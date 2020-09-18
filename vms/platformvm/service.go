@@ -153,21 +153,18 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
  ******************************************************
  */
 
-// GetBalanceArgs ...
-type GetBalanceArgs struct {
-	// Address to get the balance of
-	Address string `json:"address"`
-}
-
 // GetBalanceResponse ...
 type GetBalanceResponse struct {
 	// Balance, in nAVAX, of the address
-	Balance json.Uint64    `json:"balance"`
-	UTXOIDs []*avax.UTXOID `json:"utxoIDs"`
+	Balance            json.Uint64    `json:"balance"`
+	Unlocked           json.Uint64    `json:"unlocked"`
+	LockedStakeable    json.Uint64    `json:"lockedStakeable"`
+	LockedNotStakeable json.Uint64    `json:"lockedNotStakeable"`
+	UTXOIDs            []*avax.UTXOID `json:"utxoIDs"`
 }
 
 // GetBalance gets the balance of an address
-func (service *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, response *GetBalanceResponse) error {
+func (service *Service) GetBalance(_ *http.Request, args *api.JsonAddress, response *GetBalanceResponse) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: GetBalance called for address %s", args.Address)
 
 	// Parse to address
@@ -187,20 +184,75 @@ func (service *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, respon
 		return fmt.Errorf("couldn't get UTXO set of %s: %w", addr, err)
 	}
 
-	balance := uint64(0)
+	currentTime := service.vm.clock.Unix()
+
+	unlocked := uint64(0)
+	lockedStakeable := uint64(0)
+	lockedNotStakeable := uint64(0)
+
+utxoFor:
 	for _, utxo := range utxos {
-		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
-		if !ok {
-			// TODO: support looking up tokens that are locked.
-			continue
+		switch out := utxo.Out.(type) {
+		case *secp256k1fx.TransferOutput:
+			if out.Locktime <= currentTime {
+				newBalance, err := math.Add64(unlocked, out.Amount())
+				if err != nil {
+					return errors.New("overflow while calculating unlocked balance")
+				}
+				unlocked = newBalance
+			} else {
+				newBalance, err := math.Add64(lockedNotStakeable, out.Amount())
+				if err != nil {
+					return errors.New("overflow while calculating locked not stakeable balance")
+				}
+				lockedNotStakeable = newBalance
+			}
+		case *StakeableLockOut:
+			innerOut, ok := out.TransferableOut.(*secp256k1fx.TransferOutput)
+			if !ok {
+				service.vm.SnowmanVM.Ctx.Log.Warn("Unexpected Output type in UTXO: %T",
+					out.TransferableOut)
+				continue utxoFor
+			}
+			if innerOut.Locktime > currentTime {
+				newBalance, err := math.Add64(lockedNotStakeable, out.Amount())
+				if err != nil {
+					return errors.New("overflow while calculating locked not stakeable balance")
+				}
+				lockedNotStakeable = newBalance
+			} else if out.Locktime <= currentTime {
+				newBalance, err := math.Add64(unlocked, out.Amount())
+				if err != nil {
+					return errors.New("overflow while calculating unlocked balance")
+				}
+				unlocked = newBalance
+			} else {
+				newBalance, err := math.Add64(lockedStakeable, out.Amount())
+				if err != nil {
+					return errors.New("overflow while calculating unlocked stakeable balance")
+				}
+				lockedStakeable = newBalance
+			}
+		default:
+			continue utxoFor
 		}
-		balance, err = math.Add64(balance, out.Amount())
-		if err != nil {
-			return errors.New("overflow while calculating balance")
-		}
+
 		response.UTXOIDs = append(response.UTXOIDs, &utxo.UTXOID)
 	}
+
+	lockedBalance, err := math.Add64(lockedStakeable, lockedNotStakeable)
+	if err != nil {
+		return errors.New("overflow while calculating locked balance")
+	}
+	balance, err := math.Add64(unlocked, lockedBalance)
+	if err != nil {
+		return errors.New("overflow while calculating total balance")
+	}
+
 	response.Balance = json.Uint64(balance)
+	response.Unlocked = json.Uint64(unlocked)
+	response.LockedStakeable = json.Uint64(lockedStakeable)
+	response.LockedNotStakeable = json.Uint64(lockedNotStakeable)
 	return nil
 }
 
