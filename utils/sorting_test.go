@@ -14,7 +14,8 @@ func TestSort2dByteArray(t *testing.T) {
 	for i := 0; i < numSubArrs; i++ {
 		subArrLen := rand.Intn(maxLength) // #nosec G404
 		subArr := make([]byte, subArrLen)
-		if _, err := rand.Read(subArr); err != nil { // #nosec G404
+		_, err := rand.Read(subArr) // #nosec G404
+		if err != nil {
 			t.Fatal(err)
 		}
 		arr = append(arr, subArr)

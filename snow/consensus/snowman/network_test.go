@@ -33,9 +33,10 @@ func (n *Network) shuffleColors() {
 
 func (n *Network) Initialize(params snowball.Parameters, numColors int) {
 	n.params = params
+	// #nosec G404
 	n.colors = append(n.colors, &TestBlock{
 		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(uint64(rand.Int63())), // #nosec G404
+			IDV:     ids.Empty.Prefix(uint64(rand.Int63())),
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis,
@@ -44,9 +45,10 @@ func (n *Network) Initialize(params snowball.Parameters, numColors int) {
 
 	for i := 1; i < numColors; i++ {
 		dependency := n.colors[rand.Intn(len(n.colors))] // #nosec G404
+		// #nosec G404
 		n.colors = append(n.colors, &TestBlock{
 			TestDecidable: choices.TestDecidable{
-				IDV:     ids.Empty.Prefix(uint64(rand.Int63())), // #nosec G404
+				IDV:     ids.Empty.Prefix(uint64(rand.Int63())),
 				StatusV: choices.Processing,
 			},
 			ParentV: dependency,
