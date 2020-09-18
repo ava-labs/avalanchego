@@ -88,7 +88,7 @@ func sampleAddrs(t *testing.T, vm *VM, addrs []ids.ShortID) ([]ids.ShortID, []st
 		t.Fatal(err)
 	}
 
-	numAddrs := 1 + rand.Intn(len(addrs))
+	numAddrs := 1 + rand.Intn(len(addrs)) // #nosec G404
 	for i := 0; i < numAddrs; i++ {
 		indices, err := sampler.Sample(1)
 		if err != nil {

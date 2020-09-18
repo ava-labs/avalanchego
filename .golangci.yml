@@ -8,6 +8,7 @@ linters:
       - goimports
       - bodyclose
       - govet
+      - gosec
         #    - deadcode
         #    - errcheck
         #    - varcheck 
@@ -19,7 +20,6 @@ linters:
         #    - golint
         #    - gomnd
         #    - goprintffuncname
-        #    - gosec
         #    - ineffassign
         #    - interfacer
         #    - lll
