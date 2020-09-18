@@ -205,7 +205,6 @@ func accept(s *Socket, l net.Listener) {
 		if err != nil {
 			s.log.Error("socket nodelay error: %s", err.Error())
 		}
-
 	}
 	s.connLock.Lock()
 	s.conns[conn] = struct{}{}
