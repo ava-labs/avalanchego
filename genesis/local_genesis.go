@@ -24,8 +24,11 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u",
-				"initialAmount": 310000000000000000,
+				"initialAmount": 300000000000000000,
 				"unlockSchedule": [
+					{
+						"amount": 10000000000000000
+					},
 					{
 						"amount": 10000000000000000,
 						"locktime": 1633824000
