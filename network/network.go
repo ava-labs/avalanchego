@@ -895,7 +895,7 @@ func (n *network) attemptConnect(ip utils.IPDesc) error {
 	case *net.TCPConn:
 		err = conn.(*net.TCPConn).SetNoDelay(true)
 		if err != nil {
-			return err
+			s.log.Error("socket nodelay error: %s", err.Error())
 		}
 	}
 	return n.upgrade(&peer{
