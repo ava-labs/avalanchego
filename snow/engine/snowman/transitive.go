@@ -5,6 +5,8 @@ package snowman
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/AppsFlyer/go-sundheit/checks"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
@@ -18,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"time"
 )
 
 const (

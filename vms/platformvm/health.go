@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"fmt"
+
 	"github.com/AppsFlyer/go-sundheit/checks"
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/utils/constants"

@@ -5,10 +5,11 @@ package common
 
 import (
 	"errors"
+	"testing"
+
 	"github.com/AppsFlyer/go-sundheit/checks"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
-	"testing"
 )
 
 var (
