@@ -281,7 +281,7 @@ func (vm *VM) Initialize(
 	chain.SetOnFinalizeAndAssemble(func(state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
 		select {
 		case atx := <-vm.pendingAtomicTxs:
-			if err := atx.UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(state); err != nil {
+			if err := atx.UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(vm, state); err != nil {
 				vm.newBlockChan <- nil
 				return nil, err
 			}
@@ -323,7 +323,7 @@ func (vm *VM) Initialize(
 		if tx == nil {
 			return nil
 		}
-		return tx.UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(state)
+		return tx.UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(vm, state)
 	})
 	vm.blockCache = cache.LRU{Size: blockCacheSize}
 	vm.blockStatusCache = cache.LRU{Size: blockCacheSize}
@@ -882,7 +882,7 @@ func PublicKeyToEthAddress(pubKey crypto.PublicKey) common.Address {
 		(*pubKey.(*crypto.PublicKeySECP256K1R).ToECDSA()))
 }
 
-func (vm *VM) GetSpendableCanonical(keys []*crypto.PrivateKeySECP256K1R, amount uint64) ([]EVMInput, [][]*crypto.PrivateKeySECP256K1R, error) {
+func (vm *VM) GetSpendableCanonical(keys []*crypto.PrivateKeySECP256K1R, assetID ids.ID, amount uint64) ([]EVMInput, [][]*crypto.PrivateKeySECP256K1R, error) {
 	// NOTE: should we use HEAD block or lastAccepted?
 	state, err := vm.chain.BlockState(vm.lastAccepted.ethBlock)
 	if err != nil {
@@ -895,7 +895,12 @@ func (vm *VM) GetSpendableCanonical(keys []*crypto.PrivateKeySECP256K1R, amount 
 			break
 		}
 		addr := GetEthAddress(key)
-		balance := new(big.Int).Div(state.GetBalance(addr), x2cRate).Uint64()
+		var balance uint64
+		if assetID == vm.ctx.AVAXAssetID {
+			balance = new(big.Int).Div(state.GetBalance(addr), x2cRate).Uint64()
+		} else {
+			balance = new(big.Int).Div(state.GetBalanceMultiCoin(addr, assetID.Key()), x2cRate).Uint64()
+		}
 		if balance == 0 {
 			continue
 		}
@@ -909,6 +914,7 @@ func (vm *VM) GetSpendableCanonical(keys []*crypto.PrivateKeySECP256K1R, amount 
 		inputs = append(inputs, EVMInput{
 			Address: addr,
 			Amount:  balance,
+			AssetID: assetID,
 			Nonce:   nonce,
 		})
 		signers = append(signers, []*crypto.PrivateKeySECP256K1R{key})

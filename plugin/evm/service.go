@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/coreth"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -267,7 +268,9 @@ func (service *AvaxAPI) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 type ExportAVAXArgs struct {
 	api.UserPass
 
-	// Amount of AVAX to send
+	// AssetID of the tokens
+	AssetID ids.ID `json:"assetID"`
+	// Amount of asset to send
 	Amount json.Uint64 `json:"amount"`
 
 	// ID of the address that will receive the AVAX. This address includes the
@@ -302,8 +305,13 @@ func (service *AvaxAPI) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
 	}
 
+	assetID := service.vm.ctx.AVAXAssetID
+	if !args.AssetID.IsZero() {
+		assetID = args.AssetID
+	}
 	// Create the transaction
 	tx, err := service.vm.newExportTx(
+		assetID,             // AssetID
 		uint64(args.Amount), // Amount
 		chainID,             // ID of the chain to send the funds to
 		to,                  // Address

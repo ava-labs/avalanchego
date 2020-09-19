@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // UnsignedImportTx is an unsigned ImportTx
@@ -102,7 +103,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	fc.Produce(vm.ctx.AVAXAssetID, vm.txFee)
 
 	for _, out := range tx.Outs {
-		fc.Produce(vm.ctx.AVAXAssetID, out.Amount)
+		fc.Produce(out.AssetID, out.Amount)
 	}
 
 	for _, in := range tx.ImportedInputs {
@@ -195,12 +196,9 @@ func (vm *VM) newImportTx(
 	importedInputs := []*avax.TransferableInput{}
 	signers := [][]*crypto.PrivateKeySECP256K1R{}
 
-	importedAmount := uint64(0)
+	importedAmount := make(map[ids.ID]uint64)
 	now := vm.clock.Unix()
 	for _, utxo := range atomicUTXOs {
-		if !utxo.AssetID().Equals(vm.ctx.AVAXAssetID) {
-			continue
-		}
 		inputIntf, utxoSigners, err := kc.Spend(utxo.Out, now)
 		if err != nil {
 			continue
@@ -209,7 +207,8 @@ func (vm *VM) newImportTx(
 		if !ok {
 			continue
 		}
-		importedAmount, err = math.Add64(importedAmount, input.Amount())
+		aid := utxo.AssetID()
+		importedAmount[aid], err = math.Add64(importedAmount[aid], input.Amount())
 		if err != nil {
 			return nil, err
 		}
@@ -221,25 +220,35 @@ func (vm *VM) newImportTx(
 		signers = append(signers, utxoSigners)
 	}
 	avax.SortTransferableInputsWithSigners(importedInputs, signers)
+	importedAVAXAmount := importedAmount[vm.ctx.AVAXAssetID]
 
-	if importedAmount == 0 {
+	if importedAVAXAmount == 0 {
 		return nil, errNoFunds // No imported UTXOs were spendable
 	}
 
-	nonce, err := vm.GetAcceptedNonce(to)
-	if err != nil {
-		return nil, err
-	}
-
 	outs := []EVMOutput{}
-	if importedAmount < vm.txFee { // imported amount goes toward paying tx fee
+
+	// AVAX output
+	if importedAVAXAmount < vm.txFee { // imported amount goes toward paying tx fee
 		// TODO: spend EVM balance to compensate vm.txFee-importedAmount
 		return nil, errNoFunds
-	} else if importedAmount > vm.txFee {
+	} else if importedAVAXAmount > vm.txFee {
 		outs = append(outs, EVMOutput{
 			Address: to,
-			Amount:  importedAmount - vm.txFee,
-			Nonce:   nonce,
+			Amount:  importedAVAXAmount - vm.txFee,
+			AssetID: vm.ctx.AVAXAssetID,
+		})
+	}
+
+	// non-AVAX asset outputs
+	for aid, amount := range importedAmount {
+		if aid.Equals(vm.ctx.AVAXAssetID) || amount == 0 {
+			continue
+		}
+		outs = append(outs, EVMOutput{
+			Address: to,
+			Amount:  amount,
+			AssetID: aid,
 		})
 	}
 
@@ -258,15 +267,16 @@ func (vm *VM) newImportTx(
 	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID)
 }
 
-func (tx *UnsignedImportTx) EVMStateTransfer(state *state.StateDB) error {
+func (tx *UnsignedImportTx) EVMStateTransfer(vm *VM, state *state.StateDB) error {
 	for _, to := range tx.Outs {
-		state.AddBalance(to.Address,
-			new(big.Int).Mul(
-				new(big.Int).SetUint64(to.Amount), x2cRate))
-		if state.GetNonce(to.Address) != to.Nonce {
-			return errInvalidNonce
+		log.Info("crosschain X->C", "addr", to.Address, "amount", to.Amount)
+		amount := new(big.Int).Mul(
+			new(big.Int).SetUint64(to.Amount), x2cRate)
+		if to.AssetID == vm.ctx.AVAXAssetID {
+			state.AddBalance(to.Address, amount)
+		} else {
+			state.AddBalanceMultiCoin(to.Address, to.AssetID.Key(), amount)
 		}
-		state.SetNonce(to.Address, to.Nonce+1)
 	}
 	return nil
 }

@@ -33,14 +33,19 @@ var (
 type EVMOutput struct {
 	Address common.Address `serialize:"true" json:"address"`
 	Amount  uint64         `serialize:"true" json:"amount"`
+	AssetID ids.ID         `serialize:"true" json:"assetID"`
+}
+
+type EVMInput struct {
+	Address common.Address `serialize:"true" json:"address"`
+	Amount  uint64         `serialize:"true" json:"amount"`
+	AssetID ids.ID         `serialize:"true" json:"assetID"`
 	Nonce   uint64         `serialize:"true" json:"nonce"`
 }
 
 func (out *EVMOutput) Verify() error {
 	return nil
 }
-
-type EVMInput EVMOutput
 
 func (in *EVMInput) Verify() error {
 	return nil
@@ -66,7 +71,7 @@ type UnsignedAtomicTx interface {
 	// Accept this transaction with the additionally provided state transitions.
 	Accept(ctx *snow.Context, batch database.Batch) error
 
-	EVMStateTransfer(state *state.StateDB) error
+	EVMStateTransfer(vm *VM, state *state.StateDB) error
 }
 
 // Tx is a signed transaction
