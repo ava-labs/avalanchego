@@ -187,7 +187,7 @@ func init() {
 	// Minimum stake, in nAVAX, that can be delegated on the primary network
 	fs.Uint64Var(&Config.MinDelegatorStake, "min-delegator-stake", 25*units.Avax, "Minimum stake, in nAVAX, that can be delegated on the primary network")
 
-	minDelegatorFee := fs.Uint64("min-delegator-fee", 0, "Minimum delegation fee, in the range [0, 1000000], that can be charged for delegation on the primary network")
+	minDelegationFee := fs.Uint64("min-delegation-fee", 0, "Minimum delegation fee, in the range [0, 1000000], that can be charged for delegation on the primary network")
 
 	// Minimum staking duration in nanoseconds
 	minStakeDuration := fs.Uint64("min-stake-duration", uint64(24*time.Hour/time.Second), "Minimum staking duration, in seconds")
@@ -538,8 +538,8 @@ func init() {
 	Config.MaxStakeDuration = time.Duration(*maxStakeDuration) * time.Second
 	Config.StakeMintingPeriod = time.Duration(*stakeMintingPeriod) * time.Second
 
-	if *minDelegatorFee > 1000000 {
+	if *minDelegationFee > 1000000 {
 		errs.Add(errors.New("delegation fee must be in the range [0, 1000000]"))
 	}
-	Config.MinDelegatorFee = uint32(*minDelegatorFee)
+	Config.MinDelegationFee = uint32(*minDelegationFee)
 }

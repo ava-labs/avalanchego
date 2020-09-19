@@ -173673,7 +173673,7 @@ var (
 		"startTime": 1599696000,
 		"initialStakeDuration": 7776000,
 		"initialStakeDurationOffset": 5400,
-		"initialStakeAddresses": [
+		"initialStakedFunds": [
 			"X-avax1fqzdqvgl5s6ecudgedv9d062pyamew45h76ary",
 			"X-avax1dw3uga7amvjh7vuxyuffhnkvaqc66uyepqcx93",
 			"X-avax1cnrgn3p08xzj8cnm2xclafa53x6d637tfe9ead",
@@ -174829,159 +174829,382 @@ var (
 			"X-avax1d2xy8cf5vm456qr3atpv4hheeeyatqzaz5cqvu",
 			"X-avax156m2mfk0xw0afxuwjjn6kglys509yayvq0x4n8"
 		],
-		"initialStakeNodeIDs": [
-			"NodeID-A6onFGyJjA37EZ7kYHANMR1PFRT8NmXrF",
-			"NodeID-6SwnPJLH8cWfrJ162JjZekbmzaFpjPcf",
-			"NodeID-GSgaA47umS1px2ohVjodW9621Ks63xDxD",
-			"NodeID-BQEo5Fy1FRKLbX51ejqDd14cuSXJKArH2",
-			"NodeID-Drv1Qh7iJvW3zGBBeRnYfCzk56VCRM2GQ",
-			"NodeID-DAtCoXfLT6Y83dgJ7FmQg8eR53hz37J79",
-			"NodeID-FGRoKnyYKFWYFMb6Xbocf4hKuyCBENgWM",
-			"NodeID-Dw7tuwxpAmcpvVGp9JzaHAR3REPoJ8f2R",
-			"NodeID-4kCLS16Wy73nt1Zm54jFZsL7Msrv3UCeJ",
-			"NodeID-9T7NXBFpp8LWCyc58YdKNoowDipdVKAWz",
-			"NodeID-6ghBh6yof5ouMCya2n9fHzhpWouiZFVVj",
-			"NodeID-HiFv1DpKXkAAfJ1NHWVqQoojjznibZXHP",
-			"NodeID-Fv3t2shrpkmvLnvNzcv1rqRKbDAYFnUor",
-			"NodeID-AaxT2P4uuPAHb7vAD8mNvjQ3jgyaV7tu9",
-			"NodeID-kZNuQMHhydefgnwjYX1fhHMpRNAs9my1",
-			"NodeID-A7GwTSd47AcDVqpTVj7YtxtjHREM33EJw",
-			"NodeID-Hr78Fy8uDYiRYocRYHXp4eLCYeb8x5UuM",
-			"NodeID-9CkG9MBNavnw7EVSRsuFr7ws9gascDQy3",
-			"NodeID-A8jypu63CWp76STwKdqP6e9hjL675kdiG",
-			"NodeID-HsBEx3L71EHWSXaE6gvk2VsNntFEZsxqc",
-			"NodeID-Nr584bLpGgbCUbZFSBaBz3Xum5wpca9Ym",
-			"NodeID-QKGoUvqcgormCoMj6yPw9isY7DX9H4mdd",
-			"NodeID-HCw7S2TVbFPDWNBo1GnFWqJ47f9rDJtt1",
-			"NodeID-FYv1Lb29SqMpywYXH7yNkcFAzRF2jvm3K",
-			"NodeID-7Coo9eki57kLLpAomUeKHR49DVDtve1rW",
-			"NodeID-GXrrnggKkYmEsNLFc7utBekRjdz1pBr94",
-			"NodeID-NJxR7FwisMtZ3GAXA6jfwyycdqgLD6u6w",
-			"NodeID-4ZtjFSZbyaBH7VYmpzv9itjjnCUXXB4SJ",
-			"NodeID-KLgc2i9FqXWjvCc7cX9V1WRYejNu9Skr5",
-			"NodeID-FVtZkETZyHPgX4i3VXKAA7VPsNP9PGdyy",
-			"NodeID-MKzXHL5FgrZ92RfjZx76X9QWCw1Z9XUhs",
-			"NodeID-KcGCZ7uJDU1RUpfr4bm8eXiSxF85iBaSS",
-			"NodeID-HntcdvtNyPvtfSBn7RCdVEJbCZuhVHMrc",
-			"NodeID-4THSbiM2YZQUyYSseUN9w9suaG3xmPs6R",
-			"NodeID-5Zu8Jxbg6HDzqUFPLTakFydb1ToAwqde8",
-			"NodeID-J7FNHrEt2AX5Zos6PxWxaPiKBUkxUAxqE",
-			"NodeID-Pu5SGCYS3hxAeqCtmuP82mFVTDQAmzWeF",
-			"NodeID-F2gXNmQE8HbhD8wJZYK3E466WkMDovNhW",
-			"NodeID-GcU6q4WWVnaBwAfeuKWohbsUDb6vcphNp",
-			"NodeID-Bn3EzrkXLAZ2R9JwE9iQzbwDLaRdoPbJm",
-			"NodeID-DEAQLJUAQnGcDYAejsL4aestnx6EcGMDC",
-			"NodeID-JpSbAFWbh6BSMHaLBeeVy8GUUyBJfx2HZ",
-			"NodeID-MAv2M27MKWWygQ4mfDH3HArr3Sx2z7EFS",
-			"NodeID-87VEJfHfQemDd9kf7vWpBTTJwEADiPwSx",
-			"NodeID-Lvvtgieb1ugbhF9XxBMWHtcb2kBwqzb9u",
-			"NodeID-4C14DCL7eKVSnnvzN5X3EupQhMru7BCoJ",
-			"NodeID-M7MLNJeXMtJT5hURJkmnnrp6g3nzrkBq3",
-			"NodeID-5tMfoV9w5aRZsvUicCnpvbG3YiYmxJtwq",
-			"NodeID-AFZ1tj1U2N8A7yfDgaZs5F3nZLSakrkKZ",
-			"NodeID-BZagW7bQN98PeqvTDsEyx4NAC6iwxAaDD",
-			"NodeID-NT7j7scLgNmdUcA3wLBfLGhHZyLFQgXWJ",
-			"NodeID-5UsA7b3WUcVMZY6cHrd6YE19QvrMsgCL4",
-			"NodeID-3h8popa4K8WLgXLtgbF8j5botxZn9pxCk",
-			"NodeID-2KoiHvgF4w3vpcpCQJx1TS1jhvUNUv1Di",
-			"NodeID-oHepztt2XZVe4hNEdcDTRPLDFe1dDrvv",
-			"NodeID-EhfEzYtoLFvi9jxGVsuUm9Cxp17XP9KTV",
-			"NodeID-F39j9w849PybQ77ZTW7yT5vwW4RqvLDU7",
-			"NodeID-CjATSW5HDSDDmMW3WBsxFZVmmHxJhPaLf",
-			"NodeID-FzoZsxHsZ9fvQweVLYCRkrxhNA9871va5",
-			"NodeID-D87m2bQzEg9rquqT72zHp9BffaismCzKJ",
-			"NodeID-P1t1oaVm3jFpJpULAp3kjbpoXCWdqfQzs",
-			"NodeID-29sgUazwvdr4UWUw7twNtxdPsgRa4Qtyx",
-			"NodeID-738ej1TyMQDVYfCnYbWpnfkPtrqYMDx1i",
-			"NodeID-A68KFvmn6kR4q5XAvEyHseFaKZWEr4hVY",
-			"NodeID-LC2MkvPkGBwehNYZ4UZ83MFQ7rPPQrhsc",
-			"NodeID-MeFQ9uUwZaTxES5dZyxmChwUpnj6CWDBh",
-			"NodeID-KJWaiZPLcgCW6iPvKYTE1ekMZ6F9G9NLa",
-			"NodeID-6u8G2WE6Kb3K6d1fXWmFQyDBoL4dGnCN",
-			"NodeID-J8RBUNXW3pXWyr6Wk7x3GTDntHxcR2vJF",
-			"NodeID-PocSTWaz3HJLcnpKVR3MUmaE8zc9nJPzg",
-			"NodeID-NNCuqkczH7E13ob75z9bZh86jWaH3ZjYA",
-			"NodeID-FjXxUM6axBx1GSiatQdqeF1YgZQzpmbkE",
-			"NodeID-6iresvQ2F4jrjYAR8ZL4HBrM5bFYvPvyr",
-			"NodeID-BHK7drcmNhLnePTFwWXaQNRMVB4MrJLzU",
-			"NodeID-L7WQizfKW9Y1GZdL9oxKtp5QzgYhViySP"
-		],
-		"initialStakeRewardAddresses": [
-			"X-avax1fqzdqvgl5s6ecudgedv9d062pyamew45h76ary",
-			"X-avax1dw3uga7amvjh7vuxyuffhnkvaqc66uyepqcx93",
-			"X-avax1cnrgn3p08xzj8cnm2xclafa53x6d637tfe9ead",
-			"X-avax1dkqpvgcxc66gawr09uym46299vg05zt8zwrfxk",
-			"X-avax1u6qxhl5775yzslxpjvptw966vs55f2rg38x8qh",
-			"X-avax1d7duc6yhvegd4llvazz5dua7ghe99c0tfqu5tr",
-			"X-avax1smn9pxpapmajnu0en25fqe5x20pjk2xu7hz64c",
-			"X-avax1qvr55wtdxsa22zt7f7huex2sldclzelaqa5qjc",
-			"X-avax196lc30ya0mmqlm6arwuhtdx6s9rwa0fnvftc9j",
-			"X-avax1y6a0czgt40td093gxcn8zh0fw6cgc0d0ywse6g",
-			"X-avax1jfz8rd9s7cgv45l0e659pjfke6jd6sj303xav7",
-			"X-avax1a8kdxjxadcf9vwxh857w2k6rndpk36n9x2femh",
-			"X-avax150ugp7j6464hv8juv86zcgmayhwjaarkys68f6",
-			"X-avax1zk8v3duznw376pjpjw6dmpqag7wrzjlc276haz",
-			"X-avax13u2czku0xj5x0q8jm28ksupgkqrkvwze8nsvkq",
-			"X-avax1wxe6fugcuatgk07cgjeea6ju2x2thkhhm94wyp",
-			"X-avax1z07a7szd7spj9jmvtf6yg37vc009szga0rueaa",
-			"X-avax1jzr49l27twces7s4uks0sxqut7jhrys4ctk309",
-			"X-avax1lh6ujdrgrywm9l5vjrgcqhd3c2w80q70ls4raw",
-			"X-avax144wptphlhsdy8yu423acq6m29mvfgnz4het0u4",
-			"X-avax1axhrvc004m3670vtfd4fzx8sfp6na69ncmljh0",
-			"X-avax15zdfp5ca2d8rhxgs3whyzf4xvsymurvjmgc7hg",
-			"X-avax1c669n9mvfrdrlp6rlrdglrdzn5u02y88lxpd9p",
-			"X-avax1revjtp5mtek9jrq5t07l6jhqzyce2yf6ajlypx",
-			"X-avax1gk7jltxpsq6ny2myrlpp9jr8w3rzjvnwguc855",
-			"X-avax1x857w0g3tzc2vqy2e79mr3u56dw7m0g63vk964",
-			"X-avax1jxf09g3dtx28rhyv4pzps3tlrpl466yyt0swut",
-			"X-avax1xjpw8u95v7a65545ryknlnjqfa9retz94s4r8t",
-			"X-avax1wzw46c75sy9crhykqhhqqu7e85hc5mshqsj505",
-			"X-avax1ck85javta3aplkj9d22ldj0d5tvnq0ddmyg0rq",
-			"X-avax1ys7t3wscdvktne54fve9m4hm9fqmkj25zl4azy",
-			"X-avax1fhcg48maaj7az3wylrucwzzp6dtw5flumddcrx",
-			"X-avax1p5r80sfjg6z2r90svfxrxv9m42ysv2fr5grxaw",
-			"X-avax19m7pz5edmppvrtq5fdkj5h3pvk3v4q2q5urrw5",
-			"X-avax1zt6fupzjkty0c3nktepc4g2xl4gkqw9k3glvzk",
-			"X-avax1d4nx6y2td2e9z620gs34w4wrsllspyewrv4k89",
-			"X-avax1mpxtqddk7zdceyewty93fpcg9npv6ryp5j62fl",
-			"X-avax17rlqm2nmvvth46kva8dnm7sezsh5yr3whc0nqz",
-			"X-avax1dks5428yz35pqxczwqa2wq2g3g0f7z0uwyhq6u",
-			"X-avax1hmpvuf4jx5u524c78azzpcc78gq6xmtkk0k2m7",
-			"X-avax1ptemw86xzltp0tnzv32sk9nqc4vjkalxnys4ml",
-			"X-avax19anyn4lzpj8zpc5m2w2cgyq3fqy38462lma4e2",
-			"X-avax1wd8lrvauu2assw8e4866ex909extrlnte407j4",
-			"X-avax1w47uwv5mtfm9j4vxkz9u4vjsctvxpv6lu2606z",
-			"X-avax1qg0zsa08t0jce2u5jypds96pven89hywap7qk6",
-			"X-avax15ucjzvev2wxt8rdnt7yzx33fpupstkzewhu89v",
-			"X-avax19sqkumhs3ctkemevs7f5qs4fhnf2mqtj8zvu77",
-			"X-avax17aq4v7wtxpmvf6mykye45nhm4rsmn5vrt07sas",
-			"X-avax1eaa2tlrdn0umrvjnwcy550ctt0vuug9h0wx8pt",
-			"X-avax1lmg4yu7v7vj0wfqhwyyyt6e09kvcdyg04h8f5g",
-			"X-avax16n3us3sr4ujmtekq97k8aw76kg383v0f4876se",
-			"X-avax1rfp6u7xtw3gyuqp24x4d03vvp55wvah48g3n4u",
-			"X-avax1phjfpes330dlw8lkm6l6xavlcpxryh48xwms2e",
-			"X-avax14t6kxxma7809n2tzmpher2xc5dr086d783sqht",
-			"X-avax1d2dgpu02vhsglkgsus63zqgdr7hsqf72pw4aay",
-			"X-avax150w778eehzujjvsavrql02n4hwsvqmaned0j84",
-			"X-avax1y2l3yh6k4wmgjplpt2034lm84r2zyrjddhv79k",
-			"X-avax1hxdhdjrctsj5vfwpt2cdnzq4fqw3cjfu55yx0g",
-			"X-avax1r22hxff62e0lka238yw2aa0753mdgyza0z04gx",
-			"X-avax1r65rnfnfjju8zqyyzt5l20kc286w067kchxmh5",
-			"X-avax1gu25jq6j735zf00f83xj9rpjnv7c2zqrztygdl",
-			"X-avax12mp7g5x3ta3p5yzgmy7cpsdstglru3cpn5ruxa",
-			"X-avax1p7024sqwddv22tl2zxne8yvpyquj9u80hhj7js",
-			"X-avax1960xrhnr8rhupkxwtdek442492sty2cvmehj2e",
-			"X-avax17e8jhv8vzpqvj35u57t3vlzwcpjxk2u45v9vje",
-			"X-avax187fszjhzxd7a7ps7qtrklkuq5z4drdtuenxqqz",
-			"X-avax17mq454sp3f20k9mtf84ey5uk3sm2ukx8j25nnu",
-			"X-avax15wve78f054g3m5mj7nrzpgp5049y2h99puepl0",
-			"X-avax1qkr4u74kuaknn329sp5ehj8q75xsjjzgpw4jq3",
-			"X-avax1nxcje6sawq0zrl55nmtk2axpn7dmu4dvz67qaf",
-			"X-avax1wr66skd07szt7jvu999p073qyst08y76me8jxu",
-			"X-avax1anflkvlkdpkvv32e4raq0slmvjhsvgd6new65n",
-			"X-avax17g0styj3u99ekpn4nt7au82pqulzu6vhy2ry35",
-			"X-avax1un3ll2vycqct5sa8usuxq7lzu2ruyptsnw5h6v",
-			"X-avax1406mdpm8c8lh4mv8w88egvh8z40zf52fp44m0w"
+		"initialStakers": [
+			{
+				"nodeID": "NodeID-A6onFGyJjA37EZ7kYHANMR1PFRT8NmXrF",
+				"rewardAddress": "X-avax1fqzdqvgl5s6ecudgedv9d062pyamew45h76ary",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-6SwnPJLH8cWfrJ162JjZekbmzaFpjPcf",
+				"rewardAddress": "X-avax1dw3uga7amvjh7vuxyuffhnkvaqc66uyepqcx93",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-GSgaA47umS1px2ohVjodW9621Ks63xDxD",
+				"rewardAddress": "X-avax1cnrgn3p08xzj8cnm2xclafa53x6d637tfe9ead",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-BQEo5Fy1FRKLbX51ejqDd14cuSXJKArH2",
+				"rewardAddress": "X-avax1dkqpvgcxc66gawr09uym46299vg05zt8zwrfxk",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-Drv1Qh7iJvW3zGBBeRnYfCzk56VCRM2GQ",
+				"rewardAddress": "X-avax1u6qxhl5775yzslxpjvptw966vs55f2rg38x8qh",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-DAtCoXfLT6Y83dgJ7FmQg8eR53hz37J79",
+				"rewardAddress": "X-avax1d7duc6yhvegd4llvazz5dua7ghe99c0tfqu5tr",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-FGRoKnyYKFWYFMb6Xbocf4hKuyCBENgWM",
+				"rewardAddress": "X-avax1smn9pxpapmajnu0en25fqe5x20pjk2xu7hz64c",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-Dw7tuwxpAmcpvVGp9JzaHAR3REPoJ8f2R",
+				"rewardAddress": "X-avax1qvr55wtdxsa22zt7f7huex2sldclzelaqa5qjc",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-4kCLS16Wy73nt1Zm54jFZsL7Msrv3UCeJ",
+				"rewardAddress": "X-avax196lc30ya0mmqlm6arwuhtdx6s9rwa0fnvftc9j",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-9T7NXBFpp8LWCyc58YdKNoowDipdVKAWz",
+				"rewardAddress": "X-avax1y6a0czgt40td093gxcn8zh0fw6cgc0d0ywse6g",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-6ghBh6yof5ouMCya2n9fHzhpWouiZFVVj",
+				"rewardAddress": "X-avax1jfz8rd9s7cgv45l0e659pjfke6jd6sj303xav7",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-HiFv1DpKXkAAfJ1NHWVqQoojjznibZXHP",
+				"rewardAddress": "X-avax1a8kdxjxadcf9vwxh857w2k6rndpk36n9x2femh",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-Fv3t2shrpkmvLnvNzcv1rqRKbDAYFnUor",
+				"rewardAddress": "X-avax150ugp7j6464hv8juv86zcgmayhwjaarkys68f6",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-AaxT2P4uuPAHb7vAD8mNvjQ3jgyaV7tu9",
+				"rewardAddress": "X-avax1zk8v3duznw376pjpjw6dmpqag7wrzjlc276haz",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-kZNuQMHhydefgnwjYX1fhHMpRNAs9my1",
+				"rewardAddress": "X-avax13u2czku0xj5x0q8jm28ksupgkqrkvwze8nsvkq",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-A7GwTSd47AcDVqpTVj7YtxtjHREM33EJw",
+				"rewardAddress": "X-avax1wxe6fugcuatgk07cgjeea6ju2x2thkhhm94wyp",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-Hr78Fy8uDYiRYocRYHXp4eLCYeb8x5UuM",
+				"rewardAddress": "X-avax1z07a7szd7spj9jmvtf6yg37vc009szga0rueaa",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-9CkG9MBNavnw7EVSRsuFr7ws9gascDQy3",
+				"rewardAddress": "X-avax1jzr49l27twces7s4uks0sxqut7jhrys4ctk309",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-A8jypu63CWp76STwKdqP6e9hjL675kdiG",
+				"rewardAddress": "X-avax1lh6ujdrgrywm9l5vjrgcqhd3c2w80q70ls4raw",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-HsBEx3L71EHWSXaE6gvk2VsNntFEZsxqc",
+				"rewardAddress": "X-avax144wptphlhsdy8yu423acq6m29mvfgnz4het0u4",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-Nr584bLpGgbCUbZFSBaBz3Xum5wpca9Ym",
+				"rewardAddress": "X-avax1axhrvc004m3670vtfd4fzx8sfp6na69ncmljh0",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-QKGoUvqcgormCoMj6yPw9isY7DX9H4mdd",
+				"rewardAddress": "X-avax15zdfp5ca2d8rhxgs3whyzf4xvsymurvjmgc7hg",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-HCw7S2TVbFPDWNBo1GnFWqJ47f9rDJtt1",
+				"rewardAddress": "X-avax1c669n9mvfrdrlp6rlrdglrdzn5u02y88lxpd9p",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-FYv1Lb29SqMpywYXH7yNkcFAzRF2jvm3K",
+				"rewardAddress": "X-avax1revjtp5mtek9jrq5t07l6jhqzyce2yf6ajlypx",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-7Coo9eki57kLLpAomUeKHR49DVDtve1rW",
+				"rewardAddress": "X-avax1gk7jltxpsq6ny2myrlpp9jr8w3rzjvnwguc855",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-GXrrnggKkYmEsNLFc7utBekRjdz1pBr94",
+				"rewardAddress": "X-avax1x857w0g3tzc2vqy2e79mr3u56dw7m0g63vk964",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-NJxR7FwisMtZ3GAXA6jfwyycdqgLD6u6w",
+				"rewardAddress": "X-avax1jxf09g3dtx28rhyv4pzps3tlrpl466yyt0swut",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-4ZtjFSZbyaBH7VYmpzv9itjjnCUXXB4SJ",
+				"rewardAddress": "X-avax1xjpw8u95v7a65545ryknlnjqfa9retz94s4r8t",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-KLgc2i9FqXWjvCc7cX9V1WRYejNu9Skr5",
+				"rewardAddress": "X-avax1wzw46c75sy9crhykqhhqqu7e85hc5mshqsj505",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-FVtZkETZyHPgX4i3VXKAA7VPsNP9PGdyy",
+				"rewardAddress": "X-avax1ck85javta3aplkj9d22ldj0d5tvnq0ddmyg0rq",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-MKzXHL5FgrZ92RfjZx76X9QWCw1Z9XUhs",
+				"rewardAddress": "X-avax1ys7t3wscdvktne54fve9m4hm9fqmkj25zl4azy",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-KcGCZ7uJDU1RUpfr4bm8eXiSxF85iBaSS",
+				"rewardAddress": "X-avax1fhcg48maaj7az3wylrucwzzp6dtw5flumddcrx",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-HntcdvtNyPvtfSBn7RCdVEJbCZuhVHMrc",
+				"rewardAddress": "X-avax1p5r80sfjg6z2r90svfxrxv9m42ysv2fr5grxaw",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-4THSbiM2YZQUyYSseUN9w9suaG3xmPs6R",
+				"rewardAddress": "X-avax19m7pz5edmppvrtq5fdkj5h3pvk3v4q2q5urrw5",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-5Zu8Jxbg6HDzqUFPLTakFydb1ToAwqde8",
+				"rewardAddress": "X-avax1zt6fupzjkty0c3nktepc4g2xl4gkqw9k3glvzk",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-J7FNHrEt2AX5Zos6PxWxaPiKBUkxUAxqE",
+				"rewardAddress": "X-avax1d4nx6y2td2e9z620gs34w4wrsllspyewrv4k89",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-Pu5SGCYS3hxAeqCtmuP82mFVTDQAmzWeF",
+				"rewardAddress": "X-avax1mpxtqddk7zdceyewty93fpcg9npv6ryp5j62fl",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-F2gXNmQE8HbhD8wJZYK3E466WkMDovNhW",
+				"rewardAddress": "X-avax17rlqm2nmvvth46kva8dnm7sezsh5yr3whc0nqz",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-GcU6q4WWVnaBwAfeuKWohbsUDb6vcphNp",
+				"rewardAddress": "X-avax1dks5428yz35pqxczwqa2wq2g3g0f7z0uwyhq6u",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-Bn3EzrkXLAZ2R9JwE9iQzbwDLaRdoPbJm",
+				"rewardAddress": "X-avax1hmpvuf4jx5u524c78azzpcc78gq6xmtkk0k2m7",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-DEAQLJUAQnGcDYAejsL4aestnx6EcGMDC",
+				"rewardAddress": "X-avax1ptemw86xzltp0tnzv32sk9nqc4vjkalxnys4ml",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-JpSbAFWbh6BSMHaLBeeVy8GUUyBJfx2HZ",
+				"rewardAddress": "X-avax19anyn4lzpj8zpc5m2w2cgyq3fqy38462lma4e2",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-MAv2M27MKWWygQ4mfDH3HArr3Sx2z7EFS",
+				"rewardAddress": "X-avax1wd8lrvauu2assw8e4866ex909extrlnte407j4",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-87VEJfHfQemDd9kf7vWpBTTJwEADiPwSx",
+				"rewardAddress": "X-avax1w47uwv5mtfm9j4vxkz9u4vjsctvxpv6lu2606z",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-Lvvtgieb1ugbhF9XxBMWHtcb2kBwqzb9u",
+				"rewardAddress": "X-avax1qg0zsa08t0jce2u5jypds96pven89hywap7qk6",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-4C14DCL7eKVSnnvzN5X3EupQhMru7BCoJ",
+				"rewardAddress": "X-avax15ucjzvev2wxt8rdnt7yzx33fpupstkzewhu89v",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-M7MLNJeXMtJT5hURJkmnnrp6g3nzrkBq3",
+				"rewardAddress": "X-avax19sqkumhs3ctkemevs7f5qs4fhnf2mqtj8zvu77",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-5tMfoV9w5aRZsvUicCnpvbG3YiYmxJtwq",
+				"rewardAddress": "X-avax17aq4v7wtxpmvf6mykye45nhm4rsmn5vrt07sas",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-AFZ1tj1U2N8A7yfDgaZs5F3nZLSakrkKZ",
+				"rewardAddress": "X-avax1eaa2tlrdn0umrvjnwcy550ctt0vuug9h0wx8pt",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-BZagW7bQN98PeqvTDsEyx4NAC6iwxAaDD",
+				"rewardAddress": "X-avax1lmg4yu7v7vj0wfqhwyyyt6e09kvcdyg04h8f5g",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-NT7j7scLgNmdUcA3wLBfLGhHZyLFQgXWJ",
+				"rewardAddress": "X-avax16n3us3sr4ujmtekq97k8aw76kg383v0f4876se",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-5UsA7b3WUcVMZY6cHrd6YE19QvrMsgCL4",
+				"rewardAddress": "X-avax1rfp6u7xtw3gyuqp24x4d03vvp55wvah48g3n4u",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-3h8popa4K8WLgXLtgbF8j5botxZn9pxCk",
+				"rewardAddress": "X-avax1phjfpes330dlw8lkm6l6xavlcpxryh48xwms2e",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-2KoiHvgF4w3vpcpCQJx1TS1jhvUNUv1Di",
+				"rewardAddress": "X-avax14t6kxxma7809n2tzmpher2xc5dr086d783sqht",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-oHepztt2XZVe4hNEdcDTRPLDFe1dDrvv",
+				"rewardAddress": "X-avax1d2dgpu02vhsglkgsus63zqgdr7hsqf72pw4aay",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-EhfEzYtoLFvi9jxGVsuUm9Cxp17XP9KTV",
+				"rewardAddress": "X-avax150w778eehzujjvsavrql02n4hwsvqmaned0j84",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-F39j9w849PybQ77ZTW7yT5vwW4RqvLDU7",
+				"rewardAddress": "X-avax1y2l3yh6k4wmgjplpt2034lm84r2zyrjddhv79k",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-CjATSW5HDSDDmMW3WBsxFZVmmHxJhPaLf",
+				"rewardAddress": "X-avax1hxdhdjrctsj5vfwpt2cdnzq4fqw3cjfu55yx0g",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-FzoZsxHsZ9fvQweVLYCRkrxhNA9871va5",
+				"rewardAddress": "X-avax1r22hxff62e0lka238yw2aa0753mdgyza0z04gx",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-D87m2bQzEg9rquqT72zHp9BffaismCzKJ",
+				"rewardAddress": "X-avax1r65rnfnfjju8zqyyzt5l20kc286w067kchxmh5",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-P1t1oaVm3jFpJpULAp3kjbpoXCWdqfQzs",
+				"rewardAddress": "X-avax1gu25jq6j735zf00f83xj9rpjnv7c2zqrztygdl",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-29sgUazwvdr4UWUw7twNtxdPsgRa4Qtyx",
+				"rewardAddress": "X-avax12mp7g5x3ta3p5yzgmy7cpsdstglru3cpn5ruxa",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-738ej1TyMQDVYfCnYbWpnfkPtrqYMDx1i",
+				"rewardAddress": "X-avax1p7024sqwddv22tl2zxne8yvpyquj9u80hhj7js",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-A68KFvmn6kR4q5XAvEyHseFaKZWEr4hVY",
+				"rewardAddress": "X-avax1960xrhnr8rhupkxwtdek442492sty2cvmehj2e",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-LC2MkvPkGBwehNYZ4UZ83MFQ7rPPQrhsc",
+				"rewardAddress": "X-avax17e8jhv8vzpqvj35u57t3vlzwcpjxk2u45v9vje",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-MeFQ9uUwZaTxES5dZyxmChwUpnj6CWDBh",
+				"rewardAddress": "X-avax187fszjhzxd7a7ps7qtrklkuq5z4drdtuenxqqz",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-KJWaiZPLcgCW6iPvKYTE1ekMZ6F9G9NLa",
+				"rewardAddress": "X-avax17mq454sp3f20k9mtf84ey5uk3sm2ukx8j25nnu",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-6u8G2WE6Kb3K6d1fXWmFQyDBoL4dGnCN",
+				"rewardAddress": "X-avax15wve78f054g3m5mj7nrzpgp5049y2h99puepl0",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-J8RBUNXW3pXWyr6Wk7x3GTDntHxcR2vJF",
+				"rewardAddress": "X-avax1qkr4u74kuaknn329sp5ehj8q75xsjjzgpw4jq3",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-PocSTWaz3HJLcnpKVR3MUmaE8zc9nJPzg",
+				"rewardAddress": "X-avax1nxcje6sawq0zrl55nmtk2axpn7dmu4dvz67qaf",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-NNCuqkczH7E13ob75z9bZh86jWaH3ZjYA",
+				"rewardAddress": "X-avax1wr66skd07szt7jvu999p073qyst08y76me8jxu",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-FjXxUM6axBx1GSiatQdqeF1YgZQzpmbkE",
+				"rewardAddress": "X-avax1anflkvlkdpkvv32e4raq0slmvjhsvgd6new65n",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-6iresvQ2F4jrjYAR8ZL4HBrM5bFYvPvyr",
+				"rewardAddress": "X-avax17g0styj3u99ekpn4nt7au82pqulzu6vhy2ry35",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-BHK7drcmNhLnePTFwWXaQNRMVB4MrJLzU",
+				"rewardAddress": "X-avax1un3ll2vycqct5sa8usuxq7lzu2ruyptsnw5h6v",
+				"delegationFee": 200000
+			},
+			{
+				"nodeID": "NodeID-L7WQizfKW9Y1GZdL9oxKtp5QzgYhViySP",
+				"rewardAddress": "X-avax1406mdpm8c8lh4mv8w88egvh8z40zf52fp44m0w",
+				"delegationFee": 200000
+			}
 		],
 		"cChainGenesis": "{\"config\":{\"chainId\":43113,\"homesteadBlock\":0,\"daoForkBlock\":0,\"daoForkSupport\":true,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x730000000000000000000000000000000000000000301460806040526004361061004b5760003560e01c80631e01043914610050578063abb24ba014610092578063b6510bb3146100a9575b600080fd5b61007c6004803603602081101561006657600080fd5b8101908080359060200190929190505050610118565b6040518082815260200191505060405180910390f35b81801561009e57600080fd5b506100a761013b565b005b8180156100b557600080fd5b50610116600480360360808110156100cc57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff16906020019092919080359060200190929190803590602001909291908035906020019092919050505061013e565b005b60003073ffffffffffffffffffffffffffffffffffffffff1682905d9050919050565b5c565b8373ffffffffffffffffffffffffffffffffffffffff1681836108fc8690811502906040516000604051808303818888878c8af69550505050505015801561018a573d6000803e3d6000fd5b505050505056fea2646970667358221220ed2100d6623a884d196eceefabe5e03da4309a2562bb25262f3874f1acb31cd764736f6c634300060a0033\",\"balance\":\"0x0\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}",
 		"message": "Behind the Vast Market Rally: A Tumbling Dollar."

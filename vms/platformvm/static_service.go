@@ -66,12 +66,13 @@ type APIOwner struct {
 type APIPrimaryValidator struct {
 	APIStaker
 	// The owner the staking reward, if applicable, will go to
-	RewardOwner     *APIOwner     `json:"rewardOwner,omitempty"`
-	PotentialReward *json.Uint64  `json:"potentialReward,omitempty"`
-	DelegationFee   json.Float32  `json:"delegationFee"`
-	Uptime          *json.Float32 `json:"uptime,omitempty"`
-	Connected       *bool         `json:"connected,omitempty"`
-	Staked          []APIUTXO     `json:"staked,omitempty"`
+	RewardOwner        *APIOwner     `json:"rewardOwner,omitempty"`
+	PotentialReward    *json.Uint64  `json:"potentialReward,omitempty"`
+	DelegationFee      json.Float32  `json:"delegationFee"`
+	ExactDelegationFee *json.Uint32  `json:"exactDelegationFee,omitempty"`
+	Uptime             *json.Float32 `json:"uptime,omitempty"`
+	Connected          *bool         `json:"connected,omitempty"`
+	Staked             []APIUTXO     `json:"staked,omitempty"`
 }
 
 // APIPrimaryDelegator is the repr. of a primary network delegator sent over APIs.
@@ -275,6 +276,11 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		}
 		ids.SortShortIDs(owner.Addrs)
 
+		delegationFee := uint32(0)
+		if validator.ExactDelegationFee != nil {
+			delegationFee = uint32(*validator.ExactDelegationFee)
+		}
+
 		tx := &Tx{UnsignedTx: &UnsignedAddValidatorTx{
 			BaseTx: BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    uint32(args.NetworkID),
@@ -288,6 +294,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			},
 			Stake:        stake,
 			RewardsOwner: owner,
+			Shares:       delegationFee,
 		}}
 		if err := tx.Sign(GenesisCodec, nil); err != nil {
 			return err

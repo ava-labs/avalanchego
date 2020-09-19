@@ -39,7 +39,7 @@ type Config struct {
 
 	// Minimum delegation fee, in the range [0, 1000000], that can be charged
 	// for delegation on the primary network.
-	MinDelegatorFee uint32
+	MinDelegationFee uint32
 
 	// MinStakeDuration is the minimum amount of time a validator can validate
 	// for in a single period.
