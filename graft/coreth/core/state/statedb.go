@@ -425,6 +425,9 @@ func (s *StateDB) SetBalance(addr common.Address, amount *big.Int) {
 
 // AddBalance adds amount to the account associated with addr.
 func (s *StateDB) AddBalanceMultiCoin(addr common.Address, coinID common.Hash, amount *big.Int) {
+	if !s.IsMultiCoin(addr) {
+		s.EnableMultiCoin(addr)
+	}
 	stateObject := s.GetOrNewStateObject(addr)
 	if stateObject != nil {
 		stateObject.AddBalanceMultiCoin(coinID, amount, s.db)
