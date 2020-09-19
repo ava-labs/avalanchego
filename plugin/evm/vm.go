@@ -890,6 +890,8 @@ func (vm *VM) GetSpendableCanonical(keys []*crypto.PrivateKeySECP256K1R, assetID
 	}
 	inputs := []EVMInput{}
 	signers := [][]*crypto.PrivateKeySECP256K1R{}
+	// NOTE: we assume all keys correspond to distinct accounts here (so the
+	// nonce handling in export_tx.go is correct)
 	for _, key := range keys {
 		if amount == 0 {
 			break
