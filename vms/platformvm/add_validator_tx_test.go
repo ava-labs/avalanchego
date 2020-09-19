@@ -38,6 +38,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.minValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err == nil {
 		t.Fatal("should have errored because tx is nil")
 	}
@@ -66,6 +67,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.minValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err == nil {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
@@ -94,6 +96,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.minValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err == nil {
 		t.Fatal("should have errored because node ID is nil")
 	}
@@ -132,6 +135,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.minValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err == nil {
 		t.Fatal("should have errored because stake owner has no addresses")
 	}
@@ -164,6 +168,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.minValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err == nil {
 		t.Fatal("should have errored because rewards owner has no addresses")
 	}
@@ -192,6 +197,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.minValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err == nil {
 		t.Fatal("should have errored because stake amount too small")
 	}
@@ -220,6 +226,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.minValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err == nil {
 		t.Fatal("should have errored because of too many shares")
 	}
@@ -248,6 +255,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.minValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err == nil {
 		t.Fatal("should have errored because validation length too short")
 	}
@@ -276,6 +284,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.minValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err == nil {
 		t.Fatal("should have errored because validation length too short")
 	}
@@ -304,6 +313,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.minValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err == nil {
 		t.Fatal("should have errored because validation length too long")
 	}
@@ -327,6 +337,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.minValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -406,10 +417,10 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 	}
 	startTime := defaultGenesisTime.Add(1 * time.Second)
 	tx, err := vm.newAddValidatorTx(
-		vm.minValidatorStake,     // stake amount
-		uint64(startTime.Unix()), // start time
+		vm.minValidatorStake,                                    // stake amount
+		uint64(startTime.Unix()),                                // start time
 		uint64(startTime.Add(defaultMinStakingDuration).Unix()), // end time
-		nodeID,                     // node ID
+		nodeID, // node ID
 		key2.PublicKey().Address(), // reward address
 		PercentDenominator,         // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},

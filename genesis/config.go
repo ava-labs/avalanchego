@@ -46,18 +46,38 @@ func (a Allocation) Unparse(networkID uint32) (UnparsedAllocation, error) {
 	return ua, err
 }
 
+// Staker ...
+type Staker struct {
+	NodeID        ids.ShortID `json:"nodeID"`
+	RewardAddress ids.ShortID `json:"rewardAddress"`
+	DelegationFee uint32      `json:"delegationFee"`
+}
+
+// Unparse ...
+func (s Staker) Unparse(networkID uint32) (UnparsedStaker, error) {
+	avaxAddr, err := formatting.FormatAddress(
+		"X",
+		constants.GetHRP(networkID),
+		s.RewardAddress.Bytes(),
+	)
+	return UnparsedStaker{
+		NodeID:        s.NodeID.PrefixedString(constants.NodeIDPrefix),
+		RewardAddress: avaxAddr,
+		DelegationFee: s.DelegationFee,
+	}, err
+}
+
 // Config contains the genesis addresses used to construct a genesis
 type Config struct {
 	NetworkID uint32 `json:"networkID"`
 
 	Allocations []Allocation `json:"allocations"`
 
-	StartTime                   uint64        `json:"startTime"`
-	InitialStakeDuration        uint64        `json:"initialStakeDuration"`
-	InitialStakeDurationOffset  uint64        `json:"initialStakeDurationOffset"`
-	InitialStakeAddresses       []ids.ShortID `json:"initialStakeAddresses"`
-	InitialStakeNodeIDs         []ids.ShortID `json:"initialStakeNodeIDs"`
-	InitialStakeRewardAddresses []ids.ShortID `json:"initialStakeRewardAddresses"`
+	StartTime                  uint64        `json:"startTime"`
+	InitialStakeDuration       uint64        `json:"initialStakeDuration"`
+	InitialStakeDurationOffset uint64        `json:"initialStakeDurationOffset"`
+	InitialStakedFunds         []ids.ShortID `json:"unitialStakedFunds"`
+	InitialStakers             []Staker      `json:"initialStakers"`
 
 	CChainGenesis string `json:"cChainGenesis"`
 
@@ -67,16 +87,15 @@ type Config struct {
 // Unparse ...
 func (c Config) Unparse() (UnparsedConfig, error) {
 	uc := UnparsedConfig{
-		NetworkID:                   c.NetworkID,
-		Allocations:                 make([]UnparsedAllocation, len(c.Allocations)),
-		StartTime:                   c.StartTime,
-		InitialStakeDuration:        c.InitialStakeDuration,
-		InitialStakeDurationOffset:  c.InitialStakeDurationOffset,
-		InitialStakeAddresses:       make([]string, len(c.InitialStakeAddresses)),
-		InitialStakeNodeIDs:         make([]string, len(c.InitialStakeNodeIDs)),
-		InitialStakeRewardAddresses: make([]string, len(c.InitialStakeRewardAddresses)),
-		CChainGenesis:               c.CChainGenesis,
-		Message:                     c.Message,
+		NetworkID:                  c.NetworkID,
+		Allocations:                make([]UnparsedAllocation, len(c.Allocations)),
+		StartTime:                  c.StartTime,
+		InitialStakeDuration:       c.InitialStakeDuration,
+		InitialStakeDurationOffset: c.InitialStakeDurationOffset,
+		InitialStakedFunds:         make([]string, len(c.InitialStakedFunds)),
+		InitialStakers:             make([]UnparsedStaker, len(c.InitialStakers)),
+		CChainGenesis:              c.CChainGenesis,
+		Message:                    c.Message,
 	}
 	for i, a := range c.Allocations {
 		ua, err := a.Unparse(uc.NetworkID)
@@ -85,7 +104,7 @@ func (c Config) Unparse() (UnparsedConfig, error) {
 		}
 		uc.Allocations[i] = ua
 	}
-	for i, isa := range c.InitialStakeAddresses {
+	for i, isa := range c.InitialStakedFunds {
 		avaxAddr, err := formatting.FormatAddress(
 			"X",
 			constants.GetHRP(uc.NetworkID),
@@ -94,21 +113,14 @@ func (c Config) Unparse() (UnparsedConfig, error) {
 		if err != nil {
 			return uc, err
 		}
-		uc.InitialStakeAddresses[i] = avaxAddr
+		uc.InitialStakedFunds[i] = avaxAddr
 	}
-	for i, isnID := range c.InitialStakeNodeIDs {
-		uc.InitialStakeNodeIDs[i] = isnID.PrefixedString(constants.NodeIDPrefix)
-	}
-	for i, isa := range c.InitialStakeRewardAddresses {
-		avaxAddr, err := formatting.FormatAddress(
-			"X",
-			constants.GetHRP(uc.NetworkID),
-			isa.Bytes(),
-		)
+	for i, is := range c.InitialStakers {
+		uis, err := is.Unparse(c.NetworkID)
 		if err != nil {
 			return uc, err
 		}
-		uc.InitialStakeRewardAddresses[i] = avaxAddr
+		uc.InitialStakers[i] = uis
 	}
 
 	return uc, nil

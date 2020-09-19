@@ -202,6 +202,9 @@ type VM struct {
 	// Minimum stake, in nAVAX, that can be delegated on the primary network
 	minDelegatorStake uint64
 
+	// Minimum fee that can be charged for delegation
+	minDelegationFee uint32
+
 	// Minimum amount of time to allow a validator to stake
 	minStakeDuration time.Duration
 

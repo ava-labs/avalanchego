@@ -104,7 +104,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 
 	initiallyStaked := ids.ShortSet{}
-	initiallyStaked.Add(config.InitialStakeAddresses...)
+	initiallyStaked.Add(config.InitialStakedFunds...)
 	skippedAllocations := []Allocation(nil)
 
 	// Specify the initial state of the Platform Chain
@@ -139,16 +139,15 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		}
 	}
 
-	allNodeAllocations := splitAllocations(skippedAllocations, len(config.InitialStakeNodeIDs))
+	allNodeAllocations := splitAllocations(skippedAllocations, len(config.InitialStakers))
 	endStakingTime := genesisTime.Add(time.Duration(config.InitialStakeDuration) * time.Second)
 	stakingOffset := time.Duration(0)
-	for i, validatorID := range config.InitialStakeNodeIDs {
+	for i, staker := range config.InitialStakers {
 		nodeAllocations := allNodeAllocations[i]
-		destAddr := config.InitialStakeRewardAddresses[i]
 		endStakingTime := endStakingTime.Add(-stakingOffset)
 		stakingOffset += time.Duration(config.InitialStakeDurationOffset) * time.Second
 
-		destAddrStr, err := formatting.FormatBech32(hrp, destAddr.Bytes())
+		destAddrStr, err := formatting.FormatBech32(hrp, staker.RewardAddress.Bytes())
 		if err != nil {
 			return nil, ids.ID{}, err
 		}
@@ -175,7 +174,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				APIStaker: platformvm.APIStaker{
 					StartTime: json.Uint64(genesisTime.Unix()),
 					EndTime:   json.Uint64(endStakingTime.Unix()),
-					NodeID:    validatorID.PrefixedString(constants.NodeIDPrefix),
+					NodeID:    staker.NodeID.PrefixedString(constants.NodeIDPrefix),
 				},
 				RewardOwner: &platformvm.APIOwner{
 					Threshold: 1,

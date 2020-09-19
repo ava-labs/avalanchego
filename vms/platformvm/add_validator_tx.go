@@ -23,11 +23,12 @@ import (
 )
 
 var (
-	errNilTx          = errors.New("tx is nil")
-	errWeightTooSmall = errors.New("weight of this validator is too low")
-	errStakeTooShort  = errors.New("staking period is too short")
-	errStakeTooLong   = errors.New("staking period is too long")
-	errTooManyShares  = fmt.Errorf("a staker can only require at most %d shares from delegators", PercentDenominator)
+	errNilTx                     = errors.New("tx is nil")
+	errWeightTooSmall            = errors.New("weight of this validator is too low")
+	errStakeTooShort             = errors.New("staking period is too short")
+	errStakeTooLong              = errors.New("staking period is too long")
+	errTooManyShares             = fmt.Errorf("a staker can only require at most %d shares from delegators", PercentDenominator)
+	errInsufficientDelegationFee = errors.New("staker charges an insufficient delegation fee")
 
 	_ UnsignedProposalTx = &UnsignedAddValidatorTx{}
 	_ TimedTx            = &UnsignedAddValidatorTx{}
@@ -65,12 +66,19 @@ func (tx *UnsignedAddValidatorTx) Verify(
 	minStake uint64,
 	minStakeDuration time.Duration,
 	maxStakeDuration time.Duration,
+	minDelegationFee uint32,
 ) error {
 	switch {
 	case tx == nil:
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
+	case tx.Validator.Wght < minStake: // Ensure validator is staking at least the minimum amount
+		return errWeightTooSmall
+	case tx.Shares > PercentDenominator: // Ensure delegators shares are in the allowed amount
+		return errTooManyShares
+	case tx.Shares < minDelegationFee:
+		return errInsufficientDelegationFee
 	}
 
 	duration := tx.Validator.Duration()
@@ -105,10 +113,6 @@ func (tx *UnsignedAddValidatorTx) Verify(
 		return errOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
 		return errInvalidAmount
-	case tx.Validator.Wght < minStake: // Ensure validator is staking at least the minimum amount
-		return errWeightTooSmall
-	case tx.Shares > PercentDenominator: // Ensure delegators shares are in the allowed amount
-		return errTooManyShares
 	}
 
 	// cache that this is valid
@@ -135,6 +139,7 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 		vm.minValidatorStake,
 		vm.minStakeDuration,
 		vm.maxStakeDuration,
+		vm.minDelegationFee,
 	); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
@@ -263,5 +268,6 @@ func (vm *VM) newAddValidatorTx(
 		vm.minValidatorStake,
 		vm.minStakeDuration,
 		vm.maxStakeDuration,
+		vm.minDelegationFee,
 	)
 }
