@@ -115,7 +115,7 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	}
 
 	for _, in := range tx.Ins {
-		fc.Consume(vm.ctx.AVAXAssetID, in.Amount)
+		fc.Consume(in.AssetID, in.Amount)
 	}
 
 	if err := fc.Verify(); err != nil {
@@ -190,7 +190,7 @@ func (vm *VM) newExportTx(
 
 	// burn non-AVAX
 	if assetID != vm.ctx.AVAXAssetID {
-		ins2, signers2, err := vm.GetSpendableCanonical(keys, assetID, toBurn)
+		ins2, signers2, err := vm.GetSpendableCanonical(keys, assetID, amount)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 		}
@@ -205,7 +205,7 @@ func (vm *VM) newExportTx(
 		DestinationChain: chainID,
 		Ins:              ins,
 		ExportedOutputs: []*avax.TransferableOutput{{ // Exported to X-Chain
-			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: amount,
 				OutputOwners: secp256k1fx.OutputOwners{
