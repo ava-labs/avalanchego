@@ -174,7 +174,7 @@ func (vm *VM) newExportTx(
 
 	var toBurn uint64
 	var err error
-	if assetID == vm.ctx.AVAXAssetID {
+	if assetID.Equals(vm.ctx.AVAXAssetID) {
 		toBurn, err = safemath.Add64(amount, vm.txFee)
 		if err != nil {
 			return nil, errOverflowExport
@@ -189,7 +189,7 @@ func (vm *VM) newExportTx(
 	}
 
 	// burn non-AVAX
-	if assetID != vm.ctx.AVAXAssetID {
+	if !assetID.Equals(vm.ctx.AVAXAssetID) {
 		ins2, signers2, err := vm.GetSpendableCanonical(keys, assetID, amount)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
@@ -228,7 +228,7 @@ func (tx *UnsignedExportTx) EVMStateTransfer(vm *VM, state *state.StateDB) error
 		log.Info("crosschain C->X", "addr", from.Address, "amount", from.Amount)
 		amount := new(big.Int).Mul(
 			new(big.Int).SetUint64(from.Amount), x2cRate)
-		if from.AssetID == vm.ctx.AVAXAssetID {
+		if from.AssetID.Equals(vm.ctx.AVAXAssetID) {
 			if state.GetBalance(from.Address).Cmp(amount) < 0 {
 				return errInsufficientFunds
 			}
