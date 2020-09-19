@@ -80,9 +80,9 @@ func (t *ExportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 			return err
 		}
 		assetID := out.AssetID()
-		if !out.AssetID().Equals(vm.ctx.AVAXAssetID) {
-			return errWrongAssetID
-		}
+		//if !out.AssetID().Equals(vm.ctx.AVAXAssetID) {
+		//	return errWrongAssetID
+		//}
 		if !vm.verifyFxUsage(fxIndex, assetID) {
 			return errIncompatibleFx
 		}

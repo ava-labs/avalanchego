@@ -1506,8 +1506,8 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 	return err
 }
 
-// ImportAVAXArgs are arguments for passing into ImportAVAX requests
-type ImportAVAXArgs struct {
+// ImportArgs are arguments for passing into Import requests
+type ImportArgs struct {
 	// User that controls To
 	api.UserPass
 
@@ -1518,10 +1518,15 @@ type ImportAVAXArgs struct {
 	To string `json:"to"`
 }
 
-// ImportAVAX imports AVAX to this chain from the P-Chain.
-// The AVAX must have already been exported from the P-Chain.
+// ImportAVAX is a deprecated name for Import.
+func (service *Service) ImportAVAX(_ *http.Request, args *ImportArgs, reply *api.JsonTxID) error {
+	return service.Import(nil, args, reply)
+}
+
+// Import imports AVAX to this chain from the P/C-Chain.
+// The AVAX must have already been exported from the P/C-Chain.
 // Returns the ID of the newly created atomic transaction
-func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, reply *api.JsonTxID) error {
+func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JsonTxID) error {
 	service.vm.ctx.Log.Info("AVM: ImportAVAX called with username: %s", args.Username)
 
 	chainID, err := service.vm.ctx.BCLookup.Lookup(args.SourceChain)
@@ -1626,7 +1631,6 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, reply 
 type ExportAVAXArgs struct {
 	// User, password, from addrs, change addr
 	api.JsonSpendHeader
-
 	// Amount of nAVAX to send
 	Amount json.Uint64 `json:"amount"`
 
@@ -1639,7 +1643,26 @@ type ExportAVAXArgs struct {
 // After this tx is accepted, the AVAX must be imported to the P-chain with an importTx.
 // Returns the ID of the newly created atomic transaction
 func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply *api.JsonTxIDChangeAddr) error {
-	service.vm.ctx.Log.Info("AVM: ExportAVAX called with username: %s", args.Username)
+	return service.Export(nil, &ExportArgs{
+		ExportAVAXArgs: *args,
+		AssetID:        service.vm.ctx.AVAXAssetID,
+	}, reply)
+}
+
+// ExportArgs are arguments for passing into ExportAVA requests
+type ExportArgs struct {
+	ExportAVAXArgs
+	AssetID ids.ID `json:"assetID"`
+}
+
+// Export sends an asset from this chain to the P/C-Chain.
+// After this tx is accepted, the AVAX must be imported to the P/C-chain with an importTx.
+// Returns the ID of the newly created atomic transaction
+func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JsonTxIDChangeAddr) error {
+	service.vm.ctx.Log.Info("AVM: Export called with username: %s", args.Username)
+	if args.AssetID.IsZero() {
+		return fmt.Errorf("assetID is required")
+	}
 
 	chainID, to, err := service.vm.ParseAddress(args.To)
 	if err != nil {
@@ -1678,19 +1701,24 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply 
 		}
 	}
 
-	amountWithFee, err := safemath.Add64(uint64(args.Amount), service.vm.txFee)
+	var amountWithFee uint64
+	amounts := map[[32]byte]uint64{}
+	assetID := service.vm.ctx.AVAXAssetID
+	avaxKey := assetID.Key()
+	if args.AssetID.Equals(assetID) {
+		amountWithFee, err = safemath.Add64(uint64(args.Amount), service.vm.txFee)
+		amounts[avaxKey] = amountWithFee
+	} else {
+		assetID = args.AssetID
+		amountWithFee = service.vm.txFee
+		amounts[avaxKey] = amountWithFee
+		amounts[assetID.Key()] = uint64(args.Amount)
+	}
 	if err != nil {
 		return fmt.Errorf("problem calculating required spend amount: %w", err)
 	}
 
-	avaxKey := service.vm.ctx.AVAXAssetID.Key()
-	amountsSpent, ins, keys, err := service.vm.Spend(
-		utxos,
-		kc,
-		map[[32]byte]uint64{
-			avaxKey: amountWithFee,
-		},
-	)
+	amountsSpent, ins, keys, err := service.vm.Spend(utxos, kc, amounts)
 	if err != nil {
 		return err
 	}
@@ -1698,7 +1726,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply 
 	amountSpent := amountsSpent[avaxKey]
 
 	exportOuts := []*avax.TransferableOutput{{
-		Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
+		Asset: avax.Asset{ID: assetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: uint64(args.Amount),
 			OutputOwners: secp256k1fx.OutputOwners{

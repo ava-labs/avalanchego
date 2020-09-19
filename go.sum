@@ -34,6 +34,7 @@ github.com/allegro/bigcache v1.2.1 h1:hg1sY1raCwic3Vnsvje6TT7/pnZba83LeFck5NrFKS
 github.com/allegro/bigcache v1.2.1/go.mod h1:Cb/ax3seSYIx7SuZdm2G2xzfwmv3TPSk2ucNfQESPXM=
 github.com/aristanetworks/fsnotify v1.4.2/go.mod h1:D/rtu7LpjYM8tRJphJ0hUBYpjai8SfX+aSNsWDTq/Ks=
 github.com/aristanetworks/glog v0.0.0-20191112221043-67e8567f59f3/go.mod h1:KASm+qXFKs/xjSoWn30NrWBBvdTTQq+UjkhjEJHfSFA=
+github.com/aristanetworks/goarista v0.0.0-20170210015632-ea17b1a17847 h1:rtI0fD4oG/8eVokGVPYJEW1F88p1ZNgXiEIs9thEE4A=
 github.com/aristanetworks/goarista v0.0.0-20170210015632-ea17b1a17847/go.mod h1:D/tb0zPVXnP7fmsLZjtdUhSsumbK/ij54UXjjVgMGxQ=
 github.com/aristanetworks/goarista v0.0.0-20200812190859-4cb0e71f3c0e h1:tkEt0le4Lv5+VmcxZPIVSrP8LVPLhndIm/BOP7iPh/w=
 github.com/aristanetworks/goarista v0.0.0-20200812190859-4cb0e71f3c0e/go.mod h1:QZe5Yh80Hp1b6JxQdpfSEEe8X7hTyTEZSosSrFf/oJE=
@@ -48,6 +49,8 @@ github.com/ava-labs/coreth v0.2.14-rc.1/go.mod h1:Zhb60GFIB7G5AnUCks0Jo4Rezx/Eov
 github.com/ava-labs/coreth v0.2.15-rc.4/go.mod h1:+sK2XGKCNA48uzeHWe4iBzmiOBYmYvnnzLtOkQeQfkk=
 github.com/ava-labs/coreth v0.3.0-rc.5 h1:TMM8hQfCm5T0QFXRx+CYz62hF4mz73K23L0jS6TCN0U=
 github.com/ava-labs/coreth v0.3.0-rc.5/go.mod h1:kbztUh9/VFQwAGLfQ5nqJsZR4NrFClUCWvkDhUMOYf0=
+github.com/ava-labs/coreth v0.3.1 h1:IIbdn9B+hEVndHGBifqDfvZe6TDluZiC/oywT3FMWZc=
+github.com/ava-labs/coreth v0.3.1/go.mod h1:kbztUh9/VFQwAGLfQ5nqJsZR4NrFClUCWvkDhUMOYf0=
 github.com/ava-labs/gecko v0.6.1-rc.1 h1:BhWmoDGA0Obs5ZbEdpNqw/3rx9ZMPmjcZu1oD+yySLY=
 github.com/ava-labs/gecko v0.6.1-rc.1/go.mod h1:TT6uA1BETZpVMR0xiFtE8I5Mv4DULlS+lAL3xuYKnpA=
 github.com/ava-labs/go-ethereum v1.9.3 h1:GmnMZ/dlvVAPFmWBzEpRJX49pUAymPfoASLNRJqR0AY=
@@ -220,6 +223,7 @@ github.com/json-iterator/go v1.1.9/go.mod h1:KdQUCv79m/52Kvf8AW2vK1V8akMuk1QjK/u
 github.com/json-iterator/go v1.1.10/go.mod h1:KdQUCv79m/52Kvf8AW2vK1V8akMuk1QjK/uOdHXbAo4=
 github.com/julienschmidt/httprouter v1.1.1-0.20170430222011-975b5c4c7c21/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7VTCxuUUipMqKk8s4w=
 github.com/julienschmidt/httprouter v1.2.0/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7VTCxuUUipMqKk8s4w=
+github.com/karalabe/usb v0.0.0-20190919080040-51dc0efba356 h1:I/yrLt2WilKxlQKCM52clh5rGzTKpVctGT1lH4Dc8Jw=
 github.com/karalabe/usb v0.0.0-20190919080040-51dc0efba356/go.mod h1:Od972xHfMJowv7NGVDiWVxk2zxnWgjLlJzE+F4F7AGU=
 github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9 h1:ZHuwnjpP8LsVsUYqTqeVAI+GfDfJ6UNPrExZF+vX/DQ=
 github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9/go.mod h1:Od972xHfMJowv7NGVDiWVxk2zxnWgjLlJzE+F4F7AGU=

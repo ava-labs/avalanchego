@@ -13,7 +13,8 @@ PLUGIN_DIR="$BUILD_DIR/plugins" # Where plugin binaries (namely coreth) go
 BINARY_PATH="$PLUGIN_DIR/evm"
 
 CORETH_VER="0.3.0-rc.5" # Should match coreth version in go.mod
-CORETH_PATH="$GOPATH/pkg/mod/github.com/ava-labs/coreth@v$CORETH_VER"
+#CORETH_PATH="$GOPATH/pkg/mod/github.com/ava-labs/coreth@v$CORETH_VER"
+CORETH_PATH="/home/ymf/work/current/coreth/"
 
 if [[ $# -eq 2 ]]; then
     CORETH_PATH=$1
