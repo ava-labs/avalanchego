@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/coreth/accounts"
 	"github.com/ava-labs/coreth/accounts/keystore"
 	"github.com/ava-labs/coreth/accounts/scwallet"
@@ -558,12 +559,12 @@ func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address common.Add
 // GetBalanceMultiCoin returns the amount of wei for the given address in the state of the
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.
-func (s *PublicBlockChainAPI) GetBalanceMultiCoin(ctx context.Context, address common.Address, blockNrOrHash rpc.BlockNumberOrHash, coinID common.Hash) (*hexutil.Big, error) {
+func (s *PublicBlockChainAPI) GetAssetBalance(ctx context.Context, address common.Address, blockNrOrHash rpc.BlockNumberOrHash, assetID ids.ID) (*hexutil.Big, error) {
 	state, _, err := s.b.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
 	if state == nil || err != nil {
 		return nil, err
 	}
-	return (*hexutil.Big)(state.GetBalanceMultiCoin(address, coinID)), state.Error()
+	return (*hexutil.Big)(state.GetBalanceMultiCoin(address, assetID.Key())), state.Error()
 }
 
 // Result structs for GetProof

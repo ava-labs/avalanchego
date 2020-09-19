@@ -198,23 +198,25 @@ func (vm *VM) newExportTx(
 		signers = append(signers, signers2...)
 	}
 
+	exportOuts := []*avax.TransferableOutput{{ // Exported to X-Chain
+		Asset: avax.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: amount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  0,
+				Threshold: 1,
+				Addrs:     []ids.ShortID{to},
+			},
+		},
+	}}
+
 	// Create the transaction
 	utx := &UnsignedExportTx{
 		NetworkID:        vm.ctx.NetworkID,
 		BlockchainID:     vm.ctx.ChainID,
 		DestinationChain: chainID,
 		Ins:              ins,
-		ExportedOutputs: []*avax.TransferableOutput{{ // Exported to X-Chain
-			Asset: avax.Asset{ID: assetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amount,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{to},
-				},
-			},
-		}},
+		ExportedOutputs:  exportOuts,
 	}
 	tx := &Tx{UnsignedTx: utx}
 	if err := tx.Sign(vm.codec, signers); err != nil {
@@ -224,6 +226,7 @@ func (vm *VM) newExportTx(
 }
 
 func (tx *UnsignedExportTx) EVMStateTransfer(vm *VM, state *state.StateDB) error {
+	addrs := map[[20]byte]uint64{}
 	for _, from := range tx.Ins {
 		log.Info("crosschain C->X", "addr", from.Address, "amount", from.Amount)
 		amount := new(big.Int).Mul(
@@ -243,7 +246,10 @@ func (tx *UnsignedExportTx) EVMStateTransfer(vm *VM, state *state.StateDB) error
 		if state.GetNonce(from.Address) != from.Nonce {
 			return errInvalidNonce
 		}
-		state.SetNonce(from.Address, from.Nonce+1)
+		addrs[from.Address] = from.Nonce
+	}
+	for addr, nonce := range addrs {
+		state.SetNonce(addr, nonce+1)
 	}
 	return nil
 }
