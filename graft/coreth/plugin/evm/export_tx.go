@@ -228,13 +228,17 @@ func (tx *UnsignedExportTx) EVMStateTransfer(vm *VM, state *state.StateDB) error
 		log.Info("crosschain C->X", "addr", from.Address, "amount", from.Amount)
 		amount := new(big.Int).Mul(
 			new(big.Int).SetUint64(from.Amount), x2cRate)
-		if state.GetBalance(from.Address).Cmp(amount) < 0 {
-			return errInsufficientFunds
-		}
 		if from.AssetID == vm.ctx.AVAXAssetID {
+			if state.GetBalance(from.Address).Cmp(amount) < 0 {
+				return errInsufficientFunds
+			}
 			state.SubBalance(from.Address, amount)
 		} else {
-			state.SubBalanceMultiCoin(from.Address, from.AssetID.Key(), amount)
+			assetID := from.AssetID.Key()
+			if state.GetBalanceMultiCoin(from.Address, assetID).Cmp(amount) < 0 {
+				return errInsufficientFunds
+			}
+			state.SubBalanceMultiCoin(from.Address, assetID, amount)
 		}
 		if state.GetNonce(from.Address) != from.Nonce {
 			return errInvalidNonce
