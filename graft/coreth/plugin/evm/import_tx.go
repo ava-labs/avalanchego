@@ -179,7 +179,6 @@ func (vm *VM) newImportTx(
 	to common.Address, // Address of recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
 ) (*Tx, error) {
-	log.Info("here0")
 	if !vm.ctx.XChainID.Equals(chainID) {
 		return nil, errWrongChainID
 	}
@@ -225,7 +224,6 @@ func (vm *VM) newImportTx(
 	importedAVAXAmount := importedAmount[vm.ctx.AVAXAssetID.Key()]
 
 	if importedAVAXAmount == 0 {
-		log.Info("here1")
 		return nil, errNoFunds // No imported UTXOs were spendable
 	}
 
@@ -233,7 +231,6 @@ func (vm *VM) newImportTx(
 
 	// AVAX output
 	if importedAVAXAmount < vm.txFee { // imported amount goes toward paying tx fee
-		log.Info("here2")
 		// TODO: spend EVM balance to compensate vm.txFee-importedAmount
 		return nil, errNoFunds
 	} else if importedAVAXAmount > vm.txFee {
