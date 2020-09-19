@@ -329,10 +329,9 @@ func (service *AvaxAPI) Export(_ *http.Request, args *ExportArgs, response *api.
 		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
 	}
 
-	assetID := service.vm.ctx.AVAXAssetID
 	// Create the transaction
 	tx, err := service.vm.newExportTx(
-		assetID,             // AssetID
+		args.AssetID,        // AssetID
 		uint64(args.Amount), // Amount
 		chainID,             // ID of the chain to send the funds to
 		to,                  // Address
