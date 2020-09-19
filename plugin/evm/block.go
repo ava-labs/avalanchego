@@ -89,6 +89,10 @@ func (b *Block) Verify() error {
 	vm := b.vm
 	tx := vm.getAtomicTx(b.ethBlock)
 	if tx != nil {
+		pState, err := b.vm.chain.BlockState(b.Parent().(*Block).ethBlock)
+		if err != nil {
+			return err
+		}
 		switch atx := tx.UnsignedTx.(type) {
 		case *UnsignedImportTx:
 			if b.ethBlock.Hash() == vm.genesisHash {
@@ -128,7 +132,11 @@ func (b *Block) Verify() error {
 			return errors.New("unknown atomic tx type")
 		}
 
-		if tx.UnsignedTx.(UnsignedAtomicTx).SemanticVerify(vm, tx) != nil {
+		utx := tx.UnsignedTx.(UnsignedAtomicTx)
+		if utx.SemanticVerify(vm, tx) != nil {
+			return errInvalidBlock
+		}
+		if utx.EVMStateTransfer(vm, pState) != nil {
 			return errInvalidBlock
 		}
 	}

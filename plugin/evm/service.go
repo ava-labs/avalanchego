@@ -216,8 +216,8 @@ func (service *AvaxAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	return nil
 }
 
-// ImportAVAXArgs are the arguments to ImportAVAX
-type ImportAVAXArgs struct {
+// ImportArgs are arguments for passing into Import requests
+type ImportArgs struct {
 	api.UserPass
 
 	// Chain the funds are coming from
@@ -227,9 +227,14 @@ type ImportAVAXArgs struct {
 	To string `json:"to"`
 }
 
+// ImportAVAX is a deprecated name for Import.
+func (service *AvaxAPI) ImportAVAX(_ *http.Request, args *ImportArgs, response *api.JsonTxID) error {
+	return service.Import(nil, args, response)
+}
+
 // ImportAVAX issues a transaction to import AVAX from the X-chain. The AVAX
 // must have already been exported from the X-Chain.
-func (service *AvaxAPI) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *api.JsonTxID) error {
+func (service *AvaxAPI) Import(_ *http.Request, args *ImportArgs, response *api.JsonTxID) error {
 	log.Info("EVM: ImportAVAX called")
 
 	chainID, err := service.vm.ctx.BCLookup.Lookup(args.SourceChain)
@@ -278,10 +283,29 @@ type ExportAVAXArgs struct {
 	To string `json:"to"`
 }
 
-// ExportAVAX exports AVAX from the P-Chain to the X-Chain
+// ExportAVAX exports AVAX from the C-Chain to the X-Chain
 // It must be imported on the X-Chain to complete the transfer
 func (service *AvaxAPI) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JsonTxID) error {
-	log.Info("EVM: ExportAVAX called")
+	return service.Export(nil, &ExportArgs{
+		ExportAVAXArgs: *args,
+		AssetID:        service.vm.ctx.AVAXAssetID,
+	}, response)
+}
+
+// ExportArgs are the arguments to Export
+type ExportArgs struct {
+	ExportAVAXArgs
+	// AssetID of the tokens
+	AssetID ids.ID `json:"assetID"`
+}
+
+// Export exports an asset from the C-Chain to the X-Chain
+// It must be imported on the X-Chain to complete the transfer
+func (service *AvaxAPI) Export(_ *http.Request, args *ExportArgs, response *api.JsonTxID) error {
+	log.Info("EVM: Export called")
+	if args.AssetID.IsZero() {
+		return fmt.Errorf("assetID is required")
+	}
 
 	if args.Amount == 0 {
 		return errors.New("argument 'amount' must be > 0")
@@ -306,9 +330,6 @@ func (service *AvaxAPI) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 	}
 
 	assetID := service.vm.ctx.AVAXAssetID
-	if !args.AssetID.IsZero() {
-		assetID = args.AssetID
-	}
 	// Create the transaction
 	tx, err := service.vm.newExportTx(
 		assetID,             // AssetID
