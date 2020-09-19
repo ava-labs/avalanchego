@@ -179,6 +179,7 @@ func (vm *VM) newImportTx(
 	to common.Address, // Address of recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
 ) (*Tx, error) {
+	log.Info("here0")
 	if !vm.ctx.XChainID.Equals(chainID) {
 		return nil, errWrongChainID
 	}
@@ -196,7 +197,7 @@ func (vm *VM) newImportTx(
 	importedInputs := []*avax.TransferableInput{}
 	signers := [][]*crypto.PrivateKeySECP256K1R{}
 
-	importedAmount := make(map[ids.ID]uint64)
+	importedAmount := make(map[[32]byte]uint64)
 	now := vm.clock.Unix()
 	for _, utxo := range atomicUTXOs {
 		inputIntf, utxoSigners, err := kc.Spend(utxo.Out, now)
@@ -208,7 +209,8 @@ func (vm *VM) newImportTx(
 			continue
 		}
 		aid := utxo.AssetID()
-		importedAmount[aid], err = math.Add64(importedAmount[aid], input.Amount())
+		aidKey := aid.Key()
+		importedAmount[aidKey], err = math.Add64(importedAmount[aidKey], input.Amount())
 		if err != nil {
 			return nil, err
 		}
@@ -220,9 +222,10 @@ func (vm *VM) newImportTx(
 		signers = append(signers, utxoSigners)
 	}
 	avax.SortTransferableInputsWithSigners(importedInputs, signers)
-	importedAVAXAmount := importedAmount[vm.ctx.AVAXAssetID]
+	importedAVAXAmount := importedAmount[vm.ctx.AVAXAssetID.Key()]
 
 	if importedAVAXAmount == 0 {
+		log.Info("here1")
 		return nil, errNoFunds // No imported UTXOs were spendable
 	}
 
@@ -230,6 +233,7 @@ func (vm *VM) newImportTx(
 
 	// AVAX output
 	if importedAVAXAmount < vm.txFee { // imported amount goes toward paying tx fee
+		log.Info("here2")
 		// TODO: spend EVM balance to compensate vm.txFee-importedAmount
 		return nil, errNoFunds
 	} else if importedAVAXAmount > vm.txFee {
@@ -241,7 +245,8 @@ func (vm *VM) newImportTx(
 	}
 
 	// non-AVAX asset outputs
-	for aid, amount := range importedAmount {
+	for aidKey, amount := range importedAmount {
+		aid := ids.NewID(aidKey)
 		if aid.Equals(vm.ctx.AVAXAssetID) || amount == 0 {
 			continue
 		}
@@ -272,7 +277,7 @@ func (tx *UnsignedImportTx) EVMStateTransfer(vm *VM, state *state.StateDB) error
 		log.Info("crosschain X->C", "addr", to.Address, "amount", to.Amount)
 		amount := new(big.Int).Mul(
 			new(big.Int).SetUint64(to.Amount), x2cRate)
-		if to.AssetID == vm.ctx.AVAXAssetID {
+		if to.AssetID.Equals(vm.ctx.AVAXAssetID) {
 			state.AddBalance(to.Address, amount)
 		} else {
 			state.AddBalanceMultiCoin(to.Address, to.AssetID.Key(), amount)
