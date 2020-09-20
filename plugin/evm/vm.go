@@ -87,10 +87,6 @@ const (
 )
 
 var (
-	// minGasPrice is the number of nAVAX required per gas unit for a transaction
-	// to be valid, measured in wei
-	minGasPrice = big.NewInt(470 * params.GWei)
-
 	txFee = units.MilliAvax
 
 	errEmptyBlock                 = errors.New("empty block")
@@ -258,10 +254,10 @@ func (vm *VM) Initialize(
 
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
-	config.Miner.GasPrice = minGasPrice
+	config.Miner.GasPrice = params.MinGasPrice
 	config.RPCTxFeeCap = 100 // 100 AVAX
-	config.GPO.Default = minGasPrice
-	config.TxPool.PriceLimit = minGasPrice.Uint64()
+	config.GPO.Default = params.MinGasPrice
+	config.TxPool.PriceLimit = params.MinGasPrice.Uint64()
 	config.TxPool.NoLocals = true
 
 	if err := config.SetGCMode("archive"); err != nil {
