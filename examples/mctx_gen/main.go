@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
 	"math/big"
@@ -15,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 func checkError(err error) {
@@ -36,12 +36,13 @@ func main() {
 	var fAssetID string
 	flag.Int64Var(&fChainID, "chainid", 43112, "tx.chainId")
 	flag.Uint64Var(&fNonce, "nonce", 0, "tx.nonce")
-	flag.Int64Var(&fChainID, "gasprice", 1000000000, "tx.gasPrice")
-	flag.Uint64Var(&fNonce, "gaslimit", 10000000, "tx.gasLimit")
+	flag.Int64Var(&fGasPrice, "gasprice", 470000000000, "tx.gasPrice")
+	flag.Uint64Var(&fGasLimit, "gaslimit", 21000, "tx.gasLimit")
 	flag.Int64Var(&fAmount, "amount", 100, "tx.amount")
 	flag.StringVar(&fKey, "key", "0x56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027", "private key (hex with \"0x\")")
 	flag.StringVar(&fTo, "to", "0x1f0e5C64AFdf53175f78846f7125776E76FA8F34", "tx.to (hex with \"0x\")")
 	flag.StringVar(&fAssetID, "assetid", "va6gCYWu3boo3NKQgzdwfzB73dmTYKZn2EZ7nz5pbDBXAsaj4", "assetID")
+	flag.Parse()
 
 	_pkey, err := crypto.HexToECDSA(fKey[2:])
 	checkError(err)
@@ -64,8 +65,6 @@ func main() {
 	txJSON, err := signedTx.MarshalJSON()
 	checkError(err)
 	fmt.Printf("json: %s\n", string(txJSON))
-	buff := new(bytes.Buffer)
-	err = signedTx.EncodeRLP(buff)
-	checkError(err)
-	fmt.Printf("hex: %s\n", hexutil.Encode(buff.Bytes()))
+	b, err := rlp.EncodeToBytes(signedTx)
+	fmt.Printf("hex: %s\n", hexutil.Encode(b))
 }

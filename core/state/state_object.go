@@ -94,7 +94,7 @@ type stateObject struct {
 
 // empty returns whether the account is considered empty.
 func (s *stateObject) empty() bool {
-	return s.data.Nonce == 0 && s.data.Balance.Sign() == 0 && bytes.Equal(s.data.CodeHash, emptyCodeHash)
+	return s.data.Nonce == 0 && s.data.Balance.Sign() == 0 && bytes.Equal(s.data.CodeHash, emptyCodeHash) && !s.data.IsMultiCoin
 }
 
 // Account is the Ethereum consensus representation of accounts.
@@ -430,6 +430,7 @@ func (s *stateObject) SubBalanceMultiCoin(coinID common.Hash, amount *big.Int, d
 }
 
 func (s *stateObject) SetBalanceMultiCoin(coinID common.Hash, amount *big.Int, db Database) {
+	s.data.IsMultiCoin = true
 	NormalizeCoinID(&coinID)
 	s.SetState(db, coinID, common.BigToHash(amount))
 }
@@ -566,9 +567,9 @@ func (s *stateObject) BalanceMultiCoin(coinID common.Hash, db Database) *big.Int
 //	return true
 //}
 
-func (s *stateObject) IsMultiCoin() bool {
-	return s.data.IsMultiCoin
-}
+//func (s *stateObject) IsMultiCoin() bool {
+//	return s.data.IsMultiCoin
+//}
 
 func (s *stateObject) Nonce() uint64 {
 	return s.data.Nonce
