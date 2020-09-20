@@ -280,8 +280,7 @@ func (evm *EVM) CallExpert(caller ContractRef, addr common.Address, input []byte
 		return nil, gas, ErrInsufficientBalance
 	}
 
-	var to = AccountRef(addr)
-	mcerr := evm.Context.CanTransferMC(evm.StateDB, caller.Address(), to.Address(), coinID, value2)
+	mcerr := evm.Context.CanTransferMC(evm.StateDB, caller.Address(), addr, coinID, value2)
 	if mcerr == 1 {
 		return nil, gas, ErrInsufficientBalance
 	} else if mcerr != 0 {
@@ -289,17 +288,17 @@ func (evm *EVM) CallExpert(caller ContractRef, addr common.Address, input []byte
 	}
 
 	snapshot := evm.StateDB.Snapshot()
-	p, isPrecompile := evm.precompile(addr)
+	//p, isPrecompile := evm.precompile(addr)
 
 	if !evm.StateDB.Exist(addr) {
-		if !isPrecompile && evm.chainRules.IsEIP158 && value.Sign() == 0 {
-			// Calling a non existing account, don't do anything, but ping the tracer
-			if evm.vmConfig.Debug && evm.depth == 0 {
-				evm.vmConfig.Tracer.CaptureStart(caller.Address(), addr, false, input, gas, value)
-				evm.vmConfig.Tracer.CaptureEnd(ret, 0, 0, nil)
-			}
-			return nil, gas, nil
-		}
+		//if !isPrecompile && evm.chainRules.IsEIP158 && value.Sign() == 0 {
+		//	// Calling a non existing account, don't do anything, but ping the tracer
+		//	if evm.vmConfig.Debug && evm.depth == 0 {
+		//		evm.vmConfig.Tracer.CaptureStart(caller.Address(), addr, false, input, gas, value)
+		//		evm.vmConfig.Tracer.CaptureEnd(ret, 0, 0, nil)
+		//	}
+		//	return nil, gas, nil
+		//}
 		evm.StateDB.CreateAccount(addr)
 	}
 	evm.Transfer(evm.StateDB, caller.Address(), addr, value)
@@ -313,24 +312,24 @@ func (evm *EVM) CallExpert(caller ContractRef, addr common.Address, input []byte
 		}(gas, time.Now())
 	}
 
-	if isPrecompile {
-		ret, gas, err = RunPrecompiledContract(p, input, gas)
+	//if isPrecompile {
+	//	ret, gas, err = RunPrecompiledContract(p, input, gas)
+	//} else {
+	// Initialise a new contract and set the code that is to be used by the EVM.
+	// The contract is a scoped environment for this execution context only.
+	code := evm.StateDB.GetCode(addr)
+	if len(code) == 0 {
+		ret, err = nil, nil // gas is unchanged
 	} else {
-		// Initialise a new contract and set the code that is to be used by the EVM.
-		// The contract is a scoped environment for this execution context only.
-		code := evm.StateDB.GetCode(addr)
-		if len(code) == 0 {
-			ret, err = nil, nil // gas is unchanged
-		} else {
-			addrCopy := addr
-			// If the account has no code, we can abort here
-			// The depth-check is already done, and precompiles handled above
-			contract := NewContract(caller, AccountRef(addrCopy), value, gas)
-			contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), code)
-			ret, err = run(evm, contract, input, false)
-			gas = contract.Gas
-		}
+		addrCopy := addr
+		// If the account has no code, we can abort here
+		// The depth-check is already done, and precompiles handled above
+		contract := NewContract(caller, AccountRef(addrCopy), value, gas)
+		contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), code)
+		ret, err = run(evm, contract, input, false)
+		gas = contract.Gas
 	}
+	//}
 	// When an error was returned by the EVM or when setting the creation code
 	// above we revert to the snapshot and consume any gas remaining. Additionally
 	// when we're in homestead this also counts for code storage gas errors.
