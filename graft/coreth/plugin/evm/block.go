@@ -136,7 +136,9 @@ func (b *Block) Verify() error {
 		if utx.SemanticVerify(vm, tx) != nil {
 			return errInvalidBlock
 		}
-		if utx.EVMStateTransfer(vm, pState) != nil {
+		bc := vm.chain.BlockChain()
+		_, _, _, err = bc.Processor().Process(b.ethBlock, pState, *bc.GetVMConfig())
+		if err != nil {
 			return errInvalidBlock
 		}
 	}
