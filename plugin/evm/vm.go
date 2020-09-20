@@ -259,6 +259,7 @@ func (vm *VM) Initialize(
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
 	config.Miner.GasPrice = minGasPrice
+	config.RPCTxFeeCap = 100 // 100 AVAX
 	config.GPO.Default = minGasPrice
 	config.TxPool.PriceLimit = minGasPrice.Uint64()
 	config.TxPool.NoLocals = true
