@@ -61,8 +61,8 @@ const (
 	SstoreCleanRefundEIP2200 uint64 = 4200  // Once per SSTORE operation for resetting to the original non-zero value
 	SstoreClearRefundEIP2200 uint64 = 15000 // Once per SSTORE operation for clearing an originally existing storage slot
 
-	JumpdestGas   uint64 = 1     // Once per JUMPDEST operation.
-	EMCGas        uint64 = 1     // Once per EMC operation.
+	JumpdestGas uint64 = 1 // Once per JUMPDEST operation.
+	//EMCGas        uint64 = 1     // Once per EMC operation.
 	EpochDuration uint64 = 30000 // Duration between proof-of-work epochs.
 
 	CreateDataGas            uint64 = 200   //

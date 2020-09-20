@@ -143,7 +143,8 @@ type ExportKeyArgs struct {
 // ExportKeyReply is the response for ExportKey
 type ExportKeyReply struct {
 	// The decrypted PrivateKey for the Address provided in the arguments
-	PrivateKey string `json:"privateKey"`
+	PrivateKey    string `json:"privateKey"`
+	PrivateKeyHex string `json:"privateKeyHex"`
 }
 
 // ExportKey returns a private key from the provided user
@@ -167,6 +168,7 @@ func (service *AvaxAPI) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
 	reply.PrivateKey = constants.SecretKeyPrefix + formatting.CB58{Bytes: sk.Bytes()}.String()
+	reply.PrivateKeyHex = hexutil.Encode(sk.Bytes())
 	return nil
 }
 

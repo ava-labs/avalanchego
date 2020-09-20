@@ -558,12 +558,12 @@ func newFrontierInstructionSet() JumpTable {
 			minStack:    minStack(0, 0),
 			maxStack:    maxStack(0, 0),
 		},
-		EMC: {
-			execute:     opEMC,
-			constantGas: params.EMCGas,
-			minStack:    minStack(0, 0),
-			maxStack:    maxStack(0, 0),
-		},
+		//EMC: {
+		//	execute:     opEMC,
+		//	constantGas: params.EMCGas,
+		//	minStack:    minStack(0, 0),
+		//	maxStack:    maxStack(0, 0),
+		//},
 		PUSH1: {
 			execute:     opPush1,
 			constantGas: GasFastestStep,

@@ -267,29 +267,30 @@ func (self *StateDB) GetBalanceMultiCoin(addr common.Address, coinID common.Hash
 	return common.Big0
 }
 
-func (self *StateDB) EnableMultiCoin(addr common.Address) error {
-	stateObject := self.GetOrNewStateObject(addr)
-	if stateObject.data.Root != emptyRoot && stateObject.data.Root != zeroRoot {
-		return errors.New(fmt.Sprintf("not a fresh account: %s", stateObject.data.Root.Hex()))
-	}
-	if !stateObject.EnableMultiCoin() {
-		return errors.New("multi-coin mode already enabled")
-	}
-	log.Debug(fmt.Sprintf("enabled MC for %s", addr.Hex()))
-	return nil
-}
-
-func (self *StateDB) ForceEnableMultiCoin(addr common.Address) {
-	stateObject := self.GetOrNewStateObject(addr)
-	stateObject.EnableMultiCoin()
-}
+//func (self *StateDB) EnableMultiCoin(addr common.Address) error {
+//	stateObject := self.GetOrNewStateObject(addr)
+//	if stateObject.data.Root != emptyRoot && stateObject.data.Root != zeroRoot {
+//		return errors.New(fmt.Sprintf("not a fresh account: %s", stateObject.data.Root.Hex()))
+//	}
+//	if !stateObject.EnableMultiCoin() {
+//		return errors.New("multi-coin mode already enabled")
+//	}
+//	log.Debug(fmt.Sprintf("enabled MC for %s", addr.Hex()))
+//	return nil
+//}
+//
+//func (self *StateDB) ForceEnableMultiCoin(addr common.Address) {
+//	stateObject := self.GetOrNewStateObject(addr)
+//	stateObject.EnableMultiCoin()
+//}
 
 func (self *StateDB) IsMultiCoin(addr common.Address) bool {
-	stateObject := self.getStateObject(addr)
-	if stateObject != nil {
-		return stateObject.IsMultiCoin()
-	}
-	return false
+	return true
+	//stateObject := self.getStateObject(addr)
+	//if stateObject != nil {
+	//	return stateObject.IsMultiCoin()
+	//}
+	//return false
 }
 
 func (s *StateDB) GetNonce(addr common.Address) uint64 {
@@ -339,6 +340,10 @@ func (s *StateDB) GetCodeHash(addr common.Address) common.Hash {
 func (s *StateDB) GetState(addr common.Address, hash common.Hash) common.Hash {
 	stateObject := s.getStateObject(addr)
 	if stateObject != nil {
+		// NOTE: last-minute fix: just universally enable MC
+		//if stateObject.data.IsMultiCoin {
+		NormalizeStateKey(&hash)
+		//}
 		return stateObject.GetState(s.db, hash)
 	}
 	return common.Hash{}
@@ -425,9 +430,6 @@ func (s *StateDB) SetBalance(addr common.Address, amount *big.Int) {
 
 // AddBalance adds amount to the account associated with addr.
 func (s *StateDB) AddBalanceMultiCoin(addr common.Address, coinID common.Hash, amount *big.Int) {
-	if !s.IsMultiCoin(addr) {
-		s.EnableMultiCoin(addr)
-	}
 	stateObject := s.GetOrNewStateObject(addr)
 	if stateObject != nil {
 		stateObject.AddBalanceMultiCoin(coinID, amount, s.db)
@@ -467,9 +469,10 @@ func (s *StateDB) SetState(addr common.Address, key, value common.Hash) (res err
 	res = nil
 	stateObject := s.GetOrNewStateObject(addr)
 	if stateObject != nil {
-		if stateObject.data.IsMultiCoin {
-			NormalizeStateKey(&key)
-		}
+		// NOTE: last-minute fix: just universally enable MC
+		//if stateObject.data.IsMultiCoin {
+		NormalizeStateKey(&key)
+		//}
 		stateObject.SetState(s.db, key, value)
 	}
 	return

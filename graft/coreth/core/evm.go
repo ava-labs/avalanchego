@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
+	//"github.com/ethereum/go-ethereum/log"
 )
 
 // ChainContext supports retrieving headers and consensus parameters from the
@@ -104,14 +104,6 @@ func CanTransfer(db vm.StateDB, addr common.Address, amount *big.Int) bool {
 func CanTransferMC(db vm.StateDB, addr common.Address, to common.Address, coinID *common.Hash, amount *big.Int) int {
 	if coinID == nil {
 		return 0
-	}
-	if !db.IsMultiCoin(addr) {
-		err := db.EnableMultiCoin(addr)
-		log.Debug("try to enable MC", "addr", addr.Hex(), "err", err)
-	}
-	if !(db.IsMultiCoin(addr) && db.IsMultiCoin(to)) {
-		// incompatible
-		return -1
 	}
 	if db.GetBalanceMultiCoin(addr, *coinID).Cmp(amount) >= 0 {
 		return 0
