@@ -173,12 +173,12 @@ func TestVMGenesis(t *testing.T) {
 		{
 			networkID:  constants.MainnetID,
 			vmID:       EVMID,
-			expectedID: "2a8DqsKoGuMYxenPaPMMumcWmAXxfDgeHi6rrArQYExncj7ter",
+			expectedID: "TkJfBJ3WTUc9NH9X7avkD3PLU2skEtsqN94NhE7zJNGzjJ4F",
 		},
 		{
 			networkID:  constants.LocalID,
 			vmID:       EVMID,
-			expectedID: "WKNkfmNxgqpKPe9Q12UCoTuGYXX5JbQn2tf2WTpNTJeQrezqa",
+			expectedID: "26sSDdFXoKeShAqVfvugUiUQKhMZtHYDLeBqmBfNfcdjziTrZA",
 		},
 	}
 
