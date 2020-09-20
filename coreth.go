@@ -90,6 +90,10 @@ func (self *ETHChain) SubscribeNewMinedBlockEvent() *event.TypeMuxSubscription {
 	return self.backend.Miner().GetWorkerMux().Subscribe(core.NewMinedBlockEvent{})
 }
 
+func (self *ETHChain) BlockChain() *core.BlockChain {
+	return self.backend.BlockChain()
+}
+
 func (self *ETHChain) VerifyBlock(block *types.Block) bool {
 	txnHash := types.DeriveSha(block.Transactions(), new(trie.Trie))
 	uncleHash := types.CalcUncleHash(block.Uncles())
