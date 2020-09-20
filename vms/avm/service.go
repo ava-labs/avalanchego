@@ -1709,7 +1709,7 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.Jso
 
 	amounts := map[[32]byte]uint64{}
 	avaxKey := service.vm.ctx.AVAXAssetID.Key()
-	if assetID.Equals(assetID) {
+	if assetID.Equals(service.vm.ctx.AVAXAssetID) {
 		amountWithFee, err := safemath.Add64(uint64(args.Amount), service.vm.txFee)
 		if err != nil {
 			return fmt.Errorf("problem calculating required spend amount: %w", err)
