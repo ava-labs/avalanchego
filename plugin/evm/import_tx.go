@@ -272,11 +272,12 @@ func (vm *VM) newImportTx(
 func (tx *UnsignedImportTx) EVMStateTransfer(vm *VM, state *state.StateDB) error {
 	for _, to := range tx.Outs {
 		log.Info("crosschain X->C", "addr", to.Address, "amount", to.Amount)
-		amount := new(big.Int).Mul(
-			new(big.Int).SetUint64(to.Amount), x2cRate)
 		if to.AssetID.Equals(vm.ctx.AVAXAssetID) {
+			amount := new(big.Int).Mul(
+				new(big.Int).SetUint64(to.Amount), x2cRate)
 			state.AddBalance(to.Address, amount)
 		} else {
+			amount := new(big.Int).SetUint64(to.Amount)
 			state.AddBalanceMultiCoin(to.Address, to.AssetID.Key(), amount)
 		}
 	}
