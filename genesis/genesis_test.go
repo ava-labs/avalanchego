@@ -13,108 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 )
 
-func TestNetworkName(t *testing.T) {
-	if name := NetworkName(constants.ManhattanID); name != constants.ManhattanName {
-		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, constants.ManhattanName)
-	}
-	if name := NetworkName(constants.MainnetID); name != constants.MainnetName {
-		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, constants.MainnetName)
-	}
-	if name := NetworkName(constants.CascadeID); name != constants.CascadeName {
-		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, constants.CascadeName)
-	}
-	if name := NetworkName(constants.DenaliID); name != constants.DenaliName {
-		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, constants.DenaliName)
-	}
-	if name := NetworkName(constants.EverestID); name != constants.EverestName {
-		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, constants.EverestName)
-	}
-	if name := NetworkName(constants.TestnetID); name != constants.ManhattanName {
-		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, constants.ManhattanName)
-	}
-	if name := NetworkName(4294967295); name != "network-4294967295" {
-		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, "network-4294967295")
-	}
-}
-
-func TestNetworkID(t *testing.T) {
-	id, err := NetworkID(constants.MainnetName)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if id != constants.MainnetID {
-		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", constants.MainnetID, id)
-	}
-
-	id, err = NetworkID(constants.CascadeName)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if id != constants.CascadeID {
-		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", constants.CascadeID, id)
-	}
-
-	id, err = NetworkID("cAsCaDe")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if id != constants.CascadeID {
-		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", constants.CascadeID, id)
-	}
-
-	id, err = NetworkID(constants.DenaliName)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if id != constants.DenaliID {
-		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", constants.DenaliID, id)
-	}
-
-	id, err = NetworkID("dEnAlI")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if id != constants.DenaliID {
-		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", constants.DenaliID, id)
-	}
-
-	id, err = NetworkID(constants.TestnetName)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if id != constants.TestnetID {
-		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", constants.TestnetID, id)
-	}
-
-	id, err = NetworkID("network-4294967295")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if id != 4294967295 {
-		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", 4294967295, id)
-	}
-
-	id, err = NetworkID("4294967295")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if id != 4294967295 {
-		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", 4294967295, id)
-	}
-
-	if _, err := NetworkID("network-4294967296"); err == nil {
-		t.Fatalf("Should have errored due to the network being too large.")
-	}
-
-	if _, err := NetworkID("4294967296"); err == nil {
-		t.Fatalf("Should have errored due to the network being too large.")
-	}
-
-	if _, err := NetworkID("asdcvasdc-252"); err == nil {
-		t.Fatalf("Should have errored due to the invalid input string.")
-	}
-}
-
 func TestAliases(t *testing.T) {
 	genesisBytes, _, err := Genesis(constants.LocalID)
 	if err != nil {
@@ -145,61 +43,75 @@ func TestGenesis(t *testing.T) {
 }
 
 func TestVMGenesis(t *testing.T) {
-	tests := []struct {
-		networkID  uint32
+	type vmTest struct {
 		vmID       ids.ID
 		expectedID string
+	}
+	tests := []struct {
+		networkID uint32
+		vmTest    []vmTest
 	}{
 		{
-			networkID:  constants.ManhattanID,
-			vmID:       avm.ID,
-			expectedID: "2G6XnaMqqFj6tkYPw8i3eHFoHnQqfo2yaS5BAtNEL2Knayq6qP",
+			networkID: constants.MainnetID,
+			vmTest: []vmTest{
+				{
+					vmID:       avm.ID,
+					expectedID: "gA3rXYDWtU5fKkyid2xyQLiQbcEx6JvgqhWzrnZpdL6c4RN3x",
+				},
+				{
+					vmID:       EVMID,
+					expectedID: "22fLNERgSTrT27XZVbP84njYsyc5VrLAanoBC1iQwrhipmdPMB",
+				},
+			},
 		},
 		{
-			networkID:  constants.MainnetID,
-			vmID:       avm.ID,
-			expectedID: "gA3rXYDWtU5fKkyid2xyQLiQbcEx6JvgqhWzrnZpdL6c4RN3x",
+			networkID: constants.FujiID,
+			vmTest: []vmTest{
+				{
+					vmID:       avm.ID,
+					expectedID: "2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm",
+				},
+				{
+					vmID:       EVMID,
+					expectedID: "uGRESf9QHqXpuJQwe4BNZxcUzbZ6auYKdDXV2GkXhjKSoAN6o",
+				},
+			},
 		},
 		{
-			networkID:  constants.LocalID,
-			vmID:       avm.ID,
-			expectedID: "2eNy1mUFdmaxXNj1eQHUe7Np4gju9sJsEtWQ4MX3ToiNKuADed",
-		},
-		{
-			networkID:  constants.ManhattanID,
-			vmID:       EVMID,
-			expectedID: "2LcZK7Cp7LQNbvEbPfFvpr5qJqUjodghDndbWDZ7e6KYGMQ4jG",
-		},
-		{
-			networkID:  constants.MainnetID,
-			vmID:       EVMID,
-			expectedID: "2RVwfaPJBG1D7ujTRRguNjUvif8TDX1uyCuCgDFjkxPRymSmGq",
-		},
-		{
-			networkID:  constants.LocalID,
-			vmID:       EVMID,
-			expectedID: "2irUG9d7xeZbMYWLWo97Uv2oT9BrZfA4v5J28YJTeS6oeq4sBj",
+			networkID: constants.LocalID,
+			vmTest: []vmTest{
+				{
+					vmID:       avm.ID,
+					expectedID: "2eNy1mUFdmaxXNj1eQHUe7Np4gju9sJsEtWQ4MX3ToiNKuADed",
+				},
+				{
+					vmID:       EVMID,
+					expectedID: "2irUG9d7xeZbMYWLWo97Uv2oT9BrZfA4v5J28YJTeS6oeq4sBj",
+				},
+			},
 		},
 	}
 
 	for _, test := range tests {
-		name := fmt.Sprintf("%s-%s",
-			constants.NetworkIDToNetworkName[test.networkID],
-			test.vmID,
-		)
-		t.Run(name, func(t *testing.T) {
-			genesisTx, err := VMGenesis(test.networkID, test.vmID)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if result := genesisTx.ID().String(); test.expectedID != result {
-				t.Fatalf("%s genesisID with networkID %d was expected to be %s but was %s",
-					test.vmID,
-					test.networkID,
-					test.expectedID,
-					result)
-			}
-		})
+		for _, vmTest := range test.vmTest {
+			name := fmt.Sprintf("%s-%s",
+				constants.NetworkIDToNetworkName[test.networkID],
+				vmTest.vmID,
+			)
+			t.Run(name, func(t *testing.T) {
+				genesisTx, err := VMGenesis(test.networkID, vmTest.vmID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if result := genesisTx.ID().String(); vmTest.expectedID != result {
+					t.Fatalf("%s genesisID with networkID %d was expected to be %s but was %s",
+						vmTest.vmID,
+						test.networkID,
+						vmTest.expectedID,
+						result)
+				}
+			})
+		}
 	}
 }
 
@@ -209,12 +121,12 @@ func TestAVAXAssetID(t *testing.T) {
 		expectedID string
 	}{
 		{
-			networkID:  constants.ManhattanID,
-			expectedID: "2PQ2p3uTKfpS8Kmpss76NtDxdzikZw7uQj4x4ZKYHNRqWu5fMj",
-		},
-		{
 			networkID:  constants.MainnetID,
 			expectedID: "2F1rBxCF8dm3cBxPAJmRmvcNcSx5PHAXf5wdKAjGYRWRMm3Y3y",
+		},
+		{
+			networkID:  constants.FujiID,
+			expectedID: "U8iRqJoiJm8xZHAacmvYyZVwqQx6uDNtQeP3CQ6fcgQk3JqnK",
 		},
 		{
 			networkID:  constants.LocalID,

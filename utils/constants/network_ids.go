@@ -4,36 +4,41 @@
 package constants
 
 import (
+	"fmt"
+	"math"
 	"regexp"
+	"strconv"
+	"strings"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
 
 // Const variables to be exported
 const (
-	ManhattanID uint32 = 0
-	MainnetID   uint32 = 1
-	CascadeID   uint32 = 2
-	DenaliID    uint32 = 3
-	EverestID   uint32 = 4
+	MainnetID uint32 = 1
+	CascadeID uint32 = 2
+	DenaliID  uint32 = 3
+	EverestID uint32 = 4
+	FujiID    uint32 = 5
 
-	TestnetID  uint32 = ManhattanID
+	TestnetID  uint32 = FujiID
 	UnitTestID uint32 = 10
 	LocalID    uint32 = 12345
 
-	ManhattanName = "manhattan"
-	MainnetName   = "mainnet"
-	CascadeName   = "cascade"
-	DenaliName    = "denali"
-	EverestName   = "everest"
-	TestnetName   = "testnet"
-	UnitTestName  = "testing"
-	LocalName     = "local"
+	MainnetName  = "mainnet"
+	CascadeName  = "cascade"
+	DenaliName   = "denali"
+	EverestName  = "everest"
+	FujiName     = "fuji"
+	TestnetName  = "testnet"
+	UnitTestName = "testing"
+	LocalName    = "local"
 
 	MainnetHRP  = "avax"
 	CascadeHRP  = "cascade"
 	DenaliHRP   = "denali"
 	EverestHRP  = "everest"
+	FujiHRP     = "fuji"
 	UnitTestHRP = "testing"
 	LocalHRP    = "local"
 	FallbackHRP = "custom"
@@ -45,23 +50,23 @@ var (
 	PlatformChainID  = ids.Empty
 
 	NetworkIDToNetworkName = map[uint32]string{
-		ManhattanID: ManhattanName,
-		MainnetID:   MainnetName,
-		CascadeID:   CascadeName,
-		DenaliID:    DenaliName,
-		EverestID:   EverestName,
-		UnitTestID:  UnitTestName,
-		LocalID:     LocalName,
+		MainnetID:  MainnetName,
+		CascadeID:  CascadeName,
+		DenaliID:   DenaliName,
+		EverestID:  EverestName,
+		FujiID:     FujiName,
+		UnitTestID: UnitTestName,
+		LocalID:    LocalName,
 	}
 	NetworkNameToNetworkID = map[string]uint32{
-		ManhattanName: ManhattanID,
-		MainnetName:   MainnetID,
-		CascadeName:   CascadeID,
-		DenaliName:    DenaliID,
-		EverestName:   EverestID,
-		TestnetName:   TestnetID,
-		UnitTestName:  UnitTestID,
-		LocalName:     LocalID,
+		MainnetName:  MainnetID,
+		CascadeName:  CascadeID,
+		DenaliName:   DenaliID,
+		EverestName:  EverestID,
+		FujiName:     FujiID,
+		TestnetName:  TestnetID,
+		UnitTestName: UnitTestID,
+		LocalName:    LocalID,
 	}
 
 	NetworkIDToHRP = map[uint32]string{
@@ -69,6 +74,7 @@ var (
 		CascadeID:  CascadeHRP,
 		DenaliID:   DenaliHRP,
 		EverestID:  EverestHRP,
+		FujiID:     FujiHRP,
 		UnitTestID: UnitTestHRP,
 		LocalID:    LocalHRP,
 	}
@@ -77,6 +83,7 @@ var (
 		CascadeHRP:  CascadeID,
 		DenaliHRP:   DenaliID,
 		EverestHRP:  EverestID,
+		FujiHRP:     FujiID,
 		UnitTestHRP: UnitTestID,
 		LocalHRP:    LocalID,
 	}
@@ -90,4 +97,38 @@ func GetHRP(networkID uint32) string {
 		return hrp
 	}
 	return FallbackHRP
+}
+
+// NetworkName returns a human readable name for the network with
+// ID [networkID]
+func NetworkName(networkID uint32) string {
+	if name, exists := NetworkIDToNetworkName[networkID]; exists {
+		return name
+	}
+	return fmt.Sprintf("network-%d", networkID)
+}
+
+// NetworkID returns the ID of the network with name [networkName]
+func NetworkID(networkName string) (uint32, error) {
+	networkName = strings.ToLower(networkName)
+	if id, exists := NetworkNameToNetworkID[networkName]; exists {
+		return id, nil
+	}
+
+	if id, err := strconv.ParseUint(networkName, 10, 0); err == nil {
+		if id > math.MaxUint32 {
+			return 0, fmt.Errorf("networkID %s not in [0, 2^32)", networkName)
+		}
+		return uint32(id), nil
+	}
+	if ValidNetworkName.MatchString(networkName) {
+		if id, err := strconv.Atoi(networkName[8:]); err == nil {
+			if id > math.MaxUint32 {
+				return 0, fmt.Errorf("networkID %s not in [0, 2^32)", networkName)
+			}
+			return uint32(id), nil
+		}
+	}
+
+	return 0, fmt.Errorf("failed to parse %s as a network name", networkName)
 }

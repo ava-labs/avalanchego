@@ -16,7 +16,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/nat"
@@ -34,14 +33,14 @@ import (
 )
 
 const (
-	dbVersion = "v0.9.1"
+	dbVersion = "v1.0.0"
 )
 
 // Results of parsing the CLI
 var (
 	Config             = node.Config{}
 	Err                error
-	defaultNetworkName = constants.TestnetName
+	defaultNetworkName = constants.MainnetName
 
 	homeDir                = os.ExpandEnv("$HOME")
 	dataDirName            = fmt.Sprintf(".%s", constants.AppName)
@@ -65,7 +64,7 @@ var (
 // GetIPs returns the default IPs for each network
 func GetIPs(networkID uint32) []string {
 	switch networkID {
-	case constants.ManhattanID:
+	case constants.MainnetID:
 		return []string{
 			"54.94.43.49:9651",
 			"52.79.47.77:9651",
@@ -100,7 +99,7 @@ func GetIPs(networkID uint32) []string {
 // GetIDs returns the default IDs for each network
 func GetIDs(networkID uint32) []string {
 	switch networkID {
-	case constants.ManhattanID:
+	case constants.MainnetID:
 		return []string{
 			"NodeID-A6onFGyJjA37EZ7kYHANMR1PFRT8NmXrF",
 			"NodeID-6SwnPJLH8cWfrJ162JjZekbmzaFpjPcf",
@@ -288,15 +287,13 @@ func init() {
 	ferr := fs.Parse(os.Args[1:])
 
 	if *version { // If --version used, print version and exit
-		networkID, err := genesis.NetworkID(defaultNetworkName)
+		networkID, err := constants.NetworkID(*networkName)
 		if errs.Add(err); err != nil {
 			return
 		}
-		networkGeneration := genesis.NetworkName(networkID)
-		fmt.Printf(
-			"%s [database=%s, network=%s/%s]\n",
-			node.Version, dbVersion, defaultNetworkName, networkGeneration,
-		)
+		networkGeneration := constants.NetworkName(networkID)
+		fmt.Printf("%s [database=%s, network=%s]\n",
+			node.Version, dbVersion, networkGeneration)
 		os.Exit(0)
 	}
 
@@ -310,7 +307,7 @@ func init() {
 		os.Exit(2)
 	}
 
-	networkID, err := genesis.NetworkID(*networkName)
+	networkID, err := constants.NetworkID(*networkName)
 	if errs.Add(err); err != nil {
 		return
 	}
@@ -320,7 +317,7 @@ func init() {
 	// DB:
 	if *db {
 		*dbDir = os.ExpandEnv(*dbDir) // parse any env variables
-		dbPath := path.Join(*dbDir, genesis.NetworkName(Config.NetworkID), dbVersion)
+		dbPath := path.Join(*dbDir, constants.NetworkName(Config.NetworkID), dbVersion)
 		db, err := leveldb.New(dbPath, 0, 0, 0)
 		if err != nil {
 			errs.Add(fmt.Errorf("couldn't create db at %s: %w", dbPath, err))
