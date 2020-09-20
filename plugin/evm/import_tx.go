@@ -100,7 +100,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 
 	// do flow-checking
 	fc := avax.NewFlowChecker()
-	fc.Produce(vm.ctx.AVAXAssetID, vm.txFee)
+	//fc.Produce(vm.ctx.AVAXAssetID, vm.txFee)
 
 	for _, out := range tx.Outs {
 		fc.Produce(out.AssetID, out.Amount)
@@ -221,30 +221,30 @@ func (vm *VM) newImportTx(
 		signers = append(signers, utxoSigners)
 	}
 	avax.SortTransferableInputsWithSigners(importedInputs, signers)
-	importedAVAXAmount := importedAmount[vm.ctx.AVAXAssetID.Key()]
-
-	if importedAVAXAmount == 0 {
-		return nil, errNoFunds // No imported UTXOs were spendable
-	}
-
+	//importedAVAXAmount := importedAmount[vm.ctx.AVAXAssetID.Key()]
 	outs := []EVMOutput{}
 
-	// AVAX output
-	if importedAVAXAmount < vm.txFee { // imported amount goes toward paying tx fee
-		// TODO: spend EVM balance to compensate vm.txFee-importedAmount
-		return nil, errNoFunds
-	} else if importedAVAXAmount > vm.txFee {
-		outs = append(outs, EVMOutput{
-			Address: to,
-			Amount:  importedAVAXAmount - vm.txFee,
-			AssetID: vm.ctx.AVAXAssetID,
-		})
-	}
+	//if importedAVAXAmount == 0 {
+	//	return nil, errNoFunds // No imported UTXOs were spendable
+	//}
+
+	//// AVAX output
+	//if importedAVAXAmount < vm.txFee { // imported amount goes toward paying tx fee
+	//	// TODO: spend EVM balance to compensate vm.txFee-importedAmount
+	//	return nil, errNoFunds
+	//} else if importedAVAXAmount > vm.txFee {
+	//	outs = append(outs, EVMOutput{
+	//		Address: to,
+	//		Amount:  importedAVAXAmount - vm.txFee,
+	//		AssetID: vm.ctx.AVAXAssetID,
+	//	})
+	//}
 
 	// non-AVAX asset outputs
 	for aidKey, amount := range importedAmount {
 		aid := ids.NewID(aidKey)
-		if aid.Equals(vm.ctx.AVAXAssetID) || amount == 0 {
+		//if aid.Equals(vm.ctx.AVAXAssetID) || amount == 0 {
+		if amount == 0 {
 			continue
 		}
 		outs = append(outs, EVMOutput{
