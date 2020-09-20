@@ -65,10 +65,12 @@ func (b *EthAPIBackend) SetHead(number uint64) {
 }
 
 func (b *EthAPIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error) {
-	// Pending block is only known by the miner
+	// Pending block is only known by the miner in
+	// Ethereum, but Coreth does not have the same notion.
+	// So we treat requests for the pending block identically
+	// to the latest accepted block instead
 	if number == rpc.PendingBlockNumber {
-		block := b.eth.miner.PendingBlock()
-		return block.Header(), nil
+		return b.eth.AcceptedBlock().Header(), nil
 	}
 	// Otherwise resolve and return the block
 	if number == rpc.LatestBlockNumber {
@@ -102,10 +104,12 @@ func (b *EthAPIBackend) HeaderByHash(ctx context.Context, hash common.Hash) (*ty
 }
 
 func (b *EthAPIBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error) {
-	// Pending block is only known by the miner
+	// Pending block is only known by the miner in
+	// Ethereum, but Coreth does not have the same notion.
+	// So we treat requests for the pending block identically
+	// to the latest accepted block instead
 	if number == rpc.PendingBlockNumber {
-		block := b.eth.miner.PendingBlock()
-		return block, nil
+		return b.eth.AcceptedBlock(), nil
 	}
 	// Otherwise resolve and return the block
 	if number == rpc.LatestBlockNumber {
@@ -143,12 +147,12 @@ func (b *EthAPIBackend) BlockByNumberOrHash(ctx context.Context, blockNrOrHash r
 }
 
 func (b *EthAPIBackend) StateAndHeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*state.StateDB, *types.Header, error) {
-	// Pending state is only known by the miner
-	if number == rpc.PendingBlockNumber {
-		block, state := b.eth.miner.Pending()
-		return state, block.Header(), nil
-	}
-	// Otherwise resolve the block number and return its state
+	// Note: Ethereum typically first checks if the request is for
+	// the pending block (by rpc.PendingBlockNumber), but Coreth
+	// does not have the same notion of the miner having a pending
+	// block, so this is skipped here
+
+	// Request the block by its number and retrieve its state
 	header, err := b.HeaderByNumber(ctx, number)
 	if err != nil {
 		return nil, nil, err
