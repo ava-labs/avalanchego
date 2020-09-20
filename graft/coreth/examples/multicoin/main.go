@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core"
@@ -13,8 +14,10 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/compiler"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rlp"
 	"go/build"
 	"math/big"
 	"os"
@@ -32,6 +35,19 @@ func checkError(err error) {
 }
 
 func main() {
+	var fChainID int64
+	var fNonce uint64
+	var fKey string
+	flag.Int64Var(&fChainID, "chainid", 43112, "tx.chainId")
+	flag.Uint64Var(&fNonce, "nonce", 0, "tx.nonce")
+	flag.StringVar(&fKey, "key", "0x56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027", "private key (hex with \"0x\")")
+	nonce2 := fNonce
+	chainID2 := big.NewInt(fChainID)
+	_pkey, err := crypto.HexToECDSA(fKey[2:])
+	checkError(err)
+	pkey := coreth.NewKeyFromECDSA(_pkey)
+	flag.Parse()
+
 	// configure the chain
 	config := eth.DefaultConfig
 	config.ManualCanonical = true
@@ -59,7 +75,7 @@ func main() {
 
 	bobKey, _ := coreth.NewKey(rand.Reader)
 	genesisBlock := new(core.Genesis)
-	err := json.Unmarshal([]byte(genesisJSON), genesisBlock)
+	err = json.Unmarshal([]byte(genesisJSON), genesisBlock)
 	checkError(err)
 	hk, _ := crypto.HexToECDSA(genesisKey[2:])
 	genKey := coreth.NewKeyFromECDSA(hk)
@@ -210,6 +226,12 @@ func main() {
 
 	tx := types.NewContractCreation(nonce, big.NewInt(0), uint64(gasLimit), gasPrice, code)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), genKey.PrivateKey)
+
+	tx2 := types.NewContractCreation(nonce2, big.NewInt(0), uint64(300000), big.NewInt(470000000000), code)
+	signedTx2, err := types.SignTx(tx2, types.NewEIP155Signer(chainID2), pkey.PrivateKey)
+	signedTxBytes2, err := rlp.EncodeToBytes(signedTx2)
+	fmt.Printf("contract deployment hex: %s\n", hexutil.Encode(signedTxBytes2))
+
 	checkError(err)
 	chain.AddRemoteTxs([]*types.Transaction{signedTx})
 	nonce++
