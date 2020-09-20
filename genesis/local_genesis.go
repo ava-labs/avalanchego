@@ -16,7 +16,7 @@ var (
 				"initialAmount": 0,
 				"unlockSchedule": [
 					{
-						"amount": 20000000000000000,
+						"amount": 10000000000000000,
 						"locktime": 1633824000
 					}
 				]
@@ -27,7 +27,7 @@ var (
 				"initialAmount": 300000000000000000,
 				"unlockSchedule": [
 					{
-						"amount": 10000000000000000
+						"amount": 20000000000000000
 					},
 					{
 						"amount": 10000000000000000,

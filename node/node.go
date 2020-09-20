@@ -527,6 +527,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Fee:                n.Config.TxFee,
 			UptimePercentage:   n.Config.UptimeRequirement,
 			MinValidatorStake:  n.Config.MinValidatorStake,
+			MaxValidatorStake:  n.Config.MaxValidatorStake,
 			MinDelegatorStake:  n.Config.MinDelegatorStake,
 			MinDelegationFee:   n.Config.MinDelegationFee,
 			MinStakeDuration:   n.Config.MinStakeDuration,

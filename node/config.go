@@ -34,6 +34,10 @@ type Config struct {
 	// Minimum stake, in nAVAX, required to validate the primary network
 	MinValidatorStake uint64
 
+	// Maximum stake, in nAVAX, allowed to be placed on a single validator in
+	// the primary network
+	MaxValidatorStake uint64
+
 	// Minimum stake, in nAVAX, that can be delegated on the primary network
 	MinDelegatorStake uint64
 

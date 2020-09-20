@@ -182,7 +182,11 @@ func init() {
 	fs.Float64Var(&Config.UptimeRequirement, "uptime-requirement", .6, "Fraction of time a validator must be online to receive rewards")
 
 	// Minimum stake, in nAVAX, required to validate the primary network
-	fs.Uint64Var(&Config.MinValidatorStake, "min-validator-stake", 2*units.KiloAvax, "Minimum stake, in nAVAX, required to validate the primary network")
+	minValidatorStake := fs.Uint64("min-validator-stake", 2*units.KiloAvax, "Minimum stake, in nAVAX, required to validate the primary network")
+
+	// Maximum stake amount, in nAVAX, that can be staked and delegated to a
+	// validator on the primary network
+	maxValidatorStake := fs.Uint64("max-validator-stake", 3*units.MegaAvax, "Maximum stake, in nAVAX, that can be placed on a validator on the primary network")
 
 	// Minimum stake, in nAVAX, that can be delegated on the primary network
 	fs.Uint64Var(&Config.MinDelegatorStake, "min-delegator-stake", 25*units.Avax, "Minimum stake, in nAVAX, that can be delegated on the primary network")
@@ -542,4 +546,11 @@ func init() {
 		errs.Add(errors.New("delegation fee must be in the range [0, 1000000]"))
 	}
 	Config.MinDelegationFee = uint32(*minDelegationFee)
+
+	if *minValidatorStake > *maxValidatorStake {
+		errs.Add(errors.New("minimum validator stake can't be greater than maximum validator stake"))
+	}
+
+	Config.MinValidatorStake = *minValidatorStake
+	Config.MaxValidatorStake = *maxValidatorStake
 }

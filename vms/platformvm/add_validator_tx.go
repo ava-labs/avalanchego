@@ -25,10 +25,11 @@ import (
 var (
 	errNilTx                     = errors.New("tx is nil")
 	errWeightTooSmall            = errors.New("weight of this validator is too low")
+	errWeightTooLarge            = errors.New("weight of this validator is too large")
 	errStakeTooShort             = errors.New("staking period is too short")
 	errStakeTooLong              = errors.New("staking period is too long")
-	errTooManyShares             = fmt.Errorf("a staker can only require at most %d shares from delegators", PercentDenominator)
 	errInsufficientDelegationFee = errors.New("staker charges an insufficient delegation fee")
+	errTooManyShares             = fmt.Errorf("a staker can only require at most %d shares from delegators", PercentDenominator)
 
 	_ UnsignedProposalTx = &UnsignedAddValidatorTx{}
 	_ TimedTx            = &UnsignedAddValidatorTx{}
@@ -59,11 +60,17 @@ func (tx *UnsignedAddValidatorTx) EndTime() time.Time {
 	return tx.Validator.EndTime()
 }
 
+// Weight of this validator
+func (tx *UnsignedAddValidatorTx) Weight() uint64 {
+	return tx.Validator.Weight()
+}
+
 // Verify return nil iff [tx] is valid
 func (tx *UnsignedAddValidatorTx) Verify(
 	ctx *snow.Context,
 	c codec.Codec,
 	minStake uint64,
+	maxStake uint64,
 	minStakeDuration time.Duration,
 	maxStakeDuration time.Duration,
 	minDelegationFee uint32,
@@ -75,6 +82,8 @@ func (tx *UnsignedAddValidatorTx) Verify(
 		return nil
 	case tx.Validator.Wght < minStake: // Ensure validator is staking at least the minimum amount
 		return errWeightTooSmall
+	case tx.Validator.Wght > maxStake: // Ensure validator isn't staking too much
+		return errWeightTooLarge
 	case tx.Shares > PercentDenominator: // Ensure delegators shares are in the allowed amount
 		return errTooManyShares
 	case tx.Shares < minDelegationFee:
@@ -137,6 +146,7 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 		vm.Ctx,
 		vm.codec,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		vm.minStakeDuration,
 		vm.maxStakeDuration,
 		vm.minDelegationFee,
@@ -266,6 +276,7 @@ func (vm *VM) newAddValidatorTx(
 		vm.Ctx,
 		vm.codec,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		vm.minStakeDuration,
 		vm.maxStakeDuration,
 		vm.minDelegationFee,

@@ -26,6 +26,8 @@ var (
 	errDelegatorSubset = errors.New("delegator's time range must be a subset of the validator's time range")
 	errInvalidState    = errors.New("generated output isn't valid state")
 	errInvalidAmount   = errors.New("invalid amount")
+	errCapWeightBroken = errors.New("validator would surpass maximum weight")
+	errOverDelegated   = errors.New("validator would be over delegated")
 
 	_ UnsignedProposalTx = &UnsignedAddDelegatorTx{}
 	_ TimedTx            = &UnsignedAddDelegatorTx{}
@@ -51,6 +53,11 @@ func (tx *UnsignedAddDelegatorTx) StartTime() time.Time {
 // EndTime of this validator
 func (tx *UnsignedAddDelegatorTx) EndTime() time.Time {
 	return tx.Validator.EndTime()
+}
+
+// Weight of this validator
+func (tx *UnsignedAddDelegatorTx) Weight() uint64 {
+	return tx.Validator.Weight()
 }
 
 // Verify return nil iff [tx] is valid
@@ -147,6 +154,7 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	// Ensure that the period this delegator delegates is a subset of the time
 	// the validator validates.
 	vdr, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	vdrWeight := uint64(0)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
@@ -163,6 +171,29 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 		if !willBeValidator || !tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
 			return nil, nil, nil, nil, permError{errDelegatorSubset}
 		}
+		vdrWeight = vdr.Weight()
+	} else {
+		vdrWeight = vdr.Weight()
+	}
+
+	maxWeight, err := vm.maxStakeAmount(db, constants.PrimaryNetworkID, tx.Validator.NodeID, tx.StartTime(), tx.EndTime())
+	if err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
+	newWeight, err := safemath.Add64(maxWeight, tx.Validator.Wght)
+	if err != nil {
+		return nil, nil, nil, nil, permError{errStakeOverflow}
+	}
+	if newWeight > vm.maxValidatorStake {
+		return nil, nil, nil, nil, permError{errCapWeightBroken}
+	}
+
+	delegationRestrict, err := safemath.Mul64(5, vdrWeight)
+	if err != nil {
+		return nil, nil, nil, nil, permError{errStakeOverflow}
+	}
+	if newWeight > delegationRestrict {
+		return nil, nil, nil, nil, permError{errOverDelegated}
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
