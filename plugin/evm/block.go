@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
@@ -80,7 +81,7 @@ func (b *Block) Verify() error {
 	if b.vm.ctx.IsBootstrapped() {
 		// Ensure the minimum gas price is paid for every transaction
 		for _, tx := range b.ethBlock.Transactions() {
-			if tx.GasPrice().Cmp(minGasPrice) < 0 {
+			if tx.GasPrice().Cmp(params.MinGasPrice) < 0 {
 				return errInvalidBlock
 			}
 		}
