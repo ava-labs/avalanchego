@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -1646,14 +1645,14 @@ type ExportAVAXArgs struct {
 func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply *api.JsonTxIDChangeAddr) error {
 	return service.Export(nil, &ExportArgs{
 		ExportAVAXArgs: *args,
-		AssetID:        service.vm.ctx.AVAXAssetID,
+		AssetID:        service.vm.ctx.AVAXAssetID.String(),
 	}, reply)
 }
 
 // ExportArgs are arguments for passing into ExportAVA requests
 type ExportArgs struct {
 	ExportAVAXArgs
-	AssetID ids.ID `json:"assetID"`
+	AssetID string `json:"assetID"`
 }
 
 // Export sends an asset from this chain to the P/C-Chain.
@@ -1661,8 +1660,14 @@ type ExportArgs struct {
 // Returns the ID of the newly created atomic transaction
 func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JsonTxIDChangeAddr) error {
 	service.vm.ctx.Log.Info("AVM: Export called with username: %s", args.Username)
-	if args.AssetID.IsZero() {
-		return fmt.Errorf("assetID is required")
+
+	// Parse the asset ID
+	assetID, err := service.vm.Lookup(args.AssetID)
+	if err != nil {
+		assetID, err = ids.FromString(args.AssetID)
+		if err != nil {
+			return fmt.Errorf("asset '%s' not found", args.AssetID)
+		}
 	}
 
 	chainID, to, err := service.vm.ParseAddress(args.To)
@@ -1703,20 +1708,15 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.Jso
 	}
 
 	amounts := map[[32]byte]uint64{}
-	assetID := service.vm.ctx.AVAXAssetID
-	avaxKey := assetID.Key()
-	// TODO: improve assetImportFee
-	assetImportFee := units.MilliAvax
-	if args.AssetID.Equals(assetID) {
+	avaxKey := service.vm.ctx.AVAXAssetID.Key()
+	if assetID.Equals(assetID) {
 		amountWithFee, err := safemath.Add64(uint64(args.Amount), service.vm.txFee)
 		if err != nil {
 			return fmt.Errorf("problem calculating required spend amount: %w", err)
 		}
 		amounts[avaxKey] = amountWithFee
 	} else {
-		assetID = args.AssetID
-		amountWithFee := service.vm.txFee + assetImportFee
-		amounts[avaxKey] = amountWithFee
+		amounts[avaxKey] = service.vm.txFee
 		amounts[assetID.Key()] = uint64(args.Amount)
 	}
 
@@ -1737,29 +1737,14 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.Jso
 		},
 	}}
 
-	if !assetID.Equals(service.vm.ctx.AVAXAssetID) {
-		// extra fee for future import
-		exportOuts = append(exportOuts, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: uint64(assetImportFee),
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{to},
-				},
-			},
-		})
-	}
-
 	outs := []*avax.TransferableOutput{}
 	for assetKey, amountSpent := range amountsSpent {
-		amountWithFee := amounts[assetKey]
-		if amountSpent > amountWithFee {
+		amountToSend := amounts[assetKey]
+		if amountSpent > amountToSend {
 			outs = append(outs, &avax.TransferableOutput{
 				Asset: avax.Asset{ID: ids.NewID(assetKey)},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: amountSpent - amountWithFee,
+					Amt: amountSpent - amountToSend,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Locktime:  0,
 						Threshold: 1,
@@ -1769,8 +1754,6 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.Jso
 			})
 		}
 	}
-
-	avax.SortTransferableOutputs(exportOuts, service.vm.codec)
 	avax.SortTransferableOutputs(outs, service.vm.codec)
 
 	tx := Tx{UnsignedTx: &ExportTx{
