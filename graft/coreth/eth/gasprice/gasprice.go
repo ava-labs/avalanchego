@@ -95,77 +95,7 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 // SuggestPrice returns a gasprice so that newly created transaction can
 // have a very high chance to be included in the following blocks.
 func (gpo *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
-	head, _ := gpo.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
-	headHash := head.Hash()
-
-	// If the latest gasprice is still available, return it.
-	gpo.cacheLock.RLock()
-	lastHead, lastPrice := gpo.lastHead, gpo.lastPrice
-	gpo.cacheLock.RUnlock()
-	if headHash == lastHead {
-		return lastPrice, nil
-	}
-	gpo.fetchLock.Lock()
-	defer gpo.fetchLock.Unlock()
-
-	// Try checking the cache again, maybe the last fetch fetched what we need
-	gpo.cacheLock.RLock()
-	lastHead, lastPrice = gpo.lastHead, gpo.lastPrice
-	gpo.cacheLock.RUnlock()
-	if headHash == lastHead {
-		return lastPrice, nil
-	}
-	var (
-		sent, exp int
-		number    = head.Number.Uint64()
-		result    = make(chan getBlockPricesResult, gpo.checkBlocks)
-		quit      = make(chan struct{})
-		txPrices  []*big.Int
-	)
-	for sent < gpo.checkBlocks && number > 0 {
-		go gpo.getBlockPrices(ctx, types.MakeSigner(gpo.backend.ChainConfig(), big.NewInt(int64(number))), number, sampleNumber, result, quit)
-		sent++
-		exp++
-		number--
-	}
-	for exp > 0 {
-		res := <-result
-		if res.err != nil {
-			close(quit)
-			return lastPrice, res.err
-		}
-		exp--
-		// Nothing returned. There are two special cases here:
-		// - The block is empty
-		// - All the transactions included are sent by the miner itself.
-		// In these cases, use the latest calculated price for samping.
-		if len(res.prices) == 0 {
-			res.prices = []*big.Int{lastPrice}
-		}
-		// Besides, in order to collect enough data for sampling, if nothing
-		// meaningful returned, try to query more blocks. But the maximum
-		// is 2*checkBlocks.
-		if len(res.prices) == 1 && len(txPrices)+1+exp < gpo.checkBlocks*2 && number > 0 {
-			go gpo.getBlockPrices(ctx, types.MakeSigner(gpo.backend.ChainConfig(), big.NewInt(int64(number))), number, sampleNumber, result, quit)
-			sent++
-			exp++
-			number--
-		}
-		txPrices = append(txPrices, res.prices...)
-	}
-	price := lastPrice
-	if len(txPrices) > 0 {
-		sort.Sort(bigIntArray(txPrices))
-		price = txPrices[(len(txPrices)-1)*gpo.percentile/100]
-	}
-	if price.Cmp(gpo.maxPrice) > 0 {
-		price = new(big.Int).Set(gpo.maxPrice)
-	}
-	gpo.cacheLock.Lock()
-	gpo.lastHead = headHash
-	gpo.lastPrice = price
-	gpo.cacheLock.Unlock()
-	return price, nil
+	return params.MinGasPrice, nil
 }
 
 type getBlockPricesResult struct {
