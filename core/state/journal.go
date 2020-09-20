@@ -185,7 +185,7 @@ func (ch balanceChange) dirtied() *common.Address {
 }
 
 func (ch multiCoinEnable) revert(s *StateDB) {
-	//s.getStateObject(*ch.account).data.IsMultiCoin = false
+	s.getStateObject(*ch.account).data.IsMultiCoin = false
 }
 
 func (ch multiCoinEnable) dirtied() *common.Address {
