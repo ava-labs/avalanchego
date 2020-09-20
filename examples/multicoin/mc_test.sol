@@ -4,9 +4,9 @@ contract MCTest {
     address constant MultiCoin = 0x0100000000000000000000000000000000000000;
     uint256 balance;
     constructor() public {
-        // enable multi-coin functionality (it is disabled by default)
-        (bool success,) = MultiCoin.call(abi.encodeWithSignature("enableMultiCoin()"));
-        require(success);
+        //// enable multi-coin functionality (it is disabled by default)
+        //(bool success,) = MultiCoin.call(abi.encodeWithSignature("enableMultiCoin()"));
+        //require(success);
     }
 
     function updateBalance(uint256 coinid) public {

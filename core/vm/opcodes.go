@@ -210,8 +210,8 @@ const (
 
 const (
 	BALANCEMC = 0xcd
-	EMC       = 0xce
-	CALLEX    = 0xcf
+	//EMC       = 0xce
+	CALLEX = 0xcf
 )
 
 // 0xf0 range - closures.
@@ -385,9 +385,9 @@ var opCodeToString = map[OpCode]string{
 	LOG4:   "LOG4",
 
 	// 0xf0 range.
-	CREATE:       "CREATE",
-	CALL:         "CALL",
-	EMC:          "EMC",
+	CREATE: "CREATE",
+	CALL:   "CALL",
+	//EMC:          "EMC",
 	CALLEX:       "CALLEX",
 	RETURN:       "RETURN",
 	CALLCODE:     "CALLCODE",
@@ -553,12 +553,12 @@ var stringToOp = map[string]OpCode{
 	"CREATE":         CREATE,
 	"CREATE2":        CREATE2,
 	"CALL":           CALL,
-	"EMC":            EMC,
-	"CALLEX":         CALLEX,
-	"RETURN":         RETURN,
-	"CALLCODE":       CALLCODE,
-	"REVERT":         REVERT,
-	"SELFDESTRUCT":   SELFDESTRUCT,
+	//"EMC":            EMC,
+	"CALLEX":       CALLEX,
+	"RETURN":       RETURN,
+	"CALLCODE":     CALLCODE,
+	"REVERT":       REVERT,
+	"SELFDESTRUCT": SELFDESTRUCT,
 }
 
 // StringToOp finds the opcode whose name is stored in `str`.

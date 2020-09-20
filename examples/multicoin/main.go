@@ -52,8 +52,9 @@ func main() {
 	}
 
 	// configure the genesis block
-	genesisJSON := `{"config":{"chainId":1,"homesteadBlock":0,"daoForkBlock":0,"daoForkSupport":true,"eip150Block":0,"eip150Hash":"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0","eip155Block":0,"eip158Block":0,"byzantiumBlock":0,"constantinopleBlock":0,"petersburgBlock":0,"petersburgBlock":0,"istanbulBlock":0,"muirGlacierBlock":0},"nonce":"0x0","timestamp":"0x0","extraData":"0x00","gasLimit":"0x5f5e100","difficulty":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","coinbase":"0x0000000000000000000000000000000000000000","alloc":{"751a0b96e1042bee789452ecb20253fba40dbe85":{"balance":"0x1000000000000000", "mcbalance": {"0x0000000000000000000000000000000000000000000000000000000000000000": 1000000000000000000}}, "0100000000000000000000000000000000000000": {"code": "0x730000000000000000000000000000000000000000301460806040526004361061004b5760003560e01c80631e01043914610050578063abb24ba014610092578063b6510bb3146100a9575b600080fd5b61007c6004803603602081101561006657600080fd5b8101908080359060200190929190505050610118565b6040518082815260200191505060405180910390f35b81801561009e57600080fd5b506100a761013b565b005b8180156100b557600080fd5b50610116600480360360808110156100cc57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff16906020019092919080359060200190929190803590602001909291908035906020019092919050505061013e565b005b60003073ffffffffffffffffffffffffffffffffffffffff168290cd9050919050565bce565b8373ffffffffffffffffffffffffffffffffffffffff1681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801561018a573d6000803e3d6000fd5b505050505056fea26469706673582212205c4d96aa2a6488c426daa9567616a383dd6156eb3fe84f4905239179e553fc0f64736f6c634300060a0033", "balance": "0x0", "mcbalance": {}}},"number":"0x0","gasUsed":"0x0","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000"}`
-	mcAbiJSON := `[{"inputs":[],"name":"enableMultiCoin","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"coinid","type":"uint256"}],"name":"getBalance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address payable","name":"recipient","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"coinid","type":"uint256"},{"internalType":"uint256","name":"amount2","type":"uint256"}],"name":"transfer","outputs":[],"stateMutability":"nonpayable","type":"function"}]`
+	genesisJSON := `{"config":{"chainId":1,"homesteadBlock":0,"daoForkBlock":0,"daoForkSupport":true,"eip150Block":0,"eip150Hash":"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0","eip155Block":0,"eip158Block":0,"byzantiumBlock":0,"constantinopleBlock":0,"petersburgBlock":0,"petersburgBlock":0,"istanbulBlock":0,"muirGlacierBlock":0},"nonce":"0x0","timestamp":"0x0","extraData":"0x00","gasLimit":"0x5f5e100","difficulty":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","coinbase":"0x0000000000000000000000000000000000000000","alloc":{"751a0b96e1042bee789452ecb20253fba40dbe85":{"balance":"0x1000000000000000", "mcbalance": {"0x0000000000000000000000000000000000000000000000000000000000000000": 1000000000000000000}}, "0100000000000000000000000000000000000000": {"code": "0x73000000000000000000000000000000000000000030146080604052600436106100405760003560e01c80631e01043914610045578063b6510bb314610087575b600080fd5b6100716004803603602081101561005b57600080fd5b81019080803590602001909291905050506100f6565b6040518082815260200191505060405180910390f35b81801561009357600080fd5b506100f4600480360360808110156100aa57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190803590602001909291908035906020019092919080359060200190929190505050610119565b005b60003073ffffffffffffffffffffffffffffffffffffffff168290cd9050919050565b8373ffffffffffffffffffffffffffffffffffffffff1681836108fc8690811502906040516000604051808303818888878c8acf95505050505050158015610165573d6000803e3d6000fd5b505050505056fea2646970667358221220a48887d5b3b88ac109b26238905abcf4c49feec720a4ae2ac47db1b0fd6a3f3564736f6c634300060a0033", "balance": "0x0", "mcbalance": {}}},"number":"0x0","gasUsed":"0x0","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000"}`
+	//mcAbiJSON := `[{"inputs":[],"name":"enableMultiCoin","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"coinid","type":"uint256"}],"name":"getBalance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address payable","name":"recipient","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"coinid","type":"uint256"},{"internalType":"uint256","name":"amount2","type":"uint256"}],"name":"transfer","outputs":[],"stateMutability":"nonpayable","type":"function"}]`
+	mcAbiJSON := `[{"inputs":[{"internalType":"uint256","name":"coinid","type":"uint256"}],"name":"getBalance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address payable","name":"recipient","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"coinid","type":"uint256"},{"internalType":"uint256","name":"amount2","type":"uint256"}],"name":"transfer","outputs":[],"stateMutability":"nonpayable","type":"function"}]`
 	genesisKey := "0xabd71b35d559563fea757f0f5edbde286fb8c043105b15abb7cd57189306d7d1"
 
 	bobKey, _ := coreth.NewKey(rand.Reader)
@@ -95,7 +96,7 @@ func main() {
 
 	mcAbi, err := abi.JSON(strings.NewReader(mcAbiJSON))
 	checkError(err)
-	enableCode, err := mcAbi.Pack("enableMultiCoin")
+	//enableCode, err := mcAbi.Pack("enableMultiCoin")
 	checkError(err)
 
 	abiStr, err := json.Marshal(contract.Info.AbiDefinition)
@@ -133,11 +134,11 @@ func main() {
 				nonce++
 				time.Sleep(20 * time.Millisecond)
 
-				// enable MC for Bob
-				tx = types.NewTransaction(0, vm.BuiltinAddr, big.NewInt(0), uint64(gasLimit), gasPrice, enableCode)
-				signedTx, err = types.SignTx(tx, types.NewEIP155Signer(chainID), bobKey.PrivateKey)
-				checkError(err)
-				chain.AddRemoteTxs([]*types.Transaction{signedTx})
+				//// enable MC for Bob
+				//tx = types.NewTransaction(0, vm.BuiltinAddr, big.NewInt(0), uint64(gasLimit), gasPrice, enableCode)
+				//signedTx, err = types.SignTx(tx, types.NewEIP155Signer(chainID), bobKey.PrivateKey)
+				//checkError(err)
+				//chain.AddRemoteTxs([]*types.Transaction{signedTx})
 
 				time.Sleep(20 * time.Millisecond)
 
