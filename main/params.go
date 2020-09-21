@@ -40,7 +40,7 @@ const (
 var (
 	Config             = node.Config{}
 	Err                error
-	defaultNetworkName = constants.TestnetName
+	defaultNetworkName = constants.MainnetName
 
 	homeDir                = os.ExpandEnv("$HOME")
 	dataDirName            = fmt.Sprintf(".%s", constants.AppName)
@@ -436,9 +436,7 @@ func init() {
 	Config.ConsensusGossipFrequency = time.Duration(*consensusGossipFrequency)
 	Config.ConsensusShutdownTimeout = time.Duration(*consensusShutdownTimeout)
 
-	if networkID != constants.ManhattanID &&
-		networkID != constants.MainnetID &&
-		networkID != constants.FujiID {
+	if networkID != constants.MainnetID && networkID != constants.FujiID {
 		Config.TxFee = *txFee
 		Config.CreationTxFee = *creationTxFee
 		Config.UptimeRequirement = *uptimeRequirement

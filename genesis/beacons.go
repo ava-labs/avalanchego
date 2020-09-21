@@ -11,7 +11,7 @@ import (
 // getIPs returns the beacon IPs for each network
 func getIPs(networkID uint32) []string {
 	switch networkID {
-	case constants.ManhattanID:
+	case constants.MainnetID:
 		return []string{
 			"54.94.43.49:9651",
 			"52.79.47.77:9651",
@@ -69,7 +69,7 @@ func getIPs(networkID uint32) []string {
 // getNodeIDs returns the beacon node IDs for each network
 func getNodeIDs(networkID uint32) []string {
 	switch networkID {
-	case constants.ManhattanID:
+	case constants.MainnetID:
 		return []string{
 			"NodeID-A6onFGyJjA37EZ7kYHANMR1PFRT8NmXrF",
 			"NodeID-6SwnPJLH8cWfrJ162JjZekbmzaFpjPcf",

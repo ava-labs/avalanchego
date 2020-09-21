@@ -52,19 +52,6 @@ func TestVMGenesis(t *testing.T) {
 		vmTest    []vmTest
 	}{
 		{
-			networkID: constants.ManhattanID,
-			vmTest: []vmTest{
-				{
-					vmID:       avm.ID,
-					expectedID: "2vrXWHgGxh5n3YsLHMV16YVVJTpT4z45Fmb4y3bL6si8kLCyg9",
-				},
-				{
-					vmID:       EVMID,
-					expectedID: "2fFZQibQXcd6LTE4rpBPBAkLVXFE91Kit8pgxaBG1mRnh5xqbb",
-				},
-			},
-		},
-		{
 			networkID: constants.MainnetID,
 			vmTest: []vmTest{
 				{
@@ -133,10 +120,6 @@ func TestAVAXAssetID(t *testing.T) {
 		networkID  uint32
 		expectedID string
 	}{
-		{
-			networkID:  constants.ManhattanID,
-			expectedID: "yStkTGAAZoqUdLTrkLeeViCWx6J6XkfY8W5sag1bcHjVqdWdv",
-		},
 		{
 			networkID:  constants.MainnetID,
 			expectedID: "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",

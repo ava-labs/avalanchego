@@ -40,8 +40,6 @@ type Params struct {
 // GetParams ...
 func GetParams(networkID uint32) *Params {
 	switch networkID {
-	case constants.ManhattanID:
-		return &ManhattanParams
 	case constants.MainnetID:
 		return &MainnetParams
 	case constants.FujiID:

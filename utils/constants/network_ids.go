@@ -15,26 +15,24 @@ import (
 
 // Const variables to be exported
 const (
-	ManhattanID uint32 = 0
-	MainnetID   uint32 = 1
-	CascadeID   uint32 = 2
-	DenaliID    uint32 = 3
-	EverestID   uint32 = 4
-	FujiID      uint32 = 5
+	MainnetID uint32 = 1
+	CascadeID uint32 = 2
+	DenaliID  uint32 = 3
+	EverestID uint32 = 4
+	FujiID    uint32 = 5
 
-	TestnetID  uint32 = ManhattanID
+	TestnetID  uint32 = FujiID
 	UnitTestID uint32 = 10
 	LocalID    uint32 = 12345
 
-	ManhattanName = "manhattan"
-	MainnetName   = "mainnet"
-	CascadeName   = "cascade"
-	DenaliName    = "denali"
-	EverestName   = "everest"
-	FujiName      = "fuji"
-	TestnetName   = "testnet"
-	UnitTestName  = "testing"
-	LocalName     = "local"
+	MainnetName  = "mainnet"
+	CascadeName  = "cascade"
+	DenaliName   = "denali"
+	EverestName  = "everest"
+	FujiName     = "fuji"
+	TestnetName  = "testnet"
+	UnitTestName = "testing"
+	LocalName    = "local"
 
 	MainnetHRP  = "avax"
 	CascadeHRP  = "cascade"
@@ -52,25 +50,23 @@ var (
 	PlatformChainID  = ids.Empty
 
 	NetworkIDToNetworkName = map[uint32]string{
-		ManhattanID: ManhattanName,
-		MainnetID:   MainnetName,
-		CascadeID:   CascadeName,
-		DenaliID:    DenaliName,
-		EverestID:   EverestName,
-		FujiID:      FujiName,
-		UnitTestID:  UnitTestName,
-		LocalID:     LocalName,
+		MainnetID:  MainnetName,
+		CascadeID:  CascadeName,
+		DenaliID:   DenaliName,
+		EverestID:  EverestName,
+		FujiID:     FujiName,
+		UnitTestID: UnitTestName,
+		LocalID:    LocalName,
 	}
 	NetworkNameToNetworkID = map[string]uint32{
-		ManhattanName: ManhattanID,
-		MainnetName:   MainnetID,
-		CascadeName:   CascadeID,
-		DenaliName:    DenaliID,
-		EverestName:   EverestID,
-		FujiName:      FujiID,
-		TestnetName:   TestnetID,
-		UnitTestName:  UnitTestID,
-		LocalName:     LocalID,
+		MainnetName:  MainnetID,
+		CascadeName:  CascadeID,
+		DenaliName:   DenaliID,
+		EverestName:  EverestID,
+		FujiName:     FujiID,
+		TestnetName:  TestnetID,
+		UnitTestName: UnitTestID,
+		LocalName:    LocalID,
 	}
 
 	NetworkIDToHRP = map[uint32]string{
