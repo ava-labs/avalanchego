@@ -64,7 +64,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion(constants.PlatformName, 0, 9, 2)
+	Version       = version.NewDefaultVersion(constants.PlatformName, 0, 9, 3)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -527,6 +527,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Fee:                n.Config.TxFee,
 			UptimePercentage:   n.Config.UptimeRequirement,
 			MinValidatorStake:  n.Config.MinValidatorStake,
+			MaxValidatorStake:  n.Config.MaxValidatorStake,
 			MinDelegatorStake:  n.Config.MinDelegatorStake,
 			MinDelegationFee:   n.Config.MinDelegationFee,
 			MinStakeDuration:   n.Config.MinStakeDuration,

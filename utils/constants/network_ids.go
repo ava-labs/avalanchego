@@ -4,7 +4,11 @@
 package constants
 
 import (
+	"fmt"
+	"math"
 	"regexp"
+	"strconv"
+	"strings"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
@@ -16,6 +20,7 @@ const (
 	CascadeID   uint32 = 2
 	DenaliID    uint32 = 3
 	EverestID   uint32 = 4
+	FujiID      uint32 = 5
 
 	TestnetID  uint32 = ManhattanID
 	UnitTestID uint32 = 10
@@ -26,6 +31,7 @@ const (
 	CascadeName   = "cascade"
 	DenaliName    = "denali"
 	EverestName   = "everest"
+	FujiName      = "fuji"
 	TestnetName   = "testnet"
 	UnitTestName  = "testing"
 	LocalName     = "local"
@@ -34,6 +40,7 @@ const (
 	CascadeHRP  = "cascade"
 	DenaliHRP   = "denali"
 	EverestHRP  = "everest"
+	FujiHRP     = "fuji"
 	UnitTestHRP = "testing"
 	LocalHRP    = "local"
 	FallbackHRP = "custom"
@@ -50,6 +57,7 @@ var (
 		CascadeID:   CascadeName,
 		DenaliID:    DenaliName,
 		EverestID:   EverestName,
+		FujiID:      FujiName,
 		UnitTestID:  UnitTestName,
 		LocalID:     LocalName,
 	}
@@ -59,6 +67,7 @@ var (
 		CascadeName:   CascadeID,
 		DenaliName:    DenaliID,
 		EverestName:   EverestID,
+		FujiName:      FujiID,
 		TestnetName:   TestnetID,
 		UnitTestName:  UnitTestID,
 		LocalName:     LocalID,
@@ -69,6 +78,7 @@ var (
 		CascadeID:  CascadeHRP,
 		DenaliID:   DenaliHRP,
 		EverestID:  EverestHRP,
+		FujiID:     FujiHRP,
 		UnitTestID: UnitTestHRP,
 		LocalID:    LocalHRP,
 	}
@@ -77,6 +87,7 @@ var (
 		CascadeHRP:  CascadeID,
 		DenaliHRP:   DenaliID,
 		EverestHRP:  EverestID,
+		FujiHRP:     FujiID,
 		UnitTestHRP: UnitTestID,
 		LocalHRP:    LocalID,
 	}
@@ -90,4 +101,38 @@ func GetHRP(networkID uint32) string {
 		return hrp
 	}
 	return FallbackHRP
+}
+
+// NetworkName returns a human readable name for the network with
+// ID [networkID]
+func NetworkName(networkID uint32) string {
+	if name, exists := NetworkIDToNetworkName[networkID]; exists {
+		return name
+	}
+	return fmt.Sprintf("network-%d", networkID)
+}
+
+// NetworkID returns the ID of the network with name [networkName]
+func NetworkID(networkName string) (uint32, error) {
+	networkName = strings.ToLower(networkName)
+	if id, exists := NetworkNameToNetworkID[networkName]; exists {
+		return id, nil
+	}
+
+	if id, err := strconv.ParseUint(networkName, 10, 0); err == nil {
+		if id > math.MaxUint32 {
+			return 0, fmt.Errorf("networkID %s not in [0, 2^32)", networkName)
+		}
+		return uint32(id), nil
+	}
+	if ValidNetworkName.MatchString(networkName) {
+		if id, err := strconv.Atoi(networkName[8:]); err == nil {
+			if id > math.MaxUint32 {
+				return 0, fmt.Errorf("networkID %s not in [0, 2^32)", networkName)
+			}
+			return uint32(id), nil
+		}
+	}
+
+	return 0, fmt.Errorf("failed to parse %s as a network name", networkName)
 }

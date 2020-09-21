@@ -36,6 +36,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.Ctx,
 		vm.codec,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -65,6 +66,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.Ctx,
 		vm.codec,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -94,6 +96,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.Ctx,
 		vm.codec,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -133,6 +136,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.Ctx,
 		vm.codec,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -166,6 +170,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.Ctx,
 		vm.codec,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -195,6 +200,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.Ctx,
 		vm.codec,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -224,6 +230,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.Ctx,
 		vm.codec,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -253,6 +260,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.Ctx,
 		vm.codec,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -282,6 +290,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.Ctx,
 		vm.codec,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -311,6 +320,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.Ctx,
 		vm.codec,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -335,6 +345,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.Ctx,
 		vm.codec,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -417,10 +428,10 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 	}
 	startTime := defaultGenesisTime.Add(1 * time.Second)
 	tx, err := vm.newAddValidatorTx(
-		vm.minValidatorStake,                                    // stake amount
-		uint64(startTime.Unix()),                                // start time
+		vm.minValidatorStake,     // stake amount
+		uint64(startTime.Unix()), // start time
 		uint64(startTime.Add(defaultMinStakingDuration).Unix()), // end time
-		nodeID, // node ID
+		nodeID,                     // node ID
 		key2.PublicKey().Address(), // reward address
 		PercentDenominator,         // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},

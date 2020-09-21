@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -2043,4 +2044,35 @@ func (service *Service) GetMinStake(_ *http.Request, _ *struct{}, reply *GetMinS
 	reply.MinValidatorStake = json.Uint64(service.vm.minValidatorStake)
 	reply.MinDelegatorStake = json.Uint64(service.vm.minDelegatorStake)
 	return nil
+}
+
+// GetMaxStakeAmountArgs is the request for calling GetMaxStakeAmount.
+type GetMaxStakeAmountArgs struct {
+	SubnetID  ids.ID      `json:"subnetID"`
+	NodeID    string      `json:"nodeID"`
+	StartTime json.Uint64 `json:"startTime"`
+	EndTime   json.Uint64 `json:"endTime"`
+}
+
+// GetMaxStakeAmountReply is the response from calling GetMaxStakeAmount.
+type GetMaxStakeAmountReply struct {
+	Amount json.Uint64 `json:"amount"`
+}
+
+// GetMaxStakeAmount returns the maximum amount of AVAX staking to the named
+// node during the time period.
+func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmountArgs, reply *GetMaxStakeAmountReply) error {
+	if args.SubnetID.IsZero() {
+		args.SubnetID = service.vm.Ctx.SubnetID
+	}
+	nodeID, err := ids.ShortFromPrefixedString(args.NodeID, constants.NodeIDPrefix)
+	if err != nil {
+		return fmt.Errorf("failed to parse nodeID %q due to: %w", args.NodeID, err)
+	}
+	startTime := time.Unix(int64(args.StartTime), 0)
+	endTime := time.Unix(int64(args.EndTime), 0)
+
+	amount, err := service.vm.maxStakeAmount(service.vm.DB, args.SubnetID, nodeID, startTime, endTime)
+	reply.Amount = json.Uint64(amount)
+	return err
 }

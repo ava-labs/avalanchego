@@ -10,7 +10,6 @@ import (
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -110,7 +109,7 @@ type GetNetworkNameReply struct {
 func (service *Info) GetNetworkName(_ *http.Request, _ *struct{}, reply *GetNetworkNameReply) error {
 	service.log.Info("Info: GetNetworkName called")
 
-	reply.NetworkName = genesis.NetworkName(service.networkID)
+	reply.NetworkName = constants.NetworkName(service.networkID)
 	return nil
 }
 

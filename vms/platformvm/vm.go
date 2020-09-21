@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"container/heap"
 	"errors"
 	"fmt"
 	"math"
@@ -99,6 +100,8 @@ var (
 	errDSCantValidate           = errors.New("new blockchain can't be validated by primary network")
 	errUnknownTxType            = errors.New("unknown transaction type")
 	errStartTimeTooLate         = errors.New("start time is too far in the future")
+	errStartTimeTooEarly        = errors.New("start time is before the current chain time")
+	errStartAfterEndTime        = errors.New("start time is after the end time")
 
 	_ block.ChainVM        = &VM{}
 	_ validators.Connector = &VM{}
@@ -198,6 +201,9 @@ type VM struct {
 
 	// The minimum amount of tokens one must bond to be a validator
 	minValidatorStake uint64
+
+	// The maximum amount of tokens one can bond to a validator
+	maxValidatorStake uint64
 
 	// Minimum stake, in nAVAX, that can be delegated on the primary network
 	minDelegatorStake uint64
@@ -1458,4 +1464,161 @@ func (vm *VM) calculateUptime(db database.Database, nodeID ids.ShortID, startTim
 	}
 	bestPossibleUpDuration := uint64(currentLocalTime.Sub(startTime) / time.Second)
 	return float64(upDuration) / float64(bestPossibleUpDuration), nil
+}
+
+func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.ShortID, startTime time.Time, endTime time.Time) (uint64, error) {
+	currentTime, err := vm.getTimestamp(db)
+	if err != nil {
+		return 0, err
+	}
+	if currentTime.After(startTime) {
+		return 0, errStartTimeTooEarly
+	}
+	if startTime.After(endTime) {
+		return 0, errStartAfterEndTime
+	}
+
+	stopPrefix := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
+	stopDB := prefixdb.NewNested(stopPrefix, db)
+	defer stopDB.Close()
+
+	stopIter := stopDB.NewIterator()
+	defer stopIter.Release()
+
+	currentWeight := uint64(0)
+	toRemoveHeap := validatorHeap{}
+	for stopIter.Next() { // Iterates in order of increasing stop time
+		txBytes := stopIter.Value()
+
+		tx := rewardTx{}
+		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
+			return 0, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
+		}
+		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
+			return 0, err
+		}
+
+		validator := (*Validator)(nil)
+		switch staker := tx.Tx.UnsignedTx.(type) {
+		case *UnsignedAddDelegatorTx:
+			validator = &staker.Validator
+		case *UnsignedAddValidatorTx:
+			validator = &staker.Validator
+		case *UnsignedAddSubnetValidatorTx:
+			validator = &staker.Validator.Validator
+		default:
+			return 0, fmt.Errorf("expected validator but got %T", tx.Tx.UnsignedTx)
+		}
+
+		if !validator.NodeID.Equals(nodeID) {
+			continue
+		}
+
+		newWeight, err := safemath.Add64(currentWeight, validator.Wght)
+		if err != nil {
+			return 0, err
+		}
+		currentWeight = newWeight
+		toRemoveHeap.Add(validator)
+	}
+
+	startPrefix := []byte(fmt.Sprintf("%s%s", subnetID, startDBPrefix))
+	startDB := prefixdb.NewNested(startPrefix, db)
+	defer startDB.Close()
+
+	startIter := startDB.NewIterator()
+	defer startIter.Release()
+
+	maxWeight := uint64(0)
+	for startIter.Next() { // Iterates in order of increasing start time
+		txBytes := startIter.Value()
+
+		tx := Tx{}
+		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
+			return 0, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
+		}
+		if err := tx.Sign(vm.codec, nil); err != nil {
+			return 0, err
+		}
+
+		validator := (*Validator)(nil)
+		switch staker := tx.UnsignedTx.(type) {
+		case *UnsignedAddDelegatorTx:
+			validator = &staker.Validator
+		case *UnsignedAddValidatorTx:
+			validator = &staker.Validator
+		case *UnsignedAddSubnetValidatorTx:
+			validator = &staker.Validator.Validator
+		default:
+			return 0, fmt.Errorf("expected validator but got %T", tx.UnsignedTx)
+		}
+
+		if validator.StartTime().After(endTime) {
+			break
+		}
+
+		if !validator.NodeID.Equals(nodeID) {
+			continue
+		}
+
+		for len(toRemoveHeap) > 0 && !toRemoveHeap[0].EndTime().After(validator.StartTime()) {
+			toRemove := toRemoveHeap[0]
+			toRemoveHeap = toRemoveHeap[1:]
+
+			newWeight, err := safemath.Sub64(currentWeight, toRemove.Wght)
+			if err != nil {
+				return 0, err
+			}
+			currentWeight = newWeight
+		}
+
+		newWeight, err := safemath.Add64(currentWeight, validator.Wght)
+		if err != nil {
+			return 0, err
+		}
+		currentWeight = newWeight
+		if currentWeight > maxWeight && !startTime.After(validator.StartTime()) {
+			maxWeight = currentWeight
+		}
+
+		toRemoveHeap.Add(validator)
+	}
+
+	for len(toRemoveHeap) > 0 && toRemoveHeap[0].EndTime().Before(startTime) {
+		toRemove := toRemoveHeap[0]
+		toRemoveHeap = toRemoveHeap[1:]
+
+		newWeight, err := safemath.Sub64(currentWeight, toRemove.Wght)
+		if err != nil {
+			return 0, err
+		}
+		currentWeight = newWeight
+	}
+
+	if currentWeight > maxWeight {
+		maxWeight = currentWeight
+	}
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		startIter.Error(),
+		stopIter.Error(),
+	)
+	return maxWeight, errs.Err
+}
+
+type validatorHeap []*Validator
+
+func (h *validatorHeap) Len() int                 { return len(*h) }
+func (h *validatorHeap) Less(i, j int) bool       { return (*h)[i].EndTime().Before((*h)[j].EndTime()) }
+func (h *validatorHeap) Swap(i, j int)            { (*h)[i], (*h)[j] = (*h)[j], (*h)[i] }
+func (h *validatorHeap) Add(validator *Validator) { heap.Push(h, validator) }
+func (h *validatorHeap) Peek() *Validator         { return (*h)[0] }
+func (h *validatorHeap) Remove() *Validator       { return heap.Pop(h).(*Validator) }
+func (h *validatorHeap) Push(x interface{})       { *h = append(*h, x.(*Validator)) }
+func (h *validatorHeap) Pop() interface{} {
+	newLen := len(*h) - 1
+	val := (*h)[newLen]
+	*h = (*h)[:newLen]
+	return val
 }
