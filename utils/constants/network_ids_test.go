@@ -18,7 +18,7 @@ func TestGetHRP(t *testing.T) {
 		},
 		{
 			id:  TestnetID,
-			hrp: FujiHRP,
+			hrp: FallbackHRP,
 		},
 		{
 			id:  FujiID,
@@ -54,7 +54,7 @@ func TestNetworkName(t *testing.T) {
 		},
 		{
 			id:   TestnetID,
-			name: FujiName,
+			name: ManhattanName,
 		},
 		{
 			id:   FujiID,
