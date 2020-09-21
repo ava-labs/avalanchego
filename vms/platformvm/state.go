@@ -443,7 +443,7 @@ func (vm *VM) GetUTXOs(
 	lastIndex := ids.Empty
 	addrsList := addrs.List()
 	ids.SortShortIDs(addrsList)
-	for _, addr := range addrs.List() {
+	for _, addr := range addrsList {
 		start := ids.Empty
 		if comp := bytes.Compare(addr.Bytes(), startAddr.Bytes()); comp == -1 { // Skip addresses before [startAddr]
 			continue
