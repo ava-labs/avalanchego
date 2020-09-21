@@ -201,9 +201,9 @@ var (
 		TxFee:              units.MilliAvax,
 		CreationTxFee:      10 * units.MilliAvax,
 		UptimeRequirement:  .6, // 60%
-		MinValidatorStake:  2 * units.KiloAvax,
+		MinValidatorStake:  1 * units.Avax,
 		MaxValidatorStake:  3 * units.MegaAvax,
-		MinDelegatorStake:  25 * units.Avax,
+		MinDelegatorStake:  1 * units.Avax,
 		MinDelegationFee:   20000, // 2%
 		MinStakeDuration:   24 * time.Hour,
 		MaxStakeDuration:   365 * 24 * time.Hour,
