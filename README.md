@@ -41,9 +41,9 @@ The Avalanche binary, named `avalanchego`, is in the `build` directory.
 
 ## Running Avalanche
 
-### Connecting to Everest
+### Connecting to Mainnet
 
-To connect to the Everest Testnet, run:
+To connect to the Avalanche Mainnet, run:
 
 ```sh
 ./build/avalanchego
@@ -51,7 +51,15 @@ To connect to the Everest Testnet, run:
 
 You should see some pretty ASCII art and log messages.
 
-You can use `Ctrl + C` to kill the node.
+You can use `Ctrl+C` to kill the node.
+
+### Connecting to Fuji
+
+To connect to the Fuji Testnet, run:
+
+```sh
+./build/avalanchego --network-id=fuji
+```
 
 ### Creating a Local Testnet
 
