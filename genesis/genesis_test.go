@@ -56,11 +56,11 @@ func TestVMGenesis(t *testing.T) {
 			vmTest: []vmTest{
 				{
 					vmID:       avm.ID,
-					expectedID: "gA3rXYDWtU5fKkyid2xyQLiQbcEx6JvgqhWzrnZpdL6c4RN3x",
+					expectedID: "2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM",
 				},
 				{
 					vmID:       EVMID,
-					expectedID: "22fLNERgSTrT27XZVbP84njYsyc5VrLAanoBC1iQwrhipmdPMB",
+					expectedID: "2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5",
 				},
 			},
 		},
@@ -86,7 +86,7 @@ func TestVMGenesis(t *testing.T) {
 				},
 				{
 					vmID:       EVMID,
-					expectedID: "2irUG9d7xeZbMYWLWo97Uv2oT9BrZfA4v5J28YJTeS6oeq4sBj",
+					expectedID: "26sSDdFXoKeShAqVfvugUiUQKhMZtHYDLeBqmBfNfcdjziTrZA",
 				},
 			},
 		},
