@@ -198,8 +198,13 @@ func init() {
 			return
 		}
 		networkGeneration := constants.NetworkName(networkID)
-		fmt.Printf("%s [database=%s, network=%s]\n",
-			node.Version, dbVersion, networkGeneration)
+		if networkID == constants.MainnetID {
+			fmt.Printf("%s [database=%s, network=%s]\n",
+				node.Version, dbVersion, networkGeneration)
+		} else {
+			fmt.Printf("%s [database=%s, network=testnet/%s]\n",
+				node.Version, dbVersion, networkGeneration)
+		}
 		os.Exit(0)
 	}
 
