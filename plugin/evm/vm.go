@@ -899,7 +899,7 @@ func (vm *VM) GetSpendableCanonical(keys []*crypto.PrivateKeySECP256K1R, assetID
 		if assetID.Equals(vm.ctx.AVAXAssetID) {
 			balance = new(big.Int).Div(state.GetBalance(addr), x2cRate).Uint64()
 		} else {
-			balance = new(big.Int).Div(state.GetBalanceMultiCoin(addr, assetID.Key()), x2cRate).Uint64()
+			balance = state.GetBalanceMultiCoin(addr, assetID.Key()).Uint64()
 		}
 		if balance == 0 {
 			continue
