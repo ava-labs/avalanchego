@@ -73,7 +73,7 @@ func TestVMGenesis(t *testing.T) {
 				},
 				{
 					vmID:       EVMID,
-					expectedID: "uGRESf9QHqXpuJQwe4BNZxcUzbZ6auYKdDXV2GkXhjKSoAN6o",
+					expectedID: "TyWPnw1oUqgmcZ2LokYynEfTzmaGd9EkSft53aWJzUZN6hgJA",
 				},
 			},
 		},
@@ -122,7 +122,7 @@ func TestAVAXAssetID(t *testing.T) {
 	}{
 		{
 			networkID:  constants.MainnetID,
-			expectedID: "2F1rBxCF8dm3cBxPAJmRmvcNcSx5PHAXf5wdKAjGYRWRMm3Y3y",
+			expectedID: "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
 		},
 		{
 			networkID:  constants.FujiID,
