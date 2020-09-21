@@ -20,7 +20,7 @@ bash "./scripts/rebuild_initializer_binary.sh"
 
 
 TESTING_CONTROLLER_IMAGE="$DOCKER_REPO/avalanche-testing_controller:v0.9.5"
-BYZANTINE_IMAGE="$DOCKER_REPO/avalanche-byzantine:v0.1.0"
+BYZANTINE_IMAGE="$DOCKER_REPO/avalanche-byzantine:v0.1.1"
 
 docker pull "$TESTING_CONTROLLER_IMAGE"
 
