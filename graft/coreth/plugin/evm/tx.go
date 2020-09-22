@@ -4,14 +4,17 @@
 package evm
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/ava-labs/coreth/core/state"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -114,4 +117,32 @@ func (tx *Tx) Sign(c codec.Codec, signers [][]*crypto.PrivateKeySECP256K1R) erro
 	}
 	tx.Initialize(unsignedBytes, signedBytes)
 	return nil
+}
+
+// innerSortInputs implements sort.Interface for EVMInput
+type innerSortInputs struct {
+	inputs  []EVMInput
+	signers [][]*crypto.PrivateKeySECP256K1R
+}
+
+func (ins *innerSortInputs) Less(i, j int) bool {
+	return bytes.Compare(ins.inputs[i].Address.Bytes(), ins.inputs[j].Address.Bytes()) < 0
+}
+
+func (ins *innerSortInputs) Len() int { return len(ins.inputs) }
+
+func (ins *innerSortInputs) Swap(i, j int) {
+	ins.inputs[j], ins.inputs[i] = ins.inputs[i], ins.inputs[j]
+	ins.signers[j], ins.signers[i] = ins.signers[i], ins.signers[j]
+}
+
+// SortEVMInputsAndSigners sorts the list of EVMInputs based solely on the address of the input
+func SortEVMInputsAndSigners(inputs []EVMInput, signers [][]*crypto.PrivateKeySECP256K1R) {
+	sort.Sort(&innerSortInputs{inputs: inputs, signers: signers})
+}
+
+// IsSortedAndUniqueEVMInputs returns true if the EVM Inputs are sorted and unique
+// based on the account addresses
+func IsSortedAndUniqueEVMInputs(inputs []EVMInput) bool {
+	return utils.IsSortedAndUnique(&innerSortInputs{inputs: inputs})
 }
