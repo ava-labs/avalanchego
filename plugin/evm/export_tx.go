@@ -56,6 +56,8 @@ func (tx *UnsignedExportTx) Verify(
 		return errWrongChainID
 	case !tx.DestinationChain.Equals(avmID):
 		return errWrongChainID
+	case len(tx.Ins) == 0:
+		return errNoExportInputs
 	case len(tx.ExportedOutputs) == 0:
 		return errNoExportOutputs
 	case tx.NetworkID != ctx.NetworkID:
@@ -68,6 +70,9 @@ func (tx *UnsignedExportTx) Verify(
 		if err := in.Verify(); err != nil {
 			return err
 		}
+	}
+	if !IsSortedAndUniqueEVMInputs(tx.Ins) {
+		return errInputsNotSortedAndUnique
 	}
 
 	for _, out := range tx.ExportedOutputs {
@@ -160,7 +165,7 @@ func (tx *UnsignedExportTx) Accept(ctx *snow.Context, _ database.Batch) error {
 	return ctx.SharedMemory.Put(tx.DestinationChain, elems)
 }
 
-// Create a new transaction
+// newExportTx returns a new ExportTx
 func (vm *VM) newExportTx(
 	assetID ids.ID, // AssetID of the tokens to export
 	amount uint64, // Amount of tokens to export
@@ -183,14 +188,14 @@ func (vm *VM) newExportTx(
 		toBurn = vm.txFee
 	}
 	// burn AVAX
-	ins, signers, err := vm.GetSpendableCanonical(keys, vm.ctx.AVAXAssetID, toBurn)
+	ins, signers, err := vm.GetSpendableFunds(keys, vm.ctx.AVAXAssetID, toBurn)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 
 	// burn non-AVAX
 	if !assetID.Equals(vm.ctx.AVAXAssetID) {
-		ins2, signers2, err := vm.GetSpendableCanonical(keys, assetID, amount)
+		ins2, signers2, err := vm.GetSpendableFunds(keys, assetID, amount)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 		}
@@ -209,6 +214,9 @@ func (vm *VM) newExportTx(
 			},
 		},
 	}}
+
+	avax.SortTransferableOutputs(exportOuts, vm.codec)
+	SortEVMInputsAndSigners(ins, signers)
 
 	// Create the transaction
 	utx := &UnsignedExportTx{
