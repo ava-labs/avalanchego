@@ -25,7 +25,9 @@ type Factory struct {
 	CreationFee        uint64        // Transaction fee with state creation
 	Fee                uint64        // Transaction fee
 	MinValidatorStake  uint64        // Min amt required to validate primary network
+	MaxValidatorStake  uint64        // Max amt allowed to validate primary network
 	MinDelegatorStake  uint64        // Min amt that can be delegated
+	MinDelegationFee   uint32        // Min fee for delegation
 	UptimePercentage   float64       // Required uptime to get a reward in [0,1]
 	MinStakeDuration   time.Duration // Min time allowed for validating
 	MaxStakeDuration   time.Duration // Max time allowed for validating
@@ -42,7 +44,9 @@ func (f *Factory) New(*snow.Context) (interface{}, error) {
 		txFee:              f.Fee,
 		uptimePercentage:   f.UptimePercentage,
 		minValidatorStake:  f.MinValidatorStake,
+		maxValidatorStake:  f.MaxValidatorStake,
 		minDelegatorStake:  f.MinDelegatorStake,
+		minDelegationFee:   f.MinDelegationFee,
 		minStakeDuration:   f.MinStakeDuration,
 		maxStakeDuration:   f.MaxStakeDuration,
 		stakeMintingPeriod: f.StakeMintingPeriod,

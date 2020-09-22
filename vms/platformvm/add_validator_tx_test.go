@@ -35,11 +35,11 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err := unsignedTx.Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err == nil {
 		t.Fatal("should have errored because tx is nil")
 	}
@@ -65,11 +65,11 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err == nil {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
@@ -95,11 +95,11 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err == nil {
 		t.Fatal("should have errored because node ID is nil")
 	}
@@ -135,11 +135,11 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err == nil {
 		t.Fatal("should have errored because stake owner has no addresses")
 	}
@@ -169,11 +169,11 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err == nil {
 		t.Fatal("should have errored because rewards owner has no addresses")
 	}
@@ -199,11 +199,11 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err == nil {
 		t.Fatal("should have errored because stake amount too small")
 	}
@@ -229,11 +229,11 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err == nil {
 		t.Fatal("should have errored because of too many shares")
 	}
@@ -259,11 +259,11 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err == nil {
 		t.Fatal("should have errored because validation length too short")
 	}
@@ -289,11 +289,11 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err == nil {
 		t.Fatal("should have errored because validation length too short")
 	}
@@ -319,11 +319,11 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err == nil {
 		t.Fatal("should have errored because validation length too long")
 	}
@@ -344,11 +344,11 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	} else if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minValidatorStake,
+		vm.maxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
+		defaultMinDelegationFee,
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -387,22 +387,22 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 	}
 	vDB.Abort()
 
-	// // Case: Validator's start time too far in the future
-	// if tx, err := vm.newAddValidatorTx(
-	// 	vm.minValidatorStake,
-	// 	uint64(defaultValidateStartTime.Add(maxFutureStartTime).Unix()+1),
-	// 	uint64(defaultValidateStartTime.Add(maxFutureStartTime).Add(defaultMinStakingDuration).Unix()+1),
-	// 	nodeID,
-	// 	nodeID,
-	// 	PercentDenominator,
-	// 	[]*crypto.PrivateKeySECP256K1R{keys[0]},
-	// 	ids.ShortEmpty, // change addr
-	// ); err != nil {
-	// 	t.Fatal(err)
-	// } else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vDB, tx); err == nil {
-	// 	t.Fatal("should've errored because start time too far in the future")
-	// }
-	// vDB.Abort()
+	// Case: Validator's start time too far in the future
+	if tx, err := vm.newAddValidatorTx(
+		vm.minValidatorStake,
+		uint64(defaultValidateStartTime.Add(maxFutureStartTime).Unix()+1),
+		uint64(defaultValidateStartTime.Add(maxFutureStartTime).Add(defaultMinStakingDuration).Unix()+1),
+		nodeID,
+		nodeID,
+		PercentDenominator,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
+	); err != nil {
+		t.Fatal(err)
+	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vDB, tx); err == nil {
+		t.Fatal("should've errored because start time too far in the future")
+	}
+	vDB.Abort()
 
 	// Case: Validator already validating primary network
 	if tx, err := vm.newAddValidatorTx(

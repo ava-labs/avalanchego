@@ -26,6 +26,8 @@ var (
 	errDelegatorSubset = errors.New("delegator's time range must be a subset of the validator's time range")
 	errInvalidState    = errors.New("generated output isn't valid state")
 	errInvalidAmount   = errors.New("invalid amount")
+	errCapWeightBroken = errors.New("validator would surpass maximum weight")
+	errOverDelegated   = errors.New("validator would be over delegated")
 
 	_ UnsignedProposalTx = &UnsignedAddDelegatorTx{}
 	_ TimedTx            = &UnsignedAddDelegatorTx{}
@@ -53,12 +55,15 @@ func (tx *UnsignedAddDelegatorTx) EndTime() time.Time {
 	return tx.Validator.EndTime()
 }
 
+// Weight of this validator
+func (tx *UnsignedAddDelegatorTx) Weight() uint64 {
+	return tx.Validator.Weight()
+}
+
 // Verify return nil iff [tx] is valid
 func (tx *UnsignedAddDelegatorTx) Verify(
 	ctx *snow.Context,
 	c codec.Codec,
-	feeAmount uint64,
-	feeAssetID ids.ID,
 	minDelegatorStake uint64,
 	minStakeDuration time.Duration,
 	maxStakeDuration time.Duration,
@@ -128,8 +133,6 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	if err := tx.Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minDelegatorStake,
 		vm.minStakeDuration,
 		vm.maxStakeDuration,
@@ -144,13 +147,14 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 		return nil, nil, nil, nil, permError{fmt.Errorf("chain timestamp (%s) not before validator's start time (%s)",
 			currentTimestamp,
 			validatorStartTime)}
-		// } else if validatorStartTime.After(currentTimestamp.Add(maxFutureStartTime)) {
-		// 	return nil, nil, nil, nil, permError{fmt.Errorf("validator start time (%s) more than two weeks after current chain timestamp (%s)", validatorStartTime, currentTimestamp)}
+	} else if validatorStartTime.After(currentTimestamp.Add(maxFutureStartTime)) {
+		return nil, nil, nil, nil, permError{fmt.Errorf("validator start time (%s) more than two weeks after current chain timestamp (%s)", validatorStartTime, currentTimestamp)}
 	}
 
 	// Ensure that the period this delegator delegates is a subset of the time
 	// the validator validates.
 	vdr, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	vdrWeight := uint64(0)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
@@ -167,6 +171,29 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 		if !willBeValidator || !tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
 			return nil, nil, nil, nil, permError{errDelegatorSubset}
 		}
+		vdrWeight = vdr.Weight()
+	} else {
+		vdrWeight = vdr.Weight()
+	}
+
+	maxWeight, err := vm.maxStakeAmount(db, constants.PrimaryNetworkID, tx.Validator.NodeID, tx.StartTime(), tx.EndTime())
+	if err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
+	newWeight, err := safemath.Add64(maxWeight, tx.Validator.Wght)
+	if err != nil {
+		return nil, nil, nil, nil, permError{errStakeOverflow}
+	}
+	if newWeight > vm.maxValidatorStake {
+		return nil, nil, nil, nil, permError{errCapWeightBroken}
+	}
+
+	delegationRestrict, err := safemath.Mul64(5, vdrWeight)
+	if err != nil {
+		return nil, nil, nil, nil, permError{errStakeOverflow}
+	}
+	if newWeight > delegationRestrict {
+		return nil, nil, nil, nil, permError{errOverDelegated}
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
@@ -174,7 +201,7 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	copy(outs[len(tx.Outs):], tx.Stake)
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, 0, vm.Ctx.AVAXAssetID); err != nil {
 		return nil, nil, nil, nil, err
 	}
 
@@ -223,10 +250,10 @@ func (vm *VM) newAddDelegatorTx(
 	endTime uint64, // Unix time they stop delegating
 	nodeID ids.ShortID, // ID of the node we are delegating to
 	rewardAddress ids.ShortID, // Address to send reward to, if applicable
-	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens + fee
+	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, vm.txFee, changeAddr)
+	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, 0, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -258,8 +285,6 @@ func (vm *VM) newAddDelegatorTx(
 	return tx, utx.Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minDelegatorStake,
 		vm.minStakeDuration,
 		vm.maxStakeDuration,

@@ -4,8 +4,11 @@
 package genesis
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"math"
+	"sort"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -13,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -41,34 +43,41 @@ var (
 //    (ie the genesis state of the network)
 // 2) The asset ID of AVAX
 func FromConfig(config *Config) ([]byte, ids.ID, error) {
-	if err := config.init(); err != nil {
-		return nil, ids.ID{}, err
-	}
+	hrp := constants.GetHRP(config.NetworkID)
 
-	initialSupply := uint64(0)
+	amount := uint64(0)
 
 	// Specify the genesis state of the AVM
-	avmArgs := avm.BuildGenesisArgs{}
+	avmArgs := avm.BuildGenesisArgs{
+		NetworkID: json.Uint32(config.NetworkID),
+	}
 	{
 		avax := avm.AssetDefinition{
-			Name:         "AVAX",
+			Name:         "Avalanche",
 			Symbol:       "AVAX",
 			Denomination: 9,
 			InitialState: map[string][]interface{}{},
 		}
-
-		if len(config.MintAddresses) > 0 {
-			avax.InitialState["variableCap"] = []interface{}{avm.Owners{
-				Threshold: 1,
-				Minters:   config.MintAddresses,
-			}}
+		xAllocations := []Allocation(nil)
+		for _, allocation := range config.Allocations {
+			if allocation.InitialAmount > 0 {
+				xAllocations = append(xAllocations, allocation)
+			}
 		}
-		for _, addr := range config.FundedAddresses {
+		sortXAllocation(xAllocations)
+
+		for _, allocation := range xAllocations {
+			addr, err := formatting.FormatBech32(hrp, allocation.AVAXAddr.Bytes())
+			if err != nil {
+				return nil, ids.ID{}, err
+			}
+
 			avax.InitialState["fixedCap"] = append(avax.InitialState["fixedCap"], avm.Holder{
-				Amount:  json.Uint64(5 * units.MegaAvax),
+				Amount:  json.Uint64(allocation.InitialAmount),
 				Address: addr,
 			})
-			initialSupply += 5 * units.MegaAvax
+			avax.Memo.Bytes = append(avax.Memo.Bytes, allocation.ETHAddr.Bytes()...)
+			amount += allocation.InitialAmount
 		}
 
 		avmArgs.GenesisData = map[string]avm.AssetDefinition{
@@ -88,55 +97,95 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		return nil, ids.ID{}, fmt.Errorf("couldn't generate AVAX asset ID: %w", err)
 	}
 
-	genesisTime := time.Date(
-		/*year=*/ 2019,
-		/*month=*/ time.November,
-		/*day=*/ 1,
-		/*hour=*/ 0,
-		/*minute=*/ 0,
-		/*second=*/ 0,
-		/*nano-second=*/ 0,
-		/*location=*/ time.UTC,
-	)
+	genesisTime := time.Unix(int64(config.StartTime), 0)
+	initialSupply, err := config.InitialSupply()
+	if err != nil {
+		return nil, ids.ID{}, fmt.Errorf("couldn't calculate the initial supply: %w", err)
+	}
+
+	initiallyStaked := ids.ShortSet{}
+	initiallyStaked.Add(config.InitialStakedFunds...)
+	skippedAllocations := []Allocation(nil)
 
 	// Specify the initial state of the Platform Chain
 	platformvmArgs := platformvm.BuildGenesisArgs{
-		NetworkID:   json.Uint32(config.NetworkID),
-		AvaxAssetID: avaxAssetID,
-		Time:        json.Uint64(genesisTime.Unix()),
-		Message:     config.Message,
+		AvaxAssetID:   avaxAssetID,
+		NetworkID:     json.Uint32(config.NetworkID),
+		Time:          json.Uint64(config.StartTime),
+		InitialSupply: json.Uint64(initialSupply),
+		Message:       config.Message,
 	}
-	for _, addr := range config.FundedAddresses {
-		platformvmArgs.UTXOs = append(platformvmArgs.UTXOs,
-			platformvm.APIUTXO{
-				Address: addr,
-				Amount:  json.Uint64(5 * units.MegaAvax),
-			},
-		)
-		initialSupply += 5 * units.MegaAvax
+	for _, allocation := range config.Allocations {
+		if initiallyStaked.Contains(allocation.AVAXAddr) {
+			skippedAllocations = append(skippedAllocations, allocation)
+			continue
+		}
+		addr, err := formatting.FormatBech32(hrp, allocation.AVAXAddr.Bytes())
+		if err != nil {
+			return nil, ids.ID{}, err
+		}
+		for _, unlock := range allocation.UnlockSchedule {
+			if unlock.Amount > 0 {
+				platformvmArgs.UTXOs = append(platformvmArgs.UTXOs,
+					platformvm.APIUTXO{
+						Locktime: json.Uint64(unlock.Locktime),
+						Amount:   json.Uint64(unlock.Amount),
+						Address:  addr,
+						Message:  formatting.CB58{Bytes: allocation.ETHAddr.Bytes()},
+					},
+				)
+				amount += unlock.Amount
+			}
+		}
 	}
 
-	stakingDuration := 365 * 24 * time.Hour // ~ 1 year
-	endStakingTime := genesisTime.Add(stakingDuration)
+	allNodeAllocations := splitAllocations(skippedAllocations, len(config.InitialStakers))
+	endStakingTime := genesisTime.Add(time.Duration(config.InitialStakeDuration) * time.Second)
+	stakingOffset := time.Duration(0)
+	for i, staker := range config.InitialStakers {
+		nodeAllocations := allNodeAllocations[i]
+		endStakingTime := endStakingTime.Add(-stakingOffset)
+		stakingOffset += time.Duration(config.InitialStakeDurationOffset) * time.Second
 
-	for i, validatorID := range config.ParsedStakerIDs {
-		weight := json.Uint64(20 * units.KiloAvax)
-		destAddr := config.FundedAddresses[i%len(config.FundedAddresses)]
+		destAddrStr, err := formatting.FormatBech32(hrp, staker.RewardAddress.Bytes())
+		if err != nil {
+			return nil, ids.ID{}, err
+		}
+
+		utxos := []platformvm.APIUTXO(nil)
+		for _, allocation := range nodeAllocations {
+			addr, err := formatting.FormatBech32(hrp, allocation.AVAXAddr.Bytes())
+			if err != nil {
+				return nil, ids.ID{}, err
+			}
+			for _, unlock := range allocation.UnlockSchedule {
+				utxos = append(utxos, platformvm.APIUTXO{
+					Locktime: json.Uint64(unlock.Locktime),
+					Amount:   json.Uint64(unlock.Amount),
+					Address:  addr,
+					Message:  formatting.CB58{Bytes: allocation.ETHAddr.Bytes()},
+				})
+				amount += unlock.Amount
+			}
+		}
+
+		delegationFee := json.Uint32(staker.DelegationFee)
+
 		platformvmArgs.Validators = append(platformvmArgs.Validators,
 			platformvm.APIPrimaryValidator{
 				APIStaker: platformvm.APIStaker{
 					StartTime: json.Uint64(genesisTime.Unix()),
 					EndTime:   json.Uint64(endStakingTime.Unix()),
-					Weight:    &weight,
-					NodeID:    validatorID.PrefixedString(constants.NodeIDPrefix),
+					NodeID:    staker.NodeID.PrefixedString(constants.NodeIDPrefix),
 				},
 				RewardOwner: &platformvm.APIOwner{
 					Threshold: 1,
-					Addresses: []string{destAddr},
+					Addresses: []string{destAddrStr},
 				},
+				Staked:             utxos,
+				ExactDelegationFee: &delegationFee,
 			},
 		)
-		initialSupply += 20 * units.KiloAvax
 	}
 
 	// Specify the chains that exist upon this network's creation
@@ -153,15 +202,12 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			Name: "X-Chain",
 		},
 		{
-			GenesisData: formatting.CB58{Bytes: config.EVMBytes},
+			GenesisData: formatting.CB58{Bytes: []byte(config.CChainGenesis)},
 			SubnetID:    constants.PrimaryNetworkID,
 			VMID:        EVMID,
 			Name:        "C-Chain",
 		},
 	}
-
-	platformvmArgs.InitialSupply = json.Uint64(initialSupply)
-	platformvm.InitialSupply = initialSupply
 
 	platformvmReply := platformvm.BuildGenesisReply{}
 	platformvmSS := platformvm.StaticService{}
@@ -170,6 +216,69 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 
 	return platformvmReply.Bytes.Bytes, avaxAssetID, nil
+}
+
+func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {
+	totalAmount := uint64(0)
+	for _, allocation := range allocations {
+		for _, unlock := range allocation.UnlockSchedule {
+			totalAmount += unlock.Amount
+		}
+	}
+
+	nodeWeight := totalAmount / uint64(numSplits)
+	allNodeAllocations := make([][]Allocation, 0, numSplits)
+
+	currentNodeAllocation := []Allocation(nil)
+	currentNodeAmount := uint64(0)
+	for _, allocation := range allocations {
+		currentAllocation := allocation
+		// Already added to the X-chain
+		currentAllocation.InitialAmount = 0
+		// Going to be added until the correct amount is reached
+		currentAllocation.UnlockSchedule = nil
+
+		for _, unlock := range allocation.UnlockSchedule {
+			unlock := unlock
+			for currentNodeAmount+unlock.Amount > nodeWeight && len(allNodeAllocations) < numSplits-1 {
+				amountToAdd := nodeWeight - currentNodeAmount
+				currentAllocation.UnlockSchedule = append(currentAllocation.UnlockSchedule, LockedAmount{
+					Amount:   amountToAdd,
+					Locktime: unlock.Locktime,
+				})
+				unlock.Amount -= amountToAdd
+
+				currentNodeAllocation = append(currentNodeAllocation, currentAllocation)
+
+				allNodeAllocations = append(allNodeAllocations, currentNodeAllocation)
+
+				currentNodeAllocation = nil
+				currentNodeAmount = 0
+
+				currentAllocation = allocation
+				// Already added to the X-chain
+				currentAllocation.InitialAmount = 0
+				// Going to be added until the correct amount is reached
+				currentAllocation.UnlockSchedule = nil
+			}
+
+			if unlock.Amount == 0 {
+				continue
+			}
+
+			currentAllocation.UnlockSchedule = append(currentAllocation.UnlockSchedule, LockedAmount{
+				Amount:   unlock.Amount,
+				Locktime: unlock.Locktime,
+			})
+			currentNodeAmount += unlock.Amount
+		}
+
+		if len(currentAllocation.UnlockSchedule) > 0 {
+			currentNodeAllocation = append(currentNodeAllocation, currentAllocation)
+		}
+	}
+
+	return append(allNodeAllocations, currentNodeAllocation)
 }
 
 // Genesis returns:
@@ -187,7 +296,7 @@ func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.Tx, error) {
 		return nil, err
 	}
 	genesis := platformvm.Genesis{}
-	if err := platformvm.Codec.Unmarshal(genesisBytes, &genesis); err != nil {
+	if err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return nil, fmt.Errorf("couldn't unmarshal genesis bytes due to: %w", err)
 	}
 	if err := genesis.Initialize(); err != nil {
@@ -204,7 +313,7 @@ func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.Tx, error) {
 
 // AVAXAssetID ...
 func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
-	c := codec.NewDefault()
+	c := codec.New(math.MaxUint32, 1<<20)
 	errs := wrappers.Errs{}
 	errs.Add(
 		c.RegisterType(&avm.BaseTx{}),
@@ -245,3 +354,16 @@ func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 
 	return tx.ID(), nil
 }
+
+type innerSortXAllocation []Allocation
+
+func (xa innerSortXAllocation) Less(i, j int) bool {
+	return xa[i].InitialAmount < xa[j].InitialAmount ||
+		(xa[i].InitialAmount == xa[j].InitialAmount &&
+			bytes.Compare(xa[i].AVAXAddr.Bytes(), xa[j].AVAXAddr.Bytes()) == -1)
+}
+
+func (xa innerSortXAllocation) Len() int      { return len(xa) }
+func (xa innerSortXAllocation) Swap(i, j int) { xa[j], xa[i] = xa[i], xa[j] }
+
+func sortXAllocation(a []Allocation) { sort.Sort(innerSortXAllocation(a)) }

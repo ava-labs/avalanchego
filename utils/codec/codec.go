@@ -57,6 +57,8 @@ type codec struct {
 type Codec interface {
 	Skip(int)
 	RegisterType(interface{}) error
+	SetMaxSize(int)
+	SetMaxSliceLen(int)
 	Marshal(interface{}) ([]byte, error)
 	Unmarshal([]byte, interface{}) error
 }
@@ -97,6 +99,20 @@ func (c *codec) RegisterType(val interface{}) error {
 	c.typeToTypeID[valType] = c.nextTypeID
 	c.nextTypeID++
 	return nil
+}
+
+// SetMaxSize of bytes allowed
+func (c *codec) SetMaxSize(size int) {
+	c.lock.Lock()
+	c.maxSize = size
+	c.lock.Unlock()
+}
+
+// SetMaxSliceLen of a provided array
+func (c *codec) SetMaxSliceLen(size int) {
+	c.lock.Lock()
+	c.maxSliceLen = size
+	c.lock.Unlock()
 }
 
 // A few notes:

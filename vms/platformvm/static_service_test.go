@@ -35,6 +35,10 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
+		Staked: []APIUTXO{{
+			Amount:  weight,
+			Address: addr,
+		}},
 	}
 
 	args := BuildGenesisArgs{
@@ -71,13 +75,16 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 		APIStaker: APIStaker{
 			StartTime: 0,
 			EndTime:   15,
-			Weight:    &weight,
 			NodeID:    nodeID,
 		},
 		RewardOwner: &APIOwner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
+		Staked: []APIUTXO{{
+			Amount:  weight,
+			Address: addr,
+		}},
 	}
 
 	args := BuildGenesisArgs{
@@ -115,13 +122,16 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 		APIStaker: APIStaker{
 			StartTime: 0,
 			EndTime:   5,
-			Weight:    &weight,
 			NodeID:    nodeID,
 		},
 		RewardOwner: &APIOwner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
+		Staked: []APIUTXO{{
+			Amount:  weight,
+			Address: addr,
+		}},
 	}
 
 	args := BuildGenesisArgs{
@@ -159,39 +169,48 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		APIStaker: APIStaker{
 			StartTime: 0,
 			EndTime:   20,
-			Weight:    &weight,
 			NodeID:    nodeID,
 		},
 		RewardOwner: &APIOwner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
+		Staked: []APIUTXO{{
+			Amount:  weight,
+			Address: addr,
+		}},
 	}
 
 	validator2 := APIPrimaryValidator{
 		APIStaker: APIStaker{
 			StartTime: 3,
 			EndTime:   15,
-			Weight:    &weight,
 			NodeID:    nodeID,
 		},
 		RewardOwner: &APIOwner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
+		Staked: []APIUTXO{{
+			Amount:  weight,
+			Address: addr,
+		}},
 	}
 
 	validator3 := APIPrimaryValidator{
 		APIStaker: APIStaker{
 			StartTime: 1,
 			EndTime:   10,
-			Weight:    &weight,
 			NodeID:    nodeID,
 		},
 		RewardOwner: &APIOwner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
+		Staked: []APIUTXO{{
+			Amount:  weight,
+			Address: addr,
+		}},
 	}
 
 	args := BuildGenesisArgs{

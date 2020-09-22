@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"time"
 
@@ -65,7 +66,8 @@ type VM struct {
 	// Used to check local time
 	clock timer.Clock
 
-	codec codec.Codec
+	genesisCodec codec.Codec
+	codec        codec.Codec
 
 	pubsub *cjson.PubSubServer
 
@@ -94,15 +96,45 @@ type VM struct {
 }
 
 type codecRegistry struct {
-	codec.Codec
+	genesisCodec  codec.Codec
+	codec         codec.Codec
 	index         int
 	typeToFxIndex map[reflect.Type]int
+}
+
+func (cr *codecRegistry) Skip(amount int) {
+	cr.genesisCodec.Skip(amount)
+	cr.codec.Skip(amount)
 }
 
 func (cr *codecRegistry) RegisterType(val interface{}) error {
 	valType := reflect.TypeOf(val)
 	cr.typeToFxIndex[valType] = cr.index
-	return cr.Codec.RegisterType(val)
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		cr.genesisCodec.RegisterType(val),
+		cr.codec.RegisterType(val),
+	)
+	return errs.Err
+}
+
+func (cr *codecRegistry) SetMaxSize(size int) {
+	cr.genesisCodec.SetMaxSize(size)
+	cr.codec.SetMaxSize(size)
+}
+
+func (cr *codecRegistry) SetMaxSliceLen(size int) {
+	cr.genesisCodec.SetMaxSliceLen(size)
+	cr.codec.SetMaxSliceLen(size)
+}
+
+func (cr *codecRegistry) Marshal(v interface{}) ([]byte, error) {
+	return cr.codec.Marshal(v)
+}
+
+func (cr *codecRegistry) Unmarshal(b []byte, v interface{}) error {
+	return cr.codec.Unmarshal(b, v)
 }
 
 /*
@@ -127,6 +159,7 @@ func (vm *VM) Initialize(
 	vm.Aliaser.Initialize()
 
 	vm.pubsub = cjson.NewPubSubServer(ctx)
+	vm.genesisCodec = codec.New(math.MaxUint32, 1<<20)
 	c := codec.NewDefault()
 
 	errs := wrappers.Errs{}
@@ -142,6 +175,12 @@ func (vm *VM) Initialize(
 		c.RegisterType(&OperationTx{}),
 		c.RegisterType(&ImportTx{}),
 		c.RegisterType(&ExportTx{}),
+
+		vm.genesisCodec.RegisterType(&BaseTx{}),
+		vm.genesisCodec.RegisterType(&CreateAssetTx{}),
+		vm.genesisCodec.RegisterType(&OperationTx{}),
+		vm.genesisCodec.RegisterType(&ImportTx{}),
+		vm.genesisCodec.RegisterType(&ExportTx{}),
 	)
 	if errs.Errored() {
 		return errs.Err
@@ -161,7 +200,8 @@ func (vm *VM) Initialize(
 			Fx: fx,
 		}
 		vm.codec = &codecRegistry{
-			Codec:         c,
+			genesisCodec:  vm.genesisCodec,
+			codec:         c,
 			index:         i,
 			typeToFxIndex: vm.typeToFxIndex,
 		}
@@ -174,9 +214,10 @@ func (vm *VM) Initialize(
 
 	vm.state = &prefixedState{
 		state: &state{State: avax.State{
-			Cache: &cache.LRU{Size: stateCacheSize},
-			DB:    vm.db,
-			Codec: vm.codec,
+			Cache:        &cache.LRU{Size: stateCacheSize},
+			DB:           vm.db,
+			GenesisCodec: vm.genesisCodec,
+			Codec:        vm.codec,
 		}},
 
 		tx:       &cache.LRU{Size: idCacheSize},
@@ -490,7 +531,7 @@ func (vm *VM) FlushTxs() {
 
 func (vm *VM) initAliases(genesisBytes []byte) error {
 	genesis := Genesis{}
-	if err := vm.codec.Unmarshal(genesisBytes, &genesis); err != nil {
+	if err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return err
 	}
 
@@ -502,7 +543,7 @@ func (vm *VM) initAliases(genesisBytes []byte) error {
 		tx := Tx{
 			UnsignedTx: &genesisTx.CreateAssetTx,
 		}
-		if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
+		if err := tx.SignSECP256K1Fx(vm.genesisCodec, nil); err != nil {
 			return err
 		}
 
@@ -517,7 +558,7 @@ func (vm *VM) initAliases(genesisBytes []byte) error {
 
 func (vm *VM) initState(genesisBytes []byte) error {
 	genesis := Genesis{}
-	if err := vm.codec.Unmarshal(genesisBytes, &genesis); err != nil {
+	if err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return err
 	}
 
@@ -529,7 +570,7 @@ func (vm *VM) initState(genesisBytes []byte) error {
 		tx := Tx{
 			UnsignedTx: &genesisTx.CreateAssetTx,
 		}
-		if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
+		if err := tx.SignSECP256K1Fx(vm.genesisCodec, nil); err != nil {
 			return err
 		}
 

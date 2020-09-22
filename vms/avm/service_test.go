@@ -1156,7 +1156,7 @@ func TestImportAVAX(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	args := &ImportAVAXArgs{
+	args := &ImportArgs{
 		UserPass: api.UserPass{
 			Username: username,
 			Password: password,

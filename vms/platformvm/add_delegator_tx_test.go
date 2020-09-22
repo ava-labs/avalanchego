@@ -32,8 +32,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if err := unsignedTx.Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
@@ -60,8 +58,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
@@ -88,8 +84,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
@@ -116,8 +110,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
@@ -144,8 +136,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if err = tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
@@ -171,8 +161,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
@@ -194,8 +182,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	} else if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,

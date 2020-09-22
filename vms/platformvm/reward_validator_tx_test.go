@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/core"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -95,9 +94,9 @@ func TestUnsignedRewardValidatorTxSemanticVerify(t *testing.T) {
 		if onAbortBalance != oldBalance+toRemove.Validator.Weight() {
 			t.Fatalf("on abort, should have got back staked amount")
 		}
-		if onCommitBalance != oldBalance+toRemove.Validator.Weight() {
+		if onCommitBalance != oldBalance+toRemove.Validator.Weight()+27 {
 			t.Fatalf("on commit, should have old balance (%d) + staked amount (%d) + reward (%d) but have %d",
-				oldBalance, toRemove.Validator.Weight(), 0, onCommitBalance)
+				oldBalance, toRemove.Validator.Weight(), 27, onCommitBalance)
 		}
 	}
 }
@@ -109,6 +108,11 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 		vm.Shutdown()
 		vm.Ctx.Lock.Unlock()
 	}()
+
+	initialSupply, err := vm.getCurrentSupply(vm.DB)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
@@ -224,7 +228,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 
 	if supply, err := vm.getCurrentSupply(onAbortDB); err != nil {
 		t.Fatal(err)
-	} else if supply != 360*units.MegaAvax-expectedReward {
+	} else if supply != initialSupply-expectedReward {
 		t.Fatalf("should have removed un-rewarded tokens from the potential supply")
 	}
 }
@@ -234,9 +238,10 @@ func TestOptimisticUptime(t *testing.T) {
 	db := memdb.New()
 
 	firstVM := &VM{
-		SnowmanVM:        &core.SnowmanVM{},
-		chainManager:     chains.MockManager{},
-		uptimePercentage: .2,
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		uptimePercentage:   .2,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 	firstVM.vdrMgr = validators.NewManager()
 	firstVM.clock.Set(defaultGenesisTime)
@@ -374,9 +379,10 @@ func TestObservedUptime(t *testing.T) {
 	db := memdb.New()
 
 	firstVM := &VM{
-		SnowmanVM:        &core.SnowmanVM{},
-		chainManager:     chains.MockManager{},
-		uptimePercentage: .2,
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		uptimePercentage:   .2,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 	firstVM.vdrMgr = validators.NewManager()
 	firstVM.clock.Set(defaultGenesisTime)
@@ -518,9 +524,10 @@ func TestUptimeDisallowed(t *testing.T) {
 	db := memdb.New()
 
 	firstVM := &VM{
-		SnowmanVM:        &core.SnowmanVM{},
-		chainManager:     chains.MockManager{},
-		uptimePercentage: .2,
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		uptimePercentage:   .2,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 	firstVM.vdrMgr = validators.NewManager()
 	firstVM.clock.Set(defaultGenesisTime)

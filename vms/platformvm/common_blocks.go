@@ -205,9 +205,6 @@ func (cdb *CommonDecisionBlock) onAccept() database.Database {
 	if cdb.Status().Decided() {
 		return cdb.vm.DB
 	}
-	if cdb.onAcceptDB == nil {
-		panic(":(")
-	}
 	return cdb.onAcceptDB
 }
 
