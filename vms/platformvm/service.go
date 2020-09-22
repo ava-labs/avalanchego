@@ -30,6 +30,9 @@ const (
 
 	// Max number of addresses that can be passed in as argument to GetStake
 	maxGetStakeAddrs = 256
+
+	// Max number of addresses allowed for a single keystore user
+	maxKeystoreAddresses = 5000
 )
 
 var (
@@ -110,34 +113,43 @@ type ImportKeyArgs struct {
 func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JsonAddress) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ImportKey called for user '%s'", args.Username)
 
-	if !strings.HasPrefix(args.PrivateKey, constants.SecretKeyPrefix) {
-		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
-	}
-
-	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
-	formattedPrivateKey := formatting.CB58{}
-	if err := formattedPrivateKey.FromString(trimmedPrivateKey); err != nil {
-		return fmt.Errorf("problem parsing private key: %w", err)
-	}
-
-	factory := crypto.FactorySECP256K1R{}
-	skIntf, err := factory.ToPrivateKey(formattedPrivateKey.Bytes)
-	if err != nil {
-		return fmt.Errorf("problem parsing private key: %w", err)
-	}
-	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
-
-	reply.Address, err = service.vm.FormatLocalAddress(sk.PublicKey().Address())
-	if err != nil {
-		return fmt.Errorf("problem formatting address: %w", err)
-	}
-
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
 		return fmt.Errorf("problem retrieving data: %w", err)
 	}
 
 	user := user{db: db}
+	if addrs, _ := user.getAddresses(); len(addrs) >= maxKeystoreAddresses {
+		_ = db.Close()
+		return fmt.Errorf("keystore user has reached its limit of %d addresses", maxKeystoreAddresses)
+	}
+
+	if !strings.HasPrefix(args.PrivateKey, constants.SecretKeyPrefix) {
+		_ = db.Close()
+		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
+	}
+
+	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
+	formattedPrivateKey := formatting.CB58{}
+	if err := formattedPrivateKey.FromString(trimmedPrivateKey); err != nil {
+		_ = db.Close()
+		return fmt.Errorf("problem parsing private key: %w", err)
+	}
+
+	factory := crypto.FactorySECP256K1R{}
+	skIntf, err := factory.ToPrivateKey(formattedPrivateKey.Bytes)
+	if err != nil {
+		_ = db.Close()
+		return fmt.Errorf("problem parsing private key: %w", err)
+	}
+	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
+
+	reply.Address, err = service.vm.FormatLocalAddress(sk.PublicKey().Address())
+	if err != nil {
+		_ = db.Close()
+		return fmt.Errorf("problem formatting address: %w", err)
+	}
+
 	if err := user.putAddress(sk); err != nil {
 		// Drop any potential error closing the database to report the original
 		// error
@@ -262,23 +274,30 @@ utxoFor:
 func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, response *api.JsonAddress) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: CreateAddress called")
 
+	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		_ = db.Close()
+		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+	}
+	user := user{db: db}
+	if addrs, _ := user.getAddresses(); len(addrs) >= maxKeystoreAddresses {
+		_ = db.Close()
+		return fmt.Errorf("keystore user has reached its limit of %d addresses", maxKeystoreAddresses)
+	}
+
 	factory := crypto.FactorySECP256K1R{}
 	key, err := factory.NewPrivateKey()
 	if err != nil {
+		_ = db.Close()
 		return fmt.Errorf("couldn't create key: %w", err)
 	}
 
 	response.Address, err = service.vm.FormatLocalAddress(key.PublicKey().Address())
 	if err != nil {
+		_ = db.Close()
 		return fmt.Errorf("problem formatting address: %w", err)
 	}
 
-	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
-	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
-	}
-
-	user := user{db: db}
 	if err := user.putAddress(key.(*crypto.PrivateKeySECP256K1R)); err != nil {
 		// Drop any potential error closing the database to report the original
 		// error
