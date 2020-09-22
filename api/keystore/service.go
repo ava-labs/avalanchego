@@ -31,7 +31,7 @@ const (
 	// maxUserLen is the maximum allowed length of a username
 	maxUserLen = 1024
 
-	maxPackerSize  = 1 << 20 // max size, in bytes, of something being marshalled by Marshal()
+	maxPackerSize  = 1 << 30 // max size, in bytes, of something being marshalled by Marshal()
 	maxSliceLength = 1 << 18
 )
 
