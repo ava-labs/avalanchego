@@ -30,6 +30,9 @@ import (
 const (
 	// maxUserLen is the maximum allowed length of a username
 	maxUserLen = 1024
+
+	maxPackerSize  = 1 << 20 // max size, in bytes, of something being marshalled by Marshal()
+	maxSliceLength = 1 << 18
 )
 
 var (
@@ -75,7 +78,7 @@ type Keystore struct {
 // Initialize the keystore
 func (ks *Keystore) Initialize(log logging.Logger, db database.Database) {
 	ks.log = log
-	ks.codec = codec.NewDefault()
+	ks.codec = codec.New(maxPackerSize, maxSliceLength)
 	ks.users = make(map[string]*password.Hash)
 	ks.userDB = prefixdb.New([]byte("users"), db)
 	ks.bcDB = prefixdb.New([]byte("bcs"), db)

@@ -39,9 +39,7 @@ github.com/aristanetworks/goarista v0.0.0-20170210015632-ea17b1a17847/go.mod h1:
 github.com/aristanetworks/goarista v0.0.0-20200812190859-4cb0e71f3c0e h1:tkEt0le4Lv5+VmcxZPIVSrP8LVPLhndIm/BOP7iPh/w=
 github.com/aristanetworks/goarista v0.0.0-20200812190859-4cb0e71f3c0e/go.mod h1:QZe5Yh80Hp1b6JxQdpfSEEe8X7hTyTEZSosSrFf/oJE=
 github.com/aristanetworks/splunk-hec-go v0.3.3/go.mod h1:1VHO9r17b0K7WmOlLb9nTk/2YanvOEnLMUgsFrxBROc=
-github.com/ava-labs/avalanche-go v0.8.0-beta h1:VdSvj5DKIdzdmK0tk8l1jQIc1m3N7KRTHXTW+9I1LfI=
 github.com/ava-labs/avalanche-go v0.8.0-beta/go.mod h1:quYojL1hu0ue2glUT1ng28kADs9R94zGdEvfW0/HRg8=
-github.com/ava-labs/avalanche-go v0.8.3 h1:QsfcuwQB7K5sS9NNthO8kX9rClJYFZ+awGs/eSjJgo4=
 github.com/ava-labs/avalanchego v0.6.1-rc.1/go.mod h1:TT6uA1BETZpVMR0xiFtE8I5Mv4DULlS+lAL3xuYKnpA=
 github.com/ava-labs/avalanchego v0.8.0-beta/go.mod h1:quYojL1hu0ue2glUT1ng28kADs9R94zGdEvfW0/HRg8=
 github.com/ava-labs/avalanchego v0.8.3/go.mod h1:6zPzQv7m6vSvdKAwH+lLTga0IMd/0+HLMT5OULrpFcU=
