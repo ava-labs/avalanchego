@@ -77,9 +77,6 @@ func (tx *UnsignedImportTx) Verify(
 			return err
 		}
 	}
-	if !IsSortedAndUniqueEVMOutputs(tx.Outs) {
-		return errExportOutputsNotSortedAndUnique
-	}
 
 	for _, in := range tx.ImportedInputs {
 		if err := in.Verify(); err != nil {

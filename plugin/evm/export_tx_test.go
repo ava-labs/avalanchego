@@ -121,24 +121,9 @@ func TestExportTxVerify(t *testing.T) {
 
 	exportTx.syntacticallyVerified = false
 	exportTx.ExportedOutputs = exportedOuts
-	inputs := exportTx.Ins
 	exportTx.Ins = nil
 	// Test No Exported Outputs Errors
 	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID); err == nil {
 		t.Fatal("ExportTx should have failed verification due to no inputs")
-	}
-
-	exportTx.syntacticallyVerified = false
-	exportTx.Ins = []EVMInput{inputs[1], inputs[0]}
-	// Test unsorted EVM Inputs Errors
-	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID); err == nil {
-		t.Fatal("ExportTx should have failed verification due to unsorted inputs")
-	}
-
-	exportTx.syntacticallyVerified = false
-	exportTx.Ins = []EVMInput{inputs[0], inputs[0]}
-	// Test non-unique EVM Inputs Errors
-	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID); err == nil {
-		t.Fatal("ExportTx should have failed verification due to non-unique inputs")
 	}
 }
