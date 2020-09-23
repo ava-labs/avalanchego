@@ -7,7 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 
-	"github.com/ava-labs/avalanche-go/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constants"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
