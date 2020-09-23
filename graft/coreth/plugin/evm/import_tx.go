@@ -64,6 +64,8 @@ func (tx *UnsignedImportTx) Verify(
 		return errWrongChainID
 	case len(tx.ImportedInputs) == 0:
 		return errNoImportInputs
+	case len(tx.Outs) == 0:
+		return errNoImportOutputs
 	case tx.NetworkID != ctx.NetworkID:
 		return errWrongNetworkID
 	case !ctx.ChainID.Equals(tx.BlockchainID):
