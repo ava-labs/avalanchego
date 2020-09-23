@@ -728,7 +728,10 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	}
 
 	for i, vdrIntf := range reply.Validators {
-		vdr := vdrIntf.(APIPrimaryValidator)
+		vdr, ok := vdrIntf.(APIPrimaryValidator)
+		if !ok {
+			continue
+		}
 		if delegators, ok := vdrTodelegators[vdr.NodeID]; ok {
 			vdr.Delegators = delegators
 		}
