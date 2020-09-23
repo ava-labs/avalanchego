@@ -101,6 +101,9 @@ func (t *Transitive) finishBootstrapping() error {
 
 // Gossip implements the Engine interface
 func (t *Transitive) Gossip() error {
+	if !t.IsBootstrapped() {
+		return nil // Only gossip after finishing bootstrapping
+	}
 	edge := t.Manager.Edge()
 	if len(edge) == 0 {
 		t.Ctx.Log.Verbo("dropping gossip request as no vertices have been accepted")

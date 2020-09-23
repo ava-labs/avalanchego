@@ -117,6 +117,9 @@ func (t *Transitive) finishBootstrapping() error {
 
 // Gossip implements the Engine interface
 func (t *Transitive) Gossip() error {
+	if !t.IsBootstrapped() {
+		return nil // Only gossip after finishing bootstrapping
+	}
 	blkID := t.VM.LastAccepted()
 	blk, err := t.VM.GetBlock(blkID)
 	if err != nil {
