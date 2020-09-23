@@ -118,12 +118,4 @@ func TestExportTxVerify(t *testing.T) {
 	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID); err == nil {
 		t.Fatal("ExportTx should have failed verification due to no exported outputs")
 	}
-
-	exportTx.syntacticallyVerified = false
-	exportTx.ExportedOutputs = exportedOuts
-	exportTx.Ins = nil
-	// Test No Exported Outputs Errors
-	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID); err == nil {
-		t.Fatal("ExportTx should have failed verification due to no inputs")
-	}
 }

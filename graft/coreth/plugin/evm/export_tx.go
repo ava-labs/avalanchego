@@ -56,8 +56,6 @@ func (tx *UnsignedExportTx) Verify(
 		return errWrongChainID
 	case !tx.DestinationChain.Equals(avmID):
 		return errWrongChainID
-	case len(tx.Ins) == 0:
-		return errNoExportInputs
 	case len(tx.ExportedOutputs) == 0:
 		return errNoExportOutputs
 	case tx.NetworkID != ctx.NetworkID:
