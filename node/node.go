@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -38,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -62,7 +64,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion(constants.PlatformName, 0, 8, 1)
+	Version       = version.NewDefaultVersion(constants.PlatformName, 1, 0, 0)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -136,6 +138,7 @@ func (n *Node) initNetworking() error {
 			return err
 		}
 
+		// #nosec G402
 		tlsConfig := &tls.Config{
 			Certificates: []tls.Certificate{cert},
 			ClientAuth:   tls.RequireAnyClientCert,
@@ -143,7 +146,8 @@ func (n *Node) initNetworking() error {
 			// We only require an authenticated channel based on the peer's
 			// public key. Therefore, we can safely skip CA verification.
 			//
-			// TODO: Security audit required
+			// During our security audit by Quantstamp, this was investigated
+			// and determinted to be safe and correct.
 			InsecureSkipVerify: true,
 		}
 
@@ -161,6 +165,38 @@ func (n *Node) initNetworking() error {
 		return err
 	}
 
+	consensusRouter := n.Config.ConsensusRouter
+	if !n.Config.EnableStaking {
+		if err := primaryNetworkValidators.AddWeight(n.ID, n.Config.DisabledStakingWeight); err != nil {
+			return err
+		}
+		consensusRouter = &insecureValidatorManager{
+			Router: consensusRouter,
+			vdrs:   primaryNetworkValidators,
+			weight: n.Config.DisabledStakingWeight,
+		}
+	}
+
+	bootstrapWeight := n.beacons.Weight()
+	reqWeight := (3*bootstrapWeight + 3) / 4
+
+	if reqWeight > 0 {
+		timer := timer.NewTimer(func() {
+			n.Log.Fatal("Failed to connect to bootstrap nodes. Node shutting down...")
+			go n.Net.Close()
+		})
+
+		go timer.Dispatch()
+		timer.SetTimeoutIn(15 * time.Second)
+
+		consensusRouter = &beaconManager{
+			Router:         consensusRouter,
+			timer:          timer,
+			beacons:        n.beacons,
+			requiredWeight: reqWeight,
+		}
+	}
+
 	n.Net = network.NewDefaultNetwork(
 		n.Config.ConsensusParams.Metrics,
 		n.Log,
@@ -175,15 +211,8 @@ func (n *Node) initNetworking() error {
 		clientUpgrader,
 		primaryNetworkValidators,
 		n.beacons,
-		n.Config.ConsensusRouter,
+		consensusRouter,
 	)
-
-	if !n.Config.EnableStaking {
-		n.Net.RegisterConnector(&insecureValidatorManager{
-			vdrs:   primaryNetworkValidators,
-			weight: n.Config.DisabledStakingWeight,
-		})
-	}
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
 		// errors are already logged internally if they are meaningful
@@ -194,20 +223,61 @@ func (n *Node) initNetworking() error {
 }
 
 type insecureValidatorManager struct {
+	router.Router
 	vdrs   validators.Set
 	weight uint64
 }
 
-func (i *insecureValidatorManager) Connected(vdrID ids.ShortID) bool {
+func (i *insecureValidatorManager) Connected(vdrID ids.ShortID) {
 	_ = i.vdrs.AddWeight(vdrID, i.weight)
-	return false
+	i.Router.Connected(vdrID)
 }
 
-func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) bool {
+func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) {
 	// Shouldn't error unless the set previously had an error, which should
 	// never happen as described above
 	_ = i.vdrs.RemoveWeight(vdrID, i.weight)
-	return false
+	i.Router.Disconnected(vdrID)
+}
+
+type beaconManager struct {
+	router.Router
+	timer          *timer.Timer
+	beacons        validators.Set
+	requiredWeight uint64
+	weight         uint64
+}
+
+func (b *beaconManager) Connected(vdrID ids.ShortID) {
+	weight, ok := b.beacons.GetWeight(vdrID)
+	if !ok {
+		b.Router.Connected(vdrID)
+		return
+	}
+	weight, err := math.Add64(weight, b.weight)
+	if err != nil {
+		b.timer.Cancel()
+		b.Router.Connected(vdrID)
+		return
+	}
+	b.weight = weight
+	if b.weight >= b.requiredWeight {
+		b.timer.Cancel()
+	}
+	b.Router.Connected(vdrID)
+}
+
+func (b *beaconManager) Disconnected(vdrID ids.ShortID) {
+	if weight, ok := b.beacons.GetWeight(vdrID); ok {
+		// TODO: Account for weight changes in a more robust manner.
+
+		// Sub64 should rarely error since only validators that have added their
+		// weight can become disconnected. Because it is possible that there are
+		// changes to the validators set, we utilize that Sub64 returns 0 on
+		// error.
+		b.weight, _ = math.Sub64(b.weight, weight)
+	}
+	b.Router.Disconnected(vdrID)
 }
 
 // Dispatch starts the node's servers.
@@ -363,28 +433,6 @@ func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 		CustomBeacons: n.beacons,
 	})
 
-	bootstrapWeight := n.beacons.Weight()
-
-	reqWeight := (3*bootstrapWeight + 3) / 4
-
-	if reqWeight == 0 {
-		return nil
-	}
-
-	connectToBootstrapsTimeout := timer.NewTimer(func() {
-		n.Log.Fatal("Failed to connect to bootstrap nodes. Node shutting down...")
-		go n.Net.Close()
-	})
-
-	awaiter := chains.NewAwaiter(n.beacons, reqWeight, func() {
-		n.Log.Info("Connected to required bootstrap nodes. Starting Platform Chain...")
-		connectToBootstrapsTimeout.Cancel()
-	})
-
-	go connectToBootstrapsTimeout.Dispatch()
-	connectToBootstrapsTimeout.SetTimeoutIn(15 * time.Second)
-
-	n.Net.RegisterConnector(awaiter)
 	return nil
 }
 
@@ -427,6 +475,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
 
 	n.Config.ConsensusRouter.Initialize(
+		n.ID,
 		n.Log,
 		&timeoutManager,
 		n.Config.ConsensusGossipFrequency,
@@ -471,15 +520,23 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		n.vmManager.RegisterVMFactory(platformvm.ID, &platformvm.Factory{
-			ChainManager:     n.chainManager,
-			Validators:       vdrs,
-			StakingEnabled:   n.Config.EnableStaking,
-			Fee:              n.Config.TxFee,
-			MinStake:         n.Config.MinStake,
-			UptimePercentage: n.Config.UptimeRequirement,
+			ChainManager:       n.chainManager,
+			Validators:         vdrs,
+			StakingEnabled:     n.Config.EnableStaking,
+			CreationFee:        n.Config.CreationTxFee,
+			Fee:                n.Config.TxFee,
+			UptimePercentage:   n.Config.UptimeRequirement,
+			MinValidatorStake:  n.Config.MinValidatorStake,
+			MaxValidatorStake:  n.Config.MaxValidatorStake,
+			MinDelegatorStake:  n.Config.MinDelegatorStake,
+			MinDelegationFee:   n.Config.MinDelegationFee,
+			MinStakeDuration:   n.Config.MinStakeDuration,
+			MaxStakeDuration:   n.Config.MaxStakeDuration,
+			StakeMintingPeriod: n.Config.StakeMintingPeriod,
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
-			Fee: n.Config.TxFee,
+			CreationFee: n.Config.CreationTxFee,
+			Fee:         n.Config.TxFee,
 		}),
 		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
 			Path: filepath.Join(n.Config.PluginDir, "evm"),
@@ -563,11 +620,20 @@ func (n *Node) initAdminAPI() error {
 
 func (n *Node) initInfoAPI() error {
 	if !n.Config.InfoAPIEnabled {
-		n.Log.Info("skipping info API initializaion because it has been disabled")
+		n.Log.Info("skipping info API initialization because it has been disabled")
 		return nil
 	}
 	n.Log.Info("initializing info API")
-	service, err := info.NewService(n.Log, Version, n.ID, n.Config.NetworkID, n.chainManager, n.Net, n.Config.TxFee)
+	service, err := info.NewService(
+		n.Log,
+		Version,
+		n.ID,
+		n.Config.NetworkID,
+		n.chainManager,
+		n.Net,
+		n.Config.CreationTxFee,
+		n.Config.TxFee,
+	)
 	if err != nil {
 		return err
 	}
@@ -631,9 +697,9 @@ func (n *Node) initIPCAPI() error {
 }
 
 // Give chains and VMs aliases as specified by the genesis information
-func (n *Node) initAliases() error {
+func (n *Node) initAliases(genesisBytes []byte) error {
 	n.Log.Info("initializing aliases")
-	defaultAliases, chainAliases, vmAliases, err := genesis.Aliases(n.Config.NetworkID)
+	defaultAliases, chainAliases, vmAliases, err := genesis.Aliases(genesisBytes)
 	if err != nil {
 		return err
 	}
@@ -730,7 +796,7 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	if err := n.initIPCAPI(); err != nil { // Start the IPC API
 		return fmt.Errorf("couldn't initialize the IPC API: %w", err)
 	}
-	if err := n.initAliases(); err != nil { // Set up aliases
+	if err := n.initAliases(genesisBytes); err != nil { // Set up aliases
 		return fmt.Errorf("couldn't initialize aliases: %w", err)
 	}
 	if err := n.initChains(genesisBytes, avaxAssetID); err != nil { // Start the Platform chain

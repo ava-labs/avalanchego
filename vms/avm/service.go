@@ -42,6 +42,7 @@ var (
 	errInvalidUTXO            = errors.New("invalid utxo")
 	errNilTxID                = errors.New("nil transaction ID")
 	errNoAddresses            = errors.New("no addresses provided")
+	errNoKeys                 = errors.New("from addresses have no keys or funds")
 )
 
 // Service defines the base service for the asset vm
@@ -414,11 +415,11 @@ func (service *Service) GetAllBalances(r *http.Request, args *api.JsonAddress, r
 
 // CreateFixedCapAssetArgs are arguments for passing into CreateFixedCapAsset requests
 type CreateFixedCapAssetArgs struct {
-	api.UserPass
-	Name           string    `json:"name"`
-	Symbol         string    `json:"symbol"`
-	Denomination   byte      `json:"denomination"`
-	InitialHolders []*Holder `json:"initialHolders"`
+	api.JsonSpendHeader           // User, password, from addrs, change addr
+	Name                string    `json:"name"`
+	Symbol              string    `json:"symbol"`
+	Denomination        byte      `json:"denomination"`
+	InitialHolders      []*Holder `json:"initialHolders"`
 }
 
 // Holder describes how much an address owns of an asset
@@ -427,8 +428,14 @@ type Holder struct {
 	Address string      `json:"address"`
 }
 
+// AssetIDChangeAddr is an asset ID and a change address
+type AssetIDChangeAddr struct {
+	FormattedAssetID
+	api.JsonChangeAddr
+}
+
 // CreateFixedCapAsset returns ID of the newly created asset
-func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCapAssetArgs, reply *FormattedAssetID) error {
+func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCapAssetArgs, reply *AssetIDChangeAddr) error {
 	service.vm.ctx.Log.Info("AVM: CreateFixedCapAsset called with name: %s symbol: %s number of holders: %d",
 		args.Name,
 		args.Symbol,
@@ -439,9 +446,32 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 		return errNoHolders
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// Get the UTXOs/keys for the from addresses
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return err
+	}
+
+	// Parse the change address.
+	if len(kc.Keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use an arbitrary key
+	if args.ChangeAddr != "" {                     // If change addr specified, use that
+		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse changeAddr: %w", err)
+		}
 	}
 
 	avaxKey := service.vm.ctx.AVAXAssetID.Key()
@@ -449,7 +479,7 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 		utxos,
 		kc,
 		map[[32]byte]uint64{
-			avaxKey: service.vm.txFee,
+			avaxKey: service.vm.creationTxFee,
 		},
 	)
 	if err != nil {
@@ -457,12 +487,11 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 	}
 
 	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.txFee {
-		changeAddr := kc.Keys[0].PublicKey().Address()
+	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.creationTxFee {
 		outs = append(outs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - service.vm.txFee,
+				Amt: amountSpent - service.vm.creationTxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -513,16 +542,17 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 	}
 
 	reply.AssetID = assetID
-	return nil
+	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
+	return err
 }
 
 // CreateVariableCapAssetArgs are arguments for passing into CreateVariableCapAsset requests
 type CreateVariableCapAssetArgs struct {
-	api.UserPass
-	Name         string   `json:"name"`
-	Symbol       string   `json:"symbol"`
-	Denomination byte     `json:"denomination"`
-	MinterSets   []Owners `json:"minterSets"`
+	api.JsonSpendHeader          // User, password, from addrs, change addr
+	Name                string   `json:"name"`
+	Symbol              string   `json:"symbol"`
+	Denomination        byte     `json:"denomination"`
+	MinterSets          []Owners `json:"minterSets"`
 }
 
 // Owners describes who can perform an action
@@ -532,7 +562,7 @@ type Owners struct {
 }
 
 // CreateVariableCapAsset returns ID of the newly created asset
-func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVariableCapAssetArgs, reply *FormattedAssetID) error {
+func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVariableCapAssetArgs, reply *AssetIDChangeAddr) error {
 	service.vm.ctx.Log.Info("AVM: CreateVariableCapAsset called with name: %s symbol: %s number of minters: %d",
 		args.Name,
 		args.Symbol,
@@ -543,9 +573,32 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 		return errNoMinters
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// Get the UTXOs/keys for the from addresses
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return err
+	}
+
+	// Parse the change address.
+	if len(kc.Keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use an arbitrary key
+	if args.ChangeAddr != "" {                     // If change addr specified, use that
+		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse changeAddr: %w", err)
+		}
 	}
 
 	avaxKey := service.vm.ctx.AVAXAssetID.Key()
@@ -553,7 +606,7 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 		utxos,
 		kc,
 		map[[32]byte]uint64{
-			avaxKey: service.vm.txFee,
+			avaxKey: service.vm.creationTxFee,
 		},
 	)
 	if err != nil {
@@ -561,12 +614,11 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 	}
 
 	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.txFee {
-		changeAddr := kc.Keys[0].PublicKey().Address()
+	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.creationTxFee {
 		outs = append(outs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - service.vm.txFee,
+				Amt: amountSpent - service.vm.creationTxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -621,19 +673,20 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 	}
 
 	reply.AssetID = assetID
-	return nil
+	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
+	return err
 }
 
 // CreateNFTAssetArgs are arguments for passing into CreateNFTAsset requests
 type CreateNFTAssetArgs struct {
-	api.UserPass
-	Name       string   `json:"name"`
-	Symbol     string   `json:"symbol"`
-	MinterSets []Owners `json:"minterSets"`
+	api.JsonSpendHeader          // User, password, from addrs, change addr
+	Name                string   `json:"name"`
+	Symbol              string   `json:"symbol"`
+	MinterSets          []Owners `json:"minterSets"`
 }
 
 // CreateNFTAsset returns ID of the newly created asset
-func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs, reply *FormattedAssetID) error {
+func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs, reply *AssetIDChangeAddr) error {
 	service.vm.ctx.Log.Info("AVM: CreateNFTAsset called with name: %s symbol: %s number of minters: %d",
 		args.Name,
 		args.Symbol,
@@ -644,9 +697,32 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 		return errNoMinters
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// Get the UTXOs/keys for the from addresses
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return err
+	}
+
+	// Parse the change address.
+	if len(kc.Keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use an arbitrary key
+	if args.ChangeAddr != "" {                     // If change addr specified, use that
+		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse changeAddr: %w", err)
+		}
 	}
 
 	avaxKey := service.vm.ctx.AVAXAssetID.Key()
@@ -654,7 +730,7 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 		utxos,
 		kc,
 		map[[32]byte]uint64{
-			avaxKey: service.vm.txFee,
+			avaxKey: service.vm.creationTxFee,
 		},
 	)
 	if err != nil {
@@ -662,12 +738,11 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 	}
 
 	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.txFee {
-		changeAddr := kc.Keys[0].PublicKey().Address()
+	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.creationTxFee {
 		outs = append(outs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - service.vm.txFee,
+				Amt: amountSpent - service.vm.creationTxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -722,7 +797,8 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 	}
 
 	reply.AssetID = assetID
-	return nil
+	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
+	return err
 }
 
 // CreateAddress creates an address for the user [args.Username]
@@ -906,8 +982,8 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 
 // SendArgs are arguments for passing into Send requests
 type SendArgs struct {
-	// Username and password of user sending the funds
-	api.UserPass
+	// User, password, from addrs, change addr
+	api.JsonSpendHeader
 
 	// The amount of funds to send
 	Amount json.Uint64 `json:"amount"`
@@ -928,9 +1004,10 @@ type SendArgs struct {
 }
 
 // Send returns the ID of the newly created transaction
-func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxID) error {
+func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxIDChangeAddr) error {
 	service.vm.ctx.Log.Info("AVM: Send called with username: %s", args.Username)
 
+	// Validate the memo field
 	memoBytes := []byte(args.Memo)
 	if l := len(memoBytes); l > avax.MaxMemoSize {
 		return fmt.Errorf("max memo length is %d but provided memo field is length %d", avax.MaxMemoSize, l)
@@ -938,6 +1015,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 		return errInvalidAmount
 	}
 
+	// Parse the asset ID
 	assetID, err := service.vm.Lookup(args.AssetID)
 	if err != nil {
 		assetID, err = ids.FromString(args.AssetID)
@@ -946,11 +1024,13 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 		}
 	}
 
+	// Parse the to address
 	to, err := service.vm.ParseLocalAddress(args.To)
 	if err != nil {
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
+	// Parse the from addresses
 	fromAddrs := ids.ShortSet{}
 	for _, addrStr := range args.From {
 		addr, err := service.vm.ParseLocalAddress(addrStr)
@@ -959,9 +1039,23 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 		}
 		fromAddrs.Add(addr)
 	}
+
+	// Load user's UTXOs/keys
 	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return err
+	}
+
+	// Parse the change address.
+	if len(kc.Keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use an arbitrary key
+	if args.ChangeAddr != "" {                     // If change addr specified, use that
+		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse changeAddr: %w", err)
+		}
 	}
 
 	amounts := map[[32]byte]uint64{
@@ -1008,7 +1102,6 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 			})
 		}
 		if amountSpent > amountWithFee {
-			changeAddr := kc.Keys[0].PublicKey().Address()
 			outs = append(outs, &avax.TransferableOutput{
 				Asset: avax.Asset{ID: assetID},
 				Out: &secp256k1fx.TransferOutput{
@@ -1041,19 +1134,20 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 	}
 
 	reply.TxID = txID
-	return nil
+	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
+	return err
 }
 
 // MintArgs are arguments for passing into Mint requests
 type MintArgs struct {
-	api.UserPass
-	Amount  json.Uint64 `json:"amount"`
-	AssetID string      `json:"assetID"`
-	To      string      `json:"to"`
+	api.JsonSpendHeader             // User, password, from addrs, change addr
+	Amount              json.Uint64 `json:"amount"`
+	AssetID             string      `json:"assetID"`
+	To                  string      `json:"to"`
 }
 
 // Mint issues a transaction that mints more of the asset
-func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxID) error {
+func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxIDChangeAddr) error {
 	service.vm.ctx.Log.Info("AVM: Mint called with username: %s", args.Username)
 
 	if args.Amount == 0 {
@@ -1073,15 +1167,38 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxI
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// Get the UTXOs/keys for the from addresses
+	feeUTXOs, feeKc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return err
 	}
 
+	// Parse the change address.
+	if len(feeKc.Keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := feeKc.Keys[0].PublicKey().Address() // By default, use an arbitrary key
+	if args.ChangeAddr != "" {                        // If change addr specified, use that
+		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse changeAddr: %w", err)
+		}
+	}
+
 	avaxKey := service.vm.ctx.AVAXAssetID.Key()
 	amountsSpent, ins, keys, err := service.vm.Spend(
-		utxos,
-		kc,
+		feeUTXOs,
+		feeKc,
 		map[[32]byte]uint64{
 			avaxKey: service.vm.txFee,
 		},
@@ -1092,7 +1209,6 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxI
 
 	outs := []*avax.TransferableOutput{}
 	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.txFee {
-		changeAddr := kc.Keys[0].PublicKey().Address()
 		outs = append(outs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
@@ -1104,6 +1220,12 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxI
 				},
 			},
 		})
+	}
+
+	// Get all UTXOs/keys for the user
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
+	if err != nil {
+		return err
 	}
 
 	ops, opKeys, err := service.vm.Mint(
@@ -1138,21 +1260,23 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxI
 	}
 
 	reply.TxID = txID
-	return nil
+	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
+	return err
 }
 
 // SendNFTArgs are arguments for passing into SendNFT requests
 type SendNFTArgs struct {
-	api.UserPass
-	AssetID string      `json:"assetID"`
-	GroupID json.Uint32 `json:"groupID"`
-	To      string      `json:"to"`
+	api.JsonSpendHeader             // User, password, from addrs, change addr
+	AssetID             string      `json:"assetID"`
+	GroupID             json.Uint32 `json:"groupID"`
+	To                  string      `json:"to"`
 }
 
 // SendNFT sends an NFT
-func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.JsonTxID) error {
+func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.JsonTxIDChangeAddr) error {
 	service.vm.ctx.Log.Info("AVM: SendNFT called with username: %s", args.Username)
 
+	// Parse the asset ID
 	assetID, err := service.vm.Lookup(args.AssetID)
 	if err != nil {
 		assetID, err = ids.FromString(args.AssetID)
@@ -1161,14 +1285,38 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 		}
 	}
 
+	// Parse the to address
 	to, err := service.vm.ParseLocalAddress(args.To)
 	if err != nil {
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// Get the UTXOs/keys for the from addresses
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return err
+	}
+
+	// Parse the change address.
+	if len(kc.Keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use an arbitrary key
+	if args.ChangeAddr != "" {                     // If change addr specified, use that
+		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse changeAddr: %w", err)
+		}
 	}
 
 	avaxKey := service.vm.ctx.AVAXAssetID.Key()
@@ -1185,7 +1333,6 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 
 	outs := []*avax.TransferableOutput{}
 	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.txFee {
-		changeAddr := kc.Keys[0].PublicKey().Address()
 		outs = append(outs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
@@ -1232,19 +1379,20 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 	}
 
 	reply.TxID = txID
-	return nil
+	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
+	return err
 }
 
 // MintNFTArgs are arguments for passing into MintNFT requests
 type MintNFTArgs struct {
-	api.UserPass
-	AssetID string          `json:"assetID"`
-	Payload formatting.CB58 `json:"payload"`
-	To      string          `json:"to"`
+	api.JsonSpendHeader                 // User, password, from addrs, change addr
+	AssetID             string          `json:"assetID"`
+	Payload             formatting.CB58 `json:"payload"`
+	To                  string          `json:"to"`
 }
 
 // MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
-func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.JsonTxID) error {
+func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.JsonTxIDChangeAddr) error {
 	service.vm.ctx.Log.Info("AVM: MintNFT called with username: %s", args.Username)
 
 	assetID, err := service.vm.Lookup(args.AssetID)
@@ -1260,15 +1408,38 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// Get the UTXOs/keys for the from addresses
+	feeUTXOs, feeKc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return err
 	}
 
+	// Parse the change address.
+	if len(feeKc.Keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := feeKc.Keys[0].PublicKey().Address() // By default, use an arbitrary key
+	if args.ChangeAddr != "" {                        // If change addr specified, use that
+		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse changeAddr: %w", err)
+		}
+	}
+
 	avaxKey := service.vm.ctx.AVAXAssetID.Key()
 	amountsSpent, ins, secpKeys, err := service.vm.Spend(
-		utxos,
-		kc,
+		feeUTXOs,
+		feeKc,
 		map[[32]byte]uint64{
 			avaxKey: service.vm.txFee,
 		},
@@ -1279,7 +1450,6 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 
 	outs := []*avax.TransferableOutput{}
 	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.txFee {
-		changeAddr := kc.Keys[0].PublicKey().Address()
 		outs = append(outs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
@@ -1291,6 +1461,12 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 				},
 			},
 		})
+	}
+
+	// Get all UTXOs/keys
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
+	if err != nil {
+		return err
 	}
 
 	ops, nftKeys, err := service.vm.MintNFT(
@@ -1326,11 +1502,12 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 	}
 
 	reply.TxID = txID
-	return nil
+	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
+	return err
 }
 
-// ImportAVAXArgs are arguments for passing into ImportAVAX requests
-type ImportAVAXArgs struct {
+// ImportArgs are arguments for passing into Import requests
+type ImportArgs struct {
 	// User that controls To
 	api.UserPass
 
@@ -1341,11 +1518,16 @@ type ImportAVAXArgs struct {
 	To string `json:"to"`
 }
 
-// ImportAVAX imports AVAX to this chain from the P-Chain.
-// The AVAX must have already been exported from the P-Chain.
+// ImportAVAX is a deprecated name for Import.
+func (service *Service) ImportAVAX(_ *http.Request, args *ImportArgs, reply *api.JsonTxID) error {
+	return service.Import(nil, args, reply)
+}
+
+// Import imports an asset to this chain from the P/C-Chain.
+// The AVAX must have already been exported from the P/C-Chain.
 // Returns the ID of the newly created atomic transaction
-func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, reply *api.JsonTxID) error {
-	service.vm.ctx.Log.Info("AVM: ImportAVAX called with username: %s", args.Username)
+func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JsonTxID) error {
+	service.vm.ctx.Log.Info("AVM: Import called with username: %s", args.Username)
 
 	chainID, err := service.vm.ctx.BCLookup.Lookup(args.SourceChain)
 	if err != nil {
@@ -1447,8 +1629,8 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, reply 
 
 // ExportAVAXArgs are arguments for passing into ExportAVA requests
 type ExportAVAXArgs struct {
-	api.UserPass // User providing exported AVAX
-
+	// User, password, from addrs, change addr
+	api.JsonSpendHeader
 	// Amount of nAVAX to send
 	Amount json.Uint64 `json:"amount"`
 
@@ -1460,8 +1642,33 @@ type ExportAVAXArgs struct {
 // ExportAVAX sends AVAX from this chain to the P-Chain.
 // After this tx is accepted, the AVAX must be imported to the P-chain with an importTx.
 // Returns the ID of the newly created atomic transaction
-func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply *api.JsonTxID) error {
-	service.vm.ctx.Log.Info("AVM: ExportAVAX called with username: %s", args.Username)
+func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply *api.JsonTxIDChangeAddr) error {
+	return service.Export(nil, &ExportArgs{
+		ExportAVAXArgs: *args,
+		AssetID:        service.vm.ctx.AVAXAssetID.String(),
+	}, reply)
+}
+
+// ExportArgs are arguments for passing into ExportAVA requests
+type ExportArgs struct {
+	ExportAVAXArgs
+	AssetID string `json:"assetID"`
+}
+
+// Export sends an asset from this chain to the P/C-Chain.
+// After this tx is accepted, the AVAX must be imported to the P/C-chain with an importTx.
+// Returns the ID of the newly created atomic transaction
+func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JsonTxIDChangeAddr) error {
+	service.vm.ctx.Log.Info("AVM: Export called with username: %s", args.Username)
+
+	// Parse the asset ID
+	assetID, err := service.vm.Lookup(args.AssetID)
+	if err != nil {
+		assetID, err = ids.FromString(args.AssetID)
+		if err != nil {
+			return fmt.Errorf("asset '%s' not found", args.AssetID)
+		}
+	}
 
 	chainID, to, err := service.vm.ParseAddress(args.To)
 	if err != nil {
@@ -1472,32 +1679,54 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply 
 		return errInvalidAmount
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// Get the UTXOs/keys for the from addresses
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return err
 	}
 
-	amountWithFee, err := safemath.Add64(uint64(args.Amount), service.vm.txFee)
-	if err != nil {
-		return fmt.Errorf("problem calculating required spend amount: %w", err)
+	// Parse the change address.
+	if len(kc.Keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use an arbitrary key
+	if args.ChangeAddr != "" {                     // If change addr specified, use that
+		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse changeAddr: %w", err)
+		}
 	}
 
+	amounts := map[[32]byte]uint64{}
 	avaxKey := service.vm.ctx.AVAXAssetID.Key()
-	amountsSpent, ins, keys, err := service.vm.Spend(
-		utxos,
-		kc,
-		map[[32]byte]uint64{
-			avaxKey: amountWithFee,
-		},
-	)
+	if assetID.Equals(service.vm.ctx.AVAXAssetID) {
+		amountWithFee, err := safemath.Add64(uint64(args.Amount), service.vm.txFee)
+		if err != nil {
+			return fmt.Errorf("problem calculating required spend amount: %w", err)
+		}
+		amounts[avaxKey] = amountWithFee
+	} else {
+		amounts[avaxKey] = service.vm.txFee
+		amounts[assetID.Key()] = uint64(args.Amount)
+	}
+
+	amountsSpent, ins, keys, err := service.vm.Spend(utxos, kc, amounts)
 	if err != nil {
 		return err
 	}
-
-	amountSpent := amountsSpent[avaxKey]
 
 	exportOuts := []*avax.TransferableOutput{{
-		Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
+		Asset: avax.Asset{ID: assetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: uint64(args.Amount),
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -1509,20 +1738,23 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply 
 	}}
 
 	outs := []*avax.TransferableOutput{}
-	if amountSpent > amountWithFee {
-		changeAddr := kc.Keys[0].PublicKey().Address()
-		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - amountWithFee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{changeAddr},
+	for assetKey, amountSpent := range amountsSpent {
+		amountToSend := amounts[assetKey]
+		if amountSpent > amountToSend {
+			outs = append(outs, &avax.TransferableOutput{
+				Asset: avax.Asset{ID: ids.NewID(assetKey)},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: amountSpent - amountToSend,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{changeAddr},
+					},
 				},
-			},
-		})
+			})
+		}
 	}
+	avax.SortTransferableOutputs(outs, service.vm.codec)
 
 	tx := Tx{UnsignedTx: &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -1544,5 +1776,6 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply 
 	}
 
 	reply.TxID = txID
-	return nil
+	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
+	return err
 }

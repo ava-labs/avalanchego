@@ -26,6 +26,8 @@ var (
 	errDelegatorSubset = errors.New("delegator's time range must be a subset of the validator's time range")
 	errInvalidState    = errors.New("generated output isn't valid state")
 	errInvalidAmount   = errors.New("invalid amount")
+	errCapWeightBroken = errors.New("validator would surpass maximum weight")
+	errOverDelegated   = errors.New("validator would be over delegated")
 
 	_ UnsignedProposalTx = &UnsignedAddDelegatorTx{}
 	_ TimedTx            = &UnsignedAddDelegatorTx{}
@@ -53,19 +55,32 @@ func (tx *UnsignedAddDelegatorTx) EndTime() time.Time {
 	return tx.Validator.EndTime()
 }
 
+// Weight of this validator
+func (tx *UnsignedAddDelegatorTx) Weight() uint64 {
+	return tx.Validator.Weight()
+}
+
 // Verify return nil iff [tx] is valid
 func (tx *UnsignedAddDelegatorTx) Verify(
 	ctx *snow.Context,
 	c codec.Codec,
-	feeAmount uint64,
-	feeAssetID ids.ID,
-	minStake uint64,
+	minDelegatorStake uint64,
+	minStakeDuration time.Duration,
+	maxStakeDuration time.Duration,
 ) error {
 	switch {
 	case tx == nil:
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
+	}
+
+	duration := tx.Validator.Duration()
+	switch {
+	case duration < minStakeDuration: // Ensure staking length is not too short
+		return errStakeTooShort
+	case duration > maxStakeDuration: // Ensure staking length is not too long
+		return errStakeTooLong
 	}
 
 	if err := tx.BaseTx.Verify(ctx, c); err != nil {
@@ -92,7 +107,7 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 		return errOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
 		return errInvalidAmount
-	case tx.Validator.Wght < minStake:
+	case tx.Validator.Wght < minDelegatorStake:
 		// Ensure validator is staking at least the minimum amount
 		return errWeightTooSmall
 	}
@@ -115,7 +130,13 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	TxError,
 ) {
 	// Verify the tx is well-formed
-	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err != nil {
+	if err := tx.Verify(
+		vm.Ctx,
+		vm.codec,
+		vm.minDelegatorStake,
+		vm.minStakeDuration,
+		vm.maxStakeDuration,
+	); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
@@ -126,11 +147,14 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 		return nil, nil, nil, nil, permError{fmt.Errorf("chain timestamp (%s) not before validator's start time (%s)",
 			currentTimestamp,
 			validatorStartTime)}
+	} else if validatorStartTime.After(currentTimestamp.Add(maxFutureStartTime)) {
+		return nil, nil, nil, nil, permError{fmt.Errorf("validator start time (%s) more than two weeks after current chain timestamp (%s)", validatorStartTime, currentTimestamp)}
 	}
 
 	// Ensure that the period this delegator delegates is a subset of the time
 	// the validator validates.
 	vdr, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	vdrWeight := uint64(0)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
@@ -147,6 +171,29 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 		if !willBeValidator || !tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
 			return nil, nil, nil, nil, permError{errDelegatorSubset}
 		}
+		vdrWeight = vdr.Weight()
+	} else {
+		vdrWeight = vdr.Weight()
+	}
+
+	maxWeight, err := vm.maxStakeAmount(db, constants.PrimaryNetworkID, tx.Validator.NodeID, tx.StartTime(), tx.EndTime())
+	if err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
+	newWeight, err := safemath.Add64(maxWeight, tx.Validator.Wght)
+	if err != nil {
+		return nil, nil, nil, nil, permError{errStakeOverflow}
+	}
+	if newWeight > vm.maxValidatorStake {
+		return nil, nil, nil, nil, permError{errCapWeightBroken}
+	}
+
+	delegationRestrict, err := safemath.Mul64(5, vdrWeight)
+	if err != nil {
+		return nil, nil, nil, nil, permError{errStakeOverflow}
+	}
+	if newWeight > delegationRestrict {
+		return nil, nil, nil, nil, permError{errOverDelegated}
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
@@ -154,7 +201,7 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	copy(outs[len(tx.Outs):], tx.Stake)
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, 0, vm.Ctx.AVAXAssetID); err != nil {
 		return nil, nil, nil, nil, err
 	}
 
@@ -202,10 +249,11 @@ func (vm *VM) newAddDelegatorTx(
 	startTime, // Unix time they start delegating
 	endTime uint64, // Unix time they stop delegating
 	nodeID ids.ShortID, // ID of the node we are delegating to
-	rewardAddress ids.ShortID, // Address to returned staked tokens (and maybe reward) to
-	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens + fee
+	rewardAddress ids.ShortID, // Address to send reward to, if applicable
+	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens
+	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, vm.txFee)
+	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, 0, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -234,5 +282,11 @@ func (vm *VM) newAddDelegatorTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake)
+	return tx, utx.Verify(
+		vm.Ctx,
+		vm.codec,
+		vm.minDelegatorStake,
+		vm.minStakeDuration,
+		vm.maxStakeDuration,
+	)
 }

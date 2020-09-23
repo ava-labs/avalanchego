@@ -78,7 +78,7 @@ func defaultAddress(t *testing.T, service *Service) {
 }
 
 func TestAddValidator(t *testing.T) {
-	expectedJSONString := `{"username":"","password":"","startTime":"0","endTime":"0","nodeID":"","rewardAddress":"","delegationFeeRate":"0.0000"}`
+	expectedJSONString := `{"username":"","password":"","from":null,"changeAddr":"","startTime":"0","endTime":"0","nodeID":"","rewardAddress":"","delegationFeeRate":"0.0000"}`
 	args := AddValidatorArgs{}
 	bytes, err := json.Marshal(&args)
 	if err != nil {
@@ -170,6 +170,7 @@ func TestGetTxStatus(t *testing.T) {
 		nil,
 		"chain name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -234,6 +235,7 @@ func TestGetTx(t *testing.T) {
 					nil,
 					"chain name",
 					[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+					keys[0].PublicKey().Address(), // change addr
 				)
 			},
 		},
@@ -241,13 +243,14 @@ func TestGetTx(t *testing.T) {
 			"proposal block",
 			func() (*Tx, error) {
 				return service.vm.newAddValidatorTx( // Test GetTx works for proposal blocks
-					service.vm.minStake,
+					service.vm.minValidatorStake,
 					uint64(service.vm.clock.Time().Add(Delta).Unix()),
-					uint64(service.vm.clock.Time().Add(Delta).Add(MinimumStakingDuration).Unix()),
+					uint64(service.vm.clock.Time().Add(Delta).Add(defaultMinStakingDuration).Unix()),
 					ids.GenerateTestShortID(),
 					ids.GenerateTestShortID(),
 					0,
 					[]*crypto.PrivateKeySECP256K1R{keys[0]},
+					keys[0].PublicKey().Address(), // change addr
 				)
 			},
 		},
@@ -259,6 +262,7 @@ func TestGetTx(t *testing.T) {
 					service.vm.Ctx.XChainID,
 					ids.GenerateTestShortID(),
 					[]*crypto.PrivateKeySECP256K1R{keys[0]},
+					keys[0].PublicKey().Address(), // change addr
 				)
 			},
 		},
@@ -295,6 +299,38 @@ func TestGetTx(t *testing.T) {
 			t.Fatalf("failed test '%s': %s", test.description, err)
 		} else if !bytes.Equal(response.Tx.Bytes, tx.Bytes()) {
 			t.Fatalf("failed test '%s': byte representation of tx in response is incorrect", test.description)
+		}
+	}
+}
+
+// Test method GetBalance
+func TestGetBalance(t *testing.T) {
+	service := defaultService(t)
+	defaultAddress(t, service)
+	service.vm.Ctx.Lock.Lock()
+	defer func() { service.vm.Shutdown(); service.vm.Ctx.Lock.Unlock() }()
+
+	// Ensure GetStake is correct for each of the genesis validators
+	genesis, _ := defaultGenesis()
+	for _, utxo := range genesis.UTXOs {
+		request := api.JsonAddress{
+			Address: fmt.Sprintf("P-%s", utxo.Address),
+		}
+		reply := GetBalanceResponse{}
+		if err := service.GetBalance(nil, &request, &reply); err != nil {
+			t.Fatal(err)
+		}
+		if reply.Balance != cjson.Uint64(defaultBalance) {
+			t.Fatalf("Wrong balance. Expected %d ; Returned %d", reply.Balance, defaultBalance)
+		}
+		if reply.Unlocked != cjson.Uint64(defaultBalance) {
+			t.Fatalf("Wrong unlocked balance. Expected %d ; Returned %d", reply.Unlocked, defaultBalance)
+		}
+		if reply.LockedStakeable != 0 {
+			t.Fatalf("Wrong locked stakeable balance. Expected %d ; Returned %d", reply.LockedStakeable, 0)
+		}
+		if reply.LockedNotStakeable != 0 {
+			t.Fatalf("Wrong locked not stakeable balance. Expected %d ; Returned %d", reply.LockedNotStakeable, 0)
 		}
 	}
 }
@@ -346,14 +382,15 @@ func TestGetStake(t *testing.T) {
 	oldStake := response.Staked
 
 	// Add a delegator
-	stakeAmt := minStake + 12345
+	stakeAmt := service.vm.minDelegatorStake + 12345
 	tx, err := service.vm.newAddDelegatorTx(
 		stakeAmt,
 		uint64(defaultGenesisTime.Unix()),
-		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()),
+		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()),
 		ids.GenerateTestShortID(),
 		ids.GenerateTestShortID(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		keys[0].PublicKey().Address(), // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -376,15 +413,16 @@ func TestGetStake(t *testing.T) {
 
 	// Make sure this works for pending stakers
 	// Add a pending staker
-	stakeAmt = minStake + 54321
+	stakeAmt = service.vm.minValidatorStake + 54321
 	tx, err = service.vm.newAddValidatorTx(
 		stakeAmt,
 		uint64(defaultGenesisTime.Unix()),
-		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()),
+		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()),
 		ids.GenerateTestShortID(),
 		ids.GenerateTestShortID(),
 		0,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		keys[0].PublicKey().Address(), // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -403,15 +441,16 @@ func TestGetStake(t *testing.T) {
 
 	// Make sure this works for pending stakers
 	// Add a pending staker
-	stakeAmt = minStake + 54321
+	stakeAmt = service.vm.minValidatorStake + 54321
 	tx, err = service.vm.newAddValidatorTx(
 		stakeAmt,
 		uint64(defaultGenesisTime.Unix()),
-		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()),
+		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()),
 		ids.GenerateTestShortID(),
 		ids.GenerateTestShortID(),
 		0,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		keys[0].PublicKey().Address(), // change addr
 	)
 	if err != nil {
 		t.Fatal(err)

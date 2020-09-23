@@ -394,26 +394,26 @@ func (h *Handler) GetFailed(validatorID ids.ShortID, requestID uint32) {
 }
 
 // PushQuery passes a PushQuery message received from the network to the consensus engine.
-func (h *Handler) PushQuery(validatorID ids.ShortID, requestID uint32, deadline time.Time, blockID ids.ID, block []byte) bool {
+func (h *Handler) PushQuery(validatorID ids.ShortID, requestID uint32, deadline time.Time, containerID ids.ID, container []byte) bool {
 	return h.serviceQueue.PushMessage(message{
 		messageType: pushQueryMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
 		deadline:    deadline,
-		containerID: blockID,
-		container:   block,
+		containerID: containerID,
+		container:   container,
 		received:    h.clock.Time(),
 	})
 }
 
 // PullQuery passes a PullQuery message received from the network to the consensus engine.
-func (h *Handler) PullQuery(validatorID ids.ShortID, requestID uint32, deadline time.Time, blockID ids.ID) bool {
+func (h *Handler) PullQuery(validatorID ids.ShortID, requestID uint32, deadline time.Time, containerID ids.ID) bool {
 	return h.serviceQueue.PushMessage(message{
 		messageType: pullQueryMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
 		deadline:    deadline,
-		containerID: blockID,
+		containerID: containerID,
 		received:    h.clock.Time(),
 	})
 }
@@ -435,6 +435,22 @@ func (h *Handler) QueryFailed(validatorID ids.ShortID, requestID uint32) {
 		messageType: queryFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
+	})
+}
+
+// Connected passes a new connection notification to the consensus engine
+func (h *Handler) Connected(validatorID ids.ShortID) {
+	h.sendReliableMsg(message{
+		messageType: connectedMsg,
+		validatorID: validatorID,
+	})
+}
+
+// Disconnected passes a new connection notification to the consensus engine
+func (h *Handler) Disconnected(validatorID ids.ShortID) {
+	h.sendReliableMsg(message{
+		messageType: disconnectedMsg,
+		validatorID: validatorID,
 	})
 }
 
@@ -547,6 +563,14 @@ func (h *Handler) handleValidatorMsg(msg message, startTime time.Time) error {
 		err = h.engine.Chits(msg.validatorID, msg.requestID, msg.containerIDs)
 		timeConsumed = h.clock.Time().Sub(startTime)
 		h.chits.Observe(float64(timeConsumed.Nanoseconds()))
+	case connectedMsg:
+		err = h.engine.Connected(msg.validatorID)
+		timeConsumed = h.clock.Time().Sub(startTime)
+		h.connected.Observe(float64(timeConsumed.Nanoseconds()))
+	case disconnectedMsg:
+		err = h.engine.Disconnected(msg.validatorID)
+		timeConsumed = h.clock.Time().Sub(startTime)
+		h.disconnected.Observe(float64(timeConsumed.Nanoseconds()))
 	}
 
 	h.serviceQueue.UtilizeCPU(msg.validatorID, timeConsumed)

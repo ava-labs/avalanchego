@@ -23,11 +23,13 @@ import (
 )
 
 var (
-	errNilTx          = errors.New("tx is nil")
-	errWeightTooSmall = errors.New("weight of this validator is too low")
-	errStakeTooShort  = errors.New("staking period is too short")
-	errStakeTooLong   = errors.New("staking period is too long")
-	errTooManyShares  = fmt.Errorf("a staker can only require at most %d shares from delegators", PercentDenominator)
+	errNilTx                     = errors.New("tx is nil")
+	errWeightTooSmall            = errors.New("weight of this validator is too low")
+	errWeightTooLarge            = errors.New("weight of this validator is too large")
+	errStakeTooShort             = errors.New("staking period is too short")
+	errStakeTooLong              = errors.New("staking period is too long")
+	errInsufficientDelegationFee = errors.New("staker charges an insufficient delegation fee")
+	errTooManyShares             = fmt.Errorf("a staker can only require at most %d shares from delegators", PercentDenominator)
 
 	_ UnsignedProposalTx = &UnsignedAddValidatorTx{}
 	_ TimedTx            = &UnsignedAddValidatorTx{}
@@ -58,19 +60,42 @@ func (tx *UnsignedAddValidatorTx) EndTime() time.Time {
 	return tx.Validator.EndTime()
 }
 
+// Weight of this validator
+func (tx *UnsignedAddValidatorTx) Weight() uint64 {
+	return tx.Validator.Weight()
+}
+
 // Verify return nil iff [tx] is valid
 func (tx *UnsignedAddValidatorTx) Verify(
 	ctx *snow.Context,
 	c codec.Codec,
-	feeAmount uint64,
-	feeAssetID ids.ID,
 	minStake uint64,
+	maxStake uint64,
+	minStakeDuration time.Duration,
+	maxStakeDuration time.Duration,
+	minDelegationFee uint32,
 ) error {
 	switch {
 	case tx == nil:
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
+	case tx.Validator.Wght < minStake: // Ensure validator is staking at least the minimum amount
+		return errWeightTooSmall
+	case tx.Validator.Wght > maxStake: // Ensure validator isn't staking too much
+		return errWeightTooLarge
+	case tx.Shares > PercentDenominator: // Ensure delegators shares are in the allowed amount
+		return errTooManyShares
+	case tx.Shares < minDelegationFee:
+		return errInsufficientDelegationFee
+	}
+
+	duration := tx.Validator.Duration()
+	switch {
+	case duration < minStakeDuration: // Ensure staking length is not too short
+		return errStakeTooShort
+	case duration > maxStakeDuration: // Ensure staking length is not too long
+		return errStakeTooLong
 	}
 
 	if err := tx.BaseTx.Verify(ctx, c); err != nil {
@@ -97,10 +122,6 @@ func (tx *UnsignedAddValidatorTx) Verify(
 		return errOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
 		return errInvalidAmount
-	case tx.Validator.Wght < minStake: // Ensure validator is staking at least the minimum amount
-		return errWeightTooSmall
-	case tx.Shares > PercentDenominator: // Ensure delegators shares are in the allowed amount
-		return errTooManyShares
 	}
 
 	// cache that this is valid
@@ -121,7 +142,15 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	TxError,
 ) {
 	// Verify the tx is well-formed
-	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err != nil {
+	if err := tx.Verify(
+		vm.Ctx,
+		vm.codec,
+		vm.minValidatorStake,
+		vm.maxValidatorStake,
+		vm.minStakeDuration,
+		vm.maxStakeDuration,
+		vm.minDelegationFee,
+	); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
@@ -129,9 +158,11 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	if currentTime, err := vm.getTimestamp(db); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	} else if startTime := tx.StartTime(); !currentTime.Before(startTime) {
-		return nil, nil, nil, nil, permError{fmt.Errorf("validator's start time (%s) at or after current timestamp (%s)",
-			currentTime,
-			startTime)}
+		return nil, nil, nil, nil, permError{fmt.Errorf("validator's start time (%s) at or before current timestamp (%s)",
+			startTime,
+			currentTime)}
+	} else if startTime.After(currentTime.Add(maxFutureStartTime)) {
+		return nil, nil, nil, nil, permError{fmt.Errorf("validator start time (%s) more than two weeks after current chain timestamp (%s)", startTime, currentTime)}
 	}
 
 	_, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
@@ -159,7 +190,7 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	copy(outs[len(tx.Outs):], tx.Stake)
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, 0, vm.Ctx.AVAXAssetID); err != nil {
 		return nil, nil, nil, nil, err
 	}
 
@@ -208,9 +239,10 @@ func (vm *VM) newAddValidatorTx(
 	nodeID ids.ShortID, // ID of the node we are delegating to
 	rewardAddress ids.ShortID, // Address to send reward to, if applicable
 	shares uint32, // 10,000 times percentage of reward taken from delegators
-	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens + fee
+	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens
+	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, vm.txFee)
+	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, 0, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -240,5 +272,13 @@ func (vm *VM) newAddValidatorTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake)
+	return tx, utx.Verify(
+		vm.Ctx,
+		vm.codec,
+		vm.minValidatorStake,
+		vm.maxValidatorStake,
+		vm.minStakeDuration,
+		vm.maxStakeDuration,
+		vm.minDelegationFee,
+	)
 }

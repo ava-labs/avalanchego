@@ -107,7 +107,7 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	if len(stx.Creds) == 0 {
 		return nil, permError{errWrongNumberOfCredentials}
 	}
-	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
+	if err := tx.Verify(vm.Ctx, vm.codec, vm.creationTxFee, vm.Ctx.AVAXAssetID); err != nil {
 		return nil, permError{err}
 	}
 
@@ -117,7 +117,7 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	subnetCred := stx.Creds[baseTxCredsLen]
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, baseTxCreds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, baseTxCreds, vm.creationTxFee, vm.Ctx.AVAXAssetID); err != nil {
 		return nil, err
 	}
 
@@ -171,8 +171,9 @@ func (vm *VM) newCreateChainTx(
 	fxIDs []ids.ID, // fxs this chain supports
 	chainName string, // Name of the chain
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to sign the tx
+	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, vm.txFee)
+	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, vm.creationTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -205,5 +206,5 @@ func (vm *VM) newCreateChainTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID)
+	return tx, utx.Verify(vm.Ctx, vm.codec, vm.creationTxFee, vm.Ctx.AVAXAssetID)
 }

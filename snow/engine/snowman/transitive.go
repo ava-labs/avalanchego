@@ -179,6 +179,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 		}
 	}
 
+	t.metrics.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
 	t.Sender.MultiPut(vdr, requestID, ancestorsBytes)
 	return nil
 }

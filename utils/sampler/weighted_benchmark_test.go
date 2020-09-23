@@ -118,7 +118,7 @@ func WeightedPowBenchmarkSampler(
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = s.Sample(uint64(rand.Int63n(int64(totalWeight))))
+		_, _ = s.Sample(uint64(rand.Int63n(int64(totalWeight)))) // #nosec G404
 	}
 	return true
 }
@@ -137,7 +137,7 @@ func WeightedSingletonBenchmarkSampler(b *testing.B, s Weighted, size int) bool 
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = s.Sample(uint64(rand.Int63n(math.MaxInt64)))
+		_, _ = s.Sample(uint64(rand.Int63n(math.MaxInt64))) // #nosec G404
 	}
 	return true
 }
