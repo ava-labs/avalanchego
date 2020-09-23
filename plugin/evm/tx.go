@@ -126,7 +126,11 @@ type innerSortInputsAndSigners struct {
 }
 
 func (ins *innerSortInputsAndSigners) Less(i, j int) bool {
-	return bytes.Compare(ins.inputs[i].Address.Bytes(), ins.inputs[j].Address.Bytes()) < 0
+	addrComp := bytes.Compare(ins.inputs[i].Address.Bytes(), ins.inputs[j].Address.Bytes())
+	if addrComp != 0 {
+		return addrComp < 0
+	}
+	return bytes.Compare(ins.inputs[i].AssetID.Bytes(), ins.inputs[j].AssetID.Bytes()) < 0
 }
 
 func (ins *innerSortInputsAndSigners) Len() int { return len(ins.inputs) }
@@ -136,7 +140,7 @@ func (ins *innerSortInputsAndSigners) Swap(i, j int) {
 	ins.signers[j], ins.signers[i] = ins.signers[i], ins.signers[j]
 }
 
-// SortEVMInputsAndSigners sorts the list of EVMInputs based solely on the address of the input
+// SortEVMInputsAndSigners sorts the list of EVMInputs based on the addresses and assetIDs
 func SortEVMInputsAndSigners(inputs []EVMInput, signers [][]*crypto.PrivateKeySECP256K1R) {
 	sort.Sort(&innerSortInputsAndSigners{inputs: inputs, signers: signers})
 }
@@ -145,4 +149,35 @@ func SortEVMInputsAndSigners(inputs []EVMInput, signers [][]*crypto.PrivateKeySE
 // based on the account addresses
 func IsSortedAndUniqueEVMInputs(inputs []EVMInput) bool {
 	return utils.IsSortedAndUnique(&innerSortInputsAndSigners{inputs: inputs})
+}
+
+// innerSortEVMOutputs implements sort.Interface for EVMOutput
+type innerSortEVMOutputs struct {
+	outputs []EVMOutput
+}
+
+func (outs *innerSortEVMOutputs) Less(i, j int) bool {
+	addrComp := bytes.Compare(outs.outputs[i].Address.Bytes(), outs.outputs[j].Address.Bytes())
+	if addrComp != 0 {
+		return addrComp < 0
+	}
+	return bytes.Compare(outs.outputs[i].AssetID.Bytes(), outs.outputs[j].AssetID.Bytes()) < 0
+}
+
+func (outs *innerSortEVMOutputs) Len() int { return len(outs.outputs) }
+
+func (outs *innerSortEVMOutputs) Swap(i, j int) {
+	outs.outputs[j], outs.outputs[i] = outs.outputs[i], outs.outputs[j]
+}
+
+// SortEVMOutputs sorts the list of EVMOutputs based on the addresses and assetIDs
+// of the outputs
+func SortEVMOutputs(outputs []EVMOutput) {
+	sort.Sort(&innerSortEVMOutputs{outputs: outputs})
+}
+
+// IsSortedAndUniqueEVMOutputs returns true if the EVMOutputs are sorted and unique
+// based on the account addresses and assetIDs
+func IsSortedAndUniqueEVMOutputs(outputs []EVMOutput) bool {
+	return utils.IsSortedAndUnique(&innerSortEVMOutputs{outputs: outputs})
 }
