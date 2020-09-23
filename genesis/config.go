@@ -7,10 +7,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
-	"github.com/ava-labs/avalanchego/utils/formatting"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
