@@ -15,7 +15,6 @@ cd "$E2E_TEST_HOME" || exit
 git fetch origin --tags
 git checkout "tags/$E2E_TAG" -b "$E2E_TAG"
 
-go mod edit -replace github.com/ava-labs/avalanchego="$AVALANCHE_HOME"
 bash "./scripts/rebuild_initializer_binary.sh"
 
 
