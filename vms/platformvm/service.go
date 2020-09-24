@@ -596,7 +596,8 @@ type GetCurrentValidatorsArgs struct {
 	SubnetID ids.ID `json:"subnetID"`
 }
 
-// GetCurrentValidatorsReply are the results from calling GetCurrentValidators
+// GetCurrentValidatorsReply are the results from calling GetCurrentValidators.
+// Each validator contains a list of delegators to itself.
 type GetCurrentValidatorsReply struct {
 	Validators []interface{} `json:"validators"`
 	// Delegators is deprecated. Do not use Delegators.
@@ -748,7 +749,8 @@ type GetPendingValidatorsArgs struct {
 	SubnetID ids.ID `json:"subnetID"`
 }
 
-// GetPendingValidatorsReply are the results from calling GetPendingValidators
+// GetPendingValidatorsReply are the results from calling GetPendingValidators.
+// Unlike GetCurrentValidatorsReply, each validator has a null delegator list.
 type GetPendingValidatorsReply struct {
 	Validators []interface{} `json:"validators"`
 	Delegators []interface{} `json:"delegators"`
