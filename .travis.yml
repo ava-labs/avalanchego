@@ -26,7 +26,6 @@ jobs:
     dist: bionic
     script:
     - ".ci/build_and_test.sh"
-    - ".ci/run_docker.sh"
     - ".ci/run_e2e_tests.sh"
     - ".ci/after_success.sh"
 
