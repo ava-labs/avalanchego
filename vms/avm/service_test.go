@@ -1142,7 +1142,7 @@ func TestSendMultiple(t *testing.T) {
 	}
 
 	if _, err = vm.GetTx(reply.TxID); err != nil {
-		t.Fatalf("Failed to retrieve created transaction: %w", err)
+		t.Fatalf("Failed to retrieve created transaction: %s", err)
 	}
 }
 
