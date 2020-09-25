@@ -966,7 +966,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	return db.Close()
 }
 
-// SendOutput ...
+// SendOutput specifies that [Amount] of asset [AssetID] be sent to [To]
 type SendOutput struct {
 	// The amount of funds to send
 	Amount json.Uint64 `json:"amount"`
@@ -1000,6 +1000,7 @@ type SendMultipleArgs struct {
 	// User, password, from addrs, change addr
 	api.JsonSpendHeader
 
+	// The outputs of the transaction
 	Outputs []SendOutput `json:"outputs"`
 
 	// The addresses to send funds from
@@ -1021,7 +1022,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 	}, reply)
 }
 
-// SendMultiple returns the ID of the newly created transaction
+// SendMultiple sends a transaction with multiple outputs.
 func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, reply *api.JsonTxIDChangeAddr) error {
 	service.vm.ctx.Log.Info("AVM: Send called with username: %s", args.Username)
 
@@ -1059,22 +1060,25 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 	}
 
 	// Calculate required input amounts and create the desired outputs
+	// String repr. of asset ID --> asset ID
 	assetIDs := make(map[string]ids.ID)
+	// Asset ID --> amount of that asset being sent
 	amounts := make(map[[32]byte]uint64)
+	// Outputs of our tx
 	outs := []*avax.TransferableOutput{}
 	for _, output := range args.Outputs {
 		if output.Amount == 0 {
 			return errInvalidAmount
 		}
-		assetID, ok := assetIDs[output.AssetID]
+		assetID, ok := assetIDs[output.AssetID] // Asset ID of next output
 		if !ok {
 			assetID, err = service.lookupAssetID(output.AssetID)
 			if err != nil {
-				return err
+				return fmt.Errorf("couldn't find asset %s", output.AssetID)
 			}
 			assetIDs[output.AssetID] = assetID
 		}
-		assetKey := assetID.Key()
+		assetKey := assetID.Key() // ID as bytes
 		currentAmount := amounts[assetKey]
 		newAmount, err := safemath.Add64(currentAmount, uint64(output.Amount))
 		if err != nil {
@@ -1082,12 +1086,13 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 		}
 		amounts[assetKey] = newAmount
 
-		// Create the Output
 		// Parse the to address
 		to, err := service.vm.ParseLocalAddress(output.To)
 		if err != nil {
 			return fmt.Errorf("problem parsing to address %q: %w", output.To, err)
 		}
+
+		// Create the Output
 		outs = append(outs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
