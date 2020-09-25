@@ -456,6 +456,10 @@ func (h *Handler) Disconnected(validatorID ids.ShortID) {
 
 // Gossip passes a gossip request to the consensus engine
 func (h *Handler) Gossip() {
+	if !h.ctx.IsBootstrapped() {
+		// Shouldn't send gossipping messages while the chain is bootstrapping
+		return
+	}
 	h.sendReliableMsg(message{
 		messageType: gossipMsg,
 	})
