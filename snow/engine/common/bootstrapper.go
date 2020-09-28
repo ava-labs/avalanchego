@@ -53,9 +53,18 @@ type Bootstrapper struct {
 func (b *Bootstrapper) Initialize(config Config) error {
 	b.Config = config
 
-	for _, vdr := range b.Beacons.List() {
+	beacons, err := b.Beacons.Sample(config.SampleK)
+	if err != nil {
+		return err
+	}
+
+	for _, vdr := range beacons {
 		vdrID := vdr.ID()
 		b.pendingAcceptedFrontier.Add(vdrID)
+	}
+
+	for _, vdr := range b.Beacons.List() {
+		vdrID := vdr.ID()
 		b.pendingAccepted.Add(vdrID)
 	}
 
