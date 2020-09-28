@@ -15,6 +15,7 @@ type Config struct {
 	Validators validators.Set
 	Beacons    validators.Set
 
+	SampleK       int
 	StartupAlpha  uint64
 	Alpha         uint64
 	Sender        Sender
