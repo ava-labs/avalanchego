@@ -596,13 +596,16 @@ type GetCurrentValidatorsArgs struct {
 	SubnetID ids.ID `json:"subnetID"`
 }
 
-// GetCurrentValidatorsReply are the results from calling GetCurrentValidators
+// GetCurrentValidatorsReply are the results from calling GetCurrentValidators.
+// Each validator contains a list of delegators to itself.
 type GetCurrentValidatorsReply struct {
 	Validators []interface{} `json:"validators"`
+	// Delegators is deprecated. Do not use Delegators.
+	// Instead, use the Delegators field of each APIPrimaryValidator
 	Delegators []interface{} `json:"delegators"`
 }
 
-// GetCurrentValidators returns the list of current validators
+// GetCurrentValidators returns current validators and delegators
 func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
 	service.vm.Ctx.Log.Info("Platform: GetCurrentValidators called")
 	if args.SubnetID.IsZero() {
@@ -612,6 +615,9 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	reply.Validators = []interface{}{}
 	reply.Delegators = []interface{}{}
 
+	// Validator's node ID as string --> Delegators to them
+	vdrTodelegators := map[string][]APIPrimaryDelegator{}
+
 	stopPrefix := []byte(fmt.Sprintf("%s%s", args.SubnetID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, service.vm.DB)
 	defer stopDB.Close()
@@ -619,7 +625,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
 
-	for stopIter.Next() { // Iterates in order of increasing start time
+	for stopIter.Next() { // Iterates in order of increasing stop time
 		txBytes := stopIter.Value()
 
 		tx := rewardTx{}
@@ -651,7 +657,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			}
 
 			potentialReward := json.Uint64(tx.Reward)
-			reply.Delegators = append(reply.Delegators, APIPrimaryDelegator{
+			delegator := APIPrimaryDelegator{
 				APIStaker: APIStaker{
 					StartTime:   json.Uint64(staker.StartTime().Unix()),
 					EndTime:     json.Uint64(staker.EndTime().Unix()),
@@ -660,7 +666,9 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				},
 				RewardOwner:     rewardOwner,
 				PotentialReward: &potentialReward,
-			})
+			}
+			reply.Delegators = append(reply.Delegators, delegator)
+			vdrTodelegators[delegator.NodeID] = append(vdrTodelegators[delegator.NodeID], delegator)
 		case *UnsignedAddValidatorTx:
 			nodeID := staker.Validator.ID()
 			startTime := staker.StartTime()
@@ -716,7 +724,22 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			return fmt.Errorf("expected validator but got %T", tx.Tx.UnsignedTx)
 		}
 	}
-	return stopIter.Error()
+	if err := stopIter.Error(); err != nil {
+		return fmt.Errorf("iterator error: %w", err)
+	}
+
+	for i, vdrIntf := range reply.Validators {
+		vdr, ok := vdrIntf.(APIPrimaryValidator)
+		if !ok {
+			continue
+		}
+		if delegators, ok := vdrTodelegators[vdr.NodeID]; ok {
+			vdr.Delegators = delegators
+		}
+		reply.Validators[i] = vdr
+	}
+
+	return nil
 }
 
 // GetPendingValidatorsArgs are the arguments for calling GetPendingValidators
@@ -726,7 +749,8 @@ type GetPendingValidatorsArgs struct {
 	SubnetID ids.ID `json:"subnetID"`
 }
 
-// GetPendingValidatorsReply are the results from calling GetPendingValidators
+// GetPendingValidatorsReply are the results from calling GetPendingValidators.
+// Unlike GetCurrentValidatorsReply, each validator has a null delegator list.
 type GetPendingValidatorsReply struct {
 	Validators []interface{} `json:"validators"`
 	Delegators []interface{} `json:"delegators"`
