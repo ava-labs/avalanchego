@@ -28,6 +28,9 @@ import (
 const (
 	// Max number of addresses that can be passed in as argument to GetUTXOs
 	maxGetUTXOsAddrs = 1024
+
+	// Max number of addresses allowed for a single keystore user
+	maxKeystoreAddresses = 5000
 )
 
 var (
@@ -801,6 +804,11 @@ func (service *Service) CreateAddress(r *http.Request, args *api.UserPass, reply
 
 	user := userState{vm: service.vm}
 
+	addresses, _ := user.Addresses(db)
+	if len(addresses) >= maxKeystoreAddresses {
+		return fmt.Errorf("keystore user has reached its limit of %d addresses", maxKeystoreAddresses)
+	}
+
 	factory := crypto.FactorySECP256K1R{}
 	skIntf, err := factory.NewPrivateKey()
 	if err != nil {
@@ -812,7 +820,6 @@ func (service *Service) CreateAddress(r *http.Request, args *api.UserPass, reply
 		return fmt.Errorf("problem saving private key: %w", err)
 	}
 
-	addresses, _ := user.Addresses(db)
 	addresses = append(addresses, sk.PublicKey().Address())
 
 	if err := user.SetAddresses(db, addresses); err != nil {
@@ -925,6 +932,11 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 
 	user := userState{vm: service.vm}
 
+	addresses, _ := user.Addresses(db)
+	if len(addresses) >= maxKeystoreAddresses {
+		return fmt.Errorf("keystore user has reached its limit of %d addresses", maxKeystoreAddresses)
+	}
+
 	if !strings.HasPrefix(args.PrivateKey, constants.SecretKeyPrefix) {
 		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
 	}
@@ -944,8 +956,6 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	if err := user.SetKey(db, sk); err != nil {
 		return fmt.Errorf("problem saving key %w", err)
 	}
-
-	addresses, _ := user.Addresses(db)
 
 	newAddress := sk.PublicKey().Address()
 	reply.Address, err = service.vm.FormatLocalAddress(newAddress)
