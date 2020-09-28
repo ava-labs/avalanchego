@@ -143,3 +143,44 @@ func TestHandlerClosesOnError(t *testing.T) {
 	case <-closed:
 	}
 }
+
+func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
+	engine := common.EngineTest{T: t}
+	engine.Default(false)
+
+	engine.CantGossip = true
+
+	closed := make(chan struct{}, 1)
+
+	engine.ContextF = snow.DefaultContextTest
+	engine.GetFailedF = func(validatorID ids.ShortID, requestID uint32) error {
+		closed <- struct{}{}
+		return nil
+	}
+
+	handler := &Handler{}
+	handler.Initialize(
+		&engine,
+		validators.NewSet(),
+		nil,
+		16,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
+		"",
+		prometheus.NewRegistry(),
+	)
+	handler.clock.Set(time.Now())
+
+	go handler.Dispatch()
+
+	handler.Gossip()
+	handler.GetFailed(ids.ShortEmpty, 1)
+
+	ticker := time.NewTicker(20 * time.Millisecond)
+	select {
+	case <-ticker.C:
+		t.Fatalf("Handler shutdown timed out before calling toClose")
+	case <-closed:
+	}
+}

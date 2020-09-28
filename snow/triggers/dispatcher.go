@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -27,7 +28,7 @@ func (ed *EventDispatcher) Initialize(log logging.Logger) {
 }
 
 // Accept is called when a transaction or block is accepted
-func (ed *EventDispatcher) Accept(chainID, containerID ids.ID, container []byte) {
+func (ed *EventDispatcher) Accept(ctx *snow.Context, containerID ids.ID, container []byte) {
 	ed.lock.Lock()
 	defer ed.lock.Unlock()
 
@@ -37,12 +38,12 @@ func (ed *EventDispatcher) Accept(chainID, containerID ids.ID, container []byte)
 			continue
 		}
 
-		if err := handler.Accept(chainID, containerID, container); err != nil {
-			ed.log.Error("unable to Accept on %s for chainID %s: %s", id, chainID, err)
+		if err := handler.Accept(ctx, containerID, container); err != nil {
+			ed.log.Error("unable to Accept on %s for chainID %s: %s", id, ctx.ChainID, err)
 		}
 	}
 
-	events, exist := ed.chainHandlers[chainID.Key()]
+	events, exist := ed.chainHandlers[ctx.ChainID.Key()]
 	if !exist {
 		return
 	}
@@ -52,14 +53,14 @@ func (ed *EventDispatcher) Accept(chainID, containerID ids.ID, container []byte)
 			continue
 		}
 
-		if err := handler.Accept(chainID, containerID, container); err != nil {
-			ed.log.Error("unable to Accept on %s for chainID %s: %s", id, chainID, err)
+		if err := handler.Accept(ctx, containerID, container); err != nil {
+			ed.log.Error("unable to Accept on %s for chainID %s: %s", id, ctx.ChainID, err)
 		}
 	}
 }
 
 // Reject is called when a transaction or block is rejected
-func (ed *EventDispatcher) Reject(chainID, containerID ids.ID, container []byte) {
+func (ed *EventDispatcher) Reject(ctx *snow.Context, containerID ids.ID, container []byte) {
 	ed.lock.Lock()
 	defer ed.lock.Unlock()
 
@@ -69,12 +70,12 @@ func (ed *EventDispatcher) Reject(chainID, containerID ids.ID, container []byte)
 			continue
 		}
 
-		if err := handler.Reject(chainID, containerID, container); err != nil {
-			ed.log.Error("unable to Reject on %s for chainID %s: %s", id, chainID, err)
+		if err := handler.Reject(ctx, containerID, container); err != nil {
+			ed.log.Error("unable to Reject on %s for chainID %s: %s", id, ctx.ChainID, err)
 		}
 	}
 
-	events, exist := ed.chainHandlers[chainID.Key()]
+	events, exist := ed.chainHandlers[ctx.ChainID.Key()]
 	if !exist {
 		return
 	}
@@ -84,14 +85,14 @@ func (ed *EventDispatcher) Reject(chainID, containerID ids.ID, container []byte)
 			continue
 		}
 
-		if err := handler.Reject(chainID, containerID, container); err != nil {
-			ed.log.Error("unable to Reject on %s for chainID %s: %s", id, chainID, err)
+		if err := handler.Reject(ctx, containerID, container); err != nil {
+			ed.log.Error("unable to Reject on %s for chainID %s: %s", id, ctx.ChainID, err)
 		}
 	}
 }
 
 // Issue is called when a transaction or block is issued
-func (ed *EventDispatcher) Issue(chainID, containerID ids.ID, container []byte) {
+func (ed *EventDispatcher) Issue(ctx *snow.Context, containerID ids.ID, container []byte) {
 	ed.lock.Lock()
 	defer ed.lock.Unlock()
 
@@ -101,12 +102,12 @@ func (ed *EventDispatcher) Issue(chainID, containerID ids.ID, container []byte) 
 			continue
 		}
 
-		if err := handler.Issue(chainID, containerID, container); err != nil {
-			ed.log.Error("unable to Issue on %s for chainID %s: %s", id, chainID, err)
+		if err := handler.Issue(ctx, containerID, container); err != nil {
+			ed.log.Error("unable to Issue on %s for chainID %s: %s", id, ctx.ChainID, err)
 		}
 	}
 
-	events, exist := ed.chainHandlers[chainID.Key()]
+	events, exist := ed.chainHandlers[ctx.ChainID.Key()]
 	if !exist {
 		return
 	}
@@ -116,8 +117,8 @@ func (ed *EventDispatcher) Issue(chainID, containerID ids.ID, container []byte) 
 			continue
 		}
 
-		if err := handler.Issue(chainID, containerID, container); err != nil {
-			ed.log.Error("unable to Issue on %s for chainID %s: %s", id, chainID, err)
+		if err := handler.Issue(ctx, containerID, container); err != nil {
+			ed.log.Error("unable to Issue on %s for chainID %s: %s", id, ctx.ChainID, err)
 		}
 	}
 }
