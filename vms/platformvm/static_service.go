@@ -73,6 +73,8 @@ type APIPrimaryValidator struct {
 	Uptime             *json.Float32 `json:"uptime,omitempty"`
 	Connected          *bool         `json:"connected,omitempty"`
 	Staked             []APIUTXO     `json:"staked,omitempty"`
+	// The delegators delegating to this validator
+	Delegators []APIPrimaryDelegator `json:"delegators"`
 }
 
 // APIPrimaryDelegator is the repr. of a primary network delegator sent over APIs.

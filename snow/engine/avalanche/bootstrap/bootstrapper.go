@@ -10,12 +10,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
-	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
@@ -373,7 +373,7 @@ func (b *Bootstrapper) finish() error {
 	return nil
 }
 
-func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events *triggers.EventDispatcher) error {
+func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher) error {
 	numExecuted := 0
 
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
@@ -390,7 +390,7 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events *triggers.EventDispat
 			b.Ctx.Log.Info("executed %d operations", numExecuted)
 		}
 
-		events.Accept(b.Ctx.ChainID, job.ID(), job.Bytes())
+		events.Accept(b.Ctx, job.ID(), job.Bytes())
 	}
 	b.Ctx.Log.Info("executed %d operations", numExecuted)
 	return nil

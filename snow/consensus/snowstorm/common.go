@@ -100,7 +100,7 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 	bytes := tx.Bytes()
 
 	// Notify the IPC socket that this tx has been issued.
-	c.ctx.DecisionDispatcher.Issue(c.ctx.ChainID, txID, bytes)
+	c.ctx.DecisionDispatcher.Issue(c.ctx, txID, bytes)
 
 	// Notify the metrics that this transaction is being issued.
 	c.metrics.Issued(txID)
@@ -121,7 +121,7 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 	}
 
 	// Notify the IPC socket that this tx has been accepted.
-	c.ctx.DecisionDispatcher.Accept(c.ctx.ChainID, txID, bytes)
+	c.ctx.DecisionDispatcher.Accept(c.ctx, txID, bytes)
 
 	// Notify the metrics that this transaction was just accepted.
 	c.metrics.Accepted(txID)
@@ -139,7 +139,7 @@ func (c *common) acceptTx(tx Tx) error {
 	txID := tx.ID()
 
 	// Notify the IPC socket that this tx has been accepted.
-	c.ctx.DecisionDispatcher.Accept(c.ctx.ChainID, txID, tx.Bytes())
+	c.ctx.DecisionDispatcher.Accept(c.ctx, txID, tx.Bytes())
 
 	// Update the metrics to account for this transaction's acceptance
 	c.metrics.Accepted(txID)
@@ -164,7 +164,7 @@ func (c *common) rejectTx(tx Tx) error {
 	txID := tx.ID()
 
 	// Notify the IPC that the tx was rejected
-	c.ctx.DecisionDispatcher.Reject(c.ctx.ChainID, txID, tx.Bytes())
+	c.ctx.DecisionDispatcher.Reject(c.ctx, txID, tx.Bytes())
 
 	// Update the metrics to account for this transaction's rejection
 	c.metrics.Rejected(txID)
