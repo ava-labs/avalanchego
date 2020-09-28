@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/hashicorp/go-plugin"
+	"github.com/rs/cors"
 
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto"
@@ -213,7 +214,7 @@ func (vm *VMServer) CreateHandlers(_ context.Context, req *vmproto.CreateHandler
 		go vm.broker.AcceptAndServe(serverID, func(opts []grpc.ServerOption) *grpc.Server {
 			server := grpc.NewServer(opts...)
 			vm.serverCloser.Add(server)
-			ghttpproto.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler, vm.broker))
+			ghttpproto.RegisterHTTPServer(server, ghttp.NewServer(cors.Default().Handler(handler.Handler), vm.broker))
 			return server
 		})
 
