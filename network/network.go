@@ -897,11 +897,13 @@ func (n *network) attemptConnect(ip utils.IPDesc) error {
 	if err != nil {
 		return err
 	}
-	switch conn.(type) {
+	switch conn := conn.(type) {
 	case *net.TCPConn:
-		err = conn.(*net.TCPConn).SetNoDelay(true)
-		if err != nil {
-			n.log.Error("socket nodelay error: %s", err.Error())
+		if err := conn.SetLinger(0); err != nil {
+			n.log.Warn("failed to set no linger due to: %s", err)
+		}
+		if err := conn.SetNoDelay(true); err != nil {
+			n.log.Warn("failed to set socket nodelay due to: %s", err)
 		}
 	}
 	return n.upgrade(&peer{
