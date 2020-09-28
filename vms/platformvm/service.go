@@ -151,7 +151,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 		// error
 		return fmt.Errorf("problem saving key %w", err)
 	}
-	return nil
+	return db.Close()
 }
 
 /*
@@ -295,7 +295,7 @@ func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, respo
 		// error
 		return fmt.Errorf("problem saving key %w", err)
 	}
-	return nil
+	return db.Close()
 }
 
 // ListAddresses returns the addresses controlled by [args.Username]
