@@ -2251,6 +2251,8 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	vdr := ids.GenerateTestShortID()
 	vals.AddWeight(vdr, 1)
 
+	config.SampleK = int(vals.Weight())
+
 	sender := &common.SenderTest{}
 	sender.T = t
 	config.Sender = sender

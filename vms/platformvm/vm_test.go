@@ -1716,6 +1716,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 				Ctx:        ctx,
 				Validators: vdrs,
 				Beacons:    beacons,
+				SampleK:    int(beacons.Weight()),
 				Alpha:      uint64(beacons.Len()/2 + 1),
 				Sender:     &sender,
 			},
