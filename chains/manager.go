@@ -412,10 +412,9 @@ func (m *manager) createAvalancheChain(
 	sender := sender.Sender{}
 	sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager)
 
-	alpha := bootstrapWeight/2 + 1
 	sampleK := consensusParams.K
-	if uint64(sampleK) > alpha {
-		sampleK = int(alpha)
+	if uint64(sampleK) > bootstrapWeight {
+		sampleK = int(bootstrapWeight)
 	}
 
 	// The engine handles consensus
@@ -428,7 +427,7 @@ func (m *manager) createAvalancheChain(
 				Beacons:      beacons,
 				SampleK:      sampleK,
 				StartupAlpha: (3*bootstrapWeight + 3) / 4,
-				Alpha:        alpha, // must be > 50%
+				Alpha:        bootstrapWeight/2 + 1, // must be > 50%
 				Sender:       &sender,
 			},
 			VtxBlocked: vtxBlocker,
@@ -500,10 +499,9 @@ func (m *manager) createSnowmanChain(
 	sender := sender.Sender{}
 	sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager)
 
-	alpha := bootstrapWeight/2 + 1
 	sampleK := consensusParams.K
-	if uint64(sampleK) > alpha {
-		sampleK = int(alpha)
+	if uint64(sampleK) > bootstrapWeight {
+		sampleK = int(bootstrapWeight)
 	}
 
 	// The engine handles consensus
@@ -516,7 +514,7 @@ func (m *manager) createSnowmanChain(
 				Beacons:      beacons,
 				SampleK:      sampleK,
 				StartupAlpha: (3*bootstrapWeight + 3) / 4,
-				Alpha:        alpha, // must be > 50%
+				Alpha:        bootstrapWeight/2 + 1, // must be > 50%
 				Sender:       &sender,
 			},
 			Blocked:      blocked,
