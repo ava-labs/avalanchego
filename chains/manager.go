@@ -412,6 +412,11 @@ func (m *manager) createAvalancheChain(
 	sender := sender.Sender{}
 	sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager)
 
+	sampleK := consensusParams.K
+	if uint64(sampleK) > bootstrapWeight {
+		sampleK = int(bootstrapWeight)
+	}
+
 	// The engine handles consensus
 	engine := &aveng.Transitive{}
 	if err := engine.Initialize(aveng.Config{
@@ -420,6 +425,7 @@ func (m *manager) createAvalancheChain(
 				Ctx:          ctx,
 				Validators:   validators,
 				Beacons:      beacons,
+				SampleK:      sampleK,
 				StartupAlpha: (3*bootstrapWeight + 3) / 4,
 				Alpha:        bootstrapWeight/2 + 1, // must be > 50%
 				Sender:       &sender,
@@ -493,6 +499,11 @@ func (m *manager) createSnowmanChain(
 	sender := sender.Sender{}
 	sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager)
 
+	sampleK := consensusParams.K
+	if uint64(sampleK) > bootstrapWeight {
+		sampleK = int(bootstrapWeight)
+	}
+
 	// The engine handles consensus
 	engine := &smeng.Transitive{}
 	if err := engine.Initialize(smeng.Config{
@@ -501,6 +512,7 @@ func (m *manager) createSnowmanChain(
 				Ctx:          ctx,
 				Validators:   validators,
 				Beacons:      beacons,
+				SampleK:      sampleK,
 				StartupAlpha: (3*bootstrapWeight + 3) / 4,
 				Alpha:        bootstrapWeight/2 + 1, // must be > 50%
 				Sender:       &sender,
