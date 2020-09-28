@@ -1,7 +1,5 @@
-// This file was taken from:
-// https://github.com/OpenBazaar/openbazaar-go/blob/master/core/ulimit_non_unix.go
-
-// +build darwin linux netbsd openbsd
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
 
 package ulimit
 
