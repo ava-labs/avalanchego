@@ -303,6 +303,38 @@ func TestGetTx(t *testing.T) {
 	}
 }
 
+// Test method GetBalance
+func TestGetBalance(t *testing.T) {
+	service := defaultService(t)
+	defaultAddress(t, service)
+	service.vm.Ctx.Lock.Lock()
+	defer func() { service.vm.Shutdown(); service.vm.Ctx.Lock.Unlock() }()
+
+	// Ensure GetStake is correct for each of the genesis validators
+	genesis, _ := defaultGenesis()
+	for _, utxo := range genesis.UTXOs {
+		request := api.JsonAddress{
+			Address: fmt.Sprintf("P-%s", utxo.Address),
+		}
+		reply := GetBalanceResponse{}
+		if err := service.GetBalance(nil, &request, &reply); err != nil {
+			t.Fatal(err)
+		}
+		if reply.Balance != cjson.Uint64(defaultBalance) {
+			t.Fatalf("Wrong balance. Expected %d ; Returned %d", reply.Balance, defaultBalance)
+		}
+		if reply.Unlocked != cjson.Uint64(defaultBalance) {
+			t.Fatalf("Wrong unlocked balance. Expected %d ; Returned %d", reply.Unlocked, defaultBalance)
+		}
+		if reply.LockedStakeable != 0 {
+			t.Fatalf("Wrong locked stakeable balance. Expected %d ; Returned %d", reply.LockedStakeable, 0)
+		}
+		if reply.LockedNotStakeable != 0 {
+			t.Fatalf("Wrong locked not stakeable balance. Expected %d ; Returned %d", reply.LockedNotStakeable, 0)
+		}
+	}
+}
+
 // Test method GetStake
 func TestGetStake(t *testing.T) {
 	service := defaultService(t)
@@ -450,5 +482,123 @@ func TestGetStake(t *testing.T) {
 	}
 	if uint64(response.Staked) != uint64(oldStake)+stakeAmt {
 		t.Fatalf("expected stake to be %d but is %d", uint64(oldStake)+stakeAmt, response.Staked)
+	}
+}
+
+// Test method GetCurrentValidators
+func TestGetCurrentValidators(t *testing.T) {
+	service := defaultService(t)
+	defaultAddress(t, service)
+	service.vm.Ctx.Lock.Lock()
+	defer func() { service.vm.Shutdown(); service.vm.Ctx.Lock.Unlock() }()
+
+	genesis, _ := defaultGenesis()
+
+	// Call getValidators
+	args := GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
+	response := GetCurrentValidatorsReply{}
+	if err := service.GetCurrentValidators(nil, &args, &response); err != nil {
+		t.Fatal(err)
+	} else if len(response.Validators) != len(genesis.Validators) {
+		t.Fatalf("should be %d validators but are %d", len(genesis.Validators), len(response.Validators))
+	} else if len(response.Delegators) != 0 {
+		t.Fatalf("should be 0 delegators but are %d", len(response.Delegators))
+	}
+
+	for _, vdr := range genesis.Validators {
+		found := false
+		for i := 0; i < len(response.Validators) && !found; i++ {
+			gotVdr, ok := response.Validators[i].(APIPrimaryValidator)
+			if !ok {
+				t.Fatal("expected APIPrimaryValidator")
+			}
+			if gotVdr.NodeID != vdr.NodeID {
+				continue
+			}
+			if gotVdr.EndTime != vdr.EndTime {
+				t.Fatalf("expected end time of %s to be %v but got %v",
+					vdr.NodeID,
+					vdr.EndTime,
+					gotVdr.EndTime,
+				)
+			} else if gotVdr.StartTime != vdr.StartTime {
+				t.Fatalf("expected start time of %s to be %v but got %v",
+					vdr.NodeID,
+					vdr.StartTime,
+					gotVdr.StartTime,
+				)
+			} else if gotVdr.Weight != vdr.Weight {
+				t.Fatalf("expected weight of %s to be %v but got %v",
+					vdr.NodeID,
+					vdr.Weight,
+					gotVdr.Weight,
+				)
+			}
+			found = true
+		}
+		if !found {
+			t.Fatalf("expected validators to contain %s but didn't", vdr.NodeID)
+		}
+	}
+
+	// Add a delegator
+	stakeAmt := service.vm.minDelegatorStake + 12345
+	validatorNodeID := keys[1].PublicKey().Address()
+	delegatorStartTime := uint64(defaultValidateStartTime.Unix())
+	delegatorEndTime := uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())
+
+	tx, err := service.vm.newAddDelegatorTx(
+		stakeAmt,
+		delegatorStartTime,
+		delegatorEndTime,
+		validatorNodeID,
+		ids.GenerateTestShortID(),
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		keys[0].PublicKey().Address(), // change addr
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.vm.addStaker(service.vm.DB, constants.PrimaryNetworkID, &rewardTx{
+		Reward: 0,
+		Tx:     *tx,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Call getCurrentValidators
+	args = GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
+	if err := service.GetCurrentValidators(nil, &args, &response); err != nil {
+		t.Fatal(err)
+	} else if len(response.Validators) != len(genesis.Validators) {
+		t.Fatalf("should be %d validators but are %d", len(genesis.Validators), len(response.Validators))
+	} else if len(response.Delegators) != 1 {
+		t.Fatalf("should be 1 delegators but are %d", len(response.Delegators))
+	}
+
+	// Make sure the delegator is there
+	found := false
+	for i := 0; i < len(response.Validators) && !found; i++ {
+		vdr := response.Validators[i].(APIPrimaryValidator)
+		if vdr.NodeID != validatorNodeID.PrefixedString(constants.NodeIDPrefix) {
+			continue
+		}
+		found = true
+		if len(vdr.Delegators) != 1 {
+			t.Fatalf("%s should have 1 delegator", vdr.NodeID)
+		}
+		delegator := vdr.Delegators[0]
+		if delegator.NodeID != vdr.NodeID {
+			t.Fatal("wrong node ID")
+		} else if uint64(delegator.StartTime) != delegatorStartTime {
+			t.Fatal("wrong start time")
+		} else if uint64(delegator.EndTime) != delegatorEndTime {
+			t.Fatal("wrong end time")
+		} else if delegator.weight() != stakeAmt {
+			t.Fatalf("wrong weight")
+		}
+	}
+	if !found {
+		t.Fatalf("didnt find delegator")
 	}
 }

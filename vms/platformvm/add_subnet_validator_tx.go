@@ -46,6 +46,11 @@ func (tx *UnsignedAddSubnetValidatorTx) EndTime() time.Time {
 	return tx.Validator.EndTime()
 }
 
+// Weight of this validator
+func (tx *UnsignedAddSubnetValidatorTx) Weight() uint64 {
+	return tx.Validator.Weight()
+}
+
 // Verify return nil iff [tx] is valid
 func (tx *UnsignedAddSubnetValidatorTx) Verify(
 	ctx *snow.Context,

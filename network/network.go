@@ -16,6 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/triggers"
@@ -226,6 +227,7 @@ func NewNetwork(
 	pingPongTimeout time.Duration,
 	pingFrequency time.Duration,
 ) Network {
+	// #nosec G404
 	netw := &network{
 		log:            log,
 		id:             id,
@@ -593,8 +595,12 @@ func (n *network) Gossip(chainID, containerID ids.ID, container []byte) {
 }
 
 // Accept is called after every consensus decision
-func (n *network) Accept(chainID, containerID ids.ID, container []byte) error {
-	return n.gossipContainer(chainID, containerID, container)
+func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte) error {
+	if !ctx.IsBootstrapped() {
+		// don't gossip during bootstrapping
+		return nil
+	}
+	return n.gossipContainer(ctx.ChainID, containerID, container)
 }
 
 // heartbeat registers a new heartbeat to signal liveness
@@ -845,10 +851,10 @@ func (n *network) connectTo(ip utils.IPDesc) {
 		// Randomization is only performed here to distribute reconnection
 		// attempts to a node that previously shut down. This doesn't require
 		// cryptographically secure random number generation.
-		delay = time.Duration(float64(delay) * (1 + rand.Float64()))
+		delay = time.Duration(float64(delay) * (1 + rand.Float64())) // #nosec G404
 		if delay > n.maxReconnectDelay {
 			// set the timeout to [.75, 1) * maxReconnectDelay
-			delay = time.Duration(float64(n.maxReconnectDelay) * (3 + rand.Float64()) / 4)
+			delay = time.Duration(float64(n.maxReconnectDelay) * (3 + rand.Float64()) / 4) // #nosec G404
 		}
 
 		n.stateLock.Lock()

@@ -117,7 +117,7 @@ func TestChangePassword(t *testing.T) {
 		Password: hashedPassword,
 	}
 
-	password2 := "fejhkefjhefjhefhje"
+	password2 := "fejhkefjhefjhefhje" // #nosec G101
 	if err := auth.changePassword("", password2); err == nil {
 		t.Fatal("should have failed because old password is wrong")
 	} else if err := auth.changePassword("notThePassword", password2); err == nil {
@@ -132,7 +132,7 @@ func TestChangePassword(t *testing.T) {
 		t.Fatal("password should have been changed")
 	}
 
-	password3 := "ufwhwohwfohawfhwdwd"
+	password3 := "ufwhwohwfohawfhwdwd" // #nosec G101
 	if err := auth.changePassword(testPassword, password3); err == nil {
 		t.Fatal("should have failed because old password is wrong")
 	} else if err := auth.changePassword(password2, password3); err != nil {
@@ -157,7 +157,7 @@ func TestGetToken(t *testing.T) {
 		t.Fatal("should have failed because auth token invalid")
 	}
 
-	wellFormedToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJFbmRwb2ludHMiOlsiKiJdLCJleHAiOjE1OTM0NzU4OTR9.Cqo7TraN_CFN13q3ae4GRJCMgd8ZOlQwBzyC29M6Aps"
+	wellFormedToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJFbmRwb2ludHMiOlsiKiJdLCJleHAiOjE1OTM0NzU4OTR9.Cqo7TraN_CFN13q3ae4GRJCMgd8ZOlQwBzyC29M6Aps" // #nosec G101
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", wellFormedToken))
 	if token, err := getToken(req); err != nil {
 		t.Fatal("should have been able to parse valid header")

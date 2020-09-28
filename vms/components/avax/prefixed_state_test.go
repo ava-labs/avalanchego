@@ -23,8 +23,8 @@ func TestPrefixedFunds(t *testing.T) {
 
 	cc.RegisterType(&TestAddressable{})
 
-	st0 := NewPrefixedState(db, cc, chain0ID, chain1ID)
-	st1 := NewPrefixedState(db, cc, chain1ID, chain0ID)
+	st0 := NewPrefixedState(db, cc, cc, chain0ID, chain1ID)
+	st1 := NewPrefixedState(db, cc, cc, chain1ID, chain0ID)
 
 	addr := ids.GenerateTestShortID()
 	addrBytes := addr.Bytes()

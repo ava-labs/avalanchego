@@ -4,8 +4,10 @@
 package platformvm
 
 import (
+	"container/heap"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -98,54 +100,62 @@ var (
 	errDSCantValidate           = errors.New("new blockchain can't be validated by primary network")
 	errUnknownTxType            = errors.New("unknown transaction type")
 	errStartTimeTooLate         = errors.New("start time is too far in the future")
+	errStartTimeTooEarly        = errors.New("start time is before the current chain time")
+	errStartAfterEndTime        = errors.New("start time is after the end time")
 
 	_ block.ChainVM        = &VM{}
 	_ validators.Connector = &VM{}
 )
 
 // Codec does serialization and deserialization
-var Codec codec.Codec
+var (
+	Codec        codec.Codec
+	GenesisCodec codec.Codec
+)
 
 func init() {
 	Codec = codec.NewDefault()
+	GenesisCodec = codec.New(math.MaxUint32, math.MaxUint32)
 
-	errs := wrappers.Errs{}
-	errs.Add(
-		Codec.RegisterType(&ProposalBlock{}),
-		Codec.RegisterType(&Abort{}),
-		Codec.RegisterType(&Commit{}),
-		Codec.RegisterType(&StandardBlock{}),
-		Codec.RegisterType(&AtomicBlock{}),
+	for _, c := range []codec.Codec{Codec, GenesisCodec} {
+		errs := wrappers.Errs{}
+		errs.Add(
+			c.RegisterType(&ProposalBlock{}),
+			c.RegisterType(&Abort{}),
+			c.RegisterType(&Commit{}),
+			c.RegisterType(&StandardBlock{}),
+			c.RegisterType(&AtomicBlock{}),
 
-		// The Fx is registered here because this is the same place it is
-		// registered in the AVM. This ensures that the typeIDs match up for
-		// utxos in shared memory.
-		Codec.RegisterType(&secp256k1fx.TransferInput{}),
-		Codec.RegisterType(&secp256k1fx.MintOutput{}),
-		Codec.RegisterType(&secp256k1fx.TransferOutput{}),
-		Codec.RegisterType(&secp256k1fx.MintOperation{}),
-		Codec.RegisterType(&secp256k1fx.Credential{}),
-		Codec.RegisterType(&secp256k1fx.Input{}),
-		Codec.RegisterType(&secp256k1fx.OutputOwners{}),
+			// The Fx is registered here because this is the same place it is
+			// registered in the AVM. This ensures that the typeIDs match up for
+			// utxos in shared memory.
+			c.RegisterType(&secp256k1fx.TransferInput{}),
+			c.RegisterType(&secp256k1fx.MintOutput{}),
+			c.RegisterType(&secp256k1fx.TransferOutput{}),
+			c.RegisterType(&secp256k1fx.MintOperation{}),
+			c.RegisterType(&secp256k1fx.Credential{}),
+			c.RegisterType(&secp256k1fx.Input{}),
+			c.RegisterType(&secp256k1fx.OutputOwners{}),
 
-		Codec.RegisterType(&UnsignedAddValidatorTx{}),
-		Codec.RegisterType(&UnsignedAddSubnetValidatorTx{}),
-		Codec.RegisterType(&UnsignedAddDelegatorTx{}),
+			c.RegisterType(&UnsignedAddValidatorTx{}),
+			c.RegisterType(&UnsignedAddSubnetValidatorTx{}),
+			c.RegisterType(&UnsignedAddDelegatorTx{}),
 
-		Codec.RegisterType(&UnsignedCreateChainTx{}),
-		Codec.RegisterType(&UnsignedCreateSubnetTx{}),
+			c.RegisterType(&UnsignedCreateChainTx{}),
+			c.RegisterType(&UnsignedCreateSubnetTx{}),
 
-		Codec.RegisterType(&UnsignedImportTx{}),
-		Codec.RegisterType(&UnsignedExportTx{}),
+			c.RegisterType(&UnsignedImportTx{}),
+			c.RegisterType(&UnsignedExportTx{}),
 
-		Codec.RegisterType(&UnsignedAdvanceTimeTx{}),
-		Codec.RegisterType(&UnsignedRewardValidatorTx{}),
+			c.RegisterType(&UnsignedAdvanceTimeTx{}),
+			c.RegisterType(&UnsignedRewardValidatorTx{}),
 
-		Codec.RegisterType(&StakeableLockIn{}),
-		Codec.RegisterType(&StakeableLockOut{}),
-	)
-	if errs.Errored() {
-		panic(errs.Err)
+			c.RegisterType(&StakeableLockIn{}),
+			c.RegisterType(&StakeableLockOut{}),
+		)
+		if errs.Errored() {
+			panic(errs.Err)
+		}
 	}
 }
 
@@ -192,8 +202,14 @@ type VM struct {
 	// The minimum amount of tokens one must bond to be a validator
 	minValidatorStake uint64
 
+	// The maximum amount of tokens one can bond to a validator
+	maxValidatorStake uint64
+
 	// Minimum stake, in nAVAX, that can be delegated on the primary network
 	minDelegatorStake uint64
+
+	// Minimum fee that can be charged for delegation
+	minDelegationFee uint32
 
 	// Minimum amount of time to allow a validator to stake
 	minStakeDuration time.Duration
@@ -254,7 +270,7 @@ func (vm *VM) Initialize(
 	// the provided genesis state
 	if !vm.DBInitialized() {
 		genesis := &Genesis{}
-		if err := Codec.Unmarshal(genesisBytes, genesis); err != nil {
+		if err := GenesisCodec.Unmarshal(genesisBytes, genesis); err != nil {
 			return err
 		}
 		if err := genesis.Initialize(); err != nil {
@@ -263,26 +279,40 @@ func (vm *VM) Initialize(
 
 		// Persist UTXOs that exist at genesis
 		for _, utxo := range genesis.UTXOs {
-			if err := vm.putUTXO(vm.DB, utxo); err != nil {
+			if err := vm.putUTXO(vm.DB, &utxo.UTXO); err != nil {
 				return err
 			}
 		}
 
 		// Persist the platform chain's timestamp at genesis
-		time := time.Unix(int64(genesis.Timestamp), 0)
-		if err := vm.State.PutTime(vm.DB, timestampKey, time); err != nil {
+		genesisTime := time.Unix(int64(genesis.Timestamp), 0)
+		if err := vm.State.PutTime(vm.DB, timestampKey, genesisTime); err != nil {
 			return err
 		}
 
-		// TODO: change InitialSupply to genesis.InitialSupply.
-		if err := vm.putCurrentSupply(vm.DB, InitialSupply); err != nil {
+		if err := vm.putCurrentSupply(vm.DB, genesis.InitialSupply); err != nil {
 			return err
 		}
 
 		// Persist primary network validator set at genesis
 		for _, vdrTx := range genesis.Validators {
+			var (
+				stakeAmount   uint64
+				stakeDuration time.Duration
+			)
+			switch tx := vdrTx.UnsignedTx.(type) {
+			case *UnsignedAddValidatorTx:
+				stakeAmount = tx.Validator.Wght
+				stakeDuration = tx.Validator.Duration()
+			default:
+				return errWrongTxType
+			}
+			reward, err := vm.calculateReward(vm.DB, stakeDuration, stakeAmount)
+			if err != nil {
+				return err
+			}
 			tx := rewardTx{
-				Reward: 0,
+				Reward: reward,
 				Tx:     *vdrTx,
 			}
 			if err := vm.addStaker(vm.DB, constants.PrimaryNetworkID, &tx); err != nil {
@@ -1434,4 +1464,161 @@ func (vm *VM) calculateUptime(db database.Database, nodeID ids.ShortID, startTim
 	}
 	bestPossibleUpDuration := uint64(currentLocalTime.Sub(startTime) / time.Second)
 	return float64(upDuration) / float64(bestPossibleUpDuration), nil
+}
+
+func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.ShortID, startTime time.Time, endTime time.Time) (uint64, error) {
+	currentTime, err := vm.getTimestamp(db)
+	if err != nil {
+		return 0, err
+	}
+	if currentTime.After(startTime) {
+		return 0, errStartTimeTooEarly
+	}
+	if startTime.After(endTime) {
+		return 0, errStartAfterEndTime
+	}
+
+	stopPrefix := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
+	stopDB := prefixdb.NewNested(stopPrefix, db)
+	defer stopDB.Close()
+
+	stopIter := stopDB.NewIterator()
+	defer stopIter.Release()
+
+	currentWeight := uint64(0)
+	toRemoveHeap := validatorHeap{}
+	for stopIter.Next() { // Iterates in order of increasing stop time
+		txBytes := stopIter.Value()
+
+		tx := rewardTx{}
+		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
+			return 0, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
+		}
+		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
+			return 0, err
+		}
+
+		validator := (*Validator)(nil)
+		switch staker := tx.Tx.UnsignedTx.(type) {
+		case *UnsignedAddDelegatorTx:
+			validator = &staker.Validator
+		case *UnsignedAddValidatorTx:
+			validator = &staker.Validator
+		case *UnsignedAddSubnetValidatorTx:
+			validator = &staker.Validator.Validator
+		default:
+			return 0, fmt.Errorf("expected validator but got %T", tx.Tx.UnsignedTx)
+		}
+
+		if !validator.NodeID.Equals(nodeID) {
+			continue
+		}
+
+		newWeight, err := safemath.Add64(currentWeight, validator.Wght)
+		if err != nil {
+			return 0, err
+		}
+		currentWeight = newWeight
+		toRemoveHeap.Add(validator)
+	}
+
+	startPrefix := []byte(fmt.Sprintf("%s%s", subnetID, startDBPrefix))
+	startDB := prefixdb.NewNested(startPrefix, db)
+	defer startDB.Close()
+
+	startIter := startDB.NewIterator()
+	defer startIter.Release()
+
+	maxWeight := uint64(0)
+	for startIter.Next() { // Iterates in order of increasing start time
+		txBytes := startIter.Value()
+
+		tx := Tx{}
+		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
+			return 0, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
+		}
+		if err := tx.Sign(vm.codec, nil); err != nil {
+			return 0, err
+		}
+
+		validator := (*Validator)(nil)
+		switch staker := tx.UnsignedTx.(type) {
+		case *UnsignedAddDelegatorTx:
+			validator = &staker.Validator
+		case *UnsignedAddValidatorTx:
+			validator = &staker.Validator
+		case *UnsignedAddSubnetValidatorTx:
+			validator = &staker.Validator.Validator
+		default:
+			return 0, fmt.Errorf("expected validator but got %T", tx.UnsignedTx)
+		}
+
+		if validator.StartTime().After(endTime) {
+			break
+		}
+
+		if !validator.NodeID.Equals(nodeID) {
+			continue
+		}
+
+		for len(toRemoveHeap) > 0 && !toRemoveHeap[0].EndTime().After(validator.StartTime()) {
+			toRemove := toRemoveHeap[0]
+			toRemoveHeap = toRemoveHeap[1:]
+
+			newWeight, err := safemath.Sub64(currentWeight, toRemove.Wght)
+			if err != nil {
+				return 0, err
+			}
+			currentWeight = newWeight
+		}
+
+		newWeight, err := safemath.Add64(currentWeight, validator.Wght)
+		if err != nil {
+			return 0, err
+		}
+		currentWeight = newWeight
+		if currentWeight > maxWeight && !startTime.After(validator.StartTime()) {
+			maxWeight = currentWeight
+		}
+
+		toRemoveHeap.Add(validator)
+	}
+
+	for len(toRemoveHeap) > 0 && toRemoveHeap[0].EndTime().Before(startTime) {
+		toRemove := toRemoveHeap[0]
+		toRemoveHeap = toRemoveHeap[1:]
+
+		newWeight, err := safemath.Sub64(currentWeight, toRemove.Wght)
+		if err != nil {
+			return 0, err
+		}
+		currentWeight = newWeight
+	}
+
+	if currentWeight > maxWeight {
+		maxWeight = currentWeight
+	}
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		startIter.Error(),
+		stopIter.Error(),
+	)
+	return maxWeight, errs.Err
+}
+
+type validatorHeap []*Validator
+
+func (h *validatorHeap) Len() int                 { return len(*h) }
+func (h *validatorHeap) Less(i, j int) bool       { return (*h)[i].EndTime().Before((*h)[j].EndTime()) }
+func (h *validatorHeap) Swap(i, j int)            { (*h)[i], (*h)[j] = (*h)[j], (*h)[i] }
+func (h *validatorHeap) Add(validator *Validator) { heap.Push(h, validator) }
+func (h *validatorHeap) Peek() *Validator         { return (*h)[0] }
+func (h *validatorHeap) Remove() *Validator       { return heap.Pop(h).(*Validator) }
+func (h *validatorHeap) Push(x interface{})       { *h = append(*h, x.(*Validator)) }
+func (h *validatorHeap) Pop() interface{} {
+	newLen := len(*h) - 1
+	val := (*h)[newLen]
+	*h = (*h)[:newLen]
+	return val
 }

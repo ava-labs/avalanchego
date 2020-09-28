@@ -41,7 +41,7 @@ var addrs []ids.ShortID // addrs[i] corresponds to keys[i]
 
 var assetID = ids.NewID([32]byte{1, 2, 3})
 var username = "bobby"
-var password = "StrnasfqewiurPasswdn56d"
+var password = "StrnasfqewiurPasswdn56d" // #nosec G101
 
 func init() {
 	cb58 := formatting.CB58{}

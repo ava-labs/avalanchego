@@ -64,7 +64,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion(constants.PlatformName, 0, 8, 4)
+	Version       = version.NewDefaultVersion(constants.PlatformName, 1, 0, 0)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -138,6 +138,7 @@ func (n *Node) initNetworking() error {
 			return err
 		}
 
+		// #nosec G402
 		tlsConfig := &tls.Config{
 			Certificates: []tls.Certificate{cert},
 			ClientAuth:   tls.RequireAnyClientCert,
@@ -145,7 +146,8 @@ func (n *Node) initNetworking() error {
 			// We only require an authenticated channel based on the peer's
 			// public key. Therefore, we can safely skip CA verification.
 			//
-			// TODO: Security audit required
+			// During our security audit by Quantstamp, this was investigated
+			// and determinted to be safe and correct.
 			InsecureSkipVerify: true,
 		}
 
@@ -525,7 +527,9 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Fee:                n.Config.TxFee,
 			UptimePercentage:   n.Config.UptimeRequirement,
 			MinValidatorStake:  n.Config.MinValidatorStake,
+			MaxValidatorStake:  n.Config.MaxValidatorStake,
 			MinDelegatorStake:  n.Config.MinDelegatorStake,
+			MinDelegationFee:   n.Config.MinDelegationFee,
 			MinStakeDuration:   n.Config.MinStakeDuration,
 			MaxStakeDuration:   n.Config.MaxStakeDuration,
 			StakeMintingPeriod: n.Config.StakeMintingPeriod,
@@ -693,9 +697,9 @@ func (n *Node) initIPCAPI() error {
 }
 
 // Give chains and VMs aliases as specified by the genesis information
-func (n *Node) initAliases() error {
+func (n *Node) initAliases(genesisBytes []byte) error {
 	n.Log.Info("initializing aliases")
-	defaultAliases, chainAliases, vmAliases, err := genesis.Aliases(n.Config.NetworkID)
+	defaultAliases, chainAliases, vmAliases, err := genesis.Aliases(genesisBytes)
 	if err != nil {
 		return err
 	}
@@ -792,7 +796,7 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	if err := n.initIPCAPI(); err != nil { // Start the IPC API
 		return fmt.Errorf("couldn't initialize the IPC API: %w", err)
 	}
-	if err := n.initAliases(); err != nil { // Set up aliases
+	if err := n.initAliases(genesisBytes); err != nil { // Set up aliases
 		return fmt.Errorf("couldn't initialize aliases: %w", err)
 	}
 	if err := n.initChains(genesisBytes, avaxAssetID); err != nil { // Start the Platform chain
