@@ -480,6 +480,12 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		&timeoutManager,
 		n.Config.ConsensusGossipFrequency,
 		n.Config.ConsensusShutdownTimeout,
+		criticalChains,
+		func() {
+			if err := n.Net.Close(); err != nil {
+				n.Log.Debug("closing the network due to a fatal chain error resulted in: %s", err)
+			}
+		},
 	)
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
