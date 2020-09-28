@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
+	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -189,6 +190,8 @@ func init() {
 	// Router Configuration:
 	consensusGossipFrequency := fs.Int64("consensus-gossip-frequency", int64(10*time.Second), "Frequency of gossiping accepted frontiers.")
 	consensusShutdownTimeout := fs.Int64("consensus-shutdown-timeout", int64(1*time.Second), "Timeout before killing an unresponsive chain.")
+
+	fdLimit := fs.Uint64("fd-limit", ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
 
 	ferr := fs.Parse(os.Args[1:])
 
@@ -435,6 +438,10 @@ func init() {
 	}
 	Config.ConsensusGossipFrequency = time.Duration(*consensusGossipFrequency)
 	Config.ConsensusShutdownTimeout = time.Duration(*consensusShutdownTimeout)
+
+	if err := ulimit.Set(*fdLimit); err != nil {
+		errs.Add(fmt.Errorf("failed to set fd limit correctly due to: %s", err))
+	}
 
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
 		Config.TxFee = *txFee
