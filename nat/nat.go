@@ -122,6 +122,7 @@ func (dev *Mapper) keepPortMapping(mappedPort chan<- uint16, protocol string,
 								intPort, extPort)
 							break
 						}
+						time.Sleep(1 * time.Second)
 					}
 
 					updateTimer.Reset(mapUpdateTimeout)
