@@ -165,10 +165,12 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	}
 
 	handler := &Handler{}
+	blacklist := common.NewNoBlacklist()
 	handler.Initialize(
 		&engine,
 		validators.NewSet(),
 		nil,
+		blacklist,
 		16,
 		throttler.DefaultMaxNonStakerPendingMsgs,
 		throttler.DefaultStakerPortion,
