@@ -7,9 +7,10 @@ set -o pipefail
 # Build image from current local source
 SRC_DIR="$(dirname "${BASH_SOURCE[0]}")"
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory above this script
+DOCKERHUB_REPO="avaplatform/avalanchego"
 
 # WARNING: this will use the most recent commit even if there are un-committed changes present
 COMMIT_HASH="$(git --git-dir="$AVALANCHE_PATH/.git" rev-parse --short HEAD)"
-echo "Building Docker image based off of local repo at commit $COMMIT_HASH"
+echo "Building Docker Image: $DOCKERHUB_REPO:$COMMIT_HASH"
 
-docker build -t "avaplatform/avalanchego:$COMMIT_HASH" "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
+docker build -t "$DOCKERHUB_REPO:$COMMIT_HASH" "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"

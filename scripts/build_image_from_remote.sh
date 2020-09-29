@@ -10,6 +10,7 @@ set -o pipefail
 
 SRC_DIR="$(dirname "${BASH_SOURCE[0]}")"
 
+DOCKERHUB_REPO="avaplatform/avalanchego"
 REMOTE="https://github.com/ava-labs/avalanchego.git"
 BRANCH="master"
 
@@ -49,4 +50,4 @@ fi
 
 AVALANCHE_COMMIT="$(git --git-dir="$AVALANCHE_CLONE/.git" rev-parse --short HEAD)"
 
-"${DOCKER}" build -t "avaplatform/avalanchego:$AVALANCHE_COMMIT" "$AVALANCHE_CLONE" -f "$AVALANCHE_CLONE/Dockerfile"
+"${DOCKER}" build -t "$DOCKERHUB_REPO:$AVALANCHE_COMMIT" "$AVALANCHE_CLONE" -f "$AVALANCHE_CLONE/Dockerfile"
