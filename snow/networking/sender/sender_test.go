@@ -40,6 +40,7 @@ func TestSenderContext(t *testing.T) {
 
 func TestTimeout(t *testing.T) {
 	vdrs := validators.NewSet()
+	blacklist := blacklist.NewNoBlacklist()
 	tm := timeout.Manager{}
 	tm.Initialize(&timer.AdaptiveTimeoutConfig{
 		InitialTimeout:    time.Millisecond,
@@ -49,12 +50,7 @@ func TestTimeout(t *testing.T) {
 		TimeoutReduction:  time.Millisecond,
 		Namespace:         "",
 		Registerer:        prometheus.NewRegistry(),
-	}, &blacklist.Config{
-		Threshold:  5,
-		Duration:   time.Minute,
-		MaxPortion: 0.5,
-		Validators: vdrs,
-	})
+	}, blacklist)
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
@@ -110,6 +106,7 @@ func TestTimeout(t *testing.T) {
 
 func TestReliableMessages(t *testing.T) {
 	vdrs := validators.NewSet()
+	blacklist := blacklist.NewNoBlacklist()
 	tm := timeout.Manager{}
 	tm.Initialize(&timer.AdaptiveTimeoutConfig{
 		InitialTimeout:    time.Millisecond,
@@ -119,12 +116,7 @@ func TestReliableMessages(t *testing.T) {
 		TimeoutReduction:  time.Millisecond,
 		Namespace:         "",
 		Registerer:        prometheus.NewRegistry(),
-	}, &blacklist.Config{
-		Threshold:  5,
-		Duration:   time.Minute,
-		MaxPortion: 0.5,
-		Validators: vdrs,
-	})
+	}, blacklist)
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
@@ -190,6 +182,7 @@ func TestReliableMessages(t *testing.T) {
 }
 
 func TestReliableMessagesToMyself(t *testing.T) {
+	blacklist := blacklist.NewNoBlacklist()
 	vdrs := validators.NewSet()
 	tm := timeout.Manager{}
 	tm.Initialize(&timer.AdaptiveTimeoutConfig{
@@ -200,12 +193,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		TimeoutReduction:  time.Millisecond,
 		Namespace:         "",
 		Registerer:        prometheus.NewRegistry(),
-	}, &blacklist.Config{
-		Threshold:  5,
-		Duration:   time.Minute,
-		MaxPortion: 0.5,
-		Validators: vdrs,
-	})
+	}, blacklist)
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}

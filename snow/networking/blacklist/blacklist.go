@@ -44,7 +44,7 @@ type queryBlacklist struct {
 
 // Config defines the configuration for a blacklist
 type Config struct {
-	Validators validators.Set
+	Validators validators.Manager
 	Threshold  int
 	Duration   time.Duration
 	MaxPortion float64
@@ -53,17 +53,17 @@ type Config struct {
 // Config defines the configuration for subnet specific blacklist
 
 // NewQueryBlacklist ...
-func NewQueryBlacklist(config *Config) QueryBlacklist {
+func NewQueryBlacklist(validators validators.Set, threshold int, duration time.Duration, maxPortion float64) QueryBlacklist {
 	return &queryBlacklist{
 		pendingQueries:      make(map[[20]byte]map[uint32]struct{}),
 		consecutiveFailures: make(map[[20]byte]int),
 		blacklistTimes:      make(map[[20]byte]time.Time),
 		blacklistOrder:      list.New(),
 		blacklistSet:        ids.ShortSet{},
-		threshold:           config.Threshold,
-		duration:            config.Duration,
-		vdrs:                config.Validators,
-		maxPortion:          config.MaxPortion,
+		vdrs:                validators,
+		threshold:           threshold,
+		duration:            duration,
+		maxPortion:          maxPortion,
 	}
 }
 
@@ -78,7 +78,7 @@ type QueryBlacklist interface {
 }
 
 // RegisterQuery attempts to register a query from [validatorID] and returns true
-// if that request is not subject to the blacklist
+// if that request should be made (not subject to blacklisting)
 func (b *queryBlacklist) RegisterQuery(validatorID ids.ShortID, requestID uint32) bool {
 	b.lock.Lock()
 	defer b.lock.Unlock()

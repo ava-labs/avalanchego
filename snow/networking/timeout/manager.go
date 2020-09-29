@@ -20,8 +20,8 @@ type Manager struct {
 }
 
 // Initialize this timeout manager.
-func (m *Manager) Initialize(timeoutConfig *timer.AdaptiveTimeoutConfig, blacklistConfig *blacklist.Config) error {
-	m.blacklist = blacklist.NewManager(blacklistConfig)
+func (m *Manager) Initialize(timeoutConfig *timer.AdaptiveTimeoutConfig, blacklist blacklist.Manager) error {
+	m.blacklist = blacklist
 	return m.tm.Initialize(timeoutConfig)
 }
 
@@ -30,15 +30,15 @@ func (m *Manager) Dispatch() { m.tm.Dispatch() }
 
 // Register request to time out unless Manager.Cancel is called
 // before the timeout duration passes, with the same request parameters.
-func (m *Manager) Register(validatorID ids.ShortID, chainID ids.ID, requestID uint32, timeout func()) time.Time {
+func (m *Manager) Register(validatorID ids.ShortID, chainID ids.ID, requestID uint32, timeout func()) (time.Time, bool) {
 	if ok := m.blacklist.RegisterQuery(chainID, validatorID, requestID); !ok {
-		timeout() // TODO use executor
-		return time.Time{}
+		timeout() // TODO use executor to execute asynchronously
+		return time.Time{}, false
 	}
 	return m.tm.Put(createRequestID(validatorID, chainID, requestID), func() {
 		m.blacklist.QueryFailed(chainID, validatorID, requestID)
 		timeout()
-	})
+	}), true
 }
 
 // Cancel request timeout with the specified parameters.

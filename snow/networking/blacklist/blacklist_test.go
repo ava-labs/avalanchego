@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
@@ -22,20 +21,17 @@ func TestBlackList(t *testing.T) {
 	vdrs.AddWeight(vdr3.ID(), vdr3.Weight())
 	vdrs.AddWeight(vdr4.ID(), vdr4.Weight())
 
-	config := &Config{
-		Threshold:  3,
-		Duration:   time.Minute,
-		MaxPortion: 0.5,
-		Validators: vdrs,
-	}
-	blacklist := NewQueryBlacklist(config).(*queryBlacklist)
+	threshold := 3
+	duration := time.Minute
+	maxPortion := 0.5
+	blacklist := NewQueryBlacklist(vdrs, threshold, duration, maxPortion).(*queryBlacklist)
 
 	currentTime := time.Now()
 	blacklist.clock.Set(currentTime)
 
 	requestID := uint32(0)
 
-	for i := 0; i < config.Threshold; i++ {
+	for i := 0; i < threshold; i++ {
 		if ok := blacklist.RegisterQuery(vdr0.ID(), requestID); !ok {
 			t.Fatalf("RegisterQuery failed early for vdr0 on iteration: %d", i)
 		}
@@ -65,7 +61,7 @@ func TestBlackList(t *testing.T) {
 		t.Fatal("RegisterQuery should have been successful for responsive peer: vdr1")
 	}
 
-	blacklist.clock.Set(currentTime.Add(config.Duration))
+	blacklist.clock.Set(currentTime.Add(duration))
 	if ok := blacklist.RegisterQuery(vdr0.ID(), requestID); !ok {
 		t.Fatal("RegisterQuery should have succeeded after blacklisting time elapsed for vdr0")
 	}
@@ -83,20 +79,17 @@ func TestBlacklistDoesNotGetStuck(t *testing.T) {
 	vdrs.AddWeight(vdr1.ID(), vdr1.Weight())
 	vdrs.AddWeight(vdr2.ID(), vdr2.Weight())
 
-	config := &Config{
-		Threshold:  3,
-		Duration:   time.Minute,
-		MaxPortion: 0.5,
-		Validators: vdrs,
-	}
-	blacklist := NewQueryBlacklist(config).(*queryBlacklist)
+	threshold := 3
+	duration := time.Minute
+	maxPortion := 0.5
+	blacklist := NewQueryBlacklist(vdrs, threshold, duration, maxPortion).(*queryBlacklist)
 
 	currentTime := time.Now()
 	blacklist.clock.Set(currentTime)
 
 	requestID := uint32(0)
 
-	for i := 0; i < config.Threshold; i++ {
+	for i := 0; i < threshold; i++ {
 		if ok := blacklist.RegisterQuery(vdr0.ID(), requestID); !ok {
 			t.Fatalf("RegisterQuery failed early on iteration: %d", i)
 		}
@@ -106,7 +99,7 @@ func TestBlacklistDoesNotGetStuck(t *testing.T) {
 
 	// Check that calling QueryFailed repeatedly does not change
 	// the blacklist end time after it's already been blacklisted
-	for i := 0; i < config.Threshold; i++ {
+	for i := 0; i < threshold; i++ {
 		blacklist.QueryFailed(vdr0.ID(), requestID)
 		requestID++
 	}
@@ -116,7 +109,7 @@ func TestBlacklistDoesNotGetStuck(t *testing.T) {
 	}
 	requestID++
 
-	blacklist.clock.Set(currentTime.Add(config.Duration))
+	blacklist.clock.Set(currentTime.Add(duration))
 	if ok := blacklist.RegisterQuery(vdr0.ID(), requestID); !ok {
 		t.Fatal("RegisterQuery should have succeeded after blacklisting time elapsed")
 	}
@@ -131,20 +124,17 @@ func TestBlacklistDoesNotExceedThreshold(t *testing.T) {
 	vdrs.AddWeight(vdr1.ID(), vdr1.Weight())
 	vdrs.AddWeight(vdr2.ID(), vdr2.Weight())
 
-	config := &Config{
-		Threshold:  3,
-		Duration:   time.Minute,
-		MaxPortion: 0.5,
-		Validators: vdrs,
-	}
-	blacklist := NewQueryBlacklist(config).(*queryBlacklist)
+	threshold := 3
+	duration := time.Minute
+	maxPortion := 0.5
+	blacklist := NewQueryBlacklist(vdrs, threshold, duration, maxPortion).(*queryBlacklist)
 
 	currentTime := time.Now()
 	blacklist.clock.Set(currentTime)
 
 	requestID := uint32(0)
 
-	for i := 0; i < config.Threshold; i++ {
+	for i := 0; i < threshold; i++ {
 		if ok := blacklist.RegisterQuery(vdr0.ID(), requestID); !ok {
 			t.Fatalf("RegisterQuery failed early for vdr0 on iteration: %d", i)
 		}
@@ -162,7 +152,7 @@ func TestBlacklistDoesNotExceedThreshold(t *testing.T) {
 		t.Fatal("Blacklisted staking weight past the allowed threshold")
 	}
 
-	blacklist.clock.Set(currentTime.Add(config.Duration))
+	blacklist.clock.Set(currentTime.Add(duration))
 	if ok := blacklist.RegisterQuery(vdr0.ID(), requestID); !ok {
 		t.Fatal("RegisterQuery should have succeeded after blacklisting time elapsed")
 	}
@@ -170,19 +160,3 @@ func TestBlacklistDoesNotExceedThreshold(t *testing.T) {
 		t.Fatal("RegisterQuery should have succeeded after blacklisting time elapsed")
 	}
 }
-
-type noBlacklist struct{}
-
-// NewNoBlacklist returns an empty blacklist that will never stop any queries
-func NewNoBlacklist() Manager { return &noBlacklist{} }
-
-// RegisterQuery ...
-func (b *noBlacklist) RegisterQuery(chainID ids.ID, validatorID ids.ShortID, requestID uint32) bool {
-	return true
-}
-
-// RegisterResponse ...
-func (b *noBlacklist) RegisterResponse(chainID ids.ID, validatorID ids.ShortID, requestID uint32) {}
-
-// QueryFailed ...
-func (b *noBlacklist) QueryFailed(chainID ids.ID, validatorID ids.ShortID, requestID uint32) {}

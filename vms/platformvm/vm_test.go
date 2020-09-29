@@ -1682,6 +1682,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	beacons := vdrs
 
 	timeoutManager := timeout.Manager{}
+	blacklist := blacklist.NewNoBlacklist()
 	timeoutManager.Initialize(&timer.AdaptiveTimeoutConfig{
 		InitialTimeout:    time.Millisecond,
 		MinimumTimeout:    time.Millisecond,
@@ -1690,12 +1691,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		TimeoutReduction:  time.Millisecond,
 		Namespace:         "",
 		Registerer:        prometheus.NewRegistry(),
-	}, &blacklist.Config{
-		Validators: validators.NewSet(),
-		Threshold:  5,
-		Duration:   time.Minute,
-		MaxPortion: 0.5,
-	})
+	}, blacklist)
 	go timeoutManager.Dispatch()
 
 	chainRouter := &router.ChainRouter{}

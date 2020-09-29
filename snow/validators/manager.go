@@ -23,12 +23,20 @@ type Manager interface {
 	// GetValidators returns the validator set for the given subnet
 	// Returns false if the subnet doesn't exist
 	GetValidators(ids.ID) (Set, bool)
+
+	// GetValidatorsByChain returns the validator set for the given chainID
+	// Returns false if the chainID doesn't exist
+	GetValidatorsByChain(ids.ID) (Set, bool)
+
+	// SetChain sets the chain to use the corresponding subnet
+	SetChain(ids.ID, ids.ID)
 }
 
 // NewManager returns a new, empty manager
 func NewManager() Manager {
 	return &manager{
-		subnetToVdrs: make(map[[32]byte]Set),
+		subnetToVdrs:  make(map[[32]byte]Set),
+		chainToSubnet: make(map[[32]byte][32]byte),
 	}
 }
 
@@ -38,6 +46,8 @@ type manager struct {
 	// Key: Subnet ID
 	// Value: The validators that validate the subnet
 	subnetToVdrs map[[32]byte]Set
+
+	chainToSubnet map[[32]byte][32]byte
 }
 
 func (m *manager) Set(subnetID ids.ID, newSet Set) error {
@@ -86,4 +96,26 @@ func (m *manager) GetValidators(subnetID ids.ID) (Set, bool) {
 
 	vdrs, ok := m.subnetToVdrs[subnetID.Key()]
 	return vdrs, ok
+}
+
+// GetValidatorsByChain implements the Manager interface
+func (m *manager) GetValidatorsByChain(chainID ids.ID) (Set, bool) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	subnetKey, ok := m.chainToSubnet[chainID.Key()]
+	if !ok {
+		return nil, false
+	}
+
+	vdrs, ok := m.subnetToVdrs[subnetKey]
+	return vdrs, ok
+}
+
+// SetChain implements the Manager interface
+func (m *manager) SetChain(subnetID ids.ID, chainID ids.ID) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	m.chainToSubnet[chainID.Key()] = subnetID.Key()
 }

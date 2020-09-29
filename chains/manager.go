@@ -299,6 +299,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	if !ok {
 		return nil, fmt.Errorf("couldn't get validator set of subnet with ID %s. The subnet may not exist", chainParams.SubnetID)
 	}
+	m.Validators.SetChain(chainParams.SubnetID, chainParams.ID)
 
 	beacons := vdrs
 	if chainParams.CustomBeacons != nil {

@@ -33,7 +33,11 @@ func (bm *blacklistManager) RegisterQuery(chainID ids.ID, validatorID ids.ShortI
 	key := chainID.Key()
 	chain, exists := bm.chainBlacklists[key]
 	if !exists {
-		chain = NewQueryBlacklist(bm.config)
+		vdrs, ok := bm.config.Validators.GetValidatorsByChain(chainID)
+		if !ok {
+			return false
+		}
+		chain = NewQueryBlacklist(vdrs, bm.config.Threshold, bm.config.Duration, bm.config.MaxPortion)
 		bm.chainBlacklists[key] = chain
 	}
 
@@ -59,3 +63,19 @@ func (bm *blacklistManager) QueryFailed(chainID ids.ID, validatorID ids.ShortID,
 
 	chain.QueryFailed(validatorID, requestID)
 }
+
+type noBlacklist struct{}
+
+// NewNoBlacklist returns an empty blacklist that will never stop any queries
+func NewNoBlacklist() Manager { return &noBlacklist{} }
+
+// RegisterQuery ...
+func (b *noBlacklist) RegisterQuery(chainID ids.ID, validatorID ids.ShortID, requestID uint32) bool {
+	return true
+}
+
+// RegisterResponse ...
+func (b *noBlacklist) RegisterResponse(chainID ids.ID, validatorID ids.ShortID, requestID uint32) {}
+
+// QueryFailed ...
+func (b *noBlacklist) QueryFailed(chainID ids.ID, validatorID ids.ShortID, requestID uint32) {}
