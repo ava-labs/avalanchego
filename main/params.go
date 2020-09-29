@@ -151,8 +151,8 @@ func init() {
 	networkInitialTimeout := fs.Int64("network-initial-timeout", int64(10*time.Second), "Initial timeout value of the adaptive timeout manager, in nanoseconds.")
 	networkMinimumTimeout := fs.Int64("network-minimum-timeout", int64(500*time.Millisecond), "Minimum timeout value of the adaptive timeout manager, in nanoseconds.")
 	networkMaximumTimeout := fs.Int64("network-maximum-timeout", int64(10*time.Second), "Maximum timeout value of the adaptive timeout manager, in nanoseconds.")
-	fs.Float64Var(&Config.NetworkConfig.TimeoutMultiplier, "network-timeout-multiplier", 1.1, "Multiplier of the timeout after a failed request.")
-	networkTimeoutReduction := fs.Int64("network-timeout-reduction", int64(time.Millisecond), "Reduction of the timeout after a successful request, in nanoseconds.")
+	networkTimeoutInc := fs.Int64("network-timeout-increase", 250*int64(time.Millisecond), "Increase of network timeout after a failed request, in nanoseconds.")
+	networkTimeoutDec := fs.Int64("network-timeout-reduction", 50*int64(time.Millisecond), "Decrease of network timeout after a successful request, in nanoseconds.")
 
 	// Plugins:
 	fs.StringVar(&Config.PluginDir, "plugin-dir", defaultPluginDirs[0], "Plugin directory for Avalanche VMs")
@@ -422,13 +422,17 @@ func init() {
 		*networkInitialTimeout > *networkMaximumTimeout {
 		errs.Add(errors.New("initial timeout should be in the range [minimumTimeout, maximumTimeout]"))
 	}
-	if *networkTimeoutReduction < 0 {
+	if *networkTimeoutDec < 0 {
 		errs.Add(errors.New("timeout reduction can't be negative"))
 	}
+	if *networkTimeoutInc < 0 {
+		errs.Add(errors.New("timeout increase can't be negative"))
+	}
+
 	Config.NetworkConfig.InitialTimeout = time.Duration(*networkInitialTimeout)
 	Config.NetworkConfig.MinimumTimeout = time.Duration(*networkMinimumTimeout)
 	Config.NetworkConfig.MaximumTimeout = time.Duration(*networkMaximumTimeout)
-	Config.NetworkConfig.TimeoutReduction = time.Duration(*networkTimeoutReduction)
+	Config.NetworkConfig.TimeoutDec = time.Duration(*networkTimeoutDec)
 
 	if *consensusGossipFrequency < 0 {
 		errs.Add(errors.New("gossip frequency can't be negative"))
