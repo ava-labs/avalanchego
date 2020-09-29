@@ -1,4 +1,4 @@
-package common
+package blacklist
 
 import (
 	"container/list"
@@ -11,9 +11,6 @@ import (
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
-
-// Problem: register queries and the responses
-// to ensure that nodes are responding to messages
 
 // If a peer consistently does not respond to queries, it will
 // increase latencies on the network whenever that peer is polled.
@@ -45,16 +42,18 @@ type queryBlacklist struct {
 	lock sync.Mutex
 }
 
-// BlacklistConfig defines the configuration for a blacklist
-type BlacklistConfig struct {
+// Config defines the configuration for a blacklist
+type Config struct {
 	Validators validators.Set
 	Threshold  int
 	Duration   time.Duration
 	MaxPortion float64
 }
 
+// Config defines the configuration for subnet specific blacklist
+
 // NewQueryBlacklist ...
-func NewQueryBlacklist(config BlacklistConfig) Blacklist {
+func NewQueryBlacklist(config *Config) QueryBlacklist {
 	return &queryBlacklist{
 		pendingQueries:      make(map[[20]byte]map[uint32]struct{}),
 		consecutiveFailures: make(map[[20]byte]int),
@@ -68,8 +67,8 @@ func NewQueryBlacklist(config BlacklistConfig) Blacklist {
 	}
 }
 
-// Blacklist ...
-type Blacklist interface {
+// QueryBlacklist ...
+type QueryBlacklist interface {
 	// RegisterQuery registers a sent query and returns whether the query is subject to blacklist
 	RegisterQuery(ids.ShortID, uint32) bool
 	// RegisterResponse registers the response to a query message

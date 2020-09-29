@@ -11,6 +11,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/networking/blacklist"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
@@ -24,6 +26,11 @@ func TestManagerFire(t *testing.T) {
 		TimeoutReduction:  time.Millisecond,
 		Namespace:         "",
 		Registerer:        prometheus.NewRegistry(),
+	}, blacklist.Config{
+		Validators: validators.NewSet(),
+		Threshold:  5,
+		Duration:   time.Minute,
+		MaxPortion: 0.5,
 	})
 	go manager.Dispatch()
 
@@ -45,6 +52,11 @@ func TestManagerCancel(t *testing.T) {
 		TimeoutReduction:  time.Millisecond,
 		Namespace:         "",
 		Registerer:        prometheus.NewRegistry(),
+	}, blacklist.Config{
+		Validators: validators.NewSet(),
+		Threshold:  5,
+		Duration:   time.Minute,
+		MaxPortion: 0.5,
 	})
 	go manager.Dispatch()
 

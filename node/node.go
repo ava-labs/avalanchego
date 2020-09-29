@@ -469,7 +469,12 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	timeoutManager := timeout.Manager{}
 	n.Config.NetworkConfig.Namespace = constants.PlatformName
 	n.Config.NetworkConfig.Registerer = n.Config.ConsensusParams.Metrics
-	if err := timeoutManager.Initialize(&n.Config.NetworkConfig); err != nil {
+	vdrSet, ok := n.vdrs.GetValidators(ids.Empty)
+	if !ok {
+		return fmt.Errorf("Could not find validators")
+	}
+	n.Config.BlacklistConfig.Validators = vdrSet
+	if err := timeoutManager.Initialize(&n.Config.NetworkConfig, &n.Config.BlacklistConfig); err != nil {
 		return err
 	}
 	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)

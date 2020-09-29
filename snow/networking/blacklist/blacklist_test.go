@@ -1,4 +1,4 @@
-package common
+package blacklist
 
 import (
 	"testing"
@@ -22,7 +22,7 @@ func TestBlackList(t *testing.T) {
 	vdrs.AddWeight(vdr3.ID(), vdr3.Weight())
 	vdrs.AddWeight(vdr4.ID(), vdr4.Weight())
 
-	config := BlacklistConfig{
+	config := Config{
 		Threshold:  3,
 		Duration:   time.Minute,
 		MaxPortion: 0.5,
@@ -83,7 +83,7 @@ func TestBlacklistDoesNotGetStuck(t *testing.T) {
 	vdrs.AddWeight(vdr1.ID(), vdr1.Weight())
 	vdrs.AddWeight(vdr2.ID(), vdr2.Weight())
 
-	config := BlacklistConfig{
+	config := Config{
 		Threshold:  3,
 		Duration:   time.Minute,
 		MaxPortion: 0.5,
@@ -131,7 +131,7 @@ func TestBlacklistDoesNotExceedThreshold(t *testing.T) {
 	vdrs.AddWeight(vdr1.ID(), vdr1.Weight())
 	vdrs.AddWeight(vdr2.ID(), vdr2.Weight())
 
-	config := BlacklistConfig{
+	config := Config{
 		Threshold:  3,
 		Duration:   time.Minute,
 		MaxPortion: 0.5,
@@ -174,13 +174,15 @@ func TestBlacklistDoesNotExceedThreshold(t *testing.T) {
 type noBlacklist struct{}
 
 // NewNoBlacklist returns an empty blacklist that will never stop any queries
-func NewNoBlacklist() Blacklist { return &noBlacklist{} }
+func NewNoBlacklist() Manager { return &noBlacklist{} }
 
 // RegisterQuery ...
-func (b *noBlacklist) RegisterQuery(validatorID ids.ShortID, requestID uint32) bool { return true }
+func (b *noBlacklist) RegisterQuery(chainID ids.ID, validatorID ids.ShortID, requestID uint32) bool {
+	return true
+}
 
 // RegisterResponse ...
-func (b *noBlacklist) RegisterResponse(validatorID ids.ShortID, requestID uint32) {}
+func (b *noBlacklist) RegisterResponse(chainID ids.ID, validatorID ids.ShortID, requestID uint32) {}
 
 // QueryFailed ...
-func (b *noBlacklist) QueryFailed(validatorID ids.ShortID, requestID uint32) {}
+func (b *noBlacklist) QueryFailed(chainID ids.ID, validatorID ids.ShortID, requestID uint32) {}

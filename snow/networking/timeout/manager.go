@@ -7,17 +7,22 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/networking/blacklist"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // Manager registers and fires timeouts for the snow API.
-type Manager struct{ tm timer.AdaptiveTimeoutManager }
+type Manager struct {
+	tm        timer.AdaptiveTimeoutManager
+	blacklist blacklist.Manager
+}
 
 // Initialize this timeout manager.
-func (m *Manager) Initialize(config *timer.AdaptiveTimeoutConfig) error {
-	return m.tm.Initialize(config)
+func (m *Manager) Initialize(timeoutConfig *timer.AdaptiveTimeoutConfig, blacklistConfig *blacklist.Config) error {
+	m.blacklist = blacklist.NewManager(blacklistConfig)
+	return m.tm.Initialize(timeoutConfig)
 }
 
 // Dispatch ...
@@ -26,11 +31,19 @@ func (m *Manager) Dispatch() { m.tm.Dispatch() }
 // Register request to time out unless Manager.Cancel is called
 // before the timeout duration passes, with the same request parameters.
 func (m *Manager) Register(validatorID ids.ShortID, chainID ids.ID, requestID uint32, timeout func()) time.Time {
-	return m.tm.Put(createRequestID(validatorID, chainID, requestID), timeout)
+	if ok := m.blacklist.RegisterQuery(chainID, validatorID, requestID); !ok {
+		timeout() // TODO use executor
+		return time.Time{}
+	}
+	return m.tm.Put(createRequestID(validatorID, chainID, requestID), func() {
+		m.blacklist.QueryFailed(chainID, validatorID, requestID)
+		timeout()
+	})
 }
 
 // Cancel request timeout with the specified parameters.
 func (m *Manager) Cancel(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
+	m.blacklist.RegisterResponse(chainID, validatorID, requestID)
 	m.tm.Remove(createRequestID(validatorID, chainID, requestID))
 }
 
