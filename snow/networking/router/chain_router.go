@@ -36,6 +36,8 @@ type ChainRouter struct {
 	intervalNotifier *timer.Repeater
 	closeTimeout     time.Duration
 	peers            ids.ShortSet
+	criticalChains   ids.Set
+	onFatal          func()
 }
 
 // Initialize the router.
@@ -52,6 +54,8 @@ func (sr *ChainRouter) Initialize(
 	timeouts *timeout.Manager,
 	gossipFrequency time.Duration,
 	closeTimeout time.Duration,
+	criticalChains ids.Set,
+	onFatal func(),
 ) {
 	sr.log = log
 	sr.chains = make(map[[32]byte]*Handler)
@@ -59,6 +63,8 @@ func (sr *ChainRouter) Initialize(
 	sr.gossiper = timer.NewRepeater(sr.Gossip, gossipFrequency)
 	sr.intervalNotifier = timer.NewRepeater(sr.EndInterval, defaultCPUInterval)
 	sr.closeTimeout = closeTimeout
+	sr.criticalChains = criticalChains
+	sr.onFatal = onFatal
 
 	sr.peers.Add(nodeID)
 
@@ -133,6 +139,10 @@ func (sr *ChainRouter) RemoveChain(chainID ids.ID) {
 		chain.Context().Log.Warn("timed out while shutting down")
 	}
 	ticker.Stop()
+
+	if sr.onFatal != nil && sr.criticalChains.Contains(chainID) {
+		go sr.onFatal()
+	}
 }
 
 // GetAcceptedFrontier routes an incoming GetAcceptedFrontier request from the

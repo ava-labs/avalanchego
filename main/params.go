@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
+	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -163,12 +164,12 @@ func init() {
 	logDisplayHighlight := fs.String("log-display-highlight", "auto", "Whether to color/highlight display logs. Default highlights when the output is a terminal. Otherwise, should be one of {auto, plain, colors}")
 
 	fs.IntVar(&Config.ConsensusParams.K, "snow-sample-size", 20, "Number of nodes to query for each network poll")
-	fs.IntVar(&Config.ConsensusParams.Alpha, "snow-quorum-size", 16, "Alpha value to use for required number positive results")
-	fs.IntVar(&Config.ConsensusParams.BetaVirtuous, "snow-virtuous-commit-threshold", 20, "Beta value to use for virtuous transactions")
+	fs.IntVar(&Config.ConsensusParams.Alpha, "snow-quorum-size", 14, "Alpha value to use for required number positive results")
+	fs.IntVar(&Config.ConsensusParams.BetaVirtuous, "snow-virtuous-commit-threshold", 15, "Beta value to use for virtuous transactions")
 	fs.IntVar(&Config.ConsensusParams.BetaRogue, "snow-rogue-commit-threshold", 30, "Beta value to use for rogue transactions")
 	fs.IntVar(&Config.ConsensusParams.Parents, "snow-avalanche-num-parents", 5, "Number of vertexes for reference from each new vertex")
 	fs.IntVar(&Config.ConsensusParams.BatchSize, "snow-avalanche-batch-size", 30, "Number of operations to batch in each new vertex")
-	fs.IntVar(&Config.ConsensusParams.ConcurrentRepolls, "snow-concurrent-repolls", 1, "Minimum number of concurrent polls for finalizing consensus")
+	fs.IntVar(&Config.ConsensusParams.ConcurrentRepolls, "snow-concurrent-repolls", 4, "Minimum number of concurrent polls for finalizing consensus")
 
 	// Enable/Disable APIs:
 	fs.BoolVar(&Config.AdminAPIEnabled, "api-admin-enabled", false, "If true, this node exposes the Admin API")
@@ -189,6 +190,8 @@ func init() {
 	// Router Configuration:
 	consensusGossipFrequency := fs.Int64("consensus-gossip-frequency", int64(10*time.Second), "Frequency of gossiping accepted frontiers.")
 	consensusShutdownTimeout := fs.Int64("consensus-shutdown-timeout", int64(1*time.Second), "Timeout before killing an unresponsive chain.")
+
+	fdLimit := fs.Uint64("fd-limit", ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
 
 	ferr := fs.Parse(os.Args[1:])
 
@@ -435,6 +438,10 @@ func init() {
 	}
 	Config.ConsensusGossipFrequency = time.Duration(*consensusGossipFrequency)
 	Config.ConsensusShutdownTimeout = time.Duration(*consensusShutdownTimeout)
+
+	if err := ulimit.Set(*fdLimit); err != nil {
+		errs.Add(fmt.Errorf("failed to set fd limit correctly due to: %s", err))
+	}
 
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
 		Config.TxFee = *txFee

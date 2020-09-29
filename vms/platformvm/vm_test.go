@@ -1693,7 +1693,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	go timeoutManager.Dispatch()
 
 	chainRouter := &router.ChainRouter{}
-	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &timeoutManager, time.Hour, time.Second)
+	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &timeoutManager, time.Hour, time.Second, ids.Set{}, nil)
 
 	externalSender := &sender.ExternalSenderTest{T: t}
 	externalSender.Default(true)
@@ -1716,6 +1716,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 				Ctx:        ctx,
 				Validators: vdrs,
 				Beacons:    beacons,
+				SampleK:    int(beacons.Weight()),
 				Alpha:      uint64(beacons.Len()/2 + 1),
 				Sender:     &sender,
 			},
