@@ -435,7 +435,7 @@ func init() {
 	Config.NetworkConfig.TimeoutReduction = time.Duration(*networkTimeoutReduction)
 
 	Config.BlacklistConfig.Duration = time.Duration(*blacklistDuration)
-	Config.BlacklistConfig.MaxPortion = (1.0 - (float64(Config.ConsensusParams.Alpha) / float64(Config.ConsensusParams.K))) / 2.0
+	Config.BlacklistConfig.MaxPortion = (1.0 - (float64(Config.ConsensusParams.Alpha) / float64(Config.ConsensusParams.K))) / 3.0
 
 	if *consensusGossipFrequency < 0 {
 		errs.Add(errors.New("gossip frequency can't be negative"))
