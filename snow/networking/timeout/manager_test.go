@@ -17,13 +17,13 @@ import (
 func TestManagerFire(t *testing.T) {
 	manager := Manager{}
 	manager.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:    time.Millisecond,
-		MinimumTimeout:    time.Millisecond,
-		MaximumTimeout:    10 * time.Second,
-		TimeoutMultiplier: 1.1,
-		TimeoutReduction:  time.Millisecond,
-		Namespace:         "",
-		Registerer:        prometheus.NewRegistry(),
+		InitialTimeout: time.Millisecond,
+		MinimumTimeout: time.Millisecond,
+		MaximumTimeout: 10 * time.Second,
+		TimeoutInc:     2 * time.Millisecond,
+		TimeoutDec:     time.Millisecond,
+		Namespace:      "",
+		Registerer:     prometheus.NewRegistry(),
 	})
 	go manager.Dispatch()
 
@@ -38,13 +38,13 @@ func TestManagerFire(t *testing.T) {
 func TestManagerCancel(t *testing.T) {
 	manager := Manager{}
 	manager.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:    time.Millisecond,
-		MinimumTimeout:    time.Millisecond,
-		MaximumTimeout:    10 * time.Second,
-		TimeoutMultiplier: 1.1,
-		TimeoutReduction:  time.Millisecond,
-		Namespace:         "",
-		Registerer:        prometheus.NewRegistry(),
+		InitialTimeout: time.Millisecond,
+		MinimumTimeout: time.Millisecond,
+		MaximumTimeout: 10 * time.Second,
+		TimeoutInc:     2 * time.Millisecond,
+		TimeoutDec:     time.Millisecond,
+		Namespace:      "",
+		Registerer:     prometheus.NewRegistry(),
 	})
 	go manager.Dispatch()
 

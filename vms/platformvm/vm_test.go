@@ -1682,13 +1682,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	timeoutManager := timeout.Manager{}
 	timeoutManager.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:    time.Millisecond,
-		MinimumTimeout:    time.Millisecond,
-		MaximumTimeout:    10 * time.Second,
-		TimeoutMultiplier: 1.1,
-		TimeoutReduction:  time.Millisecond,
-		Namespace:         "",
-		Registerer:        prometheus.NewRegistry(),
+		InitialTimeout: time.Millisecond,
+		MinimumTimeout: time.Millisecond,
+		MaximumTimeout: 10 * time.Second,
+		TimeoutInc:     2 * time.Millisecond,
+		TimeoutDec:     time.Millisecond,
+		Namespace:      "",
+		Registerer:     prometheus.NewRegistry(),
 	})
 	go timeoutManager.Dispatch()
 

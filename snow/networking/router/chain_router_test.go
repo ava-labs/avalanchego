@@ -22,13 +22,13 @@ import (
 func TestShutdown(t *testing.T) {
 	tm := timeout.Manager{}
 	tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:    time.Millisecond,
-		MinimumTimeout:    time.Millisecond,
-		MaximumTimeout:    10 * time.Second,
-		TimeoutMultiplier: 1.1,
-		TimeoutReduction:  time.Millisecond,
-		Namespace:         "",
-		Registerer:        prometheus.NewRegistry(),
+		InitialTimeout: time.Millisecond,
+		MinimumTimeout: time.Millisecond,
+		MaximumTimeout: 10 * time.Second,
+		TimeoutInc:     2 * time.Millisecond,
+		TimeoutDec:     time.Millisecond,
+		Namespace:      "",
+		Registerer:     prometheus.NewRegistry(),
 	})
 	go tm.Dispatch()
 
@@ -80,13 +80,13 @@ func TestShutdownTimesOut(t *testing.T) {
 	tm := timeout.Manager{}
 	// Ensure that the MultiPut request does not timeout
 	tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:    time.Second,
-		MinimumTimeout:    500 * time.Millisecond,
-		MaximumTimeout:    10 * time.Second,
-		TimeoutMultiplier: 1.1,
-		TimeoutReduction:  time.Millisecond,
-		Namespace:         "",
-		Registerer:        prometheus.NewRegistry(),
+		InitialTimeout: time.Second,
+		MinimumTimeout: 500 * time.Millisecond,
+		MaximumTimeout: 10 * time.Second,
+		TimeoutInc:     2 * time.Millisecond,
+		TimeoutDec:     time.Millisecond,
+		Namespace:      "",
+		Registerer:     prometheus.NewRegistry(),
 	})
 	go tm.Dispatch()
 
