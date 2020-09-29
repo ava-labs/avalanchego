@@ -58,6 +58,8 @@ func (s *state) SetVertex(id ids.ID, vtx *innerVertex) error {
 	return s.db.Put(id.Bytes(), vtx.bytes)
 }
 
+// Get the status of a vertex
+// Only returns non-nil error if cache has invalid value
 func (s *state) Status(id ids.ID) (choices.Status, error) {
 	if statusIntf, found := s.dbCache.Get(id); found {
 		status, ok := statusIntf.(choices.Status)
@@ -81,7 +83,7 @@ func (s *state) Status(id ids.ID) (choices.Status, error) {
 	}
 
 	s.dbCache.Put(id, choices.Unknown)
-	return choices.Unknown, errUnknownVertex
+	return choices.Unknown, nil
 }
 
 // SetStatus sets the status of the vertex and returns an error if it fails to write to the db
