@@ -27,18 +27,22 @@ type uniqueVertex struct {
 	v     *vertexState
 }
 
-func (vtx *uniqueVertex) refresh() {
+func (vtx *uniqueVertex) refresh() error {
 	if vtx.v == nil {
 		vtx.v = &vertexState{}
 	}
 	if vtx.v.unique {
-		return
+		return nil
 	}
 
 	unique := vtx.serializer.state.UniqueVertex(vtx)
 	prevVtx := vtx.v.vtx
 	if unique == vtx {
-		vtx.v.status = vtx.serializer.state.Status(vtx.ID())
+		status, err := vtx.serializer.state.Status(vtx.ID())
+		if err != nil {
+			return fmt.Errorf("couldn't get status of vertex %s: %w", vtx.ID(), err)
+		}
+		vtx.v.status = status
 		vtx.v.unique = true
 	} else {
 		// If someone is in the cache, they must be up to date
@@ -47,10 +51,16 @@ func (vtx *uniqueVertex) refresh() {
 
 	switch {
 	case vtx.v.vtx == nil && prevVtx == nil:
-		vtx.v.vtx = vtx.serializer.state.Vertex(vtx.ID())
+		retrievedVtx, err := vtx.serializer.state.Vertex(vtx.ID())
+		if err != nil {
+			return fmt.Errorf("couldn't get vertex %s: %w", vtx.ID(), err)
+		}
+		vtx.v.vtx = retrievedVtx
 	case vtx.v.vtx == nil:
 		vtx.v.vtx = prevVtx
 	}
+
+	return nil
 }
 
 func (vtx *uniqueVertex) Evict() {
@@ -62,7 +72,9 @@ func (vtx *uniqueVertex) Evict() {
 }
 
 func (vtx *uniqueVertex) setVertex(innerVtx *innerVertex) error {
-	vtx.refresh()
+	if err := vtx.refresh(); err != nil {
+		return fmt.Errorf("couldn't refresh vertex: %w", err)
+	}
 	if vtx.v.vtx != nil {
 		return nil
 	}
@@ -74,7 +86,9 @@ func (vtx *uniqueVertex) setVertex(innerVtx *innerVertex) error {
 }
 
 func (vtx *uniqueVertex) setStatus(status choices.Status) error {
-	vtx.refresh()
+	if err := vtx.refresh(); err != nil {
+		return fmt.Errorf("couldn't refresh vertex: %w", err)
+	}
 	if vtx.v.status == status {
 		return nil
 	}
@@ -125,7 +139,9 @@ func (vtx *uniqueVertex) Reject() error {
 func (vtx *uniqueVertex) Status() choices.Status { vtx.refresh(); return vtx.v.status }
 
 func (vtx *uniqueVertex) Parents() ([]avalanche.Vertex, error) {
-	vtx.refresh()
+	if err := vtx.refresh(); err != nil {
+		return nil, fmt.Errorf("couldn't refresh vertex: %w", err)
+	}
 
 	if vtx.v.vtx == nil {
 		return nil, fmt.Errorf("failed to get parents for vertex with status: %s", vtx.v.status)
@@ -145,7 +161,9 @@ func (vtx *uniqueVertex) Parents() ([]avalanche.Vertex, error) {
 }
 
 func (vtx *uniqueVertex) Height() (uint64, error) {
-	vtx.refresh()
+	if err := vtx.refresh(); err != nil {
+		return 0, fmt.Errorf("couldn't refresh vertex: %w", err)
+	}
 
 	if vtx.v.vtx == nil {
 		return 0, fmt.Errorf("failed to get height for vertex with status: %s", vtx.v.status)
@@ -155,7 +173,9 @@ func (vtx *uniqueVertex) Height() (uint64, error) {
 }
 
 func (vtx *uniqueVertex) Txs() ([]snowstorm.Tx, error) {
-	vtx.refresh()
+	if err := vtx.refresh(); err != nil {
+		return nil, fmt.Errorf("couldn't refresh vertex: %w", err)
+	}
 
 	if vtx.v.vtx == nil {
 		return nil, fmt.Errorf("failed to get txs for vertex with status: %s", vtx.v.status)

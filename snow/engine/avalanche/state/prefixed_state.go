@@ -39,7 +39,7 @@ func (s *prefixedState) UniqueVertex(vtx *uniqueVertex) *uniqueVertex {
 	return s.uniqueVtx.Deduplicate(vtx).(*uniqueVertex)
 }
 
-func (s *prefixedState) Vertex(id ids.ID) *innerVertex {
+func (s *prefixedState) Vertex(id ids.ID) (*innerVertex, error) {
 	vID := ids.ID{}
 	if cachedVtxIDIntf, found := s.vtx.Get(id); found {
 		vID = cachedVtxIDIntf.(ids.ID)
@@ -63,7 +63,7 @@ func (s *prefixedState) SetVertex(vtx *innerVertex) error {
 	return s.state.SetVertex(vID, vtx)
 }
 
-func (s *prefixedState) Status(id ids.ID) choices.Status {
+func (s *prefixedState) Status(id ids.ID) (choices.Status, error) {
 	sID := ids.ID{}
 	if cachedStatusIDIntf, found := s.status.Get(id); found {
 		sID = cachedStatusIDIntf.(ids.ID)
@@ -87,7 +87,7 @@ func (s *prefixedState) SetStatus(id ids.ID, status choices.Status) error {
 	return s.state.SetStatus(sID, status)
 }
 
-func (s *prefixedState) Edge() []ids.ID { return s.state.Edge(uniqueEdgeID) }
+func (s *prefixedState) Edge() ([]ids.ID, error) { return s.state.Edge(uniqueEdgeID) }
 
 func (s *prefixedState) SetEdge(frontier []ids.ID) error {
 	return s.state.SetEdge(uniqueEdgeID, frontier)

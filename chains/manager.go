@@ -406,7 +406,9 @@ func (m *manager) createAvalancheChain(
 	// Handles serialization/deserialization of vertices and also the
 	// persistence of vertices
 	vtxManager := &state.Serializer{}
-	vtxManager.Initialize(ctx, vm, vertexDB)
+	if err := vtxManager.Initialize(ctx, vm, vertexDB); err != nil {
+		return nil, fmt.Errorf("couldn't initialize vtxManager: %w", err)
+	}
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
