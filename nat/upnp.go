@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	soapRequestTimeout = 3 * time.Second
+	soapRequestTimeout = 10 * time.Second
 )
 
 // upnpClient is the interface used by goupnp for their client implementations
