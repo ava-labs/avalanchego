@@ -49,4 +49,4 @@ fi
 
 AVALANCHE_COMMIT="$(git --git-dir="$AVALANCHE_CLONE/.git" rev-parse --short HEAD)"
 
-"${DOCKER}" build -t "avalanchego-$AVALANCHE_COMMIT" "$AVALANCHE_CLONE" -f "$AVALANCHE_CLONE/Dockerfile"
+"${DOCKER}" build -t "avaplatform/avalanchego:$AVALANCHE_COMMIT" "$AVALANCHE_CLONE" -f "$AVALANCHE_CLONE/Dockerfile"

@@ -14,6 +14,6 @@ if [[ $TRAVIS_REPO_SLUG != "ava-labs/avalanchego" || -z "$DOCKER_USERNAME"  ]]; 
 fi
 
 echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
-#docker push "$TRAVIS_TAG"
+
 # following should push all tags
 docker push $DOCKERHUB_REPO 
