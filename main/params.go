@@ -147,6 +147,10 @@ func init() {
 	fs.Float64Var(&Config.StakerMSGPortion, "staker-msg-reserved", 0.2, "Reserve a portion of the chain message queue's space for stakers.")
 	fs.Float64Var(&Config.StakerCPUPortion, "staker-cpu-reserved", 0.2, "Reserve a portion of the chain's CPU time for stakers.")
 
+	// Blacklist:
+	fs.IntVar(&Config.BlacklistThreshold, "staker-blacklist-threshold", 5, "Number of consecutive failed queries before blacklisting a staker.")
+	fs.Int64Var(&Config.BlacklistDuration, "staker-blacklist-duration", int64(30*time.Minute), "Amount of time a staker is considered blacklisted.")
+
 	// Network Timeouts:
 	networkInitialTimeout := fs.Int64("network-initial-timeout", int64(10*time.Second), "Initial timeout value of the adaptive timeout manager, in nanoseconds.")
 	networkMinimumTimeout := fs.Int64("network-minimum-timeout", int64(500*time.Millisecond), "Minimum timeout value of the adaptive timeout manager, in nanoseconds.")

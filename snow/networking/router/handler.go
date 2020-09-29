@@ -102,6 +102,8 @@ type Handler struct {
 	ctx    *snow.Context
 	engine common.Engine
 
+	blacklist common.Blacklist
+
 	toClose func()
 	closing bool
 }
@@ -112,6 +114,7 @@ func (h *Handler) Initialize(
 	engine common.Engine,
 	validators validators.Set,
 	msgChan <-chan common.Message,
+	blacklist common.Blacklist,
 	bufferSize int,
 	maxNonStakerPendingMsgs uint32,
 	stakerMsgPortion,
@@ -126,6 +129,7 @@ func (h *Handler) Initialize(
 	h.reliableMsgsSema = make(chan struct{}, 1)
 	h.closed = make(chan struct{})
 	h.msgChan = msgChan
+	h.blacklist = blacklist
 
 	// Defines the maximum current percentage of expected CPU utilization for
 	// a message to be placed in the queue at the corresponding index
@@ -420,6 +424,7 @@ func (h *Handler) PullQuery(validatorID ids.ShortID, requestID uint32, deadline 
 
 // Chits passes a Chits message received from the network to the consensus engine.
 func (h *Handler) Chits(validatorID ids.ShortID, requestID uint32, votes ids.Set) bool {
+	h.blacklist.RegisterResponse(validatorID, requestID)
 	return h.serviceQueue.PushMessage(message{
 		messageType:  chitsMsg,
 		validatorID:  validatorID,
@@ -431,6 +436,7 @@ func (h *Handler) Chits(validatorID ids.ShortID, requestID uint32, votes ids.Set
 
 // QueryFailed passes a QueryFailed message received from the network to the consensus engine.
 func (h *Handler) QueryFailed(validatorID ids.ShortID, requestID uint32) {
+	h.blacklist.QueryFailed(validatorID, requestID)
 	h.sendReliableMsg(message{
 		messageType: queryFailedMsg,
 		validatorID: validatorID,

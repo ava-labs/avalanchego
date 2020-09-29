@@ -46,6 +46,8 @@ type Config struct {
 	MaxNonStakerPendingMsgs uint
 	StakerMSGPortion        float64
 	StakerCPUPortion        float64
+	BlacklistThreshold      int
+	BlacklistDuration       int64
 
 	// Network configuration
 	NetworkConfig timer.AdaptiveTimeoutConfig

@@ -493,6 +493,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		MaxNonStakerPendingMsgs: uint32(n.Config.MaxNonStakerPendingMsgs),
 		StakerMSGPortion:        n.Config.StakerMSGPortion,
 		StakerCPUPortion:        n.Config.StakerCPUPortion,
+		BlacklistThreshold:      n.Config.BlacklistThreshold,
+		BlacklistDuration:       time.Duration(n.Config.BlacklistDuration),
 		Log:                     n.Log,
 		LogFactory:              n.LogFactory,
 		VMManager:               n.vmManager,

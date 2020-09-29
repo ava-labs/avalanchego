@@ -44,10 +44,12 @@ func TestShutdown(t *testing.T) {
 	engine.ShutdownF = func() error { shutdownCalled <- struct{}{}; return nil }
 
 	handler := &Handler{}
+	blacklist := common.NewNoBlacklist()
 	handler.Initialize(
 		&engine,
 		validators.NewSet(),
 		nil,
+		blacklist,
 		1,
 		throttler.DefaultMaxNonStakerPendingMsgs,
 		throttler.DefaultStakerPortion,
@@ -111,10 +113,12 @@ func TestShutdownTimesOut(t *testing.T) {
 	engine.ShutdownF = func() error { *closed++; return nil }
 
 	handler := &Handler{}
+	blacklist := common.NewNoBlacklist()
 	handler.Initialize(
 		&engine,
 		validators.NewSet(),
 		nil,
+		blacklist,
 		1,
 		throttler.DefaultMaxNonStakerPendingMsgs,
 		throttler.DefaultStakerPortion,

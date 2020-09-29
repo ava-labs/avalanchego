@@ -8,24 +8,27 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 )
 
 // Sender sends consensus messages to other validators
 type Sender struct {
-	ctx      *snow.Context
-	sender   ExternalSender // Actually does the sending over the network
-	router   router.Router
-	timeouts *timeout.Manager
+	ctx       *snow.Context
+	sender    ExternalSender // Actually does the sending over the network
+	router    router.Router
+	timeouts  *timeout.Manager
+	blacklist common.Blacklist
 }
 
 // Initialize this sender
-func (s *Sender) Initialize(ctx *snow.Context, sender ExternalSender, router router.Router, timeouts *timeout.Manager) {
+func (s *Sender) Initialize(ctx *snow.Context, sender ExternalSender, router router.Router, timeouts *timeout.Manager, blacklist common.Blacklist) {
 	s.ctx = ctx
 	s.sender = sender
 	s.router = router
 	s.timeouts = timeouts
+	s.blacklist = blacklist
 }
 
 // Context of this sender
@@ -152,7 +155,31 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 	s.ctx.Log.Verbo("Sending PushQuery to validators %v. RequestID: %d. ContainerID: %s", validatorIDs, requestID, containerID)
 
 	currentDeadline := time.Time{}
+
+	// If one of the validators in [validatorIDs] is myself, send this message directly
+	// to my own router rather than sending it over the network
+	if validatorIDs.Contains(s.ctx.NodeID) { // One of the validators in [validatorIDs] was myself
+		validatorIDs.Remove(s.ctx.NodeID)
+
+		deadline := s.timeouts.Register(s.ctx.NodeID, s.ctx.ChainID, requestID, func() {
+			s.router.QueryFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
+		})
+		if deadline.After(currentDeadline) {
+			currentDeadline = deadline
+		}
+		// We use a goroutine to avoid a deadlock in the case where the consensus engine queries itself.
+		// The flow of execution in that case is handler --> engine --> sender --> chain router --> handler
+		// If this were not a goroutine, then we would deadlock when [handler].msgs is full
+		go s.router.PushQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, currentDeadline, containerID, container)
+	}
+
 	for _, validatorID := range validatorIDs.List() {
+		if ok := s.blacklist.RegisterQuery(validatorID, requestID); !ok {
+			validatorIDs.Remove(validatorID)
+			s.router.QueryFailed(validatorID, s.ctx.ChainID, requestID)
+			continue
+		}
+
 		vID := validatorID
 		deadline := s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
 			s.router.QueryFailed(vID, s.ctx.ChainID, requestID)
@@ -160,16 +187,6 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 		if deadline.After(currentDeadline) {
 			currentDeadline = deadline
 		}
-	}
-
-	// If one of the validators in [validatorIDs] is myself, send this message directly
-	// to my own router rather than sending it over the network
-	if validatorIDs.Contains(s.ctx.NodeID) { // One of the validators in [validatorIDs] was myself
-		validatorIDs.Remove(s.ctx.NodeID)
-		// We use a goroutine to avoid a deadlock in the case where the consensus engine queries itself.
-		// The flow of execution in that case is handler --> engine --> sender --> chain router --> handler
-		// If this were not a goroutine, then we would deadlock here when [handler].msgs is full
-		go s.router.PushQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, currentDeadline, containerID, container)
 	}
 
 	s.sender.PushQuery(validatorIDs, s.ctx.ChainID, requestID, currentDeadline, containerID, container)
@@ -183,7 +200,31 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 	s.ctx.Log.Verbo("Sending PullQuery. RequestID: %d. ContainerID: %s", requestID, containerID)
 
 	currentDeadline := time.Time{}
+
+	// If one of the validators in [validatorIDs] is myself, send this message directly
+	// to my own router rather than sending it over the network
+	if validatorIDs.Contains(s.ctx.NodeID) { // One of the validators in [validatorIDs] was myself
+		validatorIDs.Remove(s.ctx.NodeID)
+
+		deadline := s.timeouts.Register(s.ctx.NodeID, s.ctx.ChainID, requestID, func() {
+			s.router.QueryFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
+		})
+		if deadline.After(currentDeadline) {
+			currentDeadline = deadline
+		}
+		// We use a goroutine to avoid a deadlock in the case where the consensus engine queries itself.
+		// The flow of execution in that case is handler --> engine --> sender --> chain router --> handler
+		// If this were not a goroutine, then we would deadlock when [handler].msgs is full
+		go s.router.PullQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, currentDeadline, containerID)
+	}
+
 	for _, validatorID := range validatorIDs.List() {
+		if ok := s.blacklist.RegisterQuery(validatorID, requestID); !ok {
+			validatorIDs.Remove(validatorID)
+			s.router.QueryFailed(validatorID, s.ctx.ChainID, requestID)
+			continue
+		}
+
 		vID := validatorID
 		deadline := s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
 			s.router.QueryFailed(vID, s.ctx.ChainID, requestID)
@@ -191,16 +232,6 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 		if deadline.After(currentDeadline) {
 			currentDeadline = deadline
 		}
-	}
-
-	// If one of the validators in [validatorIDs] is myself, send this message directly
-	// to my own router rather than sending it over the network
-	if validatorIDs.Contains(s.ctx.NodeID) { // One of the validators in [validatorIDs] was myself
-		validatorIDs.Remove(s.ctx.NodeID)
-		// We use a goroutine to avoid a deadlock in the case where the consensus engine queries itself.
-		// The flow of execution in that case is handler --> engine --> sender --> chain router --> handler
-		// If this were not a goroutine, then we would deadlock when [handler].msgs is full
-		go s.router.PullQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, currentDeadline, containerID)
 	}
 
 	s.sender.PullQuery(validatorIDs, s.ctx.ChainID, requestID, currentDeadline, containerID)

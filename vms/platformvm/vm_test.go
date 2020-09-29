@@ -1700,8 +1700,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
+	blacklist := common.NewNoBlacklist()
 
-	sender.Initialize(ctx, externalSender, chainRouter, &timeoutManager)
+	sender.Initialize(ctx, externalSender, chainRouter, &timeoutManager, blacklist)
 
 	reqID := new(uint32)
 	externalSender.GetAcceptedFrontierF = func(_ ids.ShortSet, _ ids.ID, requestID uint32, _ time.Time) {
@@ -1740,6 +1741,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		&engine,
 		vdrs,
 		msgChan,
+		blacklist,
 		1000,
 		throttler.DefaultMaxNonStakerPendingMsgs,
 		throttler.DefaultStakerPortion,

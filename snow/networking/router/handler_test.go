@@ -34,6 +34,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	}
 
 	handler := &Handler{}
+	blacklist := common.NewNoBlacklist()
 	vdrs := validators.NewSet()
 	vdr0 := ids.GenerateTestShortID()
 	vdrs.AddWeight(vdr0, 1)
@@ -41,6 +42,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
+		blacklist,
 		16,
 		throttler.DefaultMaxNonStakerPendingMsgs,
 		throttler.DefaultStakerPortion,
@@ -79,11 +81,13 @@ func TestHandlerDoesntDrop(t *testing.T) {
 	}
 
 	handler := &Handler{}
+	blacklist := common.NewNoBlacklist()
 	validators := validators.NewSet()
 	handler.Initialize(
 		&engine,
 		validators,
 		nil,
+		blacklist,
 		16,
 		throttler.DefaultMaxNonStakerPendingMsgs,
 		throttler.DefaultStakerPortion,
@@ -116,10 +120,12 @@ func TestHandlerClosesOnError(t *testing.T) {
 	}
 
 	handler := &Handler{}
+	blacklist := common.NewNoBlacklist()
 	handler.Initialize(
 		&engine,
 		validators.NewSet(),
 		nil,
+		blacklist,
 		16,
 		throttler.DefaultMaxNonStakerPendingMsgs,
 		throttler.DefaultStakerPortion,

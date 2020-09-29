@@ -26,11 +26,13 @@ import (
 func TestSenderContext(t *testing.T) {
 	context := snow.DefaultContextTest()
 	sender := Sender{}
+	blacklist := common.NewNoBlacklist()
 	sender.Initialize(
 		context,
 		&ExternalSenderTest{},
 		&router.ChainRouter{},
 		&timeout.Manager{},
+		blacklist,
 	)
 	if res := sender.Context(); !reflect.DeepEqual(res, context) {
 		t.Fatalf("Got %#v, expected %#v", res, context)
@@ -49,12 +51,13 @@ func TestTimeout(t *testing.T) {
 		Registerer:        prometheus.NewRegistry(),
 	})
 	go tm.Dispatch()
+	blacklist := common.NewNoBlacklist()
 
 	chainRouter := router.ChainRouter{}
 	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil)
 
 	sender := Sender{}
-	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm)
+	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm, blacklist)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(true)
@@ -77,6 +80,7 @@ func TestTimeout(t *testing.T) {
 		&engine,
 		validators.NewSet(),
 		nil,
+		blacklist,
 		1,
 		throttler.DefaultMaxNonStakerPendingMsgs,
 		throttler.DefaultStakerPortion,
@@ -113,12 +117,13 @@ func TestReliableMessages(t *testing.T) {
 		Registerer:        prometheus.NewRegistry(),
 	})
 	go tm.Dispatch()
+	blacklist := common.NewNoBlacklist()
 
 	chainRouter := router.ChainRouter{}
 	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil)
 
 	sender := Sender{}
-	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm)
+	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm, blacklist)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(true)
@@ -143,6 +148,7 @@ func TestReliableMessages(t *testing.T) {
 		&engine,
 		validators.NewSet(),
 		nil,
+		blacklist,
 		1,
 		throttler.DefaultMaxNonStakerPendingMsgs,
 		throttler.DefaultStakerPortion,
@@ -188,12 +194,13 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		Registerer:        prometheus.NewRegistry(),
 	})
 	go tm.Dispatch()
+	blacklist := common.NewNoBlacklist()
 
 	chainRouter := router.ChainRouter{}
 	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil)
 
 	sender := Sender{}
-	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm)
+	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm, blacklist)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(false)
@@ -218,6 +225,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		&engine,
 		validators.NewSet(),
 		nil,
+		blacklist,
 		1,
 		throttler.DefaultMaxNonStakerPendingMsgs,
 		throttler.DefaultStakerPortion,

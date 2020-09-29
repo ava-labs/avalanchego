@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/keystore"
@@ -111,6 +112,8 @@ type ManagerConfig struct {
 	MaxNonStakerPendingMsgs uint32
 	StakerMSGPortion        float64
 	StakerCPUPortion        float64
+	BlacklistThreshold      int
+	BlacklistDuration       time.Duration
 	Log                     logging.Logger
 	LogFactory              logging.Factory
 	VMManager               vms.Manager // Manage mappings from vm ID --> vm
@@ -408,9 +411,10 @@ func (m *manager) createAvalancheChain(
 	vtxManager := &state.Serializer{}
 	vtxManager.Initialize(ctx, vm, vertexDB)
 
+	blacklist := common.NewQueryBlacklist(m.ManagerConfig.BlacklistThreshold, m.ManagerConfig.BlacklistDuration)
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager)
+	sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager, blacklist)
 
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
@@ -447,6 +451,7 @@ func (m *manager) createAvalancheChain(
 		engine,
 		validators,
 		msgChan,
+		blacklist,
 		defaultChannelSize,
 		m.MaxNonStakerPendingMsgs,
 		m.StakerMSGPortion,
@@ -495,9 +500,10 @@ func (m *manager) createSnowmanChain(
 		return nil, err
 	}
 
+	blacklist := common.NewQueryBlacklist(m.ManagerConfig.BlacklistThreshold, m.ManagerConfig.BlacklistDuration)
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager)
+	sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager, blacklist)
 
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
@@ -533,6 +539,7 @@ func (m *manager) createSnowmanChain(
 		engine,
 		validators,
 		msgChan,
+		blacklist,
 		defaultChannelSize,
 		m.MaxNonStakerPendingMsgs,
 		m.StakerMSGPortion,
