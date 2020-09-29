@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
+	"github.com/ava-labs/avalanchego/snow/networking/blacklist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/throttler"
@@ -1689,6 +1690,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		TimeoutReduction:  time.Millisecond,
 		Namespace:         "",
 		Registerer:        prometheus.NewRegistry(),
+	}, &blacklist.Config{
+		Validators: validators.NewSet(),
+		Threshold:  5,
+		Duration:   time.Minute,
+		MaxPortion: 0.5,
 	})
 	go timeoutManager.Dispatch()
 

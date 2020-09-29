@@ -22,7 +22,7 @@ func TestBlackList(t *testing.T) {
 	vdrs.AddWeight(vdr3.ID(), vdr3.Weight())
 	vdrs.AddWeight(vdr4.ID(), vdr4.Weight())
 
-	config := Config{
+	config := &Config{
 		Threshold:  3,
 		Duration:   time.Minute,
 		MaxPortion: 0.5,
@@ -83,7 +83,7 @@ func TestBlacklistDoesNotGetStuck(t *testing.T) {
 	vdrs.AddWeight(vdr1.ID(), vdr1.Weight())
 	vdrs.AddWeight(vdr2.ID(), vdr2.Weight())
 
-	config := Config{
+	config := &Config{
 		Threshold:  3,
 		Duration:   time.Minute,
 		MaxPortion: 0.5,
@@ -131,7 +131,7 @@ func TestBlacklistDoesNotExceedThreshold(t *testing.T) {
 	vdrs.AddWeight(vdr1.ID(), vdr1.Weight())
 	vdrs.AddWeight(vdr2.ID(), vdr2.Weight())
 
-	config := Config{
+	config := &Config{
 		Threshold:  3,
 		Duration:   time.Minute,
 		MaxPortion: 0.5,

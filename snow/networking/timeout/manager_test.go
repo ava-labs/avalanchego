@@ -26,7 +26,7 @@ func TestManagerFire(t *testing.T) {
 		TimeoutReduction:  time.Millisecond,
 		Namespace:         "",
 		Registerer:        prometheus.NewRegistry(),
-	}, blacklist.Config{
+	}, &blacklist.Config{
 		Validators: validators.NewSet(),
 		Threshold:  5,
 		Duration:   time.Minute,
@@ -52,7 +52,7 @@ func TestManagerCancel(t *testing.T) {
 		TimeoutReduction:  time.Millisecond,
 		Namespace:         "",
 		Registerer:        prometheus.NewRegistry(),
-	}, blacklist.Config{
+	}, &blacklist.Config{
 		Validators: validators.NewSet(),
 		Threshold:  5,
 		Duration:   time.Minute,
