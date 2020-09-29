@@ -432,6 +432,7 @@ func init() {
 	Config.NetworkConfig.InitialTimeout = time.Duration(*networkInitialTimeout)
 	Config.NetworkConfig.MinimumTimeout = time.Duration(*networkMinimumTimeout)
 	Config.NetworkConfig.MaximumTimeout = time.Duration(*networkMaximumTimeout)
+	Config.NetworkConfig.TimeoutInc = time.Duration(*networkTimeoutInc)
 	Config.NetworkConfig.TimeoutDec = time.Duration(*networkTimeoutDec)
 
 	if *consensusGossipFrequency < 0 {
