@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	mapTimeout       = 30 * time.Minute
-	mapUpdateTimeout = mapTimeout / 2
-	maxRetries       = 20
+	mapTimeout        = 30 * time.Minute
+	mapUpdateTimeout  = 5 * time.Minute
+	maxRetries        = 20
+	maxRefreshRetries = 3
 )
 
 // Router describes the functionality that a network device must support to be
@@ -112,12 +113,15 @@ func (dev *Mapper) keepPortMapping(mappedPort chan<- uint16, protocol string,
 			for {
 				select {
 				case <-updateTimer.C:
-					if err := dev.r.MapPort(protocol, intPort, extPort, desc, mapTimeout); err != nil {
-						dev.log.Error("Renewing port mapping from external port %d to internal port %d failed with %s",
-							intPort, extPort, err)
-					} else {
-						dev.log.Debug("Renewed port mapping from external port %d to internal port %d.",
-							intPort, extPort)
+					for retryCnt := 0; retryCnt < maxRefreshRetries; retryCnt++ {
+						if err := dev.r.MapPort(protocol, intPort, extPort, desc, mapTimeout); err != nil {
+							dev.log.Error("Renewing port mapping from external port %d to internal port %d failed with %s",
+								intPort, extPort, err)
+						} else {
+							dev.log.Debug("Renewed port mapping from external port %d to internal port %d.",
+								intPort, extPort)
+							break
+						}
 					}
 
 					updateTimer.Reset(mapUpdateTimeout)
