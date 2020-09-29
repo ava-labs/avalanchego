@@ -50,8 +50,6 @@ type Config struct {
 	MaxPortion float64
 }
 
-// Config defines the configuration for subnet specific blacklist
-
 // NewQueryBlacklist ...
 func NewQueryBlacklist(validators validators.Set, threshold int, duration time.Duration, maxPortion float64) QueryBlacklist {
 	return &queryBlacklist{
@@ -143,7 +141,7 @@ func (b *queryBlacklist) blacklist(validatorID ids.ShortID) {
 	// Note: there could be a memory leak if a large number of
 	// validators were added, sampled, and then were blacklisted
 	// and never sampled again. Due to the minimum staking amount
-	// and durations this is not a concern.
+	// and durations this is not a realistic concern.
 	b.cleanup()
 }
 
