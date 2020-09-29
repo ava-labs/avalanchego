@@ -15,7 +15,7 @@ import (
 const (
 	mapTimeout        = 30 * time.Minute
 	mapUpdateTimeout  = 5 * time.Minute
-	maxRetries        = 20
+	maxRetries        = 100
 	maxRefreshRetries = 3
 )
 
