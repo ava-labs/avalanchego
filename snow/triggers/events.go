@@ -3,19 +3,22 @@
 
 package triggers
 
-import "github.com/ava-labs/avalanchego/ids"
+import (
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+)
 
 // Acceptor is implemented when a struct is monitoring if a message is accepted
 type Acceptor interface {
-	Accept(chainID, containerID ids.ID, container []byte) error
+	Accept(ctx *snow.Context, containerID ids.ID, container []byte) error
 }
 
 // Rejector is implemented when a struct is monitoring if a message is rejected
 type Rejector interface {
-	Reject(chainID, containerID ids.ID, container []byte) error
+	Reject(ctx *snow.Context, containerID ids.ID, container []byte) error
 }
 
 // Issuer is implemented when a struct is monitoring if a message is issued
 type Issuer interface {
-	Issue(chainID, containerID ids.ID, container []byte) error
+	Issue(ctx *snow.Context, containerID ids.ID, container []byte) error
 }

@@ -1,5 +1,5 @@
 - name: Kill Node
-  command: killall -SIGTERM avalanche
+  command: killall -SIGTERM avalanchego
   ignore_errors: true
 
 - name: Kill EVM

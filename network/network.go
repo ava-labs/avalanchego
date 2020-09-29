@@ -16,6 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/triggers"
@@ -226,6 +227,7 @@ func NewNetwork(
 	pingPongTimeout time.Duration,
 	pingFrequency time.Duration,
 ) Network {
+	// #nosec G404
 	netw := &network{
 		log:            log,
 		id:             id,
@@ -269,6 +271,7 @@ func NewNetwork(
 		log.Warn("initializing network metrics failed with: %s", err)
 	}
 	netw.executor.Initialize()
+	go netw.executor.Dispatch()
 	netw.heartbeat()
 	return netw
 }
@@ -283,11 +286,8 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 
 	for _, validatorID := range validatorIDs.List() {
 		vID := validatorID
-		peer, sent := n.peers[vID.Key()]
-		if sent {
-			sent = peer.send(msg)
-		}
-		if !sent {
+		peer, exists := n.peers[vID.Key()]
+		if !exists || !peer.connected || !peer.send(msg) {
 			n.log.Debug("failed to send GetAcceptedFrontier(%s, %s, %d)",
 				vID,
 				chainID,
@@ -315,11 +315,8 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
-	peer, sent := n.peers[validatorID.Key()]
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	peer, exists := n.peers[validatorID.Key()]
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send AcceptedFrontier(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -352,11 +349,8 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 
 	for _, validatorID := range validatorIDs.List() {
 		vID := validatorID
-		peer, sent := n.peers[vID.Key()]
-		if sent {
-			sent = peer.send(msg)
-		}
-		if !sent {
+		peer, exists := n.peers[vID.Key()]
+		if !exists || !peer.connected || !peer.send(msg) {
 			n.log.Debug("failed to send GetAccepted(%s, %s, %d, %s)",
 				validatorID,
 				chainID,
@@ -385,11 +379,8 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
-	peer, sent := n.peers[validatorID.Key()]
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	peer, exists := n.peers[validatorID.Key()]
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send Accepted(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -412,11 +403,8 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
-	peer, sent := n.peers[validatorID.Key()]
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	peer, exists := n.peers[validatorID.Key()]
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send GetAncestors(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -440,11 +428,8 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
-	peer, sent := n.peers[validatorID.Key()]
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	peer, exists := n.peers[validatorID.Key()]
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send MultiPut(%s, %s, %d, %d)",
 			validatorID,
 			chainID,
@@ -464,11 +449,8 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
-	peer, sent := n.peers[validatorID.Key()]
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	peer, exists := n.peers[validatorID.Key()]
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send Get(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -497,11 +479,8 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
-	peer, sent := n.peers[validatorID.Key()]
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	peer, exists := n.peers[validatorID.Key()]
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send Put(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -538,11 +517,8 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 
 	for _, validatorID := range validatorIDs.List() {
 		vID := validatorID
-		peer, sent := n.peers[vID.Key()]
-		if sent {
-			sent = peer.send(msg)
-		}
-		if !sent {
+		peer, exists := n.peers[vID.Key()]
+		if !exists || !peer.connected || !peer.send(msg) {
 			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
 				validatorID,
 				chainID,
@@ -567,11 +543,8 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 
 	for _, validatorID := range validatorIDs.List() {
 		vID := validatorID
-		peer, sent := n.peers[vID.Key()]
-		if sent {
-			sent = peer.send(msg)
-		}
-		if !sent {
+		peer, exists := n.peers[vID.Key()]
+		if !exists || !peer.connected || !peer.send(msg) {
 			n.log.Debug("failed to send PullQuery(%s, %s, %d, %s)",
 				validatorID,
 				chainID,
@@ -600,11 +573,8 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
-	peer, sent := n.peers[validatorID.Key()]
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	peer, exists := n.peers[validatorID.Key()]
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send Chits(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -625,8 +595,12 @@ func (n *network) Gossip(chainID, containerID ids.ID, container []byte) {
 }
 
 // Accept is called after every consensus decision
-func (n *network) Accept(chainID, containerID ids.ID, container []byte) error {
-	return n.gossipContainer(chainID, containerID, container)
+func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte) error {
+	if !ctx.IsBootstrapped() {
+		// don't gossip during bootstrapping
+		return nil
+	}
+	return n.gossipContainer(ctx.ChainID, containerID, container)
 }
 
 // heartbeat registers a new heartbeat to signal liveness
@@ -877,10 +851,10 @@ func (n *network) connectTo(ip utils.IPDesc) {
 		// Randomization is only performed here to distribute reconnection
 		// attempts to a node that previously shut down. This doesn't require
 		// cryptographically secure random number generation.
-		delay = time.Duration(float64(delay) * (1 + rand.Float64()))
+		delay = time.Duration(float64(delay) * (1 + rand.Float64())) // #nosec G404
 		if delay > n.maxReconnectDelay {
 			// set the timeout to [.75, 1) * maxReconnectDelay
-			delay = time.Duration(float64(n.maxReconnectDelay) * (3 + rand.Float64()) / 4)
+			delay = time.Duration(float64(n.maxReconnectDelay) * (3 + rand.Float64()) / 4) // #nosec G404
 		}
 
 		n.stateLock.Lock()
@@ -922,6 +896,15 @@ func (n *network) attemptConnect(ip utils.IPDesc) error {
 	conn, err := n.dialer.Dial(ip)
 	if err != nil {
 		return err
+	}
+	switch conn := conn.(type) {
+	case *net.TCPConn:
+		if err := conn.SetLinger(0); err != nil {
+			n.log.Warn("failed to set no linger due to: %s", err)
+		}
+		if err := conn.SetNoDelay(true); err != nil {
+			n.log.Warn("failed to set socket nodelay due to: %s", err)
+		}
 	}
 	return n.upgrade(&peer{
 		net:  n,

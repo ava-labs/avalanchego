@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	errDSValidatorSubset = errors.New("all subnets must be a subset of the primary network")
+	errDSValidatorSubset = errors.New("all subnets' staking period must be a subset of the primary network")
 
 	_ UnsignedProposalTx = &UnsignedAddSubnetValidatorTx{}
 	_ TimedTx            = &UnsignedAddSubnetValidatorTx{}
@@ -46,18 +46,33 @@ func (tx *UnsignedAddSubnetValidatorTx) EndTime() time.Time {
 	return tx.Validator.EndTime()
 }
 
+// Weight of this validator
+func (tx *UnsignedAddSubnetValidatorTx) Weight() uint64 {
+	return tx.Validator.Weight()
+}
+
 // Verify return nil iff [tx] is valid
 func (tx *UnsignedAddSubnetValidatorTx) Verify(
 	ctx *snow.Context,
 	c codec.Codec,
 	feeAmount uint64,
 	feeAssetID ids.ID,
+	minStakeDuration time.Duration,
+	maxStakeDuration time.Duration,
 ) error {
 	switch {
 	case tx == nil:
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
+	}
+
+	duration := tx.Validator.Duration()
+	switch {
+	case duration < minStakeDuration: // Ensure staking length is not too short
+		return errStakeTooShort
+	case duration > maxStakeDuration: // Ensure staking length is not too long
+		return errStakeTooLong
 	}
 
 	if err := tx.BaseTx.Verify(ctx, c); err != nil {
@@ -88,7 +103,14 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 	if len(stx.Creds) == 0 {
 		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
 	}
-	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
+	if err := tx.Verify(
+		vm.Ctx,
+		vm.codec,
+		vm.txFee,
+		vm.Ctx.AVAXAssetID,
+		vm.minStakeDuration,
+		vm.maxStakeDuration,
+	); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
@@ -99,6 +121,8 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, permError{fmt.Errorf("validator's start time (%s) is at or after current chain timestamp (%s)",
 			currentTimestamp,
 			validatorStartTime)}
+	} else if validatorStartTime.After(currentTimestamp.Add(maxFutureStartTime)) {
+		return nil, nil, nil, nil, permError{fmt.Errorf("validator start time (%s) more than two weeks after current chain timestamp (%s)", validatorStartTime, currentTimestamp)}
 	}
 
 	// Ensure that the period this validator validates the specified subnet is a
@@ -204,8 +228,9 @@ func (vm *VM) newAddSubnetValidatorTx(
 	nodeID ids.ShortID, // ID of the node validating
 	subnetID ids.ID, // ID of the subnet the validator will validate
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to use for adding the validator
+	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, vm.txFee)
+	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, vm.txFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -239,5 +264,12 @@ func (vm *VM) newAddSubnetValidatorTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID)
+	return tx, utx.Verify(
+		vm.Ctx,
+		vm.codec,
+		vm.txFee,
+		vm.Ctx.AVAXAssetID,
+		vm.minStakeDuration,
+		vm.maxStakeDuration,
+	)
 }

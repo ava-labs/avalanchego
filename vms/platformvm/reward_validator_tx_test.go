@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/core"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -95,9 +94,9 @@ func TestUnsignedRewardValidatorTxSemanticVerify(t *testing.T) {
 		if onAbortBalance != oldBalance+toRemove.Validator.Weight() {
 			t.Fatalf("on abort, should have got back staked amount")
 		}
-		if onCommitBalance != oldBalance+toRemove.Validator.Weight() {
+		if onCommitBalance != oldBalance+toRemove.Validator.Weight()+27 {
 			t.Fatalf("on commit, should have old balance (%d) + staked amount (%d) + reward (%d) but have %d",
-				oldBalance, toRemove.Validator.Weight(), 0, onCommitBalance)
+				oldBalance, toRemove.Validator.Weight(), 27, onCommitBalance)
 		}
 	}
 }
@@ -110,20 +109,26 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
+	initialSupply, err := vm.getCurrentSupply(vm.DB)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
 
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * MinimumStakingDuration).Unix())
+	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestShortID()
 	vdrTx, err := vm.newAddValidatorTx(
-		vm.minStake, // stakeAmt
+		vm.minValidatorStake, // stakeAmt
 		vdrStartTime,
 		vdrEndTime,
 		vdrNodeID,        // node ID
 		vdrRewardAddress, // reward address
 		PercentDenominator/4,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // fee payer
+		ids.ShortEmpty,                          // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -132,12 +137,13 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
 	delTx, err := vm.newAddDelegatorTx(
-		vm.minStake, // stakeAmt
+		vm.minDelegatorStake, // stakeAmt
 		delStartTime,
 		delEndTime,
 		vdrNodeID,                               // node ID
 		delRewardAddress,                        // reward address
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // fee payer
+		ids.ShortEmpty,                          // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -222,7 +228,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 
 	if supply, err := vm.getCurrentSupply(onAbortDB); err != nil {
 		t.Fatal(err)
-	} else if supply != 360*units.MegaAvax-expectedReward {
+	} else if supply != initialSupply-expectedReward {
 		t.Fatalf("should have removed un-rewarded tokens from the potential supply")
 	}
 }
@@ -232,9 +238,10 @@ func TestOptimisticUptime(t *testing.T) {
 	db := memdb.New()
 
 	firstVM := &VM{
-		SnowmanVM:        &core.SnowmanVM{},
-		chainManager:     chains.MockManager{},
-		uptimePercentage: .2,
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		uptimePercentage:   .2,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 	firstVM.vdrMgr = validators.NewManager()
 	firstVM.clock.Set(defaultGenesisTime)
@@ -252,7 +259,7 @@ func TestOptimisticUptime(t *testing.T) {
 	}
 
 	// Fast forward clock to time for genesis validators to leave
-	firstVM.clock.Set(defaultValidateStartTime.Add(2 * MinimumStakingDuration))
+	firstVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 
 	if err := firstVM.Bootstrapped(); err != nil {
 		t.Fatal(err)
@@ -271,7 +278,7 @@ func TestOptimisticUptime(t *testing.T) {
 
 	secondVM.vdrMgr = validators.NewManager()
 
-	secondVM.clock.Set(defaultValidateStartTime.Add(2 * MinimumStakingDuration))
+	secondVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 	secondCtx := defaultContext()
 	secondCtx.Lock.Lock()
 	defer func() {
@@ -372,9 +379,10 @@ func TestObservedUptime(t *testing.T) {
 	db := memdb.New()
 
 	firstVM := &VM{
-		SnowmanVM:        &core.SnowmanVM{},
-		chainManager:     chains.MockManager{},
-		uptimePercentage: .2,
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		uptimePercentage:   .2,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 	firstVM.vdrMgr = validators.NewManager()
 	firstVM.clock.Set(defaultGenesisTime)
@@ -400,7 +408,7 @@ func TestObservedUptime(t *testing.T) {
 
 	firstCtx.Lock.Lock()
 	// Fast forward clock to time for genesis validators to leave
-	firstVM.clock.Set(defaultValidateStartTime.Add(2 * MinimumStakingDuration))
+	firstVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 
 	if err := firstVM.Shutdown(); err != nil {
 		t.Fatal(err)
@@ -415,7 +423,7 @@ func TestObservedUptime(t *testing.T) {
 
 	secondVM.vdrMgr = validators.NewManager()
 
-	secondVM.clock.Set(defaultValidateStartTime.Add(2 * MinimumStakingDuration))
+	secondVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 	secondCtx := defaultContext()
 	secondCtx.Lock.Lock()
 	defer func() {
@@ -516,9 +524,10 @@ func TestUptimeDisallowed(t *testing.T) {
 	db := memdb.New()
 
 	firstVM := &VM{
-		SnowmanVM:        &core.SnowmanVM{},
-		chainManager:     chains.MockManager{},
-		uptimePercentage: .2,
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		uptimePercentage:   .2,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 	firstVM.vdrMgr = validators.NewManager()
 	firstVM.clock.Set(defaultGenesisTime)
@@ -532,7 +541,7 @@ func TestUptimeDisallowed(t *testing.T) {
 	}
 
 	// Fast forward clock to time for genesis validators to leave
-	firstVM.clock.Set(defaultValidateStartTime.Add(2 * MinimumStakingDuration))
+	firstVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 
 	if err := firstVM.Bootstrapping(); err != nil {
 		t.Fatal(err)
@@ -555,7 +564,7 @@ func TestUptimeDisallowed(t *testing.T) {
 
 	secondVM.vdrMgr = validators.NewManager()
 
-	secondVM.clock.Set(defaultValidateStartTime.Add(2 * MinimumStakingDuration))
+	secondVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 	secondCtx := defaultContext()
 	secondCtx.Lock.Lock()
 	defer func() {

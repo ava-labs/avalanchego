@@ -10,7 +10,6 @@ import (
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -22,29 +21,40 @@ import (
 
 // Info is the API service for unprivileged info on a node
 type Info struct {
-	version      version.Version
-	nodeID       ids.ShortID
-	networkID    uint32
-	log          logging.Logger
-	networking   network.Network
-	chainManager chains.Manager
-	txFee        uint64
+	version       version.Version
+	nodeID        ids.ShortID
+	networkID     uint32
+	log           logging.Logger
+	networking    network.Network
+	chainManager  chains.Manager
+	creationTxFee uint64
+	txFee         uint64
 }
 
 // NewService returns a new admin API service
-func NewService(log logging.Logger, version version.Version, nodeID ids.ShortID, networkID uint32, chainManager chains.Manager, peers network.Network, txFee uint64) (*common.HTTPHandler, error) {
+func NewService(
+	log logging.Logger,
+	version version.Version,
+	nodeID ids.ShortID,
+	networkID uint32,
+	chainManager chains.Manager,
+	peers network.Network,
+	creationTxFee uint64,
+	txFee uint64,
+) (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := json.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	if err := newServer.RegisterService(&Info{
-		version:      version,
-		nodeID:       nodeID,
-		networkID:    networkID,
-		log:          log,
-		chainManager: chainManager,
-		networking:   peers,
-		txFee:        txFee,
+		version:       version,
+		nodeID:        nodeID,
+		networkID:     networkID,
+		log:           log,
+		chainManager:  chainManager,
+		networking:    peers,
+		creationTxFee: creationTxFee,
+		txFee:         txFee,
 	}, "info"); err != nil {
 		return nil, err
 	}
@@ -99,7 +109,7 @@ type GetNetworkNameReply struct {
 func (service *Info) GetNetworkName(_ *http.Request, _ *struct{}, reply *GetNetworkNameReply) error {
 	service.log.Info("Info: GetNetworkName called")
 
-	reply.NetworkName = genesis.NetworkName(service.networkID)
+	reply.NetworkName = constants.NetworkName(service.networkID)
 	return nil
 }
 
@@ -163,10 +173,15 @@ func (service *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, r
 	return nil
 }
 
+// GetTxFeeResponse ...
+type GetTxFeeResponse struct {
+	CreationTxFee json.Uint64 `json:"creationTxFee"`
+	TxFee         json.Uint64 `json:"txFee"`
+}
+
 // GetTxFee returns the transaction fee in nAVAX.
-func (service *Info) GetTxFee(_ *http.Request, args *struct{}, reply *struct {
-	Fee json.Uint64 `json:"txFee"`
-}) error {
-	reply.Fee = json.Uint64(service.txFee)
+func (service *Info) GetTxFee(_ *http.Request, args *struct{}, reply *GetTxFeeResponse) error {
+	reply.CreationTxFee = json.Uint64(service.creationTxFee)
+	reply.TxFee = json.Uint64(service.txFee)
 	return nil
 }

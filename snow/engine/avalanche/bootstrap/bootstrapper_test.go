@@ -59,6 +59,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 		Ctx:        ctx,
 		Validators: peers,
 		Beacons:    peers,
+		SampleK:    int(peers.Weight()),
 		Alpha:      uint64(peers.Len()/2 + 1),
 		Sender:     sender,
 	}

@@ -107,7 +107,7 @@ func (ta *Topological) Add(vtx Vertex) error {
 		return nil // Already inserted this vertex
 	}
 
-	ta.ctx.ConsensusDispatcher.Issue(ta.ctx.ChainID, vtxID, vtx.Bytes())
+	ta.ctx.ConsensusDispatcher.Issue(ta.ctx, vtxID, vtx.Bytes())
 
 	txs, err := vtx.Txs()
 	if err != nil {
@@ -437,7 +437,7 @@ func (ta *Topological) update(vtx Vertex) error {
 			if err := vtx.Reject(); err != nil {
 				return err
 			}
-			ta.ctx.ConsensusDispatcher.Reject(ta.ctx.ChainID, vtxID, vtx.Bytes())
+			ta.ctx.ConsensusDispatcher.Reject(ta.ctx, vtxID, vtx.Bytes())
 			delete(ta.nodes, vtxKey)
 			ta.metrics.Rejected(vtxID)
 
@@ -491,7 +491,7 @@ func (ta *Topological) update(vtx Vertex) error {
 		if err := vtx.Accept(); err != nil {
 			return err
 		}
-		ta.ctx.ConsensusDispatcher.Accept(ta.ctx.ChainID, vtxID, vtx.Bytes())
+		ta.ctx.ConsensusDispatcher.Accept(ta.ctx, vtxID, vtx.Bytes())
 		delete(ta.nodes, vtxKey)
 		ta.metrics.Accepted(vtxID)
 	case rejectable:
@@ -499,7 +499,7 @@ func (ta *Topological) update(vtx Vertex) error {
 		if err := vtx.Reject(); err != nil {
 			return err
 		}
-		ta.ctx.ConsensusDispatcher.Reject(ta.ctx.ChainID, vtxID, vtx.Bytes())
+		ta.ctx.ConsensusDispatcher.Reject(ta.ctx, vtxID, vtx.Bytes())
 		delete(ta.nodes, vtxKey)
 		ta.metrics.Rejected(vtxID)
 	}

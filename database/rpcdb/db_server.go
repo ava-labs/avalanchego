@@ -5,6 +5,7 @@ package rpcdb
 
 import (
 	"errors"
+	"sync"
 
 	"golang.org/x/net/context"
 
@@ -18,6 +19,7 @@ var (
 
 // DatabaseServer is a database that is managed over RPC.
 type DatabaseServer struct {
+	lock  sync.Mutex
 	db    database.Database
 	batch database.Batch
 
@@ -86,6 +88,9 @@ func (db *DatabaseServer) Close(context.Context, *rpcdbproto.CloseRequest) (*rpc
 // WriteBatch takes in a set of key-value pairs and atomically writes them to
 // the internal database
 func (db *DatabaseServer) WriteBatch(_ context.Context, req *rpcdbproto.WriteBatchRequest) (*rpcdbproto.WriteBatchResponse, error) {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
 	db.batch.Reset()
 
 	for _, put := range req.Puts {
@@ -106,6 +111,9 @@ func (db *DatabaseServer) WriteBatch(_ context.Context, req *rpcdbproto.WriteBat
 // NewIteratorWithStartAndPrefix allocates an iterator and returns the iterator
 // ID
 func (db *DatabaseServer) NewIteratorWithStartAndPrefix(_ context.Context, req *rpcdbproto.NewIteratorWithStartAndPrefixRequest) (*rpcdbproto.NewIteratorWithStartAndPrefixResponse, error) {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
 	id := db.nextIteratorID
 	it := db.db.NewIteratorWithStartAndPrefix(req.Start, req.Prefix)
 	db.iterators[id] = it
@@ -116,6 +124,9 @@ func (db *DatabaseServer) NewIteratorWithStartAndPrefix(_ context.Context, req *
 
 // IteratorNext attempts to call next on the requested iterator
 func (db *DatabaseServer) IteratorNext(_ context.Context, req *rpcdbproto.IteratorNextRequest) (*rpcdbproto.IteratorNextResponse, error) {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
 	it, exists := db.iterators[req.Id]
 	if !exists {
 		return nil, errUnknownIterator
@@ -129,6 +140,9 @@ func (db *DatabaseServer) IteratorNext(_ context.Context, req *rpcdbproto.Iterat
 
 // IteratorError attempts to report any errors that occurred during iteration
 func (db *DatabaseServer) IteratorError(_ context.Context, req *rpcdbproto.IteratorErrorRequest) (*rpcdbproto.IteratorErrorResponse, error) {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
 	it, exists := db.iterators[req.Id]
 	if !exists {
 		return nil, errUnknownIterator
@@ -138,6 +152,9 @@ func (db *DatabaseServer) IteratorError(_ context.Context, req *rpcdbproto.Itera
 
 // IteratorRelease attempts to release the resources allocated to an iterator
 func (db *DatabaseServer) IteratorRelease(_ context.Context, req *rpcdbproto.IteratorReleaseRequest) (*rpcdbproto.IteratorReleaseResponse, error) {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
 	it, exists := db.iterators[req.Id]
 	if exists {
 		delete(db.iterators, req.Id)

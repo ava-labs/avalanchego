@@ -33,6 +33,7 @@ func (n *Network) shuffleColors() {
 
 func (n *Network) Initialize(params snowball.Parameters, numColors int) {
 	n.params = params
+	// #nosec G404
 	n.colors = append(n.colors, &TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(uint64(rand.Int63())),
@@ -43,7 +44,8 @@ func (n *Network) Initialize(params snowball.Parameters, numColors int) {
 	})
 
 	for i := 1; i < numColors; i++ {
-		dependency := n.colors[rand.Intn(len(n.colors))]
+		dependency := n.colors[rand.Intn(len(n.colors))] // #nosec G404
+		// #nosec G404
 		n.colors = append(n.colors, &TestBlock{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(uint64(rand.Int63())),
@@ -86,7 +88,7 @@ func (n *Network) Finalized() bool { return len(n.running) == 0 }
 
 func (n *Network) Round() {
 	if len(n.running) > 0 {
-		runningInd := rand.Intn(len(n.running))
+		runningInd := rand.Intn(len(n.running)) // #nosec G404
 		running := n.running[runningInd]
 
 		s := sampler.NewUniform()
