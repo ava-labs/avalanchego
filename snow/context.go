@@ -107,3 +107,7 @@ type emptyEventDispatcher struct{}
 func (emptyEventDispatcher) Issue(*Context, ids.ID, []byte)  {}
 func (emptyEventDispatcher) Accept(*Context, ids.ID, []byte) {}
 func (emptyEventDispatcher) Reject(*Context, ids.ID, []byte) {}
+
+type ContextLookup interface {
+	GetContext(chainID ids.ID) (*Context, bool)
+}

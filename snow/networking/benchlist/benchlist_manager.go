@@ -1,6 +1,12 @@
 package benchlist
 
-import "github.com/ava-labs/avalanchego/ids"
+import (
+	"time"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/validators"
+)
 
 // Manager provides an interface for a benchlist to register whether
 // queries have been successful or unsuccessful and place validators with
@@ -15,16 +21,26 @@ type Manager interface {
 	QueryFailed(ids.ID, ids.ShortID, uint32)
 }
 
+// Config defines the configuration for a benchlist
+type Config struct {
+	Validators validators.Manager
+	Threshold  int
+	Duration   time.Duration
+	MaxPortion float64
+}
+
 type benchlistManager struct {
-	config *Config
+	config    *Config
+	ctxLookup snow.ContextLookup
 	// Chain ID --> benchlist for that chain
 	chainBenchlists map[[32]byte]QueryBenchlist
 }
 
 // NewManager returns a manager for chain-specific query benchlisting
-func NewManager(config *Config) Manager {
+func NewManager(config *Config, ctxLookup snow.ContextLookup) Manager {
 	return &benchlistManager{
 		config:          config,
+		ctxLookup:       ctxLookup,
 		chainBenchlists: make(map[[32]byte]QueryBenchlist),
 	}
 }
@@ -38,7 +54,11 @@ func (bm *benchlistManager) RegisterQuery(chainID ids.ID, validatorID ids.ShortI
 		if !ok {
 			return false
 		}
-		chain = NewQueryBenchlist(vdrs, bm.config.Threshold, bm.config.Duration, bm.config.MaxPortion)
+		ctx, exists := bm.ctxLookup.GetContext(chainID)
+		if !exists {
+			return false
+		}
+		chain = NewQueryBenchlist(vdrs, ctx, bm.config.Threshold, bm.config.Duration, bm.config.MaxPortion)
 		bm.chainBenchlists[key] = chain
 	}
 

@@ -2,10 +2,12 @@ package benchlist
 
 import (
 	"container/list"
+	"math/rand"
 	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/timer"
 
@@ -45,25 +47,23 @@ type queryBenchlist struct {
 	benchlistOrder *list.List
 	benchlistSet   ids.ShortSet
 
-	threshold  int
-	duration   time.Duration
-	maxPortion float64
+	threshold    int
+	halfDuration time.Duration
+	maxPortion   float64
 
 	clock timer.Clock
+
+	metrics *metrics
+	ctx     *snow.Context
 
 	lock sync.Mutex
 }
 
-// Config defines the configuration for a benchlist
-type Config struct {
-	Validators validators.Manager
-	Threshold  int
-	Duration   time.Duration
-	MaxPortion float64
-}
-
 // NewQueryBenchlist ...
-func NewQueryBenchlist(validators validators.Set, threshold int, duration time.Duration, maxPortion float64) QueryBenchlist {
+func NewQueryBenchlist(validators validators.Set, ctx *snow.Context, threshold int, duration time.Duration, maxPortion float64) QueryBenchlist {
+	metrics := &metrics{}
+	metrics.Initialize(ctx.Namespace, ctx.Metrics)
+
 	return &queryBenchlist{
 		pendingQueries:      make(map[[20]byte]map[uint32]struct{}),
 		consecutiveFailures: make(map[[20]byte]int),
@@ -72,8 +72,10 @@ func NewQueryBenchlist(validators validators.Set, threshold int, duration time.D
 		benchlistSet:        ids.ShortSet{},
 		vdrs:                validators,
 		threshold:           threshold,
-		duration:            duration,
+		halfDuration:        duration / 2,
 		maxPortion:          maxPortion,
+		ctx:                 ctx,
+		metrics:             metrics,
 	}
 }
 
@@ -84,7 +86,7 @@ func (b *queryBenchlist) RegisterQuery(validatorID ids.ShortID, requestID uint32
 	defer b.lock.Unlock()
 
 	key := validatorID.Key()
-	if benchlisted := b.benchlisted(validatorID); benchlisted {
+	if benched := b.benched(validatorID); benched {
 		return false
 	}
 	validatorRequests, ok := b.pendingQueries[key]
@@ -120,34 +122,29 @@ func (b *queryBenchlist) QueryFailed(validatorID ids.ShortID, requestID uint32) 
 	}
 
 	key := validatorID.Key()
-	// Add a failure and benchlist [validatorID] if it has
+	// Add a failure and benches [validatorID] if it has
 	// passed the threshold
 	b.consecutiveFailures[key]++
 	if b.consecutiveFailures[key] >= b.threshold {
-		b.benchlist(validatorID)
+		b.bench(validatorID)
 	}
 }
 
-func (b *queryBenchlist) benchlist(validatorID ids.ShortID) {
+func (b *queryBenchlist) bench(validatorID ids.ShortID) {
 	if b.benchlistSet.Contains(validatorID) {
 		return
 	}
 
 	key := validatorID.Key()
 
-	// Add to benchlist times
-	// Note: we do not randomize the delay because nodes carry out
-	// a unique local view of when peers have surpassed the threshold
-	// of failed messages. Therefore, it's highly unlikely that all
-	// nodes will unbench a node at the same time.
-	// Additionally, if a node is unbenched simultaneously by the entire
-	// network, this only means that it will begin to receive consensus
-	// queries at the normal rate. There will be no backlog of messages
-	// that could spam an unbenched node.
-	b.benchlistTimes[key] = b.clock.Time().Add(b.duration)
+	// Add to benchlist times with randomized delay
+	randomizedDuration := time.Duration(rand.Float64()*float64(b.halfDuration)) + b.halfDuration
+	b.benchlistTimes[key] = b.clock.Time().Add(randomizedDuration)
 	b.benchlistOrder.PushBack(validatorID)
 	b.benchlistSet.Add(validatorID)
 	delete(b.consecutiveFailures, key)
+	b.metrics.numBenched.Inc()
+	b.ctx.Log.Debug("Benching validator %s for %v after %d consecutive failed queries", validatorID, randomizedDuration, b.threshold)
 
 	// Note: there could be a memory leak if a large number of
 	// validators were added, sampled, benched, and never sampled
@@ -156,9 +153,9 @@ func (b *queryBenchlist) benchlist(validatorID ids.ShortID) {
 	b.cleanup()
 }
 
-// benchlisted checks if [validatorID] is currently benchlisted
-// and calls cleanup if its benchlist period has elapsed
-func (b *queryBenchlist) benchlisted(validatorID ids.ShortID) bool {
+// benched checks if [validatorID] is currently benched
+// and calls cleanup if its benching period has elapsed
+func (b *queryBenchlist) benched(validatorID ids.ShortID) bool {
 	key := validatorID.Key()
 
 	end, ok := b.benchlistTimes[key]
@@ -170,29 +167,34 @@ func (b *queryBenchlist) benchlisted(validatorID ids.ShortID) bool {
 		return true
 	}
 
-	// If a benchlisted item has expired, cleanup the benchlist
+	// If a benched item has expired, cleanup the benchlist
 	b.cleanup()
 	return false
 }
 
-// cleanup ensures that we have not benchlisted too much stake
+// cleanup ensures that we have not benched too much stake
 // and removes anything from the benchlist whose time has expired
 func (b *queryBenchlist) cleanup() {
 	currentWeight, err := b.vdrs.SubsetWeight(b.benchlistSet)
 	if err != nil {
 		// Add log for this, should never happen
+		b.ctx.Log.Error("Failed to calculate subset weight due to: %w. Resetting benchlist.", err)
 		b.reset()
 		return
 	}
 
-	maxBenchlistWeight := uint64(float64(b.vdrs.Weight()) * b.maxPortion)
+	numBenched := b.benchlistSet.Len()
+	updatedWeight := currentWeight
+	totalWeight := b.vdrs.Weight()
+	maxBenchlistWeight := uint64(float64(totalWeight) * b.maxPortion)
 
 	// Iterate over elements of the benchlist in order of expiration
 	for e := b.benchlistOrder.Front(); e != nil; e = e.Next() {
 		validatorID := e.Value.(ids.ShortID)
-		// Remove elements with the next expiration until
 		key := validatorID.Key()
 		end := b.benchlistTimes[key]
+		// Remove elements with the next expiration until the next item has not
+		// expired and the bench has less than the maximum weight
 		// Note: this creates an edge case where benchlisting a validator
 		// with a sufficient stake may clear the benchlist
 		if b.clock.Time().Before(end) && currentWeight < maxBenchlistWeight {
@@ -203,18 +205,28 @@ func (b *queryBenchlist) cleanup() {
 		if ok {
 			newWeight, err := safemath.Sub64(currentWeight, removeWeight)
 			if err != nil {
-				// Add log for this, potentially add internal validators set
-				// to maintain weights
+				b.ctx.Log.Error("Failed to calculate new subset weight due to: %w. Resetting benchlist.", err)
 				b.reset()
 				return
 			}
-			currentWeight = newWeight
+			updatedWeight = newWeight
 		}
 
 		b.benchlistOrder.Remove(e)
 		delete(b.benchlistTimes, key)
 		b.benchlistSet.Remove(validatorID)
+		b.metrics.numBenched.Dec()
 	}
+
+	b.ctx.Log.Debug("Benchlist weight: (%v/%v) -> (%v/%v). Benched Validators: %d -> %d",
+		currentWeight,
+		totalWeight,
+		updatedWeight,
+		totalWeight,
+		numBenched,
+		b.benchlistSet.Len(),
+	)
+	b.metrics.weightBenched.Set(float64(updatedWeight))
 }
 
 func (b *queryBenchlist) reset() {
@@ -223,6 +235,8 @@ func (b *queryBenchlist) reset() {
 	b.benchlistTimes = make(map[[20]byte]time.Time)
 	b.benchlistOrder.Init()
 	b.benchlistSet.Clear()
+	b.metrics.weightBenched.Set(0)
+	b.metrics.numBenched.Set(0)
 }
 
 // removeQuery returns true if the query was present

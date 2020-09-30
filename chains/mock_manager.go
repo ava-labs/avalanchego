@@ -2,6 +2,7 @@ package chains
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 )
 
@@ -47,6 +48,9 @@ func (mm MockManager) Alias(ids.ID, string) error { return nil }
 
 // Shutdown ...
 func (mm MockManager) Shutdown() {}
+
+// GetContext ...
+func (mm MockManager) GetContext(ids.ID) (*snow.Context, bool) { return nil, false }
 
 // SubnetID ...
 func (mm MockManager) SubnetID(ids.ID) (ids.ID, error) { return ids.ID{}, nil }

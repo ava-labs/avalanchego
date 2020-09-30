@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
@@ -24,7 +25,7 @@ func TestBlackList(t *testing.T) {
 	threshold := 3
 	duration := time.Minute
 	maxPortion := 0.5
-	benchlist := NewQueryBenchlist(vdrs, threshold, duration, maxPortion).(*queryBenchlist)
+	benchlist := NewQueryBenchlist(vdrs, snow.DefaultContextTest(), threshold, duration, maxPortion).(*queryBenchlist)
 
 	currentTime := time.Now()
 	benchlist.clock.Set(currentTime)
@@ -82,7 +83,7 @@ func TestBenchlistDoesNotGetStuck(t *testing.T) {
 	threshold := 3
 	duration := time.Minute
 	maxPortion := 0.5
-	benchlist := NewQueryBenchlist(vdrs, threshold, duration, maxPortion).(*queryBenchlist)
+	benchlist := NewQueryBenchlist(vdrs, snow.DefaultContextTest(), threshold, duration, maxPortion).(*queryBenchlist)
 
 	currentTime := time.Now()
 	benchlist.clock.Set(currentTime)
@@ -135,7 +136,7 @@ func TestBenchlistDoesNotExceedThreshold(t *testing.T) {
 	threshold := 3
 	duration := time.Minute
 	maxPortion := 0.5
-	benchlist := NewQueryBenchlist(vdrs, threshold, duration, maxPortion).(*queryBenchlist)
+	benchlist := NewQueryBenchlist(vdrs, snow.DefaultContextTest(), threshold, duration, maxPortion).(*queryBenchlist)
 
 	currentTime := time.Now()
 	benchlist.clock.Set(currentTime)
