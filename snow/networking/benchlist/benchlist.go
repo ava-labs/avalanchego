@@ -138,7 +138,7 @@ func (b *queryBenchlist) bench(validatorID ids.ShortID) {
 	key := validatorID.Key()
 
 	// Add to benchlist times with randomized delay
-	randomizedDuration := time.Duration(rand.Float64()*float64(b.halfDuration)) + b.halfDuration
+	randomizedDuration := time.Duration(rand.Float64()*float64(b.halfDuration)) + b.halfDuration // #nosec G404
 	b.benchlistTimes[key] = b.clock.Time().Add(randomizedDuration)
 	b.benchlistOrder.PushBack(validatorID)
 	b.benchlistSet.Add(validatorID)
