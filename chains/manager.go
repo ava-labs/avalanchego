@@ -246,7 +246,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 		SharedMemory:        m.AtomicMemory.NewSharedMemory(chainParams.ID),
 		BCLookup:            m,
 		SNLookup:            m,
-		Namespace:           fmt.Sprintf("%s_%s_vm", constants.PlatformName, primaryAlias),
+		Namespace:           fmt.Sprintf("%s_%s", constants.PlatformName, primaryAlias),
 		Metrics:             m.ConsensusParams.Metrics,
 	}
 
