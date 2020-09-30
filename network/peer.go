@@ -64,6 +64,8 @@ type peer struct {
 	// unix time of the last message sent and received respectively
 	lastSent, lastReceived int64
 
+	tickerStop chan bool
+
 	// task for finishing handshaking
 	finishHandshakeTicker *time.Ticker
 
@@ -73,6 +75,9 @@ type peer struct {
 
 // assume the stateLock is held
 func (p *peer) Start() {
+
+	p.tickerStop = make(chan bool, 5)
+
 	// store the tickers in the peer..
 	// if the read or write closes, we can immediately cancel the ticket, and stop the goroutines.
 	p.finishHandshakeTicker = time.NewTicker(p.net.getVersionTimeout)
@@ -90,16 +95,21 @@ func (p *peer) Start() {
 func (p *peer) sendPings() {
 	defer p.sendPingsTicker.Stop()
 
-	for range p.sendPingsTicker.C {
-		p.net.stateLock.Lock()
-		closed := p.closed
-		p.net.stateLock.Unlock()
+	for {
+		select {
+		case <-p.sendPingsTicker.C:
+			p.net.stateLock.Lock()
+			closed := p.closed
+			p.net.stateLock.Unlock()
 
-		if closed {
+			if closed {
+				return
+			}
+
+			p.Ping()
+		case <-p.tickerStop:
 			return
 		}
-
-		p.Ping()
 	}
 }
 
@@ -107,23 +117,28 @@ func (p *peer) sendPings() {
 func (p *peer) requestFinishHandshake() {
 	defer p.finishHandshakeTicker.Stop()
 
-	for range p.finishHandshakeTicker.C {
-		p.net.stateLock.Lock()
-		gotVersion := p.gotVersion
-		gotPeerList := p.gotPeerList
-		connected := p.connected
-		closed := p.closed
-		p.net.stateLock.Unlock()
+	for {
+		select {
+		case <-p.finishHandshakeTicker.C:
+			p.net.stateLock.Lock()
+			gotVersion := p.gotVersion
+			gotPeerList := p.gotPeerList
+			connected := p.connected
+			closed := p.closed
+			p.net.stateLock.Unlock()
 
-		if connected || closed {
+			if connected || closed {
+				return
+			}
+
+			if !gotVersion {
+				p.GetVersion()
+			}
+			if !gotPeerList {
+				p.GetPeerList()
+			}
+		case <-p.tickerStop:
 			return
-		}
-
-		if !gotVersion {
-			p.GetVersion()
-		}
-		if !gotPeerList {
-			p.GetPeerList()
 		}
 	}
 }
@@ -360,6 +375,8 @@ func (p *peer) Close() {
 	if p.finishHandshakeTicker != nil {
 		p.finishHandshakeTicker.Stop()
 	}
+	p.tickerStop <- true
+	p.tickerStop <- true
 
 	p.once.Do(p.close)
 }
