@@ -63,10 +63,21 @@ type peer struct {
 
 	// unix time of the last message sent and received respectively
 	lastSent, lastReceived int64
+
+	// task for finishing handshaking
+	finishHandshakeTicker *time.Ticker
+
+	// task for sending pings
+	sendPingsTicker *time.Ticker
 }
 
 // assume the stateLock is held
 func (p *peer) Start() {
+	// store the tickers in the peer..
+	// if the read or write closes, we can immediately cancel the ticket, and stop the goroutines.
+	p.finishHandshakeTicker = time.NewTicker(p.net.getVersionTimeout)
+	p.sendPingsTicker = time.NewTicker(p.net.pingFrequency)
+
 	go p.ReadMessages()
 	go p.WriteMessages()
 
@@ -77,10 +88,9 @@ func (p *peer) Start() {
 }
 
 func (p *peer) sendPings() {
-	t := time.NewTicker(p.net.pingFrequency)
-	defer t.Stop()
+	defer p.sendPingsTicker.Stop()
 
-	for range t.C {
+	for range p.sendPingsTicker.C {
 		p.net.stateLock.Lock()
 		closed := p.closed
 		p.net.stateLock.Unlock()
@@ -95,10 +105,9 @@ func (p *peer) sendPings() {
 
 // request missing handshake messages from the peer
 func (p *peer) requestFinishHandshake() {
-	t := time.NewTicker(p.net.getVersionTimeout)
-	defer t.Stop()
+	defer p.finishHandshakeTicker.Stop()
 
-	for range t.C {
+	for range p.finishHandshakeTicker.C {
 		p.net.stateLock.Lock()
 		gotVersion := p.gotVersion
 		gotPeerList := p.gotPeerList
@@ -342,7 +351,18 @@ func (p *peer) dropMessage(msgLen, connPendingLen, networkPendingLen int) bool {
 }
 
 // assumes the stateLock is not held
-func (p *peer) Close() { p.once.Do(p.close) }
+func (p *peer) Close() {
+
+	// now that we have been asked to close signal the tickers to stop
+	if p.sendPingsTicker != nil {
+		p.sendPingsTicker.Stop()
+	}
+	if p.finishHandshakeTicker != nil {
+		p.finishHandshakeTicker.Stop()
+	}
+
+	p.once.Do(p.close)
+}
 
 // assumes only `peer.Close` calls this
 func (p *peer) close() {
