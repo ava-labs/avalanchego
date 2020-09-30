@@ -9,7 +9,7 @@ import (
 
 	"github.com/mitchellh/go-homedir"
 
-	"github.com/ava-labs/avalanche-go/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 var (

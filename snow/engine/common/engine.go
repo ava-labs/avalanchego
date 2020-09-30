@@ -4,8 +4,8 @@
 package common
 
 import (
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 )
 
 // Engine describes the standard interface of a consensus engine
@@ -292,4 +292,10 @@ type InternalHandler interface {
 
 	// Notify this engine of a message from the virtual machine.
 	Notify(Message) error
+
+	// Notify this engine of a new peer.
+	Connected(validatorID ids.ShortID) error
+
+	// Notify this engine of a removed peer.
+	Disconnected(validatorID ids.ShortID) error
 }

@@ -4,17 +4,17 @@
 package genesis
 
 import (
-	"github.com/ava-labs/avalanche-go/utils/constants"
-	"github.com/ava-labs/avalanche-go/vms/avm"
-	"github.com/ava-labs/avalanche-go/vms/nftfx"
-	"github.com/ava-labs/avalanche-go/vms/platformvm"
-	"github.com/ava-labs/avalanche-go/vms/propertyfx"
-	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
-	"github.com/ava-labs/avalanche-go/vms/timestampvm"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/nftfx"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/propertyfx"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/timestampvm"
 )
 
 // Aliases returns the default aliases based on the network ID
-func Aliases(networkID uint32) (map[string][]string, map[[32]byte][]string, map[[32]byte][]string, error) {
+func Aliases(genesisBytes []byte) (map[string][]string, map[[32]byte][]string, map[[32]byte][]string, error) {
 	generalAliases := map[string][]string{
 		"vm/" + platformvm.ID.String():             {"vm/platform"},
 		"vm/" + avm.ID.String():                    {"vm/avm"},
@@ -35,13 +35,8 @@ func Aliases(networkID uint32) (map[string][]string, map[[32]byte][]string, map[
 		propertyfx.ID.Key():  {"propertyfx"},
 	}
 
-	genesisBytes, _, err := Genesis(networkID)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
 	genesis := &platformvm.Genesis{} // TODO let's not re-create genesis to do aliasing
-	if err := platformvm.Codec.Unmarshal(genesisBytes, genesis); err != nil {
+	if err := platformvm.GenesisCodec.Unmarshal(genesisBytes, genesis); err != nil {
 		return nil, nil, nil, err
 	}
 	if err := genesis.Initialize(); err != nil {

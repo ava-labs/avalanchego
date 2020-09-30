@@ -10,13 +10,13 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow/choices"
-	"github.com/ava-labs/avalanche-go/snow/consensus/snowball"
-	"github.com/ava-labs/avalanche-go/snow/consensus/snowman"
-	"github.com/ava-labs/avalanche-go/snow/engine/common"
-	"github.com/ava-labs/avalanche-go/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanche-go/snow/validators"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 var (
@@ -56,9 +56,8 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
 	sender.CantGetAcceptedFrontier = false
 
-	te := &Transitive{}
-
-	te.Initialize(config)
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		if !blkID.Equals(gBlk.ID()) {
@@ -67,8 +66,11 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 		return gBlk, nil
 	}
 
-	te.finishBootstrapping()
-	te.Ctx.Bootstrapped()
+	te := &Transitive{}
+	te.Initialize(config)
+
+	vm.CantBootstrapping = true
+	vm.CantBootstrapped = true
 
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
@@ -405,9 +407,8 @@ func TestEngineMultipleQuery(t *testing.T) {
 	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
 	sender.CantGetAcceptedFrontier = false
 
-	te := &Transitive{}
-	te.Initialize(config)
-
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		if !blkID.Equals(gBlk.ID()) {
 			t.Fatalf("Wrong block requested")
@@ -415,8 +416,11 @@ func TestEngineMultipleQuery(t *testing.T) {
 		return gBlk, nil
 	}
 
-	te.finishBootstrapping()
-	te.Ctx.Bootstrapped()
+	te := &Transitive{}
+	te.Initialize(config)
+
+	vm.CantBootstrapping = true
+	vm.CantBootstrapped = true
 
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
@@ -876,10 +880,14 @@ func TestVoteCanceling(t *testing.T) {
 	}
 	sender.CantGetAcceptedFrontier = false
 
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
+
 	te := &Transitive{}
 	te.Initialize(config)
-	te.finishBootstrapping()
-	te.Ctx.Bootstrapped()
+
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
 
 	vm.LastAcceptedF = nil
 	sender.CantGetAcceptedFrontier = true
@@ -1621,9 +1629,8 @@ func TestEngineAggressivePolling(t *testing.T) {
 	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
 	sender.CantGetAcceptedFrontier = false
 
-	te := &Transitive{}
-
-	te.Initialize(config)
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		if !blkID.Equals(gBlk.ID()) {
@@ -1632,8 +1639,11 @@ func TestEngineAggressivePolling(t *testing.T) {
 		return gBlk, nil
 	}
 
-	te.finishBootstrapping()
-	te.Ctx.Bootstrapped()
+	te := &Transitive{}
+	te.Initialize(config)
+
+	vm.CantBootstrapping = true
+	vm.CantBootstrapped = true
 
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
@@ -1743,10 +1753,14 @@ func TestEngineDoubleChit(t *testing.T) {
 		panic("Should have errored")
 	}
 
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
+
 	te := &Transitive{}
 	te.Initialize(config)
-	te.finishBootstrapping()
-	te.Ctx.Bootstrapped()
+
+	vm.CantBootstrapping = true
+	vm.CantBootstrapped = true
 
 	vm.LastAcceptedF = nil
 	sender.CantGetAcceptedFrontier = true

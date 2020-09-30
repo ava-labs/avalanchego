@@ -4,23 +4,18 @@
 package avm
 
 import (
-	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanche-go/database"
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow"
-	"github.com/ava-labs/avalanche-go/utils/codec"
-	"github.com/ava-labs/avalanche-go/utils/crypto"
-	"github.com/ava-labs/avalanche-go/utils/hashing"
-	"github.com/ava-labs/avalanche-go/vms/components/avax"
-	"github.com/ava-labs/avalanche-go/vms/components/verify"
-	"github.com/ava-labs/avalanche-go/vms/nftfx"
-	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
-)
-
-var (
-	errWrongNumberOfCredentials = errors.New("should have the same number of credentials as inputs")
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/nftfx"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 // UnsignedTx ...
@@ -37,7 +32,14 @@ type UnsignedTx interface {
 	InputUTXOs() []*avax.UTXOID
 	UTXOs() []*avax.UTXO
 
-	SyntacticVerify(ctx *snow.Context, c codec.Codec, txFeeAssetID ids.ID, txFee uint64, numFxs int) error
+	SyntacticVerify(
+		ctx *snow.Context,
+		c codec.Codec,
+		txFeeAssetID ids.ID,
+		txFee uint64,
+		creationTxFee uint64,
+		numFxs int,
+	) error
 	SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable) error
 	ExecuteWithSideEffects(vm *VM, batch database.Batch) error
 }
@@ -63,6 +65,7 @@ func (t *Tx) SyntacticVerify(
 	c codec.Codec,
 	txFeeAssetID ids.ID,
 	txFee uint64,
+	creationTxFee uint64,
 	numFxs int,
 ) error {
 	switch {
@@ -70,7 +73,7 @@ func (t *Tx) SyntacticVerify(
 		return errNilTx
 	}
 
-	if err := t.UnsignedTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, numFxs); err != nil {
+	if err := t.UnsignedTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, creationTxFee, numFxs); err != nil {
 		return err
 	}
 
@@ -81,7 +84,10 @@ func (t *Tx) SyntacticVerify(
 	}
 
 	if numCreds := t.UnsignedTx.NumCredentials(); numCreds != len(t.Creds) {
-		return errWrongNumberOfCredentials
+		return fmt.Errorf("tx has %d credentials but %d inputs. Should be same",
+			len(t.Creds),
+			numCreds,
+		)
 	}
 	return nil
 }

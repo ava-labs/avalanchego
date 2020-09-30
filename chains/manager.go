@@ -8,36 +8,36 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ava-labs/avalanche-go/api"
-	"github.com/ava-labs/avalanche-go/api/keystore"
-	"github.com/ava-labs/avalanche-go/chains/atomic"
-	"github.com/ava-labs/avalanche-go/database"
-	"github.com/ava-labs/avalanche-go/database/prefixdb"
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/network"
-	"github.com/ava-labs/avalanche-go/snow"
-	"github.com/ava-labs/avalanche-go/snow/consensus/snowball"
-	"github.com/ava-labs/avalanche-go/snow/engine/avalanche/state"
-	"github.com/ava-labs/avalanche-go/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/avalanche-go/snow/engine/common"
-	"github.com/ava-labs/avalanche-go/snow/engine/common/queue"
-	"github.com/ava-labs/avalanche-go/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanche-go/snow/networking/router"
-	"github.com/ava-labs/avalanche-go/snow/networking/sender"
-	"github.com/ava-labs/avalanche-go/snow/networking/timeout"
-	"github.com/ava-labs/avalanche-go/snow/triggers"
-	"github.com/ava-labs/avalanche-go/snow/validators"
-	"github.com/ava-labs/avalanche-go/utils/constants"
-	"github.com/ava-labs/avalanche-go/utils/logging"
-	"github.com/ava-labs/avalanche-go/vms"
+	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/state"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/snow/networking/sender"
+	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/snow/triggers"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms"
 
-	avcon "github.com/ava-labs/avalanche-go/snow/consensus/avalanche"
-	aveng "github.com/ava-labs/avalanche-go/snow/engine/avalanche"
-	avbootstrap "github.com/ava-labs/avalanche-go/snow/engine/avalanche/bootstrap"
+	avcon "github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
+	avbootstrap "github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
 
-	smcon "github.com/ava-labs/avalanche-go/snow/consensus/snowman"
-	smeng "github.com/ava-labs/avalanche-go/snow/engine/snowman"
-	smbootstrap "github.com/ava-labs/avalanche-go/snow/engine/snowman/bootstrap"
+	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
+	smbootstrap "github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 )
 
 const (
@@ -351,28 +351,6 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 			ctx.Log.Error("Chain with ID: %s was shutdown due to a panic", chainParams.ID)
 		})
 	}
-
-	reqWeight := (3*bootstrapWeight + 3) / 4
-	if reqWeight == 0 {
-		if err := chain.Engine.Startup(); err != nil {
-			chain.Handler.Shutdown()
-			return nil, fmt.Errorf("failed to start consensus engine: %w", err)
-		}
-	} else {
-		awaiter := NewAwaiter(beacons, reqWeight, func() {
-			ctx.Lock.Lock()
-			defer ctx.Lock.Unlock()
-			if err := chain.Engine.Startup(); err != nil {
-				chain.Ctx.Log.Error("failed to start consensus engine: %s", err)
-				chain.Handler.Shutdown()
-			}
-		})
-		go m.Net.RegisterConnector(awaiter)
-	}
-
-	if connector, ok := vm.(validators.Connector); ok {
-		go m.Net.RegisterConnector(connector)
-	}
 	return chain, nil
 }
 
@@ -434,16 +412,23 @@ func (m *manager) createAvalancheChain(
 	sender := sender.Sender{}
 	sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager)
 
+	sampleK := consensusParams.K
+	if uint64(sampleK) > bootstrapWeight {
+		sampleK = int(bootstrapWeight)
+	}
+
 	// The engine handles consensus
 	engine := &aveng.Transitive{}
 	if err := engine.Initialize(aveng.Config{
 		Config: avbootstrap.Config{
 			Config: common.Config{
-				Ctx:        ctx,
-				Validators: validators,
-				Beacons:    beacons,
-				Alpha:      bootstrapWeight/2 + 1, // must be > 50%
-				Sender:     &sender,
+				Ctx:          ctx,
+				Validators:   validators,
+				Beacons:      beacons,
+				SampleK:      sampleK,
+				StartupAlpha: (3*bootstrapWeight + 3) / 4,
+				Alpha:        bootstrapWeight/2 + 1, // must be > 50%
+				Sender:       &sender,
 			},
 			VtxBlocked: vtxBlocker,
 			TxBlocked:  txBlocker,
@@ -514,16 +499,23 @@ func (m *manager) createSnowmanChain(
 	sender := sender.Sender{}
 	sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager)
 
+	sampleK := consensusParams.K
+	if uint64(sampleK) > bootstrapWeight {
+		sampleK = int(bootstrapWeight)
+	}
+
 	// The engine handles consensus
 	engine := &smeng.Transitive{}
 	if err := engine.Initialize(smeng.Config{
 		Config: smbootstrap.Config{
 			Config: common.Config{
-				Ctx:        ctx,
-				Validators: validators,
-				Beacons:    beacons,
-				Alpha:      bootstrapWeight/2 + 1, // must be > 50%
-				Sender:     &sender,
+				Ctx:          ctx,
+				Validators:   validators,
+				Beacons:      beacons,
+				SampleK:      sampleK,
+				StartupAlpha: (3*bootstrapWeight + 3) / 4,
+				Alpha:        bootstrapWeight/2 + 1, // must be > 50%
+				Sender:       &sender,
 			},
 			Blocked:      blocked,
 			VM:           vm,

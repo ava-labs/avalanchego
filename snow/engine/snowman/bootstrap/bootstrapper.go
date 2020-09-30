@@ -8,15 +8,16 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanche-go/cache"
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow/choices"
-	"github.com/ava-labs/avalanche-go/snow/consensus/snowman"
-	"github.com/ava-labs/avalanche-go/snow/engine/common"
-	"github.com/ava-labs/avalanche-go/snow/engine/common/queue"
-	"github.com/ava-labs/avalanche-go/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanche-go/utils/formatting"
-	"github.com/ava-labs/avalanche-go/vms/components/missing"
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/vms/components/missing"
 )
 
 const (
@@ -85,8 +86,7 @@ func (b *Bootstrapper) Initialize(
 	})
 
 	config.Bootstrapable = b
-	b.Bootstrapper.Initialize(config.Config)
-	return nil
+	return b.Bootstrapper.Initialize(config.Config)
 }
 
 // CurrentAcceptedFrontier returns the last accepted block
@@ -310,8 +310,8 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs) error {
 			b.Ctx.Log.Info("executed %d blocks", numExecuted)
 		}
 
-		b.Ctx.ConsensusDispatcher.Accept(b.Ctx.ChainID, job.ID(), job.Bytes())
-		b.Ctx.DecisionDispatcher.Accept(b.Ctx.ChainID, job.ID(), job.Bytes())
+		b.Ctx.ConsensusDispatcher.Accept(b.Ctx, job.ID(), job.Bytes())
+		b.Ctx.DecisionDispatcher.Accept(b.Ctx, job.ID(), job.Bytes())
 	}
 	b.Ctx.Log.Info("executed %d blocks", numExecuted)
 	return nil
@@ -329,4 +329,20 @@ func (b *Bootstrapper) GetBlock(id ids.ID) (snowman.Block, error) {
 	}
 	b.blockCache.Put(id, block)
 	return block, err
+}
+
+// Connected implements the Engine interface.
+func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
+	if connector, ok := b.VM.(validators.Connector); ok {
+		connector.Connected(validatorID)
+	}
+	return b.Bootstrapper.Connected(validatorID)
+}
+
+// Disconnected implements the Engine interface.
+func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
+	if connector, ok := b.VM.(validators.Connector); ok {
+		connector.Disconnected(validatorID)
+	}
+	return b.Bootstrapper.Disconnected(validatorID)
 }

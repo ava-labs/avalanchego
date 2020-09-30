@@ -11,25 +11,28 @@ import (
 
 	"github.com/gorilla/rpc/v2"
 
-	"github.com/ava-labs/avalanche-go/api"
-	"github.com/ava-labs/avalanche-go/chains/atomic"
-	"github.com/ava-labs/avalanche-go/database"
-	"github.com/ava-labs/avalanche-go/database/encdb"
-	"github.com/ava-labs/avalanche-go/database/memdb"
-	"github.com/ava-labs/avalanche-go/database/prefixdb"
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow/engine/common"
-	"github.com/ava-labs/avalanche-go/utils/codec"
-	"github.com/ava-labs/avalanche-go/utils/formatting"
-	"github.com/ava-labs/avalanche-go/utils/logging"
-	"github.com/ava-labs/avalanche-go/utils/password"
+	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/encdb"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/password"
 
-	jsoncodec "github.com/ava-labs/avalanche-go/utils/json"
+	jsoncodec "github.com/ava-labs/avalanchego/utils/json"
 )
 
 const (
 	// maxUserLen is the maximum allowed length of a username
 	maxUserLen = 1024
+
+	maxPackerSize  = 1 << 30 // max size, in bytes, of something being marshalled by Marshal()
+	maxSliceLength = 1 << 18
 )
 
 var (
@@ -75,7 +78,7 @@ type Keystore struct {
 // Initialize the keystore
 func (ks *Keystore) Initialize(log logging.Logger, db database.Database) {
 	ks.log = log
-	ks.codec = codec.NewDefault()
+	ks.codec = codec.New(maxPackerSize, maxSliceLength)
 	ks.users = make(map[string]*password.Hash)
 	ks.userDB = prefixdb.New([]byte("users"), db)
 	ks.bcDB = prefixdb.New([]byte("bcs"), db)

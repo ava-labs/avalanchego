@@ -12,15 +12,15 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow"
-	"github.com/ava-labs/avalanche-go/snow/engine/common"
-	"github.com/ava-labs/avalanche-go/snow/networking/router"
-	"github.com/ava-labs/avalanche-go/snow/networking/throttler"
-	"github.com/ava-labs/avalanche-go/snow/networking/timeout"
-	"github.com/ava-labs/avalanche-go/snow/validators"
-	"github.com/ava-labs/avalanche-go/utils/logging"
-	"github.com/ava-labs/avalanche-go/utils/timer"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/snow/networking/throttler"
+	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
 func TestSenderContext(t *testing.T) {
@@ -51,13 +51,14 @@ func TestTimeout(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
-	chainRouter.Initialize(logging.NoLog{}, &tm, time.Hour, time.Second)
+	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil)
 
 	sender := Sender{}
 	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(true)
+	engine.CantConnected = false
 
 	engine.ContextF = snow.DefaultContextTest
 
@@ -114,13 +115,14 @@ func TestReliableMessages(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
-	chainRouter.Initialize(logging.NoLog{}, &tm, time.Hour, time.Second)
+	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil)
 
 	sender := Sender{}
 	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(true)
+	engine.CantConnected = false
 
 	engine.ContextF = snow.DefaultContextTest
 	engine.GossipF = func() error { return nil }
@@ -158,14 +160,14 @@ func TestReliableMessages(t *testing.T) {
 			vdrIDs.Add(ids.NewShortID([20]byte{1}))
 
 			sender.PullQuery(vdrIDs, uint32(i), ids.Empty)
-			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond)))
+			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
 		}
 	}()
 
 	go func() {
 		for {
 			chainRouter.Gossip()
-			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond)))
+			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
 		}
 	}()
 
@@ -188,7 +190,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
-	chainRouter.Initialize(logging.NoLog{}, &tm, time.Hour, time.Second)
+	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil)
 
 	sender := Sender{}
 	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm)
@@ -233,14 +235,14 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			vdrIDs.Add(engine.Context().NodeID)
 
 			sender.PullQuery(vdrIDs, uint32(i), ids.Empty)
-			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond)))
+			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
 		}
 	}()
 
 	go func() {
 		for {
 			chainRouter.Gossip()
-			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond)))
+			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
 		}
 	}()
 

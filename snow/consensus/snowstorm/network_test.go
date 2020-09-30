@@ -6,12 +6,12 @@ package snowstorm
 import (
 	"math/rand"
 
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow"
-	"github.com/ava-labs/avalanche-go/snow/choices"
-	"github.com/ava-labs/avalanche-go/utils/sampler"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/sampler"
 
-	sbcon "github.com/ava-labs/avalanche-go/snow/consensus/snowball"
+	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
 type Network struct {
@@ -125,7 +125,7 @@ func (n *Network) Finalized() bool {
 
 func (n *Network) Round() {
 	if len(n.running) > 0 {
-		runningInd := rand.Intn(len(n.running))
+		runningInd := rand.Intn(len(n.running)) // #nosec G404
 		running := n.running[runningInd]
 
 		s := sampler.NewUniform()

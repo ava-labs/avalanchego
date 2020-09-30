@@ -8,8 +8,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/gconn/gconnproto"
-	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/grpcutils"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gconn/gconnproto"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
 
 // Server is a http.Handler that is managed over RPC.

@@ -12,4 +12,4 @@ BUILD_DIR=$AVALANCHE_PATH/build # Where binaries go
 
 # Build aVALANCHE
 echo "Building Avalanche..."
-go build -o "$BUILD_DIR/avalanche" "$AVALANCHE_PATH/main/"*.go
+go build -o "$BUILD_DIR/avalanchego" "$AVALANCHE_PATH/main/"*.go

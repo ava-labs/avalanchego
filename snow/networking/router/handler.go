@@ -10,11 +10,11 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow"
-	"github.com/ava-labs/avalanche-go/snow/engine/common"
-	"github.com/ava-labs/avalanche-go/snow/validators"
-	"github.com/ava-labs/avalanche-go/utils/timer"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
 // Requirement: A set of nodes spamming messages (potentially costly) shouldn't
@@ -394,26 +394,26 @@ func (h *Handler) GetFailed(validatorID ids.ShortID, requestID uint32) {
 }
 
 // PushQuery passes a PushQuery message received from the network to the consensus engine.
-func (h *Handler) PushQuery(validatorID ids.ShortID, requestID uint32, deadline time.Time, blockID ids.ID, block []byte) bool {
+func (h *Handler) PushQuery(validatorID ids.ShortID, requestID uint32, deadline time.Time, containerID ids.ID, container []byte) bool {
 	return h.serviceQueue.PushMessage(message{
 		messageType: pushQueryMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
 		deadline:    deadline,
-		containerID: blockID,
-		container:   block,
+		containerID: containerID,
+		container:   container,
 		received:    h.clock.Time(),
 	})
 }
 
 // PullQuery passes a PullQuery message received from the network to the consensus engine.
-func (h *Handler) PullQuery(validatorID ids.ShortID, requestID uint32, deadline time.Time, blockID ids.ID) bool {
+func (h *Handler) PullQuery(validatorID ids.ShortID, requestID uint32, deadline time.Time, containerID ids.ID) bool {
 	return h.serviceQueue.PushMessage(message{
 		messageType: pullQueryMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
 		deadline:    deadline,
-		containerID: blockID,
+		containerID: containerID,
 		received:    h.clock.Time(),
 	})
 }
@@ -438,8 +438,28 @@ func (h *Handler) QueryFailed(validatorID ids.ShortID, requestID uint32) {
 	})
 }
 
+// Connected passes a new connection notification to the consensus engine
+func (h *Handler) Connected(validatorID ids.ShortID) {
+	h.sendReliableMsg(message{
+		messageType: connectedMsg,
+		validatorID: validatorID,
+	})
+}
+
+// Disconnected passes a new connection notification to the consensus engine
+func (h *Handler) Disconnected(validatorID ids.ShortID) {
+	h.sendReliableMsg(message{
+		messageType: disconnectedMsg,
+		validatorID: validatorID,
+	})
+}
+
 // Gossip passes a gossip request to the consensus engine
 func (h *Handler) Gossip() {
+	if !h.ctx.IsBootstrapped() {
+		// Shouldn't send gossiping messages while the chain is bootstrapping
+		return
+	}
 	h.sendReliableMsg(message{
 		messageType: gossipMsg,
 	})
@@ -547,6 +567,14 @@ func (h *Handler) handleValidatorMsg(msg message, startTime time.Time) error {
 		err = h.engine.Chits(msg.validatorID, msg.requestID, msg.containerIDs)
 		timeConsumed = h.clock.Time().Sub(startTime)
 		h.chits.Observe(float64(timeConsumed.Nanoseconds()))
+	case connectedMsg:
+		err = h.engine.Connected(msg.validatorID)
+		timeConsumed = h.clock.Time().Sub(startTime)
+		h.connected.Observe(float64(timeConsumed.Nanoseconds()))
+	case disconnectedMsg:
+		err = h.engine.Disconnected(msg.validatorID)
+		timeConsumed = h.clock.Time().Sub(startTime)
+		h.disconnected.Observe(float64(timeConsumed.Nanoseconds()))
 	}
 
 	h.serviceQueue.UtilizeCPU(msg.validatorID, timeConsumed)

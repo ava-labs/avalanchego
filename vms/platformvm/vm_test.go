@@ -14,40 +14,44 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanche-go/chains"
-	"github.com/ava-labs/avalanche-go/chains/atomic"
-	"github.com/ava-labs/avalanche-go/database"
-	"github.com/ava-labs/avalanche-go/database/memdb"
-	"github.com/ava-labs/avalanche-go/database/prefixdb"
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow"
-	"github.com/ava-labs/avalanche-go/snow/choices"
-	"github.com/ava-labs/avalanche-go/snow/consensus/snowball"
-	"github.com/ava-labs/avalanche-go/snow/engine/common"
-	"github.com/ava-labs/avalanche-go/snow/engine/common/queue"
-	"github.com/ava-labs/avalanche-go/snow/engine/snowman/bootstrap"
-	"github.com/ava-labs/avalanche-go/snow/networking/router"
-	"github.com/ava-labs/avalanche-go/snow/networking/sender"
-	"github.com/ava-labs/avalanche-go/snow/networking/throttler"
-	"github.com/ava-labs/avalanche-go/snow/networking/timeout"
-	"github.com/ava-labs/avalanche-go/snow/validators"
-	"github.com/ava-labs/avalanche-go/utils/constants"
-	"github.com/ava-labs/avalanche-go/utils/crypto"
-	"github.com/ava-labs/avalanche-go/utils/formatting"
-	"github.com/ava-labs/avalanche-go/utils/json"
-	"github.com/ava-labs/avalanche-go/utils/logging"
-	"github.com/ava-labs/avalanche-go/utils/timer"
-	"github.com/ava-labs/avalanche-go/utils/units"
-	"github.com/ava-labs/avalanche-go/vms/components/avax"
-	"github.com/ava-labs/avalanche-go/vms/components/core"
-	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
-	"github.com/ava-labs/avalanche-go/vms/timestampvm"
+	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
+	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/snow/networking/sender"
+	"github.com/ava-labs/avalanchego/snow/networking/throttler"
+	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/core"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/timestampvm"
 
-	smcon "github.com/ava-labs/avalanche-go/snow/consensus/snowman"
-	smeng "github.com/ava-labs/avalanche-go/snow/engine/snowman"
+	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 )
 
 var (
+	defaultMinStakingDuration        = 24 * time.Hour
+	defaultMaxStakingDuration        = 365 * 24 * time.Hour
+	defaultMinDelegationFee   uint32 = 0
+
 	// AVAX asset ID in tests
 	avaxAssetID = ids.NewID([32]byte{'y', 'e', 'e', 't'})
 
@@ -60,15 +64,17 @@ var (
 	defaultValidateStartTime = defaultGenesisTime
 
 	// time that genesis validators stop validating
-	defaultValidateEndTime = defaultValidateStartTime.Add(10 * MinimumStakingDuration)
+	defaultValidateEndTime = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 
 	// each key controls an address that has [defaultBalance] AVAX at genesis
 	keys []*crypto.PrivateKeySECP256K1R
 
-	minStake = 5 * units.MilliAvax
+	defaultMinValidatorStake = 5 * units.MilliAvax
+	defaultMaxValidatorStake = SupplyCap
+	defaultMinDelegatorStake = 1 * units.MilliAvax
 
 	// amount all genesis validators have in defaultVM
-	defaultBalance uint64 = 100 * minStake
+	defaultBalance uint64 = 100 * defaultMinValidatorStake
 
 	// subnet that exists at genesis in defaultVM
 	// Its controlKeys are keys[0], keys[1], keys[2]
@@ -142,7 +148,6 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 
 	genesisValidators := make([]APIPrimaryValidator, len(keys))
 	for i, key := range keys {
-		weight := json.Uint64(defaultWeight)
 		id := key.PublicKey().Address()
 		addr, err := formatting.FormatBech32(hrp, id.Bytes())
 		if err != nil {
@@ -152,13 +157,16 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 			APIStaker: APIStaker{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
-				Weight:    &weight,
 				NodeID:    id.PrefixedString(constants.NodeIDPrefix),
 			},
 			RewardOwner: &APIOwner{
 				Threshold: 1,
 				Addresses: []string{addr},
 			},
+			Staked: []APIUTXO{{
+				Amount:  json.Uint64(defaultWeight),
+				Address: addr,
+			}},
 			DelegationFee: PercentDenominator,
 		}
 	}
@@ -172,8 +180,6 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 		Time:          json.Uint64(defaultGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
 	}
-	// TODO: Remove
-	InitialSupply = 360 * units.MegaAvax
 
 	buildGenesisResponse := BuildGenesisReply{}
 	platformvmSS := StaticService{}
@@ -185,10 +191,15 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 
 func defaultVM(t *testing.T) (*VM, database.Database) {
 	vm := &VM{
-		SnowmanVM:    &core.SnowmanVM{},
-		chainManager: chains.MockManager{},
-		txFee:        defaultTxFee,
-		minStake:     minStake,
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		txFee:              defaultTxFee,
+		minValidatorStake:  defaultMinValidatorStake,
+		maxValidatorStake:  defaultMaxValidatorStake,
+		minDelegatorStake:  defaultMinDelegatorStake,
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 
 	baseDB := memdb.New()
@@ -222,6 +233,7 @@ func defaultVM(t *testing.T) (*VM, database.Database) {
 		// control keys are keys[0], keys[1], keys[2]
 		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // pays tx fee
+		keys[0].PublicKey().Address(),           // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if err := vm.issueTx(tx); err != nil {
@@ -333,7 +345,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	}()
 
 	startTime := defaultGenesisTime.Add(Delta).Add(1 * time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 	key, err := vm.factory.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
@@ -342,13 +354,14 @@ func TestAddValidatorCommit(t *testing.T) {
 
 	// create valid tx
 	tx, err := vm.newAddValidatorTx(
-		vm.minStake,
+		vm.minValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ID,
 		ID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -416,19 +429,20 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	}()
 
 	startTime := defaultGenesisTime.Add(-Delta).Add(-1 * time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := vm.factory.NewPrivateKey()
 	ID := key.PublicKey().Address()
 
 	// create invalid tx
 	if tx, err := vm.newAddValidatorTx(
-		vm.minStake,
+		vm.minValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ID,
 		ID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if preferredHeight, err := vm.preferredHeight(); err != nil {
@@ -462,19 +476,20 @@ func TestAddValidatorReject(t *testing.T) {
 	}()
 
 	startTime := defaultGenesisTime.Add(Delta).Add(1 * time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := vm.factory.NewPrivateKey()
 	ID := key.PublicKey().Address()
 
 	// create valid tx
 	tx, err := vm.newAddValidatorTx(
-		vm.minStake,
+		vm.minValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ID,
 		ID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -544,7 +559,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	}()
 
 	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
@@ -556,6 +571,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		keys[0].PublicKey().Address(),
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -627,7 +643,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	}()
 
 	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := keys[0].PublicKey().Address()
 
 	// create valid tx
@@ -640,6 +656,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		nodeID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1016,6 +1033,7 @@ func TestCreateChain(t *testing.T) {
 		nil,
 		"name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1072,7 +1090,8 @@ func TestCreateSubnet(t *testing.T) {
 			keys[0].PublicKey().Address(),
 			keys[1].PublicKey().Address(),
 		},
-		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // payer
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		keys[0].PublicKey().Address(), // change addr // payer
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1096,7 +1115,7 @@ func TestCreateSubnet(t *testing.T) {
 
 	// Now that we've created a new subnet, add a validator to that subnet
 	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subent so tx is valid
 	if addValidatorTx, err := vm.newAddSubnetValidatorTx(
 		defaultWeight,
@@ -1105,6 +1124,7 @@ func TestCreateSubnet(t *testing.T) {
 		nodeID,
 		createSubnetTx.ID(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if err := vm.issueTx(addValidatorTx); err != nil {
@@ -1291,6 +1311,7 @@ func TestAtomicImport(t *testing.T) {
 		vm.Ctx.XChainID,
 		recipientKey.PublicKey().Address(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	); err == nil {
 		t.Fatalf("should have errored due to missing utxos")
 	}
@@ -1327,6 +1348,7 @@ func TestAtomicImport(t *testing.T) {
 		vm.Ctx.XChainID,
 		recipientKey.PublicKey().Address(),
 		[]*crypto.PrivateKeySECP256K1R{recipientKey},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1429,8 +1451,11 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	db := memdb.New()
 
 	firstVM := &VM{
-		SnowmanVM:    &core.SnowmanVM{},
-		chainManager: chains.MockManager{},
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 	firstVM.vdrMgr = validators.NewManager()
 	firstVM.clock.Set(defaultGenesisTime)
@@ -1501,8 +1526,11 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	firstCtx.Lock.Unlock()
 
 	secondVM := &VM{
-		SnowmanVM:    &core.SnowmanVM{},
-		chainManager: chains.MockManager{},
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 
 	secondVM.vdrMgr = validators.NewManager()
@@ -1532,8 +1560,11 @@ func TestRestartFullyAccepted(t *testing.T) {
 	db := memdb.New()
 
 	firstVM := &VM{
-		SnowmanVM:    &core.SnowmanVM{},
-		chainManager: chains.MockManager{},
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 
 	firstVM.vdrMgr = validators.NewManager()
@@ -1622,8 +1653,11 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstCtx.Lock.Unlock()
 
 	secondVM := &VM{
-		SnowmanVM:    &core.SnowmanVM{},
-		chainManager: chains.MockManager{},
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 
 	secondVM.vdrMgr = validators.NewManager()
@@ -1658,8 +1692,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	vm := &VM{
-		SnowmanVM:    &core.SnowmanVM{},
-		chainManager: chains.MockManager{},
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 
 	vm.vdrMgr = validators.NewManager()
@@ -1714,7 +1751,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	go timeoutManager.Dispatch()
 
 	chainRouter := &router.ChainRouter{}
-	chainRouter.Initialize(logging.NoLog{}, &timeoutManager, time.Hour, time.Second)
+	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &timeoutManager, time.Hour, time.Second, ids.Set{}, nil)
 
 	externalSender := &sender.ExternalSenderTest{T: t}
 	externalSender.Default(true)
@@ -1724,6 +1761,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	sender.Initialize(ctx, externalSender, chainRouter, &timeoutManager)
 
+	reqID := new(uint32)
+	externalSender.GetAcceptedFrontierF = func(_ ids.ShortSet, _ ids.ID, requestID uint32, _ time.Time) {
+		*reqID = requestID
+	}
+
 	// The engine handles consensus
 	engine := smeng.Transitive{}
 	engine.Initialize(smeng.Config{
@@ -1732,6 +1774,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 				Ctx:        ctx,
 				Validators: vdrs,
 				Beacons:    beacons,
+				SampleK:    int(beacons.Weight()),
 				Alpha:      uint64(beacons.Len()/2 + 1),
 				Sender:     &sender,
 			},
@@ -1766,13 +1809,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	// Allow incoming messages to be routed to the new chain
 	chainRouter.AddChain(handler)
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
-
-	reqID := new(uint32)
-	externalSender.GetAcceptedFrontierF = func(_ ids.ShortSet, _ ids.ID, requestID uint32, _ time.Time) {
-		*reqID = requestID
-	}
-
-	engine.Startup()
 
 	externalSender.GetAcceptedFrontierF = nil
 	externalSender.GetAcceptedF = func(_ ids.ShortSet, _ ids.ID, requestID uint32, _ time.Time, _ ids.Set) {
@@ -1818,8 +1854,11 @@ func TestUnverifiedParent(t *testing.T) {
 	db := memdb.New()
 
 	vm := &VM{
-		SnowmanVM:    &core.SnowmanVM{},
-		chainManager: chains.MockManager{},
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 
 	vm.vdrMgr = validators.NewManager()
@@ -1953,16 +1992,17 @@ func TestNextValidatorStartTime(t *testing.T) {
 	assert.NoError(t, err)
 
 	startTime := currentTime.Add(time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 
 	tx, err := vm.newAddValidatorTx(
-		vm.minStake,                             // stake amount
-		uint64(startTime.Unix()),                // start time
-		uint64(endTime.Unix()),                  // end time
-		vm.Ctx.NodeID,                           // node ID
-		ids.GenerateTestShortID(),               // reward address
-		PercentDenominator,                      // shares
-		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
+		vm.minValidatorStake,      // stake amount
+		uint64(startTime.Unix()),  // start time
+		uint64(endTime.Unix()),    // end time
+		vm.Ctx.NodeID,             // node ID
+		ids.GenerateTestShortID(), // reward address
+		PercentDenominator,        // shares
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr // key
 	)
 	assert.NoError(t, err)
 
@@ -1977,4 +2017,77 @@ func TestNextValidatorStartTime(t *testing.T) {
 		nextStaker.ID().Bytes(),
 		"should have marked the new tx as the next validator to be added",
 	)
+}
+
+func TestMaxStakeAmount(t *testing.T) {
+	vm, _ := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
+	tests := []struct {
+		description    string
+		startTime      time.Time
+		endTime        time.Time
+		validatorID    ids.ShortID
+		expectedAmount uint64
+	}{
+		{
+			description:    "startTime after validation period ends",
+			startTime:      defaultValidateEndTime.Add(time.Minute),
+			endTime:        defaultValidateEndTime.Add(2 * time.Minute),
+			validatorID:    keys[0].PublicKey().Address(),
+			expectedAmount: 0,
+		},
+		{
+			description:    "startTime when validation period ends",
+			startTime:      defaultValidateEndTime,
+			endTime:        defaultValidateEndTime.Add(2 * time.Minute),
+			validatorID:    keys[0].PublicKey().Address(),
+			expectedAmount: defaultWeight,
+		},
+		{
+			description:    "startTime before validation period ends",
+			startTime:      defaultValidateEndTime.Add(-time.Minute),
+			endTime:        defaultValidateEndTime.Add(2 * time.Minute),
+			validatorID:    keys[0].PublicKey().Address(),
+			expectedAmount: defaultWeight,
+		},
+		{
+			description:    "endTime after validation period ends",
+			startTime:      defaultValidateStartTime,
+			endTime:        defaultValidateEndTime.Add(time.Minute),
+			validatorID:    keys[0].PublicKey().Address(),
+			expectedAmount: defaultWeight,
+		},
+		{
+			description:    "endTime when validation period ends",
+			startTime:      defaultValidateStartTime,
+			endTime:        defaultValidateEndTime,
+			validatorID:    keys[0].PublicKey().Address(),
+			expectedAmount: defaultWeight,
+		},
+		{
+			description:    "endTime before validation period ends",
+			startTime:      defaultValidateStartTime,
+			endTime:        defaultValidateEndTime.Add(-time.Minute),
+			validatorID:    keys[0].PublicKey().Address(),
+			expectedAmount: defaultWeight,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			amount, err := vm.maxStakeAmount(vm.DB, vm.Ctx.SubnetID, test.validatorID, test.startTime, test.endTime)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if amount != test.expectedAmount {
+				t.Fatalf("wrong max stake amount. Expected %d ; Returned %d",
+					test.expectedAmount, amount)
+			}
+		})
+	}
 }

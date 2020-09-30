@@ -10,14 +10,14 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow/choices"
-	"github.com/ava-labs/avalanche-go/snow/consensus/avalanche"
-	"github.com/ava-labs/avalanche-go/snow/consensus/snowball"
-	"github.com/ava-labs/avalanche-go/snow/consensus/snowstorm"
-	"github.com/ava-labs/avalanche-go/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/avalanche-go/snow/engine/common"
-	"github.com/ava-labs/avalanche-go/snow/validators"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 var (
@@ -853,8 +853,15 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 		}, nil
 	}
 
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
+
 	te := &Transitive{}
 	te.Initialize(config)
+
+	vm.CantBootstrapping = true
+	vm.CantBootstrapped = true
+
 	te.finishBootstrapping()
 	te.Ctx.Bootstrapped()
 
@@ -939,8 +946,15 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 		panic("Should have errored")
 	}
 
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
+
 	te := &Transitive{}
 	te.Initialize(config)
+
+	vm.CantBootstrapping = true
+	vm.CantBootstrapped = true
+
 	te.finishBootstrapping()
 	te.Ctx.Bootstrapped()
 
@@ -1136,8 +1150,15 @@ func TestEngineReissue(t *testing.T) {
 		panic("Should have errored")
 	}
 
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
+
 	te := &Transitive{}
 	te.Initialize(config)
+
+	vm.CantBootstrapping = true
+	vm.CantBootstrapped = true
+
 	te.finishBootstrapping()
 	te.Ctx.Bootstrapped()
 
@@ -1268,8 +1289,15 @@ func TestEngineLargeIssue(t *testing.T) {
 		panic("Should have errored")
 	}
 
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
+
 	te := &Transitive{}
 	te.Initialize(config)
+
+	vm.CantBootstrapping = true
+	vm.CantBootstrapped = true
+
 	te.finishBootstrapping()
 	te.Ctx.Bootstrapped()
 
@@ -2223,6 +2251,8 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	vdr := ids.GenerateTestShortID()
 	vals.AddWeight(vdr, 1)
 
+	config.SampleK = int(vals.Weight())
+
 	sender := &common.SenderTest{}
 	sender.T = t
 	config.Sender = sender
@@ -2985,6 +3015,12 @@ func TestEngineAggressivePolling(t *testing.T) {
 	manager := &vertex.TestManager{T: t}
 	config.Manager = manager
 
+	vm := &vertex.TestVM{}
+	vm.T = t
+	config.VM = vm
+
+	vm.Default(true)
+
 	gVtx := &avalanche.TestVertex{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -3019,14 +3055,16 @@ func TestEngineAggressivePolling(t *testing.T) {
 		BytesV:   []byte{1},
 	}
 
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
+
 	te := &Transitive{}
 	if err := te.Initialize(config); err != nil {
 		t.Fatal(err)
 	}
-	if err := te.finishBootstrapping(); err != nil {
-		t.Fatal(err)
-	}
-	te.Ctx.Bootstrapped()
+
+	vm.CantBootstrapping = true
+	vm.CantBootstrapped = true
 
 	parsed := new(bool)
 	manager.ParseVertexF = func(b []byte) (avalanche.Vertex, error) {
@@ -3055,6 +3093,8 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	numPullQueries := new(int)
 	sender.PullQueryF = func(ids.ShortSet, uint32, ids.ID) { *numPullQueries++ }
+
+	vm.CantPendingTxs = false
 
 	te.Put(vdr, 0, vtx.ID(), vtx.Bytes())
 
@@ -3133,8 +3173,15 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 		panic("Should have errored")
 	}
 
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
+
 	te := &Transitive{}
 	te.Initialize(config)
+
+	vm.CantBootstrapping = true
+	vm.CantBootstrapped = true
+
 	te.finishBootstrapping()
 	te.Ctx.Bootstrapped()
 

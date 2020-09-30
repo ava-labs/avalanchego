@@ -6,9 +6,9 @@ package snowman
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow/consensus/snowman"
-	"github.com/ava-labs/avalanche-go/vms/components/missing"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/vms/components/missing"
 )
 
 // Voter records chits received from [vdr] once its dependencies are met.

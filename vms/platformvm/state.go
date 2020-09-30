@@ -9,17 +9,17 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanche-go/database"
-	"github.com/ava-labs/avalanche-go/database/prefixdb"
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow/consensus/snowman"
-	"github.com/ava-labs/avalanche-go/utils/constants"
-	"github.com/ava-labs/avalanche-go/utils/formatting"
-	"github.com/ava-labs/avalanche-go/utils/hashing"
-	"github.com/ava-labs/avalanche-go/utils/wrappers"
-	"github.com/ava-labs/avalanche-go/vms/components/avax"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 
-	safemath "github.com/ava-labs/avalanche-go/utils/math"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 // This file contains methods of VM that deal with getting/putting values from database
@@ -443,7 +443,7 @@ func (vm *VM) GetUTXOs(
 	lastIndex := ids.Empty
 	addrsList := addrs.List()
 	ids.SortShortIDs(addrsList)
-	for _, addr := range addrs.List() {
+	for _, addr := range addrsList {
 		start := ids.Empty
 		if comp := bytes.Compare(addr.Bytes(), startAddr.Bytes()); comp == -1 { // Skip addresses before [startAddr]
 			continue
@@ -612,17 +612,17 @@ func (vm *VM) registerDBTypes() {
 
 	marshalChainsFunc := func(chainsIntf interface{}) ([]byte, error) {
 		if chains, ok := chainsIntf.([]*Tx); ok {
-			return Codec.Marshal(chains)
+			return GenesisCodec.Marshal(chains)
 		}
 		return nil, fmt.Errorf("expected []*CreateChainTx but got type %T", chainsIntf)
 	}
 	unmarshalChainsFunc := func(bytes []byte) (interface{}, error) {
 		var chains []*Tx
-		if err := Codec.Unmarshal(bytes, &chains); err != nil {
+		if err := GenesisCodec.Unmarshal(bytes, &chains); err != nil {
 			return nil, err
 		}
 		for _, tx := range chains {
-			if err := tx.Sign(vm.codec, nil); err != nil {
+			if err := tx.Sign(GenesisCodec, nil); err != nil {
 				return nil, err
 			}
 		}

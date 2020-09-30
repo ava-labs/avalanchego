@@ -10,12 +10,12 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
-	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/ghttpproto"
-	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/greadcloser"
-	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/greadcloser/greadcloserproto"
-	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/gresponsewriter"
-	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/gresponsewriter/gresponsewriterproto"
-	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/grpcutils"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/ghttpproto"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser/greadcloserproto"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter/gresponsewriterproto"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
 
 // Client is an implementation of a messenger channel that talks over RPC.

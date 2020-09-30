@@ -4,7 +4,7 @@
 package snowman
 
 import (
-	"github.com/ava-labs/avalanche-go/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
 // OracleBlock is a block that only has two valid children. The children should

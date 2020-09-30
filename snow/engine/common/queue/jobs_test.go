@@ -8,8 +8,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ava-labs/avalanche-go/database/memdb"
-	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 // Test that creating a new queue can be created and that it is initially empty.

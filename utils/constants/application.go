@@ -9,5 +9,5 @@ const (
 	PlatformName = "avalanche"
 
 	// Name of the avalanche application
-	AppName = "avalanche-go"
+	AppName = "avalanchego"
 )

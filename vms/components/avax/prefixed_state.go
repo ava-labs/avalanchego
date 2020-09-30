@@ -7,12 +7,12 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/ava-labs/avalanche-go/cache"
-	"github.com/ava-labs/avalanche-go/database"
-	"github.com/ava-labs/avalanche-go/database/prefixdb"
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow/choices"
-	"github.com/ava-labs/avalanche-go/utils/codec"
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/codec"
 )
 
 // Addressable is the interface a feature extension must provide to be able to
@@ -136,11 +136,18 @@ type PrefixedState struct {
 }
 
 // NewPrefixedState ...
-func NewPrefixedState(db database.Database, codec codec.Codec, myChain, peerChain ids.ID) *PrefixedState {
+func NewPrefixedState(
+	db database.Database,
+	genesisCodec,
+	codec codec.Codec,
+	myChain,
+	peerChain ids.ID,
+) *PrefixedState {
 	state := &State{
-		Cache: &cache.LRU{Size: stateCacheSize},
-		DB:    db,
-		Codec: codec,
+		Cache:        &cache.LRU{Size: stateCacheSize},
+		DB:           db,
+		GenesisCodec: genesisCodec,
+		Codec:        codec,
 	}
 	return &PrefixedState{
 		isSmaller: bytes.Compare(myChain.Bytes(), peerChain.Bytes()) == -1,
@@ -223,9 +230,10 @@ func UniqueID(id ids.ID, prefix uint64, cacher cache.Cacher) ids.ID {
 // State is a thin wrapper around a database to provide, caching, serialization,
 // and de-serialization.
 type State struct {
-	Cache cache.Cacher
-	DB    database.Database
-	Codec codec.Codec
+	Cache        cache.Cacher
+	DB           database.Database
+	GenesisCodec codec.Codec
+	Codec        codec.Codec
 }
 
 // UTXO attempts to load a utxo from storage.

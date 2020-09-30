@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ava-labs/avalanche-go/utils"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 // Genesis ...
