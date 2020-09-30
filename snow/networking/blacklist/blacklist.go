@@ -12,6 +12,16 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+// QueryBlacklist ...
+type QueryBlacklist interface {
+	// RegisterQuery registers a sent query and returns whether the query is subject to blacklist
+	RegisterQuery(ids.ShortID, uint32) bool
+	// RegisterResponse registers the response to a query message
+	RegisterResponse(ids.ShortID, uint32)
+	// QueryFailed registers that a query did not receive a response within our synchrony bound
+	QueryFailed(ids.ShortID, uint32)
+}
+
 // If a peer consistently does not respond to queries, it will
 // increase latencies on the network whenever that peer is polled.
 // If we cannot terminate the poll early, then the poll will wait
@@ -23,7 +33,9 @@ import (
 
 type queryBlacklist struct {
 	vdrs validators.Set
-	// Map of peerIDs to pending query requests
+	// Validator ID --> Request ID --> non-empty iff
+	// there is an outstanding request to this validator
+	// with the corresponding requestID
 	pendingQueries map[[20]byte]map[uint32]struct{}
 	// Map of consecutive query failures
 	consecutiveFailures map[[20]byte]int
@@ -63,16 +75,6 @@ func NewQueryBlacklist(validators validators.Set, threshold int, duration time.D
 		duration:            duration,
 		maxPortion:          maxPortion,
 	}
-}
-
-// QueryBlacklist ...
-type QueryBlacklist interface {
-	// RegisterQuery registers a sent query and returns whether the query is subject to blacklist
-	RegisterQuery(ids.ShortID, uint32) bool
-	// RegisterResponse registers the response to a query message
-	RegisterResponse(ids.ShortID, uint32)
-	// QueryFailed registers that a query did not receive a response within our synchrony bound
-	QueryFailed(ids.ShortID, uint32)
 }
 
 // RegisterQuery attempts to register a query from [validatorID] and returns true
@@ -134,14 +136,23 @@ func (b *queryBlacklist) blacklist(validatorID ids.ShortID) {
 	key := validatorID.Key()
 
 	// Add to blacklist times
+	// Note: we do not randomize the delay because nodes carry out
+	// a unique local view of when peers have surpassed the threshold
+	// of failed messages. Therefore, it's highly unlikely that all
+	// nodes will unbench a node at the same time.
+	// Additionally, if a node is unbenched simultaneously by the entire
+	// network, this only means that it will begin to receive consensus
+	// queries at the normal rate. There will be no backlog of messages
+	// that could spam an unbenched node.
 	b.blacklistTimes[key] = b.clock.Time().Add(b.duration)
 	b.blacklistOrder.PushBack(validatorID)
 	b.blacklistSet.Add(validatorID)
+	delete(b.consecutiveFailures, key)
 
 	// Note: there could be a memory leak if a large number of
-	// validators were added, sampled, and then were blacklisted
-	// and never sampled again. Due to the minimum staking amount
-	// and durations this is not a realistic concern.
+	// validators were added, sampled, benched, and never sampled
+	// again. Due to the minimum staking amount and durations this
+	// is not a realistic concern.
 	b.cleanup()
 }
 
@@ -169,6 +180,7 @@ func (b *queryBlacklist) blacklisted(validatorID ids.ShortID) bool {
 func (b *queryBlacklist) cleanup() {
 	currentWeight, err := b.vdrs.SubsetWeight(b.blacklistSet)
 	if err != nil {
+		// Add log for this, should never happen
 		b.reset()
 		return
 	}
@@ -191,6 +203,8 @@ func (b *queryBlacklist) cleanup() {
 		if ok {
 			newWeight, err := safemath.Sub64(currentWeight, removeWeight)
 			if err != nil {
+				// Add log for this, potentially add internal validators set
+				// to maintain weights
 				b.reset()
 				return
 			}

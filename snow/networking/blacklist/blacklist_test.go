@@ -110,8 +110,16 @@ func TestBlacklistDoesNotGetStuck(t *testing.T) {
 	requestID++
 
 	blacklist.clock.Set(currentTime.Add(duration))
+
 	if ok := blacklist.RegisterQuery(vdr0.ID(), requestID); !ok {
 		t.Fatal("RegisterQuery should have succeeded after blacklisting time elapsed")
+	}
+
+	blacklist.QueryFailed(vdr0.ID(), requestID)
+
+	// Test that consecutive failures is reset after blacklisting
+	if ok := blacklist.RegisterQuery(vdr0.ID(), requestID); !ok {
+		t.Fatal("RegisterQuery should have succeeded after vdr0 was removed from blacklist")
 	}
 }
 

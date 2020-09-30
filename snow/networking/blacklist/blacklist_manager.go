@@ -16,7 +16,8 @@ type Manager interface {
 }
 
 type blacklistManager struct {
-	config          *Config
+	config *Config
+	// Chain ID --> blacklist for that chain
 	chainBlacklists map[[32]byte]QueryBlacklist
 }
 
