@@ -90,19 +90,17 @@ func TestBenchlistDoesNotGetStuck(t *testing.T) {
 
 	requestID := uint32(0)
 
-	for i := 0; i < threshold; i++ {
+	for ; requestID < uint32(threshold); requestID++ {
 		if ok := benchlist.RegisterQuery(vdr0.ID(), requestID); !ok {
-			t.Fatalf("RegisterQuery failed early on iteration: %d", i)
+			t.Fatalf("RegisterQuery failed early on requestID: %d", requestID)
 		}
 		benchlist.QueryFailed(vdr0.ID(), requestID)
-		requestID++
 	}
 
 	// Check that calling QueryFailed repeatedly does not change
 	// the benchlist end time after it's already been benchlisted
-	for i := 0; i < threshold; i++ {
+	for ; requestID < uint32(threshold); requestID++ {
 		benchlist.QueryFailed(vdr0.ID(), requestID)
-		requestID++
 	}
 
 	if ok := benchlist.RegisterQuery(vdr0.ID(), requestID); ok {
@@ -143,16 +141,15 @@ func TestBenchlistDoesNotExceedThreshold(t *testing.T) {
 
 	requestID := uint32(0)
 
-	for i := 0; i < threshold; i++ {
+	for ; requestID < uint32(threshold); requestID++ {
 		if ok := benchlist.RegisterQuery(vdr0.ID(), requestID); !ok {
-			t.Fatalf("RegisterQuery failed early for vdr0 on iteration: %d", i)
+			t.Fatalf("RegisterQuery failed early for vdr0 on requestID: %d", requestID)
 		}
 		if ok := benchlist.RegisterQuery(vdr1.ID(), requestID); !ok {
-			t.Fatalf("RegisterQuery failed early for vdr1 on iteration: %d", i)
+			t.Fatalf("RegisterQuery failed early for vdr1 on requestID: %d", requestID)
 		}
 		benchlist.QueryFailed(vdr0.ID(), requestID)
 		benchlist.QueryFailed(vdr1.ID(), requestID)
-		requestID++
 	}
 
 	ok0 := benchlist.RegisterQuery(vdr0.ID(), requestID)
