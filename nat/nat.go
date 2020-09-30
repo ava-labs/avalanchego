@@ -55,14 +55,14 @@ func NewPortMapper(log logging.Logger, r Router) Mapper {
 	}
 }
 
-// Map sets up port mapping using given protocol, internal and external ports
-// and returns the final port mapped. It returns 0 if mapping failed after the
-// maximun number of retries
+// Attempt to establish a PnP connection from extPort (exposed to the internet) to our
+// intPort (where our process is listening).
 func (dev *Mapper) Map(protocol string, intPort, extPort uint16, desc string) {
 	if !dev.r.IsPnP() {
 		return
 	}
 
+	// we attempt a port map, and log an Error if it fails.
 	err := dev.retryMapPort(protocol, intPort, extPort, desc, mapTimeout)
 	if err != nil {
 		dev.log.Error("PnP map failed from external port %d to internal port %d with %s",
@@ -71,9 +71,11 @@ func (dev *Mapper) Map(protocol string, intPort, extPort uint16, desc string) {
 		dev.log.Info("PnP map successful from external port %d to internal port %d",
 			intPort, extPort)
 	}
+
 	go dev.keepPortMapping(protocol, intPort, extPort, desc)
 }
 
+// Retry port map up to maxRefreshRetries with a 1 second delay
 func (dev *Mapper) retryMapPort(protocol string, intPort, extPort uint16, desc string, timeout time.Duration) error {
 	var err error
 	for retryCnt := 0; retryCnt < maxRefreshRetries; retryCnt++ {
@@ -81,6 +83,8 @@ func (dev *Mapper) retryMapPort(protocol string, intPort, extPort uint16, desc s
 		if err == nil {
 			return nil
 		}
+
+		// log a message, sleep a second and retry.
 		dev.log.Error("Renewing port mapping try #%d from external port %d to internal port %d failed with %s",
 			retryCnt+1, intPort, extPort, err)
 		time.Sleep(1 * time.Second)
@@ -89,7 +93,7 @@ func (dev *Mapper) retryMapPort(protocol string, intPort, extPort uint16, desc s
 }
 
 // keepPortMapping runs in the background to keep a port mapped. It renews the
-// the port mapping in mapUpdateTimeout.
+// the port mapping at intervals of mapUpdateTimeout.
 func (dev *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, desc string) {
 	updateTimer := time.NewTimer(mapUpdateTimeout)
 
