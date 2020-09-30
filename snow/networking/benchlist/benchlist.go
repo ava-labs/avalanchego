@@ -143,7 +143,6 @@ func (b *queryBenchlist) bench(validatorID ids.ShortID) {
 	b.benchlistOrder.PushBack(validatorID)
 	b.benchlistSet.Add(validatorID)
 	delete(b.consecutiveFailures, key)
-	b.metrics.numBenched.Inc()
 	b.ctx.Log.Debug("Benching validator %s for %v after %d consecutive failed queries", validatorID, randomizedDuration, b.threshold)
 
 	// Note: there could be a memory leak if a large number of
@@ -183,7 +182,7 @@ func (b *queryBenchlist) cleanup() {
 		return
 	}
 
-	numBenched := b.benchlistSet.Len()
+	benchLen := b.benchlistSet.Len()
 	updatedWeight := currentWeight
 	totalWeight := b.vdrs.Weight()
 	maxBenchlistWeight := uint64(float64(totalWeight) * b.maxPortion)
@@ -215,18 +214,19 @@ func (b *queryBenchlist) cleanup() {
 		b.benchlistOrder.Remove(e)
 		delete(b.benchlistTimes, key)
 		b.benchlistSet.Remove(validatorID)
-		b.metrics.numBenched.Dec()
 	}
 
+	updatedBenchLen := b.benchlistSet.Len()
 	b.ctx.Log.Debug("Benchlist weight: (%v/%v) -> (%v/%v). Benched Validators: %d -> %d",
 		currentWeight,
 		totalWeight,
 		updatedWeight,
 		totalWeight,
-		numBenched,
-		b.benchlistSet.Len(),
+		benchLen,
+		updatedBenchLen,
 	)
 	b.metrics.weightBenched.Set(float64(updatedWeight))
+	b.metrics.numBenched.Set(float64(updatedBenchLen))
 }
 
 func (b *queryBenchlist) reset() {
