@@ -26,7 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
-	"github.com/ava-labs/avalanchego/snow/networking/blacklist"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/throttler"
@@ -1682,7 +1682,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	beacons := vdrs
 
 	timeoutManager := timeout.Manager{}
-	blacklist := blacklist.NewNoBlacklist()
+	benchlist := benchlist.NewNoBenchlist()
 	timeoutManager.Initialize(&timer.AdaptiveTimeoutConfig{
 		InitialTimeout:    time.Millisecond,
 		MinimumTimeout:    time.Millisecond,
@@ -1691,7 +1691,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		TimeoutReduction:  time.Millisecond,
 		Namespace:         "",
 		Registerer:        prometheus.NewRegistry(),
-	}, blacklist)
+	}, benchlist)
 	go timeoutManager.Dispatch()
 
 	chainRouter := &router.ChainRouter{}

@@ -154,9 +154,9 @@ func init() {
 	fs.Float64Var(&Config.NetworkConfig.TimeoutMultiplier, "network-timeout-multiplier", 1.1, "Multiplier of the timeout after a failed request.")
 	networkTimeoutReduction := fs.Int64("network-timeout-reduction", int64(time.Millisecond), "Reduction of the timeout after a successful request, in nanoseconds.")
 
-	// Blacklist Parameters:
-	fs.IntVar(&Config.BlacklistConfig.Threshold, "blacklist-fail-threshold", 5, "Number of consecutive failed queries before blacklisting a node.")
-	blacklistDuration := fs.Int64("blacklist-duration", int64(time.Hour), "Amount of time a peer is blacklisted after surpassing the threshold.")
+	// Benchlist Parameters:
+	fs.IntVar(&Config.BenchlistConfig.Threshold, "benchlist-fail-threshold", 5, "Number of consecutive failed queries before benchlisting a node.")
+	benchlistDuration := fs.Int64("benchlist-duration", int64(time.Hour), "Amount of time a peer is benchlisted after surpassing the threshold.")
 
 	// Plugins:
 	fs.StringVar(&Config.PluginDir, "plugin-dir", defaultPluginDirs[0], "Plugin directory for Avalanche VMs")
@@ -434,8 +434,8 @@ func init() {
 	Config.NetworkConfig.MaximumTimeout = time.Duration(*networkMaximumTimeout)
 	Config.NetworkConfig.TimeoutReduction = time.Duration(*networkTimeoutReduction)
 
-	Config.BlacklistConfig.Duration = time.Duration(*blacklistDuration)
-	Config.BlacklistConfig.MaxPortion = (1.0 - (float64(Config.ConsensusParams.Alpha) / float64(Config.ConsensusParams.K))) / 3.0
+	Config.BenchlistConfig.Duration = time.Duration(*benchlistDuration)
+	Config.BenchlistConfig.MaxPortion = (1.0 - (float64(Config.ConsensusParams.Alpha) / float64(Config.ConsensusParams.K))) / 3.0
 
 	if *consensusGossipFrequency < 0 {
 		errs.Add(errors.New("gossip frequency can't be negative"))

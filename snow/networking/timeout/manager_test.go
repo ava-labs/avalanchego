@@ -11,13 +11,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/networking/blacklist"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
 func TestManagerFire(t *testing.T) {
 	manager := Manager{}
-	blacklist := blacklist.NewNoBlacklist()
+	benchlist := benchlist.NewNoBenchlist()
 	manager.Initialize(&timer.AdaptiveTimeoutConfig{
 		InitialTimeout:    time.Millisecond,
 		MinimumTimeout:    time.Millisecond,
@@ -26,7 +26,7 @@ func TestManagerFire(t *testing.T) {
 		TimeoutReduction:  time.Millisecond,
 		Namespace:         "",
 		Registerer:        prometheus.NewRegistry(),
-	}, blacklist)
+	}, benchlist)
 	go manager.Dispatch()
 
 	wg := sync.WaitGroup{}
@@ -39,7 +39,7 @@ func TestManagerFire(t *testing.T) {
 
 func TestManagerCancel(t *testing.T) {
 	manager := Manager{}
-	blacklist := blacklist.NewNoBlacklist()
+	benchlist := benchlist.NewNoBenchlist()
 	manager.Initialize(&timer.AdaptiveTimeoutConfig{
 		InitialTimeout:    time.Millisecond,
 		MinimumTimeout:    time.Millisecond,
@@ -48,7 +48,7 @@ func TestManagerCancel(t *testing.T) {
 		TimeoutReduction:  time.Millisecond,
 		Namespace:         "",
 		Registerer:        prometheus.NewRegistry(),
-	}, blacklist)
+	}, benchlist)
 	go manager.Dispatch()
 
 	wg := sync.WaitGroup{}

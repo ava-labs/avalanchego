@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/networking/blacklist"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -16,12 +16,12 @@ import (
 // Manager registers and fires timeouts for the snow API.
 type Manager struct {
 	tm        timer.AdaptiveTimeoutManager
-	blacklist blacklist.Manager
+	benchlist benchlist.Manager
 }
 
 // Initialize this timeout manager.
-func (m *Manager) Initialize(timeoutConfig *timer.AdaptiveTimeoutConfig, blacklist blacklist.Manager) error {
-	m.blacklist = blacklist
+func (m *Manager) Initialize(timeoutConfig *timer.AdaptiveTimeoutConfig, benchlist benchlist.Manager) error {
+	m.benchlist = benchlist
 	return m.tm.Initialize(timeoutConfig)
 }
 
@@ -31,19 +31,19 @@ func (m *Manager) Dispatch() { m.tm.Dispatch() }
 // Register request to time out unless Manager.Cancel is called
 // before the timeout duration passes, with the same request parameters.
 func (m *Manager) Register(validatorID ids.ShortID, chainID ids.ID, requestID uint32, timeout func()) (time.Time, bool) {
-	if ok := m.blacklist.RegisterQuery(chainID, validatorID, requestID); !ok {
+	if ok := m.benchlist.RegisterQuery(chainID, validatorID, requestID); !ok {
 		timeout() // TODO use executor to execute asynchronously
 		return time.Time{}, false
 	}
 	return m.tm.Put(createRequestID(validatorID, chainID, requestID), func() {
-		m.blacklist.QueryFailed(chainID, validatorID, requestID)
+		m.benchlist.QueryFailed(chainID, validatorID, requestID)
 		timeout()
 	}), true
 }
 
 // Cancel request timeout with the specified parameters.
 func (m *Manager) Cancel(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
-	m.blacklist.RegisterResponse(chainID, validatorID, requestID)
+	m.benchlist.RegisterResponse(chainID, validatorID, requestID)
 	m.tm.Remove(createRequestID(validatorID, chainID, requestID))
 }
 

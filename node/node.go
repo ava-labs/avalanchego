@@ -31,7 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/network"
-	"github.com/ava-labs/avalanchego/snow/networking/blacklist"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/triggers"
@@ -470,9 +470,9 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	timeoutManager := timeout.Manager{}
 	n.Config.NetworkConfig.Namespace = constants.PlatformName
 	n.Config.NetworkConfig.Registerer = n.Config.ConsensusParams.Metrics
-	n.Config.BlacklistConfig.Validators = n.vdrs
-	blacklistManager := blacklist.NewManager(&n.Config.BlacklistConfig)
-	if err := timeoutManager.Initialize(&n.Config.NetworkConfig, blacklistManager); err != nil {
+	n.Config.BenchlistConfig.Validators = n.vdrs
+	benchlistManager := benchlist.NewManager(&n.Config.BenchlistConfig)
+	if err := timeoutManager.Initialize(&n.Config.NetworkConfig, benchlistManager); err != nil {
 		return err
 	}
 	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)

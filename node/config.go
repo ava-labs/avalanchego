@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
-	"github.com/ava-labs/avalanchego/snow/networking/blacklist"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -51,8 +51,8 @@ type Config struct {
 	// Network configuration
 	NetworkConfig timer.AdaptiveTimeoutConfig
 
-	// Blacklist Configuration
-	BlacklistConfig blacklist.Config
+	// Benchlist Configuration
+	BenchlistConfig benchlist.Config
 
 	// Bootstrapping configuration
 	BootstrapPeers []*Peer

@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/networking/blacklist"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/throttler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -22,7 +22,7 @@ import (
 
 func TestShutdown(t *testing.T) {
 	vdrs := validators.NewSet()
-	blacklist := blacklist.NewNoBlacklist()
+	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
 	tm.Initialize(&timer.AdaptiveTimeoutConfig{
 		InitialTimeout:    time.Millisecond,
@@ -32,7 +32,7 @@ func TestShutdown(t *testing.T) {
 		TimeoutReduction:  time.Millisecond,
 		Namespace:         "",
 		Registerer:        prometheus.NewRegistry(),
-	}, blacklist)
+	}, benchlist)
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
@@ -81,7 +81,7 @@ func TestShutdown(t *testing.T) {
 
 func TestShutdownTimesOut(t *testing.T) {
 	vdrs := validators.NewSet()
-	blacklist := blacklist.NewNoBlacklist()
+	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
 	// Ensure that the MultiPut request does not timeout
 	tm.Initialize(&timer.AdaptiveTimeoutConfig{
@@ -92,7 +92,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		TimeoutReduction:  time.Millisecond,
 		Namespace:         "",
 		Registerer:        prometheus.NewRegistry(),
-	}, blacklist)
+	}, benchlist)
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
