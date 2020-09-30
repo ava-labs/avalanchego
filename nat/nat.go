@@ -65,11 +65,9 @@ func (dev *Mapper) Map(protocol string, intPort, extPort uint16, desc string) {
 	// we attempt a port map, and log an Error if it fails.
 	err := dev.retryMapPort(protocol, intPort, extPort, desc, mapTimeout)
 	if err != nil {
-		dev.log.Error("PnP map failed from external port %d to internal port %d with %s",
-			intPort, extPort, err)
+		dev.log.Error("PnP map failed from external port %d to internal port %d with %s", extPort, intPort, err)
 	} else {
-		dev.log.Info("PnP map successful from external port %d to internal port %d",
-			intPort, extPort)
+		dev.log.Info("PnP map successful from external port %d to internal port %d", extPort, intPort)
 	}
 
 	go dev.keepPortMapping(protocol, intPort, extPort, desc)
@@ -86,7 +84,7 @@ func (dev *Mapper) retryMapPort(protocol string, intPort, extPort uint16, desc s
 
 		// log a message, sleep a second and retry.
 		dev.log.Error("Renewing port mapping try #%d from external port %d to internal port %d failed with %s",
-			retryCnt+1, intPort, extPort, err)
+			retryCnt+1, extPort, intPort, err)
 		time.Sleep(1 * time.Second)
 	}
 	return err
@@ -116,7 +114,7 @@ func (dev *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, des
 			err := dev.retryMapPort(protocol, intPort, extPort, desc, mapTimeout)
 			if err != nil {
 				dev.log.Warn("Renew PnP map failed from external port %d to internal port %d with %s",
-					intPort, intPort, err)
+					extPort, intPort, err)
 			}
 			updateTimer.Reset(mapUpdateTimeout)
 		case <-dev.closer:
