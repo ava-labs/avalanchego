@@ -264,7 +264,6 @@ func init() {
 		IP:   ip,
 		Port: uint16(*consensusPort),
 	}
-	Config.StakingLocalPort = uint16(*consensusPort)
 
 	defaultBootstrapIPs, defaultBootstrapIDs := genesis.SampleBeacons(networkID, 5)
 

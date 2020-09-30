@@ -64,6 +64,10 @@ type upnpRouter struct {
 	client upnpClient
 }
 
+func (r *upnpRouter) IsPnP() bool {
+	return true
+}
+
 func (r *upnpRouter) localIP() (net.IP, error) {
 	// attempt to get an address on the router
 	deviceAddr, err := net.ResolveUDPAddr("udp", r.dev.URLBase.Host)
@@ -128,11 +132,6 @@ func (r *upnpRouter) MapPort(protocol string, intPort, extPort uint16,
 
 func (r *upnpRouter) UnmapPort(protocol string, _, extPort uint16) error {
 	return r.client.DeletePortMapping("", extPort, protocol)
-}
-
-func (r *upnpRouter) GetPortMappingEntry(extPort uint16, protocol string) (string, uint16, string, error) {
-	intPort, intAddr, _, desc, _, err := r.client.GetSpecificPortMappingEntry("", extPort, protocol)
-	return intAddr, intPort, desc, err
 }
 
 // create UPnP SOAP service client with URN

@@ -37,7 +37,6 @@ type Config struct {
 
 	// Staking configuration
 	StakingIP               utils.IPDesc
-	StakingLocalPort        uint16
 	EnableP2PTLS            bool
 	EnableStaking           bool
 	StakingKeyFile          string
