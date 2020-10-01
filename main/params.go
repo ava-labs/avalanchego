@@ -155,7 +155,7 @@ func init() {
 	networkTimeoutReduction := fs.Int64("network-timeout-reduction", int64(time.Millisecond), "Reduction of the timeout after a successful request, in nanoseconds.")
 
 	// Benchlist Parameters:
-	fs.IntVar(&Config.BenchlistConfig.Threshold, "benchlist-fail-threshold", 5, "Number of consecutive failed queries before benchlisting a node.")
+	fs.IntVar(&Config.BenchlistConfig.Threshold, "benchlist-fail-threshold", 10, "Number of consecutive failed queries before benchlisting a node.")
 	benchlistDuration := fs.Int64("benchlist-duration", int64(time.Hour), "Amount of time a peer is benchlisted after surpassing the threshold.")
 
 	// Plugins:
