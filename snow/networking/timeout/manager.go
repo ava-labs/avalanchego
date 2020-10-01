@@ -35,13 +35,15 @@ func (m *Manager) Dispatch() {
 
 // Register request to time out unless Manager.Cancel is called
 // before the timeout duration passes, with the same request parameters.
-func (m *Manager) Register(validatorID ids.ShortID, chainID ids.ID, requestID uint32, timeout func()) (time.Time, bool) {
-	if ok := m.benchlist.RegisterQuery(chainID, validatorID, requestID); !ok {
-		m.executor.Add(timeout)
-		return time.Time{}, false
+func (m *Manager) Register(validatorID ids.ShortID, chainID ids.ID, requestID uint32, register bool, timeout func()) (time.Time, bool) {
+	if register {
+		if ok := m.benchlist.RegisterQuery(chainID, validatorID, requestID); !ok {
+			m.executor.Add(timeout)
+			return time.Time{}, false
+		}
 	}
 	return m.tm.Put(createRequestID(validatorID, chainID, requestID), func() {
-		m.benchlist.QueryFailed(chainID, validatorID, requestID)
+		m.benchlist.QueryFailed(chainID, validatorID, requestID) // Benchlist ignores QueryFailed if it was not registered
 		timeout()
 	}), true
 }
