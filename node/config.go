@@ -37,6 +37,8 @@ type Config struct {
 
 	// Staking configuration
 	StakingIP               utils.IPDesc
+	// InternalStakingPort == StakingIP.Port generally unless you want your external port to be different using PnP
+	InternalStakingPort     uint16
 	EnableP2PTLS            bool
 	EnableStaking           bool
 	StakingKeyFile          string
@@ -55,6 +57,8 @@ type Config struct {
 	// HTTP configuration
 	HTTPHost            string
 	HTTPPort            uint16
+	// ExternalHTTPPort == HTTPPort unless you want a different external port to be used using PnP
+	ExternalHTTPPort    uint16
 	HTTPSEnabled        bool
 	HTTPSKeyFile        string
 	HTTPSCertFile       string
