@@ -2,6 +2,7 @@ package benchlist
 
 import (
 	"container/list"
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -62,7 +63,7 @@ type queryBenchlist struct {
 // NewQueryBenchlist ...
 func NewQueryBenchlist(validators validators.Set, ctx *snow.Context, threshold int, duration time.Duration, maxPortion float64) QueryBenchlist {
 	metrics := &metrics{}
-	metrics.Initialize(ctx.Namespace, ctx.Metrics)
+	metrics.Initialize(fmt.Sprintf("%s_benchlist", ctx.Namespace), ctx.Metrics)
 
 	return &queryBenchlist{
 		pendingQueries:      make(map[[20]byte]map[uint32]struct{}),
