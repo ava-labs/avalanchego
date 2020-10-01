@@ -36,7 +36,7 @@ type Config struct {
 	DB database.Database
 
 	// Staking configuration
-	StakingIP               utils.IPDesc
+	StakingIP utils.IPDesc
 	// InternalStakingPort == StakingIP.Port generally unless you want your external port to be different using PnP
 	InternalStakingPort     uint16
 	EnableP2PTLS            bool
@@ -55,8 +55,8 @@ type Config struct {
 	BootstrapPeers []*Peer
 
 	// HTTP configuration
-	HTTPHost            string
-	HTTPPort            uint16
+	HTTPHost string
+	HTTPPort uint16
 	// ExternalHTTPPort == HTTPPort unless you want a different external port to be used using PnP
 	ExternalHTTPPort    uint16
 	HTTPSEnabled        bool
