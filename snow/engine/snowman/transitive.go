@@ -237,11 +237,6 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkByt
 		// abandon the request.
 		return t.GetFailed(vdr, requestID)
 	}
-	if blk.Status() == choices.Processing { // Pin this block in memory until it's decided or dropped
-		t.processing[blk.ID().Key()] = blk
-		t.droppedCache.Evict(blkID)
-		t.numProcessing.Set(float64(len(t.processing)))
-	}
 
 	// issue the block into consensus. If the block has already been issued,
 	// this will be a noop. If this block has missing dependencies, vdr will
@@ -323,10 +318,6 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, 
 	} else if !blk.ID().Equals(blkID) {
 		t.Ctx.Log.Debug("query said block's ID is %s but parsed ID %s. Dropping query", blkID, blk.ID())
 		return nil
-	} else if blk.Status() == choices.Processing { // Pin this block in memory until it's decided or dropped
-		t.processing[blkID.Key()] = blk
-		t.droppedCache.Evict(blkID)
-		t.numProcessing.Set(float64(len(t.processing)))
 	}
 
 	// issue the block into consensus. If the block has already been issued,
@@ -563,6 +554,11 @@ func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 // Issue [blk] to consensus once its ancestors have been issued.
 func (t *Transitive) issue(blk snowman.Block) error {
 	blkID := blk.ID()
+	if blk.Status() == choices.Processing { // Pin this block in memory until it's decided or dropped
+		t.processing[blk.ID().Key()] = blk
+		t.droppedCache.Evict(blkID)
+		t.numProcessing.Set(float64(len(t.processing)))
+	}
 
 	// mark that the block is queued to be added to consensus once its ancestors have been
 	t.pending.Add(blkID)
@@ -700,13 +696,14 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 				t.Ctx.Log.Debug("block %s failed verification due to %s, dropping block", blk.ID(), err)
 				dropped = append(dropped, blk)
 			} else {
-				if rejected, err := t.Consensus.Add(blk); err != nil {
+				rejected, err := t.Consensus.Add(blk)
+				if err != nil {
 					return err
-				} else if rejected {
-					t.decidedCache.Put(blk.ID(), nil)
-					t.droppedCache.Evict(blkID)          // Remove from dropped cache, if it was in there
-					delete(t.processing, blk.ID().Key()) // This block was rejected. Unpin from memory.
-					t.numProcessing.Set(float64(len(t.processing)))
+				}
+				if !rejected {
+					t.processing[blkID.Key()] = blk
+					t.droppedCache.Evict(blkID)
+					t.numProcessing.Set(float64(len(t.processing))) // Record metric
 				}
 				added = append(added, blk)
 			}

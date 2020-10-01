@@ -81,6 +81,10 @@ func (b *blockJob) Execute() error {
 				b.blk.ID(), err)
 			return fmt.Errorf("failed to accept block in bootstrapping: %w", err)
 		}
+		if err := b.bs.VM.SaveBlock(b.blk); err != nil {
+			return fmt.Errorf("couldn't save block %s: %w", b.blk.ID(), err)
+		}
+
 	}
 	return nil
 }

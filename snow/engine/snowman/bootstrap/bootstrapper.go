@@ -100,7 +100,7 @@ func (b *Bootstrapper) CurrentAcceptedFrontier() ids.Set {
 func (b *Bootstrapper) FilterAccepted(containerIDs ids.Set) ids.Set {
 	acceptedIDs := ids.Set{}
 	for _, blkID := range containerIDs.List() {
-		if blk, err := b.VM.GetBlock(blkID); err == nil && blk.Status() == choices.Accepted {
+		if blk, err := b.GetBlock(blkID); err == nil && blk.Status() == choices.Accepted {
 			acceptedIDs.Add(blkID)
 		}
 	}
@@ -115,7 +115,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
 	}
 
 	for _, blkID := range acceptedContainerIDs.List() {
-		if blk, err := b.VM.GetBlock(blkID); err == nil {
+		if blk, err := b.GetBlock(blkID); err == nil {
 			if err := b.process(blk); err != nil {
 				return err
 			}
@@ -139,7 +139,7 @@ func (b *Bootstrapper) fetch(blkID ids.ID) error {
 	}
 
 	// Make sure we don't already have this block
-	if _, err := b.VM.GetBlock(blkID); err == nil {
+	if _, err := b.GetBlock(blkID); err == nil {
 		if numPending := b.OutstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
 			return b.finish()
 		}
@@ -200,10 +200,10 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 			break
 		}
 		wantedBlkID = blk.Parent()
-		b.blockCache.Put(blkID, blk) // Put block in cache
 		if err := b.VM.SaveBlock(blk); err != nil {
 			return fmt.Errorf("couldn't save block %s: %w", blk.ID(), err)
 		}
+		b.blockCache.Put(blkID, blk) // Put block in cache
 	}
 
 	return b.process(tail)

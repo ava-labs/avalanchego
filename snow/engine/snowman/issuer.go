@@ -46,6 +46,7 @@ func (i *issuer) Update() {
 	if i.abandoned || i.deps.Len() != 0 || i.t.errs.Errored() {
 		return
 	}
+
 	// Issue the block into consensus
 	i.t.errs.Add(i.t.deliver(i.blk))
 }
