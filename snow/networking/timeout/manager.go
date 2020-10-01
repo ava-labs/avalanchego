@@ -17,22 +17,27 @@ import (
 type Manager struct {
 	tm        timer.AdaptiveTimeoutManager
 	benchlist benchlist.Manager
+	executor  timer.Executor
 }
 
 // Initialize this timeout manager.
 func (m *Manager) Initialize(timeoutConfig *timer.AdaptiveTimeoutConfig, benchlist benchlist.Manager) error {
 	m.benchlist = benchlist
+	m.executor.Initialize()
 	return m.tm.Initialize(timeoutConfig)
 }
 
 // Dispatch ...
-func (m *Manager) Dispatch() { m.tm.Dispatch() }
+func (m *Manager) Dispatch() {
+	go m.executor.Dispatch()
+	m.tm.Dispatch()
+}
 
 // Register request to time out unless Manager.Cancel is called
 // before the timeout duration passes, with the same request parameters.
 func (m *Manager) Register(validatorID ids.ShortID, chainID ids.ID, requestID uint32, timeout func()) (time.Time, bool) {
 	if ok := m.benchlist.RegisterQuery(chainID, validatorID, requestID); !ok {
-		timeout() // TODO use executor to execute asynchronously
+		m.executor.Add(timeout)
 		return time.Time{}, false
 	}
 	return m.tm.Put(createRequestID(validatorID, chainID, requestID), func() {
