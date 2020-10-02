@@ -86,8 +86,6 @@ func (p *peer) Start() {
 	go p.ReadMessages()
 	go p.WriteMessages()
 
-	// Initially send the version to the peer
-	go p.Version()
 	go p.requestFinishHandshake()
 	go p.sendPings()
 }
@@ -217,6 +215,8 @@ func (p *peer) ReadMessages() {
 // attempt to write messages to the peer
 func (p *peer) WriteMessages() {
 	defer p.Close()
+
+	p.Version()
 
 	for msg := range p.sender {
 		p.net.log.Verbo("sending new message to %s:\n%s",
