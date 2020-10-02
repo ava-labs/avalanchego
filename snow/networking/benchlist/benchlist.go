@@ -162,7 +162,7 @@ func (b *queryBenchlist) bench(validatorID ids.ShortID) {
 	// added to benchlist was added in the past with an end time at most [duration]
 	// in the future, this should never produce a negative duration.
 	diff := maxEndTime.Sub(minEndTime)
-	randomizedEndTime := minEndTime.Add(time.Duration(rand.Float64() * float64(diff)))
+	randomizedEndTime := minEndTime.Add(time.Duration(rand.Float64() * float64(diff))) // #nosec G404
 
 	// Add to benchlist times with randomized delay
 	b.benchlistTimes[key] = randomizedEndTime
