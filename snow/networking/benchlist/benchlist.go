@@ -48,9 +48,9 @@ type queryBenchlist struct {
 	benchlistOrder *list.List
 	benchlistSet   ids.ShortSet
 
-	threshold    int
-	halfDuration time.Duration
-	maxPortion   float64
+	threshold  int
+	duration   time.Duration
+	maxPortion float64
 
 	clock timer.Clock
 
@@ -78,7 +78,7 @@ func NewQueryBenchlist(validators validators.Set, ctx *snow.Context, threshold i
 		benchlistSet:        ids.ShortSet{},
 		vdrs:                validators,
 		threshold:           threshold,
-		halfDuration:        duration / 2,
+		duration:            duration,
 		maxPortion:          maxPortion,
 		ctx:                 ctx,
 		metrics:             metrics,
@@ -143,13 +143,33 @@ func (b *queryBenchlist) bench(validatorID ids.ShortID) {
 
 	key := validatorID.Key()
 
+	// Goal:
+	// Random end time in the range:
+	// [max(lastEndTime,(currentTime + (duration/2)): currentTime + duration]
+	// This maintains the invariant that validators in benchlistOrder are
+	// ordered by the time that they should be unbenched
+	currTime := b.clock.Time()
+	minEndTime := currTime.Add(b.duration / 2)
+	if elem := b.benchlistOrder.Back(); elem != nil {
+		lastValidator := elem.Value.(ids.ShortID)
+		lastEndTime := b.benchlistTimes[lastValidator.Key()]
+		if lastEndTime.After(minEndTime) {
+			minEndTime = lastEndTime
+		}
+	}
+	maxEndTime := currTime.Add(b.duration)
+	// Since maxEndTime is at least [duration] in the future and every element
+	// added to benchlist was added in the past with an end time at most [duration]
+	// in the future, this should never produce a negative duration.
+	diff := maxEndTime.Sub(minEndTime)
+	randomizedEndTime := minEndTime.Add(time.Duration(rand.Float64() * float64(diff)))
+
 	// Add to benchlist times with randomized delay
-	randomizedDuration := time.Duration(rand.Float64()*float64(b.halfDuration)) + b.halfDuration // #nosec G404
-	b.benchlistTimes[key] = b.clock.Time().Add(randomizedDuration)
+	b.benchlistTimes[key] = randomizedEndTime
 	b.benchlistOrder.PushBack(validatorID)
 	b.benchlistSet.Add(validatorID)
 	delete(b.consecutiveFailures, key)
-	b.ctx.Log.Debug("Benching validator %s for %v after %d consecutive failed queries", validatorID, randomizedDuration, b.threshold)
+	b.ctx.Log.Debug("Benching validator %s for %v after %d consecutive failed queries", validatorID, randomizedEndTime.Sub(currTime), b.threshold)
 
 	// Note: there could be a memory leak if a large number of
 	// validators were added, sampled, benched, and never sampled
