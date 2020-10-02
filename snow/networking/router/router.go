@@ -23,6 +23,8 @@ type Router interface {
 		timeouts *timeout.Manager,
 		gossipFrequency,
 		shutdownTimeout time.Duration,
+		criticalChains ids.Set,
+		onFatal func(),
 	)
 	Shutdown()
 	AddChain(chain *Handler)

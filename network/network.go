@@ -16,6 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/triggers"
@@ -594,8 +595,12 @@ func (n *network) Gossip(chainID, containerID ids.ID, container []byte) {
 }
 
 // Accept is called after every consensus decision
-func (n *network) Accept(chainID, containerID ids.ID, container []byte) error {
-	return n.gossipContainer(chainID, containerID, container)
+func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte) error {
+	if !ctx.IsBootstrapped() {
+		// don't gossip during bootstrapping
+		return nil
+	}
+	return n.gossipContainer(ctx.ChainID, containerID, container)
 }
 
 // heartbeat registers a new heartbeat to signal liveness
@@ -891,6 +896,15 @@ func (n *network) attemptConnect(ip utils.IPDesc) error {
 	conn, err := n.dialer.Dial(ip)
 	if err != nil {
 		return err
+	}
+	switch conn := conn.(type) {
+	case *net.TCPConn:
+		if err := conn.SetLinger(0); err != nil {
+			n.log.Warn("failed to set no linger due to: %s", err)
+		}
+		if err := conn.SetNoDelay(true); err != nil {
+			n.log.Warn("failed to set socket nodelay due to: %s", err)
+		}
 	}
 	return n.upgrade(&peer{
 		net:  n,

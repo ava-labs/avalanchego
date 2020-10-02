@@ -30,6 +30,9 @@ const (
 
 	// Max number of addresses that can be passed in as argument to GetStake
 	maxGetStakeAddrs = 256
+
+	// Max number of addresses allowed for a single keystore user
+	maxKeystoreAddresses = 5000
 )
 
 var (
@@ -110,6 +113,17 @@ type ImportKeyArgs struct {
 func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JsonAddress) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ImportKey called for user '%s'", args.Username)
 
+	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving data: %w", err)
+	}
+	defer db.Close()
+
+	user := user{db: db}
+	if addrs, _ := user.getAddresses(); len(addrs) >= maxKeystoreAddresses {
+		return fmt.Errorf("keystore user has reached its limit of %d addresses", maxKeystoreAddresses)
+	}
+
 	if !strings.HasPrefix(args.PrivateKey, constants.SecretKeyPrefix) {
 		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
 	}
@@ -132,17 +146,9 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 		return fmt.Errorf("problem formatting address: %w", err)
 	}
 
-	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
-	if err != nil {
-		return fmt.Errorf("problem retrieving data: %w", err)
-	}
-
-	user := user{db: db}
 	if err := user.putAddress(sk); err != nil {
 		// Drop any potential error closing the database to report the original
 		// error
-		_ = db.Close()
-
 		return fmt.Errorf("problem saving key %w", err)
 	}
 	return db.Close()
@@ -262,6 +268,17 @@ utxoFor:
 func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, response *api.JsonAddress) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: CreateAddress called")
 
+	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+	}
+	defer db.Close()
+
+	user := user{db: db}
+	if addrs, _ := user.getAddresses(); len(addrs) >= maxKeystoreAddresses {
+		return fmt.Errorf("keystore user has reached its limit of %d addresses", maxKeystoreAddresses)
+	}
+
 	factory := crypto.FactorySECP256K1R{}
 	key, err := factory.NewPrivateKey()
 	if err != nil {
@@ -273,17 +290,9 @@ func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, respo
 		return fmt.Errorf("problem formatting address: %w", err)
 	}
 
-	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
-	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
-	}
-
-	user := user{db: db}
 	if err := user.putAddress(key.(*crypto.PrivateKeySECP256K1R)); err != nil {
 		// Drop any potential error closing the database to report the original
 		// error
-		_ = db.Close()
-
 		return fmt.Errorf("problem saving key %w", err)
 	}
 	return db.Close()
@@ -596,13 +605,16 @@ type GetCurrentValidatorsArgs struct {
 	SubnetID ids.ID `json:"subnetID"`
 }
 
-// GetCurrentValidatorsReply are the results from calling GetCurrentValidators
+// GetCurrentValidatorsReply are the results from calling GetCurrentValidators.
+// Each validator contains a list of delegators to itself.
 type GetCurrentValidatorsReply struct {
 	Validators []interface{} `json:"validators"`
+	// Delegators is deprecated. Do not use Delegators.
+	// Instead, use the Delegators field of each APIPrimaryValidator
 	Delegators []interface{} `json:"delegators"`
 }
 
-// GetCurrentValidators returns the list of current validators
+// GetCurrentValidators returns current validators and delegators
 func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
 	service.vm.Ctx.Log.Info("Platform: GetCurrentValidators called")
 	if args.SubnetID.IsZero() {
@@ -612,6 +624,9 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	reply.Validators = []interface{}{}
 	reply.Delegators = []interface{}{}
 
+	// Validator's node ID as string --> Delegators to them
+	vdrTodelegators := map[string][]APIPrimaryDelegator{}
+
 	stopPrefix := []byte(fmt.Sprintf("%s%s", args.SubnetID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, service.vm.DB)
 	defer stopDB.Close()
@@ -619,7 +634,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
 
-	for stopIter.Next() { // Iterates in order of increasing start time
+	for stopIter.Next() { // Iterates in order of increasing stop time
 		txBytes := stopIter.Value()
 
 		tx := rewardTx{}
@@ -651,7 +666,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			}
 
 			potentialReward := json.Uint64(tx.Reward)
-			reply.Delegators = append(reply.Delegators, APIPrimaryDelegator{
+			delegator := APIPrimaryDelegator{
 				APIStaker: APIStaker{
 					StartTime:   json.Uint64(staker.StartTime().Unix()),
 					EndTime:     json.Uint64(staker.EndTime().Unix()),
@@ -660,7 +675,9 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				},
 				RewardOwner:     rewardOwner,
 				PotentialReward: &potentialReward,
-			})
+			}
+			reply.Delegators = append(reply.Delegators, delegator)
+			vdrTodelegators[delegator.NodeID] = append(vdrTodelegators[delegator.NodeID], delegator)
 		case *UnsignedAddValidatorTx:
 			nodeID := staker.Validator.ID()
 			startTime := staker.StartTime()
@@ -716,7 +733,22 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			return fmt.Errorf("expected validator but got %T", tx.Tx.UnsignedTx)
 		}
 	}
-	return stopIter.Error()
+	if err := stopIter.Error(); err != nil {
+		return fmt.Errorf("iterator error: %w", err)
+	}
+
+	for i, vdrIntf := range reply.Validators {
+		vdr, ok := vdrIntf.(APIPrimaryValidator)
+		if !ok {
+			continue
+		}
+		if delegators, ok := vdrTodelegators[vdr.NodeID]; ok {
+			vdr.Delegators = delegators
+		}
+		reply.Validators[i] = vdr
+	}
+
+	return nil
 }
 
 // GetPendingValidatorsArgs are the arguments for calling GetPendingValidators
@@ -726,7 +758,8 @@ type GetPendingValidatorsArgs struct {
 	SubnetID ids.ID `json:"subnetID"`
 }
 
-// GetPendingValidatorsReply are the results from calling GetPendingValidators
+// GetPendingValidatorsReply are the results from calling GetPendingValidators.
+// Unlike GetCurrentValidatorsReply, each validator has a null delegator list.
 type GetPendingValidatorsReply struct {
 	Validators []interface{} `json:"validators"`
 	Delegators []interface{} `json:"delegators"`

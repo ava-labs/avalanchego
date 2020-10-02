@@ -6,6 +6,7 @@ package ipcs
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs/socket"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -37,15 +38,15 @@ func newEventSockets(ctx context, chainID ids.ID, consensusEvents *triggers.Even
 }
 
 // Accept delivers a message to the underlying eventSockets
-func (ipcs *EventSockets) Accept(chainID, containerID ids.ID, container []byte) error {
+func (ipcs *EventSockets) Accept(ctx *snow.Context, containerID ids.ID, container []byte) error {
 	if ipcs.consensusSocket != nil {
-		if err := ipcs.consensusSocket.Accept(chainID, containerID, container); err != nil {
+		if err := ipcs.consensusSocket.Accept(ctx, containerID, container); err != nil {
 			return err
 		}
 	}
 
 	if ipcs.decisionsSocket != nil {
-		if err := ipcs.decisionsSocket.Accept(chainID, containerID, container); err != nil {
+		if err := ipcs.decisionsSocket.Accept(ctx, containerID, container); err != nil {
 			return err
 		}
 	}
@@ -120,7 +121,7 @@ func newEventIPCSocket(ctx context, chainID ids.ID, name string, events *trigger
 }
 
 // Accept delivers a message to the eventSocket
-func (eis *eventSocket) Accept(_, _ ids.ID, container []byte) error {
+func (eis *eventSocket) Accept(_ *snow.Context, _ ids.ID, container []byte) error {
 	err := eis.socket.Send(container)
 	if err != nil {
 		eis.log.Error("%s while trying to send:\n%s", err, formatting.DumpBytes{Bytes: container})

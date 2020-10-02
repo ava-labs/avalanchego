@@ -88,8 +88,8 @@ func (ts *Topological) Add(blk Block) error {
 	blkBytes := blk.Bytes()
 
 	// Notify anyone listening that this block was issued.
-	ts.ctx.DecisionDispatcher.Issue(ts.ctx.ChainID, blkID, blkBytes)
-	ts.ctx.ConsensusDispatcher.Issue(ts.ctx.ChainID, blkID, blkBytes)
+	ts.ctx.DecisionDispatcher.Issue(ts.ctx, blkID, blkBytes)
+	ts.ctx.ConsensusDispatcher.Issue(ts.ctx, blkID, blkBytes)
 	ts.metrics.Issued(blkID)
 
 	parentNode, ok := ts.blocks[parentKey]
@@ -102,8 +102,8 @@ func (ts *Topological) Add(blk Block) error {
 		}
 
 		// Notify anyone listening that this block was rejected.
-		ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, blkID, blkBytes)
-		ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, blkID, blkBytes)
+		ts.ctx.DecisionDispatcher.Reject(ts.ctx, blkID, blkBytes)
+		ts.ctx.ConsensusDispatcher.Reject(ts.ctx, blkID, blkBytes)
 		ts.metrics.Rejected(blkID)
 		return nil
 	}
@@ -440,8 +440,8 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 
 	// Notify anyone listening that this block was accepted.
 	bytes := child.Bytes()
-	ts.ctx.DecisionDispatcher.Accept(ts.ctx.ChainID, pref, bytes)
-	ts.ctx.ConsensusDispatcher.Accept(ts.ctx.ChainID, pref, bytes)
+	ts.ctx.DecisionDispatcher.Accept(ts.ctx, pref, bytes)
+	ts.ctx.ConsensusDispatcher.Accept(ts.ctx, pref, bytes)
 	ts.metrics.Accepted(pref)
 
 	// Because this is the newest accepted block, this is the new head.
@@ -464,8 +464,8 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 
 		// Notify anyone listening that this block was rejected.
 		bytes := child.Bytes()
-		ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
-		ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
+		ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes)
+		ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes)
 		ts.metrics.Rejected(childID)
 
 		// Track which blocks have been directly rejected
@@ -499,8 +499,8 @@ func (ts *Topological) rejectTransitively(rejected []ids.ID) error {
 			// Notify anyone listening that this block was rejected.
 			childID := ids.NewID(childIDKey)
 			bytes := child.Bytes()
-			ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
-			ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
+			ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes)
+			ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes)
 			ts.metrics.Rejected(childID)
 
 			// add the newly rejected block to the end of the queue

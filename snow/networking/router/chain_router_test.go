@@ -33,7 +33,7 @@ func TestShutdown(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
-	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second)
+	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(false)
@@ -91,7 +91,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
-	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Millisecond)
+	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Millisecond, ids.Set{}, nil)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(false)
