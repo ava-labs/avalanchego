@@ -10,7 +10,7 @@ import (
 )
 
 // Test that benchlist will stop registering queries after a threshold of failures
-func TestBlackList(t *testing.T) {
+func TestBenchlist(t *testing.T) {
 	vdrs := validators.NewSet()
 	vdr0 := validators.GenerateRandomValidator(50)
 	vdr1 := validators.GenerateRandomValidator(50)
