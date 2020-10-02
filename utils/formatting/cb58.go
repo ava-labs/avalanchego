@@ -44,7 +44,7 @@ func (cb58 CB58) MarshalJSON() ([]byte, error) { return []byte("\"" + cb58.Strin
 
 // FromString ...
 func (cb58 *CB58) FromString(str string) error {
-	rawBytes, err := cb58FromString(str)
+	rawBytes, err := cb58.ConvertString(str)
 	if err == nil {
 		cb58.Bytes = rawBytes
 	}
@@ -53,13 +53,22 @@ func (cb58 *CB58) FromString(str string) error {
 
 // String ...
 func (cb58 CB58) String() string {
-	checked := make([]byte, len(cb58.Bytes)+4)
-	copy(checked, cb58.Bytes)
-	copy(checked[len(cb58.Bytes):], hashing.Checksum(cb58.Bytes, 4))
+	return cb58.ConvertBytes(cb58.Bytes)
+}
+
+// ConvertBytes ...
+func (cb58 CB58) ConvertBytes(b []byte) string {
+	checked := make([]byte, len(b)+4)
+	copy(checked, b)
+	copy(checked[len(b):], hashing.Checksum(b, 4))
 	return base58.Encode(checked)
 }
 
-func cb58FromString(str string) ([]byte, error) {
+// ConvertString ...
+func (cb58 CB58) ConvertString(str string) ([]byte, error) {
+	if len(str) == 0 {
+		return []byte{}, nil
+	}
 	b, err := base58.Decode(str)
 	if err != nil {
 		return nil, err
@@ -77,3 +86,6 @@ func cb58FromString(str string) ([]byte, error) {
 
 	return rawBytes, nil
 }
+
+// Encoding ...
+func (cb58 *CB58) Encoding() string { return CB58Encoding }

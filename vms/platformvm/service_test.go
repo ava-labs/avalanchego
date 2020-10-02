@@ -273,8 +273,11 @@ func TestGetTx(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed test '%s': %s", test.description, err)
 		}
-		arg := &GetTxArgs{TxID: tx.ID()}
-		var response GetTxResponse
+		arg := &api.GetTxArgs{
+			TxID:     tx.ID(),
+			Encoding: formatting.CB58Encoding,
+		}
+		var response api.FormattedTx
 		if err := service.GetTx(nil, arg, &response); err == nil {
 			t.Fatalf("failed test '%s': haven't issued tx yet so shouldn't be able to get it", test.description)
 		} else if err := service.vm.issueTx(tx); err != nil {
@@ -297,8 +300,18 @@ func TestGetTx(t *testing.T) {
 			}
 		} else if err := service.GetTx(nil, arg, &response); err != nil {
 			t.Fatalf("failed test '%s': %s", test.description, err)
-		} else if !bytes.Equal(response.Tx.Bytes, tx.Bytes()) {
-			t.Fatalf("failed test '%s': byte representation of tx in response is incorrect", test.description)
+		} else {
+			encoding, err := service.vm.encodingManager.GetEncoding(response.Encoding)
+			if err != nil {
+				t.Fatalf("failed tet '%s': %s", test.description, err)
+			}
+			responseTxBytes, err := encoding.ConvertString(response.Tx)
+			if err != nil {
+				t.Fatalf("failed test '%s': %s", test.description, err)
+			}
+			if !bytes.Equal(responseTxBytes, tx.Bytes()) {
+				t.Fatalf("failed test '%s': byte representation of tx in response is incorrect", test.description)
+			}
 		}
 	}
 }

@@ -131,7 +131,10 @@ func GetAVAXTxFromGenesisTest(genesisBytes []byte, t *testing.T) *Tx {
 }
 
 func BuildGenesisTest(t *testing.T) []byte {
-	ss := StaticService{}
+	ss, err := CreateStaticService(formatting.HexEncoding)
+	if err != nil {
+		t.Fatalf("Failed to create static service due to: %s", err)
+	}
 
 	addr0Str, _ := formatting.FormatBech32(testHRP, addrs[0].Bytes())
 	addr1Str, _ := formatting.FormatBech32(testHRP, addrs[1].Bytes())
@@ -196,12 +199,15 @@ func BuildGenesisTest(t *testing.T) []byte {
 		},
 	}}
 	reply := BuildGenesisReply{}
-	err := ss.BuildGenesis(nil, &args, &reply)
+	err = ss.BuildGenesis(nil, &args, &reply)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return reply.Bytes.Bytes
+	hex := formatting.Hex{}
+	hex.FromString(reply.Bytes)
+
+	return hex.Bytes
 }
 
 func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) {

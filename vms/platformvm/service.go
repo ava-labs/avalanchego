@@ -345,11 +345,13 @@ type Index struct {
 // If [StartIndex] is omitted, gets all UTXOs.
 // If GetUTXOs is called multiple times, with our without [StartIndex], it is not guaranteed
 // that returned UTXOs are unique. That is, the same UTXO may appear in the response of multiple calls.
+// [Encoding] defines the encoding format to use for the returned UTXOs. Can be either "cb58" or "hex"
 type GetUTXOsArgs struct {
 	Addresses   []string    `json:"addresses"`
 	SourceChain string      `json:"sourceChain"`
 	Limit       json.Uint32 `json:"limit"`
 	StartIndex  Index       `json:"startIndex"`
+	Encoding    string      `json:"encoding"`
 }
 
 // GetUTXOsResponse defines the GetUTXOs replies returned from the API
@@ -357,11 +359,13 @@ type GetUTXOsResponse struct {
 	// Number of UTXOs returned
 	NumFetched json.Uint64 `json:"numFetched"`
 	// The UTXOs
-	UTXOs []formatting.CB58 `json:"utxos"`
+	UTXOs []string `json:"utxos"`
 	// The last UTXO that was returned, and the address it corresponds to.
 	// Used for pagination. To get the rest of the UTXOs, call GetUTXOs
 	// again and set [StartIndex] to this value.
 	EndIndex Index `json:"endIndex"`
+	// Encoding specifies the format the UTXOs are returned in
+	Encoding string `json:"encoding"`
 }
 
 // GetUTXOs returns the UTXOs controlled by the given addresses
@@ -373,6 +377,11 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 	}
 	if len(args.Addresses) > maxGetUTXOsAddrs {
 		return fmt.Errorf("number of addresses given, %d, exceeds maximum, %d", len(args.Addresses), maxGetUTXOsAddrs)
+	}
+
+	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
+	if err != nil {
+		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
 	}
 
 	sourceChain := ids.ID{}
@@ -415,7 +424,6 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		utxos     []*avax.UTXO
 		endAddr   ids.ShortID
 		endUTXOID ids.ID
-		err       error
 	)
 	if sourceChain.Equals(service.vm.Ctx.ChainID) {
 		utxos, endAddr, endUTXOID, err = service.vm.GetUTXOs(
@@ -438,13 +446,13 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
 
-	response.UTXOs = make([]formatting.CB58, len(utxos))
+	response.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
 		bytes, err := service.vm.codec.Marshal(utxo)
 		if err != nil {
 			return fmt.Errorf("couldn't serialize UTXO %q: %w", utxo.InputID(), err)
 		}
-		response.UTXOs[i] = formatting.CB58{Bytes: bytes}
+		response.UTXOs[i] = encoding.ConvertBytes(bytes)
 	}
 
 	endAddress, err := service.vm.FormatLocalAddress(endAddr)
@@ -455,6 +463,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 	response.EndIndex.Address = endAddress
 	response.EndIndex.UTXO = endUTXOID.String()
 	response.NumFetched = json.Uint64(len(utxos))
+	response.Encoding = encoding.Encoding()
 	return nil
 }
 
@@ -1561,7 +1570,9 @@ type CreateBlockchainArgs struct {
 	// Human-readable name for the new blockchain, not necessarily unique
 	Name string `json:"name"`
 	// Genesis state of the blockchain being created
-	GenesisData formatting.CB58 `json:"genesisData"`
+	GenesisData string `json:"genesisData"`
+	// Encoding format to use for genesis data
+	Encoding string `json:"encoding"`
 }
 
 // CreateBlockchain issues a transaction to create a new blockchain
@@ -1572,6 +1583,16 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		return errors.New("argument 'name' not given")
 	case args.VMID == "":
 		return errors.New("argument 'vmID' not given")
+	}
+
+	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
+	if err != nil {
+		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
+	}
+
+	genesisBytes, err := encoding.ConvertString(args.GenesisData)
+	if err != nil {
+		return fmt.Errorf("problem parsing genesis data: %w", err)
 	}
 
 	vmID, err := service.vm.chainManager.LookupVM(args.VMID)
@@ -1653,7 +1674,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	// Create the transaction
 	tx, err := service.vm.newCreateChainTx(
 		args.SubnetID,
-		args.GenesisData.Bytes,
+		genesisBytes,
 		vmID,
 		fxIDs,
 		args.Name,
@@ -1839,23 +1860,20 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 	return nil
 }
 
-// IssueTxArgs ...
-type IssueTxArgs struct {
-	// Raw byte representation of the transaction
-	Tx formatting.CB58 `json:"tx"`
-}
-
-// IssueTxResponse ...
-type IssueTxResponse struct {
-	TxID ids.ID `json:"txID"`
-}
-
 // IssueTx issues a tx
-func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *IssueTxResponse) error {
+func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response *api.JsonTxID) error {
 	service.vm.Ctx.Log.Info("Platform: IssueTx called")
 
+	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
+	if err != nil {
+		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
+	}
+	txBytes, err := encoding.ConvertString(args.Tx)
+	if err != nil {
+		return fmt.Errorf("problem decoding transaction: %w", err)
+	}
 	tx := &Tx{}
-	if err := service.vm.codec.Unmarshal(args.Tx.Bytes, tx); err != nil {
+	if err := service.vm.codec.Unmarshal(txBytes, tx); err != nil {
 		return fmt.Errorf("couldn't parse tx: %w", err)
 	}
 	if err := service.vm.issueTx(tx); err != nil {
@@ -1866,25 +1884,22 @@ func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *Is
 	return nil
 }
 
-// GetTxArgs ...
-type GetTxArgs struct {
-	TxID ids.ID `json:"txID"`
-}
-
-// GetTxResponse ...
-type GetTxResponse struct {
-	// Raw byte representation of the transaction
-	Tx formatting.CB58 `json:"tx"`
-}
-
 // GetTx gets a tx
-func (service *Service) GetTx(_ *http.Request, args *GetTxArgs, response *GetTxResponse) error {
+func (service *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *api.FormattedTx) error {
 	service.vm.Ctx.Log.Info("Platform: GetTx called")
+
+	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
+	if err != nil {
+		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
+	}
+
 	txBytes, err := service.vm.getTx(service.vm.DB, args.TxID)
 	if err != nil {
 		return fmt.Errorf("couldn't get tx: %w", err)
 	}
-	response.Tx.Bytes = txBytes
+
+	response.Tx = encoding.ConvertBytes(txBytes)
+	response.Encoding = encoding.Encoding()
 	return nil
 }
 

@@ -17,7 +17,8 @@ var (
 	errMissingHexPrefix = errors.New("missing 0x prefix to hex encoding")
 )
 
-// Hex formats bytes in hexadecimal encoding
+// Hex implements the Encoding interface
+// Provides a hex format with 4 byte checksum
 type Hex struct{ Bytes []byte }
 
 // UnmarshalJSON ...
@@ -43,7 +44,7 @@ func (h Hex) MarshalJSON() ([]byte, error) { return []byte("\"" + h.String() + "
 
 // FromString ...
 func (h *Hex) FromString(str string) error {
-	rawBytes, err := hexFromString(str)
+	rawBytes, err := h.ConvertString(str)
 	if err == nil {
 		h.Bytes = rawBytes
 	}
@@ -52,13 +53,14 @@ func (h *Hex) FromString(str string) error {
 
 // String ...
 func (h Hex) String() string {
-	checked := make([]byte, len(h.Bytes)+4)
-	copy(checked, h.Bytes)
-	copy(checked[len(h.Bytes):], hashing.Checksum(h.Bytes, 4))
-	return fmt.Sprintf("0x%x", checked)
+	return h.ConvertBytes(h.Bytes)
 }
 
-func hexFromString(str string) ([]byte, error) {
+// ConvertString ...
+func (h Hex) ConvertString(str string) ([]byte, error) {
+	if len(str) == 0 {
+		return []byte{}, nil
+	}
 	if !strings.HasPrefix(str, "0x") {
 		return nil, errMissingHexPrefix
 	}
@@ -77,5 +79,17 @@ func hexFromString(str string) ([]byte, error) {
 	if !bytes.Equal(checksum, hashing.Checksum(rawBytes, 4)) {
 		return nil, errBadChecksum
 	}
+
 	return rawBytes, nil
 }
+
+// ConvertBytes ...
+func (h Hex) ConvertBytes(b []byte) string {
+	checked := make([]byte, len(b)+4)
+	copy(checked, b)
+	copy(checked[len(b):], hashing.Checksum(b, 4))
+	return fmt.Sprintf("0x%x", checked)
+}
+
+// Encoding ...
+func (h *Hex) Encoding() string { return HexEncoding }

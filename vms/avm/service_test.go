@@ -157,7 +157,7 @@ func TestServiceIssueTx(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	txArgs := &FormattedTx{}
+	txArgs := &api.FormattedTx{}
 	txReply := &api.JsonTxID{}
 	err := s.IssueTx(nil, txArgs, txReply)
 	if err == nil {
@@ -165,7 +165,8 @@ func TestServiceIssueTx(t *testing.T) {
 	}
 
 	tx := NewTx(t, genesisBytes, vm)
-	txArgs.Tx = formatting.CB58{Bytes: tx.Bytes()}
+	txArgs.Tx = formatting.Hex{Bytes: tx.Bytes()}.String()
+	txArgs.Encoding = formatting.HexEncoding
 	txReply = &api.JsonTxID{}
 	if err := s.IssueTx(nil, txArgs, txReply); err != nil {
 		t.Fatal(err)
@@ -201,7 +202,10 @@ func TestServiceGetTxStatus(t *testing.T) {
 		)
 	}
 
-	txArgs := &FormattedTx{Tx: formatting.CB58{Bytes: tx.Bytes()}}
+	txArgs := &api.FormattedTx{
+		Tx:       formatting.Hex{Bytes: tx.Bytes()}.String(),
+		Encoding: formatting.HexEncoding,
+	}
 	txReply := &api.JsonTxID{}
 	if err := s.IssueTx(nil, txArgs, txReply); err != nil {
 		t.Fatal(err)
@@ -288,12 +292,20 @@ func TestServiceGetTx(t *testing.T) {
 	genesisTxBytes := genesisTx.Bytes()
 	txID := genesisTx.ID()
 
-	reply := FormattedTx{}
-	err := s.GetTx(nil, &api.JsonTxID{
+	reply := api.FormattedTx{}
+	err := s.GetTx(nil, &api.GetTxArgs{
 		TxID: txID,
 	}, &reply)
 	assert.NoError(t, err)
-	assert.Equal(t, genesisTxBytes, reply.Tx.Bytes, "Wrong tx returned from service.GetTx")
+	encoding, err := vm.encodingManager.GetEncoding(reply.Encoding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	txBytes, err := encoding.ConvertString(reply.Tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, genesisTxBytes, txBytes, "Wrong tx returned from service.GetTx")
 }
 
 func TestServiceGetNilTx(t *testing.T) {
@@ -303,8 +315,8 @@ func TestServiceGetNilTx(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	reply := FormattedTx{}
-	err := s.GetTx(nil, &api.JsonTxID{}, &reply)
+	reply := api.FormattedTx{}
+	err := s.GetTx(nil, &api.GetTxArgs{}, &reply)
 	assert.Error(t, err, "Nil TxID should have returned an error")
 }
 
@@ -315,8 +327,8 @@ func TestServiceGetUnknownTx(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	reply := FormattedTx{}
-	err := s.GetTx(nil, &api.JsonTxID{TxID: ids.Empty}, &reply)
+	reply := api.FormattedTx{}
+	err := s.GetTx(nil, &api.GetTxArgs{TxID: ids.Empty}, &reply)
 	assert.Error(t, err, "Unknown TxID should have returned an error")
 }
 
@@ -862,9 +874,10 @@ func TestNFTWorkflow(t *testing.T) {
 			JsonFromAddrs:  api.JsonFromAddrs{},
 			JsonChangeAddr: api.JsonChangeAddr{ChangeAddr: changeAddrStr},
 		},
-		AssetID: assetID.String(),
-		Payload: formatting.CB58{Bytes: []byte{1, 2, 3, 4, 5}},
-		To:      addrStr,
+		AssetID:  assetID.String(),
+		Payload:  formatting.Hex{Bytes: []byte{1, 2, 3, 4, 5}}.String(),
+		To:       addrStr,
+		Encoding: formatting.HexEncoding,
 	}
 	mintReply := &api.JsonTxIDChangeAddr{}
 

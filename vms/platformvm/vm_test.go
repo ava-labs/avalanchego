@@ -182,11 +182,24 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	}
 
 	buildGenesisResponse := BuildGenesisReply{}
-	platformvmSS := StaticService{}
+	platformvmSS, err := CreateStaticService(formatting.CB58Encoding)
+	if err != nil {
+		panic(err)
+	}
 	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
 		panic(fmt.Errorf("problem while building platform chain's genesis state: %w", err))
 	}
-	return &buildGenesisArgs, buildGenesisResponse.Bytes.Bytes
+
+	encoding, err := platformvmSS.encodingManager.GetEncoding(buildGenesisResponse.Encoding)
+	if err != nil {
+		panic(err)
+	}
+	genesisBytes, err := encoding.ConvertString(buildGenesisResponse.Bytes)
+	if err != nil {
+		panic(err)
+	}
+
+	return &buildGenesisArgs, genesisBytes
 }
 
 func defaultVM() (*VM, database.Database) {

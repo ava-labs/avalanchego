@@ -52,21 +52,24 @@ var (
 // Service defines the base service for the asset vm
 type Service struct{ vm *VM }
 
-// FormattedTx defines a JSON formatted struct containing a Tx in CB58 format
-type FormattedTx struct {
-	Tx formatting.CB58 `json:"tx"`
-}
-
 // FormattedAssetID defines a JSON formatted struct containing an assetID as a string
 type FormattedAssetID struct {
 	AssetID ids.ID `json:"assetID"`
 }
 
 // IssueTx attempts to issue a transaction into consensus
-func (service *Service) IssueTx(r *http.Request, args *FormattedTx, reply *api.JsonTxID) error {
+func (service *Service) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JsonTxID) error {
 	service.vm.ctx.Log.Info("AVM: IssueTx called with %s", args.Tx)
 
-	txID, err := service.vm.IssueTx(args.Tx.Bytes)
+	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
+	if err != nil {
+		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
+	}
+	txBytes, err := encoding.ConvertString(args.Tx)
+	if err != nil {
+		return fmt.Errorf("problem decoding transaction: %w", err)
+	}
+	txID, err := service.vm.IssueTx(txBytes)
 	if err != nil {
 		return err
 	}
@@ -98,11 +101,16 @@ func (service *Service) GetTxStatus(r *http.Request, args *api.JsonTxID, reply *
 }
 
 // GetTx returns the specified transaction
-func (service *Service) GetTx(r *http.Request, args *api.JsonTxID, reply *FormattedTx) error {
+func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.FormattedTx) error {
 	service.vm.ctx.Log.Info("AVM: GetTx called with %s", args.TxID)
 
 	if args.TxID.IsZero() {
 		return errNilTxID
+	}
+
+	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
+	if err != nil {
+		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
 	}
 
 	tx := UniqueTx{
@@ -113,7 +121,8 @@ func (service *Service) GetTx(r *http.Request, args *api.JsonTxID, reply *Format
 		return errUnknownTx
 	}
 
-	reply.Tx.Bytes = tx.Bytes()
+	reply.Tx = encoding.ConvertBytes(tx.Bytes())
+	reply.Encoding = encoding.Encoding()
 	return nil
 }
 
@@ -141,6 +150,7 @@ type GetUTXOsArgs struct {
 	SourceChain string      `json:"sourceChain"`
 	Limit       json.Uint32 `json:"limit"`
 	StartIndex  Index       `json:"startIndex"`
+	Encoding    string      `json:"encoding"`
 }
 
 // GetUTXOsReply defines the GetUTXOs replies returned from the API
@@ -148,11 +158,13 @@ type GetUTXOsReply struct {
 	// Number of UTXOs returned
 	NumFetched json.Uint64 `json:"numFetched"`
 	// The UTXOs
-	UTXOs []formatting.CB58 `json:"utxos"`
+	UTXOs []string `json:"utxos"`
 	// The last UTXO that was returned, and the address it corresponds to.
 	// Used for pagination. To get the rest of the UTXOs, call GetUTXOs
 	// again and set [StartIndex] to this value.
 	EndIndex Index `json:"endIndex"`
+	// Encoding specifies the encoding format the UTXOs are returned in
+	Encoding string `json:"encoding"`
 }
 
 // GetUTXOs gets all utxos for passed in addresses
@@ -164,6 +176,11 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 	}
 	if len(args.Addresses) > maxGetUTXOsAddrs {
 		return fmt.Errorf("number of addresses given, %d, exceeds maximum, %d", len(args.Addresses), maxGetUTXOsAddrs)
+	}
+
+	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
+	if err != nil {
+		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
 	}
 
 	sourceChain := ids.ID{}
@@ -206,7 +223,6 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 		utxos     []*avax.UTXO
 		endAddr   ids.ShortID
 		endUTXOID ids.ID
-		err       error
 	)
 	if sourceChain.Equals(service.vm.ctx.ChainID) {
 		utxos, endAddr, endUTXOID, err = service.vm.GetUTXOs(
@@ -228,13 +244,13 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
 
-	reply.UTXOs = make([]formatting.CB58, len(utxos))
+	reply.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
 		b, err := service.vm.codec.Marshal(utxo)
 		if err != nil {
 			return fmt.Errorf("problem marshalling UTXO: %w", err)
 		}
-		reply.UTXOs[i] = formatting.CB58{Bytes: b}
+		reply.UTXOs[i] = encoding.ConvertBytes(b)
 	}
 
 	endAddress, err := service.vm.FormatLocalAddress(endAddr)
@@ -245,6 +261,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 	reply.EndIndex.Address = endAddress
 	reply.EndIndex.UTXO = endUTXOID.String()
 	reply.NumFetched = json.Uint64(len(utxos))
+	reply.Encoding = encoding.Encoding()
 	return nil
 }
 
@@ -1414,10 +1431,11 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 
 // MintNFTArgs are arguments for passing into MintNFT requests
 type MintNFTArgs struct {
-	api.JsonSpendHeader                 // User, password, from addrs, change addr
-	AssetID             string          `json:"assetID"`
-	Payload             formatting.CB58 `json:"payload"`
-	To                  string          `json:"to"`
+	api.JsonSpendHeader        // User, password, from addrs, change addr
+	AssetID             string `json:"assetID"`
+	Payload             string `json:"payload"`
+	To                  string `json:"to"`
+	Encoding            string `json:"encoding"`
 }
 
 // MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
@@ -1432,6 +1450,15 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 	to, err := service.vm.ParseLocalAddress(args.To)
 	if err != nil {
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
+	}
+
+	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
+	if err != nil {
+		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
+	}
+	payloadBytes, err := encoding.ConvertString(args.Payload)
+	if err != nil {
+		return fmt.Errorf("problem decoding payload bytes: %w", err)
 	}
 
 	// Parse the from addresses
@@ -1496,7 +1523,7 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 		utxos,
 		kc,
 		assetID,
-		args.Payload.Bytes,
+		payloadBytes,
 		to,
 	)
 	if err != nil {

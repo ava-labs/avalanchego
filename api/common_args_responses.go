@@ -30,7 +30,7 @@ type JsonAddresses struct {
 	Addresses []string `json:"addresses"`
 }
 
-// ChangeAddr is the address change is sent to, if any
+// JsonChangeAddr is the address change is sent to, if any
 type JsonChangeAddr struct {
 	ChangeAddr string `json:"changeAddr"`
 }
@@ -54,4 +54,16 @@ type JsonSpendHeader struct {
 	UserPass
 	JsonFromAddrs
 	JsonChangeAddr
+}
+
+// GetTxArgs ...
+type GetTxArgs struct {
+	TxID     ids.ID `json:"txID"`
+	Encoding string `json:"encoding"`
+}
+
+// FormattedTx defines a JSON formatted struct containing a Tx in CB58 format
+type FormattedTx struct {
+	Tx       string `json:"tx"`
+	Encoding string `json:"encoding"`
 }
