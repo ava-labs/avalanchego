@@ -2,7 +2,6 @@ package benchlist
 
 import (
 	"container/list"
-	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -18,11 +18,11 @@ import (
 // QueryBenchlist ...
 type QueryBenchlist interface {
 	// RegisterQuery registers a sent query and returns whether the query is subject to benchlist
-	RegisterQuery(ids.ShortID, uint32) bool
+	RegisterQuery(validatorID ids.ShortID, requestID uint32, msgType constants.MsgType) bool
 	// RegisterResponse registers the response to a query message
-	RegisterResponse(ids.ShortID, uint32)
+	RegisterResponse(validatorID ids.ShortID, requstID uint32)
 	// QueryFailed registers that a query did not receive a response within our synchrony bound
-	QueryFailed(ids.ShortID, uint32)
+	QueryFailed(validatorID ids.ShortID, requestID uint32)
 }
 
 // If a peer consistently does not respond to queries, it will
@@ -39,7 +39,7 @@ type queryBenchlist struct {
 	// Validator ID --> Request ID --> non-empty iff
 	// there is an outstanding request to this validator
 	// with the corresponding requestID
-	pendingQueries map[[20]byte]map[uint32]struct{}
+	pendingQueries map[[20]byte]map[uint32]pendingQuery
 	// Map of consecutive query failures
 	consecutiveFailures map[[20]byte]int
 
@@ -60,13 +60,18 @@ type queryBenchlist struct {
 	lock sync.Mutex
 }
 
+type pendingQuery struct {
+	registered time.Time
+	msgType    constants.MsgType
+}
+
 // NewQueryBenchlist ...
-func NewQueryBenchlist(validators validators.Set, ctx *snow.Context, threshold int, duration time.Duration, maxPortion float64) QueryBenchlist {
+func NewQueryBenchlist(validators validators.Set, ctx *snow.Context, threshold int, duration time.Duration, maxPortion float64, summaryEnabled bool) QueryBenchlist {
 	metrics := &metrics{}
-	metrics.Initialize(fmt.Sprintf("%s_benchlist", ctx.Namespace), ctx.Metrics)
+	metrics.Initialize(ctx, summaryEnabled)
 
 	return &queryBenchlist{
-		pendingQueries:      make(map[[20]byte]map[uint32]struct{}),
+		pendingQueries:      make(map[[20]byte]map[uint32]pendingQuery),
 		consecutiveFailures: make(map[[20]byte]int),
 		benchlistTimes:      make(map[[20]byte]time.Time),
 		benchlistOrder:      list.New(),
@@ -82,7 +87,7 @@ func NewQueryBenchlist(validators validators.Set, ctx *snow.Context, threshold i
 
 // RegisterQuery attempts to register a query from [validatorID] and returns true
 // if that request should be made (not subject to benchlisting)
-func (b *queryBenchlist) RegisterQuery(validatorID ids.ShortID, requestID uint32) bool {
+func (b *queryBenchlist) RegisterQuery(validatorID ids.ShortID, requestID uint32, msgType constants.MsgType) bool {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
@@ -92,10 +97,10 @@ func (b *queryBenchlist) RegisterQuery(validatorID ids.ShortID, requestID uint32
 	}
 	validatorRequests, ok := b.pendingQueries[key]
 	if !ok {
-		validatorRequests = make(map[uint32]struct{})
+		validatorRequests = make(map[uint32]pendingQuery)
 		b.pendingQueries[key] = validatorRequests
 	}
-	validatorRequests[requestID] = struct{}{}
+	validatorRequests[requestID] = pendingQuery{registered: b.clock.Time(), msgType: msgType}
 
 	return true
 }
@@ -231,7 +236,7 @@ func (b *queryBenchlist) cleanup() {
 }
 
 func (b *queryBenchlist) reset() {
-	b.pendingQueries = make(map[[20]byte]map[uint32]struct{})
+	b.pendingQueries = make(map[[20]byte]map[uint32]pendingQuery)
 	b.consecutiveFailures = make(map[[20]byte]int)
 	b.benchlistTimes = make(map[[20]byte]time.Time)
 	b.benchlistOrder.Init()
@@ -249,12 +254,13 @@ func (b *queryBenchlist) removeQuery(validatorID ids.ShortID, requestID uint32) 
 		return false
 	}
 
-	_, ok = validatorRequests[requestID]
+	query, ok := validatorRequests[requestID]
 	if ok {
 		delete(validatorRequests, requestID)
 		if len(validatorRequests) == 0 {
 			delete(b.pendingQueries, key)
 		}
+		b.metrics.observe(validatorID, query.msgType, float64(b.clock.Time().Sub(query.registered)))
 	}
 	return ok
 }

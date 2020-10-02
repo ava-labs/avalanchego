@@ -6,6 +6,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 // Manager provides an interface for a benchlist to register whether
@@ -14,7 +15,7 @@ import (
 // the full network timeout for their responses.
 type Manager interface {
 	// RegisterQuery registers a sent query and returns whether the query is subject to benchlist
-	RegisterQuery(ids.ID, ids.ShortID, uint32) bool
+	RegisterQuery(ids.ID, ids.ShortID, uint32, constants.MsgType) bool
 	// RegisterResponse registers the response to a query message
 	RegisterResponse(ids.ID, ids.ShortID, uint32)
 	// QueryFailed registers that a query did not receive a response within our synchrony bound
@@ -23,10 +24,11 @@ type Manager interface {
 
 // Config defines the configuration for a benchlist
 type Config struct {
-	Validators validators.Manager
-	Threshold  int
-	Duration   time.Duration
-	MaxPortion float64
+	Validators         validators.Manager
+	Threshold          int
+	Duration           time.Duration
+	MaxPortion         float64
+	PeerSummaryEnabled bool
 }
 
 type benchlistManager struct {
@@ -46,7 +48,7 @@ func NewManager(config *Config, ctxLookup snow.ContextLookup) Manager {
 }
 
 // RegisterQuery implements the Manager interface
-func (bm *benchlistManager) RegisterQuery(chainID ids.ID, validatorID ids.ShortID, requestID uint32) bool {
+func (bm *benchlistManager) RegisterQuery(chainID ids.ID, validatorID ids.ShortID, requestID uint32, msgType constants.MsgType) bool {
 	key := chainID.Key()
 	chain, exists := bm.chainBenchlists[key]
 	if !exists {
@@ -58,11 +60,11 @@ func (bm *benchlistManager) RegisterQuery(chainID ids.ID, validatorID ids.ShortI
 		if !exists {
 			return false
 		}
-		chain = NewQueryBenchlist(vdrs, ctx, bm.config.Threshold, bm.config.Duration, bm.config.MaxPortion)
+		chain = NewQueryBenchlist(vdrs, ctx, bm.config.Threshold, bm.config.Duration, bm.config.MaxPortion, bm.config.PeerSummaryEnabled)
 		bm.chainBenchlists[key] = chain
 	}
 
-	return chain.RegisterQuery(validatorID, requestID)
+	return chain.RegisterQuery(validatorID, requestID, msgType)
 }
 
 // RegisterResponse implements the Manager interface
@@ -91,7 +93,7 @@ type noBenchlist struct{}
 func NewNoBenchlist() Manager { return &noBenchlist{} }
 
 // RegisterQuery ...
-func (b *noBenchlist) RegisterQuery(chainID ids.ID, validatorID ids.ShortID, requestID uint32) bool {
+func (b *noBenchlist) RegisterQuery(chainID ids.ID, validatorID ids.ShortID, requestID uint32, msgType constants.MsgType) bool {
 	return true
 }
 

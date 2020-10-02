@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -35,9 +36,9 @@ func (m *Manager) Dispatch() {
 
 // Register request to time out unless Manager.Cancel is called
 // before the timeout duration passes, with the same request parameters.
-func (m *Manager) Register(validatorID ids.ShortID, chainID ids.ID, requestID uint32, register bool, timeout func()) (time.Time, bool) {
+func (m *Manager) Register(validatorID ids.ShortID, chainID ids.ID, requestID uint32, register bool, msgType constants.MsgType, timeout func()) (time.Time, bool) {
 	if register {
-		if ok := m.benchlist.RegisterQuery(chainID, validatorID, requestID); !ok {
+		if ok := m.benchlist.RegisterQuery(chainID, validatorID, requestID, msgType); !ok {
 			m.executor.Add(timeout)
 			return time.Time{}, false
 		}

@@ -156,6 +156,7 @@ func init() {
 
 	// Benchlist Parameters:
 	fs.IntVar(&Config.BenchlistConfig.Threshold, "benchlist-fail-threshold", 10, "Number of consecutive failed queries before benchlisting a node.")
+	fs.BoolVar(&Config.BenchlistConfig.PeerSummaryEnabled, "benchlist-peer-summary-enabled", false, "Enables peer specific query latency metrics.")
 	benchlistDuration := fs.Int64("benchlist-duration", int64(time.Hour), "Amount of time a peer is benchlisted after surpassing the threshold.")
 
 	// Plugins:
