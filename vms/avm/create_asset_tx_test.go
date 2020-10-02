@@ -17,7 +17,7 @@ import (
 
 var (
 	nameTooLong          = "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL"
-	symbolTooLong        = "LLLLL"
+	symbolTooLong        = "LLLLLL"
 	illegalNameCharacter = "h8*32"
 	invalidASCIIStr      = "ÉÎ"
 	invalidWhitespaceStr = " HAT"
