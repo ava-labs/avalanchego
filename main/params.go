@@ -125,7 +125,7 @@ func init() {
 	httpHost := fs.String("http-host", "127.0.0.1", "Address of the HTTP server")
 	httpPort := fs.Uint("http-port", 9650, "Port of the HTTP server")
 	// when using PnP and you want your http service to listen on a different port.
-	externalHttpPort := fs.Uint("http-port-external", 9650, "External port of the HTTP server")
+	externalHTTPPort := fs.Uint("http-port-external", *httpPort, "External port of the HTTP server")
 	fs.BoolVar(&Config.HTTPSEnabled, "http-tls-enabled", false, "Upgrade the HTTP server to HTTPs")
 	fs.StringVar(&Config.HTTPSKeyFile, "http-tls-key-file", "", "TLS private key file for the HTTPs server")
 	fs.StringVar(&Config.HTTPSCertFile, "http-tls-cert-file", "", "TLS certificate file for the HTTPs server")
@@ -368,7 +368,7 @@ func init() {
 	// HTTP:
 	Config.HTTPHost = *httpHost
 	Config.HTTPPort = uint16(*httpPort)
-	Config.ExternalHTTPPort = uint16(*externalHttpPort)
+	Config.ExternalHTTPPort = uint16(*externalHTTPPort)
 	if Config.APIRequireAuthToken {
 		if Config.APIAuthPassword == "" {
 			errs.Add(errors.New("api-auth-password must be provided if api-auth-required is true"))
