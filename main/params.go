@@ -140,7 +140,7 @@ func init() {
 	consensusPort := fs.Uint("staking-port", 9651, "External port of the consensus server you can override the local listening port with internal-staking-port for PnP")
 	// this is a bit more complicated, but this becomes an override for port our process will start up listening on.
 	// i did this because I think changing the meaning of 'staking-port' param could be a bit more confusing.
-	internalStakingPort := fs.Uint("internal-staking-port", 9651, "Internal listening consensus port")
+	internalStakingPort := fs.Uint("internal-staking-port", *consensusPort, "Internal listening consensus port")
 	fs.BoolVar(&Config.EnableStaking, "staking-enabled", true, "Enable staking. If enabled, Network TLS is required.")
 	fs.BoolVar(&Config.EnableP2PTLS, "p2p-tls-enabled", true, "Require TLS to authenticate network communication")
 	fs.StringVar(&Config.StakingKeyFile, "staking-tls-key-file", defaultStakingKeyPath, "TLS private key for staking")
