@@ -23,6 +23,9 @@ type Config struct {
 	// protocol to use for opening the network interface
 	Nat nat.Router
 
+	// Attempted PnP did we attempt a PnP
+	AttemptedPNP bool
+
 	// ID of the network this node should connect to
 	NetworkID uint32
 

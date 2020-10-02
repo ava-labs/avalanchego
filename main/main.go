@@ -76,6 +76,13 @@ func main() {
 		log.Debug("assertions are enabled. This may slow down execution")
 	}
 
+	// IsPnP() for NoRouter is false.
+	// Which means we tried to perform a PnP activity but we were not successful.
+	if Config.AttemptedPNP && !Config.Nat.IsPnP() {
+		log.Error("PnP router attach failed, you may not be listening publicly," +
+			" please confirm the settings in your router")
+	}
+
 	mapper := nat.NewPortMapper(log, Config.Nat)
 	defer mapper.UnmapAllPorts()
 
