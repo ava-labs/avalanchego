@@ -87,13 +87,13 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 		return err
 	}
 	if err := verify.All(&tx.Validator, tx.RewardsOwner); err != nil {
-		return err
+		return fmt.Errorf("failed to verify validator or rewards owner: %w", err)
 	}
 
 	totalStakeWeight := uint64(0)
 	for _, out := range tx.Stake {
 		if err := out.Verify(); err != nil {
-			return err
+			return fmt.Errorf("output verification failed: %w", err)
 		}
 		newWeight, err := safemath.Add64(totalStakeWeight, out.Output().Amount())
 		if err != nil {
@@ -142,7 +142,9 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 
 	// Ensure the proposed validator starts after the current timestamp
 	if currentTimestamp, err := vm.getTimestamp(db); err != nil {
-		return nil, nil, nil, nil, tempError{err}
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf("failed to get timestamp: %w", err),
+		}
 	} else if validatorStartTime := tx.StartTime(); !currentTimestamp.Before(validatorStartTime) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("chain timestamp (%s) not before validator's start time (%s)",
 			currentTimestamp,
@@ -156,7 +158,9 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	vdr, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	vdrWeight := uint64(0)
 	if err != nil {
-		return nil, nil, nil, nil, tempError{err}
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf("failed to find whether %s is a validator: %w", tx.Validator.NodeID, err),
+		}
 	}
 	if isValidator && !tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
 		return nil, nil, nil, nil, permError{errDelegatorSubset}
@@ -166,7 +170,9 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 		// time the validator will validates.
 		vdr, willBeValidator, err := vm.willBeValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
 		if err != nil {
-			return nil, nil, nil, nil, tempError{err}
+			return nil, nil, nil, nil, tempError{
+				fmt.Errorf("failed to find whether %s will be a validator: %w", tx.Validator.NodeID, err),
+			}
 		}
 		if !willBeValidator || !tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
 			return nil, nil, nil, nil, permError{errDelegatorSubset}
@@ -202,7 +208,16 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 
 	// Verify the flowcheck
 	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, 0, vm.Ctx.AVAXAssetID); err != nil {
-		return nil, nil, nil, nil, err
+		switch err.(type) {
+		case permError:
+			return nil, nil, nil, nil, permError{
+				fmt.Errorf("failed semanticVerifySpend: %s", err.Error()),
+			}
+		default:
+			return nil, nil, nil, nil, tempError{
+				fmt.Errorf("failed semanticVerifySpend: %s", err.Error()),
+			}
+		}
 	}
 
 	txID := tx.ID()
@@ -211,27 +226,37 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	onCommitDB := versiondb.New(db)
 	// Consume the UTXOS
 	if err := vm.consumeInputs(onCommitDB, tx.Ins); err != nil {
-		return nil, nil, nil, nil, tempError{err}
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf("failed to consume inputs: %w", err),
+		}
 	}
 	// Produce the UTXOS
 	if err := vm.produceOutputs(onCommitDB, txID, tx.Outs); err != nil {
-		return nil, nil, nil, nil, tempError{err}
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf("failed to produce outputs: %w", err),
+		}
 	}
 
 	// If this proposal is committed, update the pending validator set to include the delegator
 	if err := vm.enqueueStaker(onCommitDB, constants.PrimaryNetworkID, stx); err != nil {
-		return nil, nil, nil, nil, tempError{err}
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf("failed to enqueue staker: %w", err),
+		}
 	}
 
 	// Set up the DB if this tx is aborted
 	onAbortDB := versiondb.New(db)
 	// Consume the UTXOS
 	if err := vm.consumeInputs(onAbortDB, tx.Ins); err != nil {
-		return nil, nil, nil, nil, tempError{err}
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf("failed to consume inputs: %w", err),
+		}
 	}
 	// Produce the UTXOS
 	if err := vm.produceOutputs(onAbortDB, txID, outs); err != nil {
-		return nil, nil, nil, nil, tempError{err}
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf("failed to produce outputs: %w", err),
+		}
 	}
 
 	return onCommitDB, onAbortDB, nil, nil, nil

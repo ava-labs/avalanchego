@@ -70,7 +70,7 @@ func (tx *UnsignedExportTx) Verify(
 
 	for _, out := range tx.ExportedOutputs {
 		if err := out.Verify(); err != nil {
-			return err
+			return fmt.Errorf("output failed verification: %w", err)
 		}
 		if _, ok := out.Output().(*StakeableLockOut); ok {
 			return errWrongLocktime
@@ -100,18 +100,31 @@ func (tx *UnsignedExportTx) SemanticVerify(
 
 	// Verify the flowcheck
 	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
-		return err
+		switch err.(type) {
+		case permError:
+			return permError{
+				fmt.Errorf("failed semanticVerifySpend: %s", err.Error()),
+			}
+		default:
+			return tempError{
+				fmt.Errorf("failed semanticVerifySpend: %s", err.Error()),
+			}
+		}
 	}
 
 	txID := tx.ID()
 
 	// Consume the UTXOS
 	if err := vm.consumeInputs(db, tx.Ins); err != nil {
-		return tempError{err}
+		return tempError{
+			fmt.Errorf("failed to consume inputs: %w", err),
+		}
 	}
 	// Produce the UTXOS
 	if err := vm.produceOutputs(db, txID, tx.Outs); err != nil {
-		return tempError{err}
+		return tempError{
+			fmt.Errorf("failed to produce outputs: %w", err),
+		}
 	}
 	return nil
 }
@@ -133,7 +146,7 @@ func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 
 		utxoBytes, err := Codec.Marshal(utxo)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to marshal UTXO: %w", err)
 		}
 
 		elem := &atomic.Element{

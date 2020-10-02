@@ -99,16 +99,16 @@ func (tx *UnsignedAddValidatorTx) Verify(
 	}
 
 	if err := tx.BaseTx.Verify(ctx, c); err != nil {
-		return err
+		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
 	if err := verify.All(&tx.Validator, tx.RewardsOwner); err != nil {
-		return err
+		return fmt.Errorf("failed to verify validator or rewards owner: %w", err)
 	}
 
 	totalStakeWeight := uint64(0)
 	for _, out := range tx.Stake {
 		if err := out.Verify(); err != nil {
-			return err
+			return fmt.Errorf("failed to verify output: %w", err)
 		}
 		newWeight, err := safemath.Add64(totalStakeWeight, out.Output().Amount())
 		if err != nil {
@@ -156,33 +156,64 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 
 	// Ensure the proposed validator starts after the current time
 	if currentTime, err := vm.getTimestamp(db); err != nil {
-		return nil, nil, nil, nil, tempError{err}
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf("failed to get timestamp: %w", err),
+		}
 	} else if startTime := tx.StartTime(); !currentTime.Before(startTime) {
-		return nil, nil, nil, nil, permError{fmt.Errorf("validator's start time (%s) at or before current timestamp (%s)",
-			startTime,
-			currentTime)}
+		return nil, nil, nil, nil, permError{
+			fmt.Errorf("validator's start time (%s) at or before current timestamp (%s)",
+				startTime,
+				currentTime,
+			),
+		}
 	} else if startTime.After(currentTime.Add(maxFutureStartTime)) {
-		return nil, nil, nil, nil, permError{fmt.Errorf("validator start time (%s) more than two weeks after current chain timestamp (%s)", startTime, currentTime)}
+		return nil, nil, nil, nil, permError{
+			fmt.Errorf(
+				"validator start time (%s) more than two weeks after current chain timestamp (%s)",
+				startTime,
+				currentTime,
+			),
+		}
 	}
 
 	_, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err != nil {
-		return nil, nil, nil, nil, tempError{err}
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf(
+				"failed to get whether %s is a validator: %w",
+				tx.Validator.NodeID,
+				err,
+			),
+		}
 	}
 	if isValidator {
-		return nil, nil, nil, nil, permError{fmt.Errorf("validator %s already is already a primary network validator",
-			tx.Validator.NodeID)}
+		return nil, nil, nil, nil, permError{
+			fmt.Errorf(
+				"validator %s already is already a primary network validator",
+				tx.Validator.NodeID,
+			),
+		}
 	}
 
 	// Ensure that the period this validator validates the specified subnet
 	// is a subnet of the time they will validate the primary network.
 	_, willBeValidator, err := vm.willBeValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err != nil {
-		return nil, nil, nil, nil, tempError{err}
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf(
+				"failed to get whether %s will be a validator: %w",
+				tx.Validator.NodeID,
+				err,
+			),
+		}
 	}
 	if willBeValidator {
-		return nil, nil, nil, nil, permError{fmt.Errorf("validator %s already is already a primary network validator",
-			tx.Validator.NodeID)}
+		return nil, nil, nil, nil, permError{
+			fmt.Errorf(
+				"validator %s already is already a primary network validator",
+				tx.Validator.NodeID,
+			),
+		}
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
@@ -191,7 +222,16 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 
 	// Verify the flowcheck
 	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, 0, vm.Ctx.AVAXAssetID); err != nil {
-		return nil, nil, nil, nil, err
+		switch err.(type) {
+		case permError:
+			return nil, nil, nil, nil, permError{
+				fmt.Errorf("failed semanticVerifySpend: %s", err.Error()),
+			}
+		default:
+			return nil, nil, nil, nil, tempError{
+				fmt.Errorf("failed semanticVerifySpend: %s", err.Error()),
+			}
+		}
 	}
 
 	txID := tx.ID()
@@ -200,26 +240,36 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	onCommitDB := versiondb.New(db)
 	// Consume the UTXOS
 	if err := vm.consumeInputs(onCommitDB, tx.Ins); err != nil {
-		return nil, nil, nil, nil, tempError{err}
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf("failed to consume inputs: %w", err),
+		}
 	}
 	// Produce the UTXOS
 	if err := vm.produceOutputs(onCommitDB, txID, tx.Outs); err != nil {
-		return nil, nil, nil, nil, tempError{err}
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf("failed to produce outputs: %w", err),
+		}
 	}
 
 	// Add validator to set of pending validators
 	if err := vm.enqueueStaker(onCommitDB, constants.PrimaryNetworkID, stx); err != nil {
-		return nil, nil, nil, nil, tempError{err}
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf("failed to enqueue staker: %w", err),
+		}
 	}
 
 	onAbortDB := versiondb.New(db)
 	// Consume the UTXOS
 	if err := vm.consumeInputs(onAbortDB, tx.Ins); err != nil {
-		return nil, nil, nil, nil, tempError{err}
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf("failed to consume inputs: %w", err),
+		}
 	}
 	// Produce the UTXOS
 	if err := vm.produceOutputs(onAbortDB, txID, outs); err != nil {
-		return nil, nil, nil, nil, tempError{err}
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf("failed to produce outputs: %w", err),
+		}
 	}
 
 	return onCommitDB, onAbortDB, nil, nil, nil
