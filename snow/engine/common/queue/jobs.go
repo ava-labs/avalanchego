@@ -110,6 +110,9 @@ func (j *Jobs) Execute(job Job) error {
 		if deps.Len() > 0 {
 			continue
 		}
+		if err := job.Execute(); err != nil {
+			return err
+		}
 		if err := j.state.DeleteJob(j.db, blockedID); err != nil {
 			return err
 		}
