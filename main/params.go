@@ -122,6 +122,8 @@ func init() {
 
 	// IP:
 	consensusIP := fs.String("public-ip", "", "Public IP of this node")
+
+	// dynamic-public-ip overries public-ip
 	fs.BoolVar(&Config.DynamicConsensusIP, "dynamic-public-ip", false, "If true, resolve ip from ifconfig.co")
 	fs.DurationVar(&Config.DynamicConsensusUpdate, "dynamic-public-ip-update", 1*time.Minute, "Dynamic IP update time")
 
@@ -252,7 +254,6 @@ func init() {
 	}
 
 	var ip net.IP
-	// If public IP is not specified, get it using shell command dig
 	if *consensusIP == "" && !Config.DynamicConsensusIP {
 		Config.AttemptedNATTraversal = true
 		Config.Nat = nat.GetRouter()
