@@ -57,7 +57,7 @@ func (c *common) Initialize(ctx *snow.Context, params sbcon.Parameters) error {
 	c.params = params
 
 	if err := c.metrics.Initialize(params.Namespace, params.Metrics); err != nil {
-		return fmt.Errorf("failed to initialize metrics: %s", err)
+		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}
 	return params.Valid()
 }

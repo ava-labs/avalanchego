@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -187,7 +188,7 @@ func (n *Node) initNetworking() error {
 		})
 
 		go timer.Dispatch()
-		timer.SetTimeoutIn(15 * time.Second)
+		timer.SetTimeoutIn(1 * time.Minute)
 
 		consensusRouter = &beaconManager{
 			Router:         consensusRouter,
@@ -217,7 +218,7 @@ func (n *Node) initNetworking() error {
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
 		// errors are already logged internally if they are meaningful
 		_ = n.Net.Close()
-	}, os.Interrupt, os.Kill)
+	}, syscall.SIGINT, syscall.SIGTERM)
 
 	return nil
 }

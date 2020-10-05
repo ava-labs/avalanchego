@@ -34,7 +34,15 @@ const (
 // Database is a persistent key-value store. Apart from basic data storage
 // functionality it also supports batch writes and iterating over the keyspace
 // in binary-alphabetical order.
-type Database struct{ *leveldb.DB }
+type Database struct {
+	*leveldb.DB
+
+	// True if there was previously an error other than "not found" or "closed"
+	// while performing a db operation. If [errored] == true, Has, Get, Put,
+	// Delete and batch writes fail with ErrAvoidCorruption.
+	// The node should shut down.
+	errored bool
+}
 
 // New returns a wrapped LevelDB object.
 func New(file string, blockCacheSize, writeBufferSize, handleCap int) (*Database, error) {
@@ -68,27 +76,41 @@ func New(file string, blockCacheSize, writeBufferSize, handleCap int) (*Database
 
 // Has returns if the key is set in the database
 func (db *Database) Has(key []byte) (bool, error) {
+	if db.errored {
+		return false, database.ErrAvoidCorruption
+	}
 	has, err := db.DB.Has(key, nil)
-	return has, updateError(err)
+	return has, db.handleError(err)
 }
 
 // Get returns the value the key maps to in the database
 func (db *Database) Get(key []byte) ([]byte, error) {
+	if db.errored {
+		return nil, database.ErrAvoidCorruption
+	}
 	value, err := db.DB.Get(key, nil)
-	return value, updateError(err)
+	return value, db.handleError(err)
 }
 
 // Put sets the value of the provided key to the provided value
 func (db *Database) Put(key []byte, value []byte) error {
-	return updateError(db.DB.Put(key, value, nil))
+	if db.errored {
+		return database.ErrAvoidCorruption
+	}
+	return db.handleError(db.DB.Put(key, value, nil))
 }
 
 // Delete removes the key from the database
-func (db *Database) Delete(key []byte) error { return updateError(db.DB.Delete(key, nil)) }
+func (db *Database) Delete(key []byte) error {
+	if db.errored {
+		return database.ErrAvoidCorruption
+	}
+	return db.handleError(db.DB.Delete(key, nil))
+}
 
 // NewBatch creates a write/delete-only buffer that is atomically committed to
 // the database when write is called
-func (db *Database) NewBatch() database.Batch { return &batch{db: db.DB} }
+func (db *Database) NewBatch() database.Batch { return &batch{db: db} }
 
 // NewIterator creates a lexicographically ordered iterator over the database
 func (db *Database) NewIterator() database.Iterator {
@@ -121,7 +143,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 // Stat returns a particular internal stat of the database.
 func (db *Database) Stat(property string) (string, error) {
 	stat, err := db.DB.GetProperty(property)
-	return stat, updateError(err)
+	return stat, db.handleError(err)
 }
 
 // This comment is basically copy pasted from the underlying levelDB library:
@@ -136,17 +158,26 @@ func (db *Database) Stat(property string) (string, error) {
 // And a nil limit is treated as a key after all keys in the DB.
 // Therefore if both are nil then it will compact entire DB.
 func (db *Database) Compact(start []byte, limit []byte) error {
-	return updateError(db.DB.CompactRange(util.Range{Start: start, Limit: limit}))
+	return db.handleError(db.DB.CompactRange(util.Range{Start: start, Limit: limit}))
 }
 
 // Close implements the Database interface
-func (db *Database) Close() error { return updateError(db.DB.Close()) }
+func (db *Database) Close() error { return db.handleError(db.DB.Close()) }
+
+func (db *Database) handleError(err error) error {
+	err = updateError(err)
+	// If we get an error other than "not found" or "closed", disallow future
+	// database operations to avoid possible corruption
+	if err != nil && err != database.ErrNotFound && err != database.ErrClosed {
+		db.errored = true
+	}
+	return err
+}
 
 // batch is a wrapper around a levelDB batch to contain sizes.
 type batch struct {
 	leveldb.Batch
-
-	db   *leveldb.DB
+	db   *Database
 	size int
 }
 
@@ -168,7 +199,12 @@ func (b *batch) Delete(key []byte) error {
 func (b *batch) ValueSize() int { return b.size }
 
 // Write flushes any accumulated data to disk.
-func (b *batch) Write() error { return updateError(b.db.Write(&b.Batch, nil)) }
+func (b *batch) Write() error {
+	if b.db.errored {
+		return database.ErrAvoidCorruption
+	}
+	return b.db.handleError(b.db.DB.Write(&b.Batch, nil))
+}
 
 // Reset resets the batch for reuse.
 func (b *batch) Reset() {
@@ -181,9 +217,9 @@ func (b *batch) Replay(w database.KeyValueWriter) error {
 	replay := &replayer{writer: w}
 	if err := b.Batch.Replay(replay); err != nil {
 		// Never actually returns an error, because Replay just returns nil
-		return updateError(err)
+		return b.db.handleError(err)
 	}
-	return updateError(replay.err)
+	return b.db.handleError(replay.err)
 }
 
 // Inner returns itself

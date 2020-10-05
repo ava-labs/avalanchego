@@ -445,7 +445,7 @@ func init() {
 	Config.ConsensusShutdownTimeout = time.Duration(*consensusShutdownTimeout)
 
 	if err := ulimit.Set(*fdLimit); err != nil {
-		errs.Add(fmt.Errorf("failed to set fd limit correctly due to: %s", err))
+		errs.Add(fmt.Errorf("failed to set fd limit correctly due to: %w", err))
 	}
 
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
