@@ -65,13 +65,18 @@ type peer struct {
 	lastSent, lastReceived int64
 
 	tickerCloser chan struct{}
+
+	// ticker processes
+	tickerOnce sync.Once
 }
 
 // assume the stateLock is held
 func (p *peer) Start() {
 	go p.ReadMessages()
 	go p.WriteMessages()
+}
 
+func (p *peer) StartTicker() {
 	go p.requestFinishHandshake()
 	go p.sendPings()
 }
@@ -225,6 +230,7 @@ func (p *peer) WriteMessages() {
 				p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.ip, err)
 				return
 			}
+			p.tickerOnce.Do(p.StartTicker)
 			msg = msg[written:]
 		}
 		atomic.StoreInt64(&p.lastSent, p.net.clock.Time().Unix())
