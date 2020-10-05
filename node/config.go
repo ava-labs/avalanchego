@@ -36,7 +36,7 @@ type Config struct {
 	DB database.Database
 
 	// Staking configuration
-	StakingIP               utils.IPDesc
+	StakingIP               utils.DynamicIPDesc
 	StakingLocalPort        uint16
 	EnableP2PTLS            bool
 	EnableStaking           bool

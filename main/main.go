@@ -81,11 +81,11 @@ func main() {
 
 	// Open staking port
 	port, err := mapper.Map("TCP", Config.StakingLocalPort, stakingPortName)
-	if !Config.StakingIP.IsPrivate() {
+	if !Config.StakingIP.Ip().IsPrivate() {
 		if err == nil {
 			// The port was mapped and the ip is on a public network, the node
 			// should be able to be connected to peers on this public network.
-			Config.StakingIP.Port = port
+			Config.StakingIP.UpdatePort(port)
 		} else {
 			// The port mapping errored, however it is possible the node is
 			// connected directly to a public network.
