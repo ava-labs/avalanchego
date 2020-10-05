@@ -124,7 +124,7 @@ func init() {
 	// HTTP Server:
 	httpHost := fs.String("http-host", "127.0.0.1", "Address of the HTTP server")
 	httpPort := fs.Uint("http-port", 9650, "Port of the HTTP server")
-	// when using PnP and you want your http service to listen on a different port.
+	// when using NAT Traversal and you want your http service to listen on a different port.
 	externalHTTPPort := fs.Uint("http-port-external", *httpPort, "External port of the HTTP server")
 	fs.BoolVar(&Config.HTTPSEnabled, "http-tls-enabled", false, "Upgrade the HTTP server to HTTPs")
 	fs.StringVar(&Config.HTTPSKeyFile, "http-tls-key-file", "", "TLS private key file for the HTTPs server")
@@ -137,7 +137,7 @@ func init() {
 	bootstrapIDs := fs.String("bootstrap-ids", "default", "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 
 	// Staking:
-	consensusPort := fs.Uint("staking-port", 9651, "External port of the consensus server you can override the local listening port with internal-staking-port for PnP")
+	consensusPort := fs.Uint("staking-port", 9651, "External port of the consensus server you can override the local listening port with internal-staking-port for dynamic NAT traversal")
 	// this is a bit more complicated, but this becomes an override for port our process will start up listening on.
 	// i did this because I think changing the meaning of 'staking-port' param could be a bit more confusing.
 	internalStakingPort := fs.Uint("internal-staking-port", *consensusPort, "Internal listening consensus port")
@@ -250,7 +250,7 @@ func init() {
 	var ip net.IP
 	// If public IP is not specified, get it using shell command dig
 	if *consensusIP == "" {
-		Config.AttemptedPNP = true
+		Config.AttemptedNATTraversal = true
 		Config.Nat = nat.GetRouter()
 		ip, err = Config.Nat.ExternalIP()
 		if err != nil {

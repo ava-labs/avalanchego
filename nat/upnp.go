@@ -64,7 +64,7 @@ type upnpRouter struct {
 	client upnpClient
 }
 
-func (r *upnpRouter) IsPnP() bool {
+func (r *upnpRouter) IsNATTraversal() bool {
 	return true
 }
 

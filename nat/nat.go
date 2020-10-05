@@ -20,7 +20,7 @@ const (
 // Router describes the functionality that a network device must support to be
 // able to open ports to an external IP.
 type Router interface {
-	IsPnP() bool
+	IsNATTraversal() bool
 	MapPort(protocol string, intPort, extPort uint16, desc string, duration time.Duration) error
 	UnmapPort(protocol string, intPort, extPort uint16) error
 	ExternalIP() (net.IP, error)
@@ -58,7 +58,7 @@ func NewPortMapper(log logging.Logger, r Router) Mapper {
 // Attempt to establish a PnP connection from extPort (exposed to the internet) to our
 // intPort (where our process is listening).
 func (dev *Mapper) Map(protocol string, intPort, extPort uint16, desc string) {
-	if !dev.r.IsPnP() {
+	if !dev.r.IsNATTraversal() {
 		return
 	}
 

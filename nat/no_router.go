@@ -21,7 +21,7 @@ type noRouter struct {
 	ipErr error
 }
 
-func (noRouter) IsPnP() bool {
+func (noRouter) IsNATTraversal() bool {
 	return false
 }
 

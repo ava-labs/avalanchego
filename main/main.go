@@ -76,10 +76,10 @@ func main() {
 		log.Debug("assertions are enabled. This may slow down execution")
 	}
 
-	// IsPnP() for NoRouter is false.
-	// Which means we tried to perform a PnP activity but we were not successful.
-	if Config.AttemptedPNP && !Config.Nat.IsPnP() {
-		log.Error("PnP router attach failed, you may not be listening publicly," +
+	// IsNATTraversal() for NoRouter is false.
+	// Which means we tried to perform a NAT activity but we were not successful.
+	if Config.AttemptedNATTraversal && !Config.Nat.IsNATTraversal() {
+		log.Error("UPnP or NAT-PMP router attach failed, you may not be listening publicly," +
 			" please confirm the settings in your router")
 	}
 
@@ -87,13 +87,13 @@ func main() {
 	defer mapper.UnmapAllPorts()
 
 	// Open staking port
-	// we want for PnP to have the external port (Config.StakingIP.Port) to connect to our
+	// we want for NAT Traversal to have the external port (Config.StakingIP.Port) to connect to our
 	// internal listening port (Config.InternalStakingPort) which should be the same in most cases.
 	mapper.Map("TCP", Config.InternalStakingPort, Config.StakingIP.Port, stakingPortName)
 
 	// Open the HTTP port iff the HTTP server is not listening on localhost
 	if Config.HTTPHost != "127.0.0.1" && Config.HTTPHost != "localhost" {
-		// For PnP we want to route from the external port (Config.ExternalHTTPPort)
+		// For NAT Traversal we want to route from the external port (Config.ExternalHTTPPort)
 		// to our internal port (Config.HTTPPort)
 		mapper.Map("TCP", Config.HTTPPort, Config.ExternalHTTPPort, httpPortName)
 	}
