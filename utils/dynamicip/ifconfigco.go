@@ -60,12 +60,12 @@ func (u *ExternalIPUpdater) Stop() {
 }
 
 func (u *ExternalIPUpdater) UpdateExternalIP(frequency time.Duration) {
-	ticker := time.NewTicker(frequency)
-	defer ticker.Stop()
+	timer := time.NewTimer(frequency)
+	defer timer.Stop()
 
 	for {
 		select {
-		case <-ticker.C:
+		case <-timer.C:
 			ipstr, err := FetchExternalIP()
 			if err != nil {
 				u.log.Warn("Fetch external IP failed %s", err)
@@ -81,7 +81,7 @@ func (u *ExternalIPUpdater) UpdateExternalIP(frequency time.Duration) {
 			if !oldIp.Equal(newIp) {
 				u.log.Info("ExternalIP updated to %s", newIp)
 			}
-			ticker.Reset(u.updateTimeout)
+			timer.Reset(u.updateTimeout)
 		case <-u.tickerCloser:
 			return
 		}
