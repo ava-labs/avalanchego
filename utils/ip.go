@@ -106,40 +106,40 @@ func ToIPDesc(str string) (IPDesc, error) {
 }
 
 type IPDescContainer struct {
-	ip   *IPDesc
+	*IPDesc
 	lock sync.RWMutex
 }
 
 type DynamicIPDesc struct {
-	ip *IPDescContainer
+	*IPDescContainer
 }
 
 func NewDynamicIPDesc(IP net.IP, Port uint16) DynamicIPDesc {
-	return DynamicIPDesc{ip: &IPDescContainer{ip: &IPDesc{IP: IP, Port: Port}}}
+	return DynamicIPDesc{IPDescContainer: &IPDescContainer{IPDesc: &IPDesc{IP: IP, Port: Port}}}
 }
 
 func (i *DynamicIPDesc) Ip() IPDesc {
 	var ip IPDesc
-	i.ip.lock.RLock()
-	ip = *i.ip.ip
-	i.ip.lock.RUnlock()
+	i.lock.RLock()
+	ip = *i.IPDesc
+	i.lock.RUnlock()
 	return ip
 }
 
 func (i *DynamicIPDesc) Update(ip IPDesc) {
-	i.ip.lock.Lock()
-	defer i.ip.lock.Unlock()
-	i.ip.ip = &ip
+	i.lock.Lock()
+	defer i.lock.Unlock()
+	i.IPDesc = &ip
 }
 
 func (i *DynamicIPDesc) UpdatePort(port uint16) {
-	i.ip.lock.Lock()
-	defer i.ip.lock.Unlock()
-	i.ip.ip.Port = port
+	i.lock.Lock()
+	defer i.lock.Unlock()
+	i.IPDesc.Port = port
 }
 
 func (i *DynamicIPDesc) UpdateIP(IP net.IP) {
-	i.ip.lock.Lock()
-	defer i.ip.lock.Unlock()
-	i.ip.ip.IP = IP
+	i.lock.Lock()
+	defer i.lock.Unlock()
+	i.IPDesc.IP = IP
 }
