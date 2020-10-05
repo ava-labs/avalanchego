@@ -4,6 +4,9 @@ set -ev
 
 bash <(curl -s https://codecov.io/bash)
 
+FULL_COMMIT_HASH="$(git --git-dir="$AVALANCHE_HOME/.git" rev-parse HEAD)"
+COMMIT="${FULL_COMMIT_HASH::8}"
+
 AVALANCHE_IMAGE="$DOCKERHUB_REPO:$COMMIT"
 
 TRAVIS_TAG="$DOCKERHUB_REPO:travis-$TRAVIS_BUILD_NUMBER"
