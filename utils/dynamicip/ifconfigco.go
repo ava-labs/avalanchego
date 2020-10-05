@@ -29,14 +29,29 @@ func FetchExternalIP() (string, error) {
 	return ipstr, nil
 }
 
+type ExternalIPUpdaterInterface interface {
+	Stop()
+}
+
+type NoExternalIPUpdater struct {
+}
+
+func (u *NoExternalIPUpdater) Stop() {
+}
+
 type ExternalIPUpdater struct {
 	tickerCloser chan struct{}
 	log          logging.Logger
 	ip           *utils.DynamicIPDesc
 }
 
-func NewExternalIPUpdater(log logging.Logger, ip *utils.DynamicIPDesc) ExternalIPUpdater {
-	return ExternalIPUpdater{log: log, ip: ip}
+func NewExternalIPUpdater(enable bool, updateTime time.Duration, log logging.Logger, ip *utils.DynamicIPDesc) ExternalIPUpdaterInterface {
+	if enable {
+		updater := &ExternalIPUpdater{log: log, ip: ip}
+		go updater.UpdateExternalIP(updateTime)
+		return updater
+	}
+	return &NoExternalIPUpdater{}
 }
 
 func (u *ExternalIPUpdater) Stop() {

@@ -105,18 +105,8 @@ func main() {
 		mapper.Map("TCP", Config.HTTPPort, Config.ExternalHTTPPort, httpPortName, nil)
 	}
 
-	var externalIPUpdater *dynamicip.ExternalIPUpdater
-	if Config.DynamicConsensusIP {
-		updater := dynamicip.NewExternalIPUpdater(log, &Config.StakingIP)
-		externalIPUpdater = &updater
-		go externalIPUpdater.UpdateExternalIP(dynamicIPUpdateTime)
-	}
-
-	defer func() {
-		if externalIPUpdater != nil {
-			externalIPUpdater.Stop()
-		}
-	}()
+	externalIPUpdater := dynamicip.NewExternalIPUpdater(Config.DynamicConsensusIP, dynamicIPUpdateTime, log, &Config.StakingIP)
+	defer externalIPUpdater.Stop()
 
 	log.Debug("initializing node state")
 	node := node.Node{}
