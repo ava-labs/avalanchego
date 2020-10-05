@@ -261,9 +261,9 @@ func init() {
 	}
 
 	Config.StakingIP = utils.NewDynamicIPDesc(
-		   ip,
-		 uint16(*consensusPort),
-)
+		ip,
+		uint16(*consensusPort),
+	)
 	Config.StakingLocalPort = uint16(*consensusPort)
 
 	defaultBootstrapIPs, defaultBootstrapIDs := genesis.SampleBeacons(networkID, 5)
