@@ -5,7 +5,6 @@ set -ev
 bash <(curl -s https://codecov.io/bash)
 
 AVALANCHE_IMAGE="$DOCKERHUB_REPO:$COMMIT"
-# AVALANCHE_IMAGE=$(docker image ls --format="{{.Repository}}:{{.Tag}}" | grep $DOCKERHUB_REPO | head -n 1)
 
 TRAVIS_TAG="$DOCKERHUB_REPO:travis-$TRAVIS_BUILD_NUMBER"
 docker tag $AVALANCHE_IMAGE "$TRAVIS_TAG"
