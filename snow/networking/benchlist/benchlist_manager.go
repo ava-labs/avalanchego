@@ -22,7 +22,7 @@ type Manager interface {
 	// QueryFailed registers that a query did not receive a response within our synchrony bound
 	QueryFailed(ids.ID, ids.ShortID, uint32)
 	// RegisterChain registers a new chain with metrics under [namespac]
-	RegisterChain(ids.ID, string)
+	RegisterChain(*snow.Context, string)
 }
 
 // Config defines the configuration for a benchlist
@@ -35,8 +35,7 @@ type Config struct {
 }
 
 type benchlistManager struct {
-	config    *Config
-	ctxLookup snow.ContextLookup
+	config *Config
 	// Chain ID --> benchlist for that chain
 	chainBenchlists map[[32]byte]QueryBenchlist
 
@@ -44,34 +43,30 @@ type benchlistManager struct {
 }
 
 // NewManager returns a manager for chain-specific query benchlisting
-func NewManager(config *Config, ctxLookup snow.ContextLookup) Manager {
+func NewManager(config *Config) Manager {
 	return &benchlistManager{
 		config:          config,
-		ctxLookup:       ctxLookup,
 		chainBenchlists: make(map[[32]byte]QueryBenchlist),
 	}
 }
 
-func (bm *benchlistManager) RegisterChain(chainID ids.ID, namespace string) {
+func (bm *benchlistManager) RegisterChain(ctx *snow.Context, namespace string) {
 	bm.lock.Lock()
 	defer bm.lock.Unlock()
 
-	key := chainID.Key()
+	key := ctx.ChainID.Key()
 	chain, exists := bm.chainBenchlists[key]
 	if exists {
 		return
 	}
 
-	vdrs, ok := bm.config.Validators.GetValidatorsByChain(chainID)
+	vdrs, ok := bm.config.Validators.GetValidatorsByChain(ctx.ChainID)
 	if !ok {
-		return
-	}
-	ctx, exists := bm.ctxLookup.GetContext(chainID)
-	if !exists {
 		return
 	}
 	chain = NewQueryBenchlist(vdrs, ctx, bm.config.Threshold, bm.config.Duration, bm.config.MaxPortion, bm.config.PeerSummaryEnabled, namespace)
 	bm.chainBenchlists[key] = chain
+	ctx.Log.Info("Registered benchlist for chain %s", ctx.ChainID)
 }
 
 // RegisterQuery implements the Manager interface
@@ -120,7 +115,7 @@ type noBenchlist struct{}
 func NewNoBenchlist() Manager { return &noBenchlist{} }
 
 // RegisterChain ...
-func (b *noBenchlist) RegisterChain(chainID ids.ID, namespace string) {}
+func (b *noBenchlist) RegisterChain(ctx *snow.Context, namespace string) {}
 
 // RegisterQuery ...
 func (b *noBenchlist) RegisterQuery(chainID ids.ID, validatorID ids.ShortID, requestID uint32, msgType constants.MsgType) bool {

@@ -498,7 +498,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	n.Config.NetworkConfig.Namespace = constants.PlatformName
 	n.Config.NetworkConfig.Registerer = n.Config.ConsensusParams.Metrics
 	n.Config.BenchlistConfig.Validators = n.vdrs
-	benchlistManager := benchlist.NewManager(&n.Config.BenchlistConfig, n.chainManager)
+	benchlistManager := benchlist.NewManager(&n.Config.BenchlistConfig)
 
 	if err := timeoutManager.Initialize(&n.Config.NetworkConfig, benchlistManager); err != nil {
 		return err

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -34,8 +35,8 @@ func (m *Manager) Dispatch() {
 	m.tm.Dispatch()
 }
 
-func (m *Manager) RegisterChain(chainID ids.ID, namespace string) {
-	m.benchlist.RegisterChain(chainID, namespace)
+func (m *Manager) RegisterChain(ctx *snow.Context, namespace string) {
+	m.benchlist.RegisterChain(ctx, namespace)
 }
 
 // Register request to time out unless Manager.Cancel is called
