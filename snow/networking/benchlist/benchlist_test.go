@@ -26,7 +26,7 @@ func TestBenchlist(t *testing.T) {
 	threshold := 3
 	duration := time.Minute
 	maxPortion := 0.5
-	benchlist := NewQueryBenchlist(vdrs, snow.DefaultContextTest(), threshold, duration, maxPortion, false).(*queryBenchlist)
+	benchlist := NewQueryBenchlist(vdrs, snow.DefaultContextTest(), threshold, duration, maxPortion, false, "").(*queryBenchlist)
 
 	currentTime := time.Now()
 	benchlist.clock.Set(currentTime)
@@ -84,7 +84,7 @@ func TestBenchlistDoesNotGetStuck(t *testing.T) {
 	threshold := 3
 	duration := time.Minute
 	maxPortion := 0.5
-	benchlist := NewQueryBenchlist(vdrs, snow.DefaultContextTest(), threshold, duration, maxPortion, false).(*queryBenchlist)
+	benchlist := NewQueryBenchlist(vdrs, snow.DefaultContextTest(), threshold, duration, maxPortion, false, "").(*queryBenchlist)
 
 	currentTime := time.Now()
 	benchlist.clock.Set(currentTime)
@@ -135,7 +135,7 @@ func TestBenchlistDoesNotExceedThreshold(t *testing.T) {
 	threshold := 3
 	duration := time.Minute
 	maxPortion := 0.5
-	benchlist := NewQueryBenchlist(vdrs, snow.DefaultContextTest(), threshold, duration, maxPortion, false).(*queryBenchlist)
+	benchlist := NewQueryBenchlist(vdrs, snow.DefaultContextTest(), threshold, duration, maxPortion, false, "").(*queryBenchlist)
 
 	currentTime := time.Now()
 	benchlist.clock.Set(currentTime)

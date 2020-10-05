@@ -66,9 +66,9 @@ type pendingQuery struct {
 }
 
 // NewQueryBenchlist ...
-func NewQueryBenchlist(validators validators.Set, ctx *snow.Context, threshold int, duration time.Duration, maxPortion float64, summaryEnabled bool) QueryBenchlist {
+func NewQueryBenchlist(validators validators.Set, ctx *snow.Context, threshold int, duration time.Duration, maxPortion float64, summaryEnabled bool, namespace string) QueryBenchlist {
 	metrics := &metrics{}
-	metrics.Initialize(ctx, summaryEnabled)
+	metrics.Initialize(ctx, namespace, summaryEnabled)
 
 	return &queryBenchlist{
 		pendingQueries:      make(map[[20]byte]map[uint32]pendingQuery),

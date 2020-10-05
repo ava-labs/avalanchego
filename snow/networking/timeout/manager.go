@@ -34,6 +34,10 @@ func (m *Manager) Dispatch() {
 	m.tm.Dispatch()
 }
 
+func (m *Manager) RegisterChain(chainID ids.ID, namespace string) {
+	m.benchlist.RegisterChain(chainID, namespace)
+}
+
 // Register request to time out unless Manager.Cancel is called
 // before the timeout duration passes, with the same request parameters.
 func (m *Manager) Register(validatorID ids.ShortID, chainID ids.ID, requestID uint32, register bool, msgType constants.MsgType, timeout func()) (time.Time, bool) {

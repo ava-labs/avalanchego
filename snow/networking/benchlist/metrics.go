@@ -67,12 +67,12 @@ type metrics struct {
 }
 
 // Initialize implements the Engine interface
-func (m *metrics) Initialize(ctx *snow.Context, summaryEnabled bool) error {
+func (m *metrics) Initialize(ctx *snow.Context, namespace string, summaryEnabled bool) error {
 	m.ctx = ctx
 	m.summaryEnabled = summaryEnabled
 	errs := wrappers.Errs{}
 
-	benchNamespace := fmt.Sprintf("%s_benchlist", ctx.Namespace)
+	benchNamespace := fmt.Sprintf("%s_benchlist", namespace)
 
 	m.numBenched = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: benchNamespace,
