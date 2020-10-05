@@ -42,3 +42,4 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.UPLOAD_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}
+        BUCKET: ${{ secrets.BUCKET }}
