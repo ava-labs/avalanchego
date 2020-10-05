@@ -55,7 +55,7 @@ func NewPortMapper(log logging.Logger, r Router) Mapper {
 	}
 }
 
-// Attempt to establish a PnP connection from extPort (exposed to the internet) to our
+// Attempt to establish a NAT Traversal connection from extPort (exposed to the internet) to our
 // intPort (where our process is listening).
 func (dev *Mapper) Map(protocol string, intPort, extPort uint16, desc string) {
 	if !dev.r.IsNATTraversal() {
@@ -65,9 +65,9 @@ func (dev *Mapper) Map(protocol string, intPort, extPort uint16, desc string) {
 	// we attempt a port map, and log an Error if it fails.
 	err := dev.retryMapPort(protocol, intPort, extPort, desc, mapTimeout)
 	if err != nil {
-		dev.log.Error("PnP map failed from external port %d to internal port %d with %s", extPort, intPort, err)
+		dev.log.Error("NAT Traversal failed from external port %d to internal port %d with %s", extPort, intPort, err)
 	} else {
-		dev.log.Info("PnP map successful from external port %d to internal port %d", extPort, intPort)
+		dev.log.Info("NAT Traversal  successful from external port %d to internal port %d", extPort, intPort)
 	}
 
 	go dev.keepPortMapping(protocol, intPort, extPort, desc)
@@ -113,7 +113,7 @@ func (dev *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, des
 		case <-updateTimer.C:
 			err := dev.retryMapPort(protocol, intPort, extPort, desc, mapTimeout)
 			if err != nil {
-				dev.log.Warn("Renew PnP map failed from external port %d to internal port %d with %s",
+				dev.log.Warn("Renew NAT Traversal failed from external port %d to internal port %d with %s",
 					extPort, intPort, err)
 			}
 			updateTimer.Reset(mapUpdateTimeout)

@@ -60,7 +60,7 @@ type Config struct {
 	// HTTP configuration
 	HTTPHost string
 	HTTPPort uint16
-	// ExternalHTTPPort == HTTPPort unless you want a different external port to be used using PnP
+	// ExternalHTTPPort == HTTPPort unless you want a different external port to be used using NAT Traversal
 	ExternalHTTPPort    uint16
 	HTTPSEnabled        bool
 	HTTPSKeyFile        string
