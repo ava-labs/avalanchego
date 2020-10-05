@@ -63,6 +63,8 @@ type peer struct {
 
 	// unix time of the last message sent and received respectively
 	lastSent, lastReceived int64
+
+	tickerCloser chan struct{}
 }
 
 // assume the stateLock is held
@@ -70,51 +72,59 @@ func (p *peer) Start() {
 	go p.ReadMessages()
 	go p.WriteMessages()
 
-	// Initially send the version to the peer
-	go p.Version()
 	go p.requestFinishHandshake()
 	go p.sendPings()
 }
 
 func (p *peer) sendPings() {
-	t := time.NewTicker(p.net.pingFrequency)
-	defer t.Stop()
+	sendPingsTicker := time.NewTicker(p.net.pingFrequency)
+	defer sendPingsTicker.Stop()
 
-	for range t.C {
-		p.net.stateLock.Lock()
-		closed := p.closed
-		p.net.stateLock.Unlock()
+	for {
+		select {
+		case <-sendPingsTicker.C:
+			p.net.stateLock.Lock()
+			closed := p.closed
+			p.net.stateLock.Unlock()
 
-		if closed {
+			if closed {
+				return
+			}
+
+			p.Ping()
+		case <-p.tickerCloser:
 			return
 		}
-
-		p.Ping()
 	}
 }
 
 // request missing handshake messages from the peer
 func (p *peer) requestFinishHandshake() {
-	t := time.NewTicker(p.net.getVersionTimeout)
-	defer t.Stop()
+	finishHandshakeTicker := time.NewTicker(p.net.getVersionTimeout)
+	defer finishHandshakeTicker.Stop()
 
-	for range t.C {
-		p.net.stateLock.Lock()
-		gotVersion := p.gotVersion
-		gotPeerList := p.gotPeerList
-		connected := p.connected
-		closed := p.closed
-		p.net.stateLock.Unlock()
+	for {
+		select {
+		case <-finishHandshakeTicker.C:
+			p.net.stateLock.Lock()
+			gotVersion := p.gotVersion
+			gotPeerList := p.gotPeerList
+			connected := p.connected
+			closed := p.closed
+			p.net.stateLock.Unlock()
 
-		if connected || closed {
+			if connected || closed {
+				return
+			}
+
+			if !gotVersion {
+				p.GetVersion()
+			}
+			if !gotPeerList {
+				p.GetPeerList()
+			}
+		case <-p.tickerCloser:
 			return
-		}
-
-		if !gotVersion {
-			p.GetVersion()
-		}
-		if !gotPeerList {
-			p.GetPeerList()
 		}
 	}
 }
@@ -193,6 +203,8 @@ func (p *peer) ReadMessages() {
 // attempt to write messages to the peer
 func (p *peer) WriteMessages() {
 	defer p.Close()
+
+	p.Version()
 
 	for msg := range p.sender {
 		p.net.log.Verbo("sending new message to %s:\n%s",
@@ -346,6 +358,10 @@ func (p *peer) Close() { p.once.Do(p.close) }
 
 // assumes only `peer.Close` calls this
 func (p *peer) close() {
+	// If the connection is closing, we can immediately cancel the ticker
+	// goroutines.
+	close(p.tickerCloser)
+
 	if err := p.conn.Close(); err != nil {
 		p.net.log.Debug("closing peer %s resulted in an error: %s", p.id, err)
 	}
