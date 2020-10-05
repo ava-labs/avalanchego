@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -585,6 +587,9 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 
 	// Make sure this block is valid
 	if err := blk.Verify(); err != nil {
+		if err == database.ErrNotFound {
+			t.errs.Add(err)
+		}
 		t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
 
 		// if verify fails, then all descendants are also invalid
