@@ -117,22 +117,27 @@ func (dev *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, des
 				dev.log.Warn("Renew NAT Traversal failed from external port %d to internal port %d with %s",
 					extPort, intPort, err)
 			}
-			if ip != nil {
-				newIp, err := dev.r.ExternalIP()
-				if err == nil {
-					oldIp := ip.Ip().IP
-					ip.UpdateIP(newIp)
-					if !oldIp.Equal(newIp) {
-						dev.log.Info("ExternalIP updated to %s", newIp)
-					}
-				} else {
-					dev.log.Error("Renew ExternalIP failed with %s", err)
-				}
-			}
+			dev.updateIP(ip)
 			updateTimer.Reset(updateTime)
 		case <-dev.closer:
 			return
 		}
+	}
+}
+
+func (dev *Mapper) updateIP(ip *utils.DynamicIPDesc) {
+	if ip == nil {
+		return
+	}
+	newIp, err := dev.r.ExternalIP()
+	if err != nil {
+		dev.log.Error("Renew ExternalIP failed with %s", err)
+		return
+	}
+	oldIp := ip.Ip().IP
+	ip.UpdateIP(newIp)
+	if !oldIp.Equal(newIp) {
+		dev.log.Info("ExternalIP updated to %s", newIp)
 	}
 }
 
