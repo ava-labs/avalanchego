@@ -64,7 +64,7 @@ type peer struct {
 	// unix time of the last message sent and received respectively
 	lastSent, lastReceived int64
 
-	tickerStop chan bool
+	tickerCloser chan struct{}
 
 	// task for finishing handshaking
 	finishHandshakeTicker *time.Ticker
@@ -75,8 +75,7 @@ type peer struct {
 
 // assume the stateLock is held
 func (p *peer) Start() {
-
-	p.tickerStop = make(chan bool, 5)
+	p.tickerCloser = make(chan struct{}, 1)
 
 	// store the tickers in the peer..
 	// if the read or write closes, we can immediately cancel the ticket, and stop the goroutines.
@@ -105,7 +104,7 @@ func (p *peer) sendPings() {
 			}
 
 			p.Ping()
-		case <-p.tickerStop:
+		case <-p.tickerCloser:
 			return
 		}
 	}
@@ -135,7 +134,7 @@ func (p *peer) requestFinishHandshake() {
 			if !gotPeerList {
 				p.GetPeerList()
 			}
-		case <-p.tickerStop:
+		case <-p.tickerCloser:
 			return
 		}
 	}
@@ -371,14 +370,10 @@ func (p *peer) Close() { p.once.Do(p.close) }
 // assumes only `peer.Close` calls this
 func (p *peer) close() {
 	// now that we have been asked to close signal the tickers to stop
-	if p.sendPingsTicker != nil {
-		p.sendPingsTicker.Stop()
-	}
-	if p.finishHandshakeTicker != nil {
-		p.finishHandshakeTicker.Stop()
-	}
-	p.tickerStop <- true
-	p.tickerStop <- true
+	p.sendPingsTicker.Stop()
+	p.finishHandshakeTicker.Stop()
+
+	close(p.tickerCloser)
 
 	if err := p.conn.Close(); err != nil {
 		p.net.log.Debug("closing peer %s resulted in an error: %s", p.id, err)
