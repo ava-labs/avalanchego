@@ -97,4 +97,7 @@ type Config struct {
 	ConsensusRouter          router.Router
 	ConsensusGossipFrequency time.Duration
 	ConsensusShutdownTimeout time.Duration
+
+	// use dynamic IP resolution
+	DynamicConsensusIP bool
 }

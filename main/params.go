@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/dynamicip"
+
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/genesis"
@@ -120,6 +122,7 @@ func init() {
 
 	// IP:
 	consensusIP := fs.String("public-ip", "", "Public IP of this node")
+	fs.BoolVar(&Config.DynamicConsensusIP, "dynamic-public-ip", false, "If true, resolve ip from ifconfig.co")
 
 	// HTTP Server:
 	httpHost := fs.String("http-host", "127.0.0.1", "Address of the HTTP server")
@@ -249,12 +252,20 @@ func init() {
 
 	var ip net.IP
 	// If public IP is not specified, get it using shell command dig
-	if *consensusIP == "" {
+	if *consensusIP == "" && !Config.DynamicConsensusIP {
 		Config.AttemptedNATTraversal = true
 		Config.Nat = nat.GetRouter()
 		ip, err = Config.Nat.ExternalIP()
 		if err != nil {
 			ip = net.IPv4zero // Couldn't get my IP...set to 0.0.0.0
+		}
+	} else if Config.DynamicConsensusIP {
+		Config.Nat = nat.NewNoRouter()
+		ipstr, err := dynamicip.FetchExternalIP()
+		if err != nil {
+			ip = net.IPv4zero
+		} else {
+			ip = net.ParseIP(ipstr)
 		}
 	} else {
 		Config.Nat = nat.NewNoRouter()
