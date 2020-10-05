@@ -24,6 +24,10 @@ type pmpRouter struct {
 	client *natpmp.Client
 }
 
+func (r *pmpRouter) IsNATTraversal() bool {
+	return true
+}
+
 func (pmp *pmpRouter) MapPort(
 	networkProtocol string,
 	newInternalPort uint16,
@@ -63,12 +67,6 @@ func (pmp *pmpRouter) ExternalIP() (net.IP, error) {
 		return nil, err
 	}
 	return response.ExternalIPAddress[:], nil
-}
-
-// go-nat-pmp does not support port mapping entry query
-func (pmp *pmpRouter) GetPortMappingEntry(externalPort uint16, protocol string) (
-	string, uint16, string, error) {
-	return "", 0, "", fmt.Errorf("port mapping entry not found")
 }
 
 func getPMPRouter() *pmpRouter {

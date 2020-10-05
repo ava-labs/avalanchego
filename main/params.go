@@ -124,6 +124,8 @@ func init() {
 	// HTTP Server:
 	httpHost := fs.String("http-host", "127.0.0.1", "Address of the HTTP server")
 	httpPort := fs.Uint("http-port", 9650, "Port of the HTTP server")
+	// when using NAT Traversal and you want your http service to listen on a different port.
+	externalHTTPPort := fs.Uint("http-port-external", *httpPort, "External port of the HTTP server")
 	fs.BoolVar(&Config.HTTPSEnabled, "http-tls-enabled", false, "Upgrade the HTTP server to HTTPs")
 	fs.StringVar(&Config.HTTPSKeyFile, "http-tls-key-file", "", "TLS private key file for the HTTPs server")
 	fs.StringVar(&Config.HTTPSCertFile, "http-tls-cert-file", "", "TLS certificate file for the HTTPs server")
@@ -135,7 +137,10 @@ func init() {
 	bootstrapIDs := fs.String("bootstrap-ids", "default", "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 
 	// Staking:
-	consensusPort := fs.Uint("staking-port", 9651, "Port of the consensus server")
+	consensusPort := fs.Uint("staking-port", 9651, "External port of the consensus server you can override the local listening port with internal-staking-port for dynamic NAT traversal")
+	// this is a bit more complicated, but this becomes an override for port our process will start up listening on.
+	// i did this because I think changing the meaning of 'staking-port' param could be a bit more confusing.
+	internalStakingPort := fs.Uint("internal-staking-port", *consensusPort, "Internal listening consensus port")
 	fs.BoolVar(&Config.EnableStaking, "staking-enabled", true, "Enable staking. If enabled, Network TLS is required.")
 	fs.BoolVar(&Config.EnableP2PTLS, "p2p-tls-enabled", true, "Require TLS to authenticate network communication")
 	fs.StringVar(&Config.StakingKeyFile, "staking-tls-key-file", defaultStakingKeyPath, "TLS private key for staking")
@@ -245,6 +250,7 @@ func init() {
 	var ip net.IP
 	// If public IP is not specified, get it using shell command dig
 	if *consensusIP == "" {
+		Config.AttemptedNATTraversal = true
 		Config.Nat = nat.GetRouter()
 		ip, err = Config.Nat.ExternalIP()
 		if err != nil {
@@ -264,7 +270,7 @@ func init() {
 		IP:   ip,
 		Port: uint16(*consensusPort),
 	}
-	Config.StakingLocalPort = uint16(*consensusPort)
+	Config.InternalStakingPort = uint16(*internalStakingPort)
 
 	defaultBootstrapIPs, defaultBootstrapIDs := genesis.SampleBeacons(networkID, 5)
 
@@ -363,6 +369,7 @@ func init() {
 	// HTTP:
 	Config.HTTPHost = *httpHost
 	Config.HTTPPort = uint16(*httpPort)
+	Config.ExternalHTTPPort = uint16(*externalHTTPPort)
 	if Config.APIRequireAuthToken {
 		if Config.APIAuthPassword == "" {
 			errs.Add(errors.New("api-auth-password must be provided if api-auth-required is true"))
