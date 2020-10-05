@@ -68,17 +68,17 @@ func (u *ExternalIPUpdater) UpdateExternalIP(frequency time.Duration) {
 			ipstr, err := FetchExternalIP()
 			if err != nil {
 				u.log.Warn("Fetch external IP failed %s", err)
-			} else {
-				newIp := net.ParseIP(ipstr)
-				if newIp == nil {
-					u.log.Warn("Fetched external IP failed to parse %s", ipstr)
-				} else {
-					oldIp := u.ip.Ip().IP
-					u.ip.UpdateIP(newIp)
-					if !oldIp.Equal(newIp) {
-						u.log.Info("ExternalIP updated to %s", newIp)
-					}
-				}
+				continue
+			}
+			newIp := net.ParseIP(ipstr)
+			if newIp == nil {
+				u.log.Warn("Fetched external IP failed to parse %s", ipstr)
+				continue
+			}
+			oldIp := u.ip.Ip().IP
+			u.ip.UpdateIP(newIp)
+			if !oldIp.Equal(newIp) {
+				u.log.Info("ExternalIP updated to %s", newIp)
 			}
 		case <-u.tickerCloser:
 			return
