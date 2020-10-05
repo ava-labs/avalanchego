@@ -366,8 +366,10 @@ func (p *peer) dropMessage(msgLen, connPendingLen, networkPendingLen int) bool {
 }
 
 // assumes the stateLock is not held
-func (p *peer) Close() {
+func (p *peer) Close() { p.once.Do(p.close) }
 
+// assumes only `peer.Close` calls this
+func (p *peer) close() {
 	// now that we have been asked to close signal the tickers to stop
 	if p.sendPingsTicker != nil {
 		p.sendPingsTicker.Stop()
@@ -378,11 +380,6 @@ func (p *peer) Close() {
 	p.tickerStop <- true
 	p.tickerStop <- true
 
-	p.once.Do(p.close)
-}
-
-// assumes only `peer.Close` calls this
-func (p *peer) close() {
 	if err := p.conn.Close(); err != nil {
 		p.net.log.Debug("closing peer %s resulted in an error: %s", p.id, err)
 	}
