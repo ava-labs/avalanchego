@@ -211,11 +211,11 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 		switch err.(type) {
 		case permError:
 			return nil, nil, nil, nil, permError{
-				fmt.Errorf("failed semanticVerifySpend: %s", err.Error()),
+				fmt.Errorf("failed semanticVerifySpend: %w", err),
 			}
 		default:
 			return nil, nil, nil, nil, tempError{
-				fmt.Errorf("failed semanticVerifySpend: %s", err.Error()),
+				fmt.Errorf("failed semanticVerifySpend: %w", err),
 			}
 		}
 	}

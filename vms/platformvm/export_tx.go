@@ -103,11 +103,11 @@ func (tx *UnsignedExportTx) SemanticVerify(
 		switch err.(type) {
 		case permError:
 			return permError{
-				fmt.Errorf("failed semanticVerifySpend: %s", err.Error()),
+				fmt.Errorf("failed semanticVerifySpend: %w", err),
 			}
 		default:
 			return tempError{
-				fmt.Errorf("failed semanticVerifySpend: %s", err.Error()),
+				fmt.Errorf("failed semanticVerifySpend: %w", err),
 			}
 		}
 	}
