@@ -110,6 +110,9 @@ func (j *Jobs) Execute(job Job) error {
 		if deps.Len() > 0 {
 			continue
 		}
+		// TODO: Calling execute here ensures that double decision blocks are
+		//       always called atomically with their proposal blocks. This is
+		//       only a quick fix and should be handled in a more robust manner.
 		if err := job.Execute(); err != nil {
 			return err
 		}
