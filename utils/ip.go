@@ -137,3 +137,9 @@ func (i *DynamicIPDesc) UpdatePort(port uint16) {
 	defer i.ip.lock.Unlock()
 	i.ip.ip.Port = port
 }
+
+func (i *DynamicIPDesc) UpdateIP(IP net.IP) {
+	i.ip.lock.Lock()
+	defer i.ip.lock.Unlock()
+	i.ip.ip.IP = IP
+}
