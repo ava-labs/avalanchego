@@ -100,4 +100,7 @@ type Config struct {
 
 	// use dynamic IP resolution
 	DynamicConsensusIP bool
+
+	// Dynamic IP Update time
+	DynamicConsensusUpdate time.Duration
 }

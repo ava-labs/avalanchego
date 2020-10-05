@@ -5,7 +5,6 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 
@@ -29,10 +28,6 @@ const (
 var (
 	stakingPortName = fmt.Sprintf("%s-staking", constants.AppName)
 	httpPortName    = fmt.Sprintf("%s-http", constants.AppName)
-)
-
-const (
-	dynamicIPUpdateTime = 5 * time.Minute
 )
 
 // main is the primary entry point to Avalanche.
@@ -105,7 +100,7 @@ func main() {
 		mapper.Map("TCP", Config.HTTPPort, Config.ExternalHTTPPort, httpPortName, nil)
 	}
 
-	externalIPUpdater := dynamicip.NewExternalIPUpdater(Config.DynamicConsensusIP, dynamicIPUpdateTime, log, &Config.StakingIP)
+	externalIPUpdater := dynamicip.NewExternalIPUpdater(Config.DynamicConsensusIP, Config.DynamicConsensusUpdate, log, &Config.StakingIP)
 	defer externalIPUpdater.Stop()
 
 	log.Debug("initializing node state")

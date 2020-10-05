@@ -123,6 +123,7 @@ func init() {
 	// IP:
 	consensusIP := fs.String("public-ip", "", "Public IP of this node")
 	fs.BoolVar(&Config.DynamicConsensusIP, "dynamic-public-ip", false, "If true, resolve ip from ifconfig.co")
+	fs.DurationVar(&Config.DynamicConsensusUpdate, "dynamic-public-ip-update", 1*time.Minute, "Dynamic IP update time")
 
 	// HTTP Server:
 	httpHost := fs.String("http-host", "127.0.0.1", "Address of the HTTP server")
