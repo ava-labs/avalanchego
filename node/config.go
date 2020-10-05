@@ -40,7 +40,7 @@ type Config struct {
 
 	// Staking configuration
 	StakingIP utils.IPDesc
-	// InternalStakingPort == StakingIP.Port generally unless you want your external port to be different using PnP
+	// InternalStakingPort == StakingIP.Port generally unless you want your external port to be different using NAT Traversal
 	InternalStakingPort     uint16
 	EnableP2PTLS            bool
 	EnableStaking           bool
