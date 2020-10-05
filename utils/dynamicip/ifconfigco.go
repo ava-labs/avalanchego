@@ -40,15 +40,16 @@ func (u *NoExternalIPUpdater) Stop() {
 }
 
 type ExternalIPUpdater struct {
-	tickerCloser chan struct{}
-	log          logging.Logger
-	ip           *utils.DynamicIPDesc
+	tickerCloser  chan struct{}
+	log           logging.Logger
+	ip            *utils.DynamicIPDesc
+	updateTimeout time.Duration
 }
 
-func NewExternalIPUpdater(enable bool, updateTime time.Duration, log logging.Logger, ip *utils.DynamicIPDesc) ExternalIPUpdaterInterface {
+func NewExternalIPUpdater(enable bool, updateTimeout time.Duration, log logging.Logger, ip *utils.DynamicIPDesc) ExternalIPUpdaterInterface {
 	if enable {
-		updater := &ExternalIPUpdater{log: log, ip: ip}
-		go updater.UpdateExternalIP(updateTime)
+		updater := &ExternalIPUpdater{log: log, ip: ip, updateTimeout: updateTimeout}
+		go updater.UpdateExternalIP(updateTimeout)
 		return updater
 	}
 	return &NoExternalIPUpdater{}
@@ -80,6 +81,7 @@ func (u *ExternalIPUpdater) UpdateExternalIP(frequency time.Duration) {
 			if !oldIp.Equal(newIp) {
 				u.log.Info("ExternalIP updated to %s", newIp)
 			}
+			ticker.Reset(u.updateTimeout)
 		case <-u.tickerCloser:
 			return
 		}
