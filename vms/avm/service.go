@@ -372,7 +372,7 @@ func (service *Service) GetAllBalances(r *http.Request, args *api.JsonAddress, r
 
 	utxos, _, _, err := service.vm.GetUTXOs(addrSet, ids.ShortEmpty, ids.Empty, -1)
 	if err != nil {
-		return fmt.Errorf("couldn't get address's UTXOs: %s", err)
+		return fmt.Errorf("couldn't get address's UTXOs: %w", err)
 	}
 
 	assetIDs := ids.Set{}                 // IDs of assets the address has a non-zero balance of
@@ -796,7 +796,7 @@ func (service *Service) CreateAddress(r *http.Request, args *api.UserPass, reply
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 	// Drop any potential error closing the database to report the original
 	// error
