@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils"
+
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -57,7 +59,7 @@ func NewPortMapper(log logging.Logger, r Router) Mapper {
 
 // Attempt to establish a NAT Traversal connection from extPort (exposed to the internet) to our
 // intPort (where our process is listening).
-func (dev *Mapper) Map(protocol string, intPort, extPort uint16, desc string) {
+func (dev *Mapper) Map(protocol string, intPort, extPort uint16, desc string, ip *utils.DynamicIPDesc) {
 	if !dev.r.IsNATTraversal() {
 		return
 	}
@@ -67,10 +69,10 @@ func (dev *Mapper) Map(protocol string, intPort, extPort uint16, desc string) {
 	if err != nil {
 		dev.log.Error("NAT Traversal failed from external port %d to internal port %d with %s", extPort, intPort, err)
 	} else {
-		dev.log.Info("NAT Traversal successful from external port %d to internal port %d", extPort, intPort)
+		dev.log.Info("NAT Traversal  successful from external port %d to internal port %d", extPort, intPort)
 	}
 
-	go dev.keepPortMapping(protocol, intPort, extPort, desc)
+	go dev.keepPortMapping(protocol, intPort, extPort, desc, ip)
 }
 
 // Retry port map up to maxRefreshRetries with a 1 second delay
@@ -92,7 +94,7 @@ func (dev *Mapper) retryMapPort(protocol string, intPort, extPort uint16, desc s
 
 // keepPortMapping runs in the background to keep a port mapped. It renews the
 // the port mapping at intervals of mapUpdateTimeout.
-func (dev *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, desc string) {
+func (dev *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, desc string, ip *utils.DynamicIPDesc) {
 	updateTimer := time.NewTimer(mapUpdateTimeout)
 
 	dev.wg.Add(1)
@@ -115,6 +117,18 @@ func (dev *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, des
 			if err != nil {
 				dev.log.Warn("Renew NAT Traversal failed from external port %d to internal port %d with %s",
 					extPort, intPort, err)
+			}
+			if ip != nil {
+				newIp, err := dev.r.ExternalIP()
+				if err == nil {
+					oldIp := ip.Ip().IP
+					ip.UpdateIP(newIp)
+					if !oldIp.Equal(newIp) {
+						dev.log.Info("Renew ExternalIP updated to %s", newIp)
+					}
+				} else {
+					dev.log.Error("Renew ExternalIP failed with %s", err)
+				}
 			}
 			updateTimer.Reset(mapUpdateTimeout)
 		case <-dev.closer:

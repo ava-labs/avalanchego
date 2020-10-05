@@ -303,7 +303,7 @@ func (n *Node) Dispatch() error {
 
 	// Add bootstrap nodes to the peer network
 	for _, peer := range n.Config.BootstrapPeers {
-		if !peer.IP.Equal(n.Config.StakingIP) {
+		if !peer.IP.Equal(n.Config.StakingIP.Ip()) {
 			n.Net.Track(peer.IP)
 		} else {
 			n.Log.Error("can't add self as a bootstrapper")
@@ -358,7 +358,7 @@ func (n *Node) initDatabase() error {
 // uses for P2P communication
 func (n *Node) initNodeID() error {
 	if !n.Config.EnableP2PTLS {
-		n.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.String())))
+		n.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.Ip().String())))
 		n.Log.Info("Set the node's ID to %s", n.ID)
 		return nil
 	}

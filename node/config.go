@@ -39,7 +39,7 @@ type Config struct {
 	DB database.Database
 
 	// Staking configuration
-	StakingIP utils.IPDesc
+	StakingIP utils.DynamicIPDesc
 	// InternalStakingPort == StakingIP.Port generally unless you want your external port to be different using NAT Traversal
 	InternalStakingPort     uint16
 	EnableP2PTLS            bool
