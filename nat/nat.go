@@ -124,7 +124,7 @@ func (dev *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, des
 					oldIp := ip.Ip().IP
 					ip.UpdateIP(newIp)
 					if !oldIp.Equal(newIp) {
-						dev.log.Info("Renew ExternalIP updated to %s", newIp)
+						dev.log.Info("ExternalIP updated to %s", newIp)
 					}
 				} else {
 					dev.log.Error("Renew ExternalIP failed with %s", err)
