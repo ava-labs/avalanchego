@@ -65,23 +65,10 @@ type peer struct {
 	lastSent, lastReceived int64
 
 	tickerCloser chan struct{}
-
-	// task for finishing handshaking
-	finishHandshakeTicker *time.Ticker
-
-	// task for sending pings
-	sendPingsTicker *time.Ticker
 }
 
 // assume the stateLock is held
 func (p *peer) Start() {
-	p.tickerCloser = make(chan struct{}, 1)
-
-	// store the tickers in the peer..
-	// if the read or write closes, we can immediately cancel the ticket, and stop the goroutines.
-	p.finishHandshakeTicker = time.NewTicker(p.net.getVersionTimeout)
-	p.sendPingsTicker = time.NewTicker(p.net.pingFrequency)
-
 	go p.ReadMessages()
 	go p.WriteMessages()
 
@@ -90,11 +77,12 @@ func (p *peer) Start() {
 }
 
 func (p *peer) sendPings() {
-	defer p.sendPingsTicker.Stop()
+	sendPingsTicker := time.NewTicker(p.net.pingFrequency)
+	defer sendPingsTicker.Stop()
 
 	for {
 		select {
-		case <-p.sendPingsTicker.C:
+		case <-sendPingsTicker.C:
 			p.net.stateLock.Lock()
 			closed := p.closed
 			p.net.stateLock.Unlock()
@@ -112,11 +100,12 @@ func (p *peer) sendPings() {
 
 // request missing handshake messages from the peer
 func (p *peer) requestFinishHandshake() {
-	defer p.finishHandshakeTicker.Stop()
+	finishHandshakeTicker := time.NewTicker(p.net.getVersionTimeout)
+	defer finishHandshakeTicker.Stop()
 
 	for {
 		select {
-		case <-p.finishHandshakeTicker.C:
+		case <-finishHandshakeTicker.C:
 			p.net.stateLock.Lock()
 			gotVersion := p.gotVersion
 			gotPeerList := p.gotPeerList
@@ -369,10 +358,8 @@ func (p *peer) Close() { p.once.Do(p.close) }
 
 // assumes only `peer.Close` calls this
 func (p *peer) close() {
-	// now that we have been asked to close signal the tickers to stop
-	p.sendPingsTicker.Stop()
-	p.finishHandshakeTicker.Stop()
-
+	// If the connection is closing, we can immediately cancel the ticker
+	// goroutines.
 	close(p.tickerCloser)
 
 	if err := p.conn.Close(); err != nil {
