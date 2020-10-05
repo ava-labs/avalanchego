@@ -48,6 +48,7 @@ if [[ ! -d "$WORKPREFIX" ]]; then
     git --git-dir="$AVALANCHE_CLONE/.git" checkout "$BRANCH"
 fi
 
-AVALANCHE_COMMIT="$(git --git-dir="$AVALANCHE_CLONE/.git" rev-parse --short HEAD)"
+FULL_COMMIT_HASH="$(git --git-dir="$AVALANCHE_PATH/.git" rev-parse HEAD)"
+AVALANCHE_COMMIT="${FULL_COMMIT_HASH::8}"
 
 "${DOCKER}" build -t "$DOCKERHUB_REPO:$AVALANCHE_COMMIT" "$AVALANCHE_CLONE" -f "$AVALANCHE_CLONE/Dockerfile"
