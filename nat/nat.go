@@ -123,7 +123,7 @@ func (dev *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, des
 				if err != nil {
 					ip.UpdateIP(newIp)
 				} else {
-					dev.log.Warn("Renew ExternalIP failed with %s", err)
+					dev.log.Error("Renew ExternalIP failed with %s", err)
 				}
 			}
 			updateTimer.Reset(mapUpdateTimeout)
