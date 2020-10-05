@@ -7,7 +7,11 @@ bash <(curl -s https://codecov.io/bash)
 AVALANCHE_IMAGE="$DOCKERHUB_REPO:$COMMIT"
 
 TRAVIS_TAG="$DOCKERHUB_REPO:travis-$TRAVIS_BUILD_NUMBER"
-docker tag $AVALANCHE_IMAGE "$TRAVIS_TAG"
+docker tag "$AVALANCHE_IMAGE" "$TRAVIS_TAG"
+
+if [[ $TRAVIS_BRANCH == "master" ]]; then
+  docker tag "$AVALANCHE_IMAGE" "$DOCKERHUB_REPO:latest"
+fi
 
 # don't push to dockerhub if this is not being run on the main public repo
 # or if it's a PR from a fork ( => secret vars not set )
