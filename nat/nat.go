@@ -15,7 +15,6 @@ import (
 
 const (
 	mapTimeout        = 30 * time.Minute
-	mapUpdateTimeout  = 5 * time.Minute
 	maxRefreshRetries = 3
 )
 
@@ -59,7 +58,7 @@ func NewPortMapper(log logging.Logger, r Router) Mapper {
 
 // Attempt to establish a NAT Traversal connection from extPort (exposed to the internet) to our
 // intPort (where our process is listening).
-func (dev *Mapper) Map(protocol string, intPort, extPort uint16, desc string, ip *utils.DynamicIPDesc) {
+func (dev *Mapper) Map(protocol string, intPort, extPort uint16, desc string, ip *utils.DynamicIPDesc, updateTime time.Duration) {
 	if !dev.r.IsNATTraversal() {
 		return
 	}
@@ -72,7 +71,7 @@ func (dev *Mapper) Map(protocol string, intPort, extPort uint16, desc string, ip
 		dev.log.Info("NAT Traversal  successful from external port %d to internal port %d", extPort, intPort)
 	}
 
-	go dev.keepPortMapping(protocol, intPort, extPort, desc, ip)
+	go dev.keepPortMapping(protocol, intPort, extPort, desc, ip, updateTime)
 }
 
 // Retry port map up to maxRefreshRetries with a 1 second delay
@@ -94,8 +93,8 @@ func (dev *Mapper) retryMapPort(protocol string, intPort, extPort uint16, desc s
 
 // keepPortMapping runs in the background to keep a port mapped. It renews the
 // the port mapping at intervals of mapUpdateTimeout.
-func (dev *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, desc string, ip *utils.DynamicIPDesc) {
-	updateTimer := time.NewTimer(mapUpdateTimeout)
+func (dev *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, desc string, ip *utils.DynamicIPDesc, updateTime time.Duration) {
+	updateTimer := time.NewTimer(updateTime)
 
 	dev.wg.Add(1)
 
@@ -130,7 +129,7 @@ func (dev *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, des
 					dev.log.Error("Renew ExternalIP failed with %s", err)
 				}
 			}
-			updateTimer.Reset(mapUpdateTimeout)
+			updateTimer.Reset(updateTime)
 		case <-dev.closer:
 			return
 		}

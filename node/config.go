@@ -101,6 +101,6 @@ type Config struct {
 	// use dynamic IP resolution
 	DynamicConsensusIP bool
 
-	// Dynamic IP Update time
-	DynamicConsensusUpdate time.Duration
+	// Dynamic Update duration for IP or NAT traversal
+	DynamicUpdateDuration time.Duration
 }

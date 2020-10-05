@@ -125,7 +125,9 @@ func init() {
 
 	// dynamic-public-ip overries public-ip
 	fs.BoolVar(&Config.DynamicConsensusIP, "dynamic-public-ip", false, "If true, resolve ip from ifconfig.co")
-	fs.DurationVar(&Config.DynamicConsensusUpdate, "dynamic-public-ip-update", 1*time.Minute, "Dynamic IP update time")
+
+	// how often to update the dynamic IP and PnP/NAT-PMP IP and routing.
+	fs.DurationVar(&Config.DynamicUpdateDuration, "dynamic-update-duration", 5*time.Minute, "Dynamic IP and NAT Traversal update duration")
 
 	// HTTP Server:
 	httpHost := fs.String("http-host", "127.0.0.1", "Address of the HTTP server")
