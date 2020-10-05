@@ -187,7 +187,7 @@ func (n *Node) initNetworking() error {
 		})
 
 		go timer.Dispatch()
-		timer.SetTimeoutIn(15 * time.Second)
+		timer.SetTimeoutIn(1 * time.Minute)
 
 		consensusRouter = &beaconManager{
 			Router:         consensusRouter,
