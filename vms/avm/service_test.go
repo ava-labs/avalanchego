@@ -131,7 +131,7 @@ func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numT
 			reply,
 		)
 		if err != nil {
-			return fmt.Errorf("couldn't get balance of %s: %s", addr, err)
+			return fmt.Errorf("couldn't get balance of %s: %w", addr, err)
 		}
 		balances[addr.Key()] = int(reply.Balance)
 	}

@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -215,20 +216,18 @@ type SingleDecisionBlock struct {
 
 // Accept implements the snowman.Block interface
 func (sdb *SingleDecisionBlock) Accept() error {
-	sdb.VM.Ctx.Log.Verbo("Accepting block with ID %s", sdb.ID())
+	sdb.VM.Ctx.Log.Verbo("accepting block with ID %s", sdb.ID())
 
 	if err := sdb.CommonBlock.Accept(); err != nil {
-		return err
+		return fmt.Errorf("failed to accept CommonBlock: %w", err)
 	}
 
 	// Update the state of the chain in the database
 	if err := sdb.onAcceptDB.Commit(); err != nil {
-		sdb.vm.Ctx.Log.Warn("unable to commit onAcceptDB")
-		return err
+		return fmt.Errorf("failed to commit onAcceptDB: %w", err)
 	}
 	if err := sdb.vm.DB.Commit(); err != nil {
-		sdb.vm.Ctx.Log.Warn("unable to commit vm's DB")
-		return err
+		return fmt.Errorf("failed to commit vm's DB: %w", err)
 	}
 
 	for _, child := range sdb.children {
@@ -236,7 +235,7 @@ func (sdb *SingleDecisionBlock) Accept() error {
 	}
 	if sdb.onAcceptFunc != nil {
 		if err := sdb.onAcceptFunc(); err != nil {
-			return err
+			return fmt.Errorf("failed to execute onAcceptFunc: %w", err)
 		}
 	}
 
@@ -260,21 +259,19 @@ func (ddb *DoubleDecisionBlock) Accept() error {
 	}
 
 	if err := parent.CommonBlock.Accept(); err != nil {
-		return err
+		return fmt.Errorf("failed to accept parent's CommonBlock: %w", err)
 	}
 
 	if err := ddb.CommonBlock.Accept(); err != nil {
-		return err
+		return fmt.Errorf("failed to accept CommonBlock: %w", err)
 	}
 
 	// Update the state of the chain in the database
 	if err := ddb.onAcceptDB.Commit(); err != nil {
-		ddb.vm.Ctx.Log.Warn("unable to commit onAcceptDB: %s", err)
-		return err
+		return fmt.Errorf("failed to commit onAcceptDB: %w", err)
 	}
 	if err := ddb.vm.DB.Commit(); err != nil {
-		ddb.vm.Ctx.Log.Warn("unable to commit vm's DB: %s", err)
-		return err
+		return fmt.Errorf("failed to commit vm's DB: %w", err)
 	}
 
 	for _, child := range ddb.children {
@@ -282,8 +279,7 @@ func (ddb *DoubleDecisionBlock) Accept() error {
 	}
 	if ddb.onAcceptFunc != nil {
 		if err := ddb.onAcceptFunc(); err != nil {
-			ddb.vm.Ctx.Log.Warn("error executing OnAcceptFunc(): %s", err)
-			return err
+			return fmt.Errorf("failed to execute OnAcceptFunc: %w", err)
 		}
 	}
 

@@ -4,6 +4,8 @@
 package platformvm
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -50,11 +52,11 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte) error {
 
 	unsignedBytes, err := pb.vm.codec.Marshal(&pb.Tx.UnsignedTx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
 	}
 	signedBytes, err := pb.vm.codec.Marshal(&pb.Tx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
 	pb.Tx.Initialize(unsignedBytes, signedBytes)
 	return nil
@@ -107,7 +109,7 @@ func (pb *ProposalBlock) Verify() error {
 	if !ok {
 		if err := pb.Reject(); err == nil {
 			if err := pb.vm.DB.Commit(); err != nil {
-				pb.vm.Ctx.Log.Error("error committing Proposal block as rejected: %s", err)
+				return fmt.Errorf("couldn't commit VM's database: %w", err)
 			}
 		} else {
 			pb.vm.DB.Abort()
@@ -129,7 +131,7 @@ func (pb *ProposalBlock) Verify() error {
 		if !err.Temporary() {
 			if err := pb.Reject(); err == nil {
 				if err := pb.vm.DB.Commit(); err != nil {
-					pb.vm.Ctx.Log.Error("error committing Proposal block as rejected: %s", err)
+					return fmt.Errorf("couldn't commit VM's database: %w", err)
 				}
 			} else {
 				pb.vm.DB.Abort()
@@ -140,17 +142,17 @@ func (pb *ProposalBlock) Verify() error {
 
 	txBytes := tx.Bytes()
 	if err := pb.vm.putTx(pb.onCommitDB, txID, txBytes); err != nil {
-		return err
+		return fmt.Errorf("failed to put tx %s in database: %w", txID, err)
 	}
 	if err := pb.vm.putStatus(pb.onCommitDB, txID, Committed); err != nil {
-		return err
+		return fmt.Errorf("failed to put status of tx %s: %w", txID, err)
 	}
 
 	if err := pb.vm.putTx(pb.onAbortDB, txID, txBytes); err != nil {
-		return err
+		return fmt.Errorf("failed to put tx %s in database: %w", txID, err)
 	}
 	if err := pb.vm.putStatus(pb.onAbortDB, txID, Aborted); err != nil {
-		return err
+		return fmt.Errorf("failed to put status of tx %s: %w", txID, err)
 	}
 
 	pb.vm.currentBlocks[pb.ID().Key()] = pb
@@ -164,21 +166,21 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 
 	commit, err := pb.vm.newCommitBlock(blockID, pb.Height()+1)
 	if err != nil {
-		return [2]snowman.Block{}, err
+		return [2]snowman.Block{}, fmt.Errorf("failed to create commit block: %w", err)
 	}
 	abort, err := pb.vm.newAbortBlock(blockID, pb.Height()+1)
 	if err != nil {
-		return [2]snowman.Block{}, err
+		return [2]snowman.Block{}, fmt.Errorf("failed to create abort block: %w", err)
 	}
 
 	if err := pb.vm.State.PutBlock(pb.vm.DB, commit); err != nil {
-		return [2]snowman.Block{}, err
+		return [2]snowman.Block{}, fmt.Errorf("failed to put commit block: %w", err)
 	}
 	if err := pb.vm.State.PutBlock(pb.vm.DB, abort); err != nil {
-		return [2]snowman.Block{}, err
+		return [2]snowman.Block{}, fmt.Errorf("failed to put abort block: %w", err)
 	}
 	if err := pb.vm.DB.Commit(); err != nil {
-		return [2]snowman.Block{}, err
+		return [2]snowman.Block{}, fmt.Errorf("failed to commit VM's database: %w", err)
 	}
 
 	tx, ok := pb.Tx.UnsignedTx.(UnsignedProposalTx)
@@ -209,7 +211,7 @@ func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx Tx) (*Proposal
 	block := Block(pb)
 	bytes, err := Codec.Marshal(&block)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}
 	pb.Initialize(bytes, vm.SnowmanVM)
 	return pb, nil

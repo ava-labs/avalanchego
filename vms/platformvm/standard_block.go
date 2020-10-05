@@ -4,6 +4,8 @@
 package platformvm
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/core"
@@ -20,11 +22,11 @@ type StandardBlock struct {
 // initialize this block
 func (sb *StandardBlock) initialize(vm *VM, bytes []byte) error {
 	if err := sb.SingleDecisionBlock.initialize(vm, bytes); err != nil {
-		return err
+		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	for _, tx := range sb.Txs {
 		if err := tx.Sign(vm.codec, nil); err != nil {
-			return err
+			return fmt.Errorf("failed to sign block: %w", err)
 		}
 	}
 	return nil
@@ -43,7 +45,7 @@ func (sb *StandardBlock) Verify() error {
 	if !ok {
 		if err := sb.Reject(); err == nil {
 			if err := sb.vm.DB.Commit(); err != nil {
-				return err
+				return fmt.Errorf("failed to commit VM's database: %w", err)
 			}
 		} else {
 			sb.vm.DB.Abort()
@@ -65,7 +67,7 @@ func (sb *StandardBlock) Verify() error {
 			sb.vm.droppedTxCache.Put(tx.ID(), nil) // cache tx as dropped
 			if err := sb.Reject(); err == nil {
 				if err := sb.vm.DB.Commit(); err != nil {
-					return err
+					return fmt.Errorf("failed to commit VM's database: %w", err)
 				}
 			} else {
 				sb.vm.DB.Abort()
@@ -73,11 +75,11 @@ func (sb *StandardBlock) Verify() error {
 			return err
 		}
 		if txBytes, err := sb.vm.codec.Marshal(tx); err != nil {
-			return err
+			return fmt.Errorf("failed to marshal tx %s: %w", tx.ID(), err)
 		} else if err := sb.vm.putTx(sb.onAcceptDB, tx.ID(), txBytes); err != nil {
-			return err
+			return fmt.Errorf("failed to put tx %s: %w", tx.ID(), err)
 		} else if err := sb.vm.putStatus(sb.onAcceptDB, tx.ID(), Committed); err != nil {
-			return err
+			return fmt.Errorf("failed to put tx %s status: %w", tx.ID(), err)
 		} else if onAccept != nil {
 			funcs = append(funcs, onAccept)
 		}
@@ -89,7 +91,7 @@ func (sb *StandardBlock) Verify() error {
 		sb.onAcceptFunc = func() error {
 			for _, f := range funcs {
 				if err := f(); err != nil {
-					return err
+					return fmt.Errorf("failed to execute onAcceptFunc: %w", err)
 				}
 			}
 			return nil
@@ -121,7 +123,7 @@ func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*Tx) (*Stan
 	blk := Block(sb)
 	bytes, err := vm.codec.Marshal(&blk)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}
 	sb.Block.Initialize(bytes, vm.SnowmanVM)
 	return sb, nil

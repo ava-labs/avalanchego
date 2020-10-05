@@ -65,13 +65,18 @@ type peer struct {
 	lastSent, lastReceived int64
 
 	tickerCloser chan struct{}
+
+	// ticker processes
+	tickerOnce sync.Once
 }
 
 // assume the stateLock is held
 func (p *peer) Start() {
 	go p.ReadMessages()
 	go p.WriteMessages()
+}
 
+func (p *peer) StartTicker() {
 	go p.requestFinishHandshake()
 	go p.sendPings()
 }
@@ -139,11 +144,11 @@ func (p *peer) ReadMessages() {
 	}
 
 	pendingBuffer := wrappers.Packer{}
-	readBuffer := make([]byte, 1<<10)
+	readBuffer := make([]byte, p.net.readBufferSize)
 	for {
 		read, err := p.conn.Read(readBuffer)
 		if err != nil {
-			p.net.log.Verbo("error on connection read to %s %s", p.id, err)
+			p.net.log.Verbo("error on connection read to %s %s %s", p.id, p.ip, err)
 			return
 		}
 
@@ -225,6 +230,7 @@ func (p *peer) WriteMessages() {
 				p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.ip, err)
 				return
 			}
+			p.tickerOnce.Do(p.StartTicker)
 			msg = msg[written:]
 		}
 		atomic.StoreInt64(&p.lastSent, p.net.clock.Time().Unix())
@@ -362,6 +368,10 @@ func (p *peer) close() {
 	// goroutines.
 	close(p.tickerCloser)
 
+	p.net.stateLock.Lock()
+	p.closed = true
+	p.net.stateLock.Unlock()
+
 	if err := p.conn.Close(); err != nil {
 		p.net.log.Debug("closing peer %s resulted in an error: %s", p.id, err)
 	}
@@ -369,7 +379,6 @@ func (p *peer) close() {
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
 
-	p.closed = true
 	close(p.sender)
 	p.net.disconnected(p)
 }
