@@ -627,8 +627,9 @@ func (n *network) Dispatch() error {
 			return err
 		}
 		go n.upgrade(&peer{
-			net:  n,
-			conn: conn,
+			net:          n,
+			conn:         conn,
+			tickerCloser: make(chan struct{}),
 		}, n.serverUpgrader)
 	}
 }
@@ -907,9 +908,10 @@ func (n *network) attemptConnect(ip utils.IPDesc) error {
 		}
 	}
 	return n.upgrade(&peer{
-		net:  n,
-		ip:   ip,
-		conn: conn,
+		net:          n,
+		ip:           ip,
+		conn:         conn,
+		tickerCloser: make(chan struct{}),
 	}, n.clientUpgrader)
 }
 
