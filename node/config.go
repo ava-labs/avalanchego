@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -17,20 +19,13 @@ import (
 
 // Config contains all of the configurations of an Avalanche node.
 type Config struct {
+	genesis.Params
+
 	// protocol to use for opening the network interface
 	Nat nat.Router
 
 	// ID of the network this node should connect to
 	NetworkID uint32
-
-	// Transaction fee configuration
-	TxFee uint64
-
-	// Staking uptime requirements
-	UptimeRequirement float64
-
-	// Minimum stake, in nAVAX, required to validate the primary network
-	MinStake uint64
 
 	// Assertions configuration
 	EnableAssertions bool
@@ -55,6 +50,9 @@ type Config struct {
 
 	// Network configuration
 	NetworkConfig timer.AdaptiveTimeoutConfig
+
+	// Benchlist Configuration
+	BenchlistConfig benchlist.Config
 
 	// Bootstrapping configuration
 	BootstrapPeers []*Peer

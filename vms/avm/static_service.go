@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -28,6 +29,7 @@ type StaticService struct{}
 
 // BuildGenesisArgs are arguments for BuildGenesis
 type BuildGenesisArgs struct {
+	NetworkID   cjson.Uint32               `json:"networkID"`
 	GenesisData map[string]AssetDefinition `json:"genesisData"`
 }
 
@@ -37,6 +39,7 @@ type AssetDefinition struct {
 	Symbol       string                   `json:"symbol"`
 	Denomination cjson.Uint8              `json:"denomination"`
 	InitialState map[string][]interface{} `json:"initialState"`
+	Memo         formatting.CB58          `json:"memo"`
 }
 
 // BuildGenesisReply is the reply from BuildGenesis
@@ -49,7 +52,7 @@ type BuildGenesisReply struct {
 func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	errs := wrappers.Errs{}
 
-	c := codec.NewDefault()
+	c := codec.New(math.MaxUint32, 1<<20)
 	errs.Add(
 		c.RegisterType(&BaseTx{}),
 		c.RegisterType(&CreateAssetTx{}),
@@ -72,7 +75,9 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			Alias: assetAlias,
 			CreateAssetTx: CreateAssetTx{
 				BaseTx: BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    uint32(args.NetworkID),
 					BlockchainID: ids.Empty,
+					Memo:         assetDefinition.Memo.Bytes,
 				}},
 				Name:         assetDefinition.Name,
 				Symbol:       assetDefinition.Symbol,

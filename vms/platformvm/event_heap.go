@@ -16,6 +16,7 @@ type TimedTx interface {
 	ID() ids.ID
 	StartTime() time.Time
 	EndTime() time.Time
+	Weight() uint64
 	Bytes() []byte
 }
 

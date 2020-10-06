@@ -74,7 +74,7 @@ func (tx *UnsignedImportTx) Verify(
 
 	for _, in := range tx.ImportedInputs {
 		if err := in.Verify(); err != nil {
-			return err
+			return fmt.Errorf("input failed verificaiton: %w", err)
 		}
 	}
 	if !avax.IsSortedAndUniqueTransferableInputs(tx.ImportedInputs) {
@@ -100,7 +100,9 @@ func (tx *UnsignedImportTx) SemanticVerify(
 		utxoID := input.UTXOID.InputID()
 		utxo, err := vm.getUTXO(db, utxoID)
 		if err != nil {
-			return tempError{err}
+			return tempError{
+				fmt.Errorf("failed to get UTXO %s: %w", utxoID, err),
+			}
 		}
 		utxos[index] = utxo
 	}
@@ -109,11 +111,15 @@ func (tx *UnsignedImportTx) SemanticVerify(
 
 	// Consume the UTXOS
 	if err := vm.consumeInputs(db, tx.Ins); err != nil {
-		return tempError{err}
+		return tempError{
+			fmt.Errorf("failed to consume inputs: %w", err),
+		}
 	}
 	// Produce the UTXOS
 	if err := vm.produceOutputs(db, txID, tx.Outs); err != nil {
-		return tempError{err}
+		return tempError{
+			fmt.Errorf("failed to produce outputs: %w", err),
+		}
 	}
 
 	if !vm.bootstrapped {
@@ -126,13 +132,17 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	}
 	allUTXOBytes, err := vm.Ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
 	if err != nil {
-		return tempError{err}
+		return tempError{
+			fmt.Errorf("failed to get shared memory: %w", err),
+		}
 	}
 
 	for i, utxoBytes := range allUTXOBytes {
 		utxo := &avax.UTXO{}
 		if err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
-			return tempError{err}
+			return tempError{
+				fmt.Errorf("failed to get unmarshal UTXO: %w", err),
+			}
 		}
 		utxos[i+len(tx.Ins)] = utxo
 	}
@@ -162,6 +172,7 @@ func (vm *VM) newImportTx(
 	chainID ids.ID, // chain to import from
 	to ids.ShortID, // Address of recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
+	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
 	if !vm.Ctx.XChainID.Equals(chainID) {
 		return nil, errWrongChainID
@@ -215,7 +226,7 @@ func (vm *VM) newImportTx(
 	outs := []*avax.TransferableOutput{}
 	if importedAmount < vm.txFee { // imported amount goes toward paying tx fee
 		var baseSigners [][]*crypto.PrivateKeySECP256K1R
-		ins, outs, _, baseSigners, err = vm.stake(vm.DB, keys, 0, vm.txFee-importedAmount)
+		ins, outs, _, baseSigners, err = vm.stake(vm.DB, keys, 0, vm.txFee-importedAmount, changeAddr)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 		}

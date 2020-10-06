@@ -27,7 +27,7 @@ func (a *Abort) Verify() error {
 	if !ok {
 		if err := a.Reject(); err == nil {
 			if err := a.vm.DB.Commit(); err != nil {
-				a.vm.Ctx.Log.Error("error committing Abort block as rejected: %s", err)
+				return fmt.Errorf("failed to commit database while rejecting block %s: %w", a.ID(), err)
 			}
 		} else {
 			a.vm.DB.Abort()

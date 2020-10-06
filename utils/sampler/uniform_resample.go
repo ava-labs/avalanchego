@@ -42,7 +42,7 @@ func (s *uniformResample) Sample(count int) ([]uint64, error) {
 	for i := 0; i < count; {
 		// We don't use a cryptographically secure source of randomness here, as
 		// there's no need to ensure a truly random sampling.
-		draw := uint64(rand.Int63n(int64(s.length)))
+		draw := uint64(rand.Int63n(int64(s.length))) // #nosec G404
 		if _, ok := drawn[draw]; ok {
 			continue
 		}

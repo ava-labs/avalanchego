@@ -12,7 +12,7 @@ BUILD_DIR="$AVALANCHE_PATH/build" # Where binaries go
 PLUGIN_DIR="$BUILD_DIR/plugins" # Where plugin binaries (namely coreth) go
 BINARY_PATH="$PLUGIN_DIR/evm"
 
-CORETH_VER="0.2.15-rc.4" # Should match coreth version in go.mod
+CORETH_VER="0.3.4" # Should match coreth version in go.mod
 CORETH_PATH="$GOPATH/pkg/mod/github.com/ava-labs/coreth@v$CORETH_VER"
 
 if [[ $# -eq 2 ]]; then

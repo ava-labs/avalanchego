@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/json"
 )
 
 var addrStrArray = []string{
@@ -45,11 +46,11 @@ func TestBuildGenesis(t *testing.T) {
 						Address: addrMap["6mxBGnjGDCKgkVe7yfrmvMA7xE7qCv3vv"],
 					},
 					Holder{
-						Amount:  50000,
+						Amount:  json.Uint64(startBalance),
 						Address: addrMap["6ncQ19Q2U4MamkCYzshhD8XFjfwAWFzTa"],
 					},
 					Holder{
-						Amount:  50000,
+						Amount:  json.Uint64(startBalance),
 						Address: addrMap["Jz9ayEDt7dx9hDx45aXALujWmL9ZUuqe7"],
 					},
 				},

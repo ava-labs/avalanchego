@@ -5,6 +5,7 @@ package secp256k1fx
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -24,12 +25,10 @@ var (
 	errWrongNumberOfUTXOs = errors.New("wrong number of utxos for the operation")
 
 	errWrongMintCreated               = errors.New("wrong mint output created from the operation")
-	errWrongAmounts                   = errors.New("input is consuming a different amount than expected")
 	errTimelocked                     = errors.New("output is time locked")
 	errTooManySigners                 = errors.New("input has more signers than expected")
 	errTooFewSigners                  = errors.New("input has less signers than expected")
 	errInputCredentialSignersMismatch = errors.New("input expected a different number of signers than provided in the credential")
-	errWrongSigner                    = errors.New("credential does not include expected signer")
 )
 
 // Fx describes the secp256k1 feature extension
@@ -160,7 +159,7 @@ func (fx *Fx) VerifySpend(tx Tx, in *TransferInput, cred *Credential, utxo *Tran
 	if err := verify.All(utxo, in, cred); err != nil {
 		return err
 	} else if utxo.Amt != in.Amt {
-		return errWrongAmounts
+		return fmt.Errorf("utxo amount and input amount should be same but are %d and %d", utxo.Amt, in.Amt)
 	}
 
 	return fx.VerifyCredentials(tx, &in.Input, cred, &utxo.OutputOwners)
@@ -193,7 +192,9 @@ func (fx *Fx) VerifyCredentials(tx Tx, in *Input, cred *Credential, out *OutputO
 			return err
 		}
 		if expectedAddress := out.Addrs[index]; !expectedAddress.Equals(pk.Address()) {
-			return errWrongSigner
+			return fmt.Errorf("expected signature from %s but got from %s",
+				expectedAddress,
+				pk.Address())
 		}
 	}
 

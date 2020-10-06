@@ -214,7 +214,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	vmID, err := m.VMManager.Lookup(chainParams.VMAlias)
 	if err != nil {
-		return nil, fmt.Errorf("error while looking up VM: %s", err)
+		return nil, fmt.Errorf("error while looking up VM: %w", err)
 	}
 
 	primaryAlias, err := m.PrimaryAlias(chainParams.ID)
@@ -225,7 +225,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	// Create the log and context of the chain
 	chainLog, err := m.LogFactory.MakeChain(primaryAlias, "")
 	if err != nil {
-		return nil, fmt.Errorf("error while creating chain's log %s", err)
+		return nil, fmt.Errorf("error while creating chain's log %w", err)
 	}
 
 	ctx := &snow.Context{
@@ -250,13 +250,13 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	// Get a factory for the vm we want to use on our chain
 	vmFactory, err := m.VMManager.GetVMFactory(vmID)
 	if err != nil {
-		return nil, fmt.Errorf("error while getting vmFactory: %s", err)
+		return nil, fmt.Errorf("error while getting vmFactory: %w", err)
 	}
 
 	// Create the chain
 	vm, err := vmFactory.New(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error while creating vm: %s", err)
+		return nil, fmt.Errorf("error while creating vm: %w", err)
 	}
 	// TODO: Shutdown VM if an error occurs
 
@@ -264,18 +264,18 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	for i, fxAlias := range chainParams.FxAliases {
 		fxID, err := m.VMManager.Lookup(fxAlias)
 		if err != nil {
-			return nil, fmt.Errorf("error while looking up Fx: %s", err)
+			return nil, fmt.Errorf("error while looking up Fx: %w", err)
 		}
 
 		// Get a factory for the fx we want to use on our chain
 		fxFactory, err := m.VMManager.GetVMFactory(fxID)
 		if err != nil {
-			return nil, fmt.Errorf("error while getting fxFactory: %s", err)
+			return nil, fmt.Errorf("error while getting fxFactory: %w", err)
 		}
 
 		fx, err := fxFactory.New(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("error while creating fx: %s", err)
+			return nil, fmt.Errorf("error while creating fx: %w", err)
 		}
 
 		// Create the fx
@@ -321,7 +321,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 			bootstrapWeight,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("error while creating new avalanche vm %s", err)
+			return nil, fmt.Errorf("error while creating new avalanche vm %w", err)
 		}
 	case block.ChainVM:
 		chain, err = m.createSnowmanChain(
@@ -335,7 +335,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 			bootstrapWeight,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("error while creating new snowman vm %s", err)
+			return nil, fmt.Errorf("error while creating new snowman vm %w", err)
 		}
 	default:
 		return nil, fmt.Errorf("the vm should have type avalanche.DAGVM or snowman.ChainVM. Chain not created")
@@ -343,6 +343,10 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 
 	// Allows messages to be routed to the new chain
 	m.ManagerConfig.Router.AddChain(chain.Handler)
+
+	// Register the chain with the timeout manager
+	m.TimeoutManager.RegisterChain(ctx, consensusParams.Namespace)
+
 	// If the X or P Chain panics, do not attempt to recover
 	if m.CriticalChains.Contains(chainParams.ID) {
 		go ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
@@ -412,6 +416,11 @@ func (m *manager) createAvalancheChain(
 	sender := sender.Sender{}
 	sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager)
 
+	sampleK := consensusParams.K
+	if uint64(sampleK) > bootstrapWeight {
+		sampleK = int(bootstrapWeight)
+	}
+
 	// The engine handles consensus
 	engine := &aveng.Transitive{}
 	if err := engine.Initialize(aveng.Config{
@@ -420,6 +429,7 @@ func (m *manager) createAvalancheChain(
 				Ctx:          ctx,
 				Validators:   validators,
 				Beacons:      beacons,
+				SampleK:      sampleK,
 				StartupAlpha: (3*bootstrapWeight + 3) / 4,
 				Alpha:        bootstrapWeight/2 + 1, // must be > 50%
 				Sender:       &sender,
@@ -493,6 +503,11 @@ func (m *manager) createSnowmanChain(
 	sender := sender.Sender{}
 	sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager)
 
+	sampleK := consensusParams.K
+	if uint64(sampleK) > bootstrapWeight {
+		sampleK = int(bootstrapWeight)
+	}
+
 	// The engine handles consensus
 	engine := &smeng.Transitive{}
 	if err := engine.Initialize(smeng.Config{
@@ -501,6 +516,7 @@ func (m *manager) createSnowmanChain(
 				Ctx:          ctx,
 				Validators:   validators,
 				Beacons:      beacons,
+				SampleK:      sampleK,
 				StartupAlpha: (3*bootstrapWeight + 3) / 4,
 				Alpha:        bootstrapWeight/2 + 1, // must be > 50%
 				Sender:       &sender,

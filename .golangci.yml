@@ -7,10 +7,11 @@ linters:
       - gofmt
       - goimports
       - bodyclose
+      - govet
+      - gosec
         #    - deadcode
         #    - errcheck
         #    - varcheck 
-        #    - govet
         #    - gosimple
         #    - goconst
         #    - goconst
@@ -19,7 +20,6 @@ linters:
         #    - golint
         #    - gomnd
         #    - goprintffuncname
-        #    - gosec
         #    - ineffassign
         #    - interfacer
         #    - lll

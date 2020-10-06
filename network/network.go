@@ -16,6 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/triggers"
@@ -46,6 +47,8 @@ const (
 	defaultGossipSize                                = 50
 	defaultPingPongTimeout                           = time.Minute
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
+	defaultReadBufferSize                            = 16 * 1024
+	defaultReadHandshakeTimeout                      = 15 * time.Second
 )
 
 var (
@@ -127,6 +130,8 @@ type network struct {
 	gossipSize                         int
 	pingPongTimeout                    time.Duration
 	pingFrequency                      time.Duration
+	readBufferSize                     uint32
+	readHandshakeTimeout               time.Duration
 
 	executor timer.Executor
 
@@ -192,6 +197,8 @@ func NewDefaultNetwork(
 		defaultGossipSize,
 		defaultPingPongTimeout,
 		defaultPingFrequency,
+		defaultReadBufferSize,
+		defaultReadHandshakeTimeout,
 	)
 }
 
@@ -226,7 +233,10 @@ func NewNetwork(
 	gossipSize int,
 	pingPongTimeout time.Duration,
 	pingFrequency time.Duration,
+	readBufferSize uint32,
+	readHandshakeTimeout time.Duration,
 ) Network {
+	// #nosec G404
 	netw := &network{
 		log:            log,
 		id:             id,
@@ -265,6 +275,8 @@ func NewNetwork(
 		retryDelay:                         make(map[string]time.Duration),
 		myIPs:                              map[string]struct{}{ip.String(): {}},
 		peers:                              make(map[[20]byte]*peer),
+		readBufferSize:                     readBufferSize,
+		readHandshakeTimeout:               readHandshakeTimeout,
 	}
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
@@ -282,12 +294,9 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 
 	for _, peerelement := range n.getPeers(validatorIDs) {
 		peer := peerelement.peer
-		sent := peerelement.sent
+		exists := peerelement.exists
 		vID := peerelement.id
-		if sent {
-			sent = peer.send(msg)
-		}
-		if !sent {
+		if !exists || !peer.connected || !peer.send(msg) {
 			n.log.Debug("failed to send GetAcceptedFrontier(%s, %s, %d)",
 				vID,
 				chainID,
@@ -316,12 +325,9 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 	if peerelement.peer == nil {
 		return
 	}
-	sent := peerelement.sent
+	exists := peerelement.exists
 	peer := peerelement.peer
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send AcceptedFrontier(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -351,12 +357,9 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 
 	for _, peerelement := range n.getPeers(validatorIDs) {
 		peer := peerelement.peer
-		sent := peerelement.sent
+		exists := peerelement.exists
 		vID := peerelement.id
-		if sent {
-			sent = peer.send(msg)
-		}
-		if !sent {
+		if !exists || !peer.connected || !peer.send(msg) {
 			n.log.Debug("failed to send GetAccepted(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -388,11 +391,8 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	}
 
 	peer := peerelement.peer
-	sent := peerelement.sent
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	exists := peerelement.exists
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send Accepted(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -418,11 +418,8 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 	}
 
 	peer := peerelement.peer
-	sent := peerelement.sent
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	exists := peerelement.exists
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send GetAncestors(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -449,11 +446,8 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	}
 
 	peer := peerelement.peer
-	sent := peerelement.sent
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	exists := peerelement.exists
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send MultiPut(%s, %s, %d, %d)",
 			validatorID,
 			chainID,
@@ -476,11 +470,8 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	}
 
 	peer := peerelement.peer
-	sent := peerelement.sent
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	exists := peerelement.exists
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send Get(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -512,11 +503,8 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	}
 
 	peer := peerelement.peer
-	sent := peerelement.sent
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	exists := peerelement.exists
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send Put(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -550,12 +538,9 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 
 	for _, peerelement := range n.getPeers(validatorIDs) {
 		peer := peerelement.peer
-		sent := peerelement.sent
+		exists := peerelement.exists
 		vID := peerelement.id
-		if sent {
-			sent = peer.send(msg)
-		}
-		if !sent {
+		if !exists || !peer.connected || !peer.send(msg) {
 			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -577,12 +562,9 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 
 	for _, peerelement := range n.getPeers(validatorIDs) {
 		peer := peerelement.peer
-		sent := peerelement.sent
+		exists := peerelement.exists
 		vID := peerelement.id
-		if sent {
-			sent = peer.send(msg)
-		}
-		if !sent {
+		if !exists || !peer.connected || !peer.send(msg) {
 			n.log.Debug("failed to send PullQuery(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -614,11 +596,8 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 	}
 
 	peer := peerelement.peer
-	sent := peerelement.sent
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	exists := peerelement.exists
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send Chits(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -639,8 +618,12 @@ func (n *network) Gossip(chainID, containerID ids.ID, container []byte) {
 }
 
 // Accept is called after every consensus decision
-func (n *network) Accept(chainID, containerID ids.ID, container []byte) error {
-	return n.gossipContainer(chainID, containerID, container)
+func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte) error {
+	if !ctx.IsBootstrapped() {
+		// don't gossip during bootstrapping
+		return nil
+	}
+	return n.gossipContainer(ctx.ChainID, containerID, container)
 }
 
 // heartbeat registers a new heartbeat to signal liveness
@@ -666,9 +649,19 @@ func (n *network) Dispatch() error {
 			n.log.Debug("error during server accept: %s", err)
 			return err
 		}
+		switch conn := conn.(type) {
+		case *net.TCPConn:
+			if err := conn.SetLinger(0); err != nil {
+				n.log.Warn("failed to set no linger due to: %s", err)
+			}
+			if err := conn.SetNoDelay(true); err != nil {
+				n.log.Warn("failed to set socket nodelay due to: %s", err)
+			}
+		}
 		go n.upgrade(&peer{
-			net:  n,
-			conn: conn,
+			net:          n,
+			conn:         conn,
+			tickerCloser: make(chan struct{}),
 		}, n.serverUpgrader)
 	}
 }
@@ -888,10 +881,10 @@ func (n *network) connectTo(ip utils.IPDesc) {
 		// Randomization is only performed here to distribute reconnection
 		// attempts to a node that previously shut down. This doesn't require
 		// cryptographically secure random number generation.
-		delay = time.Duration(float64(delay) * (1 + rand.Float64()))
+		delay = time.Duration(float64(delay) * (1 + rand.Float64())) // #nosec G404
 		if delay > n.maxReconnectDelay {
 			// set the timeout to [.75, 1) * maxReconnectDelay
-			delay = time.Duration(float64(n.maxReconnectDelay) * (3 + rand.Float64()) / 4)
+			delay = time.Duration(float64(n.maxReconnectDelay) * (3 + rand.Float64()) / 4) // #nosec G404
 		}
 
 		n.stateLock.Lock()
@@ -934,21 +927,34 @@ func (n *network) attemptConnect(ip utils.IPDesc) error {
 	if err != nil {
 		return err
 	}
+	switch conn := conn.(type) {
+	case *net.TCPConn:
+		if err := conn.SetLinger(0); err != nil {
+			n.log.Warn("failed to set no linger due to: %s", err)
+		}
+		if err := conn.SetNoDelay(true); err != nil {
+			n.log.Warn("failed to set socket nodelay due to: %s", err)
+		}
+	}
 	return n.upgrade(&peer{
-		net:  n,
-		ip:   ip,
-		conn: conn,
+		net:          n,
+		ip:           ip,
+		conn:         conn,
+		tickerCloser: make(chan struct{}),
 	}, n.clientUpgrader)
 }
 
 // assumes the stateLock is not held. Returns an error if the peer's connection
 // wasn't able to be upgraded.
 func (n *network) upgrade(p *peer, upgrader Upgrader) error {
+	p.conn.SetReadDeadline(time.Now().Add(n.readHandshakeTimeout))
 	id, conn, err := upgrader.Upgrade(p.conn)
 	if err != nil {
+		_ = p.conn.Close()
 		n.log.Verbo("failed to upgrade connection with %s", err)
 		return err
 	}
+	conn.SetReadDeadline(time.Time{})
 	p.sender = make(chan []byte, n.sendQueueSize)
 	p.id = id
 	p.conn = conn
@@ -1066,9 +1072,9 @@ func (n *network) disconnected(p *peer) {
 }
 
 type PeerElement struct {
-	peer *peer
-	sent bool
-	id   ids.ShortID
+	peer   *peer
+	exists bool
+	id     ids.ShortID
 }
 
 func (n *network) getPeers(validatorIDs ids.ShortSet) []PeerElement {
@@ -1079,8 +1085,8 @@ func (n *network) getPeers(validatorIDs ids.ShortSet) []PeerElement {
 		vIDS := validatorIDs.List()
 		peers := make([]PeerElement, 0, len(vIDS))
 		for _, validatorID := range vIDS {
-			peer, sent := n.peers[validatorID.Key()]
-			peers = append(peers, PeerElement{peer, sent, validatorID})
+			peer, exists := n.peers[validatorID.Key()]
+			peers = append(peers, PeerElement{peer, exists, validatorID})
 		}
 		return peers
 	}

@@ -29,3 +29,29 @@ type JsonAddress struct {
 type JsonAddresses struct {
 	Addresses []string `json:"addresses"`
 }
+
+// ChangeAddr is the address change is sent to, if any
+type JsonChangeAddr struct {
+	ChangeAddr string `json:"changeAddr"`
+}
+
+// JsonTxIDChangeAddr is a tx ID and change address
+type JsonTxIDChangeAddr struct {
+	JsonTxID
+	JsonChangeAddr
+}
+
+// JsonFromAddrs is a list of addresses to send funds from
+type JsonFromAddrs struct {
+	From []string `json:"from"`
+}
+
+// JsonSpendHeader is 3 arguments to a method that spends (including those with tx fees)
+// 1) The username/password
+// 2) The addresses used in the method
+// 3) The address to send change to
+type JsonSpendHeader struct {
+	UserPass
+	JsonFromAddrs
+	JsonChangeAddr
+}

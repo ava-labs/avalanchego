@@ -12,18 +12,18 @@ import (
 )
 
 func TestRewardLongerDurationBonus(t *testing.T) {
-	shortDuration := 14 * 24 * time.Hour
+	shortDuration := 24 * time.Hour
 	totalDuration := 365 * 24 * time.Hour
 	shortBalance := units.KiloAvax
 	for i := 0; i < int(totalDuration/shortDuration); i++ {
-		reward := Reward(shortDuration, shortBalance, 359*units.MegaAvax+shortBalance)
+		reward := Reward(shortDuration, shortBalance, 359*units.MegaAvax+shortBalance, defaultMaxStakingDuration)
 		shortBalance += reward
 	}
-	reward := Reward(totalDuration%shortDuration, shortBalance, 359*units.MegaAvax+shortBalance)
+	reward := Reward(totalDuration%shortDuration, shortBalance, 359*units.MegaAvax+shortBalance, defaultMaxStakingDuration)
 	shortBalance += reward
 
 	longBalance := units.KiloAvax
-	longBalance += Reward(totalDuration, longBalance, 359*units.MegaAvax+longBalance)
+	longBalance += Reward(totalDuration, longBalance, 359*units.MegaAvax+longBalance, defaultMaxStakingDuration)
 
 	if shortBalance >= longBalance {
 		t.Fatalf("should promote stakers to stake longer")
@@ -39,25 +39,25 @@ func TestRewards(t *testing.T) {
 	}{
 		// Max duration:
 		{ // (720M - 360M) * (1M / 360M) * 12%
-			duration:       MaximumStakingDuration,
+			duration:       defaultMaxStakingDuration,
 			stakeAmount:    units.MegaAvax,
 			existingAmount: 360 * units.MegaAvax,
 			expectedReward: 120 * units.KiloAvax,
 		},
 		{ // (720M - 400M) * (1M / 400M) * 12%
-			duration:       MaximumStakingDuration,
+			duration:       defaultMaxStakingDuration,
 			stakeAmount:    units.MegaAvax,
 			existingAmount: 400 * units.MegaAvax,
 			expectedReward: 96 * units.KiloAvax,
 		},
 		{ // (720M - 400M) * (2M / 400M) * 12%
-			duration:       MaximumStakingDuration,
+			duration:       defaultMaxStakingDuration,
 			stakeAmount:    2 * units.MegaAvax,
 			existingAmount: 400 * units.MegaAvax,
 			expectedReward: 192 * units.KiloAvax,
 		},
 		{ // (720M - 720M) * (1M / 720M) * 12%
-			duration:       MaximumStakingDuration,
+			duration:       defaultMaxStakingDuration,
 			stakeAmount:    units.MegaAvax,
 			existingAmount: SupplyCap,
 			expectedReward: 0,
@@ -65,35 +65,35 @@ func TestRewards(t *testing.T) {
 		// Min duration:
 		// (720M - 360M) * (1M / 360M) * (10% + 2% * MinimumStakingDuration / MaximumStakingDuration) * MinimumStakingDuration / MaximumStakingDuration
 		{
-			duration:       MinimumStakingDuration,
+			duration:       defaultMinStakingDuration,
 			stakeAmount:    units.MegaAvax,
 			existingAmount: 360 * units.MegaAvax,
 			expectedReward: 274122724713,
 		},
 		// (720M - 360M) * (.005 / 360M) * (10% + 2% * MinimumStakingDuration / MaximumStakingDuration) * MinimumStakingDuration / MaximumStakingDuration
 		{
-			duration:       MinimumStakingDuration,
-			stakeAmount:    minStake,
+			duration:       defaultMinStakingDuration,
+			stakeAmount:    defaultMinValidatorStake,
 			existingAmount: 360 * units.MegaAvax,
 			expectedReward: 1370,
 		},
 		// (720M - 400M) * (1M / 400M) * (10% + 2% * MinimumStakingDuration / MaximumStakingDuration) * MinimumStakingDuration / MaximumStakingDuration
 		{
-			duration:       MinimumStakingDuration,
+			duration:       defaultMinStakingDuration,
 			stakeAmount:    units.MegaAvax,
 			existingAmount: 400 * units.MegaAvax,
 			expectedReward: 219298179771,
 		},
 		// (720M - 400M) * (2M / 400M) * (10% + 2% * MinimumStakingDuration / MaximumStakingDuration) * MinimumStakingDuration / MaximumStakingDuration
 		{
-			duration:       MinimumStakingDuration,
+			duration:       defaultMinStakingDuration,
 			stakeAmount:    2 * units.MegaAvax,
 			existingAmount: 400 * units.MegaAvax,
 			expectedReward: 438596359542,
 		},
 		// (720M - 720M) * (1M / 720M) * (10% + 2% * MinimumStakingDuration / MaximumStakingDuration) * MinimumStakingDuration / MaximumStakingDuration
 		{
-			duration:       MinimumStakingDuration,
+			duration:       defaultMinStakingDuration,
 			stakeAmount:    units.MegaAvax,
 			existingAmount: SupplyCap,
 			expectedReward: 0,
@@ -111,6 +111,7 @@ func TestRewards(t *testing.T) {
 				test.duration,
 				test.stakeAmount,
 				test.existingAmount,
+				defaultMaxStakingDuration,
 			)
 			if reward != test.expectedReward {
 				t.Fatalf("expected %d; got %d", test.expectedReward, reward)

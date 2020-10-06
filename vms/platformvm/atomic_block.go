@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -29,15 +30,15 @@ type AtomicBlock struct {
 // initialize this block
 func (ab *AtomicBlock) initialize(vm *VM, bytes []byte) error {
 	if err := ab.CommonDecisionBlock.initialize(vm, bytes); err != nil {
-		return err
+		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	unsignedBytes, err := vm.codec.Marshal(&ab.Tx.UnsignedTx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
 	}
 	signedBytes, err := ab.vm.codec.Marshal(&ab.Tx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
 	ab.Tx.Initialize(unsignedBytes, signedBytes)
 	return nil
@@ -83,13 +84,13 @@ func (ab *AtomicBlock) Verify() error {
 	ab.onAcceptDB = versiondb.New(pdb)
 	if err := tx.SemanticVerify(ab.vm, ab.onAcceptDB, &ab.Tx); err != nil {
 		ab.vm.droppedTxCache.Put(ab.Tx.ID(), nil) // cache tx as dropped
-		return err
+		return fmt.Errorf("tx %s failed semantic verification: %w", tx.ID(), err)
 	}
 	txBytes := ab.Tx.Bytes()
 	if err := ab.vm.putTx(ab.onAcceptDB, ab.Tx.ID(), txBytes); err != nil {
-		return err
+		return fmt.Errorf("failed to put tx %s: %w", tx.ID(), err)
 	} else if err := ab.vm.putStatus(ab.onAcceptDB, ab.Tx.ID(), Committed); err != nil {
-		return err
+		return fmt.Errorf("failed to put status of tx %s: %w", tx.ID(), err)
 	}
 
 	ab.vm.currentBlocks[ab.ID().Key()] = ab
@@ -107,25 +108,22 @@ func (ab *AtomicBlock) Accept() error {
 	}
 
 	if err := ab.CommonBlock.Accept(); err != nil {
-		return err
+		return fmt.Errorf("failed to accept CommonBlock of %s: %w", ab.ID(), err)
 	}
 
 	// Update the state of the chain in the database
 	if err := ab.onAcceptDB.Commit(); err != nil {
-		ab.vm.Ctx.Log.Error("unable to commit onAcceptDB")
-		return err
+		return fmt.Errorf("failed to commit onAcceptDB for block %s: %w", ab.ID(), err)
 	}
 
 	batch, err := ab.vm.DB.CommitBatch()
 	if err != nil {
-		ab.vm.Ctx.Log.Fatal("unable to commit vm's DB")
-		return err
+		return fmt.Errorf("failed to commit VM's database for block %s: %w", ab.ID(), err)
 	}
 	defer ab.vm.DB.Abort()
 
 	if err := tx.Accept(ab.vm.Ctx, batch); err != nil {
-		ab.vm.Ctx.Log.Error("unable to atomically commit block")
-		return err
+		return fmt.Errorf("failed to atomically accept tx %s in block %s: %w", tx.ID(), ab.ID(), err)
 	}
 
 	for _, child := range ab.children {
@@ -133,7 +131,7 @@ func (ab *AtomicBlock) Accept() error {
 	}
 	if ab.onAcceptFunc != nil {
 		if err := ab.onAcceptFunc(); err != nil {
-			return err
+			return fmt.Errorf("failed to execute onAcceptFunc of %s: %w", ab.ID(), err)
 		}
 	}
 
@@ -159,7 +157,7 @@ func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx Tx) (*AtomicBloc
 	blk := Block(ab)
 	bytes, err := Codec.Marshal(&blk)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}
 	ab.Block.Initialize(bytes, vm.SnowmanVM)
 	return ab, nil
