@@ -68,7 +68,7 @@ func (dev *Mapper) Map(protocol string, intPort, extPort uint16, desc string, ip
 	if err != nil {
 		dev.log.Error("NAT Traversal failed from external port %d to internal port %d with %s", extPort, intPort, err)
 	} else {
-		dev.log.Info("NAT Traversal  successful from external port %d to internal port %d", extPort, intPort)
+		dev.log.Info("NAT Traversal successful from external port %d to internal port %d", extPort, intPort)
 	}
 
 	go dev.keepPortMapping(protocol, intPort, extPort, desc, ip, updateTime)
