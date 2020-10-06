@@ -264,7 +264,7 @@ func init() {
 		} else {
 			ip = net.ParseIP(ipstr)
 		}
-	} else if *consensusIP == "" && !Config.DynamicConsensusIP {
+	} else if *consensusIP == "" {
 		Config.AttemptedNATTraversal = true
 		Config.Nat = nat.GetRouter()
 		ip, err = Config.Nat.ExternalIP()
