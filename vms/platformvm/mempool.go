@@ -344,7 +344,7 @@ func (m *Mempool) ResetTimer() {
 	// propose moving forward the chain timestamp
 	nextStakerChangeTime, err := m.vm.nextStakerChangeTime(db)
 	if err != nil {
-		m.vm.Ctx.Log.Error("couldn't get next staker change time: %w", err)
+		m.vm.Ctx.Log.Error("couldn't get next staker change time: %s", err)
 		return
 	}
 	if timestamp.Equal(nextStakerChangeTime) {

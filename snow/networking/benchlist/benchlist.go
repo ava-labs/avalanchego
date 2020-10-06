@@ -212,10 +212,12 @@ func (b *queryBenchlist) cleanup() {
 	currentWeight, err := b.vdrs.SubsetWeight(b.benchlistSet)
 	if err != nil {
 		// Add log for this, should never happen
-		b.ctx.Log.Error("failed to calculate subset weight due to: %w... Resetting benchlist", err)
+		b.ctx.Log.Error("failed to calculate subset weight due to: %s... Resetting benchlist", err)
 		b.reset()
 		return
 	}
+
+	currentTime := b.clock.Time()
 
 	benchLen := b.benchlistSet.Len()
 	updatedWeight := currentWeight
@@ -231,28 +233,29 @@ func (b *queryBenchlist) cleanup() {
 		// expired and the bench has less than the maximum weight
 		// Note: this creates an edge case where benchlisting a validator
 		// with a sufficient stake may clear the benchlist
-		if b.clock.Time().Before(end) && currentWeight < maxBenchlistWeight {
+		if currentTime.Before(end) && updatedWeight < maxBenchlistWeight {
 			break
 		}
 
 		removeWeight, ok := b.vdrs.GetWeight(validatorID)
 		if ok {
-			newWeight, err := safemath.Sub64(currentWeight, removeWeight)
+			newWeight, err := safemath.Sub64(updatedWeight, removeWeight)
 			if err != nil {
-				b.ctx.Log.Error("failed to calculate new subset weight due to: %w... Resetting benchlist", err)
+				b.ctx.Log.Error("failed to calculate new subset weight due to: %s... Resetting benchlist", err)
 				b.reset()
 				return
 			}
 			updatedWeight = newWeight
 		}
 
+		b.ctx.Log.Debug("Removed Validator: (%s, %d). EndTime: %s. CurrentTime: %s)", validatorID, removeWeight, end, currentTime)
 		b.benchlistOrder.Remove(e)
 		delete(b.benchlistTimes, key)
 		b.benchlistSet.Remove(validatorID)
 	}
 
 	updatedBenchLen := b.benchlistSet.Len()
-	b.ctx.Log.Debug("benchlist weight: (%d/%d) -> (%d/%d). Benched Validators: %d -> %d",
+	b.ctx.Log.Debug("Benched Weight: (%d/%d) -> (%d/%d). Benched Validators: %d -> %d.",
 		currentWeight,
 		totalWeight,
 		updatedWeight,
