@@ -35,6 +35,7 @@ func (m *Manager) Dispatch() {
 	m.tm.Dispatch()
 }
 
+// RegisterChain ...
 func (m *Manager) RegisterChain(ctx *snow.Context, namespace string) {
 	m.benchlist.RegisterChain(ctx, namespace)
 }
