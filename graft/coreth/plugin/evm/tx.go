@@ -33,12 +33,14 @@ var (
 	errNilTx             = errors.New("tx is nil")
 )
 
+// EVMOutput defines an output from EVM State created from export transactions
 type EVMOutput struct {
 	Address common.Address `serialize:"true" json:"address"`
 	Amount  uint64         `serialize:"true" json:"amount"`
 	AssetID ids.ID         `serialize:"true" json:"assetID"`
 }
 
+// EVMInput defines an input for the EVM State to be used in import transactions
 type EVMInput struct {
 	Address common.Address `serialize:"true" json:"address"`
 	Amount  uint64         `serialize:"true" json:"amount"`
@@ -46,10 +48,12 @@ type EVMInput struct {
 	Nonce   uint64         `serialize:"true" json:"nonce"`
 }
 
+// Verify ...
 func (out *EVMOutput) Verify() error {
 	return nil
 }
 
+// Verify ...
 func (in *EVMInput) Verify() error {
 	return nil
 }

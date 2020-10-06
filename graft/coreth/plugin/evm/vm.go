@@ -103,6 +103,7 @@ var (
 	errNoImportInputs                  = errors.New("tx has no imported inputs")
 	errInputsNotSortedUnique           = errors.New("inputs not sorted and unique")
 	errPublicKeySignatureMismatch      = errors.New("signature doesn't match public key")
+	errSignatureInputsMismatch         = errors.New("number of inputs does not match number of signatures")
 	errUnknownAsset                    = errors.New("unknown asset ID")
 	errNoFunds                         = errors.New("no spendable funds were found")
 	errWrongChainID                    = errors.New("tx has wrong chain ID")
@@ -916,6 +917,7 @@ func (vm *VM) GetSpendableFunds(keys []*crypto.PrivateKeySECP256K1R, assetID ids
 	return inputs, signers, nil
 }
 
+// GetAcceptedNonce returns the nonce associated with the address at the last accepted block
 func (vm *VM) GetAcceptedNonce(address common.Address) (uint64, error) {
 	state, err := vm.chain.BlockState(vm.lastAccepted.ethBlock)
 	if err != nil {

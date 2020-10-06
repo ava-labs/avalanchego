@@ -90,7 +90,7 @@ func NewContext() *snow.Context {
 
 // GenesisVM creates a VM instance with the genesis test bytes and returns
 // the channel use to send messages to the engine, the vm, and atomic memory
-func GenesisVM(t *testing.T) (chan engCommon.Message, *VM, *atomic.Memory) {
+func GenesisVM(t *testing.T, finishBootstrapping bool) (chan engCommon.Message, *VM, []byte, *atomic.Memory) {
 	genesisBytes := BuildGenesisTest(t)
 	ctx := NewContext()
 
@@ -125,17 +125,9 @@ func GenesisVM(t *testing.T) (chan engCommon.Message, *VM, *atomic.Memory) {
 		t.Fatal(err)
 	}
 
-	if err := vm.Bootstrapping(); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := vm.Bootstrapped(); err != nil {
-		t.Fatal(err)
-	}
-
-	return issuer, vm, m
+	return issuer, vm, genesisBytes, m
 }
 
 func TestVMGenesis(t *testing.T) {
-	_, _, _ = GenesisVM(t)
+	_, _, _, _ = GenesisVM(t, true)
 }

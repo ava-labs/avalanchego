@@ -98,6 +98,10 @@ func (tx *UnsignedImportTx) SemanticVerify(
 		return permError{err}
 	}
 
+	if len(stx.Creds) != len(tx.ImportedInputs) {
+		return permError{errSignatureInputsMismatch}
+	}
+
 	// do flow-checking
 	fc := avax.NewFlowChecker()
 	//fc.Produce(vm.ctx.AVAXAssetID, vm.txFee)
@@ -122,6 +126,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	for i, in := range tx.ImportedInputs {
 		utxoIDs[i] = in.UTXOID.InputID().Bytes()
 	}
+	// allUTXOBytes is guaranteed to be the same length as utxoIDs
 	allUTXOBytes, err := vm.ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
 	if err != nil {
 		return tempError{err}

@@ -231,7 +231,7 @@ func (service *AvaxAPI) ImportAVAX(_ *http.Request, args *ImportArgs, response *
 	return service.Import(nil, args, response)
 }
 
-// ImportAVAX issues a transaction to import AVAX from the X-chain. The AVAX
+// Import issues a transaction to import AVAX from the X-chain. The AVAX
 // must have already been exported from the X-Chain.
 func (service *AvaxAPI) Import(_ *http.Request, args *ImportArgs, response *api.JsonTxID) error {
 	log.Info("EVM: ImportAVAX called")
