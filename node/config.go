@@ -62,7 +62,7 @@ type Config struct {
 	BootstrapPeers []*Peer
 
 	// HTTP configuration
-	HTTPHost         string
+	HTTPHost string
 	HTTPPort uint16
 
 	HTTPSEnabled        bool
