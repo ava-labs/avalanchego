@@ -55,8 +55,8 @@ func NewPortMapper(log logging.Logger, r Router) Mapper {
 	}
 }
 
-// Attempt to establish a NAT Traversal connection from extPort (exposed to the internet) to our
-// intPort (where our process is listening).
+// Map a connection from extPort (exposed to the internet) to our intPort (where
+// our process is listening).
 func (dev *Mapper) Map(protocol string, intPort, extPort uint16, desc string) {
 	if !dev.r.IsNATTraversal() {
 		return

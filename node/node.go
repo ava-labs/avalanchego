@@ -202,7 +202,7 @@ func (n *Node) initNetworking() error {
 		n.Config.ConsensusParams.Metrics,
 		n.Log,
 		n.ID,
-		n.Config.StakingIP,
+		n.Config.ExternalStakingIP,
 		n.Config.NetworkID,
 		Version,
 		versionParser,
@@ -303,7 +303,7 @@ func (n *Node) Dispatch() error {
 
 	// Add bootstrap nodes to the peer network
 	for _, peer := range n.Config.BootstrapPeers {
-		if !peer.IP.Equal(n.Config.StakingIP) {
+		if !peer.IP.Equal(n.Config.ExternalStakingIP) {
 			n.Net.Track(peer.IP)
 		} else {
 			n.Log.Error("can't add self as a bootstrapper")
@@ -358,7 +358,7 @@ func (n *Node) initDatabase() error {
 // uses for P2P communication
 func (n *Node) initNodeID() error {
 	if !n.Config.EnableP2PTLS {
-		n.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.String())))
+		n.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(n.Config.ExternalStakingIP.String())))
 		n.Log.Info("Set the node's ID to %s", n.ID)
 		return nil
 	}
@@ -445,7 +445,7 @@ func (n *Node) initAPIServer() error {
 		n.Log,
 		n.LogFactory,
 		n.Config.HTTPHost,
-		n.Config.HTTPPort,
+		n.Config.InternalHTTPPort,
 		n.Config.APIRequireAuthToken,
 		n.Config.APIAuthPassword,
 	)
