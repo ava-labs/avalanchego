@@ -340,8 +340,9 @@ func (t *Transitive) Notify(msg common.Message) error {
 	case common.PendingTxs:
 		txs := t.VM.PendingTxs()
 		return t.batch(txs, false /*=force*/, false /*=empty*/)
+	default:
+		return nil
 	}
-	return nil
 }
 
 // If there are pending transactions from the VM, issue them.

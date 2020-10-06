@@ -756,19 +756,21 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	// 2   4
 	// Tail = 2
 
-	if pref := sm.Preference(); !block2.ID().Equals(pref) {
+	pref := sm.Preference()
+	switch {
+	case !block2.ID().Equals(pref):
 		t.Fatalf("Wrong preference listed")
-	} else if sm.Finalized() {
+	case sm.Finalized():
 		t.Fatalf("Finalized too early")
-	} else if block0.Status() != choices.Accepted {
+	case block0.Status() != choices.Accepted:
 		t.Fatalf("Should have accepted")
-	} else if block1.Status() != choices.Processing {
+	case block1.Status() != choices.Processing:
 		t.Fatalf("Should have accepted")
-	} else if block2.Status() != choices.Processing {
+	case block2.Status() != choices.Processing:
 		t.Fatalf("Should have accepted")
-	} else if block3.Status() != choices.Processing {
+	case block3.Status() != choices.Processing:
 		t.Fatalf("Should have rejected")
-	} else if block4.Status() != choices.Processing {
+	case block4.Status() != choices.Processing:
 		t.Fatalf("Should have rejected")
 	}
 
@@ -782,19 +784,21 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	//   2
 	// Tail = 2
 
-	if pref := sm.Preference(); !block2.ID().Equals(pref) {
+	pref = sm.Preference()
+	switch {
+	case !block2.ID().Equals(pref):
 		t.Fatalf("Wrong preference listed")
-	} else if !sm.Finalized() {
+	case !sm.Finalized():
 		t.Fatalf("Finalized too late")
-	} else if block0.Status() != choices.Accepted {
+	case block0.Status() != choices.Accepted:
 		t.Fatalf("Should have accepted")
-	} else if block1.Status() != choices.Accepted {
+	case block1.Status() != choices.Accepted:
 		t.Fatalf("Should have accepted")
-	} else if block2.Status() != choices.Accepted {
+	case block2.Status() != choices.Accepted:
 		t.Fatalf("Should have accepted")
-	} else if block3.Status() != choices.Rejected {
+	case block3.Status() != choices.Rejected:
 		t.Fatalf("Should have rejected")
-	} else if block4.Status() != choices.Rejected {
+	case block4.Status() != choices.Rejected:
 		t.Fatalf("Should have rejected")
 	}
 }

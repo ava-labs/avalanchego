@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -81,10 +82,17 @@ func NewContext(t *testing.T) *snow.Context {
 	ctx.AVAXAssetID = tx.ID()
 	ctx.XChainID = ids.Empty.Prefix(0)
 	aliaser := ctx.BCLookup.(*ids.Aliaser)
-	aliaser.Alias(chainID, "X")
-	aliaser.Alias(chainID, chainID.String())
-	aliaser.Alias(platformChainID, "P")
-	aliaser.Alias(platformChainID, platformChainID.String())
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		aliaser.Alias(chainID, "X"),
+		aliaser.Alias(chainID, chainID.String()),
+		aliaser.Alias(platformChainID, "P"),
+		aliaser.Alias(platformChainID, platformChainID.String()),
+	)
+	if errs.Errored() {
+		t.Fatal(errs.Err)
+	}
 
 	sn := &snLookup{
 		chainsToSubnet: make(map[[32]byte]ids.ID),

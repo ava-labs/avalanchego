@@ -274,11 +274,13 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	}
 
 	oldReqID := *requestID
-	if err := bs.MultiPut(peerID, *requestID, [][]byte{vtxBytes2}); err != nil { // send unexpected vertex
+	err = bs.MultiPut(peerID, *requestID, [][]byte{vtxBytes2})
+	switch {
+	case err != nil: // send unexpected vertex
 		t.Fatal(err)
-	} else if *requestID == oldReqID {
+	case *requestID == oldReqID:
 		t.Fatal("should have issued new request")
-	} else if !reqVtxID.Equals(vtxID0) {
+	case !reqVtxID.Equals(vtxID0):
 		t.Fatalf("should have requested vtxID0 but requested %s", reqVtxID)
 	}
 
@@ -818,25 +820,29 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 		t.Fatal("requested wrong vtx")
 	}
 
-	if err := bs.MultiPut(peerID, *reqIDPtr, [][]byte{vtxBytes1}); err != nil { // Provide vtx1; should request vtx0
+	err = bs.MultiPut(peerID, *reqIDPtr, [][]byte{vtxBytes1})
+	switch {
+	case err != nil: // Provide vtx1; should request vtx0
 		t.Fatal(err)
-	} else if bs.Ctx.IsBootstrapped() {
+	case bs.Ctx.IsBootstrapped():
 		t.Fatalf("should not have finished")
-	} else if !requested.Equals(vtxID0) {
+	case !requested.Equals(vtxID0):
 		t.Fatal("should hae requested vtx0")
 	}
 
 	vm.CantBootstrapped = false
 
-	if err := bs.MultiPut(peerID, *reqIDPtr, [][]byte{vtxBytes0}); err != nil { // Provide vtx0; can finish now
+	err = bs.MultiPut(peerID, *reqIDPtr, [][]byte{vtxBytes0})
+	switch {
+	case err != nil: // Provide vtx0; can finish now
 		t.Fatal(err)
-	} else if !bs.Ctx.IsBootstrapped() {
+	case !bs.Ctx.IsBootstrapped():
 		t.Fatal("should have finished")
-	} else if vtx0.Status() != choices.Accepted {
+	case vtx0.Status() != choices.Accepted:
 		t.Fatal("should be accepted")
-	} else if vtx1.Status() != choices.Accepted {
+	case vtx1.Status() != choices.Accepted:
 		t.Fatal("should be accepted")
-	} else if vtx2.Status() != choices.Accepted {
+	case vtx2.Status() != choices.Accepted:
 		t.Fatal("should be accepted")
 	}
 }
@@ -948,15 +954,15 @@ func TestBootstrapperFinalized(t *testing.T) {
 		t.Fatalf("should have requested vtx0")
 	}
 
-	if err := bs.GetAncestorsFailed(peerID, reqID); err != nil {
+	err = bs.GetAncestorsFailed(peerID, reqID)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	}
-
-	if !*finished {
+	case !*finished:
 		t.Fatalf("Bootstrapping should have finished")
-	} else if vtx0.Status() != choices.Accepted {
+	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
-	} else if vtx1.Status() != choices.Accepted {
+	case vtx1.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
 	}
 }
@@ -1084,13 +1090,14 @@ func TestBootstrapperAcceptsMultiPutParents(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !*finished {
+	switch {
+	case !*finished:
 		t.Fatalf("Bootstrapping should have finished")
-	} else if vtx0.Status() != choices.Accepted {
+	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
-	} else if vtx1.Status() != choices.Accepted {
+	case vtx1.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
-	} else if vtx2.Status() != choices.Accepted {
+	case vtx2.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
 	}
 }

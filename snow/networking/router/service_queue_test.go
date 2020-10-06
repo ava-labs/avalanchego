@@ -18,7 +18,9 @@ import (
 func setupMultiLevelQueue(t *testing.T, bufferSize int) (messageQueue, chan struct{}, validators.Set) {
 	vdrs := validators.NewSet()
 	metrics := &metrics{}
-	metrics.Initialize("", prometheus.NewRegistry())
+	if err := metrics.Initialize("", prometheus.NewRegistry()); err != nil {
+		t.Fatal(err)
+	}
 	consumptionRanges := []float64{
 		0.5,
 		0.75,

@@ -24,8 +24,9 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 	}()
 
 	state := vm.state
-
-	vm.codec.RegisterType(&avax.TestVerifiable{})
+	if err := vm.codec.RegisterType(&avax.TestVerifiable{}); err != nil {
+		t.Fatal(err)
+	}
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
@@ -102,8 +103,9 @@ func TestPrefixedFundingNoAddresses(t *testing.T) {
 	}()
 
 	state := vm.state
-
-	vm.codec.RegisterType(&avax.TestVerifiable{})
+	if err := vm.codec.RegisterType(&avax.TestVerifiable{}); err != nil {
+		t.Fatal(err)
+	}
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
@@ -131,8 +133,9 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 	}()
 
 	state := vm.state
-
-	vm.codec.RegisterType(&avax.TestAddressable{})
+	if err := vm.codec.RegisterType(&avax.TestAddressable{}); err != nil {
+		t.Fatal(err)
+	}
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{

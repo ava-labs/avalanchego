@@ -15,6 +15,11 @@ import (
 	"github.com/gorilla/rpc/v2/json2"
 )
 
+const (
+	// Null is the string representation of a null value
+	Null = "null"
+)
+
 var (
 	errUppercaseMethod = errors.New("method must start with a non-uppercase letter")
 )

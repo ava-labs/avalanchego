@@ -147,11 +147,15 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		t.Fatal(err)
 	} else if isValidator {
 		t.Fatalf("Shouldn't have added the validator to the validator set")
-	} else if validatorTx, willBeValidator, err := vm.willBeValidator(onAbort, constants.PrimaryNetworkID, nodeID); err != nil {
+	}
+
+	validatorTx, willBeValidator, err := vm.willBeValidator(onAbort, constants.PrimaryNetworkID, nodeID)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if !willBeValidator {
+	case !willBeValidator:
 		t.Fatalf("Shouldn't have removed the validator from the pending validator set")
-	} else if !validatorTx.ID().Equals(addPendingValidatorTx.ID()) {
+	case !validatorTx.ID().Equals(addPendingValidatorTx.ID()):
 		t.Fatalf("Added the wrong tx to the pending validator set")
 	}
 }

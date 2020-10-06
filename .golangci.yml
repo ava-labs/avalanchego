@@ -4,25 +4,24 @@ linters:
   disable-all: true
 
   enable:
-      - gofmt
-      - goimports
-      - bodyclose
-      - govet
-      - gosec
-        #    - deadcode
-        #    - errcheck
-        #    - varcheck 
-        #    - gosimple
-        #    - goconst
-        #    - goconst
-        #    - gocritic
-        #    - gocyclo
-        #    - golint
-        #    - gomnd
-        #    - goprintffuncname
-        #    - ineffassign
-        #    - interfacer
-        #    - lll
-        #    - misspell
-        #    - nakedret
-        #    - unconvert 
+    - bodyclose
+    - deadcode
+    # - errcheck
+    - goconst
+    - gofmt
+    - goimports
+    - gosec
+    - gosimple
+    - govet
+    - misspell
+    - nakedret
+    - varcheck
+    - gocritic
+    # - gocyclo
+    # - golint
+    # - gomnd
+    # - goprintffuncname
+    # - ineffassign
+    # - interfacer
+    # - lll
+    # - unconvert 

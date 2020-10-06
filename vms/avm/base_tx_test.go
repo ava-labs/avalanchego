@@ -740,7 +740,9 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	vm.codec.RegisterType(&avax.TestVerifiable{})
+	if err := vm.codec.RegisterType(&avax.TestVerifiable{}); err != nil {
+		t.Fatal(err)
+	}
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
@@ -792,7 +794,9 @@ func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	vm.codec.RegisterType(&avax.TestVerifiable{})
+	if err := vm.codec.RegisterType(&avax.TestVerifiable{}); err != nil {
+		t.Fatal(err)
+	}
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
@@ -882,7 +886,9 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 		typeToFxIndex: vm.typeToFxIndex,
 	}
 
-	cr.RegisterType(&avax.TestTransferable{})
+	if err := cr.RegisterType(&avax.TestTransferable{}); err != nil {
+		t.Fatal(err)
+	}
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
@@ -1296,7 +1302,9 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 		typeToFxIndex: vm.typeToFxIndex,
 	}
 
-	cr.RegisterType(&avax.TestVerifiable{})
+	if err := cr.RegisterType(&avax.TestVerifiable{}); err != nil {
+		t.Fatal(err)
+	}
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 

@@ -213,11 +213,15 @@ func LeftoverInputTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	} else if err := graph.Add(Green); err != nil {
 		t.Fatal(err)
-	} else if prefs := graph.Preferences(); prefs.Len() != 1 {
+	}
+
+	prefs := graph.Preferences()
+	switch {
+	case prefs.Len() != 1:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !prefs.Contains(Red.ID()) {
+	case !prefs.Contains(Red.ID()):
 		t.Fatalf("Wrong preference. Expected %s got %s", Red.ID(), prefs.List()[0])
-	} else if graph.Finalized() {
+	case graph.Finalized():
 		t.Fatalf("Finalized too early")
 	}
 
@@ -228,13 +232,17 @@ func LeftoverInputTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	} else if !updated {
 		t.Fatalf("Should have updated the frontiers")
-	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
+	}
+
+	prefs = graph.Preferences()
+	switch {
+	case prefs.Len() != 0:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !graph.Finalized() {
+	case !graph.Finalized():
 		t.Fatalf("Finalized too late")
-	} else if Red.Status() != choices.Accepted {
+	case Red.Status() != choices.Accepted:
 		t.Fatalf("%s should have been accepted", Red.ID())
-	} else if Green.Status() != choices.Rejected {
+	case Green.Status() != choices.Rejected:
 		t.Fatalf("%s should have been rejected", Green.ID())
 	}
 }
@@ -256,15 +264,21 @@ func LowerConfidenceTest(t *testing.T, factory Factory) {
 
 	if err := graph.Add(Red); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(Green); err != nil {
+	}
+	if err := graph.Add(Green); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(Blue); err != nil {
+	}
+	if err := graph.Add(Blue); err != nil {
 		t.Fatal(err)
-	} else if prefs := graph.Preferences(); prefs.Len() != 1 {
+	}
+
+	prefs := graph.Preferences()
+	switch {
+	case prefs.Len() != 1:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !prefs.Contains(Red.ID()) {
+	case !prefs.Contains(Red.ID()):
 		t.Fatalf("Wrong preference. Expected %s got %s", Red.ID(), prefs.List()[0])
-	} else if graph.Finalized() {
+	case graph.Finalized():
 		t.Fatalf("Finalized too early")
 	}
 
@@ -275,11 +289,15 @@ func LowerConfidenceTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	} else if !updated {
 		t.Fatalf("Should have updated the frontiers")
-	} else if prefs := graph.Preferences(); prefs.Len() != 1 {
+	}
+
+	prefs = graph.Preferences()
+	switch {
+	case prefs.Len() != 1:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !prefs.Contains(Blue.ID()) {
+	case !prefs.Contains(Blue.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Blue.ID())
-	} else if graph.Finalized() {
+	case graph.Finalized():
 		t.Fatalf("Finalized too early")
 	}
 }
@@ -301,19 +319,26 @@ func MiddleConfidenceTest(t *testing.T, factory Factory) {
 
 	if err := graph.Add(Red); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(Green); err != nil {
+	}
+	if err := graph.Add(Green); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(Alpha); err != nil {
+	}
+	if err := graph.Add(Alpha); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(Blue); err != nil {
+	}
+	if err := graph.Add(Blue); err != nil {
 		t.Fatal(err)
-	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
+	}
+
+	prefs := graph.Preferences()
+	switch {
+	case prefs.Len() != 2:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !prefs.Contains(Red.ID()) {
+	case !prefs.Contains(Red.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Red.ID())
-	} else if !prefs.Contains(Alpha.ID()) {
+	case !prefs.Contains(Alpha.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Alpha.ID())
-	} else if graph.Finalized() {
+	case graph.Finalized():
 		t.Fatalf("Finalized too early")
 	}
 
@@ -324,11 +349,15 @@ func MiddleConfidenceTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	} else if !updated {
 		t.Fatalf("Should have updated the frontiers")
-	} else if prefs := graph.Preferences(); prefs.Len() != 1 {
+	}
+
+	prefs = graph.Preferences()
+	switch {
+	case prefs.Len() != 1:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !prefs.Contains(Alpha.ID()) {
+	case !prefs.Contains(Alpha.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Alpha.ID())
-	} else if graph.Finalized() {
+	case graph.Finalized():
 		t.Fatalf("Finalized too early")
 	}
 }
@@ -350,15 +379,20 @@ func IndependentTest(t *testing.T, factory Factory) {
 
 	if err := graph.Add(Red); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(Alpha); err != nil {
+	}
+	if err := graph.Add(Alpha); err != nil {
 		t.Fatal(err)
-	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
+	}
+
+	prefs := graph.Preferences()
+	switch {
+	case prefs.Len() != 2:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !prefs.Contains(Red.ID()) {
+	case !prefs.Contains(Red.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Red.ID())
-	} else if !prefs.Contains(Alpha.ID()) {
+	case !prefs.Contains(Alpha.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Alpha.ID())
-	} else if graph.Finalized() {
+	case graph.Finalized():
 		t.Fatalf("Finalized too early")
 	}
 
@@ -444,33 +478,44 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	graph.Initialize(snow.DefaultContextTest(), params)
+	if err := graph.Initialize(snow.DefaultContextTest(), params); err != nil {
+		t.Fatal(err)
+	}
 
-	if !graph.IsVirtuous(Red) {
+	switch {
+	case !graph.IsVirtuous(Red):
 		t.Fatalf("Should be virtuous")
-	} else if !graph.IsVirtuous(Green) {
+	case !graph.IsVirtuous(Green):
 		t.Fatalf("Should be virtuous")
-	} else if !graph.IsVirtuous(Blue) {
+	case !graph.IsVirtuous(Blue):
 		t.Fatalf("Should be virtuous")
-	} else if !graph.IsVirtuous(Alpha) {
+	case !graph.IsVirtuous(Alpha):
 		t.Fatalf("Should be virtuous")
-	} else if err := graph.Add(Red); err != nil {
+	}
+
+	err := graph.Add(Red)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if !graph.IsVirtuous(Red) {
+	case !graph.IsVirtuous(Red):
 		t.Fatalf("Should be virtuous")
-	} else if graph.IsVirtuous(Green) {
+	case graph.IsVirtuous(Green):
 		t.Fatalf("Should not be virtuous")
-	} else if !graph.IsVirtuous(Blue) {
+	case !graph.IsVirtuous(Blue):
 		t.Fatalf("Should be virtuous")
-	} else if !graph.IsVirtuous(Alpha) {
+	case !graph.IsVirtuous(Alpha):
 		t.Fatalf("Should be virtuous")
-	} else if err := graph.Add(Green); err != nil {
+	}
+
+	err = graph.Add(Green)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if graph.IsVirtuous(Red) {
+	case graph.IsVirtuous(Red):
 		t.Fatalf("Should not be virtuous")
-	} else if graph.IsVirtuous(Green) {
+	case graph.IsVirtuous(Green):
 		t.Fatalf("Should not be virtuous")
-	} else if graph.IsVirtuous(Blue) {
+	case graph.IsVirtuous(Blue):
 		t.Fatalf("Should not be virtuous")
 	}
 }
@@ -525,25 +570,33 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	graph.Initialize(snow.DefaultContextTest(), params)
+	if err := graph.Initialize(snow.DefaultContextTest(), params); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := graph.Add(Red); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(Green); err != nil {
+	}
+	if err := graph.Add(Green); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(purple); err != nil {
+	}
+	if err := graph.Add(purple); err != nil {
 		t.Fatal(err)
-	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
+	}
+
+	prefs := graph.Preferences()
+	switch {
+	case prefs.Len() != 2:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !prefs.Contains(Red.ID()) {
+	case !prefs.Contains(Red.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Red.ID())
-	} else if !prefs.Contains(purple.ID()) {
+	case !prefs.Contains(purple.ID()):
 		t.Fatalf("Wrong preference. Expected %s", purple.ID())
-	} else if Red.Status() != choices.Processing {
+	case Red.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Processing)
-	} else if Green.Status() != choices.Processing {
+	case Green.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Processing)
-	} else if purple.Status() != choices.Processing {
+	case purple.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
@@ -553,17 +606,21 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	} else if !updated {
 		t.Fatalf("Should have updated the frontiers")
-	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
+	}
+
+	prefs = graph.Preferences()
+	switch {
+	case prefs.Len() != 2:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !prefs.Contains(Green.ID()) {
+	case !prefs.Contains(Green.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Green.ID())
-	} else if !prefs.Contains(purple.ID()) {
+	case !prefs.Contains(purple.ID()):
 		t.Fatalf("Wrong preference. Expected %s", purple.ID())
-	} else if Red.Status() != choices.Processing {
+	case Red.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Processing)
-	} else if Green.Status() != choices.Processing {
+	case Green.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Processing)
-	} else if purple.Status() != choices.Processing {
+	case purple.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
@@ -573,17 +630,21 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	} else if updated {
 		t.Fatalf("Shouldn't have updated the frontiers")
-	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
+	}
+
+	prefs = graph.Preferences()
+	switch {
+	case prefs.Len() != 2:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !prefs.Contains(Green.ID()) {
+	case !prefs.Contains(Green.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Green.ID())
-	} else if !prefs.Contains(purple.ID()) {
+	case !prefs.Contains(purple.ID()):
 		t.Fatalf("Wrong preference. Expected %s", purple.ID())
-	} else if Red.Status() != choices.Processing {
+	case Red.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Processing)
-	} else if Green.Status() != choices.Processing {
+	case Green.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Processing)
-	} else if purple.Status() != choices.Processing {
+	case purple.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
@@ -593,13 +654,17 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	} else if !updated {
 		t.Fatalf("Should have updated the frontiers")
-	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
+	}
+
+	prefs = graph.Preferences()
+	switch {
+	case prefs.Len() != 0:
 		t.Fatalf("Wrong number of preferences.")
-	} else if Red.Status() != choices.Accepted {
+	case Red.Status() != choices.Accepted:
 		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Accepted)
-	} else if Green.Status() != choices.Rejected {
+	case Green.Status() != choices.Rejected:
 		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Rejected)
-	} else if purple.Status() != choices.Accepted {
+	case purple.Status() != choices.Accepted:
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Accepted)
 	}
 }
@@ -650,21 +715,27 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 
 	if err := graph.Add(Red); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(Green); err != nil {
+	}
+	if err := graph.Add(Green); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(purple); err != nil {
+	}
+	if err := graph.Add(purple); err != nil {
 		t.Fatal(err)
-	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
+	}
+
+	prefs := graph.Preferences()
+	switch {
+	case prefs.Len() != 2:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !prefs.Contains(Red.ID()) {
+	case !prefs.Contains(Red.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Red.ID())
-	} else if !prefs.Contains(purple.ID()) {
+	case !prefs.Contains(purple.ID()):
 		t.Fatalf("Wrong preference. Expected %s", purple.ID())
-	} else if Red.Status() != choices.Processing {
+	case Red.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Processing)
-	} else if Green.Status() != choices.Processing {
+	case Green.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Processing)
-	} else if purple.Status() != choices.Processing {
+	case purple.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
@@ -674,17 +745,21 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	} else if !updated {
 		t.Fatalf("Should have updated the frontiers")
-	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
+	}
+
+	prefs = graph.Preferences()
+	switch {
+	case prefs.Len() != 2:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !prefs.Contains(Green.ID()) {
+	case !prefs.Contains(Green.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Green.ID())
-	} else if !prefs.Contains(purple.ID()) {
+	case !prefs.Contains(purple.ID()):
 		t.Fatalf("Wrong preference. Expected %s", purple.ID())
-	} else if Red.Status() != choices.Processing {
+	case Red.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Processing)
-	} else if Green.Status() != choices.Processing {
+	case Green.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Processing)
-	} else if purple.Status() != choices.Processing {
+	case purple.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
@@ -694,17 +769,21 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	} else if updated {
 		t.Fatalf("Shouldn't have updated the frontiers")
-	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
+	}
+
+	prefs = graph.Preferences()
+	switch {
+	case prefs.Len() != 2:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !prefs.Contains(Green.ID()) {
+	case !prefs.Contains(Green.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Green.ID())
-	} else if !prefs.Contains(purple.ID()) {
+	case !prefs.Contains(purple.ID()):
 		t.Fatalf("Wrong preference. Expected %s", purple.ID())
-	} else if Red.Status() != choices.Processing {
+	case Red.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Processing)
-	} else if Green.Status() != choices.Processing {
+	case Green.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Processing)
-	} else if purple.Status() != choices.Processing {
+	case purple.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
@@ -714,17 +793,21 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	} else if updated {
 		t.Fatalf("Shouldn't have updated the frontiers")
-	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
+	}
+
+	prefs = graph.Preferences()
+	switch {
+	case prefs.Len() != 2:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !prefs.Contains(Green.ID()) {
+	case !prefs.Contains(Green.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Green.ID())
-	} else if !prefs.Contains(purple.ID()) {
+	case !prefs.Contains(purple.ID()):
 		t.Fatalf("Wrong preference. Expected %s", purple.ID())
-	} else if Red.Status() != choices.Processing {
+	case Red.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Processing)
-	} else if Green.Status() != choices.Processing {
+	case Green.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Processing)
-	} else if purple.Status() != choices.Processing {
+	case purple.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
@@ -734,13 +817,17 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	} else if !updated {
 		t.Fatalf("Should have updated the frontiers")
-	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
+	}
+
+	prefs = graph.Preferences()
+	switch {
+	case prefs.Len() != 0:
 		t.Fatalf("Wrong number of preferences.")
-	} else if Red.Status() != choices.Accepted {
+	case Red.Status() != choices.Accepted:
 		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Accepted)
-	} else if Green.Status() != choices.Rejected {
+	case Green.Status() != choices.Rejected:
 		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Rejected)
-	} else if purple.Status() != choices.Accepted {
+	case purple.Status() != choices.Accepted:
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Accepted)
 	}
 }
@@ -771,25 +858,32 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 
 	if err := graph.Add(Red); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(Green); err != nil {
+	}
+	if err := graph.Add(Green); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(Blue); err != nil {
+	}
+	if err := graph.Add(Blue); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(purple); err != nil {
+	}
+	if err := graph.Add(purple); err != nil {
 		t.Fatal(err)
-	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
+	}
+
+	prefs := graph.Preferences()
+	switch {
+	case prefs.Len() != 2:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !prefs.Contains(Red.ID()) {
+	case !prefs.Contains(Red.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Red.ID())
-	} else if !prefs.Contains(purple.ID()) {
+	case !prefs.Contains(purple.ID()):
 		t.Fatalf("Wrong preference. Expected %s", purple.ID())
-	} else if Red.Status() != choices.Processing {
+	case Red.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Processing)
-	} else if Green.Status() != choices.Processing {
+	case Green.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Processing)
-	} else if Blue.Status() != choices.Processing {
+	case Blue.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", Blue.ID(), choices.Processing)
-	} else if purple.Status() != choices.Processing {
+	case purple.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
@@ -799,33 +893,43 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	} else if !updated {
 		t.Fatalf("Should have updated the frontiers")
-	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
+	}
+
+	prefs = graph.Preferences()
+	switch {
+	case prefs.Len() != 2:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !prefs.Contains(Green.ID()) {
+	case !prefs.Contains(Green.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Green.ID())
-	} else if !prefs.Contains(purple.ID()) {
+	case !prefs.Contains(purple.ID()):
 		t.Fatalf("Wrong preference. Expected %s", purple.ID())
-	} else if Red.Status() != choices.Processing {
+	case Red.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Processing)
-	} else if Green.Status() != choices.Processing {
+	case Green.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Processing)
-	} else if Blue.Status() != choices.Processing {
+	case Blue.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", Blue.ID(), choices.Processing)
-	} else if purple.Status() != choices.Processing {
+	case purple.Status() != choices.Processing:
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
-	} else if updated, err := graph.RecordPoll(gp); err != nil {
+	}
+
+	if updated, err := graph.RecordPoll(gp); err != nil {
 		t.Fatal(err)
 	} else if !updated {
 		t.Fatalf("Should have updated the frontiers")
-	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
+	}
+
+	prefs = graph.Preferences()
+	switch {
+	case prefs.Len() != 0:
 		t.Fatalf("Wrong number of preferences.")
-	} else if Red.Status() != choices.Rejected {
+	case Red.Status() != choices.Rejected:
 		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Rejected)
-	} else if Green.Status() != choices.Accepted {
+	case Green.Status() != choices.Accepted:
 		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Accepted)
-	} else if Blue.Status() != choices.Rejected {
+	case Blue.Status() != choices.Rejected:
 		t.Fatalf("Wrong status. %s should be %s", Blue.ID(), choices.Rejected)
-	} else if purple.Status() != choices.Rejected {
+	case purple.Status() != choices.Rejected:
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Rejected)
 	}
 }
@@ -1187,17 +1291,24 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 
 	if err := graph.Add(Red); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(Green); err != nil {
+	}
+	if err := graph.Add(Green); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(Blue); err != nil {
+	}
+	if err := graph.Add(Blue); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(Alpha); err != nil {
+	}
+	if err := graph.Add(Alpha); err != nil {
 		t.Fatal(err)
-	} else if prefs := graph.Preferences(); prefs.Len() != 1 {
+	}
+
+	prefs := graph.Preferences()
+	switch {
+	case prefs.Len() != 1:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !prefs.Contains(Red.ID()) {
+	case !prefs.Contains(Red.ID()):
 		t.Fatalf("Wrong preference. Expected %s got %s", Red.ID(), prefs.List()[0])
-	} else if graph.Finalized() {
+	case graph.Finalized():
 		t.Fatalf("Finalized too early")
 	}
 
@@ -1225,13 +1336,15 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		}
 	}
 
-	if prefs := graph.Preferences(); prefs.Len() != 2 {
+	prefs = graph.Preferences()
+	switch {
+	case prefs.Len() != 2:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !prefs.Contains(Red.ID()) {
+	case !prefs.Contains(Red.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Red.ID())
-	} else if !prefs.Contains(Blue.ID()) {
+	case !prefs.Contains(Blue.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Blue.ID())
-	} else if graph.Finalized() {
+	case graph.Finalized():
 		t.Fatalf("Finalized too early")
 	}
 
@@ -1257,13 +1370,15 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		}
 	}
 
-	if prefs := graph.Preferences(); prefs.Len() != 2 {
+	prefs = graph.Preferences()
+	switch {
+	case prefs.Len() != 2:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !prefs.Contains(Red.ID()) {
+	case !prefs.Contains(Red.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Red.ID())
-	} else if !prefs.Contains(Blue.ID()) {
+	case !prefs.Contains(Blue.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Blue.ID())
-	} else if graph.Finalized() {
+	case graph.Finalized():
 		t.Fatalf("Finalized too early")
 	}
 
@@ -1286,15 +1401,19 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		}
 	}
 
-	if prefs := graph.Preferences(); prefs.Len() != 2 {
+	prefs = graph.Preferences()
+	switch {
+	case prefs.Len() != 2:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !prefs.Contains(Red.ID()) {
+	case !prefs.Contains(Red.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Red.ID())
-	} else if !prefs.Contains(Blue.ID()) {
+	case !prefs.Contains(Blue.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Blue.ID())
-	} else if graph.Finalized() {
+	case graph.Finalized():
 		t.Fatalf("Finalized too early")
-	} else if changed, err := graph.RecordPoll(ga); err != nil {
+	}
+
+	if changed, err := graph.RecordPoll(ga); err != nil {
 		t.Fatal(err)
 	} else if !changed {
 		t.Fatalf("Should have caused the frontiers to recalculate")
@@ -1312,15 +1431,19 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		}
 	}
 
-	if prefs := graph.Preferences(); prefs.Len() != 2 {
+	prefs = graph.Preferences()
+	switch {
+	case prefs.Len() != 2:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !prefs.Contains(Green.ID()) {
+	case !prefs.Contains(Green.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Green.ID())
-	} else if !prefs.Contains(Alpha.ID()) {
+	case !prefs.Contains(Alpha.ID()):
 		t.Fatalf("Wrong preference. Expected %s", Alpha.ID())
-	} else if graph.Finalized() {
+	case graph.Finalized():
 		t.Fatalf("Finalized too early")
-	} else if changed, err := graph.RecordPoll(ga); err != nil {
+	}
+
+	if changed, err := graph.RecordPoll(ga); err != nil {
 		t.Fatal(err)
 	} else if !changed {
 		t.Fatalf("Should have caused the frontiers to recalculate")
@@ -1333,19 +1456,23 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		}
 	}
 
-	if prefs := graph.Preferences(); prefs.Len() != 0 {
+	prefs = graph.Preferences()
+	switch {
+	case prefs.Len() != 0:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !graph.Finalized() {
+	case !graph.Finalized():
 		t.Fatalf("Finalized too late")
-	} else if Green.Status() != choices.Accepted {
+	case Green.Status() != choices.Accepted:
 		t.Fatalf("%s should have been accepted", Green.ID())
-	} else if Alpha.Status() != choices.Accepted {
+	case Alpha.Status() != choices.Accepted:
 		t.Fatalf("%s should have been accepted", Alpha.ID())
-	} else if Red.Status() != choices.Rejected {
+	case Red.Status() != choices.Rejected:
 		t.Fatalf("%s should have been rejected", Red.ID())
-	} else if Blue.Status() != choices.Rejected {
+	case Blue.Status() != choices.Rejected:
 		t.Fatalf("%s should have been rejected", Blue.ID())
-	} else if changed, err := graph.RecordPoll(rb); err != nil {
+	}
+
+	if changed, err := graph.RecordPoll(rb); err != nil {
 		t.Fatal(err)
 	} else if changed {
 		t.Fatalf("Shouldn't have caused the frontiers to recalculate")
@@ -1358,17 +1485,19 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		}
 	}
 
-	if prefs := graph.Preferences(); prefs.Len() != 0 {
+	prefs = graph.Preferences()
+	switch {
+	case prefs.Len() != 0:
 		t.Fatalf("Wrong number of preferences.")
-	} else if !graph.Finalized() {
+	case !graph.Finalized():
 		t.Fatalf("Finalized too late")
-	} else if Green.Status() != choices.Accepted {
+	case Green.Status() != choices.Accepted:
 		t.Fatalf("%s should have been accepted", Green.ID())
-	} else if Alpha.Status() != choices.Accepted {
+	case Alpha.Status() != choices.Accepted:
 		t.Fatalf("%s should have been accepted", Alpha.ID())
-	} else if Red.Status() != choices.Rejected {
+	case Red.Status() != choices.Rejected:
 		t.Fatalf("%s should have been rejected", Red.ID())
-	} else if Blue.Status() != choices.Rejected {
+	case Blue.Status() != choices.Rejected:
 		t.Fatalf("%s should have been rejected", Blue.ID())
 	}
 }

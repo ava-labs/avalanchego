@@ -736,10 +736,10 @@ func (n *Node) initAliases(genesisBytes []byte) error {
 }
 
 // Initialize this node
-func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logging.Factory) error {
+func (n *Node) Initialize(config *Config, logger logging.Logger, logFactory logging.Factory) error {
 	n.Log = logger
 	n.LogFactory = logFactory
-	n.Config = Config
+	n.Config = config
 	n.Log.Info("Node version is: %s", Version)
 
 	httpLog, err := logFactory.MakeSubdir("http")

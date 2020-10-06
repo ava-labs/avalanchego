@@ -636,8 +636,7 @@ func (n *network) Dispatch() error {
 			n.log.Debug("error during server accept: %s", err)
 			return err
 		}
-		switch conn := conn.(type) {
-		case *net.TCPConn:
+		if conn, ok := conn.(*net.TCPConn); ok {
 			if err := conn.SetLinger(0); err != nil {
 				n.log.Warn("failed to set no linger due to: %s", err)
 			}
@@ -645,11 +644,19 @@ func (n *network) Dispatch() error {
 				n.log.Warn("failed to set socket nodelay due to: %s", err)
 			}
 		}
-		go n.upgrade(&peer{
-			net:          n,
-			conn:         conn,
-			tickerCloser: make(chan struct{}),
-		}, n.serverUpgrader)
+		go func() {
+			err := n.upgrade(
+				&peer{
+					net:          n,
+					conn:         conn,
+					tickerCloser: make(chan struct{}),
+				},
+				n.serverUpgrader,
+			)
+			if err != nil {
+				n.log.Verbo("failed to upgrade connection: %s", err)
+			}
+		}()
 	}
 }
 
@@ -917,8 +924,7 @@ func (n *network) attemptConnect(ip utils.IPDesc) error {
 	if err != nil {
 		return err
 	}
-	switch conn := conn.(type) {
-	case *net.TCPConn:
+	if conn, ok := conn.(*net.TCPConn); ok {
 		if err := conn.SetLinger(0); err != nil {
 			n.log.Warn("failed to set no linger due to: %s", err)
 		}
@@ -937,14 +943,25 @@ func (n *network) attemptConnect(ip utils.IPDesc) error {
 // assumes the stateLock is not held. Returns an error if the peer's connection
 // wasn't able to be upgraded.
 func (n *network) upgrade(p *peer, upgrader Upgrader) error {
-	p.conn.SetReadDeadline(time.Now().Add(n.readHandshakeTimeout))
+	if err := p.conn.SetReadDeadline(time.Now().Add(n.readHandshakeTimeout)); err != nil {
+		_ = p.conn.Close()
+		n.log.Verbo("failed to set the read deadline with %s", err)
+		return err
+	}
+
 	id, conn, err := upgrader.Upgrade(p.conn)
 	if err != nil {
 		_ = p.conn.Close()
 		n.log.Verbo("failed to upgrade connection with %s", err)
 		return err
 	}
-	conn.SetReadDeadline(time.Time{})
+
+	if err := conn.SetReadDeadline(time.Time{}); err != nil {
+		_ = p.conn.Close()
+		n.log.Verbo("failed to clear the read deadline with %s", err)
+		return err
+	}
+
 	p.sender = make(chan []byte, n.sendQueueSize)
 	p.id = id
 	p.conn = conn

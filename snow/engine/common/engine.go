@@ -135,7 +135,7 @@ type FetchHandler interface {
 	// container. Unless that container was pruned from the active set.
 	//
 	// This engine should respond with a Put message with the same requestID if
-	// the container was locally avaliable. Otherwise, the message can be safely
+	// the container was locally available. Otherwise, the message can be safely
 	// dropped.
 	Get(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error
 

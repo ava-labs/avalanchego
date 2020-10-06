@@ -603,8 +603,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	// any potential reentrant bugs.
 	added := []snowman.Block{}
 	dropped := []snowman.Block{}
-	switch blk := blk.(type) {
-	case OracleBlock:
+	if blk, ok := blk.(OracleBlock); ok {
 		options, err := blk.Options()
 		if err != nil {
 			return err

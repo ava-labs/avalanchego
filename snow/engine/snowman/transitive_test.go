@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
@@ -33,7 +34,9 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 	config.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
-	vals.AddWeight(vdr, 1)
+	if err := vals.AddWeight(vdr, 1); err != nil {
+		t.Fatal(err)
+	}
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -53,7 +56,7 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
+	vm.LastAcceptedF = gBlk.ID
 	sender.CantGetAcceptedFrontier = false
 
 	vm.CantBootstrapping = false
@@ -67,7 +70,9 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 	}
 
 	te := &Transitive{}
-	te.Initialize(config)
+	if err := te.Initialize(config); err != nil {
+		t.Fatal(err)
+	}
 
 	vm.CantBootstrapping = true
 	vm.CantBootstrapped = true
@@ -84,7 +89,9 @@ func TestEngineShutdown(t *testing.T) {
 	vmShutdownCalled := false
 	vm.ShutdownF = func() error { vmShutdownCalled = true; return nil }
 	vm.CantShutdown = false
-	transitive.Shutdown()
+	if err := transitive.Shutdown(); err != nil {
+		t.Fatal(err)
+	}
 	if !vmShutdownCalled {
 		t.Fatal("Shutting down the Transitive did not shutdown the VM")
 	}
@@ -134,7 +141,9 @@ func TestEngineAdd(t *testing.T) {
 		return blk, nil
 	}
 
-	te.Put(vdr, 0, blk.ID(), blk.Bytes())
+	if err := te.Put(vdr, 0, blk.ID(), blk.Bytes()); err != nil {
+		t.Fatal(err)
+	}
 
 	vm.ParseBlockF = nil
 
@@ -148,7 +157,9 @@ func TestEngineAdd(t *testing.T) {
 
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) { return nil, errUnknownBytes }
 
-	te.Put(vdr, *reqID, blk.Parent().ID(), nil)
+	if err := te.Put(vdr, *reqID, blk.Parent().ID(), nil); err != nil {
+		t.Fatal(err)
+	}
 
 	vm.ParseBlockF = nil
 
@@ -198,7 +209,9 @@ func TestEngineQuery(t *testing.T) {
 		}
 	}
 
-	te.PullQuery(vdr, 15, blk.ID())
+	if err := te.PullQuery(vdr, 15, blk.ID()); err != nil {
+		t.Fatal(err)
+	}
 	if !*blocked {
 		t.Fatalf("Didn't request block")
 	}
@@ -247,7 +260,9 @@ func TestEngineQuery(t *testing.T) {
 		}
 		return blk, nil
 	}
-	te.Put(vdr, *getRequestID, blk.ID(), blk.Bytes())
+	if err := te.Put(vdr, *getRequestID, blk.ID(), blk.Bytes()); err != nil {
+		t.Fatal(err)
+	}
 	vm.ParseBlockF = nil
 
 	if !*queried {
@@ -294,7 +309,9 @@ func TestEngineQuery(t *testing.T) {
 	}
 	blkSet := ids.Set{}
 	blkSet.Add(blk1.ID())
-	te.Chits(vdr, *queryRequestID, blkSet)
+	if err := te.Chits(vdr, *queryRequestID, blkSet); err != nil {
+		t.Fatal(err)
+	}
 
 	*queried = false
 	sender.PushQueryF = func(inVdrs ids.ShortSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
@@ -343,7 +360,9 @@ func TestEngineQuery(t *testing.T) {
 
 	_ = te.polls.String() // Shouldn't panic
 
-	te.QueryFailed(vdr, *queryRequestID)
+	if err := te.QueryFailed(vdr, *queryRequestID); err != nil {
+		t.Fatal(err)
+	}
 	if len(te.blocked) != 0 {
 		t.Fatalf("Should have finished blocking")
 	}
@@ -368,9 +387,15 @@ func TestEngineMultipleQuery(t *testing.T) {
 	vdr1 := ids.GenerateTestShortID()
 	vdr2 := ids.GenerateTestShortID()
 
-	vals.AddWeight(vdr0, 1)
-	vals.AddWeight(vdr1, 1)
-	vals.AddWeight(vdr2, 1)
+	errs := wrappers.Errs{}
+	errs.Add(
+		vals.AddWeight(vdr0, 1),
+		vals.AddWeight(vdr1, 1),
+		vals.AddWeight(vdr2, 1),
+	)
+	if errs.Errored() {
+		t.Fatal(errs.Err)
+	}
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -390,7 +415,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
+	vm.LastAcceptedF = gBlk.ID
 	sender.CantGetAcceptedFrontier = false
 
 	vm.CantBootstrapping = false
@@ -403,7 +428,9 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}
 
 	te := &Transitive{}
-	te.Initialize(config)
+	if err := te.Initialize(config); err != nil {
+		t.Fatal(err)
+	}
 
 	vm.CantBootstrapping = true
 	vm.CantBootstrapped = true
@@ -440,7 +467,9 @@ func TestEngineMultipleQuery(t *testing.T) {
 		}
 	}
 
-	te.issue(blk0)
+	if err := te.issue(blk0); err != nil {
+		t.Fatal(err)
+	}
 
 	blk1 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -482,8 +511,12 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}
 	blkSet := ids.Set{}
 	blkSet.Add(blk1.ID())
-	te.Chits(vdr0, *queryRequestID, blkSet)
-	te.Chits(vdr1, *queryRequestID, blkSet)
+	if err := te.Chits(vdr0, *queryRequestID, blkSet); err != nil {
+		t.Fatal(err)
+	}
+	if err := te.Chits(vdr1, *queryRequestID, blkSet); err != nil {
+		t.Fatal(err)
+	}
 
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
@@ -556,10 +589,14 @@ func TestEngineBlockedIssue(t *testing.T) {
 		BytesV:  []byte{2},
 	}
 
-	te.issue(blk1)
+	if err := te.issue(blk1); err != nil {
+		t.Fatal(err)
+	}
 
 	blk0.StatusV = choices.Processing
-	te.issue(blk0)
+	if err := te.issue(blk0); err != nil {
+		t.Fatal(err)
+	}
 
 	if !blk1.ID().Equals(te.Consensus.Preference()) {
 		t.Fatalf("Should have issued blk1")
@@ -581,8 +618,12 @@ func TestEngineAbandonResponse(t *testing.T) {
 		BytesV:  []byte{1},
 	}
 
-	te.issue(blk)
-	te.QueryFailed(vdr, 1)
+	if err := te.issue(blk); err != nil {
+		t.Fatal(err)
+	}
+	if err := te.QueryFailed(vdr, 1); err != nil {
+		t.Fatal(err)
+	}
 
 	if len(te.blocked) != 0 {
 		t.Fatalf("Should have removed blocking event")
@@ -616,7 +657,9 @@ func TestEngineFetchBlock(t *testing.T) {
 		*added = true
 	}
 
-	te.Get(vdr, 123, gBlk.ID())
+	if err := te.Get(vdr, 123, gBlk.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	if !*added {
 		t.Fatalf("Should have sent block to peer")
@@ -690,7 +733,9 @@ func TestEnginePushQuery(t *testing.T) {
 		}
 	}
 
-	te.PushQuery(vdr, 20, blk.ID(), blk.Bytes())
+	if err := te.PushQuery(vdr, 20, blk.ID(), blk.Bytes()); err != nil {
+		t.Fatal(err)
+	}
 
 	if !*chitted {
 		t.Fatalf("Should have sent a chit to the peer")
@@ -729,7 +774,9 @@ func TestEngineBuildBlock(t *testing.T) {
 	}
 
 	vm.BuildBlockF = func() (snowman.Block, error) { return blk, nil }
-	te.Notify(common.PendingTxs)
+	if err := te.Notify(common.PendingTxs); err != nil {
+		t.Fatal(err)
+	}
 
 	if !*queried {
 		t.Fatalf("Should have sent a query to the peer")
@@ -802,7 +849,7 @@ func TestVoteCanceling(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
+	vm.LastAcceptedF = gBlk.ID
 	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
 		switch {
 		case id.Equals(gBlk.ID()):
@@ -818,7 +865,9 @@ func TestVoteCanceling(t *testing.T) {
 	vm.CantBootstrapped = false
 
 	te := &Transitive{}
-	te.Initialize(config)
+	if err := te.Initialize(config); err != nil {
+		t.Fatal(err)
+	}
 
 	vm.CantBootstrapping = false
 	vm.CantBootstrapped = false
@@ -854,13 +903,17 @@ func TestVoteCanceling(t *testing.T) {
 		}
 	}
 
-	te.issue(blk)
+	if err := te.issue(blk); err != nil {
+		t.Fatal(err)
+	}
 
 	if te.polls.Len() != 1 {
 		t.Fatalf("Shouldn't have finished blocking issue")
 	}
 
-	te.QueryFailed(vdr0, *queryRequestID)
+	if err := te.QueryFailed(vdr0, *queryRequestID); err != nil {
+		t.Fatal(err)
+	}
 
 	if te.polls.Len() != 1 {
 		t.Fatalf("Shouldn't have finished blocking issue")
@@ -870,7 +923,9 @@ func TestVoteCanceling(t *testing.T) {
 	sender.PullQueryF = func(inVdrs ids.ShortSet, requestID uint32, blkID ids.ID) {
 		*repolled = true
 	}
-	te.QueryFailed(vdr1, *queryRequestID)
+	if err := te.QueryFailed(vdr1, *queryRequestID); err != nil {
+		t.Fatal(err)
+	}
 
 	if !*repolled {
 		t.Fatalf("Should have finished blocking issue and repolled the network")
@@ -894,12 +949,23 @@ func TestEngineNoQuery(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
+	vm.LastAcceptedF = gBlk.ID
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		if blkID.Equals(gBlk.ID()) {
+			return gBlk, nil
+		}
+		return nil, errUnknownBlock
+	}
 
 	config.VM = vm
 	te := &Transitive{}
-	te.Initialize(config)
-	te.finishBootstrapping()
+	if err := te.Initialize(config); err != nil {
+		t.Fatal(err)
+	}
+	if err := te.finishBootstrapping(); err != nil {
+		t.Fatal(err)
+	}
 	te.Ctx.Bootstrapped()
 
 	blk := &snowman.TestBlock{
@@ -912,7 +978,9 @@ func TestEngineNoQuery(t *testing.T) {
 		BytesV:  []byte{1},
 	}
 
-	te.issue(blk)
+	if err := te.issue(blk); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestEngineNoRepollQuery(t *testing.T) {
@@ -932,12 +1000,23 @@ func TestEngineNoRepollQuery(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
+	vm.LastAcceptedF = gBlk.ID
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		if blkID.Equals(gBlk.ID()) {
+			return gBlk, nil
+		}
+		return nil, errUnknownBlock
+	}
 
 	config.VM = vm
 	te := &Transitive{}
-	te.Initialize(config)
-	te.finishBootstrapping()
+	if err := te.Initialize(config); err != nil {
+		t.Fatal(err)
+	}
+	if err := te.finishBootstrapping(); err != nil {
+		t.Fatal(err)
+	}
 	te.Ctx.Bootstrapped()
 
 	te.repoll()
@@ -965,13 +1044,17 @@ func TestEngineAbandonQuery(t *testing.T) {
 		*reqID = requestID
 	}
 
-	te.PullQuery(vdr, 0, blkID)
+	if err := te.PullQuery(vdr, 0, blkID); err != nil {
+		t.Fatal(err)
+	}
 
 	if len(te.blocked) != 1 {
 		t.Fatalf("Should have blocked on request")
 	}
 
-	te.GetFailed(vdr, *reqID)
+	if err := te.GetFailed(vdr, *reqID); err != nil {
+		t.Fatal(err)
+	}
 
 	if len(te.blocked) != 0 {
 		t.Fatalf("Should have removed request")
@@ -1021,7 +1104,9 @@ func TestEngineAbandonChit(t *testing.T) {
 		t.Fatalf("Should have blocked on request")
 	}
 
-	te.GetFailed(vdr, *reqID)
+	if err := te.GetFailed(vdr, *reqID); err != nil {
+		t.Fatal(err)
+	}
 
 	if len(te.blocked) != 0 {
 		t.Fatalf("Should have removed request")
@@ -1082,7 +1167,9 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		}
 	}
 
-	te.PushQuery(vdr, 0, blockingBlk.ID(), blockingBlk.Bytes())
+	if err := te.PushQuery(vdr, 0, blockingBlk.ID(), blockingBlk.Bytes()); err != nil {
+		t.Fatal(err)
+	}
 
 	if len(te.blocked) != 3 {
 		t.Fatalf("Both inserts should be blocking in addition to the chit request")
@@ -1195,12 +1282,16 @@ func TestEngineRetryFetch(t *testing.T) {
 		*reqID = requestID
 	}
 
-	te.PullQuery(vdr, 0, missingBlk.ID())
+	if err := te.PullQuery(vdr, 0, missingBlk.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	vm.CantGetBlock = true
 	sender.GetF = nil
 
-	te.GetFailed(vdr, *reqID)
+	if err := te.GetFailed(vdr, *reqID); err != nil {
+		t.Fatal(err)
+	}
 
 	vm.CantGetBlock = false
 
@@ -1282,10 +1373,9 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 func TestEngineGossip(t *testing.T) {
 	_, _, sender, vm, te, gBlk := setup(t)
 
-	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
+	vm.LastAcceptedF = gBlk.ID
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		switch {
-		case blkID.Equals(gBlk.ID()):
+		if blkID.Equals(gBlk.ID()) {
 			return gBlk, nil
 		}
 		t.Fatal(errUnknownBlock)
@@ -1295,17 +1385,17 @@ func TestEngineGossip(t *testing.T) {
 	called := new(bool)
 	sender.GossipF = func(blkID ids.ID, blkBytes []byte) {
 		*called = true
-		switch {
-		case !blkID.Equals(gBlk.ID()):
+		if !blkID.Equals(gBlk.ID()) {
 			t.Fatal(errUnknownBlock)
 		}
-		switch {
-		case !bytes.Equal(blkBytes, gBlk.Bytes()):
+		if !bytes.Equal(blkBytes, gBlk.Bytes()) {
 			t.Fatal(errUnknownBytes)
 		}
 	}
 
-	te.Gossip()
+	if err := te.Gossip(); err != nil {
+		t.Fatal(err)
+	}
 
 	if !*called {
 		t.Fatalf("Should have gossiped the block")
@@ -1341,8 +1431,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 
 	parsed := new(bool)
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
-		switch {
-		case bytes.Equal(b, pendingBlk.Bytes()):
+		if bytes.Equal(b, pendingBlk.Bytes()) {
 			*parsed = true
 			return pendingBlk, nil
 		}
@@ -1354,8 +1443,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 			return nil, errUnknownBlock
 		}
 
-		switch {
-		case blkID.Equals(pendingBlk.ID()):
+		if blkID.Equals(pendingBlk.ID()) {
 			return pendingBlk, nil
 		}
 		return nil, errUnknownBlock
@@ -1378,8 +1466,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 
 	*parsed = false
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
-		switch {
-		case bytes.Equal(b, missingBlk.Bytes()):
+		if bytes.Equal(b, missingBlk.Bytes()) {
 			*parsed = true
 			return missingBlk, nil
 		}
@@ -1390,8 +1477,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 			return nil, errUnknownBlock
 		}
 
-		switch {
-		case blkID.Equals(missingBlk.ID()):
+		if blkID.Equals(missingBlk.ID()) {
 			return missingBlk, nil
 		}
 		return nil, errUnknownBlock
@@ -1437,8 +1523,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 
 	parsed := new(bool)
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
-		switch {
-		case bytes.Equal(b, pendingBlk.Bytes()):
+		if bytes.Equal(b, pendingBlk.Bytes()) {
 			*parsed = true
 			return pendingBlk, nil
 		}
@@ -1450,8 +1535,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 			return nil, errUnknownBlock
 		}
 
-		switch {
-		case blkID.Equals(pendingBlk.ID()):
+		if blkID.Equals(pendingBlk.ID()) {
 			return pendingBlk, nil
 		}
 		return nil, errUnknownBlock
@@ -1477,8 +1561,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 
 	*parsed = false
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
-		switch {
-		case bytes.Equal(b, missingBlk.Bytes()):
+		if bytes.Equal(b, missingBlk.Bytes()) {
 			*parsed = true
 			return missingBlk, nil
 		}
@@ -1489,8 +1572,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 			return nil, errUnknownBlock
 		}
 
-		switch {
-		case blkID.Equals(missingBlk.ID()):
+		if blkID.Equals(missingBlk.ID()) {
 			return missingBlk, nil
 		}
 		return nil, errUnknownBlock
@@ -1535,7 +1617,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
+	vm.LastAcceptedF = gBlk.ID
 	sender.CantGetAcceptedFrontier = false
 
 	vm.CantBootstrapping = false
@@ -1572,8 +1654,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	parsed := new(bool)
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
-		switch {
-		case bytes.Equal(b, pendingBlk.Bytes()):
+		if bytes.Equal(b, pendingBlk.Bytes()) {
 			*parsed = true
 			return pendingBlk, nil
 		}
@@ -1585,8 +1666,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 			return nil, errUnknownBlock
 		}
 
-		switch {
-		case blkID.Equals(pendingBlk.ID()):
+		if blkID.Equals(pendingBlk.ID()) {
 			return pendingBlk, nil
 		}
 		return nil, errUnknownBlock
@@ -1647,12 +1727,11 @@ func TestEngineDoubleChit(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
+	vm.LastAcceptedF = gBlk.ID
 	sender.CantGetAcceptedFrontier = false
 
 	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
-		switch {
-		case id.Equals(gBlk.ID()):
+		if id.Equals(gBlk.ID()) {
 			return gBlk, nil
 		}
 		t.Fatalf("Unknown block")

@@ -36,8 +36,8 @@ var (
 )
 
 // persist a tx
-func (vm *VM) putTx(db database.Database, ID ids.ID, tx []byte) error {
-	return vm.State.Put(db, txTypeID, ID, tx)
+func (vm *VM) putTx(db database.Database, id ids.ID, tx []byte) error {
+	return vm.State.Put(db, txTypeID, id, tx)
 }
 
 // retrieve a tx
@@ -53,13 +53,13 @@ func (vm *VM) getTx(db database.Database, txID ids.ID) ([]byte, error) {
 }
 
 // Persist a status
-func (vm *VM) putStatus(db database.Database, ID ids.ID, status Status) error {
-	return vm.State.Put(db, statusTypeID, ID, status)
+func (vm *VM) putStatus(db database.Database, id ids.ID, status Status) error {
+	return vm.State.Put(db, statusTypeID, id, status)
 }
 
 // Retrieve a status
-func (vm *VM) getStatus(db database.Database, ID ids.ID) (Status, error) {
-	statusIntf, err := vm.State.Get(db, statusTypeID, ID)
+func (vm *VM) getStatus(db database.Database, id ids.ID) (Status, error) {
+	statusIntf, err := vm.State.Get(db, statusTypeID, id)
 	if err != nil {
 		return Unknown, err
 	}
@@ -329,8 +329,8 @@ func (vm *VM) willBeValidator(db database.Database, subnetID ids.ID, nodeID ids.
 }
 
 // getUTXO returns the UTXO with the specified ID
-func (vm *VM) getUTXO(db database.Database, ID ids.ID) (*avax.UTXO, error) {
-	utxoIntf, err := vm.State.Get(db, utxoTypeID, ID)
+func (vm *VM) getUTXO(db database.Database, id ids.ID) (*avax.UTXO, error) {
+	utxoIntf, err := vm.State.Get(db, utxoTypeID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -508,17 +508,17 @@ func (vm *VM) getChains(db database.Database) ([]*Tx, error) {
 }
 
 // get a blockchain by its ID
-func (vm *VM) getChain(db database.Database, ID ids.ID) (*Tx, error) {
+func (vm *VM) getChain(db database.Database, id ids.ID) (*Tx, error) {
 	chains, err := vm.getChains(db)
 	if err != nil {
 		return nil, err
 	}
 	for _, chain := range chains {
-		if chain.ID().Equals(ID) {
+		if chain.ID().Equals(id) {
 			return chain, nil
 		}
 	}
-	return nil, fmt.Errorf("blockchain %s doesn't exist", ID)
+	return nil, fmt.Errorf("blockchain %s doesn't exist", id)
 }
 
 // put the list of blockchains that exist to database
@@ -526,7 +526,7 @@ func (vm *VM) putChains(db database.Database, chains []*Tx) error {
 	return vm.State.Put(db, chainsTypeID, chainsKey, chains)
 }
 
-// get the platfrom chain's timestamp from [db]
+// get the platform chain's timestamp from [db]
 func (vm *VM) getTimestamp(db database.Database) (time.Time, error) {
 	return vm.State.GetTime(db, timestampKey)
 }

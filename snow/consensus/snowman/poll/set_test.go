@@ -57,7 +57,7 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 	} else if s.Len() != 1 {
 		t.Fatalf("Should only have one active poll")
 	} else if _, finished := s.Vote(1, vdr1, vtxID); finished {
-		t.Fatalf("Shouldn't have been able to finish a non-existant poll")
+		t.Fatalf("Shouldn't have been able to finish a non-existent poll")
 	} else if _, finished := s.Vote(0, vdr1, vtxID); finished {
 		t.Fatalf("Shouldn't have been able to finish an ongoing poll")
 	} else if _, finished := s.Vote(0, vdr1, vtxID); finished {
@@ -100,7 +100,7 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 	} else if s.Len() != 1 {
 		t.Fatalf("Should only have one active poll")
 	} else if _, finished := s.Drop(1, vdr1); finished {
-		t.Fatalf("Shouldn't have been able to finish a non-existant poll")
+		t.Fatalf("Shouldn't have been able to finish a non-existent poll")
 	} else if _, finished := s.Drop(0, vdr1); finished {
 		t.Fatalf("Shouldn't have been able to finish an ongoing poll")
 	} else if _, finished := s.Drop(0, vdr1); finished {

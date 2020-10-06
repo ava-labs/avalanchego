@@ -336,19 +336,19 @@ func (s *State) IDs(key []byte, start []byte, limit int) ([]ids.ID, error) {
 }
 
 // AddID saves an ID to the prefixed database
-func (s *State) AddID(key []byte, ID ids.ID) error {
-	if ID.IsZero() {
+func (s *State) AddID(key []byte, id ids.ID) error {
+	if id.IsZero() {
 		return errZeroID
 	}
 	db := prefixdb.NewNested(key, s.DB)
-	return db.Put(ID.Bytes(), nil)
+	return db.Put(id.Bytes(), nil)
 }
 
 // RemoveID removes an ID from the prefixed database
-func (s *State) RemoveID(key []byte, ID ids.ID) error {
-	if ID.IsZero() {
+func (s *State) RemoveID(key []byte, id ids.ID) error {
+	if id.IsZero() {
 		return errZeroID
 	}
 	db := prefixdb.NewNested(key, s.DB)
-	return db.Delete(ID.Bytes())
+	return db.Delete(id.Bytes())
 }

@@ -131,11 +131,13 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	vm.CantBootstrapping = false
 	vm.CantBootstrapped = false
 
-	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should finish
+	err = bs.ForceAccepted(acceptedIDs)
+	switch {
+	case err != nil: // should finish
 		t.Fatal(err)
-	} else if !*finished {
+	case !*finished:
 		t.Fatalf("Bootstrapping should have finished")
-	} else if blk1.Status() != choices.Accepted {
+	case blk1.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
 	}
 }
@@ -268,15 +270,17 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 
 	vm.CantBootstrapped = false
 
-	if err := bs.MultiPut(peerID, *requestID, [][]byte{blkBytes1}); err != nil { // respond with right block
+	err = bs.MultiPut(peerID, *requestID, [][]byte{blkBytes1})
+	switch {
+	case err != nil: // respond with right block
 		t.Fatal(err)
-	} else if !*finished {
+	case !*finished:
 		t.Fatalf("Bootstrapping should have finished")
-	} else if blk0.Status() != choices.Accepted {
+	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
-	} else if blk1.Status() != choices.Accepted {
+	case blk1.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
-	} else if blk2.Status() != choices.Accepted {
+	case blk2.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
 	}
 }
@@ -423,13 +427,14 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		t.Fatal("should not have requested another block")
 	}
 
-	if !*finished {
+	switch {
+	case !*finished:
 		t.Fatalf("Bootstrapping should have finished")
-	} else if blk0.Status() != choices.Accepted {
+	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
-	} else if blk1.Status() != choices.Accepted {
+	case blk1.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
-	} else if blk2.Status() != choices.Accepted {
+	case blk2.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
 	}
 }
@@ -570,13 +575,14 @@ func TestBootstrapperMultiPut(t *testing.T) {
 		t.Fatal("should not have requested another block")
 	}
 
-	if !*finished {
+	switch {
+	case !*finished:
 		t.Fatalf("Bootstrapping should have finished")
-	} else if blk0.Status() != choices.Accepted {
+	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
-	} else if blk1.Status() != choices.Accepted {
+	case blk1.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
-	} else if blk2.Status() != choices.Accepted {
+	case blk2.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
 	}
 }
@@ -799,13 +805,14 @@ func TestBootstrapperFinalized(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !*finished {
+	switch {
+	case !*finished:
 		t.Fatalf("Bootstrapping should have finished")
-	} else if blk0.Status() != choices.Accepted {
+	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
-	} else if blk1.Status() != choices.Accepted {
+	case blk1.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
-	} else if blk2.Status() != choices.Accepted {
+	case blk2.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
 	}
 }

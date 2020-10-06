@@ -20,20 +20,22 @@ func TestBitSet(t *testing.T) {
 	}
 
 	bs1.Add(10)
-	if bs1.Len() != 2 {
+	switch {
+	case bs1.Len() != 2:
 		t.Fatalf("Wrong set length")
-	} else if !bs1.Contains(5) {
+	case !bs1.Contains(5):
 		t.Fatalf("Set should contain element")
-	} else if !bs1.Contains(10) {
+	case !bs1.Contains(10):
 		t.Fatalf("Set should contain element")
 	}
 
 	bs1.Add(10)
-	if bs1.Len() != 2 {
+	switch {
+	case bs1.Len() != 2:
 		t.Fatalf("Wrong set length")
-	} else if !bs1.Contains(5) {
+	case !bs1.Contains(5):
 		t.Fatalf("Set should contain element")
-	} else if !bs1.Contains(10) {
+	case !bs1.Contains(10):
 		t.Fatalf("Set should contain element")
 	}
 
@@ -47,32 +49,34 @@ func TestBitSet(t *testing.T) {
 	}
 
 	bs2.Union(bs1)
-	if bs1.Len() != 2 {
+	switch {
+	case bs1.Len() != 2:
 		t.Fatalf("Wrong set length")
-	} else if !bs1.Contains(5) {
+	case !bs1.Contains(5):
 		t.Fatalf("Set should contain element")
-	} else if !bs1.Contains(10) {
+	case !bs1.Contains(10):
 		t.Fatalf("Set should contain element")
-	} else if bs2.Len() != 3 {
+	case bs2.Len() != 3:
 		t.Fatalf("Wrong set length")
-	} else if !bs2.Contains(0) {
+	case !bs2.Contains(0):
 		t.Fatalf("Set should contain element")
-	} else if !bs2.Contains(5) {
+	case !bs2.Contains(5):
 		t.Fatalf("Set should contain element")
-	} else if !bs2.Contains(10) {
+	case !bs2.Contains(10):
 		t.Fatalf("Set should contain element")
 	}
 
 	bs1.Clear()
-	if bs1.Len() != 0 {
+	switch {
+	case bs1.Len() != 0:
 		t.Fatalf("Wrong set length")
-	} else if bs2.Len() != 3 {
+	case bs2.Len() != 3:
 		t.Fatalf("Wrong set length")
-	} else if !bs2.Contains(0) {
+	case !bs2.Contains(0):
 		t.Fatalf("Set should contain element")
-	} else if !bs2.Contains(5) {
+	case !bs2.Contains(5):
 		t.Fatalf("Set should contain element")
-	} else if !bs2.Contains(10) {
+	case !bs2.Contains(10):
 		t.Fatalf("Set should contain element")
 	}
 
@@ -84,11 +88,12 @@ func TestBitSet(t *testing.T) {
 	}
 
 	bs1.Add(1)
-	if bs1.Len() != 2 {
+	switch {
+	case bs1.Len() != 2:
 		t.Fatalf("Wrong set length")
-	} else if !bs1.Contains(1) {
+	case !bs1.Contains(1):
 		t.Fatalf("Set should contain element")
-	} else if !bs1.Contains(63) {
+	case !bs1.Contains(63):
 		t.Fatalf("Set should contain element")
 	}
 
@@ -112,13 +117,14 @@ func TestBitSet(t *testing.T) {
 
 	bs3.Intersection(bs4)
 
-	if bs3.Len() != 2 {
+	switch {
+	case bs3.Len() != 2:
 		t.Fatalf("Wrong set length")
-	} else if !bs3.Contains(2) {
+	case !bs3.Contains(2):
 		t.Fatalf("Set should contain element")
-	} else if !bs3.Contains(5) {
+	case !bs3.Contains(5):
 		t.Fatalf("Set should contain element")
-	} else if bs4.Len() != 2 {
+	case bs4.Len() != 2:
 		t.Fatalf("Wrong set length")
 	}
 
@@ -135,11 +141,12 @@ func TestBitSet(t *testing.T) {
 
 	bs5.Difference(bs6)
 
-	if bs5.Len() != 1 {
+	switch {
+	case bs5.Len() != 1:
 		t.Fatalf("Wrong set length")
-	} else if !bs5.Contains(7) {
+	case !bs5.Contains(7):
 		t.Fatalf("Set should contain element")
-	} else if bs6.Len() != 2 {
+	case bs6.Len() != 2:
 		t.Fatalf("Wrong set length")
 	}
 }

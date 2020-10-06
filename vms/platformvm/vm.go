@@ -38,13 +38,14 @@ import (
 )
 
 const (
+	// TODO: remove skipped values on the next DB migration
 	// For putting/getting values from state
 	validatorsTypeID uint64 = iota
 	chainsTypeID
-	blockTypeID
+	_
 	subnetsTypeID
 	utxoTypeID
-	utxoSetTypeID
+	_
 	txTypeID
 	statusTypeID
 	currentSupplyTypeID
@@ -938,7 +939,6 @@ func (vm *VM) Disconnected(vdrID ids.ShortID) {
 	if err := vm.DB.Commit(); err != nil {
 		vm.Ctx.Log.Error("failed to commit database changes")
 	}
-	return
 }
 
 // Check if there is a block ready to be added to consensus
