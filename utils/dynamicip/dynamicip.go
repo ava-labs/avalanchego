@@ -16,9 +16,14 @@ import (
 
 type DynamicResolver interface {
 	Resolve() (string, error)
+	IsResolver() bool
 }
 
 type NoResolver struct {
+}
+
+func (r *NoResolver) IsResolver() bool {
+	return false
 }
 
 func (r *NoResolver) Resolve() (string, error) {
@@ -41,6 +46,10 @@ func NewOpenDNSResolver() *OpenDNSResolver {
 	}}
 }
 
+func (r *OpenDNSResolver) IsResolver() bool {
+	return true
+}
+
 func (r *OpenDNSResolver) Resolve() (string, error) {
 	ip, err := r.Resolver.LookupHost(context.Background(), "myip.opendns.com")
 	if err != nil {
@@ -53,6 +62,10 @@ func (r *OpenDNSResolver) Resolve() (string, error) {
 }
 
 type IFConfigResolver struct {
+}
+
+func (r *IFConfigResolver) IsResolver() bool {
+	return true
 }
 
 func (r *IFConfigResolver) Resolve() (string, error) {
@@ -99,16 +112,20 @@ func (u *NoExternalIPUpdater) Stop() {
 }
 
 type ExternalIPUpdater struct {
-	tickerCloser  chan struct{}
-	log           logging.Logger
-	ip            *utils.DynamicIPDesc
-	updateTimeout time.Duration
+	tickerCloser    chan struct{}
+	log             logging.Logger
+	ip              *utils.DynamicIPDesc
+	updateTimeout   time.Duration
+	dynamicResolver DynamicResolver
 }
 
-func NewExternalIPUpdater(enable bool, updateTimeout time.Duration, log logging.Logger, ip *utils.DynamicIPDesc, dynamicResolver DynamicResolver) ExternalIPUpdaterInterface {
-	if enable {
-		updater := &ExternalIPUpdater{log: log, ip: ip, updateTimeout: updateTimeout}
-		go updater.UpdateExternalIP(updateTimeout, dynamicResolver)
+func NewExternalIPUpdater(updateTimeout time.Duration,
+	log logging.Logger,
+	ip *utils.DynamicIPDesc,
+	dynamicResolver DynamicResolver) ExternalIPUpdaterInterface {
+	if dynamicResolver.IsResolver() {
+		updater := &ExternalIPUpdater{log: log, ip: ip, updateTimeout: updateTimeout, dynamicResolver: dynamicResolver}
+		go updater.UpdateExternalIP()
 		return updater
 	}
 	return &NoExternalIPUpdater{}
@@ -118,14 +135,14 @@ func (u *ExternalIPUpdater) Stop() {
 	close(u.tickerCloser)
 }
 
-func (u *ExternalIPUpdater) UpdateExternalIP(frequency time.Duration, dynamicResolver DynamicResolver) {
-	timer := time.NewTimer(frequency)
+func (u *ExternalIPUpdater) UpdateExternalIP() {
+	timer := time.NewTimer(u.updateTimeout)
 	defer timer.Stop()
 
 	for {
 		select {
 		case <-timer.C:
-			u.updateIP(dynamicResolver)
+			u.updateIP(u.dynamicResolver)
 			timer.Reset(u.updateTimeout)
 		case <-u.tickerCloser:
 			return

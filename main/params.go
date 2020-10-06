@@ -123,13 +123,10 @@ func init() {
 	// IP:
 	consensusIP := fs.String("public-ip", "", "Public IP of this node")
 
-	// dynamic-public-ip overries public-ip
-	fs.BoolVar(&Config.DynamicConsensusIP, "dynamic-public-ip", false, "If true, resolve ip from ifconfig.co")
-
 	// how often to update the dynamic IP and PnP/NAT-PMP IP and routing.
 	fs.DurationVar(&Config.DynamicUpdateDuration, "dynamic-update-duration", 5*time.Minute, "Dynamic IP and NAT Traversal update duration")
 
-	dynamicPublicIPResolver := fs.String("dynamic-public-ip-resolver", "ifconfig", "'ifconfig' *default* or 'opendns'")
+	dynamicPublicIPResolver := fs.String("dynamic-public-ip", "", "*empty* *default* or 'ifconfig' or 'opendns'")
 
 	// HTTP Server:
 	httpHost := fs.String("http-host", "127.0.0.1", "Address of the HTTP server")
@@ -257,9 +254,10 @@ func init() {
 		Config.DB = memdb.New()
 	}
 
+	Config.DynamicConsensusResolver = dynamicip.NewDynamicResolver(*dynamicPublicIPResolver)
+
 	var ip net.IP
-	if Config.DynamicConsensusIP {
-		Config.DynamicConsensusResolver = dynamicip.NewDynamicResolver(*dynamicPublicIPResolver)
+	if Config.DynamicConsensusResolver.IsResolver() {
 		Config.Nat = nat.NewNoRouter()
 		ipstr, err := dynamicip.FetchExternalIP(Config.DynamicConsensusResolver)
 		if err != nil {

@@ -100,9 +100,6 @@ type Config struct {
 	ConsensusGossipFrequency time.Duration
 	ConsensusShutdownTimeout time.Duration
 
-	// use dynamic IP resolution
-	DynamicConsensusIP bool
-
 	// Dynamic Update duration for IP or NAT traversal
 	DynamicUpdateDuration time.Duration
 
