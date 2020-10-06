@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -39,6 +40,8 @@ var (
 // Mempool implements a simple mempool to convert txs into valid blocks
 type Mempool struct {
 	vm *VM
+
+	// TODO: factor out VM into separable interfaces
 
 	// vm.codec
 	// vm.ctx.Log
@@ -74,6 +77,7 @@ type Mempool struct {
 	unissuedProposalTxs *EventHeap
 	unissuedDecisionTxs []*Tx
 	unissuedAtomicTxs   []*Tx
+	unissuedTxIDs       ids.Set
 }
 
 // Initialize this mempool.
@@ -101,6 +105,10 @@ func (m *Mempool) IssueTx(tx *Tx) error {
 	if err := tx.Sign(m.vm.codec, nil); err != nil {
 		return err
 	}
+	txID := tx.ID()
+	if m.unissuedTxIDs.Contains(txID) {
+		return nil
+	}
 	switch tx.UnsignedTx.(type) {
 	case TimedTx:
 		m.unissuedProposalTxs.Add(tx)
@@ -111,6 +119,7 @@ func (m *Mempool) IssueTx(tx *Tx) error {
 	default:
 		return errUnknownTxType
 	}
+	m.unissuedTxIDs.Add(txID)
 	m.ResetTimer()
 	return nil
 }
@@ -134,6 +143,9 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		}
 		var txs []*Tx
 		txs, m.unissuedDecisionTxs = m.unissuedDecisionTxs[:numTxs], m.unissuedDecisionTxs[numTxs:]
+		for _, tx := range txs {
+			m.unissuedTxIDs.Remove(tx.ID())
+		}
 		blk, err := m.vm.newStandardBlock(preferredID, preferredHeight+1, txs)
 		if err != nil {
 			m.ResetTimer()
@@ -154,6 +166,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 	if len(m.unissuedAtomicTxs) > 0 {
 		tx := m.unissuedAtomicTxs[0]
 		m.unissuedAtomicTxs = m.unissuedAtomicTxs[1:]
+		m.unissuedTxIDs.Remove(tx.ID())
 		blk, err := m.vm.newAtomicBlock(preferredID, preferredHeight+1, *tx)
 		if err != nil {
 			return nil, err
@@ -264,6 +277,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 	syncTime := localTime.Add(Delta)
 	for m.unissuedProposalTxs.Len() > 0 {
 		tx := m.unissuedProposalTxs.Remove()
+		m.unissuedTxIDs.Remove(tx.ID())
 		utx := tx.UnsignedTx.(TimedTx)
 		if !syncTime.After(utx.StartTime()) {
 			blk, err := m.vm.newProposalBlock(preferredID, preferredHeight+1, *tx)
@@ -353,8 +367,10 @@ func (m *Mempool) ResetTimer() {
 			return
 		}
 		// If the tx doesn't meet the synchrony bound, drop it
-		m.unissuedProposalTxs.Remove()
-		m.vm.Ctx.Log.Debug("dropping tx to add validator because its start time has passed")
+		tx := m.unissuedProposalTxs.Remove()
+		txID := tx.ID()
+		m.unissuedTxIDs.Remove(txID)
+		m.vm.Ctx.Log.Debug("dropping tx %q to add validator because its start time has passed", txID)
 	}
 
 	waitTime := nextStakerChangeTime.Sub(localTime)
