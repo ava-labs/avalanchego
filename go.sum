@@ -41,8 +41,11 @@ github.com/aristanetworks/splunk-hec-go v0.3.3/go.mod h1:1VHO9r17b0K7WmOlLb9nTk/
 github.com/ava-labs/avalanche-go v0.8.0-beta/go.mod h1:quYojL1hu0ue2glUT1ng28kADs9R94zGdEvfW0/HRg8=
 github.com/ava-labs/avalanchego v0.8.3 h1:ioc7RtSAzIv40qxHDikhqZGVxF3y+8cXeIrLpGz9jtc=
 github.com/ava-labs/avalanchego v0.8.3/go.mod h1:6zPzQv7m6vSvdKAwH+lLTga0IMd/0+HLMT5OULrpFcU=
+github.com/ava-labs/avalanchego v1.0.2-rc.1 h1:Io4Ok8jXuafnt5MYonWXw/sv9XYw2MzuwXFnJyawfWk=
+github.com/ava-labs/avalanchego v1.0.2-rc.1/go.mod h1:JAkAaaj0AlCDSnfFHZwfcEPA2Sl+fOwyLJ6veWMjQWE=
 github.com/ava-labs/coreth v0.2.14-rc.1/go.mod h1:Zhb60GFIB7G5AnUCks0Jo4Rezx/EovL8o+z51aBF1A8=
 github.com/ava-labs/coreth v0.2.15-rc.4/go.mod h1:+sK2XGKCNA48uzeHWe4iBzmiOBYmYvnnzLtOkQeQfkk=
+github.com/ava-labs/coreth v0.3.4/go.mod h1:d5h8SoFyMOoFqg2gHzYgftZlKgZ1MHKKydjyq2hoABk=
 github.com/ava-labs/gecko v0.6.1-rc.1/go.mod h1:TT6uA1BETZpVMR0xiFtE8I5Mv4DULlS+lAL3xuYKnpA=
 github.com/ava-labs/go-ethereum v1.9.3 h1:GmnMZ/dlvVAPFmWBzEpRJX49pUAymPfoASLNRJqR0AY=
 github.com/ava-labs/go-ethereum v1.9.3/go.mod h1:a+agc6fXfZFsPZCylA3ry4Y8CLCqLKg3Rc23NXZ9aw8=
