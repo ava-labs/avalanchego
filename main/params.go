@@ -154,6 +154,11 @@ func init() {
 	networkTimeoutInc := fs.Int64("network-timeout-increase", 60*int64(time.Millisecond), "Increase of network timeout after a failed request, in nanoseconds.")
 	networkTimeoutDec := fs.Int64("network-timeout-reduction", 12*int64(time.Millisecond), "Decrease of network timeout after a successful request, in nanoseconds.")
 
+	// Benchlist Parameters:
+	fs.IntVar(&Config.BenchlistConfig.Threshold, "benchlist-fail-threshold", 10, "Number of consecutive failed queries before benchlisting a node.")
+	fs.BoolVar(&Config.BenchlistConfig.PeerSummaryEnabled, "benchlist-peer-summary-enabled", false, "Enables peer specific query latency metrics.")
+	benchlistDuration := fs.Int64("benchlist-duration", int64(time.Hour), "Amount of time a peer is benchlisted after surpassing the threshold.")
+
 	// Plugins:
 	fs.StringVar(&Config.PluginDir, "plugin-dir", defaultPluginDirs[0], "Plugin directory for Avalanche VMs")
 
@@ -434,6 +439,9 @@ func init() {
 	Config.NetworkConfig.MaximumTimeout = time.Duration(*networkMaximumTimeout)
 	Config.NetworkConfig.TimeoutInc = time.Duration(*networkTimeoutInc)
 	Config.NetworkConfig.TimeoutDec = time.Duration(*networkTimeoutDec)
+
+	Config.BenchlistConfig.Duration = time.Duration(*benchlistDuration)
+	Config.BenchlistConfig.MaxPortion = (1.0 - (float64(Config.ConsensusParams.Alpha) / float64(Config.ConsensusParams.K))) / 3.0
 
 	if *consensusGossipFrequency < 0 {
 		errs.Add(errors.New("gossip frequency can't be negative"))
