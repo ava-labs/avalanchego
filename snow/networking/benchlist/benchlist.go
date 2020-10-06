@@ -95,13 +95,17 @@ func (b *queryBenchlist) RegisterQuery(validatorID ids.ShortID, requestID uint32
 	if benched := b.benched(validatorID); benched {
 		return false
 	}
+
 	validatorRequests, ok := b.pendingQueries[key]
 	if !ok {
 		validatorRequests = make(map[uint32]pendingQuery)
 		b.pendingQueries[key] = validatorRequests
 	}
-	validatorRequests[requestID] = pendingQuery{registered: b.clock.Time(), msgType: msgType}
 
+	validatorRequests[requestID] = pendingQuery{
+		registered: b.clock.Time(),
+		msgType:    msgType,
+	}
 	return true
 }
 
@@ -169,7 +173,12 @@ func (b *queryBenchlist) bench(validatorID ids.ShortID) {
 	b.benchlistOrder.PushBack(validatorID)
 	b.benchlistSet.Add(validatorID)
 	delete(b.consecutiveFailures, key)
-	b.ctx.Log.Debug("Benching validator %s for %v after %d consecutive failed queries", validatorID, randomizedEndTime.Sub(currTime), b.threshold)
+	b.ctx.Log.Debug(
+		"benching validator %s after %d consecutive failed queries for %s",
+		validatorID,
+		b.threshold,
+		randomizedEndTime.Sub(currTime),
+	)
 
 	// Note: there could be a memory leak if a large number of
 	// validators were added, sampled, benched, and never sampled
@@ -203,7 +212,7 @@ func (b *queryBenchlist) cleanup() {
 	currentWeight, err := b.vdrs.SubsetWeight(b.benchlistSet)
 	if err != nil {
 		// Add log for this, should never happen
-		b.ctx.Log.Error("Failed to calculate subset weight due to: %w. Resetting benchlist.", err)
+		b.ctx.Log.Error("failed to calculate subset weight due to: %w... Resetting benchlist", err)
 		b.reset()
 		return
 	}
@@ -230,7 +239,7 @@ func (b *queryBenchlist) cleanup() {
 		if ok {
 			newWeight, err := safemath.Sub64(currentWeight, removeWeight)
 			if err != nil {
-				b.ctx.Log.Error("Failed to calculate new subset weight due to: %w. Resetting benchlist.", err)
+				b.ctx.Log.Error("failed to calculate new subset weight due to: %w... Resetting benchlist", err)
 				b.reset()
 				return
 			}
@@ -243,7 +252,7 @@ func (b *queryBenchlist) cleanup() {
 	}
 
 	updatedBenchLen := b.benchlistSet.Len()
-	b.ctx.Log.Debug("Benchlist weight: (%v/%v) -> (%v/%v). Benched Validators: %d -> %d",
+	b.ctx.Log.Debug("benchlist weight: (%d/%d) -> (%d/%d). Benched Validators: %d -> %d",
 		currentWeight,
 		totalWeight,
 		updatedWeight,
@@ -275,12 +284,14 @@ func (b *queryBenchlist) removeQuery(validatorID ids.ShortID, requestID uint32) 
 	}
 
 	query, ok := validatorRequests[requestID]
-	if ok {
-		delete(validatorRequests, requestID)
-		if len(validatorRequests) == 0 {
-			delete(b.pendingQueries, key)
-		}
-		b.metrics.observe(validatorID, query.msgType, float64(b.clock.Time().Sub(query.registered)))
+	if !ok {
+		return false
 	}
-	return ok
+
+	delete(validatorRequests, requestID)
+	if len(validatorRequests) == 0 {
+		delete(b.pendingQueries, key)
+	}
+	b.metrics.observe(validatorID, query.msgType, b.clock.Time().Sub(query.registered))
+	return true
 }

@@ -80,9 +80,6 @@ type Manager interface {
 	// Returns the ID of the subnet that is validating the provided chain
 	SubnetID(chainID ids.ID) (ids.ID, error)
 
-	// GetContext returns the ID of the chain with ID or false if it does not exist
-	GetContext(ids.ID) (*snow.Context, bool)
-
 	// Returns true iff the chain with the given ID exists and is finished bootstrapping
 	IsBootstrapped(ids.ID) bool
 
@@ -246,7 +243,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 		SharedMemory:        m.AtomicMemory.NewSharedMemory(chainParams.ID),
 		BCLookup:            m,
 		SNLookup:            m,
-		Namespace:           fmt.Sprintf("%s_%s", constants.PlatformName, primaryAlias),
+		Namespace:           fmt.Sprintf("%s_%s_vm", constants.PlatformName, primaryAlias),
 		Metrics:             m.ConsensusParams.Metrics,
 	}
 
@@ -302,7 +299,6 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	if !ok {
 		return nil, fmt.Errorf("couldn't get validator set of subnet with ID %s. The subnet may not exist", chainParams.SubnetID)
 	}
-	m.Validators.SetChain(chainParams.SubnetID, chainParams.ID)
 
 	beacons := vdrs
 	if chainParams.CustomBeacons != nil {
@@ -555,16 +551,6 @@ func (m *manager) createSnowmanChain(
 		VM:      vm,
 		Ctx:     ctx,
 	}, nil
-}
-
-func (m *manager) GetContext(id ids.ID) (*snow.Context, bool) {
-	m.chainsLock.Lock()
-	chain, exists := m.chains[id.Key()]
-	m.chainsLock.Unlock()
-	if !exists {
-		return nil, false
-	}
-	return chain.Context(), true
 }
 
 func (m *manager) SubnetID(chainID ids.ID) (ids.ID, error) {

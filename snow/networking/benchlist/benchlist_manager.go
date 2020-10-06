@@ -55,22 +55,33 @@ func (bm *benchlistManager) RegisterChain(ctx *snow.Context, namespace string) {
 	defer bm.lock.Unlock()
 
 	key := ctx.ChainID.Key()
-	chain, exists := bm.chainBenchlists[key]
-	if exists {
+	if _, exists := bm.chainBenchlists[key]; exists {
 		return
 	}
 
-	vdrs, ok := bm.config.Validators.GetValidatorsByChain(ctx.ChainID)
+	vdrs, ok := bm.config.Validators.GetValidators(ctx.SubnetID)
 	if !ok {
 		return
 	}
-	chain = NewQueryBenchlist(vdrs, ctx, bm.config.Threshold, bm.config.Duration, bm.config.MaxPortion, bm.config.PeerSummaryEnabled, namespace)
-	bm.chainBenchlists[key] = chain
+	bm.chainBenchlists[key] = NewQueryBenchlist(
+		vdrs,
+		ctx,
+		bm.config.Threshold,
+		bm.config.Duration,
+		bm.config.MaxPortion,
+		bm.config.PeerSummaryEnabled,
+		namespace,
+	)
 	ctx.Log.Info("Registered benchlist for chain %s", ctx.ChainID)
 }
 
 // RegisterQuery implements the Manager interface
-func (bm *benchlistManager) RegisterQuery(chainID ids.ID, validatorID ids.ShortID, requestID uint32, msgType constants.MsgType) bool {
+func (bm *benchlistManager) RegisterQuery(
+	chainID ids.ID,
+	validatorID ids.ShortID,
+	requestID uint32,
+	msgType constants.MsgType,
+) bool {
 	bm.lock.RLock()
 	defer bm.lock.RUnlock()
 
@@ -114,16 +125,7 @@ type noBenchlist struct{}
 // NewNoBenchlist returns an empty benchlist that will never stop any queries
 func NewNoBenchlist() Manager { return &noBenchlist{} }
 
-// RegisterChain ...
-func (b *noBenchlist) RegisterChain(ctx *snow.Context, namespace string) {}
-
-// RegisterQuery ...
-func (b *noBenchlist) RegisterQuery(chainID ids.ID, validatorID ids.ShortID, requestID uint32, msgType constants.MsgType) bool {
-	return true
-}
-
-// RegisterResponse ...
-func (b *noBenchlist) RegisterResponse(chainID ids.ID, validatorID ids.ShortID, requestID uint32) {}
-
-// QueryFailed ...
-func (b *noBenchlist) QueryFailed(chainID ids.ID, validatorID ids.ShortID, requestID uint32) {}
+func (noBenchlist) RegisterChain(*snow.Context, string)                               {}
+func (noBenchlist) RegisterQuery(ids.ID, ids.ShortID, uint32, constants.MsgType) bool { return true }
+func (noBenchlist) RegisterResponse(ids.ID, ids.ShortID, uint32)                      {}
+func (noBenchlist) QueryFailed(ids.ID, ids.ShortID, uint32)                           {}

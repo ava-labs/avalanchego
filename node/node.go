@@ -467,7 +467,30 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	criticalChains := ids.Set{}
 	criticalChains.Add(constants.PlatformChainID, createAVMTx.ID())
 
+	n.Config.NetworkConfig.Namespace = constants.PlatformName
+	n.Config.NetworkConfig.Registerer = n.Config.ConsensusParams.Metrics
+	n.Config.BenchlistConfig.Validators = n.vdrs
+	benchlistManager := benchlist.NewManager(&n.Config.BenchlistConfig)
+
 	timeoutManager := timeout.Manager{}
+	if err := timeoutManager.Initialize(&n.Config.NetworkConfig, benchlistManager); err != nil {
+		return err
+	}
+	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
+
+	n.Config.ConsensusRouter.Initialize(
+		n.ID,
+		n.Log,
+		&timeoutManager,
+		n.Config.ConsensusGossipFrequency,
+		n.Config.ConsensusShutdownTimeout,
+		criticalChains,
+		func() {
+			if err := n.Net.Close(); err != nil {
+				n.Log.Debug("closing the network due to a fatal chain error resulted in: %s", err)
+			}
+		},
+	)
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
 		StakingEnabled:          n.Config.EnableStaking,
@@ -494,30 +517,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		CriticalChains:          criticalChains,
 		TimeoutManager:          &timeoutManager,
 	})
-
-	n.Config.NetworkConfig.Namespace = constants.PlatformName
-	n.Config.NetworkConfig.Registerer = n.Config.ConsensusParams.Metrics
-	n.Config.BenchlistConfig.Validators = n.vdrs
-	benchlistManager := benchlist.NewManager(&n.Config.BenchlistConfig)
-
-	if err := timeoutManager.Initialize(&n.Config.NetworkConfig, benchlistManager); err != nil {
-		return err
-	}
-	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
-
-	n.Config.ConsensusRouter.Initialize(
-		n.ID,
-		n.Log,
-		&timeoutManager,
-		n.Config.ConsensusGossipFrequency,
-		n.Config.ConsensusShutdownTimeout,
-		criticalChains,
-		func() {
-			if err := n.Net.Close(); err != nil {
-				n.Log.Debug("closing the network due to a fatal chain error resulted in: %s", err)
-			}
-		},
-	)
 
 	vdrs := n.vdrs
 

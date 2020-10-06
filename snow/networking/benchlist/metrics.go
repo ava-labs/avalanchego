@@ -5,6 +5,7 @@ package benchlist
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -20,14 +21,18 @@ const (
 	validatorIDLabel      = "validatorID"
 )
 
-func initHistogram(namespace, name string, registerer prometheus.Registerer, errs *wrappers.Errs) prometheus.Histogram {
-	histogram := prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Namespace: namespace,
-			Name:      name,
-			Help:      defaultRequestHelpMsg,
-			Buckets:   timer.MillisecondsBuckets,
-		})
+func initHistogram(
+	namespace,
+	name string,
+	registerer prometheus.Registerer,
+	errs *wrappers.Errs,
+) prometheus.Histogram {
+	histogram := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      name,
+		Help:      defaultRequestHelpMsg,
+		Buckets:   timer.MillisecondsBuckets,
+	})
 
 	if err := registerer.Register(histogram); err != nil {
 		errs.Add(fmt.Errorf("failed to register %s statistics due to %w", name, err))
@@ -35,13 +40,17 @@ func initHistogram(namespace, name string, registerer prometheus.Registerer, err
 	return histogram
 }
 
-func initSummary(namespace, name string, registerer prometheus.Registerer, errs *wrappers.Errs) *prometheus.SummaryVec {
-	summary := prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace: namespace,
-			Name:      name,
-			Help:      defaultRequestHelpMsg,
-		}, []string{validatorIDLabel})
+func initSummary(
+	namespace,
+	name string,
+	registerer prometheus.Registerer,
+	errs *wrappers.Errs,
+) *prometheus.SummaryVec {
+	summary := prometheus.NewSummaryVec(prometheus.SummaryOpts{
+		Namespace: namespace,
+		Name:      name,
+		Help:      defaultRequestHelpMsg,
+	}, []string{validatorIDLabel})
 
 	if err := registerer.Register(summary); err != nil {
 		errs.Add(fmt.Errorf("failed to register %s statistics due to %w", name, err))
@@ -92,84 +101,71 @@ func (m *metrics) Initialize(ctx *snow.Context, namespace string, summaryEnabled
 		errs.Add(fmt.Errorf("failed to register weight benched statistics due to %w", err))
 	}
 
-	querylatencyNamespace := fmt.Sprintf("%s_sender", ctx.Namespace)
-	ctx.Log.Info("Registered benchlist metrics with namespace: %s", querylatencyNamespace)
+	queryLatencyNamespace := fmt.Sprintf("%s_sender", namespace)
 
-	m.getAcceptedFrontierSummary = initSummary(querylatencyNamespace, "lat_get_accepted_frontier_peer", ctx.Metrics, &errs)
-	m.getAcceptedSummary = initSummary(querylatencyNamespace, "lat_get_accepted_peer", ctx.Metrics, &errs)
-	m.getAncestorsSummary = initSummary(querylatencyNamespace, "lat_get_ancestors_peer", ctx.Metrics, &errs)
-	m.getSummary = initSummary(querylatencyNamespace, "lat_get_peer", ctx.Metrics, &errs)
-	m.pushQuerySummary = initSummary(querylatencyNamespace, "lat_push_query_peer", ctx.Metrics, &errs)
-	m.pullQuerySummary = initSummary(querylatencyNamespace, "lat_pull_query_peer", ctx.Metrics, &errs)
+	m.getAcceptedFrontierSummary = initSummary(queryLatencyNamespace, "lat_get_accepted_frontier_peer", ctx.Metrics, &errs)
+	m.getAcceptedSummary = initSummary(queryLatencyNamespace, "lat_get_accepted_peer", ctx.Metrics, &errs)
+	m.getAncestorsSummary = initSummary(queryLatencyNamespace, "lat_get_ancestors_peer", ctx.Metrics, &errs)
+	m.getSummary = initSummary(queryLatencyNamespace, "lat_get_peer", ctx.Metrics, &errs)
+	m.pushQuerySummary = initSummary(queryLatencyNamespace, "lat_push_query_peer", ctx.Metrics, &errs)
+	m.pullQuerySummary = initSummary(queryLatencyNamespace, "lat_pull_query_peer", ctx.Metrics, &errs)
 
-	m.getAcceptedFrontier = initHistogram(querylatencyNamespace, "lat_get_accepted_frontier", ctx.Metrics, &errs)
-	m.getAccepted = initHistogram(querylatencyNamespace, "lat_get_accepted", ctx.Metrics, &errs)
-	m.getAncestors = initHistogram(querylatencyNamespace, "lat_get_ancestors", ctx.Metrics, &errs)
-	m.get = initHistogram(querylatencyNamespace, "lat_get", ctx.Metrics, &errs)
-	m.pushQuery = initHistogram(querylatencyNamespace, "lat_push_query", ctx.Metrics, &errs)
-	m.pullQuery = initHistogram(querylatencyNamespace, "lat_pull_query", ctx.Metrics, &errs)
+	m.getAcceptedFrontier = initHistogram(queryLatencyNamespace, "lat_get_accepted_frontier", ctx.Metrics, &errs)
+	m.getAccepted = initHistogram(queryLatencyNamespace, "lat_get_accepted", ctx.Metrics, &errs)
+	m.getAncestors = initHistogram(queryLatencyNamespace, "lat_get_ancestors", ctx.Metrics, &errs)
+	m.get = initHistogram(queryLatencyNamespace, "lat_get", ctx.Metrics, &errs)
+	m.pushQuery = initHistogram(queryLatencyNamespace, "lat_push_query", ctx.Metrics, &errs)
+	m.pullQuery = initHistogram(queryLatencyNamespace, "lat_pull_query", ctx.Metrics, &errs)
 
+	ctx.Log.Info("registered benchlist metrics with namespace: %s", queryLatencyNamespace)
 	return errs.Err
 }
 
-func (m *metrics) observe(validatorID ids.ShortID, msgType constants.MsgType, latency float64) {
-	if !m.summaryEnabled {
-		switch msgType {
-		case constants.GetAcceptedFrontierMsg:
-			m.getAcceptedFrontier.Observe(latency)
-		case constants.GetAcceptedMsg:
-			m.getAccepted.Observe(latency)
-		case constants.GetMsg:
-			m.get.Observe(latency)
-		case constants.PushQueryMsg:
-			m.pushQuery.Observe(latency)
-		case constants.PullQueryMsg:
-			m.pullQuery.Observe(latency)
-		}
-
-		return
-	}
+func (m *metrics) observe(validatorID ids.ShortID, msgType constants.MsgType, latency time.Duration) {
+	latencyMS := float64(latency) / float64(time.Millisecond)
 
 	switch msgType {
 	case constants.GetAcceptedFrontierMsg:
-		observer, err := m.getAcceptedFrontierSummary.GetMetricWith(prometheus.Labels{validatorIDLabel: validatorID.String()})
-		if err == nil {
-			observer.Observe(latency)
-		} else {
-			m.ctx.Log.Warn("Failed to get observer with validatorID label")
-		}
-		m.getAcceptedFrontier.Observe(latency)
+		m.getAcceptedFrontier.Observe(latencyMS)
 	case constants.GetAcceptedMsg:
-		observer, err := m.getAcceptedSummary.GetMetricWith(prometheus.Labels{validatorIDLabel: validatorID.String()})
-		if err == nil {
-			observer.Observe(latency)
-		} else {
-			m.ctx.Log.Warn("Failed to get observer with validatorID label")
-		}
-		m.getAccepted.Observe(latency)
+		m.getAccepted.Observe(latencyMS)
 	case constants.GetMsg:
-		observer, err := m.getSummary.GetMetricWith(prometheus.Labels{validatorIDLabel: validatorID.String()})
-		if err == nil {
-			observer.Observe(latency)
-		} else {
-			m.ctx.Log.Warn("Failed to get observer with validatorID label")
-		}
-		m.get.Observe(latency)
+		m.get.Observe(latencyMS)
 	case constants.PushQueryMsg:
-		observer, err := m.pushQuerySummary.GetMetricWith(prometheus.Labels{validatorIDLabel: validatorID.String()})
-		if err == nil {
-			observer.Observe(latency)
-		} else {
-			m.ctx.Log.Warn("Failed to get observer with validatorID label")
-		}
-		m.pushQuery.Observe(latency)
+		m.pushQuery.Observe(latencyMS)
 	case constants.PullQueryMsg:
-		observer, err := m.pullQuerySummary.GetMetricWith(prometheus.Labels{validatorIDLabel: validatorID.String()})
-		if err == nil {
-			observer.Observe(latency)
-		} else {
-			m.ctx.Log.Warn("Failed to get observer with validatorID label")
-		}
-		m.pullQuery.Observe(latency)
+		m.pullQuery.Observe(latencyMS)
+	}
+
+	if !m.summaryEnabled {
+		return
+	}
+
+	labels := prometheus.Labels{
+		validatorIDLabel: validatorID.String(),
+	}
+	var (
+		observer prometheus.Observer
+		err      error
+	)
+	switch msgType {
+	case constants.GetAcceptedFrontierMsg:
+		observer, err = m.getAcceptedFrontierSummary.GetMetricWith(labels)
+	case constants.GetAcceptedMsg:
+		observer, err = m.getAcceptedSummary.GetMetricWith(labels)
+	case constants.GetMsg:
+		observer, err = m.getSummary.GetMetricWith(labels)
+	case constants.PushQueryMsg:
+		observer, err = m.pushQuerySummary.GetMetricWith(labels)
+	case constants.PullQueryMsg:
+		observer, err = m.pullQuerySummary.GetMetricWith(labels)
+	default:
+		return
+	}
+
+	if err == nil {
+		observer.Observe(latencyMS)
+	} else {
+		m.ctx.Log.Warn("Failed to get observer with validatorID label due to %s", err)
 	}
 }
