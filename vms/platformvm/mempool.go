@@ -279,17 +279,23 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		tx := m.unissuedProposalTxs.Remove()
 		m.unissuedTxIDs.Remove(tx.ID())
 		utx := tx.UnsignedTx.(TimedTx)
-		if !syncTime.After(utx.StartTime()) {
-			blk, err := m.vm.newProposalBlock(preferredID, preferredHeight+1, *tx)
-			if err != nil {
-				return nil, err
-			}
-			if err := m.vm.State.PutBlock(m.vm.DB, blk); err != nil {
-				return nil, err
-			}
-			return blk, m.vm.DB.Commit()
+		if syncTime.After(utx.StartTime()) {
+			txID := tx.ID()
+			m.unissuedTxIDs.Remove(txID)
+			m.vm.droppedTxCache.Put(txID, nil) // cache tx as dropped
+
+			m.vm.Ctx.Log.Debug("dropping tx to add validator because start time too late")
+			continue
 		}
-		m.vm.Ctx.Log.Debug("dropping tx to add validator because start time too late")
+
+		blk, err := m.vm.newProposalBlock(preferredID, preferredHeight+1, *tx)
+		if err != nil {
+			return nil, err
+		}
+		if err := m.vm.State.PutBlock(m.vm.DB, blk); err != nil {
+			return nil, err
+		}
+		return blk, m.vm.DB.Commit()
 	}
 
 	m.vm.Ctx.Log.Debug("BuildBlock returning error (no blocks)")
@@ -368,8 +374,11 @@ func (m *Mempool) ResetTimer() {
 		}
 		// If the tx doesn't meet the synchrony bound, drop it
 		tx := m.unissuedProposalTxs.Remove()
+
 		txID := tx.ID()
 		m.unissuedTxIDs.Remove(txID)
+		m.vm.droppedTxCache.Put(tx.ID(), nil) // cache tx as dropped
+
 		m.vm.Ctx.Log.Debug("dropping tx %q to add validator because its start time has passed", txID)
 	}
 
