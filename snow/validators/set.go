@@ -42,6 +42,9 @@ type Set interface {
 	// Get the validator from the set.
 	GetWeight(ids.ShortID) (uint64, bool)
 
+	// SubsetWeight returns the sum of the weights of the validators.
+	SubsetWeight(ids.ShortSet) (uint64, error)
+
 	// RemoveWeight from a staker.
 	RemoveWeight(ids.ShortID, uint64) error
 
@@ -196,6 +199,26 @@ func (s *set) getWeight(vdrID ids.ShortID) (uint64, bool) {
 		return s.vdrWeights[index], true
 	}
 	return 0, false
+}
+
+// SubsetWeight implements the Set interface.
+func (s *set) SubsetWeight(subset ids.ShortSet) (uint64, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	totalWeight := uint64(0)
+	for _, vdrID := range subset.List() {
+		weight, ok := s.getWeight(vdrID)
+		if !ok {
+			continue
+		}
+		newWeight, err := safemath.Add64(totalWeight, weight)
+		if err != nil {
+			return 0, err
+		}
+		totalWeight = newWeight
+	}
+	return totalWeight, nil
 }
 
 // RemoveWeight implements the Set interface.
