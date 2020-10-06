@@ -26,11 +26,11 @@ func (r *NoResolver) Resolve() (string, error) {
 }
 
 type OpenDNSResolver struct {
-	resolver *net.Resolver
+	*net.Resolver
 }
 
 func NewOpenDNSResolver() *OpenDNSResolver {
-	return &OpenDNSResolver{resolver: &net.Resolver{
+	return &OpenDNSResolver{&net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			d := net.Dialer{
@@ -42,7 +42,7 @@ func NewOpenDNSResolver() *OpenDNSResolver {
 }
 
 func (r *OpenDNSResolver) Resolve() (string, error) {
-	ip, err := r.resolver.LookupHost(context.Background(), "myip.opendns.com")
+	ip, err := r.Resolver.LookupHost(context.Background(), "myip.opendns.com")
 	if err != nil {
 		return "", err
 	}
