@@ -40,9 +40,11 @@ type Config struct {
 	DB database.Database
 
 	// Staking configuration
-	StakingIP utils.IPDesc
-	// InternalStakingPort == StakingIP.Port generally unless you want your external port to be different using NAT Traversal
-	InternalStakingPort     uint16
+	ExternalStakingIP utils.IPDesc
+	// InternalStakingPort is generally equal to ExternalStakingIP.Port unless
+	// the node wants the external port to be different during NAT Traversal.
+	InternalStakingPort uint16
+
 	EnableP2PTLS            bool
 	EnableStaking           bool
 	StakingKeyFile          string
@@ -62,9 +64,10 @@ type Config struct {
 	BootstrapPeers []*Peer
 
 	// HTTP configuration
-	HTTPHost string
-	HTTPPort uint16
-	// ExternalHTTPPort == HTTPPort unless you want a different external port to be used using NAT Traversal
+	HTTPHost         string
+	InternalHTTPPort uint16
+	// InternalHTTPPort is generally equal to ExternalHTTPPort unless the node
+	// wants a different external port to be used during NAT Traversal.
 	ExternalHTTPPort    uint16
 	HTTPSEnabled        bool
 	HTTPSKeyFile        string

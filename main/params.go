@@ -137,10 +137,9 @@ func init() {
 	bootstrapIDs := fs.String("bootstrap-ids", "default", "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 
 	// Staking:
-	consensusPort := fs.Uint("staking-port", 9651, "External port of the consensus server you can override the local listening port with internal-staking-port for dynamic NAT traversal")
-	// this is a bit more complicated, but this becomes an override for port our process will start up listening on.
-	// i did this because I think changing the meaning of 'staking-port' param could be a bit more confusing.
-	internalStakingPort := fs.Uint("internal-staking-port", *consensusPort, "Internal listening consensus port")
+	stakingPort := fs.Uint("staking-port", 9651, "Port of the consensus server")
+	// when using NAT Traversal and you want your consensus server to listen on a different port.
+	externalStakingPort := fs.Uint("staking-port-external", *stakingPort, "External port of the consensus server")
 	fs.BoolVar(&Config.EnableStaking, "staking-enabled", true, "Enable staking. If enabled, Network TLS is required.")
 	fs.BoolVar(&Config.EnableP2PTLS, "p2p-tls-enabled", true, "Require TLS to authenticate network communication")
 	fs.StringVar(&Config.StakingKeyFile, "staking-tls-key-file", defaultStakingKeyPath, "TLS private key for staking")
@@ -271,11 +270,11 @@ func init() {
 		return
 	}
 
-	Config.StakingIP = utils.IPDesc{
+	Config.ExternalStakingIP = utils.IPDesc{
 		IP:   ip,
-		Port: uint16(*consensusPort),
+		Port: uint16(*externalStakingPort),
 	}
-	Config.InternalStakingPort = uint16(*internalStakingPort)
+	Config.InternalStakingPort = uint16(*stakingPort)
 
 	defaultBootstrapIPs, defaultBootstrapIDs := genesis.SampleBeacons(networkID, 5)
 
@@ -373,7 +372,7 @@ func init() {
 
 	// HTTP:
 	Config.HTTPHost = *httpHost
-	Config.HTTPPort = uint16(*httpPort)
+	Config.InternalHTTPPort = uint16(*httpPort)
 	Config.ExternalHTTPPort = uint16(*externalHTTPPort)
 	if Config.APIRequireAuthToken {
 		if Config.APIAuthPassword == "" {
