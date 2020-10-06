@@ -212,7 +212,7 @@ func (b *queryBenchlist) cleanup() {
 	currentWeight, err := b.vdrs.SubsetWeight(b.benchlistSet)
 	if err != nil {
 		// Add log for this, should never happen
-		b.ctx.Log.Error("failed to calculate subset weight due to: %w... Resetting benchlist", err)
+		b.ctx.Log.Error("failed to calculate subset weight due to: %s... Resetting benchlist", err)
 		b.reset()
 		return
 	}
@@ -239,7 +239,7 @@ func (b *queryBenchlist) cleanup() {
 		if ok {
 			newWeight, err := safemath.Sub64(updatedWeight, removeWeight)
 			if err != nil {
-				b.ctx.Log.Error("failed to calculate new subset weight due to: %w... Resetting benchlist", err)
+				b.ctx.Log.Error("failed to calculate new subset weight due to: %s... Resetting benchlist", err)
 				b.reset()
 				return
 			}
