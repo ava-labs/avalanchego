@@ -228,6 +228,7 @@ func (vm *VM) newExportTx(
 	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID)
 }
 
+// EVMStateTransfer executes the state update from the atomic export transaction
 func (tx *UnsignedExportTx) EVMStateTransfer(vm *VM, state *state.StateDB) error {
 	addrs := map[[20]byte]uint64{}
 	for _, from := range tx.Ins {

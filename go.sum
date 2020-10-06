@@ -42,6 +42,7 @@ github.com/ava-labs/avalanche-go v0.8.0-beta/go.mod h1:quYojL1hu0ue2glUT1ng28kAD
 github.com/ava-labs/avalanchego v0.8.3/go.mod h1:6zPzQv7m6vSvdKAwH+lLTga0IMd/0+HLMT5OULrpFcU=
 github.com/ava-labs/avalanchego v1.0.0 h1:xpqiPJS4Gftm6iKrBQJX7tpU8y0QvnyAcznlqOOsriM=
 github.com/ava-labs/avalanchego v1.0.0/go.mod h1:0N34atGvJCfJaIjFkHBDG5QzqlSJlsC07/d9irZfA7Y=
+github.com/ava-labs/avalanchego v1.0.1 h1:zCJzU+HhmLWcK8uTa91S3MY8Fll2S7bmN2xvLgEhwlA=
 github.com/ava-labs/coreth v0.2.14-rc.1/go.mod h1:Zhb60GFIB7G5AnUCks0Jo4Rezx/EovL8o+z51aBF1A8=
 github.com/ava-labs/coreth v0.2.15-rc.4/go.mod h1:+sK2XGKCNA48uzeHWe4iBzmiOBYmYvnnzLtOkQeQfkk=
 github.com/ava-labs/coreth v0.3.4/go.mod h1:d5h8SoFyMOoFqg2gHzYgftZlKgZ1MHKKydjyq2hoABk=

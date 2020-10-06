@@ -13,7 +13,7 @@ import (
 )
 
 func TestExportTxVerifyNil(t *testing.T) {
-	var exportTx UnsignedExportTx
+	var exportTx *UnsignedExportTx
 	if err := exportTx.Verify(testXChainID, NewContext(), testTxFee, testAvaxAssetID); err == nil {
 		t.Fatal("Verify should have failed due to nil transaction")
 	}
@@ -116,6 +116,17 @@ func TestExportTxVerify(t *testing.T) {
 	exportTx.ExportedOutputs = []*avax.TransferableOutput{exportedOuts[1], exportedOuts[0]}
 	// Test Unsorted outputs Errors
 	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID); err == nil {
-		t.Fatal("ExportTx should have failed verification due to no exported outputs")
+		t.Fatal("ExportTx should have failed verification due to no unsorted exported outputs")
 	}
+
+	exportTx.syntacticallyVerified = false
+	exportTx.ExportedOutputs = []*avax.TransferableOutput{exportedOuts[0], nil}
+	// Test invalid exported output
+	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID); err == nil {
+		t.Fatal("ExportTx should have failed verification due to invalid output")
+	}
+}
+
+func TestExportTxSemanticVerify(t *testing.T) {
+
 }
