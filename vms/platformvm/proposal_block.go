@@ -46,7 +46,7 @@ func (pb *ProposalBlock) Accept() error {
 // Reject implements the snowman.Block interface
 func (pb *ProposalBlock) Reject() error {
 	if err := pb.vm.mempool.IssueTx(&pb.Tx); err != nil {
-		pb.vm.Ctx.Log.Debug("failed to reissue tx %q due to: %s", pb.Tx.ID(), err)
+		pb.vm.Ctx.Log.Verbo("failed to reissue tx %q due to: %s", pb.Tx.ID(), err)
 	}
 	return pb.CommonBlock.Reject()
 }
