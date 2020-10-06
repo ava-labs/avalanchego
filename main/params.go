@@ -260,10 +260,10 @@ func init() {
 		Config.Nat = nat.NewNoRouter()
 		ipstr, err := dynamicip.FetchExternalIP()
 		if err != nil {
-			ip = net.IPv4zero
-		} else {
-			ip = net.ParseIP(ipstr)
+			errs.Add(fmt.Errorf("dynamic ip address fetch failed %s", err))
+			return
 		}
+		ip = net.ParseIP(ipstr)
 	} else if *consensusIP == "" {
 		Config.AttemptedNATTraversal = true
 		Config.Nat = nat.GetRouter()
