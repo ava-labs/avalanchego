@@ -256,20 +256,20 @@ func init() {
 	}
 
 	var ip net.IP
-	if *consensusIP == "" && !Config.DynamicConsensusIP {
-		Config.AttemptedNATTraversal = true
-		Config.Nat = nat.GetRouter()
-		ip, err = Config.Nat.ExternalIP()
-		if err != nil {
-			ip = net.IPv4zero // Couldn't get my IP...set to 0.0.0.0
-		}
-	} else if Config.DynamicConsensusIP {
+	if Config.DynamicConsensusIP {
 		Config.Nat = nat.NewNoRouter()
 		ipstr, err := dynamicip.FetchExternalIP()
 		if err != nil {
 			ip = net.IPv4zero
 		} else {
 			ip = net.ParseIP(ipstr)
+		}
+	} else if *consensusIP == "" && !Config.DynamicConsensusIP {
+		Config.AttemptedNATTraversal = true
+		Config.Nat = nat.GetRouter()
+		ip, err = Config.Nat.ExternalIP()
+		if err != nil {
+			ip = net.IPv4zero // Couldn't get my IP...set to 0.0.0.0
 		}
 	} else {
 		Config.Nat = nat.NewNoRouter()
