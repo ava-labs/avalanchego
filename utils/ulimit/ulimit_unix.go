@@ -16,7 +16,7 @@ func Set(limit uint64) error {
 	var rLimit syscall.Rlimit
 	err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit)
 	if err != nil {
-		return fmt.Errorf("error getting rlimit: %s", err)
+		return fmt.Errorf("error getting rlimit: %w", err)
 	}
 
 	oldMax := rLimit.Max
@@ -43,7 +43,7 @@ func Set(limit uint64) error {
 		rLimit.Max = oldMax
 		rLimit.Cur = oldMax
 		if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit); err != nil {
-			return fmt.Errorf("error setting ulimit: %s", err)
+			return fmt.Errorf("error setting ulimit: %w", err)
 		}
 	}
 
