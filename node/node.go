@@ -127,7 +127,7 @@ type Node struct {
  */
 
 func (n *Node) initNetworking() error {
-	listener, err := net.Listen(TCP, fmt.Sprintf(":%d", n.Config.InternalStakingPort))
+	listener, err := net.Listen(TCP, fmt.Sprintf(":%d", n.Config.StakingIP.Port))
 	if err != nil {
 		return err
 	}
@@ -446,7 +446,7 @@ func (n *Node) initAPIServer() error {
 		n.Log,
 		n.LogFactory,
 		n.Config.HTTPHost,
-		n.Config.InternalHTTPPort,
+		n.Config.HTTPPort,
 		n.Config.APIRequireAuthToken,
 		n.Config.APIAuthPassword,
 	)
