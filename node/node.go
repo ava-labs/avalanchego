@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -31,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/triggers"
@@ -187,7 +189,7 @@ func (n *Node) initNetworking() error {
 		})
 
 		go timer.Dispatch()
-		timer.SetTimeoutIn(15 * time.Second)
+		timer.SetTimeoutIn(1 * time.Minute)
 
 		consensusRouter = &beaconManager{
 			Router:         consensusRouter,
@@ -217,7 +219,7 @@ func (n *Node) initNetworking() error {
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
 		// errors are already logged internally if they are meaningful
 		_ = n.Net.Close()
-	}, os.Interrupt, os.Kill)
+	}, syscall.SIGINT, syscall.SIGTERM)
 
 	return nil
 }
@@ -466,10 +468,13 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	criticalChains := ids.Set{}
 	criticalChains.Add(constants.PlatformChainID, createAVMTx.ID())
 
-	timeoutManager := timeout.Manager{}
 	n.Config.NetworkConfig.Namespace = constants.PlatformName
 	n.Config.NetworkConfig.Registerer = n.Config.ConsensusParams.Metrics
-	if err := timeoutManager.Initialize(&n.Config.NetworkConfig); err != nil {
+	n.Config.BenchlistConfig.Validators = n.vdrs
+	benchlistManager := benchlist.NewManager(&n.Config.BenchlistConfig)
+
+	timeoutManager := timeout.Manager{}
+	if err := timeoutManager.Initialize(&n.Config.NetworkConfig, benchlistManager); err != nil {
 		return err
 	}
 	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)

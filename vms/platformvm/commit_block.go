@@ -27,7 +27,7 @@ func (c *Commit) Verify() error {
 	if !ok {
 		if err := c.Reject(); err == nil {
 			if err := c.vm.DB.Commit(); err != nil {
-				c.vm.Ctx.Log.Error("error committing Commit block as rejected: %s", err)
+				return fmt.Errorf("failed to commit VM's database: %w", err)
 			}
 		} else {
 			c.vm.DB.Abort()
@@ -61,7 +61,7 @@ func (vm *VM) newCommitBlock(parentID ids.ID, height uint64) (*Commit, error) {
 	blk := Block(commit)
 	bytes, err := Codec.Marshal(&blk)
 	if err != nil {
-		return nil, fmt.Errorf("could not marshal commit block: %w", err)
+		return nil, fmt.Errorf("failed to marshal commit block: %w", err)
 	}
 	commit.Block.Initialize(bytes, vm.SnowmanVM)
 	return commit, nil

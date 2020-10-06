@@ -81,12 +81,12 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 
 	address, err := service.vm.ParseLocalAddress(args.Address)
 	if err != nil {
-		return fmt.Errorf("couldn't parse %s to address: %s", args.Address, err)
+		return fmt.Errorf("couldn't parse %s to address: %w", args.Address, err)
 	}
 
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	user := user{db: db}
@@ -270,7 +270,7 @@ func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, respo
 
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 	defer db.Close()
 
@@ -952,7 +952,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	// Get the keys controlled by the user
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original error
@@ -1058,7 +1058,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	// Get the keys controlled by the user
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original
@@ -1157,13 +1157,13 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	// Parse the node ID
 	nodeID, err := ids.ShortFromPrefixedString(args.NodeID, constants.NodeIDPrefix)
 	if err != nil {
-		return fmt.Errorf("error parsing nodeID: '%s': %w", args.NodeID, err)
+		return fmt.Errorf("error parsing nodeID: %q: %w", args.NodeID, err)
 	}
 
 	// Parse the subnet ID
 	subnetID, err := ids.FromString(args.SubnetID)
 	if err != nil {
-		return fmt.Errorf("problem parsing subnetID '%s': %w", args.SubnetID, err)
+		return fmt.Errorf("problem parsing subnetID %q: %w", args.SubnetID, err)
 	}
 	if subnetID.Equals(constants.PrimaryNetworkID) {
 		return errors.New("subnet validator attempts to validate primary network")
@@ -1172,7 +1172,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	// Get the keys controlled by the user
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original
@@ -1263,7 +1263,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	for _, controlKey := range args.ControlKeys {
 		controlKeyID, err := service.vm.ParseLocalAddress(controlKey)
 		if err != nil {
-			return fmt.Errorf("problem parsing control key '%s': %w", controlKey, err)
+			return fmt.Errorf("problem parsing control key %q: %w", controlKey, err)
 		}
 		controlKeys = append(controlKeys, controlKeyID)
 	}
@@ -1271,7 +1271,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	// Get the keys controlled by the user
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original
@@ -1373,7 +1373,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 	// Get this user's data
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original
@@ -1477,7 +1477,7 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 	// Get the user's info
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("couldn't get user '%s': %w", args.Username, err)
+		return fmt.Errorf("couldn't get user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original
@@ -1602,7 +1602,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	// Get the keys controlled by the user
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original
@@ -1700,7 +1700,7 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 		reply.Status = Validating
 		return nil
 	} else if blockchainID, err := ids.FromString(args.BlockchainID); err != nil {
-		return fmt.Errorf("problem parsing blockchainID '%s': %w", args.BlockchainID, err)
+		return fmt.Errorf("problem parsing blockchainID %q: %w", args.BlockchainID, err)
 	} else if exists, err := service.chainExists(service.vm.LastAccepted(), blockchainID); err != nil {
 		return fmt.Errorf("problem looking up blockchain: %w", err)
 	} else if exists {
@@ -1760,7 +1760,7 @@ func (service *Service) ValidatedBy(_ *http.Request, args *ValidatedByArgs, resp
 	service.vm.Ctx.Log.Info("Platform: ValidatedBy called")
 	chain, err := service.vm.getChain(service.vm.DB, args.BlockchainID)
 	if err != nil {
-		return fmt.Errorf("problem retrieving blockchain '%s': %w", args.BlockchainID, err)
+		return fmt.Errorf("problem retrieving blockchain %q: %w", args.BlockchainID, err)
 	}
 	response.SubnetID = chain.UnsignedTx.(*UnsignedCreateChainTx).SubnetID
 	return nil
@@ -1782,12 +1782,12 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 	// Verify that the Subnet exists
 	// Ignore lookup error if it's the PrimaryNetworkID
 	if _, err := service.vm.getSubnet(service.vm.DB, args.SubnetID); err != nil && !args.SubnetID.Equals(constants.PrimaryNetworkID) {
-		return fmt.Errorf("problem retrieving subnet '%s': %w", args.SubnetID, err)
+		return fmt.Errorf("problem retrieving subnet %q: %w", args.SubnetID, err)
 	}
 	// Get the chains that exist
 	chains, err := service.vm.getChains(service.vm.DB)
 	if err != nil {
-		return fmt.Errorf("problem retrieving chains for subnet '%s': %w", args.SubnetID, err)
+		return fmt.Errorf("problem retrieving chains for subnet %q: %w", args.SubnetID, err)
 	}
 	// Filter to get the chains validated by the specified Subnet
 	for _, chain := range chains {
