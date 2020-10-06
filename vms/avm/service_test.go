@@ -240,7 +240,7 @@ func TestServiceGetBalance(t *testing.T) {
 	balanceReply := &GetBalanceReply{}
 	err = s.GetBalance(nil, balanceArgs, balanceReply)
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(balanceReply.Balance), uint64(startBalance))
+	assert.Equal(t, uint64(balanceReply.Balance), startBalance)
 	assert.Len(t, balanceReply.UTXOIDs, 1, "should have only returned 1 utxoID")
 }
 
@@ -274,7 +274,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		t.Fatalf("Failed to get primary alias of genesis asset: %s", err)
 	}
 	assert.Equal(t, balance.AssetID, alias)
-	assert.Equal(t, uint64(balance.Balance), uint64(startBalance))
+	assert.Equal(t, uint64(balance.Balance), startBalance)
 }
 
 func TestServiceGetTx(t *testing.T) {

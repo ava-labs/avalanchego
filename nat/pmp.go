@@ -31,7 +31,7 @@ func (pmp *pmpRouter) MapPort(
 	mappingName string,
 	mappingDuration time.Duration,
 ) error {
-	protocol := string(networkProtocol)
+	protocol := networkProtocol
 	internalPort := int(newInternalPort)
 	externalPort := int(newExternalPort)
 
@@ -49,8 +49,9 @@ func (pmp *pmpRouter) MapPort(
 func (pmp *pmpRouter) UnmapPort(
 	networkProtocol string,
 	internalPort uint16,
-	_ uint16) error {
-	protocol := string(networkProtocol)
+	_ uint16,
+) error {
+	protocol := networkProtocol
 	internalPortInt := int(internalPort)
 
 	_, err := pmp.client.AddPortMapping(protocol, internalPortInt, 0, 0)

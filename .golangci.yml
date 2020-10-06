@@ -6,22 +6,22 @@ linters:
   enable:
     - bodyclose
     - deadcode
-    # - errcheck
     - goconst
+    - gocritic
     - gofmt
     - goimports
     - gosec
     - gosimple
     - govet
+    - ineffassign
+    - interfacer
     - misspell
     - nakedret
+    - unconvert
     - varcheck
-    - gocritic
-    # - gocyclo
+    # - errcheck
     # - golint
+    # - lll
+    # - gocyclo
     # - gomnd
     # - goprintffuncname
-    # - ineffassign
-    # - interfacer
-    # - lll
-    # - unconvert 

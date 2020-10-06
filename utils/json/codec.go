@@ -53,7 +53,7 @@ func (r *request) Method() (string, error) {
 		return method, errUppercaseMethod
 	}
 	uppercaseRune := string(unicode.ToUpper(firstRune))
-	return fmt.Sprintf("%s.%s%s", class, string(uppercaseRune), function[runeLen:]), nil
+	return fmt.Sprintf("%s.%s%s", class, uppercaseRune, function[runeLen:]), nil
 }
 
 func (r *request) ReadRequest(args interface{}) error {

@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/core"
+	"github.com/ava-labs/avalanchego/vms/components/state"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -721,7 +722,6 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 
 	// If the chain time would be the time for the next primary network staker to leave,
 	// then we create a block that removes the staker and proposes they receive a staker reward
-	nextValidatorEndtime := timer.MaxTime
 	tx, err := vm.nextStakerStop(db, constants.PrimaryNetworkID)
 	if err != nil {
 		return nil, err
@@ -730,7 +730,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	if !ok {
 		return nil, fmt.Errorf("expected staker tx to be TimedTx but got %T", tx)
 	}
-	nextValidatorEndtime = staker.EndTime()
+	nextValidatorEndtime := staker.EndTime()
 	if currentChainTimestamp.Equal(nextValidatorEndtime) {
 		rewardValidatorTx, err := vm.newRewardValidatorTx(tx.Tx.ID())
 		if err != nil {
@@ -1335,8 +1335,8 @@ func (vm *VM) Logger() logging.Logger { return vm.Ctx.Log }
 func (vm *VM) GetAtomicUTXOs(
 	chainID ids.ID,
 	addrs ids.ShortSet,
-	startAddr ids.ShortID,
-	startUTXOID ids.ID,
+	startAddr state.Marshaller,
+	startUTXOID state.Marshaller,
 	limit int,
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
 	if limit <= 0 || limit > maxUTXOsToFetch {

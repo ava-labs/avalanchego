@@ -991,7 +991,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 
 	// Create the transaction
 	tx, err := service.vm.newAddValidatorTx(
-		uint64(args.weight()),                // Stake amount
+		args.weight(),                        // Stake amount
 		uint64(args.StartTime),               // Start time
 		uint64(args.EndTime),                 // End time
 		nodeID,                               // Node ID
@@ -1108,7 +1108,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 
 	// Create the transaction
 	tx, err := service.vm.newAddDelegatorTx(
-		uint64(args.weight()),  // Stake amount
+		args.weight(),          // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
 		nodeID,                 // Node ID
@@ -1221,7 +1221,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 
 	// Create the transaction
 	tx, err := service.vm.newAddSubnetValidatorTx(
-		uint64(args.weight()),  // Stake amount
+		args.weight(),          // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
 		nodeID,                 // Node ID

@@ -64,7 +64,7 @@ func (t *Transitive) Initialize(config Config) error {
 	t.Params = config.Params
 	t.Consensus = config.Consensus
 
-	factory := poll.NewEarlyTermNoTraversalFactory(int(config.Params.Alpha))
+	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t.polls = poll.NewSet(factory,
 		config.Ctx.Log,
 		config.Params.Namespace,
