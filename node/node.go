@@ -446,7 +446,7 @@ func (n *Node) initAPIServer() error {
 		n.Log,
 		n.LogFactory,
 		n.Config.HTTPHost,
-		n.Config.HTTPPort,
+		n.Config.InternalHTTPPort,
 		n.Config.APIRequireAuthToken,
 		n.Config.APIAuthPassword,
 	)
