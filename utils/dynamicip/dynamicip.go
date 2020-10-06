@@ -119,10 +119,7 @@ type ExternalIPUpdater struct {
 	dynamicResolver DynamicResolver
 }
 
-func NewExternalIPUpdater(updateTimeout time.Duration,
-	log logging.Logger,
-	ip *utils.DynamicIPDesc,
-	dynamicResolver DynamicResolver) ExternalIPUpdaterInterface {
+func NewExternalIPUpdater(dynamicResolver DynamicResolver, updateTimeout time.Duration, log logging.Logger, ip *utils.DynamicIPDesc) ExternalIPUpdaterInterface {
 	if dynamicResolver.IsResolver() {
 		updater := &ExternalIPUpdater{log: log, ip: ip, updateTimeout: updateTimeout, dynamicResolver: dynamicResolver}
 		go updater.UpdateExternalIP()

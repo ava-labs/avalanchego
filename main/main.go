@@ -100,7 +100,7 @@ func main() {
 		mapper.Map("TCP", Config.HTTPPort, Config.ExternalHTTPPort, httpPortName, nil, Config.DynamicUpdateDuration)
 	}
 
-	externalIPUpdater := dynamicip.NewExternalIPUpdater(Config.DynamicUpdateDuration, log, &Config.StakingIP, Config.DynamicConsensusResolver)
+	externalIPUpdater := dynamicip.NewExternalIPUpdater(Config.DynamicConsensusResolver, Config.DynamicUpdateDuration, log, &Config.StakingIP)
 	defer externalIPUpdater.Stop()
 
 	log.Debug("initializing node state")
