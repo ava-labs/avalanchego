@@ -87,13 +87,14 @@ func (r *IFConfigResolver) Resolve() (string, error) {
 }
 
 func NewDynamicResolver(opt string) DynamicResolver {
-	if opt == "opendns" {
+	switch opt {
+	case "opendns":
 		return NewOpenDNSResolver()
-	}
-	if opt == "ifconfig" {
+	case "ifconfig":
 		return &IFConfigResolver{}
+	default:
+		return &NoResolver{}
 	}
-	return &NoResolver{}
 }
 
 func FetchExternalIP(dynamicResolver DynamicResolver) (string, error) {
