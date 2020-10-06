@@ -231,13 +231,13 @@ func (b *queryBenchlist) cleanup() {
 		// expired and the bench has less than the maximum weight
 		// Note: this creates an edge case where benchlisting a validator
 		// with a sufficient stake may clear the benchlist
-		if b.clock.Time().Before(end) && currentWeight < maxBenchlistWeight {
+		if b.clock.Time().Before(end) && updatedWeight < maxBenchlistWeight {
 			break
 		}
 
 		removeWeight, ok := b.vdrs.GetWeight(validatorID)
 		if ok {
-			newWeight, err := safemath.Sub64(currentWeight, removeWeight)
+			newWeight, err := safemath.Sub64(updatedWeight, removeWeight)
 			if err != nil {
 				b.ctx.Log.Error("failed to calculate new subset weight due to: %w... Resetting benchlist", err)
 				b.reset()
