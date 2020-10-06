@@ -217,6 +217,8 @@ func (b *queryBenchlist) cleanup() {
 		return
 	}
 
+	currentTime := b.clock.Time()
+
 	benchLen := b.benchlistSet.Len()
 	updatedWeight := currentWeight
 	totalWeight := b.vdrs.Weight()
@@ -231,7 +233,7 @@ func (b *queryBenchlist) cleanup() {
 		// expired and the bench has less than the maximum weight
 		// Note: this creates an edge case where benchlisting a validator
 		// with a sufficient stake may clear the benchlist
-		if b.clock.Time().Before(end) && updatedWeight < maxBenchlistWeight {
+		if currentTime.Before(end) && updatedWeight < maxBenchlistWeight {
 			break
 		}
 
@@ -246,13 +248,14 @@ func (b *queryBenchlist) cleanup() {
 			updatedWeight = newWeight
 		}
 
+		b.ctx.Log.Debug("Removed Validator: (%s, %d). EndTime: %s. CurrentTime: %s)", validatorID, removeWeight, end, currentTime)
 		b.benchlistOrder.Remove(e)
 		delete(b.benchlistTimes, key)
 		b.benchlistSet.Remove(validatorID)
 	}
 
 	updatedBenchLen := b.benchlistSet.Len()
-	b.ctx.Log.Debug("benchlist weight: (%d/%d) -> (%d/%d). Benched Validators: %d -> %d",
+	b.ctx.Log.Debug("Benched Weight: (%d/%d) -> (%d/%d). Benched Validators: %d -> %d.",
 		currentWeight,
 		totalWeight,
 		updatedWeight,

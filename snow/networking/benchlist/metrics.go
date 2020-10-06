@@ -117,7 +117,6 @@ func (m *metrics) Initialize(ctx *snow.Context, namespace string, summaryEnabled
 	m.pushQuery = initHistogram(queryLatencyNamespace, "lat_push_query", ctx.Metrics, &errs)
 	m.pullQuery = initHistogram(queryLatencyNamespace, "lat_pull_query", ctx.Metrics, &errs)
 
-	ctx.Log.Info("registered benchlist metrics with namespace: %s", queryLatencyNamespace)
 	return errs.Err
 }
 
