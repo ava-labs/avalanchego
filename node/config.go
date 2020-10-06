@@ -6,6 +6,8 @@ package node
 import (
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/dynamicip"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/nat"
@@ -103,4 +105,6 @@ type Config struct {
 
 	// Dynamic Update duration for IP or NAT traversal
 	DynamicUpdateDuration time.Duration
+
+	DynamicConsensusResolver dynamicip.DynamicResolver
 }

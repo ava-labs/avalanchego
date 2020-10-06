@@ -129,6 +129,8 @@ func init() {
 	// how often to update the dynamic IP and PnP/NAT-PMP IP and routing.
 	fs.DurationVar(&Config.DynamicUpdateDuration, "dynamic-update-duration", 5*time.Minute, "Dynamic IP and NAT Traversal update duration")
 
+	dynamicPublicIPResolver := fs.String("dynamic-public-ip-resolver", "ifconfig", "'ifconfig' *default* or 'opendns'")
+
 	// HTTP Server:
 	httpHost := fs.String("http-host", "127.0.0.1", "Address of the HTTP server")
 	httpPort := fs.Uint("http-port", 9650, "Port of the HTTP server")
@@ -257,13 +259,18 @@ func init() {
 
 	var ip net.IP
 	if Config.DynamicConsensusIP {
+		Config.DynamicConsensusResolver = dynamicip.NewDynamicResolver(*dynamicPublicIPResolver)
 		Config.Nat = nat.NewNoRouter()
-		ipstr, err := dynamicip.FetchExternalIP()
+		ipstr, err := dynamicip.FetchExternalIP(Config.DynamicConsensusResolver)
 		if err != nil {
 			errs.Add(fmt.Errorf("dynamic ip address fetch failed %s", err))
 			return
 		}
 		ip = net.ParseIP(ipstr)
+		if ip == nil {
+			errs.Add(fmt.Errorf("dynamic ip address fetch failed parse %s", ipstr))
+			return
+		}
 	} else if *consensusIP == "" {
 		Config.AttemptedNATTraversal = true
 		Config.Nat = nat.GetRouter()
