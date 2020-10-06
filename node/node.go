@@ -66,7 +66,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion(constants.PlatformName, 1, 0, 1)
+	Version       = version.NewDefaultVersion(constants.PlatformName, 1, 0, 2)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -127,7 +127,7 @@ type Node struct {
  */
 
 func (n *Node) initNetworking() error {
-	listener, err := net.Listen(TCP, fmt.Sprintf(":%d", n.Config.StakingLocalPort))
+	listener, err := net.Listen(TCP, fmt.Sprintf(":%d", n.Config.StakingIP.Port))
 	if err != nil {
 		return err
 	}
