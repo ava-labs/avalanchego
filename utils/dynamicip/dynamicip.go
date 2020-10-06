@@ -97,8 +97,7 @@ func NewDynamicResolver(opt string) DynamicResolver {
 }
 
 func FetchExternalIP(dynamicResolver DynamicResolver) (string, error) {
-	ip, err := dynamicResolver.Resolve()
-	return ip, err
+	return dynamicResolver.Resolve()
 }
 
 type ExternalIPUpdaterInterface interface {
