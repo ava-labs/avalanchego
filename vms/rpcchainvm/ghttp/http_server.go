@@ -35,7 +35,7 @@ func NewServer(handler http.Handler, broker *plugin.GRPCBroker) *Server {
 
 // Handle ...
 func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*ghttpproto.HTTPResponse, error) {
-	writerConn, err := s.broker.Dial(req.ResponseWriter)
+	writerConn, err := s.broker.Dial(req.ResponseWriter.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,12 @@ func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*ghtt
 	}
 	defer readerConn.Close()
 
-	writer := gresponsewriter.NewClient(gresponsewriterproto.NewWriterClient(writerConn), s.broker)
+	writerHeaders := make(http.Header)
+	for _, elem := range req.ResponseWriter.Header {
+		writerHeaders[elem.Key] = elem.Values
+	}
+
+	writer := gresponsewriter.NewClient(writerHeaders, gresponsewriterproto.NewWriterClient(writerConn), s.broker)
 	reader := greadcloser.NewClient(greadcloserproto.NewReaderClient(readerConn))
 
 	// create the request with the current context
