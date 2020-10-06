@@ -5,7 +5,6 @@ package nat
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"time"
 )
@@ -22,6 +21,10 @@ type noRouter struct {
 	ipErr error
 }
 
+func (noRouter) IsNATTraversal() bool {
+	return false
+}
+
 func (noRouter) MapPort(_ string, intPort, extPort uint16, _ string, _ time.Duration) error {
 	return errNoRouterCantMapPorts
 }
@@ -32,10 +35,6 @@ func (noRouter) UnmapPort(string, uint16, uint16) error {
 
 func (r noRouter) ExternalIP() (net.IP, error) {
 	return r.ip, r.ipErr
-}
-
-func (noRouter) GetPortMappingEntry(uint16, string) (string, uint16, string, error) {
-	return "", 0, "", fmt.Errorf("port mapping not found")
 }
 
 func getOutboundIP() (net.IP, error) {
