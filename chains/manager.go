@@ -343,6 +343,10 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 
 	// Allows messages to be routed to the new chain
 	m.ManagerConfig.Router.AddChain(chain.Handler)
+
+	// Register the chain with the timeout manager
+	m.TimeoutManager.RegisterChain(ctx, consensusParams.Namespace)
+
 	// If the X or P Chain panics, do not attempt to recover
 	if m.CriticalChains.Contains(chainParams.ID) {
 		go ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
