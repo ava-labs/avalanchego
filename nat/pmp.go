@@ -28,7 +28,7 @@ func (r *pmpRouter) IsNATTraversal() bool {
 	return true
 }
 
-func (pmp *pmpRouter) MapPort(
+func (r *pmpRouter) MapPort(
 	networkProtocol string,
 	newInternalPort uint16,
 	newExternalPort uint16,
@@ -46,23 +46,23 @@ func (pmp *pmpRouter) MapPort(
 		return fmt.Errorf("invalid mapping duration range")
 	}
 
-	_, err := pmp.client.AddPortMapping(protocol, internalPort, externalPort, int(lifetime))
+	_, err := r.client.AddPortMapping(protocol, internalPort, externalPort, int(lifetime))
 	return err
 }
 
-func (pmp *pmpRouter) UnmapPort(
+func (r *pmpRouter) UnmapPort(
 	networkProtocol string,
 	internalPort uint16,
 	_ uint16) error {
 	protocol := string(networkProtocol)
 	internalPortInt := int(internalPort)
 
-	_, err := pmp.client.AddPortMapping(protocol, internalPortInt, 0, 0)
+	_, err := r.client.AddPortMapping(protocol, internalPortInt, 0, 0)
 	return err
 }
 
-func (pmp *pmpRouter) ExternalIP() (net.IP, error) {
-	response, err := pmp.client.GetExternalAddress()
+func (r *pmpRouter) ExternalIP() (net.IP, error) {
+	response, err := r.client.GetExternalAddress()
 	if err != nil {
 		return nil, err
 	}

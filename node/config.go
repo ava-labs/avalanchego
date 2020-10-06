@@ -42,9 +42,7 @@ type Config struct {
 	DB database.Database
 
 	// Staking configuration
-	StakingIP utils.DynamicIPDesc
-	// InternalStakingPort == StakingIP.Port generally unless you want your external port to be different using NAT Traversal
-	InternalStakingPort     uint16
+	StakingIP               utils.DynamicIPDesc
 	EnableP2PTLS            bool
 	EnableStaking           bool
 	StakingKeyFile          string
@@ -66,8 +64,7 @@ type Config struct {
 	// HTTP configuration
 	HTTPHost string
 	HTTPPort uint16
-	// ExternalHTTPPort == HTTPPort unless you want a different external port to be used using NAT Traversal
-	ExternalHTTPPort    uint16
+
 	HTTPSEnabled        bool
 	HTTPSKeyFile        string
 	HTTPSCertFile       string
