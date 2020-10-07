@@ -104,13 +104,13 @@ func (tx *UnsignedExportTx) SemanticVerify(
 		}
 
 		if len(cred.Sigs) != 1 {
-			return permError{fmt.Errorf("expected one signature for EVM Input Credential, but found: %d", len(secpCredential.Sigs))}
+			return permError{fmt.Errorf("expected one signature for EVM Input Credential, but found: %d", len(cred.Sigs))}
 		}
-		pubKey, err := f.RecoverPublicKey(tx.UnsignedBytes(), secpCredential.Sigs[0][:])
+		pubKey, err := f.RecoverPublicKey(tx.UnsignedBytes(), cred.Sigs[0][:])
 		if err != nil {
 			return permError{err}
 		}
-		if tx.Ins[i].Address != PublicKeyToEthAddress(pubKey) {
+		if input.Address != PublicKeyToEthAddress(pubKey) {
 			return permError{errPublicKeySignatureMismatch}
 		}
 	}
