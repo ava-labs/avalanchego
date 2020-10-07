@@ -15,6 +15,16 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+// If a peer consistently does not respond to queries, it will
+// increase latencies on the network whenever that peer is polled.
+// If we cannot terminate the poll early, then the poll will wait
+// the full timeout before finalizing the poll and making progress.
+// This can increase network latencies to an undesirable level.
+
+// Therefore, nodes that consistently fail are "benched" such that
+// queries to that node fail immediately to avoid waiting up to
+// the full network timeout for a response.
+
 // QueryBenchlist ...
 type QueryBenchlist interface {
 	// RegisterQuery registers a sent query and returns whether the query is subject to benchlist
@@ -24,15 +34,6 @@ type QueryBenchlist interface {
 	// QueryFailed registers that a query did not receive a response within our synchrony bound
 	QueryFailed(validatorID ids.ShortID, requestID uint32)
 }
-
-// If a peer consistently does not respond to queries, it will
-// increase latencies on the network whenever that peer is polled.
-// If we cannot terminate the poll early, then the poll will wait
-// the full timeout before finalizing the poll and making progress.
-// This can increase network latencies to an undesirable level.
-
-// Therefore, a benchlist is used as a heurstic to immediately fail
-// queries to nodes that are consistently not responding.
 
 type queryBenchlist struct {
 	vdrs validators.Set
@@ -147,11 +148,9 @@ func (b *queryBenchlist) QueryFailed(validatorID ids.ShortID, requestID uint32) 
 		return
 	}
 
-	key := validatorID.Key()
-	// Tracks a message failure and benches [validatorID] if it has
+	// Track the message failure and bench [validatorID] if it has
 	// surpassed the threshold
-
-	// Get the current time
+	key := validatorID.Key()
 	currentTime := b.clock.Time()
 	failureStreak := b.consecutiveFailures[key]
 	failureStreak.consecutive++
@@ -178,7 +177,7 @@ func (b *queryBenchlist) bench(validatorID ids.ShortID) {
 
 	// Goal:
 	// Random end time in the range:
-	// [max(lastEndTime,(currentTime + (duration/2)): currentTime + duration]
+	// [max(lastEndTime, (currentTime + (duration/2)): currentTime + duration]
 	// This maintains the invariant that validators in benchlistOrder are
 	// ordered by the time that they should be unbenched
 	currTime := b.clock.Time()
@@ -260,8 +259,9 @@ func (b *queryBenchlist) cleanup() {
 		end := b.benchlistTimes[key]
 		// Remove elements with the next expiration until the next item has not
 		// expired and the bench has less than the maximum weight
-		// Note: this creates an edge case where benchlisting a validator
-		// with a sufficient stake may clear the benchlist
+		// Note: this creates an edge case where benching a validator
+		// with a sufficient stake may clear the bench if the benchlist is
+		// not parameterized correctly.
 		if currentTime.Before(end) && updatedWeight < maxBenchlistWeight {
 			break
 		}
