@@ -167,3 +167,81 @@ func TestBenchlistDoesNotExceedThreshold(t *testing.T) {
 		t.Fatal("RegisterQuery should have succeeded after benchlisting time elapsed")
 	}
 }
+
+func TestBenchlistOverUnbench(t *testing.T) {
+	vdrs := validators.NewSet()
+	vdr0 := validators.GenerateRandomValidator(50)
+	vdr1 := validators.GenerateRandomValidator(50)
+	vdr2 := validators.GenerateRandomValidator(50)
+	vdr3 := validators.GenerateRandomValidator(50)
+	vdr4 := validators.GenerateRandomValidator(50)
+	vdrs.AddWeight(vdr0.ID(), vdr0.Weight())
+	vdrs.AddWeight(vdr1.ID(), vdr1.Weight())
+	vdrs.AddWeight(vdr2.ID(), vdr2.Weight())
+	vdrs.AddWeight(vdr3.ID(), vdr3.Weight())
+	vdrs.AddWeight(vdr4.ID(), vdr4.Weight())
+
+	threshold := 3
+	duration := time.Minute
+	maxPortion := 0.5
+	benchlist := NewQueryBenchlist(vdrs, snow.DefaultContextTest(), threshold, duration, maxPortion, false, "").(*queryBenchlist)
+
+	currentTime := time.Now()
+	benchlist.clock.Set(currentTime)
+
+	requestID := uint32(0)
+
+	// Fail enough queries to bench validators 0 and 1
+	for ; requestID < uint32(threshold); requestID++ {
+		if ok := benchlist.RegisterQuery(vdr0.ID(), requestID, constants.PullQueryMsg); !ok {
+			t.Fatalf("RegisterQuery failed early for vdr0 on requestID: %d", requestID)
+		}
+		if ok := benchlist.RegisterQuery(vdr1.ID(), requestID, constants.PullQueryMsg); !ok {
+			t.Fatalf("RegisterQuery failed early for vdr1 on requestID: %d", requestID)
+		}
+		benchlist.QueryFailed(vdr0.ID(), requestID)
+		benchlist.QueryFailed(vdr1.ID(), requestID)
+	}
+
+	if ok := benchlist.RegisterQuery(vdr0.ID(), requestID, constants.PullQueryMsg); ok {
+		t.Fatal("Validator should have been benched")
+	}
+	if ok := benchlist.RegisterQuery(vdr1.ID(), requestID, constants.PullQueryMsg); ok {
+		t.Fatal("Validator should have been benched")
+	}
+
+	// Benching 1 more validator should surpass the benchlist weight limit of half the portion
+	// by benching 3/5 equally weighted validators
+	// this should result in only one of them being removed
+	for requestID := uint32(0); requestID < uint32(threshold); requestID++ {
+		if ok := benchlist.RegisterQuery(vdr2.ID(), requestID, constants.PullQueryMsg); !ok {
+			t.Fatalf("RegisterQuery failed early for vsr2 on requestID: %d", requestID)
+		}
+		benchlist.QueryFailed(vdr2.ID(), requestID)
+	}
+
+	numBenched := 0
+	if ok := benchlist.RegisterQuery(vdr0.ID(), requestID, constants.PullQueryMsg); !ok {
+		numBenched++
+	}
+	if ok := benchlist.RegisterQuery(vdr1.ID(), requestID, constants.PullQueryMsg); !ok {
+		numBenched++
+	}
+	if ok := benchlist.RegisterQuery(vdr2.ID(), requestID, constants.PullQueryMsg); !ok {
+		numBenched++
+	}
+	if numBenched != 2 {
+		t.Fatalf("Expected number of benched validators to be 2, but was: %d", numBenched)
+	}
+
+	benchlist.clock.Set(currentTime.Add(duration))
+	if ok := benchlist.RegisterQuery(vdr0.ID(), requestID, constants.PullQueryMsg); !ok {
+		t.Fatal("RegisterQuery should have succeeded after benchlisting time elapsed")
+	}
+	if ok := benchlist.RegisterQuery(vdr1.ID(), requestID, constants.PullQueryMsg); !ok {
+		t.Fatal("RegisterQuery should have succeeded after benchlisting time elapsed")
+	}
+	if ok := benchlist.RegisterQuery(vdr2.ID(), requestID, constants.PullQueryMsg); !ok {
+		t.Fatal("RegisterQuery should have succeeded after benchlisting time elapsed")
+	}
+}

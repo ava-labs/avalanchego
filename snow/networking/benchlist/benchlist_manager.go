@@ -72,7 +72,6 @@ func (bm *benchlistManager) RegisterChain(ctx *snow.Context, namespace string) {
 		bm.config.PeerSummaryEnabled,
 		namespace,
 	)
-	ctx.Log.Info("Registered benchlist for chain %s", ctx.ChainID)
 }
 
 // RegisterQuery implements the Manager interface
