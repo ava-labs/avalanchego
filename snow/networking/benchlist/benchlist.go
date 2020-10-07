@@ -225,7 +225,7 @@ func (b *queryBenchlist) cleanup() {
 	maxBenchlistWeight := uint64(float64(totalWeight) * b.maxPortion)
 
 	// Iterate over elements of the benchlist in order of expiration
-	for e := b.benchlistOrder.Front(); e != nil; e = e.Next() {
+	for e := b.benchlistOrder.Front(); e != nil; {
 		validatorID := e.Value.(ids.ShortID)
 		key := validatorID.Key()
 		end := b.benchlistTimes[key]
@@ -248,10 +248,12 @@ func (b *queryBenchlist) cleanup() {
 			updatedWeight = newWeight
 		}
 
+		next := e.Next()
 		b.ctx.Log.Debug("Removed Validator: (%s, %d). EndTime: %s. CurrentTime: %s)", validatorID, removeWeight, end, currentTime)
 		b.benchlistOrder.Remove(e)
 		delete(b.benchlistTimes, key)
 		b.benchlistSet.Remove(validatorID)
+		e = next
 	}
 
 	updatedBenchLen := b.benchlistSet.Len()
