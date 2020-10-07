@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	// Delta is the synchrony bound used for safe decision making
-	Delta = 10 * time.Second
+	// syncBound is the synchrony bound used for safe decision making
+	syncBound = 10 * time.Second
 
 	// BatchSize is the number of decision transaction to place into a block
 	BatchSize = 30
@@ -274,7 +274,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 
 	// Propose adding a new validator but only if their start time is in the
 	// future relative to local time (plus Delta)
-	syncTime := localTime.Add(Delta)
+	syncTime := localTime.Add(syncBound)
 	for m.unissuedProposalTxs.Len() > 0 {
 		tx := m.unissuedProposalTxs.Remove()
 		m.unissuedTxIDs.Remove(tx.ID())
@@ -366,7 +366,7 @@ func (m *Mempool) ResetTimer() {
 		return
 	}
 
-	syncTime := localTime.Add(Delta)
+	syncTime := localTime.Add(syncBound)
 	for m.unissuedProposalTxs.Len() > 0 {
 		if !syncTime.After(m.unissuedProposalTxs.Peek().UnsignedTx.(TimedTx).StartTime()) {
 			m.vm.SnowmanVM.NotifyBlockReady() // Should issue a ProposeAddValidator

@@ -54,6 +54,9 @@ var (
 		filepath.Join("/", "usr", "local", "lib", constants.AppName),
 		filepath.Join(homeDir, dataDirName, "plugins"),
 	}
+
+	// GitCommit should be optionally set at compile time.
+	GitCommit string
 )
 
 var (
@@ -202,18 +205,40 @@ func init() {
 	ferr := fs.Parse(os.Args[1:])
 
 	if *version { // If --version used, print version and exit
-		networkID, err := constants.NetworkID(*networkName)
-		if errs.Add(err); err != nil {
-			return
+		format := "%s ["
+		args := []interface{}{
+			node.Version,
 		}
-		networkGeneration := constants.NetworkName(networkID)
-		if networkID == constants.MainnetID {
-			fmt.Printf("%s [database=%s, network=%s]\n",
-				node.Version, dbVersion, networkGeneration)
-		} else {
-			fmt.Printf("%s [database=%s, network=testnet/%s]\n",
-				node.Version, dbVersion, networkGeneration)
+
+		{
+			networkID, err := constants.NetworkID(*networkName)
+			if errs.Add(err); err != nil {
+				return
+			}
+			networkGeneration := constants.NetworkName(networkID)
+			if networkID == constants.MainnetID {
+				format += "network=%s"
+			} else {
+				format += "network=testnet/%s"
+			}
+			args = append(args, networkGeneration)
 		}
+
+		{
+			format += ", database=%s"
+			args = append(args, dbVersion)
+		}
+
+		{
+			if GitCommit != "" {
+				format += ", commit=%s"
+				args = append(args, GitCommit)
+			}
+		}
+
+		format += "]\n"
+
+		fmt.Printf(format, args...)
 		os.Exit(0)
 	}
 
