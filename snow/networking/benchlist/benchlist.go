@@ -41,16 +41,17 @@ type queryBenchlist struct {
 	// with the corresponding requestID
 	pendingQueries map[[20]byte]map[uint32]pendingQuery
 	// Map of consecutive query failures
-	consecutiveFailures map[[20]byte]int
+	consecutiveFailures map[[20]byte]failureStreak
 
 	// Maintain benchlist
 	benchlistTimes map[[20]byte]time.Time
 	benchlistOrder *list.List
 	benchlistSet   ids.ShortSet
 
-	threshold  int
-	duration   time.Duration
-	maxPortion float64
+	threshold              int
+	minimumFailingDuration time.Duration
+	duration               time.Duration
+	maxPortion             float64
 
 	clock timer.Clock
 
@@ -65,23 +66,38 @@ type pendingQuery struct {
 	msgType    constants.MsgType
 }
 
+type failureStreak struct {
+	firstFailure time.Time
+	consecutive  int
+}
+
 // NewQueryBenchlist ...
-func NewQueryBenchlist(validators validators.Set, ctx *snow.Context, threshold int, duration time.Duration, maxPortion float64, summaryEnabled bool, namespace string) QueryBenchlist {
+func NewQueryBenchlist(
+	validators validators.Set,
+	ctx *snow.Context,
+	threshold int,
+	minimumFailingDuration,
+	duration time.Duration,
+	maxPortion float64,
+	summaryEnabled bool,
+	namespace string,
+) QueryBenchlist {
 	metrics := &metrics{}
 	metrics.Initialize(ctx, namespace, summaryEnabled)
 
 	return &queryBenchlist{
-		pendingQueries:      make(map[[20]byte]map[uint32]pendingQuery),
-		consecutiveFailures: make(map[[20]byte]int),
-		benchlistTimes:      make(map[[20]byte]time.Time),
-		benchlistOrder:      list.New(),
-		benchlistSet:        ids.ShortSet{},
-		vdrs:                validators,
-		threshold:           threshold,
-		duration:            duration,
-		maxPortion:          maxPortion,
-		ctx:                 ctx,
-		metrics:             metrics,
+		pendingQueries:         make(map[[20]byte]map[uint32]pendingQuery),
+		consecutiveFailures:    make(map[[20]byte]failureStreak),
+		benchlistTimes:         make(map[[20]byte]time.Time),
+		benchlistOrder:         list.New(),
+		benchlistSet:           ids.ShortSet{},
+		vdrs:                   validators,
+		threshold:              threshold,
+		minimumFailingDuration: minimumFailingDuration,
+		duration:               duration,
+		maxPortion:             maxPortion,
+		ctx:                    ctx,
+		metrics:                metrics,
 	}
 }
 
@@ -132,10 +148,23 @@ func (b *queryBenchlist) QueryFailed(validatorID ids.ShortID, requestID uint32) 
 	}
 
 	key := validatorID.Key()
-	// Add a failure and benches [validatorID] if it has
-	// passed the threshold
-	b.consecutiveFailures[key]++
-	if b.consecutiveFailures[key] >= b.threshold {
+	// Tracks a message failure and benches [validatorID] if it has
+	// surpassed the threshold
+
+	// Get the current time
+	currentTime := b.clock.Time()
+	failureStreak := b.consecutiveFailures[key]
+	failureStreak.consecutive++
+	if failureStreak.firstFailure.IsZero() {
+		failureStreak.firstFailure = currentTime
+		b.consecutiveFailures[key] = failureStreak
+		// Return early here since a peer will not
+		// be benched after its first failure
+		return
+	}
+	b.consecutiveFailures[key] = failureStreak
+
+	if failureStreak.consecutive >= b.threshold && currentTime.After(failureStreak.firstFailure.Add(b.minimumFailingDuration)) {
 		b.bench(validatorID)
 	}
 }
@@ -271,7 +300,7 @@ func (b *queryBenchlist) cleanup() {
 
 func (b *queryBenchlist) reset() {
 	b.pendingQueries = make(map[[20]byte]map[uint32]pendingQuery)
-	b.consecutiveFailures = make(map[[20]byte]int)
+	b.consecutiveFailures = make(map[[20]byte]failureStreak)
 	b.benchlistTimes = make(map[[20]byte]time.Time)
 	b.benchlistOrder.Init()
 	b.benchlistSet.Clear()

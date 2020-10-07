@@ -158,6 +158,7 @@ func init() {
 	fs.IntVar(&Config.BenchlistConfig.Threshold, "benchlist-fail-threshold", 10, "Number of consecutive failed queries before benchlisting a node.")
 	fs.BoolVar(&Config.BenchlistConfig.PeerSummaryEnabled, "benchlist-peer-summary-enabled", false, "Enables peer specific query latency metrics.")
 	benchlistDuration := fs.Int64("benchlist-duration", int64(time.Hour), "Amount of time a peer is benchlisted after surpassing the threshold.")
+	minimumBenchlistFailingDuration := fs.Int64("benchlist-min-failing-duration", int64(5*time.Minute), "Minimum amount of time messages to a peer must be failing before the peer is benched.")
 
 	// Plugins:
 	fs.StringVar(&Config.PluginDir, "plugin-dir", defaultPluginDirs[0], "Plugin directory for Avalanche VMs")
@@ -441,6 +442,7 @@ func init() {
 	Config.NetworkConfig.TimeoutDec = time.Duration(*networkTimeoutDec)
 
 	Config.BenchlistConfig.Duration = time.Duration(*benchlistDuration)
+	Config.BenchlistConfig.MinimumFailingDuration = time.Duration(*minimumBenchlistFailingDuration)
 	Config.BenchlistConfig.MaxPortion = (1.0 - (float64(Config.ConsensusParams.Alpha) / float64(Config.ConsensusParams.K))) / 3.0
 
 	if *consensusGossipFrequency < 0 {
