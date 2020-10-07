@@ -153,17 +153,13 @@ func (b *queryBenchlist) QueryFailed(validatorID ids.ShortID, requestID uint32) 
 	key := validatorID.Key()
 	currentTime := b.clock.Time()
 	failureStreak := b.consecutiveFailures[key]
-	failureStreak.consecutive++
-	if failureStreak.firstFailure.IsZero() {
+	if failureStreak.consecutive == 0 {
 		failureStreak.firstFailure = currentTime
-		b.consecutiveFailures[key] = failureStreak
-		// Return early here since a peer will not
-		// be benched after its first failure
-		return
 	}
+	failureStreak.consecutive++
 	b.consecutiveFailures[key] = failureStreak
 
-	if failureStreak.consecutive >= b.threshold && currentTime.After(failureStreak.firstFailure.Add(b.minimumFailingDuration)) {
+	if failureStreak.consecutive >= b.threshold && !currentTime.Before(failureStreak.firstFailure.Add(b.minimumFailingDuration)) {
 		b.bench(validatorID)
 	}
 }
@@ -253,7 +249,9 @@ func (b *queryBenchlist) cleanup() {
 	maxBenchlistWeight := uint64(float64(totalWeight) * b.maxPortion)
 
 	// Iterate over elements of the benchlist in order of expiration
-	for e := b.benchlistOrder.Front(); e != nil; {
+	for b.benchlistOrder.Len() > 0 {
+		e := b.benchlistOrder.Front()
+
 		validatorID := e.Value.(ids.ShortID)
 		key := validatorID.Key()
 		end := b.benchlistTimes[key]
@@ -277,12 +275,10 @@ func (b *queryBenchlist) cleanup() {
 			updatedWeight = newWeight
 		}
 
-		next := e.Next()
 		b.ctx.Log.Debug("Removed Validator: (%s, %d). EndTime: %s. CurrentTime: %s)", validatorID, removeWeight, end, currentTime)
 		b.benchlistOrder.Remove(e)
 		delete(b.benchlistTimes, key)
 		b.benchlistSet.Remove(validatorID)
-		e = next
 	}
 
 	updatedBenchLen := b.benchlistSet.Len()
