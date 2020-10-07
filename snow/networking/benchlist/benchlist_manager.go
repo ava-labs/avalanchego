@@ -27,11 +27,12 @@ type Manager interface {
 
 // Config defines the configuration for a benchlist
 type Config struct {
-	Validators         validators.Manager
-	Threshold          int
-	Duration           time.Duration
-	MaxPortion         float64
-	PeerSummaryEnabled bool
+	Validators             validators.Manager
+	Threshold              int
+	MinimumFailingDuration time.Duration
+	Duration               time.Duration
+	MaxPortion             float64
+	PeerSummaryEnabled     bool
 }
 
 type benchlistManager struct {
@@ -67,12 +68,12 @@ func (bm *benchlistManager) RegisterChain(ctx *snow.Context, namespace string) {
 		vdrs,
 		ctx,
 		bm.config.Threshold,
+		bm.config.MinimumFailingDuration,
 		bm.config.Duration,
 		bm.config.MaxPortion,
 		bm.config.PeerSummaryEnabled,
 		namespace,
 	)
-	ctx.Log.Info("Registered benchlist for chain %s", ctx.ChainID)
 }
 
 // RegisterQuery implements the Manager interface
