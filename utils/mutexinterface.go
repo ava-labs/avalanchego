@@ -4,18 +4,18 @@ import (
 	"sync"
 )
 
-type MutexString struct {
-	value string
+type MutexInterface struct {
+	value interface{}
 	lock  sync.RWMutex
 }
 
-func (a *MutexString) GetValue() string {
+func (a *MutexInterface) GetValue() interface{} {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 	return a.value
 }
 
-func (a *MutexString) SetValue(v string) {
+func (a *MutexInterface) SetValue(v interface{}) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.value = v

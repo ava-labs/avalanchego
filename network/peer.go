@@ -60,7 +60,7 @@ type peer struct {
 	conn net.Conn
 
 	// version that the peer reported during the handshake
-	versionStr utils.MutexString
+	versionStr utils.MutexInterface
 
 	// unix time of the last message sent and received respectively
 	lastSent, lastReceived int64

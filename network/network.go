@@ -676,7 +676,7 @@ func (n *network) Peers() []PeerID {
 				IP:           peer.conn.RemoteAddr().String(),
 				PublicIP:     peer.ip.String(),
 				ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
-				Version:      peer.versionStr.GetValue(),
+				Version:      peer.versionStr.GetValue().(string),
 				LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 				LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
 			})
