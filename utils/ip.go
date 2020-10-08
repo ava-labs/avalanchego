@@ -114,8 +114,8 @@ type DynamicIPDesc struct {
 	*IPDescContainer
 }
 
-func NewDynamicIPDesc(IP net.IP, Port uint16) DynamicIPDesc {
-	return DynamicIPDesc{IPDescContainer: &IPDescContainer{IPDesc: &IPDesc{IP: IP, Port: Port}}}
+func NewDynamicIPDesc(ip net.IP, port uint16) DynamicIPDesc {
+	return DynamicIPDesc{IPDescContainer: &IPDescContainer{IPDesc: &IPDesc{IP: ip, Port: port}}}
 }
 
 func (i *DynamicIPDesc) Ip() IPDesc {
@@ -138,8 +138,8 @@ func (i *DynamicIPDesc) UpdatePort(port uint16) {
 	i.IPDesc.Port = port
 }
 
-func (i *DynamicIPDesc) UpdateIP(IP net.IP) {
+func (i *DynamicIPDesc) UpdateIP(ip net.IP) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
-	i.IPDesc.IP = IP
+	i.IPDesc.IP = ip
 }
