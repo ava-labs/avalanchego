@@ -1040,7 +1040,7 @@ func (n *network) validatorIPs() []utils.IPDesc {
 func (n *network) connected(p *peer) {
 	p.net.stateLock.Lock()
 	id := p.id
-	n.log.Debug("connected to %s at %s", p.id, p.ip)
+	ip := p.ip
 	if !p.ip.IsZero() {
 		str := p.ip.String()
 
@@ -1050,6 +1050,8 @@ func (n *network) connected(p *peer) {
 	}
 	p.net.stateLock.Unlock()
 
+	n.log.Debug("connected to %s at %s", id, ip)
+
 	n.router.Connected(id)
 }
 
@@ -1057,7 +1059,7 @@ func (n *network) connected(p *peer) {
 func (n *network) disconnected(p *peer) {
 	p.net.stateLock.Lock()
 	id := p.id
-	n.log.Debug("disconnected from %s at %s", p.id, p.ip)
+	ip := p.ip
 	key := p.id.Key()
 	delete(n.peers, key)
 	n.numPeers.Set(float64(len(n.peers)))
@@ -1071,6 +1073,8 @@ func (n *network) disconnected(p *peer) {
 		n.track(p.ip)
 	}
 	p.net.stateLock.Unlock()
+
+	n.log.Debug("disconnected from %s at %s", id, ip)
 
 	if p.connected.GetValue() {
 		n.router.Disconnected(id)
