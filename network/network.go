@@ -1039,8 +1039,10 @@ func (n *network) validatorIPs() []utils.IPDesc {
 // called after disconnected is called with this peer.
 func (n *network) connected(p *peer) {
 	p.net.stateLock.Lock()
-	id := p.id
-	ip := p.ip
+	defer p.net.stateLock.Unlock()
+
+	n.log.Debug("connected to %s at %s", p.id, p.ip)
+
 	if !p.ip.IsZero() {
 		str := p.ip.String()
 
@@ -1048,18 +1050,17 @@ func (n *network) connected(p *peer) {
 		delete(n.retryDelay, str)
 		n.connectedIPs[str] = struct{}{}
 	}
-	p.net.stateLock.Unlock()
 
-	n.log.Debug("connected to %s at %s", id, ip)
-
-	n.router.Connected(id)
+	n.router.Connected(p.id)
 }
 
 // should only be called after the peer is marked as connected.
 func (n *network) disconnected(p *peer) {
 	p.net.stateLock.Lock()
-	id := p.id
-	ip := p.ip
+	defer p.net.stateLock.Unlock()
+
+	n.log.Debug("disconnected from %s at %s", p.id, p.ip)
+
 	key := p.id.Key()
 	delete(n.peers, key)
 	n.numPeers.Set(float64(len(n.peers)))
@@ -1072,12 +1073,9 @@ func (n *network) disconnected(p *peer) {
 
 		n.track(p.ip)
 	}
-	p.net.stateLock.Unlock()
-
-	n.log.Debug("disconnected from %s at %s", id, ip)
 
 	if p.connected.GetValue() {
-		n.router.Disconnected(id)
+		n.router.Disconnected(p.id)
 	}
 }
 
