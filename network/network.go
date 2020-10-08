@@ -1073,7 +1073,7 @@ type PeerElement struct {
 	id ids.ShortID
 }
 
-// Safe copy under lock the full list of peers
+// Safe copy the peers dressed as a PeerElement
 func (n *network) getPeers(validatorIDs ids.ShortSet) []*PeerElement {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
