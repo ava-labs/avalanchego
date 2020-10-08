@@ -321,11 +321,8 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 	}
 
 	peerelement := n.getPeer(validatorID)
-	if peerelement.peer == nil {
-		return
-	}
-	exists := peerelement.exists
 	peer := peerelement.peer
+	exists := peerelement.exists
 	if !exists || !peer.connected.GetValue() || !peer.send(msg) {
 		n.log.Debug("failed to send AcceptedFrontier(%s, %s, %d, %s)",
 			validatorID,
@@ -385,10 +382,6 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	}
 
 	peerelement := n.getPeer(validatorID)
-	if peerelement.peer == nil {
-		return
-	}
-
 	peer := peerelement.peer
 	exists := peerelement.exists
 	if !exists || !peer.connected.GetValue() || !peer.send(msg) {
@@ -412,10 +405,6 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 	}
 
 	peerelement := n.getPeer(validatorID)
-	if peerelement.peer == nil {
-		return
-	}
-
 	peer := peerelement.peer
 	exists := peerelement.exists
 	if !exists || !peer.connected.GetValue() || !peer.send(msg) {
@@ -440,10 +429,6 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	}
 
 	peerelement := n.getPeer(validatorID)
-	if peerelement.peer == nil {
-		return
-	}
-
 	peer := peerelement.peer
 	exists := peerelement.exists
 	if !exists || !peer.connected.GetValue() || !peer.send(msg) {
@@ -464,10 +449,6 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	n.log.AssertNoError(err)
 
 	peerelement := n.getPeer(validatorID)
-	if peerelement.peer == nil {
-		return
-	}
-
 	peer := peerelement.peer
 	exists := peerelement.exists
 	if !exists || !peer.connected.GetValue() || !peer.send(msg) {
@@ -497,10 +478,6 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	}
 
 	peerelement := n.getPeer(validatorID)
-	if peerelement.peer == nil {
-		return
-	}
-
 	peer := peerelement.peer
 	exists := peerelement.exists
 	if !exists || !peer.connected.GetValue() || !peer.send(msg) {
@@ -590,10 +567,6 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 	}
 
 	peerelement := n.getPeer(validatorID)
-	if peerelement.peer == nil {
-		return
-	}
-
 	peer := peerelement.peer
 	exists := peerelement.exists
 	if !exists || !peer.connected.GetValue() || !peer.send(msg) {
@@ -1138,5 +1111,5 @@ func (n *network) getPeer(validatorID ids.ShortID) *PeerElement {
 		return &PeerElement{peer, exists, validatorID}
 	}
 
-	return nil
+	return &PeerElement{nil, false, ids.ShortID{}}
 }
