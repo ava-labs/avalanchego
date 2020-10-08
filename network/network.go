@@ -788,7 +788,6 @@ func (n *network) gossip() {
 		stakers := make([]*peer, 0, len(allPeers))
 		nonStakers := make([]*peer, 0, len(allPeers))
 		for _, peer := range allPeers {
-			peer := peer
 			if n.vdrs.Contains(peer.id) {
 				stakers = append(stakers, peer)
 			} else {
