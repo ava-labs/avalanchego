@@ -12,6 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/avalanchego/cache"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/api/health"
@@ -149,7 +151,7 @@ type network struct {
 	peers map[[20]byte]*peer
 
 	clientConnectionLock sync.RWMutex
-	clientConnection     map[string]*timer.TimedMeter
+	clientConnection     *cache.LRU
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -282,7 +284,7 @@ func NewNetwork(
 		peers:                              make(map[[20]byte]*peer),
 		readBufferSize:                     readBufferSize,
 		readHandshakeTimeout:               readHandshakeTimeout,
-		clientConnection:                   make(map[string]*timer.TimedMeter),
+		clientConnection:                   &cache.LRU{Size: 10240},
 		clientConnectionTickTimeout:        clientConnectionTickTimeout,
 	}
 	if err := netw.initialize(registerer); err != nil {
@@ -655,8 +657,9 @@ func (n *network) Dispatch() error {
 		}
 
 		addr := conn.RemoteAddr().String()
+		ticks, err := n.registerConnection(addr)
 		// looking for > 1 indicating the second tick
-		if n.registerConnection(addr) > 1 {
+		if err == nil && ticks > 1 {
 			n.log.Debug("connections from: %s temporarily dropped", addr)
 			go n.closeConnection(conn)
 			continue
@@ -1081,30 +1084,37 @@ func (n *network) closeConnection(conn net.Conn) {
 	conn.Close()
 }
 
-func (n *network) registerConnection(addr string) int {
-	meter := n.registerConnectionAddress(addr)
+func (n *network) registerConnection(addr string) (int, error) {
+	meter, err := n.registerConnectionAddress(addr)
+	if err != nil {
+		return 0, err
+	}
 	tickCount := meter.Ticks()
 	if tickCount > 0 {
-		return tickCount
+		return tickCount, nil
 	}
 	meter.Tick()
-	return meter.Ticks()
+	return meter.Ticks(), nil
 }
 
-func (n *network) registerConnectionAddress(addr string) *timer.TimedMeter {
+func (n *network) registerConnectionAddress(addr string) (*timer.TimedMeter, error) {
+	id, err := ids.ToID([]byte(addr))
+	if err != nil {
+		return nil, err
+	}
 	var exists bool
-	var meter *timer.TimedMeter
+	var meter interface{}
 	n.clientConnectionLock.RLock()
-	meter, exists = n.clientConnection[addr]
+	meter, exists = n.clientConnection.Get(id)
 	n.clientConnectionLock.RUnlock()
 	if !exists {
 		n.clientConnectionLock.Lock()
-		meter, exists = n.clientConnection[addr]
+		meter, exists = n.clientConnection.Get(id)
 		if !exists {
 			meter = &timer.TimedMeter{Duration: n.clientConnectionTickTimeout}
-			n.clientConnection[addr] = meter
+			n.clientConnection.Put(id, meter)
 		}
 		n.clientConnectionLock.RUnlock()
 	}
-	return meter
+	return meter.(*timer.TimedMeter), nil
 }
