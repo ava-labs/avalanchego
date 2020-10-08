@@ -132,8 +132,7 @@ func (v *version) Before(o Version) bool {
 	{
 		v := v.Patch()
 		o := o.Patch()
-		switch {
-		case v < o:
+		if v < o {
 			return true
 		}
 	}

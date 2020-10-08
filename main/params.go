@@ -69,11 +69,9 @@ var (
 
 // Parse the CLI arguments
 func init() {
-	errs := &wrappers.Errs{}
-	defer func() { Err = errs.Err }()
-
 	loggingConfig, err := logging.DefaultConfig()
-	if errs.Add(err); errs.Errored() {
+	if err != nil {
+		Err = err
 		return
 	}
 
@@ -219,7 +217,8 @@ func init() {
 
 		{
 			networkID, err := constants.NetworkID(*networkName)
-			if errs.Add(err); err != nil {
+			if err != nil {
+				Err = err
 				return
 			}
 			networkGeneration := constants.NetworkName(networkID)
@@ -258,6 +257,9 @@ func init() {
 		// other type of error occurred when parsing args
 		os.Exit(2)
 	}
+
+	errs := &wrappers.Errs{}
+	defer func() { Err = errs.Err }()
 
 	networkID, err := constants.NetworkID(*networkName)
 	if errs.Add(err); err != nil {

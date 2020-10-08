@@ -13,7 +13,7 @@ import (
 //
 // If f is nil or there are no provided signals, then nil will be returned.
 // Otherwise, a signal channel will be returned that can be used to clear the
-// signals registed by this function by valling ClearSignals.
+// signals registered by this function by valling ClearSignals.
 func HandleSignals(f func(os.Signal), sigs ...os.Signal) chan<- os.Signal {
 	if f == nil || len(sigs) == 0 {
 		return nil

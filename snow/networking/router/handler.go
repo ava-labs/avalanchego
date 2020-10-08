@@ -36,7 +36,7 @@ import (
 //          When should we be dropping messages? If we only drop based on the
 //          queue being full, then a peer can spam messages to fill the queue
 //          causing other peers' messages to drop.
-// Answer: Drop messages if the peer has too many oustanding messages. (Could be
+// Answer: Drop messages if the peer has too many outstanding messages. (Could be
 //         weighted by the size of the queue + stake amount)
 
 // Problem: How should we prioritize peers? If we are already picking which
