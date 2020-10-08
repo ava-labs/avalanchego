@@ -39,7 +39,7 @@ type multiLevelQueue struct {
 	// Tracks total CPU consumption
 	intervalConsumption, tierConsumption, cpuInterval time.Duration
 
-	bufferSize, pendingMessages, currentTier int
+	maxPendingMsgs, pendingMessages, currentTier int
 
 	queues        []singleLevelQueue
 	cpuRanges     []float64       // CPU Utilization ranges that should be attributed to a corresponding queue
@@ -61,16 +61,16 @@ func newMultiLevelQueue(
 	metrics *metrics,
 	consumptionRanges []float64,
 	consumptionAllotments []time.Duration,
-	bufferSize int,
+	maxPendingMsgs int,
 	maxNonStakerPendingMsgs uint32,
 	cpuInterval time.Duration,
 	msgPortion,
 	cpuPortion float64,
 ) (messageQueue, chan struct{}) {
-	semaChan := make(chan struct{}, bufferSize)
-	singleLevelSize := bufferSize / len(consumptionRanges)
+	semaChan := make(chan struct{}, maxPendingMsgs)
+	singleLevelSize := maxPendingMsgs / len(consumptionRanges)
 	cpuTracker := throttler.NewEWMATracker(vdrs, cpuPortion, cpuInterval, log)
-	msgThrottler := throttler.NewMessageThrottler(vdrs, uint32(bufferSize), maxNonStakerPendingMsgs, msgPortion, log)
+	msgThrottler := throttler.NewMessageThrottler(vdrs, uint32(maxPendingMsgs), maxNonStakerPendingMsgs, msgPortion, log)
 	queues := make([]singleLevelQueue, len(consumptionRanges))
 	for index := 0; index < len(queues); index++ {
 		gauge, histogram, err := metrics.registerTierStatistics(index)
@@ -87,17 +87,17 @@ func newMultiLevelQueue(
 	}
 
 	return &multiLevelQueue{
-		validators:    vdrs,
-		cpuTracker:    cpuTracker,
-		msgThrottler:  msgThrottler,
-		queues:        queues,
-		cpuRanges:     consumptionRanges,
-		cpuAllotments: consumptionAllotments,
-		cpuInterval:   cpuInterval,
-		log:           log,
-		metrics:       metrics,
-		bufferSize:    bufferSize,
-		semaChan:      semaChan,
+		validators:     vdrs,
+		cpuTracker:     cpuTracker,
+		msgThrottler:   msgThrottler,
+		queues:         queues,
+		cpuRanges:      consumptionRanges,
+		cpuAllotments:  consumptionAllotments,
+		cpuInterval:    cpuInterval,
+		log:            log,
+		metrics:        metrics,
+		maxPendingMsgs: int(maxPendingMsgs),
+		semaChan:       semaChan,
 	}, semaChan
 }
 
@@ -109,7 +109,7 @@ func (ml *multiLevelQueue) PushMessage(msg message) bool {
 
 	// If the message queue is already full, skip iterating
 	// through the queue levels to return false
-	if ml.pendingMessages >= ml.bufferSize {
+	if ml.pendingMessages >= ml.maxPendingMsgs {
 		ml.log.Debug("Dropped message due to a full message queue with %d messages", ml.pendingMessages)
 		return false
 	}
