@@ -1114,7 +1114,7 @@ func (n *network) registerConnectionAddress(addr string) (*timer.TimedMeter, err
 			meter = &timer.TimedMeter{Duration: n.clientConnectionTickTimeout}
 			n.clientConnection.Put(id, meter)
 		}
-		n.clientConnectionLock.RUnlock()
+		n.clientConnectionLock.Unlock()
 	}
 	return meter.(*timer.TimedMeter), nil
 }
