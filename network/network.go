@@ -1063,12 +1063,17 @@ func (n *network) disconnected(p *peer) {
 	}
 }
 
+// holds onto the peer object as a result of helper functions
 type PeerElement struct {
-	peer   *peer
+	// the peer
+	peer *peer
+	// whether or not it was in the peers, we percolate to the caller to missing peers can be logged and sent to prometheus
 	exists bool
-	id     ids.ShortID
+	// this is the validator id for the peer, we pass back to the caller for logging purposes
+	id ids.ShortID
 }
 
+// Safe copy under lock the full list of peers
 func (n *network) getPeers(validatorIDs ids.ShortSet) []*PeerElement {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
@@ -1086,6 +1091,7 @@ func (n *network) getPeers(validatorIDs ids.ShortSet) []*PeerElement {
 	return []*PeerElement{}
 }
 
+// Safe copy the peers
 func (n *network) getAllPeers() []*peer {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
@@ -1101,6 +1107,7 @@ func (n *network) getAllPeers() []*peer {
 	return []*peer{}
 }
 
+// Safe find a single peer
 func (n *network) getPeer(validatorID ids.ShortID) *PeerElement {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
