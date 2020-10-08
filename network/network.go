@@ -740,9 +740,7 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte)
 	}
 
 	allPeers := make([]*peer, 0, len(n.peers))
-	for _, peer := range n.getAllPeers() {
-		allPeers = append(allPeers, peer)
-	}
+	allPeers = append(allPeers, n.getAllPeers()...)
 
 	numToGossip := n.gossipSize
 	if numToGossip > len(allPeers) {
