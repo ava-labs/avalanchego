@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	// Delta is the synchrony bound used for safe decision making
-	Delta = 10 * time.Second
+	// syncBound is the synchrony bound used for safe decision making
+	syncBound = 10 * time.Second
 
 	// BatchSize is the number of decision transaction to place into a block
 	BatchSize = 30
@@ -274,22 +274,28 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 
 	// Propose adding a new validator but only if their start time is in the
 	// future relative to local time (plus Delta)
-	syncTime := localTime.Add(Delta)
+	syncTime := localTime.Add(syncBound)
 	for m.unissuedProposalTxs.Len() > 0 {
 		tx := m.unissuedProposalTxs.Remove()
 		m.unissuedTxIDs.Remove(tx.ID())
 		utx := tx.UnsignedTx.(TimedTx)
-		if !syncTime.After(utx.StartTime()) {
-			blk, err := m.vm.newProposalBlock(preferredID, preferredHeight+1, *tx)
-			if err != nil {
-				return nil, err
-			}
-			if err := m.vm.State.PutBlock(m.vm.DB, blk); err != nil {
-				return nil, err
-			}
-			return blk, m.vm.DB.Commit()
+		if syncTime.After(utx.StartTime()) {
+			txID := tx.ID()
+			m.unissuedTxIDs.Remove(txID)
+			m.vm.droppedTxCache.Put(txID, nil) // cache tx as dropped
+
+			m.vm.Ctx.Log.Debug("dropping tx to add validator because start time too late")
+			continue
 		}
-		m.vm.Ctx.Log.Debug("dropping tx to add validator because start time too late")
+
+		blk, err := m.vm.newProposalBlock(preferredID, preferredHeight+1, *tx)
+		if err != nil {
+			return nil, err
+		}
+		if err := m.vm.State.PutBlock(m.vm.DB, blk); err != nil {
+			return nil, err
+		}
+		return blk, m.vm.DB.Commit()
 	}
 
 	m.vm.Ctx.Log.Debug("BuildBlock returning error (no blocks)")
@@ -338,7 +344,7 @@ func (m *Mempool) ResetTimer() {
 	// propose moving forward the chain timestamp
 	nextStakerChangeTime, err := m.vm.nextStakerChangeTime(db)
 	if err != nil {
-		m.vm.Ctx.Log.Error("couldn't get next staker change time: %w", err)
+		m.vm.Ctx.Log.Error("couldn't get next staker change time: %s", err)
 		return
 	}
 	if timestamp.Equal(nextStakerChangeTime) {
@@ -360,7 +366,7 @@ func (m *Mempool) ResetTimer() {
 		return
 	}
 
-	syncTime := localTime.Add(Delta)
+	syncTime := localTime.Add(syncBound)
 	for m.unissuedProposalTxs.Len() > 0 {
 		if !syncTime.After(m.unissuedProposalTxs.Peek().UnsignedTx.(TimedTx).StartTime()) {
 			m.vm.SnowmanVM.NotifyBlockReady() // Should issue a ProposeAddValidator
@@ -368,8 +374,11 @@ func (m *Mempool) ResetTimer() {
 		}
 		// If the tx doesn't meet the synchrony bound, drop it
 		tx := m.unissuedProposalTxs.Remove()
+
 		txID := tx.ID()
 		m.unissuedTxIDs.Remove(txID)
+		m.vm.droppedTxCache.Put(tx.ID(), nil) // cache tx as dropped
+
 		m.vm.Ctx.Log.Debug("dropping tx %q to add validator because its start time has passed", txID)
 	}
 

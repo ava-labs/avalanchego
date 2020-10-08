@@ -165,20 +165,22 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	// Proposed advancing timestamp to 1 second after current timestamp
-	tx, err := vm.newAdvanceTimeTx(defaultGenesisTime.Add(1 * time.Second))
+	vm.clock.Set(defaultGenesisTime) // VM's clock reads the genesis time
+
+	// Proposed advancing timestamp to 1 second after sync bound
+	tx, err := vm.newAdvanceTimeTx(defaultGenesisTime.Add(1 * time.Second).Add(syncBound))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if tx.UnsignedTx.(UnsignedProposalTx).InitiallyPrefersCommit(vm) {
-		t.Fatal("should not prefer to commit this tx because its proposed timestamp is after wall clock time")
+		t.Fatal("should not prefer to commit this tx because its proposed timestamp is outside of sync bound")
 	}
 
 	// advance wall clock time
-	vm.clock.Set(defaultGenesisTime.Add(2 * time.Second))
+	vm.clock.Set(defaultGenesisTime.Add(1 * time.Second))
 	if !tx.UnsignedTx.(UnsignedProposalTx).InitiallyPrefersCommit(vm) {
-		t.Fatal("should prefer to commit this tx because its proposed timestamp is before wall clock time")
+		t.Fatal("should prefer to commit this tx because its proposed timestamp it's within sync bound")
 	}
 }
 

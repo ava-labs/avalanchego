@@ -343,7 +343,7 @@ func TestAddValidatorCommit(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(Delta).Add(1 * time.Second)
+	startTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	key, err := vm.factory.NewPrivateKey()
 	if err != nil {
@@ -423,7 +423,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(-Delta).Add(-1 * time.Second)
+	startTime := defaultGenesisTime.Add(-syncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := vm.factory.NewPrivateKey()
 	ID := key.PublicKey().Address()
@@ -470,7 +470,7 @@ func TestAddValidatorReject(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(Delta).Add(1 * time.Second)
+	startTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := vm.factory.NewPrivateKey()
 	ID := key.PublicKey().Address()
@@ -549,7 +549,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(syncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 
 	// create valid tx
@@ -629,7 +629,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(syncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := keys[0].PublicKey().Address()
 
@@ -1077,7 +1077,7 @@ func TestCreateSubnet(t *testing.T) {
 	}
 
 	// Now that we've created a new subnet, add a validator to that subnet
-	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(syncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subent so tx is valid
 	if addValidatorTx, err := vm.newAddSubnetValidatorTx(
