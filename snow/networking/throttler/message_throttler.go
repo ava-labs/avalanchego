@@ -9,11 +9,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 const (
-	defaultIntervalsUntilPruning uint32 = 60
+	defaultIntervalsUntilPruning uint32 = 5
 )
 
 type messageThrottler struct {
@@ -54,10 +55,9 @@ func NewMessageThrottler(
 	nonReservedMsgs := maxMessages - reservedStakerMessages
 
 	throttler := &messageThrottler{
-		msgSpenders: make(map[[20]byte]*msgSpender),
-		vdrs:        vdrs,
-		log:         log,
-
+		msgSpenders:             make(map[[20]byte]*msgSpender),
+		vdrs:                    vdrs,
+		log:                     log,
 		reservedStakerMessages:  reservedStakerMessages,
 		nonReservedMsgs:         nonReservedMsgs,
 		maxNonStakerPendingMsgs: maxNonStakerPendingMsgs,
@@ -162,13 +162,14 @@ func (et *messageThrottler) EndInterval() {
 		}
 
 		if msgSpender.lastSpend+defaultIntervalsUntilPruning < et.currentPeriod && msgSpender.pendingMessages == 0 {
-			et.log.Debug("Removing validator from throttler after not hearing from it for %d periods",
-				et.currentPeriod-msgSpender.lastSpend)
+			et.log.Debug("Removing %s from throttler after not hearing from it for %d periods",
+				ids.NewShortID(key).PrefixedString(constants.NodeIDPrefix),
+				et.currentPeriod-msgSpender.lastSpend,
+			)
 			delete(et.msgSpenders, key)
 		}
 
-		// If the validator is not a staker and was not deleted, set its msgSpender
-		// attributes
+		// If the validator is not a validator and was not deleted, set its msgSpender attributes
 		msgSpender.staking = false
 		msgSpender.msgAllotment = 0
 		msgSpender.maxMessages = et.maxNonStakerPendingMsgs
