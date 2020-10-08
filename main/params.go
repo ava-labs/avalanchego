@@ -56,6 +56,9 @@ var (
 		filepath.Join("/", "usr", "local", "lib", constants.AppName),
 		filepath.Join(homeDir, dataDirName, "plugins"),
 	}
+
+	// GitCommit should be optionally set at compile time.
+	GitCommit string
 )
 
 var (
@@ -165,6 +168,7 @@ func init() {
 	fs.IntVar(&Config.BenchlistConfig.Threshold, "benchlist-fail-threshold", 10, "Number of consecutive failed queries before benchlisting a node.")
 	fs.BoolVar(&Config.BenchlistConfig.PeerSummaryEnabled, "benchlist-peer-summary-enabled", false, "Enables peer specific query latency metrics.")
 	benchlistDuration := fs.Int64("benchlist-duration", int64(time.Hour), "Amount of time a peer is benchlisted after surpassing the threshold.")
+	minimumBenchlistFailingDuration := fs.Int64("benchlist-min-failing-duration", int64(5*time.Minute), "Minimum amount of time messages to a peer must be failing before the peer is benched.")
 
 	// Plugins:
 	fs.StringVar(&Config.PluginDir, "plugin-dir", defaultPluginDirs[0], "Plugin directory for Avalanche VMs")
@@ -208,18 +212,40 @@ func init() {
 	ferr := fs.Parse(os.Args[1:])
 
 	if *version { // If --version used, print version and exit
-		networkID, err := constants.NetworkID(*networkName)
-		if errs.Add(err); err != nil {
-			return
+		format := "%s ["
+		args := []interface{}{
+			node.Version,
 		}
-		networkGeneration := constants.NetworkName(networkID)
-		if networkID == constants.MainnetID {
-			fmt.Printf("%s [database=%s, network=%s]\n",
-				node.Version, dbVersion, networkGeneration)
-		} else {
-			fmt.Printf("%s [database=%s, network=testnet/%s]\n",
-				node.Version, dbVersion, networkGeneration)
+
+		{
+			networkID, err := constants.NetworkID(*networkName)
+			if errs.Add(err); err != nil {
+				return
+			}
+			networkGeneration := constants.NetworkName(networkID)
+			if networkID == constants.MainnetID {
+				format += "network=%s"
+			} else {
+				format += "network=testnet/%s"
+			}
+			args = append(args, networkGeneration)
 		}
+
+		{
+			format += ", database=%s"
+			args = append(args, dbVersion)
+		}
+
+		{
+			if GitCommit != "" {
+				format += ", commit=%s"
+				args = append(args, GitCommit)
+			}
+		}
+
+		format += "]\n"
+
+		fmt.Printf(format, args...)
 		os.Exit(0)
 	}
 
@@ -461,6 +487,7 @@ func init() {
 	Config.NetworkConfig.TimeoutDec = time.Duration(*networkTimeoutDec)
 
 	Config.BenchlistConfig.Duration = time.Duration(*benchlistDuration)
+	Config.BenchlistConfig.MinimumFailingDuration = time.Duration(*minimumBenchlistFailingDuration)
 	Config.BenchlistConfig.MaxPortion = (1.0 - (float64(Config.ConsensusParams.Alpha) / float64(Config.ConsensusParams.K))) / 3.0
 
 	if *consensusGossipFrequency < 0 {
