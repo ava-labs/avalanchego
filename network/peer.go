@@ -245,13 +245,13 @@ func (p *peer) Send(msg Msg) bool {
 }
 
 func (p *peer) send(msg Msg) bool {
+	p.peerLock.Lock()
+	defer p.peerLock.Unlock()
+
 	if p.closed.GetValue() {
 		p.net.log.Debug("dropping message to %s due to a closed connection", p.id)
 		return false
 	}
-
-	p.peerLock.Lock()
-	defer p.peerLock.Unlock()
 
 	// is it possible to send?
 	if dropMsg := p.dropMessagePeer(); dropMsg {
@@ -393,7 +393,9 @@ func (p *peer) close() {
 		p.net.log.Debug("closing peer %s resulted in an error: %s", p.id, err)
 	}
 
+	p.peerLock.Lock()
 	close(p.sender)
+	p.peerLock.Unlock()
 
 	p.net.disconnected(p)
 }
