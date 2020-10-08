@@ -6,11 +6,12 @@ package snowstorm
 import (
 	"math/rand"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/sampler"
-	"github.com/prometheus/client_golang/prometheus"
 
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
