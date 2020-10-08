@@ -60,13 +60,13 @@ type peer struct {
 	conn net.Conn
 
 	// version that the peer reported during the handshake
-	versionStr string
+	versionStr utils.MutexString
 
 	// unix time of the last message sent and received respectively
 	lastSent, lastReceived int64
 
 	// only one peer lock should only be held at a time by a thread of execution
-	lock sync.Mutex
+	peerLock sync.RWMutex
 
 	tickerCloser chan struct{}
 
@@ -250,8 +250,8 @@ func (p *peer) send(msg Msg) bool {
 		return false
 	}
 
-	p.lock.Lock()
-	defer p.lock.Unlock()
+	p.peerLock.Lock()
+	defer p.peerLock.Unlock()
 
 	// is it possible to send?
 	if dropMsg := p.dropMessagePeer(); dropMsg {
@@ -393,10 +393,8 @@ func (p *peer) close() {
 		p.net.log.Debug("closing peer %s resulted in an error: %s", p.id, err)
 	}
 
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
 	close(p.sender)
+
 	p.net.disconnected(p)
 }
 
@@ -564,11 +562,9 @@ func (p *peer) version(msg Msg) {
 
 	p.SendPeerList()
 
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	p.versionStr = peerVersion.String()
+	p.versionStr.SetValue(peerVersion.String())
 	p.gotVersion.SetValue(true)
+
 	p.tryMarkConnected()
 }
 

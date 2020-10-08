@@ -667,15 +667,16 @@ func (n *network) Dispatch() error {
 
 // IPs implements the Network interface
 func (n *network) Peers() []PeerID {
-	peers := []PeerID{}
-	for _, peer := range n.getAllPeers() {
+	allPeers := n.getAllPeers()
+	peers := make([]PeerID, 0, len(allPeers))
+	for _, peer := range allPeers {
 		if peer.connected.GetValue() {
 			n.stateLock.RLock()
 			peers = append(peers, PeerID{
 				IP:           peer.conn.RemoteAddr().String(),
 				PublicIP:     peer.ip.String(),
 				ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
-				Version:      peer.versionStr,
+				Version:      peer.versionStr.GetValue(),
 				LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 				LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
 			})
@@ -698,6 +699,7 @@ func (n *network) Close() error {
 
 	n.stateLock.Lock()
 	if n.closed.GetValue() {
+		n.stateLock.Unlock()
 		return nil
 	}
 	n.closed.SetValue(true)
