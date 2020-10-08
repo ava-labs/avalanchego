@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	defaultCPUInterval = 5 * time.Second
+	// Larger --> Higher weight for past in message throttler
+	defaultCPUInterval = 15 * time.Second
 )
 
 var (

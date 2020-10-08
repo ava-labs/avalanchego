@@ -53,9 +53,9 @@ func TestEWMATrackerPrunesSpenders(t *testing.T) {
 	vdrs.AddWeight(staker0, 1)
 	vdrs.AddWeight(staker1, 1)
 
-	cpuPortion := 0.25
+	stakerCPUPortion := 0.25
 	period := time.Second
-	throttler := NewEWMATracker(vdrs, cpuPortion, period, logging.NoLog{})
+	throttler := NewEWMATracker(vdrs, stakerCPUPortion, period, logging.NoLog{})
 
 	throttler.UtilizeCPU(staker0, 1.0)
 	throttler.UtilizeCPU(nonStaker0, 1.0)

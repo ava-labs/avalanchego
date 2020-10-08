@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	defaultDecayFactor         float64 = 2
+	// Larger --> Consider past less for throttling
+	defaultDecayFactor         float64 = 3 / 2
 	defaultMinimumCPUAllotment         = time.Nanosecond
 )
 
@@ -23,15 +24,19 @@ type ewmaCPUTracker struct {
 	lock sync.Mutex
 	log  logging.Logger
 
-	// Track peers
-	cpuSpenders    map[[20]byte]*cpuSpender
+	// Peer's node ID --> Info about how much time we spend processing their msgs
+	cpuSpenders map[[20]byte]*cpuSpender
+	// Total CPU time spent by all peers
 	cumulativeEWMA time.Duration
-	vdrs           validators.Set
+	// Validator set
+	vdrs validators.Set
 
-	// Track CPU utilization
-	decayFactor    float64       // Factor used to discount the EWMA at every period
-	stakerCPU      time.Duration // Amount of CPU time reserved for stakers
-	nonReservedCPU time.Duration // Amount of CPU time that is not reserved for stakers
+	// Used to discount the EWMA every period
+	decayFactor float64
+	// CPU time per period reserved for stakers
+	stakerCPU time.Duration
+	// CPU time per period not reserved for stakers
+	nonReservedCPU time.Duration
 }
 
 // NewEWMATracker returns a CPUTracker that uses exponentially weighted moving
@@ -40,7 +45,7 @@ type ewmaCPUTracker struct {
 // [stakerCPUPortion] is the portion of CPU utilization to reserve for stakers (range (0, 1])
 // [period] is the interval of time to use for the calculation of EWMA
 //
-// Note: ewmaCPUTracker uses the period as the total amount of time per interval,
+// Note: ewmaCPUTracker uses the period as the total time per interval,
 // which is not the limit since it tracks consumption using EWMA.
 func NewEWMATracker(
 	vdrs validators.Set,
@@ -63,12 +68,10 @@ func NewEWMATracker(
 	}
 
 	throttler := &ewmaCPUTracker{
-		cpuSpenders: make(map[[20]byte]*cpuSpender),
-		vdrs:        vdrs,
-		log:         log,
-
-		decayFactor: defaultDecayFactor,
-
+		cpuSpenders:    make(map[[20]byte]*cpuSpender),
+		vdrs:           vdrs,
+		log:            log,
+		decayFactor:    defaultDecayFactor,
 		stakerCPU:      stakerCPU,
 		nonReservedCPU: nonReservedCPU,
 	}
@@ -85,16 +88,17 @@ func NewEWMATracker(
 	return throttler
 }
 
+// Mark that [validatorID] spent [t] CPU time
 func (et *ewmaCPUTracker) UtilizeCPU(
 	validatorID ids.ShortID,
-	consumption time.Duration,
+	t time.Duration,
 ) {
 	et.lock.Lock()
 	defer et.lock.Unlock()
 
 	sp := et.getSpender(validatorID)
-	sp.cpuEWMA += consumption
-	et.cumulativeEWMA += consumption
+	sp.cpuEWMA += t
+	et.cumulativeEWMA += t
 }
 
 // GetUtilization returns a percentage of expected CPU utilization of the peer
@@ -133,7 +137,7 @@ func (et *ewmaCPUTracker) EndInterval() {
 			continue
 		}
 
-		if cpuSpender.cpuEWMA == 0 {
+		if cpuSpender.cpuEWMA <= 1 {
 			removed++
 			delete(et.cpuSpenders, key)
 		}
