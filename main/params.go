@@ -198,7 +198,7 @@ func init() {
 
 	// Router Configuration:
 	consensusGossipFrequency := fs.Int64("consensus-gossip-frequency", int64(10*time.Second), "Frequency of gossiping accepted frontiers.")
-	consensusShutdownTimeout := fs.Int64("consensus-shutdown-timeout", int64(1*time.Second), "Timeout before killing an unresponsive chain.")
+	consensusShutdownTimeout := fs.Int64("consensus-shutdown-timeout", int64(5*time.Second), "Timeout before killing an unresponsive chain.")
 
 	fdLimit := fs.Uint64("fd-limit", ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
 
