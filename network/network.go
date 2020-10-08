@@ -12,6 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/hashing"
+
 	"github.com/ava-labs/avalanchego/cache"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -1098,7 +1100,7 @@ func (n *network) registerConnection(addr string) (int, error) {
 }
 
 func (n *network) registerConnectionAddress(addr string) (*timer.TimedMeter, error) {
-	id, err := ids.FromString(addr)
+	id, err := ids.ToID(hashing.ComputeHash256([]byte(addr)))
 	if err != nil {
 		return nil, err
 	}
