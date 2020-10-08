@@ -124,12 +124,12 @@ func init() {
 	dbDir := fs.String("db-dir", defaultDbDir, "Database directory for Avalanche state")
 
 	// IP:
-	consensusIP := fs.String("public-ip", "", "Public IP of this node")
+	consensusIP := fs.String("public-ip", "", "Public IP of this node for P2P communication. If empty, try to discover with NAT. Ignored if dynamic-public-ip is non-empty.")
 
 	// how often to update the dynamic IP and PnP/NAT-PMP IP and routing.
 	fs.DurationVar(&Config.DynamicUpdateDuration, "dynamic-update-duration", 5*time.Minute, "Dynamic IP and NAT Traversal update duration")
 
-	dynamicPublicIPResolver := fs.String("dynamic-public-ip", "", "*empty* *default* or 'ifconfig' or 'opendns'")
+	dynamicPublicIPResolver := fs.String("dynamic-public-ip", "", "'ifconfig' or 'opendns'. By default does not do dynamic public IP updates. If non-empty, ignores public-ip argument.")
 
 	// HTTP Server:
 	httpHost := fs.String("http-host", "127.0.0.1", "Address of the HTTP server")
@@ -280,22 +280,25 @@ func init() {
 		Config.DB = memdb.New()
 	}
 
-	Config.DynamicConsensusResolver = dynamicip.NewDynamicResolver(*dynamicPublicIPResolver)
+	// Resolves our public IP, or does nothing
+	Config.DynamicPublicIPResolver = dynamicip.NewResolver(*dynamicPublicIPResolver)
 
 	var ip net.IP
-	if Config.DynamicConsensusResolver.IsResolver() {
+	if Config.DynamicPublicIPResolver.IsResolver() {
+		// User specified to use dynamic IP resolution; don't use NAT traversal
 		Config.Nat = nat.NewNoRouter()
-		ipstr, err := dynamicip.FetchExternalIP(Config.DynamicConsensusResolver)
+		ipstr, err := dynamicip.FetchExternalIP(Config.DynamicPublicIPResolver)
 		if err != nil {
-			errs.Add(fmt.Errorf("dynamic ip address fetch failed %s", err))
+			errs.Add(fmt.Errorf("dynamic ip address fetch failed: %w", err))
 			return
 		}
 		ip = net.ParseIP(ipstr)
 		if ip == nil {
-			errs.Add(fmt.Errorf("dynamic ip address fetch failed parse %s", ipstr))
+			errs.Add(fmt.Errorf("failed to parse dynamic ip address: %w", err))
 			return
 		}
 	} else if *consensusIP == "" {
+		// User didn't specift a public IP to use; try with NAT traversal
 		Config.AttemptedNATTraversal = true
 		Config.Nat = nat.GetRouter()
 		ip, err = Config.Nat.ExternalIP()
@@ -303,6 +306,7 @@ func init() {
 			ip = net.IPv4zero // Couldn't get my IP...set to 0.0.0.0
 		}
 	} else {
+		// User specified a public IP to use; don't use NAT
 		Config.Nat = nat.NewNoRouter()
 		ip = net.ParseIP(*consensusIP)
 	}

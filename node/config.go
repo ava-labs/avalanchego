@@ -104,5 +104,5 @@ type Config struct {
 	// Dynamic Update duration for IP or NAT traversal
 	DynamicUpdateDuration time.Duration
 
-	DynamicConsensusResolver dynamicip.DynamicResolver
+	DynamicPublicIPResolver dynamicip.Resolver
 }
