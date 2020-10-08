@@ -322,7 +322,7 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		}
 		return nil
 	case reflect.Uint64:
-		value.SetUint(uint64(p.UnpackLong()))
+		value.SetUint(p.UnpackLong())
 		if p.Err != nil {
 			return fmt.Errorf("couldn't unmarshal uint64: %w", p.Err)
 		}

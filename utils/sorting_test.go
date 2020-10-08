@@ -23,9 +23,7 @@ func TestSort2dByteArray(t *testing.T) {
 
 	// In the unlikely event the random array is sorted, unsort it
 	if IsSorted2DBytes(arr) {
-		tmp := arr[0]
-		arr[0] = arr[len(arr)-1]
-		arr[len(arr)-1] = tmp
+		arr[0], arr[len(arr)-1] = arr[len(arr)-1], arr[0]
 	}
 	Sort2DBytes(arr) // sort it
 	if !IsSorted2DBytes(arr) {

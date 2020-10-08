@@ -24,7 +24,7 @@ func TestShutdown(t *testing.T) {
 	vdrs := validators.NewSet()
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
-	tm.Initialize(&timer.AdaptiveTimeoutConfig{
+	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
 		InitialTimeout: time.Millisecond,
 		MinimumTimeout: time.Millisecond,
 		MaximumTimeout: 10 * time.Second,
@@ -33,6 +33,9 @@ func TestShutdown(t *testing.T) {
 		Namespace:      "",
 		Registerer:     prometheus.NewRegistry(),
 	}, benchlist)
+	if err != nil {
+		t.Fatal(err)
+	}
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
@@ -84,7 +87,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
 	// Ensure that the MultiPut request does not timeout
-	tm.Initialize(&timer.AdaptiveTimeoutConfig{
+	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
 		InitialTimeout: time.Second,
 		MinimumTimeout: 500 * time.Millisecond,
 		MaximumTimeout: 10 * time.Second,
@@ -93,6 +96,9 @@ func TestShutdownTimesOut(t *testing.T) {
 		Namespace:      "",
 		Registerer:     prometheus.NewRegistry(),
 	}, benchlist)
+	if err != nil {
+		t.Fatal(err)
+	}
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}

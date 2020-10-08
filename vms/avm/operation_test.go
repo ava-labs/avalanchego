@@ -78,7 +78,9 @@ func TestOperationVerify(t *testing.T) {
 
 func TestOperationSorting(t *testing.T) {
 	c := codec.NewDefault()
-	c.RegisterType(&testOperable{})
+	if err := c.RegisterType(&testOperable{}); err != nil {
+		t.Fatal(err)
+	}
 
 	ops := []*Operation{
 		{

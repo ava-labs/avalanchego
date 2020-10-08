@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -29,16 +30,22 @@ func TestTxNil(t *testing.T) {
 
 func setupCodec() codec.Codec {
 	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
-	c.RegisterType(&ImportTx{})
-	c.RegisterType(&ExportTx{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
-	c.RegisterType(&secp256k1fx.MintOutput{})
-	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintOperation{})
-	c.RegisterType(&secp256k1fx.Credential{})
+	errs := wrappers.Errs{}
+	errs.Add(
+		c.RegisterType(&BaseTx{}),
+		c.RegisterType(&CreateAssetTx{}),
+		c.RegisterType(&OperationTx{}),
+		c.RegisterType(&ImportTx{}),
+		c.RegisterType(&ExportTx{}),
+		c.RegisterType(&secp256k1fx.TransferInput{}),
+		c.RegisterType(&secp256k1fx.MintOutput{}),
+		c.RegisterType(&secp256k1fx.TransferOutput{}),
+		c.RegisterType(&secp256k1fx.MintOperation{}),
+		c.RegisterType(&secp256k1fx.Credential{}),
+	)
+	if errs.Errored() {
+		panic(errs.Err)
+	}
 	return c
 }
 
@@ -54,7 +61,9 @@ func TestTxEmpty(t *testing.T) {
 func TestTxInvalidCredential(t *testing.T) {
 	ctx := NewContext(t)
 	c := setupCodec()
-	c.RegisterType(&avax.TestVerifiable{})
+	if err := c.RegisterType(&avax.TestVerifiable{}); err != nil {
+		t.Fatal(err)
+	}
 
 	tx := &Tx{
 		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
@@ -90,7 +99,9 @@ func TestTxInvalidCredential(t *testing.T) {
 func TestTxInvalidUnsignedTx(t *testing.T) {
 	ctx := NewContext(t)
 	c := setupCodec()
-	c.RegisterType(&avax.TestVerifiable{})
+	if err := c.RegisterType(&avax.TestVerifiable{}); err != nil {
+		t.Fatal(err)
+	}
 
 	tx := &Tx{
 		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
@@ -146,7 +157,9 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 func TestTxInvalidNumberOfCredentials(t *testing.T) {
 	ctx := NewContext(t)
 	c := setupCodec()
-	c.RegisterType(&avax.TestVerifiable{})
+	if err := c.RegisterType(&avax.TestVerifiable{}); err != nil {
+		t.Fatal(err)
+	}
 
 	tx := &Tx{
 		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{

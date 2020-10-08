@@ -65,7 +65,7 @@ func (auth *Auth) getTokenKey(*jwt.Token) (interface{}, error) {
 // Assumes the header is this form:
 // "Authorization": "Bearer TOKEN.GOES.HERE"
 func getToken(r *http.Request) (string, error) {
-	rawHeader := r.Header.Get("Authorization") // Should be "Bearer AUTH.TOKEN.HERE"
+	rawHeader := r.Header.Get(headerKey) // Should be "Bearer AUTH.TOKEN.HERE"
 	if rawHeader == "" {
 		return "", ErrNoToken
 	}
@@ -184,7 +184,14 @@ func (auth *Auth) WrapHandler(h http.Handler) http.Handler {
 			w.WriteHeader(http.StatusUnauthorized)
 			// Error is intentionally dropped here as there is nothing left to
 			// do with it.
-			_, _ = io.WriteString(w, "couldn't parse auth token. Header \"Authorization\" should be \"Bearer TOKEN.GOES.HERE\"")
+			_, _ = io.WriteString(
+				w,
+				fmt.Sprintf(
+					"couldn't parse auth token. Header \"%s\" should be \"%sTOKEN.GOES.HERE\"",
+					headerKey,
+					headerValStart,
+				),
+			)
 			return
 		}
 

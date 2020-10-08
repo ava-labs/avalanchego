@@ -153,11 +153,12 @@ func (l *Log) log(level Level, format string, args ...interface{}) {
 	}
 
 	if shouldDisplay {
-		if l.config.DisableContextualDisplaying {
+		switch {
+		case l.config.DisableContextualDisplaying:
 			fmt.Println(fmt.Sprintf(format, args...))
-		} else if l.config.DisplayHighlight == Plain {
+		case l.config.DisplayHighlight == Plain:
 			fmt.Print(output)
-		} else {
+		default:
 			fmt.Print(level.Color().Wrap(output))
 		}
 	}

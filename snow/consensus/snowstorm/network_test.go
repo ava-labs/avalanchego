@@ -6,6 +6,8 @@ package snowstorm
 import (
 	"math/rand"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -95,8 +97,11 @@ func (n *Network) Initialize(
 	}
 }
 
-func (n *Network) AddNode(cg Consensus) {
-	cg.Initialize(snow.DefaultContextTest(), n.params)
+func (n *Network) AddNode(cg Consensus) error {
+	n.params.Metrics = prometheus.NewRegistry()
+	if err := cg.Initialize(snow.DefaultContextTest(), n.params); err != nil {
+		return err
+	}
 
 	n.shuffleConsumers()
 
@@ -111,52 +116,61 @@ func (n *Network) AddNode(cg Consensus) {
 		}
 		txs[newTx.ID().Key()] = newTx
 
-		cg.Add(newTx)
+		if err := cg.Add(newTx); err != nil {
+			return err
+		}
 	}
 
 	n.nodeTxs = append(n.nodeTxs, txs)
 	n.nodes = append(n.nodes, cg)
 	n.running = append(n.running, cg)
+
+	return nil
 }
 
 func (n *Network) Finalized() bool {
 	return len(n.running) == 0
 }
 
-func (n *Network) Round() {
-	if len(n.running) > 0 {
-		runningInd := rand.Intn(len(n.running)) // #nosec G404
-		running := n.running[runningInd]
+func (n *Network) Round() error {
+	if len(n.running) == 0 {
+		return nil
+	}
 
-		s := sampler.NewUniform()
-		_ = s.Initialize(uint64(len(n.nodes)))
-		indices, _ := s.Sample(n.params.K)
-		sampledColors := ids.Bag{}
-		sampledColors.SetThreshold(n.params.Alpha)
-		for _, index := range indices {
-			peer := n.nodes[int(index)]
-			peerTxs := n.nodeTxs[int(index)]
+	runningInd := rand.Intn(len(n.running)) // #nosec G404
+	running := n.running[runningInd]
 
-			preferences := peer.Preferences()
-			for _, color := range preferences.List() {
-				sampledColors.Add(color)
-			}
-			for _, tx := range peerTxs {
-				if tx.Status() == choices.Accepted {
-					sampledColors.Add(tx.ID())
-				}
-			}
+	s := sampler.NewUniform()
+	_ = s.Initialize(uint64(len(n.nodes)))
+	indices, _ := s.Sample(n.params.K)
+	sampledColors := ids.Bag{}
+	sampledColors.SetThreshold(n.params.Alpha)
+	for _, index := range indices {
+		peer := n.nodes[int(index)]
+		peerTxs := n.nodeTxs[int(index)]
+
+		preferences := peer.Preferences()
+		for _, color := range preferences.List() {
+			sampledColors.Add(color)
 		}
-
-		running.RecordPoll(sampledColors)
-
-		// If this node has been finalized, remove it from the poller
-		if running.Finalized() {
-			newSize := len(n.running) - 1
-			n.running[runningInd] = n.running[newSize]
-			n.running = n.running[:newSize]
+		for _, tx := range peerTxs {
+			if tx.Status() == choices.Accepted {
+				sampledColors.Add(tx.ID())
+			}
 		}
 	}
+
+	if _, err := running.RecordPoll(sampledColors); err != nil {
+		return err
+	}
+
+	// If this node has been finalized, remove it from the poller
+	if running.Finalized() {
+		newSize := len(n.running) - 1
+		n.running[runningInd] = n.running[newSize]
+		n.running = n.running[:newSize]
+	}
+	return nil
 }
 
 func (n *Network) Disagreement() bool {

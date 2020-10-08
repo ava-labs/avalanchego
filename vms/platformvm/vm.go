@@ -32,19 +32,21 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/core"
+	"github.com/ava-labs/avalanchego/vms/components/state"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
+	// TODO: remove skipped values on the next DB migration
 	// For putting/getting values from state
 	validatorsTypeID uint64 = iota
 	chainsTypeID
-	blockTypeID
+	_
 	subnetsTypeID
 	utxoTypeID
-	utxoSetTypeID
+	_
 	txTypeID
 	statusTypeID
 	currentSupplyTypeID
@@ -717,7 +719,6 @@ func (vm *VM) Disconnected(vdrID ids.ShortID) {
 	if err := vm.DB.Commit(); err != nil {
 		vm.Ctx.Log.Error("failed to commit database changes")
 	}
-	return
 }
 
 // Returns the time when the next staker of any subnet starts/stops staking
@@ -1032,8 +1033,8 @@ func (vm *VM) Logger() logging.Logger { return vm.Ctx.Log }
 func (vm *VM) GetAtomicUTXOs(
 	chainID ids.ID,
 	addrs ids.ShortSet,
-	startAddr ids.ShortID,
-	startUTXOID ids.ID,
+	startAddr state.Marshaller,
+	startUTXOID state.Marshaller,
 	limit int,
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
 	if limit <= 0 || limit > maxUTXOsToFetch {

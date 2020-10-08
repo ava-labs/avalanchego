@@ -36,8 +36,8 @@ func (m *Manager) Dispatch() {
 }
 
 // RegisterChain ...
-func (m *Manager) RegisterChain(ctx *snow.Context, namespace string) {
-	m.benchlist.RegisterChain(ctx, namespace)
+func (m *Manager) RegisterChain(ctx *snow.Context, namespace string) error {
+	return m.benchlist.RegisterChain(ctx, namespace)
 }
 
 // Register request to time out unless Manager.Cancel is called
