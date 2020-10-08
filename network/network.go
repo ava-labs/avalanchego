@@ -1098,7 +1098,7 @@ func (n *network) registerConnection(addr string) (int, error) {
 }
 
 func (n *network) registerConnectionAddress(addr string) (*timer.TimedMeter, error) {
-	id, err := ids.ToID([]byte(addr))
+	id, err := ids.FromString(addr)
 	if err != nil {
 		return nil, err
 	}
