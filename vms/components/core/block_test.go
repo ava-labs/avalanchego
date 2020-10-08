@@ -38,12 +38,16 @@ func TestBlock(t *testing.T) {
 		t.Fatalf("status should be processing but is %s", status)
 	}
 
-	b.Accept()
+	if err := b.Accept(); err != nil {
+		t.Fatal(err)
+	}
 	if status := b.Status(); status != choices.Accepted {
 		t.Fatalf("status should be accepted but is %s", status)
 	}
 
-	b.Reject()
+	if err := b.Reject(); err != nil {
+		t.Fatal(err)
+	}
 	if status := b.Status(); status != choices.Rejected {
 		t.Fatalf("status should be rejected but is %s", status)
 	}

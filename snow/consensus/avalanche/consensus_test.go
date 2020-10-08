@@ -58,21 +58,27 @@ func MetricsTest(t *testing.T, factory Factory) {
 		avl := factory.New()
 		params := Parameters{
 			Parameters: snowball.Parameters{
-				Namespace:    fmt.Sprintf("%s_%s", constants.PlatformName, ctx.ChainID),
-				Metrics:      prometheus.NewRegistry(),
-				K:            2,
-				Alpha:        2,
-				BetaVirtuous: 1,
-				BetaRogue:    2,
+				Namespace:         fmt.Sprintf("%s_%s", constants.PlatformName, ctx.ChainID),
+				Metrics:           prometheus.NewRegistry(),
+				K:                 2,
+				Alpha:             2,
+				BetaVirtuous:      1,
+				BetaRogue:         2,
+				ConcurrentRepolls: 1,
 			},
 			Parents:   2,
 			BatchSize: 1,
 		}
-		params.Metrics.Register(prometheus.NewGauge(prometheus.GaugeOpts{
+		err := params.Metrics.Register(prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: params.Namespace,
 			Name:      "vtx_processing",
 		}))
-		avl.Initialize(ctx, params, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := avl.Initialize(ctx, params, nil); err == nil {
+			t.Fatalf("should have failed due to registering a duplicated statistic")
+		}
 	}
 	{
 		avl := factory.New()
@@ -88,11 +94,16 @@ func MetricsTest(t *testing.T, factory Factory) {
 			Parents:   2,
 			BatchSize: 1,
 		}
-		params.Metrics.Register(prometheus.NewGauge(prometheus.GaugeOpts{
+		err := params.Metrics.Register(prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: params.Namespace,
 			Name:      "vtx_accepted",
 		}))
-		avl.Initialize(ctx, params, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := avl.Initialize(ctx, params, nil); err == nil {
+			t.Fatalf("should have failed due to registering a duplicated statistic")
+		}
 	}
 	{
 		avl := factory.New()
@@ -108,11 +119,16 @@ func MetricsTest(t *testing.T, factory Factory) {
 			Parents:   2,
 			BatchSize: 1,
 		}
-		params.Metrics.Register(prometheus.NewGauge(prometheus.GaugeOpts{
+		err := params.Metrics.Register(prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: params.Namespace,
 			Name:      "vtx_rejected",
 		}))
-		avl.Initialize(ctx, params, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := avl.Initialize(ctx, params, nil); err == nil {
+			t.Fatalf("should have failed due to registering a duplicated statistic")
+		}
 	}
 }
 
@@ -411,7 +427,10 @@ func VirtuousTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	virtuous := avl.Virtuous()
 	switch {
@@ -562,7 +581,10 @@ func VirtuousSkippedUpdateTest(t *testing.T, factory Factory) {
 		ids.GenerateTestID(),
 	}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	virtuous := avl.Virtuous()
 	switch {
@@ -654,7 +676,10 @@ func VotingTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -698,7 +723,7 @@ func VotingTest(t *testing.T, factory Factory) {
 	sm.Add(0, vtx1.IDV)
 	sm.Add(1, vtx1.IDV)
 
-	err := avl.RecordPoll(sm)
+	err = avl.RecordPoll(sm)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -835,7 +860,10 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -891,7 +919,7 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 	sm1.Add(0, vtx0.IDV)
 	sm1.Add(1, vtx2.IDV)
 
-	err := avl.RecordPoll(sm1)
+	err = avl.RecordPoll(sm1)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -949,7 +977,10 @@ func SplitVotingTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -987,7 +1018,7 @@ func SplitVotingTest(t *testing.T, factory Factory) {
 	sm1.Add(0, vtx0.IDV) // peer 0 votes for the tx though vtx0
 	sm1.Add(1, vtx1.IDV) // peer 1 votes for the tx though vtx1
 
-	err := avl.RecordPoll(sm1)
+	err = avl.RecordPoll(sm1)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -1027,7 +1058,10 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1089,7 +1123,7 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 	sm.Add(0, vtx1.IDV)
 	sm.Add(1, vtx1.IDV)
 
-	err := avl.RecordPoll(sm)
+	err = avl.RecordPoll(sm)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -1159,7 +1193,10 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	virtuous := avl.Virtuous()
 	switch {
@@ -1209,7 +1246,7 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 		t.Fatalf("Should be virtuous.")
 	}
 
-	err := avl.Add(vtx0)
+	err = avl.Add(vtx0)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -1257,7 +1294,10 @@ func QuiesceTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1357,7 +1397,10 @@ func OrphansTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1452,7 +1495,10 @@ func ErrorOnVacuousAcceptTest(t *testing.T, factory Factory) {
 		StatusV: choices.Accepted,
 	}}}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1496,7 +1542,10 @@ func ErrorOnTxAcceptTest(t *testing.T, factory Factory) {
 	}}}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1547,7 +1596,10 @@ func ErrorOnVtxAcceptTest(t *testing.T, factory Factory) {
 	}}}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1598,7 +1650,10 @@ func ErrorOnVtxRejectTest(t *testing.T, factory Factory) {
 	}}}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1667,7 +1722,10 @@ func ErrorOnParentVtxRejectTest(t *testing.T, factory Factory) {
 	}}}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1748,7 +1806,10 @@ func ErrorOnTransitiveVtxRejectTest(t *testing.T, factory Factory) {
 	}}}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),

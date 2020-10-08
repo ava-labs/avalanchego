@@ -67,7 +67,9 @@ func TestMultiLevelQueueSendsMessages(t *testing.T) {
 		vdrList = append(vdrList, vdr)
 	}
 
-	vdrs.Set(vdrList)
+	if err := vdrs.Set(vdrList); err != nil {
+		t.Fatal(err)
+	}
 	queue.EndInterval()
 
 	for _, msg := range messages {
@@ -111,7 +113,9 @@ func TestExtraMessageDeadlock(t *testing.T) {
 		vdrList = append(vdrList, vdr)
 	}
 
-	vdrs.Set(vdrList)
+	if err := vdrs.Set(vdrList); err != nil {
+		t.Fatal(err)
+	}
 	queue.EndInterval()
 
 	// Test messages are dropped when full to avoid blocking when
@@ -140,13 +144,18 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 	vdrs := validators.NewSet()
 	validator1 := validators.GenerateRandomValidator(2000)
 	validator2 := validators.GenerateRandomValidator(2000)
-	vdrs.Set([]validators.Validator{
+
+	if err := vdrs.Set([]validators.Validator{
 		validator1,
 		validator2,
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	metrics := &metrics{}
-	metrics.Initialize("", prometheus.NewRegistry())
+	if err := metrics.Initialize("", prometheus.NewRegistry()); err != nil {
+		t.Fatal(err)
+	}
 	// Set tier1 cutoff sufficiently low so that only messages from validators
 	// the message queue has not serviced will be placed on it for the test.
 	tier1 := 0.001
@@ -235,13 +244,18 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 	vdrs := validators.NewSet()
 	vdr0 := validators.GenerateRandomValidator(2000)
 	vdr1 := validators.GenerateRandomValidator(2000)
-	vdrs.Set([]validators.Validator{
+
+	if err := vdrs.Set([]validators.Validator{
 		vdr0,
 		vdr1,
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	metrics := &metrics{}
-	metrics.Initialize("", prometheus.NewRegistry())
+	if err := metrics.Initialize("", prometheus.NewRegistry()); err != nil {
+		t.Fatal(err)
+	}
 	// Set tier1 cutoff sufficiently low so that only messages from validators
 	// the message queue has not serviced will be placed on it for the test.
 	tier1 := 0.001

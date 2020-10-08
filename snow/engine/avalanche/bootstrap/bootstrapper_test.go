@@ -50,7 +50,9 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 	sender.CantGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestShortID()
-	peers.AddWeight(peer, 1)
+	if err := peers.AddWeight(peer, 1); err != nil {
+		t.Fatal(err)
+	}
 
 	vtxBlocker, _ := queue.New(prefixdb.New([]byte("vtx"), db))
 	txBlocker, _ := queue.New(prefixdb.New([]byte("tx"), db))
@@ -154,7 +156,9 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	vm.CantBootstrapping = false
 	vm.CantBootstrapped = false
 
-	bs.ForceAccepted(acceptedIDs)
+	if err := bs.ForceAccepted(acceptedIDs); err != nil {
+		t.Fatal(err)
+	}
 
 	switch {
 	case !*finished:

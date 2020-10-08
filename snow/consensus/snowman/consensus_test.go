@@ -72,7 +72,9 @@ func InitializeTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 	}
 
-	sm.Initialize(ctx, params, GenesisID)
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
 
 	if p := sm.Parameters(); p != params {
 		t.Fatalf("Wrong returned parameters")
@@ -96,7 +98,9 @@ func AddToTailTest(t *testing.T, factory Factory) {
 		BetaRogue:         5,
 		ConcurrentRepolls: 1,
 	}
-	sm.Initialize(ctx, params, GenesisID)
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
 
 	block := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -127,7 +131,9 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 		BetaRogue:         5,
 		ConcurrentRepolls: 1,
 	}
-	sm.Initialize(ctx, params, GenesisID)
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
 
 	firstBlock := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -174,7 +180,9 @@ func AddToUnknownTest(t *testing.T, factory Factory) {
 		BetaRogue:         5,
 		ConcurrentRepolls: 1,
 	}
-	sm.Initialize(ctx, params, GenesisID)
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
 
 	parent := &TestBlock{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(1),
@@ -212,7 +220,9 @@ func IssuedPreviouslyAcceptedTest(t *testing.T, factory Factory) {
 		BetaRogue:         5,
 		ConcurrentRepolls: 1,
 	}
-	sm.Initialize(ctx, params, GenesisID)
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
 
 	if !sm.Issued(Genesis) {
 		t.Fatalf("Should have marked an accepted block as having been issued")
@@ -231,7 +241,9 @@ func IssuedPreviouslyRejectedTest(t *testing.T, factory Factory) {
 		BetaRogue:         5,
 		ConcurrentRepolls: 1,
 	}
-	sm.Initialize(ctx, params, GenesisID)
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
 
 	block := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -258,7 +270,9 @@ func IssuedUnissuedTest(t *testing.T, factory Factory) {
 		BetaRogue:         5,
 		ConcurrentRepolls: 1,
 	}
-	sm.Initialize(ctx, params, GenesisID)
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
 
 	block := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -285,7 +299,9 @@ func IssuedIssuedTest(t *testing.T, factory Factory) {
 		BetaRogue:         5,
 		ConcurrentRepolls: 1,
 	}
-	sm.Initialize(ctx, params, GenesisID)
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
 
 	block := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -314,7 +330,9 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 		BetaRogue:         3,
 		ConcurrentRepolls: 1,
 	}
-	sm.Initialize(ctx, params, GenesisID)
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
 
 	block := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -361,7 +379,9 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	sm.Initialize(ctx, params, GenesisID)
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
 
 	firstBlock := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -422,7 +442,9 @@ func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	sm.Initialize(ctx, params, GenesisID)
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
 
 	votes := ids.Bag{}
 	votes.Add(GenesisID)
@@ -447,7 +469,9 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	sm.Initialize(ctx, params, GenesisID)
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
 
 	block0 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -522,7 +546,9 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	sm.Initialize(ctx, params, GenesisID)
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
 
 	block0 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -632,7 +658,9 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	sm.Initialize(ctx, params, GenesisID)
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
 
 	block := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -678,7 +706,9 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	sm.Initialize(ctx, params, GenesisID)
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
 
 	block0 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -815,7 +845,9 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	sm.Initialize(ctx, params, GenesisID)
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
 
 	block0 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -904,26 +936,8 @@ func MetricsProcessingErrorTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	sm.Initialize(ctx, params, GenesisID)
-
-	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis,
-	}
-
-	if err := sm.Add(block); err != nil {
-		t.Fatal(err)
-	}
-
-	votes := ids.Bag{}
-	votes.Add(block.ID())
-	if err := sm.RecordPoll(votes); err != nil {
-		t.Fatal(err)
-	} else if !sm.Finalized() {
-		t.Fatalf("Snowman instance didn't finalize")
+	if err := sm.Initialize(ctx, params, GenesisID); err == nil {
+		t.Fatalf("should have errored during initialization due to a duplicate metric")
 	}
 }
 
@@ -950,26 +964,8 @@ func MetricsAcceptedErrorTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	sm.Initialize(ctx, params, GenesisID)
-
-	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis,
-	}
-
-	if err := sm.Add(block); err != nil {
-		t.Fatal(err)
-	}
-
-	votes := ids.Bag{}
-	votes.Add(block.ID())
-	if err := sm.RecordPoll(votes); err != nil {
-		t.Fatal(err)
-	} else if !sm.Finalized() {
-		t.Fatalf("Snowman instance didn't finalize")
+	if err := sm.Initialize(ctx, params, GenesisID); err == nil {
+		t.Fatalf("should have errored during initialization due to a duplicate metric")
 	}
 }
 
@@ -996,26 +992,8 @@ func MetricsRejectedErrorTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	sm.Initialize(ctx, params, GenesisID)
-
-	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis,
-	}
-
-	if err := sm.Add(block); err != nil {
-		t.Fatal(err)
-	}
-
-	votes := ids.Bag{}
-	votes.Add(block.ID())
-	if err := sm.RecordPoll(votes); err != nil {
-		t.Fatal(err)
-	} else if !sm.Finalized() {
-		t.Fatalf("Snowman instance didn't finalize")
+	if err := sm.Initialize(ctx, params, GenesisID); err == nil {
+		t.Fatalf("should have errored during initialization due to a duplicate metric")
 	}
 }
 
@@ -1032,7 +1010,9 @@ func ErrorOnInitialRejectionTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 	}
 
-	sm.Initialize(ctx, params, GenesisID)
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
 
 	rejectedBlock := &TestBlock{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(1),
@@ -1066,7 +1046,9 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 	}
 
-	sm.Initialize(ctx, params, GenesisID)
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
 
 	block := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1101,7 +1083,9 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 	}
 
-	sm.Initialize(ctx, params, GenesisID)
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
 
 	block0 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1145,7 +1129,9 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 	}
 
-	sm.Initialize(ctx, params, GenesisID)
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
 
 	block0 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1203,11 +1189,15 @@ func RandomizedConsistencyTest(t *testing.T, factory Factory) {
 	n.Initialize(params, numColors)
 
 	for i := 0; i < numNodes; i++ {
-		n.AddNode(factory.New())
+		if err := n.AddNode(factory.New()); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	for !n.Finalized() {
-		n.Round()
+		if err := n.Round(); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	if !n.Agreement() {

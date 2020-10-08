@@ -89,19 +89,18 @@ func sampleAddrs(t *testing.T, vm *VM, addrs []ids.ShortID) ([]ids.ShortID, []st
 	}
 
 	numAddrs := 1 + rand.Intn(len(addrs)) // #nosec G404
-	for i := 0; i < numAddrs; i++ {
-		indices, err := sampler.Sample(1)
-		if err != nil {
-			t.Fatal(err)
-		} else if len(indices) != 1 {
-			t.Fatal("should have gotten only 1 index")
-		}
-		addr := addrs[indices[0]]
-		sampledAddrs = append(sampledAddrs, addr)
+	indices, err := sampler.Sample(numAddrs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, index := range indices {
+		addr := addrs[index]
 		addrStr, err := vm.FormatLocalAddress(addr)
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		sampledAddrs = append(sampledAddrs, addr)
 		sampledAddrsStr = append(sampledAddrsStr, addrStr)
 	}
 	return sampledAddrs, sampledAddrsStr
@@ -153,7 +152,9 @@ func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numT
 func TestServiceIssueTx(t *testing.T) {
 	genesisBytes, vm, s, _ := setup(t)
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -178,7 +179,9 @@ func TestServiceIssueTx(t *testing.T) {
 func TestServiceGetTxStatus(t *testing.T) {
 	genesisBytes, vm, s, _ := setup(t)
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -221,7 +224,9 @@ func TestServiceGetTxStatus(t *testing.T) {
 func TestServiceGetBalance(t *testing.T) {
 	genesisBytes, vm, s, _ := setup(t)
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -247,7 +252,9 @@ func TestServiceGetBalance(t *testing.T) {
 func TestServiceGetAllBalances(t *testing.T) {
 	genesisBytes, vm, s, _ := setup(t)
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -280,7 +287,9 @@ func TestServiceGetAllBalances(t *testing.T) {
 func TestServiceGetTx(t *testing.T) {
 	genesisBytes, vm, s, _ := setup(t)
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -299,7 +308,9 @@ func TestServiceGetTx(t *testing.T) {
 func TestServiceGetNilTx(t *testing.T) {
 	_, vm, s, _ := setup(t)
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -311,7 +322,9 @@ func TestServiceGetNilTx(t *testing.T) {
 func TestServiceGetUnknownTx(t *testing.T) {
 	_, vm, s, _ := setup(t)
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -323,7 +336,9 @@ func TestServiceGetUnknownTx(t *testing.T) {
 func TestServiceGetUTXOs(t *testing.T) {
 	_, vm, s, m := setup(t)
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -585,7 +600,9 @@ func TestServiceGetUTXOs(t *testing.T) {
 func TestGetAssetDescription(t *testing.T) {
 	genesisBytes, vm, s, _ := setup(t)
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -612,7 +629,9 @@ func TestGetAssetDescription(t *testing.T) {
 func TestGetBalance(t *testing.T) {
 	genesisBytes, vm, s, _ := setup(t)
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -641,7 +660,9 @@ func TestGetBalance(t *testing.T) {
 func TestCreateFixedCapAsset(t *testing.T) {
 	_, vm, s, _ := setupWithKeys(t)
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -684,7 +705,9 @@ func TestCreateFixedCapAsset(t *testing.T) {
 func TestCreateVariableCapAsset(t *testing.T) {
 	_, vm, s, _ := setupWithKeys(t)
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -795,15 +818,13 @@ func TestCreateVariableCapAsset(t *testing.T) {
 func TestNFTWorkflow(t *testing.T) {
 	_, vm, s, _ := setupWithKeys(t)
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.ctx.Lock.Unlock()
 	}()
 
 	fromAddrs, fromAddrsStr := sampleAddrs(t, vm, addrs)
-	changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	// Test minting of the created variable cap asset
 	addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
@@ -818,7 +839,7 @@ func TestNFTWorkflow(t *testing.T) {
 				Password: password,
 			},
 			JsonFromAddrs:  api.JsonFromAddrs{From: fromAddrsStr},
-			JsonChangeAddr: api.JsonChangeAddr{ChangeAddr: changeAddrStr},
+			JsonChangeAddr: api.JsonChangeAddr{ChangeAddr: fromAddrsStr[0]},
 		},
 		Name:   "BIG COIN",
 		Symbol: "COIN",
@@ -834,8 +855,8 @@ func TestNFTWorkflow(t *testing.T) {
 	createReply := &AssetIDChangeAddr{}
 	if err := s.CreateNFTAsset(nil, createArgs, createReply); err != nil {
 		t.Fatalf("Failed to mint variable cap asset due to: %s", err)
-	} else if createReply.ChangeAddr != changeAddrStr {
-		t.Fatalf("expected change address to be %s but got %s", changeAddrStr, createReply.ChangeAddr)
+	} else if createReply.ChangeAddr != fromAddrsStr[0] {
+		t.Fatalf("expected change address to be %s but got %s", fromAddrsStr[0], createReply.ChangeAddr)
 	}
 
 	assetID := createReply.AssetID
@@ -849,7 +870,7 @@ func TestNFTWorkflow(t *testing.T) {
 	}
 	if err := createNFTTx.Accept(); err != nil {
 		t.Fatalf("Failed to accept CreateNFT transaction: %s", err)
-	} else if verifyTxFeeDeducted(t, s, fromAddrs, 1); err != nil {
+	} else if err := verifyTxFeeDeducted(t, s, fromAddrs, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -860,7 +881,7 @@ func TestNFTWorkflow(t *testing.T) {
 				Password: password,
 			},
 			JsonFromAddrs:  api.JsonFromAddrs{},
-			JsonChangeAddr: api.JsonChangeAddr{ChangeAddr: changeAddrStr},
+			JsonChangeAddr: api.JsonChangeAddr{ChangeAddr: fromAddrsStr[0]},
 		},
 		AssetID: assetID.String(),
 		Payload: formatting.CB58{Bytes: []byte{1, 2, 3, 4, 5}},
@@ -870,8 +891,8 @@ func TestNFTWorkflow(t *testing.T) {
 
 	if err := s.MintNFT(nil, mintArgs, mintReply); err != nil {
 		t.Fatalf("MintNFT returned an error: %s", err)
-	} else if createReply.ChangeAddr != changeAddrStr {
-		t.Fatalf("expected change address to be %s but got %s", changeAddrStr, mintReply.ChangeAddr)
+	} else if createReply.ChangeAddr != fromAddrsStr[0] {
+		t.Fatalf("expected change address to be %s but got %s", fromAddrsStr[0], mintReply.ChangeAddr)
 	}
 
 	mintNFTTx := UniqueTx{
@@ -894,7 +915,7 @@ func TestNFTWorkflow(t *testing.T) {
 				Password: password,
 			},
 			JsonFromAddrs:  api.JsonFromAddrs{},
-			JsonChangeAddr: api.JsonChangeAddr{ChangeAddr: changeAddrStr},
+			JsonChangeAddr: api.JsonChangeAddr{ChangeAddr: fromAddrsStr[0]},
 		},
 		AssetID: assetID.String(),
 		GroupID: 0,
@@ -903,15 +924,17 @@ func TestNFTWorkflow(t *testing.T) {
 	sendReply := &api.JsonTxIDChangeAddr{}
 	if err := s.SendNFT(nil, sendArgs, sendReply); err != nil {
 		t.Fatalf("Failed to send NFT due to: %s", err)
-	} else if sendReply.ChangeAddr != changeAddrStr {
-		t.Fatalf("expected change address to be %s but got %s", changeAddrStr, sendReply.ChangeAddr)
+	} else if sendReply.ChangeAddr != fromAddrsStr[0] {
+		t.Fatalf("expected change address to be %s but got %s", fromAddrsStr[0], sendReply.ChangeAddr)
 	}
 }
 
 func TestImportExportKey(t *testing.T) {
 	_, vm, s, _ := setup(t)
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -968,7 +991,9 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 	_, vm, s, _ := setup(t)
 	ctx := vm.ctx
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
@@ -1030,7 +1055,9 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 func TestSend(t *testing.T) {
 	genesisBytes, vm, s, _ := setupWithKeys(t)
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1084,7 +1111,9 @@ func TestSend(t *testing.T) {
 func TestSendMultiple(t *testing.T) {
 	genesisBytes, vm, s, _ := setupWithKeys(t)
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1149,7 +1178,9 @@ func TestSendMultiple(t *testing.T) {
 func TestCreateAndListAddresses(t *testing.T) {
 	_, vm, s, _ := setup(t)
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1186,7 +1217,9 @@ func TestCreateAndListAddresses(t *testing.T) {
 func TestImportAVAX(t *testing.T) {
 	genesisBytes, vm, s, m := setupWithKeys(t)
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.ctx.Lock.Unlock()
 	}()
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)

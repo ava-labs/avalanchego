@@ -6,6 +6,7 @@ linters:
   enable:
     - bodyclose
     - deadcode
+    - errcheck
     - goconst
     - gocritic
     - gofmt
@@ -19,7 +20,6 @@ linters:
     - nakedret
     - unconvert
     - varcheck
-    # - errcheck
     # - golint
     # - lll
     # - gocyclo

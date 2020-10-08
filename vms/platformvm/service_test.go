@@ -365,7 +365,12 @@ func TestGetStake(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.Ctx.Lock.Lock()
-	defer func() { service.vm.Shutdown(); service.vm.Ctx.Lock.Unlock() }()
+	defer func() {
+		if err := service.vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		service.vm.Ctx.Lock.Unlock()
+	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis()
@@ -515,7 +520,12 @@ func TestGetCurrentValidators(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.Ctx.Lock.Lock()
-	defer func() { service.vm.Shutdown(); service.vm.Ctx.Lock.Unlock() }()
+	defer func() {
+		if err := service.vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		service.vm.Ctx.Lock.Unlock()
+	}()
 
 	genesis, _ := defaultGenesis()
 

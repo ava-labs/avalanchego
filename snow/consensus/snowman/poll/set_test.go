@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 func TestNewSetErrorOnMetrics(t *testing.T) {
@@ -18,14 +19,23 @@ func TestNewSetErrorOnMetrics(t *testing.T) {
 	namespace := ""
 	registerer := prometheus.NewRegistry()
 
-	registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "polls",
-	}))
-	registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "poll_duration",
-	}))
+	errs := wrappers.Errs{}
+	errs.Add(
+		registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "polls",
+		})),
+		registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "poll_duration",
+		})),
+	)
+	if errs.Errored() {
+		t.Fatal(errs.Err)
+	}
 
-	_ = NewSet(factory, log, namespace, registerer)
+	s := NewSet(factory, log, namespace, registerer)
+	if s == nil {
+		t.Fatalf("shouldn't have failed due to a metrics initialization err")
+	}
 }
 
 func TestCreateAndFinishSuccessfulPoll(t *testing.T) {

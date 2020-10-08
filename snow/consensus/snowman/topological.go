@@ -60,12 +60,12 @@ type votes struct {
 }
 
 // Initialize implements the Snowman interface
-func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters, rootID ids.ID) {
+func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters, rootID ids.ID) error {
 	ts.ctx = ctx
 	ts.params = params
 
 	if err := ts.metrics.Initialize(ctx.Log, params.Namespace, params.Metrics); err != nil {
-		ts.ctx.Log.Error("%s", err)
+		return err
 	}
 
 	ts.head = rootID
@@ -73,6 +73,7 @@ func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters,
 		rootID.Key(): {sm: ts},
 	}
 	ts.tail = rootID
+	return nil
 }
 
 // Parameters implements the Snowman interface

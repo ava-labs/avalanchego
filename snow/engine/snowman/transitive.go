@@ -84,7 +84,9 @@ func (t *Transitive) Initialize(config Config) error {
 func (t *Transitive) finishBootstrapping() error {
 	// initialize consensus to the last accepted blockID
 	lastAcceptedID := t.VM.LastAccepted()
-	t.Consensus.Initialize(t.Ctx, t.Params, lastAcceptedID)
+	if err := t.Consensus.Initialize(t.Ctx, t.Params, lastAcceptedID); err != nil {
+		return err
+	}
 
 	lastAccepted, err := t.VM.GetBlock(lastAcceptedID)
 	if err != nil {

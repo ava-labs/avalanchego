@@ -100,11 +100,16 @@ func MetricsTest(t *testing.T, factory Factory) {
 			BetaRogue:         2,
 			ConcurrentRepolls: 1,
 		}
-		params.Metrics.Register(prometheus.NewCounter(prometheus.CounterOpts{
+		err := params.Metrics.Register(prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tx_processing",
 		}))
+		if err != nil {
+			t.Fatal(err)
+		}
 		graph := factory.New()
-		graph.Initialize(snow.DefaultContextTest(), params)
+		if err := graph.Initialize(snow.DefaultContextTest(), params); err == nil {
+			t.Fatalf("should have errored due to a duplicated metric")
+		}
 	}
 	{
 		params := sbcon.Parameters{
@@ -115,11 +120,16 @@ func MetricsTest(t *testing.T, factory Factory) {
 			BetaRogue:         2,
 			ConcurrentRepolls: 1,
 		}
-		params.Metrics.Register(prometheus.NewCounter(prometheus.CounterOpts{
+		err := params.Metrics.Register(prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tx_accepted",
 		}))
+		if err != nil {
+			t.Fatal(err)
+		}
 		graph := factory.New()
-		graph.Initialize(snow.DefaultContextTest(), params)
+		if err := graph.Initialize(snow.DefaultContextTest(), params); err == nil {
+			t.Fatalf("should have errored due to a duplicated metric")
+		}
 	}
 	{
 		params := sbcon.Parameters{
@@ -130,11 +140,16 @@ func MetricsTest(t *testing.T, factory Factory) {
 			BetaRogue:         2,
 			ConcurrentRepolls: 1,
 		}
-		params.Metrics.Register(prometheus.NewCounter(prometheus.CounterOpts{
+		err := params.Metrics.Register(prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tx_rejected",
 		}))
+		if err != nil {
+			t.Fatal(err)
+		}
 		graph := factory.New()
-		graph.Initialize(snow.DefaultContextTest(), params)
+		if err := graph.Initialize(snow.DefaultContextTest(), params); err == nil {
+			t.Fatalf("should have errored due to a duplicated metric")
+		}
 	}
 }
 
@@ -151,7 +166,10 @@ func ParamsTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if p := graph.Parameters(); p.K != params.K {
 		t.Fatalf("Wrong K parameter")
@@ -177,7 +195,10 @@ func IssuedTest(t *testing.T, factory Factory) {
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if issued := graph.Issued(Red); issued {
 		t.Fatalf("Haven't issued anything yet.")
@@ -207,7 +228,10 @@ func LeftoverInputTest(t *testing.T, factory Factory) {
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if err := graph.Add(Red); err != nil {
 		t.Fatal(err)
@@ -260,7 +284,10 @@ func LowerConfidenceTest(t *testing.T, factory Factory) {
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if err := graph.Add(Red); err != nil {
 		t.Fatal(err)
@@ -315,7 +342,10 @@ func MiddleConfidenceTest(t *testing.T, factory Factory) {
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if err := graph.Add(Red); err != nil {
 		t.Fatal(err)
@@ -375,7 +405,10 @@ func IndependentTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if err := graph.Add(Red); err != nil {
 		t.Fatal(err)
@@ -436,7 +469,10 @@ func VirtuousTest(t *testing.T, factory Factory) {
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if err := graph.Add(Red); err != nil {
 		t.Fatal(err)
@@ -533,7 +569,10 @@ func QuiesceTest(t *testing.T, factory Factory) {
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if !graph.Quiesce() {
 		t.Fatalf("Should quiesce")
@@ -711,7 +750,10 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if err := graph.Add(Red); err != nil {
 		t.Fatal(err)
@@ -854,7 +896,10 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if err := graph.Add(Red); err != nil {
 		t.Fatal(err)
@@ -952,7 +997,10 @@ func VacuouslyAcceptedTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if err := graph.Add(purple); err != nil {
 		t.Fatal(err)
@@ -976,7 +1024,10 @@ func ConflictsTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	conflictInputID := ids.Empty.Prefix(0)
 
@@ -1030,7 +1081,10 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	rogue1 := &TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(0),
@@ -1101,7 +1155,10 @@ func ErrorOnVacuouslyAcceptedTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if err := graph.Add(purple); err == nil {
 		t.Fatalf("Should have errored on acceptance")
@@ -1128,7 +1185,10 @@ func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if err := graph.Add(purple); err != nil {
 		t.Fatal(err)
@@ -1169,7 +1229,10 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if err := graph.Add(purple); err != nil {
 		t.Fatal(err)
@@ -1212,7 +1275,10 @@ func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory)
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if err := graph.Add(pink); err != nil {
 		t.Fatal(err)
@@ -1287,7 +1353,10 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if err := graph.Add(Red); err != nil {
 		t.Fatal(err)
