@@ -39,7 +39,7 @@ func NewOpenDNSResolver() *OpenDNSResolver {
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			d := net.Dialer{
-				Timeout: time.Millisecond * time.Duration(10000),
+				Timeout: 10 * time.Second,
 			}
 			return d.DialContext(ctx, "udp", "resolver1.opendns.com:53")
 		},
