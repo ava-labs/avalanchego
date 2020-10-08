@@ -286,7 +286,8 @@ func init() {
 	Config.DynamicPublicIPResolver = dynamicip.NewResolver(*dynamicPublicIPResolver)
 
 	var ip net.IP
-	if Config.DynamicPublicIPResolver.IsResolver() {
+	switch {
+	case Config.DynamicPublicIPResolver.IsResolver():
 		// User specified to use dynamic IP resolution; don't use NAT traversal
 		Config.Nat = nat.NewNoRouter()
 		ipstr, err := dynamicip.FetchExternalIP(Config.DynamicPublicIPResolver)
@@ -299,7 +300,7 @@ func init() {
 			errs.Add(fmt.Errorf("failed to parse dynamic ip address: %w", err))
 			return
 		}
-	} else if *consensusIP == "" {
+	case *consensusIP == "":
 		// User didn't specift a public IP to use; try with NAT traversal
 		Config.AttemptedNATTraversal = true
 		Config.Nat = nat.GetRouter()
@@ -307,7 +308,7 @@ func init() {
 		if err != nil {
 			ip = net.IPv4zero // Couldn't get my IP...set to 0.0.0.0
 		}
-	} else {
+	default:
 		// User specified a public IP to use; don't use NAT
 		Config.Nat = nat.NewNoRouter()
 		ip = net.ParseIP(*consensusIP)
