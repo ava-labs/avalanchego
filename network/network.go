@@ -291,7 +291,7 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 	msg, err := n.b.GetAcceptedFrontier(chainID, requestID, uint64(deadline.Sub(n.clock.Time())))
 	n.log.AssertNoError(err)
 
-	for _, peerelement := range n.getPeers(validatorIDs) {
+	for _, peerelement := range n.getConnectedPeers(validatorIDs) {
 		peer := peerelement.peer
 		exists := peerelement.exists
 		vID := peerelement.id
@@ -354,7 +354,7 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 		return
 	}
 
-	for _, peerelement := range n.getPeers(validatorIDs) {
+	for _, peerelement := range n.getConnectedPeers(validatorIDs) {
 		peer := peerelement.peer
 		exists := peerelement.exists
 		vID := peerelement.id
@@ -535,7 +535,7 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 		return // Packing message failed
 	}
 
-	for _, peerelement := range n.getPeers(validatorIDs) {
+	for _, peerelement := range n.getConnectedPeers(validatorIDs) {
 		peer := peerelement.peer
 		exists := peerelement.exists
 		vID := peerelement.id
@@ -559,7 +559,7 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 	msg, err := n.b.PullQuery(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerID)
 	n.log.AssertNoError(err)
 
-	for _, peerelement := range n.getPeers(validatorIDs) {
+	for _, peerelement := range n.getConnectedPeers(validatorIDs) {
 		peer := peerelement.peer
 		exists := peerelement.exists
 		vID := peerelement.id
@@ -1085,7 +1085,7 @@ type PeerElement struct {
 	id     ids.ShortID
 }
 
-func (n *network) getPeers(validatorIDs ids.ShortSet) []PeerElement {
+func (n *network) getConnectedPeers(validatorIDs ids.ShortSet) []PeerElement {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
@@ -1094,6 +1094,9 @@ func (n *network) getPeers(validatorIDs ids.ShortSet) []PeerElement {
 		peers := make([]PeerElement, 0, len(vIDS))
 		for _, validatorID := range vIDS {
 			peer, exists := n.peers[validatorID.Key()]
+			if exists && peer.connected.GetValue() {
+				peers = append(peers, PeerElement{peer, exists, validatorID})
+			}
 			peers = append(peers, PeerElement{peer, exists, validatorID})
 		}
 		return peers
