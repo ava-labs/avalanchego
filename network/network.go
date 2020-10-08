@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -1087,6 +1088,10 @@ func (n *network) closeConnection(conn net.Conn) {
 }
 
 func (n *network) registerConnection(addr string) (int, error) {
+	portIndex := strings.LastIndex(addr, ":")
+	if portIndex != -1 {
+		addr = addr[:portIndex]
+	}
 	meter, err := n.registerConnectionAddress(addr)
 	if err != nil {
 		return 0, err
