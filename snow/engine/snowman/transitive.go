@@ -208,6 +208,8 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkByt
 		// abandon the request.
 		return t.GetFailed(vdr, requestID)
 	}
+	// Remove any outstanding requests for this block
+	t.blkReqs.RemoveAny(blkID)
 
 	// issue the block into consensus. If the block has already been issued,
 	// this will be a noop. If this block has missing dependencies, vdr will
@@ -287,6 +289,8 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, 
 		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes{Bytes: blkBytes})
 		return nil
 	}
+	// Remove any outstanding requests for this block
+	t.blkReqs.RemoveAny(blkID)
 
 	// issue the block into consensus. If the block has already been issued,
 	// this will be a noop. If this block has missing dependencies, vdr will
