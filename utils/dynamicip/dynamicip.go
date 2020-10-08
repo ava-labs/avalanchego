@@ -14,13 +14,20 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-type DynamicResolver interface {
+var (
+	errOpenDNSNoIP = errors.New("opendns returned no ip")
+)
+
+// Resolver resolves our public IP
+type Resolver interface {
+	// Resolve our public IP
 	Resolve() (string, error)
+	// If false, Resolve always returns an error
 	IsResolver() bool
 }
 
-type NoResolver struct {
-}
+// NoResolver doesn't resolve our public IP address
+type NoResolver struct{}
 
 func (r *NoResolver) IsResolver() bool {
 	return false
@@ -30,6 +37,7 @@ func (r *NoResolver) Resolve() (string, error) {
 	return "", errors.New("invalid resolver")
 }
 
+// IFConfigResolves resolves our public IP using openDNS
 type OpenDNSResolver struct {
 	*net.Resolver
 }
@@ -56,13 +64,13 @@ func (r *OpenDNSResolver) Resolve() (string, error) {
 		return "", err
 	}
 	if len(ip) == 0 {
-		return "", errors.New(fmt.Sprintf("opendns returned no ip"))
+		return "", errOpenDNSNoIP
 	}
 	return ip[0], nil
 }
 
-type IFConfigResolver struct {
-}
+// IFConfigResolves resolves our public IP using website ifconfig.co
+type IFConfigResolver struct{}
 
 func (r *IFConfigResolver) IsResolver() bool {
 	return true
@@ -77,7 +85,7 @@ func (r *IFConfigResolver) Resolve() (string, error) {
 	defer resp.Body.Close()
 	ip, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read response from ifconfig: %w", err)
 	}
 	ipstr := string(ip)
 	ipstr = strings.Replace(ipstr, "\r\n", "", -1)
@@ -86,7 +94,7 @@ func (r *IFConfigResolver) Resolve() (string, error) {
 	return ipstr, nil
 }
 
-func NewDynamicResolver(opt string) DynamicResolver {
+func NewResolver(opt string) Resolver {
 	switch opt {
 	case "opendns":
 		return NewOpenDNSResolver()
@@ -97,46 +105,49 @@ func NewDynamicResolver(opt string) DynamicResolver {
 	}
 }
 
-func FetchExternalIP(dynamicResolver DynamicResolver) (string, error) {
-	return dynamicResolver.Resolve()
+func FetchExternalIP(resolver Resolver) (string, error) {
+	return resolver.Resolve()
 }
 
 type DynamicIPManager interface {
 	Stop()
 }
 
-type NoDynamicIP struct {
-}
+type NoDynamicIP struct{}
 
-func (noDynamicIP *NoDynamicIP) Stop() {
-}
+func (noDynamicIP *NoDynamicIP) Stop() {}
 
-type DynamicIP struct {
-	tickerCloser    chan struct{}
-	log             logging.Logger
-	ip              *utils.DynamicIPDesc
-	updateTimeout   time.Duration
-	dynamicResolver DynamicResolver
-}
-
-func NewDynamicIPManager(dynamicResolver DynamicResolver, updateTimeout time.Duration, log logging.Logger, ip *utils.DynamicIPDesc) DynamicIPManager {
-	if dynamicResolver.IsResolver() {
+// Returns a new dynamic IP that resolves and updates [ip] to our public IP every [updateTimeout].
+// Uses [dynamicResolver] to resolve our public ip.
+// Stops updating when Stop() is called.
+func NewDynamicIPManager(resolver Resolver, updateTimeout time.Duration, log logging.Logger, ip *utils.DynamicIPDesc) DynamicIPManager {
+	if resolver.IsResolver() {
 		updater := &DynamicIP{
-			tickerCloser:    make(chan struct{}),
-			log:             log,
-			ip:              ip,
-			updateTimeout:   updateTimeout,
-			dynamicResolver: dynamicResolver}
+			DynamicIPDesc: ip,
+			tickerCloser:  make(chan struct{}),
+			log:           log,
+			updateTimeout: updateTimeout,
+			resolver:      resolver}
 		go updater.UpdateExternalIP()
 		return updater
 	}
 	return &NoDynamicIP{}
 }
 
+// DynamicIP is an IP address that gets periodically updated to our public IP
+type DynamicIP struct {
+	*utils.DynamicIPDesc
+	tickerCloser  chan struct{}
+	log           logging.Logger
+	updateTimeout time.Duration
+	resolver      Resolver
+}
+
 func (dynamicIP *DynamicIP) Stop() {
 	close(dynamicIP.tickerCloser)
 }
 
+// Update our public IP address in a loop
 func (dynamicIP *DynamicIP) UpdateExternalIP() {
 	timer := time.NewTimer(dynamicIP.updateTimeout)
 	defer timer.Stop()
@@ -144,7 +155,7 @@ func (dynamicIP *DynamicIP) UpdateExternalIP() {
 	for {
 		select {
 		case <-timer.C:
-			dynamicIP.updateIP(dynamicIP.dynamicResolver)
+			dynamicIP.update(dynamicIP.resolver)
 			timer.Reset(dynamicIP.updateTimeout)
 		case <-dynamicIP.tickerCloser:
 			return
@@ -152,8 +163,9 @@ func (dynamicIP *DynamicIP) UpdateExternalIP() {
 	}
 }
 
-func (dynamicIP *DynamicIP) updateIP(dynamicResolver DynamicResolver) {
-	ipstr, err := FetchExternalIP(dynamicResolver)
+// Fetch and update our public IP address
+func (dynamicIP *DynamicIP) update(resolver Resolver) {
+	ipstr, err := FetchExternalIP(resolver)
 	if err != nil {
 		dynamicIP.log.Warn("Fetch external IP failed %s", err)
 		return
@@ -163,8 +175,8 @@ func (dynamicIP *DynamicIP) updateIP(dynamicResolver DynamicResolver) {
 		dynamicIP.log.Warn("Fetched external IP failed to parse %s", ipstr)
 		return
 	}
-	oldIp := dynamicIP.ip.Ip().IP
-	dynamicIP.ip.UpdateIP(newIp)
+	oldIp := dynamicIP.Ip().IP
+	dynamicIP.UpdateIP(newIp)
 	if !oldIp.Equal(newIp) {
 		dynamicIP.log.Info("ExternalIP updated to %s", newIp)
 	}
