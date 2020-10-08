@@ -139,6 +139,14 @@ func (ab *AtomicBlock) Accept() error {
 	return nil
 }
 
+// Reject implements the snowman.Block interface
+func (ab *AtomicBlock) Reject() error {
+	if err := ab.vm.mempool.IssueTx(&ab.Tx); err != nil {
+		ab.vm.Ctx.Log.Debug("failed to reissue tx %q due to: %s", ab.Tx.ID(), err)
+	}
+	return ab.CommonDecisionBlock.Reject()
+}
+
 // newAtomicBlock returns a new *AtomicBlock where the block's parent, a
 // decision block, has ID [parentID].
 func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx Tx) (*AtomicBlock, error) {

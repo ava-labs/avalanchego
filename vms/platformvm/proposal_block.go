@@ -43,6 +43,14 @@ func (pb *ProposalBlock) Accept() error {
 	return nil
 }
 
+// Reject implements the snowman.Block interface
+func (pb *ProposalBlock) Reject() error {
+	if err := pb.vm.mempool.IssueTx(&pb.Tx); err != nil {
+		pb.vm.Ctx.Log.Verbo("failed to reissue tx %q due to: %s", pb.Tx.ID(), err)
+	}
+	return pb.CommonBlock.Reject()
+}
+
 // Initialize this block.
 // Sets [pb.vm] to [vm] and populates non-serialized fields
 // This method should be called when a block is unmarshaled from bytes

@@ -62,8 +62,13 @@ message Request {
     ConnectionState tls = 16;
 }
 
+message ResponseWriter {
+    uint32 id = 1; // server ID
+    repeated Element header = 2;
+}
+
 message HTTPRequest {
-    uint32 responseWriter = 1; // server ID
+    ResponseWriter responseWriter = 1;
     Request request = 2;
 }
 

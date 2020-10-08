@@ -197,7 +197,7 @@ func TestGetTxStatus(t *testing.T) {
 	} else if status != Unknown {
 		t.Fatalf("status should be unknown but is %s", status)
 		// put the chain in existing chain list
-	} else if err := service.vm.issueTx(tx); err != nil {
+	} else if err := service.vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
 	} else if err := service.vm.putChains(service.vm.DB, []*Tx{tx}); err != nil {
 		t.Fatal(err)
@@ -210,7 +210,7 @@ func TestGetTxStatus(t *testing.T) {
 		// remove the chain from existing chain list
 	} else if err := service.vm.putChains(service.vm.DB, []*Tx{}); err != nil {
 		t.Fatal(err)
-	} else if err := service.vm.issueTx(tx); err != nil {
+	} else if err := service.vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
 	} else if block, err := service.vm.BuildBlock(); err != nil {
 		t.Fatal(err)
@@ -264,8 +264,8 @@ func TestGetTx(t *testing.T) {
 			func() (*Tx, error) {
 				return service.vm.newAddValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.minValidatorStake,
-					uint64(service.vm.clock.Time().Add(Delta).Unix()),
-					uint64(service.vm.clock.Time().Add(Delta).Add(defaultMinStakingDuration).Unix()),
+					uint64(service.vm.clock.Time().Add(syncBound).Unix()),
+					uint64(service.vm.clock.Time().Add(syncBound).Add(defaultMinStakingDuration).Unix()),
 					ids.GenerateTestShortID(),
 					ids.GenerateTestShortID(),
 					0,
@@ -297,7 +297,7 @@ func TestGetTx(t *testing.T) {
 		var response GetTxResponse
 		if err := service.GetTx(nil, arg, &response); err == nil {
 			t.Fatalf("failed test '%s': haven't issued tx yet so shouldn't be able to get it", test.description)
-		} else if err := service.vm.issueTx(tx); err != nil {
+		} else if err := service.vm.mempool.IssueTx(tx); err != nil {
 			t.Fatalf("failed test '%s': %s", test.description, err)
 		} else if block, err := service.vm.BuildBlock(); err != nil {
 			t.Fatalf("failed test '%s': %s", test.description, err)

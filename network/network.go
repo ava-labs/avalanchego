@@ -52,9 +52,8 @@ const (
 )
 
 var (
-	errNetworkClosed        = errors.New("network closed")
-	errPeerIsMyself         = errors.New("peer is myself")
-	errDuplicatedConnection = errors.New("duplicated connection")
+	errNetworkClosed = errors.New("network closed")
+	errPeerIsMyself  = errors.New("peer is myself")
 )
 
 func init() { rand.Seed(time.Now().UnixNano()) }
@@ -1013,7 +1012,7 @@ func (n *network) tryAddPeer(p *peer) error {
 			delete(n.disconnectedIPs, str)
 			delete(n.retryDelay, str)
 		}
-		return errDuplicatedConnection
+		return fmt.Errorf("duplicated connection from %s at %s", p.id.PrefixedString(constants.NodeIDPrefix), p.ip)
 	}
 
 	n.peers[key] = p

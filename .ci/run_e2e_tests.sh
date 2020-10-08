@@ -2,7 +2,8 @@ SCRIPTS_PATH=$(cd $(dirname "${BASH_SOURCE[0]}"); pwd)
 SRC_PATH=$(dirname "${SCRIPTS_PATH}")
 # Build the runnable Avalanche docker image
 bash "${SRC_PATH}"/scripts/build_image.sh
-AVALANCHE_IMAGE=$(docker image ls --format="{{.Repository}}" | head -n 1)
+AVALANCHE_IMAGE=$(docker image ls --format="{{.Repository}}:{{.Tag}}" | head -n 1)
+echo "Using Avalanche Image: $AVALANCHE_IMAGE"
 
 DOCKER_REPO="avaplatform"
 

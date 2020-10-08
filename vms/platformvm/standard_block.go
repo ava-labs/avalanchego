@@ -103,6 +103,16 @@ func (sb *StandardBlock) Verify() error {
 	return nil
 }
 
+// Reject implements the snowman.Block interface
+func (sb *StandardBlock) Reject() error {
+	for _, tx := range sb.Txs {
+		if err := sb.vm.mempool.IssueTx(tx); err != nil {
+			sb.vm.Ctx.Log.Debug("failed to reissue tx %q due to: %s", tx.ID(), err)
+		}
+	}
+	return sb.SingleDecisionBlock.Reject()
+}
+
 // newStandardBlock returns a new *StandardBlock where the block's parent, a
 // decision block, has ID [parentID].
 func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*Tx) (*StandardBlock, error) {
