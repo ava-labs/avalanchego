@@ -117,8 +117,10 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		}
 	}
 
-	nodeID := ids.ShortID{}
-	startTime := time.Time{}
+	var (
+		nodeID    ids.ShortID
+		startTime time.Time
+	)
 	switch uStakerTx := stakerTx.Tx.UnsignedTx.(type) {
 	case *UnsignedAddValidatorTx:
 		// Refund the stake here

@@ -8,6 +8,8 @@ import (
 	"math"
 	"reflect"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // The below structs and interfaces exist
@@ -91,8 +93,14 @@ func TestStruct(t *testing.T) {
 	}
 
 	codec := NewDefault()
-	codec.RegisterType(&MyInnerStruct{}) // Register the types that may be unmarshaled into interfaces
-	codec.RegisterType(&MyInnerStruct2{})
+	errs := wrappers.Errs{}
+	errs.Add(
+		codec.RegisterType(&MyInnerStruct{}), // Register the types that may be unmarshaled into interfaces
+		codec.RegisterType(&MyInnerStruct2{}),
+	)
+	if errs.Errored() {
+		t.Fatal(errs.Err)
+	}
 
 	myStructBytes, err := codec.Marshal(myStructInstance)
 	if err != nil {
@@ -258,7 +266,9 @@ func TestSliceOfStruct(t *testing.T) {
 		},
 	}
 	codec := NewDefault()
-	codec.RegisterType(&MyInnerStruct{})
+	if err := codec.RegisterType(&MyInnerStruct{}); err != nil {
+		t.Fatal(err)
+	}
 	bytes, err := codec.Marshal(mySlice)
 	if err != nil {
 		t.Fatal(err)
@@ -277,7 +287,9 @@ func TestSliceOfStruct(t *testing.T) {
 // Test marshalling an interface
 func TestInterface(t *testing.T) {
 	codec := NewDefault()
-	codec.RegisterType(&MyInnerStruct2{})
+	if err := codec.RegisterType(&MyInnerStruct2{}); err != nil {
+		t.Fatal(err)
+	}
 
 	var f Foo = &MyInnerStruct2{true}
 	bytes, err := codec.Marshal(&f)
@@ -307,7 +319,9 @@ func TestSliceOfInterface(t *testing.T) {
 		},
 	}
 	codec := NewDefault()
-	codec.RegisterType(&MyInnerStruct{})
+	if err := codec.RegisterType(&MyInnerStruct{}); err != nil {
+		t.Fatal(err)
+	}
 	bytes, err := codec.Marshal(mySlice)
 	if err != nil {
 		t.Fatal(err)
@@ -334,7 +348,9 @@ func TestArrayOfInterface(t *testing.T) {
 		},
 	}
 	codec := NewDefault()
-	codec.RegisterType(&MyInnerStruct{})
+	if err := codec.RegisterType(&MyInnerStruct{}); err != nil {
+		t.Fatal(err)
+	}
 	bytes, err := codec.Marshal(myArray)
 	if err != nil {
 		t.Fatal(err)
@@ -356,7 +372,9 @@ func TestPointerToInterface(t *testing.T) {
 	var myPtr *Foo = &myinnerStruct
 
 	codec := NewDefault()
-	codec.RegisterType(&MyInnerStruct{})
+	if err := codec.RegisterType(&MyInnerStruct{}); err != nil {
+		t.Fatal(err)
+	}
 
 	bytes, err := codec.Marshal(&myPtr)
 	if err != nil {
@@ -631,8 +649,12 @@ type innerNoInterface struct{}
 func TestUnmarshalInvalidInterface(t *testing.T) {
 	codec := NewDefault()
 
-	codec.RegisterType(&innerInterface{})
-	codec.RegisterType(&innerNoInterface{})
+	if err := codec.RegisterType(&innerInterface{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := codec.RegisterType(&innerNoInterface{}); err != nil {
+		t.Fatal(err)
+	}
 
 	{
 		bytes := []byte{0, 0, 0, 0, 0, 0}

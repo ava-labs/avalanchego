@@ -15,6 +15,11 @@ import (
 	"github.com/gorilla/rpc/v2/json2"
 )
 
+const (
+	// Null is the string representation of a null value
+	Null = "null"
+)
+
 var (
 	errUppercaseMethod = errors.New("method must start with a non-uppercase letter")
 )
@@ -48,7 +53,7 @@ func (r *request) Method() (string, error) {
 		return method, errUppercaseMethod
 	}
 	uppercaseRune := string(unicode.ToUpper(firstRune))
-	return fmt.Sprintf("%s.%s%s", class, string(uppercaseRune), function[runeLen:]), nil
+	return fmt.Sprintf("%s.%s%s", class, uppercaseRune, function[runeLen:]), nil
 }
 
 func (r *request) ReadRequest(args interface{}) error {

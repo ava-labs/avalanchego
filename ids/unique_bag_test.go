@@ -40,11 +40,12 @@ func TestUniqueBag(t *testing.T) {
 
 	bs1.Clear()
 	bs1 = ub3.GetSet(id1)
-	if bs1.Len() != 2 {
+	switch {
+	case bs1.Len() != 2:
 		t.Fatalf("Incorrect length of set")
-	} else if !bs1.Contains(2) {
+	case !bs1.Contains(2):
 		t.Fatalf("Set missing element")
-	} else if !bs1.Contains(4) {
+	case !bs1.Contains(4):
 		t.Fatalf("Set missing element")
 	}
 
@@ -68,11 +69,12 @@ func TestUniqueBag(t *testing.T) {
 	}
 
 	ub4id1 := ub4.GetSet(id1)
-	if ub4id1.Len() != 2 {
+	switch {
+	case ub4id1.Len() != 2:
 		t.Fatalf("Set of Unique Bag has incorrect length")
-	} else if !ub4id1.Contains(1) {
+	case !ub4id1.Contains(1):
 		t.Fatalf("Set of Unique Bag missing element")
-	} else if !ub4id1.Contains(2) {
+	case !ub4id1.Contains(2):
 		t.Fatalf("Set of Unique Bag missing element")
 	}
 

@@ -183,7 +183,7 @@ func (tm *AdaptiveTimeoutManager) remove(id ids.ID, currentTime time.Time) {
 		// This request is being removed because it finished successfully.
 		if timeout.duration <= tm.currentTimeout {
 			// If the current timeout duration is greater than or equal to the
-			// timeout that was fullfilled, reduce the timeout.
+			// timeout that was fulfilled, reduce future timeouts.
 			tm.currentTimeout -= tm.timeoutDec
 
 			if tm.currentTimeout < tm.minimumTimeout {

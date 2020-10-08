@@ -89,7 +89,7 @@ func (vm *VM) Initialize(
 
 		// Flush VM's database to underlying db
 		if err := vm.DB.Commit(); err != nil {
-			vm.Ctx.Log.Error("error while commiting db: %v", err)
+			vm.Ctx.Log.Error("error while committing db: %v", err)
 			return err
 		}
 	}
