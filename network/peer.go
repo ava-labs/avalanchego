@@ -148,9 +148,7 @@ func (p *peer) ReadMessages() {
 	for {
 		read, err := p.conn.Read(readBuffer)
 		if err != nil {
-			p.net.stateLock.RLock()
-			p.net.log.Verbo("error on connection read to %s %s %s", p.id, p.ip, err)
-			p.net.stateLock.RUnlock()
+			p.net.log.Verbo("error on connection read to %s %s %s", p.id, p.getIPSafe(), err)
 			return
 		}
 
@@ -227,9 +225,7 @@ func (p *peer) WriteMessages() {
 		for len(msg) > 0 {
 			written, err := p.conn.Write(msg)
 			if err != nil {
-				p.net.stateLock.RLock()
-				p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.ip, err)
-				p.net.stateLock.RUnlock()
+				p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.getIPSafe(), err)
 				return
 			}
 			p.tickerOnce.Do(p.StartTicker)
@@ -795,4 +791,10 @@ func (p *peer) discardMyIP() {
 		p.ip = utils.IPDesc{}
 	}
 	p.Close()
+}
+
+func (p *peer) getIPSafe() utils.IPDesc {
+	p.net.stateLock.RLock()
+	defer p.net.stateLock.RUnlock()
+	return p.ip
 }

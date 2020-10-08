@@ -291,7 +291,7 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 	msg, err := n.b.GetAcceptedFrontier(chainID, requestID, uint64(deadline.Sub(n.clock.Time())))
 	n.log.AssertNoError(err)
 
-	for _, peerelement := range n.getConnectedPeers(validatorIDs) {
+	for _, peerelement := range n.getPeers(validatorIDs) {
 		peer := peerelement.peer
 		exists := peerelement.exists
 		vID := peerelement.id
@@ -354,7 +354,7 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 		return
 	}
 
-	for _, peerelement := range n.getConnectedPeers(validatorIDs) {
+	for _, peerelement := range n.getPeers(validatorIDs) {
 		peer := peerelement.peer
 		exists := peerelement.exists
 		vID := peerelement.id
@@ -535,7 +535,7 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 		return // Packing message failed
 	}
 
-	for _, peerelement := range n.getConnectedPeers(validatorIDs) {
+	for _, peerelement := range n.getPeers(validatorIDs) {
 		peer := peerelement.peer
 		exists := peerelement.exists
 		vID := peerelement.id
@@ -559,7 +559,7 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 	msg, err := n.b.PullQuery(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerID)
 	n.log.AssertNoError(err)
 
-	for _, peerelement := range n.getConnectedPeers(validatorIDs) {
+	for _, peerelement := range n.getPeers(validatorIDs) {
 		peer := peerelement.peer
 		exists := peerelement.exists
 		vID := peerelement.id
@@ -678,16 +678,14 @@ func (n *network) Peers() []PeerID {
 	peers := make([]PeerID, 0, len(allPeers))
 	for _, peer := range allPeers {
 		if peer.connected.GetValue() {
-			n.stateLock.RLock()
 			peers = append(peers, PeerID{
 				IP:           peer.conn.RemoteAddr().String(),
-				PublicIP:     peer.ip.String(),
+				PublicIP:     peer.getIPSafe().String(),
 				ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
 				Version:      peer.versionStr.GetValue().(string),
 				LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 				LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
 			})
-			n.stateLock.RUnlock()
 		}
 	}
 	return peers
@@ -814,8 +812,8 @@ func (n *network) gossip() {
 			continue
 		}
 
-		stakers := []*peer(nil)
-		nonStakers := []*peer(nil)
+		stakers := make([]*peer, 0, len(allPeers))
+		nonStakers := make([]*peer, 0, len(allPeers))
 		for _, peer := range allPeers {
 			peer := peer
 			if n.vdrs.Contains(peer.id) {
@@ -987,10 +985,10 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 // assumes the stateLock is not held. Returns an error if the peer couldn't be
 // added.
 func (n *network) tryAddPeer(p *peer) error {
-	key := p.id.Key()
-
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
+
+	key := p.id.Key()
 
 	if n.closed.GetValue() {
 		// the network is closing, so make sure that no further reconnect
@@ -1039,13 +1037,12 @@ func (n *network) validatorIPs() []utils.IPDesc {
 	allPeers := n.getAllPeers()
 	ips := make([]utils.IPDesc, 0, len(allPeers))
 	for _, peer := range allPeers {
-		n.stateLock.RLock()
+		ip := peer.getIPSafe()
 		if peer.connected.GetValue() &&
-			!peer.ip.IsZero() &&
+			!ip.IsZero() &&
 			n.vdrs.Contains(peer.id) {
-			ips = append(ips, peer.ip)
+			ips = append(ips, ip)
 		}
-		n.stateLock.RUnlock()
 	}
 	return ips
 }
@@ -1100,24 +1097,21 @@ type PeerElement struct {
 	id     ids.ShortID
 }
 
-func (n *network) getConnectedPeers(validatorIDs ids.ShortSet) []PeerElement {
+func (n *network) getPeers(validatorIDs ids.ShortSet) []*PeerElement {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
 	if !n.closed.GetValue() {
 		vIDS := validatorIDs.List()
-		peers := make([]PeerElement, 0, len(vIDS))
+		peers := make([]*PeerElement, 0, len(vIDS))
 		for _, validatorID := range vIDS {
 			peer, exists := n.peers[validatorID.Key()]
-			if exists && peer.connected.GetValue() {
-				peers = append(peers, PeerElement{peer, exists, validatorID})
-			}
-			peers = append(peers, PeerElement{peer, exists, validatorID})
+			peers = append(peers, &PeerElement{peer, exists, validatorID})
 		}
 		return peers
 	}
 
-	return []PeerElement{}
+	return []*PeerElement{}
 }
 
 func (n *network) getAllPeers() []*peer {
@@ -1135,14 +1129,14 @@ func (n *network) getAllPeers() []*peer {
 	return []*peer{}
 }
 
-func (n *network) getPeer(validatorID ids.ShortID) PeerElement {
+func (n *network) getPeer(validatorID ids.ShortID) *PeerElement {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
 	if !n.closed.GetValue() {
-		peer, sent := n.peers[validatorID.Key()]
-		return PeerElement{peer, sent, validatorID}
+		peer, exists := n.peers[validatorID.Key()]
+		return &PeerElement{peer, exists, validatorID}
 	}
 
-	return PeerElement{nil, false, ids.ShortID{}}
+	return nil
 }
