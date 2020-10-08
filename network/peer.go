@@ -21,24 +21,24 @@ type peer struct {
 
 	// if the version message has been received and is valid. is only modified
 	// on the connection's reader routine with the network state lock held.
-	gotVersion bool
+	gotVersion utils.AtomicBool
 
 	// if the gotPeerList message has been received and is valid. is only
 	// modified on the connection's reader routine with the network state lock
 	// held.
-	gotPeerList bool
+	gotPeerList utils.AtomicBool
 
 	// if the version message has been received and is valid and the peerlist
 	// has been returned. is only modified on the connection's reader routine
 	// with the network state lock held.
-	connected bool
+	connected utils.AtomicBool
 
 	// only close the peer once
 	once sync.Once
 
 	// if the close function has been called, is only modifed when the network
 	// state lock held.
-	closed bool
+	closed utils.AtomicBool
 
 	// number of bytes currently in the send queue, is only modifed when the
 	// network state lock held.
@@ -50,6 +50,7 @@ type peer struct {
 
 	// ip may or may not be set when the peer is first started. is only modified
 	// on the connection's reader routine with the network state lock held.
+	// requires network.stateLock to be locked
 	ip utils.IPDesc
 
 	// id should be set when the peer is first started.
@@ -91,9 +92,7 @@ func (p *peer) sendPings() {
 	for {
 		select {
 		case <-sendPingsTicker.C:
-			p.lock.Lock()
-			closed := p.closed
-			p.lock.Unlock()
+			closed := p.closed.GetValue()
 
 			if closed {
 				return
@@ -114,12 +113,10 @@ func (p *peer) requestFinishHandshake() {
 	for {
 		select {
 		case <-finishHandshakeTicker.C:
-			p.lock.Lock()
-			gotVersion := p.gotVersion
-			gotPeerList := p.gotPeerList
-			connected := p.connected
-			closed := p.closed
-			p.lock.Unlock()
+			gotVersion := p.gotVersion.GetValue()
+			gotPeerList := p.gotPeerList.GetValue()
+			connected := p.connected.GetValue()
+			closed := p.closed.GetValue()
 
 			if connected || closed {
 				return
@@ -151,7 +148,9 @@ func (p *peer) ReadMessages() {
 	for {
 		read, err := p.conn.Read(readBuffer)
 		if err != nil {
+			p.net.stateLock.RLock()
 			p.net.log.Verbo("error on connection read to %s %s %s", p.id, p.ip, err)
+			p.net.stateLock.RUnlock()
 			return
 		}
 
@@ -228,7 +227,9 @@ func (p *peer) WriteMessages() {
 		for len(msg) > 0 {
 			written, err := p.conn.Write(msg)
 			if err != nil {
+				p.net.stateLock.RLock()
 				p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.ip, err)
+				p.net.stateLock.RUnlock()
 				return
 			}
 			p.tickerOnce.Do(p.StartTicker)
@@ -244,13 +245,13 @@ func (p *peer) Send(msg Msg) bool {
 }
 
 func (p *peer) send(msg Msg) bool {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	if p.closed {
+	if p.closed.GetValue() {
 		p.net.log.Debug("dropping message to %s due to a closed connection", p.id)
 		return false
 	}
+
+	p.lock.Lock()
+	defer p.lock.Unlock()
 
 	// is it possible to send?
 	if dropMsg := p.dropMessagePeer(); dropMsg {
@@ -326,14 +327,14 @@ func (p *peer) handle(msg Msg) {
 		p.peerList(msg)
 		return
 	}
-	if !p.connected {
+	if !p.connected.GetValue() {
 		p.net.log.Debug("dropping message from %s because the connection hasn't been established yet", p.id)
 
 		// attempt to finish the handshake
-		if !p.gotVersion {
+		if !p.gotVersion.GetValue() {
 			p.GetVersion()
 		}
-		if !p.gotPeerList {
+		if !p.gotPeerList.GetValue() {
 			p.GetPeerList()
 		}
 		return
@@ -386,9 +387,7 @@ func (p *peer) close() {
 	// goroutines.
 	close(p.tickerCloser)
 
-	p.net.stateLock.Lock()
-	p.closed = true
-	p.net.stateLock.Unlock()
+	p.closed.SetValue(true)
 
 	if err := p.conn.Close(); err != nil {
 		p.net.log.Debug("closing peer %s resulted in an error: %s", p.id, err)
@@ -473,7 +472,7 @@ func (p *peer) getVersion(_ Msg) { p.Version() }
 
 // assumes the stateLock is not held
 func (p *peer) version(msg Msg) {
-	if p.gotVersion {
+	if p.gotVersion.GetValue() {
 		p.net.log.Verbo("dropping duplicated version message from %s", p.id)
 		return
 	}
@@ -545,6 +544,7 @@ func (p *peer) version(msg Msg) {
 			peerVersion)
 	}
 
+	p.net.stateLock.Lock()
 	if p.ip.IsZero() {
 		// we only care about the claimed IP if we don't know the IP yet
 		peerIP := msg.Get(IP).(utils.IPDesc)
@@ -556,12 +556,11 @@ func (p *peer) version(msg Msg) {
 			// verification
 			if peerIP.IP.Equal(localPeerIP.IP) {
 				// if the IPs match, add this ip:port pair to be tracked
-				p.lock.Lock()
 				p.ip = peerIP
-				p.lock.Unlock()
 			}
 		}
 	}
+	p.net.stateLock.Unlock()
 
 	p.SendPeerList()
 
@@ -569,13 +568,13 @@ func (p *peer) version(msg Msg) {
 	defer p.lock.Unlock()
 
 	p.versionStr = peerVersion.String()
-	p.gotVersion = true
+	p.gotVersion.SetValue(true)
 	p.tryMarkConnected()
 }
 
 // assumes the stateLock is not held
 func (p *peer) getPeerList(_ Msg) {
-	if p.gotVersion {
+	if p.gotVersion.GetValue() {
 		p.SendPeerList()
 	}
 }
@@ -584,10 +583,7 @@ func (p *peer) getPeerList(_ Msg) {
 func (p *peer) peerList(msg Msg) {
 	ips := msg.Get(Peers).([]utils.IPDesc)
 
-	p.net.stateLock.Lock()
-	defer p.net.stateLock.Unlock()
-
-	p.gotPeerList = true
+	p.gotPeerList.SetValue(true)
 	p.tryMarkConnected()
 
 	for _, ip := range ips {
@@ -767,42 +763,38 @@ func (p *peer) chits(msg Msg) {
 
 // assumes the stateLock is held
 func (p *peer) tryMarkConnected() {
-	if !p.connected && p.gotVersion && p.gotPeerList {
+	if !p.connected.GetValue() && p.gotVersion.GetValue() && p.gotPeerList.GetValue() {
 		// the network connected function can only be called if disconnected
 		// wasn't already called
-		if p.closed {
+		if p.closed.GetValue() {
 			return
 		}
 
-		p.connected = true
+		p.connected.SetValue(true)
 		p.net.connected(p)
 	}
 }
 
-// assumes the stateLock is not held
 func (p *peer) discardIP() {
+	p.net.stateLock.Lock()
+	defer p.net.stateLock.Unlock()
 	// By clearing the IP, we will not attempt to reconnect to this peer
 	if !p.ip.IsZero() {
-		p.net.stateLock.Lock()
 		delete(p.net.disconnectedIPs, p.ip.String())
-		p.lock.Lock()
 		p.ip = utils.IPDesc{}
-		p.lock.Unlock()
-		p.net.stateLock.Unlock()
 	}
 	p.Close()
 }
 
-// assumes the stateLock is not held
 func (p *peer) discardMyIP() {
+	p.net.stateLock.Lock()
+	defer p.net.stateLock.Unlock()
 	// By clearing the IP, we will not attempt to reconnect to this peer
 	if !p.ip.IsZero() {
-		p.net.stateLock.Lock()
 		str := p.ip.String()
 		p.net.myIPs[str] = struct{}{}
 		delete(p.net.disconnectedIPs, str)
 		p.ip = utils.IPDesc{}
-		p.net.stateLock.Unlock()
 	}
 	p.Close()
 }
