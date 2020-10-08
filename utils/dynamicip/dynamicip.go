@@ -121,7 +121,12 @@ type DynamicIP struct {
 
 func NewDynamicIPManager(dynamicResolver DynamicResolver, updateTimeout time.Duration, log logging.Logger, ip *utils.DynamicIPDesc) DynamicIPManager {
 	if dynamicResolver.IsResolver() {
-		updater := &DynamicIP{tickerCloser: make(chan struct{}), log: log, ip: ip, updateTimeout: updateTimeout, dynamicResolver: dynamicResolver}
+		updater := &DynamicIP{
+			tickerCloser:    make(chan struct{}),
+			log:             log,
+			ip:              ip,
+			updateTimeout:   updateTimeout,
+			dynamicResolver: dynamicResolver}
 		go updater.UpdateExternalIP()
 		return updater
 	}
