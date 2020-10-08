@@ -2,6 +2,7 @@
   become: true
   yum:
     name:
+      - git
       # Staking key management
       - openssl
       - python3-cryptography

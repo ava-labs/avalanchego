@@ -2,6 +2,7 @@
   become: true
   apt:
     name:
+      - git
       # Staking key management
       - openssl
       - python3-cryptography
