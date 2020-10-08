@@ -49,6 +49,7 @@ const (
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
 	defaultReadBufferSize                            = 16 * 1024
 	defaultReadHandshakeTimeout                      = 15 * time.Second
+	defaultClientConnectionTickTimeout               = 10 * time.Second
 )
 
 var (
@@ -131,6 +132,7 @@ type network struct {
 	pingFrequency                      time.Duration
 	readBufferSize                     uint32
 	readHandshakeTimeout               time.Duration
+	clientConnectionTickTimeout        time.Duration
 
 	executor timer.Executor
 
@@ -145,6 +147,9 @@ type network struct {
 	// TODO: bound the size of [myIPs] to avoid DoS. LRU caching would be ideal
 	myIPs map[string]struct{} // set of IPs that resulted in my ID.
 	peers map[[20]byte]*peer
+
+	clientConnectionLock sync.RWMutex
+	clientConnection     map[string]*timer.TimedMeter
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -197,6 +202,7 @@ func NewDefaultNetwork(
 		defaultPingFrequency,
 		defaultReadBufferSize,
 		defaultReadHandshakeTimeout,
+		defaultClientConnectionTickTimeout,
 	)
 }
 
@@ -233,6 +239,7 @@ func NewNetwork(
 	pingFrequency time.Duration,
 	readBufferSize uint32,
 	readHandshakeTimeout time.Duration,
+	clientConnectionTickTimeout time.Duration,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -275,6 +282,8 @@ func NewNetwork(
 		peers:                              make(map[[20]byte]*peer),
 		readBufferSize:                     readBufferSize,
 		readHandshakeTimeout:               readHandshakeTimeout,
+		clientConnection:                   make(map[string]*timer.TimedMeter),
+		clientConnectionTickTimeout:        clientConnectionTickTimeout,
 	}
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
@@ -644,11 +653,21 @@ func (n *network) Dispatch() error {
 				n.log.Warn("failed to set socket nodelay due to: %s", err)
 			}
 		}
+
+		addr := conn.RemoteAddr().String()
+		if n.registeredConnectionTick(addr) > 0 {
+			n.log.Debug("connections from: %s temporarily dropped", addr)
+			go n.closeConnection(conn)
+			continue
+		}
+
 		go n.upgrade(&peer{
 			net:          n,
 			conn:         conn,
 			tickerCloser: make(chan struct{}),
 		}, n.serverUpgrader)
+
+		go n.registerConnection(addr)
 	}
 }
 
@@ -1057,4 +1076,41 @@ func (n *network) disconnected(p *peer) {
 	if p.connected {
 		n.router.Disconnected(p.id)
 	}
+}
+
+func (n *network) registeredConnectionTick(addr string) int {
+	n.clientConnectionLock.RLock()
+	defer n.clientConnectionLock.RUnlock()
+
+	meter, exists := n.clientConnection[addr]
+	if !exists {
+		return 0
+	}
+	return meter.Ticks()
+}
+
+func (n *network) closeConnection(conn net.Conn) {
+	conn.Close()
+}
+
+func (n *network) registerConnection(addr string) {
+	meter := n.registerConnectionAddress(addr)
+	meter.Tick()
+}
+
+func (n *network) registerConnectionAddress(addr string) *timer.TimedMeter {
+	var meter *timer.TimedMeter
+	n.clientConnectionLock.RLock()
+	meter, exists := n.clientConnection[addr]
+	n.clientConnectionLock.RUnlock()
+	if !exists {
+		n.clientConnectionLock.Lock()
+		meter, exists = n.clientConnection[addr]
+		if !exists {
+			meter := &timer.TimedMeter{Duration: n.clientConnectionTickTimeout}
+			n.clientConnection[addr] = meter
+		}
+		n.clientConnectionLock.RUnlock()
+	}
+	return meter
 }
