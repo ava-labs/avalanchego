@@ -655,7 +655,8 @@ func (n *network) Dispatch() error {
 		}
 
 		addr := conn.RemoteAddr().String()
-		if n.registeredConnectionTick(addr) > 0 {
+		// looking for > 1 indicating the second tick
+		if n.registerConnection(addr) > 1 {
 			n.log.Debug("connections from: %s temporarily dropped", addr)
 			go n.closeConnection(conn)
 			continue
@@ -666,8 +667,6 @@ func (n *network) Dispatch() error {
 			conn:         conn,
 			tickerCloser: make(chan struct{}),
 		}, n.serverUpgrader)
-
-		go n.registerConnection(addr)
 	}
 }
 
@@ -1078,24 +1077,18 @@ func (n *network) disconnected(p *peer) {
 	}
 }
 
-func (n *network) registeredConnectionTick(addr string) int {
-	n.clientConnectionLock.RLock()
-	defer n.clientConnectionLock.RUnlock()
-
-	meter, exists := n.clientConnection[addr]
-	if !exists {
-		return 0
-	}
-	return meter.Ticks()
-}
-
 func (n *network) closeConnection(conn net.Conn) {
 	conn.Close()
 }
 
-func (n *network) registerConnection(addr string) {
+func (n *network) registerConnection(addr string) int {
 	meter := n.registerConnectionAddress(addr)
+	tickCount := meter.Ticks()
+	if tickCount > 0 {
+		return tickCount
+	}
 	meter.Tick()
+	return meter.Ticks()
 }
 
 func (n *network) registerConnectionAddress(addr string) *timer.TimedMeter {
