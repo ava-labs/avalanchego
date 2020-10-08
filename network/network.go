@@ -1021,8 +1021,9 @@ func (n *network) tryAddPeer(p *peer) error {
 // assumes the stateLock is not held. Returns the ips of connections that have
 // valid IPs that are marked as validators.
 func (n *network) validatorIPs() []utils.IPDesc {
-	ips := []utils.IPDesc(nil)
-	for _, peer := range n.getAllPeers() {
+	allPeers := n.getAllPeers()
+	ips := make([]utils.IPDesc, 0, len(allPeers))
+	for _, peer := range allPeers {
 		n.stateLock.RLock()
 		if peer.connected.GetValue() &&
 			!peer.ip.IsZero() &&
