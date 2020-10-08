@@ -1099,15 +1099,16 @@ func (n *network) registerConnection(addr string) {
 }
 
 func (n *network) registerConnectionAddress(addr string) *timer.TimedMeter {
+	var exists bool
 	var meter *timer.TimedMeter
 	n.clientConnectionLock.RLock()
-	meter, exists := n.clientConnection[addr]
+	meter, exists = n.clientConnection[addr]
 	n.clientConnectionLock.RUnlock()
 	if !exists {
 		n.clientConnectionLock.Lock()
 		meter, exists = n.clientConnection[addr]
 		if !exists {
-			meter := &timer.TimedMeter{Duration: n.clientConnectionTickTimeout}
+			meter = &timer.TimedMeter{Duration: n.clientConnectionTickTimeout}
 			n.clientConnection[addr] = meter
 		}
 		n.clientConnectionLock.RUnlock()
