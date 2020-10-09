@@ -1006,11 +1006,15 @@ func (n *network) tryAddPeer(p *peer) error {
 
 	// If I am already connected to this peer, then I should close this new
 	// connection.
-	if _, ok := n.peers[key]; ok {
+	if peer, ok := n.peers[key]; ok {
 		if !p.ip.IsZero() {
 			str := p.ip.String()
 			delete(n.disconnectedIPs, str)
 			delete(n.retryDelay, str)
+			// if peer connect ip is not zero.  and it's different than the peer ip lets update assuming it's newer.
+			if !p.ip.Equal(peer.ip) {
+				peer.ip = p.ip
+			}
 		}
 		return fmt.Errorf("duplicated connection from %s at %s", p.id.PrefixedString(constants.NodeIDPrefix), p.ip)
 	}
