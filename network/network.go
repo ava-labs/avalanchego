@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -55,6 +54,8 @@ const (
 	defaultReadBufferSize                            = 16 * 1024
 	defaultReadHandshakeTimeout                      = 15 * time.Second
 	defaultClientConnectionTickTimeout               = 10 * time.Second
+	defaultClientConnectionCacheSize                 = 10000
+	defaultClientMaximumTicks                        = 1
 )
 
 var (
@@ -138,6 +139,7 @@ type network struct {
 	readBufferSize                     uint32
 	readHandshakeTimeout               time.Duration
 	clientConnectionTickTimeout        time.Duration
+	clientMaximumTicks                 int
 
 	executor timer.Executor
 
@@ -208,6 +210,8 @@ func NewDefaultNetwork(
 		defaultReadBufferSize,
 		defaultReadHandshakeTimeout,
 		defaultClientConnectionTickTimeout,
+		defaultClientConnectionCacheSize,
+		defaultClientMaximumTicks,
 	)
 }
 
@@ -245,6 +249,8 @@ func NewNetwork(
 	readBufferSize uint32,
 	readHandshakeTimeout time.Duration,
 	clientConnectionTickTimeout time.Duration,
+	clientConnectionCacheSize int,
+	clientMaximumTicks int,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -287,8 +293,9 @@ func NewNetwork(
 		peers:                              make(map[[20]byte]*peer),
 		readBufferSize:                     readBufferSize,
 		readHandshakeTimeout:               readHandshakeTimeout,
-		clientConnection:                   &cache.LRU{Size: 10240},
+		clientConnection:                   &cache.LRU{Size: clientConnectionCacheSize},
 		clientConnectionTickTimeout:        clientConnectionTickTimeout,
+		clientMaximumTicks:                 clientMaximumTicks,
 	}
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
@@ -660,9 +667,9 @@ func (n *network) Dispatch() error {
 
 		addr := conn.RemoteAddr().String()
 		ticks, err := n.registerConnection(addr)
-		// looking for > 1 indicating the second tick
-		if err == nil && ticks > 1 {
-			n.log.Debug("connections from: %s temporarily dropped", addr)
+		// looking for > n.clientMaximumTicks indicating the second tick
+		if err == nil && ticks > n.clientMaximumTicks {
+			n.log.Debug("connection from: %s temporarily dropped", addr)
 			go n.closeConnection(conn)
 			continue
 		}
@@ -1105,18 +1112,18 @@ func (n *network) closeConnection(conn net.Conn) {
 }
 
 func (n *network) registerConnection(addr string) (int, error) {
-	portIndex := strings.LastIndex(addr, ":")
-	if portIndex != -1 {
-		addr = addr[:portIndex]
+	ip, err := utils.ToIPDesc(addr)
+	if err != nil {
+		return 0, err
 	}
+
+	// normalize to just the incoming IP
+	addr = ip.IP.String()
 	meter, err := n.registerConnectionAddress(addr)
 	if err != nil {
 		return 0, err
 	}
-	tickCount := meter.Ticks()
-	if tickCount > 0 {
-		return tickCount, nil
-	}
+
 	meter.Tick()
 	return meter.Ticks(), nil
 }
@@ -1126,13 +1133,18 @@ func (n *network) registerConnectionAddress(addr string) (*timer.TimedMeter, err
 	if err != nil {
 		return nil, err
 	}
-	var exists bool
-	var meter interface{}
+
+	// lets get the meter
 	n.clientConnectionLock.RLock()
-	meter, exists = n.clientConnection.Get(id)
+	meter, exists := n.clientConnection.Get(id)
 	n.clientConnectionLock.RUnlock()
+
+	// if the meter doesn't exist we'll create one
 	if !exists {
 		n.clientConnectionLock.Lock()
+
+		// lets just confirm under lock it wasn't create.
+		// some other thread could of addedit.
 		meter, exists = n.clientConnection.Get(id)
 		if !exists {
 			meter = &timer.TimedMeter{Duration: n.clientConnectionTickTimeout}
