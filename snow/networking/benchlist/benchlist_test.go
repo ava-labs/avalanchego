@@ -8,6 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
@@ -22,16 +23,36 @@ func TestBenchlist(t *testing.T) {
 	vdr2 := validators.GenerateRandomValidator(50)
 	vdr3 := validators.GenerateRandomValidator(50)
 	vdr4 := validators.GenerateRandomValidator(50)
-	vdrs.AddWeight(vdr0.ID(), vdr0.Weight())
-	vdrs.AddWeight(vdr1.ID(), vdr1.Weight())
-	vdrs.AddWeight(vdr2.ID(), vdr2.Weight())
-	vdrs.AddWeight(vdr3.ID(), vdr3.Weight())
-	vdrs.AddWeight(vdr4.ID(), vdr4.Weight())
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		vdrs.AddWeight(vdr0.ID(), vdr0.Weight()),
+		vdrs.AddWeight(vdr1.ID(), vdr1.Weight()),
+		vdrs.AddWeight(vdr2.ID(), vdr2.Weight()),
+		vdrs.AddWeight(vdr3.ID(), vdr3.Weight()),
+		vdrs.AddWeight(vdr4.ID(), vdr4.Weight()),
+	)
+	if errs.Errored() {
+		t.Fatal(errs.Err)
+	}
 
 	threshold := 3
 	duration := time.Minute
 	maxPortion := 0.5
-	b := NewQueryBenchlist(vdrs, snow.DefaultContextTest(), threshold, minimumFailingDuration, duration, maxPortion, false, "").(*queryBenchlist)
+	benchIntf, err := NewQueryBenchlist(
+		vdrs,
+		snow.DefaultContextTest(),
+		threshold,
+		minimumFailingDuration,
+		duration,
+		maxPortion,
+		false,
+		"",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := benchIntf.(*queryBenchlist)
 
 	currentTime := time.Now()
 	b.clock.Set(currentTime)
@@ -72,14 +93,34 @@ func TestBenchlistDoesNotGetStuck(t *testing.T) {
 	vdr0 := validators.GenerateRandomValidator(50)
 	vdr1 := validators.GenerateRandomValidator(50)
 	vdr2 := validators.GenerateRandomValidator(50)
-	vdrs.AddWeight(vdr0.ID(), vdr0.Weight())
-	vdrs.AddWeight(vdr1.ID(), vdr1.Weight())
-	vdrs.AddWeight(vdr2.ID(), vdr2.Weight())
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		vdrs.AddWeight(vdr0.ID(), vdr0.Weight()),
+		vdrs.AddWeight(vdr1.ID(), vdr1.Weight()),
+		vdrs.AddWeight(vdr2.ID(), vdr2.Weight()),
+	)
+	if errs.Errored() {
+		t.Fatal(errs.Err)
+	}
 
 	threshold := 3
 	duration := time.Minute
 	maxPortion := 0.5
-	b := NewQueryBenchlist(vdrs, snow.DefaultContextTest(), threshold, minimumFailingDuration, duration, maxPortion, false, "").(*queryBenchlist)
+	benchIntf, err := NewQueryBenchlist(
+		vdrs,
+		snow.DefaultContextTest(),
+		threshold,
+		minimumFailingDuration,
+		duration,
+		maxPortion,
+		false,
+		"",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := benchIntf.(*queryBenchlist)
 
 	currentTime := time.Now()
 	b.clock.Set(currentTime)
@@ -125,17 +166,37 @@ func TestBenchlistOverUnbench(t *testing.T) {
 	vdr3 := validators.GenerateRandomValidator(50)
 	vdr4 := validators.GenerateRandomValidator(50)
 	vdr5 := validators.GenerateRandomValidator(50)
-	vdrs.AddWeight(vdr0.ID(), vdr0.Weight())
-	vdrs.AddWeight(vdr1.ID(), vdr1.Weight())
-	vdrs.AddWeight(vdr2.ID(), vdr2.Weight())
-	vdrs.AddWeight(vdr3.ID(), vdr3.Weight())
-	vdrs.AddWeight(vdr4.ID(), vdr4.Weight())
-	vdrs.AddWeight(vdr5.ID(), vdr5.Weight())
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		vdrs.AddWeight(vdr0.ID(), vdr0.Weight()),
+		vdrs.AddWeight(vdr1.ID(), vdr1.Weight()),
+		vdrs.AddWeight(vdr2.ID(), vdr2.Weight()),
+		vdrs.AddWeight(vdr3.ID(), vdr3.Weight()),
+		vdrs.AddWeight(vdr4.ID(), vdr4.Weight()),
+		vdrs.AddWeight(vdr5.ID(), vdr5.Weight()),
+	)
+	if errs.Errored() {
+		t.Fatal(errs.Err)
+	}
 
 	threshold := 3
 	duration := time.Minute
 	maxPortion := 0.5
-	b := NewQueryBenchlist(vdrs, snow.DefaultContextTest(), threshold, minimumFailingDuration, duration, maxPortion, false, "").(*queryBenchlist)
+	benchIntf, err := NewQueryBenchlist(
+		vdrs,
+		snow.DefaultContextTest(),
+		threshold,
+		minimumFailingDuration,
+		duration,
+		maxPortion,
+		false,
+		"",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := benchIntf.(*queryBenchlist)
 
 	currentTime := time.Now()
 	b.clock.Set(currentTime)

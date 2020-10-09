@@ -19,8 +19,12 @@ func TestEWMATrackerPrioritizes(t *testing.T) {
 	vdr1 := ids.GenerateTestShortID()
 	nonStaker := ids.GenerateTestShortID()
 
-	vdrs.AddWeight(vdr0, 1)
-	vdrs.AddWeight(vdr1, 1)
+	if err := vdrs.AddWeight(vdr0, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := vdrs.AddWeight(vdr1, 1); err != nil {
+		t.Fatal(err)
+	}
 
 	cpuPortion := 0.25
 	period := time.Second
@@ -50,8 +54,12 @@ func TestEWMATrackerPrunesSpenders(t *testing.T) {
 	nonStaker0 := ids.GenerateTestShortID()
 	nonStaker1 := ids.GenerateTestShortID()
 
-	vdrs.AddWeight(staker0, 1)
-	vdrs.AddWeight(staker1, 1)
+	if err := vdrs.AddWeight(staker0, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := vdrs.AddWeight(staker1, 1); err != nil {
+		t.Fatal(err)
+	}
 
 	cpuPortion := 0.25
 	period := time.Second
@@ -97,8 +105,12 @@ func TestMessageThrottlerPrunesSpenders(t *testing.T) {
 	nonStaker1 := ids.GenerateTestShortID()
 	nonStaker2 := ids.GenerateTestShortID()
 
-	vdrs.AddWeight(staker0, 1)
-	vdrs.AddWeight(staker1, 1)
+	if err := vdrs.AddWeight(staker0, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := vdrs.AddWeight(staker1, 1); err != nil {
+		t.Fatal(err)
+	}
 
 	maxMessages := uint32(1024)
 	msgPortion := 0.25
@@ -152,8 +164,12 @@ func TestMessageThrottling(t *testing.T) {
 	nonStaker0 := ids.GenerateTestShortID()
 	nonStaker1 := ids.GenerateTestShortID()
 
-	vdrs.AddWeight(staker0, 1)
-	vdrs.AddWeight(staker1, 1)
+	if err := vdrs.AddWeight(staker0, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := vdrs.AddWeight(staker1, 1); err != nil {
+		t.Fatal(err)
+	}
 
 	maxMessages := uint32(8)
 	msgPortion := 0.25
@@ -226,8 +242,12 @@ func TestCalculatesEWMA(t *testing.T) {
 	vdr0 := ids.GenerateTestShortID()
 	vdr1 := ids.GenerateTestShortID()
 
-	vdrs.AddWeight(vdr0, 1)
-	vdrs.AddWeight(vdr1, 1)
+	if err := vdrs.AddWeight(vdr0, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := vdrs.AddWeight(vdr1, 1); err != nil {
+		t.Fatal(err)
+	}
 
 	stakerPortion := 0.25
 	period := time.Second

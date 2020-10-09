@@ -205,7 +205,6 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 
 	// If the chain time would be the time for the next primary network staker to leave,
 	// then we create a block that removes the staker and proposes they receive a staker reward
-	nextValidatorEndtime := timer.MaxTime
 	tx, err := m.vm.nextStakerStop(db, constants.PrimaryNetworkID)
 	if err != nil {
 		return nil, err
@@ -214,7 +213,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 	if !ok {
 		return nil, fmt.Errorf("expected staker tx to be TimedTx but got %T", tx)
 	}
-	nextValidatorEndtime = staker.EndTime()
+	nextValidatorEndtime := staker.EndTime()
 	if currentChainTimestamp.Equal(nextValidatorEndtime) {
 		rewardValidatorTx, err := m.vm.newRewardValidatorTx(tx.Tx.ID())
 		if err != nil {

@@ -333,7 +333,9 @@ func TestIssueImportTx(t *testing.T) {
 
 	ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
@@ -343,7 +345,9 @@ func TestIssueImportTx(t *testing.T) {
 	}
 
 	parsedTx := txs[0]
-	parsedTx.Accept()
+	if err := parsedTx.Accept(); err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := vm.ctx.SharedMemory.Get(platformID, [][]byte{utxoID.InputID().Bytes()}); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
@@ -368,7 +372,9 @@ func TestForceAcceptImportTx(t *testing.T) {
 	vm := &VM{}
 	ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
@@ -438,7 +444,9 @@ func TestForceAcceptImportTx(t *testing.T) {
 		t.Fatalf("Should have failed verification")
 	}
 
-	parsedTx.Accept()
+	if err := parsedTx.Accept(); err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := vm.ctx.SharedMemory.Get(platformID, [][]byte{utxoID.InputID().Bytes()}); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")

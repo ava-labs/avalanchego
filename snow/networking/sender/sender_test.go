@@ -42,7 +42,7 @@ func TestTimeout(t *testing.T) {
 	vdrs := validators.NewSet()
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
-	tm.Initialize(&timer.AdaptiveTimeoutConfig{
+	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
 		InitialTimeout: time.Millisecond,
 		MinimumTimeout: time.Millisecond,
 		MaximumTimeout: 10 * time.Second,
@@ -51,6 +51,9 @@ func TestTimeout(t *testing.T) {
 		Namespace:      "",
 		Registerer:     prometheus.NewRegistry(),
 	}, benchlist)
+	if err != nil {
+		t.Fatal(err)
+	}
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
@@ -108,7 +111,7 @@ func TestReliableMessages(t *testing.T) {
 	vdrs := validators.NewSet()
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
-	tm.Initialize(&timer.AdaptiveTimeoutConfig{
+	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
 		InitialTimeout: time.Millisecond,
 		MinimumTimeout: time.Millisecond,
 		MaximumTimeout: 10 * time.Second,
@@ -117,6 +120,9 @@ func TestReliableMessages(t *testing.T) {
 		Namespace:      "",
 		Registerer:     prometheus.NewRegistry(),
 	}, benchlist)
+	if err != nil {
+		t.Fatal(err)
+	}
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
@@ -185,7 +191,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	benchlist := benchlist.NewNoBenchlist()
 	vdrs := validators.NewSet()
 	tm := timeout.Manager{}
-	tm.Initialize(&timer.AdaptiveTimeoutConfig{
+	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
 		InitialTimeout: time.Millisecond,
 		MinimumTimeout: time.Millisecond,
 		MaximumTimeout: 10 * time.Second,
@@ -194,6 +200,9 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		Namespace:      "",
 		Registerer:     prometheus.NewRegistry(),
 	}, benchlist)
+	if err != nil {
+		t.Fatal(err)
+	}
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}

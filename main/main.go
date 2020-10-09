@@ -46,11 +46,19 @@ func main() {
 	}
 	fmt.Println(header)
 
-	defer func() { recover() }()
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered panic from", r)
+		}
+	}()
 
-	defer log.Stop()
-	defer log.StopOnPanic()
-	defer Config.DB.Close()
+	defer func() {
+		if err := Config.DB.Close(); err != nil {
+			log.Warn("failed to close the node's DB: %s", err)
+		}
+		log.StopOnPanic()
+		log.Stop()
+	}()
 
 	// Track if sybil control is enforced
 	if !Config.EnableStaking && Config.EnableP2PTLS {
@@ -67,7 +75,7 @@ func main() {
 	crypto.EnableCrypto = Config.EnableCrypto
 
 	if err := Config.ConsensusParams.Valid(); err != nil {
-		log.Fatal("consensus parameters are invalid: %s", err)
+		log.Error("consensus parameters are invalid: %s", err)
 		return
 	}
 
@@ -101,7 +109,7 @@ func main() {
 	log.Debug("initializing node state")
 	node := node.Node{}
 	if err := node.Initialize(&Config, log, factory); err != nil {
-		log.Fatal("error initializing node state: %s", err)
+		log.Error("error initializing node state: %s", err)
 		return
 	}
 

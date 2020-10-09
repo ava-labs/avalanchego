@@ -74,7 +74,7 @@ func (tx *UnsignedImportTx) Verify(
 
 	for _, in := range tx.ImportedInputs {
 		if err := in.Verify(); err != nil {
-			return fmt.Errorf("input failed verificaiton: %w", err)
+			return fmt.Errorf("input failed verification: %w", err)
 		}
 	}
 	if !avax.IsSortedAndUniqueTransferableInputs(tx.ImportedInputs) {

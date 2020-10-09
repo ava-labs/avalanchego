@@ -1,6 +1,7 @@
 package benchlist
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -8,6 +9,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+)
+
+var (
+	errUnknownValidators = errors.New("unknown validator set for provided chain")
 )
 
 // Manager provides an interface for a benchlist to register whether
@@ -22,7 +27,7 @@ type Manager interface {
 	// QueryFailed registers that a query did not receive a response within our synchrony bound
 	QueryFailed(ids.ID, ids.ShortID, uint32)
 	// RegisterChain registers a new chain with metrics under [namespac]
-	RegisterChain(*snow.Context, string)
+	RegisterChain(*snow.Context, string) error
 }
 
 // Config defines the configuration for a benchlist
@@ -51,20 +56,21 @@ func NewManager(config *Config) Manager {
 	}
 }
 
-func (bm *benchlistManager) RegisterChain(ctx *snow.Context, namespace string) {
+func (bm *benchlistManager) RegisterChain(ctx *snow.Context, namespace string) error {
 	bm.lock.Lock()
 	defer bm.lock.Unlock()
 
 	key := ctx.ChainID.Key()
 	if _, exists := bm.chainBenchlists[key]; exists {
-		return
+		return nil
 	}
 
 	vdrs, ok := bm.config.Validators.GetValidators(ctx.SubnetID)
 	if !ok {
-		return
+		return errUnknownValidators
 	}
-	bm.chainBenchlists[key] = NewQueryBenchlist(
+
+	benchlist, err := NewQueryBenchlist(
 		vdrs,
 		ctx,
 		bm.config.Threshold,
@@ -74,6 +80,12 @@ func (bm *benchlistManager) RegisterChain(ctx *snow.Context, namespace string) {
 		bm.config.PeerSummaryEnabled,
 		namespace,
 	)
+	if err != nil {
+		return err
+	}
+
+	bm.chainBenchlists[key] = benchlist
+	return nil
 }
 
 // RegisterQuery implements the Manager interface
@@ -126,7 +138,7 @@ type noBenchlist struct{}
 // NewNoBenchlist returns an empty benchlist that will never stop any queries
 func NewNoBenchlist() Manager { return &noBenchlist{} }
 
-func (noBenchlist) RegisterChain(*snow.Context, string)                               {}
+func (noBenchlist) RegisterChain(*snow.Context, string) error                         { return nil }
 func (noBenchlist) RegisterQuery(ids.ID, ids.ShortID, uint32, constants.MsgType) bool { return true }
 func (noBenchlist) RegisterResponse(ids.ID, ids.ShortID, uint32)                      {}
 func (noBenchlist) QueryFailed(ids.ID, ids.ShortID, uint32)                           {}

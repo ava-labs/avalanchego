@@ -82,10 +82,8 @@ func NewQueryBenchlist(
 	maxPortion float64,
 	summaryEnabled bool,
 	namespace string,
-) QueryBenchlist {
+) (QueryBenchlist, error) {
 	metrics := &metrics{}
-	metrics.Initialize(ctx, namespace, summaryEnabled)
-
 	return &queryBenchlist{
 		pendingQueries:         make(map[[20]byte]map[uint32]pendingQuery),
 		consecutiveFailures:    make(map[[20]byte]failureStreak),
@@ -99,7 +97,7 @@ func NewQueryBenchlist(
 		maxPortion:             maxPortion,
 		ctx:                    ctx,
 		metrics:                metrics,
-	}
+	}, metrics.Initialize(ctx, namespace, summaryEnabled)
 }
 
 // RegisterQuery attempts to register a query from [validatorID] and returns true

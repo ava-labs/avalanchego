@@ -13,6 +13,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+const (
+	initialUnaryDescription = "SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [0, 256)"
+)
+
 func TestTreeParams(t *testing.T) { ParamsTest(t, TreeFactory{}) }
 
 func TestSnowballSingleton(t *testing.T) {
@@ -619,7 +623,7 @@ func TestSnowballFineGrained(t *testing.T) {
 	tree := Tree{}
 	tree.Initialize(params, c0000)
 	{
-		expected := "SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [0, 256)"
+		expected := initialUnaryDescription
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
 		} else if pref := tree.Preference(); !c0000.Equals(pref) {
@@ -737,7 +741,7 @@ func TestSnowballDoubleAdd(t *testing.T) {
 	tree.Add(Red)
 
 	{
-		expected := "SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [0, 256)"
+		expected := initialUnaryDescription
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
 		} else if pref := tree.Preference(); !Red.Equals(pref) {
@@ -788,7 +792,7 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 	tree := Tree{}
 	tree.Initialize(params, c0000)
 	{
-		expected := "SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [0, 256)"
+		expected := initialUnaryDescription
 		if pref := tree.Preference(); !c0000.Equals(pref) {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {

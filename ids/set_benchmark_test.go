@@ -1,3 +1,6 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package ids
 
 import (
@@ -5,13 +8,14 @@ import (
 	"testing"
 )
 
-//
 func BenchmarkSetListSmall(b *testing.B) {
 	smallLen := 5
 	set := Set{}
 	for i := 0; i < smallLen; i++ {
 		var idBytes [32]byte
-		rand.Read(idBytes[:])
+		if _, err := rand.Read(idBytes[:]); err != nil {
+			b.Fatal(err)
+		}
 		NewID(idBytes)
 		set.Add(NewID(idBytes))
 	}
@@ -26,7 +30,9 @@ func BenchmarkSetListMedium(b *testing.B) {
 	set := Set{}
 	for i := 0; i < mediumLen; i++ {
 		var idBytes [32]byte
-		rand.Read(idBytes[:])
+		if _, err := rand.Read(idBytes[:]); err != nil {
+			b.Fatal(err)
+		}
 		NewID(idBytes)
 		set.Add(NewID(idBytes))
 	}
@@ -42,7 +48,9 @@ func BenchmarkSetListLarge(b *testing.B) {
 	set := Set{}
 	for i := 0; i < largeLen; i++ {
 		var idBytes [32]byte
-		rand.Read(idBytes[:])
+		if _, err := rand.Read(idBytes[:]); err != nil {
+			b.Fatal(err)
+		}
 		NewID(idBytes)
 		set.Add(NewID(idBytes))
 	}

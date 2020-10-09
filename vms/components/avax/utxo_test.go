@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -34,11 +35,18 @@ func TestUTXOVerifyEmpty(t *testing.T) {
 
 func TestUTXOSerialize(t *testing.T) {
 	c := codec.NewDefault()
-	c.RegisterType(&secp256k1fx.MintOutput{})
-	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.Input{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
-	c.RegisterType(&secp256k1fx.Credential{})
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		c.RegisterType(&secp256k1fx.MintOutput{}),
+		c.RegisterType(&secp256k1fx.TransferOutput{}),
+		c.RegisterType(&secp256k1fx.Input{}),
+		c.RegisterType(&secp256k1fx.TransferInput{}),
+		c.RegisterType(&secp256k1fx.Credential{}),
+	)
+	if errs.Errored() {
+		t.Fatal(errs.Err)
+	}
 
 	expected := []byte{
 		// Codec version

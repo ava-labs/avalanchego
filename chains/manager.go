@@ -341,11 +341,13 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 		return nil, fmt.Errorf("the vm should have type avalanche.DAGVM or snowman.ChainVM. Chain not created")
 	}
 
+	// Register the chain with the timeout manager
+	if err := m.TimeoutManager.RegisterChain(ctx, consensusParams.Namespace); err != nil {
+		return nil, err
+	}
+
 	// Allows messages to be routed to the new chain
 	m.ManagerConfig.Router.AddChain(chain.Handler)
-
-	// Register the chain with the timeout manager
-	m.TimeoutManager.RegisterChain(ctx, consensusParams.Namespace)
 
 	// If the X or P Chain panics, do not attempt to recover
 	if m.CriticalChains.Contains(chainParams.ID) {

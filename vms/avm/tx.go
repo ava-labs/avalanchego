@@ -68,8 +68,7 @@ func (t *Tx) SyntacticVerify(
 	creationTxFee uint64,
 	numFxs int,
 ) error {
-	switch {
-	case t == nil || t.UnsignedTx == nil:
+	if t == nil || t.UnsignedTx == nil {
 		return errNilTx
 	}
 
