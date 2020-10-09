@@ -10,14 +10,13 @@ type Float32 float32
 
 // MarshalJSON ...
 func (f Float32) MarshalJSON() ([]byte, error) {
-	//return []byte("\"" + strconv.FormatUint(uint64(u), 10) + "\""), nil
 	return []byte("\"" + strconv.FormatFloat(float64(f), byte('f'), 4, 32) + "\""), nil
 }
 
 // UnmarshalJSON ...
 func (f *Float32) UnmarshalJSON(b []byte) error {
 	str := string(b)
-	if str == "null" {
+	if str == Null {
 		return nil
 	}
 	if len(str) >= 2 {

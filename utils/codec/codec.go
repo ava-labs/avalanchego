@@ -288,61 +288,61 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 	case reflect.Uint8:
 		value.SetUint(uint64(p.UnpackByte()))
 		if p.Err != nil {
-			return fmt.Errorf("couldn't unmarshal uint8: %s", p.Err)
+			return fmt.Errorf("couldn't unmarshal uint8: %w", p.Err)
 		}
 		return nil
 	case reflect.Int8:
 		value.SetInt(int64(p.UnpackByte()))
 		if p.Err != nil {
-			return fmt.Errorf("couldn't unmarshal int8: %s", p.Err)
+			return fmt.Errorf("couldn't unmarshal int8: %w", p.Err)
 		}
 		return nil
 	case reflect.Uint16:
 		value.SetUint(uint64(p.UnpackShort()))
 		if p.Err != nil {
-			return fmt.Errorf("couldn't unmarshal uint16: %s", p.Err)
+			return fmt.Errorf("couldn't unmarshal uint16: %w", p.Err)
 		}
 		return nil
 	case reflect.Int16:
 		value.SetInt(int64(p.UnpackShort()))
 		if p.Err != nil {
-			return fmt.Errorf("couldn't unmarshal int16: %s", p.Err)
+			return fmt.Errorf("couldn't unmarshal int16: %w", p.Err)
 		}
 		return nil
 	case reflect.Uint32:
 		value.SetUint(uint64(p.UnpackInt()))
 		if p.Err != nil {
-			return fmt.Errorf("couldn't unmarshal uint32: %s", p.Err)
+			return fmt.Errorf("couldn't unmarshal uint32: %w", p.Err)
 		}
 		return nil
 	case reflect.Int32:
 		value.SetInt(int64(p.UnpackInt()))
 		if p.Err != nil {
-			return fmt.Errorf("couldn't unmarshal int32: %s", p.Err)
+			return fmt.Errorf("couldn't unmarshal int32: %w", p.Err)
 		}
 		return nil
 	case reflect.Uint64:
-		value.SetUint(uint64(p.UnpackLong()))
+		value.SetUint(p.UnpackLong())
 		if p.Err != nil {
-			return fmt.Errorf("couldn't unmarshal uint64: %s", p.Err)
+			return fmt.Errorf("couldn't unmarshal uint64: %w", p.Err)
 		}
 		return nil
 	case reflect.Int64:
 		value.SetInt(int64(p.UnpackLong()))
 		if p.Err != nil {
-			return fmt.Errorf("couldn't unmarshal int64: %s", p.Err)
+			return fmt.Errorf("couldn't unmarshal int64: %w", p.Err)
 		}
 		return nil
 	case reflect.Bool:
 		value.SetBool(p.UnpackBool())
 		if p.Err != nil {
-			return fmt.Errorf("couldn't unmarshal bool: %s", p.Err)
+			return fmt.Errorf("couldn't unmarshal bool: %w", p.Err)
 		}
 		return nil
 	case reflect.Slice:
 		numElts := int(p.UnpackInt())
 		if p.Err != nil {
-			return fmt.Errorf("couldn't unmarshal slice: %s", p.Err)
+			return fmt.Errorf("couldn't unmarshal slice: %w", p.Err)
 		}
 		if numElts > c.maxSliceLen {
 			return fmt.Errorf("array length, %d, exceeds maximum length, %d",
@@ -359,7 +359,7 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		// Unmarshal each element into the appropriate index of the slice
 		for i := 0; i < numElts; i++ {
 			if err := c.unmarshal(p, value.Index(i)); err != nil {
-				return fmt.Errorf("couldn't unmarshal slice element: %s", err)
+				return fmt.Errorf("couldn't unmarshal slice element: %w", err)
 			}
 		}
 		return nil
@@ -377,20 +377,20 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		}
 		for i := 0; i < numElts; i++ {
 			if err := c.unmarshal(p, value.Index(i)); err != nil {
-				return fmt.Errorf("couldn't unmarshal array element: %s", err)
+				return fmt.Errorf("couldn't unmarshal array element: %w", err)
 			}
 		}
 		return nil
 	case reflect.String:
 		value.SetString(p.UnpackStr())
 		if p.Err != nil {
-			return fmt.Errorf("couldn't unmarshal string: %s", p.Err)
+			return fmt.Errorf("couldn't unmarshal string: %w", p.Err)
 		}
 		return nil
 	case reflect.Interface:
 		typeID := p.UnpackInt() // Get the type ID
 		if p.Err != nil {
-			return fmt.Errorf("couldn't unmarshal interface: %s", p.Err)
+			return fmt.Errorf("couldn't unmarshal interface: %w", p.Err)
 		}
 		// Get a type that implements the interface
 		implementingType, ok := c.typeIDToType[typeID]
@@ -404,7 +404,7 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		intfImplementor := reflect.New(implementingType).Elem() // instance of the proper type
 		// Unmarshal into the struct
 		if err := c.unmarshal(p, intfImplementor); err != nil {
-			return fmt.Errorf("couldn't unmarshal interface: %s", err)
+			return fmt.Errorf("couldn't unmarshal interface: %w", err)
 		}
 		// And assign the filled struct to the value
 		value.Set(intfImplementor)
@@ -413,12 +413,12 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		// Get indices of fields that will be unmarshaled into
 		serializedFieldIndices, err := c.getSerializedFieldIndices(value.Type())
 		if err != nil {
-			return fmt.Errorf("couldn't unmarshal struct: %s", err)
+			return fmt.Errorf("couldn't unmarshal struct: %w", err)
 		}
 		// Go through the fields and umarshal into them
 		for _, index := range serializedFieldIndices {
 			if err := c.unmarshal(p, value.Field(index)); err != nil {
-				return fmt.Errorf("couldn't unmarshal struct: %s", err)
+				return fmt.Errorf("couldn't unmarshal struct: %w", err)
 			}
 		}
 		return nil
@@ -429,7 +429,7 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		v := reflect.New(t)
 		// Fill the value
 		if err := c.unmarshal(p, v.Elem()); err != nil {
-			return fmt.Errorf("couldn't unmarshal pointer: %s", err)
+			return fmt.Errorf("couldn't unmarshal pointer: %w", err)
 		}
 		// Assign to the top-level struct's member
 		value.Set(v)

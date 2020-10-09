@@ -1,4 +1,4 @@
-// (c) 2020, Alex Willmer. All rights reserved.
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ids
@@ -37,7 +37,9 @@ func TestAliaserLookup(t *testing.T) {
 	id := NewID([32]byte{'K', 'a', 't', 'e', ' ', 'K', 'a', 'n', 'e'})
 	aliaser := Aliaser{}
 	aliaser.Initialize()
-	aliaser.Alias(id, "Batwoman")
+	if err := aliaser.Alias(id, "Batwoman"); err != nil {
+		t.Fatal(err)
+	}
 
 	res, err := aliaser.Lookup("Batwoman")
 	if err != nil {
@@ -63,8 +65,12 @@ func TestAliaserAliases(t *testing.T) {
 	id := NewID([32]byte{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'})
 	aliaser := Aliaser{}
 	aliaser.Initialize()
-	aliaser.Alias(id, "Batman")
-	aliaser.Alias(id, "Dark Knight")
+	if err := aliaser.Alias(id, "Batman"); err != nil {
+		t.Fatal(err)
+	}
+	if err := aliaser.Alias(id, "Dark Knight"); err != nil {
+		t.Fatal(err)
+	}
 
 	aliases := aliaser.Aliases(id)
 	expected := []string{"Batman", "Dark Knight"}
@@ -78,8 +84,12 @@ func TestAliaserPrimaryAlias(t *testing.T) {
 	id2 := NewID([32]byte{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'})
 	aliaser := Aliaser{}
 	aliaser.Initialize()
-	aliaser.Alias(id2, "Batman")
-	aliaser.Alias(id2, "Dark Knight")
+	if err := aliaser.Alias(id2, "Batman"); err != nil {
+		t.Fatal(err)
+	}
+	if err := aliaser.Alias(id2, "Dark Knight"); err != nil {
+		t.Fatal(err)
+	}
 
 	res, err := aliaser.PrimaryAlias(id1)
 	if res != "" {
@@ -104,7 +114,9 @@ func TestAliaserAliasClash(t *testing.T) {
 	id2 := NewID([32]byte{'D', 'i', 'c', 'k', ' ', 'G', 'r', 'a', 'y', 's', 'o', 'n'})
 	aliaser := Aliaser{}
 	aliaser.Initialize()
-	aliaser.Alias(id1, "Batman")
+	if err := aliaser.Alias(id1, "Batman"); err != nil {
+		t.Fatal(err)
+	}
 
 	err := aliaser.Alias(id2, "Batman")
 	if err == nil {
@@ -117,8 +129,12 @@ func TestAliaserRemoveAlias(t *testing.T) {
 	id2 := NewID([32]byte{'J', 'a', 'm', 'e', 's', ' ', 'G', 'o', 'r', 'd', 'o', 'n'})
 	aliaser := Aliaser{}
 	aliaser.Initialize()
-	aliaser.Alias(id1, "Batman")
-	aliaser.Alias(id1, "Dark Knight")
+	if err := aliaser.Alias(id1, "Batman"); err != nil {
+		t.Fatal(err)
+	}
+	if err := aliaser.Alias(id1, "Dark Knight"); err != nil {
+		t.Fatal(err)
+	}
 
 	aliaser.RemoveAliases(id1)
 

@@ -36,8 +36,8 @@ type snowmanState struct {
 }
 
 // GetBlock gets the block with ID [ID] from [db]
-func (s *snowmanState) GetBlock(db database.Database, ID ids.ID) (snowman.Block, error) {
-	blockInterface, err := s.Get(db, state.BlockTypeID, ID)
+func (s *snowmanState) GetBlock(db database.Database, id ids.ID) (snowman.Block, error) {
+	blockInterface, err := s.Get(db, state.BlockTypeID, id)
 	if err != nil {
 		return nil, err
 	}

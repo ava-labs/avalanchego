@@ -1,6 +1,8 @@
 package platformvm
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -24,16 +26,16 @@ func (tx *BaseTx) Verify(ctx *snow.Context, c codec.Codec) error {
 		return nil
 	}
 	if err := tx.MetadataVerify(ctx); err != nil {
-		return err
+		return fmt.Errorf("metadata failed verification: %w", err)
 	}
 	for _, out := range tx.Outs {
 		if err := out.Verify(); err != nil {
-			return err
+			return fmt.Errorf("output failed verification: %w", err)
 		}
 	}
 	for _, in := range tx.Ins {
 		if err := in.Verify(); err != nil {
-			return err
+			return fmt.Errorf("input failed verification: %w", err)
 		}
 	}
 	switch {

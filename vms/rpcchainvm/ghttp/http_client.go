@@ -55,7 +55,10 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 
 	req := &ghttpproto.HTTPRequest{
-		ResponseWriter: writerID,
+		ResponseWriter: &ghttpproto.ResponseWriter{
+			Id:     writerID,
+			Header: make([]*ghttpproto.Element, 0, len(r.Header)),
+		},
 		Request: &ghttpproto.Request{
 			Method:           r.Method,
 			Proto:            r.Proto,
@@ -71,6 +74,12 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			RemoteAddr:       r.RemoteAddr,
 			RequestURI:       r.RequestURI,
 		},
+	}
+	for key, values := range w.Header() {
+		req.ResponseWriter.Header = append(req.ResponseWriter.Header, &ghttpproto.Element{
+			Key:    key,
+			Values: values,
+		})
 	}
 	for key, values := range r.Header {
 		req.Request.Header = append(req.Request.Header, &ghttpproto.Element{

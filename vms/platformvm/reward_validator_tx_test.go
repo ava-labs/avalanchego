@@ -25,7 +25,9 @@ func TestUnsignedRewardValidatorTxSemanticVerify(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
@@ -105,7 +107,9 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
@@ -282,7 +286,9 @@ func TestOptimisticUptime(t *testing.T) {
 	secondCtx := defaultContext()
 	secondCtx.Lock.Lock()
 	defer func() {
-		secondVM.Shutdown()
+		if err := secondVM.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		secondCtx.Lock.Unlock()
 	}()
 
@@ -427,7 +433,9 @@ func TestObservedUptime(t *testing.T) {
 	secondCtx := defaultContext()
 	secondCtx.Lock.Lock()
 	defer func() {
-		secondVM.Shutdown()
+		if err := secondVM.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		secondCtx.Lock.Unlock()
 	}()
 
@@ -568,7 +576,9 @@ func TestUptimeDisallowed(t *testing.T) {
 	secondCtx := defaultContext()
 	secondCtx.Lock.Lock()
 	defer func() {
-		secondVM.Shutdown()
+		if err := secondVM.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		secondCtx.Lock.Unlock()
 	}()
 
