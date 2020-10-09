@@ -50,7 +50,8 @@ type peer struct {
 
 	// ip may or may not be set when the peer is first started. is only modified
 	// on the connection's reader routine with the network state lock held.
-	ip *utils.MutexInterface
+	ip     utils.IPDesc
+	ipLock sync.RWMutex
 
 	// id should be set when the peer is first started.
 	id ids.ShortID
@@ -796,9 +797,13 @@ func (p *peer) discardMyIP() {
 }
 
 func (p *peer) setIP(ip utils.IPDesc) {
-	p.ip.SetValue(ip)
+	p.ipLock.Lock()
+	defer p.ipLock.Unlock()
+	p.ip = ip
 }
 
 func (p *peer) getIP() utils.IPDesc {
-	return p.ip.GetValue().(utils.IPDesc)
+	p.ipLock.RLock()
+	defer p.ipLock.RUnlock()
+	return p.ip
 }
