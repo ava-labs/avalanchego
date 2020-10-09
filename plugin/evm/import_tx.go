@@ -98,6 +98,10 @@ func (tx *UnsignedImportTx) SemanticVerify(
 		return permError{err}
 	}
 
+	if len(stx.Creds) != len(tx.ImportedInputs) {
+		return permError{errSignatureInputsMismatch}
+	}
+
 	// do flow-checking
 	fc := avax.NewFlowChecker()
 	//fc.Produce(vm.ctx.AVAXAssetID, vm.txFee)
@@ -122,18 +126,10 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	for i, in := range tx.ImportedInputs {
 		utxoIDs[i] = in.UTXOID.InputID().Bytes()
 	}
+	// allUTXOBytes is guaranteed to be the same length as utxoIDs
 	allUTXOBytes, err := vm.ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
 	if err != nil {
 		return tempError{err}
-	}
-
-	utxos := make([]*avax.UTXO, len(tx.ImportedInputs))
-	for i, utxoBytes := range allUTXOBytes {
-		utxo := &avax.UTXO{}
-		if err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
-			return tempError{err}
-		}
-		utxos[i] = utxo
 	}
 
 	for i, in := range tx.ImportedInputs {
@@ -173,7 +169,7 @@ func (tx *UnsignedImportTx) Accept(ctx *snow.Context, _ database.Batch) error {
 	return ctx.SharedMemory.Remove(tx.SourceChain, utxoIDs)
 }
 
-// Create a new transaction
+// newImportTx returns a new ImportTx
 func (vm *VM) newImportTx(
 	chainID ids.ID, // chain to import from
 	to common.Address, // Address of recipient
@@ -240,19 +236,22 @@ func (vm *VM) newImportTx(
 	//	})
 	//}
 
-	// non-AVAX asset outputs
-	for aidKey, amount := range importedAmount {
-		aid := ids.NewID(aidKey)
-		//if aid.Equals(vm.ctx.AVAXAssetID) || amount == 0 {
+	// This will create unique outputs (in the context of sorting)
+	// since each output will have a unique assetID
+	for assetKey, amount := range importedAmount {
+		assetID := ids.NewID(assetKey)
+		//if assetID.Equals(vm.ctx.AVAXAssetID) || amount == 0 {
 		if amount == 0 {
 			continue
 		}
 		outs = append(outs, EVMOutput{
 			Address: to,
 			Amount:  amount,
-			AssetID: aid,
+			AssetID: assetID,
 		})
 	}
+
+	SortEVMOutputs(outs)
 
 	// Create the transaction
 	utx := &UnsignedImportTx{
@@ -269,6 +268,8 @@ func (vm *VM) newImportTx(
 	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID)
 }
 
+// EVMStateTransfer performs the state transfer to increase the balances of
+// accounts accordingly with the imported EVMOutputs
 func (tx *UnsignedImportTx) EVMStateTransfer(vm *VM, state *state.StateDB) error {
 	for _, to := range tx.Outs {
 		log.Info("crosschain X->C", "addr", to.Address, "amount", to.Amount)

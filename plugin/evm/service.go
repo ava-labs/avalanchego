@@ -151,7 +151,7 @@ type ExportKeyReply struct {
 func (service *AvaxAPI) ExportKey(r *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
 	log.Info("EVM: ExportKey called")
 
-	address, err := service.vm.ParseEthAddress(args.Address)
+	address, err := ParseEthAddress(args.Address)
 	if err != nil {
 		return fmt.Errorf("couldn't parse %s to address: %s", args.Address, err)
 	}
@@ -200,10 +200,7 @@ func (service *AvaxAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
 
 	// TODO: return eth address here
-	reply.Address, err = service.vm.FormatEthAddress(GetEthAddress(sk))
-	if err != nil {
-		return fmt.Errorf("problem formatting address: %w", err)
-	}
+	reply.Address = FormatEthAddress(GetEthAddress(sk))
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
@@ -234,7 +231,7 @@ func (service *AvaxAPI) ImportAVAX(_ *http.Request, args *ImportArgs, response *
 	return service.Import(nil, args, response)
 }
 
-// ImportAVAX issues a transaction to import AVAX from the X-chain. The AVAX
+// Import issues a transaction to import AVAX from the X-chain. The AVAX
 // must have already been exported from the X-Chain.
 func (service *AvaxAPI) Import(_ *http.Request, args *ImportArgs, response *api.JsonTxID) error {
 	log.Info("EVM: ImportAVAX called")
@@ -244,7 +241,7 @@ func (service *AvaxAPI) Import(_ *http.Request, args *ImportArgs, response *api.
 		return fmt.Errorf("problem parsing chainID %q: %w", args.SourceChain, err)
 	}
 
-	to, err := service.vm.ParseEthAddress(args.To)
+	to, err := ParseEthAddress(args.To)
 	if err != nil { // Parse address
 		return fmt.Errorf("couldn't parse argument 'to' to an address: %w", err)
 	}

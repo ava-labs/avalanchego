@@ -92,16 +92,25 @@ func (tx *UnsignedExportTx) SemanticVerify(
 		return permError{err}
 	}
 
+	if len(tx.Ins) != len(stx.Creds) {
+		return permError{errSignatureInputsMismatch}
+	}
+
 	f := crypto.FactorySECP256K1R{}
-	for i, cred := range stx.Creds {
+	for i, input := range tx.Ins {
+		cred := stx.Creds[i].(*secp256k1fx.Credential)
 		if err := cred.Verify(); err != nil {
 			return permError{err}
 		}
-		pubKey, err := f.RecoverPublicKey(tx.UnsignedBytes(), cred.(*secp256k1fx.Credential).Sigs[0][:])
+
+		if len(cred.Sigs) != 1 {
+			return permError{fmt.Errorf("expected one signature for EVM Input Credential, but found: %d", len(cred.Sigs))}
+		}
+		pubKey, err := f.RecoverPublicKey(tx.UnsignedBytes(), cred.Sigs[0][:])
 		if err != nil {
 			return permError{err}
 		}
-		if tx.Ins[i].Address != PublicKeyToEthAddress(pubKey) {
+		if input.Address != PublicKeyToEthAddress(pubKey) {
 			return permError{errPublicKeySignatureMismatch}
 		}
 	}
@@ -160,7 +169,7 @@ func (tx *UnsignedExportTx) Accept(ctx *snow.Context, _ database.Batch) error {
 	return ctx.SharedMemory.Put(tx.DestinationChain, elems)
 }
 
-// Create a new transaction
+// newExportTx returns a new ExportTx
 func (vm *VM) newExportTx(
 	assetID ids.ID, // AssetID of the tokens to export
 	amount uint64, // Amount of tokens to export
@@ -183,14 +192,14 @@ func (vm *VM) newExportTx(
 		toBurn = vm.txFee
 	}
 	// burn AVAX
-	ins, signers, err := vm.GetSpendableCanonical(keys, vm.ctx.AVAXAssetID, toBurn)
+	ins, signers, err := vm.GetSpendableFunds(keys, vm.ctx.AVAXAssetID, toBurn)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 
 	// burn non-AVAX
 	if !assetID.Equals(vm.ctx.AVAXAssetID) {
-		ins2, signers2, err := vm.GetSpendableCanonical(keys, assetID, amount)
+		ins2, signers2, err := vm.GetSpendableFunds(keys, assetID, amount)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 		}
@@ -210,6 +219,9 @@ func (vm *VM) newExportTx(
 		},
 	}}
 
+	avax.SortTransferableOutputs(exportOuts, vm.codec)
+	SortEVMInputsAndSigners(ins, signers)
+
 	// Create the transaction
 	utx := &UnsignedExportTx{
 		NetworkID:        vm.ctx.NetworkID,
@@ -225,6 +237,7 @@ func (vm *VM) newExportTx(
 	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID)
 }
 
+// EVMStateTransfer executes the state update from the atomic export transaction
 func (tx *UnsignedExportTx) EVMStateTransfer(vm *VM, state *state.StateDB) error {
 	addrs := map[[20]byte]uint64{}
 	for _, from := range tx.Ins {
