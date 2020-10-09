@@ -17,12 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-// defaultCheckOpts is a Check whose properties represent a default Check
-var defaultCheckOpts = check{
-	executionPeriod: 30 * time.Second,
-	initialDelay:    10 * time.Second,
-}
-
 // Health observes a set of vital signs and makes them available through an HTTP
 // API.
 type Health struct {
@@ -73,9 +67,14 @@ func (h *Health) RegisterHeartbeat(name string, hb Heartbeater, max time.Duratio
 // RegisterMonotonicCheckFunc adds a Check with default options and the given CheckFn
 // After it passes once, its logic (checkFunc) is never run again; it just passes
 func (h *Health) RegisterMonotonicCheckFunc(name string, checkFn func() (interface{}, error)) error {
-	check := monotonicCheck{check: defaultCheckOpts}
-	check.name = name
-	check.checkFn = checkFn
+	check := monotonicCheck{
+		check: check{
+			name: name,
+			checkFn: checkFn,
+			executionPeriod: constants.DefaultHealthCheckExecutionPeriod,
+			initialDelay: constants.DefaultHealthCheckInitialDelay,
+		}
+	}
 	return h.RegisterCheck(check)
 }
 
