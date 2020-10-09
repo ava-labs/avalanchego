@@ -103,12 +103,16 @@ var (
 	errNoImportInputs             = errors.New("tx has no imported inputs")
 	errInputsNotSortedUnique      = errors.New("inputs not sorted and unique")
 	errPublicKeySignatureMismatch = errors.New("signature doesn't match public key")
+	errSignatureInputsMismatch    = errors.New("number of inputs does not match number of signatures")
 	errUnknownAsset               = errors.New("unknown asset ID")
 	errNoFunds                    = errors.New("no spendable funds were found")
 	errWrongChainID               = errors.New("tx has wrong chain ID")
 	errInsufficientFunds          = errors.New("insufficient funds")
-	errNoExportOutputs            = errors.New("no export outputs")
-	errOutputsNotSorted           = errors.New("outputs not sorted")
+	errNoExportOutputs            = errors.New("tx has no export outputs")
+	errOutputsNotSorted           = errors.New("tx outputs not sorted")
+	errNoImportOutputs            = errors.New("tx has no outputs to import")
+	errNoExportInputs             = errors.New("tx has no inputs to export")
+	errInputsNotSortedAndUnique   = errors.New("inputs not sorted and unique")
 	errOverflowExport             = errors.New("overflow when computing export amount + txFee")
 	errInvalidNonce               = errors.New("invalid nonce")
 )
@@ -772,17 +776,6 @@ func (vm *VM) getLastAccepted() *Block {
 	return vm.lastAccepted
 }
 
-func (vm *VM) ParseEthAddress(addrStr string) (common.Address, error) {
-	if !common.IsHexAddress(addrStr) {
-		return common.Address{}, errInvalidAddr
-	}
-	return common.HexToAddress(addrStr), nil
-}
-
-func (vm *VM) FormatEthAddress(addr common.Address) (string, error) {
-	return addr.Hex(), nil
-}
-
 // ParseAddress takes in an address and produces the ID of the chain it's for
 // the ID of the address
 func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
@@ -871,16 +864,11 @@ func (vm *VM) GetAtomicUTXOs(
 	return utxos, lastAddrID, lastUTXOID, nil
 }
 
-func GetEthAddress(privKey *crypto.PrivateKeySECP256K1R) common.Address {
-	return PublicKeyToEthAddress(privKey.PublicKey())
-}
-
-func PublicKeyToEthAddress(pubKey crypto.PublicKey) common.Address {
-	return ethcrypto.PubkeyToAddress(
-		(*pubKey.(*crypto.PublicKeySECP256K1R).ToECDSA()))
-}
-
-func (vm *VM) GetSpendableCanonical(keys []*crypto.PrivateKeySECP256K1R, assetID ids.ID, amount uint64) ([]EVMInput, [][]*crypto.PrivateKeySECP256K1R, error) {
+// GetSpendableFunds returns a list of EVMInputs and keys (in corresponding order)
+// to total [amount] of [assetID] owned by [keys]
+// TODO switch to returning a list of private keys
+// since there are no multisig inputs in Ethereum
+func (vm *VM) GetSpendableFunds(keys []*crypto.PrivateKeySECP256K1R, assetID ids.ID, amount uint64) ([]EVMInput, [][]*crypto.PrivateKeySECP256K1R, error) {
 	// NOTE: should we use HEAD block or lastAccepted?
 	state, err := vm.chain.BlockState(vm.lastAccepted.ethBlock)
 	if err != nil {
@@ -920,16 +908,43 @@ func (vm *VM) GetSpendableCanonical(keys []*crypto.PrivateKeySECP256K1R, assetID
 		signers = append(signers, []*crypto.PrivateKeySECP256K1R{key})
 		amount -= balance
 	}
+
 	if amount > 0 {
 		return nil, nil, errInsufficientFunds
 	}
+
 	return inputs, signers, nil
 }
 
+// GetAcceptedNonce returns the nonce associated with the address at the last accepted block
 func (vm *VM) GetAcceptedNonce(address common.Address) (uint64, error) {
 	state, err := vm.chain.BlockState(vm.lastAccepted.ethBlock)
 	if err != nil {
 		return 0, err
 	}
 	return state.GetNonce(address), nil
+}
+
+// ParseEthAddress parses [addrStr] and returns an Ethereum address
+func ParseEthAddress(addrStr string) (common.Address, error) {
+	if !common.IsHexAddress(addrStr) {
+		return common.Address{}, errInvalidAddr
+	}
+	return common.HexToAddress(addrStr), nil
+}
+
+// FormatEthAddress formats [addr] into a string
+func FormatEthAddress(addr common.Address) string {
+	return addr.Hex()
+}
+
+// GetEthAddress returns the ethereum address derived from [privKey]
+func GetEthAddress(privKey *crypto.PrivateKeySECP256K1R) common.Address {
+	return PublicKeyToEthAddress(privKey.PublicKey())
+}
+
+// PublicKeyToEthAddress returns the ethereum address derived from [pubKey]
+func PublicKeyToEthAddress(pubKey crypto.PublicKey) common.Address {
+	return ethcrypto.PubkeyToAddress(
+		(*pubKey.(*crypto.PublicKeySECP256K1R).ToECDSA()))
 }

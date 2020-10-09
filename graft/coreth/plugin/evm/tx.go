@@ -4,14 +4,17 @@
 package evm
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/ava-labs/coreth/core/state"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -30,12 +33,14 @@ var (
 	errNilTx             = errors.New("tx is nil")
 )
 
+// EVMOutput defines an output from EVM State created from export transactions
 type EVMOutput struct {
 	Address common.Address `serialize:"true" json:"address"`
 	Amount  uint64         `serialize:"true" json:"amount"`
 	AssetID ids.ID         `serialize:"true" json:"assetID"`
 }
 
+// EVMInput defines an input for the EVM State to be used in import transactions
 type EVMInput struct {
 	Address common.Address `serialize:"true" json:"address"`
 	Amount  uint64         `serialize:"true" json:"amount"`
@@ -43,10 +48,12 @@ type EVMInput struct {
 	Nonce   uint64         `serialize:"true" json:"nonce"`
 }
 
+// Verify ...
 func (out *EVMOutput) Verify() error {
 	return nil
 }
 
+// Verify ...
 func (in *EVMInput) Verify() error {
 	return nil
 }
@@ -114,4 +121,67 @@ func (tx *Tx) Sign(c codec.Codec, signers [][]*crypto.PrivateKeySECP256K1R) erro
 	}
 	tx.Initialize(unsignedBytes, signedBytes)
 	return nil
+}
+
+// innerSortInputsAndSigners implements sort.Interface for EVMInput
+type innerSortInputsAndSigners struct {
+	inputs  []EVMInput
+	signers [][]*crypto.PrivateKeySECP256K1R
+}
+
+func (ins *innerSortInputsAndSigners) Less(i, j int) bool {
+	addrComp := bytes.Compare(ins.inputs[i].Address.Bytes(), ins.inputs[j].Address.Bytes())
+	if addrComp != 0 {
+		return addrComp < 0
+	}
+	return bytes.Compare(ins.inputs[i].AssetID.Bytes(), ins.inputs[j].AssetID.Bytes()) < 0
+}
+
+func (ins *innerSortInputsAndSigners) Len() int { return len(ins.inputs) }
+
+func (ins *innerSortInputsAndSigners) Swap(i, j int) {
+	ins.inputs[j], ins.inputs[i] = ins.inputs[i], ins.inputs[j]
+	ins.signers[j], ins.signers[i] = ins.signers[i], ins.signers[j]
+}
+
+// SortEVMInputsAndSigners sorts the list of EVMInputs based on the addresses and assetIDs
+func SortEVMInputsAndSigners(inputs []EVMInput, signers [][]*crypto.PrivateKeySECP256K1R) {
+	sort.Sort(&innerSortInputsAndSigners{inputs: inputs, signers: signers})
+}
+
+// IsSortedAndUniqueEVMInputs returns true if the EVM Inputs are sorted and unique
+// based on the account addresses
+func IsSortedAndUniqueEVMInputs(inputs []EVMInput) bool {
+	return utils.IsSortedAndUnique(&innerSortInputsAndSigners{inputs: inputs})
+}
+
+// innerSortEVMOutputs implements sort.Interface for EVMOutput
+type innerSortEVMOutputs struct {
+	outputs []EVMOutput
+}
+
+func (outs *innerSortEVMOutputs) Less(i, j int) bool {
+	addrComp := bytes.Compare(outs.outputs[i].Address.Bytes(), outs.outputs[j].Address.Bytes())
+	if addrComp != 0 {
+		return addrComp < 0
+	}
+	return bytes.Compare(outs.outputs[i].AssetID.Bytes(), outs.outputs[j].AssetID.Bytes()) < 0
+}
+
+func (outs *innerSortEVMOutputs) Len() int { return len(outs.outputs) }
+
+func (outs *innerSortEVMOutputs) Swap(i, j int) {
+	outs.outputs[j], outs.outputs[i] = outs.outputs[i], outs.outputs[j]
+}
+
+// SortEVMOutputs sorts the list of EVMOutputs based on the addresses and assetIDs
+// of the outputs
+func SortEVMOutputs(outputs []EVMOutput) {
+	sort.Sort(&innerSortEVMOutputs{outputs: outputs})
+}
+
+// IsSortedAndUniqueEVMOutputs returns true if the EVMOutputs are sorted and unique
+// based on the account addresses and assetIDs
+func IsSortedAndUniqueEVMOutputs(outputs []EVMOutput) bool {
+	return utils.IsSortedAndUnique(&innerSortEVMOutputs{outputs: outputs})
 }
