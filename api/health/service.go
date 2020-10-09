@@ -69,11 +69,11 @@ func (h *Health) RegisterHeartbeat(name string, hb Heartbeater, max time.Duratio
 func (h *Health) RegisterMonotonicCheckFunc(name string, checkFn func() (interface{}, error)) error {
 	check := monotonicCheck{
 		check: check{
-			name: name,
-			checkFn: checkFn,
+			name:            name,
+			checkFn:         checkFn,
 			executionPeriod: constants.DefaultHealthCheckExecutionPeriod,
-			initialDelay: constants.DefaultHealthCheckInitialDelay,
-		}
+			initialDelay:    constants.DefaultHealthCheckInitialDelay,
+		},
 	}
 	return h.RegisterCheck(check)
 }

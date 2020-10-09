@@ -455,7 +455,7 @@ func (m *manager) createAvalancheChain(
 	}
 	wrapperHc := &healthCheckWrapper{
 		chain: chainAlias,
-		Lock:  &ctx.Lock,
+		lock:  &ctx.Lock,
 		check: engine.Health,
 	}
 	if err := m.HealthService.RegisterCheck(wrapperHc); err != nil {
@@ -570,7 +570,7 @@ func (m *manager) createSnowmanChain(
 
 	wrapperHc := &healthCheckWrapper{
 		chain: chainAlias,
-		Lock:  &ctx.Lock,
+		lock:  &ctx.Lock,
 		check: engine.Health,
 	}
 	if err := m.HealthService.RegisterCheck(wrapperHc); err != nil {
@@ -635,14 +635,13 @@ func (m *manager) isChainWithAlias(aliases ...string) (string, bool) {
 	return "", false
 }
 
-// Wraps a health check function by prepending chain ID/alias
-// to a health check name  and by grabbing the blockchain's
-// lock before executing the health check
+// Wraps a health check.
+// Grabs [Lock] before executing the health check
 type healthCheckWrapper struct {
 	check func() (interface{}, error)
 
 	// Grabs/releases this before/after health check func
-	Lock *sync.RWMutex
+	lock *sync.RWMutex
 
 	// Alias/ID of chain this health check is for
 	chain string
@@ -655,7 +654,7 @@ func (hc *healthCheckWrapper) Name() string {
 
 // Execute executes the health check function with the lock
 func (hc *healthCheckWrapper) Execute() (interface{}, error) {
-	hc.Lock.Lock()
-	defer hc.Lock.Unlock()
+	hc.lock.Lock()
+	defer hc.lock.Unlock()
 	return hc.check()
 }
