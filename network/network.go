@@ -775,7 +775,7 @@ func (n *network) gossip() {
 		ips := make([]utils.IPDesc, 0, len(n.peers))
 
 		n.stateLock.RLock()
-		for _, peer := range n.getAllPeers() {
+		for _, peer := range allPeers {
 			if peer.connected.GetValue() &&
 				!peer.ip.IsZero() &&
 				n.vdrs.Contains(peer.id) {
