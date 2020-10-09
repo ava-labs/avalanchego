@@ -773,7 +773,7 @@ func (n *network) gossip() {
 			continue
 		}
 
-		ips := make([]utils.IPDesc, 0, len(n.peers))
+		ips := make([]utils.IPDesc, 0, len(allPeers))
 		for _, peer := range allPeers {
 			ip := peer.getIP()
 			if peer.connected.GetValue() &&
