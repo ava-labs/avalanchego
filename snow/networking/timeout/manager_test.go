@@ -18,7 +18,7 @@ import (
 func TestManagerFire(t *testing.T) {
 	manager := Manager{}
 	benchlist := benchlist.NewNoBenchlist()
-	manager.Initialize(&timer.AdaptiveTimeoutConfig{
+	err := manager.Initialize(&timer.AdaptiveTimeoutConfig{
 		InitialTimeout: time.Millisecond,
 		MinimumTimeout: time.Millisecond,
 		MaximumTimeout: 10 * time.Second,
@@ -27,6 +27,9 @@ func TestManagerFire(t *testing.T) {
 		Namespace:      "",
 		Registerer:     prometheus.NewRegistry(),
 	}, benchlist)
+	if err != nil {
+		t.Fatal(err)
+	}
 	go manager.Dispatch()
 
 	wg := sync.WaitGroup{}
@@ -40,7 +43,7 @@ func TestManagerFire(t *testing.T) {
 func TestManagerCancel(t *testing.T) {
 	manager := Manager{}
 	benchlist := benchlist.NewNoBenchlist()
-	manager.Initialize(&timer.AdaptiveTimeoutConfig{
+	err := manager.Initialize(&timer.AdaptiveTimeoutConfig{
 		InitialTimeout: time.Millisecond,
 		MinimumTimeout: time.Millisecond,
 		MaximumTimeout: 10 * time.Second,
@@ -49,6 +52,9 @@ func TestManagerCancel(t *testing.T) {
 		Namespace:      "",
 		Registerer:     prometheus.NewRegistry(),
 	}, benchlist)
+	if err != nil {
+		t.Fatal(err)
+	}
 	go manager.Dispatch()
 
 	wg := sync.WaitGroup{}

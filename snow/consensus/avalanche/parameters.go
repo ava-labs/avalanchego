@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
-// Parameters the avalanche paramaters include the snowball paramters and the
+// Parameters the avalanche parameters include the snowball parameters and the
 // optimal number of parents
 type Parameters struct {
 	snowball.Parameters

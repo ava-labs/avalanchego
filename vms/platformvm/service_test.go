@@ -113,7 +113,12 @@ func TestExportKey(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.Ctx.Lock.Lock()
-	defer func() { service.vm.Shutdown(); service.vm.Ctx.Lock.Unlock() }()
+	defer func() {
+		if err := service.vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		service.vm.Ctx.Lock.Unlock()
+	}()
 
 	reply := ExportKeyReply{}
 	if err := service.ExportKey(nil, &args, &reply); err != nil {
@@ -144,7 +149,12 @@ func TestImportKey(t *testing.T) {
 
 	service := defaultService(t)
 	service.vm.Ctx.Lock.Lock()
-	defer func() { service.vm.Shutdown(); service.vm.Ctx.Lock.Unlock() }()
+	defer func() {
+		if err := service.vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		service.vm.Ctx.Lock.Unlock()
+	}()
 
 	reply := api.JsonAddress{}
 	if err := service.ImportKey(nil, &args, &reply); err != nil {
@@ -160,7 +170,12 @@ func TestGetTxStatus(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.Ctx.Lock.Lock()
-	defer func() { service.vm.Shutdown(); service.vm.Ctx.Lock.Unlock() }()
+	defer func() {
+		if err := service.vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		service.vm.Ctx.Lock.Unlock()
+	}()
 
 	// create a tx
 	tx, err := service.vm.newCreateChainTx(
@@ -217,7 +232,12 @@ func TestGetTx(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.Ctx.Lock.Lock()
-	defer func() { service.vm.Shutdown(); service.vm.Ctx.Lock.Unlock() }()
+	defer func() {
+		if err := service.vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		service.vm.Ctx.Lock.Unlock()
+	}()
 
 	type test struct {
 		description string
@@ -308,7 +328,12 @@ func TestGetBalance(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.Ctx.Lock.Lock()
-	defer func() { service.vm.Shutdown(); service.vm.Ctx.Lock.Unlock() }()
+	defer func() {
+		if err := service.vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		service.vm.Ctx.Lock.Unlock()
+	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis()
@@ -340,7 +365,12 @@ func TestGetStake(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.Ctx.Lock.Lock()
-	defer func() { service.vm.Shutdown(); service.vm.Ctx.Lock.Unlock() }()
+	defer func() {
+		if err := service.vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		service.vm.Ctx.Lock.Unlock()
+	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis()
@@ -490,18 +520,26 @@ func TestGetCurrentValidators(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.Ctx.Lock.Lock()
-	defer func() { service.vm.Shutdown(); service.vm.Ctx.Lock.Unlock() }()
+	defer func() {
+		if err := service.vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		service.vm.Ctx.Lock.Unlock()
+	}()
 
 	genesis, _ := defaultGenesis()
 
 	// Call getValidators
 	args := GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
 	response := GetCurrentValidatorsReply{}
-	if err := service.GetCurrentValidators(nil, &args, &response); err != nil {
+
+	err := service.GetCurrentValidators(nil, &args, &response)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if len(response.Validators) != len(genesis.Validators) {
+	case len(response.Validators) != len(genesis.Validators):
 		t.Fatalf("should be %d validators but are %d", len(genesis.Validators), len(response.Validators))
-	} else if len(response.Delegators) != 0 {
+	case len(response.Delegators) != 0:
 		t.Fatalf("should be 0 delegators but are %d", len(response.Delegators))
 	}
 
@@ -509,32 +547,31 @@ func TestGetCurrentValidators(t *testing.T) {
 		found := false
 		for i := 0; i < len(response.Validators) && !found; i++ {
 			gotVdr, ok := response.Validators[i].(APIPrimaryValidator)
-			if !ok {
+			switch {
+			case !ok:
 				t.Fatal("expected APIPrimaryValidator")
-			}
-			if gotVdr.NodeID != vdr.NodeID {
-				continue
-			}
-			if gotVdr.EndTime != vdr.EndTime {
+			case gotVdr.NodeID != vdr.NodeID:
+			case gotVdr.EndTime != vdr.EndTime:
 				t.Fatalf("expected end time of %s to be %v but got %v",
 					vdr.NodeID,
 					vdr.EndTime,
 					gotVdr.EndTime,
 				)
-			} else if gotVdr.StartTime != vdr.StartTime {
+			case gotVdr.StartTime != vdr.StartTime:
 				t.Fatalf("expected start time of %s to be %v but got %v",
 					vdr.NodeID,
 					vdr.StartTime,
 					gotVdr.StartTime,
 				)
-			} else if gotVdr.Weight != vdr.Weight {
+			case gotVdr.Weight != vdr.Weight:
 				t.Fatalf("expected weight of %s to be %v but got %v",
 					vdr.NodeID,
 					vdr.Weight,
 					gotVdr.Weight,
 				)
+			default:
+				found = true
 			}
-			found = true
 		}
 		if !found {
 			t.Fatalf("expected validators to contain %s but didn't", vdr.NodeID)
@@ -568,11 +605,13 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	// Call getCurrentValidators
 	args = GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
-	if err := service.GetCurrentValidators(nil, &args, &response); err != nil {
+	err = service.GetCurrentValidators(nil, &args, &response)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if len(response.Validators) != len(genesis.Validators) {
+	case len(response.Validators) != len(genesis.Validators):
 		t.Fatalf("should be %d validators but are %d", len(genesis.Validators), len(response.Validators))
-	} else if len(response.Delegators) != 1 {
+	case len(response.Delegators) != 1:
 		t.Fatalf("should be 1 delegators but are %d", len(response.Delegators))
 	}
 
@@ -588,13 +627,14 @@ func TestGetCurrentValidators(t *testing.T) {
 			t.Fatalf("%s should have 1 delegator", vdr.NodeID)
 		}
 		delegator := vdr.Delegators[0]
-		if delegator.NodeID != vdr.NodeID {
+		switch {
+		case delegator.NodeID != vdr.NodeID:
 			t.Fatal("wrong node ID")
-		} else if uint64(delegator.StartTime) != delegatorStartTime {
+		case uint64(delegator.StartTime) != delegatorStartTime:
 			t.Fatal("wrong start time")
-		} else if uint64(delegator.EndTime) != delegatorEndTime {
+		case uint64(delegator.EndTime) != delegatorEndTime:
 			t.Fatal("wrong end time")
-		} else if delegator.weight() != stakeAmt {
+		case delegator.weight() != stakeAmt:
 			t.Fatalf("wrong weight")
 		}
 	}

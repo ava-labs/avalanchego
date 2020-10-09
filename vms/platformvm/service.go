@@ -216,24 +216,24 @@ utxoFor:
 			}
 		case *StakeableLockOut:
 			innerOut, ok := out.TransferableOut.(*secp256k1fx.TransferOutput)
-			if !ok {
+			switch {
+			case !ok:
 				service.vm.SnowmanVM.Ctx.Log.Warn("Unexpected Output type in UTXO: %T",
 					out.TransferableOut)
 				continue utxoFor
-			}
-			if innerOut.Locktime > currentTime {
+			case innerOut.Locktime > currentTime:
 				newBalance, err := math.Add64(lockedNotStakeable, out.Amount())
 				if err != nil {
 					return errors.New("overflow while calculating locked not stakeable balance")
 				}
 				lockedNotStakeable = newBalance
-			} else if out.Locktime <= currentTime {
+			case out.Locktime <= currentTime:
 				newBalance, err := math.Add64(unlocked, out.Amount())
 				if err != nil {
 					return errors.New("overflow while calculating unlocked balance")
 				}
 				unlocked = newBalance
-			} else {
+			default:
 				newBalance, err := math.Add64(lockedStakeable, out.Amount())
 				if err != nil {
 					return errors.New("overflow while calculating unlocked stakeable balance")
@@ -991,7 +991,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 
 	// Create the transaction
 	tx, err := service.vm.newAddValidatorTx(
-		uint64(args.weight()),                // Stake amount
+		args.weight(),                        // Stake amount
 		uint64(args.StartTime),               // Start time
 		uint64(args.EndTime),                 // End time
 		nodeID,                               // Node ID
@@ -1108,7 +1108,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 
 	// Create the transaction
 	tx, err := service.vm.newAddDelegatorTx(
-		uint64(args.weight()),  // Stake amount
+		args.weight(),          // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
 		nodeID,                 // Node ID
@@ -1221,7 +1221,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 
 	// Create the transaction
 	tx, err := service.vm.newAddSubnetValidatorTx(
-		uint64(args.weight()),  // Stake amount
+		args.weight(),          // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
 		nodeID,                 // Node ID
@@ -1691,8 +1691,7 @@ type GetBlockchainStatusReply struct {
 // GetBlockchainStatus gets the status of a blockchain with the ID [args.BlockchainID].
 func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchainStatusArgs, reply *GetBlockchainStatusReply) error {
 	service.vm.Ctx.Log.Info("Platform: GetBlockchainStatus called")
-	switch {
-	case args.BlockchainID == "":
+	if args.BlockchainID == "" {
 		return errors.New("argument 'blockchainID' not given")
 	}
 

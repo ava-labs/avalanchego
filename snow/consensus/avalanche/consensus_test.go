@@ -58,21 +58,27 @@ func MetricsTest(t *testing.T, factory Factory) {
 		avl := factory.New()
 		params := Parameters{
 			Parameters: snowball.Parameters{
-				Namespace:    fmt.Sprintf("%s_%s", constants.PlatformName, ctx.ChainID),
-				Metrics:      prometheus.NewRegistry(),
-				K:            2,
-				Alpha:        2,
-				BetaVirtuous: 1,
-				BetaRogue:    2,
+				Namespace:         fmt.Sprintf("%s_%s", constants.PlatformName, ctx.ChainID),
+				Metrics:           prometheus.NewRegistry(),
+				K:                 2,
+				Alpha:             2,
+				BetaVirtuous:      1,
+				BetaRogue:         2,
+				ConcurrentRepolls: 1,
 			},
 			Parents:   2,
 			BatchSize: 1,
 		}
-		params.Metrics.Register(prometheus.NewGauge(prometheus.GaugeOpts{
+		err := params.Metrics.Register(prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: params.Namespace,
 			Name:      "vtx_processing",
 		}))
-		avl.Initialize(ctx, params, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := avl.Initialize(ctx, params, nil); err == nil {
+			t.Fatalf("should have failed due to registering a duplicated statistic")
+		}
 	}
 	{
 		avl := factory.New()
@@ -88,11 +94,16 @@ func MetricsTest(t *testing.T, factory Factory) {
 			Parents:   2,
 			BatchSize: 1,
 		}
-		params.Metrics.Register(prometheus.NewGauge(prometheus.GaugeOpts{
+		err := params.Metrics.Register(prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: params.Namespace,
 			Name:      "vtx_accepted",
 		}))
-		avl.Initialize(ctx, params, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := avl.Initialize(ctx, params, nil); err == nil {
+			t.Fatalf("should have failed due to registering a duplicated statistic")
+		}
 	}
 	{
 		avl := factory.New()
@@ -108,11 +119,16 @@ func MetricsTest(t *testing.T, factory Factory) {
 			Parents:   2,
 			BatchSize: 1,
 		}
-		params.Metrics.Register(prometheus.NewGauge(prometheus.GaugeOpts{
+		err := params.Metrics.Register(prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: params.Namespace,
 			Name:      "vtx_rejected",
 		}))
-		avl.Initialize(ctx, params, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := avl.Initialize(ctx, params, nil); err == nil {
+			t.Fatalf("should have failed due to registering a duplicated statistic")
+		}
 	}
 }
 
@@ -138,15 +154,17 @@ func ParamsTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if p := avl.Parameters(); p.K != params.K {
+	p := avl.Parameters()
+	switch {
+	case p.K != params.K:
 		t.Fatalf("Wrong K parameter")
-	} else if p.Alpha != params.Alpha {
+	case p.Alpha != params.Alpha:
 		t.Fatalf("Wrong Alpha parameter")
-	} else if p.BetaVirtuous != params.BetaVirtuous {
+	case p.BetaVirtuous != params.BetaVirtuous:
 		t.Fatalf("Wrong Beta1 parameter")
-	} else if p.BetaRogue != params.BetaRogue {
+	case p.BetaRogue != params.BetaRogue:
 		t.Fatalf("Wrong Beta2 parameter")
-	} else if p.Parents != params.Parents {
+	case p.Parents != params.Parents:
 		t.Fatalf("Wrong Parents parameter")
 	}
 }
@@ -204,11 +222,13 @@ func AddTest(t *testing.T, factory Factory) {
 		TxsV:     []snowstorm.Tx{tx0},
 	}
 
-	if err := avl.Add(vtx0); err != nil {
+	err := avl.Add(vtx0)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if avl.Finalized() {
+	case avl.Finalized():
 		t.Fatalf("A non-empty avalanche instance is finalized")
-	} else if !ids.UnsortedEquals([]ids.ID{vtx0.IDV}, avl.Preferences().List()) {
+	case !ids.UnsortedEquals([]ids.ID{vtx0.IDV}, avl.Preferences().List()):
 		t.Fatalf("Initial frontier failed to be set")
 	}
 
@@ -228,23 +248,33 @@ func AddTest(t *testing.T, factory Factory) {
 		TxsV:     []snowstorm.Tx{tx1},
 	}
 
-	if err := avl.Add(vtx1); err != nil {
+	err = avl.Add(vtx1)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if avl.Finalized() {
+	case avl.Finalized():
 		t.Fatalf("A non-empty avalanche instance is finalized")
-	} else if !ids.UnsortedEquals([]ids.ID{vtx0.IDV}, avl.Preferences().List()) {
+	case !ids.UnsortedEquals([]ids.ID{vtx0.IDV}, avl.Preferences().List()):
 		t.Fatalf("Initial frontier failed to be set")
-	} else if err := avl.Add(vtx1); err != nil {
+	}
+
+	err = avl.Add(vtx1)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if avl.Finalized() {
+	case avl.Finalized():
 		t.Fatalf("A non-empty avalanche instance is finalized")
-	} else if !ids.UnsortedEquals([]ids.ID{vtx0.IDV}, avl.Preferences().List()) {
+	case !ids.UnsortedEquals([]ids.ID{vtx0.IDV}, avl.Preferences().List()):
 		t.Fatalf("Initial frontier failed to be set")
-	} else if err := avl.Add(vts[0]); err != nil {
+	}
+
+	err = avl.Add(vts[0])
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if avl.Finalized() {
+	case avl.Finalized():
 		t.Fatalf("A non-empty avalanche instance is finalized")
-	} else if !ids.UnsortedEquals([]ids.ID{vtx0.IDV}, avl.Preferences().List()) {
+	case !ids.UnsortedEquals([]ids.ID{vtx0.IDV}, avl.Preferences().List()):
 		t.Fatalf("Initial frontier failed to be set")
 	}
 }
@@ -397,13 +427,18 @@ func VirtuousTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	if virtuous := avl.Virtuous(); virtuous.Len() != 2 {
+	virtuous := avl.Virtuous()
+	switch {
+	case virtuous.Len() != 2:
 		t.Fatalf("Wrong number of virtuous.")
-	} else if !virtuous.Contains(vts[0].ID()) {
+	case !virtuous.Contains(vts[0].ID()):
 		t.Fatalf("Wrong virtuous")
-	} else if !virtuous.Contains(vts[1].ID()) {
+	case !virtuous.Contains(vts[1].ID()):
 		t.Fatalf("Wrong virtuous")
 	}
 
@@ -475,27 +510,43 @@ func VirtuousTest(t *testing.T, factory Factory) {
 
 	if err := avl.RecordPoll(votes); err != nil {
 		t.Fatal(err)
-	} else if virtuous := avl.Virtuous(); virtuous.Len() != 2 {
+	}
+
+	virtuous = avl.Virtuous()
+	switch {
+	case virtuous.Len() != 2:
 		t.Fatalf("Wrong number of virtuous.")
-	} else if !virtuous.Contains(vts[0].ID()) {
+	case !virtuous.Contains(vts[0].ID()):
 		t.Fatalf("Wrong virtuous")
-	} else if !virtuous.Contains(vts[1].ID()) {
+	case !virtuous.Contains(vts[1].ID()):
 		t.Fatalf("Wrong virtuous")
-	} else if err := avl.Add(vtx2); err != nil {
+	}
+
+	if err := avl.Add(vtx2); err != nil {
 		t.Fatal(err)
-	} else if virtuous := avl.Virtuous(); virtuous.Len() != 2 {
+	}
+
+	virtuous = avl.Virtuous()
+	switch {
+	case virtuous.Len() != 2:
 		t.Fatalf("Wrong number of virtuous.")
-	} else if !virtuous.Contains(vts[0].ID()) {
+	case !virtuous.Contains(vts[0].ID()):
 		t.Fatalf("Wrong virtuous")
-	} else if !virtuous.Contains(vts[1].ID()) {
+	case !virtuous.Contains(vts[1].ID()):
 		t.Fatalf("Wrong virtuous")
-	} else if err := avl.RecordPoll(votes); err != nil {
+	}
+
+	if err := avl.RecordPoll(votes); err != nil {
 		t.Fatal(err)
-	} else if virtuous := avl.Virtuous(); virtuous.Len() != 2 {
+	}
+
+	virtuous = avl.Virtuous()
+	switch {
+	case virtuous.Len() != 2:
 		t.Fatalf("Wrong number of virtuous.")
-	} else if !virtuous.Contains(vts[0].ID()) {
+	case !virtuous.Contains(vts[0].ID()):
 		t.Fatalf("Wrong virtuous")
-	} else if !virtuous.Contains(vts[1].ID()) {
+	case !virtuous.Contains(vts[1].ID()):
 		t.Fatalf("Wrong virtuous")
 	}
 }
@@ -530,13 +581,18 @@ func VirtuousSkippedUpdateTest(t *testing.T, factory Factory) {
 		ids.GenerateTestID(),
 	}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	if virtuous := avl.Virtuous(); virtuous.Len() != 2 {
+	virtuous := avl.Virtuous()
+	switch {
+	case virtuous.Len() != 2:
 		t.Fatalf("Wrong number of virtuous.")
-	} else if !virtuous.Contains(vts[0].ID()) {
+	case !virtuous.Contains(vts[0].ID()):
 		t.Fatalf("Wrong virtuous")
-	} else if !virtuous.Contains(vts[1].ID()) {
+	case !virtuous.Contains(vts[1].ID()):
 		t.Fatalf("Wrong virtuous")
 	}
 
@@ -620,7 +676,10 @@ func VotingTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -663,21 +722,28 @@ func VotingTest(t *testing.T, factory Factory) {
 	sm := ids.UniqueBag{}
 	sm.Add(0, vtx1.IDV)
 	sm.Add(1, vtx1.IDV)
-	if err := avl.RecordPoll(sm); err != nil {
+
+	err = avl.RecordPoll(sm)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if avl.Finalized() {
+	case avl.Finalized():
 		t.Fatalf("An avalanche instance finalized too early")
-	} else if !ids.UnsortedEquals([]ids.ID{vtx1.IDV}, avl.Preferences().List()) {
+	case !ids.UnsortedEquals([]ids.ID{vtx1.IDV}, avl.Preferences().List()):
 		t.Fatalf("Initial frontier failed to be set")
-	} else if err := avl.RecordPoll(sm); err != nil {
+	}
+
+	err = avl.RecordPoll(sm)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if !avl.Finalized() {
+	case !avl.Finalized():
 		t.Fatalf("An avalanche instance finalized too late")
-	} else if !ids.UnsortedEquals([]ids.ID{vtx1.IDV}, avl.Preferences().List()) {
+	case !ids.UnsortedEquals([]ids.ID{vtx1.IDV}, avl.Preferences().List()):
 		t.Fatalf("Initial frontier failed to be set")
-	} else if tx0.Status() != choices.Rejected {
+	case tx0.Status() != choices.Rejected:
 		t.Fatalf("Tx should have been rejected")
-	} else if tx1.Status() != choices.Accepted {
+	case tx1.Status() != choices.Accepted:
 		t.Fatalf("Tx should have been accepted")
 	}
 }
@@ -794,7 +860,10 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -849,28 +918,34 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 	sm1 := ids.UniqueBag{}
 	sm1.Add(0, vtx0.IDV)
 	sm1.Add(1, vtx2.IDV)
-	if err := avl.RecordPoll(sm1); err != nil {
+
+	err = avl.RecordPoll(sm1)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if avl.Finalized() {
+	case avl.Finalized():
 		t.Fatalf("An avalanche instance finalized too early")
-	} else if !ids.UnsortedEquals([]ids.ID{vtx2.IDV}, avl.Preferences().List()) {
+	case !ids.UnsortedEquals([]ids.ID{vtx2.IDV}, avl.Preferences().List()):
 		t.Fatalf("Initial frontier failed to be set")
-	} else if tx0.Status() != choices.Accepted {
+	case tx0.Status() != choices.Accepted:
 		t.Fatalf("Tx should have been accepted")
 	}
 
 	sm2 := ids.UniqueBag{}
 	sm2.Add(0, vtx2.IDV)
 	sm2.Add(1, vtx2.IDV)
-	if err := avl.RecordPoll(sm2); err != nil {
+
+	err = avl.RecordPoll(sm2)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if !avl.Finalized() {
+	case !avl.Finalized():
 		t.Fatalf("An avalanche instance finalized too late")
-	} else if !ids.UnsortedEquals([]ids.ID{vtx2.IDV}, avl.Preferences().List()) {
+	case !ids.UnsortedEquals([]ids.ID{vtx2.IDV}, avl.Preferences().List()):
 		t.Fatalf("Initial frontier failed to be set")
-	} else if tx0.Status() != choices.Accepted {
+	case tx0.Status() != choices.Accepted:
 		t.Fatalf("Tx should have been accepted")
-	} else if tx1.Status() != choices.Accepted {
+	case tx1.Status() != choices.Accepted:
 		t.Fatalf("Tx should have been accepted")
 	}
 }
@@ -902,7 +977,10 @@ func SplitVotingTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -939,13 +1017,16 @@ func SplitVotingTest(t *testing.T, factory Factory) {
 	sm1 := ids.UniqueBag{}
 	sm1.Add(0, vtx0.IDV) // peer 0 votes for the tx though vtx0
 	sm1.Add(1, vtx1.IDV) // peer 1 votes for the tx though vtx1
-	if err := avl.RecordPoll(sm1); err != nil {
+
+	err = avl.RecordPoll(sm1)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if !avl.Finalized() {
+	case !avl.Finalized():
 		t.Fatalf("An avalanche instance finalized too late")
-	} else if !ids.UnsortedEquals([]ids.ID{vtx0.IDV, vtx1.IDV}, avl.Preferences().List()) {
+	case !ids.UnsortedEquals([]ids.ID{vtx0.IDV, vtx1.IDV}, avl.Preferences().List()):
 		t.Fatalf("Initial frontier failed to be set")
-	} else if tx0.Status() != choices.Accepted {
+	case tx0.Status() != choices.Accepted:
 		t.Fatalf("Tx should have been accepted")
 	}
 }
@@ -977,7 +1058,10 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1038,35 +1122,46 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 	sm := ids.UniqueBag{}
 	sm.Add(0, vtx1.IDV)
 	sm.Add(1, vtx1.IDV)
-	if err := avl.RecordPoll(sm); err != nil {
+
+	err = avl.RecordPoll(sm)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if avl.Finalized() {
+	case avl.Finalized():
 		t.Fatalf("An avalanche instance finalized too early")
-	} else if !ids.UnsortedEquals([]ids.ID{vtx1.IDV}, avl.Preferences().List()) {
+	case !ids.UnsortedEquals([]ids.ID{vtx1.IDV}, avl.Preferences().List()):
 		t.Fatalf("Initial frontier failed to be set")
-	} else if err := avl.RecordPoll(sm); err != nil {
+	}
+
+	err = avl.RecordPoll(sm)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if avl.Finalized() {
+	case avl.Finalized():
 		t.Fatalf("An avalanche instance finalized too early")
-	} else if !ids.UnsortedEquals([]ids.ID{vtx1.IDV}, avl.Preferences().List()) {
+	case !ids.UnsortedEquals([]ids.ID{vtx1.IDV}, avl.Preferences().List()):
 		t.Fatalf("Initial frontier failed to be set")
-	} else if tx0.Status() != choices.Rejected {
+	case tx0.Status() != choices.Rejected:
 		t.Fatalf("Tx should have been rejected")
-	} else if tx1.Status() != choices.Accepted {
+	case tx1.Status() != choices.Accepted:
 		t.Fatalf("Tx should have been accepted")
-	} else if tx2.Status() != choices.Processing {
+	case tx2.Status() != choices.Processing:
 		t.Fatalf("Tx should not have been decided")
-	} else if err := avl.RecordPoll(sm); err != nil {
+	}
+
+	err = avl.RecordPoll(sm)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if avl.Finalized() {
+	case avl.Finalized():
 		t.Fatalf("An avalanche instance finalized too early")
-	} else if !ids.UnsortedEquals([]ids.ID{vtx1.IDV}, avl.Preferences().List()) {
+	case !ids.UnsortedEquals([]ids.ID{vtx1.IDV}, avl.Preferences().List()):
 		t.Fatalf("Initial frontier failed to be set")
-	} else if tx0.Status() != choices.Rejected {
+	case tx0.Status() != choices.Rejected:
 		t.Fatalf("Tx should have been rejected")
-	} else if tx1.Status() != choices.Accepted {
+	case tx1.Status() != choices.Accepted:
 		t.Fatalf("Tx should have been accepted")
-	} else if tx2.Status() != choices.Processing {
+	case tx2.Status() != choices.Processing:
 		t.Fatalf("Tx should not have been decided")
 	}
 }
@@ -1098,13 +1193,18 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	if virtuous := avl.Virtuous(); virtuous.Len() != 2 {
+	virtuous := avl.Virtuous()
+	switch {
+	case virtuous.Len() != 2:
 		t.Fatalf("Wrong number of virtuous.")
-	} else if !virtuous.Contains(vts[0].ID()) {
+	case !virtuous.Contains(vts[0].ID()):
 		t.Fatalf("Wrong virtuous")
-	} else if !virtuous.Contains(vts[1].ID()) {
+	case !virtuous.Contains(vts[1].ID()):
 		t.Fatalf("Wrong virtuous")
 	}
 
@@ -1144,17 +1244,25 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 		t.Fatalf("Should be virtuous.")
 	} else if !avl.IsVirtuous(tx1) {
 		t.Fatalf("Should be virtuous.")
-	} else if err := avl.Add(vtx0); err != nil {
+	}
+
+	err = avl.Add(vtx0)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if !avl.IsVirtuous(tx0) {
+	case !avl.IsVirtuous(tx0):
 		t.Fatalf("Should be virtuous.")
-	} else if avl.IsVirtuous(tx1) {
+	case avl.IsVirtuous(tx1):
 		t.Fatalf("Should not be virtuous.")
-	} else if err := avl.Add(vtx1); err != nil {
+	}
+
+	err = avl.Add(vtx1)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if avl.IsVirtuous(tx0) {
+	case avl.IsVirtuous(tx0):
 		t.Fatalf("Should not be virtuous.")
-	} else if avl.IsVirtuous(tx1) {
+	case avl.IsVirtuous(tx1):
 		t.Fatalf("Should not be virtuous.")
 	}
 }
@@ -1186,7 +1294,10 @@ func QuiesceTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1286,7 +1397,10 @@ func OrphansTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1381,7 +1495,10 @@ func ErrorOnVacuousAcceptTest(t *testing.T, factory Factory) {
 		StatusV: choices.Accepted,
 	}}}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1425,7 +1542,10 @@ func ErrorOnTxAcceptTest(t *testing.T, factory Factory) {
 	}}}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1476,7 +1596,10 @@ func ErrorOnVtxAcceptTest(t *testing.T, factory Factory) {
 	}}}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1527,7 +1650,10 @@ func ErrorOnVtxRejectTest(t *testing.T, factory Factory) {
 	}}}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1596,7 +1722,10 @@ func ErrorOnParentVtxRejectTest(t *testing.T, factory Factory) {
 	}}}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1677,7 +1806,10 @@ func ErrorOnTransitiveVtxRejectTest(t *testing.T, factory Factory) {
 	}}}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),

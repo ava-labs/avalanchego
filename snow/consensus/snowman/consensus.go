@@ -13,7 +13,7 @@ import (
 // process a series of dependent operations.
 type Consensus interface {
 	// Takes in the context, snowball parameters, and the last accepted block.
-	Initialize(*snow.Context, snowball.Parameters, ids.ID)
+	Initialize(*snow.Context, snowball.Parameters, ids.ID) error
 
 	// Returns the parameters that describe this snowman instance
 	Parameters() snowball.Parameters
