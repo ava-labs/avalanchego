@@ -1124,8 +1124,9 @@ func (n *network) registerConnection(addr string) (int, error) {
 		return 0, err
 	}
 
+	tickCount := meter.Ticks()
 	meter.Tick()
-	return meter.Ticks(), nil
+	return tickCount, nil
 }
 
 func (n *network) registerConnectionAddress(addr string) (*timer.TimedMeter, error) {
