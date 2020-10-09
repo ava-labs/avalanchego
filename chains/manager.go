@@ -41,7 +41,7 @@ import (
 )
 
 const (
-	defaultChannelSize = 1024
+	defaultChannelSize = 8192
 )
 
 // Manager manages the chains running on this node.
