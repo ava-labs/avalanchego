@@ -1083,7 +1083,7 @@ func (n *network) disconnected(p *peer) {
 type PeerElement struct {
 	// the peer
 	peer *peer
-	// whether or not it was in the peers, we percolate to the caller to missing peers can be logged and sent to prometheus
+	// whether or not it was in peers when we cloned the list, we percolate to the caller for logging and prometheus stats
 	exists bool
 	// this is the validator id for the peer, we pass back to the caller for logging purposes
 	id ids.ShortID
