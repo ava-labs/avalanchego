@@ -647,13 +647,14 @@ func (n *network) Dispatch() error {
 
 // IPs implements the Network interface
 func (n *network) Peers() []PeerID {
-	allPeers := n.getAllPeers()
-	peers := make([]PeerID, 0, len(allPeers))
-	for _, peer := range allPeers {
+	n.stateLock.RLock()
+	defer n.stateLock.RUnlock()
+	peers := make([]PeerID, 0, len(n.peers))
+	for _, peer := range n.peers {
 		if peer.connected.GetValue() {
 			peers = append(peers, PeerID{
 				IP:           peer.conn.RemoteAddr().String(),
-				PublicIP:     peer.getIPSafe().String(),
+				PublicIP:     peer.ip.String(),
 				ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
 				Version:      peer.versionStr.GetValue().(string),
 				LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
@@ -710,8 +711,7 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte)
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
 
-	allPeers := make([]*peer, 0, len(n.peers))
-	allPeers = append(allPeers, n.getAllPeers()...)
+	allPeers := n.getAllPeers()
 
 	numToGossip := n.gossipSize
 	if numToGossip > len(allPeers) {
@@ -763,7 +763,27 @@ func (n *network) gossip() {
 	defer t.Stop()
 
 	for range t.C {
-		ips := n.validatorIPs()
+		if n.closed.GetValue() {
+			return
+		}
+
+		allPeers := n.getAllPeers()
+		if len(allPeers) == 0 {
+			continue
+		}
+
+		ips := make([]utils.IPDesc, 0, len(n.peers))
+
+		n.stateLock.RLock()
+		for _, peer := range n.getAllPeers() {
+			if peer.connected.GetValue() &&
+				!peer.ip.IsZero() &&
+				n.vdrs.Contains(peer.id) {
+				ips = append(ips, peer.ip)
+			}
+		}
+		n.stateLock.RUnlock()
+
 		if len(ips) == 0 {
 			n.log.Debug("skipping validator gossiping as no public validators are connected")
 			continue
@@ -773,15 +793,6 @@ func (n *network) gossip() {
 			n.log.Error("failed to build peer list to gossip: %s. len(ips): %d",
 				err,
 				len(ips))
-			continue
-		}
-
-		if n.closed.GetValue() {
-			return
-		}
-
-		allPeers := n.getAllPeers()
-		if len(allPeers) == 0 {
 			continue
 		}
 
@@ -1006,14 +1017,14 @@ func (n *network) tryAddPeer(p *peer) error {
 // assumes the stateLock is not held. Returns the ips of connections that have
 // valid IPs that are marked as validators.
 func (n *network) validatorIPs() []utils.IPDesc {
-	allPeers := n.getAllPeers()
-	ips := make([]utils.IPDesc, 0, len(allPeers))
-	for _, peer := range allPeers {
-		ip := peer.getIPSafe()
+	n.stateLock.RLock()
+	defer n.stateLock.RUnlock()
+	ips := make([]utils.IPDesc, 0, len(n.peers))
+	for _, peer := range n.peers {
 		if peer.connected.GetValue() &&
-			!ip.IsZero() &&
+			!peer.ip.IsZero() &&
 			n.vdrs.Contains(peer.id) {
-			ips = append(ips, ip)
+			ips = append(ips, peer.ip)
 		}
 	}
 	return ips
