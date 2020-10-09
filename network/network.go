@@ -925,7 +925,7 @@ func (n *network) attemptConnect(ip utils.IPDesc) error {
 	}
 	return n.upgrade(&peer{
 		net:          n,
-		ip:           utils.NewMutexInterface(ip),
+		ip:           ip,
 		conn:         conn,
 		tickerCloser: make(chan struct{}),
 	}, n.clientUpgrader)
