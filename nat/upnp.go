@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	soapRequestTimeout = 3 * time.Second
+	soapRequestTimeout = 10 * time.Second
 )
 
 // upnpClient is the interface used by goupnp for their client implementations
@@ -62,6 +62,10 @@ type upnpClient interface {
 type upnpRouter struct {
 	dev    *goupnp.RootDevice
 	client upnpClient
+}
+
+func (r *upnpRouter) IsNATTraversal() bool {
+	return true
 }
 
 func (r *upnpRouter) localIP() (net.IP, error) {
@@ -128,11 +132,6 @@ func (r *upnpRouter) MapPort(protocol string, intPort, extPort uint16,
 
 func (r *upnpRouter) UnmapPort(protocol string, _, extPort uint16) error {
 	return r.client.DeletePortMapping("", extPort, protocol)
-}
-
-func (r *upnpRouter) GetPortMappingEntry(extPort uint16, protocol string) (string, uint16, string, error) {
-	intPort, intAddr, _, desc, _, err := r.client.GetSpecificPortMappingEntry("", extPort, protocol)
-	return intAddr, intPort, desc, err
 }
 
 // create UPnP SOAP service client with URN

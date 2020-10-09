@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
@@ -80,7 +81,7 @@ func (t *ExportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 			return err
 		}
 		assetID := out.AssetID()
-		if !out.AssetID().Equals(vm.ctx.AVAXAssetID) {
+		if !out.AssetID().Equals(vm.ctx.AVAXAssetID) && t.DestinationChain.Equals(constants.PlatformChainID) {
 			return errWrongAssetID
 		}
 		if !vm.verifyFxUsage(fxIndex, assetID) {

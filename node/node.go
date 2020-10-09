@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -31,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/triggers"
@@ -64,7 +66,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion(constants.PlatformName, 0, 8, 4)
+	Version       = version.NewDefaultVersion(constants.PlatformName, 1, 0, 2)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -128,7 +130,7 @@ type Node struct {
  */
 
 func (n *Node) initNetworking() error {
-	listener, err := net.Listen(TCP, fmt.Sprintf(":%d", n.Config.StakingLocalPort))
+	listener, err := net.Listen(TCP, fmt.Sprintf(":%d", n.Config.StakingIP.Port))
 	if err != nil {
 		return err
 	}
@@ -190,7 +192,7 @@ func (n *Node) initNetworking() error {
 		})
 
 		go timer.Dispatch()
-		timer.SetTimeoutIn(15 * time.Second)
+		timer.SetTimeoutIn(1 * time.Minute)
 
 		consensusRouter = &beaconManager{
 			Router:         consensusRouter,
@@ -220,7 +222,7 @@ func (n *Node) initNetworking() error {
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
 		// errors are already logged internally if they are meaningful
 		_ = n.Net.Close()
-	}, os.Interrupt, os.Kill)
+	}, syscall.SIGINT, syscall.SIGTERM)
 
 	return nil
 }
@@ -469,10 +471,13 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	criticalChains := ids.Set{}
 	criticalChains.Add(constants.PlatformChainID, createAVMTx.ID())
 
-	timeoutManager := timeout.Manager{}
 	n.Config.NetworkConfig.Namespace = constants.PlatformName
 	n.Config.NetworkConfig.Registerer = n.Config.ConsensusParams.Metrics
-	if err := timeoutManager.Initialize(&n.Config.NetworkConfig); err != nil {
+	n.Config.BenchlistConfig.Validators = n.vdrs
+	benchlistManager := benchlist.NewManager(&n.Config.BenchlistConfig)
+
+	timeoutManager := timeout.Manager{}
+	if err := timeoutManager.Initialize(&n.Config.NetworkConfig, benchlistManager); err != nil {
 		return err
 	}
 	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
@@ -483,6 +488,12 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		&timeoutManager,
 		n.Config.ConsensusGossipFrequency,
 		n.Config.ConsensusShutdownTimeout,
+		criticalChains,
+		func() {
+			if err := n.Net.Close(); err != nil {
+				n.Log.Debug("closing the network due to a fatal chain error resulted in: %s", err)
+			}
+		},
 	)
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
@@ -531,7 +542,9 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Fee:                n.Config.TxFee,
 			UptimePercentage:   n.Config.UptimeRequirement,
 			MinValidatorStake:  n.Config.MinValidatorStake,
+			MaxValidatorStake:  n.Config.MaxValidatorStake,
 			MinDelegatorStake:  n.Config.MinDelegatorStake,
+			MinDelegationFee:   n.Config.MinDelegationFee,
 			MinStakeDuration:   n.Config.MinStakeDuration,
 			MaxStakeDuration:   n.Config.MaxStakeDuration,
 			StakeMintingPeriod: n.Config.StakeMintingPeriod,
@@ -700,9 +713,9 @@ func (n *Node) initIPCAPI() error {
 }
 
 // Give chains and VMs aliases as specified by the genesis information
-func (n *Node) initAliases() error {
+func (n *Node) initAliases(genesisBytes []byte) error {
 	n.Log.Info("initializing aliases")
-	defaultAliases, chainAliases, vmAliases, err := genesis.Aliases(n.Config.NetworkID)
+	defaultAliases, chainAliases, vmAliases, err := genesis.Aliases(genesisBytes)
 	if err != nil {
 		return err
 	}
@@ -732,10 +745,10 @@ func (n *Node) initAliases() error {
 }
 
 // Initialize this node
-func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logging.Factory) error {
+func (n *Node) Initialize(config *Config, logger logging.Logger, logFactory logging.Factory) error {
 	n.Log = logger
 	n.LogFactory = logFactory
-	n.Config = Config
+	n.Config = config
 	n.Log.Info("Node version is: %s", Version)
 
 	httpLog, err := logFactory.MakeSubdir("http")
@@ -801,7 +814,7 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	if err := n.initIPCAPI(); err != nil { // Start the IPC API
 		return fmt.Errorf("couldn't initialize the IPC API: %w", err)
 	}
-	if err := n.initAliases(); err != nil { // Set up aliases
+	if err := n.initAliases(genesisBytes); err != nil { // Set up aliases
 		return fmt.Errorf("couldn't initialize aliases: %w", err)
 	}
 	if err := n.initChains(genesisBytes, avaxAssetID); err != nil { // Start the Platform chain

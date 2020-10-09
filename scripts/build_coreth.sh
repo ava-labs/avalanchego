@@ -12,8 +12,10 @@ BUILD_DIR="$AVALANCHE_PATH/build" # Where binaries go
 PLUGIN_DIR="$BUILD_DIR/plugins" # Where plugin binaries (namely coreth) go
 BINARY_PATH="$PLUGIN_DIR/evm"
 
-CORETH_VER="0.3.0-rc.6" # Should match coreth version in go.mod
-CORETH_PATH="$GOPATH/pkg/mod/github.com/ava-labs/coreth@v$CORETH_VER"
+CORETH_VER="v0.3.5"
+go get "github.com/ava-labs/coreth@$CORETH_VER"
+
+CORETH_PATH="$GOPATH/pkg/mod/github.com/ava-labs/coreth@$CORETH_VER"
 
 if [[ $# -eq 2 ]]; then
     CORETH_PATH=$1
@@ -26,3 +28,6 @@ fi
 # Build Coreth, which is run as a subprocess
 echo "Building Coreth..."
 go build -o "$BINARY_PATH" "$CORETH_PATH/plugin/"*.go
+
+# Building coreth + using go get can mess with the go.mod file.
+go mod tidy

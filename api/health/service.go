@@ -19,7 +19,7 @@ import (
 
 // defaultCheckOpts is a Check whose properties represent a default Check
 var defaultCheckOpts = check{
-	executionPeriod: time.Minute,
+	executionPeriod: 30 * time.Second,
 	initialDelay:    10 * time.Second,
 }
 

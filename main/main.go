@@ -46,11 +46,19 @@ func main() {
 	}
 	fmt.Println(header)
 
-	defer func() { recover() }()
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered panic from", r)
+		}
+	}()
 
-	defer log.Stop()
-	defer log.StopOnPanic()
-	defer Config.DB.Close()
+	defer func() {
+		if err := Config.DB.Close(); err != nil {
+			log.Warn("failed to close the node's DB: %s", err)
+		}
+		log.StopOnPanic()
+		log.Stop()
+	}()
 
 	// Track if sybil control is enforced
 	if !Config.EnableStaking && Config.EnableP2PTLS {
@@ -67,7 +75,7 @@ func main() {
 	crypto.EnableCrypto = Config.EnableCrypto
 
 	if err := Config.ConsensusParams.Valid(); err != nil {
-		log.Fatal("consensus parameters are invalid: %s", err)
+		log.Error("consensus parameters are invalid: %s", err)
 		return
 	}
 
@@ -76,35 +84,32 @@ func main() {
 		log.Debug("assertions are enabled. This may slow down execution")
 	}
 
+	// IsNATTraversal() for NoRouter is false.
+	// Which means we tried to perform a NAT activity but we were not successful.
+	if Config.AttemptedNATTraversal && !Config.Nat.IsNATTraversal() {
+		log.Error("UPnP or NAT-PMP router attach failed, you may not be listening publicly," +
+			" please confirm the settings in your router")
+	}
+
 	mapper := nat.NewPortMapper(log, Config.Nat)
 	defer mapper.UnmapAllPorts()
 
 	// Open staking port
-	port, err := mapper.Map("TCP", Config.StakingLocalPort, stakingPortName)
-	if !Config.StakingIP.IsPrivate() {
-		if err == nil {
-			// The port was mapped and the ip is on a public network, the node
-			// should be able to be connected to peers on this public network.
-			Config.StakingIP.Port = port
-		} else {
-			// The port mapping errored, however it is possible the node is
-			// connected directly to a public network.
-			log.Warn("NAT traversal has failed. Unless the node is connected directly to a public network, the node will be able to connect to less nodes.")
-		}
-	} else {
-		// The reported IP is private, so this node will not be discoverable.
-		log.Warn("NAT traversal has failed. The node will be able to connect to less nodes.")
-	}
+	// we want for NAT Traversal to have the external port (Config.StakingIP.Port) to connect to our
+	// internal listening port (Config.InternalStakingPort) which should be the same in most cases.
+	mapper.Map("TCP", Config.StakingIP.Port, Config.StakingIP.Port, stakingPortName)
 
 	// Open the HTTP port iff the HTTP server is not listening on localhost
 	if Config.HTTPHost != "127.0.0.1" && Config.HTTPHost != "localhost" {
-		_, _ = mapper.Map("TCP", Config.HTTPPort, httpPortName)
+		// For NAT Traversal we want to route from the external port (Config.ExternalHTTPPort)
+		// to our internal port (Config.HTTPPort)
+		mapper.Map("TCP", Config.HTTPPort, Config.HTTPPort, httpPortName)
 	}
 
 	log.Debug("initializing node state")
 	node := node.Node{}
 	if err := node.Initialize(&Config, log, factory); err != nil {
-		log.Fatal("error initializing node state: %s", err)
+		log.Error("error initializing node state: %s", err)
 		return
 	}
 

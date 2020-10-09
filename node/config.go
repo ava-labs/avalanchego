@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -17,36 +19,16 @@ import (
 
 // Config contains all of the configurations of an Avalanche node.
 type Config struct {
+	genesis.Params
+
 	// protocol to use for opening the network interface
 	Nat nat.Router
 
+	// Attempted NAT Traversal did we attempt
+	AttemptedNATTraversal bool
+
 	// ID of the network this node should connect to
 	NetworkID uint32
-
-	// Transaction fee for transactions that create new state
-	CreationTxFee uint64
-	// Transaction fee
-	TxFee uint64
-
-	// Staking uptime requirements
-	UptimeRequirement float64
-
-	// Minimum stake, in nAVAX, required to validate the primary network
-	MinValidatorStake uint64
-
-	// Minimum stake, in nAVAX, that can be delegated on the primary network
-	MinDelegatorStake uint64
-
-	// MinStakeDuration is the minimum amount of time a validator can validate
-	// for in a single period.
-	MinStakeDuration time.Duration
-
-	// MaxStakeDuration is the maximum amount of time a validator can validate
-	// for in a single period.
-	MaxStakeDuration time.Duration
-
-	// StakeMintingPeriod is the amount of time for a consumption period.
-	StakeMintingPeriod time.Duration
 
 	// Assertions configuration
 	EnableAssertions bool
@@ -58,8 +40,8 @@ type Config struct {
 	DB database.Database
 
 	// Staking configuration
-	StakingIP               utils.IPDesc
-	StakingLocalPort        uint16
+	StakingIP utils.IPDesc
+
 	EnableP2PTLS            bool
 	EnableStaking           bool
 	StakingKeyFile          string
@@ -72,12 +54,16 @@ type Config struct {
 	// Network configuration
 	NetworkConfig timer.AdaptiveTimeoutConfig
 
+	// Benchlist Configuration
+	BenchlistConfig benchlist.Config
+
 	// Bootstrapping configuration
 	BootstrapPeers []*Peer
 
 	// HTTP configuration
-	HTTPHost            string
-	HTTPPort            uint16
+	HTTPHost string
+	HTTPPort uint16
+
 	HTTPSEnabled        bool
 	HTTPSKeyFile        string
 	HTTPSCertFile       string

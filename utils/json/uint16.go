@@ -24,7 +24,7 @@ func (u Uint16) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON ...
 func (u *Uint16) UnmarshalJSON(b []byte) error {
 	str := string(b)
-	if str == "null" {
+	if str == Null {
 		return nil
 	}
 	if len(str) >= 2 {

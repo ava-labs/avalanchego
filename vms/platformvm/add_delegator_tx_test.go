@@ -20,7 +20,9 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
@@ -32,8 +34,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if err := unsignedTx.Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
@@ -60,8 +60,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
@@ -88,8 +86,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
@@ -116,8 +112,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
@@ -144,8 +138,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if err = tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
@@ -171,8 +163,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
@@ -194,8 +184,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	} else if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
@@ -208,7 +196,9 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 	nodeID := keys[0].PublicKey().Address()

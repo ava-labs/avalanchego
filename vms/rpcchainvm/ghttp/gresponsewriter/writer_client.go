@@ -28,10 +28,10 @@ type Client struct {
 }
 
 // NewClient returns a database instance connected to a remote database instance
-func NewClient(client gresponsewriterproto.WriterClient, broker *plugin.GRPCBroker) *Client {
+func NewClient(header http.Header, client gresponsewriterproto.WriterClient, broker *plugin.GRPCBroker) *Client {
 	return &Client{
 		client: client,
-		header: make(http.Header),
+		header: header,
 		broker: broker,
 	}
 }

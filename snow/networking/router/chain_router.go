@@ -36,6 +36,8 @@ type ChainRouter struct {
 	intervalNotifier *timer.Repeater
 	closeTimeout     time.Duration
 	peers            ids.ShortSet
+	criticalChains   ids.Set
+	onFatal          func()
 }
 
 // Initialize the router.
@@ -52,6 +54,8 @@ func (sr *ChainRouter) Initialize(
 	timeouts *timeout.Manager,
 	gossipFrequency time.Duration,
 	closeTimeout time.Duration,
+	criticalChains ids.Set,
+	onFatal func(),
 ) {
 	sr.log = log
 	sr.chains = make(map[[32]byte]*Handler)
@@ -59,6 +63,8 @@ func (sr *ChainRouter) Initialize(
 	sr.gossiper = timer.NewRepeater(sr.Gossip, gossipFrequency)
 	sr.intervalNotifier = timer.NewRepeater(sr.EndInterval, defaultCPUInterval)
 	sr.closeTimeout = closeTimeout
+	sr.criticalChains = criticalChains
+	sr.onFatal = onFatal
 
 	sr.peers.Add(nodeID)
 
@@ -133,6 +139,10 @@ func (sr *ChainRouter) RemoveChain(chainID ids.ID) {
 		chain.Context().Log.Warn("timed out while shutting down")
 	}
 	ticker.Stop()
+
+	if sr.onFatal != nil && sr.criticalChains.Contains(chainID) {
+		go sr.onFatal()
+	}
 }
 
 // GetAcceptedFrontier routes an incoming GetAcceptedFrontier request from the
@@ -291,15 +301,17 @@ func (sr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 
 	// This message came in response to a Get message from this node, and when we sent that Get
 	// message we set a timeout. Since we got a response, cancel the timeout.
-	if chain, exists := sr.chains[chainID.Key()]; exists {
+	chain, exists := sr.chains[chainID.Key()]
+	switch {
+	case exists:
 		if chain.Put(validatorID, requestID, containerID, container) {
 			sr.timeouts.Cancel(validatorID, chainID, requestID)
 		}
-	} else if requestID == constants.GossipMsgRequestID {
+	case requestID == constants.GossipMsgRequestID:
 		sr.log.Verbo("Gossiped Put(%s, %s, %d, %s) dropped due to unknown chain. Container:",
 			validatorID, chainID, requestID, containerID, formatting.DumpBytes{Bytes: container},
 		)
-	} else {
+	default:
 		sr.log.Debug("Put(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
 		sr.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
 	}

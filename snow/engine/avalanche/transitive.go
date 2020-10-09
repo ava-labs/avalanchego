@@ -64,7 +64,7 @@ func (t *Transitive) Initialize(config Config) error {
 	t.Params = config.Params
 	t.Consensus = config.Consensus
 
-	factory := poll.NewEarlyTermNoTraversalFactory(int(config.Params.Alpha))
+	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t.polls = poll.NewSet(factory,
 		config.Ctx.Log,
 		config.Params.Namespace,
@@ -340,8 +340,9 @@ func (t *Transitive) Notify(msg common.Message) error {
 	case common.PendingTxs:
 		txs := t.VM.PendingTxs()
 		return t.batch(txs, false /*=force*/, false /*=empty*/)
+	default:
+		return nil
 	}
-	return nil
 }
 
 // If there are pending transactions from the VM, issue them.

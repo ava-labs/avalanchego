@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/throttler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -20,20 +21,25 @@ import (
 )
 
 func TestShutdown(t *testing.T) {
+	vdrs := validators.NewSet()
+	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
-	tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:    time.Millisecond,
-		MinimumTimeout:    time.Millisecond,
-		MaximumTimeout:    10 * time.Second,
-		TimeoutMultiplier: 1.1,
-		TimeoutReduction:  time.Millisecond,
-		Namespace:         "",
-		Registerer:        prometheus.NewRegistry(),
-	})
+	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout: time.Millisecond,
+		MinimumTimeout: time.Millisecond,
+		MaximumTimeout: 10 * time.Second,
+		TimeoutInc:     2 * time.Millisecond,
+		TimeoutDec:     time.Millisecond,
+		Namespace:      "",
+		Registerer:     prometheus.NewRegistry(),
+	}, benchlist)
+	if err != nil {
+		t.Fatal(err)
+	}
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
-	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second)
+	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(false)
@@ -46,7 +52,7 @@ func TestShutdown(t *testing.T) {
 	handler := &Handler{}
 	handler.Initialize(
 		&engine,
-		validators.NewSet(),
+		vdrs,
 		nil,
 		1,
 		throttler.DefaultMaxNonStakerPendingMsgs,
@@ -77,21 +83,26 @@ func TestShutdown(t *testing.T) {
 }
 
 func TestShutdownTimesOut(t *testing.T) {
+	vdrs := validators.NewSet()
+	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
 	// Ensure that the MultiPut request does not timeout
-	tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:    time.Second,
-		MinimumTimeout:    500 * time.Millisecond,
-		MaximumTimeout:    10 * time.Second,
-		TimeoutMultiplier: 1.1,
-		TimeoutReduction:  time.Millisecond,
-		Namespace:         "",
-		Registerer:        prometheus.NewRegistry(),
-	})
+	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout: time.Second,
+		MinimumTimeout: 500 * time.Millisecond,
+		MaximumTimeout: 10 * time.Second,
+		TimeoutInc:     2 * time.Millisecond,
+		TimeoutDec:     time.Millisecond,
+		Namespace:      "",
+		Registerer:     prometheus.NewRegistry(),
+	}, benchlist)
+	if err != nil {
+		t.Fatal(err)
+	}
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
-	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Millisecond)
+	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Millisecond, ids.Set{}, nil)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(false)
@@ -113,7 +124,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	handler := &Handler{}
 	handler.Initialize(
 		&engine,
-		validators.NewSet(),
+		vdrs,
 		nil,
 		1,
 		throttler.DefaultMaxNonStakerPendingMsgs,

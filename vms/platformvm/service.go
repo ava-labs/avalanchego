@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -29,6 +30,9 @@ const (
 
 	// Max number of addresses that can be passed in as argument to GetStake
 	maxGetStakeAddrs = 256
+
+	// Max number of addresses allowed for a single keystore user
+	maxKeystoreAddresses = 5000
 )
 
 var (
@@ -77,12 +81,12 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 
 	address, err := service.vm.ParseLocalAddress(args.Address)
 	if err != nil {
-		return fmt.Errorf("couldn't parse %s to address: %s", args.Address, err)
+		return fmt.Errorf("couldn't parse %s to address: %w", args.Address, err)
 	}
 
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	user := user{db: db}
@@ -109,6 +113,17 @@ type ImportKeyArgs struct {
 func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JsonAddress) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ImportKey called for user '%s'", args.Username)
 
+	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving data: %w", err)
+	}
+	defer db.Close()
+
+	user := user{db: db}
+	if addrs, _ := user.getAddresses(); len(addrs) >= maxKeystoreAddresses {
+		return fmt.Errorf("keystore user has reached its limit of %d addresses", maxKeystoreAddresses)
+	}
+
 	if !strings.HasPrefix(args.PrivateKey, constants.SecretKeyPrefix) {
 		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
 	}
@@ -131,17 +146,9 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 		return fmt.Errorf("problem formatting address: %w", err)
 	}
 
-	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
-	if err != nil {
-		return fmt.Errorf("problem retrieving data: %w", err)
-	}
-
-	user := user{db: db}
 	if err := user.putAddress(sk); err != nil {
 		// Drop any potential error closing the database to report the original
 		// error
-		_ = db.Close()
-
 		return fmt.Errorf("problem saving key %w", err)
 	}
 	return db.Close()
@@ -209,24 +216,24 @@ utxoFor:
 			}
 		case *StakeableLockOut:
 			innerOut, ok := out.TransferableOut.(*secp256k1fx.TransferOutput)
-			if !ok {
+			switch {
+			case !ok:
 				service.vm.SnowmanVM.Ctx.Log.Warn("Unexpected Output type in UTXO: %T",
 					out.TransferableOut)
 				continue utxoFor
-			}
-			if innerOut.Locktime > currentTime {
+			case innerOut.Locktime > currentTime:
 				newBalance, err := math.Add64(lockedNotStakeable, out.Amount())
 				if err != nil {
 					return errors.New("overflow while calculating locked not stakeable balance")
 				}
 				lockedNotStakeable = newBalance
-			} else if out.Locktime <= currentTime {
+			case out.Locktime <= currentTime:
 				newBalance, err := math.Add64(unlocked, out.Amount())
 				if err != nil {
 					return errors.New("overflow while calculating unlocked balance")
 				}
 				unlocked = newBalance
-			} else {
+			default:
 				newBalance, err := math.Add64(lockedStakeable, out.Amount())
 				if err != nil {
 					return errors.New("overflow while calculating unlocked stakeable balance")
@@ -261,6 +268,17 @@ utxoFor:
 func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, response *api.JsonAddress) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: CreateAddress called")
 
+	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
+	}
+	defer db.Close()
+
+	user := user{db: db}
+	if addrs, _ := user.getAddresses(); len(addrs) >= maxKeystoreAddresses {
+		return fmt.Errorf("keystore user has reached its limit of %d addresses", maxKeystoreAddresses)
+	}
+
 	factory := crypto.FactorySECP256K1R{}
 	key, err := factory.NewPrivateKey()
 	if err != nil {
@@ -272,17 +290,9 @@ func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, respo
 		return fmt.Errorf("problem formatting address: %w", err)
 	}
 
-	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
-	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
-	}
-
-	user := user{db: db}
 	if err := user.putAddress(key.(*crypto.PrivateKeySECP256K1R)); err != nil {
 		// Drop any potential error closing the database to report the original
 		// error
-		_ = db.Close()
-
 		return fmt.Errorf("problem saving key %w", err)
 	}
 	return db.Close()
@@ -595,13 +605,16 @@ type GetCurrentValidatorsArgs struct {
 	SubnetID ids.ID `json:"subnetID"`
 }
 
-// GetCurrentValidatorsReply are the results from calling GetCurrentValidators
+// GetCurrentValidatorsReply are the results from calling GetCurrentValidators.
+// Each validator contains a list of delegators to itself.
 type GetCurrentValidatorsReply struct {
 	Validators []interface{} `json:"validators"`
+	// Delegators is deprecated. Do not use Delegators.
+	// Instead, use the Delegators field of each APIPrimaryValidator
 	Delegators []interface{} `json:"delegators"`
 }
 
-// GetCurrentValidators returns the list of current validators
+// GetCurrentValidators returns current validators and delegators
 func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
 	service.vm.Ctx.Log.Info("Platform: GetCurrentValidators called")
 	if args.SubnetID.IsZero() {
@@ -611,6 +624,9 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	reply.Validators = []interface{}{}
 	reply.Delegators = []interface{}{}
 
+	// Validator's node ID as string --> Delegators to them
+	vdrTodelegators := map[string][]APIPrimaryDelegator{}
+
 	stopPrefix := []byte(fmt.Sprintf("%s%s", args.SubnetID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, service.vm.DB)
 	defer stopDB.Close()
@@ -618,7 +634,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
 
-	for stopIter.Next() { // Iterates in order of increasing start time
+	for stopIter.Next() { // Iterates in order of increasing stop time
 		txBytes := stopIter.Value()
 
 		tx := rewardTx{}
@@ -650,7 +666,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			}
 
 			potentialReward := json.Uint64(tx.Reward)
-			reply.Delegators = append(reply.Delegators, APIPrimaryDelegator{
+			delegator := APIPrimaryDelegator{
 				APIStaker: APIStaker{
 					StartTime:   json.Uint64(staker.StartTime().Unix()),
 					EndTime:     json.Uint64(staker.EndTime().Unix()),
@@ -659,7 +675,9 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				},
 				RewardOwner:     rewardOwner,
 				PotentialReward: &potentialReward,
-			})
+			}
+			reply.Delegators = append(reply.Delegators, delegator)
+			vdrTodelegators[delegator.NodeID] = append(vdrTodelegators[delegator.NodeID], delegator)
 		case *UnsignedAddValidatorTx:
 			nodeID := staker.Validator.ID()
 			startTime := staker.StartTime()
@@ -715,7 +733,22 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			return fmt.Errorf("expected validator but got %T", tx.Tx.UnsignedTx)
 		}
 	}
-	return stopIter.Error()
+	if err := stopIter.Error(); err != nil {
+		return fmt.Errorf("iterator error: %w", err)
+	}
+
+	for i, vdrIntf := range reply.Validators {
+		vdr, ok := vdrIntf.(APIPrimaryValidator)
+		if !ok {
+			continue
+		}
+		if delegators, ok := vdrTodelegators[vdr.NodeID]; ok {
+			vdr.Delegators = delegators
+		}
+		reply.Validators[i] = vdr
+	}
+
+	return nil
 }
 
 // GetPendingValidatorsArgs are the arguments for calling GetPendingValidators
@@ -725,7 +758,8 @@ type GetPendingValidatorsArgs struct {
 	SubnetID ids.ID `json:"subnetID"`
 }
 
-// GetPendingValidatorsReply are the results from calling GetPendingValidators
+// GetPendingValidatorsReply are the results from calling GetPendingValidators.
+// Unlike GetCurrentValidatorsReply, each validator has a null delegator list.
 type GetPendingValidatorsReply struct {
 	Validators []interface{} `json:"validators"`
 	Delegators []interface{} `json:"delegators"`
@@ -918,7 +952,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	// Get the keys controlled by the user
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original error
@@ -957,7 +991,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 
 	// Create the transaction
 	tx, err := service.vm.newAddValidatorTx(
-		uint64(args.weight()),                // Stake amount
+		args.weight(),                        // Stake amount
 		uint64(args.StartTime),               // Start time
 		uint64(args.EndTime),                 // End time
 		nodeID,                               // Node ID
@@ -976,7 +1010,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.issueTx(tx),
+		service.vm.mempool.IssueTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1024,7 +1058,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	// Get the keys controlled by the user
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original
@@ -1074,7 +1108,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 
 	// Create the transaction
 	tx, err := service.vm.newAddDelegatorTx(
-		uint64(args.weight()),  // Stake amount
+		args.weight(),          // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
 		nodeID,                 // Node ID
@@ -1092,7 +1126,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.issueTx(tx),
+		service.vm.mempool.IssueTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1123,13 +1157,13 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	// Parse the node ID
 	nodeID, err := ids.ShortFromPrefixedString(args.NodeID, constants.NodeIDPrefix)
 	if err != nil {
-		return fmt.Errorf("error parsing nodeID: '%s': %w", args.NodeID, err)
+		return fmt.Errorf("error parsing nodeID: %q: %w", args.NodeID, err)
 	}
 
 	// Parse the subnet ID
 	subnetID, err := ids.FromString(args.SubnetID)
 	if err != nil {
-		return fmt.Errorf("problem parsing subnetID '%s': %w", args.SubnetID, err)
+		return fmt.Errorf("problem parsing subnetID %q: %w", args.SubnetID, err)
 	}
 	if subnetID.Equals(constants.PrimaryNetworkID) {
 		return errors.New("subnet validator attempts to validate primary network")
@@ -1138,7 +1172,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	// Get the keys controlled by the user
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original
@@ -1187,7 +1221,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 
 	// Create the transaction
 	tx, err := service.vm.newAddSubnetValidatorTx(
-		uint64(args.weight()),  // Stake amount
+		args.weight(),          // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
 		nodeID,                 // Node ID
@@ -1205,7 +1239,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.issueTx(tx),
+		service.vm.mempool.IssueTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1229,7 +1263,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	for _, controlKey := range args.ControlKeys {
 		controlKeyID, err := service.vm.ParseLocalAddress(controlKey)
 		if err != nil {
-			return fmt.Errorf("problem parsing control key '%s': %w", controlKey, err)
+			return fmt.Errorf("problem parsing control key %q: %w", controlKey, err)
 		}
 		controlKeys = append(controlKeys, controlKeyID)
 	}
@@ -1237,7 +1271,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	// Get the keys controlled by the user
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original
@@ -1302,7 +1336,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.issueTx(tx),
+		service.vm.mempool.IssueTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1339,7 +1373,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 	// Get this user's data
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original
@@ -1405,7 +1439,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.issueTx(tx),
+		service.vm.mempool.IssueTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1443,7 +1477,7 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 	// Get the user's info
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("couldn't get user '%s': %w", args.Username, err)
+		return fmt.Errorf("couldn't get user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original
@@ -1501,7 +1535,7 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		service.vm.issueTx(tx),
+		service.vm.mempool.IssueTx(tx),
 		db.Close(),
 		err,
 	)
@@ -1568,7 +1602,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	// Get the keys controlled by the user
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original
@@ -1636,7 +1670,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.issueTx(tx),
+		service.vm.mempool.IssueTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1657,8 +1691,7 @@ type GetBlockchainStatusReply struct {
 // GetBlockchainStatus gets the status of a blockchain with the ID [args.BlockchainID].
 func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchainStatusArgs, reply *GetBlockchainStatusReply) error {
 	service.vm.Ctx.Log.Info("Platform: GetBlockchainStatus called")
-	switch {
-	case args.BlockchainID == "":
+	if args.BlockchainID == "" {
 		return errors.New("argument 'blockchainID' not given")
 	}
 
@@ -1666,7 +1699,7 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 		reply.Status = Validating
 		return nil
 	} else if blockchainID, err := ids.FromString(args.BlockchainID); err != nil {
-		return fmt.Errorf("problem parsing blockchainID '%s': %w", args.BlockchainID, err)
+		return fmt.Errorf("problem parsing blockchainID %q: %w", args.BlockchainID, err)
 	} else if exists, err := service.chainExists(service.vm.LastAccepted(), blockchainID); err != nil {
 		return fmt.Errorf("problem looking up blockchain: %w", err)
 	} else if exists {
@@ -1726,7 +1759,7 @@ func (service *Service) ValidatedBy(_ *http.Request, args *ValidatedByArgs, resp
 	service.vm.Ctx.Log.Info("Platform: ValidatedBy called")
 	chain, err := service.vm.getChain(service.vm.DB, args.BlockchainID)
 	if err != nil {
-		return fmt.Errorf("problem retrieving blockchain '%s': %w", args.BlockchainID, err)
+		return fmt.Errorf("problem retrieving blockchain %q: %w", args.BlockchainID, err)
 	}
 	response.SubnetID = chain.UnsignedTx.(*UnsignedCreateChainTx).SubnetID
 	return nil
@@ -1748,12 +1781,12 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 	// Verify that the Subnet exists
 	// Ignore lookup error if it's the PrimaryNetworkID
 	if _, err := service.vm.getSubnet(service.vm.DB, args.SubnetID); err != nil && !args.SubnetID.Equals(constants.PrimaryNetworkID) {
-		return fmt.Errorf("problem retrieving subnet '%s': %w", args.SubnetID, err)
+		return fmt.Errorf("problem retrieving subnet %q: %w", args.SubnetID, err)
 	}
 	// Get the chains that exist
 	chains, err := service.vm.getChains(service.vm.DB)
 	if err != nil {
-		return fmt.Errorf("problem retrieving chains for subnet '%s': %w", args.SubnetID, err)
+		return fmt.Errorf("problem retrieving chains for subnet %q: %w", args.SubnetID, err)
 	}
 	// Filter to get the chains validated by the specified Subnet
 	for _, chain := range chains {
@@ -1824,7 +1857,7 @@ func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *Is
 	if err := service.vm.codec.Unmarshal(args.Tx.Bytes, tx); err != nil {
 		return fmt.Errorf("couldn't parse tx: %w", err)
 	}
-	if err := service.vm.issueTx(tx); err != nil {
+	if err := service.vm.mempool.IssueTx(tx); err != nil {
 		return fmt.Errorf("couldn't issue tx: %w", err)
 	}
 
@@ -2051,5 +2084,36 @@ func (service *Service) GetTotalStake(_ *http.Request, _ *struct{}, reply *struc
 }) error {
 	stake, err := service.vm.getTotalStake()
 	reply.Stake = json.Uint64(stake)
+	return err
+}
+
+// GetMaxStakeAmountArgs is the request for calling GetMaxStakeAmount.
+type GetMaxStakeAmountArgs struct {
+	SubnetID  ids.ID      `json:"subnetID"`
+	NodeID    string      `json:"nodeID"`
+	StartTime json.Uint64 `json:"startTime"`
+	EndTime   json.Uint64 `json:"endTime"`
+}
+
+// GetMaxStakeAmountReply is the response from calling GetMaxStakeAmount.
+type GetMaxStakeAmountReply struct {
+	Amount json.Uint64 `json:"amount"`
+}
+
+// GetMaxStakeAmount returns the maximum amount of AVAX staking to the named
+// node during the time period.
+func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmountArgs, reply *GetMaxStakeAmountReply) error {
+	if args.SubnetID.IsZero() {
+		args.SubnetID = service.vm.Ctx.SubnetID
+	}
+	nodeID, err := ids.ShortFromPrefixedString(args.NodeID, constants.NodeIDPrefix)
+	if err != nil {
+		return fmt.Errorf("failed to parse nodeID %q due to: %w", args.NodeID, err)
+	}
+	startTime := time.Unix(int64(args.StartTime), 0)
+	endTime := time.Unix(int64(args.EndTime), 0)
+
+	amount, err := service.vm.maxStakeAmount(service.vm.DB, args.SubnetID, nodeID, startTime, endTime)
+	reply.Amount = json.Uint64(amount)
 	return err
 }
