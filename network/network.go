@@ -657,7 +657,6 @@ func (n *network) Dispatch() error {
 				n.log.Warn("failed to set socket nodelay due to: %s", err)
 			}
 		}
-<<<<<<< HEAD
 
 		addr := conn.RemoteAddr().String()
 		ticks, err := n.registerConnection(addr)
