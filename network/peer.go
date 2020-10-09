@@ -241,6 +241,10 @@ func (p *peer) Send(msg Msg) bool {
 }
 
 func (p *peer) send(msg Msg) bool {
+	// makes sending single threaded or we will overwhelm the service_queue which is initialized with 1024 buffers
+	p.net.peerSendLock.Lock()
+	defer p.net.peerSendLock.Unlock()
+
 	p.peerLock.Lock()
 	defer p.peerLock.Unlock()
 

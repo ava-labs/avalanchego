@@ -137,7 +137,11 @@ type network struct {
 	b Builder
 
 	// stateLock should never be held when grabbing a peer lock
-	stateLock       sync.RWMutex
+	stateLock sync.RWMutex
+
+	// peer send lock controls the sending across multiple peers.
+	peerSendLock sync.Mutex
+
 	pendingBytes    int64
 	closed          utils.AtomicBool
 	disconnectedIPs map[string]struct{}
