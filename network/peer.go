@@ -50,8 +50,7 @@ type peer struct {
 
 	// ip may or may not be set when the peer is first started. is only modified
 	// on the connection's reader routine with the network state lock held.
-	// requires network.stateLock to be locked
-	ip utils.IPDesc
+	ip *utils.MutexInterface
 
 	// id should be set when the peer is first started.
 	id ids.ShortID
@@ -148,7 +147,7 @@ func (p *peer) ReadMessages() {
 	for {
 		read, err := p.conn.Read(readBuffer)
 		if err != nil {
-			p.net.log.Verbo("error on connection read to %s %s %s", p.id, p.getIPSafe(), err)
+			p.net.log.Verbo("error on connection read to %s %s %s", p.id, p.getIP(), err)
 			return
 		}
 
@@ -225,7 +224,7 @@ func (p *peer) WriteMessages() {
 		for len(msg) > 0 {
 			written, err := p.conn.Write(msg)
 			if err != nil {
-				p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.getIPSafe(), err)
+				p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.getIP(), err)
 				return
 			}
 			p.tickerOnce.Do(p.StartTicker)
@@ -540,8 +539,8 @@ func (p *peer) version(msg Msg) {
 			peerVersion)
 	}
 
-	p.net.stateLock.Lock()
-	if p.ip.IsZero() {
+	ip := p.getIP()
+	if ip.IsZero() {
 		// we only care about the claimed IP if we don't know the IP yet
 		peerIP := msg.Get(IP).(utils.IPDesc)
 
@@ -552,11 +551,10 @@ func (p *peer) version(msg Msg) {
 			// verification
 			if peerIP.IP.Equal(localPeerIP.IP) {
 				// if the IPs match, add this ip:port pair to be tracked
-				p.ip = peerIP
+				p.setIP(peerIP)
 			}
 		}
 	}
-	p.net.stateLock.Unlock()
 
 	p.SendPeerList()
 
@@ -772,10 +770,12 @@ func (p *peer) tryMarkConnected() {
 func (p *peer) discardIP() {
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
+
+	ip := p.getIP()
 	// By clearing the IP, we will not attempt to reconnect to this peer
-	if !p.ip.IsZero() {
-		delete(p.net.disconnectedIPs, p.ip.String())
-		p.ip = utils.IPDesc{}
+	if !ip.IsZero() {
+		delete(p.net.disconnectedIPs, ip.String())
+		p.setIP(utils.IPDesc{})
 	}
 	p.Close()
 }
@@ -783,18 +783,22 @@ func (p *peer) discardIP() {
 func (p *peer) discardMyIP() {
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
+
+	ip := p.getIP()
 	// By clearing the IP, we will not attempt to reconnect to this peer
-	if !p.ip.IsZero() {
-		str := p.ip.String()
+	if !ip.IsZero() {
+		str := ip.String()
 		p.net.myIPs[str] = struct{}{}
 		delete(p.net.disconnectedIPs, str)
-		p.ip = utils.IPDesc{}
+		p.setIP(utils.IPDesc{})
 	}
 	p.Close()
 }
 
-func (p *peer) getIPSafe() utils.IPDesc {
-	p.net.stateLock.RLock()
-	defer p.net.stateLock.RUnlock()
-	return p.ip
+func (p *peer) setIP(ip utils.IPDesc) {
+	p.ip.SetValue(ip)
+}
+
+func (p *peer) getIP() utils.IPDesc {
+	return p.ip.GetValue().(utils.IPDesc)
 }

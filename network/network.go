@@ -649,12 +649,13 @@ func (n *network) Dispatch() error {
 func (n *network) Peers() []PeerID {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
+
 	peers := make([]PeerID, 0, len(n.peers))
 	for _, peer := range n.peers {
 		if peer.connected.GetValue() {
 			peers = append(peers, PeerID{
 				IP:           peer.conn.RemoteAddr().String(),
-				PublicIP:     peer.ip.String(),
+				PublicIP:     peer.getIP().String(),
 				ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
 				Version:      peer.versionStr.GetValue().(string),
 				LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
@@ -773,16 +774,14 @@ func (n *network) gossip() {
 		}
 
 		ips := make([]utils.IPDesc, 0, len(n.peers))
-
-		n.stateLock.RLock()
 		for _, peer := range allPeers {
+			ip := peer.getIP()
 			if peer.connected.GetValue() &&
-				!peer.ip.IsZero() &&
+				!ip.IsZero() &&
 				n.vdrs.Contains(peer.id) {
-				ips = append(ips, peer.ip)
+				ips = append(ips, ip)
 			}
 		}
-		n.stateLock.RUnlock()
 
 		if len(ips) == 0 {
 			n.log.Debug("skipping validator gossiping as no public validators are connected")
@@ -926,7 +925,7 @@ func (n *network) attemptConnect(ip utils.IPDesc) error {
 	}
 	return n.upgrade(&peer{
 		net:          n,
-		ip:           ip,
+		ip:           utils.NewMutexInterface(ip),
 		conn:         conn,
 		tickerCloser: make(chan struct{}),
 	}, n.clientUpgrader)
@@ -971,6 +970,8 @@ func (n *network) tryAddPeer(p *peer) error {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
+	ip := p.getIP()
+
 	key := p.id.Key()
 
 	if n.closed.GetValue() {
@@ -982,14 +983,14 @@ func (n *network) tryAddPeer(p *peer) error {
 	// if this connection is myself, then I should delete the connection and
 	// mark the IP as one of mine.
 	if p.id.Equals(n.id) {
-		if !p.ip.IsZero() {
+		if !ip.IsZero() {
 			// if n.ip is less useful than p.ip set it to this IP
 			if n.ip.IsZero() {
 				n.log.Info("setting my ip to %s because I was able to connect to myself through this channel",
-					p.ip)
-				n.ip = p.ip
+					ip)
+				n.ip = ip
 			}
-			str := p.ip.String()
+			str := ip.String()
 			delete(n.disconnectedIPs, str)
 			delete(n.retryDelay, str)
 			n.myIPs[str] = struct{}{}
@@ -1000,12 +1001,12 @@ func (n *network) tryAddPeer(p *peer) error {
 	// If I am already connected to this peer, then I should close this new
 	// connection.
 	if _, ok := n.peers[key]; ok {
-		if !p.ip.IsZero() {
-			str := p.ip.String()
+		if !ip.IsZero() {
+			str := ip.String()
 			delete(n.disconnectedIPs, str)
 			delete(n.retryDelay, str)
 		}
-		return fmt.Errorf("duplicated connection from %s at %s", p.id.PrefixedString(constants.NodeIDPrefix), p.ip)
+		return fmt.Errorf("duplicated connection from %s at %s", p.id.PrefixedString(constants.NodeIDPrefix), ip)
 	}
 
 	n.peers[key] = p
@@ -1021,10 +1022,11 @@ func (n *network) validatorIPs() []utils.IPDesc {
 	defer n.stateLock.RUnlock()
 	ips := make([]utils.IPDesc, 0, len(n.peers))
 	for _, peer := range n.peers {
+		ip := peer.getIP()
 		if peer.connected.GetValue() &&
-			!peer.ip.IsZero() &&
+			!ip.IsZero() &&
 			n.vdrs.Contains(peer.id) {
-			ips = append(ips, peer.ip)
+			ips = append(ips, ip)
 		}
 	}
 	return ips
@@ -1036,10 +1038,11 @@ func (n *network) connected(p *peer) {
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
 
-	n.log.Debug("connected to %s at %s", p.id, p.ip)
+	ip := p.getIP()
+	n.log.Debug("connected to %s at %s", p.id, ip)
 
-	if !p.ip.IsZero() {
-		str := p.ip.String()
+	if !ip.IsZero() {
+		str := ip.String()
 
 		delete(n.disconnectedIPs, str)
 		delete(n.retryDelay, str)
@@ -1054,19 +1057,21 @@ func (n *network) disconnected(p *peer) {
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
 
-	n.log.Debug("disconnected from %s at %s", p.id, p.ip)
+	ip := p.getIP()
+
+	n.log.Debug("disconnected from %s at %s", p.id, ip)
 
 	key := p.id.Key()
 	delete(n.peers, key)
 	n.numPeers.Set(float64(len(n.peers)))
 
-	if !p.ip.IsZero() {
-		str := p.ip.String()
+	if !ip.IsZero() {
+		str := ip.String()
 
 		delete(n.disconnectedIPs, str)
 		delete(n.connectedIPs, str)
 
-		n.track(p.ip)
+		n.track(ip)
 	}
 
 	if p.connected.GetValue() {
