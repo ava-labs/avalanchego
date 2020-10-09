@@ -1011,7 +1011,6 @@ func (n *network) tryAddPeer(p *peer) error {
 			str := p.ip.String()
 			delete(n.disconnectedIPs, str)
 			delete(n.retryDelay, str)
-			// if peer connect ip is not zero.  and it's different than the peer ip we know lets update.
 			if peer.ip.IsZero() && !p.ip.Equal(peer.ip) {
 				peer.ip = p.ip
 			}
