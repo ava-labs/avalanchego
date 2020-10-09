@@ -89,6 +89,8 @@ type Network interface {
 	// must be managed internally to the network. Calling close multiple times
 	// will return a nil error.
 	Close() error
+
+	Bounce()
 }
 
 type network struct {
@@ -283,6 +285,21 @@ func NewNetwork(
 	go netw.executor.Dispatch()
 	netw.heartbeat()
 	return netw
+}
+
+func (n *network) Bounce() {
+	n.stateLock.Lock()
+	for _, peer := range n.peers {
+		if peer == nil {
+			continue
+		}
+		ip := peer.ip
+		if ip.IsZero() || ip.Equal(n.ip.Ip()) {
+			continue
+		}
+		go peer.Close()
+	}
+	n.stateLock.Unlock()
 }
 
 // GetAcceptedFrontier implements the Sender interface.

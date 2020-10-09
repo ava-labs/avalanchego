@@ -105,4 +105,7 @@ type Config struct {
 	DynamicUpdateDuration time.Duration
 
 	DynamicPublicIPResolver dynamicip.Resolver
+
+	// holds the current ip manager
+	IPUpdater dynamicip.DynamicIPManager
 }

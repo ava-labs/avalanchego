@@ -216,7 +216,10 @@ func (n *Node) initNetworking() error {
 		consensusRouter,
 	)
 
+	n.Config.IPUpdater.SetNetork(n.Net)
+
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
+		n.Config.IPUpdater.SetNetork(nil)
 		// errors are already logged internally if they are meaningful
 		_ = n.Net.Close()
 	}, syscall.SIGINT, syscall.SIGTERM)

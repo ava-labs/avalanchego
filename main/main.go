@@ -112,6 +112,8 @@ func main() {
 	externalIPUpdater := dynamicip.NewDynamicIPManager(Config.DynamicPublicIPResolver, Config.DynamicUpdateDuration, log, &Config.StakingIP)
 	defer externalIPUpdater.Stop()
 
+	Config.IPUpdater = externalIPUpdater
+
 	log.Debug("initializing node state")
 	node := node.Node{}
 	if err := node.Initialize(&Config, log, factory); err != nil {

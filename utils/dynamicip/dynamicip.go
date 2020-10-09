@@ -8,8 +8,10 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -88,9 +90,9 @@ func (r *IFConfigResolver) Resolve() (string, error) {
 		return "", fmt.Errorf("failed to read response from ifconfig: %w", err)
 	}
 	ipstr := string(ip)
-	ipstr = strings.Replace(ipstr, "\r\n", "", -1)
-	ipstr = strings.Replace(ipstr, "\r", "", -1)
-	ipstr = strings.Replace(ipstr, "\n", "", -1)
+	ipstr = strings.ReplaceAll(ipstr, "\r\n", "")
+	ipstr = strings.ReplaceAll(ipstr, "\r", "")
+	ipstr = strings.ReplaceAll(ipstr, "\n", "")
 	return ipstr, nil
 }
 
@@ -111,11 +113,13 @@ func FetchExternalIP(resolver Resolver) (string, error) {
 
 type DynamicIPManager interface {
 	Stop()
+	SetNetork(n network.Network)
 }
 
 type NoDynamicIP struct{}
 
-func (noDynamicIP *NoDynamicIP) Stop() {}
+func (noDynamicIP *NoDynamicIP) Stop()                     {}
+func (noDynamicIP *NoDynamicIP) SetNetork(network.Network) {}
 
 // Returns a new dynamic IP that resolves and updates [ip] to our public IP every [updateTimeout].
 // Uses [dynamicResolver] to resolve our public ip.
@@ -141,10 +145,18 @@ type DynamicIP struct {
 	log           logging.Logger
 	updateTimeout time.Duration
 	resolver      Resolver
+	net           network.Network
+	netLock       sync.RWMutex
 }
 
 func (dynamicIP *DynamicIP) Stop() {
 	close(dynamicIP.tickerCloser)
+}
+
+func (dynamicIP *DynamicIP) SetNetork(net network.Network) {
+	dynamicIP.netLock.Lock()
+	defer dynamicIP.netLock.Unlock()
+	dynamicIP.net = net
 }
 
 // Update our public IP address in a loop
@@ -179,5 +191,10 @@ func (dynamicIP *DynamicIP) update(resolver Resolver) {
 	dynamicIP.UpdateIP(newIp)
 	if !oldIp.Equal(newIp) {
 		dynamicIP.log.Info("ExternalIP updated to %s", newIp)
+		dynamicIP.netLock.RLock()
+		if dynamicIP.net != nil {
+			dynamicIP.net.Bounce()
+		}
+		dynamicIP.netLock.RUnlock()
 	}
 }
