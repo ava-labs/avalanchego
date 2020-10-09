@@ -17,7 +17,7 @@ import (
 var (
 	// strongPassword defines a password used for the following tests that
 	// scores high enough to pass the password strength scoring system
-	strongPassword = "N_+=_jJ;^(<;{4,:*m6CET}'&N;83FYK.wtNpwp-Jt"
+	strongPassword = "N_+=_jJ;^(<;{4,:*m6CET}'&N;83FYK.wtNpwp-Jt" // #nosec G101
 )
 
 func TestServiceListNoUsers(t *testing.T) {
@@ -65,7 +65,7 @@ func TestServiceCreateUser(t *testing.T) {
 // genStr returns a string of given length
 func genStr(n int) string {
 	b := make([]byte, n)
-	rand.Read(b)
+	rand.Read(b) // #nosec G404
 	return fmt.Sprintf("%x", b)[:n]
 }
 

@@ -89,6 +89,7 @@ func (t *OperationTx) SyntacticVerify(
 	c codec.Codec,
 	txFeeAssetID ids.ID,
 	txFee uint64,
+	_ uint64,
 	numFxs int,
 ) error {
 	switch {
@@ -98,7 +99,7 @@ func (t *OperationTx) SyntacticVerify(
 		return errNoOperations
 	}
 
-	if err := t.BaseTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, numFxs); err != nil {
+	if err := t.BaseTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, txFee, numFxs); err != nil {
 		return err
 	}
 
