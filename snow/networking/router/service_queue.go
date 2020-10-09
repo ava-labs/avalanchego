@@ -126,6 +126,7 @@ func (ml *multiLevelQueue) PushMessage(msg message) bool {
 	case ml.semaChan <- struct{}{}:
 	default:
 		ml.log.Error("Sempahore channel was full after pushing message to the message queue")
+		ml.pendingMessages--
 	}
 	ml.metrics.pending.Inc()
 	return true
