@@ -290,16 +290,12 @@ func init() {
 	case Config.DynamicPublicIPResolver.IsResolver():
 		// User specified to use dynamic IP resolution; don't use NAT traversal
 		Config.Nat = nat.NewNoRouter()
-		ipstr, err := dynamicip.FetchExternalIP(Config.DynamicPublicIPResolver)
+		ip, err = dynamicip.FetchExternalIP(Config.DynamicPublicIPResolver)
 		if err != nil {
-			errs.Add(fmt.Errorf("dynamic ip address fetch failed: %w", err))
+			errs.Add(fmt.Errorf("dynamic ip address fetch failed: %s", err))
 			return
 		}
-		ip = net.ParseIP(ipstr)
-		if ip == nil {
-			errs.Add(fmt.Errorf("failed to parse dynamic ip address: %w", err))
-			return
-		}
+
 	case *consensusIP == "":
 		// User didn't specift a public IP to use; try with NAT traversal
 		Config.AttemptedNATTraversal = true

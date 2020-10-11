@@ -21,7 +21,7 @@ var (
 // Resolver resolves our public IP
 type Resolver interface {
 	// Resolve our public IP
-	Resolve() (string, error)
+	Resolve() (net.IP, error)
 	// If false, Resolve always returns an error
 	IsResolver() bool
 }
@@ -33,8 +33,8 @@ func (r *NoResolver) IsResolver() bool {
 	return false
 }
 
-func (r *NoResolver) Resolve() (string, error) {
-	return "", errors.New("invalid resolver")
+func (r *NoResolver) Resolve() (net.IP, error) {
+	return nil, errors.New("invalid resolver")
 }
 
 // IFConfigResolves resolves our public IP using openDNS
@@ -58,15 +58,25 @@ func (r *OpenDNSResolver) IsResolver() bool {
 	return true
 }
 
-func (r *OpenDNSResolver) Resolve() (string, error) {
+func (r *OpenDNSResolver) Resolve() (net.IP, error) {
 	ip, err := r.Resolver.LookupHost(context.Background(), "myip.opendns.com")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if len(ip) == 0 {
-		return "", errOpenDNSNoIP
+		return nil, errOpenDNSNoIP
 	}
-	return ip[0], nil
+	for _, ipv := range ip {
+		ipResolved := net.ParseIP(ipv)
+		if ipResolved != nil && strings.Contains(ipv, ".") {
+			return ipResolved, nil
+		}
+	}
+	ipResolved := net.ParseIP(ip[0])
+	if ipResolved == nil {
+		return nil, fmt.Errorf("invalid ip %s", ip[0])
+	}
+	return net.ParseIP(ip[0]), nil
 }
 
 // IFConfigResolves resolves our public IP using website ifconfig.co
@@ -76,22 +86,26 @@ func (r *IFConfigResolver) IsResolver() bool {
 	return true
 }
 
-func (r *IFConfigResolver) Resolve() (string, error) {
+func (r *IFConfigResolver) Resolve() (net.IP, error) {
 	url := "http://ifconfig.co"
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	ip, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response from ifconfig: %w", err)
+		return nil, fmt.Errorf("failed to read response from ifconfig: %w", err)
 	}
 	ipstr := string(ip)
-	ipstr = strings.Replace(ipstr, "\r\n", "", -1)
-	ipstr = strings.Replace(ipstr, "\r", "", -1)
-	ipstr = strings.Replace(ipstr, "\n", "", -1)
-	return ipstr, nil
+	ipstr = strings.ReplaceAll(ipstr, "\r\n", "")
+	ipstr = strings.ReplaceAll(ipstr, "\r", "")
+	ipstr = strings.ReplaceAll(ipstr, "\n", "")
+	ipResolved := net.ParseIP(ipstr)
+	if ipResolved == nil {
+		return nil, fmt.Errorf("invalid ip %s", ipstr)
+	}
+	return ipResolved, nil
 }
 
 func NewResolver(opt string) Resolver {
@@ -105,11 +119,11 @@ func NewResolver(opt string) Resolver {
 	}
 }
 
-func FetchExternalIP(resolver Resolver) (string, error) {
+func FetchExternalIP(resolver Resolver) (net.IP, error) {
 	return resolver.Resolve()
 }
 
-type DynamicIPManager interface {
+type IPManager interface {
 	Stop()
 }
 
@@ -120,7 +134,7 @@ func (noDynamicIP *NoDynamicIP) Stop() {}
 // Returns a new dynamic IP that resolves and updates [ip] to our public IP every [updateTimeout].
 // Uses [dynamicResolver] to resolve our public ip.
 // Stops updating when Stop() is called.
-func NewDynamicIPManager(resolver Resolver, updateTimeout time.Duration, log logging.Logger, ip *utils.DynamicIPDesc) DynamicIPManager {
+func NewDynamicIPManager(resolver Resolver, updateTimeout time.Duration, log logging.Logger, ip *utils.DynamicIPDesc) IPManager {
 	if resolver.IsResolver() {
 		updater := &DynamicIP{
 			DynamicIPDesc: ip,
@@ -165,19 +179,14 @@ func (dynamicIP *DynamicIP) UpdateExternalIP() {
 
 // Fetch and update our public IP address
 func (dynamicIP *DynamicIP) update(resolver Resolver) {
-	ipstr, err := FetchExternalIP(resolver)
+	newIP, err := FetchExternalIP(resolver)
 	if err != nil {
 		dynamicIP.log.Warn("Fetch external IP failed %s", err)
 		return
 	}
-	newIp := net.ParseIP(ipstr)
-	if newIp == nil {
-		dynamicIP.log.Warn("Fetched external IP failed to parse %s", ipstr)
-		return
-	}
-	oldIp := dynamicIP.Ip().IP
-	dynamicIP.UpdateIP(newIp)
-	if !oldIp.Equal(newIp) {
-		dynamicIP.log.Info("ExternalIP updated to %s", newIp)
+	oldIP := dynamicIP.Ip().IP
+	dynamicIP.UpdateIP(newIP)
+	if !oldIP.Equal(newIP) {
+		dynamicIP.log.Info("ExternalIP updated to %s", newIP)
 	}
 }
