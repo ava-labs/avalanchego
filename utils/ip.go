@@ -118,7 +118,7 @@ func NewDynamicIPDesc(ip net.IP, port uint16) DynamicIPDesc {
 	return DynamicIPDesc{IPDescContainer: &IPDescContainer{IPDesc: &IPDesc{IP: ip, Port: port}}}
 }
 
-func (i *DynamicIPDesc) Ip() IPDesc {
+func (i *DynamicIPDesc) IP() IPDesc {
 	var ip IPDesc
 	i.lock.RLock()
 	ip = *i.IPDesc

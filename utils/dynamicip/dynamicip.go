@@ -184,7 +184,7 @@ func (dynamicIP *DynamicIP) update(resolver Resolver) {
 		dynamicIP.log.Warn("Fetch external IP failed %s", err)
 		return
 	}
-	oldIP := dynamicIP.Ip().IP
+	oldIP := dynamicIP.IP().IP
 	dynamicIP.UpdateIP(newIP)
 	if !oldIP.Equal(newIP) {
 		dynamicIP.log.Info("ExternalIP updated to %s", newIP)

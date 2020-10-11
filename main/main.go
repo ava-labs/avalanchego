@@ -99,7 +99,7 @@ func main() {
 	// Open staking port
 	// we want for NAT Traversal to have the external port (Config.StakingIP.Port) to connect to our
 	// internal listening port (Config.InternalStakingPort) which should be the same in most cases.
-	mapper.Map("TCP", Config.StakingIP.Ip().Port, Config.StakingIP.Ip().Port, stakingPortName, &Config.StakingIP, Config.DynamicUpdateDuration)
+	mapper.Map("TCP", Config.StakingIP.IP().Port, Config.StakingIP.IP().Port, stakingPortName, &Config.StakingIP, Config.DynamicUpdateDuration)
 
 	// Open the HTTP port iff the HTTP server is not listening on localhost
 	if Config.HTTPHost != "127.0.0.1" && Config.HTTPHost != "localhost" {

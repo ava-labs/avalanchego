@@ -397,7 +397,7 @@ func (p *peer) Version() {
 		p.net.networkID,
 		p.net.nodeID,
 		p.net.clock.Unix(),
-		p.net.ip.Ip(),
+		p.net.ip.IP(),
 		p.net.version.String(),
 	)
 	p.net.stateLock.Unlock()
@@ -573,7 +573,7 @@ func (p *peer) peerList(msg Msg) {
 	p.tryMarkConnected()
 
 	for _, ip := range ips {
-		if !ip.Equal(p.net.ip.Ip()) &&
+		if !ip.Equal(p.net.ip.IP()) &&
 			!ip.IsZero() &&
 			(p.net.allowPrivateIPs || !ip.IsPrivate()) {
 			// TODO: only try to connect once

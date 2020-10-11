@@ -271,7 +271,7 @@ func NewNetwork(
 		disconnectedIPs:                    make(map[string]struct{}),
 		connectedIPs:                       make(map[string]struct{}),
 		retryDelay:                         make(map[string]time.Duration),
-		myIPs:                              map[string]struct{}{ip.Ip().String(): {}},
+		myIPs:                              map[string]struct{}{ip.IP().String(): {}},
 		peers:                              make(map[[20]byte]*peer),
 		readBufferSize:                     readBufferSize,
 		readHandshakeTimeout:               readHandshakeTimeout,
@@ -991,7 +991,7 @@ func (n *network) tryAddPeer(p *peer) error {
 	if p.id.Equals(n.id) {
 		if !p.ip.IsZero() {
 			// if n.ip is less useful than p.ip set it to this IP
-			if n.ip.Ip().IsZero() {
+			if n.ip.IP().IsZero() {
 				n.log.Info("setting my ip to %s because I was able to connect to myself through this channel",
 					p.ip)
 				n.ip.Update(p.ip)
