@@ -132,15 +132,15 @@ func (m *Mapper) updateIP(ip *utils.DynamicIPDesc) {
 	if ip == nil {
 		return
 	}
-	newIp, err := m.r.ExternalIP()
+	newIP, err := m.r.ExternalIP()
 	if err != nil {
 		m.log.Error("failed to get external IP: %s", err)
 		return
 	}
-	oldIp := ip.Ip().IP
-	ip.UpdateIP(newIp)
-	if !oldIp.Equal(newIp) {
-		m.log.Info("external IP updated to: %s", newIp)
+	oldIP := ip.Ip().IP
+	ip.UpdateIP(newIP)
+	if !oldIP.Equal(newIP) {
+		m.log.Info("external IP updated to: %s", newIP)
 	}
 }
 
