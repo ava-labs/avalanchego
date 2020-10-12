@@ -155,6 +155,11 @@ func (p *peer) Start() error {
 		return errAlreadyPeered
 	}
 
+	// It wasn't a PeerOk, so we punt..
+	if errorNo != uint32(PeerOk) {
+		return fmt.Errorf("version nak errorNo=%d", errorNo)
+	}
+
 	p.versionStr = peerVersion.String()
 	p.gotVersion = true
 
