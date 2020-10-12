@@ -1,8 +1,8 @@
 package nftfx
 
 import (
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 )
 
 // ID that this Fx uses when labeled

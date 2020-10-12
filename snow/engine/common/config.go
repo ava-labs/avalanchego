@@ -4,8 +4,8 @@
 package common
 
 import (
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/validators"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 // Config wraps the common configurations that are needed by a Snow consensus
@@ -15,6 +15,8 @@ type Config struct {
 	Validators validators.Set
 	Beacons    validators.Set
 
+	SampleK       int
+	StartupAlpha  uint64
 	Alpha         uint64
 	Sender        Sender
 	Bootstrapable Bootstrapable

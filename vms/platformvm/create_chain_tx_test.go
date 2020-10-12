@@ -6,18 +6,20 @@ package platformvm
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/vms/avm"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestUnsignedCreateChainTxVerify(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
@@ -130,6 +132,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			test.fxIDs,
 			test.chainName,
 			test.keys,
+			ids.ShortEmpty, // change addr
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -149,7 +152,9 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
@@ -160,6 +165,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 		nil,
 		"chain name",
 		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -177,7 +183,9 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
@@ -188,6 +196,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		nil,
 		"chain name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -217,7 +226,9 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
@@ -228,6 +239,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 		nil,
 		"chain name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -242,7 +254,9 @@ func TestCreateChainTxAlreadyExists(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
@@ -254,6 +268,7 @@ func TestCreateChainTxAlreadyExists(t *testing.T) {
 		nil,
 		"chain name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -275,7 +290,9 @@ func TestCreateChainTxValid(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
@@ -287,6 +304,7 @@ func TestCreateChainTxValid(t *testing.T) {
 		nil,
 		"chain name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)

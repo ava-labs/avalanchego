@@ -11,15 +11,16 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/database/memdb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowman"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/engine/snowman/block"
-	"github.com/ava-labs/gecko/snow/validators"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 var (
@@ -43,7 +44,9 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 	sender.CantGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestShortID()
-	peers.AddWeight(peer, 1)
+	if err := peers.AddWeight(peer, 1); err != nil {
+		t.Fatal(err)
+	}
 
 	blocker, _ := queue.New(db)
 
@@ -51,6 +54,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 		Ctx:        ctx,
 		Validators: peers,
 		Beacons:    peers,
+		SampleK:    int(peers.Weight()),
 		Alpha:      uint64(peers.Len()/2 + 1),
 		Sender:     sender,
 	}
@@ -94,7 +98,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -129,11 +133,13 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	vm.CantBootstrapping = false
 	vm.CantBootstrapped = false
 
-	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should finish
+	err = bs.ForceAccepted(acceptedIDs)
+	switch {
+	case err != nil: // should finish
 		t.Fatal(err)
-	} else if !*finished {
+	case !*finished:
 		t.Fatalf("Bootstrapping should have finished")
-	} else if blk1.Status() != choices.Accepted {
+	case blk1.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
 	}
 }
@@ -185,7 +191,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -266,15 +272,17 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 
 	vm.CantBootstrapped = false
 
-	if err := bs.MultiPut(peerID, *requestID, [][]byte{blkBytes1}); err != nil { // respond with right block
+	err = bs.MultiPut(peerID, *requestID, [][]byte{blkBytes1})
+	switch {
+	case err != nil: // respond with right block
 		t.Fatal(err)
-	} else if !*finished {
+	case !*finished:
 		t.Fatalf("Bootstrapping should have finished")
-	} else if blk0.Status() != choices.Accepted {
+	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
-	} else if blk1.Status() != choices.Accepted {
+	case blk1.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
-	} else if blk2.Status() != choices.Accepted {
+	case blk2.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
 	}
 }
@@ -334,7 +342,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -421,13 +429,14 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		t.Fatal("should not have requested another block")
 	}
 
-	if !*finished {
+	switch {
+	case !*finished:
 		t.Fatalf("Bootstrapping should have finished")
-	} else if blk0.Status() != choices.Accepted {
+	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
-	} else if blk1.Status() != choices.Accepted {
+	case blk1.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
-	} else if blk2.Status() != choices.Accepted {
+	case blk2.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
 	}
 }
@@ -489,7 +498,7 @@ func TestBootstrapperMultiPut(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -568,13 +577,14 @@ func TestBootstrapperMultiPut(t *testing.T) {
 		t.Fatal("should not have requested another block")
 	}
 
-	if !*finished {
+	switch {
+	case !*finished:
 		t.Fatalf("Bootstrapping should have finished")
-	} else if blk0.Status() != choices.Accepted {
+	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
-	} else if blk1.Status() != choices.Accepted {
+	case blk1.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
-	} else if blk2.Status() != choices.Accepted {
+	case blk2.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
 	}
 }
@@ -588,7 +598,7 @@ func TestBootstrapperAcceptedFrontier(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		nil,
-		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -627,7 +637,7 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		nil,
-		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -714,7 +724,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -797,13 +807,14 @@ func TestBootstrapperFinalized(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !*finished {
+	switch {
+	case !*finished:
 		t.Fatalf("Bootstrapping should have finished")
-	} else if blk0.Status() != choices.Accepted {
+	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
-	} else if blk1.Status() != choices.Accepted {
+	case blk1.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
-	} else if blk2.Status() != choices.Accepted {
+	case blk2.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
 	}
 }

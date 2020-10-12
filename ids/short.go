@@ -10,9 +10,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ava-labs/gecko/utils"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 // ShortEmpty is a useful all zero value
@@ -23,7 +23,7 @@ type ShortID struct {
 	ID *[20]byte `serialize:"true"`
 }
 
-// NewShortID creates an identifer from a 20 byte hash
+// NewShortID creates an identifier from a 20 byte hash
 func NewShortID(id [20]byte) ShortID { return ShortID{ID: &id} }
 
 // ToShortID attempt to convert a byte slice into an id

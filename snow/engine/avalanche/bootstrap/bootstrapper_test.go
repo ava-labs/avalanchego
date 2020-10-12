@@ -11,17 +11,18 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/database/memdb"
-	"github.com/ava-labs/gecko/database/prefixdb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/avalanche"
-	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
-	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/validators"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 var (
@@ -49,7 +50,9 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 	sender.CantGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestShortID()
-	peers.AddWeight(peer, 1)
+	if err := peers.AddWeight(peer, 1); err != nil {
+		t.Fatal(err)
+	}
 
 	vtxBlocker, _ := queue.New(prefixdb.New([]byte("vtx"), db))
 	txBlocker, _ := queue.New(prefixdb.New([]byte("tx"), db))
@@ -58,6 +61,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 		Ctx:        ctx,
 		Validators: peers,
 		Beacons:    peers,
+		SampleK:    int(peers.Weight()),
 		Alpha:      uint64(peers.Len()/2 + 1),
 		Sender:     sender,
 	}
@@ -112,7 +116,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s_bs", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s_bs", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -152,7 +156,9 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	vm.CantBootstrapping = false
 	vm.CantBootstrapped = false
 
-	bs.ForceAccepted(acceptedIDs)
+	if err := bs.ForceAccepted(acceptedIDs); err != nil {
+		t.Fatal(err)
+	}
 
 	switch {
 	case !*finished:
@@ -212,7 +218,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s_bs", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s_bs", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -272,11 +278,13 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	}
 
 	oldReqID := *requestID
-	if err := bs.MultiPut(peerID, *requestID, [][]byte{vtxBytes2}); err != nil { // send unexpected vertex
+	err = bs.MultiPut(peerID, *requestID, [][]byte{vtxBytes2})
+	switch {
+	case err != nil: // send unexpected vertex
 		t.Fatal(err)
-	} else if *requestID == oldReqID {
+	case *requestID == oldReqID:
 		t.Fatal("should have issued new request")
-	} else if !reqVtxID.Equals(vtxID0) {
+	case !reqVtxID.Equals(vtxID0):
 		t.Fatalf("should have requested vtxID0 but requested %s", reqVtxID)
 	}
 
@@ -387,7 +395,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s_bs", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s_bs", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -531,7 +539,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s_bs", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s_bs", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -619,7 +627,7 @@ func TestBootstrapperAcceptedFrontier(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		nil,
-		fmt.Sprintf("gecko_%s_bs", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s_bs", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -669,7 +677,7 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s_bs", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s_bs", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -755,7 +763,7 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s_bs", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s_bs", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -816,25 +824,29 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 		t.Fatal("requested wrong vtx")
 	}
 
-	if err := bs.MultiPut(peerID, *reqIDPtr, [][]byte{vtxBytes1}); err != nil { // Provide vtx1; should request vtx0
+	err = bs.MultiPut(peerID, *reqIDPtr, [][]byte{vtxBytes1})
+	switch {
+	case err != nil: // Provide vtx1; should request vtx0
 		t.Fatal(err)
-	} else if bs.Ctx.IsBootstrapped() {
+	case bs.Ctx.IsBootstrapped():
 		t.Fatalf("should not have finished")
-	} else if !requested.Equals(vtxID0) {
+	case !requested.Equals(vtxID0):
 		t.Fatal("should hae requested vtx0")
 	}
 
 	vm.CantBootstrapped = false
 
-	if err := bs.MultiPut(peerID, *reqIDPtr, [][]byte{vtxBytes0}); err != nil { // Provide vtx0; can finish now
+	err = bs.MultiPut(peerID, *reqIDPtr, [][]byte{vtxBytes0})
+	switch {
+	case err != nil: // Provide vtx0; can finish now
 		t.Fatal(err)
-	} else if !bs.Ctx.IsBootstrapped() {
+	case !bs.Ctx.IsBootstrapped():
 		t.Fatal("should have finished")
-	} else if vtx0.Status() != choices.Accepted {
+	case vtx0.Status() != choices.Accepted:
 		t.Fatal("should be accepted")
-	} else if vtx1.Status() != choices.Accepted {
+	case vtx1.Status() != choices.Accepted:
 		t.Fatal("should be accepted")
-	} else if vtx2.Status() != choices.Accepted {
+	case vtx2.Status() != choices.Accepted:
 		t.Fatal("should be accepted")
 	}
 }
@@ -871,7 +883,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s_bs", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s_bs", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -946,15 +958,15 @@ func TestBootstrapperFinalized(t *testing.T) {
 		t.Fatalf("should have requested vtx0")
 	}
 
-	if err := bs.GetAncestorsFailed(peerID, reqID); err != nil {
+	err = bs.GetAncestorsFailed(peerID, reqID)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	}
-
-	if !*finished {
+	case !*finished:
 		t.Fatalf("Bootstrapping should have finished")
-	} else if vtx0.Status() != choices.Accepted {
+	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
-	} else if vtx1.Status() != choices.Accepted {
+	case vtx1.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
 	}
 }
@@ -1003,7 +1015,7 @@ func TestBootstrapperAcceptsMultiPutParents(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s_bs", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s_bs", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -1082,13 +1094,14 @@ func TestBootstrapperAcceptsMultiPutParents(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !*finished {
+	switch {
+	case !*finished:
 		t.Fatalf("Bootstrapping should have finished")
-	} else if vtx0.Status() != choices.Accepted {
+	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
-	} else if vtx1.Status() != choices.Accepted {
+	case vtx1.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
-	} else if vtx2.Status() != choices.Accepted {
+	case vtx2.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
 	}
 }

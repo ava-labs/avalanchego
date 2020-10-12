@@ -6,11 +6,11 @@ package avm
 import (
 	"errors"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 var (
@@ -89,6 +89,7 @@ func (t *OperationTx) SyntacticVerify(
 	c codec.Codec,
 	txFeeAssetID ids.ID,
 	txFee uint64,
+	_ uint64,
 	numFxs int,
 ) error {
 	switch {
@@ -98,7 +99,7 @@ func (t *OperationTx) SyntacticVerify(
 		return errNoOperations
 	}
 
-	if err := t.BaseTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, numFxs); err != nil {
+	if err := t.BaseTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, txFee, numFxs); err != nil {
 		return err
 	}
 

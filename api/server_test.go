@@ -13,8 +13,8 @@ import (
 	"github.com/gorilla/rpc/v2"
 	"github.com/gorilla/rpc/v2/json2"
 
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 type Service struct{ called bool }
@@ -30,7 +30,17 @@ func (s *Service) Call(_ *http.Request, args *Args, reply *Reply) error {
 
 func TestCall(t *testing.T) {
 	s := Server{}
-	s.Initialize(logging.NoLog{}, logging.NoFactory{}, "localhost", 8080)
+	err := s.Initialize(
+		logging.NoLog{},
+		logging.NoFactory{},
+		"localhost",
+		8080,
+		false,
+		"",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	serv := &Service{}
 	newServer := rpc.NewServer()
@@ -40,7 +50,14 @@ func TestCall(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := s.AddRoute(&common.HTTPHandler{Handler: newServer}, new(sync.RWMutex), "vm/lol", "", logging.NoLog{}); err != nil {
+	err = s.AddRoute(
+		&common.HTTPHandler{Handler: newServer},
+		new(sync.RWMutex),
+		"vm/lol",
+		"",
+		logging.NoLog{},
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -54,7 +71,10 @@ func TestCall(t *testing.T) {
 	headers := map[string]string{
 		"Content-Type": "application/json",
 	}
-	s.Call(writer, "POST", "lol", "", body, headers)
+	err = s.Call(writer, "POST", "lol", "", body, headers)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if !serv.called {
 		t.Fatalf("Should have been called")

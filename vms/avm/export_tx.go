@@ -6,13 +6,14 @@ package avm
 import (
 	"errors"
 
-	"github.com/ava-labs/gecko/chains/atomic"
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 var (
@@ -36,6 +37,7 @@ func (t *ExportTx) SyntacticVerify(
 	c codec.Codec,
 	txFeeAssetID ids.ID,
 	txFee uint64,
+	_ uint64,
 	_ int,
 ) error {
 	switch {
@@ -79,7 +81,7 @@ func (t *ExportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 			return err
 		}
 		assetID := out.AssetID()
-		if !out.AssetID().Equals(vm.ctx.AVAXAssetID) {
+		if !out.AssetID().Equals(vm.ctx.AVAXAssetID) && t.DestinationChain.Equals(constants.PlatformChainID) {
 			return errWrongAssetID
 		}
 		if !vm.verifyFxUsage(fxIndex, assetID) {

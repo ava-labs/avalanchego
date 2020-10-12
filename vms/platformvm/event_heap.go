@@ -8,7 +8,7 @@ import (
 	"container/heap"
 	"time"
 
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 // TimedTx ...
@@ -16,6 +16,7 @@ type TimedTx interface {
 	ID() ids.ID
 	StartTime() time.Time
 	EndTime() time.Time
+	Weight() uint64
 	Bytes() []byte
 }
 

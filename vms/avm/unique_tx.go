@@ -7,10 +7,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
-	"github.com/ava-labs/gecko/vms/components/avax"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
 var (
@@ -306,7 +306,14 @@ func (tx *UniqueTx) SyntacticVerify() error {
 	}
 
 	tx.verifiedTx = true
-	tx.validity = tx.Tx.SyntacticVerify(tx.vm.ctx, tx.vm.codec, tx.vm.ctx.AVAXAssetID, tx.vm.txFee, len(tx.vm.fxs))
+	tx.validity = tx.Tx.SyntacticVerify(
+		tx.vm.ctx,
+		tx.vm.codec,
+		tx.vm.ctx.AVAXAssetID,
+		tx.vm.txFee,
+		tx.vm.creationTxFee,
+		len(tx.vm.fxs),
+	)
 	return tx.validity
 }
 

@@ -6,10 +6,10 @@ package queue
 import (
 	"errors"
 
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/versiondb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
@@ -109,6 +109,12 @@ func (j *Jobs) Execute(job Job) error {
 		}
 		if deps.Len() > 0 {
 			continue
+		}
+		// TODO: Calling execute here ensures that double decision blocks are
+		//       always called atomically with their proposal blocks. This is
+		//       only a quick fix and should be handled in a more robust manner.
+		if err := job.Execute(); err != nil {
+			return err
 		}
 		if err := j.state.DeleteJob(j.db, blockedID); err != nil {
 			return err

@@ -4,9 +4,9 @@
 package avalanche
 
 import (
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/consensus/avalanche"
-	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 )
 
 // issuer issues [vtx] into consensus after its dependencies are met.

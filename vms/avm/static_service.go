@@ -6,16 +6,18 @@ package avm
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"math"
 	"net/http"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/wrappers"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	cjson "github.com/ava-labs/gecko/utils/json"
+	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
 var (
@@ -27,6 +29,7 @@ type StaticService struct{}
 
 // BuildGenesisArgs are arguments for BuildGenesis
 type BuildGenesisArgs struct {
+	NetworkID   cjson.Uint32               `json:"networkID"`
 	GenesisData map[string]AssetDefinition `json:"genesisData"`
 }
 
@@ -36,6 +39,7 @@ type AssetDefinition struct {
 	Symbol       string                   `json:"symbol"`
 	Denomination cjson.Uint8              `json:"denomination"`
 	InitialState map[string][]interface{} `json:"initialState"`
+	Memo         formatting.CB58          `json:"memo"`
 }
 
 // BuildGenesisReply is the reply from BuildGenesis
@@ -48,7 +52,7 @@ type BuildGenesisReply struct {
 func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	errs := wrappers.Errs{}
 
-	c := codec.NewDefault()
+	c := codec.New(math.MaxUint32, 1<<20)
 	errs.Add(
 		c.RegisterType(&BaseTx{}),
 		c.RegisterType(&CreateAssetTx{}),
@@ -71,7 +75,9 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			Alias: assetAlias,
 			CreateAssetTx: CreateAssetTx{
 				BaseTx: BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    uint32(args.NetworkID),
 					BlockchainID: ids.Empty,
+					Memo:         assetDefinition.Memo.Bytes,
 				}},
 				Name:         assetDefinition.Name,
 				Symbol:       assetDefinition.Symbol,
@@ -88,19 +94,19 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 					for _, state := range initialStates {
 						b, err := json.Marshal(state)
 						if err != nil {
-							return err
+							return fmt.Errorf("problem marshaling state: %w", err)
 						}
 						holder := Holder{}
 						if err := json.Unmarshal(b, &holder); err != nil {
-							return err
+							return fmt.Errorf("problem unmarshaling holder: %w", err)
 						}
 						_, addrbuff, err := formatting.ParseBech32(holder.Address)
 						if err != nil {
-							return err
+							return fmt.Errorf("problem parsing holder address: %w", err)
 						}
 						addr, err := ids.ToShortID(addrbuff)
 						if err != nil {
-							return err
+							return fmt.Errorf("problem parsing holder address: %w", err)
 						}
 						initialState.Outs = append(initialState.Outs, &secp256k1fx.TransferOutput{
 							Amt: uint64(holder.Amount),
@@ -114,11 +120,11 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 					for _, state := range initialStates {
 						b, err := json.Marshal(state)
 						if err != nil {
-							return err
+							return fmt.Errorf("problem marshaling state: %w", err)
 						}
 						owners := Owners{}
 						if err := json.Unmarshal(b, &owners); err != nil {
-							return err
+							return fmt.Errorf("problem unmarshaling Owners: %w", err)
 						}
 
 						out := &secp256k1fx.MintOutput{
@@ -129,11 +135,11 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 						for _, address := range owners.Minters {
 							_, addrbuff, err := formatting.ParseBech32(address)
 							if err != nil {
-								return err
+								return fmt.Errorf("problem parsing minters address: %w", err)
 							}
 							addr, err := ids.ToShortID(addrbuff)
 							if err != nil {
-								return err
+								return fmt.Errorf("problem parsing minters address: %w", err)
 							}
 							out.Addrs = append(out.Addrs, addr)
 						}
@@ -155,7 +161,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 
 	b, err := c.Marshal(&g)
 	if err != nil {
-		return err
+		return fmt.Errorf("problem marshaling genesis: %w", err)
 	}
 
 	reply.Bytes.Bytes = b

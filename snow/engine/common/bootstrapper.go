@@ -4,11 +4,12 @@
 package common
 
 import (
-	stdmath "math"
 	"time"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/math"
+	stdmath "math"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -33,6 +34,8 @@ const (
 type Bootstrapper struct {
 	Config
 
+	RequestID uint32
+
 	// IDs of validators we have requested the accepted frontier from but haven't
 	// received a reply from
 	pendingAcceptedFrontier ids.ShortSet
@@ -41,24 +44,40 @@ type Bootstrapper struct {
 	pendingAccepted ids.ShortSet
 	acceptedVotes   map[[32]byte]uint64
 
-	RequestID uint32
+	// current weight
+	started bool
+	weight  uint64
 }
 
 // Initialize implements the Engine interface.
-func (b *Bootstrapper) Initialize(config Config) {
+func (b *Bootstrapper) Initialize(config Config) error {
 	b.Config = config
+
+	beacons, err := b.Beacons.Sample(config.SampleK)
+	if err != nil {
+		return err
+	}
+
+	for _, vdr := range beacons {
+		vdrID := vdr.ID()
+		b.pendingAcceptedFrontier.Add(vdrID)
+	}
 
 	for _, vdr := range b.Beacons.List() {
 		vdrID := vdr.ID()
-		b.pendingAcceptedFrontier.Add(vdrID)
 		b.pendingAccepted.Add(vdrID)
 	}
 
 	b.acceptedVotes = make(map[[32]byte]uint64)
+	if b.Config.StartupAlpha > 0 {
+		return nil
+	}
+	return b.Startup()
 }
 
 // Startup implements the Engine interface.
 func (b *Bootstrapper) Startup() error {
+	b.started = true
 	if b.pendingAcceptedFrontier.Len() == 0 {
 		b.Ctx.Log.Info("Bootstrapping skipped due to no provided bootstraps")
 		return b.Bootstrapable.ForceAccepted(ids.Set{})
@@ -168,4 +187,38 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 	}
 
 	return b.Bootstrapable.ForceAccepted(accepted)
+}
+
+// Connected implements the Engine interface.
+func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
+	if b.started {
+		return nil
+	}
+	weight, ok := b.Beacons.GetWeight(validatorID)
+	if !ok {
+		return nil
+	}
+	weight, err := math.Add64(weight, b.weight)
+	if err != nil {
+		return err
+	}
+	b.weight = weight
+	if b.weight < b.StartupAlpha {
+		return nil
+	}
+	return b.Startup()
+}
+
+// Disconnected implements the Engine interface.
+func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
+	if weight, ok := b.Beacons.GetWeight(validatorID); ok {
+		// TODO: Account for weight changes in a more robust manner.
+
+		// Sub64 should rarely error since only validators that have added their
+		// weight can become disconnected. Because it is possible that there are
+		// changes to the validators set, we utilize that Sub64 returns 0 on
+		// error.
+		b.weight, _ = math.Sub64(b.weight, weight)
+	}
+	return nil
 }

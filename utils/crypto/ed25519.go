@@ -8,8 +8,8 @@ import (
 
 	"golang.org/x/crypto/ed25519"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 var (
@@ -50,7 +50,7 @@ type PublicKeyED25519 struct {
 
 // Verify implements the PublicKey interface
 func (k *PublicKeyED25519) Verify(msg, sig []byte) bool {
-	return ed25519.Verify(ed25519.PublicKey(k.pk), msg, sig)
+	return ed25519.Verify(k.pk, msg, sig)
 }
 
 // VerifyHash implements the PublicKey interface
@@ -83,7 +83,7 @@ type PrivateKeyED25519 struct {
 func (k *PrivateKeyED25519) PublicKey() PublicKey {
 	if k.pk == nil {
 		k.pk = &PublicKeyED25519{
-			pk: ed25519.PrivateKey(k.sk).Public().(ed25519.PublicKey),
+			pk: k.sk.Public().(ed25519.PublicKey),
 		}
 	}
 	return k.pk
@@ -91,7 +91,7 @@ func (k *PrivateKeyED25519) PublicKey() PublicKey {
 
 // Sign implements the PrivateKey interface
 func (k *PrivateKeyED25519) Sign(msg []byte) ([]byte, error) {
-	return ed25519.Sign(ed25519.PrivateKey(k.sk), msg), nil
+	return ed25519.Sign(k.sk, msg), nil
 }
 
 // SignHash implements the PrivateKey interface

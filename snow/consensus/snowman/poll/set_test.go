@@ -6,9 +6,11 @@ package poll
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 func TestNewSetErrorOnMetrics(t *testing.T) {
@@ -17,14 +19,23 @@ func TestNewSetErrorOnMetrics(t *testing.T) {
 	namespace := ""
 	registerer := prometheus.NewRegistry()
 
-	registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "polls",
-	}))
-	registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "poll_duration",
-	}))
+	errs := wrappers.Errs{}
+	errs.Add(
+		registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "polls",
+		})),
+		registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "poll_duration",
+		})),
+	)
+	if errs.Errored() {
+		t.Fatal(errs.Err)
+	}
 
-	_ = NewSet(factory, log, namespace, registerer)
+	s := NewSet(factory, log, namespace, registerer)
+	if s == nil {
+		t.Fatalf("shouldn't have failed due to a metrics initialization err")
+	}
 }
 
 func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
@@ -56,7 +67,7 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 	} else if s.Len() != 1 {
 		t.Fatalf("Should only have one active poll")
 	} else if _, finished := s.Vote(1, vdr1, vtxID); finished {
-		t.Fatalf("Shouldn't have been able to finish a non-existant poll")
+		t.Fatalf("Shouldn't have been able to finish a non-existent poll")
 	} else if _, finished := s.Vote(0, vdr1, vtxID); finished {
 		t.Fatalf("Shouldn't have been able to finish an ongoing poll")
 	} else if _, finished := s.Vote(0, vdr1, vtxID); finished {
@@ -99,7 +110,7 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 	} else if s.Len() != 1 {
 		t.Fatalf("Should only have one active poll")
 	} else if _, finished := s.Drop(1, vdr1); finished {
-		t.Fatalf("Shouldn't have been able to finish a non-existant poll")
+		t.Fatalf("Shouldn't have been able to finish a non-existent poll")
 	} else if _, finished := s.Drop(0, vdr1); finished {
 		t.Fatalf("Shouldn't have been able to finish an ongoing poll")
 	} else if _, finished := s.Drop(0, vdr1); finished {

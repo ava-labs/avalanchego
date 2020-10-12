@@ -6,9 +6,9 @@ package avm
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/utils/constants"
-
-	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/json"
 )
 
 var addrStrArray = []string{
@@ -27,8 +27,14 @@ func TestBuildGenesis(t *testing.T) {
 	var addrMap = map[string]string{}
 	for _, addrStr := range addrStrArray {
 		cb58 := formatting.CB58{}
-		cb58.FromString(addrStr)
-		addrMap[addrStr], _ = formatting.FormatBech32(testHRP, cb58.Bytes)
+		err := cb58.FromString(addrStr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		addrMap[addrStr], err = formatting.FormatBech32(testHRP, cb58.Bytes)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	args := BuildGenesisArgs{GenesisData: map[string]AssetDefinition{
 		"asset1": {
@@ -46,11 +52,11 @@ func TestBuildGenesis(t *testing.T) {
 						Address: addrMap["6mxBGnjGDCKgkVe7yfrmvMA7xE7qCv3vv"],
 					},
 					Holder{
-						Amount:  50000,
+						Amount:  json.Uint64(startBalance),
 						Address: addrMap["6ncQ19Q2U4MamkCYzshhD8XFjfwAWFzTa"],
 					},
 					Holder{
-						Amount:  50000,
+						Amount:  json.Uint64(startBalance),
 						Address: addrMap["Jz9ayEDt7dx9hDx45aXALujWmL9ZUuqe7"],
 					},
 				},

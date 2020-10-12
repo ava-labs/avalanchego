@@ -8,11 +8,11 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 var (

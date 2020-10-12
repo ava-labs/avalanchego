@@ -8,17 +8,17 @@ import (
 	"math"
 	"testing"
 
-	"github.com/ava-labs/gecko/api/keystore"
-	"github.com/ava-labs/gecko/chains/atomic"
-	"github.com/ava-labs/gecko/database/memdb"
-	"github.com/ava-labs/gecko/database/prefixdb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/components/verify"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestExportTxSyntacticVerify(t *testing.T) {
@@ -39,7 +39,7 @@ func TestExportTxSyntacticVerify(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: avax.Asset{ID: asset},
+				Asset: avax.Asset{ID: assetID},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -50,7 +50,7 @@ func TestExportTxSyntacticVerify(t *testing.T) {
 		}},
 		DestinationChain: platformChainID,
 		ExportedOuts: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: asset},
+			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 12345,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -62,7 +62,7 @@ func TestExportTxSyntacticVerify(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err != nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -73,7 +73,7 @@ func TestExportTxSyntacticVerifyNil(t *testing.T) {
 
 	tx := (*ExportTx)(nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to a nil ExportTx")
 	}
 }
@@ -96,7 +96,7 @@ func TestExportTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: avax.Asset{ID: asset},
+				Asset: avax.Asset{ID: assetID},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -107,7 +107,7 @@ func TestExportTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 		}},
 		DestinationChain: platformChainID,
 		ExportedOuts: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: asset},
+			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 12345,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -119,7 +119,7 @@ func TestExportTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to a wrong network ID")
 	}
 }
@@ -147,7 +147,7 @@ func TestExportTxSyntacticVerifyWrongBlockchainID(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: avax.Asset{ID: asset},
+				Asset: avax.Asset{ID: assetID},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -158,7 +158,7 @@ func TestExportTxSyntacticVerifyWrongBlockchainID(t *testing.T) {
 		}},
 		DestinationChain: platformChainID,
 		ExportedOuts: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: asset},
+			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 12345,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -170,7 +170,7 @@ func TestExportTxSyntacticVerifyWrongBlockchainID(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to wrong blockchain ID")
 	}
 }
@@ -193,7 +193,7 @@ func TestExportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: avax.Asset{ID: asset},
+				Asset: avax.Asset{ID: assetID},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -205,7 +205,7 @@ func TestExportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 		}},
 		DestinationChain: platformChainID,
 		ExportedOuts: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: asset},
+			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 12345,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -217,7 +217,7 @@ func TestExportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to memo field being too long")
 	}
 }
@@ -240,7 +240,7 @@ func TestExportTxSyntacticVerifyInvalidBaseOutput(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: avax.Asset{ID: asset},
+				Asset: avax.Asset{ID: assetID},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -249,7 +249,7 @@ func TestExportTxSyntacticVerifyInvalidBaseOutput(t *testing.T) {
 				},
 			}},
 			Outs: []*avax.TransferableOutput{{
-				Asset: avax.Asset{ID: asset},
+				Asset: avax.Asset{ID: assetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 10000,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -261,7 +261,7 @@ func TestExportTxSyntacticVerifyInvalidBaseOutput(t *testing.T) {
 		}},
 		DestinationChain: platformChainID,
 		ExportedOuts: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: asset},
+			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 2345,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -273,7 +273,7 @@ func TestExportTxSyntacticVerifyInvalidBaseOutput(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to an invalid base output")
 	}
 }
@@ -296,7 +296,7 @@ func TestExportTxSyntacticVerifyUnsortedBaseOutputs(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: avax.Asset{ID: asset},
+				Asset: avax.Asset{ID: assetID},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -306,7 +306,7 @@ func TestExportTxSyntacticVerifyUnsortedBaseOutputs(t *testing.T) {
 			}},
 			Outs: []*avax.TransferableOutput{
 				{
-					Asset: avax.Asset{ID: asset},
+					Asset: avax.Asset{ID: assetID},
 					Out: &secp256k1fx.TransferOutput{
 						Amt: 10000,
 						OutputOwners: secp256k1fx.OutputOwners{
@@ -316,7 +316,7 @@ func TestExportTxSyntacticVerifyUnsortedBaseOutputs(t *testing.T) {
 					},
 				},
 				{
-					Asset: avax.Asset{ID: asset},
+					Asset: avax.Asset{ID: assetID},
 					Out: &secp256k1fx.TransferOutput{
 						Amt: 1111,
 						OutputOwners: secp256k1fx.OutputOwners{
@@ -329,7 +329,7 @@ func TestExportTxSyntacticVerifyUnsortedBaseOutputs(t *testing.T) {
 		}},
 		DestinationChain: platformChainID,
 		ExportedOuts: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: asset},
+			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 1234,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -341,7 +341,7 @@ func TestExportTxSyntacticVerifyUnsortedBaseOutputs(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to unsorted base outputs")
 	}
 }
@@ -364,7 +364,7 @@ func TestExportTxSyntacticVerifyInvalidOutput(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: avax.Asset{ID: asset},
+				Asset: avax.Asset{ID: assetID},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -375,7 +375,7 @@ func TestExportTxSyntacticVerifyInvalidOutput(t *testing.T) {
 		}},
 		DestinationChain: platformChainID,
 		ExportedOuts: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: asset},
+			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 12345,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -387,7 +387,7 @@ func TestExportTxSyntacticVerifyInvalidOutput(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to invalid output")
 	}
 }
@@ -410,7 +410,7 @@ func TestExportTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: avax.Asset{ID: asset},
+				Asset: avax.Asset{ID: assetID},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -422,7 +422,7 @@ func TestExportTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 		DestinationChain: platformChainID,
 		ExportedOuts: []*avax.TransferableOutput{
 			{
-				Asset: avax.Asset{ID: asset},
+				Asset: avax.Asset{ID: assetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 10000,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -432,7 +432,7 @@ func TestExportTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 				},
 			},
 			{
-				Asset: avax.Asset{ID: asset},
+				Asset: avax.Asset{ID: assetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 2345,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -445,7 +445,7 @@ func TestExportTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to unsorted outputs")
 	}
 }
@@ -469,7 +469,7 @@ func TestExportTxSyntacticVerifyInvalidInput(t *testing.T) {
 						}),
 						OutputIndex: 0,
 					},
-					Asset: avax.Asset{ID: asset},
+					Asset: avax.Asset{ID: assetID},
 					In: &secp256k1fx.TransferInput{
 						Amt: 54321,
 						Input: secp256k1fx.Input{
@@ -487,7 +487,7 @@ func TestExportTxSyntacticVerifyInvalidInput(t *testing.T) {
 						}),
 						OutputIndex: 1,
 					},
-					Asset: avax.Asset{ID: asset},
+					Asset: avax.Asset{ID: assetID},
 					In: &secp256k1fx.TransferInput{
 						Amt: 0,
 						Input: secp256k1fx.Input{
@@ -499,7 +499,7 @@ func TestExportTxSyntacticVerifyInvalidInput(t *testing.T) {
 		}},
 		DestinationChain: platformChainID,
 		ExportedOuts: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: asset},
+			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 12345,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -511,7 +511,7 @@ func TestExportTxSyntacticVerifyInvalidInput(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to invalid input")
 	}
 }
@@ -535,7 +535,7 @@ func TestExportTxSyntacticVerifyUnsortedInputs(t *testing.T) {
 						}),
 						OutputIndex: 1,
 					},
-					Asset: avax.Asset{ID: asset},
+					Asset: avax.Asset{ID: assetID},
 					In: &secp256k1fx.TransferInput{
 						Amt: 1,
 						Input: secp256k1fx.Input{
@@ -553,7 +553,7 @@ func TestExportTxSyntacticVerifyUnsortedInputs(t *testing.T) {
 						}),
 						OutputIndex: 0,
 					},
-					Asset: avax.Asset{ID: asset},
+					Asset: avax.Asset{ID: assetID},
 					In: &secp256k1fx.TransferInput{
 						Amt: 54321,
 						Input: secp256k1fx.Input{
@@ -565,7 +565,7 @@ func TestExportTxSyntacticVerifyUnsortedInputs(t *testing.T) {
 		}},
 		DestinationChain: platformChainID,
 		ExportedOuts: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: asset},
+			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 12345,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -577,7 +577,7 @@ func TestExportTxSyntacticVerifyUnsortedInputs(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to unsorted inputs")
 	}
 }
@@ -600,7 +600,7 @@ func TestExportTxSyntacticVerifyInvalidFlowCheck(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: avax.Asset{ID: asset},
+				Asset: avax.Asset{ID: assetID},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -611,7 +611,7 @@ func TestExportTxSyntacticVerifyInvalidFlowCheck(t *testing.T) {
 		}},
 		DestinationChain: platformChainID,
 		ExportedOuts: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: asset},
+			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 123450,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -623,7 +623,7 @@ func TestExportTxSyntacticVerifyInvalidFlowCheck(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to an invalid flow check")
 	}
 }
@@ -733,11 +733,13 @@ func TestExportTxSemanticVerify(t *testing.T) {
 	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
-	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	avaxID := genesisTx.ID()
 	rawTx := &Tx{UnsignedTx: &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -746,11 +748,11 @@ func TestExportTxSemanticVerify(t *testing.T) {
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        avaxID,
-					OutputIndex: 1,
+					OutputIndex: 2,
 				},
 				Asset: avax.Asset{ID: avaxID},
 				In: &secp256k1fx.TransferInput{
-					Amt:   50000,
+					Amt:   startBalance,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 				},
 			}},
@@ -759,7 +761,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: 50000,
+				Amt: startBalance - vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -791,11 +793,13 @@ func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
 	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
-	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	avaxID := genesisTx.ID()
 	rawTx := &Tx{UnsignedTx: &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -804,11 +808,11 @@ func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        avaxID,
-					OutputIndex: 1,
+					OutputIndex: 2,
 				},
 				Asset: avax.Asset{ID: avaxID},
 				In: &secp256k1fx.TransferInput{
-					Amt:   50000,
+					Amt:   startBalance,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 				},
 			}},
@@ -817,7 +821,7 @@ func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: 50000,
+				Amt: startBalance - vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -849,11 +853,13 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
-	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	avaxID := genesisTx.ID()
 	rawTx := &Tx{UnsignedTx: &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -866,7 +872,7 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 				},
 				Asset: avax.Asset{ID: avaxID},
 				In: &secp256k1fx.TransferInput{
-					Amt:   50000,
+					Amt:   startBalance,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 				},
 			}},
@@ -875,7 +881,7 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: 50000,
+				Amt: startBalance - vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -907,33 +913,48 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
-	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	avaxID := genesisTx.ID()
 	rawTx := &Tx{UnsignedTx: &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
-			Ins: []*avax.TransferableInput{{
-				UTXOID: avax.UTXOID{
-					TxID:        avaxID,
-					OutputIndex: 1,
+			Ins: []*avax.TransferableInput{
+				{ // this input pays the tx fee
+					UTXOID: avax.UTXOID{
+						TxID:        avaxID,
+						OutputIndex: 2,
+					},
+					Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt:   startBalance,
+						Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+					},
 				},
-				Asset: avax.Asset{ID: ids.Empty},
-				In: &secp256k1fx.TransferInput{
-					Amt:   50000,
-					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+				{
+					UTXOID: avax.UTXOID{
+						TxID:        avaxID,
+						OutputIndex: 5, // this index doesn't really exist
+					},
+					Asset: avax.Asset{ID: ids.Empty},
+					In: &secp256k1fx.TransferInput{
+						Amt:   startBalance,
+						Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+					},
 				},
-			}},
+			},
 		}},
 		DestinationChain: platformChainID,
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: ids.Empty},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: 50000,
+				Amt: startBalance - vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -942,7 +963,14 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 		}},
 	}}
 
-	if err := rawTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := rawTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{
+		{
+			keys[0],
+		},
+		{
+			keys[0],
+		},
+	}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -979,7 +1007,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	}
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
 
-	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
 	avaxID := genesisTx.ID()
 
@@ -1001,8 +1029,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 					InitializeF: func(vmIntf interface{}) error {
 						vm := vmIntf.(*VM)
 						c := vm.Codec()
-						c.RegisterType(&avax.TestVerifiable{})
-						return nil
+						return c.RegisterType(&avax.TestVerifiable{})
 					},
 				},
 			},
@@ -1022,7 +1049,9 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	}
 
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
@@ -1033,11 +1062,11 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        avaxID,
-					OutputIndex: 1,
+					OutputIndex: 2,
 				},
 				Asset: avax.Asset{ID: avaxID},
 				In: &secp256k1fx.TransferInput{
-					Amt:   50000,
+					Amt:   startBalance,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 				},
 			}},
@@ -1046,7 +1075,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: 50000,
+				Amt: startBalance - vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -1078,11 +1107,13 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
-	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	avaxID := genesisTx.ID()
 	rawTx := &Tx{UnsignedTx: &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -1091,11 +1122,11 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        avaxID,
-					OutputIndex: 1,
+					OutputIndex: 2,
 				},
 				Asset: avax.Asset{ID: avaxID},
 				In: &secp256k1fx.TransferInput{
-					Amt:   50000,
+					Amt:   startBalance,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 				},
 			}},
@@ -1104,7 +1135,7 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: 50000,
+				Amt: startBalance - vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -1145,7 +1176,7 @@ func TestIssueExportTx(t *testing.T) {
 	ctx := NewContext(t)
 	ctx.SharedMemory = m.NewSharedMemory(chainID)
 
-	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
 	avaxID := genesisTx.ID()
 
@@ -1182,11 +1213,11 @@ func TestIssueExportTx(t *testing.T) {
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        avaxID,
-					OutputIndex: 1,
+					OutputIndex: 2,
 				},
 				Asset: avax.Asset{ID: avaxID},
 				In: &secp256k1fx.TransferInput{
-					Amt:   50000,
+					Amt:   startBalance,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 				},
 			}},
@@ -1195,7 +1226,7 @@ func TestIssueExportTx(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: 50000,
+				Amt: startBalance - vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{key.PublicKey().Address()},
@@ -1220,7 +1251,9 @@ func TestIssueExportTx(t *testing.T) {
 
 	ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
@@ -1267,7 +1300,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	ctx := NewContext(t)
 	ctx.SharedMemory = m.NewSharedMemory(chainID)
 
-	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
 	avaxID := genesisTx.ID()
 	platformID := ids.Empty.Prefix(0)
@@ -1308,11 +1341,11 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        avaxID,
-					OutputIndex: 1,
+					OutputIndex: 2,
 				},
 				Asset: avax.Asset{ID: avaxID},
 				In: &secp256k1fx.TransferInput{
-					Amt:   50000,
+					Amt:   startBalance,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 				},
 			}},
@@ -1321,7 +1354,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: 50000,
+				Amt: startBalance - vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{key.PublicKey().Address()},
@@ -1346,7 +1379,9 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
@@ -1371,7 +1406,9 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsedTx.Accept()
+	if err := parsedTx.Accept(); err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := peerSharedMemory.Get(vm.ctx.ChainID, [][]byte{utxoID.Bytes()}); err == nil {
 		t.Fatalf("should have failed to read the utxo")

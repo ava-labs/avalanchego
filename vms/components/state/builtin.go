@@ -7,14 +7,14 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-func marshalID(IDIntf interface{}) ([]byte, error) {
-	if ID, ok := IDIntf.(ids.ID); ok {
-		return ID.Bytes(), nil
+func marshalID(idIntf interface{}) ([]byte, error) {
+	if id, ok := idIntf.(ids.ID); ok {
+		return id.Bytes(), nil
 	}
 	return nil, errors.New("expected ids.ID but got unexpected type")
 }
@@ -23,8 +23,8 @@ func unmarshalID(bytes []byte) (interface{}, error) {
 	return ids.ToID(bytes)
 }
 
-func marshalStatus(StatusIntf interface{}) ([]byte, error) {
-	if status, ok := StatusIntf.(choices.Status); ok {
+func marshalStatus(statusIntf interface{}) ([]byte, error) {
+	if status, ok := statusIntf.(choices.Status); ok {
 		return status.Bytes(), nil
 	}
 	return nil, errors.New("expected choices.Status but got unexpected type")
@@ -39,8 +39,8 @@ func unmarshalStatus(bytes []byte) (interface{}, error) {
 	return status, p.Err
 }
 
-func marshalTime(TimeIntf interface{}) ([]byte, error) {
-	if t, ok := TimeIntf.(time.Time); ok {
+func marshalTime(timeIntf interface{}) ([]byte, error) {
+	if t, ok := timeIntf.(time.Time); ok {
 		p := wrappers.Packer{MaxSize: wrappers.LongLen}
 		p.PackLong(uint64(t.Unix()))
 		return p.Bytes, p.Err

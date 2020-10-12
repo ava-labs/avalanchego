@@ -4,8 +4,8 @@
 package avm
 
 import (
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 )
 
 // ID that this VM uses when labeled
@@ -15,12 +15,14 @@ var (
 
 // Factory ...
 type Factory struct {
-	Fee uint64
+	CreationFee uint64
+	Fee         uint64
 }
 
 // New ...
 func (f *Factory) New(*snow.Context) (interface{}, error) {
 	return &VM{
-		txFee: f.Fee,
+		creationTxFee: f.CreationFee,
+		txFee:         f.Fee,
 	}, nil
 }

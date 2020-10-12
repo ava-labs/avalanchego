@@ -6,17 +6,22 @@ package platformvm
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+
 	"strings"
 	"testing"
 
-	"github.com/ava-labs/gecko/api"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	"github.com/ava-labs/gecko/api/keystore"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/vms/avm"
+	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
 var (
@@ -73,7 +78,7 @@ func defaultAddress(t *testing.T, service *Service) {
 }
 
 func TestAddValidator(t *testing.T) {
-	expectedJSONString := `{"startTime":"0","endTime":"0","nodeID":"","rewardAddress":"","delegationFeeRate":"0.0000","username":"","password":""}`
+	expectedJSONString := `{"username":"","password":"","from":null,"changeAddr":"","startTime":"0","endTime":"0","nodeID":"","rewardAddress":"","delegationFeeRate":"0.0000"}`
 	args := AddValidatorArgs{}
 	bytes, err := json.Marshal(&args)
 	if err != nil {
@@ -108,7 +113,12 @@ func TestExportKey(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.Ctx.Lock.Lock()
-	defer func() { service.vm.Shutdown(); service.vm.Ctx.Lock.Unlock() }()
+	defer func() {
+		if err := service.vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		service.vm.Ctx.Lock.Unlock()
+	}()
 
 	reply := ExportKeyReply{}
 	if err := service.ExportKey(nil, &args, &reply); err != nil {
@@ -139,7 +149,12 @@ func TestImportKey(t *testing.T) {
 
 	service := defaultService(t)
 	service.vm.Ctx.Lock.Lock()
-	defer func() { service.vm.Shutdown(); service.vm.Ctx.Lock.Unlock() }()
+	defer func() {
+		if err := service.vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		service.vm.Ctx.Lock.Unlock()
+	}()
 
 	reply := api.JsonAddress{}
 	if err := service.ImportKey(nil, &args, &reply); err != nil {
@@ -155,7 +170,12 @@ func TestGetTxStatus(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.Ctx.Lock.Lock()
-	defer func() { service.vm.Shutdown(); service.vm.Ctx.Lock.Unlock() }()
+	defer func() {
+		if err := service.vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		service.vm.Ctx.Lock.Unlock()
+	}()
 
 	// create a tx
 	tx, err := service.vm.newCreateChainTx(
@@ -165,6 +185,7 @@ func TestGetTxStatus(t *testing.T) {
 		nil,
 		"chain name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -176,7 +197,7 @@ func TestGetTxStatus(t *testing.T) {
 	} else if status != Unknown {
 		t.Fatalf("status should be unknown but is %s", status)
 		// put the chain in existing chain list
-	} else if err := service.vm.issueTx(tx); err != nil {
+	} else if err := service.vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
 	} else if err := service.vm.putChains(service.vm.DB, []*Tx{tx}); err != nil {
 		t.Fatal(err)
@@ -189,7 +210,7 @@ func TestGetTxStatus(t *testing.T) {
 		// remove the chain from existing chain list
 	} else if err := service.vm.putChains(service.vm.DB, []*Tx{}); err != nil {
 		t.Fatal(err)
-	} else if err := service.vm.issueTx(tx); err != nil {
+	} else if err := service.vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
 	} else if block, err := service.vm.BuildBlock(); err != nil {
 		t.Fatal(err)
@@ -211,7 +232,12 @@ func TestGetTx(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.Ctx.Lock.Lock()
-	defer func() { service.vm.Shutdown(); service.vm.Ctx.Lock.Unlock() }()
+	defer func() {
+		if err := service.vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		service.vm.Ctx.Lock.Unlock()
+	}()
 
 	type test struct {
 		description string
@@ -229,6 +255,7 @@ func TestGetTx(t *testing.T) {
 					nil,
 					"chain name",
 					[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+					keys[0].PublicKey().Address(), // change addr
 				)
 			},
 		},
@@ -236,13 +263,14 @@ func TestGetTx(t *testing.T) {
 			"proposal block",
 			func() (*Tx, error) {
 				return service.vm.newAddValidatorTx( // Test GetTx works for proposal blocks
-					service.vm.minStake,
-					uint64(service.vm.clock.Time().Add(Delta).Unix()),
-					uint64(service.vm.clock.Time().Add(Delta).Add(MinimumStakingDuration).Unix()),
+					service.vm.minValidatorStake,
+					uint64(service.vm.clock.Time().Add(syncBound).Unix()),
+					uint64(service.vm.clock.Time().Add(syncBound).Add(defaultMinStakingDuration).Unix()),
 					ids.GenerateTestShortID(),
 					ids.GenerateTestShortID(),
 					0,
 					[]*crypto.PrivateKeySECP256K1R{keys[0]},
+					keys[0].PublicKey().Address(), // change addr
 				)
 			},
 		},
@@ -254,6 +282,7 @@ func TestGetTx(t *testing.T) {
 					service.vm.Ctx.XChainID,
 					ids.GenerateTestShortID(),
 					[]*crypto.PrivateKeySECP256K1R{keys[0]},
+					keys[0].PublicKey().Address(), // change addr
 				)
 			},
 		},
@@ -268,7 +297,7 @@ func TestGetTx(t *testing.T) {
 		var response GetTxResponse
 		if err := service.GetTx(nil, arg, &response); err == nil {
 			t.Fatalf("failed test '%s': haven't issued tx yet so shouldn't be able to get it", test.description)
-		} else if err := service.vm.issueTx(tx); err != nil {
+		} else if err := service.vm.mempool.IssueTx(tx); err != nil {
 			t.Fatalf("failed test '%s': %s", test.description, err)
 		} else if block, err := service.vm.BuildBlock(); err != nil {
 			t.Fatalf("failed test '%s': %s", test.description, err)
@@ -291,5 +320,325 @@ func TestGetTx(t *testing.T) {
 		} else if !bytes.Equal(response.Tx.Bytes, tx.Bytes()) {
 			t.Fatalf("failed test '%s': byte representation of tx in response is incorrect", test.description)
 		}
+	}
+}
+
+// Test method GetBalance
+func TestGetBalance(t *testing.T) {
+	service := defaultService(t)
+	defaultAddress(t, service)
+	service.vm.Ctx.Lock.Lock()
+	defer func() {
+		if err := service.vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		service.vm.Ctx.Lock.Unlock()
+	}()
+
+	// Ensure GetStake is correct for each of the genesis validators
+	genesis, _ := defaultGenesis()
+	for _, utxo := range genesis.UTXOs {
+		request := api.JsonAddress{
+			Address: fmt.Sprintf("P-%s", utxo.Address),
+		}
+		reply := GetBalanceResponse{}
+		if err := service.GetBalance(nil, &request, &reply); err != nil {
+			t.Fatal(err)
+		}
+		if reply.Balance != cjson.Uint64(defaultBalance) {
+			t.Fatalf("Wrong balance. Expected %d ; Returned %d", reply.Balance, defaultBalance)
+		}
+		if reply.Unlocked != cjson.Uint64(defaultBalance) {
+			t.Fatalf("Wrong unlocked balance. Expected %d ; Returned %d", reply.Unlocked, defaultBalance)
+		}
+		if reply.LockedStakeable != 0 {
+			t.Fatalf("Wrong locked stakeable balance. Expected %d ; Returned %d", reply.LockedStakeable, 0)
+		}
+		if reply.LockedNotStakeable != 0 {
+			t.Fatalf("Wrong locked not stakeable balance. Expected %d ; Returned %d", reply.LockedNotStakeable, 0)
+		}
+	}
+}
+
+// Test method GetStake
+func TestGetStake(t *testing.T) {
+	service := defaultService(t)
+	defaultAddress(t, service)
+	service.vm.Ctx.Lock.Lock()
+	defer func() {
+		if err := service.vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		service.vm.Ctx.Lock.Unlock()
+	}()
+
+	// Ensure GetStake is correct for each of the genesis validators
+	genesis, _ := defaultGenesis()
+	addrs := []string{}
+	for _, validator := range genesis.Validators {
+		addr := fmt.Sprintf("P-%s", validator.RewardOwner.Addresses[0])
+		addrs = append(addrs, addr)
+		args := api.JsonAddresses{
+			Addresses: []string{addr},
+		}
+		response := GetStakeReply{}
+		if err := service.GetStake(nil, &args, &response); err != nil {
+			t.Fatal(err)
+		}
+		if uint64(response.Staked) != defaultWeight {
+			t.Fatalf("expected stake to be %d but is %d", defaultWeight, response.Staked)
+		}
+	}
+
+	// Make sure this works for multiple addresses
+	args := api.JsonAddresses{
+		Addresses: addrs,
+	}
+	response := GetStakeReply{}
+	if err := service.GetStake(nil, &args, &response); err != nil {
+		t.Fatal(err)
+	}
+	if int(response.Staked) != len(genesis.Validators)*defaultWeight {
+		t.Fatalf("expected stake to be %d but is %d", len(genesis.Validators)*defaultWeight, response.Staked)
+	}
+
+	// Make sure this works for delegators
+	// Get the old amount of stake for keys[0]
+	addr, _ := service.vm.FormatLocalAddress(keys[0].PublicKey().Address())
+	args.Addresses = []string{addr}
+	if err := service.GetStake(nil, &args, &response); err != nil {
+		t.Fatal(err)
+	}
+	oldStake := response.Staked
+
+	// Add a delegator
+	stakeAmt := service.vm.minDelegatorStake + 12345
+	tx, err := service.vm.newAddDelegatorTx(
+		stakeAmt,
+		uint64(defaultGenesisTime.Unix()),
+		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()),
+		ids.GenerateTestShortID(),
+		ids.GenerateTestShortID(),
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		keys[0].PublicKey().Address(), // change addr
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.vm.addStaker(service.vm.DB, constants.PrimaryNetworkID, &rewardTx{
+		Reward: 0,
+		Tx:     *tx,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure the delegator has the right stake (old stake + stakeAmt)
+	if err := service.GetStake(nil, &args, &response); err != nil {
+		t.Fatal(err)
+	}
+	if uint64(response.Staked) != uint64(oldStake)+stakeAmt {
+		t.Fatalf("expected stake to be %d but is %d", uint64(oldStake)+stakeAmt, response.Staked)
+	}
+	oldStake = response.Staked
+
+	// Make sure this works for pending stakers
+	// Add a pending staker
+	stakeAmt = service.vm.minValidatorStake + 54321
+	tx, err = service.vm.newAddValidatorTx(
+		stakeAmt,
+		uint64(defaultGenesisTime.Unix()),
+		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()),
+		ids.GenerateTestShortID(),
+		ids.GenerateTestShortID(),
+		0,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		keys[0].PublicKey().Address(), // change addr
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.vm.enqueueStaker(service.vm.DB, constants.PrimaryNetworkID, tx); err != nil {
+		t.Fatal(err)
+	}
+	// Make sure the delegator has the right stake (old stake + stakeAmt)
+	if err := service.GetStake(nil, &args, &response); err != nil {
+		t.Fatal(err)
+	}
+	if uint64(response.Staked) != uint64(oldStake)+stakeAmt {
+		t.Fatalf("expected stake to be %d but is %d", uint64(oldStake)+stakeAmt, response.Staked)
+	}
+	oldStake += cjson.Uint64(stakeAmt)
+
+	// Make sure this works for pending stakers
+	// Add a pending staker
+	stakeAmt = service.vm.minValidatorStake + 54321
+	tx, err = service.vm.newAddValidatorTx(
+		stakeAmt,
+		uint64(defaultGenesisTime.Unix()),
+		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()),
+		ids.GenerateTestShortID(),
+		ids.GenerateTestShortID(),
+		0,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		keys[0].PublicKey().Address(), // change addr
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stake := tx.UnsignedTx.(*UnsignedAddValidatorTx).Stake
+	stake = append(stake, &avax.TransferableOutput{
+		Asset: avax.Asset{ID: avaxAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 1,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+			},
+		},
+	})
+	stake[0], stake[1] = stake[1], stake[0]
+	tx.UnsignedTx.(*UnsignedAddValidatorTx).Stake = stake
+	if err := tx.Sign(service.vm.codec, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := service.vm.enqueueStaker(service.vm.DB, constants.PrimaryNetworkID, tx); err != nil {
+		t.Fatal(err)
+	}
+	// Make sure the delegator has the right stake (old stake + stakeAmt)
+	if err := service.GetStake(nil, &args, &response); err != nil {
+		t.Fatal(err)
+	}
+	if uint64(response.Staked) != uint64(oldStake)+stakeAmt {
+		t.Fatalf("expected stake to be %d but is %d", uint64(oldStake)+stakeAmt, response.Staked)
+	}
+}
+
+// Test method GetCurrentValidators
+func TestGetCurrentValidators(t *testing.T) {
+	service := defaultService(t)
+	defaultAddress(t, service)
+	service.vm.Ctx.Lock.Lock()
+	defer func() {
+		if err := service.vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		service.vm.Ctx.Lock.Unlock()
+	}()
+
+	genesis, _ := defaultGenesis()
+
+	// Call getValidators
+	args := GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
+	response := GetCurrentValidatorsReply{}
+
+	err := service.GetCurrentValidators(nil, &args, &response)
+	switch {
+	case err != nil:
+		t.Fatal(err)
+	case len(response.Validators) != len(genesis.Validators):
+		t.Fatalf("should be %d validators but are %d", len(genesis.Validators), len(response.Validators))
+	case len(response.Delegators) != 0:
+		t.Fatalf("should be 0 delegators but are %d", len(response.Delegators))
+	}
+
+	for _, vdr := range genesis.Validators {
+		found := false
+		for i := 0; i < len(response.Validators) && !found; i++ {
+			gotVdr, ok := response.Validators[i].(APIPrimaryValidator)
+			switch {
+			case !ok:
+				t.Fatal("expected APIPrimaryValidator")
+			case gotVdr.NodeID != vdr.NodeID:
+			case gotVdr.EndTime != vdr.EndTime:
+				t.Fatalf("expected end time of %s to be %v but got %v",
+					vdr.NodeID,
+					vdr.EndTime,
+					gotVdr.EndTime,
+				)
+			case gotVdr.StartTime != vdr.StartTime:
+				t.Fatalf("expected start time of %s to be %v but got %v",
+					vdr.NodeID,
+					vdr.StartTime,
+					gotVdr.StartTime,
+				)
+			case gotVdr.Weight != vdr.Weight:
+				t.Fatalf("expected weight of %s to be %v but got %v",
+					vdr.NodeID,
+					vdr.Weight,
+					gotVdr.Weight,
+				)
+			default:
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("expected validators to contain %s but didn't", vdr.NodeID)
+		}
+	}
+
+	// Add a delegator
+	stakeAmt := service.vm.minDelegatorStake + 12345
+	validatorNodeID := keys[1].PublicKey().Address()
+	delegatorStartTime := uint64(defaultValidateStartTime.Unix())
+	delegatorEndTime := uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())
+
+	tx, err := service.vm.newAddDelegatorTx(
+		stakeAmt,
+		delegatorStartTime,
+		delegatorEndTime,
+		validatorNodeID,
+		ids.GenerateTestShortID(),
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		keys[0].PublicKey().Address(), // change addr
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.vm.addStaker(service.vm.DB, constants.PrimaryNetworkID, &rewardTx{
+		Reward: 0,
+		Tx:     *tx,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Call getCurrentValidators
+	args = GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
+	err = service.GetCurrentValidators(nil, &args, &response)
+	switch {
+	case err != nil:
+		t.Fatal(err)
+	case len(response.Validators) != len(genesis.Validators):
+		t.Fatalf("should be %d validators but are %d", len(genesis.Validators), len(response.Validators))
+	case len(response.Delegators) != 1:
+		t.Fatalf("should be 1 delegators but are %d", len(response.Delegators))
+	}
+
+	// Make sure the delegator is there
+	found := false
+	for i := 0; i < len(response.Validators) && !found; i++ {
+		vdr := response.Validators[i].(APIPrimaryValidator)
+		if vdr.NodeID != validatorNodeID.PrefixedString(constants.NodeIDPrefix) {
+			continue
+		}
+		found = true
+		if len(vdr.Delegators) != 1 {
+			t.Fatalf("%s should have 1 delegator", vdr.NodeID)
+		}
+		delegator := vdr.Delegators[0]
+		switch {
+		case delegator.NodeID != vdr.NodeID:
+			t.Fatal("wrong node ID")
+		case uint64(delegator.StartTime) != delegatorStartTime:
+			t.Fatal("wrong start time")
+		case uint64(delegator.EndTime) != delegatorEndTime:
+			t.Fatal("wrong end time")
+		case delegator.weight() != stakeAmt:
+			t.Fatalf("wrong weight")
+		}
+	}
+	if !found {
+		t.Fatalf("didnt find delegator")
 	}
 }

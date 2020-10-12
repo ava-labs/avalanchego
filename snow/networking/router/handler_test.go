@@ -8,12 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/networking/throttler"
+	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
@@ -35,7 +36,9 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	handler := &Handler{}
 	vdrs := validators.NewSet()
 	vdr0 := ids.GenerateTestShortID()
-	vdrs.AddWeight(vdr0, 1)
+	if err := vdrs.AddWeight(vdr0, 1); err != nil {
+		t.Fatal(err)
+	}
 	handler.Initialize(
 		&engine,
 		vdrs,
@@ -134,6 +137,47 @@ func TestHandlerClosesOnError(t *testing.T) {
 	go handler.Dispatch()
 
 	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1, time.Now().Add(time.Second))
+
+	ticker := time.NewTicker(20 * time.Millisecond)
+	select {
+	case <-ticker.C:
+		t.Fatalf("Handler shutdown timed out before calling toClose")
+	case <-closed:
+	}
+}
+
+func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
+	engine := common.EngineTest{T: t}
+	engine.Default(false)
+
+	engine.CantGossip = true
+
+	closed := make(chan struct{}, 1)
+
+	engine.ContextF = snow.DefaultContextTest
+	engine.GetFailedF = func(validatorID ids.ShortID, requestID uint32) error {
+		closed <- struct{}{}
+		return nil
+	}
+
+	handler := &Handler{}
+	handler.Initialize(
+		&engine,
+		validators.NewSet(),
+		nil,
+		16,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
+		"",
+		prometheus.NewRegistry(),
+	)
+	handler.clock.Set(time.Now())
+
+	go handler.Dispatch()
+
+	handler.Gossip()
+	handler.GetFailed(ids.ShortEmpty, 1)
 
 	ticker := time.NewTicker(20 * time.Millisecond)
 	select {

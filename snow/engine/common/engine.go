@@ -4,8 +4,8 @@
 package common
 
 import (
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 )
 
 // Engine describes the standard interface of a consensus engine
@@ -135,7 +135,7 @@ type FetchHandler interface {
 	// container. Unless that container was pruned from the active set.
 	//
 	// This engine should respond with a Put message with the same requestID if
-	// the container was locally avaliable. Otherwise, the message can be safely
+	// the container was locally available. Otherwise, the message can be safely
 	// dropped.
 	Get(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error
 
@@ -292,4 +292,10 @@ type InternalHandler interface {
 
 	// Notify this engine of a message from the virtual machine.
 	Notify(Message) error
+
+	// Notify this engine of a new peer.
+	Connected(validatorID ids.ShortID) error
+
+	// Notify this engine of a removed peer.
+	Disconnected(validatorID ids.ShortID) error
 }

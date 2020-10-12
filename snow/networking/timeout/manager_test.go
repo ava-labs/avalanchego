@@ -10,42 +10,51 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/timer"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
+	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
 func TestManagerFire(t *testing.T) {
 	manager := Manager{}
-	manager.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:    10 * time.Second,
-		MinimumTimeout:    500 * time.Millisecond,
-		MaximumTimeout:    10 * time.Second,
-		TimeoutMultiplier: 1.1,
-		TimeoutReduction:  time.Millisecond,
-		Namespace:         "",
-		Registerer:        prometheus.NewRegistry(),
-	})
+	benchlist := benchlist.NewNoBenchlist()
+	err := manager.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout: time.Millisecond,
+		MinimumTimeout: time.Millisecond,
+		MaximumTimeout: 10 * time.Second,
+		TimeoutInc:     2 * time.Millisecond,
+		TimeoutDec:     time.Millisecond,
+		Namespace:      "",
+		Registerer:     prometheus.NewRegistry(),
+	}, benchlist)
+	if err != nil {
+		t.Fatal(err)
+	}
 	go manager.Dispatch()
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	manager.Register(ids.NewShortID([20]byte{}), ids.NewID([32]byte{}), 0, wg.Done)
+	manager.Register(ids.NewShortID([20]byte{}), ids.NewID([32]byte{}), 0, true, 0, wg.Done)
 
 	wg.Wait()
 }
 
 func TestManagerCancel(t *testing.T) {
 	manager := Manager{}
-	manager.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:    10 * time.Second,
-		MinimumTimeout:    500 * time.Millisecond,
-		MaximumTimeout:    10 * time.Second,
-		TimeoutMultiplier: 1.1,
-		TimeoutReduction:  time.Millisecond,
-		Namespace:         "",
-		Registerer:        prometheus.NewRegistry(),
-	})
+	benchlist := benchlist.NewNoBenchlist()
+	err := manager.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout: time.Millisecond,
+		MinimumTimeout: time.Millisecond,
+		MaximumTimeout: 10 * time.Second,
+		TimeoutInc:     2 * time.Millisecond,
+		TimeoutDec:     time.Millisecond,
+		Namespace:      "",
+		Registerer:     prometheus.NewRegistry(),
+	}, benchlist)
+	if err != nil {
+		t.Fatal(err)
+	}
 	go manager.Dispatch()
 
 	wg := sync.WaitGroup{}
@@ -53,11 +62,11 @@ func TestManagerCancel(t *testing.T) {
 
 	fired := new(bool)
 
-	manager.Register(ids.NewShortID([20]byte{}), ids.NewID([32]byte{}), 0, func() { *fired = true })
+	manager.Register(ids.NewShortID([20]byte{}), ids.NewID([32]byte{}), 0, true, 0, func() { *fired = true })
 
 	manager.Cancel(ids.NewShortID([20]byte{}), ids.NewID([32]byte{}), 0)
 
-	manager.Register(ids.NewShortID([20]byte{}), ids.NewID([32]byte{}), 1, wg.Done)
+	manager.Register(ids.NewShortID([20]byte{}), ids.NewID([32]byte{}), 1, true, 0, wg.Done)
 
 	wg.Wait()
 

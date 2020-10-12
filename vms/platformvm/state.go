@@ -9,17 +9,18 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/prefixdb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/consensus/snowman"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/utils/wrappers"
-	"github.com/ava-labs/gecko/vms/components/avax"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/state"
 
-	safemath "github.com/ava-labs/gecko/utils/math"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 // This file contains methods of VM that deal with getting/putting values from database
@@ -36,8 +37,8 @@ var (
 )
 
 // persist a tx
-func (vm *VM) putTx(db database.Database, ID ids.ID, tx []byte) error {
-	return vm.State.Put(db, txTypeID, ID, tx)
+func (vm *VM) putTx(db database.Database, id ids.ID, tx []byte) error {
+	return vm.State.Put(db, txTypeID, id, tx)
 }
 
 // retrieve a tx
@@ -53,13 +54,13 @@ func (vm *VM) getTx(db database.Database, txID ids.ID) ([]byte, error) {
 }
 
 // Persist a status
-func (vm *VM) putStatus(db database.Database, ID ids.ID, status Status) error {
-	return vm.State.Put(db, statusTypeID, ID, status)
+func (vm *VM) putStatus(db database.Database, id ids.ID, status Status) error {
+	return vm.State.Put(db, statusTypeID, id, status)
 }
 
 // Retrieve a status
-func (vm *VM) getStatus(db database.Database, ID ids.ID) (Status, error) {
-	statusIntf, err := vm.State.Get(db, statusTypeID, ID)
+func (vm *VM) getStatus(db database.Database, id ids.ID) (Status, error) {
+	statusIntf, err := vm.State.Get(db, statusTypeID, id)
 	if err != nil {
 		return Unknown, err
 	}
@@ -150,12 +151,12 @@ func (vm *VM) dequeueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 
 // Add a staker to subnet [subnetID]
 // A staker may be a validator or a delegator
-func (vm *VM) addStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) error {
+func (vm *VM) addStaker(db database.Database, subnetID ids.ID, tx *rewardTx) error {
 	var (
 		staker   TimedTx
 		priority byte
 	)
-	switch unsignedTx := stakerTx.UnsignedTx.(type) {
+	switch unsignedTx := tx.Tx.UnsignedTx.(type) {
 	case *UnsignedAddDelegatorTx:
 		staker = unsignedTx
 		priority = 0
@@ -166,10 +167,15 @@ func (vm *VM) addStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) err
 		staker = unsignedTx
 		priority = 2
 	default:
-		return fmt.Errorf("staker is unexpected type %T", stakerTx)
+		return fmt.Errorf("staker is unexpected type %T", tx.Tx.UnsignedTx)
 	}
-	stakerID := staker.ID().Bytes() // Tx ID of this tx
-	txBytes := stakerTx.Bytes()
+
+	txBytes, err := vm.codec.Marshal(tx)
+	if err != nil {
+		return err
+	}
+
+	txID := tx.Tx.ID().Bytes() // Tx ID of this tx
 
 	// Sorted by subnet ID then stop time then tx ID
 	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
@@ -179,7 +185,7 @@ func (vm *VM) addStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) err
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.EndTime().Unix()))
 	p.PackByte(priority)
-	p.PackFixedBytes(stakerID)
+	p.PackFixedBytes(txID)
 	if p.Err != nil {
 		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
 	}
@@ -190,12 +196,12 @@ func (vm *VM) addStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) err
 
 // Remove a staker from subnet [subnetID]
 // A staker may be a validator or a delegator
-func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) error {
+func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, tx *rewardTx) error {
 	var (
 		staker   TimedTx
 		priority byte
 	)
-	switch unsignedTx := stakerTx.UnsignedTx.(type) {
+	switch unsignedTx := tx.Tx.UnsignedTx.(type) {
 	case *UnsignedAddDelegatorTx:
 		staker = unsignedTx
 		priority = 0
@@ -206,9 +212,10 @@ func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) 
 		staker = unsignedTx
 		priority = 2
 	default:
-		return fmt.Errorf("staker is unexpected type %T", stakerTx)
+		return fmt.Errorf("staker is unexpected type %T", tx.Tx.UnsignedTx)
 	}
-	stakerID := staker.ID().Bytes() // Tx ID of this tx
+
+	txID := tx.Tx.ID().Bytes() // Tx ID of this tx
 
 	// Sorted by subnet ID then stop time
 	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
@@ -218,7 +225,7 @@ func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) 
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.EndTime().Unix()))
 	p.PackByte(priority)
-	p.PackFixedBytes(stakerID)
+	p.PackFixedBytes(txID)
 	if p.Err != nil {
 		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
 	}
@@ -246,7 +253,7 @@ func (vm *VM) nextStakerStart(db database.Database, subnetID ids.ID) (*Tx, error
 }
 
 // Returns the current staker that will stop staking next
-func (vm *VM) nextStakerStop(db database.Database, subnetID ids.ID) (*Tx, error) {
+func (vm *VM) nextStakerStop(db database.Database, subnetID ids.ID) (*rewardTx, error) {
 	iter := prefixdb.NewNested([]byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix)), db).NewIterator()
 	defer iter.Release()
 
@@ -256,11 +263,11 @@ func (vm *VM) nextStakerStop(db database.Database, subnetID ids.ID) (*Tx, error)
 	// Key: [Staker stop time] | [Tx ID]
 	// Value: Byte repr. of tx that added this validator
 
-	tx := Tx{}
+	tx := rewardTx{}
 	if err := Codec.Unmarshal(iter.Value(), &tx); err != nil {
 		return nil, err
 	}
-	return &tx, tx.Sign(vm.codec, nil)
+	return &tx, tx.Tx.Sign(vm.codec, nil)
 }
 
 // Returns true if [nodeID] is a validator (not a delegator) of subnet [subnetID]
@@ -270,15 +277,15 @@ func (vm *VM) isValidator(db database.Database, subnetID ids.ID, nodeID ids.Shor
 
 	for iter.Next() {
 		txBytes := iter.Value()
-		tx := Tx{}
+		tx := rewardTx{}
 		if err := Codec.Unmarshal(txBytes, &tx); err != nil {
 			return nil, false, err
 		}
-		if err := tx.Sign(vm.codec, nil); err != nil {
+		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
 			return nil, false, err
 		}
 
-		switch vdr := tx.UnsignedTx.(type) {
+		switch vdr := tx.Tx.UnsignedTx.(type) {
 		case *UnsignedAddValidatorTx:
 			if subnetID.Equals(constants.PrimaryNetworkID) && vdr.Validator.NodeID.Equals(nodeID) {
 				return vdr, true, nil
@@ -323,8 +330,8 @@ func (vm *VM) willBeValidator(db database.Database, subnetID ids.ID, nodeID ids.
 }
 
 // getUTXO returns the UTXO with the specified ID
-func (vm *VM) getUTXO(db database.Database, ID ids.ID) (*avax.UTXO, error) {
-	utxoIntf, err := vm.State.Get(db, utxoTypeID, ID)
+func (vm *VM) getUTXO(db database.Database, id ids.ID) (*avax.UTXO, error) {
+	utxoIntf, err := vm.State.Get(db, utxoTypeID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -423,7 +430,7 @@ func (vm *VM) removeReferencingUTXO(db database.Database, addrBytes []byte, utxo
 func (vm *VM) GetUTXOs(
 	db database.Database,
 	addrs ids.ShortSet,
-	startAddr ids.ShortID,
+	startAddr state.Marshaller,
 	startUTXOID ids.ID,
 	limit int,
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
@@ -437,7 +444,7 @@ func (vm *VM) GetUTXOs(
 	lastIndex := ids.Empty
 	addrsList := addrs.List()
 	ids.SortShortIDs(addrsList)
-	for _, addr := range addrs.List() {
+	for _, addr := range addrsList {
 		start := ids.Empty
 		if comp := bytes.Compare(addr.Bytes(), startAddr.Bytes()); comp == -1 { // Skip addresses before [startAddr]
 			continue
@@ -502,17 +509,17 @@ func (vm *VM) getChains(db database.Database) ([]*Tx, error) {
 }
 
 // get a blockchain by its ID
-func (vm *VM) getChain(db database.Database, ID ids.ID) (*Tx, error) {
+func (vm *VM) getChain(db database.Database, id ids.ID) (*Tx, error) {
 	chains, err := vm.getChains(db)
 	if err != nil {
 		return nil, err
 	}
 	for _, chain := range chains {
-		if chain.ID().Equals(ID) {
+		if chain.ID().Equals(id) {
 			return chain, nil
 		}
 	}
-	return nil, fmt.Errorf("blockchain %s doesn't exist", ID)
+	return nil, fmt.Errorf("blockchain %s doesn't exist", id)
 }
 
 // put the list of blockchains that exist to database
@@ -520,7 +527,7 @@ func (vm *VM) putChains(db database.Database, chains []*Tx) error {
 	return vm.State.Put(db, chainsTypeID, chainsKey, chains)
 }
 
-// get the platfrom chain's timestamp from [db]
+// get the platform chain's timestamp from [db]
 func (vm *VM) getTimestamp(db database.Database) (time.Time, error) {
 	return vm.State.GetTime(db, timestampKey)
 }
@@ -606,17 +613,17 @@ func (vm *VM) registerDBTypes() {
 
 	marshalChainsFunc := func(chainsIntf interface{}) ([]byte, error) {
 		if chains, ok := chainsIntf.([]*Tx); ok {
-			return Codec.Marshal(chains)
+			return GenesisCodec.Marshal(chains)
 		}
 		return nil, fmt.Errorf("expected []*CreateChainTx but got type %T", chainsIntf)
 	}
 	unmarshalChainsFunc := func(bytes []byte) (interface{}, error) {
 		var chains []*Tx
-		if err := Codec.Unmarshal(bytes, &chains); err != nil {
+		if err := GenesisCodec.Unmarshal(bytes, &chains); err != nil {
 			return nil, err
 		}
 		for _, tx := range chains {
-			if err := tx.Sign(vm.codec, nil); err != nil {
+			if err := tx.Sign(GenesisCodec, nil); err != nil {
 				return nil, err
 			}
 		}
@@ -696,6 +703,38 @@ func (vm *VM) registerDBTypes() {
 	if err := vm.State.RegisterType(statusTypeID, marshalStatusFunc, unmarshalStatusFunc); err != nil {
 		vm.Ctx.Log.Warn(errRegisteringType.Error())
 	}
+
+	marshalCurrentSupplyFunc := func(currentSupplyIntf interface{}) ([]byte, error) {
+		if currentSupply, ok := currentSupplyIntf.(uint64); ok {
+			return vm.codec.Marshal(currentSupply)
+		}
+		return nil, fmt.Errorf("expected uint64 but got type %T", currentSupplyIntf)
+	}
+	unmarshalCurrentSupplyFunc := func(bytes []byte) (interface{}, error) {
+		var currentSupply uint64
+		if err := Codec.Unmarshal(bytes, &currentSupply); err != nil {
+			return nil, err
+		}
+		return currentSupply, nil
+	}
+	if err := vm.State.RegisterType(currentSupplyTypeID, marshalCurrentSupplyFunc, unmarshalCurrentSupplyFunc); err != nil {
+		vm.Ctx.Log.Warn(errRegisteringType.Error())
+	}
+}
+
+func (vm *VM) getCurrentSupply(db database.Database) (uint64, error) {
+	currentSupplyIntf, err := vm.State.Get(db, currentSupplyTypeID, currentSupplyKey)
+	if err != nil {
+		return 0, err
+	}
+	if currentSupply, ok := currentSupplyIntf.(uint64); ok {
+		return currentSupply, nil
+	}
+	return 0, fmt.Errorf("expected current supply to be uint64 but is type %T", currentSupplyIntf)
+}
+
+func (vm *VM) putCurrentSupply(db database.Database, currentSupply uint64) error {
+	return vm.State.Put(db, currentSupplyTypeID, currentSupplyKey, currentSupply)
 }
 
 type validatorUptime struct {

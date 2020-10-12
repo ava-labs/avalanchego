@@ -11,13 +11,13 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gconn"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gconn/gconnproto"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greader"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greader/greaderproto"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gresponsewriter/gresponsewriterproto"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gwriter"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gwriter/gwriterproto"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gconn"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gconn/gconnproto"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greader"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greader/greaderproto"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter/gresponsewriterproto"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gwriter"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gwriter/gwriterproto"
 )
 
 // Client is an implementation of a messenger channel that talks over RPC.
@@ -28,10 +28,10 @@ type Client struct {
 }
 
 // NewClient returns a database instance connected to a remote database instance
-func NewClient(client gresponsewriterproto.WriterClient, broker *plugin.GRPCBroker) *Client {
+func NewClient(header http.Header, client gresponsewriterproto.WriterClient, broker *plugin.GRPCBroker) *Client {
 	return &Client{
 		client: client,
-		header: make(http.Header),
+		header: header,
 		broker: broker,
 	}
 }
@@ -115,13 +115,20 @@ func (c *Client) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 		return nil, nil, err
 	}
 
-	conn := gconn.NewClient(gconnproto.NewConnClient(connConn), &addr{
-		network: resp.LocalNetwork,
-		str:     resp.LocalString,
-	}, &addr{
-		network: resp.RemoteNetwork,
-		str:     resp.RemoteString,
-	}, connConn, readerConn, writerConn)
+	conn := gconn.NewClient(
+		gconnproto.NewConnClient(connConn),
+		&addr{
+			network: resp.LocalNetwork,
+			str:     resp.LocalString,
+		},
+		&addr{
+			network: resp.RemoteNetwork,
+			str:     resp.RemoteString,
+		},
+		connConn,
+		readerConn,
+		writerConn,
+	)
 
 	reader := greader.NewClient(greaderproto.NewReaderClient(readerConn))
 	writer := gwriter.NewClient(gwriterproto.NewWriterClient(writerConn))

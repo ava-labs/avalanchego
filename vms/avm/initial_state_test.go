@@ -8,12 +8,12 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/components/verify"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestInitialStateVerifyNil(t *testing.T) {
@@ -53,7 +53,9 @@ func TestInitialStateVerifyNilOutput(t *testing.T) {
 
 func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 	c := codec.NewDefault()
-	c.RegisterType(&avax.TestVerifiable{})
+	if err := c.RegisterType(&avax.TestVerifiable{}); err != nil {
+		t.Fatal(err)
+	}
 	numFxs := 1
 
 	is := InitialState{
@@ -67,7 +69,9 @@ func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 
 func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
 	c := codec.NewDefault()
-	c.RegisterType(&avax.TestTransferable{})
+	if err := c.RegisterType(&avax.TestTransferable{}); err != nil {
+		t.Fatal(err)
+	}
 	numFxs := 1
 
 	is := InitialState{
@@ -90,7 +94,9 @@ func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
 
 func TestInitialStateVerifySerialization(t *testing.T) {
 	c := codec.NewDefault()
-	c.RegisterType(&secp256k1fx.TransferOutput{})
+	if err := c.RegisterType(&secp256k1fx.TransferOutput{}); err != nil {
+		t.Fatal(err)
+	}
 
 	expected := []byte{
 		// Codec version:

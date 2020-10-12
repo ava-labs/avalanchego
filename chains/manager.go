@@ -8,36 +8,36 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ava-labs/gecko/api"
-	"github.com/ava-labs/gecko/api/keystore"
-	"github.com/ava-labs/gecko/chains/atomic"
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/prefixdb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/network"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
-	"github.com/ava-labs/gecko/snow/engine/avalanche/state"
-	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/engine/snowman/block"
-	"github.com/ava-labs/gecko/snow/networking/router"
-	"github.com/ava-labs/gecko/snow/networking/sender"
-	"github.com/ava-labs/gecko/snow/networking/timeout"
-	"github.com/ava-labs/gecko/snow/triggers"
-	"github.com/ava-labs/gecko/snow/validators"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/vms"
+	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/state"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/snow/networking/sender"
+	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/snow/triggers"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms"
 
-	avcon "github.com/ava-labs/gecko/snow/consensus/avalanche"
-	aveng "github.com/ava-labs/gecko/snow/engine/avalanche"
-	avbootstrap "github.com/ava-labs/gecko/snow/engine/avalanche/bootstrap"
+	avcon "github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
+	avbootstrap "github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
 
-	smcon "github.com/ava-labs/gecko/snow/consensus/snowman"
-	smeng "github.com/ava-labs/gecko/snow/engine/snowman"
-	smbootstrap "github.com/ava-labs/gecko/snow/engine/snowman/bootstrap"
+	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
+	smbootstrap "github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 )
 
 const (
@@ -214,7 +214,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	vmID, err := m.VMManager.Lookup(chainParams.VMAlias)
 	if err != nil {
-		return nil, fmt.Errorf("error while looking up VM: %s", err)
+		return nil, fmt.Errorf("error while looking up VM: %w", err)
 	}
 
 	primaryAlias, err := m.PrimaryAlias(chainParams.ID)
@@ -225,7 +225,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	// Create the log and context of the chain
 	chainLog, err := m.LogFactory.MakeChain(primaryAlias, "")
 	if err != nil {
-		return nil, fmt.Errorf("error while creating chain's log %s", err)
+		return nil, fmt.Errorf("error while creating chain's log %w", err)
 	}
 
 	ctx := &snow.Context{
@@ -243,20 +243,20 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 		SharedMemory:        m.AtomicMemory.NewSharedMemory(chainParams.ID),
 		BCLookup:            m,
 		SNLookup:            m,
-		Namespace:           fmt.Sprintf("gecko_%s_vm", primaryAlias),
+		Namespace:           fmt.Sprintf("%s_%s_vm", constants.PlatformName, primaryAlias),
 		Metrics:             m.ConsensusParams.Metrics,
 	}
 
 	// Get a factory for the vm we want to use on our chain
 	vmFactory, err := m.VMManager.GetVMFactory(vmID)
 	if err != nil {
-		return nil, fmt.Errorf("error while getting vmFactory: %s", err)
+		return nil, fmt.Errorf("error while getting vmFactory: %w", err)
 	}
 
 	// Create the chain
 	vm, err := vmFactory.New(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error while creating vm: %s", err)
+		return nil, fmt.Errorf("error while creating vm: %w", err)
 	}
 	// TODO: Shutdown VM if an error occurs
 
@@ -264,18 +264,18 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	for i, fxAlias := range chainParams.FxAliases {
 		fxID, err := m.VMManager.Lookup(fxAlias)
 		if err != nil {
-			return nil, fmt.Errorf("error while looking up Fx: %s", err)
+			return nil, fmt.Errorf("error while looking up Fx: %w", err)
 		}
 
 		// Get a factory for the fx we want to use on our chain
 		fxFactory, err := m.VMManager.GetVMFactory(fxID)
 		if err != nil {
-			return nil, fmt.Errorf("error while getting fxFactory: %s", err)
+			return nil, fmt.Errorf("error while getting fxFactory: %w", err)
 		}
 
 		fx, err := fxFactory.New(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("error while creating fx: %s", err)
+			return nil, fmt.Errorf("error while creating fx: %w", err)
 		}
 
 		// Create the fx
@@ -286,7 +286,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	}
 
 	consensusParams := m.ConsensusParams
-	consensusParams.Namespace = fmt.Sprintf("gecko_%s", primaryAlias)
+	consensusParams.Namespace = fmt.Sprintf("%s_%s", constants.PlatformName, primaryAlias)
 
 	// The validators of this blockchain
 	var vdrs validators.Set // Validators validating this blockchain
@@ -321,7 +321,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 			bootstrapWeight,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("error while creating new avalanche vm %s", err)
+			return nil, fmt.Errorf("error while creating new avalanche vm %w", err)
 		}
 	case block.ChainVM:
 		chain, err = m.createSnowmanChain(
@@ -335,14 +335,20 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 			bootstrapWeight,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("error while creating new snowman vm %s", err)
+			return nil, fmt.Errorf("error while creating new snowman vm %w", err)
 		}
 	default:
 		return nil, fmt.Errorf("the vm should have type avalanche.DAGVM or snowman.ChainVM. Chain not created")
 	}
 
+	// Register the chain with the timeout manager
+	if err := m.TimeoutManager.RegisterChain(ctx, consensusParams.Namespace); err != nil {
+		return nil, err
+	}
+
 	// Allows messages to be routed to the new chain
 	m.ManagerConfig.Router.AddChain(chain.Handler)
+
 	// If the X or P Chain panics, do not attempt to recover
 	if m.CriticalChains.Contains(chainParams.ID) {
 		go ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
@@ -350,28 +356,6 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 		go ctx.Log.RecoverAndExit(chain.Handler.Dispatch, func() {
 			ctx.Log.Error("Chain with ID: %s was shutdown due to a panic", chainParams.ID)
 		})
-	}
-
-	reqWeight := (3*bootstrapWeight + 3) / 4
-	if reqWeight == 0 {
-		if err := chain.Engine.Startup(); err != nil {
-			chain.Handler.Shutdown()
-			return nil, fmt.Errorf("failed to start consensus engine: %w", err)
-		}
-	} else {
-		awaiter := NewAwaiter(beacons, reqWeight, func() {
-			ctx.Lock.Lock()
-			defer ctx.Lock.Unlock()
-			if err := chain.Engine.Startup(); err != nil {
-				chain.Ctx.Log.Error("failed to start consensus engine: %s", err)
-				chain.Handler.Shutdown()
-			}
-		})
-		go m.Net.RegisterConnector(awaiter)
-	}
-
-	if connector, ok := vm.(validators.Connector); ok {
-		go m.Net.RegisterConnector(connector)
 	}
 	return chain, nil
 }
@@ -434,16 +418,23 @@ func (m *manager) createAvalancheChain(
 	sender := sender.Sender{}
 	sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager)
 
+	sampleK := consensusParams.K
+	if uint64(sampleK) > bootstrapWeight {
+		sampleK = int(bootstrapWeight)
+	}
+
 	// The engine handles consensus
 	engine := &aveng.Transitive{}
 	if err := engine.Initialize(aveng.Config{
 		Config: avbootstrap.Config{
 			Config: common.Config{
-				Ctx:        ctx,
-				Validators: validators,
-				Beacons:    beacons,
-				Alpha:      bootstrapWeight/2 + 1, // must be > 50%
-				Sender:     &sender,
+				Ctx:          ctx,
+				Validators:   validators,
+				Beacons:      beacons,
+				SampleK:      sampleK,
+				StartupAlpha: (3*bootstrapWeight + 3) / 4,
+				Alpha:        bootstrapWeight/2 + 1, // must be > 50%
+				Sender:       &sender,
 			},
 			VtxBlocked: vtxBlocker,
 			TxBlocked:  txBlocker,
@@ -514,16 +505,23 @@ func (m *manager) createSnowmanChain(
 	sender := sender.Sender{}
 	sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager)
 
+	sampleK := consensusParams.K
+	if uint64(sampleK) > bootstrapWeight {
+		sampleK = int(bootstrapWeight)
+	}
+
 	// The engine handles consensus
 	engine := &smeng.Transitive{}
 	if err := engine.Initialize(smeng.Config{
 		Config: smbootstrap.Config{
 			Config: common.Config{
-				Ctx:        ctx,
-				Validators: validators,
-				Beacons:    beacons,
-				Alpha:      bootstrapWeight/2 + 1, // must be > 50%
-				Sender:     &sender,
+				Ctx:          ctx,
+				Validators:   validators,
+				Beacons:      beacons,
+				SampleK:      sampleK,
+				StartupAlpha: (3*bootstrapWeight + 3) / 4,
+				Alpha:        bootstrapWeight/2 + 1, // must be > 50%
+				Sender:       &sender,
 			},
 			Blocked:      blocked,
 			VM:           vm,

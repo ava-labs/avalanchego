@@ -5,14 +5,15 @@ package platformvm
 
 import (
 	"errors"
+	"fmt"
 
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/versiondb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowman"
-	"github.com/ava-labs/gecko/vms/components/core"
-	"github.com/ava-labs/gecko/vms/components/missing"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/vms/components/core"
+	"github.com/ava-labs/avalanchego/vms/components/missing"
 )
 
 // When one stakes, one must specify the time one will start to validate and
@@ -55,7 +56,7 @@ import (
 //      ** This should be the initial preference if staker.startTime > Wall clock
 //         time
 //	- A commit block must always be preceded on the chain by the proposal block whose
-//	  proposal is being commited
+//	  proposal is being committed
 // 3. A rejection block
 //  - Does one of the following:
 //    * Reject a proposal to change the chain time from t to t' (therefore keeping it at t)
@@ -205,9 +206,6 @@ func (cdb *CommonDecisionBlock) onAccept() database.Database {
 	if cdb.Status().Decided() {
 		return cdb.vm.DB
 	}
-	if cdb.onAcceptDB == nil {
-		panic(":(")
-	}
 	return cdb.onAcceptDB
 }
 
@@ -218,20 +216,18 @@ type SingleDecisionBlock struct {
 
 // Accept implements the snowman.Block interface
 func (sdb *SingleDecisionBlock) Accept() error {
-	sdb.VM.Ctx.Log.Verbo("Accepting block with ID %s", sdb.ID())
+	sdb.VM.Ctx.Log.Verbo("accepting block with ID %s", sdb.ID())
 
 	if err := sdb.CommonBlock.Accept(); err != nil {
-		return err
+		return fmt.Errorf("failed to accept CommonBlock: %w", err)
 	}
 
 	// Update the state of the chain in the database
 	if err := sdb.onAcceptDB.Commit(); err != nil {
-		sdb.vm.Ctx.Log.Warn("unable to commit onAcceptDB")
-		return err
+		return fmt.Errorf("failed to commit onAcceptDB: %w", err)
 	}
 	if err := sdb.vm.DB.Commit(); err != nil {
-		sdb.vm.Ctx.Log.Warn("unable to commit vm's DB")
-		return err
+		return fmt.Errorf("failed to commit vm's DB: %w", err)
 	}
 
 	for _, child := range sdb.children {
@@ -239,7 +235,7 @@ func (sdb *SingleDecisionBlock) Accept() error {
 	}
 	if sdb.onAcceptFunc != nil {
 		if err := sdb.onAcceptFunc(); err != nil {
-			return err
+			return fmt.Errorf("failed to execute onAcceptFunc: %w", err)
 		}
 	}
 
@@ -263,21 +259,19 @@ func (ddb *DoubleDecisionBlock) Accept() error {
 	}
 
 	if err := parent.CommonBlock.Accept(); err != nil {
-		return err
+		return fmt.Errorf("failed to accept parent's CommonBlock: %w", err)
 	}
 
 	if err := ddb.CommonBlock.Accept(); err != nil {
-		return err
+		return fmt.Errorf("failed to accept CommonBlock: %w", err)
 	}
 
 	// Update the state of the chain in the database
 	if err := ddb.onAcceptDB.Commit(); err != nil {
-		ddb.vm.Ctx.Log.Warn("unable to commit onAcceptDB: %s", err)
-		return err
+		return fmt.Errorf("failed to commit onAcceptDB: %w", err)
 	}
 	if err := ddb.vm.DB.Commit(); err != nil {
-		ddb.vm.Ctx.Log.Warn("unable to commit vm's DB: %s", err)
-		return err
+		return fmt.Errorf("failed to commit vm's DB: %w", err)
 	}
 
 	for _, child := range ddb.children {
@@ -285,8 +279,7 @@ func (ddb *DoubleDecisionBlock) Accept() error {
 	}
 	if ddb.onAcceptFunc != nil {
 		if err := ddb.onAcceptFunc(); err != nil {
-			ddb.vm.Ctx.Log.Warn("error executing OnAcceptFunc(): %s", err)
-			return err
+			return fmt.Errorf("failed to execute OnAcceptFunc: %w", err)
 		}
 	}
 

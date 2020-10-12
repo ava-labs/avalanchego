@@ -9,9 +9,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/gecko/database/memdb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/codec"
 )
 
 func TestPrefixedFunds(t *testing.T) {
@@ -21,10 +21,12 @@ func TestPrefixedFunds(t *testing.T) {
 	db := memdb.New()
 	cc := codec.NewDefault()
 
-	cc.RegisterType(&TestAddressable{})
+	if err := cc.RegisterType(&TestAddressable{}); err != nil {
+		t.Fatal(err)
+	}
 
-	st0 := NewPrefixedState(db, cc, chain0ID, chain1ID)
-	st1 := NewPrefixedState(db, cc, chain1ID, chain0ID)
+	st0 := NewPrefixedState(db, cc, cc, chain0ID, chain1ID)
+	st1 := NewPrefixedState(db, cc, cc, chain1ID, chain0ID)
 
 	addr := ids.GenerateTestShortID()
 	addrBytes := addr.Bytes()

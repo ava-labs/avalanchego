@@ -8,15 +8,15 @@ import (
 
 	"github.com/gorilla/rpc/v2"
 
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/versiondb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowman"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/utils/json"
-	"github.com/ava-labs/gecko/vms/components/state"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/vms/components/state"
 )
 
 var (
@@ -54,7 +54,7 @@ type SnowmanVM struct {
 }
 
 // SetPreference sets the block with ID [ID] as the preferred block
-func (svm *SnowmanVM) SetPreference(ID ids.ID) { svm.preferred = ID }
+func (svm *SnowmanVM) SetPreference(id ids.ID) { svm.preferred = id }
 
 // Preferred returns the ID of the preferred block
 func (svm *SnowmanVM) Preferred() ids.ID { return svm.preferred }
@@ -68,8 +68,8 @@ func (svm *SnowmanVM) ParseBlock(bytes []byte) (snowman.Block, error) {
 }
 
 // GetBlock returns the block with ID [ID]
-func (svm *SnowmanVM) GetBlock(ID ids.ID) (snowman.Block, error) {
-	block, err := svm.State.Get(svm.DB, state.BlockTypeID, ID)
+func (svm *SnowmanVM) GetBlock(id ids.ID) (snowman.Block, error) {
+	block, err := svm.State.Get(svm.DB, state.BlockTypeID, id)
 	if err != nil {
 		return nil, err
 	}

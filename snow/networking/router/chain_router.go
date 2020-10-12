@@ -7,18 +7,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/gecko/utils/constants"
-
-	"github.com/ava-labs/gecko/utils/formatting"
-
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/networking/timeout"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/timer"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
 const (
 	defaultCPUInterval = 5 * time.Second
+)
+
+var (
+	_ Router = &ChainRouter{}
 )
 
 // ChainRouter routes incoming messages from the validator network
@@ -33,6 +35,9 @@ type ChainRouter struct {
 	gossiper         *timer.Repeater
 	intervalNotifier *timer.Repeater
 	closeTimeout     time.Duration
+	peers            ids.ShortSet
+	criticalChains   ids.Set
+	onFatal          func()
 }
 
 // Initialize the router.
@@ -44,10 +49,13 @@ type ChainRouter struct {
 // This router also fires a gossip event every [gossipFrequency] to the engine,
 // notifying the engine it should gossip it's accepted set.
 func (sr *ChainRouter) Initialize(
+	nodeID ids.ShortID,
 	log logging.Logger,
 	timeouts *timeout.Manager,
 	gossipFrequency time.Duration,
 	closeTimeout time.Duration,
+	criticalChains ids.Set,
+	onFatal func(),
 ) {
 	sr.log = log
 	sr.chains = make(map[[32]byte]*Handler)
@@ -55,9 +63,42 @@ func (sr *ChainRouter) Initialize(
 	sr.gossiper = timer.NewRepeater(sr.Gossip, gossipFrequency)
 	sr.intervalNotifier = timer.NewRepeater(sr.EndInterval, defaultCPUInterval)
 	sr.closeTimeout = closeTimeout
+	sr.criticalChains = criticalChains
+	sr.onFatal = onFatal
+
+	sr.peers.Add(nodeID)
 
 	go log.RecoverAndPanic(sr.gossiper.Dispatch)
 	go log.RecoverAndPanic(sr.intervalNotifier.Dispatch)
+}
+
+// Shutdown shuts down this router
+func (sr *ChainRouter) Shutdown() {
+	sr.lock.Lock()
+	prevChains := sr.chains
+	sr.chains = map[[32]byte]*Handler{}
+	sr.lock.Unlock()
+
+	sr.gossiper.Stop()
+	sr.intervalNotifier.Stop()
+
+	for _, chain := range prevChains {
+		chain.Shutdown()
+	}
+
+	ticker := time.NewTicker(sr.closeTimeout)
+	timedout := false
+	for _, chain := range prevChains {
+		select {
+		case <-chain.closed:
+		case <-ticker.C:
+			timedout = true
+		}
+	}
+	if timedout {
+		sr.log.Warn("timed out while shutting down the chains")
+	}
+	ticker.Stop()
 }
 
 // AddChain registers the specified chain so that incoming
@@ -70,6 +111,10 @@ func (sr *ChainRouter) AddChain(chain *Handler) {
 	sr.log.Debug("registering chain %s with chain router", chainID)
 	chain.toClose = func() { sr.RemoveChain(chainID) }
 	sr.chains[chainID.Key()] = chain
+
+	for _, validatorID := range sr.peers.List() {
+		chain.Connected(validatorID)
+	}
 }
 
 // RemoveChain removes the specified chain so that incoming
@@ -94,6 +139,10 @@ func (sr *ChainRouter) RemoveChain(chainID ids.ID) {
 		chain.Context().Log.Warn("timed out while shutting down")
 	}
 	ticker.Stop()
+
+	if sr.onFatal != nil && sr.criticalChains.Contains(chainID) {
+		go sr.onFatal()
+	}
 }
 
 // GetAcceptedFrontier routes an incoming GetAcceptedFrontier request from the
@@ -252,15 +301,17 @@ func (sr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 
 	// This message came in response to a Get message from this node, and when we sent that Get
 	// message we set a timeout. Since we got a response, cancel the timeout.
-	if chain, exists := sr.chains[chainID.Key()]; exists {
+	chain, exists := sr.chains[chainID.Key()]
+	switch {
+	case exists:
 		if chain.Put(validatorID, requestID, containerID, container) {
 			sr.timeouts.Cancel(validatorID, chainID, requestID)
 		}
-	} else if requestID == constants.GossipMsgRequestID {
+	case requestID == constants.GossipMsgRequestID:
 		sr.log.Verbo("Gossiped Put(%s, %s, %d, %s) dropped due to unknown chain. Container:",
 			validatorID, chainID, requestID, containerID, formatting.DumpBytes{Bytes: container},
 		)
-	} else {
+	default:
 		sr.log.Debug("Put(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
 		sr.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
 	}
@@ -337,39 +388,32 @@ func (sr *ChainRouter) QueryFailed(validatorID ids.ShortID, chainID ids.ID, requ
 	}
 }
 
-// Shutdown shuts down this router
-func (sr *ChainRouter) Shutdown() {
+// Connected routes an incoming notification that a validator was just connected
+func (sr *ChainRouter) Connected(validatorID ids.ShortID) {
 	sr.lock.Lock()
-	prevChains := sr.chains
-	sr.chains = map[[32]byte]*Handler{}
-	sr.lock.Unlock()
+	defer sr.lock.Unlock()
 
-	sr.gossiper.Stop()
-	sr.intervalNotifier.Stop()
+	sr.peers.Add(validatorID)
+	for _, chain := range sr.chains {
+		chain.Connected(validatorID)
+	}
+}
 
-	for _, chain := range prevChains {
-		chain.Shutdown()
-	}
+// Disconnected routes an incoming notification that a validator was connected
+func (sr *ChainRouter) Disconnected(validatorID ids.ShortID) {
+	sr.lock.Lock()
+	defer sr.lock.Unlock()
 
-	ticker := time.NewTicker(sr.closeTimeout)
-	timedout := false
-	for _, chain := range prevChains {
-		select {
-		case <-chain.closed:
-		case <-ticker.C:
-			timedout = true
-		}
+	sr.peers.Remove(validatorID)
+	for _, chain := range sr.chains {
+		chain.Disconnected(validatorID)
 	}
-	if timedout {
-		sr.log.Warn("timed out while shutting down the chains")
-	}
-	ticker.Stop()
 }
 
 // Gossip accepted containers
 func (sr *ChainRouter) Gossip() {
-	sr.lock.Lock()
-	defer sr.lock.Unlock()
+	sr.lock.RLock()
+	defer sr.lock.RUnlock()
 
 	for _, chain := range sr.chains {
 		chain.Gossip()
@@ -378,8 +422,8 @@ func (sr *ChainRouter) Gossip() {
 
 // EndInterval notifies the chains that the current CPU interval has ended
 func (sr *ChainRouter) EndInterval() {
-	sr.lock.Lock()
-	defer sr.lock.Unlock()
+	sr.lock.RLock()
+	defer sr.lock.RUnlock()
 
 	for _, chain := range sr.chains {
 		chain.endInterval()

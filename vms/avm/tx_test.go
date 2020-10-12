@@ -7,19 +7,20 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/utils/units"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/components/verify"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestTxNil(t *testing.T) {
 	ctx := NewContext(t)
 	c := codec.NewDefault()
 	tx := (*Tx)(nil)
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Should have errored due to nil tx")
 	}
 	if err := tx.SemanticVerify(nil, nil); err == nil {
@@ -29,16 +30,22 @@ func TestTxNil(t *testing.T) {
 
 func setupCodec() codec.Codec {
 	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
-	c.RegisterType(&ImportTx{})
-	c.RegisterType(&ExportTx{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
-	c.RegisterType(&secp256k1fx.MintOutput{})
-	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintOperation{})
-	c.RegisterType(&secp256k1fx.Credential{})
+	errs := wrappers.Errs{}
+	errs.Add(
+		c.RegisterType(&BaseTx{}),
+		c.RegisterType(&CreateAssetTx{}),
+		c.RegisterType(&OperationTx{}),
+		c.RegisterType(&ImportTx{}),
+		c.RegisterType(&ExportTx{}),
+		c.RegisterType(&secp256k1fx.TransferInput{}),
+		c.RegisterType(&secp256k1fx.MintOutput{}),
+		c.RegisterType(&secp256k1fx.TransferOutput{}),
+		c.RegisterType(&secp256k1fx.MintOperation{}),
+		c.RegisterType(&secp256k1fx.Credential{}),
+	)
+	if errs.Errored() {
+		panic(errs.Err)
+	}
 	return c
 }
 
@@ -46,7 +53,7 @@ func TestTxEmpty(t *testing.T) {
 	ctx := NewContext(t)
 	c := setupCodec()
 	tx := &Tx{}
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Should have errored due to nil tx")
 	}
 }
@@ -54,7 +61,9 @@ func TestTxEmpty(t *testing.T) {
 func TestTxInvalidCredential(t *testing.T) {
 	ctx := NewContext(t)
 	c := setupCodec()
-	c.RegisterType(&avax.TestVerifiable{})
+	if err := c.RegisterType(&avax.TestVerifiable{}); err != nil {
+		t.Fatal(err)
+	}
 
 	tx := &Tx{
 		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
@@ -65,7 +74,7 @@ func TestTxInvalidCredential(t *testing.T) {
 					TxID:        ids.Empty,
 					OutputIndex: 0,
 				},
-				Asset: avax.Asset{ID: asset},
+				Asset: avax.Asset{ID: assetID},
 				In: &secp256k1fx.TransferInput{
 					Amt: 20 * units.KiloAvax,
 					Input: secp256k1fx.Input{
@@ -82,7 +91,7 @@ func TestTxInvalidCredential(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid credential")
 	}
 }
@@ -90,7 +99,9 @@ func TestTxInvalidCredential(t *testing.T) {
 func TestTxInvalidUnsignedTx(t *testing.T) {
 	ctx := NewContext(t)
 	c := setupCodec()
-	c.RegisterType(&avax.TestVerifiable{})
+	if err := c.RegisterType(&avax.TestVerifiable{}); err != nil {
+		t.Fatal(err)
+	}
 
 	tx := &Tx{
 		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
@@ -102,7 +113,7 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 						TxID:        ids.Empty,
 						OutputIndex: 0,
 					},
-					Asset: avax.Asset{ID: asset},
+					Asset: avax.Asset{ID: assetID},
 					In: &secp256k1fx.TransferInput{
 						Amt: 20 * units.KiloAvax,
 						Input: secp256k1fx.Input{
@@ -117,7 +128,7 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 						TxID:        ids.Empty,
 						OutputIndex: 0,
 					},
-					Asset: avax.Asset{ID: asset},
+					Asset: avax.Asset{ID: assetID},
 					In: &secp256k1fx.TransferInput{
 						Amt: 20 * units.KiloAvax,
 						Input: secp256k1fx.Input{
@@ -138,7 +149,7 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid unsigned tx")
 	}
 }
@@ -146,7 +157,9 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 func TestTxInvalidNumberOfCredentials(t *testing.T) {
 	ctx := NewContext(t)
 	c := setupCodec()
-	c.RegisterType(&avax.TestVerifiable{})
+	if err := c.RegisterType(&avax.TestVerifiable{}); err != nil {
+		t.Fatal(err)
+	}
 
 	tx := &Tx{
 		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
@@ -155,7 +168,7 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 			Ins: []*avax.TransferableInput{
 				{
 					UTXOID: avax.UTXOID{TxID: ids.Empty, OutputIndex: 0},
-					Asset:  avax.Asset{ID: asset},
+					Asset:  avax.Asset{ID: assetID},
 					In: &secp256k1fx.TransferInput{
 						Amt: 20 * units.KiloAvax,
 						Input: secp256k1fx.Input{
@@ -167,7 +180,7 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 				},
 				{
 					UTXOID: avax.UTXOID{TxID: ids.Empty, OutputIndex: 1},
-					Asset:  avax.Asset{ID: asset},
+					Asset:  avax.Asset{ID: assetID},
 					In: &secp256k1fx.TransferInput{
 						Amt: 20 * units.KiloAvax,
 						Input: secp256k1fx.Input{
@@ -185,7 +198,7 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid unsigned tx")
 	}
 }

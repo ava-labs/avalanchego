@@ -4,16 +4,16 @@
 package snowman
 
 import (
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
 // Consensus represents a general snowman instance that can be used directly to
 // process a series of dependent operations.
 type Consensus interface {
 	// Takes in the context, snowball parameters, and the last accepted block.
-	Initialize(*snow.Context, snowball.Parameters, ids.ID)
+	Initialize(*snow.Context, snowball.Parameters, ids.ID) error
 
 	// Returns the parameters that describe this snowman instance
 	Parameters() snowball.Parameters

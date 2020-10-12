@@ -8,15 +8,16 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/cache"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/avalanche"
-	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/triggers"
-	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
 const (
@@ -94,8 +95,7 @@ func (b *Bootstrapper) Initialize(
 	})
 
 	config.Bootstrapable = b
-	b.Bootstrapper.Initialize(config.Config)
-	return nil
+	return b.Bootstrapper.Initialize(config.Config)
 }
 
 // CurrentAcceptedFrontier returns the set of vertices that this node has accepted
@@ -348,7 +348,7 @@ func (b *Bootstrapper) finish() error {
 		return nil
 	}
 
-	b.Ctx.Log.Info("finished fetching %d vertices. executing transaction state transitions...",
+	b.Ctx.Log.Info("bootstrapping fetched %d vertices. executing transaction state transitions...",
 		b.NumFetched)
 	if err := b.executeAll(b.TxBlocked, b.Ctx.DecisionDispatcher); err != nil {
 		return err
@@ -373,7 +373,7 @@ func (b *Bootstrapper) finish() error {
 	return nil
 }
 
-func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events *triggers.EventDispatcher) error {
+func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher) error {
 	numExecuted := 0
 
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
@@ -390,8 +390,24 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events *triggers.EventDispat
 			b.Ctx.Log.Info("executed %d operations", numExecuted)
 		}
 
-		events.Accept(b.Ctx.ChainID, job.ID(), job.Bytes())
+		events.Accept(b.Ctx, job.ID(), job.Bytes())
 	}
 	b.Ctx.Log.Info("executed %d operations", numExecuted)
 	return nil
+}
+
+// Connected implements the Engine interface.
+func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
+	if connector, ok := b.VM.(validators.Connector); ok {
+		connector.Connected(validatorID)
+	}
+	return b.Bootstrapper.Connected(validatorID)
+}
+
+// Disconnected implements the Engine interface.
+func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
+	if connector, ok := b.VM.(validators.Connector); ok {
+		connector.Disconnected(validatorID)
+	}
+	return b.Bootstrapper.Disconnected(validatorID)
 }

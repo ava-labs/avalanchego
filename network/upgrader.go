@@ -8,8 +8,8 @@ import (
 	"errors"
 	"net"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 var (

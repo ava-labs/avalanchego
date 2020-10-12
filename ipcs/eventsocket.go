@@ -4,15 +4,13 @@
 package ipcs
 
 import (
-	"go.nanomsg.org/mangos/v3/protocol/pub"
-
-	mangos "go.nanomsg.org/mangos/v3"
-
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/triggers"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/ipcs/socket"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/triggers"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // EventSockets is a set of named eventSockets
@@ -40,15 +38,15 @@ func newEventSockets(ctx context, chainID ids.ID, consensusEvents *triggers.Even
 }
 
 // Accept delivers a message to the underlying eventSockets
-func (ipcs *EventSockets) Accept(chainID, containerID ids.ID, container []byte) error {
+func (ipcs *EventSockets) Accept(ctx *snow.Context, containerID ids.ID, container []byte) error {
 	if ipcs.consensusSocket != nil {
-		if err := ipcs.consensusSocket.Accept(chainID, containerID, container); err != nil {
+		if err := ipcs.consensusSocket.Accept(ctx, containerID, container); err != nil {
 			return err
 		}
 	}
 
 	if ipcs.decisionsSocket != nil {
-		if err := ipcs.decisionsSocket.Accept(chainID, containerID, container); err != nil {
+		if err := ipcs.decisionsSocket.Accept(ctx, containerID, container); err != nil {
 			return err
 		}
 	}
@@ -85,31 +83,28 @@ func (ipcs *EventSockets) DecisionsURL() string {
 type eventSocket struct {
 	url          string
 	log          logging.Logger
-	socket       mangos.Socket
+	socket       *socket.Socket
 	unregisterFn func() error
 }
 
 // newEventIPCSocket creates a *eventSocket for the given chain and
 // EventDispatcher that writes to a local IPC socket
 func newEventIPCSocket(ctx context, chainID ids.ID, name string, events *triggers.EventDispatcher) (*eventSocket, error) {
-	sock, err := pub.NewSocket()
-	if err != nil {
-		return nil, err
-	}
+	var (
+		url     = ipcURL(ctx, chainID, name)
+		ipcName = ipcIdentifierPrefix + "-" + name
+		eis     = &eventSocket{
+			log:    ctx.log,
+			url:    url,
+			socket: socket.NewSocket(url, ctx.log),
+			unregisterFn: func() error {
+				return events.DeregisterChain(chainID, ipcName)
+			},
+		}
+	)
 
-	ipcName := ipcIdentifierPrefix + "-" + name
-
-	eis := &eventSocket{
-		log:    ctx.log,
-		socket: sock,
-		url:    ipcURL(ctx, chainID, name),
-		unregisterFn: func() error {
-			return events.DeregisterChain(chainID, ipcName)
-		},
-	}
-
-	if err = sock.Listen("ipc://" + eis.url); err != nil {
-		if err := sock.Close(); err != nil {
+	if err := eis.socket.Listen(); err != nil {
+		if err := eis.socket.Close(); err != nil {
 			return nil, err
 		}
 		return nil, err
@@ -126,7 +121,7 @@ func newEventIPCSocket(ctx context, chainID ids.ID, name string, events *trigger
 }
 
 // Accept delivers a message to the eventSocket
-func (eis *eventSocket) Accept(_, _ ids.ID, container []byte) error {
+func (eis *eventSocket) Accept(_ *snow.Context, _ ids.ID, container []byte) error {
 	err := eis.socket.Send(container)
 	if err != nil {
 		eis.log.Error("%s while trying to send:\n%s", err, formatting.DumpBytes{Bytes: container})
@@ -137,10 +132,8 @@ func (eis *eventSocket) Accept(_, _ ids.ID, container []byte) error {
 // stop unregisters the event handler and closes the eventSocket
 func (eis *eventSocket) stop() error {
 	eis.log.Info("closing Chain IPC")
-
 	errs := wrappers.Errs{}
 	errs.Add(eis.unregisterFn(), eis.socket.Close())
-
 	return errs.Err
 }
 

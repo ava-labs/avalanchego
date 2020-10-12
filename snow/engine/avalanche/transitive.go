@@ -7,21 +7,20 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/gecko/utils/sampler"
-
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/network"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/avalanche"
-	"github.com/ava-labs/gecko/snow/consensus/avalanche/poll"
-	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
-	"github.com/ava-labs/gecko/snow/engine/avalanche/bootstrap"
-	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/events"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	"github.com/ava-labs/avalanchego/snow/consensus/avalanche/poll"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/events"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/sampler"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
@@ -65,7 +64,7 @@ func (t *Transitive) Initialize(config Config) error {
 	t.Params = config.Params
 	t.Consensus = config.Consensus
 
-	factory := poll.NewEarlyTermNoTraversalFactory(int(config.Params.Alpha))
+	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t.polls = poll.NewSet(factory,
 		config.Ctx.Log,
 		config.Params.Namespace,
@@ -187,6 +186,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.I
 		}
 	}
 
+	t.metrics.getAncestorsVtxs.Observe(float64(len(ancestorsBytes)))
 	t.Sender.MultiPut(vdr, requestID, ancestorsBytes)
 	return nil
 }
@@ -340,8 +340,9 @@ func (t *Transitive) Notify(msg common.Message) error {
 	case common.PendingTxs:
 		txs := t.VM.PendingTxs()
 		return t.batch(txs, false /*=force*/, false /*=empty*/)
+	default:
+		return nil
 	}
-	return nil
 }
 
 // If there are pending transactions from the VM, issue them.
@@ -358,9 +359,7 @@ func (t *Transitive) repoll() error {
 	}
 
 	for i := t.polls.Len(); i < t.Params.ConcurrentRepolls; i++ {
-		if err := t.batch(nil, false /*=force*/, true /*=empty*/); err != nil {
-			return err
-		}
+		t.issueRepoll()
 	}
 	return nil
 }
@@ -500,38 +499,43 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 // Otherwise, some txs may not be put into vertices that are issued.
 // If [empty], will always result in a new poll.
 func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
-	batch := make([]snowstorm.Tx, 0, t.Params.BatchSize)
 	issuedTxs := ids.Set{}
 	consumed := ids.Set{}
 	issued := false
 	orphans := t.Consensus.Orphans()
-	for _, tx := range txs {
+	start := 0
+	end := 0
+	for end < len(txs) {
+		tx := txs[end]
 		inputs := tx.InputIDs()
-		overlaps := consumed.Overlaps(inputs) // See if this tx shares inputs with another one in this batch
-		if len(batch) >= t.Params.BatchSize || (force && overlaps) {
-			// The batch is big enough to issue, or we need to issue this batch
-			// because we're forcing each tx to be issued but adding [tx] to
-			// this batch would result in a vertex with conflicting txs.
-			if err := t.issueBatch(batch); err != nil {
+		overlaps := consumed.Overlaps(inputs)
+		if end-start >= t.Params.BatchSize || (force && overlaps) {
+			if err := t.issueBatch(txs[start:end]); err != nil {
 				return err
 			}
-			batch = make([]snowstorm.Tx, 0, t.Params.BatchSize)
+			start = end
 			consumed.Clear()
 			issued = true
 			overlaps = false
 		}
+
 		if txID := tx.ID(); !overlaps && // should never allow conflicting txs in the same vertex
 			!issuedTxs.Contains(txID) && // shouldn't issue duplicated transactions to the same vertex
 			(force || t.Consensus.IsVirtuous(tx)) && // force allows for a conflict to be issued
 			(!t.Consensus.TxIssued(tx) || orphans.Contains(txID)) { // should only reissue orphaned txs
-			batch = append(batch, tx)
+			end++
 			issuedTxs.Add(txID)
 			consumed.Union(inputs)
+		} else {
+			newLen := len(txs) - 1
+			txs[end] = txs[newLen]
+			txs[newLen] = nil
+			txs = txs[:newLen]
 		}
 	}
 
-	if len(batch) > 0 {
-		return t.issueBatch(batch)
+	if end > start {
+		return t.issueBatch(txs[start:end])
 	} else if empty && !issued {
 		t.issueRepoll()
 	}

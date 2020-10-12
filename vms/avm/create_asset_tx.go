@@ -9,10 +9,10 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/vms/components/avax"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
 const (
@@ -77,6 +77,7 @@ func (t *CreateAssetTx) SyntacticVerify(
 	ctx *snow.Context,
 	c codec.Codec,
 	txFeeAssetID ids.ID,
+	_ uint64,
 	txFee uint64,
 	numFxs int,
 ) error {
@@ -110,7 +111,7 @@ func (t *CreateAssetTx) SyntacticVerify(
 		}
 	}
 
-	if err := t.BaseTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, numFxs); err != nil {
+	if err := t.BaseTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, txFee, numFxs); err != nil {
 		return err
 	}
 

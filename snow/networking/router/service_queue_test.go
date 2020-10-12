@@ -10,16 +10,18 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/networking/tracker"
-	"github.com/ava-labs/gecko/snow/validators"
-	"github.com/ava-labs/gecko/utils/logging"
 )
 
 // returns a new multi-level queue that will never throttle or prioritize
 func setupMultiLevelQueue(t *testing.T, bufferSize int) (messageQueue, chan struct{}) {
 	metrics := &metrics{}
-	metrics.Initialize("", prometheus.NewRegistry())
+	if err := metrics.Initialize("", prometheus.NewRegistry()); err != nil {
+		t.Fatal(err)
+	}
 	consumptionRanges := []float64{
 		0.5,
 		0.75,
@@ -124,13 +126,18 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 	vdrs := validators.NewSet()
 	validator1 := validators.GenerateRandomValidator(2000)
 	validator2 := validators.GenerateRandomValidator(2000)
-	vdrs.Set([]validators.Validator{
+
+	if err := vdrs.Set([]validators.Validator{
 		validator1,
 		validator2,
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	metrics := &metrics{}
-	metrics.Initialize("", prometheus.NewRegistry())
+	if err := metrics.Initialize("", prometheus.NewRegistry()); err != nil {
+		t.Fatal(err)
+	}
 	// Set tier1 cutoff sufficiently low so that only messages from validators
 	// the message queue has not serviced will be placed on it for the test.
 	tier1 := 0.001
@@ -234,13 +241,18 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 	vdrs := validators.NewSet()
 	vdr0 := validators.GenerateRandomValidator(2000)
 	vdr1 := validators.GenerateRandomValidator(2000)
-	vdrs.Set([]validators.Validator{
+
+	if err := vdrs.Set([]validators.Validator{
 		vdr0,
 		vdr1,
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	metrics := &metrics{}
-	metrics.Initialize("", prometheus.NewRegistry())
+	if err := metrics.Initialize("", prometheus.NewRegistry()); err != nil {
+		t.Fatal(err)
+	}
 	// Set tier1 cutoff sufficiently low so that only messages from validators
 	// the message queue has not serviced will be placed on it for the test.
 	tier1 := 0.001

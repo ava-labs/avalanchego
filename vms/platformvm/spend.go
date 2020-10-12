@@ -4,15 +4,15 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/components/verify"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	safemath "github.com/ava-labs/gecko/utils/math"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -28,6 +28,7 @@ var (
 // - [keys] are the owners of the funds
 // - [amount] is the amount of funds that are trying to be staked
 // - [fee] is the amount of AVAX that should be burned
+// - [changeAddr] is the address that change, if there is any, is sent to
 // Returns:
 // - [inputs] the inputs that should be consumed to fund the outputs
 // - [returnedOutputs] the outputs that should be immediately returned to the
@@ -40,6 +41,7 @@ func (vm *VM) stake(
 	keys []*crypto.PrivateKeySECP256K1R,
 	amount uint64,
 	fee uint64,
+	changeAddr ids.ShortID,
 ) (
 	[]*avax.TransferableInput, // inputs
 	[]*avax.TransferableOutput, // returnedOutputs
@@ -140,7 +142,7 @@ func (vm *VM) stake(
 			Out: &StakeableLockOut{
 				Locktime: out.Locktime,
 				TransferableOut: &secp256k1fx.TransferOutput{
-					Amt:          remainingValue,
+					Amt:          amountToStake,
 					OutputOwners: inner.OutputOwners,
 				},
 			},
@@ -232,7 +234,6 @@ func (vm *VM) stake(
 
 		if amountToStake > 0 {
 			// Some of this input was put for staking
-			changeAddr := kc.Keys[0].PublicKey().Address()
 			stakedOuts = append(stakedOuts, &avax.TransferableOutput{
 				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 				Out: &secp256k1fx.TransferOutput{
@@ -248,7 +249,6 @@ func (vm *VM) stake(
 
 		if remainingValue > 0 {
 			// This input had extra value, so some of it must be returned
-			changeAddr := kc.Keys[0].PublicKey().Address()
 			returnedOuts = append(returnedOuts, &avax.TransferableOutput{
 				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 				Out: &secp256k1fx.TransferOutput{
@@ -267,7 +267,8 @@ func (vm *VM) stake(
 	}
 
 	if amountBurned < fee || amountStaked < amount {
-		return nil, nil, nil, nil, fmt.Errorf("provided keys have balance (unlocked, locked) (%d, %d) but need (%d, %d)",
+		return nil, nil, nil, nil, fmt.Errorf(
+			"provided keys have balance (unlocked, locked) (%d, %d) but need (%d, %d)",
 			amountBurned, amountStaked, fee, amount)
 	}
 
@@ -420,7 +421,9 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 		// Verify that this tx's credentials allow [in] to be spent
 		if err := vm.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
-			return permError{err}
+			return permError{
+				fmt.Errorf("failed to verify transfer: %w", err),
+			}
 		}
 
 		amount := in.Amount()
@@ -441,7 +444,9 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		owner := owned.Owners()
 		ownerBytes, err := vm.codec.Marshal(owner)
 		if err != nil {
-			return tempError{err}
+			return tempError{
+				fmt.Errorf("couldn't marshal owner: %w", err),
+			}
 		}
 		ownerID := hashing.ComputeHash256Array(ownerBytes)
 		owners, ok := lockedConsumed[locktime]
@@ -487,7 +492,9 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		owner := owned.Owners()
 		ownerBytes, err := vm.codec.Marshal(owner)
 		if err != nil {
-			return tempError{err}
+			return tempError{
+				fmt.Errorf("couldn't marshal owner: %w", err),
+			}
 		}
 		ownerID := hashing.ComputeHash256Array(ownerBytes)
 		owners, ok := lockedProduced[locktime]
@@ -534,7 +541,9 @@ func (vm *VM) consumeInputs(
 	for _, input := range ins {
 		utxoID := input.UTXOID.InputID()
 		if err := vm.removeUTXO(db, utxoID); err != nil {
-			return tempError{err}
+			return tempError{
+				fmt.Errorf("failed to remove UTXO %s: %w", utxoID, err),
+			}
 		}
 	}
 	return nil
@@ -556,7 +565,7 @@ func (vm *VM) produceOutputs(
 			Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 			Out:   out.Output(),
 		}); err != nil {
-			return err
+			return fmt.Errorf("failed to put UTXO %w", err)
 		}
 	}
 	return nil

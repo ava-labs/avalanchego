@@ -3,9 +3,9 @@ package vertex
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/avalanche"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 )
 
 // This example inserts several ints into an IntHeap, checks the minimum,
@@ -135,11 +135,12 @@ func TestUniqueVertexHeapRemainsUnique(t *testing.T) {
 	pushed2 := h.Push(vtx1)
 	pushed3 := h.Push(vtx2)
 	pushed4 := h.Push(vtx3)
-	if h.Len() != 3 {
+	switch {
+	case h.Len() != 3:
 		t.Fatalf("Unique Vertex Heap has incorrect length: %d", h.Len())
-	} else if !(pushed1 && pushed2 && pushed3) {
+	case !(pushed1 && pushed2 && pushed3):
 		t.Fatalf("Failed to push a new unique element")
-	} else if pushed4 {
+	case pushed4:
 		t.Fatalf("Pushed non-unique element to the unique vertex heap")
 	}
 }

@@ -8,7 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 // Byzantine is a naive implementation of a multi-choice snowball instance
@@ -60,15 +60,17 @@ func ParamsTest(t *testing.T, factory Factory) {
 	}
 	sb.Initialize(params, Red)
 
-	if p := sb.Parameters(); p.K != params.K {
+	p := sb.Parameters()
+	switch {
+	case p.K != params.K:
 		t.Fatalf("Wrong K parameter")
-	} else if p.Alpha != params.Alpha {
+	case p.Alpha != params.Alpha:
 		t.Fatalf("Wrong Alpha parameter")
-	} else if p.BetaVirtuous != params.BetaVirtuous {
+	case p.BetaVirtuous != params.BetaVirtuous:
 		t.Fatalf("Wrong Beta1 parameter")
-	} else if p.BetaRogue != params.BetaRogue {
+	case p.BetaRogue != params.BetaRogue:
 		t.Fatalf("Wrong Beta2 parameter")
-	} else if p.ConcurrentRepolls != params.ConcurrentRepolls {
+	case p.ConcurrentRepolls != params.ConcurrentRepolls:
 		t.Fatalf("Wrong Repoll parameter")
 	}
 }

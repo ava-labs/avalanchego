@@ -7,16 +7,16 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/gecko/chains/atomic"
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	safemath "github.com/ava-labs/gecko/utils/math"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -70,7 +70,7 @@ func (tx *UnsignedExportTx) Verify(
 
 	for _, out := range tx.ExportedOutputs {
 		if err := out.Verify(); err != nil {
-			return err
+			return fmt.Errorf("output failed verification: %w", err)
 		}
 		if _, ok := out.Output().(*StakeableLockOut); ok {
 			return errWrongLocktime
@@ -100,18 +100,31 @@ func (tx *UnsignedExportTx) SemanticVerify(
 
 	// Verify the flowcheck
 	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
-		return err
+		switch err.(type) {
+		case permError:
+			return permError{
+				fmt.Errorf("failed semanticVerifySpend: %w", err),
+			}
+		default:
+			return tempError{
+				fmt.Errorf("failed semanticVerifySpend: %w", err),
+			}
+		}
 	}
 
 	txID := tx.ID()
 
 	// Consume the UTXOS
 	if err := vm.consumeInputs(db, tx.Ins); err != nil {
-		return tempError{err}
+		return tempError{
+			fmt.Errorf("failed to consume inputs: %w", err),
+		}
 	}
 	// Produce the UTXOS
 	if err := vm.produceOutputs(db, txID, tx.Outs); err != nil {
-		return tempError{err}
+		return tempError{
+			fmt.Errorf("failed to produce outputs: %w", err),
+		}
 	}
 	return nil
 }
@@ -133,7 +146,7 @@ func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 
 		utxoBytes, err := Codec.Marshal(utxo)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to marshal UTXO: %w", err)
 		}
 
 		elem := &atomic.Element{
@@ -156,6 +169,7 @@ func (vm *VM) newExportTx(
 	chainID ids.ID, // Chain to send the UTXOs to
 	to ids.ShortID, // Address of chain recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee and provide the tokens
+	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
 	if !vm.Ctx.XChainID.Equals(chainID) {
 		return nil, errWrongChainID
@@ -165,7 +179,7 @@ func (vm *VM) newExportTx(
 	if err != nil {
 		return nil, errOverflowExport
 	}
-	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, toBurn)
+	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, toBurn, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}

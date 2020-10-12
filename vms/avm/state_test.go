@@ -7,12 +7,12 @@ import (
 	"math"
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/units"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 // Test function IDs when argument start is empty
@@ -20,7 +20,9 @@ func TestStateIDsNoStart(t *testing.T) {
 	_, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
@@ -155,7 +157,9 @@ func TestStateIDsWithStart(t *testing.T) {
 	_, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
@@ -182,17 +186,27 @@ func TestStateIDsWithStart(t *testing.T) {
 		t.Fatal(err)
 	} else if len(result) != 3 {
 		t.Fatalf("result should have all 3 IDs but has %d", len(result))
-	} else if result, err := state.IDs(ids.Empty.Bytes(), id0.Bytes(), math.MaxInt32); err != nil { // start after id0
+	}
+
+	result, err := state.IDs(ids.Empty.Bytes(), id0.Bytes(), math.MaxInt32)
+	switch {
+	case err != nil: // start after id0
 		t.Fatal(err)
-	} else if len(result) != 2 {
+	case len(result) != 2:
 		t.Fatalf("result should have 2 IDs but has %d", len(result))
-	} else if (!result[0].Equals(id1) && !result[1].Equals(id1)) || (!result[0].Equals(id2) && !result[1].Equals(id2)) {
-		t.Fatal("result should have id1 and id2")
-	} else if result, err := state.IDs(ids.Empty.Bytes(), id1.Bytes(), math.MaxInt32); err != nil { // start after id1
+	case !result[0].Equals(id1) && !result[1].Equals(id1):
+		t.Fatal("result should have id1")
+	case !result[0].Equals(id2) && !result[1].Equals(id2):
+		t.Fatal("result should have id2")
+	}
+
+	result, err = state.IDs(ids.Empty.Bytes(), id1.Bytes(), math.MaxInt32)
+	switch {
+	case err != nil: // start after id1
 		t.Fatal(err)
-	} else if len(result) != 1 {
+	case len(result) != 1:
 		t.Fatalf("result should have 1 IDs but has %d", len(result))
-	} else if !result[0].Equals(id2) {
+	case !result[0].Equals(id2):
 		t.Fatal("result should be id2")
 	}
 }
@@ -201,7 +215,9 @@ func TestStateStatuses(t *testing.T) {
 	_, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
@@ -248,13 +264,17 @@ func TestStateUTXOs(t *testing.T) {
 	_, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
 	state := vm.state.state
 
-	vm.codec.RegisterType(&avax.TestVerifiable{})
+	if err := vm.codec.RegisterType(&avax.TestVerifiable{}); err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := state.UTXO(ids.Empty); err == nil {
 		t.Fatalf("Should have errored when reading utxo")
@@ -324,13 +344,17 @@ func TestStateTXs(t *testing.T) {
 	_, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
 	state := vm.state.state
 
-	vm.codec.RegisterType(&avax.TestTransferable{})
+	if err := vm.codec.RegisterType(&avax.TestTransferable{}); err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := state.Tx(ids.Empty); err == nil {
 		t.Fatalf("Should have errored when reading tx")
@@ -344,7 +368,7 @@ func TestStateTXs(t *testing.T) {
 				TxID:        ids.Empty,
 				OutputIndex: 0,
 			},
-			Asset: avax.Asset{ID: asset},
+			Asset: avax.Asset{ID: assetID},
 			In: &secp256k1fx.TransferInput{
 				Amt: 20 * units.KiloAvax,
 				Input: secp256k1fx.Input{

@@ -8,14 +8,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/versiondb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 
-	safemath "github.com/ava-labs/gecko/utils/math"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -73,9 +73,11 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 
 	stakerTx, err := vm.nextStakerStop(db, constants.PrimaryNetworkID)
 	if err != nil {
-		return nil, nil, nil, nil, permError{err}
+		return nil, nil, nil, nil, permError{
+			fmt.Errorf("failed to get next staker stop time: %w", err),
+		}
 	}
-	if stakerID := stakerTx.ID(); !stakerID.Equals(tx.TxID) {
+	if stakerID := stakerTx.Tx.ID(); !stakerID.Equals(tx.TxID) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("attempting to remove TxID: %s. Should be removing %s",
 			tx.TxID,
 			stakerID)}
@@ -84,10 +86,12 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 	// Verify that the chain's timestamp is the validator's end time
 	currentTime, err := vm.getTimestamp(db)
 	if err != nil {
-		return nil, nil, nil, nil, tempError{err}
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf("failed to get timestamp: %w", err),
+		}
 	}
 
-	staker, ok := stakerTx.UnsignedTx.(TimedTx)
+	staker, ok := stakerTx.Tx.UnsignedTx.(TimedTx)
 	if !ok {
 		return nil, nil, nil, nil, permError{errWrongTxType}
 	}
@@ -100,18 +104,24 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 	// If this tx's proposal is committed, remove the validator from the validator set
 	onCommitDB := versiondb.New(db)
 	if err := vm.removeStaker(onCommitDB, constants.PrimaryNetworkID, stakerTx); err != nil {
-		return nil, nil, nil, nil, tempError{err}
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf("failed to remove staker: %w", err),
+		}
 	}
 
 	// If this tx's proposal is aborted, remove the validator from the validator set
 	onAbortDB := versiondb.New(db)
 	if err := vm.removeStaker(onAbortDB, constants.PrimaryNetworkID, stakerTx); err != nil {
-		return nil, nil, nil, nil, tempError{err}
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf("failed to remove staker: %w", err),
+		}
 	}
 
-	nodeID := ids.ShortID{}
-	startTime := time.Time{}
-	switch uStakerTx := stakerTx.UnsignedTx.(type) {
+	var (
+		nodeID    ids.ShortID
+		startTime time.Time
+	)
+	switch uStakerTx := stakerTx.Tx.UnsignedTx.(type) {
 	case *UnsignedAddValidatorTx:
 		// Refund the stake here
 		for i, out := range uStakerTx.Stake {
@@ -125,18 +135,24 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 			}
 
 			if err := vm.putUTXO(onCommitDB, utxo); err != nil {
-				return nil, nil, nil, nil, tempError{err}
+				return nil, nil, nil, nil, tempError{
+					fmt.Errorf("failed to put UTXO: %w", err),
+				}
 			}
 			if err := vm.putUTXO(onAbortDB, utxo); err != nil {
-				return nil, nil, nil, nil, tempError{err}
+				return nil, nil, nil, nil, tempError{
+					fmt.Errorf("failed to put UTXO: %w", err),
+				}
 			}
 		}
 
 		// Provide the reward here
-		if reward := reward(uStakerTx.Validator.Duration(), uStakerTx.Validator.Wght, InflationRate); reward > 0 {
-			outIntf, err := vm.fx.CreateOutput(reward, uStakerTx.RewardsOwner)
+		if stakerTx.Reward > 0 {
+			outIntf, err := vm.fx.CreateOutput(stakerTx.Reward, uStakerTx.RewardsOwner)
 			if err != nil {
-				return nil, nil, nil, nil, permError{err}
+				return nil, nil, nil, nil, permError{
+					fmt.Errorf("failed to create output: %w", err),
+				}
 			}
 			out, ok := outIntf.(verify.State)
 			if !ok {
@@ -150,7 +166,25 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 				Out:   out,
 			}); err != nil {
-				return nil, nil, nil, nil, tempError{err}
+				return nil, nil, nil, nil, tempError{
+					fmt.Errorf("failed to create output: %w", err),
+				}
+			}
+
+			currentSupply, err := vm.getCurrentSupply(onAbortDB)
+			if err != nil {
+				return nil, nil, nil, nil, tempError{
+					fmt.Errorf("failed to get current supply: %w", err),
+				}
+			}
+			newSupply, err := safemath.Sub64(currentSupply, stakerTx.Reward)
+			if err != nil {
+				return nil, nil, nil, nil, permError{err}
+			}
+			if err := vm.putCurrentSupply(onAbortDB, newSupply); err != nil {
+				return nil, nil, nil, nil, tempError{
+					fmt.Errorf("failed to put current supply: %w", err),
+				}
 			}
 		}
 
@@ -158,16 +192,26 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		nodeID = uStakerTx.Validator.ID()
 		startTime = uStakerTx.StartTime()
 		if err := vm.deleteUptime(onCommitDB, nodeID); err != nil {
-			return nil, nil, nil, nil, tempError{err}
+			return nil, nil, nil, nil, tempError{
+				fmt.Errorf("failed to put supply: %w", err),
+			}
 		}
 		if err := vm.deleteUptime(onAbortDB, nodeID); err != nil {
-			return nil, nil, nil, nil, tempError{err}
+			return nil, nil, nil, nil, tempError{
+				fmt.Errorf("failed to put supply: %w", err),
+			}
 		}
 	case *UnsignedAddDelegatorTx:
 		// We're removing a delegator
 		vdrTx, ok, err := vm.isValidator(db, constants.PrimaryNetworkID, uStakerTx.Validator.NodeID)
 		if err != nil {
-			return nil, nil, nil, nil, tempError{err}
+			return nil, nil, nil, nil, tempError{
+				fmt.Errorf(
+					"failed to get whether %s is a validator: %w",
+					uStakerTx.Validator.NodeID,
+					err,
+				),
+			}
 		}
 		if !ok {
 			return nil, nil, nil, nil, permError{
@@ -191,24 +235,42 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 			}
 
 			if err := vm.putUTXO(onCommitDB, utxo); err != nil {
-				return nil, nil, nil, nil, tempError{err}
+				return nil, nil, nil, nil, tempError{
+					fmt.Errorf("failed to put UTXO: %w", err),
+				}
 			}
 			if err := vm.putUTXO(onAbortDB, utxo); err != nil {
-				return nil, nil, nil, nil, tempError{err}
+				return nil, nil, nil, nil, tempError{
+					fmt.Errorf("failed to put UTXO: %w", err),
+				}
 			}
 		}
 
-		// If reward given, it will be this amount
-		reward := reward(uStakerTx.Validator.Duration(), uStakerTx.Validator.Wght, InflationRate)
+		currentSupply, err := vm.getCurrentSupply(onAbortDB)
+		if err != nil {
+			return nil, nil, nil, nil, tempError{
+				fmt.Errorf("failed to get supply: %w", err),
+			}
+		}
+		newSupply, err := safemath.Sub64(currentSupply, stakerTx.Reward)
+		if err != nil {
+			return nil, nil, nil, nil, permError{err}
+		}
+		if err := vm.putCurrentSupply(onAbortDB, newSupply); err != nil {
+			return nil, nil, nil, nil, tempError{
+				fmt.Errorf("failed to put supply: %w", err),
+			}
+		}
+
 		// Calculate split of reward between delegator/delegatee
 		// The delegator gives stake to the validatee
-		delegatorShares := NumberOfShares - uint64(vdr.Shares)         // parentTx.Shares <= NumberOfShares so no underflow
-		delegatorReward := delegatorShares * (reward / NumberOfShares) // delegatorShares <= NumberOfShares so no overflow
+		delegatorShares := PercentDenominator - uint64(vdr.Shares)                  // parentTx.Shares <= NumberOfShares so no underflow
+		delegatorReward := delegatorShares * (stakerTx.Reward / PercentDenominator) // delegatorShares <= NumberOfShares so no overflow
 		// Delay rounding as long as possible for small numbers
-		if optimisticReward, err := safemath.Mul64(delegatorShares, reward); err == nil {
-			delegatorReward = optimisticReward / NumberOfShares
+		if optimisticReward, err := safemath.Mul64(delegatorShares, stakerTx.Reward); err == nil {
+			delegatorReward = optimisticReward / PercentDenominator
 		}
-		delegateeReward := reward - delegatorReward // delegatorReward <= reward so no underflow
+		delegateeReward := stakerTx.Reward - delegatorReward // delegatorReward <= reward so no underflow
 
 		offset := 0
 
@@ -216,7 +278,9 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		if delegatorReward > 0 {
 			outIntf, err := vm.fx.CreateOutput(delegatorReward, uStakerTx.RewardsOwner)
 			if err != nil {
-				return nil, nil, nil, nil, permError{err}
+				return nil, nil, nil, nil, permError{
+					fmt.Errorf("failed to create output: %w", err),
+				}
 			}
 			out, ok := outIntf.(verify.State)
 			if !ok {
@@ -230,7 +294,9 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 				Out:   out,
 			}); err != nil {
-				return nil, nil, nil, nil, tempError{err}
+				return nil, nil, nil, nil, tempError{
+					fmt.Errorf("failed to put UTXO: %w", err),
+				}
 			}
 
 			offset++
@@ -240,7 +306,9 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		if delegateeReward > 0 {
 			outIntf, err := vm.fx.CreateOutput(delegateeReward, vdr.RewardsOwner)
 			if err != nil {
-				return nil, nil, nil, nil, permError{err}
+				return nil, nil, nil, nil, permError{
+					fmt.Errorf("failed to create output: %w", err),
+				}
 			}
 			out, ok := outIntf.(verify.State)
 			if !ok {
@@ -254,7 +322,9 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 				Out:   out,
 			}); err != nil {
-				return nil, nil, nil, nil, tempError{err}
+				return nil, nil, nil, nil, tempError{
+					fmt.Errorf("failed to put UTXO: %w", err),
+				}
 			}
 		}
 		nodeID = uStakerTx.Validator.ID()
@@ -270,7 +340,9 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 
 	uptime, err := vm.calculateUptime(vm.DB, nodeID, startTime)
 	if err != nil {
-		return nil, nil, nil, nil, tempError{err}
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf("failed to calculate uptime: %w", err),
+		}
 	}
 
 	tx.shouldPreferCommit = uptime >= vm.uptimePercentage

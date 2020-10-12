@@ -6,10 +6,10 @@ package state
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/database/memdb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // toy example of a block, just used for testing
@@ -257,26 +257,35 @@ func TestSameKeyDifferentTypeID(t *testing.T) {
 	}
 
 	// ensure the account is still there and correct
-	if accInterface, err := state.Get(db, accountTypeID, sharedKey); err != nil {
+	accInterface, err := state.Get(db, accountTypeID, sharedKey)
+	if err != nil {
 		t.Fatal(err)
-	} else if accFromState, ok := accInterface.(*account); !ok {
+	}
+	accFromState, ok := accInterface.(*account)
+	switch {
+	case !ok:
 		t.Fatal("should have been type *account")
-	} else if accFromState.balance != acc.balance {
+	case accFromState.balance != acc.balance:
 		t.Fatal("balances should be same")
-	} else if !accFromState.id.Equals(acc.id) {
+	case !accFromState.id.Equals(acc.id):
 		t.Fatal("ids should be the same")
-	} else if accFromState.nonce != acc.nonce {
+	case accFromState.nonce != acc.nonce:
 		t.Fatal("nonces should be same")
 	}
 
 	// ensure the block is still there and correct
-	if blockInterface, err := state.Get(db, blockTypeID, sharedKey); err != nil {
+	blockInterface, err := state.Get(db, blockTypeID, sharedKey)
+	if err != nil {
 		t.Fatal(err)
-	} else if blockFromState, ok := blockInterface.(*block); !ok {
+	}
+
+	blockFromState, ok := blockInterface.(*block)
+	switch {
+	case !ok:
 		t.Fatal("should have been type *block")
-	} else if !blockFromState.parentID.Equals(block1.parentID) {
+	case !blockFromState.parentID.Equals(block1.parentID):
 		t.Fatal("parentIDs should be same")
-	} else if blockFromState.value != block1.value {
+	case blockFromState.value != block1.value:
 		t.Fatal("values should be same")
 	}
 }
@@ -323,13 +332,18 @@ func TestOverwrite(t *testing.T) {
 
 	// ensure the first value was over-written
 	// get it and make sure it's right
-	if blockInterface, err := state.Get(db, blockTypeID, key); err != nil {
+	blockInterface, err := state.Get(db, blockTypeID, key)
+	if err != nil {
 		t.Fatal(err)
-	} else if blockFromState, ok := blockInterface.(*block); !ok {
+	}
+
+	blockFromState, ok := blockInterface.(*block)
+	switch {
+	case !ok:
 		t.Fatal("should have been type *block")
-	} else if !blockFromState.parentID.Equals(block2.parentID) {
+	case !blockFromState.parentID.Equals(block2.parentID):
 		t.Fatal("parentIDs should be same")
-	} else if blockFromState.value != block2.value {
+	case blockFromState.value != block2.value:
 		t.Fatal("values should be same")
 	}
 }
@@ -364,15 +378,20 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	// get it and make sure it's right
-	if acc1Interface, err := state.Get(db, accountTypeID, acc1.id); err != nil {
+	acc1Interface, err := state.Get(db, accountTypeID, acc1.id)
+	if err != nil {
 		t.Fatal(err)
-	} else if acc1FromState, ok := acc1Interface.(*account); !ok {
+	}
+
+	acc1FromState, ok := acc1Interface.(*account)
+	switch {
+	case !ok:
 		t.Fatal("should have been type *account")
-	} else if acc1FromState.balance != acc1.balance {
+	case acc1FromState.balance != acc1.balance:
 		t.Fatal("balances should be same")
-	} else if !acc1FromState.id.Equals(acc1.id) {
+	case !acc1FromState.id.Equals(acc1.id):
 		t.Fatal("ids should be the same")
-	} else if acc1FromState.nonce != acc1.nonce {
+	case acc1FromState.nonce != acc1.nonce:
 		t.Fatal("nonces should be same")
 	}
 
@@ -389,15 +408,20 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	// get it and make sure it's right
-	if acc2Interface, err := state.Get(db, accountTypeID, acc2.id); err != nil {
+	acc2Interface, err := state.Get(db, accountTypeID, acc2.id)
+	if err != nil {
 		t.Fatal(err)
-	} else if acc2FromState, ok := acc2Interface.(*account); !ok {
+	}
+
+	acc2FromState, ok := acc2Interface.(*account)
+	switch {
+	case !ok:
 		t.Fatal("should have been type *account")
-	} else if acc2FromState.balance != acc2.balance {
+	case acc2FromState.balance != acc2.balance:
 		t.Fatal("balances should be same")
-	} else if !acc2FromState.id.Equals(acc2.id) {
+	case !acc2FromState.id.Equals(acc2.id):
 		t.Fatal("ids should be the same")
-	} else if acc2FromState.nonce != acc2.nonce {
+	case acc2FromState.nonce != acc2.nonce:
 		t.Fatal("nonces should be same")
 	}
 
@@ -420,13 +444,18 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	// get it and make sure it's right
-	if block1Interface, err := state.Get(db, blockTypeID, block1ID); err != nil {
+	block1Interface, err := state.Get(db, blockTypeID, block1ID)
+	if err != nil {
 		t.Fatal(err)
-	} else if block1FromState, ok := block1Interface.(*block); !ok {
+	}
+
+	block1FromState, ok := block1Interface.(*block)
+	switch {
+	case !ok:
 		t.Fatal("should have been type *block")
-	} else if !block1FromState.parentID.Equals(block1.parentID) {
+	case !block1FromState.parentID.Equals(block1.parentID):
 		t.Fatal("parentIDs should be same")
-	} else if block1FromState.value != block1.value {
+	case block1FromState.value != block1.value:
 		t.Fatal("values should be same")
 	}
 
@@ -443,13 +472,18 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	// get it and make sure it's right
-	if block2Interface, err := state.Get(db, blockTypeID, block2ID); err != nil {
+	block2Interface, err := state.Get(db, blockTypeID, block2ID)
+	if err != nil {
 		t.Fatal(err)
-	} else if block2FromState, ok := block2Interface.(*block); !ok {
+	}
+
+	block2FromState, ok := block2Interface.(*block)
+	switch {
+	case !ok:
 		t.Fatal("should have been type *block")
-	} else if !block2FromState.parentID.Equals(block2.parentID) {
+	case !block2FromState.parentID.Equals(block2.parentID):
 		t.Fatal("parentIDs should be same")
-	} else if block2FromState.value != block2.value {
+	case block2FromState.value != block2.value:
 		t.Fatal("values should be same")
 	}
 }

@@ -90,11 +90,12 @@ func TestPackerUnpackByte(t *testing.T) {
 		expected    byte = 1
 		expectedLen      = ByteLen
 	)
-	if p.Errored() {
+	switch {
+	case p.Errored():
 		t.Fatalf("Packer.UnpackByte unexpectedly raised %s", p.Err)
-	} else if actual != expected {
+	case actual != expected:
 		t.Fatalf("Packer.UnpackByte returned %d, but expected %d", actual, expected)
-	} else if p.Offset != expectedLen {
+	case p.Offset != expectedLen:
 		t.Fatalf("Packer.UnpackByte left Offset %d, expected %d", p.Offset, expectedLen)
 	}
 
@@ -132,11 +133,13 @@ func TestPackerUnpackShort(t *testing.T) {
 		expected    uint16 = 0x0102
 		expectedLen        = ShortLen
 	)
-	if p.Errored() {
+
+	switch {
+	case p.Errored():
 		t.Fatalf("Packer.UnpackShort unexpectedly raised %s", p.Err)
-	} else if actual != expected {
+	case actual != expected:
 		t.Fatalf("Packer.UnpackShort returned %d, but expected %d", actual, expected)
-	} else if p.Offset != expectedLen {
+	case p.Offset != expectedLen:
 		t.Fatalf("Packer.UnpackShort left Offset %d, expected %d", p.Offset, expectedLen)
 	}
 
@@ -179,11 +182,13 @@ func TestPackerUnpackInt(t *testing.T) {
 		expected    uint32 = 0x01020304
 		expectedLen        = IntLen
 	)
-	if p.Errored() {
+
+	switch {
+	case p.Errored():
 		t.Fatalf("Packer.UnpackInt unexpectedly raised %s", p.Err)
-	} else if actual != expected {
+	case actual != expected:
 		t.Fatalf("Packer.UnpackInt returned %d, but expected %d", actual, expected)
-	} else if p.Offset != expectedLen {
+	case p.Offset != expectedLen:
 		t.Fatalf("Packer.UnpackInt left Offset %d, expected %d", p.Offset, expectedLen)
 	}
 
@@ -226,11 +231,13 @@ func TestPackerUnpackLong(t *testing.T) {
 		expected    uint64 = 0x0102030405060708
 		expectedLen        = LongLen
 	)
-	if p.Errored() {
+
+	switch {
+	case p.Errored():
 		t.Fatalf("Packer.UnpackLong unexpectedly raised %s", p.Err)
-	} else if actual != expected {
+	case actual != expected:
 		t.Fatalf("Packer.UnpackLong returned %d, but expected %d", actual, expected)
-	} else if p.Offset != expectedLen {
+	case p.Offset != expectedLen:
 		t.Fatalf("Packer.UnpackLong left Offset %d, expected %d", p.Offset, expectedLen)
 	}
 
@@ -273,11 +280,13 @@ func TestPackerUnpackFixedBytes(t *testing.T) {
 		expected    = []byte("Avax")
 		expectedLen = 4
 	)
-	if p.Errored() {
+
+	switch {
+	case p.Errored():
 		t.Fatalf("Packer.UnpackFixedBytes unexpectedly raised %s", p.Err)
-	} else if !bytes.Equal(actual, expected) {
+	case !bytes.Equal(actual, expected):
 		t.Fatalf("Packer.UnpackFixedBytes returned %d, but expected %d", actual, expected)
-	} else if p.Offset != expectedLen {
+	case p.Offset != expectedLen:
 		t.Fatalf("Packer.UnpackFixedBytes left Offset %d, expected %d", p.Offset, expectedLen)
 	}
 
@@ -320,11 +329,13 @@ func TestPackerUnpackBytes(t *testing.T) {
 		expected    = []byte("Avax")
 		expectedLen = 8
 	)
-	if p.Errored() {
+
+	switch {
+	case p.Errored():
 		t.Fatalf("Packer.UnpackBytes unexpectedly raised %s", p.Err)
-	} else if !bytes.Equal(actual, expected) {
+	case !bytes.Equal(actual, expected):
 		t.Fatalf("Packer.UnpackBytes returned %d, but expected %d", actual, expected)
-	} else if p.Offset != expectedLen {
+	case p.Offset != expectedLen:
 		t.Fatalf("Packer.UnpackBytes left Offset %d, expected %d", p.Offset, expectedLen)
 	}
 
@@ -367,11 +378,13 @@ func TestPackerUnpackFixedByteSlices(t *testing.T) {
 		expected    = [][]byte{[]byte("Avax"), []byte("Evax")}
 		expectedLen = 12
 	)
-	if p.Errored() {
+
+	switch {
+	case p.Errored():
 		t.Fatalf("Packer.UnpackFixedByteSlices unexpectedly raised %s", p.Err)
-	} else if !reflect.DeepEqual(actual, expected) {
+	case !reflect.DeepEqual(actual, expected):
 		t.Fatalf("Packer.UnpackFixedByteSlices returned %d, but expected %d", actual, expected)
-	} else if p.Offset != expectedLen {
+	case p.Offset != expectedLen:
 		t.Fatalf("Packer.UnpackFixedByteSlices left Offset %d, expected %d", p.Offset, expectedLen)
 	}
 
@@ -482,11 +495,13 @@ func TestPackerUnpackBool(t *testing.T) {
 		expected    bool = true
 		expectedLen      = BoolLen
 	)
-	if p.Errored() {
+
+	switch {
+	case p.Errored():
 		t.Fatalf("Packer.UnpackBool unexpectedly raised %s", p.Err)
-	} else if actual != expected {
+	case actual != expected:
 		t.Fatalf("Packer.UnpackBool returned %t, but expected %t", actual, expected)
-	} else if p.Offset != expectedLen {
+	case p.Offset != expectedLen:
 		t.Fatalf("Packer.UnpackBool left Offset %d, expected %d", p.Offset, expectedLen)
 	}
 

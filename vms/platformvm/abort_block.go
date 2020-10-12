@@ -6,8 +6,8 @@ package platformvm
 import (
 	"fmt"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/vms/components/core"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/components/core"
 )
 
 // Abort being accepted results in the proposal of its parent (which must be a proposal block)
@@ -27,7 +27,7 @@ func (a *Abort) Verify() error {
 	if !ok {
 		if err := a.Reject(); err == nil {
 			if err := a.vm.DB.Commit(); err != nil {
-				a.vm.Ctx.Log.Error("error committing Abort block as rejected: %s", err)
+				return fmt.Errorf("failed to commit database while rejecting block %s: %w", a.ID(), err)
 			}
 		} else {
 			a.vm.DB.Abort()

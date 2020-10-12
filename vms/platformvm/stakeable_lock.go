@@ -3,7 +3,7 @@ package platformvm
 import (
 	"errors"
 
-	"github.com/ava-labs/gecko/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
 var (
@@ -14,6 +14,14 @@ var (
 type StakeableLockOut struct {
 	Locktime             uint64 `serialize:"true" json:"locktime"`
 	avax.TransferableOut `serialize:"true"`
+}
+
+// Addresses ...
+func (s *StakeableLockOut) Addresses() [][]byte {
+	if addressable, ok := s.TransferableOut.(avax.Addressable); ok {
+		return addressable.Addresses()
+	}
+	return nil
 }
 
 // Verify ...

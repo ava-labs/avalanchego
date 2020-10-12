@@ -10,14 +10,14 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ava-labs/gecko/api"
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 var (
 	// strongPassword defines a password used for the following tests that
 	// scores high enough to pass the password strength scoring system
-	strongPassword = "N_+=_jJ;^(<;{4,:*m6CET}'&N;83FYK.wtNpwp-Jt"
+	strongPassword = "N_+=_jJ;^(<;{4,:*m6CET}'&N;83FYK.wtNpwp-Jt" // #nosec G101
 )
 
 func TestServiceListNoUsers(t *testing.T) {
@@ -65,23 +65,23 @@ func TestServiceCreateUser(t *testing.T) {
 // genStr returns a string of given length
 func genStr(n int) string {
 	b := make([]byte, n)
-	rand.Read(b)
+	rand.Read(b) // #nosec G404
 	return fmt.Sprintf("%x", b)[:n]
 }
 
 // TestServiceCreateUserArgsCheck generates excessively long usernames or
-// passwords to assure the santity checks on string length are not exceeded
+// passwords to assure the sanity checks on string length are not exceeded
 func TestServiceCreateUserArgsCheck(t *testing.T) {
 	ks := CreateTestKeystore()
 
 	{
 		reply := api.SuccessResponse{}
 		err := ks.CreateUser(nil, &api.UserPass{
-			Username: genStr(maxUserPassLen + 1),
+			Username: genStr(maxUserLen + 1),
 			Password: strongPassword,
 		}, &reply)
 
-		if reply.Success || err != errUserPassMaxLength {
+		if reply.Success || err != errUserMaxLength {
 			t.Fatal("User was created when it should have been rejected due to too long a Username, err =", err)
 		}
 	}
@@ -90,10 +90,10 @@ func TestServiceCreateUserArgsCheck(t *testing.T) {
 		reply := api.SuccessResponse{}
 		err := ks.CreateUser(nil, &api.UserPass{
 			Username: "shortuser",
-			Password: genStr(maxUserPassLen + 1),
+			Password: genStr(maxUserLen + 1),
 		}, &reply)
 
-		if reply.Success || err != errUserPassMaxLength {
+		if reply.Success || err == nil {
 			t.Fatal("User was created when it should have been rejected due to too long a Password, err =", err)
 		}
 	}
@@ -122,8 +122,8 @@ func TestServiceCreateUserWeakPassword(t *testing.T) {
 			Password: "weak",
 		}, &reply)
 
-		if err != errWeakPassword {
-			t.Error("Unexpected error occurred when testing weak password:", err)
+		if err == nil {
+			t.Error("Expected error when testing weak password")
 		}
 
 		if reply.Success {

@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/timer"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
 var (
@@ -42,10 +42,16 @@ var (
 
 func init() {
 	cb58 := formatting.CB58{}
-	cb58.FromString("31SoC6ehdWUWFcuzkXci7ymFEQ8HGTJgw")
+	err := cb58.FromString("31SoC6ehdWUWFcuzkXci7ymFEQ8HGTJgw")
+	if err != nil {
+		panic(err)
+	}
 	copy(addr2Bytes[:], cb58.Bytes)
 	addr2 = ids.NewShortID(addr2Bytes)
-	cb58.FromString("c7doHa86hWYyfXTVnNsdP1CG1gxhXVpZ9Q5CiHi2oFRdnaxh2YR2Mvu2cUNMgyQy4BNQaXAxWWPt36BJ5pDWX1Xeos4h9L")
+	err = cb58.FromString("c7doHa86hWYyfXTVnNsdP1CG1gxhXVpZ9Q5CiHi2oFRdnaxh2YR2Mvu2cUNMgyQy4BNQaXAxWWPt36BJ5pDWX1Xeos4h9L")
+	if err != nil {
+		panic(err)
+	}
 	copy(sig2Bytes[:], cb58.Bytes)
 
 }

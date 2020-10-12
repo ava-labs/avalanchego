@@ -12,16 +12,22 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/chains/atomic"
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/triggers"
-	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 // Callable ...
 type Callable interface {
 	Call(writer http.ResponseWriter, method, base, endpoint string, body io.Reader, headers map[string]string) error
+}
+
+// EventDispatcher ...
+type EventDispatcher interface {
+	Issue(ctx *Context, containerID ids.ID, container []byte)
+	Accept(ctx *Context, containerID ids.ID, container []byte)
+	Reject(ctx *Context, containerID ids.ID, container []byte)
 }
 
 // Keystore ...
@@ -54,8 +60,8 @@ type Context struct {
 	AVAXAssetID ids.ID
 
 	Log                 logging.Logger
-	DecisionDispatcher  *triggers.EventDispatcher
-	ConsensusDispatcher *triggers.EventDispatcher
+	DecisionDispatcher  EventDispatcher
+	ConsensusDispatcher EventDispatcher
 	Lock                sync.RWMutex
 	Keystore            Keystore
 	SharedMemory        atomic.SharedMemory
@@ -80,10 +86,6 @@ func (ctx *Context) Bootstrapped() {
 
 // DefaultContextTest ...
 func DefaultContextTest() *Context {
-	decisionED := triggers.EventDispatcher{}
-	decisionED.Initialize(logging.NoLog{})
-	consensusED := triggers.EventDispatcher{}
-	consensusED.Initialize(logging.NoLog{})
 	aliaser := &ids.Aliaser{}
 	aliaser.Initialize()
 	return &Context{
@@ -92,10 +94,16 @@ func DefaultContextTest() *Context {
 		ChainID:             ids.Empty,
 		NodeID:              ids.ShortEmpty,
 		Log:                 logging.NoLog{},
-		DecisionDispatcher:  &decisionED,
-		ConsensusDispatcher: &consensusED,
+		DecisionDispatcher:  emptyEventDispatcher{},
+		ConsensusDispatcher: emptyEventDispatcher{},
 		BCLookup:            aliaser,
 		Namespace:           "",
 		Metrics:             prometheus.NewRegistry(),
 	}
 }
+
+type emptyEventDispatcher struct{}
+
+func (emptyEventDispatcher) Issue(*Context, ids.ID, []byte)  {}
+func (emptyEventDispatcher) Accept(*Context, ids.ID, []byte) {}
+func (emptyEventDispatcher) Reject(*Context, ids.ID, []byte) {}

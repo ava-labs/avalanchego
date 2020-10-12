@@ -6,9 +6,9 @@ package router
 import (
 	"time"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/networking/timeout"
-	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 // Router routes consensus messages to the Handler of the consensus
@@ -17,15 +17,18 @@ type Router interface {
 	ExternalRouter
 	InternalRouter
 
-	AddChain(chain *Handler)
-	RemoveChain(chainID ids.ID)
-	Shutdown()
 	Initialize(
+		nodeID ids.ShortID,
 		log logging.Logger,
 		timeouts *timeout.Manager,
 		gossipFrequency,
 		shutdownTimeout time.Duration,
+		criticalChains ids.Set,
+		onFatal func(),
 	)
+	Shutdown()
+	AddChain(chain *Handler)
+	RemoveChain(chainID ids.ID)
 }
 
 // ExternalRouter routes messages from the network to the
@@ -51,4 +54,7 @@ type InternalRouter interface {
 	GetFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
 	GetAncestorsFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
 	QueryFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
+
+	Connected(validatorID ids.ShortID)
+	Disconnected(validatorID ids.ShortID)
 }

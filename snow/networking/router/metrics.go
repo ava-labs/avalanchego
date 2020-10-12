@@ -8,8 +8,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/utils/timer"
-	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
@@ -41,6 +41,7 @@ type metrics struct {
 	getAncestors, multiPut, getAncestorsFailed,
 	get, put, getFailed,
 	pushQuery, pullQuery, chits, queryFailed,
+	connected, disconnected,
 	notify,
 	gossip,
 	cpu,
@@ -69,7 +70,7 @@ func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer)
 	})
 
 	if err := registerer.Register(m.dropped); err != nil {
-		errs.Add(fmt.Errorf("failed to register dropped statistics due to %s", err))
+		errs.Add(fmt.Errorf("failed to register dropped statistics due to %w", err))
 	}
 
 	m.expired = prometheus.NewCounter(prometheus.CounterOpts{
@@ -78,7 +79,7 @@ func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer)
 		Help:      "Number of expired events",
 	})
 	if err := registerer.Register(m.expired); err != nil {
-		errs.Add(fmt.Errorf("failed to register expired statistics due to %s", err))
+		errs.Add(fmt.Errorf("failed to register expired statistics due to %w", err))
 	}
 
 	m.throttled = prometheus.NewCounter(prometheus.CounterOpts{
@@ -87,7 +88,7 @@ func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer)
 		Help:      "Number of throttled events",
 	})
 	if err := registerer.Register(m.throttled); err != nil {
-		errs.Add(fmt.Errorf("failed to register throttled statistics due to %s", err))
+		errs.Add(fmt.Errorf("failed to register throttled statistics due to %w", err))
 	}
 
 	m.getAcceptedFrontier = initHistogram(namespace, "get_accepted_frontier", registerer, &errs)
@@ -106,6 +107,8 @@ func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer)
 	m.pullQuery = initHistogram(namespace, "pull_query", registerer, &errs)
 	m.chits = initHistogram(namespace, "chits", registerer, &errs)
 	m.queryFailed = initHistogram(namespace, "query_failed", registerer, &errs)
+	m.connected = initHistogram(namespace, "connected", registerer, &errs)
+	m.disconnected = initHistogram(namespace, "disconnected", registerer, &errs)
 	m.notify = initHistogram(namespace, "notify", registerer, &errs)
 	m.gossip = initHistogram(namespace, "gossip", registerer, &errs)
 

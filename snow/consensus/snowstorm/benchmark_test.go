@@ -9,7 +9,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	sbcon "github.com/ava-labs/gecko/snow/consensus/snowball"
+	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
 func Simulate(
@@ -17,7 +17,7 @@ func Simulate(
 	params sbcon.Parameters,
 	seed int64,
 	fact Factory,
-) {
+) error {
 	net := Network{}
 	rand.Seed(seed)
 	net.Initialize(
@@ -29,15 +29,20 @@ func Simulate(
 
 	rand.Seed(seed)
 	for i := 0; i < numNodes; i++ {
-		net.AddNode(fact.New())
+		if err := net.AddNode(fact.New()); err != nil {
+			return err
+		}
 	}
 
 	numRounds := 0
 	for !net.Finalized() && !net.Disagreement() && numRounds < 50 {
 		rand.Seed(int64(numRounds) + seed)
-		net.Round()
+		if err := net.Round(); err != nil {
+			return err
+		}
 		numRounds++
 	}
+	return nil
 }
 
 /*
@@ -48,41 +53,49 @@ func Simulate(
 
 func BenchmarkVirtuousDirected(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		Simulate(
+		err := Simulate(
 			/*numColors=*/ 25,
 			/*colorsPerConsumer=*/ 1,
 			/*maxInputConflicts=*/ 1,
 			/*numNodes=*/ 50,
 			/*params=*/ sbcon.Parameters{
-				Metrics:      prometheus.NewRegistry(),
-				K:            20,
-				Alpha:        11,
-				BetaVirtuous: 20,
-				BetaRogue:    30,
+				Metrics:           prometheus.NewRegistry(),
+				K:                 20,
+				Alpha:             11,
+				BetaVirtuous:      20,
+				BetaRogue:         30,
+				ConcurrentRepolls: 1,
 			},
 			/*seed=*/ 0,
 			/*fact=*/ DirectedFactory{},
 		)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
 func BenchmarkVirtuousInput(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		Simulate(
+		err := Simulate(
 			/*numColors=*/ 25,
 			/*colorsPerConsumer=*/ 1,
 			/*maxInputConflicts=*/ 1,
 			/*numNodes=*/ 50,
 			/*params=*/ sbcon.Parameters{
-				Metrics:      prometheus.NewRegistry(),
-				K:            20,
-				Alpha:        11,
-				BetaVirtuous: 20,
-				BetaRogue:    30,
+				Metrics:           prometheus.NewRegistry(),
+				K:                 20,
+				Alpha:             11,
+				BetaVirtuous:      20,
+				BetaRogue:         30,
+				ConcurrentRepolls: 1,
 			},
 			/*seed=*/ 0,
 			/*fact=*/ InputFactory{},
 		)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -94,41 +107,49 @@ func BenchmarkVirtuousInput(b *testing.B) {
 
 func BenchmarkRogueDirected(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		Simulate(
+		err := Simulate(
 			/*numColors=*/ 25,
 			/*colorsPerConsumer=*/ 1,
 			/*maxInputConflicts=*/ 3,
 			/*numNodes=*/ 50,
 			/*params=*/ sbcon.Parameters{
-				Metrics:      prometheus.NewRegistry(),
-				K:            20,
-				Alpha:        11,
-				BetaVirtuous: 20,
-				BetaRogue:    30,
+				Metrics:           prometheus.NewRegistry(),
+				K:                 20,
+				Alpha:             11,
+				BetaVirtuous:      20,
+				BetaRogue:         30,
+				ConcurrentRepolls: 1,
 			},
 			/*seed=*/ 0,
 			/*fact=*/ DirectedFactory{},
 		)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
 func BenchmarkRogueInput(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		Simulate(
+		err := Simulate(
 			/*numColors=*/ 25,
 			/*colorsPerConsumer=*/ 1,
 			/*maxInputConflicts=*/ 3,
 			/*numNodes=*/ 50,
 			/*params=*/ sbcon.Parameters{
-				Metrics:      prometheus.NewRegistry(),
-				K:            20,
-				Alpha:        11,
-				BetaVirtuous: 20,
-				BetaRogue:    30,
+				Metrics:           prometheus.NewRegistry(),
+				K:                 20,
+				Alpha:             11,
+				BetaVirtuous:      20,
+				BetaRogue:         30,
+				ConcurrentRepolls: 1,
 			},
 			/*seed=*/ 0,
 			/*fact=*/ InputFactory{},
 		)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -140,41 +161,49 @@ func BenchmarkRogueInput(b *testing.B) {
 
 func BenchmarkMultiDirected(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		Simulate(
+		err := Simulate(
 			/*numColors=*/ 50,
 			/*colorsPerConsumer=*/ 10,
 			/*maxInputConflicts=*/ 1,
 			/*numNodes=*/ 50,
 			/*params=*/ sbcon.Parameters{
-				Metrics:      prometheus.NewRegistry(),
-				K:            20,
-				Alpha:        11,
-				BetaVirtuous: 20,
-				BetaRogue:    30,
+				Metrics:           prometheus.NewRegistry(),
+				K:                 20,
+				Alpha:             11,
+				BetaVirtuous:      20,
+				BetaRogue:         30,
+				ConcurrentRepolls: 1,
 			},
 			/*seed=*/ 0,
 			/*fact=*/ DirectedFactory{},
 		)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
 func BenchmarkMultiInput(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		Simulate(
+		err := Simulate(
 			/*numColors=*/ 50,
 			/*colorsPerConsumer=*/ 10,
 			/*maxInputConflicts=*/ 1,
 			/*numNodes=*/ 50,
 			/*params=*/ sbcon.Parameters{
-				Metrics:      prometheus.NewRegistry(),
-				K:            20,
-				Alpha:        11,
-				BetaVirtuous: 20,
-				BetaRogue:    30,
+				Metrics:           prometheus.NewRegistry(),
+				K:                 20,
+				Alpha:             11,
+				BetaVirtuous:      20,
+				BetaRogue:         30,
+				ConcurrentRepolls: 1,
 			},
 			/*seed=*/ 0,
 			/*fact=*/ InputFactory{},
 		)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -186,40 +215,48 @@ func BenchmarkMultiInput(b *testing.B) {
 
 func BenchmarkMultiRogueDirected(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		Simulate(
+		err := Simulate(
 			/*numColors=*/ 50,
 			/*colorsPerConsumer=*/ 10,
 			/*maxInputConflicts=*/ 3,
 			/*numNodes=*/ 50,
 			/*params=*/ sbcon.Parameters{
-				Metrics:      prometheus.NewRegistry(),
-				K:            20,
-				Alpha:        11,
-				BetaVirtuous: 20,
-				BetaRogue:    30,
+				Metrics:           prometheus.NewRegistry(),
+				K:                 20,
+				Alpha:             11,
+				BetaVirtuous:      20,
+				BetaRogue:         30,
+				ConcurrentRepolls: 1,
 			},
 			/*seed=*/ 0,
 			/*fact=*/ DirectedFactory{},
 		)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
 func BenchmarkMultiRogueInput(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		Simulate(
+		err := Simulate(
 			/*numColors=*/ 50,
 			/*colorsPerConsumer=*/ 10,
 			/*maxInputConflicts=*/ 3,
 			/*numNodes=*/ 50,
 			/*params=*/ sbcon.Parameters{
-				Metrics:      prometheus.NewRegistry(),
-				K:            20,
-				Alpha:        11,
-				BetaVirtuous: 20,
-				BetaRogue:    30,
+				Metrics:           prometheus.NewRegistry(),
+				K:                 20,
+				Alpha:             11,
+				BetaVirtuous:      20,
+				BetaRogue:         30,
+				ConcurrentRepolls: 1,
 			},
 			/*seed=*/ 0,
 			/*fact=*/ InputFactory{},
 		)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }

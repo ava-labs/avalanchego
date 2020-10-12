@@ -8,12 +8,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/utils/wrappers"
-
-	"github.com/ava-labs/gecko/cache"
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const cacheSize = 1000
@@ -175,8 +174,8 @@ func (s *state) GetStatus(db database.Database, key ids.ID) choices.Status {
 }
 
 // PutID associates [key] with [ID] in [db]
-func (s *state) PutID(db database.Database, key ids.ID, ID ids.ID) error {
-	return s.Put(db, IDTypeID, key, ID)
+func (s *state) PutID(db database.Database, key ids.ID, id ids.ID) error {
+	return s.Put(db, IDTypeID, key, id)
 }
 
 // GetID gets the ID associated with [key] in [db]
@@ -213,17 +212,17 @@ func (s *state) GetTime(db database.Database, key ids.ID) (time.Time, error) {
 }
 
 // Prefix [ID] with [typeID] to prevent key collisions in the database
-func (s *state) uniqueID(ID ids.ID, typeID uint64) ids.ID {
+func (s *state) uniqueID(id ids.ID, typeID uint64) ids.ID {
 	uIDCache, cacheExists := s.uniqueIDCaches[typeID]
 	if cacheExists {
-		if uID, uIDExists := uIDCache.Get(ID); uIDExists { // Get the uniqueID associated with [typeID] and [ID]
+		if uID, uIDExists := uIDCache.Get(id); uIDExists { // Get the uniqueID associated with [typeID] and [ID]
 			return uID.(ids.ID)
 		}
 	} else {
 		s.uniqueIDCaches[typeID] = &cache.LRU{Size: cacheSize}
 	}
-	uID := ID.Prefix(typeID)
-	s.uniqueIDCaches[typeID].Put(ID, uID)
+	uID := id.Prefix(typeID)
+	s.uniqueIDCaches[typeID].Put(id, uID)
 	return uID
 }
 

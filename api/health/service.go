@@ -11,14 +11,14 @@ import (
 
 	"github.com/gorilla/rpc/v2"
 
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/utils/json"
-	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 // defaultCheckOpts is a Check whose properties represent a default Check
 var defaultCheckOpts = check{
-	executionPeriod: time.Minute,
+	executionPeriod: 30 * time.Second,
 	initialDelay:    10 * time.Second,
 }
 

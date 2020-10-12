@@ -9,42 +9,52 @@ import (
 
 	"github.com/gorilla/rpc/v2"
 
-	"github.com/ava-labs/gecko/chains"
-	"github.com/ava-labs/gecko/genesis"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/network"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/json"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/version"
+	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 // Info is the API service for unprivileged info on a node
 type Info struct {
-	version      version.Version
-	nodeID       ids.ShortID
-	networkID    uint32
-	log          logging.Logger
-	networking   network.Network
-	chainManager chains.Manager
-	txFee        uint64
+	version       version.Version
+	nodeID        ids.ShortID
+	networkID     uint32
+	log           logging.Logger
+	networking    network.Network
+	chainManager  chains.Manager
+	creationTxFee uint64
+	txFee         uint64
 }
 
 // NewService returns a new admin API service
-func NewService(log logging.Logger, version version.Version, nodeID ids.ShortID, networkID uint32, chainManager chains.Manager, peers network.Network, txFee uint64) (*common.HTTPHandler, error) {
+func NewService(
+	log logging.Logger,
+	version version.Version,
+	nodeID ids.ShortID,
+	networkID uint32,
+	chainManager chains.Manager,
+	peers network.Network,
+	creationTxFee uint64,
+	txFee uint64,
+) (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := json.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	if err := newServer.RegisterService(&Info{
-		version:      version,
-		nodeID:       nodeID,
-		networkID:    networkID,
-		log:          log,
-		chainManager: chainManager,
-		networking:   peers,
-		txFee:        txFee,
+		version:       version,
+		nodeID:        nodeID,
+		networkID:     networkID,
+		log:           log,
+		chainManager:  chainManager,
+		networking:    peers,
+		creationTxFee: creationTxFee,
+		txFee:         txFee,
 	}, "info"); err != nil {
 		return nil, err
 	}
@@ -99,7 +109,7 @@ type GetNetworkNameReply struct {
 func (service *Info) GetNetworkName(_ *http.Request, _ *struct{}, reply *GetNetworkNameReply) error {
 	service.log.Info("Info: GetNetworkName called")
 
-	reply.NetworkName = genesis.NetworkName(service.networkID)
+	reply.NetworkName = constants.NetworkName(service.networkID)
 	return nil
 }
 
@@ -124,6 +134,9 @@ func (service *Info) GetBlockchainID(_ *http.Request, args *GetBlockchainIDArgs,
 
 // PeersReply are the results from calling Peers
 type PeersReply struct {
+	// Number of elements in [Peers]
+	NumPeers json.Uint64 `json:"numPeers"`
+	// Each element is a peer
 	Peers []network.PeerID `json:"peers"`
 }
 
@@ -132,6 +145,7 @@ func (service *Info) Peers(_ *http.Request, _ *struct{}, reply *PeersReply) erro
 	service.log.Info("Info: Peers called")
 
 	reply.Peers = service.networking.Peers()
+	reply.NumPeers = json.Uint64(len(reply.Peers))
 	return nil
 }
 
@@ -151,7 +165,7 @@ type IsBootstrappedResponse struct {
 // IsBootstrapped returns nil and sets [reply.IsBootstrapped] == true iff [args.Chain] exists and is done bootstrapping
 // Returns an error if the chain doesn't exist
 func (service *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, reply *IsBootstrappedResponse) error {
-	service.log.Info("Info: IsBootstrapped called")
+	service.log.Info("Info: IsBootstrapped called with chain: %s", args.Chain)
 	if args.Chain == "" {
 		return fmt.Errorf("argument 'chain' not given")
 	}
@@ -163,12 +177,15 @@ func (service *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, r
 	return nil
 }
 
+// GetTxFeeResponse ...
+type GetTxFeeResponse struct {
+	CreationTxFee json.Uint64 `json:"creationTxFee"`
+	TxFee         json.Uint64 `json:"txFee"`
+}
+
 // GetTxFee returns the transaction fee in nAVAX.
-// Note that the transaction fee is a command line argument and this node's view
-// of the transaction fee may be different than another node's.
-func (service *Info) GetTxFee(_ *http.Request, args *struct{}, reply *struct {
-	Fee json.Uint64 `json:"txFee"`
-}) error {
-	reply.Fee = json.Uint64(service.txFee)
+func (service *Info) GetTxFee(_ *http.Request, args *struct{}, reply *GetTxFeeResponse) error {
+	reply.CreationTxFee = json.Uint64(service.creationTxFee)
+	reply.TxFee = json.Uint64(service.txFee)
 	return nil
 }

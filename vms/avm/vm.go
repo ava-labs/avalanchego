@@ -7,33 +7,34 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"time"
 
 	"github.com/gorilla/rpc/v2"
 
-	"github.com/ava-labs/gecko/cache"
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/versiondb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/timer"
-	"github.com/ava-labs/gecko/utils/wrappers"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/components/verify"
-	"github.com/ava-labs/gecko/vms/nftfx"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/nftfx"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	cjson "github.com/ava-labs/gecko/utils/json"
-	safemath "github.com/ava-labs/gecko/utils/math"
+	cjson "github.com/ava-labs/avalanchego/utils/json"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -65,7 +66,8 @@ type VM struct {
 	// Used to check local time
 	clock timer.Clock
 
-	codec codec.Codec
+	genesisCodec codec.Codec
+	codec        codec.Codec
 
 	pubsub *cjson.PubSubServer
 
@@ -75,7 +77,9 @@ type VM struct {
 	// Set to true once this VM is marked as `Bootstrapped` by the engine
 	bootstrapped bool
 
-	// fee that must be burned by every transaction
+	// fee that must be burned by every state creating transaction
+	creationTxFee uint64
+	// fee that must be burned by every non-state creating transaction
 	txFee uint64
 
 	// Transaction issuing
@@ -92,15 +96,45 @@ type VM struct {
 }
 
 type codecRegistry struct {
-	codec.Codec
+	genesisCodec  codec.Codec
+	codec         codec.Codec
 	index         int
 	typeToFxIndex map[reflect.Type]int
+}
+
+func (cr *codecRegistry) Skip(amount int) {
+	cr.genesisCodec.Skip(amount)
+	cr.codec.Skip(amount)
 }
 
 func (cr *codecRegistry) RegisterType(val interface{}) error {
 	valType := reflect.TypeOf(val)
 	cr.typeToFxIndex[valType] = cr.index
-	return cr.Codec.RegisterType(val)
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		cr.genesisCodec.RegisterType(val),
+		cr.codec.RegisterType(val),
+	)
+	return errs.Err
+}
+
+func (cr *codecRegistry) SetMaxSize(size int) {
+	cr.genesisCodec.SetMaxSize(size)
+	cr.codec.SetMaxSize(size)
+}
+
+func (cr *codecRegistry) SetMaxSliceLen(size int) {
+	cr.genesisCodec.SetMaxSliceLen(size)
+	cr.codec.SetMaxSliceLen(size)
+}
+
+func (cr *codecRegistry) Marshal(v interface{}) ([]byte, error) {
+	return cr.codec.Marshal(v)
+}
+
+func (cr *codecRegistry) Unmarshal(b []byte, v interface{}) error {
+	return cr.codec.Unmarshal(b, v)
 }
 
 /*
@@ -125,6 +159,7 @@ func (vm *VM) Initialize(
 	vm.Aliaser.Initialize()
 
 	vm.pubsub = cjson.NewPubSubServer(ctx)
+	vm.genesisCodec = codec.New(math.MaxUint32, 1<<20)
 	c := codec.NewDefault()
 
 	errs := wrappers.Errs{}
@@ -140,6 +175,12 @@ func (vm *VM) Initialize(
 		c.RegisterType(&OperationTx{}),
 		c.RegisterType(&ImportTx{}),
 		c.RegisterType(&ExportTx{}),
+
+		vm.genesisCodec.RegisterType(&BaseTx{}),
+		vm.genesisCodec.RegisterType(&CreateAssetTx{}),
+		vm.genesisCodec.RegisterType(&OperationTx{}),
+		vm.genesisCodec.RegisterType(&ImportTx{}),
+		vm.genesisCodec.RegisterType(&ExportTx{}),
 	)
 	if errs.Errored() {
 		return errs.Err
@@ -159,7 +200,8 @@ func (vm *VM) Initialize(
 			Fx: fx,
 		}
 		vm.codec = &codecRegistry{
-			Codec:         c,
+			genesisCodec:  vm.genesisCodec,
+			codec:         c,
 			index:         i,
 			typeToFxIndex: vm.typeToFxIndex,
 		}
@@ -172,9 +214,10 @@ func (vm *VM) Initialize(
 
 	vm.state = &prefixedState{
 		state: &state{State: avax.State{
-			Cache: &cache.LRU{Size: stateCacheSize},
-			DB:    vm.db,
-			Codec: vm.codec,
+			Cache:        &cache.LRU{Size: stateCacheSize},
+			DB:           vm.db,
+			GenesisCodec: vm.genesisCodec,
+			Codec:        vm.codec,
 		}},
 
 		tx:       &cache.LRU{Size: idCacheSize},
@@ -488,7 +531,7 @@ func (vm *VM) FlushTxs() {
 
 func (vm *VM) initAliases(genesisBytes []byte) error {
 	genesis := Genesis{}
-	if err := vm.codec.Unmarshal(genesisBytes, &genesis); err != nil {
+	if err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return err
 	}
 
@@ -500,7 +543,7 @@ func (vm *VM) initAliases(genesisBytes []byte) error {
 		tx := Tx{
 			UnsignedTx: &genesisTx.CreateAssetTx,
 		}
-		if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
+		if err := tx.SignSECP256K1Fx(vm.genesisCodec, nil); err != nil {
 			return err
 		}
 
@@ -515,7 +558,7 @@ func (vm *VM) initAliases(genesisBytes []byte) error {
 
 func (vm *VM) initState(genesisBytes []byte) error {
 	genesis := Genesis{}
-	if err := vm.codec.Unmarshal(genesisBytes, &genesis); err != nil {
+	if err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return err
 	}
 
@@ -527,7 +570,7 @@ func (vm *VM) initState(genesisBytes []byte) error {
 		tx := Tx{
 			UnsignedTx: &genesisTx.CreateAssetTx,
 		}
-		if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
+		if err := tx.SignSECP256K1Fx(vm.genesisCodec, nil); err != nil {
 			return err
 		}
 
@@ -709,10 +752,15 @@ func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiab
 	return fx.VerifyOperation(tx, op.Op, cred, utxos)
 }
 
-// LoadUser ...
+// LoadUser returns:
+// 1) The UTXOs that reference one or more addresses controlled by the given user
+// 2) A keychain that contains this user's keys
+// If [addrsToUse] has positive length, returns UTXOs that reference one or more
+// addresses controlled by the given user that are also in [addrsToUse].
 func (vm *VM) LoadUser(
 	username string,
 	password string,
+	addrsToUse ids.ShortSet,
 ) (
 	[]*avax.UTXO,
 	*secp256k1fx.Keychain,
@@ -722,15 +770,25 @@ func (vm *VM) LoadUser(
 	if err != nil {
 		return nil, nil, fmt.Errorf("problem retrieving user: %w", err)
 	}
+	// Drop any potential error closing the database to report the original
+	// error
+	defer db.Close()
 
 	user := userState{vm: vm}
+
+	// true iff we should only return UTXOs that reference one or more addresses in [addrsToUse]
+	filterAddresses := len(addrsToUse) > 0
 
 	// The error is explicitly dropped, as it may just mean that there are no addresses.
 	addresses, _ := user.Addresses(db)
 
 	addrs := ids.ShortSet{}
 	for _, addr := range addresses {
-		addrs.Add(addr)
+		if !filterAddresses {
+			addrs.Add(addr)
+		} else if filterAddresses && addrsToUse.Contains(addr) {
+			addrs.Add(addr)
+		}
 	}
 	utxos, _, _, err := vm.GetUTXOs(addrs, ids.ShortEmpty, ids.Empty, -1)
 	if err != nil {
@@ -738,7 +796,7 @@ func (vm *VM) LoadUser(
 	}
 
 	kc := secp256k1fx.NewKeychain()
-	for _, addr := range addresses {
+	for _, addr := range addrs.List() {
 		sk, err := user.Key(db, addr)
 		if err != nil {
 			return nil, nil, fmt.Errorf("problem retrieving private key: %w", err)
@@ -746,7 +804,7 @@ func (vm *VM) LoadUser(
 		kc.Add(sk)
 	}
 
-	return utxos, kc, nil
+	return utxos, kc, db.Close()
 }
 
 // Spend ...
@@ -805,7 +863,11 @@ func (vm *VM) Spend(
 
 	for asset, amount := range amounts {
 		if amountsSpent[asset] < amount {
-			return nil, nil, nil, errInsufficientFunds
+			return nil, nil, nil, fmt.Errorf("want to spend %d of asset %s but only have %d",
+				amount,
+				ids.NewID(asset),
+				amountsSpent[asset],
+			)
 		}
 	}
 

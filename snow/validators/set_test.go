@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestSetSet(t *testing.T) {
@@ -149,4 +149,32 @@ func TestSetWeight(t *testing.T) {
 	setWeight := s.Weight()
 	expectedWeight := weight0 + weight1
 	assert.Equal(t, expectedWeight, setWeight, "wrong set weight")
+}
+
+func TestSetSubsetWeight(t *testing.T) {
+	vdr0 := ids.NewShortID([20]byte{1})
+	weight0 := uint64(93)
+	vdr1 := ids.NewShortID([20]byte{2})
+	weight1 := uint64(123)
+	vdr2 := ids.NewShortID([20]byte{3})
+	weight2 := uint64(810)
+	subset := ids.ShortSet{}
+	subset.Add(vdr0)
+	subset.Add(vdr1)
+
+	s := NewSet()
+	err := s.AddWeight(vdr0, weight0)
+	assert.NoError(t, err)
+
+	err = s.AddWeight(vdr1, weight1)
+	assert.NoError(t, err)
+	err = s.AddWeight(vdr2, weight2)
+	assert.NoError(t, err)
+
+	subsetWeight, err := s.SubsetWeight(subset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedWeight := weight0 + weight1
+	assert.Equal(t, expectedWeight, subsetWeight, "wrong subset weight")
 }

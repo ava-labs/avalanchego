@@ -3,13 +3,11 @@ package core
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowman"
-
-	"github.com/ava-labs/gecko/ids"
-
-	"github.com/ava-labs/gecko/database/memdb"
-	"github.com/ava-labs/gecko/database/versiondb"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
 func TestBlock(t *testing.T) {
@@ -40,12 +38,16 @@ func TestBlock(t *testing.T) {
 		t.Fatalf("status should be processing but is %s", status)
 	}
 
-	b.Accept()
+	if err := b.Accept(); err != nil {
+		t.Fatal(err)
+	}
 	if status := b.Status(); status != choices.Accepted {
 		t.Fatalf("status should be accepted but is %s", status)
 	}
 
-	b.Reject()
+	if err := b.Reject(); err != nil {
+		t.Fatal(err)
+	}
 	if status := b.Status(); status != choices.Rejected {
 		t.Fatalf("status should be rejected but is %s", status)
 	}

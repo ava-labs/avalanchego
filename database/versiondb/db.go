@@ -8,10 +8,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/memdb"
-	"github.com/ava-labs/gecko/database/nodb"
-	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/nodb"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 // Database implements the Database interface by living on top of another

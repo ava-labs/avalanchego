@@ -12,9 +12,10 @@ func TestSort2dByteArray(t *testing.T) {
 	// Create a random 2D array
 	arr := [][]byte{}
 	for i := 0; i < numSubArrs; i++ {
-		subArrLen := rand.Intn(maxLength)
+		subArrLen := rand.Intn(maxLength) // #nosec G404
 		subArr := make([]byte, subArrLen)
-		if _, err := rand.Read(subArr); err != nil {
+		_, err := rand.Read(subArr) // #nosec G404
+		if err != nil {
 			t.Fatal(err)
 		}
 		arr = append(arr, subArr)
@@ -22,9 +23,7 @@ func TestSort2dByteArray(t *testing.T) {
 
 	// In the unlikely event the random array is sorted, unsort it
 	if IsSorted2DBytes(arr) {
-		tmp := arr[0]
-		arr[0] = arr[len(arr)-1]
-		arr[len(arr)-1] = tmp
+		arr[0], arr[len(arr)-1] = arr[len(arr)-1], arr[0]
 	}
 	Sort2DBytes(arr) // sort it
 	if !IsSorted2DBytes(arr) {

@@ -6,7 +6,7 @@ package platformvm
 import (
 	"time"
 
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 // Validator is a validator.
@@ -41,14 +41,9 @@ func (v *Validator) Weight() uint64 { return v.Wght }
 
 // Verify validates the ID for this validator
 func (v *Validator) Verify() error {
-	duration := v.Duration()
 	switch {
 	case v.NodeID.IsZero(): // Ensure the validator has a valid ID
 		return errInvalidID
-	case duration < MinimumStakingDuration: // Ensure staking length is not too short
-		return errStakeTooShort
-	case duration > MaximumStakingDuration: // Ensure staking length is not too long
-		return errStakeTooLong
 	case v.Wght == 0: // Ensure the validator has some weight
 		return errWeightTooSmall
 	default:

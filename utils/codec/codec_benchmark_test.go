@@ -6,7 +6,7 @@ package codec
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // BenchmarkMarshal benchmarks the codec's marshal function
@@ -38,9 +38,17 @@ func BenchmarkMarshal(b *testing.B) {
 	var unmarshaledMyStructInstance myStruct
 
 	codec := NewDefault()
-	codec.RegisterType(&MyInnerStruct{}) // Register the types that may be unmarshaled into interfaces
-	codec.RegisterType(&MyInnerStruct2{})
-	codec.Marshal(myStructInstance) // warm up serializedFields cache
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		codec.RegisterType(&MyInnerStruct{}), // Register the types that may be unmarshaled into interfaces
+		codec.RegisterType(&MyInnerStruct2{}),
+	)
+	_, err := codec.Marshal(myStructInstance) // warm up serializedFields cache
+	if errs.Add(err); errs.Errored() {
+		b.Fatal(errs.Err)
+	}
+
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		bytes, err := codec.Marshal(myStructInstance)

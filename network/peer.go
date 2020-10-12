@@ -10,10 +10,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 type peer struct {
@@ -21,6 +21,16 @@ type peer struct {
 
 	// if the version message has been received and is valid. is only modified
 	// on the connection's reader routine with the network state lock held.
+	gotVersion bool
+
+	// if the gotPeerList message has been received and is valid. is only
+	// modified on the connection's reader routine with the network state lock
+	// held.
+	gotPeerList bool
+
+	// if the version message has been received and is valid and the peerlist
+	// has been returned. is only modified on the connection's reader routine
+	// with the network state lock held.
 	connected bool
 
 	// only close the peer once
@@ -53,52 +63,74 @@ type peer struct {
 
 	// unix time of the last message sent and received respectively
 	lastSent, lastReceived int64
+
+	tickerCloser chan struct{}
+
+	// ticker processes
+	tickerOnce sync.Once
 }
 
 // assume the stateLock is held
 func (p *peer) Start() {
 	go p.ReadMessages()
 	go p.WriteMessages()
+}
 
-	// Initially send the version to the peer
-	go p.Version()
-	go p.requestVersion()
+func (p *peer) StartTicker() {
+	go p.requestFinishHandshake()
 	go p.sendPings()
 }
 
 func (p *peer) sendPings() {
-	t := time.NewTicker(p.net.pingFrequency)
-	defer t.Stop()
+	sendPingsTicker := time.NewTicker(p.net.pingFrequency)
+	defer sendPingsTicker.Stop()
 
-	for range t.C {
-		p.net.stateLock.Lock()
-		closed := p.closed
-		p.net.stateLock.Unlock()
+	for {
+		select {
+		case <-sendPingsTicker.C:
+			p.net.stateLock.Lock()
+			closed := p.closed
+			p.net.stateLock.Unlock()
 
-		if closed {
+			if closed {
+				return
+			}
+
+			p.Ping()
+		case <-p.tickerCloser:
 			return
 		}
-
-		p.Ping()
 	}
 }
 
-// request the version from the peer until we get the version from them
-func (p *peer) requestVersion() {
-	t := time.NewTicker(p.net.getVersionTimeout)
-	defer t.Stop()
+// request missing handshake messages from the peer
+func (p *peer) requestFinishHandshake() {
+	finishHandshakeTicker := time.NewTicker(p.net.getVersionTimeout)
+	defer finishHandshakeTicker.Stop()
 
-	for range t.C {
-		p.net.stateLock.Lock()
-		connected := p.connected
-		closed := p.closed
-		p.net.stateLock.Unlock()
+	for {
+		select {
+		case <-finishHandshakeTicker.C:
+			p.net.stateLock.Lock()
+			gotVersion := p.gotVersion
+			gotPeerList := p.gotPeerList
+			connected := p.connected
+			closed := p.closed
+			p.net.stateLock.Unlock()
 
-		if connected || closed {
+			if connected || closed {
+				return
+			}
+
+			if !gotVersion {
+				p.GetVersion()
+			}
+			if !gotPeerList {
+				p.GetPeerList()
+			}
+		case <-p.tickerCloser:
 			return
 		}
-
-		p.GetVersion()
 	}
 }
 
@@ -112,11 +144,11 @@ func (p *peer) ReadMessages() {
 	}
 
 	pendingBuffer := wrappers.Packer{}
-	readBuffer := make([]byte, 1<<10)
+	readBuffer := make([]byte, p.net.readBufferSize)
 	for {
 		read, err := p.conn.Read(readBuffer)
 		if err != nil {
-			p.net.log.Verbo("error on connection read to %s %s", p.id, err)
+			p.net.log.Verbo("error on connection read to %s %s %s", p.id, p.ip, err)
 			return
 		}
 
@@ -177,6 +209,8 @@ func (p *peer) ReadMessages() {
 func (p *peer) WriteMessages() {
 	defer p.Close()
 
+	p.Version()
+
 	for msg := range p.sender {
 		p.net.log.Verbo("sending new message to %s:\n%s",
 			p.id,
@@ -196,6 +230,7 @@ func (p *peer) WriteMessages() {
 				p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.ip, err)
 				return
 			}
+			p.tickerOnce.Do(p.StartTicker)
 			msg = msg[written:]
 		}
 		atomic.StoreInt64(&p.lastSent, p.net.clock.Time().Unix())
@@ -270,19 +305,26 @@ func (p *peer) handle(msg Msg) {
 	case Pong:
 		p.pong(msg)
 		return
+	case GetPeerList:
+		p.getPeerList(msg)
+		return
+	case PeerList:
+		p.peerList(msg)
+		return
 	}
 	if !p.connected {
 		p.net.log.Debug("dropping message from %s because the connection hasn't been established yet", p.id)
 
-		// send a get version message so that the peer's future messages are hopefully not dropped
-		p.GetVersion()
+		// attempt to finish the handshake
+		if !p.gotVersion {
+			p.GetVersion()
+		}
+		if !p.gotPeerList {
+			p.GetPeerList()
+		}
 		return
 	}
 	switch op {
-	case GetPeerList:
-		p.getPeerList(msg)
-	case PeerList:
-		p.peerList(msg)
 	case GetAcceptedFrontier:
 		p.getAcceptedFrontier(msg)
 	case AcceptedFrontier:
@@ -322,14 +364,21 @@ func (p *peer) Close() { p.once.Do(p.close) }
 
 // assumes only `peer.Close` calls this
 func (p *peer) close() {
+	// If the connection is closing, we can immediately cancel the ticker
+	// goroutines.
+	close(p.tickerCloser)
+
 	p.net.stateLock.Lock()
-	defer p.net.stateLock.Unlock()
+	p.closed = true
+	p.net.stateLock.Unlock()
 
 	if err := p.conn.Close(); err != nil {
 		p.net.log.Debug("closing peer %s resulted in an error: %s", p.id, err)
 	}
 
-	p.closed = true
+	p.net.stateLock.Lock()
+	defer p.net.stateLock.Unlock()
+
 	close(p.sender)
 	p.net.disconnected(p)
 }
@@ -406,7 +455,7 @@ func (p *peer) getVersion(_ Msg) { p.Version() }
 
 // assumes the stateLock is not held
 func (p *peer) version(msg Msg) {
-	if p.connected {
+	if p.gotVersion {
 		p.net.log.Verbo("dropping duplicated version message from %s", p.id)
 		return
 	}
@@ -501,26 +550,28 @@ func (p *peer) version(msg Msg) {
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
 
-	// the network connected function can only be called if disconnected wasn't
-	// already called
-	if p.closed {
-		return
-	}
-
 	p.versionStr = peerVersion.String()
-
-	p.connected = true
-	p.net.connected(p)
+	p.gotVersion = true
+	p.tryMarkConnected()
 }
 
 // assumes the stateLock is not held
-func (p *peer) getPeerList(_ Msg) { p.SendPeerList() }
+func (p *peer) getPeerList(_ Msg) {
+	if p.gotVersion {
+		p.SendPeerList()
+	}
+}
 
 // assumes the stateLock is not held
 func (p *peer) peerList(msg Msg) {
 	ips := msg.Get(Peers).([]utils.IPDesc)
 
 	p.net.stateLock.Lock()
+	defer p.net.stateLock.Unlock()
+
+	p.gotPeerList = true
+	p.tryMarkConnected()
+
 	for _, ip := range ips {
 		if !ip.Equal(p.net.ip) &&
 			!ip.IsZero() &&
@@ -529,7 +580,6 @@ func (p *peer) peerList(msg Msg) {
 			p.net.track(ip)
 		}
 	}
-	p.net.stateLock.Unlock()
 }
 
 // assumes the stateLock is not held
@@ -693,6 +743,20 @@ func (p *peer) chits(msg Msg) {
 	}
 
 	p.net.router.Chits(p.id, chainID, requestID, containerIDs)
+}
+
+// assumes the stateLock is held
+func (p *peer) tryMarkConnected() {
+	if !p.connected && p.gotVersion && p.gotPeerList {
+		// the network connected function can only be called if disconnected
+		// wasn't already called
+		if p.closed {
+			return
+		}
+
+		p.connected = true
+		p.net.connected(p)
+	}
 }
 
 // assumes the stateLock is not held

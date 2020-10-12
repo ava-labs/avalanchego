@@ -7,25 +7,28 @@ import (
 	"math"
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/units"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestPrefixedSetsAndGets(t *testing.T) {
 	_, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
 	state := vm.state
-
-	vm.codec.RegisterType(&avax.TestVerifiable{})
+	if err := vm.codec.RegisterType(&avax.TestVerifiable{}); err != nil {
+		t.Fatal(err)
+	}
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
@@ -44,7 +47,7 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 				TxID:        ids.Empty,
 				OutputIndex: 0,
 			},
-			Asset: avax.Asset{ID: asset},
+			Asset: avax.Asset{ID: assetID},
 			In: &secp256k1fx.TransferInput{
 				Amt: 20 * units.KiloAvax,
 				Input: secp256k1fx.Input{
@@ -97,13 +100,16 @@ func TestPrefixedFundingNoAddresses(t *testing.T) {
 	_, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
 	state := vm.state
-
-	vm.codec.RegisterType(&avax.TestVerifiable{})
+	if err := vm.codec.RegisterType(&avax.TestVerifiable{}); err != nil {
+		t.Fatal(err)
+	}
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
@@ -126,13 +132,16 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 	_, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
 	state := vm.state
-
-	vm.codec.RegisterType(&avax.TestAddressable{})
+	if err := vm.codec.RegisterType(&avax.TestAddressable{}); err != nil {
+		t.Fatal(err)
+	}
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{

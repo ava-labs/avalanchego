@@ -8,10 +8,10 @@ import (
 	"encoding/hex"
 	"sort"
 
-	"github.com/ava-labs/gecko/utils"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // Empty is a useful all zero value
@@ -24,7 +24,7 @@ type ID struct {
 	ID *[32]byte `serialize:"true"`
 }
 
-// NewID creates an identifer from a 32 byte hash
+// NewID creates an identifier from a 32 byte hash
 func NewID(id [32]byte) ID { return ID{ID: &id} }
 
 // ToID attempt to convert a byte slice into an id
@@ -114,12 +114,12 @@ func (id ID) Bit(i uint) int {
 
 	// b = [7, 6, 5, 4, 3, 2, 1, 0]
 
-	b = b >> bitIndex
+	b >>= bitIndex
 
 	// b = [0, ..., bitIndex + 1, bitIndex]
 	// 1 = [0, 0, 0, 0, 0, 0, 0, 1]
 
-	b = b & 1
+	b &= 1
 
 	// b = [0, 0, 0, 0, 0, 0, 0, bitIndex]
 

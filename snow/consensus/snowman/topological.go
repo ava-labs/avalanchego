@@ -4,9 +4,9 @@
 package snowman
 
 import (
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
 const (
@@ -60,12 +60,12 @@ type votes struct {
 }
 
 // Initialize implements the Snowman interface
-func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters, rootID ids.ID) {
+func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters, rootID ids.ID) error {
 	ts.ctx = ctx
 	ts.params = params
 
 	if err := ts.metrics.Initialize(ctx.Log, params.Namespace, params.Metrics); err != nil {
-		ts.ctx.Log.Error("%s", err)
+		return err
 	}
 
 	ts.head = rootID
@@ -73,6 +73,7 @@ func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters,
 		rootID.Key(): {sm: ts},
 	}
 	ts.tail = rootID
+	return nil
 }
 
 // Parameters implements the Snowman interface
@@ -88,8 +89,8 @@ func (ts *Topological) Add(blk Block) error {
 	blkBytes := blk.Bytes()
 
 	// Notify anyone listening that this block was issued.
-	ts.ctx.DecisionDispatcher.Issue(ts.ctx.ChainID, blkID, blkBytes)
-	ts.ctx.ConsensusDispatcher.Issue(ts.ctx.ChainID, blkID, blkBytes)
+	ts.ctx.DecisionDispatcher.Issue(ts.ctx, blkID, blkBytes)
+	ts.ctx.ConsensusDispatcher.Issue(ts.ctx, blkID, blkBytes)
 	ts.metrics.Issued(blkID)
 
 	parentNode, ok := ts.blocks[parentKey]
@@ -102,8 +103,8 @@ func (ts *Topological) Add(blk Block) error {
 		}
 
 		// Notify anyone listening that this block was rejected.
-		ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, blkID, blkBytes)
-		ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, blkID, blkBytes)
+		ts.ctx.DecisionDispatcher.Reject(ts.ctx, blkID, blkBytes)
+		ts.ctx.ConsensusDispatcher.Reject(ts.ctx, blkID, blkBytes)
 		ts.metrics.Rejected(blkID)
 		return nil
 	}
@@ -179,7 +180,7 @@ func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
 	}
 
 	// Runtime = |live set| ; Space = Constant
-	ts.tail = ts.getPreferredDecendent(preferred)
+	ts.tail = ts.getPreferredDescendant(preferred)
 	return nil
 }
 
@@ -214,7 +215,7 @@ func (ts *Topological) calculateInDegree(
 		parentID := parent.ID()
 		parentIDKey := parentID.Key()
 
-		// Add the votes for this block to the parent's set of responces
+		// Add the votes for this block to the parent's set of responses
 		numVotes := votes.Count(vote)
 		kahn, previouslySeen := kahns[parentIDKey]
 		kahn.votes.AddCount(vote, numVotes)
@@ -268,7 +269,7 @@ func (ts *Topological) pushVotes(
 		leafID := leaves[newLeavesSize]
 		leaves = leaves[:newLeavesSize]
 
-		// get the block and sort infomation about the block
+		// get the block and sort information about the block
 		leafIDKey := leafID.Key()
 		kahnNode := kahnNodes[leafIDKey]
 		block := ts.blocks[leafIDKey]
@@ -413,8 +414,8 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 	return newPreferred, nil
 }
 
-// Get the preferred decendent of the provided block ID
-func (ts *Topological) getPreferredDecendent(blkID ids.ID) ids.ID {
+// Get the preferred descendant of the provided block ID
+func (ts *Topological) getPreferredDescendant(blkID ids.ID) ids.ID {
 	// Traverse from the provided ID to the preferred child until there are no
 	// children.
 	for block := ts.blocks[blkID.Key()]; block.sb != nil; block = ts.blocks[blkID.Key()] {
@@ -440,8 +441,8 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 
 	// Notify anyone listening that this block was accepted.
 	bytes := child.Bytes()
-	ts.ctx.DecisionDispatcher.Accept(ts.ctx.ChainID, pref, bytes)
-	ts.ctx.ConsensusDispatcher.Accept(ts.ctx.ChainID, pref, bytes)
+	ts.ctx.DecisionDispatcher.Accept(ts.ctx, pref, bytes)
+	ts.ctx.ConsensusDispatcher.Accept(ts.ctx, pref, bytes)
 	ts.metrics.Accepted(pref)
 
 	// Because this is the newest accepted block, this is the new head.
@@ -464,8 +465,8 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 
 		// Notify anyone listening that this block was rejected.
 		bytes := child.Bytes()
-		ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
-		ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
+		ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes)
+		ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes)
 		ts.metrics.Rejected(childID)
 
 		// Track which blocks have been directly rejected
@@ -499,8 +500,8 @@ func (ts *Topological) rejectTransitively(rejected []ids.ID) error {
 			// Notify anyone listening that this block was rejected.
 			childID := ids.NewID(childIDKey)
 			bytes := child.Bytes()
-			ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
-			ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
+			ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes)
+			ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes)
 			ts.metrics.Rejected(childID)
 
 			// add the newly rejected block to the end of the queue

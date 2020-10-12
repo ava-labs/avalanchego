@@ -7,18 +7,18 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/network"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
-	"github.com/ava-labs/gecko/snow/consensus/snowman"
-	"github.com/ava-labs/gecko/snow/consensus/snowman/poll"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/engine/snowman/bootstrap"
-	"github.com/ava-labs/gecko/snow/events"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/poll"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
+	"github.com/ava-labs/avalanchego/snow/events"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
@@ -60,7 +60,7 @@ func (t *Transitive) Initialize(config Config) error {
 	t.Params = config.Params
 	t.Consensus = config.Consensus
 
-	factory := poll.NewEarlyTermNoTraversalFactory(int(config.Params.Alpha))
+	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t.polls = poll.NewSet(factory,
 		config.Ctx.Log,
 		config.Params.Namespace,
@@ -84,7 +84,9 @@ func (t *Transitive) Initialize(config Config) error {
 func (t *Transitive) finishBootstrapping() error {
 	// initialize consensus to the last accepted blockID
 	lastAcceptedID := t.VM.LastAccepted()
-	t.Consensus.Initialize(t.Ctx, t.Params, lastAcceptedID)
+	if err := t.Consensus.Initialize(t.Ctx, t.Params, lastAcceptedID); err != nil {
+		return err
+	}
 
 	lastAccepted, err := t.VM.GetBlock(lastAcceptedID)
 	if err != nil {
@@ -179,6 +181,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 		}
 	}
 
+	t.metrics.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
 	t.Sender.MultiPut(vdr, requestID, ancestorsBytes)
 	return nil
 }
@@ -602,8 +605,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	// any potential reentrant bugs.
 	added := []snowman.Block{}
 	dropped := []snowman.Block{}
-	switch blk := blk.(type) {
-	case OracleBlock:
+	if blk, ok := blk.(OracleBlock); ok {
 		options, err := blk.Options()
 		if err != nil {
 			return err

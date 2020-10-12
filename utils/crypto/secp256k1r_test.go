@@ -11,9 +11,9 @@ import (
 
 	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v3"
 
-	"github.com/ava-labs/gecko/cache"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 func TestRecover(t *testing.T) {

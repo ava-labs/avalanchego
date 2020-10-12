@@ -7,8 +7,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger/messengerproto"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger/messengerproto"
 )
 
 var (
