@@ -96,6 +96,8 @@ func (p *peer) Start() error {
 	if msg.Op() == PeerList {
 		go p.handle(msg)
 		go p.ReadMessages()
+
+		// we need to ask for a version.
 		go p.Version()
 		go p.WriteMessages()
 		return nil
@@ -124,7 +126,9 @@ func (p *peer) Start() error {
 
 		go p.handle(msg)
 		go p.ReadMessages()
-		go p.Version()
+
+		// we did see a version, so lets get a peerlist.
+		go p.GetPeerList()
 		go p.WriteMessages()
 		return nil
 	}
@@ -163,8 +167,10 @@ func (p *peer) Start() error {
 	p.versionStr = peerVersion.String()
 	p.gotVersion = true
 
-	go p.GetPeerList()
+	// so we got version, and versionNak was PeerOk.
+	// continue processing the peer, lets ask for a PeerList and continue processing.
 	go p.ReadMessages()
+	go p.GetPeerList()
 	go p.WriteMessages()
 
 	go p.tickerOnce.Do(p.StartTicker)
