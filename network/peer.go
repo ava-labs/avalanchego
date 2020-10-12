@@ -869,11 +869,11 @@ func (p *peer) discardMyIP() {
 	p.Close()
 }
 
+// Read a single message from the connection.
 func (p *peer) readMsg() (Msg, error) {
 	pendingBuffer := wrappers.Packer{}
 	readBuffer, err := p.readFull(4)
 	if err != nil {
-		p.net.log.Verbo("error on connection read to %s %s %s", p.id, p.ip, err)
 		return nil, err
 	}
 	if len(readBuffer) != 4 {
@@ -881,10 +881,13 @@ func (p *peer) readMsg() (Msg, error) {
 	}
 
 	pendingBuffer.Bytes = append(pendingBuffer.Bytes, readBuffer...)
+
+	// lets figure out the size of the message..
 	size := pendingBuffer.UnpackInt()
+
+	// now lets read the message.
 	readBuffer, err = p.readFull(size)
 	if err != nil {
-		p.net.log.Verbo("error on connection read to %s %s %s", p.id, p.ip, err)
 		return nil, err
 	}
 	if uint32(len(readBuffer)) != size {
@@ -892,17 +895,18 @@ func (p *peer) readMsg() (Msg, error) {
 	}
 
 	pendingBuffer.Bytes = append(pendingBuffer.Bytes, readBuffer...)
+
+	// reset the offset after the size read.
 	pendingBuffer.Offset = 0
+
+	// unpack the bytes or error out...
 	msgBytes := pendingBuffer.UnpackBytes()
 	if pendingBuffer.Errored() {
 		return nil, pendingBuffer.Err
 	}
 
-	p.net.log.Verbo("parsing new message from %s:\n%s",
-		p.id,
-		formatting.DumpBytes{Bytes: msgBytes})
-
-	msg, err := p.net.b.Parse(msgBytes)
+	var msg Msg
+	msg, err = p.net.b.Parse(msgBytes)
 	if err != nil {
 		p.net.log.Debug("failed to parse new message from %s:\n%s\n%s",
 			p.id,
@@ -914,9 +918,14 @@ func (p *peer) readMsg() (Msg, error) {
 	return msg, nil
 }
 
+// send the raw msg bytes
 func (p *peer) sendRaw(msg []byte) error {
+
+	// pack the message with a header.
 	packer := wrappers.Packer{Bytes: make([]byte, len(msg)+wrappers.IntLen)}
 	packer.PackBytes(msg)
+
+	// transmit the data..
 	msg = packer.Bytes
 	for len(msg) > 0 {
 		written, err := p.conn.Write(msg)
@@ -928,6 +937,7 @@ func (p *peer) sendRaw(msg []byte) error {
 	return nil
 }
 
+// read from the connection up to len bytes..  Don't stop till we got them.
 func (p *peer) readFull(len uint32) ([]byte, error) {
 	responseBuffer := make([]byte, 0, len)
 	for len > 0 {
@@ -943,6 +953,7 @@ func (p *peer) readFull(len uint32) ([]byte, error) {
 	return responseBuffer, nil
 }
 
+// Print out the peer version check message.
 func (p *peer) checkPeerVersion(peerVersion version.Version) {
 	if p.net.version.Before(peerVersion) {
 		if p.net.beacons.Contains(p.id) {
@@ -966,7 +977,8 @@ func (p *peer) verionAck() (Msg, error) {
 		p.net.ip,
 		p.net.version.String(),
 	)
-	return p.sendAndReceive(err, msg)
+	p.net.log.AssertNoError(err)
+	return p.sendAndReceive(msg)
 }
 
 // build versionNak and send it
@@ -974,21 +986,16 @@ func (p *peer) versionNack(peerResponse VersionNakField) (Msg, error) {
 	msg, err := p.net.b.VersionNak(
 		peerResponse,
 	)
-	return p.sendAndReceive(err, msg)
+	p.net.log.AssertNoError(err)
+	return p.sendAndReceive(msg)
 }
 
-func (p *peer) sendAndReceive(err error, msg Msg) (Msg, error) {
-	p.net.log.AssertNoError(err)
-
-	err = p.sendRaw(msg.Bytes())
+// send the message and read the response.
+func (p *peer) sendAndReceive(msg Msg) (Msg, error) {
+	err := p.sendRaw(msg.Bytes())
 	if err != nil {
 		return nil, err
 	}
 
-	// read version.
-	msg, err = p.readMsg()
-	if err != nil {
-		return nil, err
-	}
-	return msg, nil
+	return p.readMsg()
 }
