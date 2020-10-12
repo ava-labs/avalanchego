@@ -25,6 +25,13 @@ func (m Builder) Version(networkID, nodeID uint32, myTime uint64, ip utils.IPDes
 	})
 }
 
+func (m Builder) VersionNak(errorID PeerField, errorMsg string) (Msg, error) {
+	return m.Pack(VersionNak, map[Field]interface{}{
+		ErrorNo:  errorID,
+		ErrorMsg: errorMsg,
+	})
+}
+
 // GetPeerList message
 func (m Builder) GetPeerList() (Msg, error) { return m.Pack(GetPeerList, nil) }
 

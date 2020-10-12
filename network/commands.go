@@ -25,6 +25,15 @@ const (
 	ContainerBytes                   // Used for gossiping
 	ContainerIDs                     // Used for querying
 	MultiContainerBytes              // Used in MultiPut
+	ErrorNo                          // Used in VersionNak
+	ErrorMsg                         // Used in VersionNak
+)
+
+type PeerField uint32
+
+const (
+	PeerOk PeerField = iota
+	PeerAlreadyPeered
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -194,6 +203,7 @@ const (
 	PushQuery
 	PullQuery
 	Chits
+	VersionNak
 )
 
 // Defines the messages that can be sent/received with this network

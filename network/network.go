@@ -49,11 +49,15 @@ const (
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
 	defaultReadBufferSize                            = 16 * 1024
 	defaultReadHandshakeTimeout                      = 15 * time.Second
+	defaultReadPeerVersionTimeout                    = 15 * time.Second
 )
 
 var (
-	errNetworkClosed = errors.New("network closed")
-	errPeerIsMyself  = errors.New("peer is myself")
+	errNetworkClosed   = errors.New("network closed")
+	errPeerIsMyself    = errors.New("peer is myself")
+	errAllreadyPeered  = errors.New("already peered")
+	errVersionExpected = errors.New("no version msg")
+	errVersionNak      = errors.New("no version nak")
 )
 
 func init() { rand.Seed(time.Now().UnixNano()) }
@@ -131,6 +135,8 @@ type network struct {
 	pingFrequency                      time.Duration
 	readBufferSize                     uint32
 	readHandshakeTimeout               time.Duration
+	// time for the version ack/nack to complete
+	readPeerVersionTimeout time.Duration
 
 	executor timer.Executor
 
@@ -197,6 +203,7 @@ func NewDefaultNetwork(
 		defaultPingFrequency,
 		defaultReadBufferSize,
 		defaultReadHandshakeTimeout,
+		defaultReadPeerVersionTimeout,
 	)
 }
 
@@ -233,6 +240,7 @@ func NewNetwork(
 	pingFrequency time.Duration,
 	readBufferSize uint32,
 	readHandshakeTimeout time.Duration,
+	readPeerVersionTimeout time.Duration,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -275,6 +283,7 @@ func NewNetwork(
 		peers:                              make(map[[20]byte]*peer),
 		readBufferSize:                     readBufferSize,
 		readHandshakeTimeout:               readHandshakeTimeout,
+		readPeerVersionTimeout:             readPeerVersionTimeout,
 	}
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
@@ -909,6 +918,10 @@ func (n *network) connectTo(ip utils.IPDesc) {
 		if err == nil {
 			return
 		}
+		if err == errAllreadyPeered || err == errVersionExpected {
+			n.log.Debug("error attempting to connect to %s: %s", ip, err)
+			return
+		}
 		n.log.Verbo("error attempting to connect to %s: %s. Reattempting in %s",
 			ip, err, delay)
 	}
@@ -968,6 +981,7 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 	if err := n.tryAddPeer(p); err != nil {
 		_ = p.conn.Close()
 		n.log.Debug("dropping peer connection due to: %s", err)
+		return err
 	}
 	return nil
 }
@@ -1015,9 +1029,14 @@ func (n *network) tryAddPeer(p *peer) error {
 		return fmt.Errorf("duplicated connection from %s at %s", p.id.PrefixedString(constants.NodeIDPrefix), p.ip)
 	}
 
+	// start peer, and check if it works.
+	err := p.Start()
+	if err != nil {
+		return err
+	}
+
 	n.peers[key] = p
 	n.numPeers.Set(float64(len(n.peers)))
-	p.Start()
 	return nil
 }
 
@@ -1074,4 +1093,14 @@ func (n *network) disconnected(p *peer) {
 	if p.connected {
 		n.router.Disconnected(p.id)
 	}
+}
+
+// assume the stateLock is held
+func (n *network) AmIPeered(id ids.ShortID) bool {
+	for _, peer := range n.peers {
+		if peer.connected && id.Equals(peer.id) {
+			return true
+		}
+	}
+	return false
 }
