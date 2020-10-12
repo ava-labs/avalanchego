@@ -1860,7 +1860,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 }
 
 // IssueTx issues a tx
-func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response *api.JsonTxID) error {
+func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response *api.JSONTxID) error {
 	service.vm.Ctx.Log.Info("Platform: IssueTx called")
 
 	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)

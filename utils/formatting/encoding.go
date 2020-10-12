@@ -4,7 +4,6 @@
 package formatting
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -13,10 +12,6 @@ const (
 	HexEncoding = "hex"
 	// CB58Encoding specifies the CB58 encoding format
 	CB58Encoding = "cb58"
-)
-
-var (
-	errMissingEncoding = errors.New("unrecognized encoding f")
 )
 
 // Encoding returns a struct used to format bytes for a specific encoding

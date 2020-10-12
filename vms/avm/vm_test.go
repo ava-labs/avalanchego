@@ -213,7 +213,9 @@ func BuildGenesisTest(t *testing.T) []byte {
 	}
 
 	hex := formatting.Hex{}
-	hex.FromString(reply.Bytes)
+	if err := hex.FromString(reply.Bytes); err != nil {
+		t.Fatal(err)
+	}
 
 	return hex.Bytes
 }
