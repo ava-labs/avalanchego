@@ -1,5 +1,5 @@
-// // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
-// // See the file LICENSE for licensing terms.
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
 
 package router
 
@@ -13,30 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
-
-type infiniteResourcePool struct{}
-
-func (i *infiniteResourcePool) TakeMessage(vdr ids.ShortID) bool { return true }
-
-func (i *infiniteResourcePool) ReturnMessage(vdr ids.ShortID) {}
-
-func (i *infiniteResourcePool) Utilization(vdr ids.ShortID) float64 { return 0 }
-
-func newInfiniteResourcePoolManager() ResourceManager {
-	return &infiniteResourcePool{}
-}
-
-type noResourcesManager struct{}
-
-func (no *noResourcesManager) TakeMessage(vdr ids.ShortID) bool { return false }
-
-func (no *noResourcesManager) ReturnMessage(vdr ids.ShortID) {}
-
-func (no *noResourcesManager) Utilization(vdr ids.ShortID) float64 { return 1.0 }
-
-func newNoResourcesManager() ResourceManager {
-	return &noResourcesManager{}
-}
 
 func TestTakeMessage(t *testing.T) {
 	bufferSize := 8
@@ -120,4 +96,28 @@ func TestStakerGetsThrottled(t *testing.T) {
 		}
 	}
 	t.Fatal("Staker should have been throttled before taking up the entire message queue.")
+}
+
+type infiniteResourcePool struct{}
+
+func (i *infiniteResourcePool) TakeMessage(vdr ids.ShortID) bool { return true }
+
+func (i *infiniteResourcePool) ReturnMessage(vdr ids.ShortID) {}
+
+func (i *infiniteResourcePool) Utilization(vdr ids.ShortID) float64 { return 0 }
+
+func newInfiniteResourcePoolManager() ResourceManager {
+	return &infiniteResourcePool{}
+}
+
+type noResourcesManager struct{}
+
+func (no *noResourcesManager) TakeMessage(vdr ids.ShortID) bool { return false }
+
+func (no *noResourcesManager) ReturnMessage(vdr ids.ShortID) {}
+
+func (no *noResourcesManager) Utilization(vdr ids.ShortID) float64 { return 1.0 }
+
+func newNoResourcesManager() ResourceManager {
+	return &noResourcesManager{}
 }

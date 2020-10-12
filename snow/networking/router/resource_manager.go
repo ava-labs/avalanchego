@@ -15,7 +15,7 @@ const (
 	// DefaultMaxNonStakerPendingMsgs is the default number of messages that can be taken from
 	// the shared message pool by a single validator
 	DefaultMaxNonStakerPendingMsgs uint32 = 20
-	// DefaultStakerPortion is the default amount of CPU time and pending messages to allot to stakers
+	// DefaultStakerPortion is the default portion of resources to reserve for stakers
 	DefaultStakerPortion float64 = 0.375
 )
 
@@ -53,7 +53,7 @@ func NewResourceManager(
 	stakerMsgPortion,
 	stakerCPUPortion float64,
 ) ResourceManager {
-	// Number of messages reserved for Stakers vs. Non-Stakers
+	// Number of messages reserved for stakers vs. non-stakers
 	reservedMessages := uint32(stakerMsgPortion * float64(bufferSize))
 	poolMessages := bufferSize - reservedMessages
 
@@ -92,7 +92,7 @@ func (rm *resourceManager) TakeMessage(vdr ids.ShortID) bool {
 	messageAllotment := uint32(stakerPortion * float64(rm.reservedMessages))
 	messageCount := totalPeerMessages - peerPoolMessages
 	// Allow at least one message per staker, even when staking
-	// portion rounds message allotment down to 0
+	// portion rounds message allotment down to 0.
 	if messageCount <= messageAllotment {
 		rm.msgTracker.Add(vdr)
 		return true

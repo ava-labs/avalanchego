@@ -116,11 +116,9 @@ func (ml *multiLevelQueue) PopMessage() (message, error) {
 	return msg, err
 }
 
-// UtilizeCPU registers that the node was processing a message from [vdr]
-// from [startTime] to [endTime] for a period of [duration]
-// startTime, endTime, and duration are all provided since they are
-// already calculated in handler
-func (ml *multiLevelQueue) UtilizeCPU(vdr ids.ShortID, duration time.Duration) {
+// UtilizeCPU registers that the node was processing a message from [validatorID]
+// for [duration]
+func (ml *multiLevelQueue) UtilizeCPU(validatorID ids.ShortID, duration time.Duration) {
 	ml.lock.Lock()
 	defer ml.lock.Unlock()
 
@@ -134,7 +132,7 @@ func (ml *multiLevelQueue) UtilizeCPU(vdr ids.ShortID, duration time.Duration) {
 }
 
 // EndInterval marks the end of a regular interval of CPU time
-// at [currentTime]
+// occurred at [currentTime]
 func (ml *multiLevelQueue) EndInterval(currentTime time.Time) {
 	ml.lock.Lock()
 	defer ml.lock.Unlock()
