@@ -67,7 +67,6 @@ var (
 
 	// Version is the version of this code
 	Version       = version.NewDefaultVersion(constants.PlatformName, 1, 0, 2)
-	NetVersion    = version.NewDefaultVersion(constants.PlatformName, 1, 0, 3)
 	versionParser = version.NewDefaultParser()
 )
 
