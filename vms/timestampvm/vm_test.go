@@ -44,7 +44,10 @@ func TestGenesis(t *testing.T) {
 	vm := &VM{}
 	ctx := snow.DefaultContextTest()
 	ctx.ChainID = blockchainID
-	vm.Initialize(ctx, db, []byte{0, 0, 0, 0, 0}, msgChan, nil)
+
+	if err := vm.Initialize(ctx, db, []byte{0, 0, 0, 0, 0}, msgChan, nil); err != nil {
+		t.Fatal(err)
+	}
 
 	// Verify that the db is initialized
 	if !vm.DBInitialized() {
@@ -114,7 +117,9 @@ func TestHappyPath(t *testing.T) {
 	if err := snowmanBlock2.Verify(); err != nil {
 		t.Fatal(err)
 	}
-	snowmanBlock2.Accept() // accept the block
+	if err := snowmanBlock2.Accept(); err != nil { // accept the block
+		t.Fatal(err)
+	}
 	vm.SetPreference(snowmanBlock2.ID())
 
 	// Should be the block we just accepted
@@ -152,7 +157,9 @@ func TestHappyPath(t *testing.T) {
 		if err := block.Verify(); err != nil {
 			t.Fatal(err)
 		}
-		block.Accept() // accept the block
+		if err := block.Accept(); err != nil { // accept the block
+			t.Fatal(err)
+		}
 		vm.SetPreference(block.ID())
 	}
 

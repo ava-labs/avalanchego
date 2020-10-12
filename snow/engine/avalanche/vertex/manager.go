@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 )
 
-// Manager defines the persistant storage that is required by the consensus
+// Manager defines the persistent storage that is required by the consensus
 // engine
 type Manager interface {
 	// Create a new vertex from the contents of a vertex

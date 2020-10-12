@@ -58,7 +58,7 @@ type FormattedAssetID struct {
 }
 
 // IssueTx attempts to issue a transaction into consensus
-func (service *Service) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JsonTxID) error {
+func (service *Service) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
 	service.vm.ctx.Log.Info("AVM: IssueTx called with %s", args.Tx)
 
 	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
@@ -84,7 +84,7 @@ type GetTxStatusReply struct {
 }
 
 // GetTxStatus returns the status of the specified transaction
-func (service *Service) GetTxStatus(r *http.Request, args *api.JsonTxID, reply *GetTxStatusReply) error {
+func (service *Service) GetTxStatus(r *http.Request, args *api.JSONTxID, reply *GetTxStatusReply) error {
 	service.vm.ctx.Log.Info("AVM: GetTxStatus called with %s", args.TxID)
 
 	if args.TxID.IsZero() {
@@ -377,7 +377,7 @@ type GetAllBalancesReply struct {
 //   Value: The balance of the asset held by the address
 // Note that balances include assets that the address only _partially_ owns
 // (ie is one of several addresses specified in a multi-sig)
-func (service *Service) GetAllBalances(r *http.Request, args *api.JsonAddress, reply *GetAllBalancesReply) error {
+func (service *Service) GetAllBalances(r *http.Request, args *api.JSONAddress, reply *GetAllBalancesReply) error {
 	service.vm.ctx.Log.Info("AVM: GetAllBalances called with address: %s", args.Address)
 
 	address, err := service.vm.ParseLocalAddress(args.Address)
@@ -389,7 +389,7 @@ func (service *Service) GetAllBalances(r *http.Request, args *api.JsonAddress, r
 
 	utxos, _, _, err := service.vm.GetUTXOs(addrSet, ids.ShortEmpty, ids.Empty, -1)
 	if err != nil {
-		return fmt.Errorf("couldn't get address's UTXOs: %s", err)
+		return fmt.Errorf("couldn't get address's UTXOs: %w", err)
 	}
 
 	assetIDs := ids.Set{}                 // IDs of assets the address has a non-zero balance of
@@ -430,7 +430,7 @@ func (service *Service) GetAllBalances(r *http.Request, args *api.JsonAddress, r
 
 // CreateFixedCapAssetArgs are arguments for passing into CreateFixedCapAsset requests
 type CreateFixedCapAssetArgs struct {
-	api.JsonSpendHeader           // User, password, from addrs, change addr
+	api.JSONSpendHeader           // User, password, from addrs, change addr
 	Name                string    `json:"name"`
 	Symbol              string    `json:"symbol"`
 	Denomination        byte      `json:"denomination"`
@@ -446,7 +446,7 @@ type Holder struct {
 // AssetIDChangeAddr is an asset ID and a change address
 type AssetIDChangeAddr struct {
 	FormattedAssetID
-	api.JsonChangeAddr
+	api.JSONChangeAddr
 }
 
 // CreateFixedCapAsset returns ID of the newly created asset
@@ -560,7 +560,7 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 
 // CreateVariableCapAssetArgs are arguments for passing into CreateVariableCapAsset requests
 type CreateVariableCapAssetArgs struct {
-	api.JsonSpendHeader          // User, password, from addrs, change addr
+	api.JSONSpendHeader          // User, password, from addrs, change addr
 	Name                string   `json:"name"`
 	Symbol              string   `json:"symbol"`
 	Denomination        byte     `json:"denomination"`
@@ -688,7 +688,7 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 
 // CreateNFTAssetArgs are arguments for passing into CreateNFTAsset requests
 type CreateNFTAssetArgs struct {
-	api.JsonSpendHeader          // User, password, from addrs, change addr
+	api.JSONSpendHeader          // User, password, from addrs, change addr
 	Name                string   `json:"name"`
 	Symbol              string   `json:"symbol"`
 	MinterSets          []Owners `json:"minterSets"`
@@ -808,12 +808,12 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 }
 
 // CreateAddress creates an address for the user [args.Username]
-func (service *Service) CreateAddress(r *http.Request, args *api.UserPass, reply *api.JsonAddress) error {
+func (service *Service) CreateAddress(r *http.Request, args *api.UserPass, reply *api.JSONAddress) error {
 	service.vm.ctx.Log.Info("AVM: CreateAddress called for user '%s'", args.Username)
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 	// Drop any potential error closing the database to report the original
 	// error
@@ -853,7 +853,7 @@ func (service *Service) CreateAddress(r *http.Request, args *api.UserPass, reply
 }
 
 // ListAddresses returns all of the addresses controlled by user [args.Username]
-func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, response *api.JsonAddresses) error {
+func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, response *api.JSONAddresses) error {
 	service.vm.ctx.Log.Info("AVM: ListAddresses called for user '%s'", args.Username)
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -935,7 +935,7 @@ type ImportKeyReply struct {
 }
 
 // ImportKey adds a private key to the provided user
-func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JsonAddress) error {
+func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
 	service.vm.ctx.Log.Info("AVM: ImportKey called for user '%s'", args.Username)
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -1008,7 +1008,7 @@ type SendOutput struct {
 // SendArgs are arguments for passing into Send requests
 type SendArgs struct {
 	// User, password, from addrs, change addr
-	api.JsonSpendHeader
+	api.JSONSpendHeader
 
 	// The amount, assetID, and destination to send funds to
 	SendOutput
@@ -1025,7 +1025,7 @@ type SendArgs struct {
 // SendMultipleArgs are arguments for passing into SendMultiple requests
 type SendMultipleArgs struct {
 	// User, password, from addrs, change addr
-	api.JsonSpendHeader
+	api.JSONSpendHeader
 
 	// The outputs of the transaction
 	Outputs []SendOutput `json:"outputs"`
@@ -1040,9 +1040,9 @@ type SendMultipleArgs struct {
 }
 
 // Send returns the ID of the newly created transaction
-func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxIDChangeAddr) error {
+func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JSONTxIDChangeAddr) error {
 	return service.SendMultiple(r, &SendMultipleArgs{
-		JsonSpendHeader: args.JsonSpendHeader,
+		JSONSpendHeader: args.JSONSpendHeader,
 		Outputs:         []SendOutput{args.SendOutput},
 		From:            args.From,
 		Memo:            args.Memo,
@@ -1050,7 +1050,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 }
 
 // SendMultiple sends a transaction with multiple outputs.
-func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, reply *api.JsonTxIDChangeAddr) error {
+func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Info("AVM: Send called with username: %s", args.Username)
 
 	// Validate the memo field
@@ -1198,14 +1198,14 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 
 // MintArgs are arguments for passing into Mint requests
 type MintArgs struct {
-	api.JsonSpendHeader             // User, password, from addrs, change addr
+	api.JSONSpendHeader             // User, password, from addrs, change addr
 	Amount              json.Uint64 `json:"amount"`
 	AssetID             string      `json:"assetID"`
 	To                  string      `json:"to"`
 }
 
 // Mint issues a transaction that mints more of the asset
-func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxIDChangeAddr) error {
+func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Info("AVM: Mint called with username: %s", args.Username)
 
 	if args.Amount == 0 {
@@ -1318,14 +1318,14 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxI
 
 // SendNFTArgs are arguments for passing into SendNFT requests
 type SendNFTArgs struct {
-	api.JsonSpendHeader             // User, password, from addrs, change addr
+	api.JSONSpendHeader             // User, password, from addrs, change addr
 	AssetID             string      `json:"assetID"`
 	GroupID             json.Uint32 `json:"groupID"`
 	To                  string      `json:"to"`
 }
 
 // SendNFT sends an NFT
-func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.JsonTxIDChangeAddr) error {
+func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Info("AVM: SendNFT called with username: %s", args.Username)
 
 	// Parse the asset ID
@@ -1431,7 +1431,7 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 
 // MintNFTArgs are arguments for passing into MintNFT requests
 type MintNFTArgs struct {
-	api.JsonSpendHeader        // User, password, from addrs, change addr
+	api.JSONSpendHeader        // User, password, from addrs, change addr
 	AssetID             string `json:"assetID"`
 	Payload             string `json:"payload"`
 	To                  string `json:"to"`
@@ -1439,7 +1439,7 @@ type MintNFTArgs struct {
 }
 
 // MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
-func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.JsonTxIDChangeAddr) error {
+func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Info("AVM: MintNFT called with username: %s", args.Username)
 
 	assetID, err := service.lookupAssetID(args.AssetID)
@@ -1569,14 +1569,14 @@ type ImportArgs struct {
 }
 
 // ImportAVAX is a deprecated name for Import.
-func (service *Service) ImportAVAX(_ *http.Request, args *ImportArgs, reply *api.JsonTxID) error {
+func (service *Service) ImportAVAX(_ *http.Request, args *ImportArgs, reply *api.JSONTxID) error {
 	return service.Import(nil, args, reply)
 }
 
 // Import imports an asset to this chain from the P/C-Chain.
 // The AVAX must have already been exported from the P/C-Chain.
 // Returns the ID of the newly created atomic transaction
-func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JsonTxID) error {
+func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JSONTxID) error {
 	service.vm.ctx.Log.Info("AVM: Import called with username: %s", args.Username)
 
 	chainID, err := service.vm.ctx.BCLookup.Lookup(args.SourceChain)
@@ -1680,7 +1680,7 @@ func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.Jso
 // ExportAVAXArgs are arguments for passing into ExportAVA requests
 type ExportAVAXArgs struct {
 	// User, password, from addrs, change addr
-	api.JsonSpendHeader
+	api.JSONSpendHeader
 	// Amount of nAVAX to send
 	Amount json.Uint64 `json:"amount"`
 
@@ -1692,7 +1692,7 @@ type ExportAVAXArgs struct {
 // ExportAVAX sends AVAX from this chain to the P-Chain.
 // After this tx is accepted, the AVAX must be imported to the P-chain with an importTx.
 // Returns the ID of the newly created atomic transaction
-func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply *api.JsonTxIDChangeAddr) error {
+func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply *api.JSONTxIDChangeAddr) error {
 	return service.Export(nil, &ExportArgs{
 		ExportAVAXArgs: *args,
 		AssetID:        service.vm.ctx.AVAXAssetID.String(),
@@ -1708,7 +1708,7 @@ type ExportArgs struct {
 // Export sends an asset from this chain to the P/C-Chain.
 // After this tx is accepted, the AVAX must be imported to the P/C-chain with an importTx.
 // Returns the ID of the newly created atomic transaction
-func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JsonTxIDChangeAddr) error {
+func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Info("AVM: Export called with username: %s", args.Username)
 
 	// Parse the asset ID

@@ -10,7 +10,7 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-// Highlighting mode to apply to displayed logs
+// Highlight mode to apply to displayed logs
 type Highlight int
 
 // Highlighting modes available
@@ -19,7 +19,7 @@ const (
 	Colors
 )
 
-// Choose a highlighting mode
+// ToHighlight chooses a highlighting mode
 func ToHighlight(h string, fd uintptr) (Highlight, error) {
 	switch strings.ToUpper(h) {
 	case "PLAIN":
@@ -29,9 +29,8 @@ func ToHighlight(h string, fd uintptr) (Highlight, error) {
 	case "AUTO":
 		if !terminal.IsTerminal(int(fd)) {
 			return Plain, nil
-		} else {
-			return Colors, nil
 		}
+		return Colors, nil
 	default:
 		return Plain, fmt.Errorf("unknown highlight mode: %s", h)
 	}

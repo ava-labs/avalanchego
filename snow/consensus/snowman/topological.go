@@ -60,12 +60,12 @@ type votes struct {
 }
 
 // Initialize implements the Snowman interface
-func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters, rootID ids.ID) {
+func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters, rootID ids.ID) error {
 	ts.ctx = ctx
 	ts.params = params
 
 	if err := ts.metrics.Initialize(ctx.Log, params.Namespace, params.Metrics); err != nil {
-		ts.ctx.Log.Error("%s", err)
+		return err
 	}
 
 	ts.head = rootID
@@ -73,6 +73,7 @@ func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters,
 		rootID.Key(): {sm: ts},
 	}
 	ts.tail = rootID
+	return nil
 }
 
 // Parameters implements the Snowman interface
@@ -179,7 +180,7 @@ func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
 	}
 
 	// Runtime = |live set| ; Space = Constant
-	ts.tail = ts.getPreferredDecendent(preferred)
+	ts.tail = ts.getPreferredDescendant(preferred)
 	return nil
 }
 
@@ -214,7 +215,7 @@ func (ts *Topological) calculateInDegree(
 		parentID := parent.ID()
 		parentIDKey := parentID.Key()
 
-		// Add the votes for this block to the parent's set of responces
+		// Add the votes for this block to the parent's set of responses
 		numVotes := votes.Count(vote)
 		kahn, previouslySeen := kahns[parentIDKey]
 		kahn.votes.AddCount(vote, numVotes)
@@ -268,7 +269,7 @@ func (ts *Topological) pushVotes(
 		leafID := leaves[newLeavesSize]
 		leaves = leaves[:newLeavesSize]
 
-		// get the block and sort infomation about the block
+		// get the block and sort information about the block
 		leafIDKey := leafID.Key()
 		kahnNode := kahnNodes[leafIDKey]
 		block := ts.blocks[leafIDKey]
@@ -413,8 +414,8 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 	return newPreferred, nil
 }
 
-// Get the preferred decendent of the provided block ID
-func (ts *Topological) getPreferredDecendent(blkID ids.ID) ids.ID {
+// Get the preferred descendant of the provided block ID
+func (ts *Topological) getPreferredDescendant(blkID ids.ID) ids.ID {
 	// Traverse from the provided ID to the preferred child until there are no
 	// children.
 	for block := ts.blocks[blkID.Key()]; block.sb != nil; block = ts.blocks[blkID.Key()] {

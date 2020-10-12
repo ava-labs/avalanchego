@@ -20,11 +20,12 @@ func TestConflictGraphEquality(t *testing.T) {
 	maxInputConflicts := 2
 	numNodes := 100
 	params := sbcon.Parameters{
-		Metrics:      prometheus.NewRegistry(),
-		K:            20,
-		Alpha:        11,
-		BetaVirtuous: 20,
-		BetaRogue:    30,
+		Metrics:           prometheus.NewRegistry(),
+		K:                 20,
+		Alpha:             11,
+		BetaVirtuous:      20,
+		BetaRogue:         30,
+		ConcurrentRepolls: 1,
 	}
 	seed := int64(0)
 
@@ -38,22 +39,31 @@ func TestConflictGraphEquality(t *testing.T) {
 
 	rand.Seed(seed)
 	for i := 0; i < numNodes; i++ {
-		nDirected.AddNode(&Directed{})
+		if err := nDirected.AddNode(&Directed{}); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	rand.Seed(seed)
 	for i := 0; i < numNodes; i++ {
-		nInput.AddNode(&Input{})
+		if err := nInput.AddNode(&Input{}); err != nil {
+			t.Fatal(err)
+		}
 	}
 
-	numRounds := 0
-	for !nDirected.Finalized() && !nDirected.Disagreement() && !nInput.Finalized() && !nInput.Disagreement() {
+	for numRounds := 0; !nDirected.Finalized() &&
+		!nDirected.Disagreement() &&
+		!nInput.Finalized() &&
+		!nInput.Disagreement(); numRounds++ {
 		rand.Seed(int64(numRounds) + seed)
-		nDirected.Round()
+		if err := nDirected.Round(); err != nil {
+			t.Fatal(err)
+		}
 
 		rand.Seed(int64(numRounds) + seed)
-		nInput.Round()
-		numRounds++
+		if err := nInput.Round(); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	if nDirected.Disagreement() || nInput.Disagreement() {

@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -22,6 +23,9 @@ type Config struct {
 
 	// protocol to use for opening the network interface
 	Nat nat.Router
+
+	// Attempted NAT Traversal did we attempt
+	AttemptedNATTraversal bool
 
 	// ID of the network this node should connect to
 	NetworkID uint32
@@ -36,8 +40,8 @@ type Config struct {
 	DB database.Database
 
 	// Staking configuration
-	StakingIP               utils.IPDesc
-	StakingLocalPort        uint16
+	StakingIP utils.IPDesc
+
 	EnableP2PTLS            bool
 	EnableStaking           bool
 	StakingKeyFile          string
@@ -50,12 +54,16 @@ type Config struct {
 	// Network configuration
 	NetworkConfig timer.AdaptiveTimeoutConfig
 
+	// Benchlist Configuration
+	BenchlistConfig benchlist.Config
+
 	// Bootstrapping configuration
 	BootstrapPeers []*Peer
 
 	// HTTP configuration
-	HTTPHost            string
-	HTTPPort            uint16
+	HTTPHost string
+	HTTPPort uint16
+
 	HTTPSEnabled        bool
 	HTTPSKeyFile        string
 	HTTPSCertFile       string

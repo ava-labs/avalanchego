@@ -131,11 +131,11 @@ func (s *Server) RegisterChain(ctx *snow.Context, vmIntf interface{}) {
 }
 
 // AddChainRoute registers a route to a chain's handler
-func (s *Server) AddChainRoute(handler *common.HTTPHandler, ctx *snow.Context, base, endpoint string, log logging.Logger) error {
+func (s *Server) AddChainRoute(handler *common.HTTPHandler, ctx *snow.Context, base, endpoint string, loggingWriter io.Writer) error {
 	url := fmt.Sprintf("%s/%s", baseURL, base)
 	s.log.Info("adding route %s%s", url, endpoint)
 	// Apply logging middleware
-	h := handlers.CombinedLoggingHandler(log, handler.Handler)
+	h := handlers.CombinedLoggingHandler(loggingWriter, handler.Handler)
 	// Apply middleware to grab/release chain's lock before/after calling API method
 	h, err := lockMiddleware(h, handler.LockOptions, &ctx.Lock)
 	if err != nil {
@@ -147,11 +147,11 @@ func (s *Server) AddChainRoute(handler *common.HTTPHandler, ctx *snow.Context, b
 }
 
 // AddRoute registers a route to a handler.
-func (s *Server) AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string, log logging.Logger) error {
+func (s *Server) AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string, loggingWriter io.Writer) error {
 	url := fmt.Sprintf("%s/%s", baseURL, base)
 	s.log.Info("adding route %s%s", url, endpoint)
 	// Apply logging middleware
-	h := handlers.CombinedLoggingHandler(log, handler.Handler)
+	h := handlers.CombinedLoggingHandler(loggingWriter, handler.Handler)
 	// Apply middleware to grab/release chain's lock before/after calling API method
 	h, err := lockMiddleware(h, handler.LockOptions, lock)
 	if err != nil {

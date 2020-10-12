@@ -38,7 +38,8 @@ jobs:
       run: 7z a avalanchego-macos-${{ steps.get_version.outputs.VERSION }}.zip build/avalanchego build/plugins
 
     - name: Upload file to S3 
-      run: aws s3 cp avalanchego-macos-${{ steps.get_version.outputs.VERSION }}.zip s3://{{ secrets.BUCKET }}/macos/ 
+      run: aws s3 cp avalanchego-macos-${{ steps.get_version.outputs.VERSION }}.zip s3://${{ secrets.BUCKET }}/macos/ 
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.UPLOAD_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}
+        BUCKET: ${{ secrets.BUCKET }}

@@ -81,12 +81,12 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 
 	address, err := service.vm.ParseLocalAddress(args.Address)
 	if err != nil {
-		return fmt.Errorf("couldn't parse %s to address: %s", args.Address, err)
+		return fmt.Errorf("couldn't parse %s to address: %w", args.Address, err)
 	}
 
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	user := user{db: db}
@@ -110,7 +110,7 @@ type ImportKeyArgs struct {
 }
 
 // ImportKey adds a private key to the provided user
-func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JsonAddress) error {
+func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ImportKey called for user '%s'", args.Username)
 
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -171,7 +171,7 @@ type GetBalanceResponse struct {
 }
 
 // GetBalance gets the balance of an address
-func (service *Service) GetBalance(_ *http.Request, args *api.JsonAddress, response *GetBalanceResponse) error {
+func (service *Service) GetBalance(_ *http.Request, args *api.JSONAddress, response *GetBalanceResponse) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: GetBalance called for address %s", args.Address)
 
 	// Parse to address
@@ -216,24 +216,24 @@ utxoFor:
 			}
 		case *StakeableLockOut:
 			innerOut, ok := out.TransferableOut.(*secp256k1fx.TransferOutput)
-			if !ok {
+			switch {
+			case !ok:
 				service.vm.SnowmanVM.Ctx.Log.Warn("Unexpected Output type in UTXO: %T",
 					out.TransferableOut)
 				continue utxoFor
-			}
-			if innerOut.Locktime > currentTime {
+			case innerOut.Locktime > currentTime:
 				newBalance, err := math.Add64(lockedNotStakeable, out.Amount())
 				if err != nil {
 					return errors.New("overflow while calculating locked not stakeable balance")
 				}
 				lockedNotStakeable = newBalance
-			} else if out.Locktime <= currentTime {
+			case out.Locktime <= currentTime:
 				newBalance, err := math.Add64(unlocked, out.Amount())
 				if err != nil {
 					return errors.New("overflow while calculating unlocked balance")
 				}
 				unlocked = newBalance
-			} else {
+			default:
 				newBalance, err := math.Add64(lockedStakeable, out.Amount())
 				if err != nil {
 					return errors.New("overflow while calculating unlocked stakeable balance")
@@ -265,12 +265,12 @@ utxoFor:
 
 // CreateAddress creates an address controlled by [args.Username]
 // Returns the newly created address
-func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, response *api.JsonAddress) error {
+func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, response *api.JSONAddress) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: CreateAddress called")
 
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 	defer db.Close()
 
@@ -299,7 +299,7 @@ func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, respo
 }
 
 // ListAddresses returns the addresses controlled by [args.Username]
-func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, response *api.JsonAddresses) error {
+func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, response *api.JSONAddresses) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ListAddresses called")
 
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -908,7 +908,7 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 // AddValidatorArgs are the arguments to AddValidator
 type AddValidatorArgs struct {
 	// User, password, from addrs, change addr
-	api.JsonSpendHeader
+	api.JSONSpendHeader
 	APIStaker
 	// The address the staking reward, if applicable, will go to
 	RewardAddress     string       `json:"rewardAddress"`
@@ -917,7 +917,7 @@ type AddValidatorArgs struct {
 
 // AddValidator creates and signs and issues a transaction to add a
 // validator to the primary network
-func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *api.JsonTxIDChangeAddr) error {
+func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: AddValidator called")
 	switch {
 	case args.RewardAddress == "":
@@ -961,7 +961,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	// Get the keys controlled by the user
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original error
@@ -1000,7 +1000,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 
 	// Create the transaction
 	tx, err := service.vm.newAddValidatorTx(
-		uint64(args.weight()),                // Stake amount
+		args.weight(),                        // Stake amount
 		uint64(args.StartTime),               // Start time
 		uint64(args.EndTime),                 // End time
 		nodeID,                               // Node ID
@@ -1019,7 +1019,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.issueTx(tx),
+		service.vm.mempool.IssueTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1028,14 +1028,14 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 // AddDelegatorArgs are the arguments to AddDelegator
 type AddDelegatorArgs struct {
 	// User, password, from addrs, change addr
-	api.JsonSpendHeader
+	api.JSONSpendHeader
 	APIStaker
 	RewardAddress string `json:"rewardAddress"`
 }
 
 // AddDelegator creates and signs and issues a transaction to add a
 // delegator to the primary network
-func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *api.JsonTxIDChangeAddr) error {
+func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: AddDelegator called")
 	switch {
 	case uint64(args.StartTime) < service.vm.clock.Unix():
@@ -1067,7 +1067,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	// Get the keys controlled by the user
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original
@@ -1117,7 +1117,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 
 	// Create the transaction
 	tx, err := service.vm.newAddDelegatorTx(
-		uint64(args.weight()),  // Stake amount
+		args.weight(),          // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
 		nodeID,                 // Node ID
@@ -1135,7 +1135,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.issueTx(tx),
+		service.vm.mempool.IssueTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1144,7 +1144,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 // AddSubnetValidatorArgs are the arguments to AddSubnetValidator
 type AddSubnetValidatorArgs struct {
 	// User, password, from addrs, change addr
-	api.JsonSpendHeader
+	api.JSONSpendHeader
 	APIStaker
 	// ID of subnet to validate
 	SubnetID string `json:"subnetID"`
@@ -1152,7 +1152,7 @@ type AddSubnetValidatorArgs struct {
 
 // AddSubnetValidator creates and signs and issues a transaction to
 // add a validator to a subnet other than the primary network
-func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorArgs, response *api.JsonTxIDChangeAddr) error {
+func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorArgs, response *api.JSONTxIDChangeAddr) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: AddSubnetValidator called")
 	switch {
 	case args.SubnetID == "":
@@ -1166,13 +1166,13 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	// Parse the node ID
 	nodeID, err := ids.ShortFromPrefixedString(args.NodeID, constants.NodeIDPrefix)
 	if err != nil {
-		return fmt.Errorf("error parsing nodeID: '%s': %w", args.NodeID, err)
+		return fmt.Errorf("error parsing nodeID: %q: %w", args.NodeID, err)
 	}
 
 	// Parse the subnet ID
 	subnetID, err := ids.FromString(args.SubnetID)
 	if err != nil {
-		return fmt.Errorf("problem parsing subnetID '%s': %w", args.SubnetID, err)
+		return fmt.Errorf("problem parsing subnetID %q: %w", args.SubnetID, err)
 	}
 	if subnetID.Equals(constants.PrimaryNetworkID) {
 		return errors.New("subnet validator attempts to validate primary network")
@@ -1181,7 +1181,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	// Get the keys controlled by the user
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original
@@ -1230,7 +1230,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 
 	// Create the transaction
 	tx, err := service.vm.newAddSubnetValidatorTx(
-		uint64(args.weight()),  // Stake amount
+		args.weight(),          // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
 		nodeID,                 // Node ID
@@ -1248,7 +1248,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.issueTx(tx),
+		service.vm.mempool.IssueTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1257,14 +1257,14 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 // CreateSubnetArgs are the arguments to CreateSubnet
 type CreateSubnetArgs struct {
 	// User, password, from addrs, change addr
-	api.JsonSpendHeader
+	api.JSONSpendHeader
 	// The ID member of APISubnet is ignored
 	APISubnet
 }
 
 // CreateSubnet creates and signs and issues a transaction to create a new
 // subnet
-func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response *api.JsonTxIDChangeAddr) error {
+func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response *api.JSONTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: CreateSubnet called")
 
 	// Parse the control keys
@@ -1272,7 +1272,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	for _, controlKey := range args.ControlKeys {
 		controlKeyID, err := service.vm.ParseLocalAddress(controlKey)
 		if err != nil {
-			return fmt.Errorf("problem parsing control key '%s': %w", controlKey, err)
+			return fmt.Errorf("problem parsing control key %q: %w", controlKey, err)
 		}
 		controlKeys = append(controlKeys, controlKeyID)
 	}
@@ -1280,7 +1280,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	// Get the keys controlled by the user
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original
@@ -1345,7 +1345,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.issueTx(tx),
+		service.vm.mempool.IssueTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1354,7 +1354,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 // ExportAVAXArgs are the arguments to ExportAVAX
 type ExportAVAXArgs struct {
 	// User, password, from addrs, change addr
-	api.JsonSpendHeader
+	api.JSONSpendHeader
 
 	// Amount of AVAX to send
 	Amount json.Uint64 `json:"amount"`
@@ -1366,7 +1366,7 @@ type ExportAVAXArgs struct {
 
 // ExportAVAX exports AVAX from the P-Chain to the X-Chain
 // It must be imported on the X-Chain to complete the transfer
-func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JsonTxIDChangeAddr) error {
+func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JSONTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: ExportAVAX called")
 
 	if args.Amount == 0 {
@@ -1382,7 +1382,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 	// Get this user's data
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original
@@ -1448,7 +1448,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.issueTx(tx),
+		service.vm.mempool.IssueTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1457,7 +1457,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 // ImportAVAXArgs are the arguments to ImportAVAX
 type ImportAVAXArgs struct {
 	// User, password, from addrs, change addr
-	api.JsonSpendHeader
+	api.JSONSpendHeader
 
 	// Chain the funds are coming from
 	SourceChain string `json:"sourceChain"`
@@ -1468,7 +1468,7 @@ type ImportAVAXArgs struct {
 
 // ImportAVAX issues a transaction to import AVAX from the X-chain. The AVAX
 // must have already been exported from the X-Chain.
-func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *api.JsonTxIDChangeAddr) error {
+func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *api.JSONTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: ImportAVAX called")
 
 	// Parse the sourceCHain
@@ -1486,7 +1486,7 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 	// Get the user's info
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("couldn't get user '%s': %w", args.Username, err)
+		return fmt.Errorf("couldn't get user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original
@@ -1544,7 +1544,7 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		service.vm.issueTx(tx),
+		service.vm.mempool.IssueTx(tx),
 		db.Close(),
 		err,
 	)
@@ -1560,7 +1560,7 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 // CreateBlockchainArgs is the arguments for calling CreateBlockchain
 type CreateBlockchainArgs struct {
 	// User, password, from addrs, change addr
-	api.JsonSpendHeader
+	api.JSONSpendHeader
 	// ID of Subnet that validates the new blockchain
 	SubnetID ids.ID `json:"subnetID"`
 	// ID of the VM the new blockchain is running
@@ -1576,7 +1576,7 @@ type CreateBlockchainArgs struct {
 }
 
 // CreateBlockchain issues a transaction to create a new blockchain
-func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, response *api.JsonTxIDChangeAddr) error {
+func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, response *api.JSONTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: CreateBlockchain called")
 	switch {
 	case args.Name == "":
@@ -1623,7 +1623,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	// Get the keys controlled by the user
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
 
 	// Drop any potential error closing the database to report the original
@@ -1691,7 +1691,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.issueTx(tx),
+		service.vm.mempool.IssueTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1712,8 +1712,7 @@ type GetBlockchainStatusReply struct {
 // GetBlockchainStatus gets the status of a blockchain with the ID [args.BlockchainID].
 func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchainStatusArgs, reply *GetBlockchainStatusReply) error {
 	service.vm.Ctx.Log.Info("Platform: GetBlockchainStatus called")
-	switch {
-	case args.BlockchainID == "":
+	if args.BlockchainID == "" {
 		return errors.New("argument 'blockchainID' not given")
 	}
 
@@ -1721,7 +1720,7 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 		reply.Status = Validating
 		return nil
 	} else if blockchainID, err := ids.FromString(args.BlockchainID); err != nil {
-		return fmt.Errorf("problem parsing blockchainID '%s': %w", args.BlockchainID, err)
+		return fmt.Errorf("problem parsing blockchainID %q: %w", args.BlockchainID, err)
 	} else if exists, err := service.chainExists(service.vm.LastAccepted(), blockchainID); err != nil {
 		return fmt.Errorf("problem looking up blockchain: %w", err)
 	} else if exists {
@@ -1781,7 +1780,7 @@ func (service *Service) ValidatedBy(_ *http.Request, args *ValidatedByArgs, resp
 	service.vm.Ctx.Log.Info("Platform: ValidatedBy called")
 	chain, err := service.vm.getChain(service.vm.DB, args.BlockchainID)
 	if err != nil {
-		return fmt.Errorf("problem retrieving blockchain '%s': %w", args.BlockchainID, err)
+		return fmt.Errorf("problem retrieving blockchain %q: %w", args.BlockchainID, err)
 	}
 	response.SubnetID = chain.UnsignedTx.(*UnsignedCreateChainTx).SubnetID
 	return nil
@@ -1803,12 +1802,12 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 	// Verify that the Subnet exists
 	// Ignore lookup error if it's the PrimaryNetworkID
 	if _, err := service.vm.getSubnet(service.vm.DB, args.SubnetID); err != nil && !args.SubnetID.Equals(constants.PrimaryNetworkID) {
-		return fmt.Errorf("problem retrieving subnet '%s': %w", args.SubnetID, err)
+		return fmt.Errorf("problem retrieving subnet %q: %w", args.SubnetID, err)
 	}
 	// Get the chains that exist
 	chains, err := service.vm.getChains(service.vm.DB)
 	if err != nil {
-		return fmt.Errorf("problem retrieving chains for subnet '%s': %w", args.SubnetID, err)
+		return fmt.Errorf("problem retrieving chains for subnet %q: %w", args.SubnetID, err)
 	}
 	// Filter to get the chains validated by the specified Subnet
 	for _, chain := range chains {
@@ -1876,7 +1875,7 @@ func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response
 	if err := service.vm.codec.Unmarshal(txBytes, tx); err != nil {
 		return fmt.Errorf("couldn't parse tx: %w", err)
 	}
-	if err := service.vm.issueTx(tx); err != nil {
+	if err := service.vm.mempool.IssueTx(tx); err != nil {
 		return fmt.Errorf("couldn't issue tx: %w", err)
 	}
 
@@ -1951,7 +1950,7 @@ type GetStakeReply struct {
 // This method only concerns itself with the Primary Network, not subnets
 // TODO: Improve the performance of this method by maintaining this data
 // in a data structure rather than re-calculating it by iterating over stakers
-func (service *Service) GetStake(_ *http.Request, args *api.JsonAddresses, response *GetStakeReply) error {
+func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, response *GetStakeReply) error {
 	service.vm.Ctx.Log.Info("Platform: GetStake called")
 
 	if len(args.Addresses) > maxGetStakeAddrs {
