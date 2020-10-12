@@ -10,10 +10,10 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 // returns a new multi-level queue that will never throttle or prioritize
@@ -216,9 +216,7 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 
 	// Utilize the remainder of the time that should be alloted to the highest priority
 	// queue.
-	startTime = endTime
 	duration = perTier
-	endTime = startTime.Add(duration)
 	queue.UtilizeCPU(validator1.ID(), duration)
 
 	<-semaChan
@@ -342,13 +340,17 @@ func TestMultiLevelQueueFreesSpace(t *testing.T) {
 	vdrs := validators.NewSet()
 	validator1 := validators.GenerateRandomValidator(2000)
 	validator2 := validators.GenerateRandomValidator(2000)
-	vdrs.Set([]validators.Validator{
+	if err := vdrs.Set([]validators.Validator{
 		validator1,
 		validator2,
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	metrics := &metrics{}
-	metrics.Initialize("", prometheus.NewRegistry())
+	if err := metrics.Initialize("", prometheus.NewRegistry()); err != nil {
+		t.Fatal(err)
+	}
 	// Set tier1 cutoff sufficiently low so that only messages from validators
 	// the message queue has not serviced will be placed on it for the test.
 	tier1 := 0.001
@@ -436,13 +438,17 @@ func TestMultiLevelQueueThrottles(t *testing.T) {
 	vdrs := validators.NewSet()
 	validator1 := validators.GenerateRandomValidator(2000)
 	validator2 := validators.GenerateRandomValidator(2000)
-	vdrs.Set([]validators.Validator{
+	if err := vdrs.Set([]validators.Validator{
 		validator1,
 		validator2,
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	metrics := &metrics{}
-	metrics.Initialize("", prometheus.NewRegistry())
+	if err := metrics.Initialize("", prometheus.NewRegistry()); err != nil {
+		t.Fatal(err)
+	}
 	// Set tier1 cutoff sufficiently low so that only messages from validators
 	// the message queue has not serviced will be placed on it for the test.
 	tier1 := 0.001

@@ -50,7 +50,9 @@ func TestTakeMessage(t *testing.T) {
 	cpuTracker := tracker.NewCPUTracker(time.Second)
 	msgTracker := tracker.NewMessageTracker()
 	vdrs := validators.NewSet()
-	vdrs.Set(vdrList)
+	if err := vdrs.Set(vdrList); err != nil {
+		t.Fatal(err)
+	}
 	resourceManager := NewResourceManager(
 		vdrs,
 		logging.NoLog{},
@@ -94,7 +96,9 @@ func TestStakerGetsThrottled(t *testing.T) {
 	cpuTracker := tracker.NewCPUTracker(time.Second)
 	msgTracker := tracker.NewMessageTracker()
 	vdrs := validators.NewSet()
-	vdrs.Set(vdrList)
+	if err := vdrs.Set(vdrList); err != nil {
+		t.Fatal(err)
+	}
 	resourceManager := NewResourceManager(
 		vdrs,
 		logging.NoLog{},
