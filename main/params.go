@@ -122,6 +122,8 @@ func init() {
 	// IP:
 	consensusIP := fs.String("public-ip", "", "Public IP of this node")
 
+	clientMeterTickDuration := fs.Duration("client-connection-meter-duration", 0*time.Second, "Enable client connection metering, limits the number of connections from an IP within specified duration to 1")
+
 	// HTTP Server:
 	httpHost := fs.String("http-host", "127.0.0.1", "Address of the HTTP server")
 	httpPort := fs.Uint("http-port", 9650, "Port of the HTTP server")
@@ -257,6 +259,10 @@ func init() {
 	networkID, err := constants.NetworkID(*networkName)
 	if errs.Add(err); err != nil {
 		return
+	}
+
+	if clientMeterTickDuration.Nanoseconds() != 0 {
+		Config.ClientMeterTickDuration = clientMeterTickDuration
 	}
 
 	Config.NetworkID = networkID

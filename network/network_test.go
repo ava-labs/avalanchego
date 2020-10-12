@@ -204,6 +204,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler,
+		nil,
 	)
 	assert.NotNil(t, net)
 
@@ -310,6 +311,7 @@ func TestEstablishConnection(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler0,
+		nil,
 	)
 	assert.NotNil(t, net0)
 
@@ -328,6 +330,7 @@ func TestEstablishConnection(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler1,
+		nil,
 	)
 	assert.NotNil(t, net1)
 
@@ -446,6 +449,7 @@ func TestDoubleTrack(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler0,
+		nil,
 	)
 	assert.NotNil(t, net0)
 
@@ -464,6 +468,7 @@ func TestDoubleTrack(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler1,
+		nil,
 	)
 	assert.NotNil(t, net1)
 
@@ -583,6 +588,7 @@ func TestDoubleClose(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler0,
+		nil,
 	)
 	assert.NotNil(t, net0)
 
@@ -601,6 +607,7 @@ func TestDoubleClose(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler1,
+		nil,
 	)
 	assert.NotNil(t, net1)
 
@@ -725,6 +732,7 @@ func TestTrackConnected(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler0,
+		nil,
 	)
 	assert.NotNil(t, net0)
 
@@ -743,6 +751,7 @@ func TestTrackConnected(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler1,
+		nil,
 	)
 	assert.NotNil(t, net1)
 
@@ -841,6 +850,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler,
+		nil,
 	)
 	assert.NotNil(t, net0)
 
@@ -859,6 +869,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler,
+		nil,
 	)
 	assert.NotNil(t, net1)
 

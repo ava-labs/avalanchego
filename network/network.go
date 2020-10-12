@@ -53,9 +53,8 @@ const (
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
 	defaultReadBufferSize                            = 16 * 1024
 	defaultReadHandshakeTimeout                      = 15 * time.Second
-	defaultClientConnectionTickTimeout               = 10 * time.Second
 	defaultClientConnectionCacheSize                 = 10000
-	defaultClientMaximumTicks                        = 1
+	defaultClientMaximumTicks                        = 0
 )
 
 var (
@@ -138,7 +137,7 @@ type network struct {
 	pingFrequency                      time.Duration
 	readBufferSize                     uint32
 	readHandshakeTimeout               time.Duration
-	clientConnectionTickTimeout        time.Duration
+	clientConnectionTickTimeout        *time.Duration
 	clientMaximumTicks                 int
 
 	executor timer.Executor
@@ -176,6 +175,7 @@ func NewDefaultNetwork(
 	vdrs validators.Set,
 	beacons validators.Set,
 	router router.Router,
+	clientConnectionTickTimeout *time.Duration,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -209,7 +209,7 @@ func NewDefaultNetwork(
 		defaultPingFrequency,
 		defaultReadBufferSize,
 		defaultReadHandshakeTimeout,
-		defaultClientConnectionTickTimeout,
+		clientConnectionTickTimeout,
 		defaultClientConnectionCacheSize,
 		defaultClientMaximumTicks,
 	)
@@ -248,7 +248,7 @@ func NewNetwork(
 	pingFrequency time.Duration,
 	readBufferSize uint32,
 	readHandshakeTimeout time.Duration,
-	clientConnectionTickTimeout time.Duration,
+	clientConnectionTickTimeout *time.Duration,
 	clientConnectionCacheSize int,
 	clientMaximumTicks int,
 ) Network {
@@ -665,13 +665,15 @@ func (n *network) Dispatch() error {
 			}
 		}
 
-		addr := conn.RemoteAddr().String()
-		ticks, err := n.registerConnection(addr)
-		// looking for > n.clientMaximumTicks indicating the second tick
-		if err == nil && ticks > n.clientMaximumTicks {
-			n.log.Debug("connection from: %s temporarily dropped", addr)
-			go n.closeConnection(conn)
-			continue
+		if n.clientConnectionTickTimeout != nil {
+			addr := conn.RemoteAddr().String()
+			ticks, err := n.registerConnection(addr)
+			// looking for > n.clientMaximumTicks indicating the second tick
+			if err == nil && ticks > n.clientMaximumTicks {
+				n.log.Debug("connection from: %s temporarily dropped", addr)
+				_ = conn.Close()
+				continue
+			}
 		}
 
 		go func() {
@@ -1107,10 +1109,6 @@ func (n *network) disconnected(p *peer) {
 	}
 }
 
-func (n *network) closeConnection(conn net.Conn) {
-	conn.Close()
-}
-
 func (n *network) registerConnection(addr string) (int, error) {
 	ip, err := utils.ToIPDesc(addr)
 	if err != nil {
@@ -1148,7 +1146,7 @@ func (n *network) registerConnectionAddress(addr string) (*timer.TimedMeter, err
 		// some other thread could of addedit.
 		meter, exists = n.clientConnection.Get(id)
 		if !exists {
-			meter = &timer.TimedMeter{Duration: n.clientConnectionTickTimeout}
+			meter = &timer.TimedMeter{Duration: *n.clientConnectionTickTimeout}
 			n.clientConnection.Put(id, meter)
 		}
 		n.clientConnectionLock.Unlock()

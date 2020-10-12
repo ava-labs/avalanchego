@@ -214,6 +214,7 @@ func (n *Node) initNetworking() error {
 		primaryNetworkValidators,
 		n.beacons,
 		consensusRouter,
+		n.Config.ClientMeterTickDuration,
 	)
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
