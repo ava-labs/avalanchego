@@ -29,11 +29,11 @@ const (
 	ErrorMsg                         // Used in VersionNak
 )
 
-type PeerField uint32
+type VersionNakField uint32
 
 const (
-	PeerOk PeerField = iota
-	PeerAlreadyPeered
+	PeerOk            VersionNakField = iota // Nothing is wrong with peering
+	PeerAlreadyPeered                        // We already Peered
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -65,6 +65,10 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackHashes
 	case MultiContainerBytes:
 		return wrappers.TryPack2DBytes
+	case ErrorNo:
+		return wrappers.TryPackInt
+	case ErrorMsg:
+		return wrappers.TryPackStr
 	default:
 		return nil
 	}
@@ -99,6 +103,10 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackHashes
 	case MultiContainerBytes:
 		return wrappers.TryUnpack2DBytes
+	case ErrorNo:
+		return wrappers.TryUnpackInt
+	case ErrorMsg:
+		return wrappers.TryUnpackStr
 	default:
 		return nil
 	}
@@ -132,6 +140,10 @@ func (f Field) String() string {
 		return "Container IDs"
 	case MultiContainerBytes:
 		return "MultiContainerBytes"
+	case ErrorNo:
+		return "ErrorNO"
+	case ErrorMsg:
+		return "ErrorMsg"
 	default:
 		return "Unknown Field"
 	}
@@ -176,6 +188,8 @@ func (op Op) String() string {
 		return "pull_query"
 	case Chits:
 		return "chits"
+	case VersionNak:
+		return "version_nak"
 	default:
 		return "Unknown Op"
 	}
@@ -229,5 +243,7 @@ var (
 		PushQuery: {ChainID, RequestID, Deadline, ContainerID, ContainerBytes},
 		PullQuery: {ChainID, RequestID, Deadline, ContainerID},
 		Chits:     {ChainID, RequestID, ContainerIDs},
+		// version nak
+		VersionNak: {ErrorNo, ErrorMsg},
 	}
 )

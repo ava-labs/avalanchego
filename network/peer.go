@@ -86,13 +86,13 @@ func (p *peer) Start() error {
 		return err
 	}
 
+	// send the version and get a msg from receiver..
 	msg, err := p.verionAck()
 	if err != nil {
 		return err
 	}
 
-	// not sure who is sending a peerlist first..
-	// fall back to normal processing logic.
+	// not sure who is sending a peerlist first.  fall back to normal processing logic.
 	if msg.Op() == PeerList {
 		go p.handle(msg)
 		go p.ReadMessages()
@@ -101,6 +101,7 @@ func (p *peer) Start() error {
 		return nil
 	}
 
+	// We didn't get a Version msg.  This is unexpected..
 	if msg.Op() != Version {
 		return errVersionExpected
 	}
@@ -109,6 +110,7 @@ func (p *peer) Start() error {
 	peerVersionStr := msg.Get(VersionStr).(string)
 	var peerVersion version.Version
 	peerVersion, err = p.net.parser.Parse(peerVersionStr)
+
 	if err != nil {
 		return err
 	}
@@ -129,6 +131,8 @@ func (p *peer) Start() error {
 
 	// am I already peered to them?
 	if p.net.AmIPeered(p.id) {
+
+		// we already peered, so tell client so.  They are expecting a response in a VersionNak
 		_, err := p.versionNack(PeerAlreadyPeered)
 		if err != nil {
 			p.net.log.Verbo("unable to send version nak %s", err)
@@ -137,22 +141,24 @@ func (p *peer) Start() error {
 		return errAlreadyPeered
 	}
 
-	p.versionStr = peerVersion.String()
-	p.gotVersion = true
-
+	// We are not already peered, so send client VersionNak
 	msg, err = p.versionNack(PeerOk)
 	if err != nil {
-		p.net.log.Error("unable to send version nak %s", err)
 		return errVersionNak
 	}
 
-	errorNo := msg.Get(ErrorNo).(PeerField)
+	// test the versionNak to see if we are safe to peer.
+	errorNo := msg.Get(ErrorNo).(uint32)
 
-	// we were not peered, but they were..
-	if errorNo == PeerAlreadyPeered {
+	// the peer responded with we are already peered to them.
+	if errorNo == uint32(PeerAlreadyPeered) {
 		return errAlreadyPeered
 	}
 
+	p.versionStr = peerVersion.String()
+	p.gotVersion = true
+
+	go p.GetPeerList()
 	go p.ReadMessages()
 	go p.WriteMessages()
 
@@ -953,7 +959,7 @@ func (p *peer) verionAck() (Msg, error) {
 }
 
 // build versionNak and send it
-func (p *peer) versionNack(peerResponse PeerField) (Msg, error) {
+func (p *peer) versionNack(peerResponse VersionNakField) (Msg, error) {
 	msg, err := p.net.b.VersionNak(
 		peerResponse,
 		errAlreadyPeered.Error(),

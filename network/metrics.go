@@ -60,7 +60,7 @@ type metrics struct {
 	getAcceptedFrontier, acceptedFrontier,
 	getAccepted, accepted,
 	get, getAncestors, put, multiPut,
-	pushQuery, pullQuery, chits messageMetrics
+	pushQuery, pullQuery, chits, versionNak messageMetrics
 }
 
 func (m *metrics) initialize(registerer prometheus.Registerer) error {
@@ -94,6 +94,7 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 	errs.Add(m.pushQuery.initialize(PushQuery, registerer))
 	errs.Add(m.pullQuery.initialize(PullQuery, registerer))
 	errs.Add(m.chits.initialize(Chits, registerer))
+	errs.Add(m.chits.initialize(VersionNak, registerer))
 
 	return errs.Err
 }
@@ -134,6 +135,8 @@ func (m *metrics) message(msgType Op) *messageMetrics {
 		return &m.pullQuery
 	case Chits:
 		return &m.chits
+	case VersionNak:
+		return &m.versionNak
 	default:
 		return nil
 	}
