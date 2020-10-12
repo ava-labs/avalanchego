@@ -11,6 +11,7 @@ linters:
     - gocritic
     - gofmt
     - goimports
+    - golint
     - gosec
     - gosimple
     - govet
@@ -20,7 +21,6 @@ linters:
     - nakedret
     - unconvert
     - varcheck
-    # - golint
     # - lll
     # - gocyclo
     # - gomnd
