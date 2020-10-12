@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/networking/throttler"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
@@ -166,9 +165,9 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		16,
-		throttler.DefaultMaxNonStakerPendingMsgs,
-		throttler.DefaultStakerPortion,
-		throttler.DefaultStakerPortion,
+		DefaultMaxNonStakerPendingMsgs,
+		DefaultStakerPortion,
+		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)

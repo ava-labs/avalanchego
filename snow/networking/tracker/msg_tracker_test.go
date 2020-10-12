@@ -6,7 +6,7 @@ package tracker
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestMessageTrackerNoPool(t *testing.T) {

@@ -6,7 +6,7 @@ package tracker
 import (
 	"sync"
 
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 // CountingTracker is an interface for tracking peers' usage of a discrete resource
