@@ -349,7 +349,7 @@ func TestGetTotalStake(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		_ = vm.Shutdown()
 		vm.Ctx.Lock.Unlock()
 	}()
 
