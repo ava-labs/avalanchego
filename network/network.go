@@ -1143,7 +1143,7 @@ func (n *network) registerConnectionAddress(addr string) (*timer.TimedMeter, err
 		n.clientConnectionLock.Lock()
 
 		// lets just confirm under lock it wasn't create.
-		// some other thread could of addedit.
+		// some other thread could of added the IP.
 		meter, exists = n.clientConnection.Get(id)
 		if !exists {
 			meter = &timer.TimedMeter{Duration: *n.clientConnectionTickTimeout}
