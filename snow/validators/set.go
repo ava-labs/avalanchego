@@ -86,7 +86,7 @@ func NewBestSet(expectedSampleSize int) Set {
 // update a validators weight, one should ensure to call add with the updated
 // validator.
 type set struct {
-	lock        sync.Mutex
+	lock        sync.RWMutex
 	vdrMap      map[[20]byte]int
 	vdrSlice    []*validator
 	vdrWeights  []uint64
@@ -257,8 +257,8 @@ func (s *set) removeWeight(vdrID ids.ShortID, weight uint64) error {
 
 // Get implements the Set interface.
 func (s *set) Get(vdrID ids.ShortID) (Validator, bool) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	return s.get(vdrID)
 }
@@ -305,8 +305,8 @@ func (s *set) remove(vdrID ids.ShortID) error {
 
 // Contains implements the Set interface.
 func (s *set) Contains(vdrID ids.ShortID) bool {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	return s.contains(vdrID)
 }
@@ -318,8 +318,8 @@ func (s *set) contains(vdrID ids.ShortID) bool {
 
 // Len implements the Set interface.
 func (s *set) Len() int {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	return s.len()
 }
@@ -328,8 +328,8 @@ func (s *set) len() int { return len(s.vdrSlice) }
 
 // List implements the Group interface.
 func (s *set) List() []Validator {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	return s.list()
 }
@@ -364,15 +364,15 @@ func (s *set) sample(size int) ([]Validator, error) {
 }
 
 func (s *set) Weight() uint64 {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	return s.totalWeight
 }
 
 func (s *set) String() string {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	return s.string()
 }
