@@ -12,10 +12,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/hashing"
-
-	"github.com/ava-labs/avalanchego/cache"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/api/health"
@@ -137,8 +133,8 @@ type network struct {
 	pingFrequency                      time.Duration
 	readBufferSize                     uint32
 	readHandshakeTimeout               time.Duration
-	clientConnectionTickTimeout        *time.Duration
 	clientMaximumTicks                 int
+	clientControl                      ClientControl
 
 	executor timer.Executor
 
@@ -153,9 +149,6 @@ type network struct {
 	// TODO: bound the size of [myIPs] to avoid DoS. LRU caching would be ideal
 	myIPs map[string]struct{} // set of IPs that resulted in my ID.
 	peers map[[20]byte]*peer
-
-	clientConnectionLock sync.RWMutex
-	clientConnection     *cache.LRU
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -293,8 +286,7 @@ func NewNetwork(
 		peers:                              make(map[[20]byte]*peer),
 		readBufferSize:                     readBufferSize,
 		readHandshakeTimeout:               readHandshakeTimeout,
-		clientConnection:                   &cache.LRU{Size: clientConnectionCacheSize},
-		clientConnectionTickTimeout:        clientConnectionTickTimeout,
+		clientControl:                      NewClientControl(clientConnectionTickTimeout, clientConnectionCacheSize),
 		clientMaximumTicks:                 clientMaximumTicks,
 	}
 	if err := netw.initialize(registerer); err != nil {
@@ -665,15 +657,13 @@ func (n *network) Dispatch() error {
 			}
 		}
 
-		if n.clientConnectionTickTimeout != nil {
-			addr := conn.RemoteAddr().String()
-			ticks, err := n.registerConnection(addr)
-			// looking for > n.clientMaximumTicks indicating the second tick
-			if err == nil && ticks > n.clientMaximumTicks {
-				n.log.Debug("connection from: %s temporarily dropped", addr)
-				_ = conn.Close()
-				continue
-			}
+		addr := conn.RemoteAddr().String()
+		ticks, err := n.clientControl.RegisterConnection(addr)
+		// looking for > n.clientMaximumTicks indicating the second tick
+		if err == nil && ticks > n.clientMaximumTicks {
+			n.log.Debug("connection from: %s temporarily dropped", addr)
+			_ = conn.Close()
+			continue
 		}
 
 		go func() {
@@ -1107,49 +1097,4 @@ func (n *network) disconnected(p *peer) {
 	if p.connected {
 		n.router.Disconnected(p.id)
 	}
-}
-
-func (n *network) registerConnection(addr string) (int, error) {
-	ip, err := utils.ToIPDesc(addr)
-	if err != nil {
-		return 0, err
-	}
-
-	// normalize to just the incoming IP
-	addr = ip.IP.String()
-	meter, err := n.registerConnectionAddress(addr)
-	if err != nil {
-		return 0, err
-	}
-
-	tickCount := meter.Ticks()
-	meter.Tick()
-	return tickCount, nil
-}
-
-func (n *network) registerConnectionAddress(addr string) (*timer.TimedMeter, error) {
-	id, err := ids.ToID(hashing.ComputeHash256([]byte(addr)))
-	if err != nil {
-		return nil, err
-	}
-
-	// lets get the meter
-	n.clientConnectionLock.RLock()
-	meter, exists := n.clientConnection.Get(id)
-	n.clientConnectionLock.RUnlock()
-
-	// if the meter doesn't exist we'll create one
-	if !exists {
-		n.clientConnectionLock.Lock()
-
-		// lets just confirm under lock it wasn't create.
-		// some other thread could of added the IP.
-		meter, exists = n.clientConnection.Get(id)
-		if !exists {
-			meter = &timer.TimedMeter{Duration: *n.clientConnectionTickTimeout}
-			n.clientConnection.Put(id, meter)
-		}
-		n.clientConnectionLock.Unlock()
-	}
-	return meter.(*timer.TimedMeter), nil
 }
