@@ -962,7 +962,6 @@ func (p *peer) verionAck() (Msg, error) {
 func (p *peer) versionNack(peerResponse VersionNakField) (Msg, error) {
 	msg, err := p.net.b.VersionNak(
 		peerResponse,
-		errAlreadyPeered.Error(),
 	)
 	return p.sendAndReceive(err, msg)
 }

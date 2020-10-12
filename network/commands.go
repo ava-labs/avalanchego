@@ -26,7 +26,6 @@ const (
 	ContainerIDs                     // Used for querying
 	MultiContainerBytes              // Used in MultiPut
 	ErrorNo                          // Used in VersionNak
-	ErrorMsg                         // Used in VersionNak
 )
 
 type VersionNakField uint32
@@ -67,8 +66,6 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPack2DBytes
 	case ErrorNo:
 		return wrappers.TryPackInt
-	case ErrorMsg:
-		return wrappers.TryPackStr
 	default:
 		return nil
 	}
@@ -105,8 +102,6 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpack2DBytes
 	case ErrorNo:
 		return wrappers.TryUnpackInt
-	case ErrorMsg:
-		return wrappers.TryUnpackStr
 	default:
 		return nil
 	}
@@ -141,9 +136,7 @@ func (f Field) String() string {
 	case MultiContainerBytes:
 		return "MultiContainerBytes"
 	case ErrorNo:
-		return "ErrorNO"
-	case ErrorMsg:
-		return "ErrorMsg"
+		return "ErrorNumber"
 	default:
 		return "Unknown Field"
 	}
@@ -244,6 +237,6 @@ var (
 		PullQuery: {ChainID, RequestID, Deadline, ContainerID},
 		Chits:     {ChainID, RequestID, ContainerIDs},
 		// version nak
-		VersionNak: {ErrorNo, ErrorMsg},
+		VersionNak: {ErrorNo},
 	}
 )

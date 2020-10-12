@@ -327,17 +327,15 @@ func TestBuildChits(t *testing.T) {
 
 func TestVersionNak(t *testing.T) {
 	errorNo := uint32(PeerOk)
-	msg, err := TestBuilder.VersionNak(PeerOk, "msg")
+	msg, err := TestBuilder.VersionNak(PeerOk)
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, VersionNak, msg.Op())
 	assert.Equal(t, errorNo, msg.Get(ErrorNo))
-	assert.Equal(t, "msg", msg.Get(ErrorMsg))
 
 	parsedMsg, err := TestBuilder.Parse(msg.Bytes())
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, VersionNak, parsedMsg.Op())
 	assert.Equal(t, errorNo, parsedMsg.Get(ErrorNo))
-	assert.Equal(t, "msg", parsedMsg.Get(ErrorMsg))
 }
