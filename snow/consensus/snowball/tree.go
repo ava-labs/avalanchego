@@ -390,7 +390,7 @@ func (u *unaryNode) Add(newChoice ids.ID) node {
 
 func (u *unaryNode) RecordPoll(votes ids.Bag, reset bool) node {
 	// This ensures that votes for rejected colors are dropped
-	votes = votes.Filter(u.decidedPrefix, u.commonPrefix, u.preference)
+	votes = votes.Filter(u.decidedPrefix, u.commonPrefix, u.preference) // TODO: test this
 
 	// If my parent didn't get enough votes previously, then neither did I
 	if reset {
@@ -478,7 +478,7 @@ func (b *binaryNode) Add(id ids.ID) node {
 	// Regardless, the case is handled
 	if child != nil &&
 		// + 1 is used because we already explicitly check the p.bit bit
-		ids.EqualSubset(b.bit+1, child.DecidedPrefix(), b.preferences[bit], id) {
+		ids.EqualSubset(b.bit+1, child.DecidedPrefix(), b.preferences[bit], id) { // TODO: test this
 		b.children[bit] = child.Add(id)
 	}
 	// If child is nil, then the id has already been added to the tree, so
@@ -503,7 +503,7 @@ func (b *binaryNode) RecordPoll(votes ids.Bag, reset bool) node {
 		b.shouldReset[bit] = true
 		// 1-bit isn't set here because it is set below anyway
 	}
-	b.shouldReset[1-bit] = true // They didn't get the threshold of votes
+	b.shouldReset[1-bit] = true // They didn't get the threshold of votes // TODO: test this
 
 	prunedVotes := splitVotes[bit]
 	// If this bit got alpha votes, it was a successful poll
@@ -523,13 +523,13 @@ func (b *binaryNode) RecordPoll(votes ids.Bag, reset bool) node {
 			}
 			newChild := child.RecordPoll(filteredVotes, b.shouldReset[bit])
 			b.children[bit] = newChild
-			b.preferences[bit] = newChild.Preference()
+			b.preferences[bit] = newChild.Preference() // TODO: test this
 		}
 		b.shouldReset[bit] = false // We passed the reset down
 	} else {
 		b.snowball.RecordUnsuccessfulPoll()
 		// The winning child didn't get enough votes either
-		b.shouldReset[bit] = true
+		b.shouldReset[bit] = true // TODO: test this
 	}
 	return b
 }

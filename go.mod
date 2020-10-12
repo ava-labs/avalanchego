@@ -3,6 +3,7 @@ module github.com/ava-labs/avalanchego
 go 1.14
 
 require (
+	github.com/AntonStoeckl/go-mutesting v1.4.0 // indirect
 	github.com/AppsFlyer/go-sundheit v0.2.0
 	github.com/Microsoft/go-winio v0.4.14
 	github.com/btcsuite/btcutil v1.0.2
