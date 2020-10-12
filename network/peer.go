@@ -102,7 +102,6 @@ func (p *peer) Start() error {
 	}
 
 	if msg.Op() != Version {
-		p.net.log.Info("unable to peer %s %s %s", p.id, p.ip, msg.Op())
 		return errVersionExpected
 	}
 
@@ -135,7 +134,7 @@ func (p *peer) Start() error {
 			p.net.log.Verbo("unable to send version nak %s", err)
 		}
 
-		return errAllreadyPeered
+		return errAlreadyPeered
 	}
 
 	p.versionStr = peerVersion.String()
@@ -151,7 +150,7 @@ func (p *peer) Start() error {
 
 	// we were not peered, but they were..
 	if errorNo == PeerAlreadyPeered {
-		return errAllreadyPeered
+		return errAlreadyPeered
 	}
 
 	go p.ReadMessages()
@@ -957,7 +956,7 @@ func (p *peer) verionAck() (Msg, error) {
 func (p *peer) versionNack(peerResponse PeerField) (Msg, error) {
 	msg, err := p.net.b.VersionNak(
 		peerResponse,
-		errAllreadyPeered.Error(),
+		errAlreadyPeered.Error(),
 	)
 	return p.sendAndReceive(err, msg)
 }

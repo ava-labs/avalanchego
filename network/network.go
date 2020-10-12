@@ -55,9 +55,9 @@ const (
 var (
 	errNetworkClosed   = errors.New("network closed")
 	errPeerIsMyself    = errors.New("peer is myself")
-	errAllreadyPeered  = errors.New("already peered")
-	errVersionExpected = errors.New("no version msg")
-	errVersionNak      = errors.New("no version nak")
+	errAlreadyPeered   = errors.New("peered already to node")
+	errVersionExpected = errors.New("expected version msg")
+	errVersionNak      = errors.New("expected version nak msg")
 )
 
 func init() { rand.Seed(time.Now().UnixNano()) }
@@ -918,7 +918,7 @@ func (n *network) connectTo(ip utils.IPDesc) {
 		if err == nil {
 			return
 		}
-		if err == errAllreadyPeered || err == errVersionExpected {
+		if err == errAlreadyPeered || err == errVersionExpected {
 			n.log.Debug("error attempting to connect to %s: %s", ip, err)
 			return
 		}
