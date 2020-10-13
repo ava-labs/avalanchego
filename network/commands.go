@@ -28,11 +28,9 @@ const (
 	ErrorNo                          // Used in VersionNak
 )
 
-type VersionNakField uint32
-
 const (
-	PeerOk            VersionNakField = iota // Nothing is wrong with peering
-	PeerAlreadyPeered                        // We already Peered
+	Success       uint32 = iota // Nothing is wrong with peering
+	AlreadyPeered               // We already Peered
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -237,6 +235,6 @@ var (
 		PullQuery: {ChainID, RequestID, Deadline, ContainerID},
 		Chits:     {ChainID, RequestID, ContainerIDs},
 		// version nak
-		VersionNak: {ErrorNo},
+		VersionNak: {ErrorNo, Peers},
 	}
 )

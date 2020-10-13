@@ -94,7 +94,7 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 	errs.Add(m.pushQuery.initialize(PushQuery, registerer))
 	errs.Add(m.pullQuery.initialize(PullQuery, registerer))
 	errs.Add(m.chits.initialize(Chits, registerer))
-	errs.Add(m.chits.initialize(VersionNak, registerer))
+	errs.Add(m.versionNak.initialize(VersionNak, registerer))
 
 	return errs.Err
 }

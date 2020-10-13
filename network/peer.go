@@ -73,9 +73,6 @@ type peer struct {
 	lastSent, lastReceived int64
 
 	tickerCloser chan struct{}
-
-	// ticker processes
-	tickerOnce sync.Once
 }
 
 // assume the stateLock is held
@@ -92,19 +89,27 @@ func (p *peer) Start() error {
 		return err
 	}
 
-	// not sure who is sending a peerlist first.  fall back to normal processing logic.
-	if msg.Op() == PeerList {
+	switch msg.Op() {
+	case PeerList:
+		// if the first message is not version.  fall back to normal processing logic.
+		// only acceptable option at this point would be a PeerList request
+		// lets take care of the peer request
 		go p.handle(msg)
+
 		go p.ReadMessages()
 
 		// we need to ask for a version.
 		go p.Version()
 		go p.WriteMessages()
-		return nil
-	}
 
-	// We didn't get a Version msg.  This is unexpected..
-	if msg.Op() != Version {
+		go p.requestFinishHandshake()
+		go p.sendPings()
+
+		return nil
+	case Version:
+	// fallthrough
+	default:
+		// We didn't get a Version msg.  This is unexpected..
 		return errVersionExpected
 	}
 
@@ -112,7 +117,6 @@ func (p *peer) Start() error {
 	peerVersionStr := msg.Get(VersionStr).(string)
 	var peerVersion version.Version
 	peerVersion, err = p.net.parser.Parse(peerVersionStr)
-
 	if err != nil {
 		return err
 	}
@@ -120,67 +124,99 @@ func (p *peer) Start() error {
 	// add peer version msg..
 	p.checkPeerVersion(peerVersion)
 
-	// we have the peer's version, and it's not high enough..
-	// fallback logic now we kick off the normal processing.
+	// we have the peer's version, and it's not high enough.. fallback logic start the normal processing.
 	if peerVersion.Before(VersionPeerNak) {
 
+		// process the version message
 		go p.handle(msg)
+
 		go p.ReadMessages()
 
-		// we did see a version, so lets get a peerlist.
+		// ask for a peer list
 		go p.GetPeerList()
 		go p.WriteMessages()
+
+		go p.requestFinishHandshake()
+		go p.sendPings()
+
 		return nil
 	}
 
-	// am I already peered to them?
-	if p.net.AmIPeered(p.id) {
+	// set my IP from the Version msg.
+	p.ip = msg.Get(IP).(utils.IPDesc)
+	// register the peers version.
+	p.versionStr = peerVersion.String()
 
-		// we already peered, so tell client so.  They are expecting a response in a VersionNak
-		_, err := p.versionNack(PeerAlreadyPeered)
+	return p.processVersionNak()
+}
+
+func (p *peer) processVersionNak() error {
+	// am I already peered to them?
+	if p.net.IsPeered(p.id) {
+		// we already peered respond to client.
+		_, err := p.versionNack(AlreadyPeered, nil)
 		if err != nil {
+			// it would not matter if we didn't send the nack..
+			// we will end up disconnecting the connection.
 			p.net.log.Verbo("unable to send version nak %s", err)
 		}
 
 		return errAlreadyPeered
 	}
 
+	ips := p.net.validatorIPsNoLock()
 	// We are not already peered, so send client VersionNak
-	msg, err = p.versionNack(PeerOk)
+	msg, err := p.versionNack(Success, ips)
 	if err != nil {
-		return errVersionNak
+		return errVersionNakExpected
 	}
 
 	// test the versionNak to see if we are safe to peer.
 	errorNo := msg.Get(ErrorNo).(uint32)
-
-	// the peer responded with we are already peered to them.
-	if errorNo == uint32(PeerAlreadyPeered) {
+	switch errorNo {
+	case AlreadyPeered:
+		// the peer responded we are already peered to them.
 		return errAlreadyPeered
-	}
-
-	// It wasn't a PeerOk, so we punt..
-	if errorNo != uint32(PeerOk) {
+	case Success:
+		// fall through
+	default:
+		// not expected -- It wasn't a Success, so we punt..
 		return fmt.Errorf("version nak errorNo=%d", errorNo)
 	}
 
-	p.versionStr = peerVersion.String()
-	p.gotVersion = true
+	peers := msg.Get(Peers).([]utils.IPDesc)
 
-	// so we got version, and versionNak was PeerOk.
-	// continue processing the peer, lets ask for a PeerList and continue processing.
+	// we now have the version and peer list
+	p.gotVersion = true
+	p.gotPeerList = true
+
+	// note that we are connected. (same as tryMarkConnected)
+	p.connected = true
+
+	// register with network this peer connected.
+	p.net.connected(p)
+
 	go p.ReadMessages()
-	go p.GetPeerList()
 	go p.WriteMessages()
 
-	go p.tickerOnce.Do(p.StartTicker)
+	go p.sendPings()
+
+	// track the peers
+	go func() {
+		for _, ip := range peers {
+			if !ip.Equal(p.net.ip) &&
+				!ip.IsZero() &&
+				(p.net.allowPrivateIPs || !ip.IsPrivate()) {
+
+				// we need a state lock to call track
+				p.net.stateLock.Lock()
+				p.net.track(ip)
+				p.net.stateLock.Unlock()
+			}
+		}
+	}()
 
 	return nil
-}
-
-func (p *peer) StartTicker() {
-	go p.requestFinishHandshake()
-	go p.sendPings()
 }
 
 func (p *peer) sendPings() {
@@ -326,7 +362,6 @@ func (p *peer) WriteMessages() {
 			p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.ip, err)
 			return
 		}
-		p.tickerOnce.Do(p.StartTicker)
 		atomic.StoreInt64(&p.lastSent, p.net.clock.Time().Unix())
 	}
 }
@@ -982,9 +1017,10 @@ func (p *peer) verionAck() (Msg, error) {
 }
 
 // build versionNak and send it
-func (p *peer) versionNack(peerResponse VersionNakField) (Msg, error) {
+func (p *peer) versionNack(peerResponse uint32, ips []utils.IPDesc) (Msg, error) {
 	msg, err := p.net.b.VersionNak(
 		peerResponse,
+		ips,
 	)
 	p.net.log.AssertNoError(err)
 	return p.sendAndReceive(msg)

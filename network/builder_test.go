@@ -325,17 +325,57 @@ func TestBuildChits(t *testing.T) {
 	assert.Equal(t, containerIDs, parsedMsg.Get(ContainerIDs))
 }
 
-func TestVersionNak(t *testing.T) {
-	errorNo := uint32(PeerOk)
-	msg, err := TestBuilder.VersionNak(PeerOk)
+func TestVersionNakNoIps(t *testing.T) {
+	msg, err := TestBuilder.VersionNak(Success, nil)
+
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, VersionNak, msg.Op())
-	assert.Equal(t, errorNo, msg.Get(ErrorNo))
+	assert.Equal(t, Success, msg.Get(ErrorNo))
+	ipsf, ok := msg.Get(Peers).([]utils.IPDesc)
+	if !ok {
+		t.Errorf("Peers is not a list")
+	}
+	assert.Equal(t, 0, len(ipsf))
 
 	parsedMsg, err := TestBuilder.Parse(msg.Bytes())
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, VersionNak, parsedMsg.Op())
-	assert.Equal(t, errorNo, parsedMsg.Get(ErrorNo))
+	assert.Equal(t, Success, parsedMsg.Get(ErrorNo))
+	ipsf, ok = msg.Get(Peers).([]utils.IPDesc)
+	if !ok {
+		t.Errorf("Peers is not a list")
+	}
+	assert.Equal(t, 0, len(ipsf))
+}
+
+func TestVersionNak(t *testing.T) {
+	ips := make([]utils.IPDesc, 1)
+	ip, _ := utils.ToIPDesc("192.168.1.1:7")
+	ips[0] = ip
+
+	msg, err := TestBuilder.VersionNak(Success, ips)
+	assert.NoError(t, err)
+	assert.NotNil(t, msg)
+	assert.Equal(t, VersionNak, msg.Op())
+	assert.Equal(t, Success, msg.Get(ErrorNo))
+	ipsf, ok := msg.Get(Peers).([]utils.IPDesc)
+	if !ok {
+		t.Errorf("Peers is not a list")
+	}
+	assert.Equal(t, 1, len(ipsf))
+	assert.Equal(t, ips, msg.Get(Peers))
+
+	parsedMsg, err := TestBuilder.Parse(msg.Bytes())
+	assert.NoError(t, err)
+	assert.NotNil(t, parsedMsg)
+	assert.Equal(t, VersionNak, parsedMsg.Op())
+	assert.Equal(t, Success, parsedMsg.Get(ErrorNo))
+	ipsf, ok = msg.Get(Peers).([]utils.IPDesc)
+	if !ok {
+		t.Errorf("Peers is not a list")
+	}
+	assert.Equal(t, 1, len(ipsf))
+	assert.Equal(t, ips, msg.Get(Peers))
 }

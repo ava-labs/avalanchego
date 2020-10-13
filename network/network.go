@@ -53,11 +53,11 @@ const (
 )
 
 var (
-	errNetworkClosed   = errors.New("network closed")
-	errPeerIsMyself    = errors.New("peer is myself")
-	errAlreadyPeered   = errors.New("peered already to node")
-	errVersionExpected = errors.New("expected version msg")
-	errVersionNak      = errors.New("expected version nak msg")
+	errNetworkClosed      = errors.New("network closed")
+	errPeerIsMyself       = errors.New("peer is myself")
+	errAlreadyPeered      = errors.New("peered already to node")
+	errVersionExpected    = errors.New("expected version msg")
+	errVersionNakExpected = errors.New("expected version nak msg")
 )
 
 func init() { rand.Seed(time.Now().UnixNano()) }
@@ -1046,7 +1046,12 @@ func (n *network) validatorIPs() []utils.IPDesc {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
-	ips := []utils.IPDesc(nil)
+	return n.validatorIPsNoLock()
+}
+
+// assumes no state lock is held
+func (n *network) validatorIPsNoLock() []utils.IPDesc {
+	ips := make([]utils.IPDesc, 0, len(n.peers))
 	for _, peer := range n.peers {
 		if peer.connected &&
 			!peer.ip.IsZero() &&
@@ -1097,7 +1102,7 @@ func (n *network) disconnected(p *peer) {
 
 // assumes stateLock is held
 // iterate the peers and find if we are already peered to this node.
-func (n *network) AmIPeered(id ids.ShortID) bool {
+func (n *network) IsPeered(id ids.ShortID) bool {
 	for _, peer := range n.peers {
 		if peer == nil {
 			continue

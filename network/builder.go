@@ -25,10 +25,10 @@ func (m Builder) Version(networkID, nodeID uint32, myTime uint64, ip utils.IPDes
 	})
 }
 
-func (m Builder) VersionNak(errorID VersionNakField) (Msg, error) {
-	errorIDu32 := uint32(errorID)
+func (m Builder) VersionNak(errorID uint32, ips []utils.IPDesc) (Msg, error) {
 	return m.Pack(VersionNak, map[Field]interface{}{
-		ErrorNo: errorIDu32,
+		ErrorNo: errorID,
+		Peers:   ips,
 	})
 }
 
