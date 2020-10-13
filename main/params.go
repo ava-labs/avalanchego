@@ -122,7 +122,17 @@ func init() {
 	// IP:
 	consensusIP := fs.String("public-ip", "", "Public IP of this node")
 
-	clientMeterTickDuration := fs.Duration("client-connection-meter-duration", 0*time.Second, "Enable client connection metering, limits the number of connections from an IP within specified duration to 1")
+	// Incoming connection throttling
+	// After we receive [conn-meter-max-attempts] incoming connections from a given IP
+	// in the last [conn-meter-reset-duration], we close all subsequent incoming connections
+	// from the IP before upgrade.
+	fs.DurationVar(&Config.ConnMeterResetDuration, "conn-meter-reset-duration", 30*time.Second,
+		"Upgrade at most [conn-meter-max-attempts] connections from a given IP per [conn-meter-reset-duration]. "+
+			"If [conn-meter-reset-duration] is 0, incoming connections are not rate-limited.")
+
+	fs.IntVar(&Config.ConnMeterMaxConns, "conn-meter-max-conns", 5,
+		"Upgrade at most [conn-meter-max-attempts] connections from a given IP per [conn-meter-reset-duration]. "+
+			"If [conn-meter-reset-duration] is 0, incoming connections are not rate-limited.")
 
 	// HTTP Server:
 	httpHost := fs.String("http-host", "127.0.0.1", "Address of the HTTP server")
@@ -259,10 +269,6 @@ func init() {
 	networkID, err := constants.NetworkID(*networkName)
 	if errs.Add(err); err != nil {
 		return
-	}
-
-	if clientMeterTickDuration.Nanoseconds() != 0 {
-		Config.ClientMeterTickDuration = clientMeterTickDuration
 	}
 
 	Config.NetworkID = networkID
