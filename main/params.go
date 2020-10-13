@@ -127,8 +127,12 @@ func init() {
 	// in the last [conn-meter-reset-duration], we close all subsequent incoming connections
 	// from the IP before upgrade.
 	fs.DurationVar(&Config.ConnMeterResetDuration, "conn-meter-reset-duration", 30*time.Second,
-		"Upgrade at most [conn-meter-max-attempts] connections from a given IP per [conn-meter-reset-duration]")
-	fs.IntVar(&Config.ConnMeterMaxConns, "conn-meter-max-conns", 5, "Upgrade at most [conn-meter-max-attempts] connections from a given IP per [conn-meter-reset-duration]")
+		"Upgrade at most [conn-meter-max-attempts] connections from a given IP per [conn-meter-reset-duration]. "+
+			"If [conn-meter-reset-duration] is 0, incoming connections are not rate-limited.")
+
+	fs.IntVar(&Config.ConnMeterMaxConns, "conn-meter-max-conns", 5,
+		"Upgrade at most [conn-meter-max-attempts] connections from a given IP per [conn-meter-reset-duration]. "+
+			"If [conn-meter-reset-duration] is 0, incoming connections are not rate-limited.")
 
 	// HTTP Server:
 	httpHost := fs.String("http-host", "127.0.0.1", "Address of the HTTP server")
