@@ -932,7 +932,7 @@ func (p *peer) discardMyIP() {
 // Read a single message from the connection.
 func (p *peer) readMsg() (Msg, error) {
 	pendingBuffer := wrappers.Packer{}
-	readBuffer, err := p.readFull(4)
+	readBuffer, err := p.readFull(wrappers.IntLen)
 	if err != nil {
 		return nil, err
 	}
