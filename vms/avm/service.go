@@ -265,7 +265,7 @@ type GetAssetDescriptionReply struct {
 func (service *Service) GetAssetDescription(_ *http.Request, args *GetAssetDescriptionArgs, reply *GetAssetDescriptionReply) error {
 	service.vm.ctx.Log.Info("AVM: GetAssetDescription called with %s", args.AssetID)
 
-	assetID, err := service.lookupAssetID(args.AssetID)
+	assetID, err := service.vm.lookupAssetID(args.AssetID)
 	if err != nil {
 		return err
 	}
@@ -311,7 +311,7 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
 	}
 
-	assetID, err := service.lookupAssetID(args.AssetID)
+	assetID, err := service.vm.lookupAssetID(args.AssetID)
 	if err != nil {
 		return err
 	}
@@ -464,7 +464,7 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 	if len(kc.Keys) == 0 {
 		return errNoKeys
 	}
-	changeAddr, err := service.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
+	changeAddr, err := service.vm.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
 	if err != nil {
 		return err
 	}
@@ -588,7 +588,7 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 	if len(kc.Keys) == 0 {
 		return errNoKeys
 	}
-	changeAddr, err := service.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
+	changeAddr, err := service.vm.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
 	if err != nil {
 		return err
 	}
@@ -709,7 +709,7 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 	if len(kc.Keys) == 0 {
 		return errNoKeys
 	}
-	changeAddr, err := service.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
+	changeAddr, err := service.vm.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
 	if err != nil {
 		return err
 	}
@@ -1064,7 +1064,7 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 	if len(kc.Keys) == 0 {
 		return errNoKeys
 	}
-	changeAddr, err := service.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
+	changeAddr, err := service.vm.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
 	if err != nil {
 		return err
 	}
@@ -1082,7 +1082,7 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 		}
 		assetID, ok := assetIDs[output.AssetID] // Asset ID of next output
 		if !ok {
-			assetID, err = service.lookupAssetID(output.AssetID)
+			assetID, err = service.vm.lookupAssetID(output.AssetID)
 			if err != nil {
 				return fmt.Errorf("couldn't find asset %s", output.AssetID)
 			}
@@ -1195,7 +1195,7 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxI
 		return errInvalidMintAmount
 	}
 
-	assetID, err := service.lookupAssetID(args.AssetID)
+	assetID, err := service.vm.lookupAssetID(args.AssetID)
 	if err != nil {
 		return err
 	}
@@ -1225,7 +1225,7 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxI
 	if len(feeKc.Keys) == 0 {
 		return errNoKeys
 	}
-	changeAddr, err := service.selectChangeAddr(feeKc.Keys[0].PublicKey().Address(), args.ChangeAddr)
+	changeAddr, err := service.vm.selectChangeAddr(feeKc.Keys[0].PublicKey().Address(), args.ChangeAddr)
 	if err != nil {
 		return err
 	}
@@ -1312,7 +1312,7 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 	service.vm.ctx.Log.Info("AVM: SendNFT called with username: %s", args.Username)
 
 	// Parse the asset ID
-	assetID, err := service.lookupAssetID(args.AssetID)
+	assetID, err := service.vm.lookupAssetID(args.AssetID)
 	if err != nil {
 		return err
 	}
@@ -1343,7 +1343,7 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 	if len(kc.Keys) == 0 {
 		return errNoKeys
 	}
-	changeAddr, err := service.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
+	changeAddr, err := service.vm.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
 	if err != nil {
 		return err
 	}
@@ -1424,7 +1424,7 @@ type MintNFTArgs struct {
 func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Info("AVM: MintNFT called with username: %s", args.Username)
 
-	assetID, err := service.lookupAssetID(args.AssetID)
+	assetID, err := service.vm.lookupAssetID(args.AssetID)
 	if err != nil {
 		return err
 	}
@@ -1454,7 +1454,7 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 	if len(feeKc.Keys) == 0 {
 		return errNoKeys
 	}
-	changeAddr, err := service.selectChangeAddr(feeKc.Keys[0].PublicKey().Address(), args.ChangeAddr)
+	changeAddr, err := service.vm.selectChangeAddr(feeKc.Keys[0].PublicKey().Address(), args.ChangeAddr)
 	if err != nil {
 		return err
 	}
@@ -1685,7 +1685,7 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSO
 	service.vm.ctx.Log.Info("AVM: Export called with username: %s", args.Username)
 
 	// Parse the asset ID
-	assetID, err := service.lookupAssetID(args.AssetID)
+	assetID, err := service.vm.lookupAssetID(args.AssetID)
 	if err != nil {
 		return err
 	}
@@ -1719,7 +1719,7 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSO
 	if len(kc.Keys) == 0 {
 		return errNoKeys
 	}
-	changeAddr, err := service.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
+	changeAddr, err := service.vm.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
 	if err != nil {
 		return err
 	}
@@ -1795,31 +1795,4 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSO
 	reply.TxID = txID
 	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
 	return err
-}
-
-// selectChangeAddr returns the change address to be used for [kc] when [changeAddr] is given
-// as the optional change address argument
-func (service *Service) selectChangeAddr(defaultAddr ids.ShortID, changeAddr string) (ids.ShortID, error) {
-	if changeAddr == "" {
-		return defaultAddr, nil
-	}
-
-	addr, err := service.vm.ParseLocalAddress(changeAddr)
-	if err != nil {
-		return ids.ShortID{}, fmt.Errorf("couldn't parse changeAddr: %w", err)
-	}
-	return addr, nil
-}
-
-// lookupAssetID looks for an ID aliased by [asset] and if it fails
-// attempts to parse [asset] into an ID
-func (service *Service) lookupAssetID(asset string) (ids.ID, error) {
-	assetID, err := service.vm.Lookup(asset)
-	if err != nil {
-		assetID, err = ids.FromString(asset)
-		if err != nil {
-			return ids.ID{}, fmt.Errorf("asset '%s' not found", asset)
-		}
-	}
-	return assetID, nil
 }

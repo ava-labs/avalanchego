@@ -158,6 +158,7 @@ func (tx *UniqueTx) Accept() error {
 	tx.vm.ctx.Log.Verbo("Accepted Tx: %s", txID)
 
 	tx.vm.pubsub.Publish("accepted", txID)
+	tx.vm.walletService.decided(txID)
 
 	tx.deps = nil // Needed to prevent a memory leak
 
@@ -182,6 +183,7 @@ func (tx *UniqueTx) Reject() error {
 	}
 
 	tx.vm.pubsub.Publish("rejected", txID)
+	tx.vm.walletService.decided(txID)
 
 	tx.deps = nil // Needed to prevent a memory leak
 

@@ -624,3 +624,9 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 	t.Sender.Get(vdr, t.RequestID, vtxID)
 	t.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len())) // Tracks performance statistics
 }
+
+// Health implements the common.Engine interface
+func (t *Transitive) Health() (interface{}, error) {
+	// TODO add more health checks
+	return t.VM.Health()
+}
