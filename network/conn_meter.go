@@ -17,8 +17,6 @@ type ConnMeter interface {
 	// Register that the given address tried to connect to us.
 	// Returns the number of times they previously tried.
 	Register(addr string) (int, error)
-	// Unregister the IP, removing the meter
-	UnRegister(addr string)
 }
 
 // Return a new connection counter
