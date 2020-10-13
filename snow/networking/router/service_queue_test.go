@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/uptime"
 )
 
 // returns a new multi-level queue that will never throttle or prioritize
@@ -156,7 +157,7 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 		perTier,
 	}
 
-	cpuTracker := tracker.NewCPUTracker(time.Second)
+	cpuTracker := tracker.NewCPUTracker(uptime.IntervalFactory{}, time.Second)
 	msgTracker := tracker.NewMessageTracker()
 	resourceManager := NewResourceManager(
 		vdrs,
@@ -269,7 +270,7 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 		perTier,
 	}
 
-	cpuTracker := tracker.NewCPUTracker(time.Second)
+	cpuTracker := tracker.NewCPUTracker(uptime.IntervalFactory{}, time.Second)
 	msgTracker := tracker.NewMessageTracker()
 	resourceManager := NewResourceManager(
 		vdrs,
@@ -372,7 +373,7 @@ func TestMultiLevelQueueFreesSpace(t *testing.T) {
 		perTier,
 	}
 
-	cpuTracker := tracker.NewCPUTracker(time.Second)
+	cpuTracker := tracker.NewCPUTracker(uptime.IntervalFactory{}, time.Second)
 	msgTracker := tracker.NewMessageTracker()
 	resourceManager := NewResourceManager(
 		vdrs,

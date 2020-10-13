@@ -149,7 +149,7 @@ func init() {
 	fs.Float64Var(&Config.StakerCPUPortion, "staker-cpu-reserved", router.DefaultStakerPortion, "Reserve a portion of the chain's CPU time for stakers.")
 
 	// Network Timeouts:
-	networkInitialTimeout := fs.Int64("network-initial-timeout", int64(10*time.Second), "Initial timeout value of the adaptive timeout manager, in nanoseconds.")
+	networkInitialTimeout := fs.Int64("network-initial-timeout", int64(5*time.Second), "Initial timeout value of the adaptive timeout manager, in nanoseconds.")
 	networkMinimumTimeout := fs.Int64("network-minimum-timeout", int64(500*time.Millisecond), "Minimum timeout value of the adaptive timeout manager, in nanoseconds.")
 	networkMaximumTimeout := fs.Int64("network-maximum-timeout", int64(10*time.Second), "Maximum timeout value of the adaptive timeout manager, in nanoseconds.")
 	networkTimeoutInc := fs.Int64("network-timeout-increase", 60*int64(time.Millisecond), "Increase of network timeout after a failed request, in nanoseconds.")

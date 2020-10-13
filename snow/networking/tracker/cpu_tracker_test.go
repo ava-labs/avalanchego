@@ -8,11 +8,12 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/uptime"
 )
 
 func TestCPUTracker(t *testing.T) {
 	halflife := time.Second
-	cpuTracker := NewCPUTracker(halflife)
+	cpuTracker := NewCPUTracker(uptime.IntervalFactory{}, halflife)
 	vdr1 := ids.NewShortID([20]byte{1})
 	vdr2 := ids.NewShortID([20]byte{2})
 
