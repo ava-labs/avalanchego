@@ -242,10 +242,6 @@ func NewNetwork(
 	readHandshakeTimeout time.Duration,
 	readPeerVersionTimeout time.Duration,
 ) Network {
-	// insert localhost as myip.
-	localIP, err := utils.ToIPDesc(fmt.Sprintf("127.0.0.1:%d", ip.Port))
-	log.AssertNoError(err)
-
 	// #nosec G404
 	netw := &network{
 		log:            log,
@@ -283,7 +279,7 @@ func NewNetwork(
 		disconnectedIPs:                    make(map[string]struct{}),
 		connectedIPs:                       make(map[string]struct{}),
 		retryDelay:                         make(map[string]time.Duration),
-		myIPs:                              map[string]struct{}{ip.String(): {}, localIP.String(): {}},
+		myIPs:                              map[string]struct{}{ip.String(): {}},
 		peers:                              make(map[[20]byte]*peer),
 		readBufferSize:                     readBufferSize,
 		readHandshakeTimeout:               readHandshakeTimeout,
