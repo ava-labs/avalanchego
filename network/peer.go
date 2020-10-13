@@ -77,7 +77,6 @@ type peer struct {
 
 // assume the stateLock is held
 func (p *peer) Start() error {
-
 	if err := p.conn.SetReadDeadline(p.net.clock.Time().Add(p.net.readPeerVersionTimeout)); err != nil {
 		p.net.log.Verbo("error on setting the connection read timeout %s", err)
 		return err
@@ -86,11 +85,19 @@ func (p *peer) Start() error {
 	// send the version and get a msg from receiver..
 	msg, err := p.verionAck()
 	if err != nil {
+		if p.id.Equals(p.net.id) {
+			return errPeerIsMyself
+		}
 		return err
 	}
 
 	switch msg.Op() {
 	case PeerList:
+		// handle old self check logic
+		if p.id.Equals(p.net.id) {
+			return errPeerIsMyself
+		}
+
 		// if the first message is not version.  fall back to normal processing logic.
 		// only acceptable option at this point would be a PeerList request
 		// lets take care of the peer request
@@ -109,6 +116,11 @@ func (p *peer) Start() error {
 	case Version:
 	// fallthrough
 	default:
+		// handle old self check logic
+		if p.id.Equals(p.net.id) {
+			return errPeerIsMyself
+		}
+
 		// We didn't get a Version msg.  This is unexpected..
 		return errVersionExpected
 	}
@@ -126,6 +138,10 @@ func (p *peer) Start() error {
 
 	// we have the peer's version, and it's not high enough.. fallback logic start the normal processing.
 	if peerVersion.Before(VersionPeerNak) {
+		// handle old self check logic
+		if p.id.Equals(p.net.id) {
+			return errPeerIsMyself
+		}
 
 		// process the version message
 		go p.handle(msg)
@@ -151,6 +167,17 @@ func (p *peer) Start() error {
 }
 
 func (p *peer) processVersionNak() error {
+	if p.id.Equals(p.net.id) {
+		// we already peered respond to client.
+		_, err := p.versionNack(SelfPeered, nil)
+		if err != nil {
+			// it would not matter if we didn't send the nack..
+			// we will end up disconnecting the connection.
+			p.net.log.Verbo("unable to send version nak %s", err)
+		}
+		return errPeerIsMyself
+	}
+
 	// am I already peered to them?
 	if p.net.IsPeered(p.id) {
 		// we already peered respond to client.
@@ -177,6 +204,9 @@ func (p *peer) processVersionNak() error {
 	case AlreadyPeered:
 		// the peer responded we are already peered to them.
 		return errAlreadyPeered
+	case SelfPeered:
+		// the peer responded we are already peered to them.
+		return errPeerIsMyself
 	case Success:
 		// fall through
 	default:

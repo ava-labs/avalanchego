@@ -31,6 +31,7 @@ const (
 const (
 	Success       uint32 = iota // Nothing is wrong with peering
 	AlreadyPeered               // We already Peered
+	SelfPeered                  // peering to myself
 )
 
 // Packer returns the packer function that can be used to pack this field.

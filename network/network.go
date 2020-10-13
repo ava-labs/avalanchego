@@ -242,6 +242,10 @@ func NewNetwork(
 	readHandshakeTimeout time.Duration,
 	readPeerVersionTimeout time.Duration,
 ) Network {
+	// insert localhost as myip.
+	localIP, err := utils.ToIPDesc(fmt.Sprintf("127.0.0.1:%d", ip.Port))
+	log.AssertNoError(err)
+
 	// #nosec G404
 	netw := &network{
 		log:            log,
@@ -279,7 +283,7 @@ func NewNetwork(
 		disconnectedIPs:                    make(map[string]struct{}),
 		connectedIPs:                       make(map[string]struct{}),
 		retryDelay:                         make(map[string]time.Duration),
-		myIPs:                              map[string]struct{}{ip.String(): {}},
+		myIPs:                              map[string]struct{}{ip.String(): {}, localIP.String(): {}},
 		peers:                              make(map[[20]byte]*peer),
 		readBufferSize:                     readBufferSize,
 		readHandshakeTimeout:               readHandshakeTimeout,
@@ -918,7 +922,7 @@ func (n *network) connectTo(ip utils.IPDesc) {
 		if err == nil {
 			return
 		}
-		if err == errAlreadyPeered || err == errVersionExpected {
+		if err == errAlreadyPeered || err == errVersionExpected || err == errPeerIsMyself {
 			n.log.Debug("error attempting to connect to %s: %s", ip, err)
 			return
 		}
@@ -980,7 +984,7 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 
 	if err := n.tryAddPeer(p); err != nil {
 		_ = p.conn.Close()
-		n.log.Debug("dropping peer connection due to: %s", err)
+		n.log.Debug("dropping peer connection %s due to: %s", id, err)
 		return err
 	}
 	return nil
@@ -998,6 +1002,39 @@ func (n *network) tryAddPeer(p *peer) error {
 		// the network is closing, so make sure that no further reconnect
 		// attempts are made.
 		return errNetworkClosed
+	}
+
+	// start peer, and check if it works.
+	err := p.Start()
+	if err != nil {
+		if !p.ip.IsZero() {
+			str := p.ip.String()
+			delete(n.disconnectedIPs, str)
+			delete(n.retryDelay, str)
+		}
+
+		// special processing
+		if err == errPeerIsMyself {
+			if !p.ip.IsZero() {
+				// if n.ip is less useful than p.ip set it to this IP
+				if n.ip.IsZero() {
+					n.log.Info("setting my ip to %s because I was able to connect to myself through this channel",
+						p.ip)
+					n.ip = p.ip
+				}
+				str := p.ip.String()
+				delete(n.disconnectedIPs, str)
+				delete(n.retryDelay, str)
+				n.myIPs[str] = struct{}{}
+			}
+			return errPeerIsMyself
+		}
+
+		if _, ok := n.peers[key]; ok {
+			// we are peering..  this will stop the connection loop
+			return errAlreadyPeered
+		}
+		return err
 	}
 
 	// if this connection is myself, then I should delete the connection and
@@ -1027,12 +1064,6 @@ func (n *network) tryAddPeer(p *peer) error {
 			delete(n.retryDelay, str)
 		}
 		return fmt.Errorf("duplicated connection from %s at %s", p.id.PrefixedString(constants.NodeIDPrefix), p.ip)
-	}
-
-	// start peer, and check if it works.
-	err := p.Start()
-	if err != nil {
-		return err
 	}
 
 	n.peers[key] = p
