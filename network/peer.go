@@ -85,9 +85,6 @@ func (p *peer) Start() error {
 	// send the version and get a msg from receiver..
 	msg, err := p.verionAck()
 	if err != nil {
-		if p.id.Equals(p.net.id) {
-			return errPeerIsMyself
-		}
 		return err
 	}
 
@@ -136,7 +133,7 @@ func (p *peer) Start() error {
 	// add peer version msg..
 	p.checkPeerVersion(peerVersion)
 
-	// we have the peer's version, and it's not high enough.. fallback logic start the normal processing.
+	// if the client is not running correct version then fallback logic start the normal processing.
 	if peerVersion.Before(VersionPeerNak) {
 		// handle old self check logic
 		if p.id.Equals(p.net.id) {
@@ -187,7 +184,6 @@ func (p *peer) processVersionNak() error {
 			// we will end up disconnecting the connection.
 			p.net.log.Verbo("unable to send version nak %s", err)
 		}
-
 		return errAlreadyPeered
 	}
 

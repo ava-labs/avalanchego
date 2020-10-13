@@ -992,17 +992,19 @@ func (n *network) tryAddPeer(p *peer) error {
 	key := p.id.Key()
 
 	n.stateLock.Lock()
-	defer n.stateLock.Unlock()
-
 	if n.closed {
+		n.stateLock.Unlock()
 		// the network is closing, so make sure that no further reconnect
 		// attempts are made.
 		return errNetworkClosed
 	}
+	n.stateLock.Unlock()
 
 	// start peer, and check if it works.
 	err := p.Start()
 	if err != nil {
+		n.stateLock.Lock()
+		defer n.stateLock.Unlock()
 		if !p.ip.IsZero() {
 			str := p.ip.String()
 			delete(n.disconnectedIPs, str)
@@ -1032,6 +1034,9 @@ func (n *network) tryAddPeer(p *peer) error {
 		}
 		return err
 	}
+
+	n.stateLock.Lock()
+	defer n.stateLock.Unlock()
 
 	// if this connection is myself, then I should delete the connection and
 	// mark the IP as one of mine.
