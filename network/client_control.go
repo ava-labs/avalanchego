@@ -74,8 +74,6 @@ func (n *clientControl) unRegisterConnectionAddress(addr string) {
 		return
 	}
 
-	n.lock.Lock()
-	defer n.lock.Unlock()
 	n.cache.Evict(id)
 }
 
