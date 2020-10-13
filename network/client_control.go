@@ -84,14 +84,11 @@ func (n *clientControl) registerConnectionAddress(addr string) (*timer.TimedMete
 	}
 
 	// lets get the meter
-	n.lock.RLock()
 	meter, exists := n.cache.Get(id)
-	n.lock.RUnlock()
 
 	// if the meter doesn't exist we'll create one
 	if !exists {
 		n.lock.Lock()
-
 		// lets just confirm under lock it wasn't create.
 		// some other thread could of added the IP.
 		meter, exists = n.cache.Get(id)
