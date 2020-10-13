@@ -45,15 +45,6 @@ type connMeter struct {
 	lock          sync.RWMutex
 }
 
-func (n *connMeter) UnRegister(addr string) {
-	ip, err := utils.ToIPDesc(addr)
-	if err != nil {
-		return
-	}
-	addr = ip.IP.String()
-	n.unRegisterAddress(addr)
-}
-
 func (n *connMeter) Register(addr string) (int, error) {
 	ip, err := utils.ToIPDesc(addr)
 	if err != nil {
@@ -70,15 +61,6 @@ func (n *connMeter) Register(addr string) (int, error) {
 	tickCount := meter.Ticks()
 	meter.Tick()
 	return tickCount, nil
-}
-
-func (n *connMeter) unRegisterAddress(addr string) {
-	id, err := ids.ToID(hashing.ComputeHash256([]byte(addr)))
-	if err != nil {
-		return
-	}
-
-	n.cache.Evict(id)
 }
 
 func (n *connMeter) registerAddress(addr string) (*timer.TimedMeter, error) {
