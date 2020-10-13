@@ -89,6 +89,9 @@ type Node struct {
 	// Manages shared memory
 	sharedMemory atomic.Memory
 
+	// Monitors node health and runs health checks
+	healthService *health.Health
+
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
 
@@ -519,6 +522,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		XChainID:                xChainID,
 		CriticalChains:          criticalChains,
 		TimeoutManager:          &timeoutManager,
+		HealthService:           n.healthService,
 	})
 
 	vdrs := n.vdrs
@@ -691,6 +695,7 @@ func (n *Node) initHealthAPI() error {
 	if err != nil {
 		return err
 	}
+	n.healthService = service
 	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "health", "", n.HTTPLog)
 }
 
@@ -791,6 +796,11 @@ func (n *Node) Initialize(config *Config, logger logging.Logger, logFactory logg
 	if err != nil {
 		return fmt.Errorf("couldn't create genesis bytes: %w", err)
 	}
+	// Start the Health API
+	// Has to be initialized before chain manager
+	if err := n.initHealthAPI(); err != nil {
+		return fmt.Errorf("couldn't initialize health API: %w", err)
+	}
 	if err := n.initChainManager(avaxAssetID); err != nil { // Set up the chain manager
 		return fmt.Errorf("couldn't initialize chain manager: %w", err)
 	}
@@ -799,9 +809,6 @@ func (n *Node) Initialize(config *Config, logger logging.Logger, logFactory logg
 	}
 	if err := n.initInfoAPI(); err != nil { // Start the Info API
 		return fmt.Errorf("couldn't initialize info API: %w", err)
-	}
-	if err := n.initHealthAPI(); err != nil { // Start the Health API
-		return fmt.Errorf("couldn't initialize health API: %w", err)
 	}
 	if err := n.initIPCs(); err != nil { // Start the IPCs
 		return fmt.Errorf("couldn't initialize IPCs: %w", err)

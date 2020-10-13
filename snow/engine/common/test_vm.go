@@ -19,12 +19,15 @@ var (
 type TestVM struct {
 	T *testing.T
 
-	CantInitialize, CantBootstrapping, CantBootstrapped, CantShutdown, CantCreateHandlers, CantCreateStaticHandlers bool
+	CantInitialize, CantBootstrapping, CantBootstrapped,
+	CantShutdown, CantCreateHandlers, CantCreateStaticHandlers,
+	CantHealth bool
 
 	InitializeF                              func(*snow.Context, database.Database, []byte, chan<- Message, []*Fx) error
 	BootstrappingF, BootstrappedF, ShutdownF func() error
 	CreateHandlersF                          func() map[string]*HTTPHandler
 	CreateStaticHandlersF                    func() map[string]*HTTPHandler
+	HealthF                                  func() (interface{}, error)
 }
 
 // Default ...
@@ -35,6 +38,7 @@ func (vm *TestVM) Default(cant bool) {
 	vm.CantShutdown = cant
 	vm.CantCreateHandlers = cant
 	vm.CantCreateStaticHandlers = cant
+	vm.CantHealth = cant
 }
 
 // Initialize ...
@@ -107,4 +111,15 @@ func (vm *TestVM) CreateStaticHandlers() map[string]*HTTPHandler {
 		vm.T.Fatalf("Unexpectedly called CreateStaticHandlers")
 	}
 	return nil
+}
+
+// Health ...
+func (vm *TestVM) Health() (interface{}, error) {
+	if vm.HealthF != nil {
+		return vm.HealthF()
+	}
+	if vm.CantHealth && vm.T != nil {
+		vm.T.Fatalf("Unexpectedly called Health")
+	}
+	return nil, errors.New("Unexpectedly called Health")
 }
