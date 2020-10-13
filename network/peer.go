@@ -176,7 +176,7 @@ func (p *peer) processVersionNak() error {
 	}
 
 	// am I already peered to them?
-	if p.net.IsPeered(p.id) {
+	if p.net.isPeered(p.id) {
 		// we already peered respond to client.
 		_, err := p.versionNack(AlreadyPeered, nil)
 		if err != nil {

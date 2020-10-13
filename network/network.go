@@ -1134,7 +1134,7 @@ func (n *network) disconnected(p *peer) {
 
 // assumes stateLock is held
 // iterate the peers and find if we are already peered to this node.
-func (n *network) IsPeered(id ids.ShortID) bool {
+func (n *network) isPeered(id ids.ShortID) bool {
 	for _, peer := range n.peers {
 		if peer == nil {
 			continue
