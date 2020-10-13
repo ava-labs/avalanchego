@@ -49,8 +49,7 @@ const (
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
 	defaultReadBufferSize                            = 16 * 1024
 	defaultReadHandshakeTimeout                      = 15 * time.Second
-	defaultClientConnectionCacheSize                 = 10000
-	defaultClientMaximumTicks                        = 0
+	defaultConnMeterCacheSize                        = 10000
 )
 
 var (
@@ -133,8 +132,8 @@ type network struct {
 	pingFrequency                      time.Duration
 	readBufferSize                     uint32
 	readHandshakeTimeout               time.Duration
-	clientMaximumTicks                 int
-	clientControl                      ClientControl
+	connMeterMaxConns                  int
+	connMeter                          ConnMeter
 
 	executor timer.Executor
 
@@ -168,7 +167,8 @@ func NewDefaultNetwork(
 	vdrs validators.Set,
 	beacons validators.Set,
 	router router.Router,
-	clientConnectionTickTimeout *time.Duration,
+	connMeterResetDuration time.Duration,
+	connMeterMaxConns int,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -202,9 +202,9 @@ func NewDefaultNetwork(
 		defaultPingFrequency,
 		defaultReadBufferSize,
 		defaultReadHandshakeTimeout,
-		clientConnectionTickTimeout,
-		defaultClientConnectionCacheSize,
-		defaultClientMaximumTicks,
+		connMeterResetDuration,
+		defaultConnMeterCacheSize,
+		connMeterMaxConns,
 	)
 }
 
@@ -241,9 +241,9 @@ func NewNetwork(
 	pingFrequency time.Duration,
 	readBufferSize uint32,
 	readHandshakeTimeout time.Duration,
-	clientConnectionTickTimeout *time.Duration,
-	clientConnectionCacheSize int,
-	clientMaximumTicks int,
+	connMeterResetDuration time.Duration,
+	connMeterCacheSize int,
+	connMeterMaxConns int,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -286,8 +286,8 @@ func NewNetwork(
 		peers:                              make(map[[20]byte]*peer),
 		readBufferSize:                     readBufferSize,
 		readHandshakeTimeout:               readHandshakeTimeout,
-		clientControl:                      NewClientControl(clientConnectionTickTimeout, clientConnectionCacheSize),
-		clientMaximumTicks:                 clientMaximumTicks,
+		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize),
+		connMeterMaxConns:                  connMeterMaxConns,
 	}
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
@@ -658,9 +658,9 @@ func (n *network) Dispatch() error {
 		}
 
 		addr := conn.RemoteAddr().String()
-		ticks, err := n.clientControl.RegisterConnection(addr)
-		// looking for > n.clientMaximumTicks indicating the second tick
-		if err == nil && ticks > n.clientMaximumTicks {
+		ticks, err := n.connMeter.RegisterConnection(addr)
+		// looking for > n.connMeterMaxConns indicating the second tick
+		if err == nil && ticks > n.connMeterMaxConns {
 			n.log.Debug("connection from: %s temporarily dropped", addr)
 			_ = conn.Close()
 			continue
