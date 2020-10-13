@@ -124,8 +124,7 @@ func (p *peer) Start() error {
 
 	// parse and check if version is correct.
 	peerVersionStr := msg.Get(VersionStr).(string)
-	var peerVersion version.Version
-	peerVersion, err = p.net.parser.Parse(peerVersionStr)
+	peerVersion, err := p.net.parser.Parse(peerVersionStr)
 	if err != nil {
 		return err
 	}
