@@ -26,6 +26,8 @@ type message struct {
 	deadline     time.Time // Time this message must be responded to
 }
 
+// IsPeriodic returns true if this message is of a type that is sent on a
+// periodic basis.
 func (m message) IsPeriodic() bool {
 	return m.requestID == constants.GossipMsgRequestID ||
 		m.messageType == constants.GossipMsg
