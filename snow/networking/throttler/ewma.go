@@ -16,7 +16,7 @@ import (
 
 const (
 	// Larger --> Consider past less for throttling
-	defaultDecayFactor         float64 = 3 / 2
+	defaultDecayFactor         float64 = 1.5
 	defaultMinimumCPUAllotment         = time.Nanosecond
 )
 

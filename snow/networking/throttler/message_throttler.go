@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	defaultIntervalsUntilPruning uint32 = 5
+	defaultIntervalsUntilPruning uint32 = 10
 )
 
 type messageThrottler struct {
