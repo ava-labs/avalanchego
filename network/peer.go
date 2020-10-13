@@ -966,8 +966,7 @@ func (p *peer) readMsg() (Msg, error) {
 		return nil, pendingBuffer.Err
 	}
 
-	var msg Msg
-	msg, err = p.net.b.Parse(msgBytes)
+	msg, err := p.net.b.Parse(msgBytes)
 	if err != nil {
 		p.net.log.Debug("failed to parse new message from %s:\n%s\n%s",
 			p.id,
