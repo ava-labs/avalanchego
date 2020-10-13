@@ -188,8 +188,8 @@ func (s *set) addWeight(vdrID ids.ShortID, weight uint64) error {
 
 // GetWeight implements the Set interface.
 func (s *set) GetWeight(vdrID ids.ShortID) (uint64, bool) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	return s.getWeight(vdrID)
 }
@@ -203,8 +203,8 @@ func (s *set) getWeight(vdrID ids.ShortID) (uint64, bool) {
 
 // SubsetWeight implements the Set interface.
 func (s *set) SubsetWeight(subset ids.ShortSet) (uint64, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	totalWeight := uint64(0)
 	for _, vdrID := range subset.List() {
