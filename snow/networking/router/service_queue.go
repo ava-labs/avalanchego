@@ -109,7 +109,7 @@ func (ml *multiLevelQueue) PopMessage() (message, error) {
 
 	msg, err := ml.popMessage()
 	if err == nil {
-		ml.msgManager.RemoveProcessing(msg.validatorID)
+		ml.msgManager.RemovePending(msg.validatorID)
 		ml.pendingMessages--
 		ml.metrics.pending.Dec()
 	}
@@ -212,7 +212,7 @@ func (ml *multiLevelQueue) pushMessage(msg message) bool {
 		return false
 	}
 
-	processing := ml.msgManager.AddProcessing(validatorID)
+	processing := ml.msgManager.AddPending(validatorID)
 	if !processing {
 		ml.metrics.dropped.Inc()
 		ml.metrics.throttled.Inc()
@@ -223,7 +223,7 @@ func (ml *multiLevelQueue) pushMessage(msg message) bool {
 	if !ml.placeMessage(msg) {
 		ml.log.Verbo("Dropped message while attempting to place it in a queue: %s", msg)
 		ml.metrics.dropped.Inc()
-		ml.msgManager.RemoveProcessing(validatorID)
+		ml.msgManager.RemovePending(validatorID)
 		return false
 	}
 

@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-func TestAddProcessing(t *testing.T) {
+func TestAddPending(t *testing.T) {
 	bufferSize := 8
 	vdrList := make([]validators.Validator, 0, bufferSize)
 	for i := 0; i < bufferSize; i++ {
@@ -41,22 +41,22 @@ func TestAddProcessing(t *testing.T) {
 	)
 
 	for i, vdr := range vdrList {
-		if success := resourceManager.AddProcessing(vdr.ID()); !success {
+		if success := resourceManager.AddPending(vdr.ID()); !success {
 			t.Fatalf("Failed to take message %d.", i)
 		}
 	}
 
-	if success := resourceManager.AddProcessing(nonStakerID); success {
+	if success := resourceManager.AddPending(nonStakerID); success {
 		t.Fatal("Should have throttled message from non-staker when the message pool was empty")
 	}
 
 	for _, vdr := range vdrList {
-		resourceManager.RemoveProcessing(vdr.ID())
+		resourceManager.RemovePending(vdr.ID())
 	}
 
 	// Ensure that space is freed up after returning the messages
 	// to the resource manager
-	if success := resourceManager.AddProcessing(nonStakerID); !success {
+	if success := resourceManager.AddPending(nonStakerID); !success {
 		t.Fatal("Failed to take additional message after all previous messages were returned.")
 	}
 }
@@ -90,7 +90,7 @@ func TestStakerGetsThrottled(t *testing.T) {
 	// cannot take up the entire message queue
 	vdrID := vdrList[0].ID()
 	for i := 0; i < bufferSize; i++ {
-		if success := resourceManager.AddProcessing(vdrID); !success {
+		if success := resourceManager.AddPending(vdrID); !success {
 			// The staker was throttled before taking up the whole message queue
 			return
 		}
@@ -100,9 +100,9 @@ func TestStakerGetsThrottled(t *testing.T) {
 
 type infiniteResourceManager struct{}
 
-func (i *infiniteResourceManager) AddProcessing(vdr ids.ShortID) bool { return true }
+func (i *infiniteResourceManager) AddPending(vdr ids.ShortID) bool { return true }
 
-func (i *infiniteResourceManager) RemoveProcessing(vdr ids.ShortID) {}
+func (i *infiniteResourceManager) RemovePending(vdr ids.ShortID) {}
 
 func (i *infiniteResourceManager) Utilization(vdr ids.ShortID) float64 { return 0 }
 
@@ -112,9 +112,9 @@ func newInfiniteResourceManager() MsgManager {
 
 type noResourcesManager struct{}
 
-func (no *noResourcesManager) AddProcessing(vdr ids.ShortID) bool { return false }
+func (no *noResourcesManager) AddPending(vdr ids.ShortID) bool { return false }
 
-func (no *noResourcesManager) RemoveProcessing(vdr ids.ShortID) {}
+func (no *noResourcesManager) RemovePending(vdr ids.ShortID) {}
 
 func (no *noResourcesManager) Utilization(vdr ids.ShortID) float64 { return 1.0 }
 

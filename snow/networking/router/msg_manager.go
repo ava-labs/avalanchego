@@ -20,13 +20,14 @@ const (
 )
 
 // MsgManager manages incoming messages. It should be called when an incoming message
-// is ready to be processing and when an incoming message is processed.
+// is ready to be processed and when an incoming message is processed. We call the
+// message "pending" if it has been received but not processed.
 type MsgManager interface {
-	// AddProcessing marks that there is a message from [vdr] ready to be processed.
+	// AddPending marks that there is a message from [vdr] ready to be processed.
 	// Returns true if the message will eventually be processed.
-	AddProcessing(ids.ShortID) bool
+	AddPending(ids.ShortID) bool
 	// Called when we process a message from the given peer
-	RemoveProcessing(ids.ShortID)
+	RemovePending(ids.ShortID)
 	Utilization(ids.ShortID) float64
 }
 
@@ -76,9 +77,9 @@ func NewMsgManager(
 	}
 }
 
-// AddProcessing marks that there is a message from [vdr] ready to be processed.
+// AddPending marks that there is a message from [vdr] ready to be processed.
 // Return true if the message was added to the processing list.
-func (rm *msgManager) AddProcessing(vdr ids.ShortID) bool {
+func (rm *msgManager) AddPending(vdr ids.ShortID) bool {
 	// Attempt to take the message from the pool
 	outstandingPoolMessages := rm.msgTracker.PoolCount()
 	totalPeerMessages, peerPoolMessages := rm.msgTracker.OutstandingCount(vdr)
@@ -108,8 +109,8 @@ func (rm *msgManager) AddProcessing(vdr ids.ShortID) bool {
 	return false
 }
 
-// RemoveProcessing marks that a message from [vdr] has been processed.
-func (rm *msgManager) RemoveProcessing(vdr ids.ShortID) {
+// RemovePending marks that a message from [vdr] has been processed.
+func (rm *msgManager) RemovePending(vdr ids.ShortID) {
 	rm.msgTracker.Remove(vdr)
 }
 
