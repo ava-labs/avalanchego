@@ -20,9 +20,9 @@ type TimeTracker interface {
 	EndInterval(time.Time)
 }
 
+// cpuTracker implements TimeTracker
 type cpuTracker struct {
-	lock sync.Mutex
-
+	lock            sync.Mutex
 	cumulativeMeter uptime.Meter
 	halflife        time.Duration
 	cpuSpenders     map[[20]byte]uptime.Meter

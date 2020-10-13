@@ -11,7 +11,7 @@ const (
 	maxSkippedIntervals = 32
 )
 
-// IntervalFactory implements the Factory interface by returning an intervale
+// IntervalFactory implements the Factory interface by returning an interval
 // based meter.
 type IntervalFactory struct{}
 
