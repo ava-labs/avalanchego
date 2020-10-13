@@ -5,6 +5,7 @@ package rpcchainvm
 
 import (
 	"context"
+	"encoding/json"
 
 	"google.golang.org/grpc"
 
@@ -277,6 +278,34 @@ func (vm *VMServer) SetPreference(_ context.Context, req *vmproto.SetPreferenceR
 	}
 	vm.vm.SetPreference(id)
 	return &vmproto.SetPreferenceResponse{}, nil
+}
+
+// Health ...
+func (vm *VMServer) Health(_ context.Context, req *vmproto.HealthRequest) (*vmproto.HealthResponse, error) {
+	details, err := vm.vm.Health()
+	if err != nil {
+		return &vmproto.HealthResponse{}, err
+	}
+
+	// Try to stringify the details
+	detailsStr := "couldn't parse health check details to string"
+	switch details := details.(type) {
+	case nil:
+		detailsStr = ""
+	case string:
+		detailsStr = details
+	case map[string]string:
+		asJSON, err := json.Marshal(details)
+		if err != nil {
+			detailsStr = string(asJSON)
+		}
+	case []byte:
+		detailsStr = string(details)
+	}
+
+	return &vmproto.HealthResponse{
+		Details: detailsStr,
+	}, nil
 }
 
 // BlockVerify ...
