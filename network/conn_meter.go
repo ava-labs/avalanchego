@@ -34,8 +34,6 @@ func (n *noConnMeter) Register(addr string) (int, error) {
 	return 0, nil
 }
 
-func (n *noConnMeter) UnRegister(addr string) {}
-
 // connMeter implements ConnMeter
 type connMeter struct {
 	cache         *cache.LRU
