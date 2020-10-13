@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-func TestTakeMessage(t *testing.T) {
+func TestAddProcessing(t *testing.T) {
 	bufferSize := 8
 	vdrList := make([]validators.Validator, 0, bufferSize)
 	for i := 0; i < bufferSize; i++ {
@@ -29,7 +29,7 @@ func TestTakeMessage(t *testing.T) {
 	if err := vdrs.Set(vdrList); err != nil {
 		t.Fatal(err)
 	}
-	resourceManager := NewResourceManager(
+	resourceManager := NewMsgManager(
 		vdrs,
 		logging.NoLog{},
 		msgTracker,
@@ -41,22 +41,22 @@ func TestTakeMessage(t *testing.T) {
 	)
 
 	for i, vdr := range vdrList {
-		if success := resourceManager.TakeMessage(vdr.ID()); !success {
+		if success := resourceManager.AddProcessing(vdr.ID()); !success {
 			t.Fatalf("Failed to take message %d.", i)
 		}
 	}
 
-	if success := resourceManager.TakeMessage(nonStakerID); success {
+	if success := resourceManager.AddProcessing(nonStakerID); success {
 		t.Fatal("Should have throttled message from non-staker when the message pool was empty")
 	}
 
 	for _, vdr := range vdrList {
-		resourceManager.ReturnMessage(vdr.ID())
+		resourceManager.RemoveProcessing(vdr.ID())
 	}
 
 	// Ensure that space is freed up after returning the messages
 	// to the resource manager
-	if success := resourceManager.TakeMessage(nonStakerID); !success {
+	if success := resourceManager.AddProcessing(nonStakerID); !success {
 		t.Fatal("Failed to take additional message after all previous messages were returned.")
 	}
 }
@@ -75,7 +75,7 @@ func TestStakerGetsThrottled(t *testing.T) {
 	if err := vdrs.Set(vdrList); err != nil {
 		t.Fatal(err)
 	}
-	resourceManager := NewResourceManager(
+	resourceManager := NewMsgManager(
 		vdrs,
 		logging.NoLog{},
 		msgTracker,
@@ -90,7 +90,7 @@ func TestStakerGetsThrottled(t *testing.T) {
 	// cannot take up the entire message queue
 	vdrID := vdrList[0].ID()
 	for i := 0; i < bufferSize; i++ {
-		if success := resourceManager.TakeMessage(vdrID); !success {
+		if success := resourceManager.AddProcessing(vdrID); !success {
 			// The staker was throttled before taking up the whole message queue
 			return
 		}
@@ -98,26 +98,26 @@ func TestStakerGetsThrottled(t *testing.T) {
 	t.Fatal("Staker should have been throttled before taking up the entire message queue.")
 }
 
-type infiniteResourcePool struct{}
+type infiniteResourceManager struct{}
 
-func (i *infiniteResourcePool) TakeMessage(vdr ids.ShortID) bool { return true }
+func (i *infiniteResourceManager) AddProcessing(vdr ids.ShortID) bool { return true }
 
-func (i *infiniteResourcePool) ReturnMessage(vdr ids.ShortID) {}
+func (i *infiniteResourceManager) RemoveProcessing(vdr ids.ShortID) {}
 
-func (i *infiniteResourcePool) Utilization(vdr ids.ShortID) float64 { return 0 }
+func (i *infiniteResourceManager) Utilization(vdr ids.ShortID) float64 { return 0 }
 
-func newInfiniteResourcePoolManager() ResourceManager {
-	return &infiniteResourcePool{}
+func newInfiniteResourceManager() MsgManager {
+	return &infiniteResourceManager{}
 }
 
 type noResourcesManager struct{}
 
-func (no *noResourcesManager) TakeMessage(vdr ids.ShortID) bool { return false }
+func (no *noResourcesManager) AddProcessing(vdr ids.ShortID) bool { return false }
 
-func (no *noResourcesManager) ReturnMessage(vdr ids.ShortID) {}
+func (no *noResourcesManager) RemoveProcessing(vdr ids.ShortID) {}
 
 func (no *noResourcesManager) Utilization(vdr ids.ShortID) float64 { return 1.0 }
 
-func newNoResourcesManager() ResourceManager {
+func newNoResourcesManager() MsgManager {
 	return &noResourcesManager{}
 }

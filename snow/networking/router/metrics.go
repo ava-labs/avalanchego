@@ -4,6 +4,7 @@
 package router
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,6 +16,10 @@ import (
 
 const (
 	defaultRequestHelpMsg = "Time spent processing this request in nanoseconds"
+)
+
+var (
+	errUnknownMsgType = errors.New("unknown message type")
 )
 
 func initHistogram(namespace, name string, registerer prometheus.Registerer, errs *wrappers.Errs) prometheus.Histogram {
@@ -159,45 +164,45 @@ func (m *metrics) registerTierStatistics(tier int) (prometheus.Gauge, prometheus
 	return gauge, histogram, errs.Err
 }
 
-func (m *metrics) getMSGHistogram(msg constants.MsgType) prometheus.Histogram {
+func (m *metrics) getMSGHistogram(msg constants.MsgType) (prometheus.Histogram, error) {
 	switch msg {
 	case constants.GetAcceptedFrontierMsg:
-		return m.getAcceptedFrontier
+		return m.getAcceptedFrontier, nil
 	case constants.AcceptedFrontierMsg:
-		return m.acceptedFrontier
+		return m.acceptedFrontier, nil
 	case constants.GetAcceptedFrontierFailedMsg:
-		return m.getAcceptedFrontierFailed
+		return m.getAcceptedFrontierFailed, nil
 	case constants.GetAcceptedMsg:
-		return m.getAccepted
+		return m.getAccepted, nil
 	case constants.AcceptedMsg:
-		return m.accepted
+		return m.accepted, nil
 	case constants.GetAcceptedFailedMsg:
-		return m.getAcceptedFailed
+		return m.getAcceptedFailed, nil
 	case constants.GetAncestorsMsg:
-		return m.getAncestors
+		return m.getAncestors, nil
 	case constants.GetAncestorsFailedMsg:
-		return m.getAncestorsFailed
+		return m.getAncestorsFailed, nil
 	case constants.MultiPutMsg:
-		return m.multiPut
+		return m.multiPut, nil
 	case constants.GetMsg:
-		return m.get
+		return m.get, nil
 	case constants.GetFailedMsg:
-		return m.getFailed
+		return m.getFailed, nil
 	case constants.PutMsg:
-		return m.put
+		return m.put, nil
 	case constants.PushQueryMsg:
-		return m.pushQuery
+		return m.pushQuery, nil
 	case constants.PullQueryMsg:
-		return m.pullQuery
+		return m.pullQuery, nil
 	case constants.QueryFailedMsg:
-		return m.queryFailed
+		return m.queryFailed, nil
 	case constants.ChitsMsg:
-		return m.chits
+		return m.chits, nil
 	case constants.ConnectedMsg:
-		return m.connected
+		return m.connected, nil
 	case constants.DisconnectedMsg:
-		return m.disconnected
+		return m.disconnected, nil
 	default:
-		panic(fmt.Sprintf("unknown message type %s", msg))
+		return nil, errUnknownMsgType
 	}
 }

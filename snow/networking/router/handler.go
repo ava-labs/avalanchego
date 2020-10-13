@@ -152,7 +152,7 @@ func (h *Handler) Initialize(
 
 	h.cpuTracker = tracker.NewCPUTracker(cpuInterval)
 	msgTracker := tracker.NewMessageTracker()
-	resourceManager := NewResourceManager(
+	msgManager := NewMsgManager(
 		validators,
 		h.ctx.Log,
 		msgTracker,
@@ -164,7 +164,7 @@ func (h *Handler) Initialize(
 	)
 
 	h.serviceQueue, h.msgSema = newMultiLevelQueue(
-		resourceManager,
+		msgManager,
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
@@ -555,8 +555,11 @@ func (h *Handler) handleValidatorMsg(msg message, startTime time.Time) error {
 	endTime := h.clock.Time()
 	timeConsumed := endTime.Sub(startTime)
 
-	histogram := h.getMSGHistogram(msg.messageType)
-	histogram.Observe(float64(timeConsumed))
+	if histogram, err := h.getMSGHistogram(msg.messageType); err != nil {
+		h.ctx.Log.Debug("%s", err)
+	} else {
+		histogram.Observe(float64(timeConsumed))
+	}
 
 	h.cpuTracker.UtilizeTime(msg.validatorID, startTime, endTime)
 	h.serviceQueue.UtilizeCPU(msg.validatorID, timeConsumed)
