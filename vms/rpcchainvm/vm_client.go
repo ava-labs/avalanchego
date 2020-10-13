@@ -327,6 +327,14 @@ func (vm *VMClient) SetPreference(id ids.ID) {
 // LastAccepted ...
 func (vm *VMClient) LastAccepted() ids.ID { return vm.lastAccepted }
 
+// Health ...
+func (vm *VMClient) Health() (interface{}, error) {
+	return vm.client.Health(
+		context.Background(),
+		&vmproto.HealthRequest{},
+	)
+}
+
 // BlockClient is an implementation of Block that talks over RPC.
 type BlockClient struct {
 	vm *VMClient

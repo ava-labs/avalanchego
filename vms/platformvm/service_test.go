@@ -156,7 +156,7 @@ func TestImportKey(t *testing.T) {
 		service.vm.Ctx.Lock.Unlock()
 	}()
 
-	reply := api.JsonAddress{}
+	reply := api.JSONAddress{}
 	if err := service.ImportKey(nil, &args, &reply); err != nil {
 		t.Fatal(err)
 	}
@@ -338,7 +338,7 @@ func TestGetBalance(t *testing.T) {
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis()
 	for _, utxo := range genesis.UTXOs {
-		request := api.JsonAddress{
+		request := api.JSONAddress{
 			Address: fmt.Sprintf("P-%s", utxo.Address),
 		}
 		reply := GetBalanceResponse{}
@@ -378,7 +378,7 @@ func TestGetStake(t *testing.T) {
 	for _, validator := range genesis.Validators {
 		addr := fmt.Sprintf("P-%s", validator.RewardOwner.Addresses[0])
 		addrs = append(addrs, addr)
-		args := api.JsonAddresses{
+		args := api.JSONAddresses{
 			Addresses: []string{addr},
 		}
 		response := GetStakeReply{}
@@ -391,7 +391,7 @@ func TestGetStake(t *testing.T) {
 	}
 
 	// Make sure this works for multiple addresses
-	args := api.JsonAddresses{
+	args := api.JSONAddresses{
 		Addresses: addrs,
 	}
 	response := GetStakeReply{}

@@ -99,4 +99,8 @@ type Config struct {
 	ConsensusRouter          router.Router
 	ConsensusGossipFrequency time.Duration
 	ConsensusShutdownTimeout time.Duration
+
+	// Throttling incoming connections
+	ConnMeterResetDuration time.Duration
+	ConnMeterMaxConns      int
 }

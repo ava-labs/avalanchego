@@ -6,6 +6,7 @@ set -o pipefail
 
 # Set GOPATH
 GOPATH="$(go env GOPATH)"
+CURRENT_DIR="$(pwd)"
 
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory above this script
 BUILD_DIR="$AVALANCHE_PATH/build" # Where binaries go
@@ -27,7 +28,9 @@ fi
 
 # Build Coreth, which is run as a subprocess
 echo "Building Coreth..."
-go build -o "$BINARY_PATH" "$CORETH_PATH/plugin/"*.go
+cd "$CORETH_PATH"
+go build -o "$BINARY_PATH" "plugin/"*.go
+cd "$CURRENT_DIR"
 
 # Building coreth + using go get can mess with the go.mod file.
 go mod tidy
