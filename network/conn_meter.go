@@ -1,6 +1,7 @@
 package network
 
 import (
+	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -15,9 +16,9 @@ import (
 type ConnMeter interface {
 	// Register that the given address tried to connect to us.
 	// Returns the number of times they previously tried.
-	RegisterConnection(addr string) (int, error)
+	Register(addr string) (int, error)
 	// Unregister the IP, removing the meter
-	UnRegisterConnection(addr string)
+	UnRegister(addr string)
 }
 
 // Return a new connection counter
@@ -31,28 +32,29 @@ func NewConnMeter(resetDuration time.Duration, size int) ConnMeter {
 
 type noConnMeter struct{}
 
-func (n *noConnMeter) RegisterConnection(addr string) (int, error) {
+func (n *noConnMeter) Register(addr string) (int, error) {
 	return 0, nil
 }
 
-func (n *noConnMeter) UnRegisterConnection(addr string) {}
+func (n *noConnMeter) UnRegister(addr string) {}
 
 // connMeter implements ConnMeter
 type connMeter struct {
 	cache         *cache.LRU
 	resetDuration time.Duration
+	lock          sync.RWMutex
 }
 
-func (n *connMeter) UnRegisterConnection(addr string) {
+func (n *connMeter) UnRegister(addr string) {
 	ip, err := utils.ToIPDesc(addr)
 	if err != nil {
 		return
 	}
 	addr = ip.IP.String()
-	n.unRegisterConnectionAddress(addr)
+	n.unRegisterAddress(addr)
 }
 
-func (n *connMeter) RegisterConnection(addr string) (int, error) {
+func (n *connMeter) Register(addr string) (int, error) {
 	ip, err := utils.ToIPDesc(addr)
 	if err != nil {
 		return 0, err
@@ -60,7 +62,7 @@ func (n *connMeter) RegisterConnection(addr string) (int, error) {
 
 	// normalize to just the incoming IP
 	addr = ip.IP.String()
-	meter, err := n.registerConnectionAddress(addr)
+	meter, err := n.registerAddress(addr)
 	if err != nil {
 		return 0, err
 	}
@@ -70,7 +72,7 @@ func (n *connMeter) RegisterConnection(addr string) (int, error) {
 	return tickCount, nil
 }
 
-func (n *connMeter) unRegisterConnectionAddress(addr string) {
+func (n *connMeter) unRegisterAddress(addr string) {
 	id, err := ids.ToID(hashing.ComputeHash256([]byte(addr)))
 	if err != nil {
 		return
@@ -79,7 +81,7 @@ func (n *connMeter) unRegisterConnectionAddress(addr string) {
 	n.cache.Evict(id)
 }
 
-func (n *connMeter) registerConnectionAddress(addr string) (*timer.TimedMeter, error) {
+func (n *connMeter) registerAddress(addr string) (*timer.TimedMeter, error) {
 	id, err := ids.ToID(hashing.ComputeHash256([]byte(addr)))
 	if err != nil {
 		return nil, err
@@ -87,11 +89,20 @@ func (n *connMeter) registerConnectionAddress(addr string) (*timer.TimedMeter, e
 
 	// Get the meter
 	meter, exists := n.cache.Get(id)
+	if exists {
+		return meter.(*timer.TimedMeter), nil
+	}
+
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	meter, exists = n.cache.Get(id)
+	if exists {
+		return meter.(*timer.TimedMeter), nil
+	}
 
 	// create the meter if one meter doesn't exist
-	if !exists {
-		meter = &timer.TimedMeter{Duration: n.resetDuration}
-		n.cache.Put(id, meter)
-	}
+	meter = &timer.TimedMeter{Duration: n.resetDuration}
+	n.cache.Put(id, meter)
 	return meter.(*timer.TimedMeter), nil
 }

@@ -658,7 +658,7 @@ func (n *network) Dispatch() error {
 		}
 
 		addr := conn.RemoteAddr().String()
-		ticks, err := n.connMeter.RegisterConnection(addr)
+		ticks, err := n.connMeter.Register(addr)
 		// looking for > n.connMeterMaxConns indicating the second tick
 		if err == nil && ticks > n.connMeterMaxConns {
 			n.log.Debug("connection from: %s temporarily dropped", addr)
