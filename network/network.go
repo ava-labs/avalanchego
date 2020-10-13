@@ -49,6 +49,7 @@ const (
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
 	defaultReadBufferSize                            = 16 * 1024
 	defaultReadHandshakeTimeout                      = 15 * time.Second
+	defaultConnMeterCacheSize                        = 10000
 )
 
 var (
@@ -131,6 +132,8 @@ type network struct {
 	pingFrequency                      time.Duration
 	readBufferSize                     uint32
 	readHandshakeTimeout               time.Duration
+	connMeterMaxConns                  int
+	connMeter                          ConnMeter
 
 	executor timer.Executor
 
@@ -164,6 +167,8 @@ func NewDefaultNetwork(
 	vdrs validators.Set,
 	beacons validators.Set,
 	router router.Router,
+	connMeterResetDuration time.Duration,
+	connMeterMaxConns int,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -197,6 +202,9 @@ func NewDefaultNetwork(
 		defaultPingFrequency,
 		defaultReadBufferSize,
 		defaultReadHandshakeTimeout,
+		connMeterResetDuration,
+		defaultConnMeterCacheSize,
+		connMeterMaxConns,
 	)
 }
 
@@ -233,6 +241,9 @@ func NewNetwork(
 	pingFrequency time.Duration,
 	readBufferSize uint32,
 	readHandshakeTimeout time.Duration,
+	connMeterResetDuration time.Duration,
+	connMeterCacheSize int,
+	connMeterMaxConns int,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -275,6 +286,8 @@ func NewNetwork(
 		peers:                              make(map[[20]byte]*peer),
 		readBufferSize:                     readBufferSize,
 		readHandshakeTimeout:               readHandshakeTimeout,
+		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize),
+		connMeterMaxConns:                  connMeterMaxConns,
 	}
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
@@ -643,6 +656,16 @@ func (n *network) Dispatch() error {
 				n.log.Warn("failed to set socket nodelay due to: %s", err)
 			}
 		}
+
+		addr := conn.RemoteAddr().String()
+		ticks, err := n.connMeter.Register(addr)
+		// looking for > n.connMeterMaxConns indicating the second tick
+		if err == nil && ticks > n.connMeterMaxConns {
+			n.log.Debug("connection from: %s temporarily dropped", addr)
+			_ = conn.Close()
+			continue
+		}
+
 		go func() {
 			err := n.upgrade(
 				&peer{

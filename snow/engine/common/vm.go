@@ -59,6 +59,10 @@ type VM interface {
 	// it have an extension called `accounts`, where clients could get
 	// information about their accounts.
 	CreateHandlers() map[string]*HTTPHandler
+
+	// Returns nil if the VM is healthy.
+	// Periodically called and reported via the node's Health API.
+	Health() (interface{}, error)
 }
 
 // StaticVM describes the functionality that allows a user to interact with a VM
