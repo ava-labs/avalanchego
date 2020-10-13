@@ -42,10 +42,12 @@ type EngineTest struct {
 	CantPushQuery,
 	CantPullQuery,
 	CantQueryFailed,
-	CantChits bool
+	CantChits,
 
 	CantConnected,
-	CantDisconnected bool
+	CantDisconnected,
+
+	CantHealth bool
 
 	IsBootstrappedF                                    func() bool
 	ContextF                                           func() *snow.Context
@@ -58,6 +60,7 @@ type EngineTest struct {
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(validatorID ids.ShortID, requestID uint32) error
 	ConnectedF, DisconnectedF func(validatorID ids.ShortID) error
+	HealthF                   func() (interface{}, error)
 }
 
 var _ Engine = &EngineTest{}
@@ -96,6 +99,8 @@ func (e *EngineTest) Default(cant bool) {
 
 	e.CantConnected = cant
 	e.CantDisconnected = cant
+
+	e.CantHealth = cant
 }
 
 // Context ...
@@ -427,4 +432,15 @@ func (e *EngineTest) IsBootstrapped() bool {
 		e.T.Fatalf("Unexpectedly called IsBootstrapped")
 	}
 	return false
+}
+
+// Health ...
+func (e *EngineTest) Health() (interface{}, error) {
+	if e.HealthF != nil {
+		return e.HealthF()
+	}
+	if e.CantHealth && e.T != nil {
+		e.T.Fatalf("Unexpectedly called Health")
+	}
+	return nil, errors.New("unexpectedly called Health")
 }

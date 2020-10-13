@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
-	"github.com/ava-labs/avalanchego/snow/networking/throttler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -342,6 +341,134 @@ func TestGenesis(t *testing.T) {
 	if _, err := vm.getSubnet(vm.DB, testSubnet1.ID()); err != nil {
 		t.Fatalf("expected subnet %s to exist", testSubnet1.ID())
 	}
+}
+
+// Test method getTotalStake
+func TestGetTotalStake(t *testing.T) {
+	vm, _ := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		vm.Ctx.Lock.Unlock()
+	}()
+
+	// Make sure stake is right after genesis
+	stake, err := vm.getTotalStake()
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedStake := len(keys) * defaultWeight
+	if expectedStake != int(stake) {
+		t.Fatalf("expected total stake to be %d but is %d",
+			expectedStake,
+			stake,
+		)
+	}
+
+	// add a validator
+	vdrID := ids.GenerateTestShortID()
+	vdrStakeAmt := vm.minValidatorStake
+	addValidatorTx, err := vm.newAddValidatorTx(
+		vdrStakeAmt,
+		uint64(defaultValidateStartTime.Unix()),
+		uint64(defaultValidateEndTime.Unix()),
+		vdrID,
+		ids.GenerateTestShortID(),
+		0,
+		keys,
+		keys[0].PublicKey().Address(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	validatorRewardTx := &rewardTx{
+		Reward: 100,
+		Tx:     *addValidatorTx,
+	}
+	if err := vm.addStaker(vm.DB, constants.PrimaryNetworkID, validatorRewardTx); err != nil {
+		t.Fatal(err)
+	}
+
+	// Ensure the stake increased
+	oldStake := stake
+	stake, err = vm.getTotalStake()
+	if err != nil {
+		t.Fatal(err)
+	} else if stake != oldStake+vdrStakeAmt {
+		t.Fatalf("excpected ottal stake to be %d but is %d",
+			oldStake+vdrStakeAmt,
+			stake,
+		)
+	}
+
+	// add a delegator
+	delegatorStakeAmt := 2 * vm.minDelegatorStake
+	addDelegatorTx, err := vm.newAddDelegatorTx(
+		delegatorStakeAmt,
+		uint64(defaultValidateStartTime.Unix()),
+		uint64(defaultValidateEndTime.Unix()),
+		vdrID,
+		ids.GenerateTestShortID(),
+		keys,
+		keys[0].PublicKey().Address(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	delegatorRewardTx := &rewardTx{
+		Reward: 100,
+		Tx:     *addDelegatorTx,
+	}
+	if err := vm.addStaker(vm.DB, constants.PrimaryNetworkID, delegatorRewardTx); err != nil {
+		t.Fatal(err)
+	}
+
+	// Ensure the stake increased
+	oldStake = stake
+	stake, err = vm.getTotalStake()
+	if err != nil {
+		t.Fatal(err)
+	} else if stake != oldStake+delegatorStakeAmt {
+		t.Fatalf("expected total stake to be %d but is %d",
+			oldStake+delegatorStakeAmt,
+			stake,
+		)
+	}
+
+	// Remove the delegator
+	if err := vm.removeStaker(vm.DB, constants.PrimaryNetworkID, delegatorRewardTx); err != nil {
+		t.Fatal(err)
+	}
+	// Ensure the stake decreased
+	oldStake = stake
+	stake, err = vm.getTotalStake()
+	if err != nil {
+		t.Fatal(err)
+	} else if stake != oldStake-delegatorStakeAmt {
+		t.Fatalf("expected total stake to be %d but is %d",
+			oldStake-delegatorStakeAmt,
+			stake,
+		)
+	}
+
+	// Remove the validator
+	if err := vm.removeStaker(vm.DB, constants.PrimaryNetworkID, validatorRewardTx); err != nil {
+		t.Fatal(err)
+	}
+	// Ensure the stake decreased
+	oldStake = stake
+	stake, err = vm.getTotalStake()
+	if err != nil {
+		t.Fatal(err)
+	} else if stake != oldStake-vdrStakeAmt {
+		t.Fatalf("expected total stake to be %d but is %d",
+			oldStake-vdrStakeAmt,
+			stake,
+		)
+	}
+
 }
 
 // accept proposal to add validator to primary network
@@ -1794,10 +1921,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		&engine,
 		vdrs,
 		msgChan,
-		1000,
-		throttler.DefaultMaxNonStakerPendingMsgs,
-		throttler.DefaultStakerPortion,
-		throttler.DefaultStakerPortion,
+		1024,
+		router.DefaultMaxNonStakerPendingMsgs,
+		router.DefaultStakerPortion,
+		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)

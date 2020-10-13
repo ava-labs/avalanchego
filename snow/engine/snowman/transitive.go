@@ -655,3 +655,9 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 func (t *Transitive) IsBootstrapped() bool {
 	return t.Ctx.IsBootstrapped()
 }
+
+// Health implements the common.Engine interface
+func (t *Transitive) Health() (interface{}, error) {
+	// TODO add more health checks
+	return t.VM.Health()
+}
