@@ -25,7 +25,7 @@ type Credential struct {
 func (cr *Credential) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString("{\"signatures\":[")
 	for i, sig := range cr.Sigs {
-		buffer.WriteString(fmt.Sprintf("\"%s\"", formatting.CB58{Bytes: sig[:]}))
+		buffer.WriteString(fmt.Sprintf("\"%s\"", formatting.Hex{Bytes: sig[:]}))
 		if i != len(cr.Sigs)-1 {
 			buffer.WriteString(",")
 		}

@@ -19,31 +19,39 @@ const (
 	DefaultStakerPortion float64 = 0.375
 )
 
-// ResourceManager defines the interface for the allocation
-// of resources from different pools
-type ResourceManager interface {
-	TakeMessage(ids.ShortID) bool
-	ReturnMessage(ids.ShortID)
+// MsgManager manages incoming messages. It should be called when an incoming message
+// is ready to be processed and when an incoming message is processed. We call the
+// message "pending" if it has been received but not processed.
+type MsgManager interface {
+	// AddPending marks that there is a message from [vdr] ready to be processed.
+	// Returns true if the message will eventually be processed.
+	AddPending(ids.ShortID) bool
+	// Called when we process a message from the given peer
+	RemovePending(ids.ShortID)
 	Utilization(ids.ShortID) float64
 }
 
-type resourceManager struct {
-	log  logging.Logger
-	vdrs validators.Set
-
+// msgManager implements MsgManager
+type msgManager struct {
+	log                            logging.Logger
+	vdrs                           validators.Set
 	maxNonStakerPendingMsgs        uint32
 	poolMessages, reservedMessages uint32
 	stakerMsgPortion               float64
 	msgTracker                     tracker.CountingTracker
-
-	stakerCPUPortion float64
-	cpuTracker       tracker.TimeTracker
-
-	clock timer.Clock
+	stakerCPUPortion               float64
+	cpuTracker                     tracker.TimeTracker
+	clock                          timer.Clock
 }
 
-// NewResourceManager ...
-func NewResourceManager(
+// NewMsgManager returns a new MsgManager
+// [vdrs] is the network validator set
+// [msgTracker] tracks how many messages we've received from each peer
+// [cpuTracker] tracks how much time we spend processing messages from each peer
+// [bufferSize] is the maximum number of pending messages (those we have
+//   received but not processed.)
+// [maxNonStakerPendingMsgs] is the maximum number of pending messages from non-validators.
+func NewMsgManager(
 	vdrs validators.Set,
 	log logging.Logger,
 	msgTracker tracker.CountingTracker,
@@ -52,27 +60,26 @@ func NewResourceManager(
 	maxNonStakerPendingMsgs uint32,
 	stakerMsgPortion,
 	stakerCPUPortion float64,
-) ResourceManager {
+) MsgManager {
 	// Number of messages reserved for stakers vs. non-stakers
 	reservedMessages := uint32(stakerMsgPortion * float64(bufferSize))
 	poolMessages := bufferSize - reservedMessages
 
-	return &resourceManager{
-		vdrs:       vdrs,
-		msgTracker: msgTracker,
-		cpuTracker: cpuTracker,
-		log:        log,
-
+	return &msgManager{
+		vdrs:                    vdrs,
+		msgTracker:              msgTracker,
+		cpuTracker:              cpuTracker,
+		log:                     log,
 		reservedMessages:        reservedMessages,
 		poolMessages:            poolMessages,
 		maxNonStakerPendingMsgs: maxNonStakerPendingMsgs,
-
-		stakerCPUPortion: stakerCPUPortion,
+		stakerCPUPortion:        stakerCPUPortion,
 	}
 }
 
-// TakeMessage attempts to take a message from an available resource
-func (rm *resourceManager) TakeMessage(vdr ids.ShortID) bool {
+// AddPending marks that there is a message from [vdr] ready to be processed.
+// Return true if the message was added to the processing list.
+func (rm *msgManager) AddPending(vdr ids.ShortID) bool {
 	// Attempt to take the message from the pool
 	outstandingPoolMessages := rm.msgTracker.PoolCount()
 	totalPeerMessages, peerPoolMessages := rm.msgTracker.OutstandingCount(vdr)
@@ -102,14 +109,14 @@ func (rm *resourceManager) TakeMessage(vdr ids.ShortID) bool {
 	return false
 }
 
-// ReturnMessage returns a message to its resource pool
-func (rm *resourceManager) ReturnMessage(vdr ids.ShortID) {
+// RemovePending marks that a message from [vdr] has been processed.
+func (rm *msgManager) RemovePending(vdr ids.ShortID) {
 	rm.msgTracker.Remove(vdr)
 }
 
 // Utilization returns the percentage of expected utilization
 // for [vdr] to determine message priority
-func (rm *resourceManager) Utilization(vdr ids.ShortID) float64 {
+func (rm *msgManager) Utilization(vdr ids.ShortID) float64 {
 	currentTime := rm.clock.Time()
 	vdrUtilization := rm.cpuTracker.Utilization(vdr, currentTime)
 	numSpenders := rm.cpuTracker.Len()
