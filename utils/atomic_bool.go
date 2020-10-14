@@ -14,8 +14,6 @@ func (a *AtomicBool) SetValue(b bool) {
 	var value uint32
 	if b {
 		value = 1
-	} else {
-		value = 0
 	}
 	atomic.StoreUint32(&a.value, value)
 }

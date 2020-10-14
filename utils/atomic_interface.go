@@ -4,24 +4,24 @@ import (
 	"sync"
 )
 
-type MutexInterface struct {
+type AtomicInterface struct {
 	value interface{}
 	lock  sync.RWMutex
 }
 
-func NewMutexInterface(v interface{}) *MutexInterface {
-	mutexInterface := MutexInterface{}
+func NewAtomicInterface(v interface{}) *AtomicInterface {
+	mutexInterface := AtomicInterface{}
 	mutexInterface.SetValue(v)
 	return &mutexInterface
 }
 
-func (a *MutexInterface) GetValue() interface{} {
+func (a *AtomicInterface) GetValue() interface{} {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 	return a.value
 }
 
-func (a *MutexInterface) SetValue(v interface{}) {
+func (a *AtomicInterface) SetValue(v interface{}) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.value = v

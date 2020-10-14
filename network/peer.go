@@ -60,7 +60,7 @@ type peer struct {
 	conn net.Conn
 
 	// version that the peer reported during the handshake
-	versionStr utils.MutexInterface
+	versionStr utils.AtomicInterface
 
 	// unix time of the last message sent and received respectively
 	lastSent, lastReceived int64
@@ -237,10 +237,6 @@ func (p *peer) WriteMessages() {
 
 // send assumes that the stateLock is not held.
 func (p *peer) Send(msg Msg) bool {
-	return p.send(msg)
-}
-
-func (p *peer) send(msg Msg) bool {
 	p.peerLock.Lock()
 	defer p.peerLock.Unlock()
 
@@ -756,12 +752,10 @@ func (p *peer) chits(msg Msg) {
 
 // assumes the stateLock is held
 func (p *peer) tryMarkConnected() {
-	if !p.connected.GetValue() && p.gotVersion.GetValue() && p.gotPeerList.GetValue() {
-		// the network connected function can only be called if disconnected
-		// wasn't already called
-		if p.closed.GetValue() {
-			return
-		}
+	if !p.connected.GetValue() && // not already connected
+		p.gotVersion.GetValue() && // not waiting for version
+		p.gotPeerList.GetValue() && // not waiting for peerlist
+		!p.closed.GetValue() { // and not already disconnected
 
 		p.connected.SetValue(true)
 		p.net.connected(p)
@@ -769,29 +763,28 @@ func (p *peer) tryMarkConnected() {
 }
 
 func (p *peer) discardIP() {
-	p.net.stateLock.Lock()
-	defer p.net.stateLock.Unlock()
-
-	ip := p.getIP()
 	// By clearing the IP, we will not attempt to reconnect to this peer
-	if !ip.IsZero() {
-		delete(p.net.disconnectedIPs, ip.String())
+	if ip := p.getIP(); !ip.IsZero() {
 		p.setIP(utils.IPDesc{})
+
+		p.net.stateLock.Lock()
+		delete(p.net.disconnectedIPs, ip.String())
+		p.net.stateLock.Unlock()
 	}
 	p.Close()
 }
 
 func (p *peer) discardMyIP() {
-	p.net.stateLock.Lock()
-	defer p.net.stateLock.Unlock()
-
-	ip := p.getIP()
 	// By clearing the IP, we will not attempt to reconnect to this peer
-	if !ip.IsZero() {
+	if ip := p.getIP(); !ip.IsZero() {
+		p.setIP(utils.IPDesc{})
+
 		str := ip.String()
+
+		p.net.stateLock.Lock()
 		p.net.myIPs[str] = struct{}{}
 		delete(p.net.disconnectedIPs, str)
-		p.setIP(utils.IPDesc{})
+		p.net.stateLock.Unlock()
 	}
 	p.Close()
 }
