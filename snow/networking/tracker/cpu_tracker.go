@@ -24,6 +24,7 @@ type TimeTracker interface {
 	EndInterval(time.Time)
 }
 
+// cpuTracker implements TimeTracker
 type cpuTracker struct {
 	lock sync.Mutex
 
