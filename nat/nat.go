@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils"
-
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 

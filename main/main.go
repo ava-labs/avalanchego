@@ -6,12 +6,11 @@ package main
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/utils/dynamicip"
-
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -96,20 +95,39 @@ func main() {
 	mapper := nat.NewPortMapper(log, Config.Nat)
 	defer mapper.UnmapAllPorts()
 
-	// Open staking port
-	// we want for NAT Traversal to have the external port (Config.StakingIP.Port) to connect to our
-	// internal listening port (Config.InternalStakingPort) which should be the same in most cases.
-	mapper.Map("TCP", Config.StakingIP.IP().Port, Config.StakingIP.IP().Port, stakingPortName, &Config.StakingIP, Config.DynamicUpdateDuration)
+	// Open staking port we want for NAT Traversal to have the external port
+	// (Config.StakingIP.Port) to connect to our internal listening port
+	// (Config.InternalStakingPort) which should be the same in most cases.
+	mapper.Map(
+		"TCP",
+		Config.StakingIP.IP().Port,
+		Config.StakingIP.IP().Port,
+		stakingPortName,
+		&Config.StakingIP,
+		Config.DynamicUpdateDuration,
+	)
 
 	// Open the HTTP port iff the HTTP server is not listening on localhost
 	if Config.HTTPHost != "127.0.0.1" && Config.HTTPHost != "localhost" {
-		// For NAT Traversal we want to route from the external port (Config.ExternalHTTPPort)
-		// to our internal port (Config.HTTPPort)
-		mapper.Map("TCP", Config.HTTPPort, Config.HTTPPort, httpPortName, nil, Config.DynamicUpdateDuration)
+		// For NAT Traversal we want to route from the external port
+		// (Config.ExternalHTTPPort) to our internal port (Config.HTTPPort)
+		mapper.Map(
+			"TCP",
+			Config.HTTPPort,
+			Config.HTTPPort,
+			httpPortName,
+			nil,
+			Config.DynamicUpdateDuration,
+		)
 	}
 
-	// Resularly updates our public IP (or does nothing, if configured that way)
-	externalIPUpdater := dynamicip.NewDynamicIPManager(Config.DynamicPublicIPResolver, Config.DynamicUpdateDuration, log, &Config.StakingIP)
+	// Regularly updates our public IP (or does nothing, if configured that way)
+	externalIPUpdater := dynamicip.NewDynamicIPManager(
+		Config.DynamicPublicIPResolver,
+		Config.DynamicUpdateDuration,
+		log,
+		&Config.StakingIP,
+	)
 	defer externalIPUpdater.Stop()
 
 	log.Debug("initializing node state")
