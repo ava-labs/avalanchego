@@ -9,9 +9,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
-
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/uptime"
 )
 
 func TestAddPending(t *testing.T) {
@@ -23,7 +23,7 @@ func TestAddPending(t *testing.T) {
 	}
 	nonStakerID := ids.NewShortID([20]byte{16})
 
-	cpuTracker := tracker.NewCPUTracker(time.Second)
+	cpuTracker := tracker.NewCPUTracker(uptime.IntervalFactory{}, time.Second)
 	msgTracker := tracker.NewMessageTracker()
 	vdrs := validators.NewSet()
 	if err := vdrs.Set(vdrList); err != nil {
@@ -69,7 +69,7 @@ func TestStakerGetsThrottled(t *testing.T) {
 		vdrList = append(vdrList, vdr)
 	}
 
-	cpuTracker := tracker.NewCPUTracker(time.Second)
+	cpuTracker := tracker.NewCPUTracker(uptime.IntervalFactory{}, time.Second)
 	msgTracker := tracker.NewMessageTracker()
 	vdrs := validators.NewSet()
 	if err := vdrs.Set(vdrList); err != nil {

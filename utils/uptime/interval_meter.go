@@ -22,10 +22,8 @@ func (IntervalFactory) New(halflife time.Duration) Meter {
 
 type intervalMeter struct {
 	running bool
-	started time.Time
 
-	halflife time.Duration
-
+	halflife       time.Duration
 	previousValues time.Duration
 	currentValue   time.Duration
 	nextHalvening  time.Time
@@ -38,19 +36,19 @@ func NewIntervalMeter(halflife time.Duration) Meter {
 }
 
 func (a *intervalMeter) Start(currentTime time.Time) {
-	if a.running {
-		return
-	}
-	a.Read(currentTime)
-	a.running = true
+	a.update(currentTime, true)
 }
 
 func (a *intervalMeter) Stop(currentTime time.Time) {
-	if !a.running {
+	a.update(currentTime, false)
+}
+
+func (a *intervalMeter) update(currentTime time.Time, running bool) {
+	if a.running == running {
 		return
 	}
 	a.Read(currentTime)
-	a.running = false
+	a.running = running
 }
 
 func (a *intervalMeter) Read(currentTime time.Time) float64 {

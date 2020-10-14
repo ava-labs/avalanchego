@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/uptime"
 )
 
 // Requirement: A set of nodes spamming messages (potentially costly) shouldn't
@@ -150,7 +151,7 @@ func (h *Handler) Initialize(
 		cpuInterval / 4,
 	}
 
-	h.cpuTracker = tracker.NewCPUTracker(cpuInterval)
+	h.cpuTracker = tracker.NewCPUTracker(uptime.IntervalFactory{}, cpuInterval)
 	msgTracker := tracker.NewMessageTracker()
 	msgManager := NewMsgManager(
 		validators,

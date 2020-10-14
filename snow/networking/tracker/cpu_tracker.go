@@ -11,6 +11,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/uptime"
 )
 
+const (
+	epsilon = 1e-9
+)
+
 // TimeTracker is an interface for tracking peers' usage of CPU Time
 type TimeTracker interface {
 	UtilizeTime(ids.ShortID, time.Time, time.Time)
@@ -22,17 +26,20 @@ type TimeTracker interface {
 
 // cpuTracker implements TimeTracker
 type cpuTracker struct {
-	lock            sync.Mutex
+	lock sync.Mutex
+
+	factory         uptime.Factory
 	cumulativeMeter uptime.Meter
 	halflife        time.Duration
 	cpuSpenders     map[[20]byte]uptime.Meter
 }
 
 // NewCPUTracker ...
-func NewCPUTracker(halflife time.Duration) TimeTracker {
+func NewCPUTracker(factory uptime.Factory, halflife time.Duration) TimeTracker {
 	return &cpuTracker{
+		factory:         factory,
+		cumulativeMeter: factory.New(halflife),
 		halflife:        halflife,
-		cumulativeMeter: uptime.NewIntervalMeter(halflife),
 		cpuSpenders:     make(map[[20]byte]uptime.Meter),
 	}
 }
@@ -47,7 +54,7 @@ func (ct *cpuTracker) getMeter(vdr ids.ShortID) uptime.Meter {
 		return meter
 	}
 
-	newMeter := uptime.NewIntervalMeter(ct.halflife)
+	newMeter := ct.factory.New(ct.halflife)
 	ct.cpuSpenders[key] = newMeter
 	return newMeter
 }
@@ -97,7 +104,7 @@ func (ct *cpuTracker) EndInterval(currentTime time.Time) {
 	ct.lock.Lock()
 	defer ct.lock.Unlock()
 	for key, meter := range ct.cpuSpenders {
-		if meter.Read(currentTime) == 0 {
+		if meter.Read(currentTime) <= epsilon {
 			delete(ct.cpuSpenders, key)
 		}
 	}
