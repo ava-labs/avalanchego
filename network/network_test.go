@@ -337,8 +337,6 @@ func TestEstablishConnection(t *testing.T) {
 	)
 	assert.NotNil(t, net1)
 
-	net0.Track(ip1)
-
 	go func() {
 		err := net0.Dispatch()
 		assert.Error(t, err)
@@ -347,6 +345,8 @@ func TestEstablishConnection(t *testing.T) {
 		err := net1.Dispatch()
 		assert.Error(t, err)
 	}()
+
+	net0.Track(ip1)
 
 	wg0.Wait()
 	wg1.Wait()
