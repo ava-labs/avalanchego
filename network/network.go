@@ -1032,22 +1032,18 @@ func (n *network) tryAddPeer(p *peer) error {
 	if err != nil {
 		n.stateLock.Lock()
 		defer n.stateLock.Unlock()
-		if !p.ip.IsZero() {
-			str := p.ip.String()
-			delete(n.disconnectedIPs, str)
-			delete(n.retryDelay, str)
-		}
 
 		// special processing
 		if err == errPeerIsMyself {
-			if !p.ip.IsZero() {
+			if !p.getIP().IsZero() {
+				peerIP := p.getIP()
 				// if n.ip is less useful than p.ip set it to this IP
 				if n.ip.IsZero() {
 					n.log.Info("setting my ip to %s because I was able to connect to myself through this channel",
-						p.ip)
-					n.ip = p.ip
+						peerIP)
+					n.ip = peerIP
 				}
-				str := p.ip.String()
+				str := peerIP.String()
 				delete(n.disconnectedIPs, str)
 				delete(n.retryDelay, str)
 				n.myIPs[str] = struct{}{}
