@@ -86,10 +86,18 @@ func (w *WalletService) update(utxos []*avax.UTXO) ([]*avax.UTXO, error) {
 }
 
 // IssueTx attempts to issue a transaction into consensus
-func (w *WalletService) IssueTx(r *http.Request, args *FormattedTx, reply *api.JSONTxID) error {
+func (w *WalletService) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
 	w.vm.ctx.Log.Info("AVM Wallet: IssueTx called with %s", args.Tx)
 
-	txID, err := w.issue(args.Tx.Bytes)
+	encoding, err := w.vm.encodingManager.GetEncoding(args.Encoding)
+	if err != nil {
+		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
+	}
+	txBytes, err := encoding.ConvertString(args.Tx)
+	if err != nil {
+		return fmt.Errorf("problem decoding transaction: %w", err)
+	}
+	txID, err := w.issue(txBytes)
 	reply.TxID = txID
 	return err
 }
