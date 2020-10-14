@@ -659,7 +659,7 @@ func (n *network) Dispatch() error {
 		}
 
 		go func() {
-			err := n.upgrade(
+			id, err := n.upgrade(
 				&peer{
 					net:          n,
 					conn:         conn,
@@ -668,7 +668,7 @@ func (n *network) Dispatch() error {
 				n.serverUpgrader,
 			)
 			if err != nil {
-				n.log.Verbo("failed to upgrade connection: %s", err)
+				n.log.Verbo("failed to upgrade connection %s: %s", id, err)
 			}
 		}()
 	}
@@ -929,27 +929,27 @@ func (n *network) connectTo(ip utils.IPDesc) {
 		n.retryDelay[str] = delay
 		n.stateLock.Unlock()
 
-		err := n.attemptConnect(ip)
+		id, err := n.attemptConnect(ip)
 		if err == nil {
 			return
 		}
 		if err == errAlreadyPeered || err == errVersionExpected || err == errPeerIsMyself {
-			n.log.Debug("error attempting to connect to %s: %s", ip, err)
+			n.log.Debug("error attempting to connect %s to %s: %s", id, ip, err)
 			return
 		}
-		n.log.Verbo("error attempting to connect to %s: %s. Reattempting in %s",
-			ip, err, delay)
+		n.log.Verbo("error attempting to connect %s to %s: %s. Reattempting in %s",
+			id, ip, err, delay)
 	}
 }
 
 // assumes the stateLock is not held. Returns nil if a connection was able to be
 // established, or the network is closed.
-func (n *network) attemptConnect(ip utils.IPDesc) error {
+func (n *network) attemptConnect(ip utils.IPDesc) (ids.ShortID, error) {
 	n.log.Verbo("attempting to connect to %s", ip)
 
 	conn, err := n.dialer.Dial(ip)
 	if err != nil {
-		return err
+		return ids.ShortEmpty, err
 	}
 	if conn, ok := conn.(*net.TCPConn); ok {
 		if err := conn.SetLinger(0); err != nil {
@@ -969,28 +969,28 @@ func (n *network) attemptConnect(ip utils.IPDesc) error {
 
 // assumes the stateLock is not held. Returns an error if the peer's connection
 // wasn't able to be upgraded.
-func (n *network) upgrade(p *peer, upgrader Upgrader) error {
+func (n *network) upgrade(p *peer, upgrader Upgrader) (ids.ShortID, error) {
 	if err := p.conn.SetReadDeadline(time.Now().Add(n.readHandshakeTimeout)); err != nil {
 		_ = p.conn.Close()
 		n.log.Verbo("failed to set the read deadline with %s", err)
-		return err
+		return ids.ShortEmpty, err
 	}
 
 	id, conn, err := upgrader.Upgrade(p.conn)
 	if err != nil {
 		_ = p.conn.Close()
 		n.log.Verbo("failed to upgrade connection with %s", err)
-		return err
+		return id, err
 	}
 
 	if n.isPeered(id) {
-		return errAlreadyPeered
+		return id, errAlreadyPeered
 	}
 
 	if err := conn.SetReadDeadline(time.Time{}); err != nil {
 		_ = p.conn.Close()
 		n.log.Verbo("failed to clear the read deadline with %s", err)
-		return err
+		return id, err
 	}
 
 	p.sender = make(chan []byte, n.sendQueueSize)
@@ -1000,9 +1000,9 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 	if err := n.tryAddPeer(p); err != nil {
 		_ = p.conn.Close()
 		n.log.Debug("dropping peer connection %s due to: %s", id, err)
-		return err
+		return id, err
 	}
-	return nil
+	return id, nil
 }
 
 // assumes the stateLock is not held. Returns an error if the peer couldn't be
