@@ -186,7 +186,7 @@ func (p *peer) processVersionNak() error {
 	}
 
 	ips := p.net.validatorIPsNoLock()
-	// We are not already peered, so send client VersionNak
+	// We are not peered, so send client VersionNak
 	msg, err := p.versionNack(Success, ips)
 	if err != nil {
 		return errVersionNakExpected

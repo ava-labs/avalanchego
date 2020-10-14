@@ -1004,8 +1004,6 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 // assumes the stateLock is not held. Returns an error if the peer couldn't be
 // added.
 func (n *network) tryAddPeer(p *peer) error {
-	ip := p.getIP()
-
 	key := p.id.Key()
 
 	if n.closed.GetValue() {
@@ -1051,6 +1049,8 @@ func (n *network) tryAddPeer(p *peer) error {
 
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
+
+	ip := p.getIP()
 
 	// if this connection is myself, then I should delete the connection and
 	// mark the IP as one of mine.
@@ -1161,6 +1161,9 @@ func (n *network) disconnected(p *peer) {
 // assumes stateLock is held
 // iterate the peers and find if we are already peered to this node.
 func (n *network) isPeered(id ids.ShortID) bool {
+	n.stateLock.Lock()
+	defer n.stateLock.Unlock()
+
 	_, exists := n.peers[id.Key()]
 	return exists
 }
