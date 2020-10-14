@@ -20,40 +20,38 @@ type peer struct {
 	net *network // network this peer is part of
 
 	// if the version message has been received and is valid. is only modified
-	// on the connection's reader routine with the network state lock held.
+	// on the connection's reader routine.
 	gotVersion utils.AtomicBool
 
 	// if the gotPeerList message has been received and is valid. is only
-	// modified on the connection's reader routine with the network state lock
-	// held.
+	// modified on the connection's reader routine.
 	gotPeerList utils.AtomicBool
 
 	// if the version message has been received and is valid and the peerlist
-	// has been returned. is only modified on the connection's reader routine
-	// with the network state lock held.
+	// has been returned. is only modified on the connection's reader routine.
 	connected utils.AtomicBool
 
 	// only close the peer once
 	once sync.Once
 
-	// if the close function has been called, is only modifed when the network
-	// state lock held.
+	// if the close function has been called.
 	closed utils.AtomicBool
 
-	// number of bytes currently in the send queue, is only modifed when the
-	// network state lock held.
+	// number of bytes currently in the send queue.
 	pendingBytes int64
 
+	// lock to ensure that closing of the sender queue is handled safely
+	senderLock sync.Mutex
 	// queue of messages this connection is attempting to send the peer. Is
 	// closed when the connection is closed.
 	sender chan []byte
 
 	// ip may or may not be set when the peer is first started. is only modified
-	// on the connection's reader routine with the network state lock held.
+	// on the connection's reader routine.
 	ip     utils.IPDesc
 	ipLock sync.RWMutex
 
-	// id should be set when the peer is first started.
+	// id should be set when the peer is first created.
 	id ids.ShortID
 
 	// the connection object that is used to read/write messages from
@@ -64,9 +62,6 @@ type peer struct {
 
 	// unix time of the last message sent and received respectively
 	lastSent, lastReceived int64
-
-	// only one peer lock should only be held at a time by a thread of execution
-	peerLock sync.RWMutex
 
 	tickerCloser chan struct{}
 
@@ -237,9 +232,11 @@ func (p *peer) WriteMessages() {
 
 // send assumes that the stateLock is not held.
 func (p *peer) Send(msg Msg) bool {
-	p.peerLock.Lock()
-	defer p.peerLock.Unlock()
+	p.senderLock.Lock()
+	defer p.senderLock.Unlock()
 
+	// If the peer was closed then the sender channel was closed and we are
+	// unable to send this message without panicking. So drop the message.
 	if p.closed.GetValue() {
 		p.net.log.Debug("dropping message to %s due to a closed connection", p.id)
 		return false
@@ -385,9 +382,11 @@ func (p *peer) close() {
 		p.net.log.Debug("closing peer %s resulted in an error: %s", p.id, err)
 	}
 
-	p.peerLock.Lock()
+	p.senderLock.Lock()
+	// The locks guarantee here that the sender routine will read that the peer
+	// has been closed and will therefore not attempt to write on this channel.
 	close(p.sender)
-	p.peerLock.Unlock()
+	p.senderLock.Unlock()
 
 	p.net.disconnected(p)
 }

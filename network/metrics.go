@@ -17,24 +17,21 @@ type messageMetrics struct {
 }
 
 func (mm *messageMetrics) initialize(msgType Op, registerer prometheus.Registerer) error {
-	mm.numSent = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: constants.PlatformName,
-			Name:      fmt.Sprintf("%s_sent", msgType),
-			Help:      fmt.Sprintf("Number of %s messages sent", msgType),
-		})
-	mm.numFailed = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: constants.PlatformName,
-			Name:      fmt.Sprintf("%s_failed", msgType),
-			Help:      fmt.Sprintf("Number of %s messages that failed to be sent", msgType),
-		})
-	mm.numReceived = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: constants.PlatformName,
-			Name:      fmt.Sprintf("%s_received", msgType),
-			Help:      fmt.Sprintf("Number of %s messages received", msgType),
-		})
+	mm.numSent = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: constants.PlatformName,
+		Name:      fmt.Sprintf("%s_sent", msgType),
+		Help:      fmt.Sprintf("Number of %s messages sent", msgType),
+	})
+	mm.numFailed = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: constants.PlatformName,
+		Name:      fmt.Sprintf("%s_failed", msgType),
+		Help:      fmt.Sprintf("Number of %s messages that failed to be sent", msgType),
+	})
+	mm.numReceived = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: constants.PlatformName,
+		Name:      fmt.Sprintf("%s_received", msgType),
+		Help:      fmt.Sprintf("Number of %s messages received", msgType),
+	})
 
 	if err := registerer.Register(mm.numSent); err != nil {
 		return fmt.Errorf("failed to register sent statistics of %s due to %s",
@@ -64,37 +61,36 @@ type metrics struct {
 }
 
 func (m *metrics) initialize(registerer prometheus.Registerer) error {
-	m.numPeers = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: constants.PlatformName,
-			Name:      "peers",
-			Help:      "Number of network peers",
-		})
+	m.numPeers = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: constants.PlatformName,
+		Name:      "peers",
+		Help:      "Number of network peers",
+	})
 
 	errs := wrappers.Errs{}
 	if err := registerer.Register(m.numPeers); err != nil {
 		errs.Add(fmt.Errorf("failed to register peers statistics due to %s",
 			err))
 	}
-
-	errs.Add(m.getVersion.initialize(GetVersion, registerer))
-	errs.Add(m.version.initialize(Version, registerer))
-	errs.Add(m.getPeerlist.initialize(GetPeerList, registerer))
-	errs.Add(m.peerlist.initialize(PeerList, registerer))
-	errs.Add(m.ping.initialize(Ping, registerer))
-	errs.Add(m.pong.initialize(Pong, registerer))
-	errs.Add(m.getAcceptedFrontier.initialize(GetAcceptedFrontier, registerer))
-	errs.Add(m.acceptedFrontier.initialize(AcceptedFrontier, registerer))
-	errs.Add(m.getAccepted.initialize(GetAccepted, registerer))
-	errs.Add(m.accepted.initialize(Accepted, registerer))
-	errs.Add(m.get.initialize(Get, registerer))
-	errs.Add(m.getAncestors.initialize(GetAncestors, registerer))
-	errs.Add(m.put.initialize(Put, registerer))
-	errs.Add(m.multiPut.initialize(MultiPut, registerer))
-	errs.Add(m.pushQuery.initialize(PushQuery, registerer))
-	errs.Add(m.pullQuery.initialize(PullQuery, registerer))
-	errs.Add(m.chits.initialize(Chits, registerer))
-
+	errs.Add(
+		m.getVersion.initialize(GetVersion, registerer),
+		m.version.initialize(Version, registerer),
+		m.getPeerlist.initialize(GetPeerList, registerer),
+		m.peerlist.initialize(PeerList, registerer),
+		m.ping.initialize(Ping, registerer),
+		m.pong.initialize(Pong, registerer),
+		m.getAcceptedFrontier.initialize(GetAcceptedFrontier, registerer),
+		m.acceptedFrontier.initialize(AcceptedFrontier, registerer),
+		m.getAccepted.initialize(GetAccepted, registerer),
+		m.accepted.initialize(Accepted, registerer),
+		m.get.initialize(Get, registerer),
+		m.getAncestors.initialize(GetAncestors, registerer),
+		m.put.initialize(Put, registerer),
+		m.multiPut.initialize(MultiPut, registerer),
+		m.pushQuery.initialize(PushQuery, registerer),
+		m.pullQuery.initialize(PullQuery, registerer),
+		m.chits.initialize(Chits, registerer),
+	)
 	return errs.Err
 }
 

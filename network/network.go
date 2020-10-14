@@ -301,6 +301,7 @@ func NewNetwork(
 }
 
 // GetAcceptedFrontier implements the Sender interface.
+// assumes the stateLock is not held.
 func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time) {
 	msg, err := n.b.GetAcceptedFrontier(chainID, requestID, uint64(deadline.Sub(n.clock.Time())))
 	n.log.AssertNoError(err)
@@ -322,6 +323,7 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 }
 
 // AcceptedFrontier implements the Sender interface.
+// assumes the stateLock is not held.
 func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set) {
 	msg, err := n.b.AcceptedFrontier(chainID, requestID, containerIDs)
 	if err != nil {
@@ -347,6 +349,7 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 }
 
 // GetAccepted implements the Sender interface.
+// assumes the stateLock is not held.
 func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs ids.Set) {
 	msg, err := n.b.GetAccepted(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerIDs)
 	if err != nil {
@@ -380,6 +383,7 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 }
 
 // Accepted implements the Sender interface.
+// assumes the stateLock is not held.
 func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set) {
 	msg, err := n.b.Accepted(chainID, requestID, containerIDs)
 	if err != nil {
@@ -405,6 +409,7 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 }
 
 // GetAncestors implements the Sender interface.
+// assumes the stateLock is not held.
 func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) {
 	msg, err := n.b.GetAncestors(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerID)
 	if err != nil {
@@ -427,6 +432,7 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 }
 
 // MultiPut implements the Sender interface.
+// assumes the stateLock is not held.
 func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte) {
 	msg, err := n.b.MultiPut(chainID, requestID, containers)
 	if err != nil {
@@ -448,6 +454,7 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 }
 
 // Get implements the Sender interface.
+// assumes the stateLock is not held.
 func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) {
 	msg, err := n.b.Get(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerID)
 	n.log.AssertNoError(err)
@@ -467,6 +474,7 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 }
 
 // Put implements the Sender interface.
+// assumes the stateLock is not held.
 func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
 	msg, err := n.b.Put(chainID, requestID, containerID, container)
 	if err != nil {
@@ -494,6 +502,7 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 }
 
 // PushQuery implements the Sender interface.
+// assumes the stateLock is not held.
 func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID, container []byte) {
 	msg, err := n.b.PushQuery(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerID, container)
 
@@ -531,6 +540,7 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 }
 
 // PullQuery implements the Sender interface.
+// assumes the stateLock is not held.
 func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) {
 	msg, err := n.b.PullQuery(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerID)
 	n.log.AssertNoError(err)
@@ -553,6 +563,7 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 }
 
 // Chits implements the Sender interface.
+// assumes the stateLock is not held.
 func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes ids.Set) {
 	msg, err := n.b.Chits(chainID, requestID, votes)
 	if err != nil {
@@ -578,6 +589,7 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 }
 
 // Gossip attempts to gossip the container to the network
+// assumes the stateLock is not held.
 func (n *network) Gossip(chainID, containerID ids.ID, container []byte) {
 	if err := n.gossipContainer(chainID, containerID, container); err != nil {
 		n.log.Debug("failed to Gossip(%s, %s): %s", chainID, containerID, err)
@@ -586,6 +598,7 @@ func (n *network) Gossip(chainID, containerID ids.ID, container []byte) {
 }
 
 // Accept is called after every consensus decision
+// assumes the stateLock is not held.
 func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte) error {
 	if !ctx.IsBootstrapped() {
 		// don't gossip during bootstrapping
@@ -602,6 +615,7 @@ func (n *network) GetHeartbeat() int64 { return atomic.LoadInt64(&n.lastHeartbea
 
 // Dispatch starts accepting connections from other nodes attempting to connect
 // to this node.
+// assumes the stateLock is not held.
 func (n *network) Dispatch() error {
 	go n.gossip()
 	for {
@@ -652,6 +666,7 @@ func (n *network) Dispatch() error {
 }
 
 // IPs implements the Network interface
+// assumes the stateLock is not held.
 func (n *network) Peers() []PeerID {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
@@ -673,6 +688,7 @@ func (n *network) Peers() []PeerID {
 }
 
 // Close implements the Network interface
+// assumes the stateLock is not held.
 func (n *network) Close() error {
 	err := n.listener.Close()
 	if err != nil {
@@ -704,6 +720,7 @@ func (n *network) Close() error {
 }
 
 // Track implements the Network interface
+// assumes the stateLock is not held.
 func (n *network) Track(ip utils.IPDesc) {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
@@ -1040,6 +1057,7 @@ func (n *network) validatorIPs() []utils.IPDesc {
 
 // should only be called after the peer is marked as connected. Should not be
 // called after disconnected is called with this peer.
+// assumes the stateLock is not held.
 func (n *network) connected(p *peer) {
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
@@ -1059,6 +1077,7 @@ func (n *network) connected(p *peer) {
 }
 
 // should only be called after the peer is marked as connected.
+// assumes the stateLock is not held.
 func (n *network) disconnected(p *peer) {
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
@@ -1096,6 +1115,7 @@ type PeerElement struct {
 }
 
 // Safe copy the peers dressed as a PeerElement
+// assumes the stateLock is not held.
 func (n *network) getPeers(validatorIDs ids.ShortSet) []*PeerElement {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
@@ -1116,6 +1136,7 @@ func (n *network) getPeers(validatorIDs ids.ShortSet) []*PeerElement {
 }
 
 // Safe copy the peers
+// assumes the stateLock is not held.
 func (n *network) getAllPeers() []*peer {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
@@ -1132,6 +1153,7 @@ func (n *network) getAllPeers() []*peer {
 }
 
 // Safe find a single peer
+// assumes the stateLock is not held.
 func (n *network) getPeer(validatorID ids.ShortID) *peer {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
