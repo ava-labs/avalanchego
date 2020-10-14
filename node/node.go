@@ -66,7 +66,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion(constants.PlatformName, 1, 0, 2)
+	Version       = version.NewDefaultVersion(constants.PlatformName, 1, 0, 3)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -309,7 +309,7 @@ func (n *Node) Dispatch() error {
 
 	// Add bootstrap nodes to the peer network
 	for _, peer := range n.Config.BootstrapPeers {
-		if !peer.IP.Equal(n.Config.StakingIP) {
+		if !peer.IP.Equal(n.Config.StakingIP.IP()) {
 			n.Net.Track(peer.IP)
 		} else {
 			n.Log.Error("can't add self as a bootstrapper")
@@ -364,7 +364,7 @@ func (n *Node) initDatabase() error {
 // uses for P2P communication
 func (n *Node) initNodeID() error {
 	if !n.Config.EnableP2PTLS {
-		n.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.String())))
+		n.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.IP().String())))
 		n.Log.Info("Set the node's ID to %s", n.ID)
 		return nil
 	}
