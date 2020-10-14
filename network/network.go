@@ -983,10 +983,6 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) (ids.ShortID, error) {
 		return id, err
 	}
 
-	if n.isPeered(id) {
-		return id, errAlreadyPeered
-	}
-
 	if err := conn.SetReadDeadline(time.Time{}); err != nil {
 		_ = p.conn.Close()
 		n.log.Verbo("failed to clear the read deadline with %s", err)
