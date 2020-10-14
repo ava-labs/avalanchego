@@ -98,7 +98,7 @@ type network struct {
 
 	log            logging.Logger
 	id             ids.ShortID
-	ip             utils.IPDesc
+	ip             utils.DynamicIPDesc
 	networkID      uint32
 	version        version.Version
 	parser         version.Parser
@@ -158,7 +158,7 @@ func NewDefaultNetwork(
 	registerer prometheus.Registerer,
 	log logging.Logger,
 	id ids.ShortID,
-	ip utils.IPDesc,
+	ip utils.DynamicIPDesc,
 	networkID uint32,
 	version version.Version,
 	parser version.Parser,
@@ -215,7 +215,7 @@ func NewNetwork(
 	registerer prometheus.Registerer,
 	log logging.Logger,
 	id ids.ShortID,
-	ip utils.IPDesc,
+	ip utils.DynamicIPDesc,
 	networkID uint32,
 	version version.Version,
 	parser version.Parser,
@@ -284,7 +284,7 @@ func NewNetwork(
 		disconnectedIPs:                    make(map[string]struct{}),
 		connectedIPs:                       make(map[string]struct{}),
 		retryDelay:                         make(map[string]time.Duration),
-		myIPs:                              map[string]struct{}{ip.String(): {}},
+		myIPs:                              map[string]struct{}{ip.IP().String(): {}},
 		peers:                              make(map[[20]byte]*peer),
 		readBufferSize:                     readBufferSize,
 		readHandshakeTimeout:               readHandshakeTimeout,
@@ -1008,10 +1008,10 @@ func (n *network) tryAddPeer(p *peer) error {
 	if p.id.Equals(n.id) {
 		if !ip.IsZero() {
 			// if n.ip is less useful than p.ip set it to this IP
-			if n.ip.IsZero() {
+			if n.ip.IP().IsZero() {
 				n.log.Info("setting my ip to %s because I was able to connect to myself through this channel",
-					ip)
-				n.ip = ip
+					p.ip)
+				n.ip.Update(p.ip)
 			}
 			str := ip.String()
 			delete(n.disconnectedIPs, str)
