@@ -153,7 +153,7 @@ func (h *Handler) Initialize(
 
 	h.cpuTracker = tracker.NewCPUTracker(uptime.IntervalFactory{}, cpuInterval)
 	msgTracker := tracker.NewMessageTracker()
-	resourceManager := NewResourceManager(
+	msgManager := NewMsgManager(
 		validators,
 		h.ctx.Log,
 		msgTracker,
@@ -165,7 +165,7 @@ func (h *Handler) Initialize(
 	)
 
 	h.serviceQueue, h.msgSema = newMultiLevelQueue(
-		resourceManager,
+		msgManager,
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,

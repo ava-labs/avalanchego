@@ -35,7 +35,7 @@ type multiLevelQueue struct {
 
 	currentTier int
 
-	resourceManager ResourceManager
+	msgManager MsgManager
 
 	// CPU based prioritization
 	queues        []singleLevelQueue
@@ -57,7 +57,7 @@ type multiLevelQueue struct {
 // defines the range of priorities for the multi-level queue and the amount of time to
 // spend on each level. Their length must be the same.
 func newMultiLevelQueue(
-	resourceManager ResourceManager,
+	msgManager MsgManager,
 	consumptionRanges []float64,
 	consumptionAllotments []time.Duration,
 	bufferSize int,
@@ -82,14 +82,14 @@ func newMultiLevelQueue(
 	}
 
 	return &multiLevelQueue{
-		resourceManager: resourceManager,
-		queues:          queues,
-		cpuRanges:       consumptionRanges,
-		cpuAllotments:   consumptionAllotments,
-		log:             log,
-		metrics:         metrics,
-		bufferSize:      bufferSize,
-		semaChan:        semaChan,
+		msgManager:    msgManager,
+		queues:        queues,
+		cpuRanges:     consumptionRanges,
+		cpuAllotments: consumptionAllotments,
+		log:           log,
+		metrics:       metrics,
+		bufferSize:    bufferSize,
+		semaChan:      semaChan,
 	}, semaChan
 }
 
@@ -109,7 +109,7 @@ func (ml *multiLevelQueue) PopMessage() (message, error) {
 
 	msg, err := ml.popMessage()
 	if err == nil {
-		ml.resourceManager.ReturnMessage(msg.validatorID)
+		ml.msgManager.RemovePending(msg.validatorID)
 		ml.pendingMessages--
 		ml.metrics.pending.Dec()
 	}
@@ -212,8 +212,8 @@ func (ml *multiLevelQueue) pushMessage(msg message) bool {
 		return false
 	}
 
-	success := ml.resourceManager.TakeMessage(validatorID)
-	if !success {
+	processing := ml.msgManager.AddPending(validatorID)
+	if !processing {
 		ml.metrics.dropped.Inc()
 		ml.metrics.throttled.Inc()
 		return false
@@ -223,7 +223,7 @@ func (ml *multiLevelQueue) pushMessage(msg message) bool {
 	if !ml.placeMessage(msg) {
 		ml.log.Verbo("Dropped message while attempting to place it in a queue: %s", msg)
 		ml.metrics.dropped.Inc()
-		ml.resourceManager.ReturnMessage(validatorID)
+		ml.msgManager.RemovePending(validatorID)
 		return false
 	}
 
@@ -265,7 +265,7 @@ func (ml *multiLevelQueue) waterfallMessage(msg message, queueIndex int) bool {
 // getPriorityIndex finds the correct index to place a message from [vdr]
 // based on its current utilization
 func (ml *multiLevelQueue) getPriorityIndex(validatorID ids.ShortID) int {
-	utilization := ml.resourceManager.Utilization(validatorID)
+	utilization := ml.msgManager.Utilization(validatorID)
 	for i := 0; i < len(ml.cpuRanges); i++ {
 		if utilization <= ml.cpuRanges[i] {
 			return i
