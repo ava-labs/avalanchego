@@ -1057,10 +1057,6 @@ func (n *network) tryAddPeer(p *peer) error {
 			peerIP := p.getIP()
 			if peer.getIP().IsZero() && !peerIP.IsZero() {
 				peer.setIP(peerIP)
-				str := peerIP.String()
-				delete(n.disconnectedIPs, str)
-				delete(n.retryDelay, str)
-				n.connectedIPs[str] = struct{}{}
 				n.log.Debug("updating %s to %s", peer.id, peer.getIP())
 			}
 			// we are peering..  this will stop the connection loop
