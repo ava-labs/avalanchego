@@ -40,7 +40,7 @@ func setupMultiLevelQueue(t *testing.T, bufferSize int) (messageQueue, chan stru
 		cpuInterval / 4,
 	}
 
-	resourceManager := newInfiniteResourcePoolManager()
+	resourceManager := newInfiniteResourceManager()
 	queue, semaChan := newMultiLevelQueue(
 		resourceManager,
 		consumptionRanges,
@@ -159,7 +159,7 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 
 	cpuTracker := tracker.NewCPUTracker(uptime.IntervalFactory{}, time.Second)
 	msgTracker := tracker.NewMessageTracker()
-	resourceManager := NewResourceManager(
+	resourceManager := NewMsgManager(
 		vdrs,
 		logging.NoLog{},
 		msgTracker,
@@ -272,7 +272,7 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 
 	cpuTracker := tracker.NewCPUTracker(uptime.IntervalFactory{}, time.Second)
 	msgTracker := tracker.NewMessageTracker()
-	resourceManager := NewResourceManager(
+	resourceManager := NewMsgManager(
 		vdrs,
 		logging.NoLog{},
 		msgTracker,
@@ -375,7 +375,7 @@ func TestMultiLevelQueueFreesSpace(t *testing.T) {
 
 	cpuTracker := tracker.NewCPUTracker(uptime.IntervalFactory{}, time.Second)
 	msgTracker := tracker.NewMessageTracker()
-	resourceManager := NewResourceManager(
+	resourceManager := NewMsgManager(
 		vdrs,
 		logging.NoLog{},
 		msgTracker,

@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	defaultCPUInterval = 5 * time.Second
+	defaultCPUInterval = 15 * time.Second
 )
 
 var (
