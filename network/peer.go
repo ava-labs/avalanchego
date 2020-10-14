@@ -5,6 +5,7 @@ package network
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"net"
 	"sync"
@@ -84,6 +85,16 @@ func (p *peer) Start() error {
 	// send the version and get a msg from receiver..
 	msg, err := p.verionAck()
 	if err != nil {
+
+		// old logic (needs to be removed)
+		// if we get an EOF from a versionAck, remote peer is an older versioned node.
+		// it's actually (probably) closing a connection to us b/c we are already peered.
+		// if that happens, then lets check if we think we are peered.
+		if err == io.EOF {
+			if p.net.isPeered(p.id) {
+				return errAlreadyPeered
+			}
+		}
 		return err
 	}
 
