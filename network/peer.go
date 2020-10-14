@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	VersionPeerNak = version.NewDefaultVersion(constants.PlatformName, 1, 0, 3)
+	VersionPeerNak = version.NewDefaultVersion(constants.PlatformName, 1, 0, 4)
 )
 
 type peer struct {
