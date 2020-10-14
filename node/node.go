@@ -66,7 +66,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion(constants.PlatformName, 1, 0, 2)
+	Version       = version.NewDefaultVersion(constants.PlatformName, 1, 0, 3)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -88,6 +88,9 @@ type Node struct {
 
 	// Manages shared memory
 	sharedMemory atomic.Memory
+
+	// Monitors node health and runs health checks
+	healthService *health.Health
 
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
@@ -214,6 +217,8 @@ func (n *Node) initNetworking() error {
 		primaryNetworkValidators,
 		n.beacons,
 		consensusRouter,
+		n.Config.ConnMeterResetDuration,
+		n.Config.ConnMeterMaxConns,
 	)
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
@@ -304,7 +309,7 @@ func (n *Node) Dispatch() error {
 
 	// Add bootstrap nodes to the peer network
 	for _, peer := range n.Config.BootstrapPeers {
-		if !peer.IP.Equal(n.Config.StakingIP) {
+		if !peer.IP.Equal(n.Config.StakingIP.IP()) {
 			n.Net.Track(peer.IP)
 		} else {
 			n.Log.Error("can't add self as a bootstrapper")
@@ -359,7 +364,7 @@ func (n *Node) initDatabase() error {
 // uses for P2P communication
 func (n *Node) initNodeID() error {
 	if !n.Config.EnableP2PTLS {
-		n.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.String())))
+		n.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.IP().String())))
 		n.Log.Info("Set the node's ID to %s", n.ID)
 		return nil
 	}
@@ -517,6 +522,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		XChainID:                xChainID,
 		CriticalChains:          criticalChains,
 		TimeoutManager:          &timeoutManager,
+		HealthService:           n.healthService,
 	})
 
 	vdrs := n.vdrs
@@ -689,6 +695,7 @@ func (n *Node) initHealthAPI() error {
 	if err != nil {
 		return err
 	}
+	n.healthService = service
 	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "health", "", n.HTTPLog)
 }
 
@@ -789,6 +796,11 @@ func (n *Node) Initialize(config *Config, logger logging.Logger, logFactory logg
 	if err != nil {
 		return fmt.Errorf("couldn't create genesis bytes: %w", err)
 	}
+	// Start the Health API
+	// Has to be initialized before chain manager
+	if err := n.initHealthAPI(); err != nil {
+		return fmt.Errorf("couldn't initialize health API: %w", err)
+	}
 	if err := n.initChainManager(avaxAssetID); err != nil { // Set up the chain manager
 		return fmt.Errorf("couldn't initialize chain manager: %w", err)
 	}
@@ -797,9 +809,6 @@ func (n *Node) Initialize(config *Config, logger logging.Logger, logFactory logg
 	}
 	if err := n.initInfoAPI(); err != nil { // Start the Info API
 		return fmt.Errorf("couldn't initialize info API: %w", err)
-	}
-	if err := n.initHealthAPI(); err != nil { // Start the Health API
-		return fmt.Errorf("couldn't initialize health API: %w", err)
 	}
 	if err := n.initIPCs(); err != nil { // Start the IPCs
 		return fmt.Errorf("couldn't initialize IPCs: %w", err)

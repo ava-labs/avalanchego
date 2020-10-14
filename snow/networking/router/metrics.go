@@ -8,6 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -156,4 +157,47 @@ func (m *metrics) registerTierStatistics(tier int) (prometheus.Gauge, prometheus
 		errs.Add(fmt.Errorf("failed to register tier_%d_wait_time statistics due to %w", tier, err))
 	}
 	return gauge, histogram, errs.Err
+}
+
+func (m *metrics) getMSGHistogram(msg constants.MsgType) prometheus.Histogram {
+	switch msg {
+	case constants.GetAcceptedFrontierMsg:
+		return m.getAcceptedFrontier
+	case constants.AcceptedFrontierMsg:
+		return m.acceptedFrontier
+	case constants.GetAcceptedFrontierFailedMsg:
+		return m.getAcceptedFrontierFailed
+	case constants.GetAcceptedMsg:
+		return m.getAccepted
+	case constants.AcceptedMsg:
+		return m.accepted
+	case constants.GetAcceptedFailedMsg:
+		return m.getAcceptedFailed
+	case constants.GetAncestorsMsg:
+		return m.getAncestors
+	case constants.GetAncestorsFailedMsg:
+		return m.getAncestorsFailed
+	case constants.MultiPutMsg:
+		return m.multiPut
+	case constants.GetMsg:
+		return m.get
+	case constants.GetFailedMsg:
+		return m.getFailed
+	case constants.PutMsg:
+		return m.put
+	case constants.PushQueryMsg:
+		return m.pushQuery
+	case constants.PullQueryMsg:
+		return m.pullQuery
+	case constants.QueryFailedMsg:
+		return m.queryFailed
+	case constants.ChitsMsg:
+		return m.chits
+	case constants.ConnectedMsg:
+		return m.connected
+	case constants.DisconnectedMsg:
+		return m.disconnected
+	default:
+		panic(fmt.Sprintf("unknown message type %s", msg))
+	}
 }

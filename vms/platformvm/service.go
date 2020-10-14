@@ -110,7 +110,7 @@ type ImportKeyArgs struct {
 }
 
 // ImportKey adds a private key to the provided user
-func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JsonAddress) error {
+func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ImportKey called for user '%s'", args.Username)
 
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -171,7 +171,7 @@ type GetBalanceResponse struct {
 }
 
 // GetBalance gets the balance of an address
-func (service *Service) GetBalance(_ *http.Request, args *api.JsonAddress, response *GetBalanceResponse) error {
+func (service *Service) GetBalance(_ *http.Request, args *api.JSONAddress, response *GetBalanceResponse) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: GetBalance called for address %s", args.Address)
 
 	// Parse to address
@@ -265,7 +265,7 @@ utxoFor:
 
 // CreateAddress creates an address controlled by [args.Username]
 // Returns the newly created address
-func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, response *api.JsonAddress) error {
+func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, response *api.JSONAddress) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: CreateAddress called")
 
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -299,7 +299,7 @@ func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, respo
 }
 
 // ListAddresses returns the addresses controlled by [args.Username]
-func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, response *api.JsonAddresses) error {
+func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, response *api.JSONAddresses) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ListAddresses called")
 
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -345,11 +345,13 @@ type Index struct {
 // If [StartIndex] is omitted, gets all UTXOs.
 // If GetUTXOs is called multiple times, with our without [StartIndex], it is not guaranteed
 // that returned UTXOs are unique. That is, the same UTXO may appear in the response of multiple calls.
+// [Encoding] defines the encoding format to use for the returned UTXOs. Can be either "cb58" or "hex"
 type GetUTXOsArgs struct {
 	Addresses   []string    `json:"addresses"`
 	SourceChain string      `json:"sourceChain"`
 	Limit       json.Uint32 `json:"limit"`
 	StartIndex  Index       `json:"startIndex"`
+	Encoding    string      `json:"encoding"`
 }
 
 // GetUTXOsResponse defines the GetUTXOs replies returned from the API
@@ -357,11 +359,13 @@ type GetUTXOsResponse struct {
 	// Number of UTXOs returned
 	NumFetched json.Uint64 `json:"numFetched"`
 	// The UTXOs
-	UTXOs []formatting.CB58 `json:"utxos"`
+	UTXOs []string `json:"utxos"`
 	// The last UTXO that was returned, and the address it corresponds to.
 	// Used for pagination. To get the rest of the UTXOs, call GetUTXOs
 	// again and set [StartIndex] to this value.
 	EndIndex Index `json:"endIndex"`
+	// Encoding specifies the format the UTXOs are returned in
+	Encoding string `json:"encoding"`
 }
 
 // GetUTXOs returns the UTXOs controlled by the given addresses
@@ -373,6 +377,11 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 	}
 	if len(args.Addresses) > maxGetUTXOsAddrs {
 		return fmt.Errorf("number of addresses given, %d, exceeds maximum, %d", len(args.Addresses), maxGetUTXOsAddrs)
+	}
+
+	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
+	if err != nil {
+		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
 	}
 
 	sourceChain := ids.ID{}
@@ -415,7 +424,6 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		utxos     []*avax.UTXO
 		endAddr   ids.ShortID
 		endUTXOID ids.ID
-		err       error
 	)
 	if sourceChain.Equals(service.vm.Ctx.ChainID) {
 		utxos, endAddr, endUTXOID, err = service.vm.GetUTXOs(
@@ -438,13 +446,13 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
 
-	response.UTXOs = make([]formatting.CB58, len(utxos))
+	response.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
 		bytes, err := service.vm.codec.Marshal(utxo)
 		if err != nil {
 			return fmt.Errorf("couldn't serialize UTXO %q: %w", utxo.InputID(), err)
 		}
-		response.UTXOs[i] = formatting.CB58{Bytes: bytes}
+		response.UTXOs[i] = encoding.ConvertBytes(bytes)
 	}
 
 	endAddress, err := service.vm.FormatLocalAddress(endAddr)
@@ -455,6 +463,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 	response.EndIndex.Address = endAddress
 	response.EndIndex.UTXO = endUTXOID.String()
 	response.NumFetched = json.Uint64(len(utxos))
+	response.Encoding = encoding.Encoding()
 	return nil
 }
 
@@ -899,7 +908,7 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 // AddValidatorArgs are the arguments to AddValidator
 type AddValidatorArgs struct {
 	// User, password, from addrs, change addr
-	api.JsonSpendHeader
+	api.JSONSpendHeader
 	APIStaker
 	// The address the staking reward, if applicable, will go to
 	RewardAddress     string       `json:"rewardAddress"`
@@ -908,7 +917,7 @@ type AddValidatorArgs struct {
 
 // AddValidator creates and signs and issues a transaction to add a
 // validator to the primary network
-func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *api.JsonTxIDChangeAddr) error {
+func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: AddValidator called")
 	switch {
 	case args.RewardAddress == "":
@@ -1019,14 +1028,14 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 // AddDelegatorArgs are the arguments to AddDelegator
 type AddDelegatorArgs struct {
 	// User, password, from addrs, change addr
-	api.JsonSpendHeader
+	api.JSONSpendHeader
 	APIStaker
 	RewardAddress string `json:"rewardAddress"`
 }
 
 // AddDelegator creates and signs and issues a transaction to add a
 // delegator to the primary network
-func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *api.JsonTxIDChangeAddr) error {
+func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: AddDelegator called")
 	switch {
 	case uint64(args.StartTime) < service.vm.clock.Unix():
@@ -1135,7 +1144,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 // AddSubnetValidatorArgs are the arguments to AddSubnetValidator
 type AddSubnetValidatorArgs struct {
 	// User, password, from addrs, change addr
-	api.JsonSpendHeader
+	api.JSONSpendHeader
 	APIStaker
 	// ID of subnet to validate
 	SubnetID string `json:"subnetID"`
@@ -1143,7 +1152,7 @@ type AddSubnetValidatorArgs struct {
 
 // AddSubnetValidator creates and signs and issues a transaction to
 // add a validator to a subnet other than the primary network
-func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorArgs, response *api.JsonTxIDChangeAddr) error {
+func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorArgs, response *api.JSONTxIDChangeAddr) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: AddSubnetValidator called")
 	switch {
 	case args.SubnetID == "":
@@ -1248,14 +1257,14 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 // CreateSubnetArgs are the arguments to CreateSubnet
 type CreateSubnetArgs struct {
 	// User, password, from addrs, change addr
-	api.JsonSpendHeader
+	api.JSONSpendHeader
 	// The ID member of APISubnet is ignored
 	APISubnet
 }
 
 // CreateSubnet creates and signs and issues a transaction to create a new
 // subnet
-func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response *api.JsonTxIDChangeAddr) error {
+func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response *api.JSONTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: CreateSubnet called")
 
 	// Parse the control keys
@@ -1345,7 +1354,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 // ExportAVAXArgs are the arguments to ExportAVAX
 type ExportAVAXArgs struct {
 	// User, password, from addrs, change addr
-	api.JsonSpendHeader
+	api.JSONSpendHeader
 
 	// Amount of AVAX to send
 	Amount json.Uint64 `json:"amount"`
@@ -1357,7 +1366,7 @@ type ExportAVAXArgs struct {
 
 // ExportAVAX exports AVAX from the P-Chain to the X-Chain
 // It must be imported on the X-Chain to complete the transfer
-func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JsonTxIDChangeAddr) error {
+func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JSONTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: ExportAVAX called")
 
 	if args.Amount == 0 {
@@ -1448,7 +1457,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 // ImportAVAXArgs are the arguments to ImportAVAX
 type ImportAVAXArgs struct {
 	// User, password, from addrs, change addr
-	api.JsonSpendHeader
+	api.JSONSpendHeader
 
 	// Chain the funds are coming from
 	SourceChain string `json:"sourceChain"`
@@ -1459,7 +1468,7 @@ type ImportAVAXArgs struct {
 
 // ImportAVAX issues a transaction to import AVAX from the X-chain. The AVAX
 // must have already been exported from the X-Chain.
-func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *api.JsonTxIDChangeAddr) error {
+func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *api.JSONTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: ImportAVAX called")
 
 	// Parse the sourceCHain
@@ -1551,7 +1560,7 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 // CreateBlockchainArgs is the arguments for calling CreateBlockchain
 type CreateBlockchainArgs struct {
 	// User, password, from addrs, change addr
-	api.JsonSpendHeader
+	api.JSONSpendHeader
 	// ID of Subnet that validates the new blockchain
 	SubnetID ids.ID `json:"subnetID"`
 	// ID of the VM the new blockchain is running
@@ -1561,17 +1570,29 @@ type CreateBlockchainArgs struct {
 	// Human-readable name for the new blockchain, not necessarily unique
 	Name string `json:"name"`
 	// Genesis state of the blockchain being created
-	GenesisData formatting.CB58 `json:"genesisData"`
+	GenesisData string `json:"genesisData"`
+	// Encoding format to use for genesis data
+	Encoding string `json:"encoding"`
 }
 
 // CreateBlockchain issues a transaction to create a new blockchain
-func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, response *api.JsonTxIDChangeAddr) error {
+func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, response *api.JSONTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: CreateBlockchain called")
 	switch {
 	case args.Name == "":
 		return errors.New("argument 'name' not given")
 	case args.VMID == "":
 		return errors.New("argument 'vmID' not given")
+	}
+
+	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
+	if err != nil {
+		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
+	}
+
+	genesisBytes, err := encoding.ConvertString(args.GenesisData)
+	if err != nil {
+		return fmt.Errorf("problem parsing genesis data: %w", err)
 	}
 
 	vmID, err := service.vm.chainManager.LookupVM(args.VMID)
@@ -1653,7 +1674,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	// Create the transaction
 	tx, err := service.vm.newCreateChainTx(
 		args.SubnetID,
-		args.GenesisData.Bytes,
+		genesisBytes,
 		vmID,
 		fxIDs,
 		args.Name,
@@ -1838,23 +1859,20 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 	return nil
 }
 
-// IssueTxArgs ...
-type IssueTxArgs struct {
-	// Raw byte representation of the transaction
-	Tx formatting.CB58 `json:"tx"`
-}
-
-// IssueTxResponse ...
-type IssueTxResponse struct {
-	TxID ids.ID `json:"txID"`
-}
-
 // IssueTx issues a tx
-func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *IssueTxResponse) error {
+func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response *api.JSONTxID) error {
 	service.vm.Ctx.Log.Info("Platform: IssueTx called")
 
+	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
+	if err != nil {
+		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
+	}
+	txBytes, err := encoding.ConvertString(args.Tx)
+	if err != nil {
+		return fmt.Errorf("problem decoding transaction: %w", err)
+	}
 	tx := &Tx{}
-	if err := service.vm.codec.Unmarshal(args.Tx.Bytes, tx); err != nil {
+	if err := service.vm.codec.Unmarshal(txBytes, tx); err != nil {
 		return fmt.Errorf("couldn't parse tx: %w", err)
 	}
 	if err := service.vm.mempool.IssueTx(tx); err != nil {
@@ -1865,25 +1883,22 @@ func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *Is
 	return nil
 }
 
-// GetTxArgs ...
-type GetTxArgs struct {
-	TxID ids.ID `json:"txID"`
-}
-
-// GetTxResponse ...
-type GetTxResponse struct {
-	// Raw byte representation of the transaction
-	Tx formatting.CB58 `json:"tx"`
-}
-
 // GetTx gets a tx
-func (service *Service) GetTx(_ *http.Request, args *GetTxArgs, response *GetTxResponse) error {
+func (service *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *api.FormattedTx) error {
 	service.vm.Ctx.Log.Info("Platform: GetTx called")
+
+	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
+	if err != nil {
+		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
+	}
+
 	txBytes, err := service.vm.getTx(service.vm.DB, args.TxID)
 	if err != nil {
 		return fmt.Errorf("couldn't get tx: %w", err)
 	}
-	response.Tx.Bytes = txBytes
+
+	response.Tx = encoding.ConvertBytes(txBytes)
+	response.Encoding = encoding.Encoding()
 	return nil
 }
 
@@ -1935,7 +1950,7 @@ type GetStakeReply struct {
 // This method only concerns itself with the Primary Network, not subnets
 // TODO: Improve the performance of this method by maintaining this data
 // in a data structure rather than re-calculating it by iterating over stakers
-func (service *Service) GetStake(_ *http.Request, args *api.JsonAddresses, response *GetStakeReply) error {
+func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, response *GetStakeReply) error {
 	service.vm.Ctx.Log.Info("Platform: GetStake called")
 
 	if len(args.Addresses) > maxGetStakeAddrs {
@@ -2076,6 +2091,15 @@ func (service *Service) GetMinStake(_ *http.Request, _ *struct{}, reply *GetMinS
 	reply.MinValidatorStake = json.Uint64(service.vm.minValidatorStake)
 	reply.MinDelegatorStake = json.Uint64(service.vm.minDelegatorStake)
 	return nil
+}
+
+// GetTotalStake returns the total amount staked on the Primary Network
+func (service *Service) GetTotalStake(_ *http.Request, _ *struct{}, reply *struct {
+	Stake json.Uint64 `json:"stake"`
+}) error {
+	stake, err := service.vm.getTotalStake()
+	reply.Stake = json.Uint64(stake)
+	return err
 }
 
 // GetMaxStakeAmountArgs is the request for calling GetMaxStakeAmount.

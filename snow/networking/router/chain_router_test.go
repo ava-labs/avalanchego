@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
-	"github.com/ava-labs/avalanchego/snow/networking/throttler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -55,9 +54,9 @@ func TestShutdown(t *testing.T) {
 		vdrs,
 		nil,
 		1,
-		throttler.DefaultMaxNonStakerPendingMsgs,
-		throttler.DefaultStakerPortion,
-		throttler.DefaultStakerPortion,
+		DefaultMaxNonStakerPendingMsgs,
+		DefaultStakerPortion,
+		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -127,9 +126,9 @@ func TestShutdownTimesOut(t *testing.T) {
 		vdrs,
 		nil,
 		1,
-		throttler.DefaultMaxNonStakerPendingMsgs,
-		throttler.DefaultStakerPortion,
-		throttler.DefaultStakerPortion,
+		DefaultMaxNonStakerPendingMsgs,
+		DefaultStakerPortion,
+		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)

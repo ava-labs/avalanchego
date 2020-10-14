@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -84,9 +85,9 @@ func main() {
 		log.Debug("assertions are enabled. This may slow down execution")
 	}
 
-	// IsNATTraversal() for NoRouter is false.
+	// SupportsNAT() for NoRouter is false.
 	// Which means we tried to perform a NAT activity but we were not successful.
-	if Config.AttemptedNATTraversal && !Config.Nat.IsNATTraversal() {
+	if Config.AttemptedNATTraversal && !Config.Nat.SupportsNAT() {
 		log.Error("UPnP or NAT-PMP router attach failed, you may not be listening publicly," +
 			" please confirm the settings in your router")
 	}
@@ -94,17 +95,40 @@ func main() {
 	mapper := nat.NewPortMapper(log, Config.Nat)
 	defer mapper.UnmapAllPorts()
 
-	// Open staking port
-	// we want for NAT Traversal to have the external port (Config.StakingIP.Port) to connect to our
-	// internal listening port (Config.InternalStakingPort) which should be the same in most cases.
-	mapper.Map("TCP", Config.StakingIP.Port, Config.StakingIP.Port, stakingPortName)
+	// Open staking port we want for NAT Traversal to have the external port
+	// (Config.StakingIP.Port) to connect to our internal listening port
+	// (Config.InternalStakingPort) which should be the same in most cases.
+	mapper.Map(
+		"TCP",
+		Config.StakingIP.IP().Port,
+		Config.StakingIP.IP().Port,
+		stakingPortName,
+		&Config.StakingIP,
+		Config.DynamicUpdateDuration,
+	)
 
 	// Open the HTTP port iff the HTTP server is not listening on localhost
 	if Config.HTTPHost != "127.0.0.1" && Config.HTTPHost != "localhost" {
-		// For NAT Traversal we want to route from the external port (Config.ExternalHTTPPort)
-		// to our internal port (Config.HTTPPort)
-		mapper.Map("TCP", Config.HTTPPort, Config.HTTPPort, httpPortName)
+		// For NAT Traversal we want to route from the external port
+		// (Config.ExternalHTTPPort) to our internal port (Config.HTTPPort)
+		mapper.Map(
+			"TCP",
+			Config.HTTPPort,
+			Config.HTTPPort,
+			httpPortName,
+			nil,
+			Config.DynamicUpdateDuration,
+		)
 	}
+
+	// Regularly updates our public IP (or does nothing, if configured that way)
+	externalIPUpdater := dynamicip.NewDynamicIPManager(
+		Config.DynamicPublicIPResolver,
+		Config.DynamicUpdateDuration,
+		log,
+		&Config.StakingIP,
+	)
+	defer externalIPUpdater.Stop()
 
 	log.Debug("initializing node state")
 	node := node.Node{}

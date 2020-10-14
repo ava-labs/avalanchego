@@ -6,6 +6,7 @@ package platformvm
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"net/http"
 	"sort"
 
@@ -32,14 +33,23 @@ var (
 )
 
 // StaticService defines the static API methods exposed by the platform VM
-type StaticService struct{}
+type StaticService struct{ encodingManager formatting.EncodingManager }
+
+// CreateStaticService ...
+func CreateStaticService(defaultEnc string) (*StaticService, error) {
+	encodingManager, err := formatting.NewEncodingManager(defaultEnc)
+	if err != nil {
+		return nil, err
+	}
+	return &StaticService{encodingManager: encodingManager}, nil
+}
 
 // APIUTXO is a UTXO on the Platform Chain that exists at the chain's genesis.
 type APIUTXO struct {
-	Locktime json.Uint64     `json:"locktime"`
-	Amount   json.Uint64     `json:"amount"`
-	Address  string          `json:"address"`
-	Message  formatting.CB58 `json:"message"`
+	Locktime json.Uint64 `json:"locktime"`
+	Amount   json.Uint64 `json:"amount"`
+	Address  string      `json:"address"`
+	Message  string      `json:"message"`
 }
 
 // APIStaker is the representation of a staker sent via APIs.
@@ -103,11 +113,11 @@ func (v *APIStaker) weight() uint64 {
 // [Name] is a human-readable, non-unique name for the chain.
 // [SubnetID] is the ID of the subnet that validates the chain
 type APIChain struct {
-	GenesisData formatting.CB58 `json:"genesisData"`
-	VMID        ids.ID          `json:"vmID"`
-	FxIDs       []ids.ID        `json:"fxIDs"`
-	Name        string          `json:"name"`
-	SubnetID    ids.ID          `json:"subnetID"`
+	GenesisData string   `json:"genesisData"`
+	VMID        ids.ID   `json:"vmID"`
+	FxIDs       []ids.ID `json:"fxIDs"`
+	Name        string   `json:"name"`
+	SubnetID    ids.ID   `json:"subnetID"`
 }
 
 // BuildGenesisArgs are the arguments used to create
@@ -126,11 +136,13 @@ type BuildGenesisArgs struct {
 	Time          json.Uint64           `json:"time"`
 	InitialSupply json.Uint64           `json:"initialSupply"`
 	Message       string                `json:"message"`
+	Encoding      string                `json:"encoding"`
 }
 
 // BuildGenesisReply is the reply from BuildGenesis
 type BuildGenesisReply struct {
-	Bytes formatting.CB58 `json:"bytes"`
+	Bytes    string `json:"bytes"`
+	Encoding string `json:"encoding"`
 }
 
 // GenesisUTXO adds messages to UTXOs
@@ -175,6 +187,10 @@ func bech32ToID(address string) (ids.ShortID, error) {
 
 // BuildGenesis build the genesis state of the Platform Chain (and thereby the Avalanche network.)
 func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
+	encoding, err := ss.encodingManager.GetEncoding(args.Encoding)
+	if err != nil {
+		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
+	}
 	// Specify the UTXOs on the Platform chain that exist at genesis.
 	utxos := make([]*GenesisUTXO, 0, len(args.UTXOs))
 	for i, apiUTXO := range args.UTXOs {
@@ -207,9 +223,13 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				TransferableOut: utxo.Out.(avax.TransferableOut),
 			}
 		}
+		messageBytes, err := encoding.ConvertString(apiUTXO.Message)
+		if err != nil {
+			return fmt.Errorf("problem decoding UTXO message bytes: %w", err)
+		}
 		utxos = append(utxos, &GenesisUTXO{
 			UTXO:    utxo,
-			Message: apiUTXO.Message.Bytes,
+			Message: messageBytes,
 		})
 	}
 
@@ -250,8 +270,11 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				return errStakeOverflow
 			}
 			weight = newWeight
-
-			memo = append(memo, apiUTXO.Message.Bytes...)
+			messageBytes, err := encoding.ConvertString(apiUTXO.Message)
+			if err != nil {
+				return fmt.Errorf("problem decoding validator UTXO message bytes: %w", err)
+			}
+			memo = append(memo, messageBytes...)
 		}
 
 		if weight == 0 {
@@ -308,6 +331,10 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	// Specify the chains that exist at genesis.
 	chains := []*Tx{}
 	for _, chain := range args.Chains {
+		genesisBytes, err := encoding.ConvertString(chain.GenesisData)
+		if err != nil {
+			return fmt.Errorf("problem decoding chain genesis data: %w", err)
+		}
 		tx := &Tx{UnsignedTx: &UnsignedCreateChainTx{
 			BaseTx: BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    uint32(args.NetworkID),
@@ -317,7 +344,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			ChainName:   chain.Name,
 			VMID:        chain.VMID,
 			FxIDs:       chain.FxIDs,
-			GenesisData: chain.GenesisData.Bytes,
+			GenesisData: genesisBytes,
 			SubnetAuth:  &secp256k1fx.Input{},
 		}}
 		if err := tx.Sign(GenesisCodec, nil); err != nil {
@@ -339,7 +366,8 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 
 	// Marshal genesis to bytes
 	bytes, err := GenesisCodec.Marshal(genesis)
-	reply.Bytes.Bytes = bytes
+	reply.Bytes = encoding.ConvertBytes(bytes)
+	reply.Encoding = encoding.Encoding()
 	return err
 }
 

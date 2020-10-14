@@ -5,6 +5,7 @@ package avm
 
 import (
 	"bytes"
+	"container/list"
 	"errors"
 	"fmt"
 	"math"
@@ -60,6 +61,8 @@ type VM struct {
 	metrics
 	ids.Aliaser
 
+	encodingManager formatting.EncodingManager
+
 	// Contains information of where this VM is executing
 	ctx *snow.Context
 
@@ -93,6 +96,8 @@ type VM struct {
 
 	typeToFxIndex map[reflect.Type]int
 	fxs           []*parsedFx
+
+	walletService WalletService
 }
 
 type codecRegistry struct {
@@ -157,6 +162,11 @@ func (vm *VM) Initialize(
 	vm.db = versiondb.New(db)
 	vm.typeToFxIndex = map[reflect.Type]int{}
 	vm.Aliaser.Initialize()
+	encodingManager, err := formatting.NewEncodingManager(formatting.CB58Encoding)
+	if err != nil {
+		return fmt.Errorf("problem creating encoding manager: %w", err)
+	}
+	vm.encodingManager = encodingManager
 
 	vm.pubsub = cjson.NewPubSubServer(ctx)
 	vm.genesisCodec = codec.New(math.MaxUint32, 1<<20)
@@ -246,6 +256,10 @@ func (vm *VM) Initialize(
 	go ctx.Log.RecoverAndPanic(vm.timer.Dispatch)
 	vm.batchTimeout = batchTimeout
 
+	vm.walletService.vm = vm
+	vm.walletService.pendingTxMap = make(map[[32]byte]*list.Element)
+	vm.walletService.pendingTxOrdering = list.New()
+
 	return vm.db.Commit()
 }
 
@@ -295,15 +309,23 @@ func (vm *VM) Shutdown() error {
 func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 	vm.metrics.numCreateHandlersCalls.Inc()
 
-	rpcServer := rpc.NewServer()
 	codec := cjson.NewCodec()
+
+	rpcServer := rpc.NewServer()
 	rpcServer.RegisterCodec(codec, "application/json")
 	rpcServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	// name this service "avm"
 	vm.ctx.Log.AssertNoError(rpcServer.RegisterService(&Service{vm: vm}, "avm"))
 
+	walletServer := rpc.NewServer()
+	walletServer.RegisterCodec(codec, "application/json")
+	walletServer.RegisterCodec(codec, "application/json;charset=UTF-8")
+	// name this service "avm"
+	vm.ctx.Log.AssertNoError(walletServer.RegisterService(&vm.walletService, "wallet"))
+
 	return map[string]*common.HTTPHandler{
 		"":        {Handler: rpcServer},
+		"/wallet": {Handler: walletServer},
 		"/pubsub": {LockOptions: common.NoLock, Handler: vm.pubsub},
 	}
 }
@@ -315,7 +337,8 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	// name this service "avm"
-	_ = newServer.RegisterService(&StaticService{}, "avm")
+	staticService, _ := CreateStaticService(formatting.CB58Encoding)
+	_ = newServer.RegisterService(staticService, "avm")
 	return map[string]*common.HTTPHandler{
 		"": {LockOptions: common.WriteLock, Handler: newServer},
 	}
@@ -593,16 +616,10 @@ func (vm *VM) initState(genesisBytes []byte) error {
 }
 
 func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
-	rawTx := &Tx{}
-	err := vm.codec.Unmarshal(bytes, rawTx)
+	rawTx, err := vm.parsePrivateTx(bytes)
 	if err != nil {
 		return nil, err
 	}
-	unsignedBytes, err := vm.codec.Marshal(&rawTx.UnsignedTx)
-	if err != nil {
-		return nil, err
-	}
-	rawTx.Initialize(unsignedBytes, bytes)
 
 	tx := &UniqueTx{
 		TxState: &TxState{
@@ -625,6 +642,20 @@ func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
 		return tx, vm.db.Commit()
 	}
 
+	return tx, nil
+}
+
+func (vm *VM) parsePrivateTx(txBytes []byte) (*Tx, error) {
+	tx := &Tx{}
+	err := vm.codec.Unmarshal(txBytes, tx)
+	if err != nil {
+		return nil, err
+	}
+	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
+	if err != nil {
+		return nil, err
+	}
+	tx.Initialize(unsignedBytes, txBytes)
 	return tx, nil
 }
 
@@ -1201,4 +1232,29 @@ func (vm *VM) FormatAddress(chainID ids.ID, addr ids.ShortID) (string, error) {
 	}
 	hrp := constants.GetHRP(vm.ctx.NetworkID)
 	return formatting.FormatAddress(chainIDAlias, hrp, addr.Bytes())
+}
+
+// selectChangeAddr returns the change address to be used for [kc] when [changeAddr] is given
+// as the optional change address argument
+func (vm *VM) selectChangeAddr(defaultAddr ids.ShortID, changeAddr string) (ids.ShortID, error) {
+	if changeAddr == "" {
+		return defaultAddr, nil
+	}
+	addr, err := vm.ParseLocalAddress(changeAddr)
+	if err != nil {
+		return ids.ShortID{}, fmt.Errorf("couldn't parse changeAddr: %w", err)
+	}
+	return addr, nil
+}
+
+// lookupAssetID looks for an ID aliased by [asset] and if it fails
+// attempts to parse [asset] into an ID
+func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
+	if assetID, err := vm.Lookup(asset); err == nil {
+		return assetID, nil
+	}
+	if assetID, err := ids.FromString(asset); err == nil {
+		return assetID, nil
+	}
+	return ids.ID{}, fmt.Errorf("asset '%s' not found", asset)
 }
