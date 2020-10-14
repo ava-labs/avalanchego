@@ -934,6 +934,21 @@ func (n *network) connectTo(ip utils.IPDesc) {
 			return
 		}
 		if err == errAlreadyPeered || err == errVersionExpected || err == errPeerIsMyself {
+			if err == errAlreadyPeered {
+				// if we peered, and the peer's ip is not known.
+				// update it and set this peer as connected.
+				peer := n.getPeer(id)
+				if peer != nil {
+					if peer.getIP().IsZero() {
+						peer.setIP(ip)
+						n.stateLock.Lock()
+						delete(n.disconnectedIPs, str)
+						delete(n.retryDelay, str)
+						n.connectedIPs[str] = struct{}{}
+						n.stateLock.Unlock()
+					}
+				}
+			}
 			n.log.Debug("error attempting to connect %s to %s: %s", id, ip, err)
 			return
 		}
