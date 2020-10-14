@@ -239,7 +239,7 @@ func (p *peer) processVersionNak() error {
 	// track the peers
 	go func() {
 		for _, ip := range peers {
-			if !ip.Equal(p.net.ip) &&
+			if !ip.Equal(p.net.ip.IP()) &&
 				!ip.IsZero() &&
 				(p.net.allowPrivateIPs || !ip.IsPrivate()) {
 
@@ -1047,7 +1047,7 @@ func (p *peer) verionAck() (Msg, error) {
 		p.net.networkID,
 		p.net.nodeID,
 		p.net.clock.Unix(),
-		p.net.ip,
+		p.net.ip.IP(),
 		p.net.version.String(),
 	)
 	p.net.log.AssertNoError(err)

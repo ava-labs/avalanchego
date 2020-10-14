@@ -1041,7 +1041,7 @@ func (n *network) tryAddPeer(p *peer) error {
 				if n.ip.IsZero() {
 					n.log.Info("setting my ip to %s because I was able to connect to myself through this channel",
 						peerIP)
-					n.ip = peerIP
+					n.ip.Update(peerIP)
 				}
 				str := peerIP.String()
 				delete(n.disconnectedIPs, str)
