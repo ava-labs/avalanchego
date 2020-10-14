@@ -1051,7 +1051,18 @@ func (n *network) tryAddPeer(p *peer) error {
 			return errPeerIsMyself
 		}
 
-		if _, ok := n.peers[key]; ok {
+		if peer, ok := n.peers[key]; ok {
+			// if the peered ip is zero then we should update to this connect IP
+			// the remote peer connected to us before we connected to them...  And we don't know their IP
+			if peer.getIP().IsZero() {
+				peer.setIP(p.getIP())
+				peerIP := p.getIP()
+				str := peerIP.String()
+				delete(n.disconnectedIPs, str)
+				delete(n.retryDelay, str)
+				n.connectedIPs[str] = struct{}{}
+				n.log.Debug("updating %s to %s", peer.id, peer.getIP())
+			}
 			// we are peering..  this will stop the connection loop
 			return errAlreadyPeered
 		}
