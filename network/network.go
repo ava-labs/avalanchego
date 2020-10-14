@@ -1052,11 +1052,11 @@ func (n *network) tryAddPeer(p *peer) error {
 		}
 
 		if peer, ok := n.peers[key]; ok {
-			// if the peered ip is zero then we should update to this connect IP
+			// if the peered ip is zero and we are connecting to them (meaning that we have an IP) then we should update to this connect IP
 			// the remote peer connected to us before we connected to them...  And we don't know their IP
-			if peer.getIP().IsZero() {
-				peer.setIP(p.getIP())
-				peerIP := p.getIP()
+			peerIP := p.getIP()
+			if peer.getIP().IsZero() && !peerIP.IsZero() {
+				peer.setIP(peerIP)
 				str := peerIP.String()
 				delete(n.disconnectedIPs, str)
 				delete(n.retryDelay, str)
