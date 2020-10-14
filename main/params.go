@@ -129,6 +129,18 @@ func init() {
 
 	dynamicPublicIPResolver := fs.String("dynamic-public-ip", "", "'ifconfig' or 'opendns'. By default does not do dynamic public IP updates. If non-empty, ignores public-ip argument.")
 
+	// Incoming connection throttling
+	// After we receive [conn-meter-max-attempts] incoming connections from a given IP
+	// in the last [conn-meter-reset-duration], we close all subsequent incoming connections
+	// from the IP before upgrade.
+	fs.DurationVar(&Config.ConnMeterResetDuration, "conn-meter-reset-duration", 0*time.Second,
+		"Upgrade at most [conn-meter-max-attempts] connections from a given IP per [conn-meter-reset-duration]. "+
+			"If [conn-meter-reset-duration] is 0, incoming connections are not rate-limited.")
+
+	fs.IntVar(&Config.ConnMeterMaxConns, "conn-meter-max-conns", 5,
+		"Upgrade at most [conn-meter-max-attempts] connections from a given IP per [conn-meter-reset-duration]. "+
+			"If [conn-meter-reset-duration] is 0, incoming connections are not rate-limited.")
+
 	// HTTP Server:
 	httpHost := fs.String("http-host", "127.0.0.1", "Address of the HTTP server")
 	httpPort := fs.Uint("http-port", 9650, "Port of the HTTP server")
@@ -151,12 +163,12 @@ func init() {
 	fs.Uint64Var(&Config.DisabledStakingWeight, "staking-disabled-weight", 1, "Weight to provide to each peer when staking is disabled")
 
 	// Throttling:
-	fs.UintVar(&Config.MaxNonStakerPendingMsgs, "max-non-staker-pending-msgs", 3, "Maximum number of messages a non-staker is allowed to have pending.")
-	fs.Float64Var(&Config.StakerMSGPortion, "staker-msg-reserved", 0.2, "Reserve a portion of the chain message queue's space for stakers.")
-	fs.Float64Var(&Config.StakerCPUPortion, "staker-cpu-reserved", 0.2, "Reserve a portion of the chain's CPU time for stakers.")
+	fs.UintVar(&Config.MaxNonStakerPendingMsgs, "max-non-staker-pending-msgs", uint(router.DefaultMaxNonStakerPendingMsgs), "Maximum number of messages a non-staker is allowed to have pending.")
+	fs.Float64Var(&Config.StakerMSGPortion, "staker-msg-reserved", router.DefaultStakerPortion, "Reserve a portion of the chain message queue's space for stakers.")
+	fs.Float64Var(&Config.StakerCPUPortion, "staker-cpu-reserved", router.DefaultStakerPortion, "Reserve a portion of the chain's CPU time for stakers.")
 
 	// Network Timeouts:
-	networkInitialTimeout := fs.Int64("network-initial-timeout", int64(10*time.Second), "Initial timeout value of the adaptive timeout manager, in nanoseconds.")
+	networkInitialTimeout := fs.Int64("network-initial-timeout", int64(5*time.Second), "Initial timeout value of the adaptive timeout manager, in nanoseconds.")
 	networkMinimumTimeout := fs.Int64("network-minimum-timeout", int64(500*time.Millisecond), "Minimum timeout value of the adaptive timeout manager, in nanoseconds.")
 	networkMaximumTimeout := fs.Int64("network-maximum-timeout", int64(10*time.Second), "Maximum timeout value of the adaptive timeout manager, in nanoseconds.")
 	networkTimeoutInc := fs.Int64("network-timeout-increase", 60*int64(time.Millisecond), "Increase of network timeout after a failed request, in nanoseconds.")
@@ -203,7 +215,7 @@ func init() {
 
 	// Router Configuration:
 	consensusGossipFrequency := fs.Int64("consensus-gossip-frequency", int64(10*time.Second), "Frequency of gossiping accepted frontiers.")
-	consensusShutdownTimeout := fs.Int64("consensus-shutdown-timeout", int64(1*time.Second), "Timeout before killing an unresponsive chain.")
+	consensusShutdownTimeout := fs.Int64("consensus-shutdown-timeout", int64(5*time.Second), "Timeout before killing an unresponsive chain.")
 
 	fdLimit := fs.Uint64("fd-limit", ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
 

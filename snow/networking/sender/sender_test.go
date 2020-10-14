@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
-	"github.com/ava-labs/avalanchego/snow/networking/throttler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -84,9 +83,9 @@ func TestTimeout(t *testing.T) {
 		vdrs,
 		nil,
 		1,
-		throttler.DefaultMaxNonStakerPendingMsgs,
-		throttler.DefaultStakerPortion,
-		throttler.DefaultStakerPortion,
+		router.DefaultMaxNonStakerPendingMsgs,
+		router.DefaultStakerPortion,
+		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -155,9 +154,9 @@ func TestReliableMessages(t *testing.T) {
 		vdrs,
 		nil,
 		1,
-		throttler.DefaultMaxNonStakerPendingMsgs,
-		throttler.DefaultStakerPortion,
-		throttler.DefaultStakerPortion,
+		router.DefaultMaxNonStakerPendingMsgs,
+		router.DefaultStakerPortion,
+		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -235,9 +234,9 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		vdrs,
 		nil,
 		1,
-		throttler.DefaultMaxNonStakerPendingMsgs,
-		throttler.DefaultStakerPortion,
-		throttler.DefaultStakerPortion,
+		router.DefaultMaxNonStakerPendingMsgs,
+		router.DefaultStakerPortion,
+		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)

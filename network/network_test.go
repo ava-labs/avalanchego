@@ -204,6 +204,8 @@ func TestNewDefaultNetwork(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler,
+		time.Duration(0),
+		0,
 	)
 	assert.NotNil(t, net)
 
@@ -310,6 +312,8 @@ func TestEstablishConnection(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler0,
+		time.Duration(0),
+		0,
 	)
 	assert.NotNil(t, net0)
 
@@ -328,10 +332,10 @@ func TestEstablishConnection(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler1,
+		time.Duration(0),
+		0,
 	)
 	assert.NotNil(t, net1)
-
-	net0.Track(ip1.IP())
 
 	go func() {
 		err := net0.Dispatch()
@@ -341,6 +345,8 @@ func TestEstablishConnection(t *testing.T) {
 		err := net1.Dispatch()
 		assert.Error(t, err)
 	}()
+
+	net0.Track(ip1.IP())
 
 	wg0.Wait()
 	wg1.Wait()
@@ -446,6 +452,8 @@ func TestDoubleTrack(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler0,
+		time.Duration(0),
+		0,
 	)
 	assert.NotNil(t, net0)
 
@@ -464,6 +472,8 @@ func TestDoubleTrack(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler1,
+		time.Duration(0),
+		0,
 	)
 	assert.NotNil(t, net1)
 
@@ -583,6 +593,8 @@ func TestDoubleClose(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler0,
+		time.Duration(0),
+		0,
 	)
 	assert.NotNil(t, net0)
 
@@ -601,6 +613,8 @@ func TestDoubleClose(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler1,
+		time.Duration(0),
+		0,
 	)
 	assert.NotNil(t, net1)
 
@@ -725,6 +739,8 @@ func TestTrackConnected(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler0,
+		time.Duration(0),
+		0,
 	)
 	assert.NotNil(t, net0)
 
@@ -743,6 +759,8 @@ func TestTrackConnected(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler1,
+		time.Duration(0),
+		0,
 	)
 	assert.NotNil(t, net1)
 
@@ -841,6 +859,8 @@ func TestTrackConnectedRace(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler,
+		time.Duration(0),
+		0,
 	)
 	assert.NotNil(t, net0)
 
@@ -859,6 +879,8 @@ func TestTrackConnectedRace(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler,
+		time.Duration(0),
+		0,
 	)
 	assert.NotNil(t, net1)
 

@@ -39,6 +39,7 @@ func GetRouter() Router {
 	if r := getPMPRouter(); r != nil {
 		return r
 	}
+
 	return NewNoRouter()
 }
 

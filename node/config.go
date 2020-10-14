@@ -105,4 +105,8 @@ type Config struct {
 	DynamicUpdateDuration time.Duration
 
 	DynamicPublicIPResolver dynamicip.Resolver
+
+	// Throttling incoming connections
+	ConnMeterResetDuration time.Duration
+	ConnMeterMaxConns      int
 }
