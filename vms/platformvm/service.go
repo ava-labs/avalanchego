@@ -677,6 +677,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			potentialReward := json.Uint64(tx.Reward)
 			delegator := APIPrimaryDelegator{
 				APIStaker: APIStaker{
+					TxID:        tx.Tx.ID(),
 					StartTime:   json.Uint64(staker.StartTime().Unix()),
 					EndTime:     json.Uint64(staker.EndTime().Unix()),
 					StakeAmount: &weight,
@@ -719,6 +720,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 
 			reply.Validators = append(reply.Validators, APIPrimaryValidator{
 				APIStaker: APIStaker{
+					TxID:        tx.Tx.ID(),
 					NodeID:      nodeID.PrefixedString(constants.NodeIDPrefix),
 					StartTime:   json.Uint64(startTime.Unix()),
 					EndTime:     json.Uint64(staker.EndTime().Unix()),
@@ -733,6 +735,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 		case *UnsignedAddSubnetValidatorTx:
 			weight := json.Uint64(staker.Validator.Weight())
 			reply.Validators = append(reply.Validators, APIStaker{
+				TxID:      tx.Tx.ID(),
 				NodeID:    staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
 				StartTime: json.Uint64(staker.StartTime().Unix()),
 				EndTime:   json.Uint64(staker.EndTime().Unix()),
@@ -806,6 +809,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 		case *UnsignedAddDelegatorTx:
 			weight := json.Uint64(staker.Validator.Weight())
 			reply.Delegators = append(reply.Delegators, APIStaker{
+				TxID:        tx.ID(),
 				NodeID:      staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
 				StartTime:   json.Uint64(staker.StartTime().Unix()),
 				EndTime:     json.Uint64(staker.EndTime().Unix()),
@@ -819,6 +823,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			_, connected := service.vm.connections[nodeID.Key()]
 			reply.Validators = append(reply.Validators, APIPrimaryValidator{
 				APIStaker: APIStaker{
+					TxID:        tx.ID(),
 					NodeID:      staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
 					StartTime:   json.Uint64(staker.StartTime().Unix()),
 					EndTime:     json.Uint64(staker.EndTime().Unix()),
@@ -830,6 +835,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 		case *UnsignedAddSubnetValidatorTx:
 			weight := json.Uint64(staker.Validator.Weight())
 			reply.Validators = append(reply.Validators, APIStaker{
+				TxID:      tx.ID(),
 				NodeID:    staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
 				StartTime: json.Uint64(staker.StartTime().Unix()),
 				EndTime:   json.Uint64(staker.EndTime().Unix()),
