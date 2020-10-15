@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"sync"
 )
 
 // This was taken from: https://stackoverflow.com/a/50825191/3478466
@@ -102,4 +103,43 @@ func ToIPDesc(str string) (IPDesc, error) {
 		IP:   ip,
 		Port: uint16(port),
 	}, nil
+}
+
+type IPDescContainer struct {
+	*IPDesc
+	lock sync.RWMutex
+}
+
+type DynamicIPDesc struct {
+	*IPDescContainer
+}
+
+func NewDynamicIPDesc(ip net.IP, port uint16) DynamicIPDesc {
+	return DynamicIPDesc{IPDescContainer: &IPDescContainer{IPDesc: &IPDesc{IP: ip, Port: port}}}
+}
+
+func (i *DynamicIPDesc) IP() IPDesc {
+	var ip IPDesc
+	i.lock.RLock()
+	ip = *i.IPDesc
+	i.lock.RUnlock()
+	return ip
+}
+
+func (i *DynamicIPDesc) Update(ip IPDesc) {
+	i.lock.Lock()
+	defer i.lock.Unlock()
+	i.IPDesc = &ip
+}
+
+func (i *DynamicIPDesc) UpdatePort(port uint16) {
+	i.lock.Lock()
+	defer i.lock.Unlock()
+	i.IPDesc.Port = port
+}
+
+func (i *DynamicIPDesc) UpdateIP(ip net.IP) {
+	i.lock.Lock()
+	defer i.lock.Unlock()
+	i.IPDesc.IP = ip
 }

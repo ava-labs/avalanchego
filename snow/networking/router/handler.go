@@ -13,9 +13,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/uptime"
 )
 
 // Requirement: A set of nodes spamming messages (potentially costly) shouldn't
@@ -95,6 +97,8 @@ type Handler struct {
 	closed           chan struct{}
 	msgChan          <-chan common.Message
 
+	cpuTracker tracker.TimeTracker
+
 	clock timer.Clock
 
 	serviceQueue messageQueue
@@ -147,17 +151,26 @@ func (h *Handler) Initialize(
 		cpuInterval / 4,
 	}
 
-	h.serviceQueue, h.msgSema = newMultiLevelQueue(
+	h.cpuTracker = tracker.NewCPUTracker(uptime.IntervalFactory{}, cpuInterval)
+	msgTracker := tracker.NewMessageTracker()
+	msgManager := NewMsgManager(
 		validators,
 		h.ctx.Log,
-		&h.metrics,
+		msgTracker,
+		h.cpuTracker,
+		uint32(bufferSize),
+		maxNonStakerPendingMsgs,
+		stakerMsgPortion,
+		stakerCPUPortion,
+	)
+
+	h.serviceQueue, h.msgSema = newMultiLevelQueue(
+		msgManager,
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
-		maxNonStakerPendingMsgs,
-		cpuInterval,
-		stakerMsgPortion,
-		stakerCPUPortion,
+		h.ctx.Log,
+		&h.metrics,
 	)
 	h.engine = engine
 	h.validators = validators
@@ -500,86 +513,54 @@ func (h *Handler) shutdownDispatch() {
 
 func (h *Handler) handleValidatorMsg(msg message, startTime time.Time) error {
 	var (
-		err          error
-		timeConsumed time.Duration
+		err error
 	)
 	switch msg.messageType {
 	case constants.GetAcceptedFrontierMsg:
 		err = h.engine.GetAcceptedFrontier(msg.validatorID, msg.requestID)
-		timeConsumed = h.clock.Time().Sub(startTime)
-		h.getAcceptedFrontier.Observe(float64(timeConsumed.Nanoseconds()))
 	case constants.AcceptedFrontierMsg:
 		err = h.engine.AcceptedFrontier(msg.validatorID, msg.requestID, msg.containerIDs)
-		timeConsumed = h.clock.Time().Sub(startTime)
-		h.acceptedFrontier.Observe(float64(timeConsumed.Nanoseconds()))
 	case constants.GetAcceptedFrontierFailedMsg:
 		err = h.engine.GetAcceptedFrontierFailed(msg.validatorID, msg.requestID)
-		timeConsumed = h.clock.Time().Sub(startTime)
-		h.getAcceptedFrontierFailed.Observe(float64(timeConsumed.Nanoseconds()))
 	case constants.GetAcceptedMsg:
 		err = h.engine.GetAccepted(msg.validatorID, msg.requestID, msg.containerIDs)
-		timeConsumed = h.clock.Time().Sub(startTime)
-		h.getAccepted.Observe(float64(timeConsumed.Nanoseconds()))
 	case constants.AcceptedMsg:
 		err = h.engine.Accepted(msg.validatorID, msg.requestID, msg.containerIDs)
-		timeConsumed = h.clock.Time().Sub(startTime)
-		h.accepted.Observe(float64(timeConsumed.Nanoseconds()))
 	case constants.GetAcceptedFailedMsg:
 		err = h.engine.GetAcceptedFailed(msg.validatorID, msg.requestID)
-		timeConsumed = h.clock.Time().Sub(startTime)
-		h.getAcceptedFailed.Observe(float64(timeConsumed.Nanoseconds()))
 	case constants.GetAncestorsMsg:
 		err = h.engine.GetAncestors(msg.validatorID, msg.requestID, msg.containerID)
-		timeConsumed = h.clock.Time().Sub(startTime)
-		h.getAncestors.Observe(float64(timeConsumed.Nanoseconds()))
 	case constants.GetAncestorsFailedMsg:
 		err = h.engine.GetAncestorsFailed(msg.validatorID, msg.requestID)
-		timeConsumed = h.clock.Time().Sub(startTime)
-		h.getAncestorsFailed.Observe(float64(timeConsumed.Nanoseconds()))
 	case constants.MultiPutMsg:
 		err = h.engine.MultiPut(msg.validatorID, msg.requestID, msg.containers)
-		timeConsumed = h.clock.Time().Sub(startTime)
-		h.multiPut.Observe(float64(timeConsumed.Nanoseconds()))
 	case constants.GetMsg:
 		err = h.engine.Get(msg.validatorID, msg.requestID, msg.containerID)
-		timeConsumed = h.clock.Time().Sub(startTime)
-		h.get.Observe(float64(timeConsumed.Nanoseconds()))
 	case constants.GetFailedMsg:
 		err = h.engine.GetFailed(msg.validatorID, msg.requestID)
-		timeConsumed = h.clock.Time().Sub(startTime)
-		h.getFailed.Observe(float64(timeConsumed.Nanoseconds()))
 	case constants.PutMsg:
 		err = h.engine.Put(msg.validatorID, msg.requestID, msg.containerID, msg.container)
-		timeConsumed = h.clock.Time().Sub(startTime)
-		h.put.Observe(float64(timeConsumed.Nanoseconds()))
 	case constants.PushQueryMsg:
 		err = h.engine.PushQuery(msg.validatorID, msg.requestID, msg.containerID, msg.container)
-		timeConsumed = h.clock.Time().Sub(startTime)
-		h.pushQuery.Observe(float64(timeConsumed.Nanoseconds()))
 	case constants.PullQueryMsg:
 		err = h.engine.PullQuery(msg.validatorID, msg.requestID, msg.containerID)
-		timeConsumed = h.clock.Time().Sub(startTime)
-		h.pullQuery.Observe(float64(timeConsumed.Nanoseconds()))
 	case constants.QueryFailedMsg:
 		err = h.engine.QueryFailed(msg.validatorID, msg.requestID)
-		timeConsumed = h.clock.Time().Sub(startTime)
-		h.queryFailed.Observe(float64(timeConsumed.Nanoseconds()))
 	case constants.ChitsMsg:
 		err = h.engine.Chits(msg.validatorID, msg.requestID, msg.containerIDs)
-		timeConsumed = h.clock.Time().Sub(startTime)
-		h.chits.Observe(float64(timeConsumed.Nanoseconds()))
 	case constants.ConnectedMsg:
 		err = h.engine.Connected(msg.validatorID)
-		timeConsumed = h.clock.Time().Sub(startTime)
-		h.connected.Observe(float64(timeConsumed.Nanoseconds()))
 	case constants.DisconnectedMsg:
 		err = h.engine.Disconnected(msg.validatorID)
-		timeConsumed = h.clock.Time().Sub(startTime)
-		h.disconnected.Observe(float64(timeConsumed.Nanoseconds()))
 	}
+	endTime := h.clock.Time()
+	timeConsumed := endTime.Sub(startTime)
 
+	histogram := h.getMSGHistogram(msg.messageType)
+	histogram.Observe(float64(timeConsumed))
+
+	h.cpuTracker.UtilizeTime(msg.validatorID, startTime, endTime)
 	h.serviceQueue.UtilizeCPU(msg.validatorID, timeConsumed)
-
 	return err
 }
 
@@ -595,4 +576,8 @@ func (h *Handler) sendReliableMsg(msg message) {
 	}
 }
 
-func (h *Handler) endInterval() { h.serviceQueue.EndInterval() }
+func (h *Handler) endInterval() {
+	endTime := h.clock.Time()
+	h.cpuTracker.EndInterval(endTime)
+	h.serviceQueue.EndInterval(endTime)
+}

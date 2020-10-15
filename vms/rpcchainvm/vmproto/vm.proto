@@ -99,6 +99,12 @@ message BlockRejectRequest {
 
 message BlockRejectResponse {}
 
+message HealthRequest{}
+
+message HealthResponse{
+    string details = 1;
+}
+
 service VM {
     rpc Initialize(InitializeRequest) returns (InitializeResponse);
     rpc Bootstrapping(BootstrappingRequest) returns (BootstrappingResponse);
@@ -109,6 +115,7 @@ service VM {
     rpc ParseBlock(ParseBlockRequest) returns (ParseBlockResponse);
     rpc GetBlock(GetBlockRequest) returns (GetBlockResponse);
     rpc SetPreference(SetPreferenceRequest) returns (SetPreferenceResponse);
+    rpc Health(HealthRequest) returns (HealthResponse);
 
     rpc BlockVerify(BlockVerifyRequest) returns (BlockVerifyResponse);
     rpc BlockAccept(BlockAcceptRequest) returns (BlockAcceptResponse);

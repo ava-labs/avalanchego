@@ -17,6 +17,10 @@ type Engine interface {
 
 	// Returns true iff the chain is done bootstrapping
 	IsBootstrapped() bool
+
+	// Returns nil if the engine is healthy.
+	// Periodically called and reported through the health API
+	Health() (interface{}, error)
 }
 
 // Handler defines the functions that are acted on the node
