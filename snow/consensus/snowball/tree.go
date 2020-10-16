@@ -481,7 +481,6 @@ func (b *binaryNode) Add(id ids.ID) node {
 		// + 1 is used because we already explicitly check the p.bit bit
 		ids.EqualSubset(b.bit+1, child.DecidedPrefix(), b.preferences[bit], id) {
 		b.children[bit] = child.Add(id)
-
 	}
 	// If child is nil, then the id has already been added to the tree, so
 	// nothing should be done
