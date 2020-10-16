@@ -546,8 +546,8 @@ func (s *PublicBlockChainAPI) BlockNumber() hexutil.Uint64 {
 }
 
 // GetBalance returns the amount of wei for the given address in the state of the
-// given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
-// block numbers are also allowed.
+// given block number. The rpc.LatestBlockNumber, rpc.PendingBlockNumber, and
+// rpc.AcceptedBlockNumber meta block numbers are also allowed.
 func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address common.Address, blockNrOrHash rpc.BlockNumberOrHash) (*hexutil.Big, error) {
 	state, _, err := s.b.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
 	if state == nil || err != nil {
@@ -556,9 +556,9 @@ func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address common.Add
 	return (*hexutil.Big)(state.GetBalance(address)), state.Error()
 }
 
-// GetBalanceMultiCoin returns the amount of wei for the given address in the state of the
-// given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
-// block numbers are also allowed.
+// GetAssetBalance returns the amount of wei for the given address in the state of the
+// given block number. The rpc.LatestBlockNumber, rpc.PendingBlockNumber, and
+// rpc.AcceptedBlockNumber meta block numbers are also allowed.
 func (s *PublicBlockChainAPI) GetAssetBalance(ctx context.Context, address common.Address, blockNrOrHash rpc.BlockNumberOrHash, assetID ids.ID) (*hexutil.Big, error) {
 	state, _, err := s.b.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
 	if state == nil || err != nil {
@@ -640,12 +640,13 @@ func (s *PublicBlockChainAPI) GetHeaderByNumber(ctx context.Context, number rpc.
 	header, err := s.b.HeaderByNumber(ctx, number)
 	if header != nil && err == nil {
 		response := s.rpcMarshalHeader(ctx, header)
-		if number == rpc.PendingBlockNumber {
-			// Pending header need to nil out a few fields
-			for _, field := range []string{"hash", "nonce", "miner"} {
-				response[field] = nil
-			}
-		}
+		// coreth has no notion of a pending block
+		// if number == rpc.PendingBlockNumber {
+		// 	// Pending header need to nil out a few fields
+		// 	for _, field := range []string{"hash", "nonce", "miner"} {
+		// 		response[field] = nil
+		// 	}
+		// }
 		return response, err
 	}
 	return nil, err
@@ -669,12 +670,13 @@ func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, number rpc.B
 	block, err := s.b.BlockByNumber(ctx, number)
 	if block != nil && err == nil {
 		response, err := s.rpcMarshalBlock(ctx, block, true, fullTx)
-		if err == nil && number == rpc.PendingBlockNumber {
-			// Pending blocks need to nil out a few fields
-			for _, field := range []string{"hash", "nonce", "miner"} {
-				response[field] = nil
-			}
-		}
+		// coreth has no notion of a pending block
+		// if err == nil && number == rpc.PendingBlockNumber {
+		// 	// Pending blocks need to nil out a few fields
+		// 	for _, field := range []string{"hash", "nonce", "miner"} {
+		// 		response[field] = nil
+		// 	}
+		// }
 		return response, err
 	}
 	return nil, err

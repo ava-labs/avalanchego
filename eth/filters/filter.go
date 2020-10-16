@@ -129,6 +129,8 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 		return f.blockLogs(ctx, header)
 	}
 	// Figure out the limits of the filter range
+	// LatestBlockNumber is handled appropriately in HeaderByNumber
+	// so it is left in place here.
 	header, _ := f.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
 	if header == nil {
 		return nil, nil

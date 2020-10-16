@@ -65,20 +65,12 @@ func (b *EthAPIBackend) SetHead(number uint64) {
 }
 
 func (b *EthAPIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error) {
-	// Pending block is only known by the miner in
-	// Ethereum, but Coreth does not have the same notion.
-	// So we treat requests for the pending block identically
-	// to the latest accepted block instead
-	if number == rpc.PendingBlockNumber {
+	// Treat requests for the pending, latest, or accepted block
+	// identically.
+	if number.IsAccepted() {
 		return b.eth.AcceptedBlock().Header(), nil
 	}
-	// Otherwise resolve and return the block
-	if number == rpc.LatestBlockNumber {
-		return b.eth.blockchain.CurrentBlock().Header(), nil
-	}
-	if number == rpc.AcceptedBlockNumber {
-		return b.eth.AcceptedBlock().Header(), nil
-	}
+
 	return b.eth.blockchain.GetHeaderByNumber(uint64(number)), nil
 }
 
@@ -104,20 +96,12 @@ func (b *EthAPIBackend) HeaderByHash(ctx context.Context, hash common.Hash) (*ty
 }
 
 func (b *EthAPIBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error) {
-	// Pending block is only known by the miner in
-	// Ethereum, but Coreth does not have the same notion.
-	// So we treat requests for the pending block identically
-	// to the latest accepted block instead
-	if number == rpc.PendingBlockNumber {
+	// Treat requests for the pending, latest, or accepted block
+	// identically.
+	if number.IsAccepted() {
 		return b.eth.AcceptedBlock(), nil
 	}
-	// Otherwise resolve and return the block
-	if number == rpc.LatestBlockNumber {
-		return b.eth.blockchain.CurrentBlock(), nil
-	}
-	if number == rpc.AcceptedBlockNumber {
-		return b.eth.AcceptedBlock(), nil
-	}
+
 	return b.eth.blockchain.GetBlockByNumber(uint64(number)), nil
 }
 
@@ -147,11 +131,6 @@ func (b *EthAPIBackend) BlockByNumberOrHash(ctx context.Context, blockNrOrHash r
 }
 
 func (b *EthAPIBackend) StateAndHeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*state.StateDB, *types.Header, error) {
-	// Note: Ethereum typically first checks if the request is for
-	// the pending block (by rpc.PendingBlockNumber), but Coreth
-	// does not have the same notion of the miner having a pending
-	// block, so this is skipped here
-
 	// Request the block by its number and retrieve its state
 	header, err := b.HeaderByNumber(ctx, number)
 	if err != nil {
