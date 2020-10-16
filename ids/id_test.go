@@ -24,7 +24,7 @@ func TestID(t *testing.T) {
 	}
 
 	if nextPrefix := id.Prefix(0); !prefixed.Equals(nextPrefix) {
-		t.Fatalf("ID.Prefix not consistant")
+		t.Fatalf("ID.Prefix not consistent")
 	}
 
 	if b := id.Bytes(); !bytes.Equal(hash[:], b) {
@@ -43,23 +43,24 @@ func TestIDBit(t *testing.T) {
 	id7 := NewID([32]byte{1 << 7})
 	id8 := NewID([32]byte{0, 1 << 0})
 
-	if id0.Bit(0) != 1 {
+	switch {
+	case id0.Bit(0) != 1:
 		t.Fatalf("Wrong bit")
-	} else if id1.Bit(1) != 1 {
+	case id1.Bit(1) != 1:
 		t.Fatalf("Wrong bit")
-	} else if id2.Bit(2) != 1 {
+	case id2.Bit(2) != 1:
 		t.Fatalf("Wrong bit")
-	} else if id3.Bit(3) != 1 {
+	case id3.Bit(3) != 1:
 		t.Fatalf("Wrong bit")
-	} else if id4.Bit(4) != 1 {
+	case id4.Bit(4) != 1:
 		t.Fatalf("Wrong bit")
-	} else if id5.Bit(5) != 1 {
+	case id5.Bit(5) != 1:
 		t.Fatalf("Wrong bit")
-	} else if id6.Bit(6) != 1 {
+	case id6.Bit(6) != 1:
 		t.Fatalf("Wrong bit")
-	} else if id7.Bit(7) != 1 {
+	case id7.Bit(7) != 1:
 		t.Fatalf("Wrong bit")
-	} else if id8.Bit(8) != 1 {
+	case id8.Bit(8) != 1:
 		t.Fatalf("Wrong bit")
 	}
 }

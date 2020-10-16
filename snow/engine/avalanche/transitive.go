@@ -64,7 +64,7 @@ func (t *Transitive) Initialize(config Config) error {
 	t.Params = config.Params
 	t.Consensus = config.Consensus
 
-	factory := poll.NewEarlyTermNoTraversalFactory(int(config.Params.Alpha))
+	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t.polls = poll.NewSet(factory,
 		config.Ctx.Log,
 		config.Params.Namespace,
@@ -340,8 +340,9 @@ func (t *Transitive) Notify(msg common.Message) error {
 	case common.PendingTxs:
 		txs := t.VM.PendingTxs()
 		return t.batch(txs, false /*=force*/, false /*=empty*/)
+	default:
+		return nil
 	}
-	return nil
 }
 
 // If there are pending transactions from the VM, issue them.
@@ -622,4 +623,10 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 	t.outstandingVtxReqs.Add(vdr, t.RequestID, vtxID) // Mark that there is an outstanding request for this vertex
 	t.Sender.Get(vdr, t.RequestID, vtxID)
 	t.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len())) // Tracks performance statistics
+}
+
+// Health implements the common.Engine interface
+func (t *Transitive) Health() (interface{}, error) {
+	// TODO add more health checks
+	return t.VM.Health()
 }

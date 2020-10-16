@@ -15,8 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
-	"github.com/ava-labs/avalanchego/snow/networking/throttler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -38,16 +38,21 @@ func TestSenderContext(t *testing.T) {
 }
 
 func TestTimeout(t *testing.T) {
+	vdrs := validators.NewSet()
+	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
-	tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:    time.Millisecond,
-		MinimumTimeout:    time.Millisecond,
-		MaximumTimeout:    10 * time.Second,
-		TimeoutMultiplier: 1.1,
-		TimeoutReduction:  time.Millisecond,
-		Namespace:         "",
-		Registerer:        prometheus.NewRegistry(),
-	})
+	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout: time.Millisecond,
+		MinimumTimeout: time.Millisecond,
+		MaximumTimeout: 10 * time.Second,
+		TimeoutInc:     2 * time.Millisecond,
+		TimeoutDec:     time.Millisecond,
+		Namespace:      "",
+		Registerer:     prometheus.NewRegistry(),
+	}, benchlist)
+	if err != nil {
+		t.Fatal(err)
+	}
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
@@ -75,12 +80,12 @@ func TestTimeout(t *testing.T) {
 	handler := router.Handler{}
 	handler.Initialize(
 		&engine,
-		validators.NewSet(),
+		vdrs,
 		nil,
 		1,
-		throttler.DefaultMaxNonStakerPendingMsgs,
-		throttler.DefaultStakerPortion,
-		throttler.DefaultStakerPortion,
+		router.DefaultMaxNonStakerPendingMsgs,
+		router.DefaultStakerPortion,
+		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -102,16 +107,21 @@ func TestTimeout(t *testing.T) {
 }
 
 func TestReliableMessages(t *testing.T) {
+	vdrs := validators.NewSet()
+	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
-	tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:    time.Millisecond,
-		MinimumTimeout:    time.Millisecond,
-		MaximumTimeout:    10 * time.Second,
-		TimeoutMultiplier: 1.1,
-		TimeoutReduction:  time.Millisecond,
-		Namespace:         "",
-		Registerer:        prometheus.NewRegistry(),
-	})
+	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout: time.Millisecond,
+		MinimumTimeout: time.Millisecond,
+		MaximumTimeout: 10 * time.Second,
+		TimeoutInc:     2 * time.Millisecond,
+		TimeoutDec:     time.Millisecond,
+		Namespace:      "",
+		Registerer:     prometheus.NewRegistry(),
+	}, benchlist)
+	if err != nil {
+		t.Fatal(err)
+	}
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
@@ -141,12 +151,12 @@ func TestReliableMessages(t *testing.T) {
 	handler := router.Handler{}
 	handler.Initialize(
 		&engine,
-		validators.NewSet(),
+		vdrs,
 		nil,
 		1,
-		throttler.DefaultMaxNonStakerPendingMsgs,
-		throttler.DefaultStakerPortion,
-		throttler.DefaultStakerPortion,
+		router.DefaultMaxNonStakerPendingMsgs,
+		router.DefaultStakerPortion,
+		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -177,16 +187,21 @@ func TestReliableMessages(t *testing.T) {
 }
 
 func TestReliableMessagesToMyself(t *testing.T) {
+	benchlist := benchlist.NewNoBenchlist()
+	vdrs := validators.NewSet()
 	tm := timeout.Manager{}
-	tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:    time.Millisecond,
-		MinimumTimeout:    time.Millisecond,
-		MaximumTimeout:    10 * time.Second,
-		TimeoutMultiplier: 1.1,
-		TimeoutReduction:  time.Millisecond,
-		Namespace:         "",
-		Registerer:        prometheus.NewRegistry(),
-	})
+	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout: time.Millisecond,
+		MinimumTimeout: time.Millisecond,
+		MaximumTimeout: 10 * time.Second,
+		TimeoutInc:     2 * time.Millisecond,
+		TimeoutDec:     time.Millisecond,
+		Namespace:      "",
+		Registerer:     prometheus.NewRegistry(),
+	}, benchlist)
+	if err != nil {
+		t.Fatal(err)
+	}
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
@@ -216,12 +231,12 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	handler := router.Handler{}
 	handler.Initialize(
 		&engine,
-		validators.NewSet(),
+		vdrs,
 		nil,
 		1,
-		throttler.DefaultMaxNonStakerPendingMsgs,
-		throttler.DefaultStakerPortion,
-		throttler.DefaultStakerPortion,
+		router.DefaultMaxNonStakerPendingMsgs,
+		router.DefaultStakerPortion,
+		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)

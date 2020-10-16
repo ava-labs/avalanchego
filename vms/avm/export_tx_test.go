@@ -733,7 +733,9 @@ func TestExportTxSemanticVerify(t *testing.T) {
 	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
@@ -791,7 +793,9 @@ func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
 	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
@@ -849,7 +853,9 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
@@ -907,7 +913,9 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
@@ -1021,8 +1029,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 					InitializeF: func(vmIntf interface{}) error {
 						vm := vmIntf.(*VM)
 						c := vm.Codec()
-						c.RegisterType(&avax.TestVerifiable{})
-						return nil
+						return c.RegisterType(&avax.TestVerifiable{})
 					},
 				},
 			},
@@ -1042,7 +1049,9 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	}
 
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
@@ -1098,7 +1107,9 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
@@ -1240,7 +1251,9 @@ func TestIssueExportTx(t *testing.T) {
 
 	ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
@@ -1366,7 +1379,9 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
@@ -1391,7 +1406,9 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsedTx.Accept()
+	if err := parsedTx.Accept(); err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := peerSharedMemory.Get(vm.ctx.ChainID, [][]byte{utxoID.Bytes()}); err == nil {
 		t.Fatalf("should have failed to read the utxo")

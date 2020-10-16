@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
@@ -54,6 +55,9 @@ var (
 		filepath.Join("/", "usr", "local", "lib", constants.AppName),
 		filepath.Join(homeDir, dataDirName, "plugins"),
 	}
+
+	// GitCommit should be optionally set at compile time.
+	GitCommit string
 )
 
 var (
@@ -64,11 +68,9 @@ var (
 
 // Parse the CLI arguments
 func init() {
-	errs := &wrappers.Errs{}
-	defer func() { Err = errs.Err }()
-
 	loggingConfig, err := logging.DefaultConfig()
-	if errs.Add(err); errs.Errored() {
+	if err != nil {
+		Err = err
 		return
 	}
 
@@ -99,14 +101,14 @@ func init() {
 
 	minDelegationFee := fs.Uint64("min-delegation-fee", 20000, "Minimum delegation fee, in the range [0, 1000000], that can be charged for delegation on the primary network")
 
-	// Minimum staking duration in nanoseconds
-	minStakeDuration := fs.Uint64("min-stake-duration", uint64(24*time.Hour/time.Second), "Minimum staking duration, in seconds")
+	// Minimum staking duration
+	fs.DurationVar(&Config.MinStakeDuration, "min-stake-duration", 24*time.Hour, "Minimum staking duration")
 
-	// Maximum staking duration in nanoseconds
-	maxStakeDuration := fs.Uint64("max-stake-duration", uint64(365*24*time.Hour/time.Second), "Maximum staking duration, in seconds")
+	// Maximum staking duration
+	fs.DurationVar(&Config.MaxStakeDuration, "max-stake-duration", 365*24*time.Hour, "Maximum staking duration")
 
-	// Stake minting period in nanoseconds
-	stakeMintingPeriod := fs.Uint64("stake-minting-period", uint64(365*24*time.Hour/time.Second), "Consumption period of the staking function, in seconds")
+	// Stake minting period
+	fs.DurationVar(&Config.StakeMintingPeriod, "stake-minting-period", 365*24*time.Hour, "Consumption period of the staking function")
 
 	// Assertions:
 	fs.BoolVar(&loggingConfig.Assertions, "assertions-enabled", true, "Turn on assertion execution")
@@ -119,7 +121,24 @@ func init() {
 	dbDir := fs.String("db-dir", defaultDbDir, "Database directory for Avalanche state")
 
 	// IP:
-	consensusIP := fs.String("public-ip", "", "Public IP of this node")
+	consensusIP := fs.String("public-ip", "", "Public IP of this node for P2P communication. If empty, try to discover with NAT. Ignored if dynamic-public-ip is non-empty.")
+
+	// how often to update the dynamic IP and PnP/NAT-PMP IP and routing.
+	fs.DurationVar(&Config.DynamicUpdateDuration, "dynamic-update-duration", 5*time.Minute, "Dynamic IP and NAT Traversal update duration")
+
+	dynamicPublicIPResolver := fs.String("dynamic-public-ip", "", "'ifconfig' or 'opendns'. By default does not do dynamic public IP updates. If non-empty, ignores public-ip argument.")
+
+	// Incoming connection throttling
+	// After we receive [conn-meter-max-attempts] incoming connections from a given IP
+	// in the last [conn-meter-reset-duration], we close all subsequent incoming connections
+	// from the IP before upgrade.
+	fs.DurationVar(&Config.ConnMeterResetDuration, "conn-meter-reset-duration", 0*time.Second,
+		"Upgrade at most [conn-meter-max-attempts] connections from a given IP per [conn-meter-reset-duration]. "+
+			"If [conn-meter-reset-duration] is 0, incoming connections are not rate-limited.")
+
+	fs.IntVar(&Config.ConnMeterMaxConns, "conn-meter-max-conns", 5,
+		"Upgrade at most [conn-meter-max-attempts] connections from a given IP per [conn-meter-reset-duration]. "+
+			"If [conn-meter-reset-duration] is 0, incoming connections are not rate-limited.")
 
 	// HTTP Server:
 	httpHost := fs.String("http-host", "127.0.0.1", "Address of the HTTP server")
@@ -135,7 +154,7 @@ func init() {
 	bootstrapIDs := fs.String("bootstrap-ids", "default", "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 
 	// Staking:
-	consensusPort := fs.Uint("staking-port", 9651, "Port of the consensus server")
+	stakingPort := fs.Uint("staking-port", 9651, "Port of the consensus server")
 	fs.BoolVar(&Config.EnableStaking, "staking-enabled", true, "Enable staking. If enabled, Network TLS is required.")
 	fs.BoolVar(&Config.EnableP2PTLS, "p2p-tls-enabled", true, "Require TLS to authenticate network communication")
 	fs.StringVar(&Config.StakingKeyFile, "staking-tls-key-file", defaultStakingKeyPath, "TLS private key for staking")
@@ -143,16 +162,22 @@ func init() {
 	fs.Uint64Var(&Config.DisabledStakingWeight, "staking-disabled-weight", 1, "Weight to provide to each peer when staking is disabled")
 
 	// Throttling:
-	fs.UintVar(&Config.MaxNonStakerPendingMsgs, "max-non-staker-pending-msgs", 3, "Maximum number of messages a non-staker is allowed to have pending.")
-	fs.Float64Var(&Config.StakerMSGPortion, "staker-msg-reserved", 0.2, "Reserve a portion of the chain message queue's space for stakers.")
-	fs.Float64Var(&Config.StakerCPUPortion, "staker-cpu-reserved", 0.2, "Reserve a portion of the chain's CPU time for stakers.")
+	fs.UintVar(&Config.MaxNonStakerPendingMsgs, "max-non-staker-pending-msgs", uint(router.DefaultMaxNonStakerPendingMsgs), "Maximum number of messages a non-staker is allowed to have pending.")
+	fs.Float64Var(&Config.StakerMSGPortion, "staker-msg-reserved", router.DefaultStakerPortion, "Reserve a portion of the chain message queue's space for stakers.")
+	fs.Float64Var(&Config.StakerCPUPortion, "staker-cpu-reserved", router.DefaultStakerPortion, "Reserve a portion of the chain's CPU time for stakers.")
 
 	// Network Timeouts:
-	networkInitialTimeout := fs.Int64("network-initial-timeout", int64(10*time.Second), "Initial timeout value of the adaptive timeout manager, in nanoseconds.")
-	networkMinimumTimeout := fs.Int64("network-minimum-timeout", int64(500*time.Millisecond), "Minimum timeout value of the adaptive timeout manager, in nanoseconds.")
-	networkMaximumTimeout := fs.Int64("network-maximum-timeout", int64(10*time.Second), "Maximum timeout value of the adaptive timeout manager, in nanoseconds.")
-	fs.Float64Var(&Config.NetworkConfig.TimeoutMultiplier, "network-timeout-multiplier", 1.1, "Multiplier of the timeout after a failed request.")
-	networkTimeoutReduction := fs.Int64("network-timeout-reduction", int64(time.Millisecond), "Reduction of the timeout after a successful request, in nanoseconds.")
+	fs.DurationVar(&Config.NetworkConfig.InitialTimeout, "network-initial-timeout", 5*time.Second, "Initial timeout value of the adaptive timeout manager, in nanoseconds.")
+	fs.DurationVar(&Config.NetworkConfig.MinimumTimeout, "network-minimum-timeout", 500*time.Millisecond, "Minimum timeout value of the adaptive timeout manager, in nanoseconds.")
+	fs.DurationVar(&Config.NetworkConfig.MaximumTimeout, "network-maximum-timeout", 10*time.Second, "Maximum timeout value of the adaptive timeout manager, in nanoseconds.")
+	fs.DurationVar(&Config.NetworkConfig.TimeoutInc, "network-timeout-increase", 60*time.Millisecond, "Increase of network timeout after a failed request, in nanoseconds.")
+	fs.DurationVar(&Config.NetworkConfig.TimeoutDec, "network-timeout-reduction", 12*time.Millisecond, "Decrease of network timeout after a successful request, in nanoseconds.")
+
+	// Benchlist Parameters:
+	fs.IntVar(&Config.BenchlistConfig.Threshold, "benchlist-fail-threshold", 10, "Number of consecutive failed queries before benchlisting a node.")
+	fs.BoolVar(&Config.BenchlistConfig.PeerSummaryEnabled, "benchlist-peer-summary-enabled", false, "Enables peer specific query latency metrics.")
+	fs.DurationVar(&Config.BenchlistConfig.Duration, "benchlist-duration", time.Hour, "Amount of time a peer is benchlisted after surpassing the threshold.")
+	fs.DurationVar(&Config.BenchlistConfig.MinimumFailingDuration, "benchlist-min-failing-duration", 5*time.Minute, "Minimum amount of time messages to a peer must be failing before the peer is benched.")
 
 	// Plugins:
 	fs.StringVar(&Config.PluginDir, "plugin-dir", defaultPluginDirs[0], "Plugin directory for Avalanche VMs")
@@ -188,26 +213,49 @@ func init() {
 	fs.StringVar(&Config.IPCPath, "ipcs-path", ipcs.DefaultBaseURL, "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
 
 	// Router Configuration:
-	consensusGossipFrequency := fs.Int64("consensus-gossip-frequency", int64(10*time.Second), "Frequency of gossiping accepted frontiers.")
-	consensusShutdownTimeout := fs.Int64("consensus-shutdown-timeout", int64(1*time.Second), "Timeout before killing an unresponsive chain.")
+	fs.DurationVar(&Config.ConsensusGossipFrequency, "consensus-gossip-frequency", 10*time.Second, "Frequency of gossiping accepted frontiers.")
+	fs.DurationVar(&Config.ConsensusShutdownTimeout, "consensus-shutdown-timeout", 5*time.Second, "Timeout before killing an unresponsive chain.")
 
 	fdLimit := fs.Uint64("fd-limit", ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
 
 	ferr := fs.Parse(os.Args[1:])
 
 	if *version { // If --version used, print version and exit
-		networkID, err := constants.NetworkID(*networkName)
-		if errs.Add(err); err != nil {
-			return
+		format := "%s ["
+		args := []interface{}{
+			node.Version,
 		}
-		networkGeneration := constants.NetworkName(networkID)
-		if networkID == constants.MainnetID {
-			fmt.Printf("%s [database=%s, network=%s]\n",
-				node.Version, dbVersion, networkGeneration)
-		} else {
-			fmt.Printf("%s [database=%s, network=testnet/%s]\n",
-				node.Version, dbVersion, networkGeneration)
+
+		{
+			networkID, err := constants.NetworkID(*networkName)
+			if err != nil {
+				Err = err
+				return
+			}
+			networkGeneration := constants.NetworkName(networkID)
+			if networkID == constants.MainnetID {
+				format += "network=%s"
+			} else {
+				format += "network=testnet/%s"
+			}
+			args = append(args, networkGeneration)
 		}
+
+		{
+			format += ", database=%s"
+			args = append(args, dbVersion)
+		}
+
+		{
+			if GitCommit != "" {
+				format += ", commit=%s"
+				args = append(args, GitCommit)
+			}
+		}
+
+		format += "]\n"
+
+		fmt.Printf(format, args...)
 		os.Exit(0)
 	}
 
@@ -220,6 +268,9 @@ func init() {
 		// other type of error occurred when parsing args
 		os.Exit(2)
 	}
+
+	errs := &wrappers.Errs{}
+	defer func() { Err = errs.Err }()
 
 	networkID, err := constants.NetworkID(*networkName)
 	if errs.Add(err); err != nil {
@@ -242,15 +293,30 @@ func init() {
 		Config.DB = memdb.New()
 	}
 
+	// Resolves our public IP, or does nothing
+	Config.DynamicPublicIPResolver = dynamicip.NewResolver(*dynamicPublicIPResolver)
+
 	var ip net.IP
-	// If public IP is not specified, get it using shell command dig
-	if *consensusIP == "" {
+	switch {
+	case Config.DynamicPublicIPResolver.IsResolver():
+		// User specified to use dynamic IP resolution; don't use NAT traversal
+		Config.Nat = nat.NewNoRouter()
+		ip, err = dynamicip.FetchExternalIP(Config.DynamicPublicIPResolver)
+		if err != nil {
+			errs.Add(fmt.Errorf("dynamic ip address fetch failed: %s", err))
+			return
+		}
+
+	case *consensusIP == "":
+		// User didn't specift a public IP to use; try with NAT traversal
+		Config.AttemptedNATTraversal = true
 		Config.Nat = nat.GetRouter()
 		ip, err = Config.Nat.ExternalIP()
 		if err != nil {
 			ip = net.IPv4zero // Couldn't get my IP...set to 0.0.0.0
 		}
-	} else {
+	default:
+		// User specified a public IP to use; don't use NAT
 		Config.Nat = nat.NewNoRouter()
 		ip = net.ParseIP(*consensusIP)
 	}
@@ -260,11 +326,10 @@ func init() {
 		return
 	}
 
-	Config.StakingIP = utils.IPDesc{
-		IP:   ip,
-		Port: uint16(*consensusPort),
-	}
-	Config.StakingLocalPort = uint16(*consensusPort)
+	Config.StakingIP = utils.NewDynamicIPDesc(
+		ip,
+		uint16(*stakingPort),
+	)
 
 	defaultBootstrapIPs, defaultBootstrapIDs := genesis.SampleBeacons(networkID, 5)
 
@@ -412,35 +477,34 @@ func init() {
 		Config.IPCDefaultChainIDs = strings.Split(*ipcsChainIDs, ",")
 	}
 
-	if *networkMinimumTimeout < 1 {
+	if Config.NetworkConfig.MinimumTimeout < 1 {
 		errs.Add(errors.New("minimum timeout must be positive"))
 	}
-	if *networkMinimumTimeout > *networkMaximumTimeout {
+	if Config.NetworkConfig.MinimumTimeout > Config.NetworkConfig.MaximumTimeout {
 		errs.Add(errors.New("maximum timeout can't be less than minimum timeout"))
 	}
-	if *networkInitialTimeout < *networkMinimumTimeout ||
-		*networkInitialTimeout > *networkMaximumTimeout {
+	if Config.NetworkConfig.InitialTimeout < Config.NetworkConfig.MinimumTimeout ||
+		Config.NetworkConfig.InitialTimeout > Config.NetworkConfig.MaximumTimeout {
 		errs.Add(errors.New("initial timeout should be in the range [minimumTimeout, maximumTimeout]"))
 	}
-	if *networkTimeoutReduction < 0 {
+	if Config.NetworkConfig.TimeoutDec < 0 {
 		errs.Add(errors.New("timeout reduction can't be negative"))
 	}
-	Config.NetworkConfig.InitialTimeout = time.Duration(*networkInitialTimeout)
-	Config.NetworkConfig.MinimumTimeout = time.Duration(*networkMinimumTimeout)
-	Config.NetworkConfig.MaximumTimeout = time.Duration(*networkMaximumTimeout)
-	Config.NetworkConfig.TimeoutReduction = time.Duration(*networkTimeoutReduction)
+	if Config.NetworkConfig.TimeoutInc < 0 {
+		errs.Add(errors.New("timeout increase can't be negative"))
+	}
 
-	if *consensusGossipFrequency < 0 {
+	Config.BenchlistConfig.MaxPortion = (1.0 - (float64(Config.ConsensusParams.Alpha) / float64(Config.ConsensusParams.K))) / 3.0
+
+	if Config.ConsensusGossipFrequency < 0 {
 		errs.Add(errors.New("gossip frequency can't be negative"))
 	}
-	if *consensusShutdownTimeout < 0 {
+	if Config.ConsensusShutdownTimeout < 0 {
 		errs.Add(errors.New("gossip frequency can't be negative"))
 	}
-	Config.ConsensusGossipFrequency = time.Duration(*consensusGossipFrequency)
-	Config.ConsensusShutdownTimeout = time.Duration(*consensusShutdownTimeout)
 
 	if err := ulimit.Set(*fdLimit); err != nil {
-		errs.Add(fmt.Errorf("failed to set fd limit correctly due to: %s", err))
+		errs.Add(fmt.Errorf("failed to set fd limit correctly due to: %w", err))
 	}
 
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
@@ -462,19 +526,15 @@ func init() {
 		}
 		Config.MinDelegationFee = uint32(*minDelegationFee)
 
-		if *minStakeDuration == 0 {
+		if Config.MinStakeDuration == 0 {
 			errs.Add(errors.New("min stake duration can't be zero"))
 		}
-		if *maxStakeDuration < *minStakeDuration {
+		if Config.MaxStakeDuration < Config.MinStakeDuration {
 			errs.Add(errors.New("max stake duration can't be less than min stake duration"))
 		}
-		if *stakeMintingPeriod < *maxStakeDuration {
+		if Config.StakeMintingPeriod < Config.MaxStakeDuration {
 			errs.Add(errors.New("stake minting period can't be less than max stake duration"))
 		}
-
-		Config.MinStakeDuration = time.Duration(*minStakeDuration) * time.Second
-		Config.MaxStakeDuration = time.Duration(*maxStakeDuration) * time.Second
-		Config.StakeMintingPeriod = time.Duration(*stakeMintingPeriod) * time.Second
 	} else {
 		Config.Params = *genesis.GetParams(networkID)
 	}

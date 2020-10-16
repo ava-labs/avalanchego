@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/networking/throttler"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
@@ -36,15 +35,17 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	handler := &Handler{}
 	vdrs := validators.NewSet()
 	vdr0 := ids.GenerateTestShortID()
-	vdrs.AddWeight(vdr0, 1)
+	if err := vdrs.AddWeight(vdr0, 1); err != nil {
+		t.Fatal(err)
+	}
 	handler.Initialize(
 		&engine,
 		vdrs,
 		nil,
 		16,
-		throttler.DefaultMaxNonStakerPendingMsgs,
-		throttler.DefaultStakerPortion,
-		throttler.DefaultStakerPortion,
+		DefaultMaxNonStakerPendingMsgs,
+		DefaultStakerPortion,
+		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -85,9 +86,9 @@ func TestHandlerDoesntDrop(t *testing.T) {
 		validators,
 		nil,
 		16,
-		throttler.DefaultMaxNonStakerPendingMsgs,
-		throttler.DefaultStakerPortion,
-		throttler.DefaultStakerPortion,
+		DefaultMaxNonStakerPendingMsgs,
+		DefaultStakerPortion,
+		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -121,9 +122,9 @@ func TestHandlerClosesOnError(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		16,
-		throttler.DefaultMaxNonStakerPendingMsgs,
-		throttler.DefaultStakerPortion,
-		throttler.DefaultStakerPortion,
+		DefaultMaxNonStakerPendingMsgs,
+		DefaultStakerPortion,
+		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -164,9 +165,9 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		16,
-		throttler.DefaultMaxNonStakerPendingMsgs,
-		throttler.DefaultStakerPortion,
-		throttler.DefaultStakerPortion,
+		DefaultMaxNonStakerPendingMsgs,
+		DefaultStakerPortion,
+		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)

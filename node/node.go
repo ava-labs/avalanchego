@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -31,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/triggers"
@@ -64,7 +66,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion(constants.PlatformName, 1, 0, 1)
+	Version       = version.NewDefaultVersion(constants.PlatformName, 1, 0, 3)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -86,6 +88,9 @@ type Node struct {
 
 	// Manages shared memory
 	sharedMemory atomic.Memory
+
+	// Monitors node health and runs health checks
+	healthService *health.Health
 
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
@@ -125,7 +130,7 @@ type Node struct {
  */
 
 func (n *Node) initNetworking() error {
-	listener, err := net.Listen(TCP, fmt.Sprintf(":%d", n.Config.StakingLocalPort))
+	listener, err := net.Listen(TCP, fmt.Sprintf(":%d", n.Config.StakingIP.Port))
 	if err != nil {
 		return err
 	}
@@ -187,7 +192,7 @@ func (n *Node) initNetworking() error {
 		})
 
 		go timer.Dispatch()
-		timer.SetTimeoutIn(15 * time.Second)
+		timer.SetTimeoutIn(1 * time.Minute)
 
 		consensusRouter = &beaconManager{
 			Router:         consensusRouter,
@@ -212,12 +217,14 @@ func (n *Node) initNetworking() error {
 		primaryNetworkValidators,
 		n.beacons,
 		consensusRouter,
+		n.Config.ConnMeterResetDuration,
+		n.Config.ConnMeterMaxConns,
 	)
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
 		// errors are already logged internally if they are meaningful
 		_ = n.Net.Close()
-	}, os.Interrupt, os.Kill)
+	}, syscall.SIGINT, syscall.SIGTERM)
 
 	return nil
 }
@@ -302,7 +309,7 @@ func (n *Node) Dispatch() error {
 
 	// Add bootstrap nodes to the peer network
 	for _, peer := range n.Config.BootstrapPeers {
-		if !peer.IP.Equal(n.Config.StakingIP) {
+		if !peer.IP.Equal(n.Config.StakingIP.IP()) {
 			n.Net.Track(peer.IP)
 		} else {
 			n.Log.Error("can't add self as a bootstrapper")
@@ -357,7 +364,7 @@ func (n *Node) initDatabase() error {
 // uses for P2P communication
 func (n *Node) initNodeID() error {
 	if !n.Config.EnableP2PTLS {
-		n.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.String())))
+		n.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.IP().String())))
 		n.Log.Info("Set the node's ID to %s", n.ID)
 		return nil
 	}
@@ -466,10 +473,13 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	criticalChains := ids.Set{}
 	criticalChains.Add(constants.PlatformChainID, createAVMTx.ID())
 
-	timeoutManager := timeout.Manager{}
 	n.Config.NetworkConfig.Namespace = constants.PlatformName
 	n.Config.NetworkConfig.Registerer = n.Config.ConsensusParams.Metrics
-	if err := timeoutManager.Initialize(&n.Config.NetworkConfig); err != nil {
+	n.Config.BenchlistConfig.Validators = n.vdrs
+	benchlistManager := benchlist.NewManager(&n.Config.BenchlistConfig)
+
+	timeoutManager := timeout.Manager{}
+	if err := timeoutManager.Initialize(&n.Config.NetworkConfig, benchlistManager); err != nil {
 		return err
 	}
 	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
@@ -512,6 +522,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		XChainID:                xChainID,
 		CriticalChains:          criticalChains,
 		TimeoutManager:          &timeoutManager,
+		HealthService:           n.healthService,
 	})
 
 	vdrs := n.vdrs
@@ -684,6 +695,7 @@ func (n *Node) initHealthAPI() error {
 	if err != nil {
 		return err
 	}
+	n.healthService = service
 	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "health", "", n.HTTPLog)
 }
 
@@ -735,10 +747,10 @@ func (n *Node) initAliases(genesisBytes []byte) error {
 }
 
 // Initialize this node
-func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logging.Factory) error {
+func (n *Node) Initialize(config *Config, logger logging.Logger, logFactory logging.Factory) error {
 	n.Log = logger
 	n.LogFactory = logFactory
-	n.Config = Config
+	n.Config = config
 	n.Log.Info("Node version is: %s", Version)
 
 	httpLog, err := logFactory.MakeSubdir("http")
@@ -784,6 +796,11 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	if err != nil {
 		return fmt.Errorf("couldn't create genesis bytes: %w", err)
 	}
+	// Start the Health API
+	// Has to be initialized before chain manager
+	if err := n.initHealthAPI(); err != nil {
+		return fmt.Errorf("couldn't initialize health API: %w", err)
+	}
 	if err := n.initChainManager(avaxAssetID); err != nil { // Set up the chain manager
 		return fmt.Errorf("couldn't initialize chain manager: %w", err)
 	}
@@ -792,9 +809,6 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	}
 	if err := n.initInfoAPI(); err != nil { // Start the Info API
 		return fmt.Errorf("couldn't initialize info API: %w", err)
-	}
-	if err := n.initHealthAPI(); err != nil { // Start the Health API
-		return fmt.Errorf("couldn't initialize health API: %w", err)
 	}
 	if err := n.initIPCs(); err != nil { // Start the IPCs
 		return fmt.Errorf("couldn't initialize IPCs: %w", err)

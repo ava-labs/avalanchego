@@ -60,7 +60,7 @@ func (t *Transitive) Initialize(config Config) error {
 	t.Params = config.Params
 	t.Consensus = config.Consensus
 
-	factory := poll.NewEarlyTermNoTraversalFactory(int(config.Params.Alpha))
+	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t.polls = poll.NewSet(factory,
 		config.Ctx.Log,
 		config.Params.Namespace,
@@ -84,7 +84,9 @@ func (t *Transitive) Initialize(config Config) error {
 func (t *Transitive) finishBootstrapping() error {
 	// initialize consensus to the last accepted blockID
 	lastAcceptedID := t.VM.LastAccepted()
-	t.Consensus.Initialize(t.Ctx, t.Params, lastAcceptedID)
+	if err := t.Consensus.Initialize(t.Ctx, t.Params, lastAcceptedID); err != nil {
+		return err
+	}
 
 	lastAccepted, err := t.VM.GetBlock(lastAcceptedID)
 	if err != nil {
@@ -603,8 +605,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	// any potential reentrant bugs.
 	added := []snowman.Block{}
 	dropped := []snowman.Block{}
-	switch blk := blk.(type) {
-	case OracleBlock:
+	if blk, ok := blk.(OracleBlock); ok {
 		options, err := blk.Options()
 		if err != nil {
 			return err
@@ -653,4 +654,10 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 // IsBootstrapped returns true iff this chain is done bootstrapping
 func (t *Transitive) IsBootstrapped() bool {
 	return t.Ctx.IsBootstrapped()
+}
+
+// Health implements the common.Engine interface
+func (t *Transitive) Health() (interface{}, error) {
+	// TODO add more health checks
+	return t.VM.Health()
 }

@@ -47,9 +47,11 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 
 	amount := uint64(0)
 
+	encoding := formatting.Hex{}
 	// Specify the genesis state of the AVM
 	avmArgs := avm.BuildGenesisArgs{
 		NetworkID: json.Uint32(config.NetworkID),
+		Encoding:  formatting.HexEncoding,
 	}
 	{
 		avax := avm.AssetDefinition{
@@ -58,6 +60,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			Denomination: 9,
 			InitialState: map[string][]interface{}{},
 		}
+		memoBytes := []byte{}
 		xAllocations := []Allocation(nil)
 		for _, allocation := range config.Allocations {
 			if allocation.InitialAmount > 0 {
@@ -76,23 +79,31 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				Amount:  json.Uint64(allocation.InitialAmount),
 				Address: addr,
 			})
-			avax.Memo.Bytes = append(avax.Memo.Bytes, allocation.ETHAddr.Bytes()...)
+			memoBytes = append(memoBytes, allocation.ETHAddr.Bytes()...)
 			amount += allocation.InitialAmount
 		}
 
+		encoding.Bytes = memoBytes
+		avax.Memo = encoding.String()
 		avmArgs.GenesisData = map[string]avm.AssetDefinition{
 			"AVAX": avax, // The AVM starts out with one asset: AVAX
 		}
 	}
 	avmReply := avm.BuildGenesisReply{}
 
-	avmSS := avm.StaticService{}
-	err := avmSS.BuildGenesis(nil, &avmArgs, &avmReply)
+	avmSS, err := avm.CreateStaticService(formatting.HexEncoding)
+	if err != nil {
+		return nil, ids.ID{}, fmt.Errorf("problem creating avm Static Service: %w", err)
+	}
+	err = avmSS.BuildGenesis(nil, &avmArgs, &avmReply)
 	if err != nil {
 		return nil, ids.ID{}, err
 	}
 
-	avaxAssetID, err := AVAXAssetID(avmReply.Bytes.Bytes)
+	if err := encoding.FromString(avmReply.Bytes); err != nil {
+		return nil, ids.ID{}, fmt.Errorf("couldn't parse avm genesis reply: %w", err)
+	}
+	avaxAssetID, err := AVAXAssetID(encoding.Bytes)
 	if err != nil {
 		return nil, ids.ID{}, fmt.Errorf("couldn't generate AVAX asset ID: %w", err)
 	}
@@ -131,7 +142,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 						Locktime: json.Uint64(unlock.Locktime),
 						Amount:   json.Uint64(unlock.Amount),
 						Address:  addr,
-						Message:  formatting.CB58{Bytes: allocation.ETHAddr.Bytes()},
+						Message:  formatting.Hex{Bytes: allocation.ETHAddr.Bytes()}.String(),
 					},
 				)
 				amount += unlock.Amount
@@ -163,7 +174,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 					Locktime: json.Uint64(unlock.Locktime),
 					Amount:   json.Uint64(unlock.Amount),
 					Address:  addr,
-					Message:  formatting.CB58{Bytes: allocation.ETHAddr.Bytes()},
+					Message:  formatting.Hex{Bytes: allocation.ETHAddr.Bytes()}.String(),
 				})
 				amount += unlock.Amount
 			}
@@ -202,7 +213,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			Name: "X-Chain",
 		},
 		{
-			GenesisData: formatting.CB58{Bytes: []byte(config.CChainGenesis)},
+			GenesisData: formatting.Hex{Bytes: []byte(config.CChainGenesis)}.String(),
 			SubnetID:    constants.PrimaryNetworkID,
 			VMID:        EVMID,
 			Name:        "C-Chain",
@@ -210,12 +221,19 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 
 	platformvmReply := platformvm.BuildGenesisReply{}
-	platformvmSS := platformvm.StaticService{}
+	platformvmSS, err := platformvm.CreateStaticService(formatting.HexEncoding)
+	if err != nil {
+		return nil, ids.ID{}, fmt.Errorf("problem creating platformvm Static Service: %w", err)
+	}
 	if err := platformvmSS.BuildGenesis(nil, &platformvmArgs, &platformvmReply); err != nil {
 		return nil, ids.ID{}, fmt.Errorf("problem while building platform chain's genesis state: %w", err)
 	}
 
-	return platformvmReply.Bytes.Bytes, avaxAssetID, nil
+	if err := encoding.FromString(platformvmReply.Bytes); err != nil {
+		return nil, ids.ID{}, fmt.Errorf("problem parsing platformvm genesis bytes: %w", err)
+	}
+
+	return encoding.Bytes, avaxAssetID, nil
 }
 
 func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {

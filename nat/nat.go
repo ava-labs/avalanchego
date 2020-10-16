@@ -4,32 +4,30 @@
 package nat
 
 import (
-	"errors"
 	"net"
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 const (
-	mapTimeout       = 30 * time.Minute
-	mapUpdateTimeout = mapTimeout / 2
-	maxRetries       = 20
+	mapTimeout        = 30 * time.Minute
+	maxRefreshRetries = 3
 )
 
 // Router describes the functionality that a network device must support to be
 // able to open ports to an external IP.
 type Router interface {
+	// True iff this router supports NAT
+	SupportsNAT() bool
+	// Map external port [extPort] to internal port [intPort] for [duration]
 	MapPort(protocol string, intPort, extPort uint16, desc string, duration time.Duration) error
+	// Undo a port mapping
 	UnmapPort(protocol string, intPort, extPort uint16) error
+	// Return our external IP
 	ExternalIP() (net.IP, error)
-	GetPortMappingEntry(extPort uint16, protocol string) (
-		InternalIP string,
-		InternalPort uint16,
-		Description string,
-		err error,
-	)
 }
 
 // GetRouter returns a router on the current network.
@@ -61,81 +59,95 @@ func NewPortMapper(log logging.Logger, r Router) Mapper {
 	}
 }
 
-// Map sets up port mapping using given protocol, internal and external ports
-// and returns the final port mapped. It returns 0 if mapping failed after the
-// maximun number of retries
-func (dev *Mapper) Map(protocol string, intPort uint16, desc string) (uint16, error) {
-	mappedPort := make(chan uint16)
-
-	go dev.keepPortMapping(mappedPort, protocol, intPort, desc)
-
-	port := <-mappedPort
-	if port == 0 {
-		return 0, errors.New("failed to map port")
+// Map external port [extPort] (exposed to the internet) to internal port [intPort] (where our process is listening)
+// and set [ip]. Does this every [updateTime]. [ip] may be nil.
+func (m *Mapper) Map(protocol string, intPort, extPort uint16, desc string, ip *utils.DynamicIPDesc, updateTime time.Duration) {
+	if !m.r.SupportsNAT() {
+		return
 	}
-	return port, nil
+
+	// we attempt a port map, and log an Error if it fails.
+	err := m.retryMapPort(protocol, intPort, extPort, desc, mapTimeout)
+	if err != nil {
+		m.log.Error("NAT Traversal failed from external port %d to internal port %d with %s", extPort, intPort, err)
+	} else {
+		m.log.Info("NAT Traversal successful from external port %d to internal port %d", extPort, intPort)
+	}
+
+	go m.keepPortMapping(protocol, intPort, extPort, desc, ip, updateTime)
 }
 
-// keepPortMapping runs in the background to keep a port mapped. It renews the
-// the port mapping in mapUpdateTimeout.
-func (dev *Mapper) keepPortMapping(mappedPort chan<- uint16, protocol string,
-	intPort uint16, desc string) {
-	updateTimer := time.NewTimer(mapUpdateTimeout)
+// Retry port map up to maxRefreshRetries with a 1 second delay
+func (m *Mapper) retryMapPort(protocol string, intPort, extPort uint16, desc string, timeout time.Duration) error {
+	var err error
+	for retryCnt := 0; retryCnt < maxRefreshRetries; retryCnt++ {
+		err = m.r.MapPort(protocol, intPort, extPort, desc, timeout)
+		if err == nil {
+			return nil
+		}
 
-	for i := 0; i <= maxRetries; i++ {
-		extPort := intPort + uint16(i)
-		if addr, port, desc, err := dev.r.GetPortMappingEntry(extPort, protocol); err == nil {
-			dev.log.Debug("Port %d is taken by %s:%d: %s, retry with the next port",
-				extPort, addr, port, desc)
-		} else if err := dev.r.MapPort(protocol, intPort, extPort, desc, mapTimeout); err != nil {
-			dev.log.Debug("Map port failed. Protocol %s Internal %d External %d. %s",
-				protocol, intPort, extPort, err)
-		} else {
-			dev.log.Info("Mapped Protocol %s Internal %d External %d.", protocol,
-				intPort, extPort)
+		// log a message, sleep a second and retry.
+		m.log.Error("Renewing port mapping try #%d from external port %d to internal port %d failed with %s",
+			retryCnt+1, extPort, intPort, err)
+		time.Sleep(1 * time.Second)
+	}
+	return err
+}
 
-			dev.wg.Add(1)
+// keepPortMapping runs in the background to keep a port mapped. It renews the mapping from [extPort]
+// to [intPort]] every [updateTime]. Updates [ip] every [updateTime].
+func (m *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, desc string, ip *utils.DynamicIPDesc, updateTime time.Duration) {
+	updateTimer := time.NewTimer(updateTime)
 
-			mappedPort <- extPort
+	m.wg.Add(1)
 
-			defer func(extPort uint16) {
-				updateTimer.Stop()
+	defer func(extPort uint16) {
+		updateTimer.Stop()
 
-				dev.log.Debug("Unmap protocol %s external port %d", protocol, extPort)
-				if err := dev.r.UnmapPort(protocol, intPort, extPort); err != nil {
-					dev.log.Debug("Error unmapping port %d to %d: %s", intPort, extPort, err)
-				}
+		m.log.Debug("Unmap protocol %s external port %d", protocol, extPort)
+		if err := m.r.UnmapPort(protocol, intPort, extPort); err != nil {
+			m.log.Debug("Error unmapping port %d to %d: %s", intPort, extPort, err)
+		}
 
-				dev.wg.Done()
-			}(extPort)
+		m.wg.Done()
+	}(extPort)
 
-			for {
-				select {
-				case <-updateTimer.C:
-					if err := dev.r.MapPort(protocol, intPort, extPort, desc, mapTimeout); err != nil {
-						dev.log.Error("Renewing port mapping from external port %d to internal port %d failed with %s",
-							intPort, extPort, err)
-					} else {
-						dev.log.Debug("Renewed port mapping from external port %d to internal port %d.",
-							intPort, extPort)
-					}
-
-					updateTimer.Reset(mapUpdateTimeout)
-				case <-dev.closer:
-					return
-				}
+	for {
+		select {
+		case <-updateTimer.C:
+			err := m.retryMapPort(protocol, intPort, extPort, desc, mapTimeout)
+			if err != nil {
+				m.log.Warn("Renew NAT Traversal failed from external port %d to internal port %d with %s",
+					extPort, intPort, err)
 			}
+			m.updateIP(ip)
+			updateTimer.Reset(updateTime)
+		case <-m.closer:
+			return
 		}
 	}
+}
 
-	dev.log.Debug("Unable to map port %d~%d", intPort, intPort+maxRetries)
-	mappedPort <- 0
+func (m *Mapper) updateIP(ip *utils.DynamicIPDesc) {
+	if ip == nil {
+		return
+	}
+	newIP, err := m.r.ExternalIP()
+	if err != nil {
+		m.log.Error("failed to get external IP: %s", err)
+		return
+	}
+	oldIP := ip.IP().IP
+	ip.UpdateIP(newIP)
+	if !oldIP.Equal(newIP) {
+		m.log.Info("external IP updated to: %s", newIP)
+	}
 }
 
 // UnmapAllPorts stops mapping all ports from this mapper and attempts to unmap
 // them.
-func (dev *Mapper) UnmapAllPorts() {
-	close(dev.closer)
-	dev.wg.Wait()
-	dev.log.Info("Unmapped all ports")
+func (m *Mapper) UnmapAllPorts() {
+	close(m.closer)
+	m.wg.Wait()
+	m.log.Info("Unmapped all ports")
 }

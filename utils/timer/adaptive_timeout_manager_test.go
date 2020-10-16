@@ -16,15 +16,18 @@ import (
 
 func TestAdaptiveTimeoutManager(t *testing.T) {
 	tm := AdaptiveTimeoutManager{}
-	tm.Initialize(&AdaptiveTimeoutConfig{
-		InitialTimeout:    time.Millisecond,
-		MinimumTimeout:    time.Millisecond,
-		MaximumTimeout:    time.Hour,
-		TimeoutMultiplier: 2,
-		TimeoutReduction:  time.Microsecond,
-		Namespace:         constants.PlatformName,
-		Registerer:        prometheus.NewRegistry(),
+	err := tm.Initialize(&AdaptiveTimeoutConfig{
+		InitialTimeout: time.Millisecond,
+		MinimumTimeout: time.Millisecond,
+		MaximumTimeout: time.Hour,
+		TimeoutInc:     2 * time.Millisecond,
+		TimeoutDec:     time.Microsecond,
+		Namespace:      constants.PlatformName,
+		Registerer:     prometheus.NewRegistry(),
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	go tm.Dispatch()
 
 	var lock sync.Mutex

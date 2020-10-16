@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
@@ -130,6 +131,7 @@ type ManagerConfig struct {
 	XChainID                ids.ID
 	CriticalChains          ids.Set          // Chains that can't exit gracefully
 	TimeoutManager          *timeout.Manager // Manages request timeouts when sending messages to other validators
+	HealthService           *health.Health
 }
 
 type manager struct {
@@ -214,7 +216,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	vmID, err := m.VMManager.Lookup(chainParams.VMAlias)
 	if err != nil {
-		return nil, fmt.Errorf("error while looking up VM: %s", err)
+		return nil, fmt.Errorf("error while looking up VM: %w", err)
 	}
 
 	primaryAlias, err := m.PrimaryAlias(chainParams.ID)
@@ -225,17 +227,16 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	// Create the log and context of the chain
 	chainLog, err := m.LogFactory.MakeChain(primaryAlias, "")
 	if err != nil {
-		return nil, fmt.Errorf("error while creating chain's log %s", err)
+		return nil, fmt.Errorf("error while creating chain's log %w", err)
 	}
 
 	ctx := &snow.Context{
-		NetworkID:   m.NetworkID,
-		SubnetID:    chainParams.SubnetID,
-		ChainID:     chainParams.ID,
-		NodeID:      m.NodeID,
-		XChainID:    m.XChainID,
-		AVAXAssetID: m.AVAXAssetID,
-
+		NetworkID:           m.NetworkID,
+		SubnetID:            chainParams.SubnetID,
+		ChainID:             chainParams.ID,
+		NodeID:              m.NodeID,
+		XChainID:            m.XChainID,
+		AVAXAssetID:         m.AVAXAssetID,
 		Log:                 chainLog,
 		DecisionDispatcher:  m.DecisionEvents,
 		ConsensusDispatcher: m.ConsensusEvents,
@@ -250,13 +251,13 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	// Get a factory for the vm we want to use on our chain
 	vmFactory, err := m.VMManager.GetVMFactory(vmID)
 	if err != nil {
-		return nil, fmt.Errorf("error while getting vmFactory: %s", err)
+		return nil, fmt.Errorf("error while getting vmFactory: %w", err)
 	}
 
 	// Create the chain
 	vm, err := vmFactory.New(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error while creating vm: %s", err)
+		return nil, fmt.Errorf("error while creating vm: %w", err)
 	}
 	// TODO: Shutdown VM if an error occurs
 
@@ -264,18 +265,18 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	for i, fxAlias := range chainParams.FxAliases {
 		fxID, err := m.VMManager.Lookup(fxAlias)
 		if err != nil {
-			return nil, fmt.Errorf("error while looking up Fx: %s", err)
+			return nil, fmt.Errorf("error while looking up Fx: %w", err)
 		}
 
 		// Get a factory for the fx we want to use on our chain
 		fxFactory, err := m.VMManager.GetVMFactory(fxID)
 		if err != nil {
-			return nil, fmt.Errorf("error while getting fxFactory: %s", err)
+			return nil, fmt.Errorf("error while getting fxFactory: %w", err)
 		}
 
 		fx, err := fxFactory.New(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("error while creating fx: %s", err)
+			return nil, fmt.Errorf("error while creating fx: %w", err)
 		}
 
 		// Create the fx
@@ -321,7 +322,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 			bootstrapWeight,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("error while creating new avalanche vm %s", err)
+			return nil, fmt.Errorf("error while creating new avalanche vm %w", err)
 		}
 	case block.ChainVM:
 		chain, err = m.createSnowmanChain(
@@ -335,14 +336,20 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 			bootstrapWeight,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("error while creating new snowman vm %s", err)
+			return nil, fmt.Errorf("error while creating new snowman vm %w", err)
 		}
 	default:
 		return nil, fmt.Errorf("the vm should have type avalanche.DAGVM or snowman.ChainVM. Chain not created")
 	}
 
+	// Register the chain with the timeout manager
+	if err := m.TimeoutManager.RegisterChain(ctx, consensusParams.Namespace); err != nil {
+		return nil, err
+	}
+
 	// Allows messages to be routed to the new chain
 	m.ManagerConfig.Router.AddChain(chain.Handler)
+
 	// If the X or P Chain panics, do not attempt to recover
 	if m.CriticalChains.Contains(chainParams.ID) {
 		go ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
@@ -439,6 +446,20 @@ func (m *manager) createAvalancheChain(
 		Consensus: &avcon.Topological{},
 	}); err != nil {
 		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
+	}
+
+	// Register health checks
+	chainAlias, err := m.PrimaryAlias(ctx.ChainID)
+	if err != nil {
+		chainAlias = ctx.ChainID.String()
+	}
+	wrapperHc := &healthCheckWrapper{
+		chain: chainAlias,
+		lock:  &ctx.Lock,
+		check: engine.Health,
+	}
+	if err := m.HealthService.RegisterCheck(wrapperHc); err != nil {
+		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
@@ -541,6 +562,21 @@ func (m *manager) createSnowmanChain(
 		consensusParams.Metrics,
 	)
 
+	// Register health checks
+	chainAlias, err := m.PrimaryAlias(ctx.ChainID)
+	if err != nil {
+		chainAlias = ctx.ChainID.String()
+	}
+
+	wrapperHc := &healthCheckWrapper{
+		chain: chainAlias,
+		lock:  &ctx.Lock,
+		check: engine.Health,
+	}
+	if err := m.HealthService.RegisterCheck(wrapperHc); err != nil {
+		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
+	}
+
 	return &chain{
 		Engine:  engine,
 		Handler: handler,
@@ -597,4 +633,28 @@ func (m *manager) isChainWithAlias(aliases ...string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// Wraps a health check.
+// Grabs [Lock] before executing the health check
+type healthCheckWrapper struct {
+	check func() (interface{}, error)
+
+	// Grabs/releases this before/after health check func
+	lock *sync.RWMutex
+
+	// Alias/ID of chain this health check is for
+	chain string
+}
+
+// Name is this health check's formatted name
+func (hc *healthCheckWrapper) Name() string {
+	return hc.chain
+}
+
+// Execute executes the health check function with the lock
+func (hc *healthCheckWrapper) Execute() (interface{}, error) {
+	hc.lock.Lock()
+	defer hc.lock.Unlock()
+	return hc.check()
 }

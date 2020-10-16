@@ -9,8 +9,8 @@ type SuccessResponse struct {
 	Success bool `json:"success"`
 }
 
-// JsonTxID contains the ID of a transaction
-type JsonTxID struct {
+// JSONTxID contains the ID of a transaction
+type JSONTxID struct {
 	TxID ids.ID `json:"txID"`
 }
 
@@ -20,38 +20,50 @@ type UserPass struct {
 	Password string `json:"password"`
 }
 
-// JsonAddress contains an address
-type JsonAddress struct {
+// JSONAddress contains an address
+type JSONAddress struct {
 	Address string `json:"address"`
 }
 
-// JsonAddresses contains a list of address
-type JsonAddresses struct {
+// JSONAddresses contains a list of address
+type JSONAddresses struct {
 	Addresses []string `json:"addresses"`
 }
 
-// ChangeAddr is the address change is sent to, if any
-type JsonChangeAddr struct {
+// JSONChangeAddr is the address change is sent to, if any
+type JSONChangeAddr struct {
 	ChangeAddr string `json:"changeAddr"`
 }
 
-// JsonTxIDChangeAddr is a tx ID and change address
-type JsonTxIDChangeAddr struct {
-	JsonTxID
-	JsonChangeAddr
+// JSONTxIDChangeAddr is a tx ID and change address
+type JSONTxIDChangeAddr struct {
+	JSONTxID
+	JSONChangeAddr
 }
 
-// JsonFromAddrs is a list of addresses to send funds from
-type JsonFromAddrs struct {
+// JSONFromAddrs is a list of addresses to send funds from
+type JSONFromAddrs struct {
 	From []string `json:"from"`
 }
 
-// JsonSpendHeader is 3 arguments to a method that spends (including those with tx fees)
+// JSONSpendHeader is 3 arguments to a method that spends (including those with tx fees)
 // 1) The username/password
 // 2) The addresses used in the method
 // 3) The address to send change to
-type JsonSpendHeader struct {
+type JSONSpendHeader struct {
 	UserPass
-	JsonFromAddrs
-	JsonChangeAddr
+	JSONFromAddrs
+	JSONChangeAddr
+}
+
+// GetTxArgs ...
+type GetTxArgs struct {
+	TxID     ids.ID `json:"txID"`
+	Encoding string `json:"encoding"`
+}
+
+// FormattedTx defines a JSON formatted struct containing a Tx in CB58 format
+type FormattedTx struct {
+	Tx       string `json:"tx"`
+	Encoding string `json:"encoding"`
 }

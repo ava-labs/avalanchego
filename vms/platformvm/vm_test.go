@@ -26,9 +26,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
-	"github.com/ava-labs/avalanchego/snow/networking/throttler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/core"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -120,10 +121,17 @@ func defaultContext() *snow.Context {
 	ctx.AVAXAssetID = avaxAssetID
 	aliaser := &ids.Aliaser{}
 	aliaser.Initialize()
-	aliaser.Alias(constants.PlatformChainID, "P")
-	aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String())
-	aliaser.Alias(avmID, "X")
-	aliaser.Alias(avmID, avmID.String())
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		aliaser.Alias(constants.PlatformChainID, "P"),
+		aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String()),
+		aliaser.Alias(avmID, "X"),
+		aliaser.Alias(avmID, avmID.String()),
+	)
+	if errs.Errored() {
+		panic(errs.Err)
+	}
 	ctx.BCLookup = aliaser
 	return ctx
 }
@@ -182,11 +190,24 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	}
 
 	buildGenesisResponse := BuildGenesisReply{}
-	platformvmSS := StaticService{}
+	platformvmSS, err := CreateStaticService(formatting.CB58Encoding)
+	if err != nil {
+		panic(err)
+	}
 	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
 		panic(fmt.Errorf("problem while building platform chain's genesis state: %w", err))
 	}
-	return &buildGenesisArgs, buildGenesisResponse.Bytes.Bytes
+
+	encoding, err := platformvmSS.encodingManager.GetEncoding(buildGenesisResponse.Encoding)
+	if err != nil {
+		panic(err)
+	}
+	genesisBytes, err := encoding.ConvertString(buildGenesisResponse.Bytes)
+	if err != nil {
+		panic(err)
+	}
+
+	return &buildGenesisArgs, genesisBytes
 }
 
 func defaultVM() (*VM, database.Database) {
@@ -236,7 +257,7 @@ func defaultVM() (*VM, database.Database) {
 		keys[0].PublicKey().Address(),           // change addr
 	); err != nil {
 		panic(err)
-	} else if err := vm.issueTx(tx); err != nil {
+	} else if err := vm.mempool.IssueTx(tx); err != nil {
 		panic(err)
 	} else if blk, err := vm.BuildBlock(); err != nil {
 		panic(err)
@@ -256,7 +277,9 @@ func TestGenesis(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
@@ -333,16 +356,146 @@ func TestGenesis(t *testing.T) {
 	}
 }
 
+// Test method getTotalStake
+func TestGetTotalStake(t *testing.T) {
+	vm, _ := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		vm.Ctx.Lock.Unlock()
+	}()
+
+	// Make sure stake is right after genesis
+	stake, err := vm.getTotalStake()
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedStake := len(keys) * defaultWeight
+	if expectedStake != int(stake) {
+		t.Fatalf("expected total stake to be %d but is %d",
+			expectedStake,
+			stake,
+		)
+	}
+
+	// add a validator
+	vdrID := ids.GenerateTestShortID()
+	vdrStakeAmt := vm.minValidatorStake
+	addValidatorTx, err := vm.newAddValidatorTx(
+		vdrStakeAmt,
+		uint64(defaultValidateStartTime.Unix()),
+		uint64(defaultValidateEndTime.Unix()),
+		vdrID,
+		ids.GenerateTestShortID(),
+		0,
+		keys,
+		keys[0].PublicKey().Address(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	validatorRewardTx := &rewardTx{
+		Reward: 100,
+		Tx:     *addValidatorTx,
+	}
+	if err := vm.addStaker(vm.DB, constants.PrimaryNetworkID, validatorRewardTx); err != nil {
+		t.Fatal(err)
+	}
+
+	// Ensure the stake increased
+	oldStake := stake
+	stake, err = vm.getTotalStake()
+	if err != nil {
+		t.Fatal(err)
+	} else if stake != oldStake+vdrStakeAmt {
+		t.Fatalf("excpected ottal stake to be %d but is %d",
+			oldStake+vdrStakeAmt,
+			stake,
+		)
+	}
+
+	// add a delegator
+	delegatorStakeAmt := 2 * vm.minDelegatorStake
+	addDelegatorTx, err := vm.newAddDelegatorTx(
+		delegatorStakeAmt,
+		uint64(defaultValidateStartTime.Unix()),
+		uint64(defaultValidateEndTime.Unix()),
+		vdrID,
+		ids.GenerateTestShortID(),
+		keys,
+		keys[0].PublicKey().Address(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	delegatorRewardTx := &rewardTx{
+		Reward: 100,
+		Tx:     *addDelegatorTx,
+	}
+	if err := vm.addStaker(vm.DB, constants.PrimaryNetworkID, delegatorRewardTx); err != nil {
+		t.Fatal(err)
+	}
+
+	// Ensure the stake increased
+	oldStake = stake
+	stake, err = vm.getTotalStake()
+	if err != nil {
+		t.Fatal(err)
+	} else if stake != oldStake+delegatorStakeAmt {
+		t.Fatalf("expected total stake to be %d but is %d",
+			oldStake+delegatorStakeAmt,
+			stake,
+		)
+	}
+
+	// Remove the delegator
+	if err := vm.removeStaker(vm.DB, constants.PrimaryNetworkID, delegatorRewardTx); err != nil {
+		t.Fatal(err)
+	}
+	// Ensure the stake decreased
+	oldStake = stake
+	stake, err = vm.getTotalStake()
+	if err != nil {
+		t.Fatal(err)
+	} else if stake != oldStake-delegatorStakeAmt {
+		t.Fatalf("expected total stake to be %d but is %d",
+			oldStake-delegatorStakeAmt,
+			stake,
+		)
+	}
+
+	// Remove the validator
+	if err := vm.removeStaker(vm.DB, constants.PrimaryNetworkID, validatorRewardTx); err != nil {
+		t.Fatal(err)
+	}
+	// Ensure the stake decreased
+	oldStake = stake
+	stake, err = vm.getTotalStake()
+	if err != nil {
+		t.Fatal(err)
+	} else if stake != oldStake-vdrStakeAmt {
+		t.Fatalf("expected total stake to be %d but is %d",
+			oldStake-vdrStakeAmt,
+			stake,
+		)
+	}
+
+}
+
 // accept proposal to add validator to primary network
 func TestAddValidatorCommit(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(Delta).Add(1 * time.Second)
+	startTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	key, err := vm.factory.NewPrivateKey()
 	if err != nil {
@@ -366,7 +519,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.issueTx(tx); err != nil {
+	if err := vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	blk, err := vm.BuildBlock()
@@ -418,11 +571,13 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(-Delta).Add(-1 * time.Second)
+	startTime := defaultGenesisTime.Add(-syncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := vm.factory.NewPrivateKey()
 	ID := key.PublicKey().Address()
@@ -465,11 +620,13 @@ func TestAddValidatorReject(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(Delta).Add(1 * time.Second)
+	startTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := vm.factory.NewPrivateKey()
 	ID := key.PublicKey().Address()
@@ -490,7 +647,7 @@ func TestAddValidatorReject(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.issueTx(tx); err != nil {
+	if err := vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	blk, err := vm.BuildBlock()
@@ -544,11 +701,13 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(syncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 
 	// create valid tx
@@ -568,7 +727,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.issueTx(tx); err != nil {
+	if err := vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	blk, err := vm.BuildBlock()
@@ -624,11 +783,13 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(syncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := keys[0].PublicKey().Address()
 
@@ -649,7 +810,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.issueTx(tx); err != nil {
+	if err := vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	blk, err := vm.BuildBlock()
@@ -705,7 +866,9 @@ func TestRewardValidatorAccept(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
@@ -804,7 +967,9 @@ func TestRewardValidatorReject(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
@@ -890,7 +1055,9 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
@@ -975,7 +1142,9 @@ func TestUnneededBuildBlock(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 	if _, err := vm.BuildBlock(); err == nil {
@@ -988,7 +1157,9 @@ func TestCreateChain(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
@@ -1003,7 +1174,7 @@ func TestCreateChain(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatal(err)
-	} else if err := vm.issueTx(tx); err != nil {
+	} else if err := vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
 	} else if blk, err := vm.BuildBlock(); err != nil { // should contain proposal to create chain
 		t.Fatal(err)
@@ -1042,24 +1213,26 @@ func TestCreateSubnet(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
 	nodeID := keys[0].PublicKey().Address()
 
 	createSubnetTx, err := vm.newCreateSubnetTx(
-		1, //threshold
+		1, // threshold
 		[]ids.ShortID{ // control keys
 			keys[0].PublicKey().Address(),
 			keys[1].PublicKey().Address(),
 		},
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-		keys[0].PublicKey().Address(), // change addr // payer
+		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // payer
+		keys[0].PublicKey().Address(),           // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
-	} else if err := vm.issueTx(createSubnetTx); err != nil {
+	} else if err := vm.mempool.IssueTx(createSubnetTx); err != nil {
 		t.Fatal(err)
 	} else if blk, err := vm.BuildBlock(); err != nil { // should contain proposal to create subnet
 		t.Fatal(err)
@@ -1076,7 +1249,7 @@ func TestCreateSubnet(t *testing.T) {
 	}
 
 	// Now that we've created a new subnet, add a validator to that subnet
-	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(syncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subent so tx is valid
 	if addValidatorTx, err := vm.newAddSubnetValidatorTx(
@@ -1089,7 +1262,7 @@ func TestCreateSubnet(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if err := vm.issueTx(addValidatorTx); err != nil {
+	} else if err := vm.mempool.IssueTx(addValidatorTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1241,7 +1414,9 @@ func TestAtomicImport(t *testing.T) {
 	vm, baseDB := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
@@ -1304,7 +1479,7 @@ func TestAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(tx); err != nil {
+	if err := vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
 	} else if blk, err := vm.BuildBlock(); err != nil {
 		t.Fatal(err)
@@ -1328,7 +1503,9 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
@@ -1468,7 +1645,9 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	firstVM.Shutdown()
+	if err := firstVM.Shutdown(); err != nil {
+		t.Fatal(err)
+	}
 	firstCtx.Lock.Unlock()
 
 	secondVM := &VM{
@@ -1485,7 +1664,9 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	secondCtx := defaultContext()
 	secondCtx.Lock.Lock()
 	defer func() {
-		secondVM.Shutdown()
+		if err := secondVM.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		secondCtx.Lock.Unlock()
 	}()
 
@@ -1591,7 +1772,9 @@ func TestRestartFullyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	firstVM.Shutdown()
+	if err := firstVM.Shutdown(); err != nil {
+		t.Fatal(err)
+	}
 	firstCtx.Lock.Unlock()
 
 	secondVM := &VM{
@@ -1608,7 +1791,9 @@ func TestRestartFullyAccepted(t *testing.T) {
 	secondCtx := defaultContext()
 	secondCtx.Lock.Lock()
 	defer func() {
-		secondVM.Shutdown()
+		if err := secondVM.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		secondCtx.Lock.Unlock()
 	}()
 
@@ -1677,19 +1862,25 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	peerID := ids.NewShortID([20]byte{1, 2, 3, 4, 5, 4, 3, 2, 1})
 	vdrs := validators.NewSet()
-	vdrs.AddWeight(peerID, 1)
+	if err := vdrs.AddWeight(peerID, 1); err != nil {
+		t.Fatal(err)
+	}
 	beacons := vdrs
 
 	timeoutManager := timeout.Manager{}
-	timeoutManager.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:    time.Millisecond,
-		MinimumTimeout:    time.Millisecond,
-		MaximumTimeout:    10 * time.Second,
-		TimeoutMultiplier: 1.1,
-		TimeoutReduction:  time.Millisecond,
-		Namespace:         "",
-		Registerer:        prometheus.NewRegistry(),
-	})
+	benchlist := benchlist.NewNoBenchlist()
+	err = timeoutManager.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout: time.Millisecond,
+		MinimumTimeout: time.Millisecond,
+		MaximumTimeout: 10 * time.Second,
+		TimeoutInc:     2 * time.Millisecond,
+		TimeoutDec:     time.Millisecond,
+		Namespace:      "",
+		Registerer:     prometheus.NewRegistry(),
+	}, benchlist)
+	if err != nil {
+		t.Fatal(err)
+	}
 	go timeoutManager.Dispatch()
 
 	chainRouter := &router.ChainRouter{}
@@ -1710,7 +1901,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// The engine handles consensus
 	engine := smeng.Transitive{}
-	engine.Initialize(smeng.Config{
+	err = engine.Initialize(smeng.Config{
 		Config: bootstrap.Config{
 			Config: common.Config{
 				Ctx:        ctx,
@@ -1733,6 +1924,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		},
 		Consensus: &smcon.Topological{},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
@@ -1740,10 +1934,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		&engine,
 		vdrs,
 		msgChan,
-		1000,
-		throttler.DefaultMaxNonStakerPendingMsgs,
-		throttler.DefaultStakerPortion,
-		throttler.DefaultStakerPortion,
+		1024,
+		router.DefaultMaxNonStakerPendingMsgs,
+		router.DefaultStakerPortion,
+		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -1759,7 +1953,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	frontier := ids.Set{}
 	frontier.Add(advanceTimeBlkID)
-	engine.AcceptedFrontier(peerID, *reqID, frontier)
+	if err := engine.AcceptedFrontier(peerID, *reqID, frontier); err != nil {
+		t.Fatal(err)
+	}
 
 	externalSender.GetAcceptedF = nil
 	externalSender.GetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, _ time.Time, containerID ids.ID) {
@@ -1769,13 +1965,17 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		}
 	}
 
-	engine.Accepted(peerID, *reqID, frontier)
+	if err := engine.Accepted(peerID, *reqID, frontier); err != nil {
+		t.Fatal(err)
+	}
 
 	externalSender.GetF = nil
 	externalSender.CantPushQuery = false
 	externalSender.CantPullQuery = false
 
-	engine.MultiPut(peerID, *reqID, [][]byte{advanceTimeBlkBytes})
+	if err := engine.MultiPut(peerID, *reqID, [][]byte{advanceTimeBlkBytes}); err != nil {
+		t.Fatal(err)
+	}
 
 	externalSender.CantPushQuery = true
 
@@ -1809,7 +2009,9 @@ func TestUnverifiedParent(t *testing.T) {
 	ctx := defaultContext()
 	ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		ctx.Lock.Unlock()
 	}()
 
@@ -1887,7 +2089,7 @@ func TestParseAddressInvalid(t *testing.T) {
 			want: "expected chainID to be \"11111111111111111111111111111111LpoYY\" but was \"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\"",
 		},
 		{
-			in:   "P-testing18jma8ppw3nhx5r4ap", //truncated
+			in:   "P-testing18jma8ppw3nhx5r4ap", // truncated
 			want: "checksum failed. Expected qwqey4, got x5r4ap.",
 		},
 	}
@@ -1927,7 +2129,9 @@ func TestNextValidatorStartTime(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 
@@ -1966,7 +2170,9 @@ func TestMaxStakeAmount(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
-		vm.Shutdown()
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
 		vm.Ctx.Lock.Unlock()
 	}()
 

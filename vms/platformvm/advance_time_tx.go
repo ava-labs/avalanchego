@@ -49,7 +49,7 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	switch {
 	case tx == nil:
 		return nil, nil, nil, nil, tempError{errNilTx}
-	case vm.clock.Time().Add(Delta).Before(tx.Timestamp()):
+	case vm.clock.Time().Add(syncBound).Before(tx.Timestamp()):
 		return nil, nil, nil, nil, tempError{fmt.Errorf("proposed time, %s, is too far in the future relative to local time (%s)",
 			tx.Timestamp(), vm.clock.Time())}
 	case len(stx.Creds) != 0:
@@ -94,10 +94,10 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	return onCommitDB, onAbortDB, onCommitFunc, nil, nil
 }
 
-// InitiallyPrefersCommit returns true if the proposed time isn't after the
-// current wall clock time.
+// InitiallyPrefersCommit returns true if the proposed time is at
+// or before the current time plus the synchrony bound
 func (tx *UnsignedAdvanceTimeTx) InitiallyPrefersCommit(vm *VM) bool {
-	return !tx.Timestamp().After(vm.clock.Time())
+	return !tx.Timestamp().After(vm.clock.Time().Add(syncBound))
 }
 
 // newAdvanceTimeTx creates a new tx that, if it is accepted and followed by a

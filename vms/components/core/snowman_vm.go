@@ -54,7 +54,7 @@ type SnowmanVM struct {
 }
 
 // SetPreference sets the block with ID [ID] as the preferred block
-func (svm *SnowmanVM) SetPreference(ID ids.ID) { svm.preferred = ID }
+func (svm *SnowmanVM) SetPreference(id ids.ID) { svm.preferred = id }
 
 // Preferred returns the ID of the preferred block
 func (svm *SnowmanVM) Preferred() ids.ID { return svm.preferred }
@@ -68,8 +68,8 @@ func (svm *SnowmanVM) ParseBlock(bytes []byte) (snowman.Block, error) {
 }
 
 // GetBlock returns the block with ID [ID]
-func (svm *SnowmanVM) GetBlock(ID ids.ID) (snowman.Block, error) {
-	block, err := svm.State.Get(svm.DB, state.BlockTypeID, ID)
+func (svm *SnowmanVM) GetBlock(id ids.ID) (snowman.Block, error) {
+	block, err := svm.State.Get(svm.DB, state.BlockTypeID, id)
 	if err != nil {
 		return nil, err
 	}

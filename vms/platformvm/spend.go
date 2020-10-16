@@ -267,7 +267,8 @@ func (vm *VM) stake(
 	}
 
 	if amountBurned < fee || amountStaked < amount {
-		return nil, nil, nil, nil, fmt.Errorf("provided keys have balance (unlocked, locked) (%d, %d) but need (%d, %d)",
+		return nil, nil, nil, nil, fmt.Errorf(
+			"provided keys have balance (unlocked, locked) (%d, %d) but need (%d, %d)",
 			amountBurned, amountStaked, fee, amount)
 	}
 
@@ -420,7 +421,9 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 		// Verify that this tx's credentials allow [in] to be spent
 		if err := vm.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
-			return permError{err}
+			return permError{
+				fmt.Errorf("failed to verify transfer: %w", err),
+			}
 		}
 
 		amount := in.Amount()
@@ -441,7 +444,9 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		owner := owned.Owners()
 		ownerBytes, err := vm.codec.Marshal(owner)
 		if err != nil {
-			return tempError{err}
+			return tempError{
+				fmt.Errorf("couldn't marshal owner: %w", err),
+			}
 		}
 		ownerID := hashing.ComputeHash256Array(ownerBytes)
 		owners, ok := lockedConsumed[locktime]
@@ -487,7 +492,9 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		owner := owned.Owners()
 		ownerBytes, err := vm.codec.Marshal(owner)
 		if err != nil {
-			return tempError{err}
+			return tempError{
+				fmt.Errorf("couldn't marshal owner: %w", err),
+			}
 		}
 		ownerID := hashing.ComputeHash256Array(ownerBytes)
 		owners, ok := lockedProduced[locktime]
@@ -534,7 +541,9 @@ func (vm *VM) consumeInputs(
 	for _, input := range ins {
 		utxoID := input.UTXOID.InputID()
 		if err := vm.removeUTXO(db, utxoID); err != nil {
-			return tempError{err}
+			return tempError{
+				fmt.Errorf("failed to remove UTXO %s: %w", utxoID, err),
+			}
 		}
 	}
 	return nil
@@ -556,7 +565,7 @@ func (vm *VM) produceOutputs(
 			Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 			Out:   out.Output(),
 		}); err != nil {
-			return err
+			return fmt.Errorf("failed to put UTXO %w", err)
 		}
 	}
 	return nil
