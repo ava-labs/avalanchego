@@ -92,7 +92,7 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 		*bn = EarliestBlockNumber
 		return nil
 	case "latest":
-		*bn = AcceptedBlockNumber
+		*bn = LatestBlockNumber
 		return nil
 	case "pending":
 		*bn = PendingBlockNumber
@@ -115,6 +115,11 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 
 func (bn BlockNumber) Int64() int64 {
 	return (int64)(bn)
+}
+
+// IsAccepted returns true if this blockNumber should be treated as a request for the last accepted block
+func (bn BlockNumber) IsAccepted() bool {
+	return bn < EarliestBlockNumber && bn >= AcceptedBlockNumber
 }
 
 type BlockNumberOrHash struct {
@@ -147,7 +152,7 @@ func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
 		bnh.BlockNumber = &bn
 		return nil
 	case "latest":
-		bn := AcceptedBlockNumber
+		bn := LatestBlockNumber
 		bnh.BlockNumber = &bn
 		return nil
 	case "pending":
