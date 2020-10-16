@@ -278,21 +278,13 @@ func NewPublicDebugAPI(eth *Ethereum) *PublicDebugAPI {
 
 // DumpBlock retrieves the entire state of the database at a given block.
 func (api *PublicDebugAPI) DumpBlock(blockNr rpc.BlockNumber) (state.Dump, error) {
-	if blockNr == rpc.PendingBlockNumber {
-		// If we're dumping the pending state, we need to request
-		// both the pending block as well as the pending state from
-		// the miner and operate on those
-		_, stateDb := api.eth.miner.Pending()
-		return stateDb.RawDump(false, false, true), nil
-	}
 	var block *types.Block
-	if blockNr == rpc.LatestBlockNumber {
-		block = api.eth.blockchain.CurrentBlock()
-	} else if blockNr == rpc.AcceptedBlockNumber {
+	if blockNr.IsAccepted() {
 		block = api.eth.AcceptedBlock()
 	} else {
 		block = api.eth.blockchain.GetBlockByNumber(uint64(blockNr))
 	}
+
 	if block == nil {
 		return state.Dump{}, fmt.Errorf("block #%d not found", blockNr)
 	}
@@ -362,27 +354,19 @@ func (api *PublicDebugAPI) AccountRange(blockNrOrHash rpc.BlockNumberOrHash, sta
 	var err error
 
 	if number, ok := blockNrOrHash.Number(); ok {
-		if number == rpc.PendingBlockNumber {
-			// If we're dumping the pending state, we need to request
-			// both the pending block as well as the pending state from
-			// the miner and operate on those
-			_, stateDb = api.eth.miner.Pending()
+		var block *types.Block
+		if number.IsAccepted() {
+			block = api.eth.AcceptedBlock()
 		} else {
-			var block *types.Block
-			if number == rpc.LatestBlockNumber {
-				block = api.eth.blockchain.CurrentBlock()
-			} else if number == rpc.AcceptedBlockNumber {
-				block = api.eth.AcceptedBlock()
-			} else {
-				block = api.eth.blockchain.GetBlockByNumber(uint64(number))
-			}
-			if block == nil {
-				return state.IteratorDump{}, fmt.Errorf("block #%d not found", number)
-			}
-			stateDb, err = api.eth.BlockChain().StateAt(block.Root())
-			if err != nil {
-				return state.IteratorDump{}, err
-			}
+			block = api.eth.blockchain.GetBlockByNumber(uint64(number))
+		}
+
+		if block == nil {
+			return state.IteratorDump{}, fmt.Errorf("block #%d not found", number)
+		}
+		stateDb, err = api.eth.BlockChain().StateAt(block.Root())
+		if err != nil {
+			return state.IteratorDump{}, err
 		}
 	} else if hash, ok := blockNrOrHash.Hash(); ok {
 		block := api.eth.blockchain.GetBlockByHash(hash)
@@ -393,6 +377,8 @@ func (api *PublicDebugAPI) AccountRange(blockNrOrHash rpc.BlockNumberOrHash, sta
 		if err != nil {
 			return state.IteratorDump{}, err
 		}
+	} else {
+		return state.IteratorDump{}, errors.New("either block number or block hash must be specified")
 	}
 
 	if maxResults > AccountRangeMaxResults || maxResults <= 0 {

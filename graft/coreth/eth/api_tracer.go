@@ -105,26 +105,18 @@ func (api *PrivateDebugAPI) TraceChain(ctx context.Context, start, end rpc.Block
 	// Fetch the block interval that we want to trace
 	var from, to *types.Block
 
-	switch start {
-	case rpc.PendingBlockNumber:
-		from = api.eth.miner.PendingBlock()
-	case rpc.LatestBlockNumber:
-		from = api.eth.blockchain.CurrentBlock()
-	case rpc.AcceptedBlockNumber:
+	if start.IsAccepted() {
 		from = api.eth.AcceptedBlock()
-	default:
+	} else {
 		from = api.eth.blockchain.GetBlockByNumber(uint64(start))
 	}
-	switch end {
-	case rpc.PendingBlockNumber:
-		to = api.eth.miner.PendingBlock()
-	case rpc.LatestBlockNumber:
-		to = api.eth.blockchain.CurrentBlock()
-	case rpc.AcceptedBlockNumber:
-		from = api.eth.AcceptedBlock()
-	default:
+
+	if end.IsAccepted() {
+		to = api.eth.AcceptedBlock()
+	} else {
 		to = api.eth.blockchain.GetBlockByNumber(uint64(end))
 	}
+
 	// Trace the chain if we've found all our blocks
 	if from == nil {
 		return nil, fmt.Errorf("starting block #%d not found", start)
@@ -360,16 +352,12 @@ func (api *PrivateDebugAPI) TraceBlockByNumber(ctx context.Context, number rpc.B
 	// Fetch the block that we want to trace
 	var block *types.Block
 
-	switch number {
-	case rpc.PendingBlockNumber:
-		block = api.eth.miner.PendingBlock()
-	case rpc.LatestBlockNumber:
-		block = api.eth.blockchain.CurrentBlock()
-	case rpc.AcceptedBlockNumber:
+	if number.IsAccepted() {
 		block = api.eth.AcceptedBlock()
-	default:
+	} else {
 		block = api.eth.blockchain.GetBlockByNumber(uint64(number))
 	}
+
 	// Trace the block if it was found
 	if block == nil {
 		return nil, fmt.Errorf("block #%d not found", number)
