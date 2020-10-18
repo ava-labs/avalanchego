@@ -9,7 +9,7 @@ import (
 )
 
 type continuousAverager struct {
-	halflife    time.Duration
+	halflife    float64
 	weightedSum float64
 	normalizer  float64
 	lastUpdated time.Time
@@ -21,7 +21,7 @@ func NewAverager(
 	currentTime time.Time,
 ) Averager {
 	return &continuousAverager{
-		halflife:    halflife,
+		halflife:    float64(halflife) / math.Log(2),
 		weightedSum: initialPrediction,
 		normalizer:  1,
 		lastUpdated: currentTime,
@@ -39,8 +39,8 @@ func (a *continuousAverager) Observe(value float64, currentTime time.Time) {
 	// zero if this call is out of order, otherwise negative
 	oldDelta := previousTime.Sub(a.lastUpdated)
 
-	newWeightedDelta := math.Pow(2, float64(newDelta)/float64(a.halflife))
-	oldWeightedDelta := math.Pow(2, float64(oldDelta)/float64(a.halflife))
+	newWeightedDelta := math.Exp(float64(newDelta) / a.halflife)
+	oldWeightedDelta := math.Exp(float64(oldDelta) / a.halflife)
 
 	a.weightedSum = newWeightedDelta*value + oldWeightedDelta*a.weightedSum
 	a.normalizer = newWeightedDelta + oldWeightedDelta*a.normalizer
