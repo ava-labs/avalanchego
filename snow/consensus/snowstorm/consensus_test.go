@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
@@ -78,19 +79,30 @@ func Setup() {
 	Blue.InputIDsV.Add(Z)
 
 	Alpha.InputIDsV.Add(Z)
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		Red.Verify(),
+		Green.Verify(),
+		Blue.Verify(),
+		Alpha.Verify(),
+	)
+	if errs.Errored() {
+		panic(errs.Err)
+	}
 }
 
 // Execute all tests against a consensus implementation
 func ConsensusTest(t *testing.T, factory Factory, prefix string) {
 	for _, test := range Tests {
+		Setup()
 		test(t, factory)
 	}
+	Setup()
 	StringTest(t, factory, prefix)
 }
 
 func MetricsTest(t *testing.T, factory Factory) {
-	Setup()
-
 	{
 		params := sbcon.Parameters{
 			Metrics:           prometheus.NewRegistry(),
@@ -154,8 +166,6 @@ func MetricsTest(t *testing.T, factory Factory) {
 }
 
 func ParamsTest(t *testing.T, factory Factory) {
-	Setup()
-
 	graph := factory.New()
 
 	params := sbcon.Parameters{
@@ -183,8 +193,6 @@ func ParamsTest(t *testing.T, factory Factory) {
 }
 
 func IssuedTest(t *testing.T, factory Factory) {
-	Setup()
-
 	graph := factory.New()
 
 	params := sbcon.Parameters{
@@ -216,8 +224,6 @@ func IssuedTest(t *testing.T, factory Factory) {
 }
 
 func LeftoverInputTest(t *testing.T, factory Factory) {
-	Setup()
-
 	graph := factory.New()
 
 	params := sbcon.Parameters{
@@ -272,8 +278,6 @@ func LeftoverInputTest(t *testing.T, factory Factory) {
 }
 
 func LowerConfidenceTest(t *testing.T, factory Factory) {
-	Setup()
-
 	graph := factory.New()
 
 	params := sbcon.Parameters{
@@ -330,8 +334,6 @@ func LowerConfidenceTest(t *testing.T, factory Factory) {
 }
 
 func MiddleConfidenceTest(t *testing.T, factory Factory) {
-	Setup()
-
 	graph := factory.New()
 
 	params := sbcon.Parameters{
@@ -393,8 +395,6 @@ func MiddleConfidenceTest(t *testing.T, factory Factory) {
 }
 
 func IndependentTest(t *testing.T, factory Factory) {
-	Setup()
-
 	graph := factory.New()
 
 	params := sbcon.Parameters{
@@ -457,8 +457,6 @@ func IndependentTest(t *testing.T, factory Factory) {
 }
 
 func VirtuousTest(t *testing.T, factory Factory) {
-	Setup()
-
 	graph := factory.New()
 
 	params := sbcon.Parameters{
@@ -502,8 +500,6 @@ func VirtuousTest(t *testing.T, factory Factory) {
 }
 
 func IsVirtuousTest(t *testing.T, factory Factory) {
-	Setup()
-
 	graph := factory.New()
 
 	params := sbcon.Parameters{
@@ -557,8 +553,6 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 }
 
 func QuiesceTest(t *testing.T, factory Factory) {
-	Setup()
-
 	graph := factory.New()
 
 	params := sbcon.Parameters{
@@ -588,8 +582,6 @@ func QuiesceTest(t *testing.T, factory Factory) {
 }
 
 func AcceptingDependencyTest(t *testing.T, factory Factory) {
-	Setup()
-
 	graph := factory.New()
 
 	purple := &TestTx{
@@ -724,8 +716,6 @@ func (tx *singleAcceptTx) Accept() error {
 }
 
 func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
-	Setup()
-
 	graph := factory.New()
 
 	rawPurple := &TestTx{
@@ -875,8 +865,6 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 }
 
 func RejectingDependencyTest(t *testing.T, factory Factory) {
-	Setup()
-
 	graph := factory.New()
 
 	purple := &TestTx{
@@ -980,8 +968,6 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 }
 
 func VacuouslyAcceptedTest(t *testing.T, factory Factory) {
-	Setup()
-
 	graph := factory.New()
 
 	purple := &TestTx{TestDecidable: choices.TestDecidable{
@@ -1012,8 +998,6 @@ func VacuouslyAcceptedTest(t *testing.T, factory Factory) {
 }
 
 func ConflictsTest(t *testing.T, factory Factory) {
-	Setup()
-
 	graph := factory.New()
 
 	params := sbcon.Parameters{
@@ -1069,8 +1053,6 @@ func ConflictsTest(t *testing.T, factory Factory) {
 }
 
 func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
-	Setup()
-
 	graph := factory.New()
 
 	params := sbcon.Parameters{
@@ -1137,8 +1119,6 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 }
 
 func ErrorOnVacuouslyAcceptedTest(t *testing.T, factory Factory) {
-	Setup()
-
 	graph := factory.New()
 
 	purple := &TestTx{TestDecidable: choices.TestDecidable{
@@ -1166,8 +1146,6 @@ func ErrorOnVacuouslyAcceptedTest(t *testing.T, factory Factory) {
 }
 
 func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
-	Setup()
-
 	graph := factory.New()
 
 	purple := &TestTx{TestDecidable: choices.TestDecidable{
@@ -1202,8 +1180,6 @@ func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 }
 
 func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) {
-	Setup()
-
 	graph := factory.New()
 
 	X := ids.Empty.Prefix(4)
@@ -1248,8 +1224,6 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 }
 
 func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory) {
-	Setup()
-
 	graph := factory.New()
 
 	X := ids.Empty.Prefix(4)
@@ -1294,8 +1268,6 @@ func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory)
 }
 
 func UTXOCleanupTest(t *testing.T, factory Factory) {
-	Setup()
-
 	graph := factory.New()
 
 	params := sbcon.Parameters{
@@ -1341,8 +1313,6 @@ func UTXOCleanupTest(t *testing.T, factory Factory) {
 }
 
 func StringTest(t *testing.T, factory Factory, prefix string) {
-	Setup()
-
 	graph := factory.New()
 
 	params := sbcon.Parameters{
