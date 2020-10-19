@@ -8,6 +8,10 @@ import (
 	"time"
 )
 
+var (
+	convertEToBase2 = -math.Log(2)
+)
+
 // ContinuousFactory implements the Factory interface by returning a continuous
 // time meter.
 type ContinuousFactory struct{}
@@ -28,7 +32,7 @@ type continuousMeter struct {
 // NewMeter returns a new Meter with the provided halflife
 func NewMeter(halflife time.Duration) Meter {
 	return &continuousMeter{
-		halflife: float64(halflife) / math.Log(2),
+		halflife: float64(halflife) / convertEToBase2,
 	}
 }
 
@@ -55,7 +59,7 @@ func (a *continuousMeter) Read(currentTime time.Time) float64 {
 	}
 	a.lastUpdated = currentTime
 
-	factor := math.Exp(-float64(timeSincePreviousUpdate) / a.halflife)
+	factor := math.Exp(float64(timeSincePreviousUpdate) / a.halflife)
 	a.value *= factor
 	if a.running {
 		a.value += 1 - factor
