@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	convertEToBase2 = -math.Log(2)
+	convertEToBase2 = math.Log(2)
 )
 
 // ContinuousFactory implements the Factory interface by returning a continuous
@@ -53,8 +53,8 @@ func (a *continuousMeter) update(currentTime time.Time, running bool) {
 }
 
 func (a *continuousMeter) Read(currentTime time.Time) float64 {
-	timeSincePreviousUpdate := currentTime.Sub(a.lastUpdated)
-	if timeSincePreviousUpdate <= 0 {
+	timeSincePreviousUpdate := a.lastUpdated.Sub(currentTime)
+	if timeSincePreviousUpdate >= 0 {
 		return a.value
 	}
 	a.lastUpdated = currentTime

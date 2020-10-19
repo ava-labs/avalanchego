@@ -34,8 +34,8 @@ func NewAverager(
 
 func (a *continuousAverager) Observe(value float64, currentTime time.Time) {
 	delta := a.lastUpdated.Sub(currentTime)
-
-	if delta < 0 {
+	switch {
+	case delta < 0:
 		// If the times are called in order, scale the previous values to keep the
 		// sizes manageable
 		newWeight := math.Exp(float64(delta) / a.halflife)
@@ -44,22 +44,18 @@ func (a *continuousAverager) Observe(value float64, currentTime time.Time) {
 		a.normalizer = 1 + newWeight*a.normalizer
 
 		a.lastUpdated = currentTime
-		return
-	}
-
-	if delta == 0 {
+	case delta == 0:
 		// If this is called multiple times at the same wall clock time, no
 		// scaling needs to occur
 		a.weightedSum += value
 		a.normalizer++
-		return
+	default:
+		// If the times are called out of order, don't scale the previous values
+		newWeight := math.Exp(float64(-delta) / a.halflife)
+
+		a.weightedSum += newWeight * value
+		a.normalizer += newWeight
 	}
-
-	// If the times are called out of order, don't scale the previous values
-	newWeight := math.Exp(float64(-delta) / a.halflife)
-
-	a.weightedSum += newWeight * value
-	a.normalizer += newWeight
 }
 
 func (a *continuousAverager) Read() float64 {
