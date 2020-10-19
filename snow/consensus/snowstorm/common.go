@@ -317,11 +317,10 @@ func ConsensusString(name string, nodes []*snowballNode) string {
 	sb.WriteString("(")
 
 	format := fmt.Sprintf(
-		"\n    Choice[%s] = ID: %%50s SB(NumSuccessfulPolls = %%d, Confidence = %%d)",
+		"\n    Choice[%s] = ID: %%50s %%s",
 		formatting.IntFormat(len(nodes)-1))
 	for i, txNode := range nodes {
-		sb.WriteString(fmt.Sprintf(format,
-			i, txNode.txID, txNode.numSuccessfulPolls, txNode.confidence))
+		sb.WriteString(fmt.Sprintf(format, i, txNode.txID, txNode))
 	}
 
 	if len(nodes) > 0 {
