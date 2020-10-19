@@ -53,11 +53,13 @@ type APIUTXO struct {
 }
 
 // APIStaker is the representation of a staker sent via APIs.
+// [TxID] is the txID of the transaction that added this staker.
 // [Amount] is the amount of tokens being staked.
 // [StartTime] is the Unix time when they start staking
 // [Endtime] is the Unix time repr. of when they are done staking
 // [NodeID] is the node ID of the staker
 type APIStaker struct {
+	TxID        ids.ID       `json:"txID"`
 	StartTime   json.Uint64  `json:"startTime"`
 	EndTime     json.Uint64  `json:"endTime"`
 	Weight      *json.Uint64 `json:"weight,omitempty"`
