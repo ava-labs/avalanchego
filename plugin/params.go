@@ -32,7 +32,10 @@ func init() {
 	if *config == "default" {
 		cliConfig.EthAPIEnabled = true
 		cliConfig.TxPoolAPIEnabled = true
+		cliConfig.RPCGasCap = 2500000000 // 25000000 x 100
+		cliConfig.RPCTxFeeCap = 100      // 100 AVAX
 	} else {
+		// TODO only overwrite values that were explicitly set
 		errs.Add(json.Unmarshal([]byte(*config), &cliConfig))
 	}
 }

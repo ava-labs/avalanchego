@@ -7,6 +7,10 @@ type CommandLineConfig struct {
 	Web3APIEnabled        bool `json:"web3APIEnabled"`
 	CorethAdminAPIEnabled bool `json:"corethAdminAPIEnabled"`
 
+	// Coreth API Gas/Price Caps
+	RPCGasCap   uint64  `json:"rpcGasCap"`
+	RPCTxFeeCap float64 `json:"rpcTxFeeCap"`
+
 	// Eth APIs
 	EthAPIEnabled      bool `json:"ethAPIEnabled"`
 	PersonalAPIEnabled bool `json:"personalAPIEnabled"`
