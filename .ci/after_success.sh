@@ -4,22 +4,26 @@ set -ev
 
 bash <(curl -s https://codecov.io/bash)
 
+# Skip if this is not on the main public repo or
+# if this is not a trusted build (Docker Credentials are not set)
+if [[ $TRAVIS_REPO_SLUG != "ava-labs/avalanchego" || -z "$DOCKER_USERNAME"  ]]; then
+  exit 0;
+fi
+
 FULL_COMMIT_HASH="$(git --git-dir="$AVALANCHE_HOME/.git" rev-parse HEAD)"
 COMMIT="${FULL_COMMIT_HASH::8}"
 
 AVALANCHE_IMAGE="$DOCKERHUB_REPO:$COMMIT"
 
-TRAVIS_TAG="$DOCKERHUB_REPO:travis-$TRAVIS_BUILD_NUMBER"
-docker tag "$AVALANCHE_IMAGE" "$TRAVIS_TAG"
+TRAVIS_IMAGE_TAG="$DOCKERHUB_REPO:travis-$TRAVIS_BUILD_NUMBER"
+docker tag "$AVALANCHE_IMAGE" "$TRAVIS_IMAGE_TAG"
 
 if [[ $TRAVIS_BRANCH == "master" ]]; then
   docker tag "$AVALANCHE_IMAGE" "$DOCKERHUB_REPO:latest"
 fi
 
-# don't push to dockerhub if this is not being run on the main public repo
-# or if it's a PR from a fork ( => secret vars not set )
-if [[ $TRAVIS_REPO_SLUG != "ava-labs/avalanchego" || -z "$DOCKER_USERNAME"  ]]; then
-  exit 0;
+if [[ $TRAVIS_TAG != "" ]]; then
+  docker tag "$AVALANCHE_IMAGE" "$DOCKERHUB_REPO:$TRAVIS_TAG"
 fi
 
 echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin

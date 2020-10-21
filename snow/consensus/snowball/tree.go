@@ -389,8 +389,9 @@ func (u *unaryNode) Add(newChoice ids.ID) node {
 }
 
 func (u *unaryNode) RecordPoll(votes ids.Bag, reset bool) node {
-	// This ensures that votes for rejected colors are dropped
-	votes = votes.Filter(u.decidedPrefix, u.commonPrefix, u.preference)
+	// We are guaranteed that the votes are of IDs that have previously been
+	// added. This ensures that the provided votes all have the same bits in the
+	// range [u.decidedPrefix, u.commonPrefix) as in u.preference.
 
 	// If my parent didn't get enough votes previously, then neither did I
 	if reset {
@@ -493,8 +494,9 @@ func (b *binaryNode) RecordPoll(votes ids.Bag, reset bool) node {
 	// for bit 1
 	splitVotes := votes.Split(uint(b.bit))
 
-	bit := 0 // Because alpha > k/2, only the larger count could be increased
-	if splitVotes[0].Len() < splitVotes[1].Len() {
+	bit := 0
+	// We only care about which bit is set if a successful poll can happen
+	if splitVotes[1].Len() >= b.tree.params.Alpha {
 		bit = 1
 	}
 
