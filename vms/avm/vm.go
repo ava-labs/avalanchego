@@ -45,9 +45,6 @@ const (
 	idCacheSize     = 30000
 	txCacheSize     = 30000
 	maxUTXOsToFetch = 1024
-
-	// Max number of UTXO IDs in an operation
-	maxUTXOsPerOp = 2048
 )
 
 var (
@@ -761,9 +758,6 @@ func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiab
 	opAssetID := op.AssetID()
 
 	numUTXOs := len(op.UTXOIDs)
-	if numUTXOs > maxUTXOsPerOp {
-		return fmt.Errorf("operation has %d UTXO IDs but max is %d", numUTXOs, maxUTXOsPerOp)
-	}
 	utxos := make([]interface{}, numUTXOs)
 	for i, utxoID := range op.UTXOIDs {
 		utxo, err := vm.getUTXO(utxoID)
