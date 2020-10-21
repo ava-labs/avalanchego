@@ -45,6 +45,9 @@ const (
 	idCacheSize     = 30000
 	txCacheSize     = 30000
 	maxUTXOsToFetch = 1024
+
+	// Max number of UTXO IDs in an operation
+	maxUTXOsPerOp = 2048
 )
 
 var (
@@ -757,8 +760,12 @@ func (vm *VM) verifyTransfer(tx UnsignedTx, in *avax.TransferableInput, cred ver
 func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiable) error {
 	opAssetID := op.AssetID()
 
-	utxos := []interface{}{}
-	for _, utxoID := range op.UTXOIDs {
+	numUTXOs := len(op.UTXOIDs)
+	if numUTXOs > maxUTXOsPerOp {
+		return fmt.Errorf("operation has %d UTXO IDs but max is %d", numUTXOs, maxUTXOsPerOp)
+	}
+	utxos := make([]interface{}, numUTXOs)
+	for i, utxoID := range op.UTXOIDs {
 		utxo, err := vm.getUTXO(utxoID)
 		if err != nil {
 			return err
@@ -768,7 +775,7 @@ func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiab
 		if !utxoAssetID.Equals(opAssetID) {
 			return errAssetIDMismatch
 		}
-		utxos = append(utxos, utxo.Out)
+		utxos[i] = utxo.Out
 	}
 
 	fxIndex, err := vm.getFx(op.Op)
