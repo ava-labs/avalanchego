@@ -121,17 +121,20 @@ func (vtx *innerVertex) Unmarshal(b []byte, vm vertex.DAGVM) error {
 		p.Add(errBadEpoch)
 	}
 
-	parentIDs := []ids.ID(nil)
-	for i := p.UnpackInt(); i > 0 && !p.Errored(); i-- {
-		parentID, _ := ids.ToID(p.UnpackFixedBytes(hashing.HashLen))
-		parentIDs = append(parentIDs, parentID)
+	numParents := p.UnpackInt()
+	parentIDs := make([]ids.ID, numParents)
+	for i := 0; i < int(numParents) && !p.Errored(); i++ {
+		parentID, err := ids.ToID(p.UnpackFixedBytes(hashing.HashLen))
+		p.Add(err)
+		parentIDs[i] = parentID
 	}
 
-	txs := []snowstorm.Tx(nil)
-	for i := p.UnpackInt(); i > 0 && !p.Errored(); i-- {
+	numTxs := p.UnpackInt()
+	txs := make([]snowstorm.Tx, numTxs)
+	for i := 0; i < int(numTxs) && !p.Errored(); i++ {
 		tx, err := vm.ParseTx(p.UnpackBytes())
 		p.Add(err)
-		txs = append(txs, tx)
+		txs[i] = tx
 	}
 
 	if p.Offset != len(b) {
