@@ -1,5 +1,8 @@
 # AvalancheGo
 
+Official node implementation of the [Avalanche](https://avax.network) network -
+a blockchains platform with high throughput, and blazing fast transactions.
+
 ## Installation
 
 Avalanche is an incredibly lightweight protocol, so the minimum computer requirements are quite modest.
