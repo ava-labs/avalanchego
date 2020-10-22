@@ -86,12 +86,15 @@ func (dg *Directed) IsVirtuous(tx Tx) bool {
 
 // Conflicts implements the Consensus interface
 func (dg *Directed) Conflicts(tx Tx) ids.Set {
-	conflicts := ids.Set{}
+	var conflicts ids.Set = nil
 	if node, exists := dg.txs[tx.ID().Key()]; exists {
 		// If the tx is currently processing, the conflicting txs are just the
 		// union of the inbound conflicts and the outbound conflicts.
-		conflicts.Union(node.ins)
-		conflicts.Union(node.outs)
+		// Only bother to call Union, which will do a memory allocation, if ins or outs are non-empty.
+		if node.ins.Len() > 0 || node.outs.Len() > 0 {
+			conflicts.Union(node.ins)
+			conflicts.Union(node.outs)
+		}
 	} else {
 		// If the tx isn't currently processing, the conflicting txs are the
 		// union of all the txs that spend an input that this tx spends.
