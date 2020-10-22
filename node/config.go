@@ -111,4 +111,8 @@ type Config struct {
 
 	// Service Control Callback
 	ServiceControl utils.ServiceControl
+
+	// peer monitor
+	PeerMonitorTimeout         time.Duration
+	PeerMonitorInactiveTimeout time.Duration
 }

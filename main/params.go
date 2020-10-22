@@ -216,6 +216,11 @@ func init() {
 	fs.DurationVar(&Config.ConsensusGossipFrequency, "consensus-gossip-frequency", 10*time.Second, "Frequency of gossiping accepted frontiers.")
 	fs.DurationVar(&Config.ConsensusShutdownTimeout, "consensus-shutdown-timeout", 5*time.Second, "Timeout before killing an unresponsive chain.")
 
+	// Peer Monitor Configuration:
+	fs.DurationVar(&Config.PeerMonitorTimeout, "peer-monitor-timeout", 5*time.Second, "Frequency of monitoring connected peers.")
+	fs.DurationVar(&Config.PeerMonitorInactiveTimeout, "peer-monitor-inactive-timeout", 1*time.Minute, "Timeout before restarted node for lack of peers.")
+
+
 	fdLimit := fs.Uint64("fd-limit", ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
 
 	ferr := fs.Parse(os.Args[1:])

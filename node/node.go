@@ -226,6 +226,8 @@ func (n *Node) initNetworking() error {
 		n.Config.ConnMeterResetDuration,
 		n.Config.ConnMeterMaxConns,
 		n.Config.ServiceControl,
+		n.Config.PeerMonitorTimeout,
+		n.Config.PeerMonitorInactiveTimeout,
 	)
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {

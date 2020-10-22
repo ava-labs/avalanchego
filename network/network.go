@@ -50,8 +50,6 @@ const (
 	defaultReadBufferSize                            = 16 * 1024
 	defaultReadHandshakeTimeout                      = 15 * time.Second
 	defaultConnMeterCacheSize                        = 10000
-	defaultPeerMonitorTimeout                        = 5 * time.Second
-	defaultPeerMonitorConnMeter                      = 30 * time.Second
 )
 
 var (
@@ -189,6 +187,8 @@ func NewDefaultNetwork(
 	connMeterResetDuration time.Duration,
 	connMeterMaxConns int,
 	serviceControl utils.ServiceControl,
+	peerMonitorTimeout time.Duration,
+	peerMonitorInactiveMeter time.Duration,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -226,8 +226,8 @@ func NewDefaultNetwork(
 		defaultConnMeterCacheSize,
 		connMeterMaxConns,
 		serviceControl,
-		defaultPeerMonitorTimeout,
-		defaultPeerMonitorConnMeter,
+		peerMonitorTimeout,
+		peerMonitorInactiveMeter,
 	)
 }
 
@@ -269,7 +269,7 @@ func NewNetwork(
 	connMeterMaxConns int,
 	serviceControl utils.ServiceControl,
 	peerMonitorTimeout time.Duration,
-	peerMonitorConnMeter time.Duration,
+	peerMonitorInactiveMeter time.Duration,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -314,10 +314,10 @@ func NewNetwork(
 		readHandshakeTimeout:               readHandshakeTimeout,
 		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize),
 		connMeterMaxConns:                  connMeterMaxConns,
-		peerMonitorActivityMeter:           timer.TimedMeter{Duration: peerMonitorConnMeter},
-		serviceControl:                     serviceControl,
 		peerMonitorCloser:                  make(chan struct{}),
 		peerMonitorTimeout:                 peerMonitorTimeout,
+		peerMonitorActivityMeter:           timer.TimedMeter{Duration: peerMonitorInactiveMeter},
+		serviceControl:                     serviceControl,
 	}
 
 	// pre-queue one tick to avoid immediate shutdown.
@@ -329,7 +329,7 @@ func NewNetwork(
 	netw.executor.Initialize()
 	go netw.executor.Dispatch()
 	netw.heartbeat()
-	if serviceControl != nil {
+	if serviceControl != nil && peerMonitorTimeout.Milliseconds() != 0 {
 		go netw.peerMonitor()
 	}
 	return netw
