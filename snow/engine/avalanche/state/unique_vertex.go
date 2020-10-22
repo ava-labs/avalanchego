@@ -59,17 +59,8 @@ func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
 		return vtx, nil
 	}
 
-	// Otherwise, set the status to Processing and write
-	// to the database before returning the vertex
-	if err := vtx.serializer.state.SetStatus(vtx.ID(), choices.Processing); err != nil {
-		return nil, err
-	}
-	if err := vtx.serializer.state.SetVertex(vtx.v.vtx); err != nil {
-		return nil, err
-	}
 	vtx.v.status = choices.Processing
-
-	return vtx, nil
+	return vtx, vtx.persist()
 }
 
 func (vtx *uniqueVertex) refresh() {
@@ -117,15 +108,20 @@ func (vtx *uniqueVertex) Evict() {
 
 func (vtx *uniqueVertex) setVertex(innerVtx *innerVertex) error {
 	vtx.shallowRefresh()
-	if vtx.v.vtx != nil {
+	vtx.v.vtx = innerVtx
+
+	if vtx.v.status != choices.Unknown {
 		return nil
 	}
+	vtx.v.status = choices.Processing
+	return vtx.persist()
+}
 
-	vtx.v.vtx = innerVtx
-	if err := vtx.serializer.state.SetVertex(innerVtx); err != nil {
+func (vtx *uniqueVertex) persist() error {
+	if err := vtx.serializer.state.SetVertex(vtx.v.vtx); err != nil {
 		return err
 	}
-	return vtx.setStatus(choices.Processing)
+	return vtx.setStatus(vtx.v.status)
 }
 
 func (vtx *uniqueVertex) setStatus(status choices.Status) error {
