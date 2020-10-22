@@ -11,10 +11,7 @@ import (
 )
 
 const (
-	txID uint64 = iota
-	utxoID
-	txStatusID
-	dbInitializedID
+	dbInitializedID uint64 = iota
 )
 
 var (
@@ -24,43 +21,13 @@ var (
 // prefixedState wraps a state object. By prefixing the state, there will be no
 // collisions between different types of objects that have the same hash.
 type prefixedState struct {
-	state *state
-
-	tx, utxo, txStatus cache.Cacher
-	uniqueTx           cache.Deduplicator
+	*state
+	uniqueTx cache.Deduplicator
 }
 
 // UniqueTx de-duplicates the transaction.
 func (s *prefixedState) UniqueTx(tx *UniqueTx) *UniqueTx {
 	return s.uniqueTx.Deduplicate(tx).(*UniqueTx)
-}
-
-// Tx attempts to load a transaction from storage.
-func (s *prefixedState) Tx(id ids.ID) (*Tx, error) { return s.state.Tx(uniqueID(id, txID, s.tx)) }
-
-// SetTx saves the provided transaction to storage.
-func (s *prefixedState) SetTx(id ids.ID, tx *Tx) error {
-	return s.state.SetTx(uniqueID(id, txID, s.tx), tx)
-}
-
-// UTXO attempts to load a utxo from storage.
-func (s *prefixedState) UTXO(id ids.ID) (*avax.UTXO, error) {
-	return s.state.UTXO(uniqueID(id, utxoID, s.utxo))
-}
-
-// SetUTXO saves the provided utxo to storage.
-func (s *prefixedState) SetUTXO(id ids.ID, utxo *avax.UTXO) error {
-	return s.state.SetUTXO(uniqueID(id, utxoID, s.utxo), utxo)
-}
-
-// Status returns the status of the provided transaction id from storage.
-func (s *prefixedState) Status(id ids.ID) (choices.Status, error) {
-	return s.state.Status(uniqueID(id, txStatusID, s.txStatus))
-}
-
-// SetStatus saves the provided status to storage.
-func (s *prefixedState) SetStatus(id ids.ID, status choices.Status) error {
-	return s.state.SetStatus(uniqueID(id, txStatusID, s.txStatus), status)
 }
 
 // DBInitialized returns the status of this database. If the database is
