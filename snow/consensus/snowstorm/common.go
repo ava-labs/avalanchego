@@ -106,7 +106,7 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 	c.metrics.Issued(txID)
 
 	// If this tx has inputs, it needs to be voted on before being accepted.
-	if inputs := tx.InputIDs(); inputs.Len() != 0 {
+	if inputs := tx.InputIDs(); len(inputs) != 0 {
 		return true, nil
 	}
 

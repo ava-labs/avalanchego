@@ -507,7 +507,8 @@ func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
 	end := 0
 	for end < len(txs) {
 		tx := txs[end]
-		inputs := tx.InputIDs()
+		inputs := ids.Set{}
+		inputs.Add(tx.InputIDs()...)
 		overlaps := consumed.Overlaps(inputs)
 		if end-start >= t.Params.BatchSize || (force && overlaps) {
 			if err := t.issueBatch(txs[start:end]); err != nil {

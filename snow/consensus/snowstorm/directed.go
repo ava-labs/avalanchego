@@ -72,8 +72,8 @@ func (dg *Directed) IsVirtuous(tx Tx) bool {
 
 	// The tx isn't processing, so we need to check to see if it conflicts with
 	// any of the other txs that are currently processing.
-	for utxoIDKey := range tx.InputIDs() {
-		if _, exists := dg.utxos[utxoIDKey]; exists {
+	for _, utxoID := range tx.InputIDs() {
+		if _, exists := dg.utxos[utxoID.Key()]; exists {
 			// A currently processing tx names the same input as the provided
 			// tx, so the provided tx would be rogue.
 			return false
@@ -98,8 +98,8 @@ func (dg *Directed) Conflicts(tx Tx) ids.Set {
 	} else {
 		// If the tx isn't currently processing, the conflicting txs are the
 		// union of all the txs that spend an input that this tx spends.
-		for inputIDKey := range tx.InputIDs() {
-			if spends, exists := dg.utxos[inputIDKey]; exists {
+		for _, inputID := range tx.InputIDs() {
+			if spends, exists := dg.utxos[inputID.Key()]; exists {
 				conflicts.Union(spends)
 			}
 		}
@@ -119,7 +119,8 @@ func (dg *Directed) Add(tx Tx) error {
 	// For each UTXO consumed by the tx:
 	// * Add edges between this tx and txs that consume this UTXO
 	// * Mark this tx as attempting to consume this UTXO
-	for inputIDKey := range tx.InputIDs() {
+	for _, inputID := range tx.InputIDs() {
+		inputIDKey := inputID.Key()
 
 		// Get the set of txs that are currently processing that also consume
 		// this UTXO
@@ -270,8 +271,8 @@ func (dg *Directed) accept(txID ids.ID) error {
 
 	// This tx is consuming all the UTXOs from its inputs, so we can prune them
 	// all from memory
-	for inputIDKey := range txNode.tx.InputIDs() {
-		delete(dg.utxos, inputIDKey)
+	for _, inputID := range txNode.tx.InputIDs() {
+		delete(dg.utxos, inputID.Key())
 	}
 
 	// This tx is now accepted, so it shouldn't be part of the virtuous set or
@@ -298,7 +299,8 @@ func (dg *Directed) reject(conflictIDs ids.Set) error {
 		conflict := dg.txs[conflictKey]
 		// This tx is no longer an option for consuming the UTXOs from its
 		// inputs, so we should remove their reference to this tx.
-		for inputIDKey := range conflict.tx.InputIDs() {
+		for _, inputID := range conflict.tx.InputIDs() {
+			inputIDKey := inputID.Key()
 			txIDs, exists := dg.utxos[inputIDKey]
 			if !exists {
 				// This UTXO may no longer exist because it was removed due to

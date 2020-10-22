@@ -78,8 +78,8 @@ func (ig *Input) Initialize(ctx *snow.Context, params sbcon.Parameters) error {
 // IsVirtuous implements the ConflictGraph interface
 func (ig *Input) IsVirtuous(tx Tx) bool {
 	txID := tx.ID()
-	for utxoIDKey := range tx.InputIDs() {
-		utxo, exists := ig.utxos[utxoIDKey]
+	for _, utxoID := range tx.InputIDs() {
+		utxo, exists := ig.utxos[utxoID.Key()]
 		// If the UTXO wasn't currently processing, then this tx won't conflict
 		// due to this UTXO.
 		if !exists {
@@ -106,8 +106,8 @@ func (ig *Input) Conflicts(tx Tx) ids.Set {
 	var conflicts ids.Set = nil
 	// The conflicting txs are the union of all the txs that spend an input that
 	// this tx spends.
-	for utxoIDKey := range tx.InputIDs() {
-		if utxo, exists := ig.utxos[utxoIDKey]; exists {
+	for _, utxoID := range tx.InputIDs() {
+		if utxo, exists := ig.utxos[utxoID.Key()]; exists {
 			conflicts.Union(utxo.spenders)
 		}
 	}
@@ -136,7 +136,8 @@ func (ig *Input) Add(tx Tx) error {
 	// For each UTXO consumed by the tx:
 	// * Mark this tx as attempting to consume this UTXO
 	// * Mark the UTXO as being rogue if applicable
-	for inputIDKey := range tx.InputIDs() {
+	for _, inputID := range tx.InputIDs() {
+		inputIDKey := inputID.Key()
 		utxo, exists := ig.utxos[inputIDKey]
 		if exists {
 			// If the utxo was already being consumed by another tx, this utxo
@@ -232,7 +233,8 @@ func (ig *Input) RecordPoll(votes ids.Bag) (bool, error) {
 		// The confidence of the tx is the minimum confidence of all the input's
 		// conflict sets
 		confidence := math.MaxInt32
-		for inputIDKey := range txNode.tx.InputIDs() {
+		for _, inputID := range txNode.tx.InputIDs() {
+			inputIDKey := inputID.Key()
 			utxo := ig.utxos[inputIDKey]
 
 			// If this tx wasn't voted for during the last poll, the confidence
@@ -321,8 +323,8 @@ func (ig *Input) String() string {
 		txID := tx.tx.ID()
 
 		confidence := ig.params.BetaRogue
-		for inputIDKey := range tx.tx.InputIDs() {
-			input := ig.utxos[inputIDKey]
+		for _, inputID := range tx.tx.InputIDs() {
+			input := ig.utxos[inputID.Key()]
 			if input.lastVote != ig.currentVote || !txID.Equals(input.color) {
 				confidence = 0
 				break
@@ -353,8 +355,8 @@ func (ig *Input) accept(txID ids.ID) error {
 
 	// This tx is consuming all the UTXOs from its inputs, so we can prune them
 	// all from memory
-	for inputIDKey := range txNode.tx.InputIDs() {
-		delete(ig.utxos, inputIDKey)
+	for _, inputID := range txNode.tx.InputIDs() {
+		delete(ig.utxos, inputID.Key())
 	}
 
 	// This tx is now accepted, so it shouldn't be part of the virtuous set or
@@ -392,8 +394,9 @@ func (ig *Input) reject(conflictIDs ids.Set) error {
 }
 
 // Remove id from all of its conflict sets
-func (ig *Input) removeConflict(txID [32]byte, inputIDs ids.Set) {
-	for inputIDKey := range inputIDs {
+func (ig *Input) removeConflict(txID [32]byte, inputIDs []ids.ID) {
+	for _, inputID := range inputIDs {
+		inputIDKey := inputID.Key()
 		utxo, exists := ig.utxos[inputIDKey]
 		if !exists {
 			// if the utxo doesn't exists, it was already consumed, so there is
@@ -444,8 +447,8 @@ func (ig *Input) removeConflict(txID [32]byte, inputIDs ids.Set) {
 		// We need to check if this tx is now preferred
 		txNode := ig.txs[preference.Key()]
 		isPreferred := true
-		for inputIDKey := range txNode.tx.InputIDs() {
-			input := ig.utxos[inputIDKey]
+		for _, inputID := range txNode.tx.InputIDs() {
+			input := ig.utxos[inputID.Key()]
 
 			if !preference.Equals(input.preference) {
 				// If this preference isn't the preferred color, the tx isn't
