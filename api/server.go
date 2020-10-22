@@ -253,6 +253,7 @@ func (s *Server) Call(
 }
 
 func (s *Server) Shutdown() {
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	s.srv.Shutdown(ctx)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_ = s.srv.Shutdown(ctx)
 }
