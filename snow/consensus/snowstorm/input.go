@@ -103,18 +103,20 @@ func (ig *Input) IsVirtuous(tx Tx) bool {
 
 // Conflicts implements the ConflictGraph interface
 func (ig *Input) Conflicts(tx Tx) ids.Set {
-	conflicts := ids.Set{}
+	var conflicts ids.Set = nil
 	// The conflicting txs are the union of all the txs that spend an input that
 	// this tx spends.
-	for _, utxoID := range tx.InputIDs().List() {
-		if utxo, exists := ig.utxos[utxoID.Key()]; exists {
+	for utxoIDKey := range tx.InputIDs() {
+		if utxo, exists := ig.utxos[utxoIDKey]; exists {
 			conflicts.Union(utxo.spenders)
 		}
 	}
 	// A tx can't conflict with itself, so we should make sure to remove the
 	// provided tx from the conflict set. This is needed in case this tx is
 	// currently processing.
-	conflicts.Remove(tx.ID())
+	if conflicts != nil { // Don't bother removing tx.ID() if conflicts is empty
+		conflicts.Remove(tx.ID())
+	}
 	return conflicts
 }
 
