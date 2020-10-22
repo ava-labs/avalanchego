@@ -757,8 +757,9 @@ func (vm *VM) verifyTransfer(tx UnsignedTx, in *avax.TransferableInput, cred ver
 func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiable) error {
 	opAssetID := op.AssetID()
 
-	utxos := []interface{}{}
-	for _, utxoID := range op.UTXOIDs {
+	numUTXOs := len(op.UTXOIDs)
+	utxos := make([]interface{}, numUTXOs)
+	for i, utxoID := range op.UTXOIDs {
 		utxo, err := vm.getUTXO(utxoID)
 		if err != nil {
 			return err
@@ -768,7 +769,7 @@ func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiab
 		if !utxoAssetID.Equals(opAssetID) {
 			return errAssetIDMismatch
 		}
-		utxos = append(utxos, utxo.Out)
+		utxos[i] = utxo.Out
 	}
 
 	fxIndex, err := vm.getFx(op.Op)
