@@ -45,10 +45,10 @@ import (
 const (
 	batchTimeout       = time.Second
 	batchSize          = 30
-	statusCacheSize    = 30000
-	idCacheSize        = 30000
-	txCacheSize        = 30000
-	utxoCacheSize      = 30000
+	statusCacheSize    = 10000
+	idCacheSize        = 10000
+	txCacheSize        = 10000
+	utxoCacheSize      = 10000
 	assetToFxCacheSize = 1024
 	maxUTXOsToFetch    = 1024
 
