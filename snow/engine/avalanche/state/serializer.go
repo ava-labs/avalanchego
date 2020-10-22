@@ -60,24 +60,12 @@ func (s *Serializer) Initialize(ctx *snow.Context, vm vertex.DAGVM, db database.
 
 // ParseVertex implements the avalanche.State interface
 func (s *Serializer) ParseVertex(b []byte) (avalanche.Vertex, error) {
-	vtx, err := s.parseVertex(b)
+	vtx, err := newUniqueVertex(s, b)
 	if err != nil {
 		return nil, err
 	}
-	if err := vtx.Verify(); err != nil {
-		return nil, err
-	}
-	uVtx := &uniqueVertex{
-		serializer: s,
-		vtxID:      vtx.ID(),
-	}
-	if uVtx.Status() == choices.Unknown {
-		if err := uVtx.setVertex(vtx); err != nil {
-			return nil, err
-		}
-	}
 
-	return uVtx, s.db.Commit()
+	return vtx, s.db.Commit()
 }
 
 // BuildVertex implements the avalanche.State interface

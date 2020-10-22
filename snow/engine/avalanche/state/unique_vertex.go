@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 // uniqueVertex acts as a cache for vertices in the database.
@@ -25,6 +26,48 @@ type uniqueVertex struct {
 
 	vtxID ids.ID
 	v     *vertexState
+}
+
+// newUniqueVertex returns a uniqueVertex instance from [b] by checking the cache
+// and then parsing the vertex bytes on a cache miss.
+func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
+	vtx := &uniqueVertex{
+		vtxID:      ids.NewID(hashing.ComputeHash256Array(b)),
+		serializer: s,
+		v:          &vertexState{},
+	}
+
+	unique := vtx.serializer.state.UniqueVertex(vtx)
+	if unique != vtx {
+		// If the vertex is known and in the cache,
+		// then we have no new information to add
+		// so we return it as is.
+		if unique.v.status != choices.Unknown {
+			return unique, nil
+		}
+
+		// The status was Unknown, so we need to parse and persist the vertex
+		innerVertex, err := s.parseVertex(b)
+		if err != nil {
+			return nil, err
+		}
+		unique.v.vtx = innerVertex
+		unique.persist()
+		return unique, nil
+	}
+
+	// The vertex was not in the cache, so mark it as unique and
+	// attempt to parse the vertex bytes.
+	vtx.v.unique = true
+	innerVertex, err := s.parseVertex(b)
+	if err != nil {
+		return nil, err
+	}
+
+	// Persist the vertex if necessary
+	vtx.v.vtx = innerVertex
+	vtx.persist()
+	return vtx, nil
 }
 
 func (vtx *uniqueVertex) refresh() {
@@ -58,6 +101,24 @@ func (vtx *uniqueVertex) Evict() {
 		vtx.v.unique = false
 		// make sure the parents can be garbage collected
 		vtx.v.parents = nil
+	}
+}
+
+// persist writes the vertex and status to the database if necessary
+// and also updates the current status of [vtx]
+// Assumes the inner vertex is non-nil
+func (vtx *uniqueVertex) persist() {
+	if vtx.v.status != choices.Unknown {
+		return
+	}
+
+	status := vtx.serializer.state.Status(vtx.ID())
+	if status == choices.Unknown {
+		vtx.serializer.state.SetStatus(vtx.ID(), choices.Processing)
+		vtx.serializer.state.SetVertex(vtx.v.vtx)
+		vtx.v.status = choices.Processing
+	} else {
+		vtx.v.status = status
 	}
 }
 
