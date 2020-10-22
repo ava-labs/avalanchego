@@ -374,7 +374,6 @@ func (ig *Input) accept(txID ids.ID) error {
 // reject all the named txIDs and remove them from their conflict sets
 func (ig *Input) reject(conflictIDs ids.Set) error {
 	for conflictKey := range conflictIDs {
-		conflictID := ids.NewID(conflictKey)
 		conflict := ig.txs[conflictKey]
 
 		// We are rejecting the tx, so we should remove it from the graph
@@ -382,10 +381,10 @@ func (ig *Input) reject(conflictIDs ids.Set) error {
 
 		// While it's statistically unlikely that something being rejected is
 		// preferred, it is handled for completion.
-		ig.preferences.Remove(conflictID)
+		delete(ig.preferences, conflictKey)
 
 		// Remove this tx from all the conflict sets it's currently in
-		ig.removeConflict(conflictID, conflict.tx.InputIDs().List()...)
+		ig.removeConflict(conflictKey, conflict.tx.InputIDs().List()...)
 
 		if err := ig.rejectTx(conflict.tx); err != nil {
 			return err
@@ -395,7 +394,7 @@ func (ig *Input) reject(conflictIDs ids.Set) error {
 }
 
 // Remove id from all of its conflict sets
-func (ig *Input) removeConflict(txID ids.ID, inputIDs ...ids.ID) {
+func (ig *Input) removeConflict(txID [32]byte, inputIDs ...ids.ID) {
 	for _, inputID := range inputIDs {
 		inputKey := inputID.Key()
 		utxo, exists := ig.utxos[inputKey]
@@ -406,7 +405,7 @@ func (ig *Input) removeConflict(txID ids.ID, inputIDs ...ids.ID) {
 		}
 
 		// This tx is no longer attempting to spend this utxo.
-		utxo.spenders.Remove(txID)
+		delete(utxo.spenders, txID)
 
 		// If there is nothing attempting to consume the utxo anymore, remove it
 		// from memory.
@@ -416,7 +415,7 @@ func (ig *Input) removeConflict(txID ids.ID, inputIDs ...ids.ID) {
 		}
 
 		// If I'm rejecting the non-preference, there is nothing else to update.
-		if !utxo.preference.Equals(txID) {
+		if utxo.preference.Key() != txID {
 			ig.utxos[inputKey] = utxo
 			continue
 		}

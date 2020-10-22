@@ -296,7 +296,6 @@ func (dg *Directed) accept(txID ids.ID) error {
 // reject all the named txIDs and remove them from the graph
 func (dg *Directed) reject(conflictIDs ids.Set) error {
 	for conflictKey := range conflictIDs {
-		conflictID := ids.NewID(conflictKey)
 		conflict := dg.txs[conflictKey]
 		// This tx is no longer an option for consuming the UTXOs from its
 		// inputs, so we should remove their reference to this tx.
@@ -309,7 +308,7 @@ func (dg *Directed) reject(conflictIDs ids.Set) error {
 				// left to remove from memory.
 				continue
 			}
-			txIDs.Remove(conflictID)
+			delete(txIDs, conflictKey)
 			if txIDs.Len() == 0 {
 				// If this tx was the last tx consuming this UTXO, we should
 				// prune the UTXO from memory entirely.
@@ -326,11 +325,11 @@ func (dg *Directed) reject(conflictIDs ids.Set) error {
 
 		// While it's statistically unlikely that something being rejected is
 		// preferred, it is handled for completion.
-		dg.preferences.Remove(conflictID)
+		delete(dg.preferences, conflictKey)
 
 		// remove the edge between this node and all its neighbors
-		dg.removeConflict(conflictID, conflict.ins.List()...)
-		dg.removeConflict(conflictID, conflict.outs.List()...)
+		dg.removeConflict(conflictKey, conflict.ins.List()...)
+		dg.removeConflict(conflictKey, conflict.outs.List()...)
 
 		if err := dg.rejectTx(conflict.tx); err != nil {
 			return err
@@ -376,7 +375,7 @@ func (dg *Directed) redirectEdge(txNode *directedTx, conflictID ids.ID) bool {
 	return true
 }
 
-func (dg *Directed) removeConflict(txID ids.ID, neighborIDs ...ids.ID) {
+func (dg *Directed) removeConflict(txID [32]byte, neighborIDs ...ids.ID) {
 	for _, neighborID := range neighborIDs {
 		neighborKey := neighborID.Key()
 		neighbor, exists := dg.txs[neighborKey]
@@ -387,8 +386,8 @@ func (dg *Directed) removeConflict(txID ids.ID, neighborIDs ...ids.ID) {
 		}
 
 		// Remove any edge to this tx.
-		neighbor.ins.Remove(txID)
-		neighbor.outs.Remove(txID)
+		delete(neighbor.ins, txID)
+		delete(neighbor.outs, txID)
 
 		if neighbor.outs.Len() == 0 {
 			// If this tx should now be preferred, make sure its status is
