@@ -271,9 +271,6 @@ func (dg *Directed) accept(txID ids.ID) error {
 
 	// This tx is consuming all the UTXOs from its inputs, so we can prune them
 	// all from memory
-	for _, inputID := range txNode.tx.InputIDs().List() {
-		delete(dg.utxos, inputID.Key())
-	}
 	for inputIDKey := range txNode.tx.InputIDs() {
 		delete(dg.utxos, inputIDKey)
 	}
