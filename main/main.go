@@ -130,6 +130,8 @@ func main() {
 	)
 	defer externalIPUpdater.Stop()
 
+	log.Info("Node started with IP: %s", Config.StakingIP.IP().String())
+
 	log.Debug("initializing node state")
 	node := node.Node{}
 	if err := node.Initialize(&Config, log, factory); err != nil {
