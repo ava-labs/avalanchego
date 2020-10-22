@@ -144,8 +144,12 @@ func NewPrefixedState(
 	peerChain ids.ID,
 ) *PrefixedState {
 	state := &State{
-		Cache:        &cache.LRU{Size: stateCacheSize},
-		DB:           db,
+		UTXOCache:    &cache.LRU{Size: stateCacheSize},
+		UTXODB:       prefixdb.NewNested([]byte("utxo"), db),
+		StatusCache:  &cache.LRU{Size: stateCacheSize},
+		StatusDB:     prefixdb.NewNested([]byte("status"), db),
+		IDCache:      &cache.LRU{Size: stateCacheSize},
+		IDDB:         prefixdb.NewNested([]byte("id"), db),
 		GenesisCodec: genesisCodec,
 		Codec:        codec,
 	}
@@ -230,22 +234,26 @@ func UniqueID(id ids.ID, prefix uint64, cacher cache.Cacher) ids.ID {
 // State is a thin wrapper around a database to provide, caching, serialization,
 // and de-serialization.
 type State struct {
-	Cache        cache.Cacher
-	DB           database.Database
+	UTXOCache    cache.Cacher
+	UTXODB       database.Database
+	StatusCache  cache.Cacher
+	StatusDB     database.Database
+	IDCache      cache.Cacher
+	IDDB         database.Database
 	GenesisCodec codec.Codec
 	Codec        codec.Codec
 }
 
 // UTXO attempts to load a utxo from storage.
 func (s *State) UTXO(id ids.ID) (*UTXO, error) {
-	if utxoIntf, found := s.Cache.Get(id); found {
+	if utxoIntf, found := s.UTXOCache.Get(id); found {
 		if utxo, ok := utxoIntf.(*UTXO); ok {
 			return utxo, nil
 		}
 		return nil, errCacheTypeMismatch
 	}
 
-	bytes, err := s.DB.Get(id.Bytes())
+	bytes, err := s.UTXODB.Get(id.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -256,15 +264,15 @@ func (s *State) UTXO(id ids.ID) (*UTXO, error) {
 		return nil, err
 	}
 
-	s.Cache.Put(id, utxo)
+	s.UTXOCache.Put(id, utxo)
 	return utxo, nil
 }
 
 // SetUTXO saves the provided utxo to storage.
 func (s *State) SetUTXO(id ids.ID, utxo *UTXO) error {
 	if utxo == nil {
-		s.Cache.Evict(id)
-		return s.DB.Delete(id.Bytes())
+		s.UTXOCache.Evict(id)
+		return s.UTXODB.Delete(id.Bytes())
 	}
 
 	bytes, err := s.Codec.Marshal(utxo)
@@ -272,20 +280,20 @@ func (s *State) SetUTXO(id ids.ID, utxo *UTXO) error {
 		return err
 	}
 
-	s.Cache.Put(id, utxo)
-	return s.DB.Put(id.Bytes(), bytes)
+	s.UTXOCache.Put(id, utxo)
+	return s.UTXODB.Put(id.Bytes(), bytes)
 }
 
 // Status returns a status from storage.
 func (s *State) Status(id ids.ID) (choices.Status, error) {
-	if statusIntf, found := s.Cache.Get(id); found {
+	if statusIntf, found := s.StatusCache.Get(id); found {
 		if status, ok := statusIntf.(choices.Status); ok {
 			return status, nil
 		}
 		return choices.Unknown, errCacheTypeMismatch
 	}
 
-	bytes, err := s.DB.Get(id.Bytes())
+	bytes, err := s.StatusDB.Get(id.Bytes())
 	if err != nil {
 		return choices.Unknown, err
 	}
@@ -295,15 +303,15 @@ func (s *State) Status(id ids.ID) (choices.Status, error) {
 		return choices.Unknown, err
 	}
 
-	s.Cache.Put(id, status)
+	s.StatusCache.Put(id, status)
 	return status, nil
 }
 
 // SetStatus saves a status in storage.
 func (s *State) SetStatus(id ids.ID, status choices.Status) error {
 	if status == choices.Unknown {
-		s.Cache.Evict(id)
-		return s.DB.Delete(id.Bytes())
+		s.StatusCache.Evict(id)
+		return s.StatusDB.Delete(id.Bytes())
 	}
 
 	bytes, err := s.Codec.Marshal(status)
@@ -311,8 +319,8 @@ func (s *State) SetStatus(id ids.ID, status choices.Status) error {
 		return err
 	}
 
-	s.Cache.Put(id, status)
-	return s.DB.Put(id.Bytes(), bytes)
+	s.StatusCache.Put(id, status)
+	return s.StatusDB.Put(id.Bytes(), bytes)
 }
 
 // IDs returns the slice of IDs associated with [id], starting after [start].
@@ -320,7 +328,7 @@ func (s *State) SetStatus(id ids.ID, status choices.Status) error {
 // Returns at most [limit] IDs.
 func (s *State) IDs(key []byte, start []byte, limit int) ([]ids.ID, error) {
 	idSlice := []ids.ID(nil)
-	iter := prefixdb.NewNested(key, s.DB).NewIteratorWithStart(start)
+	iter := prefixdb.NewNested(key, s.IDDB).NewIteratorWithStart(start)
 	defer iter.Release()
 
 	numFetched := 0
@@ -340,7 +348,7 @@ func (s *State) AddID(key []byte, id ids.ID) error {
 	if id.IsZero() {
 		return errZeroID
 	}
-	db := prefixdb.NewNested(key, s.DB)
+	db := prefixdb.NewNested(key, s.IDDB)
 	return db.Put(id.Bytes(), nil)
 }
 
@@ -349,6 +357,6 @@ func (s *State) RemoveID(key []byte, id ids.ID) error {
 	if id.IsZero() {
 		return errZeroID
 	}
-	db := prefixdb.NewNested(key, s.DB)
+	db := prefixdb.NewNested(key, s.IDDB)
 	return db.Delete(id.Bytes())
 }

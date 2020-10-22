@@ -16,6 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -41,9 +42,10 @@ import (
 const (
 	batchTimeout    = time.Second
 	batchSize       = 30
-	stateCacheSize  = 30000
+	statusCacheSize = 30000
 	idCacheSize     = 30000
 	txCacheSize     = 30000
+	utxoCacheSize   = 30000
 	maxUTXOsToFetch = 1024
 )
 
@@ -223,17 +225,20 @@ func (vm *VM) Initialize(
 	vm.codec = c
 
 	vm.state = &prefixedState{
-		state: &state{State: avax.State{
-			Cache:        &cache.LRU{Size: stateCacheSize},
-			DB:           vm.db,
-			GenesisCodec: vm.genesisCodec,
-			Codec:        vm.codec,
-		}},
-
-		tx:       &cache.LRU{Size: idCacheSize},
-		utxo:     &cache.LRU{Size: idCacheSize},
-		txStatus: &cache.LRU{Size: idCacheSize},
-
+		state: &state{
+			txCache: &cache.LRU{Size: txCacheSize},
+			txDb:    prefixdb.NewNested([]byte("tx"), vm.db),
+			State: avax.State{
+				UTXOCache:    &cache.LRU{Size: utxoCacheSize},
+				UTXODB:       prefixdb.NewNested([]byte("utxo"), vm.db),
+				StatusCache:  &cache.LRU{Size: statusCacheSize},
+				StatusDB:     prefixdb.NewNested([]byte("status"), vm.db),
+				IDCache:      &cache.LRU{Size: idCacheSize},
+				IDDB:         prefixdb.NewNested([]byte("id"), vm.db),
+				GenesisCodec: vm.genesisCodec,
+				Codec:        vm.codec,
+			},
+		},
 		uniqueTx: &cache.EvictableLRU{Size: txCacheSize},
 	}
 

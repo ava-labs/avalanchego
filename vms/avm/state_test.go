@@ -107,7 +107,7 @@ func TestStateIDsNoStart(t *testing.T) {
 		}
 	}
 
-	state.Cache.Flush()
+	state.IDCache.Flush()
 
 	result, err = state.IDs(ids.Empty.Bytes(), []byte{}, math.MaxInt32)
 	if err != nil {
@@ -302,7 +302,7 @@ func TestStateUTXOs(t *testing.T) {
 		t.Fatalf("Wrong UTXO returned")
 	}
 
-	state.Cache.Flush()
+	state.UTXOCache.Flush()
 
 	result, err = state.UTXO(ids.Empty)
 	if err != nil {
@@ -333,7 +333,7 @@ func TestStateUTXOs(t *testing.T) {
 		t.Fatalf("Should have errored when reading utxo")
 	}
 
-	state.Cache.Flush()
+	state.UTXOCache.Flush()
 
 	if _, err := state.UTXO(ids.Empty); err == nil {
 		t.Fatalf("Should have errored when reading utxo")
@@ -396,7 +396,7 @@ func TestStateTXs(t *testing.T) {
 		t.Fatalf("Wrong Tx returned")
 	}
 
-	state.Cache.Flush()
+	state.txCache.Flush()
 
 	result, err = state.Tx(ids.Empty)
 	if err != nil {
@@ -423,7 +423,7 @@ func TestStateTXs(t *testing.T) {
 		t.Fatalf("Should have errored when reading tx")
 	}
 
-	state.Cache.Flush()
+	state.txCache.Flush()
 
 	if _, err := state.Tx(ids.Empty); err == nil {
 		t.Fatalf("Should have errored when reading tx")
