@@ -35,8 +35,9 @@ const (
 )
 
 const (
-	stateCacheSize = 10000
-	idCacheSize    = 10000
+	statusCacheSize = 10000
+	idCacheSize     = 10000
+	utxoCacheSize   = 10000
 )
 
 type chainState struct {
@@ -146,11 +147,11 @@ func NewPrefixedState(
 	peerChain ids.ID,
 ) *PrefixedState {
 	state := &State{
-		UTXOCache:    &cache.LRU{Size: stateCacheSize},
+		UTXOCache:    &cache.LRU{Size: utxoCacheSize},
 		UTXODB:       prefixdb.NewNested([]byte("utxo"), db),
-		StatusCache:  &cache.LRU{Size: stateCacheSize},
+		StatusCache:  &cache.LRU{Size: statusCacheSize},
 		StatusDB:     prefixdb.NewNested([]byte("status"), db),
-		IDCache:      &cache.LRU{Size: stateCacheSize},
+		IDCache:      &cache.LRU{Size: idCacheSize},
 		IDDB:         prefixdb.NewNested([]byte("id"), db),
 		GenesisCodec: genesisCodec,
 		Codec:        codec,
