@@ -205,9 +205,10 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 	votes.SetThreshold(dg.params.Alpha)
 	// Get the set of IDs that meet this alpha threshold
 	metThreshold := votes.Threshold()
-	for _, txID := range metThreshold.List() {
+	for txIDKey := range metThreshold {
+
 		// Get the node this tx represents
-		txNode, exist := dg.txs[txID.Key()]
+		txNode, exist := dg.txs[txIDKey]
 		if !exist {
 			// This tx may have already been accepted because of tx
 			// dependencies. If this is the case, we can just drop the vote.
@@ -217,7 +218,7 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 		txNode.RecordSuccessfulPoll(dg.currentVote)
 
 		dg.ctx.Log.Verbo("Updated TxID=%s to have consensus state=%s",
-			txID, &txNode.snowball)
+			ids.NewID(txIDKey), &txNode.snowball)
 
 		// If the tx should be accepted, then we should defer its acceptance
 		// until its dependencies are decided. If this tx was already marked to
