@@ -52,8 +52,7 @@ func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
 			return nil, err
 		}
 		unique.v.vtx = innerVertex
-		unique.persist()
-		return unique, nil
+		return unique, unique.persist()
 	}
 
 	// The vertex was not in the cache, so mark it as unique and
@@ -66,8 +65,7 @@ func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
 
 	// Persist the vertex if necessary
 	vtx.v.vtx = innerVertex
-	vtx.persist()
-	return vtx, nil
+	return vtx, vtx.persist()
 }
 
 func (vtx *uniqueVertex) refresh() {
@@ -107,19 +105,25 @@ func (vtx *uniqueVertex) Evict() {
 // persist writes the vertex and status to the database if necessary
 // and also updates the current status of [vtx]
 // Assumes the inner vertex is non-nil
-func (vtx *uniqueVertex) persist() {
+func (vtx *uniqueVertex) persist() error {
 	if vtx.v.status != choices.Unknown {
-		return
+		return nil
 	}
 
 	status := vtx.serializer.state.Status(vtx.ID())
 	if status == choices.Unknown {
-		vtx.serializer.state.SetStatus(vtx.ID(), choices.Processing)
-		vtx.serializer.state.SetVertex(vtx.v.vtx)
+		if err := vtx.serializer.state.SetStatus(vtx.ID(), choices.Processing); err != nil {
+			return err
+		}
+		if err := vtx.serializer.state.SetVertex(vtx.v.vtx); err != nil {
+			return err
+		}
 		vtx.v.status = choices.Processing
 	} else {
 		vtx.v.status = status
 	}
+
+	return nil
 }
 
 func (vtx *uniqueVertex) setVertex(innerVtx *innerVertex) error {
