@@ -1163,8 +1163,8 @@ func TestTxCached(t *testing.T) {
 		*called = true
 		return nil, errors.New("")
 	}
-	vm.state.state.DB = db
-	vm.state.state.Cache.Flush()
+	vm.state.state.txDb = prefixdb.New([]byte("tx"), db)
+	vm.state.state.txCache.Flush()
 
 	_, err = vm.Parse(txBytes)
 	assert.NoError(t, err)
@@ -1194,9 +1194,10 @@ func TestTxNotCached(t *testing.T) {
 		return nil, errors.New("")
 	}
 	db.OnPut = func([]byte, []byte) error { return nil }
-	vm.state.state.DB = db
+	vm.state.state.txDb = prefixdb.New([]byte("tx"), db)
+	vm.state.state.StatusDB = prefixdb.New([]byte("status"), db)
 	vm.state.uniqueTx.Flush()
-	vm.state.state.Cache.Flush()
+	vm.state.StatusCache.Flush()
 
 	_, err = vm.Parse(txBytes)
 	assert.NoError(t, err)
