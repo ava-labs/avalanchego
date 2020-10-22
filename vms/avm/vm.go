@@ -39,12 +39,13 @@ import (
 )
 
 const (
-	batchTimeout    = time.Second
-	batchSize       = 30
-	stateCacheSize  = 30000
-	idCacheSize     = 30000
-	txCacheSize     = 30000
-	maxUTXOsToFetch = 1024
+	batchTimeout       = time.Second
+	batchSize          = 30
+	stateCacheSize     = 30000
+	idCacheSize        = 30000
+	txCacheSize        = 30000
+	assetToFxCacheSize = 1024
+	maxUTXOsToFetch    = 1024
 )
 
 var (
@@ -84,6 +85,9 @@ type VM struct {
 	creationTxFee uint64
 	// fee that must be burned by every non-state creating transaction
 	txFee uint64
+
+	// Asset ID --> Bit set with fx IDs the asset supports
+	assetToFxCache *cache.LRU
 
 	// Transaction issuing
 	timer        *timer.Timer
@@ -167,6 +171,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("problem creating encoding manager: %w", err)
 	}
 	vm.encodingManager = encodingManager
+	vm.assetToFxCache = &cache.LRU{Size: assetToFxCacheSize}
 
 	vm.pubsub = cjson.NewPubSubServer(ctx)
 	vm.genesisCodec = codec.New(math.MaxUint32, 1<<20)
@@ -705,6 +710,10 @@ func (vm *VM) getFx(val interface{}) (int, error) {
 }
 
 func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
+	fxIDsIntf, assetInCache := vm.assetToFxCache.Get(assetID)
+	if assetInCache && fxIDsIntf.(ids.BitSet).Contains(uint(fxID)) {
+		return true
+	}
 	tx := &UniqueTx{
 		vm:   vm,
 		txID: assetID,
@@ -720,6 +729,13 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	// make a map
 	for _, state := range createAssetTx.States {
 		if state.FxID == uint32(fxID) {
+			// Cache that this asset supports this fx
+			fxIDs := ids.BitSet(0)
+			if assetInCache {
+				fxIDs = fxIDsIntf.(ids.BitSet)
+			}
+			fxIDs.Add(uint(fxID))
+			vm.assetToFxCache.Put(assetID, fxIDs)
 			return true
 		}
 	}
