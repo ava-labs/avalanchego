@@ -108,4 +108,7 @@ type Config struct {
 	// Throttling incoming connections
 	ConnMeterResetDuration time.Duration
 	ConnMeterMaxConns      int
+
+	// Service Control Callback
+	ServiceControl utils.ServiceControl
 }

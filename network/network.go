@@ -50,6 +50,8 @@ const (
 	defaultReadBufferSize                            = 16 * 1024
 	defaultReadHandshakeTimeout                      = 15 * time.Second
 	defaultConnMeterCacheSize                        = 10000
+	defaultPeerMonitorTimeout                        = 5 * time.Second
+	defaultPeerMonitorConnMeter                      = 30 * time.Second
 )
 
 var (
@@ -150,6 +152,21 @@ type network struct {
 	// TODO: bound the size of [myIPs] to avoid DoS. LRU caching would be ideal
 	myIPs map[string]struct{} // set of IPs that resulted in my ID.
 	peers map[[20]byte]*peer
+
+	// ensures the close of the network only happens once.
+	closeOnce sync.Once
+
+	// signals the peermonitor to close when Network is shutdown
+	peerMonitorCloser chan struct{}
+
+	// use to help monitor the connected peers, not 0 when there are connected peers.
+	peerMonitorActivityMeter timer.TimedMeter
+
+	// how often do we do a peer check to update the peerMonitorActivityMeter
+	peerMonitorTimeout time.Duration
+
+	// called when the peers count has dropped to 0 within the specified time.
+	serviceControl utils.ServiceControl
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -171,6 +188,7 @@ func NewDefaultNetwork(
 	router router.Router,
 	connMeterResetDuration time.Duration,
 	connMeterMaxConns int,
+	serviceControl utils.ServiceControl,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -207,6 +225,9 @@ func NewDefaultNetwork(
 		connMeterResetDuration,
 		defaultConnMeterCacheSize,
 		connMeterMaxConns,
+		serviceControl,
+		defaultPeerMonitorTimeout,
+		defaultPeerMonitorConnMeter,
 	)
 }
 
@@ -246,6 +267,9 @@ func NewNetwork(
 	connMeterResetDuration time.Duration,
 	connMeterCacheSize int,
 	connMeterMaxConns int,
+	serviceControl utils.ServiceControl,
+	peerMonitorTimeout time.Duration,
+	peerMonitorConnMeter time.Duration,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -290,13 +314,24 @@ func NewNetwork(
 		readHandshakeTimeout:               readHandshakeTimeout,
 		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize),
 		connMeterMaxConns:                  connMeterMaxConns,
+		peerMonitorActivityMeter:           timer.TimedMeter{Duration: peerMonitorConnMeter},
+		serviceControl:                     serviceControl,
+		peerMonitorCloser:                  make(chan struct{}),
+		peerMonitorTimeout:                 peerMonitorTimeout,
 	}
+
+	// pre-queue one tick to avoid immediate shutdown.
+	netw.peerMonitorActivityMeter.Tick()
+
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
 	}
 	netw.executor.Initialize()
 	go netw.executor.Dispatch()
 	netw.heartbeat()
+	if serviceControl != nil {
+		go netw.peerMonitor()
+	}
 	return netw
 }
 
@@ -690,19 +725,26 @@ func (n *network) Peers() []PeerID {
 // Close implements the Network interface
 // assumes the stateLock is not held.
 func (n *network) Close() error {
+	n.closeOnce.Do(n.close)
+	return nil
+}
+
+func (n *network) close() {
+	close(n.peerMonitorCloser)
+
 	err := n.listener.Close()
 	if err != nil {
 		n.log.Debug("closing network listener failed with: %s", err)
 	}
 
 	if n.closed.GetValue() {
-		return nil
+		return
 	}
 
 	n.stateLock.Lock()
 	if n.closed.GetValue() {
 		n.stateLock.Unlock()
-		return nil
+		return
 	}
 	n.closed.SetValue(true)
 
@@ -716,7 +758,6 @@ func (n *network) Close() error {
 	for _, peer := range peersToClose {
 		peer.Close() // Grabs the stateLock
 	}
-	return err
 }
 
 // Track implements the Network interface
@@ -1162,4 +1203,33 @@ func (n *network) getPeer(validatorID ids.ShortID) *peer {
 		return nil
 	}
 	return n.peers[validatorID.Key()]
+}
+
+func (n *network) peerMonitor() {
+	ticker := time.NewTicker(n.peerMonitorTimeout)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			if n.closed.GetValue() {
+				return
+			}
+			// var connectedPeers uint64
+			n.stateLock.RLock()
+			for _, peer := range n.peers {
+				if peer != nil && peer.connected.GetValue() {
+					n.peerMonitorActivityMeter.Tick()
+					break
+				}
+			}
+			n.stateLock.RUnlock()
+			if n.peerMonitorActivityMeter.Ticks() != 0 {
+				continue
+			}
+			ticker.Stop()
+			go n.serviceControl.SystemShutdown()
+		case <-n.peerMonitorCloser:
+			return
+		}
+	}
 }

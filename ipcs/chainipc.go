@@ -86,6 +86,12 @@ func (cipcs *ChainIPCs) Unpublish(chainID ids.ID) (bool, error) {
 	return true, chainIPCs.stop()
 }
 
+func (cipcs *ChainIPCs) Shutdown() {
+	for _, ch := range cipcs.chains {
+		_ = ch.stop()
+	}
+}
+
 func ipcURL(ctx context, chainID ids.ID, eventType string) string {
 	return filepath.Join(ctx.path, fmt.Sprintf("%d-%s-%s", ctx.networkID, chainID.String(), eventType))
 }

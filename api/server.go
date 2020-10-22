@@ -4,6 +4,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
+	"time"
 
 	"github.com/gorilla/handlers"
 
@@ -43,6 +45,9 @@ type Server struct {
 	// Handles authorization. Must be non-nil after initialization, even if
 	// token authorization is off.
 	auth *auth.Auth
+
+	// http server
+	srv *http.Server
 }
 
 // Initialize creates the API server at the provided host and port
@@ -82,7 +87,8 @@ func (s *Server) Dispatch() error {
 	s.log.Info("HTTP API server listening on %q", s.listenAddress)
 	handler := cors.Default().Handler(s.router)
 	handler = s.auth.WrapHandler(handler)
-	return http.Serve(listener, handler)
+	s.srv = &http.Server{Handler: handler}
+	return s.srv.Serve(listener)
 }
 
 // DispatchTLS starts the API server with the provided TLS certificate
@@ -244,4 +250,9 @@ func (s *Server) Call(
 	handler.ServeHTTP(writer, req)
 
 	return nil
+}
+
+func (s *Server) Shutdown() {
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	s.srv.Shutdown(ctx)
 }

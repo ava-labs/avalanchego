@@ -121,6 +121,12 @@ type Node struct {
 
 	// channel for closing the node
 	nodeCloser chan<- os.Signal
+
+	// ensures that we only close the node once.
+	shutdownOnce sync.Once
+
+	// is node shutting down
+	shuttingDown utils.AtomicBool
 }
 
 /*
@@ -219,6 +225,7 @@ func (n *Node) initNetworking() error {
 		consensusRouter,
 		n.Config.ConnMeterResetDuration,
 		n.Config.ConnMeterMaxConns,
+		n.Config.ServiceControl,
 	)
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
@@ -301,7 +308,9 @@ func (n *Node) Dispatch() error {
 		n.Log.Debug("Initializing API server")
 		err := n.APIServer.Dispatch()
 
-		n.Log.Fatal("API server initialization failed with %s", err)
+		if !n.shuttingDown.GetValue() {
+			n.Log.Fatal("API server initialization failed with %s", err)
+		}
 
 		// errors are already logged internally if they are meaningful
 		_ = n.Net.Close() // If the server isn't up, shut down the node.
@@ -827,11 +836,18 @@ func (n *Node) Initialize(config *Config, logger logging.Logger, logFactory logg
 
 // Shutdown this node
 func (n *Node) Shutdown() {
+	n.shuttingDown.SetValue(true)
+	n.shutdownOnce.Do(n.shutdown)
+}
+
+func (n *Node) shutdown() {
 	n.Log.Info("shutting down the node")
 	// Close already logs its own error if one occurs, so the error is ignored
 	// here
-	_ = n.Net.Close()
+	n.IPCs.Shutdown()
 	n.chainManager.Shutdown()
+	_ = n.Net.Close()
+	n.APIServer.Shutdown()
 	utils.ClearSignals(n.nodeCloser)
 	n.Log.Info("node shut down successfully")
 }

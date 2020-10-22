@@ -5,9 +5,11 @@ package main
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/node"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
@@ -130,16 +132,66 @@ func main() {
 	)
 	defer externalIPUpdater.Stop()
 
+	Config.ServiceControl = &systemShutdown{}
+
+	for {
+		shutdown := &utils.AtomicBool{}
+		err := mainRun(log, factory, shutdown, Config.ServiceControl)
+		if err != nil {
+			break
+		}
+		// if the shutdown was not requested, it was SIGINT..  break the loop
+		if !shutdown.GetValue() {
+			break
+		}
+	}
+}
+
+func mainRun(log logging.Logger, factory logging.Factory, shutdown *utils.AtomicBool, restart utils.ServiceControl) error {
 	log.Debug("initializing node state")
 	node := node.Node{}
 	if err := node.Initialize(&Config, log, factory); err != nil {
 		log.Error("error initializing node state: %s", err)
+		return err
+	}
+
+	sControl.node = &node
+	sControl.shutdown = shutdown
+
+	defer func() {
+		if !shutdown.GetValue() {
+			node.Shutdown()
+		}
+	}()
+
+	log.Debug("dispatching node handlers")
+	err := node.Dispatch()
+	log.Debug("node dispatching returned with %s", err)
+	return nil
+}
+
+type systemShutdownControl struct {
+	lock     sync.Mutex
+	node     *node.Node
+	shutdown *utils.AtomicBool
+}
+
+var sControl systemShutdownControl
+
+type systemShutdown struct {
+}
+
+func (s *systemShutdown) SystemShutdown() {
+	sControl.lock.Lock()
+	defer sControl.lock.Unlock()
+
+	if sControl.node == nil {
 		return
 	}
 
-	defer node.Shutdown()
+	sControl.shutdown.SetValue(true)
+	sControl.node.Shutdown()
 
-	log.Debug("dispatching node handlers")
-	err = node.Dispatch()
-	log.Debug("node dispatching returned with %s", err)
+	sControl.node = nil
+	sControl.shutdown = nil
 }

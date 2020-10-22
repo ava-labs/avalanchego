@@ -4,6 +4,9 @@
 package ipcs
 
 import (
+	"os"
+	"syscall"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs/socket"
 	"github.com/ava-labs/avalanchego/snow"
@@ -93,15 +96,27 @@ func newEventIPCSocket(ctx context, chainID ids.ID, name string, events *trigger
 	var (
 		url     = ipcURL(ctx, chainID, name)
 		ipcName = ipcIdentifierPrefix + "-" + name
-		eis     = &eventSocket{
-			log:    ctx.log,
-			url:    url,
-			socket: socket.NewSocket(url, ctx.log),
-			unregisterFn: func() error {
-				return events.DeregisterChain(chainID, ipcName)
-			},
-		}
 	)
+
+	err := os.Remove(url)
+	if err != nil {
+		if patherr, ok := err.(*os.PathError); ok {
+			if patherr.Err != syscall.ENOENT {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
+	}
+
+	var eis = &eventSocket{
+		log:    ctx.log,
+		url:    url,
+		socket: socket.NewSocket(url, ctx.log),
+		unregisterFn: func() error {
+			return events.DeregisterChain(chainID, ipcName)
+		},
+	}
 
 	if err := eis.socket.Listen(); err != nil {
 		if err := eis.socket.Close(); err != nil {

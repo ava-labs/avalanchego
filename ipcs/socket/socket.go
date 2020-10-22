@@ -40,6 +40,9 @@ type Socket struct {
 
 	quitCh chan struct{}
 	doneCh chan struct{}
+
+	// the current listener
+	listener net.Listener
 }
 
 // NewSocket creates a new socket object for the given address. It does not open
@@ -64,6 +67,7 @@ func (s *Socket) Listen() error {
 	if err != nil {
 		return err
 	}
+	s.listener = l
 
 	// Start a loop that accepts new connections until told to quit
 	go func() {
@@ -113,6 +117,13 @@ func (s *Socket) Send(msg []byte) error {
 func (s *Socket) Close() error {
 	// Signal to the event loop to stop and wait for it to signal back
 	close(s.quitCh)
+
+	listener := s.listener
+	s.listener = nil
+
+	// close the listener to break the loop
+	_ = listener.Close()
+
 	<-s.doneCh
 
 	// Zero out the connection pool but save a reference so we can close them all
@@ -124,9 +135,15 @@ func (s *Socket) Close() error {
 	// Close all connections that were open at the time of shutdown
 	errs := wrappers.Errs{}
 	for conn := range conns {
-		errs.Add(conn.Close())
+		if conn != nil {
+			errs.Add(conn.Close())
+		}
 	}
 	return errs.Err
+}
+
+func (s *Socket) Running() bool {
+	return s.listener != nil
 }
 
 func (s *Socket) removeConn(c net.Conn) {
@@ -197,6 +214,9 @@ type acceptFn func(*Socket, net.Listener)
 func accept(s *Socket, l net.Listener) {
 	conn, err := l.Accept()
 	if err != nil {
+		if !s.Running() {
+			return
+		}
 		s.log.Error("socket accept error: %s", err.Error())
 	}
 	if conn, ok := conn.(*net.TCPConn); ok {
