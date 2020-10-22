@@ -363,16 +363,16 @@ func (ig *Input) accept(txID ids.ID) error {
 	ig.preferences.Remove(txID)
 
 	// Reject all the txs that conflicted with this tx.
-	if err := ig.reject(conflicts.List()...); err != nil {
+	if err := ig.reject(conflicts); err != nil {
 		return err
 	}
 	return ig.acceptTx(txNode.tx)
 }
 
 // reject all the named txIDs and remove them from their conflict sets
-func (ig *Input) reject(conflictIDs ...ids.ID) error {
-	for _, conflictID := range conflictIDs {
-		conflictKey := conflictID.Key()
+func (ig *Input) reject(conflictIDs ids.Set) error {
+	for conflictKey := range conflictIDs {
+		conflictID := ids.NewID(conflictKey)
 		conflict := ig.txs[conflictKey]
 
 		// We are rejecting the tx, so we should remove it from the graph

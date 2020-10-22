@@ -270,6 +270,9 @@ func (dg *Directed) accept(txID ids.ID) error {
 	for _, inputID := range txNode.tx.InputIDs().List() {
 		delete(dg.utxos, inputID.Key())
 	}
+	for inputIDKey := range txNode.tx.InputIDs() {
+		delete(dg.utxos, inputIDKey)
+	}
 
 	// This tx is now accepted, so it shouldn't be part of the virtuous set or
 	// the preferred set. Its status as Accepted implies these descriptions.
@@ -277,24 +280,23 @@ func (dg *Directed) accept(txID ids.ID) error {
 	dg.preferences.Remove(txID)
 
 	// Reject all the txs that conflicted with this tx.
-	if err := dg.reject(txNode.ins.List()...); err != nil {
+	if err := dg.reject(txNode.ins); err != nil {
 		return err
 	}
 	// While it is typically true that a tx this is being accepted is preferred,
 	// it is possible for this to not be the case. So this is handled for
 	// completeness.
-	if err := dg.reject(txNode.outs.List()...); err != nil {
+	if err := dg.reject(txNode.outs); err != nil {
 		return err
 	}
 	return dg.acceptTx(txNode.tx)
 }
 
 // reject all the named txIDs and remove them from the graph
-func (dg *Directed) reject(conflictIDs ...ids.ID) error {
-	for _, conflictID := range conflictIDs {
-		conflictKey := conflictID.Key()
+func (dg *Directed) reject(conflictIDs ids.Set) error {
+	for conflictKey := range conflictIDs {
+		conflictID := ids.NewID(conflictKey)
 		conflict := dg.txs[conflictKey]
-
 		// This tx is no longer an option for consuming the UTXOs from its
 		// inputs, so we should remove their reference to this tx.
 		for _, inputID := range conflict.tx.InputIDs().List() {
