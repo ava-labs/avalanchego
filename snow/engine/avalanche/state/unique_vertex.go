@@ -43,22 +43,26 @@ func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
 	}
 	vtx.shallowRefresh()
 
+	// If the vtx exists, then the vertex is already known
 	if vtx.v.vtx != nil {
 		return vtx, nil
 	}
 
+	// If it wasn't in the cache parse the vertex and set it
 	innerVertex, err := s.parseVertex(b)
 	if err != nil {
 		return nil, err
 	}
 	vtx.v.vtx = innerVertex
 
-	// If the vertex is already known, skip writing it
-	// to the database
-	if vtx.v.status != choices.Unknown {
+	// If the vertex has already been fetched,
+	// skip persisting the vertex.
+	if vtx.v.status.Fetched() {
 		return vtx, nil
 	}
 
+	// The vertex is newly parsed, so set the status
+	// and persist it.
 	vtx.v.status = choices.Processing
 	return vtx, vtx.persist()
 }
@@ -121,7 +125,7 @@ func (vtx *uniqueVertex) persist() error {
 	if err := vtx.serializer.state.SetVertex(vtx.v.vtx); err != nil {
 		return err
 	}
-	return vtx.setStatus(vtx.v.status)
+	return vtx.serializer.state.SetStatus(vtx.ID(), vtx.v.status)
 }
 
 func (vtx *uniqueVertex) setStatus(status choices.Status) error {
