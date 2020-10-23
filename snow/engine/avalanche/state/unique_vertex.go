@@ -123,7 +123,7 @@ func (vtx *uniqueVertex) persist() error {
 }
 
 func (vtx *uniqueVertex) setStatus(status choices.Status) error {
-	vtx.refresh()
+	vtx.shallowRefresh()
 	if vtx.v.status == status {
 		return nil
 	}
@@ -171,7 +171,7 @@ func (vtx *uniqueVertex) Reject() error {
 	return vtx.serializer.db.Commit()
 }
 
-func (vtx *uniqueVertex) Status() choices.Status { vtx.refresh(); return vtx.v.status }
+func (vtx *uniqueVertex) Status() choices.Status { vtx.shallowRefresh(); return vtx.v.status }
 
 func (vtx *uniqueVertex) Parents() ([]avalanche.Vertex, error) {
 	vtx.refresh()
