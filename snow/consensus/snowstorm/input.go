@@ -149,9 +149,9 @@ func (ig *Input) Add(tx Tx) error {
 			// were considered virtuous that are now known to be rogue. If
 			// that's the case we should remove those txs from the virtuous
 			// sets.
-			for _, conflictID := range utxo.spenders.List() {
-				ig.virtuous.Remove(conflictID)
-				ig.virtuousVoting.Remove(conflictID)
+			for conflictIDKey := range utxo.spenders {
+				delete(ig.virtuous, conflictIDKey)
+				delete(ig.virtuousVoting, conflictIDKey)
 			}
 		} else {
 			// If there isn't a conflict for this UTXO, I'm the preferred
@@ -212,16 +212,15 @@ func (ig *Input) RecordPoll(votes ids.Bag) (bool, error) {
 	votes.SetThreshold(ig.params.Alpha)
 	// Get the set of IDs that meet this alpha threshold
 	metThreshold := votes.Threshold()
-	for _, txID := range metThreshold.List() {
-		txKey := txID.Key()
-
+	for txIDKey := range metThreshold {
 		// Get the node this tx represents
-		txNode, exist := ig.txs[txKey]
+		txNode, exist := ig.txs[txIDKey]
 		if !exist {
 			// This tx may have already been accepted because of tx
 			// dependencies. If this is the case, we can just drop the vote.
 			continue
 		}
+		txID := ids.NewID(txIDKey)
 
 		txNode.numSuccessfulPolls++
 		txNode.lastVote = ig.currentVote
@@ -427,12 +426,12 @@ func (ig *Input) removeConflict(txID [32]byte, inputIDs []ids.ID) {
 		lastVote := 0
 
 		// Find the new Snowball preference
-		for _, spender := range utxo.spenders.List() {
-			txNode := ig.txs[spender.Key()]
+		for spenderKey := range utxo.spenders {
+			txNode := ig.txs[spenderKey]
 			if txNode.numSuccessfulPolls > numSuccessfulPolls ||
 				(txNode.numSuccessfulPolls == numSuccessfulPolls &&
 					lastVote < txNode.lastVote) {
-				preference = spender
+				preference = ids.NewID(spenderKey)
 				numSuccessfulPolls = txNode.numSuccessfulPolls
 				lastVote = txNode.lastVote
 			}

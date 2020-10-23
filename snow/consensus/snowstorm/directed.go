@@ -133,16 +133,15 @@ func (dg *Directed) Add(tx Tx) error {
 		txNode.outs.Union(spenders)
 
 		// Update txs conflicting with tx to account for its issuance
-		for _, conflictID := range spenders.List() {
-			conflictKey := conflictID.Key()
+		for conflictIDKey := range spenders {
 
 			// Get the node that contains this conflicting tx
-			conflict := dg.txs[conflictKey]
+			conflict := dg.txs[conflictIDKey]
 
 			// This conflicting tx can't be virtuous anymore. So, we attempt to
 			// remove it from all of the virtuous sets.
-			dg.virtuous.Remove(conflictID)
-			dg.virtuousVoting.Remove(conflictID)
+			delete(dg.virtuous, conflictIDKey)
+			delete(dg.virtuousVoting, conflictIDKey)
 
 			// This tx should be set to rogue if it wasn't rogue before.
 			conflict.rogue = true
@@ -328,8 +327,8 @@ func (dg *Directed) reject(conflictIDs ids.Set) error {
 		delete(dg.preferences, conflictKey)
 
 		// remove the edge between this node and all its neighbors
-		dg.removeConflict(conflictKey, conflict.ins.List()...)
-		dg.removeConflict(conflictKey, conflict.outs.List()...)
+		dg.removeConflict(conflictKey, conflict.ins)
+		dg.removeConflict(conflictKey, conflict.outs)
 
 		if err := dg.rejectTx(conflict.tx); err != nil {
 			return err
@@ -342,14 +341,15 @@ func (dg *Directed) reject(conflictIDs ids.Set) error {
 // preferences have changed
 func (dg *Directed) redirectEdges(tx *directedTx) bool {
 	changed := false
-	for _, conflictID := range tx.outs.List() {
-		changed = dg.redirectEdge(tx, conflictID) || changed
+	for conflictIDKey := range tx.outs {
+		changed = dg.redirectEdge(tx, ids.NewID(conflictIDKey)) || changed
 	}
 	return changed
 }
 
 // Change the direction of this edge if needed. Returns true if the direction
 // was switched.
+// TODO replace
 func (dg *Directed) redirectEdge(txNode *directedTx, conflictID ids.ID) bool {
 	conflict := dg.txs[conflictID.Key()]
 	if txNode.numSuccessfulPolls <= conflict.numSuccessfulPolls {
@@ -375,10 +375,9 @@ func (dg *Directed) redirectEdge(txNode *directedTx, conflictID ids.ID) bool {
 	return true
 }
 
-func (dg *Directed) removeConflict(txID [32]byte, neighborIDs ...ids.ID) {
-	for _, neighborID := range neighborIDs {
-		neighborKey := neighborID.Key()
-		neighbor, exists := dg.txs[neighborKey]
+func (dg *Directed) removeConflict(txIDKey [32]byte, neighborIDs ids.Set) {
+	for neighborIDKey := range neighborIDs {
+		neighbor, exists := dg.txs[neighborIDKey]
 		if !exists {
 			// If the neighbor doesn't exist, they may have already been
 			// rejected, so this mapping can be skipped.
@@ -386,13 +385,13 @@ func (dg *Directed) removeConflict(txID [32]byte, neighborIDs ...ids.ID) {
 		}
 
 		// Remove any edge to this tx.
-		delete(neighbor.ins, txID)
-		delete(neighbor.outs, txID)
+		delete(neighbor.ins, txIDKey)
+		delete(neighbor.outs, txIDKey)
 
 		if neighbor.outs.Len() == 0 {
 			// If this tx should now be preferred, make sure its status is
 			// updated.
-			dg.preferences.Add(neighborID)
+			dg.preferences.Add(ids.NewID(neighborIDKey))
 		}
 	}
 }

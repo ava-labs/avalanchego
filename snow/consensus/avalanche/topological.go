@@ -155,8 +155,8 @@ func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 	// just reset the confidence values in the conflict graph and not perform
 	// any traversals.
 	partialVotes := ids.BitSet(0)
-	for _, vote := range responses.List() {
-		votes := responses.GetSet(vote)
+	for voteKey := range responses {
+		votes := responses.GetSet(ids.NewID(voteKey))
 		partialVotes.Union(votes)
 		if partialVotes.Len() >= ta.params.Alpha {
 			break
@@ -206,15 +206,15 @@ func (ta *Topological) calculateInDegree(responses ids.UniqueBag) (
 	kahns := make(map[[32]byte]kahnNode, minMapSize)
 	leaves := ids.Set{}
 
-	for _, vote := range responses.List() {
-		key := vote.Key()
+	for voteKey := range responses {
 		// If it is not found, then the vote is either for something decided,
 		// or something we haven't heard of yet.
-		if vtx := ta.nodes[key]; vtx != nil {
-			kahn, previouslySeen := kahns[key]
+		if vtx := ta.nodes[voteKey]; vtx != nil {
+			vote := ids.NewID(voteKey)
+			kahn, previouslySeen := kahns[voteKey]
 			// Add this new vote to the current bag of votes
 			kahn.votes.Union(responses.GetSet(vote))
-			kahns[key] = kahn
+			kahns[voteKey] = kahn
 
 			if !previouslySeen {
 				// If I've never seen this node before, it is currently a leaf.

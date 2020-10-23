@@ -230,8 +230,8 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	t.vtxBlocked.Abandon(vtxID)
 
 	if t.outstandingVtxReqs.Len() == 0 {
-		for _, txID := range t.missingTxs.List() {
-			t.txBlocked.Abandon(txID)
+		for txIDKey := range t.missingTxs {
+			t.txBlocked.Abandon(ids.NewID(txIDKey))
 		}
 		t.missingTxs.Clear()
 	}
@@ -311,8 +311,8 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) err
 		requestID: requestID,
 		response:  votes,
 	}
-	voteList := votes.List()
-	for _, vote := range voteList {
+	for voteKey := range votes {
+		vote := ids.NewID(voteKey)
 		if added, err := t.issueFromByID(vdr, vote); err != nil {
 			return err
 		} else if !added {
@@ -481,8 +481,8 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 
 	if t.outstandingVtxReqs.Len() == 0 {
 		// There are no outstanding vertex requests but we don't have these transactions, so we're not getting them.
-		for _, txID := range t.missingTxs.List() {
-			t.txBlocked.Abandon(txID)
+		for txIDKey := range t.missingTxs {
+			t.txBlocked.Abandon(ids.NewID(txIDKey))
 		}
 		t.missingTxs.Clear()
 	}

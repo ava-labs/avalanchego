@@ -78,12 +78,11 @@ func (v *voter) Update() {
 func (v *voter) bubbleVotes(votes ids.UniqueBag) (ids.UniqueBag, error) {
 	bubbledVotes := ids.UniqueBag{}
 	vertexHeap := vertex.NewHeap()
-	for _, vote := range votes.List() {
-		vtx, err := v.t.Manager.GetVertex(vote)
+	for voteKey := range votes {
+		vtx, err := v.t.Manager.GetVertex(ids.NewID(voteKey))
 		if err != nil {
 			continue
 		}
-
 		vertexHeap.Push(vtx)
 	}
 

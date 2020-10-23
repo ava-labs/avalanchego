@@ -51,8 +51,10 @@ func (m Builder) GetAcceptedFrontier(chainID ids.ID, requestID uint32, deadline 
 // AcceptedFrontier message
 func (m Builder) AcceptedFrontier(chainID ids.ID, requestID uint32, containerIDs ids.Set) (Msg, error) {
 	containerIDBytes := make([][]byte, containerIDs.Len())
-	for i, containerID := range containerIDs.List() {
-		containerIDBytes[i] = containerID.Bytes()
+	i := 0
+	for containerID := range containerIDs {
+		containerIDBytes[i] = containerID[:]
+		i++
 	}
 	return m.Pack(AcceptedFrontier, map[Field]interface{}{
 		ChainID:      chainID.Bytes(),
