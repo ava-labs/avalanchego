@@ -21,12 +21,6 @@ import (
 // will eventually be evicted from memory, when the uniqueVertex is evicted from
 // the cache. If the uniqueVertex has a function called again afther this
 // eviction, the vertex will be re-loaded from the database.
-//
-// Invariant: a uniqueVertex should never have a vertex state
-// where the innerVertex is non-nil and the
-// status is Unknown
-// ie v.vtx != nil ==> v.status != choices.Unknown at all times
-// This is ensured by updating the status first.
 type uniqueVertex struct {
 	serializer *Serializer
 
@@ -70,7 +64,7 @@ func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
 func (vtx *uniqueVertex) refresh() {
 	vtx.shallowRefresh()
 
-	if vtx.v.vtx == nil && vtx.v.status != choices.Unknown {
+	if vtx.v.vtx == nil && vtx.v.status.Fetched() {
 		vtx.v.vtx = vtx.serializer.state.Vertex(vtx.ID())
 	}
 }
@@ -114,7 +108,7 @@ func (vtx *uniqueVertex) setVertex(innerVtx *innerVertex) error {
 	vtx.shallowRefresh()
 	vtx.v.vtx = innerVtx
 
-	if vtx.v.status != choices.Unknown {
+	if vtx.v.status.Fetched() {
 		return nil
 	}
 	vtx.v.status = choices.Processing
