@@ -358,9 +358,12 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 			requestID,
 			containerIDs,
 			err)
-		for _, validatorID := range validatorIDs.List() {
+		for validatorIDKey := range validatorIDs {
+			validatorID := ids.NewShortID(validatorIDKey)
 			vID := validatorID
-			n.executor.Add(func() { n.router.GetAcceptedFailed(vID, chainID, requestID) })
+			n.executor.Add(func() {
+				n.router.GetAcceptedFailed(vID, chainID, requestID)
+			})
 		}
 		return
 	}
@@ -1124,14 +1127,16 @@ func (n *network) getPeers(validatorIDs ids.ShortSet) []*PeerElement {
 		return nil
 	}
 
-	vIDS := validatorIDs.List()
-	peers := make([]*PeerElement, 0, len(vIDS))
-	for _, validatorID := range vIDS {
-		peers = append(peers, &PeerElement{
-			peer: n.peers[validatorID.Key()],
-			id:   validatorID,
-		})
+	peers := make([]*PeerElement, validatorIDs.Len())
+	i := 0
+	for validatorIDKey := range validatorIDs {
+		peers[i] = &PeerElement{
+			peer: n.peers[validatorIDKey],
+			id:   ids.NewShortID(validatorIDKey),
+		}
+		i++
 	}
+
 	return peers
 }
 

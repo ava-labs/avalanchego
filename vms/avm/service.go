@@ -411,7 +411,9 @@ func (service *Service) GetAllBalances(r *http.Request, args *api.JSONAddress, r
 	}
 
 	reply.Balances = make([]Balance, assetIDs.Len())
-	for i, assetID := range assetIDs.List() {
+	i := 0
+	for assetIDKey := range assetIDs {
+		assetID := ids.NewID(assetIDKey)
 		if alias, err := service.vm.PrimaryAlias(assetID); err == nil {
 			reply.Balances[i] = Balance{
 				AssetID: alias,
@@ -423,6 +425,7 @@ func (service *Service) GetAllBalances(r *http.Request, args *api.JSONAddress, r
 				Balance: json.Uint64(balances[assetID.Key()]),
 			}
 		}
+		i++
 	}
 
 	return nil

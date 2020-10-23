@@ -219,7 +219,8 @@ func (tx *UniqueTx) Dependencies() []snowstorm.Tx {
 		})
 	}
 	consumedIDs := tx.Tx.ConsumedAssetIDs()
-	for _, assetID := range tx.Tx.AssetIDs().List() {
+	for assetIDKey := range tx.Tx.AssetIDs() {
+		assetID := ids.NewID(assetIDKey)
 		if consumedIDs.Contains(assetID) || txIDs.Contains(assetID) {
 			continue
 		}

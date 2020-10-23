@@ -545,23 +545,13 @@ func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
 
 // Issues a new poll for a preferred vertex in order to move consensus along
 func (t *Transitive) issueRepoll() {
-	preferredIDs := t.Consensus.Preferences().List()
-	numPreferredIDs := len(preferredIDs)
-	if numPreferredIDs == 0 {
+	preferredIDs := t.Consensus.Preferences()
+	if preferredIDs.Len() == 0 {
 		t.Ctx.Log.Error("re-query attempt was dropped due to no pending vertices")
 		return
 	}
 
-	s := sampler.NewUniform()
-	if err := s.Initialize(uint64(numPreferredIDs)); err != nil {
-		return // Should never really happen
-	}
-	indices, err := s.Sample(1)
-	if err != nil {
-		return // Also should never really happen because the edge has positive length
-	}
-	vtxID := preferredIDs[int(indices[0])] // ID of a preferred vertex
-
+	vtxID := preferredIDs.CappedList(1)[0]
 	vdrs, err := t.Validators.Sample(t.Params.K) // Validators to sample
 	vdrBag := ids.ShortBag{}                     // IDs of validators to be sampled
 	for _, vdr := range vdrs {
@@ -585,24 +575,21 @@ func (t *Transitive) issueBatch(txs []snowstorm.Tx) error {
 	t.Ctx.Log.Verbo("batching %d transactions into a new vertex", len(txs))
 
 	// Randomly select parents of this vertex from among the virtuous set
-	virtuousIDs := t.Consensus.Virtuous().List()
+	virtuousIDs := t.Consensus.Virtuous().CappedList(t.Params.Parents)
+	numVirtuousIDs := len(virtuousIDs)
 	s := sampler.NewUniform()
-	if err := s.Initialize(uint64(len(virtuousIDs))); err != nil {
+	if err := s.Initialize(uint64(numVirtuousIDs)); err != nil {
 		return err
 	}
 
-	count := len(virtuousIDs)
-	if count > t.Params.Parents {
-		count = t.Params.Parents
-	}
-	indices, err := s.Sample(count)
+	indices, err := s.Sample(numVirtuousIDs)
 	if err != nil {
 		return err
 	}
 
-	parentIDs := ids.Set{}
-	for _, index := range indices {
-		parentIDs.Add(virtuousIDs[int(index)])
+	parentIDs := make([]ids.ID, len(indices))
+	for i, index := range indices {
+		parentIDs[i] = virtuousIDs[int(index)]
 	}
 
 	vtx, err := t.Manager.BuildVertex(parentIDs, txs)

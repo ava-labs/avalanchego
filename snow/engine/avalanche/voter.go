@@ -50,8 +50,10 @@ func (v *voter) Update() {
 		return
 	}
 
-	txs := []snowstorm.Tx(nil)
-	for _, orphanID := range v.t.Consensus.Orphans().List() {
+	orphans := v.t.Consensus.Orphans()
+	txs := make([]snowstorm.Tx, 0, orphans.Len())
+	for orphanIDKey := range orphans {
+		orphanID := ids.NewID(orphanIDKey)
 		if tx, err := v.t.VM.GetTx(orphanID); err == nil {
 			txs = append(txs, tx)
 		} else {
