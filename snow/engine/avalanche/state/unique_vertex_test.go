@@ -188,14 +188,36 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 			t.Fatalf("expected status to be %s, but found: %s", expectedStatus, status)
 		}
 
-		parents, err := vtx.Parents()
-		switch {
-		case err != nil:
+		// Call bytes first to check for regression bug
+		// where it's unsafe to call Bytes or Verify directly
+		// after calling Status to refresh a vertex
+		if !bytes.Equal(vtx.Bytes(), vertexBytes) {
+			t.Fatalf("Found unexpected vertex bytes")
+		}
+
+		vtxParents, err := vtx.Parents()
+		if err != nil {
 			t.Fatalf("Fetching vertex parents errored with: %s", err)
-		case len(parents) != 1:
-			t.Fatalf("Expected vertex to have 1 parent, but found %d", len(parents))
-		case !parents[0].ID().Equals(parentID):
-			t.Fatalf("Found unexpected parentID: %s, expected: %s", parents[0].ID(), parentID)
+		}
+		vtxHeight, err := vtx.Height()
+		if err != nil {
+			t.Fatalf("Fetching vertex height errored with: %s", err)
+		}
+		vtxTxs, err := vtx.Txs()
+		if err != nil {
+			t.Fatalf("Fetching vertx txs errored with: %s", err)
+		}
+		switch {
+		case vtxHeight != height:
+			t.Fatalf("Expected vertex height to be %d, but found %d", height, vtxHeight)
+		case len(vtxParents) != 1:
+			t.Fatalf("Expected vertex to have 1 parent, but found %d", len(vtxParents))
+		case !vtxParents[0].ID().Equals(parentID):
+			t.Fatalf("Found unexpected parentID: %s, expected: %s", vtxParents[0].ID(), parentID)
+		case len(vtxTxs) != 1:
+			t.Fatalf("Exepcted vertex to have 1 transaction, but found %d", len(vtxTxs))
+		case !bytes.Equal(vtxTxs[0].Bytes(), txBytes):
+			t.Fatalf("Found unexpected transaction bytes")
 		}
 	}
 

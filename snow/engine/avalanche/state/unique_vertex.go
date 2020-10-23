@@ -171,7 +171,10 @@ func (vtx *uniqueVertex) Reject() error {
 	return vtx.serializer.db.Commit()
 }
 
-func (vtx *uniqueVertex) Status() choices.Status { vtx.shallowRefresh(); return vtx.v.status }
+// TODO: run performance test to see if shallow refreshing
+// (which will mean that refresh must be called in Bytes and Verify)
+// improves performance
+func (vtx *uniqueVertex) Status() choices.Status { vtx.refresh(); return vtx.v.status }
 
 func (vtx *uniqueVertex) Parents() ([]avalanche.Vertex, error) {
 	vtx.refresh()
