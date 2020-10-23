@@ -219,9 +219,6 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 
 		txNode.RecordSuccessfulPoll(dg.currentVote)
 
-		dg.ctx.Log.Verbo("Updated TxID=%v to have consensus state=%s",
-			txIDKey, &txNode.snowball)
-
 		// If the tx should be accepted, then we should defer its acceptance
 		// until its dependencies are decided. If this tx was already marked to
 		// be accepted, we shouldn't register it again.
