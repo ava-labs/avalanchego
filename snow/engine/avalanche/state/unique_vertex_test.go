@@ -187,11 +187,14 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 		if status := vtx.Status(); status != expectedStatus {
 			t.Fatalf("expected status to be %s, but found: %s", expectedStatus, status)
 		}
-		if parents, err := vtx.Parents(); err != nil {
+
+		parents, err := vtx.Parents()
+		switch {
+		case err != nil:
 			t.Fatalf("Fetching vertex parents errored with: %s", err)
-		} else if len(parents) != 1 {
+		case len(parents) != 1:
 			t.Fatalf("Expected vertex to have 1 parent, but found %d", len(parents))
-		} else if !parents[0].ID().Equals(parentID) {
+		case !parents[0].ID().Equals(parentID):
 			t.Fatalf("Found unexpected parentID: %s, expected: %s", parents[0].ID(), parentID)
 		}
 	}
