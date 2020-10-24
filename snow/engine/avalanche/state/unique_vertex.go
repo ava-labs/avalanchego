@@ -47,6 +47,9 @@ func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := innerVertex.Verify(); err != nil {
+		return nil, err
+	}
 	vtx.v.vtx = innerVertex
 
 	// If the vertex has already been fetched,
