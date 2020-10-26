@@ -89,6 +89,9 @@ type VM struct {
 	// Asset ID --> Bit set with fx IDs the asset supports
 	assetToFxCache *cache.LRU
 
+	// Asset ID --> Bit set with fx IDs this asset does not support
+	negativeAssetToFxCache *cache.LRU
+
 	// Transaction issuing
 	timer        *timer.Timer
 	batchTimeout time.Duration
@@ -172,6 +175,7 @@ func (vm *VM) Initialize(
 	}
 	vm.encodingManager = encodingManager
 	vm.assetToFxCache = &cache.LRU{Size: assetToFxCacheSize}
+	vm.negativeAssetToFxCache = &cache.LRU{Size: assetToFxCacheSize}
 
 	vm.pubsub = cjson.NewPubSubServer(ctx)
 	vm.genesisCodec = codec.New(math.MaxUint32, 1<<20)
@@ -710,10 +714,18 @@ func (vm *VM) getFx(val interface{}) (int, error) {
 }
 
 func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
+	// Check cache to see whether this asset supports this fx
 	fxIDsIntf, assetInCache := vm.assetToFxCache.Get(assetID)
 	if assetInCache && fxIDsIntf.(ids.BitSet).Contains(uint(fxID)) {
 		return true
 	}
+	// Check cache to see whether this asset doesn't support this fx
+	fxIDsIntf, assetInNegativeCache := vm.negativeAssetToFxCache.Get(assetID)
+	if assetInNegativeCache && fxIDsIntf.(ids.BitSet).Contains(uint(fxID)) {
+		return false
+	}
+	// Caches don't say whether this asset support this fx.
+	// Get the tx that created the asset and check.
 	tx := &UniqueTx{
 		vm:   vm,
 		txID: assetID,
@@ -723,10 +735,9 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	}
 	createAssetTx, ok := tx.UnsignedTx.(*CreateAssetTx)
 	if !ok {
+		// This transaction was not an asset creation tx
 		return false
 	}
-	// TODO: This could be a binary search to improve performance... Or perhaps
-	// make a map
 	for _, state := range createAssetTx.States {
 		if state.FxID == uint32(fxID) {
 			// Cache that this asset supports this fx
@@ -739,6 +750,13 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 			return true
 		}
 	}
+	// Cache that this asset doesn't support this fx
+	fxIDs := ids.BitSet(0)
+	if assetInNegativeCache {
+		fxIDs = fxIDsIntf.(ids.BitSet)
+	}
+	fxIDs.Add(uint(fxID))
+	vm.negativeAssetToFxCache.Put(assetID, fxIDs)
 	return false
 }
 
