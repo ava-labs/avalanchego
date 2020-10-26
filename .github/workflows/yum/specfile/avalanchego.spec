@@ -17,5 +17,5 @@ Avalanche is an incredibly lightweight protocol, so the minimum computer require
 
 %changelog
 * Mon Oct 26 2020 Charlie Wyse <charlie@avalabs.org>
-- First creationg of package
+- First creation of package
 
