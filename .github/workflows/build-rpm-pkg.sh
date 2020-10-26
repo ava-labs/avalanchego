@@ -25,4 +25,4 @@ fi
 NEW_VERSION_STRING="Version: $VER"
 sed -i "s/Version.*/$NEW_VERSION_STRING/g" yum/specfile/avalanchego.spec
 rpmbuild --bb --buildroot $RPM_BASE_DIR .github/workflows/yum/specfile/avalanchego.spec
-aws s3 cp ~/rpmbuild/RPMS/x86_64/avalanchego-*.rpm s3://$BUCKET/linux/yum
+aws s3 cp ~/rpmbuild/RPMS/x86_64/avalanchego-*.rpm s3://$BUCKET/linux/rpm
