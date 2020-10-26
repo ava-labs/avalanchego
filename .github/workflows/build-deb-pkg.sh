@@ -33,4 +33,4 @@ fi
 NEW_VERSION_STRING="Version: $VER"
 sed -i "s/Version.*/$NEW_VERSION_STRING/g" debian/DEBIAN/control
 dpkg-deb --build debian avalanchego-linux_$TAG.deb
-aws s3 cp avalanchego-linux_$TAG.deb s3://$BUCKET/linux/
+aws s3 cp avalanchego-linux_$TAG.deb s3://$BUCKET/linux/apt/
