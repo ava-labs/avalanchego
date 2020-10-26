@@ -397,7 +397,7 @@ func init() {
 		}
 	}
 
-	Config.WhitelistedSubnets.Add(ids.Empty)
+	Config.WhitelistedSubnets.Add(constants.PrimaryNetworkID)
 	for _, subnet := range strings.Split(*whitelistedSubnets, ",") {
 		if subnet != "" {
 			subnetID, err := ids.FromString(subnet)
