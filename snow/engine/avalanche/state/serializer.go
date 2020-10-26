@@ -102,9 +102,7 @@ func (s *Serializer) BuildVertex(parentSet ids.Set, txs []snowstorm.Tx) (avalanc
 	}
 	// setVertex handles the case where this vertex already exists even
 	// though we just made it
-	uVtx.setVertex(vtx)
-
-	return uVtx, nil
+	return uVtx, uVtx.setVertex(vtx)
 }
 
 // GetVertex implements the avalanche.State interface
