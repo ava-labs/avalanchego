@@ -90,6 +90,9 @@ type Network interface {
 	// must be managed internally to the network. Calling close multiple times
 	// will return a nil error.
 	Close() error
+
+	// Return the IP of the node
+	IP() utils.IPDesc
 }
 
 type network struct {
@@ -728,6 +731,10 @@ func (n *network) Track(ip utils.IPDesc) {
 	defer n.stateLock.Unlock()
 
 	n.track(ip)
+}
+
+func (n *network) IP() utils.IPDesc {
+	return n.ip.IP()
 }
 
 // assumes the stateLock is not held.
