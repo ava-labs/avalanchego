@@ -122,7 +122,10 @@ func (vtx *uniqueVertex) persist() error {
 	if err := vtx.serializer.state.SetVertex(vtx.v.vtx); err != nil {
 		return err
 	}
-	return vtx.serializer.state.SetStatus(vtx.ID(), vtx.v.status)
+	if err := vtx.serializer.state.SetStatus(vtx.ID(), vtx.v.status); err != nil {
+		return err
+	}
+	return vtx.serializer.db.Commit()
 }
 
 func (vtx *uniqueVertex) setStatus(status choices.Status) error {
