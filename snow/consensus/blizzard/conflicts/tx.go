@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package blizzard
+package conflicts
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
@@ -26,18 +26,4 @@ type Tx interface {
 	// In the context of a UTXO-based payments system, for example, this would
 	// be the IDs of the UTXOs consumed by this transaction
 	InputIDs() ids.Set
-
-	// Verify that the state transition this transaction would make if it were
-	// accepted is valid. If the state transition is invalid, a non-nil error
-	// should be returned.
-	//
-	// It is guaranteed that when Verify is called, all the dependencies of
-	// this transaction have already been successfully verified.
-	Verify() error
-
-	// Bytes returns the binary representation of this transaction.
-	//
-	// This is used for sending transactions to peers. Another node should be
-	// able to parse these bytes to the same transaction.
-	Bytes() []byte
 }
