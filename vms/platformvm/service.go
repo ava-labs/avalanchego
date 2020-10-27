@@ -1936,7 +1936,7 @@ type GetTxStatusResponse struct {
 	includeReason bool
 	Status        `json:",omitempty"`
 	// Reason this tx was dropped.
-	// Only non-nil if Status
+	// Only non-empty if Status is dropped
 	Reason string `json:"reason"`
 }
 
