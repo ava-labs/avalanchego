@@ -190,12 +190,15 @@ func TestGetTxStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	arg := &GetTxStatusArgs{TxID: tx.ID()}
-	var status Status
-	if err := service.GetTxStatus(nil, arg, &status); err != nil {
+
+	arg := &api.JSONTxID{TxID: tx.ID()}
+	var resp GetTxStatusResponse
+	if err := service.GetTxStatus(nil, arg, &resp); err != nil {
 		t.Fatal(err)
-	} else if status != Unknown {
-		t.Fatalf("status should be unknown but is %s", status)
+	} else if resp.Status != Unknown {
+		t.Fatalf("status should be unknown but is %s", resp.Status)
+	} else if resp.Reason != nil {
+		t.Fatalf("reason should be nil but is %s", *resp.Reason)
 		// put the chain in existing chain list
 	} else if err := service.vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
@@ -203,10 +206,15 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	} else if _, err := service.vm.BuildBlock(); err == nil {
 		t.Fatal("should have errored because chain already exists")
-	} else if err := service.GetTxStatus(nil, arg, &status); err != nil {
+	}
+
+	resp = GetTxStatusResponse{} // reset
+	if err := service.GetTxStatus(nil, arg, &resp); err != nil {
 		t.Fatal(err)
-	} else if status != Dropped {
-		t.Fatalf("status should be Dropped but is %s", status)
+	} else if resp.Status != Dropped {
+		t.Fatalf("status should be Dropped but is %s", resp.Status)
+	} else if resp.Reason == nil {
+		t.Fatalf("reason should not be empty but is")
 		// remove the chain from existing chain list
 	} else if err := service.vm.putChains(service.vm.DB, []*Tx{}); err != nil {
 		t.Fatal(err)
@@ -220,10 +228,17 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
-	} else if err := service.GetTxStatus(nil, arg, &status); err != nil {
+	}
+
+	resp = GetTxStatusResponse{} // reset
+	err = service.GetTxStatus(nil, arg, &resp)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if status != Committed {
-		t.Fatalf("status should be Committed but is %s", status)
+	case resp.Status != Committed:
+		t.Fatalf("status should be Committed but is %s", resp.Status)
+	case resp.Reason != nil:
+		t.Fatalf("reason should be nil but is %s", *resp.Reason)
 	}
 }
 

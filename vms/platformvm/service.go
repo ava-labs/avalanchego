@@ -1908,17 +1908,20 @@ func (service *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *ap
 	return nil
 }
 
-// GetTxStatusArgs ...
-type GetTxStatusArgs struct {
-	TxID ids.ID `json:"txID"`
+// GetTxStatusResponse ...
+type GetTxStatusResponse struct {
+	Status `json:"status"`
+	// Reason this tx was dropped.
+	// Only non-nil if Status
+	Reason *string `json:"reason,omitempty"`
 }
 
 // GetTxStatus gets a tx's status
-func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *Status) error {
+func (service *Service) GetTxStatus(_ *http.Request, args *api.JSONTxID, response *GetTxStatusResponse) error {
 	service.vm.Ctx.Log.Info("Platform: GetTxStatus called")
 	status, err := service.vm.getStatus(service.vm.DB, args.TxID)
 	if err == nil { // Found the status. Report it.
-		*response = status
+		response.Status = status
 		return nil
 	}
 	// The status of this transaction is not in the database.
@@ -1926,19 +1929,25 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 	preferred, err := service.vm.getBlock(service.vm.Preferred())
 	if err != nil {
 		service.vm.Ctx.Log.Error("couldn't get preferred block: %s", err)
-		*response = Unknown
+		response.Status = Unknown
 		return nil
 	}
 	if block, ok := preferred.(decision); ok {
 		if _, err := service.vm.getStatus(block.onAccept(), args.TxID); err == nil {
-			*response = Processing // Found the status in the preferred block's db. Report tx is processing.
+			response.Status = Processing // Found the status in the preferred block's db. Report tx is processing.
 			return nil
 		}
 	}
-	if _, ok := service.vm.droppedTxCache.Get(args.TxID); ok {
-		*response = Dropped
+	if reason, ok := service.vm.droppedTxCache.Get(args.TxID); ok {
+		response.Status = Dropped
+		reasonStr, ok := reason.(string)
+		if !ok {
+			service.vm.Ctx.Log.Warn("reason should be a string")
+			return nil
+		}
+		response.Reason = &reasonStr
 	} else {
-		*response = Unknown
+		response.Status = Unknown
 	}
 	return nil
 }
