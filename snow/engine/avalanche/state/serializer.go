@@ -7,6 +7,7 @@ package state
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
@@ -67,6 +68,10 @@ func (s *Serializer) ParseVertex(b []byte) (avalanche.Vertex, error) {
 func (s *Serializer) BuildVertex(parentSet ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
 	if len(txs) == 0 {
 		return nil, errNoTxs
+	} else if l := len(txs); l > maxTxsPerVtx {
+		return nil, fmt.Errorf("number of txs (%d) exceeds max (%d)", l, maxTxsPerVtx)
+	} else if l := parentSet.Len(); l > maxNumParents {
+		return nil, fmt.Errorf("number of parents (%d) exceeds max (%d)", l, maxNumParents)
 	}
 
 	parentIDs := parentSet.List()

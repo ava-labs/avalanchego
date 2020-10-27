@@ -189,3 +189,16 @@ func (service *Info) GetTxFee(_ *http.Request, args *struct{}, reply *GetTxFeeRe
 	reply.TxFee = json.Uint64(service.txFee)
 	return nil
 }
+
+// GetNodeIPReply are the results from calling GetNodeVersion
+type GetNodeIPReply struct {
+	IP string `json:"ip"`
+}
+
+// GetNodeVersion returns the version this node is running
+func (service *Info) GetNodeIP(_ *http.Request, _ *struct{}, reply *GetNodeIPReply) error {
+	service.log.Info("Info: GetNodeIP called")
+
+	reply.IP = service.networking.IP().String()
+	return nil
+}
