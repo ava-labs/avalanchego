@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	stdjson "encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -1908,17 +1909,51 @@ func (service *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *ap
 	return nil
 }
 
+// GetTxStatusArgs ...
+type GetTxStatusArgs struct {
+	TxID ids.ID `json:"txID"`
+	// If IncludeReason is false returns a response that looks like:
+	// {
+	// 	"jsonrpc": "2.0",
+	// 	"result": "Dropped",
+	// 	"id": 1
+	// }
+	// If IncludeReason is true returns a response that looks like this:
+	// {
+	// 	"jsonrpc": "2.0",
+	// 	"result": {
+	//     "status":"[Status]",
+	//     "reason":"[Reason tx was dropped, if applicable]"
+	//  },
+	// 	"id": 1
+	// }
+	// In the latter, "reason" is only present if the status is dropped
+	IncludeReason bool `json:"includeReason"`
+}
+
 // GetTxStatusResponse ...
 type GetTxStatusResponse struct {
-	Status Status `json:"status"`
+	includeReason bool
+	Status        `json:",omitempty"`
 	// Reason this tx was dropped.
 	// Only non-nil if Status
-	Reason *string `json:"reason,omitempty"`
+	Reason string `json:"reason"`
+}
+
+func (r GetTxStatusResponse) MarshalJSON() ([]byte, error) {
+	if !r.includeReason {
+		return stdjson.Marshal(r.Status)
+	}
+	if r.Reason != "" {
+		return []byte(fmt.Sprintf("{\"status\": \"%s\", \"reason\": \"%s\"}", r.Status, r.Reason)), nil
+	}
+	return []byte(fmt.Sprintf("{\"status\": \"%s\"}", r.Status)), nil
 }
 
 // GetTxStatus gets a tx's status
-func (service *Service) GetTxStatus(_ *http.Request, args *api.JSONTxID, response *GetTxStatusResponse) error {
+func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *GetTxStatusResponse) error {
 	service.vm.Ctx.Log.Info("Platform: GetTxStatus called")
+	response.includeReason = args.IncludeReason
 	status, err := service.vm.getStatus(service.vm.DB, args.TxID)
 	if err == nil { // Found the status. Report it.
 		response.Status = status
@@ -1934,7 +1969,9 @@ func (service *Service) GetTxStatus(_ *http.Request, args *api.JSONTxID, respons
 	}
 	if block, ok := preferred.(decision); ok {
 		if _, err := service.vm.getStatus(block.onAccept(), args.TxID); err == nil {
-			response.Status = Processing // Found the status in the preferred block's db. Report tx is processing.
+			// Found the status in the preferred block's db. Report tx is processing.
+			status := Processing
+			response.Status = status
 			return nil
 		}
 	}
@@ -1942,10 +1979,10 @@ func (service *Service) GetTxStatus(_ *http.Request, args *api.JSONTxID, respons
 		response.Status = Dropped
 		reasonStr, ok := reason.(string)
 		if !ok {
-			service.vm.Ctx.Log.Warn("reason should be a string")
+			service.vm.Ctx.Log.Error("reason should be a string")
 			return nil
 		}
-		response.Reason = &reasonStr
+		response.Reason = reasonStr
 	} else {
 		response.Status = Unknown
 	}

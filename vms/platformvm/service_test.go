@@ -191,14 +191,14 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	arg := &api.JSONTxID{TxID: tx.ID()}
+	arg := &GetTxStatusArgs{TxID: tx.ID()}
 	var resp GetTxStatusResponse
 	if err := service.GetTxStatus(nil, arg, &resp); err != nil {
 		t.Fatal(err)
 	} else if resp.Status != Unknown {
 		t.Fatalf("status should be unknown but is %s", resp.Status)
-	} else if resp.Reason != nil {
-		t.Fatalf("reason should be nil but is %s", *resp.Reason)
+	} else if resp.Reason != "" {
+		t.Fatalf("reason should be empty but is %s", resp.Reason)
 		// put the chain in existing chain list
 	} else if err := service.vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
@@ -209,14 +209,30 @@ func TestGetTxStatus(t *testing.T) {
 	}
 
 	resp = GetTxStatusResponse{} // reset
-	if err := service.GetTxStatus(nil, arg, &resp); err != nil {
+	err = service.GetTxStatus(nil, arg, &resp)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if resp.Status != Dropped {
+	case resp.Status != Dropped:
 		t.Fatalf("status should be Dropped but is %s", resp.Status)
-	} else if resp.Reason == nil {
-		t.Fatalf("reason should not be empty but is")
-		// remove the chain from existing chain list
-	} else if err := service.vm.putChains(service.vm.DB, []*Tx{}); err != nil {
+	case resp.Reason == "":
+		t.Fatal("reason shouldn't be empty")
+	}
+
+	resp = GetTxStatusResponse{} // reset
+	argIncludeReason := &GetTxStatusArgs{TxID: tx.ID(), IncludeReason: true}
+	err = service.GetTxStatus(nil, argIncludeReason, &resp)
+	switch {
+	case err != nil:
+		t.Fatal(err)
+	case resp.Status != Dropped:
+		t.Fatalf("status should be Dropped but is %s", resp.Status)
+	case resp.Reason == "":
+		t.Fatalf("reason shouldn't be empty")
+	}
+
+	// remove the chain from existing chain list
+	if err := service.vm.putChains(service.vm.DB, []*Tx{}); err != nil {
 		t.Fatal(err)
 	} else if err := service.vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
@@ -237,8 +253,8 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	case resp.Status != Committed:
 		t.Fatalf("status should be Committed but is %s", resp.Status)
-	case resp.Reason != nil:
-		t.Fatalf("reason should be nil but is %s", *resp.Reason)
+	case resp.Reason != "":
+		t.Fatalf("reason should be empty but is %s", resp.Reason)
 	}
 }
 
