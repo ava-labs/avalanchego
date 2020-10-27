@@ -1910,7 +1910,7 @@ func (service *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *ap
 
 // GetTxStatusResponse ...
 type GetTxStatusResponse struct {
-	Status `json:"status"`
+	Status Status `json:"status"`
 	// Reason this tx was dropped.
 	// Only non-nil if Status
 	Reason *string `json:"reason,omitempty"`
