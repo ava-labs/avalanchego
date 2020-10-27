@@ -94,9 +94,11 @@ func (s *Socket) Send(msg []byte) error {
 
 	// Get a copy of connections
 	s.connLock.RLock()
-	conns := make([]net.Conn, 0, len(s.conns))
-	for c := range s.conns {
-		conns = append(conns, c)
+	conns := make([]net.Conn, len(s.conns))
+	i := 0
+	for conn := range s.conns {
+		conns[i] = conn
+		i++
 	}
 	s.connLock.RUnlock()
 

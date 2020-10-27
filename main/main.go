@@ -132,6 +132,8 @@ func main() {
 	)
 	defer externalIPUpdater.Stop()
 
+	log.Info("IP: %s", Config.StakingIP.IP())
+
 	Config.ServiceControl = &systemShutdown{}
 
 	for {

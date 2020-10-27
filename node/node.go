@@ -534,6 +534,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		CriticalChains:          criticalChains,
 		TimeoutManager:          &timeoutManager,
 		HealthService:           n.healthService,
+		WhitelistedSubnets:      n.Config.WhitelistedSubnets,
 	})
 
 	vdrs := n.vdrs

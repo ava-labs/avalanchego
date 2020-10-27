@@ -90,6 +90,9 @@ type Network interface {
 	// must be managed internally to the network. Calling close multiple times
 	// will return a nil error.
 	Close() error
+
+	// Return the IP of the node
+	IP() utils.IPDesc
 }
 
 type network struct {
@@ -748,9 +751,11 @@ func (n *network) close() {
 	}
 	n.closed.SetValue(true)
 
-	peersToClose := make([]*peer, 0, len(n.peers))
+	peersToClose := make([]*peer, len(n.peers))
+	i := 0
 	for _, peer := range n.peers {
-		peersToClose = append(peersToClose, peer)
+		peersToClose[i] = peer
+		i++
 	}
 	n.peers = make(map[[20]byte]*peer)
 	n.stateLock.Unlock()
@@ -767,6 +772,10 @@ func (n *network) Track(ip utils.IPDesc) {
 	defer n.stateLock.Unlock()
 
 	n.track(ip)
+}
+
+func (n *network) IP() utils.IPDesc {
+	return n.ip.IP()
 }
 
 // assumes the stateLock is not held.
@@ -1186,9 +1195,11 @@ func (n *network) getAllPeers() []*peer {
 		return nil
 	}
 
-	peers := make([]*peer, 0, len(n.peers))
+	peers := make([]*peer, len(n.peers))
+	i := 0
 	for _, peer := range n.peers {
-		peers = append(peers, peer)
+		peers[i] = peer
+		i++
 	}
 	return peers
 }
