@@ -28,7 +28,7 @@ cd $PKG_ROOT
 echo "Tag: $TAG"
 VER=$TAG
 if [[ $TAG =~ ^v ]]; then
-  VER=$(echo $TAG | cut -d'v' -f 2)
+  VER=$(echo $TAG | tr -d 'v')
 fi
 NEW_VERSION_STRING="Version: $VER"
 sed -i "s/Version.*/$NEW_VERSION_STRING/g" debian/DEBIAN/control
