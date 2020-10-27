@@ -17,7 +17,7 @@ if [[ $OK -ne 0 ]]; then
 fi
 
 echo "Build rpm package..."
-VER=$(echo $TAG | tr -d 'v' | sed "s/-/./")
+VER=$(echo $TAG | tr -d 'v' | sed "s/-/_/")
 echo "Tag: $VER"
 rpmbuild --bb --define "version $VER" --buildroot $RPM_BASE_DIR .github/workflows/yum/specfile/avalanchego.spec
 aws s3 cp ~/rpmbuild/RPMS/x86_64/avalanchego-*.rpm s3://$BUCKET/linux/rpm
