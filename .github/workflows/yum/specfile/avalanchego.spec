@@ -1,7 +1,7 @@
 %define _build_id_links none
 
 Name:           avalanchego
-Version:        0.1.0
+Version:        %{version}
 Release:        1%{?dist}
 Summary:        The Avalanche platform binaries
 URL:            https://github.com/ava-labs/%{name}

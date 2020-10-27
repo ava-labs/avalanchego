@@ -18,11 +18,5 @@ fi
 
 echo "Build rpm package..."
 echo "Tag: $TAG"
-VER=$TAG
-if [[ $TAG =~ ^v ]]; then
-  VER=$(echo $TAG | cut -d'v' -f 2)
-fi
-NEW_VERSION_STRING="Version: $VER"
-sed -i "s/Version.*/$NEW_VERSION_STRING/g" yum/specfile/avalanchego.spec
-rpmbuild --bb --buildroot $RPM_BASE_DIR .github/workflows/yum/specfile/avalanchego.spec
+rpmbuild --bb --define "version $TAG" --buildroot $RPM_BASE_DIR .github/workflows/yum/specfile/avalanchego.spec
 aws s3 cp ~/rpmbuild/RPMS/x86_64/avalanchego-*.rpm s3://$BUCKET/linux/rpm
