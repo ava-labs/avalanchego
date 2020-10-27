@@ -6,6 +6,7 @@ Release:        1%{?dist}
 Summary:        The Avalanche platform binaries
 URL:            https://github.com/ava-labs/%{name}
 License:        BSD-3
+AutoReqProv:    no
 
 %description
 Avalanche is an incredibly lightweight protocol, so the minimum computer requirements are quite modest.
