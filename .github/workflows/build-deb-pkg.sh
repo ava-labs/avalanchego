@@ -28,9 +28,9 @@ cd $PKG_ROOT
 echo "Tag: $TAG"
 VER=$TAG
 if [[ $TAG =~ ^v ]]; then
-  VER=$(echo $TAG | cut -d'v' -f 2)
+  VER=$(echo $TAG | tr -d 'v')
 fi
 NEW_VERSION_STRING="Version: $VER"
 sed -i "s/Version.*/$NEW_VERSION_STRING/g" debian/DEBIAN/control
 dpkg-deb --build debian avalanchego-linux_$TAG.deb
-aws s3 cp avalanchego-linux_$TAG.deb s3://$BUCKET/linux/
+aws s3 cp avalanchego-linux_$TAG.deb s3://$BUCKET/linux/deb/
