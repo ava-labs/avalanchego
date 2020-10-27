@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package rpcchainvm
+package evm
 
 import (
 	"errors"
@@ -10,13 +10,20 @@ import (
 	"log"
 	"os/exec"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 )
 
 var (
 	errWrongVM = errors.New("wrong vm type")
+)
+
+var (
+	// ID that this VM uses when labeled
+	ID = ids.NewID([32]byte{'e', 'v', 'm'})
 )
 
 // Factory ...
@@ -31,8 +38,8 @@ func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 	// because the command is a controlled and required input
 	// #nosec G204
 	config := &plugin.ClientConfig{
-		HandshakeConfig: Handshake,
-		Plugins:         PluginMap,
+		HandshakeConfig: rpcchainvm.Handshake,
+		Plugins:         rpcchainvm.PluginMap,
 		Cmd:             exec.Command(f.Path, fmt.Sprintf("--config=%s", f.Config)),
 		AllowedProtocols: []plugin.Protocol{
 			plugin.ProtocolNetRPC,
@@ -67,7 +74,7 @@ func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 		return nil, err
 	}
 
-	vm, ok := raw.(*VMClient)
+	vm, ok := raw.(*rpcchainvm.VMClient)
 	if !ok {
 		client.Kill()
 		return nil, errWrongVM
