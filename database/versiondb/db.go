@@ -129,9 +129,9 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 		}
 	}
 	sort.Strings(keys) // Keys need to be in sorted order
-	values := make([]valueDelete, 0, len(keys))
-	for _, key := range keys {
-		values = append(values, db.mem[key])
+	values := make([]valueDelete, len(keys))
+	for i, key := range keys {
+		values[i] = db.mem[key]
 	}
 
 	return &iterator{
