@@ -2,7 +2,7 @@
 
 Name:           avalanchego
 Version:        %{version}
-Release:        1%{?dist}
+Release:        %{release}
 Summary:        The Avalanche platform binaries
 URL:            https://github.com/ava-labs/%{name}
 License:        BSD-3
