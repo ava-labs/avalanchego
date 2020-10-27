@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -231,6 +232,10 @@ func (vm *VM) Initialize(
 	toEngine chan<- commonEng.Message,
 	fxs []*commonEng.Fx,
 ) error {
+	if vm.CLIConfig.ParsingError != nil {
+		return vm.CLIConfig.ParsingError
+	}
+
 	if len(fxs) > 0 {
 		return errUnsupportedFXs
 	}
@@ -514,17 +519,19 @@ func newHandler(name string, service interface{}, lockOption ...commonEng.LockOp
 // CreateHandlers makes new http handlers that can handle API calls
 func (vm *VM) CreateHandlers() map[string]*commonEng.HTTPHandler {
 	handler := vm.chain.NewRPCHandler()
+	enabledAPIs := vm.CLIConfig.EthAPIs()
 	vm.chain.AttachEthService(handler, vm.CLIConfig.EthAPIs())
 
 	if vm.CLIConfig.SnowmanAPIEnabled {
 		handler.RegisterName("snowman", &SnowmanAPI{vm})
-	}
-	if vm.CLIConfig.Web3APIEnabled {
-		handler.RegisterName("web3", &Web3API{})
+		enabledAPIs = append(enabledAPIs, "snowman")
 	}
 	if vm.CLIConfig.CorethAdminAPIEnabled {
 		handler.RegisterName("admin", &admin.Performance{})
+		enabledAPIs = append(enabledAPIs, "coreth-admin")
 	}
+
+	log.Info(fmt.Sprintf("Enabled APIs: %s", strings.Join(enabledAPIs, ", ")))
 
 	return map[string]*commonEng.HTTPHandler{
 		"/rpc":  {LockOptions: commonEng.NoLock, Handler: handler},
