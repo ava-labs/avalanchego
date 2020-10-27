@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -38,15 +37,6 @@ type SnowmanAPI struct{ vm *VM }
 
 // AvaxAPI offers Avalanche network related API methods
 type AvaxAPI struct{ vm *VM }
-
-// Web3API offers helper API methods
-type Web3API struct{}
-
-// ClientVersion returns the version of the vm running
-func (s *Web3API) ClientVersion() string { return version }
-
-// Sha3 returns the bytes returned by hashing [input] with Keccak256
-func (s *Web3API) Sha3(input hexutil.Bytes) hexutil.Bytes { return ethcrypto.Keccak256(input) }
 
 // GetAcceptedFrontReply defines the reply that will be sent from the
 // GetAcceptedFront API call
@@ -70,6 +60,9 @@ func (api *SnowmanAPI) IssueBlock(ctx context.Context) error {
 
 	return api.vm.tryBlockGen()
 }
+
+// ClientVersion returns the version of the vm running
+func (service *AvaxAPI) ClientVersion() string { return version }
 
 // ExportKeyArgs are arguments for ExportKey
 type ExportKeyArgs struct {
