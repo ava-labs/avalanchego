@@ -126,7 +126,7 @@ func init() {
 	// how often to update the dynamic IP and PnP/NAT-PMP IP and routing.
 	fs.DurationVar(&Config.DynamicUpdateDuration, "dynamic-update-duration", 5*time.Minute, "Dynamic IP and NAT Traversal update duration")
 
-	dynamicPublicIPResolver := fs.String("dynamic-public-ip", "", "'ifconfig' or 'opendns'. By default does not do dynamic public IP updates. If non-empty, ignores public-ip argument.")
+	dynamicPublicIPResolver := fs.String("dynamic-public-ip", "", "'ifconfigco' (alias 'ifconfig') or 'opendns' or 'ifconfigme'. By default does not do dynamic public IP updates. If non-empty, ignores public-ip argument.")
 
 	// Incoming connection throttling
 	// After we receive [conn-meter-max-attempts] incoming connections from a given IP
