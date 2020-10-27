@@ -154,6 +154,8 @@ func init() {
 type VM struct {
 	ctx *snow.Context
 
+	CLIConfig CommandLineConfig
+
 	chainID          *big.Int
 	networkID        uint64
 	genesisHash      common.Hash
@@ -259,8 +261,8 @@ func (vm *VM) Initialize(
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
 	config.Miner.GasPrice = params.MinGasPrice
-	config.RPCGasCap = 2500000000 // 25000000 x 100
-	config.RPCTxFeeCap = 100      // 100 AVAX
+	config.RPCGasCap = vm.CLIConfig.RPCGasCap
+	config.RPCTxFeeCap = vm.CLIConfig.RPCTxFeeCap
 	config.GPO.Default = params.MinGasPrice
 	config.TxPool.PriceLimit = params.MinGasPrice.Uint64()
 	config.TxPool.NoLocals = true
@@ -512,12 +514,17 @@ func newHandler(name string, service interface{}, lockOption ...commonEng.LockOp
 // CreateHandlers makes new http handlers that can handle API calls
 func (vm *VM) CreateHandlers() map[string]*commonEng.HTTPHandler {
 	handler := vm.chain.NewRPCHandler()
-	vm.chain.AttachEthService(handler, []string{"eth", "personal", "txpool"})
-	handler.RegisterName("net", &NetAPI{vm})
-	handler.RegisterName("snowman", &SnowmanAPI{vm})
-	handler.RegisterName("web3", &Web3API{})
-	handler.RegisterName("debug", &DebugAPI{vm})
-	handler.RegisterName("admin", &admin.Performance{})
+	vm.chain.AttachEthService(handler, vm.CLIConfig.EthAPIs())
+
+	if vm.CLIConfig.SnowmanAPIEnabled {
+		handler.RegisterName("snowman", &SnowmanAPI{vm})
+	}
+	if vm.CLIConfig.Web3APIEnabled {
+		handler.RegisterName("web3", &Web3API{})
+	}
+	if vm.CLIConfig.CorethAdminAPIEnabled {
+		handler.RegisterName("admin", &admin.Performance{})
+	}
 
 	return map[string]*commonEng.HTTPHandler{
 		"/rpc":  {LockOptions: commonEng.NoLock, Handler: handler},
