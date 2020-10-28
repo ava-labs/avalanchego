@@ -86,7 +86,7 @@ func (dg *Directed) IsVirtuous(tx Tx) bool {
 
 // Conflicts implements the Consensus interface
 func (dg *Directed) Conflicts(tx Tx) ids.Set {
-	var conflicts ids.Set = nil
+	var conflicts ids.Set
 	if node, exists := dg.txs[tx.ID().Key()]; exists {
 		// If the tx is currently processing, the conflicting txs are just the
 		// union of the inbound conflicts and the outbound conflicts.
@@ -208,7 +208,6 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 	// Get the set of IDs that meet this alpha threshold
 	metThreshold := votes.Threshold()
 	for txIDKey := range metThreshold {
-
 		// Get the node this tx represents
 		txNode, exist := dg.txs[txIDKey]
 		if !exist {

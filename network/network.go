@@ -360,9 +360,8 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 			err)
 		for validatorIDKey := range validatorIDs {
 			validatorID := ids.NewShortID(validatorIDKey)
-			vID := validatorID
 			n.executor.Add(func() {
-				n.router.GetAcceptedFailed(vID, chainID, requestID)
+				n.router.GetAcceptedFailed(validatorID, chainID, requestID)
 			})
 		}
 		return
@@ -517,9 +516,8 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			err,
 			len(container))
 		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
-		for _, validatorID := range validatorIDs.List() {
-			vID := validatorID
-			n.executor.Add(func() { n.router.QueryFailed(vID, chainID, requestID) })
+		for validatorIDKey := range validatorIDs {
+			n.executor.Add(func() { n.router.QueryFailed(ids.NewShortID(validatorIDKey), chainID, requestID) })
 		}
 		return // Packing message failed
 	}

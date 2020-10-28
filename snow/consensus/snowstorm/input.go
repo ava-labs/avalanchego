@@ -103,7 +103,7 @@ func (ig *Input) IsVirtuous(tx Tx) bool {
 
 // Conflicts implements the ConflictGraph interface
 func (ig *Input) Conflicts(tx Tx) ids.Set {
-	var conflicts ids.Set = nil
+	var conflicts ids.Set
 	// The conflicting txs are the union of all the txs that spend an input that
 	// this tx spends.
 	for _, utxoID := range tx.InputIDs() {

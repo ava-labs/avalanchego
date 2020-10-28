@@ -53,7 +53,8 @@ func (m Builder) AcceptedFrontier(chainID ids.ID, requestID uint32, containerIDs
 	containerIDBytes := make([][]byte, containerIDs.Len())
 	i := 0
 	for containerID := range containerIDs {
-		containerIDBytes[i] = containerID[:]
+		copied := containerID
+		containerIDBytes[i] = copied[:]
 		i++
 	}
 	return m.Pack(AcceptedFrontier, map[Field]interface{}{
@@ -68,7 +69,9 @@ func (m Builder) GetAccepted(chainID ids.ID, requestID uint32, deadline uint64, 
 	containerIDBytes := make([][]byte, containerIDs.Len())
 	i := 0
 	for containerID := range containerIDs {
-		containerIDBytes[i] = containerID[:]
+		copied := containerID
+		containerIDBytes[i] = copied[:]
+		i++
 	}
 	return m.Pack(GetAccepted, map[Field]interface{}{
 		ChainID:      chainID.Bytes(),
@@ -83,7 +86,9 @@ func (m Builder) Accepted(chainID ids.ID, requestID uint32, containerIDs ids.Set
 	containerIDBytes := make([][]byte, containerIDs.Len())
 	i := 0
 	for containerID := range containerIDs {
-		containerIDBytes[i] = containerID[:]
+		copied := containerID
+		containerIDBytes[i] = copied[:]
+		i++
 	}
 	return m.Pack(Accepted, map[Field]interface{}{
 		ChainID:      chainID.Bytes(),
