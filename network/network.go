@@ -518,7 +518,7 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
 		for validatorIDKey := range validatorIDs {
 			vID := ids.NewShortID(validatorIDKey)
-			n.executor.Add(func() { n.router.QueryFailed(vid, chainID, requestID) })
+			n.executor.Add(func() { n.router.QueryFailed(vID, chainID, requestID) })
 		}
 		return // Packing message failed
 	}
