@@ -220,6 +220,9 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Subnet Whitelist
 	fs.String(whitelistedSubnetsKey, "", "Whitelist of subnets to validate.")
 
+	// Coreth Config
+	fs.String(corethConfigKey, defaultString, "Specifies config to pass into coreth")
+
 	return fs
 }
 
@@ -630,11 +633,15 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.EnableCrypto = v.GetBool(signatureVerificationEnabledKey)
 
 	// Coreth Plugin
-	corethConfig, err := json.Marshal(v.Get(corethConfigKey))
-	if err != nil {
-		return fmt.Errorf("couldn't parse coreth config: %w", err)
+	corethConfigString := v.GetString(corethConfigKey)
+	if corethConfigString != defaultString {
+		corethConfigBytes, err := json.Marshal(v.Get(corethConfigKey))
+		if err != nil {
+			return fmt.Errorf("couldn't parse coreth config: %w", err)
+		}
+		corethConfigString = string(corethConfigBytes)
 	}
-	Config.CorethConfig = string(corethConfig)
+	Config.CorethConfig = corethConfigString
 
 	return nil
 }
