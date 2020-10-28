@@ -635,11 +635,17 @@ func setNodeConfig(v *viper.Viper) error {
 	// Coreth Plugin
 	corethConfigString := v.GetString(corethConfigKey)
 	if corethConfigString != defaultString {
-		corethConfigBytes, err := json.Marshal(v.Get(corethConfigKey))
-		if err != nil {
-			return fmt.Errorf("couldn't parse coreth config: %w", err)
+		corethConfigValue := v.Get(corethConfigKey)
+		switch value := corethConfigValue.(type) {
+		case string:
+			corethConfigString = value
+		default:
+			corethConfigBytes, err := json.Marshal(value)
+			if err != nil {
+				return fmt.Errorf("couldn't parse coreth config: %w", err)
+			}
+			corethConfigString = string(corethConfigBytes)
 		}
-		corethConfigString = string(corethConfigBytes)
 	}
 	Config.CorethConfig = corethConfigString
 
