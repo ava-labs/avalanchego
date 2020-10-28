@@ -162,7 +162,8 @@ func (m Builder) Chits(chainID ids.ID, requestID uint32, containerIDs ids.Set) (
 	containerIDBytes := make([][]byte, containerIDs.Len())
 	i := 0
 	for containerID := range containerIDs {
-		containerIDBytes[i] = containerID[:]
+		copied := containerID
+		containerIDBytes[i] = copied[:]
 		i++
 	}
 	return m.Pack(Chits, map[Field]interface{}{
