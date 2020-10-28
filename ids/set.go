@@ -54,8 +54,8 @@ func (ids *Set) Overlaps(big Set) bool {
 		big = *ids
 	}
 
-	for _, id := range small.List() {
-		if big.Contains(id) {
+	for id := range small {
+		if _, ok := big[id]; ok {
 			return true
 		}
 	}

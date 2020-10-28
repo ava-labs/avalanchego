@@ -51,8 +51,11 @@ func (m Builder) GetAcceptedFrontier(chainID ids.ID, requestID uint32, deadline 
 // AcceptedFrontier message
 func (m Builder) AcceptedFrontier(chainID ids.ID, requestID uint32, containerIDs ids.Set) (Msg, error) {
 	containerIDBytes := make([][]byte, containerIDs.Len())
-	for i, containerID := range containerIDs.List() {
-		containerIDBytes[i] = containerID.Bytes()
+	i := 0
+	for containerID := range containerIDs {
+		copied := containerID
+		containerIDBytes[i] = copied[:]
+		i++
 	}
 	return m.Pack(AcceptedFrontier, map[Field]interface{}{
 		ChainID:      chainID.Bytes(),
@@ -64,8 +67,11 @@ func (m Builder) AcceptedFrontier(chainID ids.ID, requestID uint32, containerIDs
 // GetAccepted message
 func (m Builder) GetAccepted(chainID ids.ID, requestID uint32, deadline uint64, containerIDs ids.Set) (Msg, error) {
 	containerIDBytes := make([][]byte, containerIDs.Len())
-	for i, containerID := range containerIDs.List() {
-		containerIDBytes[i] = containerID.Bytes()
+	i := 0
+	for containerID := range containerIDs {
+		copied := containerID
+		containerIDBytes[i] = copied[:]
+		i++
 	}
 	return m.Pack(GetAccepted, map[Field]interface{}{
 		ChainID:      chainID.Bytes(),
@@ -78,8 +84,11 @@ func (m Builder) GetAccepted(chainID ids.ID, requestID uint32, deadline uint64, 
 // Accepted message
 func (m Builder) Accepted(chainID ids.ID, requestID uint32, containerIDs ids.Set) (Msg, error) {
 	containerIDBytes := make([][]byte, containerIDs.Len())
-	for i, containerID := range containerIDs.List() {
-		containerIDBytes[i] = containerID.Bytes()
+	i := 0
+	for containerID := range containerIDs {
+		copied := containerID
+		containerIDBytes[i] = copied[:]
+		i++
 	}
 	return m.Pack(Accepted, map[Field]interface{}{
 		ChainID:      chainID.Bytes(),
@@ -151,8 +160,11 @@ func (m Builder) PullQuery(chainID ids.ID, requestID uint32, deadline uint64, co
 // Chits message
 func (m Builder) Chits(chainID ids.ID, requestID uint32, containerIDs ids.Set) (Msg, error) {
 	containerIDBytes := make([][]byte, containerIDs.Len())
-	for i, containerID := range containerIDs.List() {
-		containerIDBytes[i] = containerID.Bytes()
+	i := 0
+	for containerID := range containerIDs {
+		copied := containerID
+		containerIDBytes[i] = copied[:]
+		i++
 	}
 	return m.Pack(Chits, map[Field]interface{}{
 		ChainID:      chainID.Bytes(),

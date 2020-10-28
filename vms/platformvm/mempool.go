@@ -278,12 +278,17 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		tx := m.unissuedProposalTxs.Remove()
 		m.unissuedTxIDs.Remove(tx.ID())
 		utx := tx.UnsignedTx.(TimedTx)
-		if syncTime.After(utx.StartTime()) {
+		startTime := utx.StartTime()
+		if syncTime.After(startTime) {
 			txID := tx.ID()
 			m.unissuedTxIDs.Remove(txID)
-			m.vm.droppedTxCache.Put(txID, nil) // cache tx as dropped
-
-			m.vm.Ctx.Log.Debug("dropping tx to add validator because start time too late")
+			errMsg := fmt.Sprintf(
+				"synchrony bound (%s) is later than staker start time (%s)",
+				syncTime,
+				startTime,
+			)
+			m.vm.droppedTxCache.Put(txID, errMsg) // cache tx as dropped
+			m.vm.Ctx.Log.Debug("dropping tx %s: %s", txID, errMsg)
 			continue
 		}
 
@@ -367,18 +372,24 @@ func (m *Mempool) ResetTimer() {
 
 	syncTime := localTime.Add(syncBound)
 	for m.unissuedProposalTxs.Len() > 0 {
-		if !syncTime.After(m.unissuedProposalTxs.Peek().UnsignedTx.(TimedTx).StartTime()) {
+		startTime := m.unissuedProposalTxs.Peek().UnsignedTx.(TimedTx).StartTime()
+		if !syncTime.After(startTime) {
 			m.vm.SnowmanVM.NotifyBlockReady() // Should issue a ProposeAddValidator
 			return
 		}
 		// If the tx doesn't meet the synchrony bound, drop it
-		tx := m.unissuedProposalTxs.Remove()
-
-		txID := tx.ID()
+		txID := m.unissuedProposalTxs.Remove().ID()
 		m.unissuedTxIDs.Remove(txID)
-		m.vm.droppedTxCache.Put(tx.ID(), nil) // cache tx as dropped
-
-		m.vm.Ctx.Log.Debug("dropping tx %q to add validator because its start time has passed", txID)
+		errMsg := fmt.Sprintf(
+			"synchrony bound (%s) is later than staker start time (%s)",
+			syncTime,
+			startTime,
+		)
+		m.vm.droppedTxCache.Put( // cache tx as dropped
+			txID,
+			errMsg,
+		)
+		m.vm.Ctx.Log.Debug("dropping tx %s: %s", txID, errMsg)
 	}
 
 	waitTime := nextStakerChangeTime.Sub(localTime)

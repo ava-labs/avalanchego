@@ -144,7 +144,7 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 
 	// Attempt to add the new chain to the database
 	currentChains, sErr := vm.getChains(db) // chains that currently exist
-	if err != nil {
+	if sErr != nil {
 		return nil, tempError{fmt.Errorf("couldn't get list of blockchains: %w", sErr)}
 	}
 	for _, chain := range currentChains {

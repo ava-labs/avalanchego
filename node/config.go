@@ -112,4 +112,7 @@ type Config struct {
 
 	// Subnet Whitelist
 	WhitelistedSubnets ids.Set
+
+	// Coreth
+	CorethConfig string
 }
