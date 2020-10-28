@@ -1933,11 +1933,11 @@ type GetTxStatusArgs struct {
 
 // GetTxStatusResponse ...
 type GetTxStatusResponse struct {
+	Status
 	includeReason bool
-	Status        `json:",omitempty"`
 	// Reason this tx was dropped.
 	// Only non-empty if Status is dropped
-	Reason string `json:"reason"`
+	Reason string
 }
 
 func (r GetTxStatusResponse) MarshalJSON() ([]byte, error) {
