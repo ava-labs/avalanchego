@@ -126,7 +126,7 @@ func init() {
 	// how often to update the dynamic IP and PnP/NAT-PMP IP and routing.
 	fs.DurationVar(&Config.DynamicUpdateDuration, "dynamic-update-duration", 5*time.Minute, "Dynamic IP and NAT Traversal update duration")
 
-	dynamicPublicIPResolver := fs.String("dynamic-public-ip", "", "'ifconfig' or 'opendns'. By default does not do dynamic public IP updates. If non-empty, ignores public-ip argument.")
+	dynamicPublicIPResolver := fs.String("dynamic-public-ip", "", "'ifconfigco' (alias 'ifconfig') or 'opendns' or 'ifconfigme'. By default does not do dynamic public IP updates. If non-empty, ignores public-ip argument.")
 
 	// Incoming connection throttling
 	// After we receive [conn-meter-max-attempts] incoming connections from a given IP
@@ -217,6 +217,9 @@ func init() {
 	fs.DurationVar(&Config.ConsensusShutdownTimeout, "consensus-shutdown-timeout", 5*time.Second, "Timeout before killing an unresponsive chain.")
 
 	fdLimit := fs.Uint64("fd-limit", ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
+
+	// Subnet Whitelist
+	whitelistedSubnets := fs.String("whitelisted-subnets", "", "Whitelist of subnets to validate.")
 
 	ferr := fs.Parse(os.Args[1:])
 
@@ -391,6 +394,18 @@ func init() {
 	} else {
 		for _, peer := range Config.BootstrapPeers {
 			peer.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(peer.IP.String())))
+		}
+	}
+
+	Config.WhitelistedSubnets.Add(constants.PrimaryNetworkID)
+	for _, subnet := range strings.Split(*whitelistedSubnets, ",") {
+		if subnet != "" {
+			subnetID, err := ids.FromString(subnet)
+			if err != nil {
+				errs.Add(fmt.Errorf("couldn't parse subnetID: %w", err))
+				return
+			}
+			Config.WhitelistedSubnets.Add(subnetID)
 		}
 	}
 
