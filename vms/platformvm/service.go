@@ -4,7 +4,6 @@
 package platformvm
 
 import (
-	stdjson "encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -1942,7 +1941,7 @@ type GetTxStatusResponse struct {
 
 func (r GetTxStatusResponse) MarshalJSON() ([]byte, error) {
 	if !r.includeReason {
-		return stdjson.Marshal(r.Status)
+		return r.Status.MarshalJSON()
 	}
 	if r.Reason != "" {
 		return []byte(fmt.Sprintf("{\"status\": \"%s\", \"reason\": \"%s\"}", r.Status, r.Reason)), nil
