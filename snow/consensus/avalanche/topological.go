@@ -179,7 +179,6 @@ func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 		return err
 	}
 	// Update the conflict graph: O(|Transactions|)
-	ta.ctx.Log.Verbo("Updating consumer confidences based on:\n%s", &votes)
 	if updated, err := ta.cg.RecordPoll(votes); !updated || err != nil {
 		// If the transaction statuses weren't changed, there is no need to
 		// perform a traversal.
