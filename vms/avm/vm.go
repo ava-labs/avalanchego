@@ -425,8 +425,11 @@ func (vm *VM) GetAtomicUTXOs(
 	}
 
 	addrsList := make([][]byte, addrs.Len())
-	for i, addr := range addrs.List() {
-		addrsList[i] = addr.Bytes()
+	i := 0
+	for addr := range addrs {
+		copied := addr
+		addrsList[i] = copied[:]
+		i++
 	}
 
 	allUTXOBytes, lastAddr, lastUTXO, err := vm.ctx.SharedMemory.Indexed(

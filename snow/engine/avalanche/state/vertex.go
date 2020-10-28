@@ -69,7 +69,8 @@ func (vtx *innerVertex) Verify() error {
 
 	inputIDs := ids.Set{}
 	for _, tx := range vtx.txs {
-		inputs := tx.InputIDs()
+		inputs := ids.Set{}
+		inputs.Add(tx.InputIDs()...)
 		if inputs.Overlaps(inputIDs) {
 			return errConflictingTxs
 		}
