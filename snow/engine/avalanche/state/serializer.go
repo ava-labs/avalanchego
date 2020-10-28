@@ -70,7 +70,7 @@ func (s *Serializer) BuildVertex(parentIDs []ids.ID, txs []snowstorm.Tx) (avalan
 		return nil, errNoTxs
 	} else if l := len(txs); l > maxTxsPerVtx {
 		return nil, fmt.Errorf("number of txs (%d) exceeds max (%d)", l, maxTxsPerVtx)
-	} else if l := parentSet.Len(); l > maxNumParents {
+	} else if l := len(parentIDs); l > maxNumParents {
 		return nil, fmt.Errorf("number of parents (%d) exceeds max (%d)", l, maxNumParents)
 	}
 
