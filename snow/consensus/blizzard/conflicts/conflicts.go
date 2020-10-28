@@ -60,6 +60,8 @@ func (c *conflicts) Add(txIntf choices.Decidable) error {
 		c:  c,
 		tx: tx,
 	}
+
+	toReject.deps.Add(txID)
 	for _, dependency := range tx.Dependencies() {
 		if dependency.Status() != choices.Accepted {
 			// If the dependency isn't accepted, then it must be processing.
@@ -168,7 +170,9 @@ func (c *conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 		c.pendingReject.Abandon(txID)
 
 		conflicts, _ := c.Conflicts(tx)
-
+		for _, conflict := range conflicts {
+			c.pendingReject.Fulfill(conflict.ID())
+		}
 	}
 
 	rejectable := c.rejectable

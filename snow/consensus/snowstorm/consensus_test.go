@@ -34,6 +34,7 @@ var (
 		AcceptingDependencyTest,
 		AcceptingSlowDependencyTest,
 		RejectingDependencyTest,
+		RejectingSlowDependencyTest,
 		VacuouslyAcceptedTest,
 		ConflictsTest,
 		VirtuousDependsOnRogueTest,
@@ -964,6 +965,141 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", Blue.ID(), choices.Rejected)
 	case purple.Status() != choices.Rejected:
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Rejected)
+	}
+}
+
+type singleRejectTx struct {
+	Tx
+
+	t        *testing.T
+	rejected bool
+}
+
+func (tx *singleRejectTx) Reject() error {
+	if tx.rejected {
+		tx.t.Fatalf("reject called multiple times")
+	}
+	tx.rejected = true
+	return tx.Tx.Reject()
+}
+
+func RejectingSlowDependencyTest(t *testing.T, factory Factory) {
+	graph := factory.New()
+
+	rawPurple := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(100),
+			StatusV: choices.Processing,
+		},
+		DependenciesV: []Tx{Red},
+	}
+	conflictID := ids.Empty.Prefix(101)
+	rawPurple.InputIDsV.Add(conflictID)
+
+	purple := &singleAcceptTx{
+		Tx: rawPurple,
+		t:  t,
+	}
+
+	rawCyan := &TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.Empty.Prefix(102),
+		StatusV: choices.Processing,
+	}}
+	rawCyan.InputIDsV.Add(conflictID)
+
+	cyan := &singleRejectTx{
+		Tx: rawCyan,
+		t:  t,
+	}
+
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         1,
+		ConcurrentRepolls: 1,
+	}
+	err := graph.Initialize(snow.DefaultContextTest(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := graph.Add(Red); err != nil {
+		t.Fatal(err)
+	}
+	if err := graph.Add(Green); err != nil {
+		t.Fatal(err)
+	}
+	if err := graph.Add(purple); err != nil {
+		t.Fatal(err)
+	}
+	if err := graph.Add(cyan); err != nil {
+		t.Fatal(err)
+	}
+
+	prefs := graph.Preferences()
+	switch {
+	case prefs.Len() != 2:
+		t.Fatalf("Wrong number of preferences.")
+	case !prefs.Contains(Red.ID()):
+		t.Fatalf("Wrong preference. Expected %s", Red.ID())
+	case !prefs.Contains(purple.ID()):
+		t.Fatalf("Wrong preference. Expected %s", purple.ID())
+	case Red.Status() != choices.Processing:
+		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Processing)
+	case Green.Status() != choices.Processing:
+		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Processing)
+	case purple.Status() != choices.Processing:
+		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
+	case cyan.Status() != choices.Processing:
+		t.Fatalf("Wrong status. %s should be %s", cyan.ID(), choices.Processing)
+	}
+
+	c := ids.Bag{}
+	c.Add(cyan.ID())
+	if updated, err := graph.RecordPoll(c); err != nil {
+		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
+	}
+
+	prefs = graph.Preferences()
+	switch {
+	case prefs.Len() != 1:
+		t.Fatalf("Wrong number of preferences.")
+	case !prefs.Contains(Red.ID()):
+		t.Fatalf("Wrong preference. Expected %s", Red.ID())
+	case Red.Status() != choices.Processing:
+		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Processing)
+	case Green.Status() != choices.Processing:
+		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Processing)
+	case purple.Status() != choices.Rejected:
+		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Rejected)
+	case cyan.Status() != choices.Accepted:
+		t.Fatalf("Wrong status. %s should be %s", cyan.ID(), choices.Accepted)
+	}
+
+	g := ids.Bag{}
+	g.Add(Green.ID())
+	if updated, err := graph.RecordPoll(g); err != nil {
+		t.Fatal(err)
+	} else if updated {
+		t.Fatalf("Shouldn't have updated the frontiers")
+	}
+
+	prefs = graph.Preferences()
+	switch {
+	case prefs.Len() != 0:
+		t.Fatalf("Wrong number of preferences.")
+	case Red.Status() != choices.Rejected:
+		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Rejected)
+	case Green.Status() != choices.Accepted:
+		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Accepted)
+	case purple.Status() != choices.Rejected:
+		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Rejected)
+	case cyan.Status() != choices.Accepted:
+		t.Fatalf("Wrong status. %s should be %s", cyan.ID(), choices.Accepted)
 	}
 }
 
