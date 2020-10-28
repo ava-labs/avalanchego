@@ -157,14 +157,13 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 		weight = w
 	}
 
-	for _, containerID := range containerIDs.List() {
-		key := containerID.Key()
-		previousWeight := b.acceptedVotes[key]
+	for containerIDKey := range containerIDs {
+		previousWeight := b.acceptedVotes[containerIDKey]
 		newWeight, err := math.Add64(weight, previousWeight)
 		if err != nil {
 			newWeight = stdmath.MaxUint64
 		}
-		b.acceptedVotes[key] = newWeight
+		b.acceptedVotes[containerIDKey] = newWeight
 	}
 
 	if b.pendingAccepted.Len() != 0 {

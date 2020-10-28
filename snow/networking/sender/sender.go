@@ -35,10 +35,10 @@ func (s *Sender) Context() *snow.Context { return s.ctx }
 // GetAcceptedFrontier ...
 func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32) {
 	currentDeadline := time.Time{}
-	for _, validatorID := range validatorIDs.List() {
-		vID := validatorID
+	for validatorIDKey := range validatorIDs {
+		validatorID := ids.NewShortID(validatorIDKey)
 		deadline, ok := s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, true, constants.GetAcceptedFrontierMsg, func() {
-			s.router.GetAcceptedFrontierFailed(vID, s.ctx.ChainID, requestID)
+			s.router.GetAcceptedFrontierFailed(validatorID, s.ctx.ChainID, requestID)
 		})
 		if deadline.After(currentDeadline) {
 			currentDeadline = deadline
@@ -69,10 +69,10 @@ func (s *Sender) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, con
 // GetAccepted ...
 func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, containerIDs ids.Set) {
 	currentDeadline := time.Time{}
-	for _, validatorID := range validatorIDs.List() {
-		vID := validatorID
+	for validatorIDKey := range validatorIDs {
+		validatorID := ids.NewShortID(validatorIDKey)
 		deadline, ok := s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, true, constants.GetAcceptedMsg, func() {
-			s.router.GetAcceptedFailed(vID, s.ctx.ChainID, requestID)
+			s.router.GetAcceptedFailed(validatorID, s.ctx.ChainID, requestID)
 		})
 		if deadline.After(currentDeadline) {
 			currentDeadline = deadline
@@ -166,10 +166,10 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 	s.ctx.Log.Verbo("Sending PushQuery to validators %v. RequestID: %d. ContainerID: %s", validatorIDs, requestID, containerID)
 
 	currentDeadline := time.Time{}
-	for _, validatorID := range validatorIDs.List() {
-		vID := validatorID
+	for validatorIDKey := range validatorIDs {
+		validatorID := ids.NewShortID(validatorIDKey)
 		deadline, ok := s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, true, constants.PushQueryMsg, func() {
-			s.router.QueryFailed(vID, s.ctx.ChainID, requestID)
+			s.router.QueryFailed(validatorID, s.ctx.ChainID, requestID)
 		})
 		if deadline.After(currentDeadline) {
 			currentDeadline = deadline
@@ -200,10 +200,10 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 	s.ctx.Log.Verbo("Sending PullQuery. RequestID: %d. ContainerID: %s", requestID, containerID)
 
 	currentDeadline := time.Time{}
-	for _, validatorID := range validatorIDs.List() {
-		vID := validatorID
+	for validatorIDKey := range validatorIDs {
+		validatorID := ids.NewShortID(validatorIDKey)
 		deadline, ok := s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, true, constants.PullQueryMsg, func() {
-			s.router.QueryFailed(vID, s.ctx.ChainID, requestID)
+			s.router.QueryFailed(validatorID, s.ctx.ChainID, requestID)
 		})
 		if deadline.After(currentDeadline) {
 			currentDeadline = deadline

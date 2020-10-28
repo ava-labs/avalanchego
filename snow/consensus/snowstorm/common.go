@@ -106,7 +106,7 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 	c.metrics.Issued(txID)
 
 	// If this tx has inputs, it needs to be voted on before being accepted.
-	if inputs := tx.InputIDs(); inputs.Len() != 0 {
+	if inputs := tx.InputIDs(); len(inputs) != 0 {
 		return true, nil
 	}
 
@@ -275,7 +275,9 @@ func (r *rejector) Fulfill(ids.ID) {
 		return
 	}
 	r.rejected = true
-	r.errs.Add(r.g.reject(r.txID))
+	asSet := ids.Set{}
+	asSet.Add(r.txID)
+	r.errs.Add(r.g.reject(asSet))
 }
 
 func (*rejector) Abandon(ids.ID) {}
