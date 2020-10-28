@@ -9,7 +9,7 @@ const (
 	versionKey                      = "version"
 	networkNameKey                  = "network-id"
 	txFeeKey                        = "tx-fee"
-	creationTxFeeKey                = "creaton-tx-fee"
+	creationTxFeeKey                = "creation-tx-fee"
 	uptimeRequirementKey            = "uptime-requirement"
 	minValidatorStakeKey            = "min-validator-stake"
 	maxValidatorStakeKey            = "max-validator-stake"

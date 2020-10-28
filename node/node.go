@@ -51,6 +51,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/timestampvm"
 
@@ -556,7 +557,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			CreationFee: n.Config.CreationTxFee,
 			Fee:         n.Config.TxFee,
 		}),
-		n.vmManager.RegisterVMFactory(evm.ID, &evm.Factory{
+		n.vmManager.RegisterVMFactory(evm.ID, &rpcchainvm.Factory{
 			Path:   filepath.Join(n.Config.PluginDir, "evm"),
 			Config: n.Config.CorethConfig,
 		}),
