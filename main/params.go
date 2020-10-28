@@ -522,8 +522,6 @@ func setNodeConfig(v *viper.Viper) error {
 		Config.IPCPath = ipcsPath
 	}
 
-	Config.IPCPath = v.GetString(ipcsPathKey)
-
 	// Throttling
 	Config.MaxNonStakerPendingMsgs = v.GetUint(maxNonStakerPendingMsgsKey)
 	Config.StakerMSGPortion = v.GetFloat64(stakerMsgReservedKey)
