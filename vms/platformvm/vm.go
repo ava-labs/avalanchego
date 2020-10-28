@@ -1056,9 +1056,8 @@ func (vm *VM) GetAtomicUTXOs(
 	addrsList := make([][]byte, addrs.Len())
 	i := 0
 	for addr := range addrs {
-		copied := make([]byte, 20)
-		copy(copied, addr[:])
-		addrsList[i] = copied
+		copied := addr
+		addrsList[i] = copied[:]
 		i++
 	}
 
