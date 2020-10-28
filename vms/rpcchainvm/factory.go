@@ -5,6 +5,7 @@ package rpcchainvm
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os/exec"
@@ -19,7 +20,10 @@ var (
 )
 
 // Factory ...
-type Factory struct{ Path string }
+type Factory struct {
+	Path   string
+	Config string
+}
 
 // New ...
 func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
@@ -29,7 +33,7 @@ func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 	config := &plugin.ClientConfig{
 		HandshakeConfig: Handshake,
 		Plugins:         PluginMap,
-		Cmd:             exec.Command(f.Path),
+		Cmd:             exec.Command(f.Path, fmt.Sprintf("--config=%s", f.Config)),
 		AllowedProtocols: []plugin.Protocol{
 			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,
