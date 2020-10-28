@@ -909,6 +909,7 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 	}
 }
 
+// Test that we can't create an output of by consuming a UTXO that doesn't exist
 func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
@@ -921,15 +922,16 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	avaxID := genesisTx.ID()
+	assetID := ids.GenerateTestID()
 	rawTx := &Tx{UnsignedTx: &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{
-				{ // this input pays the tx fee
+				{
 					UTXOID: avax.UTXOID{
 						TxID:        avaxID,
-						OutputIndex: 2,
+						OutputIndex: 0,
 					},
 					Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 					In: &secp256k1fx.TransferInput{
@@ -939,10 +941,10 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 				},
 				{
 					UTXOID: avax.UTXOID{
-						TxID:        avaxID,
-						OutputIndex: 5, // this index doesn't really exist
+						TxID:        assetID, // This tx doesn't exist
+						OutputIndex: 0,
 					},
-					Asset: avax.Asset{ID: ids.Empty},
+					Asset: avax.Asset{ID: assetID}, // This asset doesn't exist
 					In: &secp256k1fx.TransferInput{
 						Amt:   startBalance,
 						Input: secp256k1fx.Input{SigIndices: []uint32{0}},
@@ -952,7 +954,7 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 		}},
 		DestinationChain: platformChainID,
 		ExportedOuts: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: ids.Empty},
+			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: startBalance - vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{

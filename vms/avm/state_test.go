@@ -28,9 +28,9 @@ func TestStateIDsNoStart(t *testing.T) {
 
 	state := vm.state.state
 
-	id0 := ids.NewID([32]byte{0x00, 0})
-	id1 := ids.NewID([32]byte{0x01, 0})
-	id2 := ids.NewID([32]byte{0x02, 0})
+	id0 := ids.NewID([32]byte{0x01, 0})
+	id1 := ids.NewID([32]byte{0x02, 0})
+	id2 := ids.NewID([32]byte{0x03, 0})
 
 	if _, err := state.IDs(ids.Empty.Bytes(), []byte{}, math.MaxInt32); err != nil {
 		t.Fatal(err)
@@ -164,9 +164,9 @@ func TestStateIDsWithStart(t *testing.T) {
 	}()
 
 	state := vm.state.state
-	id0 := ids.NewID([32]byte{0x00, 0})
-	id1 := ids.NewID([32]byte{0x01, 0})
-	id2 := ids.NewID([32]byte{0x02, 0})
+	id0 := ids.NewID([32]byte{0x01, 0})
+	id1 := ids.NewID([32]byte{0x02, 0})
+	id2 := ids.NewID([32]byte{0x03, 0})
 
 	// State should be empty to start
 	if _, err := state.IDs(ids.Empty.Bytes(), []byte{}, math.MaxInt32); err != nil {
@@ -223,15 +223,16 @@ func TestStateStatuses(t *testing.T) {
 
 	state := vm.state.state
 
-	if _, err := state.Status(ids.Empty); err == nil {
+	id := ids.GenerateTestID()
+	if _, err := state.Status(id); err == nil {
 		t.Fatalf("Should have errored when reading ids")
 	}
 
-	if err := state.SetStatus(ids.Empty, choices.Accepted); err != nil {
+	if err := state.SetStatus(id, choices.Accepted); err != nil {
 		t.Fatal(err)
 	}
 
-	status, err := state.Status(ids.Empty)
+	status, err := state.Status(id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,11 +240,11 @@ func TestStateStatuses(t *testing.T) {
 		t.Fatalf("Should have returned the %s status", choices.Accepted)
 	}
 
-	if err := state.AddID(ids.Empty.Bytes(), ids.Empty); err != nil {
+	if err := state.AddID(id.Bytes(), id); err != nil {
 		t.Fatal(err)
 	}
 
-	status, err = state.Status(ids.Empty)
+	status, err = state.Status(id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,11 +252,11 @@ func TestStateStatuses(t *testing.T) {
 		t.Fatalf("Should have returned the %s status", choices.Accepted)
 	}
 
-	if err := state.SetStatus(ids.Empty, choices.Unknown); err != nil {
+	if err := state.SetStatus(id, choices.Unknown); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := state.Status(ids.Empty); err == nil {
+	if _, err := state.Status(id); err == nil {
 		t.Fatalf("Should have errored when reading ids")
 	}
 }

@@ -28,8 +28,9 @@ func TestTransferableOutputVerifyNilFx(t *testing.T) {
 }
 
 func TestTransferableOutputVerify(t *testing.T) {
+	assetID := ids.GenerateTestID()
 	to := &TransferableOutput{
-		Asset: Asset{ID: ids.Empty},
+		Asset: Asset{ID: assetID},
 		Out:   &TestTransferable{Val: 1},
 	}
 	if err := to.Verify(); err != nil {
@@ -179,9 +180,10 @@ func TestTransferableInputVerifyNilFx(t *testing.T) {
 }
 
 func TestTransferableInputVerify(t *testing.T) {
+	assetID := ids.GenerateTestID()
 	ti := &TransferableInput{
-		UTXOID: UTXOID{TxID: ids.Empty},
-		Asset:  Asset{ID: ids.Empty},
+		UTXOID: UTXOID{TxID: assetID},
+		Asset:  Asset{ID: assetID},
 		In:     &TestTransferable{},
 	}
 	if err := ti.Verify(); err != nil {

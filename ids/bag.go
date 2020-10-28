@@ -17,7 +17,7 @@ const (
 // A bag has the ability to split and filter on it's bits for ease of use for
 // binary voting.
 type Bag struct {
-	counts map[[32]byte]int
+	counts map[ID]int
 	size   int
 
 	mode     ID
@@ -29,7 +29,7 @@ type Bag struct {
 
 func (b *Bag) init() {
 	if b.counts == nil {
-		b.counts = make(map[[32]byte]int, minBagSize)
+		b.counts = make(map[ID]int, minBagSize)
 	}
 }
 
@@ -66,8 +66,8 @@ func (b *Bag) AddCount(id ID, count int) {
 
 	b.init()
 
-	totalCount := b.counts[*id.ID] + count
-	b.counts[*id.ID] = totalCount
+	totalCount := b.counts[id] + count
+	b.counts[id] = totalCount
 	b.size += count
 
 	if totalCount > b.modeFreq {
@@ -82,7 +82,7 @@ func (b *Bag) AddCount(id ID, count int) {
 // Count returns the number of times the id has been added.
 func (b *Bag) Count(id ID) int {
 	b.init()
-	return b.counts[*id.ID]
+	return b.counts[id]
 }
 
 // Len returns the number of times an id has been added.
@@ -151,8 +151,7 @@ func (b *Bag) String() string {
 	sb := strings.Builder{}
 
 	sb.WriteString(fmt.Sprintf("Bag: (Size = %d)", b.Len()))
-	for idBytes, count := range b.counts {
-		id := NewID(idBytes)
+	for id, count := range b.counts {
 		sb.WriteString(fmt.Sprintf("\n    ID[%s]: Count = %d", id, count))
 	}
 

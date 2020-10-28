@@ -18,14 +18,6 @@ func TestUTXOIDVerifyNil(t *testing.T) {
 	}
 }
 
-func TestUTXOIDVerifyEmpty(t *testing.T) {
-	utxoID := &UTXOID{}
-
-	if err := utxoID.Verify(); err == nil {
-		t.Fatalf("Should have errored due to an empty utxo ID")
-	}
-}
-
 func TestUTXOID(t *testing.T) {
 	c := codec.NewDefault()
 

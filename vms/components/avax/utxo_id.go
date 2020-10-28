@@ -49,8 +49,6 @@ func (utxo *UTXOID) Verify() error {
 	switch {
 	case utxo == nil:
 		return errNilUTXOID
-	case utxo.TxID.IsZero():
-		return errNilTxID
 	default:
 		return nil
 	}

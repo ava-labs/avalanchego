@@ -28,7 +28,7 @@ func (ids *Set) init(size int) {
 func (ids *Set) Add(idList ...ID) {
 	ids.init(2 * len(idList))
 	for _, id := range idList {
-		(*ids)[*id.ID] = true
+		(*ids)[id] = true
 	}
 }
 
@@ -43,7 +43,7 @@ func (ids *Set) Union(set Set) {
 // Contains returns true if the set contains this id, false otherwise
 func (ids *Set) Contains(id ID) bool {
 	ids.init(1)
-	return (*ids)[*id.ID]
+	return (*ids)[id]
 }
 
 // Overlaps returns true if the intersection of the set is non-empty
@@ -69,7 +69,7 @@ func (ids Set) Len() int { return len(ids) }
 func (ids *Set) Remove(idList ...ID) {
 	ids.init(1)
 	for _, id := range idList {
-		delete(*ids, *id.ID)
+		delete(*ids, id)
 	}
 }
 

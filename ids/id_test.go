@@ -138,11 +138,11 @@ func TestIDUnmarshalJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
-			foo := ID{}
+			foo := ID([32]byte{})
 			err := foo.UnmarshalJSON(tt.in)
 			if err != tt.err {
 				t.Errorf("Expected err %s, got error %v", tt.err, err)
-			} else if foo.ID != nil && foo.Key() != tt.out.Key() {
+			} else if foo != tt.out {
 				t.Errorf("got %q, expected %q", foo.Key(), tt.out.Key())
 			}
 		})
@@ -164,7 +164,7 @@ func TestIDString(t *testing.T) {
 		id       ID
 		expected string
 	}{
-		{"ID{}", ID{}, "nil"},
+		{"ID{}", ID{}, "11111111111111111111111111111111LpoYY"},
 		{"ID{[32]byte{24}}", NewID([32]byte{24}), "Ba3mm8Ra8JYYebeZ9p7zw1ayorDbeD1euwxhgzSLsncKqGoNt"},
 	}
 	for _, tt := range tests {
