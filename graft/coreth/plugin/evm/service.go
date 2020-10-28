@@ -109,7 +109,7 @@ type ImportKeyArgs struct {
 }
 
 // ImportKey adds a private key to the provided user
-func (service *AvaxAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JsonAddress) error {
+func (service *AvaxAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
 	log.Info(fmt.Sprintf("EVM: ImportKey called for user '%s'", args.Username))
 
 	if !strings.HasPrefix(args.PrivateKey, constants.SecretKeyPrefix) {
@@ -157,13 +157,13 @@ type ImportArgs struct {
 }
 
 // ImportAVAX is a deprecated name for Import.
-func (service *AvaxAPI) ImportAVAX(_ *http.Request, args *ImportArgs, response *api.JsonTxID) error {
+func (service *AvaxAPI) ImportAVAX(_ *http.Request, args *ImportArgs, response *api.JSONTxID) error {
 	return service.Import(nil, args, response)
 }
 
 // Import issues a transaction to import AVAX from the X-chain. The AVAX
 // must have already been exported from the X-Chain.
-func (service *AvaxAPI) Import(_ *http.Request, args *ImportArgs, response *api.JsonTxID) error {
+func (service *AvaxAPI) Import(_ *http.Request, args *ImportArgs, response *api.JSONTxID) error {
 	log.Info("EVM: ImportAVAX called")
 
 	chainID, err := service.vm.ctx.BCLookup.Lookup(args.SourceChain)
@@ -214,7 +214,7 @@ type ExportAVAXArgs struct {
 
 // ExportAVAX exports AVAX from the C-Chain to the X-Chain
 // It must be imported on the X-Chain to complete the transfer
-func (service *AvaxAPI) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JsonTxID) error {
+func (service *AvaxAPI) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JSONTxID) error {
 	return service.Export(nil, &ExportArgs{
 		ExportAVAXArgs: *args,
 		AssetID:        service.vm.ctx.AVAXAssetID,
@@ -230,7 +230,7 @@ type ExportArgs struct {
 
 // Export exports an asset from the C-Chain to the X-Chain
 // It must be imported on the X-Chain to complete the transfer
-func (service *AvaxAPI) Export(_ *http.Request, args *ExportArgs, response *api.JsonTxID) error {
+func (service *AvaxAPI) Export(_ *http.Request, args *ExportArgs, response *api.JSONTxID) error {
 	log.Info("EVM: Export called")
 	if args.AssetID.IsZero() {
 		return fmt.Errorf("assetID is required")
