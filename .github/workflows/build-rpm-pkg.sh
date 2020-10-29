@@ -22,4 +22,4 @@ REL=$(echo $TAG | gawk -F- '{print$2}')
 [ -z "$REL" ] && REL=0 
 echo "Tag: $VER"
 rpmbuild --bb --define "version $VER" --define "release $REL" --buildroot $RPM_BASE_DIR .github/workflows/yum/specfile/avalanchego.spec
-aws s3 cp ~/rpmbuild/RPMS/x86_64/avalanchego-*.rpm s3://$BUCKET/linux/rpm
+aws s3 cp ~/rpmbuild/RPMS/x86_64/avalanchego-*.rpm s3://$BUCKET/linux/rpm/
