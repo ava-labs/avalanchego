@@ -63,9 +63,6 @@ type directedTx struct {
 	// once its transitive dependencies have also been accepted
 	pendingAccept bool
 
-	// tx is the actual transaction this node represents
-	tx choices.Decidable
-
 	// ins is the set of txIDs that this tx conflicts with that are less
 	// preferred than this tx
 	ins ids.Set
@@ -168,7 +165,7 @@ func (dg *Directed) Add(tx choices.Decidable) error {
 	}
 
 	txID := tx.ID()
-	txNode := &directedTx{tx: tx}
+	txNode := &directedTx{}
 
 	conflicts, err := dg.conflicts.Conflicts(tx)
 	if err != nil {
@@ -371,9 +368,9 @@ func (dg *Directed) removeConflict(txID ids.ID, neighborIDs ids.Set) {
 func (dg *Directed) String() string {
 	nodes := make([]*snowballNode, len(dg.txs))
 	i := 0
-	for _, txNode := range dg.txs {
+	for txKey, txNode := range dg.txs {
 		nodes[i] = &snowballNode{
-			txID:               txNode.tx.ID(),
+			txID:               ids.NewID(txKey),
 			numSuccessfulPolls: txNode.numSuccessfulPolls,
 			confidence:         txNode.Confidence(dg.currentVote),
 		}
