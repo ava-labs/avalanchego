@@ -64,5 +64,5 @@ type Consensus interface {
 	accept(txID ids.ID) error
 
 	// Reject all the provided txs and remove them from the graph
-	reject(txIDs ...ids.ID) error
+	reject(txIDs ids.Set) error
 }

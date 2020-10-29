@@ -171,7 +171,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 	subnetCred := stx.Creds[baseTxCredsLen]
 
 	subnet, timedErr := vm.getSubnet(db, tx.Validator.Subnet)
-	if err != nil {
+	if timedErr != nil {
 		return nil, nil, nil, nil, timedErr
 	}
 	unsignedSubnet := subnet.UnsignedTx.(*UnsignedCreateSubnetTx)

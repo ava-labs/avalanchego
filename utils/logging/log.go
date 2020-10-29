@@ -110,10 +110,22 @@ func (l *Log) run() {
 }
 
 func (l *Log) Write(p []byte) (int, error) {
-	l.writeLock.Lock()
-	defer l.writeLock.Unlock()
+	if l == nil {
+		return 0, nil
+	}
 
-	return l.writer.Write(p)
+	l.configLock.Lock()
+	defer l.configLock.Unlock()
+
+	if !l.config.DisableLogging {
+		l.flushLock.Lock()
+		l.messages = append(l.messages, string(p))
+		l.size += len(p)
+		l.needsFlush.Signal()
+		l.flushLock.Unlock()
+	}
+
+	return len(p), nil
 }
 
 // Stop ...

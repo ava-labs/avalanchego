@@ -7,23 +7,26 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
+const (
+	defaultCacheSize = 2048
+)
+
 var (
-	errWrongVMType         = errors.New("wrong vm type")
-	errWrongTxType         = errors.New("wrong tx type")
-	errWrongOpType         = errors.New("wrong operation type")
-	errWrongUTXOType       = errors.New("wrong utxo type")
-	errWrongInputType      = errors.New("wrong input type")
-	errWrongCredentialType = errors.New("wrong credential type")
-	errWrongOwnerType      = errors.New("wrong owner type")
-
-	errWrongNumberOfUTXOs = errors.New("wrong number of utxos for the operation")
-
+	errWrongVMType                    = errors.New("wrong vm type")
+	errWrongTxType                    = errors.New("wrong tx type")
+	errWrongOpType                    = errors.New("wrong operation type")
+	errWrongUTXOType                  = errors.New("wrong utxo type")
+	errWrongInputType                 = errors.New("wrong input type")
+	errWrongCredentialType            = errors.New("wrong credential type")
+	errWrongOwnerType                 = errors.New("wrong owner type")
+	errWrongNumberOfUTXOs             = errors.New("wrong number of utxos for the operation")
 	errWrongMintCreated               = errors.New("wrong mint output created from the operation")
 	errTimelocked                     = errors.New("output is time locked")
 	errTooManySigners                 = errors.New("input has more signers than expected")
@@ -47,6 +50,9 @@ func (fx *Fx) Initialize(vmIntf interface{}) error {
 	log := fx.VM.Logger()
 	log.Debug("Initializing secp561k1 fx")
 
+	fx.SECPFactory = crypto.FactorySECP256K1R{
+		Cache: cache.LRU{Size: defaultCacheSize},
+	}
 	c := fx.VM.Codec()
 	errs := wrappers.Errs{}
 	errs.Add(

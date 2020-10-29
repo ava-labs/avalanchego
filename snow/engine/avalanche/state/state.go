@@ -103,10 +103,12 @@ func (s *state) Edge(id ids.ID) []ids.ID {
 	if b, err := s.db.Get(id.Bytes()); err == nil {
 		p := wrappers.Packer{Bytes: b}
 
-		frontier := []ids.ID{}
-		for i := p.UnpackInt(); i > 0 && !p.Errored(); i-- {
-			id, _ := ids.ToID(p.UnpackFixedBytes(hashing.HashLen))
-			frontier = append(frontier, id)
+		frontierSize := p.UnpackInt()
+		frontier := make([]ids.ID, frontierSize)
+		for i := 0; i < int(frontierSize) && !p.Errored(); i++ {
+			id, err := ids.ToID(p.UnpackFixedBytes(hashing.HashLen))
+			p.Add(err)
+			frontier[i] = id
 		}
 
 		if p.Offset == len(b) && !p.Errored() {
