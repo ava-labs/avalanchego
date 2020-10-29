@@ -27,7 +27,7 @@ func TestVertexVerify(t *testing.T) {
 		chainID:   ids.NewID([32]byte{1}),
 		height:    1,
 		parentIDs: []ids.ID{ids.NewID([32]byte{2})},
-		txs:       []snowstorm.Tx{tx0},
+		txs:       []conflicts.Tx{tx0},
 	}
 
 	if err := validVertex.Verify(); err != nil {
@@ -39,7 +39,7 @@ func TestVertexVerify(t *testing.T) {
 		chainID:   ids.NewID([32]byte{1}),
 		height:    1,
 		parentIDs: []ids.ID{ids.NewID([32]byte{'d', 'u', 'p'}), ids.NewID([32]byte{'d', 'u', 'p'})},
-		txs:       []snowstorm.Tx{tx0},
+		txs:       []conflicts.Tx{tx0},
 	}
 
 	if err := nonUniqueParentsVtx.Verify(); err == nil {
@@ -55,7 +55,7 @@ func TestVertexVerify(t *testing.T) {
 		chainID:   ids.NewID([32]byte{1}),
 		height:    1,
 		parentIDs: []ids.ID{sortedParents[1], sortedParents[0]},
-		txs:       []snowstorm.Tx{tx0},
+		txs:       []conflicts.Tx{tx0},
 	}
 
 	if err := nonSortedParentsVtx.Verify(); err == nil {
@@ -67,7 +67,7 @@ func TestVertexVerify(t *testing.T) {
 		chainID:   ids.NewID([32]byte{1}),
 		height:    1,
 		parentIDs: []ids.ID{ids.NewID([32]byte{2})},
-		txs:       []snowstorm.Tx{},
+		txs:       []conflicts.Tx{},
 	}
 
 	if err := noTxsVertex.Verify(); err == nil {
@@ -81,14 +81,14 @@ func TestVertexVerify(t *testing.T) {
 		DependenciesV: nil,
 		InputIDsV:     nil,
 	}
-	sortedTxs := []snowstorm.Tx{tx0, tx1}
+	sortedTxs := []conflicts.Tx{tx0, tx1}
 	sortTxs(sortedTxs)
 	unsortedTxsVertex := &innerVertex{
 		id:        ids.NewID([32]byte{}),
 		chainID:   ids.NewID([32]byte{1}),
 		height:    1,
 		parentIDs: []ids.ID{ids.NewID([32]byte{2})},
-		txs:       []snowstorm.Tx{sortedTxs[1], sortedTxs[0]},
+		txs:       []conflicts.Tx{sortedTxs[1], sortedTxs[0]},
 	}
 
 	if err := unsortedTxsVertex.Verify(); err == nil {
@@ -100,7 +100,7 @@ func TestVertexVerify(t *testing.T) {
 		chainID:   ids.NewID([32]byte{1}),
 		height:    1,
 		parentIDs: []ids.ID{ids.NewID([32]byte{2})},
-		txs:       []snowstorm.Tx{tx0, tx0},
+		txs:       []conflicts.Tx{tx0, tx0},
 	}
 
 	if err := nonUniqueTxsVertex.Verify(); err == nil {
@@ -116,7 +116,7 @@ func TestVertexVerify(t *testing.T) {
 		InputIDsV:     inputs,
 	}
 
-	conflictingTxs := []snowstorm.Tx{tx0, conflictingTx}
+	conflictingTxs := []conflicts.Tx{tx0, conflictingTx}
 	sortTxs(conflictingTxs)
 
 	conflictingTxsVertex := &innerVertex{

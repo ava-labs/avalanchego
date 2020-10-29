@@ -219,7 +219,7 @@ func AddTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx0},
+		TxsV:     []conflicts.Tx{tx0},
 	}
 
 	err := avl.Add(vtx0)
@@ -245,7 +245,7 @@ func AddTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx1},
+		TxsV:     []conflicts.Tx{tx1},
 	}
 
 	err = avl.Add(vtx1)
@@ -327,7 +327,7 @@ func VertexIssuedTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx},
+		TxsV:     []conflicts.Tx{tx},
 	}
 
 	if avl.VertexIssued(vtx) {
@@ -364,7 +364,7 @@ func TxIssuedTest(t *testing.T, factory Factory) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Accepted,
 		},
-		TxsV: []snowstorm.Tx{tx0},
+		TxsV: []conflicts.Tx{tx0},
 	}}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
@@ -390,7 +390,7 @@ func TxIssuedTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		HeightV: 1,
-		TxsV:    []snowstorm.Tx{tx1},
+		TxsV:    []conflicts.Tx{tx1},
 	}
 
 	if err := avl.Add(vtx); err != nil {
@@ -455,7 +455,7 @@ func VirtuousTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx0},
+		TxsV:     []conflicts.Tx{tx0},
 	}
 
 	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
@@ -471,7 +471,7 @@ func VirtuousTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx1},
+		TxsV:     []conflicts.Tx{tx1},
 	}
 
 	tx2 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
@@ -487,7 +487,7 @@ func VirtuousTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: []Vertex{vtx0},
 		HeightV:  2,
-		TxsV:     []snowstorm.Tx{tx2},
+		TxsV:     []conflicts.Tx{tx2},
 	}
 
 	if err := avl.Add(vtx0); err != nil {
@@ -609,7 +609,7 @@ func VirtuousSkippedUpdateTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx0},
+		TxsV:     []conflicts.Tx{tx0},
 	}
 
 	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
@@ -625,7 +625,7 @@ func VirtuousSkippedUpdateTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx1},
+		TxsV:     []conflicts.Tx{tx1},
 	}
 
 	if err := avl.Add(vtx0); err != nil {
@@ -694,7 +694,7 @@ func VotingTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx0},
+		TxsV:     []conflicts.Tx{tx0},
 	}
 
 	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
@@ -710,7 +710,7 @@ func VotingTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx1},
+		TxsV:     []conflicts.Tx{tx1},
 	}
 
 	if err := avl.Add(vtx0); err != nil {
@@ -793,7 +793,7 @@ func IgnoreInvalidVotingTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx0},
+		TxsV:     []conflicts.Tx{tx0},
 	}
 
 	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
@@ -809,7 +809,7 @@ func IgnoreInvalidVotingTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx1},
+		TxsV:     []conflicts.Tx{tx1},
 	}
 
 	if err := avl.Add(vtx0); err != nil {
@@ -878,7 +878,7 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx0},
+		TxsV:     []conflicts.Tx{tx0},
 	}
 
 	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
@@ -894,7 +894,7 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: []Vertex{vtx0},
 		HeightV:  2,
-		TxsV:     []snowstorm.Tx{tx1},
+		TxsV:     []conflicts.Tx{tx1},
 	}
 
 	vtx2 := &TestVertex{
@@ -904,7 +904,7 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: []Vertex{vtx1},
 		HeightV:  3,
-		TxsV:     []snowstorm.Tx{tx1},
+		TxsV:     []conflicts.Tx{tx1},
 	}
 
 	if err := avl.Add(vtx0); err != nil {
@@ -995,7 +995,7 @@ func SplitVotingTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx0},
+		TxsV:     []conflicts.Tx{tx0},
 	}
 
 	vtx1 := &TestVertex{
@@ -1005,7 +1005,7 @@ func SplitVotingTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx0},
+		TxsV:     []conflicts.Tx{tx0},
 	}
 
 	if err := avl.Add(vtx0); err != nil {
@@ -1076,7 +1076,7 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx0},
+		TxsV:     []conflicts.Tx{tx0},
 	}
 
 	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
@@ -1092,7 +1092,7 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx1},
+		TxsV:     []conflicts.Tx{tx1},
 	}
 
 	tx2 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
@@ -1108,7 +1108,7 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: []Vertex{vtx0},
 		HeightV:  2,
-		TxsV:     []snowstorm.Tx{tx2},
+		TxsV:     []conflicts.Tx{tx2},
 	}
 
 	if err := avl.Add(vtx0); err != nil {
@@ -1221,7 +1221,7 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx0},
+		TxsV:     []conflicts.Tx{tx0},
 	}
 
 	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
@@ -1237,7 +1237,7 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx1},
+		TxsV:     []conflicts.Tx{tx1},
 	}
 
 	if !avl.IsVirtuous(tx0) {
@@ -1312,7 +1312,7 @@ func QuiesceTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx0},
+		TxsV:     []conflicts.Tx{tx0},
 	}
 
 	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
@@ -1328,7 +1328,7 @@ func QuiesceTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx1},
+		TxsV:     []conflicts.Tx{tx1},
 	}
 
 	tx2 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
@@ -1344,7 +1344,7 @@ func QuiesceTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx2},
+		TxsV:     []conflicts.Tx{tx2},
 	}
 
 	if err := avl.Add(vtx0); err != nil {
@@ -1415,7 +1415,7 @@ func OrphansTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx0},
+		TxsV:     []conflicts.Tx{tx0},
 	}
 
 	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
@@ -1431,7 +1431,7 @@ func OrphansTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx1},
+		TxsV:     []conflicts.Tx{tx1},
 	}
 
 	tx2 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
@@ -1447,7 +1447,7 @@ func OrphansTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: []Vertex{vtx0},
 		HeightV:  2,
-		TxsV:     []snowstorm.Tx{tx2},
+		TxsV:     []conflicts.Tx{tx2},
 	}
 
 	if err := avl.Add(vtx0); err != nil {
@@ -1513,7 +1513,7 @@ func ErrorOnVacuousAcceptTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx0},
+		TxsV:     []conflicts.Tx{tx0},
 	}
 
 	if err := avl.Add(vtx0); err == nil {
@@ -1561,7 +1561,7 @@ func ErrorOnTxAcceptTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx0},
+		TxsV:     []conflicts.Tx{tx0},
 	}
 
 	if err := avl.Add(vtx0); err != nil {
@@ -1615,7 +1615,7 @@ func ErrorOnVtxAcceptTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx0},
+		TxsV:     []conflicts.Tx{tx0},
 	}
 
 	if err := avl.Add(vtx0); err != nil {
@@ -1668,7 +1668,7 @@ func ErrorOnVtxRejectTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx0},
+		TxsV:     []conflicts.Tx{tx0},
 	}
 
 	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
@@ -1685,7 +1685,7 @@ func ErrorOnVtxRejectTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx1},
+		TxsV:     []conflicts.Tx{tx1},
 	}
 
 	if err := avl.Add(vtx0); err != nil {
@@ -1740,7 +1740,7 @@ func ErrorOnParentVtxRejectTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx0},
+		TxsV:     []conflicts.Tx{tx0},
 	}
 
 	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
@@ -1757,7 +1757,7 @@ func ErrorOnParentVtxRejectTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx1},
+		TxsV:     []conflicts.Tx{tx1},
 	}
 
 	vtx2 := &TestVertex{
@@ -1767,7 +1767,7 @@ func ErrorOnParentVtxRejectTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: []Vertex{vtx1},
 		HeightV:  2,
-		TxsV:     []snowstorm.Tx{tx1},
+		TxsV:     []conflicts.Tx{tx1},
 	}
 
 	if err := avl.Add(vtx0); err != nil {
@@ -1824,7 +1824,7 @@ func ErrorOnTransitiveVtxRejectTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx0},
+		TxsV:     []conflicts.Tx{tx0},
 	}
 
 	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
@@ -1840,7 +1840,7 @@ func ErrorOnTransitiveVtxRejectTest(t *testing.T, factory Factory) {
 		},
 		ParentsV: vts,
 		HeightV:  1,
-		TxsV:     []snowstorm.Tx{tx1},
+		TxsV:     []conflicts.Tx{tx1},
 	}
 
 	vtx2 := &TestVertex{

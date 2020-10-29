@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/snow/consensus/blizzard/conflicts"
 
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
@@ -35,27 +35,27 @@ var (
 		AcceptingSlowDependencyTest,
 		RejectingDependencyTest,
 		RejectingSlowDependencyTest,
-		VacuouslyAcceptedTest,
+		InvalidAddTest,
+		InvalidConflictsTest,
 		ConflictsTest,
 		VirtuousDependsOnRogueTest,
-		ErrorOnVacuouslyAcceptedTest,
 		ErrorOnAcceptedTest,
 		ErrorOnRejectingLowerConfidenceConflictTest,
 		ErrorOnRejectingHigherConfidenceConflictTest,
 		UTXOCleanupTest,
 	}
 
-	Red, Green, Blue, Alpha *TestTx
+	Red, Green, Blue, Alpha *conflicts.TestTx
 )
 
 //  R - G - B - A
 func Setup() {
-	Red = &TestTx{}
-	Green = &TestTx{}
-	Blue = &TestTx{}
-	Alpha = &TestTx{}
+	Red = &conflicts.TestTx{}
+	Green = &conflicts.TestTx{}
+	Blue = &conflicts.TestTx{}
+	Alpha = &conflicts.TestTx{}
 
-	for i, color := range []*TestTx{Red, Green, Blue, Alpha} {
+	for i, color := range []*conflicts.TestTx{Red, Green, Blue, Alpha} {
 		color.IDV = ids.Empty.Prefix(uint64(i))
 		color.AcceptV = nil
 		color.RejectV = nil
@@ -63,8 +63,6 @@ func Setup() {
 
 		color.DependenciesV = nil
 		color.InputIDsV.Clear()
-		color.VerifyV = nil
-		color.BytesV = []byte{byte(i)}
 	}
 
 	X := ids.Empty.Prefix(4)
@@ -80,17 +78,6 @@ func Setup() {
 	Blue.InputIDsV.Add(Z)
 
 	Alpha.InputIDsV.Add(Z)
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		Red.Verify(),
-		Green.Verify(),
-		Blue.Verify(),
-		Alpha.Verify(),
-	)
-	if errs.Errored() {
-		panic(errs.Err)
-	}
 }
 
 // Execute all tests against a consensus implementation
@@ -120,7 +107,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			t.Fatal(err)
 		}
 		graph := factory.New()
-		if err := graph.Initialize(snow.DefaultContextTest(), params); err == nil {
+		if err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params); err == nil {
 			t.Fatalf("should have errored due to a duplicated metric")
 		}
 	}
@@ -140,7 +127,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			t.Fatal(err)
 		}
 		graph := factory.New()
-		if err := graph.Initialize(snow.DefaultContextTest(), params); err == nil {
+		if err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params); err == nil {
 			t.Fatalf("should have errored due to a duplicated metric")
 		}
 	}
@@ -160,7 +147,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			t.Fatal(err)
 		}
 		graph := factory.New()
-		if err := graph.Initialize(snow.DefaultContextTest(), params); err == nil {
+		if err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params); err == nil {
 			t.Fatalf("should have errored due to a duplicated metric")
 		}
 	}
@@ -177,7 +164,7 @@ func ParamsTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +191,7 @@ func IssuedTest(t *testing.T, factory Factory) {
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +222,7 @@ func LeftoverInputTest(t *testing.T, factory Factory) {
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,7 +276,7 @@ func LowerConfidenceTest(t *testing.T, factory Factory) {
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -345,7 +332,7 @@ func MiddleConfidenceTest(t *testing.T, factory Factory) {
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -406,7 +393,7 @@ func IndependentTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -468,7 +455,7 @@ func VirtuousTest(t *testing.T, factory Factory) {
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -511,44 +498,49 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	if err := graph.Initialize(snow.DefaultContextTest(), params); err != nil {
+	if err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params); err != nil {
 		t.Fatal(err)
 	}
 
-	switch {
-	case !graph.IsVirtuous(Red):
+	if v, _ := graph.IsVirtuous(Red); !v {
 		t.Fatalf("Should be virtuous")
-	case !graph.IsVirtuous(Green):
+	}
+	if v, _ := graph.IsVirtuous(Green); !v {
 		t.Fatalf("Should be virtuous")
-	case !graph.IsVirtuous(Blue):
+	}
+	if v, _ := graph.IsVirtuous(Blue); !v {
 		t.Fatalf("Should be virtuous")
-	case !graph.IsVirtuous(Alpha):
+	}
+	if v, _ := graph.IsVirtuous(Alpha); !v {
 		t.Fatalf("Should be virtuous")
 	}
 
-	err := graph.Add(Red)
-	switch {
-	case err != nil:
+	if err := graph.Add(Red); err != nil {
 		t.Fatal(err)
-	case !graph.IsVirtuous(Red):
+	}
+	if v, _ := graph.IsVirtuous(Red); !v {
 		t.Fatalf("Should be virtuous")
-	case graph.IsVirtuous(Green):
+	}
+	if v, _ := graph.IsVirtuous(Green); v {
 		t.Fatalf("Should not be virtuous")
-	case !graph.IsVirtuous(Blue):
+	}
+	if v, _ := graph.IsVirtuous(Blue); !v {
 		t.Fatalf("Should be virtuous")
-	case !graph.IsVirtuous(Alpha):
+	}
+	if v, _ := graph.IsVirtuous(Alpha); !v {
 		t.Fatalf("Should be virtuous")
 	}
 
-	err = graph.Add(Green)
-	switch {
-	case err != nil:
+	if err := graph.Add(Green); err != nil {
 		t.Fatal(err)
-	case graph.IsVirtuous(Red):
+	}
+	if v, _ := graph.IsVirtuous(Red); v {
 		t.Fatalf("Should not be virtuous")
-	case graph.IsVirtuous(Green):
+	}
+	if v, _ := graph.IsVirtuous(Green); v {
 		t.Fatalf("Should not be virtuous")
-	case graph.IsVirtuous(Blue):
+	}
+	if v, _ := graph.IsVirtuous(Blue); v {
 		t.Fatalf("Should not be virtuous")
 	}
 }
@@ -564,7 +556,7 @@ func QuiesceTest(t *testing.T, factory Factory) {
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -585,12 +577,12 @@ func QuiesceTest(t *testing.T, factory Factory) {
 func AcceptingDependencyTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
-	purple := &TestTx{
+	purple := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(7),
 			StatusV: choices.Processing,
 		},
-		DependenciesV: []Tx{Red},
+		DependenciesV: []conflicts.Tx{Red},
 	}
 	purple.InputIDsV.Add(ids.Empty.Prefix(8))
 
@@ -602,7 +594,7 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	if err := graph.Initialize(snow.DefaultContextTest(), params); err != nil {
+	if err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params); err != nil {
 		t.Fatal(err)
 	}
 
@@ -702,7 +694,7 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 }
 
 type singleAcceptTx struct {
-	Tx
+	conflicts.Tx
 
 	t        *testing.T
 	accepted bool
@@ -719,12 +711,12 @@ func (tx *singleAcceptTx) Accept() error {
 func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
-	rawPurple := &TestTx{
+	rawPurple := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(7),
 			StatusV: choices.Processing,
 		},
-		DependenciesV: []Tx{Red},
+		DependenciesV: []conflicts.Tx{Red},
 	}
 	rawPurple.InputIDsV.Add(ids.Empty.Prefix(8))
 
@@ -741,7 +733,7 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -868,12 +860,12 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 func RejectingDependencyTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
-	purple := &TestTx{
+	purple := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(7),
 			StatusV: choices.Processing,
 		},
-		DependenciesV: []Tx{Red, Blue},
+		DependenciesV: []conflicts.Tx{Red, Blue},
 	}
 	purple.InputIDsV.Add(ids.Empty.Prefix(8))
 
@@ -885,7 +877,7 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -969,7 +961,7 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 }
 
 type singleRejectTx struct {
-	Tx
+	conflicts.Tx
 
 	t        *testing.T
 	rejected bool
@@ -986,12 +978,12 @@ func (tx *singleRejectTx) Reject() error {
 func RejectingSlowDependencyTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
-	rawPurple := &TestTx{
+	rawPurple := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(100),
 			StatusV: choices.Processing,
 		},
-		DependenciesV: []Tx{Red},
+		DependenciesV: []conflicts.Tx{Red},
 	}
 	conflictID := ids.Empty.Prefix(101)
 	rawPurple.InputIDsV.Add(conflictID)
@@ -1001,7 +993,7 @@ func RejectingSlowDependencyTest(t *testing.T, factory Factory) {
 		t:  t,
 	}
 
-	rawCyan := &TestTx{TestDecidable: choices.TestDecidable{
+	rawCyan := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(102),
 		StatusV: choices.Processing,
 	}}
@@ -1020,7 +1012,7 @@ func RejectingSlowDependencyTest(t *testing.T, factory Factory) {
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1103,13 +1095,8 @@ func RejectingSlowDependencyTest(t *testing.T, factory Factory) {
 	}
 }
 
-func VacuouslyAcceptedTest(t *testing.T, factory Factory) {
+func InvalidAddTest(t *testing.T, factory Factory) {
 	graph := factory.New()
-
-	purple := &TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.Empty.Prefix(7),
-		StatusV: choices.Processing,
-	}}
 
 	params := sbcon.Parameters{
 		Metrics:           prometheus.NewRegistry(),
@@ -1119,18 +1106,43 @@ func VacuouslyAcceptedTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := graph.Add(purple); err != nil {
-		t.Fatal(err)
-	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
-		t.Fatalf("Wrong number of preferences.")
-	} else if status := purple.Status(); status != choices.Accepted {
-		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Accepted)
+	tx := &choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Processing,
 	}
+
+	err = graph.Add(tx)
+	assert.Error(t, err)
+}
+
+func InvalidConflictsTest(t *testing.T, factory Factory) {
+	graph := factory.New()
+
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
+	}
+	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx := &choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Processing,
+	}
+
+	_, err = graph.Conflicts(tx)
+	assert.Error(t, err)
 }
 
 func ConflictsTest(t *testing.T, factory Factory) {
@@ -1144,7 +1156,7 @@ func ConflictsTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1154,7 +1166,7 @@ func ConflictsTest(t *testing.T, factory Factory) {
 	insPurple := ids.Set{}
 	insPurple.Add(conflictInputID)
 
-	purple := &TestTx{
+	purple := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(6),
 			StatusV: choices.Processing,
@@ -1165,7 +1177,7 @@ func ConflictsTest(t *testing.T, factory Factory) {
 	insOrange := ids.Set{}
 	insOrange.Add(conflictInputID)
 
-	orange := &TestTx{
+	orange := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(7),
 			StatusV: choices.Processing,
@@ -1175,13 +1187,13 @@ func ConflictsTest(t *testing.T, factory Factory) {
 
 	if err := graph.Add(purple); err != nil {
 		t.Fatal(err)
-	} else if orangeConflicts := graph.Conflicts(orange); orangeConflicts.Len() != 1 {
+	} else if orangeConflicts, _ := graph.Conflicts(orange); orangeConflicts.Len() != 1 {
 		t.Fatalf("Wrong number of conflicts")
 	} else if !orangeConflicts.Contains(purple.IDV) {
 		t.Fatalf("Conflicts does not contain the right transaction")
 	} else if err := graph.Add(orange); err != nil {
 		t.Fatal(err)
-	} else if orangeConflicts := graph.Conflicts(orange); orangeConflicts.Len() != 1 {
+	} else if orangeConflicts, _ := graph.Conflicts(orange); orangeConflicts.Len() != 1 {
 		t.Fatalf("Wrong number of conflicts")
 	} else if !orangeConflicts.Contains(purple.IDV) {
 		t.Fatalf("Conflicts does not contain the right transaction")
@@ -1199,25 +1211,25 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	rogue1 := &TestTx{TestDecidable: choices.TestDecidable{
+	rogue1 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(0),
 		StatusV: choices.Processing,
 	}}
-	rogue2 := &TestTx{TestDecidable: choices.TestDecidable{
+	rogue2 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(1),
 		StatusV: choices.Processing,
 	}}
-	virtuous := &TestTx{
+	virtuous := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(2),
 			StatusV: choices.Processing,
 		},
-		DependenciesV: []Tx{rogue1},
+		DependenciesV: []conflicts.Tx{rogue1},
 	}
 
 	input1 := ids.Empty.Prefix(3)
@@ -1254,37 +1266,10 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 	}
 }
 
-func ErrorOnVacuouslyAcceptedTest(t *testing.T, factory Factory) {
-	graph := factory.New()
-
-	purple := &TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.Empty.Prefix(7),
-		AcceptV: errors.New(""),
-		StatusV: choices.Processing,
-	}}
-
-	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := graph.Add(purple); err == nil {
-		t.Fatalf("Should have errored on acceptance")
-	}
-}
-
 func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
-	purple := &TestTx{TestDecidable: choices.TestDecidable{
+	purple := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(7),
 		AcceptV: errors.New(""),
 		StatusV: choices.Processing,
@@ -1299,7 +1284,7 @@ func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1320,13 +1305,13 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 
 	X := ids.Empty.Prefix(4)
 
-	purple := &TestTx{TestDecidable: choices.TestDecidable{
+	purple := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(7),
 		StatusV: choices.Processing,
 	}}
 	purple.InputIDsV.Add(X)
 
-	pink := &TestTx{TestDecidable: choices.TestDecidable{
+	pink := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(8),
 		RejectV: errors.New(""),
 		StatusV: choices.Processing,
@@ -1341,7 +1326,7 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1364,13 +1349,13 @@ func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory)
 
 	X := ids.Empty.Prefix(4)
 
-	purple := &TestTx{TestDecidable: choices.TestDecidable{
+	purple := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(7),
 		StatusV: choices.Processing,
 	}}
 	purple.InputIDsV.Add(X)
 
-	pink := &TestTx{TestDecidable: choices.TestDecidable{
+	pink := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(8),
 		RejectV: errors.New(""),
 		StatusV: choices.Processing,
@@ -1385,7 +1370,7 @@ func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory)
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1414,7 +1399,7 @@ func UTXOCleanupTest(t *testing.T, factory Factory) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
 	assert.NoError(t, err)
 
 	err = graph.Add(Red)
@@ -1459,7 +1444,7 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
 	}
-	err := graph.Initialize(snow.DefaultContextTest(), params)
+	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
 	if err != nil {
 		t.Fatal(err)
 	}

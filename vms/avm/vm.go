@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -88,7 +88,7 @@ type VM struct {
 	// Transaction issuing
 	timer        *timer.Timer
 	batchTimeout time.Duration
-	txs          []snowstorm.Tx
+	txs          []conflicts.Tx
 	toEngine     chan<- common.Message
 
 	baseDB database.Database
@@ -345,7 +345,7 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 }
 
 // PendingTxs implements the avalanche.DAGVM interface
-func (vm *VM) PendingTxs() []snowstorm.Tx {
+func (vm *VM) PendingTxs() []conflicts.Tx {
 	vm.metrics.numPendingTxsCalls.Inc()
 
 	vm.timer.Cancel()
@@ -356,14 +356,14 @@ func (vm *VM) PendingTxs() []snowstorm.Tx {
 }
 
 // ParseTx implements the avalanche.DAGVM interface
-func (vm *VM) ParseTx(b []byte) (snowstorm.Tx, error) {
+func (vm *VM) ParseTx(b []byte) (conflicts.Tx, error) {
 	vm.metrics.numParseTxCalls.Inc()
 
 	return vm.parseTx(b)
 }
 
 // GetTx implements the avalanche.DAGVM interface
-func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
+func (vm *VM) GetTx(txID ids.ID) (conflicts.Tx, error) {
 	vm.metrics.numGetTxCalls.Inc()
 
 	tx := &UniqueTx{
@@ -659,7 +659,7 @@ func (vm *VM) parsePrivateTx(txBytes []byte) (*Tx, error) {
 	return tx, nil
 }
 
-func (vm *VM) issueTx(tx snowstorm.Tx) {
+func (vm *VM) issueTx(tx conflicts.Tx) {
 	vm.txs = append(vm.txs, tx)
 	switch {
 	case len(vm.txs) == batchSize:

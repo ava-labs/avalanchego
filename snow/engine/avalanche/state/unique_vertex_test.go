@@ -72,7 +72,7 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 		parentIDs: parentIDs,
 		chainID:   chainID,
 		height:    height,
-		txs:       []snowstorm.Tx{testTx},
+		txs:       []conflicts.Tx{testTx},
 	}
 
 	uVtx := &uniqueVertex{
