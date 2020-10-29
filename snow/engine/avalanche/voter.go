@@ -50,8 +50,10 @@ func (v *voter) Update() {
 		return
 	}
 
-	txs := []snowstorm.Tx(nil)
-	for _, orphanID := range v.t.Consensus.Orphans().List() {
+	orphans := v.t.Consensus.Orphans()
+	txs := make([]snowstorm.Tx, 0, orphans.Len())
+	for orphanIDKey := range orphans {
+		orphanID := ids.NewID(orphanIDKey)
 		if tx, err := v.t.VM.GetTx(orphanID); err == nil {
 			txs = append(txs, tx)
 		} else {
@@ -78,12 +80,11 @@ func (v *voter) Update() {
 func (v *voter) bubbleVotes(votes ids.UniqueBag) (ids.UniqueBag, error) {
 	bubbledVotes := ids.UniqueBag{}
 	vertexHeap := vertex.NewHeap()
-	for _, vote := range votes.List() {
-		vtx, err := v.t.Manager.GetVertex(vote)
+	for voteKey := range votes {
+		vtx, err := v.t.Manager.GetVertex(ids.NewID(voteKey))
 		if err != nil {
 			continue
 		}
-
 		vertexHeap.Push(vtx)
 	}
 

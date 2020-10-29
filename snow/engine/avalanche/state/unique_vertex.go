@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 // uniqueVertex acts as a cache for vertices in the database.
@@ -27,7 +28,55 @@ type uniqueVertex struct {
 	v     *vertexState
 }
 
+// newUniqueVertex returns a uniqueVertex instance from [b] by checking the cache
+// and then parsing the vertex bytes on a cache miss.
+func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
+	vtx := &uniqueVertex{
+		vtxID:      ids.NewID(hashing.ComputeHash256Array(b)),
+		serializer: s,
+	}
+	vtx.shallowRefresh()
+
+	// If the vtx exists, then the vertex is already known
+	if vtx.v.vtx != nil {
+		return vtx, nil
+	}
+
+	// If it wasn't in the cache parse the vertex and set it
+	innerVertex, err := s.parseVertex(b)
+	if err != nil {
+		return nil, err
+	}
+	if err := innerVertex.Verify(); err != nil {
+		return nil, err
+	}
+	vtx.v.vtx = innerVertex
+
+	// If the vertex has already been fetched,
+	// skip persisting the vertex.
+	if vtx.v.status.Fetched() {
+		return vtx, nil
+	}
+
+	// The vertex is newly parsed, so set the status
+	// and persist it.
+	vtx.v.status = choices.Processing
+	return vtx, vtx.persist()
+}
+
 func (vtx *uniqueVertex) refresh() {
+	vtx.shallowRefresh()
+
+	if vtx.v.vtx == nil && vtx.v.status.Fetched() {
+		vtx.v.vtx = vtx.serializer.state.Vertex(vtx.ID())
+	}
+}
+
+// shallowRefresh checks the cache for the uniqueVertex and gets the
+// most up to date status for [vtx]
+// ensures that the status is up to date for this vertex
+// inner vertex may be nil after calling shallowRefresh
+func (vtx *uniqueVertex) shallowRefresh() {
 	if vtx.v == nil {
 		vtx.v = &vertexState{}
 	}
@@ -45,10 +94,7 @@ func (vtx *uniqueVertex) refresh() {
 		*vtx = *unique
 	}
 
-	switch {
-	case vtx.v.vtx == nil && prevVtx == nil:
-		vtx.v.vtx = vtx.serializer.state.Vertex(vtx.ID())
-	case vtx.v.vtx == nil:
+	if vtx.v.vtx == nil {
 		vtx.v.vtx = prevVtx
 	}
 }
@@ -62,19 +108,28 @@ func (vtx *uniqueVertex) Evict() {
 }
 
 func (vtx *uniqueVertex) setVertex(innerVtx *innerVertex) error {
-	vtx.refresh()
-	if vtx.v.vtx != nil {
+	vtx.shallowRefresh()
+	vtx.v.vtx = innerVtx
+
+	if vtx.v.status.Fetched() {
 		return nil
 	}
-	vtx.v.vtx = innerVtx
-	if err := vtx.serializer.state.SetVertex(innerVtx); err != nil {
+	vtx.v.status = choices.Processing
+	return vtx.persist()
+}
+
+func (vtx *uniqueVertex) persist() error {
+	if err := vtx.serializer.state.SetVertex(vtx.v.vtx); err != nil {
 		return err
 	}
-	return vtx.setStatus(choices.Processing)
+	if err := vtx.serializer.state.SetStatus(vtx.ID(), vtx.v.status); err != nil {
+		return err
+	}
+	return vtx.serializer.db.Commit()
 }
 
 func (vtx *uniqueVertex) setStatus(status choices.Status) error {
-	vtx.refresh()
+	vtx.shallowRefresh()
 	if vtx.v.status == status {
 		return nil
 	}
@@ -122,6 +177,9 @@ func (vtx *uniqueVertex) Reject() error {
 	return vtx.serializer.db.Commit()
 }
 
+// TODO: run performance test to see if shallow refreshing
+// (which will mean that refresh must be called in Bytes and Verify)
+// improves performance
 func (vtx *uniqueVertex) Status() choices.Status { vtx.refresh(); return vtx.v.status }
 
 func (vtx *uniqueVertex) Parents() ([]avalanche.Vertex, error) {

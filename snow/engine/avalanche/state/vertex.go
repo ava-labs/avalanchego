@@ -6,6 +6,7 @@ package state
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"sort"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -16,8 +17,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// maxSize is the maximum allowed vertex size. It is necessary to deter DoS.
-const maxSize = 1 << 20
+const (
+	// maxSize is the maximum allowed vertex size. It is necessary to deter DoS.
+	maxSize = 1 << 20
+
+	// maxNumParents is the max number of parents a vertex may have
+	maxNumParents = 128
+
+	// maxTxsPerVtx is the max number of transactions a vertex may have
+	maxTxsPerVtx = 128
+)
 
 const (
 	version uint16 = 0
@@ -60,7 +69,8 @@ func (vtx *innerVertex) Verify() error {
 
 	inputIDs := ids.Set{}
 	for _, tx := range vtx.txs {
-		inputs := tx.InputIDs()
+		inputs := ids.Set{}
+		inputs.Add(tx.InputIDs()...)
 		if inputs.Overlaps(inputIDs) {
 			return errConflictingTxs
 		}
@@ -121,17 +131,26 @@ func (vtx *innerVertex) Unmarshal(b []byte, vm vertex.DAGVM) error {
 		p.Add(errBadEpoch)
 	}
 
-	parentIDs := []ids.ID(nil)
-	for i := p.UnpackInt(); i > 0 && !p.Errored(); i-- {
-		parentID, _ := ids.ToID(p.UnpackFixedBytes(hashing.HashLen))
-		parentIDs = append(parentIDs, parentID)
+	numParents := p.UnpackInt()
+	if numParents > maxNumParents {
+		return fmt.Errorf("vertex says it has %d parents but max is %d", numParents, maxNumParents)
+	}
+	parentIDs := make([]ids.ID, numParents)
+	for i := 0; i < int(numParents) && !p.Errored(); i++ {
+		parentID, err := ids.ToID(p.UnpackFixedBytes(hashing.HashLen))
+		p.Add(err)
+		parentIDs[i] = parentID
 	}
 
-	txs := []snowstorm.Tx(nil)
-	for i := p.UnpackInt(); i > 0 && !p.Errored(); i-- {
+	numTxs := p.UnpackInt()
+	if numTxs > maxTxsPerVtx {
+		return fmt.Errorf("vertex says it has %d txs but max is %d", numTxs, maxTxsPerVtx)
+	}
+	txs := make([]snowstorm.Tx, numTxs)
+	for i := 0; i < int(numTxs) && !p.Errored(); i++ {
 		tx, err := vm.ParseTx(p.UnpackBytes())
 		p.Add(err)
-		txs = append(txs, tx)
+		txs[i] = tx
 	}
 
 	if p.Offset != len(b) {

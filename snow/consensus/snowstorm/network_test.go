@@ -91,7 +91,7 @@ func (n *Network) Initialize(
 			IDV:     ids.Empty.Prefix(idCount),
 			StatusV: choices.Processing,
 		}}
-		tx.InputIDsV.Add(selected...)
+		tx.InputIDsV = append(tx.InputIDsV, selected...)
 
 		n.consumers = append(n.consumers, tx)
 	}

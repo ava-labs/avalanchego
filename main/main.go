@@ -31,9 +31,9 @@ var (
 
 // main is the primary entry point to Avalanche.
 func main() {
-	// Err is set based on the CLI arguments
-	if Err != nil {
-		fmt.Printf("parsing parameters returned with error %s\n", Err)
+	// parse config using viper
+	if err := parseViper(); err != nil {
+		fmt.Printf("parsing parameters returned with error %s\n", err)
 		return
 	}
 
@@ -129,6 +129,8 @@ func main() {
 		&Config.StakingIP,
 	)
 	defer externalIPUpdater.Stop()
+
+	log.Info("IP: %s", Config.StakingIP.IP())
 
 	log.Debug("initializing node state")
 	node := node.Node{}

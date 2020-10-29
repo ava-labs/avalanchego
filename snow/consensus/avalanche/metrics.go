@@ -4,7 +4,6 @@
 package avalanche
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -12,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 type metrics struct {
@@ -44,16 +44,13 @@ func (m *metrics) Initialize(log logging.Logger, namespace string, registerer pr
 		Buckets:   timer.MillisecondsBuckets,
 	})
 
-	if err := registerer.Register(m.numProcessing); err != nil {
-		return fmt.Errorf("failed to register vtx_processing statistics due to %w", err)
-	}
-	if err := registerer.Register(m.latAccepted); err != nil {
-		return fmt.Errorf("failed to register vtx_accepted statistics due to %w", err)
-	}
-	if err := registerer.Register(m.latRejected); err != nil {
-		return fmt.Errorf("failed to register vtx_rejected statistics due to %w", err)
-	}
-	return nil
+	errs := wrappers.Errs{}
+	errs.Add(
+		registerer.Register(m.numProcessing),
+		registerer.Register(m.latAccepted),
+		registerer.Register(m.latRejected),
+	)
+	return errs.Err
 }
 
 func (m *metrics) Issued(id ids.ID) {

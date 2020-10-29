@@ -78,7 +78,7 @@ func defaultAddress(t *testing.T, service *Service) {
 }
 
 func TestAddValidator(t *testing.T) {
-	expectedJSONString := `{"username":"","password":"","from":null,"changeAddr":"","startTime":"0","endTime":"0","nodeID":"","rewardAddress":"","delegationFeeRate":"0.0000"}`
+	expectedJSONString := `{"username":"","password":"","from":null,"changeAddr":"","txID":null,"startTime":"0","endTime":"0","nodeID":"","rewardAddress":"","delegationFeeRate":"0.0000"}`
 	args := AddValidatorArgs{}
 	bytes, err := json.Marshal(&args)
 	if err != nil {
@@ -190,12 +190,15 @@ func TestGetTxStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	arg := &GetTxStatusArgs{TxID: tx.ID()}
-	var status Status
-	if err := service.GetTxStatus(nil, arg, &status); err != nil {
+	var resp GetTxStatusResponse
+	if err := service.GetTxStatus(nil, arg, &resp); err != nil {
 		t.Fatal(err)
-	} else if status != Unknown {
-		t.Fatalf("status should be unknown but is %s", status)
+	} else if resp.Status != Unknown {
+		t.Fatalf("status should be unknown but is %s", resp.Status)
+	} else if resp.Reason != "" {
+		t.Fatalf("reason should be empty but is %s", resp.Reason)
 		// put the chain in existing chain list
 	} else if err := service.vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
@@ -203,12 +206,33 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	} else if _, err := service.vm.BuildBlock(); err == nil {
 		t.Fatal("should have errored because chain already exists")
-	} else if err := service.GetTxStatus(nil, arg, &status); err != nil {
+	}
+
+	resp = GetTxStatusResponse{} // reset
+	err = service.GetTxStatus(nil, arg, &resp)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if status != Dropped {
-		t.Fatalf("status should be Dropped but is %s", status)
-		// remove the chain from existing chain list
-	} else if err := service.vm.putChains(service.vm.DB, []*Tx{}); err != nil {
+	case resp.Status != Dropped:
+		t.Fatalf("status should be Dropped but is %s", resp.Status)
+	case resp.Reason == "":
+		t.Fatal("reason shouldn't be empty")
+	}
+
+	resp = GetTxStatusResponse{} // reset
+	argIncludeReason := &GetTxStatusArgs{TxID: tx.ID(), IncludeReason: true}
+	err = service.GetTxStatus(nil, argIncludeReason, &resp)
+	switch {
+	case err != nil:
+		t.Fatal(err)
+	case resp.Status != Dropped:
+		t.Fatalf("status should be Dropped but is %s", resp.Status)
+	case resp.Reason == "":
+		t.Fatalf("reason shouldn't be empty")
+	}
+
+	// remove the chain from existing chain list
+	if err := service.vm.putChains(service.vm.DB, []*Tx{}); err != nil {
 		t.Fatal(err)
 	} else if err := service.vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
@@ -220,10 +244,17 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
-	} else if err := service.GetTxStatus(nil, arg, &status); err != nil {
+	}
+
+	resp = GetTxStatusResponse{} // reset
+	err = service.GetTxStatus(nil, arg, &resp)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if status != Committed {
-		t.Fatalf("status should be Committed but is %s", status)
+	case resp.Status != Committed:
+		t.Fatalf("status should be Committed but is %s", resp.Status)
+	case resp.Reason != "":
+		t.Fatalf("reason should be empty but is %s", resp.Reason)
 	}
 }
 

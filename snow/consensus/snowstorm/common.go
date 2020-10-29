@@ -106,7 +106,7 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 	c.metrics.Issued(txID)
 
 	// If this tx has inputs, it needs to be voted on before being accepted.
-	if inputs := tx.InputIDs(); inputs.Len() != 0 {
+	if inputs := tx.InputIDs(); len(inputs) != 0 {
 		return true, nil
 	}
 
@@ -275,7 +275,9 @@ func (r *rejector) Fulfill(ids.ID) {
 		return
 	}
 	r.rejected = true
-	r.errs.Add(r.g.reject(r.txID))
+	asSet := ids.Set{}
+	asSet.Add(r.txID)
+	r.errs.Add(r.g.reject(asSet))
 }
 
 func (*rejector) Abandon(ids.ID) {}
@@ -317,11 +319,10 @@ func ConsensusString(name string, nodes []*snowballNode) string {
 	sb.WriteString("(")
 
 	format := fmt.Sprintf(
-		"\n    Choice[%s] = ID: %%50s SB(NumSuccessfulPolls = %%d, Confidence = %%d)",
+		"\n    Choice[%s] = ID: %%50s %%s",
 		formatting.IntFormat(len(nodes)-1))
 	for i, txNode := range nodes {
-		sb.WriteString(fmt.Sprintf(format,
-			i, txNode.txID, txNode.numSuccessfulPolls, txNode.confidence))
+		sb.WriteString(fmt.Sprintf(format, i, txNode.txID, txNode))
 	}
 
 	if len(nodes) > 0 {

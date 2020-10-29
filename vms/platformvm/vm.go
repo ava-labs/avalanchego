@@ -207,7 +207,9 @@ type VM struct {
 
 	// Contains the IDs of transactions recently dropped because they failed verification.
 	// These txs may be re-issued and put into accepted blocks, so check the database
-	// to see if it was later committed/aborted before reporting that it's dropped
+	// to see if it was later committed/aborted before reporting that it's dropped.
+	// Key: Tx ID
+	// Value: String repr. of the verification error
 	droppedTxCache cache.LRU
 
 	// Bootstrapped remembers if this chain has finished bootstrapping or not
@@ -737,14 +739,10 @@ func (vm *VM) nextStakerChangeTime(db database.Database) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, fmt.Errorf("couldn't get subnets: %w", err)
 	}
-	subnetIDs := ids.Set{}
-	subnetIDs.Add(constants.PrimaryNetworkID)
-	for _, subnet := range subnets {
-		subnetIDs.Add(subnet.ID())
-	}
-
 	earliest := timer.MaxTime
-	for _, subnetID := range subnetIDs.List() {
+
+	for _, subnet := range subnets {
+		subnetID := subnet.ID()
 		if tx, err := vm.nextStakerStart(db, subnetID); err == nil {
 			if staker, ok := tx.UnsignedTx.(TimedTx); ok {
 				if startTime := staker.StartTime(); startTime.Before(earliest) {
@@ -757,6 +755,20 @@ func (vm *VM) nextStakerChangeTime(db database.Database) (time.Time, error) {
 				if endTime := staker.EndTime(); endTime.Before(earliest) {
 					earliest = endTime
 				}
+			}
+		}
+	}
+	if tx, err := vm.nextStakerStart(db, constants.PrimaryNetworkID); err == nil {
+		if staker, ok := tx.UnsignedTx.(TimedTx); ok {
+			if startTime := staker.StartTime(); startTime.Before(earliest) {
+				earliest = startTime
+			}
+		}
+	}
+	if tx, err := vm.nextStakerStop(db, constants.PrimaryNetworkID); err == nil {
+		if staker, ok := tx.Tx.UnsignedTx.(TimedTx); ok {
+			if endTime := staker.EndTime(); endTime.Before(earliest) {
+				earliest = endTime
 			}
 		}
 	}
@@ -775,15 +787,11 @@ func (vm *VM) updateValidators(db database.Database) error {
 		return err
 	}
 
-	subnetIDs := ids.Set{}
-	subnetIDs.Add(constants.PrimaryNetworkID)
-	for _, subnet := range subnets {
-		subnetIDs.Add(subnet.ID())
+	if err := vm.updateSubnetValidators(db, constants.PrimaryNetworkID, timestamp); err != nil {
+		return err
 	}
-	subnetIDList := subnetIDs.List()
-
-	for _, subnetID := range subnetIDList {
-		if err := vm.updateSubnetValidators(db, subnetID, timestamp); err != nil {
+	for _, subnet := range subnets {
+		if err := vm.updateSubnetValidators(db, subnet.ID(), timestamp); err != nil {
 			return err
 		}
 	}
@@ -964,14 +972,11 @@ func (vm *VM) updateVdrMgr(force bool) error {
 		return err
 	}
 
-	subnetIDs := ids.Set{}
-	subnetIDs.Add(constants.PrimaryNetworkID)
-	for _, subnet := range subnets {
-		subnetIDs.Add(subnet.ID())
+	if err := vm.updateVdrSet(constants.PrimaryNetworkID); err != nil {
+		return err
 	}
-
-	for _, subnetID := range subnetIDs.List() {
-		if err := vm.updateVdrSet(subnetID); err != nil {
+	for _, subnet := range subnets {
+		if err := vm.updateVdrSet(subnet.ID()); err != nil {
 			return err
 		}
 	}
@@ -1051,8 +1056,11 @@ func (vm *VM) GetAtomicUTXOs(
 	}
 
 	addrsList := make([][]byte, addrs.Len())
-	for i, addr := range addrs.List() {
-		addrsList[i] = addr.Bytes()
+	i := 0
+	for addr := range addrs {
+		copied := addr
+		addrsList[i] = copied[:]
+		i++
 	}
 
 	allUTXOBytes, lastAddr, lastUTXO, err := vm.Ctx.SharedMemory.Indexed(

@@ -317,7 +317,7 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) err
 		// potentially abandon the request.
 		return t.QueryFailed(vdr, requestID)
 	}
-	blkID := votes.List()[0]
+	blkID := votes.CappedList(1)[0]
 
 	t.Ctx.Log.Verbo("Chits(%s, %d) contains vote for %s", vdr, requestID, blkID)
 
