@@ -87,7 +87,7 @@ type GetTxStatusReply struct {
 func (service *Service) GetTxStatus(r *http.Request, args *api.JSONTxID, reply *GetTxStatusReply) error {
 	service.vm.ctx.Log.Info("AVM: GetTxStatus called with %s", args.TxID)
 
-	if args.TxID.IsZero() {
+	if args.TxID == ids.Empty {
 		return errNilTxID
 	}
 
@@ -104,7 +104,7 @@ func (service *Service) GetTxStatus(r *http.Request, args *api.JSONTxID, reply *
 func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.FormattedTx) error {
 	service.vm.ctx.Log.Info("AVM: GetTx called with %s", args.TxID)
 
-	if args.TxID.IsZero() {
+	if args.TxID == ids.Empty {
 		return errNilTxID
 	}
 

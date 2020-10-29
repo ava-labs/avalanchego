@@ -43,7 +43,7 @@ func (md *Metadata) Verify() error {
 	switch {
 	case md == nil:
 		return errNilMetadata
-	case md.id.IsZero():
+	case md.id == ids.Empty:
 		return errMetadataNotInitialize
 	default:
 		return nil

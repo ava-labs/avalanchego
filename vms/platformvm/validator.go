@@ -72,7 +72,7 @@ func (v *SubnetValidator) SubnetID() ids.ID { return v.Subnet }
 // Verify this validator is valid
 func (v *SubnetValidator) Verify() error {
 	switch {
-	case v.Subnet.IsZero():
+	case v.Subnet == ids.Empty:
 		return errNoSubnetID
 	default:
 		return v.Validator.Verify()

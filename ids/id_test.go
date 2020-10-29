@@ -103,7 +103,7 @@ func TestIDMarshalJSON(t *testing.T) {
 		out   []byte
 		err   error
 	}{
-		{"ID{}", ID{}, []byte("null"), nil},
+		{"ID{}", ID{}, []byte("\"11111111111111111111111111111111LpoYY\""), nil},
 		{"ID(\"ava labs\")",
 			NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
 			[]byte("\"jvYi6Tn9idMi7BaymUVi9zWjg5tpmW7trfKG1AYJLKZJ2fsU7\""),

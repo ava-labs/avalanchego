@@ -337,18 +337,12 @@ func (s *State) IDs(key []byte, start []byte, limit int) ([]ids.ID, error) {
 
 // AddID saves an ID to the prefixed database
 func (s *State) AddID(key []byte, id ids.ID) error {
-	if id.IsZero() {
-		return errZeroID
-	}
 	db := prefixdb.NewNested(key, s.DB)
 	return db.Put(id.Bytes(), nil)
 }
 
 // RemoveID removes an ID from the prefixed database
 func (s *State) RemoveID(key []byte, id ids.ID) error {
-	if id.IsZero() {
-		return errZeroID
-	}
 	db := prefixdb.NewNested(key, s.DB)
 	return db.Delete(id.Bytes())
 }

@@ -56,7 +56,7 @@ func TestGenesis(t *testing.T) {
 
 	// Get lastAccepted
 	lastAccepted := vm.LastAccepted()
-	if lastAccepted.IsZero() {
+	if lastAccepted == ids.Empty {
 		t.Fatal("lastAccepted should not be empty")
 	}
 

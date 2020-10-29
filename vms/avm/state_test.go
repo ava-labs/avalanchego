@@ -146,10 +146,6 @@ func TestStateIDsNoStart(t *testing.T) {
 		t.Fatal(err)
 	} else if len(result) != 0 {
 		t.Fatalf("Should have returned 0 IDs")
-	} else if err := state.AddID(ids.Empty.Bytes(), ids.ID{}); err == nil {
-		t.Fatalf("Should have errored during serialization")
-	} else if err := state.RemoveID(ids.Empty.Bytes(), ids.ID{}); err == nil {
-		t.Fatalf("Should have errored during serialization")
 	}
 }
 

@@ -59,7 +59,7 @@ func (tx *UnsignedImportTx) Verify(
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.SourceChain.IsZero():
+	case tx.SourceChain == ids.Empty:
 		return errWrongChainID
 	case !tx.SourceChain.Equals(avmID):
 		// TODO: remove this check if we allow for P->C swaps

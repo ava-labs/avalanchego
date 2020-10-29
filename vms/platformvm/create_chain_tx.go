@@ -63,13 +63,13 @@ func (tx *UnsignedCreateChainTx) Verify(
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.SubnetID.IsZero():
+	case tx.SubnetID == ids.Empty:
 		return errNoSubnetID
 	case tx.SubnetID.Equals(constants.PrimaryNetworkID):
 		return errDSCantValidate
 	case len(tx.ChainName) > maxNameLen:
 		return errNameTooLong
-	case tx.VMID.IsZero():
+	case tx.VMID == ids.Empty:
 		return errInvalidVMID
 	case !ids.IsSortedAndUniqueIDs(tx.FxIDs):
 		return errFxIDsNotSortedAndUnique

@@ -33,7 +33,7 @@ func (utxo *UTXOID) InputSource() (ids.ID, uint32) { return utxo.TxID, utxo.Outp
 
 // InputID returns a unique ID of the UTXO that this input is spending
 func (utxo *UTXOID) InputID() ids.ID {
-	if utxo.id.IsZero() {
+	if utxo.id == ids.Empty {
 		utxo.id = utxo.TxID.Prefix(uint64(utxo.OutputIndex))
 	}
 	return utxo.id

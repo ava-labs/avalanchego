@@ -39,11 +39,7 @@ func FromString(idStr string) (ID, error) {
 
 // MarshalJSON ...
 func (id ID) MarshalJSON() ([]byte, error) {
-	if id.IsZero() {
-		return []byte("null"), nil
-	}
-	cb58 := formatting.CB58{Bytes: id[:]}
-	return cb58.MarshalJSON()
+	return formatting.CB58{Bytes: id[:]}.MarshalJSON()
 }
 
 // UnmarshalJSON ...
@@ -62,9 +58,6 @@ func (id *ID) UnmarshalJSON(b []byte) error {
 	*id = newID
 	return nil
 }
-
-// IsZero returns true if the value has not been initialized
-func (id ID) IsZero() bool { return id == [32]byte{} }
 
 // Key returns a 32 byte hash that this id represents. This is useful to allow
 // for this id to be used as keys in maps.

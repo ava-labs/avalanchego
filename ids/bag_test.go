@@ -21,7 +21,7 @@ func TestBagAdd(t *testing.T) {
 		t.Fatalf("Bag.Len returned %d elements expected %d", count, 0)
 	} else if list := bag.List(); len(list) != 0 {
 		t.Fatalf("Bag.List returned %v expected %v", list, nil)
-	} else if mode, freq := bag.Mode(); !mode.IsZero() {
+	} else if mode, freq := bag.Mode(); mode != Empty {
 		t.Fatalf("Bag.Mode[0] returned %s expected %s", mode, ID{})
 	} else if freq != 0 {
 		t.Fatalf("Bag.Mode[1] returned %d expected %d", freq, 0)

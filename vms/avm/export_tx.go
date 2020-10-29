@@ -43,7 +43,7 @@ func (t *ExportTx) SyntacticVerify(
 	switch {
 	case t == nil:
 		return errNilTx
-	case t.DestinationChain.IsZero():
+	case t.DestinationChain == ids.Empty:
 		return errWrongBlockchainID
 	case len(t.ExportedOuts) == 0:
 		return errNoExportOutputs
