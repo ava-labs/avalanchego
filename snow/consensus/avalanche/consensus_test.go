@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
@@ -36,7 +36,6 @@ var (
 		IsVirtuousTest,
 		QuiesceTest,
 		OrphansTest,
-		ErrorOnVacuousAcceptTest,
 		ErrorOnTxAcceptTest,
 		ErrorOnVtxAcceptTest,
 		ErrorOnVtxRejectTest,
@@ -206,7 +205,7 @@ func AddTest(t *testing.T, factory Factory) {
 		t.Fatalf("Initial frontier failed to be set")
 	}
 
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -232,7 +231,7 @@ func AddTest(t *testing.T, factory Factory) {
 		t.Fatalf("Initial frontier failed to be set")
 	}
 
-	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx1 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -314,7 +313,7 @@ func VertexIssuedTest(t *testing.T, factory Factory) {
 		t.Fatalf("Genesis Vertex not reported as issued")
 	}
 
-	tx := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -355,7 +354,7 @@ func TxIssuedTest(t *testing.T, factory Factory) {
 		BatchSize: 1,
 	}
 
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Accepted,
 	}}
@@ -368,7 +367,7 @@ func TxIssuedTest(t *testing.T, factory Factory) {
 	}}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx1 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -442,7 +441,7 @@ func VirtuousTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong virtuous")
 	}
 
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -458,7 +457,7 @@ func VirtuousTest(t *testing.T, factory Factory) {
 		TxsV:     []conflicts.Tx{tx0},
 	}
 
-	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx1 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -474,7 +473,7 @@ func VirtuousTest(t *testing.T, factory Factory) {
 		TxsV:     []conflicts.Tx{tx1},
 	}
 
-	tx2 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx2 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -596,7 +595,7 @@ func VirtuousSkippedUpdateTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong virtuous")
 	}
 
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -612,7 +611,7 @@ func VirtuousSkippedUpdateTest(t *testing.T, factory Factory) {
 		TxsV:     []conflicts.Tx{tx0},
 	}
 
-	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx1 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -681,7 +680,7 @@ func VotingTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -697,7 +696,7 @@ func VotingTest(t *testing.T, factory Factory) {
 		TxsV:     []conflicts.Tx{tx0},
 	}
 
-	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx1 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -780,7 +779,7 @@ func IgnoreInvalidVotingTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -796,7 +795,7 @@ func IgnoreInvalidVotingTest(t *testing.T, factory Factory) {
 		TxsV:     []conflicts.Tx{tx0},
 	}
 
-	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx1 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -865,7 +864,7 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -881,7 +880,7 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 		TxsV:     []conflicts.Tx{tx0},
 	}
 
-	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx1 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -982,7 +981,7 @@ func SplitVotingTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -1063,7 +1062,7 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -1079,7 +1078,7 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 		TxsV:     []conflicts.Tx{tx0},
 	}
 
-	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx1 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -1095,7 +1094,7 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 		TxsV:     []conflicts.Tx{tx1},
 	}
 
-	tx2 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx2 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -1208,7 +1207,7 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong virtuous")
 	}
 
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -1224,7 +1223,7 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 		TxsV:     []conflicts.Tx{tx0},
 	}
 
-	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx1 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -1240,29 +1239,29 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 		TxsV:     []conflicts.Tx{tx1},
 	}
 
-	if !avl.IsVirtuous(tx0) {
+	if v, _ := avl.IsVirtuous(tx0); !v {
 		t.Fatalf("Should be virtuous.")
-	} else if !avl.IsVirtuous(tx1) {
+	} else if v, _ := avl.IsVirtuous(tx1); !v {
 		t.Fatalf("Should be virtuous.")
 	}
 
-	err = avl.Add(vtx0)
-	switch {
-	case err != nil:
+	if err := avl.Add(vtx0); err != nil {
 		t.Fatal(err)
-	case !avl.IsVirtuous(tx0):
+	}
+	if v, _ := avl.IsVirtuous(tx0); !v {
 		t.Fatalf("Should be virtuous.")
-	case avl.IsVirtuous(tx1):
+	}
+	if v, _ := avl.IsVirtuous(tx1); v {
 		t.Fatalf("Should not be virtuous.")
 	}
 
-	err = avl.Add(vtx1)
-	switch {
-	case err != nil:
+	if err := avl.Add(vtx1); err != nil {
 		t.Fatal(err)
-	case avl.IsVirtuous(tx0):
+	}
+	if v, _ := avl.IsVirtuous(tx0); v {
 		t.Fatalf("Should not be virtuous.")
-	case avl.IsVirtuous(tx1):
+	}
+	if v, _ := avl.IsVirtuous(tx1); v {
 		t.Fatalf("Should not be virtuous.")
 	}
 }
@@ -1299,7 +1298,7 @@ func QuiesceTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -1315,7 +1314,7 @@ func QuiesceTest(t *testing.T, factory Factory) {
 		TxsV:     []conflicts.Tx{tx0},
 	}
 
-	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx1 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -1331,7 +1330,7 @@ func QuiesceTest(t *testing.T, factory Factory) {
 		TxsV:     []conflicts.Tx{tx1},
 	}
 
-	tx2 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx2 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -1402,7 +1401,7 @@ func OrphansTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -1418,7 +1417,7 @@ func OrphansTest(t *testing.T, factory Factory) {
 		TxsV:     []conflicts.Tx{tx0},
 	}
 
-	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx1 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -1434,7 +1433,7 @@ func OrphansTest(t *testing.T, factory Factory) {
 		TxsV:     []conflicts.Tx{tx1},
 	}
 
-	tx2 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx2 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -1475,52 +1474,6 @@ func OrphansTest(t *testing.T, factory Factory) {
 	}
 }
 
-func ErrorOnVacuousAcceptTest(t *testing.T, factory Factory) {
-	avl := factory.New()
-
-	params := Parameters{
-		Parameters: snowball.Parameters{
-			Metrics:           prometheus.NewRegistry(),
-			K:                 1,
-			Alpha:             1,
-			BetaVirtuous:      math.MaxInt32,
-			BetaRogue:         math.MaxInt32,
-			ConcurrentRepolls: 1,
-		},
-		Parents:   2,
-		BatchSize: 1,
-	}
-	vts := []Vertex{&TestVertex{TestDecidable: choices.TestDecidable{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Accepted,
-	}}}
-
-	err := avl.Initialize(snow.DefaultContextTest(), params, vts)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.GenerateTestID(),
-		AcceptV: errors.New(""),
-		StatusV: choices.Processing,
-	}}
-
-	vtx0 := &TestVertex{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentsV: vts,
-		HeightV:  1,
-		TxsV:     []conflicts.Tx{tx0},
-	}
-
-	if err := avl.Add(vtx0); err == nil {
-		t.Fatalf("Should have errored on vertex issuance")
-	}
-}
-
 func ErrorOnTxAcceptTest(t *testing.T, factory Factory) {
 	avl := factory.New()
 
@@ -1547,7 +1500,7 @@ func ErrorOnTxAcceptTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		AcceptV: errors.New(""),
 		StatusV: choices.Processing,
@@ -1601,7 +1554,7 @@ func ErrorOnVtxAcceptTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -1655,7 +1608,7 @@ func ErrorOnVtxRejectTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -1671,7 +1624,7 @@ func ErrorOnVtxRejectTest(t *testing.T, factory Factory) {
 		TxsV:     []conflicts.Tx{tx0},
 	}
 
-	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx1 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -1727,7 +1680,7 @@ func ErrorOnParentVtxRejectTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -1743,7 +1696,7 @@ func ErrorOnParentVtxRejectTest(t *testing.T, factory Factory) {
 		TxsV:     []conflicts.Tx{tx0},
 	}
 
-	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx1 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -1811,7 +1764,7 @@ func ErrorOnTransitiveVtxRejectTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
@@ -1827,7 +1780,7 @@ func ErrorOnTransitiveVtxRejectTest(t *testing.T, factory Factory) {
 		TxsV:     []conflicts.Tx{tx0},
 	}
 
-	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx1 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}

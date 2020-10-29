@@ -14,6 +14,9 @@ type TestTx struct {
 
 	DependenciesV []Tx
 	InputIDsV     ids.Set
+
+	VerifyV error
+	BytesV  []byte
 }
 
 // Dependencies implements the Tx interface
@@ -21,3 +24,9 @@ func (t *TestTx) Dependencies() []Tx { return t.DependenciesV }
 
 // InputIDs implements the Tx interface
 func (t *TestTx) InputIDs() ids.Set { return t.InputIDsV }
+
+// Verify implements the Tx interface
+func (t *TestTx) Verify() error { return t.VerifyV }
+
+// Bytes implements the Tx interface
+func (t *TestTx) Bytes() []byte { return t.BytesV }

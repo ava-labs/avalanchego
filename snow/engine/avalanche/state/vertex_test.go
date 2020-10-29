@@ -8,14 +8,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
 )
 
 func TestVertexVerify(t *testing.T) {
 	conflictingInputID := ids.NewID([32]byte{'i', 'n'})
 	inputs := ids.Set{}
 	inputs.Add(conflictingInputID)
-	tx0 := &snowstorm.TestTx{
+	tx0 := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV: ids.NewID([32]byte{'t', 'x', '0'}),
 		},
@@ -74,7 +74,7 @@ func TestVertexVerify(t *testing.T) {
 		t.Fatal("Vertex with no txs should not have passed verification")
 	}
 
-	tx1 := &snowstorm.TestTx{
+	tx1 := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV: ids.NewID([32]byte{'t', 'x', '1'}),
 		},
@@ -108,7 +108,7 @@ func TestVertexVerify(t *testing.T) {
 	}
 
 	inputs.Add(ids.NewID([32]byte{'e', 'x', 't', 'r', 'a'}))
-	conflictingTx := &snowstorm.TestTx{
+	conflictingTx := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV: ids.NewID([32]byte{'c', 'o', 'n', 'f', 'l', 'i', 'c', 't'}),
 		},

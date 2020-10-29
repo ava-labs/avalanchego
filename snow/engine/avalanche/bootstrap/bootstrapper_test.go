@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
@@ -334,7 +334,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	txBytes0 := []byte{0}
 	txBytes1 := []byte{1}
 
-	tx0 := &snowstorm.TestTx{
+	tx0 := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     txID0,
 			StatusV: choices.Processing,
@@ -344,7 +344,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	tx0.InputIDsV.Add(utxos[0])
 
 	// Depends on tx0
-	tx1 := &snowstorm.TestTx{
+	tx1 := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     txID1,
 			StatusV: choices.Processing,
@@ -494,12 +494,12 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 
 	txBytes1 := []byte{1}
 
-	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     txID0,
 		StatusV: choices.Unknown,
 	}}
 
-	tx1 := &snowstorm.TestTx{
+	tx1 := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     txID1,
 			StatusV: choices.Processing,

@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 )
 
@@ -58,7 +58,7 @@ func TestUnknownUniqueVertexErrors(t *testing.T) {
 func TestUniqueVertexCacheHit(t *testing.T) {
 	s := newSerializer(t)
 
-	testTx := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+	testTx := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
 		IDV: ids.NewID([32]byte{1}),
 	}}
 
