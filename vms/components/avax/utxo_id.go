@@ -14,7 +14,6 @@ import (
 
 var (
 	errNilUTXOID = errors.New("nil utxo ID is not valid")
-	errNilTxID   = errors.New("nil tx ID is not valid")
 )
 
 // UTXOID ...
