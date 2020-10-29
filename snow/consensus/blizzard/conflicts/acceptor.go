@@ -9,7 +9,7 @@ import (
 
 // acceptor implements Blockable
 type acceptor struct {
-	c        *conflicts
+	c        *Conflicts
 	deps     ids.Set
 	rejected bool
 	tx       Tx

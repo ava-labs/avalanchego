@@ -9,7 +9,7 @@ import (
 
 // rejector implements Blockable
 type rejector struct {
-	c        *conflicts
+	c        *Conflicts
 	deps     ids.Set
 	rejected bool // true if the tx has been rejected
 	tx       Tx

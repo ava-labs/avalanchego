@@ -8,17 +8,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/blizzard"
 	"github.com/ava-labs/avalanchego/snow/events"
 )
 
 var (
 	errInvalidTxType = errors.New("invalid tx type")
-
-	_ blizzard.Conflicts = &conflicts{}
 )
 
-type conflicts struct {
+type Conflicts struct {
 	// track the currently processing txs
 	txs map[[32]byte]Tx
 
@@ -38,11 +35,18 @@ type conflicts struct {
 	rejectable []choices.Decidable
 }
 
+func New() *Conflicts {
+	return &Conflicts{
+		txs:   make(map[[32]byte]Tx),
+		utxos: make(map[[32]byte]ids.Set),
+	}
+}
+
 // Add this tx to the conflict set. If this tx is of the correct type, this tx
 // will be added to the set of processing txs. It is assumed this tx wasn't
 // already processing. This will mark the consumed utxos and register a rejector
 // that will be notified if a dependency of this tx was rejected.
-func (c *conflicts) Add(txIntf choices.Decidable) error {
+func (c *Conflicts) Add(txIntf choices.Decidable) error {
 	tx, ok := txIntf.(Tx)
 	if !ok {
 		return errInvalidTxType
@@ -78,7 +82,7 @@ func (c *conflicts) Add(txIntf choices.Decidable) error {
 // IsVirtuous checks the currently processing txs for conflicts. It is allowed
 // to call with function with txs that aren't yet processing or currently
 // processing txs.
-func (c *conflicts) IsVirtuous(txIntf choices.Decidable) (bool, error) {
+func (c *Conflicts) IsVirtuous(txIntf choices.Decidable) (bool, error) {
 	tx, ok := txIntf.(Tx)
 	if !ok {
 		return false, errInvalidTxType
@@ -98,7 +102,7 @@ func (c *conflicts) IsVirtuous(txIntf choices.Decidable) (bool, error) {
 // Conflicts returns the collection of txs that are currently processing that
 // conflict with the provided tx. It is allowed to call with function with txs
 // that aren't yet processing or currently processing txs.
-func (c *conflicts) Conflicts(txIntf choices.Decidable) ([]choices.Decidable, error) {
+func (c *Conflicts) Conflicts(txIntf choices.Decidable) ([]choices.Decidable, error) {
 	tx, ok := txIntf.(Tx)
 	if !ok {
 		return nil, errInvalidTxType
@@ -126,7 +130,7 @@ func (c *conflicts) Conflicts(txIntf choices.Decidable) ([]choices.Decidable, er
 // Accept notifies this conflict manager that a tx has been conditionally
 // accepted. This means that assuming all the txs this tx depends on are
 // accepted, then this tx should be accepted as well. This
-func (c *conflicts) Accept(txID ids.ID) {
+func (c *Conflicts) Accept(txID ids.ID) {
 	tx, exists := c.txs[txID.Key()]
 	if !exists {
 		return
@@ -148,7 +152,7 @@ func (c *conflicts) Accept(txID ids.ID) {
 	c.pendingAccept.Register(toAccept)
 }
 
-func (c *conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
+func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 	acceptable := c.acceptable
 	c.acceptable = nil
 	for _, tx := range acceptable {
@@ -159,7 +163,7 @@ func (c *conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 			spenders := c.utxos[inputKey]
 			spenders.Remove(txID)
 			if spenders.Len() == 0 {
-				spenders.Remove(txID)
+				delete(c.utxos, inputKey)
 			} else {
 				c.utxos[inputKey] = spenders
 			}
@@ -169,6 +173,8 @@ func (c *conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 		c.pendingAccept.Fulfill(txID)
 		c.pendingReject.Abandon(txID)
 
+		// Conflicts should never return an error, as the type has already been
+		// asserted.
 		conflicts, _ := c.Conflicts(tx)
 		for _, conflict := range conflicts {
 			c.pendingReject.Fulfill(conflict.ID())
@@ -185,7 +191,7 @@ func (c *conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 			spenders := c.utxos[inputKey]
 			spenders.Remove(txID)
 			if spenders.Len() == 0 {
-				spenders.Remove(txID)
+				delete(c.utxos, inputKey)
 			} else {
 				c.utxos[inputKey] = spenders
 			}

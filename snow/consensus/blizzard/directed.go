@@ -133,10 +133,13 @@ func (dg *Directed) Conflicts(tx choices.Decidable) (ids.Set, error) {
 	if node, exists := dg.txs[tx.ID().Key()]; exists {
 		// If the tx is currently processing, the conflicting txs are just the
 		// union of the inbound conflicts and the outbound conflicts.
-		conflicts := make(ids.Set, node.ins.Len()+node.outs.Len())
-		conflicts.Union(node.ins)
-		conflicts.Union(node.outs)
-
+		var conflicts ids.Set
+		// Avoid performing a memory allocation since the set is normally empty.
+		if numConflicts := node.ins.Len() + node.outs.Len(); numConflicts > 0 {
+			conflicts = make(ids.Set, numConflicts)
+			conflicts.Union(node.ins)
+			conflicts.Union(node.outs)
+		}
 		return conflicts, nil
 	}
 
@@ -181,6 +184,9 @@ func (dg *Directed) Add(tx choices.Decidable) error {
 	if err != nil {
 		return err
 	}
+
+	// Notify the metrics that this transaction is being issued.
+	dg.metrics.Issued(txID)
 
 	for _, conflict := range conflicts {
 		conflictID := conflict.ID()
@@ -393,11 +399,10 @@ func (dg *Directed) String() string {
 	sb.WriteString("DG(")
 
 	format := fmt.Sprintf(
-		"\n    Choice[%s] = ID: %%50s SB(NumSuccessfulPolls = %%d, Confidence = %%d)",
+		"\n    Choice[%s] = ID: %%50s %%s",
 		formatting.IntFormat(len(nodes)-1))
 	for i, txNode := range nodes {
-		sb.WriteString(fmt.Sprintf(format,
-			i, txNode.txID, txNode.numSuccessfulPolls, txNode.confidence))
+		sb.WriteString(fmt.Sprintf(format, i, txNode.txID, txNode))
 	}
 
 	if len(nodes) > 0 {

@@ -1084,8 +1084,8 @@ func RejectingSlowDependencyTest(t *testing.T, factory Factory) {
 	g.Add(Green.ID())
 	if updated, err := graph.RecordPoll(g); err != nil {
 		t.Fatal(err)
-	} else if updated {
-		t.Fatalf("Shouldn't have updated the frontiers")
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
 	}
 
 	prefs = graph.Preferences()
