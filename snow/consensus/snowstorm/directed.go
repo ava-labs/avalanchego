@@ -144,16 +144,7 @@ func (dg *Directed) Conflicts(tx choices.Decidable) (ids.Set, error) {
 
 	// If the tx isn't currently processing, the conflicting txs are the
 	// union of all the txs that spend an input that this tx spends.
-	txConflicts, err := dg.conflicts.Conflicts(tx)
-	if err != nil {
-		return nil, err
-	}
-
-	conflicts := make(ids.Set, len(txConflicts))
-	for _, conflict := range txConflicts {
-		conflicts.Add(conflict.ID())
-	}
-	return conflicts, nil
+	return dg.conflicts.Conflicts(tx)
 }
 
 // Issued implements the Consensus interface
@@ -187,8 +178,8 @@ func (dg *Directed) Add(tx choices.Decidable) error {
 	// Notify the metrics that this transaction is being issued.
 	dg.metrics.Issued(txID)
 
-	for _, conflict := range conflicts {
-		conflictID := conflict.ID()
+	for conflictKey := range conflicts {
+		conflictID := ids.NewID(conflictKey)
 
 		// This conflicting tx can't be virtuous anymore. So, we attempt to
 		// remove it from all of the virtuous sets.
@@ -201,7 +192,7 @@ func (dg *Directed) Add(tx choices.Decidable) error {
 		txNode.outs.Add(conflictID)
 		txNode.rogue = true
 
-		conflictNode := dg.txs[conflictID.Key()]
+		conflictNode := dg.txs[conflictKey]
 		conflictNode.ins.Add(txID)
 		conflictNode.rogue = true
 	}

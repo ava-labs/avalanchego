@@ -17,7 +17,7 @@ type Conflicts interface {
 
 	// Conflicts returns the transactions that conflict with the provided
 	// transaction
-	Conflicts(tx choices.Decidable) ([]choices.Decidable, error)
+	Conflicts(tx choices.Decidable) (ids.Set, error)
 
 	// Mark this transaction as conditionally accepted
 	Accept(txID ids.ID)

@@ -99,25 +99,20 @@ func (c *Conflicts) IsVirtuous(txIntf choices.Decidable) (bool, error) {
 // Conflicts returns the collection of txs that are currently processing that
 // conflict with the provided tx. It is assumed any tx passed into this function
 // is not yet processing.
-func (c *Conflicts) Conflicts(txIntf choices.Decidable) ([]choices.Decidable, error) {
+func (c *Conflicts) Conflicts(txIntf choices.Decidable) (ids.Set, error) {
 	tx, ok := txIntf.(Tx)
 	if !ok {
 		return nil, errInvalidTxType
 	}
+	return c.conflicts(tx), nil
+}
 
-	var (
-		conflictSet ids.Set
-		conflicts   []choices.Decidable
-	)
+func (c *Conflicts) conflicts(tx Tx) ids.Set {
+	var conflicts ids.Set
 	for _, inputID := range tx.InputIDs() {
-		for spenderKey := range c.utxos[inputID.Key()] {
-			if !conflictSet[spenderKey] {
-				conflictSet.Add(ids.NewID(spenderKey))
-				conflicts = append(conflicts, c.txs[spenderKey])
-			}
-		}
+		conflicts.Union(c.utxos[inputID.Key()])
 	}
-	return conflicts, nil
+	return conflicts
 }
 
 // Accept notifies this conflict manager that a tx has been conditionally
@@ -168,11 +163,8 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 		c.pendingAccept.Fulfill(txID)
 		c.pendingReject.Abandon(txID)
 
-		// Conflicts should never return an error, as the type has already been
-		// asserted.
-		conflicts, _ := c.Conflicts(tx)
-		for _, conflict := range conflicts {
-			c.pendingReject.Fulfill(conflict.ID())
+		for conflictKey := range c.conflicts(tx) {
+			c.pendingReject.Fulfill(ids.NewID(conflictKey))
 		}
 	}
 
