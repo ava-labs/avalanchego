@@ -13,17 +13,16 @@ type TestTx struct {
 	choices.TestDecidable
 
 	DependenciesV []Tx
-	InputIDsV     ids.Set
-
-	VerifyV error
-	BytesV  []byte
+	InputIDsV     []ids.ID
+	VerifyV       error
+	BytesV        []byte
 }
 
 // Dependencies implements the Tx interface
 func (t *TestTx) Dependencies() []Tx { return t.DependenciesV }
 
 // InputIDs implements the Tx interface
-func (t *TestTx) InputIDs() ids.Set { return t.InputIDsV }
+func (t *TestTx) InputIDs() []ids.ID { return t.InputIDsV }
 
 // Verify implements the Tx interface
 func (t *TestTx) Verify() error { return t.VerifyV }

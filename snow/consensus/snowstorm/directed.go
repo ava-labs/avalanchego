@@ -124,7 +124,6 @@ func (dg *Directed) IsVirtuous(tx choices.Decidable) (bool, error) {
 	if node, exists := dg.txs[tx.ID().Key()]; exists {
 		return !node.rogue, nil
 	}
-
 	return dg.conflicts.IsVirtuous(tx)
 }
 
@@ -253,9 +252,6 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 
 		txID := ids.NewID(txKey)
 
-		dg.ctx.Log.Verbo("Updated tx, %q, to have consensus state: %s",
-			txID, &txNode.snowball)
-
 		// If the tx can be accepted, then we should notify the conflict manager
 		// to defer its acceptance until its dependencies are decided. If this
 		// tx was already marked to be accepted, we shouldn't register it again.
@@ -360,6 +356,7 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 }
 
 func (dg *Directed) removeConflict(txID ids.ID, neighborIDs ids.Set) {
+	txKey := txID.Key()
 	for neighborKey := range neighborIDs {
 		neighbor, exists := dg.txs[neighborKey]
 		if !exists {
@@ -369,8 +366,8 @@ func (dg *Directed) removeConflict(txID ids.ID, neighborIDs ids.Set) {
 		}
 
 		// Remove any edge to this tx.
-		neighbor.ins.Remove(txID)
-		neighbor.outs.Remove(txID)
+		delete(neighbor.ins, txKey)
+		delete(neighbor.outs, txKey)
 
 		if neighbor.outs.Len() == 0 {
 			// If this tx should now be preferred, make sure its status is

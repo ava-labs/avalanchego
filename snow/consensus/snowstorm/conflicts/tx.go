@@ -25,7 +25,7 @@ type Tx interface {
 	//
 	// In the context of a UTXO-based payments system, for example, this would
 	// be the IDs of the UTXOs consumed by this transaction
-	InputIDs() ids.Set
+	InputIDs() []ids.ID
 
 	Verify() error
 	Bytes() []byte

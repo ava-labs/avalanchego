@@ -54,7 +54,8 @@ func (c *Conflicts) Add(txIntf choices.Decidable) error {
 
 	txID := tx.ID()
 	c.txs[txID.Key()] = tx
-	for inputKey := range tx.InputIDs() {
+	for _, inputID := range tx.InputIDs() {
+		inputKey := inputID.Key()
 		spenders := c.utxos[inputKey]
 		spenders.Add(txID)
 		c.utxos[inputKey] = spenders
@@ -79,20 +80,16 @@ func (c *Conflicts) Add(txIntf choices.Decidable) error {
 	return nil
 }
 
-// IsVirtuous checks the currently processing txs for conflicts. It is allowed
-// to call with function with txs that aren't yet processing or currently
-// processing txs.
+// IsVirtuous checks the currently processing txs for conflicts. It is assumed
+// any tx passed into this function is not yet processing.
 func (c *Conflicts) IsVirtuous(txIntf choices.Decidable) (bool, error) {
 	tx, ok := txIntf.(Tx)
 	if !ok {
 		return false, errInvalidTxType
 	}
 
-	txID := tx.ID()
-	for inputKey := range tx.InputIDs() {
-		spenders := c.utxos[inputKey]
-		if numSpenders := spenders.Len(); numSpenders > 1 ||
-			(numSpenders == 1 && !spenders.Contains(txID)) {
+	for _, inputID := range tx.InputIDs() {
+		if _, exists := c.utxos[inputID.Key()]; exists {
 			return false, nil
 		}
 	}
@@ -100,28 +97,24 @@ func (c *Conflicts) IsVirtuous(txIntf choices.Decidable) (bool, error) {
 }
 
 // Conflicts returns the collection of txs that are currently processing that
-// conflict with the provided tx. It is allowed to call with function with txs
-// that aren't yet processing or currently processing txs.
+// conflict with the provided tx. It is assumed any tx passed into this function
+// is not yet processing.
 func (c *Conflicts) Conflicts(txIntf choices.Decidable) ([]choices.Decidable, error) {
 	tx, ok := txIntf.(Tx)
 	if !ok {
 		return nil, errInvalidTxType
 	}
 
-	txID := tx.ID()
-	var conflictSet ids.Set
-	conflictSet.Add(txID)
-
-	conflicts := []choices.Decidable(nil)
-	for inputKey := range tx.InputIDs() {
-		spenders := c.utxos[inputKey]
-		for spenderKey := range spenders {
-			spenderID := ids.NewID(spenderKey)
-			if conflictSet.Contains(spenderID) {
-				continue
+	var (
+		conflictSet ids.Set
+		conflicts   []choices.Decidable
+	)
+	for _, inputID := range tx.InputIDs() {
+		for spenderKey := range c.utxos[inputID.Key()] {
+			if !conflictSet[spenderKey] {
+				conflictSet.Add(ids.NewID(spenderKey))
+				conflicts = append(conflicts, c.txs[spenderKey])
 			}
-			conflictSet.Add(spenderID)
-			conflicts = append(conflicts, c.txs[spenderKey])
 		}
 	}
 	return conflicts, nil
@@ -157,11 +150,13 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 	c.acceptable = nil
 	for _, tx := range acceptable {
 		txID := tx.ID()
+		txKey := txID.Key()
 
 		tx := tx.(Tx)
-		for inputKey := range tx.InputIDs() {
+		for _, inputID := range tx.InputIDs() {
+			inputKey := inputID.Key()
 			spenders := c.utxos[inputKey]
-			spenders.Remove(txID)
+			delete(spenders, txKey)
 			if spenders.Len() == 0 {
 				delete(c.utxos, inputKey)
 			} else {
@@ -169,7 +164,7 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 			}
 		}
 
-		delete(c.txs, txID.Key())
+		delete(c.txs, txKey)
 		c.pendingAccept.Fulfill(txID)
 		c.pendingReject.Abandon(txID)
 
@@ -185,11 +180,13 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 	c.rejectable = nil
 	for _, tx := range rejectable {
 		txID := tx.ID()
+		txKey := txID.Key()
 
 		tx := tx.(Tx)
-		for inputKey := range tx.InputIDs() {
+		for _, inputID := range tx.InputIDs() {
+			inputKey := inputID.Key()
 			spenders := c.utxos[inputKey]
-			spenders.Remove(txID)
+			delete(spenders, txKey)
 			if spenders.Len() == 0 {
 				delete(c.utxos, inputKey)
 			} else {
@@ -197,7 +194,7 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 			}
 		}
 
-		delete(c.txs, txID.Key())
+		delete(c.txs, txKey)
 		c.pendingAccept.Abandon(txID)
 		c.pendingReject.Fulfill(txID)
 	}

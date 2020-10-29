@@ -207,8 +207,8 @@ func (s *set) SubsetWeight(subset ids.ShortSet) (uint64, error) {
 	defer s.lock.RUnlock()
 
 	totalWeight := uint64(0)
-	for _, vdrID := range subset.List() {
-		weight, ok := s.getWeight(vdrID)
+	for vdrIDKey := range subset {
+		weight, ok := s.getWeight(ids.NewShortID(vdrIDKey))
 		if !ok {
 			continue
 		}
