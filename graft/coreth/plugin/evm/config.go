@@ -3,19 +3,21 @@ package evm
 // CommandLineConfig ...
 type CommandLineConfig struct {
 	// Coreth APIs
-	SnowmanAPIEnabled     bool `json:"snowmanAPIEnabled"`
-	Web3APIEnabled        bool `json:"web3APIEnabled"`
-	CorethAdminAPIEnabled bool `json:"corethAdminAPIEnabled"`
+	SnowmanAPIEnabled     bool `json:"snowman-api-enabled"`
+	CorethAdminAPIEnabled bool `json:"coreth-admin-api-enabled"`
+	NetAPIEnabled         bool `json:"net-api-enabled"`
 
 	// Coreth API Gas/Price Caps
-	RPCGasCap   uint64  `json:"rpcGasCap"`
-	RPCTxFeeCap float64 `json:"rpcTxFeeCap"`
+	RPCGasCap   uint64  `json:"rpc-gas-cap"`
+	RPCTxFeeCap float64 `json:"rpc-tx-fee-cap"`
 
 	// Eth APIs
-	EthAPIEnabled      bool `json:"ethAPIEnabled"`
-	PersonalAPIEnabled bool `json:"personalAPIEnabled"`
-	TxPoolAPIEnabled   bool `json:"txPoolAPIEnabled"`
-	DebugAPIEnabled    bool `json:"debugAPIEnabled"`
+	EthAPIEnabled      bool `json:"eth-api-enabled"`
+	PersonalAPIEnabled bool `json:"personal-api-enabled"`
+	TxPoolAPIEnabled   bool `json:"tx-pool-api-enabled"`
+	DebugAPIEnabled    bool `json:"debug-api-enabled"`
+
+	ParsingError error
 }
 
 // EthAPIs returns an array of strings representing the Eth APIs that should be enabled
