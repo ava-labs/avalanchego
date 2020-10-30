@@ -38,6 +38,18 @@ type SnowmanAPI struct{ vm *VM }
 // AvaxAPI offers Avalanche network related API methods
 type AvaxAPI struct{ vm *VM }
 
+// NetAPI offers network related API methods
+type NetAPI struct{ vm *VM }
+
+// Listening returns an indication if the node is listening for network connections.
+func (s *NetAPI) Listening() bool { return true } // always listening
+
+// PeerCount returns the number of connected peers
+func (s *NetAPI) PeerCount() hexutil.Uint { return hexutil.Uint(0) } // TODO: report number of connected peers
+
+// Version returns the current ethereum protocol version.
+func (s *NetAPI) Version() string { return fmt.Sprintf("%d", s.vm.networkID) }
+
 // GetAcceptedFrontReply defines the reply that will be sent from the
 // GetAcceptedFront API call
 type GetAcceptedFrontReply struct {
