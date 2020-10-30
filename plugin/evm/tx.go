@@ -134,7 +134,7 @@ func (ins *innerSortInputsAndSigners) Less(i, j int) bool {
 	if addrComp != 0 {
 		return addrComp < 0
 	}
-	return bytes.Compare(ins.inputs[i].AssetID.Bytes(), ins.inputs[j].AssetID.Bytes()) < 0
+	return bytes.Compare(ins.inputs[i].AssetID[:], ins.inputs[j].AssetID[:]) < 0
 }
 
 func (ins *innerSortInputsAndSigners) Len() int { return len(ins.inputs) }
@@ -165,7 +165,7 @@ func (outs *innerSortEVMOutputs) Less(i, j int) bool {
 	if addrComp != 0 {
 		return addrComp < 0
 	}
-	return bytes.Compare(outs.outputs[i].AssetID.Bytes(), outs.outputs[j].AssetID.Bytes()) < 0
+	return bytes.Compare(outs.outputs[i].AssetID[:], outs.outputs[j].AssetID[:]) < 0
 }
 
 func (outs *innerSortEVMOutputs) Len() int { return len(outs.outputs) }
