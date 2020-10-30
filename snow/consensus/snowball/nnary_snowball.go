@@ -48,9 +48,8 @@ func (sb *nnarySnowball) Preference() ids.ID {
 
 // RecordSuccessfulPoll implements the NnarySnowball interface
 func (sb *nnarySnowball) RecordSuccessfulPoll(choice ids.ID) {
-	key := choice.Key()
-	numSuccessfulPolls := sb.numSuccessfulPolls[key] + 1
-	sb.numSuccessfulPolls[key] = numSuccessfulPolls
+	numSuccessfulPolls := sb.numSuccessfulPolls[choice] + 1
+	sb.numSuccessfulPolls[choice] = numSuccessfulPolls
 
 	if numSuccessfulPolls > sb.maxSuccessfulPolls {
 		sb.preference = choice

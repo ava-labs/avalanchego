@@ -60,8 +60,7 @@ func (bm *benchlistManager) RegisterChain(ctx *snow.Context, namespace string) e
 	bm.lock.Lock()
 	defer bm.lock.Unlock()
 
-	key := ctx.ChainID.Key()
-	if _, exists := bm.chainBenchlists[key]; exists {
+	if _, exists := bm.chainBenchlists[ctx.ChainID]; exists {
 		return nil
 	}
 
@@ -84,7 +83,7 @@ func (bm *benchlistManager) RegisterChain(ctx *snow.Context, namespace string) e
 		return err
 	}
 
-	bm.chainBenchlists[key] = benchlist
+	bm.chainBenchlists[ctx.ChainID] = benchlist
 	return nil
 }
 
@@ -98,8 +97,7 @@ func (bm *benchlistManager) RegisterQuery(
 	bm.lock.RLock()
 	defer bm.lock.RUnlock()
 
-	key := chainID.Key()
-	chain, exists := bm.chainBenchlists[key]
+	chain, exists := bm.chainBenchlists[chainID]
 	if !exists {
 		return false
 	}
@@ -112,7 +110,7 @@ func (bm *benchlistManager) RegisterResponse(chainID ids.ID, validatorID ids.Sho
 	bm.lock.RLock()
 	defer bm.lock.RUnlock()
 
-	chain, exists := bm.chainBenchlists[chainID.Key()]
+	chain, exists := bm.chainBenchlists[chainID]
 	if !exists {
 		return
 	}
@@ -125,7 +123,7 @@ func (bm *benchlistManager) QueryFailed(chainID ids.ID, validatorID ids.ShortID,
 	bm.lock.RLock()
 	defer bm.lock.RUnlock()
 
-	chain, exists := bm.chainBenchlists[chainID.Key()]
+	chain, exists := bm.chainBenchlists[chainID]
 	if !exists {
 		return
 	}

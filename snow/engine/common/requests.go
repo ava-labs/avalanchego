@@ -39,7 +39,7 @@ func (r *Requests) Add(vdr ids.ShortID, requestID uint32, containerID ids.ID) {
 	if r.idToReq == nil {
 		r.idToReq = make(map[[32]byte]req, minRequestsSize)
 	}
-	r.idToReq[containerID.Key()] = req{
+	r.idToReq[containerID] = req{
 		vdr: vdr,
 		id:  requestID,
 	}
@@ -65,14 +65,14 @@ func (r *Requests) Remove(vdr ids.ShortID, requestID uint32) (ids.ID, bool) {
 		delete(vdrReqs, requestID)
 	}
 
-	delete(r.idToReq, containerID.Key())
+	delete(r.idToReq, containerID)
 	return containerID, true
 }
 
 // RemoveAny outstanding requests for the container ID. True is returned if the
 // container ID had an outstanding request.
 func (r *Requests) RemoveAny(containerID ids.ID) bool {
-	req, ok := r.idToReq[containerID.Key()]
+	req, ok := r.idToReq[containerID]
 	if !ok {
 		return false
 	}
@@ -87,6 +87,6 @@ func (r *Requests) Len() int { return len(r.idToReq) }
 // Contains returns true if there is an outstanding request for the container
 // ID.
 func (r *Requests) Contains(containerID ids.ID) bool {
-	_, ok := r.idToReq[containerID.Key()]
+	_, ok := r.idToReq[containerID]
 	return ok
 }

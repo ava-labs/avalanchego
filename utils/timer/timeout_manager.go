@@ -84,7 +84,7 @@ func (tm *TimeoutManager) timeout() {
 func (tm *TimeoutManager) put(id ids.ID, handler func()) {
 	tm.remove(id)
 
-	tm.timeoutMap[id.Key()] = tm.timeoutList.PushBack(timeout{
+	tm.timeoutMap[id] = tm.timeoutList.PushBack(timeout{
 		id:      id,
 		handler: handler,
 		timer:   time.Now(),
@@ -96,12 +96,11 @@ func (tm *TimeoutManager) put(id ids.ID, handler func()) {
 }
 
 func (tm *TimeoutManager) remove(id ids.ID) {
-	key := id.Key()
-	e, exists := tm.timeoutMap[key]
+	e, exists := tm.timeoutMap[id]
 	if !exists {
 		return
 	}
-	delete(tm.timeoutMap, key)
+	delete(tm.timeoutMap, id)
 	tm.timeoutList.Remove(e)
 }
 

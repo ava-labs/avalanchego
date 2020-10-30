@@ -101,7 +101,7 @@ func (w *Wallet) AddUTXO(utxo *avax.UTXO) {
 
 	if _, _, err := w.keychain.Spend(out, stdmath.MaxUint64); err == nil {
 		w.utxoSet.Put(utxo)
-		w.balance[utxo.AssetID().Key()] += out.Amount()
+		w.balance[utxo.AssetID()] += out.Amount()
 	}
 }
 
@@ -113,19 +113,18 @@ func (w *Wallet) RemoveUTXO(utxoID ids.ID) {
 	}
 
 	assetID := utxo.AssetID()
-	assetKey := assetID.Key()
-	newBalance := w.balance[assetKey] - utxo.Out.(avax.TransferableOut).Amount()
+	newBalance := w.balance[assetID] - utxo.Out.(avax.TransferableOut).Amount()
 	if newBalance == 0 {
-		delete(w.balance, assetKey)
+		delete(w.balance, assetID)
 	} else {
-		w.balance[assetKey] = newBalance
+		w.balance[assetID] = newBalance
 	}
 
 	w.utxoSet.Remove(utxoID)
 }
 
 // Balance returns the amount of the assets in this wallet
-func (w *Wallet) Balance(assetID ids.ID) uint64 { return w.balance[assetID.Key()] }
+func (w *Wallet) Balance(assetID ids.ID) uint64 { return w.balance[assetID] }
 
 // CreateTx returns a tx that sends [amount] of [assetID] to [destAddr]
 func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (*avm.Tx, error) {

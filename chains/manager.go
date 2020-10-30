@@ -199,10 +199,9 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		m.Log.Error("Error while creating new chain: %s", err)
 		return
 	}
-	chainID := chainParams.ID.Key()
 
 	m.chainsLock.Lock()
-	m.chains[chainID] = chain.Handler
+	m.chains[chainParams.ID] = chain.Handler
 	m.chainsLock.Unlock()
 
 	// Associate the newly created chain with its default alias
@@ -589,7 +588,7 @@ func (m *manager) SubnetID(chainID ids.ID) (ids.ID, error) {
 	m.chainsLock.Lock()
 	defer m.chainsLock.Unlock()
 
-	chain, exists := m.chains[chainID.Key()]
+	chain, exists := m.chains[chainID]
 	if !exists {
 		return ids.ID{}, errors.New("unknown chain ID")
 	}
@@ -598,7 +597,7 @@ func (m *manager) SubnetID(chainID ids.ID) (ids.ID, error) {
 
 func (m *manager) IsBootstrapped(id ids.ID) bool {
 	m.chainsLock.Lock()
-	chain, exists := m.chains[id.Key()]
+	chain, exists := m.chains[id]
 	m.chainsLock.Unlock()
 	if !exists {
 		return false

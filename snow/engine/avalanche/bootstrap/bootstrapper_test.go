@@ -933,7 +933,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		if !vdr.Equals(peerID) {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}
-		requestIDs[vtxID.Key()] = reqID
+		requestIDs[vtxID] = reqID
 	}
 
 	vm.CantBootstrapping = false
@@ -942,7 +942,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	reqID, ok := requestIDs[vtxID1.Key()]
+	reqID, ok := requestIDs[vtxID1]
 	if !ok {
 		t.Fatalf("should have requested vtx1")
 	}
@@ -953,7 +953,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	reqID, ok = requestIDs[vtxID0.Key()]
+	reqID, ok = requestIDs[vtxID0]
 	if !ok {
 		t.Fatalf("should have requested vtx0")
 	}
@@ -1074,7 +1074,7 @@ func TestBootstrapperAcceptsMultiPutParents(t *testing.T) {
 		if !vdr.Equals(peerID) {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}
-		requestIDs[vtxID.Key()] = reqID
+		requestIDs[vtxID] = reqID
 	}
 
 	vm.CantBootstrapping = false
@@ -1083,7 +1083,7 @@ func TestBootstrapperAcceptsMultiPutParents(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	reqID, ok := requestIDs[vtxID2.Key()]
+	reqID, ok := requestIDs[vtxID2]
 	if !ok {
 		t.Fatalf("should have requested vtx2")
 	}

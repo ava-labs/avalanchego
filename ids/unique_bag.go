@@ -35,31 +35,29 @@ func (b *UniqueBag) Add(setID uint, idSet ...ID) {
 func (b *UniqueBag) UnionSet(id ID, set BitSet) {
 	b.init()
 
-	key := id.Key()
-	previousSet := (*b)[key]
+	previousSet := (*b)[id]
 	previousSet.Union(set)
-	(*b)[key] = previousSet
+	(*b)[id] = previousSet
 }
 
 // DifferenceSet ...
 func (b *UniqueBag) DifferenceSet(id ID, set BitSet) {
 	b.init()
 
-	key := id.Key()
-	previousSet := (*b)[key]
+	previousSet := (*b)[id]
 	previousSet.Difference(set)
-	(*b)[key] = previousSet
+	(*b)[id] = previousSet
 }
 
 // Difference ...
 func (b *UniqueBag) Difference(diff *UniqueBag) {
 	b.init()
 
-	for key, previousSet := range *b {
-		if previousSetDiff, exists := (*diff)[key]; exists {
+	for id, previousSet := range *b {
+		if previousSetDiff, exists := (*diff)[id]; exists {
 			previousSet.Difference(previousSetDiff)
 		}
-		(*b)[key] = previousSet
+		(*b)[id] = previousSet
 	}
 }
 
@@ -67,7 +65,7 @@ func (b *UniqueBag) Difference(diff *UniqueBag) {
 func (b *UniqueBag) GetSet(id ID) BitSet { return (*b)[id] }
 
 // RemoveSet ...
-func (b *UniqueBag) RemoveSet(id ID) { delete(*b, id.Key()) }
+func (b *UniqueBag) RemoveSet(id ID) { delete(*b, id) }
 
 // List ...
 func (b *UniqueBag) List() []ID {

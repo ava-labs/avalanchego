@@ -58,9 +58,7 @@ func NewChainIPCs(log logging.Logger, path string, networkID uint32, consensusEv
 
 // Publish creates a set of eventSockets for the given chainID
 func (cipcs *ChainIPCs) Publish(chainID ids.ID) (*EventSockets, error) {
-	chainIDKey := chainID.Key()
-
-	if es, ok := cipcs.chains[chainIDKey]; ok {
+	if es, ok := cipcs.chains[chainID]; ok {
 		cipcs.log.Info("returning existing blockchainID %s", chainID.String())
 		return es, nil
 	}
@@ -71,7 +69,7 @@ func (cipcs *ChainIPCs) Publish(chainID ids.ID) (*EventSockets, error) {
 		return nil, err
 	}
 
-	cipcs.chains[chainIDKey] = es
+	cipcs.chains[chainID] = es
 	cipcs.log.Info("created IPC sockets for blockchain %s at %s and %s", chainID.String(), es.ConsensusURL(), es.DecisionsURL())
 	return es, nil
 }
@@ -79,7 +77,7 @@ func (cipcs *ChainIPCs) Publish(chainID ids.ID) (*EventSockets, error) {
 // Unpublish stops the eventSocket for the given chain if it exists. It returns
 // whether or not the socket existed and errors when trying to close it
 func (cipcs *ChainIPCs) Unpublish(chainID ids.ID) (bool, error) {
-	chainIPCs, ok := cipcs.chains[chainID.Key()]
+	chainIPCs, ok := cipcs.chains[chainID]
 	if !ok {
 		return false, nil
 	}

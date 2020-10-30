@@ -93,7 +93,7 @@ func (ab *AtomicBlock) Verify() error {
 		return fmt.Errorf("failed to put status of tx %s: %w", tx.ID(), err)
 	}
 
-	ab.vm.currentBlocks[ab.ID().Key()] = ab
+	ab.vm.currentBlocks[ab.ID()] = ab
 	ab.parentBlock().addChild(ab)
 	return nil
 }

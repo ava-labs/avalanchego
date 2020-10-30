@@ -153,7 +153,7 @@ func (tm *AdaptiveTimeoutManager) put(id ids.ID, handler func()) time.Time {
 		duration: tm.currentTimeout,
 		deadline: currentTime.Add(tm.currentTimeout),
 	}
-	tm.timeoutMap[id.Key()] = timeout
+	tm.timeoutMap[id] = timeout
 	heap.Push(&tm.timeoutQueue, timeout)
 
 	tm.registerTimeout()
@@ -161,8 +161,7 @@ func (tm *AdaptiveTimeoutManager) put(id ids.ID, handler func()) time.Time {
 }
 
 func (tm *AdaptiveTimeoutManager) remove(id ids.ID, currentTime time.Time) {
-	key := id.Key()
-	timeout, exists := tm.timeoutMap[key]
+	timeout, exists := tm.timeoutMap[id]
 	if !exists {
 		return
 	}
@@ -197,7 +196,7 @@ func (tm *AdaptiveTimeoutManager) remove(id ids.ID, currentTime time.Time) {
 	tm.currentDurationMetric.Set(float64(tm.currentTimeout))
 
 	// Remove the timeout from the map
-	delete(tm.timeoutMap, key)
+	delete(tm.timeoutMap, id)
 
 	// Remove the timeout from the queue
 	heap.Remove(&tm.timeoutQueue, timeout.index)

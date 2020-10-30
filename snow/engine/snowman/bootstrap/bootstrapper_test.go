@@ -778,7 +778,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		if !vdr.Equals(peerID) {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}
-		requestIDs[vtxID.Key()] = reqID
+		requestIDs[vtxID] = reqID
 	}
 
 	vm.CantBootstrapping = false
@@ -787,7 +787,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	reqID, ok := requestIDs[blkID2.Key()]
+	reqID, ok := requestIDs[blkID2]
 	if !ok {
 		t.Fatalf("should have requested blk2")
 	}
@@ -798,7 +798,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	reqID, ok = requestIDs[blkID1.Key()]
+	reqID, ok = requestIDs[blkID1]
 	if !ok {
 		t.Fatalf("should have requested blk1")
 	}

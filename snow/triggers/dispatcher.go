@@ -43,7 +43,7 @@ func (ed *EventDispatcher) Accept(ctx *snow.Context, containerID ids.ID, contain
 		}
 	}
 
-	events, exist := ed.chainHandlers[ctx.ChainID.Key()]
+	events, exist := ed.chainHandlers[ctx.ChainID]
 	if !exist {
 		return
 	}
@@ -75,7 +75,7 @@ func (ed *EventDispatcher) Reject(ctx *snow.Context, containerID ids.ID, contain
 		}
 	}
 
-	events, exist := ed.chainHandlers[ctx.ChainID.Key()]
+	events, exist := ed.chainHandlers[ctx.ChainID]
 	if !exist {
 		return
 	}
@@ -107,7 +107,7 @@ func (ed *EventDispatcher) Issue(ctx *snow.Context, containerID ids.ID, containe
 		}
 	}
 
-	events, exist := ed.chainHandlers[ctx.ChainID.Key()]
+	events, exist := ed.chainHandlers[ctx.ChainID]
 	if !exist {
 		return
 	}
@@ -128,11 +128,10 @@ func (ed *EventDispatcher) RegisterChain(chainID ids.ID, identifier string, hand
 	ed.lock.Lock()
 	defer ed.lock.Unlock()
 
-	chainIDKey := chainID.Key()
-	events, exist := ed.chainHandlers[chainIDKey]
+	events, exist := ed.chainHandlers[chainID]
 	if !exist {
 		events = make(map[string]interface{})
-		ed.chainHandlers[chainIDKey] = events
+		ed.chainHandlers[chainID] = events
 	}
 
 	if _, ok := events[identifier]; ok {
@@ -148,8 +147,7 @@ func (ed *EventDispatcher) DeregisterChain(chainID ids.ID, identifier string) er
 	ed.lock.Lock()
 	defer ed.lock.Unlock()
 
-	chainIDKey := chainID.Key()
-	events, exist := ed.chainHandlers[chainIDKey]
+	events, exist := ed.chainHandlers[chainID]
 	if !exist {
 		return fmt.Errorf("chain %s has no handlers", chainID)
 	}
@@ -159,7 +157,7 @@ func (ed *EventDispatcher) DeregisterChain(chainID ids.ID, identifier string) er
 	}
 
 	if len(events) == 1 {
-		delete(ed.chainHandlers, chainIDKey)
+		delete(ed.chainHandlers, chainID)
 	} else {
 		delete(events, identifier)
 	}

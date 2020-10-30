@@ -625,7 +625,7 @@ func (vm *VM) GetBlock(blkID ids.ID) (snowman.Block, error) { return vm.getBlock
 
 func (vm *VM) getBlock(blkID ids.ID) (Block, error) {
 	// If block is in memory, return it.
-	if blk, exists := vm.currentBlocks[blkID.Key()]; exists {
+	if blk, exists := vm.currentBlocks[blkID]; exists {
 		return blk, nil
 	}
 	// Block isn't in memory. If block is in database, return it.

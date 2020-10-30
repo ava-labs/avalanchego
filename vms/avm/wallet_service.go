@@ -25,12 +25,11 @@ type WalletService struct {
 }
 
 func (w *WalletService) decided(txID ids.ID) {
-	txKey := txID.Key()
-	e, ok := w.pendingTxMap[txKey]
+	e, ok := w.pendingTxMap[txID]
 	if !ok {
 		return
 	}
-	delete(w.pendingTxMap, txKey)
+	delete(w.pendingTxMap, txID)
 	w.pendingTxOrdering.Remove(e)
 }
 
@@ -45,19 +44,18 @@ func (w *WalletService) issue(txBytes []byte) (ids.ID, error) {
 		return ids.ID{}, err
 	}
 
-	txKey := txID.Key()
-	if _, dup := w.pendingTxMap[txKey]; dup {
+	if _, dup := w.pendingTxMap[txID]; dup {
 		return txID, nil
 	}
 
-	w.pendingTxMap[txKey] = w.pendingTxOrdering.PushBack(tx)
+	w.pendingTxMap[txID] = w.pendingTxOrdering.PushBack(tx)
 	return txID, nil
 }
 
 func (w *WalletService) update(utxos []*avax.UTXO) ([]*avax.UTXO, error) {
 	utxoMap := make(map[[32]byte]*avax.UTXO, len(utxos))
 	for _, utxo := range utxos {
-		utxoMap[utxo.InputID().Key()] = utxo
+		utxoMap[utxo.InputID()] = utxo
 	}
 
 	for e := w.pendingTxOrdering.Front(); e != nil; e = e.Next() {
@@ -66,15 +64,15 @@ func (w *WalletService) update(utxos []*avax.UTXO) ([]*avax.UTXO, error) {
 			if inputUTXO.Symbolic() {
 				continue
 			}
-			utxoKey := inputUTXO.InputID().Key()
-			if _, exists := utxoMap[utxoKey]; !exists {
+			utxoID := inputUTXO.InputID()
+			if _, exists := utxoMap[utxoID]; !exists {
 				return nil, errMissingUTXO
 			}
-			delete(utxoMap, utxoKey)
+			delete(utxoMap, utxoID)
 		}
 
 		for _, utxo := range tx.UTXOs() {
-			utxoMap[utxo.InputID().Key()] = utxo
+			utxoMap[utxo.InputID()] = utxo
 		}
 	}
 
@@ -175,13 +173,12 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 			}
 			assetIDs[output.AssetID] = assetID
 		}
-		assetKey := assetID.Key() // ID as bytes
-		currentAmount := amounts[assetKey]
+		currentAmount := amounts[assetID]
 		newAmount, err := safemath.Add64(currentAmount, uint64(output.Amount))
 		if err != nil {
 			return fmt.Errorf("problem calculating required spend amount: %w", err)
 		}
-		amounts[assetKey] = newAmount
+		amounts[assetID] = newAmount
 
 		// Parse the to address
 		to, err := w.vm.ParseLocalAddress(output.To)
@@ -208,12 +205,11 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 		amountsWithFee[assetKey] = amount
 	}
 
-	avaxKey := w.vm.ctx.AVAXAssetID.Key()
-	amountWithFee, err := safemath.Add64(amounts[avaxKey], w.vm.txFee)
+	amountWithFee, err := safemath.Add64(amounts[w.vm.ctx.AVAXAssetID], w.vm.txFee)
 	if err != nil {
 		return fmt.Errorf("problem calculating required spend amount: %w", err)
 	}
-	amountsWithFee[avaxKey] = amountWithFee
+	amountsWithFee[w.vm.ctx.AVAXAssetID] = amountWithFee
 
 	amountsSpent, ins, keys, err := w.vm.Spend(
 		utxos,

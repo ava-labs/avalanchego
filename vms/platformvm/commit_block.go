@@ -37,7 +37,7 @@ func (c *Commit) Verify() error {
 
 	c.onAcceptDB, c.onAcceptFunc = parent.onCommit()
 
-	c.vm.currentBlocks[c.ID().Key()] = c
+	c.vm.currentBlocks[c.ID()] = c
 	c.parentBlock().addChild(c)
 	return nil
 }

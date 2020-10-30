@@ -50,7 +50,7 @@ func (c *EvictableLRU) resize() {
 		c.entryList.Remove(e)
 
 		val := e.Value.(Evictable)
-		delete(c.entryMap, val.ID().Key())
+		delete(c.entryMap, val.ID())
 		val.Evict()
 	}
 }
@@ -59,14 +59,14 @@ func (c *EvictableLRU) deduplicate(value Evictable) Evictable {
 	c.init()
 	c.resize()
 
-	key := value.ID().Key()
+	key := value.ID()
 	if e, ok := c.entryMap[key]; !ok {
 		if c.entryList.Len() >= c.Size {
 			e = c.entryList.Front()
 			c.entryList.MoveToBack(e)
 
 			val := e.Value.(Evictable)
-			delete(c.entryMap, val.ID().Key())
+			delete(c.entryMap, val.ID())
 			val.Evict()
 
 			e.Value = value

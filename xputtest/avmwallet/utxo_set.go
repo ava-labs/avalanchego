@@ -28,9 +28,8 @@ func (us *UTXOSet) Put(utxo *avax.UTXO) {
 		us.utxoMap = make(map[[32]byte]int)
 	}
 	utxoID := utxo.InputID()
-	utxoKey := utxoID.Key()
-	if _, ok := us.utxoMap[utxoKey]; !ok {
-		us.utxoMap[utxoKey] = len(us.UTXOs)
+	if _, ok := us.utxoMap[utxoID]; !ok {
+		us.utxoMap[utxoID] = len(us.UTXOs)
 		us.UTXOs = append(us.UTXOs, utxo)
 	}
 }
@@ -40,7 +39,7 @@ func (us *UTXOSet) Get(id ids.ID) *avax.UTXO {
 	if us.utxoMap == nil {
 		return nil
 	}
-	if i, ok := us.utxoMap[id.Key()]; ok {
+	if i, ok := us.utxoMap[id]; ok {
 		utxo := us.UTXOs[i]
 		return utxo
 	}
@@ -49,7 +48,7 @@ func (us *UTXOSet) Get(id ids.ID) *avax.UTXO {
 
 // Remove ...
 func (us *UTXOSet) Remove(id ids.ID) *avax.UTXO {
-	i, ok := us.utxoMap[id.Key()]
+	i, ok := us.utxoMap[id]
 	if !ok {
 		return nil
 	}
@@ -61,8 +60,8 @@ func (us *UTXOSet) Remove(id ids.ID) *avax.UTXO {
 	us.UTXOs[i] = us.UTXOs[j]
 	us.UTXOs = us.UTXOs[:j]
 
-	us.utxoMap[utxoJ.InputID().Key()] = i
-	delete(us.utxoMap, utxoI.InputID().Key())
+	us.utxoMap[utxoJ.InputID()] = i
+	delete(us.utxoMap, utxoI.InputID())
 
 	return utxoI
 }

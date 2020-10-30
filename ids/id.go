@@ -59,10 +59,6 @@ func (id *ID) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// Key returns a 32 byte hash that this id represents. This is useful to allow
-// for this id to be used as keys in maps.
-func (id ID) Key() [32]byte { return id } // todo remove
-
 // Prefix this id to create a more selective id. This can be used to store
 // multiple values under the same key. For example:
 // prefix1(id) -> confidence

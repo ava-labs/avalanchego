@@ -13,13 +13,9 @@ func TestID(t *testing.T) {
 	hash := [32]byte{24}
 	id := NewID(hash)
 
-	if key := id.Key(); !bytes.Equal(hash[:], key[:]) {
-		t.Fatalf("ID.Key returned wrong bytes")
-	}
-
 	prefixed := id.Prefix(0)
 
-	if key := id.Key(); !bytes.Equal(hash[:], key[:]) {
+	if !bytes.Equal(hash[:], id[:]) {
 		t.Fatalf("ID.Prefix mutated the ID")
 	}
 
@@ -73,7 +69,7 @@ func TestFromString(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if id.Key() != id2.Key() {
+	if id != id2 {
 		t.Fatal("Expected FromString to be inverse of String but it wasn't")
 	}
 }
@@ -143,7 +139,7 @@ func TestIDUnmarshalJSON(t *testing.T) {
 			if err != tt.err {
 				t.Errorf("Expected err %s, got error %v", tt.err, err)
 			} else if foo != tt.out {
-				t.Errorf("got %q, expected %q", foo.Key(), tt.out.Key())
+				t.Errorf("got %q, expected %q", foo, tt.out)
 			}
 		})
 	}

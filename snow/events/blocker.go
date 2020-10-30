@@ -28,9 +28,8 @@ func (b *Blocker) init() {
 func (b *Blocker) Fulfill(id ids.ID) {
 	b.init()
 
-	key := id.Key()
-	blocking := (*b)[key]
-	delete(*b, key)
+	blocking := (*b)[id]
+	delete(*b, id)
 
 	for _, pending := range blocking {
 		pending.Fulfill(id)
@@ -42,9 +41,8 @@ func (b *Blocker) Fulfill(id ids.ID) {
 func (b *Blocker) Abandon(id ids.ID) {
 	b.init()
 
-	key := id.Key()
-	blocking := (*b)[key]
-	delete(*b, key)
+	blocking := (*b)[id]
+	delete(*b, id)
 
 	for _, pending := range blocking {
 		pending.Abandon(id)

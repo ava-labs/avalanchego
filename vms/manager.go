@@ -78,7 +78,7 @@ func NewManager(apiServer *api.Server, log logging.Logger) Manager {
 // Return a factory that can create new instances of the vm whose
 // ID is [vmID]
 func (m *manager) GetVMFactory(vmID ids.ID) (VMFactory, error) {
-	if factory, ok := m.vmFactories[vmID.Key()]; ok {
+	if factory, ok := m.vmFactories[vmID]; ok {
 		return factory, nil
 	}
 	return nil, fmt.Errorf("no vm with ID '%v' has been registered", vmID)
@@ -88,15 +88,14 @@ func (m *manager) GetVMFactory(vmID ids.ID) (VMFactory, error) {
 // Map [vmID] to [factory]. [factory] creates new instances of the vm whose
 // ID is [vmID]
 func (m *manager) RegisterVMFactory(vmID ids.ID, factory VMFactory) error {
-	key := vmID.Key()
-	if _, exists := m.vmFactories[key]; exists {
+	if _, exists := m.vmFactories[vmID]; exists {
 		return fmt.Errorf("a vm with ID '%v' has already been registered", vmID)
 	}
 	if err := m.Alias(vmID, vmID.String()); err != nil {
 		return err
 	}
 
-	m.vmFactories[key] = factory
+	m.vmFactories[vmID] = factory
 
 	// add the static API endpoints
 	m.addStaticAPIEndpoints(vmID)

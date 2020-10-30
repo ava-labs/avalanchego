@@ -271,7 +271,7 @@ func (vm *VMClient) ParseBlock(bytes []byte) (snowman.Block, error) {
 	id, err := ids.ToID(resp.Id)
 	vm.ctx.Log.AssertNoError(err)
 
-	if blk, cached := vm.blks[id.Key()]; cached {
+	if blk, cached := vm.blks[id]; cached {
 		return blk, nil
 	}
 
@@ -291,7 +291,7 @@ func (vm *VMClient) ParseBlock(bytes []byte) (snowman.Block, error) {
 
 // GetBlock ...
 func (vm *VMClient) GetBlock(id ids.ID) (snowman.Block, error) {
-	if blk, cached := vm.blks[id.Key()]; cached {
+	if blk, cached := vm.blks[id]; cached {
 		return blk, nil
 	}
 
@@ -350,7 +350,7 @@ func (b *BlockClient) ID() ids.ID { return b.id }
 
 // Accept ...
 func (b *BlockClient) Accept() error {
-	delete(b.vm.blks, b.id.Key())
+	delete(b.vm.blks, b.id)
 	b.status = choices.Accepted
 	_, err := b.vm.client.BlockAccept(context.Background(), &vmproto.BlockAcceptRequest{
 		Id: b.id.Bytes(),
@@ -365,7 +365,7 @@ func (b *BlockClient) Accept() error {
 
 // Reject ...
 func (b *BlockClient) Reject() error {
-	delete(b.vm.blks, b.id.Key())
+	delete(b.vm.blks, b.id)
 	b.status = choices.Rejected
 	_, err := b.vm.client.BlockReject(context.Background(), &vmproto.BlockRejectRequest{
 		Id: b.id.Bytes(),
@@ -393,7 +393,7 @@ func (b *BlockClient) Verify() error {
 		return err
 	}
 
-	b.vm.blks[b.id.Key()] = b
+	b.vm.blks[b.id] = b
 	return nil
 }
 

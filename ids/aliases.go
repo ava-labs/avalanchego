@@ -39,7 +39,7 @@ func (a *Aliaser) Aliases(id ID) []string {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
-	return a.aliases[id.Key()]
+	return a.aliases[id]
 }
 
 // PrimaryAlias returns the first alias of [id]
@@ -47,7 +47,7 @@ func (a *Aliaser) PrimaryAlias(id ID) (string, error) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
-	aliases, exists := a.aliases[id.Key()]
+	aliases, exists := a.aliases[id]
 	if !exists || len(aliases) == 0 {
 		return "", fmt.Errorf("there is no alias for ID %s", id)
 	}
@@ -62,10 +62,9 @@ func (a *Aliaser) Alias(id ID, alias string) error {
 	if _, exists := a.dealias[alias]; exists {
 		return fmt.Errorf("%s is already used as an alias for an ID", alias)
 	}
-	key := id.Key()
 
 	a.dealias[alias] = id
-	a.aliases[key] = append(a.aliases[key], alias)
+	a.aliases[id] = append(a.aliases[id], alias)
 	return nil
 }
 
@@ -74,10 +73,8 @@ func (a *Aliaser) RemoveAliases(id ID) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	key := id.Key()
-
-	aliases := a.aliases[key]
-	delete(a.aliases, key)
+	aliases := a.aliases[id]
+	delete(a.aliases, id)
 	for _, alias := range aliases {
 		delete(a.dealias, alias)
 	}

@@ -73,18 +73,17 @@ func (m *metrics) Initialize(
 // snowstorm consensus instance. It is assumed that either Accept or Reject will
 // be called with this same ID in the future.
 func (m *metrics) Issued(id ids.ID) {
-	m.processing[id.Key()] = m.clock.Time()
+	m.processing[id] = m.clock.Time()
 	m.numProcessing.Inc()
 }
 
 // Accepted marks that a transaction with the provided ID was accepted. It is
 // assumed that Issued was previously called with this ID.
 func (m *metrics) Accepted(id ids.ID) {
-	key := id.Key()
-	start := m.processing[key]
+	start := m.processing[id]
 	end := m.clock.Time()
 
-	delete(m.processing, key)
+	delete(m.processing, id)
 
 	m.accepted.Observe(float64(end.Sub(start).Milliseconds()))
 	m.numProcessing.Dec()
@@ -93,11 +92,10 @@ func (m *metrics) Accepted(id ids.ID) {
 // Rejected marks that a transaction with the provided ID was rejected. It is
 // assumed that Issued was previously called with this ID.
 func (m *metrics) Rejected(id ids.ID) {
-	key := id.Key()
-	start := m.processing[key]
+	start := m.processing[id]
 	end := m.clock.Time()
 
-	delete(m.processing, key)
+	delete(m.processing, id)
 
 	m.rejected.Observe(float64(end.Sub(start).Milliseconds()))
 	m.numProcessing.Dec()

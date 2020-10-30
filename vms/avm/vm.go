@@ -859,9 +859,8 @@ func (vm *VM) Spend(
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
-		assetKey := assetID.Key()
-		amount := amounts[assetKey]
-		amountSpent := amountsSpent[assetKey]
+		amount := amounts[assetID]
+		amountSpent := amountsSpent[assetID]
 
 		if amountSpent >= amount {
 			// we already have enough inputs allocated to this asset
@@ -883,7 +882,7 @@ func (vm *VM) Spend(
 			// there was an error calculating the consumed amount, just error
 			return nil, nil, nil, errSpendOverflow
 		}
-		amountsSpent[assetKey] = newAmountSpent
+		amountsSpent[assetID] = newAmountSpent
 
 		// add the new input to the array
 		ins = append(ins, &avax.TransferableInput{
@@ -1001,8 +1000,7 @@ func (vm *VM) SpendAll(
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
-		assetKey := assetID.Key()
-		amountSpent := amountsSpent[assetKey]
+		amountSpent := amountsSpent[assetID]
 
 		inputIntf, signers, err := kc.Spend(utxo.Out, time)
 		if err != nil {
@@ -1019,7 +1017,7 @@ func (vm *VM) SpendAll(
 			// there was an error calculating the consumed amount, just error
 			return nil, nil, nil, errSpendOverflow
 		}
-		amountsSpent[assetKey] = newAmountSpent
+		amountsSpent[assetID] = newAmountSpent
 
 		// add the new input to the array
 		ins = append(ins, &avax.TransferableInput{
@@ -1056,8 +1054,7 @@ func (vm *VM) Mint(
 		utxo := utxo
 
 		assetID := utxo.AssetID()
-		assetKey := assetID.Key()
-		amount := amounts[assetKey]
+		amount := amounts[assetID]
 		if amount == 0 {
 			continue
 		}
@@ -1097,7 +1094,7 @@ func (vm *VM) Mint(
 		keys = append(keys, signers)
 
 		// remove the asset from the required amounts to mint
-		delete(amounts, assetKey)
+		delete(amounts, assetID)
 	}
 
 	for _, amount := range amounts {

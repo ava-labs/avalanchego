@@ -79,7 +79,7 @@ func (c *LRU) resize() {
 		c.entryList.Remove(e)
 
 		val := e.Value.(*entry)
-		delete(c.entryMap, val.Key.Key())
+		delete(c.entryMap, val.Key)
 	}
 }
 
@@ -87,13 +87,13 @@ func (c *LRU) put(key ids.ID, value interface{}) {
 	c.init()
 	c.resize()
 
-	if e, ok := c.entryMap[key.Key()]; !ok {
+	if e, ok := c.entryMap[key]; !ok {
 		if c.entryList.Len() >= c.Size {
 			e = c.entryList.Front()
 			c.entryList.MoveToBack(e)
 
 			val := e.Value.(*entry)
-			delete(c.entryMap, val.Key.Key())
+			delete(c.entryMap, val.Key)
 			val.Key = key
 			val.Value = value
 		} else {
@@ -102,7 +102,7 @@ func (c *LRU) put(key ids.ID, value interface{}) {
 				Value: value,
 			})
 		}
-		c.entryMap[key.Key()] = e
+		c.entryMap[key] = e
 	} else {
 		c.entryList.MoveToBack(e)
 
@@ -115,7 +115,7 @@ func (c *LRU) get(key ids.ID) (interface{}, bool) {
 	c.init()
 	c.resize()
 
-	if e, ok := c.entryMap[key.Key()]; ok {
+	if e, ok := c.entryMap[key]; ok {
 		c.entryList.MoveToBack(e)
 
 		val := e.Value.(*entry)
@@ -128,10 +128,9 @@ func (c *LRU) evict(key ids.ID) {
 	c.init()
 	c.resize()
 
-	keyBytes := key.Key()
-	if e, ok := c.entryMap[keyBytes]; ok {
+	if e, ok := c.entryMap[key]; ok {
 		c.entryList.Remove(e)
-		delete(c.entryMap, keyBytes)
+		delete(c.entryMap, key)
 	}
 }
 

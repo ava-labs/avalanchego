@@ -37,8 +37,7 @@ func (fc *FlowChecker) Produce(assetID ids.ID, amount uint64) { fc.add(fc.produc
 
 func (fc *FlowChecker) add(value map[[32]byte]uint64, assetID ids.ID, amount uint64) {
 	var err error
-	assetIDKey := assetID.Key()
-	value[assetIDKey], err = math.Add64(value[assetIDKey], amount)
+	value[assetID], err = math.Add64(value[assetID], amount)
 	fc.errs.Add(err)
 }
 

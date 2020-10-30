@@ -44,11 +44,9 @@ func (m *manager) Set(subnetID ids.ID, newSet Set) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	subnetKey := subnetID.Key()
-
-	oldSet, exists := m.subnetToVdrs[subnetKey]
+	oldSet, exists := m.subnetToVdrs[subnetID]
 	if !exists {
-		m.subnetToVdrs[subnetKey] = newSet
+		m.subnetToVdrs[subnetID] = newSet
 		return nil
 	}
 	return oldSet.Set(newSet.List())
@@ -58,12 +56,11 @@ func (m *manager) Set(subnetID ids.ID, newSet Set) error {
 func (m *manager) AddWeight(subnetID ids.ID, vdrID ids.ShortID, weight uint64) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	subnetIDKey := subnetID.Key()
 
-	vdrs, ok := m.subnetToVdrs[subnetIDKey]
+	vdrs, ok := m.subnetToVdrs[subnetID]
 	if !ok {
 		vdrs = NewSet()
-		m.subnetToVdrs[subnetIDKey] = vdrs
+		m.subnetToVdrs[subnetID] = vdrs
 	}
 	return vdrs.AddWeight(vdrID, weight)
 }
@@ -73,7 +70,7 @@ func (m *manager) RemoveWeight(subnetID ids.ID, vdrID ids.ShortID, weight uint64
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	if vdrs, ok := m.subnetToVdrs[subnetID.Key()]; ok {
+	if vdrs, ok := m.subnetToVdrs[subnetID]; ok {
 		return vdrs.RemoveWeight(vdrID, weight)
 	}
 	return nil
@@ -84,6 +81,6 @@ func (m *manager) GetValidators(subnetID ids.ID) (Set, bool) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	vdrs, ok := m.subnetToVdrs[subnetID.Key()]
+	vdrs, ok := m.subnetToVdrs[subnetID]
 	return vdrs, ok
 }

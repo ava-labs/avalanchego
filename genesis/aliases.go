@@ -23,16 +23,16 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[[32]byte][]string, m
 		"bc/" + constants.PlatformChainID.String(): {"P", "platform", "bc/P", "bc/platform"},
 	}
 	chainAliases := map[[32]byte][]string{
-		constants.PlatformChainID.Key(): {"P", "platform"},
+		constants.PlatformChainID: {"P", "platform"},
 	}
 	vmAliases := map[[32]byte][]string{
-		platformvm.ID.Key():  {"platform"},
-		avm.ID.Key():         {"avm"},
-		EVMID.Key():          {"evm"},
-		timestampvm.ID.Key(): {"timestamp"},
-		secp256k1fx.ID.Key(): {"secp256k1fx"},
-		nftfx.ID.Key():       {"nftfx"},
-		propertyfx.ID.Key():  {"propertyfx"},
+		platformvm.ID:  {"platform"},
+		avm.ID:         {"avm"},
+		EVMID:          {"evm"},
+		timestampvm.ID: {"timestamp"},
+		secp256k1fx.ID: {"secp256k1fx"},
+		nftfx.ID:       {"nftfx"},
+		propertyfx.ID:  {"propertyfx"},
 	}
 
 	genesis := &platformvm.Genesis{} // TODO let's not re-create genesis to do aliasing
@@ -48,13 +48,13 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[[32]byte][]string, m
 		switch {
 		case avm.ID.Equals(uChain.VMID):
 			generalAliases["bc/"+chain.ID().String()] = []string{"X", "avm", "bc/X", "bc/avm"}
-			chainAliases[chain.ID().Key()] = []string{"X", "avm"}
+			chainAliases[chain.ID()] = []string{"X", "avm"}
 		case EVMID.Equals(uChain.VMID):
 			generalAliases["bc/"+chain.ID().String()] = []string{"C", "evm", "bc/C", "bc/evm"}
-			chainAliases[chain.ID().Key()] = []string{"C", "evm"}
+			chainAliases[chain.ID()] = []string{"C", "evm"}
 		case timestampvm.ID.Equals(uChain.VMID):
 			generalAliases["bc/"+chain.ID().String()] = []string{"bc/timestamp"}
-			chainAliases[chain.ID().Key()] = []string{"timestamp"}
+			chainAliases[chain.ID()] = []string{"timestamp"}
 		}
 	}
 	return generalAliases, chainAliases, vmAliases, nil
