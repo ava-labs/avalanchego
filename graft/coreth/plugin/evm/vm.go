@@ -530,6 +530,10 @@ func (vm *VM) CreateHandlers() map[string]*commonEng.HTTPHandler {
 		handler.RegisterName("admin", &admin.Performance{})
 		enabledAPIs = append(enabledAPIs, "coreth-admin")
 	}
+	if vm.CLIConfig.NetAPIEnabled {
+		handler.RegisterName("net", &NetAPI{vm})
+		enabledAPIs = append(enabledAPIs, "net")
+	}
 
 	log.Info(fmt.Sprintf("Enabled APIs: %s", strings.Join(enabledAPIs, ", ")))
 
