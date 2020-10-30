@@ -183,7 +183,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
 	}
 
-	sourceChain := ids.ID{}
+	var sourceChain ids.ID
 	if args.SourceChain == "" {
 		sourceChain = service.vm.ctx.ChainID
 	} else {

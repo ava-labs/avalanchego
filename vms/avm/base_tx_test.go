@@ -179,7 +179,7 @@ func TestBaseTxGetters(t *testing.T) {
 		t.Fatalf("Wrong tx ID returned")
 	} else if utxoIndex := utxo.OutputIndex; utxoIndex != 0 {
 		t.Fatalf("Wrong output index returned")
-	} else if assetID := utxo.AssetID(); assetID != assetID {
+	} else if gotAssetID := utxo.AssetID(); gotAssetID != assetID {
 		t.Fatalf("Wrong asset ID returned")
 	}
 }
