@@ -117,13 +117,11 @@ func (c *Conflicts) conflicts(tx Tx) ids.Set {
 
 // Accept notifies this conflict manager that a tx has been conditionally
 // accepted. This means that assuming all the txs this tx depends on are
-// accepted, then this tx should be accepted as well. This
+// accepted, then this tx should be accepted as well. This assumes that the tx
+// has been issued, hasn't previously been marked as conditionally accepted, and
+// hasn't been returned as being rejectable.
 func (c *Conflicts) Accept(txID ids.ID) {
-	tx, exists := c.txs[txID.Key()]
-	if !exists {
-		return
-	}
-
+	tx := c.txs[txID.Key()]
 	toAccept := &acceptor{
 		c:  c,
 		tx: tx,
