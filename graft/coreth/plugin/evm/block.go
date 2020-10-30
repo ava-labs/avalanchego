@@ -34,7 +34,7 @@ func (b *Block) Accept() error {
 
 	log.Trace(fmt.Sprintf("Block %s is accepted", b.ID()))
 	vm.updateStatus(b.id, choices.Accepted)
-	if err := vm.acceptedDB.Put(b.ethBlock.Number().Bytes(), b.id.Bytes()); err != nil {
+	if err := vm.acceptedDB.Put(b.ethBlock.Number().Bytes(), b.id[:]); err != nil {
 		return err
 	}
 
@@ -68,7 +68,7 @@ func (b *Block) Status() choices.Status {
 
 // Parent implements the snowman.Block interface
 func (b *Block) Parent() snowman.Block {
-	parentID := ids.NewID(b.ethBlock.ParentHash())
+	parentID := ids.ID(b.ethBlock.ParentHash())
 	if block := b.vm.getBlock(parentID); block != nil {
 		return block
 	}
