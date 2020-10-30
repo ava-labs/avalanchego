@@ -100,13 +100,13 @@ func (vtx *innerVertex) Marshal() ([]byte, error) {
 	p := wrappers.Packer{MaxSize: maxSize}
 
 	p.PackShort(version)
-	p.PackFixedBytes(vtx.chainID.Bytes())
+	p.PackFixedBytes(vtx.chainID[:])
 	p.PackLong(vtx.height)
 	p.PackInt(0)
 
 	p.PackInt(uint32(len(vtx.parentIDs)))
 	for _, parentID := range vtx.parentIDs {
-		p.PackFixedBytes(parentID.Bytes())
+		p.PackFixedBytes(parentID[:])
 	}
 
 	p.PackInt(uint32(len(vtx.txs)))
@@ -175,7 +175,9 @@ func (vtx *innerVertex) Unmarshal(b []byte, vm vertex.DAGVM) error {
 type sortTxsData []snowstorm.Tx
 
 func (txs sortTxsData) Less(i, j int) bool {
-	return bytes.Compare(txs[i].ID().Bytes(), txs[j].ID().Bytes()) == -1
+	id1 := txs[i].ID()
+	id2 := txs[j].ID()
+	return bytes.Compare(id1[:], id2[:]) == -1
 }
 func (txs sortTxsData) Len() int      { return len(txs) }
 func (txs sortTxsData) Swap(i, j int) { txs[j], txs[i] = txs[i], txs[j] }

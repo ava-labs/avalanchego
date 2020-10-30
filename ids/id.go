@@ -69,7 +69,7 @@ func (id ID) Prefix(prefixes ...uint64) ID {
 	for _, prefix := range prefixes {
 		packer.PackLong(prefix)
 	}
-	packer.PackFixedBytes(id.Bytes())
+	packer.PackFixedBytes(id[:])
 
 	return hashing.ComputeHash256Array(packer.Bytes)
 }
@@ -79,17 +79,12 @@ func (id ID) Equals(oID ID) bool { // todo do we need this?
 	return id == oID
 }
 
-// Bytes returns the 32 byte hash as a slice. It is assumed this slice is not
-// modified.
-func (id ID) Bytes() []byte { return id[:] }
-
 // Bit returns the bit value at the ith index of the byte array. Returns 0 or 1
 func (id ID) Bit(i uint) int {
 	byteIndex := i / BitsPerByte
 	bitIndex := i % BitsPerByte
 
-	bytes := id.Bytes()
-	b := bytes[byteIndex]
+	b := id[:][byteIndex]
 
 	// b = [7, 6, 5, 4, 3, 2, 1, 0]
 
@@ -106,18 +101,18 @@ func (id ID) Bit(i uint) int {
 }
 
 // Hex returns a hex encoded string of this id.
-func (id ID) Hex() string { return hex.EncodeToString(id.Bytes()) }
+func (id ID) Hex() string { return hex.EncodeToString(id[:]) }
 
 func (id ID) String() string {
-	return formatting.CB58{Bytes: id.Bytes()}.String()
+	return formatting.CB58{Bytes: id[:]}.String()
 }
 
 type sortIDData []ID
 
 func (ids sortIDData) Less(i, j int) bool {
 	return bytes.Compare(
-		ids[i].Bytes(),
-		ids[j].Bytes()) == -1
+		ids[i][:],
+		ids[j][:]) == -1
 }
 func (ids sortIDData) Len() int      { return len(ids) }
 func (ids sortIDData) Swap(i, j int) { ids[j], ids[i] = ids[i], ids[j] }

@@ -52,7 +52,7 @@ func (m *Memory) GetDatabase(sharedID ids.ID) (*versiondb.Database, database.Dat
 	lock.Lock()
 
 	vdb := versiondb.New(m.db)
-	return vdb, prefixdb.New(sharedID.Bytes(), vdb)
+	return vdb, prefixdb.New(sharedID[:], vdb)
 }
 
 // ReleaseDatabase unlocks the provided DB

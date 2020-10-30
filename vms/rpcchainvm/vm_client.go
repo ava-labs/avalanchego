@@ -124,11 +124,11 @@ func (vm *VMClient) Initialize(
 
 	resp, err := vm.client.Initialize(context.Background(), &vmproto.InitializeRequest{
 		NetworkID:          ctx.NetworkID,
-		SubnetID:           ctx.SubnetID.Bytes(),
-		ChainID:            ctx.ChainID.Bytes(),
+		SubnetID:           ctx.SubnetID[:],
+		ChainID:            ctx.ChainID[:],
 		NodeID:             ctx.NodeID.Bytes(),
-		XChainID:           ctx.XChainID.Bytes(),
-		AvaxAssetID:        ctx.AVAXAssetID.Bytes(),
+		XChainID:           ctx.XChainID[:],
+		AvaxAssetID:        ctx.AVAXAssetID[:],
 		GenesisBytes:       genesisBytes,
 		DbServer:           dbBrokerID,
 		EngineServer:       messengerBrokerID,
@@ -296,7 +296,7 @@ func (vm *VMClient) GetBlock(id ids.ID) (snowman.Block, error) {
 	}
 
 	resp, err := vm.client.GetBlock(context.Background(), &vmproto.GetBlockRequest{
-		Id: id.Bytes(),
+		Id: id[:],
 	})
 	if err != nil {
 		return nil, err
@@ -319,7 +319,7 @@ func (vm *VMClient) GetBlock(id ids.ID) (snowman.Block, error) {
 // SetPreference ...
 func (vm *VMClient) SetPreference(id ids.ID) {
 	_, err := vm.client.SetPreference(context.Background(), &vmproto.SetPreferenceRequest{
-		Id: id.Bytes(),
+		Id: id[:],
 	})
 	vm.ctx.Log.AssertNoError(err)
 }
@@ -353,7 +353,7 @@ func (b *BlockClient) Accept() error {
 	delete(b.vm.blks, b.id)
 	b.status = choices.Accepted
 	_, err := b.vm.client.BlockAccept(context.Background(), &vmproto.BlockAcceptRequest{
-		Id: b.id.Bytes(),
+		Id: b.id[:],
 	})
 	if err != nil {
 		return err
@@ -368,7 +368,7 @@ func (b *BlockClient) Reject() error {
 	delete(b.vm.blks, b.id)
 	b.status = choices.Rejected
 	_, err := b.vm.client.BlockReject(context.Background(), &vmproto.BlockRejectRequest{
-		Id: b.id.Bytes(),
+		Id: b.id[:],
 	})
 	return err
 }
@@ -387,7 +387,7 @@ func (b *BlockClient) Parent() snowman.Block {
 // Verify ...
 func (b *BlockClient) Verify() error {
 	_, err := b.vm.client.BlockVerify(context.Background(), &vmproto.BlockVerifyRequest{
-		Id: b.id.Bytes(),
+		Id: b.id[:],
 	})
 	if err != nil {
 		return err

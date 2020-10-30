@@ -311,8 +311,9 @@ func TestIssueImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	inputID := utxo.InputID()
 	if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
-		Key:   utxo.InputID().Bytes(),
+		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			key.PublicKey().Address().Bytes(),
@@ -348,8 +349,8 @@ func TestIssueImportTx(t *testing.T) {
 	if err := parsedTx.Accept(); err != nil {
 		t.Fatal(err)
 	}
-
-	if _, err := vm.ctx.SharedMemory.Get(platformID, [][]byte{utxoID.InputID().Bytes()}); err == nil {
+	id := utxoID.InputID()
+	if _, err := vm.ctx.SharedMemory.Get(platformID, [][]byte{id[:]}); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
 	}
 }
@@ -448,7 +449,8 @@ func TestForceAcceptImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := vm.ctx.SharedMemory.Get(platformID, [][]byte{utxoID.InputID().Bytes()}); err == nil {
+	id := utxoID.InputID()
+	if _, err := vm.ctx.SharedMemory.Get(platformID, [][]byte{id[:]}); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
 	}
 }

@@ -1404,7 +1404,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	utxoID := utxo.InputID()
 
 	peerSharedMemory := m.NewSharedMemory(platformID)
-	if err := peerSharedMemory.Remove(vm.ctx.ChainID, [][]byte{utxoID.Bytes()}); err != nil {
+	if err := peerSharedMemory.Remove(vm.ctx.ChainID, [][]byte{utxoID[:]}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1412,7 +1412,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := peerSharedMemory.Get(vm.ctx.ChainID, [][]byte{utxoID.Bytes()}); err == nil {
+	if _, err := peerSharedMemory.Get(vm.ctx.ChainID, [][]byte{utxoID[:]}); err == nil {
 		t.Fatalf("should have failed to read the utxo")
 	}
 }

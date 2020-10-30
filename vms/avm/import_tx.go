@@ -110,7 +110,8 @@ func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 
 	utxoIDs := make([][]byte, len(t.ImportedIns))
 	for i, in := range t.ImportedIns {
-		utxoIDs[i] = in.UTXOID.InputID().Bytes()
+		inputID := in.UTXOID.InputID()
+		utxoIDs[i] = inputID[:]
 	}
 	allUTXOBytes, err := vm.ctx.SharedMemory.Get(t.SourceChain, utxoIDs)
 	if err != nil {
@@ -137,7 +138,8 @@ func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 func (t *ImportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 	utxoIDs := make([][]byte, len(t.ImportedIns))
 	for i, in := range t.ImportedIns {
-		utxoIDs[i] = in.UTXOID.InputID().Bytes()
+		inputID := in.UTXOID.InputID()
+		utxoIDs[i] = inputID[:]
 	}
 	return vm.ctx.SharedMemory.Remove(t.SourceChain, utxoIDs, batch)
 }

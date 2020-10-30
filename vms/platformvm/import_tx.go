@@ -128,7 +128,8 @@ func (tx *UnsignedImportTx) SemanticVerify(
 
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))
 	for i, in := range tx.ImportedInputs {
-		utxoIDs[i] = in.UTXOID.InputID().Bytes()
+		utxoID := in.UTXOID.InputID()
+		utxoIDs[i] = utxoID[:]
 	}
 	allUTXOBytes, err := vm.Ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
 	if err != nil {
@@ -162,7 +163,8 @@ func (tx *UnsignedImportTx) SemanticVerify(
 func (tx *UnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) error {
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))
 	for i, in := range tx.ImportedInputs {
-		utxoIDs[i] = in.InputID().Bytes()
+		utxoID := in.InputID()
+		utxoIDs[i] = utxoID[:]
 	}
 	return ctx.SharedMemory.Remove(tx.SourceChain, utxoIDs, batch)
 }

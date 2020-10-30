@@ -84,7 +84,7 @@ func (sm *sharedMemory) Put(peerChainID ids.ID, elems []*Element, batches ...dat
 	s := state{
 		c: sm.m.codec,
 	}
-	if bytes.Compare(sm.thisChainID.Bytes(), peerChainID.Bytes()) == -1 {
+	if bytes.Compare(sm.thisChainID[:], peerChainID[:]) == -1 {
 		s.valueDB = prefixdb.New(largerValuePrefix, db)
 		s.indexDB = prefixdb.New(largerIndexPrefix, db)
 	} else {
@@ -113,7 +113,7 @@ func (sm *sharedMemory) Get(peerChainID ids.ID, keys [][]byte) ([][]byte, error)
 	s := state{
 		c: sm.m.codec,
 	}
-	if bytes.Compare(sm.thisChainID.Bytes(), peerChainID.Bytes()) == -1 {
+	if bytes.Compare(sm.thisChainID[:], peerChainID[:]) == -1 {
 		s.valueDB = prefixdb.New(smallerValuePrefix, db)
 	} else {
 		s.valueDB = prefixdb.New(largerValuePrefix, db)
@@ -144,7 +144,7 @@ func (sm *sharedMemory) Indexed(
 	s := state{
 		c: sm.m.codec,
 	}
-	if bytes.Compare(sm.thisChainID.Bytes(), peerChainID.Bytes()) == -1 {
+	if bytes.Compare(sm.thisChainID[:], peerChainID[:]) == -1 {
 		s.valueDB = prefixdb.New(smallerValuePrefix, db)
 		s.indexDB = prefixdb.New(smallerIndexPrefix, db)
 	} else {
@@ -176,7 +176,7 @@ func (sm *sharedMemory) Remove(peerChainID ids.ID, keys [][]byte, batches ...dat
 	s := state{
 		c: sm.m.codec,
 	}
-	if bytes.Compare(sm.thisChainID.Bytes(), peerChainID.Bytes()) == -1 {
+	if bytes.Compare(sm.thisChainID[:], peerChainID[:]) == -1 {
 		s.valueDB = prefixdb.New(smallerValuePrefix, db)
 		s.indexDB = prefixdb.New(smallerIndexPrefix, db)
 	} else {

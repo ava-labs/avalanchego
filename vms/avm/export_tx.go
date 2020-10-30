@@ -112,8 +112,9 @@ func (t *ExportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 			return err
 		}
 
+		inputID := utxo.InputID()
 		elem := &atomic.Element{
-			Key:   utxo.InputID().Bytes(),
+			Key:   inputID[:],
 			Value: utxoBytes,
 		}
 		if out, ok := utxo.Out.(avax.Addressable); ok {

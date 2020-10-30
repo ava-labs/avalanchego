@@ -1458,9 +1458,9 @@ func TestAtomicImport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	inputID := utxo.InputID()
 	if err := peerSharedMemory.Put(vm.Ctx.ChainID, []*atomic.Element{{
-		Key:   utxo.InputID().Bytes(),
+		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			recipientKey.PublicKey().Address().Bytes(),
@@ -1492,8 +1492,8 @@ func TestAtomicImport(t *testing.T) {
 	} else if status != Committed {
 		t.Fatalf("status should be Committed but is %s", status)
 	}
-
-	if _, err := vm.Ctx.SharedMemory.Get(vm.Ctx.XChainID, [][]byte{utxoID.InputID().Bytes()}); err == nil {
+	inputID = utxoID.InputID()
+	if _, err := vm.Ctx.SharedMemory.Get(vm.Ctx.XChainID, [][]byte{inputID[:]}); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
 	}
 }
@@ -2158,10 +2158,12 @@ func TestNextValidatorStartTime(t *testing.T) {
 
 	nextStaker, err := vm.nextStakerStart(vm.DB, constants.PrimaryNetworkID)
 	assert.NoError(t, err)
+	txID := tx.ID()
+	nextStakerID := nextStaker.ID()
 	assert.Equal(
 		t,
-		tx.ID().Bytes(),
-		nextStaker.ID().Bytes(),
+		txID[:],
+		nextStakerID[:],
 		"should have marked the new tx as the next validator to be added",
 	)
 }

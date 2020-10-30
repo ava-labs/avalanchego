@@ -59,7 +59,7 @@ func (utxos innerSortUTXOIDs) Less(i, j int) bool {
 	iID, iIndex := utxos[i].InputSource()
 	jID, jIndex := utxos[j].InputSource()
 
-	switch bytes.Compare(iID.Bytes(), jID.Bytes()) {
+	switch bytes.Compare(iID[:], jID[:]) {
 	case -1:
 		return true
 	case 0:

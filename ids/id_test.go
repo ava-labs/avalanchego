@@ -23,7 +23,7 @@ func TestID(t *testing.T) {
 		t.Fatalf("ID.Prefix not consistent")
 	}
 
-	if b := id.Bytes(); !bytes.Equal(hash[:], b) {
+	if b := id[:]; !bytes.Equal(hash[:], b) {
 		t.Fatalf("ID.Bytes returned wrong bytes")
 	}
 }

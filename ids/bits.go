@@ -27,8 +27,8 @@ func EqualSubset(start, stop int, id1, id2 ID) bool {
 		return false
 	}
 
-	id1Bytes := id1.Bytes()
-	id2Bytes := id2.Bytes()
+	id1Bytes := id1[:]
+	id2Bytes := id2[:]
 
 	startIndex := start / BitsPerByte
 	stopIndex := stop / BitsPerByte
@@ -73,8 +73,8 @@ func FirstDifferenceSubset(start, stop int, id1, id2 ID) (int, bool) {
 		return 0, false
 	}
 
-	id1Bytes := id1.Bytes()
-	id2Bytes := id2.Bytes()
+	id1Bytes := id1[:]
+	id2Bytes := id2[:]
 
 	startIndex := start / BitsPerByte
 	stopIndex := stop / BitsPerByte

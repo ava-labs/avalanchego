@@ -29,7 +29,7 @@ func NewClient(client gsharedmemoryproto.SharedMemoryClient) *Client {
 // Put ...
 func (c *Client) Put(peerChainID ids.ID, elems []*atomic.Element, batches ...database.Batch) error {
 	req := gsharedmemoryproto.PutRequest{
-		PeerChainID: peerChainID.Bytes(),
+		PeerChainID: peerChainID[:],
 		Elems:       make([]*gsharedmemoryproto.Element, len(elems)),
 		Batches:     make([]*gsharedmemoryproto.Batch, len(batches)),
 	}
@@ -64,7 +64,7 @@ func (c *Client) Put(peerChainID ids.ID, elems []*atomic.Element, batches ...dat
 // Get ...
 func (c *Client) Get(peerChainID ids.ID, keys [][]byte) (values [][]byte, err error) {
 	resp, err := c.client.Get(context.Background(), &gsharedmemoryproto.GetRequest{
-		PeerChainID: peerChainID.Bytes(),
+		PeerChainID: peerChainID[:],
 		Keys:        keys,
 	})
 	if err != nil {
@@ -87,7 +87,7 @@ func (c *Client) Indexed(
 	err error,
 ) {
 	resp, err := c.client.Indexed(context.Background(), &gsharedmemoryproto.IndexedRequest{
-		PeerChainID: peerChainID.Bytes(),
+		PeerChainID: peerChainID[:],
 		Traits:      traits,
 		StartTrait:  startTrait,
 		StartKey:    startKey,
@@ -102,7 +102,7 @@ func (c *Client) Indexed(
 // Remove ...
 func (c *Client) Remove(peerChainID ids.ID, keys [][]byte, batches ...database.Batch) error {
 	req := gsharedmemoryproto.RemoveRequest{
-		PeerChainID: peerChainID.Bytes(),
+		PeerChainID: peerChainID[:],
 		Keys:        keys,
 		Batches:     make([]*gsharedmemoryproto.Batch, len(batches)),
 	}

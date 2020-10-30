@@ -42,7 +42,7 @@ func (m Builder) Pong() (Msg, error) { return m.Pack(Pong, nil) }
 // GetAcceptedFrontier message
 func (m Builder) GetAcceptedFrontier(chainID ids.ID, requestID uint32, deadline uint64) (Msg, error) {
 	return m.Pack(GetAcceptedFrontier, map[Field]interface{}{
-		ChainID:   chainID.Bytes(),
+		ChainID:   chainID[:],
 		RequestID: requestID,
 		Deadline:  deadline,
 	})
@@ -58,7 +58,7 @@ func (m Builder) AcceptedFrontier(chainID ids.ID, requestID uint32, containerIDs
 		i++
 	}
 	return m.Pack(AcceptedFrontier, map[Field]interface{}{
-		ChainID:      chainID.Bytes(),
+		ChainID:      chainID[:],
 		RequestID:    requestID,
 		ContainerIDs: containerIDBytes,
 	})
@@ -74,7 +74,7 @@ func (m Builder) GetAccepted(chainID ids.ID, requestID uint32, deadline uint64, 
 		i++
 	}
 	return m.Pack(GetAccepted, map[Field]interface{}{
-		ChainID:      chainID.Bytes(),
+		ChainID:      chainID[:],
 		RequestID:    requestID,
 		Deadline:     deadline,
 		ContainerIDs: containerIDBytes,
@@ -91,7 +91,7 @@ func (m Builder) Accepted(chainID ids.ID, requestID uint32, containerIDs ids.Set
 		i++
 	}
 	return m.Pack(Accepted, map[Field]interface{}{
-		ChainID:      chainID.Bytes(),
+		ChainID:      chainID[:],
 		RequestID:    requestID,
 		ContainerIDs: containerIDBytes,
 	})
@@ -100,17 +100,17 @@ func (m Builder) Accepted(chainID ids.ID, requestID uint32, containerIDs ids.Set
 // GetAncestors message
 func (m Builder) GetAncestors(chainID ids.ID, requestID uint32, deadline uint64, containerID ids.ID) (Msg, error) {
 	return m.Pack(GetAncestors, map[Field]interface{}{
-		ChainID:     chainID.Bytes(),
+		ChainID:     chainID[:],
 		RequestID:   requestID,
 		Deadline:    deadline,
-		ContainerID: containerID.Bytes(),
+		ContainerID: containerID[:],
 	})
 }
 
 // MultiPut message
 func (m Builder) MultiPut(chainID ids.ID, requestID uint32, containers [][]byte) (Msg, error) {
 	return m.Pack(MultiPut, map[Field]interface{}{
-		ChainID:             chainID.Bytes(),
+		ChainID:             chainID[:],
 		RequestID:           requestID,
 		MultiContainerBytes: containers,
 	})
@@ -119,19 +119,19 @@ func (m Builder) MultiPut(chainID ids.ID, requestID uint32, containers [][]byte)
 // Get message
 func (m Builder) Get(chainID ids.ID, requestID uint32, deadline uint64, containerID ids.ID) (Msg, error) {
 	return m.Pack(Get, map[Field]interface{}{
-		ChainID:     chainID.Bytes(),
+		ChainID:     chainID[:],
 		RequestID:   requestID,
 		Deadline:    deadline,
-		ContainerID: containerID.Bytes(),
+		ContainerID: containerID[:],
 	})
 }
 
 // Put message
 func (m Builder) Put(chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) (Msg, error) {
 	return m.Pack(Put, map[Field]interface{}{
-		ChainID:        chainID.Bytes(),
+		ChainID:        chainID[:],
 		RequestID:      requestID,
-		ContainerID:    containerID.Bytes(),
+		ContainerID:    containerID[:],
 		ContainerBytes: container,
 	})
 }
@@ -139,10 +139,10 @@ func (m Builder) Put(chainID ids.ID, requestID uint32, containerID ids.ID, conta
 // PushQuery message
 func (m Builder) PushQuery(chainID ids.ID, requestID uint32, deadline uint64, containerID ids.ID, container []byte) (Msg, error) {
 	return m.Pack(PushQuery, map[Field]interface{}{
-		ChainID:        chainID.Bytes(),
+		ChainID:        chainID[:],
 		RequestID:      requestID,
 		Deadline:       deadline,
-		ContainerID:    containerID.Bytes(),
+		ContainerID:    containerID[:],
 		ContainerBytes: container,
 	})
 }
@@ -150,10 +150,10 @@ func (m Builder) PushQuery(chainID ids.ID, requestID uint32, deadline uint64, co
 // PullQuery message
 func (m Builder) PullQuery(chainID ids.ID, requestID uint32, deadline uint64, containerID ids.ID) (Msg, error) {
 	return m.Pack(PullQuery, map[Field]interface{}{
-		ChainID:     chainID.Bytes(),
+		ChainID:     chainID[:],
 		RequestID:   requestID,
 		Deadline:    deadline,
-		ContainerID: containerID.Bytes(),
+		ContainerID: containerID[:],
 	})
 }
 
@@ -167,7 +167,7 @@ func (m Builder) Chits(chainID ids.ID, requestID uint32, containerIDs ids.Set) (
 		i++
 	}
 	return m.Pack(Chits, map[Field]interface{}{
-		ChainID:      chainID.Bytes(),
+		ChainID:      chainID[:],
 		RequestID:    requestID,
 		ContainerIDs: containerIDBytes,
 	})

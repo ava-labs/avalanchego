@@ -399,8 +399,9 @@ func TestServiceGetUTXOs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		utxoID := utxo.InputID()
 		elems[i] = &atomic.Element{
-			Key:   utxo.InputID().Bytes(),
+			Key:   utxoID[:],
 			Value: utxoBytes,
 			Traits: [][]byte{
 				rawAddr.Bytes(),
@@ -1257,8 +1258,9 @@ func TestImportAVAX(t *testing.T) {
 	}
 
 	peerSharedMemory := m.NewSharedMemory(platformChainID)
+	utxoID := utxo.InputID()
 	if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
-		Key:   utxo.InputID().Bytes(),
+		Key:   utxoID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			addr0.Bytes(),

@@ -436,7 +436,7 @@ func (vm *VM) GetAtomicUTXOs(
 		chainID,
 		addrsList,
 		startAddr.Bytes(),
-		startUTXOID.Bytes(),
+		startUTXOID[:],
 		limit,
 	)
 	if err != nil {

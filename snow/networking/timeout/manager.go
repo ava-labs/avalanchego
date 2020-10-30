@@ -65,5 +65,5 @@ func createRequestID(validatorID ids.ShortID, chainID ids.ID, requestID uint32) 
 	p := wrappers.Packer{Bytes: make([]byte, wrappers.IntLen)}
 	p.PackInt(requestID)
 
-	return hashing.ByteArraysToHash256Array(validatorID.Bytes(), chainID.Bytes(), p.Bytes)
+	return hashing.ByteArraysToHash256Array(validatorID.Bytes(), chainID[:], p.Bytes)
 }

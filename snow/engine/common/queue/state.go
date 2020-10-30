@@ -62,11 +62,11 @@ func (s *state) IDs(db database.Database, prefix []byte) ([]ids.ID, error) {
 // AddID saves an ID to the prefixed database
 func (s *state) AddID(db database.Database, prefix []byte, key ids.ID) error {
 	pdb := prefixdb.NewNested(prefix, db)
-	return pdb.Put(key.Bytes(), nil)
+	return pdb.Put(key[:], nil)
 }
 
 // RemoveID removes an ID from the prefixed database
 func (s *state) RemoveID(db database.Database, prefix []byte, key ids.ID) error {
 	pdb := prefixdb.NewNested(prefix, db)
-	return pdb.Delete(key.Bytes())
+	return pdb.Delete(key[:])
 }

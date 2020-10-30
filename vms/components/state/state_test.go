@@ -22,7 +22,7 @@ const blockSize = 40 // hashing.HashLen (32) + length of uin64 (8)
 
 func (b *block) Bytes() ([]byte, error) {
 	p := wrappers.Packer{Bytes: make([]byte, blockSize)}
-	p.PackFixedBytes(b.parentID.Bytes())
+	p.PackFixedBytes(b.parentID[:])
 	p.PackLong(b.value)
 	return p.Bytes, p.Err
 }
@@ -62,7 +62,7 @@ const accountSize = 32 + 8 + 8
 
 func (acc *account) Bytes() ([]byte, error) {
 	p := wrappers.Packer{Bytes: make([]byte, accountSize)}
-	p.PackFixedBytes(acc.id.Bytes())
+	p.PackFixedBytes(acc.id[:])
 	p.PackLong(acc.balance)
 	p.PackLong(acc.nonce)
 	return p.Bytes, p.Err
