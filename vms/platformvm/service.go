@@ -425,7 +425,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		endAddr   ids.ShortID
 		endUTXOID ids.ID
 	)
-	if sourceChain.Equals(service.vm.Ctx.ChainID) {
+	if sourceChain == service.vm.Ctx.ChainID {
 		utxos, endAddr, endUTXOID, err = service.vm.GetUTXOs(
 			service.vm.DB,
 			addrSet,
@@ -592,7 +592,7 @@ func (service *Service) GetStakingAssetID(_ *http.Request, args *GetStakingAsset
 		args.SubnetID = constants.PrimaryNetworkID
 	}
 
-	if !args.SubnetID.Equals(constants.PrimaryNetworkID) {
+	if args.SubnetID != constants.PrimaryNetworkID {
 		return fmt.Errorf("Subnet %s doesn't have a valid staking token",
 			args.SubnetID)
 	}
@@ -1180,7 +1180,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	if err != nil {
 		return fmt.Errorf("problem parsing subnetID %q: %w", args.SubnetID, err)
 	}
-	if subnetID.Equals(constants.PrimaryNetworkID) {
+	if subnetID == constants.PrimaryNetworkID {
 		return errors.New("subnet validator attempts to validate primary network")
 	}
 
@@ -1618,11 +1618,11 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	// TODO: Document FXs and have user specify them in API call
 	fxIDsSet := ids.Set{}
 	fxIDsSet.Add(fxIDs...)
-	if vmID.Equals(avm.ID) && !fxIDsSet.Contains(secp256k1fx.ID) {
+	if vmID == avm.ID && !fxIDsSet.Contains(secp256k1fx.ID) {
 		fxIDs = append(fxIDs, secp256k1fx.ID)
 	}
 
-	if args.SubnetID.Equals(constants.PrimaryNetworkID) {
+	if args.SubnetID == constants.PrimaryNetworkID {
 		return errDSCantValidate
 	}
 
@@ -1762,7 +1762,7 @@ func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error
 	}
 
 	for _, chain := range chains {
-		if chain.ID().Equals(chainID) {
+		if chain.ID() == chainID {
 			return true, nil
 		}
 	}
@@ -1807,7 +1807,7 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 	service.vm.Ctx.Log.Info("Platform: Validates called")
 	// Verify that the Subnet exists
 	// Ignore lookup error if it's the PrimaryNetworkID
-	if _, err := service.vm.getSubnet(service.vm.DB, args.SubnetID); err != nil && !args.SubnetID.Equals(constants.PrimaryNetworkID) {
+	if _, err := service.vm.getSubnet(service.vm.DB, args.SubnetID); err != nil && args.SubnetID != constants.PrimaryNetworkID {
 		return fmt.Errorf("problem retrieving subnet %q: %w", args.SubnetID, err)
 	}
 	// Get the chains that exist
@@ -1817,7 +1817,7 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 	}
 	// Filter to get the chains validated by the specified Subnet
 	for _, chain := range chains {
-		if chain.UnsignedTx.(*UnsignedCreateChainTx).SubnetID.Equals(args.SubnetID) {
+		if chain.UnsignedTx.(*UnsignedCreateChainTx).SubnetID == args.SubnetID {
 			response.BlockchainIDs = append(response.BlockchainIDs, chain.ID())
 		}
 	}
@@ -2033,7 +2033,7 @@ func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, respo
 			err    error
 		)
 		for _, stake := range outs {
-			if !stake.AssetID().Equals(service.vm.Ctx.AVAXAssetID) {
+			if stake.AssetID() != service.vm.Ctx.AVAXAssetID {
 				continue
 			}
 			out := stake.Out

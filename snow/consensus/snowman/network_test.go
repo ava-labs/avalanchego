@@ -131,7 +131,7 @@ func (n *Network) Agreement() bool {
 	}
 	pref := n.nodes[0].Preference()
 	for _, node := range n.nodes {
-		if !pref.Equals(node.Preference()) {
+		if pref != node.Preference() {
 			return false
 		}
 	}

@@ -23,7 +23,7 @@ func TestFlat(t *testing.T) {
 	f.Add(Green)
 	f.Add(Blue)
 
-	if pref := f.Preference(); !pref.Equals(Red) {
+	if pref := f.Preference(); pref != Red {
 		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
 	} else if f.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -33,7 +33,7 @@ func TestFlat(t *testing.T) {
 	twoBlue.Add(Blue, Blue)
 	f.RecordPoll(twoBlue)
 
-	if pref := f.Preference(); !pref.Equals(Blue) {
+	if pref := f.Preference(); pref != Blue {
 		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
 	} else if f.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -43,7 +43,7 @@ func TestFlat(t *testing.T) {
 	twoBlue.Add(Red, Blue)
 	f.RecordPoll(oneRedOneBlue)
 
-	if pref := f.Preference(); !pref.Equals(Blue) {
+	if pref := f.Preference(); pref != Blue {
 		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
 	} else if f.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -51,7 +51,7 @@ func TestFlat(t *testing.T) {
 
 	f.RecordPoll(twoBlue)
 
-	if pref := f.Preference(); !pref.Equals(Blue) {
+	if pref := f.Preference(); pref != Blue {
 		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
 	} else if f.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -59,7 +59,7 @@ func TestFlat(t *testing.T) {
 
 	f.RecordPoll(twoBlue)
 
-	if pref := f.Preference(); !pref.Equals(Blue) {
+	if pref := f.Preference(); pref != Blue {
 		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
 	} else if !f.Finalized() {
 		t.Fatalf("Finalized too late")

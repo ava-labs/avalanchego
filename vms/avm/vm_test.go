@@ -568,7 +568,7 @@ func TestIssueTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !txID.Equals(newTx.ID()) {
+	if txID != newTx.ID() {
 		t.Fatalf("Issue Tx returned wrong TxID")
 	}
 	ctx.Lock.Unlock()

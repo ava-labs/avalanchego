@@ -67,7 +67,7 @@ func TestStateIDsNoStart(t *testing.T) {
 	ids.SortIDs(result)
 	for i, resultID := range result {
 		expectedID := expected[i]
-		if !expectedID.Equals(resultID) {
+		if expectedID != resultID {
 			t.Fatalf("Wrong ID returned")
 		}
 	}
@@ -102,7 +102,7 @@ func TestStateIDsNoStart(t *testing.T) {
 	ids.SortIDs(result)
 	for i, resultID := range result {
 		expectedID := expected[i]
-		if !expectedID.Equals(resultID) {
+		if expectedID != resultID {
 			t.Fatalf("Wrong ID returned")
 		}
 	}
@@ -119,7 +119,7 @@ func TestStateIDsNoStart(t *testing.T) {
 	ids.SortIDs(result)
 	for i, resultID := range result {
 		expectedID := expected[i]
-		if !expectedID.Equals(resultID) {
+		if expectedID != resultID {
 			t.Fatalf("Wrong ID returned")
 		}
 	}
@@ -190,9 +190,9 @@ func TestStateIDsWithStart(t *testing.T) {
 		t.Fatal(err)
 	case len(result) != 2:
 		t.Fatalf("result should have 2 IDs but has %d", len(result))
-	case !result[0].Equals(id1) && !result[1].Equals(id1):
+	case result[0] != id1 && result[1] != id1:
 		t.Fatal("result should have id1")
-	case !result[0].Equals(id2) && !result[1].Equals(id2):
+	case result[0] != id2 && result[1] != id2:
 		t.Fatal("result should have id2")
 	}
 
@@ -202,7 +202,7 @@ func TestStateIDsWithStart(t *testing.T) {
 		t.Fatal(err)
 	case len(result) != 1:
 		t.Fatalf("result should have 1 IDs but has %d", len(result))
-	case !result[0].Equals(id2):
+	case result[0] != id2:
 		t.Fatal("result should be id2")
 	}
 }
@@ -389,7 +389,7 @@ func TestStateTXs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !result.ID().Equals(tx.ID()) {
+	if result.ID() != tx.ID() {
 		t.Fatalf("Wrong Tx returned")
 	}
 
@@ -400,7 +400,7 @@ func TestStateTXs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !result.ID().Equals(tx.ID()) {
+	if result.ID() != tx.ID() {
 		t.Fatalf("Wrong Tx returned")
 	}
 

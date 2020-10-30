@@ -80,7 +80,7 @@ func TestTxHeapStart(t *testing.T) {
 	txHeap.Add(validator0)
 	if timestamp := txHeap.Timestamp(); !timestamp.Equal(vdr0Tx.StartTime()) {
 		t.Fatalf("TxHeap.Timestamp returned %s, expected %s", timestamp, vdr0Tx.StartTime())
-	} else if top := txHeap.Peek(); !top.ID().Equals(validator0.ID()) {
+	} else if top := txHeap.Peek(); top.ID() != validator0.ID() {
 		t.Fatalf("TxHeap prioritized %s, expected %s", top.ID(), validator0.ID())
 	}
 }
@@ -155,7 +155,7 @@ func TestTxHeapStop(t *testing.T) {
 	txHeap.Add(validator0)
 	if timestamp := txHeap.Timestamp(); !timestamp.Equal(vdr0Tx.EndTime()) {
 		t.Fatalf("TxHeap.Timestamp returned %s, expected %s", timestamp, vdr0Tx.EndTime())
-	} else if top := txHeap.Txs[0]; !top.ID().Equals(validator0.ID()) {
+	} else if top := txHeap.Txs[0]; top.ID() != validator0.ID() {
 		t.Fatalf("TxHeap prioritized %s, expected %s", top.ID(), validator0.ID())
 	}
 }
@@ -202,7 +202,7 @@ func TestTxHeapStartValidatorVsDelegatorOrdering(t *testing.T) {
 	txHeap.Add(validator)
 	txHeap.Add(delegator)
 
-	if top := txHeap.Txs[0]; !top.ID().Equals(validator.ID()) {
+	if top := txHeap.Txs[0]; top.ID() != validator.ID() {
 		t.Fatalf("TxHeap prioritized %s, expected %s", top.ID(), validator.ID())
 	}
 }
@@ -250,7 +250,7 @@ func TestTxHeapStopValidatorVsDelegatorOrdering(t *testing.T) {
 	txHeap.Add(validator)
 	txHeap.Add(delegator)
 
-	if top := txHeap.Txs[0]; !top.ID().Equals(delegator.ID()) {
+	if top := txHeap.Txs[0]; top.ID() != delegator.ID() {
 		t.Fatalf("TxHeap prioritized %s, expected %s", top.ID(), delegator.ID())
 	}
 }

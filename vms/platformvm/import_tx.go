@@ -61,7 +61,7 @@ func (tx *UnsignedImportTx) Verify(
 		return nil
 	case tx.SourceChain == ids.Empty:
 		return errWrongChainID
-	case !tx.SourceChain.Equals(avmID):
+	case tx.SourceChain != avmID:
 		// TODO: remove this check if we allow for P->C swaps
 		return errWrongChainID
 	case len(tx.ImportedInputs) == 0:
@@ -176,7 +176,7 @@ func (vm *VM) newImportTx(
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	if !vm.Ctx.XChainID.Equals(chainID) {
+	if vm.Ctx.XChainID != chainID {
 		return nil, errWrongChainID
 	}
 
@@ -196,7 +196,7 @@ func (vm *VM) newImportTx(
 	importedAmount := uint64(0)
 	now := vm.clock.Unix()
 	for _, utxo := range atomicUTXOs {
-		if !utxo.AssetID().Equals(vm.Ctx.AVAXAssetID) {
+		if utxo.AssetID() != vm.Ctx.AVAXAssetID {
 			continue
 		}
 		inputIntf, utxoSigners, err := kc.Spend(utxo.Out, now)

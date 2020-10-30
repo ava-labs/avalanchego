@@ -74,11 +74,6 @@ func (id ID) Prefix(prefixes ...uint64) ID {
 	return hashing.ComputeHash256Array(packer.Bytes)
 }
 
-// Equals returns true if the ids have the same byte representation
-func (id ID) Equals(oID ID) bool { // todo do we need this?
-	return id == oID
-}
-
 // Bit returns the bit value at the ith index of the byte array. Returns 0 or 1
 func (id ID) Bit(i uint) int {
 	byteIndex := i / BitsPerByte

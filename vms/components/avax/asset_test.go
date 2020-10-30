@@ -53,7 +53,7 @@ func TestAssetID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !id.AssetID().Equals(newID.AssetID()) {
+	if id.AssetID() != newID.AssetID() {
 		t.Fatalf("Parsing returned the wrong Asset ID")
 	}
 }

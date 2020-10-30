@@ -116,7 +116,7 @@ func (ts *Topological) Add(blk Block) error {
 	}
 
 	// If we are extending the tail, this is the new tail
-	if ts.tail.Equals(parentID) {
+	if ts.tail == parentID {
 		ts.tail = blkID
 	}
 	return nil
@@ -348,7 +348,7 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 		parentBlock.sb.RecordPoll(vote.votes)
 
 		// Only accept when you are finalized and the head.
-		if parentBlock.sb.Finalized() && ts.head.Equals(vote.parentID) {
+		if parentBlock.sb.Finalized() && ts.head == vote.parentID {
 			if err := ts.accept(parentBlock); err != nil {
 				return ids.ID{}, err
 			}
@@ -377,7 +377,7 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 
 		// If we are on the preferred branch and the nextID is the preference of
 		// the snowball instance, then we are following the preferred branch.
-		onPreferredBranch = onPreferredBranch && nextID.Equals(parentPreference)
+		onPreferredBranch = onPreferredBranch && nextID == parentPreference
 
 		// If there wasn't an alpha threshold on the branch (either on this vote
 		// or a past transitive vote), I should falter now.

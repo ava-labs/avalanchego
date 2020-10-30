@@ -71,7 +71,7 @@ func (t *ExportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 	if err != nil {
 		return err
 	}
-	if !vm.ctx.SubnetID.Equals(subnetID) || t.DestinationChain.Equals(vm.ctx.ChainID) {
+	if vm.ctx.SubnetID != subnetID || t.DestinationChain == vm.ctx.ChainID {
 		return errWrongBlockchainID
 	}
 
@@ -81,7 +81,7 @@ func (t *ExportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 			return err
 		}
 		assetID := out.AssetID()
-		if !out.AssetID().Equals(vm.ctx.AVAXAssetID) && t.DestinationChain.Equals(constants.PlatformChainID) {
+		if out.AssetID() != vm.ctx.AVAXAssetID && t.DestinationChain == constants.PlatformChainID {
 			return errWrongAssetID
 		}
 		if !vm.verifyFxUsage(fxIndex, assetID) {

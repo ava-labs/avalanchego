@@ -21,7 +21,7 @@ var blockchainID = ids.ID([32]byte{1, 2, 3})
 // * Data [expectedData]
 // * Verify() returns nil iff passesVerify == true
 func assertBlock(block *Block, parentID ids.ID, expectedData [dataLen]byte, passesVerify bool) error {
-	if !block.ParentID().Equals(parentID) {
+	if block.ParentID() != parentID {
 		return fmt.Errorf("expect parent ID to be %s but was %s", parentID, block.ParentID())
 	}
 	if block.Data != expectedData {
@@ -180,12 +180,12 @@ func TestHappyPath(t *testing.T) {
 	// Next, check the blocks we added are there
 	if block2FromState, err := vm.GetBlock(block2.ID()); err != nil {
 		t.Fatal(err)
-	} else if !block2FromState.ID().Equals(block2.ID()) {
+	} else if block2FromState.ID() != block2.ID() {
 		t.Fatal("expected IDs to match but they don't")
 	}
 	if block3FromState, err := vm.GetBlock(block3.ID()); err != nil {
 		t.Fatal(err)
-	} else if !block3FromState.ID().Equals(block3.ID()) {
+	} else if block3FromState.ID() != block3.ID() {
 		t.Fatal("expected IDs to match but they don't")
 	}
 

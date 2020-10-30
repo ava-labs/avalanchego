@@ -77,7 +77,7 @@ func TestEngineAdd(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !te.Ctx.ChainID.Equals(ids.Empty) {
+	if te.Ctx.ChainID != ids.Empty {
 		t.Fatalf("Wrong chain ID")
 	}
 
@@ -106,7 +106,7 @@ func TestEngineAdd(t *testing.T) {
 		if !vdr.Equals(inVdr) {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
-		if !vtx.ParentsV[0].ID().Equals(vtxID) {
+		if vtx.ParentsV[0].ID() != vtxID {
 			t.Fatalf("Asking for wrong vertex")
 		}
 	}
@@ -200,9 +200,9 @@ func TestEngineQuery(t *testing.T) {
 	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
-		case id.Equals(gVtx.ID()):
+		case id == gVtx.ID():
 			return gVtx, nil
-		case id.Equals(mVtx.ID()):
+		case id == mVtx.ID():
 			return mVtx, nil
 		}
 
@@ -221,7 +221,7 @@ func TestEngineQuery(t *testing.T) {
 			t.Fatalf("Sent multiple requests")
 		}
 		*vertexed = true
-		if !vtxID.Equals(vtx0.ID()) {
+		if vtxID != vtx0.ID() {
 			t.Fatalf("Wrong vertex requested")
 		}
 		return nil, errUnknownVertex
@@ -236,7 +236,7 @@ func TestEngineQuery(t *testing.T) {
 		if !vdr.Equals(inVdr) {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
-		if !vtx0.ID().Equals(vtxID) {
+		if vtx0.ID() != vtxID {
 			t.Fatalf("Asking for wrong vertex")
 		}
 	}
@@ -265,7 +265,7 @@ func TestEngineQuery(t *testing.T) {
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
-		if !vtx0.ID().Equals(vtxID) {
+		if vtx0.ID() != vtxID {
 			t.Fatalf("Asking for wrong vertex")
 		}
 	}
@@ -311,14 +311,14 @@ func TestEngineQuery(t *testing.T) {
 	}
 
 	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
-		if vtxID.Equals(vtx0.ID()) {
+		if vtxID == vtx0.ID() {
 			return &avalanche.TestVertex{
 				TestDecidable: choices.TestDecidable{
 					StatusV: choices.Unknown,
 				},
 			}, nil
 		}
-		if vtxID.Equals(vtx1.ID()) {
+		if vtxID == vtx1.ID() {
 			return nil, errUnknownVertex
 		}
 		t.Fatalf("Wrong vertex requested")
@@ -334,7 +334,7 @@ func TestEngineQuery(t *testing.T) {
 		if !vdr.Equals(inVdr) {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
-		if !vtx1.ID().Equals(vtxID) {
+		if vtx1.ID() != vtxID {
 			t.Fatalf("Asking for wrong vertex")
 		}
 	}
@@ -357,7 +357,7 @@ func TestEngineQuery(t *testing.T) {
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
-		if !vtx1.ID().Equals(vtxID) {
+		if vtx1.ID() != vtxID {
 			t.Fatalf("Asking for wrong vertex")
 		}
 	}
@@ -368,14 +368,14 @@ func TestEngineQuery(t *testing.T) {
 		}
 
 		manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
-			if vtxID.Equals(vtx0.ID()) {
+			if vtxID == vtx0.ID() {
 				return &avalanche.TestVertex{
 					TestDecidable: choices.TestDecidable{
 						StatusV: choices.Processing,
 					},
 				}, nil
 			}
-			if vtxID.Equals(vtx1.ID()) {
+			if vtxID == vtx1.ID() {
 				return vtx1, nil
 			}
 			t.Fatalf("Wrong vertex requested")
@@ -464,9 +464,9 @@ func TestEngineMultipleQuery(t *testing.T) {
 	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
-		case id.Equals(gVtx.ID()):
+		case id == gVtx.ID():
 			return gVtx, nil
-		case id.Equals(mVtx.ID()):
+		case id == mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -507,7 +507,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
-		if !vtx0.ID().Equals(vtxID) {
+		if vtx0.ID() != vtxID {
 			t.Fatalf("Asking for wrong vertex")
 		}
 	}
@@ -528,13 +528,13 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
-		case id.Equals(gVtx.ID()):
+		case id == gVtx.ID():
 			return gVtx, nil
-		case id.Equals(mVtx.ID()):
+		case id == mVtx.ID():
 			return mVtx, nil
-		case id.Equals(vtx0.ID()):
+		case id == vtx0.ID():
 			return vtx0, nil
-		case id.Equals(vtx1.ID()):
+		case id == vtx1.ID():
 			return nil, errUnknownVertex
 		}
 		t.Fatalf("Unknown vertex")
@@ -552,7 +552,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		if !vdr0.Equals(inVdr) {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
-		if !vtx1.ID().Equals(vtxID) {
+		if vtx1.ID() != vtxID {
 			t.Fatalf("Asking for wrong vertex")
 		}
 	}
@@ -810,7 +810,7 @@ func TestEngineScheduleRepoll(t *testing.T) {
 	repolled := new(bool)
 	sender.PullQueryF = func(_ ids.ShortSet, _ uint32, vtxID ids.ID) {
 		*repolled = true
-		if !vtxID.Equals(vtx.ID()) {
+		if vtxID != vtx.ID() {
 			t.Fatalf("Wrong vertex queried")
 		}
 	}
@@ -892,9 +892,9 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
-		case id.Equals(gVtx.ID()):
+		case id == gVtx.ID():
 			return gVtx, nil
-		case id.Equals(mVtx.ID()):
+		case id == mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1000,9 +1000,9 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
-		case id.Equals(gVtx.ID()):
+		case id == gVtx.ID():
 			return gVtx, nil
-		case id.Equals(mVtx.ID()):
+		case id == mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1083,9 +1083,9 @@ func TestEngineIssueRepoll(t *testing.T) {
 	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
-		case id.Equals(gVtx.ID()):
+		case id == gVtx.ID():
 			return gVtx, nil
-		case id.Equals(mVtx.ID()):
+		case id == mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1103,7 +1103,7 @@ func TestEngineIssueRepoll(t *testing.T) {
 		if !vdrs.Equals(vdrSet) {
 			t.Fatalf("Wrong query recipients")
 		}
-		if !vtxID.Equals(gVtx.ID()) && !vtxID.Equals(mVtx.ID()) {
+		if vtxID != gVtx.ID() && vtxID != mVtx.ID() {
 			t.Fatalf("Unknown re-query")
 		}
 	}
@@ -1211,11 +1211,11 @@ func TestEngineReissue(t *testing.T) {
 	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
-		case id.Equals(gVtx.ID()):
+		case id == gVtx.ID():
 			return gVtx, nil
-		case id.Equals(mVtx.ID()):
+		case id == mVtx.ID():
 			return mVtx, nil
-		case id.Equals(vtx.ID()):
+		case id == vtx.ID():
 			return vtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1249,7 +1249,7 @@ func TestEngineReissue(t *testing.T) {
 	}
 
 	vm.GetTxF = func(id ids.ID) (snowstorm.Tx, error) {
-		if !id.Equals(tx0.ID()) {
+		if id != tx0.ID() {
 			t.Fatalf("Wrong tx")
 		}
 		return tx0, nil
@@ -1287,7 +1287,7 @@ func TestEngineReissue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(lastVtx.TxsV) != 1 || !lastVtx.TxsV[0].ID().Equals(tx0.ID()) {
+	if len(lastVtx.TxsV) != 1 || lastVtx.TxsV[0].ID() != tx0.ID() {
 		t.Fatalf("Should have re-issued the tx")
 	}
 }
@@ -1361,9 +1361,9 @@ func TestEngineLargeIssue(t *testing.T) {
 	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
-		case id.Equals(gVtx.ID()):
+		case id == gVtx.ID():
 			return gVtx, nil
-		case id.Equals(mVtx.ID()):
+		case id == mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1403,7 +1403,7 @@ func TestEngineLargeIssue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(lastVtx.TxsV) != 1 || !lastVtx.TxsV[0].ID().Equals(tx1.ID()) {
+	if len(lastVtx.TxsV) != 1 || lastVtx.TxsV[0].ID() != tx1.ID() {
 		t.Fatalf("Should have issued txs differently")
 	}
 }
@@ -1437,9 +1437,9 @@ func TestEngineGetVertex(t *testing.T) {
 	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
-		case id.Equals(gVtx.ID()):
+		case id == gVtx.ID():
 			return gVtx, nil
-		case id.Equals(mVtx.ID()):
+		case id == mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1455,7 +1455,7 @@ func TestEngineGetVertex(t *testing.T) {
 		if !v.Equals(vdr.ID()) {
 			t.Fatalf("Wrong validator")
 		}
-		if !mVtx.ID().Equals(vtxID) {
+		if mVtx.ID() != vtxID {
 			t.Fatalf("Wrong vertex")
 		}
 	}
@@ -1507,9 +1507,9 @@ func TestEngineInsufficientValidators(t *testing.T) {
 	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
-		case id.Equals(gVtx.ID()):
+		case id == gVtx.ID():
 			return gVtx, nil
-		case id.Equals(mVtx.ID()):
+		case id == mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1582,11 +1582,11 @@ func TestEnginePushGossip(t *testing.T) {
 	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
-		case id.Equals(gVtx.ID()):
+		case id == gVtx.ID():
 			return gVtx, nil
-		case id.Equals(mVtx.ID()):
+		case id == mVtx.ID():
 			return mVtx, nil
-		case id.Equals(vtx.ID()):
+		case id == vtx.ID():
 			return vtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1669,11 +1669,11 @@ func TestEngineSingleQuery(t *testing.T) {
 	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
-		case id.Equals(gVtx.ID()):
+		case id == gVtx.ID():
 			return gVtx, nil
-		case id.Equals(mVtx.ID()):
+		case id == mVtx.ID():
 			return mVtx, nil
-		case id.Equals(vtx.ID()):
+		case id == vtx.ID():
 			return vtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1760,9 +1760,9 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
-		case id.Equals(gVtx.ID()):
+		case id == gVtx.ID():
 			return gVtx, nil
-		case id.Equals(mVtx.ID()):
+		case id == mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1864,9 +1864,9 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
-		case id.Equals(gVtx.ID()):
+		case id == gVtx.ID():
 			return gVtx, nil
-		case id.Equals(mVtx.ID()):
+		case id == mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1883,7 +1883,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	}
 
 	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
-		if vtxID.Equals(blockingVtx.ID()) {
+		if vtxID == blockingVtx.ID() {
 			return blockingVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1985,9 +1985,9 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
-		case id.Equals(gVtx.ID()):
+		case id == gVtx.ID():
 			return gVtx, nil
-		case id.Equals(mVtx.ID()):
+		case id == mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -2011,7 +2011,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
-		if !issuedVtx.ID().Equals(vtxID) {
+		if issuedVtx.ID() != vtxID {
 			t.Fatalf("Asking for wrong vertex")
 		}
 	}
@@ -2021,7 +2021,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	}
 
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		if id.Equals(blockingVtx.ID()) {
+		if id == blockingVtx.ID() {
 			return blockingVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -2119,9 +2119,9 @@ func TestEngineMissingTx(t *testing.T) {
 	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
-		case id.Equals(gVtx.ID()):
+		case id == gVtx.ID():
 			return gVtx, nil
-		case id.Equals(mVtx.ID()):
+		case id == mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -2145,7 +2145,7 @@ func TestEngineMissingTx(t *testing.T) {
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
-		if !issuedVtx.ID().Equals(vtxID) {
+		if issuedVtx.ID() != vtxID {
 			t.Fatalf("Asking for wrong vertex")
 		}
 	}
@@ -2155,7 +2155,7 @@ func TestEngineMissingTx(t *testing.T) {
 	}
 
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		if id.Equals(blockingVtx.ID()) {
+		if id == blockingVtx.ID() {
 			return blockingVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -2307,7 +2307,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 	}
 
 	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
-		if vtxID.Equals(gVtx.ID()) {
+		if vtxID == gVtx.ID() {
 			return gVtx, nil
 		}
 		t.Fatalf("Unknown vertex requested")
@@ -2334,7 +2334,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 		panic("Unknown bytes provided")
 	}
 	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
-		if vtxID.Equals(vtxID1) {
+		if vtxID == vtxID1 {
 			return vtx1, nil
 		}
 		t.Fatalf("Unknown bytes provided")
@@ -2354,12 +2354,12 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 
 	requested := new(bool)
 	sender.GetF = func(_ ids.ShortID, _ uint32, vtxID ids.ID) {
-		if vtxID.Equals(vtxID0) {
+		if vtxID == vtxID0 {
 			*requested = true
 		}
 	}
 	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
-		if vtxID.Equals(vtxID1) {
+		if vtxID == vtxID1 {
 			return vtx1, nil
 		}
 		t.Fatalf("Unknown bytes provided")
@@ -2516,7 +2516,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	}
 
 	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
-		if vtxID.Equals(vtxID0) {
+		if vtxID == vtxID0 {
 			return nil, errMissing
 		}
 		t.Fatalf("Unknown vertex requested")
@@ -2527,7 +2527,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		if !vdr.Equals(inVdr) {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
-		if !vtx0.ID().Equals(vtxID) {
+		if vtx0.ID() != vtxID {
 			t.Fatalf("Asking for wrong vertex")
 		}
 		*requestID = reqID
@@ -2558,7 +2558,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		return []ids.ID{vtxID0}
 	}
 	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
-		if vtxID.Equals(vtxID0) {
+		if vtxID == vtxID0 {
 			return vtx0, nil
 		}
 		t.Fatalf("Unknown bytes provided")
@@ -2608,7 +2608,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 			t.Fatalf("Should have requested from %s", vdr)
 		}
 
-		if !vtxID1.Equals(vtxID) {
+		if vtxID1 != vtxID {
 			t.Fatalf("Sent wrong query ID")
 		}
 		if !bytes.Equal(vtxBytes1, vtx) {
@@ -2616,7 +2616,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		}
 	}
 	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
-		if vtxID.Equals(vtxID1) {
+		if vtxID == vtxID1 {
 			return vtx1, nil
 		}
 		t.Fatalf("Unknown bytes provided")
@@ -2717,9 +2717,9 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 
 	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		switch {
-		case vtxID.Equals(vtx0.ID()):
+		case vtxID == vtx0.ID():
 			return vtx0, nil
-		case vtxID.Equals(vtx1.ID()):
+		case vtxID == vtx1.ID():
 			return vtx1, nil
 		}
 		return nil, errors.New("Unknown vtx")
@@ -2807,7 +2807,7 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 	te.Sender = sender
 
 	sender.PushQueryF = func(_ ids.ShortSet, _ uint32, vtxID ids.ID, _ []byte) {
-		if !expectedVtxID.Equals(vtxID) {
+		if expectedVtxID != vtxID {
 			t.Fatalf("wrong vertex queried")
 		}
 	}
@@ -2841,7 +2841,7 @@ func TestEngineGossip(t *testing.T) {
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID()} }
 	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
-		if vtxID.Equals(gVtx.ID()) {
+		if vtxID == gVtx.ID() {
 			return gVtx, nil
 		}
 		t.Fatal(errUnknownVertex)
@@ -2851,7 +2851,7 @@ func TestEngineGossip(t *testing.T) {
 	called := new(bool)
 	sender.GossipF = func(vtxID ids.ID, vtxBytes []byte) {
 		*called = true
-		if !vtxID.Equals(gVtx.ID()) {
+		if vtxID != gVtx.ID() {
 			t.Fatal(errUnknownVertex)
 		}
 		if !bytes.Equal(vtxBytes, gVtx.Bytes()) {
@@ -2954,7 +2954,7 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 			return nil, errUnknownVertex
 		}
 
-		if vtxID.Equals(vtx1.ID()) {
+		if vtxID == vtx1.ID() {
 			return vtx1, nil
 		}
 		return nil, errUnknownVertex
@@ -2966,7 +2966,7 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 		if !reqVdr.Equals(vdr) {
 			t.Fatalf("Wrong validator requested")
 		}
-		if !vtxID.Equals(vtx0.ID()) {
+		if vtxID != vtx0.ID() {
 			t.Fatalf("Wrong vertex requested")
 		}
 	}
@@ -2993,7 +2993,7 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 			return nil, errUnknownVertex
 		}
 
-		if vtxID.Equals(vtx0.ID()) {
+		if vtxID == vtx0.ID() {
 			return vtx0, nil
 		}
 		return nil, errUnknownVertex
@@ -3097,7 +3097,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 			return nil, errUnknownVertex
 		}
 
-		if vtxID.Equals(vtx1.ID()) {
+		if vtxID == vtx1.ID() {
 			return vtx1, nil
 		}
 		return nil, errUnknownVertex
@@ -3109,7 +3109,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 		if !reqVdr.Equals(vdr) {
 			t.Fatalf("Wrong validator requested")
 		}
-		if !vtxID.Equals(vtx0.ID()) {
+		if vtxID != vtx0.ID() {
 			t.Fatalf("Wrong vertex requested")
 		}
 	}
@@ -3139,7 +3139,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 			return nil, errUnknownVertex
 		}
 
-		if vtxID.Equals(vtx0.ID()) {
+		if vtxID == vtx0.ID() {
 			return vtx0, nil
 		}
 		return nil, errUnknownVertex
@@ -3245,7 +3245,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 			return nil, errUnknownVertex
 		}
 
-		if vtxID.Equals(vtx.ID()) {
+		if vtxID == vtx.ID() {
 			return vtx, nil
 		}
 		return nil, errUnknownVertex
@@ -3331,9 +3331,9 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
-		case id.Equals(gVtx.ID()):
+		case id == gVtx.ID():
 			return gVtx, nil
-		case id.Equals(mVtx.ID()):
+		case id == mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -3373,7 +3373,7 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(lastVtx.TxsV) != 1 || !lastVtx.TxsV[0].ID().Equals(tx.ID()) {
+	if len(lastVtx.TxsV) != 1 || lastVtx.TxsV[0].ID() != tx.ID() {
 		t.Fatalf("Should have issued txs differently")
 	}
 
@@ -3450,9 +3450,9 @@ func TestEngineDoubleChit(t *testing.T) {
 	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
-		case id.Equals(gVtx.ID()):
+		case id == gVtx.ID():
 			return gVtx, nil
-		case id.Equals(mVtx.ID()):
+		case id == mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -3470,12 +3470,12 @@ func TestEngineDoubleChit(t *testing.T) {
 		if inVdrs.Len() != 2 {
 			t.Fatalf("Wrong number of validators")
 		}
-		if !vtxID.Equals(vtx.ID()) {
+		if vtxID != vtx.ID() {
 			t.Fatalf("Wrong vertex requested")
 		}
 	}
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		if id.Equals(vtx.ID()) {
+		if id == vtx.ID() {
 			return vtx, nil
 		}
 		t.Fatalf("Unknown vertex")

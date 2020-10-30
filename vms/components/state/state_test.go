@@ -267,7 +267,7 @@ func TestSameKeyDifferentTypeID(t *testing.T) {
 		t.Fatal("should have been type *account")
 	case accFromState.balance != acc.balance:
 		t.Fatal("balances should be same")
-	case !accFromState.id.Equals(acc.id):
+	case accFromState.id != acc.id:
 		t.Fatal("ids should be the same")
 	case accFromState.nonce != acc.nonce:
 		t.Fatal("nonces should be same")
@@ -283,7 +283,7 @@ func TestSameKeyDifferentTypeID(t *testing.T) {
 	switch {
 	case !ok:
 		t.Fatal("should have been type *block")
-	case !blockFromState.parentID.Equals(block1.parentID):
+	case blockFromState.parentID != block1.parentID:
 		t.Fatal("parentIDs should be same")
 	case blockFromState.value != block1.value:
 		t.Fatal("values should be same")
@@ -341,7 +341,7 @@ func TestOverwrite(t *testing.T) {
 	switch {
 	case !ok:
 		t.Fatal("should have been type *block")
-	case !blockFromState.parentID.Equals(block2.parentID):
+	case blockFromState.parentID != block2.parentID:
 		t.Fatal("parentIDs should be same")
 	case blockFromState.value != block2.value:
 		t.Fatal("values should be same")
@@ -389,7 +389,7 @@ func TestHappyPath(t *testing.T) {
 		t.Fatal("should have been type *account")
 	case acc1FromState.balance != acc1.balance:
 		t.Fatal("balances should be same")
-	case !acc1FromState.id.Equals(acc1.id):
+	case acc1FromState.id != acc1.id:
 		t.Fatal("ids should be the same")
 	case acc1FromState.nonce != acc1.nonce:
 		t.Fatal("nonces should be same")
@@ -419,7 +419,7 @@ func TestHappyPath(t *testing.T) {
 		t.Fatal("should have been type *account")
 	case acc2FromState.balance != acc2.balance:
 		t.Fatal("balances should be same")
-	case !acc2FromState.id.Equals(acc2.id):
+	case acc2FromState.id != acc2.id:
 		t.Fatal("ids should be the same")
 	case acc2FromState.nonce != acc2.nonce:
 		t.Fatal("nonces should be same")
@@ -453,7 +453,7 @@ func TestHappyPath(t *testing.T) {
 	switch {
 	case !ok:
 		t.Fatal("should have been type *block")
-	case !block1FromState.parentID.Equals(block1.parentID):
+	case block1FromState.parentID != block1.parentID:
 		t.Fatal("parentIDs should be same")
 	case block1FromState.value != block1.value:
 		t.Fatal("values should be same")
@@ -481,7 +481,7 @@ func TestHappyPath(t *testing.T) {
 	switch {
 	case !ok:
 		t.Fatal("should have been type *block")
-	case !block2FromState.parentID.Equals(block2.parentID):
+	case block2FromState.parentID != block2.parentID:
 		t.Fatal("parentIDs should be same")
 	case block2FromState.value != block2.value:
 		t.Fatal("values should be same")

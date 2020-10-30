@@ -287,11 +287,11 @@ func (vm *VM) isValidator(db database.Database, subnetID ids.ID, nodeID ids.Shor
 
 		switch vdr := tx.Tx.UnsignedTx.(type) {
 		case *UnsignedAddValidatorTx:
-			if subnetID.Equals(constants.PrimaryNetworkID) && vdr.Validator.NodeID.Equals(nodeID) {
+			if subnetID == constants.PrimaryNetworkID && vdr.Validator.NodeID.Equals(nodeID) {
 				return vdr, true, nil
 			}
 		case *UnsignedAddSubnetValidatorTx:
-			if subnetID.Equals(vdr.Validator.SubnetID()) && vdr.Validator.NodeID.Equals(nodeID) {
+			if subnetID == vdr.Validator.SubnetID() && vdr.Validator.NodeID.Equals(nodeID) {
 				return vdr, true, nil
 			}
 		}
@@ -317,11 +317,11 @@ func (vm *VM) willBeValidator(db database.Database, subnetID ids.ID, nodeID ids.
 
 		switch vdr := tx.UnsignedTx.(type) {
 		case *UnsignedAddValidatorTx:
-			if subnetID.Equals(constants.PrimaryNetworkID) && vdr.Validator.NodeID.Equals(nodeID) {
+			if subnetID == constants.PrimaryNetworkID && vdr.Validator.NodeID.Equals(nodeID) {
 				return vdr, true, nil
 			}
 		case *UnsignedAddSubnetValidatorTx:
-			if subnetID.Equals(vdr.Validator.SubnetID()) && vdr.Validator.NodeID.Equals(nodeID) {
+			if subnetID == vdr.Validator.SubnetID() && vdr.Validator.NodeID.Equals(nodeID) {
 				return vdr, true, nil
 			}
 		}
@@ -397,7 +397,7 @@ func (vm *VM) getReferencingUTXOs(db database.Database, addr []byte, start ids.I
 	for toFetch > 0 && iter.Next() {
 		if utxoID, err := ids.ToID(iter.Key()); err != nil {
 			return nil, err
-		} else if !utxoID.Equals(start) {
+		} else if utxoID != start {
 			utxoIDs.Add(utxoID)
 			toFetch--
 		}
@@ -515,7 +515,7 @@ func (vm *VM) getChain(db database.Database, id ids.ID) (*Tx, error) {
 		return nil, err
 	}
 	for _, chain := range chains {
-		if chain.ID().Equals(id) {
+		if chain.ID() == id {
 			return chain, nil
 		}
 	}
@@ -570,7 +570,7 @@ func (vm *VM) getSubnet(db database.Database, id ids.ID) (*Tx, TxError) {
 	}
 
 	for _, subnet := range subnets {
-		if subnet.ID().Equals(id) {
+		if subnet.ID() == id {
 			return subnet, nil
 		}
 	}

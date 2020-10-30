@@ -98,7 +98,7 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 	if len(parents) != 1 {
 		t.Fatalf("Parents should have length 1")
 	}
-	if !parents[0].ID().Equals(parentID) {
+	if parents[0].ID() != parentID {
 		t.Fatalf("ParentID is incorrect")
 	}
 
@@ -212,7 +212,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 			t.Fatalf("Expected vertex height to be %d, but found %d", height, vtxHeight)
 		case len(vtxParents) != 1:
 			t.Fatalf("Expected vertex to have 1 parent, but found %d", len(vtxParents))
-		case !vtxParents[0].ID().Equals(parentID):
+		case vtxParents[0].ID() != parentID:
 			t.Fatalf("Found unexpected parentID: %s, expected: %s", vtxParents[0].ID(), parentID)
 		case len(vtxTxs) != 1:
 			t.Fatalf("Exepcted vertex to have 1 transaction, but found %d", len(vtxTxs))

@@ -100,7 +100,7 @@ func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 	if err != nil {
 		return err
 	}
-	if !vm.ctx.SubnetID.Equals(subnetID) || t.SourceChain.Equals(vm.ctx.ChainID) {
+	if vm.ctx.SubnetID != subnetID || t.SourceChain == vm.ctx.ChainID {
 		return errWrongBlockchainID
 	}
 

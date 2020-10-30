@@ -752,7 +752,7 @@ func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cr
 
 	utxoAssetID := utxo.AssetID()
 	inAssetID := in.AssetID()
-	if !utxoAssetID.Equals(inAssetID) {
+	if utxoAssetID != inAssetID {
 		return errAssetIDMismatch
 	}
 
@@ -783,7 +783,7 @@ func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiab
 		}
 
 		utxoAssetID := utxo.AssetID()
-		if !utxoAssetID.Equals(opAssetID) {
+		if utxoAssetID != opAssetID {
 			return errAssetIDMismatch
 		}
 		utxos[i] = utxo.Out
@@ -949,7 +949,7 @@ func (vm *VM) SpendNFT(
 			break
 		}
 
-		if !utxo.AssetID().Equals(assetID) {
+		if utxo.AssetID() != assetID {
 			// wrong asset ID
 			continue
 		}
@@ -1148,7 +1148,7 @@ func (vm *VM) MintNFT(
 			break
 		}
 
-		if !utxo.AssetID().Equals(assetID) {
+		if utxo.AssetID() != assetID {
 			// wrong asset id
 			continue
 		}
@@ -1200,7 +1200,7 @@ func (vm *VM) ParseLocalAddress(addrStr string) (ids.ShortID, error) {
 	if err != nil {
 		return ids.ShortID{}, err
 	}
-	if !chainID.Equals(vm.ctx.ChainID) {
+	if chainID != vm.ctx.ChainID {
 		return ids.ShortID{}, fmt.Errorf("expected chainID to be %q but was %q",
 			vm.ctx.ChainID, chainID)
 	}

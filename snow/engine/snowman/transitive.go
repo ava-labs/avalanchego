@@ -386,7 +386,7 @@ func (t *Transitive) Notify(msg common.Message) error {
 		// The newly created block should be built on top of the preferred block.
 		// Otherwise, the new block doesn't have the best chance of being confirmed.
 		parentID := blk.Parent().ID()
-		if pref := t.Consensus.Preference(); !parentID.Equals(pref) {
+		if pref := t.Consensus.Preference(); parentID != pref {
 			t.Ctx.Log.Warn("built block with parent: %s, expected %s", parentID, pref)
 		}
 

@@ -259,7 +259,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 
 	vtxID := vtx.ID()
 	// If the vertex is neither the requested vertex nor a needed vertex, return early and re-fetch if necessary
-	if requested && !requestedVtxID.Equals(vtxID) {
+	if requested && requestedVtxID != vtxID {
 		b.Ctx.Log.Debug("received incorrect vertex from %s with vertexID %s", vdr, vtxID)
 		return b.fetch(requestedVtxID)
 	}

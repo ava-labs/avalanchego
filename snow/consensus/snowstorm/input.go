@@ -321,7 +321,7 @@ func (ig *Input) String() string {
 		confidence := ig.params.BetaRogue
 		for _, inputID := range tx.tx.InputIDs() {
 			input := ig.utxos[inputID]
-			if input.lastVote != ig.currentVote || !txID.Equals(input.color) {
+			if input.lastVote != ig.currentVote || txID != input.color {
 				confidence = 0
 				break
 			}
@@ -444,7 +444,7 @@ func (ig *Input) removeConflict(txID [32]byte, inputIDs []ids.ID) {
 		for _, inputID := range txNode.tx.InputIDs() {
 			input := ig.utxos[inputID]
 
-			if !preference.Equals(input.preference) {
+			if preference != input.preference {
 				// If this preference isn't the preferred color, the tx isn't
 				// preferred. Also note that the input might not exist, in which
 				// case this tx is going to be rejected in a later iteration.

@@ -1675,7 +1675,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if lastAccepted := secondVM.LastAccepted(); !genesisID.Equals(lastAccepted) {
+	if lastAccepted := secondVM.LastAccepted(); genesisID != lastAccepted {
 		t.Fatalf("Shouldn't have changed the genesis")
 	}
 }
@@ -1800,7 +1800,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	secondMsgChan := make(chan common.Message, 1)
 	if err := secondVM.Initialize(secondCtx, db, genesisBytes, secondMsgChan, nil); err != nil {
 		t.Fatal(err)
-	} else if lastAccepted := secondVM.LastAccepted(); !options[0].ID().Equals(lastAccepted) {
+	} else if lastAccepted := secondVM.LastAccepted(); options[0].ID() != lastAccepted {
 		t.Fatalf("Should have changed the genesis")
 	}
 }
@@ -1960,7 +1960,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	externalSender.GetAcceptedF = nil
 	externalSender.GetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, _ time.Time, containerID ids.ID) {
 		*reqID = requestID
-		if !containerID.Equals(advanceTimeBlkID) {
+		if containerID != advanceTimeBlkID {
 			t.Fatalf("wrong block requested")
 		}
 	}
@@ -1979,7 +1979,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	externalSender.CantPushQuery = true
 
-	if pref := vm.Preferred(); !pref.Equals(advanceTimePreference.ID()) {
+	if pref := vm.Preferred(); pref != advanceTimePreference.ID() {
 		t.Fatalf("wrong preference reported after bootstrapping to proposal block\nPreferred: %s\nExpected: %s\nGenesis: %s",
 			pref,
 			advanceTimePreference.ID(),
@@ -2055,7 +2055,7 @@ func TestUnverifiedParent(t *testing.T) {
 	}
 
 	parentBlk := secondAdvanceTimeBlk.Parent()
-	if parentBlkID := parentBlk.ID(); !parentBlkID.Equals(firstOption.ID()) {
+	if parentBlkID := parentBlk.ID(); parentBlkID != firstOption.ID() {
 		t.Fatalf("Wrong parent block ID returned")
 	} else if err := firstOption.Verify(); err != nil {
 		t.Fatal(err)

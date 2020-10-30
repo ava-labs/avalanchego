@@ -56,7 +56,7 @@ func TestSnowballSingleton(t *testing.T) {
 
 	if !tree.Finalized() {
 		t.Fatalf("Snowball should be finalized")
-	} else if !Red.Equals(tree.Preference()) {
+	} else if Red != tree.Preference() {
 		t.Fatalf("After only voting red, something else was decided")
 	}
 
@@ -68,7 +68,7 @@ func TestSnowballSingleton(t *testing.T) {
 
 	if !tree.Finalized() {
 		t.Fatalf("Snowball should be finalized")
-	} else if !Red.Equals(tree.Preference()) {
+	} else if Red != tree.Preference() {
 		t.Fatalf("After only voting red, something else was decided")
 	}
 }
@@ -107,7 +107,7 @@ func TestSnowballRecordUnsuccessfulPoll(t *testing.T) {
 
 	if !tree.Finalized() {
 		t.Fatalf("Snowball should be finalized")
-	} else if !Red.Equals(tree.Preference()) {
+	} else if Red != tree.Preference() {
 		t.Fatalf("After only voting red, something else was decided")
 	}
 }
@@ -121,7 +121,7 @@ func TestSnowballBinary(t *testing.T) {
 	tree.Initialize(params, Red)
 	tree.Add(Blue)
 
-	if pref := tree.Preference(); !Red.Equals(pref) {
+	if pref := tree.Preference(); Red != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -131,7 +131,7 @@ func TestSnowballBinary(t *testing.T) {
 	oneBlue.Add(Blue)
 	tree.RecordPoll(oneBlue)
 
-	if pref := tree.Preference(); !Blue.Equals(pref) {
+	if pref := tree.Preference(); Blue != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -141,7 +141,7 @@ func TestSnowballBinary(t *testing.T) {
 	oneRed.Add(Red)
 	tree.RecordPoll(oneRed)
 
-	if pref := tree.Preference(); !Blue.Equals(pref) {
+	if pref := tree.Preference(); Blue != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -149,7 +149,7 @@ func TestSnowballBinary(t *testing.T) {
 
 	tree.RecordPoll(oneBlue)
 
-	if pref := tree.Preference(); !Blue.Equals(pref) {
+	if pref := tree.Preference(); Blue != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -157,7 +157,7 @@ func TestSnowballBinary(t *testing.T) {
 
 	tree.RecordPoll(oneBlue)
 
-	if pref := tree.Preference(); !Blue.Equals(pref) {
+	if pref := tree.Preference(); Blue != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
 	} else if !tree.Finalized() {
 		t.Fatalf("Didn't finalized correctly")
@@ -188,7 +188,7 @@ func TestSnowballLastBinary(t *testing.T) {
 		"    SB(Preference = 0, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 255"
 	if str := tree.String(); expected != str {
 		t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-	} else if pref := tree.Preference(); !zero.Equals(pref) {
+	} else if pref := tree.Preference(); zero != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", zero, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -198,7 +198,7 @@ func TestSnowballLastBinary(t *testing.T) {
 	oneBag.Add(one)
 	tree.RecordPoll(oneBag)
 
-	if pref := tree.Preference(); !one.Equals(pref) {
+	if pref := tree.Preference(); one != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", one, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -206,7 +206,7 @@ func TestSnowballLastBinary(t *testing.T) {
 
 	tree.RecordPoll(oneBag)
 
-	if pref := tree.Preference(); !one.Equals(pref) {
+	if pref := tree.Preference(); one != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", one, pref)
 	} else if !tree.Finalized() {
 		t.Fatalf("Finalized too late")
@@ -237,7 +237,7 @@ func TestSnowballAddPreviouslyRejected(t *testing.T) {
 			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !zero.Equals(pref) {
+		} else if pref := tree.Preference(); zero != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", zero, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -256,7 +256,7 @@ func TestSnowballAddPreviouslyRejected(t *testing.T) {
 			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !zero.Equals(pref) {
+		} else if pref := tree.Preference(); zero != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", zero, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -273,7 +273,7 @@ func TestSnowballAddPreviouslyRejected(t *testing.T) {
 			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !zero.Equals(pref) {
+		} else if pref := tree.Preference(); zero != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", zero, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -299,7 +299,7 @@ func TestSnowballNewUnary(t *testing.T) {
 			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !zero.Equals(pref) {
+		} else if pref := tree.Preference(); zero != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", zero, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -316,7 +316,7 @@ func TestSnowballNewUnary(t *testing.T) {
 			"    SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = false)) Bits = [1, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !one.Equals(pref) {
+		} else if pref := tree.Preference(); one != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", one, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -331,7 +331,7 @@ func TestSnowballNewUnary(t *testing.T) {
 			"    SB(NumSuccessfulPolls = 2, SF(Confidence = 2, Finalized = true)) Bits = [1, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !one.Equals(pref) {
+		} else if pref := tree.Preference(); one != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", one, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -363,7 +363,7 @@ func TestSnowballTransitiveReset(t *testing.T) {
 			"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !zero.Equals(pref) {
+		} else if pref := tree.Preference(); zero != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", zero, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -384,7 +384,7 @@ func TestSnowballTransitiveReset(t *testing.T) {
 			"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !zero.Equals(pref) {
+		} else if pref := tree.Preference(); zero != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", zero, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -404,7 +404,7 @@ func TestSnowballTransitiveReset(t *testing.T) {
 			"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !zero.Equals(pref) {
+		} else if pref := tree.Preference(); zero != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", zero, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -423,7 +423,7 @@ func TestSnowballTransitiveReset(t *testing.T) {
 			"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !zero.Equals(pref) {
+		} else if pref := tree.Preference(); zero != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", zero, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -436,7 +436,7 @@ func TestSnowballTransitiveReset(t *testing.T) {
 		expected := "SB(NumSuccessfulPolls = 3, SF(Confidence = 2, Finalized = true)) Bits = [4, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !zero.Equals(pref) {
+		} else if pref := tree.Preference(); zero != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", zero, pref)
 		} else if !tree.Finalized() {
 			t.Fatalf("Finalized too late")
@@ -460,7 +460,7 @@ func TestSnowballTrinary(t *testing.T) {
 	//        / \
 	//       G   B
 
-	if pref := tree.Preference(); !Green.Equals(pref) {
+	if pref := tree.Preference(); Green != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Green, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -470,7 +470,7 @@ func TestSnowballTrinary(t *testing.T) {
 	redBag.Add(Red)
 	tree.RecordPoll(redBag)
 
-	if pref := tree.Preference(); !Red.Equals(pref) {
+	if pref := tree.Preference(); Red != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -480,7 +480,7 @@ func TestSnowballTrinary(t *testing.T) {
 	blueBag.Add(Blue)
 	tree.RecordPoll(blueBag)
 
-	if pref := tree.Preference(); !Red.Equals(pref) {
+	if pref := tree.Preference(); Red != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -492,7 +492,7 @@ func TestSnowballTrinary(t *testing.T) {
 
 	// Here is a case where voting for a color makes a different color become
 	// the preferred color. This is intended behavior.
-	if pref := tree.Preference(); !Blue.Equals(pref) {
+	if pref := tree.Preference(); Blue != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -500,7 +500,7 @@ func TestSnowballTrinary(t *testing.T) {
 
 	tree.RecordPoll(redBag)
 
-	if pref := tree.Preference(); !Blue.Equals(pref) {
+	if pref := tree.Preference(); Blue != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -508,7 +508,7 @@ func TestSnowballTrinary(t *testing.T) {
 
 	tree.RecordPoll(greenBag)
 
-	if pref := tree.Preference(); !Green.Equals(pref) {
+	if pref := tree.Preference(); Green != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Green, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -529,7 +529,7 @@ func TestSnowballCloseTrinary(t *testing.T) {
 	tree.Add(cyan)
 	tree.Add(magenta)
 
-	if pref := tree.Preference(); !yellow.Equals(pref) {
+	if pref := tree.Preference(); yellow != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", yellow, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -539,7 +539,7 @@ func TestSnowballCloseTrinary(t *testing.T) {
 	yellowBag.Add(yellow)
 	tree.RecordPoll(yellowBag)
 
-	if pref := tree.Preference(); !yellow.Equals(pref) {
+	if pref := tree.Preference(); yellow != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", yellow, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -549,7 +549,7 @@ func TestSnowballCloseTrinary(t *testing.T) {
 	magentaBag.Add(magenta)
 	tree.RecordPoll(magentaBag)
 
-	if pref := tree.Preference(); !yellow.Equals(pref) {
+	if pref := tree.Preference(); yellow != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", yellow, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -559,7 +559,7 @@ func TestSnowballCloseTrinary(t *testing.T) {
 	cyanBag.Add(cyan)
 	tree.RecordPoll(cyanBag)
 
-	if pref := tree.Preference(); !yellow.Equals(pref) {
+	if pref := tree.Preference(); yellow != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", yellow, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -567,7 +567,7 @@ func TestSnowballCloseTrinary(t *testing.T) {
 
 	tree.RecordPoll(cyanBag)
 
-	if pref := tree.Preference(); !yellow.Equals(pref) {
+	if pref := tree.Preference(); yellow != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", yellow, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -589,7 +589,7 @@ func TestSnowballAddRejected(t *testing.T) {
 	tree.Add(c1000)
 	tree.Add(c0010)
 
-	if pref := tree.Preference(); !c0000.Equals(pref) {
+	if pref := tree.Preference(); c0000 != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -607,7 +607,7 @@ func TestSnowballAddRejected(t *testing.T) {
 			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !c0010.Equals(pref) {
+		} else if pref := tree.Preference(); c0010 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0010, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -623,7 +623,7 @@ func TestSnowballAddRejected(t *testing.T) {
 			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !c0010.Equals(pref) {
+		} else if pref := tree.Preference(); c0010 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0010, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -645,7 +645,7 @@ func TestSnowballResetChild(t *testing.T) {
 	tree.Add(c0100)
 	tree.Add(c1000)
 
-	if pref := tree.Preference(); !c0000.Equals(pref) {
+	if pref := tree.Preference(); c0000 != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -663,7 +663,7 @@ func TestSnowballResetChild(t *testing.T) {
 			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !c0000.Equals(pref) {
+		} else if pref := tree.Preference(); c0000 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -681,7 +681,7 @@ func TestSnowballResetChild(t *testing.T) {
 			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !c0000.Equals(pref) {
+		} else if pref := tree.Preference(); c0000 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -697,7 +697,7 @@ func TestSnowballResetChild(t *testing.T) {
 			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !c0000.Equals(pref) {
+		} else if pref := tree.Preference(); c0000 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -719,7 +719,7 @@ func TestSnowballResetSibling(t *testing.T) {
 	tree.Add(c0100)
 	tree.Add(c1000)
 
-	if pref := tree.Preference(); !c0000.Equals(pref) {
+	if pref := tree.Preference(); c0000 != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -737,7 +737,7 @@ func TestSnowballResetSibling(t *testing.T) {
 			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !c0100.Equals(pref) {
+		} else if pref := tree.Preference(); c0100 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0100, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -756,7 +756,7 @@ func TestSnowballResetSibling(t *testing.T) {
 			"    SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = true)) Bits = [1, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !c0100.Equals(pref) {
+		} else if pref := tree.Preference(); c0100 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0100, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -772,7 +772,7 @@ func TestSnowballResetSibling(t *testing.T) {
 			"    SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = true)) Bits = [1, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !c0100.Equals(pref) {
+		} else if pref := tree.Preference(); c0100 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0100, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -832,7 +832,7 @@ func TestSnowballFineGrained(t *testing.T) {
 		expected := initialUnaryDescription
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !c0000.Equals(pref) {
+		} else if pref := tree.Preference(); c0000 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -846,7 +846,7 @@ func TestSnowballFineGrained(t *testing.T) {
 			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !c0000.Equals(pref) {
+		} else if pref := tree.Preference(); c0000 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -862,7 +862,7 @@ func TestSnowballFineGrained(t *testing.T) {
 			"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !c0000.Equals(pref) {
+		} else if pref := tree.Preference(); c0000 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -881,7 +881,7 @@ func TestSnowballFineGrained(t *testing.T) {
 			"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !c0000.Equals(pref) {
+		} else if pref := tree.Preference(); c0000 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -901,7 +901,7 @@ func TestSnowballFineGrained(t *testing.T) {
 			"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !c0000.Equals(pref) {
+		} else if pref := tree.Preference(); c0000 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -917,7 +917,7 @@ func TestSnowballFineGrained(t *testing.T) {
 			"    SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = true)) Bits = [3, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !c0000.Equals(pref) {
+		} else if pref := tree.Preference(); c0000 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -929,7 +929,7 @@ func TestSnowballFineGrained(t *testing.T) {
 		expected := "SB(NumSuccessfulPolls = 2, SF(Confidence = 2, Finalized = true)) Bits = [3, 256)"
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !c0010.Equals(pref) {
+		} else if pref := tree.Preference(); c0010 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0010, pref)
 		} else if !tree.Finalized() {
 			t.Fatalf("Finalized too late")
@@ -950,7 +950,7 @@ func TestSnowballDoubleAdd(t *testing.T) {
 		expected := initialUnaryDescription
 		if str := tree.String(); expected != str {
 			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
-		} else if pref := tree.Preference(); !Red.Equals(pref) {
+		} else if pref := tree.Preference(); Red != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -999,7 +999,7 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 	tree.Initialize(params, c0000)
 	{
 		expected := initialUnaryDescription
-		if pref := tree.Preference(); !c0000.Equals(pref) {
+		if pref := tree.Preference(); c0000 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -1013,7 +1013,7 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 0\n" +
 			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)\n" +
 			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
-		if pref := tree.Preference(); !c0000.Equals(pref) {
+		if pref := tree.Preference(); c0000 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -1030,7 +1030,7 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 			"            SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)\n" +
 			"            SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)\n" +
 			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
-		if pref := tree.Preference(); !c0000.Equals(pref) {
+		if pref := tree.Preference(); c0000 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -1048,7 +1048,7 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 			"        SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = true)) Bits = [3, 256)\n" +
 			"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)\n" +
 			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
-		if pref := tree.Preference(); !c0000.Equals(pref) {
+		if pref := tree.Preference(); c0000 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -1064,7 +1064,7 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 			"        SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = true)) Bits = [3, 256)\n" +
 			"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)\n" +
 			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
-		if pref := tree.Preference(); !c0000.Equals(pref) {
+		if pref := tree.Preference(); c0000 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")
@@ -1080,7 +1080,7 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 1, NumSuccessfulPolls[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 2\n" +
 			"    SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = true)) Bits = [3, 256)\n" +
 			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)"
-		if pref := tree.Preference(); !c0000.Equals(pref) {
+		if pref := tree.Preference(); c0000 != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
 			t.Fatalf("Finalized too early")

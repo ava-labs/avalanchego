@@ -13,7 +13,7 @@ func TestMissingBlock(t *testing.T) {
 	id := [32]byte{255}
 	mb := Block{BlkID: id}
 
-	if blkID := mb.ID(); !blkID.Equals(id) {
+	if blkID := mb.ID(); blkID != id {
 		t.Fatalf("missingBlock.ID returned %s, expected %s", blkID, id)
 	} else if status := mb.Status(); status != choices.Unknown {
 		t.Fatalf("missingBlock.Status returned %s, expected %s", status, choices.Unknown)

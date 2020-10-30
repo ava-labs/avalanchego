@@ -57,7 +57,7 @@ func (tx *UnsignedExportTx) Verify(
 		return nil
 	case tx.DestinationChain == ids.Empty:
 		return errWrongChainID
-	case !tx.DestinationChain.Equals(avmID):
+	case tx.DestinationChain != avmID:
 		// TODO: remove this check if we allow for P->C swaps
 		return errWrongChainID
 	case len(tx.ExportedOutputs) == 0:
@@ -171,7 +171,7 @@ func (vm *VM) newExportTx(
 	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee and provide the tokens
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	if !vm.Ctx.XChainID.Equals(chainID) {
+	if vm.Ctx.XChainID != chainID {
 		return nil, errWrongChainID
 	}
 

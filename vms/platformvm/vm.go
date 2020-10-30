@@ -431,7 +431,7 @@ func (vm *VM) createChain(tx *Tx) {
 		return
 	}
 	if vm.stakingEnabled && // Staking is enabled, so nodes might not validate all chains
-		!constants.PrimaryNetworkID.Equals(unsignedTx.SubnetID) && // All nodes must validate the primary network
+		constants.PrimaryNetworkID != unsignedTx.SubnetID && // All nodes must validate the primary network
 		!validators.Contains(vm.Ctx.NodeID) { // This node doesn't validate this blockchain
 		return
 	}
@@ -642,7 +642,7 @@ func (vm *VM) getBlock(blkID ids.ID) (Block, error) {
 
 // SetPreference sets the preferred block to be the one with ID [blkID]
 func (vm *VM) SetPreference(blkID ids.ID) {
-	if !blkID.Equals(vm.Preferred()) {
+	if blkID != vm.Preferred() {
 		vm.SnowmanVM.SetPreference(blkID)
 		vm.mempool.ResetTimer()
 	}
@@ -831,7 +831,7 @@ func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, time
 
 		switch staker := tx.UnsignedTx.(type) {
 		case *UnsignedAddDelegatorTx:
-			if !subnetID.Equals(constants.PrimaryNetworkID) {
+			if subnetID != constants.PrimaryNetworkID {
 				return fmt.Errorf("AddDelegatorTx is invalid for subnet %s",
 					subnetID)
 			}
@@ -855,7 +855,7 @@ func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, time
 				return fmt.Errorf("couldn't add staker: %w", err)
 			}
 		case *UnsignedAddValidatorTx:
-			if !subnetID.Equals(constants.PrimaryNetworkID) {
+			if subnetID != constants.PrimaryNetworkID {
 				return fmt.Errorf("AddValidatorTx is invalid for subnet %s",
 					subnetID)
 			}
@@ -879,7 +879,7 @@ func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, time
 				return fmt.Errorf("couldn't add staker: %w", err)
 			}
 		case *UnsignedAddSubnetValidatorTx:
-			if txSubnetID := staker.Validator.SubnetID(); !subnetID.Equals(txSubnetID) {
+			if txSubnetID := staker.Validator.SubnetID(); subnetID != txSubnetID {
 				return fmt.Errorf("AddSubnetValidatorTx references the incorrect subnet. Expected %s; Got %s",
 					subnetID, txSubnetID)
 			}
@@ -922,7 +922,7 @@ func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, time
 
 		switch staker := tx.Tx.UnsignedTx.(type) {
 		case *UnsignedAddDelegatorTx:
-			if !subnetID.Equals(constants.PrimaryNetworkID) {
+			if subnetID != constants.PrimaryNetworkID {
 				return fmt.Errorf("AddDelegatorTx is invalid for subnet %s",
 					subnetID)
 			}
@@ -930,7 +930,7 @@ func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, time
 				return nil
 			}
 		case *UnsignedAddValidatorTx:
-			if !subnetID.Equals(constants.PrimaryNetworkID) {
+			if subnetID != constants.PrimaryNetworkID {
 				return fmt.Errorf("AddValidatorTx is invalid for subnet %s",
 					subnetID)
 			}
@@ -938,7 +938,7 @@ func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, time
 				return nil
 			}
 		case *UnsignedAddSubnetValidatorTx:
-			if txSubnetID := staker.Validator.SubnetID(); !subnetID.Equals(txSubnetID) {
+			if txSubnetID := staker.Validator.SubnetID(); subnetID != txSubnetID {
 				return fmt.Errorf("AddSubnetValidatorTx references the incorrect subnet. Expected %s; Got %s",
 					subnetID, txSubnetID)
 			}
@@ -1099,7 +1099,7 @@ func (vm *VM) ParseLocalAddress(addrStr string) (ids.ShortID, error) {
 	if err != nil {
 		return ids.ShortID{}, err
 	}
-	if !chainID.Equals(vm.Ctx.ChainID) {
+	if chainID != vm.Ctx.ChainID {
 		return ids.ShortID{}, fmt.Errorf("expected chainID to be %q but was %q",
 			vm.Ctx.ChainID, chainID)
 	}

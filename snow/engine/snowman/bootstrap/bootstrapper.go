@@ -167,7 +167,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 	if err != nil {
 		b.Ctx.Log.Debug("Failed to parse requested block %s: %s", wantedBlkID, err)
 		return b.fetch(wantedBlkID)
-	} else if actualID := wantedBlk.ID(); !actualID.Equals(wantedBlkID) {
+	} else if actualID := wantedBlk.ID(); actualID != wantedBlkID {
 		b.Ctx.Log.Debug("expected the first block to be the requested block, %s, but is %s",
 			wantedBlk, actualID)
 		return b.fetch(wantedBlkID)

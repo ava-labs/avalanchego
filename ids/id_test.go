@@ -19,7 +19,7 @@ func TestID(t *testing.T) {
 		t.Fatalf("ID.Prefix mutated the ID")
 	}
 
-	if nextPrefix := id.Prefix(0); !prefixed.Equals(nextPrefix) {
+	if nextPrefix := id.Prefix(0); prefixed != nextPrefix {
 		t.Fatalf("ID.Prefix not consistent")
 	}
 

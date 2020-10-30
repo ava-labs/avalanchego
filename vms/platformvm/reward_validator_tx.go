@@ -77,7 +77,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 			fmt.Errorf("failed to get next staker stop time: %w", err),
 		}
 	}
-	if stakerID := stakerTx.Tx.ID(); !stakerID.Equals(tx.TxID) {
+	if stakerID := stakerTx.Tx.ID(); stakerID != tx.TxID {
 		return nil, nil, nil, nil, permError{fmt.Errorf("attempting to remove TxID: %s. Should be removing %s",
 			tx.TxID,
 			stakerID)}

@@ -138,7 +138,7 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 	ins := []*avax.TransferableInput{}
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 	for _, utxo := range w.utxoSet.UTXOs {
-		if !utxo.AssetID().Equals(assetID) {
+		if utxo.AssetID() != assetID {
 			continue
 		}
 		inputIntf, signers, err := w.keychain.Spend(utxo.Out, time)

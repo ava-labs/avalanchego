@@ -224,7 +224,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 		endAddr   ids.ShortID
 		endUTXOID ids.ID
 	)
-	if sourceChain.Equals(service.vm.ctx.ChainID) {
+	if sourceChain == service.vm.ctx.ChainID {
 		utxos, endAddr, endUTXOID, err = service.vm.GetUTXOs(
 			addrSet,
 			startAddr,
@@ -343,7 +343,7 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 
 	reply.UTXOIDs = make([]avax.UTXOID, 0, len(utxos))
 	for _, utxo := range utxos {
-		if !utxo.AssetID().Equals(assetID) {
+		if utxo.AssetID() != assetID {
 			continue
 		}
 		transferable, ok := utxo.Out.(avax.TransferableOut)
@@ -1743,7 +1743,7 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSO
 	}
 
 	amounts := map[[32]byte]uint64{}
-	if assetID.Equals(service.vm.ctx.AVAXAssetID) {
+	if assetID == service.vm.ctx.AVAXAssetID {
 		amountWithFee, err := safemath.Add64(uint64(args.Amount), service.vm.txFee)
 		if err != nil {
 			return fmt.Errorf("problem calculating required spend amount: %w", err)

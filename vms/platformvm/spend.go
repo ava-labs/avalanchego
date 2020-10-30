@@ -82,7 +82,7 @@ func (vm *VM) stake(
 			break
 		}
 
-		if assetID := utxo.AssetID(); !assetID.Equals(vm.Ctx.AVAXAssetID) {
+		if assetID := utxo.AssetID(); assetID != vm.Ctx.AVAXAssetID {
 			continue // We only care about staking AVAX, so ignore other assets
 		}
 
@@ -178,7 +178,7 @@ func (vm *VM) stake(
 			break
 		}
 
-		if assetID := utxo.AssetID(); !assetID.Equals(vm.Ctx.AVAXAssetID) {
+		if assetID := utxo.AssetID(); assetID != vm.Ctx.AVAXAssetID {
 			continue // We only care about burning AVAX, so ignore other assets
 		}
 
@@ -390,10 +390,10 @@ func (vm *VM) semanticVerifySpendUTXOs(
 	for index, input := range ins {
 		utxo := utxos[index] // The UTXO consumed by [input]
 
-		if assetID := utxo.AssetID(); !assetID.Equals(feeAssetID) {
+		if assetID := utxo.AssetID(); assetID != feeAssetID {
 			return permError{errAssetIDMismatch}
 		}
-		if assetID := input.AssetID(); !assetID.Equals(feeAssetID) {
+		if assetID := input.AssetID(); assetID != feeAssetID {
 			return permError{errAssetIDMismatch}
 		}
 
@@ -462,7 +462,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 	}
 
 	for _, out := range outs {
-		if assetID := out.AssetID(); !assetID.Equals(feeAssetID) {
+		if assetID := out.AssetID(); assetID != feeAssetID {
 			return permError{errAssetIDMismatch}
 		}
 

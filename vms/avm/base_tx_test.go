@@ -175,11 +175,11 @@ func TestBaseTxGetters(t *testing.T) {
 		t.Fatalf("Wrong consumed asset returned")
 	} else if utxos := tx.UTXOs(); len(utxos) != 1 {
 		t.Fatalf("Wrong number of utxos returned")
-	} else if utxo := utxos[0]; !utxo.TxID.Equals(txID) {
+	} else if utxo := utxos[0]; utxo.TxID != txID {
 		t.Fatalf("Wrong tx ID returned")
 	} else if utxoIndex := utxo.OutputIndex; utxoIndex != 0 {
 		t.Fatalf("Wrong output index returned")
-	} else if assetID := utxo.AssetID(); !assetID.Equals(assetID) {
+	} else if assetID := utxo.AssetID(); assetID != assetID {
 		t.Fatalf("Wrong asset ID returned")
 	}
 }

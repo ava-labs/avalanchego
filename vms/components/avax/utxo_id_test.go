@@ -48,7 +48,7 @@ func TestUTXOID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !utxoID.InputID().Equals(newUTXOID.InputID()) {
+	if utxoID.InputID() != newUTXOID.InputID() {
 		t.Fatalf("Parsing returned the wrong UTXO ID")
 	}
 }

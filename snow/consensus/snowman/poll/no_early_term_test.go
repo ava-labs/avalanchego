@@ -28,7 +28,7 @@ func TestNoEarlyTermResults(t *testing.T) {
 	result := poll.Result()
 	if list := result.List(); len(list) != 1 {
 		t.Fatalf("Wrong number of vertices returned")
-	} else if retVtxID := list[0]; !retVtxID.Equals(vtxID) {
+	} else if retVtxID := list[0]; retVtxID != vtxID {
 		t.Fatalf("Wrong vertex returned")
 	} else if result.Count(vtxID) != 1 {
 		t.Fatalf("Wrong number of votes returned")

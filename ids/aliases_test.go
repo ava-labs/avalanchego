@@ -23,7 +23,7 @@ func TestAliaserLookupError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
 			res, err := tt.aliaser.Lookup(tt.alias)
-			if !tt.res.Equals(res) {
+			if tt.res != res {
 				t.Errorf("Got %v, expected %v", res, tt.res)
 			}
 			if err == nil {

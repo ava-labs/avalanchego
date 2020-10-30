@@ -65,7 +65,7 @@ func (tx *UnsignedCreateChainTx) Verify(
 		return nil
 	case tx.SubnetID == ids.Empty:
 		return errNoSubnetID
-	case tx.SubnetID.Equals(constants.PrimaryNetworkID):
+	case tx.SubnetID == constants.PrimaryNetworkID:
 		return errDSCantValidate
 	case len(tx.ChainName) > maxNameLen:
 		return errNameTooLong
@@ -148,7 +148,7 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 		return nil, tempError{fmt.Errorf("couldn't get list of blockchains: %w", sErr)}
 	}
 	for _, chain := range currentChains {
-		if chain.ID().Equals(tx.ID()) {
+		if chain.ID() == tx.ID() {
 			return nil, permError{fmt.Errorf("chain %s already exists", chain.ID())}
 		}
 	}
