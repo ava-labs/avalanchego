@@ -19,9 +19,9 @@ func (r *rejector) Dependencies() ids.Set { return r.deps }
 
 func (r *rejector) Fulfill(ids.ID) {
 	if r.rejected {
-		return
+		return // TODO: add test for this line
 	}
-	r.rejected = true
+	r.rejected = true // TODO: add test for this line
 	r.c.rejectable = append(r.c.rejectable, r.tx)
 }
 

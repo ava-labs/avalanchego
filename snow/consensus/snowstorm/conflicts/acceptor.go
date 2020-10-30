@@ -22,12 +22,12 @@ func (a *acceptor) Fulfill(id ids.ID) {
 	a.Update()
 }
 
-func (a *acceptor) Abandon(id ids.ID) { a.rejected = true }
+func (a *acceptor) Abandon(id ids.ID) { a.rejected = true } // TODO: add test for a.rejected = true
 
 func (a *acceptor) Update() {
 	// If I was rejected or I am still waiting on dependencies to finish or an
 	// error has occurred, I shouldn't do anything.
-	if a.rejected || a.deps.Len() != 0 {
+	if a.rejected || a.deps.Len() != 0 { // TODO: add test for a.rejected
 		return
 	}
 	a.c.acceptable = append(a.c.acceptable, a.tx)

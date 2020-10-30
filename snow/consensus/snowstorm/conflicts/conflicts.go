@@ -153,7 +153,7 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 			if spenders.Len() == 0 {
 				delete(c.utxos, inputKey)
 			} else {
-				c.utxos[inputKey] = spenders
+				c.utxos[inputKey] = spenders // TODO: add test for this line
 			}
 		}
 
@@ -180,7 +180,7 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 			if spenders.Len() == 0 {
 				delete(c.utxos, inputKey)
 			} else {
-				c.utxos[inputKey] = spenders
+				c.utxos[inputKey] = spenders // TODO: add test for this line
 			}
 		}
 
