@@ -4,16 +4,10 @@
 package queue
 
 import (
-	"errors"
-
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-)
-
-var (
-	errZeroID = errors.New("zero id")
 )
 
 type state struct{ jobs *Jobs }

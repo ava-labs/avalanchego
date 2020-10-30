@@ -214,7 +214,6 @@ func (s *PrefixedState) FundUTXO(utxo *UTXO) error {
 
 var (
 	errCacheTypeMismatch = errors.New("type returned from cache doesn't match the expected type")
-	errZeroID            = errors.New("database key ID value not initialized")
 )
 
 // UniqueID returns a unique identifier
