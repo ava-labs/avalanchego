@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
@@ -19,9 +18,9 @@ func TestBaseTxMarshalJSON(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	blockchainID := ids.NewID([32]byte{1})
-	utxoTxID := ids.NewID([32]byte{2})
-	assetID := ids.NewID([32]byte{3})
+	blockchainID := [32]byte{1}
+	utxoTxID := [32]byte{2}
+	assetID := [32]byte{3}
 	tx := &BaseTx{BaseTx: avax.BaseTx{
 		BlockchainID: blockchainID,
 		NetworkID:    4,

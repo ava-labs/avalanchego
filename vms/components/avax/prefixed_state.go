@@ -52,9 +52,8 @@ func (s *chainState) UTXO(id ids.ID) (*UTXO, error) {
 // All UTXO IDs have IDs greater than [start].
 // The returned list contains at most [limit] UTXO IDs.
 func (s *chainState) Funds(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
-	var addrArr [32]byte
-	copy(addrArr[:], addr)
-	addrID := ids.NewID(addrArr)
+	var addrID [32]byte
+	copy(addrID[:], addr)
 	return s.IDs(UniqueID(addrID, s.fundsIDPrefix, s.fundsID).Bytes(), start.Bytes(), limit)
 }
 
@@ -104,11 +103,10 @@ func (s *chainState) setStatus(id ids.ID, status choices.Status) error {
 
 func (s *chainState) removeUTXO(addrs [][]byte, utxoID ids.ID) error {
 	for _, addr := range addrs {
-		var addrArr [32]byte
-		copy(addrArr[:], addr)
-		addrID := ids.NewID(addrArr)
+		var addrID [32]byte
+		copy(addrID[:], addr)
 		addrID = UniqueID(addrID, s.fundsIDPrefix, s.fundsID)
-		if err := s.RemoveID(addrID.Bytes(), utxoID); err != nil {
+		if err := s.RemoveID(addrID[:], utxoID); err != nil {
 			return err
 		}
 	}
@@ -117,11 +115,10 @@ func (s *chainState) removeUTXO(addrs [][]byte, utxoID ids.ID) error {
 
 func (s *chainState) addUTXO(addrs [][]byte, utxoID ids.ID) error {
 	for _, addr := range addrs {
-		var addrArr [32]byte
-		copy(addrArr[:], addr)
-		addrID := ids.NewID(addrArr)
+		var addrID [32]byte
+		copy(addrID[:], addr)
 		addrID = UniqueID(addrID, s.fundsIDPrefix, s.fundsID)
-		if err := s.AddID(addrID.Bytes(), utxoID); err != nil {
+		if err := s.AddID(addrID[:], utxoID); err != nil {
 			return err
 		}
 	}

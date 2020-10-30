@@ -223,9 +223,8 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 	}
 
 	// Add the required change outputs
-	for asset, amountWithFee := range amountsWithFee {
-		assetID := ids.NewID(asset)
-		amountSpent := amountsSpent[asset]
+	for assetID, amountWithFee := range amountsWithFee {
+		amountSpent := amountsSpent[assetID]
 
 		if amountSpent > amountWithFee {
 			outs = append(outs, &avax.TransferableOutput{

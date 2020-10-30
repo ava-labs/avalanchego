@@ -12,21 +12,21 @@ import (
 )
 
 func TestVertexVerify(t *testing.T) {
-	conflictingInputID := ids.NewID([32]byte{'i', 'n'})
+	conflictingInputID := ids.ID([32]byte{'i', 'n'})
 	inputs := []ids.ID{}
 	inputs = append(inputs, conflictingInputID)
 	tx0 := &snowstorm.TestTx{
 		TestDecidable: choices.TestDecidable{
-			IDV: ids.NewID([32]byte{'t', 'x', '0'}),
+			IDV: ids.ID([32]byte{'t', 'x', '0'}),
 		},
 		DependenciesV: nil,
 		InputIDsV:     inputs,
 	}
 	validVertex := &innerVertex{
-		id:        ids.NewID([32]byte{}),
-		chainID:   ids.NewID([32]byte{1}),
+		id:        ids.ID([32]byte{}),
+		chainID:   ids.ID([32]byte{1}),
 		height:    1,
-		parentIDs: []ids.ID{ids.NewID([32]byte{2})},
+		parentIDs: []ids.ID{ids.ID([32]byte{2})},
 		txs:       []snowstorm.Tx{tx0},
 	}
 
@@ -35,10 +35,10 @@ func TestVertexVerify(t *testing.T) {
 	}
 
 	nonUniqueParentsVtx := &innerVertex{
-		id:        ids.NewID([32]byte{}),
-		chainID:   ids.NewID([32]byte{1}),
+		id:        ids.ID([32]byte{}),
+		chainID:   ids.ID([32]byte{1}),
 		height:    1,
-		parentIDs: []ids.ID{ids.NewID([32]byte{'d', 'u', 'p'}), ids.NewID([32]byte{'d', 'u', 'p'})},
+		parentIDs: []ids.ID{ids.ID([32]byte{'d', 'u', 'p'}), ids.ID([32]byte{'d', 'u', 'p'})},
 		txs:       []snowstorm.Tx{tx0},
 	}
 
@@ -46,13 +46,13 @@ func TestVertexVerify(t *testing.T) {
 		t.Fatal("Vertex with non unique parents should not have passed verification")
 	}
 
-	parent0 := ids.NewID([32]byte{0})
-	parent1 := ids.NewID([32]byte{1})
+	parent0 := ids.ID([32]byte{0})
+	parent1 := ids.ID([32]byte{1})
 	sortedParents := []ids.ID{parent0, parent1}
 	ids.SortIDs(sortedParents)
 	nonSortedParentsVtx := &innerVertex{
-		id:        ids.NewID([32]byte{}),
-		chainID:   ids.NewID([32]byte{1}),
+		id:        ids.ID([32]byte{}),
+		chainID:   ids.ID([32]byte{1}),
 		height:    1,
 		parentIDs: []ids.ID{sortedParents[1], sortedParents[0]},
 		txs:       []snowstorm.Tx{tx0},
@@ -63,10 +63,10 @@ func TestVertexVerify(t *testing.T) {
 	}
 
 	noTxsVertex := &innerVertex{
-		id:        ids.NewID([32]byte{}),
-		chainID:   ids.NewID([32]byte{1}),
+		id:        ids.ID([32]byte{}),
+		chainID:   ids.ID([32]byte{1}),
 		height:    1,
-		parentIDs: []ids.ID{ids.NewID([32]byte{2})},
+		parentIDs: []ids.ID{ids.ID([32]byte{2})},
 		txs:       []snowstorm.Tx{},
 	}
 
@@ -76,7 +76,7 @@ func TestVertexVerify(t *testing.T) {
 
 	tx1 := &snowstorm.TestTx{
 		TestDecidable: choices.TestDecidable{
-			IDV: ids.NewID([32]byte{'t', 'x', '1'}),
+			IDV: ids.ID([32]byte{'t', 'x', '1'}),
 		},
 		DependenciesV: nil,
 		InputIDsV:     nil,
@@ -84,10 +84,10 @@ func TestVertexVerify(t *testing.T) {
 	sortedTxs := []snowstorm.Tx{tx0, tx1}
 	sortTxs(sortedTxs)
 	unsortedTxsVertex := &innerVertex{
-		id:        ids.NewID([32]byte{}),
-		chainID:   ids.NewID([32]byte{1}),
+		id:        ids.ID([32]byte{}),
+		chainID:   ids.ID([32]byte{1}),
 		height:    1,
-		parentIDs: []ids.ID{ids.NewID([32]byte{2})},
+		parentIDs: []ids.ID{ids.ID([32]byte{2})},
 		txs:       []snowstorm.Tx{sortedTxs[1], sortedTxs[0]},
 	}
 
@@ -96,10 +96,10 @@ func TestVertexVerify(t *testing.T) {
 	}
 
 	nonUniqueTxsVertex := &innerVertex{
-		id:        ids.NewID([32]byte{}),
-		chainID:   ids.NewID([32]byte{1}),
+		id:        ids.ID([32]byte{}),
+		chainID:   ids.ID([32]byte{1}),
 		height:    1,
-		parentIDs: []ids.ID{ids.NewID([32]byte{2})},
+		parentIDs: []ids.ID{ids.ID([32]byte{2})},
 		txs:       []snowstorm.Tx{tx0, tx0},
 	}
 
@@ -107,10 +107,10 @@ func TestVertexVerify(t *testing.T) {
 		t.Fatal("Vertex with non-unique transactions should not have passed verification")
 	}
 
-	inputs = append(inputs, ids.NewID([32]byte{'e', 'x', 't', 'r', 'a'}))
+	inputs = append(inputs, ids.ID([32]byte{'e', 'x', 't', 'r', 'a'}))
 	conflictingTx := &snowstorm.TestTx{
 		TestDecidable: choices.TestDecidable{
-			IDV: ids.NewID([32]byte{'c', 'o', 'n', 'f', 'l', 'i', 'c', 't'}),
+			IDV: ids.ID([32]byte{'c', 'o', 'n', 'f', 'l', 'i', 'c', 't'}),
 		},
 		DependenciesV: nil,
 		InputIDsV:     inputs,
@@ -120,10 +120,10 @@ func TestVertexVerify(t *testing.T) {
 	sortTxs(conflictingTxs)
 
 	conflictingTxsVertex := &innerVertex{
-		id:        ids.NewID([32]byte{}),
-		chainID:   ids.NewID([32]byte{1}),
+		id:        ids.ID([32]byte{}),
+		chainID:   ids.ID([32]byte{1}),
 		height:    1,
-		parentIDs: []ids.ID{ids.NewID([32]byte{2})},
+		parentIDs: []ids.ID{ids.ID([32]byte{2})},
 		txs:       conflictingTxs,
 	}
 

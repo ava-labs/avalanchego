@@ -175,7 +175,7 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 	accepted := ids.Set{}
 	for key, weight := range b.acceptedVotes {
 		if weight >= b.Alpha {
-			accepted.Add(ids.NewID(key))
+			accepted.Add(key)
 		}
 	}
 

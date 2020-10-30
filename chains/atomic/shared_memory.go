@@ -324,7 +324,7 @@ func (s *state) getKeys(traits [][]byte, startTrait, startKey []byte, limit int)
 			key := iter.Key()
 			lastKey = key
 
-			id := ids.NewID(hashing.ComputeHash256Array(key))
+			id := hashing.ComputeHash256Array(key)
 			if tracked.Contains(id) {
 				continue
 			}

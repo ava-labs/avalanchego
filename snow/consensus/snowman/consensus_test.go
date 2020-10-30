@@ -851,21 +851,21 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 
 	block0 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
-			IDV:     ids.NewID([32]byte{0x0f}), // 0b1111
+			IDV:     ids.ID([32]byte{0x0f}), // 0b1111
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis,
 	}
 	block1 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
-			IDV:     ids.NewID([32]byte{0x08}), // 0b1000
+			IDV:     ids.ID([32]byte{0x08}), // 0b1000
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis,
 	}
 	block2 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
-			IDV:     ids.NewID([32]byte{0x01}), // 0b0001
+			IDV:     ids.ID([32]byte{0x01}), // 0b0001
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis,

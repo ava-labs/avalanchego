@@ -75,10 +75,10 @@ const (
 )
 
 var (
-	timestampKey     = ids.NewID([32]byte{'t', 'i', 'm', 'e'})
-	chainsKey        = ids.NewID([32]byte{'c', 'h', 'a', 'i', 'n', 's'})
-	subnetsKey       = ids.NewID([32]byte{'s', 'u', 'b', 'n', 'e', 't', 's'})
-	currentSupplyKey = ids.NewID([32]byte{'c', 'u', 'r', 'r', 'e', 't', ' ', 's', 'u', 'p', 'p', 'l', 'y'})
+	timestampKey     = [32]byte{'t', 'i', 'm', 'e'}
+	chainsKey        = [32]byte{'c', 'h', 'a', 'i', 'n', 's'}
+	subnetsKey       = [32]byte{'s', 'u', 'b', 'n', 'e', 't', 's'}
+	currentSupplyKey = [32]byte{'c', 'u', 'r', 'r', 'e', 't', ' ', 's', 'u', 'p', 'p', 'l', 'y'}
 
 	errRegisteringType          = errors.New("error registering type with database")
 	errInvalidLastAcceptedBlock = errors.New("last accepted block must be a decision block")
@@ -339,7 +339,7 @@ func (vm *VM) Initialize(
 		// Create the genesis block and save it as being accepted (We don't just
 		// do genesisBlock.Accept() because then it'd look for genesisBlock's
 		// non-existent parent)
-		genesisID := ids.NewID(hashing.ComputeHash256Array(genesisBytes))
+		genesisID := hashing.ComputeHash256Array(genesisBytes)
 		genesisBlock, err := vm.newCommitBlock(genesisID, 0)
 		if err != nil {
 			return err

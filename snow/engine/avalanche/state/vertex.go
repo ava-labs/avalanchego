@@ -162,7 +162,7 @@ func (vtx *innerVertex) Unmarshal(b []byte, vm vertex.DAGVM) error {
 	}
 
 	*vtx = innerVertex{
-		id:        ids.NewID(hashing.ComputeHash256Array(b)),
+		id:        hashing.ComputeHash256Array(b),
 		parentIDs: parentIDs,
 		chainID:   chainID,
 		height:    height,

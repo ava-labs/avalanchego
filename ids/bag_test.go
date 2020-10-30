@@ -9,7 +9,7 @@ import (
 
 func TestBagAdd(t *testing.T) {
 	id0 := Empty
-	id1 := NewID([32]byte{1})
+	id1 := [32]byte{1}
 
 	bag := Bag{}
 
@@ -86,7 +86,7 @@ func TestBagAdd(t *testing.T) {
 
 func TestBagSetThreshold(t *testing.T) {
 	id0 := Empty
-	id1 := NewID([32]byte{1})
+	id1 := [32]byte{1}
 
 	bag := Bag{}
 
@@ -134,8 +134,8 @@ func TestBagSetThreshold(t *testing.T) {
 
 func TestBagFilter(t *testing.T) {
 	id0 := Empty
-	id1 := NewID([32]byte{1})
-	id2 := NewID([32]byte{2})
+	id1 := [32]byte{1}
+	id2 := [32]byte{2}
 
 	bag := Bag{}
 
@@ -156,8 +156,8 @@ func TestBagFilter(t *testing.T) {
 
 func TestBagSplit(t *testing.T) {
 	id0 := Empty
-	id1 := NewID([32]byte{1})
-	id2 := NewID([32]byte{2})
+	id1 := [32]byte{1}
+	id2 := [32]byte{2}
 
 	bag := Bag{}
 

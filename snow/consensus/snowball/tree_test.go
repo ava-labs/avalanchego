@@ -166,7 +166,7 @@ func TestSnowballBinary(t *testing.T) {
 
 func TestSnowballLastBinary(t *testing.T) {
 	zero := ids.Empty
-	one := ids.NewID([32]byte{
+	one := ids.ID([32]byte{
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -214,10 +214,10 @@ func TestSnowballLastBinary(t *testing.T) {
 }
 
 func TestSnowballAddPreviouslyRejected(t *testing.T) {
-	zero := ids.NewID([32]byte{0b00000000})
-	one := ids.NewID([32]byte{0b00000001})
-	two := ids.NewID([32]byte{0b00000010})
-	four := ids.NewID([32]byte{0b00000100})
+	zero := ids.ID([32]byte{0b00000000})
+	one := ids.ID([32]byte{0b00000001})
+	two := ids.ID([32]byte{0b00000010})
+	four := ids.ID([32]byte{0b00000100})
 
 	params := Parameters{
 		Metrics: prometheus.NewRegistry(),
@@ -282,8 +282,8 @@ func TestSnowballAddPreviouslyRejected(t *testing.T) {
 }
 
 func TestSnowballNewUnary(t *testing.T) {
-	zero := ids.NewID([32]byte{0b00000000})
-	one := ids.NewID([32]byte{0b00000001})
+	zero := ids.ID([32]byte{0b00000000})
+	one := ids.ID([32]byte{0b00000001})
 
 	params := Parameters{
 		Metrics: prometheus.NewRegistry(),
@@ -340,9 +340,9 @@ func TestSnowballNewUnary(t *testing.T) {
 }
 
 func TestSnowballTransitiveReset(t *testing.T) {
-	zero := ids.NewID([32]byte{0b00000000})
-	two := ids.NewID([32]byte{0b00000010})
-	eight := ids.NewID([32]byte{0b00001000})
+	zero := ids.ID([32]byte{0b00000000})
+	two := ids.ID([32]byte{0b00000010})
+	eight := ids.ID([32]byte{0b00001000})
 
 	params := Parameters{
 		Metrics: prometheus.NewRegistry(),
@@ -516,9 +516,9 @@ func TestSnowballTrinary(t *testing.T) {
 }
 
 func TestSnowballCloseTrinary(t *testing.T) {
-	yellow := ids.NewID([32]byte{0x01})
-	cyan := ids.NewID([32]byte{0x02})
-	magenta := ids.NewID([32]byte{0x03})
+	yellow := ids.ID([32]byte{0x01})
+	cyan := ids.ID([32]byte{0x02})
+	magenta := ids.ID([32]byte{0x03})
 
 	params := Parameters{
 		Metrics: prometheus.NewRegistry(),
@@ -575,10 +575,10 @@ func TestSnowballCloseTrinary(t *testing.T) {
 }
 
 func TestSnowballAddRejected(t *testing.T) {
-	c0000 := ids.NewID([32]byte{0x00}) // 0000
-	c1000 := ids.NewID([32]byte{0x01}) // 1000
-	c0101 := ids.NewID([32]byte{0x0a}) // 0101
-	c0010 := ids.NewID([32]byte{0x04}) // 0010
+	c0000 := ids.ID([32]byte{0x00}) // 0000
+	c1000 := ids.ID([32]byte{0x01}) // 1000
+	c0101 := ids.ID([32]byte{0x0a}) // 0101
+	c0010 := ids.ID([32]byte{0x04}) // 0010
 
 	params := Parameters{
 		Metrics: prometheus.NewRegistry(),
@@ -632,9 +632,9 @@ func TestSnowballAddRejected(t *testing.T) {
 }
 
 func TestSnowballResetChild(t *testing.T) {
-	c0000 := ids.NewID([32]byte{0x00}) // 0000
-	c0100 := ids.NewID([32]byte{0x02}) // 0100
-	c1000 := ids.NewID([32]byte{0x01}) // 1000
+	c0000 := ids.ID([32]byte{0x00}) // 0000
+	c0100 := ids.ID([32]byte{0x02}) // 0100
+	c1000 := ids.ID([32]byte{0x01}) // 1000
 
 	params := Parameters{
 		Metrics: prometheus.NewRegistry(),
@@ -706,9 +706,9 @@ func TestSnowballResetChild(t *testing.T) {
 }
 
 func TestSnowballResetSibling(t *testing.T) {
-	c0000 := ids.NewID([32]byte{0x00}) // 0000
-	c0100 := ids.NewID([32]byte{0x02}) // 0100
-	c1000 := ids.NewID([32]byte{0x01}) // 1000
+	c0000 := ids.ID([32]byte{0x00}) // 0000
+	c0100 := ids.ID([32]byte{0x02}) // 0100
+	c1000 := ids.ID([32]byte{0x01}) // 1000
 
 	params := Parameters{
 		Metrics: prometheus.NewRegistry(),
@@ -817,10 +817,10 @@ func TestSnowball5Colors(t *testing.T) {
 }
 
 func TestSnowballFineGrained(t *testing.T) {
-	c0000 := ids.NewID([32]byte{0x00})
-	c1000 := ids.NewID([32]byte{0x01})
-	c1100 := ids.NewID([32]byte{0x03})
-	c0010 := ids.NewID([32]byte{0x04})
+	c0000 := ids.ID([32]byte{0x00})
+	c1000 := ids.ID([32]byte{0x01})
+	c1100 := ids.ID([32]byte{0x03})
+	c0010 := ids.ID([32]byte{0x04})
 
 	params := Parameters{
 		Metrics: prometheus.NewRegistry(),
@@ -986,10 +986,10 @@ func TestSnowballConsistent(t *testing.T) {
 }
 
 func TestSnowballFilterBinaryChildren(t *testing.T) {
-	c0000 := ids.NewID([32]byte{0b00000000})
-	c1000 := ids.NewID([32]byte{0b00000001})
-	c0100 := ids.NewID([32]byte{0b00000010})
-	c0010 := ids.NewID([32]byte{0b00000100})
+	c0000 := ids.ID([32]byte{0b00000000})
+	c1000 := ids.ID([32]byte{0b00000001})
+	c0100 := ids.ID([32]byte{0b00000010})
+	c0010 := ids.ID([32]byte{0b00000100})
 
 	params := Parameters{
 		Metrics: prometheus.NewRegistry(),

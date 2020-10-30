@@ -81,7 +81,7 @@ func (ids Set) List() []ID {
 	idList := make([]ID, ids.Len())
 	i := 0
 	for id := range ids {
-		idList[i] = NewID(id)
+		idList[i] = id
 		i++
 	}
 	return idList
@@ -102,7 +102,7 @@ func (ids Set) CappedList(size int) []ID {
 		if i >= size {
 			break
 		}
-		idList[i] = NewID(id)
+		idList[i] = id
 		i++
 	}
 	return idList
@@ -131,7 +131,7 @@ func (ids Set) String() string {
 			sb.WriteString(", ")
 		}
 		first = false
-		sb.WriteString(NewID(idBytes).String())
+		sb.WriteString(ID(idBytes).String())
 	}
 	sb.WriteString("}")
 	return sb.String()

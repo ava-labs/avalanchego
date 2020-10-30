@@ -913,7 +913,7 @@ func (vm *VM) Spend(
 		if amountsSpent[asset] < amount {
 			return nil, nil, nil, fmt.Errorf("want to spend %d of asset %s but only have %d",
 				amount,
-				ids.NewID(asset),
+				ids.ID(asset),
 				amountsSpent[asset],
 			)
 		}

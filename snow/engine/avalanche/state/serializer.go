@@ -98,7 +98,7 @@ func (s *Serializer) BuildVertex(parentIDs []ids.ID, txs []snowstorm.Tx) (avalan
 		return nil, err
 	}
 	vtx.bytes = bytes
-	vtx.id = ids.NewID(hashing.ComputeHash256Array(vtx.bytes))
+	vtx.id = hashing.ComputeHash256Array(vtx.bytes)
 
 	uVtx := &uniqueVertex{
 		serializer: s,

@@ -154,8 +154,8 @@ func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 	// just reset the confidence values in the conflict graph and not perform
 	// any traversals.
 	partialVotes := ids.BitSet(0)
-	for voteKey := range responses {
-		votes := responses.GetSet(ids.NewID(voteKey))
+	for vote := range responses {
+		votes := responses.GetSet(vote)
 		partialVotes.Union(votes)
 		if partialVotes.Len() >= ta.params.Alpha {
 			break
@@ -204,15 +204,14 @@ func (ta *Topological) calculateInDegree(responses ids.UniqueBag) (
 	kahns := make(map[[32]byte]kahnNode, minMapSize)
 	leaves := ids.Set{}
 
-	for voteKey := range responses {
+	for vote := range responses {
 		// If it is not found, then the vote is either for something decided,
 		// or something we haven't heard of yet.
-		if vtx := ta.nodes[voteKey]; vtx != nil {
-			vote := ids.NewID(voteKey)
-			kahn, previouslySeen := kahns[voteKey]
+		if vtx := ta.nodes[vote]; vtx != nil {
+			kahn, previouslySeen := kahns[vote]
 			// Add this new vote to the current bag of votes
 			kahn.votes.Union(responses.GetSet(vote))
-			kahns[voteKey] = kahn
+			kahns[vote] = kahn
 
 			if !previouslySeen {
 				// If I've never seen this node before, it is currently a leaf.
@@ -335,10 +334,8 @@ func (ta *Topological) pushVotes(
 
 	// Create bag of votes for conflicting transactions
 	conflictingVotes := make(ids.UniqueBag)
-	for txHash, conflicts := range txConflicts {
-		txID := ids.NewID(txHash)
-		for conflictTxHash := range conflicts {
-			conflictTxID := ids.NewID(conflictTxHash)
+	for txID, conflicts := range txConflicts {
+		for conflictTxID := range conflicts {
 			conflictingVotes.UnionSet(txID, votes.GetSet(conflictTxID))
 		}
 	}

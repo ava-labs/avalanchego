@@ -8,7 +8,7 @@ import (
 )
 
 func TestSet(t *testing.T) {
-	id1 := NewID([32]byte{1})
+	id1 := ID([32]byte{1})
 
 	ids := Set{}
 
@@ -79,7 +79,7 @@ func TestSetCappedList(t *testing.T) {
 		t.Fatalf("List should have been %s but was %s", id, returnedID)
 	}
 
-	id2 := NewID([32]byte{1})
+	id2 := ID([32]byte{1})
 	set.Add(id2)
 
 	if list := set.CappedList(0); len(list) != 0 {

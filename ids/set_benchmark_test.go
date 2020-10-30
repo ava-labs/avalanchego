@@ -16,8 +16,7 @@ func BenchmarkSetListSmall(b *testing.B) {
 		if _, err := rand.Read(idBytes[:]); err != nil {
 			b.Fatal(err)
 		}
-		NewID(idBytes)
-		set.Add(NewID(idBytes))
+		set.Add(ID(idBytes))
 	}
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -33,8 +32,7 @@ func BenchmarkSetListMedium(b *testing.B) {
 		if _, err := rand.Read(idBytes[:]); err != nil {
 			b.Fatal(err)
 		}
-		NewID(idBytes)
-		set.Add(NewID(idBytes))
+		set.Add(ID(idBytes))
 	}
 	b.ResetTimer()
 
@@ -51,8 +49,7 @@ func BenchmarkSetListLarge(b *testing.B) {
 		if _, err := rand.Read(idBytes[:]); err != nil {
 			b.Fatal(err)
 		}
-		NewID(idBytes)
-		set.Add(NewID(idBytes))
+		set.Add(ID(idBytes))
 	}
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {

@@ -32,7 +32,7 @@ import (
 )
 
 var networkID uint32 = 10
-var chainID = ids.NewID([32]byte{5, 4, 3, 2, 1})
+var chainID = [32]byte{5, 4, 3, 2, 1}
 var platformChainID = ids.Empty.Prefix(0)
 var testTxFee = uint64(1000)
 var startBalance = uint64(50000)
@@ -40,7 +40,7 @@ var startBalance = uint64(50000)
 var keys []*crypto.PrivateKeySECP256K1R
 var addrs []ids.ShortID // addrs[i] corresponds to keys[i]
 
-var assetID = ids.NewID([32]byte{1, 2, 3})
+var assetID = [32]byte{1, 2, 3}
 var username = "bobby"
 var password = "StrnasfqewiurPasswdn56d" // #nosec G101
 
@@ -86,7 +86,7 @@ func NewContext(t *testing.T) *snow.Context {
 	errs := wrappers.Errs{}
 	errs.Add(
 		aliaser.Alias(chainID, "X"),
-		aliaser.Alias(chainID, chainID.String()),
+		aliaser.Alias(chainID, ids.ID(chainID).String()),
 		aliaser.Alias(platformChainID, "P"),
 		aliaser.Alias(platformChainID, platformChainID.String()),
 	)

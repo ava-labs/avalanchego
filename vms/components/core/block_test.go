@@ -5,13 +5,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
 func TestBlock(t *testing.T) {
-	parentID := ids.NewID([32]byte{1, 2, 3, 4, 5})
+	parentID := [32]byte{1, 2, 3, 4, 5}
 	db := versiondb.New(memdb.New())
 	state, err := NewSnowmanState(func([]byte) (snowman.Block, error) { return nil, nil })
 	if err != nil {

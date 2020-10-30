@@ -11,7 +11,7 @@ import (
 
 func TestID(t *testing.T) {
 	hash := [32]byte{24}
-	id := NewID(hash)
+	id := ID(hash)
 
 	prefixed := id.Prefix(0)
 
@@ -29,15 +29,15 @@ func TestID(t *testing.T) {
 }
 
 func TestIDBit(t *testing.T) {
-	id0 := NewID([32]byte{1 << 0})
-	id1 := NewID([32]byte{1 << 1})
-	id2 := NewID([32]byte{1 << 2})
-	id3 := NewID([32]byte{1 << 3})
-	id4 := NewID([32]byte{1 << 4})
-	id5 := NewID([32]byte{1 << 5})
-	id6 := NewID([32]byte{1 << 6})
-	id7 := NewID([32]byte{1 << 7})
-	id8 := NewID([32]byte{0, 1 << 0})
+	id0 := ID([32]byte{1 << 0})
+	id1 := ID([32]byte{1 << 1})
+	id2 := ID([32]byte{1 << 2})
+	id3 := ID([32]byte{1 << 3})
+	id4 := ID([32]byte{1 << 4})
+	id5 := ID([32]byte{1 << 5})
+	id6 := ID([32]byte{1 << 6})
+	id7 := ID([32]byte{1 << 7})
+	id8 := ID([32]byte{0, 1 << 0})
 
 	switch {
 	case id0.Bit(0) != 1:
@@ -62,8 +62,7 @@ func TestIDBit(t *testing.T) {
 }
 
 func TestFromString(t *testing.T) {
-	key := [32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}
-	id := NewID(key)
+	id := ID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'})
 	idStr := id.String()
 	id2, err := FromString(idStr)
 	if err != nil {
@@ -101,7 +100,7 @@ func TestIDMarshalJSON(t *testing.T) {
 	}{
 		{"ID{}", ID{}, []byte("\"11111111111111111111111111111111LpoYY\""), nil},
 		{"ID(\"ava labs\")",
-			NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+			ID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
 			[]byte("\"jvYi6Tn9idMi7BaymUVi9zWjg5tpmW7trfKG1AYJLKZJ2fsU7\""),
 			nil,
 		},
@@ -128,7 +127,7 @@ func TestIDUnmarshalJSON(t *testing.T) {
 		{"ID{}", []byte("null"), ID{}, nil},
 		{"ID(\"ava labs\")",
 			[]byte("\"jvYi6Tn9idMi7BaymUVi9zWjg5tpmW7trfKG1AYJLKZJ2fsU7\""),
-			NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+			ID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
 			nil,
 		},
 	}
@@ -146,7 +145,7 @@ func TestIDUnmarshalJSON(t *testing.T) {
 }
 
 func TestIDHex(t *testing.T) {
-	id := NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'})
+	id := ID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'})
 	expected := "617661206c616273000000000000000000000000000000000000000000000000"
 	actual := id.Hex()
 	if actual != expected {
@@ -161,7 +160,7 @@ func TestIDString(t *testing.T) {
 		expected string
 	}{
 		{"ID{}", ID{}, "11111111111111111111111111111111LpoYY"},
-		{"ID{[32]byte{24}}", NewID([32]byte{24}), "Ba3mm8Ra8JYYebeZ9p7zw1ayorDbeD1euwxhgzSLsncKqGoNt"},
+		{"ID{[32]byte{24}}", ID([32]byte{24}), "Ba3mm8Ra8JYYebeZ9p7zw1ayorDbeD1euwxhgzSLsncKqGoNt"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
@@ -175,15 +174,15 @@ func TestIDString(t *testing.T) {
 
 func TestSortIDs(t *testing.T) {
 	ids := []ID{
-		NewID([32]byte{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
-		NewID([32]byte{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'}),
-		NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+		ID([32]byte{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+		ID([32]byte{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'}),
+		ID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
 	}
 	SortIDs(ids)
 	expected := []ID{
-		NewID([32]byte{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'}),
-		NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
-		NewID([32]byte{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+		ID([32]byte{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'}),
+		ID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+		ID([32]byte{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
 	}
 	if !reflect.DeepEqual(ids, expected) {
 		t.Fatal("[]ID was not sorted lexographically")
@@ -192,22 +191,22 @@ func TestSortIDs(t *testing.T) {
 
 func TestIsSortedAndUnique(t *testing.T) {
 	unsorted := []ID{
-		NewID([32]byte{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
-		NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+		ID([32]byte{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+		ID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
 	}
 	if IsSortedAndUniqueIDs(unsorted) {
 		t.Fatal("Wrongly accepted unsorted IDs")
 	}
 	duplicated := []ID{
-		NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
-		NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+		ID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+		ID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
 	}
 	if IsSortedAndUniqueIDs(duplicated) {
 		t.Fatal("Wrongly accepted duplicated IDs")
 	}
 	sorted := []ID{
-		NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
-		NewID([32]byte{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+		ID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+		ID([32]byte{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
 	}
 	if !IsSortedAndUniqueIDs(sorted) {
 		t.Fatal("Wrongly rejected sorted, unique IDs")

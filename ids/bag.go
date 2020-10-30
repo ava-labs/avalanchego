@@ -44,7 +44,7 @@ func (b *Bag) SetThreshold(threshold int) {
 	b.metThreshold.Clear()
 	for vote, count := range b.counts {
 		if count >= threshold {
-			b.metThreshold.Add(NewID(vote))
+			b.metThreshold.Add(vote)
 		}
 	}
 }
@@ -93,7 +93,7 @@ func (b *Bag) List() []ID {
 	idList := make([]ID, len(b.counts))
 	i := 0
 	for id := range b.counts {
-		idList[i] = NewID(id)
+		idList[i] = id
 		i++
 	}
 	return idList
@@ -126,9 +126,8 @@ func (b *Bag) Threshold() Set { return b.metThreshold }
 func (b *Bag) Filter(start, end int, id ID) Bag {
 	newBag := Bag{}
 	for vote, count := range b.counts {
-		voteID := NewID(vote)
-		if EqualSubset(start, end, id, voteID) {
-			newBag.AddCount(voteID, count)
+		if EqualSubset(start, end, id, vote) {
+			newBag.AddCount(vote, count)
 		}
 	}
 	return newBag
@@ -140,9 +139,8 @@ func (b *Bag) Filter(start, end int, id ID) Bag {
 func (b *Bag) Split(index uint) [2]Bag {
 	splitVotes := [2]Bag{}
 	for vote, count := range b.counts {
-		voteID := NewID(vote)
-		bit := voteID.Bit(index)
-		splitVotes[bit].AddCount(voteID, count)
+		bit := vote.Bit(index)
+		splitVotes[bit].AddCount(vote, count)
 	}
 	return splitVotes
 }

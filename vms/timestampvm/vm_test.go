@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
-var blockchainID = ids.NewID([32]byte{1, 2, 3})
+var blockchainID = ids.ID([32]byte{1, 2, 3})
 
 // Utility function to assert that [block] has:
 // * Parent with ID [parentID]

@@ -412,17 +412,16 @@ func (service *Service) GetAllBalances(r *http.Request, args *api.JSONAddress, r
 
 	reply.Balances = make([]Balance, assetIDs.Len())
 	i := 0
-	for assetIDKey := range assetIDs {
-		assetID := ids.NewID(assetIDKey)
+	for assetID := range assetIDs {
 		if alias, err := service.vm.PrimaryAlias(assetID); err == nil {
 			reply.Balances[i] = Balance{
 				AssetID: alias,
-				Balance: json.Uint64(balances[assetIDKey]),
+				Balance: json.Uint64(balances[assetID]),
 			}
 		} else {
 			reply.Balances[i] = Balance{
-				AssetID: assetID.String(),
-				Balance: json.Uint64(balances[assetIDKey]),
+				AssetID: ids.ID(assetID).String(),
+				Balance: json.Uint64(balances[assetID]),
 			}
 		}
 		i++
@@ -1153,9 +1152,8 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 	}
 
 	// Add the required change outputs
-	for asset, amountWithFee := range amountsWithFee {
-		assetID := ids.NewID(asset)
-		amountSpent := amountsSpent[asset]
+	for assetID, amountWithFee := range amountsWithFee {
+		amountSpent := amountsSpent[assetID]
 
 		if amountSpent > amountWithFee {
 			outs = append(outs, &avax.TransferableOutput{
@@ -1630,8 +1628,7 @@ func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JSO
 	keys = append(keys, importKeys...)
 
 	outs := []*avax.TransferableOutput{}
-	for asset, amount := range amountsSpent {
-		assetID := ids.NewID(asset)
+	for assetID, amount := range amountsSpent {
 		if amount > 0 {
 			outs = append(outs, &avax.TransferableOutput{
 				Asset: avax.Asset{ID: assetID},
@@ -1775,11 +1772,11 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSO
 	}}
 
 	outs := []*avax.TransferableOutput{}
-	for assetKey, amountSpent := range amountsSpent {
-		amountToSend := amounts[assetKey]
+	for assetID, amountSpent := range amountsSpent {
+		amountToSend := amounts[assetID]
 		if amountSpent > amountToSend {
 			outs = append(outs, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: ids.NewID(assetKey)},
+				Asset: avax.Asset{ID: assetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: amountSpent - amountToSend,
 					OutputOwners: secp256k1fx.OutputOwners{

@@ -5,14 +5,12 @@ package cache
 
 import (
 	"testing"
-
-	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestLRU(t *testing.T) {
 	cache := LRU{Size: 1}
 
-	id1 := ids.NewID([32]byte{1})
+	id1 := [32]byte{1}
 	if _, found := cache.Get(id1); found {
 		t.Fatalf("Retrieved value when none exists")
 	}
@@ -39,7 +37,7 @@ func TestLRU(t *testing.T) {
 		t.Fatalf("Failed to retrieve correct value when one exists")
 	}
 
-	id2 := ids.NewID([32]byte{2})
+	id2 := [32]byte{2}
 
 	expectedValue2 := 2
 	cache.Put(id2, expectedValue2)
@@ -56,9 +54,9 @@ func TestLRU(t *testing.T) {
 func TestLRUEviction(t *testing.T) {
 	cache := LRU{Size: 2}
 
-	id1 := ids.NewID([32]byte{1})
-	id2 := ids.NewID([32]byte{2})
-	id3 := ids.NewID([32]byte{3})
+	id1 := [32]byte{1}
+	id2 := [32]byte{2}
+	id3 := [32]byte{3}
 
 	cache.Put(id1, 1)
 	cache.Put(id2, 2)
@@ -133,8 +131,8 @@ func TestLRUEviction(t *testing.T) {
 func TestLRUResize(t *testing.T) {
 	cache := LRU{Size: 2}
 
-	id1 := ids.NewID([32]byte{1})
-	id2 := ids.NewID([32]byte{2})
+	id1 := [32]byte{1}
+	id2 := [32]byte{2}
 
 	cache.Put(id1, 1)
 	cache.Put(id2, 2)

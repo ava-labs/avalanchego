@@ -211,15 +211,14 @@ func (ig *Input) RecordPoll(votes ids.Bag) (bool, error) {
 	votes.SetThreshold(ig.params.Alpha)
 	// Get the set of IDs that meet this alpha threshold
 	metThreshold := votes.Threshold()
-	for txIDKey := range metThreshold {
+	for txID := range metThreshold {
 		// Get the node this tx represents
-		txNode, exist := ig.txs[txIDKey]
+		txNode, exist := ig.txs[txID]
 		if !exist {
 			// This tx may have already been accepted because of tx
 			// dependencies. If this is the case, we can just drop the vote.
 			continue
 		}
-		txID := ids.NewID(txIDKey)
 
 		txNode.numSuccessfulPolls++
 		txNode.lastVote = ig.currentVote
@@ -238,7 +237,7 @@ func (ig *Input) RecordPoll(votes ids.Bag) (bool, error) {
 			// should have been reset during the last poll. So, we reset it now.
 			// Additionally, if a different tx was voted for in the last poll,
 			// the confidence should also be reset.
-			if utxo.lastVote+1 != ig.currentVote || !txID.Equals(utxo.color) {
+			if utxo.lastVote+1 != ig.currentVote || txID != utxo.color {
 				utxo.confidence = 0
 			}
 			utxo.lastVote = ig.currentVote
@@ -251,7 +250,7 @@ func (ig *Input) RecordPoll(votes ids.Bag) (bool, error) {
 			if txNode.numSuccessfulPolls > utxo.numSuccessfulPolls {
 				// If this node didn't previous prefer this tx, then we need to
 				// update the preferences.
-				if !txID.Equals(utxo.preference) {
+				if txID != utxo.preference {
 					// If the previous preference lost it's preference in this
 					// input, it can't be preferred in all the inputs.
 					if ig.preferences.Contains(utxo.preference) {
@@ -422,12 +421,12 @@ func (ig *Input) removeConflict(txID [32]byte, inputIDs []ids.ID) {
 		lastVote := 0
 
 		// Find the new Snowball preference
-		for spenderKey := range utxo.spenders {
-			txNode := ig.txs[spenderKey]
+		for spender := range utxo.spenders {
+			txNode := ig.txs[spender]
 			if txNode.numSuccessfulPolls > numSuccessfulPolls ||
 				(txNode.numSuccessfulPolls == numSuccessfulPolls &&
 					lastVote < txNode.lastVote) {
-				preference = ids.NewID(spenderKey)
+				preference = spender
 				numSuccessfulPolls = txNode.numSuccessfulPolls
 				lastVote = txNode.lastVote
 			}

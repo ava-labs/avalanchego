@@ -106,12 +106,12 @@ func TestPutUnregistered(t *testing.T) {
 
 	// make an account
 	acc1 := &account{
-		id:      ids.NewID([32]byte{1, 2, 3}),
+		id:      [32]byte{1, 2, 3},
 		balance: 1,
 		nonce:   2,
 	}
 
-	if err := state.Put(db, 1, ids.NewID([32]byte{1, 2, 3}), acc1); err == nil {
+	if err := state.Put(db, 1, [32]byte{1, 2, 3}, acc1); err == nil {
 		t.Fatal("should have failed because type ID is unregistred")
 	}
 
@@ -121,7 +121,7 @@ func TestPutUnregistered(t *testing.T) {
 	}
 
 	// should not error now
-	if err := state.Put(db, 1, ids.NewID([32]byte{1, 2, 3}), acc1); err != nil {
+	if err := state.Put(db, 1, [32]byte{1, 2, 3}, acc1); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -137,7 +137,7 @@ func TestKeyDoesNotExist(t *testing.T) {
 	db := memdb.New()
 	defer db.Close()
 
-	if _, err := state.Get(db, 1, ids.NewID([32]byte{1, 2, 3})); err == nil {
+	if _, err := state.Get(db, 1, [32]byte{1, 2, 3}); err == nil {
 		t.Fatal("should have failed because no such key or typeID exists")
 	}
 
@@ -148,7 +148,7 @@ func TestKeyDoesNotExist(t *testing.T) {
 	}
 
 	// Should still fail because there is no value with this key
-	if _, err := state.Get(db, typeID, ids.NewID([32]byte{1, 2, 3})); err == nil {
+	if _, err := state.Get(db, typeID, [32]byte{1, 2, 3}); err == nil {
 		t.Fatal("should have failed because no such key exists")
 	}
 }
@@ -194,10 +194,10 @@ func TestGetWrongTypeID(t *testing.T) {
 
 	// make and put a block
 	block := &block{
-		parentID: ids.NewID([32]byte{4, 5, 6}),
+		parentID: [32]byte{4, 5, 6},
 		value:    5,
 	}
-	blockID := ids.NewID([32]byte{1, 2, 3})
+	blockID := [32]byte{1, 2, 3}
 	if err = state.Put(db, blockTypeID, blockID, block); err != nil {
 		t.Fatal(err)
 	}
@@ -231,11 +231,11 @@ func TestSameKeyDifferentTypeID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sharedKey := ids.NewID([32]byte{1, 2, 3})
+	sharedKey := [32]byte{1, 2, 3}
 
 	// make an account
 	acc := &account{
-		id:      ids.NewID([32]byte{1, 2, 3}),
+		id:      [32]byte{1, 2, 3},
 		balance: 1,
 		nonce:   2,
 	}
@@ -247,7 +247,7 @@ func TestSameKeyDifferentTypeID(t *testing.T) {
 
 	// make a block
 	block1 := &block{
-		parentID: ids.NewID([32]byte{4, 5, 6}),
+		parentID: [32]byte{4, 5, 6},
 		value:    5,
 	}
 
@@ -308,11 +308,11 @@ func TestOverwrite(t *testing.T) {
 
 	// make a block
 	block1 := &block{
-		parentID: ids.NewID([32]byte{4, 5, 6}),
+		parentID: [32]byte{4, 5, 6},
 		value:    5,
 	}
 
-	key := ids.NewID([32]byte{1, 2, 3})
+	key := [32]byte{1, 2, 3}
 
 	// put it
 	if err = state.Put(db, blockTypeID, key, block1); err != nil {
@@ -321,7 +321,7 @@ func TestOverwrite(t *testing.T) {
 
 	// make another block
 	block2 := &block{
-		parentID: ids.NewID([32]byte{100, 200, 1}),
+		parentID: [32]byte{100, 200, 1},
 		value:    6,
 	}
 
@@ -367,7 +367,7 @@ func TestHappyPath(t *testing.T) {
 
 	// make an account
 	acc1 := &account{
-		id:      ids.NewID([32]byte{1, 2, 3}),
+		id:      [32]byte{1, 2, 3},
 		balance: 1,
 		nonce:   2,
 	}
@@ -397,7 +397,7 @@ func TestHappyPath(t *testing.T) {
 
 	// make another account
 	acc2 := &account{
-		id:      ids.NewID([32]byte{9, 2, 1}),
+		id:      [32]byte{9, 2, 1},
 		balance: 7,
 		nonce:   44,
 	}
@@ -432,9 +432,9 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	// make a block
-	block1ID := ids.NewID([32]byte{9, 9, 9})
+	block1ID := [32]byte{9, 9, 9}
 	block1 := &block{
-		parentID: ids.NewID([32]byte{4, 5, 6}),
+		parentID: [32]byte{4, 5, 6},
 		value:    5,
 	}
 
@@ -460,9 +460,9 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	// make another block
-	block2ID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9})
+	block2ID := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9}
 	block2 := &block{
-		parentID: ids.NewID([32]byte{10, 1, 2}),
+		parentID: [32]byte{10, 1, 2},
 		value:    67,
 	}
 

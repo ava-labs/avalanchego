@@ -6,8 +6,6 @@ package cache
 import (
 	"crypto/rand"
 	"testing"
-
-	"github.com/ava-labs/avalanchego/ids"
 )
 
 func BenchmarkLRUCachePutSmall(b *testing.B) {
@@ -19,7 +17,7 @@ func BenchmarkLRUCachePutSmall(b *testing.B) {
 			if _, err := rand.Read(idBytes[:]); err != nil {
 				b.Fatal(err)
 			}
-			cache.Put(ids.NewID(idBytes), n)
+			cache.Put(idBytes, n)
 		}
 		b.StopTimer()
 		cache.Flush()
@@ -36,7 +34,7 @@ func BenchmarkLRUCachePutMedium(b *testing.B) {
 			if _, err := rand.Read(idBytes[:]); err != nil {
 				b.Fatal(err)
 			}
-			cache.Put(ids.NewID(idBytes), n)
+			cache.Put(idBytes, n)
 		}
 		b.StopTimer()
 		cache.Flush()
@@ -53,7 +51,7 @@ func BenchmarkLRUCachePutLarge(b *testing.B) {
 			if _, err := rand.Read(idBytes[:]); err != nil {
 				b.Fatal(err)
 			}
-			cache.Put(ids.NewID(idBytes), n)
+			cache.Put(idBytes, n)
 		}
 		b.StopTimer()
 		cache.Flush()

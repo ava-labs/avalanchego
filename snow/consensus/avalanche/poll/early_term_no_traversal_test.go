@@ -12,7 +12,7 @@ import (
 func TestEarlyTermNoTraversalResults(t *testing.T) {
 	alpha := 1
 
-	vtxID := ids.NewID([32]byte{1})
+	vtxID := ids.ID([32]byte{1})
 	votes := []ids.ID{vtxID}
 
 	vdr1 := ids.NewShortID([20]byte{1}) // k = 1
@@ -41,7 +41,7 @@ func TestEarlyTermNoTraversalResults(t *testing.T) {
 func TestEarlyTermNoTraversalString(t *testing.T) {
 	alpha := 2
 
-	vtxID := ids.NewID([32]byte{1})
+	vtxID := ids.ID([32]byte{1})
 	votes := []ids.ID{vtxID}
 
 	vdr1 := ids.NewShortID([20]byte{1})
@@ -68,7 +68,7 @@ func TestEarlyTermNoTraversalString(t *testing.T) {
 func TestEarlyTermNoTraversalDropsDuplicatedVotes(t *testing.T) {
 	alpha := 2
 
-	vtxID := ids.NewID([32]byte{1})
+	vtxID := ids.ID([32]byte{1})
 	votes := []ids.ID{vtxID}
 
 	vdr1 := ids.NewShortID([20]byte{1})
@@ -100,7 +100,7 @@ func TestEarlyTermNoTraversalDropsDuplicatedVotes(t *testing.T) {
 func TestEarlyTermNoTraversalTerminatesEarly(t *testing.T) {
 	alpha := 3
 
-	vtxID := ids.NewID([32]byte{1})
+	vtxID := ids.ID([32]byte{1})
 	votes := []ids.ID{vtxID}
 
 	vdr1 := ids.NewShortID([20]byte{1})
@@ -138,10 +138,10 @@ func TestEarlyTermNoTraversalTerminatesEarly(t *testing.T) {
 func TestEarlyTermNoTraversalForSharedAncestor(t *testing.T) {
 	alpha := 4
 
-	vtxA := ids.NewID([32]byte{1})
-	vtxB := ids.NewID([32]byte{2})
-	vtxC := ids.NewID([32]byte{3})
-	vtxD := ids.NewID([32]byte{4})
+	vtxA := ids.ID([32]byte{1})
+	vtxB := ids.ID([32]byte{2})
+	vtxC := ids.ID([32]byte{3})
+	vtxD := ids.ID([32]byte{4})
 
 	// If validators 1-3 vote for frontier vertices
 	// B, C, and D respectively, which all share the common ancestor

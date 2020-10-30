@@ -109,8 +109,7 @@ func (b *Bootstrapper) CurrentAcceptedFrontier() ids.Set {
 // FilterAccepted returns the IDs of vertices in [containerIDs] that this node has accepted
 func (b *Bootstrapper) FilterAccepted(containerIDs ids.Set) ids.Set {
 	acceptedVtxIDs := ids.Set{}
-	for vtxIDKey := range containerIDs {
-		vtxID := ids.NewID(vtxIDKey)
+	for vtxID := range containerIDs {
 		if vtx, err := b.Manager.GetVertex(vtxID); err == nil && vtx.Status() == choices.Accepted {
 			acceptedVtxIDs.Add(vtxID)
 		}
@@ -332,8 +331,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
 	}
 
 	toProcess := make([]avalanche.Vertex, 0, acceptedContainerIDs.Len())
-	for vtxIDKey := range acceptedContainerIDs {
-		vtxID := ids.NewID(vtxIDKey)
+	for vtxID := range acceptedContainerIDs {
 		if vtx, err := b.Manager.GetVertex(vtxID); err == nil {
 			toProcess = append(toProcess, vtx) // Process this vertex.
 		} else {

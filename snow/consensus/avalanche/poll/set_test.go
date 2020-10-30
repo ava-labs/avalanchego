@@ -44,7 +44,7 @@ func TestCreateAndFinishPoll(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
 
-	vtxID := ids.NewID([32]byte{1})
+	vtxID := ids.ID([32]byte{1})
 	votes := []ids.ID{vtxID}
 
 	vdr1 := ids.NewShortID([20]byte{1})

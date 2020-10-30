@@ -455,8 +455,7 @@ func (vm *VM) GetUTXOs(
 		if err != nil {
 			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s", addr)
 		}
-		for utxoIDKey := range utxoIDs { // Get the UTXOs
-			utxoID := ids.NewID(utxoIDKey)
+		for utxoID := range utxoIDs { // Get the UTXOs
 			if seen.Contains(utxoID) { // already have this UTXO in the list
 				continue
 			}

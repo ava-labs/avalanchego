@@ -381,19 +381,18 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 
 		// If there wasn't an alpha threshold on the branch (either on this vote
 		// or a past transitive vote), I should falter now.
-		for childIDKey := range parentBlock.children {
-			childID := ids.NewID(childIDKey)
+		for childID := range parentBlock.children {
 			// If we don't need to transitively falter and the child is going to
 			// have RecordPoll called on it, then there is no reason to reset
 			// the block's confidence
-			if !shouldTransitivelyFalter && childID.Equals(nextID) {
+			if !shouldTransitivelyFalter && childID == nextID {
 				continue
 			}
 
 			// If we finalized a child of the current block, then all other
 			// children will have been rejected and removed from the tree.
 			// Therefore, we need to make sure the child is still in the tree.
-			childBlock, notRejected := ts.blocks[childIDKey]
+			childBlock, notRejected := ts.blocks[childID]
 			if notRejected {
 				ts.ctx.Log.Verbo("Defering confidence reset of %s. Voting for %s", childID, nextID)
 
@@ -482,13 +481,12 @@ func (ts *Topological) rejectTransitively(rejected []ids.ID) error {
 		rejectedNode := ts.blocks[rejectedID]
 		delete(ts.blocks, rejectedID)
 
-		for childIDKey, child := range rejectedNode.children {
+		for childID, child := range rejectedNode.children {
 			if err := child.Reject(); err != nil {
 				return err
 			}
 
 			// Notify anyone listening that this block was rejected.
-			childID := ids.NewID(childIDKey)
 			bytes := child.Bytes()
 			ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes)
 			ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes)

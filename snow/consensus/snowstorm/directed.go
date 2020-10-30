@@ -333,8 +333,8 @@ func (dg *Directed) reject(conflictIDs ids.Set) error {
 // preferences have changed
 func (dg *Directed) redirectEdges(tx *directedTx) bool {
 	changed := false
-	for conflictIDKey := range tx.outs {
-		changed = dg.redirectEdge(tx, ids.NewID(conflictIDKey)) || changed
+	for conflictID := range tx.outs {
+		changed = dg.redirectEdge(tx, conflictID) || changed
 	}
 	return changed
 }
@@ -368,8 +368,8 @@ func (dg *Directed) redirectEdge(txNode *directedTx, conflictID ids.ID) bool {
 }
 
 func (dg *Directed) removeConflict(txIDKey [32]byte, neighborIDs ids.Set) {
-	for neighborIDKey := range neighborIDs {
-		neighbor, exists := dg.txs[neighborIDKey]
+	for neighborID := range neighborIDs {
+		neighbor, exists := dg.txs[neighborID]
 		if !exists {
 			// If the neighbor doesn't exist, they may have already been
 			// rejected, so this mapping can be skipped.
@@ -383,7 +383,7 @@ func (dg *Directed) removeConflict(txIDKey [32]byte, neighborIDs ids.Set) {
 		if neighbor.outs.Len() == 0 {
 			// If this tx should now be preferred, make sure its status is
 			// updated.
-			dg.preferences.Add(ids.NewID(neighborIDKey))
+			dg.preferences.Add(neighborID)
 		}
 	}
 }

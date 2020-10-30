@@ -85,7 +85,7 @@ func (id ShortID) IsZero() bool { return id.ID == nil }
 func (id ShortID) LongID() ID {
 	dest := [32]byte{}
 	copy(dest[:], id.ID[:])
-	return NewID(dest)
+	return dest
 }
 
 // Key returns a 20 byte hash that this id represents. This is useful to allow

@@ -34,7 +34,7 @@ func TestUnknownUniqueVertexErrors(t *testing.T) {
 
 	uVtx := &uniqueVertex{
 		serializer: s,
-		vtxID:      ids.NewID([32]byte{}),
+		vtxID:      ids.ID([32]byte{}),
 	}
 
 	status := uVtx.Status()
@@ -62,13 +62,13 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 	s := newSerializer(t, nil)
 
 	testTx := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
-		IDV: ids.NewID([32]byte{1}),
+		IDV: ids.ID([32]byte{1}),
 	}}
 
-	vtxID := ids.NewID([32]byte{2})
-	parentID := ids.NewID([32]byte{'p', 'a', 'r', 'e', 'n', 't'})
+	vtxID := ids.ID([32]byte{2})
+	parentID := ids.ID([32]byte{'p', 'a', 'r', 'e', 'n', 't'})
 	parentIDs := []ids.ID{parentID}
-	chainID := ids.NewID([32]byte{}) // Same as chainID of serializer
+	chainID := ids.ID([32]byte{}) // Same as chainID of serializer
 	height := uint64(1)
 	vtx := &innerVertex{
 		id:        vtxID,
@@ -130,7 +130,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 	txBytes := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9}
 	testTx := &snowstorm.TestTx{
 		TestDecidable: choices.TestDecidable{
-			IDV: ids.NewID([32]byte{1}),
+			IDV: ids.ID([32]byte{1}),
 		},
 		BytesV: txBytes,
 	}
@@ -142,9 +142,9 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 		return testTx, nil
 	}
 	s := newSerializer(t, parseTx)
-	parentID := ids.NewID([32]byte{'p', 'a', 'r', 'e', 'n', 't'})
+	parentID := ids.ID([32]byte{'p', 'a', 'r', 'e', 'n', 't'})
 	parentIDs := []ids.ID{parentID}
-	chainID := ids.NewID([32]byte{})
+	chainID := ids.ID([32]byte{})
 	height := uint64(1)
 	innerVertex := &innerVertex{
 		parentIDs: parentIDs,
@@ -157,7 +157,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vtxID := ids.NewID(hashing.ComputeHash256Array(vertexBytes))
+	vtxID := ids.ID(hashing.ComputeHash256Array(vertexBytes))
 
 	uVtx := uniqueVertex{
 		vtxID:      vtxID,

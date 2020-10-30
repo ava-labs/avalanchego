@@ -20,9 +20,6 @@ var Empty ID = [32]byte{}
 // ID wraps a 32 byte hash used as an identifier
 type ID [32]byte
 
-// NewID creates an identifier from a 32 byte hash
-func NewID(id [32]byte) ID { return id } // todo remove
-
 // ToID attempt to convert a byte slice into an id
 func ToID(bytes []byte) (ID, error) {
 	return hashing.ToHash256(bytes)
@@ -74,7 +71,7 @@ func (id ID) Prefix(prefixes ...uint64) ID {
 	}
 	packer.PackFixedBytes(id.Bytes())
 
-	return NewID(hashing.ComputeHash256Array(packer.Bytes))
+	return hashing.ComputeHash256Array(packer.Bytes)
 }
 
 // Equals returns true if the ids have the same byte representation

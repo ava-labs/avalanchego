@@ -6,12 +6,11 @@ package missing
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
 func TestMissingBlock(t *testing.T) {
-	id := ids.NewID([32]byte{255})
+	id := [32]byte{255}
 	mb := Block{BlkID: id}
 
 	if blkID := mb.ID(); !blkID.Equals(id) {

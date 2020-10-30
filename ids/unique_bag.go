@@ -72,7 +72,7 @@ func (b *UniqueBag) List() []ID {
 	idList := make([]ID, len(*b))
 	i := 0
 	for id := range *b {
-		idList[i] = NewID(id)
+		idList[i] = id
 		i++
 	}
 	return idList
@@ -83,7 +83,7 @@ func (b *UniqueBag) Bag(alpha int) Bag {
 	bag := Bag{}
 	bag.SetThreshold(alpha)
 	for id, bs := range *b {
-		bag.AddCount(NewID(id), bs.Len())
+		bag.AddCount(id, bs.Len())
 	}
 	return bag
 }
@@ -92,9 +92,8 @@ func (b *UniqueBag) String() string {
 	sb := strings.Builder{}
 
 	sb.WriteString(fmt.Sprintf("UniqueBag: (Size = %d)", len(*b)))
-	for idBytes, set := range *b {
-		id := NewID(idBytes)
-		sb.WriteString(fmt.Sprintf("\n    ID[%s]: Members = %s", id, set))
+	for id, set := range *b {
+		sb.WriteString(fmt.Sprintf("\n    ID[%s]: Members = %s", ID(id), set))
 	}
 
 	return sb.String()

@@ -14,7 +14,7 @@ import (
 )
 
 func TestNewWallet(t *testing.T) {
-	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	chainID := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -25,7 +25,7 @@ func TestNewWallet(t *testing.T) {
 }
 
 func TestWalletGetAddress(t *testing.T) {
-	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	chainID := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -41,7 +41,7 @@ func TestWalletGetAddress(t *testing.T) {
 }
 
 func TestWalletGetMultipleAddresses(t *testing.T) {
-	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	chainID := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -61,7 +61,7 @@ func TestWalletGetMultipleAddresses(t *testing.T) {
 }
 
 func TestWalletEmptyBalance(t *testing.T) {
-	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	chainID := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -73,7 +73,7 @@ func TestWalletEmptyBalance(t *testing.T) {
 }
 
 func TestWalletAddUTXO(t *testing.T) {
-	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	chainID := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -95,7 +95,7 @@ func TestWalletAddUTXO(t *testing.T) {
 }
 
 func TestWalletAddInvalidUTXO(t *testing.T) {
-	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	chainID := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -114,7 +114,7 @@ func TestWalletAddInvalidUTXO(t *testing.T) {
 }
 
 func TestWalletCreateTx(t *testing.T) {
-	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	chainID := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -164,7 +164,7 @@ func TestWalletCreateTx(t *testing.T) {
 }
 
 func TestWalletImportKey(t *testing.T) {
-	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	chainID := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -189,7 +189,7 @@ func TestWalletImportKey(t *testing.T) {
 }
 
 func TestWalletString(t *testing.T) {
-	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	chainID := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)

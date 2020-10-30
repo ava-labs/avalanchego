@@ -16,8 +16,7 @@ func BenchmarkBagListSmall(b *testing.B) {
 		if _, err := rand.Read(idBytes[:]); err != nil {
 			b.Fatal(err)
 		}
-		NewID(idBytes)
-		bag.Add(NewID(idBytes))
+		bag.Add(idBytes)
 	}
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -33,8 +32,7 @@ func BenchmarkBagListMedium(b *testing.B) {
 		if _, err := rand.Read(idBytes[:]); err != nil {
 			b.Fatal(err)
 		}
-		NewID(idBytes)
-		bag.Add(NewID(idBytes))
+		bag.Add(idBytes)
 	}
 	b.ResetTimer()
 
@@ -51,8 +49,7 @@ func BenchmarkBagListLarge(b *testing.B) {
 		if _, err := rand.Read(idBytes[:]); err != nil {
 			b.Fatal(err)
 		}
-		NewID(idBytes)
-		bag.Add(NewID(idBytes))
+		bag.Add(idBytes)
 	}
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {

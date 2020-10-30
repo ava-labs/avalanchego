@@ -98,5 +98,5 @@ func (m *Memory) sharedID(id1, id2 ids.ID) ids.ID {
 	combinedBytes, err := m.codec.Marshal([2][32]byte{id1, id2})
 	m.log.AssertNoError(err)
 
-	return ids.NewID(hashing.ComputeHash256Array(combinedBytes))
+	return hashing.ComputeHash256Array(combinedBytes)
 }
