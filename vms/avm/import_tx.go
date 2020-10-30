@@ -72,8 +72,6 @@ func (t *ImportTx) SyntacticVerify(
 	switch {
 	case t == nil:
 		return errNilTx
-	case t.SourceChain == ids.Empty:
-		return errWrongBlockchainID
 	case len(t.ImportedIns) == 0:
 		return errNoImportInputs
 	}
