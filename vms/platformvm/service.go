@@ -1911,14 +1911,51 @@ func (service *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *ap
 // GetTxStatusArgs ...
 type GetTxStatusArgs struct {
 	TxID ids.ID `json:"txID"`
+	// If IncludeReason is false returns a response that looks like:
+	// {
+	// 	"jsonrpc": "2.0",
+	// 	"result": "Dropped",
+	// 	"id": 1
+	// }
+	// If IncludeReason is true returns a response that looks like this:
+	// {
+	// 	"jsonrpc": "2.0",
+	// 	"result": {
+	//     "status":"[Status]",
+	//     "reason":"[Reason tx was dropped, if applicable]"
+	//  },
+	// 	"id": 1
+	// }
+	// In the latter, "reason" is only present if the status is dropped
+	IncludeReason bool `json:"includeReason"`
+}
+
+// GetTxStatusResponse ...
+type GetTxStatusResponse struct {
+	Status
+	includeReason bool
+	// Reason this tx was dropped.
+	// Only non-empty if Status is dropped
+	Reason string
+}
+
+func (r GetTxStatusResponse) MarshalJSON() ([]byte, error) {
+	if !r.includeReason {
+		return r.Status.MarshalJSON()
+	}
+	if r.Reason != "" {
+		return []byte(fmt.Sprintf("{\"status\": \"%s\", \"reason\": \"%s\"}", r.Status, r.Reason)), nil
+	}
+	return []byte(fmt.Sprintf("{\"status\": \"%s\"}", r.Status)), nil
 }
 
 // GetTxStatus gets a tx's status
-func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *Status) error {
+func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *GetTxStatusResponse) error {
 	service.vm.Ctx.Log.Info("Platform: GetTxStatus called")
+	response.includeReason = args.IncludeReason
 	status, err := service.vm.getStatus(service.vm.DB, args.TxID)
 	if err == nil { // Found the status. Report it.
-		*response = status
+		response.Status = status
 		return nil
 	}
 	// The status of this transaction is not in the database.
@@ -1926,19 +1963,27 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 	preferred, err := service.vm.getBlock(service.vm.Preferred())
 	if err != nil {
 		service.vm.Ctx.Log.Error("couldn't get preferred block: %s", err)
-		*response = Unknown
+		response.Status = Unknown
 		return nil
 	}
 	if block, ok := preferred.(decision); ok {
 		if _, err := service.vm.getStatus(block.onAccept(), args.TxID); err == nil {
-			*response = Processing // Found the status in the preferred block's db. Report tx is processing.
+			// Found the status in the preferred block's db. Report tx is processing.
+			status := Processing
+			response.Status = status
 			return nil
 		}
 	}
-	if _, ok := service.vm.droppedTxCache.Get(args.TxID); ok {
-		*response = Dropped
+	if reason, ok := service.vm.droppedTxCache.Get(args.TxID); ok {
+		response.Status = Dropped
+		reasonStr, ok := reason.(string)
+		if !ok {
+			service.vm.Ctx.Log.Error("reason should be a string")
+			return nil
+		}
+		response.Reason = reasonStr
 	} else {
-		*response = Unknown
+		response.Status = Unknown
 	}
 	return nil
 }

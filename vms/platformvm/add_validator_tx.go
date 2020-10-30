@@ -189,7 +189,7 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	if isValidator {
 		return nil, nil, nil, nil, permError{
 			fmt.Errorf(
-				"validator %s already is already a primary network validator",
+				"validator %s is already a primary network validator",
 				tx.Validator.NodeID,
 			),
 		}
@@ -210,7 +210,7 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	if willBeValidator {
 		return nil, nil, nil, nil, permError{
 			fmt.Errorf(
-				"validator %s already is already a primary network validator",
+				"validator %s is already a primary network validator",
 				tx.Validator.NodeID,
 			),
 		}

@@ -76,9 +76,11 @@ func (w *WalletService) update(utxos []*avax.UTXO) ([]*avax.UTXO, error) {
 		}
 	}
 
-	newUTXOs := make([]*avax.UTXO, 0, len(utxoMap))
+	newUTXOs := make([]*avax.UTXO, len(utxoMap))
+	i := 0
 	for _, utxo := range utxoMap {
-		newUTXOs = append(newUTXOs, utxo)
+		newUTXOs[i] = utxo
+		i++
 	}
 	return newUTXOs, nil
 }

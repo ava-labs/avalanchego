@@ -39,12 +39,13 @@ import (
 )
 
 const (
-	batchTimeout    = time.Second
-	batchSize       = 30
-	stateCacheSize  = 30000
-	idCacheSize     = 30000
-	txCacheSize     = 30000
-	maxUTXOsToFetch = 1024
+	batchTimeout       = time.Second
+	batchSize          = 30
+	stateCacheSize     = 30000
+	idCacheSize        = 30000
+	txCacheSize        = 30000
+	assetToFxCacheSize = 1024
+	maxUTXOsToFetch    = 1024
 )
 
 var (
@@ -84,6 +85,9 @@ type VM struct {
 	creationTxFee uint64
 	// fee that must be burned by every non-state creating transaction
 	txFee uint64
+
+	// Asset ID --> Bit set with fx IDs the asset supports
+	assetToFxCache *cache.LRU
 
 	// Transaction issuing
 	timer        *timer.Timer
@@ -167,6 +171,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("problem creating encoding manager: %w", err)
 	}
 	vm.encodingManager = encodingManager
+	vm.assetToFxCache = &cache.LRU{Size: assetToFxCacheSize}
 
 	vm.pubsub = cjson.NewPubSubServer(ctx)
 	vm.genesisCodec = codec.New(math.MaxUint32, 1<<20)
@@ -708,6 +713,13 @@ func (vm *VM) getFx(val interface{}) (int, error) {
 }
 
 func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
+	// Check cache to see whether this asset supports this fx
+	fxIDsIntf, assetInCache := vm.assetToFxCache.Get(assetID)
+	if assetInCache {
+		return fxIDsIntf.(ids.BitSet).Contains(uint(fxID))
+	}
+	// Caches doesn't say whether this asset support this fx.
+	// Get the tx that created the asset and check.
 	tx := &UniqueTx{
 		vm:   vm,
 		txID: assetID,
@@ -717,16 +729,18 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	}
 	createAssetTx, ok := tx.UnsignedTx.(*CreateAssetTx)
 	if !ok {
+		// This transaction was not an asset creation tx
 		return false
 	}
-	// TODO: This could be a binary search to improve performance... Or perhaps
-	// make a map
+	fxIDs := ids.BitSet(0)
 	for _, state := range createAssetTx.States {
 		if state.FxID == uint32(fxID) {
-			return true
+			// Cache that this asset supports this fx
+			fxIDs.Add(uint(fxID))
 		}
 	}
-	return false
+	vm.assetToFxCache.Put(assetID, fxIDs)
+	return fxIDs.Contains(uint(fxID))
 }
 
 func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable, utxo *avax.UTXO) error {
@@ -760,8 +774,9 @@ func (vm *VM) verifyTransfer(tx UnsignedTx, in *avax.TransferableInput, cred ver
 func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiable) error {
 	opAssetID := op.AssetID()
 
-	utxos := []interface{}{}
-	for _, utxoID := range op.UTXOIDs {
+	numUTXOs := len(op.UTXOIDs)
+	utxos := make([]interface{}, numUTXOs)
+	for i, utxoID := range op.UTXOIDs {
 		utxo, err := vm.getUTXO(utxoID)
 		if err != nil {
 			return err
@@ -771,7 +786,7 @@ func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiab
 		if !utxoAssetID.Equals(opAssetID) {
 			return errAssetIDMismatch
 		}
-		utxos = append(utxos, utxo.Out)
+		utxos[i] = utxo.Out
 	}
 
 	fxIndex, err := vm.getFx(op.Op)

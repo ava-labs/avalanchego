@@ -133,7 +133,7 @@ func (pb *ProposalBlock) Verify() error {
 	var err TxError
 	pb.onCommitDB, pb.onAbortDB, pb.onCommitFunc, pb.onAbortFunc, err = tx.SemanticVerify(pb.vm, pdb, &pb.Tx)
 	if err != nil {
-		pb.vm.droppedTxCache.Put(txID, nil) // cache tx as dropped
+		pb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
 		// If this block's transaction proposes to advance the timestamp, the transaction may fail
 		// verification now but be valid in the future, so don't (permanently) mark the block as rejected.
 		if !err.Temporary() {

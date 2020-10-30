@@ -6,6 +6,7 @@ package genesis
 import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/evm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
@@ -18,7 +19,7 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[[32]byte][]string, m
 	generalAliases := map[string][]string{
 		"vm/" + platformvm.ID.String():             {"vm/platform"},
 		"vm/" + avm.ID.String():                    {"vm/avm"},
-		"vm/" + EVMID.String():                     {"vm/evm"},
+		"vm/" + evm.ID.String():                    {"vm/evm"},
 		"vm/" + timestampvm.ID.String():            {"vm/timestamp"},
 		"bc/" + constants.PlatformChainID.String(): {"P", "platform", "bc/P", "bc/platform"},
 	}
@@ -28,7 +29,7 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[[32]byte][]string, m
 	vmAliases := map[[32]byte][]string{
 		platformvm.ID:  {"platform"},
 		avm.ID:         {"avm"},
-		EVMID:          {"evm"},
+		evm.ID:         {"evm"},
 		timestampvm.ID: {"timestamp"},
 		secp256k1fx.ID: {"secp256k1fx"},
 		nftfx.ID:       {"nftfx"},
@@ -49,7 +50,7 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[[32]byte][]string, m
 		case avm.ID.Equals(uChain.VMID):
 			generalAliases["bc/"+chain.ID().String()] = []string{"X", "avm", "bc/X", "bc/avm"}
 			chainAliases[chain.ID()] = []string{"X", "avm"}
-		case EVMID.Equals(uChain.VMID):
+		case evm.ID.Equals(uChain.VMID):
 			generalAliases["bc/"+chain.ID().String()] = []string{"C", "evm", "bc/C", "bc/evm"}
 			chainAliases[chain.ID()] = []string{"C", "evm"}
 		case timestampvm.ID.Equals(uChain.VMID):

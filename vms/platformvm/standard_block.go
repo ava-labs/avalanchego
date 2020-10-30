@@ -64,7 +64,7 @@ func (sb *StandardBlock) Verify() error {
 		}
 		onAccept, err := utx.SemanticVerify(sb.vm, sb.onAcceptDB, tx)
 		if err != nil {
-			sb.vm.droppedTxCache.Put(tx.ID(), nil) // cache tx as dropped
+			sb.vm.droppedTxCache.Put(tx.ID(), err.Error()) // cache tx as dropped
 			if err := sb.Reject(); err == nil {
 				if err := sb.vm.DB.Commit(); err != nil {
 					return fmt.Errorf("failed to commit VM's database: %w", err)

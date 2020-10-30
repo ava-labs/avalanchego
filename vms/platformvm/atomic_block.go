@@ -83,7 +83,7 @@ func (ab *AtomicBlock) Verify() error {
 
 	ab.onAcceptDB = versiondb.New(pdb)
 	if err := tx.SemanticVerify(ab.vm, ab.onAcceptDB, &ab.Tx); err != nil {
-		ab.vm.droppedTxCache.Put(ab.Tx.ID(), nil) // cache tx as dropped
+		ab.vm.droppedTxCache.Put(ab.Tx.ID(), err.Error()) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", tx.ID(), err)
 	}
 	txBytes := ab.Tx.Bytes()
