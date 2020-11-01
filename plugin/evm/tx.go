@@ -23,10 +23,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-// Max size of memo field
-// Don't change without also changing avm.maxMemoSize
-const maxMemoSize = 256
-
 var (
 	errWrongBlockchainID = errors.New("wrong blockchain ID provided")
 	errWrongNetworkID    = errors.New("tx was issued with a different network ID")
