@@ -53,7 +53,7 @@ func (db Database) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
 
 // NewIteratorWithStart implements ethdb.Database
 func (db Database) NewIteratorWithStart(start []byte) ethdb.Iterator {
-	return db.NewIteratorWithStart(start)
+	return db.Database.NewIteratorWithStart(start)
 }
 
 // Batch implements ethdb.Batch
