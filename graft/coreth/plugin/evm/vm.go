@@ -57,10 +57,6 @@ import (
 )
 
 var (
-	zeroAddr = common.Address{
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	}
 	x2cRate = big.NewInt(1000000000)
 )
 
@@ -83,10 +79,6 @@ const (
 	bdTimerStateLong
 )
 
-const (
-	addressSep = "-"
-)
-
 var (
 	txFee = units.MilliAvax
 
@@ -99,21 +91,14 @@ var (
 	errInvalidAddr                = errors.New("invalid hex address")
 	errTooManyAtomicTx            = errors.New("too many pending atomic txs")
 	errAssetIDMismatch            = errors.New("asset IDs in the input don't match the utxo")
-	errWrongNumberOfCredentials   = errors.New("should have the same number of credentials as inputs")
-	errNoInputs                   = errors.New("tx has no inputs")
 	errNoImportInputs             = errors.New("tx has no imported inputs")
 	errInputsNotSortedUnique      = errors.New("inputs not sorted and unique")
 	errPublicKeySignatureMismatch = errors.New("signature doesn't match public key")
 	errSignatureInputsMismatch    = errors.New("number of inputs does not match number of signatures")
-	errUnknownAsset               = errors.New("unknown asset ID")
-	errNoFunds                    = errors.New("no spendable funds were found")
 	errWrongChainID               = errors.New("tx has wrong chain ID")
 	errInsufficientFunds          = errors.New("insufficient funds")
 	errNoExportOutputs            = errors.New("tx has no export outputs")
 	errOutputsNotSorted           = errors.New("tx outputs not sorted")
-	errNoImportOutputs            = errors.New("tx has no outputs to import")
-	errNoExportInputs             = errors.New("tx has no inputs to export")
-	errInputsNotSortedAndUnique   = errors.New("inputs not sorted and unique")
 	errOverflowExport             = errors.New("overflow when computing export amount + txFee")
 	errInvalidNonce               = errors.New("invalid nonce")
 )
@@ -457,8 +442,8 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	}
 	blockHash := ethBlock.Hash()
 	// Coinbase must be zero on C-Chain
-	if bytes.Compare(blockHash.Bytes(), vm.genesisHash.Bytes()) != 0 &&
-		bytes.Compare(ethBlock.Coinbase().Bytes(), coreth.BlackholeAddr.Bytes()) != 0 {
+	if !bytes.Equal(blockHash.Bytes(), vm.genesisHash.Bytes()) &&
+		!bytes.Equal(ethBlock.Coinbase().Bytes(), coreth.BlackholeAddr.Bytes()) {
 		return nil, errInvalidBlock
 	}
 	block := &Block{
@@ -713,16 +698,6 @@ func (vm *VM) getBlock(id ids.ID) *Block {
 	}
 	vm.blockCache.Put(id, block)
 	return block
-}
-
-func (vm *VM) issueRemoteTxs(txs []*types.Transaction) error {
-	errs := vm.chain.AddRemoteTxs(txs)
-	for _, err := range errs {
-		if err != nil {
-			return err
-		}
-	}
-	return vm.tryBlockGen()
 }
 
 func (vm *VM) writeBackMetadata() {

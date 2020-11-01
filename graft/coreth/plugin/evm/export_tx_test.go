@@ -76,7 +76,7 @@ func TestExportTxVerify(t *testing.T) {
 
 	// Test Valid Export Tx
 	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID); err != nil {
-		t.Fatalf("Failed to verify valid ExportTx: %w", err)
+		t.Fatalf("Failed to verify valid ExportTx: %s", err)
 	}
 
 	exportTx.syntacticallyVerified = false

@@ -77,7 +77,7 @@ func TestImportTxVerify(t *testing.T) {
 
 	// Test Valid ImportTx
 	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID); err != nil {
-		t.Fatalf("Failed to verify ImportTx: %w", err)
+		t.Fatalf("Failed to verify ImportTx: %s", err)
 	}
 
 	importTx.syntacticallyVerified = false
@@ -268,7 +268,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 	}
 
 	if err := unsignedImportTx.Accept(vm.ctx, nil); err != nil {
-		t.Fatalf("Accept failed due to: %w", err)
+		t.Fatalf("Accept failed due to: %s", err)
 	}
 
 	if err := unsignedImportTx.EVMStateTransfer(vm, state); err != nil {
