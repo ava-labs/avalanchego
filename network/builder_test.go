@@ -123,11 +123,9 @@ func TestBuildAcceptedFrontier(t *testing.T) {
 	chainID := ids.Empty.Prefix(0)
 	requestID := uint32(5)
 	containerID := ids.Empty.Prefix(1)
-	containerIDSet := ids.Set{}
-	containerIDSet.Add(containerID)
 	containerIDs := [][]byte{containerID[:]}
 
-	msg, err := TestBuilder.AcceptedFrontier(chainID, requestID, containerIDSet)
+	msg, err := TestBuilder.AcceptedFrontier(chainID, requestID, []ids.ID{containerID})
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, AcceptedFrontier, msg.Op())
@@ -149,11 +147,9 @@ func TestBuildGetAccepted(t *testing.T) {
 	requestID := uint32(5)
 	deadline := uint64(15)
 	containerID := ids.Empty.Prefix(1)
-	containerIDSet := ids.Set{}
-	containerIDSet.Add(containerID)
 	containerIDs := [][]byte{containerID[:]}
 
-	msg, err := TestBuilder.GetAccepted(chainID, requestID, deadline, containerIDSet)
+	msg, err := TestBuilder.GetAccepted(chainID, requestID, deadline, []ids.ID{containerID})
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetAccepted, msg.Op())
@@ -176,11 +172,9 @@ func TestBuildAccepted(t *testing.T) {
 	chainID := ids.Empty.Prefix(0)
 	requestID := uint32(5)
 	containerID := ids.Empty.Prefix(1)
-	containerIDSet := ids.Set{}
-	containerIDSet.Add(containerID)
 	containerIDs := [][]byte{containerID[:]}
 
-	msg, err := TestBuilder.Accepted(chainID, requestID, containerIDSet)
+	msg, err := TestBuilder.Accepted(chainID, requestID, []ids.ID{containerID})
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, Accepted, msg.Op())
@@ -304,11 +298,9 @@ func TestBuildChits(t *testing.T) {
 	chainID := ids.Empty.Prefix(0)
 	requestID := uint32(5)
 	containerID := ids.Empty.Prefix(1)
-	containerIDSet := ids.Set{}
-	containerIDSet.Add(containerID)
 	containerIDs := [][]byte{containerID[:]}
 
-	msg, err := TestBuilder.Chits(chainID, requestID, containerIDSet)
+	msg, err := TestBuilder.Chits(chainID, requestID, []ids.ID{containerID})
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, Chits, msg.Op())

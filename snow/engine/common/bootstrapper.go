@@ -80,7 +80,7 @@ func (b *Bootstrapper) Startup() error {
 	b.started = true
 	if b.pendingAcceptedFrontier.Len() == 0 {
 		b.Ctx.Log.Info("Bootstrapping skipped due to no provided bootstraps")
-		return b.Bootstrapable.ForceAccepted(ids.Set{})
+		return b.Bootstrapable.ForceAccepted(nil)
 	}
 
 	// Ask each of the bootstrap validators to send their accepted frontier
@@ -101,11 +101,11 @@ func (b *Bootstrapper) GetAcceptedFrontier(validatorID ids.ShortID, requestID ui
 // GetAcceptedFrontierFailed implements the Engine interface.
 func (b *Bootstrapper) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
 	// If we can't get a response from [validatorID], act as though they said their accepted frontier is empty
-	return b.AcceptedFrontier(validatorID, requestID, ids.Set{})
+	return b.AcceptedFrontier(validatorID, requestID, nil)
 }
 
 // AcceptedFrontier implements the Engine interface.
-func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error {
+func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	if !b.pendingAcceptedFrontier.Contains(validatorID) {
 		b.Ctx.Log.Debug("Received an AcceptedFrontier message from %s unexpectedly", validatorID)
 		return nil
@@ -114,7 +114,7 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 	b.pendingAcceptedFrontier.Remove(validatorID)
 
 	// Union the reported accepted frontier from [validatorID] with the accepted frontier we got from others
-	b.acceptedFrontier.Union(containerIDs)
+	b.acceptedFrontier.Add(containerIDs...)
 
 	// We've received the accepted frontier from every bootstrap validator
 	// Ask each bootstrap validator to filter the list of containers that we were
@@ -125,13 +125,13 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 		vdrs.Union(b.pendingAccepted)
 
 		b.RequestID++
-		b.Sender.GetAccepted(vdrs, b.RequestID, b.acceptedFrontier)
+		b.Sender.GetAccepted(vdrs, b.RequestID, b.acceptedFrontier.List())
 	}
 	return nil
 }
 
 // GetAccepted implements the Engine interface.
-func (b *Bootstrapper) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error {
+func (b *Bootstrapper) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	b.Sender.Accepted(validatorID, requestID, b.Bootstrapable.FilterAccepted(containerIDs))
 	return nil
 }
@@ -140,11 +140,11 @@ func (b *Bootstrapper) GetAccepted(validatorID ids.ShortID, requestID uint32, co
 func (b *Bootstrapper) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
 	// If we can't get a response from [validatorID], act as though they said
 	// that they think none of the containers we sent them in GetAccepted are accepted
-	return b.Accepted(validatorID, requestID, ids.Set{})
+	return b.Accepted(validatorID, requestID, nil)
 }
 
 // Accepted implements the Engine interface.
-func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error {
+func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	if !b.pendingAccepted.Contains(validatorID) {
 		b.Ctx.Log.Debug("Received an Accepted message from %s unexpectedly", validatorID)
 		return nil
@@ -157,13 +157,13 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 		weight = w
 	}
 
-	for containerIDKey := range containerIDs {
-		previousWeight := b.acceptedVotes[containerIDKey]
+	for _, containerID := range containerIDs {
+		previousWeight := b.acceptedVotes[containerID]
 		newWeight, err := math.Add64(weight, previousWeight)
 		if err != nil {
 			newWeight = stdmath.MaxUint64
 		}
-		b.acceptedVotes[containerIDKey] = newWeight
+		b.acceptedVotes[containerID] = newWeight
 	}
 
 	if b.pendingAccepted.Len() != 0 {
@@ -172,14 +172,14 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 
 	// We've received the filtered accepted frontier from every bootstrap validator
 	// Accept all containers that have a sufficient weight behind them
-	accepted := ids.Set{}
-	for key, weight := range b.acceptedVotes {
+	accepted := make([]ids.ID, 0, len(b.acceptedVotes))
+	for containerID, weight := range b.acceptedVotes {
 		if weight >= b.Alpha {
-			accepted.Add(key)
+			accepted = append(accepted, containerID)
 		}
 	}
 
-	if size := accepted.Len(); size == 0 && b.Beacons.Len() > 0 {
+	if size := len(accepted); size == 0 && b.Beacons.Len() > 0 {
 		b.Ctx.Log.Info("Bootstrapping finished with no accepted frontier. This is likely a result of failing to be able to connect to the specified bootstraps, or no transactions have been issued on this chain yet")
 	} else {
 		b.Ctx.Log.Info("Bootstrapping started syncing with %d vertices in the accepted frontier", size)

@@ -302,7 +302,7 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, 
 }
 
 // Chits implements the Engine interface
-func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) error {
+func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) error {
 	// if the engine hasn't been bootstrapped, we shouldn't be receiving chits
 	if !t.Ctx.IsBootstrapped() {
 		t.Ctx.Log.Debug("dropping Chits(%s, %d) due to bootstrapping", vdr, requestID)
@@ -310,14 +310,14 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) err
 	}
 
 	// Since this is a linear chain, there should only be one ID in the vote set
-	if votes.Len() != 1 {
-		t.Ctx.Log.Debug("Chits(%s, %d) was called with %d votes (expected 1)", vdr, requestID, votes.Len())
+	if len(votes) != 1 {
+		t.Ctx.Log.Debug("Chits(%s, %d) was called with %d votes (expected 1)", vdr, requestID, len(votes))
 		// because QueryFailed doesn't utilize the assumption that we actually
 		// sent a Query message, we can safely call QueryFailed here to
 		// potentially abandon the request.
 		return t.QueryFailed(vdr, requestID)
 	}
-	blkID := votes.CappedList(1)[0]
+	blkID := votes[0]
 
 	t.Ctx.Log.Verbo("Chits(%s, %d) contains vote for %s", vdr, requestID, blkID)
 

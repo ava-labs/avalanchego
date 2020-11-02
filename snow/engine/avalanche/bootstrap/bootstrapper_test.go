@@ -123,8 +123,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acceptedIDs := ids.Set{}
-	acceptedIDs.Add(vtxID0, vtxID1, vtxID2)
+	acceptedIDs := []ids.ID{vtxID0, vtxID1, vtxID2}
 
 	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		switch {
@@ -225,8 +224,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acceptedIDs := ids.Set{}
-	acceptedIDs.Add(vtxID1)
+	acceptedIDs := []ids.ID{vtxID1}
 
 	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		switch {
@@ -402,8 +400,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acceptedIDs := ids.Set{}
-	acceptedIDs.Add(vtxID1)
+	acceptedIDs := []ids.ID{vtxID1}
 
 	manager.ParseVertexF = func(vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
@@ -546,8 +543,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acceptedIDs := ids.Set{}
-	acceptedIDs.Add(vtxID1)
+	acceptedIDs := []ids.ID{vtxID1}
 
 	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		switch {
@@ -642,16 +638,18 @@ func TestBootstrapperAcceptedFrontier(t *testing.T) {
 	}
 
 	accepted := bs.CurrentAcceptedFrontier()
+	acceptedSet := ids.Set{}
+	acceptedSet.Add(accepted...)
 
 	manager.EdgeF = nil
 
-	if !accepted.Contains(vtxID0) {
+	if !acceptedSet.Contains(vtxID0) {
 		t.Fatalf("Vtx should be accepted")
 	}
-	if !accepted.Contains(vtxID1) {
+	if !acceptedSet.Contains(vtxID1) {
 		t.Fatalf("Vtx should be accepted")
 	}
-	if accepted.Contains(vtxID2) {
+	if acceptedSet.Contains(vtxID2) {
 		t.Fatalf("Vtx shouldn't be accepted")
 	}
 }
@@ -684,12 +682,7 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vtxIDs := ids.Set{}
-	vtxIDs.Add(
-		vtxID0,
-		vtxID1,
-		vtxID2,
-	)
+	vtxIDs := []ids.ID{vtxID0, vtxID1, vtxID2}
 
 	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		switch {
@@ -705,16 +698,18 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 	}
 
 	accepted := bs.FilterAccepted(vtxIDs)
+	acceptedSet := ids.Set{}
+	acceptedSet.Add(accepted...)
 
 	manager.GetVertexF = nil
 
-	if !accepted.Contains(vtxID0) {
+	if !acceptedSet.Contains(vtxID0) {
 		t.Fatalf("Vtx should be accepted")
 	}
-	if !accepted.Contains(vtxID1) {
+	if !acceptedSet.Contains(vtxID1) {
 		t.Fatalf("Vtx should be accepted")
 	}
-	if accepted.Contains(vtxID2) {
+	if acceptedSet.Contains(vtxID2) {
 		t.Fatalf("Vtx shouldn't be accepted")
 	}
 }
@@ -770,8 +765,7 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acceptedIDs := ids.Set{}
-	acceptedIDs.Add(vtxID2)
+	acceptedIDs := []ids.ID{vtxID2}
 
 	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		switch {
@@ -890,9 +884,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acceptedIDs := ids.Set{}
-	acceptedIDs.Add(vtxID0)
-	acceptedIDs.Add(vtxID1)
+	acceptedIDs := []ids.ID{vtxID0, vtxID1}
 
 	parsedVtx0 := false
 	parsedVtx1 := false
@@ -1022,8 +1014,7 @@ func TestBootstrapperAcceptsMultiPutParents(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acceptedIDs := ids.Set{}
-	acceptedIDs.Add(vtxID2)
+	acceptedIDs := []ids.ID{vtxID2}
 
 	parsedVtx0 := false
 	parsedVtx1 := false

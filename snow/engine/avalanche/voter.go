@@ -14,7 +14,7 @@ type voter struct {
 	t         *Transitive
 	vdr       ids.ShortID
 	requestID uint32
-	response  ids.Set
+	response  []ids.ID
 	deps      ids.Set
 }
 
@@ -34,7 +34,7 @@ func (v *voter) Update() {
 		return
 	}
 
-	results, finished := v.t.polls.Vote(v.requestID, v.vdr, v.response.List())
+	results, finished := v.t.polls.Vote(v.requestID, v.vdr, v.response)
 	if !finished {
 		return
 	}

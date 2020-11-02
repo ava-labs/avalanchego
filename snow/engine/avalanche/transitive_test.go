@@ -271,12 +271,12 @@ func TestEngineQuery(t *testing.T) {
 	}
 
 	chitted := new(bool)
-	sender.ChitsF = func(inVdr ids.ShortID, _ uint32, prefs ids.Set) {
+	sender.ChitsF = func(inVdr ids.ShortID, _ uint32, prefs []ids.ID) {
 		if *chitted {
 			t.Fatalf("Sent multiple chits")
 		}
 		*chitted = true
-		if prefs.Len() != 1 || !prefs.Contains(vtx0.ID()) {
+		if len(prefs) != 1 || prefs[0] != vtx0.ID() {
 			t.Fatalf("Wrong chits preferences")
 		}
 	}
@@ -339,9 +339,7 @@ func TestEngineQuery(t *testing.T) {
 		}
 	}
 
-	s := ids.Set{}
-	s.Add(vtx1.ID())
-	if err := te.Chits(vdr, *queryRequestID, s); err != nil {
+	if err := te.Chits(vdr, *queryRequestID, []ids.ID{vtx1.ID()}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -557,12 +555,9 @@ func TestEngineMultipleQuery(t *testing.T) {
 		}
 	}
 
-	s0 := ids.Set{}
-	s0.Add(vtx0.ID())
-	s0.Add(vtx1.ID())
+	s0 := []ids.ID{vtx0.ID(), vtx1.ID()}
 
-	s2 := ids.Set{}
-	s2.Add(vtx0.ID())
+	s2 := []ids.ID{vtx0.ID()}
 
 	if err := te.Chits(vdr0, *queryRequestID, s0); err != nil {
 		t.Fatal(err)
@@ -1281,9 +1276,7 @@ func TestEngineReissue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := ids.Set{}
-	s.Add(vtx.ID())
-	if err := te.Chits(vdr, *queryRequestID, s); err != nil {
+	if err := te.Chits(vdr, *queryRequestID, []ids.ID{vtx.ID()}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2028,9 +2021,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	voteSet := ids.Set{}
-	voteSet.Add(blockingVtx.ID())
-	if err := te.Chits(vdr, *queryRequestID, voteSet); err != nil {
+	if err := te.Chits(vdr, *queryRequestID, []ids.ID{blockingVtx.ID()}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2162,9 +2153,7 @@ func TestEngineMissingTx(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	voteSet := ids.Set{}
-	voteSet.Add(blockingVtx.ID())
-	if err := te.Chits(vdr, *queryRequestID, voteSet); err != nil {
+	if err := te.Chits(vdr, *queryRequestID, []ids.ID{blockingVtx.ID()}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2489,18 +2478,17 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		t.Fatalf("Should have requested from the validators during Initialize")
 	}
 
-	acceptedFrontier := ids.Set{}
-	acceptedFrontier.Add(vtxID0)
+	acceptedFrontier := []ids.ID{vtxID0}
 
 	*requested = false
-	sender.GetAcceptedF = func(vdrs ids.ShortSet, reqID uint32, proposedAccepted ids.Set) {
+	sender.GetAcceptedF = func(vdrs ids.ShortSet, reqID uint32, proposedAccepted []ids.ID) {
 		if vdrs.Len() != 1 {
 			t.Fatalf("Should have requested from the validators")
 		}
 		if !vdrs.Contains(vdr) {
 			t.Fatalf("Should have requested from %s", vdr)
 		}
-		if !acceptedFrontier.Equals(proposedAccepted) {
+		if !ids.Equals(acceptedFrontier, proposedAccepted) {
 			t.Fatalf("Wrong proposedAccepted vertices.\nExpected: %s\nGot: %s", acceptedFrontier, proposedAccepted)
 		}
 		*requested = true
@@ -2588,15 +2576,14 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		t.Fatalf("Unknown bytes provided")
 		panic("Unknown bytes provided")
 	}
-	sender.ChitsF = func(inVdr ids.ShortID, _ uint32, chits ids.Set) {
+	sender.ChitsF = func(inVdr ids.ShortID, _ uint32, chits []ids.ID) {
 		if !inVdr.Equals(vdr) {
 			t.Fatalf("Sent to the wrong validator")
 		}
 
-		expected := ids.Set{}
-		expected.Add(vtxID1)
+		expected := []ids.ID{vtxID1}
 
-		if !expected.Equals(chits) {
+		if !ids.Equals(expected, chits) {
 			t.Fatalf("Returned wrong chits")
 		}
 	}
@@ -2725,9 +2712,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 		return nil, errors.New("Unknown vtx")
 	}
 
-	votes := ids.Set{}
-	votes.Add(vtx1.ID())
-	if err := te.Chits(vdr, *reqID, votes); err != nil {
+	if err := te.Chits(vdr, *reqID, []ids.ID{vtx1.ID()}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3486,8 +3471,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	votes := ids.Set{}
-	votes.Add(vtx.ID())
+	votes := []ids.ID{vtx.ID()}
 
 	if status := tx.Status(); status != choices.Processing {
 		t.Fatalf("Wrong tx status: %s ; expected: %s", status, choices.Processing)

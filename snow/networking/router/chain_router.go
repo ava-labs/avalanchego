@@ -162,7 +162,7 @@ func (sr *ChainRouter) GetAcceptedFrontier(validatorID ids.ShortID, chainID ids.
 // AcceptedFrontier routes an incoming AcceptedFrontier request from the
 // validator with ID [validatorID]  to the consensus engine working on the
 // chain with ID [chainID]
-func (sr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set) {
+func (sr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
@@ -193,7 +193,7 @@ func (sr *ChainRouter) GetAcceptedFrontierFailed(validatorID ids.ShortID, chainI
 // GetAccepted routes an incoming GetAccepted request from the
 // validator with ID [validatorID]  to the consensus engine working on the
 // chain with ID [chainID]
-func (sr *ChainRouter) GetAccepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs ids.Set) {
+func (sr *ChainRouter) GetAccepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs []ids.ID) {
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
@@ -207,7 +207,7 @@ func (sr *ChainRouter) GetAccepted(validatorID ids.ShortID, chainID ids.ID, requ
 // Accepted routes an incoming Accepted request from the validator with ID
 // [validatorID]  to the consensus engine working on the chain with ID
 // [chainID]
-func (sr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set) {
+func (sr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
@@ -360,7 +360,7 @@ func (sr *ChainRouter) PullQuery(validatorID ids.ShortID, chainID ids.ID, reques
 
 // Chits routes an incoming Chits message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
-func (sr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes ids.Set) {
+func (sr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID) {
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 

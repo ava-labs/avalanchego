@@ -1947,12 +1947,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
 	externalSender.GetAcceptedFrontierF = nil
-	externalSender.GetAcceptedF = func(_ ids.ShortSet, _ ids.ID, requestID uint32, _ time.Time, _ ids.Set) {
+	externalSender.GetAcceptedF = func(_ ids.ShortSet, _ ids.ID, requestID uint32, _ time.Time, _ []ids.ID) {
 		*reqID = requestID
 	}
 
-	frontier := ids.Set{}
-	frontier.Add(advanceTimeBlkID)
+	frontier := []ids.ID{advanceTimeBlkID}
 	if err := engine.AcceptedFrontier(peerID, *reqID, frontier); err != nil {
 		t.Fatal(err)
 	}

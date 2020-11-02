@@ -56,7 +56,7 @@ type EngineTest struct {
 	GetF, GetAncestorsF, PullQueryF                    func(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error
 	PutF, PushQueryF                                   func(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error
 	MultiPutF                                          func(validatorID ids.ShortID, requestID uint32, containers [][]byte) error
-	AcceptedFrontierF, GetAcceptedF, AcceptedF, ChitsF func(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error
+	AcceptedFrontierF, GetAcceptedF, AcceptedF, ChitsF func(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(validatorID ids.ShortID, requestID uint32) error
 	ConnectedF, DisconnectedF func(validatorID ids.ShortID) error
@@ -199,7 +199,7 @@ func (e *EngineTest) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestI
 }
 
 // AcceptedFrontier ...
-func (e *EngineTest) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error {
+func (e *EngineTest) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	if e.AcceptedFrontierF != nil {
 		return e.AcceptedFrontierF(validatorID, requestID, containerIDs)
 	}
@@ -213,7 +213,7 @@ func (e *EngineTest) AcceptedFrontier(validatorID ids.ShortID, requestID uint32,
 }
 
 // GetAccepted ...
-func (e *EngineTest) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error {
+func (e *EngineTest) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	if e.GetAcceptedF != nil {
 		return e.GetAcceptedF(validatorID, requestID, containerIDs)
 	}
@@ -241,7 +241,7 @@ func (e *EngineTest) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32
 }
 
 // Accepted ...
-func (e *EngineTest) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error {
+func (e *EngineTest) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	if e.AcceptedF != nil {
 		return e.AcceptedF(validatorID, requestID, containerIDs)
 	}
@@ -382,7 +382,7 @@ func (e *EngineTest) QueryFailed(validatorID ids.ShortID, requestID uint32) erro
 }
 
 // Chits ...
-func (e *EngineTest) Chits(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error {
+func (e *EngineTest) Chits(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	if e.ChitsF != nil {
 		return e.ChitsF(validatorID, requestID, containerIDs)
 	}

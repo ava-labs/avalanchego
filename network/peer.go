@@ -608,14 +608,14 @@ func (p *peer) acceptedFrontier(msg Msg) {
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
 
-	containerIDs := ids.Set{}
-	for _, containerIDBytes := range msg.Get(ContainerIDs).([][]byte) {
-		containerID, err := ids.ToID(containerIDBytes)
+	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
+	containerIDs := make([]ids.ID, len(containerIDsBytes))
+	for i, containerIDBytes := range containerIDsBytes {
+		containerIDs[i], err = ids.ToID(containerIDBytes)
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
 			return
 		}
-		containerIDs.Add(containerID)
 	}
 
 	p.net.router.AcceptedFrontier(p.id, chainID, requestID, containerIDs)
@@ -628,14 +628,14 @@ func (p *peer) getAccepted(msg Msg) {
 	requestID := msg.Get(RequestID).(uint32)
 	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(Deadline).(uint64)))
 
-	containerIDs := ids.Set{}
-	for _, containerIDBytes := range msg.Get(ContainerIDs).([][]byte) {
-		containerID, err := ids.ToID(containerIDBytes)
+	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
+	containerIDs := make([]ids.ID, len(containerIDsBytes))
+	for i, containerIDBytes := range containerIDsBytes {
+		containerIDs[i], err = ids.ToID(containerIDBytes)
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
 			return
 		}
-		containerIDs.Add(containerID)
 	}
 
 	p.net.router.GetAccepted(p.id, chainID, requestID, deadline, containerIDs)
@@ -647,14 +647,14 @@ func (p *peer) accepted(msg Msg) {
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
 
-	containerIDs := ids.Set{}
-	for _, containerIDBytes := range msg.Get(ContainerIDs).([][]byte) {
-		containerID, err := ids.ToID(containerIDBytes)
+	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
+	containerIDs := make([]ids.ID, len(containerIDsBytes))
+	for i, containerIDBytes := range containerIDsBytes {
+		containerIDs[i], err = ids.ToID(containerIDBytes)
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
 			return
 		}
-		containerIDs.Add(containerID)
 	}
 
 	p.net.router.Accepted(p.id, chainID, requestID, containerIDs)
@@ -736,14 +736,14 @@ func (p *peer) chits(msg Msg) {
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
 
-	containerIDs := ids.Set{}
-	for _, containerIDBytes := range msg.Get(ContainerIDs).([][]byte) {
-		containerID, err := ids.ToID(containerIDBytes)
+	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
+	containerIDs := make([]ids.ID, len(containerIDsBytes))
+	for i, containerIDBytes := range containerIDsBytes {
+		containerIDs[i], err = ids.ToID(containerIDBytes)
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
 			return
 		}
-		containerIDs.Add(containerID)
 	}
 
 	p.net.router.Chits(p.id, chainID, requestID, containerIDs)

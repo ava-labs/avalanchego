@@ -238,7 +238,7 @@ func TestEngineQuery(t *testing.T) {
 	}
 
 	chitted := new(bool)
-	sender.ChitsF = func(inVdr ids.ShortID, requestID uint32, prefSet ids.Set) {
+	sender.ChitsF = func(inVdr ids.ShortID, requestID uint32, prefSet []ids.ID) {
 		if *chitted {
 			t.Fatalf("Sent multiple chits")
 		}
@@ -246,10 +246,10 @@ func TestEngineQuery(t *testing.T) {
 		if requestID != 15 {
 			t.Fatalf("Wrong request ID")
 		}
-		if prefSet.Len() != 1 {
+		if len(prefSet) != 1 {
 			t.Fatal("Should only be one vote")
 		}
-		if blk.ID() != prefSet.List()[0] {
+		if blk.ID() != prefSet[0] {
 			t.Fatalf("Wrong chits block")
 		}
 	}
@@ -307,9 +307,7 @@ func TestEngineQuery(t *testing.T) {
 			t.Fatalf("Asking for wrong block")
 		}
 	}
-	blkSet := ids.Set{}
-	blkSet.Add(blk1.ID())
-	if err := te.Chits(vdr, *queryRequestID, blkSet); err != nil {
+	if err := te.Chits(vdr, *queryRequestID, []ids.ID{blk1.ID()}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -511,8 +509,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 			t.Fatalf("Asking for wrong block")
 		}
 	}
-	blkSet := ids.Set{}
-	blkSet.Add(blk1.ID())
+	blkSet := []ids.ID{blk1.ID()}
 	if err := te.Chits(vdr0, *queryRequestID, blkSet); err != nil {
 		t.Fatal(err)
 	}
@@ -557,8 +554,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}
 
 	// Should be dropped because the query was already filled
-	blkSet = ids.Set{}
-	blkSet.Add(blk0.ID())
+	blkSet = []ids.ID{blk0.ID()}
 	if err := te.Chits(vdr2, *queryRequestID, blkSet); err != nil {
 		t.Fatal(err)
 	}
@@ -703,7 +699,7 @@ func TestEnginePushQuery(t *testing.T) {
 	}
 
 	chitted := new(bool)
-	sender.ChitsF = func(inVdr ids.ShortID, requestID uint32, votes ids.Set) {
+	sender.ChitsF = func(inVdr ids.ShortID, requestID uint32, votes []ids.ID) {
 		if *chitted {
 			t.Fatalf("Sent chit multiple times")
 		}
@@ -714,11 +710,10 @@ func TestEnginePushQuery(t *testing.T) {
 		if requestID != 20 {
 			t.Fatalf("Wrong request id")
 		}
-		if votes.Len() != 1 {
+		if len(votes) != 1 {
 			t.Fatal("votes should only have one element")
 		}
-		vote := votes.List()[0]
-		if blk.ID() != vote {
+		if blk.ID() != votes[0] {
 			t.Fatalf("Asking for wrong block")
 		}
 	}
@@ -1102,9 +1097,7 @@ func TestEngineAbandonChit(t *testing.T) {
 		*reqID = requestID
 	}
 
-	fakeBlkIDSet := ids.Set{}
-	fakeBlkIDSet.Add(fakeBlkID)
-	if err := te.Chits(vdr, 0, fakeBlkIDSet); err != nil {
+	if err := te.Chits(vdr, 0, []ids.ID{fakeBlkID}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1261,9 +1254,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 			panic("Should have failed")
 		}
 	}
-	blockingBlkIDSet := ids.Set{}
-	blockingBlkIDSet.Add(blockingBlk.ID())
-	if err := te.Chits(vdr, *queryRequestID, blockingBlkIDSet); err != nil {
+	if err := te.Chits(vdr, *queryRequestID, []ids.ID{blockingBlk.ID()}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1385,9 +1376,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	votes := ids.Set{}
-	votes.Add(invalidBlkID)
-	if err := te.Chits(vdr, *reqID, votes); err != nil {
+	if err := te.Chits(vdr, *reqID, []ids.ID{invalidBlkID}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1847,8 +1836,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	blkSet := ids.Set{}
-	blkSet.Add(blk.ID())
+	blkSet := []ids.ID{blk.ID()}
 
 	if status := blk.Status(); status != choices.Processing {
 		t.Fatalf("Wrong status: %s ; expected: %s", status, choices.Processing)

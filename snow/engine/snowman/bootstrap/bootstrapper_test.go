@@ -105,8 +105,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acceptedIDs := ids.Set{}
-	acceptedIDs.Add(blkID1)
+	acceptedIDs := []ids.ID{blkID1}
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch {
@@ -198,8 +197,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acceptedIDs := ids.Set{}
-	acceptedIDs.Add(blkID2)
+	acceptedIDs := []ids.ID{blkID2}
 
 	parsedBlk1 := false
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
@@ -349,8 +347,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acceptedIDs := ids.Set{}
-	acceptedIDs.Add(blkID3)
+	acceptedIDs := []ids.ID{blkID3}
 
 	parsedBlk1 := false
 	parsedBlk2 := false
@@ -505,8 +502,7 @@ func TestBootstrapperMultiPut(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acceptedIDs := ids.Set{}
-	acceptedIDs.Add(blkID3)
+	acceptedIDs := []ids.ID{blkID3}
 
 	parsedBlk1 := false
 	parsedBlk2 := false
@@ -609,10 +605,10 @@ func TestBootstrapperAcceptedFrontier(t *testing.T) {
 
 	accepted := bs.CurrentAcceptedFrontier()
 
-	if accepted.Len() != 1 {
+	if len(accepted) != 1 {
 		t.Fatalf("Only one block should be accepted")
 	}
-	if !accepted.Contains(blkID) {
+	if accepted[0] != blkID {
 		t.Fatalf("Blk should be accepted")
 	}
 }
@@ -644,12 +640,7 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	blkIDs := ids.Set{}
-	blkIDs.Add(
-		blkID0,
-		blkID1,
-		blkID2,
-	)
+	blkIDs := []ids.ID{blkID0, blkID1, blkID2}
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch {
@@ -666,17 +657,19 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 	vm.CantBootstrapping = false
 
 	accepted := bs.FilterAccepted(blkIDs)
+	acceptedSet := ids.Set{}
+	acceptedSet.Add(accepted...)
 
-	if accepted.Len() != 2 {
+	if acceptedSet.Len() != 2 {
 		t.Fatalf("Two blocks should be accepted")
 	}
-	if !accepted.Contains(blkID0) {
+	if !acceptedSet.Contains(blkID0) {
 		t.Fatalf("Blk should be accepted")
 	}
-	if !accepted.Contains(blkID1) {
+	if !acceptedSet.Contains(blkID1) {
 		t.Fatalf("Blk should be accepted")
 	}
-	if accepted.Contains(blkID2) {
+	if acceptedSet.Contains(blkID2) {
 		t.Fatalf("Blk shouldn't be accepted")
 	}
 }
@@ -731,9 +724,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acceptedIDs := ids.Set{}
-	acceptedIDs.Add(blkID1)
-	acceptedIDs.Add(blkID2)
+	acceptedIDs := []ids.ID{blkID1, blkID2}
 
 	parsedBlk1 := false
 	parsedBlk2 := false
