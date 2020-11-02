@@ -10,6 +10,10 @@ import (
 const (
 	// The minimum capacity of a set
 	minSetSize = 16
+
+	// If a set has more than this many keys, it will be cleared by setting the map to nil
+	// rather than iteratively deleting
+	clearSizeThreshold = 512
 )
 
 // Set is a set of IDs
@@ -74,7 +78,15 @@ func (ids *Set) Remove(idList ...ID) {
 }
 
 // Clear empties this set
-func (ids *Set) Clear() { *ids = nil }
+func (ids *Set) Clear() {
+	if len(*ids) > clearSizeThreshold {
+		*ids = nil
+		return
+	}
+	for key := range *ids {
+		delete(*ids, key)
+	}
+}
 
 // List converts this set into a list
 func (ids Set) List() []ID {

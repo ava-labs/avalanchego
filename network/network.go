@@ -138,6 +138,10 @@ type network struct {
 	connMeterMaxConns                  int
 	connMeter                          ConnMeter
 
+	// Pool of ids.Set to avoid allocating them
+	// You can't assume that an id set taken from the pool is empty
+	idSetPool sync.Pool
+
 	executor timer.Executor
 
 	b Builder
@@ -293,6 +297,11 @@ func NewNetwork(
 		readHandshakeTimeout:               readHandshakeTimeout,
 		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize),
 		connMeterMaxConns:                  connMeterMaxConns,
+		idSetPool: sync.Pool{
+			New: func() interface{} {
+				return ids.Set{}
+			},
+		},
 	}
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)

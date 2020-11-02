@@ -98,3 +98,34 @@ func TestSetCappedList(t *testing.T) {
 		t.Fatalf("list contains unexpected element %s", returnedID)
 	}
 }
+
+// Test that Clear() works with both the iterative and set-to-nil path
+func TestSetClearLarge(t *testing.T) {
+	// Using iterative clear path
+	set := Set{}
+	for i := 0; i < clearSizeThreshold; i++ {
+		set.Add(GenerateTestID())
+	}
+	set.Clear()
+	if set.Len() != 0 {
+		t.Fatal("length should be 0")
+	}
+	set.Add(GenerateTestID())
+	if set.Len() != 1 {
+		t.Fatal("length should be 1")
+	}
+
+	// Using bulk (set map to nil) path
+	set = Set{}
+	for i := 0; i < clearSizeThreshold+1; i++ {
+		set.Add(GenerateTestID())
+	}
+	set.Clear()
+	if set.Len() != 0 {
+		t.Fatal("length should be 0")
+	}
+	set.Add(GenerateTestID())
+	if set.Len() != 1 {
+		t.Fatal("length should be 1")
+	}
+}
