@@ -12,12 +12,20 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
+const (
+	defaultBufCap = 512
+)
+
 // Database partitions a database into a sub-database by prefixing all keys with
 // a unique value.
 type Database struct {
 	lock     sync.RWMutex
 	dbPrefix []byte
 	db       database.Database
+
+	// Holds unused []byte
+	// Invariant: all []byte in this Pool have length 0
+	bufferPool sync.Pool
 }
 
 // New returns a new prefixed database
@@ -26,7 +34,6 @@ func New(prefix []byte, db database.Database) *Database {
 		simplePrefix := make([]byte, len(prefixDB.dbPrefix)+len(prefix))
 		copy(simplePrefix, prefixDB.dbPrefix)
 		copy(simplePrefix[len(prefixDB.dbPrefix):], prefix)
-
 		return NewNested(simplePrefix, prefixDB.db)
 	}
 	return NewNested(prefix, db)
@@ -38,10 +45,17 @@ func NewNested(prefix []byte, db database.Database) *Database {
 	return &Database{
 		dbPrefix: hashing.ComputeHash256(prefix),
 		db:       db,
+		bufferPool: sync.Pool{
+			New: func() interface{} {
+				return make([]byte, 0, defaultBufCap)
+			},
+		},
 	}
 }
 
 // Has implements the Database interface
+// Assumes that it is OK for the argument to db.db.Has
+// to be modified after db.db.Has returns
 func (db *Database) Has(key []byte) (bool, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
@@ -49,10 +63,18 @@ func (db *Database) Has(key []byte) (bool, error) {
 	if db.db == nil {
 		return false, database.ErrClosed
 	}
-	return db.db.Has(db.prefix(key))
+	prefixedKey := db.prefix(key)
+	defer func() {
+		prefixedKey = prefixedKey[:0]
+		db.bufferPool.Put(prefixedKey)
+	}()
+
+	return db.db.Has(prefixedKey)
 }
 
 // Get implements the Database interface
+// Assumes that it is OK for the argument to db.db.Get
+// to be modified after db.db.Get returns
 func (db *Database) Get(key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
@@ -60,10 +82,18 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	if db.db == nil {
 		return nil, database.ErrClosed
 	}
-	return db.db.Get(db.prefix(key))
+	prefixedKey := db.prefix(key)
+	defer func() {
+		prefixedKey = prefixedKey[:0]
+		db.bufferPool.Put(prefixedKey)
+	}()
+
+	return db.db.Get(prefixedKey)
 }
 
 // Put implements the Database interface
+// Assumes that it is OK for the argument to db.db.Put
+// to be modified after db.db.Put returns
 func (db *Database) Put(key, value []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -71,7 +101,13 @@ func (db *Database) Put(key, value []byte) error {
 	if db.db == nil {
 		return database.ErrClosed
 	}
-	return db.db.Put(db.prefix(key), value)
+	prefixedKey := db.prefix(key)
+	defer func() {
+		prefixedKey = prefixedKey[:0]
+		db.bufferPool.Put(prefixedKey)
+	}()
+
+	return db.db.Put(prefixedKey, value)
 }
 
 // Delete implements the Database interface
@@ -82,7 +118,13 @@ func (db *Database) Delete(key []byte) error {
 	if db.db == nil {
 		return database.ErrClosed
 	}
-	return db.db.Delete(db.prefix(key))
+	prefixedKey := db.prefix(key)
+	defer func() {
+		prefixedKey = prefixedKey[:0]
+		db.bufferPool.Put(prefixedKey)
+	}()
+
+	return db.db.Delete(prefixedKey)
 }
 
 // NewBatch implements the Database interface
@@ -157,7 +199,16 @@ func (db *Database) Close() error {
 }
 
 func (db *Database) prefix(key []byte) []byte {
-	prefixedKey := make([]byte, len(db.dbPrefix)+len(key))
+	// Get a []byte from the pool
+	prefixedKey := db.bufferPool.Get().([]byte)
+	keyLen := len(db.dbPrefix) + len(key)
+	if cap(prefixedKey) >= keyLen {
+		// The [] byte we got from the pool is big enough to hold the prefixed key
+		prefixedKey = prefixedKey[:keyLen]
+	} else {
+		// The []byte from the pool wasn't big enough...allocate a new, bigger one
+		prefixedKey = make([]byte, keyLen)
+	}
 	copy(prefixedKey, db.dbPrefix)
 	copy(prefixedKey[len(db.dbPrefix):], key)
 	return prefixedKey
@@ -176,15 +227,31 @@ type batch struct {
 }
 
 // Put implements the Batch interface
+// Assumes that it is OK for the argument to b.Batch.Put
+// to be modified after b.Batch.Put returns
 func (b *batch) Put(key, value []byte) error {
 	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), utils.CopyBytes(value), false})
-	return b.Batch.Put(b.db.prefix(key), value)
+	prefixedKey := b.db.prefix(key)
+	defer func() {
+		prefixedKey = prefixedKey[:0]
+		b.db.bufferPool.Put(prefixedKey)
+	}()
+
+	return b.Batch.Put(prefixedKey, value)
 }
 
 // Delete implements the Batch interface
+// Assumes that it is OK for the argument to b.Batch.Delete
+// to be modified after b.Batch.Delete returns
 func (b *batch) Delete(key []byte) error {
 	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), nil, true})
-	return b.Batch.Delete(b.db.prefix(key))
+	prefixedKey := b.db.prefix(key)
+	defer func() {
+		prefixedKey = prefixedKey[:0]
+		b.db.bufferPool.Put(prefixedKey)
+	}()
+
+	return b.Batch.Delete(prefixedKey)
 }
 
 // Write flushes any accumulated data to the memory database.
