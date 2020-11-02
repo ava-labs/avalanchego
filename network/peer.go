@@ -610,8 +610,7 @@ func (p *peer) acceptedFrontier(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := p.net.idSetPool.Get().(ids.Set) // To prevent duplicates
-	containerIDsSet.Clear()
+	containerIDsSet := ids.Set{} // To prevent duplicates
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
@@ -625,7 +624,6 @@ func (p *peer) acceptedFrontier(msg Msg) {
 		containerIDs[i] = containerID
 		containerIDsSet.Add(containerID)
 	}
-	p.net.idSetPool.Put(containerIDsSet)
 
 	p.net.router.AcceptedFrontier(p.id, chainID, requestID, containerIDs)
 }
@@ -639,8 +637,7 @@ func (p *peer) getAccepted(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := p.net.idSetPool.Get().(ids.Set) // To prevent duplicates
-	containerIDsSet.Clear()
+	containerIDsSet := ids.Set{} // To prevent duplicates
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
@@ -654,7 +651,6 @@ func (p *peer) getAccepted(msg Msg) {
 		containerIDs[i] = containerID
 		containerIDsSet.Add(containerID)
 	}
-	p.net.idSetPool.Put(containerIDsSet)
 
 	p.net.router.GetAccepted(p.id, chainID, requestID, deadline, containerIDs)
 }
@@ -667,8 +663,7 @@ func (p *peer) accepted(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := p.net.idSetPool.Get().(ids.Set) // To prevent duplicates
-	containerIDsSet.Clear()
+	containerIDsSet := ids.Set{} // To prevent duplicates
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
@@ -682,7 +677,6 @@ func (p *peer) accepted(msg Msg) {
 		containerIDs[i] = containerID
 		containerIDsSet.Add(containerID)
 	}
-	p.net.idSetPool.Put(containerIDsSet)
 
 	p.net.router.Accepted(p.id, chainID, requestID, containerIDs)
 }
@@ -765,8 +759,7 @@ func (p *peer) chits(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := p.net.idSetPool.Get().(ids.Set) // To prevent duplicates
-	containerIDsSet.Clear()
+	containerIDsSet := ids.Set{} // To prevent duplicates
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
@@ -780,7 +773,6 @@ func (p *peer) chits(msg Msg) {
 		containerIDs[i] = containerID
 		containerIDsSet.Add(containerID)
 	}
-	p.net.idSetPool.Put(containerIDsSet)
 
 	p.net.router.Chits(p.id, chainID, requestID, containerIDs)
 }
