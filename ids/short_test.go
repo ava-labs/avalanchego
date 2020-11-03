@@ -52,3 +52,64 @@ func TestIsUniqueShortIDs(t *testing.T) {
 		t.Fatal("should not be unique")
 	}
 }
+
+func TestIsSortedAndUniqueShortIDs(t *testing.T) {
+	ids := []ShortID{}
+	if !IsSortedAndUniqueShortIDs(ids) {
+		t.Fatal("input is sorted and unique")
+	}
+
+	ids = []ShortID{GenerateTestShortID()}
+	if !IsSortedAndUniqueShortIDs(ids) {
+		t.Fatal("input is sorted and unique")
+	}
+
+	id0 := NewShortID([20]byte{0})
+	id1 := NewShortID([20]byte{1})
+	id2 := NewShortID([20]byte{2})
+
+	ids = []ShortID{id0, id0}
+	if IsSortedAndUniqueShortIDs(ids) {
+		t.Fatal("input is not sorted and unique")
+	}
+
+	ids = []ShortID{id0, id1}
+	if !IsSortedAndUniqueShortIDs(ids) {
+		t.Fatal("input is sorted and unique")
+	}
+
+	ids = []ShortID{id1, id0}
+	if IsSortedAndUniqueShortIDs(ids) {
+		t.Fatal("input is not sorted and unique")
+	}
+
+	ids = []ShortID{id0, id1, id2}
+	if !IsSortedAndUniqueShortIDs(ids) {
+		t.Fatal("input is sorted and unique")
+	}
+
+	ids = []ShortID{id0, id1, id2, id2}
+	if IsSortedAndUniqueShortIDs(ids) {
+		t.Fatal("input is not sorted and unique")
+	}
+
+	ids = []ShortID{id0, id1, id1}
+	if IsSortedAndUniqueShortIDs(ids) {
+		t.Fatal("input is not sorted and unique")
+	}
+
+	ids = []ShortID{id0, id0, id1}
+	if IsSortedAndUniqueShortIDs(ids) {
+		t.Fatal("input is not sorted and unique")
+	}
+
+	ids = []ShortID{id2, id1, id0}
+	if IsSortedAndUniqueShortIDs(ids) {
+		t.Fatal("input is not sorted and unique")
+	}
+
+	ids = []ShortID{id2, id1, id2}
+	if IsSortedAndUniqueShortIDs(ids) {
+		t.Fatal("input is not sorted and unique")
+	}
+}
