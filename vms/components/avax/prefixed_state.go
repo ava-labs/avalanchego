@@ -52,7 +52,7 @@ func (s *chainState) UTXO(id ids.ID) (*UTXO, error) {
 // All UTXO IDs have IDs greater than [start].
 // The returned list contains at most [limit] UTXO IDs.
 func (s *chainState) Funds(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
-	var addrID [32]byte
+	var addrID ids.ID
 	copy(addrID[:], addr)
 	key := UniqueID(addrID, s.fundsIDPrefix, s.fundsID)
 	return s.IDs(key[:], start[:], limit)
@@ -104,7 +104,7 @@ func (s *chainState) setStatus(id ids.ID, status choices.Status) error {
 
 func (s *chainState) removeUTXO(addrs [][]byte, utxoID ids.ID) error {
 	for _, addr := range addrs {
-		var addrID [32]byte
+		var addrID ids.ID
 		copy(addrID[:], addr)
 		addrID = UniqueID(addrID, s.fundsIDPrefix, s.fundsID)
 		if err := s.RemoveID(addrID[:], utxoID); err != nil {
@@ -116,7 +116,7 @@ func (s *chainState) removeUTXO(addrs [][]byte, utxoID ids.ID) error {
 
 func (s *chainState) addUTXO(addrs [][]byte, utxoID ids.ID) error {
 	for _, addr := range addrs {
-		var addrID [32]byte
+		var addrID ids.ID
 		copy(addrID[:], addr)
 		addrID = UniqueID(addrID, s.fundsIDPrefix, s.fundsID)
 		if err := s.AddID(addrID[:], utxoID); err != nil {

@@ -24,7 +24,7 @@ type entry struct {
 // done, based on evicting the least recently used value.
 type LRU struct {
 	lock      sync.Mutex
-	entryMap  map[[32]byte]*list.Element
+	entryMap  map[ids.ID]*list.Element
 	entryList *list.List
 	Size      int
 }
@@ -63,7 +63,7 @@ func (c *LRU) Flush() {
 
 func (c *LRU) init() {
 	if c.entryMap == nil {
-		c.entryMap = make(map[[32]byte]*list.Element, minCacheSize)
+		c.entryMap = make(map[ids.ID]*list.Element, minCacheSize)
 	}
 	if c.entryList == nil {
 		c.entryList = list.New()
@@ -137,6 +137,6 @@ func (c *LRU) evict(key ids.ID) {
 func (c *LRU) flush() {
 	c.init()
 
-	c.entryMap = make(map[[32]byte]*list.Element, minCacheSize)
+	c.entryMap = make(map[ids.ID]*list.Element, minCacheSize)
 	c.entryList = list.New()
 }

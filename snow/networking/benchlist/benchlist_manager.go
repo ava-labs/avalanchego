@@ -43,7 +43,7 @@ type Config struct {
 type benchlistManager struct {
 	config *Config
 	// Chain ID --> benchlist for that chain
-	chainBenchlists map[[32]byte]QueryBenchlist
+	chainBenchlists map[ids.ID]QueryBenchlist
 
 	lock sync.RWMutex
 }
@@ -52,7 +52,7 @@ type benchlistManager struct {
 func NewManager(config *Config) Manager {
 	return &benchlistManager{
 		config:          config,
-		chainBenchlists: make(map[[32]byte]QueryBenchlist),
+		chainBenchlists: make(map[ids.ID]QueryBenchlist),
 	}
 }
 

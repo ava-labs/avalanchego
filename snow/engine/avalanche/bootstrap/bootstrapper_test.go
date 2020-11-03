@@ -920,7 +920,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		return nil, errUnknownVertex
 	}
 
-	requestIDs := map[[32]byte]uint32{}
+	requestIDs := map[ids.ID]uint32{}
 	sender.GetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
 		if !vdr.Equals(peerID) {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
@@ -1060,7 +1060,7 @@ func TestBootstrapperAcceptsMultiPutParents(t *testing.T) {
 		return nil, errUnknownVertex
 	}
 
-	requestIDs := map[[32]byte]uint32{}
+	requestIDs := map[ids.ID]uint32{}
 	sender.GetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
 		if !vdr.Equals(peerID) {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)

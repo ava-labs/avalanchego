@@ -16,14 +16,14 @@ import (
 type EventDispatcher struct {
 	lock          sync.Mutex
 	log           logging.Logger
-	chainHandlers map[[32]byte]map[string]interface{}
+	chainHandlers map[ids.ID]map[string]interface{}
 	handlers      map[string]interface{}
 }
 
 // Initialize creates the EventDispatcher's initial values
 func (ed *EventDispatcher) Initialize(log logging.Logger) {
 	ed.log = log
-	ed.chainHandlers = make(map[[32]byte]map[string]interface{})
+	ed.chainHandlers = make(map[ids.ID]map[string]interface{})
 	ed.handlers = make(map[string]interface{})
 }
 

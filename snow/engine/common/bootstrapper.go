@@ -42,7 +42,7 @@ type Bootstrapper struct {
 	acceptedFrontier        ids.Set
 
 	pendingAccepted ids.ShortSet
-	acceptedVotes   map[[32]byte]uint64
+	acceptedVotes   map[ids.ID]uint64
 
 	// current weight
 	started bool
@@ -68,7 +68,7 @@ func (b *Bootstrapper) Initialize(config Config) error {
 		b.pendingAccepted.Add(vdrID)
 	}
 
-	b.acceptedVotes = make(map[[32]byte]uint64)
+	b.acceptedVotes = make(map[ids.ID]uint64)
 	if b.Config.StartupAlpha > 0 {
 		return nil
 	}

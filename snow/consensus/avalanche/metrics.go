@@ -19,12 +19,12 @@ type metrics struct {
 	latAccepted, latRejected prometheus.Histogram
 
 	clock      timer.Clock
-	processing map[[32]byte]time.Time
+	processing map[ids.ID]time.Time
 }
 
 // Initialize implements the Engine interface
 func (m *metrics) Initialize(log logging.Logger, namespace string, registerer prometheus.Registerer) error {
-	m.processing = make(map[[32]byte]time.Time)
+	m.processing = make(map[ids.ID]time.Time)
 
 	m.numProcessing = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,

@@ -13,11 +13,11 @@ const (
 )
 
 // UniqueBag ...
-type UniqueBag map[[32]byte]BitSet
+type UniqueBag map[ID]BitSet
 
 func (b *UniqueBag) init() {
 	if *b == nil {
-		*b = make(map[[32]byte]BitSet, minUniqueBagSize)
+		*b = make(map[ID]BitSet, minUniqueBagSize)
 	}
 }
 
@@ -93,7 +93,7 @@ func (b *UniqueBag) String() string {
 
 	sb.WriteString(fmt.Sprintf("UniqueBag: (Size = %d)", len(*b)))
 	for id, set := range *b {
-		sb.WriteString(fmt.Sprintf("\n    ID[%s]: Members = %s", ID(id), set))
+		sb.WriteString(fmt.Sprintf("\n    ID[%s]: Members = %s", id, set))
 	}
 
 	return sb.String()

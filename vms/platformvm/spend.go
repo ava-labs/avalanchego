@@ -384,8 +384,8 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 	// Track the amount of locked transfers and their owners
 	// locktime -> ownerID -> amount
-	lockedProduced := make(map[uint64]map[[32]byte]uint64)
-	lockedConsumed := make(map[uint64]map[[32]byte]uint64)
+	lockedProduced := make(map[uint64]map[ids.ID]uint64)
+	lockedConsumed := make(map[uint64]map[ids.ID]uint64)
 
 	for index, input := range ins {
 		utxo := utxos[index] // The UTXO consumed by [input]
@@ -451,7 +451,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		ownerID := hashing.ComputeHash256Array(ownerBytes)
 		owners, ok := lockedConsumed[locktime]
 		if !ok {
-			owners = make(map[[32]byte]uint64)
+			owners = make(map[ids.ID]uint64)
 			lockedConsumed[locktime] = owners
 		}
 		newAmount, err := safemath.Add64(owners[ownerID], amount)
@@ -499,7 +499,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		ownerID := hashing.ComputeHash256Array(ownerBytes)
 		owners, ok := lockedProduced[locktime]
 		if !ok {
-			owners = make(map[[32]byte]uint64)
+			owners = make(map[ids.ID]uint64)
 			lockedProduced[locktime] = owners
 		}
 		newAmount, err := safemath.Add64(owners[ownerID], amount)

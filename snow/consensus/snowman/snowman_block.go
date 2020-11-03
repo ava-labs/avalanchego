@@ -4,6 +4,7 @@
 package snowman
 
 import (
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
@@ -28,7 +29,7 @@ type snowmanBlock struct {
 	// children is the set of blocks that have been issued that name this block
 	// as their parent. If this node has not had a child issued under it, this value
 	// will be nil
-	children map[[32]byte]Block
+	children map[ids.ID]Block
 }
 
 func (n *snowmanBlock) AddChild(child Block) {
@@ -39,7 +40,7 @@ func (n *snowmanBlock) AddChild(child Block) {
 	if n.sb == nil {
 		n.sb = &snowball.Tree{}
 		n.sb.Initialize(n.sm.Parameters(), childID)
-		n.children = make(map[[32]byte]Block)
+		n.children = make(map[ids.ID]Block)
 	} else {
 		n.sb.Add(childID)
 	}

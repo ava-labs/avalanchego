@@ -36,7 +36,7 @@ type Topological struct {
 	head ids.ID
 
 	// blocks stores the last accepted block and all the pending blocks
-	blocks map[[32]byte]*snowmanBlock // blockID -> snowmanBlock
+	blocks map[ids.ID]*snowmanBlock // blockID -> snowmanBlock
 
 	// tail is the preferred block with no children
 	tail ids.ID
@@ -69,7 +69,7 @@ func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters,
 	}
 
 	ts.head = rootID
-	ts.blocks = map[[32]byte]*snowmanBlock{
+	ts.blocks = map[ids.ID]*snowmanBlock{
 		rootID: {sm: ts},
 	}
 	ts.tail = rootID
@@ -190,8 +190,8 @@ func (ts *Topological) Finalized() bool { return len(ts.blocks) == 1 }
 // reachable section of the graph annotated with the number of inbound edges and
 // the non-transitively applied votes. Also returns the list of leaf blocks.
 func (ts *Topological) calculateInDegree(
-	votes ids.Bag) (map[[32]byte]kahnNode, []ids.ID) {
-	kahns := make(map[[32]byte]kahnNode, minMapSize)
+	votes ids.Bag) (map[ids.ID]kahnNode, []ids.ID) {
+	kahns := make(map[ids.ID]kahnNode, minMapSize)
 	leaves := ids.Set{}
 
 	for _, vote := range votes.List() {
@@ -257,7 +257,7 @@ func (ts *Topological) calculateInDegree(
 // convert the tree into a branch of snowball instances with at least alpha
 // votes
 func (ts *Topological) pushVotes(
-	kahnNodes map[[32]byte]kahnNode, leaves []ids.ID) []votes {
+	kahnNodes map[ids.ID]kahnNode, leaves []ids.ID) []votes {
 	voteStack := make([]votes, 0, len(kahnNodes))
 	for len(leaves) > 0 {
 		// pop a leaf off the stack

@@ -72,7 +72,7 @@ type AdaptiveTimeoutManager struct {
 
 	lock           sync.Mutex
 	currentTimeout time.Duration // Amount of time before a timeout
-	timeoutMap     map[[32]byte]*adaptiveTimeout
+	timeoutMap     map[ids.ID]*adaptiveTimeout
 	timeoutQueue   timeoutQueue
 	timer          *Timer // Timer that will fire to clear the timeouts
 }
@@ -89,7 +89,7 @@ func (tm *AdaptiveTimeoutManager) Initialize(config *AdaptiveTimeoutConfig) erro
 	tm.timeoutInc = config.TimeoutInc
 	tm.timeoutDec = config.TimeoutDec
 	tm.currentTimeout = config.InitialTimeout
-	tm.timeoutMap = make(map[[32]byte]*adaptiveTimeout)
+	tm.timeoutMap = make(map[ids.ID]*adaptiveTimeout)
 	tm.timer = NewTimer(tm.Timeout)
 	return config.Registerer.Register(tm.currentDurationMetric)
 }

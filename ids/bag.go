@@ -81,7 +81,6 @@ func (b *Bag) AddCount(id ID, count int) {
 
 // Count returns the number of times the id has been added.
 func (b *Bag) Count(id ID) int {
-	b.init()
 	return b.counts[id]
 }
 

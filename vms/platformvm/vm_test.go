@@ -54,7 +54,7 @@ var (
 	defaultMinDelegationFee   uint32 = 0
 
 	// AVAX asset ID in tests
-	avaxAssetID = [32]byte{'y', 'e', 'e', 't'}
+	avaxAssetID = ids.ID{'y', 'e', 'e', 't'}
 
 	defaultTxFee = uint64(100)
 

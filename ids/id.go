@@ -15,7 +15,7 @@ import (
 )
 
 // Empty is a useful all zero value
-var Empty ID = [32]byte{}
+var Empty = ID{}
 
 // ID wraps a 32 byte hash used as an identifier
 type ID [32]byte
@@ -79,7 +79,7 @@ func (id ID) Bit(i uint) int {
 	byteIndex := i / BitsPerByte
 	bitIndex := i % BitsPerByte
 
-	b := id[:][byteIndex]
+	b := id[byteIndex]
 
 	// b = [7, 6, 5, 4, 3, 2, 1, 0]
 

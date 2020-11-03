@@ -38,7 +38,7 @@ type Topological struct {
 	params Parameters
 
 	// Maps vtxID -> vtx
-	nodes map[[32]byte]Vertex
+	nodes map[ids.ID]Vertex
 	// Tracks the conflict relations
 	cg snowstorm.Consensus
 
@@ -47,10 +47,10 @@ type Topological struct {
 	// orphans are the txIDs that are virtuous, but not preferred
 	preferred, virtuous, orphans ids.Set
 	// frontier is the set of vts that have no descendents
-	frontier map[[32]byte]Vertex
+	frontier map[ids.ID]Vertex
 	// preferenceCache is the cache for strongly preferred checks
 	// virtuousCache is the cache for strongly virtuous checks
-	preferenceCache, virtuousCache map[[32]byte]bool
+	preferenceCache, virtuousCache map[ids.ID]bool
 }
 
 type kahnNode struct {
@@ -75,14 +75,14 @@ func (ta *Topological) Initialize(
 		return err
 	}
 
-	ta.nodes = make(map[[32]byte]Vertex, minMapSize)
+	ta.nodes = make(map[ids.ID]Vertex, minMapSize)
 
 	ta.cg = &snowstorm.Directed{}
 	if err := ta.cg.Initialize(ctx, params.Parameters); err != nil {
 		return err
 	}
 
-	ta.frontier = make(map[[32]byte]Vertex, minMapSize)
+	ta.frontier = make(map[ids.ID]Vertex, minMapSize)
 	for _, vtx := range frontier {
 		ta.frontier[vtx.ID()] = vtx
 	}
@@ -197,11 +197,11 @@ func (ta *Topological) Finalized() bool { return ta.cg.Finalized() }
 // reachable section of the graph annotated with the number of inbound edges and
 // the non-transitively applied votes. Also returns the list of leaf nodes.
 func (ta *Topological) calculateInDegree(responses ids.UniqueBag) (
-	map[[32]byte]kahnNode,
+	map[ids.ID]kahnNode,
 	[]ids.ID,
 	error,
 ) {
-	kahns := make(map[[32]byte]kahnNode, minMapSize)
+	kahns := make(map[ids.ID]kahnNode, minMapSize)
 	leaves := ids.Set{}
 
 	for vote := range responses {
@@ -233,10 +233,10 @@ func (ta *Topological) calculateInDegree(responses ids.UniqueBag) (
 
 // adds a new in-degree reference for all nodes
 func (ta *Topological) markAncestorInDegrees(
-	kahns map[[32]byte]kahnNode,
+	kahns map[ids.ID]kahnNode,
 	leaves ids.Set,
 	deps []Vertex,
-) (map[[32]byte]kahnNode, ids.Set, error) {
+) (map[ids.ID]kahnNode, ids.Set, error) {
 	frontier := make([]Vertex, 0, len(deps))
 	for _, vtx := range deps {
 		// The vertex may have been decided, no need to vote in that case
@@ -282,11 +282,11 @@ func (ta *Topological) markAncestorInDegrees(
 
 // count the number of votes for each operation
 func (ta *Topological) pushVotes(
-	kahnNodes map[[32]byte]kahnNode,
+	kahnNodes map[ids.ID]kahnNode,
 	leaves []ids.ID,
 ) (ids.Bag, error) {
 	votes := make(ids.UniqueBag)
-	txConflicts := make(map[[32]byte]ids.Set, minMapSize)
+	txConflicts := make(map[ids.ID]ids.Set, minMapSize)
 
 	for len(leaves) > 0 {
 		newLeavesSize := len(leaves) - 1
@@ -502,9 +502,9 @@ func (ta *Topological) updateFrontiers() error {
 	ta.preferred.Clear()
 	ta.virtuous.Clear()
 	ta.orphans.Clear()
-	ta.frontier = make(map[[32]byte]Vertex, minMapSize)
-	ta.preferenceCache = make(map[[32]byte]bool, minMapSize)
-	ta.virtuousCache = make(map[[32]byte]bool, minMapSize)
+	ta.frontier = make(map[ids.ID]Vertex, minMapSize)
+	ta.preferenceCache = make(map[ids.ID]bool, minMapSize)
+	ta.virtuousCache = make(map[ids.ID]bool, minMapSize)
 
 	ta.orphans.Union(ta.cg.Virtuous()) // Initially, nothing is preferred
 

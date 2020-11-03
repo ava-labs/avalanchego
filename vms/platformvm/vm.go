@@ -75,10 +75,10 @@ const (
 )
 
 var (
-	timestampKey     = [32]byte{'t', 'i', 'm', 'e'}
-	chainsKey        = [32]byte{'c', 'h', 'a', 'i', 'n', 's'}
-	subnetsKey       = [32]byte{'s', 'u', 'b', 'n', 'e', 't', 's'}
-	currentSupplyKey = [32]byte{'c', 'u', 'r', 'r', 'e', 't', ' ', 's', 'u', 'p', 'p', 'l', 'y'}
+	timestampKey     = ids.ID{'t', 'i', 'm', 'e'}
+	chainsKey        = ids.ID{'c', 'h', 'a', 'i', 'n', 's'}
+	subnetsKey       = ids.ID{'s', 'u', 'b', 'n', 'e', 't', 's'}
+	currentSupplyKey = ids.ID{'c', 'u', 'r', 'r', 'e', 't', ' ', 's', 'u', 'p', 'p', 'l', 'y'}
 
 	errRegisteringType          = errors.New("error registering type with database")
 	errInvalidLastAcceptedBlock = errors.New("last accepted block must be a decision block")
@@ -174,7 +174,7 @@ type VM struct {
 
 	// Key: block ID
 	// Value: the block
-	currentBlocks map[[32]byte]Block
+	currentBlocks map[ids.ID]Block
 
 	// fee that must be burned by every state creating transaction
 	creationTxFee uint64
@@ -361,7 +361,7 @@ func (vm *VM) Initialize(
 		}
 	}
 
-	vm.currentBlocks = make(map[[32]byte]Block)
+	vm.currentBlocks = make(map[ids.ID]Block)
 
 	if err := vm.initSubnets(); err != nil {
 		ctx.Log.Error("failed to initialize Subnets: %s", err)

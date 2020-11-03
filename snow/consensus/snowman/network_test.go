@@ -66,7 +66,7 @@ func (n *Network) AddNode(sm Consensus) error {
 	}
 
 	n.shuffleColors()
-	deps := map[[32]byte]Block{}
+	deps := map[ids.ID]Block{}
 	for _, blk := range n.colors {
 		myDep, found := deps[blk.ParentV.ID()]
 		if !found {

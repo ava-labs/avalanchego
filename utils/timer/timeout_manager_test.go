@@ -4,6 +4,7 @@
 package timer
 
 import (
+	"github.com/ava-labs/avalanchego/ids"
 	"sync"
 	"testing"
 	"time"
@@ -18,6 +19,6 @@ func TestTimeoutManager(t *testing.T) {
 	tm.Initialize(time.Millisecond)
 	go tm.Dispatch()
 
-	tm.Put([32]byte{}, wg.Done)
-	tm.Put([32]byte{1}, wg.Done)
+	tm.Put(ids.ID{}, wg.Done)
+	tm.Put(ids.ID{1}, wg.Done)
 }

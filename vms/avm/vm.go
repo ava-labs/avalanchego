@@ -262,7 +262,7 @@ func (vm *VM) Initialize(
 	vm.batchTimeout = batchTimeout
 
 	vm.walletService.vm = vm
-	vm.walletService.pendingTxMap = make(map[[32]byte]*list.Element)
+	vm.walletService.pendingTxMap = make(map[ids.ID]*list.Element)
 	vm.walletService.pendingTxOrdering = list.New()
 
 	return vm.db.Commit()
@@ -860,14 +860,14 @@ func (vm *VM) LoadUser(
 func (vm *VM) Spend(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
-	amounts map[[32]byte]uint64,
+	amounts map[ids.ID]uint64,
 ) (
-	map[[32]byte]uint64,
+	map[ids.ID]uint64,
 	[]*avax.TransferableInput,
 	[][]*crypto.PrivateKeySECP256K1R,
 	error,
 ) {
-	amountsSpent := make(map[[32]byte]uint64, len(amounts))
+	amountsSpent := make(map[ids.ID]uint64, len(amounts))
 	time := vm.clock.Unix()
 
 	ins := []*avax.TransferableInput{}
@@ -1003,12 +1003,12 @@ func (vm *VM) SpendAll(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
 ) (
-	map[[32]byte]uint64,
+	map[ids.ID]uint64,
 	[]*avax.TransferableInput,
 	[][]*crypto.PrivateKeySECP256K1R,
 	error,
 ) {
-	amountsSpent := make(map[[32]byte]uint64)
+	amountsSpent := make(map[ids.ID]uint64)
 	time := vm.clock.Unix()
 
 	ins := []*avax.TransferableInput{}
@@ -1052,7 +1052,7 @@ func (vm *VM) SpendAll(
 func (vm *VM) Mint(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
-	amounts map[[32]byte]uint64,
+	amounts map[ids.ID]uint64,
 	to ids.ShortID,
 ) (
 	[]*Operation,

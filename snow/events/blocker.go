@@ -15,11 +15,11 @@ const (
 )
 
 // Blocker tracks objects that are blocked
-type Blocker map[[32]byte][]Blockable
+type Blocker map[ids.ID][]Blockable
 
 func (b *Blocker) init() {
 	if *b == nil {
-		*b = make(map[[32]byte][]Blockable, minBlockerSize)
+		*b = make(map[ids.ID][]Blockable, minBlockerSize)
 	}
 }
 

@@ -14,13 +14,13 @@ import (
 type Aliaser struct {
 	lock    sync.RWMutex
 	dealias map[string]ID
-	aliases map[[32]byte][]string
+	aliases map[ID][]string
 }
 
 // Initialize the aliaser to have no aliases
 func (a *Aliaser) Initialize() {
 	a.dealias = make(map[string]ID)
-	a.aliases = make(map[[32]byte][]string)
+	a.aliases = make(map[ID][]string)
 }
 
 // Lookup returns the ID associated with alias

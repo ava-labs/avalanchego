@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func TestAdaptiveTimeoutManager(t *testing.T) {
@@ -43,14 +43,14 @@ func TestAdaptiveTimeoutManager(t *testing.T) {
 
 		numSuccessful--
 		if numSuccessful > 0 {
-			tm.Put([32]byte{byte(numSuccessful)}, *callback)
+			tm.Put(ids.ID{byte(numSuccessful)}, *callback)
 		}
 		if numSuccessful >= 0 {
 			wg.Done()
 		}
 		if numSuccessful%2 == 0 {
-			tm.Remove([32]byte{byte(numSuccessful)})
-			tm.Put([32]byte{byte(numSuccessful)}, *callback)
+			tm.Remove(ids.ID{byte(numSuccessful)})
+			tm.Put(ids.ID{byte(numSuccessful)}, *callback)
 		}
 	}
 	(*callback)()

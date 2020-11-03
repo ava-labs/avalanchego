@@ -30,7 +30,7 @@ type context struct {
 // ChainIPCs maintains IPCs for a set of chains
 type ChainIPCs struct {
 	context
-	chains          map[[32]byte]*EventSockets
+	chains          map[ids.ID]*EventSockets
 	consensusEvents *triggers.EventDispatcher
 	decisionEvents  *triggers.EventDispatcher
 }
@@ -44,7 +44,7 @@ func NewChainIPCs(log logging.Logger, path string, networkID uint32, consensusEv
 			networkID: networkID,
 			path:      path,
 		},
-		chains:          make(map[[32]byte]*EventSockets),
+		chains:          make(map[ids.ID]*EventSockets),
 		consensusEvents: consensusEvents,
 		decisionEvents:  decisionEvents,
 	}

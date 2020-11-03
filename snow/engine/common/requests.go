@@ -19,7 +19,7 @@ type req struct {
 // Requests tracks pending container messages from a peer.
 type Requests struct {
 	reqsToID map[[20]byte]map[uint32]ids.ID
-	idToReq  map[[32]byte]req
+	idToReq  map[ids.ID]req
 }
 
 // Add a request. Assumes that requestIDs are unique. Assumes that containerIDs
@@ -37,7 +37,7 @@ func (r *Requests) Add(vdr ids.ShortID, requestID uint32, containerID ids.ID) {
 	vdrReqs[requestID] = containerID
 
 	if r.idToReq == nil {
-		r.idToReq = make(map[[32]byte]req, minRequestsSize)
+		r.idToReq = make(map[ids.ID]req, minRequestsSize)
 	}
 	r.idToReq[containerID] = req{
 		vdr: vdr,

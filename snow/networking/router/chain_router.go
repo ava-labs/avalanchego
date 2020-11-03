@@ -30,7 +30,7 @@ var (
 type ChainRouter struct {
 	log              logging.Logger
 	lock             sync.RWMutex
-	chains           map[[32]byte]*Handler
+	chains           map[ids.ID]*Handler
 	timeouts         *timeout.Manager
 	gossiper         *timer.Repeater
 	intervalNotifier *timer.Repeater
@@ -58,7 +58,7 @@ func (sr *ChainRouter) Initialize(
 	onFatal func(),
 ) {
 	sr.log = log
-	sr.chains = make(map[[32]byte]*Handler)
+	sr.chains = make(map[ids.ID]*Handler)
 	sr.timeouts = timeouts
 	sr.gossiper = timer.NewRepeater(sr.Gossip, gossipFrequency)
 	sr.intervalNotifier = timer.NewRepeater(sr.EndInterval, defaultCPUInterval)
@@ -76,7 +76,7 @@ func (sr *ChainRouter) Initialize(
 func (sr *ChainRouter) Shutdown() {
 	sr.lock.Lock()
 	prevChains := sr.chains
-	sr.chains = map[[32]byte]*Handler{}
+	sr.chains = map[ids.ID]*Handler{}
 	sr.lock.Unlock()
 
 	sr.gossiper.Stop()

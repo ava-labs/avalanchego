@@ -392,8 +392,8 @@ func (service *Service) GetAllBalances(r *http.Request, args *api.JSONAddress, r
 		return fmt.Errorf("couldn't get address's UTXOs: %w", err)
 	}
 
-	assetIDs := ids.Set{}                 // IDs of assets the address has a non-zero balance of
-	balances := make(map[[32]byte]uint64) // key: ID (as bytes). value: balance of that asset
+	assetIDs := ids.Set{}               // IDs of assets the address has a non-zero balance of
+	balances := make(map[ids.ID]uint64) // key: ID (as bytes). value: balance of that asset
 	for _, utxo := range utxos {
 		transferable, ok := utxo.Out.(avax.TransferableOut)
 		if !ok {
@@ -491,7 +491,7 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 	amountsSpent, ins, keys, err := service.vm.Spend(
 		utxos,
 		kc,
-		map[[32]byte]uint64{
+		map[ids.ID]uint64{
 			service.vm.ctx.AVAXAssetID: service.vm.creationTxFee,
 		},
 	)
@@ -614,7 +614,7 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 	amountsSpent, ins, keys, err := service.vm.Spend(
 		utxos,
 		kc,
-		map[[32]byte]uint64{
+		map[ids.ID]uint64{
 			service.vm.ctx.AVAXAssetID: service.vm.creationTxFee,
 		},
 	)
@@ -734,7 +734,7 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 	amountsSpent, ins, keys, err := service.vm.Spend(
 		utxos,
 		kc,
-		map[[32]byte]uint64{
+		map[ids.ID]uint64{
 			service.vm.ctx.AVAXAssetID: service.vm.creationTxFee,
 		},
 	)
@@ -1089,7 +1089,7 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 	// String repr. of asset ID --> asset ID
 	assetIDs := make(map[string]ids.ID)
 	// Asset ID --> amount of that asset being sent
-	amounts := make(map[[32]byte]uint64)
+	amounts := make(map[ids.ID]uint64)
 	// Outputs of our tx
 	outs := []*avax.TransferableOutput{}
 	for _, output := range args.Outputs {
@@ -1131,7 +1131,7 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 		})
 	}
 
-	amountsWithFee := make(map[[32]byte]uint64, len(amounts)+1)
+	amountsWithFee := make(map[ids.ID]uint64, len(amounts)+1)
 	for assetID, amount := range amounts {
 		amountsWithFee[assetID] = amount
 	}
@@ -1246,7 +1246,7 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxI
 	amountsSpent, ins, keys, err := service.vm.Spend(
 		feeUTXOs,
 		feeKc,
-		map[[32]byte]uint64{
+		map[ids.ID]uint64{
 			service.vm.ctx.AVAXAssetID: service.vm.txFee,
 		},
 	)
@@ -1278,7 +1278,7 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxI
 	ops, opKeys, err := service.vm.Mint(
 		utxos,
 		kc,
-		map[[32]byte]uint64{
+		map[ids.ID]uint64{
 			assetID: uint64(args.Amount),
 		},
 		to,
@@ -1363,7 +1363,7 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 	amountsSpent, ins, secpKeys, err := service.vm.Spend(
 		utxos,
 		kc,
-		map[[32]byte]uint64{
+		map[ids.ID]uint64{
 			service.vm.ctx.AVAXAssetID: service.vm.txFee,
 		},
 	)
@@ -1483,7 +1483,7 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 	amountsSpent, ins, secpKeys, err := service.vm.Spend(
 		feeUTXOs,
 		feeKc,
-		map[[32]byte]uint64{
+		map[ids.ID]uint64{
 			service.vm.ctx.AVAXAssetID: service.vm.txFee,
 		},
 	)
@@ -1601,11 +1601,11 @@ func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JSO
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 
 	if amountSpent := amountsSpent[service.vm.ctx.AVAXAssetID]; amountSpent < service.vm.txFee {
-		var localAmountsSpent map[[32]byte]uint64
+		var localAmountsSpent map[ids.ID]uint64
 		localAmountsSpent, ins, keys, err = service.vm.Spend(
 			utxos,
 			kc,
-			map[[32]byte]uint64{
+			map[ids.ID]uint64{
 				service.vm.ctx.AVAXAssetID: service.vm.txFee - amountSpent,
 			},
 		)
@@ -1742,7 +1742,7 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSO
 		return err
 	}
 
-	amounts := map[[32]byte]uint64{}
+	amounts := map[ids.ID]uint64{}
 	if assetID == service.vm.ctx.AVAXAssetID {
 		amountWithFee, err := safemath.Add64(uint64(args.Amount), service.vm.txFee)
 		if err != nil {

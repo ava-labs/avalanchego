@@ -34,7 +34,7 @@ func TestAliaserLookupError(t *testing.T) {
 }
 
 func TestAliaserLookup(t *testing.T) {
-	id := [32]byte{'K', 'a', 't', 'e', ' ', 'K', 'a', 'n', 'e'}
+	id := ID{'K', 'a', 't', 'e', ' ', 'K', 'a', 'n', 'e'}
 	aliaser := Aliaser{}
 	aliaser.Initialize()
 	if err := aliaser.Alias(id, "Batwoman"); err != nil {
@@ -51,7 +51,7 @@ func TestAliaserLookup(t *testing.T) {
 }
 
 func TestAliaserAliasesEmpty(t *testing.T) {
-	id := [32]byte{'J', 'a', 'm', 'e', 's', ' ', 'G', 'o', 'r', 'd', 'o', 'n'}
+	id := ID{'J', 'a', 'm', 'e', 's', ' ', 'G', 'o', 'r', 'd', 'o', 'n'}
 	aliaser := Aliaser{}
 	aliaser.Initialize()
 
@@ -62,7 +62,7 @@ func TestAliaserAliasesEmpty(t *testing.T) {
 }
 
 func TestAliaserAliases(t *testing.T) {
-	id := [32]byte{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
+	id := ID{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
 	aliaser := Aliaser{}
 	aliaser.Initialize()
 	if err := aliaser.Alias(id, "Batman"); err != nil {
@@ -80,8 +80,8 @@ func TestAliaserAliases(t *testing.T) {
 }
 
 func TestAliaserPrimaryAlias(t *testing.T) {
-	id1 := [32]byte{'J', 'a', 'm', 'e', 's', ' ', 'G', 'o', 'r', 'd', 'o', 'n'}
-	id2 := [32]byte{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
+	id1 := ID{'J', 'a', 'm', 'e', 's', ' ', 'G', 'o', 'r', 'd', 'o', 'n'}
+	id2 := ID{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
 	aliaser := Aliaser{}
 	aliaser.Initialize()
 	if err := aliaser.Alias(id2, "Batman"); err != nil {
@@ -110,8 +110,8 @@ func TestAliaserPrimaryAlias(t *testing.T) {
 }
 
 func TestAliaserAliasClash(t *testing.T) {
-	id1 := [32]byte{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
-	id2 := [32]byte{'D', 'i', 'c', 'k', ' ', 'G', 'r', 'a', 'y', 's', 'o', 'n'}
+	id1 := ID{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
+	id2 := ID{'D', 'i', 'c', 'k', ' ', 'G', 'r', 'a', 'y', 's', 'o', 'n'}
 	aliaser := Aliaser{}
 	aliaser.Initialize()
 	if err := aliaser.Alias(id1, "Batman"); err != nil {
@@ -125,8 +125,8 @@ func TestAliaserAliasClash(t *testing.T) {
 }
 
 func TestAliaserRemoveAlias(t *testing.T) {
-	id1 := [32]byte{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
-	id2 := [32]byte{'J', 'a', 'm', 'e', 's', ' ', 'G', 'o', 'r', 'd', 'o', 'n'}
+	id1 := ID{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
+	id2 := ID{'J', 'a', 'm', 'e', 's', ' ', 'G', 'o', 'r', 'd', 'o', 'n'}
 	aliaser := Aliaser{}
 	aliaser.Initialize()
 	if err := aliaser.Alias(id1, "Batman"); err != nil {

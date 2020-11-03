@@ -20,7 +20,7 @@ import (
 type WalletService struct {
 	vm *VM
 
-	pendingTxMap      map[[32]byte]*list.Element
+	pendingTxMap      map[ids.ID]*list.Element
 	pendingTxOrdering *list.List
 }
 
@@ -53,7 +53,7 @@ func (w *WalletService) issue(txBytes []byte) (ids.ID, error) {
 }
 
 func (w *WalletService) update(utxos []*avax.UTXO) ([]*avax.UTXO, error) {
-	utxoMap := make(map[[32]byte]*avax.UTXO, len(utxos))
+	utxoMap := make(map[ids.ID]*avax.UTXO, len(utxos))
 	for _, utxo := range utxos {
 		utxoMap[utxo.InputID()] = utxo
 	}
@@ -160,7 +160,7 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 	// String repr. of asset ID --> asset ID
 	assetIDs := make(map[string]ids.ID)
 	// Asset ID --> amount of that asset being sent
-	amounts := make(map[[32]byte]uint64)
+	amounts := make(map[ids.ID]uint64)
 	// Outputs of our tx
 	outs := []*avax.TransferableOutput{}
 	for _, output := range args.Outputs {
@@ -202,7 +202,7 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 		})
 	}
 
-	amountsWithFee := make(map[[32]byte]uint64, len(amounts)+1)
+	amountsWithFee := make(map[ids.ID]uint64, len(amounts)+1)
 	for assetKey, amount := range amounts {
 		amountsWithFee[assetKey] = amount
 	}

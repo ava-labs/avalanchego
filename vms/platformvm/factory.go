@@ -14,7 +14,7 @@ import (
 
 // ID of the platform VM
 var (
-	ID = ids.ID([32]byte{'p', 'l', 'a', 't', 'f', 'o', 'r', 'm', 'v', 'm'})
+	ID = ids.ID{'p', 'l', 'a', 't', 'f', 'o', 'r', 'm', 'v', 'm'}
 )
 
 // Factory can create new instances of the Platform Chain

@@ -58,7 +58,7 @@ type VMClient struct {
 	conns        []*grpc.ClientConn
 
 	ctx  *snow.Context
-	blks map[[32]byte]*BlockClient
+	blks map[ids.ID]*BlockClient
 
 	lastAccepted ids.ID
 }
@@ -68,7 +68,7 @@ func NewClient(client vmproto.VMClient, broker *plugin.GRPCBroker) *VMClient {
 	return &VMClient{
 		client: client,
 		broker: broker,
-		blks:   make(map[[32]byte]*BlockClient),
+		blks:   make(map[ids.ID]*BlockClient),
 	}
 }
 

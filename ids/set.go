@@ -17,14 +17,14 @@ const (
 )
 
 // Set is a set of IDs
-type Set map[[32]byte]bool
+type Set map[ID]bool
 
 func (ids *Set) init(size int) {
 	if *ids == nil {
 		if minSetSize > size {
 			size = minSetSize
 		}
-		*ids = make(map[[32]byte]bool, size)
+		*ids = make(map[ID]bool, size)
 	}
 }
 
@@ -46,7 +46,6 @@ func (ids *Set) Union(set Set) {
 
 // Contains returns true if the set contains this id, false otherwise
 func (ids *Set) Contains(id ID) bool {
-	ids.init(1)
 	return (*ids)[id]
 }
 
@@ -71,7 +70,6 @@ func (ids Set) Len() int { return len(ids) }
 
 // Remove all the id from this set, if the id isn't in the set, nothing happens
 func (ids *Set) Remove(idList ...ID) {
-	ids.init(1)
 	for _, id := range idList {
 		delete(*ids, id)
 	}
@@ -138,12 +136,12 @@ func (ids Set) String() string {
 	sb := strings.Builder{}
 	sb.WriteString("{")
 	first := true
-	for idBytes := range ids {
+	for id := range ids {
 		if !first {
 			sb.WriteString(", ")
 		}
 		first = false
-		sb.WriteString(ID(idBytes).String())
+		sb.WriteString(id.String())
 	}
 	sb.WriteString("}")
 	return sb.String()

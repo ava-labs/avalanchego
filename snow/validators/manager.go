@@ -28,7 +28,7 @@ type Manager interface {
 // NewManager returns a new, empty manager
 func NewManager() Manager {
 	return &manager{
-		subnetToVdrs: make(map[[32]byte]Set),
+		subnetToVdrs: make(map[ids.ID]Set),
 	}
 }
 
@@ -37,7 +37,7 @@ type manager struct {
 	lock sync.Mutex
 	// Key: Subnet ID
 	// Value: The validators that validate the subnet
-	subnetToVdrs map[[32]byte]Set
+	subnetToVdrs map[ids.ID]Set
 }
 
 func (m *manager) Set(subnetID ids.ID, newSet Set) error {

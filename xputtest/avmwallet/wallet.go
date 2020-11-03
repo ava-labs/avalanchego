@@ -34,7 +34,7 @@ type Wallet struct {
 	keychain *secp256k1fx.Keychain // Mapping from public address to the SigningKeys
 	utxoSet  *UTXOSet              // Mapping from utxoIDs to UTXOs
 
-	balance map[[32]byte]uint64
+	balance map[ids.ID]uint64
 	txFee   uint64
 
 	txs []*avm.Tx
@@ -63,7 +63,7 @@ func NewWallet(log logging.Logger, networkID uint32, chainID ids.ID, txFee uint6
 		log:       log,
 		keychain:  secp256k1fx.NewKeychain(),
 		utxoSet:   &UTXOSet{},
-		balance:   make(map[[32]byte]uint64),
+		balance:   make(map[ids.ID]uint64),
 		txFee:     txFee,
 	}, errs.Err
 }

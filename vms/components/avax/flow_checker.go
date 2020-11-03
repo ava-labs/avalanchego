@@ -17,15 +17,15 @@ var (
 
 // FlowChecker ...
 type FlowChecker struct {
-	consumed, produced map[[32]byte]uint64
+	consumed, produced map[ids.ID]uint64
 	errs               wrappers.Errs
 }
 
 // NewFlowChecker ...
 func NewFlowChecker() *FlowChecker {
 	return &FlowChecker{
-		consumed: make(map[[32]byte]uint64),
-		produced: make(map[[32]byte]uint64),
+		consumed: make(map[ids.ID]uint64),
+		produced: make(map[ids.ID]uint64),
 	}
 }
 
@@ -35,7 +35,7 @@ func (fc *FlowChecker) Consume(assetID ids.ID, amount uint64) { fc.add(fc.consum
 // Produce ...
 func (fc *FlowChecker) Produce(assetID ids.ID, amount uint64) { fc.add(fc.produced, assetID, amount) }
 
-func (fc *FlowChecker) add(value map[[32]byte]uint64, assetID ids.ID, amount uint64) {
+func (fc *FlowChecker) add(value map[ids.ID]uint64, assetID ids.ID, amount uint64) {
 	var err error
 	value[assetID], err = math.Add64(value[assetID], amount)
 	fc.errs.Add(err)

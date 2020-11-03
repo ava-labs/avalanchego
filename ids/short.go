@@ -83,7 +83,7 @@ func (id ShortID) IsZero() bool { return id.ID == nil }
 
 // LongID returns a 32 byte identifier from this id
 func (id ShortID) LongID() ID {
-	dest := [32]byte{}
+	dest := ID{}
 	copy(dest[:], id.ID[:])
 	return dest
 }

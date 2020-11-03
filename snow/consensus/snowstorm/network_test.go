@@ -19,7 +19,7 @@ import (
 type Network struct {
 	params         sbcon.Parameters
 	consumers      []*TestTx
-	nodeTxs        []map[[32]byte]*TestTx
+	nodeTxs        []map[ids.ID]*TestTx
 	nodes, running []Consensus
 }
 
@@ -44,7 +44,7 @@ func (n *Network) Initialize(
 
 	idCount := uint64(0)
 
-	colorMap := map[[32]byte]int{}
+	colorMap := map[ids.ID]int{}
 	colors := []ids.ID{}
 	for i := 0; i < numColors; i++ {
 		idCount++
@@ -53,7 +53,7 @@ func (n *Network) Initialize(
 		colors = append(colors, color)
 	}
 
-	count := map[[32]byte]int{}
+	count := map[ids.ID]int{}
 	for len(colors) > 0 {
 		selected := []ids.ID{}
 		s := sampler.NewUniform()
@@ -103,7 +103,7 @@ func (n *Network) AddNode(cg Consensus) error {
 
 	n.shuffleConsumers()
 
-	txs := map[[32]byte]*TestTx{}
+	txs := map[ids.ID]*TestTx{}
 	for _, tx := range n.consumers {
 		newTx := &TestTx{
 			TestDecidable: choices.TestDecidable{
@@ -188,7 +188,7 @@ func (n *Network) Disagreement() bool {
 }
 
 func (n *Network) Agreement() bool {
-	statuses := map[[32]byte]choices.Status{}
+	statuses := map[ids.ID]choices.Status{}
 	for _, color := range n.consumers {
 		for _, nodeTx := range n.nodeTxs {
 			colorID := color.ID()

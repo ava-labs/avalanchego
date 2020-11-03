@@ -4,6 +4,7 @@
 package genesis
 
 import (
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/evm"
@@ -15,7 +16,7 @@ import (
 )
 
 // Aliases returns the default aliases based on the network ID
-func Aliases(genesisBytes []byte) (map[string][]string, map[[32]byte][]string, map[[32]byte][]string, error) {
+func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, map[ids.ID][]string, error) {
 	generalAliases := map[string][]string{
 		"vm/" + platformvm.ID.String():             {"vm/platform"},
 		"vm/" + avm.ID.String():                    {"vm/avm"},
@@ -23,10 +24,10 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[[32]byte][]string, m
 		"vm/" + timestampvm.ID.String():            {"vm/timestamp"},
 		"bc/" + constants.PlatformChainID.String(): {"P", "platform", "bc/P", "bc/platform"},
 	}
-	chainAliases := map[[32]byte][]string{
+	chainAliases := map[ids.ID][]string{
 		constants.PlatformChainID: {"P", "platform"},
 	}
-	vmAliases := map[[32]byte][]string{
+	vmAliases := map[ids.ID][]string{
 		platformvm.ID:  {"platform"},
 		avm.ID:         {"avm"},
 		evm.ID:         {"evm"},

@@ -7,5 +7,5 @@ import "github.com/ava-labs/avalanchego/ids"
 
 var (
 	// ID that this VM uses when labeled
-	ID = ids.ID([32]byte{'e', 'v', 'm'})
+	ID = ids.ID{'e', 'v', 'm'}
 )

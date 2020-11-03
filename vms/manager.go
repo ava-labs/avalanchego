@@ -55,7 +55,7 @@ type manager struct {
 
 	// Key: The key underlying a VM's ID
 	// Value: A factory that creates new instances of that VM
-	vmFactories map[[32]byte]VMFactory
+	vmFactories map[ids.ID]VMFactory
 
 	// The node's API server.
 	// [manager] adds routes to this server to expose new API endpoints/services
@@ -67,7 +67,7 @@ type manager struct {
 // NewManager returns an instance of a VM manager
 func NewManager(apiServer *api.Server, log logging.Logger) Manager {
 	m := &manager{
-		vmFactories: make(map[[32]byte]VMFactory),
+		vmFactories: make(map[ids.ID]VMFactory),
 		apiServer:   apiServer,
 		log:         log,
 	}

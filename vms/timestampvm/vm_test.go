@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
-var blockchainID = ids.ID([32]byte{1, 2, 3})
+var blockchainID = ids.ID{1, 2, 3}
 
 // Utility function to assert that [block] has:
 // * Parent with ID [parentID]
@@ -72,7 +72,7 @@ func TestGenesis(t *testing.T) {
 	}
 
 	// Verify that the genesis block has the data we expect
-	if err := assertBlock(genesisBlock, ids.Empty, [32]byte{0, 0, 0, 0, 0}, true); err != nil {
+	if err := assertBlock(genesisBlock, ids.Empty, ids.ID{0, 0, 0, 0, 0}, true); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -193,7 +193,7 @@ func TestHappyPath(t *testing.T) {
 }
 
 func TestMakeStringFrom32Bytes(t *testing.T) {
-	bytes := [32]byte{'w', 'o', 'o'}
+	bytes := ids.ID{'w', 'o', 'o'}
 	bytesFormatter := formatting.CB58{Bytes: bytes[:]}
 	t.Log(bytesFormatter.String())
 }

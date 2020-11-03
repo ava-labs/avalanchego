@@ -28,9 +28,9 @@ func TestStateIDsNoStart(t *testing.T) {
 
 	state := vm.state.state
 
-	id0 := [32]byte{0x01, 0}
-	id1 := [32]byte{0x02, 0}
-	id2 := [32]byte{0x03, 0}
+	id0 := ids.ID{0x01, 0}
+	id1 := ids.ID{0x02, 0}
+	id2 := ids.ID{0x03, 0}
 
 	if _, err := state.IDs(ids.Empty[:], []byte{}, math.MaxInt32); err != nil {
 		t.Fatal(err)
@@ -160,9 +160,9 @@ func TestStateIDsWithStart(t *testing.T) {
 	}()
 
 	state := vm.state.state
-	id0 := ids.ID([32]byte{0x01, 0})
-	id1 := ids.ID([32]byte{0x02, 0})
-	id2 := ids.ID([32]byte{0x03, 0})
+	id0 := ids.ID{0x01, 0}
+	id1 := ids.ID{0x02, 0}
+	id2 := ids.ID{0x03, 0}
 
 	// State should be empty to start
 	if _, err := state.IDs(ids.Empty[:], []byte{}, math.MaxInt32); err != nil {
