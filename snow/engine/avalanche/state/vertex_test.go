@@ -26,7 +26,7 @@ func TestVertexVerify(t *testing.T) {
 		id:        ids.ID{},
 		chainID:   ids.ID{1},
 		height:    1,
-		parentIDs: []ids.ID{ids.ID{2}},
+		parentIDs: []ids.ID{{2}},
 		txs:       []snowstorm.Tx{tx0},
 	}
 
@@ -38,7 +38,7 @@ func TestVertexVerify(t *testing.T) {
 		id:        ids.ID{},
 		chainID:   ids.ID{1},
 		height:    1,
-		parentIDs: []ids.ID{ids.ID{'d', 'u', 'p'}, ids.ID{'d', 'u', 'p'}},
+		parentIDs: []ids.ID{{'d', 'u', 'p'}, {'d', 'u', 'p'}},
 		txs:       []snowstorm.Tx{tx0},
 	}
 
@@ -66,7 +66,7 @@ func TestVertexVerify(t *testing.T) {
 		id:        ids.ID{},
 		chainID:   ids.ID{1},
 		height:    1,
-		parentIDs: []ids.ID{ids.ID{2}},
+		parentIDs: []ids.ID{{2}},
 		txs:       []snowstorm.Tx{},
 	}
 
@@ -87,7 +87,7 @@ func TestVertexVerify(t *testing.T) {
 		id:        ids.ID{},
 		chainID:   ids.ID{1},
 		height:    1,
-		parentIDs: []ids.ID{ids.ID{2}},
+		parentIDs: []ids.ID{{2}},
 		txs:       []snowstorm.Tx{sortedTxs[1], sortedTxs[0]},
 	}
 
@@ -99,7 +99,7 @@ func TestVertexVerify(t *testing.T) {
 		id:        ids.ID{},
 		chainID:   ids.ID{1},
 		height:    1,
-		parentIDs: []ids.ID{ids.ID{2}},
+		parentIDs: []ids.ID{{2}},
 		txs:       []snowstorm.Tx{tx0, tx0},
 	}
 
@@ -123,7 +123,7 @@ func TestVertexVerify(t *testing.T) {
 		id:        ids.ID{},
 		chainID:   ids.ID{1},
 		height:    1,
-		parentIDs: []ids.ID{ids.ID{2}},
+		parentIDs: []ids.ID{{2}},
 		txs:       conflictingTxs,
 	}
 

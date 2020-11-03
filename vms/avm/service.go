@@ -420,7 +420,7 @@ func (service *Service) GetAllBalances(r *http.Request, args *api.JSONAddress, r
 			}
 		} else {
 			reply.Balances[i] = Balance{
-				AssetID: ids.ID(assetID).String(),
+				AssetID: assetID.String(),
 				Balance: json.Uint64(balances[assetID]),
 			}
 		}

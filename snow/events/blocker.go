@@ -72,7 +72,7 @@ func (b *Blocker) PrefixedString(prefix string) string {
 	for key, value := range *b {
 		s.WriteString(fmt.Sprintf("\n%sID[%s]: %d",
 			prefix,
-			ids.ID(key),
+			key,
 			len(value)))
 	}
 

@@ -168,15 +168,15 @@ func TestIDString(t *testing.T) {
 
 func TestSortIDs(t *testing.T) {
 	ids := []ID{
-		ID{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-		ID{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'},
-		ID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
+		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
+		{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'},
+		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 	}
 	SortIDs(ids)
 	expected := []ID{
-		ID{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'},
-		ID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-		ID{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
+		{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'},
+		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
+		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 	}
 	if !reflect.DeepEqual(ids, expected) {
 		t.Fatal("[]ID was not sorted lexographically")
@@ -185,22 +185,22 @@ func TestSortIDs(t *testing.T) {
 
 func TestIsSortedAndUnique(t *testing.T) {
 	unsorted := []ID{
-		ID{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-		ID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
+		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
+		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 	}
 	if IsSortedAndUniqueIDs(unsorted) {
 		t.Fatal("Wrongly accepted unsorted IDs")
 	}
 	duplicated := []ID{
-		ID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-		ID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
+		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
+		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 	}
 	if IsSortedAndUniqueIDs(duplicated) {
 		t.Fatal("Wrongly accepted duplicated IDs")
 	}
 	sorted := []ID{
-		ID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-		ID{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
+		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
+		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 	}
 	if !IsSortedAndUniqueIDs(sorted) {
 		t.Fatal("Wrongly rejected sorted, unique IDs")

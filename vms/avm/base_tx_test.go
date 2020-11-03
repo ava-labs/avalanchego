@@ -330,7 +330,7 @@ func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
-		BlockchainID: ids.ID(chainID).Prefix(0),
+		BlockchainID: chainID.Prefix(0),
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
