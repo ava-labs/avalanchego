@@ -4,10 +4,11 @@
 package timer
 
 import (
-	"github.com/ava-labs/avalanchego/ids"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestTimeoutManager(t *testing.T) {

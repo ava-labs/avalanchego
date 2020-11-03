@@ -2,9 +2,10 @@ package platformvm
 
 import (
 	"encoding/json"
-	"github.com/ava-labs/avalanchego/ids"
 	"strings"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/ids"
 
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )

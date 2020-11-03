@@ -5,8 +5,9 @@ package cache
 
 import (
 	"crypto/rand"
-	"github.com/ava-labs/avalanchego/ids"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 func BenchmarkLRUCachePutSmall(b *testing.B) {

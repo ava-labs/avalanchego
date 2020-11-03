@@ -4,9 +4,10 @@
 package avax
 
 import (
+	"testing"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/codec"
-	"testing"
 )
 
 func TestAssetVerifyNil(t *testing.T) {

@@ -80,7 +80,9 @@ func (b *UniqueBag) List() []ID {
 
 // Bag ...
 func (b *UniqueBag) Bag(alpha int) Bag {
-	bag := Bag{}
+	bag := Bag{
+		counts: make(map[ID]int, len(*b)),
+	}
 	bag.SetThreshold(alpha)
 	for id, bs := range *b {
 		bag.AddCount(id, bs.Len())

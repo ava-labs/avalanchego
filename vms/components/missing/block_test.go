@@ -4,8 +4,9 @@
 package missing
 
 import (
-	"github.com/ava-labs/avalanchego/ids"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/ids"
 
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
