@@ -29,5 +29,71 @@ func TestSort2dByteArray(t *testing.T) {
 	if !IsSorted2DBytes(arr) {
 		t.Fatal("should be sorted")
 	}
+}
 
+func TestSortUint32Array(t *testing.T) {
+	arr := []uint32{}
+	if !IsSortedAndUniqueUint32(arr) {
+		t.Fatal("is sorted and unique")
+	}
+
+	arr = []uint32{0}
+	if !IsSortedAndUniqueUint32(arr) {
+		t.Fatal("is sorted and unique")
+	}
+
+	arr = []uint32{0, 0}
+	if IsSortedAndUniqueUint32(arr) {
+		t.Fatal("is not sorted and unique")
+	}
+
+	arr = []uint32{0, 1}
+	if !IsSortedAndUniqueUint32(arr) {
+		t.Fatal("is sorted and unique")
+	}
+
+	arr = []uint32{1, 0}
+	if IsSortedAndUniqueUint32(arr) {
+		t.Fatal("is not sorted and unique")
+	}
+
+	arr = []uint32{0, 1, 2}
+	if !IsSortedAndUniqueUint32(arr) {
+		t.Fatal("is sorted and unique")
+	}
+
+	arr = []uint32{0, 0, 1}
+	if IsSortedAndUniqueUint32(arr) {
+		t.Fatal("is not sorted and unique")
+	}
+
+	arr = []uint32{0, 1, 1}
+	if IsSortedAndUniqueUint32(arr) {
+		t.Fatal("is not sorted and unique")
+	}
+
+	arr = []uint32{2, 1, 0}
+	if IsSortedAndUniqueUint32(arr) {
+		t.Fatal("is not sorted and unique")
+	}
+
+	arr = []uint32{2, 1, 2}
+	if IsSortedAndUniqueUint32(arr) {
+		t.Fatal("is not sorted and unique")
+	}
+
+	arr = []uint32{2, 1, 3}
+	if IsSortedAndUniqueUint32(arr) {
+		t.Fatal("is not sorted and unique")
+	}
+
+	arr = []uint32{0, 10, 20}
+	if !IsSortedAndUniqueUint32(arr) {
+		t.Fatal("is sorted and unique")
+	}
+
+	arr = []uint32{10, 20, 25}
+	if !IsSortedAndUniqueUint32(arr) {
+		t.Fatal("is sorted and unique")
+	}
 }
