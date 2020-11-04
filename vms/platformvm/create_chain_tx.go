@@ -63,8 +63,6 @@ func (tx *UnsignedCreateChainTx) Verify(
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.SubnetID == ids.Empty:
-		return errNoSubnetID
 	case tx.SubnetID == constants.PrimaryNetworkID:
 		return errDSCantValidate
 	case len(tx.ChainName) > maxNameLen:

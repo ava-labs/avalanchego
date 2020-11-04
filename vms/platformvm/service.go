@@ -588,10 +588,6 @@ type GetStakingAssetIDResponse struct {
 func (service *Service) GetStakingAssetID(_ *http.Request, args *GetStakingAssetIDArgs, response *GetStakingAssetIDResponse) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: GetStakingAssetID called")
 
-	if args.SubnetID == ids.Empty {
-		args.SubnetID = constants.PrimaryNetworkID
-	}
-
 	if args.SubnetID != constants.PrimaryNetworkID {
 		return fmt.Errorf("Subnet %s doesn't have a valid staking token",
 			args.SubnetID)
@@ -626,9 +622,6 @@ type GetCurrentValidatorsReply struct {
 // GetCurrentValidators returns current validators and delegators
 func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
 	service.vm.Ctx.Log.Info("Platform: GetCurrentValidators called")
-	if args.SubnetID == ids.Empty {
-		args.SubnetID = constants.PrimaryNetworkID
-	}
 
 	reply.Validators = []interface{}{}
 	reply.Delegators = []interface{}{}
@@ -780,9 +773,6 @@ type GetPendingValidatorsReply struct {
 // GetPendingValidators returns the list of pending validators
 func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidatorsArgs, reply *GetPendingValidatorsReply) error {
 	service.vm.Ctx.Log.Info("Platform: GetPendingValidators called")
-	if args.SubnetID == ids.Empty {
-		args.SubnetID = constants.PrimaryNetworkID
-	}
 
 	reply.Validators = []interface{}{}
 	reply.Delegators = []interface{}{}
@@ -878,9 +868,6 @@ type SampleValidatorsReply struct {
 // SampleValidators returns a sampling of the list of current validators
 func (service *Service) SampleValidators(_ *http.Request, args *SampleValidatorsArgs, reply *SampleValidatorsReply) error {
 	service.vm.Ctx.Log.Info("Platform: SampleValidators called with Size = %d", args.Size)
-	if args.SubnetID == ids.Empty {
-		args.SubnetID = constants.PrimaryNetworkID
-	}
 
 	validators, ok := service.vm.vdrMgr.GetValidators(args.SubnetID)
 	if !ok {
@@ -2169,9 +2156,6 @@ type GetMaxStakeAmountReply struct {
 // GetMaxStakeAmount returns the maximum amount of AVAX staking to the named
 // node during the time period.
 func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmountArgs, reply *GetMaxStakeAmountReply) error {
-	if args.SubnetID == ids.Empty {
-		args.SubnetID = service.vm.Ctx.SubnetID
-	}
 	nodeID, err := ids.ShortFromPrefixedString(args.NodeID, constants.NodeIDPrefix)
 	if err != nil {
 		return fmt.Errorf("failed to parse nodeID %q due to: %w", args.NodeID, err)
