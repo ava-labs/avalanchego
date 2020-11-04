@@ -47,14 +47,14 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, map
 
 	for _, chain := range genesis.Chains {
 		uChain := chain.UnsignedTx.(*platformvm.UnsignedCreateChainTx)
-		switch {
-		case avm.ID == uChain.VMID:
+		switch uChain.VMID {
+		case avm.ID:
 			generalAliases["bc/"+chain.ID().String()] = []string{"X", "avm", "bc/X", "bc/avm"}
 			chainAliases[chain.ID()] = []string{"X", "avm"}
-		case evm.ID == uChain.VMID:
+		case evm.ID:
 			generalAliases["bc/"+chain.ID().String()] = []string{"C", "evm", "bc/C", "bc/evm"}
 			chainAliases[chain.ID()] = []string{"C", "evm"}
-		case timestampvm.ID == uChain.VMID:
+		case timestampvm.ID:
 			generalAliases["bc/"+chain.ID().String()] = []string{"bc/timestamp"}
 			chainAliases[chain.ID()] = []string{"timestamp"}
 		}

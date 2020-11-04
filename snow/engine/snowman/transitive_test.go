@@ -283,10 +283,10 @@ func TestEngineQuery(t *testing.T) {
 	}
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		switch {
-		case blkID == blk.ID():
+		switch blkID {
+		case blk.ID():
 			return blk, nil
-		case blkID == blk1.ID():
+		case blk1.ID():
 			return nil, errUnknownBlock
 		}
 		t.Fatalf("Wrong block requested")
@@ -334,10 +334,10 @@ func TestEngineQuery(t *testing.T) {
 		}
 
 		vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-			switch {
-			case blkID == blk.ID():
+			switch blkID {
+			case blk.ID():
 				return blk, nil
-			case blkID == blk1.ID():
+			case blk1.ID():
 				return blk1, nil
 			}
 			t.Fatalf("Wrong block requested")

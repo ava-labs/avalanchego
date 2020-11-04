@@ -2703,10 +2703,10 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	}
 
 	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
-		switch {
-		case vtxID == vtx0.ID():
+		switch vtxID {
+		case vtx0.ID():
 			return vtx0, nil
-		case vtxID == vtx1.ID():
+		case vtx1.ID():
 			return vtx1, nil
 		}
 		return nil, errors.New("Unknown vtx")
