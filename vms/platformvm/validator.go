@@ -4,9 +4,15 @@
 package platformvm
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
+)
+
+var (
+	errBadSubnetID = errors.New("subnet ID can't be primary network ID")
 )
 
 // Validator is a validator.
@@ -71,9 +77,9 @@ func (v *SubnetValidator) SubnetID() ids.ID { return v.Subnet }
 
 // Verify this validator is valid
 func (v *SubnetValidator) Verify() error {
-	switch {
-	case v.Subnet == ids.Empty:
-		return errNoSubnetID
+	switch v.Subnet {
+	case constants.PrimaryNetworkID:
+		return errBadSubnetID
 	default:
 		return v.Validator.Verify()
 	}
