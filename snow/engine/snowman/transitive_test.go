@@ -482,12 +482,12 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}
 
 	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
-		switch {
-		case id == gBlk.ID():
+		switch id {
+		case gBlk.ID():
 			return gBlk, nil
-		case id == blk0.ID():
+		case blk0.ID():
 			return blk0, nil
-		case id == blk1.ID():
+		case blk1.ID():
 			return nil, errUnknownBlock
 		}
 		t.Fatalf("Unknown block")
@@ -858,8 +858,8 @@ func TestVoteCanceling(t *testing.T) {
 
 	vm.LastAcceptedF = gBlk.ID
 	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
-		switch {
-		case id == gBlk.ID():
+		switch id {
+		case gBlk.ID():
 			return gBlk, nil
 		default:
 			t.Fatalf("Loaded unknown block")
@@ -1029,8 +1029,8 @@ func TestEngineAbandonQuery(t *testing.T) {
 	blkID := ids.GenerateTestID()
 
 	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
-		switch {
-		case id == blkID:
+		switch id {
+		case blkID:
 			return nil, errUnknownBlock
 		default:
 			t.Fatalf("Loaded unknown block")
@@ -1083,8 +1083,8 @@ func TestEngineAbandonChit(t *testing.T) {
 
 	fakeBlkID := ids.GenerateTestID()
 	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
-		switch {
-		case id == fakeBlkID:
+		switch id {
+		case fakeBlkID:
 			return nil, errUnknownBlock
 		default:
 			t.Fatalf("Loaded unknown block")
@@ -1826,10 +1826,10 @@ func TestEngineDoubleChit(t *testing.T) {
 	}
 
 	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
-		switch {
-		case id == gBlk.ID():
+		switch id {
+		case gBlk.ID():
 			return gBlk, nil
-		case id == blk.ID():
+		case blk.ID():
 			return blk, nil
 		}
 		t.Fatalf("Unknown block")

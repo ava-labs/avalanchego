@@ -199,10 +199,10 @@ func TestEngineQuery(t *testing.T) {
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		switch {
-		case id == gVtx.ID():
+		switch id {
+		case gVtx.ID():
 			return gVtx, nil
-		case id == mVtx.ID():
+		case mVtx.ID():
 			return mVtx, nil
 		}
 
@@ -461,10 +461,10 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		switch {
-		case id == gVtx.ID():
+		switch id {
+		case gVtx.ID():
 			return gVtx, nil
-		case id == mVtx.ID():
+		case mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -525,14 +525,14 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}
 
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		switch {
-		case id == gVtx.ID():
+		switch id {
+		case gVtx.ID():
 			return gVtx, nil
-		case id == mVtx.ID():
+		case mVtx.ID():
 			return mVtx, nil
-		case id == vtx0.ID():
+		case vtx0.ID():
 			return vtx0, nil
-		case id == vtx1.ID():
+		case vtx1.ID():
 			return nil, errUnknownVertex
 		}
 		t.Fatalf("Unknown vertex")
@@ -886,10 +886,10 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		switch {
-		case id == gVtx.ID():
+		switch id {
+		case gVtx.ID():
 			return gVtx, nil
-		case id == mVtx.ID():
+		case mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -994,10 +994,10 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		switch {
-		case id == gVtx.ID():
+		switch id {
+		case gVtx.ID():
 			return gVtx, nil
-		case id == mVtx.ID():
+		case mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1077,10 +1077,10 @@ func TestEngineIssueRepoll(t *testing.T) {
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		switch {
-		case id == gVtx.ID():
+		switch id {
+		case gVtx.ID():
 			return gVtx, nil
-		case id == mVtx.ID():
+		case mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1205,12 +1205,12 @@ func TestEngineReissue(t *testing.T) {
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		switch {
-		case id == gVtx.ID():
+		switch id {
+		case gVtx.ID():
 			return gVtx, nil
-		case id == mVtx.ID():
+		case mVtx.ID():
 			return mVtx, nil
-		case id == vtx.ID():
+		case vtx.ID():
 			return vtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1353,10 +1353,10 @@ func TestEngineLargeIssue(t *testing.T) {
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		switch {
-		case id == gVtx.ID():
+		switch id {
+		case gVtx.ID():
 			return gVtx, nil
-		case id == mVtx.ID():
+		case mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1429,10 +1429,10 @@ func TestEngineGetVertex(t *testing.T) {
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		switch {
-		case id == gVtx.ID():
+		switch id {
+		case gVtx.ID():
 			return gVtx, nil
-		case id == mVtx.ID():
+		case mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1499,10 +1499,10 @@ func TestEngineInsufficientValidators(t *testing.T) {
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		switch {
-		case id == gVtx.ID():
+		switch id {
+		case gVtx.ID():
 			return gVtx, nil
-		case id == mVtx.ID():
+		case mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1574,12 +1574,12 @@ func TestEnginePushGossip(t *testing.T) {
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		switch {
-		case id == gVtx.ID():
+		switch id {
+		case gVtx.ID():
 			return gVtx, nil
-		case id == mVtx.ID():
+		case mVtx.ID():
 			return mVtx, nil
-		case id == vtx.ID():
+		case vtx.ID():
 			return vtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1661,12 +1661,12 @@ func TestEngineSingleQuery(t *testing.T) {
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		switch {
-		case id == gVtx.ID():
+		switch id {
+		case gVtx.ID():
 			return gVtx, nil
-		case id == mVtx.ID():
+		case mVtx.ID():
 			return mVtx, nil
-		case id == vtx.ID():
+		case vtx.ID():
 			return vtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1752,10 +1752,10 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		switch {
-		case id == gVtx.ID():
+		switch id {
+		case gVtx.ID():
 			return gVtx, nil
-		case id == mVtx.ID():
+		case mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1856,10 +1856,10 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		switch {
-		case id == gVtx.ID():
+		switch id {
+		case gVtx.ID():
 			return gVtx, nil
-		case id == mVtx.ID():
+		case mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -1977,10 +1977,10 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		switch {
-		case id == gVtx.ID():
+		switch id {
+		case gVtx.ID():
 			return gVtx, nil
-		case id == mVtx.ID():
+		case mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -2109,10 +2109,10 @@ func TestEngineMissingTx(t *testing.T) {
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		switch {
-		case id == gVtx.ID():
+		switch id {
+		case gVtx.ID():
 			return gVtx, nil
-		case id == mVtx.ID():
+		case mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -3315,10 +3315,10 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		switch {
-		case id == gVtx.ID():
+		switch id {
+		case gVtx.ID():
 			return gVtx, nil
-		case id == mVtx.ID():
+		case mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
@@ -3434,10 +3434,10 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
-		switch {
-		case id == gVtx.ID():
+		switch id {
+		case gVtx.ID():
 			return gVtx, nil
-		case id == mVtx.ID():
+		case mVtx.ID():
 			return mVtx, nil
 		}
 		t.Fatalf("Unknown vertex")
