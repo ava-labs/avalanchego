@@ -534,6 +534,10 @@ func (vm *VM) CreateHandlers() map[string]*commonEng.HTTPHandler {
 		handler.RegisterName("net", &NetAPI{vm})
 		enabledAPIs = append(enabledAPIs, "net")
 	}
+	if vm.CLIConfig.Web3APIEnabled {
+		handler.RegisterName("web3", &Web3API{})
+		enabledAPIs = append(enabledAPIs, "web3")
+	}
 
 	log.Info(fmt.Sprintf("Enabled APIs: %s", strings.Join(enabledAPIs, ", ")))
 

@@ -16,6 +16,7 @@ type CommandLineConfig struct {
 	PersonalAPIEnabled bool `json:"personal-api-enabled"`
 	TxPoolAPIEnabled   bool `json:"tx-pool-api-enabled"`
 	DebugAPIEnabled    bool `json:"debug-api-enabled"`
+	Web3APIEnabled     bool `json:"web3-api-enabled"`
 
 	ParsingError error
 }
