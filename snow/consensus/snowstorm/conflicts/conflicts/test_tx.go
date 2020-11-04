@@ -12,21 +12,20 @@ import (
 type TestTx struct {
 	choices.TestDecidable
 
-	DependenciesV []Tx
+	EpochV        uint32
+	RestrictionsV []ids.ID
 	InputIDsV     ids.Set
-
-	VerifyV error
-	BytesV  []byte
+	OutputIDsV    ids.Set
 }
 
-// Dependencies implements the Tx interface
-func (t *TestTx) Dependencies() []Tx { return t.DependenciesV }
+// Epoch implements the Tx interface
+func (t *TestTx) Epoch() uint32 { return t.EpochV }
+
+// Restrictions implements the Tx interface
+func (t *TestTx) Restrictions() []ids.ID { return t.RestrictionsV }
 
 // InputIDs implements the Tx interface
 func (t *TestTx) InputIDs() ids.Set { return t.InputIDsV }
 
-// Verify implements the Tx interface
-func (t *TestTx) Verify() error { return t.VerifyV }
-
-// Bytes implements the Tx interface
-func (t *TestTx) Bytes() []byte { return t.BytesV }
+// OutputIDs implements the Tx interface
+func (t *TestTx) OutputIDs() ids.Set { return t.OutputIDsV }

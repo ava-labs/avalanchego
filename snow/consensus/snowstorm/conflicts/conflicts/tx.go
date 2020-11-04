@@ -18,17 +18,17 @@ type Tx interface {
 	// Restrictions this transaction is attempting to enforce.
 	Restrictions() []ids.ID
 
-	// MissingInputIDs is a set where each element is the ID of a piece of state
-	// that hasn't been produced yet.
-	//
-	// In the context of a UTXO-based payments system, for example, this would
-	// be the IDs of the UTXOs consumed by this transaction.
-	MissingInputIDs() ids.Set
-
 	// InputIDs is a set where each element is the ID of a piece of state that
 	// will be consumed if this transaction is accepted.
 	//
 	// In the context of a UTXO-based payments system, for example, this would
 	// be the IDs of the UTXOs consumed by this transaction.
 	InputIDs() ids.Set
+
+	// OutputIDs is a set where each element is the ID of a piece of state that
+	// will be produced on acceptance.
+	//
+	// In the context of a UTXO-based payments system, for example, this would
+	// be the IDs of the UTXOs produced by this transaction.
+	OutputIDs() ids.Set
 }
