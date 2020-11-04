@@ -19,11 +19,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 )
 
 const (
-	version = "coreth-v0.3.7"
+	version = "coreth"
 )
 
 // test constants
@@ -49,6 +50,15 @@ func (s *NetAPI) PeerCount() hexutil.Uint { return hexutil.Uint(0) } // TODO: re
 
 // Version returns the current ethereum protocol version.
 func (s *NetAPI) Version() string { return fmt.Sprintf("%d", s.vm.networkID) }
+
+// Web3API offers helper API methods
+type Web3API struct{}
+
+// ClientVersion returns the version of the vm running
+func (s *Web3API) ClientVersion() string { return version }
+
+// Sha3 returns the bytes returned by hashing [input] with Keccak256
+func (s *Web3API) Sha3(input hexutil.Bytes) hexutil.Bytes { return ethcrypto.Keccak256(input) }
 
 // GetAcceptedFrontReply defines the reply that will be sent from the
 // GetAcceptedFront API call
