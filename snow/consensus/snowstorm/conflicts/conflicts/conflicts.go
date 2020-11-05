@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/events"
 )
 
 var (
@@ -20,13 +19,10 @@ type Conflicts struct {
 	txs map[[32]byte]Tx
 
 	// track which txs are currently consuming which utxos
-	utxos map[[32]byte]ids.Set
+	consumedUTXOs map[[32]byte]ids.Set
 
-	// keeps track of whether dependencies have been accepted
-	pendingAccept events.Blocker
-
-	// keeps track of whether dependencies have been rejected
-	pendingReject events.Blocker
+	// track which txs are currently producing which utxos
+	producedUTXOs map[[32]byte]ids.Set
 
 	// track txs that have been marked as ready to accept
 	acceptable []choices.Decidable
@@ -37,8 +33,9 @@ type Conflicts struct {
 
 func New() *Conflicts {
 	return &Conflicts{
-		txs:   make(map[[32]byte]Tx),
-		utxos: make(map[[32]byte]ids.Set),
+		txs:           make(map[[32]byte]Tx),
+		consumedUTXOs: make(map[[32]byte]ids.Set),
+		producedUTXOs: make(map[[32]byte]ids.Set),
 	}
 }
 
@@ -55,27 +52,15 @@ func (c *Conflicts) Add(txIntf choices.Decidable) error {
 	txID := tx.ID()
 	c.txs[txID.Key()] = tx
 	for inputKey := range tx.InputIDs() {
-		spenders := c.utxos[inputKey]
+		spenders := c.consumedUTXOs[inputKey]
 		spenders.Add(txID)
-		c.utxos[inputKey] = spenders
+		c.consumedUTXOs[inputKey] = spenders
 	}
-
-	toReject := &rejector{
-		c:  c,
-		tx: tx,
+	for outputKey := range tx.OutputIDs() {
+		producers := c.producedUTXOs[outputKey]
+		producers.Add(txID)
+		c.producedUTXOs[outputKey] = producers
 	}
-
-	toReject.deps.Add(txID)
-	for _, dependency := range tx.Dependencies() {
-		if dependency.Status() != choices.Accepted {
-			// If the dependency isn't accepted, then it must be processing.
-			// This tx should be accepted after this tx is accepted. Note that
-			// the dependencies can't already be rejected, because it is assumed
-			// that this tx is currently considered valid.
-			toReject.deps.Add(dependency.ID())
-		}
-	}
-	c.pendingReject.Register(toReject)
 	return nil
 }
 
