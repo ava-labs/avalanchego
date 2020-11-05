@@ -5,6 +5,7 @@ type CommandLineConfig struct {
 	// Coreth APIs
 	SnowmanAPIEnabled     bool `json:"snowman-api-enabled"`
 	CorethAdminAPIEnabled bool `json:"coreth-admin-api-enabled"`
+	NetAPIEnabled         bool `json:"net-api-enabled"`
 
 	// Coreth API Gas/Price Caps
 	RPCGasCap   uint64  `json:"rpc-gas-cap"`
