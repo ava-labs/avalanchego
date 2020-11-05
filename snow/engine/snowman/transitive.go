@@ -635,11 +635,13 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		blkID := blk.ID()
 		t.pending.Remove(blkID)
 		t.blocked.Fulfill(blkID)
+		t.blkReqs.RemoveAny(blkID)
 	}
 	for _, blk := range dropped {
 		blkID := blk.ID()
 		t.pending.Remove(blkID)
 		t.blocked.Abandon(blkID)
+		t.blkReqs.RemoveAny(blkID)
 	}
 
 	// If we should issue multiple queries at the same time, we need to repoll
