@@ -193,12 +193,12 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		startTime = uStakerTx.StartTime()
 		if err := vm.deleteUptime(onCommitDB, nodeID); err != nil {
 			return nil, nil, nil, nil, tempError{
-				fmt.Errorf("failed to put supply: %w", err),
+				fmt.Errorf("failed to delete uptime for %s: %w", nodeID.PrefixedString(constants.NodeIDPrefix), err),
 			}
 		}
 		if err := vm.deleteUptime(onAbortDB, nodeID); err != nil {
 			return nil, nil, nil, nil, tempError{
-				fmt.Errorf("failed to put supply: %w", err),
+				fmt.Errorf("failed to delete uptime for %s: %w", nodeID.PrefixedString(constants.NodeIDPrefix), err),
 			}
 		}
 	case *UnsignedAddDelegatorTx:
