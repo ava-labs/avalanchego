@@ -911,6 +911,7 @@ pendingStakerLoop:
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
 
+currentStakerLoop:
 	for stopIter.Next() { // Iterates in order of increasing start time
 		txBytes := stopIter.Value()
 
@@ -929,7 +930,7 @@ pendingStakerLoop:
 					subnetID)
 			}
 			if staker.EndTime().After(timestamp) {
-				return nil
+				break currentStakerLoop
 			}
 		case *UnsignedAddValidatorTx:
 			if !subnetID.Equals(constants.PrimaryNetworkID) {
@@ -937,7 +938,7 @@ pendingStakerLoop:
 					subnetID)
 			}
 			if staker.EndTime().After(timestamp) {
-				return nil
+				break currentStakerLoop
 			}
 		case *UnsignedAddSubnetValidatorTx:
 			if txSubnetID := staker.Validator.SubnetID(); !subnetID.Equals(txSubnetID) {
@@ -945,7 +946,7 @@ pendingStakerLoop:
 					subnetID, txSubnetID)
 			}
 			if staker.EndTime().After(timestamp) {
-				return nil
+				break currentStakerLoop
 			}
 			if err := vm.removeStaker(db, subnetID, &tx); err != nil {
 				return fmt.Errorf("couldn't remove staker: %w", err)
