@@ -23,10 +23,10 @@ type ExternalSenderTest struct {
 	CantGossip bool
 
 	GetAcceptedFrontierF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time)
-	AcceptedFrontierF    func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set)
+	AcceptedFrontierF    func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
 
-	GetAcceptedF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs ids.Set)
-	AcceptedF    func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set)
+	GetAcceptedF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs []ids.ID)
+	AcceptedF    func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
 
 	GetAncestorsF func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID)
 	MultiPutF     func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte)
@@ -36,7 +36,7 @@ type ExternalSenderTest struct {
 
 	PushQueryF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID, container []byte)
 	PullQueryF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID)
-	ChitsF     func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes ids.Set)
+	ChitsF     func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID)
 
 	GossipF func(chainID ids.ID, containerID ids.ID, container []byte)
 }
@@ -79,7 +79,7 @@ func (s *ExternalSenderTest) GetAcceptedFrontier(validatorIDs ids.ShortSet, chai
 // AcceptedFrontier calls AcceptedFrontierF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *ExternalSenderTest) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set) {
+func (s *ExternalSenderTest) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
 	switch {
 	case s.AcceptedFrontierF != nil:
 		s.AcceptedFrontierF(validatorID, chainID, requestID, containerIDs)
@@ -93,7 +93,7 @@ func (s *ExternalSenderTest) AcceptedFrontier(validatorID ids.ShortID, chainID i
 // GetAccepted calls GetAcceptedF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *ExternalSenderTest) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs ids.Set) {
+func (s *ExternalSenderTest) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs []ids.ID) {
 	switch {
 	case s.GetAcceptedF != nil:
 		s.GetAcceptedF(validatorIDs, chainID, requestID, deadline, containerIDs)
@@ -107,7 +107,7 @@ func (s *ExternalSenderTest) GetAccepted(validatorIDs ids.ShortSet, chainID ids.
 // Accepted calls AcceptedF if it was initialized. If it wasn't initialized and
 // this function shouldn't be called and testing was initialized, then testing
 // will fail.
-func (s *ExternalSenderTest) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set) {
+func (s *ExternalSenderTest) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
 	switch {
 	case s.AcceptedF != nil:
 		s.AcceptedF(validatorID, chainID, requestID, containerIDs)
@@ -205,7 +205,7 @@ func (s *ExternalSenderTest) PullQuery(vdrs ids.ShortSet, chainID ids.ID, reques
 // Chits calls ChitsF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *ExternalSenderTest) Chits(vdr ids.ShortID, chainID ids.ID, requestID uint32, votes ids.Set) {
+func (s *ExternalSenderTest) Chits(vdr ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID) {
 	switch {
 	case s.ChitsF != nil:
 		s.ChitsF(vdr, chainID, requestID, votes)

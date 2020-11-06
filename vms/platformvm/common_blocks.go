@@ -139,7 +139,7 @@ func (cb *CommonBlock) Reject() error {
 
 // free removes this block from memory
 func (cb *CommonBlock) free() {
-	delete(cb.vm.currentBlocks, cb.ID().Key())
+	delete(cb.vm.currentBlocks, cb.ID())
 	cb.children = nil
 }
 

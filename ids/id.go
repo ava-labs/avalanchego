@@ -15,29 +15,20 @@ import (
 )
 
 // Empty is a useful all zero value
-var Empty = ID{ID: &[32]byte{}}
+var Empty = ID{}
 
-// ID wraps a 32 byte hash as an identifier
-// Internal field [ID] should never be modified
-// from outside ids package
-type ID struct {
-	ID *[32]byte `serialize:"true"`
-}
-
-// NewID creates an identifier from a 32 byte hash
-func NewID(id [32]byte) ID { return ID{ID: &id} }
+// ID wraps a 32 byte hash used as an identifier
+type ID [32]byte
 
 // ToID attempt to convert a byte slice into an id
 func ToID(bytes []byte) (ID, error) {
-	addrHash, err := hashing.ToHash256(bytes)
-	return NewID(addrHash), err
+	return hashing.ToHash256(bytes)
 }
 
 // FromString is the inverse of ID.String()
 func FromString(idStr string) (ID, error) {
 	cb58 := formatting.CB58{}
-	err := cb58.FromString(idStr)
-	if err != nil {
+	if err := cb58.FromString(idStr); err != nil {
 		return ID{}, err
 	}
 	return ToID(cb58.Bytes)
@@ -45,11 +36,7 @@ func FromString(idStr string) (ID, error) {
 
 // MarshalJSON ...
 func (id ID) MarshalJSON() ([]byte, error) {
-	if id.IsZero() {
-		return []byte("null"), nil
-	}
-	cb58 := formatting.CB58{Bytes: id.ID[:]}
-	return cb58.MarshalJSON()
+	return formatting.CB58{Bytes: id[:]}.MarshalJSON()
 }
 
 // UnmarshalJSON ...
@@ -69,13 +56,6 @@ func (id *ID) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// IsZero returns true if the value has not been initialized
-func (id ID) IsZero() bool { return id.ID == nil }
-
-// Key returns a 32 byte hash that this id represents. This is useful to allow
-// for this id to be used as keys in maps.
-func (id ID) Key() [32]byte { return *id.ID }
-
 // Prefix this id to create a more selective id. This can be used to store
 // multiple values under the same key. For example:
 // prefix1(id) -> confidence
@@ -89,28 +69,17 @@ func (id ID) Prefix(prefixes ...uint64) ID {
 	for _, prefix := range prefixes {
 		packer.PackLong(prefix)
 	}
-	packer.PackFixedBytes(id.Bytes())
+	packer.PackFixedBytes(id[:])
 
-	return NewID(hashing.ComputeHash256Array(packer.Bytes))
+	return hashing.ComputeHash256Array(packer.Bytes)
 }
-
-// Equals returns true if the ids have the same byte representation
-func (id ID) Equals(oID ID) bool {
-	return id.ID == oID.ID ||
-		(id.ID != nil && oID.ID != nil && bytes.Equal(id.Bytes(), oID.Bytes()))
-}
-
-// Bytes returns the 32 byte hash as a slice. It is assumed this slice is not
-// modified.
-func (id ID) Bytes() []byte { return id.ID[:] }
 
 // Bit returns the bit value at the ith index of the byte array. Returns 0 or 1
 func (id ID) Bit(i uint) int {
 	byteIndex := i / BitsPerByte
 	bitIndex := i % BitsPerByte
 
-	bytes := id.Bytes()
-	b := bytes[byteIndex]
+	b := id[byteIndex]
 
 	// b = [7, 6, 5, 4, 3, 2, 1, 0]
 
@@ -127,23 +96,18 @@ func (id ID) Bit(i uint) int {
 }
 
 // Hex returns a hex encoded string of this id.
-func (id ID) Hex() string { return hex.EncodeToString(id.Bytes()) }
+func (id ID) Hex() string { return hex.EncodeToString(id[:]) }
 
 func (id ID) String() string {
-	if id.IsZero() {
-		return "nil"
-	}
-	bytes := id.Bytes()
-	cb58 := formatting.CB58{Bytes: bytes}
-	return cb58.String()
+	return formatting.CB58{Bytes: id[:]}.String()
 }
 
 type sortIDData []ID
 
 func (ids sortIDData) Less(i, j int) bool {
 	return bytes.Compare(
-		ids[i].Bytes(),
-		ids[j].Bytes()) == -1
+		ids[i][:],
+		ids[j][:]) == -1
 }
 func (ids sortIDData) Len() int      { return len(ids) }
 func (ids sortIDData) Swap(i, j int) { ids[j], ids[i] = ids[i], ids[j] }

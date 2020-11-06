@@ -329,7 +329,7 @@ func (ks *Keystore) GetDatabase(bID ids.ID, username, password string) (database
 	}
 
 	userDB := prefixdb.New([]byte(username), ks.bcDB)
-	bcDB := prefixdb.NewNested(bID.Bytes(), userDB)
+	bcDB := prefixdb.NewNested(bID[:], userDB)
 	return encdb.New([]byte(password), bcDB)
 }
 

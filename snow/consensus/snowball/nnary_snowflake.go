@@ -43,7 +43,7 @@ func (sf *nnarySnowflake) Initialize(betaVirtuous, betaRogue int, choice ids.ID)
 }
 
 // Add implements the NnarySnowflake interface
-func (sf *nnarySnowflake) Add(choice ids.ID) { sf.rogue = sf.rogue || !choice.Equals(sf.preference) }
+func (sf *nnarySnowflake) Add(choice ids.ID) { sf.rogue = sf.rogue || choice != sf.preference }
 
 // RecordSuccessfulPoll implements the NnarySnowflake interface
 func (sf *nnarySnowflake) RecordSuccessfulPoll(choice ids.ID) {
@@ -51,7 +51,7 @@ func (sf *nnarySnowflake) RecordSuccessfulPoll(choice ids.ID) {
 		return // This instace is already decided.
 	}
 
-	if preference := sf.Preference(); preference.Equals(choice) {
+	if preference := sf.Preference(); preference == choice {
 		sf.confidence++
 	} else {
 		// confidence is set to 1 because there has already been 1 successful
