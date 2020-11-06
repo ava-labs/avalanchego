@@ -32,7 +32,7 @@ type uniqueVertex struct {
 // and then parsing the vertex bytes on a cache miss.
 func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
 	vtx := &uniqueVertex{
-		vtxID:      ids.NewID(hashing.ComputeHash256Array(b)),
+		vtxID:      hashing.ComputeHash256Array(b),
 		serializer: s,
 	}
 	vtx.shallowRefresh()

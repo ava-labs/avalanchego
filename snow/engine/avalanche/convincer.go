@@ -37,5 +37,5 @@ func (c *convincer) Update() {
 		return
 	}
 
-	c.sender.Chits(c.vdr, c.requestID, c.consensus.Preferences())
+	c.sender.Chits(c.vdr, c.requestID, c.consensus.Preferences().List())
 }

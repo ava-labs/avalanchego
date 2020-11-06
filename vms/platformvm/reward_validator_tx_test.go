@@ -70,7 +70,7 @@ func TestUnsignedRewardValidatorTxSemanticVerify(t *testing.T) {
 
 	if nextToRemove, err := vm.nextStakerStop(onCommitDB, constants.PrimaryNetworkID); err != nil {
 		t.Fatal(err)
-	} else if toRemove.ID().Equals(nextToRemove.Tx.ID()) {
+	} else if toRemove.ID() == nextToRemove.Tx.ID() {
 		t.Fatalf("Should have removed the previous validator")
 	}
 

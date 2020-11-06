@@ -24,7 +24,7 @@ type Metadata struct {
 
 // Initialize set the bytes and ID
 func (md *Metadata) Initialize(unsignedBytes, bytes []byte) {
-	md.id = ids.NewID(hashing.ComputeHash256Array(bytes))
+	md.id = hashing.ComputeHash256Array(bytes)
 	md.unsignedBytes = unsignedBytes
 	md.bytes = bytes
 }
@@ -43,7 +43,7 @@ func (md *Metadata) Verify() error {
 	switch {
 	case md == nil:
 		return errNilMetadata
-	case md.id.IsZero():
+	case md.id == ids.Empty:
 		return errMetadataNotInitialize
 	default:
 		return nil

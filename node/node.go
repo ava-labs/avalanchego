@@ -353,7 +353,7 @@ func (n *Node) initDatabase() error {
 		return err
 	}
 
-	if !genesisHash.Equals(expectedGenesisHash) {
+	if genesisHash != expectedGenesisHash {
 		return fmt.Errorf("db contains invalid genesis hash. DB Genesis: %s Generated Genesis: %s", genesisHash, expectedGenesisHash)
 	}
 	return nil
@@ -725,16 +725,14 @@ func (n *Node) initAliases(genesisBytes []byte) error {
 		return err
 	}
 
-	for chainIDKey, aliases := range chainAliases {
-		chainID := ids.NewID(chainIDKey)
+	for chainID, aliases := range chainAliases {
 		for _, alias := range aliases {
 			if err := n.chainManager.Alias(chainID, alias); err != nil {
 				return err
 			}
 		}
 	}
-	for vmIDKey, aliases := range vmAliases {
-		vmID := ids.NewID(vmIDKey)
+	for vmID, aliases := range vmAliases {
 		for _, alias := range aliases {
 			if err := n.vmManager.Alias(vmID, alias); err != nil {
 				return err

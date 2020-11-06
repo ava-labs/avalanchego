@@ -35,6 +35,6 @@ func (s *Server) SubnetID(
 		return nil, err
 	}
 	return &gsubnetlookupproto.SubnetIDResponse{
-		Id: id.Bytes(),
+		Id: id[:],
 	}, nil
 }

@@ -20,7 +20,7 @@ type message struct {
 	containerID  ids.ID
 	container    []byte
 	containers   [][]byte
-	containerIDs ids.Set
+	containerIDs []ids.ID
 	notification common.Message
 	received     time.Time // Time this message was received
 	deadline     time.Time // Time this message must be responded to
