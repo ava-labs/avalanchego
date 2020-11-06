@@ -39,7 +39,7 @@ func (c *Client) Lookup(alias string) (ids.ID, error) {
 // PrimaryAlias ...
 func (c *Client) PrimaryAlias(id ids.ID) (string, error) {
 	resp, err := c.client.PrimaryAlias(context.Background(), &galiaslookupproto.PrimaryAliasRequest{
-		Id: id.Bytes(),
+		Id: id[:],
 	})
 	if err != nil {
 		return "", err

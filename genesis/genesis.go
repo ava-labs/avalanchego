@@ -318,7 +318,7 @@ func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.Tx, error) {
 	}
 	for _, chain := range genesis.Chains {
 		uChain := chain.UnsignedTx.(*platformvm.UnsignedCreateChainTx)
-		if uChain.VMID.Equals(vmID) {
+		if uChain.VMID == vmID {
 			return chain, nil
 		}
 	}

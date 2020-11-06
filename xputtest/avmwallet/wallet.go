@@ -34,7 +34,7 @@ type Wallet struct {
 	keychain *secp256k1fx.Keychain // Mapping from public address to the SigningKeys
 	utxoSet  *UTXOSet              // Mapping from utxoIDs to UTXOs
 
-	balance map[[32]byte]uint64
+	balance map[ids.ID]uint64
 	txFee   uint64
 
 	txs []*avm.Tx
@@ -63,7 +63,7 @@ func NewWallet(log logging.Logger, networkID uint32, chainID ids.ID, txFee uint6
 		log:       log,
 		keychain:  secp256k1fx.NewKeychain(),
 		utxoSet:   &UTXOSet{},
-		balance:   make(map[[32]byte]uint64),
+		balance:   make(map[ids.ID]uint64),
 		txFee:     txFee,
 	}, errs.Err
 }
@@ -101,7 +101,7 @@ func (w *Wallet) AddUTXO(utxo *avax.UTXO) {
 
 	if _, _, err := w.keychain.Spend(out, stdmath.MaxUint64); err == nil {
 		w.utxoSet.Put(utxo)
-		w.balance[utxo.AssetID().Key()] += out.Amount()
+		w.balance[utxo.AssetID()] += out.Amount()
 	}
 }
 
@@ -113,19 +113,18 @@ func (w *Wallet) RemoveUTXO(utxoID ids.ID) {
 	}
 
 	assetID := utxo.AssetID()
-	assetKey := assetID.Key()
-	newBalance := w.balance[assetKey] - utxo.Out.(avax.TransferableOut).Amount()
+	newBalance := w.balance[assetID] - utxo.Out.(avax.TransferableOut).Amount()
 	if newBalance == 0 {
-		delete(w.balance, assetKey)
+		delete(w.balance, assetID)
 	} else {
-		w.balance[assetKey] = newBalance
+		w.balance[assetID] = newBalance
 	}
 
 	w.utxoSet.Remove(utxoID)
 }
 
 // Balance returns the amount of the assets in this wallet
-func (w *Wallet) Balance(assetID ids.ID) uint64 { return w.balance[assetID.Key()] }
+func (w *Wallet) Balance(assetID ids.ID) uint64 { return w.balance[assetID] }
 
 // CreateTx returns a tx that sends [amount] of [assetID] to [destAddr]
 func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (*avm.Tx, error) {
@@ -139,7 +138,7 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 	ins := []*avax.TransferableInput{}
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 	for _, utxo := range w.utxoSet.UTXOs {
-		if !utxo.AssetID().Equals(assetID) {
+		if utxo.AssetID() != assetID {
 			continue
 		}
 		inputIntf, signers, err := w.keychain.Spend(utxo.Out, time)

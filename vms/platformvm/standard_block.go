@@ -98,7 +98,7 @@ func (sb *StandardBlock) Verify() error {
 		}
 	}
 
-	sb.vm.currentBlocks[sb.ID().Key()] = sb
+	sb.vm.currentBlocks[sb.ID()] = sb
 	sb.parentBlock().addChild(sb)
 	return nil
 }

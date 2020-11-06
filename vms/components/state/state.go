@@ -118,18 +118,19 @@ func (s *state) Put(db database.Database, typeID uint64, key ids.ID, value inter
 	// Get the unique ID of thie key/typeID pair
 	uID := s.uniqueID(key, typeID)
 	if value == nil {
-		return db.Delete(uID.Bytes())
+		return db.Delete(uID[:])
 	}
 	// Put the byte repr. of the value in the database
 	valueBytes, err := marshaller(value)
 	if err != nil {
 		return err
 	}
-	return db.Put(uID.Bytes(), valueBytes)
+	return db.Put(uID[:], valueBytes)
 }
 
 func (s *state) Has(db database.Database, typeID uint64, key ids.ID) (bool, error) {
-	return db.Has(s.uniqueID(key, typeID).Bytes())
+	key = s.uniqueID(key, typeID)
+	return db.Has(key[:])
 }
 
 // Implements State.Get
@@ -143,7 +144,7 @@ func (s *state) Get(db database.Database, typeID uint64, key ids.ID) (interface{
 	uID := s.uniqueID(key, typeID)
 
 	// Get the value from the database
-	valueBytes, err := db.Get(uID.Bytes())
+	valueBytes, err := db.Get(uID[:])
 	if err != nil {
 		return nil, err
 	}
