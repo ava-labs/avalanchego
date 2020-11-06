@@ -27,7 +27,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		return nil
 	}
 
-	engine.GetAcceptedF = func(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error {
+	engine.GetAcceptedF = func(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 		called <- struct{}{}
 		return nil
 	}
@@ -54,7 +54,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	handler.clock.Set(currentTime)
 
 	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1, currentTime.Add(-time.Second))
-	handler.GetAccepted(ids.NewShortID([20]byte{}), 1, currentTime.Add(time.Second), ids.Set{})
+	handler.GetAccepted(ids.NewShortID([20]byte{}), 1, currentTime.Add(time.Second), nil)
 
 	go handler.Dispatch()
 

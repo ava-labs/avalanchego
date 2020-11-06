@@ -58,7 +58,7 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 }
 
 // AcceptedFrontier ...
-func (s *Sender) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) {
+func (s *Sender) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
 	if validatorID.Equals(s.ctx.NodeID) {
 		go s.router.AcceptedFrontier(validatorID, s.ctx.ChainID, requestID, containerIDs)
 	} else {
@@ -67,7 +67,7 @@ func (s *Sender) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, con
 }
 
 // GetAccepted ...
-func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, containerIDs ids.Set) {
+func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, containerIDs []ids.ID) {
 	currentDeadline := time.Time{}
 	for validatorIDKey := range validatorIDs {
 		validatorID := ids.NewShortID(validatorIDKey)
@@ -91,7 +91,7 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 }
 
 // Accepted ...
-func (s *Sender) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) {
+func (s *Sender) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
 	if validatorID.Equals(s.ctx.NodeID) {
 		go s.router.Accepted(validatorID, s.ctx.ChainID, requestID, containerIDs)
 	} else {
@@ -227,7 +227,7 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 }
 
 // Chits sends chits
-func (s *Sender) Chits(validatorID ids.ShortID, requestID uint32, votes ids.Set) {
+func (s *Sender) Chits(validatorID ids.ShortID, requestID uint32, votes []ids.ID) {
 	s.ctx.Log.Verbo("Sending Chits to validator %s. RequestID: %d. Votes: %s", validatorID, requestID, votes)
 	// If [validatorID] is myself, send this message directly
 	// to my own router rather than sending it over the network

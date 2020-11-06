@@ -61,11 +61,12 @@ func TestOperationVerifyUTXOIDsNotSorted(t *testing.T) {
 
 func TestOperationVerify(t *testing.T) {
 	c := codec.NewDefault()
+	assetID := ids.GenerateTestID()
 	op := &Operation{
-		Asset: avax.Asset{ID: ids.Empty},
+		Asset: avax.Asset{ID: assetID},
 		UTXOIDs: []*avax.UTXOID{
 			{
-				TxID:        ids.Empty,
+				TxID:        assetID,
 				OutputIndex: 1,
 			},
 		},
