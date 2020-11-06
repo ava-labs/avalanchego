@@ -824,33 +824,14 @@ func (vm *VM) LoadUser(
 	defer db.Close()
 
 	user := userState{vm: vm}
-
-	// true iff we should only return UTXOs that reference one or more addresses in [addrsToUse]
-	filterAddresses := len(addrsToUse) > 0
-
-	// The error is explicitly dropped, as it may just mean that there are no addresses.
-	addresses, _ := user.Addresses(db)
-
-	addrs := ids.ShortSet{}
-	for _, addr := range addresses {
-		if !filterAddresses {
-			addrs.Add(addr)
-		} else if filterAddresses && addrsToUse.Contains(addr) {
-			addrs.Add(addr)
-		}
+	kc, err := user.Keychain(db, addrsToUse)
+	if err != nil {
+		return nil, nil, err
 	}
-	utxos, _, _, err := vm.GetUTXOs(addrs, ids.ShortEmpty, ids.Empty, -1)
+
+	utxos, _, _, err := vm.GetUTXOs(kc.Addresses(), ids.ShortEmpty, ids.Empty, -1)
 	if err != nil {
 		return nil, nil, fmt.Errorf("problem retrieving user's UTXOs: %w", err)
-	}
-
-	kc := secp256k1fx.NewKeychain()
-	for _, addr := range addrs.List() {
-		sk, err := user.Key(db, addr)
-		if err != nil {
-			return nil, nil, fmt.Errorf("problem retrieving private key: %w", err)
-		}
-		kc.Add(sk)
 	}
 
 	return utxos, kc, db.Close()
