@@ -32,7 +32,7 @@ import (
 )
 
 var networkID uint32 = 10
-var chainID = ids.NewID([32]byte{5, 4, 3, 2, 1})
+var chainID = ids.ID{5, 4, 3, 2, 1}
 var platformChainID = ids.Empty.Prefix(0)
 var testTxFee = uint64(1000)
 var startBalance = uint64(50000)
@@ -40,7 +40,7 @@ var startBalance = uint64(50000)
 var keys []*crypto.PrivateKeySECP256K1R
 var addrs []ids.ShortID // addrs[i] corresponds to keys[i]
 
-var assetID = ids.NewID([32]byte{1, 2, 3})
+var assetID = ids.ID{1, 2, 3}
 var username = "bobby"
 var password = "StrnasfqewiurPasswdn56d" // #nosec G101
 
@@ -61,11 +61,11 @@ func init() {
 }
 
 type snLookup struct {
-	chainsToSubnet map[[32]byte]ids.ID
+	chainsToSubnet map[ids.ID]ids.ID
 }
 
 func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
-	subnetID, ok := sn.chainsToSubnet[chainID.Key()]
+	subnetID, ok := sn.chainsToSubnet[chainID]
 	if !ok {
 		return ids.ID{}, errors.New("")
 	}
@@ -95,10 +95,10 @@ func NewContext(t *testing.T) *snow.Context {
 	}
 
 	sn := &snLookup{
-		chainsToSubnet: make(map[[32]byte]ids.ID),
+		chainsToSubnet: make(map[ids.ID]ids.ID),
 	}
-	sn.chainsToSubnet[chainID.Key()] = ctx.SubnetID
-	sn.chainsToSubnet[platformChainID.Key()] = ctx.SubnetID
+	sn.chainsToSubnet[chainID] = ctx.SubnetID
+	sn.chainsToSubnet[platformChainID] = ctx.SubnetID
 	ctx.SNLookup = sn
 	return ctx
 }
@@ -568,7 +568,7 @@ func TestIssueTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !txID.Equals(newTx.ID()) {
+	if txID != newTx.ID() {
 		t.Fatalf("Issue Tx returned wrong TxID")
 	}
 	ctx.Lock.Unlock()

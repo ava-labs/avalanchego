@@ -72,8 +72,6 @@ func (t *ImportTx) SyntacticVerify(
 	switch {
 	case t == nil:
 		return errNilTx
-	case t.SourceChain.IsZero():
-		return errWrongBlockchainID
 	case len(t.ImportedIns) == 0:
 		return errNoImportInputs
 	}
@@ -100,7 +98,7 @@ func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 	if err != nil {
 		return err
 	}
-	if !vm.ctx.SubnetID.Equals(subnetID) || t.SourceChain.Equals(vm.ctx.ChainID) {
+	if vm.ctx.SubnetID != subnetID || t.SourceChain == vm.ctx.ChainID {
 		return errWrongBlockchainID
 	}
 
@@ -110,7 +108,8 @@ func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 
 	utxoIDs := make([][]byte, len(t.ImportedIns))
 	for i, in := range t.ImportedIns {
-		utxoIDs[i] = in.UTXOID.InputID().Bytes()
+		inputID := in.UTXOID.InputID()
+		utxoIDs[i] = inputID[:]
 	}
 	allUTXOBytes, err := vm.ctx.SharedMemory.Get(t.SourceChain, utxoIDs)
 	if err != nil {
@@ -137,7 +136,8 @@ func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 func (t *ImportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 	utxoIDs := make([][]byte, len(t.ImportedIns))
 	for i, in := range t.ImportedIns {
-		utxoIDs[i] = in.UTXOID.InputID().Bytes()
+		inputID := in.UTXOID.InputID()
+		utxoIDs[i] = inputID[:]
 	}
 	return vm.ctx.SharedMemory.Remove(t.SourceChain, utxoIDs, batch)
 }

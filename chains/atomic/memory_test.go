@@ -23,7 +23,7 @@ func TestMemorySharedID(t *testing.T) {
 	sharedID0 := m.sharedID(blockchainID0, blockchainID1)
 	sharedID1 := m.sharedID(blockchainID1, blockchainID0)
 
-	if !sharedID0.Equals(sharedID1) {
+	if sharedID0 != sharedID1 {
 		t.Fatalf("SharedMemory.sharedID should be communitive")
 	}
 }

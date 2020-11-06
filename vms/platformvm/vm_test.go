@@ -54,7 +54,7 @@ var (
 	defaultMinDelegationFee   uint32 = 0
 
 	// AVAX asset ID in tests
-	avaxAssetID = ids.NewID([32]byte{'y', 'e', 'e', 't'})
+	avaxAssetID = ids.ID{'y', 'e', 'e', 't'}
 
 	defaultTxFee = uint64(100)
 
@@ -1458,9 +1458,9 @@ func TestAtomicImport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	inputID := utxo.InputID()
 	if err := peerSharedMemory.Put(vm.Ctx.ChainID, []*atomic.Element{{
-		Key:   utxo.InputID().Bytes(),
+		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			recipientKey.PublicKey().Address().Bytes(),
@@ -1492,8 +1492,8 @@ func TestAtomicImport(t *testing.T) {
 	} else if status != Committed {
 		t.Fatalf("status should be Committed but is %s", status)
 	}
-
-	if _, err := vm.Ctx.SharedMemory.Get(vm.Ctx.XChainID, [][]byte{utxoID.InputID().Bytes()}); err == nil {
+	inputID = utxoID.InputID()
+	if _, err := vm.Ctx.SharedMemory.Get(vm.Ctx.XChainID, [][]byte{inputID[:]}); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
 	}
 }
@@ -1675,7 +1675,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if lastAccepted := secondVM.LastAccepted(); !genesisID.Equals(lastAccepted) {
+	if lastAccepted := secondVM.LastAccepted(); genesisID != lastAccepted {
 		t.Fatalf("Shouldn't have changed the genesis")
 	}
 }
@@ -1800,7 +1800,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	secondMsgChan := make(chan common.Message, 1)
 	if err := secondVM.Initialize(secondCtx, db, genesisBytes, secondMsgChan, nil); err != nil {
 		t.Fatal(err)
-	} else if lastAccepted := secondVM.LastAccepted(); !options[0].ID().Equals(lastAccepted) {
+	} else if lastAccepted := secondVM.LastAccepted(); options[0].ID() != lastAccepted {
 		t.Fatalf("Should have changed the genesis")
 	}
 }
@@ -1947,12 +1947,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
 	externalSender.GetAcceptedFrontierF = nil
-	externalSender.GetAcceptedF = func(_ ids.ShortSet, _ ids.ID, requestID uint32, _ time.Time, _ ids.Set) {
+	externalSender.GetAcceptedF = func(_ ids.ShortSet, _ ids.ID, requestID uint32, _ time.Time, _ []ids.ID) {
 		*reqID = requestID
 	}
 
-	frontier := ids.Set{}
-	frontier.Add(advanceTimeBlkID)
+	frontier := []ids.ID{advanceTimeBlkID}
 	if err := engine.AcceptedFrontier(peerID, *reqID, frontier); err != nil {
 		t.Fatal(err)
 	}
@@ -1960,7 +1959,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	externalSender.GetAcceptedF = nil
 	externalSender.GetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, _ time.Time, containerID ids.ID) {
 		*reqID = requestID
-		if !containerID.Equals(advanceTimeBlkID) {
+		if containerID != advanceTimeBlkID {
 			t.Fatalf("wrong block requested")
 		}
 	}
@@ -1979,7 +1978,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	externalSender.CantPushQuery = true
 
-	if pref := vm.Preferred(); !pref.Equals(advanceTimePreference.ID()) {
+	if pref := vm.Preferred(); pref != advanceTimePreference.ID() {
 		t.Fatalf("wrong preference reported after bootstrapping to proposal block\nPreferred: %s\nExpected: %s\nGenesis: %s",
 			pref,
 			advanceTimePreference.ID(),
@@ -2055,7 +2054,7 @@ func TestUnverifiedParent(t *testing.T) {
 	}
 
 	parentBlk := secondAdvanceTimeBlk.Parent()
-	if parentBlkID := parentBlk.ID(); !parentBlkID.Equals(firstOption.ID()) {
+	if parentBlkID := parentBlk.ID(); parentBlkID != firstOption.ID() {
 		t.Fatalf("Wrong parent block ID returned")
 	} else if err := firstOption.Verify(); err != nil {
 		t.Fatal(err)
@@ -2158,10 +2157,12 @@ func TestNextValidatorStartTime(t *testing.T) {
 
 	nextStaker, err := vm.nextStakerStart(vm.DB, constants.PrimaryNetworkID)
 	assert.NoError(t, err)
+	txID := tx.ID()
+	nextStakerID := nextStaker.ID()
 	assert.Equal(
 		t,
-		tx.ID().Bytes(),
-		nextStaker.ID().Bytes(),
+		txID[:],
+		nextStakerID[:],
 		"should have marked the new tx as the next validator to be added",
 	)
 }

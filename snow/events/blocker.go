@@ -15,11 +15,11 @@ const (
 )
 
 // Blocker tracks objects that are blocked
-type Blocker map[[32]byte][]Blockable
+type Blocker map[ids.ID][]Blockable
 
 func (b *Blocker) init() {
 	if *b == nil {
-		*b = make(map[[32]byte][]Blockable, minBlockerSize)
+		*b = make(map[ids.ID][]Blockable, minBlockerSize)
 	}
 }
 
@@ -28,9 +28,8 @@ func (b *Blocker) init() {
 func (b *Blocker) Fulfill(id ids.ID) {
 	b.init()
 
-	key := id.Key()
-	blocking := (*b)[key]
-	delete(*b, key)
+	blocking := (*b)[id]
+	delete(*b, id)
 
 	for _, pending := range blocking {
 		pending.Fulfill(id)
@@ -42,9 +41,8 @@ func (b *Blocker) Fulfill(id ids.ID) {
 func (b *Blocker) Abandon(id ids.ID) {
 	b.init()
 
-	key := id.Key()
-	blocking := (*b)[key]
-	delete(*b, key)
+	blocking := (*b)[id]
+	delete(*b, id)
 
 	for _, pending := range blocking {
 		pending.Abandon(id)
@@ -74,7 +72,7 @@ func (b *Blocker) PrefixedString(prefix string) string {
 	for key, value := range *b {
 		s.WriteString(fmt.Sprintf("\n%sID[%s]: %d",
 			prefix,
-			ids.NewID(key),
+			key,
 			len(value)))
 	}
 
