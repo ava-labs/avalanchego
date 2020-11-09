@@ -4,7 +4,6 @@
 package evm
 
 import (
-	"bytes"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -448,8 +447,7 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	}
 	blockHash := ethBlock.Hash()
 	// Coinbase must be zero on C-Chain
-	if !bytes.Equal(blockHash.Bytes(), vm.genesisHash.Bytes()) &&
-		!bytes.Equal(ethBlock.Coinbase().Bytes(), coreth.BlackholeAddr.Bytes()) {
+	if blockHash != vm.genesisHash && ethBlock.Coinbase() != coreth.BlackholeAddr {
 		return nil, errInvalidBlock
 	}
 	block := &Block{
