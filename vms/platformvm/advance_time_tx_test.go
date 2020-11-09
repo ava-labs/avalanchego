@@ -343,6 +343,83 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers2(t *testing.T) {
 	}
 }
 
+// Regression test for https://github.com/ava-labs/avalanchego/pull/584
+// that ensures it fixes a bug where subnet validators are not removed
+// when timestamp is advanced and there is a pending staker whose start time
+// is after the new timestamp
+func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
+	vm, _ := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		vm.Ctx.Lock.Unlock()
+	}()
+
+	// Add a subnet validator to the staker set
+	subnetValidatorNodeID := keys[0].PublicKey().Address()
+	// Starts after the corre
+	subnetVdr1StartTime := defaultValidateStartTime
+	subnetVdr1EndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
+	tx, err := vm.newAddSubnetValidatorTx(
+		1,                                  // Weight
+		uint64(subnetVdr1StartTime.Unix()), // Start time
+		uint64(subnetVdr1EndTime.Unix()),   // end time
+		subnetValidatorNodeID,              // Node ID
+		testSubnet1.ID(),                   // Subnet ID
+		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]}, // Keys
+		ids.ShortEmpty, // reward address
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rewardTx := &rewardTx{
+		Reward: 0,
+		Tx:     *tx,
+	}
+	if err := vm.addStaker(vm.DB, testSubnet1.ID(), rewardTx); err != nil {
+		t.Fatal(err)
+	}
+	// The above validator is now part of the staking set
+
+	// Queue a staker that joins the staker set after the above validator leaves
+	tx, err = vm.newAddSubnetValidatorTx(
+		1, // Weight
+		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                // Start time
+		uint64(subnetVdr1EndTime.Add(time.Second).Add(defaultMinStakingDuration).Unix()), // end time
+		keys[1].PublicKey().Address(),                                                    // Node ID
+		testSubnet1.ID(),                                                                 // Subnet ID
+		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},                                 // Keys
+		ids.ShortEmpty, // reward address
+	)
+	if err != nil {
+		t.Fatal(err)
+	} else if err := vm.enqueueStaker(vm.DB, testSubnet1.ID(), tx); err != nil {
+		t.Fatal(err)
+	}
+	// The above validator is now in the pending staker set
+
+	// Advance time to the first staker's end time.
+	vm.clock.Set(subnetVdr1EndTime)
+	tx, err = vm.newAdvanceTimeTx(subnetVdr1EndTime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	onCommitDB, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The first staker should now be removed. Verify that is the case.
+	_, isValidator, err := vm.isValidator(onCommitDB, testSubnet1.ID(), subnetValidatorNodeID)
+	if err != nil {
+		t.Fatal(err)
+	} else if isValidator {
+		t.Fatal("should have been removed from validator set")
+	}
+}
+
 // Test method InitiallyPrefersCommit
 func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 	vm, _ := defaultVM()
