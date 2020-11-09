@@ -99,6 +99,7 @@ type ChainParameters struct {
 }
 
 type chain struct {
+	Name    string
 	Engine  common.Engine
 	Handler *router.Handler
 	Ctx     *snow.Context
@@ -156,7 +157,6 @@ type manager struct {
 //     <db> is this node's database
 //     <sender> sends messages to other validators
 //     <validators> validate this chain
-// TODO: Make this function take less arguments
 func New(config *ManagerConfig) Manager {
 	m := &manager{
 		ManagerConfig: *config,
@@ -218,7 +218,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	m.Log.AssertNoError(m.Alias(chainParams.ID, chainParams.ID.String()))
 
 	// Notify those that registered to be notified when a new chain is created
-	m.notifyRegistrants(chain.Ctx, chain.VM)
+	m.notifyRegistrants(chain.Name, chain.Ctx, chain.VM)
 }
 
 // Create a chain
@@ -486,6 +486,7 @@ func (m *manager) createAvalancheChain(
 	)
 
 	return &chain{
+		Name:    chainAlias,
 		Engine:  engine,
 		Handler: handler,
 		VM:      vm,
@@ -587,6 +588,7 @@ func (m *manager) createSnowmanChain(
 	}
 
 	return &chain{
+		Name:    chainAlias,
 		Engine:  engine,
 		Handler: handler,
 		VM:      vm,
@@ -626,9 +628,9 @@ func (m *manager) LookupVM(alias string) (ids.ID, error) { return m.VMManager.Lo
 
 // Notify registrants [those who want to know about the creation of chains]
 // that the specified chain has been created
-func (m *manager) notifyRegistrants(ctx *snow.Context, vm interface{}) {
+func (m *manager) notifyRegistrants(name string, ctx *snow.Context, vm interface{}) {
 	for _, registrant := range m.registrants {
-		registrant.RegisterChain(ctx, vm)
+		registrant.RegisterChain(name, ctx, vm)
 	}
 }
 
