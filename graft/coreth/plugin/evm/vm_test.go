@@ -23,14 +23,14 @@ import (
 
 var (
 	testNetworkID    uint32 = 10
-	testCChainID            = ids.ID([32]byte{'c', 'c', 'h', 'a', 'i', 'n', 't', 'e', 's', 't'})
-	testXChainID            = ids.ID([32]byte{'t', 'e', 's', 't', 'x'})
-	nonExistentID           = ids.ID([32]byte{'F'})
+	testCChainID            = ids.ID{'c', 'c', 'h', 'a', 'i', 'n', 't', 'e', 's', 't'}
+	testXChainID            = ids.ID{'t', 'e', 's', 't', 'x'}
+	nonExistentID           = ids.ID{'F'}
 	testTxFee               = uint64(1000)
 	testKeys         []*crypto.PrivateKeySECP256K1R
 	testEthAddrs     []common.Address // testEthAddrs[i] corresponds to testKeys[i]
 	testShortIDAddrs []ids.ShortID
-	testAvaxAssetID  = [32]byte{1, 2, 3}
+	testAvaxAssetID  = ids.ID{1, 2, 3}
 	username         = "Johns"
 	password         = "CjasdjhiPeirbSenfeI13" // #nosec G101
 )
