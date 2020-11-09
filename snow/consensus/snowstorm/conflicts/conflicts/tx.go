@@ -16,14 +16,16 @@ type Tx interface {
 	// will perform.
 	TransitionID() ids.ID
 
-	// Epoch this transaction was issued to.
+	// Epoch this transaction was issued in.
 	Epoch() uint32
 
-	// Restrictions this transaction is attempting to enforce.
+	// Restrictions returns a list of transition IDs that need to be performed
+	// in a later epoch if this transaction is to be accepted.
 	Restrictions() []ids.ID
 
-	// Dependencies is a list of incomplete TransitionIDs upon which this
-	// transaction depends.
+	// Dependencies is a list of transition IDs that need to be performed before
+	// this transaction is to be accepted, that have not already been performed.
+	// These dependencies can be executed in the same epoch as this transaction.
 	Dependencies() []ids.ID
 
 	// InputIDs is a set where each element is the ID of a piece of state that

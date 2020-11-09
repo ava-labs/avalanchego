@@ -15,14 +15,28 @@ var (
 )
 
 type Conflicts struct {
-	// track the currently processing txs
+	// track the currently processing txs. Maps ID() to tx.
 	txs map[[32]byte]Tx
 
-	// track which txs are currently consuming which utxos
-	consumedUTXOs map[[32]byte]ids.Set
+	// transitions tracks the currently processing txIDs for a transition. Maps
+	// transitionID to a set of txIDs.
+	transitions map[[32]byte]ids.Set
 
-	// track which txs are currently producing which utxos
-	producedUTXOs map[[32]byte]ids.Set
+	// track which txs are currently consuming which utxos. Maps inputID to a
+	// set of txIDs.
+	utxos map[[32]byte]ids.Set
+
+	// track which txs are attempting to be restricted. Maps transitionID to a
+	// set of txIDs.
+	restrictions map[[32]byte]ids.Set
+
+	// track which txs are blocking on others. Maps transitionID to a set of
+	// txIDs.
+	dependencies map[[32]byte]ids.Set
+
+	// accepted tracks the set of txIDs that have been conditionally accepted,
+	// but not returned as fully accepted.
+	accepted ids.Set
 
 	// track txs that have been marked as ready to accept
 	acceptable []choices.Decidable
@@ -33,9 +47,11 @@ type Conflicts struct {
 
 func New() *Conflicts {
 	return &Conflicts{
-		txs:           make(map[[32]byte]Tx),
-		consumedUTXOs: make(map[[32]byte]ids.Set),
-		producedUTXOs: make(map[[32]byte]ids.Set),
+		txs:          make(map[[32]byte]Tx),
+		transitions:  make(map[[32]byte]ids.Set),
+		utxos:        make(map[[32]byte]ids.Set),
+		restrictions: make(map[[32]byte]ids.Set),
+		dependencies: make(map[[32]byte]ids.Set),
 	}
 }
 
@@ -51,21 +67,37 @@ func (c *Conflicts) Add(txIntf choices.Decidable) error {
 
 	txID := tx.ID()
 	c.txs[txID.Key()] = tx
+
+	transitionID := tx.TransitionID()
+	transitionKey := transitionID.Key()
+	txIDs := c.transitions[transitionKey]
+	txIDs.Add(txID)
+	c.transitions[transitionKey] = txIDs
+
 	for inputKey := range tx.InputIDs() {
-		spenders := c.consumedUTXOs[inputKey]
+		spenders := c.utxos[inputKey]
 		spenders.Add(txID)
-		c.consumedUTXOs[inputKey] = spenders
+		c.utxos[inputKey] = spenders
 	}
-	for outputKey := range tx.OutputIDs() {
-		producers := c.producedUTXOs[outputKey]
-		producers.Add(txID)
-		c.producedUTXOs[outputKey] = producers
+
+	for _, restrictionID := range tx.Restrictions() {
+		restrictionKey := restrictionID.Key()
+		restrictors := c.restrictions[restrictionKey]
+		restrictors.Add(txID)
+		c.restrictions[restrictionKey] = restrictors
+	}
+
+	for _, dependencyID := range tx.Dependencies() {
+		dependencyKey := dependencyID.Key()
+		dependents := c.dependencies[dependencyKey]
+		dependents.Add(txID)
+		c.dependencies[dependencyKey] = dependents
 	}
 	return nil
 }
 
 // IsVirtuous checks the currently processing txs for conflicts. It is allowed
-// to call with function with txs that aren't yet processing or currently
+// to call this function with txs that aren't yet processing or currently
 // processing txs.
 func (c *Conflicts) IsVirtuous(txIntf choices.Decidable) (bool, error) {
 	tx, ok := txIntf.(Tx)
@@ -78,6 +110,18 @@ func (c *Conflicts) IsVirtuous(txIntf choices.Decidable) (bool, error) {
 		spenders := c.utxos[inputKey]
 		if numSpenders := spenders.Len(); numSpenders > 1 ||
 			(numSpenders == 1 && !spenders.Contains(txID)) {
+			return false, nil
+		}
+	}
+
+	epoch := tx.Epoch()
+	transitionID := tx.TransitionID()
+	transitionKey := transitionID.Key()
+	restrictors := c.restrictions[transitionKey]
+	for restrictorKey := range restrictors {
+		restrictor := c.txs[restrictorKey]
+		restrictorEpoch := restrictor.Epoch()
+		if restrictorEpoch <= epoch {
 			return false, nil
 		}
 	}
@@ -109,6 +153,26 @@ func (c *Conflicts) Conflicts(txIntf choices.Decidable) ([]choices.Decidable, er
 			conflicts = append(conflicts, c.txs[spenderKey])
 		}
 	}
+
+	epoch := tx.Epoch()
+	transitionID := tx.TransitionID()
+	transitionKey := transitionID.Key()
+	restrictors := c.restrictions[transitionKey]
+	for restrictorKey := range restrictors {
+		restrictorID := ids.NewID(restrictorKey)
+		if conflictSet.Contains(restrictorID) {
+			continue
+		}
+
+		restrictor := c.txs[restrictorKey]
+		restrictorEpoch := restrictor.Epoch()
+		if restrictorEpoch > epoch {
+			continue
+		}
+
+		conflictSet.Add(restrictorID)
+		conflicts = append(conflicts, restrictor)
+	}
 	return conflicts, nil
 }
 
@@ -120,26 +184,27 @@ func (c *Conflicts) Accept(txID ids.ID) {
 	if !exists {
 		return
 	}
+	c.accepted.Add(txID)
 
-	toAccept := &acceptor{
-		c:  c,
-		tx: tx,
-	}
+	acceptable := true
 	for _, dependency := range tx.Dependencies() {
-		if dependency.Status() != choices.Accepted {
-			// If the dependency isn't accepted, then it must be processing.
-			// This tx should be accepted after this tx is accepted. Note that
-			// the dependencies can't already be rejected, because it is assumed
-			// that this tx is currently considered valid.
-			toAccept.deps.Add(dependency.ID())
+		if !c.accepted.Contains(dependency) {
+			acceptable = false
 		}
 	}
-	c.pendingAccept.Register(toAccept)
+	if acceptable {
+		c.acceptable = append(c.acceptable, tx)
+	}
 }
 
 func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 	acceptable := c.acceptable
 	c.acceptable = nil
+
+	// rejected tracks the set of txIDs that have been rejected but not yet
+	// removed from the graph.
+	rejected := ids.Set{}
+
 	for _, tx := range acceptable {
 		txID := tx.ID()
 
@@ -162,7 +227,12 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 		// asserted.
 		conflicts, _ := c.Conflicts(tx)
 		for _, conflict := range conflicts {
-			c.pendingReject.Fulfill(conflict.ID())
+			conflictID := conflict.ID()
+			if rejected.Contains(conflictID) {
+				continue
+			}
+			rejected.Add(conflictID)
+			c.rejectable = append(c.rejectable, conflict)
 		}
 	}
 
