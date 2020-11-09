@@ -34,7 +34,7 @@ func (v *voter) Update() {
 
 	results := ids.Bag{}
 	finished := false
-	if v.response.IsZero() {
+	if v.response == ids.Empty {
 		results, finished = v.t.polls.Drop(v.requestID, v.vdr)
 	} else {
 		results, finished = v.t.polls.Vote(v.requestID, v.vdr, v.response)

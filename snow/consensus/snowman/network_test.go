@@ -66,9 +66,9 @@ func (n *Network) AddNode(sm Consensus) error {
 	}
 
 	n.shuffleColors()
-	deps := map[[32]byte]Block{}
+	deps := map[ids.ID]Block{}
 	for _, blk := range n.colors {
-		myDep, found := deps[blk.ParentV.ID().Key()]
+		myDep, found := deps[blk.ParentV.ID()]
 		if !found {
 			myDep = blk.Parent()
 		}
@@ -85,7 +85,7 @@ func (n *Network) AddNode(sm Consensus) error {
 		if err := sm.Add(myVtx); err != nil {
 			return err
 		}
-		deps[myVtx.ID().Key()] = myDep
+		deps[myVtx.ID()] = myDep
 	}
 	n.nodes = append(n.nodes, sm)
 	n.running = append(n.running, sm)
@@ -131,7 +131,7 @@ func (n *Network) Agreement() bool {
 	}
 	pref := n.nodes[0].Preference()
 	for _, node := range n.nodes {
-		if !pref.Equals(node.Preference()) {
+		if pref != node.Preference() {
 			return false
 		}
 	}

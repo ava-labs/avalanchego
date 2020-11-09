@@ -22,12 +22,12 @@ func (s *userState) SetAddresses(db database.Database, addrs []ids.ShortID) erro
 	if err != nil {
 		return err
 	}
-	return db.Put(addresses.Bytes(), bytes)
+	return db.Put(addresses[:], bytes)
 }
 
 // Addresses ...
 func (s *userState) Addresses(db database.Database) ([]ids.ShortID, error) {
-	bytes, err := db.Get(addresses.Bytes())
+	bytes, err := db.Get(addresses[:])
 	if err != nil {
 		return nil, err
 	}

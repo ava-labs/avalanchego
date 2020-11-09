@@ -27,14 +27,11 @@ func EqualSubset(start, stop int, id1, id2 ID) bool {
 		return false
 	}
 
-	id1Bytes := id1.Bytes()
-	id2Bytes := id2.Bytes()
-
 	startIndex := start / BitsPerByte
 	stopIndex := stop / BitsPerByte
 
 	// If there is a series of bytes between the first byte and the last byte, they must be equal
-	if startIndex+1 < stopIndex && !bytes.Equal(id1Bytes[startIndex+1:stopIndex], id2Bytes[startIndex+1:stopIndex]) {
+	if startIndex+1 < stopIndex && !bytes.Equal(id1[startIndex+1:stopIndex], id2[startIndex+1:stopIndex]) {
 		return false
 	}
 
@@ -49,17 +46,17 @@ func EqualSubset(start, stop int, id1, id2 ID) bool {
 		mask := startMask & stopMask
 
 		// The index here could be startIndex or stopIndex, as they are equal
-		b1 := mask & int(id1Bytes[startIndex])
-		b2 := mask & int(id2Bytes[startIndex])
+		b1 := mask & int(id1[startIndex])
+		b2 := mask & int(id2[startIndex])
 
 		return b1 == b2
 	}
 
-	start1 := startMask & int(id1Bytes[startIndex])
-	start2 := startMask & int(id2Bytes[startIndex])
+	start1 := startMask & int(id1[startIndex])
+	start2 := startMask & int(id2[startIndex])
 
-	stop1 := stopMask & int(id1Bytes[stopIndex])
-	stop2 := stopMask & int(id2Bytes[stopIndex])
+	stop1 := stopMask & int(id1[stopIndex])
+	stop2 := stopMask & int(id2[stopIndex])
 
 	return start1 == start2 && stop1 == stop2
 }
@@ -72,9 +69,6 @@ func FirstDifferenceSubset(start, stop int, id1, id2 ID) (int, bool) {
 	if start > stop || stop < 0 || stop >= NumBits {
 		return 0, false
 	}
-
-	id1Bytes := id1.Bytes()
-	id2Bytes := id2.Bytes()
 
 	startIndex := start / BitsPerByte
 	stopIndex := stop / BitsPerByte
@@ -90,8 +84,8 @@ func FirstDifferenceSubset(start, stop int, id1, id2 ID) (int, bool) {
 		mask := startMask & stopMask
 
 		// The index here could be startIndex or stopIndex, as they are equal
-		b1 := mask & int(id1Bytes[startIndex])
-		b2 := mask & int(id2Bytes[startIndex])
+		b1 := mask & int(id1[startIndex])
+		b2 := mask & int(id2[startIndex])
 
 		if b1 == b2 {
 			return 0, false
@@ -102,8 +96,8 @@ func FirstDifferenceSubset(start, stop int, id1, id2 ID) (int, bool) {
 	}
 
 	// Check the first byte, may have some bits masked
-	start1 := startMask & int(id1Bytes[startIndex])
-	start2 := startMask & int(id2Bytes[startIndex])
+	start1 := startMask & int(id1[startIndex])
+	start2 := startMask & int(id2[startIndex])
 
 	if start1 != start2 {
 		bd := start1 ^ start2
@@ -112,8 +106,8 @@ func FirstDifferenceSubset(start, stop int, id1, id2 ID) (int, bool) {
 
 	// Check all the interior bits
 	for i := startIndex + 1; i < stopIndex; i++ {
-		b1 := int(id1Bytes[i])
-		b2 := int(id2Bytes[i])
+		b1 := int(id1[i])
+		b2 := int(id2[i])
 		if b1 != b2 {
 			bd := b1 ^ b2
 			return bits.TrailingZeros8(uint8(bd)) + i*BitsPerByte, true
@@ -121,8 +115,8 @@ func FirstDifferenceSubset(start, stop int, id1, id2 ID) (int, bool) {
 	}
 
 	// Check the last byte, may have some bits masked
-	stop1 := stopMask & int(id1Bytes[stopIndex])
-	stop2 := stopMask & int(id2Bytes[stopIndex])
+	stop1 := stopMask & int(id1[stopIndex])
+	stop2 := stopMask & int(id2[stopIndex])
 
 	if stop1 != stop2 {
 		bd := stop1 ^ stop2

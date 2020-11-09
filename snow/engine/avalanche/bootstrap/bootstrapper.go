@@ -100,19 +100,16 @@ func (b *Bootstrapper) Initialize(
 
 // CurrentAcceptedFrontier returns the set of vertices that this node has accepted
 // that have no accepted children
-func (b *Bootstrapper) CurrentAcceptedFrontier() ids.Set {
-	acceptedFrontier := ids.Set{}
-	acceptedFrontier.Add(b.Manager.Edge()...)
-	return acceptedFrontier
+func (b *Bootstrapper) CurrentAcceptedFrontier() []ids.ID {
+	return b.Manager.Edge()
 }
 
 // FilterAccepted returns the IDs of vertices in [containerIDs] that this node has accepted
-func (b *Bootstrapper) FilterAccepted(containerIDs ids.Set) ids.Set {
-	acceptedVtxIDs := ids.Set{}
-	for vtxIDKey := range containerIDs {
-		vtxID := ids.NewID(vtxIDKey)
+func (b *Bootstrapper) FilterAccepted(containerIDs []ids.ID) []ids.ID {
+	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
+	for _, vtxID := range containerIDs {
 		if vtx, err := b.Manager.GetVertex(vtxID); err == nil && vtx.Status() == choices.Accepted {
-			acceptedVtxIDs.Add(vtxID)
+			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
 		}
 	}
 	return acceptedVtxIDs
@@ -260,7 +257,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 
 	vtxID := vtx.ID()
 	// If the vertex is neither the requested vertex nor a needed vertex, return early and re-fetch if necessary
-	if requested && !requestedVtxID.Equals(vtxID) {
+	if requested && requestedVtxID != vtxID {
 		b.Ctx.Log.Debug("received incorrect vertex from %s with vertexID %s", vdr, vtxID)
 		return b.fetch(requestedVtxID)
 	}
@@ -325,15 +322,14 @@ func (b *Bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) err
 }
 
 // ForceAccepted starts bootstrapping. Process the vertices in [accepterContainerIDs].
-func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
+func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	if err := b.VM.Bootstrapping(); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
 			err)
 	}
 
-	toProcess := make([]avalanche.Vertex, 0, acceptedContainerIDs.Len())
-	for vtxIDKey := range acceptedContainerIDs {
-		vtxID := ids.NewID(vtxIDKey)
+	toProcess := make([]avalanche.Vertex, 0, len(acceptedContainerIDs))
+	for _, vtxID := range acceptedContainerIDs {
 		if vtx, err := b.Manager.GetVertex(vtxID); err == nil {
 			toProcess = append(toProcess, vtx) // Process this vertex.
 		} else {

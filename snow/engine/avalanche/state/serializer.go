@@ -98,7 +98,7 @@ func (s *Serializer) BuildVertex(parentIDs []ids.ID, txs []snowstorm.Tx) (avalan
 		return nil, err
 	}
 	vtx.bytes = bytes
-	vtx.id = ids.NewID(hashing.ComputeHash256Array(vtx.bytes))
+	vtx.id = hashing.ComputeHash256Array(vtx.bytes)
 
 	uVtx := &uniqueVertex{
 		serializer: s,
@@ -119,7 +119,7 @@ func (s *Serializer) parseVertex(b []byte) (*innerVertex, error) {
 	vtx := &innerVertex{}
 	if err := vtx.Unmarshal(b, s.vm); err != nil {
 		return nil, err
-	} else if !vtx.chainID.Equals(s.ctx.ChainID) {
+	} else if vtx.chainID != s.ctx.ChainID {
 		return nil, errWrongChainID
 	}
 	return vtx, nil

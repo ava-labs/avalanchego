@@ -70,9 +70,9 @@ func TestNewImportTx(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-
+		inputID := utxo.InputID()
 		if err := peerSharedMemory.Put(vm.Ctx.ChainID, []*atomic.Element{{
-			Key:   utxo.InputID().Bytes(),
+			Key:   inputID[:],
 			Value: utxoBytes,
 			Traits: [][]byte{
 				recipientKey.PublicKey().Address().Bytes(),

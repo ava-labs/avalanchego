@@ -14,7 +14,6 @@ import (
 
 var (
 	errNilUTXOID = errors.New("nil utxo ID is not valid")
-	errNilTxID   = errors.New("nil tx ID is not valid")
 )
 
 // UTXOID ...
@@ -34,7 +33,7 @@ func (utxo *UTXOID) InputSource() (ids.ID, uint32) { return utxo.TxID, utxo.Outp
 
 // InputID returns a unique ID of the UTXO that this input is spending
 func (utxo *UTXOID) InputID() ids.ID {
-	if utxo.id.IsZero() {
+	if utxo.id == ids.Empty {
 		utxo.id = utxo.TxID.Prefix(uint64(utxo.OutputIndex))
 	}
 	return utxo.id
@@ -49,8 +48,6 @@ func (utxo *UTXOID) Verify() error {
 	switch {
 	case utxo == nil:
 		return errNilUTXOID
-	case utxo.TxID.IsZero():
-		return errNilTxID
 	default:
 		return nil
 	}
@@ -62,7 +59,7 @@ func (utxos innerSortUTXOIDs) Less(i, j int) bool {
 	iID, iIndex := utxos[i].InputSource()
 	jID, jIndex := utxos[j].InputSource()
 
-	switch bytes.Compare(iID.Bytes(), jID.Bytes()) {
+	switch bytes.Compare(iID[:], jID[:]) {
 	case -1:
 		return true
 	case 0:
