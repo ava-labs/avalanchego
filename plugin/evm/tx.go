@@ -117,7 +117,7 @@ func (tx *Tx) Sign(c codec.Codec, signers [][]*crypto.PrivateKeySECP256K1R) erro
 
 	signedBytes, err := c.Marshal(tx)
 	if err != nil {
-		return fmt.Errorf("couldn't marshal ProposalTx: %w", err)
+		return fmt.Errorf("couldn't marshal Tx: %w", err)
 	}
 	tx.Initialize(unsignedBytes, signedBytes)
 	return nil

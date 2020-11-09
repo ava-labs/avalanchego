@@ -155,7 +155,8 @@ func init() {
 type VM struct {
 	ctx *snow.Context
 
-	CLIConfig CommandLineConfig
+	CLIConfig       CommandLineConfig
+	encodingManager formatting.EncodingManager
 
 	chainID          *big.Int
 	networkID        uint64
@@ -236,6 +237,12 @@ func (vm *VM) Initialize(
 		return vm.CLIConfig.ParsingError
 	}
 
+	encodingManager, err := formatting.NewEncodingManager(formatting.CB58Encoding)
+	if err != nil {
+		return fmt.Errorf("problem creating encoding manager: %w", err)
+	}
+	vm.encodingManager = encodingManager
+
 	if len(fxs) > 0 {
 		return errUnsupportedFXs
 	}
@@ -243,8 +250,7 @@ func (vm *VM) Initialize(
 	vm.ctx = ctx
 	vm.chaindb = Database{db}
 	g := new(core.Genesis)
-	err := json.Unmarshal(b, g)
-	if err != nil {
+	if err := json.Unmarshal(b, g); err != nil {
 		return err
 	}
 
@@ -945,6 +951,35 @@ func (vm *VM) GetAcceptedNonce(address common.Address) (uint64, error) {
 		return 0, err
 	}
 	return state.GetNonce(address), nil
+}
+
+// ParseLocalAddress takes in an address for this chain and produces the ID
+func (vm *VM) ParseLocalAddress(addrStr string) (ids.ShortID, error) {
+	chainID, addr, err := vm.ParseAddress(addrStr)
+	if err != nil {
+		return ids.ShortID{}, err
+	}
+	if !chainID.Equals(vm.ctx.ChainID) {
+		return ids.ShortID{}, fmt.Errorf("expected chainID to be %q but was %q",
+			vm.ctx.ChainID, chainID)
+	}
+	return addr, nil
+}
+
+// FormatLocalAddress takes in a raw address and produces the formatted address
+func (vm *VM) FormatLocalAddress(addr ids.ShortID) (string, error) {
+	return vm.FormatAddress(vm.ctx.ChainID, addr)
+}
+
+// FormatAddress takes in a chainID and a raw address and produces the formatted
+// address
+func (vm *VM) FormatAddress(chainID ids.ID, addr ids.ShortID) (string, error) {
+	chainIDAlias, err := vm.ctx.BCLookup.PrimaryAlias(chainID)
+	if err != nil {
+		return "", err
+	}
+	hrp := constants.GetHRP(vm.ctx.NetworkID)
+	return formatting.FormatAddress(chainIDAlias, hrp, addr.Bytes())
 }
 
 // ParseEthAddress parses [addrStr] and returns an Ethereum address
