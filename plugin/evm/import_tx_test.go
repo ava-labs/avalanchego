@@ -22,7 +22,7 @@ func TestImportTxVerifyNil(t *testing.T) {
 
 func TestImportTxVerify(t *testing.T) {
 	var importAmount uint64 = 10000000
-	txID := ids.NewID([32]byte{0xff})
+	txID := ids.ID{0xff}
 	importTx := &UnsignedImportTx{
 		NetworkID:    testNetworkID,
 		BlockchainID: testCChainID,
@@ -77,7 +77,7 @@ func TestImportTxVerify(t *testing.T) {
 
 	// Test Valid ImportTx
 	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID); err != nil {
-		t.Fatalf("Failed to verify ImportTx: %w", err)
+		t.Fatalf("Failed to verify ImportTx: %s", err)
 	}
 
 	importTx.syntacticallyVerified = false
@@ -134,12 +134,12 @@ func TestImportTxSemanticVerify(t *testing.T) {
 
 	importAmount := uint64(1000000)
 	utxoID := avax.UTXOID{
-		TxID: ids.NewID([32]byte{
+		TxID: ids.ID{
 			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
 			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
 			0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
 			0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
-		}),
+		},
 	}
 
 	utxo := &avax.UTXO{
@@ -203,9 +203,9 @@ func TestImportTxSemanticVerify(t *testing.T) {
 	if err := unsignedImportTx.SemanticVerify(vm, tx); err != nil {
 		t.Fatal("Should have failed to import non-existent UTXO")
 	}
-
+	inputID := utxo.InputID()
 	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
-		Key:   utxo.InputID().Bytes(),
+		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
@@ -268,7 +268,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 	}
 
 	if err := unsignedImportTx.Accept(vm.ctx, nil); err != nil {
-		t.Fatalf("Accept failed due to: %w", err)
+		t.Fatalf("Accept failed due to: %s", err)
 	}
 
 	if err := unsignedImportTx.EVMStateTransfer(vm, state); err != nil {
@@ -293,12 +293,12 @@ func TestNewImportTx(t *testing.T) {
 
 	importAmount := uint64(1000000)
 	utxoID := avax.UTXOID{
-		TxID: ids.NewID([32]byte{
+		TxID: ids.ID{
 			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
 			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
 			0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
 			0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
-		}),
+		},
 	}
 
 	utxo := &avax.UTXO{
@@ -318,9 +318,9 @@ func TestNewImportTx(t *testing.T) {
 	}
 
 	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
-
+	inputID := utxo.InputID()
 	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
-		Key:   utxo.InputID().Bytes(),
+		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),

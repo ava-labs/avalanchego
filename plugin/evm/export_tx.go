@@ -17,6 +17,7 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -52,15 +53,13 @@ func (tx *UnsignedExportTx) Verify(
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.DestinationChain.IsZero():
-		return errWrongChainID
-	case !tx.DestinationChain.Equals(avmID):
+	case tx.DestinationChain != avmID:
 		return errWrongChainID
 	case len(tx.ExportedOutputs) == 0:
 		return errNoExportOutputs
 	case tx.NetworkID != ctx.NetworkID:
 		return errWrongNetworkID
-	case !ctx.ChainID.Equals(tx.BlockchainID):
+	case ctx.ChainID != tx.BlockchainID:
 		return errWrongBlockchainID
 	}
 
@@ -154,9 +153,9 @@ func (tx *UnsignedExportTx) Accept(ctx *snow.Context, _ database.Batch) error {
 		if err != nil {
 			return err
 		}
-
+		utxoID := utxo.InputID()
 		elem := &atomic.Element{
-			Key:   utxo.InputID().Bytes(),
+			Key:   utxoID[:],
 			Value: utxoBytes,
 		}
 		if out, ok := utxo.Out.(avax.Addressable); ok {
@@ -177,13 +176,13 @@ func (vm *VM) newExportTx(
 	to ids.ShortID, // Address of chain recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee and provide the tokens
 ) (*Tx, error) {
-	if !vm.ctx.XChainID.Equals(chainID) {
+	if vm.ctx.XChainID != chainID {
 		return nil, errWrongChainID
 	}
 
 	var toBurn uint64
 	var err error
-	if assetID.Equals(vm.ctx.AVAXAssetID) {
+	if assetID == vm.ctx.AVAXAssetID {
 		toBurn, err = safemath.Add64(amount, vm.txFee)
 		if err != nil {
 			return nil, errOverflowExport
@@ -198,7 +197,7 @@ func (vm *VM) newExportTx(
 	}
 
 	// burn non-AVAX
-	if !assetID.Equals(vm.ctx.AVAXAssetID) {
+	if assetID != vm.ctx.AVAXAssetID {
 		ins2, signers2, err := vm.GetSpendableFunds(keys, assetID, amount)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
@@ -242,7 +241,7 @@ func (tx *UnsignedExportTx) EVMStateTransfer(vm *VM, state *state.StateDB) error
 	addrs := map[[20]byte]uint64{}
 	for _, from := range tx.Ins {
 		log.Info("crosschain C->X", "addr", from.Address, "amount", from.Amount)
-		if from.AssetID.Equals(vm.ctx.AVAXAssetID) {
+		if from.AssetID == vm.ctx.AVAXAssetID {
 			amount := new(big.Int).Mul(
 				new(big.Int).SetUint64(from.Amount), x2cRate)
 			if state.GetBalance(from.Address).Cmp(amount) < 0 {
@@ -251,11 +250,10 @@ func (tx *UnsignedExportTx) EVMStateTransfer(vm *VM, state *state.StateDB) error
 			state.SubBalance(from.Address, amount)
 		} else {
 			amount := new(big.Int).SetUint64(from.Amount)
-			assetID := from.AssetID.Key()
-			if state.GetBalanceMultiCoin(from.Address, assetID).Cmp(amount) < 0 {
+			if state.GetBalanceMultiCoin(from.Address, common.Hash(from.AssetID)).Cmp(amount) < 0 {
 				return errInsufficientFunds
 			}
-			state.SubBalanceMultiCoin(from.Address, assetID, amount)
+			state.SubBalanceMultiCoin(from.Address, common.Hash(from.AssetID), amount)
 		}
 		if state.GetNonce(from.Address) != from.Nonce {
 			return errInvalidNonce
