@@ -3,13 +3,11 @@
 
 package evm
 
-import (
-	"github.com/ava-labs/avalanchego/ids"
-)
+import "github.com/ava-labs/avalanchego/ids"
 
 // ID this VM should be referenced by
 var (
-	ID = ids.NewID([32]byte{'e', 'v', 'm'})
+	ID = ids.ID{'e', 'v', 'm'}
 )
 
 // Factory ...

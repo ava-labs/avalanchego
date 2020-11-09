@@ -23,18 +23,16 @@ import (
 
 var (
 	testNetworkID    uint32 = 10
-	testCChainID            = ids.NewID([32]byte{'c', 'c', 'h', 'a', 'i', 'n', 't', 'e', 's', 't'})
-	testXChainID            = ids.NewID([32]byte{'t', 'e', 's', 't', 'x'})
-	nonExistentID           = ids.NewID([32]byte{'F'})
+	testCChainID            = ids.ID{'c', 'c', 'h', 'a', 'i', 'n', 't', 'e', 's', 't'}
+	testXChainID            = ids.ID{'t', 'e', 's', 't', 'x'}
+	nonExistentID           = ids.ID{'F'}
 	testTxFee               = uint64(1000)
-	startBalance            = uint64(50000)
 	testKeys         []*crypto.PrivateKeySECP256K1R
 	testEthAddrs     []common.Address // testEthAddrs[i] corresponds to testKeys[i]
 	testShortIDAddrs []ids.ShortID
-	testAvaxAssetID         = ids.NewID([32]byte{1, 2, 3})
-	username                = "Johns"
-	password                = "CjasdjhiPeirbSenfeI13" // #nosec G101
-	ethChainID       uint32 = 43112
+	testAvaxAssetID  = ids.ID{1, 2, 3}
+	username         = "Johns"
+	password         = "CjasdjhiPeirbSenfeI13" // #nosec G101
 )
 
 func init() {
@@ -63,7 +61,7 @@ func BuildGenesisTest(t *testing.T) []byte {
 
 	genesis := &core.Genesis{}
 	if err := json.Unmarshal([]byte(genesisJSON), genesis); err != nil {
-		t.Fatalf("Problem unmarshaling genesis JSON: %w", err)
+		t.Fatalf("Problem unmarshaling genesis JSON: %s", err)
 	}
 	genesisReply, err := ss.BuildGenesis(nil, genesis)
 	if err != nil {
@@ -79,10 +77,10 @@ func NewContext() *snow.Context {
 	ctx.AVAXAssetID = testAvaxAssetID
 	ctx.XChainID = ids.Empty.Prefix(0)
 	aliaser := ctx.BCLookup.(*ids.Aliaser)
-	aliaser.Alias(testCChainID, "C")
-	aliaser.Alias(testCChainID, testCChainID.String())
-	aliaser.Alias(testXChainID, "X")
-	aliaser.Alias(testXChainID, testXChainID.String())
+	_ = aliaser.Alias(testCChainID, "C")
+	_ = aliaser.Alias(testCChainID, testCChainID.String())
+	_ = aliaser.Alias(testXChainID, "X")
+	_ = aliaser.Alias(testXChainID, testXChainID.String())
 
 	// SNLookup might be required here???
 	return ctx
