@@ -934,7 +934,7 @@ func (vm *VM) ParseLocalAddress(addrStr string) (ids.ShortID, error) {
 	if err != nil {
 		return ids.ShortID{}, err
 	}
-	if !chainID.Equals(vm.ctx.ChainID) {
+	if chainID != vm.ctx.ChainID {
 		return ids.ShortID{}, fmt.Errorf("expected chainID to be %q but was %q",
 			vm.ctx.ChainID, chainID)
 	}
