@@ -58,15 +58,15 @@ func (tx *UnsignedImportTx) Verify(
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.SourceChain.IsZero():
+	case tx.SourceChain == ids.Empty:
 		return errWrongChainID
-	case !tx.SourceChain.Equals(avmID):
+	case tx.SourceChain != avmID:
 		return errWrongChainID
 	case len(tx.ImportedInputs) == 0:
 		return errNoImportInputs
 	case tx.NetworkID != ctx.NetworkID:
 		return errWrongNetworkID
-	case !ctx.ChainID.Equals(tx.BlockchainID):
+	case ctx.ChainID != tx.BlockchainID:
 		return errWrongBlockchainID
 	}
 
@@ -124,7 +124,8 @@ func (tx *UnsignedImportTx) SemanticVerify(
 
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))
 	for i, in := range tx.ImportedInputs {
-		utxoIDs[i] = in.UTXOID.InputID().Bytes()
+		inputID := in.UTXOID.InputID()
+		utxoIDs[i] = inputID[:]
 	}
 	// allUTXOBytes is guaranteed to be the same length as utxoIDs
 	allUTXOBytes, err := vm.ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
@@ -144,7 +145,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 
 		utxoAssetID := utxo.AssetID()
 		inAssetID := in.AssetID()
-		if !utxoAssetID.Equals(inAssetID) {
+		if utxoAssetID != inAssetID {
 			return permError{errAssetIDMismatch}
 		}
 
@@ -164,7 +165,8 @@ func (tx *UnsignedImportTx) Accept(ctx *snow.Context, _ database.Batch) error {
 	// TODO: Is any batch passed in here?
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))
 	for i, in := range tx.ImportedInputs {
-		utxoIDs[i] = in.InputID().Bytes()
+		inputID := in.InputID()
+		utxoIDs[i] = inputID[:]
 	}
 	return ctx.SharedMemory.Remove(tx.SourceChain, utxoIDs)
 }
@@ -175,7 +177,7 @@ func (vm *VM) newImportTx(
 	to common.Address, // Address of recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
 ) (*Tx, error) {
-	if !vm.ctx.XChainID.Equals(chainID) {
+	if vm.ctx.XChainID != chainID {
 		return nil, errWrongChainID
 	}
 
@@ -204,8 +206,7 @@ func (vm *VM) newImportTx(
 			continue
 		}
 		aid := utxo.AssetID()
-		aidKey := aid.Key()
-		importedAmount[aidKey], err = math.Add64(importedAmount[aidKey], input.Amount())
+		importedAmount[aid], err = math.Add64(importedAmount[aid], input.Amount())
 		if err != nil {
 			return nil, err
 		}
@@ -238,8 +239,7 @@ func (vm *VM) newImportTx(
 
 	// This will create unique outputs (in the context of sorting)
 	// since each output will have a unique assetID
-	for assetKey, amount := range importedAmount {
-		assetID := ids.NewID(assetKey)
+	for assetID, amount := range importedAmount {
 		//if assetID.Equals(vm.ctx.AVAXAssetID) || amount == 0 {
 		if amount == 0 {
 			continue
@@ -273,13 +273,13 @@ func (vm *VM) newImportTx(
 func (tx *UnsignedImportTx) EVMStateTransfer(vm *VM, state *state.StateDB) error {
 	for _, to := range tx.Outs {
 		log.Info("crosschain X->C", "addr", to.Address, "amount", to.Amount)
-		if to.AssetID.Equals(vm.ctx.AVAXAssetID) {
+		if to.AssetID == vm.ctx.AVAXAssetID {
 			amount := new(big.Int).Mul(
 				new(big.Int).SetUint64(to.Amount), x2cRate)
 			state.AddBalance(to.Address, amount)
 		} else {
 			amount := new(big.Int).SetUint64(to.Amount)
-			state.AddBalanceMultiCoin(to.Address, to.AssetID.Key(), amount)
+			state.AddBalanceMultiCoin(to.Address, common.Hash(to.AssetID), amount)
 		}
 	}
 	return nil
