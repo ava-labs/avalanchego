@@ -4,6 +4,7 @@
 package ipcs
 
 import (
+	"errors"
 	"os"
 	"syscall"
 
@@ -99,17 +100,11 @@ func newEventIPCSocket(ctx context, chainID ids.ID, name string, events *trigger
 	)
 
 	err := os.Remove(url)
-	if err != nil {
-		if patherr, ok := err.(*os.PathError); ok {
-			if patherr.Err != syscall.ENOENT {
-				return nil, err
-			}
-		} else {
-			return nil, err
-		}
+	if err != nil && !errors.Is(err, syscall.ENOENT) {
+		return nil, err
 	}
 
-	var eis = &eventSocket{
+	eis := &eventSocket{
 		log:    ctx.log,
 		url:    url,
 		socket: socket.NewSocket(url, ctx.log),

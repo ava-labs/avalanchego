@@ -31,33 +31,27 @@ var (
 
 // Socket manages sending messages over a socket to many subscribed clients
 type Socket struct {
-	log logging.Logger
-
+	log      logging.Logger
 	addr     string
 	accept   acceptFn
 	connLock *sync.RWMutex
 	conns    map[net.Conn]struct{}
-
-	quitCh chan struct{}
-	doneCh chan struct{}
-
-	// the current listener
-	listener net.Listener
+	quitCh   chan struct{}
+	doneCh   chan struct{}
+	listener net.Listener // the current listener
 }
 
 // NewSocket creates a new socket object for the given address. It does not open
 // the socket until Listen is called.
 func NewSocket(addr string, log logging.Logger) *Socket {
 	return &Socket{
-		log: log,
-
+		log:      log,
 		addr:     addr,
 		accept:   accept,
 		connLock: &sync.RWMutex{},
 		conns:    map[net.Conn]struct{}{},
-
-		quitCh: make(chan struct{}),
-		doneCh: make(chan struct{}),
+		quitCh:   make(chan struct{}),
+		doneCh:   make(chan struct{}),
 	}
 }
 
@@ -88,7 +82,7 @@ func (s *Socket) Listen() error {
 // Send writes the given message to all connection clients
 func (s *Socket) Send(msg []byte) error {
 	// Prefix the message with an 8 byte length
-	lenBytes := make([]byte, 8)
+	lenBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(lenBytes, uint64(len(msg)))
 	msg = append(lenBytes, msg...)
 
@@ -212,7 +206,7 @@ func (e errReadTimeout) Error() string {
 type acceptFn func(*Socket, net.Listener)
 
 // accept is the default acceptFn for sockets. It accepts the next connection
-// from the given listen and adds it to the Socket's connection list
+// from the given listener and adds it to the Socket's connection list
 func accept(s *Socket, l net.Listener) {
 	conn, err := l.Accept()
 	if err != nil {
