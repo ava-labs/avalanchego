@@ -819,6 +819,7 @@ func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, time
 	startIter := startDB.NewIterator()
 	defer startIter.Release()
 
+pendingStakerLoop:
 	for startIter.Next() { // Iterates in order of increasing start time
 		txBytes := startIter.Value()
 
@@ -837,7 +838,7 @@ func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, time
 					subnetID)
 			}
 			if staker.StartTime().After(timestamp) {
-				return nil
+				break pendingStakerLoop
 			}
 			if err := vm.dequeueStaker(db, subnetID, &tx); err != nil {
 				return fmt.Errorf("couldn't dequeue staker: %w", err)
@@ -861,7 +862,7 @@ func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, time
 					subnetID)
 			}
 			if staker.StartTime().After(timestamp) {
-				return nil
+				break pendingStakerLoop
 			}
 			if err := vm.dequeueStaker(db, subnetID, &tx); err != nil {
 				return fmt.Errorf("couldn't dequeue staker: %w", err)
@@ -885,7 +886,7 @@ func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, time
 					subnetID, txSubnetID)
 			}
 			if staker.StartTime().After(timestamp) {
-				return nil
+				break pendingStakerLoop
 			}
 			if err := vm.dequeueStaker(db, subnetID, &tx); err != nil {
 				return fmt.Errorf("couldn't dequeue staker: %w", err)
@@ -910,6 +911,7 @@ func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, time
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
 
+currentStakerLoop:
 	for stopIter.Next() { // Iterates in order of increasing start time
 		txBytes := stopIter.Value()
 
@@ -928,7 +930,7 @@ func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, time
 					subnetID)
 			}
 			if staker.EndTime().After(timestamp) {
-				return nil
+				break currentStakerLoop
 			}
 		case *UnsignedAddValidatorTx:
 			if subnetID != constants.PrimaryNetworkID {
@@ -936,7 +938,7 @@ func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, time
 					subnetID)
 			}
 			if staker.EndTime().After(timestamp) {
-				return nil
+				break currentStakerLoop
 			}
 		case *UnsignedAddSubnetValidatorTx:
 			if txSubnetID := staker.Validator.SubnetID(); subnetID != txSubnetID {
@@ -944,7 +946,7 @@ func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, time
 					subnetID, txSubnetID)
 			}
 			if staker.EndTime().After(timestamp) {
-				return nil
+				break currentStakerLoop
 			}
 			if err := vm.removeStaker(db, subnetID, &tx); err != nil {
 				return fmt.Errorf("couldn't remove staker: %w", err)

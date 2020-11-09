@@ -79,6 +79,7 @@ var (
 
 	// subnet that exists at genesis in defaultVM
 	// Its controlKeys are keys[0], keys[1], keys[2]
+	// Its threshold is 2
 	testSubnet1            *UnsignedCreateSubnetTx
 	testSubnet1ControlKeys []*crypto.PrivateKeySECP256K1R
 
