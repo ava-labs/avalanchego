@@ -193,12 +193,12 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		startTime = uStakerTx.StartTime()
 		if err := vm.deleteUptime(onCommitDB, nodeID); err != nil {
 			return nil, nil, nil, nil, tempError{
-				fmt.Errorf("failed to put supply: %w", err),
+				fmt.Errorf("failed to delete uptime for %s: %w", nodeID.PrefixedString(constants.NodeIDPrefix), err),
 			}
 		}
 		if err := vm.deleteUptime(onAbortDB, nodeID); err != nil {
 			return nil, nil, nil, nil, tempError{
-				fmt.Errorf("failed to put supply: %w", err),
+				fmt.Errorf("failed to delete uptime for %s: %w", nodeID.PrefixedString(constants.NodeIDPrefix), err),
 			}
 		}
 	case *UnsignedAddDelegatorTx:
@@ -349,13 +349,13 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 	return onCommitDB, onAbortDB, updateValidators, updateValidators, nil
 }
 
-// InitiallyPrefersCommit returns true.
-//
-// Right now, *Commit (that is, remove the validator and reward them) is always
-// preferred over *Abort (remove the validator but don't reward them.)
+// InitiallyPrefersCommit returns true if this node thinks the validator
+// should receive a staking reward.
 //
 // TODO: A validator should receive a reward only if they are sufficiently
 // responsive and correct during the time they are validating.
+// Right now they receive a reward if they're up (but not necessarily
+// correct and responsive) for a sufficient amount of time
 func (tx *UnsignedRewardValidatorTx) InitiallyPrefersCommit(*VM) bool {
 	return tx.shouldPreferCommit
 }
