@@ -15,12 +15,11 @@ import (
 
 // Key in the database whose corresponding value is the list of
 // addresses this user controls
-var addressesKey = ids.Empty.Bytes()
+var addressesKey = ids.Empty[:]
 
 var (
-	errDBNil        = errors.New("db uninitialized")
-	errKeyNil       = errors.New("key uninitialized")
-	errEmptyAddress = errors.New("address is empty")
+	errDBNil  = errors.New("db uninitialized")
+	errKeyNil = errors.New("key uninitialized")
 )
 
 type user struct {

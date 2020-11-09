@@ -565,7 +565,7 @@ func (s *PublicBlockChainAPI) GetAssetBalance(ctx context.Context, address commo
 	if state == nil || err != nil {
 		return nil, err
 	}
-	return (*hexutil.Big)(state.GetBalanceMultiCoin(address, assetID.Key())), state.Error()
+	return (*hexutil.Big)(state.GetBalanceMultiCoin(address, common.Hash(assetID))), state.Error()
 }
 
 // Result structs for GetProof

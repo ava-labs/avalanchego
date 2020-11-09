@@ -57,7 +57,7 @@ func main() {
 	assetID, err := ids.FromString(fAssetID)
 	checkError(err)
 	mcAbi, err := abi.JSON(strings.NewReader(mcAbiJSON))
-	data, err := mcAbi.Pack("transfer", to, big.NewInt(0), common.Hash(assetID.Key()).Big(), big.NewInt(fAmount))
+	data, err := mcAbi.Pack("transfer", to, big.NewInt(0), common.Hash(assetID).Big(), big.NewInt(fAmount))
 	checkError(err)
 	tx := types.NewTransaction(nonce, vm.BuiltinAddr, big.NewInt(0), uint64(gasLimit), gasPrice, data)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), pkey.PrivateKey)

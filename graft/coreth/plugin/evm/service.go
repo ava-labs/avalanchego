@@ -262,7 +262,7 @@ type ExportArgs struct {
 // It must be imported on the X-Chain to complete the transfer
 func (service *AvaxAPI) Export(_ *http.Request, args *ExportArgs, response *api.JSONTxID) error {
 	log.Info("EVM: Export called")
-	if args.AssetID.IsZero() {
+	if args.AssetID == ids.Empty {
 		return fmt.Errorf("assetID is required")
 	}
 
