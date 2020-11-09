@@ -7,7 +7,7 @@ import "github.com/ava-labs/avalanchego/ids"
 
 // ID this VM should be referenced by
 var (
-	ID = ids.ID([32]byte{'e', 'v', 'm'})
+	ID = ids.ID{'e', 'v', 'm'}
 )
 
 // Factory ...

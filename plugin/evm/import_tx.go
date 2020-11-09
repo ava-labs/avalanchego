@@ -58,8 +58,6 @@ func (tx *UnsignedImportTx) Verify(
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.SourceChain == ids.Empty:
-		return errWrongChainID
 	case tx.SourceChain != avmID:
 		return errWrongChainID
 	case len(tx.ImportedInputs) == 0:
