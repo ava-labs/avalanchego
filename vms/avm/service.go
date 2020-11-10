@@ -411,18 +411,21 @@ func (service *Service) GetAllBalances(r *http.Request, args *api.JSONAddress, r
 	}
 
 	reply.Balances = make([]Balance, assetIDs.Len())
-	for i, assetID := range assetIDs.List() {
+	i := 0
+	for assetIDKey := range assetIDs {
+		assetID := ids.NewID(assetIDKey)
 		if alias, err := service.vm.PrimaryAlias(assetID); err == nil {
 			reply.Balances[i] = Balance{
 				AssetID: alias,
-				Balance: json.Uint64(balances[assetID.Key()]),
+				Balance: json.Uint64(balances[assetIDKey]),
 			}
 		} else {
 			reply.Balances[i] = Balance{
 				AssetID: assetID.String(),
-				Balance: json.Uint64(balances[assetID.Key()]),
+				Balance: json.Uint64(balances[assetIDKey]),
 			}
 		}
+		i++
 	}
 
 	return nil

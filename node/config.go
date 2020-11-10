@@ -116,4 +116,7 @@ type Config struct {
 	// Connection checker
 	DisconnectedCheckFreq      time.Duration
 	DisconnectedRestartTimeout time.Duration
+
+	// Coreth
+	CorethConfig string
 }

@@ -395,9 +395,11 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 			requestID,
 			containerIDs,
 			err)
-		for _, validatorID := range validatorIDs.List() {
-			vID := validatorID
-			n.executor.Add(func() { n.router.GetAcceptedFailed(vID, chainID, requestID) })
+		for validatorIDKey := range validatorIDs {
+			validatorID := ids.NewShortID(validatorIDKey)
+			n.executor.Add(func() {
+				n.router.GetAcceptedFailed(validatorID, chainID, requestID)
+			})
 		}
 		return
 	}
@@ -551,8 +553,8 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			err,
 			len(container))
 		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
-		for _, validatorID := range validatorIDs.List() {
-			vID := validatorID
+		for validatorIDKey := range validatorIDs {
+			vID := ids.NewShortID(validatorIDKey)
 			n.executor.Add(func() { n.router.QueryFailed(vID, chainID, requestID) })
 		}
 		return // Packing message failed
@@ -1180,14 +1182,16 @@ func (n *network) getPeers(validatorIDs ids.ShortSet) []*PeerElement {
 		return nil
 	}
 
-	vIDS := validatorIDs.List()
-	peers := make([]*PeerElement, 0, len(vIDS))
-	for _, validatorID := range vIDS {
-		peers = append(peers, &PeerElement{
-			peer: n.peers[validatorID.Key()],
-			id:   validatorID,
-		})
+	peers := make([]*PeerElement, validatorIDs.Len())
+	i := 0
+	for validatorIDKey := range validatorIDs {
+		peers[i] = &PeerElement{
+			peer: n.peers[validatorIDKey],
+			id:   ids.NewShortID(validatorIDKey),
+		}
+		i++
 	}
+
 	return peers
 }
 

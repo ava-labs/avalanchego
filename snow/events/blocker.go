@@ -55,9 +55,8 @@ func (b *Blocker) Abandon(id ids.ID) {
 func (b *Blocker) Register(pending Blockable) {
 	b.init()
 
-	for _, pendingID := range pending.Dependencies().List() {
-		key := pendingID.Key()
-		(*b)[key] = append((*b)[key], pending)
+	for pendingID := range pending.Dependencies() {
+		(*b)[pendingID] = append((*b)[pendingID], pending)
 	}
 
 	pending.Update()

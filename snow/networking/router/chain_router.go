@@ -113,8 +113,8 @@ func (sr *ChainRouter) AddChain(chain *Handler) {
 	chain.toClose = func() { sr.RemoveChain(chainID) }
 	sr.chains[chainID.Key()] = chain
 
-	for _, validatorID := range sr.peers.List() {
-		chain.Connected(validatorID)
+	for validatorID := range sr.peers {
+		chain.Connected(ids.NewShortID(validatorID))
 	}
 }
 

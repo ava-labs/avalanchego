@@ -210,7 +210,7 @@ func AddTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx0.InputIDsV.Add(utxos[0])
+	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	vtx0 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -236,7 +236,7 @@ func AddTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx1.InputIDsV.Add(utxos[0])
+	tx1.InputIDsV = append(tx1.InputIDsV, utxos[0])
 
 	vtx1 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -318,7 +318,7 @@ func VertexIssuedTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx.InputIDsV.Add(utxos[0])
+	tx.InputIDsV = append(tx.InputIDsV, utxos[0])
 
 	vtx := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -372,7 +372,7 @@ func TxIssuedTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx1.InputIDsV.Add(utxos[0])
+	tx1.InputIDsV = append(tx1.InputIDsV, utxos[0])
 
 	if err := avl.Initialize(snow.DefaultContextTest(), params, vts); err != nil {
 		t.Fatal(err)
@@ -446,7 +446,7 @@ func VirtuousTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx0.InputIDsV.Add(utxos[0])
+	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	vtx0 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -462,7 +462,7 @@ func VirtuousTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx1.InputIDsV.Add(utxos[0])
+	tx1.InputIDsV = append(tx1.InputIDsV, utxos[0])
 
 	vtx1 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -478,7 +478,7 @@ func VirtuousTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx2.InputIDsV.Add(utxos[1])
+	tx2.InputIDsV = append(tx2.InputIDsV, utxos[1])
 
 	vtx2 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -600,7 +600,7 @@ func VirtuousSkippedUpdateTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx0.InputIDsV.Add(utxos[0])
+	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	vtx0 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -616,7 +616,7 @@ func VirtuousSkippedUpdateTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx1.InputIDsV.Add(utxos[0])
+	tx1.InputIDsV = append(tx1.InputIDsV, utxos[0])
 
 	vtx1 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -685,7 +685,7 @@ func VotingTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx0.InputIDsV.Add(utxos[0])
+	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	vtx0 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -701,7 +701,7 @@ func VotingTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx1.InputIDsV.Add(utxos[0])
+	tx1.InputIDsV = append(tx1.InputIDsV, utxos[0])
 
 	vtx1 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -784,7 +784,7 @@ func IgnoreInvalidVotingTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx0.InputIDsV.Add(utxos[0])
+	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	vtx0 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -800,7 +800,7 @@ func IgnoreInvalidVotingTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx1.InputIDsV.Add(utxos[0])
+	tx1.InputIDsV = append(tx1.InputIDsV, utxos[0])
 
 	vtx1 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -869,7 +869,7 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx0.InputIDsV.Add(utxos[0])
+	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	vtx0 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -885,7 +885,7 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx1.InputIDsV.Add(utxos[1])
+	tx1.InputIDsV = append(tx1.InputIDsV, utxos[1])
 
 	vtx1 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -986,7 +986,7 @@ func SplitVotingTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx0.InputIDsV.Add(utxos[0])
+	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	vtx0 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -1067,7 +1067,7 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx0.InputIDsV.Add(utxos[0])
+	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	vtx0 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -1083,7 +1083,7 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx1.InputIDsV.Add(utxos[0])
+	tx1.InputIDsV = append(tx1.InputIDsV, utxos[0])
 
 	vtx1 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -1099,7 +1099,7 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx2.InputIDsV.Add(utxos[1])
+	tx2.InputIDsV = append(tx2.InputIDsV, utxos[1])
 
 	vtx2 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -1212,7 +1212,7 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx0.InputIDsV.Add(utxos[0])
+	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	vtx0 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -1228,7 +1228,7 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx1.InputIDsV.Add(utxos[0])
+	tx1.InputIDsV = append(tx1.InputIDsV, utxos[0])
 
 	vtx1 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -1303,7 +1303,7 @@ func QuiesceTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx0.InputIDsV.Add(utxos[0])
+	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	vtx0 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -1319,7 +1319,7 @@ func QuiesceTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx1.InputIDsV.Add(utxos[0])
+	tx1.InputIDsV = append(tx1.InputIDsV, utxos[0])
 
 	vtx1 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -1335,7 +1335,7 @@ func QuiesceTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx2.InputIDsV.Add(utxos[1])
+	tx2.InputIDsV = append(tx2.InputIDsV, utxos[1])
 
 	vtx2 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -1406,7 +1406,7 @@ func OrphansTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx0.InputIDsV.Add(utxos[0])
+	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	vtx0 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -1422,7 +1422,7 @@ func OrphansTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx1.InputIDsV.Add(utxos[0])
+	tx1.InputIDsV = append(tx1.InputIDsV, utxos[0])
 
 	vtx1 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -1438,7 +1438,7 @@ func OrphansTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx2.InputIDsV.Add(utxos[1])
+	tx2.InputIDsV = append(tx2.InputIDsV, utxos[1])
 
 	vtx2 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -1552,7 +1552,7 @@ func ErrorOnTxAcceptTest(t *testing.T, factory Factory) {
 		AcceptV: errors.New(""),
 		StatusV: choices.Processing,
 	}}
-	tx0.InputIDsV.Add(utxos[0])
+	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	vtx0 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -1605,7 +1605,7 @@ func ErrorOnVtxAcceptTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx0.InputIDsV.Add(utxos[0])
+	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	vtx0 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -1659,7 +1659,7 @@ func ErrorOnVtxRejectTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx0.InputIDsV.Add(utxos[0])
+	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	vtx0 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -1675,7 +1675,7 @@ func ErrorOnVtxRejectTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx1.InputIDsV.Add(utxos[0])
+	tx1.InputIDsV = append(tx1.InputIDsV, utxos[0])
 
 	vtx1 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -1731,7 +1731,7 @@ func ErrorOnParentVtxRejectTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx0.InputIDsV.Add(utxos[0])
+	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	vtx0 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -1747,7 +1747,7 @@ func ErrorOnParentVtxRejectTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx1.InputIDsV.Add(utxos[0])
+	tx1.InputIDsV = append(tx1.InputIDsV, utxos[0])
 
 	vtx1 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -1815,7 +1815,7 @@ func ErrorOnTransitiveVtxRejectTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx0.InputIDsV.Add(utxos[0])
+	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	vtx0 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -1831,7 +1831,7 @@ func ErrorOnTransitiveVtxRejectTest(t *testing.T, factory Factory) {
 		IDV:     ids.GenerateTestID(),
 		StatusV: choices.Processing,
 	}}
-	tx1.InputIDsV.Add(utxos[0])
+	tx1.InputIDsV = append(tx1.InputIDsV, utxos[0])
 
 	vtx1 := &TestVertex{
 		TestDecidable: choices.TestDecidable{

@@ -27,6 +27,9 @@ jobs:
     - name: Install aws cli
       run: sudo apt-get install awscli
 
+    - name: Install rpmbuild
+      run: sudo apt-get install rpm 
+
     - name: Get the version
       id: get_version
       run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
@@ -34,6 +37,14 @@ jobs:
 
     - name: Create debian package structure
       run: ./.github/workflows/build-deb-pkg.sh
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.UPLOAD_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}
+        TAG: ${{ steps.get_version.outputs.VERSION }}
+        BUCKET: ${{ secrets.BUCKET }}
+
+    - name: Create RPM package 
+      run: ./.github/workflows/build-rpm-pkg.sh
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.UPLOAD_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}

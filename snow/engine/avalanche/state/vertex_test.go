@@ -13,8 +13,8 @@ import (
 
 func TestVertexVerify(t *testing.T) {
 	conflictingInputID := ids.NewID([32]byte{'i', 'n'})
-	inputs := ids.Set{}
-	inputs.Add(conflictingInputID)
+	inputs := []ids.ID{}
+	inputs = append(inputs, conflictingInputID)
 	tx0 := &snowstorm.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV: ids.NewID([32]byte{'t', 'x', '0'}),
@@ -107,7 +107,7 @@ func TestVertexVerify(t *testing.T) {
 		t.Fatal("Vertex with non-unique transactions should not have passed verification")
 	}
 
-	inputs.Add(ids.NewID([32]byte{'e', 'x', 't', 'r', 'a'}))
+	inputs = append(inputs, ids.NewID([32]byte{'e', 'x', 't', 'r', 'a'}))
 	conflictingTx := &snowstorm.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV: ids.NewID([32]byte{'c', 'o', 'n', 'f', 'l', 'i', 'c', 't'}),

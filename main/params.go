@@ -4,6 +4,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -13,6 +14,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -31,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/password"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
@@ -41,21 +44,19 @@ const (
 // Results of parsing the CLI
 var (
 	Config             = node.Config{}
-	Err                error
 	defaultNetworkName = constants.MainnetName
 
 	homeDir                = os.ExpandEnv("$HOME")
-	dataDirName            = fmt.Sprintf(".%s", constants.AppName)
-	defaultDbDir           = filepath.Join(homeDir, dataDirName, "db")
-	defaultStakingKeyPath  = filepath.Join(homeDir, dataDirName, "staking", "staker.key")
-	defaultStakingCertPath = filepath.Join(homeDir, dataDirName, "staking", "staker.crt")
+	prefixedAppName        = fmt.Sprintf(".%s", constants.AppName)
+	defaultDbDir           = filepath.Join(homeDir, prefixedAppName, "db")
+	defaultStakingKeyPath  = filepath.Join(homeDir, prefixedAppName, "staking", "staker.key")
+	defaultStakingCertPath = filepath.Join(homeDir, prefixedAppName, "staking", "staker.crt")
 	defaultPluginDirs      = []string{
 		filepath.Join(".", "build", "plugins"),
 		filepath.Join(".", "plugins"),
 		filepath.Join("/", "usr", "local", "lib", constants.AppName),
-		filepath.Join(homeDir, dataDirName, "plugins"),
+		filepath.Join(homeDir, prefixedAppName, "plugins"),
 	}
-
 	// GitCommit should be optionally set at compile time.
 	GitCommit string
 )
@@ -66,257 +67,269 @@ var (
 	errInvalidStakerWeights = errors.New("staking weights must be positive")
 )
 
-// Parse the CLI arguments
-func init() {
-	loggingConfig, err := logging.DefaultConfig()
-	if err != nil {
-		Err = err
-		return
-	}
-
+// avalancheFlagSet returns the complete set of flags for avalanchego
+func avalancheFlagSet() *flag.FlagSet {
 	fs := flag.NewFlagSet(constants.AppName, flag.ContinueOnError)
 
 	// If this is true, print the version and quit.
-	version := fs.Bool("version", false, "If true, print version and quit")
+	fs.Bool(versionKey, false, "If true, print version and quit")
+
+	// Config File:
+	fs.String(configFileKey, defaultString, "Specifies a config file")
 
 	// NetworkID:
-	networkName := fs.String("network-id", defaultNetworkName, "Network ID this node will connect to")
+	fs.String(networkNameKey, defaultNetworkName, "Network ID this node will connect to")
 
 	// AVAX fees:
-	txFee := fs.Uint64("tx-fee", units.MilliAvax, "Transaction fee, in nAVAX")
-	creationTxFee := fs.Uint64("creation-tx-fee", units.MilliAvax, "Transaction fee, in nAVAX, for transactions that create new state")
+	fs.Uint64(txFeeKey, units.MilliAvax, "Transaction fee, in nAVAX")
+	fs.Uint64(creationTxFeeKey, units.MilliAvax, "Transaction fee, in nAVAX, for transactions that create new state")
 
 	// Uptime requirement:
-	uptimeRequirement := fs.Float64("uptime-requirement", .6, "Fraction of time a validator must be online to receive rewards")
+	fs.Float64(uptimeRequirementKey, .6, "Fraction of time a validator must be online to receive rewards")
 
 	// Minimum stake, in nAVAX, required to validate the primary network
-	minValidatorStake := fs.Uint64("min-validator-stake", 2*units.KiloAvax, "Minimum stake, in nAVAX, required to validate the primary network")
+	fs.Uint64(minValidatorStakeKey, 2*units.KiloAvax, "Minimum stake, in nAVAX, required to validate the primary network")
 
 	// Maximum stake amount, in nAVAX, that can be staked and delegated to a
 	// validator on the primary network
-	maxValidatorStake := fs.Uint64("max-validator-stake", 3*units.MegaAvax, "Maximum stake, in nAVAX, that can be placed on a validator on the primary network")
+	fs.Uint64(maxValidatorStakeKey, 3*units.MegaAvax, "Maximum stake, in nAVAX, that can be placed on a validator on the primary network")
 
 	// Minimum stake, in nAVAX, that can be delegated on the primary network
-	minDelegatorStake := fs.Uint64("min-delegator-stake", 25*units.Avax, "Minimum stake, in nAVAX, that can be delegated on the primary network")
+	fs.Uint64(minDelegatorStakeKey, 25*units.Avax, "Minimum stake, in nAVAX, that can be delegated on the primary network")
 
-	minDelegationFee := fs.Uint64("min-delegation-fee", 20000, "Minimum delegation fee, in the range [0, 1000000], that can be charged for delegation on the primary network")
+	fs.Uint64(minDelegatorFeeKey, 20000, "Minimum delegation fee, in the range [0, 1000000], that can be charged for delegation on the primary network")
 
 	// Minimum staking duration
-	fs.DurationVar(&Config.MinStakeDuration, "min-stake-duration", 24*time.Hour, "Minimum staking duration")
+	fs.Duration(minStakeDurationKey, 24*time.Hour, "Minimum staking duration")
 
 	// Maximum staking duration
-	fs.DurationVar(&Config.MaxStakeDuration, "max-stake-duration", 365*24*time.Hour, "Maximum staking duration")
+	fs.Duration(maxStakeDurationKey, 365*24*time.Hour, "Maximum staking duration")
 
 	// Stake minting period
-	fs.DurationVar(&Config.StakeMintingPeriod, "stake-minting-period", 365*24*time.Hour, "Consumption period of the staking function")
+	fs.Duration(stakeMintingPeriodKey, 365*24*time.Hour, "Consumption period of the staking function")
 
 	// Assertions:
-	fs.BoolVar(&loggingConfig.Assertions, "assertions-enabled", true, "Turn on assertion execution")
+	fs.Bool(assertionsEnabledKey, true, "Turn on assertion execution")
 
 	// Crypto:
-	fs.BoolVar(&Config.EnableCrypto, "signature-verification-enabled", true, "Turn on signature verification")
+	fs.Bool(signatureVerificationEnabledKey, true, "Turn on signature verification")
 
 	// Database:
-	db := fs.Bool("db-enabled", true, "Turn on persistent storage")
-	dbDir := fs.String("db-dir", defaultDbDir, "Database directory for Avalanche state")
+	fs.Bool(dbEnabledKey, true, "Turn on persistent storage")
+	fs.String(dbDirKey, defaultString, "Database directory for Avalanche state")
 
 	// IP:
-	consensusIP := fs.String("public-ip", "", "Public IP of this node for P2P communication. If empty, try to discover with NAT. Ignored if dynamic-public-ip is non-empty.")
+	fs.String(publicIPKey, "", "Public IP of this node for P2P communication. If empty, try to discover with NAT. Ignored if dynamic-public-ip is non-empty.")
 
 	// how often to update the dynamic IP and PnP/NAT-PMP IP and routing.
-	fs.DurationVar(&Config.DynamicUpdateDuration, "dynamic-update-duration", 5*time.Minute, "Dynamic IP and NAT Traversal update duration")
+	fs.Duration(dynamicUpdateDurationKey, 5*time.Minute, "Dynamic IP and NAT Traversal update duration")
 
-	dynamicPublicIPResolver := fs.String("dynamic-public-ip", "", "'ifconfigco' (alias 'ifconfig') or 'opendns' or 'ifconfigme'. By default does not do dynamic public IP updates. If non-empty, ignores public-ip argument.")
+	fs.String(dynamicPublicIPResolverKey, "", "'ifconfigco' (alias 'ifconfig') or 'opendns' or 'ifconfigme'. By default does not do dynamic public IP updates. If non-empty, ignores public-ip argument.")
 
 	// Incoming connection throttling
-	// After we receive [conn-meter-max-attempts] incoming connections from a given IP
+	// After we receive [conn-meter-max-conns] incoming connections from a given IP
 	// in the last [conn-meter-reset-duration], we close all subsequent incoming connections
 	// from the IP before upgrade.
-	fs.DurationVar(&Config.ConnMeterResetDuration, "conn-meter-reset-duration", 0*time.Second,
-		"Upgrade at most [conn-meter-max-attempts] connections from a given IP per [conn-meter-reset-duration]. "+
+	fs.Duration(connMeterResetDurationKey, 0*time.Second,
+		"Upgrade at most [conn-meter-max-conns] connections from a given IP per [conn-meter-reset-duration]. "+
 			"If [conn-meter-reset-duration] is 0, incoming connections are not rate-limited.")
 
-	fs.IntVar(&Config.ConnMeterMaxConns, "conn-meter-max-conns", 5,
-		"Upgrade at most [conn-meter-max-attempts] connections from a given IP per [conn-meter-reset-duration]. "+
+	fs.Int(connMeterMaxConnsKey, 5,
+		"Upgrade at most [conn-meter-max-conns] connections from a given IP per [conn-meter-reset-duration]. "+
 			"If [conn-meter-reset-duration] is 0, incoming connections are not rate-limited.")
 
 	// HTTP Server:
-	httpHost := fs.String("http-host", "127.0.0.1", "Address of the HTTP server")
-	httpPort := fs.Uint("http-port", 9650, "Port of the HTTP server")
-	fs.BoolVar(&Config.HTTPSEnabled, "http-tls-enabled", false, "Upgrade the HTTP server to HTTPs")
-	fs.StringVar(&Config.HTTPSKeyFile, "http-tls-key-file", "", "TLS private key file for the HTTPs server")
-	fs.StringVar(&Config.HTTPSCertFile, "http-tls-cert-file", "", "TLS certificate file for the HTTPs server")
-	fs.BoolVar(&Config.APIRequireAuthToken, "api-auth-required", false, "Require authorization token to call HTTP APIs")
-	fs.StringVar(&Config.APIAuthPassword, "api-auth-password", "", "Password used to create/validate API authorization tokens. Can be changed via API call.")
+	fs.String(httpHostKey, "127.0.0.1", "Address of the HTTP server")
+	fs.Uint(httpPortKey, 9650, "Port of the HTTP server")
+	fs.Bool(httpsEnabledKey, false, "Upgrade the HTTP server to HTTPs")
+	fs.String(httpsKeyFileKey, "", "TLS private key file for the HTTPs server")
+	fs.String(httpsCertFileKey, "", "TLS certificate file for the HTTPs server")
+	fs.Bool(apiAuthRequiredKey, false, "Require authorization token to call HTTP APIs")
+	fs.String(apiAuthPasswordKey, "", "Password used to create/validate API authorization tokens. Can be changed via API call.")
 
 	// Bootstrapping:
-	bootstrapIPs := fs.String("bootstrap-ips", "default", "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
-	bootstrapIDs := fs.String("bootstrap-ids", "default", "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	fs.String(bootstrapIPsKey, defaultString, "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
+	fs.String(bootstrapIDsKey, defaultString, "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 
 	// Staking:
-	stakingPort := fs.Uint("staking-port", 9651, "Port of the consensus server")
-	fs.BoolVar(&Config.EnableStaking, "staking-enabled", true, "Enable staking. If enabled, Network TLS is required.")
-	fs.BoolVar(&Config.EnableP2PTLS, "p2p-tls-enabled", true, "Require TLS to authenticate network communication")
-	fs.StringVar(&Config.StakingKeyFile, "staking-tls-key-file", defaultStakingKeyPath, "TLS private key for staking")
-	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", defaultStakingCertPath, "TLS certificate for staking")
-	fs.Uint64Var(&Config.DisabledStakingWeight, "staking-disabled-weight", 1, "Weight to provide to each peer when staking is disabled")
+	fs.Uint(stakingPortKey, 9651, "Port of the consensus server")
+	fs.Bool(stakingEnabledKey, true, "Enable staking. If enabled, Network TLS is required.")
+	fs.Bool(p2pTLSEnabledKey, true, "Require TLS to authenticate network communication")
+	fs.String(stakingKeyPathKey, defaultString, "TLS private key for staking")
+	fs.String(stakingCertPathKey, defaultString, "TLS certificate for staking")
+	fs.Uint64(stakingDisabledWeightKey, 1, "Weight to provide to each peer when staking is disabled")
 
 	// Throttling:
-	fs.UintVar(&Config.MaxNonStakerPendingMsgs, "max-non-staker-pending-msgs", uint(router.DefaultMaxNonStakerPendingMsgs), "Maximum number of messages a non-staker is allowed to have pending.")
-	fs.Float64Var(&Config.StakerMSGPortion, "staker-msg-reserved", router.DefaultStakerPortion, "Reserve a portion of the chain message queue's space for stakers.")
-	fs.Float64Var(&Config.StakerCPUPortion, "staker-cpu-reserved", router.DefaultStakerPortion, "Reserve a portion of the chain's CPU time for stakers.")
+	fs.Uint(maxNonStakerPendingMsgsKey, uint(router.DefaultMaxNonStakerPendingMsgs), "Maximum number of messages a non-staker is allowed to have pending.")
+	fs.Float64(stakerMsgReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain message queue's space for stakers.")
+	fs.Float64(stakerCPUReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain's CPU time for stakers.")
 
 	// Network Timeouts:
-	fs.DurationVar(&Config.NetworkConfig.InitialTimeout, "network-initial-timeout", 5*time.Second, "Initial timeout value of the adaptive timeout manager, in nanoseconds.")
-	fs.DurationVar(&Config.NetworkConfig.MinimumTimeout, "network-minimum-timeout", 500*time.Millisecond, "Minimum timeout value of the adaptive timeout manager, in nanoseconds.")
-	fs.DurationVar(&Config.NetworkConfig.MaximumTimeout, "network-maximum-timeout", 10*time.Second, "Maximum timeout value of the adaptive timeout manager, in nanoseconds.")
-	fs.DurationVar(&Config.NetworkConfig.TimeoutInc, "network-timeout-increase", 60*time.Millisecond, "Increase of network timeout after a failed request, in nanoseconds.")
-	fs.DurationVar(&Config.NetworkConfig.TimeoutDec, "network-timeout-reduction", 12*time.Millisecond, "Decrease of network timeout after a successful request, in nanoseconds.")
+	fs.Duration(networkInitialTimeoutKey, 5*time.Second, "Initial timeout value of the adaptive timeout manager, in nanoseconds.")
+	fs.Duration(networkMinimumTimeoutKey, 500*time.Millisecond, "Minimum timeout value of the adaptive timeout manager, in nanoseconds.")
+	fs.Duration(networkMaximumTimeoutKey, 10*time.Second, "Maximum timeout value of the adaptive timeout manager, in nanoseconds.")
+	fs.Duration(networkTimeoutIncreaseKey, 60*time.Millisecond, "Increase of network timeout after a failed request, in nanoseconds.")
+	fs.Duration(networkTimeoutReductionKey, 12*time.Millisecond, "Decrease of network timeout after a successful request, in nanoseconds.")
 
 	// Benchlist Parameters:
-	fs.IntVar(&Config.BenchlistConfig.Threshold, "benchlist-fail-threshold", 10, "Number of consecutive failed queries before benchlisting a node.")
-	fs.BoolVar(&Config.BenchlistConfig.PeerSummaryEnabled, "benchlist-peer-summary-enabled", false, "Enables peer specific query latency metrics.")
-	fs.DurationVar(&Config.BenchlistConfig.Duration, "benchlist-duration", time.Hour, "Amount of time a peer is benchlisted after surpassing the threshold.")
-	fs.DurationVar(&Config.BenchlistConfig.MinimumFailingDuration, "benchlist-min-failing-duration", 5*time.Minute, "Minimum amount of time messages to a peer must be failing before the peer is benched.")
+	fs.Int(benchlistFailThresholdKey, 10, "Number of consecutive failed queries before benchlisting a node.")
+	fs.Bool(benchlistPeerSummaryEnabledKey, false, "Enables peer specific query latency metrics.")
+	fs.Duration(benchlistDurationKey, time.Hour, "Amount of time a peer is benchlisted after surpassing the threshold.")
+	fs.Duration(benchlistMinFailingDurationKey, 5*time.Minute, "Minimum amount of time messages to a peer must be failing before the peer is benched.")
 
 	// Plugins:
-	fs.StringVar(&Config.PluginDir, "plugin-dir", defaultPluginDirs[0], "Plugin directory for Avalanche VMs")
+	fs.String(pluginDirKey, defaultString, "Plugin directory for Avalanche VMs")
 
 	// Logging:
-	logsDir := fs.String("log-dir", "", "Logging directory for Avalanche")
-	logLevel := fs.String("log-level", "info", "The log level. Should be one of {verbo, debug, info, warn, error, fatal, off}")
-	logDisplayLevel := fs.String("log-display-level", "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, info, warn, error, fatal, off}")
-	logDisplayHighlight := fs.String("log-display-highlight", "auto", "Whether to color/highlight display logs. Default highlights when the output is a terminal. Otherwise, should be one of {auto, plain, colors}")
+	fs.String(logsDirKey, "", "Logging directory for Avalanche")
+	fs.String(logLevelKey, "info", "The log level. Should be one of {verbo, debug, info, warn, error, fatal, off}")
+	fs.String(logDisplayLevelKey, "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, info, warn, error, fatal, off}")
+	fs.String(logDisplayHighlightKey, "auto", "Whether to color/highlight display logs. Default highlights when the output is a terminal. Otherwise, should be one of {auto, plain, colors}")
 
-	fs.IntVar(&Config.ConsensusParams.K, "snow-sample-size", 20, "Number of nodes to query for each network poll")
-	fs.IntVar(&Config.ConsensusParams.Alpha, "snow-quorum-size", 14, "Alpha value to use for required number positive results")
-	fs.IntVar(&Config.ConsensusParams.BetaVirtuous, "snow-virtuous-commit-threshold", 15, "Beta value to use for virtuous transactions")
-	fs.IntVar(&Config.ConsensusParams.BetaRogue, "snow-rogue-commit-threshold", 30, "Beta value to use for rogue transactions")
-	fs.IntVar(&Config.ConsensusParams.Parents, "snow-avalanche-num-parents", 5, "Number of vertexes for reference from each new vertex")
-	fs.IntVar(&Config.ConsensusParams.BatchSize, "snow-avalanche-batch-size", 30, "Number of operations to batch in each new vertex")
-	fs.IntVar(&Config.ConsensusParams.ConcurrentRepolls, "snow-concurrent-repolls", 4, "Minimum number of concurrent polls for finalizing consensus")
+	fs.Int(snowSampleSizeKey, 20, "Number of nodes to query for each network poll")
+	fs.Int(snowQuorumSizeKey, 14, "Alpha value to use for required number positive results")
+	fs.Int(snowVirtuousCommitThresholdKey, 15, "Beta value to use for virtuous transactions")
+	fs.Int(snowRogueCommitThresholdKey, 30, "Beta value to use for rogue transactions")
+	fs.Int(snowAvalancheNumParentsKey, 5, "Number of vertexes for reference from each new vertex")
+	fs.Int(snowAvalancheBatchSizeKey, 30, "Number of operations to batch in each new vertex")
+	fs.Int(snowConcurrentRepollsKey, 4, "Minimum number of concurrent polls for finalizing consensus")
 
 	// Enable/Disable APIs:
-	fs.BoolVar(&Config.AdminAPIEnabled, "api-admin-enabled", false, "If true, this node exposes the Admin API")
-	fs.BoolVar(&Config.InfoAPIEnabled, "api-info-enabled", true, "If true, this node exposes the Info API")
-	fs.BoolVar(&Config.KeystoreAPIEnabled, "api-keystore-enabled", true, "If true, this node exposes the Keystore API")
-	fs.BoolVar(&Config.MetricsAPIEnabled, "api-metrics-enabled", true, "If true, this node exposes the Metrics API")
-	fs.BoolVar(&Config.HealthAPIEnabled, "api-health-enabled", true, "If true, this node exposes the Health API")
-	fs.BoolVar(&Config.IPCAPIEnabled, "api-ipcs-enabled", false, "If true, IPCs can be opened")
+	fs.Bool(adminAPIEnabledKey, false, "If true, this node exposes the Admin API")
+	fs.Bool(infoAPIEnabledKey, true, "If true, this node exposes the Info API")
+	fs.Bool(keystoreAPIEnabledKey, true, "If true, this node exposes the Keystore API")
+	fs.Bool(metricsAPIEnabledKey, true, "If true, this node exposes the Metrics API")
+	fs.Bool(healthAPIEnabledKey, true, "If true, this node exposes the Health API")
+	fs.Bool(ipcAPIEnabledKey, false, "If true, IPCs can be opened")
 
 	// Throughput Server
-	throughputPort := fs.Uint("xput-server-port", 9652, "Port of the deprecated throughput test server")
-	fs.BoolVar(&Config.ThroughputServerEnabled, "xput-server-enabled", false, "If true, throughput test server is created")
+	fs.Uint(xputServerPortKey, 9652, "Port of the deprecated throughput test server")
+	fs.Bool(xputServerEnabledKey, false, "If true, throughput test server is created")
 
 	// IPC
-	ipcsChainIDs := fs.String("ipcs-chain-ids", "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
-	fs.StringVar(&Config.IPCPath, "ipcs-path", ipcs.DefaultBaseURL, "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
+	fs.String(ipcsChainIDsKey, "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
+	fs.String(ipcsPathKey, defaultString, "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
 
 	// Router Configuration:
-	fs.DurationVar(&Config.ConsensusGossipFrequency, "consensus-gossip-frequency", 10*time.Second, "Frequency of gossiping accepted frontiers.")
-	fs.DurationVar(&Config.ConsensusShutdownTimeout, "consensus-shutdown-timeout", 5*time.Second, "Timeout before killing an unresponsive chain.")
+	fs.Duration(consensusGossipFrequencyKey, 10*time.Second, "Frequency of gossiping accepted frontiers.")
+	fs.Duration(consensusShutdownTimeoutKey, 5*time.Second, "Timeout before killing an unresponsive chain.")
 
 	// Connectivity monitoring configuration:
-	fs.DurationVar(&Config.DisconnectedCheckFreq, "disconnected-check-frequency", 10*time.Second, "How often the node checks if it is connected to any peers. "+
+	fs.Duration(disconnectedCheckFreqKey, 10*time.Second, "How often the node checks if it is connected to any peers. "+
 		"If node has no peers for [disconnected-restart-timeout], it restarts. Can be at most [disconnected-restart-timeout]. "+
 		"If 0, node will not restart even if not connected to any peers.")
-	fs.DurationVar(&Config.DisconnectedRestartTimeout, "disconnected-restart-timeout", 1*time.Minute, "Node restarts if not connected to any peers for this amount of time. "+
+	fs.Duration(disconnectedRestartTimeoutKey, 1*time.Minute, "Node restarts if not connected to any peers for this amount of time. "+
 		"If 0, node will not restart even if not connected to any peers.")
 
-	fdLimit := fs.Uint64("fd-limit", ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
+	// File Descriptor Limit
+	fs.Uint64(fdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
 
 	// Subnet Whitelist
-	whitelistedSubnets := fs.String("whitelisted-subnets", "", "Whitelist of subnets to validate.")
+	fs.String(whitelistedSubnetsKey, "", "Whitelist of subnets to validate.")
 
-	ferr := fs.Parse(os.Args[1:])
+	// Coreth Config
+	fs.String(corethConfigKey, defaultString, "Specifies config to pass into coreth")
 
-	if *version { // If --version used, print version and exit
-		format := "%s ["
-		args := []interface{}{node.Version}
+	return fs
+}
 
-		{
-			networkID, err := constants.NetworkID(*networkName)
-			if err != nil {
-				Err = err
-				return
-			}
-			networkGeneration := constants.NetworkName(networkID)
-			if networkID == constants.MainnetID {
-				format += "network=%s"
-			} else {
-				format += "network=testnet/%s"
-			}
-			args = append(args, networkGeneration)
+// getViper returns the viper environment from parsing config file from default search paths
+// and any parsed command line flags
+func getViper() (*viper.Viper, error) {
+	v := viper.New()
+
+	fs := avalancheFlagSet()
+	pflag.CommandLine.AddGoFlagSet(fs)
+	pflag.Parse()
+	if err := v.BindPFlags(pflag.CommandLine); err != nil {
+		return nil, err
+	}
+
+	if configFile := v.GetString(configFileKey); configFile != defaultString {
+		v.SetConfigFile(configFile)
+		if err := v.ReadInConfig(); err != nil {
+			return nil, err
 		}
-
-		{
-			format += ", database=%s"
-			args = append(args, dbVersion)
-		}
-
-		{
-			if GitCommit != "" {
-				format += ", commit=%s"
-				args = append(args, GitCommit)
-			}
-		}
-
-		format += "]\n"
-
-		fmt.Printf(format, args...)
-		os.Exit(0)
 	}
 
-	if ferr == flag.ErrHelp {
-		// display usage/help text and exit successfully
-		os.Exit(0)
+	return v, nil
+}
+
+// setNodeConfig sets attributes on [Config] based on the values
+// defined in the [viper] environment
+func setNodeConfig(v *viper.Viper) error {
+	// Logging:
+	loggingConfig, err := logging.DefaultConfig()
+	if err != nil {
+		return err
+	}
+	logsDir := v.GetString(logsDirKey)
+	if logsDir != "" {
+		loggingConfig.Directory = logsDir
+	}
+	loggingConfig.LogLevel, err = logging.ToLevel(v.GetString(logLevelKey))
+	if err != nil {
+		return err
 	}
 
-	if ferr != nil {
-		// other type of error occurred when parsing args
-		os.Exit(2)
+	logDisplayLevel := v.GetString(logDisplayLevelKey)
+	if logDisplayLevel == "" {
+		logDisplayLevel = v.GetString(logLevelKey)
+	}
+	displayLevel, err := logging.ToLevel(logDisplayLevel)
+	if err != nil {
+		return err
+	}
+	loggingConfig.DisplayLevel = displayLevel
+
+	loggingConfig.DisplayHighlight, err = logging.ToHighlight(v.GetString(logDisplayHighlightKey), os.Stdout.Fd())
+	if err != nil {
+		return err
 	}
 
-	errs := &wrappers.Errs{}
-	defer func() { Err = errs.Err }()
+	Config.LoggingConfig = loggingConfig
 
-	networkID, err := constants.NetworkID(*networkName)
-	if errs.Add(err); err != nil {
-		return
+	// NetworkID
+	networkID, err := constants.NetworkID(v.GetString(networkNameKey))
+	if err != nil {
+		return err
 	}
-
 	Config.NetworkID = networkID
 
 	// DB:
-	if *db {
-		*dbDir = os.ExpandEnv(*dbDir) // parse any env variables
-		dbPath := path.Join(*dbDir, constants.NetworkName(Config.NetworkID), dbVersion)
+	if v.GetBool(dbEnabledKey) {
+		dbDir := v.GetString(dbDirKey)
+		if dbDir == defaultString {
+			dbDir = defaultDbDir
+		}
+		dbDir = os.ExpandEnv(dbDir) // parse any env variables
+		dbPath := path.Join(dbDir, constants.NetworkName(Config.NetworkID), dbVersion)
 		db, err := leveldb.New(dbPath, 0, 0, 0)
 		if err != nil {
-			errs.Add(fmt.Errorf("couldn't create db at %s: %w", dbPath, err))
-			return
+			return fmt.Errorf("couldn't create db at %s: %w", dbPath, err)
 		}
 		Config.DB = db
 	} else {
 		Config.DB = memdb.New()
 	}
 
+	// IP Configuration
 	// Resolves our public IP, or does nothing
-	Config.DynamicPublicIPResolver = dynamicip.NewResolver(*dynamicPublicIPResolver)
+	Config.DynamicPublicIPResolver = dynamicip.NewResolver(v.GetString(dynamicPublicIPResolverKey))
 
 	var ip net.IP
+	publicIP := v.GetString(publicIPKey)
 	switch {
 	case Config.DynamicPublicIPResolver.IsResolver():
 		// User specified to use dynamic IP resolution; don't use NAT traversal
 		Config.Nat = nat.NewNoRouter()
 		ip, err = dynamicip.FetchExternalIP(Config.DynamicPublicIPResolver)
 		if err != nil {
-			errs.Add(fmt.Errorf("dynamic ip address fetch failed: %s", err))
-			return
+			return fmt.Errorf("dynamic ip address fetch failed: %s", err)
 		}
 
-	case *consensusIP == "":
-		// User didn't specift a public IP to use; try with NAT traversal
+	case publicIP == "":
+		// User didn't specify a public IP to use; try with NAT traversal
 		Config.AttemptedNATTraversal = true
 		Config.Nat = nat.GetRouter()
 		ip, err = Config.Nat.ExternalIP()
@@ -326,31 +339,76 @@ func init() {
 	default:
 		// User specified a public IP to use; don't use NAT
 		Config.Nat = nat.NewNoRouter()
-		ip = net.ParseIP(*consensusIP)
+		ip = net.ParseIP(publicIP)
 	}
 
 	if ip == nil {
-		errs.Add(fmt.Errorf("invalid IP Address %s", *consensusIP))
-		return
+		return fmt.Errorf("invalid IP Address %s", publicIP)
 	}
 
 	Config.StakingIP = utils.NewDynamicIPDesc(
 		ip,
-		uint16(*stakingPort),
+		uint16(v.GetUint(stakingPortKey)),
 	)
 
-	defaultBootstrapIPs, defaultBootstrapIDs := genesis.SampleBeacons(networkID, 5)
+	Config.DynamicUpdateDuration = v.GetDuration(dynamicUpdateDurationKey)
+
+	Config.ConnMeterResetDuration = v.GetDuration(connMeterResetDurationKey)
+	Config.ConnMeterMaxConns = v.GetInt(connMeterMaxConnsKey)
+
+	// Staking:
+	Config.EnableStaking = v.GetBool(stakingEnabledKey)
+	Config.EnableP2PTLS = v.GetBool(p2pTLSEnabledKey)
+	Config.StakingKeyFile = v.GetString(stakingKeyPathKey)
+	Config.StakingCertFile = v.GetString(stakingCertPathKey)
+	Config.DisabledStakingWeight = v.GetUint64(stakingDisabledWeightKey)
+
+	Config.MinStakeDuration = v.GetDuration(minStakeDurationKey)
+	Config.MaxStakeDuration = v.GetDuration(maxStakeDurationKey)
+	Config.StakeMintingPeriod = v.GetDuration(stakeMintingPeriodKey)
+
+	stakingKeyPath := v.GetString(stakingKeyPathKey)
+	if stakingKeyPath == defaultString {
+		Config.StakingKeyFile = defaultStakingKeyPath
+	} else {
+		Config.StakingKeyFile = stakingKeyPath
+	}
+	stakingCertPath := v.GetString(stakingCertPathKey)
+	if stakingCertPath == defaultString {
+		Config.StakingCertFile = defaultStakingCertPath
+	} else {
+		Config.StakingCertFile = stakingCertPath
+	}
+
+	// parse any env variables
+	Config.StakingCertFile = os.ExpandEnv(Config.StakingCertFile)
+	Config.StakingKeyFile = os.ExpandEnv(Config.StakingKeyFile)
+	switch {
+	// If staking key/cert locations are specified but not found, error
+	case Config.StakingKeyFile != defaultStakingKeyPath || Config.StakingCertFile != defaultStakingCertPath:
+		if _, err := os.Stat(Config.StakingKeyFile); os.IsNotExist(err) {
+			return fmt.Errorf("couldn't find staking key at %s", Config.StakingKeyFile)
+		} else if _, err := os.Stat(Config.StakingCertFile); os.IsNotExist(err) {
+			return fmt.Errorf("couldn't find staking certificate at %s", Config.StakingCertFile)
+		}
+	default:
+		// Only creates staking key/cert if [stakingKeyPath] doesn't exist
+		if err := staking.GenerateStakingKeyCert(Config.StakingKeyFile, Config.StakingCertFile); err != nil {
+			return fmt.Errorf("couldn't generate staking key/cert: %w", err)
+		}
+	}
 
 	// Bootstrapping:
-	if *bootstrapIPs == "default" {
-		*bootstrapIPs = strings.Join(defaultBootstrapIPs, ",")
+	defaultBootstrapIPs, defaultBootstrapIDs := genesis.SampleBeacons(Config.NetworkID, 5)
+	bootstrapIPs := v.GetString(bootstrapIPsKey)
+	if bootstrapIPs == defaultString {
+		bootstrapIPs = strings.Join(defaultBootstrapIPs, ",")
 	}
-	for _, ip := range strings.Split(*bootstrapIPs, ",") {
+	for _, ip := range strings.Split(bootstrapIPs, ",") {
 		if ip != "" {
 			addr, err := utils.ToIPDesc(ip)
 			if err != nil {
-				errs.Add(fmt.Errorf("couldn't parse ip: %w", err))
-				return
+				return fmt.Errorf("couldn't parse bootstrap ip %s: %w", ip, err)
 			}
 			Config.BootstrapPeers = append(Config.BootstrapPeers, &node.Peer{
 				IP: addr,
@@ -358,43 +416,40 @@ func init() {
 		}
 	}
 
-	if *bootstrapIDs == "default" {
-		if *bootstrapIPs == "" {
-			*bootstrapIDs = ""
+	bootstrapIDs := v.GetString(bootstrapIDsKey)
+	if bootstrapIDs == defaultString {
+		if bootstrapIPs == "" {
+			bootstrapIDs = ""
 		} else {
-			*bootstrapIDs = strings.Join(defaultBootstrapIDs, ",")
+			bootstrapIDs = strings.Join(defaultBootstrapIDs, ",")
 		}
 	}
 
 	if Config.EnableStaking && !Config.EnableP2PTLS {
-		errs.Add(errStakingRequiresTLS)
-		return
+		return errStakingRequiresTLS
 	}
 
 	if !Config.EnableStaking && Config.DisabledStakingWeight == 0 {
-		errs.Add(errInvalidStakerWeights)
+		return errInvalidStakerWeights
 	}
 
 	if Config.EnableP2PTLS {
 		i := 0
-		for _, id := range strings.Split(*bootstrapIDs, ",") {
+		for _, id := range strings.Split(bootstrapIDs, ",") {
 			if id != "" {
 				peerID, err := ids.ShortFromPrefixedString(id, constants.NodeIDPrefix)
 				if err != nil {
-					errs.Add(fmt.Errorf("couldn't parse bootstrap peer id: %w", err))
-					return
+					return fmt.Errorf("couldn't parse bootstrap peer id: %w", err)
 				}
 				if len(Config.BootstrapPeers) <= i {
-					errs.Add(errBootstrapMismatch)
-					return
+					return errBootstrapMismatch
 				}
 				Config.BootstrapPeers[i].ID = peerID
 				i++
 			}
 		}
 		if len(Config.BootstrapPeers) != i {
-			errs.Add(fmt.Errorf("more bootstrap IPs, %d, provided than bootstrap IDs, %d", len(Config.BootstrapPeers), i))
-			return
+			return fmt.Errorf("more bootstrap IPs, %d, provided than bootstrap IDs, %d", len(Config.BootstrapPeers), i)
 		}
 	} else {
 		for _, peer := range Config.BootstrapPeers {
@@ -403,18 +458,23 @@ func init() {
 	}
 
 	Config.WhitelistedSubnets.Add(constants.PrimaryNetworkID)
-	for _, subnet := range strings.Split(*whitelistedSubnets, ",") {
+	for _, subnet := range strings.Split(v.GetString(whitelistedSubnetsKey), ",") {
 		if subnet != "" {
 			subnetID, err := ids.FromString(subnet)
 			if err != nil {
-				errs.Add(fmt.Errorf("couldn't parse subnetID: %w", err))
-				return
+				return fmt.Errorf("couldn't parse subnetID %s: %w", subnet, err)
 			}
 			Config.WhitelistedSubnets.Add(subnetID)
 		}
 	}
 
 	// Plugins
+	pluginDir := v.GetString(pluginDirKey)
+	if pluginDir == defaultString {
+		Config.PluginDir = defaultPluginDirs[0]
+	} else {
+		Config.PluginDir = pluginDir
+	}
 	if _, err := os.Stat(Config.PluginDir); os.IsNotExist(err) {
 		for _, dir := range defaultPluginDirs {
 			if _, err := os.Stat(dir); !os.IsNotExist(err) {
@@ -424,142 +484,225 @@ func init() {
 		}
 	}
 
-	// Staking
-	Config.StakingCertFile = os.ExpandEnv(Config.StakingCertFile) // parse any env variable
-	Config.StakingKeyFile = os.ExpandEnv(Config.StakingKeyFile)
-	switch {
-	// If staking key/cert locations are specified but not found, error
-	case Config.StakingKeyFile != defaultStakingKeyPath || Config.StakingCertFile != defaultStakingCertPath:
-		if _, err := os.Stat(Config.StakingKeyFile); os.IsNotExist(err) {
-			errs.Add(fmt.Errorf("couldn't find staking key at %s", Config.StakingKeyFile))
-			return
-		} else if _, err := os.Stat(Config.StakingCertFile); os.IsNotExist(err) {
-			errs.Add(fmt.Errorf("couldn't find staking certificate at %s", Config.StakingCertFile))
-			return
-		}
-	default:
-		// Only creates staking key/cert if [stakingKeyPath] doesn't exist
-		if err := staking.GenerateStakingKeyCert(Config.StakingKeyFile, Config.StakingCertFile); err != nil {
-			errs.Add(fmt.Errorf("couldn't generate staking key/cert: %w", err))
-			return
-		}
-	}
-
 	// HTTP:
-	Config.HTTPHost = *httpHost
-	Config.HTTPPort = uint16(*httpPort)
+	Config.HTTPHost = v.GetString(httpHostKey)
+	Config.HTTPPort = uint16(v.GetUint(httpPortKey))
 	if Config.APIRequireAuthToken {
 		if Config.APIAuthPassword == "" {
-			errs.Add(errors.New("api-auth-password must be provided if api-auth-required is true"))
-			return
+			return errors.New("api-auth-password must be provided if api-auth-required is true")
 		}
 		if !password.SufficientlyStrong(Config.APIAuthPassword, password.OK) {
-			errs.Add(errors.New("api-auth-password is not strong enough. Add more characters"))
-			return
+			return errors.New("api-auth-password is not strong enough. Add more characters")
 		}
 	}
 
-	// Logging:
-	if *logsDir != "" {
-		loggingConfig.Directory = *logsDir
-	}
-	logFileLevel, err := logging.ToLevel(*logLevel)
-	if errs.Add(err); err != nil {
-		return
-	}
-	loggingConfig.LogLevel = logFileLevel
+	Config.HTTPSEnabled = v.GetBool(httpsEnabledKey)
+	Config.HTTPSKeyFile = v.GetString(httpsKeyFileKey)
+	Config.HTTPSCertFile = v.GetString(httpsCertFileKey)
 
-	if *logDisplayLevel == "" {
-		*logDisplayLevel = *logLevel
-	}
-	displayLevel, err := logging.ToLevel(*logDisplayLevel)
-	if errs.Add(err); err != nil {
-		return
-	}
-	loggingConfig.DisplayLevel = displayLevel
+	// API Auth
+	Config.APIRequireAuthToken = v.GetBool(apiAuthRequiredKey)
+	Config.APIAuthPassword = v.GetString(apiAuthPasswordKey)
 
-	displayHighlight, err := logging.ToHighlight(*logDisplayHighlight, os.Stdout.Fd())
-	if errs.Add(err); err != nil {
-		return
-	}
-	loggingConfig.DisplayHighlight = displayHighlight
-
-	Config.LoggingConfig = loggingConfig
+	// APIs
+	Config.AdminAPIEnabled = v.GetBool(adminAPIEnabledKey)
+	Config.InfoAPIEnabled = v.GetBool(infoAPIEnabledKey)
+	Config.KeystoreAPIEnabled = v.GetBool(keystoreAPIEnabledKey)
+	Config.MetricsAPIEnabled = v.GetBool(metricsAPIEnabledKey)
+	Config.HealthAPIEnabled = v.GetBool(healthAPIEnabledKey)
+	Config.IPCAPIEnabled = v.GetBool(ipcAPIEnabledKey)
 
 	// Throughput:
-	Config.ThroughputPort = uint16(*throughputPort)
+	Config.ThroughputServerEnabled = v.GetBool(xputServerEnabledKey)
+	Config.ThroughputPort = uint16(v.GetUint(xputServerPortKey))
 
 	// Router used for consensus
 	Config.ConsensusRouter = &router.ChainRouter{}
 
 	// IPCs
-	if *ipcsChainIDs != "" {
-		Config.IPCDefaultChainIDs = strings.Split(*ipcsChainIDs, ",")
+	ipcsChainIDs := v.GetString(ipcsChainIDsKey)
+	if ipcsChainIDs != "" {
+		Config.IPCDefaultChainIDs = strings.Split(ipcsChainIDs, ",")
 	}
 
+	ipcsPath := v.GetString(ipcsPathKey)
+	if ipcsPath == defaultString {
+		Config.IPCPath = ipcs.DefaultBaseURL
+	} else {
+		Config.IPCPath = ipcsPath
+	}
+
+	// Throttling
+	Config.MaxNonStakerPendingMsgs = v.GetUint(maxNonStakerPendingMsgsKey)
+	Config.StakerMSGPortion = v.GetFloat64(stakerMsgReservedKey)
+	Config.StakerCPUPortion = v.GetFloat64(stakerCPUReservedKey)
+
+	// Network Timeout
+	Config.NetworkConfig.InitialTimeout = v.GetDuration(networkInitialTimeoutKey)
+	Config.NetworkConfig.MinimumTimeout = v.GetDuration(networkMinimumTimeoutKey)
+	Config.NetworkConfig.MaximumTimeout = v.GetDuration(networkMaximumTimeoutKey)
+	Config.NetworkConfig.TimeoutInc = v.GetDuration(networkTimeoutIncreaseKey)
+	Config.NetworkConfig.TimeoutDec = v.GetDuration(networkTimeoutReductionKey)
+
 	if Config.NetworkConfig.MinimumTimeout < 1 {
-		errs.Add(errors.New("minimum timeout must be positive"))
+		return errors.New("minimum timeout must be positive")
 	}
 	if Config.NetworkConfig.MinimumTimeout > Config.NetworkConfig.MaximumTimeout {
-		errs.Add(errors.New("maximum timeout can't be less than minimum timeout"))
+		return errors.New("maximum timeout can't be less than minimum timeout")
 	}
 	if Config.NetworkConfig.InitialTimeout < Config.NetworkConfig.MinimumTimeout ||
 		Config.NetworkConfig.InitialTimeout > Config.NetworkConfig.MaximumTimeout {
-		errs.Add(errors.New("initial timeout should be in the range [minimumTimeout, maximumTimeout]"))
+		return errors.New("initial timeout should be in the range [minimumTimeout, maximumTimeout]")
 	}
 	if Config.NetworkConfig.TimeoutDec < 0 {
-		errs.Add(errors.New("timeout reduction can't be negative"))
+		return errors.New("timeout reduction can't be negative")
 	}
 	if Config.NetworkConfig.TimeoutInc < 0 {
-		errs.Add(errors.New("timeout increase can't be negative"))
-	}
-	// Restart:
-	if Config.DisconnectedCheckFreq > Config.DisconnectedRestartTimeout {
-		errs.Add(errors.New("[disconnected-check-frequency] can't be greater than [disconnected-restart-timeout]"))
+		return errors.New("timeout increase can't be negative")
 	}
 
+	// Restart:
+	Config.DisconnectedCheckFreq = v.GetDuration(disconnectedCheckFreqKey)
+	Config.DisconnectedRestartTimeout = v.GetDuration(disconnectedRestartTimeoutKey)
+	if Config.DisconnectedCheckFreq > Config.DisconnectedRestartTimeout {
+		return fmt.Errorf("[%s] can't be greater than [%s]", disconnectedCheckFreqKey, disconnectedRestartTimeoutKey)
+	}
+
+	// Benchlist
+	Config.BenchlistConfig.Threshold = v.GetInt(benchlistFailThresholdKey)
+	Config.BenchlistConfig.PeerSummaryEnabled = v.GetBool(benchlistPeerSummaryEnabledKey)
+	Config.BenchlistConfig.Duration = v.GetDuration(benchlistDurationKey)
+	Config.BenchlistConfig.MinimumFailingDuration = v.GetDuration(benchlistMinFailingDurationKey)
 	Config.BenchlistConfig.MaxPortion = (1.0 - (float64(Config.ConsensusParams.Alpha) / float64(Config.ConsensusParams.K))) / 3.0
 
 	if Config.ConsensusGossipFrequency < 0 {
-		errs.Add(errors.New("gossip frequency can't be negative"))
+		return errors.New("gossip frequency can't be negative")
 	}
 	if Config.ConsensusShutdownTimeout < 0 {
-		errs.Add(errors.New("gossip frequency can't be negative"))
+		return errors.New("gossip frequency can't be negative")
 	}
 
-	if err := ulimit.Set(*fdLimit); err != nil {
-		errs.Add(fmt.Errorf("failed to set fd limit correctly due to: %w", err))
+	// File Descriptor Limit
+	fdLimit := v.GetUint64(fdLimitKey)
+	if err := ulimit.Set(fdLimit); err != nil {
+		return fmt.Errorf("failed to set fd limit correctly due to: %w", err)
 	}
 
+	// Network Parameters
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
-		Config.TxFee = *txFee
-		Config.CreationTxFee = *creationTxFee
-		Config.UptimeRequirement = *uptimeRequirement
-		Config.UptimeRequirement = *uptimeRequirement
 
-		if *minValidatorStake > *maxValidatorStake {
-			errs.Add(errors.New("minimum validator stake can't be greater than maximum validator stake"))
+		txFee := v.GetUint64(txFeeKey)
+		creationTxFee := v.GetUint64(creationTxFeeKey)
+		uptimeRequirement := v.GetFloat64(uptimeRequirementKey)
+		Config.TxFee = txFee
+		Config.CreationTxFee = creationTxFee
+		Config.UptimeRequirement = uptimeRequirement
+
+		minValidatorStake := v.GetUint64(minValidatorStakeKey)
+		maxValidatorStake := v.GetUint64(maxValidatorStakeKey)
+		minDelegatorStake := v.GetUint64(minDelegatorStakeKey)
+		minDelegationFee := v.GetUint64(minDelegatorFeeKey)
+		if minValidatorStake > maxValidatorStake {
+			return errors.New("minimum validator stake can't be greater than maximum validator stake")
 		}
 
-		Config.MinValidatorStake = *minValidatorStake
-		Config.MaxValidatorStake = *maxValidatorStake
-		Config.MinDelegatorStake = *minDelegatorStake
+		Config.MinValidatorStake = minValidatorStake
+		Config.MaxValidatorStake = maxValidatorStake
+		Config.MinDelegatorStake = minDelegatorStake
 
-		if *minDelegationFee > 1000000 {
-			errs.Add(errors.New("delegation fee must be in the range [0, 1000000]"))
+		if minDelegationFee > 1000000 {
+			return errors.New("delegation fee must be in the range [0, 1000000]")
 		}
-		Config.MinDelegationFee = uint32(*minDelegationFee)
+		Config.MinDelegationFee = uint32(minDelegationFee)
 
 		if Config.MinStakeDuration == 0 {
-			errs.Add(errors.New("min stake duration can't be zero"))
+			return errors.New("min stake duration can't be zero")
 		}
 		if Config.MaxStakeDuration < Config.MinStakeDuration {
-			errs.Add(errors.New("max stake duration can't be less than min stake duration"))
+			return errors.New("max stake duration can't be less than min stake duration")
 		}
 		if Config.StakeMintingPeriod < Config.MaxStakeDuration {
-			errs.Add(errors.New("stake minting period can't be less than max stake duration"))
+			return errors.New("stake minting period can't be less than max stake duration")
 		}
 	} else {
 		Config.Params = *genesis.GetParams(networkID)
 	}
+
+	// Consensus Parameters
+	Config.ConsensusParams.K = v.GetInt(snowSampleSizeKey)
+	Config.ConsensusParams.Alpha = v.GetInt(snowQuorumSizeKey)
+	Config.ConsensusParams.BetaVirtuous = v.GetInt(snowVirtuousCommitThresholdKey)
+	Config.ConsensusParams.BetaRogue = v.GetInt(snowRogueCommitThresholdKey)
+	Config.ConsensusParams.Parents = v.GetInt(snowAvalancheNumParentsKey)
+	Config.ConsensusParams.BatchSize = v.GetInt(snowAvalancheBatchSizeKey)
+	Config.ConsensusParams.ConcurrentRepolls = v.GetInt(snowConcurrentRepollsKey)
+
+	Config.ConsensusGossipFrequency = v.GetDuration(consensusGossipFrequencyKey)
+	Config.ConsensusShutdownTimeout = v.GetDuration(consensusShutdownTimeoutKey)
+
+	// Assertions
+	Config.EnableAssertions = v.GetBool(assertionsEnabledKey)
+
+	// Crypto
+	Config.EnableCrypto = v.GetBool(signatureVerificationEnabledKey)
+
+	// Coreth Plugin
+	corethConfigString := v.GetString(corethConfigKey)
+	if corethConfigString != defaultString {
+		corethConfigValue := v.Get(corethConfigKey)
+		switch value := corethConfigValue.(type) {
+		case string:
+			corethConfigString = value
+		default:
+			corethConfigBytes, err := json.Marshal(value)
+			if err != nil {
+				return fmt.Errorf("couldn't parse coreth config: %w", err)
+			}
+			corethConfigString = string(corethConfigBytes)
+		}
+	}
+	Config.CorethConfig = corethConfigString
+
+	return nil
+}
+
+func parseViper() error {
+	v, err := getViper()
+	if err != nil {
+		return err
+	}
+
+	if v.GetBool(versionKey) {
+		format := "%s ["
+		args := []interface{}{
+			node.Version,
+		}
+
+		networkID, err := constants.NetworkID(v.GetString(networkNameKey))
+		if err != nil {
+			return err
+		}
+		networkGeneration := constants.NetworkName(networkID)
+		if networkID == constants.MainnetID {
+			format += "network=%s"
+		} else {
+			format += "network=testnet/%s"
+		}
+		args = append(args, networkGeneration)
+
+		format += ", database=%s"
+		args = append(args, dbVersion)
+
+		if GitCommit != "" {
+			format += ", commit=%s"
+			args = append(args, GitCommit)
+		}
+
+		format += "]\n"
+
+		fmt.Printf(format, args...)
+		os.Exit(0)
+	}
+
+	return setNodeConfig(v)
 }

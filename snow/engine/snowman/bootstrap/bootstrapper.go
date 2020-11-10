@@ -84,7 +84,8 @@ func (b *Bootstrapper) CurrentAcceptedFrontier() ids.Set {
 // FilterAccepted returns the blocks in [containerIDs] that we have accepted
 func (b *Bootstrapper) FilterAccepted(containerIDs ids.Set) ids.Set {
 	acceptedIDs := ids.Set{}
-	for _, blkID := range containerIDs.List() {
+	for blkIDKey := range containerIDs {
+		blkID := ids.NewID(blkIDKey)
 		if blk, err := b.VM.GetBlock(blkID); err == nil && blk.Status() == choices.Accepted {
 			acceptedIDs.Add(blkID)
 		}
@@ -99,7 +100,8 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
 			err)
 	}
 
-	for _, blkID := range acceptedContainerIDs.List() {
+	for blkIDKey := range acceptedContainerIDs {
+		blkID := ids.NewID(blkIDKey)
 		if blk, err := b.VM.GetBlock(blkID); err == nil {
 			if err := b.process(blk); err != nil {
 				return err
