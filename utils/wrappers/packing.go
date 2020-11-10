@@ -228,7 +228,7 @@ func (p *Packer) PackBytes(bytes []byte) {
 }
 
 // PackBytes append a byte slice to the byte array
-func (p *Packer) PackBytesLength(bytes []byte) {
+func (p *Packer) PackUint32(bytes []byte) {
 	p.PackInt(uint32(len(bytes)))
 }
 

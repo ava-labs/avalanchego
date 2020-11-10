@@ -215,7 +215,7 @@ func (p *peer) WriteMessages() {
 		atomic.AddInt64(&p.net.pendingBytes, -int64(len(msg)))
 
 		packer := wrappers.Packer{Bytes: make([]byte, wrappers.IntLen)}
-		packer.PackBytesLength(msg)
+		packer.PackUint32(msg)
 		msgb := packer.Bytes
 
 		for _, byteSlice := range [][]byte{msgb, msg} {
