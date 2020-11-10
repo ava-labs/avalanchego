@@ -227,11 +227,6 @@ func (p *Packer) PackBytes(bytes []byte) {
 	p.PackFixedBytes(bytes)
 }
 
-// PackBytes append a byte slice to the byte array
-func (p *Packer) PackUint32(bytes []byte) {
-	p.PackInt(uint32(len(bytes)))
-}
-
 // UnpackBytes unpack a byte slice from the byte array
 func (p *Packer) UnpackBytes() []byte {
 	size := p.UnpackInt()
