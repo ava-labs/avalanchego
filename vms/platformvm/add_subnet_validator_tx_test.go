@@ -107,7 +107,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.Subnet = ids.ID{ID: nil}
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.Subnet = ids.ID{}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(

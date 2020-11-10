@@ -28,7 +28,7 @@ func NewClient(client gsubnetlookupproto.SubnetLookupClient) *Client {
 // SubnetID ...
 func (c *Client) SubnetID(chainID ids.ID) (ids.ID, error) {
 	resp, err := c.client.SubnetID(context.Background(), &gsubnetlookupproto.SubnetIDRequest{
-		ChainID: chainID.Bytes(),
+		ChainID: chainID[:],
 	})
 	if err != nil {
 		return ids.ID{}, err

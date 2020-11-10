@@ -34,7 +34,7 @@ func TestUnknownUniqueVertexErrors(t *testing.T) {
 
 	uVtx := &uniqueVertex{
 		serializer: s,
-		vtxID:      ids.NewID([32]byte{}),
+		vtxID:      ids.ID{},
 	}
 
 	status := uVtx.Status()
@@ -62,13 +62,13 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 	s := newSerializer(t, nil)
 
 	testTx := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
-		IDV: ids.NewID([32]byte{1}),
+		IDV: ids.ID{1},
 	}}
 
-	vtxID := ids.NewID([32]byte{2})
-	parentID := ids.NewID([32]byte{'p', 'a', 'r', 'e', 'n', 't'})
+	vtxID := ids.ID{2}
+	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't'}
 	parentIDs := []ids.ID{parentID}
-	chainID := ids.NewID([32]byte{}) // Same as chainID of serializer
+	chainID := ids.ID{} // Same as chainID of serializer
 	height := uint64(1)
 	vtx := &innerVertex{
 		id:        vtxID,
@@ -98,7 +98,7 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 	if len(parents) != 1 {
 		t.Fatalf("Parents should have length 1")
 	}
-	if !parents[0].ID().Equals(parentID) {
+	if parents[0].ID() != parentID {
 		t.Fatalf("ParentID is incorrect")
 	}
 
@@ -130,7 +130,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 	txBytes := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9}
 	testTx := &snowstorm.TestTx{
 		TestDecidable: choices.TestDecidable{
-			IDV: ids.NewID([32]byte{1}),
+			IDV: ids.ID{1},
 		},
 		BytesV: txBytes,
 	}
@@ -142,9 +142,9 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 		return testTx, nil
 	}
 	s := newSerializer(t, parseTx)
-	parentID := ids.NewID([32]byte{'p', 'a', 'r', 'e', 'n', 't'})
+	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't'}
 	parentIDs := []ids.ID{parentID}
-	chainID := ids.NewID([32]byte{})
+	chainID := ids.ID{}
 	height := uint64(1)
 	innerVertex := &innerVertex{
 		parentIDs: parentIDs,
@@ -157,7 +157,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vtxID := ids.NewID(hashing.ComputeHash256Array(vertexBytes))
+	vtxID := ids.ID(hashing.ComputeHash256Array(vertexBytes))
 
 	uVtx := uniqueVertex{
 		vtxID:      vtxID,
@@ -212,7 +212,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 			t.Fatalf("Expected vertex height to be %d, but found %d", height, vtxHeight)
 		case len(vtxParents) != 1:
 			t.Fatalf("Expected vertex to have 1 parent, but found %d", len(vtxParents))
-		case !vtxParents[0].ID().Equals(parentID):
+		case vtxParents[0].ID() != parentID:
 			t.Fatalf("Found unexpected parentID: %s, expected: %s", vtxParents[0].ID(), parentID)
 		case len(vtxTxs) != 1:
 			t.Fatalf("Exepcted vertex to have 1 transaction, but found %d", len(vtxTxs))

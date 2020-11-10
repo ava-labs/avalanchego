@@ -26,7 +26,7 @@ type Memory struct {
 	lock  sync.Mutex
 	log   logging.Logger
 	codec codec.Codec
-	locks map[[32]byte]*rcLock
+	locks map[ids.ID]*rcLock
 	db    database.Database
 }
 
@@ -34,7 +34,7 @@ type Memory struct {
 func (m *Memory) Initialize(log logging.Logger, db database.Database) {
 	m.log = log
 	m.codec = codec.NewDefault()
-	m.locks = make(map[[32]byte]*rcLock)
+	m.locks = make(map[ids.ID]*rcLock)
 	m.db = db
 }
 
@@ -52,7 +52,7 @@ func (m *Memory) GetDatabase(sharedID ids.ID) (*versiondb.Database, database.Dat
 	lock.Lock()
 
 	vdb := versiondb.New(m.db)
-	return vdb, prefixdb.New(sharedID.Bytes(), vdb)
+	return vdb, prefixdb.New(sharedID[:], vdb)
 }
 
 // ReleaseDatabase unlocks the provided DB
@@ -65,11 +65,10 @@ func (m *Memory) makeLock(sharedID ids.ID) *sync.Mutex {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	key := sharedID.Key()
-	rc, exists := m.locks[key]
+	rc, exists := m.locks[sharedID]
 	if !exists {
 		rc = &rcLock{}
-		m.locks[key] = rc
+		m.locks[sharedID] = rc
 	}
 	rc.count++
 	return &rc.lock
@@ -79,29 +78,25 @@ func (m *Memory) releaseLock(sharedID ids.ID) *sync.Mutex {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	key := sharedID.Key()
-	rc, exists := m.locks[key]
+	rc, exists := m.locks[sharedID]
 	if !exists {
 		panic("Attemping to free an unknown lock")
 	}
 	rc.count--
 	if rc.count == 0 {
-		delete(m.locks, key)
+		delete(m.locks, sharedID)
 	}
 	return &rc.lock
 }
 
 // sharedID calculates the ID of the shared memory space
 func (m *Memory) sharedID(id1, id2 ids.ID) ids.ID {
-	idKey1 := id1.Key()
-	idKey2 := id2.Key()
-
-	if bytes.Compare(idKey1[:], idKey2[:]) == 1 {
-		idKey1, idKey2 = idKey2, idKey1
+	if bytes.Compare(id1[:], id2[:]) == 1 {
+		id1, id2 = id2, id1
 	}
 
-	combinedBytes, err := m.codec.Marshal([2][32]byte{idKey1, idKey2})
+	combinedBytes, err := m.codec.Marshal([2]ids.ID{id1, id2})
 	m.log.AssertNoError(err)
 
-	return ids.NewID(hashing.ComputeHash256Array(combinedBytes))
+	return hashing.ComputeHash256Array(combinedBytes)
 }

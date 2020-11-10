@@ -9,7 +9,7 @@ import (
 
 func TestBagAdd(t *testing.T) {
 	id0 := Empty
-	id1 := NewID([32]byte{1})
+	id1 := ID{1}
 
 	bag := Bag{}
 
@@ -21,7 +21,7 @@ func TestBagAdd(t *testing.T) {
 		t.Fatalf("Bag.Len returned %d elements expected %d", count, 0)
 	} else if list := bag.List(); len(list) != 0 {
 		t.Fatalf("Bag.List returned %v expected %v", list, nil)
-	} else if mode, freq := bag.Mode(); !mode.IsZero() {
+	} else if mode, freq := bag.Mode(); mode != Empty {
 		t.Fatalf("Bag.Mode[0] returned %s expected %s", mode, ID{})
 	} else if freq != 0 {
 		t.Fatalf("Bag.Mode[1] returned %d expected %d", freq, 0)
@@ -39,7 +39,7 @@ func TestBagAdd(t *testing.T) {
 		t.Fatalf("Bag.Len returned %d expected %d", count, 1)
 	} else if list := bag.List(); len(list) != 1 {
 		t.Fatalf("Bag.List returned %d expected %d", len(list), 1)
-	} else if mode, freq := bag.Mode(); !mode.Equals(id0) {
+	} else if mode, freq := bag.Mode(); mode != id0 {
 		t.Fatalf("Bag.Mode[0] returned %s expected %s", mode, id0)
 	} else if freq != 1 {
 		t.Fatalf("Bag.Mode[1] returned %d expected %d", freq, 1)
@@ -57,7 +57,7 @@ func TestBagAdd(t *testing.T) {
 		t.Fatalf("Bag.Len returned %d expected %d", count, 2)
 	} else if list := bag.List(); len(list) != 1 {
 		t.Fatalf("Bag.List returned %d expected %d", len(list), 1)
-	} else if mode, freq := bag.Mode(); !mode.Equals(id0) {
+	} else if mode, freq := bag.Mode(); mode != id0 {
 		t.Fatalf("Bag.Mode[0] returned %s expected %s", mode, id0)
 	} else if freq != 2 {
 		t.Fatalf("Bag.Mode[1] returned %d expected %d", freq, 2)
@@ -75,7 +75,7 @@ func TestBagAdd(t *testing.T) {
 		t.Fatalf("Bag.Len returned %d expected %d", count, 5)
 	} else if list := bag.List(); len(list) != 2 {
 		t.Fatalf("Bag.List returned %d expected %d", len(list), 2)
-	} else if mode, freq := bag.Mode(); !mode.Equals(id1) {
+	} else if mode, freq := bag.Mode(); mode != id1 {
 		t.Fatalf("Bag.Mode[0] returned %s expected %s", mode, id1)
 	} else if freq != 3 {
 		t.Fatalf("Bag.Mode[1] returned %d expected %d", freq, 3)
@@ -86,7 +86,7 @@ func TestBagAdd(t *testing.T) {
 
 func TestBagSetThreshold(t *testing.T) {
 	id0 := Empty
-	id1 := NewID([32]byte{1})
+	id1 := ID{1}
 
 	bag := Bag{}
 
@@ -103,7 +103,7 @@ func TestBagSetThreshold(t *testing.T) {
 		t.Fatalf("Bag.Len returned %d expected %d", count, 5)
 	} else if list := bag.List(); len(list) != 2 {
 		t.Fatalf("Bag.List returned %d expected %d", len(list), 2)
-	} else if mode, freq := bag.Mode(); !mode.Equals(id1) {
+	} else if mode, freq := bag.Mode(); mode != id1 {
 		t.Fatalf("Bag.Mode[0] returned %s expected %s", mode, id1)
 	} else if freq != 3 {
 		t.Fatalf("Bag.Mode[1] returned %d expected %d", freq, 3)
@@ -121,7 +121,7 @@ func TestBagSetThreshold(t *testing.T) {
 		t.Fatalf("Bag.Len returned %d expected %d", count, 5)
 	} else if list := bag.List(); len(list) != 2 {
 		t.Fatalf("Bag.List returned %d expected %d", len(list), 2)
-	} else if mode, freq := bag.Mode(); !mode.Equals(id1) {
+	} else if mode, freq := bag.Mode(); mode != id1 {
 		t.Fatalf("Bag.Mode[0] returned %s expected %s", mode, id1)
 	} else if freq != 3 {
 		t.Fatalf("Bag.Mode[1] returned %d expected %d", freq, 3)
@@ -134,8 +134,8 @@ func TestBagSetThreshold(t *testing.T) {
 
 func TestBagFilter(t *testing.T) {
 	id0 := Empty
-	id1 := NewID([32]byte{1})
-	id2 := NewID([32]byte{2})
+	id1 := ID{1}
+	id2 := ID{2}
 
 	bag := Bag{}
 
@@ -156,8 +156,8 @@ func TestBagFilter(t *testing.T) {
 
 func TestBagSplit(t *testing.T) {
 	id0 := Empty
-	id1 := NewID([32]byte{1})
-	id2 := NewID([32]byte{2})
+	id1 := ID{1}
+	id2 := ID{2}
 
 	bag := Bag{}
 
