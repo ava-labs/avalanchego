@@ -113,10 +113,7 @@ type Config struct {
 	// Subnet Whitelist
 	WhitelistedSubnets ids.Set
 
-	// Service Control Callback
-	ServiceControl utils.ServiceControl
-
-	// peer monitor
-	PeerMonitorTimeout         time.Duration
-	PeerMonitorInactiveTimeout time.Duration
+	// Connection checker
+	ConnectedCheckFreq         time.Duration
+	DisconnectedRestartTimeout time.Duration
 }

@@ -127,6 +127,9 @@ type Node struct {
 
 	// is node shutting down
 	shuttingDown utils.AtomicBool
+
+	// Restarter can shutdown and restart the node
+	restarter utils.Restarter
 }
 
 /*
@@ -225,9 +228,9 @@ func (n *Node) initNetworking() error {
 		consensusRouter,
 		n.Config.ConnMeterResetDuration,
 		n.Config.ConnMeterMaxConns,
-		n.Config.ServiceControl,
-		n.Config.PeerMonitorTimeout,
-		n.Config.PeerMonitorInactiveTimeout,
+		n.restarter,
+		n.Config.ConnectedCheckFreq,
+		n.Config.DisconnectedRestartTimeout,
 	)
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
@@ -759,10 +762,16 @@ func (n *Node) initAliases(genesisBytes []byte) error {
 }
 
 // Initialize this node
-func (n *Node) Initialize(config *Config, logger logging.Logger, logFactory logging.Factory) error {
+func (n *Node) Initialize(
+	config *Config,
+	logger logging.Logger,
+	logFactory logging.Factory,
+	restarter utils.Restarter,
+) error {
 	n.Log = logger
 	n.LogFactory = logFactory
 	n.Config = config
+	n.restarter = restarter
 	n.Log.Info("Node version is: %s", Version)
 
 	httpLog, err := logFactory.MakeSubdir("http")
@@ -774,15 +783,12 @@ func (n *Node) Initialize(config *Config, logger logging.Logger, logFactory logg
 	if err := n.initDatabase(); err != nil { // Set up the node's database
 		return fmt.Errorf("problem initializing database: %w", err)
 	}
-
 	if err = n.initNodeID(); err != nil { // Derive this node's ID
 		return fmt.Errorf("problem initializing staker ID: %w", err)
 	}
-
 	if err = n.initBeacons(); err != nil { // Configure the beacons
 		return fmt.Errorf("problem initializing node beacons: %w", err)
 	}
-
 	// Start HTTP APIs
 	if err := n.initAPIServer(); err != nil { // Start the API Server
 		return fmt.Errorf("couldn't initialize API server: %w", err)
@@ -793,17 +799,13 @@ func (n *Node) Initialize(config *Config, logger logging.Logger, logFactory logg
 	if err := n.initMetricsAPI(); err != nil { // Start the Metrics API
 		return fmt.Errorf("couldn't initialize metrics API: %w", err)
 	}
-
-	n.initSharedMemory() // Initialize shared memory
-
+	n.initSharedMemory()                      // Initialize shared memory
 	if err = n.initNetworking(); err != nil { // Set up all networking
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}
-
 	if err = n.initEventDispatcher(); err != nil { // Set up the event dipatcher
 		return fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
-
 	genesisBytes, avaxAssetID, err := genesis.Genesis(n.Config.NetworkID)
 	if err != nil {
 		return fmt.Errorf("couldn't create genesis bytes: %w", err)
@@ -838,19 +840,19 @@ func (n *Node) Initialize(config *Config, logger logging.Logger, logFactory logg
 }
 
 // Shutdown this node
+// May be called multiple times
 func (n *Node) Shutdown() {
 	n.shuttingDown.SetValue(true)
 	n.shutdownOnce.Do(n.shutdown)
 }
 
 func (n *Node) shutdown() {
-	n.Log.Info("shutting down the node")
-	// Close already logs its own error if one occurs, so the error is ignored
-	// here
+	n.Log.Info("shutting down node")
 	n.IPCs.Shutdown()
 	n.chainManager.Shutdown()
+	// Close already logs its own error if one occurs, so the error is ignored here
 	_ = n.Net.Close()
 	n.APIServer.Shutdown()
 	utils.ClearSignals(n.nodeCloser)
-	n.Log.Info("node shut down successfully")
+	n.Log.Info("finished node shutdown")
 }

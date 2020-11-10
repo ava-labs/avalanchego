@@ -29,7 +29,8 @@ const (
 )
 
 var (
-	errUnknownLockOption = errors.New("invalid lock options")
+	errUnknownLockOption  = errors.New("invalid lock options")
+	serverShutdownTimeout = 10 * time.Second
 )
 
 // Server maintains the HTTP router
@@ -252,8 +253,11 @@ func (s *Server) Call(
 	return nil
 }
 
+// Shutdown this server
 func (s *Server) Shutdown() {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), serverShutdownTimeout)
 	defer cancel()
-	_ = s.srv.Shutdown(ctx)
+	if err := s.srv.Shutdown(ctx); err != nil {
+		s.log.Error("error while shutting down API sever: %s", err)
+	}
 }

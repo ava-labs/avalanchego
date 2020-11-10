@@ -5,7 +5,6 @@ package main
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/node"
@@ -39,10 +38,10 @@ func main() {
 		return
 	}
 
-	factory := logging.NewFactory(Config.LoggingConfig)
-	defer factory.Close()
+	logFactory := logging.NewFactory(Config.LoggingConfig)
+	defer logFactory.Close()
 
-	log, err := factory.Make()
+	log, err := logFactory.Make()
 	if err != nil {
 		fmt.Printf("starting logger failed with: %s\n", err)
 		return
@@ -132,68 +131,52 @@ func main() {
 	)
 	defer externalIPUpdater.Stop()
 
-	log.Info("IP: %s", Config.StakingIP.IP())
-
-	Config.ServiceControl = &systemShutdown{}
+	log.Info("this node's IP is set to: %s", Config.StakingIP.IP())
 
 	for {
-		shutdown := &utils.AtomicBool{}
-		err := mainRun(log, factory, shutdown, Config.ServiceControl)
+		shouldRestart, err := run(log, logFactory)
 		if err != nil {
 			break
 		}
-		// if the shutdown was not requested, it was SIGINT..  break the loop
-		if !shutdown.GetValue() {
+		// If the node says it should restart, do that. Otherwise, end the program.
+		if !shouldRestart {
 			break
 		}
+		log.Info("restarting node")
 	}
 }
 
-func mainRun(log logging.Logger, factory logging.Factory, shutdown *utils.AtomicBool, restart utils.ServiceControl) error {
-	log.Debug("initializing node state")
+// Initialize and run the node.
+// Returns true if the node should restart after this function returns.
+func run(log logging.Logger, logFactory logging.Factory) (bool, error) {
+	log.Debug("initializing node")
 	node := node.Node{}
-	if err := node.Initialize(&Config, log, factory); err != nil {
-		log.Error("error initializing node state: %s", err)
-		return err
+	restarter := &restarter{
+		node:          &node,
+		shouldRestart: &utils.AtomicBool{},
 	}
-
-	sControl.node = &node
-	sControl.shutdown = shutdown
-
-	defer func() {
-		if !shutdown.GetValue() {
-			node.Shutdown()
-		}
-	}()
+	if err := node.Initialize(&Config, log, logFactory, restarter); err != nil {
+		log.Error("error initializing node: %s", err)
+		return restarter.shouldRestart.GetValue(), err
+	}
 
 	log.Debug("dispatching node handlers")
 	err := node.Dispatch()
 	log.Debug("node dispatching returned with %s", err)
-	return nil
+	return restarter.shouldRestart.GetValue(), nil
 }
 
-type systemShutdownControl struct {
-	lock     sync.Mutex
-	node     *node.Node
-	shutdown *utils.AtomicBool
+// restarter implements utils.Restarter
+type restarter struct {
+	node *node.Node
+	// If true, node should restart after shutting down
+	shouldRestart *utils.AtomicBool
 }
 
-var sControl systemShutdownControl
-
-type systemShutdown struct {
-}
-
-func (s *systemShutdown) SystemShutdown() {
-	sControl.lock.Lock()
-	defer sControl.lock.Unlock()
-
-	if sControl.node == nil {
-		return
-	}
-
-	sControl.shutdown.SetValue(true)
-	sControl.node.Shutdown()
-
-	sControl.node = nil
-	sControl.shutdown = nil
+// Restarter shuts down the node and marks that it should restart
+// It is safe to call Restart multiple times
+func (r *restarter) Restart() {
+	r.shouldRestart.SetValue(true)
+	// Shutdown is safe to call multiple times because it uses sync.Once
+	r.node.Shutdown()
 }

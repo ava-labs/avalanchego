@@ -216,9 +216,12 @@ func init() {
 	fs.DurationVar(&Config.ConsensusGossipFrequency, "consensus-gossip-frequency", 10*time.Second, "Frequency of gossiping accepted frontiers.")
 	fs.DurationVar(&Config.ConsensusShutdownTimeout, "consensus-shutdown-timeout", 5*time.Second, "Timeout before killing an unresponsive chain.")
 
-	// Peer Monitor Configuration:
-	fs.DurationVar(&Config.PeerMonitorTimeout, "peer-monitor-timeout", 5*time.Second, "Frequency of monitoring connected peers.")
-	fs.DurationVar(&Config.PeerMonitorInactiveTimeout, "peer-monitor-inactive-timeout", 1*time.Minute, "Timeout before restarted node for lack of peers.")
+	// Connectivity monitoring configuration:
+	fs.DurationVar(&Config.ConnectedCheckFreq, "connected-check-frequency", 10*time.Second, "How often the node checks if it is connected to any peers. "+
+		"If node has no peers for [disconnected-restart-timeout], it restarts. Can be at most [disconnected-restart-timeout]. "+
+		"If 0, node will not restart even if not connected to any peers.")
+	fs.DurationVar(&Config.DisconnectedRestartTimeout, "disconnected-restart-timeout", 1*time.Minute, "Node restarts if not connected to any peers for this amount of time. "+
+		"If 0, node will not restart even if not connected to any peers.")
 
 	fdLimit := fs.Uint64("fd-limit", ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
 
@@ -229,9 +232,7 @@ func init() {
 
 	if *version { // If --version used, print version and exit
 		format := "%s ["
-		args := []interface{}{
-			node.Version,
-		}
+		args := []interface{}{node.Version}
 
 		{
 			networkID, err := constants.NetworkID(*networkName)
@@ -511,6 +512,10 @@ func init() {
 	}
 	if Config.NetworkConfig.TimeoutInc < 0 {
 		errs.Add(errors.New("timeout increase can't be negative"))
+	}
+	// Restart:
+	if Config.ConnectedCheckFreq > Config.DisconnectedRestartTimeout {
+		errs.Add(errors.New("[connected-check-frequency] can't be greater than [disconnected-restart-timeout]"))
 	}
 
 	Config.BenchlistConfig.MaxPortion = (1.0 - (float64(Config.ConsensusParams.Alpha) / float64(Config.ConsensusParams.K))) / 3.0

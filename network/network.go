@@ -99,25 +99,22 @@ type network struct {
 	// The metrics that this network tracks
 	metrics
 
-	log            logging.Logger
-	id             ids.ShortID
-	ip             utils.DynamicIPDesc
-	networkID      uint32
-	version        version.Version
-	parser         version.Parser
-	listener       net.Listener
-	dialer         Dialer
-	serverUpgrader Upgrader
-	clientUpgrader Upgrader
-	vdrs           validators.Set // set of current validators in the Avalanche network
-	beacons        validators.Set // set of beacons in the Avalanche network
-	router         router.Router  // router must be thread safe
-
-	nodeID uint32
-
-	clock         timer.Clock
-	lastHeartbeat int64
-
+	log                                logging.Logger
+	id                                 ids.ShortID
+	ip                                 utils.DynamicIPDesc
+	networkID                          uint32
+	version                            version.Version
+	parser                             version.Parser
+	listener                           net.Listener
+	dialer                             Dialer
+	serverUpgrader                     Upgrader
+	clientUpgrader                     Upgrader
+	vdrs                               validators.Set // set of current validators in the Avalanche network
+	beacons                            validators.Set // set of beacons in the Avalanche network
+	router                             router.Router  // router must be thread safe
+	nodeID                             uint32
+	clock                              timer.Clock
+	lastHeartbeat                      int64
 	initialReconnectDelay              time.Duration
 	maxReconnectDelay                  time.Duration
 	maxMessageSize                     int64
@@ -137,14 +134,10 @@ type network struct {
 	readHandshakeTimeout               time.Duration
 	connMeterMaxConns                  int
 	connMeter                          ConnMeter
-
-	executor timer.Executor
-
-	b Builder
-
+	executor                           timer.Executor
+	b                                  Builder
 	// stateLock should never be held when grabbing a peer lock
-	stateLock sync.RWMutex
-
+	stateLock       sync.RWMutex
 	pendingBytes    int64
 	closed          utils.AtomicBool
 	disconnectedIPs map[string]struct{}
@@ -157,17 +150,23 @@ type network struct {
 	// ensures the close of the network only happens once.
 	closeOnce sync.Once
 
-	// signals the peermonitor to close when Network is shutdown
-	peerMonitorCloser chan struct{}
+	// Signals the connection checker to close when Network is shutdown.
+	// See restartOnDisconnect()
+	connectedCheckerCloser chan struct{}
 
-	// use to help monitor the connected peers, not 0 when there are connected peers.
-	peerMonitorActivityMeter timer.TimedMeter
+	// Used to monitor whether the node is connected to peers. If the node has
+	// been connected to at least one peer in the last [disconnectedRestartTimeout]
+	// then connectedMeter.Ticks() is non-zero.
+	connectedMeter timer.TimedMeter
 
-	// how often do we do a peer check to update the peerMonitorActivityMeter
-	peerMonitorTimeout time.Duration
+	// How often we check that we're connected to at least one peer.
+	// Used to update [connectedMeter].
+	// If 0, node will not restart even if it has no peers.
+	connectedCheckFreq time.Duration
 
-	// called when the peers count has dropped to 0 within the specified time.
-	serviceControl utils.ServiceControl
+	// restarter can shutdown and restart the node.
+	// If nil, node will not restart even if it has no peers.
+	restarter utils.Restarter
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -189,9 +188,9 @@ func NewDefaultNetwork(
 	router router.Router,
 	connMeterResetDuration time.Duration,
 	connMeterMaxConns int,
-	serviceControl utils.ServiceControl,
-	peerMonitorTimeout time.Duration,
-	peerMonitorInactiveMeter time.Duration,
+	restarter utils.Restarter,
+	connectedCheckFreq time.Duration,
+	disconnectedRestartTimeout time.Duration,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -228,9 +227,9 @@ func NewDefaultNetwork(
 		connMeterResetDuration,
 		defaultConnMeterCacheSize,
 		connMeterMaxConns,
-		serviceControl,
-		peerMonitorTimeout,
-		peerMonitorInactiveMeter,
+		restarter,
+		connectedCheckFreq,
+		disconnectedRestartTimeout,
 	)
 }
 
@@ -270,9 +269,9 @@ func NewNetwork(
 	connMeterResetDuration time.Duration,
 	connMeterCacheSize int,
 	connMeterMaxConns int,
-	serviceControl utils.ServiceControl,
-	peerMonitorTimeout time.Duration,
-	peerMonitorInactiveMeter time.Duration,
+	restarter utils.Restarter,
+	connectedCheckFreq time.Duration,
+	disconnectedRestartTimeout time.Duration,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -317,14 +316,11 @@ func NewNetwork(
 		readHandshakeTimeout:               readHandshakeTimeout,
 		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize),
 		connMeterMaxConns:                  connMeterMaxConns,
-		peerMonitorCloser:                  make(chan struct{}),
-		peerMonitorTimeout:                 peerMonitorTimeout,
-		peerMonitorActivityMeter:           timer.TimedMeter{Duration: peerMonitorInactiveMeter},
-		serviceControl:                     serviceControl,
+		connectedCheckerCloser:             make(chan struct{}),
+		connectedCheckFreq:                 connectedCheckFreq,
+		connectedMeter:                     timer.TimedMeter{Duration: disconnectedRestartTimeout},
+		restarter:                          restarter,
 	}
-
-	// pre-queue one tick to avoid immediate shutdown.
-	netw.peerMonitorActivityMeter.Tick()
 
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
@@ -332,8 +328,10 @@ func NewNetwork(
 	netw.executor.Initialize()
 	go netw.executor.Dispatch()
 	netw.heartbeat()
-	if serviceControl != nil && peerMonitorTimeout.Milliseconds() != 0 {
-		go netw.peerMonitor()
+	if restarter != nil && connectedCheckFreq != 0 && disconnectedRestartTimeout != 0 {
+		// pre-queue one tick to avoid immediate shutdown.
+		netw.connectedMeter.Tick()
+		go netw.restartOnDisconnect()
 	}
 	return netw
 }
@@ -733,7 +731,8 @@ func (n *network) Close() error {
 }
 
 func (n *network) close() {
-	close(n.peerMonitorCloser)
+	// Stop checking whether we're connected to peers.
+	close(n.connectedCheckerCloser)
 
 	err := n.listener.Close()
 	if err != nil {
@@ -1216,30 +1215,33 @@ func (n *network) getPeer(validatorID ids.ShortID) *peer {
 	return n.peers[validatorID.Key()]
 }
 
-func (n *network) peerMonitor() {
-	ticker := time.NewTicker(n.peerMonitorTimeout)
-	defer ticker.Stop()
+// restartOnDisconnect checks every [n.connectedCheckFreq] whether this node is connected
+// to any peers. If the node is not connected to any peers for [disconnectedRestartTimeout],
+// restarts the node.
+func (n *network) restartOnDisconnect() {
+	ticker := time.NewTicker(n.connectedCheckFreq)
 	for {
 		select {
 		case <-ticker.C:
 			if n.closed.GetValue() {
 				return
 			}
-			// var connectedPeers uint64
 			n.stateLock.RLock()
 			for _, peer := range n.peers {
 				if peer != nil && peer.connected.GetValue() {
-					n.peerMonitorActivityMeter.Tick()
+					n.connectedMeter.Tick()
 					break
 				}
 			}
 			n.stateLock.RUnlock()
-			if n.peerMonitorActivityMeter.Ticks() != 0 {
+			if n.connectedMeter.Ticks() != 0 {
 				continue
 			}
 			ticker.Stop()
-			go n.serviceControl.SystemShutdown()
-		case <-n.peerMonitorCloser:
+			n.log.Info("restarting node due to no peers")
+			go n.restarter.Restart()
+		case <-n.connectedCheckerCloser:
+			ticker.Stop()
 			return
 		}
 	}
