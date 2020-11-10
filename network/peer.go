@@ -4,6 +4,7 @@
 package network
 
 import (
+	"encoding/binary"
 	"math"
 	"net"
 	"sync"
@@ -214,17 +215,18 @@ func (p *peer) WriteMessages() {
 		atomic.AddInt64(&p.pendingBytes, -int64(len(msg)))
 		atomic.AddInt64(&p.net.pendingBytes, -int64(len(msg)))
 
-		packer := wrappers.Packer{Bytes: make([]byte, len(msg)+wrappers.IntLen)}
-		packer.PackBytes(msg)
-		msg = packer.Bytes
-		for len(msg) > 0 {
-			written, err := p.conn.Write(msg)
-			if err != nil {
-				p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.getIP(), err)
-				return
+		msgb := [wrappers.IntLen]byte{}
+		binary.BigEndian.PutUint32(msgb[:], uint32(len(msg)))
+		for _, byteSlice := range [][]byte{msgb[:], msg} {
+			for len(byteSlice) > 0 {
+				written, err := p.conn.Write(byteSlice)
+				if err != nil {
+					p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.getIP(), err)
+					return
+				}
+				p.tickerOnce.Do(p.StartTicker)
+				byteSlice = byteSlice[written:]
 			}
-			p.tickerOnce.Do(p.StartTicker)
-			msg = msg[written:]
 		}
 		atomic.StoreInt64(&p.lastSent, p.net.clock.Time().Unix())
 	}
