@@ -83,33 +83,38 @@ func (s *Socket) Listen() error {
 
 // Send writes the given message to all connection clients
 func (s *Socket) Send(msg []byte) error {
+	var conns []net.Conn = nil
 	// Get a copy of connections
 	s.connLock.RLock()
-	conns := make([]net.Conn, len(s.conns))
-	i := 0
-	for conn := range s.conns {
-		conns[i] = conn
-		i++
+	if len(s.conns) > 0 {
+		conns = make([]net.Conn, len(s.conns))
+		i := 0
+		for conn := range s.conns {
+			conns[i] = conn
+			i++
+		}
 	}
 	s.connLock.RUnlock()
 
 	// Write to each connection
+	if len(conns) == 0 {
+		return nil
+	}
+
 	var err error
 	errs := wrappers.Errs{}
-	if len(conns) > 0 {
-		// Prefix the message with an 8 byte length
-		lenBytes := make([]byte, 8)
-		binary.BigEndian.PutUint64(lenBytes, uint64(len(msg)))
-		// msg = append(lenBytes, msg...)
-		for _, conn := range conns {
-			if _, err = conn.Write(lenBytes); err != nil {
+	// Prefix the message with an 8 byte length
+	lenBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(lenBytes, uint64(len(msg)))
+	// msg = append(lenBytes, msg...)
+	for _, conn := range conns {
+		if _, err = conn.Write(lenBytes); err != nil {
+			s.removeConn(conn)
+			errs.Add(fmt.Errorf("failed to write message to %s: %w", conn.RemoteAddr(), err))
+		} else {
+			if _, err = conn.Write(msg); err != nil {
 				s.removeConn(conn)
 				errs.Add(fmt.Errorf("failed to write message to %s: %w", conn.RemoteAddr(), err))
-			} else {
-				if _, err = conn.Write(msg); err != nil {
-					s.removeConn(conn)
-					errs.Add(fmt.Errorf("failed to write message to %s: %w", conn.RemoteAddr(), err))
-				}
 			}
 		}
 	}
