@@ -525,7 +525,7 @@ func TestGenesisGetUTXOs(t *testing.T) {
 	// Create a starting point of 1100 UTXOs
 	utxoCount := 1100
 	var genesisUTXOs []APIUTXO
-	for i:= 0 ; i <utxoCount; i++ {
+	for i := 0; i < utxoCount; i++ {
 		genesisUTXOs = append(genesisUTXOs, APIUTXO{
 			Amount:  json.Uint64(defaultBalance),
 			Address: addrString,
