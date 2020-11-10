@@ -89,7 +89,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 // Put implements the Database interface
 // Assumes that it is OK for the argument to db.db.Put
 // to be modified after db.db.Put returns.
-// [key] can be modified after this method reutns.
+// [key] can be modified after this method returns.
 // [value] should not be modified.
 func (db *Database) Put(key, value []byte) error {
 	db.lock.Lock()

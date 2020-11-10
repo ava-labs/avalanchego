@@ -4,6 +4,7 @@
 package ids
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -54,62 +55,72 @@ func TestIsUniqueShortIDs(t *testing.T) {
 }
 
 func TestIsSortedAndUniqueShortIDs(t *testing.T) {
-	ids := []ShortID{}
-	if !IsSortedAndUniqueShortIDs(ids) {
-		t.Fatal("input is sorted and unique")
-	}
-
-	ids = []ShortID{GenerateTestShortID()}
-	if !IsSortedAndUniqueShortIDs(ids) {
-		t.Fatal("input is sorted and unique")
-	}
-
 	id0 := NewShortID([20]byte{0})
 	id1 := NewShortID([20]byte{1})
 	id2 := NewShortID([20]byte{2})
 
-	ids = []ShortID{id0, id0}
-	if IsSortedAndUniqueShortIDs(ids) {
-		t.Fatal("input is not sorted and unique")
+	tests := []struct {
+		arr      []ShortID
+		isSorted bool
+	}{
+		{
+			arr:      nil,
+			isSorted: true,
+		},
+		{
+			arr:      []ShortID{},
+			isSorted: true,
+		},
+		{
+			arr:      []ShortID{GenerateTestShortID()},
+			isSorted: true,
+		},
+		{
+			arr:      []ShortID{id0, id0},
+			isSorted: false,
+		},
+		{
+			arr:      []ShortID{id0, id1},
+			isSorted: true,
+		},
+		{
+			arr:      []ShortID{id1, id0},
+			isSorted: false,
+		},
+		{
+			arr:      []ShortID{id0, id1, id2},
+			isSorted: true,
+		},
+		{
+			arr:      []ShortID{id0, id1, id2, id2},
+			isSorted: false,
+		},
+		{
+			arr:      []ShortID{id0, id1, id1},
+			isSorted: false,
+		},
+		{
+			arr:      []ShortID{id0, id0, id1},
+			isSorted: false,
+		},
+		{
+			arr:      []ShortID{id2, id1, id0},
+			isSorted: false,
+		},
+		{
+			arr:      []ShortID{id2, id1, id2},
+			isSorted: false,
+		},
 	}
-
-	ids = []ShortID{id0, id1}
-	if !IsSortedAndUniqueShortIDs(ids) {
-		t.Fatal("input is sorted and unique")
-	}
-
-	ids = []ShortID{id1, id0}
-	if IsSortedAndUniqueShortIDs(ids) {
-		t.Fatal("input is not sorted and unique")
-	}
-
-	ids = []ShortID{id0, id1, id2}
-	if !IsSortedAndUniqueShortIDs(ids) {
-		t.Fatal("input is sorted and unique")
-	}
-
-	ids = []ShortID{id0, id1, id2, id2}
-	if IsSortedAndUniqueShortIDs(ids) {
-		t.Fatal("input is not sorted and unique")
-	}
-
-	ids = []ShortID{id0, id1, id1}
-	if IsSortedAndUniqueShortIDs(ids) {
-		t.Fatal("input is not sorted and unique")
-	}
-
-	ids = []ShortID{id0, id0, id1}
-	if IsSortedAndUniqueShortIDs(ids) {
-		t.Fatal("input is not sorted and unique")
-	}
-
-	ids = []ShortID{id2, id1, id0}
-	if IsSortedAndUniqueShortIDs(ids) {
-		t.Fatal("input is not sorted and unique")
-	}
-
-	ids = []ShortID{id2, id1, id2}
-	if IsSortedAndUniqueShortIDs(ids) {
-		t.Fatal("input is not sorted and unique")
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%v", test.arr), func(t *testing.T) {
+			if test.isSorted {
+				if !IsSortedAndUniqueShortIDs(test.arr) {
+					t.Fatal("should have been marked as sorted and unique")
+				}
+			} else if IsSortedAndUniqueShortIDs(test.arr) {
+				t.Fatal("shouldn't have been marked as sorted and unique")
+			}
+		})
 	}
 }
