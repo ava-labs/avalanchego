@@ -653,9 +653,9 @@ func (n *network) GetHeartbeat() int64 { return atomic.LoadInt64(&n.lastHeartbea
 // to this node.
 // assumes the stateLock is not held.
 func (n *network) Dispatch() error {
-	go n.gossip()
-	for {
-		conn, err := n.listener.Accept()
+	go n.gossip() // Periodically gossip peers
+	for {         // Continuously accept new connections
+		conn, err := n.listener.Accept() // Returns error when n.Close() is called
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
 				// Sleep for a small amount of time to try to wait for the
@@ -664,6 +664,12 @@ func (n *network) Dispatch() error {
 				continue
 			}
 
+			// When [n].Close() is called, [n.listener].Close() is called.
+			// This causes [n.listener].Accept() to return an error.
+			// If that happened, don't log/return an error here.
+			if !n.closed.GetValue() {
+				return nil
+			}
 			n.log.Debug("error during server accept: %s", err)
 			return err
 		}
@@ -680,7 +686,7 @@ func (n *network) Dispatch() error {
 		ticks, err := n.connMeter.Register(addr)
 		// looking for > n.connMeterMaxConns indicating the second tick
 		if err == nil && ticks > n.connMeterMaxConns {
-			n.log.Debug("connection from: %s temporarily dropped", addr)
+			n.log.Debug("connection from %s temporarily dropped", addr)
 			_ = conn.Close()
 			continue
 		}
@@ -731,11 +737,11 @@ func (n *network) Close() error {
 }
 
 func (n *network) close() {
+	n.log.Info("shutting down network")
 	// Stop checking whether we're connected to peers.
 	close(n.connectedCheckerCloser)
 
-	err := n.listener.Close()
-	if err != nil {
+	if err := n.listener.Close(); err != nil {
 		n.log.Debug("closing network listener failed with: %s", err)
 	}
 

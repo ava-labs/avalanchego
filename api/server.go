@@ -257,7 +257,9 @@ func (s *Server) Call(
 func (s *Server) Shutdown() {
 	ctx, cancel := context.WithTimeout(context.Background(), serverShutdownTimeout)
 	defer cancel()
-	if err := s.srv.Shutdown(ctx); err != nil {
-		s.log.Error("error while shutting down API sever: %s", err)
+	if s.srv != nil {
+		if err := s.srv.Shutdown(ctx); err != nil {
+			s.log.Error("error while shutting down API server: %s", err)
+		}
 	}
 }

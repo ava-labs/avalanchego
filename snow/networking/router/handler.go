@@ -505,7 +505,6 @@ func (h *Handler) shutdownDispatch() {
 	if err := h.engine.Shutdown(); err != nil {
 		h.ctx.Log.Error("Error while shutting down the chain: %s", err)
 	}
-	h.ctx.Log.Info("finished shutting down chain")
 	if h.toClose != nil {
 		go h.toClose()
 	}

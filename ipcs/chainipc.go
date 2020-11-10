@@ -87,6 +87,7 @@ func (cipcs *ChainIPCs) Unpublish(chainID ids.ID) (bool, error) {
 }
 
 func (cipcs *ChainIPCs) Shutdown() {
+	cipcs.log.Info("shutting down chain IPCs")
 	for _, ch := range cipcs.chains {
 		_ = ch.stop()
 	}

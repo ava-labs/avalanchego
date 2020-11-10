@@ -149,7 +149,7 @@ func main() {
 // Initialize and run the node.
 // Returns true if the node should restart after this function returns.
 func run(log logging.Logger, logFactory logging.Factory) (bool, error) {
-	log.Debug("initializing node")
+	log.Info("initializing node")
 	node := node.Node{}
 	restarter := &restarter{
 		node:          &node,
@@ -162,7 +162,9 @@ func run(log logging.Logger, logFactory logging.Factory) (bool, error) {
 
 	log.Debug("dispatching node handlers")
 	err := node.Dispatch()
-	log.Debug("node dispatching returned with %s", err)
+	if err != nil {
+		log.Debug("node dispatch returned: %s", err)
+	}
 	return restarter.shouldRestart.GetValue(), nil
 }
 
