@@ -210,6 +210,92 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	return &buildGenesisArgs, genesisBytes
 }
 
+// Returns:
+// 1) The genesis state
+// 2) The byte representation of the default genesis for tests
+func BuildGenesisTest(t *testing.T) (*BuildGenesisArgs, []byte) {
+	return BuildGenesisTestWithArgs(t, nil)
+}
+
+// Returns:
+// 1) The genesis state
+// 2) The byte representation of the default genesis for tests
+func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenesisArgs, []byte) {
+
+	genesisUTXOs := make([]APIUTXO, len(keys))
+	hrp := constants.NetworkIDToHRP[testNetworkID]
+	for i, key := range keys {
+		id := key.PublicKey().Address()
+		addr, err := formatting.FormatBech32(hrp, id.Bytes())
+		if err != nil {
+			t.Fatal(err)
+		}
+		genesisUTXOs[i] = APIUTXO{
+			Amount:  json.Uint64(defaultBalance),
+			Address: addr,
+		}
+	}
+
+	genesisValidators := make([]APIPrimaryValidator, len(keys))
+	for i, key := range keys {
+		id := key.PublicKey().Address()
+		addr, err := formatting.FormatBech32(hrp, id.Bytes())
+		if err != nil {
+			panic(err)
+		}
+		genesisValidators[i] = APIPrimaryValidator{
+			APIStaker: APIStaker{
+				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
+				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
+				NodeID:    id.PrefixedString(constants.NodeIDPrefix),
+			},
+			RewardOwner: &APIOwner{
+				Threshold: 1,
+				Addresses: []string{addr},
+			},
+			Staked: []APIUTXO{{
+				Amount:  json.Uint64(defaultWeight),
+				Address: addr,
+			}},
+			DelegationFee: PercentDenominator,
+		}
+	}
+
+	buildGenesisArgs := BuildGenesisArgs{
+		NetworkID:     json.Uint32(testNetworkID),
+		AvaxAssetID:   avaxAssetID,
+		UTXOs:         genesisUTXOs,
+		Validators:    genesisValidators,
+		Chains:        nil,
+		Time:          json.Uint64(defaultGenesisTime.Unix()),
+		InitialSupply: json.Uint64(360 * units.MegaAvax),
+	}
+
+	if args != nil {
+		buildGenesisArgs = *args
+	}
+
+	buildGenesisResponse := BuildGenesisReply{}
+	platformvmSS, err := CreateStaticService(formatting.CB58Encoding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
+		t.Fatalf("problem while building platform chain's genesis state: %v", err)
+	}
+
+	encoding, err := platformvmSS.encodingManager.GetEncoding(buildGenesisResponse.Encoding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	genesisBytes, err := encoding.ConvertString(buildGenesisResponse.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return &buildGenesisArgs, genesisBytes
+}
+
 func defaultVM() (*VM, database.Database) {
 	vm := &VM{
 		SnowmanVM:          &core.SnowmanVM{},
@@ -272,6 +358,80 @@ func defaultVM() (*VM, database.Database) {
 	return vm, baseDB
 }
 
+func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) {
+	return GenesisVMWithArgs(t, nil)
+}
+
+func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
+	var genesisBytes []byte
+
+	if args != nil {
+		_, genesisBytes = BuildGenesisTestWithArgs(t, args)
+	} else {
+		_, genesisBytes = BuildGenesisTest(t)
+	}
+
+	vm := &VM{
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		txFee:              defaultTxFee,
+		minValidatorStake:  defaultMinValidatorStake,
+		maxValidatorStake:  defaultMaxValidatorStake,
+		minDelegatorStake:  defaultMinDelegatorStake,
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
+	}
+
+	baseDB := memdb.New()
+	chainDB := prefixdb.New([]byte{0}, baseDB)
+	atomicDB := prefixdb.New([]byte{1}, baseDB)
+
+	vm.vdrMgr = validators.NewManager()
+
+	vm.clock.Set(defaultGenesisTime)
+	msgChan := make(chan common.Message, 1)
+	ctx := defaultContext()
+
+	m := &atomic.Memory{}
+	m.Initialize(logging.NoLog{}, atomicDB)
+
+	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
+
+	ctx.Lock.Lock()
+	defer ctx.Lock.Unlock()
+	//_, genesisBytes := defaultGenesis()
+	if err := vm.Initialize(ctx, chainDB, genesisBytes, msgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := vm.Bootstrapped(); err != nil {
+		panic(err)
+	}
+
+	// Create a subnet and store it in testSubnet1
+	if tx, err := vm.newCreateSubnetTx(
+		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
+		// control keys are keys[0], keys[1], keys[2]
+		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
+		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // pays tx fee
+		keys[0].PublicKey().Address(),           // change addr
+	); err != nil {
+		panic(err)
+	} else if err := vm.mempool.IssueTx(tx); err != nil {
+		panic(err)
+	} else if blk, err := vm.BuildBlock(); err != nil {
+		panic(err)
+	} else if err := blk.Verify(); err != nil {
+		panic(err)
+	} else if err := blk.Accept(); err != nil {
+		panic(err)
+	} else {
+		testSubnet1 = tx.UnsignedTx.(*UnsignedCreateSubnetTx)
+	}
+
+	return genesisBytes, msgChan, vm, m
+}
+
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
 	vm, _ := defaultVM()
@@ -304,7 +464,7 @@ func TestGenesis(t *testing.T) {
 		}
 		addrs := ids.ShortSet{}
 		addrs.Add(addr)
-		utxos, _, _, err := vm.GetUTXOs(vm.DB, addrs, ids.ShortEmpty, ids.Empty, -1)
+		utxos, _, _, err := vm.GetUTXOs(vm.DB, addrs, ids.ShortEmpty, ids.Empty, -1, false)
 		if err != nil {
 			t.Fatal("couldn't find UTXO")
 		} else if len(utxos) != 1 {
@@ -355,6 +515,142 @@ func TestGenesis(t *testing.T) {
 		t.Fatalf("expected subnet %s to exist", testSubnet1.ID())
 	}
 }
+
+func TestGenesisGetUTXOs(t *testing.T) {
+
+	addr := keys[0].PublicKey().Address()
+	hrp := constants.NetworkIDToHRP[testNetworkID]
+	addrString, _ := formatting.FormatBech32(hrp, addr.Bytes())
+
+	// Create a starting point of 1100 UTXOs
+	utxoCount := 1100
+	var genesisUTXOs []APIUTXO
+	for i:= 0 ; i <utxoCount; i++ {
+		genesisUTXOs = append(genesisUTXOs, APIUTXO{
+			Amount:  json.Uint64(defaultBalance),
+			Address: addrString,
+		})
+	}
+
+	// Inject them in the Genesis build
+	buildGenesisArgs := BuildGenesisArgs{
+		NetworkID:     json.Uint32(testNetworkID),
+		AvaxAssetID:   avaxAssetID,
+		UTXOs:         genesisUTXOs,
+		Validators:    []APIPrimaryValidator{},
+		Chains:        nil,
+		Time:          json.Uint64(defaultGenesisTime.Unix()),
+		InitialSupply: json.Uint64(360 * units.MegaAvax),
+	}
+
+	_, _, vm, _ := GenesisVMWithArgs(t, &buildGenesisArgs)
+
+	addrsSet := ids.ShortSet{}
+	addrsSet.Add(addr)
+
+	// Fetch all UTXOs
+	utxosNonPaginated, _, _, err := vm.GetUTXOs(vm.DB, addrsSet, ids.ShortEmpty, ids.Empty, -1, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(utxosNonPaginated) != utxoCount {
+		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", utxoCount, len(utxosNonPaginated))
+	}
+
+	// TODO delete of rewrite this test
+	//// First Page - using paginated calls
+	//paginatedUtxos, lastAddr, lastIdx, err := vm.GetUTXOs(vm.DB, addrsSet, ids.ShortEmpty, ids.Empty, -1, true)
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//
+	////if len(paginatedUtxos) != utxoCount {
+	////	t.Fatalf("Wrong number of utxos. Should be Paginated. Expected (%d) returned (%d)", utxoCount, len(paginatedUtxos))
+	////}
+	//
+	//// Last Page - using paginated calls
+	//paginatedUtxosLastPage, _, _, err := vm.GetUTXOs(vm.DB, addrsSet, lastAddr, lastIdx, -1, true)
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//
+	//var duplicatedUTXOs []*avax.UTXO
+	//for _, utxo0 := range paginatedUtxos {
+	//	for _, utxo1 := range paginatedUtxosLastPage {
+	//		if utxo0.InputID().Equals(utxo1.InputID()){
+	//			duplicatedUTXOs = append(duplicatedUTXOs, utxo1)
+	//		}
+	//	}
+	//}
+	//
+	//if len(paginatedUtxos) + len(paginatedUtxosLastPage) != utxoCount {
+	//	t.Fatalf("Wrong number of utxos. Should have paginated through all. Expected (%d) returned (%d)", utxoCount, len(paginatedUtxos) + len(paginatedUtxosLastPage))
+	//}
+}
+
+// TODO test that uses transactions to validate the getutxo
+//func TestGenesisGetUTXOsTransactions(t *testing.T) {
+//
+//	utxoCount := 4
+//	addr := keys[0].PublicKey().Address()
+//	//hrp := constants.NetworkIDToHRP[testNetworkID]
+//	//addrString, _ := formatting.FormatBech32(hrp, addr.Bytes())
+//
+//	_, _, vm, _ := GenesisVM(t)
+//
+//	//addressDelegatorSource:= keys[1].PublicKey().Address()
+//	addressReceiveDelegation := keys[0].PublicKey().Address()
+//
+//	// Case: Valid
+//	tx, err := vm.newAddDelegatorTx(
+//		vm.minDelegatorStake,
+//		uint64(defaultValidateStartTime.Unix()),
+//		uint64(defaultValidateEndTime.Unix()),
+//		addressReceiveDelegation,
+//		addressReceiveDelegation,
+//		[]*crypto.PrivateKeySECP256K1R{keys[1]},
+//		addressReceiveDelegation, // change addr
+//	)
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//
+//	err = tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
+//		vm.Ctx,
+//		vm.codec,
+//		vm.minDelegatorStake,
+//		defaultMinStakingDuration,
+//		defaultMaxStakingDuration,
+//	)
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//
+//	addrsSet := ids.ShortSet{}
+//	addrsSet.Add(addr)
+//
+//	addrsSet1 := ids.ShortSet{}
+//	addrsSet1.Add(keys[1].PublicKey().Address())
+//
+//	utxos, _, _, err := vm.GetUTXOs(vm.DB, addrsSet1, ids.ShortEmpty, ids.Empty, -1, false)
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//
+//	fmt.Println("utxos -> ", len(utxos))
+//
+//	utxos, _, _, err = vm.GetUTXOs(vm.DB, addrsSet, ids.ShortEmpty, ids.Empty, -1, false)
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//
+//	fmt.Println("utxos -> ", len(utxos))
+//
+//	if len(utxos) != utxoCount {
+//		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", utxoCount, len(utxos))
+//	}
+//}
 
 // Test method getTotalStake
 func TestGetTotalStake(t *testing.T) {

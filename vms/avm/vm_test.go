@@ -6,9 +6,8 @@ package avm
 import (
 	"bytes"
 	"errors"
-	"testing"
-
 	"github.com/stretchr/testify/assert"
+	"testing"
 
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -138,17 +137,13 @@ func GetAVAXTxFromGenesisTest(genesisBytes []byte, t *testing.T) *Tx {
 	return &tx
 }
 
+// BuildGenesisTest is the common Genesis builder for most tests
 func BuildGenesisTest(t *testing.T) []byte {
-	ss, err := CreateStaticService(formatting.HexEncoding)
-	if err != nil {
-		t.Fatalf("Failed to create static service due to: %s", err)
-	}
-
 	addr0Str, _ := formatting.FormatBech32(testHRP, addrs[0].Bytes())
 	addr1Str, _ := formatting.FormatBech32(testHRP, addrs[1].Bytes())
 	addr2Str, _ := formatting.FormatBech32(testHRP, addrs[2].Bytes())
 
-	args := BuildGenesisArgs{GenesisData: map[string]AssetDefinition{
+	defaultArgs := &BuildGenesisArgs{GenesisData: map[string]AssetDefinition{
 		"asset1": {
 			Name:   "AVAX",
 			Symbol: "SYMB",
@@ -206,8 +201,20 @@ func BuildGenesisTest(t *testing.T) []byte {
 			},
 		},
 	}}
+
+	return BuildGenesisTestWithArgs(t, defaultArgs)
+}
+
+// BuildGenesisTestWithArgs allows building the genesis while injecting different starting points (args)
+func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) []byte  {
+
+	ss, err := CreateStaticService(formatting.HexEncoding)
+	if err != nil {
+		t.Fatalf("Failed to create static service due to: %s", err)
+	}
+
 	reply := BuildGenesisReply{}
-	err = ss.BuildGenesis(nil, &args, &reply)
+	err = ss.BuildGenesis(nil, args, &reply)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,10 +225,19 @@ func BuildGenesisTest(t *testing.T) []byte {
 	}
 
 	return hex.Bytes
+
 }
 
 func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) {
+	return GenesisVMWithArgs(t, nil)
+}
+
+func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
 	genesisBytes := BuildGenesisTest(t)
+	if args != nil {
+		genesisBytes = BuildGenesisTestWithArgs(t, args)
+	}
+
 	ctx := NewContext(t)
 
 	baseDB := memdb.New()
@@ -596,13 +612,81 @@ func TestGenesisGetUTXOs(t *testing.T) {
 
 	addrsSet := ids.ShortSet{}
 	addrsSet.Add(addrs[0])
-	utxos, _, _, err := vm.GetUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, -1)
+	utxos, _, _, err := vm.GetUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, -1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if len(utxos) != 4 {
 		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 4, len(utxos))
+	}
+}
+
+// TestGenesisGetPaginatedUTXOs tests
+// - Pagination when the total UTXOs exceed maxUTXOsToFetch (1024)
+// - Fetching all UTXOs when they exceed maxUTXOsToFetch (1024)
+func TestGenesisGetPaginatedUTXOs(t *testing.T) {
+
+	addr0Str, _ := formatting.FormatBech32(testHRP, addrs[0].Bytes())
+
+	// Create a starting point of 2000 UTXOs
+	utxoCount := 2000
+	holder := map[string][]interface{}{}
+	for i:= 0 ; i <utxoCount; i++ {
+		holder["fixedCap"] = append(holder["fixedCap"], Holder{
+			Amount:  json.Uint64(startBalance),
+			Address: addr0Str,
+		})
+	}
+
+	// Inject them in the Genesis build
+	genesisArgs := &BuildGenesisArgs{GenesisData: map[string]AssetDefinition{
+		"asset1": {
+			Name:   "AVAX",
+			Symbol: "SYMB",
+			InitialState: holder,
+		},
+	}}
+	_, _, vm, _ := GenesisVMWithArgs(t, genesisArgs)
+	ctx := vm.ctx
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	addrsSet := ids.ShortSet{}
+	addrsSet.Add(addrs[0])
+
+	// First Page - using paginated calls
+	paginatedUtxos, lastAddr, lastIdx, err := vm.GetUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, -1, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(paginatedUtxos) == utxoCount {
+		t.Fatalf("Wrong number of utxos. Should be Paginated. Expected (%d) returned (%d)", maxUTXOsToFetch, len(paginatedUtxos))
+	}
+
+	// Last Page - using paginated calls
+	paginatedUtxosLastPage, _, _, err := vm.GetUTXOs(addrsSet, lastAddr, lastIdx, -1, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(paginatedUtxos) + len(paginatedUtxosLastPage) != utxoCount {
+		t.Fatalf("Wrong number of utxos. Should have paginated through all. Expected (%d) returned (%d)", utxoCount, len(paginatedUtxos) + len(paginatedUtxosLastPage))
+	}
+
+	// Fetch all UTXOs
+	utxosNonPaginated, _, _, err := vm.GetUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, -1, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(utxosNonPaginated) != utxoCount {
+		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", utxoCount, len(utxosNonPaginated))
 	}
 }
 
