@@ -6,8 +6,9 @@ package avm
 import (
 	"bytes"
 	"errors"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -206,7 +207,7 @@ func BuildGenesisTest(t *testing.T) []byte {
 }
 
 // BuildGenesisTestWithArgs allows building the genesis while injecting different starting points (args)
-func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) []byte  {
+func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) []byte {
 
 	ss, err := CreateStaticService(formatting.HexEncoding)
 	if err != nil {
@@ -632,7 +633,7 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 	// Create a starting point of 2000 UTXOs
 	utxoCount := 2000
 	holder := map[string][]interface{}{}
-	for i:= 0 ; i <utxoCount; i++ {
+	for i := 0; i < utxoCount; i++ {
 		holder["fixedCap"] = append(holder["fixedCap"], Holder{
 			Amount:  json.Uint64(startBalance),
 			Address: addr0Str,
@@ -642,8 +643,8 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 	// Inject them in the Genesis build
 	genesisArgs := &BuildGenesisArgs{GenesisData: map[string]AssetDefinition{
 		"asset1": {
-			Name:   "AVAX",
-			Symbol: "SYMB",
+			Name:         "AVAX",
+			Symbol:       "SYMB",
 			InitialState: holder,
 		},
 	}}
@@ -675,8 +676,8 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(paginatedUtxos) + len(paginatedUtxosLastPage) != utxoCount {
-		t.Fatalf("Wrong number of utxos. Should have paginated through all. Expected (%d) returned (%d)", utxoCount, len(paginatedUtxos) + len(paginatedUtxosLastPage))
+	if len(paginatedUtxos)+len(paginatedUtxosLastPage) != utxoCount {
+		t.Fatalf("Wrong number of utxos. Should have paginated through all. Expected (%d) returned (%d)", utxoCount, len(paginatedUtxos)+len(paginatedUtxosLastPage))
 	}
 
 	// Fetch all UTXOs
