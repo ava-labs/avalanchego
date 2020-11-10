@@ -104,10 +104,10 @@ func (s *Socket) Send(msg []byte) error {
 	var err error
 	errs := wrappers.Errs{}
 	// Prefix the message with an 8 byte length
-	lenBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(lenBytes, uint64(len(msg)))
+	lenBytes := [8]byte{}
+	binary.BigEndian.PutUint64(lenBytes[:], uint64(len(msg)))
 	for _, conn := range conns {
-		for _, byteSlice := range [][]byte{lenBytes, msg} {
+		for _, byteSlice := range [][]byte{lenBytes[:], msg} {
 			if _, err = conn.Write(byteSlice); err != nil {
 				s.removeConn(conn)
 				errs.Add(fmt.Errorf("failed to write message to %s: %w", conn.RemoteAddr(), err))
