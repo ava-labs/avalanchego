@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
@@ -127,7 +126,12 @@ func SortShortIDs(ids []ShortID) { sort.Sort(sortShortIDData(ids)) }
 
 // IsSortedAndUniqueShortIDs returns true if the ids are sorted and unique
 func IsSortedAndUniqueShortIDs(ids []ShortID) bool {
-	return utils.IsSortedAndUnique(sortShortIDData(ids))
+	for i := 0; i < len(ids)-1; i++ {
+		if bytes.Compare(ids[i].Bytes(), ids[i+1].Bytes()) != -1 {
+			return false
+		}
+	}
+	return true
 }
 
 // IsUniqueShortIDs returns true iff [ids] are unique
