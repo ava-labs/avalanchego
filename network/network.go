@@ -162,7 +162,7 @@ type network struct {
 	// How often we check that we're connected to at least one peer.
 	// Used to update [connectedMeter].
 	// If 0, node will not restart even if it has no peers.
-	connectedCheckFreq time.Duration
+	disconnectedCheckFreq time.Duration
 
 	// restarter can shutdown and restart the node.
 	// If nil, node will not restart even if it has no peers.
@@ -189,7 +189,7 @@ func NewDefaultNetwork(
 	connMeterResetDuration time.Duration,
 	connMeterMaxConns int,
 	restarter utils.Restarter,
-	connectedCheckFreq time.Duration,
+	disconnectedCheckFreq time.Duration,
 	disconnectedRestartTimeout time.Duration,
 ) Network {
 	return NewNetwork(
@@ -228,7 +228,7 @@ func NewDefaultNetwork(
 		defaultConnMeterCacheSize,
 		connMeterMaxConns,
 		restarter,
-		connectedCheckFreq,
+		disconnectedCheckFreq,
 		disconnectedRestartTimeout,
 	)
 }
@@ -270,7 +270,7 @@ func NewNetwork(
 	connMeterCacheSize int,
 	connMeterMaxConns int,
 	restarter utils.Restarter,
-	connectedCheckFreq time.Duration,
+	disconnectedCheckFreq time.Duration,
 	disconnectedRestartTimeout time.Duration,
 ) Network {
 	// #nosec G404
@@ -317,7 +317,7 @@ func NewNetwork(
 		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize),
 		connMeterMaxConns:                  connMeterMaxConns,
 		connectedCheckerCloser:             make(chan struct{}),
-		connectedCheckFreq:                 connectedCheckFreq,
+		disconnectedCheckFreq:              disconnectedCheckFreq,
 		connectedMeter:                     timer.TimedMeter{Duration: disconnectedRestartTimeout},
 		restarter:                          restarter,
 	}
@@ -328,7 +328,8 @@ func NewNetwork(
 	netw.executor.Initialize()
 	go netw.executor.Dispatch()
 	netw.heartbeat()
-	if restarter != nil && connectedCheckFreq != 0 && disconnectedRestartTimeout != 0 {
+	if restarter != nil && disconnectedCheckFreq != 0 && disconnectedRestartTimeout != 0 {
+		log.Info("node will restart if not connected to any peers")
 		// pre-queue one tick to avoid immediate shutdown.
 		netw.connectedMeter.Tick()
 		go netw.restartOnDisconnect()
@@ -1221,11 +1222,11 @@ func (n *network) getPeer(validatorID ids.ShortID) *peer {
 	return n.peers[validatorID.Key()]
 }
 
-// restartOnDisconnect checks every [n.connectedCheckFreq] whether this node is connected
+// restartOnDisconnect checks every [n.disconnectedCheckFreq] whether this node is connected
 // to any peers. If the node is not connected to any peers for [disconnectedRestartTimeout],
 // restarts the node.
 func (n *network) restartOnDisconnect() {
-	ticker := time.NewTicker(n.connectedCheckFreq)
+	ticker := time.NewTicker(n.disconnectedCheckFreq)
 	for {
 		select {
 		case <-ticker.C:

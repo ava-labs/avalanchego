@@ -114,6 +114,6 @@ type Config struct {
 	WhitelistedSubnets ids.Set
 
 	// Connection checker
-	ConnectedCheckFreq         time.Duration
+	DisconnectedCheckFreq      time.Duration
 	DisconnectedRestartTimeout time.Duration
 }

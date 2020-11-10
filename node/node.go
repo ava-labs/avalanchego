@@ -240,7 +240,7 @@ func (n *Node) initNetworking() error {
 		n.Config.ConnMeterResetDuration,
 		n.Config.ConnMeterMaxConns,
 		n.restarter,
-		n.Config.ConnectedCheckFreq,
+		n.Config.DisconnectedCheckFreq,
 		n.Config.DisconnectedRestartTimeout,
 	)
 

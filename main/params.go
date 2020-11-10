@@ -217,7 +217,7 @@ func init() {
 	fs.DurationVar(&Config.ConsensusShutdownTimeout, "consensus-shutdown-timeout", 5*time.Second, "Timeout before killing an unresponsive chain.")
 
 	// Connectivity monitoring configuration:
-	fs.DurationVar(&Config.ConnectedCheckFreq, "connected-check-frequency", 10*time.Second, "How often the node checks if it is connected to any peers. "+
+	fs.DurationVar(&Config.DisconnectedCheckFreq, "disconnected-check-frequency", 10*time.Second, "How often the node checks if it is connected to any peers. "+
 		"If node has no peers for [disconnected-restart-timeout], it restarts. Can be at most [disconnected-restart-timeout]. "+
 		"If 0, node will not restart even if not connected to any peers.")
 	fs.DurationVar(&Config.DisconnectedRestartTimeout, "disconnected-restart-timeout", 1*time.Minute, "Node restarts if not connected to any peers for this amount of time. "+
@@ -514,8 +514,8 @@ func init() {
 		errs.Add(errors.New("timeout increase can't be negative"))
 	}
 	// Restart:
-	if Config.ConnectedCheckFreq > Config.DisconnectedRestartTimeout {
-		errs.Add(errors.New("[connected-check-frequency] can't be greater than [disconnected-restart-timeout]"))
+	if Config.DisconnectedCheckFreq > Config.DisconnectedRestartTimeout {
+		errs.Add(errors.New("[disconnected-check-frequency] can't be greater than [disconnected-restart-timeout]"))
 	}
 
 	Config.BenchlistConfig.MaxPortion = (1.0 - (float64(Config.ConsensusParams.Alpha) / float64(Config.ConsensusParams.K))) / 3.0
