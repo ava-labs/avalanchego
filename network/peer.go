@@ -217,22 +217,17 @@ func (p *peer) WriteMessages() {
 		packer := wrappers.Packer{Bytes: make([]byte, wrappers.IntLen)}
 		packer.PackBytesLength(msg)
 		msgb := packer.Bytes
-		for len(msgb) > 0 {
-			written, err := p.conn.Write(msgb)
-			if err != nil {
-				p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.getIP(), err)
-				return
+
+		for _, byteSlice := range [][]byte{msgb, msg} {
+			for len(byteSlice) > 0 {
+				written, err := p.conn.Write(byteSlice)
+				if err != nil {
+					p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.getIP(), err)
+					return
+				}
+				p.tickerOnce.Do(p.StartTicker)
+				byteSlice = byteSlice[written:]
 			}
-			p.tickerOnce.Do(p.StartTicker)
-			msgb = msgb[written:]
-		}
-		for len(msg) > 0 {
-			written, err := p.conn.Write(msg)
-			if err != nil {
-				p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.getIP(), err)
-				return
-			}
-			msg = msg[written:]
 		}
 		atomic.StoreInt64(&p.lastSent, p.net.clock.Time().Unix())
 	}
