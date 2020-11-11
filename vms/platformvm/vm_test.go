@@ -560,35 +560,32 @@ func TestGenesisGetUTXOs(t *testing.T) {
 		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", utxoCount, len(utxosNonPaginated))
 	}
 
-	///// TODO delete of rewrite this test
-	//// First Page - using paginated calls
-	//paginatedUtxos, lastAddr, lastIdx, err := vm.GetUTXOs(vm.DB, addrsSet, ids.ShortEmpty, ids.Empty, -1, true)
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
-	//
-	////if len(paginatedUtxos) != utxoCount {
-	////	t.Fatalf("Wrong number of utxos. Should be Paginated. Expected (%d) returned (%d)", utxoCount, len(paginatedUtxos))
-	////}
-	//
-	//// Last Page - using paginated calls
-	//paginatedUtxosLastPage, _, _, err := vm.GetUTXOs(vm.DB, addrsSet, lastAddr, lastIdx, -1, true)
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
-	//
-	//var duplicatedUTXOs []*avax.UTXO
-	//for _, utxo0 := range paginatedUtxos {
-	//	for _, utxo1 := range paginatedUtxosLastPage {
-	//		if utxo0.InputID().Equals(utxo1.InputID()){
-	//			duplicatedUTXOs = append(duplicatedUTXOs, utxo1)
-	//		}
-	//	}
-	//}
-	//
-	//if len(paginatedUtxos) + len(paginatedUtxosLastPage) != utxoCount {
-	//	t.Fatalf("Wrong number of utxos. Should have paginated through all. Expected (%d) returned (%d)", utxoCount, len(paginatedUtxos) + len(paginatedUtxosLastPage))
-	//}
+	// First Page - using paginated calls
+	paginatedUtxos, lastAddr, lastIdx, err := vm.GetUTXOs(vm.DB, addrsSet, ids.ShortEmpty, ids.Empty, -1, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// either fetches the utxoCount or the maxUTXOsToFetch depending on which is greater
+	if utxoCount >= maxUTXOsToFetch {
+		if len(paginatedUtxos) != maxUTXOsToFetch {
+			t.Fatalf("Wrong number of utxos. Should be Paginated. Expected (%d) returned (%d)", maxUTXOsToFetch, len(paginatedUtxos))
+		}
+	} else {
+		if len(paginatedUtxos) != utxoCount {
+			t.Fatalf("Wrong number of utxos. Should be Paginated. Expected (%d) returned (%d)", utxoCount, len(paginatedUtxos))
+		}
+	}
+
+	// Last Page - using paginated calls (assuming there only 2 pages ofc)
+	paginatedUtxosLastPage, _, _, err := vm.GetUTXOs(vm.DB, addrsSet, lastAddr, lastIdx, -1, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(paginatedUtxos)+len(paginatedUtxosLastPage) != utxoCount {
+		t.Fatalf("Wrong number of utxos. Should have paginated through all. Expected (%d) returned (%d)", utxoCount, len(paginatedUtxos)+len(paginatedUtxosLastPage))
+	}
 }
 
 // TODO test that uses transactions to validate the getutxo

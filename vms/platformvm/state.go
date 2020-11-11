@@ -389,20 +389,22 @@ func (vm *VM) removeUTXO(db database.Database, utxoID ids.ID) error {
 // Only returns UTXOs after [start].
 // Returns at most [limit] UTXO IDs.
 // Returns nil if no UTXOs reference [addr].
-func (vm *VM) getReferencingUTXOs(db database.Database, addr []byte, start ids.ID, limit int) (ids.Set, error) {
-	toFetch := limit
-	utxoIDs := ids.Set{}
+func (vm *VM) getReferencingUTXOs(db database.Database, addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
+
+	idSlice := []ids.ID(nil)
+
 	iter := prefixdb.NewNested(addr, db).NewIteratorWithStart(start.Bytes())
 	defer iter.Release()
-	for toFetch > 0 && iter.Next() {
-		if utxoID, err := ids.ToID(iter.Key()); err != nil {
+	numFetched := 0
+	for numFetched < limit && iter.Next() {
+		if keyID, err := ids.ToID(iter.Key()); err != nil {
 			return nil, err
-		} else if !utxoID.Equals(start) {
-			utxoIDs.Add(utxoID)
-			toFetch--
+		} else if !bytes.Equal(keyID.Bytes(), start.Bytes()) {
+			idSlice = append(idSlice, keyID)
+			numFetched++
 		}
 	}
-	return utxoIDs, nil
+	return idSlice, nil
 }
 
 // Persist that the UTXO with ID [utxoID] references [addr]
@@ -459,19 +461,18 @@ func (vm *VM) GetUTXOs(
 			if err != nil {
 				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s", addr)
 			}
-			for utxoIDKey := range utxoIDs { // Get the UTXOs
-				utxoID := ids.NewID(utxoIDKey)
-				if seen.Contains(utxoID) { // already have this UTXO in the list
+			for _, utxoIDKey := range utxoIDs { // Get the UTXOs
+				if seen.Contains(utxoIDKey) { // already have this UTXO in the list
 					continue
 				}
-				utxo, err := vm.getUTXO(db, utxoID)
+				utxo, err := vm.getUTXO(db, utxoIDKey)
 				if err != nil {
-					return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
+					return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoIDKey, err)
 				}
 				utxos = append(utxos, utxo)
-				seen.Add(utxoID)
+				seen.Add(utxoIDKey)
 				lastAddr = addr
-				lastIndex = utxoID
+				lastIndex = utxoIDKey
 				currLimit--
 				if currLimit <= 0 {
 					break // Found [limit] utxos; stop.
@@ -481,7 +482,7 @@ func (vm *VM) GetUTXOs(
 			if paginate || utxoIDs == nil || len(utxoIDs) == 0 { // Avoiding a downstream make([]) making this an infinite loop
 				break // No more utxos available for that address | Don't fetch more utxos
 			}
-			start = utxoIDs.List()[len(utxoIDs)-1]
+			start = utxoIDs[len(utxoIDs)-1]
 		}
 	}
 	return utxos, lastAddr, lastIndex, nil
