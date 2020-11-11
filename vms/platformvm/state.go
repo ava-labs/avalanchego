@@ -391,7 +391,6 @@ func (vm *VM) removeUTXO(db database.Database, utxoID ids.ID) error {
 // Returns nil if no UTXOs reference [addr].
 
 func (vm *VM) getReferencingUTXOs(db database.Database, addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
-
 	idSlice := []ids.ID(nil)
 
 	iter := prefixdb.NewNested(addr, db).NewIteratorWithStart(start[:])

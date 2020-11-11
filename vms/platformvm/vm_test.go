@@ -222,7 +222,6 @@ func BuildGenesisTest(t *testing.T) (*BuildGenesisArgs, []byte) {
 // 1) The genesis state
 // 2) The byte representation of the default genesis for tests
 func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenesisArgs, []byte) {
-
 	genesisUTXOs := make([]APIUTXO, len(keys))
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range keys {
@@ -519,7 +518,6 @@ func TestGenesis(t *testing.T) {
 }
 
 func TestGenesisGetUTXOs(t *testing.T) {
-
 	addr := keys[0].PublicKey().Address()
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	addrString, _ := formatting.FormatBech32(hrp, addr.Bytes())

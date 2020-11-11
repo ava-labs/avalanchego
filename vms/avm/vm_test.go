@@ -208,7 +208,6 @@ func BuildGenesisTest(t *testing.T) []byte {
 
 // BuildGenesisTestWithArgs allows building the genesis while injecting different starting points (args)
 func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) []byte {
-
 	ss, err := CreateStaticService(formatting.HexEncoding)
 	if err != nil {
 		t.Fatalf("Failed to create static service due to: %s", err)
@@ -629,7 +628,6 @@ func TestGenesisGetUTXOs(t *testing.T) {
 // - Pagination when the total UTXOs exceed maxUTXOsToFetch (1024)
 // - Fetching all UTXOs when they exceed maxUTXOsToFetch (1024)
 func TestGenesisGetPaginatedUTXOs(t *testing.T) {
-
 	addr0Str, _ := formatting.FormatBech32(testHRP, addrs[0].Bytes())
 
 	// Create a starting point of 2000 UTXOs
