@@ -670,8 +670,8 @@ func (n *network) Dispatch() error {
 			// When [n].Close() is called, [n.listener].Close() is called.
 			// This causes [n.listener].Accept() to return an error.
 			// If that happened, don't log/return an error here.
-			if !n.closed.GetValue() {
-				return nil
+			if n.closed.GetValue() {
+				return errNetworkClosed
 			}
 			n.log.Debug("error during server accept: %s", err)
 			return err
