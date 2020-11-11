@@ -479,7 +479,7 @@ func (vm *VM) GetUTXOs(
 				}
 			}
 
-			if paginate || utxoIDs == nil || len(utxoIDs) == 0 { // Avoiding a downstream make([]) making this an infinite loop
+			if paginate || len(utxoIDs) == 0 { // Avoiding a downstream make([]) making this an infinite loop
 				break // No more utxos available for that address | Don't fetch more utxos
 			}
 			start = utxoIDs[len(utxoIDs)-1]
