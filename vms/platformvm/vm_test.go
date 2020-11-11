@@ -269,6 +269,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 		Chains:        nil,
 		Time:          json.Uint64(defaultGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
+		Encoding:      formatting.CB58Encoding,
 	}
 
 	if args != nil {
@@ -276,7 +277,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 	}
 
 	buildGenesisResponse := BuildGenesisReply{}
-	platformvmSS, err := CreateStaticService(formatting.CB58Encoding)
+	platformvmSS, err := CreateStaticService(buildGenesisArgs.Encoding)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -400,7 +401,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-	//_, genesisBytes := defaultGenesis()
+	// _, genesisBytes := defaultGenesis()
 	if err := vm.Initialize(ctx, chainDB, genesisBytes, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -541,6 +542,7 @@ func TestGenesisGetUTXOs(t *testing.T) {
 		Chains:        nil,
 		Time:          json.Uint64(defaultGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
+		Encoding:      formatting.HexEncoding,
 	}
 
 	_, _, vm, _ := GenesisVMWithArgs(t, &buildGenesisArgs)
@@ -558,7 +560,7 @@ func TestGenesisGetUTXOs(t *testing.T) {
 		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", utxoCount, len(utxosNonPaginated))
 	}
 
-	// TODO delete of rewrite this test
+	///// TODO delete of rewrite this test
 	//// First Page - using paginated calls
 	//paginatedUtxos, lastAddr, lastIdx, err := vm.GetUTXOs(vm.DB, addrsSet, ids.ShortEmpty, ids.Empty, -1, true)
 	//if err != nil {
