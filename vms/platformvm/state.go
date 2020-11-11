@@ -399,7 +399,7 @@ func (vm *VM) getReferencingUTXOs(db database.Database, addr []byte, start ids.I
 	for numFetched < limit && iter.Next() {
 		if keyID, err := ids.ToID(iter.Key()); err != nil {
 			return nil, err
-		} else if !bytes.Equal(keyID.Bytes(), start.Bytes()) {
+		} else if keyID != start {
 			idSlice = append(idSlice, keyID)
 			numFetched++
 		}

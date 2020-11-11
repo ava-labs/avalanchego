@@ -661,33 +661,33 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 	addrsSet.Add(addrs[0])
 
 	// First Page - using paginated calls
-	paginatedUtxos, lastAddr, lastIdx, err := vm.GetUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, -1, true)
+	paginatedUTXOs, lastAddr, lastIdx, err := vm.GetUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, -1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(paginatedUtxos) == utxoCount {
-		t.Fatalf("Wrong number of utxos. Should be Paginated. Expected (%d) returned (%d)", maxUTXOsToFetch, len(paginatedUtxos))
+	if len(paginatedUTXOs) == utxoCount {
+		t.Fatalf("Wrong number of utxos. Should be Paginated. Expected (%d) returned (%d)", maxUTXOsToFetch, len(paginatedUTXOs))
 	}
 
 	// Last Page - using paginated calls
-	paginatedUtxosLastPage, _, _, err := vm.GetUTXOs(addrsSet, lastAddr, lastIdx, -1, true)
+	paginatedUTXOsLastPage, _, _, err := vm.GetUTXOs(addrsSet, lastAddr, lastIdx, -1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(paginatedUtxos)+len(paginatedUtxosLastPage) != utxoCount {
-		t.Fatalf("Wrong number of utxos. Should have paginated through all. Expected (%d) returned (%d)", utxoCount, len(paginatedUtxos)+len(paginatedUtxosLastPage))
+	if len(paginatedUTXOs)+len(paginatedUTXOsLastPage) != utxoCount {
+		t.Fatalf("Wrong number of utxos. Should have paginated through all. Expected (%d) returned (%d)", utxoCount, len(paginatedUTXOs)+len(paginatedUTXOsLastPage))
 	}
 
 	// Fetch all UTXOs
-	utxosNonPaginated, _, _, err := vm.GetUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, -1, false)
+	notPaginatedUTXOs, _, _, err := vm.GetUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, -1, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(utxosNonPaginated) != utxoCount {
-		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", utxoCount, len(utxosNonPaginated))
+	if len(notPaginatedUTXOs) != utxoCount {
+		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", utxoCount, len(notPaginatedUTXOs))
 	}
 }
 

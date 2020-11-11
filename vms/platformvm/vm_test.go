@@ -551,105 +551,36 @@ func TestGenesisGetUTXOs(t *testing.T) {
 	addrsSet.Add(addr)
 
 	// Fetch all UTXOs
-	utxosNonPaginated, _, _, err := vm.GetUTXOs(vm.DB, addrsSet, ids.ShortEmpty, ids.Empty, -1, false)
+	notPaginatedUTXOs, _, _, err := vm.GetUTXOs(vm.DB, addrsSet, ids.ShortEmpty, ids.Empty, -1, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(utxosNonPaginated) != utxoCount {
-		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", utxoCount, len(utxosNonPaginated))
+	if len(notPaginatedUTXOs) != utxoCount {
+		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", utxoCount, len(notPaginatedUTXOs))
 	}
 
 	// First Page - using paginated calls
-	paginatedUtxos, lastAddr, lastIdx, err := vm.GetUTXOs(vm.DB, addrsSet, ids.ShortEmpty, ids.Empty, -1, true)
+	paginatedUTXOs, lastAddr, lastIdx, err := vm.GetUTXOs(vm.DB, addrsSet, ids.ShortEmpty, ids.Empty, -1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// either fetches the utxoCount or the maxUTXOsToFetch depending on which is greater
-	if utxoCount >= maxUTXOsToFetch {
-		if len(paginatedUtxos) != maxUTXOsToFetch {
-			t.Fatalf("Wrong number of utxos. Should be Paginated. Expected (%d) returned (%d)", maxUTXOsToFetch, len(paginatedUtxos))
-		}
-	} else {
-		if len(paginatedUtxos) != utxoCount {
-			t.Fatalf("Wrong number of utxos. Should be Paginated. Expected (%d) returned (%d)", utxoCount, len(paginatedUtxos))
-		}
+	if len(paginatedUTXOs) != maxUTXOsToFetch {
+		t.Fatalf("Wrong number of utxos. Should be Paginated. Expected (%d) returned (%d)", maxUTXOsToFetch, len(paginatedUTXOs))
 	}
 
 	// Last Page - using paginated calls (assuming there only 2 pages ofc)
-	paginatedUtxosLastPage, _, _, err := vm.GetUTXOs(vm.DB, addrsSet, lastAddr, lastIdx, -1, true)
+	paginatedUTXOsLastPage, _, _, err := vm.GetUTXOs(vm.DB, addrsSet, lastAddr, lastIdx, -1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(paginatedUtxos)+len(paginatedUtxosLastPage) != utxoCount {
-		t.Fatalf("Wrong number of utxos. Should have paginated through all. Expected (%d) returned (%d)", utxoCount, len(paginatedUtxos)+len(paginatedUtxosLastPage))
+	if len(paginatedUTXOs)+len(paginatedUTXOsLastPage) != utxoCount {
+		t.Fatalf("Wrong number of utxos. Should have paginated through all. Expected (%d) returned (%d)", utxoCount, len(paginatedUTXOs)+len(paginatedUTXOsLastPage))
 	}
 }
-
-// TODO test that uses transactions to validate the getutxo
-//func TestGenesisGetUTXOsTransactions(t *testing.T) {
-//
-//	utxoCount := 4
-//	addr := keys[0].PublicKey().Address()
-//	//hrp := constants.NetworkIDToHRP[testNetworkID]
-//	//addrString, _ := formatting.FormatBech32(hrp, addr.Bytes())
-//
-//	_, _, vm, _ := GenesisVM(t)
-//
-//	//addressDelegatorSource:= keys[1].PublicKey().Address()
-//	addressReceiveDelegation := keys[0].PublicKey().Address()
-//
-//	// Case: Valid
-//	tx, err := vm.newAddDelegatorTx(
-//		vm.minDelegatorStake,
-//		uint64(defaultValidateStartTime.Unix()),
-//		uint64(defaultValidateEndTime.Unix()),
-//		addressReceiveDelegation,
-//		addressReceiveDelegation,
-//		[]*crypto.PrivateKeySECP256K1R{keys[1]},
-//		addressReceiveDelegation, // change addr
-//	)
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//
-//	err = tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
-//		vm.Ctx,
-//		vm.codec,
-//		vm.minDelegatorStake,
-//		defaultMinStakingDuration,
-//		defaultMaxStakingDuration,
-//	)
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//
-//	addrsSet := ids.ShortSet{}
-//	addrsSet.Add(addr)
-//
-//	addrsSet1 := ids.ShortSet{}
-//	addrsSet1.Add(keys[1].PublicKey().Address())
-//
-//	utxos, _, _, err := vm.GetUTXOs(vm.DB, addrsSet1, ids.ShortEmpty, ids.Empty, -1, false)
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//
-//	fmt.Println("utxos -> ", len(utxos))
-//
-//	utxos, _, _, err = vm.GetUTXOs(vm.DB, addrsSet, ids.ShortEmpty, ids.Empty, -1, false)
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//
-//	fmt.Println("utxos -> ", len(utxos))
-//
-//	if len(utxos) != utxoCount {
-//		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", utxoCount, len(utxos))
-//	}
-//}
 
 // Test method getTotalStake
 func TestGetTotalStake(t *testing.T) {
