@@ -12,7 +12,7 @@ import (
 
 func TestCB58(t *testing.T) {
 	addr := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 255}
-	result, err := CB58{addr}.String()
+	result, err := CB58{}.ConvertBytes(addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +24,7 @@ func TestCB58(t *testing.T) {
 
 func TestCB58Single(t *testing.T) {
 	addr := []byte{0}
-	result, err := CB58{addr}.String()
+	result, err := CB58{}.ConvertBytes(addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,12 +39,12 @@ func TestCB58Single(t *testing.T) {
 // greater than the maximum length
 func TestCB58TooLarge(t *testing.T) {
 	b := make([]byte, maxCB58Size)
-	_, err := CB58{b}.String()
+	_, err := CB58{}.ConvertBytes(b)
 	if err != nil {
 		t.Fatal(err)
 	}
 	b = make([]byte, maxCB58Size+1)
-	_, err = CB58{b}.String()
+	_, err = CB58{}.ConvertBytes(b)
 	if err == nil {
 		t.Fatal("should have failed due to too large")
 	}
@@ -53,7 +53,7 @@ func TestCB58TooLarge(t *testing.T) {
 // Test that we can stringify byte slice whose length is that of an ID
 func TestCB58ID(t *testing.T) {
 	id := make([]byte, hashing.HashLen)
-	_, err := CB58{id}.String()
+	_, err := CB58{}.ConvertBytes(id)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -49,7 +49,7 @@ func (cb58 *CB58) UnmarshalJSON(b []byte) error {
 
 // MarshalJSON ...
 func (cb58 CB58) MarshalJSON() ([]byte, error) {
-	str, err := cb58.String()
+	str, err := cb58.ConvertBytes(cb58.Bytes)
 	if err != nil {
 		return nil, err
 	}
@@ -63,11 +63,6 @@ func (cb58 *CB58) FromString(str string) error {
 		cb58.Bytes = rawBytes
 	}
 	return err
-}
-
-// String ...
-func (cb58 CB58) String() (string, error) {
-	return cb58.ConvertBytes(cb58.Bytes)
 }
 
 // ConvertBytes ...

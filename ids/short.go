@@ -101,11 +101,9 @@ func (id ShortID) String() string {
 	if id.IsZero() {
 		return "nil"
 	}
-	bytes := id.Bytes()
-	cb58 := formatting.CB58{Bytes: bytes}
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of an ID
-	str, _ := cb58.String()
+	str, _ := formatting.CB58{}.ConvertBytes(id.Bytes())
 	return str
 }
 

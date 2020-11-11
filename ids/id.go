@@ -101,7 +101,7 @@ func (id ID) Hex() string { return hex.EncodeToString(id[:]) }
 func (id ID) String() string {
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of an ID
-	s, _ := formatting.CB58{Bytes: id[:]}.String()
+	s, _ := formatting.CB58{}.ConvertBytes(id[:])
 	return s
 }
 

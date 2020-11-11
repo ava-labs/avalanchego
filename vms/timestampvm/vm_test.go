@@ -194,8 +194,7 @@ func TestHappyPath(t *testing.T) {
 
 func TestMakeStringFrom32Bytes(t *testing.T) {
 	bytes := ids.ID{'w', 'o', 'o'}
-	bytesFormatter := formatting.CB58{Bytes: bytes[:]}
-	t.Log(bytesFormatter.String())
+	t.Log(formatting.CB58{}.ConvertBytes(bytes[:]))
 }
 
 func TestService(t *testing.T) {
