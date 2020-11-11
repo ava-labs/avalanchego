@@ -471,7 +471,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, utxoID := range utxoIDs.List() {
+	for _, utxoID := range utxoIDs {
 		if err := vm.removeUTXO(vDB, utxoID); err != nil {
 			t.Fatal(err)
 		}
