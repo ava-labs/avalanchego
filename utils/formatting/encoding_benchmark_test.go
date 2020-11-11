@@ -82,7 +82,7 @@ func BenchmarkEncodings(b *testing.B) {
 		_, _ = rand.Read(bytes) // #nosec G404
 		b.Run(fmt.Sprintf("%s-%d bytes", benchmark.encoding, benchmark.size), func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
-				_ = enc.ConvertBytes(bytes)
+				_, _ = enc.ConvertBytes(bytes)
 			}
 		})
 	}
