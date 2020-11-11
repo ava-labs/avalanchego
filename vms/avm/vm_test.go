@@ -226,7 +226,6 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) []byte {
 	}
 
 	return hex.Bytes
-
 }
 
 func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) {
@@ -234,9 +233,12 @@ func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) 
 }
 
 func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
-	genesisBytes := BuildGenesisTest(t)
+	var genesisBytes []byte
+
 	if args != nil {
 		genesisBytes = BuildGenesisTestWithArgs(t, args)
+	} else {
+		genesisBytes = BuildGenesisTest(t)
 	}
 
 	ctx := NewContext(t)

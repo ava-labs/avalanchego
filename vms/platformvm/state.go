@@ -459,7 +459,7 @@ func (vm *VM) GetUTXOs(
 			currLimit := limit
 			utxoIDs, err := vm.getReferencingUTXOs(db, addr.Bytes(), start, currLimit) // Get IDs of UTXOs to fetch
 			if err != nil {
-				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s", addr)
+				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 			}
 			for _, utxoIDKey := range utxoIDs { // Get the UTXOs
 				if seen.Contains(utxoIDKey) { // already have this UTXO in the list

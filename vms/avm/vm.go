@@ -500,7 +500,7 @@ func (vm *VM) GetUTXOs(
 			currLimit := limit
 			utxoIDs, err := vm.state.Funds(addr.Bytes(), start, limit) // Get UTXOs associated with [addr]
 			if err != nil {
-				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s", addr)
+				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 			}
 			for _, utxoID := range utxoIDs {
 				if seen.Contains(utxoID) { // Already have this UTXO in the list
