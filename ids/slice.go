@@ -10,7 +10,7 @@ func Equals(a, b []ID) bool {
 	}
 
 	for i, aID := range a {
-		if !aID.Equals(b[i]) {
+		if aID != b[i] {
 			return false
 		}
 	}

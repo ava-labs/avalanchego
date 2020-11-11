@@ -29,5 +29,89 @@ func TestSort2dByteArray(t *testing.T) {
 	if !IsSorted2DBytes(arr) {
 		t.Fatal("should be sorted")
 	}
+}
 
+func TestSortUint32Array(t *testing.T) {
+	tests := []struct {
+		name     string
+		arr      []uint32
+		isSorted bool
+	}{
+		{
+			name:     "nil",
+			arr:      nil,
+			isSorted: true,
+		},
+		{
+			name:     "[]",
+			arr:      []uint32{},
+			isSorted: true,
+		},
+		{
+			name:     "[0]",
+			arr:      []uint32{0},
+			isSorted: true,
+		},
+		{
+			name:     "[0,0]",
+			arr:      []uint32{0, 0},
+			isSorted: false,
+		},
+		{
+			name:     "[0,1]",
+			arr:      []uint32{0, 1},
+			isSorted: true,
+		},
+		{
+			name:     "[1,0]",
+			arr:      []uint32{1, 0},
+			isSorted: false,
+		},
+		{
+			name:     "[0,1,2]",
+			arr:      []uint32{0, 1, 2},
+			isSorted: true,
+		},
+		{
+			name:     "[0,0,1]",
+			arr:      []uint32{0, 0, 1},
+			isSorted: false,
+		},
+		{
+			name:     "[0,1,1]",
+			arr:      []uint32{0, 1, 1},
+			isSorted: false,
+		},
+		{
+			name:     "[2,1,2]",
+			arr:      []uint32{2, 1, 2},
+			isSorted: false,
+		},
+		{
+			name:     "[2,1,3]",
+			arr:      []uint32{2, 1, 3},
+			isSorted: false,
+		},
+		{
+			name:     "[0,10,20]",
+			arr:      []uint32{0, 10, 20},
+			isSorted: true,
+		},
+		{
+			name:     "[10,20,25]",
+			arr:      []uint32{10, 20, 25},
+			isSorted: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.isSorted {
+				if !IsSortedAndUniqueUint32(test.arr) {
+					t.Fatal("should have been marked as sorted and unique")
+				}
+			} else if IsSortedAndUniqueUint32(test.arr) {
+				t.Fatal("shouldn't have been marked as sorted and unique")
+			}
+		})
+	}
 }

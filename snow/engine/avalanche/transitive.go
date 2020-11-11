@@ -230,8 +230,8 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	t.vtxBlocked.Abandon(vtxID)
 
 	if t.outstandingVtxReqs.Len() == 0 {
-		for txIDKey := range t.missingTxs {
-			t.txBlocked.Abandon(ids.NewID(txIDKey))
+		for txID := range t.missingTxs {
+			t.txBlocked.Abandon(txID)
 		}
 		t.missingTxs.Clear()
 	}
@@ -299,7 +299,7 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, 
 }
 
 // Chits implements the Engine interface
-func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) error {
+func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) error {
 	if !t.Ctx.IsBootstrapped() {
 		t.Ctx.Log.Debug("dropping Chits(%s, %d) due to bootstrapping", vdr, requestID)
 		return nil
@@ -311,8 +311,7 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) err
 		requestID: requestID,
 		response:  votes,
 	}
-	for voteKey := range votes {
-		vote := ids.NewID(voteKey)
+	for _, vote := range votes {
 		if added, err := t.issueFromByID(vdr, vote); err != nil {
 			return err
 		} else if !added {
@@ -326,7 +325,7 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) err
 
 // QueryFailed implements the Engine interface
 func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
-	return t.Chits(vdr, requestID, ids.Set{})
+	return t.Chits(vdr, requestID, nil)
 }
 
 // Notify implements the Engine interface
@@ -481,8 +480,8 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 
 	if t.outstandingVtxReqs.Len() == 0 {
 		// There are no outstanding vertex requests but we don't have these transactions, so we're not getting them.
-		for txIDKey := range t.missingTxs {
-			t.txBlocked.Abandon(ids.NewID(txIDKey))
+		for txID := range t.missingTxs {
+			t.txBlocked.Abandon(txID)
 		}
 		t.missingTxs.Clear()
 	}

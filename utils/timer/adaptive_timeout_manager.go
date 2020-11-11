@@ -72,7 +72,7 @@ type AdaptiveTimeoutManager struct {
 
 	lock           sync.Mutex
 	currentTimeout time.Duration // Amount of time before a timeout
-	timeoutMap     map[[32]byte]*adaptiveTimeout
+	timeoutMap     map[ids.ID]*adaptiveTimeout
 	timeoutQueue   timeoutQueue
 	timer          *Timer // Timer that will fire to clear the timeouts
 }
@@ -89,7 +89,7 @@ func (tm *AdaptiveTimeoutManager) Initialize(config *AdaptiveTimeoutConfig) erro
 	tm.timeoutInc = config.TimeoutInc
 	tm.timeoutDec = config.TimeoutDec
 	tm.currentTimeout = config.InitialTimeout
-	tm.timeoutMap = make(map[[32]byte]*adaptiveTimeout)
+	tm.timeoutMap = make(map[ids.ID]*adaptiveTimeout)
 	tm.timer = NewTimer(tm.Timeout)
 	return config.Registerer.Register(tm.currentDurationMetric)
 }
@@ -153,7 +153,7 @@ func (tm *AdaptiveTimeoutManager) put(id ids.ID, handler func()) time.Time {
 		duration: tm.currentTimeout,
 		deadline: currentTime.Add(tm.currentTimeout),
 	}
-	tm.timeoutMap[id.Key()] = timeout
+	tm.timeoutMap[id] = timeout
 	heap.Push(&tm.timeoutQueue, timeout)
 
 	tm.registerTimeout()
@@ -161,8 +161,7 @@ func (tm *AdaptiveTimeoutManager) put(id ids.ID, handler func()) time.Time {
 }
 
 func (tm *AdaptiveTimeoutManager) remove(id ids.ID, currentTime time.Time) {
-	key := id.Key()
-	timeout, exists := tm.timeoutMap[key]
+	timeout, exists := tm.timeoutMap[id]
 	if !exists {
 		return
 	}
@@ -197,7 +196,7 @@ func (tm *AdaptiveTimeoutManager) remove(id ids.ID, currentTime time.Time) {
 	tm.currentDurationMetric.Set(float64(tm.currentTimeout))
 
 	// Remove the timeout from the map
-	delete(tm.timeoutMap, key)
+	delete(tm.timeoutMap, id)
 
 	// Remove the timeout from the queue
 	heap.Remove(&tm.timeoutQueue, timeout.index)

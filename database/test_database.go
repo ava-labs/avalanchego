@@ -28,6 +28,8 @@ var (
 		TestIteratorClosed,
 		TestStatNoPanic,
 		TestCompactNoPanic,
+		TestMemorySafetyDatabase,
+		TestMemorySafetyBatch,
 	}
 )
 
@@ -121,6 +123,48 @@ func TestSimpleKeyValueClosed(t *testing.T, db Database) {
 	}
 }
 
+// TestMemorySafetyDatabase ensures it is safe to modify
+// a key after passing it to Database.Put and Database.Get.
+func TestMemorySafetyDatabase(t *testing.T, db Database) {
+	key := []byte("key")
+	value := []byte("value")
+	key2 := []byte("key2")
+	value2 := []byte("value2")
+
+	// Put both K/V pairs in the database
+	if err := db.Put(key, value); err != nil {
+		t.Fatal(err)
+	} else if err := db.Put(key2, value2); err != nil {
+		t.Fatal(err)
+	}
+	// Get the value for [key]
+	gotVal, err := db.Get(key)
+	if err != nil {
+		t.Fatalf("should have been able to get value but got %s", err)
+	} else if !bytes.Equal(gotVal, value) {
+		t.Fatal("got the wrong value")
+	}
+	// Modify [key]; make sure the value we got before hasn't changed
+	key = key2
+	gotVal2, err := db.Get(key)
+	switch {
+	case err != nil:
+		t.Fatal(err)
+	case !bytes.Equal(gotVal2, value2):
+		t.Fatal("got wrong value")
+	case !bytes.Equal(gotVal, value):
+		t.Fatal("value changed")
+	}
+	// Reset [key] to its original value and make sure it's correct
+	key = []byte("key")
+	gotVal, err = db.Get(key)
+	if err != nil {
+		t.Fatalf("should have been able to get value but got %s", err)
+	} else if !bytes.Equal(gotVal, value) {
+		t.Fatal("got the wrong value")
+	}
+}
+
 // TestBatchPut ...
 func TestBatchPut(t *testing.T, db Database) {
 	key := []byte("hello")
@@ -149,26 +193,17 @@ func TestBatchPut(t *testing.T, db Database) {
 		t.Fatalf("Unexpected error on db.Get: %s", err)
 	} else if !bytes.Equal(value, v) {
 		t.Fatalf("db.Get: Returned: 0x%x ; Expected: 0x%x", v, value)
-	}
-
-	if err := db.Delete(key); err != nil {
+	} else if err := db.Delete(key); err != nil {
 		t.Fatalf("Unexpected error on db.Delete: %s", err)
 	}
 
-	batch = db.NewBatch()
-	if batch == nil {
+	if batch = db.NewBatch(); batch == nil {
 		t.Fatalf("db.NewBatch returned nil")
-	}
-
-	if err := batch.Put(key, value); err != nil {
+	} else if err := batch.Put(key, value); err != nil {
 		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	}
-
-	if err := db.Close(); err != nil {
+	} else if err := db.Close(); err != nil {
 		t.Fatalf("Error while closing the database: %s", err)
-	}
-
-	if err := batch.Write(); err != ErrClosed {
+	} else if err := batch.Write(); err != ErrClosed {
 		t.Fatalf("Expected %s on batch.Write", ErrClosed)
 	}
 }
@@ -203,6 +238,51 @@ func TestBatchDelete(t *testing.T, db Database) {
 		t.Fatalf("Expected %s on db.Get for missing key %s. Returned 0x%x", ErrNotFound, key, v)
 	} else if err := db.Delete(key); err != nil {
 		t.Fatalf("Unexpected error on db.Delete: %s", err)
+	}
+}
+
+// TestMemorySafetyDatabase ensures it is safe to modify
+// a key after passing it to Batch.Put.
+func TestMemorySafetyBatch(t *testing.T, db Database) {
+	key := []byte("hello")
+	value := []byte("world")
+	valueCopy := []byte("world")
+
+	batch := db.NewBatch()
+	if batch == nil {
+		t.Fatalf("db.NewBatch returned nil")
+	}
+
+	// Put a key in the batch
+	if err := batch.Put(key, value); err != nil {
+		t.Fatalf("Unexpected error on batch.Put: %s", err)
+	} else if size := batch.ValueSize(); size <= 0 {
+		t.Fatalf("batch.ValueSize: Returned: %d ; Expected: > 0", size)
+	}
+
+	// Modify the key
+	keyCopy := key
+	key = []byte("jello")
+	if err := batch.Write(); err != nil {
+		t.Fatalf("Unexpected error on batch.Write: %s", err)
+	}
+
+	// Make sure the original key was written to the database
+	if has, err := db.Has(keyCopy); err != nil {
+		t.Fatalf("Unexpected error on db.Has: %s", err)
+	} else if !has {
+		t.Fatalf("db.Has unexpectedly returned false on key %s", key)
+	} else if v, err := db.Get(keyCopy); err != nil {
+		t.Fatalf("Unexpected error on db.Get: %s", err)
+	} else if !bytes.Equal(valueCopy, v) {
+		t.Fatalf("db.Get: Returned: 0x%x ; Expected: 0x%x", v, value)
+	}
+
+	// Make sure the new key wasn't written to the database
+	if has, err := db.Has(key); err != nil {
+		t.Fatalf("Unexpected error on db.Has: %s", err)
+	} else if has {
+		t.Fatal("database shouldn't have the new key")
 	}
 }
 

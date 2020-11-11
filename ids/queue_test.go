@@ -23,7 +23,7 @@ func TestQueueSetinit(t *testing.T) {
 
 func TestQueueSetSetHead(t *testing.T) {
 	qs := QueueSet{}
-	id := NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'})
+	id := ID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}
 	qs.SetHead(id)
 	if qs.idList == nil || id != qs.idList.Front().Value.(ID) {
 		t.Fatal("Failed to set head of unintilised queue")
@@ -34,7 +34,7 @@ func TestQueueSetSetHead(t *testing.T) {
 		t.Fatal("Mutated a queue which already had the desired head")
 	}
 
-	id2 := NewID([32]byte{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'})
+	id2 := ID{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}
 	qs.SetHead(id2)
 	if qs.idList.Len() != 1 || id2 != qs.idList.Front().Value.(ID) {
 		t.Fatal("Didn't replace the existing head")
@@ -43,13 +43,13 @@ func TestQueueSetSetHead(t *testing.T) {
 
 func TestQueueSetAppend(t *testing.T) {
 	qs := QueueSet{}
-	id := NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'})
+	id := ID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}
 	qs.Append(id)
 	if qs.idList == nil || id != qs.idList.Front().Value.(ID) {
 		t.Fatal("Failed to append to an uninitialised queue")
 	}
 
-	id2 := NewID([32]byte{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'})
+	id2 := ID{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}
 	qs.Append(id2)
 	if qs.idList.Len() != 2 || id2 != qs.idList.Back().Value.(ID) {
 		t.Fatal("Failed to append to the back of the queue")
@@ -63,8 +63,8 @@ func TestQueueGetTail(t *testing.T) {
 		t.Fatalf("Empty queue returned %v, expected empty ID %v", tail, Empty)
 	}
 
-	qs.Append(NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}))
-	id2 := NewID([32]byte{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'})
+	qs.Append(ID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'})
+	id2 := ID{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}
 	qs.Append(id2)
 	tail = qs.GetTail()
 	if tail != id2 {

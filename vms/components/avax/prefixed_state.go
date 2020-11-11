@@ -52,10 +52,10 @@ func (s *chainState) UTXO(id ids.ID) (*UTXO, error) {
 // All UTXO IDs have IDs greater than [start].
 // The returned list contains at most [limit] UTXO IDs.
 func (s *chainState) Funds(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
-	var addrArr [32]byte
-	copy(addrArr[:], addr)
-	addrID := ids.NewID(addrArr)
-	return s.IDs(UniqueID(addrID, s.fundsIDPrefix, s.fundsID).Bytes(), start.Bytes(), limit)
+	var addrID ids.ID
+	copy(addrID[:], addr)
+	key := UniqueID(addrID, s.fundsIDPrefix, s.fundsID)
+	return s.IDs(key[:], start[:], limit)
 }
 
 // SpendUTXO consumes the provided platform utxo.
@@ -104,11 +104,10 @@ func (s *chainState) setStatus(id ids.ID, status choices.Status) error {
 
 func (s *chainState) removeUTXO(addrs [][]byte, utxoID ids.ID) error {
 	for _, addr := range addrs {
-		var addrArr [32]byte
-		copy(addrArr[:], addr)
-		addrID := ids.NewID(addrArr)
+		var addrID ids.ID
+		copy(addrID[:], addr)
 		addrID = UniqueID(addrID, s.fundsIDPrefix, s.fundsID)
-		if err := s.RemoveID(addrID.Bytes(), utxoID); err != nil {
+		if err := s.RemoveID(addrID[:], utxoID); err != nil {
 			return err
 		}
 	}
@@ -117,11 +116,10 @@ func (s *chainState) removeUTXO(addrs [][]byte, utxoID ids.ID) error {
 
 func (s *chainState) addUTXO(addrs [][]byte, utxoID ids.ID) error {
 	for _, addr := range addrs {
-		var addrArr [32]byte
-		copy(addrArr[:], addr)
-		addrID := ids.NewID(addrArr)
+		var addrID ids.ID
+		copy(addrID[:], addr)
 		addrID = UniqueID(addrID, s.fundsIDPrefix, s.fundsID)
-		if err := s.AddID(addrID.Bytes(), utxoID); err != nil {
+		if err := s.AddID(addrID[:], utxoID); err != nil {
 			return err
 		}
 	}
@@ -150,7 +148,7 @@ func NewPrefixedState(
 		Codec:        codec,
 	}
 	return &PrefixedState{
-		isSmaller: bytes.Compare(myChain.Bytes(), peerChain.Bytes()) == -1,
+		isSmaller: bytes.Compare(myChain[:], peerChain[:]) == -1,
 		smallerChain: chainState{
 			State: state,
 
@@ -214,7 +212,6 @@ func (s *PrefixedState) FundUTXO(utxo *UTXO) error {
 
 var (
 	errCacheTypeMismatch = errors.New("type returned from cache doesn't match the expected type")
-	errZeroID            = errors.New("database key ID value not initialized")
 )
 
 // UniqueID returns a unique identifier
@@ -245,7 +242,7 @@ func (s *State) UTXO(id ids.ID) (*UTXO, error) {
 		return nil, errCacheTypeMismatch
 	}
 
-	bytes, err := s.DB.Get(id.Bytes())
+	bytes, err := s.DB.Get(id[:])
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +261,7 @@ func (s *State) UTXO(id ids.ID) (*UTXO, error) {
 func (s *State) SetUTXO(id ids.ID, utxo *UTXO) error {
 	if utxo == nil {
 		s.Cache.Evict(id)
-		return s.DB.Delete(id.Bytes())
+		return s.DB.Delete(id[:])
 	}
 
 	bytes, err := s.Codec.Marshal(utxo)
@@ -273,7 +270,7 @@ func (s *State) SetUTXO(id ids.ID, utxo *UTXO) error {
 	}
 
 	s.Cache.Put(id, utxo)
-	return s.DB.Put(id.Bytes(), bytes)
+	return s.DB.Put(id[:], bytes)
 }
 
 // Status returns a status from storage.
@@ -285,7 +282,7 @@ func (s *State) Status(id ids.ID) (choices.Status, error) {
 		return choices.Unknown, errCacheTypeMismatch
 	}
 
-	bytes, err := s.DB.Get(id.Bytes())
+	bytes, err := s.DB.Get(id[:])
 	if err != nil {
 		return choices.Unknown, err
 	}
@@ -303,7 +300,7 @@ func (s *State) Status(id ids.ID) (choices.Status, error) {
 func (s *State) SetStatus(id ids.ID, status choices.Status) error {
 	if status == choices.Unknown {
 		s.Cache.Evict(id)
-		return s.DB.Delete(id.Bytes())
+		return s.DB.Delete(id[:])
 	}
 
 	bytes, err := s.Codec.Marshal(status)
@@ -312,7 +309,7 @@ func (s *State) SetStatus(id ids.ID, status choices.Status) error {
 	}
 
 	s.Cache.Put(id, status)
-	return s.DB.Put(id.Bytes(), bytes)
+	return s.DB.Put(id[:], bytes)
 }
 
 // IDs returns the slice of IDs associated with [id], starting after [start].
@@ -327,7 +324,7 @@ func (s *State) IDs(key []byte, start []byte, limit int) ([]ids.ID, error) {
 	for numFetched < limit && iter.Next() {
 		if keyID, err := ids.ToID(iter.Key()); err != nil {
 			return nil, err
-		} else if !bytes.Equal(keyID.Bytes(), start) { // don't return [start]
+		} else if !bytes.Equal(keyID[:], start) { // don't return [start]
 			idSlice = append(idSlice, keyID)
 			numFetched++
 		}
@@ -337,18 +334,12 @@ func (s *State) IDs(key []byte, start []byte, limit int) ([]ids.ID, error) {
 
 // AddID saves an ID to the prefixed database
 func (s *State) AddID(key []byte, id ids.ID) error {
-	if id.IsZero() {
-		return errZeroID
-	}
 	db := prefixdb.NewNested(key, s.DB)
-	return db.Put(id.Bytes(), nil)
+	return db.Put(id[:], nil)
 }
 
 // RemoveID removes an ID from the prefixed database
 func (s *State) RemoveID(key []byte, id ids.ID) error {
-	if id.IsZero() {
-		return errZeroID
-	}
 	db := prefixdb.NewNested(key, s.DB)
-	return db.Delete(id.Bytes())
+	return db.Delete(id[:])
 }

@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
@@ -81,13 +80,6 @@ func (id *ShortID) UnmarshalJSON(b []byte) error {
 // IsZero returns true if the value has not been initialized
 func (id ShortID) IsZero() bool { return id.ID == nil }
 
-// LongID returns a 32 byte identifier from this id
-func (id ShortID) LongID() ID {
-	dest := [32]byte{}
-	copy(dest[:], id.ID[:])
-	return NewID(dest)
-}
-
 // Key returns a 20 byte hash that this id represents. This is useful to allow
 // for this id to be used as keys in maps.
 func (id ShortID) Key() [20]byte { return *id.ID }
@@ -134,7 +126,12 @@ func SortShortIDs(ids []ShortID) { sort.Sort(sortShortIDData(ids)) }
 
 // IsSortedAndUniqueShortIDs returns true if the ids are sorted and unique
 func IsSortedAndUniqueShortIDs(ids []ShortID) bool {
-	return utils.IsSortedAndUnique(sortShortIDData(ids))
+	for i := 0; i < len(ids)-1; i++ {
+		if bytes.Compare(ids[i].Bytes(), ids[i+1].Bytes()) != -1 {
+			return false
+		}
+	}
+	return true
 }
 
 // IsUniqueShortIDs returns true iff [ids] are unique
