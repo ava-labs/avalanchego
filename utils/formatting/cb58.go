@@ -29,33 +29,6 @@ var (
 // CB58 formats bytes in checksummed base-58 encoding
 type CB58 struct{ Bytes []byte }
 
-// UnmarshalJSON ...
-func (cb58 *CB58) UnmarshalJSON(b []byte) error {
-	str := string(b)
-	if str == "null" {
-		return nil
-	}
-
-	if len(str) < 2 {
-		return errMissingQuotes
-	}
-
-	lastIndex := len(str) - 1
-	if str[0] != '"' || str[lastIndex] != '"' {
-		return errMissingQuotes
-	}
-	return cb58.FromString(str[1:lastIndex])
-}
-
-// MarshalJSON ...
-func (cb58 CB58) MarshalJSON() ([]byte, error) {
-	str, err := cb58.ConvertBytes(cb58.Bytes)
-	if err != nil {
-		return nil, err
-	}
-	return []byte("\"" + str + "\""), nil
-}
-
 // FromString ...
 func (cb58 *CB58) FromString(str string) error {
 	rawBytes, err := cb58.ConvertString(str)

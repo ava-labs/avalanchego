@@ -6,6 +6,8 @@ package ids
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"sort"
 
 	"github.com/ava-labs/avalanchego/utils"
@@ -15,7 +17,10 @@ import (
 )
 
 // Empty is a useful all zero value
-var Empty = ID{}
+var (
+	Empty            = ID{}
+	errMissingQuotes = errors.New("first and last characters should be quotes")
+)
 
 // ID wraps a 32 byte hash used as an identifier
 type ID [32]byte
@@ -36,24 +41,34 @@ func FromString(idStr string) (ID, error) {
 
 // MarshalJSON ...
 func (id ID) MarshalJSON() ([]byte, error) {
-	return formatting.CB58{Bytes: id[:]}.MarshalJSON()
+	str, err := formatting.CB58{}.ConvertBytes(id[:])
+	if err != nil {
+		return nil, err
+	}
+	return []byte("\"" + str + "\""), nil
 }
 
 // UnmarshalJSON ...
 func (id *ID) UnmarshalJSON(b []byte) error {
-	if string(b) == "null" {
+	str := string(b)
+	if str == "null" { // If "null", do nothing
 		return nil
+	} else if len(str) < 2 {
+		return errMissingQuotes
 	}
-	cb58 := formatting.CB58{}
-	if err := cb58.UnmarshalJSON(b); err != nil {
-		return err
+
+	lastIndex := len(str) - 1
+	if str[0] != '"' || str[lastIndex] != '"' {
+		return errMissingQuotes
 	}
-	newID, err := ToID(cb58.Bytes)
+
+	// Parse CB58 formatted string to bytes
+	bytes, err := formatting.CB58{}.ConvertString(str[1:lastIndex])
 	if err != nil {
-		return err
+		return fmt.Errorf("couldn't decode ID to bytes: %w", err)
 	}
-	*id = newID
-	return nil
+	*id, err = ToID(bytes)
+	return err
 }
 
 // Prefix this id to create a more selective id. This can be used to store
