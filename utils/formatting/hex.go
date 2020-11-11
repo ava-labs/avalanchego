@@ -53,7 +53,8 @@ func (h *Hex) FromString(str string) error {
 
 // String ...
 func (h Hex) String() string {
-	return h.ConvertBytes(h.Bytes)
+	s, _ := h.ConvertBytes(h.Bytes)
+	return s
 }
 
 // ConvertString ...
@@ -83,12 +84,13 @@ func (h Hex) ConvertString(str string) ([]byte, error) {
 	return rawBytes, nil
 }
 
-// ConvertBytes ...
-func (h Hex) ConvertBytes(b []byte) string {
+// ConvertBytes returns the string representation of [b]
+// Always returns a nil error
+func (h Hex) ConvertBytes(b []byte) (string, error) {
 	checked := make([]byte, len(b)+4)
 	copy(checked, b)
 	copy(checked[len(b):], hashing.Checksum(b, 4))
-	return fmt.Sprintf("0x%x", checked)
+	return fmt.Sprintf("0x%x", checked), nil
 }
 
 // Encoding ...

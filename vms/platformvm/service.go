@@ -99,7 +99,10 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
 
-	reply.PrivateKey = constants.SecretKeyPrefix + formatting.CB58{Bytes: sk.Bytes()}.String()
+	// We assume that the maximum size of a byte slice that
+	// can be stringified is at least the length of a SECP256K1 private key
+	privKeyStr, _ := formatting.CB58{Bytes: sk.Bytes()}.String()
+	reply.PrivateKey = constants.SecretKeyPrefix + privKeyStr
 	return db.Close()
 }
 
@@ -452,7 +455,10 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		if err != nil {
 			return fmt.Errorf("couldn't serialize UTXO %q: %w", utxo.InputID(), err)
 		}
-		response.UTXOs[i] = encoding.ConvertBytes(bytes)
+		response.UTXOs[i], err = encoding.ConvertBytes(bytes)
+		if err != nil {
+			return fmt.Errorf("couldn't encode UTXO %s as string: %s", utxo.InputID(), err)
+		}
 	}
 
 	endAddress, err := service.vm.FormatLocalAddress(endAddr)
@@ -1890,7 +1896,10 @@ func (service *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *ap
 		return fmt.Errorf("couldn't get tx: %w", err)
 	}
 
-	response.Tx = encoding.ConvertBytes(txBytes)
+	response.Tx, err = encoding.ConvertBytes(txBytes)
+	if err != nil {
+		return fmt.Errorf("couldn't encode tx as a string: %s", err)
+	}
 	response.Encoding = encoding.Encoding()
 	return nil
 }

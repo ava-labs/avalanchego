@@ -95,7 +95,7 @@ func (s *Service) GetBlock(_ *http.Request, args *GetBlockArgs, reply *GetBlockR
 	reply.APIBlock.Timestamp = json.Uint64(block.Timestamp)
 	reply.APIBlock.ParentID = block.ParentID().String()
 	byteFormatter := formatting.CB58{Bytes: block.Data[:]}
-	reply.Data = byteFormatter.String()
+	reply.Data, err = byteFormatter.String()
 
-	return nil
+	return err
 }

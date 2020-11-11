@@ -16,7 +16,7 @@ const (
 
 // Encoding returns a struct used to format bytes for a specific encoding
 type Encoding interface {
-	ConvertBytes([]byte) string
+	ConvertBytes([]byte) (string, error)
 	ConvertString(str string) ([]byte, error)
 	Encoding() string
 }

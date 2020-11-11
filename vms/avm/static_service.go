@@ -184,7 +184,10 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		return fmt.Errorf("problem marshaling genesis: %w", err)
 	}
 
-	reply.Bytes = encoding.ConvertBytes(b)
+	reply.Bytes, err = encoding.ConvertBytes(b)
+	if err != nil {
+		return fmt.Errorf("couldn't encode genesis as string: %s", err)
+	}
 	reply.Encoding = encoding.Encoding()
 	return nil
 }

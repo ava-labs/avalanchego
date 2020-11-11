@@ -118,10 +118,13 @@ func (kc *Keychain) PrefixedString(prefix string) string {
 	format := fmt.Sprintf("%%sKey[%s]: Key: %%s Address: %%s\n",
 		formatting.IntFormat(len(kc.Keys)-1))
 	for i, key := range kc.Keys {
+		// We assume that the maximum size of a byte slice that
+		// can be stringified is at least the length of a SECP256K1 private key
+		keyStr, _ := formatting.CB58{Bytes: key.Bytes()}.String()
 		s.WriteString(fmt.Sprintf(format,
 			prefix,
 			i,
-			formatting.CB58{Bytes: key.Bytes()},
+			keyStr,
 			key.PublicKey().Address()))
 	}
 

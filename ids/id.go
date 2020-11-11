@@ -99,7 +99,10 @@ func (id ID) Bit(i uint) int {
 func (id ID) Hex() string { return hex.EncodeToString(id[:]) }
 
 func (id ID) String() string {
-	return formatting.CB58{Bytes: id[:]}.String()
+	// We assume that the maximum size of a byte slice that
+	// can be stringified is at least the length of an ID
+	s, _ := formatting.CB58{Bytes: id[:]}.String()
+	return s
 }
 
 type sortIDData []ID

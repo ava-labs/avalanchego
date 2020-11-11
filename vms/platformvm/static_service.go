@@ -368,9 +368,15 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 
 	// Marshal genesis to bytes
 	bytes, err := GenesisCodec.Marshal(genesis)
-	reply.Bytes = encoding.ConvertBytes(bytes)
+	if err != nil {
+		return fmt.Errorf("couldn't marshal genesis: %w", err)
+	}
+	reply.Bytes, err = encoding.ConvertBytes(bytes)
+	if err != nil {
+		return fmt.Errorf("couldn't encode genesis as string: %w", err)
+	}
 	reply.Encoding = encoding.Encoding()
-	return err
+	return nil
 }
 
 type innerSortAPIUTXO []APIUTXO

@@ -960,12 +960,13 @@ func TestImportExportKey(t *testing.T) {
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
 
 	formattedKey := formatting.CB58{Bytes: sk.Bytes()}
+	privKeyStr, _ := formatting.CB58{Bytes: sk.Bytes()}.String()
 	importArgs := &ImportKeyArgs{
 		UserPass: api.UserPass{
 			Username: username,
 			Password: password,
 		},
-		PrivateKey: constants.SecretKeyPrefix + formatting.CB58{Bytes: sk.Bytes()}.String(),
+		PrivateKey: constants.SecretKeyPrefix + privKeyStr,
 	}
 	importReply := &api.JSONAddress{}
 	if err = s.ImportKey(nil, importArgs, importReply); err != nil {
@@ -1017,13 +1018,13 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 		t.Fatalf("problem generating private key: %s", err)
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
-
+	privKeyStr, _ := formatting.CB58{Bytes: sk.Bytes()}.String()
 	args := ImportKeyArgs{
 		UserPass: api.UserPass{
 			Username: username,
 			Password: password,
 		},
-		PrivateKey: constants.SecretKeyPrefix + formatting.CB58{Bytes: sk.Bytes()}.String(),
+		PrivateKey: constants.SecretKeyPrefix + privKeyStr,
 	}
 	reply := api.JSONAddress{}
 	if err = s.ImportKey(nil, &args, &reply); err != nil {
