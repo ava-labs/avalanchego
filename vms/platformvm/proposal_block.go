@@ -163,7 +163,7 @@ func (pb *ProposalBlock) Verify() error {
 		return fmt.Errorf("failed to put status of tx %s: %w", txID, err)
 	}
 
-	pb.vm.currentBlocks[pb.ID().Key()] = pb
+	pb.vm.currentBlocks[pb.ID()] = pb
 	parentIntf.addChild(pb)
 	return nil
 }

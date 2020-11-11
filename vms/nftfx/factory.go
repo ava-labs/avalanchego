@@ -7,7 +7,7 @@ import (
 
 // ID that this Fx uses when labeled
 var (
-	ID = ids.NewID([32]byte{'n', 'f', 't', 'f', 'x'})
+	ID = ids.ID{'n', 'f', 't', 'f', 'x'}
 )
 
 // Factory ...

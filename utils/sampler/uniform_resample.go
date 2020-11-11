@@ -22,6 +22,7 @@ func init() { rand.Seed(time.Now().UnixNano()) }
 // Sampling is performed in O(count) time and O(count) space.
 type uniformResample struct {
 	length uint64
+	drawn  map[uint64]struct{}
 }
 
 func (s *uniformResample) Initialize(length uint64) error {
@@ -37,16 +38,23 @@ func (s *uniformResample) Sample(count int) ([]uint64, error) {
 		return nil, errOutOfRange
 	}
 
-	drawn := make(map[uint64]struct{}, count)
+	if s.drawn == nil {
+		s.drawn = make(map[uint64]struct{}, count)
+	} else {
+		for k := range s.drawn {
+			delete(s.drawn, k)
+		}
+	}
+
 	results := make([]uint64, count)
 	for i := 0; i < count; {
 		// We don't use a cryptographically secure source of randomness here, as
 		// there's no need to ensure a truly random sampling.
 		draw := uint64(rand.Int63n(int64(s.length))) // #nosec G404
-		if _, ok := drawn[draw]; ok {
+		if _, ok := s.drawn[draw]; ok {
 			continue
 		}
-		drawn[draw] = struct{}{}
+		s.drawn[draw] = struct{}{}
 
 		results[i] = draw
 		i++

@@ -75,33 +75,30 @@ func (b *Bootstrapper) Initialize(
 }
 
 // CurrentAcceptedFrontier returns the last accepted block
-func (b *Bootstrapper) CurrentAcceptedFrontier() ids.Set {
-	acceptedFrontier := ids.Set{}
-	acceptedFrontier.Add(b.VM.LastAccepted())
+func (b *Bootstrapper) CurrentAcceptedFrontier() []ids.ID {
+	acceptedFrontier := []ids.ID{b.VM.LastAccepted()}
 	return acceptedFrontier
 }
 
 // FilterAccepted returns the blocks in [containerIDs] that we have accepted
-func (b *Bootstrapper) FilterAccepted(containerIDs ids.Set) ids.Set {
-	acceptedIDs := ids.Set{}
-	for blkIDKey := range containerIDs {
-		blkID := ids.NewID(blkIDKey)
+func (b *Bootstrapper) FilterAccepted(containerIDs []ids.ID) []ids.ID {
+	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
+	for _, blkID := range containerIDs {
 		if blk, err := b.VM.GetBlock(blkID); err == nil && blk.Status() == choices.Accepted {
-			acceptedIDs.Add(blkID)
+			acceptedIDs = append(acceptedIDs, blkID)
 		}
 	}
 	return acceptedIDs
 }
 
 // ForceAccepted ...
-func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
+func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	if err := b.VM.Bootstrapping(); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
 			err)
 	}
 
-	for blkIDKey := range acceptedContainerIDs {
-		blkID := ids.NewID(blkIDKey)
+	for _, blkID := range acceptedContainerIDs {
 		if blk, err := b.VM.GetBlock(blkID); err == nil {
 			if err := b.process(blk); err != nil {
 				return err
@@ -169,7 +166,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 	if err != nil {
 		b.Ctx.Log.Debug("Failed to parse requested block %s: %s", wantedBlkID, err)
 		return b.fetch(wantedBlkID)
-	} else if actualID := wantedBlk.ID(); !actualID.Equals(wantedBlkID) {
+	} else if actualID := wantedBlk.ID(); actualID != wantedBlkID {
 		b.Ctx.Log.Debug("expected the first block to be the requested block, %s, but is %s",
 			wantedBlk, actualID)
 		return b.fetch(wantedBlkID)

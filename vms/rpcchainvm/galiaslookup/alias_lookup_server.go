@@ -31,7 +31,7 @@ func (s *Server) Lookup(
 		return nil, err
 	}
 	return &galiaslookupproto.LookupResponse{
-		Id: id.Bytes(),
+		Id: id[:],
 	}, nil
 }
 

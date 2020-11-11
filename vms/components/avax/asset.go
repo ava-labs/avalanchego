@@ -27,7 +27,7 @@ func (asset *Asset) Verify() error {
 	switch {
 	case asset == nil:
 		return errNilAssetID
-	case asset.ID.IsZero():
+	case asset.ID == ids.Empty:
 		return errEmptyAssetID
 	default:
 		return nil

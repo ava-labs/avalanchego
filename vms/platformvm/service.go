@@ -384,7 +384,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
 	}
 
-	sourceChain := ids.ID{}
+	var sourceChain ids.ID
 	if args.SourceChain == "" {
 		sourceChain = service.vm.Ctx.ChainID
 	} else {
@@ -425,7 +425,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		endAddr   ids.ShortID
 		endUTXOID ids.ID
 	)
-	if sourceChain.Equals(service.vm.Ctx.ChainID) {
+	if sourceChain == service.vm.Ctx.ChainID {
 		utxos, endAddr, endUTXOID, err = service.vm.GetUTXOs(
 			service.vm.DB,
 			addrSet,
@@ -589,11 +589,7 @@ type GetStakingAssetIDResponse struct {
 func (service *Service) GetStakingAssetID(_ *http.Request, args *GetStakingAssetIDArgs, response *GetStakingAssetIDResponse) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: GetStakingAssetID called")
 
-	if args.SubnetID.IsZero() {
-		args.SubnetID = constants.PrimaryNetworkID
-	}
-
-	if !args.SubnetID.Equals(constants.PrimaryNetworkID) {
+	if args.SubnetID != constants.PrimaryNetworkID {
 		return fmt.Errorf("Subnet %s doesn't have a valid staking token",
 			args.SubnetID)
 	}
@@ -627,9 +623,6 @@ type GetCurrentValidatorsReply struct {
 // GetCurrentValidators returns current validators and delegators
 func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
 	service.vm.Ctx.Log.Info("Platform: GetCurrentValidators called")
-	if args.SubnetID.IsZero() {
-		args.SubnetID = constants.PrimaryNetworkID
-	}
 
 	reply.Validators = []interface{}{}
 	reply.Delegators = []interface{}{}
@@ -781,9 +774,6 @@ type GetPendingValidatorsReply struct {
 // GetPendingValidators returns the list of pending validators
 func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidatorsArgs, reply *GetPendingValidatorsReply) error {
 	service.vm.Ctx.Log.Info("Platform: GetPendingValidators called")
-	if args.SubnetID.IsZero() {
-		args.SubnetID = constants.PrimaryNetworkID
-	}
 
 	reply.Validators = []interface{}{}
 	reply.Delegators = []interface{}{}
@@ -879,9 +869,6 @@ type SampleValidatorsReply struct {
 // SampleValidators returns a sampling of the list of current validators
 func (service *Service) SampleValidators(_ *http.Request, args *SampleValidatorsArgs, reply *SampleValidatorsReply) error {
 	service.vm.Ctx.Log.Info("Platform: SampleValidators called with Size = %d", args.Size)
-	if args.SubnetID.IsZero() {
-		args.SubnetID = constants.PrimaryNetworkID
-	}
 
 	validators, ok := service.vm.vdrMgr.GetValidators(args.SubnetID)
 	if !ok {
@@ -1181,7 +1168,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	if err != nil {
 		return fmt.Errorf("problem parsing subnetID %q: %w", args.SubnetID, err)
 	}
-	if subnetID.Equals(constants.PrimaryNetworkID) {
+	if subnetID == constants.PrimaryNetworkID {
 		return errors.New("subnet validator attempts to validate primary network")
 	}
 
@@ -1619,11 +1606,11 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	// TODO: Document FXs and have user specify them in API call
 	fxIDsSet := ids.Set{}
 	fxIDsSet.Add(fxIDs...)
-	if vmID.Equals(avm.ID) && !fxIDsSet.Contains(secp256k1fx.ID) {
+	if vmID == avm.ID && !fxIDsSet.Contains(secp256k1fx.ID) {
 		fxIDs = append(fxIDs, secp256k1fx.ID)
 	}
 
-	if args.SubnetID.Equals(constants.PrimaryNetworkID) {
+	if args.SubnetID == constants.PrimaryNetworkID {
 		return errDSCantValidate
 	}
 
@@ -1763,7 +1750,7 @@ func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error
 	}
 
 	for _, chain := range chains {
-		if chain.ID().Equals(chainID) {
+		if chain.ID() == chainID {
 			return true, nil
 		}
 	}
@@ -1808,7 +1795,7 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 	service.vm.Ctx.Log.Info("Platform: Validates called")
 	// Verify that the Subnet exists
 	// Ignore lookup error if it's the PrimaryNetworkID
-	if _, err := service.vm.getSubnet(service.vm.DB, args.SubnetID); err != nil && !args.SubnetID.Equals(constants.PrimaryNetworkID) {
+	if _, err := service.vm.getSubnet(service.vm.DB, args.SubnetID); err != nil && args.SubnetID != constants.PrimaryNetworkID {
 		return fmt.Errorf("problem retrieving subnet %q: %w", args.SubnetID, err)
 	}
 	// Get the chains that exist
@@ -1818,7 +1805,7 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 	}
 	// Filter to get the chains validated by the specified Subnet
 	for _, chain := range chains {
-		if chain.UnsignedTx.(*UnsignedCreateChainTx).SubnetID.Equals(args.SubnetID) {
+		if chain.UnsignedTx.(*UnsignedCreateChainTx).SubnetID == args.SubnetID {
 			response.BlockchainIDs = append(response.BlockchainIDs, chain.ID())
 		}
 	}
@@ -2034,7 +2021,7 @@ func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, respo
 			err    error
 		)
 		for _, stake := range outs {
-			if !stake.AssetID().Equals(service.vm.Ctx.AVAXAssetID) {
+			if stake.AssetID() != service.vm.Ctx.AVAXAssetID {
 				continue
 			}
 			out := stake.Out
@@ -2170,9 +2157,6 @@ type GetMaxStakeAmountReply struct {
 // GetMaxStakeAmount returns the maximum amount of AVAX staking to the named
 // node during the time period.
 func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmountArgs, reply *GetMaxStakeAmountReply) error {
-	if args.SubnetID.IsZero() {
-		args.SubnetID = service.vm.Ctx.SubnetID
-	}
 	nodeID, err := ids.ShortFromPrefixedString(args.NodeID, constants.NodeIDPrefix)
 	if err != nil {
 		return fmt.Errorf("failed to parse nodeID %q due to: %w", args.NodeID, err)

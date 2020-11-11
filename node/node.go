@@ -67,7 +67,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion(constants.PlatformName, 1, 0, 4)
+	Version       = version.NewDefaultVersion(constants.PlatformName, 1, 0, 5)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -148,12 +148,12 @@ func (n *Node) initNetworking() error {
 		tlsConfig := &tls.Config{
 			Certificates: []tls.Certificate{cert},
 			ClientAuth:   tls.RequireAnyClientCert,
-			// We do not use TLS's CA functionality to authenticate a hostname.
-			// We only require an authenticated channel based on the peer's
-			// public key. Therefore, we can safely skip CA verification.
+			// We do not use the TLS CA functionality to authenticate a
+			// hostname. We only require an authenticated channel based on the
+			// peer's public key. Therefore, we can safely skip CA verification.
 			//
 			// During our security audit by Quantstamp, this was investigated
-			// and determinted to be safe and correct.
+			// and confirmed to be safe and correct.
 			InsecureSkipVerify: true,
 		}
 
@@ -353,7 +353,7 @@ func (n *Node) initDatabase() error {
 		return err
 	}
 
-	if !genesisHash.Equals(expectedGenesisHash) {
+	if genesisHash != expectedGenesisHash {
 		return fmt.Errorf("db contains invalid genesis hash. DB Genesis: %s Generated Genesis: %s", genesisHash, expectedGenesisHash)
 	}
 	return nil
@@ -592,7 +592,7 @@ func (n *Node) initKeystoreAPI() error {
 		return err
 	}
 	if !n.Config.KeystoreAPIEnabled {
-		n.Log.Info("skipping keystore API initializaion because it has been disabled")
+		n.Log.Info("skipping keystore API initialization because it has been disabled")
 		return nil
 	}
 	n.Log.Info("initializing keystore API")
@@ -706,7 +706,7 @@ func (n *Node) initHealthAPI() error {
 // Assumes n.log and n.chainManager already initialized
 func (n *Node) initIPCAPI() error {
 	if !n.Config.IPCAPIEnabled {
-		n.Log.Info("skipping ipc API initializaion because it has been disabled")
+		n.Log.Info("skipping ipc API initialization because it has been disabled")
 		return nil
 	}
 	n.Log.Info("initializing ipc API")
@@ -725,16 +725,14 @@ func (n *Node) initAliases(genesisBytes []byte) error {
 		return err
 	}
 
-	for chainIDKey, aliases := range chainAliases {
-		chainID := ids.NewID(chainIDKey)
+	for chainID, aliases := range chainAliases {
 		for _, alias := range aliases {
 			if err := n.chainManager.Alias(chainID, alias); err != nil {
 				return err
 			}
 		}
 	}
-	for vmIDKey, aliases := range vmAliases {
-		vmID := ids.NewID(vmIDKey)
+	for vmID, aliases := range vmAliases {
 		for _, alias := range aliases {
 			if err := n.vmManager.Alias(vmID, alias); err != nil {
 				return err
