@@ -83,7 +83,7 @@ func (s *Socket) Listen() error {
 func (s *Socket) Send(msg []byte) error {
 	var conns []net.Conn = nil
 
-  // Get a copy of connections
+	// Get a copy of connections
 	s.connLock.RLock()
 	if len(s.conns) > 0 {
 		conns = make([]net.Conn, len(s.conns))
