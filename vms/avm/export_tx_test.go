@@ -1003,7 +1003,10 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 
 	ctx.Lock.Lock()
 
-	userKeystore := keystore.CreateTestKeystore()
+	userKeystore, err := keystore.CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := userKeystore.AddUser(username, password); err != nil {
 		t.Fatal(err)
 	}
@@ -1015,7 +1018,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 
 	issuer := make(chan common.Message, 1)
 	vm := &VM{}
-	err := vm.Initialize(
+	err = vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,

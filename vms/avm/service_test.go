@@ -38,7 +38,10 @@ var (
 // 4) atomic memory to use in tests
 func setup(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
 	genesisBytes, _, vm, m := GenesisVM(t)
-	keystore := keystore.CreateTestKeystore()
+	keystore, err := keystore.CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := keystore.AddUser(username, password); err != nil {
 		t.Fatalf("couldn't add user: %s", err)
 	}

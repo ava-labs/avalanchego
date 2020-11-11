@@ -234,7 +234,10 @@ func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) 
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
 
-	userKeystore := keystore.CreateTestKeystore()
+	userKeystore, err := keystore.CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := userKeystore.AddUser(username, password); err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +248,7 @@ func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) 
 		txFee:         testTxFee,
 		creationTxFee: testTxFee,
 	}
-	err := vm.Initialize(
+	err = vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
