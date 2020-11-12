@@ -90,5 +90,5 @@ func TestAcceptConflicts(t *testing.T) {
 	assert.Empty(t, c.pendingReject)
 
 	toAccept := toAccepts[0]
-	assert.True(t, toAccept.ID().Equals(tx.ID()))
+	assert.Equal(t, tx.ID(), toAccept.ID())
 }

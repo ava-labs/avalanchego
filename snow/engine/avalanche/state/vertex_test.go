@@ -12,21 +12,20 @@ import (
 )
 
 func TestVertexVerify(t *testing.T) {
-	conflictingInputID := ids.NewID([32]byte{'i', 'n'})
-	inputs := ids.Set{}
-	inputs.Add(conflictingInputID)
+	conflictingInputID := ids.ID{'i', 'n'}
+	inputs := []ids.ID{conflictingInputID}
 	tx0 := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
-			IDV: ids.NewID([32]byte{'t', 'x', '0'}),
+			IDV: ids.ID{'t', 'x', '0'},
 		},
 		DependenciesV: nil,
 		InputIDsV:     inputs,
 	}
 	validVertex := &innerVertex{
-		id:        ids.NewID([32]byte{}),
-		chainID:   ids.NewID([32]byte{1}),
+		id:        ids.ID{},
+		chainID:   ids.ID{1},
 		height:    1,
-		parentIDs: []ids.ID{ids.NewID([32]byte{2})},
+		parentIDs: []ids.ID{{2}},
 		txs:       []conflicts.Tx{tx0},
 	}
 
@@ -35,10 +34,10 @@ func TestVertexVerify(t *testing.T) {
 	}
 
 	nonUniqueParentsVtx := &innerVertex{
-		id:        ids.NewID([32]byte{}),
-		chainID:   ids.NewID([32]byte{1}),
+		id:        ids.ID{},
+		chainID:   ids.ID{1},
 		height:    1,
-		parentIDs: []ids.ID{ids.NewID([32]byte{'d', 'u', 'p'}), ids.NewID([32]byte{'d', 'u', 'p'})},
+		parentIDs: []ids.ID{{'d', 'u', 'p'}, {'d', 'u', 'p'}},
 		txs:       []conflicts.Tx{tx0},
 	}
 
@@ -46,13 +45,13 @@ func TestVertexVerify(t *testing.T) {
 		t.Fatal("Vertex with non unique parents should not have passed verification")
 	}
 
-	parent0 := ids.NewID([32]byte{0})
-	parent1 := ids.NewID([32]byte{1})
+	parent0 := ids.ID{0}
+	parent1 := ids.ID{1}
 	sortedParents := []ids.ID{parent0, parent1}
 	ids.SortIDs(sortedParents)
 	nonSortedParentsVtx := &innerVertex{
-		id:        ids.NewID([32]byte{}),
-		chainID:   ids.NewID([32]byte{1}),
+		id:        ids.ID{},
+		chainID:   ids.ID{1},
 		height:    1,
 		parentIDs: []ids.ID{sortedParents[1], sortedParents[0]},
 		txs:       []conflicts.Tx{tx0},
@@ -63,10 +62,10 @@ func TestVertexVerify(t *testing.T) {
 	}
 
 	noTxsVertex := &innerVertex{
-		id:        ids.NewID([32]byte{}),
-		chainID:   ids.NewID([32]byte{1}),
+		id:        ids.ID{},
+		chainID:   ids.ID{1},
 		height:    1,
-		parentIDs: []ids.ID{ids.NewID([32]byte{2})},
+		parentIDs: []ids.ID{{2}},
 		txs:       []conflicts.Tx{},
 	}
 
@@ -76,7 +75,7 @@ func TestVertexVerify(t *testing.T) {
 
 	tx1 := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
-			IDV: ids.NewID([32]byte{'t', 'x', '1'}),
+			IDV: ids.ID{'t', 'x', '1'},
 		},
 		DependenciesV: nil,
 		InputIDsV:     nil,
@@ -84,10 +83,10 @@ func TestVertexVerify(t *testing.T) {
 	sortedTxs := []conflicts.Tx{tx0, tx1}
 	sortTxs(sortedTxs)
 	unsortedTxsVertex := &innerVertex{
-		id:        ids.NewID([32]byte{}),
-		chainID:   ids.NewID([32]byte{1}),
+		id:        ids.ID{},
+		chainID:   ids.ID{1},
 		height:    1,
-		parentIDs: []ids.ID{ids.NewID([32]byte{2})},
+		parentIDs: []ids.ID{{2}},
 		txs:       []conflicts.Tx{sortedTxs[1], sortedTxs[0]},
 	}
 
@@ -96,10 +95,10 @@ func TestVertexVerify(t *testing.T) {
 	}
 
 	nonUniqueTxsVertex := &innerVertex{
-		id:        ids.NewID([32]byte{}),
-		chainID:   ids.NewID([32]byte{1}),
+		id:        ids.ID{},
+		chainID:   ids.ID{1},
 		height:    1,
-		parentIDs: []ids.ID{ids.NewID([32]byte{2})},
+		parentIDs: []ids.ID{{2}},
 		txs:       []conflicts.Tx{tx0, tx0},
 	}
 
@@ -107,10 +106,10 @@ func TestVertexVerify(t *testing.T) {
 		t.Fatal("Vertex with non-unique transactions should not have passed verification")
 	}
 
-	inputs.Add(ids.NewID([32]byte{'e', 'x', 't', 'r', 'a'}))
+	inputs = append(inputs, ids.ID{'e', 'x', 't', 'r', 'a'})
 	conflictingTx := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
-			IDV: ids.NewID([32]byte{'c', 'o', 'n', 'f', 'l', 'i', 'c', 't'}),
+			IDV: ids.ID{'c', 'o', 'n', 'f', 'l', 'i', 'c', 't'},
 		},
 		DependenciesV: nil,
 		InputIDsV:     inputs,
@@ -120,10 +119,10 @@ func TestVertexVerify(t *testing.T) {
 	sortTxs(conflictingTxs)
 
 	conflictingTxsVertex := &innerVertex{
-		id:        ids.NewID([32]byte{}),
-		chainID:   ids.NewID([32]byte{1}),
+		id:        ids.ID{},
+		chainID:   ids.ID{1},
 		height:    1,
-		parentIDs: []ids.ID{ids.NewID([32]byte{2})},
+		parentIDs: []ids.ID{{2}},
 		txs:       conflictingTxs,
 	}
 

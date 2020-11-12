@@ -33,9 +33,9 @@ type BaseTx struct {
 
 // InputUTXOs track which UTXOs this transaction is consuming.
 func (t *BaseTx) InputUTXOs() []*UTXOID {
-	utxos := []*UTXOID(nil)
-	for _, in := range t.Ins {
-		utxos = append(utxos, &in.UTXOID)
+	utxos := make([]*UTXOID, len(t.Ins))
+	for i, in := range t.Ins {
+		utxos[i] = &in.UTXOID
 	}
 	return utxos
 }
@@ -79,7 +79,7 @@ func (t *BaseTx) MetadataVerify(ctx *snow.Context) error {
 		return errNilTx
 	case t.NetworkID != ctx.NetworkID:
 		return errWrongNetworkID
-	case !t.BlockchainID.Equals(ctx.ChainID):
+	case t.BlockchainID != ctx.ChainID:
 		return errWrongChainID
 	case len(t.Memo) > MaxMemoSize:
 		return fmt.Errorf("memo length, %d, exceeds maximum memo length, %d",

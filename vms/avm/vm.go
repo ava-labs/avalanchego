@@ -39,12 +39,13 @@ import (
 )
 
 const (
-	batchTimeout    = time.Second
-	batchSize       = 30
-	stateCacheSize  = 30000
-	idCacheSize     = 30000
-	txCacheSize     = 30000
-	maxUTXOsToFetch = 1024
+	batchTimeout       = time.Second
+	batchSize          = 30
+	stateCacheSize     = 30000
+	idCacheSize        = 30000
+	txCacheSize        = 30000
+	assetToFxCacheSize = 1024
+	maxUTXOsToFetch    = 1024
 )
 
 var (
@@ -84,6 +85,9 @@ type VM struct {
 	creationTxFee uint64
 	// fee that must be burned by every non-state creating transaction
 	txFee uint64
+
+	// Asset ID --> Bit set with fx IDs the asset supports
+	assetToFxCache *cache.LRU
 
 	// Transaction issuing
 	timer        *timer.Timer
@@ -167,6 +171,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("problem creating encoding manager: %w", err)
 	}
 	vm.encodingManager = encodingManager
+	vm.assetToFxCache = &cache.LRU{Size: assetToFxCacheSize}
 
 	vm.pubsub = cjson.NewPubSubServer(ctx)
 	vm.genesisCodec = codec.New(math.MaxUint32, 1<<20)
@@ -257,7 +262,7 @@ func (vm *VM) Initialize(
 	vm.batchTimeout = batchTimeout
 
 	vm.walletService.vm = vm
-	vm.walletService.pendingTxMap = make(map[[32]byte]*list.Element)
+	vm.walletService.pendingTxMap = make(map[ids.ID]*list.Element)
 	vm.walletService.pendingTxOrdering = list.New()
 
 	return vm.db.Commit()
@@ -420,15 +425,18 @@ func (vm *VM) GetAtomicUTXOs(
 	}
 
 	addrsList := make([][]byte, addrs.Len())
-	for i, addr := range addrs.List() {
-		addrsList[i] = addr.Bytes()
+	i := 0
+	for addr := range addrs {
+		copied := addr
+		addrsList[i] = copied[:]
+		i++
 	}
 
 	allUTXOBytes, lastAddr, lastUTXO, err := vm.ctx.SharedMemory.Indexed(
 		chainID,
 		addrsList,
 		startAddr.Bytes(),
-		startUTXOID.Bytes(),
+		startUTXOID[:],
 		limit,
 	)
 	if err != nil {
@@ -469,6 +477,7 @@ func (vm *VM) GetUTXOs(
 	startAddr ids.ShortID,
 	startUTXOID ids.ID,
 	limit int,
+	paginate bool,
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
 	if limit <= 0 || limit > maxUTXOsToFetch {
 		limit = maxUTXOsToFetch
@@ -487,26 +496,34 @@ func (vm *VM) GetUTXOs(
 		} else if comp == 0 {
 			start = startUTXOID
 		}
-		utxoIDs, err := vm.state.Funds(addr.Bytes(), start, limit) // Get UTXOs associated with [addr]
-		if err != nil {
-			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s", addr)
-		}
-		for _, utxoID := range utxoIDs {
-			if seen.Contains(utxoID) { // Already have this UTXO in the list
-				continue
-			}
-			utxo, err := vm.state.UTXO(utxoID)
+		for {
+			currLimit := limit
+			utxoIDs, err := vm.state.Funds(addr.Bytes(), start, limit) // Get UTXOs associated with [addr]
 			if err != nil {
-				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
+				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 			}
-			utxos = append(utxos, utxo)
-			seen.Add(utxoID)
-			lastAddr = addr
-			lastIndex = utxoID
-			limit--
-			if limit <= 0 {
-				break // Found [limit] utxos; stop.
+			for _, utxoID := range utxoIDs {
+				if seen.Contains(utxoID) { // Already have this UTXO in the list
+					continue
+				}
+				utxo, err := vm.state.UTXO(utxoID)
+				if err != nil {
+					return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
+				}
+				utxos = append(utxos, utxo)
+				seen.Add(utxoID)
+				lastAddr = addr
+				lastIndex = utxoID
+				currLimit--
+				if currLimit <= 0 {
+					break // Found [currLimit] utxos; stop current set.
+				}
 			}
+
+			if paginate || len(utxoIDs) == 0 { // Avoiding a downstream make([]) making this an infinite loop
+				break // No more utxos available for that address | Don't fetch more utxos
+			}
+			start = utxoIDs[len(utxoIDs)-1]
 		}
 	}
 	return utxos, lastAddr, lastIndex, nil
@@ -705,6 +722,13 @@ func (vm *VM) getFx(val interface{}) (int, error) {
 }
 
 func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
+	// Check cache to see whether this asset supports this fx
+	fxIDsIntf, assetInCache := vm.assetToFxCache.Get(assetID)
+	if assetInCache {
+		return fxIDsIntf.(ids.BitSet).Contains(uint(fxID))
+	}
+	// Caches doesn't say whether this asset support this fx.
+	// Get the tx that created the asset and check.
 	tx := &UniqueTx{
 		vm:   vm,
 		txID: assetID,
@@ -714,16 +738,18 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	}
 	createAssetTx, ok := tx.UnsignedTx.(*CreateAssetTx)
 	if !ok {
+		// This transaction was not an asset creation tx
 		return false
 	}
-	// TODO: This could be a binary search to improve performance... Or perhaps
-	// make a map
+	fxIDs := ids.BitSet(0)
 	for _, state := range createAssetTx.States {
 		if state.FxID == uint32(fxID) {
-			return true
+			// Cache that this asset supports this fx
+			fxIDs.Add(uint(fxID))
 		}
 	}
-	return false
+	vm.assetToFxCache.Put(assetID, fxIDs)
+	return fxIDs.Contains(uint(fxID))
 }
 
 func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable, utxo *avax.UTXO) error {
@@ -735,7 +761,7 @@ func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cr
 
 	utxoAssetID := utxo.AssetID()
 	inAssetID := in.AssetID()
-	if !utxoAssetID.Equals(inAssetID) {
+	if utxoAssetID != inAssetID {
 		return errAssetIDMismatch
 	}
 
@@ -757,18 +783,19 @@ func (vm *VM) verifyTransfer(tx UnsignedTx, in *avax.TransferableInput, cred ver
 func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiable) error {
 	opAssetID := op.AssetID()
 
-	utxos := []interface{}{}
-	for _, utxoID := range op.UTXOIDs {
+	numUTXOs := len(op.UTXOIDs)
+	utxos := make([]interface{}, numUTXOs)
+	for i, utxoID := range op.UTXOIDs {
 		utxo, err := vm.getUTXO(utxoID)
 		if err != nil {
 			return err
 		}
 
 		utxoAssetID := utxo.AssetID()
-		if !utxoAssetID.Equals(opAssetID) {
+		if utxoAssetID != opAssetID {
 			return errAssetIDMismatch
 		}
-		utxos = append(utxos, utxo.Out)
+		utxos[i] = utxo.Out
 	}
 
 	fxIndex, err := vm.getFx(op.Op)
@@ -807,32 +834,14 @@ func (vm *VM) LoadUser(
 
 	user := userState{vm: vm}
 
-	// true iff we should only return UTXOs that reference one or more addresses in [addrsToUse]
-	filterAddresses := len(addrsToUse) > 0
-
-	// The error is explicitly dropped, as it may just mean that there are no addresses.
-	addresses, _ := user.Addresses(db)
-
-	addrs := ids.ShortSet{}
-	for _, addr := range addresses {
-		if !filterAddresses {
-			addrs.Add(addr)
-		} else if filterAddresses && addrsToUse.Contains(addr) {
-			addrs.Add(addr)
-		}
+	kc, err := user.Keychain(db, addrsToUse)
+	if err != nil {
+		return nil, nil, err
 	}
-	utxos, _, _, err := vm.GetUTXOs(addrs, ids.ShortEmpty, ids.Empty, -1)
+
+	utxos, _, _, err := vm.GetUTXOs(kc.Addresses(), ids.ShortEmpty, ids.Empty, -1, false)
 	if err != nil {
 		return nil, nil, fmt.Errorf("problem retrieving user's UTXOs: %w", err)
-	}
-
-	kc := secp256k1fx.NewKeychain()
-	for _, addr := range addrs.List() {
-		sk, err := user.Key(db, addr)
-		if err != nil {
-			return nil, nil, fmt.Errorf("problem retrieving private key: %w", err)
-		}
-		kc.Add(sk)
 	}
 
 	return utxos, kc, db.Close()
@@ -842,23 +851,22 @@ func (vm *VM) LoadUser(
 func (vm *VM) Spend(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
-	amounts map[[32]byte]uint64,
+	amounts map[ids.ID]uint64,
 ) (
-	map[[32]byte]uint64,
+	map[ids.ID]uint64,
 	[]*avax.TransferableInput,
 	[][]*crypto.PrivateKeySECP256K1R,
 	error,
 ) {
-	amountsSpent := make(map[[32]byte]uint64, len(amounts))
+	amountsSpent := make(map[ids.ID]uint64, len(amounts))
 	time := vm.clock.Unix()
 
 	ins := []*avax.TransferableInput{}
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
-		assetKey := assetID.Key()
-		amount := amounts[assetKey]
-		amountSpent := amountsSpent[assetKey]
+		amount := amounts[assetID]
+		amountSpent := amountsSpent[assetID]
 
 		if amountSpent >= amount {
 			// we already have enough inputs allocated to this asset
@@ -880,7 +888,7 @@ func (vm *VM) Spend(
 			// there was an error calculating the consumed amount, just error
 			return nil, nil, nil, errSpendOverflow
 		}
-		amountsSpent[assetKey] = newAmountSpent
+		amountsSpent[assetID] = newAmountSpent
 
 		// add the new input to the array
 		ins = append(ins, &avax.TransferableInput{
@@ -896,7 +904,7 @@ func (vm *VM) Spend(
 		if amountsSpent[asset] < amount {
 			return nil, nil, nil, fmt.Errorf("want to spend %d of asset %s but only have %d",
 				amount,
-				ids.NewID(asset),
+				asset,
 				amountsSpent[asset],
 			)
 		}
@@ -932,7 +940,7 @@ func (vm *VM) SpendNFT(
 			break
 		}
 
-		if !utxo.AssetID().Equals(assetID) {
+		if utxo.AssetID() != assetID {
 			// wrong asset ID
 			continue
 		}
@@ -986,20 +994,19 @@ func (vm *VM) SpendAll(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
 ) (
-	map[[32]byte]uint64,
+	map[ids.ID]uint64,
 	[]*avax.TransferableInput,
 	[][]*crypto.PrivateKeySECP256K1R,
 	error,
 ) {
-	amountsSpent := make(map[[32]byte]uint64)
+	amountsSpent := make(map[ids.ID]uint64)
 	time := vm.clock.Unix()
 
 	ins := []*avax.TransferableInput{}
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
-		assetKey := assetID.Key()
-		amountSpent := amountsSpent[assetKey]
+		amountSpent := amountsSpent[assetID]
 
 		inputIntf, signers, err := kc.Spend(utxo.Out, time)
 		if err != nil {
@@ -1016,7 +1023,7 @@ func (vm *VM) SpendAll(
 			// there was an error calculating the consumed amount, just error
 			return nil, nil, nil, errSpendOverflow
 		}
-		amountsSpent[assetKey] = newAmountSpent
+		amountsSpent[assetID] = newAmountSpent
 
 		// add the new input to the array
 		ins = append(ins, &avax.TransferableInput{
@@ -1036,7 +1043,7 @@ func (vm *VM) SpendAll(
 func (vm *VM) Mint(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
-	amounts map[[32]byte]uint64,
+	amounts map[ids.ID]uint64,
 	to ids.ShortID,
 ) (
 	[]*Operation,
@@ -1053,8 +1060,7 @@ func (vm *VM) Mint(
 		utxo := utxo
 
 		assetID := utxo.AssetID()
-		assetKey := assetID.Key()
-		amount := amounts[assetKey]
+		amount := amounts[assetID]
 		if amount == 0 {
 			continue
 		}
@@ -1094,7 +1100,7 @@ func (vm *VM) Mint(
 		keys = append(keys, signers)
 
 		// remove the asset from the required amounts to mint
-		delete(amounts, assetKey)
+		delete(amounts, assetID)
 	}
 
 	for _, amount := range amounts {
@@ -1133,7 +1139,7 @@ func (vm *VM) MintNFT(
 			break
 		}
 
-		if !utxo.AssetID().Equals(assetID) {
+		if utxo.AssetID() != assetID {
 			// wrong asset id
 			continue
 		}
@@ -1185,7 +1191,7 @@ func (vm *VM) ParseLocalAddress(addrStr string) (ids.ShortID, error) {
 	if err != nil {
 		return ids.ShortID{}, err
 	}
-	if !chainID.Equals(vm.ctx.ChainID) {
+	if chainID != vm.ctx.ChainID {
 		return ids.ShortID{}, fmt.Errorf("expected chainID to be %q but was %q",
 			vm.ctx.ChainID, chainID)
 	}

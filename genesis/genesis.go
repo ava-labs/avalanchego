@@ -18,15 +18,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/evm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-)
-
-// ID of the EVM VM
-var (
-	EVMID = ids.NewID([32]byte{'e', 'v', 'm'})
 )
 
 // Genesis returns the genesis data of the Platform Chain.
@@ -215,7 +211,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		{
 			GenesisData: formatting.Hex{Bytes: []byte(config.CChainGenesis)}.String(),
 			SubnetID:    constants.PrimaryNetworkID,
-			VMID:        EVMID,
+			VMID:        evm.ID,
 			Name:        "C-Chain",
 		},
 	}
@@ -322,7 +318,7 @@ func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.Tx, error) {
 	}
 	for _, chain := range genesis.Chains {
 		uChain := chain.UnsignedTx.(*platformvm.UnsignedCreateChainTx)
-		if uChain.VMID.Equals(vmID) {
+		if uChain.VMID == vmID {
 			return chain, nil
 		}
 	}

@@ -43,8 +43,6 @@ func (t *ExportTx) SyntacticVerify(
 	switch {
 	case t == nil:
 		return errNilTx
-	case t.DestinationChain.IsZero():
-		return errWrongBlockchainID
 	case len(t.ExportedOuts) == 0:
 		return errNoExportOutputs
 	}
@@ -71,7 +69,7 @@ func (t *ExportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 	if err != nil {
 		return err
 	}
-	if !vm.ctx.SubnetID.Equals(subnetID) || t.DestinationChain.Equals(vm.ctx.ChainID) {
+	if vm.ctx.SubnetID != subnetID || t.DestinationChain == vm.ctx.ChainID {
 		return errWrongBlockchainID
 	}
 
@@ -81,7 +79,7 @@ func (t *ExportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 			return err
 		}
 		assetID := out.AssetID()
-		if !out.AssetID().Equals(vm.ctx.AVAXAssetID) && t.DestinationChain.Equals(constants.PlatformChainID) {
+		if out.AssetID() != vm.ctx.AVAXAssetID && t.DestinationChain == constants.PlatformChainID {
 			return errWrongAssetID
 		}
 		if !vm.verifyFxUsage(fxIndex, assetID) {
@@ -112,8 +110,9 @@ func (t *ExportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 			return err
 		}
 
+		inputID := utxo.InputID()
 		elem := &atomic.Element{
-			Key:   utxo.InputID().Bytes(),
+			Key:   inputID[:],
 			Value: utxoBytes,
 		}
 		if out, ok := utxo.Out.(avax.Addressable); ok {

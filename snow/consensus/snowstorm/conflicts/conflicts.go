@@ -17,10 +17,10 @@ var (
 
 type Conflicts struct {
 	// track the currently processing txs
-	txs map[[32]byte]Tx
+	txs map[ids.ID]Tx
 
 	// track which txs are currently consuming which utxos
-	utxos map[[32]byte]ids.Set
+	utxos map[ids.ID]ids.Set
 
 	// keeps track of whether dependencies have been accepted
 	pendingAccept events.Blocker
@@ -37,8 +37,8 @@ type Conflicts struct {
 
 func New() *Conflicts {
 	return &Conflicts{
-		txs:   make(map[[32]byte]Tx),
-		utxos: make(map[[32]byte]ids.Set),
+		txs:   make(map[ids.ID]Tx),
+		utxos: make(map[ids.ID]ids.Set),
 	}
 }
 
@@ -53,11 +53,11 @@ func (c *Conflicts) Add(txIntf choices.Decidable) error {
 	}
 
 	txID := tx.ID()
-	c.txs[txID.Key()] = tx
-	for inputKey := range tx.InputIDs() {
-		spenders := c.utxos[inputKey]
+	c.txs[txID] = tx
+	for _, inputID := range tx.InputIDs() {
+		spenders := c.utxos[inputID]
 		spenders.Add(txID)
-		c.utxos[inputKey] = spenders
+		c.utxos[inputID] = spenders
 	}
 
 	toReject := &rejector{
@@ -89,8 +89,8 @@ func (c *Conflicts) IsVirtuous(txIntf choices.Decidable) (bool, error) {
 	}
 
 	txID := tx.ID()
-	for inputKey := range tx.InputIDs() {
-		spenders := c.utxos[inputKey]
+	for _, inputID := range tx.InputIDs() {
+		spenders := c.utxos[inputID]
 		if numSpenders := spenders.Len(); numSpenders > 1 ||
 			(numSpenders == 1 && !spenders.Contains(txID)) {
 			return false, nil
@@ -113,15 +113,14 @@ func (c *Conflicts) Conflicts(txIntf choices.Decidable) ([]choices.Decidable, er
 	conflictSet.Add(txID)
 
 	conflicts := []choices.Decidable(nil)
-	for inputKey := range tx.InputIDs() {
-		spenders := c.utxos[inputKey]
-		for spenderKey := range spenders {
-			spenderID := ids.NewID(spenderKey)
+	for _, inputID := range tx.InputIDs() {
+		spenders := c.utxos[inputID]
+		for spenderID := range spenders {
 			if conflictSet.Contains(spenderID) {
 				continue
 			}
 			conflictSet.Add(spenderID)
-			conflicts = append(conflicts, c.txs[spenderKey])
+			conflicts = append(conflicts, c.txs[spenderID])
 		}
 	}
 	return conflicts, nil
@@ -131,7 +130,7 @@ func (c *Conflicts) Conflicts(txIntf choices.Decidable) ([]choices.Decidable, er
 // accepted. This means that assuming all the txs this tx depends on are
 // accepted, then this tx should be accepted as well. This
 func (c *Conflicts) Accept(txID ids.ID) {
-	tx, exists := c.txs[txID.Key()]
+	tx, exists := c.txs[txID]
 	if !exists {
 		return
 	}
@@ -159,17 +158,17 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 		txID := tx.ID()
 
 		tx := tx.(Tx)
-		for inputKey := range tx.InputIDs() {
-			spenders := c.utxos[inputKey]
+		for _, inputID := range tx.InputIDs() {
+			spenders := c.utxos[inputID]
 			spenders.Remove(txID)
 			if spenders.Len() == 0 {
-				delete(c.utxos, inputKey)
+				delete(c.utxos, inputID)
 			} else {
-				c.utxos[inputKey] = spenders
+				c.utxos[inputID] = spenders
 			}
 		}
 
-		delete(c.txs, txID.Key())
+		delete(c.txs, txID)
 		c.pendingAccept.Fulfill(txID)
 		c.pendingReject.Abandon(txID)
 
@@ -187,17 +186,17 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 		txID := tx.ID()
 
 		tx := tx.(Tx)
-		for inputKey := range tx.InputIDs() {
-			spenders := c.utxos[inputKey]
+		for _, inputID := range tx.InputIDs() {
+			spenders := c.utxos[inputID]
 			spenders.Remove(txID)
 			if spenders.Len() == 0 {
-				delete(c.utxos, inputKey)
+				delete(c.utxos, inputID)
 			} else {
-				c.utxos[inputKey] = spenders
+				c.utxos[inputID] = spenders
 			}
 		}
 
-		delete(c.txs, txID.Key())
+		delete(c.txs, txID)
 		c.pendingAccept.Abandon(txID)
 		c.pendingReject.Fulfill(txID)
 	}

@@ -32,7 +32,7 @@ import (
 )
 
 var networkID uint32 = 10
-var chainID = ids.NewID([32]byte{5, 4, 3, 2, 1})
+var chainID = ids.ID{5, 4, 3, 2, 1}
 var platformChainID = ids.Empty.Prefix(0)
 var testTxFee = uint64(1000)
 var startBalance = uint64(50000)
@@ -40,7 +40,7 @@ var startBalance = uint64(50000)
 var keys []*crypto.PrivateKeySECP256K1R
 var addrs []ids.ShortID // addrs[i] corresponds to keys[i]
 
-var assetID = ids.NewID([32]byte{1, 2, 3})
+var assetID = ids.ID{1, 2, 3}
 var username = "bobby"
 var password = "StrnasfqewiurPasswdn56d" // #nosec G101
 
@@ -61,11 +61,11 @@ func init() {
 }
 
 type snLookup struct {
-	chainsToSubnet map[[32]byte]ids.ID
+	chainsToSubnet map[ids.ID]ids.ID
 }
 
 func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
-	subnetID, ok := sn.chainsToSubnet[chainID.Key()]
+	subnetID, ok := sn.chainsToSubnet[chainID]
 	if !ok {
 		return ids.ID{}, errors.New("")
 	}
@@ -95,10 +95,10 @@ func NewContext(t *testing.T) *snow.Context {
 	}
 
 	sn := &snLookup{
-		chainsToSubnet: make(map[[32]byte]ids.ID),
+		chainsToSubnet: make(map[ids.ID]ids.ID),
 	}
-	sn.chainsToSubnet[chainID.Key()] = ctx.SubnetID
-	sn.chainsToSubnet[platformChainID.Key()] = ctx.SubnetID
+	sn.chainsToSubnet[chainID] = ctx.SubnetID
+	sn.chainsToSubnet[platformChainID] = ctx.SubnetID
 	ctx.SNLookup = sn
 	return ctx
 }
@@ -138,17 +138,13 @@ func GetAVAXTxFromGenesisTest(genesisBytes []byte, t *testing.T) *Tx {
 	return &tx
 }
 
+// BuildGenesisTest is the common Genesis builder for most tests
 func BuildGenesisTest(t *testing.T) []byte {
-	ss, err := CreateStaticService(formatting.HexEncoding)
-	if err != nil {
-		t.Fatalf("Failed to create static service due to: %s", err)
-	}
-
 	addr0Str, _ := formatting.FormatBech32(testHRP, addrs[0].Bytes())
 	addr1Str, _ := formatting.FormatBech32(testHRP, addrs[1].Bytes())
 	addr2Str, _ := formatting.FormatBech32(testHRP, addrs[2].Bytes())
 
-	args := BuildGenesisArgs{GenesisData: map[string]AssetDefinition{
+	defaultArgs := &BuildGenesisArgs{GenesisData: map[string]AssetDefinition{
 		"asset1": {
 			Name:   "AVAX",
 			Symbol: "SYMB",
@@ -206,8 +202,19 @@ func BuildGenesisTest(t *testing.T) []byte {
 			},
 		},
 	}}
+
+	return BuildGenesisTestWithArgs(t, defaultArgs)
+}
+
+// BuildGenesisTestWithArgs allows building the genesis while injecting different starting points (args)
+func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) []byte {
+	ss, err := CreateStaticService(formatting.HexEncoding)
+	if err != nil {
+		t.Fatalf("Failed to create static service due to: %s", err)
+	}
+
 	reply := BuildGenesisReply{}
-	err = ss.BuildGenesis(nil, &args, &reply)
+	err = ss.BuildGenesis(nil, args, &reply)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +228,18 @@ func BuildGenesisTest(t *testing.T) []byte {
 }
 
 func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) {
-	genesisBytes := BuildGenesisTest(t)
+	return GenesisVMWithArgs(t, nil)
+}
+
+func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
+	var genesisBytes []byte
+
+	if args != nil {
+		genesisBytes = BuildGenesisTestWithArgs(t, args)
+	} else {
+		genesisBytes = BuildGenesisTest(t)
+	}
+
 	ctx := NewContext(t)
 
 	baseDB := memdb.New()
@@ -568,7 +586,7 @@ func TestIssueTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !txID.Equals(newTx.ID()) {
+	if txID != newTx.ID() {
 		t.Fatalf("Issue Tx returned wrong TxID")
 	}
 	ctx.Lock.Unlock()
@@ -596,13 +614,80 @@ func TestGenesisGetUTXOs(t *testing.T) {
 
 	addrsSet := ids.ShortSet{}
 	addrsSet.Add(addrs[0])
-	utxos, _, _, err := vm.GetUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, -1)
+	utxos, _, _, err := vm.GetUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, -1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if len(utxos) != 4 {
 		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 4, len(utxos))
+	}
+}
+
+// TestGenesisGetPaginatedUTXOs tests
+// - Pagination when the total UTXOs exceed maxUTXOsToFetch (1024)
+// - Fetching all UTXOs when they exceed maxUTXOsToFetch (1024)
+func TestGenesisGetPaginatedUTXOs(t *testing.T) {
+	addr0Str, _ := formatting.FormatBech32(testHRP, addrs[0].Bytes())
+
+	// Create a starting point of 2000 UTXOs
+	utxoCount := 2000
+	holder := map[string][]interface{}{}
+	for i := 0; i < utxoCount; i++ {
+		holder["fixedCap"] = append(holder["fixedCap"], Holder{
+			Amount:  json.Uint64(startBalance),
+			Address: addr0Str,
+		})
+	}
+
+	// Inject them in the Genesis build
+	genesisArgs := &BuildGenesisArgs{GenesisData: map[string]AssetDefinition{
+		"asset1": {
+			Name:         "AVAX",
+			Symbol:       "SYMB",
+			InitialState: holder,
+		},
+	}}
+	_, _, vm, _ := GenesisVMWithArgs(t, genesisArgs)
+	ctx := vm.ctx
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	addrsSet := ids.ShortSet{}
+	addrsSet.Add(addrs[0])
+
+	// First Page - using paginated calls
+	paginatedUTXOs, lastAddr, lastIdx, err := vm.GetUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, -1, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(paginatedUTXOs) == utxoCount {
+		t.Fatalf("Wrong number of utxos. Should be Paginated. Expected (%d) returned (%d)", maxUTXOsToFetch, len(paginatedUTXOs))
+	}
+
+	// Last Page - using paginated calls
+	paginatedUTXOsLastPage, _, _, err := vm.GetUTXOs(addrsSet, lastAddr, lastIdx, -1, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(paginatedUTXOs)+len(paginatedUTXOsLastPage) != utxoCount {
+		t.Fatalf("Wrong number of utxos. Should have paginated through all. Expected (%d) returned (%d)", utxoCount, len(paginatedUTXOs)+len(paginatedUTXOsLastPage))
+	}
+
+	// Fetch all UTXOs
+	notPaginatedUTXOs, _, _, err := vm.GetUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, -1, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(notPaginatedUTXOs) != utxoCount {
+		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", utxoCount, len(notPaginatedUTXOs))
 	}
 }
 

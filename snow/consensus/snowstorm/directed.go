@@ -53,7 +53,7 @@ type Directed struct {
 
 	// Key: Transaction ID
 	// Value: Node that represents this transaction in the conflict graph
-	txs map[[32]byte]*directedTx
+	txs map[ids.ID]*directedTx
 }
 
 type directedTx struct {
@@ -84,7 +84,7 @@ func (dg *Directed) Initialize(
 	dg.ctx = ctx
 	dg.conflicts = conflicts
 	dg.params = params
-	dg.txs = make(map[[32]byte]*directedTx)
+	dg.txs = make(map[ids.ID]*directedTx)
 
 	if err := dg.metrics.Initialize(params.Namespace, params.Metrics); err != nil {
 		return fmt.Errorf("failed to initialize metrics: %w", err)
@@ -121,7 +121,7 @@ func (dg *Directed) Finalized() bool {
 func (dg *Directed) IsVirtuous(tx choices.Decidable) (bool, error) {
 	// If the tx is currently processing, we should just return if it is
 	// registered as rogue or not.
-	if node, exists := dg.txs[tx.ID().Key()]; exists {
+	if node, exists := dg.txs[tx.ID()]; exists {
 		return !node.rogue, nil
 	}
 
@@ -130,7 +130,7 @@ func (dg *Directed) IsVirtuous(tx choices.Decidable) (bool, error) {
 
 // Conflicts implements the Consensus interface
 func (dg *Directed) Conflicts(tx choices.Decidable) (ids.Set, error) {
-	if node, exists := dg.txs[tx.ID().Key()]; exists {
+	if node, exists := dg.txs[tx.ID()]; exists {
 		// If the tx is currently processing, the conflicting txs are just the
 		// union of the inbound conflicts and the outbound conflicts.
 		var conflicts ids.Set
@@ -166,7 +166,7 @@ func (dg *Directed) Issued(tx choices.Decidable) bool {
 	}
 
 	// If the tx is currently processing, then it must have been issued.
-	_, ok := dg.txs[tx.ID().Key()]
+	_, ok := dg.txs[tx.ID()]
 	return ok
 }
 
@@ -177,17 +177,17 @@ func (dg *Directed) Add(tx choices.Decidable) error {
 		return nil
 	}
 
-	txID := tx.ID()
-	txNode := &directedTx{tx: tx}
-
 	conflicts, err := dg.conflicts.Conflicts(tx)
 	if err != nil {
 		return err
 	}
 
+	txID := tx.ID()
+
 	// Notify the metrics that this transaction is being issued.
 	dg.metrics.Issued(txID)
 
+	txNode := &directedTx{tx: tx}
 	for _, conflict := range conflicts {
 		conflictID := conflict.ID()
 
@@ -202,7 +202,7 @@ func (dg *Directed) Add(tx choices.Decidable) error {
 		txNode.outs.Add(conflictID)
 		txNode.rogue = true
 
-		conflictNode := dg.txs[conflictID.Key()]
+		conflictNode := dg.txs[conflictID]
 		conflictNode.ins.Add(txID)
 		conflictNode.rogue = true
 	}
@@ -217,7 +217,7 @@ func (dg *Directed) Add(tx choices.Decidable) error {
 	}
 
 	// Add this tx to the set of currently processing txs
-	dg.txs[txID.Key()] = txNode
+	dg.txs[txID] = txNode
 	return dg.conflicts.Add(tx)
 }
 
@@ -239,9 +239,9 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 	changed := false
 
 	// Update the confidence values based on the provided votes.
-	for txKey := range metThreshold {
+	for txID := range metThreshold {
 		// Get the node this tx represents
-		txNode, exist := dg.txs[txKey]
+		txNode, exist := dg.txs[txID]
 		if !exist {
 			// This tx may have already been decided because of tx dependencies.
 			// If this is the case, we can just drop the vote.
@@ -250,11 +250,6 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 
 		// Update the confidence values.
 		txNode.RecordSuccessfulPoll(dg.currentVote)
-
-		txID := ids.NewID(txKey)
-
-		dg.ctx.Log.Verbo("Updated tx, %q, to have consensus state: %s",
-			txID, &txNode.snowball)
 
 		// If the tx can be accepted, then we should notify the conflict manager
 		// to defer its acceptance until its dependencies are decided. If this
@@ -275,14 +270,12 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 		}
 
 		// Make sure that edges are directed correctly.
-		for conflictKey := range txNode.outs {
-			conflict := dg.txs[conflictKey]
+		for conflictID := range txNode.outs {
+			conflict := dg.txs[conflictID]
 			if txNode.numSuccessfulPolls <= conflict.numSuccessfulPolls {
 				// The edge is already pointing in the correct direction.
 				continue
 			}
-
-			conflictID := ids.NewID(conflictKey)
 
 			// Change the edge direction according to the conflict tx
 			conflict.ins.Remove(txID)
@@ -309,7 +302,7 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 			toAcceptID := toAccept.ID()
 
 			// We can remove the accepted tx from the graph.
-			delete(dg.txs, toAcceptID.Key())
+			delete(dg.txs, toAcceptID)
 
 			// This tx is now accepted, so it shouldn't be part of the virtuous
 			// set or the preferred set. Its status as Accepted implies these
@@ -327,11 +320,10 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 		}
 		for _, toReject := range rejectable {
 			toRejectID := toReject.ID()
-			toRejectKey := toRejectID.Key()
-			toRejectNode := dg.txs[toRejectKey]
+			toRejectNode := dg.txs[toRejectID]
 
 			// We can remove the rejected tx from the graph.
-			delete(dg.txs, toRejectKey)
+			delete(dg.txs, toRejectID)
 
 			// While it's statistically unlikely that something being rejected
 			// is preferred, it is handled for completion.
@@ -360,8 +352,8 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 }
 
 func (dg *Directed) removeConflict(txID ids.ID, neighborIDs ids.Set) {
-	for neighborKey := range neighborIDs {
-		neighbor, exists := dg.txs[neighborKey]
+	for neighborID := range neighborIDs {
+		neighbor, exists := dg.txs[neighborID]
 		if !exists {
 			// If the neighbor doesn't exist, they may have already been
 			// rejected, so this mapping can be skipped.
@@ -369,13 +361,13 @@ func (dg *Directed) removeConflict(txID ids.ID, neighborIDs ids.Set) {
 		}
 
 		// Remove any edge to this tx.
-		neighbor.ins.Remove(txID)
-		neighbor.outs.Remove(txID)
+		delete(neighbor.ins, txID)
+		delete(neighbor.outs, txID)
 
 		if neighbor.outs.Len() == 0 {
 			// If this tx should now be preferred, make sure its status is
 			// updated.
-			dg.preferences.Add(ids.NewID(neighborKey))
+			dg.preferences.Add(neighborID)
 		}
 	}
 }
@@ -428,7 +420,7 @@ func (sb *snowballNode) String() string {
 type sortSnowballNodeData []*snowballNode
 
 func (sb sortSnowballNodeData) Less(i, j int) bool {
-	return bytes.Compare(sb[i].txID.Bytes(), sb[j].txID.Bytes()) == -1
+	return bytes.Compare(sb[i].txID[:], sb[j].txID[:]) == -1
 }
 func (sb sortSnowballNodeData) Len() int      { return len(sb) }
 func (sb sortSnowballNodeData) Swap(i, j int) { sb[j], sb[i] = sb[i], sb[j] }

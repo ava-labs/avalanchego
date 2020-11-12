@@ -90,7 +90,7 @@ func (n *Network) Disagreement() bool {
 	if i < len(n.nodes) {
 		pref := n.nodes[i].Preference()
 		for ; i < len(n.nodes); i++ {
-			if node := n.nodes[i]; node.Finalized() && !pref.Equals(node.Preference()) {
+			if node := n.nodes[i]; node.Finalized() && pref != node.Preference() {
 				return true
 			}
 		}
@@ -104,7 +104,7 @@ func (n *Network) Agreement() bool {
 	}
 	pref := n.nodes[0].Preference()
 	for _, node := range n.nodes {
-		if !pref.Equals(node.Preference()) {
+		if pref != node.Preference() {
 			return false
 		}
 	}

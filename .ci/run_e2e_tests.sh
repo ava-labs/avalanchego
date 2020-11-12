@@ -9,10 +9,10 @@ echo "Using Avalanche Image: $AVALANCHE_IMAGE"
 
 DOCKER_REPO="avaplatform"
 BYZANTINE_IMAGE="$DOCKER_REPO/avalanche-byzantine:v0.1.3-rc.1"
-TEST_SUITE_IMAGE="$DOCKER_REPO/avalanche-testing:v0.10.1-rc.1"
+TEST_SUITE_IMAGE="$DOCKER_REPO/avalanche-testing:v0.10.2"
 
 # If Docker Credentials are not available skip the Byzantine Tests
-if [[ ${#DOCKER_USERNAME} == 0 ]]; then
+if [[ -z ${DOCKER_USERNAME} ]]; then
     echo "Skipping Byzantine Tests because Docker Credentials were not present."
     BYZANTINE_IMAGE=""
 else
@@ -21,7 +21,7 @@ else
 fi
 
 # Kurtosis Environment Parameters
-KURTOSIS_CORE_CHANNEL="master"
+KURTOSIS_CORE_CHANNEL="1.0.3"
 INITIALIZER_IMAGE="kurtosistech/kurtosis-core_initializer:${KURTOSIS_CORE_CHANNEL}"
 API_IMAGE="kurtosistech/kurtosis-core_api:${KURTOSIS_CORE_CHANNEL}"
 PARALLELISM=4

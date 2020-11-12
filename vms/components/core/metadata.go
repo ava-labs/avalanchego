@@ -32,6 +32,6 @@ func (i *Metadata) SetStatus(status choices.Status) { i.status = status }
 // and sets [i.status] to choices.Processing
 func (i *Metadata) Initialize(bytes []byte) {
 	i.bytes = bytes
-	i.id = ids.NewID(hashing.ComputeHash256Array(i.bytes))
+	i.id = hashing.ComputeHash256Array(i.bytes)
 	i.status = choices.Processing
 }

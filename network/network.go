@@ -90,6 +90,9 @@ type Network interface {
 	// must be managed internally to the network. Calling close multiple times
 	// will return a nil error.
 	Close() error
+
+	// Return the IP of the node
+	IP() utils.IPDesc
 }
 
 type network struct {
@@ -324,7 +327,7 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 
 // AcceptedFrontier implements the Sender interface.
 // assumes the stateLock is not held.
-func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set) {
+func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
 	msg, err := n.b.AcceptedFrontier(chainID, requestID, containerIDs)
 	if err != nil {
 		n.log.Error("failed to build AcceptedFrontier(%s, %d, %s): %s",
@@ -350,7 +353,7 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 
 // GetAccepted implements the Sender interface.
 // assumes the stateLock is not held.
-func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs ids.Set) {
+func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs []ids.ID) {
 	msg, err := n.b.GetAccepted(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerIDs)
 	if err != nil {
 		n.log.Error("failed to build GetAccepted(%s, %d, %s): %s",
@@ -358,9 +361,11 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 			requestID,
 			containerIDs,
 			err)
-		for _, validatorID := range validatorIDs.List() {
-			vID := validatorID
-			n.executor.Add(func() { n.router.GetAcceptedFailed(vID, chainID, requestID) })
+		for validatorIDKey := range validatorIDs {
+			validatorID := ids.NewShortID(validatorIDKey)
+			n.executor.Add(func() {
+				n.router.GetAcceptedFailed(validatorID, chainID, requestID)
+			})
 		}
 		return
 	}
@@ -384,7 +389,7 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 
 // Accepted implements the Sender interface.
 // assumes the stateLock is not held.
-func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set) {
+func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
 	msg, err := n.b.Accepted(chainID, requestID, containerIDs)
 	if err != nil {
 		n.log.Error("failed to build Accepted(%s, %d, %s): %s",
@@ -514,8 +519,8 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			err,
 			len(container))
 		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
-		for _, validatorID := range validatorIDs.List() {
-			vID := validatorID
+		for validatorIDKey := range validatorIDs {
+			vID := ids.NewShortID(validatorIDKey)
 			n.executor.Add(func() { n.router.QueryFailed(vID, chainID, requestID) })
 		}
 		return // Packing message failed
@@ -564,7 +569,7 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 
 // Chits implements the Sender interface.
 // assumes the stateLock is not held.
-func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes ids.Set) {
+func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID) {
 	msg, err := n.b.Chits(chainID, requestID, votes)
 	if err != nil {
 		n.log.Error("failed to build Chits(%s, %d, %s): %s",
@@ -706,9 +711,11 @@ func (n *network) Close() error {
 	}
 	n.closed.SetValue(true)
 
-	peersToClose := make([]*peer, 0, len(n.peers))
+	peersToClose := make([]*peer, len(n.peers))
+	i := 0
 	for _, peer := range n.peers {
-		peersToClose = append(peersToClose, peer)
+		peersToClose[i] = peer
+		i++
 	}
 	n.peers = make(map[[20]byte]*peer)
 	n.stateLock.Unlock()
@@ -726,6 +733,10 @@ func (n *network) Track(ip utils.IPDesc) {
 	defer n.stateLock.Unlock()
 
 	n.track(ip)
+}
+
+func (n *network) IP() utils.IPDesc {
+	return n.ip.IP()
 }
 
 // assumes the stateLock is not held.
@@ -1124,14 +1135,16 @@ func (n *network) getPeers(validatorIDs ids.ShortSet) []*PeerElement {
 		return nil
 	}
 
-	vIDS := validatorIDs.List()
-	peers := make([]*PeerElement, 0, len(vIDS))
-	for _, validatorID := range vIDS {
-		peers = append(peers, &PeerElement{
-			peer: n.peers[validatorID.Key()],
-			id:   validatorID,
-		})
+	peers := make([]*PeerElement, validatorIDs.Len())
+	i := 0
+	for validatorIDKey := range validatorIDs {
+		peers[i] = &PeerElement{
+			peer: n.peers[validatorIDKey],
+			id:   ids.NewShortID(validatorIDKey),
+		}
+		i++
 	}
+
 	return peers
 }
 
@@ -1145,9 +1158,11 @@ func (n *network) getAllPeers() []*peer {
 		return nil
 	}
 
-	peers := make([]*peer, 0, len(n.peers))
+	peers := make([]*peer, len(n.peers))
+	i := 0
 	for _, peer := range n.peers {
-		peers = append(peers, peer)
+		peers[i] = peer
+		i++
 	}
 	return peers
 }

@@ -78,7 +78,7 @@ func (f *FactorySECP256K1R) RecoverHashPublicKey(hash, sig []byte) (PublicKey, e
 	cacheBytes := make([]byte, len(hash)+len(sig))
 	copy(cacheBytes, hash)
 	copy(cacheBytes[len(hash):], sig)
-	id := ids.NewID(hashing.ComputeHash256Array(cacheBytes))
+	id := hashing.ComputeHash256Array(cacheBytes)
 	if cachedPublicKey, ok := f.Cache.Get(id); ok {
 		return cachedPublicKey.(*PublicKeySECP256K1R), nil
 	}
