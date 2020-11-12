@@ -52,7 +52,7 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 	}
 	reply := BuildGenesisReply{}
 
-	ss, err := CreateStaticService(formatting.CB58Encoding)
+	ss, err := CreateStaticService(formatting.CB58)
 	if err != nil {
 		t.Fatalf("Failed to create static service due to: %s", err)
 	}
@@ -102,7 +102,7 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 	}
 	reply := BuildGenesisReply{}
 
-	ss, err := CreateStaticService(formatting.CB58Encoding)
+	ss, err := CreateStaticService(formatting.CB58)
 	if err != nil {
 		t.Fatalf("Failed to create static service due to: %s", err)
 	}
@@ -153,7 +153,7 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 	}
 	reply := BuildGenesisReply{}
 
-	ss, err := CreateStaticService(formatting.CB58Encoding)
+	ss, err := CreateStaticService(formatting.CB58)
 	if err != nil {
 		t.Fatalf("Failed to create static service due to: %s", err)
 	}
@@ -239,7 +239,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	}
 	reply := BuildGenesisReply{}
 
-	ss, err := CreateStaticService(formatting.CB58Encoding)
+	ss, err := CreateStaticService(formatting.CB58)
 	if err != nil {
 		t.Fatalf("Failed to create static service due to: %s", err)
 	}

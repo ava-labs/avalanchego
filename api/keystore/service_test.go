@@ -232,7 +232,7 @@ func TestServiceUseBlockchainDB(t *testing.T) {
 }
 
 func TestServiceExportImport(t *testing.T) {
-	encodings := []formatting.Encoding{formatting.HexEncoding, formatting.CB58Encoding}
+	encodings := []formatting.Encoding{formatting.HexEncoding, formatting.CB58}
 	for _, encoding := range encodings {
 		ks, err := CreateTestKeystore()
 		if err != nil {

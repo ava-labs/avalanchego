@@ -107,7 +107,7 @@ func init() {
 		"2RWLv6YVEXDiWLpaCbXhhqxtLbnFaKQsWPSSMSPhpWo47uJAeV",
 	} {
 
-		privKeyBytes, err := formatting.NewEncoder(formatting.CB58Encoding).ConvertString(key)
+		privKeyBytes, err := formatting.NewEncoder(formatting.CB58).ConvertString(key)
 		ctx.Log.AssertNoError(err)
 		pk, err := factory.ToPrivateKey(privKeyBytes)
 		ctx.Log.AssertNoError(err)
@@ -192,7 +192,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	}
 
 	buildGenesisResponse := BuildGenesisReply{}
-	platformvmSS, err := CreateStaticService(formatting.CB58Encoding)
+	platformvmSS, err := CreateStaticService(formatting.CB58)
 	if err != nil {
 		panic(err)
 	}
@@ -270,7 +270,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 		Chains:        nil,
 		Time:          json.Uint64(defaultGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
-		Encoding:      formatting.CB58Encoding,
+		Encoding:      formatting.CB58,
 	}
 
 	if args != nil {

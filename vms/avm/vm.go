@@ -166,7 +166,7 @@ func (vm *VM) Initialize(
 	vm.db = versiondb.New(db)
 	vm.typeToFxIndex = map[reflect.Type]int{}
 	vm.Aliaser.Initialize()
-	encodingManager, err := formatting.NewEncodingManager(formatting.CB58Encoding)
+	encodingManager, err := formatting.NewEncodingManager(formatting.CB58)
 	if err != nil {
 		return fmt.Errorf("problem creating encoding manager: %w", err)
 	}
@@ -342,7 +342,7 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	// name this service "avm"
-	staticService, _ := CreateStaticService(formatting.CB58Encoding)
+	staticService, _ := CreateStaticService(formatting.CB58)
 	_ = newServer.RegisterService(staticService, "avm")
 	return map[string]*common.HTTPHandler{
 		"": {LockOptions: common.WriteLock, Handler: newServer},

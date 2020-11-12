@@ -12,7 +12,7 @@ import (
 
 func TestCB58(t *testing.T) {
 	addr := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 255}
-	result, err := CB58{}.ConvertBytes(addr)
+	result, err := cb58Encoder{}.ConvertBytes(addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +24,7 @@ func TestCB58(t *testing.T) {
 
 func TestCB58Single(t *testing.T) {
 	addr := []byte{0}
-	result, err := CB58{}.ConvertBytes(addr)
+	result, err := cb58Encoder{}.ConvertBytes(addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,12 +39,12 @@ func TestCB58Single(t *testing.T) {
 // greater than the maximum length
 func TestCB58TooLarge(t *testing.T) {
 	b := make([]byte, maxCB58Size)
-	_, err := CB58{}.ConvertBytes(b)
+	_, err := cb58Encoder{}.ConvertBytes(b)
 	if err != nil {
 		t.Fatal(err)
 	}
 	b = make([]byte, maxCB58Size+1)
-	_, err = CB58{}.ConvertBytes(b)
+	_, err = cb58Encoder{}.ConvertBytes(b)
 	if err == nil {
 		t.Fatal("should have failed due to too large")
 	}
@@ -53,7 +53,7 @@ func TestCB58TooLarge(t *testing.T) {
 // Test that we can stringify byte slice whose length is that of an ID
 func TestCB58ID(t *testing.T) {
 	id := make([]byte, hashing.HashLen)
-	_, err := CB58{}.ConvertBytes(id)
+	_, err := cb58Encoder{}.ConvertBytes(id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestCB58ID(t *testing.T) {
 
 func TestCB58ParseBytes(t *testing.T) {
 	ui := "1NVSVezva3bAtJesnUj"
-	b, err := CB58{}.ConvertString(ui)
+	b, err := cb58Encoder{}.ConvertString(ui)
 	if err != nil {
 		t.Fatalf("Failed to process %s", ui)
 	}
@@ -73,7 +73,7 @@ func TestCB58ParseBytes(t *testing.T) {
 
 func TestCB58ParseBytesSingle(t *testing.T) {
 	ui := "1c7hwa"
-	b, err := CB58{}.ConvertString(ui)
+	b, err := cb58Encoder{}.ConvertString(ui)
 	if err != nil {
 		t.Fatalf("Failed to process %s", ui)
 	}
@@ -85,25 +85,25 @@ func TestCB58ParseBytesSingle(t *testing.T) {
 
 func TestCB58ParseBytesError(t *testing.T) {
 	ui := "0"
-	_, err := CB58{}.ConvertString(ui)
+	_, err := cb58Encoder{}.ConvertString(ui)
 	if err == nil {
 		t.Fatalf("should have errored while parsing %s", ui)
 	}
 
 	ui = "13pP7vbI"
-	_, err = CB58{}.ConvertString(ui)
+	_, err = cb58Encoder{}.ConvertString(ui)
 	if err == nil {
 		t.Fatalf("should have errored while parsing %s", ui)
 	}
 
 	ui = "13"
-	_, err = CB58{}.ConvertString(ui)
+	_, err = cb58Encoder{}.ConvertString(ui)
 	if err == nil {
 		t.Fatalf("should have errored while parsing %s", ui)
 	}
 
 	ui = "13pP7vb3"
-	_, err = CB58{}.ConvertString(ui)
+	_, err = cb58Encoder{}.ConvertString(ui)
 	if err == nil {
 		t.Fatalf("should have errored while parsing %s", ui)
 	}

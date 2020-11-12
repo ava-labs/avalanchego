@@ -17,7 +17,7 @@ var (
 )
 
 const (
-	defaultEncoding = formatting.CB58Encoding
+	defaultEncoding = formatting.CB58
 )
 
 // Credential ...

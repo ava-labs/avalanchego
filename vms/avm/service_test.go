@@ -976,7 +976,7 @@ func TestImportExportKey(t *testing.T) {
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
 
-	encoder := formatting.NewEncoder(formatting.CB58Encoding)
+	encoder := formatting.NewEncoder(formatting.CB58)
 	privKeyStr, _ := encoder.ConvertBytes(sk.Bytes())
 	importArgs := &ImportKeyArgs{
 		UserPass: api.UserPass{
@@ -1035,7 +1035,7 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 		t.Fatalf("problem generating private key: %s", err)
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
-	encoder := formatting.NewEncoder(formatting.CB58Encoding)
+	encoder := formatting.NewEncoder(formatting.CB58)
 	privKeyStr, _ := encoder.ConvertBytes(sk.Bytes())
 	args := ImportKeyArgs{
 		UserPass: api.UserPass{

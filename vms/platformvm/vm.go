@@ -242,7 +242,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.codec = Codec
-	encodingManager, err := formatting.NewEncodingManager(formatting.CB58Encoding)
+	encodingManager, err := formatting.NewEncodingManager(formatting.CB58)
 	if err != nil {
 		return fmt.Errorf("problem creating encoding manager: %w", err)
 	}
@@ -663,7 +663,7 @@ func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 // CreateStaticHandlers implements the snowman.ChainVM interface
 func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	// Static service's name is platform
-	staticService, _ := CreateStaticService(formatting.CB58Encoding)
+	staticService, _ := CreateStaticService(formatting.CB58)
 	handler, _ := vm.SnowmanVM.NewHandler("platform", staticService)
 	return map[string]*common.HTTPHandler{
 		"": handler,

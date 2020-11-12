@@ -23,13 +23,13 @@ var (
 )
 
 func TestBuildGenesis(t *testing.T) {
-	ss, err := CreateStaticService(formatting.CB58Encoding)
+	ss, err := CreateStaticService(formatting.CB58)
 	if err != nil {
 		t.Fatalf("Failed to create static service due to: %s", err)
 	}
 	var addrMap = map[string]string{}
 	for _, addrStr := range addrStrArray {
-		b, err := formatting.NewEncoder(formatting.CB58Encoding).ConvertString(addrStr)
+		b, err := formatting.NewEncoder(formatting.CB58).ConvertString(addrStr)
 		if err != nil {
 			t.Fatal(err)
 		}

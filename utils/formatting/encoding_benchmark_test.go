@@ -15,27 +15,27 @@ func BenchmarkEncodings(b *testing.B) {
 		size     int
 	}{
 		{
-			encoding: CB58Encoding,
+			encoding: CB58,
 			size:     1 << 10, // 1kb
 		},
 		{
-			encoding: CB58Encoding,
+			encoding: CB58,
 			size:     1 << 11, // 2kb
 		},
 		{
-			encoding: CB58Encoding,
+			encoding: CB58,
 			size:     1 << 12, // 4kb
 		},
 		{
-			encoding: CB58Encoding,
+			encoding: CB58,
 			size:     1 << 13, // 8kb
 		},
 		{
-			encoding: CB58Encoding,
+			encoding: CB58,
 			size:     1 << 14, // 16kb
 		},
 		{
-			encoding: CB58Encoding,
+			encoding: CB58,
 			size:     1 << 15, // 32kb
 		},
 		{

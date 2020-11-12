@@ -45,7 +45,7 @@ var username = "bobby"
 var password = "StrnasfqewiurPasswdn56d" // #nosec G101
 
 func init() {
-	encoder := formatting.NewEncoder(formatting.CB58Encoding)
+	encoder := formatting.NewEncoder(formatting.CB58)
 	factory := crypto.FactorySECP256K1R{}
 
 	for _, key := range []string{

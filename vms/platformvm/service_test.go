@@ -132,7 +132,7 @@ func TestExportKey(t *testing.T) {
 		t.Fatalf("ExportKeyReply is missing secret key prefix: %s", constants.SecretKeyPrefix)
 	}
 	privateKeyString := strings.TrimPrefix(reply.PrivateKey, constants.SecretKeyPrefix)
-	privKeyBytes, err := formatting.NewEncoder(formatting.CB58Encoding).ConvertString(privateKeyString)
+	privKeyBytes, err := formatting.NewEncoder(formatting.CB58).ConvertString(privateKeyString)
 	if err != nil {
 		t.Fatalf("Failed to parse key: %s", err)
 	}
@@ -329,7 +329,7 @@ func TestGetTx(t *testing.T) {
 		}
 		arg := &api.GetTxArgs{
 			TxID:     tx.ID(),
-			Encoding: formatting.CB58Encoding,
+			Encoding: formatting.CB58,
 		}
 		var response api.FormattedTx
 		if err := service.GetTx(nil, arg, &response); err == nil {

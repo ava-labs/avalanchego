@@ -82,7 +82,7 @@ func (ks *Keystore) Initialize(log logging.Logger, db database.Database) error {
 	ks.users = make(map[string]*password.Hash)
 	ks.userDB = prefixdb.New([]byte("users"), db)
 	ks.bcDB = prefixdb.New([]byte("bcs"), db)
-	encodingManager, err := formatting.NewEncodingManager(formatting.CB58Encoding)
+	encodingManager, err := formatting.NewEncodingManager(formatting.CB58)
 	if err != nil {
 		return fmt.Errorf("problem creating encoding manager: %w", err)
 	}

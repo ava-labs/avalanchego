@@ -25,11 +25,12 @@ var (
 	errBadChecksum     = errors.New("invalid input checksum")
 )
 
-// CB58 formats bytes in checksummed base-58 encoding
-type CB58 struct{}
+// cb58 formats bytes in checksummed base-58 encoding
+// cb58 implements Encoder
+type cb58Encoder struct{}
 
 // ConvertBytes ...
-func (cb58 CB58) ConvertBytes(b []byte) (string, error) {
+func (cb58 cb58Encoder) ConvertBytes(b []byte) (string, error) {
 	if len(b) > maxCB58Size {
 		return "", fmt.Errorf("byte slice length (%d) > maximum for cb58 (%d)", len(b), maxCB58Size)
 	}
@@ -40,7 +41,7 @@ func (cb58 CB58) ConvertBytes(b []byte) (string, error) {
 }
 
 // ConvertString ...
-func (cb58 CB58) ConvertString(str string) ([]byte, error) {
+func (cb58 cb58Encoder) ConvertString(str string) ([]byte, error) {
 	if len(str) == 0 {
 		return []byte{}, nil
 	}
@@ -63,4 +64,4 @@ func (cb58 CB58) ConvertString(str string) ([]byte, error) {
 }
 
 // Encoding ...
-func (cb58 *CB58) Encoding() Encoding { return CB58Encoding }
+func (cb58 *cb58Encoder) Encoding() Encoding { return CB58 }

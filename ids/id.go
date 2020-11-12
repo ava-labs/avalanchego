@@ -18,7 +18,7 @@ import (
 
 const (
 	// The encoding used to convert IDs from bytes to string and vice versa
-	defaultEncoding = formatting.CB58Encoding
+	defaultEncoding = formatting.CB58
 )
 
 var (

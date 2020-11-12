@@ -359,7 +359,7 @@ func (vm *VM) putUTXO(db database.Database, utxo *avax.UTXO) error {
 				// We assume that the maximum size of a byte slice that
 				// can be stringified is at least the length of an address.
 				// If conversion of address to string fails, ignore the error
-				addrStr, _ := formatting.NewEncoder(formatting.CB58Encoding).ConvertBytes(addrBytes)
+				addrStr, _ := formatting.NewEncoder(formatting.CB58).ConvertBytes(addrBytes)
 				return fmt.Errorf("couldn't update UTXO set of address %s", addrStr)
 			}
 		}
@@ -385,7 +385,7 @@ func (vm *VM) removeUTXO(db database.Database, utxoID ids.ID) error {
 				// We assume that the maximum size of a byte slice that
 				// can be stringified is at least the length of an address.
 				// If conversion of address to string fails, ignore the error
-				addrStr, _ := formatting.NewEncoder(formatting.CB58Encoding).ConvertBytes(addrBytes)
+				addrStr, _ := formatting.NewEncoder(formatting.CB58).ConvertBytes(addrBytes)
 				return fmt.Errorf("couldn't update UTXO set of address %s", addrStr)
 			}
 		}

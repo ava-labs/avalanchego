@@ -31,12 +31,12 @@ func TestEncodingManager(t *testing.T) {
 		t.Fatal("Encoding manager returned the wrong default encoding when HexEncoding was specified")
 	}
 
-	cb58, err := m.GetEncoder(CB58Encoding)
+	encoder, err := m.GetEncoder(CB58)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := cb58.(*CB58); !ok {
-		t.Fatal("Encoding manager returned the wrong encoding when CB58Encoding was specified")
+	if _, ok := encoder.(*cb58Encoder); !ok {
+		t.Fatal("Encoding manager returned the wrong encoding when CB58 was specified")
 	}
 
 	/* TODO do we need this

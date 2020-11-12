@@ -18,15 +18,15 @@ type Encoding uint8
 const (
 	// HexEncoding specifies a hex plus 4 byte checksum encoding format
 	HexEncoding = iota
-	// CB58Encoding specifies the CB58 encoding format
-	CB58Encoding
+	// CB58 specifies the CB58 encoding format
+	CB58
 )
 
 func (enc Encoding) String() string {
 	switch enc {
 	case HexEncoding:
 		return "hex"
-	case CB58Encoding:
+	case CB58:
 		return "cb58"
 	default:
 		return errInvalidEncoding.Error()
@@ -35,7 +35,7 @@ func (enc Encoding) String() string {
 
 func (enc Encoding) valid() bool {
 	switch enc {
-	case HexEncoding, CB58Encoding:
+	case HexEncoding, CB58:
 		return true
 	}
 	return false
@@ -57,7 +57,7 @@ func (enc *Encoding) UnmarshalJSON(b []byte) error {
 	case "\"hex\"":
 		*enc = HexEncoding
 	case "\"cb58\"":
-		*enc = CB58Encoding
+		*enc = CB58
 	default:
 		return errInvalidEncoding
 	}
@@ -74,8 +74,8 @@ type Encoder interface {
 // NewEncoder returns a new Encoder that uses the specified encoding
 func NewEncoder(encoding Encoding) Encoder {
 	switch encoding {
-	case CB58Encoding:
-		return &CB58{}
+	case CB58:
+		return &cb58Encoder{}
 	default:
 		return &Hex{}
 	}
@@ -92,7 +92,7 @@ type manager struct {
 
 // NewEncodingManager returns an EncodingManager with the provided default
 func NewEncodingManager(defaultEnc Encoding) (EncodingManager, error) {
-	if defaultEnc != HexEncoding && defaultEnc != CB58Encoding {
+	if defaultEnc != HexEncoding && defaultEnc != CB58 {
 		return nil, fmt.Errorf("unrecognized default encoding: %s", defaultEnc)
 	}
 	return &manager{defaultEnc: defaultEnc}, nil
@@ -104,8 +104,8 @@ func (m *manager) GetEncoder(encoding Encoding) (Encoder, error) {
 	switch encoding {
 	case HexEncoding:
 		return &Hex{}, nil
-	case CB58Encoding:
-		return &CB58{}, nil
+	case CB58:
+		return &cb58Encoder{}, nil
 	default:
 		return nil, errors.New("invalid encoder")
 	}

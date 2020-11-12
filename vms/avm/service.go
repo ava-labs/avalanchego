@@ -926,7 +926,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of a SECP256K1 private key
-	privKeyStr, _ := formatting.NewEncoder(formatting.CB58Encoding).ConvertBytes(sk.Bytes())
+	privKeyStr, _ := formatting.NewEncoder(formatting.CB58).ConvertBytes(sk.Bytes())
 	reply.PrivateKey = constants.SecretKeyPrefix + privKeyStr
 	return db.Close()
 }
@@ -967,7 +967,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
 	}
 	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
-	privKeyBytes, err := formatting.NewEncoder(formatting.CB58Encoding).ConvertString(trimmedPrivateKey)
+	privKeyBytes, err := formatting.NewEncoder(formatting.CB58).ConvertString(trimmedPrivateKey)
 	if err != nil {
 		return fmt.Errorf("problem parsing private key: %w", err)
 	}
