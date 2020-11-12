@@ -79,35 +79,3 @@ func NewEncoder(encoding Encoding) Encoder {
 		return &hexEncoder{}
 	}
 }
-
-/*
-// EncodingManager is an interface to provide an Encoding interface
-type EncodingManager interface {
-	GetEncoder(encoding Encoding) (Encoder, error)
-}
-
-type manager struct {
-	defaultEnc Encoding
-}
-
-// NewEncodingManager returns an EncodingManager with the provided default
-func NewEncodingManager(defaultEnc Encoding) (EncodingManager, error) {
-	if defaultEnc != Hex && defaultEnc != CB58 {
-		return nil, fmt.Errorf("unrecognized default encoding: %s", defaultEnc)
-	}
-	return &manager{defaultEnc: defaultEnc}, nil
-}
-
-// GetEncoding returns a struct to be used for the given encoding
-// TODO: Does this need to return an error?
-func (m *manager) GetEncoder(encoding Encoding) (Encoder, error) {
-	switch encoding {
-	case Hex:
-		return &hexEncoder{}, nil
-	case CB58:
-		return &cb58Encoder{}, nil
-	default:
-		return nil, errors.New("invalid encoder")
-	}
-}
-*/
