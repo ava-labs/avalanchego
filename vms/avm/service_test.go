@@ -169,8 +169,12 @@ func TestServiceIssueTx(t *testing.T) {
 	}
 
 	tx := NewTx(t, genesisBytes, vm)
-	txArgs.Tx = formatting.Hex{Bytes: tx.Bytes()}.String()
-	txArgs.Encoding = formatting.HexEncoding
+	encoder := formatting.NewEncoder(formatting.HexEncoding)
+	txArgs.Tx, err = encoder.ConvertBytes(tx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	txArgs.Encoding = encoder.Encoding()
 	txReply = &api.JSONTxID{}
 	if err := s.IssueTx(nil, txArgs, txReply); err != nil {
 		t.Fatal(err)
@@ -208,9 +212,14 @@ func TestServiceGetTxStatus(t *testing.T) {
 		)
 	}
 
+	encoder := formatting.NewEncoder(formatting.HexEncoding)
+	txStr, err := encoder.ConvertBytes(tx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	txArgs := &api.FormattedTx{
-		Tx:       formatting.Hex{Bytes: tx.Bytes()}.String(),
-		Encoding: formatting.HexEncoding,
+		Tx:       txStr,
+		Encoding: encoder.Encoding(),
 	}
 	txReply := &api.JSONTxID{}
 	if err := s.IssueTx(nil, txArgs, txReply); err != nil {
@@ -309,7 +318,7 @@ func TestServiceGetTx(t *testing.T) {
 		TxID: txID,
 	}, &reply)
 	assert.NoError(t, err)
-	encoding, err := vm.encodingManager.GetEncoding(reply.Encoding)
+	encoding, err := vm.encodingManager.GetEncoder(reply.Encoding)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -890,6 +899,11 @@ func TestNFTWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	encoder := formatting.NewEncoder(formatting.HexEncoding)
+	payload, err := encoder.ConvertBytes([]byte{1, 2, 3, 4, 5})
+	if err != nil {
+		t.Fatal(err)
+	}
 	mintArgs := &MintNFTArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass: api.UserPass{
@@ -900,9 +914,9 @@ func TestNFTWorkflow(t *testing.T) {
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: fromAddrsStr[0]},
 		},
 		AssetID:  assetID.String(),
-		Payload:  formatting.Hex{Bytes: []byte{1, 2, 3, 4, 5}}.String(),
+		Payload:  payload,
 		To:       addrStr,
-		Encoding: formatting.HexEncoding,
+		Encoding: encoder.Encoding(),
 	}
 	mintReply := &api.JSONTxIDChangeAddr{}
 
@@ -962,7 +976,8 @@ func TestImportExportKey(t *testing.T) {
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
 
-	privKeyStr, _ := formatting.CB58{}.ConvertBytes(sk.Bytes())
+	encoder := formatting.NewEncoder(formatting.CB58Encoding)
+	privKeyStr, _ := encoder.ConvertBytes(sk.Bytes())
 	importArgs := &ImportKeyArgs{
 		UserPass: api.UserPass{
 			Username: username,
@@ -995,7 +1010,7 @@ func TestImportExportKey(t *testing.T) {
 		t.Fatalf("ExportKeyReply private key: %s mssing secret key prefix: %s", exportReply.PrivateKey, constants.SecretKeyPrefix)
 	}
 
-	parsedKeyBytes, err := formatting.CB58{}.ConvertString(strings.TrimPrefix(exportReply.PrivateKey, constants.SecretKeyPrefix))
+	parsedKeyBytes, err := encoder.ConvertString(strings.TrimPrefix(exportReply.PrivateKey, constants.SecretKeyPrefix))
 	if err != nil {
 		t.Fatal("Failed to parse exported private key")
 	}
@@ -1020,7 +1035,8 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 		t.Fatalf("problem generating private key: %s", err)
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
-	privKeyStr, _ := formatting.CB58{}.ConvertBytes(sk.Bytes())
+	encoder := formatting.NewEncoder(formatting.CB58Encoding)
+	privKeyStr, _ := encoder.ConvertBytes(sk.Bytes())
 	args := ImportKeyArgs{
 		UserPass: api.UserPass{
 			Username: username,

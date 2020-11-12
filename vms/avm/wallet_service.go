@@ -89,7 +89,7 @@ func (w *WalletService) update(utxos []*avax.UTXO) ([]*avax.UTXO, error) {
 func (w *WalletService) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
 	w.vm.ctx.Log.Info("AVM Wallet: IssueTx called with %s", args.Tx)
 
-	encoding, err := w.vm.encodingManager.GetEncoding(args.Encoding)
+	encoding, err := w.vm.encodingManager.GetEncoder(args.Encoding)
 	if err != nil {
 		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
 	}

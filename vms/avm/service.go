@@ -61,7 +61,7 @@ type FormattedAssetID struct {
 func (service *Service) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
 	service.vm.ctx.Log.Info("AVM: IssueTx called with %s", args.Tx)
 
-	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
+	encoding, err := service.vm.encodingManager.GetEncoder(args.Encoding)
 	if err != nil {
 		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
 	}
@@ -108,7 +108,7 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.F
 		return errNilTxID
 	}
 
-	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
+	encoding, err := service.vm.encodingManager.GetEncoder(args.Encoding)
 	if err != nil {
 		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
 	}
@@ -149,11 +149,11 @@ type Index struct {
 // If GetUTXOs is called multiple times, with our without [StartIndex], it is not guaranteed
 // that returned UTXOs are unique. That is, the same UTXO may appear in the response of multiple calls.
 type GetUTXOsArgs struct {
-	Addresses   []string    `json:"addresses"`
-	SourceChain string      `json:"sourceChain"`
-	Limit       json.Uint32 `json:"limit"`
-	StartIndex  Index       `json:"startIndex"`
-	Encoding    string      `json:"encoding"`
+	Addresses   []string            `json:"addresses"`
+	SourceChain string              `json:"sourceChain"`
+	Limit       json.Uint32         `json:"limit"`
+	StartIndex  Index               `json:"startIndex"`
+	Encoding    formatting.Encoding `json:"encoding"`
 }
 
 // GetUTXOsReply defines the GetUTXOs replies returned from the API
@@ -167,7 +167,7 @@ type GetUTXOsReply struct {
 	// again and set [StartIndex] to this value.
 	EndIndex Index `json:"endIndex"`
 	// Encoding specifies the encoding format the UTXOs are returned in
-	Encoding string `json:"encoding"`
+	Encoding formatting.Encoding `json:"encoding"`
 }
 
 // GetUTXOs gets all utxos for passed in addresses
@@ -181,7 +181,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 		return fmt.Errorf("number of addresses given, %d, exceeds maximum, %d", len(args.Addresses), maxGetUTXOsAddrs)
 	}
 
-	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
+	encoding, err := service.vm.encodingManager.GetEncoder(args.Encoding)
 	if err != nil {
 		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
 	}
@@ -926,7 +926,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of a SECP256K1 private key
-	privKeyStr, _ := formatting.CB58{}.ConvertBytes(sk.Bytes())
+	privKeyStr, _ := formatting.NewEncoder(formatting.CB58Encoding).ConvertBytes(sk.Bytes())
 	reply.PrivateKey = constants.SecretKeyPrefix + privKeyStr
 	return db.Close()
 }
@@ -967,7 +967,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
 	}
 	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
-	privKeyBytes, err := formatting.CB58{}.ConvertString(trimmedPrivateKey)
+	privKeyBytes, err := formatting.NewEncoder(formatting.CB58Encoding).ConvertString(trimmedPrivateKey)
 	if err != nil {
 		return fmt.Errorf("problem parsing private key: %w", err)
 	}
@@ -1435,11 +1435,11 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 
 // MintNFTArgs are arguments for passing into MintNFT requests
 type MintNFTArgs struct {
-	api.JSONSpendHeader        // User, password, from addrs, change addr
-	AssetID             string `json:"assetID"`
-	Payload             string `json:"payload"`
-	To                  string `json:"to"`
-	Encoding            string `json:"encoding"`
+	api.JSONSpendHeader                     // User, password, from addrs, change addr
+	AssetID             string              `json:"assetID"`
+	Payload             string              `json:"payload"`
+	To                  string              `json:"to"`
+	Encoding            formatting.Encoding `json:"encoding"`
 }
 
 // MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
@@ -1456,7 +1456,7 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
-	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
+	encoding, err := service.vm.encodingManager.GetEncoder(args.Encoding)
 	if err != nil {
 		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
 	}

@@ -16,16 +16,26 @@ var (
 	errNilCredential = errors.New("nil credential")
 )
 
+const (
+	defaultEncoding = formatting.CB58Encoding
+)
+
 // Credential ...
 type Credential struct {
 	Sigs [][crypto.SECP256K1RSigLen]byte `serialize:"true" json:"signatures"`
 }
 
 // MarshalJSON marshals [cr] to JSON
+// The string representation of each signature is created using the hex formatter
 func (cr *Credential) MarshalJSON() ([]byte, error) {
+	encoder := formatting.NewEncoder(defaultEncoding)
 	buffer := bytes.NewBufferString("{\"signatures\":[")
 	for i, sig := range cr.Sigs {
-		buffer.WriteString(fmt.Sprintf("\"%s\"", formatting.Hex{Bytes: sig[:]}))
+		sigStr, err := encoder.ConvertBytes(sig[:])
+		if err != nil {
+			return nil, fmt.Errorf("couldn't convert signature to string: %w", err)
+		}
+		buffer.WriteString(fmt.Sprintf("\"%s\"", sigStr))
 		if i != len(cr.Sigs)-1 {
 			buffer.WriteString(",")
 		}

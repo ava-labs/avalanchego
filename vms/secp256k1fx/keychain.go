@@ -114,13 +114,13 @@ func (kc *Keychain) Match(owners *OutputOwners, time uint64) ([]uint32, []*crypt
 // added before every line.
 func (kc *Keychain) PrefixedString(prefix string) string {
 	s := strings.Builder{}
-
+	encoder := formatting.NewEncoder(defaultEncoding)
 	format := fmt.Sprintf("%%sKey[%s]: Key: %%s Address: %%s\n",
 		formatting.IntFormat(len(kc.Keys)-1))
 	for i, key := range kc.Keys {
 		// We assume that the maximum size of a byte slice that
 		// can be stringified is at least the length of a SECP256K1 private key
-		keyStr, _ := formatting.CB58{}.ConvertBytes(key.Bytes())
+		keyStr, _ := encoder.ConvertBytes(key.Bytes())
 		s.WriteString(fmt.Sprintf(format,
 			prefix,
 			i,

@@ -4,34 +4,94 @@
 package formatting
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 )
+
+var (
+	errInvalidEncoding = errors.New("invalid encoding")
+)
+
+type Encoding uint8
 
 const (
 	// HexEncoding specifies a hex plus 4 byte checksum encoding format
-	HexEncoding = "hex"
+	HexEncoding = iota
 	// CB58Encoding specifies the CB58 encoding format
-	CB58Encoding = "cb58"
+	CB58Encoding
 )
 
+func (enc Encoding) String() string {
+	switch enc {
+	case HexEncoding:
+		return "hex"
+	case CB58Encoding:
+		return "cb58"
+	default:
+		return errInvalidEncoding.Error()
+	}
+}
+
+func (enc Encoding) valid() bool {
+	switch enc {
+	case HexEncoding, CB58Encoding:
+		return true
+	}
+	return false
+}
+
+// MarshalJSON ...
+func (enc Encoding) MarshalJSON() ([]byte, error) {
+	if !enc.valid() {
+		return nil, errInvalidEncoding
+	}
+	return []byte("\"" + enc.String() + "\""), nil
+}
+
+// UnmarshalJSON ...
+func (enc *Encoding) UnmarshalJSON(b []byte) error {
+	str := strings.ToLower(string(b))
+
+	switch str {
+	case "\"hex\"":
+		*enc = HexEncoding
+	case "\"cb58\"":
+		*enc = CB58Encoding
+	default:
+		return errInvalidEncoding
+	}
+	return nil
+}
+
 // Encoding returns a struct used to format bytes for a specific encoding
-type Encoding interface {
+type Encoder interface {
 	ConvertBytes([]byte) (string, error)
 	ConvertString(str string) ([]byte, error)
-	Encoding() string
+	Encoding() Encoding
+}
+
+// NewEncoder returns a new Encoder that uses the specified encoding
+func NewEncoder(encoding Encoding) Encoder {
+	switch encoding {
+	case CB58Encoding:
+		return &CB58{}
+	default:
+		return &Hex{}
+	}
 }
 
 // EncodingManager is an interface to provide an Encoding interface
 type EncodingManager interface {
-	GetEncoding(encoding string) (Encoding, error)
+	GetEncoder(encoding Encoding) (Encoder, error)
 }
 
 type manager struct {
-	defaultEnc string
+	defaultEnc Encoding
 }
 
 // NewEncodingManager returns an EncodingManager with the provided default
-func NewEncodingManager(defaultEnc string) (EncodingManager, error) {
+func NewEncodingManager(defaultEnc Encoding) (EncodingManager, error) {
 	if defaultEnc != HexEncoding && defaultEnc != CB58Encoding {
 		return nil, fmt.Errorf("unrecognized default encoding: %s", defaultEnc)
 	}
@@ -39,16 +99,14 @@ func NewEncodingManager(defaultEnc string) (EncodingManager, error) {
 }
 
 // GetEncoding returns a struct to be used for the given encoding
-func (m *manager) GetEncoding(encoding string) (Encoding, error) {
-	if encoding == "" {
-		encoding = m.defaultEnc
-	}
+// TODO: Does this need to return an error?
+func (m *manager) GetEncoder(encoding Encoding) (Encoder, error) {
 	switch encoding {
 	case HexEncoding:
 		return &Hex{}, nil
 	case CB58Encoding:
 		return &CB58{}, nil
 	default:
-		return nil, fmt.Errorf("unrecognized encoding format: %s", encoding)
+		return nil, errors.New("invalid encoder")
 	}
 }

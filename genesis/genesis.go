@@ -36,18 +36,18 @@ import (
 
 // FromConfig returns:
 // 1) The byte representation of the genesis state of the platform chain
-//    (ie the genesis state of the network)
+//    (ie the genesis state of the network), formatted using the hex encoder
 // 2) The asset ID of AVAX
 func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	hrp := constants.GetHRP(config.NetworkID)
 
 	amount := uint64(0)
 
-	encoding := formatting.Hex{}
+	encoder := formatting.NewEncoder(formatting.HexEncoding)
 	// Specify the genesis state of the AVM
 	avmArgs := avm.BuildGenesisArgs{
 		NetworkID: json.Uint32(config.NetworkID),
-		Encoding:  formatting.HexEncoding,
+		Encoding:  encoder.Encoding(),
 	}
 	{
 		avax := avm.AssetDefinition{
@@ -80,7 +80,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		}
 
 		var err error
-		avax.Memo, err = encoding.ConvertBytes(memoBytes)
+		avax.Memo, err = encoder.ConvertBytes(memoBytes)
 		if err != nil {
 			return nil, ids.Empty, fmt.Errorf("couldn't parse memo bytes to string: %w", err)
 		}
@@ -90,7 +90,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 	avmReply := avm.BuildGenesisReply{}
 
-	avmSS, err := avm.CreateStaticService(formatting.HexEncoding)
+	avmSS, err := avm.CreateStaticService(encoder.Encoding())
 	if err != nil {
 		return nil, ids.ID{}, fmt.Errorf("problem creating avm Static Service: %w", err)
 	}
@@ -99,7 +99,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		return nil, ids.ID{}, err
 	}
 
-	bytes, err := encoding.ConvertString(avmReply.Bytes)
+	bytes, err := encoder.ConvertString(avmReply.Bytes)
 	if err != nil {
 		return nil, ids.ID{}, fmt.Errorf("couldn't parse avm genesis reply: %w", err)
 	}
@@ -137,12 +137,16 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		}
 		for _, unlock := range allocation.UnlockSchedule {
 			if unlock.Amount > 0 {
+				msgStr, err := encoder.ConvertBytes(allocation.ETHAddr.Bytes())
+				if err != nil {
+					return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
+				}
 				platformvmArgs.UTXOs = append(platformvmArgs.UTXOs,
 					platformvm.APIUTXO{
 						Locktime: json.Uint64(unlock.Locktime),
 						Amount:   json.Uint64(unlock.Amount),
 						Address:  addr,
-						Message:  formatting.Hex{Bytes: allocation.ETHAddr.Bytes()}.String(),
+						Message:  msgStr,
 					},
 				)
 				amount += unlock.Amount
@@ -170,11 +174,15 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				return nil, ids.ID{}, err
 			}
 			for _, unlock := range allocation.UnlockSchedule {
+				msgStr, err := encoder.ConvertBytes(allocation.ETHAddr.Bytes())
+				if err != nil {
+					return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
+				}
 				utxos = append(utxos, platformvm.APIUTXO{
 					Locktime: json.Uint64(unlock.Locktime),
 					Amount:   json.Uint64(unlock.Amount),
 					Address:  addr,
-					Message:  formatting.Hex{Bytes: allocation.ETHAddr.Bytes()}.String(),
+					Message:  msgStr,
 				})
 				amount += unlock.Amount
 			}
@@ -200,6 +208,10 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 
 	// Specify the chains that exist upon this network's creation
+	genesisStr, err := encoder.ConvertBytes([]byte(config.CChainGenesis))
+	if err != nil {
+		return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
+	}
 	platformvmArgs.Chains = []platformvm.APIChain{
 		{
 			GenesisData: avmReply.Bytes,
@@ -213,7 +225,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			Name: "X-Chain",
 		},
 		{
-			GenesisData: formatting.Hex{Bytes: []byte(config.CChainGenesis)}.String(),
+			GenesisData: genesisStr,
 			SubnetID:    constants.PrimaryNetworkID,
 			VMID:        evm.ID,
 			Name:        "C-Chain",
@@ -221,7 +233,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 
 	platformvmReply := platformvm.BuildGenesisReply{}
-	platformvmSS, err := platformvm.CreateStaticService(formatting.HexEncoding)
+	platformvmSS, err := platformvm.CreateStaticService(encoder.Encoding())
 	if err != nil {
 		return nil, ids.ID{}, fmt.Errorf("problem creating platformvm Static Service: %w", err)
 	}
@@ -229,7 +241,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		return nil, ids.ID{}, fmt.Errorf("problem while building platform chain's genesis state: %w", err)
 	}
 
-	genesisBytes, err := encoding.ConvertString(platformvmReply.Bytes)
+	genesisBytes, err := encoder.ConvertString(platformvmReply.Bytes)
 	if err != nil {
 		return nil, ids.ID{}, fmt.Errorf("problem parsing platformvm genesis bytes: %w", err)
 	}

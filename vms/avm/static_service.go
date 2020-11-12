@@ -28,7 +28,7 @@ var (
 type StaticService struct{ encodingManager formatting.EncodingManager }
 
 // CreateStaticService ...
-func CreateStaticService(defaultEnc string) (*StaticService, error) {
+func CreateStaticService(defaultEnc formatting.Encoding) (*StaticService, error) {
 	encodingManager, err := formatting.NewEncodingManager(defaultEnc)
 	if err != nil {
 		return nil, err
@@ -40,7 +40,7 @@ func CreateStaticService(defaultEnc string) (*StaticService, error) {
 type BuildGenesisArgs struct {
 	NetworkID   cjson.Uint32               `json:"networkID"`
 	GenesisData map[string]AssetDefinition `json:"genesisData"`
-	Encoding    string                     `json:"encoding"`
+	Encoding    formatting.Encoding        `json:"encoding"`
 }
 
 // AssetDefinition ...
@@ -54,8 +54,8 @@ type AssetDefinition struct {
 
 // BuildGenesisReply is the reply from BuildGenesis
 type BuildGenesisReply struct {
-	Bytes    string `json:"bytes"`
-	Encoding string `json:"encoding"`
+	Bytes    string              `json:"bytes"`
+	Encoding formatting.Encoding `json:"encoding"`
 }
 
 // BuildGenesis returns the UTXOs such that at least one address in [args.Addresses] is
@@ -80,7 +80,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		return errs.Err
 	}
 
-	encoding, err := ss.encodingManager.GetEncoding(args.Encoding)
+	encoding, err := ss.encodingManager.GetEncoder(args.Encoding)
 	if err != nil {
 		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
 	}

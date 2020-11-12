@@ -45,7 +45,7 @@ var username = "bobby"
 var password = "StrnasfqewiurPasswdn56d" // #nosec G101
 
 func init() {
-	cb58 := formatting.CB58{}
+	encoder := formatting.NewEncoder(formatting.CB58Encoding)
 	factory := crypto.FactorySECP256K1R{}
 
 	for _, key := range []string{
@@ -53,7 +53,7 @@ func init() {
 		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
 		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
 	} {
-		keyBytes, _ := cb58.ConvertString(key)
+		keyBytes, _ := encoder.ConvertString(key)
 		pk, _ := factory.ToPrivateKey(keyBytes)
 		keys = append(keys, pk.(*crypto.PrivateKeySECP256K1R))
 		addrs = append(addrs, pk.PublicKey().Address())
@@ -219,7 +219,16 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) []byte {
 		t.Fatal(err)
 	}
 
-	b, err := formatting.Hex{}.ConvertString(reply.Bytes)
+	encoderManger, err := formatting.NewEncodingManager(reply.Encoding)
+	if err != nil {
+		t.Fatalf("couldn't create encoding manager: %s", err)
+	}
+	encoder, err := encoderManger.GetEncoder(reply.Encoding)
+	if err != nil {
+		t.Fatalf("couldn't get encoder: %s", err)
+	}
+
+	b, err := encoder.ConvertString(reply.Bytes)
 	if err != nil {
 		t.Fatal(err)
 	}

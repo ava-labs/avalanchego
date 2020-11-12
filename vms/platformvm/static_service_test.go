@@ -248,7 +248,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		t.Fatalf("BuildGenesis should not have errored but got error: %s", err)
 	}
 
-	encoding, err := ss.encodingManager.GetEncoding(reply.Encoding)
+	encoding, err := ss.encodingManager.GetEncoder(reply.Encoding)
 	if err != nil {
 		t.Fatalf("Failed to get encoding due to: %s", err)
 	}

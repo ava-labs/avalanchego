@@ -10,7 +10,10 @@ import (
 
 func TestHex(t *testing.T) {
 	addr := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 255}
-	result := Hex{addr}.String()
+	result, err := Hex{}.ConvertBytes(addr)
+	if err != nil {
+		t.Fatal()
+	}
 	expected := "0x00010203040506070809ff4482539c"
 	if result != expected {
 		t.Fatalf("Expected %s, got %s", expected, result)
@@ -19,7 +22,10 @@ func TestHex(t *testing.T) {
 
 func TestHexSingle(t *testing.T) {
 	addr := []byte{0}
-	result := Hex{addr}.String()
+	result, err := Hex{}.ConvertBytes(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
 	expected := "0x0017afa01d"
 	if result != expected {
 		t.Fatalf("Expected %s, got %s", expected, result)

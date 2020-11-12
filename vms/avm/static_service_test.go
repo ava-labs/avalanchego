@@ -29,7 +29,7 @@ func TestBuildGenesis(t *testing.T) {
 	}
 	var addrMap = map[string]string{}
 	for _, addrStr := range addrStrArray {
-		b, err := formatting.CB58{}.ConvertString(addrStr)
+		b, err := formatting.NewEncoder(formatting.CB58Encoding).ConvertString(addrStr)
 		if err != nil {
 			t.Fatal(err)
 		}

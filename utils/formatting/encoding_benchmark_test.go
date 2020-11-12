@@ -11,7 +11,7 @@ import (
 
 func BenchmarkEncodings(b *testing.B) {
 	benchmarks := []struct {
-		encoding string
+		encoding Encoding
 		size     int
 	}{
 		{
@@ -77,7 +77,7 @@ func BenchmarkEncodings(b *testing.B) {
 	}
 	manager, _ := NewEncodingManager(HexEncoding)
 	for _, benchmark := range benchmarks {
-		enc, _ := manager.GetEncoding(benchmark.encoding)
+		enc, _ := manager.GetEncoder(benchmark.encoding)
 		bytes := make([]byte, benchmark.size)
 		_, _ = rand.Read(bytes) // #nosec G404
 		b.Run(fmt.Sprintf("%s-%d bytes", benchmark.encoding, benchmark.size), func(b *testing.B) {

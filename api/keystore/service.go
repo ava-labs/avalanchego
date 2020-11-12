@@ -161,7 +161,7 @@ type ExportUserArgs struct {
 	// The username and password
 	api.UserPass
 	// The encoding for the exported user ("hex" or "cb58")
-	Encoding string `json:"encoding"`
+	Encoding formatting.Encoding `json:"encoding"`
 }
 
 // ExportUserReply is the reply from ExportUser
@@ -208,7 +208,7 @@ func (ks *Keystore) ExportUser(_ *http.Request, args *ExportUserArgs, reply *Exp
 	}
 
 	// Encode the user from bytes to string
-	encoder, err := ks.encodingManager.GetEncoding(args.Encoding)
+	encoder, err := ks.encodingManager.GetEncoder(args.Encoding)
 	if err != nil {
 		return fmt.Errorf("couldn't get encoder: %w", err)
 	}
@@ -228,7 +228,7 @@ type ImportUserArgs struct {
 	// The string representation of the user
 	User string `json:"user"`
 	// The encoding of [User] ("hex" or "cb58")
-	Encoding string `json:"encoding"`
+	Encoding formatting.Encoding `json:"encoding"`
 }
 
 // ImportUser imports a serialized encoding of a user's information complete with encrypted database values,
@@ -244,7 +244,7 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *api
 	defer ks.lock.Unlock()
 
 	// Decode the user from string to bytes
-	encoder, err := ks.encodingManager.GetEncoding(args.Encoding)
+	encoder, err := ks.encodingManager.GetEncoder(args.Encoding)
 	if err != nil {
 		return fmt.Errorf("couldn't get encoder: %w", err)
 	}

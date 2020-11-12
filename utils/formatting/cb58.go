@@ -63,4 +63,4 @@ func (cb58 CB58) ConvertString(str string) ([]byte, error) {
 }
 
 // Encoding ...
-func (cb58 *CB58) Encoding() string { return CB58Encoding }
+func (cb58 *CB58) Encoding() Encoding { return CB58Encoding }

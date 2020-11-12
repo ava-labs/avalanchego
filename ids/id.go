@@ -16,8 +16,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// Empty is a useful all zero value
+const (
+	// The encoding used to convert IDs from bytes to string and vice versa
+	defaultEncoding = formatting.CB58Encoding
+)
+
 var (
+	// Empty is a useful all zero value
 	Empty            = ID{}
 	errMissingQuotes = errors.New("first and last characters should be quotes")
 )
@@ -32,7 +37,7 @@ func ToID(bytes []byte) (ID, error) {
 
 // FromString is the inverse of ID.String()
 func FromString(idStr string) (ID, error) {
-	bytes, err := formatting.CB58{}.ConvertString(idStr)
+	bytes, err := formatting.NewEncoder(defaultEncoding).ConvertString(idStr)
 	if err != nil {
 		return ID{}, err
 	}
@@ -41,7 +46,7 @@ func FromString(idStr string) (ID, error) {
 
 // MarshalJSON ...
 func (id ID) MarshalJSON() ([]byte, error) {
-	str, err := formatting.CB58{}.ConvertBytes(id[:])
+	str, err := formatting.NewEncoder(defaultEncoding).ConvertBytes(id[:])
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +68,7 @@ func (id *ID) UnmarshalJSON(b []byte) error {
 	}
 
 	// Parse CB58 formatted string to bytes
-	bytes, err := formatting.CB58{}.ConvertString(str[1:lastIndex])
+	bytes, err := formatting.NewEncoder(defaultEncoding).ConvertString(str[1:lastIndex])
 	if err != nil {
 		return fmt.Errorf("couldn't decode ID to bytes: %w", err)
 	}
@@ -116,7 +121,7 @@ func (id ID) Hex() string { return hex.EncodeToString(id[:]) }
 func (id ID) String() string {
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of an ID
-	s, _ := formatting.CB58{}.ConvertBytes(id[:])
+	s, _ := formatting.NewEncoder(defaultEncoding).ConvertBytes(id[:])
 	return s
 }
 

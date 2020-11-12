@@ -36,7 +36,7 @@ var (
 type StaticService struct{ encodingManager formatting.EncodingManager }
 
 // CreateStaticService ...
-func CreateStaticService(defaultEnc string) (*StaticService, error) {
+func CreateStaticService(defaultEnc formatting.Encoding) (*StaticService, error) {
 	encodingManager, err := formatting.NewEncodingManager(defaultEnc)
 	if err != nil {
 		return nil, err
@@ -138,13 +138,13 @@ type BuildGenesisArgs struct {
 	Time          json.Uint64           `json:"time"`
 	InitialSupply json.Uint64           `json:"initialSupply"`
 	Message       string                `json:"message"`
-	Encoding      string                `json:"encoding"`
+	Encoding      formatting.Encoding   `json:"encoding"`
 }
 
 // BuildGenesisReply is the reply from BuildGenesis
 type BuildGenesisReply struct {
-	Bytes    string `json:"bytes"`
-	Encoding string `json:"encoding"`
+	Bytes    string              `json:"bytes"`
+	Encoding formatting.Encoding `json:"encoding"`
 }
 
 // GenesisUTXO adds messages to UTXOs
@@ -189,7 +189,7 @@ func bech32ToID(address string) (ids.ShortID, error) {
 
 // BuildGenesis build the genesis state of the Platform Chain (and thereby the Avalanche network.)
 func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
-	encoding, err := ss.encodingManager.GetEncoding(args.Encoding)
+	encoding, err := ss.encodingManager.GetEncoder(args.Encoding)
 	if err != nil {
 		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
 	}

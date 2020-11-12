@@ -1,6 +1,9 @@
 package api
 
-import "github.com/ava-labs/avalanchego/ids"
+import (
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+)
 
 // This file contains structs used in arguments and responses in services
 
@@ -58,12 +61,12 @@ type JSONSpendHeader struct {
 
 // GetTxArgs ...
 type GetTxArgs struct {
-	TxID     ids.ID `json:"txID"`
-	Encoding string `json:"encoding"`
+	TxID     ids.ID              `json:"txID"`
+	Encoding formatting.Encoding `json:"encoding"`
 }
 
 // FormattedTx defines a JSON formatted struct containing a Tx in CB58 format
 type FormattedTx struct {
-	Tx       string `json:"tx"`
-	Encoding string `json:"encoding"`
+	Tx       string              `json:"tx"`
+	Encoding formatting.Encoding `json:"encoding"`
 }

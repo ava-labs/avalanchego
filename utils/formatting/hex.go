@@ -19,13 +19,7 @@ var (
 
 // Hex implements the Encoding interface
 // Provides a hex format with 4 byte checksum
-type Hex struct{ Bytes []byte }
-
-// String ...
-func (h Hex) String() string {
-	s, _ := h.ConvertBytes(h.Bytes)
-	return s
-}
+type Hex struct{}
 
 // ConvertString ...
 func (h Hex) ConvertString(str string) ([]byte, error) {
@@ -64,4 +58,4 @@ func (h Hex) ConvertBytes(b []byte) (string, error) {
 }
 
 // Encoding ...
-func (h *Hex) Encoding() string { return HexEncoding }
+func (h *Hex) Encoding() Encoding { return HexEncoding }
