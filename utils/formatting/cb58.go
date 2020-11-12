@@ -21,7 +21,6 @@ const (
 )
 
 var (
-	errMissingQuotes   = errors.New("missing quotes")
 	errMissingChecksum = errors.New("input string is smaller than the checksum size")
 	errBadChecksum     = errors.New("invalid input checksum")
 )

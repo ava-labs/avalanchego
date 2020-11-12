@@ -219,12 +219,12 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) []byte {
 		t.Fatal(err)
 	}
 
-	hex := formatting.Hex{}
-	if err := hex.FromString(reply.Bytes); err != nil {
+	b, err := formatting.Hex{}.ConvertString(reply.Bytes)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	return hex.Bytes
+	return b
 }
 
 func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) {

@@ -79,8 +79,11 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			amount += allocation.InitialAmount
 		}
 
-		encoding.Bytes = memoBytes
-		avax.Memo = encoding.String()
+		var err error
+		avax.Memo, err = encoding.ConvertBytes(memoBytes)
+		if err != nil {
+			return nil, ids.Empty, fmt.Errorf("couldn't parse memo bytes to string: %w", err)
+		}
 		avmArgs.GenesisData = map[string]avm.AssetDefinition{
 			"AVAX": avax, // The AVM starts out with one asset: AVAX
 		}
@@ -96,10 +99,11 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		return nil, ids.ID{}, err
 	}
 
-	if err := encoding.FromString(avmReply.Bytes); err != nil {
+	bytes, err := encoding.ConvertString(avmReply.Bytes)
+	if err != nil {
 		return nil, ids.ID{}, fmt.Errorf("couldn't parse avm genesis reply: %w", err)
 	}
-	avaxAssetID, err := AVAXAssetID(encoding.Bytes)
+	avaxAssetID, err := AVAXAssetID(bytes)
 	if err != nil {
 		return nil, ids.ID{}, fmt.Errorf("couldn't generate AVAX asset ID: %w", err)
 	}
@@ -225,11 +229,12 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		return nil, ids.ID{}, fmt.Errorf("problem while building platform chain's genesis state: %w", err)
 	}
 
-	if err := encoding.FromString(platformvmReply.Bytes); err != nil {
+	genesisBytes, err := encoding.ConvertString(platformvmReply.Bytes)
+	if err != nil {
 		return nil, ids.ID{}, fmt.Errorf("problem parsing platformvm genesis bytes: %w", err)
 	}
 
-	return encoding.Bytes, avaxAssetID, nil
+	return genesisBytes, avaxAssetID, nil
 }
 
 func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {

@@ -21,36 +21,6 @@ var (
 // Provides a hex format with 4 byte checksum
 type Hex struct{ Bytes []byte }
 
-// UnmarshalJSON ...
-func (h *Hex) UnmarshalJSON(b []byte) error {
-	str := string(b)
-	if str == "null" {
-		return nil
-	}
-
-	if len(str) < 2 {
-		return errMissingQuotes
-	}
-
-	lastIndex := len(str) - 1
-	if str[0] != '"' || str[lastIndex] != '"' {
-		return errMissingQuotes
-	}
-	return h.FromString(str[1:lastIndex])
-}
-
-// MarshalJSON ...
-func (h Hex) MarshalJSON() ([]byte, error) { return []byte("\"" + h.String() + "\""), nil }
-
-// FromString ...
-func (h *Hex) FromString(str string) error {
-	rawBytes, err := h.ConvertString(str)
-	if err == nil {
-		h.Bytes = rawBytes
-	}
-	return err
-}
-
 // String ...
 func (h Hex) String() string {
 	s, _ := h.ConvertBytes(h.Bytes)
