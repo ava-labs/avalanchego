@@ -34,3 +34,8 @@ jobs:
     osx_image: xcode11.4
     script:
     - ".ci/build_and_test.sh"
+
+  - stage: build
+    os: windows
+    script:
+    - ".ci/build_and_test.sh"
