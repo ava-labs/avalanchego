@@ -382,7 +382,11 @@ func (vm *VM) removeUTXO(db database.Database, utxoID ids.ID) error {
 		// For each owner of this UTXO, remove from their list of UTXOs
 		for _, addrBytes := range addressable.Addresses() {
 			if err := vm.removeReferencingUTXO(db, addrBytes, utxoID); err != nil {
-				return fmt.Errorf("couldn't update UTXO set of address %s", formatting.CB58{Bytes: addrBytes})
+				// We assume that the maximum size of a byte slice that
+				// can be stringified is at least the length of an address.
+				// If conversion of address to string fails, ignore the error
+				addrStr, _ := formatting.CB58{}.ConvertBytes(addrBytes)
+				return fmt.Errorf("couldn't update UTXO set of address %s", addrStr)
 			}
 		}
 	}

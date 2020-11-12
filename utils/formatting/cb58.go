@@ -27,7 +27,7 @@ var (
 )
 
 // CB58 formats bytes in checksummed base-58 encoding
-type CB58 struct{ Bytes []byte }
+type CB58 struct{}
 
 // ConvertBytes ...
 func (cb58 CB58) ConvertBytes(b []byte) (string, error) {
