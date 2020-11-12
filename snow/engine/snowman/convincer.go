@@ -37,8 +37,6 @@ func (c *convincer) Update() {
 		return
 	}
 
-	pref := c.consensus.Preference()
-	prefSet := ids.Set{}
-	prefSet.Add(pref)
-	c.sender.Chits(c.vdr, c.requestID, prefSet)
+	pref := []ids.ID{c.consensus.Preference()}
+	c.sender.Chits(c.vdr, c.requestID, pref)
 }

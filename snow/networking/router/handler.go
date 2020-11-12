@@ -287,7 +287,7 @@ func (h *Handler) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32,
 
 // AcceptedFrontier passes a AcceptedFrontier message received from the network
 // to the consensus engine.
-func (h *Handler) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) bool {
+func (h *Handler) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) bool {
 	return h.serviceQueue.PushMessage(message{
 		messageType:  constants.AcceptedFrontierMsg,
 		validatorID:  validatorID,
@@ -309,7 +309,7 @@ func (h *Handler) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID u
 
 // GetAccepted passes a GetAccepted message received from the
 // network to the consensus engine.
-func (h *Handler) GetAccepted(validatorID ids.ShortID, requestID uint32, deadline time.Time, containerIDs ids.Set) bool {
+func (h *Handler) GetAccepted(validatorID ids.ShortID, requestID uint32, deadline time.Time, containerIDs []ids.ID) bool {
 	return h.serviceQueue.PushMessage(message{
 		messageType:  constants.GetAcceptedMsg,
 		validatorID:  validatorID,
@@ -322,7 +322,7 @@ func (h *Handler) GetAccepted(validatorID ids.ShortID, requestID uint32, deadlin
 
 // Accepted passes a Accepted message received from the network to the consensus
 // engine.
-func (h *Handler) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) bool {
+func (h *Handler) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) bool {
 	return h.serviceQueue.PushMessage(message{
 		messageType:  constants.AcceptedMsg,
 		validatorID:  validatorID,
@@ -433,7 +433,7 @@ func (h *Handler) PullQuery(validatorID ids.ShortID, requestID uint32, deadline 
 }
 
 // Chits passes a Chits message received from the network to the consensus engine.
-func (h *Handler) Chits(validatorID ids.ShortID, requestID uint32, votes ids.Set) bool {
+func (h *Handler) Chits(validatorID ids.ShortID, requestID uint32, votes []ids.ID) bool {
 	return h.serviceQueue.PushMessage(message{
 		messageType:  constants.ChitsMsg,
 		validatorID:  validatorID,

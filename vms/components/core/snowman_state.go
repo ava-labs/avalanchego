@@ -16,7 +16,7 @@ import (
 var errWrongType = errors.New("got unexpected type from database")
 
 // state.Get(Db, IDTypeID, lastAcceptedID) == ID of last accepted block
-var lastAcceptedID = ids.NewID([32]byte{'l', 'a', 's', 't'})
+var lastAcceptedID = ids.ID{'l', 'a', 's', 't'}
 
 // SnowmanState is a wrapper around state.State
 // In additions to the methods exposed by state.State,

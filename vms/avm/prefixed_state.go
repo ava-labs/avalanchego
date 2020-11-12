@@ -76,7 +76,7 @@ func (s *prefixedState) SetDBInitialized(status choices.Status) error {
 // All returned UTXO IDs have IDs greater than [start], where ids.Empty is the "least" ID.
 // Returns at most [limit] UTXO IDs.
 func (s *prefixedState) Funds(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
-	return s.state.IDs(addr, start.Bytes(), limit)
+	return s.state.IDs(addr, start[:], limit)
 }
 
 // SpendUTXO consumes the provided utxo.

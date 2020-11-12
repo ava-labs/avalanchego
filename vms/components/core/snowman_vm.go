@@ -25,7 +25,7 @@ var (
 
 // If the status of this ID is not choices.Accepted,
 // the db has not yet been initialized
-var dbInitializedID = ids.NewID([32]byte{'d', 'b', ' ', 'i', 'n', 'i', 't'})
+var dbInitializedID = ids.ID{'d', 'b', ' ', 'i', 'n', 'i', 't'}
 
 // SnowmanVM provides the core functionality shared by most snowman vms
 type SnowmanVM struct {

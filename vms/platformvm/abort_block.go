@@ -37,7 +37,7 @@ func (a *Abort) Verify() error {
 
 	a.onAcceptDB, a.onAcceptFunc = parent.onAbort()
 
-	a.vm.currentBlocks[a.ID().Key()] = a
+	a.vm.currentBlocks[a.ID()] = a
 	a.parentBlock().addChild(a)
 	return nil
 }

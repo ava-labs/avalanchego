@@ -59,9 +59,7 @@ func (tx *UnsignedImportTx) Verify(
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.SourceChain.IsZero():
-		return errWrongChainID
-	case !tx.SourceChain.Equals(avmID):
+	case tx.SourceChain != avmID:
 		// TODO: remove this check if we allow for P->C swaps
 		return errWrongChainID
 	case len(tx.ImportedInputs) == 0:
@@ -128,7 +126,8 @@ func (tx *UnsignedImportTx) SemanticVerify(
 
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))
 	for i, in := range tx.ImportedInputs {
-		utxoIDs[i] = in.UTXOID.InputID().Bytes()
+		utxoID := in.UTXOID.InputID()
+		utxoIDs[i] = utxoID[:]
 	}
 	allUTXOBytes, err := vm.Ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
 	if err != nil {
@@ -162,7 +161,8 @@ func (tx *UnsignedImportTx) SemanticVerify(
 func (tx *UnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) error {
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))
 	for i, in := range tx.ImportedInputs {
-		utxoIDs[i] = in.InputID().Bytes()
+		utxoID := in.InputID()
+		utxoIDs[i] = utxoID[:]
 	}
 	return ctx.SharedMemory.Remove(tx.SourceChain, utxoIDs, batch)
 }
@@ -174,7 +174,7 @@ func (vm *VM) newImportTx(
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	if !vm.Ctx.XChainID.Equals(chainID) {
+	if vm.Ctx.XChainID != chainID {
 		return nil, errWrongChainID
 	}
 
@@ -194,7 +194,7 @@ func (vm *VM) newImportTx(
 	importedAmount := uint64(0)
 	now := vm.clock.Unix()
 	for _, utxo := range atomicUTXOs {
-		if !utxo.AssetID().Equals(vm.Ctx.AVAXAssetID) {
+		if utxo.AssetID() != vm.Ctx.AVAXAssetID {
 			continue
 		}
 		inputIntf, utxoSigners, err := kc.Spend(utxo.Out, now)

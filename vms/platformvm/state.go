@@ -90,7 +90,7 @@ func (vm *VM) enqueueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 	default:
 		return fmt.Errorf("staker is unexpected type %T", stakerTx)
 	}
-	stakerID := staker.ID().Bytes() // Tx ID of this tx
+	stakerID := staker.ID() // Tx ID of this tx
 	txBytes := stakerTx.Bytes()
 
 	// Sorted by subnet ID then start time then tx ID
@@ -101,7 +101,7 @@ func (vm *VM) enqueueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.StartTime().Unix()))
 	p.PackByte(priority)
-	p.PackFixedBytes(stakerID)
+	p.PackFixedBytes(stakerID[:])
 	if p.Err != nil {
 		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
 	}
@@ -130,7 +130,7 @@ func (vm *VM) dequeueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 	default:
 		return fmt.Errorf("staker is unexpected type %T", stakerTx)
 	}
-	stakerID := staker.ID().Bytes() // Tx ID of this tx
+	stakerID := staker.ID() // Tx ID of this tx
 
 	// Sorted by subnet ID then start time then ID
 	prefixStart := []byte(fmt.Sprintf("%s%s", subnetID, startDBPrefix))
@@ -140,7 +140,7 @@ func (vm *VM) dequeueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.StartTime().Unix()))
 	p.PackByte(priority)
-	p.PackFixedBytes(stakerID)
+	p.PackFixedBytes(stakerID[:])
 	if p.Err != nil {
 		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
 	}
@@ -175,7 +175,7 @@ func (vm *VM) addStaker(db database.Database, subnetID ids.ID, tx *rewardTx) err
 		return err
 	}
 
-	txID := tx.Tx.ID().Bytes() // Tx ID of this tx
+	txID := tx.Tx.ID() // Tx ID of this tx
 
 	// Sorted by subnet ID then stop time then tx ID
 	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
@@ -185,7 +185,7 @@ func (vm *VM) addStaker(db database.Database, subnetID ids.ID, tx *rewardTx) err
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.EndTime().Unix()))
 	p.PackByte(priority)
-	p.PackFixedBytes(txID)
+	p.PackFixedBytes(txID[:])
 	if p.Err != nil {
 		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
 	}
@@ -215,7 +215,7 @@ func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, tx *rewardTx) 
 		return fmt.Errorf("staker is unexpected type %T", tx.Tx.UnsignedTx)
 	}
 
-	txID := tx.Tx.ID().Bytes() // Tx ID of this tx
+	txID := tx.Tx.ID() // Tx ID of this tx
 
 	// Sorted by subnet ID then stop time
 	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
@@ -225,7 +225,7 @@ func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, tx *rewardTx) 
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.EndTime().Unix()))
 	p.PackByte(priority)
-	p.PackFixedBytes(txID)
+	p.PackFixedBytes(txID[:])
 	if p.Err != nil {
 		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
 	}
@@ -287,11 +287,11 @@ func (vm *VM) isValidator(db database.Database, subnetID ids.ID, nodeID ids.Shor
 
 		switch vdr := tx.Tx.UnsignedTx.(type) {
 		case *UnsignedAddValidatorTx:
-			if subnetID.Equals(constants.PrimaryNetworkID) && vdr.Validator.NodeID.Equals(nodeID) {
+			if subnetID == constants.PrimaryNetworkID && vdr.Validator.NodeID.Equals(nodeID) {
 				return vdr, true, nil
 			}
 		case *UnsignedAddSubnetValidatorTx:
-			if subnetID.Equals(vdr.Validator.SubnetID()) && vdr.Validator.NodeID.Equals(nodeID) {
+			if subnetID == vdr.Validator.SubnetID() && vdr.Validator.NodeID.Equals(nodeID) {
 				return vdr, true, nil
 			}
 		}
@@ -317,11 +317,11 @@ func (vm *VM) willBeValidator(db database.Database, subnetID ids.ID, nodeID ids.
 
 		switch vdr := tx.UnsignedTx.(type) {
 		case *UnsignedAddValidatorTx:
-			if subnetID.Equals(constants.PrimaryNetworkID) && vdr.Validator.NodeID.Equals(nodeID) {
+			if subnetID == constants.PrimaryNetworkID && vdr.Validator.NodeID.Equals(nodeID) {
 				return vdr, true, nil
 			}
 		case *UnsignedAddSubnetValidatorTx:
-			if subnetID.Equals(vdr.Validator.SubnetID()) && vdr.Validator.NodeID.Equals(nodeID) {
+			if subnetID == vdr.Validator.SubnetID() && vdr.Validator.NodeID.Equals(nodeID) {
 				return vdr, true, nil
 			}
 		}
@@ -389,32 +389,37 @@ func (vm *VM) removeUTXO(db database.Database, utxoID ids.ID) error {
 // Only returns UTXOs after [start].
 // Returns at most [limit] UTXO IDs.
 // Returns nil if no UTXOs reference [addr].
-func (vm *VM) getReferencingUTXOs(db database.Database, addr []byte, start ids.ID, limit int) (ids.Set, error) {
-	toFetch := limit
-	utxoIDs := ids.Set{}
-	iter := prefixdb.NewNested(addr, db).NewIteratorWithStart(start.Bytes())
+
+func (vm *VM) getReferencingUTXOs(db database.Database, addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
+	idSlice := []ids.ID(nil)
+
+	iter := prefixdb.NewNested(addr, db).NewIteratorWithStart(start[:])
 	defer iter.Release()
-	for toFetch > 0 && iter.Next() {
-		if utxoID, err := ids.ToID(iter.Key()); err != nil {
+	numFetched := 0
+	for numFetched < limit && iter.Next() {
+		if keyID, err := ids.ToID(iter.Key()); err != nil {
 			return nil, err
-		} else if !utxoID.Equals(start) {
-			utxoIDs.Add(utxoID)
-			toFetch--
+		} else if keyID != start {
+			idSlice = append(idSlice, keyID)
+			numFetched++
+
 		}
 	}
-	return utxoIDs, nil
+	return idSlice, nil
 }
 
 // Persist that the UTXO with ID [utxoID] references [addr]
 func (vm *VM) putReferencingUTXO(db database.Database, addrBytes []byte, utxoID ids.ID) error {
 	prefixedDB := prefixdb.NewNested(addrBytes, db)
-	return prefixedDB.Put(utxoID.Bytes(), nil)
+
+	defer prefixedDB.Close()
+	return prefixedDB.Put(utxoID[:], nil)
 }
 
 // Remove the UTXO with ID [utxoID] from the set of UTXOs that reference [addr]
 func (vm *VM) removeReferencingUTXO(db database.Database, addrBytes []byte, utxoID ids.ID) error {
 	prefixedDB := prefixdb.NewNested(addrBytes, db)
-	return prefixedDB.Delete(utxoID.Bytes())
+	return prefixedDB.Delete(utxoID[:])
 }
 
 // GetUTXOs returns UTXOs such that at least one of the addresses in [addrs] is referenced.
@@ -433,6 +438,7 @@ func (vm *VM) GetUTXOs(
 	startAddr state.Marshaller,
 	startUTXOID ids.ID,
 	limit int,
+	paginate bool,
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
 	if limit <= 0 || limit > maxUTXOsToFetch { // Don't fetch more than [maxUTXOsToFetch]
 		limit = maxUTXOsToFetch
@@ -451,27 +457,34 @@ func (vm *VM) GetUTXOs(
 		} else if comp == 0 {
 			start = startUTXOID
 		}
-		utxoIDs, err := vm.getReferencingUTXOs(db, addr.Bytes(), start, limit) // Get IDs of UTXOs to fetch
-		if err != nil {
-			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s", addr)
-		}
-		for utxoIDKey := range utxoIDs { // Get the UTXOs
-			utxoID := ids.NewID(utxoIDKey)
-			if seen.Contains(utxoID) { // already have this UTXO in the list
-				continue
-			}
-			utxo, err := vm.getUTXO(db, utxoID)
+		for {
+			currLimit := limit
+			utxoIDs, err := vm.getReferencingUTXOs(db, addr.Bytes(), start, currLimit) // Get IDs of UTXOs to fetch
 			if err != nil {
-				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
+				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 			}
-			utxos = append(utxos, utxo)
-			seen.Add(utxoID)
-			lastAddr = addr
-			lastIndex = utxoID
-			limit--
-			if limit <= 0 {
-				break // Found [limit] utxos; stop.
+			for _, utxoIDKey := range utxoIDs { // Get the UTXOs
+				if seen.Contains(utxoIDKey) { // already have this UTXO in the list
+					continue
+				}
+				utxo, err := vm.getUTXO(db, utxoIDKey)
+				if err != nil {
+					return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoIDKey, err)
+				}
+				utxos = append(utxos, utxo)
+				seen.Add(utxoIDKey)
+				lastAddr = addr
+				lastIndex = utxoIDKey
+				currLimit--
+				if currLimit <= 0 {
+					break // Found [limit] utxos; stop.
+				}
 			}
+
+			if paginate || len(utxoIDs) == 0 { // Avoiding a downstream make([]) making this an infinite loop
+				break // No more utxos available for that address | Don't fetch more utxos
+			}
+			start = utxoIDs[len(utxoIDs)-1]
 		}
 	}
 	return utxos, lastAddr, lastIndex, nil
@@ -479,7 +492,7 @@ func (vm *VM) GetUTXOs(
 
 // getBalance returns the balance of [addrs]
 func (vm *VM) getBalance(db database.Database, addrs ids.ShortSet) (uint64, error) {
-	utxos, _, _, err := vm.GetUTXOs(db, addrs, ids.ShortEmpty, ids.Empty, -1)
+	utxos, _, _, err := vm.GetUTXOs(db, addrs, ids.ShortEmpty, ids.Empty, -1, false)
 	if err != nil {
 		return 0, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}
@@ -516,7 +529,7 @@ func (vm *VM) getChain(db database.Database, id ids.ID) (*Tx, error) {
 		return nil, err
 	}
 	for _, chain := range chains {
-		if chain.ID().Equals(id) {
+		if chain.ID() == id {
 			return chain, nil
 		}
 	}
@@ -571,7 +584,7 @@ func (vm *VM) getSubnet(db database.Database, id ids.ID) (*Tx, TxError) {
 	}
 
 	for _, subnet := range subnets {
-		if subnet.ID().Equals(id) {
+		if subnet.ID() == id {
 			return subnet, nil
 		}
 	}

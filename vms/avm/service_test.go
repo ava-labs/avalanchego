@@ -172,7 +172,7 @@ func TestServiceIssueTx(t *testing.T) {
 	if err := s.IssueTx(nil, txArgs, txReply); err != nil {
 		t.Fatal(err)
 	}
-	if !txReply.TxID.Equals(tx.ID()) {
+	if txReply.TxID != tx.ID() {
 		t.Fatalf("Expected %q, got %q", txReply.TxID, tx.ID())
 	}
 }
@@ -399,8 +399,9 @@ func TestServiceGetUTXOs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		utxoID := utxo.InputID()
 		elems[i] = &atomic.Element{
-			Key:   utxo.InputID().Bytes(),
+			Key:   utxoID[:],
 			Value: utxoBytes,
 			Traits: [][]byte{
 				rawAddr.Bytes(),
@@ -1116,7 +1117,7 @@ func TestSend(t *testing.T) {
 		t.Fatalf("Expected to find 1 pending tx after send, but found %d", len(pendingTxs))
 	}
 
-	if !reply.TxID.Equals(pendingTxs[0].ID()) {
+	if reply.TxID != pendingTxs[0].ID() {
 		t.Fatal("Transaction ID returned by Send does not match the transaction found in vm's pending transactions")
 	}
 }
@@ -1179,7 +1180,7 @@ func TestSendMultiple(t *testing.T) {
 		t.Fatalf("Expected to find 1 pending tx after send, but found %d", len(pendingTxs))
 	}
 
-	if !reply.TxID.Equals(pendingTxs[0].ID()) {
+	if reply.TxID != pendingTxs[0].ID() {
 		t.Fatal("Transaction ID returned by SendMultiple does not match the transaction found in vm's pending transactions")
 	}
 
@@ -1257,8 +1258,9 @@ func TestImportAVAX(t *testing.T) {
 	}
 
 	peerSharedMemory := m.NewSharedMemory(platformChainID)
+	utxoID := utxo.InputID()
 	if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
-		Key:   utxo.InputID().Bytes(),
+		Key:   utxoID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			addr0.Bytes(),

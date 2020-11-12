@@ -25,7 +25,7 @@ func (qs *QueueSet) SetHead(id ID) {
 	for qs.idList.Len() > 0 {
 		element := qs.idList.Front()
 		head := element.Value.(ID)
-		if head.Equals(id) {
+		if head == id {
 			return
 		}
 		qs.idList.Remove(element)

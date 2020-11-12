@@ -13,10 +13,10 @@ import (
 // Right now this is implemented in the networking package
 type ExternalSender interface {
 	GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time)
-	AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set)
+	AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
 
-	GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs ids.Set)
-	Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set)
+	GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs []ids.ID)
+	Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
 
 	GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID)
 	MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte)
@@ -26,7 +26,7 @@ type ExternalSender interface {
 
 	PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID, container []byte)
 	PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID)
-	Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes ids.Set)
+	Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID)
 
 	Gossip(chainID ids.ID, containerID ids.ID, container []byte)
 }

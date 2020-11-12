@@ -99,6 +99,7 @@ type ChainParameters struct {
 }
 
 type chain struct {
+	Name    string
 	Engine  common.Engine
 	Handler *router.Handler
 	Ctx     *snow.Context
@@ -149,18 +150,17 @@ type manager struct {
 	chainsLock sync.Mutex
 	// Key: Chain's ID
 	// Value: The chain
-	chains map[[32]byte]*router.Handler
+	chains map[ids.ID]*router.Handler
 }
 
 // New returns a new Manager where:
 //     <db> is this node's database
 //     <sender> sends messages to other validators
 //     <validators> validate this chain
-// TODO: Make this function take less arguments
 func New(config *ManagerConfig) Manager {
 	m := &manager{
 		ManagerConfig: *config,
-		chains:        make(map[[32]byte]*router.Handler),
+		chains:        make(map[ids.ID]*router.Handler),
 	}
 	m.Initialize()
 	return m
@@ -209,17 +209,16 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		m.Log.Error("Error while creating new chain: %s", err)
 		return
 	}
-	chainID := chainParams.ID.Key()
 
 	m.chainsLock.Lock()
-	m.chains[chainID] = chain.Handler
+	m.chains[chainParams.ID] = chain.Handler
 	m.chainsLock.Unlock()
 
 	// Associate the newly created chain with its default alias
 	m.Log.AssertNoError(m.Alias(chainParams.ID, chainParams.ID.String()))
 
 	// Notify those that registered to be notified when a new chain is created
-	m.notifyRegistrants(chain.Ctx, chain.VM)
+	m.notifyRegistrants(chain.Name, chain.Ctx, chain.VM)
 }
 
 // Create a chain
@@ -397,7 +396,7 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	db := prefixdb.New(ctx.ChainID.Bytes(), m.DB)
+	db := prefixdb.New(ctx.ChainID[:], m.DB)
 	vmDB := prefixdb.New([]byte("vm"), db)
 	vertexDB := prefixdb.New([]byte("vertex"), db)
 	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db)
@@ -487,6 +486,7 @@ func (m *manager) createAvalancheChain(
 	)
 
 	return &chain{
+		Name:    chainAlias,
 		Engine:  engine,
 		Handler: handler,
 		VM:      vm,
@@ -508,7 +508,7 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	db := prefixdb.New(ctx.ChainID.Bytes(), m.DB)
+	db := prefixdb.New(ctx.ChainID[:], m.DB)
 	vmDB := prefixdb.New([]byte("vm"), db)
 	bootstrappingDB := prefixdb.New([]byte("bs"), db)
 
@@ -588,6 +588,7 @@ func (m *manager) createSnowmanChain(
 	}
 
 	return &chain{
+		Name:    chainAlias,
 		Engine:  engine,
 		Handler: handler,
 		VM:      vm,
@@ -599,7 +600,7 @@ func (m *manager) SubnetID(chainID ids.ID) (ids.ID, error) {
 	m.chainsLock.Lock()
 	defer m.chainsLock.Unlock()
 
-	chain, exists := m.chains[chainID.Key()]
+	chain, exists := m.chains[chainID]
 	if !exists {
 		return ids.ID{}, errors.New("unknown chain ID")
 	}
@@ -608,7 +609,7 @@ func (m *manager) SubnetID(chainID ids.ID) (ids.ID, error) {
 
 func (m *manager) IsBootstrapped(id ids.ID) bool {
 	m.chainsLock.Lock()
-	chain, exists := m.chains[id.Key()]
+	chain, exists := m.chains[id]
 	m.chainsLock.Unlock()
 	if !exists {
 		return false
@@ -627,9 +628,9 @@ func (m *manager) LookupVM(alias string) (ids.ID, error) { return m.VMManager.Lo
 
 // Notify registrants [those who want to know about the creation of chains]
 // that the specified chain has been created
-func (m *manager) notifyRegistrants(ctx *snow.Context, vm interface{}) {
+func (m *manager) notifyRegistrants(name string, ctx *snow.Context, vm interface{}) {
 	for _, registrant := range m.registrants {
-		registrant.RegisterChain(ctx, vm)
+		registrant.RegisterChain(name, ctx, vm)
 	}
 }
 
