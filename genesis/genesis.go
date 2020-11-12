@@ -43,7 +43,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 
 	amount := uint64(0)
 
-	encoder := formatting.NewEncoder(formatting.HexEncoding)
+	encoder := formatting.NewEncoder(formatting.Hex)
 	// Specify the genesis state of the AVM
 	avmArgs := avm.BuildGenesisArgs{
 		NetworkID: json.Uint32(config.NetworkID),

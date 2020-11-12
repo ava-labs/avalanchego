@@ -17,12 +17,12 @@ var (
 	errMissingHexPrefix = errors.New("missing 0x prefix to hex encoding")
 )
 
-// Hex implements the Encoding interface
+// hexEncoder implements the Encoder interface
 // Provides a hex format with 4 byte checksum
-type Hex struct{}
+type hexEncoder struct{}
 
 // ConvertString ...
-func (h Hex) ConvertString(str string) ([]byte, error) {
+func (h hexEncoder) ConvertString(str string) ([]byte, error) {
 	if len(str) == 0 {
 		return []byte{}, nil
 	}
@@ -50,7 +50,7 @@ func (h Hex) ConvertString(str string) ([]byte, error) {
 
 // ConvertBytes returns the string representation of [b]
 // Always returns a nil error
-func (h Hex) ConvertBytes(b []byte) (string, error) {
+func (h hexEncoder) ConvertBytes(b []byte) (string, error) {
 	checked := make([]byte, len(b)+4)
 	copy(checked, b)
 	copy(checked[len(b):], hashing.Checksum(b, 4))
@@ -58,4 +58,4 @@ func (h Hex) ConvertBytes(b []byte) (string, error) {
 }
 
 // Encoding ...
-func (h *Hex) Encoding() Encoding { return HexEncoding }
+func (h *hexEncoder) Encoding() Encoding { return Hex }

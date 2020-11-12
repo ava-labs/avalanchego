@@ -10,7 +10,7 @@ import (
 
 func TestHex(t *testing.T) {
 	addr := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 255}
-	result, err := Hex{}.ConvertBytes(addr)
+	result, err := hexEncoder{}.ConvertBytes(addr)
 	if err != nil {
 		t.Fatal()
 	}
@@ -22,7 +22,7 @@ func TestHex(t *testing.T) {
 
 func TestHexSingle(t *testing.T) {
 	addr := []byte{0}
-	result, err := Hex{}.ConvertBytes(addr)
+	result, err := hexEncoder{}.ConvertBytes(addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +33,7 @@ func TestHexSingle(t *testing.T) {
 }
 
 func TestHexFromStringInvalidCharacter(t *testing.T) {
-	hexWrapper := Hex{}
+	hexWrapper := hexEncoder{}
 	bytes, err := hexWrapper.ConvertString("0x0017afa0Zd") // Contains invalid character Z
 	if err == nil {
 		t.Fatalf("Should have errored reading invalid character 'Z', instead produced: 0x%x", bytes)
@@ -42,7 +42,7 @@ func TestHexFromStringInvalidCharacter(t *testing.T) {
 
 func TestHexParseBytes(t *testing.T) {
 	ui := "0x00010203040506070809ff4482539c"
-	hexWrapper := Hex{}
+	hexWrapper := hexEncoder{}
 	b, err := hexWrapper.ConvertString(ui)
 	if err != nil {
 		t.Fatalf("Failed to process %s", ui)

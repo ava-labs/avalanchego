@@ -169,7 +169,7 @@ func TestServiceIssueTx(t *testing.T) {
 	}
 
 	tx := NewTx(t, genesisBytes, vm)
-	encoder := formatting.NewEncoder(formatting.HexEncoding)
+	encoder := formatting.NewEncoder(formatting.Hex)
 	txArgs.Tx, err = encoder.ConvertBytes(tx.Bytes())
 	if err != nil {
 		t.Fatal(err)
@@ -212,7 +212,7 @@ func TestServiceGetTxStatus(t *testing.T) {
 		)
 	}
 
-	encoder := formatting.NewEncoder(formatting.HexEncoding)
+	encoder := formatting.NewEncoder(formatting.Hex)
 	txStr, err := encoder.ConvertBytes(tx.Bytes())
 	if err != nil {
 		t.Fatal(err)
@@ -899,7 +899,7 @@ func TestNFTWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	encoder := formatting.NewEncoder(formatting.HexEncoding)
+	encoder := formatting.NewEncoder(formatting.Hex)
 	payload, err := encoder.ConvertBytes([]byte{1, 2, 3, 4, 5})
 	if err != nil {
 		t.Fatal(err)

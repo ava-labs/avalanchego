@@ -208,7 +208,7 @@ func BuildGenesisTest(t *testing.T) []byte {
 
 // BuildGenesisTestWithArgs allows building the genesis while injecting different starting points (args)
 func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) []byte {
-	ss, err := CreateStaticService(formatting.HexEncoding)
+	ss, err := CreateStaticService(formatting.Hex)
 	if err != nil {
 		t.Fatalf("Failed to create static service due to: %s", err)
 	}

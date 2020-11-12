@@ -542,7 +542,7 @@ func TestGenesisGetUTXOs(t *testing.T) {
 		Chains:        nil,
 		Time:          json.Uint64(defaultGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
-		Encoding:      formatting.HexEncoding,
+		Encoding:      formatting.Hex,
 	}
 
 	_, _, vm, _ := GenesisVMWithArgs(t, &buildGenesisArgs)

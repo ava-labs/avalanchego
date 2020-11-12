@@ -8,7 +8,7 @@ import (
 )
 
 func TestEncodingManager(t *testing.T) {
-	m, err := NewEncodingManager(HexEncoding)
+	m, err := NewEncodingManager(Hex)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -23,12 +23,12 @@ func TestEncodingManager(t *testing.T) {
 	}
 	*/
 
-	hex2, err := m.GetEncoder(HexEncoding)
+	hex2, err := m.GetEncoder(Hex)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := hex2.(*Hex); !ok {
-		t.Fatal("Encoding manager returned the wrong default encoding when HexEncoding was specified")
+	if _, ok := hex2.(*hexEncoder); !ok {
+		t.Fatal("Encoding manager returned the wrong default encoder when Hex was specified")
 	}
 
 	encoder, err := m.GetEncoder(CB58)
