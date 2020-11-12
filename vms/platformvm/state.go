@@ -281,17 +281,20 @@ func (vm *VM) isValidator(db database.Database, subnetID ids.ID, nodeID ids.Shor
 		if err := Codec.Unmarshal(txBytes, &tx); err != nil {
 			return nil, false, err
 		}
-		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
-			return nil, false, err
-		}
 
 		switch vdr := tx.Tx.UnsignedTx.(type) {
 		case *UnsignedAddValidatorTx:
 			if subnetID == constants.PrimaryNetworkID && vdr.Validator.NodeID.Equals(nodeID) {
+				if err := tx.Tx.Sign(vm.codec, nil); err != nil {
+					return nil, false, err
+				}
 				return vdr, true, nil
 			}
 		case *UnsignedAddSubnetValidatorTx:
 			if subnetID == vdr.Validator.SubnetID() && vdr.Validator.NodeID.Equals(nodeID) {
+				if err := tx.Tx.Sign(vm.codec, nil); err != nil {
+					return nil, false, err
+				}
 				return vdr, true, nil
 			}
 		}
@@ -311,17 +314,20 @@ func (vm *VM) willBeValidator(db database.Database, subnetID ids.ID, nodeID ids.
 		if err := Codec.Unmarshal(txBytes, &tx); err != nil {
 			return nil, false, err
 		}
-		if err := tx.Sign(vm.codec, nil); err != nil {
-			return nil, false, err
-		}
 
 		switch vdr := tx.UnsignedTx.(type) {
 		case *UnsignedAddValidatorTx:
 			if subnetID == constants.PrimaryNetworkID && vdr.Validator.NodeID.Equals(nodeID) {
+				if err := tx.Sign(vm.codec, nil); err != nil {
+					return nil, false, err
+				}
 				return vdr, true, nil
 			}
 		case *UnsignedAddSubnetValidatorTx:
 			if subnetID == vdr.Validator.SubnetID() && vdr.Validator.NodeID.Equals(nodeID) {
+				if err := tx.Sign(vm.codec, nil); err != nil {
+					return nil, false, err
+				}
 				return vdr, true, nil
 			}
 		}
