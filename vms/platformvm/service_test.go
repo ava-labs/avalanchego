@@ -132,13 +132,13 @@ func TestExportKey(t *testing.T) {
 		t.Fatalf("ExportKeyReply is missing secret key prefix: %s", constants.SecretKeyPrefix)
 	}
 	privateKeyString := strings.TrimPrefix(reply.PrivateKey, constants.SecretKeyPrefix)
-	privateKey := formatting.CB58{}
-	if err := privateKey.FromString(privateKeyString); err != nil {
+	privKeyBytes, err := formatting.CB58{}.ConvertString(privateKeyString)
+	if err != nil {
 		t.Fatalf("Failed to parse key: %s", err)
 	}
 
-	if !bytes.Equal(testPrivateKey, privateKey.Bytes) {
-		t.Fatalf("Expected %v, got %v", testPrivateKey, privateKey.Bytes)
+	if !bytes.Equal(testPrivateKey, privKeyBytes) {
+		t.Fatalf("Expected %v, got %v", testPrivateKey, privKeyBytes)
 	}
 }
 

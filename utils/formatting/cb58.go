@@ -29,15 +29,6 @@ var (
 // CB58 formats bytes in checksummed base-58 encoding
 type CB58 struct{ Bytes []byte }
 
-// FromString ...
-func (cb58 *CB58) FromString(str string) error {
-	rawBytes, err := cb58.ConvertString(str)
-	if err == nil {
-		cb58.Bytes = rawBytes
-	}
-	return err
-}
-
 // ConvertBytes ...
 func (cb58 CB58) ConvertBytes(b []byte) (string, error) {
 	if len(b) > maxCB58Size {

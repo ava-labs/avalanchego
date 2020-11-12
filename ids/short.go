@@ -33,12 +33,11 @@ func ToShortID(bytes []byte) (ShortID, error) {
 
 // ShortFromString is the inverse of ShortID.String()
 func ShortFromString(idStr string) (ShortID, error) {
-	cb58 := formatting.CB58{}
-	err := cb58.FromString(idStr)
+	bytes, err := formatting.CB58{}.ConvertString(idStr)
 	if err != nil {
 		return ShortID{}, err
 	}
-	return ToShortID(cb58.Bytes)
+	return ToShortID(bytes)
 }
 
 // ShortFromPrefixedString returns a ShortID assuming the cb58 format is

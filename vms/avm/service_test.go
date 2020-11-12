@@ -962,7 +962,6 @@ func TestImportExportKey(t *testing.T) {
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
 
-	formattedKey := formatting.CB58{Bytes: sk.Bytes()}
 	privKeyStr, _ := formatting.CB58{}.ConvertBytes(sk.Bytes())
 	importArgs := &ImportKeyArgs{
 		UserPass: api.UserPass{
@@ -996,11 +995,11 @@ func TestImportExportKey(t *testing.T) {
 		t.Fatalf("ExportKeyReply private key: %s mssing secret key prefix: %s", exportReply.PrivateKey, constants.SecretKeyPrefix)
 	}
 
-	exportedKey := formatting.CB58{}
-	if err := exportedKey.FromString(strings.TrimPrefix(exportReply.PrivateKey, constants.SecretKeyPrefix)); err != nil {
+	parsedKeyBytes, err := formatting.CB58{}.ConvertString(strings.TrimPrefix(exportReply.PrivateKey, constants.SecretKeyPrefix))
+	if err != nil {
 		t.Fatal("Failed to parse exported private key")
 	}
-	if !bytes.Equal(exportedKey.Bytes, formattedKey.Bytes) {
+	if !bytes.Equal(sk.Bytes(), parsedKeyBytes) {
 		t.Fatal("Unexpected key was found in ExportKeyReply")
 	}
 }

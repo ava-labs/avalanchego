@@ -29,12 +29,11 @@ func TestBuildGenesis(t *testing.T) {
 	}
 	var addrMap = map[string]string{}
 	for _, addrStr := range addrStrArray {
-		cb58 := formatting.CB58{}
-		err := cb58.FromString(addrStr)
+		b, err := formatting.CB58{}.ConvertString(addrStr)
 		if err != nil {
 			t.Fatal(err)
 		}
-		addrMap[addrStr], err = formatting.FormatBech32(testHRP, cb58.Bytes)
+		addrMap[addrStr], err = formatting.FormatBech32(testHRP, b)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -61,53 +61,50 @@ func TestCB58ID(t *testing.T) {
 
 func TestCB58ParseBytes(t *testing.T) {
 	ui := "1NVSVezva3bAtJesnUj"
-	cb58 := CB58{}
-	err := cb58.FromString(ui)
+	b, err := CB58{}.ConvertString(ui)
 	if err != nil {
 		t.Fatalf("Failed to process %s", ui)
 	}
 	expected := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 255}
-	if !bytes.Equal(cb58.Bytes, expected) {
-		t.Fatalf("Expected 0x%x, got 0x%x", expected, cb58.Bytes)
+	if !bytes.Equal(b, expected) {
+		t.Fatalf("Expected 0x%x, got 0x%x", expected, b)
 	}
 }
 
 func TestCB58ParseBytesSingle(t *testing.T) {
 	ui := "1c7hwa"
-	cb58 := CB58{}
-	err := cb58.FromString(ui)
+	b, err := CB58{}.ConvertString(ui)
 	if err != nil {
 		t.Fatalf("Failed to process %s", ui)
 	}
 	expected := []byte{0}
-	if !bytes.Equal(cb58.Bytes, expected) {
-		t.Fatalf("Expected 0x%x, got 0x%x", expected, cb58.Bytes)
+	if !bytes.Equal(b, expected) {
+		t.Fatalf("Expected 0x%x, got 0x%x", expected, b)
 	}
 }
 
 func TestCB58ParseBytesError(t *testing.T) {
 	ui := "0"
-	cb58 := CB58{}
-	err := cb58.FromString(ui)
+	_, err := CB58{}.ConvertString(ui)
 	if err == nil {
-		t.Fatalf("Incorrectly parsed %s", ui)
+		t.Fatalf("should have errored while parsing %s", ui)
 	}
 
 	ui = "13pP7vbI"
-	err = cb58.FromString(ui)
+	_, err = CB58{}.ConvertString(ui)
 	if err == nil {
-		t.Fatalf("Incorrectly parsed %s", ui)
+		t.Fatalf("should have errored while parsing %s", ui)
 	}
 
 	ui = "13"
-	err = cb58.FromString(ui)
+	_, err = CB58{}.ConvertString(ui)
 	if err == nil {
-		t.Fatalf("Incorrectly parsed %s", ui)
+		t.Fatalf("should have errored while parsing %s", ui)
 	}
 
 	ui = "13pP7vb3"
-	err = cb58.FromString(ui)
+	_, err = CB58{}.ConvertString(ui)
 	if err == nil {
-		t.Fatalf("Incorrectly parsed %s", ui)
+		t.Fatalf("should have errored while parsing %s", ui)
 	}
 }

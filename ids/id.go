@@ -32,11 +32,11 @@ func ToID(bytes []byte) (ID, error) {
 
 // FromString is the inverse of ID.String()
 func FromString(idStr string) (ID, error) {
-	cb58 := formatting.CB58{}
-	if err := cb58.FromString(idStr); err != nil {
+	bytes, err := formatting.CB58{}.ConvertString(idStr)
+	if err != nil {
 		return ID{}, err
 	}
-	return ToID(cb58.Bytes)
+	return ToID(bytes)
 }
 
 // MarshalJSON ...

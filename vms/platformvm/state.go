@@ -356,7 +356,11 @@ func (vm *VM) putUTXO(db database.Database, utxo *avax.UTXO) error {
 		// For each owner of this UTXO, add to list of UTXOs owned by that addr
 		for _, addrBytes := range addressable.Addresses() {
 			if err := vm.putReferencingUTXO(db, addrBytes, utxoID); err != nil {
-				return fmt.Errorf("couldn't update UTXO set of address %s", formatting.CB58{Bytes: addrBytes})
+				// We assume that the maximum size of a byte slice that
+				// can be stringified is at least the length of an address.
+				// If conversion of address to string fails, ignore the error
+				addrStr, _ := formatting.CB58{}.ConvertBytes(addrBytes)
+				return fmt.Errorf("couldn't update UTXO set of address %s", addrStr)
 			}
 		}
 	}

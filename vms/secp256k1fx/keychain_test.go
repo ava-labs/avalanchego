@@ -45,10 +45,10 @@ func TestKeychainAdd(t *testing.T) {
 	kc := NewKeychain()
 
 	cb58 := formatting.CB58{}
-	if err := cb58.FromString(keys[0]); err != nil {
+	skBytes, err := cb58.ConvertString(keys[0])
+	if err != nil {
 		t.Fatal(err)
 	}
-	skBytes := cb58.Bytes
 
 	skIntff, err := kc.factory.ToPrivateKey(skBytes)
 	if err != nil {
@@ -102,10 +102,10 @@ func TestKeychainMatch(t *testing.T) {
 	cb58 := formatting.CB58{}
 	sks := []*crypto.PrivateKeySECP256K1R{}
 	for _, keyStr := range keys {
-		if err := cb58.FromString(keyStr); err != nil {
+		skBytes, err := cb58.ConvertString(keyStr)
+		if err != nil {
 			t.Fatal(err)
 		}
-		skBytes := cb58.Bytes
 
 		skIntf, err := kc.factory.ToPrivateKey(skBytes)
 		if err != nil {
@@ -170,10 +170,10 @@ func TestKeychainSpendMint(t *testing.T) {
 	cb58 := formatting.CB58{}
 	sks := []*crypto.PrivateKeySECP256K1R{}
 	for _, keyStr := range keys {
-		if err := cb58.FromString(keyStr); err != nil {
+		skBytes, err := cb58.ConvertString(keyStr)
+		if err != nil {
 			t.Fatal(err)
 		}
-		skBytes := cb58.Bytes
 
 		skIntf, err := kc.factory.ToPrivateKey(skBytes)
 		if err != nil {
@@ -232,10 +232,10 @@ func TestKeychainSpendTransfer(t *testing.T) {
 	cb58 := formatting.CB58{}
 	sks := []*crypto.PrivateKeySECP256K1R{}
 	for _, keyStr := range keys {
-		if err := cb58.FromString(keyStr); err != nil {
+		skBytes, err := cb58.ConvertString(keyStr)
+		if err != nil {
 			t.Fatal(err)
 		}
-		skBytes := cb58.Bytes
 
 		skIntf, err := kc.factory.ToPrivateKey(skBytes)
 		if err != nil {
@@ -302,10 +302,10 @@ func TestKeychainString(t *testing.T) {
 	kc := NewKeychain()
 
 	cb58 := formatting.CB58{}
-	if err := cb58.FromString(keys[0]); err != nil {
+	skBytes, err := cb58.ConvertString(keys[0])
+	if err != nil {
 		t.Fatal(err)
 	}
-	skBytes := cb58.Bytes
 
 	skIntf, err := kc.factory.ToPrivateKey(skBytes)
 	if err != nil {
@@ -329,10 +329,10 @@ func TestKeychainPrefixedString(t *testing.T) {
 	kc := NewKeychain()
 
 	cb58 := formatting.CB58{}
-	if err := cb58.FromString(keys[0]); err != nil {
+	skBytes, err := cb58.ConvertString(keys[0])
+	if err != nil {
 		t.Fatal(err)
 	}
-	skBytes := cb58.Bytes
 
 	skIntf, err := kc.factory.ToPrivateKey(skBytes)
 	if err != nil {

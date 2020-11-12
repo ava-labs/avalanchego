@@ -98,7 +98,6 @@ const (
 
 func init() {
 	ctx := defaultContext()
-	byteFormatter := formatting.CB58{}
 	factory := crypto.FactorySECP256K1R{}
 	for _, key := range []string{
 		"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
@@ -107,8 +106,10 @@ func init() {
 		"ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN",
 		"2RWLv6YVEXDiWLpaCbXhhqxtLbnFaKQsWPSSMSPhpWo47uJAeV",
 	} {
-		ctx.Log.AssertNoError(byteFormatter.FromString(key))
-		pk, err := factory.ToPrivateKey(byteFormatter.Bytes)
+
+		privKeyBytes, err := formatting.CB58{}.ConvertString(key)
+		ctx.Log.AssertNoError(err)
+		pk, err := factory.ToPrivateKey(privKeyBytes)
 		ctx.Log.AssertNoError(err)
 		keys = append(keys, pk.(*crypto.PrivateKeySECP256K1R))
 	}
