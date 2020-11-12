@@ -166,9 +166,6 @@ type VM struct {
 	// Used to create and use keys.
 	factory crypto.FactorySECP256K1R
 
-	// Used to manage encoding for API calls
-	encodingManager formatting.EncodingManager
-
 	// Used to get time. Useful for faking time during tests.
 	clock timer.Clock
 
@@ -242,11 +239,6 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.codec = Codec
-	encodingManager, err := formatting.NewEncodingManager(formatting.CB58)
-	if err != nil {
-		return fmt.Errorf("problem creating encoding manager: %w", err)
-	}
-	vm.encodingManager = encodingManager
 
 	vm.droppedTxCache = cache.LRU{Size: droppedTxCacheSize}
 	vm.connections = make(map[[20]byte]time.Time)
@@ -663,7 +655,7 @@ func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 // CreateStaticHandlers implements the snowman.ChainVM interface
 func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	// Static service's name is platform
-	staticService, _ := CreateStaticService(formatting.CB58)
+	staticService := CreateStaticService()
 	handler, _ := vm.SnowmanVM.NewHandler("platform", staticService)
 	return map[string]*common.HTTPHandler{
 		"": handler,

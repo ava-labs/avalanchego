@@ -25,15 +25,11 @@ var (
 )
 
 // StaticService defines the base service for the asset vm
-type StaticService struct{ encodingManager formatting.EncodingManager }
+type StaticService struct{}
 
 // CreateStaticService ...
-func CreateStaticService(defaultEnc formatting.Encoding) (*StaticService, error) {
-	encodingManager, err := formatting.NewEncodingManager(defaultEnc)
-	if err != nil {
-		return nil, err
-	}
-	return &StaticService{encodingManager: encodingManager}, nil
+func CreateStaticService() *StaticService {
+	return &StaticService{}
 }
 
 // BuildGenesisArgs are arguments for BuildGenesis
@@ -80,14 +76,11 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		return errs.Err
 	}
 
-	encoding, err := ss.encodingManager.GetEncoder(args.Encoding)
-	if err != nil {
-		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
-	}
+	encoder := formatting.NewEncoder(args.Encoding)
 
 	g := Genesis{}
 	for assetAlias, assetDefinition := range args.GenesisData {
-		assetMemo, err := encoding.ConvertString(assetDefinition.Memo)
+		assetMemo, err := encoder.ConvertString(assetDefinition.Memo)
 		if err != nil {
 			return fmt.Errorf("problem formatting asset definition memo due to: %w", err)
 		}
@@ -184,10 +177,10 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		return fmt.Errorf("problem marshaling genesis: %w", err)
 	}
 
-	reply.Bytes, err = encoding.ConvertBytes(b)
+	reply.Bytes, err = encoder.ConvertBytes(b)
 	if err != nil {
 		return fmt.Errorf("couldn't encode genesis as string: %s", err)
 	}
-	reply.Encoding = encoding.Encoding()
+	reply.Encoding = encoder.Encoding()
 	return nil
 }

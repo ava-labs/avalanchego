@@ -75,9 +75,8 @@ func BenchmarkEncodings(b *testing.B) {
 			size:     1 << 22, // 4mb
 		},
 	}
-	manager, _ := NewEncodingManager(Hex)
 	for _, benchmark := range benchmarks {
-		enc, _ := manager.GetEncoder(benchmark.encoding)
+		enc := NewEncoder(benchmark.encoding)
 		bytes := make([]byte, benchmark.size)
 		_, _ = rand.Read(bytes) // #nosec G404
 		b.Run(fmt.Sprintf("%s-%d bytes", benchmark.encoding, benchmark.size), func(b *testing.B) {

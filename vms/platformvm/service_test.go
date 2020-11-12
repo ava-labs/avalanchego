@@ -355,11 +355,8 @@ func TestGetTx(t *testing.T) {
 		} else if err := service.GetTx(nil, arg, &response); err != nil {
 			t.Fatalf("failed test '%s': %s", test.description, err)
 		} else {
-			encoding, err := service.vm.encodingManager.GetEncoder(response.Encoding)
-			if err != nil {
-				t.Fatalf("failed tet '%s': %s", test.description, err)
-			}
-			responseTxBytes, err := encoding.ConvertString(response.Tx)
+			encoder := formatting.NewEncoder(response.Encoding)
+			responseTxBytes, err := encoder.ConvertString(response.Tx)
 			if err != nil {
 				t.Fatalf("failed test '%s': %s", test.description, err)
 			}

@@ -52,10 +52,7 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 	}
 	reply := BuildGenesisReply{}
 
-	ss, err := CreateStaticService(formatting.CB58)
-	if err != nil {
-		t.Fatalf("Failed to create static service due to: %s", err)
-	}
+	ss := CreateStaticService()
 
 	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
 		t.Fatalf("Should have errored due to an invalid balance")
@@ -102,10 +99,7 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 	}
 	reply := BuildGenesisReply{}
 
-	ss, err := CreateStaticService(formatting.CB58)
-	if err != nil {
-		t.Fatalf("Failed to create static service due to: %s", err)
-	}
+	ss := CreateStaticService()
 
 	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
 		t.Fatalf("Should have errored due to an invalid amount")
@@ -153,10 +147,7 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 	}
 	reply := BuildGenesisReply{}
 
-	ss, err := CreateStaticService(formatting.CB58)
-	if err != nil {
-		t.Fatalf("Failed to create static service due to: %s", err)
-	}
+	ss := CreateStaticService()
 
 	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
 		t.Fatalf("Should have errored due to an invalid end time")
@@ -239,20 +230,14 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	}
 	reply := BuildGenesisReply{}
 
-	ss, err := CreateStaticService(formatting.CB58)
-	if err != nil {
-		t.Fatalf("Failed to create static service due to: %s", err)
-	}
+	ss := CreateStaticService()
 
 	if err := ss.BuildGenesis(nil, &args, &reply); err != nil {
 		t.Fatalf("BuildGenesis should not have errored but got error: %s", err)
 	}
 
-	encoding, err := ss.encodingManager.GetEncoder(reply.Encoding)
-	if err != nil {
-		t.Fatalf("Failed to get encoding due to: %s", err)
-	}
-	genesisBytes, err := encoding.ConvertString(reply.Bytes)
+	encoder := formatting.NewEncoder(reply.Encoding)
+	genesisBytes, err := encoder.ConvertString(reply.Bytes)
 	if err != nil {
 		t.Fatalf("Problem decoding BuildGenesis response: %s", err)
 	}

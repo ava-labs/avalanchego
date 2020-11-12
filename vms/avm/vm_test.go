@@ -208,26 +208,15 @@ func BuildGenesisTest(t *testing.T) []byte {
 
 // BuildGenesisTestWithArgs allows building the genesis while injecting different starting points (args)
 func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) []byte {
-	ss, err := CreateStaticService(formatting.Hex)
-	if err != nil {
-		t.Fatalf("Failed to create static service due to: %s", err)
-	}
+	ss := CreateStaticService()
 
 	reply := BuildGenesisReply{}
-	err = ss.BuildGenesis(nil, args, &reply)
+	err := ss.BuildGenesis(nil, args, &reply)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	encoderManger, err := formatting.NewEncodingManager(reply.Encoding)
-	if err != nil {
-		t.Fatalf("couldn't create encoding manager: %s", err)
-	}
-	encoder, err := encoderManger.GetEncoder(reply.Encoding)
-	if err != nil {
-		t.Fatalf("couldn't get encoder: %s", err)
-	}
-
+	encoder := formatting.NewEncoder(reply.Encoding)
 	b, err := encoder.ConvertString(reply.Bytes)
 	if err != nil {
 		t.Fatal(err)

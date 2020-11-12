@@ -54,10 +54,9 @@ type UserDB struct {
 
 // Keystore is the RPC interface for keystore management
 type Keystore struct {
-	lock            sync.Mutex
-	log             logging.Logger
-	codec           codec.Codec
-	encodingManager formatting.EncodingManager
+	lock  sync.Mutex
+	log   logging.Logger
+	codec codec.Codec
 
 	// Key: username
 	// Value: The user with that name
@@ -82,11 +81,6 @@ func (ks *Keystore) Initialize(log logging.Logger, db database.Database) error {
 	ks.users = make(map[string]*password.Hash)
 	ks.userDB = prefixdb.New([]byte("users"), db)
 	ks.bcDB = prefixdb.New([]byte("bcs"), db)
-	encodingManager, err := formatting.NewEncodingManager(formatting.CB58)
-	if err != nil {
-		return fmt.Errorf("problem creating encoding manager: %w", err)
-	}
-	ks.encodingManager = encodingManager
 	return nil
 }
 
@@ -208,11 +202,7 @@ func (ks *Keystore) ExportUser(_ *http.Request, args *ExportUserArgs, reply *Exp
 	}
 
 	// Encode the user from bytes to string
-	encoder, err := ks.encodingManager.GetEncoder(args.Encoding)
-	if err != nil {
-		return fmt.Errorf("couldn't get encoder: %w", err)
-	}
-
+	encoder := formatting.NewEncoder(args.Encoding)
 	reply.User, err = encoder.ConvertBytes(b)
 	if err != nil {
 		return fmt.Errorf("couldn't encode user to string: %w", err)
@@ -244,10 +234,7 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *api
 	defer ks.lock.Unlock()
 
 	// Decode the user from string to bytes
-	encoder, err := ks.encodingManager.GetEncoder(args.Encoding)
-	if err != nil {
-		return fmt.Errorf("couldn't get encoder: %w", err)
-	}
+	encoder := formatting.NewEncoder(args.Encoding)
 	userBytes, err := encoder.ConvertString(args.User)
 	if err != nil {
 		return fmt.Errorf("couldn't decode 'user' to bytes: %w", err)

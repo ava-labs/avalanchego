@@ -5,7 +5,6 @@ package formatting
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 )
 
@@ -81,6 +80,7 @@ func NewEncoder(encoding Encoding) Encoder {
 	}
 }
 
+/*
 // EncodingManager is an interface to provide an Encoding interface
 type EncodingManager interface {
 	GetEncoder(encoding Encoding) (Encoder, error)
@@ -110,3 +110,4 @@ func (m *manager) GetEncoder(encoding Encoding) (Encoder, error) {
 		return nil, errors.New("invalid encoder")
 	}
 }
+*/

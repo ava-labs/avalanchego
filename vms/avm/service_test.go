@@ -318,11 +318,11 @@ func TestServiceGetTx(t *testing.T) {
 		TxID: txID,
 	}, &reply)
 	assert.NoError(t, err)
-	encoding, err := vm.encodingManager.GetEncoder(reply.Encoding)
+	encoder := formatting.NewEncoder(reply.Encoding)
 	if err != nil {
 		t.Fatal(err)
 	}
-	txBytes, err := encoding.ConvertString(reply.Tx)
+	txBytes, err := encoder.ConvertString(reply.Tx)
 	if err != nil {
 		t.Fatal(err)
 	}

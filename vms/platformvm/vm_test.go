@@ -192,19 +192,13 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	}
 
 	buildGenesisResponse := BuildGenesisReply{}
-	platformvmSS, err := CreateStaticService(formatting.CB58)
-	if err != nil {
-		panic(err)
-	}
+	platformvmSS := CreateStaticService()
 	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
 		panic(fmt.Errorf("problem while building platform chain's genesis state: %w", err))
 	}
 
-	encoding, err := platformvmSS.encodingManager.GetEncoder(buildGenesisResponse.Encoding)
-	if err != nil {
-		panic(err)
-	}
-	genesisBytes, err := encoding.ConvertString(buildGenesisResponse.Bytes)
+	encoder := formatting.NewEncoder(buildGenesisResponse.Encoding)
+	genesisBytes, err := encoder.ConvertString(buildGenesisResponse.Bytes)
 	if err != nil {
 		panic(err)
 	}
@@ -278,19 +272,13 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 	}
 
 	buildGenesisResponse := BuildGenesisReply{}
-	platformvmSS, err := CreateStaticService(buildGenesisArgs.Encoding)
-	if err != nil {
-		t.Fatal(err)
-	}
+	platformvmSS := CreateStaticService()
 	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
 		t.Fatalf("problem while building platform chain's genesis state: %v", err)
 	}
 
-	encoding, err := platformvmSS.encodingManager.GetEncoder(buildGenesisResponse.Encoding)
-	if err != nil {
-		t.Fatal(err)
-	}
-	genesisBytes, err := encoding.ConvertString(buildGenesisResponse.Bytes)
+	encoder := formatting.NewEncoder(buildGenesisResponse.Encoding)
+	genesisBytes, err := encoder.ConvertString(buildGenesisResponse.Bytes)
 	if err != nil {
 		t.Fatal(err)
 	}

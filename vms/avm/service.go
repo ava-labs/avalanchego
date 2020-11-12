@@ -61,11 +61,8 @@ type FormattedAssetID struct {
 func (service *Service) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
 	service.vm.ctx.Log.Info("AVM: IssueTx called with %s", args.Tx)
 
-	encoding, err := service.vm.encodingManager.GetEncoder(args.Encoding)
-	if err != nil {
-		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
-	}
-	txBytes, err := encoding.ConvertString(args.Tx)
+	encoder := formatting.NewEncoder(args.Encoding)
+	txBytes, err := encoder.ConvertString(args.Tx)
 	if err != nil {
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
@@ -108,11 +105,6 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.F
 		return errNilTxID
 	}
 
-	encoding, err := service.vm.encodingManager.GetEncoder(args.Encoding)
-	if err != nil {
-		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
-	}
-
 	tx := UniqueTx{
 		vm:   service.vm,
 		txID: args.TxID,
@@ -121,11 +113,13 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.F
 		return errUnknownTx
 	}
 
-	reply.Tx, err = encoding.ConvertBytes(tx.Bytes())
+	encoder := formatting.NewEncoder(args.Encoding)
+	var err error
+	reply.Tx, err = encoder.ConvertBytes(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("couldn't encode tx as string: %s", err)
 	}
-	reply.Encoding = encoding.Encoding()
+	reply.Encoding = encoder.Encoding()
 	return nil
 }
 
@@ -181,11 +175,6 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 		return fmt.Errorf("number of addresses given, %d, exceeds maximum, %d", len(args.Addresses), maxGetUTXOsAddrs)
 	}
 
-	encoding, err := service.vm.encodingManager.GetEncoder(args.Encoding)
-	if err != nil {
-		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
-	}
-
 	var sourceChain ids.ID
 	if args.SourceChain == "" {
 		sourceChain = service.vm.ctx.ChainID
@@ -226,6 +215,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 		utxos     []*avax.UTXO
 		endAddr   ids.ShortID
 		endUTXOID ids.ID
+		err       error
 	)
 	if sourceChain == service.vm.ctx.ChainID {
 		utxos, endAddr, endUTXOID, err = service.vm.GetUTXOs(
@@ -248,13 +238,14 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
 
+	encoder := formatting.NewEncoder(args.Encoding)
 	reply.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
 		b, err := service.vm.codec.Marshal(utxo)
 		if err != nil {
 			return fmt.Errorf("problem marshalling UTXO: %w", err)
 		}
-		reply.UTXOs[i], err = encoding.ConvertBytes(b)
+		reply.UTXOs[i], err = encoder.ConvertBytes(b)
 		if err != nil {
 			return fmt.Errorf("couldn't encode UTXO %s as string: %s", utxo.InputID(), err)
 		}
@@ -268,7 +259,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 	reply.EndIndex.Address = endAddress
 	reply.EndIndex.UTXO = endUTXOID.String()
 	reply.NumFetched = json.Uint64(len(utxos))
-	reply.Encoding = encoding.Encoding()
+	reply.Encoding = encoder.Encoding()
 	return nil
 }
 
@@ -1456,11 +1447,9 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
-	encoding, err := service.vm.encodingManager.GetEncoder(args.Encoding)
-	if err != nil {
-		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
-	}
-	payloadBytes, err := encoding.ConvertString(args.Payload)
+	encoder := formatting.NewEncoder(args.Encoding)
+
+	payloadBytes, err := encoder.ConvertString(args.Payload)
 	if err != nil {
 		return fmt.Errorf("problem decoding payload bytes: %w", err)
 	}
