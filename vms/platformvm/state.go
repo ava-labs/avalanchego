@@ -393,25 +393,30 @@ func (vm *VM) removeUTXO(db database.Database, utxoID ids.ID) error {
 // Only returns UTXOs after [start].
 // Returns at most [limit] UTXO IDs.
 // Returns nil if no UTXOs reference [addr].
-func (vm *VM) getReferencingUTXOs(db database.Database, addr []byte, start ids.ID, limit int) (ids.Set, error) {
-	toFetch := limit
-	utxoIDs := ids.Set{}
+
+func (vm *VM) getReferencingUTXOs(db database.Database, addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
+	idSlice := []ids.ID(nil)
+
 	iter := prefixdb.NewNested(addr, db).NewIteratorWithStart(start[:])
 	defer iter.Release()
-	for toFetch > 0 && iter.Next() {
-		if utxoID, err := ids.ToID(iter.Key()); err != nil {
+	numFetched := 0
+	for numFetched < limit && iter.Next() {
+		if keyID, err := ids.ToID(iter.Key()); err != nil {
 			return nil, err
-		} else if utxoID != start {
-			utxoIDs.Add(utxoID)
-			toFetch--
+		} else if keyID != start {
+			idSlice = append(idSlice, keyID)
+			numFetched++
+
 		}
 	}
-	return utxoIDs, nil
+	return idSlice, nil
 }
 
 // Persist that the UTXO with ID [utxoID] references [addr]
 func (vm *VM) putReferencingUTXO(db database.Database, addrBytes []byte, utxoID ids.ID) error {
 	prefixedDB := prefixdb.NewNested(addrBytes, db)
+
+	defer prefixedDB.Close()
 	return prefixedDB.Put(utxoID[:], nil)
 }
 
@@ -437,6 +442,7 @@ func (vm *VM) GetUTXOs(
 	startAddr state.Marshaller,
 	startUTXOID ids.ID,
 	limit int,
+	paginate bool,
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
 	if limit <= 0 || limit > maxUTXOsToFetch { // Don't fetch more than [maxUTXOsToFetch]
 		limit = maxUTXOsToFetch
@@ -455,26 +461,34 @@ func (vm *VM) GetUTXOs(
 		} else if comp == 0 {
 			start = startUTXOID
 		}
-		utxoIDs, err := vm.getReferencingUTXOs(db, addr.Bytes(), start, limit) // Get IDs of UTXOs to fetch
-		if err != nil {
-			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s", addr)
-		}
-		for utxoID := range utxoIDs { // Get the UTXOs
-			if seen.Contains(utxoID) { // already have this UTXO in the list
-				continue
-			}
-			utxo, err := vm.getUTXO(db, utxoID)
+		for {
+			currLimit := limit
+			utxoIDs, err := vm.getReferencingUTXOs(db, addr.Bytes(), start, currLimit) // Get IDs of UTXOs to fetch
 			if err != nil {
-				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
+				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 			}
-			utxos = append(utxos, utxo)
-			seen.Add(utxoID)
-			lastAddr = addr
-			lastIndex = utxoID
-			limit--
-			if limit <= 0 {
-				break // Found [limit] utxos; stop.
+			for _, utxoIDKey := range utxoIDs { // Get the UTXOs
+				if seen.Contains(utxoIDKey) { // already have this UTXO in the list
+					continue
+				}
+				utxo, err := vm.getUTXO(db, utxoIDKey)
+				if err != nil {
+					return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoIDKey, err)
+				}
+				utxos = append(utxos, utxo)
+				seen.Add(utxoIDKey)
+				lastAddr = addr
+				lastIndex = utxoIDKey
+				currLimit--
+				if currLimit <= 0 {
+					break // Found [limit] utxos; stop.
+				}
 			}
+
+			if paginate || len(utxoIDs) == 0 { // Avoiding a downstream make([]) making this an infinite loop
+				break // No more utxos available for that address | Don't fetch more utxos
+			}
+			start = utxoIDs[len(utxoIDs)-1]
 		}
 	}
 	return utxos, lastAddr, lastIndex, nil
@@ -482,7 +496,7 @@ func (vm *VM) GetUTXOs(
 
 // getBalance returns the balance of [addrs]
 func (vm *VM) getBalance(db database.Database, addrs ids.ShortSet) (uint64, error) {
-	utxos, _, _, err := vm.GetUTXOs(db, addrs, ids.ShortEmpty, ids.Empty, -1)
+	utxos, _, _, err := vm.GetUTXOs(db, addrs, ids.ShortEmpty, ids.Empty, -1, false)
 	if err != nil {
 		return 0, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}
