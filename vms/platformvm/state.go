@@ -96,7 +96,7 @@ func (vm *VM) enqueueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 	// Sorted by subnet ID then start time then tx ID
 	prefixStart := []byte(fmt.Sprintf("%s%s", subnetID, startDBPrefix))
 	prefixStartDB := prefixdb.NewNested(prefixStart, db)
-	defer prefixStartDB.Close()
+	defer vm.Ctx.Log.LogDeferredErrorFunc(prefixStartDB.Close)
 
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.StartTime().Unix()))
@@ -135,7 +135,7 @@ func (vm *VM) dequeueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 	// Sorted by subnet ID then start time then ID
 	prefixStart := []byte(fmt.Sprintf("%s%s", subnetID, startDBPrefix))
 	prefixStartDB := prefixdb.NewNested(prefixStart, db)
-	defer prefixStartDB.Close()
+	defer vm.Ctx.Log.LogDeferredErrorFunc(prefixStartDB.Close)
 
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.StartTime().Unix()))
@@ -180,7 +180,7 @@ func (vm *VM) addStaker(db database.Database, subnetID ids.ID, tx *rewardTx) err
 	// Sorted by subnet ID then stop time then tx ID
 	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
 	prefixStopDB := prefixdb.NewNested(prefixStop, db)
-	defer prefixStopDB.Close()
+	defer vm.Ctx.Log.LogDeferredErrorFunc(prefixStopDB.Close)
 
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.EndTime().Unix()))
@@ -220,7 +220,7 @@ func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, tx *rewardTx) 
 	// Sorted by subnet ID then stop time
 	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
 	prefixStopDB := prefixdb.NewNested(prefixStop, db)
-	defer prefixStopDB.Close()
+	defer vm.Ctx.Log.LogDeferredErrorFunc(prefixStopDB.Close)
 
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.EndTime().Unix()))
@@ -412,7 +412,7 @@ func (vm *VM) getReferencingUTXOs(db database.Database, addr []byte, start ids.I
 func (vm *VM) putReferencingUTXO(db database.Database, addrBytes []byte, utxoID ids.ID) error {
 	prefixedDB := prefixdb.NewNested(addrBytes, db)
 
-	defer prefixedDB.Close()
+	defer vm.Ctx.Log.LogDeferredErrorFunc(prefixedDB.Close)
 	return prefixedDB.Put(utxoID[:], nil)
 }
 
@@ -758,7 +758,7 @@ type validatorUptime struct {
 
 func (vm *VM) uptime(db database.Database, nodeID ids.ShortID) (*validatorUptime, error) {
 	uptimeDB := prefixdb.NewNested([]byte(uptimeDBPrefix), db)
-	defer uptimeDB.Close()
+	defer vm.Ctx.Log.LogDeferredErrorFunc(uptimeDB.Close)
 
 	uptimeBytes, err := uptimeDB.Get(nodeID.Bytes())
 	if err != nil {
@@ -778,13 +778,13 @@ func (vm *VM) setUptime(db database.Database, nodeID ids.ShortID, uptime *valida
 	}
 
 	uptimeDB := prefixdb.NewNested([]byte(uptimeDBPrefix), db)
-	defer uptimeDB.Close()
+	defer vm.Ctx.Log.LogDeferredErrorFunc(uptimeDB.Close)
 
 	return uptimeDB.Put(nodeID.Bytes(), uptimeBytes)
 }
 func (vm *VM) deleteUptime(db database.Database, nodeID ids.ShortID) error {
 	uptimeDB := prefixdb.NewNested([]byte(uptimeDBPrefix), db)
-	defer uptimeDB.Close()
+	defer vm.Ctx.Log.LogDeferredErrorFunc(uptimeDB.Close)
 
 	return uptimeDB.Delete(nodeID.Bytes())
 }

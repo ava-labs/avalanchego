@@ -468,7 +468,7 @@ func (vm *VM) Bootstrapped() error {
 
 	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, vm.DB)
-	defer stopDB.Close()
+	defer vm.Ctx.Log.LogDeferredErrorFunc(stopDB.Close)
 
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
@@ -531,7 +531,7 @@ func (vm *VM) Shutdown() error {
 
 	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, vm.DB)
-	defer stopDB.Close()
+	defer vm.Ctx.Log.LogDeferredErrorFunc(stopDB.Close)
 
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
@@ -814,7 +814,7 @@ func (vm *VM) calculateReward(db database.Database, duration time.Duration, stak
 func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, timestamp time.Time) error {
 	startPrefix := []byte(fmt.Sprintf("%s%s", subnetID, startDBPrefix))
 	startDB := prefixdb.NewNested(startPrefix, db)
-	defer startDB.Close()
+	defer vm.Ctx.Log.LogDeferredErrorFunc(startDB.Close)
 
 	startIter := startDB.NewIterator()
 	defer startIter.Release()
@@ -906,7 +906,7 @@ pendingStakerLoop:
 
 	stopPrefix := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, db)
-	defer stopDB.Close()
+	defer vm.Ctx.Log.LogDeferredErrorFunc(stopDB.Close)
 
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
@@ -990,7 +990,7 @@ func (vm *VM) updateVdrSet(subnetID ids.ID) error {
 
 	stopPrefix := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, vm.DB)
-	defer stopDB.Close()
+	defer vm.Ctx.Log.LogDeferredErrorFunc(stopDB.Close)
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
 
@@ -1190,7 +1190,7 @@ func (vm *VM) calculateUptime(db database.Database, nodeID ids.ShortID, startTim
 func (vm *VM) getStakers() ([]validators.Validator, error) {
 	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, vm.DB)
-	defer stopDB.Close()
+	defer vm.Ctx.Log.LogDeferredErrorFunc(stopDB.Close)
 	iter := stopDB.NewIterator()
 	defer iter.Release()
 
@@ -1226,7 +1226,7 @@ func (vm *VM) getStakers() ([]validators.Validator, error) {
 func (vm *VM) getPendingStakers() ([]validators.Validator, error) {
 	startDBPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, startDBPrefix))
 	startDB := prefixdb.NewNested(startDBPrefix, vm.DB)
-	defer startDB.Close()
+	defer vm.Ctx.Log.LogDeferredErrorFunc(startDB.Close)
 	iter := startDB.NewIterator()
 	defer iter.Release()
 
@@ -1314,7 +1314,7 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 
 	stopPrefix := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, db)
-	defer stopDB.Close()
+	defer vm.Ctx.Log.LogDeferredErrorFunc(stopDB.Close)
 
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
@@ -1358,7 +1358,7 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 
 	startPrefix := []byte(fmt.Sprintf("%s%s", subnetID, startDBPrefix))
 	startDB := prefixdb.NewNested(startPrefix, db)
-	defer startDB.Close()
+	defer vm.Ctx.Log.LogDeferredErrorFunc(startDB.Close)
 
 	startIter := startDB.NewIterator()
 	defer startIter.Release()
