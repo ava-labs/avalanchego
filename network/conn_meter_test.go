@@ -20,6 +20,10 @@ func TestNoConnMeter(t *testing.T) {
 	count, err := m.Register(localhost)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, count)
+
+	count, err = m.Register(localhost)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, count)
 }
 
 func TestConnMeter(t *testing.T) {
@@ -32,4 +36,26 @@ func TestConnMeter(t *testing.T) {
 	count, err = m.Register(localhost)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
+}
+
+func TestConnMeterReplace(t *testing.T) {
+	remote := "127.0.0.2:9651"
+	differentPort := "127.0.0.1:9650"
+	m := NewConnMeter(time.Hour, 1)
+
+	count, err := m.Register(localhost)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, count)
+
+	count, err = m.Register(differentPort)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	count, err = m.Register(remote)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, count)
+
+	count, err = m.Register(localhost)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, count)
 }
