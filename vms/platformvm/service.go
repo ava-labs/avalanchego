@@ -101,7 +101,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of a SECP256K1 private key
-	privKeyStr, _ := formatting.NewEncoder(formatting.CB58).ConvertBytes(sk.Bytes())
+	privKeyStr, _ := formatting.Encode(formatting.CB58, sk.Bytes())
 	reply.PrivateKey = constants.SecretKeyPrefix + privKeyStr
 	return db.Close()
 }
@@ -132,7 +132,8 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	}
 
 	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
-	privKeyBytes, err := formatting.NewEncoder(formatting.CB58).ConvertString(trimmedPrivateKey)
+	privKeyBytes, err := formatting.Decode(formatting.CB58, trimmedPrivateKey)
+
 	if err != nil {
 		return fmt.Errorf("problem parsing private key: %w", err)
 	}
@@ -382,8 +383,6 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		return fmt.Errorf("number of addresses given, %d, exceeds maximum, %d", len(args.Addresses), maxGetUTXOsAddrs)
 	}
 
-	encoder := formatting.NewEncoder(response.Encoding)
-
 	var sourceChain ids.ID
 	if args.SourceChain == "" {
 		sourceChain = service.vm.Ctx.ChainID
@@ -454,7 +453,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		if err != nil {
 			return fmt.Errorf("couldn't serialize UTXO %q: %w", utxo.InputID(), err)
 		}
-		response.UTXOs[i], err = encoder.ConvertBytes(bytes)
+		response.UTXOs[i], err = formatting.Encode(args.Encoding, bytes)
 		if err != nil {
 			return fmt.Errorf("couldn't encode UTXO %s as string: %s", utxo.InputID(), err)
 		}
@@ -468,7 +467,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 	response.EndIndex.Address = endAddress
 	response.EndIndex.UTXO = endUTXOID.String()
 	response.NumFetched = json.Uint64(len(utxos))
-	response.Encoding = encoder.Encoding()
+	response.Encoding = args.Encoding
 	return nil
 }
 
@@ -1583,9 +1582,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		return errors.New("argument 'vmID' not given")
 	}
 
-	encoder := formatting.NewEncoder(args.Encoding)
-
-	genesisBytes, err := encoder.ConvertString(args.GenesisData)
+	genesisBytes, err := formatting.Decode(args.Encoding, args.GenesisData)
 	if err != nil {
 		return fmt.Errorf("problem parsing genesis data: %w", err)
 	}
@@ -1858,8 +1855,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response *api.JSONTxID) error {
 	service.vm.Ctx.Log.Info("Platform: IssueTx called")
 
-	encoder := formatting.NewEncoder(args.Encoding)
-	txBytes, err := encoder.ConvertString(args.Tx)
+	txBytes, err := formatting.Decode(args.Encoding, args.Tx)
 	if err != nil {
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
@@ -1884,12 +1880,11 @@ func (service *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *ap
 		return fmt.Errorf("couldn't get tx: %w", err)
 	}
 
-	encoder := formatting.NewEncoder(args.Encoding)
-	response.Tx, err = encoder.ConvertBytes(txBytes)
+	response.Tx, err = formatting.Encode(args.Encoding, txBytes)
 	if err != nil {
 		return fmt.Errorf("couldn't encode tx as a string: %s", err)
 	}
-	response.Encoding = encoder.Encoding()
+	response.Encoding = args.Encoding
 	return nil
 }
 

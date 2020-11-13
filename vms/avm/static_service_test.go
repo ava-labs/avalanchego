@@ -26,7 +26,7 @@ func TestBuildGenesis(t *testing.T) {
 	ss := CreateStaticService()
 	var addrMap = map[string]string{}
 	for _, addrStr := range addrStrArray {
-		b, err := formatting.NewEncoder(formatting.CB58).ConvertString(addrStr)
+		b, err := formatting.Decode(formatting.CB58, addrStr)
 		if err != nil {
 			t.Fatal(err)
 		}

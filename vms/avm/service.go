@@ -61,8 +61,7 @@ type FormattedAssetID struct {
 func (service *Service) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
 	service.vm.ctx.Log.Info("AVM: IssueTx called with %s", args.Tx)
 
-	encoder := formatting.NewEncoder(args.Encoding)
-	txBytes, err := encoder.ConvertString(args.Tx)
+	txBytes, err := formatting.Decode(args.Encoding, args.Tx)
 	if err != nil {
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
@@ -113,13 +112,12 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.F
 		return errUnknownTx
 	}
 
-	encoder := formatting.NewEncoder(args.Encoding)
 	var err error
-	reply.Tx, err = encoder.ConvertBytes(tx.Bytes())
+	reply.Tx, err = formatting.Encode(args.Encoding, tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("couldn't encode tx as string: %s", err)
 	}
-	reply.Encoding = encoder.Encoding()
+	reply.Encoding = args.Encoding
 	return nil
 }
 
@@ -238,14 +236,13 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
 
-	encoder := formatting.NewEncoder(args.Encoding)
 	reply.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
 		b, err := service.vm.codec.Marshal(utxo)
 		if err != nil {
 			return fmt.Errorf("problem marshalling UTXO: %w", err)
 		}
-		reply.UTXOs[i], err = encoder.ConvertBytes(b)
+		reply.UTXOs[i], err = formatting.Encode(args.Encoding, b)
 		if err != nil {
 			return fmt.Errorf("couldn't encode UTXO %s as string: %s", utxo.InputID(), err)
 		}
@@ -259,7 +256,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 	reply.EndIndex.Address = endAddress
 	reply.EndIndex.UTXO = endUTXOID.String()
 	reply.NumFetched = json.Uint64(len(utxos))
-	reply.Encoding = encoder.Encoding()
+	reply.Encoding = args.Encoding
 	return nil
 }
 
@@ -917,7 +914,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of a SECP256K1 private key
-	privKeyStr, _ := formatting.NewEncoder(formatting.CB58).ConvertBytes(sk.Bytes())
+	privKeyStr, _ := formatting.Encode(formatting.CB58, sk.Bytes())
 	reply.PrivateKey = constants.SecretKeyPrefix + privKeyStr
 	return db.Close()
 }
@@ -958,7 +955,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
 	}
 	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
-	privKeyBytes, err := formatting.NewEncoder(formatting.CB58).ConvertString(trimmedPrivateKey)
+	privKeyBytes, err := formatting.Decode(formatting.CB58, trimmedPrivateKey)
 	if err != nil {
 		return fmt.Errorf("problem parsing private key: %w", err)
 	}
@@ -1447,9 +1444,7 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
-	encoder := formatting.NewEncoder(args.Encoding)
-
-	payloadBytes, err := encoder.ConvertString(args.Payload)
+	payloadBytes, err := formatting.Decode(args.Encoding, args.Payload)
 	if err != nil {
 		return fmt.Errorf("problem decoding payload bytes: %w", err)
 	}

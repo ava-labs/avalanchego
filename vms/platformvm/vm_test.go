@@ -107,7 +107,7 @@ func init() {
 		"2RWLv6YVEXDiWLpaCbXhhqxtLbnFaKQsWPSSMSPhpWo47uJAeV",
 	} {
 
-		privKeyBytes, err := formatting.NewEncoder(formatting.CB58).ConvertString(key)
+		privKeyBytes, err := formatting.Decode(formatting.CB58, key)
 		ctx.Log.AssertNoError(err)
 		pk, err := factory.ToPrivateKey(privKeyBytes)
 		ctx.Log.AssertNoError(err)
@@ -197,8 +197,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 		panic(fmt.Errorf("problem while building platform chain's genesis state: %w", err))
 	}
 
-	encoder := formatting.NewEncoder(buildGenesisResponse.Encoding)
-	genesisBytes, err := encoder.ConvertString(buildGenesisResponse.Bytes)
+	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
 	if err != nil {
 		panic(err)
 	}
@@ -277,8 +276,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 		t.Fatalf("problem while building platform chain's genesis state: %v", err)
 	}
 
-	encoder := formatting.NewEncoder(buildGenesisResponse.Encoding)
-	genesisBytes, err := encoder.ConvertString(buildGenesisResponse.Bytes)
+	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
 	if err != nil {
 		t.Fatal(err)
 	}

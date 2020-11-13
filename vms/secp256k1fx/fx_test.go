@@ -41,14 +41,13 @@ var (
 )
 
 func init() {
-	encoder := formatting.NewEncoder(defaultEncoding)
-	b, err := encoder.ConvertString("31SoC6ehdWUWFcuzkXci7ymFEQ8HGTJgw")
+	b, err := formatting.Decode(defaultEncoding, "31SoC6ehdWUWFcuzkXci7ymFEQ8HGTJgw")
 	if err != nil {
 		panic(err)
 	}
 	copy(addr2Bytes[:], b)
 	addr2 = ids.NewShortID(addr2Bytes)
-	b, err = encoder.ConvertString("c7doHa86hWYyfXTVnNsdP1CG1gxhXVpZ9Q5CiHi2oFRdnaxh2YR2Mvu2cUNMgyQy4BNQaXAxWWPt36BJ5pDWX1Xeos4h9L")
+	b, err = formatting.Decode(defaultEncoding, "c7doHa86hWYyfXTVnNsdP1CG1gxhXVpZ9Q5CiHi2oFRdnaxh2YR2Mvu2cUNMgyQy4BNQaXAxWWPt36BJ5pDWX1Xeos4h9L")
 	if err != nil {
 		panic(err)
 	}

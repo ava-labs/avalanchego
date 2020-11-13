@@ -75,13 +75,12 @@ type Keystore struct {
 }
 
 // Initialize the keystore
-func (ks *Keystore) Initialize(log logging.Logger, db database.Database) error {
+func (ks *Keystore) Initialize(log logging.Logger, db database.Database) {
 	ks.log = log
 	ks.codec = codec.New(maxPackerSize, maxSliceLength)
 	ks.users = make(map[string]*password.Hash)
 	ks.userDB = prefixdb.New([]byte("users"), db)
 	ks.bcDB = prefixdb.New([]byte("bcs"), db)
-	return nil
 }
 
 // CreateHandler returns a new service object that can send requests to thisAPI.
@@ -202,8 +201,7 @@ func (ks *Keystore) ExportUser(_ *http.Request, args *ExportUserArgs, reply *Exp
 	}
 
 	// Encode the user from bytes to string
-	encoder := formatting.NewEncoder(args.Encoding)
-	reply.User, err = encoder.ConvertBytes(b)
+	reply.User, err = formatting.Encode(args.Encoding, b)
 	if err != nil {
 		return fmt.Errorf("couldn't encode user to string: %w", err)
 	}
@@ -234,8 +232,7 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *api
 	defer ks.lock.Unlock()
 
 	// Decode the user from string to bytes
-	encoder := formatting.NewEncoder(args.Encoding)
-	userBytes, err := encoder.ConvertString(args.User)
+	userBytes, err := formatting.Decode(args.Encoding, args.User)
 	if err != nil {
 		return fmt.Errorf("couldn't decode 'user' to bytes: %w", err)
 	}
@@ -398,8 +395,8 @@ func (ks *Keystore) AddUser(username, pword string) error {
 }
 
 // CreateTestKeystore returns a new keystore that can be utilized for testing
-func CreateTestKeystore() (*Keystore, error) {
+func CreateTestKeystore() *Keystore {
 	ks := &Keystore{}
-	err := ks.Initialize(logging.NoLog{}, memdb.New())
-	return ks, err
+	ks.Initialize(logging.NoLog{}, memdb.New())
+	return ks
 }

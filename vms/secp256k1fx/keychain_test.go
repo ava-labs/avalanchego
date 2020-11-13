@@ -44,8 +44,7 @@ func TestKeychainGetUnknownAddr(t *testing.T) {
 func TestKeychainAdd(t *testing.T) {
 	kc := NewKeychain()
 
-	encoder := formatting.NewEncoder(defaultEncoding)
-	skBytes, err := encoder.ConvertString(keys[0])
+	skBytes, err := formatting.Decode(defaultEncoding, keys[0])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,10 +98,9 @@ func TestKeychainNew(t *testing.T) {
 func TestKeychainMatch(t *testing.T) {
 	kc := NewKeychain()
 
-	encoder := formatting.NewEncoder(defaultEncoding)
 	sks := []*crypto.PrivateKeySECP256K1R{}
 	for _, keyStr := range keys {
-		skBytes, err := encoder.ConvertString(keyStr)
+		skBytes, err := formatting.Decode(defaultEncoding, keyStr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -167,10 +165,9 @@ func TestKeychainMatch(t *testing.T) {
 func TestKeychainSpendMint(t *testing.T) {
 	kc := NewKeychain()
 
-	encoder := formatting.NewEncoder(defaultEncoding)
 	sks := []*crypto.PrivateKeySECP256K1R{}
 	for _, keyStr := range keys {
-		skBytes, err := encoder.ConvertString(keyStr)
+		skBytes, err := formatting.Decode(defaultEncoding, keyStr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -229,10 +226,9 @@ func TestKeychainSpendMint(t *testing.T) {
 func TestKeychainSpendTransfer(t *testing.T) {
 	kc := NewKeychain()
 
-	encoder := formatting.NewEncoder(defaultEncoding)
 	sks := []*crypto.PrivateKeySECP256K1R{}
 	for _, keyStr := range keys {
-		skBytes, err := encoder.ConvertString(keyStr)
+		skBytes, err := formatting.Decode(defaultEncoding, keyStr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -301,8 +297,7 @@ func TestKeychainSpendTransfer(t *testing.T) {
 func TestKeychainString(t *testing.T) {
 	kc := NewKeychain()
 
-	encoder := formatting.NewEncoder(defaultEncoding)
-	skBytes, err := encoder.ConvertString(keys[0])
+	skBytes, err := formatting.Decode(defaultEncoding, keys[0])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -328,8 +323,7 @@ func TestKeychainString(t *testing.T) {
 func TestKeychainPrefixedString(t *testing.T) {
 	kc := NewKeychain()
 
-	encoder := formatting.NewEncoder(defaultEncoding)
-	skBytes, err := encoder.ConvertString(keys[0])
+	skBytes, err := formatting.Decode(defaultEncoding, keys[0])
 	if err != nil {
 		t.Fatal(err)
 	}

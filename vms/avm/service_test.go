@@ -38,10 +38,7 @@ var (
 // 4) atomic memory to use in tests
 func setup(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
 	genesisBytes, _, vm, m := GenesisVM(t)
-	keystore, err := keystore.CreateTestKeystore()
-	if err != nil {
-		t.Fatal(err)
-	}
+	keystore := keystore.CreateTestKeystore()
 	if err := keystore.AddUser(username, password); err != nil {
 		t.Fatalf("couldn't add user: %s", err)
 	}
@@ -169,12 +166,11 @@ func TestServiceIssueTx(t *testing.T) {
 	}
 
 	tx := NewTx(t, genesisBytes, vm)
-	encoder := formatting.NewEncoder(formatting.Hex)
-	txArgs.Tx, err = encoder.ConvertBytes(tx.Bytes())
+	txArgs.Tx, err = formatting.Encode(formatting.Hex, tx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
-	txArgs.Encoding = encoder.Encoding()
+	txArgs.Encoding = formatting.Hex
 	txReply = &api.JSONTxID{}
 	if err := s.IssueTx(nil, txArgs, txReply); err != nil {
 		t.Fatal(err)
@@ -212,14 +208,13 @@ func TestServiceGetTxStatus(t *testing.T) {
 		)
 	}
 
-	encoder := formatting.NewEncoder(formatting.Hex)
-	txStr, err := encoder.ConvertBytes(tx.Bytes())
+	txStr, err := formatting.Encode(formatting.Hex, tx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
 	txArgs := &api.FormattedTx{
 		Tx:       txStr,
-		Encoding: encoder.Encoding(),
+		Encoding: formatting.Hex,
 	}
 	txReply := &api.JSONTxID{}
 	if err := s.IssueTx(nil, txArgs, txReply); err != nil {
@@ -318,11 +313,10 @@ func TestServiceGetTx(t *testing.T) {
 		TxID: txID,
 	}, &reply)
 	assert.NoError(t, err)
-	encoder := formatting.NewEncoder(reply.Encoding)
 	if err != nil {
 		t.Fatal(err)
 	}
-	txBytes, err := encoder.ConvertString(reply.Tx)
+	txBytes, err := formatting.Decode(reply.Encoding, reply.Tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -899,8 +893,7 @@ func TestNFTWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	encoder := formatting.NewEncoder(formatting.Hex)
-	payload, err := encoder.ConvertBytes([]byte{1, 2, 3, 4, 5})
+	payload, err := formatting.Encode(formatting.Hex, []byte{1, 2, 3, 4, 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -916,7 +909,7 @@ func TestNFTWorkflow(t *testing.T) {
 		AssetID:  assetID.String(),
 		Payload:  payload,
 		To:       addrStr,
-		Encoding: encoder.Encoding(),
+		Encoding: formatting.Hex,
 	}
 	mintReply := &api.JSONTxIDChangeAddr{}
 
@@ -976,8 +969,10 @@ func TestImportExportKey(t *testing.T) {
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
 
-	encoder := formatting.NewEncoder(formatting.CB58)
-	privKeyStr, _ := encoder.ConvertBytes(sk.Bytes())
+	privKeyStr, err := formatting.Encode(formatting.CB58, sk.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	importArgs := &ImportKeyArgs{
 		UserPass: api.UserPass{
 			Username: username,
@@ -1010,7 +1005,7 @@ func TestImportExportKey(t *testing.T) {
 		t.Fatalf("ExportKeyReply private key: %s mssing secret key prefix: %s", exportReply.PrivateKey, constants.SecretKeyPrefix)
 	}
 
-	parsedKeyBytes, err := encoder.ConvertString(strings.TrimPrefix(exportReply.PrivateKey, constants.SecretKeyPrefix))
+	parsedKeyBytes, err := formatting.Decode(formatting.CB58, strings.TrimPrefix(exportReply.PrivateKey, constants.SecretKeyPrefix))
 	if err != nil {
 		t.Fatal("Failed to parse exported private key")
 	}
@@ -1035,8 +1030,10 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 		t.Fatalf("problem generating private key: %s", err)
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
-	encoder := formatting.NewEncoder(formatting.CB58)
-	privKeyStr, _ := encoder.ConvertBytes(sk.Bytes())
+	privKeyStr, err := formatting.Encode(formatting.CB58, sk.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	args := ImportKeyArgs{
 		UserPass: api.UserPass{
 			Username: username,

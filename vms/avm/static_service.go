@@ -76,11 +76,10 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		return errs.Err
 	}
 
-	encoder := formatting.NewEncoder(args.Encoding)
-
 	g := Genesis{}
 	for assetAlias, assetDefinition := range args.GenesisData {
-		assetMemo, err := encoder.ConvertString(assetDefinition.Memo)
+		assetMemo, err := formatting.Decode(args.Encoding, assetDefinition.Memo)
+
 		if err != nil {
 			return fmt.Errorf("problem formatting asset definition memo due to: %w", err)
 		}
@@ -177,10 +176,10 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		return fmt.Errorf("problem marshaling genesis: %w", err)
 	}
 
-	reply.Bytes, err = encoder.ConvertBytes(b)
+	reply.Bytes, err = formatting.Encode(args.Encoding, b)
 	if err != nil {
 		return fmt.Errorf("couldn't encode genesis as string: %s", err)
 	}
-	reply.Encoding = encoder.Encoding()
+	reply.Encoding = args.Encoding
 	return nil
 }

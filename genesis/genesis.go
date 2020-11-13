@@ -25,6 +25,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+const (
+	defaultEncoding = formatting.Hex
+)
+
 // Genesis returns the genesis data of the Platform Chain.
 //
 // Since an Avalanche network has exactly one Platform Chain, and the Platform
@@ -43,11 +47,10 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 
 	amount := uint64(0)
 
-	encoder := formatting.NewEncoder(formatting.Hex)
 	// Specify the genesis state of the AVM
 	avmArgs := avm.BuildGenesisArgs{
 		NetworkID: json.Uint32(config.NetworkID),
-		Encoding:  encoder.Encoding(),
+		Encoding:  defaultEncoding,
 	}
 	{
 		avax := avm.AssetDefinition{
@@ -80,7 +83,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		}
 
 		var err error
-		avax.Memo, err = encoder.ConvertBytes(memoBytes)
+		avax.Memo, err = formatting.Encode(defaultEncoding, memoBytes)
 		if err != nil {
 			return nil, ids.Empty, fmt.Errorf("couldn't parse memo bytes to string: %w", err)
 		}
@@ -96,7 +99,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		return nil, ids.ID{}, err
 	}
 
-	bytes, err := encoder.ConvertString(avmReply.Bytes)
+	bytes, err := formatting.Decode(defaultEncoding, avmReply.Bytes)
 	if err != nil {
 		return nil, ids.ID{}, fmt.Errorf("couldn't parse avm genesis reply: %w", err)
 	}
@@ -134,7 +137,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		}
 		for _, unlock := range allocation.UnlockSchedule {
 			if unlock.Amount > 0 {
-				msgStr, err := encoder.ConvertBytes(allocation.ETHAddr.Bytes())
+				msgStr, err := formatting.Encode(defaultEncoding, allocation.ETHAddr.Bytes())
 				if err != nil {
 					return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 				}
@@ -171,7 +174,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				return nil, ids.ID{}, err
 			}
 			for _, unlock := range allocation.UnlockSchedule {
-				msgStr, err := encoder.ConvertBytes(allocation.ETHAddr.Bytes())
+				msgStr, err := formatting.Encode(defaultEncoding, allocation.ETHAddr.Bytes())
 				if err != nil {
 					return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 				}
@@ -205,7 +208,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 
 	// Specify the chains that exist upon this network's creation
-	genesisStr, err := encoder.ConvertBytes([]byte(config.CChainGenesis))
+	genesisStr, err := formatting.Encode(defaultEncoding, []byte(config.CChainGenesis))
 	if err != nil {
 		return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 	}
@@ -235,7 +238,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		return nil, ids.ID{}, fmt.Errorf("problem while building platform chain's genesis state: %w", err)
 	}
 
-	genesisBytes, err := encoder.ConvertString(platformvmReply.Bytes)
+	genesisBytes, err := formatting.Decode(defaultEncoding, platformvmReply.Bytes)
 	if err != nil {
 		return nil, ids.ID{}, fmt.Errorf("problem parsing platformvm genesis bytes: %w", err)
 	}

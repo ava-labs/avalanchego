@@ -185,7 +185,6 @@ func bech32ToID(address string) (ids.ShortID, error) {
 
 // BuildGenesis build the genesis state of the Platform Chain (and thereby the Avalanche network.)
 func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
-	encoder := formatting.NewEncoder(args.Encoding)
 	// Specify the UTXOs on the Platform chain that exist at genesis.
 	utxos := make([]*GenesisUTXO, 0, len(args.UTXOs))
 	for i, apiUTXO := range args.UTXOs {
@@ -218,7 +217,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				TransferableOut: utxo.Out.(avax.TransferableOut),
 			}
 		}
-		messageBytes, err := encoder.ConvertString(apiUTXO.Message)
+		messageBytes, err := formatting.Decode(args.Encoding, apiUTXO.Message)
 		if err != nil {
 			return fmt.Errorf("problem decoding UTXO message bytes: %w", err)
 		}
@@ -265,7 +264,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				return errStakeOverflow
 			}
 			weight = newWeight
-			messageBytes, err := encoder.ConvertString(apiUTXO.Message)
+			messageBytes, err := formatting.Decode(args.Encoding, apiUTXO.Message)
 			if err != nil {
 				return fmt.Errorf("problem decoding validator UTXO message bytes: %w", err)
 			}
@@ -326,7 +325,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	// Specify the chains that exist at genesis.
 	chains := []*Tx{}
 	for _, chain := range args.Chains {
-		genesisBytes, err := encoder.ConvertString(chain.GenesisData)
+		genesisBytes, err := formatting.Decode(args.Encoding, chain.GenesisData)
 		if err != nil {
 			return fmt.Errorf("problem decoding chain genesis data: %w", err)
 		}
@@ -364,11 +363,11 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	if err != nil {
 		return fmt.Errorf("couldn't marshal genesis: %w", err)
 	}
-	reply.Bytes, err = encoder.ConvertBytes(bytes)
+	reply.Bytes, err = formatting.Encode(args.Encoding, bytes)
 	if err != nil {
 		return fmt.Errorf("couldn't encode genesis as string: %w", err)
 	}
-	reply.Encoding = encoder.Encoding()
+	reply.Encoding = args.Encoding
 	return nil
 }
 

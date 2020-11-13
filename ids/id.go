@@ -37,7 +37,7 @@ func ToID(bytes []byte) (ID, error) {
 
 // FromString is the inverse of ID.String()
 func FromString(idStr string) (ID, error) {
-	bytes, err := formatting.NewEncoder(defaultEncoding).ConvertString(idStr)
+	bytes, err := formatting.Decode(defaultEncoding, idStr)
 	if err != nil {
 		return ID{}, err
 	}
@@ -46,7 +46,7 @@ func FromString(idStr string) (ID, error) {
 
 // MarshalJSON ...
 func (id ID) MarshalJSON() ([]byte, error) {
-	str, err := formatting.NewEncoder(defaultEncoding).ConvertBytes(id[:])
+	str, err := formatting.Encode(defaultEncoding, id[:])
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func (id *ID) UnmarshalJSON(b []byte) error {
 	}
 
 	// Parse CB58 formatted string to bytes
-	bytes, err := formatting.NewEncoder(defaultEncoding).ConvertString(str[1:lastIndex])
+	bytes, err := formatting.Decode(defaultEncoding, str[1:lastIndex])
 	if err != nil {
 		return fmt.Errorf("couldn't decode ID to bytes: %w", err)
 	}
@@ -121,7 +121,7 @@ func (id ID) Hex() string { return hex.EncodeToString(id[:]) }
 func (id ID) String() string {
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of an ID
-	s, _ := formatting.NewEncoder(defaultEncoding).ConvertBytes(id[:])
+	s, _ := formatting.Encode(defaultEncoding, id[:])
 	return s
 }
 

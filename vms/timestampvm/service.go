@@ -32,7 +32,7 @@ type ProposeBlockReply struct{ Success bool }
 // ProposeBlock is an API method to propose a new block whose data is [args].Data.
 // [args].Data must be a string repr. of a 32 byte array
 func (s *Service) ProposeBlock(_ *http.Request, args *ProposeBlockArgs, reply *ProposeBlockReply) error {
-	bytes, err := formatting.NewEncoder(formatting.CB58).ConvertString(args.Data)
+	bytes, err := formatting.Decode(formatting.CB58, args.Data)
 	if err != nil || len(bytes) != dataLen {
 		return errBadData
 	}
@@ -90,7 +90,7 @@ func (s *Service) GetBlock(_ *http.Request, args *GetBlockArgs, reply *GetBlockR
 	reply.APIBlock.ID = block.ID().String()
 	reply.APIBlock.Timestamp = json.Uint64(block.Timestamp)
 	reply.APIBlock.ParentID = block.ParentID().String()
-	reply.Data, err = formatting.NewEncoder(formatting.CB58).ConvertBytes(block.Data[:])
+	reply.Data, err = formatting.Encode(formatting.CB58, block.Data[:])
 
 	return err
 }

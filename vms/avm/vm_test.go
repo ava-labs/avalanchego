@@ -45,7 +45,6 @@ var username = "bobby"
 var password = "StrnasfqewiurPasswdn56d" // #nosec G101
 
 func init() {
-	encoder := formatting.NewEncoder(formatting.CB58)
 	factory := crypto.FactorySECP256K1R{}
 
 	for _, key := range []string{
@@ -53,7 +52,7 @@ func init() {
 		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
 		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
 	} {
-		keyBytes, _ := encoder.ConvertString(key)
+		keyBytes, _ := formatting.Decode(formatting.CB58, key)
 		pk, _ := factory.ToPrivateKey(keyBytes)
 		keys = append(keys, pk.(*crypto.PrivateKeySECP256K1R))
 		addrs = append(addrs, pk.PublicKey().Address())
@@ -216,8 +215,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) []byte {
 		t.Fatal(err)
 	}
 
-	encoder := formatting.NewEncoder(reply.Encoding)
-	b, err := encoder.ConvertString(reply.Bytes)
+	b, err := formatting.Decode(reply.Encoding, reply.Bytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,10 +248,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
 
-	userKeystore, err := keystore.CreateTestKeystore()
-	if err != nil {
-		t.Fatal(err)
-	}
+	userKeystore := keystore.CreateTestKeystore()
 	if err := userKeystore.AddUser(username, password); err != nil {
 		t.Fatal(err)
 	}
@@ -264,7 +259,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 		txFee:         testTxFee,
 		creationTxFee: testTxFee,
 	}
-	err = vm.Initialize(
+	err := vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,

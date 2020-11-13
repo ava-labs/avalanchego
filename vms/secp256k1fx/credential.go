@@ -28,10 +28,9 @@ type Credential struct {
 // MarshalJSON marshals [cr] to JSON
 // The string representation of each signature is created using the hex formatter
 func (cr *Credential) MarshalJSON() ([]byte, error) {
-	encoder := formatting.NewEncoder(defaultEncoding)
 	buffer := bytes.NewBufferString("{\"signatures\":[")
 	for i, sig := range cr.Sigs {
-		sigStr, err := encoder.ConvertBytes(sig[:])
+		sigStr, err := formatting.Encode(defaultEncoding, sig[:])
 		if err != nil {
 			return nil, fmt.Errorf("couldn't convert signature to string: %w", err)
 		}

@@ -586,9 +586,7 @@ func (n *Node) initSharedMemory() {
 func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
 	keystoreDB := prefixdb.New([]byte("keystore"), n.DB)
-	if err := n.keystoreServer.Initialize(n.Log, keystoreDB); err != nil {
-		return err
-	}
+	n.keystoreServer.Initialize(n.Log, keystoreDB)
 	keystoreHandler, err := n.keystoreServer.CreateHandler()
 	if err != nil {
 		return err
