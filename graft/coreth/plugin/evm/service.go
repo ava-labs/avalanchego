@@ -91,6 +91,17 @@ func (api *SnowmanAPI) IssueBlock(ctx context.Context) error {
 	return api.vm.tryBlockGen()
 }
 
+// parseAssetID parses an assetID string into an ID
+func (service *AvaxAPI) parseAssetID(assetID string) (ids.ID, error) {
+	if assetID == "" {
+		return ids.ID{}, fmt.Errorf("assetID is required")
+	} else if assetID == "AVAX" {
+		return service.vm.ctx.AVAXAssetID, nil
+	} else {
+		return ids.FromString(assetID)
+	}
+}
+
 // ClientVersion returns the version of the vm running
 func (service *AvaxAPI) ClientVersion() string { return version }
 
@@ -232,8 +243,6 @@ func (service *AvaxAPI) Import(_ *http.Request, args *ImportArgs, response *api.
 type ExportAVAXArgs struct {
 	api.UserPass
 
-	// AssetID of the tokens
-	AssetID ids.ID `json:"assetID"`
 	// Amount of asset to send
 	Amount json.Uint64 `json:"amount"`
 
@@ -247,7 +256,7 @@ type ExportAVAXArgs struct {
 func (service *AvaxAPI) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JSONTxID) error {
 	return service.Export(nil, &ExportArgs{
 		ExportAVAXArgs: *args,
-		AssetID:        service.vm.ctx.AVAXAssetID,
+		AssetID:        service.vm.ctx.AVAXAssetID.String(),
 	}, response)
 }
 
@@ -255,15 +264,17 @@ func (service *AvaxAPI) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 type ExportArgs struct {
 	ExportAVAXArgs
 	// AssetID of the tokens
-	AssetID ids.ID `json:"assetID"`
+	AssetID string `json:"assetID"`
 }
 
 // Export exports an asset from the C-Chain to the X-Chain
 // It must be imported on the X-Chain to complete the transfer
 func (service *AvaxAPI) Export(_ *http.Request, args *ExportArgs, response *api.JSONTxID) error {
 	log.Info("EVM: Export called")
-	if args.AssetID == ids.Empty {
-		return fmt.Errorf("assetID is required")
+
+	assetID, err := service.parseAssetID(args.AssetID)
+	if err != nil {
+		return err
 	}
 
 	if args.Amount == 0 {
@@ -290,7 +301,7 @@ func (service *AvaxAPI) Export(_ *http.Request, args *ExportArgs, response *api.
 
 	// Create the transaction
 	tx, err := service.vm.newExportTx(
-		args.AssetID,        // AssetID
+		assetID,             // AssetID
 		uint64(args.Amount), // Amount
 		chainID,             // ID of the chain to send the funds to
 		to,                  // Address
