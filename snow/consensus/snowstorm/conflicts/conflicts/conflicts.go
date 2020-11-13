@@ -194,40 +194,70 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 	acceptable := c.acceptable
 	c.acceptable = nil
 
-	// // rejected tracks the set of txIDs that have been rejected but not yet
-	// // removed from the graph.
-	// rejected := ids.Set{}
+	// rejected tracks the set of txIDs that have been rejected but not yet
+	// removed from the graph.
+	rejected := ids.Set{}
 
-	// for _, tx := range acceptable {
-	// 	txID := tx.ID()
+	for _, tx := range acceptable {
+		txID := tx.ID()
 
-	// 	tx := tx.(Tx)
-	// 	for inputKey := range tx.InputIDs() {
-	// 		spenders := c.utxos[inputKey]
-	// 		spenders.Remove(txID)
-	// 		if spenders.Len() == 0 {
-	// 			delete(c.utxos, inputKey)
-	// 		} else {
-	// 			c.utxos[inputKey] = spenders
-	// 		}
-	// 	}
+		tx := tx.(Tx)
+		for inputID := range tx.InputIDs() {
+			spenders := c.utxos[inputID]
+			spenders.Remove(txID)
+			if spenders.Len() == 0 {
+				delete(c.utxos, inputID)
+			} else {
+				c.utxos[inputID] = spenders
+			}
+		}
 
-	// 	delete(c.txs, txID)
-	// 	c.pendingAccept.Fulfill(txID)
-	// 	c.pendingReject.Abandon(txID)
+		for _, restrictionID := range tx.Restrictions() {
+			restrictors := c.restrictions[restrictionID]
+			restrictors.Remove(txID)
+			if restrictors.Len() == 0 {
+				delete(c.restrictions, restrictionID)
+			} else {
+				c.restrictions[restrictionID] = restrictors
+			}
+		}
 
-	// 	// Conflicts should never return an error, as the type has already been
-	// 	// asserted.
-	// 	conflicts, _ := c.Conflicts(tx)
-	// 	for _, conflict := range conflicts {
-	// 		conflictID := conflict.ID()
-	// 		if rejected.Contains(conflictID) {
-	// 			continue
-	// 		}
-	// 		rejected.Add(conflictID)
-	// 		c.rejectable = append(c.rejectable, conflict)
-	// 	}
-	// }
+		transitionID := tx.TransitionID()
+		epoch := tx.Epoch()
+		dependents := c.dependencies[transitionID]
+		for dependentID := range dependents {
+			dependent := c.txs[dependentID]
+			dependentEpoch := dependent.Epoch()
+			if dependentEpoch < epoch && !rejected.Contains(dependentID) {
+				rejected.Add(dependentID)
+				c.rejectable = append(c.rejectable, dependent)
+			}
+
+			// TODO: if the dependent
+		}
+
+		for _, dependencyID := range tx.Dependencies() {
+			dependents := c.dependencies[dependencyID]
+			dependents.Add(txID)
+			c.dependencies[dependencyID] = dependents
+		}
+
+		delete(c.txs, txID)
+		c.pendingAccept.Fulfill(txID)
+		c.pendingReject.Abandon(txID)
+
+		// Conflicts should never return an error, as the type has already been
+		// asserted.
+		conflicts, _ := c.Conflicts(tx)
+		for _, conflict := range conflicts {
+			conflictID := conflict.ID()
+			if rejected.Contains(conflictID) {
+				continue
+			}
+			rejected.Add(conflictID)
+			c.rejectable = append(c.rejectable, conflict)
+		}
+	}
 
 	rejectable := c.rejectable
 	c.rejectable = nil
