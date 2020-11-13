@@ -78,8 +78,6 @@ func (enc *Encoding) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	switch strings.ToLower(str) {
-	case "null":
-		return nil
 	case "\"hex\"":
 		*enc = Hex
 	case "\"cb58\"":
