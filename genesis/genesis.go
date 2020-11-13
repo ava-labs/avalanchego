@@ -238,7 +238,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		return nil, ids.ID{}, fmt.Errorf("problem while building platform chain's genesis state: %w", err)
 	}
 
-	genesisBytes, err := formatting.Decode(defaultEncoding, platformvmReply.Bytes)
+	genesisBytes, err := formatting.Decode(platformvmReply.Encoding, platformvmReply.Bytes)
 	if err != nil {
 		return nil, ids.ID{}, fmt.Errorf("problem parsing platformvm genesis bytes: %w", err)
 	}
