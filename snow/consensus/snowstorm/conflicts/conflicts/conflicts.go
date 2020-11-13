@@ -199,9 +199,22 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 	rejected := ids.Set{}
 
 	for _, tx := range acceptable {
-		txID := tx.ID()
-
 		tx := tx.(Tx)
+		txID := tx.ID()
+		transitionID := tx.TransitionID()
+		epoch := tx.Epoch()
+
+		// Remove the accepted transaction from the collection:
+
+		// 
+		txIDs := c.transitions[transitionID]
+		txIDs.Remove(txID)
+		if txIDs.Len() == 0 {
+			delete(c.transitions, transitionID)
+		} else {
+			c.transitions[transitionID] = txIDs
+		}
+
 		for inputID := range tx.InputIDs() {
 			spenders := c.utxos[inputID]
 			spenders.Remove(txID)
@@ -222,8 +235,9 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 			}
 		}
 
-		transitionID := tx.TransitionID()
-		epoch := tx.Epoch()
+
+		
+
 		dependents := c.dependencies[transitionID]
 		for dependentID := range dependents {
 			dependent := c.txs[dependentID]
@@ -233,6 +247,10 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 				c.rejectable = append(c.rejectable, dependent)
 			}
 
+			canAccept := true
+			for _, dependencyID := range dependent.Dependencies() {
+				if c.a
+			}
 			// TODO: if the dependent
 		}
 
