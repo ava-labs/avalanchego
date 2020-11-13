@@ -40,7 +40,7 @@ const (
 
 // FromConfig returns:
 // 1) The byte representation of the genesis state of the platform chain
-//    (ie the genesis state of the network), formatted using the hex encoder
+//    (ie the genesis state of the network)
 // 2) The asset ID of AVAX
 func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	hrp := constants.GetHRP(config.NetworkID)

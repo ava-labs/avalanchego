@@ -161,6 +161,8 @@ type ExportUserArgs struct {
 type ExportUserReply struct {
 	// String representation of the user
 	User string `json:"user"`
+	// The encoding for the exported user ("hex" or "cb58")
+	Encoding formatting.Encoding `json:"encoding"`
 }
 
 // ExportUser exports a serialized encoding of a user's information complete with encrypted database values
@@ -205,7 +207,7 @@ func (ks *Keystore) ExportUser(_ *http.Request, args *ExportUserArgs, reply *Exp
 	if err != nil {
 		return fmt.Errorf("couldn't encode user to string: %w", err)
 	}
-
+	reply.Encoding = args.Encoding
 	return nil
 }
 

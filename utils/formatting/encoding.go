@@ -37,10 +37,10 @@ var (
 type Encoding uint8
 
 const (
-	// Hex specifies a hex plus 4 byte checksum encoding format
-	Hex Encoding = iota
 	// CB58 specifies the CB58 encoding format
-	CB58
+	CB58 Encoding = iota
+	// Hex specifies a hex plus 4 byte checksum encoding format
+	Hex
 )
 
 // String ...
@@ -73,7 +73,13 @@ func (enc Encoding) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON ...
 func (enc *Encoding) UnmarshalJSON(b []byte) error {
-	switch strings.ToLower(string(b)) {
+	str := string(b)
+	if str == "null" {
+		return nil
+	}
+	switch strings.ToLower(str) {
+	case "null":
+		return nil
 	case "\"hex\"":
 		*enc = Hex
 	case "\"cb58\"":
