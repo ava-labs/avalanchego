@@ -48,7 +48,8 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 		Validators: []APIPrimaryValidator{
 			validator,
 		},
-		Time: 5,
+		Time:     5,
+		Encoding: formatting.Hex,
 	}
 	reply := BuildGenesisReply{}
 
@@ -95,7 +96,8 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 		Validators: []APIPrimaryValidator{
 			validator,
 		},
-		Time: 5,
+		Time:     5,
+		Encoding: formatting.Hex,
 	}
 	reply := BuildGenesisReply{}
 
@@ -143,7 +145,8 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 		Validators: []APIPrimaryValidator{
 			validator,
 		},
-		Time: 5,
+		Time:     5,
+		Encoding: formatting.Hex,
 	}
 	reply := BuildGenesisReply{}
 
@@ -226,7 +229,8 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 			validator2,
 			validator3,
 		},
-		Time: 5,
+		Time:     5,
+		Encoding: formatting.Hex,
 	}
 	reply := BuildGenesisReply{}
 

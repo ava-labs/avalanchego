@@ -125,6 +125,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		Time:          json.Uint64(config.StartTime),
 		InitialSupply: json.Uint64(initialSupply),
 		Message:       config.Message,
+		Encoding:      defaultEncoding,
 	}
 	for _, allocation := range config.Allocations {
 		if initiallyStaked.Contains(allocation.AVAXAddr) {
