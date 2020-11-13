@@ -214,12 +214,12 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Duration(consensusGossipFrequencyKey, 10*time.Second, "Frequency of gossiping accepted frontiers.")
 	fs.Duration(consensusShutdownTimeoutKey, 5*time.Second, "Timeout before killing an unresponsive chain.")
 
-	// Connectivity monitoring configuration:
+	// Restart on disconnect configuration:
 	fs.Duration(disconnectedCheckFreqKey, 10*time.Second, "How often the node checks if it is connected to any peers. "+
-		"If node has no peers for [disconnected-restart-timeout], it restarts. Can be at most [disconnected-restart-timeout]. "+
-		"If 0, node will not restart even if not connected to any peers.")
-	fs.Duration(disconnectedRestartTimeoutKey, 1*time.Minute, "Node restarts if not connected to any peers for this amount of time. "+
-		"If 0, node will not restart even if not connected to any peers.")
+		"See [restart-on-disconnected]. If 0, node will not restart due to disconnection.")
+	fs.Duration(disconnectedRestartTimeoutKey, 1*time.Minute, "If [restart-on-disconnected], node restarts if not connected to any peers for this amount of time. "+
+		"If 0, node will not restart due to disconnection.")
+	fs.Bool(restartOnDisconnectedKey, false, "If true, this node will restart if it is not connected to any peers for [disconnected-restart-timeout].")
 
 	// File Descriptor Limit
 	fs.Uint64(fdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
@@ -562,6 +562,7 @@ func setNodeConfig(v *viper.Viper) error {
 	}
 
 	// Restart:
+	Config.RestartOnDisconnected = v.GetBool(restartOnDisconnectedKey)
 	Config.DisconnectedCheckFreq = v.GetDuration(disconnectedCheckFreqKey)
 	Config.DisconnectedRestartTimeout = v.GetDuration(disconnectedRestartTimeoutKey)
 	if Config.DisconnectedCheckFreq > Config.DisconnectedRestartTimeout {

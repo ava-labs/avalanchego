@@ -207,6 +207,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 		time.Duration(0),
 		0,
 		nil,
+		false,
 		0,
 		0,
 	)
@@ -318,6 +319,7 @@ func TestEstablishConnection(t *testing.T) {
 		time.Duration(0),
 		0,
 		nil,
+		false,
 		0,
 		0,
 	)
@@ -341,6 +343,7 @@ func TestEstablishConnection(t *testing.T) {
 		time.Duration(0),
 		0,
 		nil,
+		false,
 		0,
 		0,
 	)
@@ -464,6 +467,7 @@ func TestDoubleTrack(t *testing.T) {
 		time.Duration(0),
 		0,
 		nil,
+		false,
 		0,
 		0,
 	)
@@ -487,6 +491,7 @@ func TestDoubleTrack(t *testing.T) {
 		time.Duration(0),
 		0,
 		nil,
+		false,
 		0,
 		0,
 	)
@@ -611,6 +616,7 @@ func TestDoubleClose(t *testing.T) {
 		time.Duration(0),
 		0,
 		nil,
+		false,
 		0,
 		0,
 	)
@@ -634,6 +640,7 @@ func TestDoubleClose(t *testing.T) {
 		time.Duration(0),
 		0,
 		nil,
+		false,
 		0,
 		0,
 	)
@@ -763,6 +770,7 @@ func TestTrackConnected(t *testing.T) {
 		time.Duration(0),
 		0,
 		nil,
+		false,
 		0,
 		0,
 	)
@@ -786,6 +794,7 @@ func TestTrackConnected(t *testing.T) {
 		time.Duration(0),
 		0,
 		nil,
+		false,
 		0,
 		0,
 	)
@@ -889,6 +898,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		time.Duration(0),
 		0,
 		nil,
+		false,
 		0,
 		0,
 	)
@@ -912,6 +922,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		time.Duration(0),
 		0,
 		nil,
+		false,
 		0,
 		0,
 	)

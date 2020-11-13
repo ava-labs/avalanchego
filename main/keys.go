@@ -83,4 +83,5 @@ const (
 	corethConfigKey                 = "coreth-config"
 	disconnectedCheckFreqKey        = "disconnected-check-frequency"
 	disconnectedRestartTimeoutKey   = "disconnected-restart-timeout"
+	restartOnDisconnectedKey        = "restart-on-disconnected"
 )

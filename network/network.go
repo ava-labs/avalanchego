@@ -150,6 +150,9 @@ type network struct {
 	// ensures the close of the network only happens once.
 	closeOnce sync.Once
 
+	// True if the node should restart if it detects it's disconnected from all peers
+	restartOnDisconnected bool
+
 	// Signals the connection checker to close when Network is shutdown.
 	// See restartOnDisconnect()
 	connectedCheckerCloser chan struct{}
@@ -189,6 +192,7 @@ func NewDefaultNetwork(
 	connMeterResetDuration time.Duration,
 	connMeterMaxConns int,
 	restarter utils.Restarter,
+	restartOnDisconnected bool,
 	disconnectedCheckFreq time.Duration,
 	disconnectedRestartTimeout time.Duration,
 ) Network {
@@ -228,6 +232,7 @@ func NewDefaultNetwork(
 		defaultConnMeterCacheSize,
 		connMeterMaxConns,
 		restarter,
+		restartOnDisconnected,
 		disconnectedCheckFreq,
 		disconnectedRestartTimeout,
 	)
@@ -270,6 +275,7 @@ func NewNetwork(
 	connMeterCacheSize int,
 	connMeterMaxConns int,
 	restarter utils.Restarter,
+	restartOnDisconnected bool,
 	disconnectedCheckFreq time.Duration,
 	disconnectedRestartTimeout time.Duration,
 ) Network {
@@ -316,6 +322,7 @@ func NewNetwork(
 		readHandshakeTimeout:               readHandshakeTimeout,
 		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize),
 		connMeterMaxConns:                  connMeterMaxConns,
+		restartOnDisconnected:              restartOnDisconnected,
 		connectedCheckerCloser:             make(chan struct{}),
 		disconnectedCheckFreq:              disconnectedCheckFreq,
 		connectedMeter:                     timer.TimedMeter{Duration: disconnectedRestartTimeout},
@@ -328,7 +335,7 @@ func NewNetwork(
 	netw.executor.Initialize()
 	go netw.executor.Dispatch()
 	netw.heartbeat()
-	if restarter != nil && disconnectedCheckFreq != 0 && disconnectedRestartTimeout != 0 {
+	if restartOnDisconnected && disconnectedCheckFreq != 0 && disconnectedRestartTimeout != 0 {
 		log.Info("node will restart if not connected to any peers")
 		// pre-queue one tick to avoid immediate shutdown.
 		netw.connectedMeter.Tick()
