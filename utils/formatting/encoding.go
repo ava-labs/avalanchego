@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	// maximum length byte slice can be marshalled to a string
+	// maximum length byte slice can be encoded as a string or vice versa
 	// using the CB58 encoding. Must be longer than the length
 	// of an ID and longer than the length of a SECP256k1 private key
 	// TODO: Reduce to a reasonable amount (e.g. 16 * 1024) after we
@@ -92,9 +92,10 @@ func (enc *Encoding) UnmarshalJSON(b []byte) error {
 // [bytes] may be nil, in which case it will be treated the same
 // as an empty slice
 func Encode(encoding Encoding, bytes []byte) (string, error) {
-	if !encoding.valid() {
+	switch {
+	case !encoding.valid():
 		return "", errInvalidEncoding
-	} else if encoding == CB58 && len(bytes) > maxCB58Size {
+	case encoding == CB58 && len(bytes) > maxCB58Size:
 		return "", fmt.Errorf("byte slice length (%d) > maximum for cb58 (%d)", len(bytes), maxCB58Size)
 	}
 
@@ -114,10 +115,13 @@ func Encode(encoding Encoding, bytes []byte) (string, error) {
 // Decode [str] to bytes using the given encoding
 // If [str] is the empty string, returns a nil byte slice and nil error
 func Decode(encoding Encoding, str string) ([]byte, error) {
-	if !encoding.valid() {
+	switch {
+	case !encoding.valid():
 		return nil, errInvalidEncoding
-	} else if len(str) == 0 {
+	case len(str) == 0:
 		return nil, nil
+	case encoding == CB58 && len(str) > maxCB58Size:
+		return nil, fmt.Errorf("string length (%d) > maximum for cb58 (%d)", len(str), maxCB58Size)
 	}
 
 	var (
