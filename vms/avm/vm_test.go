@@ -629,15 +629,26 @@ func TestGenesisGetUTXOs(t *testing.T) {
 // - Fetching all UTXOs when they exceed maxUTXOsToFetch (1024)
 func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 	addr0Str, _ := formatting.FormatBech32(testHRP, addrs[0].Bytes())
+	addr1Str, _ := formatting.FormatBech32(testHRP, addrs[1].Bytes())
+	addr2Str, _ := formatting.FormatBech32(testHRP, addrs[2].Bytes())
 
-	// Create a starting point of 2000 UTXOs
+	// Create a starting point of 2000 UTXOs on different addresses
 	utxoCount := 2000
 	holder := map[string][]interface{}{}
 	for i := 0; i < utxoCount; i++ {
-		holder["fixedCap"] = append(holder["fixedCap"], Holder{
-			Amount:  json.Uint64(startBalance),
-			Address: addr0Str,
-		})
+		holder["fixedCap"] = append(holder["fixedCap"],
+			Holder{
+				Amount:  json.Uint64(startBalance),
+				Address: addr0Str,
+			},
+			Holder{
+				Amount:  json.Uint64(startBalance),
+				Address: addr1Str,
+			},
+			Holder{
+				Amount:  json.Uint64(startBalance),
+				Address: addr2Str,
+			})
 	}
 
 	// Inject them in the Genesis build
@@ -658,26 +669,55 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 	}()
 
 	addrsSet := ids.ShortSet{}
-	addrsSet.Add(addrs[0])
+	addrsSet.Add(addrs[0], addrs[1])
+
+	var (
+		pag1UTXOs, pag2UTXOs, pag3UTXOs, pag4UTXOs []*avax.UTXO
+		lastAddr                                   ids.ShortID
+		lastIdx                                    ids.ID
+		err                                        error
+	)
 
 	// First Page - using paginated calls
-	paginatedUTXOs, lastAddr, lastIdx, err := vm.GetUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, -1, true)
+	pag1UTXOs, lastAddr, lastIdx, err = vm.GetUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, -1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(paginatedUTXOs) == utxoCount {
-		t.Fatalf("Wrong number of utxos. Should be Paginated. Expected (%d) returned (%d)", maxUTXOsToFetch, len(paginatedUTXOs))
+	if len(pag1UTXOs) == utxoCount {
+		t.Fatalf("Wrong number of utxos. Should be Paginated. Expected (%d) returned (%d)", maxUTXOsToFetch, len(pag1UTXOs))
 	}
 
-	// Last Page - using paginated calls
-	paginatedUTXOsLastPage, _, _, err := vm.GetUTXOs(addrsSet, lastAddr, lastIdx, -1, true)
+	// Second Page - using paginated calls
+	pag2UTXOs, lastAddr, lastIdx, err = vm.GetUTXOs(addrsSet, lastAddr, lastIdx, -1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(paginatedUTXOs)+len(paginatedUTXOsLastPage) != utxoCount {
-		t.Fatalf("Wrong number of utxos. Should have paginated through all. Expected (%d) returned (%d)", utxoCount, len(paginatedUTXOs)+len(paginatedUTXOsLastPage))
+	if len(pag1UTXOs)+len(pag2UTXOs) != 2*maxUTXOsToFetch {
+		t.Fatalf("Wrong number of utxos. Should have paginated through 2 pages. Expected (%d) returned (%d)", 2*maxUTXOsToFetch, len(pag1UTXOs)+len(pag2UTXOs))
+	}
+
+	// Third Page - using paginated calls
+	pag3UTXOs, lastAddr, lastIdx, err = vm.GetUTXOs(addrsSet, lastAddr, lastIdx, -1, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	thirdPageCount := len(pag1UTXOs) + len(pag2UTXOs) + len(pag3UTXOs)
+	if thirdPageCount != 3*maxUTXOsToFetch {
+		t.Fatalf("Wrong number of utxos. Should have paginated through 3 pages. Expected (%d) returned (%d)", 3*maxUTXOsToFetch, thirdPageCount)
+	}
+
+	// Fourth Page - using paginated calls
+	pag4UTXOs, _, _, err = vm.GetUTXOs(addrsSet, lastAddr, lastIdx, -1, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fourthPageCount := thirdPageCount + len(pag4UTXOs)
+	if fourthPageCount != 2*utxoCount {
+		t.Fatalf("Wrong number of utxos. Should have paginated through all. Expected (%d) returned (%d)", 2*utxoCount, fourthPageCount)
 	}
 
 	// Fetch all UTXOs
@@ -686,8 +726,8 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(notPaginatedUTXOs) != utxoCount {
-		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", utxoCount, len(notPaginatedUTXOs))
+	if len(notPaginatedUTXOs) != 2*utxoCount {
+		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 2*utxoCount, len(notPaginatedUTXOs))
 	}
 }
 

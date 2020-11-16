@@ -423,7 +423,6 @@ func (vm *VM) removeReferencingUTXO(db database.Database, addrBytes []byte, utxo
 }
 
 // GetUTXOs returns UTXOs such that at least one of the addresses in [addrs] is referenced.
-// Assumed elements of [addrs] are unique.
 // Returns at most [limit] UTXOs.
 // If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
 // Only returns UTXOs associated with addresses >= [startAddr].
@@ -440,10 +439,71 @@ func (vm *VM) GetUTXOs(
 	limit int,
 	paginate bool,
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
-	if limit <= 0 || limit > maxUTXOsToFetch { // Don't fetch more than [maxUTXOsToFetch]
+	if limit <= 0 || limit > maxUTXOsToFetch {
 		limit = maxUTXOsToFetch
 	}
 
+	if paginate {
+		return vm.getPaginatedUTXOs(db, addrs, startAddr, startUTXOID, limit)
+	}
+	return vm.getAllUTXOs(db, addrs, startAddr, startUTXOID, limit)
+}
+
+func (vm *VM) getPaginatedUTXOs(
+	db database.Database,
+	addrs ids.ShortSet,
+	startAddr state.Marshaller,
+	startUTXOID ids.ID,
+	limit int,
+) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
+	seen := ids.Set{} // IDs of UTXOs already in the list
+	utxos := make([]*avax.UTXO, 0, limit)
+	lastAddr := ids.ShortEmpty
+	lastIndex := ids.Empty
+	addrsList := addrs.List()
+	ids.SortShortIDs(addrsList)
+
+	for _, addr := range addrsList {
+		start := ids.Empty
+		if comp := bytes.Compare(addr.Bytes(), startAddr.Bytes()); comp == -1 { // Skip addresses before [startAddr]
+			continue
+		} else if comp == 0 {
+			start = startUTXOID
+		}
+
+		utxoIDs, err := vm.getReferencingUTXOs(db, addr.Bytes(), start, limit) // Get IDs of UTXOs to fetch
+		if err != nil {
+			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
+		}
+		for _, utxoIDKey := range utxoIDs { // Get the UTXOs
+			if seen.Contains(utxoIDKey) { // already have this UTXO in the list
+				continue
+			}
+			utxo, err := vm.getUTXO(db, utxoIDKey)
+			if err != nil {
+				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoIDKey, err)
+			}
+			utxos = append(utxos, utxo)
+			seen.Add(utxoIDKey)
+			lastAddr = addr
+			lastIndex = utxoIDKey
+			limit--
+			if limit <= 0 {
+				break // Found [limit] utxos; stop.
+			}
+		}
+
+	}
+	return utxos, lastAddr, lastIndex, nil
+}
+
+func (vm *VM) getAllUTXOs(
+	db database.Database,
+	addrs ids.ShortSet,
+	startAddr state.Marshaller,
+	startUTXOID ids.ID,
+	limit int,
+) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
 	seen := ids.Set{} // IDs of UTXOs already in the list
 	utxos := make([]*avax.UTXO, 0, limit)
 	lastAddr := ids.ShortEmpty
@@ -481,13 +541,15 @@ func (vm *VM) GetUTXOs(
 				}
 			}
 
-			if paginate || len(utxoIDs) == 0 { // Avoiding a downstream make([]) making this an infinite loop
-				break // No more utxos available for that address | Don't fetch more utxos
+			if len(utxoIDs) == 0 {
+				break // no more utxos in this address
 			}
-			start = utxoIDs[len(utxoIDs)-1]
+			addr = lastAddr
+			start = lastIndex
 		}
 	}
 	return utxos, lastAddr, lastIndex, nil
+
 }
 
 // getBalance returns the balance of [addrs]
