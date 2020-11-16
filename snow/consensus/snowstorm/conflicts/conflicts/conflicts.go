@@ -80,10 +80,10 @@ func (c *Conflicts) Add(txIntf choices.Decidable) error {
 	txIDs.Add(txID)
 	c.transitions[transitionID] = txIDs
 
-	for inputKey := range tx.InputIDs() {
-		spenders := c.utxos[inputKey]
+	for _, inputID := range tx.InputIDs() {
+		spenders := c.utxos[inputID]
 		spenders.Add(txID)
-		c.utxos[inputKey] = spenders
+		c.utxos[inputID] = spenders
 	}
 
 	for _, restrictionID := range tx.Restrictions() {
@@ -110,8 +110,8 @@ func (c *Conflicts) IsVirtuous(txIntf choices.Decidable) (bool, error) {
 	}
 
 	txID := tx.ID()
-	for inputKey := range tx.InputIDs() {
-		spenders := c.utxos[inputKey]
+	for _, inputID := range tx.InputIDs() {
+		spenders := c.utxos[inputID]
 		if numSpenders := spenders.Len(); numSpenders > 1 ||
 			(numSpenders == 1 && !spenders.Contains(txID)) {
 			return false, nil
@@ -121,11 +121,26 @@ func (c *Conflicts) IsVirtuous(txIntf choices.Decidable) (bool, error) {
 	epoch := tx.Epoch()
 	transitionID := tx.TransitionID()
 	restrictors := c.restrictions[transitionID]
-	for restrictorKey := range restrictors {
-		restrictor := c.txs[restrictorKey]
+	// Check if other transactions have marked as attempting to restrict this tx
+	// to at least their epoch.
+	for restrictorID := range restrictors {
+		restrictor := c.txs[restrictorID]
 		restrictorEpoch := restrictor.Epoch()
-		if restrictorEpoch <= epoch {
+		if restrictorEpoch > epoch {
 			return false, nil
+		}
+	}
+
+	// Check if this transaction has marked as attempting to restrict other txs
+	// to at least this epoch.
+	for _, restrictedTransitionID := range tx.Restrictions() {
+		restrictionIDs := c.transitions[restrictedTransitionID]
+		for restrictionID := range restrictionIDs {
+			restriction := c.txs[restrictionID]
+			restrictionEpoch := restriction.Epoch()
+			if restrictionEpoch < epoch {
+				return false, nil
+			}
 		}
 	}
 	return true, nil
@@ -145,7 +160,7 @@ func (c *Conflicts) Conflicts(txIntf choices.Decidable) ([]choices.Decidable, er
 	conflictSet.Add(txID)
 
 	conflicts := []choices.Decidable(nil)
-	for inputID := range tx.InputIDs() {
+	for _, inputID := range tx.InputIDs() {
 		spenders := c.utxos[inputID]
 		for spenderID := range spenders {
 			if conflictSet.Contains(spenderID) {
@@ -159,6 +174,8 @@ func (c *Conflicts) Conflicts(txIntf choices.Decidable) ([]choices.Decidable, er
 	epoch := tx.Epoch()
 	transitionID := tx.TransitionID()
 	restrictors := c.restrictions[transitionID]
+	// Check if other transactions have marked as attempting to restrict this tx
+	// to at least their epoch.
 	for restrictorID := range restrictors {
 		if conflictSet.Contains(restrictorID) {
 			continue
@@ -167,11 +184,27 @@ func (c *Conflicts) Conflicts(txIntf choices.Decidable) ([]choices.Decidable, er
 		restrictor := c.txs[restrictorID]
 		restrictorEpoch := restrictor.Epoch()
 		if restrictorEpoch > epoch {
-			continue
+			conflictSet.Add(restrictorID)
+			conflicts = append(conflicts, restrictor)
 		}
+	}
 
-		conflictSet.Add(restrictorID)
-		conflicts = append(conflicts, restrictor)
+	// Check if this transaction has marked as attempting to restrict other txs
+	// to at least this epoch.
+	for _, restrictedTransitionID := range tx.Restrictions() {
+		restrictionIDs := c.transitions[restrictedTransitionID]
+		for restrictionID := range restrictionIDs {
+			if conflictSet.Contains(restrictionID) {
+				continue
+			}
+
+			restriction := c.txs[restrictionID]
+			restrictionEpoch := restriction.Epoch()
+			if restrictionEpoch < epoch {
+				conflictSet.Add(restrictionID)
+				conflicts = append(conflicts, restriction)
+			}
+		}
 	}
 	return conflicts, nil
 }
@@ -229,7 +262,7 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 		}
 
 		// Remove the UTXO mappings
-		for inputID := range tx.InputIDs() {
+		for _, inputID := range tx.InputIDs() {
 			spenders := c.utxos[inputID]
 			spenders.Remove(txID)
 			if spenders.Len() == 0 {
@@ -315,7 +348,7 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 		}
 
 		// Remove the UTXO mappings
-		for inputID := range tx.InputIDs() {
+		for _, inputID := range tx.InputIDs() {
 			spenders := c.utxos[inputID]
 			spenders.Remove(txID)
 			if spenders.Len() == 0 {

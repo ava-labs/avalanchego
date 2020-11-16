@@ -20,7 +20,7 @@ type TestTx struct {
 	EpochV        uint32
 	RestrictionsV []ids.ID
 	DependenciesV []ids.ID
-	InputIDsV     ids.Set
+	InputIDsV     []ids.ID
 }
 
 // TransitionID implements the Tx interface
@@ -36,4 +36,4 @@ func (t *TestTx) Restrictions() []ids.ID { return t.RestrictionsV }
 func (t *TestTx) Dependencies() []ids.ID { return t.DependenciesV }
 
 // InputIDs implements the Tx interface
-func (t *TestTx) InputIDs() ids.Set { return t.InputIDsV }
+func (t *TestTx) InputIDs() []ids.ID { return t.InputIDsV }

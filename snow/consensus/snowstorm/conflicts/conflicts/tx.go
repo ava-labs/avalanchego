@@ -28,10 +28,10 @@ type Tx interface {
 	// These dependencies can be executed in the same epoch as this transaction.
 	Dependencies() []ids.ID
 
-	// InputIDs is a set where each element is the ID of a piece of state that
+	// InputIDs is a list where each element is the ID of a piece of state that
 	// will be consumed if this transaction is accepted.
 	//
 	// In the context of a UTXO-based payments system, for example, this would
 	// be the IDs of the UTXOs consumed by this transaction.
-	InputIDs() ids.Set
+	InputIDs() []ids.ID
 }
