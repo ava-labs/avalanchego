@@ -573,11 +573,13 @@ func (vm *VM) getAllUTXOs(addrs ids.ShortSet,
 				lastAddr = addr
 				lastIndex = utxoID
 			}
-			if len(utxoIDs) == 0 {
-				break // no more utxos in this address
-			}
 			addr = lastAddr
 			start = lastIndex
+
+			// it can refetch a single seen utxo
+			if len(utxoIDs) == 0 || (len(utxoIDs) == 1 && seen.Contains(utxoIDs[0])) {
+				break // no more utxos in this address
+			}
 		}
 	}
 	return utxos, lastAddr, lastIndex, nil

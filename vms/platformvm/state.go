@@ -537,15 +537,18 @@ func (vm *VM) getAllUTXOs(
 				lastIndex = utxoIDKey
 				currLimit--
 				if currLimit <= 0 {
-					break // Found [limit] utxos; stop.
+					break // Found [currLimit] utxos; stop.
 				}
 			}
 
-			if len(utxoIDs) == 0 {
-				break // no more utxos in this address
-			}
 			addr = lastAddr
 			start = lastIndex
+
+			// it can refetch a single seen utxo
+			if len(utxoIDs) == 0 || (len(utxoIDs) == 1 && seen.Contains(utxoIDs[0])) {
+				break // no more utxos in this address
+			}
+
 		}
 	}
 	return utxos, lastAddr, lastIndex, nil
