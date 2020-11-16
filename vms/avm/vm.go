@@ -539,7 +539,6 @@ func (vm *VM) getAllUTXOs(addrs ids.ShortSet,
 	startUTXOID ids.ID,
 	limit int,
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
-
 	seen := ids.Set{} // IDs of UTXOs already in the list
 	utxos := make([]*avax.UTXO, 0, limit)
 	lastAddr := ids.ShortEmpty
@@ -561,6 +560,9 @@ func (vm *VM) getAllUTXOs(addrs ids.ShortSet,
 				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 			}
 			for _, utxoID := range utxoIDs {
+				lastAddr = addr
+				lastIndex = utxoID
+
 				if seen.Contains(utxoID) { // Already have this UTXO in the list
 					continue
 				}
@@ -570,14 +572,11 @@ func (vm *VM) getAllUTXOs(addrs ids.ShortSet,
 				}
 				utxos = append(utxos, utxo)
 				seen.Add(utxoID)
-				lastAddr = addr
-				lastIndex = utxoID
 			}
 			addr = lastAddr
 			start = lastIndex
 
-			// it can refetch a single seen utxo
-			if len(utxoIDs) == 0 || (len(utxoIDs) == 1 && seen.Contains(utxoIDs[0])) {
+			if len(utxoIDs) == 0 {
 				break // no more utxos in this address
 			}
 		}

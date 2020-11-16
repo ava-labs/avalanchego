@@ -510,6 +510,7 @@ func (vm *VM) getAllUTXOs(
 	lastIndex := ids.Empty
 	addrsList := addrs.List()
 	ids.SortShortIDs(addrsList)
+
 	for _, addr := range addrsList {
 		start := ids.Empty
 		if comp := bytes.Compare(addr.Bytes(), startAddr.Bytes()); comp == -1 { // Skip addresses before [startAddr]
@@ -517,13 +518,16 @@ func (vm *VM) getAllUTXOs(
 		} else if comp == 0 {
 			start = startUTXOID
 		}
+
 		for {
-			currLimit := limit
-			utxoIDs, err := vm.getReferencingUTXOs(db, addr.Bytes(), start, currLimit) // Get IDs of UTXOs to fetch
+			utxoIDs, err := vm.getReferencingUTXOs(db, addr.Bytes(), start, limit) // Get IDs of UTXOs to fetch
 			if err != nil {
 				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 			}
 			for _, utxoIDKey := range utxoIDs { // Get the UTXOs
+				lastAddr = addr
+				lastIndex = utxoIDKey
+
 				if seen.Contains(utxoIDKey) { // already have this UTXO in the list
 					continue
 				}
@@ -533,22 +537,14 @@ func (vm *VM) getAllUTXOs(
 				}
 				utxos = append(utxos, utxo)
 				seen.Add(utxoIDKey)
-				lastAddr = addr
-				lastIndex = utxoIDKey
-				currLimit--
-				if currLimit <= 0 {
-					break // Found [currLimit] utxos; stop.
-				}
 			}
 
 			addr = lastAddr
 			start = lastIndex
 
-			// it can refetch a single seen utxo
-			if len(utxoIDs) == 0 || (len(utxoIDs) == 1 && seen.Contains(utxoIDs[0])) {
+			if len(utxoIDs) == 0 {
 				break // no more utxos in this address
 			}
-
 		}
 	}
 	return utxos, lastAddr, lastIndex, nil
