@@ -182,6 +182,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	}
 
 	buildGenesisArgs := BuildGenesisArgs{
+		Encoding:      formatting.Hex,
 		NetworkID:     json.Uint32(testNetworkID),
 		AvaxAssetID:   avaxAssetID,
 		UTXOs:         genesisUTXOs,

@@ -143,64 +143,66 @@ func BuildGenesisTest(t *testing.T) []byte {
 	addr1Str, _ := formatting.FormatBech32(testHRP, addrs[1].Bytes())
 	addr2Str, _ := formatting.FormatBech32(testHRP, addrs[2].Bytes())
 
-	defaultArgs := &BuildGenesisArgs{GenesisData: map[string]AssetDefinition{
-		"asset1": {
-			Name:   "AVAX",
-			Symbol: "SYMB",
-			InitialState: map[string][]interface{}{
-				"fixedCap": {
-					Holder{
-						Amount:  json.Uint64(startBalance),
-						Address: addr0Str,
-					},
-					Holder{
-						Amount:  json.Uint64(startBalance),
-						Address: addr1Str,
-					},
-					Holder{
-						Amount:  json.Uint64(startBalance),
-						Address: addr2Str,
-					},
-				},
-			},
-		},
-		"asset2": {
-			Name:   "myVarCapAsset",
-			Symbol: "MVCA",
-			InitialState: map[string][]interface{}{
-				"variableCap": {
-					Owners{
-						Threshold: 1,
-						Minters: []string{
-							addr0Str,
-							addr1Str,
+	defaultArgs := &BuildGenesisArgs{
+		Encoding: formatting.Hex,
+		GenesisData: map[string]AssetDefinition{
+			"asset1": {
+				Name:   "AVAX",
+				Symbol: "SYMB",
+				InitialState: map[string][]interface{}{
+					"fixedCap": {
+						Holder{
+							Amount:  json.Uint64(startBalance),
+							Address: addr0Str,
 						},
-					},
-					Owners{
-						Threshold: 2,
-						Minters: []string{
-							addr0Str,
-							addr1Str,
-							addr2Str,
+						Holder{
+							Amount:  json.Uint64(startBalance),
+							Address: addr1Str,
+						},
+						Holder{
+							Amount:  json.Uint64(startBalance),
+							Address: addr2Str,
 						},
 					},
 				},
 			},
-		},
-		"asset3": {
-			Name: "myOtherVarCapAsset",
-			InitialState: map[string][]interface{}{
-				"variableCap": {
-					Owners{
-						Threshold: 1,
-						Minters: []string{
-							addr0Str,
+			"asset2": {
+				Name:   "myVarCapAsset",
+				Symbol: "MVCA",
+				InitialState: map[string][]interface{}{
+					"variableCap": {
+						Owners{
+							Threshold: 1,
+							Minters: []string{
+								addr0Str,
+								addr1Str,
+							},
+						},
+						Owners{
+							Threshold: 2,
+							Minters: []string{
+								addr0Str,
+								addr1Str,
+								addr2Str,
+							},
 						},
 					},
 				},
 			},
-		},
-	}}
+			"asset3": {
+				Name: "myOtherVarCapAsset",
+				InitialState: map[string][]interface{}{
+					"variableCap": {
+						Owners{
+							Threshold: 1,
+							Minters: []string{
+								addr0Str,
+							},
+						},
+					},
+				},
+			},
+		}}
 
 	return BuildGenesisTestWithArgs(t, defaultArgs)
 }
@@ -637,13 +639,15 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 	}
 
 	// Inject them in the Genesis build
-	genesisArgs := &BuildGenesisArgs{GenesisData: map[string]AssetDefinition{
-		"asset1": {
-			Name:         "AVAX",
-			Symbol:       "SYMB",
-			InitialState: holder,
-		},
-	}}
+	genesisArgs := &BuildGenesisArgs{
+		Encoding: formatting.Hex,
+		GenesisData: map[string]AssetDefinition{
+			"asset1": {
+				Name:         "AVAX",
+				Symbol:       "SYMB",
+				InitialState: holder,
+			},
+		}}
 	_, _, vm, _ := GenesisVMWithArgs(t, genesisArgs)
 	ctx := vm.ctx
 	defer func() {
