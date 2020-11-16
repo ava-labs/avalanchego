@@ -16,17 +16,23 @@ import (
 )
 
 const (
-	// maximum length byte slice can be encoded as a string or vice versa
+	// maximum length byte slice can be encoded as a string
 	// using the CB58 encoding. Must be longer than the length
 	// of an ID and longer than the length of a SECP256k1 private key
 	// TODO: Reduce to a reasonable amount (e.g. 16 * 1024) after we
 	// give users a chance to export very large keystore users to hex
-	maxCB58Size = math.MaxInt32
-
-	checksumLen = 4
+	maxCB58EncodeSize = math.MaxInt32
+	hexPrefix         = "0x"
+	checksumLen       = 4
 )
 
 var (
+	// Maximum length CB58 encoded string that can be decoded to bytes
+	// This is different than [maxCB58EncodeSize] because each byte can express up
+	// to 256 but each base 58 digit can express up to 58
+	// The 10 is because there seems to be a floating point issue where the calculated
+	// max decode size (using this formula) is slightly smaller than the actual
+	maxCB58DecodeSize   = int(float64(maxCB58EncodeSize)*math.Log2(256)/math.Log2(58)) + 10
 	errInvalidEncoding  = errors.New("invalid encoding")
 	errMissingChecksum  = errors.New("input string is smaller than the checksum size")
 	errBadChecksum      = errors.New("invalid input checksum")
@@ -95,8 +101,8 @@ func Encode(encoding Encoding, bytes []byte) (string, error) {
 	switch {
 	case !encoding.valid():
 		return "", errInvalidEncoding
-	case encoding == CB58 && len(bytes) > maxCB58Size:
-		return "", fmt.Errorf("byte slice length (%d) > maximum for cb58 (%d)", len(bytes), maxCB58Size)
+	case encoding == CB58 && len(bytes) > maxCB58EncodeSize:
+		return "", fmt.Errorf("byte slice length (%d) > maximum for cb58 (%d)", len(bytes), maxCB58EncodeSize)
 	}
 
 	checked := make([]byte, len(bytes)+checksumLen)
@@ -120,8 +126,8 @@ func Decode(encoding Encoding, str string) ([]byte, error) {
 		return nil, errInvalidEncoding
 	case len(str) == 0:
 		return nil, nil
-	case encoding == CB58 && len(str) > maxCB58Size:
-		return nil, fmt.Errorf("string length (%d) > maximum for cb58 (%d)", len(str), maxCB58Size)
+	case encoding == CB58 && len(str) > maxCB58DecodeSize:
+		return nil, fmt.Errorf("string length (%d) > maximum for cb58 (%d)", len(str), maxCB58DecodeSize)
 	}
 
 	var (
@@ -130,7 +136,7 @@ func Decode(encoding Encoding, str string) ([]byte, error) {
 	)
 	switch encoding {
 	case Hex:
-		if !strings.HasPrefix(str, "0x") {
+		if !strings.HasPrefix(str, hexPrefix) {
 			return nil, errMissingHexPrefix
 		}
 		decodedBytes, err = hex.DecodeString(str[2:])
