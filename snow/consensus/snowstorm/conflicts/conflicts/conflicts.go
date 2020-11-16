@@ -5,6 +5,7 @@ package conflicts
 
 import (
 	"errors"
+	"math"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -15,7 +16,9 @@ var (
 )
 
 type Conflicts struct {
-	// track the currently processing txs. Maps ID() to tx.
+	// track the currently processing txs. Maps ID() to tx. This includes
+	// transactions that have been added to the acceptable and rejectable
+	// queues.
 	txs map[ids.ID]Tx
 
 	// transitions tracks the currently processing txIDs for a transition. Maps
@@ -34,8 +37,12 @@ type Conflicts struct {
 	// txIDs.
 	dependencies map[ids.ID]ids.Set
 
-	// accepted tracks the set of txIDs that have been conditionally accepted,
-	// but not returned as fully accepted.
+	// conditionallyAccepted tracks the set of txIDs that have been
+	// conditionally accepted, but not returned as fully accepted.
+	conditionallyAccepted ids.Set
+
+	// accepted tracks the set of txIDs that have been added to the acceptable
+	// queue.
 	accepted ids.Set
 
 	// track txs that have been marked as ready to accept
@@ -177,7 +184,6 @@ func (c *Conflicts) Accept(txID ids.ID) {
 	if !exists {
 		return
 	}
-	c.accepted.Add(txID)
 
 	acceptable := true
 	for _, dependency := range tx.Dependencies() {
@@ -186,11 +192,17 @@ func (c *Conflicts) Accept(txID ids.ID) {
 		}
 	}
 	if acceptable {
+		transitionID := tx.TransitionID()
+		c.accepted.Add(transitionID)
 		c.acceptable = append(c.acceptable, tx)
+	} else {
+		c.conditionallyAccepted.Add(txID)
 	}
 }
 
 func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
+	accepted := c.accepted
+	c.accepted = nil
 	acceptable := c.acceptable
 	c.acceptable = nil
 
@@ -204,9 +216,10 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 		transitionID := tx.TransitionID()
 		epoch := tx.Epoch()
 
-		// Remove the accepted transaction from the collection:
+		// Remove the accepted transaction from the collection
+		delete(c.txs, txID)
 
-		// 
+		// Remove the transitions map
 		txIDs := c.transitions[transitionID]
 		txIDs.Remove(txID)
 		if txIDs.Len() == 0 {
@@ -215,6 +228,7 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 			c.transitions[transitionID] = txIDs
 		}
 
+		// Remove the UTXO mappings
 		for inputID := range tx.InputIDs() {
 			spenders := c.utxos[inputID]
 			spenders.Remove(txID)
@@ -225,6 +239,7 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 			}
 		}
 
+		// Remove the restrictions
 		for _, restrictionID := range tx.Restrictions() {
 			restrictors := c.restrictions[restrictionID]
 			restrictors.Remove(txID)
@@ -235,10 +250,13 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 			}
 		}
 
-
-		
-
+		// Remove the dependency pointers of the transactions that depended on
+		// this transition. If a transaction has been conditionally accepted and
+		// it has no dependencies left, then it should be marked as accepted. If
+		// Reject dependencies that are no longer valid to be accepted.
 		dependents := c.dependencies[transitionID]
+		delete(c.dependencies, transitionID)
+	acceptedDependentLoop:
 		for dependentID := range dependents {
 			dependent := c.txs[dependentID]
 			dependentEpoch := dependent.Epoch()
@@ -247,22 +265,22 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 				c.rejectable = append(c.rejectable, dependent)
 			}
 
-			canAccept := true
-			for _, dependencyID := range dependent.Dependencies() {
-				if c.a
+			if !c.conditionallyAccepted.Contains(dependentID) {
+				continue
 			}
-			// TODO: if the dependent
-		}
 
-		for _, dependencyID := range tx.Dependencies() {
-			dependents := c.dependencies[dependencyID]
-			dependents.Add(txID)
-			c.dependencies[dependencyID] = dependents
-		}
+			for _, dependencyID := range dependent.Dependencies() {
+				if !accepted.Contains(dependencyID) {
+					continue acceptedDependentLoop
+				}
+			}
 
-		delete(c.txs, txID)
-		c.pendingAccept.Fulfill(txID)
-		c.pendingReject.Abandon(txID)
+			dependentTransitionID := dependent.TransitionID()
+
+			c.conditionallyAccepted.Remove(dependentID)
+			c.accepted.Add(dependentTransitionID)
+			c.acceptable = append(c.acceptable, dependent)
+		}
 
 		// Conflicts should never return an error, as the type has already been
 		// asserted.
@@ -279,24 +297,80 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 
 	rejectable := c.rejectable
 	c.rejectable = nil
-	// for _, tx := range rejectable {
-	// 	txID := tx.ID()
+	for _, tx := range rejectable {
+		tx := tx.(Tx)
+		txID := tx.ID()
+		transitionID := tx.TransitionID()
 
-	// 	tx := tx.(Tx)
-	// 	for inputKey := range tx.InputIDs() {
-	// 		spenders := c.utxos[inputKey]
-	// 		spenders.Remove(txID)
-	// 		if spenders.Len() == 0 {
-	// 			delete(c.utxos, inputKey)
-	// 		} else {
-	// 			c.utxos[inputKey] = spenders
-	// 		}
-	// 	}
+		// Remove the rejected transaction from the collection
+		delete(c.txs, txID)
 
-	// 	delete(c.txs, txID)
-	// 	c.pendingAccept.Abandon(txID)
-	// 	c.pendingReject.Fulfill(txID)
-	// }
+		// Remove the transitions map
+		txIDs := c.transitions[transitionID]
+		txIDs.Remove(txID)
+		if txIDs.Len() == 0 {
+			delete(c.transitions, transitionID)
+		} else {
+			c.transitions[transitionID] = txIDs
+		}
+
+		// Remove the UTXO mappings
+		for inputID := range tx.InputIDs() {
+			spenders := c.utxos[inputID]
+			spenders.Remove(txID)
+			if spenders.Len() == 0 {
+				delete(c.utxos, inputID)
+			} else {
+				c.utxos[inputID] = spenders
+			}
+		}
+
+		// Remove the restrictions
+		for _, restrictionID := range tx.Restrictions() {
+			restrictors := c.restrictions[restrictionID]
+			restrictors.Remove(txID)
+			if restrictors.Len() == 0 {
+				delete(c.restrictions, restrictionID)
+			} else {
+				c.restrictions[restrictionID] = restrictors
+			}
+		}
+
+		if txIDs.Len() == 0 {
+			// Remove the dependency pointers of the transactions that depended
+			// on this transition.
+			dependents := c.dependencies[transitionID]
+			for dependentID := range dependents {
+				dependent := c.txs[dependentID]
+				if !rejected.Contains(dependentID) {
+					rejected.Add(dependentID)
+					c.rejectable = append(c.rejectable, dependent)
+				}
+			}
+			delete(c.dependencies, transitionID)
+		} else {
+			lowestRemainingEpoch := uint32(math.MaxUint32)
+			for otherTxID := range txIDs {
+				otherTx := c.txs[otherTxID]
+				otherEpoch := otherTx.Epoch()
+				if otherEpoch < lowestRemainingEpoch {
+					lowestRemainingEpoch = otherEpoch
+				}
+			}
+
+			// Remove the dependency pointers of the transactions that depended
+			// on the transition to be performed in this epoch.
+			dependents := c.dependencies[transitionID]
+			for dependentID := range dependents {
+				dependent := c.txs[dependentID]
+				dependentEpoch := dependent.Epoch()
+				if dependentEpoch < lowestRemainingEpoch && !rejected.Contains(dependentID) {
+					rejected.Add(dependentID)
+					c.rejectable = append(c.rejectable, dependent)
+				}
+			}
+		}
+	}
 
 	return acceptable, rejectable
 }
