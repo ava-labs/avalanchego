@@ -35,11 +35,8 @@ var (
 
 // Codec handles marshaling and unmarshaling of structs
 type codec struct {
-	lock        sync.Mutex
-	version     uint16
-	maxSize     int
-	maxSliceLen int
-
+	lock         sync.Mutex
+	maxSliceLen  int
 	nextTypeID   uint32
 	typeIDToType map[uint32]reflect.Type
 	typeToTypeID map[reflect.Type]uint32
@@ -57,18 +54,14 @@ type codec struct {
 type Codec interface {
 	Skip(int)
 	RegisterType(interface{}) error
-	SetMaxSize(int)
-	SetMaxSliceLen(int)
-	Marshal(interface{}) ([]byte, error)
+	MarshalInto(interface{}, *wrappers.Packer) error
 	Unmarshal([]byte, interface{}) error
 }
 
 // New returns a new, concurrency-safe codec
-func New(maxSize, maxSliceLen int) Codec {
+func New(maxSliceLen int) Codec {
 	return &codec{
-		maxSize:                maxSize,
 		maxSliceLen:            maxSliceLen,
-		version:                version,
 		nextTypeID:             0,
 		typeIDToType:           map[uint32]reflect.Type{},
 		typeToTypeID:           map[reflect.Type]uint32{},
@@ -77,7 +70,7 @@ func New(maxSize, maxSliceLen int) Codec {
 }
 
 // NewDefault returns a new codec with reasonable default values
-func NewDefault() Codec { return New(defaultMaxSize, defaultMaxSliceLength) }
+func NewDefault() Codec { return New(defaultMaxSliceLength) }
 
 // Skip some number of type IDs
 func (c *codec) Skip(num int) {
@@ -99,20 +92,6 @@ func (c *codec) RegisterType(val interface{}) error {
 	c.typeToTypeID[valType] = c.nextTypeID
 	c.nextTypeID++
 	return nil
-}
-
-// SetMaxSize of bytes allowed
-func (c *codec) SetMaxSize(size int) {
-	c.lock.Lock()
-	c.maxSize = size
-	c.lock.Unlock()
-}
-
-// SetMaxSliceLen of a provided array
-func (c *codec) SetMaxSliceLen(size int) {
-	c.lock.Lock()
-	c.maxSliceLen = size
-	c.lock.Unlock()
 }
 
 // A few notes:
