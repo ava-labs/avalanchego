@@ -38,25 +38,30 @@ func BenchmarkMarshal(b *testing.B) {
 	var unmarshaledMyStructInstance myStruct
 
 	codec := NewDefault()
-
+	manager := NewDefaultManager()
 	errs := wrappers.Errs{}
 	errs.Add(
 		codec.RegisterType(&MyInnerStruct{}), // Register the types that may be unmarshaled into interfaces
 		codec.RegisterType(&MyInnerStruct2{}),
+		manager.RegisterCodec(0, codec),
 	)
-	_, err := codec.Marshal(myStructInstance) // warm up serializedFields cache
+	_, err := manager.Marshal(0, myStructInstance) // warm up serializedFields cache
 	if errs.Add(err); errs.Errored() {
 		b.Fatal(errs.Err)
 	}
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		bytes, err := codec.Marshal(myStructInstance)
+		bytes, err := manager.Marshal(0, myStructInstance)
 		if err != nil {
 			b.Fatal(err)
 		}
-		if err := codec.Unmarshal(bytes, &unmarshaledMyStructInstance); err != nil {
+		version, err := manager.Unmarshal(bytes, &unmarshaledMyStructInstance)
+		if err != nil {
 			b.Fatal(err)
+		}
+		if version != 0 {
+			b.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
 		}
 
 	}

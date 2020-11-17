@@ -11,6 +11,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
+const (
+	// default max size, in bytes, of something being marshalled by Marshal()
+	defaultMaxSize = 1 << 18
+
+	// initial capacity of byte slice that values are marshaled into.
+	// Larger value --> need less memory allocations but possibly have allocated but unused memory
+	// Smaller value --> need more memory allocations but more efficient use of allocated memory
+	initialSliceCap = 128
+)
+
 var (
 	errUnknownVersion    = errors.New("unknown codec version")
 	errDuplicatedVersion = errors.New("duplicated codec version")
