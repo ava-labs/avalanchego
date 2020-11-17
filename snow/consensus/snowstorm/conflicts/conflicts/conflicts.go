@@ -16,25 +16,29 @@ var (
 )
 
 type Conflicts struct {
-	// track the currently processing txs. Maps ID() to tx. This includes
+	// track the currently processing txs. This includes
 	// transactions that have been added to the acceptable and rejectable
 	// queues.
+	// Transaction ID --> The transaction with that ID
 	txs map[ids.ID]Tx
 
-	// transitions tracks the currently processing txIDs for a transition. Maps
-	// transitionID to a set of txIDs.
+	// transitions tracks the currently processing txIDs for a transition.
+	// Transition ID --> IDs of transactions that perform the transition
 	transitions map[ids.ID]ids.Set
 
-	// track which txs are currently consuming which utxos. Maps inputID to a
-	// set of txIDs.
+	// track which txs are currently consuming which utxos.
+	// UTXO ID --> IDs of transactions that consume the UTXO
 	utxos map[ids.ID]ids.Set
 
-	// track which txs are attempting to be restricted. Maps transitionID to a
-	// set of txIDs.
+	// track which txs are attempting to be restricted.
+	// Transition ID --> IDs of transactions that require the transition
+	// to be performed in the transaction's epoch or a later one if
+	// the transaction is to be accepted.
 	restrictions map[ids.ID]ids.Set
 
-	// track which txs are blocking on others. Maps transitionID to a set of
-	// txIDs.
+	// track which txs are blocking on others.
+	// Transition ID --> IDs of transactions that need the transition to be
+	// performed before the transaction is accepted.
 	dependencies map[ids.ID]ids.Set
 
 	// conditionallyAccepted tracks the set of txIDs that have been
@@ -109,20 +113,24 @@ func (c *Conflicts) IsVirtuous(txIntf choices.Decidable) (bool, error) {
 		return false, errInvalidTxType
 	}
 
+	// Check whether this transaction consumes the same state as
+	// a different processing transaction
 	txID := tx.ID()
-	for _, inputID := range tx.InputIDs() {
-		spenders := c.utxos[inputID]
+	for _, inputID := range tx.InputIDs() { // For each piece of state [tx] consumes
+		spenders := c.utxos[inputID] // txs that consume this state
 		if numSpenders := spenders.Len(); numSpenders > 1 ||
 			(numSpenders == 1 && !spenders.Contains(txID)) {
 			return false, nil
 		}
 	}
 
-	epoch := tx.Epoch()
-	transitionID := tx.TransitionID()
-	restrictors := c.restrictions[transitionID]
 	// Check if other transactions have marked as attempting to restrict this tx
 	// to at least their epoch.
+	epoch := tx.Epoch()
+	transitionID := tx.TransitionID()
+	// [restictors] is the set of transactions that require [tx]
+	// to be performed in a later epoch
+	restrictors := c.restrictions[transitionID]
 	for restrictorID := range restrictors {
 		restrictor := c.txs[restrictorID]
 		restrictorEpoch := restrictor.Epoch()
@@ -134,6 +142,8 @@ func (c *Conflicts) IsVirtuous(txIntf choices.Decidable) (bool, error) {
 	// Check if this transaction has marked as attempting to restrict other txs
 	// to at least this epoch.
 	for _, restrictedTransitionID := range tx.Restrictions() {
+		// [restrictionIDs] is a set of transactions that [tx] requires
+		// to be performed in [epoch] or a later one
 		restrictionIDs := c.transitions[restrictedTransitionID]
 		for restrictionID := range restrictionIDs {
 			restriction := c.txs[restrictionID]
@@ -158,8 +168,9 @@ func (c *Conflicts) Conflicts(txIntf choices.Decidable) ([]choices.Decidable, er
 	txID := tx.ID()
 	var conflictSet ids.Set
 	conflictSet.Add(txID)
-
 	conflicts := []choices.Decidable(nil)
+
+	// Add to the conflict set transactions that consume the same state as [tx]
 	for _, inputID := range tx.InputIDs() {
 		spenders := c.utxos[inputID]
 		for spenderID := range spenders {
@@ -171,16 +182,15 @@ func (c *Conflicts) Conflicts(txIntf choices.Decidable) ([]choices.Decidable, er
 		}
 	}
 
+	// Add to the conflict set transactions that require the transition performed
+	// by [tx] to be in at least their epoch, but which are in an epoch after [tx]'s
 	epoch := tx.Epoch()
 	transitionID := tx.TransitionID()
 	restrictors := c.restrictions[transitionID]
-	// Check if other transactions have marked as attempting to restrict this tx
-	// to at least their epoch.
 	for restrictorID := range restrictors {
 		if conflictSet.Contains(restrictorID) {
 			continue
 		}
-
 		restrictor := c.txs[restrictorID]
 		restrictorEpoch := restrictor.Epoch()
 		if restrictorEpoch > epoch {
@@ -189,15 +199,14 @@ func (c *Conflicts) Conflicts(txIntf choices.Decidable) ([]choices.Decidable, er
 		}
 	}
 
-	// Check if this transaction has marked as attempting to restrict other txs
-	// to at least this epoch.
+	// Add to the conflict set transactions that perform a transition that [tx]
+	// requires to occur in [epoch] or later, but which are in an earlier epoch
 	for _, restrictedTransitionID := range tx.Restrictions() {
 		restrictionIDs := c.transitions[restrictedTransitionID]
 		for restrictionID := range restrictionIDs {
 			if conflictSet.Contains(restrictionID) {
 				continue
 			}
-
 			restriction := c.txs[restrictionID]
 			restrictionEpoch := restriction.Epoch()
 			if restrictionEpoch < epoch {
@@ -210,8 +219,8 @@ func (c *Conflicts) Conflicts(txIntf choices.Decidable) ([]choices.Decidable, er
 }
 
 // Accept notifies this conflict manager that a tx has been conditionally
-// accepted. This means that assuming all the txs this tx depends on are
-// accepted, then this tx should be accepted as well. This
+// accepted. This means that, assuming all the txs this tx depends on are
+// accepted, then this tx should be accepted as well.
 func (c *Conflicts) Accept(txID ids.ID) {
 	tx, exists := c.txs[txID]
 	if !exists {
@@ -221,6 +230,8 @@ func (c *Conflicts) Accept(txID ids.ID) {
 	acceptable := true
 	for _, dependency := range tx.Dependencies() {
 		if !c.accepted.Contains(dependency) {
+			// [tx] is not acceptable because a transition it requires to have
+			// been performed has not yet been
 			acceptable = false
 		}
 	}
@@ -243,16 +254,17 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 	// removed from the graph.
 	rejected := ids.Set{}
 
+	// Accept each acceptable tx
 	for _, tx := range acceptable {
 		tx := tx.(Tx)
 		txID := tx.ID()
 		transitionID := tx.TransitionID()
 		epoch := tx.Epoch()
 
-		// Remove the accepted transaction from the collection
+		// Remove the accepted transaction from the processing tx set
 		delete(c.txs, txID)
 
-		// Remove the transitions map
+		// Remove from the transitions map
 		txIDs := c.transitions[transitionID]
 		txIDs.Remove(txID)
 		if txIDs.Len() == 0 {
@@ -261,7 +273,7 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 			c.transitions[transitionID] = txIDs
 		}
 
-		// Remove the UTXO mappings
+		// Remove from the UTXO map
 		for _, inputID := range tx.InputIDs() {
 			spenders := c.utxos[inputID]
 			spenders.Remove(txID)
@@ -272,7 +284,7 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 			}
 		}
 
-		// Remove the restrictions
+		// Remove from the restrictions map
 		for _, restrictionID := range tx.Restrictions() {
 			restrictors := c.restrictions[restrictionID]
 			restrictors.Remove(txID)
@@ -284,9 +296,11 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 		}
 
 		// Remove the dependency pointers of the transactions that depended on
-		// this transition. If a transaction has been conditionally accepted and
-		// it has no dependencies left, then it should be marked as accepted. If
+		// [tx]'s transition. If a transaction has been conditionally accepted and
+		// it has no dependencies left, then it should be marked as accepted.
 		// Reject dependencies that are no longer valid to be accepted.
+		// [dependents] is the set of transactions that require transition
+		// [transitionID] to be performed before they are accepted
 		dependents := c.dependencies[transitionID]
 		delete(c.dependencies, transitionID)
 	acceptedDependentLoop:
@@ -294,6 +308,9 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 			dependent := c.txs[dependentID]
 			dependentEpoch := dependent.Epoch()
 			if dependentEpoch < epoch && !rejected.Contains(dependentID) {
+				// [dependent] requires [tx]'s transition to happen
+				// no later than [epoch] but the transition happens after.
+				// Therefore, [dependent] may no longer be accepted.
 				rejected.Add(dependentID)
 				c.rejectable = append(c.rejectable, dependent)
 			}
@@ -302,19 +319,24 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 				continue
 			}
 
+			// [dependent] has been conditionally accepted.
+			// Check whether all of its transition dependencies are met
 			for _, dependencyID := range dependent.Dependencies() {
 				if !accepted.Contains(dependencyID) {
 					continue acceptedDependentLoop
 				}
 			}
 
+			// [dependent] has been conditionally accepted
+			// and its transition dependencies have been met.
+			// Therefore, it is acceptable.
 			dependentTransitionID := dependent.TransitionID()
-
 			c.conditionallyAccepted.Remove(dependentID)
 			c.accepted.Add(dependentTransitionID)
 			c.acceptable = append(c.acceptable, dependent)
 		}
 
+		// Mark that the transactions that conflict with [tx] are rejectable
 		// Conflicts should never return an error, as the type has already been
 		// asserted.
 		conflicts, _ := c.Conflicts(tx)
@@ -328,6 +350,7 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 		}
 	}
 
+	// Reject each rejectable transaction
 	rejectable := c.rejectable
 	c.rejectable = nil
 	for _, tx := range rejectable {
@@ -335,10 +358,10 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 		txID := tx.ID()
 		transitionID := tx.TransitionID()
 
-		// Remove the rejected transaction from the collection
+		// Remove the rejected transaction from the processing tx set
 		delete(c.txs, txID)
 
-		// Remove the transitions map
+		// Remove from the transitions map
 		txIDs := c.transitions[transitionID]
 		txIDs.Remove(txID)
 		if txIDs.Len() == 0 {
@@ -347,7 +370,7 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 			c.transitions[transitionID] = txIDs
 		}
 
-		// Remove the UTXO mappings
+		// Remove from the UTXO map
 		for _, inputID := range tx.InputIDs() {
 			spenders := c.utxos[inputID]
 			spenders.Remove(txID)
@@ -358,7 +381,7 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 			}
 		}
 
-		// Remove the restrictions
+		// Remove from the restrictions map
 		for _, restrictionID := range tx.Restrictions() {
 			restrictors := c.restrictions[restrictionID]
 			restrictors.Remove(txID)
@@ -370,6 +393,7 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 		}
 
 		if txIDs.Len() == 0 {
+			// [tx] was the only processing tx that performs transition [transitionID]
 			// Remove the dependency pointers of the transactions that depended
 			// on this transition.
 			dependents := c.dependencies[transitionID]
@@ -382,6 +406,9 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 			}
 			delete(c.dependencies, transitionID)
 		} else {
+			// There are processing tx's other than [tx] that
+			// perform transition [transitionID].
+			// Calculate the earlier possible epoch in which the transition may occur.
 			lowestRemainingEpoch := uint32(math.MaxUint32)
 			for otherTxID := range txIDs {
 				otherTx := c.txs[otherTxID]
@@ -391,8 +418,8 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 				}
 			}
 
-			// Remove the dependency pointers of the transactions that depended
-			// on the transition to be performed in this epoch.
+			// Mark as rejectable txs that require transition [transitionID] to
+			// occur earlier than it possibly may.
 			dependents := c.dependencies[transitionID]
 			for dependentID := range dependents {
 				dependent := c.txs[dependentID]
