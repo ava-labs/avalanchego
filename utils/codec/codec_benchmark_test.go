@@ -63,7 +63,6 @@ func BenchmarkMarshal(b *testing.B) {
 		if version != 0 {
 			b.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
 		}
-
 	}
 }
 
