@@ -409,7 +409,7 @@ func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 // Returns at most [limit] UTXOs.
 // If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
 // Returns:
-// * The fetched of UTXOs
+// * The fetched UTXOs
 // * true if all there are no more UTXOs in this range to fetch
 // * The address associated with the last UTXO fetched
 // * The ID of the last UTXO fetched
@@ -469,7 +469,7 @@ func (vm *VM) GetAtomicUTXOs(
 // Only returns UTXOs associated with addresses >= [startAddr].
 // For address [startAddr], only returns UTXOs whose IDs are greater than [startUTXOID].
 // Returns:
-// * The fetched of UTXOs
+// * The fetched UTXOs
 // * The address associated with the last UTXO fetched
 // * The ID of the last UTXO fetched
 func (vm *VM) GetUTXOs(

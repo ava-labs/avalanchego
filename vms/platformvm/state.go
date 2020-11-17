@@ -428,7 +428,7 @@ func (vm *VM) removeReferencingUTXO(db database.Database, addrBytes []byte, utxo
 // Only returns UTXOs associated with addresses >= [startAddr].
 // For address [startAddr], only returns UTXOs whose IDs are greater than [startUTXOID].
 // Returns:
-// * The fetched of UTXOs
+// * The fetched UTXOs
 // * The address associated with the last UTXO fetched
 // * The ID of the last UTXO fetched
 func (vm *VM) GetUTXOs(
