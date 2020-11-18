@@ -33,6 +33,8 @@ const (
 
 	maxPackerSize  = 1 << 30 // max size, in bytes, of something being marshalled by Marshal()
 	maxSliceLength = 1 << 18
+
+	codecVersion = 0
 )
 
 var (
@@ -57,7 +59,7 @@ type Keystore struct {
 	lock sync.Mutex
 	log  logging.Logger
 
-	codec codec.Codec
+	codec codec.Manager
 
 	// Key: username
 	// Value: The user with that name
@@ -76,12 +78,19 @@ type Keystore struct {
 }
 
 // Initialize the keystore
-func (ks *Keystore) Initialize(log logging.Logger, db database.Database) {
+func (ks *Keystore) Initialize(log logging.Logger, db database.Database) error {
+	c := codec.New(codec.DefaultTagName, maxSliceLength)
+	manager := codec.NewManager(maxPackerSize)
+	if err := manager.RegisterCodec(codecVersion, c); err != nil {
+		return err
+	}
+
 	ks.log = log
-	ks.codec = codec.New(maxPackerSize, maxSliceLength)
+	ks.codec = manager
 	ks.users = make(map[string]*password.Hash)
 	ks.userDB = prefixdb.New([]byte("users"), db)
 	ks.bcDB = prefixdb.New([]byte("bcs"), db)
+	return nil
 }
 
 // CreateHandler returns a new service object that can send requests to thisAPI.
@@ -110,7 +119,8 @@ func (ks *Keystore) getUser(username string) (*password.Hash, error) {
 	}
 
 	user = &password.Hash{}
-	return user, ks.codec.Unmarshal(userBytes, user)
+	_, err = ks.codec.Unmarshal(userBytes, user)
+	return user, err
 }
 
 // CreateUser creates an empty user with the provided username and password
@@ -186,7 +196,7 @@ func (ks *Keystore) ExportUser(_ *http.Request, args *api.UserPass, reply *Expor
 		return err
 	}
 
-	b, err := ks.codec.Marshal(&userData)
+	b, err := ks.codec.Marshal(codecVersion, &userData)
 	if err != nil {
 		return err
 	}
@@ -217,14 +227,14 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *api
 	}
 
 	userData := UserDB{}
-	if err := ks.codec.Unmarshal(args.User.Bytes, &userData); err != nil {
+	if _, err := ks.codec.Unmarshal(args.User.Bytes, &userData); err != nil {
 		return err
 	}
 	if !userData.Hash.Check(args.Password) {
 		return fmt.Errorf("incorrect password for user %q", args.Username)
 	}
 
-	usrBytes, err := ks.codec.Marshal(&userData.Hash)
+	usrBytes, err := ks.codec.Marshal(codecVersion, &userData.Hash)
 	if err != nil {
 		return err
 	}
@@ -356,7 +366,7 @@ func (ks *Keystore) AddUser(username, pword string) error {
 		return err
 	}
 
-	userBytes, err := ks.codec.Marshal(user)
+	userBytes, err := ks.codec.Marshal(codecVersion, user)
 	if err != nil {
 		return err
 	}
@@ -370,8 +380,7 @@ func (ks *Keystore) AddUser(username, pword string) error {
 }
 
 // CreateTestKeystore returns a new keystore that can be utilized for testing
-func CreateTestKeystore() *Keystore {
+func CreateTestKeystore() (*Keystore, error) {
 	ks := &Keystore{}
-	ks.Initialize(logging.NoLog{}, memdb.New())
-	return ks
+	return ks, ks.Initialize(logging.NoLog{}, memdb.New())
 }

@@ -198,7 +198,7 @@ func (sm *sharedMemory) Remove(peerChainID ids.ID, keys [][]byte, batches ...dat
 }
 
 type state struct {
-	c       codec.Codec
+	c       codec.Manager
 	valueDB database.Database
 	indexDB database.Database
 }
@@ -252,7 +252,7 @@ func (s *state) SetValue(e *Element) error {
 		Traits:  e.Traits,
 	}
 
-	valueBytes, err := s.c.Marshal(&dbElem)
+	valueBytes, err := s.c.Marshal(codecVersion, &dbElem)
 	if err != nil {
 		return err
 	}
@@ -269,7 +269,7 @@ func (s *state) RemoveValue(key []byte) error {
 
 		// The value doesn't exist, so we should optimistically deleted it
 		dbElem := dbElement{Present: false}
-		valueBytes, err := s.c.Marshal(&dbElem)
+		valueBytes, err := s.c.Marshal(codecVersion, &dbElem)
 		if err != nil {
 			return err
 		}
@@ -293,7 +293,8 @@ func (s *state) loadValue(key []byte) (*dbElement, error) {
 
 	// The key was in the database
 	value := &dbElement{}
-	return value, s.c.Unmarshal(valueBytes, value)
+	_, err = s.c.Unmarshal(valueBytes, value)
+	return value, err
 }
 
 func (s *state) getKeys(traits [][]byte, startTrait, startKey []byte, limit int) ([][]byte, []byte, []byte, error) {

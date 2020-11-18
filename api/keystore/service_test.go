@@ -21,7 +21,10 @@ var (
 )
 
 func TestServiceListNoUsers(t *testing.T) {
-	ks := CreateTestKeystore()
+	ks, err := CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	reply := ListUsersReply{}
 	if err := ks.ListUsers(nil, nil, &reply); err != nil {
@@ -33,7 +36,10 @@ func TestServiceListNoUsers(t *testing.T) {
 }
 
 func TestServiceCreateUser(t *testing.T) {
-	ks := CreateTestKeystore()
+	ks, err := CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	{
 		reply := api.SuccessResponse{}
@@ -72,7 +78,10 @@ func genStr(n int) string {
 // TestServiceCreateUserArgsCheck generates excessively long usernames or
 // passwords to assure the sanity checks on string length are not exceeded
 func TestServiceCreateUserArgsCheck(t *testing.T) {
-	ks := CreateTestKeystore()
+	ks, err := CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	{
 		reply := api.SuccessResponse{}
@@ -113,7 +122,10 @@ func TestServiceCreateUserArgsCheck(t *testing.T) {
 // TestServiceCreateUserWeakPassword tests creating a new user with a weak
 // password to ensure the password strength check is working
 func TestServiceCreateUserWeakPassword(t *testing.T) {
-	ks := CreateTestKeystore()
+	ks, err := CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	{
 		reply := api.SuccessResponse{}
@@ -133,7 +145,10 @@ func TestServiceCreateUserWeakPassword(t *testing.T) {
 }
 
 func TestServiceCreateDuplicate(t *testing.T) {
-	ks := CreateTestKeystore()
+	ks, err := CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	{
 		reply := api.SuccessResponse{}
@@ -160,7 +175,10 @@ func TestServiceCreateDuplicate(t *testing.T) {
 }
 
 func TestServiceCreateUserNoName(t *testing.T) {
-	ks := CreateTestKeystore()
+	ks, err := CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	reply := api.SuccessResponse{}
 	if err := ks.CreateUser(nil, &api.UserPass{
@@ -171,7 +189,10 @@ func TestServiceCreateUserNoName(t *testing.T) {
 }
 
 func TestServiceUseBlockchainDB(t *testing.T) {
-	ks := CreateTestKeystore()
+	ks, err := CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	{
 		reply := api.SuccessResponse{}
@@ -210,7 +231,10 @@ func TestServiceUseBlockchainDB(t *testing.T) {
 }
 
 func TestServiceExportImport(t *testing.T) {
-	ks := CreateTestKeystore()
+	ks, err := CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	{
 		reply := api.SuccessResponse{}
@@ -243,7 +267,10 @@ func TestServiceExportImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newKS := CreateTestKeystore()
+	newKS, err := CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	{
 		reply := api.SuccessResponse{}
@@ -354,7 +381,10 @@ func TestServiceDeleteUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			ks := CreateTestKeystore()
+			ks, err := CreateTestKeystore()
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			if tt.setup != nil {
 				if err := tt.setup(ks); err != nil {
@@ -362,7 +392,7 @@ func TestServiceDeleteUser(t *testing.T) {
 				}
 			}
 			got := &api.SuccessResponse{}
-			err := ks.DeleteUser(nil, tt.request, got)
+			err = ks.DeleteUser(nil, tt.request, got)
 			if (err != nil) != tt.wantError {
 				t.Fatalf("DeleteUser() failed: error %v, wantError %v", err, tt.wantError)
 			}

@@ -17,8 +17,8 @@ const (
 	// default max length of a slice being marshalled by Marshal(). Should be <= math.MaxUint32.
 	defaultMaxSliceLength = 1 << 18
 
-	// default tag name that enables serialization.
-	defaultTagName = "serialize"
+	// DefaultTagName that enables serialization.
+	DefaultTagName = "serialize"
 
 	// TagValue is the value the tag must have to be serialized.
 	TagValue = "true"
@@ -71,7 +71,7 @@ func New(tagName string, maxSliceLen int) Codec {
 }
 
 // NewDefault returns a new codec with reasonable default values
-func NewDefault() Codec { return New(defaultTagName, defaultMaxSliceLength) }
+func NewDefault() Codec { return New(DefaultTagName, defaultMaxSliceLength) }
 
 // Skip some number of type IDs
 func (c *codec) Skip(num int) {

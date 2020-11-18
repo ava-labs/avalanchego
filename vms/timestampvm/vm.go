@@ -29,7 +29,7 @@ var (
 // and a piece of data (a string)
 type VM struct {
 	core.SnowmanVM
-	codec codec.Codec
+	codec codec.Manager
 	// Proposed pieces of data that haven't been put into a block and proposed yet
 	mempool [][dataLen]byte
 }
