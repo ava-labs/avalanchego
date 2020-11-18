@@ -87,9 +87,9 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 
 	vm := VM{}
 	vm.genesisCodec = codec.New(math.MaxUint32, 1<<20)
-	vm.genesisCodec.RegisterType(&avax.TestAddressable{})
+	_ = vm.genesisCodec.RegisterType(&avax.TestAddressable{})
 	c := codec.New(math.MaxUint32, 1<<20)
-	c.RegisterType(&secp256k1fx.TransferOutput{})
+	_ = c.RegisterType(&secp256k1fx.TransferOutput{})
 
 	vm.codec = &codecRegistry{
 		genesisCodec:  vm.genesisCodec,
@@ -134,17 +134,14 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 		}
 	}
 
-	//addr0Str, _ := formatting.FormatBech32(testHRP, addrs[0].Bytes())
-
 	addrsSet := ids.ShortSet{}
 	addrsSet.Add(addrs[0])
 
 	var (
-		//fetchedUTXOs []*avax.UTXO
-		err error
+		err               error
+		notPaginatedUTXOs []*avax.UTXO
 	)
 
-	var notPaginatedUTXOs []*avax.UTXO
 	// Fetch all UTXOs older version
 	notPaginatedUTXOs, _, _, err = vm.getAllUTXOs(addrsSet, ids.ShortEmpty, ids.Empty)
 	if err != nil {
