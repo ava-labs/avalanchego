@@ -195,20 +195,25 @@ func TestGetTxStatus(t *testing.T) {
 	argIncludeReason := &GetTxStatusArgs{TxID: tx.ID(), IncludeReason: true}
 
 	var resp GetTxStatusResponse
-	if err := service.GetTxStatus(nil, arg, &resp); err != nil {
+	err = service.GetTxStatus(nil, arg, &resp)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if resp.Status != Unknown {
+	case resp.Status != Unknown:
 		t.Fatalf("status should be unknown but is %s", resp.Status)
-	} else if resp.Reason != "" {
+	case resp.Reason != "":
 		t.Fatalf("reason should be empty but is %s", resp.Reason)
 	}
 
 	resp = GetTxStatusResponse{} // reset
-	if err := service.GetTxStatus(nil, argIncludeReason, &resp); err != nil {
+
+	err = service.GetTxStatus(nil, argIncludeReason, &resp)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if resp.Status != Unknown {
+	case resp.Status != Unknown:
 		t.Fatalf("status should be unknown but is %s", resp.Status)
-	} else if resp.Reason != "" {
+	case resp.Reason != "":
 		t.Fatalf("reason should be empty but is %s", resp.Reason)
 	}
 
