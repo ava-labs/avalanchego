@@ -112,6 +112,7 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 		uniqueTx: &cache.EvictableLRU{Size: txCacheSize},
 	}
 
+	// #nosec G404
 	for i := 0; i < utxoCount; i++ {
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
