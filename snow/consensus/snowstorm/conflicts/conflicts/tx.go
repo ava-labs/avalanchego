@@ -19,8 +19,8 @@ type Tx interface {
 	// Epoch this transaction was issued in.
 	Epoch() uint32
 
-	// Restrictions returns a list of transition IDs that need to be performed
-	// in a later epoch if this transaction is to be accepted.
+	// Restrictions returns a list of transition IDs that need to be performed in
+	// this transaction's epoch or a later one if this transaction is to be accepted.
 	Restrictions() []ids.ID
 
 	// Dependencies is a list of transition IDs that need to be performed before
