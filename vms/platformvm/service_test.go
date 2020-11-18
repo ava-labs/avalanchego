@@ -429,8 +429,8 @@ func TestGetStake(t *testing.T) {
 		if err := service.GetStake(nil, &args, &response); err != nil {
 			t.Fatal(err)
 		}
-		if uint64(response.Staked) != defaultWeight {
-			t.Fatalf("expected stake to be %d but is %d", defaultWeight, response.Staked)
+		if uint64(response.Stake) != defaultWeight {
+			t.Fatalf("expected stake to be %d but is %d", defaultWeight, response.Stake)
 		}
 	}
 
@@ -442,8 +442,8 @@ func TestGetStake(t *testing.T) {
 	if err := service.GetStake(nil, &args, &response); err != nil {
 		t.Fatal(err)
 	}
-	if int(response.Staked) != len(genesis.Validators)*defaultWeight {
-		t.Fatalf("expected stake to be %d but is %d", len(genesis.Validators)*defaultWeight, response.Staked)
+	if int(response.Stake) != len(genesis.Validators)*defaultWeight {
+		t.Fatalf("expected stake to be %d but is %d", len(genesis.Validators)*defaultWeight, response.Stake)
 	}
 
 	// Make sure this works for delegators
@@ -453,7 +453,7 @@ func TestGetStake(t *testing.T) {
 	if err := service.GetStake(nil, &args, &response); err != nil {
 		t.Fatal(err)
 	}
-	oldStake := response.Staked
+	oldStake := response.Stake
 
 	// Add a delegator
 	stakeAmt := service.vm.minDelegatorStake + 12345
@@ -480,10 +480,10 @@ func TestGetStake(t *testing.T) {
 	if err := service.GetStake(nil, &args, &response); err != nil {
 		t.Fatal(err)
 	}
-	if uint64(response.Staked) != uint64(oldStake)+stakeAmt {
-		t.Fatalf("expected stake to be %d but is %d", uint64(oldStake)+stakeAmt, response.Staked)
+	if uint64(response.Stake) != uint64(oldStake)+stakeAmt {
+		t.Fatalf("expected stake to be %d but is %d", uint64(oldStake)+stakeAmt, response.Stake)
 	}
-	oldStake = response.Staked
+	oldStake = response.Stake
 
 	// Make sure this works for pending stakers
 	// Add a pending staker
@@ -508,8 +508,8 @@ func TestGetStake(t *testing.T) {
 	if err := service.GetStake(nil, &args, &response); err != nil {
 		t.Fatal(err)
 	}
-	if uint64(response.Staked) != uint64(oldStake)+stakeAmt {
-		t.Fatalf("expected stake to be %d but is %d", uint64(oldStake)+stakeAmt, response.Staked)
+	if uint64(response.Stake) != uint64(oldStake)+stakeAmt {
+		t.Fatalf("expected stake to be %d but is %d", uint64(oldStake)+stakeAmt, response.Stake)
 	}
 	oldStake += cjson.Uint64(stakeAmt)
 
@@ -554,8 +554,8 @@ func TestGetStake(t *testing.T) {
 	if err := service.GetStake(nil, &args, &response); err != nil {
 		t.Fatal(err)
 	}
-	if uint64(response.Staked) != uint64(oldStake)+stakeAmt {
-		t.Fatalf("expected stake to be %d but is %d", uint64(oldStake)+stakeAmt, response.Staked)
+	if uint64(response.Stake) != uint64(oldStake)+stakeAmt {
+		t.Fatalf("expected stake to be %d but is %d", uint64(oldStake)+stakeAmt, response.Stake)
 	}
 }
 

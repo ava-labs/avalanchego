@@ -435,66 +435,66 @@ func TestServiceGetUTXOs(t *testing.T) {
 		label     string
 		count     int
 		shouldErr bool
-		args      *GetUTXOsArgs
+		args      *api.GetUTXOsArgs
 	}{
 		{
 			label:     "invalid address: ''",
 			shouldErr: true,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{""},
 			},
 		},
 		{
 			label:     "invalid address: '-'",
 			shouldErr: true,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{"-"},
 			},
 		},
 		{
 			label:     "invalid address: 'foo'",
 			shouldErr: true,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{"foo"},
 			},
 		},
 		{
 			label:     "invalid address: 'foo-bar'",
 			shouldErr: true,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{"foo-bar"},
 			},
 		},
 		{
 			label:     "invalid address: '<ChainID>'",
 			shouldErr: true,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{vm.ctx.ChainID.String()},
 			},
 		},
 		{
 			label:     "invalid address: '<ChainID>-'",
 			shouldErr: true,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{fmt.Sprintf("%s-", vm.ctx.ChainID.String())},
 			},
 		},
 		{
 			label:     "invalid address: '<Unknown ID>-<addr>'",
 			shouldErr: true,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{unknownChainAddr},
 			},
 		},
 		{
 			label:     "no addresses",
 			shouldErr: true,
-			args:      &GetUTXOsArgs{},
+			args:      &api.GetUTXOsArgs{},
 		},
 		{
 			label: "get all X-chain UTXOs",
 			count: numUTXOs,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 				},
@@ -503,7 +503,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label: "get one X-chain UTXO",
 			count: 1,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 				},
@@ -513,7 +513,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label: "limit greater than number of UTXOs",
 			count: numUTXOs,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 				},
@@ -523,7 +523,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label: "no utxos to return",
 			count: 0,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xEmptyAddr,
 				},
@@ -532,7 +532,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label: "multiple address with utxos",
 			count: numUTXOs,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xEmptyAddr,
 					xAddr,
@@ -542,7 +542,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label: "get all P-chain UTXOs",
 			count: numUTXOs,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 				},
@@ -553,7 +553,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 			label:     "invalid source chain ID",
 			shouldErr: true,
 			count:     numUTXOs,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 				},
@@ -563,7 +563,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label: "get all P-chain UTXOs",
 			count: numUTXOs,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 				},
@@ -573,7 +573,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label:     "get UTXOs from multiple chains",
 			shouldErr: true,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 					pAddr,
@@ -583,7 +583,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label:     "get UTXOs for an address on a different chain",
 			shouldErr: true,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					pAddr,
 				},
@@ -592,7 +592,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.label, func(t *testing.T) {
-			reply := &GetUTXOsReply{}
+			reply := &api.GetUTXOsReply{}
 			err := s.GetUTXOs(nil, test.args, reply)
 			if err != nil {
 				if !test.shouldErr {
@@ -691,7 +691,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 	}
 	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
-	err = s.CreateFixedCapAsset(nil, &CreateFixedCapAssetArgs{
+	err = s.CreateFixedCapAsset(nil, &CreateAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass: api.UserPass{
 				Username: username,
@@ -735,7 +735,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	}
 	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
-	err = s.CreateVariableCapAsset(nil, &CreateVariableCapAssetArgs{
+	err = s.CreateVariableCapAsset(nil, &CreateAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass: api.UserPass{
 				Username: username,

@@ -407,17 +407,14 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 	startAddr := ids.ShortEmpty
 	startUTXO := ids.Empty
 	if args.StartIndex.Address != "" || args.StartIndex.UTXO != "" {
-		addr, err := service.vm.ParseLocalAddress(args.StartIndex.Address)
+		startAddr, err = service.vm.ParseLocalAddress(args.StartIndex.Address)
 		if err != nil {
 			return fmt.Errorf("couldn't parse start index address %q: %w", args.StartIndex.Address, err)
 		}
-		utxo, err := ids.FromString(args.StartIndex.UTXO)
+		startUTXO, err = ids.FromString(args.StartIndex.UTXO)
 		if err != nil {
 			return fmt.Errorf("couldn't parse start index utxo: %w", err)
 		}
-
-		startAddr = addr
-		startUTXO = utxo
 	}
 
 	var (
@@ -1927,6 +1924,7 @@ type GetTxStatusResponse struct {
 	Reason string
 }
 
+// MarshalJSON ...
 func (r GetTxStatusResponse) MarshalJSON() ([]byte, error) {
 	if !r.includeReason {
 		return r.Status.MarshalJSON()
@@ -1978,7 +1976,7 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 
 // GetStakeReply is the response from calling GetStake.
 type GetStakeReply struct {
-	Staked json.Uint64 `json:"staked"`
+	Stake json.Uint64 `json:"stake"`
 }
 
 // GetStake returns the amount of nAVAX that [args.Addresses] have cumulatively
@@ -2113,7 +2111,7 @@ func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, respo
 		return fmt.Errorf("iterator errored: %w", err)
 	}
 
-	response.Staked = json.Uint64(totalStake)
+	response.Stake = json.Uint64(totalStake)
 	return nil
 }
 
@@ -2133,9 +2131,7 @@ func (service *Service) GetMinStake(_ *http.Request, _ *struct{}, reply *GetMinS
 }
 
 // GetTotalStake returns the total amount staked on the Primary Network
-func (service *Service) GetTotalStake(_ *http.Request, _ *struct{}, reply *struct {
-	Stake json.Uint64 `json:"stake"`
-}) error {
+func (service *Service) GetTotalStake(_ *http.Request, _ *struct{}, reply *GetStakeReply) error {
 	stake, err := service.vm.getTotalStake()
 	reply.Stake = json.Uint64(stake)
 	return err
@@ -2154,7 +2150,7 @@ type GetMaxStakeAmountReply struct {
 	Amount json.Uint64 `json:"amount"`
 }
 
-// GetMaxStakeAmount returns the maximum amount of AVAX staking to the named
+// GetMaxStakeAmount returns the maximum amount of nAVAX staking to the named
 // node during the time period.
 func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmountArgs, reply *GetMaxStakeAmountReply) error {
 	nodeID, err := ids.ShortFromPrefixedString(args.NodeID, constants.NodeIDPrefix)
