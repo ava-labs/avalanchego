@@ -486,7 +486,7 @@ func (vm *VM) GetUTXOs(
 	if paginate {
 		return vm.getPaginatedUTXOs(addrs, startAddr, startUTXOID, limit)
 	}
-	return vm.getAllUTXOs(addrs, startAddr, startUTXOID, limit)
+	return vm.getAllUTXOs(addrs, startAddr, startUTXOID)
 }
 
 func (vm *VM) getPaginatedUTXOs(addrs ids.ShortSet,
@@ -494,7 +494,7 @@ func (vm *VM) getPaginatedUTXOs(addrs ids.ShortSet,
 	startUTXOID ids.ID,
 	limit int,
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
-	seen := ids.Set{} // IDs of UTXOs already in the list
+	seen := ids.New(limit) // IDs of UTXOs already in the list
 	utxos := make([]*avax.UTXO, 0, limit)
 	lastAddr := ids.ShortEmpty
 	lastIndex := ids.Empty
@@ -537,10 +537,9 @@ func (vm *VM) getPaginatedUTXOs(addrs ids.ShortSet,
 func (vm *VM) getAllUTXOs(addrs ids.ShortSet,
 	startAddr ids.ShortID,
 	startUTXOID ids.ID,
-	limit int,
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
-	seen := ids.Set{} // IDs of UTXOs already in the list
-	utxos := make([]*avax.UTXO, 0, limit)
+	seen := ids.New(maxUTXOsToFetch) // IDs of UTXOs already in the list
+	utxos := make([]*avax.UTXO, 0, maxUTXOsToFetch)
 	lastAddr := ids.ShortEmpty
 	lastIndex := ids.Empty
 	addrsList := addrs.List()
@@ -555,7 +554,7 @@ func (vm *VM) getAllUTXOs(addrs ids.ShortSet,
 		}
 
 		for {
-			utxoIDs, err := vm.state.Funds(addr.Bytes(), start, limit) // Get UTXOs associated with [addr]
+			utxoIDs, err := vm.state.Funds(addr.Bytes(), start, maxUTXOsToFetch) // Get UTXOs associated with [addr]
 			if err != nil {
 				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 			}

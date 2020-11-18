@@ -5,7 +5,18 @@ package avm
 
 import (
 	"fmt"
+	"math"
+	"math/rand"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	"github.com/ava-labs/avalanchego/utils/codec"
+
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -69,4 +80,91 @@ func BenchmarkLoadUser(b *testing.B) {
 			runLoadUserBenchmark(b, numKeys)
 		})
 	}
+}
+
+// GetAllUTXOsBenchmark is a helper func to benchmark the GetAllUTXOs depending on the size
+func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
+
+	vm := VM{}
+	vm.genesisCodec = codec.New(math.MaxUint32, 1<<20)
+	vm.genesisCodec.RegisterType(&avax.TestAddressable{})
+	c := codec.New(math.MaxUint32, 1<<20)
+	c.RegisterType(&secp256k1fx.TransferOutput{})
+
+	vm.codec = &codecRegistry{
+		genesisCodec:  vm.genesisCodec,
+		codec:         c,
+		index:         0,
+		typeToFxIndex: vm.typeToFxIndex,
+	}
+	vm.state = &prefixedState{
+		state: &state{State: avax.State{
+			Cache:        &cache.LRU{Size: stateCacheSize},
+			DB:           prefixdb.New([]byte{1}, memdb.New()),
+			GenesisCodec: vm.genesisCodec,
+			Codec:        c,
+		}},
+
+		tx:       &cache.LRU{Size: idCacheSize},
+		utxo:     &cache.LRU{Size: idCacheSize},
+		txStatus: &cache.LRU{Size: idCacheSize},
+
+		uniqueTx: &cache.EvictableLRU{Size: txCacheSize},
+	}
+
+	for i := 0; i < utxoCount; i++ {
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.GenerateTestID(),
+				OutputIndex: rand.Uint32(),
+			},
+			Asset: avax.Asset{ID: ids.ID{'y', 'e', 'e', 't'}},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 100000,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Addrs:     []ids.ShortID{addrs[0]},
+					Threshold: 1,
+				},
+			},
+		}
+
+		if err := vm.state.FundUTXO(utxo); err != nil {
+			b.Fatal(err)
+		}
+	}
+
+	//addr0Str, _ := formatting.FormatBech32(testHRP, addrs[0].Bytes())
+
+	addrsSet := ids.ShortSet{}
+	addrsSet.Add(addrs[0])
+
+	var (
+		//fetchedUTXOs []*avax.UTXO
+		err error
+	)
+
+	var notPaginatedUTXOs []*avax.UTXO
+	// Fetch all UTXOs older version
+	notPaginatedUTXOs, _, _, err = vm.getAllUTXOs(addrsSet, ids.ShortEmpty, ids.Empty)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	if len(notPaginatedUTXOs) != utxoCount {
+		b.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", utxoCount, len(notPaginatedUTXOs))
+	}
+
+}
+
+func Benchmark100GetUTXosExistingVersion(b *testing.B) {
+	GetAllUTXOsBenchmark(b, 100)
+}
+
+func Benchmark10000GetUTXosExistingVersion(b *testing.B) {
+	GetAllUTXOsBenchmark(b, 10000)
+}
+
+func Benchmark100000GetUTXosExistingVersion(b *testing.B) {
+	GetAllUTXOsBenchmark(b, 100000)
 }

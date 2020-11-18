@@ -446,7 +446,7 @@ func (vm *VM) GetUTXOs(
 	if paginate {
 		return vm.getPaginatedUTXOs(db, addrs, startAddr, startUTXOID, limit)
 	}
-	return vm.getAllUTXOs(db, addrs, startAddr, startUTXOID, limit)
+	return vm.getAllUTXOs(db, addrs, startAddr, startUTXOID)
 }
 
 func (vm *VM) getPaginatedUTXOs(
@@ -456,7 +456,7 @@ func (vm *VM) getPaginatedUTXOs(
 	startUTXOID ids.ID,
 	limit int,
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
-	seen := ids.Set{} // IDs of UTXOs already in the list
+	seen := ids.New(limit) // IDs of UTXOs already in the list
 	utxos := make([]*avax.UTXO, 0, limit)
 	lastAddr := ids.ShortEmpty
 	lastIndex := ids.Empty
@@ -502,10 +502,9 @@ func (vm *VM) getAllUTXOs(
 	addrs ids.ShortSet,
 	startAddr state.Marshaller,
 	startUTXOID ids.ID,
-	limit int,
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
-	seen := ids.Set{} // IDs of UTXOs already in the list
-	utxos := make([]*avax.UTXO, 0, limit)
+	seen := ids.New(maxUTXOsToFetch) // IDs of UTXOs already in the list
+	utxos := make([]*avax.UTXO, 0, maxUTXOsToFetch)
 	lastAddr := ids.ShortEmpty
 	lastIndex := ids.Empty
 	addrsList := addrs.List()
@@ -520,7 +519,7 @@ func (vm *VM) getAllUTXOs(
 		}
 
 		for {
-			utxoIDs, err := vm.getReferencingUTXOs(db, addr.Bytes(), start, limit) // Get IDs of UTXOs to fetch
+			utxoIDs, err := vm.getReferencingUTXOs(db, addr.Bytes(), start, maxUTXOsToFetch) // Get IDs of UTXOs to fetch
 			if err != nil {
 				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 			}
