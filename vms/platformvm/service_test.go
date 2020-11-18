@@ -192,6 +192,8 @@ func TestGetTxStatus(t *testing.T) {
 	}
 
 	arg := &GetTxStatusArgs{TxID: tx.ID()}
+	argIncludeReason := &GetTxStatusArgs{TxID: tx.ID(), IncludeReason: true}
+
 	var resp GetTxStatusResponse
 	if err := service.GetTxStatus(nil, arg, &resp); err != nil {
 		t.Fatal(err)
@@ -199,8 +201,19 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatalf("status should be unknown but is %s", resp.Status)
 	} else if resp.Reason != "" {
 		t.Fatalf("reason should be empty but is %s", resp.Reason)
-		// put the chain in existing chain list
-	} else if err := service.vm.mempool.IssueTx(tx); err != nil {
+	}
+
+	resp = GetTxStatusResponse{} // reset
+	if err := service.GetTxStatus(nil, argIncludeReason, &resp); err != nil {
+		t.Fatal(err)
+	} else if resp.Status != Unknown {
+		t.Fatalf("status should be unknown but is %s", resp.Status)
+	} else if resp.Reason != "" {
+		t.Fatalf("reason should be empty but is %s", resp.Reason)
+	}
+
+	// put the chain in existing chain list
+	if err := service.vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
 	} else if err := service.vm.putChains(service.vm.DB, []*Tx{tx}); err != nil {
 		t.Fatal(err)
@@ -215,12 +228,11 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	case resp.Status != Dropped:
 		t.Fatalf("status should be Dropped but is %s", resp.Status)
-	case resp.Reason == "":
-		t.Fatal("reason shouldn't be empty")
+	case resp.Reason != "":
+		t.Fatal("reason should be empty when IncludeReason is false")
 	}
 
 	resp = GetTxStatusResponse{} // reset
-	argIncludeReason := &GetTxStatusArgs{TxID: tx.ID(), IncludeReason: true}
 	err = service.GetTxStatus(nil, argIncludeReason, &resp)
 	switch {
 	case err != nil:
@@ -239,7 +251,7 @@ func TestGetTxStatus(t *testing.T) {
 	} else if block, err := service.vm.BuildBlock(); err != nil {
 		t.Fatal(err)
 	} else if blk, ok := block.(*StandardBlock); !ok {
-		t.Fatalf("should be *StandardBlock but it %T", blk)
+		t.Fatalf("should be *StandardBlock but is %T", blk)
 	} else if err := blk.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {

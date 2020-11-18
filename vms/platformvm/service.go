@@ -1917,28 +1917,15 @@ type GetTxStatusArgs struct {
 
 // GetTxStatusResponse ...
 type GetTxStatusResponse struct {
-	Status
-	includeReason bool
+	Status Status `json:"status"`
 	// Reason this tx was dropped.
 	// Only non-empty if Status is dropped
-	Reason string
-}
-
-// MarshalJSON ...
-func (r GetTxStatusResponse) MarshalJSON() ([]byte, error) {
-	if !r.includeReason {
-		return r.Status.MarshalJSON()
-	}
-	if r.Reason != "" {
-		return []byte(fmt.Sprintf("{\"status\": \"%s\", \"reason\": \"%s\"}", r.Status, r.Reason)), nil
-	}
-	return []byte(fmt.Sprintf("{\"status\": \"%s\"}", r.Status)), nil
+	Reason string `json:"reason,omitempty"`
 }
 
 // GetTxStatus gets a tx's status
 func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *GetTxStatusResponse) error {
 	service.vm.Ctx.Log.Info("Platform: GetTxStatus called")
-	response.includeReason = args.IncludeReason
 	status, err := service.vm.getStatus(service.vm.DB, args.TxID)
 	if err == nil { // Found the status. Report it.
 		response.Status = status
@@ -1962,12 +1949,14 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 	}
 	if reason, ok := service.vm.droppedTxCache.Get(args.TxID); ok {
 		response.Status = Dropped
-		reasonStr, ok := reason.(string)
-		if !ok {
-			service.vm.Ctx.Log.Error("reason should be a string")
-			return nil
+		if args.IncludeReason {
+			reasonStr, ok := reason.(string)
+			if !ok {
+				service.vm.Ctx.Log.Error("reason should be a string")
+				return nil
+			}
+			response.Reason = reasonStr
 		}
-		response.Reason = reasonStr
 	} else {
 		response.Status = Unknown
 	}
