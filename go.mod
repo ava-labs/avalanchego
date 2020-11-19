@@ -4,7 +4,9 @@ go 1.14
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.5.7
+	github.com/ava-labs/avalanche-testing v0.9.6
 	github.com/ava-labs/avalanchego v1.0.4-update-id-2
+	github.com/ava-labs/gecko v0.6.1-rc.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
 	github.com/edsrzf/mmap-go v1.0.0
@@ -23,6 +25,7 @@ require (
 	github.com/pborman/uuid v1.2.0
 	github.com/prometheus/tsdb v0.10.0
 	github.com/rjeczalik/notify v0.9.2
+	github.com/sirupsen/logrus v1.6.0
 	github.com/status-im/keycard-go v0.0.0-20200402102358-957c09536969
 	github.com/steakknife/bloomfilter v0.0.0-20180922174646-6819c0d2a570
 	github.com/tyler-smith/go-bip39 v1.0.2
