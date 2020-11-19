@@ -48,14 +48,12 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 		Validators: []APIPrimaryValidator{
 			validator,
 		},
-		Time: 5,
+		Time:     5,
+		Encoding: formatting.Hex,
 	}
 	reply := BuildGenesisReply{}
 
-	ss, err := CreateStaticService(formatting.CB58Encoding)
-	if err != nil {
-		t.Fatalf("Failed to create static service due to: %s", err)
-	}
+	ss := CreateStaticService()
 
 	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
 		t.Fatalf("Should have errored due to an invalid balance")
@@ -98,14 +96,12 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 		Validators: []APIPrimaryValidator{
 			validator,
 		},
-		Time: 5,
+		Time:     5,
+		Encoding: formatting.Hex,
 	}
 	reply := BuildGenesisReply{}
 
-	ss, err := CreateStaticService(formatting.CB58Encoding)
-	if err != nil {
-		t.Fatalf("Failed to create static service due to: %s", err)
-	}
+	ss := CreateStaticService()
 
 	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
 		t.Fatalf("Should have errored due to an invalid amount")
@@ -149,14 +145,12 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 		Validators: []APIPrimaryValidator{
 			validator,
 		},
-		Time: 5,
+		Time:     5,
+		Encoding: formatting.Hex,
 	}
 	reply := BuildGenesisReply{}
 
-	ss, err := CreateStaticService(formatting.CB58Encoding)
-	if err != nil {
-		t.Fatalf("Failed to create static service due to: %s", err)
-	}
+	ss := CreateStaticService()
 
 	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
 		t.Fatalf("Should have errored due to an invalid end time")
@@ -235,24 +229,18 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 			validator2,
 			validator3,
 		},
-		Time: 5,
+		Time:     5,
+		Encoding: formatting.Hex,
 	}
 	reply := BuildGenesisReply{}
 
-	ss, err := CreateStaticService(formatting.CB58Encoding)
-	if err != nil {
-		t.Fatalf("Failed to create static service due to: %s", err)
-	}
+	ss := CreateStaticService()
 
 	if err := ss.BuildGenesis(nil, &args, &reply); err != nil {
 		t.Fatalf("BuildGenesis should not have errored but got error: %s", err)
 	}
 
-	encoding, err := ss.encodingManager.GetEncoding(reply.Encoding)
-	if err != nil {
-		t.Fatalf("Failed to get encoding due to: %s", err)
-	}
-	genesisBytes, err := encoding.ConvertString(reply.Bytes)
+	genesisBytes, err := formatting.Decode(reply.Encoding, reply.Bytes)
 	if err != nil {
 		t.Fatalf("Problem decoding BuildGenesis response: %s", err)
 	}

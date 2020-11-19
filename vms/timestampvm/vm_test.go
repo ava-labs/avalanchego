@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
 var blockchainID = ids.ID{1, 2, 3}
@@ -190,12 +189,6 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	ctx.Lock.Unlock()
-}
-
-func TestMakeStringFrom32Bytes(t *testing.T) {
-	bytes := ids.ID{'w', 'o', 'o'}
-	bytesFormatter := formatting.CB58{Bytes: bytes[:]}
-	t.Log(bytesFormatter.String())
 }
 
 func TestService(t *testing.T) {
