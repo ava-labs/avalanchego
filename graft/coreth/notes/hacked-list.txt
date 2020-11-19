@@ -30,6 +30,9 @@
 ./eth/config.go
 ./eth/gen_config.go
 ./eth/tracers/internal/tracers/assets.go
+./ethclient/ethclient.go
+./ethclient/ethclient_test.go
+./ethclient/signer.go
 ./internal/ethapi/api.go
 ./internal/ethapi/backend.go
 ./miner/miner.go
@@ -41,3 +44,4 @@
 ./params/protocol_params.go
 ./rpc/client.go
 ./rpc/types.go
+./interfaces.go
