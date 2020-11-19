@@ -52,8 +52,7 @@ type codec struct {
 
 // Codec marshals and unmarshals
 type Codec interface {
-	Skip(int)
-	RegisterType(interface{}) error
+	Registry
 	MarshalInto(interface{}, *wrappers.Packer) error
 	Unmarshal([]byte, interface{}) error
 }

@@ -46,6 +46,8 @@ const (
 	txCacheSize        = 30000
 	assetToFxCacheSize = 1024
 	maxUTXOsToFetch    = 1024
+
+	codecVersion = 0
 )
 
 var (
@@ -70,8 +72,8 @@ type VM struct {
 	// Used to check local time
 	clock timer.Clock
 
-	genesisCodec codec.Codec
-	codec        codec.Codec
+	genesisCodec codec.Manager
+	codec        codec.Manager
 
 	pubsub *cjson.PubSubServer
 
@@ -102,48 +104,6 @@ type VM struct {
 	fxs           []*parsedFx
 
 	walletService WalletService
-}
-
-type codecRegistry struct {
-	genesisCodec  codec.Codec
-	codec         codec.Codec
-	index         int
-	typeToFxIndex map[reflect.Type]int
-}
-
-func (cr *codecRegistry) Skip(amount int) {
-	cr.genesisCodec.Skip(amount)
-	cr.codec.Skip(amount)
-}
-
-func (cr *codecRegistry) RegisterType(val interface{}) error {
-	valType := reflect.TypeOf(val)
-	cr.typeToFxIndex[valType] = cr.index
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		cr.genesisCodec.RegisterType(val),
-		cr.codec.RegisterType(val),
-	)
-	return errs.Err
-}
-
-func (cr *codecRegistry) SetMaxSize(size int) {
-	cr.genesisCodec.SetMaxSize(size)
-	cr.codec.SetMaxSize(size)
-}
-
-func (cr *codecRegistry) SetMaxSliceLen(size int) {
-	cr.genesisCodec.SetMaxSliceLen(size)
-	cr.codec.SetMaxSliceLen(size)
-}
-
-func (cr *codecRegistry) Marshal(v interface{}) ([]byte, error) {
-	return cr.codec.Marshal(v)
-}
-
-func (cr *codecRegistry) Unmarshal(b []byte, v interface{}) error {
-	return cr.codec.Unmarshal(b, v)
 }
 
 /*
