@@ -1161,6 +1161,10 @@ func RPCMarshalBlock(block *types.Block, inclTx bool, fullTx bool) (map[string]i
 	fields := RPCMarshalHeader(block.Header())
 	fields["size"] = hexutil.Uint64(block.Size())
 
+	if len(block.ExtraData()) != 0 {
+		fields["blockExtraData"] = hexutil.Encode(block.ExtraData())
+	}
+
 	if inclTx {
 		formatTx := func(tx *types.Transaction) (interface{}, error) {
 			return tx.Hash(), nil
