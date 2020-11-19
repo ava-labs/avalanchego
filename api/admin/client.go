@@ -26,40 +26,28 @@ func NewClient(uri string, requestTimeout time.Duration) *Client {
 func (c *Client) StartCPUProfiler() (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("startCPUProfiler", struct{}{}, res)
-	if err != nil {
-		return false, err
-	}
-	return res.Success, nil
+	return res.Success, err
 }
 
 // StopCPUProfiler ...
 func (c *Client) StopCPUProfiler() (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("stopCPUProfiler", struct{}{}, res)
-	if err != nil {
-		return false, err
-	}
-	return res.Success, nil
+	return res.Success, err
 }
 
 // MemoryProfile ...
 func (c *Client) MemoryProfile() (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("memoryProfile", struct{}{}, res)
-	if err != nil {
-		return false, err
-	}
-	return res.Success, nil
+	return res.Success, err
 }
 
 // LockProfile ...
 func (c *Client) LockProfile() (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("memoryProfile", struct{}{}, res)
-	if err != nil {
-		return false, err
-	}
-	return res.Success, nil
+	return res.Success, err
 }
 
 // Alias ...
@@ -69,10 +57,7 @@ func (c *Client) Alias(endpoint, alias string) (bool, error) {
 		Endpoint: endpoint,
 		Alias:    alias,
 	}, res)
-	if err != nil {
-		return false, err
-	}
-	return res.Success, nil
+	return res.Success, err
 }
 
 // AliasChain ...
@@ -82,18 +67,12 @@ func (c *Client) AliasChain(chain, alias string) (bool, error) {
 		Chain: chain,
 		Alias: alias,
 	}, res)
-	if err != nil {
-		return false, err
-	}
-	return res.Success, nil
+	return res.Success, err
 }
 
 // Stacktrace ...
 func (c *Client) Stacktrace() (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("stacktrace", struct{}{}, res)
-	if err != nil {
-		return false, err
-	}
-	return res.Success, nil
+	return res.Success, err
 }
