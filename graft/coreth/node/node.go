@@ -113,8 +113,8 @@ func New(conf *Config) (*Node, error) {
 		eventmux:      new(event.TypeMux),
 		log:           conf.Logger,
 		stop:          make(chan struct{}),
-		server:        &p2p.Server{Config: conf.P2P},
-		databases:     make(map[*closeTrackingDB]struct{}),
+		// server:        &p2p.Server{Config: conf.P2P},
+		databases: make(map[*closeTrackingDB]struct{}),
 	}
 
 	// Register built-in APIs.
@@ -133,19 +133,19 @@ func New(conf *Config) (*Node, error) {
 	node.accman = am
 	node.ephemKeystore = ephemeralKeystore
 
-	// Initialize the p2p server. This creates the node key and discovery databases.
-	node.server.Config.PrivateKey = node.config.NodeKey()
-	node.server.Config.Name = node.config.NodeName()
-	node.server.Config.Logger = node.log
-	if node.server.Config.StaticNodes == nil {
-		node.server.Config.StaticNodes = node.config.StaticNodes()
-	}
-	if node.server.Config.TrustedNodes == nil {
-		node.server.Config.TrustedNodes = node.config.TrustedNodes()
-	}
-	if node.server.Config.NodeDatabase == "" {
-		node.server.Config.NodeDatabase = node.config.NodeDB()
-	}
+	// // Initialize the p2p server. This creates the node key and discovery databases.
+	// node.server.Config.PrivateKey = node.config.NodeKey()
+	// node.server.Config.Name = node.config.NodeName()
+	// node.server.Config.Logger = node.log
+	// if node.server.Config.StaticNodes == nil {
+	// 	node.server.Config.StaticNodes = node.config.StaticNodes()
+	// }
+	// if node.server.Config.TrustedNodes == nil {
+	// 	node.server.Config.TrustedNodes = node.config.TrustedNodes()
+	// }
+	// if node.server.Config.NodeDatabase == "" {
+	// 	node.server.Config.NodeDatabase = node.config.NodeDB()
+	// }
 
 	// Configure RPC servers.
 
@@ -161,10 +161,11 @@ func (n *Node) Config() *Config {
 // only to inspect fields of the currently running server. Callers should not
 // start or stop the returned server.
 func (n *Node) Server() *p2p.Server {
-	n.lock.Lock()
-	defer n.lock.Unlock()
+	// n.lock.Lock()
+	// defer n.lock.Unlock()
 
-	return n.server
+	// return n.server
+	return nil
 }
 
 // DataDir retrieves the current datadir used by the protocol stack.
