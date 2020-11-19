@@ -29,7 +29,7 @@ jobs:
 
     - name: Get the commit id 
       id: get_version
-      run: echo ::set-output name=VERSION::${git rev-parse --short "$GITHUB_SHA"}
+      run: echo ::set-output name=VERSION::${GITHUB_SHA::8}
       shell: bash
 
     - name: Create debian package structure
