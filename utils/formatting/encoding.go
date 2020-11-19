@@ -145,11 +145,16 @@ func Decode(encoding Encoding, str string) ([]byte, error) {
 	}
 	if err != nil {
 		return nil, err
-	} else if len(decodedBytes) < checksumLen {
+	}
+	if len(decodedBytes) < checksumLen {
 		return nil, errMissingChecksum
 	}
 	// Verify the checksum
 	rawBytes := decodedBytes[:len(decodedBytes)-checksumLen]
+	if len(rawBytes) > maxCB58EncodeSize {
+		return nil, fmt.Errorf("byte slice length (%d) > maximum for cb58 (%d)", len(decodedBytes), maxCB58EncodeSize)
+	}
+
 	checksum := decodedBytes[len(decodedBytes)-checksumLen:]
 	if !bytes.Equal(checksum, hashing.Checksum(rawBytes, checksumLen)) {
 		return nil, errBadChecksum

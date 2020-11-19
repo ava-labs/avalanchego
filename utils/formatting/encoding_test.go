@@ -164,19 +164,33 @@ func TestDecodeHexInvalid(t *testing.T) {
 
 /* TODO add this test back when we make [maxCB58Size]
 a reasonable size and not math.MaxInt32
+
 func TestEncodeCB58TooLarge(t *testing.T) {
-	maxSizeBytes := make([]byte, maxCB58Size)
+	maxSizeBytes := make([]byte, maxCB58EncodeSize)
 	if _, err := Encode(CB58, maxSizeBytes); err != nil {
 		t.Fatal("should have been able to encode max size slice")
 	}
 
-	tooLargeBytes := make([]byte, maxCB58Size+1)
+	tooLargeBytes := make([]byte, maxCB58EncodeSize+1)
 	if _, err := Encode(CB58, tooLargeBytes); err == nil {
 		t.Fatal("should have errored due to too large")
 	}
 
 	if _, err := Encode(Hex, tooLargeBytes); err != nil {
 		t.Fatal("size limit shouldn't apply to hex encoding")
+	}
+}
+
+func TestDecodeCB58TooLarge(t *testing.T) {
+	bytes := make([]byte, maxCB58EncodeSize+1)
+
+	checked := make([]byte, len(bytes)+checksumLen)
+	copy(checked, bytes)
+	copy(checked[len(bytes):], hashing.Checksum(bytes, checksumLen))
+	encoded := base58.Encode(checked)
+
+	if _, err := Decode(CB58, encoded); err == nil {
+		t.Fatal("should have errored due to too large")
 	}
 }
 */
