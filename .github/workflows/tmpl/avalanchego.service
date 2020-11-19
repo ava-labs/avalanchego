@@ -1,0 +1,21 @@
+# {{ ansible_managed }}
+
+[Unit]
+Description=Avalanche Go node implementation
+Documentation=https://docs.avax.network/
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ubuntu
+Restart=always
+RestartSec=1
+User=ubuntu
+LimitNOFILE=16384
+StandardOutput=null
+StandardError=null
+ExecStart=/usr/local/bin/avalanchego --config-file /etc/avalanchego/conf.json 
+
+[Install]
+WantedBy=multi-user.target
