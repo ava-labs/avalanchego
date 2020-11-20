@@ -461,6 +461,7 @@ func (vm *VM) GetAtomicUTXOs(
 // If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
 // Only returns UTXOs associated with addresses >= [startAddr].
 // For address [startAddr], only returns UTXOs whose IDs are greater than [startUTXOID].
+// Given a ![paginate] input all utxos will be fetched
 // Returns:
 // * The fetched UTXOs
 // * The address associated with the last UTXO fetched
@@ -479,7 +480,7 @@ func (vm *VM) GetUTXOs(
 	if paginate {
 		return vm.getPaginatedUTXOs(addrs, startAddr, startUTXOID, limit)
 	}
-	return vm.getAllUTXOs(addrs, startAddr, startUTXOID)
+	return vm.getAllUTXOs(addrs)
 }
 
 func (vm *VM) getPaginatedUTXOs(addrs ids.ShortSet,
@@ -487,10 +488,14 @@ func (vm *VM) getPaginatedUTXOs(addrs ids.ShortSet,
 	startUTXOID ids.ID,
 	limit int,
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
-	seen := ids.New(limit) // IDs of UTXOs already in the list
-	utxos := make([]*avax.UTXO, 0, limit)
 	lastAddr := ids.ShortEmpty
 	lastIndex := ids.Empty
+
+	utxos := make([]*avax.UTXO, 0, limit)
+	seen := ids.New(limit) // IDs of UTXOs already in the list
+	searchSize := limit    // the limit diminishes which can impact the expected return
+
+	// enforces the same ordering for pagination
 	addrsList := addrs.List()
 	ids.SortShortIDs(addrsList)
 
@@ -502,78 +507,83 @@ func (vm *VM) getPaginatedUTXOs(addrs ids.ShortSet,
 			start = startUTXOID
 		}
 
-		utxoIDs, err := vm.state.Funds(addr.Bytes(), start, limit) // Get UTXOs associated with [addr]
+		utxoIDs, err := vm.state.Funds(addr.Bytes(), start, searchSize) // Get UTXOs associated with [addr]
 		if err != nil {
 			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 		}
 		for _, utxoID := range utxoIDs {
+			lastIndex = utxoID // The last searched UTXO - not the last found
+			lastAddr = addr    // The last address searched that has UTXOs (even duplicated) - not the last found
+
 			if seen.Contains(utxoID) { // Already have this UTXO in the list
 				continue
 			}
+
 			utxo, err := vm.state.UTXO(utxoID)
 			if err != nil {
 				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
 			}
+
 			utxos = append(utxos, utxo)
 			seen.Add(utxoID)
-			lastAddr = addr
-			lastIndex = utxoID
 			limit--
 			if limit <= 0 {
-				break // Found [limit] utxos; stop.
+				return utxos, lastAddr, lastIndex, nil // Found [limit] utxos; stop.
 			}
+		}
+	}
+	return utxos, lastAddr, lastIndex, nil // Didnt reach the [limit] utxos; no more were found
+}
+
+func (vm *VM) getAllUTXOs(addrs ids.ShortSet) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
+	var err error
+	lastAddr := ids.ShortEmpty
+	lastIndex := ids.Empty
+	seen := ids.New(maxUTXOsToFetch) // IDs of UTXOs already in the list
+	utxos := make([]*avax.UTXO, 0, maxUTXOsToFetch)
+
+	// iterate over the addresses and get all the utxos
+	for _, addr := range addrs.List() {
+		lastIndex, err = vm.getAllUniqueAddressUTXOs(addr, seen, &utxos)
+		if err != nil {
+			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
+		}
+
+		if lastIndex != ids.Empty {
+			lastAddr = addr // The last address searched that has UTXOs (even duplicated) - not the last found
 		}
 	}
 	return utxos, lastAddr, lastIndex, nil
 }
 
-func (vm *VM) getAllUTXOs(addrs ids.ShortSet,
-	startAddr ids.ShortID,
-	startUTXOID ids.ID,
-) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
-	seen := ids.New(maxUTXOsToFetch) // IDs of UTXOs already in the list
-	utxos := make([]*avax.UTXO, 0, maxUTXOsToFetch)
-	lastAddr := ids.ShortEmpty
+func (vm *VM) getAllUniqueAddressUTXOs(addr ids.ShortID, seen *ids.Set, utxos *[]*avax.UTXO) (ids.ID, error) {
 	lastIndex := ids.Empty
-	addrsList := addrs.List()
-	ids.SortShortIDs(addrsList)
 
-	for _, addr := range addrsList {
-		start := ids.Empty
-		if comp := bytes.Compare(addr.Bytes(), startAddr.Bytes()); comp == -1 { // Skip addresses before [startAddr]
-			continue
-		} else if comp == 0 {
-			start = startUTXOID
+	for {
+		utxoIDs, err := vm.state.Funds(addr.Bytes(), lastIndex, maxUTXOsToFetch) // Get UTXOs associated with [addr]
+		if err != nil {
+			return ids.ID{}, err
 		}
 
-		for {
-			utxoIDs, err := vm.state.Funds(addr.Bytes(), start, maxUTXOsToFetch) // Get UTXOs associated with [addr]
+		if len(utxoIDs) == 0 {
+			return lastIndex, nil
+		}
+
+		for _, utxoID := range utxoIDs {
+			lastIndex = utxoID // The last searched UTXO - not the last found
+
+			if seen.Contains(utxoID) { // Already have this UTXO in the list
+				continue
+			}
+
+			utxo, err := vm.state.UTXO(utxoID)
 			if err != nil {
-				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
+				return ids.ID{}, err
 			}
-			for _, utxoID := range utxoIDs {
-				lastAddr = addr
-				lastIndex = utxoID
-
-				if seen.Contains(utxoID) { // Already have this UTXO in the list
-					continue
-				}
-				utxo, err := vm.state.UTXO(utxoID)
-				if err != nil {
-					return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
-				}
-				utxos = append(utxos, utxo)
-				seen.Add(utxoID)
-			}
-			addr = lastAddr
-			start = lastIndex
-
-			if len(utxoIDs) == 0 {
-				break // no more utxos in this address
-			}
+			*utxos = append(*utxos, utxo)
+			seen.Add(utxoID)
 		}
 	}
-	return utxos, lastAddr, lastIndex, nil
 }
 
 /*

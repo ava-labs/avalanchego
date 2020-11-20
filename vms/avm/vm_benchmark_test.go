@@ -145,7 +145,7 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 
 	b.ResetTimer()
 	// Fetch all UTXOs older version
-	notPaginatedUTXOs, _, _, err = vm.getAllUTXOs(addrsSet, ids.ShortEmpty, ids.Empty)
+	notPaginatedUTXOs, _, _, err = vm.getAllUTXOs(addrsSet)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -156,14 +156,19 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 
 }
 
-func Benchmark100GetUTXosExistingVersion(b *testing.B) {
-	GetAllUTXOsBenchmark(b, 100)
-}
+func BenchmarkGetUTXOs(b *testing.B) {
+	tests := []struct {
+		name      string
+		utxoCount int
+	}{
+		{"100", 100},
+		{"10k", 10000},
+		{"100k", 100000},
+	}
 
-func Benchmark10000GetUTXosExistingVersion(b *testing.B) {
-	GetAllUTXOsBenchmark(b, 10000)
-}
-
-func Benchmark100000GetUTXosExistingVersion(b *testing.B) {
-	GetAllUTXOsBenchmark(b, 100000)
+	for _, count := range tests {
+		b.Run(count.name, func(b *testing.B) {
+			GetAllUTXOsBenchmark(b, count.utxoCount)
+		})
+	}
 }
