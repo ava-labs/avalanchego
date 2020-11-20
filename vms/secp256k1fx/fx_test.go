@@ -41,18 +41,17 @@ var (
 )
 
 func init() {
-	cb58 := formatting.CB58{}
-	err := cb58.FromString("31SoC6ehdWUWFcuzkXci7ymFEQ8HGTJgw")
+	b, err := formatting.Decode(formatting.CB58, "31SoC6ehdWUWFcuzkXci7ymFEQ8HGTJgw")
 	if err != nil {
 		panic(err)
 	}
-	copy(addr2Bytes[:], cb58.Bytes)
+	copy(addr2Bytes[:], b)
 	addr2 = ids.NewShortID(addr2Bytes)
-	err = cb58.FromString("c7doHa86hWYyfXTVnNsdP1CG1gxhXVpZ9Q5CiHi2oFRdnaxh2YR2Mvu2cUNMgyQy4BNQaXAxWWPt36BJ5pDWX1Xeos4h9L")
+	b, err = formatting.Decode(formatting.CB58, "c7doHa86hWYyfXTVnNsdP1CG1gxhXVpZ9Q5CiHi2oFRdnaxh2YR2Mvu2cUNMgyQy4BNQaXAxWWPt36BJ5pDWX1Xeos4h9L")
 	if err != nil {
 		panic(err)
 	}
-	copy(sig2Bytes[:], cb58.Bytes)
+	copy(sig2Bytes[:], b)
 
 }
 

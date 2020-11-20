@@ -45,7 +45,6 @@ var username = "bobby"
 var password = "StrnasfqewiurPasswdn56d" // #nosec G101
 
 func init() {
-	cb58 := formatting.CB58{}
 	factory := crypto.FactorySECP256K1R{}
 
 	for _, key := range []string{
@@ -53,8 +52,8 @@ func init() {
 		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
 		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
 	} {
-		_ = cb58.FromString(key)
-		pk, _ := factory.ToPrivateKey(cb58.Bytes)
+		keyBytes, _ := formatting.Decode(formatting.CB58, key)
+		pk, _ := factory.ToPrivateKey(keyBytes)
 		keys = append(keys, pk.(*crypto.PrivateKeySECP256K1R))
 		addrs = append(addrs, pk.PublicKey().Address())
 	}
@@ -144,87 +143,86 @@ func BuildGenesisTest(t *testing.T) []byte {
 	addr1Str, _ := formatting.FormatBech32(testHRP, addrs[1].Bytes())
 	addr2Str, _ := formatting.FormatBech32(testHRP, addrs[2].Bytes())
 
-	defaultArgs := &BuildGenesisArgs{GenesisData: map[string]AssetDefinition{
-		"asset1": {
-			Name:   "AVAX",
-			Symbol: "SYMB",
-			InitialState: map[string][]interface{}{
-				"fixedCap": {
-					Holder{
-						Amount:  json.Uint64(startBalance),
-						Address: addr0Str,
-					},
-					Holder{
-						Amount:  json.Uint64(startBalance),
-						Address: addr1Str,
-					},
-					Holder{
-						Amount:  json.Uint64(startBalance),
-						Address: addr2Str,
-					},
-				},
-			},
-		},
-		"asset2": {
-			Name:   "myVarCapAsset",
-			Symbol: "MVCA",
-			InitialState: map[string][]interface{}{
-				"variableCap": {
-					Owners{
-						Threshold: 1,
-						Minters: []string{
-							addr0Str,
-							addr1Str,
+	defaultArgs := &BuildGenesisArgs{
+		Encoding: formatting.Hex,
+		GenesisData: map[string]AssetDefinition{
+			"asset1": {
+				Name:   "AVAX",
+				Symbol: "SYMB",
+				InitialState: map[string][]interface{}{
+					"fixedCap": {
+						Holder{
+							Amount:  json.Uint64(startBalance),
+							Address: addr0Str,
 						},
-					},
-					Owners{
-						Threshold: 2,
-						Minters: []string{
-							addr0Str,
-							addr1Str,
-							addr2Str,
+						Holder{
+							Amount:  json.Uint64(startBalance),
+							Address: addr1Str,
+						},
+						Holder{
+							Amount:  json.Uint64(startBalance),
+							Address: addr2Str,
 						},
 					},
 				},
 			},
-		},
-		"asset3": {
-			Name: "myOtherVarCapAsset",
-			InitialState: map[string][]interface{}{
-				"variableCap": {
-					Owners{
-						Threshold: 1,
-						Minters: []string{
-							addr0Str,
+			"asset2": {
+				Name:   "myVarCapAsset",
+				Symbol: "MVCA",
+				InitialState: map[string][]interface{}{
+					"variableCap": {
+						Owners{
+							Threshold: 1,
+							Minters: []string{
+								addr0Str,
+								addr1Str,
+							},
+						},
+						Owners{
+							Threshold: 2,
+							Minters: []string{
+								addr0Str,
+								addr1Str,
+								addr2Str,
+							},
 						},
 					},
 				},
 			},
-		},
-	}}
+			"asset3": {
+				Name: "myOtherVarCapAsset",
+				InitialState: map[string][]interface{}{
+					"variableCap": {
+						Owners{
+							Threshold: 1,
+							Minters: []string{
+								addr0Str,
+							},
+						},
+					},
+				},
+			},
+		}}
 
 	return BuildGenesisTestWithArgs(t, defaultArgs)
 }
 
 // BuildGenesisTestWithArgs allows building the genesis while injecting different starting points (args)
 func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) []byte {
-	ss, err := CreateStaticService(formatting.HexEncoding)
-	if err != nil {
-		t.Fatalf("Failed to create static service due to: %s", err)
-	}
+	ss := CreateStaticService()
 
 	reply := BuildGenesisReply{}
-	err = ss.BuildGenesis(nil, args, &reply)
+	err := ss.BuildGenesis(nil, args, &reply)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	hex := formatting.Hex{}
-	if err := hex.FromString(reply.Bytes); err != nil {
+	b, err := formatting.Decode(reply.Encoding, reply.Bytes)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	return hex.Bytes
+	return b
 }
 
 func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) {
@@ -652,13 +650,15 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 	}
 
 	// Inject them in the Genesis build
-	genesisArgs := &BuildGenesisArgs{GenesisData: map[string]AssetDefinition{
-		"asset1": {
-			Name:         "AVAX",
-			Symbol:       "SYMB",
-			InitialState: holder,
-		},
-	}}
+	genesisArgs := &BuildGenesisArgs{
+		Encoding: formatting.Hex,
+		GenesisData: map[string]AssetDefinition{
+			"asset1": {
+				Name:         "AVAX",
+				Symbol:       "SYMB",
+				InitialState: holder,
+			},
+		}}
 	_, _, vm, _ := GenesisVMWithArgs(t, genesisArgs)
 	ctx := vm.ctx
 	defer func() {
