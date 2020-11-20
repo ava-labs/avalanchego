@@ -46,7 +46,7 @@ func (tx *UnsignedExportTx) InputUTXOs() ids.Set { return ids.Set{} }
 func (tx *UnsignedExportTx) Verify(
 	avmID ids.ID,
 	ctx *snow.Context,
-	c codec.Codec,
+	c codec.Manager,
 	feeAmount uint64,
 	feeAssetID ids.ID,
 ) error {
@@ -142,7 +142,7 @@ func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 			Out:   out.Out,
 		}
 
-		utxoBytes, err := Codec.Marshal(utxo)
+		utxoBytes, err := Codec.Marshal(codecVersion, utxo)
 		if err != nil {
 			return fmt.Errorf("failed to marshal UTXO: %w", err)
 		}

@@ -75,7 +75,7 @@ func (t *CreateAssetTx) UTXOs() []*avax.UTXO {
 // SyntacticVerify that this transaction is well-formed.
 func (t *CreateAssetTx) SyntacticVerify(
 	ctx *snow.Context,
-	c codec.Codec,
+	c codec.Manager,
 	txFeeAssetID ids.ID,
 	_ uint64,
 	txFee uint64,

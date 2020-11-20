@@ -359,7 +359,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 
 	// Marshal genesis to bytes
-	bytes, err := GenesisCodec.Marshal(genesis)
+	bytes, err := GenesisCodec.Marshal(codecVersion, genesis)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal genesis: %w", err)
 	}

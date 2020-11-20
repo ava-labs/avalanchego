@@ -18,7 +18,7 @@ type userState struct{ vm *VM }
 
 // SetAddresses ...
 func (s *userState) SetAddresses(db database.Database, addrs []ids.ShortID) error {
-	bytes, err := s.vm.codec.Marshal(addrs)
+	bytes, err := s.vm.codec.Marshal(codecVersion, addrs)
 	if err != nil {
 		return err
 	}
@@ -32,7 +32,7 @@ func (s *userState) Addresses(db database.Database) ([]ids.ShortID, error) {
 		return nil, err
 	}
 	addresses := []ids.ShortID{}
-	if err := s.vm.codec.Unmarshal(bytes, &addresses); err != nil {
+	if _, err := s.vm.codec.Unmarshal(bytes, &addresses); err != nil {
 		return nil, err
 	}
 	return addresses, nil
