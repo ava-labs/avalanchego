@@ -24,10 +24,10 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/rpc"
-	"github.com/ava-labs/gecko/ids"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -324,28 +324,29 @@ type rpcProgress struct {
 
 // SyncProgress retrieves the current progress of the sync algorithm. If there's
 // no sync currently running, it returns nil.
-func (ec *Client) SyncProgress(ctx context.Context) (*coreth.SyncProgress, error) {
-	var raw json.RawMessage
-	if err := ec.c.CallContext(ctx, &raw, "eth_syncing"); err != nil {
-		return nil, err
-	}
-	// Handle the possible response types
-	var syncing bool
-	if err := json.Unmarshal(raw, &syncing); err == nil {
-		return nil, nil // Not syncing (always false)
-	}
-	var progress *rpcProgress
-	if err := json.Unmarshal(raw, &progress); err != nil {
-		return nil, err
-	}
-	return &coreth.SyncProgress{
-		StartingBlock: uint64(progress.StartingBlock),
-		CurrentBlock:  uint64(progress.CurrentBlock),
-		HighestBlock:  uint64(progress.HighestBlock),
-		PulledStates:  uint64(progress.PulledStates),
-		KnownStates:   uint64(progress.KnownStates),
-	}, nil
-}
+// eth_syncing is not implemented in Coreth
+// func (ec *Client) SyncProgress(ctx context.Context) (*coreth.SyncProgress, error) {
+// 	var raw json.RawMessage
+// 	if err := ec.c.CallContext(ctx, &raw, "eth_syncing"); err != nil {
+// 		return nil, err
+// 	}
+// 	// Handle the possible response types
+// 	var syncing bool
+// 	if err := json.Unmarshal(raw, &syncing); err == nil {
+// 		return nil, nil // Not syncing (always false)
+// 	}
+// 	var progress *rpcProgress
+// 	if err := json.Unmarshal(raw, &progress); err != nil {
+// 		return nil, err
+// 	}
+// 	return &coreth.SyncProgress{
+// 		StartingBlock: uint64(progress.StartingBlock),
+// 		CurrentBlock:  uint64(progress.CurrentBlock),
+// 		HighestBlock:  uint64(progress.HighestBlock),
+// 		PulledStates:  uint64(progress.PulledStates),
+// 		KnownStates:   uint64(progress.KnownStates),
+// 	}, nil
+// }
 
 // SubscribeNewHead subscribes to notifications about the current blockchain head
 // on the given channel.
