@@ -11,78 +11,79 @@ import (
 
 func BenchmarkEncodings(b *testing.B) {
 	benchmarks := []struct {
-		encoding string
+		encoding Encoding
 		size     int
 	}{
 		{
-			encoding: CB58Encoding,
+			encoding: CB58,
 			size:     1 << 10, // 1kb
 		},
 		{
-			encoding: CB58Encoding,
+			encoding: CB58,
 			size:     1 << 11, // 2kb
 		},
 		{
-			encoding: CB58Encoding,
+			encoding: CB58,
 			size:     1 << 12, // 4kb
 		},
 		{
-			encoding: CB58Encoding,
+			encoding: CB58,
 			size:     1 << 13, // 8kb
 		},
 		{
-			encoding: CB58Encoding,
+			encoding: CB58,
 			size:     1 << 14, // 16kb
 		},
 		{
-			encoding: CB58Encoding,
+			encoding: CB58,
 			size:     1 << 15, // 32kb
 		},
 		{
-			encoding: HexEncoding,
+			encoding: Hex,
 			size:     1 << 10, // 1kb
 		},
 		{
-			encoding: HexEncoding,
+			encoding: Hex,
 			size:     1 << 12, // 4kb
 		},
 		{
-			encoding: HexEncoding,
+			encoding: Hex,
 			size:     1 << 15, // 32kb
 		},
 		{
-			encoding: HexEncoding,
+			encoding: Hex,
 			size:     1 << 17, // 128kb
 		},
 		{
-			encoding: HexEncoding,
+			encoding: Hex,
 			size:     1 << 18, // 256kb
 		},
 		{
-			encoding: HexEncoding,
+			encoding: Hex,
 			size:     1 << 19, // 512kb
 		},
 		{
-			encoding: HexEncoding,
+			encoding: Hex,
 			size:     1 << 20, // 1mb
 		},
 		{
-			encoding: HexEncoding,
+			encoding: Hex,
 			size:     1 << 21, // 2mb
 		},
 		{
-			encoding: HexEncoding,
+			encoding: Hex,
 			size:     1 << 22, // 4mb
 		},
 	}
-	manager, _ := NewEncodingManager(HexEncoding)
 	for _, benchmark := range benchmarks {
-		enc, _ := manager.GetEncoding(benchmark.encoding)
 		bytes := make([]byte, benchmark.size)
 		_, _ = rand.Read(bytes) // #nosec G404
 		b.Run(fmt.Sprintf("%s-%d bytes", benchmark.encoding, benchmark.size), func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
-				_ = enc.ConvertBytes(bytes)
+				if _, err := Encode(benchmark.encoding, bytes); err != nil {
+					b.Fatal(err)
+				}
+
 			}
 		})
 	}

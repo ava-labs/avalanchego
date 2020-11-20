@@ -64,16 +64,15 @@ type VM struct {
 	metrics
 	ids.Aliaser
 
-	encodingManager formatting.EncodingManager
-
 	// Contains information of where this VM is executing
 	ctx *snow.Context
 
 	// Used to check local time
 	clock timer.Clock
 
-	genesisCodec codec.Manager
-	codec        codec.Manager
+	genesisCodec  codec.Manager
+	codec         codec.Manager
+	codecRegistry codec.Registry
 
 	pubsub *cjson.PubSubServer
 
@@ -126,16 +125,15 @@ func (vm *VM) Initialize(
 	vm.db = versiondb.New(db)
 	vm.typeToFxIndex = map[reflect.Type]int{}
 	vm.Aliaser.Initialize()
-	encodingManager, err := formatting.NewEncodingManager(formatting.CB58Encoding)
-	if err != nil {
-		return fmt.Errorf("problem creating encoding manager: %w", err)
-	}
-	vm.encodingManager = encodingManager
 	vm.assetToFxCache = &cache.LRU{Size: assetToFxCacheSize}
 
 	vm.pubsub = cjson.NewPubSubServer(ctx)
-	vm.genesisCodec = codec.New(math.MaxUint32, 1<<20)
+
+	genesisCodec := codec.New(codec.DefaultTagName, 1<<20)
 	c := codec.NewDefault()
+
+	vm.genesisCodec = codec.NewManager(math.MaxInt32)
+	vm.codec = codec.NewDefaultManager()
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -150,12 +148,14 @@ func (vm *VM) Initialize(
 		c.RegisterType(&OperationTx{}),
 		c.RegisterType(&ImportTx{}),
 		c.RegisterType(&ExportTx{}),
+		vm.codec.RegisterCodec(codecVersion, c),
 
-		vm.genesisCodec.RegisterType(&BaseTx{}),
-		vm.genesisCodec.RegisterType(&CreateAssetTx{}),
-		vm.genesisCodec.RegisterType(&OperationTx{}),
-		vm.genesisCodec.RegisterType(&ImportTx{}),
-		vm.genesisCodec.RegisterType(&ExportTx{}),
+		genesisCodec.RegisterType(&BaseTx{}),
+		genesisCodec.RegisterType(&CreateAssetTx{}),
+		genesisCodec.RegisterType(&OperationTx{}),
+		genesisCodec.RegisterType(&ImportTx{}),
+		genesisCodec.RegisterType(&ExportTx{}),
+		vm.genesisCodec.RegisterCodec(codecVersion, genesisCodec),
 	)
 	if errs.Errored() {
 		return errs.Err
@@ -174,18 +174,15 @@ func (vm *VM) Initialize(
 			ID: fxContainer.ID,
 			Fx: fx,
 		}
-		vm.codec = &codecRegistry{
-			genesisCodec:  vm.genesisCodec,
-			codec:         c,
-			index:         i,
-			typeToFxIndex: vm.typeToFxIndex,
+		vm.codecRegistry = &codecRegistry{
+			codecs:      []codec.Codec{genesisCodec, c},
+			index:       i,
+			typeToIndex: vm.typeToFxIndex,
 		}
 		if err := fx.Initialize(vm); err != nil {
 			return err
 		}
 	}
-
-	vm.codec = c
 
 	vm.state = &prefixedState{
 		state: &state{State: avax.State{
@@ -302,7 +299,7 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	// name this service "avm"
-	staticService, _ := CreateStaticService(formatting.CB58Encoding)
+	staticService := CreateStaticService()
 	_ = newServer.RegisterService(staticService, "avm")
 	return map[string]*common.HTTPHandler{
 		"": {LockOptions: common.WriteLock, Handler: newServer},
@@ -415,7 +412,7 @@ func (vm *VM) GetAtomicUTXOs(
 	utxos := make([]*avax.UTXO, len(allUTXOBytes))
 	for i, utxoBytes := range allUTXOBytes {
 		utxo := &avax.UTXO{}
-		if err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
+		if _, err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
 			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error parsing UTXO: %w", err)
 		}
 		utxos[i] = utxo
@@ -499,7 +496,10 @@ func (vm *VM) GetUTXOs(
 func (vm *VM) Clock() *timer.Clock { return &vm.clock }
 
 // Codec returns a reference to the internal codec of this VM
-func (vm *VM) Codec() codec.Codec { return vm.codec }
+func (vm *VM) Codec() codec.Manager { return vm.codec }
+
+// CodecRegistry returns a reference to the internal codec registry of this VM
+func (vm *VM) CodecRegistry() codec.Registry { return vm.codecRegistry }
 
 // Logger returns a reference to the internal logger of this VM
 func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
@@ -531,7 +531,7 @@ func (vm *VM) FlushTxs() {
 
 func (vm *VM) initAliases(genesisBytes []byte) error {
 	genesis := Genesis{}
-	if err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
+	if _, err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return err
 	}
 
@@ -558,7 +558,7 @@ func (vm *VM) initAliases(genesisBytes []byte) error {
 
 func (vm *VM) initState(genesisBytes []byte) error {
 	genesis := Genesis{}
-	if err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
+	if _, err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return err
 	}
 
@@ -624,11 +624,11 @@ func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
 
 func (vm *VM) parsePrivateTx(txBytes []byte) (*Tx, error) {
 	tx := &Tx{}
-	err := vm.codec.Unmarshal(txBytes, tx)
+	_, err := vm.codec.Unmarshal(txBytes, tx)
 	if err != nil {
 		return nil, err
 	}
-	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
+	unsignedBytes, err := vm.codec.Marshal(codecVersion, &tx.UnsignedTx)
 	if err != nil {
 		return nil, err
 	}
