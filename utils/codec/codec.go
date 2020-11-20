@@ -34,13 +34,14 @@ var (
 
 // Codec handles marshaling and unmarshaling of structs
 type codec struct {
-	lock         sync.Mutex
+	lock         sync.RWMutex
 	tagName      string
 	maxSliceLen  int
 	nextTypeID   uint32
 	typeIDToType map[uint32]reflect.Type
 	typeToTypeID map[reflect.Type]uint32
 
+	fieldLock sync.Mutex
 	// Key: a struct type
 	// Value: Slice where each element is index in the struct type
 	// of a field that is serialized/deserialized
@@ -99,7 +100,7 @@ func (c *codec) RegisterType(val interface{}) error {
 // A few notes:
 // 1) See codec_test.go for examples of usage
 // 2) We use "marshal" and "serialize" interchangeably, and "unmarshal" and "deserialize" interchangeably
-// 3) To include a field of a struct in the serialized form, add the tag `serialize:"true"` to it
+// 3) To include a field of a struct in the serialized form, add the tag `{tagName}:"true"` to it. `{tagName}` defaults to `serialize`.
 // 4) These typed members of a struct may be serialized:
 //    bool, string, uint[8,16,32,64], int[8,16,32,64],
 //	  structs, slices, arrays, interface.
@@ -115,8 +116,8 @@ func (c *codec) MarshalInto(value interface{}, p *wrappers.Packer) error {
 		return errMarshalNil // can't marshal nil
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
 	return c.marshal(reflect.ValueOf(value), p)
 }
@@ -240,8 +241,8 @@ func (c *codec) Unmarshal(bytes []byte, dest interface{}) error {
 		return errUnmarshalNil
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
 	p := wrappers.Packer{
 		Bytes: bytes,
@@ -419,6 +420,9 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 // are to be serialized/deserialized
 // c.lock should be held for the duration of this method
 func (c *codec) getSerializedFieldIndices(t reflect.Type) ([]int, error) {
+	c.fieldLock.Lock()
+	defer c.fieldLock.Unlock()
+
 	if c.serializedFieldIndices == nil {
 		c.serializedFieldIndices = make(map[reflect.Type][]int)
 	}

@@ -28,9 +28,20 @@ var (
 
 // Manager describes the functionality for managing codec versions.
 type Manager interface {
+	// Associate the given codec with the given version ID
 	RegisterCodec(version uint16, codec Codec) error
+
+	// Define the maximum size, in bytes, of something serialized/deserialized
+	// by this codec manager
 	SetMaxSize(int)
+
+	// Marshal the given value using the codec with the given version.
+	// RegisterCodec must have been called with that version.
 	Marshal(version uint16, source interface{}) (destination []byte, err error)
+
+	// Unmarshal the given bytes into the given destination. [destination] must
+	// be a pointer or an interface. Returns the version of the codec that
+	// produces the given bytes.
 	Unmarshal(source []byte, destination interface{}) (version uint16, err error)
 }
 
@@ -104,9 +115,8 @@ func (m *manager) Unmarshal(bytes []byte, dest interface{}) (uint16, error) {
 	}
 
 	m.lock.RLock()
-	defer m.lock.RUnlock()
-
 	if len(bytes) > m.maxSize {
+		m.lock.RUnlock()
 		return 0, fmt.Errorf("byte array exceeds maximum length, %d", m.maxSize)
 	}
 
@@ -116,10 +126,12 @@ func (m *manager) Unmarshal(bytes []byte, dest interface{}) (uint16, error) {
 
 	version := p.UnpackShort()
 	if p.Errored() { // Make sure the codec version is correct
+		m.lock.RUnlock()
 		return 0, errCantUnpackVersion
 	}
 
 	c, exists := m.codecs[version]
+	m.lock.RUnlock()
 	if !exists {
 		return version, errUnknownVersion
 	}

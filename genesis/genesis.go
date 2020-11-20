@@ -27,6 +27,7 @@ import (
 
 const (
 	defaultEncoding = formatting.Hex
+	codecVersion    = 0
 )
 
 // Genesis returns the genesis data of the Platform Chain.
@@ -356,7 +357,7 @@ func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
 		c.RegisterType(&secp256k1fx.MintOperation{}),
 		c.RegisterType(&secp256k1fx.Credential{}),
-		m.RegisterCodec(0, c),
+		m.RegisterCodec(codecVersion, c),
 	)
 	if errs.Errored() {
 		return ids.ID{}, errs.Err
@@ -373,11 +374,11 @@ func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 	genesisTx := genesis.Txs[0]
 
 	tx := avm.Tx{UnsignedTx: &genesisTx.CreateAssetTx}
-	unsignedBytes, err := m.Marshal(0, tx.UnsignedTx)
+	unsignedBytes, err := m.Marshal(codecVersion, tx.UnsignedTx)
 	if err != nil {
 		return ids.ID{}, err
 	}
-	signedBytes, err := m.Marshal(0, &tx)
+	signedBytes, err := m.Marshal(codecVersion, &tx)
 	if err != nil {
 		return ids.ID{}, err
 	}
