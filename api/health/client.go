@@ -32,16 +32,11 @@ func (c *Client) GetLiveness() (*GetLivenessReply, error) {
 // in between checks and returns early if GetLiveness returns healthy
 func (c *Client) AwaitHealthy(checks int, interval time.Duration) (bool, error) {
 	for i := 0; i < checks; i++ {
-		time.Sleep(interval)
 		res, err := c.GetLiveness()
-		if err != nil {
-			continue
-		}
-
-		if res.Healthy {
+		if err == nil && res.Healthy {
 			return true, nil
 		}
+		time.Sleep(interval)
 	}
-
 	return false, nil
 }
