@@ -1,6 +1,7 @@
 package vmargs
 
 import (
+	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
@@ -25,11 +26,11 @@ type Index struct {
 // If GetUTXOs is called multiple times, with our without [StartIndex], it is not guaranteed
 // that returned UTXOs are unique. That is, the same UTXO may appear in the response of multiple calls.
 type GetUTXOsArgs struct {
-	Addresses   []string    `json:"addresses"`
-	SourceChain string      `json:"sourceChain"`
-	Limit       json.Uint32 `json:"limit"`
-	StartIndex  Index       `json:"startIndex"`
-	Encoding    string      `json:"encoding"`
+	Addresses   []string            `json:"addresses"`
+	SourceChain string              `json:"sourceChain"`
+	Limit       json.Uint32         `json:"limit"`
+	StartIndex  Index               `json:"startIndex"`
+	Encoding    formatting.Encoding `json:"encoding"`
 }
 
 // GetUTXOsReply defines the GetUTXOs replies returned from the API
@@ -43,14 +44,14 @@ type GetUTXOsReply struct {
 	// again and set [StartIndex] to this value.
 	EndIndex Index `json:"endIndex"`
 	// Encoding specifies the encoding format the UTXOs are returned in
-	Encoding string `json:"encoding"`
+	Encoding formatting.Encoding `json:"encoding"`
 }
 
 // BuildGenesisArgs are arguments for BuildGenesis
 type BuildGenesisArgs struct {
 	NetworkID   cjson.Uint32               `json:"networkID"`
 	GenesisData map[string]AssetDefinition `json:"genesisData"`
-	Encoding    string                     `json:"encoding"`
+	Encoding    formatting.Encoding        `json:"encoding"`
 }
 
 // AssetDefinition ...
@@ -64,6 +65,6 @@ type AssetDefinition struct {
 
 // BuildGenesisReply is the reply from BuildGenesis
 type BuildGenesisReply struct {
-	Bytes    string `json:"bytes"`
-	Encoding string `json:"encoding"`
+	Bytes    string              `json:"bytes"`
+	Encoding formatting.Encoding `json:"encoding"`
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/avm/internalvm"
+	"github.com/ava-labs/avalanchego/vms/avm/internalavm"
 	"github.com/ava-labs/avalanchego/vms/avm/vmargs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -27,11 +27,11 @@ func BuildGenesis(args *vmargs.BuildGenesisArgs, reply *vmargs.BuildGenesisReply
 
 	c := codec.New(math.MaxUint32, 1<<20)
 	errs.Add(
-		c.RegisterType(&internalvm.BaseTx{}),
-		c.RegisterType(&internalvm.CreateAssetTx{}),
-		c.RegisterType(&internalvm.OperationTx{}),
-		c.RegisterType(&internalvm.ImportTx{}),
-		c.RegisterType(&internalvm.ExportTx{}),
+		c.RegisterType(&internalavm.BaseTx{}),
+		c.RegisterType(&internalavm.CreateAssetTx{}),
+		c.RegisterType(&internalavm.OperationTx{}),
+		c.RegisterType(&internalavm.ImportTx{}),
+		c.RegisterType(&internalavm.ExportTx{}),
 		c.RegisterType(&secp256k1fx.TransferInput{}),
 		c.RegisterType(&secp256k1fx.MintOutput{}),
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
@@ -42,26 +42,17 @@ func BuildGenesis(args *vmargs.BuildGenesisArgs, reply *vmargs.BuildGenesisReply
 		return errs.Err
 	}
 
-	encodingManager, err := formatting.NewEncodingManager(args.Encoding)
-	if err != nil {
-		fmt.Errorf("problem creating avm Static Service: %w", err)
-	}
-
-	encoding, err := encodingManager.GetEncoding(args.Encoding)
-	if err != nil {
-		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
-	}
-
-	g := internalvm.Genesis{}
+	g := internalavm.Genesis{}
 	for assetAlias, assetDefinition := range args.GenesisData {
-		assetMemo, err := encoding.ConvertString(assetDefinition.Memo)
+		assetMemo, err := formatting.Decode(args.Encoding, assetDefinition.Memo)
+
 		if err != nil {
 			return fmt.Errorf("problem formatting asset definition memo due to: %w", err)
 		}
-		asset := internalvm.GenesisAsset{
+		asset := internalavm.GenesisAsset{
 			Alias: assetAlias,
-			CreateAssetTx: internalvm.CreateAssetTx{
-				BaseTx: internalvm.BaseTx{BaseTx: avax.BaseTx{
+			CreateAssetTx: internalavm.CreateAssetTx{
+				BaseTx: internalavm.BaseTx{BaseTx: avax.BaseTx{
 					NetworkID:    uint32(args.NetworkID),
 					BlockchainID: ids.Empty,
 					Memo:         assetMemo,
@@ -72,7 +63,7 @@ func BuildGenesis(args *vmargs.BuildGenesisArgs, reply *vmargs.BuildGenesisReply
 			},
 		}
 		if len(assetDefinition.InitialState) > 0 {
-			initialState := &internalvm.InitialState{
+			initialState := &internalavm.InitialState{
 				FxID: 0, // TODO: Should lookup secp256k1fx FxID
 			}
 			for assetType, initialStates := range assetDefinition.InitialState {
@@ -83,7 +74,7 @@ func BuildGenesis(args *vmargs.BuildGenesisArgs, reply *vmargs.BuildGenesisReply
 						if err != nil {
 							return fmt.Errorf("problem marshaling state: %w", err)
 						}
-						holder := internalvm.Holder{}
+						holder := internalavm.Holder{}
 						if err := json.Unmarshal(b, &holder); err != nil {
 							return fmt.Errorf("problem unmarshaling holder: %w", err)
 						}
@@ -109,7 +100,7 @@ func BuildGenesis(args *vmargs.BuildGenesisArgs, reply *vmargs.BuildGenesisReply
 						if err != nil {
 							return fmt.Errorf("problem marshaling state: %w", err)
 						}
-						owners := internalvm.Owners{}
+						owners := internalavm.Owners{}
 						if err := json.Unmarshal(b, &owners); err != nil {
 							return fmt.Errorf("problem unmarshaling Owners: %w", err)
 						}
@@ -151,7 +142,10 @@ func BuildGenesis(args *vmargs.BuildGenesisArgs, reply *vmargs.BuildGenesisReply
 		return fmt.Errorf("problem marshaling genesis: %w", err)
 	}
 
-	reply.Bytes = encoding.ConvertBytes(b)
-	reply.Encoding = encoding.Encoding()
+	reply.Bytes, err = formatting.Encode(args.Encoding, b)
+	if err != nil {
+		return fmt.Errorf("couldn't encode genesis as string: %s", err)
+	}
+	reply.Encoding = args.Encoding
 	return nil
 }

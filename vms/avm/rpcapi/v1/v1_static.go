@@ -3,7 +3,7 @@ package v1
 import (
 	"net/http"
 
-	"github.com/ava-labs/avalanchego/vms/avm/internalvm"
+	"github.com/ava-labs/avalanchego/vms/avm/internalavm"
 	"github.com/ava-labs/avalanchego/vms/avm/vmargs"
 )
 
@@ -20,11 +20,5 @@ func NewStaticController() *V1StaticController {
 // referenced in the UTXO.
 func (c *V1StaticController) BuildGenesis(_ *http.Request, args *vmargs.BuildGenesisArgs, reply *vmargs.BuildGenesisReply) error {
 
-	staticService, err := internalvm.CreateStaticService(args.Encoding)
-	if err != nil {
-		// TODO review this - add log ?
-		return err
-	}
-
-	return staticService.BuildGenesis(nil, args, reply)
+	return internalavm.CreateStaticService().BuildGenesis(nil, args, reply)
 }

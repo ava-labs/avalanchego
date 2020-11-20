@@ -2,21 +2,23 @@ package avm
 
 import (
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/vms/avm/internalvm"
+	"github.com/ava-labs/avalanchego/vms/avm/internalavm"
 	"github.com/ava-labs/avalanchego/vms/avm/rpcapi"
 	"github.com/ava-labs/avalanchego/vms/avm/service"
 )
 
 type VM struct {
-	avm     *internalvm.VM
+	avm     *internalavm.VM
 	rpcapi  *rpcapi.RPCAPI
 	service *service.Service
 }
 
 func NewVM(creationTxFee uint64, txFee uint64) *VM {
-	internalVM := internalvm.NewVM(creationTxFee, txFee)
+	internalVM := internalavm.NewVM(creationTxFee, txFee)
 	return &VM{
 		avm:     internalVM,
 		rpcapi:  rpcapi.NewRPCAPI(),
@@ -66,4 +68,22 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 // Periodically called and reported via the node's Health API.
 func (vm *VM) Health() (interface{}, error) {
 	return vm.avm.Health()
+}
+
+// TODO change this to something nicer
+// Its a DAG
+
+// PendingTxs implements the avalanche.DAGVM interface
+func (vm *VM) PendingTxs() []snowstorm.Tx {
+	return vm.PendingTxs()
+}
+
+// ParseTx implements the avalanche.DAGVM interface
+func (vm *VM) ParseTx(b []byte) (snowstorm.Tx, error) {
+	return vm.ParseTx(b)
+}
+
+// GetTx implements the avalanche.DAGVM interface
+func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
+	return vm.GetTx(txID)
 }

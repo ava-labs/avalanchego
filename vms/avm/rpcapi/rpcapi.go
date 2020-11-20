@@ -3,7 +3,7 @@ package rpcapi
 import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	cjson "github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/vms/avm/internalvm"
+	"github.com/ava-labs/avalanchego/vms/avm/internalavm"
 	v1 "github.com/ava-labs/avalanchego/vms/avm/rpcapi/v1"
 	v2 "github.com/ava-labs/avalanchego/vms/avm/rpcapi/v2"
 	"github.com/ava-labs/avalanchego/vms/avm/service"
@@ -21,7 +21,7 @@ func NewRPCAPI() *RPCAPI {
 func (api *RPCAPI) CreateHandlers(vmIntf interface{}, service *service.Service) map[string]*common.HTTPHandler {
 	//vm.metrics.numCreateHandlersCalls.Inc()
 
-	vm, ok := vmIntf.(*internalvm.VM)
+	vm, ok := vmIntf.(*internalavm.VM)
 	if !ok {
 		return nil
 	}
@@ -57,7 +57,7 @@ func (api *RPCAPI) CreateHandlers(vmIntf interface{}, service *service.Service) 
 
 // CreateHandlers implements the avalanche.DAGVM interface
 func (api *RPCAPI) CreateStaticHandlers(vmIntf interface{}) map[string]*common.HTTPHandler {
-	vm, ok := vmIntf.(*internalvm.VM)
+	vm, ok := vmIntf.(*internalavm.VM)
 	if !ok {
 		return nil
 	}

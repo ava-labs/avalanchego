@@ -3,7 +3,9 @@ package service
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/vms/avm/internalvm"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+
+	"github.com/ava-labs/avalanchego/vms/avm/internalavm"
 
 	"github.com/ava-labs/avalanchego/vms/avm/vmargs"
 
@@ -22,10 +24,10 @@ const (
 )
 
 type Service struct {
-	vm *internalvm.VM
+	vm *internalavm.VM
 }
 
-func NewService(vm *internalvm.VM) *Service {
+func NewService(vm *internalavm.VM) *Service {
 	return &Service{vm: vm}
 }
 
@@ -34,17 +36,13 @@ func (service *Service) GetUTXOs(args *vmargs.GetUTXOsArgs) (*vmargs.GetUTXOsRep
 	service.vm.Context().Log.Info("AVM: GetUTXOs called for with %s", args.Addresses)
 
 	reply := &vmargs.GetUTXOsReply{}
+	var err error
 
 	if len(args.Addresses) == 0 {
 		return nil, vmerror.ErrNoAddresses
 	}
 	if len(args.Addresses) > maxGetUTXOsAddrs {
 		return nil, fmt.Errorf("number of addresses given, %d, exceeds maximum, %d", len(args.Addresses), maxGetUTXOsAddrs)
-	}
-
-	encoding, err := service.vm.EncodingManager().GetEncoding(args.Encoding)
-	if err != nil {
-		return nil, fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
 	}
 
 	var sourceChain ids.ID
@@ -115,7 +113,10 @@ func (service *Service) GetUTXOs(args *vmargs.GetUTXOsArgs) (*vmargs.GetUTXOsRep
 		if err != nil {
 			return nil, fmt.Errorf("problem marshalling UTXO: %w", err)
 		}
-		reply.UTXOs[i] = encoding.ConvertBytes(b)
+		reply.UTXOs[i], err = formatting.Encode(args.Encoding, b)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't encode UTXO %s as string: %s", utxo.InputID(), err)
+		}
 	}
 
 	endAddress, err := service.vm.FormatLocalAddress(endAddr)
@@ -126,7 +127,7 @@ func (service *Service) GetUTXOs(args *vmargs.GetUTXOsArgs) (*vmargs.GetUTXOsRep
 	reply.EndIndex.Address = endAddress
 	reply.EndIndex.UTXO = endUTXOID.String()
 	reply.NumFetched = json.Uint64(len(utxos))
-	reply.Encoding = encoding.Encoding()
+	reply.Encoding = args.Encoding
 	return reply, nil
 }
 
