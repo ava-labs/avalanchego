@@ -6,12 +6,9 @@ package avm
 import (
 	"bytes"
 	"fmt"
+	"math/rand"
 	"strings"
 	"testing"
-
-	"math/rand"
-
-	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/keystore"
@@ -25,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -38,7 +36,10 @@ var (
 // 4) atomic memory to use in tests
 func setup(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
 	genesisBytes, _, vm, m := GenesisVM(t)
-	keystore := keystore.CreateTestKeystore()
+	keystore, err := keystore.CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := keystore.AddUser(username, password); err != nil {
 		t.Fatalf("couldn't add user: %s", err)
 	}
@@ -401,7 +402,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 			},
 		}
 
-		utxoBytes, err := vm.codec.Marshal(utxo)
+		utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1268,7 +1269,7 @@ func TestImportAVAX(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := vm.codec.Marshal(utxo)
+	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}

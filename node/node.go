@@ -575,10 +575,10 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 }
 
 // initSharedMemory initializes the shared memory for cross chain interation
-func (n *Node) initSharedMemory() {
+func (n *Node) initSharedMemory() error {
 	n.Log.Info("initializing SharedMemory")
 	sharedMemoryDB := prefixdb.New([]byte("shared memory"), n.DB)
-	n.sharedMemory.Initialize(n.Log, sharedMemoryDB)
+	return n.sharedMemory.Initialize(n.Log, sharedMemoryDB)
 }
 
 // initKeystoreAPI initializes the keystore service
@@ -586,7 +586,9 @@ func (n *Node) initSharedMemory() {
 func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
 	keystoreDB := prefixdb.New([]byte("keystore"), n.DB)
-	n.keystoreServer.Initialize(n.Log, keystoreDB)
+	if err := n.keystoreServer.Initialize(n.Log, keystoreDB); err != nil {
+		return err
+	}
 	keystoreHandler, err := n.keystoreServer.CreateHandler()
 	if err != nil {
 		return err
@@ -783,7 +785,9 @@ func (n *Node) Initialize(config *Config, logger logging.Logger, logFactory logg
 		return fmt.Errorf("couldn't initialize metrics API: %w", err)
 	}
 
-	n.initSharedMemory() // Initialize shared memory
+	if err := n.initSharedMemory(); err != nil { // Initialize shared memory
+		return fmt.Errorf("problem initializing shared memory: %w", err)
+	}
 
 	if err = n.initNetworking(); err != nil { // Set up all networking
 		return fmt.Errorf("problem initializing networking: %w", err)

@@ -309,7 +309,10 @@ func defaultVM() (*VM, database.Database) {
 	ctx := defaultContext()
 
 	m := &atomic.Memory{}
-	m.Initialize(logging.NoLog{}, atomicDB)
+	err := m.Initialize(logging.NoLog{}, atomicDB)
+	if err != nil {
+		panic(err)
+	}
 
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
@@ -383,7 +386,10 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 	ctx := defaultContext()
 
 	m := &atomic.Memory{}
-	m.Initialize(logging.NoLog{}, atomicDB)
+	err := m.Initialize(logging.NoLog{}, atomicDB)
+	if err != nil {
+		panic(err)
+	}
 
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
@@ -1641,7 +1647,10 @@ func TestAtomicImport(t *testing.T) {
 	recipientKey := keys[1]
 
 	m := &atomic.Memory{}
-	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{5}, baseDB))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{5}, baseDB))
+	if err != nil {
+		t.Fatal(err)
+	}
 	vm.Ctx.SharedMemory = m.NewSharedMemory(vm.Ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.Ctx.XChainID)
 
@@ -1667,7 +1676,7 @@ func TestAtomicImport(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := vm.codec.Marshal(utxo)
+	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}

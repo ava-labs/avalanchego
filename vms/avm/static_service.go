@@ -59,7 +59,8 @@ type BuildGenesisReply struct {
 func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	errs := wrappers.Errs{}
 
-	c := codec.New(math.MaxUint32, 1<<20)
+	c := codec.New(codec.DefaultTagName, 1<<20)
+	manager := codec.NewManager(math.MaxUint32)
 	errs.Add(
 		c.RegisterType(&BaseTx{}),
 		c.RegisterType(&CreateAssetTx{}),
@@ -71,6 +72,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
 		c.RegisterType(&secp256k1fx.MintOperation{}),
 		c.RegisterType(&secp256k1fx.Credential{}),
+		manager.RegisterCodec(codecVersion, c),
 	)
 	if errs.Errored() {
 		return errs.Err
@@ -163,7 +165,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 					return errUnknownAssetType
 				}
 			}
-			initialState.Sort(c)
+			initialState.Sort(manager)
 			asset.States = append(asset.States, initialState)
 		}
 		asset.Sort()
@@ -171,7 +173,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 	g.Sort()
 
-	b, err := c.Marshal(&g)
+	b, err := manager.Marshal(codecVersion, &g)
 	if err != nil {
 		return fmt.Errorf("problem marshaling genesis: %w", err)
 	}

@@ -449,7 +449,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 
 	response.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		bytes, err := service.vm.codec.Marshal(utxo)
+		bytes, err := service.vm.codec.Marshal(codecVersion, utxo)
 		if err != nil {
 			return fmt.Errorf("couldn't serialize UTXO %q: %w", utxo.InputID(), err)
 		}
@@ -644,7 +644,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 		txBytes := stopIter.Value()
 
 		tx := rewardTx{}
-		if err := service.vm.codec.Unmarshal(txBytes, &tx); err != nil {
+		if _, err := service.vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
 		if err := tx.Tx.Sign(service.vm.codec, nil); err != nil {
@@ -792,7 +792,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 		txBytes := startIter.Value()
 
 		tx := Tx{}
-		if err := service.vm.codec.Unmarshal(txBytes, &tx); err != nil {
+		if _, err := service.vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
 		if err := tx.Sign(service.vm.codec, nil); err != nil {
@@ -1860,7 +1860,7 @@ func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
 	tx := &Tx{}
-	if err := service.vm.codec.Unmarshal(txBytes, tx); err != nil {
+	if _, err := service.vm.codec.Unmarshal(txBytes, tx); err != nil {
 		return fmt.Errorf("couldn't parse tx: %w", err)
 	}
 	if err := service.vm.mempool.IssueTx(tx); err != nil {
@@ -2054,7 +2054,7 @@ func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, respo
 		stakerBytes := stopIter.Value()
 
 		tx := rewardTx{}
-		if err := service.vm.codec.Unmarshal(stakerBytes, &tx); err != nil {
+		if _, err := service.vm.codec.Unmarshal(stakerBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
 		if err := tx.Tx.Sign(service.vm.codec, nil); err != nil {
@@ -2085,7 +2085,7 @@ func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, respo
 		stakerBytes := startIter.Value()
 
 		tx := Tx{}
-		if err := service.vm.codec.Unmarshal(stakerBytes, &tx); err != nil {
+		if _, err := service.vm.codec.Unmarshal(stakerBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
 		if err := tx.Sign(service.vm.codec, nil); err != nil {

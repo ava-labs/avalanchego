@@ -35,6 +35,7 @@ func TestUTXOVerifyEmpty(t *testing.T) {
 
 func TestUTXOSerialize(t *testing.T) {
 	c := codec.NewDefault()
+	manager := codec.NewDefaultManager()
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -43,6 +44,7 @@ func TestUTXOSerialize(t *testing.T) {
 		c.RegisterType(&secp256k1fx.Input{}),
 		c.RegisterType(&secp256k1fx.TransferInput{}),
 		c.RegisterType(&secp256k1fx.Credential{}),
+		manager.RegisterCodec(codecVersion, c),
 	)
 	if errs.Errored() {
 		t.Fatal(errs.Err)
@@ -113,7 +115,7 @@ func TestUTXOSerialize(t *testing.T) {
 		},
 	}
 
-	utxoBytes, err := c.Marshal(utxo)
+	utxoBytes, err := manager.Marshal(codecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}

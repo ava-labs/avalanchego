@@ -63,7 +63,7 @@ func (t *ImportTx) NumCredentials() int { return t.BaseTx.NumCredentials() + len
 // SyntacticVerify that this transaction is well-formed.
 func (t *ImportTx) SyntacticVerify(
 	ctx *snow.Context,
-	c codec.Codec,
+	c codec.Manager,
 	txFeeAssetID ids.ID,
 	txFee uint64,
 	_ uint64,
@@ -119,7 +119,7 @@ func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 	offset := t.BaseTx.NumCredentials()
 	for i, in := range t.ImportedIns {
 		utxo := avax.UTXO{}
-		if err := vm.codec.Unmarshal(allUTXOBytes[i], &utxo); err != nil {
+		if _, err := vm.codec.Unmarshal(allUTXOBytes[i], &utxo); err != nil {
 			return err
 		}
 

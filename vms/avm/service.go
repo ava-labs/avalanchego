@@ -238,7 +238,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 
 	reply.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		b, err := service.vm.codec.Marshal(utxo)
+		b, err := service.vm.codec.Marshal(codecVersion, utxo)
 		if err != nil {
 			return fmt.Errorf("problem marshalling UTXO: %w", err)
 		}

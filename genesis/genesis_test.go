@@ -38,7 +38,7 @@ func TestGenesis(t *testing.T) {
 		t.Fatal(err)
 	}
 	genesis := platformvm.Genesis{}
-	if err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
+	if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		t.Fatal(err)
 	}
 }
