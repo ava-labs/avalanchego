@@ -5,6 +5,7 @@ package api
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 )
 
@@ -64,14 +65,14 @@ type JSONSpendHeader struct {
 
 // GetTxArgs ...
 type GetTxArgs struct {
-	TxID     ids.ID `json:"txID"`
-	Encoding string `json:"encoding"`
+	TxID     ids.ID              `json:"txID"`
+	Encoding formatting.Encoding `json:"encoding"`
 }
 
 // FormattedTx defines a JSON formatted struct containing a Tx in CB58 format
 type FormattedTx struct {
-	Tx       string `json:"tx"`
-	Encoding string `json:"encoding"`
+	Tx       string              `json:"tx"`
+	Encoding formatting.Encoding `json:"encoding"`
 }
 
 // Index is an address and an associated UTXO.
@@ -94,11 +95,11 @@ type Index struct {
 // If GetUTXOs is called multiple times, with our without [StartIndex], it is not guaranteed
 // that returned UTXOs are unique. That is, the same UTXO may appear in the response of multiple calls.
 type GetUTXOsArgs struct {
-	Addresses   []string    `json:"addresses"`
-	SourceChain string      `json:"sourceChain"`
-	Limit       json.Uint32 `json:"limit"`
-	StartIndex  Index       `json:"startIndex"`
-	Encoding    string      `json:"encoding"`
+	Addresses   []string            `json:"addresses"`
+	SourceChain string              `json:"sourceChain"`
+	Limit       json.Uint32         `json:"limit"`
+	StartIndex  Index               `json:"startIndex"`
+	Encoding    formatting.Encoding `json:"encoding"`
 }
 
 // GetUTXOsReply defines the GetUTXOs replies returned from the API
@@ -112,5 +113,5 @@ type GetUTXOsReply struct {
 	// again and set [StartIndex] to this value.
 	EndIndex Index `json:"endIndex"`
 	// Encoding specifies the encoding format the UTXOs are returned in
-	Encoding string `json:"encoding"`
+	Encoding formatting.Encoding `json:"encoding"`
 }

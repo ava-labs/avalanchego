@@ -11,8 +11,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	cjson "github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
+
+	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
 // Client ...
@@ -29,10 +30,14 @@ func NewClient(uri, chain string, requestTimeout time.Duration) *Client {
 
 // IssueTx issues a transaction to a node and returns the TxID
 func (c *Client) IssueTx(txBytes []byte) (ids.ID, error) {
+	txStr, err := formatting.Encode(formatting.Hex, txBytes)
+	if err != nil {
+		return ids.ID{}, err
+	}
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest("issueTx", &api.FormattedTx{
-		Tx:       formatting.Hex{Bytes: txBytes}.String(),
-		Encoding: formatting.HexEncoding,
+	err = c.requester.SendRequest("issueTx", &api.FormattedTx{
+		Tx:       txStr,
+		Encoding: formatting.Hex,
 	}, res)
 	return res.TxID, err
 }
@@ -51,17 +56,17 @@ func (c *Client) GetTx(txID ids.ID) ([]byte, error) {
 	res := &api.FormattedTx{}
 	err := c.requester.SendRequest("getTx", &api.GetTxArgs{
 		TxID:     txID,
-		Encoding: formatting.HexEncoding,
+		Encoding: formatting.Hex,
 	}, res)
 	if err != nil {
 		return nil, err
 	}
 
-	formatter := formatting.Hex{}
-	if err := formatter.FromString(res.Tx); err != nil {
+	txBytes, err := formatting.Decode(res.Encoding, res.Tx)
+	if err != nil {
 		return nil, err
 	}
-	return formatter.Bytes, nil
+	return txBytes, nil
 }
 
 // GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
@@ -74,19 +79,19 @@ func (c *Client) GetUTXOs(addrs []string, limit uint32, startAddress, startUTXOI
 			Address: startAddress,
 			UTXO:    startUTXOID,
 		},
-		Encoding: formatting.HexEncoding,
+		Encoding: formatting.Hex,
 	}, res)
 	if err != nil {
 		return nil, api.Index{}, err
 	}
 
-	formatter := formatting.Hex{}
 	utxos := make([][]byte, len(res.UTXOs))
 	for i, utxo := range res.UTXOs {
-		if err := formatter.FromString(utxo); err != nil {
+		utxoBytes, err := formatting.Decode(res.Encoding, utxo)
+		if err != nil {
 			return nil, api.Index{}, err
 		}
-		utxos[i] = formatter.Bytes
+		utxos[i] = utxoBytes
 	}
 	return utxos, res.EndIndex, nil
 }
@@ -356,17 +361,21 @@ func (c *Client) MintNFT(
 	payload []byte,
 	to string,
 ) (ids.ID, error) {
+	payloadStr, err := formatting.Encode(formatting.Hex, payload)
+	if err != nil {
+		return ids.ID{}, err
+	}
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest("mintNFT", &MintNFTArgs{
+	err = c.requester.SendRequest("mintNFT", &MintNFTArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: from},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
 		},
 		AssetID:  assetID,
-		Payload:  formatting.Hex{Bytes: payload}.String(),
-		Encoding: formatting.HexEncoding,
+		Payload:  payloadStr,
 		To:       to,
+		Encoding: formatting.Hex,
 	}, res)
 	return res.TxID, err
 }

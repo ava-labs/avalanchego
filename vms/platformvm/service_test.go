@@ -129,13 +129,12 @@ func TestExportKey(t *testing.T) {
 		t.Fatalf("ExportKeyReply is missing secret key prefix: %s", constants.SecretKeyPrefix)
 	}
 	privateKeyString := strings.TrimPrefix(reply.PrivateKey, constants.SecretKeyPrefix)
-	privateKey := formatting.CB58{}
-	if err := privateKey.FromString(privateKeyString); err != nil {
+	privKeyBytes, err := formatting.Decode(formatting.CB58, privateKeyString)
+	if err != nil {
 		t.Fatalf("Failed to parse key: %s", err)
 	}
-
-	if !bytes.Equal(testPrivateKey, privateKey.Bytes) {
-		t.Fatalf("Expected %v, got %v", testPrivateKey, privateKey.Bytes)
+	if !bytes.Equal(testPrivateKey, privKeyBytes) {
+		t.Fatalf("Expected %v, got %v", testPrivateKey, privKeyBytes)
 	}
 }
 
@@ -343,7 +342,7 @@ func TestGetTx(t *testing.T) {
 		}
 		arg := &api.GetTxArgs{
 			TxID:     tx.ID(),
-			Encoding: formatting.CB58Encoding,
+			Encoding: formatting.CB58,
 		}
 		var response api.FormattedTx
 		if err := service.GetTx(nil, arg, &response); err == nil {
@@ -369,11 +368,7 @@ func TestGetTx(t *testing.T) {
 		} else if err := service.GetTx(nil, arg, &response); err != nil {
 			t.Fatalf("failed test '%s': %s", test.description, err)
 		} else {
-			encoding, err := service.vm.encodingManager.GetEncoding(response.Encoding)
-			if err != nil {
-				t.Fatalf("failed tet '%s': %s", test.description, err)
-			}
-			responseTxBytes, err := encoding.ConvertString(response.Tx)
+			responseTxBytes, err := formatting.Decode(response.Encoding, response.Tx)
 			if err != nil {
 				t.Fatalf("failed test '%s': %s", test.description, err)
 			}

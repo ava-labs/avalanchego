@@ -61,11 +61,7 @@ type FormattedAssetID struct {
 func (service *Service) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
 	service.vm.ctx.Log.Info("AVM: IssueTx called with %s", args.Tx)
 
-	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
-	if err != nil {
-		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
-	}
-	txBytes, err := encoding.ConvertString(args.Tx)
+	txBytes, err := formatting.Decode(args.Encoding, args.Tx)
 	if err != nil {
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
@@ -108,11 +104,6 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.F
 		return errNilTxID
 	}
 
-	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
-	if err != nil {
-		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
-	}
-
 	tx := UniqueTx{
 		vm:   service.vm,
 		txID: args.TxID,
@@ -121,8 +112,12 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.F
 		return errUnknownTx
 	}
 
-	reply.Tx = encoding.ConvertBytes(tx.Bytes())
-	reply.Encoding = encoding.Encoding()
+	var err error
+	reply.Tx, err = formatting.Encode(args.Encoding, tx.Bytes())
+	if err != nil {
+		return fmt.Errorf("couldn't encode tx as string: %s", err)
+	}
+	reply.Encoding = args.Encoding
 	return nil
 }
 
@@ -135,11 +130,6 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 	}
 	if len(args.Addresses) > maxGetUTXOsAddrs {
 		return fmt.Errorf("number of addresses given, %d, exceeds maximum, %d", len(args.Addresses), maxGetUTXOsAddrs)
-	}
-
-	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
-	if err != nil {
-		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
 	}
 
 	var sourceChain ids.ID
@@ -165,6 +155,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 	startAddr := ids.ShortEmpty
 	startUTXO := ids.Empty
 	if args.StartIndex.Address != "" || args.StartIndex.UTXO != "" {
+		var err error
 		startAddr, err = service.vm.ParseLocalAddress(args.StartIndex.Address)
 		if err != nil {
 			return fmt.Errorf("couldn't parse start index address %q: %w", args.StartIndex.Address, err)
@@ -179,6 +170,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 		utxos     []*avax.UTXO
 		endAddr   ids.ShortID
 		endUTXOID ids.ID
+		err       error
 	)
 	if sourceChain == service.vm.ctx.ChainID {
 		utxos, endAddr, endUTXOID, err = service.vm.GetUTXOs(
@@ -207,7 +199,10 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 		if err != nil {
 			return fmt.Errorf("problem marshalling UTXO: %w", err)
 		}
-		reply.UTXOs[i] = encoding.ConvertBytes(b)
+		reply.UTXOs[i], err = formatting.Encode(args.Encoding, b)
+		if err != nil {
+			return fmt.Errorf("couldn't encode UTXO %s as string: %s", utxo.InputID(), err)
+		}
 	}
 
 	endAddress, err := service.vm.FormatLocalAddress(endAddr)
@@ -218,7 +213,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 	reply.EndIndex.Address = endAddress
 	reply.EndIndex.UTXO = endUTXOID.String()
 	reply.NumFetched = json.Uint64(len(utxos))
-	reply.Encoding = encoding.Encoding()
+	reply.Encoding = args.Encoding
 	return nil
 }
 
@@ -794,7 +789,10 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
 
-	reply.PrivateKey = constants.SecretKeyPrefix + formatting.CB58{Bytes: sk.Bytes()}.String()
+	// We assume that the maximum size of a byte slice that
+	// can be stringified is at least the length of a SECP256K1 private key
+	privKeyStr, _ := formatting.Encode(formatting.CB58, sk.Bytes())
+	reply.PrivateKey = constants.SecretKeyPrefix + privKeyStr
 	return db.Close()
 }
 
@@ -834,13 +832,13 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
 	}
 	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
-	formattedPrivateKey := formatting.CB58{}
-	if err := formattedPrivateKey.FromString(trimmedPrivateKey); err != nil {
+	privKeyBytes, err := formatting.Decode(formatting.CB58, trimmedPrivateKey)
+	if err != nil {
 		return fmt.Errorf("problem parsing private key: %w", err)
 	}
 
 	factory := crypto.FactorySECP256K1R{}
-	skIntf, err := factory.ToPrivateKey(formattedPrivateKey.Bytes)
+	skIntf, err := factory.ToPrivateKey(privKeyBytes)
 	if err != nil {
 		return fmt.Errorf("problem parsing private key: %w", err)
 	}
@@ -1302,11 +1300,11 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 
 // MintNFTArgs are arguments for passing into MintNFT requests
 type MintNFTArgs struct {
-	api.JSONSpendHeader        // User, password, from addrs, change addr
-	AssetID             string `json:"assetID"`
-	Payload             string `json:"payload"`
-	To                  string `json:"to"`
-	Encoding            string `json:"encoding"`
+	api.JSONSpendHeader                     // User, password, from addrs, change addr
+	AssetID             string              `json:"assetID"`
+	Payload             string              `json:"payload"`
+	To                  string              `json:"to"`
+	Encoding            formatting.Encoding `json:"encoding"`
 }
 
 // MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
@@ -1323,11 +1321,7 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
-	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
-	if err != nil {
-		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
-	}
-	payloadBytes, err := encoding.ConvertString(args.Payload)
+	payloadBytes, err := formatting.Decode(args.Encoding, args.Payload)
 	if err != nil {
 		return fmt.Errorf("problem decoding payload bytes: %w", err)
 	}

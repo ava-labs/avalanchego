@@ -6,9 +6,8 @@ package keystore
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/formatting"
-
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
@@ -40,17 +39,28 @@ func (c *Client) ListUsers() ([]string, error) {
 
 // ExportUser returns the byte representation of the requested [user]
 func (c *Client) ExportUser(user api.UserPass) ([]byte, error) {
-	res := &ExportUserReply{}
+	res := &ExportUserReply{
+		Encoding: formatting.Hex,
+	}
 	err := c.requester.SendRequest("exportUser", &user, res)
-	return res.User.Bytes, err
+	if err != nil {
+		return nil, err
+	}
+	return formatting.Decode(res.Encoding, res.User)
 }
 
 // ImportUser imports the keystore user in [account] under [user]
 func (c *Client) ImportUser(user api.UserPass, account []byte) (bool, error) {
+	accountStr, err := formatting.Encode(formatting.Hex, account)
+	if err != nil {
+		return false, err
+	}
+
 	res := &api.SuccessResponse{}
-	err := c.requester.SendRequest("importUser", &ImportUserArgs{
+	err = c.requester.SendRequest("importUser", &ImportUserArgs{
 		UserPass: user,
-		User:     formatting.CB58{Bytes: account},
+		User:     accountStr,
+		Encoding: formatting.Hex,
 	}, res)
 	return res.Success, err
 }

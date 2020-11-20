@@ -80,19 +80,19 @@ func (c *Client) GetUTXOs(addresses []string) ([][]byte, api.Index, error) {
 	res := &api.GetUTXOsReply{}
 	err := c.requester.SendRequest("getUTXOs", &api.GetUTXOsArgs{
 		Addresses: addresses,
-		Encoding:  formatting.HexEncoding,
+		Encoding:  formatting.Hex,
 	}, res)
 	if err != nil {
 		return nil, api.Index{}, err
 	}
 
-	formatter := formatting.Hex{}
 	utxos := make([][]byte, len(res.UTXOs))
 	for i, utxo := range res.UTXOs {
-		if err := formatter.FromString(utxo); err != nil {
+		utxoBytes, err := formatting.Decode(res.Encoding, utxo)
+		if err != nil {
 			return nil, api.Index{}, err
 		}
-		utxos[i] = formatter.Bytes
+		utxos[i] = utxoBytes
 	}
 	return utxos, res.EndIndex, nil
 }
@@ -316,8 +316,13 @@ func (c *Client) CreateBlockchain(
 	name string,
 	genesisData []byte,
 ) (ids.ID, error) {
+	genesisDataStr, err := formatting.Encode(formatting.Hex, genesisData)
+	if err != nil {
+		return ids.ID{}, err
+	}
+
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest("createBlockchain", &CreateBlockchainArgs{
+	err = c.requester.SendRequest("createBlockchain", &CreateBlockchainArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: from},
@@ -327,8 +332,8 @@ func (c *Client) CreateBlockchain(
 		VMID:        vmID,
 		FxIDs:       fxIDs,
 		Name:        name,
-		GenesisData: formatting.Hex{Bytes: genesisData}.String(),
-		Encoding:    formatting.HexEncoding,
+		GenesisData: genesisDataStr,
+		Encoding:    formatting.Hex,
 	}, res)
 	return res.TxID, err
 }
@@ -369,12 +374,16 @@ func (c *Client) GetBlockchains() ([]APIBlockchain, error) {
 
 // IssueTx issues the transaction and returns its transaction ID
 func (c *Client) IssueTx(txBytes []byte) (ids.ID, error) {
-	res := &api.JSONTxID{}
-	err := c.requester.SendRequest("issueTx", &api.FormattedTx{
-		Tx:       formatting.Hex{Bytes: txBytes}.String(),
-		Encoding: formatting.HexEncoding,
-	}, res)
+	txStr, err := formatting.Encode(formatting.Hex, txBytes)
+	if err != nil {
+		return ids.ID{}, err
+	}
 
+	res := &api.JSONTxID{}
+	err = c.requester.SendRequest("issueTx", &api.FormattedTx{
+		Tx:       txStr,
+		Encoding: formatting.Hex,
+	}, res)
 	return res.TxID, err
 }
 
@@ -383,17 +392,12 @@ func (c *Client) GetTx(txID ids.ID) ([]byte, error) {
 	res := &api.FormattedTx{}
 	err := c.requester.SendRequest("getTx", &api.GetTxArgs{
 		TxID:     txID,
-		Encoding: formatting.HexEncoding,
+		Encoding: formatting.Hex,
 	}, res)
 	if err != nil {
 		return nil, err
 	}
-
-	formatter := formatting.Hex{}
-	if err := formatter.FromString(res.Tx); err != nil {
-		return nil, err
-	}
-	return formatter.Bytes, nil
+	return formatting.Decode(res.Encoding, res.Tx)
 }
 
 // GetTxStatus returns the status of the transaction corresponding to [txID]
