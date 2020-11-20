@@ -54,9 +54,8 @@ type UserDB struct {
 
 // Keystore is the RPC interface for keystore management
 type Keystore struct {
-	lock sync.Mutex
-	log  logging.Logger
-
+	lock  sync.Mutex
+	log   logging.Logger
 	codec codec.Codec
 
 	// Key: username
@@ -150,13 +149,24 @@ func (ks *Keystore) ListUsers(_ *http.Request, args *struct{}, reply *ListUsersR
 	return it.Error()
 }
 
+// ExportUserArgs ...
+type ExportUserArgs struct {
+	// The username and password
+	api.UserPass
+	// The encoding for the exported user ("hex" or "cb58")
+	Encoding formatting.Encoding `json:"encoding"`
+}
+
 // ExportUserReply is the reply from ExportUser
 type ExportUserReply struct {
-	User formatting.CB58 `json:"user"`
+	// String representation of the user
+	User string `json:"user"`
+	// The encoding for the exported user ("hex" or "cb58")
+	Encoding formatting.Encoding `json:"encoding"`
 }
 
 // ExportUser exports a serialized encoding of a user's information complete with encrypted database values
-func (ks *Keystore) ExportUser(_ *http.Request, args *api.UserPass, reply *ExportUserReply) error {
+func (ks *Keystore) ExportUser(_ *http.Request, args *ExportUserArgs, reply *ExportUserReply) error {
 	ks.log.Info("Keystore: ExportUser called for %s", args.Username)
 
 	ks.lock.Lock()
@@ -186,18 +196,29 @@ func (ks *Keystore) ExportUser(_ *http.Request, args *api.UserPass, reply *Expor
 		return err
 	}
 
+	// Get byte representation of user
 	b, err := ks.codec.Marshal(&userData)
 	if err != nil {
 		return err
 	}
-	reply.User.Bytes = b
+
+	// Encode the user from bytes to string
+	reply.User, err = formatting.Encode(args.Encoding, b)
+	if err != nil {
+		return fmt.Errorf("couldn't encode user to string: %w", err)
+	}
+	reply.Encoding = args.Encoding
 	return nil
 }
 
 // ImportUserArgs are arguments for ImportUser
 type ImportUserArgs struct {
+	// The username and password of the user being imported
 	api.UserPass
-	User formatting.CB58 `json:"user"`
+	// The string representation of the user
+	User string `json:"user"`
+	// The encoding of [User] ("hex" or "cb58")
+	Encoding formatting.Encoding `json:"encoding"`
 }
 
 // ImportUser imports a serialized encoding of a user's information complete with encrypted database values,
@@ -212,12 +233,18 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *api
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
+	// Decode the user from string to bytes
+	userBytes, err := formatting.Decode(args.Encoding, args.User)
+	if err != nil {
+		return fmt.Errorf("couldn't decode 'user' to bytes: %w", err)
+	}
+
 	if usr, err := ks.getUser(args.Username); err == nil || usr != nil {
 		return fmt.Errorf("user already exists: %s", args.Username)
 	}
 
 	userData := UserDB{}
-	if err := ks.codec.Unmarshal(args.User.Bytes, &userData); err != nil {
+	if err := ks.codec.Unmarshal(userBytes, &userData); err != nil {
 		return err
 	}
 	if !userData.Hash.Check(args.Password) {
