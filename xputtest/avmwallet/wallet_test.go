@@ -210,7 +210,7 @@ func TestWalletString(t *testing.T) {
 	w.ImportKey(sk.(*crypto.PrivateKeySECP256K1R))
 
 	expected := "Keychain:" +
-		"\n    Key[0]: Key: ZrYnAmArnk97JGzkq3kxTmFuKQnmajc86Xyd3JXC29meZ7znH Address: EHQiyKpq1VxkyNzt9bj1BLn5tzQ6Vt96q" +
+		"\n    Key[0]: Key: 0x4a9982985c39a804874c623cd49ea77d635f927cb96b3fb73b9359a24fb40c9e3ea07c56 Address: EHQiyKpq1VxkyNzt9bj1BLn5tzQ6Vt96q" +
 		"\nUTXOs (length=0):"
 	if str := w.String(); str != expected {
 		t.Fatalf("got:\n%s\n\nexpected:\n%s", str, expected)

@@ -32,7 +32,7 @@ type UnsignedCreateSubnetTx struct {
 // Verify this transaction is well-formed
 func (tx *UnsignedCreateSubnetTx) Verify(
 	ctx *snow.Context,
-	c codec.Codec,
+	c codec.Manager,
 	feeAmount uint64,
 	feeAssetID ids.ID,
 ) error {

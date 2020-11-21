@@ -63,7 +63,7 @@ func (tx *UnsignedAddDelegatorTx) Weight() uint64 {
 // Verify return nil iff [tx] is valid
 func (tx *UnsignedAddDelegatorTx) Verify(
 	ctx *snow.Context,
-	c codec.Codec,
+	c codec.Manager,
 	minDelegatorStake uint64,
 	minStakeDuration time.Duration,
 	maxStakeDuration time.Duration,

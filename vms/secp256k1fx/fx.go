@@ -53,7 +53,7 @@ func (fx *Fx) Initialize(vmIntf interface{}) error {
 	fx.SECPFactory = crypto.FactorySECP256K1R{
 		Cache: cache.LRU{Size: defaultCacheSize},
 	}
-	c := fx.VM.Codec()
+	c := fx.VM.CodecRegistry()
 	errs := wrappers.Errs{}
 	errs.Add(
 		c.RegisterType(&TransferInput{}),

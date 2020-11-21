@@ -6,6 +6,8 @@ package ids
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"sort"
 
 	"github.com/ava-labs/avalanchego/utils"
@@ -14,8 +16,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// Empty is a useful all zero value
-var Empty = ID{}
+const (
+	// The encoding used to convert IDs from bytes to string and vice versa
+	defaultEncoding = formatting.CB58
+)
+
+var (
+	// Empty is a useful all zero value
+	Empty            = ID{}
+	errMissingQuotes = errors.New("first and last characters should be quotes")
+)
 
 // ID wraps a 32 byte hash used as an identifier
 type ID [32]byte
@@ -27,33 +37,43 @@ func ToID(bytes []byte) (ID, error) {
 
 // FromString is the inverse of ID.String()
 func FromString(idStr string) (ID, error) {
-	cb58 := formatting.CB58{}
-	if err := cb58.FromString(idStr); err != nil {
+	bytes, err := formatting.Decode(defaultEncoding, idStr)
+	if err != nil {
 		return ID{}, err
 	}
-	return ToID(cb58.Bytes)
+	return ToID(bytes)
 }
 
 // MarshalJSON ...
 func (id ID) MarshalJSON() ([]byte, error) {
-	return formatting.CB58{Bytes: id[:]}.MarshalJSON()
+	str, err := formatting.Encode(defaultEncoding, id[:])
+	if err != nil {
+		return nil, err
+	}
+	return []byte("\"" + str + "\""), nil
 }
 
 // UnmarshalJSON ...
 func (id *ID) UnmarshalJSON(b []byte) error {
-	if string(b) == "null" {
+	str := string(b)
+	if str == "null" { // If "null", do nothing
 		return nil
+	} else if len(str) < 2 {
+		return errMissingQuotes
 	}
-	cb58 := formatting.CB58{}
-	if err := cb58.UnmarshalJSON(b); err != nil {
-		return err
+
+	lastIndex := len(str) - 1
+	if str[0] != '"' || str[lastIndex] != '"' {
+		return errMissingQuotes
 	}
-	newID, err := ToID(cb58.Bytes)
+
+	// Parse CB58 formatted string to bytes
+	bytes, err := formatting.Decode(defaultEncoding, str[1:lastIndex])
 	if err != nil {
-		return err
+		return fmt.Errorf("couldn't decode ID to bytes: %w", err)
 	}
-	*id = newID
-	return nil
+	*id, err = ToID(bytes)
+	return err
 }
 
 // Prefix this id to create a more selective id. This can be used to store
@@ -99,7 +119,10 @@ func (id ID) Bit(i uint) int {
 func (id ID) Hex() string { return hex.EncodeToString(id[:]) }
 
 func (id ID) String() string {
-	return formatting.CB58{Bytes: id[:]}.String()
+	// We assume that the maximum size of a byte slice that
+	// can be stringified is at least the length of an ID
+	s, _ := formatting.Encode(defaultEncoding, id[:])
+	return s
 }
 
 type sortIDData []ID

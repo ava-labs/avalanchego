@@ -33,12 +33,11 @@ func ToShortID(bytes []byte) (ShortID, error) {
 
 // ShortFromString is the inverse of ShortID.String()
 func ShortFromString(idStr string) (ShortID, error) {
-	cb58 := formatting.CB58{}
-	err := cb58.FromString(idStr)
+	bytes, err := formatting.Decode(defaultEncoding, idStr)
 	if err != nil {
 		return ShortID{}, err
 	}
-	return ToShortID(cb58.Bytes)
+	return ToShortID(bytes)
 }
 
 // ShortFromPrefixedString returns a ShortID assuming the cb58 format is
@@ -56,25 +55,34 @@ func (id ShortID) MarshalJSON() ([]byte, error) {
 	if id.IsZero() {
 		return []byte("null"), nil
 	}
-	cb58 := formatting.CB58{Bytes: id.ID[:]}
-	return cb58.MarshalJSON()
+	str, err := formatting.Encode(defaultEncoding, id.ID[:])
+	if err != nil {
+		return nil, err
+	}
+	return []byte("\"" + str + "\""), nil
 }
 
 // UnmarshalJSON ...
 func (id *ShortID) UnmarshalJSON(b []byte) error {
-	if string(b) == "null" {
+	str := string(b)
+	if str == "null" { // If "null", do nothing
 		return nil
+	} else if len(str) < 2 {
+		return errMissingQuotes
 	}
-	cb58 := formatting.CB58{}
-	if err := cb58.UnmarshalJSON(b); err != nil {
-		return err
+
+	lastIndex := len(str) - 1
+	if str[0] != '"' || str[lastIndex] != '"' {
+		return errMissingQuotes
 	}
-	newID, err := ToShortID(cb58.Bytes)
+
+	// Parse CB58 formatted string to bytes
+	bytes, err := formatting.Decode(defaultEncoding, str[1:lastIndex])
 	if err != nil {
-		return err
+		return fmt.Errorf("couldn't decode ID to bytes: %w", err)
 	}
-	*id = newID
-	return nil
+	*id, err = ToShortID(bytes)
+	return err
 }
 
 // IsZero returns true if the value has not been initialized
@@ -101,9 +109,10 @@ func (id ShortID) String() string {
 	if id.IsZero() {
 		return "nil"
 	}
-	bytes := id.Bytes()
-	cb58 := formatting.CB58{Bytes: bytes}
-	return cb58.String()
+	// We assume that the maximum size of a byte slice that
+	// can be stringified is at least the length of an ID
+	str, _ := formatting.Encode(defaultEncoding, id.Bytes())
+	return str
 }
 
 // PrefixedString returns the String representation with a prefix added

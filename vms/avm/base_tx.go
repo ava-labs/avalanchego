@@ -26,7 +26,7 @@ type BaseTx struct {
 // SyntacticVerify that this transaction is well-formed.
 func (t *BaseTx) SyntacticVerify(
 	ctx *snow.Context,
-	c codec.Codec,
+	c codec.Manager,
 	txFeeAssetID ids.ID,
 	txFee uint64,
 	_ uint64,
