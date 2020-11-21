@@ -598,8 +598,6 @@ func TestGetCurrentValidators(t *testing.T) {
 		t.Fatal(err)
 	case len(response.Validators) != len(genesis.Validators):
 		t.Fatalf("should be %d validators but are %d", len(genesis.Validators), len(response.Validators))
-	case len(response.Delegators) != 0:
-		t.Fatalf("should be 0 delegators but are %d", len(response.Delegators))
 	}
 
 	for _, vdr := range genesis.Validators {
@@ -670,8 +668,6 @@ func TestGetCurrentValidators(t *testing.T) {
 		t.Fatal(err)
 	case len(response.Validators) != len(genesis.Validators):
 		t.Fatalf("should be %d validators but are %d", len(genesis.Validators), len(response.Validators))
-	case len(response.Delegators) != 1:
-		t.Fatalf("should be 1 delegators but are %d", len(response.Delegators))
 	}
 
 	// Make sure the delegator is there
