@@ -28,7 +28,7 @@ func (fx *Fx) Initialize(vmIntf interface{}) error {
 	}
 
 	log := fx.VM.Logger()
-	log.Debug("initializing nft fx")
+	log.Debug("Initializing nft fx")
 
 	c := fx.VM.CodecRegistry()
 	errs := wrappers.Errs{}
