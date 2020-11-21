@@ -101,7 +101,7 @@ type rpcBlock struct {
 	Transactions []rpcTransaction `json:"transactions"`
 	UncleHashes  []common.Hash    `json:"uncles"`
 	Version      uint32           `json:"version"`
-	ExtraData    *[]byte          `json:"blockExtraData"`
+	BlockExtraData    *[]byte          `json:"blockExtraData"`
 }
 
 func (ec *Client) getBlock(ctx context.Context, method string, args ...interface{}) (*types.Block, error) {
@@ -166,7 +166,7 @@ func (ec *Client) getBlock(ctx context.Context, method string, args ...interface
 		}
 		txs[i] = tx.tx
 	}
-	return types.NewBlockWithHeader(head).WithBody(txs, uncles, body.Version, body.ExtraData), nil
+	return types.NewBlockWithHeader(head).WithBody(txs, uncles, body.Version, body.BlockExtraData), nil
 }
 
 // HeaderByHash returns the block header with the given hash.

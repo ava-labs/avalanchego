@@ -1162,7 +1162,7 @@ func RPCMarshalBlock(block *types.Block, inclTx bool, fullTx bool) (map[string]i
 	fields["size"] = hexutil.Uint64(block.Size())
 
 	if len(block.ExtraData()) != 0 {
-		fields["blockExtraData"] = hexutil.Encode(block.ExtraData())
+		fields["blockExtraData"] = block.ExtraData()
 	}
 
 	if inclTx {
