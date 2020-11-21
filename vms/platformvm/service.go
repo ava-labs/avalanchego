@@ -616,9 +616,6 @@ type GetCurrentValidatorsArgs struct {
 // Each validator contains a list of delegators to itself.
 type GetCurrentValidatorsReply struct {
 	Validators []interface{} `json:"validators"`
-	// Delegators is deprecated. Do not use Delegators.
-	// Instead, use the Delegators field of each APIPrimaryValidator
-	Delegators []interface{} `json:"delegators"`
 }
 
 // GetCurrentValidators returns current validators and delegators
@@ -626,7 +623,6 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	service.vm.Ctx.Log.Info("Platform: GetCurrentValidators called")
 
 	reply.Validators = []interface{}{}
-	reply.Delegators = []interface{}{}
 
 	// Validator's node ID as string --> Delegators to them
 	vdrTodelegators := map[string][]APIPrimaryDelegator{}
@@ -681,7 +677,6 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				RewardOwner:     rewardOwner,
 				PotentialReward: &potentialReward,
 			}
-			reply.Delegators = append(reply.Delegators, delegator)
 			vdrTodelegators[delegator.NodeID] = append(vdrTodelegators[delegator.NodeID], delegator)
 		case *UnsignedAddValidatorTx:
 			nodeID := staker.Validator.ID()
