@@ -8,16 +8,16 @@ import (
 )
 
 // Controller defines the apis available to the AVM
-type V1StaticController struct {
+type StaticController struct {
 }
 
 // NewStaticController create a new instance of the Controller
-func NewStaticController() *V1StaticController {
-	return &V1StaticController{}
+func NewStaticController() *StaticController {
+	return &StaticController{}
 }
 
 // BuildGenesis returns the UTXOs such that at least one address in [args.Addresses] is
 // referenced in the UTXO.
-func (c *V1StaticController) BuildGenesis(_ *http.Request, args *vmargs.BuildGenesisArgs, reply *vmargs.BuildGenesisReply) error {
+func (c *StaticController) BuildGenesis(_ *http.Request, args *vmargs.BuildGenesisArgs, reply *vmargs.BuildGenesisReply) error {
 	return internalavm.CreateStaticService().BuildGenesis(nil, args, reply)
 }

@@ -7,17 +7,17 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/vmargs"
 )
 
-// V2StaticController defines the apis available to the AVM
-type V2StaticController struct {
+// StaticController defines the apis available to the AVM
+type StaticController struct {
 }
 
 // NewStaticController create a new instance of the Static Controller
-func NewStaticController() *V2StaticController {
-	return &V2StaticController{}
+func NewStaticController() *StaticController {
+	return &StaticController{}
 }
 
 // BuildGenesis returns the UTXOs such that at least one address in [args.Addresses] is
 // referenced in the UTXO.
-func (c *V2StaticController) BuildGenesis(_ *http.Request, args *vmargs.BuildGenesisArgs, reply *vmargs.BuildGenesisReply) error {
+func (c *StaticController) BuildGenesis(_ *http.Request, args *vmargs.BuildGenesisArgs, reply *vmargs.BuildGenesisReply) error {
 	return static.BuildGenesis(args, reply)
 }
