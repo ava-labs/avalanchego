@@ -9,9 +9,10 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/ava-labs/avalanchego/api/apiargs"
+
 	"github.com/gorilla/rpc/v2"
 
-	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/encdb"
@@ -113,7 +114,7 @@ func (ks *Keystore) getUser(username string) (*password.Hash, error) {
 }
 
 // CreateUser creates an empty user with the provided username and password
-func (ks *Keystore) CreateUser(_ *http.Request, args *api.UserPass, reply *api.SuccessResponse) error {
+func (ks *Keystore) CreateUser(_ *http.Request, args *apiargs.UserPass, reply *apiargs.SuccessResponse) error {
 	ks.log.Info("Keystore: CreateUser called with %.*s", maxUserLen, args.Username)
 
 	ks.lock.Lock()
@@ -152,7 +153,7 @@ func (ks *Keystore) ListUsers(_ *http.Request, args *struct{}, reply *ListUsersR
 // ExportUserArgs ...
 type ExportUserArgs struct {
 	// The username and password
-	api.UserPass
+	apiargs.UserPass
 	// The encoding for the exported user ("hex" or "cb58")
 	Encoding formatting.Encoding `json:"encoding"`
 }
@@ -214,7 +215,7 @@ func (ks *Keystore) ExportUser(_ *http.Request, args *ExportUserArgs, reply *Exp
 // ImportUserArgs are arguments for ImportUser
 type ImportUserArgs struct {
 	// The username and password of the user being imported
-	api.UserPass
+	apiargs.UserPass
 	// The string representation of the user
 	User string `json:"user"`
 	// The encoding of [User] ("hex" or "cb58")
@@ -223,7 +224,7 @@ type ImportUserArgs struct {
 
 // ImportUser imports a serialized encoding of a user's information complete with encrypted database values,
 // integrity checks the password, and adds it to the database
-func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *api.SuccessResponse) error {
+func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *apiargs.SuccessResponse) error {
 	ks.log.Info("Keystore: ImportUser called for %s", args.Username)
 
 	if args.Username == "" {
@@ -280,7 +281,7 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *api
 }
 
 // DeleteUser deletes user with the provided username and password.
-func (ks *Keystore) DeleteUser(_ *http.Request, args *api.UserPass, reply *api.SuccessResponse) error {
+func (ks *Keystore) DeleteUser(_ *http.Request, args *apiargs.UserPass, reply *apiargs.SuccessResponse) error {
 	ks.log.Info("Keystore: DeleteUser called with %s", args.Username)
 
 	if args.Username == "" {

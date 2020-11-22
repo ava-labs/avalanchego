@@ -1,17 +1,21 @@
-package static
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package internalavm
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
+	"net/http"
+
+	"github.com/ava-labs/avalanchego/vms/avm/vmargs"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/avm/internalavm"
-	"github.com/ava-labs/avalanchego/vms/avm/vmargs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -20,18 +24,26 @@ var (
 	errUnknownAssetType = errors.New("unknown asset type")
 )
 
+// StaticService defines the base service for the asset vm
+type StaticService struct{}
+
+// CreateStaticService ...
+func CreateStaticService() *StaticService {
+	return &StaticService{}
+}
+
 // BuildGenesis returns the UTXOs such that at least one address in [args.Addresses] is
 // referenced in the UTXO.
-func BuildGenesis(args *vmargs.BuildGenesisArgs, reply *vmargs.BuildGenesisReply) error {
+func (ss *StaticService) BuildGenesis(_ *http.Request, args *vmargs.BuildGenesisArgs, reply *vmargs.BuildGenesisReply) error {
 	errs := wrappers.Errs{}
 
 	c := codec.New(math.MaxUint32, 1<<20)
 	errs.Add(
-		c.RegisterType(&internalavm.BaseTx{}),
-		c.RegisterType(&internalavm.CreateAssetTx{}),
-		c.RegisterType(&internalavm.OperationTx{}),
-		c.RegisterType(&internalavm.ImportTx{}),
-		c.RegisterType(&internalavm.ExportTx{}),
+		c.RegisterType(&BaseTx{}),
+		c.RegisterType(&CreateAssetTx{}),
+		c.RegisterType(&OperationTx{}),
+		c.RegisterType(&ImportTx{}),
+		c.RegisterType(&ExportTx{}),
 		c.RegisterType(&secp256k1fx.TransferInput{}),
 		c.RegisterType(&secp256k1fx.MintOutput{}),
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
@@ -42,17 +54,17 @@ func BuildGenesis(args *vmargs.BuildGenesisArgs, reply *vmargs.BuildGenesisReply
 		return errs.Err
 	}
 
-	g := internalavm.Genesis{}
+	g := Genesis{}
 	for assetAlias, assetDefinition := range args.GenesisData {
 		assetMemo, err := formatting.Decode(args.Encoding, assetDefinition.Memo)
 
 		if err != nil {
 			return fmt.Errorf("problem formatting asset definition memo due to: %w", err)
 		}
-		asset := internalavm.GenesisAsset{
+		asset := GenesisAsset{
 			Alias: assetAlias,
-			CreateAssetTx: internalavm.CreateAssetTx{
-				BaseTx: internalavm.BaseTx{BaseTx: avax.BaseTx{
+			CreateAssetTx: CreateAssetTx{
+				BaseTx: BaseTx{BaseTx: avax.BaseTx{
 					NetworkID:    uint32(args.NetworkID),
 					BlockchainID: ids.Empty,
 					Memo:         assetMemo,
@@ -63,7 +75,7 @@ func BuildGenesis(args *vmargs.BuildGenesisArgs, reply *vmargs.BuildGenesisReply
 			},
 		}
 		if len(assetDefinition.InitialState) > 0 {
-			initialState := &internalavm.InitialState{
+			initialState := &InitialState{
 				FxID: 0, // TODO: Should lookup secp256k1fx FxID
 			}
 			for assetType, initialStates := range assetDefinition.InitialState {

@@ -19,6 +19,5 @@ func NewStaticController() *V1StaticController {
 // BuildGenesis returns the UTXOs such that at least one address in [args.Addresses] is
 // referenced in the UTXO.
 func (c *V1StaticController) BuildGenesis(_ *http.Request, args *vmargs.BuildGenesisArgs, reply *vmargs.BuildGenesisReply) error {
-
 	return internalavm.CreateStaticService().BuildGenesis(nil, args, reply)
 }

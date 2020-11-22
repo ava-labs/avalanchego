@@ -132,6 +132,5 @@ func (service *Service) GetUTXOs(args *vmargs.GetUTXOsArgs) (*vmargs.GetUTXOsRep
 }
 
 func (service *Service) Log() logging.Logger {
-
 	return service.vm.Context().Log
 }
