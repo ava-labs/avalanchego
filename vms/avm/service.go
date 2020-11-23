@@ -34,19 +34,20 @@ const (
 )
 
 var (
-	errUnknownAssetID         = errors.New("unknown asset ID")
-	errTxNotCreateAsset       = errors.New("transaction doesn't create an asset")
-	errNoHolders              = errors.New("initialHolders must not be empty")
-	errNoMinters              = errors.New("no minters provided")
-	errInvalidAmount          = errors.New("amount must be positive")
-	errNoOutputs              = errors.New("no outputs to send")
-	errSpendOverflow          = errors.New("spent amount overflows uint64")
-	errInvalidMintAmount      = errors.New("amount minted must be positive")
-	errAddressesCantMintAsset = errors.New("provided addresses don't have the authority to mint the provided asset")
-	errInvalidUTXO            = errors.New("invalid utxo")
-	errNilTxID                = errors.New("nil transaction ID")
-	errNoAddresses            = errors.New("no addresses provided")
-	errNoKeys                 = errors.New("from addresses have no keys or funds")
+	errUnknownAssetID           = errors.New("unknown asset ID")
+	errTxNotCreateAsset         = errors.New("transaction doesn't create an asset")
+	errNoHolders                = errors.New("initialHolders must not be empty")
+	errNoMinters                = errors.New("no minters provided")
+	errInvalidAmount            = errors.New("amount must be positive")
+	errNoOutputs                = errors.New("no outputs to send")
+	errSpendOverflow            = errors.New("spent amount overflows uint64")
+	errInvalidMintAmount        = errors.New("amount minted must be positive")
+	errAddressesCantMintAsset   = errors.New("provided addresses don't have the authority to mint the provided asset")
+	errAddressesCantFreezeAsset = errors.New("provided addresses don't have the authority to freeze the provided asset")
+	errInvalidUTXO              = errors.New("invalid utxo")
+	errNilTxID                  = errors.New("nil transaction ID")
+	errNoAddresses              = errors.New("no addresses provided")
+	errNoKeys                   = errors.New("from addresses have no keys or funds")
 )
 
 // Service defines the base service for the asset vm
@@ -641,6 +642,136 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 	initialState := &InitialState{
 		FxID: 0, // TODO: Should lookup secp256k1fx FxID
 		Outs: make([]verify.State, 0, len(args.MinterSets)),
+	}
+	for _, owner := range args.MinterSets {
+		minter := &secp256k1fx.MintOutput{
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: uint32(owner.Threshold),
+				Addrs:     make([]ids.ShortID, 0, len(owner.Minters)),
+			},
+		}
+		for _, address := range owner.Minters {
+			addr, err := service.vm.ParseLocalAddress(address)
+			if err != nil {
+				return err
+			}
+			minter.Addrs = append(minter.Addrs, addr)
+		}
+		ids.SortShortIDs(minter.Addrs)
+		initialState.Outs = append(initialState.Outs, minter)
+	}
+	initialState.Sort(service.vm.codec)
+
+	tx := Tx{UnsignedTx: &CreateAssetTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    service.vm.ctx.NetworkID,
+			BlockchainID: service.vm.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+		}},
+		Name:         args.Name,
+		Symbol:       args.Symbol,
+		Denomination: args.Denomination,
+		States:       []*InitialState{initialState},
+	}}
+	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
+		return err
+	}
+
+	assetID, err := service.vm.IssueTx(tx.Bytes())
+	if err != nil {
+		return fmt.Errorf("problem issuing transaction: %w", err)
+	}
+
+	reply.AssetID = assetID
+	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
+	return err
+}
+
+// CreateFreezableAsset returns ID of the newly created asset
+// TODO fix this
+func (service *Service) CreateFreezableAsset(r *http.Request, args *CreateVariableCapAssetArgs, reply *AssetIDChangeAddr) error {
+	service.vm.ctx.Log.Info("AVM: CreateFreezableAsset called with name: %s symbol: %s number of freezers: %d",
+		args.Name,
+		args.Symbol,
+		len(args.MinterSets),
+	)
+
+	if len(args.MinterSets) == 0 {
+		return errNoMinters
+	}
+
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// Get the UTXOs/keys for the from addresses
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
+	if err != nil {
+		return err
+	}
+
+	// Parse the change address.
+	if len(kc.Keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr, err := service.vm.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
+	if err != nil {
+		return err
+	}
+
+	amountsSpent, ins, keys, err := service.vm.Spend(
+		utxos,
+		kc,
+		map[ids.ID]uint64{
+			service.vm.ctx.AVAXAssetID: service.vm.creationTxFee,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	outs := []*avax.TransferableOutput{}
+	if amountSpent := amountsSpent[service.vm.ctx.AVAXAssetID]; amountSpent > service.vm.creationTxFee {
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amountSpent - service.vm.creationTxFee,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{changeAddr},
+				},
+			},
+		})
+	}
+
+	initialState := &InitialState{
+		FxID: 0, // TODO: Should lookup secp256k1fx FxID
+		Outs: make([]verify.State, 0, len(args.MinterSets)),
+	}
+	for _, owner := range args.MinterSets {
+		freezer := &secp256k1fx.FreezeOutput{
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: uint32(owner.Threshold),
+				Addrs:     make([]ids.ShortID, 0, len(owner.Minters)),
+			},
+		}
+		for _, address := range owner.Minters {
+			addr, err := service.vm.ParseLocalAddress(address)
+			if err != nil {
+				return err
+			}
+			freezer.Addrs = append(freezer.Addrs, addr)
+		}
+		ids.SortShortIDs(freezer.Addrs)
+		initialState.Outs = append(initialState.Outs, freezer)
 	}
 	for _, owner := range args.MinterSets {
 		minter := &secp256k1fx.MintOutput{
@@ -1302,6 +1433,123 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxI
 		return err
 	}
 
+	txID, err := service.vm.IssueTx(tx.Bytes())
+	if err != nil {
+		return fmt.Errorf("problem issuing transaction: %w", err)
+	}
+
+	reply.TxID = txID
+	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
+	return err
+}
+
+// FreezeArgs ... TODO comment
+type FreezeArgs struct {
+	// User, password, from addrs, change addr
+	api.JSONSpendHeader
+	// ID of the asset being frozen
+	AssetID string `json:"assetID"`
+	// IDs of the specific UTXOs to freeze
+	UTXOs []ids.ID `json:"utxos"`
+	// If true, freeze all UTXOs for this asset
+	FreezeAll bool `json:"freezeAll"`
+}
+
+// TODO Comment and implement
+func (service *Service) Freeze(_ *http.Request, args *FreezeArgs, reply *api.JSONTxIDChangeAddr) error {
+	service.vm.ctx.Log.Info("AVM: Freeze called with username: %s", args.Username)
+
+	// Parse the asset ID
+	assetID, err := service.vm.lookupAssetID(args.AssetID)
+	if err != nil {
+		return err
+	}
+
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// Get the UTXOs/keys for the from addresses
+	feeUTXOs, feeKc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
+	if err != nil {
+		return err
+	}
+
+	// Parse the change address.
+	if len(feeKc.Keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr, err := service.vm.selectChangeAddr(feeKc.Keys[0].PublicKey().Address(), args.ChangeAddr)
+	if err != nil {
+		return err
+	}
+
+	amountsSpent, ins, keys, err := service.vm.Spend(
+		feeUTXOs,
+		feeKc,
+		map[ids.ID]uint64{
+			service.vm.ctx.AVAXAssetID: service.vm.txFee,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	outs := []*avax.TransferableOutput{}
+	if amountSpent := amountsSpent[service.vm.ctx.AVAXAssetID]; amountSpent > service.vm.txFee {
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amountSpent - service.vm.txFee,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{changeAddr},
+				},
+			},
+		})
+	}
+
+	// Get all UTXOs/keys for the user
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
+	if err != nil {
+		return err
+	}
+
+	// Create the freeze operation
+	ops, opKeys, err := service.vm.Freeze(
+		utxos,
+		kc,
+		assetID,
+		args.UTXOs,
+		args.FreezeAll,
+	)
+	if err != nil {
+		return err
+	}
+	keys = append(keys, opKeys...)
+
+	// Create the transaction
+	tx := Tx{UnsignedTx: &OperationTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    service.vm.ctx.NetworkID,
+			BlockchainID: service.vm.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+		}},
+		Ops: ops,
+	}}
+	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
+		return err
+	}
+
+	// Issue the transaction
 	txID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)

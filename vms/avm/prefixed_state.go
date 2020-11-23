@@ -4,9 +4,14 @@
 package avm
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
@@ -20,6 +25,15 @@ const (
 var (
 	dbInitialized = ids.Empty.Prefix(dbInitializedID)
 )
+
+func uniqueID(id ids.ID, prefix uint64, cacher cache.Cacher) ids.ID {
+	if cachedIDIntf, found := cacher.Get(id); found {
+		return cachedIDIntf.(ids.ID)
+	}
+	uID := id.Prefix(prefix)
+	cacher.Put(id, uID)
+	return uID
+}
 
 // prefixedState wraps a state object. By prefixing the state, there will be no
 // collisions between different types of objects that have the same hash.
@@ -128,4 +142,44 @@ func (s *prefixedState) addUTXO(addrs [][]byte, utxoID ids.ID) error {
 		}
 	}
 	return nil
+}
+
+// FreezeAsset marks that all UTXOs with asset ID [assetID]
+// were frozen in the given epoch.
+func (s *prefixedState) FreezeAsset(assetID ids.ID, epoch uint32) error {
+	p := wrappers.Packer{MaxSize: wrappers.IntLen}
+	p.PackInt(epoch)
+	if p.Errored() {
+		// Should never happen in practice
+		return fmt.Errorf("couldn't pack epoch: %w", p.Err)
+	}
+
+	key := make([]byte, len(freezeAssetPrefix)+hashing.HashLen)
+	copy(key, freezeAssetPrefix)
+	copy(key[len(freezeAssetPrefix):], assetID[:])
+	return s.state.DB.Put(key, p.Bytes)
+}
+
+// AssetFrozen returns the epoch during which all UTXOs with the
+// given asset ID was frozen.
+// Returns errNotFrozen if the entire asset is not frozen.
+func (s *prefixedState) AssetFrozen(assetID ids.ID) (bool, uint32, error) {
+	key := make([]byte, len(freezeAssetPrefix)+hashing.HashLen)
+	copy(key, freezeAssetPrefix)
+	copy(key[len(freezeAssetPrefix):], assetID[:])
+
+	epochBytes, err := s.state.DB.Get(key)
+	if err == database.ErrNotFound {
+		return false, 0, nil
+	} else if err != nil {
+		return false, 0, err
+	}
+
+	p := wrappers.Packer{Bytes: epochBytes}
+	epoch := p.UnpackInt()
+	if p.Errored() {
+		// Should never happen in practice
+		return false, 0, fmt.Errorf("couldn't unpack epoch from bytes: %w", err)
+	}
+	return true, epoch, nil
 }

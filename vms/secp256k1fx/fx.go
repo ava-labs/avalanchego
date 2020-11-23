@@ -61,6 +61,8 @@ func (fx *Fx) Initialize(vmIntf interface{}) error {
 		c.RegisterType(&TransferOutput{}),
 		c.RegisterType(&MintOperation{}),
 		c.RegisterType(&Credential{}),
+		c.RegisterType(&FreezeOperation{}), // TODO register this properly
+		c.RegisterType(&FreezeOutput{}),    // TODO register this properly
 	)
 	return errs.Err
 }
@@ -106,37 +108,54 @@ func (fx *Fx) VerifyPermission(txIntf, inIntf, credIntf, ownerIntf interface{}) 
 }
 
 // VerifyOperation ...
-func (fx *Fx) VerifyOperation(txIntf, opIntf, credIntf interface{}, utxosIntf []interface{}) error {
+func (fx *Fx) VerifyOperation(txIntf, opIntf, credIntf interface{}, outsIntf []interface{}) error {
 	tx, ok := txIntf.(Tx)
 	if !ok {
 		return errWrongTxType
-	}
-	op, ok := opIntf.(*MintOperation)
-	if !ok {
-		return errWrongOpType
 	}
 	cred, ok := credIntf.(*Credential)
 	if !ok {
 		return errWrongCredentialType
 	}
-	if len(utxosIntf) != 1 {
+	if len(outsIntf) != 1 {
 		return errWrongNumberOfUTXOs
 	}
-	out, ok := utxosIntf[0].(*MintOutput)
-	if !ok {
-		return errWrongUTXOType
+	switch op := opIntf.(type) {
+	case *FreezeOperation:
+		out, ok := outsIntf[0].(*FreezeOutput)
+		if !ok {
+			return errWrongUTXOType
+		}
+		return fx.verifyFreezeOperation(tx, op, cred, out)
+	case *MintOperation:
+		out, ok := outsIntf[0].(*MintOutput)
+		if !ok {
+			return errWrongUTXOType
+		}
+		return fx.verifyMintOperation(tx, op, cred, out)
+	default:
+		return errWrongOpType
 	}
-	return fx.verifyOperation(tx, op, cred, out)
 }
 
-func (fx *Fx) verifyOperation(tx Tx, op *MintOperation, cred *Credential, utxo *MintOutput) error {
-	if err := verify.All(op, cred, utxo); err != nil {
+func (fx *Fx) verifyMintOperation(tx Tx, op *MintOperation, cred *Credential, out *MintOutput) error {
+	if err := verify.All(op, cred, out); err != nil {
 		return err
 	}
-	if !utxo.Equals(&op.MintOutput.OutputOwners) {
+	if !out.Equals(&op.MintOutput.OutputOwners) {
 		return errWrongMintCreated
 	}
-	return fx.VerifyCredentials(tx, &op.MintInput, cred, &utxo.OutputOwners)
+	return fx.VerifyCredentials(tx, &op.MintInput, cred, &out.OutputOwners)
+}
+
+func (fx *Fx) verifyFreezeOperation(tx Tx, op *FreezeOperation, cred *Credential, out *FreezeOutput) error {
+	if err := verify.All(op, cred, out); err != nil {
+		return err
+	}
+	if !out.Equals(&op.FreezeOutput.OutputOwners) {
+		return errWrongMintCreated
+	}
+	return fx.VerifyCredentials(tx, &op.Input, cred, &out.OutputOwners)
 }
 
 // VerifyTransfer ...

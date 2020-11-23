@@ -6,23 +6,14 @@ package avm
 import (
 	"errors"
 
-	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
 var (
 	errCacheTypeMismatch = errors.New("type returned from cache doesn't match the expected type")
+	freezeAssetPrefix    = []byte("freezeAsset")
 )
-
-func uniqueID(id ids.ID, prefix uint64, cacher cache.Cacher) ids.ID {
-	if cachedIDIntf, found := cacher.Get(id); found {
-		return cachedIDIntf.(ids.ID)
-	}
-	uID := id.Prefix(prefix)
-	cacher.Put(id, uID)
-	return uID
-}
 
 // state is a thin wrapper around a database to provide, caching, serialization,
 // and de-serialization.

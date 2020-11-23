@@ -23,6 +23,11 @@ type BaseTx struct {
 	avax.BaseTx `serialize:"true"`
 }
 
+// Epoch ... TODO implement
+func (t *BaseTx) Epoch() uint32 {
+	return 0
+}
+
 // SyntacticVerify that this transaction is well-formed.
 func (t *BaseTx) SyntacticVerify(
 	ctx *snow.Context,

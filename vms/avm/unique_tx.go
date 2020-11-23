@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
@@ -135,6 +136,11 @@ func (tx *UniqueTx) Accept() error {
 		if err := tx.vm.state.FundUTXO(utxo); err != nil {
 			tx.vm.ctx.Log.Error("Failed to fund utxo %s due to %s", utxo.InputID(), err)
 			return err
+		}
+		if _, ok := utxo.Out.(*secp256k1fx.FreezeOutput); ok {
+			if err := tx.vm.state.FreezeAsset(utxo.AssetID(), tx.Epoch()); err != nil {
+				return err
+			}
 		}
 	}
 

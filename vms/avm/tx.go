@@ -24,6 +24,7 @@ type UnsignedTx interface {
 	ID() ids.ID
 	UnsignedBytes() []byte
 	Bytes() []byte
+	Epoch() uint32
 
 	ConsumedAssetIDs() ids.Set
 	AssetIDs() ids.Set
@@ -51,8 +52,7 @@ type UnsignedTx interface {
 // outputs.
 type Tx struct {
 	UnsignedTx `serialize:"true" json:"unsignedTx"`
-
-	Creds []verify.Verifiable `serialize:"true" json:"credentials"` // The credentials of this transaction
+	Creds      []verify.Verifiable `serialize:"true" json:"credentials"` // The credentials of this transaction
 }
 
 // Credentials describes the authorization that allows the Inputs to consume the
