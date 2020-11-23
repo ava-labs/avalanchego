@@ -95,5 +95,5 @@ func (h *EventHeap) Pop() interface{} {
 
 // Bytes returns the byte representation of this heap
 func (h *EventHeap) Bytes() ([]byte, error) {
-	return Codec.Marshal(h)
+	return Codec.Marshal(codecVersion, h)
 }

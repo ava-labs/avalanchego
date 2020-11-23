@@ -21,7 +21,7 @@ import (
 
 func TestImportTxSyntacticVerify(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &ImportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -67,7 +67,7 @@ func TestImportTxSyntacticVerify(t *testing.T) {
 
 func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &ImportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -202,7 +202,7 @@ func TestImportTxSerialization(t *testing.T) {
 		}},
 	}}
 
-	c := setupCodec()
+	_, c := setupCodec()
 	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +221,10 @@ func TestIssueImportTx(t *testing.T) {
 	baseDB := memdb.New()
 
 	m := &atomic.Memory{}
-	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := NewContext(t)
 	ctx.SharedMemory = m.NewSharedMemory(chainID)
@@ -234,7 +237,7 @@ func TestIssueImportTx(t *testing.T) {
 
 	ctx.Lock.Lock()
 	vm := &VM{}
-	err := vm.Initialize(
+	err = vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
@@ -306,7 +309,7 @@ func TestIssueImportTx(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := vm.codec.Marshal(utxo)
+	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -363,7 +366,10 @@ func TestForceAcceptImportTx(t *testing.T) {
 	baseDB := memdb.New()
 
 	m := &atomic.Memory{}
-	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := NewContext(t)
 	ctx.SharedMemory = m.NewSharedMemory(chainID)
@@ -379,7 +385,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	err := vm.Initialize(
+	err = vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,

@@ -8,8 +8,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -29,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/stretchr/testify/assert"
 )
 
 var networkID uint32 = 10
@@ -45,7 +44,6 @@ var username = "bobby"
 var password = "StrnasfqewiurPasswdn56d" // #nosec G101
 
 func init() {
-	cb58 := formatting.CB58{}
 	factory := crypto.FactorySECP256K1R{}
 
 	for _, key := range []string{
@@ -53,8 +51,8 @@ func init() {
 		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
 		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
 	} {
-		_ = cb58.FromString(key)
-		pk, _ := factory.ToPrivateKey(cb58.Bytes)
+		keyBytes, _ := formatting.Decode(formatting.CB58, key)
+		pk, _ := factory.ToPrivateKey(keyBytes)
 		keys = append(keys, pk.(*crypto.PrivateKeySECP256K1R))
 		addrs = append(addrs, pk.PublicKey().Address())
 	}
@@ -107,9 +105,9 @@ func NewContext(t *testing.T) *snow.Context {
 //   1) tx in genesis that creates AVAX
 //   2) the index of the output
 func GetAVAXTxFromGenesisTest(genesisBytes []byte, t *testing.T) *Tx {
-	c := setupCodec()
+	_, c := setupCodec()
 	genesis := Genesis{}
-	if err := c.Unmarshal(genesisBytes, &genesis); err != nil {
+	if _, err := c.Unmarshal(genesisBytes, &genesis); err != nil {
 		t.Fatal(err)
 	}
 
@@ -144,87 +142,86 @@ func BuildGenesisTest(t *testing.T) []byte {
 	addr1Str, _ := formatting.FormatBech32(testHRP, addrs[1].Bytes())
 	addr2Str, _ := formatting.FormatBech32(testHRP, addrs[2].Bytes())
 
-	defaultArgs := &BuildGenesisArgs{GenesisData: map[string]AssetDefinition{
-		"asset1": {
-			Name:   "AVAX",
-			Symbol: "SYMB",
-			InitialState: map[string][]interface{}{
-				"fixedCap": {
-					Holder{
-						Amount:  json.Uint64(startBalance),
-						Address: addr0Str,
-					},
-					Holder{
-						Amount:  json.Uint64(startBalance),
-						Address: addr1Str,
-					},
-					Holder{
-						Amount:  json.Uint64(startBalance),
-						Address: addr2Str,
-					},
-				},
-			},
-		},
-		"asset2": {
-			Name:   "myVarCapAsset",
-			Symbol: "MVCA",
-			InitialState: map[string][]interface{}{
-				"variableCap": {
-					Owners{
-						Threshold: 1,
-						Minters: []string{
-							addr0Str,
-							addr1Str,
+	defaultArgs := &BuildGenesisArgs{
+		Encoding: formatting.Hex,
+		GenesisData: map[string]AssetDefinition{
+			"asset1": {
+				Name:   "AVAX",
+				Symbol: "SYMB",
+				InitialState: map[string][]interface{}{
+					"fixedCap": {
+						Holder{
+							Amount:  json.Uint64(startBalance),
+							Address: addr0Str,
 						},
-					},
-					Owners{
-						Threshold: 2,
-						Minters: []string{
-							addr0Str,
-							addr1Str,
-							addr2Str,
+						Holder{
+							Amount:  json.Uint64(startBalance),
+							Address: addr1Str,
+						},
+						Holder{
+							Amount:  json.Uint64(startBalance),
+							Address: addr2Str,
 						},
 					},
 				},
 			},
-		},
-		"asset3": {
-			Name: "myOtherVarCapAsset",
-			InitialState: map[string][]interface{}{
-				"variableCap": {
-					Owners{
-						Threshold: 1,
-						Minters: []string{
-							addr0Str,
+			"asset2": {
+				Name:   "myVarCapAsset",
+				Symbol: "MVCA",
+				InitialState: map[string][]interface{}{
+					"variableCap": {
+						Owners{
+							Threshold: 1,
+							Minters: []string{
+								addr0Str,
+								addr1Str,
+							},
+						},
+						Owners{
+							Threshold: 2,
+							Minters: []string{
+								addr0Str,
+								addr1Str,
+								addr2Str,
+							},
 						},
 					},
 				},
 			},
-		},
-	}}
+			"asset3": {
+				Name: "myOtherVarCapAsset",
+				InitialState: map[string][]interface{}{
+					"variableCap": {
+						Owners{
+							Threshold: 1,
+							Minters: []string{
+								addr0Str,
+							},
+						},
+					},
+				},
+			},
+		}}
 
 	return BuildGenesisTestWithArgs(t, defaultArgs)
 }
 
 // BuildGenesisTestWithArgs allows building the genesis while injecting different starting points (args)
 func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) []byte {
-	ss, err := CreateStaticService(formatting.HexEncoding)
-	if err != nil {
-		t.Fatalf("Failed to create static service due to: %s", err)
-	}
+	ss := CreateStaticService()
 
 	reply := BuildGenesisReply{}
-	err = ss.BuildGenesis(nil, args, &reply)
+	err := ss.BuildGenesis(nil, args, &reply)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	hex := formatting.Hex{}
-	if err := hex.FromString(reply.Bytes); err != nil {
+	b, err := formatting.Decode(reply.Encoding, reply.Bytes)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	return hex.Bytes
+	return b
 }
 
 func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) {
@@ -245,14 +242,20 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 	baseDB := memdb.New()
 
 	m := &atomic.Memory{}
-	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	if err != nil {
+		t.Fatal(err)
+	}
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	// NB: this lock is intentionally left locked when this function returns.
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
 
-	userKeystore := keystore.CreateTestKeystore()
+	userKeystore, err := keystore.CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := userKeystore.AddUser(username, password); err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +266,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 		txFee:         testTxFee,
 		creationTxFee: testTxFee,
 	}
-	err := vm.Initialize(
+	err = vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
@@ -479,7 +482,7 @@ func TestTxSerialization(t *testing.T) {
 		})
 	}
 
-	c := setupCodec()
+	_, c := setupCodec()
 	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -641,13 +644,15 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 	}
 
 	// Inject them in the Genesis build
-	genesisArgs := &BuildGenesisArgs{GenesisData: map[string]AssetDefinition{
-		"asset1": {
-			Name:         "AVAX",
-			Symbol:       "SYMB",
-			InitialState: holder,
-		},
-	}}
+	genesisArgs := &BuildGenesisArgs{
+		Encoding: formatting.Hex,
+		GenesisData: map[string]AssetDefinition{
+			"asset1": {
+				Name:         "AVAX",
+				Symbol:       "SYMB",
+				InitialState: holder,
+			},
+		}}
 	_, _, vm, _ := GenesisVMWithArgs(t, genesisArgs)
 	ctx := vm.ctx
 	defer func() {
@@ -1031,7 +1036,7 @@ func TestIssueProperty(t *testing.T) {
 		}},
 	}}
 
-	unsignedBytes, err := vm.codec.Marshal(&mintPropertyTx.UnsignedTx)
+	unsignedBytes, err := vm.codec.Marshal(codecVersion, &mintPropertyTx.UnsignedTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1050,7 +1055,7 @@ func TestIssueProperty(t *testing.T) {
 		}},
 	})
 
-	signedBytes, err := vm.codec.Marshal(mintPropertyTx)
+	signedBytes, err := vm.codec.Marshal(codecVersion, mintPropertyTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1077,11 +1082,11 @@ func TestIssueProperty(t *testing.T) {
 
 	burnPropertyTx.Creds = append(burnPropertyTx.Creds, &propertyfx.Credential{})
 
-	unsignedBytes, err = vm.codec.Marshal(burnPropertyTx.UnsignedTx)
+	unsignedBytes, err = vm.codec.Marshal(codecVersion, burnPropertyTx.UnsignedTx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	signedBytes, err = vm.codec.Marshal(burnPropertyTx)
+	signedBytes, err = vm.codec.Marshal(codecVersion, burnPropertyTx)
 	if err != nil {
 		t.Fatal(err)
 	}
