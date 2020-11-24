@@ -193,6 +193,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Int(snowAvalancheNumParentsKey, 5, "Number of vertexes for reference from each new vertex")
 	fs.Int(snowAvalancheBatchSizeKey, 30, "Number of operations to batch in each new vertex")
 	fs.Int(snowConcurrentRepollsKey, 4, "Minimum number of concurrent polls for finalizing consensus")
+	fs.Int64(snowEpochFirstTransition, 1607626800, "Unix timestamp of the first epoch transaction, in seconds. Defaults to 12/10/2020 @ 7:00pm (UTC)")
+	fs.Duration(snowEpochDuration, 6*time.Hour, "Duration of each epoch")
 
 	// Enable/Disable APIs:
 	fs.Bool(adminAPIEnabledKey, false, "If true, this node exposes the Admin API")
@@ -576,7 +578,6 @@ func setNodeConfig(v *viper.Viper) error {
 
 	// Network Parameters
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
-
 		txFee := v.GetUint64(txFeeKey)
 		creationTxFee := v.GetUint64(creationTxFeeKey)
 		uptimeRequirement := v.GetFloat64(uptimeRequirementKey)
@@ -610,6 +611,9 @@ func setNodeConfig(v *viper.Viper) error {
 		if Config.StakeMintingPeriod < Config.MaxStakeDuration {
 			return errors.New("stake minting period can't be less than max stake duration")
 		}
+
+		Config.EpochFirstTransition = time.Unix(v.GetInt64(snowEpochFirstTransition), 0)
+		Config.EpochDuration = v.GetDuration(snowEpochDuration)
 	} else {
 		Config.Params = *genesis.GetParams(networkID)
 	}

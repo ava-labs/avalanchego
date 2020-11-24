@@ -186,7 +186,7 @@ func (sr *ChainRouter) GetAcceptedFrontierFailed(validatorID ids.ShortID, chainI
 	if chain, exists := sr.chains[chainID]; exists {
 		chain.GetAcceptedFrontierFailed(validatorID, requestID)
 	} else {
-		sr.log.Error("GetAcceptedFrontierFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+		sr.log.Debug("GetAcceptedFrontierFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 	}
 }
 
@@ -231,7 +231,7 @@ func (sr *ChainRouter) GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID
 	if chain, exists := sr.chains[chainID]; exists {
 		chain.GetAcceptedFailed(validatorID, requestID)
 	} else {
-		sr.log.Error("GetAcceptedFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+		sr.log.Debug("GetAcceptedFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 	}
 }
 
@@ -276,7 +276,7 @@ func (sr *ChainRouter) GetAncestorsFailed(validatorID ids.ShortID, chainID ids.I
 	if chain, exists := sr.chains[chainID]; exists {
 		chain.GetAncestorsFailed(validatorID, requestID)
 	} else {
-		sr.log.Error("GetAncestorsFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+		sr.log.Debug("GetAncestorsFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 	}
 }
 
@@ -327,7 +327,7 @@ func (sr *ChainRouter) GetFailed(validatorID ids.ShortID, chainID ids.ID, reques
 	if chain, exists := sr.chains[chainID]; exists {
 		chain.GetFailed(validatorID, requestID)
 	} else {
-		sr.log.Error("GetFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+		sr.log.Debug("GetFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 	}
 }
 
@@ -384,7 +384,7 @@ func (sr *ChainRouter) QueryFailed(validatorID ids.ShortID, chainID ids.ID, requ
 	if chain, exists := sr.chains[chainID]; exists {
 		chain.QueryFailed(validatorID, requestID)
 	} else {
-		sr.log.Error("QueryFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+		sr.log.Debug("QueryFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 	}
 }
 

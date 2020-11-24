@@ -66,6 +66,8 @@ const (
 	snowAvalancheNumParentsKey      = "snow-avalanche-num-parents"
 	snowAvalancheBatchSizeKey       = "snow-avalanche-batch-size"
 	snowConcurrentRepollsKey        = "snow-concurrent-repolls"
+	snowEpochFirstTransition        = "snow-epoch-first-transition"
+	snowEpochDuration               = "snow-epoch-duration"
 	whitelistedSubnetsKey           = "whitelisted-subnets"
 	adminAPIEnabledKey              = "api-admin-enabled"
 	infoAPIEnabledKey               = "api-info-enabled"
