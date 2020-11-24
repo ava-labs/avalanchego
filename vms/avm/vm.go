@@ -626,11 +626,6 @@ func (vm *VM) initState(genesisBytes []byte) error {
 			if err := vm.state.FundUTXO(utxo); err != nil {
 				return err
 			}
-			if _, ok := utxo.Out.(*secp256k1fx.FreezeOutput); ok {
-				if err := vm.state.FreezeAsset(utxo.AssetID(), tx.Epoch()); err != nil {
-					return err
-				}
-			}
 		}
 	}
 
@@ -774,13 +769,22 @@ func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cr
 		return errIncompatibleFx
 	}
 
+	// Check if the UTXO's asset if frozen
+	// TODO If the asset is frozen, compare the epoch during which
+	// it was locked to the current one
 	if isFrozen, _, err := vm.state.AssetFrozen(utxoAssetID); err != nil {
 		return err
 	} else if isFrozen {
 		return fmt.Errorf("asset %s is frozen", utxoAssetID)
 	}
 
-	return fx.VerifyTransfer(tx, in.In, cred, utxo.Out)
+	// TODO: Check if this UTXO is frozen, and if so, when it was
+
+	if err := fx.VerifyTransfer(in.In, utxo.Out); err != nil {
+		return err
+	}
+	// TODO check if the asset owner allows this operation
+	return fx.VerifyPermission(tx, in.In, cred, utxo.Out)
 }
 
 func (vm *VM) verifyTransfer(tx UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable) error {
@@ -1116,75 +1120,6 @@ func (vm *VM) Mint(
 		if amount > 0 {
 			return nil, nil, errAddressesCantMintAsset
 		}
-	}
-
-	sortOperationsWithSigners(ops, keys, vm.codec)
-	return ops, keys, nil
-}
-
-// TODO is this right?
-func (vm *VM) Freeze(
-	utxos []*avax.UTXO,
-	kc *secp256k1fx.Keychain,
-	assetID ids.ID,
-	utxosToFreeze []ids.ID,
-	freezeAll bool,
-) (
-	[]*Operation,
-	[][]*crypto.PrivateKeySECP256K1R,
-	error,
-) {
-
-	// TODO should we do argument sanity checks here?
-
-	time := vm.clock.Unix()
-	ops := []*Operation{}
-	keys := [][]*crypto.PrivateKeySECP256K1R{}
-
-	for _, utxo := range utxos {
-		// makes sure that the variable isn't overwritten with the next iteration
-		utxo := utxo
-
-		if len(ops) > 0 {
-			// we have already been able to create the operation needed
-			break
-		}
-
-		if utxo.AssetID() != assetID {
-			// wrong asset id
-			continue
-		}
-		out, ok := utxo.Out.(*secp256k1fx.FreezeOutput)
-		if !ok {
-			// wrong output type
-			continue
-		}
-
-		indices, signers, ok := kc.Match(&out.OutputOwners, time)
-		if !ok {
-			// unable to spend the output
-			continue
-		}
-
-		// add the operation to the array
-		ops = append(ops, &Operation{
-			Asset: avax.Asset{ID: assetID},
-			UTXOIDs: []*avax.UTXOID{
-				&utxo.UTXOID,
-			},
-			Op: &secp256k1fx.FreezeOperation{
-				Input: secp256k1fx.Input{
-					SigIndices: indices,
-				},
-				FreezeOutput: *out,
-			},
-		})
-		// add the required keys to the array
-		keys = append(keys, signers)
-	}
-
-	if len(ops) == 0 {
-		return nil, nil, errAddressesCantFreezeAsset
 	}
 
 	sortOperationsWithSigners(ops, keys, vm.codec)

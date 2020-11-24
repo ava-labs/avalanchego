@@ -420,7 +420,11 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		}
 
 		// Verify that this tx's credentials allow [in] to be spent
-		if err := vm.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
+		if err := vm.fx.VerifyTransfer(in, out); err != nil {
+			return permError{
+				fmt.Errorf("failed to verify transfer: %w", err),
+			}
+		} else if err := vm.fx.VerifyPermission(tx, in, creds[index], out); err != nil {
 			return permError{
 				fmt.Errorf("failed to verify transfer: %w", err),
 			}

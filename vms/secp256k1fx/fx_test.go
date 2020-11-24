@@ -124,7 +124,10 @@ func TestFxVerifyTransfer(t *testing.T) {
 		},
 	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, out); err != nil {
+	if err := fx.VerifyTransfer(in, out); err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.VerifyPermission(tx, in, cred, out); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -159,7 +162,10 @@ func TestFxVerifyTransferNilTx(t *testing.T) {
 		},
 	}
 
-	if err := fx.VerifyTransfer(nil, in, cred, out); err == nil {
+	if err := fx.VerifyTransfer(in, out); err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.VerifyPermission(nil, in, cred, out); err == nil {
 		t.Fatalf("Should have failed verification due to a nil tx")
 	}
 }
@@ -172,22 +178,14 @@ func TestFxVerifyTransferNilOutput(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
-	tx := &testTx{
-		bytes: txBytes,
-	}
 	in := &TransferInput{
 		Amt: 1,
 		Input: Input{
 			SigIndices: []uint32{0},
 		},
 	}
-	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			sigBytes,
-		},
-	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, nil); err == nil {
+	if err := fx.VerifyTransfer(in, nil); err == nil {
 		t.Fatalf("Should have failed verification due to a nil output")
 	}
 }
@@ -200,9 +198,6 @@ func TestFxVerifyTransferNilInput(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
-	tx := &testTx{
-		bytes: txBytes,
-	}
 	out := &TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -213,13 +208,8 @@ func TestFxVerifyTransferNilInput(t *testing.T) {
 			},
 		},
 	}
-	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			sigBytes,
-		},
-	}
 
-	if err := fx.VerifyTransfer(tx, nil, cred, out); err == nil {
+	if err := fx.VerifyTransfer(nil, out); err == nil {
 		t.Fatalf("Should have failed verification due to a nil input")
 	}
 }
@@ -252,7 +242,10 @@ func TestFxVerifyTransferNilCredential(t *testing.T) {
 		},
 	}
 
-	if err := fx.VerifyTransfer(tx, in, nil, out); err == nil {
+	if err := fx.VerifyTransfer(in, out); err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.VerifyPermission(tx, in, nil, out); err == nil {
 		t.Fatalf("Should have failed verification due to a nil credential")
 	}
 }
@@ -264,9 +257,6 @@ func TestFxVerifyTransferInvalidOutput(t *testing.T) {
 	fx := Fx{}
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
-	}
-	tx := &testTx{
-		bytes: txBytes,
 	}
 	out := &TransferOutput{
 		Amt: 1,
@@ -284,13 +274,8 @@ func TestFxVerifyTransferInvalidOutput(t *testing.T) {
 			SigIndices: []uint32{0},
 		},
 	}
-	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			sigBytes,
-		},
-	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
+	if err := fx.VerifyTransfer(in, out); err == nil {
 		t.Fatalf("Should have errored due to an invalid output")
 	}
 }
@@ -302,9 +287,6 @@ func TestFxVerifyTransferWrongAmounts(t *testing.T) {
 	fx := Fx{}
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
-	}
-	tx := &testTx{
-		bytes: txBytes,
 	}
 	out := &TransferOutput{
 		Amt: 1,
@@ -322,13 +304,8 @@ func TestFxVerifyTransferWrongAmounts(t *testing.T) {
 			SigIndices: []uint32{0},
 		},
 	}
-	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			sigBytes,
-		},
-	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
+	if err := fx.VerifyTransfer(in, out); err == nil {
 		t.Fatalf("Should have errored due to different amounts")
 	}
 }
@@ -366,7 +343,10 @@ func TestFxVerifyTransferTimelocked(t *testing.T) {
 		},
 	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
+	if err := fx.VerifyTransfer(in, out); err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.VerifyPermission(tx, in, cred, out); err == nil {
 		t.Fatalf("Should have errored due to a timelocked output")
 	}
 }
@@ -405,7 +385,10 @@ func TestFxVerifyTransferTooManySigners(t *testing.T) {
 		},
 	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
+	if err := fx.VerifyTransfer(in, out); err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.VerifyPermission(tx, in, cred, out); err == nil {
 		t.Fatalf("Should have errored due to too many signers")
 	}
 }
@@ -441,7 +424,10 @@ func TestFxVerifyTransferTooFewSigners(t *testing.T) {
 		Sigs: [][crypto.SECP256K1RSigLen]byte{},
 	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
+	if err := fx.VerifyTransfer(in, out); err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.VerifyPermission(tx, in, cred, out); err == nil {
 		t.Fatalf("Should have errored due to too few signers")
 	}
 }
@@ -480,7 +466,10 @@ func TestFxVerifyTransferMismatchedSigners(t *testing.T) {
 		},
 	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
+	if err := fx.VerifyTransfer(in, out); err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.VerifyPermission(tx, in, cred, out); err == nil {
 		t.Fatalf("Should have errored due to too mismatched signers")
 	}
 }
@@ -521,7 +510,10 @@ func TestFxVerifyTransferInvalidSignature(t *testing.T) {
 		},
 	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, out); err != nil {
+	if err := fx.VerifyTransfer(in, out); err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.VerifyPermission(tx, in, cred, out); err != nil {
 		t.Fatal(err)
 	}
 
@@ -529,7 +521,10 @@ func TestFxVerifyTransferInvalidSignature(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
+	if err := fx.VerifyTransfer(in, out); err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.VerifyPermission(tx, in, cred, out); err == nil {
 		t.Fatalf("Should have errored due to an invalid signature")
 	}
 }
@@ -570,7 +565,10 @@ func TestFxVerifyTransferWrongSigner(t *testing.T) {
 		},
 	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, out); err != nil {
+	if err := fx.VerifyTransfer(in, out); err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.VerifyPermission(tx, in, cred, out); err != nil {
 		t.Fatal(err)
 	}
 
@@ -578,7 +576,7 @@ func TestFxVerifyTransferWrongSigner(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
+	if err := fx.VerifyPermission(tx, in, cred, out); err == nil {
 		t.Fatalf("Should have errored due to a wrong signer")
 	}
 }
