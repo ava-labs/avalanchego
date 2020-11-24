@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/vms/avm/internalavm"
+	"github.com/ava-labs/avalanchego/vms/avm"
 
 	"github.com/ava-labs/avalanchego/api/apiargs"
 
@@ -185,7 +185,7 @@ func TestGetTxStatus(t *testing.T) {
 	tx, err := service.vm.newCreateChainTx(
 		testSubnet1.ID(),
 		nil,
-		internalavm.ID,
+		avm.ID,
 		nil,
 		"chain name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -303,7 +303,7 @@ func TestGetTx(t *testing.T) {
 				return service.vm.newCreateChainTx( // Test GetTx works for standard blocks
 					testSubnet1.ID(),
 					nil,
-					internalavm.ID,
+					avm.ID,
 					nil,
 					"chain name",
 					[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},

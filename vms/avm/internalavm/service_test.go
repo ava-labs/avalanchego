@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/vms/avm/vmargs"
+
 	"github.com/ava-labs/avalanchego/api/apiargs"
 
 	"github.com/ava-labs/avalanchego/api/keystore"
@@ -123,9 +125,9 @@ func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numT
 		if err != nil {
 			t.Fatal(err)
 		}
-		reply := &GetBalanceReply{}
+		reply := &vmargs.GetBalanceReply{}
 		err = s.GetBalance(nil,
-			&GetBalanceArgs{
+			&vmargs.GetBalanceArgs{
 				Address: addrStr,
 				AssetID: s.vm.ctx.AVAXAssetID.String(),
 			},
@@ -192,14 +194,14 @@ func TestServiceGetTxStatus(t *testing.T) {
 	}()
 
 	statusArgs := &apiargs.JSONTxID{}
-	statusReply := &GetTxStatusReply{}
+	statusReply := &vmargs.GetTxStatusReply{}
 	if err := s.GetTxStatus(nil, statusArgs, statusReply); err == nil {
 		t.Fatal("Expected empty transaction to return an error")
 	}
 
 	tx := NewTx(t, genesisBytes, vm)
 	statusArgs.TxID = tx.ID()
-	statusReply = &GetTxStatusReply{}
+	statusReply = &vmargs.GetTxStatusReply{}
 	if err := s.GetTxStatus(nil, statusArgs, statusReply); err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +224,7 @@ func TestServiceGetTxStatus(t *testing.T) {
 	if err := s.IssueTx(nil, txArgs, txReply); err != nil {
 		t.Fatal(err)
 	}
-	statusReply = &GetTxStatusReply{}
+	statusReply = &vmargs.GetTxStatusReply{}
 	if err := s.GetTxStatus(nil, statusArgs, statusReply); err != nil {
 		t.Fatal(err)
 	}
@@ -251,11 +253,11 @@ func TestServiceGetBalance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	balanceArgs := &GetBalanceArgs{
+	balanceArgs := &vmargs.GetBalanceArgs{
 		Address: addrStr,
 		AssetID: assetID.String(),
 	}
-	balanceReply := &GetBalanceReply{}
+	balanceReply := &vmargs.GetBalanceReply{}
 	err = s.GetBalance(nil, balanceArgs, balanceReply)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(balanceReply.Balance), startBalance)
@@ -282,7 +284,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 	balanceArgs := &apiargs.JSONAddress{
 		Address: addrStr,
 	}
-	balanceReply := &GetAllBalancesReply{}
+	balanceReply := &vmargs.GetAllBalancesReply{}
 	err = s.GetAllBalances(nil, balanceArgs, balanceReply)
 	assert.NoError(t, err)
 
@@ -443,66 +445,66 @@ func TestServiceGetUTXOs(t *testing.T) {
 		label     string
 		count     int
 		shouldErr bool
-		args      *apiargs.GetUTXOsArgs
+		args      *vmargs.GetUTXOsArgs
 	}{
 		{
 			label:     "invalid address: ''",
 			shouldErr: true,
-			args: &apiargs.GetUTXOsArgs{
+			args: &vmargs.GetUTXOsArgs{
 				Addresses: []string{""},
 			},
 		},
 		{
 			label:     "invalid address: '-'",
 			shouldErr: true,
-			args: &apiargs.GetUTXOsArgs{
+			args: &vmargs.GetUTXOsArgs{
 				Addresses: []string{"-"},
 			},
 		},
 		{
 			label:     "invalid address: 'foo'",
 			shouldErr: true,
-			args: &apiargs.GetUTXOsArgs{
+			args: &vmargs.GetUTXOsArgs{
 				Addresses: []string{"foo"},
 			},
 		},
 		{
 			label:     "invalid address: 'foo-bar'",
 			shouldErr: true,
-			args: &apiargs.GetUTXOsArgs{
+			args: &vmargs.GetUTXOsArgs{
 				Addresses: []string{"foo-bar"},
 			},
 		},
 		{
 			label:     "invalid address: '<ChainID>'",
 			shouldErr: true,
-			args: &apiargs.GetUTXOsArgs{
+			args: &vmargs.GetUTXOsArgs{
 				Addresses: []string{vm.ctx.ChainID.String()},
 			},
 		},
 		{
 			label:     "invalid address: '<ChainID>-'",
 			shouldErr: true,
-			args: &apiargs.GetUTXOsArgs{
+			args: &vmargs.GetUTXOsArgs{
 				Addresses: []string{fmt.Sprintf("%s-", vm.ctx.ChainID.String())},
 			},
 		},
 		{
 			label:     "invalid address: '<Unknown ID>-<addr>'",
 			shouldErr: true,
-			args: &apiargs.GetUTXOsArgs{
+			args: &vmargs.GetUTXOsArgs{
 				Addresses: []string{unknownChainAddr},
 			},
 		},
 		{
 			label:     "no addresses",
 			shouldErr: true,
-			args:      &apiargs.GetUTXOsArgs{},
+			args:      &vmargs.GetUTXOsArgs{},
 		},
 		{
 			label: "get all X-chain UTXOs",
 			count: numUTXOs,
-			args: &apiargs.GetUTXOsArgs{
+			args: &vmargs.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 				},
@@ -511,7 +513,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label: "get one X-chain UTXO",
 			count: 1,
-			args: &apiargs.GetUTXOsArgs{
+			args: &vmargs.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 				},
@@ -521,7 +523,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label: "limit greater than number of UTXOs",
 			count: numUTXOs,
-			args: &apiargs.GetUTXOsArgs{
+			args: &vmargs.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 				},
@@ -531,7 +533,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label: "no utxos to return",
 			count: 0,
-			args: &apiargs.GetUTXOsArgs{
+			args: &vmargs.GetUTXOsArgs{
 				Addresses: []string{
 					xEmptyAddr,
 				},
@@ -540,7 +542,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label: "multiple address with utxos",
 			count: numUTXOs,
-			args: &apiargs.GetUTXOsArgs{
+			args: &vmargs.GetUTXOsArgs{
 				Addresses: []string{
 					xEmptyAddr,
 					xAddr,
@@ -550,7 +552,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label: "get all P-chain UTXOs",
 			count: numUTXOs,
-			args: &apiargs.GetUTXOsArgs{
+			args: &vmargs.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 				},
@@ -561,7 +563,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 			label:     "invalid source chain ID",
 			shouldErr: true,
 			count:     numUTXOs,
-			args: &apiargs.GetUTXOsArgs{
+			args: &vmargs.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 				},
@@ -571,7 +573,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label: "get all P-chain UTXOs",
 			count: numUTXOs,
-			args: &apiargs.GetUTXOsArgs{
+			args: &vmargs.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 				},
@@ -581,7 +583,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label:     "get UTXOs from multiple chains",
 			shouldErr: true,
-			args: &apiargs.GetUTXOsArgs{
+			args: &vmargs.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 					pAddr,
@@ -591,7 +593,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label:     "get UTXOs for an address on a different chain",
 			shouldErr: true,
-			args: &apiargs.GetUTXOsArgs{
+			args: &vmargs.GetUTXOsArgs{
 				Addresses: []string{
 					pAddr,
 				},
@@ -600,7 +602,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.label, func(t *testing.T) {
-			reply := &apiargs.GetUTXOsReply{}
+			reply := &vmargs.GetUTXOsReply{}
 			err := s.GetUTXOs(nil, test.args, reply)
 			if err != nil {
 				if !test.shouldErr {
@@ -631,8 +633,8 @@ func TestGetAssetDescription(t *testing.T) {
 
 	avaxAssetID := genesisTx.ID()
 
-	reply := GetAssetDescriptionReply{}
-	err := s.GetAssetDescription(nil, &GetAssetDescriptionArgs{
+	reply := vmargs.GetAssetDescriptionReply{}
+	err := s.GetAssetDescription(nil, &vmargs.GetAssetDescriptionArgs{
 		AssetID: avaxAssetID.String(),
 	}, &reply)
 	if err != nil {
@@ -660,12 +662,12 @@ func TestGetBalance(t *testing.T) {
 
 	avaxAssetID := genesisTx.ID()
 
-	reply := GetBalanceReply{}
+	reply := vmargs.GetBalanceReply{}
 	addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = s.GetBalance(nil, &GetBalanceArgs{
+	err = s.GetBalance(nil, &vmargs.GetBalanceArgs{
 		Address: addrStr,
 		AssetID: avaxAssetID.String(),
 	}, &reply)
@@ -687,7 +689,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	reply := AssetIDChangeAddr{}
+	reply := vmargs.AssetIDChangeAddr{}
 	addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
 	if err != nil {
 		t.Fatal(err)
@@ -699,7 +701,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 	}
 	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
-	err = s.CreateFixedCapAsset(nil, &CreateAssetArgs{
+	err = s.CreateFixedCapAsset(nil, &vmargs.CreateAssetArgs{
 		JSONSpendHeader: apiargs.JSONSpendHeader{
 			UserPass: apiargs.UserPass{
 				Username: username,
@@ -711,7 +713,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 		Name:         "testAsset",
 		Symbol:       "TEST",
 		Denomination: 1,
-		InitialHolders: []*Holder{{
+		InitialHolders: []*vmargs.Holder{{
 			Amount:  123456789,
 			Address: addrStr,
 		}},
@@ -732,7 +734,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	reply := AssetIDChangeAddr{}
+	reply := vmargs.AssetIDChangeAddr{}
 	addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
 	if err != nil {
 		t.Fatal(err)
@@ -743,7 +745,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	}
 	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
-	err = s.CreateVariableCapAsset(nil, &CreateAssetArgs{
+	err = s.CreateVariableCapAsset(nil, &vmargs.CreateAssetArgs{
 		JSONSpendHeader: apiargs.JSONSpendHeader{
 			UserPass: apiargs.UserPass{
 				Username: username,
@@ -754,7 +756,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		},
 		Name:   "test asset",
 		Symbol: "TEST",
-		MinterSets: []Owners{
+		MinterSets: []vmargs.Owners{
 			{
 				Threshold: 1,
 				Minters: []string{
@@ -782,7 +784,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 
 	createdAssetID := reply.AssetID.String()
 	// Test minting of the created variable cap asset
-	mintArgs := &MintArgs{
+	mintArgs := &vmargs.MintArgs{
 		JSONSpendHeader: apiargs.JSONSpendHeader{
 			UserPass: apiargs.UserPass{
 				Username: username,
@@ -813,7 +815,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		t.Fatalf("Failed to accept MintTx due to: %s", err)
 	}
 
-	sendArgs := &SendArgs{
+	sendArgs := &vmargs.SendArgs{
 		JSONSpendHeader: apiargs.JSONSpendHeader{
 			UserPass: apiargs.UserPass{
 				Username: username,
@@ -822,7 +824,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 			JSONFromAddrs:  apiargs.JSONFromAddrs{From: fromAddrsStr},
 			JSONChangeAddr: apiargs.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
-		SendOutput: SendOutput{
+		SendOutput: vmargs.SendOutput{
 			Amount:  200,
 			AssetID: createdAssetID,
 			To:      addrStr,
@@ -853,7 +855,7 @@ func TestNFTWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	createArgs := &CreateNFTAssetArgs{
+	createArgs := &vmargs.CreateNFTAssetArgs{
 		JSONSpendHeader: apiargs.JSONSpendHeader{
 			UserPass: apiargs.UserPass{
 				Username: username,
@@ -864,7 +866,7 @@ func TestNFTWorkflow(t *testing.T) {
 		},
 		Name:   "BIG COIN",
 		Symbol: "COIN",
-		MinterSets: []Owners{
+		MinterSets: []vmargs.Owners{
 			{
 				Threshold: 1,
 				Minters: []string{
@@ -873,7 +875,7 @@ func TestNFTWorkflow(t *testing.T) {
 			},
 		},
 	}
-	createReply := &AssetIDChangeAddr{}
+	createReply := &vmargs.AssetIDChangeAddr{}
 	if err := s.CreateNFTAsset(nil, createArgs, createReply); err != nil {
 		t.Fatalf("Failed to mint variable cap asset due to: %s", err)
 	} else if createReply.ChangeAddr != fromAddrsStr[0] {
@@ -899,7 +901,7 @@ func TestNFTWorkflow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mintArgs := &MintNFTArgs{
+	mintArgs := &vmargs.MintNFTArgs{
 		JSONSpendHeader: apiargs.JSONSpendHeader{
 			UserPass: apiargs.UserPass{
 				Username: username,
@@ -934,7 +936,7 @@ func TestNFTWorkflow(t *testing.T) {
 		t.Fatalf("Failed to accept MintNFTTx: %s", err)
 	}
 
-	sendArgs := &SendNFTArgs{
+	sendArgs := &vmargs.SendNFTArgs{
 		JSONSpendHeader: apiargs.JSONSpendHeader{
 			UserPass: apiargs.UserPass{
 				Username: username,
@@ -975,7 +977,7 @@ func TestImportExportKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	importArgs := &ImportKeyArgs{
+	importArgs := &vmargs.ImportKeyArgs{
 		UserPass: apiargs.UserPass{
 			Username: username,
 			Password: password,
@@ -991,14 +993,14 @@ func TestImportExportKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	exportArgs := &ExportKeyArgs{
+	exportArgs := &vmargs.ExportKeyArgs{
 		UserPass: apiargs.UserPass{
 			Username: username,
 			Password: password,
 		},
 		Address: addrStr,
 	}
-	exportReply := &ExportKeyReply{}
+	exportReply := &vmargs.ExportKeyReply{}
 	if err = s.ExportKey(nil, exportArgs, exportReply); err != nil {
 		t.Fatal(err)
 	}
@@ -1036,7 +1038,7 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	args := ImportKeyArgs{
+	args := vmargs.ImportKeyArgs{
 		UserPass: apiargs.UserPass{
 			Username: username,
 			Password: password,
@@ -1107,7 +1109,7 @@ func TestSend(t *testing.T) {
 	}
 	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
-	args := &SendArgs{
+	args := &vmargs.SendArgs{
 		JSONSpendHeader: apiargs.JSONSpendHeader{
 			UserPass: apiargs.UserPass{
 				Username: username,
@@ -1116,7 +1118,7 @@ func TestSend(t *testing.T) {
 			JSONFromAddrs:  apiargs.JSONFromAddrs{From: fromAddrsStr},
 			JSONChangeAddr: apiargs.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
-		SendOutput: SendOutput{
+		SendOutput: vmargs.SendOutput{
 			Amount:  500,
 			AssetID: assetID.String(),
 			To:      addrStr,
@@ -1163,7 +1165,7 @@ func TestSendMultiple(t *testing.T) {
 	}
 	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
-	args := &SendMultipleArgs{
+	args := &vmargs.SendMultipleArgs{
 		JSONSpendHeader: apiargs.JSONSpendHeader{
 			UserPass: apiargs.UserPass{
 				Username: username,
@@ -1172,7 +1174,7 @@ func TestSendMultiple(t *testing.T) {
 			JSONFromAddrs:  apiargs.JSONFromAddrs{From: fromAddrsStr},
 			JSONChangeAddr: apiargs.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
-		Outputs: []SendOutput{
+		Outputs: []vmargs.SendOutput{
 			{
 				Amount:  500,
 				AssetID: assetID.String(),
@@ -1291,7 +1293,7 @@ func TestImportAVAX(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	args := &ImportArgs{
+	args := &vmargs.ImportArgs{
 		UserPass: apiargs.UserPass{
 			Username: username,
 			Password: password,

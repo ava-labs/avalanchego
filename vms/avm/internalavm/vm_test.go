@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/vms/avm/vmargs"
+
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -142,23 +144,23 @@ func BuildGenesisTest(t *testing.T) []byte {
 	addr1Str, _ := formatting.FormatBech32(testHRP, addrs[1].Bytes())
 	addr2Str, _ := formatting.FormatBech32(testHRP, addrs[2].Bytes())
 
-	defaultArgs := &BuildGenesisArgs{
+	defaultArgs := &vmargs.BuildGenesisArgs{
 		Encoding: formatting.Hex,
-		GenesisData: map[string]AssetDefinition{
+		GenesisData: map[string]vmargs.AssetDefinition{
 			"asset1": {
 				Name:   "AVAX",
 				Symbol: "SYMB",
 				InitialState: map[string][]interface{}{
 					"fixedCap": {
-						Holder{
+						vmargs.Holder{
 							Amount:  json.Uint64(startBalance),
 							Address: addr0Str,
 						},
-						Holder{
+						vmargs.Holder{
 							Amount:  json.Uint64(startBalance),
 							Address: addr1Str,
 						},
-						Holder{
+						vmargs.Holder{
 							Amount:  json.Uint64(startBalance),
 							Address: addr2Str,
 						},
@@ -170,14 +172,14 @@ func BuildGenesisTest(t *testing.T) []byte {
 				Symbol: "MVCA",
 				InitialState: map[string][]interface{}{
 					"variableCap": {
-						Owners{
+						vmargs.Owners{
 							Threshold: 1,
 							Minters: []string{
 								addr0Str,
 								addr1Str,
 							},
 						},
-						Owners{
+						vmargs.Owners{
 							Threshold: 2,
 							Minters: []string{
 								addr0Str,
@@ -192,7 +194,7 @@ func BuildGenesisTest(t *testing.T) []byte {
 				Name: "myOtherVarCapAsset",
 				InitialState: map[string][]interface{}{
 					"variableCap": {
-						Owners{
+						vmargs.Owners{
 							Threshold: 1,
 							Minters: []string{
 								addr0Str,
@@ -207,10 +209,10 @@ func BuildGenesisTest(t *testing.T) []byte {
 }
 
 // BuildGenesisTestWithArgs allows building the genesis while injecting different starting points (args)
-func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) []byte {
+func BuildGenesisTestWithArgs(t *testing.T, args *vmargs.BuildGenesisArgs) []byte {
 	ss := CreateStaticService()
 
-	reply := BuildGenesisReply{}
+	reply := vmargs.BuildGenesisReply{}
 	err := ss.BuildGenesis(nil, args, &reply)
 	if err != nil {
 		t.Fatal(err)
@@ -228,7 +230,7 @@ func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) 
 	return GenesisVMWithArgs(t, nil)
 }
 
-func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
+func GenesisVMWithArgs(t *testing.T, args *vmargs.BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
 	var genesisBytes []byte
 
 	if args != nil {
@@ -637,16 +639,16 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 	utxoCount := 2000
 	holder := map[string][]interface{}{}
 	for i := 0; i < utxoCount; i++ {
-		holder["fixedCap"] = append(holder["fixedCap"], Holder{
+		holder["fixedCap"] = append(holder["fixedCap"], vmargs.Holder{
 			Amount:  json.Uint64(startBalance),
 			Address: addr0Str,
 		})
 	}
 
 	// Inject them in the Genesis build
-	genesisArgs := &BuildGenesisArgs{
+	genesisArgs := &vmargs.BuildGenesisArgs{
 		Encoding: formatting.Hex,
-		GenesisData: map[string]AssetDefinition{
+		GenesisData: map[string]vmargs.AssetDefinition{
 			"asset1": {
 				Name:         "AVAX",
 				Symbol:       "SYMB",

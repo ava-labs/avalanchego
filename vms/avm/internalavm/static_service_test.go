@@ -6,6 +6,8 @@ package internalavm
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/vms/avm/vmargs"
+
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -35,28 +37,28 @@ func TestBuildGenesis(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	args := BuildGenesisArgs{
+	args := vmargs.BuildGenesisArgs{
 		Encoding: formatting.Hex,
-		GenesisData: map[string]AssetDefinition{
+		GenesisData: map[string]vmargs.AssetDefinition{
 			"asset1": {
 				Name:         "myFixedCapAsset",
 				Symbol:       "MFCA",
 				Denomination: 8,
 				InitialState: map[string][]interface{}{
 					"fixedCap": {
-						Holder{
+						vmargs.Holder{
 							Amount:  100000,
 							Address: addrMap["A9bTQjfYGBFK3JPRJqF2eh3JYL7cHocvy"],
 						},
-						Holder{
+						vmargs.Holder{
 							Amount:  100000,
 							Address: addrMap["6mxBGnjGDCKgkVe7yfrmvMA7xE7qCv3vv"],
 						},
-						Holder{
+						vmargs.Holder{
 							Amount:  json.Uint64(startBalance),
 							Address: addrMap["6ncQ19Q2U4MamkCYzshhD8XFjfwAWFzTa"],
 						},
-						Holder{
+						vmargs.Holder{
 							Amount:  json.Uint64(startBalance),
 							Address: addrMap["Jz9ayEDt7dx9hDx45aXALujWmL9ZUuqe7"],
 						},
@@ -68,14 +70,14 @@ func TestBuildGenesis(t *testing.T) {
 				Symbol: "MVCA",
 				InitialState: map[string][]interface{}{
 					"variableCap": {
-						Owners{
+						vmargs.Owners{
 							Threshold: 1,
 							Minters: []string{
 								addrMap["A9bTQjfYGBFK3JPRJqF2eh3JYL7cHocvy"],
 								addrMap["6mxBGnjGDCKgkVe7yfrmvMA7xE7qCv3vv"],
 							},
 						},
-						Owners{
+						vmargs.Owners{
 							Threshold: 2,
 							Minters: []string{
 								addrMap["6ncQ19Q2U4MamkCYzshhD8XFjfwAWFzTa"],
@@ -89,7 +91,7 @@ func TestBuildGenesis(t *testing.T) {
 				Name: "myOtherVarCapAsset",
 				InitialState: map[string][]interface{}{
 					"variableCap": {
-						Owners{
+						vmargs.Owners{
 							Threshold: 1,
 							Minters: []string{
 								addrMap["A9bTQjfYGBFK3JPRJqF2eh3JYL7cHocvy"],
@@ -99,7 +101,7 @@ func TestBuildGenesis(t *testing.T) {
 				},
 			},
 		}}
-	reply := BuildGenesisReply{}
+	reply := vmargs.BuildGenesisReply{}
 	err := ss.BuildGenesis(nil, &args, &reply)
 	if err != nil {
 		t.Fatal(err)
