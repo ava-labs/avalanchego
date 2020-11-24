@@ -75,15 +75,15 @@ func (vm *VM) Health() (interface{}, error) {
 
 // PendingTxs implements the avalanche.DAGVM interface
 func (vm *VM) PendingTxs() []snowstorm.Tx {
-	return vm.PendingTxs()
+	return vm.avm.PendingTxs()
 }
 
 // ParseTx implements the avalanche.DAGVM interface
 func (vm *VM) ParseTx(b []byte) (snowstorm.Tx, error) {
-	return vm.ParseTx(b)
+	return vm.avm.ParseTx(b)
 }
 
 // GetTx implements the avalanche.DAGVM interface
 func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
-	return vm.GetTx(txID)
+	return vm.avm.GetTx(txID)
 }
