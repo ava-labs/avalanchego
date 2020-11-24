@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/vms/avm/internalavm"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/evm"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 )
@@ -25,7 +26,7 @@ func TestAliases(t *testing.T) {
 	}
 	if _, exists := generalAliases["vm/"+platformvm.ID.String()]; !exists {
 		t.Fatalf("Should have a custom alias from the vm")
-	} else if _, exists := generalAliases["vm/"+avm.ID.String()]; !exists {
+	} else if _, exists := generalAliases["vm/"+internalavm.ID.String()]; !exists {
 		t.Fatalf("Should have a custom alias from the vm")
 	} else if _, exists := generalAliases["vm/"+evm.ID.String()]; !exists {
 		t.Fatalf("Should have a custom alias from the vm")
@@ -56,7 +57,7 @@ func TestVMGenesis(t *testing.T) {
 			networkID: constants.MainnetID,
 			vmTest: []vmTest{
 				{
-					vmID:       avm.ID,
+					vmID:       internalavm.ID,
 					expectedID: "2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM",
 				},
 				{
@@ -69,7 +70,7 @@ func TestVMGenesis(t *testing.T) {
 			networkID: constants.FujiID,
 			vmTest: []vmTest{
 				{
-					vmID:       avm.ID,
+					vmID:       internalavm.ID,
 					expectedID: "2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm",
 				},
 				{
@@ -82,7 +83,7 @@ func TestVMGenesis(t *testing.T) {
 			networkID: constants.LocalID,
 			vmTest: []vmTest{
 				{
-					vmID:       avm.ID,
+					vmID:       internalavm.ID,
 					expectedID: "2eNy1mUFdmaxXNj1eQHUe7Np4gju9sJsEtWQ4MX3ToiNKuADed",
 				},
 				{

@@ -6,10 +6,11 @@ package platformvm
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/vms/avm/internalavm"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -41,7 +42,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			shouldErr:   true,
 			subnetID:    testSubnet1.ID(),
 			genesisData: nil,
-			vmID:        avm.ID,
+			vmID:        internalavm.ID,
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -52,7 +53,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			shouldErr:   true,
 			subnetID:    testSubnet1.ID(),
 			genesisData: nil,
-			vmID:        avm.ID,
+			vmID:        internalavm.ID,
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -63,7 +64,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			shouldErr:   true,
 			subnetID:    testSubnet1.ID(),
 			genesisData: nil,
-			vmID:        avm.ID,
+			vmID:        internalavm.ID,
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -74,7 +75,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			shouldErr:   true,
 			subnetID:    testSubnet1.ID(),
 			genesisData: nil,
-			vmID:        avm.ID,
+			vmID:        internalavm.ID,
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -85,7 +86,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			shouldErr:   true,
 			subnetID:    testSubnet1.ID(),
 			genesisData: nil,
-			vmID:        avm.ID,
+			vmID:        internalavm.ID,
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -99,7 +100,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			shouldErr:   true,
 			subnetID:    testSubnet1.ID(),
 			genesisData: nil,
-			vmID:        avm.ID,
+			vmID:        internalavm.ID,
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -113,7 +114,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			shouldErr:   true,
 			subnetID:    testSubnet1.ID(),
 			genesisData: nil,
-			vmID:        avm.ID,
+			vmID:        internalavm.ID,
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -161,7 +162,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	tx, err := vm.newCreateChainTx(
 		testSubnet1.ID(),
 		nil,
-		avm.ID,
+		internalavm.ID,
 		nil,
 		"chain name",
 		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
@@ -192,7 +193,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	tx, err := vm.newCreateChainTx( // create a tx
 		testSubnet1.ID(),
 		nil,
-		avm.ID,
+		internalavm.ID,
 		nil,
 		"chain name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -235,7 +236,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	tx, err := vm.newCreateChainTx(
 		testSubnet1.ID(),
 		nil,
-		avm.ID,
+		internalavm.ID,
 		nil,
 		"chain name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -264,7 +265,7 @@ func TestCreateChainTxAlreadyExists(t *testing.T) {
 	tx, err := vm.newCreateChainTx(
 		testSubnet1.ID(),
 		nil,
-		avm.ID,
+		internalavm.ID,
 		nil,
 		"chain name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -300,7 +301,7 @@ func TestCreateChainTxValid(t *testing.T) {
 	tx, err := vm.newCreateChainTx(
 		testSubnet1.ID(),
 		nil,
-		avm.ID,
+		internalavm.ID,
 		nil,
 		"chain name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
