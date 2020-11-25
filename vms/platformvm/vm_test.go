@@ -98,7 +98,6 @@ const (
 
 func init() {
 	ctx := defaultContext()
-	byteFormatter := formatting.CB58{}
 	factory := crypto.FactorySECP256K1R{}
 	for _, key := range []string{
 		"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
@@ -107,8 +106,10 @@ func init() {
 		"ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN",
 		"2RWLv6YVEXDiWLpaCbXhhqxtLbnFaKQsWPSSMSPhpWo47uJAeV",
 	} {
-		ctx.Log.AssertNoError(byteFormatter.FromString(key))
-		pk, err := factory.ToPrivateKey(byteFormatter.Bytes)
+
+		privKeyBytes, err := formatting.Decode(formatting.CB58, key)
+		ctx.Log.AssertNoError(err)
+		pk, err := factory.ToPrivateKey(privKeyBytes)
 		ctx.Log.AssertNoError(err)
 		keys = append(keys, pk.(*crypto.PrivateKeySECP256K1R))
 	}
@@ -181,6 +182,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	}
 
 	buildGenesisArgs := BuildGenesisArgs{
+		Encoding:      formatting.Hex,
 		NetworkID:     json.Uint32(testNetworkID),
 		AvaxAssetID:   avaxAssetID,
 		UTXOs:         genesisUTXOs,
@@ -191,19 +193,12 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	}
 
 	buildGenesisResponse := BuildGenesisReply{}
-	platformvmSS, err := CreateStaticService(formatting.CB58Encoding)
-	if err != nil {
-		panic(err)
-	}
+	platformvmSS := CreateStaticService()
 	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
 		panic(fmt.Errorf("problem while building platform chain's genesis state: %w", err))
 	}
 
-	encoding, err := platformvmSS.encodingManager.GetEncoding(buildGenesisResponse.Encoding)
-	if err != nil {
-		panic(err)
-	}
-	genesisBytes, err := encoding.ConvertString(buildGenesisResponse.Bytes)
+	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
 	if err != nil {
 		panic(err)
 	}
@@ -269,7 +264,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 		Chains:        nil,
 		Time:          json.Uint64(defaultGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
-		Encoding:      formatting.CB58Encoding,
+		Encoding:      formatting.CB58,
 	}
 
 	if args != nil {
@@ -277,19 +272,12 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 	}
 
 	buildGenesisResponse := BuildGenesisReply{}
-	platformvmSS, err := CreateStaticService(buildGenesisArgs.Encoding)
-	if err != nil {
-		t.Fatal(err)
-	}
+	platformvmSS := CreateStaticService()
 	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
 		t.Fatalf("problem while building platform chain's genesis state: %v", err)
 	}
 
-	encoding, err := platformvmSS.encodingManager.GetEncoding(buildGenesisResponse.Encoding)
-	if err != nil {
-		t.Fatal(err)
-	}
-	genesisBytes, err := encoding.ConvertString(buildGenesisResponse.Bytes)
+	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,7 +309,10 @@ func defaultVM() (*VM, database.Database) {
 	ctx := defaultContext()
 
 	m := &atomic.Memory{}
-	m.Initialize(logging.NoLog{}, atomicDB)
+	err := m.Initialize(logging.NoLog{}, atomicDB)
+	if err != nil {
+		panic(err)
+	}
 
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
@@ -395,7 +386,10 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 	ctx := defaultContext()
 
 	m := &atomic.Memory{}
-	m.Initialize(logging.NoLog{}, atomicDB)
+	err := m.Initialize(logging.NoLog{}, atomicDB)
+	if err != nil {
+		panic(err)
+	}
 
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
@@ -541,7 +535,7 @@ func TestGenesisGetUTXOs(t *testing.T) {
 		Chains:        nil,
 		Time:          json.Uint64(defaultGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
-		Encoding:      formatting.HexEncoding,
+		Encoding:      formatting.Hex,
 	}
 
 	_, _, vm, _ := GenesisVMWithArgs(t, &buildGenesisArgs)
@@ -1653,7 +1647,10 @@ func TestAtomicImport(t *testing.T) {
 	recipientKey := keys[1]
 
 	m := &atomic.Memory{}
-	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{5}, baseDB))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{5}, baseDB))
+	if err != nil {
+		t.Fatal(err)
+	}
 	vm.Ctx.SharedMemory = m.NewSharedMemory(vm.Ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.Ctx.XChainID)
 
@@ -1679,7 +1676,7 @@ func TestAtomicImport(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := vm.codec.Marshal(utxo)
+	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -16,6 +16,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+const (
+	codecVersion = 0
+)
+
 type rcLock struct {
 	lock  sync.Mutex
 	count int
@@ -25,17 +29,24 @@ type rcLock struct {
 type Memory struct {
 	lock  sync.Mutex
 	log   logging.Logger
-	codec codec.Codec
+	codec codec.Manager
 	locks map[ids.ID]*rcLock
 	db    database.Database
 }
 
 // Initialize the SharedMemory
-func (m *Memory) Initialize(log logging.Logger, db database.Database) {
+func (m *Memory) Initialize(log logging.Logger, db database.Database) error {
+	c := codec.NewDefault()
+	manager := codec.NewDefaultManager()
+	if err := manager.RegisterCodec(codecVersion, c); err != nil {
+		return err
+	}
+
 	m.log = log
-	m.codec = codec.NewDefault()
+	m.codec = manager
 	m.locks = make(map[ids.ID]*rcLock)
 	m.db = db
+	return nil
 }
 
 // NewSharedMemory returns a new SharedMemory
@@ -95,7 +106,7 @@ func (m *Memory) sharedID(id1, id2 ids.ID) ids.ID {
 		id1, id2 = id2, id1
 	}
 
-	combinedBytes, err := m.codec.Marshal([2]ids.ID{id1, id2})
+	combinedBytes, err := m.codec.Marshal(codecVersion, [2]ids.ID{id1, id2})
 	m.log.AssertNoError(err)
 
 	return hashing.ComputeHash256Array(combinedBytes)

@@ -25,7 +25,10 @@ func NewConnMeter(resetDuration time.Duration, size int) ConnMeter {
 	if resetDuration == 0 {
 		return &noConnMeter{}
 	}
-	return &connMeter{cache: &cache.LRU{Size: size}}
+	return &connMeter{
+		cache:         &cache.LRU{Size: size},
+		resetDuration: resetDuration,
+	}
 }
 
 type noConnMeter struct{}
@@ -36,9 +39,9 @@ func (n *noConnMeter) Register(addr string) (int, error) {
 
 // connMeter implements ConnMeter
 type connMeter struct {
+	lock          sync.RWMutex
 	cache         *cache.LRU
 	resetDuration time.Duration
-	lock          sync.RWMutex
 }
 
 func (n *connMeter) Register(addr string) (int, error) {

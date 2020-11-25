@@ -85,6 +85,10 @@ func TestTransferInputVerifyUnsorted(t *testing.T) {
 
 func TestTransferInputSerialize(t *testing.T) {
 	c := codec.NewDefault()
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(0, c); err != nil {
+		t.Fatal(err)
+	}
 
 	expected := []byte{
 		// Codec version
@@ -109,7 +113,7 @@ func TestTransferInputSerialize(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := c.Marshal(&in)
+	result, err := m.Marshal(0, &in)
 	if err != nil {
 		t.Fatal(err)
 	}

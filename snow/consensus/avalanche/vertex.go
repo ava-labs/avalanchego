@@ -19,6 +19,9 @@ type Vertex interface {
 	// greater than the maximum height of the parents.
 	Height() (uint64, error)
 
+	// Returns the epoch this vertex was issued in.
+	Epoch() (uint32, error)
+
 	// Returns a series of state transitions to be performed on acceptance
 	Txs() ([]snowstorm.Tx, error)
 
