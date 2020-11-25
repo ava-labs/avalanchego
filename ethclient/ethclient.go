@@ -126,7 +126,7 @@ func (ec *Client) getBlock(ctx context.Context, method string, args ...interface
 	if len(body.BlockExtraData) != 0 {
 		blockExtraDataDecoded, err := hexutil.Decode(body.BlockExtraData)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("problem parsing block extra data: %w", err)
 		}
 		blockExtraData = &blockExtraDataDecoded
 	}
