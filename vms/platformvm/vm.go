@@ -767,9 +767,6 @@ pendingStakerLoop:
 		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
-		if err := tx.Sign(vm.codec, nil); err != nil {
-			return err
-		}
 
 		switch staker := tx.UnsignedTx.(type) {
 		case *UnsignedAddDelegatorTx:
@@ -780,6 +777,11 @@ pendingStakerLoop:
 			if staker.StartTime().After(timestamp) {
 				break pendingStakerLoop
 			}
+
+			if err := tx.Sign(vm.codec, nil); err != nil {
+				return err
+			}
+
 			if err := vm.dequeueStaker(db, subnetID, &tx); err != nil {
 				return fmt.Errorf("couldn't dequeue staker: %w", err)
 			}
@@ -804,6 +806,11 @@ pendingStakerLoop:
 			if staker.StartTime().After(timestamp) {
 				break pendingStakerLoop
 			}
+
+			if err := tx.Sign(vm.codec, nil); err != nil {
+				return err
+			}
+
 			if err := vm.dequeueStaker(db, subnetID, &tx); err != nil {
 				return fmt.Errorf("couldn't dequeue staker: %w", err)
 			}
@@ -828,6 +835,11 @@ pendingStakerLoop:
 			if staker.StartTime().After(timestamp) {
 				break pendingStakerLoop
 			}
+
+			if err := tx.Sign(vm.codec, nil); err != nil {
+				return err
+			}
+
 			if err := vm.dequeueStaker(db, subnetID, &tx); err != nil {
 				return fmt.Errorf("couldn't dequeue staker: %w", err)
 			}
@@ -859,9 +871,6 @@ currentStakerLoop:
 		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
-		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
-			return err
-		}
 
 		switch staker := tx.Tx.UnsignedTx.(type) {
 		case *UnsignedAddDelegatorTx:
@@ -888,6 +897,11 @@ currentStakerLoop:
 			if staker.EndTime().After(timestamp) {
 				break currentStakerLoop
 			}
+
+			if err := tx.Tx.Sign(vm.codec, nil); err != nil {
+				return err
+			}
+
 			if err := vm.removeStaker(db, subnetID, &tx); err != nil {
 				return fmt.Errorf("couldn't remove staker: %w", err)
 			}
@@ -985,7 +999,7 @@ func (vm *VM) Logger() logging.Logger { return vm.Ctx.Log }
 // Returns at most [limit] UTXOs.
 // If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
 // Returns:
-// * The fetched of UTXOs
+// * The fetched UTXOs
 // * true if all there are no more UTXOs in this range to fetch
 // * The address associated with the last UTXO fetched
 // * The ID of the last UTXO fetched
@@ -1271,9 +1285,6 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return 0, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
-		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
-			return 0, err
-		}
 
 		validator := (*Validator)(nil)
 		switch staker := tx.Tx.UnsignedTx.(type) {
@@ -1289,6 +1300,10 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 
 		if !validator.NodeID.Equals(nodeID) {
 			continue
+		}
+
+		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
+			return 0, err
 		}
 
 		newWeight, err := safemath.Add64(currentWeight, validator.Wght)
@@ -1314,9 +1329,6 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return 0, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
-		if err := tx.Sign(vm.codec, nil); err != nil {
-			return 0, err
-		}
 
 		validator := (*Validator)(nil)
 		switch staker := tx.UnsignedTx.(type) {
@@ -1336,6 +1348,10 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 
 		if !validator.NodeID.Equals(nodeID) {
 			continue
+		}
+
+		if err := tx.Sign(vm.codec, nil); err != nil {
+			return 0, err
 		}
 
 		for len(toRemoveHeap) > 0 && !toRemoveHeap[0].EndTime().After(validator.StartTime()) {
