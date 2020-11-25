@@ -48,7 +48,7 @@ func (u *user) getAddresses() ([]common.Address, error) {
 		return nil, err
 	}
 	addresses := []common.Address{}
-	if err := Codec.Unmarshal(bytes, &addresses); err != nil {
+	if _, err := Codec.Unmarshal(bytes, &addresses); err != nil {
 		return nil, err
 	}
 	return addresses, nil
@@ -94,7 +94,7 @@ func (u *user) putAddress(privKey *crypto.PrivateKeySECP256K1R) error {
 		}
 	}
 	addresses = append(addresses, address)
-	bytes, err := Codec.Marshal(addresses)
+	bytes, err := Codec.Marshal(codecVersion, addresses)
 	if err != nil {
 		return err
 	}
