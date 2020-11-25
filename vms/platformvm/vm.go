@@ -999,7 +999,7 @@ func (vm *VM) Logger() logging.Logger { return vm.Ctx.Log }
 // Returns at most [limit] UTXOs.
 // If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
 // Returns:
-// * The fetched of UTXOs
+// * The fetched UTXOs
 // * true if all there are no more UTXOs in this range to fetch
 // * The address associated with the last UTXO fetched
 // * The ID of the last UTXO fetched
