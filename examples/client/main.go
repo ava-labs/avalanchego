@@ -22,7 +22,21 @@ var (
 	prefixedPrivateKey = fmt.Sprintf("PrivateKey-%s", key)
 	ipAddr             = "127.0.0.1"
 	port               = 9650
+	pk                 crypto.PrivateKey
+	secpKey            *crypto.PrivateKeySECP256K1R
+	ethAddr            common.Address
 )
+
+func init() {
+	pkBytes, err := formatting.Decode(formatting.CB58, key)
+	if err != nil {
+		panic(err)
+	}
+	factory := crypto.FactorySECP256K1R{}
+	pk, err = factory.ToPrivateKey(pkBytes)
+	secpKey = pk.(*crypto.PrivateKeySECP256K1R)
+	ethAddr = evm.GetEthAddress(secpKey)
+}
 
 type ethWSAPITestExecutor struct {
 	uri            string
@@ -38,13 +52,6 @@ func (e *ethWSAPITestExecutor) ExecuteTest() error {
 	fmt.Printf("Created ethclient\n")
 
 	ctx := context.Background()
-
-	cb58 := formatting.CB58{}
-	factory := crypto.FactorySECP256K1R{}
-	_ = cb58.FromString(key)
-	pk, _ := factory.ToPrivateKey(cb58.Bytes)
-	secpKey := pk.(*crypto.PrivateKeySECP256K1R)
-	ethAddr := evm.GetEthAddress(secpKey)
 
 	if err := testSubscription(ctx, client); err != nil {
 		return fmt.Errorf("Subscription Test failed: %w", err)
@@ -71,13 +78,6 @@ func (e *ethRPCAPITestExecutor) ExecuteTest() error {
 	fmt.Printf("Created ethclient\n")
 
 	ctx := context.Background()
-
-	cb58 := formatting.CB58{}
-	factory := crypto.FactorySECP256K1R{}
-	_ = cb58.FromString(key)
-	pk, _ := factory.ToPrivateKey(cb58.Bytes)
-	secpKey := pk.(*crypto.PrivateKeySECP256K1R)
-	ethAddr := evm.GetEthAddress(secpKey)
 
 	if err := testHeaderAndBlockCalls(ctx, client, ethAddr); err != nil {
 		return fmt.Errorf("HeaderAndBlockCalls Test failed: %w", err)
