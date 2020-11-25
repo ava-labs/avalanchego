@@ -89,8 +89,8 @@ type Tx struct {
 // (*secp256k1fx.Credential)
 
 // Sign this transaction with the provided signers
-func (tx *Tx) Sign(c codec.Codec, signers [][]*crypto.PrivateKeySECP256K1R) error {
-	unsignedBytes, err := c.Marshal(&tx.UnsignedTx)
+func (tx *Tx) Sign(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {
+	unsignedBytes, err := c.Marshal(codecVersion, &tx.UnsignedTx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal UnsignedTx: %w", err)
 	}
@@ -111,7 +111,7 @@ func (tx *Tx) Sign(c codec.Codec, signers [][]*crypto.PrivateKeySECP256K1R) erro
 		tx.Creds = append(tx.Creds, cred) // Attach credential
 	}
 
-	signedBytes, err := c.Marshal(tx)
+	signedBytes, err := c.Marshal(codecVersion, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal Tx: %w", err)
 	}
