@@ -1,6 +1,6 @@
 # Build a debian package from the avalanchego repo 
 
-name: build-linux-release
+name: build-linux-arm64-release
 
 # Controls when the action will run.
 on:
@@ -11,9 +11,9 @@ on:
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
-  build-linux:
+  build-arm64:
     # The type of runner that the job will run on
-    runs-on: ubuntu-18.04 
+    runs-on: self-hosted 
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -42,15 +42,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}
         TAG: ${{ steps.get_version.outputs.VERSION }}
         BUCKET: ${{ secrets.BUCKET }}
-
-    - name: Create RPM package 
-      run: ./.github/workflows/build-rpm-pkg.sh
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.UPLOAD_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}
-        TAG: ${{ steps.get_version.outputs.VERSION }}
-        BUCKET: ${{ secrets.BUCKET }}
-        ARCH: "amd64"
+        ARCH: "arm64"
 
     - name: Create tgz package structure
       run: ./.github/workflows/build-tgz-pkg.sh
@@ -59,4 +51,4 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}
         TAG: ${{ steps.get_version.outputs.VERSION }}
         BUCKET: ${{ secrets.BUCKET }}
-        ARCH: "amd64"
+        ARCH: "arm64"
