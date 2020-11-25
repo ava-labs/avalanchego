@@ -442,7 +442,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return permError{errUnknownOwners}
 		}
 		owner := owned.Owners()
-		ownerBytes, err := vm.codec.Marshal(owner)
+		ownerBytes, err := vm.codec.Marshal(codecVersion, owner)
 		if err != nil {
 			return tempError{
 				fmt.Errorf("couldn't marshal owner: %w", err),
@@ -490,7 +490,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return permError{errUnknownOwners}
 		}
 		owner := owned.Owners()
-		ownerBytes, err := vm.codec.Marshal(owner)
+		ownerBytes, err := vm.codec.Marshal(codecVersion, owner)
 		if err != nil {
 			return tempError{
 				fmt.Errorf("couldn't marshal owner: %w", err),

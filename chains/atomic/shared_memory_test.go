@@ -15,7 +15,10 @@ import (
 
 func TestSharedMemory(t *testing.T) {
 	m := Memory{}
-	m.Initialize(logging.NoLog{}, memdb.New())
+	err := m.Initialize(logging.NoLog{}, memdb.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	chainID0 := ids.GenerateTestID()
 	chainID1 := ids.GenerateTestID()
@@ -23,7 +26,7 @@ func TestSharedMemory(t *testing.T) {
 	sm0 := m.NewSharedMemory(chainID0)
 	sm1 := m.NewSharedMemory(chainID1)
 
-	err := sm0.Put(chainID1, []*Element{{
+	err = sm0.Put(chainID1, []*Element{{
 		Key:   []byte{0},
 		Value: []byte{1},
 		Traits: [][]byte{

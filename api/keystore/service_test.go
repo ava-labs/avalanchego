@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
 var (
@@ -21,7 +22,10 @@ var (
 )
 
 func TestServiceListNoUsers(t *testing.T) {
-	ks := CreateTestKeystore()
+	ks, err := CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	reply := ListUsersReply{}
 	if err := ks.ListUsers(nil, nil, &reply); err != nil {
@@ -33,7 +37,10 @@ func TestServiceListNoUsers(t *testing.T) {
 }
 
 func TestServiceCreateUser(t *testing.T) {
-	ks := CreateTestKeystore()
+	ks, err := CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	{
 		reply := api.SuccessResponse{}
@@ -72,7 +79,10 @@ func genStr(n int) string {
 // TestServiceCreateUserArgsCheck generates excessively long usernames or
 // passwords to assure the sanity checks on string length are not exceeded
 func TestServiceCreateUserArgsCheck(t *testing.T) {
-	ks := CreateTestKeystore()
+	ks, err := CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	{
 		reply := api.SuccessResponse{}
@@ -113,7 +123,10 @@ func TestServiceCreateUserArgsCheck(t *testing.T) {
 // TestServiceCreateUserWeakPassword tests creating a new user with a weak
 // password to ensure the password strength check is working
 func TestServiceCreateUserWeakPassword(t *testing.T) {
-	ks := CreateTestKeystore()
+	ks, err := CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	{
 		reply := api.SuccessResponse{}
@@ -133,7 +146,10 @@ func TestServiceCreateUserWeakPassword(t *testing.T) {
 }
 
 func TestServiceCreateDuplicate(t *testing.T) {
-	ks := CreateTestKeystore()
+	ks, err := CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	{
 		reply := api.SuccessResponse{}
@@ -160,7 +176,10 @@ func TestServiceCreateDuplicate(t *testing.T) {
 }
 
 func TestServiceCreateUserNoName(t *testing.T) {
-	ks := CreateTestKeystore()
+	ks, err := CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	reply := api.SuccessResponse{}
 	if err := ks.CreateUser(nil, &api.UserPass{
@@ -171,7 +190,10 @@ func TestServiceCreateUserNoName(t *testing.T) {
 }
 
 func TestServiceUseBlockchainDB(t *testing.T) {
-	ks := CreateTestKeystore()
+	ks, err := CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	{
 		reply := api.SuccessResponse{}
@@ -210,92 +232,106 @@ func TestServiceUseBlockchainDB(t *testing.T) {
 }
 
 func TestServiceExportImport(t *testing.T) {
-	ks := CreateTestKeystore()
-
-	{
-		reply := api.SuccessResponse{}
-		if err := ks.CreateUser(nil, &api.UserPass{
-			Username: "bob",
-			Password: strongPassword,
-		}, &reply); err != nil {
-			t.Fatal(err)
-		}
-		if !reply.Success {
-			t.Fatalf("User should have been created successfully")
-		}
-	}
-
-	{
-		db, err := ks.GetDatabase(ids.Empty, "bob", strongPassword)
+	encodings := []formatting.Encoding{formatting.Hex, formatting.CB58}
+	for _, encoding := range encodings {
+		ks, err := CreateTestKeystore()
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := db.Put([]byte("hello"), []byte("world")); err != nil {
-			t.Fatal(err)
-		}
-	}
 
-	exportReply := ExportUserReply{}
-	if err := ks.ExportUser(nil, &api.UserPass{
-		Username: "bob",
-		Password: strongPassword,
-	}, &exportReply); err != nil {
-		t.Fatal(err)
-	}
-
-	newKS := CreateTestKeystore()
-
-	{
-		reply := api.SuccessResponse{}
-		if err := newKS.ImportUser(nil, &ImportUserArgs{
-			UserPass: api.UserPass{
+		{
+			reply := api.SuccessResponse{}
+			if err := ks.CreateUser(nil, &api.UserPass{
 				Username: "bob",
-				Password: "",
-			},
-			User: exportReply.User,
-		}, &reply); err == nil {
-			t.Fatal("Should have errored due to incorrect password")
+				Password: strongPassword,
+			}, &reply); err != nil {
+				t.Fatal(err)
+			}
+			if !reply.Success {
+				t.Fatalf("User should have been created successfully")
+			}
 		}
-	}
 
-	{
-		reply := api.SuccessResponse{}
-		if err := newKS.ImportUser(nil, &ImportUserArgs{
-			UserPass: api.UserPass{
-				Username: "",
-				Password: "strongPassword",
-			},
-			User: exportReply.User,
-		}, &reply); err == nil {
-			t.Fatal("Should have errored due to empty username")
+		{
+			db, err := ks.GetDatabase(ids.Empty, "bob", strongPassword)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := db.Put([]byte("hello"), []byte("world")); err != nil {
+				t.Fatal(err)
+			}
 		}
-	}
 
-	{
-		reply := api.SuccessResponse{}
-		if err := newKS.ImportUser(nil, &ImportUserArgs{
+		exportArgs := ExportUserArgs{
 			UserPass: api.UserPass{
 				Username: "bob",
 				Password: strongPassword,
 			},
-			User: exportReply.User,
-		}, &reply); err != nil {
+			Encoding: encoding,
+		}
+		exportReply := ExportUserReply{}
+		if err := ks.ExportUser(nil, &exportArgs, &exportReply); err != nil {
 			t.Fatal(err)
 		}
-		if !reply.Success {
-			t.Fatalf("User should have been imported successfully")
-		}
-	}
 
-	{
-		db, err := newKS.GetDatabase(ids.Empty, "bob", strongPassword)
+		newKS, err := CreateTestKeystore()
 		if err != nil {
 			t.Fatal(err)
 		}
-		if val, err := db.Get([]byte("hello")); err != nil {
-			t.Fatal(err)
-		} else if !bytes.Equal(val, []byte("world")) {
-			t.Fatalf("Should have read '%s' from the db", "world")
+
+		{
+			reply := api.SuccessResponse{}
+			if err := newKS.ImportUser(nil, &ImportUserArgs{
+				UserPass: api.UserPass{
+					Username: "bob",
+					Password: "",
+				},
+				User: exportReply.User,
+			}, &reply); err == nil {
+				t.Fatal("Should have errored due to incorrect password")
+			}
+		}
+
+		{
+			reply := api.SuccessResponse{}
+			if err := newKS.ImportUser(nil, &ImportUserArgs{
+				UserPass: api.UserPass{
+					Username: "",
+					Password: "strongPassword",
+				},
+				User: exportReply.User,
+			}, &reply); err == nil {
+				t.Fatal("Should have errored due to empty username")
+			}
+		}
+
+		{
+			reply := api.SuccessResponse{}
+			if err := newKS.ImportUser(nil, &ImportUserArgs{
+				UserPass: api.UserPass{
+					Username: "bob",
+					Password: strongPassword,
+				},
+				User:     exportReply.User,
+				Encoding: encoding,
+			}, &reply); err != nil {
+				t.Fatal(err)
+			}
+			if !reply.Success {
+				t.Fatalf("User should have been imported successfully")
+			}
+		}
+
+		{
+			db, err := newKS.GetDatabase(ids.Empty, "bob", strongPassword)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if val, err := db.Get([]byte("hello")); err != nil {
+				t.Fatal(err)
+			} else if !bytes.Equal(val, []byte("world")) {
+				t.Fatalf("Should have read '%s' from the db", "world")
+			}
 		}
 	}
 }
@@ -354,7 +390,10 @@ func TestServiceDeleteUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			ks := CreateTestKeystore()
+			ks, err := CreateTestKeystore()
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			if tt.setup != nil {
 				if err := tt.setup(ks); err != nil {
@@ -362,7 +401,7 @@ func TestServiceDeleteUser(t *testing.T) {
 				}
 			}
 			got := &api.SuccessResponse{}
-			err := ks.DeleteUser(nil, tt.request, got)
+			err = ks.DeleteUser(nil, tt.request, got)
 			if (err != nil) != tt.wantError {
 				t.Fatalf("DeleteUser() failed: error %v, wantError %v", err, tt.wantError)
 			}

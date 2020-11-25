@@ -33,6 +33,8 @@ const (
 
 	maxPackerSize  = 1 << 30 // max size, in bytes, of something being marshalled by Marshal()
 	maxSliceLength = 1 << 18
+
+	codecVersion = 0
 )
 
 var (
@@ -54,10 +56,9 @@ type UserDB struct {
 
 // Keystore is the RPC interface for keystore management
 type Keystore struct {
-	lock sync.Mutex
-	log  logging.Logger
-
-	codec codec.Codec
+	lock  sync.Mutex
+	log   logging.Logger
+	codec codec.Manager
 
 	// Key: username
 	// Value: The user with that name
@@ -76,12 +77,19 @@ type Keystore struct {
 }
 
 // Initialize the keystore
-func (ks *Keystore) Initialize(log logging.Logger, db database.Database) {
+func (ks *Keystore) Initialize(log logging.Logger, db database.Database) error {
+	c := codec.New(codec.DefaultTagName, maxSliceLength)
+	manager := codec.NewManager(maxPackerSize)
+	if err := manager.RegisterCodec(codecVersion, c); err != nil {
+		return err
+	}
+
 	ks.log = log
-	ks.codec = codec.New(maxPackerSize, maxSliceLength)
+	ks.codec = manager
 	ks.users = make(map[string]*password.Hash)
 	ks.userDB = prefixdb.New([]byte("users"), db)
 	ks.bcDB = prefixdb.New([]byte("bcs"), db)
+	return nil
 }
 
 // CreateHandler returns a new service object that can send requests to thisAPI.
@@ -110,7 +118,8 @@ func (ks *Keystore) getUser(username string) (*password.Hash, error) {
 	}
 
 	user = &password.Hash{}
-	return user, ks.codec.Unmarshal(userBytes, user)
+	_, err = ks.codec.Unmarshal(userBytes, user)
+	return user, err
 }
 
 // CreateUser creates an empty user with the provided username and password
@@ -150,13 +159,24 @@ func (ks *Keystore) ListUsers(_ *http.Request, args *struct{}, reply *ListUsersR
 	return it.Error()
 }
 
+// ExportUserArgs ...
+type ExportUserArgs struct {
+	// The username and password
+	api.UserPass
+	// The encoding for the exported user ("hex" or "cb58")
+	Encoding formatting.Encoding `json:"encoding"`
+}
+
 // ExportUserReply is the reply from ExportUser
 type ExportUserReply struct {
-	User formatting.CB58 `json:"user"`
+	// String representation of the user
+	User string `json:"user"`
+	// The encoding for the exported user ("hex" or "cb58")
+	Encoding formatting.Encoding `json:"encoding"`
 }
 
 // ExportUser exports a serialized encoding of a user's information complete with encrypted database values
-func (ks *Keystore) ExportUser(_ *http.Request, args *api.UserPass, reply *ExportUserReply) error {
+func (ks *Keystore) ExportUser(_ *http.Request, args *ExportUserArgs, reply *ExportUserReply) error {
 	ks.log.Info("Keystore: ExportUser called for %s", args.Username)
 
 	ks.lock.Lock()
@@ -186,18 +206,29 @@ func (ks *Keystore) ExportUser(_ *http.Request, args *api.UserPass, reply *Expor
 		return err
 	}
 
-	b, err := ks.codec.Marshal(&userData)
+	// Get byte representation of user
+	b, err := ks.codec.Marshal(codecVersion, &userData)
 	if err != nil {
 		return err
 	}
-	reply.User.Bytes = b
+
+	// Encode the user from bytes to string
+	reply.User, err = formatting.Encode(args.Encoding, b)
+	if err != nil {
+		return fmt.Errorf("couldn't encode user to string: %w", err)
+	}
+	reply.Encoding = args.Encoding
 	return nil
 }
 
 // ImportUserArgs are arguments for ImportUser
 type ImportUserArgs struct {
+	// The username and password of the user being imported
 	api.UserPass
-	User formatting.CB58 `json:"user"`
+	// The string representation of the user
+	User string `json:"user"`
+	// The encoding of [User] ("hex" or "cb58")
+	Encoding formatting.Encoding `json:"encoding"`
 }
 
 // ImportUser imports a serialized encoding of a user's information complete with encrypted database values,
@@ -212,19 +243,25 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *api
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
+	// Decode the user from string to bytes
+	userBytes, err := formatting.Decode(args.Encoding, args.User)
+	if err != nil {
+		return fmt.Errorf("couldn't decode 'user' to bytes: %w", err)
+	}
+
 	if usr, err := ks.getUser(args.Username); err == nil || usr != nil {
 		return fmt.Errorf("user already exists: %s", args.Username)
 	}
 
 	userData := UserDB{}
-	if err := ks.codec.Unmarshal(args.User.Bytes, &userData); err != nil {
+	if _, err := ks.codec.Unmarshal(userBytes, &userData); err != nil {
 		return err
 	}
 	if !userData.Hash.Check(args.Password) {
 		return fmt.Errorf("incorrect password for user %q", args.Username)
 	}
 
-	usrBytes, err := ks.codec.Marshal(&userData.Hash)
+	usrBytes, err := ks.codec.Marshal(codecVersion, &userData.Hash)
 	if err != nil {
 		return err
 	}
@@ -356,7 +393,7 @@ func (ks *Keystore) AddUser(username, pword string) error {
 		return err
 	}
 
-	userBytes, err := ks.codec.Marshal(user)
+	userBytes, err := ks.codec.Marshal(codecVersion, user)
 	if err != nil {
 		return err
 	}
@@ -370,8 +407,7 @@ func (ks *Keystore) AddUser(username, pword string) error {
 }
 
 // CreateTestKeystore returns a new keystore that can be utilized for testing
-func CreateTestKeystore() *Keystore {
+func CreateTestKeystore() (*Keystore, error) {
 	ks := &Keystore{}
-	ks.Initialize(logging.NoLog{}, memdb.New())
-	return ks
+	return ks, ks.Initialize(logging.NoLog{}, memdb.New())
 }
