@@ -97,11 +97,11 @@ func (ec *Client) BlockNumber(ctx context.Context) (uint64, error) {
 }
 
 type rpcBlock struct {
-	Hash         common.Hash      `json:"hash"`
-	Transactions []rpcTransaction `json:"transactions"`
-	UncleHashes  []common.Hash    `json:"uncles"`
-	Version      uint32           `json:"version"`
-	ExtraData    *[]byte          `json:"blockExtraData"`
+	Hash           common.Hash      `json:"hash"`
+	Transactions   []rpcTransaction `json:"transactions"`
+	UncleHashes    []common.Hash    `json:"uncles"`
+	Version        uint32           `json:"version"`
+	BlockExtraData string           `json:"blockExtraData"`
 }
 
 func (ec *Client) getBlock(ctx context.Context, method string, args ...interface{}) (*types.Block, error) {
@@ -121,6 +121,16 @@ func (ec *Client) getBlock(ctx context.Context, method string, args ...interface
 	if err := json.Unmarshal(raw, &body); err != nil {
 		return nil, err
 	}
+
+	var blockExtraData *[]byte
+	if len(body.BlockExtraData) != 0 {
+		blockExtraDataDecoded, err := hexutil.Decode(body.BlockExtraData)
+		if err != nil {
+			return nil, fmt.Errorf("problem parsing block extra data: %w", err)
+		}
+		blockExtraData = &blockExtraDataDecoded
+	}
+
 	// Quick-verify transaction and uncle lists. This mostly helps with debugging the server.
 	if head.UncleHash == types.EmptyUncleHash && len(body.UncleHashes) > 0 {
 		return nil, fmt.Errorf("server returned non-empty uncle list but block header indicates no uncles")
@@ -166,7 +176,7 @@ func (ec *Client) getBlock(ctx context.Context, method string, args ...interface
 		}
 		txs[i] = tx.tx
 	}
-	return types.NewBlockWithHeader(head).WithBody(txs, uncles, body.Version, body.ExtraData), nil
+	return types.NewBlockWithHeader(head).WithBody(txs, uncles, body.Version, blockExtraData), nil
 }
 
 // HeaderByHash returns the block header with the given hash.
