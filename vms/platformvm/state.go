@@ -469,8 +469,8 @@ func (vm *VM) getPaginatedUTXOs(
 	lastIndex := ids.Empty
 
 	utxos := make([]*avax.UTXO, 0, limit)
-	seen := ids.New(limit) // IDs of UTXOs already in the list
-	searchSize := limit    // the limit diminishes which can impact the expected return
+	seen := make(ids.Set, limit) // IDs of UTXOs already in the list
+	searchSize := limit          // the limit diminishes which can impact the expected return
 
 	// enforces the same ordering for pagination
 	addrsList := addrs.List()
@@ -519,12 +519,16 @@ func (vm *VM) getAllUTXOs(
 	var err error
 	lastAddr := ids.ShortEmpty
 	lastIndex := ids.Empty
-	seen := ids.New(maxUTXOsToFetch) // IDs of UTXOs already in the list
+	seen := make(ids.Set, maxUTXOsToFetch) // IDs of UTXOs already in the list
 	utxos := make([]*avax.UTXO, 0, maxUTXOsToFetch)
 
+	// enforces the same ordering for pagination
+	addrsList := addrs.List()
+	ids.SortShortIDs(addrsList)
+
 	// iterate over the addresses and get all the utxos
-	for _, addr := range addrs.List() {
-		lastIndex, err = vm.getAllUniqueAddressUTXOs(db, addr, seen, &utxos)
+	for _, addr := range addrsList {
+		lastIndex, err = vm.getAllUniqueAddressUTXOs(db, addr, &seen, &utxos)
 		if err != nil {
 			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 		}

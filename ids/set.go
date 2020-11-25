@@ -19,13 +19,6 @@ const (
 // Set is a set of IDs
 type Set map[ID]bool
 
-// New returns a set of a given size
-func New(size int) *Set {
-	newSet := &Set{}
-	newSet.init(size)
-	return newSet
-}
-
 func (ids *Set) init(size int) {
 	if *ids == nil {
 		if minSetSize > size {

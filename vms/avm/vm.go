@@ -492,8 +492,8 @@ func (vm *VM) getPaginatedUTXOs(addrs ids.ShortSet,
 	lastIndex := ids.Empty
 
 	utxos := make([]*avax.UTXO, 0, limit)
-	seen := ids.New(limit) // IDs of UTXOs already in the list
-	searchSize := limit    // the limit diminishes which can impact the expected return
+	seen := make(ids.Set, limit) // IDs of UTXOs already in the list
+	searchSize := limit          // the limit diminishes which can impact the expected return
 
 	// enforces the same ordering for pagination
 	addrsList := addrs.List()
@@ -507,7 +507,9 @@ func (vm *VM) getPaginatedUTXOs(addrs ids.ShortSet,
 			start = startUTXOID
 		}
 
-		utxoIDs, err := vm.state.Funds(addr.Bytes(), start, searchSize) // Get UTXOs associated with [addr]
+		// Get UTXOs associated with [addr]. [searchSize] is used here to ensure
+		// that no UTXOs are dropped due to duplicated fetching.
+		utxoIDs, err := vm.state.Funds(addr.Bytes(), start, searchSize)
 		if err != nil {
 			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 		}
@@ -539,12 +541,16 @@ func (vm *VM) getAllUTXOs(addrs ids.ShortSet) ([]*avax.UTXO, ids.ShortID, ids.ID
 	var err error
 	lastAddr := ids.ShortEmpty
 	lastIndex := ids.Empty
-	seen := ids.New(maxUTXOsToFetch) // IDs of UTXOs already in the list
+	seen := make(ids.Set, maxUTXOsToFetch) // IDs of UTXOs already in the list
 	utxos := make([]*avax.UTXO, 0, maxUTXOsToFetch)
 
+	// enforces the same ordering for pagination
+	addrsList := addrs.List()
+	ids.SortShortIDs(addrsList)
+
 	// iterate over the addresses and get all the utxos
-	for _, addr := range addrs.List() {
-		lastIndex, err = vm.getAllUniqueAddressUTXOs(addr, seen, &utxos)
+	for _, addr := range addrsList {
+		lastIndex, err = vm.getAllUniqueAddressUTXOs(addr, &seen, &utxos)
 		if err != nil {
 			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 		}
