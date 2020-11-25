@@ -70,6 +70,7 @@ const (
 	batchSize       = 250
 	maxUTXOsToFetch = 1024
 	blockCacheSize  = 1 << 10 // 1024
+	codecVersion    = uint16(0)
 )
 
 const (
@@ -110,26 +111,29 @@ func maxDuration(x, y time.Duration) time.Duration {
 }
 
 // Codec does serialization and deserialization
-var Codec codec.Codec
+var Codec codec.Manager
 
 func init() {
-	Codec = codec.NewDefault()
+	Codec = codec.NewDefaultManager()
+	c := codec.NewDefault()
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		Codec.RegisterType(&UnsignedImportTx{}),
-		Codec.RegisterType(&UnsignedExportTx{}),
+		c.RegisterType(&UnsignedImportTx{}),
+		c.RegisterType(&UnsignedExportTx{}),
 	)
-	Codec.Skip(3)
+	c.Skip(3)
 	errs.Add(
-		Codec.RegisterType(&secp256k1fx.TransferInput{}),
-		Codec.RegisterType(&secp256k1fx.MintOutput{}),
-		Codec.RegisterType(&secp256k1fx.TransferOutput{}),
-		Codec.RegisterType(&secp256k1fx.MintOperation{}),
-		Codec.RegisterType(&secp256k1fx.Credential{}),
-		Codec.RegisterType(&secp256k1fx.Input{}),
-		Codec.RegisterType(&secp256k1fx.OutputOwners{}),
+		c.RegisterType(&secp256k1fx.TransferInput{}),
+		c.RegisterType(&secp256k1fx.MintOutput{}),
+		c.RegisterType(&secp256k1fx.TransferOutput{}),
+		c.RegisterType(&secp256k1fx.MintOperation{}),
+		c.RegisterType(&secp256k1fx.Credential{}),
+		c.RegisterType(&secp256k1fx.Input{}),
+		c.RegisterType(&secp256k1fx.OutputOwners{}),
 	)
+
+	errs.Add(Codec.RegisterCodec(0, c))
 	if errs.Errored() {
 		panic(errs.Err)
 	}
@@ -139,8 +143,7 @@ func init() {
 type VM struct {
 	ctx *snow.Context
 
-	CLIConfig       CommandLineConfig
-	encodingManager formatting.EncodingManager
+	CLIConfig CommandLineConfig
 
 	chainID          *big.Int
 	networkID        uint64
@@ -173,7 +176,8 @@ type VM struct {
 	txSubmitChan          <-chan struct{}
 	atomicTxSubmitChan    chan struct{}
 	shutdownSubmitChan    chan struct{}
-	codec                 codec.Codec
+	baseCodec             codec.Codec
+	codec                 codec.Manager
 	clock                 timer.Clock
 	txFee                 uint64
 	pendingAtomicTxs      chan *Tx
@@ -187,7 +191,7 @@ type VM struct {
 func (vm *VM) getAtomicTx(block *types.Block) *Tx {
 	extdata := block.ExtraData()
 	atx := new(Tx)
-	if err := vm.codec.Unmarshal(extdata, atx); err != nil {
+	if _, err := vm.codec.Unmarshal(extdata, atx); err != nil {
 		return nil
 	}
 	atx.Sign(vm.codec, nil)
@@ -195,7 +199,10 @@ func (vm *VM) getAtomicTx(block *types.Block) *Tx {
 }
 
 // Codec implements the secp256k1fx interface
-func (vm *VM) Codec() codec.Codec { return codec.NewDefault() }
+func (vm *VM) Codec() codec.Manager { return vm.codec }
+
+// CodecRegistry implements the secp256k1fx interface
+func (vm *VM) CodecRegistry() codec.Registry { return vm.baseCodec }
 
 // Clock implements the secp256k1fx interface
 func (vm *VM) Clock() *timer.Clock { return &vm.clock }
@@ -220,12 +227,6 @@ func (vm *VM) Initialize(
 	if vm.CLIConfig.ParsingError != nil {
 		return vm.CLIConfig.ParsingError
 	}
-
-	encodingManager, err := formatting.NewEncodingManager(formatting.CB58Encoding)
-	if err != nil {
-		return fmt.Errorf("problem creating encoding manager: %w", err)
-	}
-	vm.encodingManager = encodingManager
 
 	if len(fxs) > 0 {
 		return errUnsupportedFXs
@@ -284,7 +285,7 @@ func (vm *VM) Initialize(
 				vm.newBlockChan <- nil
 				return nil, err
 			}
-			raw, _ := vm.codec.Marshal(atx)
+			raw, _ := vm.codec.Marshal(codecVersion, atx)
 			return raw, nil
 		default:
 			if len(txs) == 0 {
@@ -382,10 +383,14 @@ func (vm *VM) Initialize(
 	vm.genesisHash = chain.GetGenesisBlock().Hash()
 	log.Info(fmt.Sprintf("lastAccepted = %s", vm.lastAccepted.ethBlock.Hash().Hex()))
 
-	// TODO: shutdown this go routine
 	vm.shutdownWg.Add(1)
 	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
 	vm.codec = Codec
+	// The Codec explicitly registers the types it requires from the secp256k1fx
+	// so [vm.baseCodec] is a dummy codec use to fulfill the secp256k1fx VM
+	// interface. The fx will register all of its types, which can be safely
+	// ignored by the VM's codec.
+	vm.baseCodec = codec.NewDefault()
 
 	return vm.fx.Initialize(vm)
 }
@@ -857,7 +862,7 @@ func (vm *VM) GetAtomicUTXOs(
 	utxos := make([]*avax.UTXO, len(allUTXOBytes))
 	for i, utxoBytes := range allUTXOBytes {
 		utxo := &avax.UTXO{}
-		if err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
+		if _, err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
 			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error parsing UTXO: %w", err)
 		}
 		utxos[i] = utxo
