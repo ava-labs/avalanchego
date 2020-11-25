@@ -25,11 +25,10 @@ const (
 )
 
 var (
-	errMarshalNil        = errors.New("can't marshal nil pointer or interface")
-	errUnmarshalNil      = errors.New("can't unmarshal nil")
-	errNeedPointer       = errors.New("argument to unmarshal must be a pointer")
-	errCantPackVersion   = errors.New("couldn't pack codec version")
-	errCantUnpackVersion = errors.New("couldn't unpack codec version")
+	errMarshalNil   = errors.New("can't marshal nil pointer or interface")
+	errUnmarshalNil = errors.New("can't unmarshal nil")
+	errNeedPointer  = errors.New("argument to unmarshal must be a pointer")
+	errExtraSpace   = errors.New("trailing buffer space")
 )
 
 // Codec handles marshaling and unmarshaling of structs
@@ -251,7 +250,13 @@ func (c *codec) Unmarshal(bytes []byte, dest interface{}) error {
 	if destPtr.Kind() != reflect.Ptr {
 		return errNeedPointer
 	}
-	return c.unmarshal(&p, destPtr.Elem())
+	if err := c.unmarshal(&p, destPtr.Elem()); err != nil {
+		return err
+	}
+	if p.Offset != len(bytes) {
+		return errExtraSpace
+	}
+	return nil
 }
 
 // Unmarshal from p.Bytes into [value]. [value] must be addressable.

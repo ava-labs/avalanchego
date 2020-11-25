@@ -35,12 +35,9 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 
 	peers := validators.NewSet()
 	db := memdb.New()
-	sender := &common.SenderTest{}
-	manager := &vertex.TestManager{}
+	sender := &common.SenderTest{T: t}
+	manager := vertex.NewTestManager(t)
 	vm := &vertex.TestVM{}
-
-	sender.T = t
-	manager.T = t
 	vm.T = t
 
 	sender.Default(true)

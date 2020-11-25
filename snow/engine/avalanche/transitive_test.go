@@ -65,7 +65,7 @@ func TestEngineAdd(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	manager.Default(true)
@@ -163,7 +163,7 @@ func TestEngineQuery(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	manager.Default(true)
@@ -444,7 +444,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -597,7 +597,7 @@ func TestEngineBlockedIssue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -673,7 +673,7 @@ func TestEngineAbandonResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	sender := &common.SenderTest{}
@@ -773,7 +773,7 @@ func TestEngineScheduleRepoll(t *testing.T) {
 		TxsV:     []snowstorm.Tx{tx0},
 	}
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	manager.Default(true)
@@ -839,7 +839,7 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	manager.Default(true)
@@ -947,7 +947,7 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	manager.Default(true)
@@ -1061,7 +1061,7 @@ func TestEngineIssueRepoll(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	manager.Default(true)
@@ -1129,7 +1129,7 @@ func TestEngineReissue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	manager.Default(true)
@@ -1306,7 +1306,7 @@ func TestEngineLargeIssue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	manager.Default(true)
@@ -1413,7 +1413,7 @@ func TestEngineGetVertex(t *testing.T) {
 
 	vdr := validators.GenerateRandomValidator(1)
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	manager.Default(true)
@@ -1471,7 +1471,7 @@ func TestEngineInsufficientValidators(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	manager.Default(true)
@@ -1546,7 +1546,7 @@ func TestEnginePushGossip(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	manager.Default(true)
@@ -1633,7 +1633,7 @@ func TestEngineSingleQuery(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	manager.Default(true)
@@ -1704,7 +1704,7 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	manager.Default(true)
@@ -1808,7 +1808,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	manager.Default(true)
@@ -1929,7 +1929,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	manager.Default(true)
@@ -2061,7 +2061,7 @@ func TestEngineMissingTx(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	manager.Default(true)
@@ -2186,7 +2186,7 @@ func TestEngineIssueBlockingTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -2254,7 +2254,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	manager.Default(true)
@@ -2384,7 +2384,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 
 	sender.Default(true)
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	manager.Default(true)
@@ -2631,7 +2631,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -2732,7 +2732,7 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -2811,7 +2811,7 @@ func TestEngineGossip(t *testing.T) {
 
 	sender.Default(true)
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -2873,7 +2873,7 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 	sender.T = t
 	config.Sender = sender
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	gVtx := &avalanche.TestVertex{
@@ -3013,7 +3013,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	sender.T = t
 	config.Sender = sender
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	gVtx := &avalanche.TestVertex{
@@ -3162,7 +3162,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	sender.T = t
 	config.Sender = sender
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	vm := &vertex.TestVM{}
@@ -3277,7 +3277,7 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	manager.Default(true)
@@ -3398,7 +3398,7 @@ func TestEngineDoubleChit(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	manager := &vertex.TestManager{T: t}
+	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
 	manager.Default(true)
