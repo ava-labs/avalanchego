@@ -5,21 +5,13 @@ package avm
 
 import (
 	"fmt"
-	"math"
 	"math/rand"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	"github.com/ava-labs/avalanchego/utils/codec"
-
-	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func BenchmarkLoadUser(b *testing.B) {
@@ -84,33 +76,16 @@ func BenchmarkLoadUser(b *testing.B) {
 
 // GetAllUTXOsBenchmark is a helper func to benchmark the GetAllUTXOs depending on the size
 func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
+	_, _, vm, _ := GenesisVM(b)
+	ctx := vm.ctx
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			b.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
 
-	vm := VM{}
-	vm.genesisCodec = codec.New(math.MaxUint32, 1<<20)
-	_ = vm.genesisCodec.RegisterType(&avax.TestAddressable{})
-	c := codec.New(math.MaxUint32, 1<<20)
-	_ = c.RegisterType(&secp256k1fx.TransferOutput{})
-
-	vm.codec = &codecRegistry{
-		genesisCodec:  vm.genesisCodec,
-		codec:         c,
-		index:         0,
-		typeToFxIndex: vm.typeToFxIndex,
-	}
-	vm.state = &prefixedState{
-		state: &state{State: avax.State{
-			Cache:        &cache.LRU{Size: stateCacheSize},
-			DB:           prefixdb.New([]byte{1}, memdb.New()),
-			GenesisCodec: vm.genesisCodec,
-			Codec:        c,
-		}},
-
-		tx:       &cache.LRU{Size: idCacheSize},
-		utxo:     &cache.LRU{Size: idCacheSize},
-		txStatus: &cache.LRU{Size: idCacheSize},
-
-		uniqueTx: &cache.EvictableLRU{Size: txCacheSize},
-	}
+	addr := ids.GenerateTestShortID()
 
 	// #nosec G404
 	for i := 0; i < utxoCount; i++ {
@@ -124,7 +99,7 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 				Amt: 100000,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
-					Addrs:     []ids.ShortID{addrs[0]},
+					Addrs:     []ids.ShortID{addr},
 					Threshold: 1,
 				},
 			},
@@ -136,7 +111,7 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 	}
 
 	addrsSet := ids.ShortSet{}
-	addrsSet.Add(addrs[0])
+	addrsSet.Add(addr)
 
 	var (
 		err               error
@@ -144,16 +119,18 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 	)
 
 	b.ResetTimer()
-	// Fetch all UTXOs older version
-	notPaginatedUTXOs, _, _, err = vm.getAllUTXOs(addrsSet)
-	if err != nil {
-		b.Fatal(err)
-	}
 
-	if len(notPaginatedUTXOs) != utxoCount {
-		b.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", utxoCount, len(notPaginatedUTXOs))
-	}
+	for i := 0; i < b.N; i++ {
+		// Fetch all UTXOs older version
+		notPaginatedUTXOs, _, _, err = vm.getAllUTXOs(addrsSet)
+		if err != nil {
+			b.Fatal(err)
+		}
 
+		if len(notPaginatedUTXOs) != utxoCount {
+			b.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", utxoCount, len(notPaginatedUTXOs))
+		}
+	}
 }
 
 func BenchmarkGetUTXOs(b *testing.B) {
