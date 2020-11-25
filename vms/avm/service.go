@@ -887,11 +887,6 @@ type SendArgs struct {
 	// The amount, assetID, and destination to send funds to
 	SendOutput
 
-	// The addresses to send funds from
-	// If empty, will send from any addresses
-	// controlled by the given user
-	From []string `json:"from"`
-
 	// Memo field
 	Memo string `json:"memo"`
 }
