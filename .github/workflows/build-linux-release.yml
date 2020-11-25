@@ -11,7 +11,7 @@ on:
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
-  build:
+  build-linux:
     # The type of runner that the job will run on
     runs-on: ubuntu-18.04 
 
@@ -54,6 +54,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}
         TAG: ${{ steps.get_version.outputs.VERSION }}
         BUCKET: ${{ secrets.BUCKET }}
+        ARCH: "amd64"
 
     - name: Create tgz package structure
       run: ./.github/workflows/build-tgz-pkg.sh
@@ -62,3 +63,4 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}
         TAG: ${{ steps.get_version.outputs.VERSION }}
         BUCKET: ${{ secrets.BUCKET }}
+        ARCH: "amd64"
