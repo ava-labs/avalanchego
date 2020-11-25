@@ -269,7 +269,7 @@ func TestStateUTXOs(t *testing.T) {
 
 	state := vm.state.state
 
-	if err := vm.codec.RegisterType(&avax.TestVerifiable{}); err != nil {
+	if err := vm.CodecRegistry().RegisterType(&avax.TestVerifiable{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -349,7 +349,7 @@ func TestStateTXs(t *testing.T) {
 
 	state := vm.state.state
 
-	if err := vm.codec.RegisterType(&avax.TestTransferable{}); err != nil {
+	if err := vm.CodecRegistry().RegisterType(&avax.TestTransferable{}); err != nil {
 		t.Fatal(err)
 	}
 

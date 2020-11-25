@@ -170,7 +170,7 @@ func (vm *VM) addStaker(db database.Database, subnetID ids.ID, tx *rewardTx) err
 		return fmt.Errorf("staker is unexpected type %T", tx.Tx.UnsignedTx)
 	}
 
-	txBytes, err := vm.codec.Marshal(tx)
+	txBytes, err := vm.codec.Marshal(codecVersion, tx)
 	if err != nil {
 		return err
 	}
@@ -246,7 +246,7 @@ func (vm *VM) nextStakerStart(db database.Database, subnetID ids.ID) (*Tx, error
 	// Value: Byte repr. of tx that added this validator
 
 	tx := Tx{}
-	if err := Codec.Unmarshal(iter.Value(), &tx); err != nil {
+	if _, err := Codec.Unmarshal(iter.Value(), &tx); err != nil {
 		return nil, err
 	}
 	return &tx, tx.Sign(vm.codec, nil)
@@ -264,7 +264,7 @@ func (vm *VM) nextStakerStop(db database.Database, subnetID ids.ID) (*rewardTx, 
 	// Value: Byte repr. of tx that added this validator
 
 	tx := rewardTx{}
-	if err := Codec.Unmarshal(iter.Value(), &tx); err != nil {
+	if _, err := Codec.Unmarshal(iter.Value(), &tx); err != nil {
 		return nil, err
 	}
 	return &tx, tx.Tx.Sign(vm.codec, nil)
@@ -278,20 +278,23 @@ func (vm *VM) isValidator(db database.Database, subnetID ids.ID, nodeID ids.Shor
 	for iter.Next() {
 		txBytes := iter.Value()
 		tx := rewardTx{}
-		if err := Codec.Unmarshal(txBytes, &tx); err != nil {
-			return nil, false, err
-		}
-		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
+		if _, err := Codec.Unmarshal(txBytes, &tx); err != nil {
 			return nil, false, err
 		}
 
 		switch vdr := tx.Tx.UnsignedTx.(type) {
 		case *UnsignedAddValidatorTx:
 			if subnetID == constants.PrimaryNetworkID && vdr.Validator.NodeID.Equals(nodeID) {
+				if err := tx.Tx.Sign(vm.codec, nil); err != nil {
+					return nil, false, err
+				}
 				return vdr, true, nil
 			}
 		case *UnsignedAddSubnetValidatorTx:
 			if subnetID == vdr.Validator.SubnetID() && vdr.Validator.NodeID.Equals(nodeID) {
+				if err := tx.Tx.Sign(vm.codec, nil); err != nil {
+					return nil, false, err
+				}
 				return vdr, true, nil
 			}
 		}
@@ -308,20 +311,23 @@ func (vm *VM) willBeValidator(db database.Database, subnetID ids.ID, nodeID ids.
 	for iter.Next() {
 		txBytes := iter.Value()
 		tx := Tx{}
-		if err := Codec.Unmarshal(txBytes, &tx); err != nil {
-			return nil, false, err
-		}
-		if err := tx.Sign(vm.codec, nil); err != nil {
+		if _, err := Codec.Unmarshal(txBytes, &tx); err != nil {
 			return nil, false, err
 		}
 
 		switch vdr := tx.UnsignedTx.(type) {
 		case *UnsignedAddValidatorTx:
 			if subnetID == constants.PrimaryNetworkID && vdr.Validator.NodeID.Equals(nodeID) {
+				if err := tx.Sign(vm.codec, nil); err != nil {
+					return nil, false, err
+				}
 				return vdr, true, nil
 			}
 		case *UnsignedAddSubnetValidatorTx:
 			if subnetID == vdr.Validator.SubnetID() && vdr.Validator.NodeID.Equals(nodeID) {
+				if err := tx.Sign(vm.codec, nil); err != nil {
+					return nil, false, err
+				}
 				return vdr, true, nil
 			}
 		}
@@ -691,7 +697,7 @@ func (vm *VM) registerDBTypes() {
 	}
 	unmarshalValidatorsFunc := func(bytes []byte) (interface{}, error) {
 		stakers := EventHeap{}
-		if err := Codec.Unmarshal(bytes, &stakers); err != nil {
+		if _, err := Codec.Unmarshal(bytes, &stakers); err != nil {
 			return nil, err
 		}
 		for _, tx := range stakers.Txs {
@@ -707,13 +713,13 @@ func (vm *VM) registerDBTypes() {
 
 	marshalChainsFunc := func(chainsIntf interface{}) ([]byte, error) {
 		if chains, ok := chainsIntf.([]*Tx); ok {
-			return GenesisCodec.Marshal(chains)
+			return GenesisCodec.Marshal(codecVersion, chains)
 		}
 		return nil, fmt.Errorf("expected []*CreateChainTx but got type %T", chainsIntf)
 	}
 	unmarshalChainsFunc := func(bytes []byte) (interface{}, error) {
 		var chains []*Tx
-		if err := GenesisCodec.Unmarshal(bytes, &chains); err != nil {
+		if _, err := GenesisCodec.Unmarshal(bytes, &chains); err != nil {
 			return nil, err
 		}
 		for _, tx := range chains {
@@ -729,13 +735,13 @@ func (vm *VM) registerDBTypes() {
 
 	marshalSubnetsFunc := func(subnetsIntf interface{}) ([]byte, error) {
 		if subnets, ok := subnetsIntf.([]*Tx); ok {
-			return Codec.Marshal(subnets)
+			return Codec.Marshal(codecVersion, subnets)
 		}
 		return nil, fmt.Errorf("expected []*Tx but got type %T", subnetsIntf)
 	}
 	unmarshalSubnetsFunc := func(bytes []byte) (interface{}, error) {
 		var subnets []*Tx
-		if err := Codec.Unmarshal(bytes, &subnets); err != nil {
+		if _, err := Codec.Unmarshal(bytes, &subnets); err != nil {
 			return nil, err
 		}
 		for _, tx := range subnets {
@@ -751,15 +757,15 @@ func (vm *VM) registerDBTypes() {
 
 	marshalUTXOFunc := func(utxoIntf interface{}) ([]byte, error) {
 		if utxo, ok := utxoIntf.(*avax.UTXO); ok {
-			return Codec.Marshal(utxo)
+			return Codec.Marshal(codecVersion, utxo)
 		} else if utxo, ok := utxoIntf.(avax.UTXO); ok {
-			return Codec.Marshal(utxo)
+			return Codec.Marshal(codecVersion, utxo)
 		}
 		return nil, fmt.Errorf("expected *avax.UTXO but got type %T", utxoIntf)
 	}
 	unmarshalUTXOFunc := func(bytes []byte) (interface{}, error) {
 		var utxo avax.UTXO
-		if err := Codec.Unmarshal(bytes, &utxo); err != nil {
+		if _, err := Codec.Unmarshal(bytes, &utxo); err != nil {
 			return nil, err
 		}
 		return &utxo, nil
@@ -783,13 +789,13 @@ func (vm *VM) registerDBTypes() {
 
 	marshalStatusFunc := func(statusIntf interface{}) ([]byte, error) {
 		if status, ok := statusIntf.(Status); ok {
-			return vm.codec.Marshal(status)
+			return vm.codec.Marshal(codecVersion, status)
 		}
 		return nil, fmt.Errorf("expected Status but got type %T", statusIntf)
 	}
 	unmarshalStatusFunc := func(bytes []byte) (interface{}, error) {
 		var status Status
-		if err := Codec.Unmarshal(bytes, &status); err != nil {
+		if _, err := Codec.Unmarshal(bytes, &status); err != nil {
 			return nil, err
 		}
 		return status, nil
@@ -800,13 +806,13 @@ func (vm *VM) registerDBTypes() {
 
 	marshalCurrentSupplyFunc := func(currentSupplyIntf interface{}) ([]byte, error) {
 		if currentSupply, ok := currentSupplyIntf.(uint64); ok {
-			return vm.codec.Marshal(currentSupply)
+			return vm.codec.Marshal(codecVersion, currentSupply)
 		}
 		return nil, fmt.Errorf("expected uint64 but got type %T", currentSupplyIntf)
 	}
 	unmarshalCurrentSupplyFunc := func(bytes []byte) (interface{}, error) {
 		var currentSupply uint64
-		if err := Codec.Unmarshal(bytes, &currentSupply); err != nil {
+		if _, err := Codec.Unmarshal(bytes, &currentSupply); err != nil {
 			return nil, err
 		}
 		return currentSupply, nil
@@ -846,13 +852,13 @@ func (vm *VM) uptime(db database.Database, nodeID ids.ShortID) (*validatorUptime
 	}
 
 	uptime := validatorUptime{}
-	if err := Codec.Unmarshal(uptimeBytes, &uptime); err != nil {
+	if _, err := Codec.Unmarshal(uptimeBytes, &uptime); err != nil {
 		return nil, err
 	}
 	return &uptime, nil
 }
 func (vm *VM) setUptime(db database.Database, nodeID ids.ShortID, uptime *validatorUptime) error {
-	uptimeBytes, err := Codec.Marshal(uptime)
+	uptimeBytes, err := Codec.Marshal(codecVersion, uptime)
 	if err != nil {
 		return err
 	}
@@ -880,7 +886,7 @@ func (vm *VM) deleteUptime(db database.Database, nodeID ids.ShortID) error {
 func (vm *VM) unmarshalBlockFunc(bytes []byte) (snowman.Block, error) {
 	// Parse the serialized fields from bytes into a new block
 	var block Block
-	if err := Codec.Unmarshal(bytes, &block); err != nil {
+	if _, err := Codec.Unmarshal(bytes, &block); err != nil {
 		return nil, err
 	}
 	// Populate the un-serialized fields of the block

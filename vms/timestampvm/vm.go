@@ -17,7 +17,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/core"
 )
 
-const dataLen = 32
+const (
+	dataLen      = 32
+	codecVersion = 0
+)
 
 var (
 	errNoPendingBlocks = errors.New("there is no block to propose")
@@ -29,7 +32,7 @@ var (
 // and a piece of data (a string)
 type VM struct {
 	core.SnowmanVM
-	codec codec.Codec
+	codec codec.Manager
 	// Proposed pieces of data that haven't been put into a block and proposed yet
 	mempool [][dataLen]byte
 }
@@ -51,7 +54,12 @@ func (vm *VM) Initialize(
 		ctx.Log.Error("error initializing SnowmanVM: %v", err)
 		return err
 	}
-	vm.codec = codec.NewDefault()
+	c := codec.NewDefault()
+	manager := codec.NewDefaultManager()
+	if err := manager.RegisterCodec(codecVersion, c); err != nil {
+		return err
+	}
+	vm.codec = manager
 
 	// If database is empty, create it using the provided genesis data
 	if !vm.DBInitialized() {
@@ -156,7 +164,7 @@ func (vm *VM) proposeBlock(data [dataLen]byte) {
 // This function is used by the vm's state to unmarshal blocks saved in state
 func (vm *VM) ParseBlock(bytes []byte) (snowman.Block, error) {
 	block := &Block{}
-	err := vm.codec.Unmarshal(bytes, block)
+	_, err := vm.codec.Unmarshal(bytes, block)
 	block.Initialize(bytes, &vm.SnowmanVM)
 	return block, err
 }
@@ -172,7 +180,7 @@ func (vm *VM) NewBlock(parentID ids.ID, height uint64, data [dataLen]byte, times
 		Data:      data,
 		Timestamp: timestamp.Unix(),
 	}
-	blockBytes, err := vm.codec.Marshal(block)
+	blockBytes, err := vm.codec.Marshal(codecVersion, block)
 	if err != nil {
 		return nil, err
 	}

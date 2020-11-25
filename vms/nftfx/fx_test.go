@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -35,9 +34,8 @@ var (
 
 func TestFxInitialize(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		CLK:  new(timer.Clock),
-		Code: codec.NewDefault(),
-		Log:  logging.NoLog{},
+		Codec: codec.NewDefault(),
+		Log:   logging.NoLog{},
 	}
 	fx := Fx{}
 	err := fx.Initialize(&vm)
@@ -56,9 +54,8 @@ func TestFxInitializeInvalid(t *testing.T) {
 
 func TestFxVerifyMintOperation(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		CLK:  new(timer.Clock),
-		Code: codec.NewDefault(),
-		Log:  logging.NoLog{},
+		Codec: codec.NewDefault(),
+		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
@@ -95,9 +92,8 @@ func TestFxVerifyMintOperation(t *testing.T) {
 
 func TestFxVerifyMintOperationWrongTx(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		CLK:  new(timer.Clock),
-		Code: codec.NewDefault(),
-		Log:  logging.NoLog{},
+		Codec: codec.NewDefault(),
+		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
@@ -131,9 +127,8 @@ func TestFxVerifyMintOperationWrongTx(t *testing.T) {
 
 func TestFxVerifyMintOperationWrongNumberUTXOs(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		CLK:  new(timer.Clock),
-		Code: codec.NewDefault(),
-		Log:  logging.NoLog{},
+		Codec: codec.NewDefault(),
+		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
@@ -164,9 +159,8 @@ func TestFxVerifyMintOperationWrongNumberUTXOs(t *testing.T) {
 
 func TestFxVerifyMintOperationWrongCredential(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		CLK:  new(timer.Clock),
-		Code: codec.NewDefault(),
-		Log:  logging.NoLog{},
+		Codec: codec.NewDefault(),
+		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
@@ -198,9 +192,8 @@ func TestFxVerifyMintOperationWrongCredential(t *testing.T) {
 
 func TestFxVerifyMintOperationInvalidUTXO(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		CLK:  new(timer.Clock),
-		Code: codec.NewDefault(),
-		Log:  logging.NoLog{},
+		Codec: codec.NewDefault(),
+		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
@@ -231,9 +224,8 @@ func TestFxVerifyMintOperationInvalidUTXO(t *testing.T) {
 
 func TestFxVerifyMintOperationFailingVerification(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		CLK:  new(timer.Clock),
-		Code: codec.NewDefault(),
-		Log:  logging.NoLog{},
+		Codec: codec.NewDefault(),
+		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
@@ -271,9 +263,8 @@ func TestFxVerifyMintOperationFailingVerification(t *testing.T) {
 
 func TestFxVerifyMintOperationInvalidGroupID(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		CLK:  new(timer.Clock),
-		Code: codec.NewDefault(),
-		Log:  logging.NoLog{},
+		Codec: codec.NewDefault(),
+		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
@@ -311,9 +302,8 @@ func TestFxVerifyMintOperationInvalidGroupID(t *testing.T) {
 
 func TestFxVerifyTransferOperation(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		CLK:  new(timer.Clock),
-		Code: codec.NewDefault(),
-		Log:  logging.NoLog{},
+		Codec: codec.NewDefault(),
+		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
@@ -364,9 +354,8 @@ func TestFxVerifyTransferOperation(t *testing.T) {
 
 func TestFxVerifyTransferOperationWrongUTXO(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		CLK:  new(timer.Clock),
-		Code: codec.NewDefault(),
-		Log:  logging.NoLog{},
+		Codec: codec.NewDefault(),
+		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
@@ -407,9 +396,8 @@ func TestFxVerifyTransferOperationWrongUTXO(t *testing.T) {
 
 func TestFxVerifyTransferOperationFailedVerify(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		CLK:  new(timer.Clock),
-		Code: codec.NewDefault(),
-		Log:  logging.NoLog{},
+		Codec: codec.NewDefault(),
+		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
@@ -457,9 +445,8 @@ func TestFxVerifyTransferOperationFailedVerify(t *testing.T) {
 
 func TestFxVerifyTransferOperationWrongGroupID(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		CLK:  new(timer.Clock),
-		Code: codec.NewDefault(),
-		Log:  logging.NoLog{},
+		Codec: codec.NewDefault(),
+		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
@@ -510,9 +497,8 @@ func TestFxVerifyTransferOperationWrongGroupID(t *testing.T) {
 
 func TestFxVerifyTransferOperationWrongBytes(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		CLK:  new(timer.Clock),
-		Code: codec.NewDefault(),
-		Log:  logging.NoLog{},
+		Codec: codec.NewDefault(),
+		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
@@ -562,13 +548,9 @@ func TestFxVerifyTransferOperationWrongBytes(t *testing.T) {
 }
 
 func TestFxVerifyTransferOperationTooSoon(t *testing.T) {
-	now := time.Now()
-	clk := timer.Clock{}
-	clk.Set(now)
 	vm := secp256k1fx.TestVM{
-		CLK:  &clk,
-		Code: codec.NewDefault(),
-		Log:  logging.NoLog{},
+		Codec: codec.NewDefault(),
+		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
@@ -589,7 +571,7 @@ func TestFxVerifyTransferOperationTooSoon(t *testing.T) {
 		GroupID: 1,
 		Payload: []byte{2},
 		OutputOwners: secp256k1fx.OutputOwners{
-			Locktime:  clk.Unix() + 1,
+			Locktime:  vm.CLK.Unix() + 1,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				ids.NewShortID(addrBytes),
@@ -620,9 +602,8 @@ func TestFxVerifyTransferOperationTooSoon(t *testing.T) {
 
 func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		CLK:  new(timer.Clock),
-		Code: codec.NewDefault(),
-		Log:  logging.NoLog{},
+		Codec: codec.NewDefault(),
+		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
@@ -658,9 +639,8 @@ func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 
 func TestFxVerifyTransfer(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		CLK:  new(timer.Clock),
-		Code: codec.NewDefault(),
-		Log:  logging.NoLog{},
+		Codec: codec.NewDefault(),
+		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)

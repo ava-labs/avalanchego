@@ -406,17 +406,15 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 	startAddr := ids.ShortEmpty
 	startUTXO := ids.Empty
 	if args.StartIndex.Address != "" || args.StartIndex.UTXO != "" {
-		addr, err := service.vm.ParseLocalAddress(args.StartIndex.Address)
+		var err error
+		startAddr, err = service.vm.ParseLocalAddress(args.StartIndex.Address)
 		if err != nil {
 			return fmt.Errorf("couldn't parse start index address %q: %w", args.StartIndex.Address, err)
 		}
-		utxo, err := ids.FromString(args.StartIndex.UTXO)
+		startUTXO, err = ids.FromString(args.StartIndex.UTXO)
 		if err != nil {
 			return fmt.Errorf("couldn't parse start index utxo: %w", err)
 		}
-
-		startAddr = addr
-		startUTXO = utxo
 	}
 
 	var (
@@ -449,7 +447,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 
 	response.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		bytes, err := service.vm.codec.Marshal(utxo)
+		bytes, err := service.vm.codec.Marshal(codecVersion, utxo)
 		if err != nil {
 			return fmt.Errorf("couldn't serialize UTXO %q: %w", utxo.InputID(), err)
 		}
@@ -618,9 +616,6 @@ type GetCurrentValidatorsArgs struct {
 // Each validator contains a list of delegators to itself.
 type GetCurrentValidatorsReply struct {
 	Validators []interface{} `json:"validators"`
-	// Delegators is deprecated. Do not use Delegators.
-	// Instead, use the Delegators field of each APIPrimaryValidator
-	Delegators []interface{} `json:"delegators"`
 }
 
 // GetCurrentValidators returns current validators and delegators
@@ -628,7 +623,6 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	service.vm.Ctx.Log.Info("Platform: GetCurrentValidators called")
 
 	reply.Validators = []interface{}{}
-	reply.Delegators = []interface{}{}
 
 	// Validator's node ID as string --> Delegators to them
 	vdrTodelegators := map[string][]APIPrimaryDelegator{}
@@ -644,7 +638,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 		txBytes := stopIter.Value()
 
 		tx := rewardTx{}
-		if err := service.vm.codec.Unmarshal(txBytes, &tx); err != nil {
+		if _, err := service.vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
 		if err := tx.Tx.Sign(service.vm.codec, nil); err != nil {
@@ -683,7 +677,6 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				RewardOwner:     rewardOwner,
 				PotentialReward: &potentialReward,
 			}
-			reply.Delegators = append(reply.Delegators, delegator)
 			vdrTodelegators[delegator.NodeID] = append(vdrTodelegators[delegator.NodeID], delegator)
 		case *UnsignedAddValidatorTx:
 			nodeID := staker.Validator.ID()
@@ -792,7 +785,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 		txBytes := startIter.Value()
 
 		tx := Tx{}
-		if err := service.vm.codec.Unmarshal(txBytes, &tx); err != nil {
+		if _, err := service.vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
 		if err := tx.Sign(service.vm.codec, nil); err != nil {
@@ -1860,7 +1853,7 @@ func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
 	tx := &Tx{}
-	if err := service.vm.codec.Unmarshal(txBytes, tx); err != nil {
+	if _, err := service.vm.codec.Unmarshal(txBytes, tx); err != nil {
 		return fmt.Errorf("couldn't parse tx: %w", err)
 	}
 	if err := service.vm.mempool.IssueTx(tx); err != nil {
@@ -1912,27 +1905,15 @@ type GetTxStatusArgs struct {
 
 // GetTxStatusResponse ...
 type GetTxStatusResponse struct {
-	Status
-	includeReason bool
+	Status Status `json:"status"`
 	// Reason this tx was dropped.
 	// Only non-empty if Status is dropped
-	Reason string
-}
-
-func (r GetTxStatusResponse) MarshalJSON() ([]byte, error) {
-	if !r.includeReason {
-		return r.Status.MarshalJSON()
-	}
-	if r.Reason != "" {
-		return []byte(fmt.Sprintf("{\"status\": \"%s\", \"reason\": \"%s\"}", r.Status, r.Reason)), nil
-	}
-	return []byte(fmt.Sprintf("{\"status\": \"%s\"}", r.Status)), nil
+	Reason string `json:"reason,omitempty"`
 }
 
 // GetTxStatus gets a tx's status
 func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *GetTxStatusResponse) error {
 	service.vm.Ctx.Log.Info("Platform: GetTxStatus called")
-	response.includeReason = args.IncludeReason
 	status, err := service.vm.getStatus(service.vm.DB, args.TxID)
 	if err == nil { // Found the status. Report it.
 		response.Status = status
@@ -1956,12 +1937,14 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 	}
 	if reason, ok := service.vm.droppedTxCache.Get(args.TxID); ok {
 		response.Status = Dropped
-		reasonStr, ok := reason.(string)
-		if !ok {
-			service.vm.Ctx.Log.Error("reason should be a string")
-			return nil
+		if args.IncludeReason {
+			reasonStr, ok := reason.(string)
+			if !ok {
+				service.vm.Ctx.Log.Error("reason should be a string")
+				return nil
+			}
+			response.Reason = reasonStr
 		}
-		response.Reason = reasonStr
 	} else {
 		response.Status = Unknown
 	}
@@ -1970,7 +1953,7 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 
 // GetStakeReply is the response from calling GetStake.
 type GetStakeReply struct {
-	Staked json.Uint64 `json:"staked"`
+	Stake json.Uint64 `json:"stake"`
 }
 
 // GetStake returns the amount of nAVAX that [args.Addresses] have cumulatively
@@ -2054,7 +2037,7 @@ func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, respo
 		stakerBytes := stopIter.Value()
 
 		tx := rewardTx{}
-		if err := service.vm.codec.Unmarshal(stakerBytes, &tx); err != nil {
+		if _, err := service.vm.codec.Unmarshal(stakerBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
 		if err := tx.Tx.Sign(service.vm.codec, nil); err != nil {
@@ -2085,7 +2068,7 @@ func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, respo
 		stakerBytes := startIter.Value()
 
 		tx := Tx{}
-		if err := service.vm.codec.Unmarshal(stakerBytes, &tx); err != nil {
+		if _, err := service.vm.codec.Unmarshal(stakerBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
 		if err := tx.Sign(service.vm.codec, nil); err != nil {
@@ -2105,7 +2088,7 @@ func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, respo
 		return fmt.Errorf("iterator errored: %w", err)
 	}
 
-	response.Staked = json.Uint64(totalStake)
+	response.Stake = json.Uint64(totalStake)
 	return nil
 }
 
@@ -2125,9 +2108,7 @@ func (service *Service) GetMinStake(_ *http.Request, _ *struct{}, reply *GetMinS
 }
 
 // GetTotalStake returns the total amount staked on the Primary Network
-func (service *Service) GetTotalStake(_ *http.Request, _ *struct{}, reply *struct {
-	Stake json.Uint64 `json:"stake"`
-}) error {
+func (service *Service) GetTotalStake(_ *http.Request, _ *struct{}, reply *GetStakeReply) error {
 	stake, err := service.vm.getTotalStake()
 	reply.Stake = json.Uint64(stake)
 	return err
@@ -2146,7 +2127,7 @@ type GetMaxStakeAmountReply struct {
 	Amount json.Uint64 `json:"amount"`
 }
 
-// GetMaxStakeAmount returns the maximum amount of AVAX staking to the named
+// GetMaxStakeAmount returns the maximum amount of nAVAX staking to the named
 // node during the time period.
 func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmountArgs, reply *GetMaxStakeAmountReply) error {
 	nodeID, err := ids.ShortFromPrefixedString(args.NodeID, constants.NodeIDPrefix)

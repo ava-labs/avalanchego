@@ -23,7 +23,7 @@ import (
 
 func TestExportTxSyntacticVerify(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -69,7 +69,7 @@ func TestExportTxSyntacticVerify(t *testing.T) {
 
 func TestExportTxSyntacticVerifyNil(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := (*ExportTx)(nil)
 
@@ -80,7 +80,7 @@ func TestExportTxSyntacticVerifyNil(t *testing.T) {
 
 func TestExportTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -126,7 +126,7 @@ func TestExportTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 
 func TestExportTxSyntacticVerifyWrongBlockchainID(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -177,7 +177,7 @@ func TestExportTxSyntacticVerifyWrongBlockchainID(t *testing.T) {
 
 func TestExportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -224,7 +224,7 @@ func TestExportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 
 func TestExportTxSyntacticVerifyInvalidBaseOutput(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -280,7 +280,7 @@ func TestExportTxSyntacticVerifyInvalidBaseOutput(t *testing.T) {
 
 func TestExportTxSyntacticVerifyUnsortedBaseOutputs(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -348,7 +348,7 @@ func TestExportTxSyntacticVerifyUnsortedBaseOutputs(t *testing.T) {
 
 func TestExportTxSyntacticVerifyInvalidOutput(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -394,7 +394,7 @@ func TestExportTxSyntacticVerifyInvalidOutput(t *testing.T) {
 
 func TestExportTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -452,7 +452,7 @@ func TestExportTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 
 func TestExportTxSyntacticVerifyInvalidInput(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -518,7 +518,7 @@ func TestExportTxSyntacticVerifyInvalidInput(t *testing.T) {
 
 func TestExportTxSyntacticVerifyUnsortedInputs(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -584,7 +584,7 @@ func TestExportTxSyntacticVerifyUnsortedInputs(t *testing.T) {
 
 func TestExportTxSyntacticVerifyInvalidFlowCheck(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -718,7 +718,7 @@ func TestExportTxSerialization(t *testing.T) {
 		},
 	}}
 
-	c := setupCodec()
+	_, c := setupCodec()
 	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -998,12 +998,18 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	baseDB := memdb.New()
 
 	m := &atomic.Memory{}
-	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	if err != nil {
+		t.Fatal(err)
+	}
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	ctx.Lock.Lock()
 
-	userKeystore := keystore.CreateTestKeystore()
+	userKeystore, err := keystore.CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := userKeystore.AddUser(username, password); err != nil {
 		t.Fatal(err)
 	}
@@ -1015,7 +1021,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 
 	issuer := make(chan common.Message, 1)
 	vm := &VM{}
-	err := vm.Initialize(
+	err = vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
@@ -1030,8 +1036,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 				Fx: &FxTest{
 					InitializeF: func(vmIntf interface{}) error {
 						vm := vmIntf.(*VM)
-						c := vm.Codec()
-						return c.RegisterType(&avax.TestVerifiable{})
+						return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
 					},
 				},
 			},
@@ -1173,7 +1178,10 @@ func TestIssueExportTx(t *testing.T) {
 	baseDB := memdb.New()
 
 	m := &atomic.Memory{}
-	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := NewContext(t)
 	ctx.SharedMemory = m.NewSharedMemory(chainID)
@@ -1297,7 +1305,10 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	baseDB := memdb.New()
 
 	m := &atomic.Memory{}
-	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := NewContext(t)
 	ctx.SharedMemory = m.NewSharedMemory(chainID)
@@ -1309,7 +1320,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	ctx.Lock.Lock()
 	vm := &VM{}
-	err := vm.Initialize(
+	err = vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,

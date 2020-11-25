@@ -8,8 +8,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -29,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/stretchr/testify/assert"
 )
 
 var networkID uint32 = 10
@@ -106,9 +105,9 @@ func NewContext(t *testing.T) *snow.Context {
 //   1) tx in genesis that creates AVAX
 //   2) the index of the output
 func GetAVAXTxFromGenesisTest(genesisBytes []byte, t *testing.T) *Tx {
-	c := setupCodec()
+	_, c := setupCodec()
 	genesis := Genesis{}
-	if err := c.Unmarshal(genesisBytes, &genesis); err != nil {
+	if _, err := c.Unmarshal(genesisBytes, &genesis); err != nil {
 		t.Fatal(err)
 	}
 
@@ -243,14 +242,20 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 	baseDB := memdb.New()
 
 	m := &atomic.Memory{}
-	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	if err != nil {
+		t.Fatal(err)
+	}
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	// NB: this lock is intentionally left locked when this function returns.
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
 
-	userKeystore := keystore.CreateTestKeystore()
+	userKeystore, err := keystore.CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := userKeystore.AddUser(username, password); err != nil {
 		t.Fatal(err)
 	}
@@ -261,7 +266,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 		txFee:         testTxFee,
 		creationTxFee: testTxFee,
 	}
-	err := vm.Initialize(
+	err = vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
@@ -477,7 +482,7 @@ func TestTxSerialization(t *testing.T) {
 		})
 	}
 
-	c := setupCodec()
+	_, c := setupCodec()
 	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -1047,7 +1052,7 @@ func TestIssueProperty(t *testing.T) {
 		}},
 	}}
 
-	unsignedBytes, err := vm.codec.Marshal(&mintPropertyTx.UnsignedTx)
+	unsignedBytes, err := vm.codec.Marshal(codecVersion, &mintPropertyTx.UnsignedTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1066,7 +1071,7 @@ func TestIssueProperty(t *testing.T) {
 		}},
 	})
 
-	signedBytes, err := vm.codec.Marshal(mintPropertyTx)
+	signedBytes, err := vm.codec.Marshal(codecVersion, mintPropertyTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1093,11 +1098,11 @@ func TestIssueProperty(t *testing.T) {
 
 	burnPropertyTx.Creds = append(burnPropertyTx.Creds, &propertyfx.Credential{})
 
-	unsignedBytes, err = vm.codec.Marshal(burnPropertyTx.UnsignedTx)
+	unsignedBytes, err = vm.codec.Marshal(codecVersion, burnPropertyTx.UnsignedTx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	signedBytes, err = vm.codec.Marshal(burnPropertyTx)
+	signedBytes, err = vm.codec.Marshal(codecVersion, burnPropertyTx)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -27,6 +27,7 @@ import (
 
 const (
 	defaultEncoding = formatting.Hex
+	codecVersion    = 0
 )
 
 // Genesis returns the genesis data of the Platform Chain.
@@ -325,7 +326,7 @@ func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.Tx, error) {
 		return nil, err
 	}
 	genesis := platformvm.Genesis{}
-	if err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
+	if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return nil, fmt.Errorf("couldn't unmarshal genesis bytes due to: %w", err)
 	}
 	if err := genesis.Initialize(); err != nil {
@@ -342,7 +343,8 @@ func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.Tx, error) {
 
 // AVAXAssetID ...
 func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
-	c := codec.New(math.MaxUint32, 1<<20)
+	c := codec.New(codec.DefaultTagName, 1<<20)
+	m := codec.NewManager(math.MaxUint32)
 	errs := wrappers.Errs{}
 	errs.Add(
 		c.RegisterType(&avm.BaseTx{}),
@@ -355,13 +357,14 @@ func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
 		c.RegisterType(&secp256k1fx.MintOperation{}),
 		c.RegisterType(&secp256k1fx.Credential{}),
+		m.RegisterCodec(codecVersion, c),
 	)
 	if errs.Errored() {
 		return ids.ID{}, errs.Err
 	}
 
 	genesis := avm.Genesis{}
-	if err := c.Unmarshal(avmGenesisBytes, &genesis); err != nil {
+	if _, err := m.Unmarshal(avmGenesisBytes, &genesis); err != nil {
 		return ids.ID{}, err
 	}
 
@@ -371,11 +374,11 @@ func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 	genesisTx := genesis.Txs[0]
 
 	tx := avm.Tx{UnsignedTx: &genesisTx.CreateAssetTx}
-	unsignedBytes, err := c.Marshal(tx.UnsignedTx)
+	unsignedBytes, err := m.Marshal(codecVersion, tx.UnsignedTx)
 	if err != nil {
 		return ids.ID{}, err
 	}
-	signedBytes, err := c.Marshal(&tx)
+	signedBytes, err := m.Marshal(codecVersion, &tx)
 	if err != nil {
 		return ids.ID{}, err
 	}

@@ -246,7 +246,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	}
 
 	genesis := &Genesis{}
-	if err := Codec.Unmarshal(genesisBytes, genesis); err != nil {
+	if _, err := Codec.Unmarshal(genesisBytes, genesis); err != nil {
 		t.Fatal(err)
 	}
 	validators := genesis.Validators
