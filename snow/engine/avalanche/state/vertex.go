@@ -34,8 +34,8 @@ const (
 
 var (
 	errBadCodec       = errors.New("invalid codec")
-	errBadEpoch       = errors.New("invalid epoch")
 	errExtraSpace     = errors.New("trailing buffer space")
+	errBadEpoch       = errors.New("invalid epoch")
 	errInvalidParents = errors.New("vertex contains non-sorted or duplicated parentIDs")
 	errInvalidTxs     = errors.New("vertex contains non-sorted or duplicated transactions")
 	errNoTxs          = errors.New("vertex contains no transactions")
@@ -47,6 +47,7 @@ type innerVertex struct {
 
 	chainID ids.ID
 	height  uint64
+	epoch   uint32
 
 	parentIDs []ids.ID
 	txs       []snowstorm.Tx
@@ -59,6 +60,8 @@ func (vtx *innerVertex) Bytes() []byte { return vtx.bytes }
 
 func (vtx *innerVertex) Verify() error {
 	switch {
+	case vtx.epoch != 0:
+		return errBadEpoch
 	case !ids.IsSortedAndUniqueIDs(vtx.parentIDs):
 		return errInvalidParents
 	case len(vtx.txs) == 0:
@@ -127,9 +130,7 @@ func (vtx *innerVertex) Unmarshal(b []byte, vm vertex.DAGVM) error {
 
 	chainID, _ := ids.ToID(p.UnpackFixedBytes(hashing.HashLen))
 	height := p.UnpackLong()
-	if epoch := p.UnpackInt(); epoch != 0 {
-		p.Add(errBadEpoch)
-	}
+	epoch := p.UnpackInt()
 
 	numParents := p.UnpackInt()
 	if numParents > maxNumParents {
@@ -166,6 +167,7 @@ func (vtx *innerVertex) Unmarshal(b []byte, vm vertex.DAGVM) error {
 		parentIDs: parentIDs,
 		chainID:   chainID,
 		height:    height,
+		epoch:     epoch,
 		txs:       txs,
 		bytes:     b,
 	}

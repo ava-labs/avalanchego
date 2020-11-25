@@ -116,13 +116,13 @@ func (c *Client) GetStakingAssetID(subnetID ids.ID) (ids.ID, error) {
 	return res.AssetID, err
 }
 
-// GetCurrentValidators returns the list of current validators and the list of delegators for subnet with ID [subnetID]
-func (c *Client) GetCurrentValidators(subnetID ids.ID) ([]interface{}, []interface{}, error) {
+// GetCurrentValidators returns the list of current validators for subnet with ID [subnetID]
+func (c *Client) GetCurrentValidators(subnetID ids.ID) ([]interface{}, error) {
 	res := &GetCurrentValidatorsReply{}
 	err := c.requester.SendRequest("getCurrentValidators", &GetCurrentValidatorsArgs{
 		SubnetID: subnetID,
 	}, res)
-	return res.Validators, res.Delegators, err
+	return res.Validators, err
 }
 
 // GetPendingValidators returns the list of pending validators for subnet with ID [subnetID]
@@ -265,9 +265,9 @@ func (c *Client) CreateSubnet(
 
 // ExportAVAX issues an ExportAVAX transaction and returns the txID
 func (c *Client) ExportAVAX(
+	user api.UserPass,
 	from []string,
 	changeAddr string,
-	user api.UserPass,
 	to string,
 	amount uint64,
 ) (ids.ID, error) {
