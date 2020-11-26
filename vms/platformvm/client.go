@@ -268,9 +268,9 @@ func (c *Client) CreateSubnet(
 
 // ExportAVAX issues an ExportAVAX transaction and returns the txID
 func (c *Client) ExportAVAX(
+	user apiargs.UserPass,
 	from []string,
 	changeAddr string,
-	user apiargs.UserPass,
 	to string,
 	amount uint64,
 ) (ids.ID, error) {
