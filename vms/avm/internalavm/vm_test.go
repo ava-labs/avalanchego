@@ -637,7 +637,7 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 	addr1Str, _ := formatting.FormatBech32(testHRP, addrs[1].Bytes())
 	addr2Str, _ := formatting.FormatBech32(testHRP, addrs[2].Bytes())
 
-	// Create a starting point of 3000 UTXOs on different addresses
+	// Create a starting point of 2345 UTXOs on different addresses
 	utxoCount := 2345
 	holder := map[string][]interface{}{}
 	for i := 0; i < utxoCount; i++ {
@@ -654,10 +654,6 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 				Amount:  json.Uint64(startBalance),
 				Address: addr2Str,
 			})
-		holder["fixedCap"] = append(holder["fixedCap"], vmargs.Holder{
-			Amount:  json.Uint64(startBalance),
-			Address: addr0Str,
-		})
 	}
 
 	// Inject them in the Genesis build
