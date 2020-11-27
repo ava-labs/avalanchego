@@ -884,7 +884,9 @@ func (n *Node) Shutdown() {
 func (n *Node) shutdown() {
 	n.Log.Info("shutting down node")
 	if n.IPCs != nil {
-		n.IPCs.Shutdown()
+		if err := n.IPCs.Shutdown(); err != nil {
+			n.Log.Debug("error during IPC shutdown: %s", err)
+		}
 	}
 	if n.chainManager != nil {
 		n.chainManager.Shutdown()
@@ -893,7 +895,9 @@ func (n *Node) shutdown() {
 		// Close already logs its own error if one occurs, so the error is ignored here
 		_ = n.Net.Close()
 	}
-	n.APIServer.Shutdown()
+	if err := n.APIServer.Shutdown(); err != nil {
+		n.Log.Debug("error during API shutdown: %s", err)
+	}
 	utils.ClearSignals(n.nodeCloser)
 	n.doneShuttingDown.Done()
 	n.Log.Info("finished node shutdown")
