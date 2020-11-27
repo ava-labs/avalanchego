@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
@@ -84,11 +85,14 @@ func (cipcs *ChainIPCs) Unpublish(chainID ids.ID) (bool, error) {
 	return true, chainIPCs.stop()
 }
 
-func (cipcs *ChainIPCs) Shutdown() {
+func (cipcs *ChainIPCs) Shutdown() error {
 	cipcs.log.Info("shutting down chain IPCs")
+
+	errs := wrappers.Errs{}
 	for _, ch := range cipcs.chains {
-		_ = ch.stop()
+		errs.Add(ch.stop())
 	}
+	return errs.Err
 }
 
 func ipcURL(ctx context, chainID ids.ID, eventType string) string {
