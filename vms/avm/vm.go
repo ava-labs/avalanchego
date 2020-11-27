@@ -828,10 +828,9 @@ func (vm *VM) LoadUser(
 	if err != nil {
 		return nil, nil, fmt.Errorf("problem retrieving user: %w", err)
 	}
-	// TODO check this with Dan
 	// Drop any potential error closing the database to report the original
 	// error
-	defer vm.ctx.Log.LogDeferredErrorFunc(db.Close)
+	defer db.Close()
 
 	user := userState{vm: vm}
 

@@ -62,7 +62,6 @@ type Logger interface {
 
 	// Stop this logger and write back all meta-data.
 	Stop()
-	LogDeferredErrorFunc(f func() error)
 }
 
 // RotatingWriter allows for rotating a stream writer

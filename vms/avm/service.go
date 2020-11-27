@@ -815,7 +815,7 @@ func (service *Service) CreateAddress(r *http.Request, args *api.UserPass, reply
 	if err != nil {
 		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
-	defer service.vm.ctx.Log.LogDeferredErrorFunc(db.Close)
+	defer db.Close()
 
 	user := userState{vm: service.vm}
 
@@ -858,19 +858,23 @@ func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, respo
 	if err != nil {
 		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
-	defer service.vm.ctx.Log.LogDeferredErrorFunc(db.Close)
 
 	response.Addresses = []string{}
 
 	user := userState{vm: service.vm}
 	addresses, err := user.Addresses(db)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user addresses '%s': %w", args.Username, err)
+		// An error fetching the addresses may just mean that the user has no
+		// addresses.
+		return db.Close()
 	}
 
 	for _, address := range addresses {
 		addr, err := service.vm.FormatLocalAddress(address)
 		if err != nil {
+			// Drop any potential error closing the database to report the
+			// original error
+			_ = db.Close()
 			return fmt.Errorf("problem formatting address: %w", err)
 		}
 		response.Addresses = append(response.Addresses, addr)
@@ -903,7 +907,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 	if err != nil {
 		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
-	defer service.vm.ctx.Log.LogDeferredErrorFunc(db.Close)
+	defer db.Close()
 
 	user := userState{vm: service.vm}
 
@@ -936,7 +940,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	if err != nil {
 		return fmt.Errorf("problem retrieving data: %w", err)
 	}
-	defer service.vm.ctx.Log.LogDeferredErrorFunc(db.Close)
+	defer db.Close()
 
 	user := userState{vm: service.vm}
 

@@ -77,9 +77,6 @@ func (NoLog) SetDisplayingEnabled(bool) {}
 // SetContextualDisplayingEnabled ...
 func (NoLog) SetContextualDisplayingEnabled(bool) {}
 
-// LogDeferredErrorFunc ...
-func (NoLog) LogDeferredErrorFunc(f func() error) {}
-
 // NoIOWriter is a mock Writer that does not write to any underlying source
 type NoIOWriter struct{}
 

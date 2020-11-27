@@ -334,15 +334,6 @@ func (l *Log) SetContextualDisplayingEnabled(enabled bool) {
 	l.config.DisableContextualDisplaying = !enabled
 }
 
-func (l *Log) LogDeferredErrorFunc(f func() error) {
-
-	err := f()
-	if err != nil {
-		l.log(Fatal, "%s", err)
-	}
-	// logs the error but doesn't return it - we might expand this in the future
-}
-
 type fileWriter struct {
 	writer *bufio.Writer
 	file   *os.File

@@ -88,12 +88,13 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 	if err != nil {
 		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
-	defer service.vm.SnowmanVM.Ctx.Log.LogDeferredErrorFunc(db.Close)
 
 	user := user{db: db}
-
 	sk, err := user.getKey(address)
 	if err != nil {
+		// Drop any potential error closing the database to report the original
+		// error
+		_ = db.Close()
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
 
@@ -115,7 +116,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	if err != nil {
 		return fmt.Errorf("problem retrieving data: %w", err)
 	}
-	defer service.vm.SnowmanVM.Ctx.Log.LogDeferredErrorFunc(db.Close)
+	defer db.Close()
 
 	user := user{db: db}
 	if addrs, _ := user.getAddresses(); len(addrs) >= maxKeystoreAddresses {
@@ -268,7 +269,7 @@ func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, respo
 	if err != nil {
 		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
-	defer service.vm.SnowmanVM.Ctx.Log.LogDeferredErrorFunc(db.Close)
+	defer db.Close()
 
 	user := user{db: db}
 	if addrs, _ := user.getAddresses(); len(addrs) >= maxKeystoreAddresses {
@@ -301,7 +302,7 @@ func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, respo
 		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 
-	defer service.vm.SnowmanVM.Ctx.Log.LogDeferredErrorFunc(db.Close)
+	defer db.Close()
 
 	user := user{db: db}
 	addresses, err := user.getAddresses()
@@ -624,7 +625,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 
 	stopPrefix := []byte(fmt.Sprintf("%s%s", args.SubnetID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, service.vm.DB)
-	defer service.vm.SnowmanVM.Ctx.Log.LogDeferredErrorFunc(stopDB.Close)
+	defer stopDB.Close()
 
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
@@ -746,7 +747,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 		reply.Validators[i] = vdr
 	}
 
-	return nil
+	return stopDB.Close()
 }
 
 // GetPendingValidatorsArgs are the arguments for calling GetPendingValidators
@@ -772,7 +773,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 
 	startPrefix := []byte(fmt.Sprintf("%s%s", args.SubnetID, startDBPrefix))
 	startDB := prefixdb.NewNested(startPrefix, service.vm.DB)
-	defer service.vm.SnowmanVM.Ctx.Log.LogDeferredErrorFunc(startDB.Close)
+	defer startDB.Close()
 
 	startIter := startDB.NewIterator()
 	defer startIter.Release()
@@ -828,7 +829,12 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			return fmt.Errorf("expected validator but got %T", tx.UnsignedTx)
 		}
 	}
-	return startIter.Error()
+	errs := wrappers.Errs{}
+	errs.Add(
+		startIter.Error(),
+		startDB.Close(),
+	)
+	return errs.Err
 }
 
 // GetCurrentSupplyReply are the results from calling GetCurrentSupply
@@ -949,7 +955,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	if err != nil {
 		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
-	defer service.vm.SnowmanVM.Ctx.Log.LogDeferredErrorFunc(db.Close)
+	defer db.Close()
 
 	// Get the user's keys
 	user := user{db: db}
@@ -1053,7 +1059,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	if err != nil {
 		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
-	defer service.vm.SnowmanVM.Ctx.Log.LogDeferredErrorFunc(db.Close)
+	defer db.Close()
 
 	user := user{db: db}
 	privKeys, err := user.getKeys()
@@ -1164,7 +1170,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	if err != nil {
 		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
-	defer service.vm.SnowmanVM.Ctx.Log.LogDeferredErrorFunc(db.Close)
+	defer db.Close()
 
 	user := user{db: db}
 	keys, err := user.getKeys()
@@ -1260,7 +1266,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	if err != nil {
 		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
-	defer service.vm.SnowmanVM.Ctx.Log.LogDeferredErrorFunc(db.Close)
+	defer db.Close()
 
 	user := user{db: db}
 	privKeys, err := user.getKeys()
@@ -1359,7 +1365,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 	if err != nil {
 		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
-	defer service.vm.SnowmanVM.Ctx.Log.LogDeferredErrorFunc(db.Close)
+	defer db.Close()
 
 	user := user{db: db}
 	privKeys, err := user.getKeys()
@@ -1460,7 +1466,7 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 	if err != nil {
 		return fmt.Errorf("couldn't get user %q: %w", args.Username, err)
 	}
-	defer service.vm.SnowmanVM.Ctx.Log.LogDeferredErrorFunc(db.Close)
+	defer db.Close()
 
 	user := user{db: db}
 	privKeys, err := user.getKeys()
@@ -1513,9 +1519,9 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 
 	errs := wrappers.Errs{}
 	errs.Add(
+		err,
 		service.vm.mempool.IssueTx(tx),
 		db.Close(),
-		err,
 	)
 	return errs.Err
 }
@@ -1594,7 +1600,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	if err != nil {
 		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
-	defer service.vm.SnowmanVM.Ctx.Log.LogDeferredErrorFunc(db.Close)
+	defer db.Close()
 
 	user := user{db: db}
 	keys, err := user.getKeys()
@@ -2026,7 +2032,7 @@ func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, respo
 
 	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, service.vm.DB)
-	defer service.vm.SnowmanVM.Ctx.Log.LogDeferredErrorFunc(stopDB.Close)
+	defer stopDB.Close()
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
 
@@ -2057,7 +2063,7 @@ func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, respo
 	// Iterate over pending validators
 	startPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, startDBPrefix))
 	startDB := prefixdb.NewNested(startPrefix, service.vm.DB)
-	defer service.vm.SnowmanVM.Ctx.Log.LogDeferredErrorFunc(startDB.Close)
+	defer startDB.Close()
 	startIter := startDB.NewIterator()
 	defer startIter.Release()
 
@@ -2081,12 +2087,18 @@ func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, respo
 			return err
 		}
 	}
-	if err := stopIter.Error(); err != nil {
+	if err := startIter.Error(); err != nil {
 		return fmt.Errorf("iterator errored: %w", err)
 	}
 
 	response.Staked = json.Uint64(totalStake)
-	return nil
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		stopDB.Close(),
+		startDB.Close(),
+	)
+	return errs.Err
 }
 
 // GetMinStakeReply is the response from calling GetMinStake.
