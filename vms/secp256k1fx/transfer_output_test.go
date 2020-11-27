@@ -142,6 +142,10 @@ func TestOutputVerifyDuplicated(t *testing.T) {
 
 func TestOutputSerialize(t *testing.T) {
 	c := codec.NewDefault()
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(0, c); err != nil {
+		t.Fatal(err)
+	}
 
 	expected := []byte{
 		// Codec version
@@ -187,7 +191,7 @@ func TestOutputSerialize(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := c.Marshal(&out)
+	result, err := m.Marshal(0, &out)
 	if err != nil {
 		t.Fatal(err)
 	}

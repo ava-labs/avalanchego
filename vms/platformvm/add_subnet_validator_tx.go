@@ -54,7 +54,7 @@ func (tx *UnsignedAddSubnetValidatorTx) Weight() uint64 {
 // Verify return nil iff [tx] is valid
 func (tx *UnsignedAddSubnetValidatorTx) Verify(
 	ctx *snow.Context,
-	c codec.Codec,
+	c codec.Manager,
 	feeAmount uint64,
 	feeAssetID ids.ID,
 	minStakeDuration time.Duration,

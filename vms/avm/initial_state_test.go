@@ -18,35 +18,47 @@ import (
 
 func TestInitialStateVerifyNil(t *testing.T) {
 	c := codec.NewDefault()
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(codecVersion, c); err != nil {
+		t.Fatal(err)
+	}
 	numFxs := 1
 
 	is := (*InitialState)(nil)
-	if err := is.Verify(c, numFxs); err == nil {
+	if err := is.Verify(m, numFxs); err == nil {
 		t.Fatalf("Should have errored due to nil initial state")
 	}
 }
 
 func TestInitialStateVerifyUnknownFxID(t *testing.T) {
 	c := codec.NewDefault()
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(codecVersion, c); err != nil {
+		t.Fatal(err)
+	}
 	numFxs := 1
 
 	is := InitialState{
 		FxID: 1,
 	}
-	if err := is.Verify(c, numFxs); err == nil {
+	if err := is.Verify(m, numFxs); err == nil {
 		t.Fatalf("Should have errored due to unknown FxID")
 	}
 }
 
 func TestInitialStateVerifyNilOutput(t *testing.T) {
 	c := codec.NewDefault()
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(codecVersion, c); err != nil {
+		t.Fatal(err)
+	}
 	numFxs := 1
 
 	is := InitialState{
 		FxID: 0,
 		Outs: []verify.State{nil},
 	}
-	if err := is.Verify(c, numFxs); err == nil {
+	if err := is.Verify(m, numFxs); err == nil {
 		t.Fatalf("Should have errored due to a nil output")
 	}
 }
@@ -56,13 +68,17 @@ func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 	if err := c.RegisterType(&avax.TestVerifiable{}); err != nil {
 		t.Fatal(err)
 	}
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(codecVersion, c); err != nil {
+		t.Fatal(err)
+	}
 	numFxs := 1
 
 	is := InitialState{
 		FxID: 0,
 		Outs: []verify.State{&avax.TestVerifiable{Err: errors.New("")}},
 	}
-	if err := is.Verify(c, numFxs); err == nil {
+	if err := is.Verify(m, numFxs); err == nil {
 		t.Fatalf("Should have errored due to an invalid output")
 	}
 }
@@ -70,6 +86,10 @@ func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
 	c := codec.NewDefault()
 	if err := c.RegisterType(&avax.TestTransferable{}); err != nil {
+		t.Fatal(err)
+	}
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(codecVersion, c); err != nil {
 		t.Fatal(err)
 	}
 	numFxs := 1
@@ -81,13 +101,13 @@ func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
 			&avax.TestTransferable{Val: 0},
 		},
 	}
-	if err := is.Verify(c, numFxs); err == nil {
+	if err := is.Verify(m, numFxs); err == nil {
 		t.Fatalf("Should have errored due to unsorted outputs")
 	}
 
-	is.Sort(c)
+	is.Sort(m)
 
-	if err := is.Verify(c, numFxs); err != nil {
+	if err := is.Verify(m, numFxs); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -95,6 +115,10 @@ func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
 func TestInitialStateVerifySerialization(t *testing.T) {
 	c := codec.NewDefault()
 	if err := c.RegisterType(&secp256k1fx.TransferOutput{}); err != nil {
+		t.Fatal(err)
+	}
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(codecVersion, c); err != nil {
 		t.Fatal(err)
 	}
 
@@ -142,7 +166,7 @@ func TestInitialStateVerifySerialization(t *testing.T) {
 		},
 	}
 
-	isBytes, err := c.Marshal(is)
+	isBytes, err := m.Marshal(codecVersion, is)
 	if err != nil {
 		t.Fatal(err)
 	}

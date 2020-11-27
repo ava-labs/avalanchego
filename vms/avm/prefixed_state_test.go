@@ -26,7 +26,7 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 	}()
 
 	state := vm.state
-	if err := vm.codec.RegisterType(&avax.TestVerifiable{}); err != nil {
+	if err := vm.CodecRegistry().RegisterType(&avax.TestVerifiable{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -107,7 +107,7 @@ func TestPrefixedFundingNoAddresses(t *testing.T) {
 	}()
 
 	state := vm.state
-	if err := vm.codec.RegisterType(&avax.TestVerifiable{}); err != nil {
+	if err := vm.CodecRegistry().RegisterType(&avax.TestVerifiable{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -139,7 +139,7 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 	}()
 
 	state := vm.state
-	if err := vm.codec.RegisterType(&avax.TestAddressable{}); err != nil {
+	if err := vm.CodecRegistry().RegisterType(&avax.TestAddressable{}); err != nil {
 		t.Fatal(err)
 	}
 

@@ -117,7 +117,7 @@ func TestBaseTxSerialization(t *testing.T) {
 		Memo: []byte{0x00, 0x01, 0x02, 0x03},
 	}}}
 
-	c := setupCodec()
+	_, c := setupCodec()
 	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -186,7 +186,7 @@ func TestBaseTxGetters(t *testing.T) {
 
 func TestBaseTxSyntacticVerify(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
@@ -229,7 +229,7 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 
 func TestBaseTxSyntacticVerifyMemoTooLarge(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
@@ -273,7 +273,7 @@ func TestBaseTxSyntacticVerifyMemoTooLarge(t *testing.T) {
 
 func TestBaseTxSyntacticVerifyNil(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := (*BaseTx)(nil)
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
@@ -283,7 +283,7 @@ func TestBaseTxSyntacticVerifyNil(t *testing.T) {
 
 func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID + 1,
@@ -326,7 +326,7 @@ func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 
 func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
@@ -369,7 +369,7 @@ func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
 
 func TestBaseTxSyntacticVerifyInvalidOutput(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
@@ -403,7 +403,7 @@ func TestBaseTxSyntacticVerifyInvalidOutput(t *testing.T) {
 
 func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
@@ -460,7 +460,7 @@ func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 
 func TestBaseTxSyntacticVerifyInvalidInput(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
@@ -486,7 +486,7 @@ func TestBaseTxSyntacticVerifyInvalidInput(t *testing.T) {
 
 func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
@@ -549,7 +549,7 @@ func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
 
 func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
@@ -604,7 +604,7 @@ func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
 
 func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
@@ -647,7 +647,7 @@ func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
 
 func TestBaseTxSyntacticVerifyUninitialized(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
@@ -744,7 +744,7 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	if err := vm.codec.RegisterType(&avax.TestVerifiable{}); err != nil {
+	if err := vm.CodecRegistry().RegisterType(&avax.TestVerifiable{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -800,7 +800,7 @@ func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	if err := vm.codec.RegisterType(&avax.TestVerifiable{}); err != nil {
+	if err := vm.CodecRegistry().RegisterType(&avax.TestVerifiable{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -854,6 +854,11 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
+	fx := &FxTest{}
+	fx.InitializeF = func(interface{}) error {
+		return vm.CodecRegistry().RegisterType(&avax.TestTransferable{})
+	}
+
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
@@ -868,7 +873,7 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 			},
 			{
 				ID: ids.ID{1},
-				Fx: &FxTest{},
+				Fx: fx,
 			},
 		},
 	)
@@ -884,17 +889,6 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 
 	err = vm.Bootstrapped()
 	if err != nil {
-		t.Fatal(err)
-	}
-
-	cr := codecRegistry{
-		genesisCodec:  vm.genesisCodec,
-		codec:         vm.codec,
-		index:         1,
-		typeToFxIndex: vm.typeToFxIndex,
-	}
-
-	if err := cr.RegisterType(&avax.TestTransferable{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1282,6 +1276,12 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 	ctx.Lock.Lock()
 
 	vm := &VM{}
+
+	fx := &FxTest{}
+	fx.InitializeF = func(interface{}) error {
+		return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
+	}
+
 	err := vm.Initialize(
 		ctx,
 		memdb.New(),
@@ -1294,7 +1294,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 			},
 			{
 				ID: ids.Empty,
-				Fx: &FxTest{},
+				Fx: fx,
 			},
 		},
 	)
@@ -1310,17 +1310,6 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 
 	err = vm.Bootstrapped()
 	if err != nil {
-		t.Fatal(err)
-	}
-
-	cr := codecRegistry{
-		genesisCodec:  vm.genesisCodec,
-		codec:         vm.codec,
-		index:         1,
-		typeToFxIndex: vm.typeToFxIndex,
-	}
-
-	if err := cr.RegisterType(&avax.TestVerifiable{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1429,6 +1418,12 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 	ctx.Lock.Lock()
 
 	vm := &VM{}
+
+	fx := &FxTest{}
+	fx.InitializeF = func(interface{}) error {
+		return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
+	}
+
 	err := vm.Initialize(
 		ctx,
 		memdb.New(),
@@ -1441,7 +1436,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 			},
 			{
 				ID: ids.Empty,
-				Fx: &FxTest{},
+				Fx: fx,
 			},
 		},
 	)
@@ -1457,17 +1452,6 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 
 	err = vm.Bootstrapped()
 	if err != nil {
-		t.Fatal(err)
-	}
-
-	cr := codecRegistry{
-		genesisCodec:  vm.genesisCodec,
-		codec:         vm.codec,
-		index:         1,
-		typeToFxIndex: vm.typeToFxIndex,
-	}
-
-	if err := cr.RegisterType(&avax.TestVerifiable{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1615,7 +1599,7 @@ func TestBaseTxSemanticVerifyMalformedOutput(t *testing.T) {
 	}
 
 	tx := &Tx{}
-	if err := vm.codec.Unmarshal(txBytes, tx); err == nil {
+	if _, err := vm.codec.Unmarshal(txBytes, tx); err == nil {
 		t.Fatalf("should have failed to unmarshal the tx")
 	}
 }
@@ -1630,7 +1614,7 @@ func TestBaseTxSemanticVerifyInvalidFxOutput(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	if err := vm.codec.RegisterType(&avax.TestTransferable{}); err != nil {
+	if err := vm.CodecRegistry().RegisterType(&avax.TestTransferable{}); err != nil {
 		t.Fatal(err)
 	}
 
