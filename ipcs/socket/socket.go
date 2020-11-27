@@ -127,7 +127,7 @@ func (s *Socket) Close() error {
 	s.listener = nil
 
 	// close the listener to break the loop
-	_ = listener.Close()
+	err := listener.Close()
 
 	<-s.doneCh
 
@@ -138,7 +138,7 @@ func (s *Socket) Close() error {
 	s.connLock.Unlock()
 
 	// Close all connections that were open at the time of shutdown
-	errs := wrappers.Errs{}
+	errs := wrappers.Errs{Err: err}
 	for conn := range conns {
 		if conn != nil {
 			errs.Add(conn.Close())

@@ -536,7 +536,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		n.Config.ConsensusGossipFrequency,
 		n.Config.ConsensusShutdownTimeout,
 		criticalChains,
-		func() { n.Shutdown() },
+		n.Shutdown,
 	)
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
