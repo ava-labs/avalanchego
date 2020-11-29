@@ -69,7 +69,7 @@ func BuildGenesisTest(t *testing.T) []byte {
 	}
 	genesisBytes, err := formatting.Decode(genesisReply.Encoding, genesisReply.Bytes)
 	if err != nil {
-		t.Fatalf("Failed to decode genesis bytes: %w", err)
+		t.Fatalf("Failed to decode genesis bytes: %s", err)
 	}
 	return genesisBytes
 }
