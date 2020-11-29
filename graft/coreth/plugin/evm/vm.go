@@ -131,9 +131,9 @@ func init() {
 		c.RegisterType(&secp256k1fx.Credential{}),
 		c.RegisterType(&secp256k1fx.Input{}),
 		c.RegisterType(&secp256k1fx.OutputOwners{}),
+		Codec.RegisterCodec(codecVersion, c),
 	)
 
-	errs.Add(Codec.RegisterCodec(0, c))
 	if errs.Errored() {
 		panic(errs.Err)
 	}

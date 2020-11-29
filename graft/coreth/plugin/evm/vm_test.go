@@ -63,9 +63,13 @@ func BuildGenesisTest(t *testing.T) []byte {
 	if err := json.Unmarshal([]byte(genesisJSON), genesis); err != nil {
 		t.Fatalf("Problem unmarshaling genesis JSON: %s", err)
 	}
-	genesisBytes, err := ss.BuildGenesis(nil, genesis)
+	genesisReply, err := ss.BuildGenesis(nil, genesis)
 	if err != nil {
 		t.Fatalf("Failed to create test genesis")
+	}
+	genesisBytes, err := formatting.Decode(genesisReply.Encoding, genesisReply.Bytes)
+	if err != nil {
+		t.Fatalf("Failed to decode genesis bytes: %w", err)
 	}
 	return genesisBytes
 }
