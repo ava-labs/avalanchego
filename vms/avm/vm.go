@@ -645,7 +645,7 @@ func (vm *VM) initState(genesisBytes []byte) error {
 		}
 
 		txID := tx.ID()
-		vm.ctx.Log.Info("Initializing with AssetID %s", txID)
+		vm.ctx.Log.Info("initializing with AssetID %s", txID)
 		if err := vm.state.SetTx(txID, &tx); err != nil {
 			return err
 		}

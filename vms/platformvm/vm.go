@@ -315,7 +315,7 @@ func (vm *VM) Initialize(
 	}
 
 	lastAcceptedID := vm.LastAccepted()
-	vm.Ctx.Log.Info("Initializing last accepted block as %s", lastAcceptedID)
+	vm.Ctx.Log.Info("initializing last accepted block as %s", lastAcceptedID)
 
 	// Build off the most recently accepted block
 	vm.SetPreference(lastAcceptedID)
