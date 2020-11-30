@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	version = "coreth-v0.3.14"
+	version = "coreth-v0.3.15"
 )
 
 // test constants
@@ -91,6 +91,17 @@ func (api *SnowmanAPI) IssueBlock(ctx context.Context) error {
 	return api.vm.tryBlockGen()
 }
 
+// parseAssetID parses an assetID string into an ID
+func (service *AvaxAPI) parseAssetID(assetID string) (ids.ID, error) {
+	if assetID == "" {
+		return ids.ID{}, fmt.Errorf("assetID is required")
+	} else if assetID == "AVAX" {
+		return service.vm.ctx.AVAXAssetID, nil
+	} else {
+		return ids.FromString(assetID)
+	}
+}
+
 // ClientVersion returns the version of the vm running
 func (service *AvaxAPI) ClientVersion() string { return version }
 
@@ -127,7 +138,11 @@ func (service *AvaxAPI) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 	if err != nil {
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
-	reply.PrivateKey = constants.SecretKeyPrefix + formatting.CB58{Bytes: sk.Bytes()}.String()
+	encodedKey, err := formatting.Encode(formatting.CB58, sk.Bytes())
+	if err != nil {
+		return fmt.Errorf("problem encoding bytes as cb58: %w", err)
+	}
+	reply.PrivateKey = constants.SecretKeyPrefix + encodedKey
 	reply.PrivateKeyHex = hexutil.Encode(sk.Bytes())
 	return nil
 }
@@ -147,13 +162,13 @@ func (service *AvaxAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	}
 
 	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
-	formattedPrivateKey := formatting.CB58{}
-	if err := formattedPrivateKey.FromString(trimmedPrivateKey); err != nil {
+	pkBytes, err := formatting.Decode(formatting.CB58, trimmedPrivateKey)
+	if err != nil {
 		return fmt.Errorf("problem parsing private key: %w", err)
 	}
 
 	factory := crypto.FactorySECP256K1R{}
-	skIntf, err := factory.ToPrivateKey(formattedPrivateKey.Bytes)
+	skIntf, err := factory.ToPrivateKey(pkBytes)
 	if err != nil {
 		return fmt.Errorf("problem parsing private key: %w", err)
 	}
@@ -232,8 +247,6 @@ func (service *AvaxAPI) Import(_ *http.Request, args *ImportArgs, response *api.
 type ExportAVAXArgs struct {
 	api.UserPass
 
-	// AssetID of the tokens
-	AssetID ids.ID `json:"assetID"`
 	// Amount of asset to send
 	Amount json.Uint64 `json:"amount"`
 
@@ -247,7 +260,7 @@ type ExportAVAXArgs struct {
 func (service *AvaxAPI) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JSONTxID) error {
 	return service.Export(nil, &ExportArgs{
 		ExportAVAXArgs: *args,
-		AssetID:        service.vm.ctx.AVAXAssetID,
+		AssetID:        service.vm.ctx.AVAXAssetID.String(),
 	}, response)
 }
 
@@ -255,15 +268,17 @@ func (service *AvaxAPI) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 type ExportArgs struct {
 	ExportAVAXArgs
 	// AssetID of the tokens
-	AssetID ids.ID `json:"assetID"`
+	AssetID string `json:"assetID"`
 }
 
 // Export exports an asset from the C-Chain to the X-Chain
 // It must be imported on the X-Chain to complete the transfer
 func (service *AvaxAPI) Export(_ *http.Request, args *ExportArgs, response *api.JSONTxID) error {
 	log.Info("EVM: Export called")
-	if args.AssetID == ids.Empty {
-		return fmt.Errorf("assetID is required")
+
+	assetID, err := service.parseAssetID(args.AssetID)
+	if err != nil {
+		return err
 	}
 
 	if args.Amount == 0 {
@@ -290,7 +305,7 @@ func (service *AvaxAPI) Export(_ *http.Request, args *ExportArgs, response *api.
 
 	// Create the transaction
 	tx, err := service.vm.newExportTx(
-		args.AssetID,        // AssetID
+		assetID,             // AssetID
 		uint64(args.Amount), // Amount
 		chainID,             // ID of the chain to send the funds to
 		to,                  // Address
@@ -304,49 +319,8 @@ func (service *AvaxAPI) Export(_ *http.Request, args *ExportArgs, response *api.
 	return service.vm.issueTx(tx)
 }
 
-// Index is an address and an associated UTXO.
-// Marks a starting or stopping point when fetching UTXOs. Used for pagination.
-type Index struct {
-	Address string `json:"address"` // The address as a string
-	UTXO    string `json:"utxo"`    // The UTXO ID as a string
-}
-
-// GetUTXOsArgs are arguments for passing into GetUTXOs.
-// Gets the UTXOs that reference at least one address in [Addresses].
-// Returns at most [limit] addresses.
-// If specified, [SourceChain] is the chain where the atomic UTXOs were exported from. If not specified,
-// then GetUTXOs returns an error since the C Chain only has atomic UTXOs.
-// If [limit] == 0 or > [maxUTXOsToFetch], fetches up to [maxUTXOsToFetch].
-// [StartIndex] defines where to start fetching UTXOs (for pagination.)
-// UTXOs fetched are from addresses equal to or greater than [StartIndex.Address]
-// For address [StartIndex.Address], only UTXOs with IDs greater than [StartIndex.UTXO] will be returned.
-// If [StartIndex] is omitted, gets all UTXOs.
-// If GetUTXOs is called multiple times, with our without [StartIndex], it is not guaranteed
-// that returned UTXOs are unique. That is, the same UTXO may appear in the response of multiple calls.
-type GetUTXOsArgs struct {
-	Addresses   []string    `json:"addresses"`
-	SourceChain string      `json:"sourceChain"`
-	Limit       json.Uint32 `json:"limit"`
-	StartIndex  Index       `json:"startIndex"`
-	Encoding    string      `json:"encoding"`
-}
-
-// GetUTXOsReply defines the GetUTXOs replies returned from the API
-type GetUTXOsReply struct {
-	// Number of UTXOs returned
-	NumFetched json.Uint64 `json:"numFetched"`
-	// The UTXOs
-	UTXOs []string `json:"utxos"`
-	// The last UTXO that was returned, and the address it corresponds to.
-	// Used for pagination. To get the rest of the UTXOs, call GetUTXOs
-	// again and set [StartIndex] to this value.
-	EndIndex Index `json:"endIndex"`
-	// Encoding specifies the encoding format the UTXOs are returned in
-	Encoding string `json:"encoding"`
-}
-
 // GetUTXOs gets all utxos for passed in addresses
-func (service *AvaxAPI) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *GetUTXOsReply) error {
+func (service *AvaxAPI) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply *api.GetUTXOsReply) error {
 	service.vm.ctx.Log.Info("EVM: GetUTXOs called for with %s", args.Addresses)
 
 	if len(args.Addresses) == 0 {
@@ -354,11 +328,6 @@ func (service *AvaxAPI) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 	}
 	if len(args.Addresses) > maxGetUTXOsAddrs {
 		return fmt.Errorf("number of addresses given, %d, exceeds maximum, %d", len(args.Addresses), maxGetUTXOsAddrs)
-	}
-
-	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
-	if err != nil {
-		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
 	}
 
 	sourceChain := ids.ID{}
@@ -407,11 +376,15 @@ func (service *AvaxAPI) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 
 	reply.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		b, err := service.vm.codec.Marshal(utxo)
+		b, err := service.vm.codec.Marshal(codecVersion, utxo)
 		if err != nil {
 			return fmt.Errorf("problem marshalling UTXO: %w", err)
 		}
-		reply.UTXOs[i] = encoding.ConvertBytes(b)
+		str, err := formatting.Encode(args.Encoding, b)
+		if err != nil {
+			return fmt.Errorf("problem encoding utxo: %w", err)
+		}
+		reply.UTXOs[i] = str
 	}
 
 	endAddress, err := service.vm.FormatLocalAddress(endAddr)
@@ -422,7 +395,7 @@ func (service *AvaxAPI) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 	reply.EndIndex.Address = endAddress
 	reply.EndIndex.UTXO = endUTXOID.String()
 	reply.NumFetched = json.Uint64(len(utxos))
-	reply.Encoding = encoding.Encoding()
+	reply.Encoding = args.Encoding
 	return nil
 }
 
@@ -430,17 +403,13 @@ func (service *AvaxAPI) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 func (service *AvaxAPI) IssueTx(r *http.Request, args *api.FormattedTx, response *api.JSONTxID) error {
 	log.Info("EVM: IssueTx called")
 
-	encoding, err := service.vm.encodingManager.GetEncoding(args.Encoding)
-	if err != nil {
-		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
-	}
-	txBytes, err := encoding.ConvertString(args.Tx)
+	txBytes, err := formatting.Decode(args.Encoding, args.Tx)
 	if err != nil {
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
 
 	tx := &Tx{}
-	if err := service.vm.codec.Unmarshal(txBytes, tx); err != nil {
+	if _, err := service.vm.codec.Unmarshal(txBytes, tx); err != nil {
 		return fmt.Errorf("problem parsing transaction: %w", err)
 	}
 	if err := tx.Sign(service.vm.codec, nil); err != nil {

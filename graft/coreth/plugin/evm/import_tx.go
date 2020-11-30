@@ -135,7 +135,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 		utxoBytes := allUTXOBytes[i]
 
 		utxo := &avax.UTXO{}
-		if err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
+		if _, err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
 			return tempError{err}
 		}
 
