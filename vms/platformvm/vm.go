@@ -315,7 +315,7 @@ func (vm *VM) Initialize(
 	}
 
 	lastAcceptedID := vm.LastAccepted()
-	vm.Ctx.Log.Info("Initializing last accepted block as %s", lastAcceptedID)
+	vm.Ctx.Log.Info("initializing last accepted block as %s", lastAcceptedID)
 
 	// Build off the most recently accepted block
 	vm.SetPreference(lastAcceptedID)
@@ -458,7 +458,12 @@ func (vm *VM) Bootstrapped() error {
 	if err := stopIter.Error(); err != nil {
 		return err
 	}
-	return vm.DB.Commit()
+
+	errs.Add(
+		vm.DB.Commit(),
+		stopDB.Close(),
+	)
+	return errs.Err
 }
 
 // Shutdown this blockchain
@@ -529,13 +534,17 @@ func (vm *VM) Shutdown() error {
 			vm.Ctx.Log.Error("failed to write back uptime data")
 		}
 	}
-	if err := vm.DB.Commit(); err != nil {
-		return err
-	}
 	if err := stopIter.Error(); err != nil {
 		return err
 	}
-	return vm.DB.Close()
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		vm.DB.Commit(),
+		stopDB.Close(),
+		vm.DB.Close(),
+	)
+	return errs.Err
 }
 
 // BuildBlock builds a block to be added to consensus
@@ -913,7 +922,9 @@ currentStakerLoop:
 	errs := wrappers.Errs{}
 	errs.Add(
 		startIter.Error(),
+		startDB.Close(),
 		stopIter.Error(),
+		stopDB.Close(),
 	)
 	return errs.Err
 }
@@ -979,6 +990,7 @@ func (vm *VM) updateVdrSet(subnetID ids.ID) error {
 	errs.Add(
 		vm.vdrMgr.Set(subnetID, vdrs),
 		stopIter.Error(),
+		stopDB.Close(),
 	)
 	return errs.Err
 }
@@ -1152,7 +1164,6 @@ func (vm *VM) getStakers() ([]validators.Validator, error) {
 	defer iter.Release()
 
 	stakers := []validators.Validator{}
-
 	for iter.Next() { // Iterates in order of increasing start time
 		txBytes := iter.Value()
 		tx := rewardTx{}
@@ -1169,11 +1180,13 @@ func (vm *VM) getStakers() ([]validators.Validator, error) {
 			stakers = append(stakers, &staker.Validator)
 		}
 	}
-	if err := iter.Error(); err != nil {
-		return nil, err
-	}
 
-	return stakers, nil
+	errs := wrappers.Errs{}
+	errs.Add(
+		iter.Error(),
+		stopDB.Close(),
+	)
+	return stakers, errs.Err
 }
 
 // Returns the pending staker set of the Primary Network.
@@ -1188,7 +1201,6 @@ func (vm *VM) getPendingStakers() ([]validators.Validator, error) {
 	defer iter.Release()
 
 	stakers := []validators.Validator{}
-
 	for iter.Next() { // Iterates in order of increasing start time
 		txBytes := iter.Value()
 		tx := rewardTx{}
@@ -1205,11 +1217,13 @@ func (vm *VM) getPendingStakers() ([]validators.Validator, error) {
 			stakers = append(stakers, &staker.Validator)
 		}
 	}
-	if err := iter.Error(); err != nil {
-		return nil, err
-	}
 
-	return stakers, nil
+	errs := wrappers.Errs{}
+	errs.Add(
+		iter.Error(),
+		startDB.Close(),
+	)
+	return stakers, errs.Err
 }
 
 // Returns the total amount being staked on the Primary Network, in nAVAX.
@@ -1394,8 +1408,10 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		startIter.Error(),
 		stopIter.Error(),
+		stopDB.Close(),
+		startIter.Error(),
+		startDB.Close(),
 	)
 	return maxWeight, errs.Err
 }

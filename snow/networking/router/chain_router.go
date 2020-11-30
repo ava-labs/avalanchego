@@ -74,6 +74,7 @@ func (sr *ChainRouter) Initialize(
 
 // Shutdown shuts down this router
 func (sr *ChainRouter) Shutdown() {
+	sr.log.Info("shutting down chain router")
 	sr.lock.Lock()
 	prevChains := sr.chains
 	sr.chains = map[ids.ID]*Handler{}
