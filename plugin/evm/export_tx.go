@@ -149,7 +149,7 @@ func (tx *UnsignedExportTx) Accept(ctx *snow.Context, _ database.Batch) error {
 			Out:   out.Out,
 		}
 
-		utxoBytes, err := Codec.Marshal(utxo)
+		utxoBytes, err := Codec.Marshal(codecVersion, utxo)
 		if err != nil {
 			return err
 		}

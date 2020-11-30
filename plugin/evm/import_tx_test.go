@@ -153,7 +153,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := vm.codec.Marshal(utxo)
+	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,7 +312,7 @@ func TestNewImportTx(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := vm.codec.Marshal(utxo)
+	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
