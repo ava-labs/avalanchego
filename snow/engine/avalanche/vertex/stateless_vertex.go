@@ -11,7 +11,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
@@ -21,6 +23,10 @@ const (
 	// noEpochTransitionsCodecVersion is the codec version that was used when
 	// there were no epoch transitions
 	noEpochTransitionsCodecVersion = uint16(0)
+
+	// apricotCodecVersion is the codec version that was used when we added
+	// epoch transitions
+	apricotCodecVersion = uint16(1)
 
 	// maxNumParents is the max number of parents a vertex may have
 	maxNumParents = 128
@@ -36,14 +42,32 @@ var (
 	errTooManyTxs       = fmt.Errorf("vertex contains more than %d transactions", maxTxsPerVtx)
 	errInvalidParents   = errors.New("vertex contains non-sorted or duplicated parentIDs")
 	errInvalidTxs       = errors.New("vertex contains non-sorted or duplicated transactions")
+
+	Codec codec.Manager
 )
 
+func init() {
+	codecV0 := codec.New("serializeV0", maxSize)
+	codecV1 := codec.New("serializeV1", maxSize)
+	Codec = codec.NewManager(maxSize)
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		Codec.RegisterCodec(noEpochTransitionsCodecVersion, codecV0),
+		Codec.RegisterCodec(apricotCodecVersion, codecV1),
+	)
+	if errs.Errored() {
+		panic(errs.Err)
+	}
+}
+
 type StatelessVertex struct {
-	ChainID   ids.ID   `serialize:"true" json:"chainID"`
-	Height    uint64   `serialize:"true" json:"height"`
-	Epoch     uint32   `serialize:"true" json:"epoch"`
-	ParentIDs []ids.ID `serialize:"true" json:"parentIDs"`
-	Txs       [][]byte `serialize:"true" json:"txs"`
+	ChainID      ids.ID   `serializeV0:"true" serializeV1:"true" json:"chainID"`
+	Height       uint64   `serializeV0:"true" serializeV1:"true" json:"height"`
+	Epoch        uint32   `serializeV0:"true" serializeV1:"true" json:"epoch"`
+	ParentIDs    []ids.ID `serializeV0:"true" serializeV1:"true" json:"parentIDs"`
+	Txs          [][]byte `serializeV0:"true" serializeV1:"true" json:"txs"`
+	Restrictions []ids.ID `serializeV1:"true" json:"restrictions"`
 }
 
 func (v *StatelessVertex) Verify() error {
@@ -58,7 +82,7 @@ func (v *StatelessVertex) Verify() error {
 		return errTooManyTxs
 	case !ids.IsSortedAndUniqueIDs(v.ParentIDs):
 		return errInvalidParents
-	case !isSortedAndUniqueHashOf(v.Txs):
+	case !IsSortedAndUniqueHashOf(v.Txs):
 		return errInvalidTxs
 	default:
 		return nil
@@ -76,7 +100,7 @@ func (d sortHashOfData) Less(i, j int) bool {
 func (d sortHashOfData) Len() int      { return len(d) }
 func (d sortHashOfData) Swap(i, j int) { d[j], d[i] = d[i], d[j] }
 
-func sortHashOf(bytesSlice [][]byte) { sort.Sort(sortHashOfData(bytesSlice)) }
-func isSortedAndUniqueHashOf(bytesSlice [][]byte) bool {
+func SortHashOf(bytesSlice [][]byte) { sort.Sort(sortHashOfData(bytesSlice)) }
+func IsSortedAndUniqueHashOf(bytesSlice [][]byte) bool {
 	return utils.IsSortedAndUnique(sortHashOfData(bytesSlice))
 }
