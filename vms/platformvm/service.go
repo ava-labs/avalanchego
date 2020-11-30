@@ -90,7 +90,6 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 	}
 
 	user := user{db: db}
-
 	sk, err := user.getKey(address)
 	if err != nil {
 		// Drop any potential error closing the database to report the original
@@ -151,8 +150,6 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	}
 
 	if err := user.putAddress(sk); err != nil {
-		// Drop any potential error closing the database to report the original
-		// error
 		return fmt.Errorf("problem saving key %w", err)
 	}
 	return db.Close()
@@ -295,8 +292,6 @@ func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, respo
 	}
 
 	if err := user.putAddress(key.(*crypto.PrivateKeySECP256K1R)); err != nil {
-		// Drop any potential error closing the database to report the original
-		// error
 		return fmt.Errorf("problem saving key %w", err)
 	}
 	return db.Close()
@@ -311,8 +306,6 @@ func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, respo
 		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 
-	// Drop any potential error closing the database to report the original
-	// error
 	defer db.Close()
 
 	user := user{db: db}
@@ -750,7 +743,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 		reply.Validators[i] = vdr
 	}
 
-	return nil
+	return stopDB.Close()
 }
 
 // GetPendingValidatorsArgs are the arguments for calling GetPendingValidators
@@ -832,7 +825,12 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			return fmt.Errorf("expected validator but got %T", tx.UnsignedTx)
 		}
 	}
-	return startIter.Error()
+	errs := wrappers.Errs{}
+	errs.Add(
+		startIter.Error(),
+		startDB.Close(),
+	)
+	return errs.Err
 }
 
 // GetCurrentSupplyReply are the results from calling GetCurrentSupply
@@ -953,8 +951,6 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	if err != nil {
 		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
-
-	// Drop any potential error closing the database to report the original error
 	defer db.Close()
 
 	// Get the user's keys
@@ -1059,9 +1055,6 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	if err != nil {
 		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
-
-	// Drop any potential error closing the database to report the original
-	// error
 	defer db.Close()
 
 	user := user{db: db}
@@ -1173,9 +1166,6 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	if err != nil {
 		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
-
-	// Drop any potential error closing the database to report the original
-	// error
 	defer db.Close()
 
 	user := user{db: db}
@@ -1272,9 +1262,6 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	if err != nil {
 		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
-
-	// Drop any potential error closing the database to report the original
-	// error
 	defer db.Close()
 
 	user := user{db: db}
@@ -1374,9 +1361,6 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 	if err != nil {
 		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
-
-	// Drop any potential error closing the database to report the original
-	// error
 	defer db.Close()
 
 	user := user{db: db}
@@ -1478,9 +1462,6 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 	if err != nil {
 		return fmt.Errorf("couldn't get user %q: %w", args.Username, err)
 	}
-
-	// Drop any potential error closing the database to report the original
-	// error
 	defer db.Close()
 
 	user := user{db: db}
@@ -1534,9 +1515,9 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 
 	errs := wrappers.Errs{}
 	errs.Add(
+		err,
 		service.vm.mempool.IssueTx(tx),
 		db.Close(),
-		err,
 	)
 	return errs.Err
 }
@@ -1610,9 +1591,6 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	if err != nil {
 		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
-
-	// Drop any potential error closing the database to report the original
-	// error
 	defer db.Close()
 
 	user := user{db: db}
@@ -2084,12 +2062,18 @@ func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, respo
 			return err
 		}
 	}
-	if err := stopIter.Error(); err != nil {
+	if err := startIter.Error(); err != nil {
 		return fmt.Errorf("iterator errored: %w", err)
 	}
 
 	response.Stake = json.Uint64(totalStake)
-	return nil
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		stopDB.Close(),
+		startDB.Close(),
+	)
+	return errs.Err
 }
 
 // GetMinStakeReply is the response from calling GetMinStake.

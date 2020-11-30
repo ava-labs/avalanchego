@@ -96,18 +96,25 @@ func (vm *VM) enqueueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 	// Sorted by subnet ID then start time then tx ID
 	prefixStart := []byte(fmt.Sprintf("%s%s", subnetID, startDBPrefix))
 	prefixStartDB := prefixdb.NewNested(prefixStart, db)
-	defer prefixStartDB.Close()
 
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.StartTime().Unix()))
 	p.PackByte(priority)
 	p.PackFixedBytes(stakerID[:])
 	if p.Err != nil {
+		// Close the DB, but ignore the error, as the parent error needs to be
+		// returned.
+		_ = prefixStartDB.Close()
 		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
 	}
 	startKey := p.Bytes
 
-	return prefixStartDB.Put(startKey, txBytes)
+	errs := wrappers.Errs{}
+	errs.Add(
+		prefixStartDB.Put(startKey, txBytes),
+		prefixStartDB.Close(),
+	)
+	return errs.Err
 }
 
 // Remove a staker from subnet [subnetID]'s pending validator queue. A staker
@@ -135,18 +142,25 @@ func (vm *VM) dequeueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 	// Sorted by subnet ID then start time then ID
 	prefixStart := []byte(fmt.Sprintf("%s%s", subnetID, startDBPrefix))
 	prefixStartDB := prefixdb.NewNested(prefixStart, db)
-	defer prefixStartDB.Close()
 
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.StartTime().Unix()))
 	p.PackByte(priority)
 	p.PackFixedBytes(stakerID[:])
 	if p.Err != nil {
+		// Close the DB, but ignore the error, as the parent error needs to be
+		// returned.
+		_ = prefixStartDB.Close()
 		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
 	}
 	startKey := p.Bytes
 
-	return prefixStartDB.Delete(startKey)
+	errs := wrappers.Errs{}
+	errs.Add(
+		prefixStartDB.Delete(startKey),
+		prefixStartDB.Close(),
+	)
+	return errs.Err
 }
 
 // Add a staker to subnet [subnetID]
@@ -180,18 +194,25 @@ func (vm *VM) addStaker(db database.Database, subnetID ids.ID, tx *rewardTx) err
 	// Sorted by subnet ID then stop time then tx ID
 	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
 	prefixStopDB := prefixdb.NewNested(prefixStop, db)
-	defer prefixStopDB.Close()
 
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.EndTime().Unix()))
 	p.PackByte(priority)
 	p.PackFixedBytes(txID[:])
 	if p.Err != nil {
+		// Close the DB, but ignore the error, as the parent error needs to be
+		// returned.
+		_ = prefixStopDB.Close()
 		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
 	}
 	stopKey := p.Bytes
 
-	return prefixStopDB.Put(stopKey, txBytes)
+	errs := wrappers.Errs{}
+	errs.Add(
+		prefixStopDB.Put(stopKey, txBytes),
+		prefixStopDB.Close(),
+	)
+	return errs.Err
 }
 
 // Remove a staker from subnet [subnetID]
@@ -220,18 +241,25 @@ func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, tx *rewardTx) 
 	// Sorted by subnet ID then stop time
 	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
 	prefixStopDB := prefixdb.NewNested(prefixStop, db)
-	defer prefixStopDB.Close()
 
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.EndTime().Unix()))
 	p.PackByte(priority)
 	p.PackFixedBytes(txID[:])
 	if p.Err != nil {
+		// Close the DB, but ignore the error, as the parent error needs to be
+		// returned.
+		_ = prefixStopDB.Close()
 		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
 	}
 	stopKey := p.Bytes
 
-	return prefixStopDB.Delete(stopKey)
+	errs := wrappers.Errs{}
+	errs.Add(
+		prefixStopDB.Delete(stopKey),
+		prefixStopDB.Close(),
+	)
+	return errs.Err
 }
 
 // Returns the pending staker that will start staking next
@@ -425,9 +453,12 @@ func (vm *VM) getReferencingUTXOs(db database.Database, addr []byte, start ids.I
 // Persist that the UTXO with ID [utxoID] references [addr]
 func (vm *VM) putReferencingUTXO(db database.Database, addrBytes []byte, utxoID ids.ID) error {
 	prefixedDB := prefixdb.NewNested(addrBytes, db)
-
-	defer prefixedDB.Close()
-	return prefixedDB.Put(utxoID[:], nil)
+	errs := wrappers.Errs{}
+	errs.Add(
+		prefixedDB.Put(utxoID[:], nil),
+		prefixedDB.Close(),
+	)
+	return errs.Err
 }
 
 // Remove the UTXO with ID [utxoID] from the set of UTXOs that reference [addr]
@@ -855,8 +886,9 @@ func (vm *VM) uptime(db database.Database, nodeID ids.ShortID) (*validatorUptime
 	if _, err := Codec.Unmarshal(uptimeBytes, &uptime); err != nil {
 		return nil, err
 	}
-	return &uptime, nil
+	return &uptime, uptimeDB.Close()
 }
+
 func (vm *VM) setUptime(db database.Database, nodeID ids.ShortID, uptime *validatorUptime) error {
 	uptimeBytes, err := Codec.Marshal(codecVersion, uptime)
 	if err != nil {
@@ -864,15 +896,22 @@ func (vm *VM) setUptime(db database.Database, nodeID ids.ShortID, uptime *valida
 	}
 
 	uptimeDB := prefixdb.NewNested([]byte(uptimeDBPrefix), db)
-	defer uptimeDB.Close()
-
-	return uptimeDB.Put(nodeID.Bytes(), uptimeBytes)
+	errs := wrappers.Errs{}
+	errs.Add(
+		uptimeDB.Put(nodeID.Bytes(), uptimeBytes),
+		uptimeDB.Close(),
+	)
+	return errs.Err
 }
+
 func (vm *VM) deleteUptime(db database.Database, nodeID ids.ShortID) error {
 	uptimeDB := prefixdb.NewNested([]byte(uptimeDBPrefix), db)
-	defer uptimeDB.Close()
-
-	return uptimeDB.Delete(nodeID.Bytes())
+	errs := wrappers.Errs{}
+	errs.Add(
+		uptimeDB.Delete(nodeID.Bytes()),
+		uptimeDB.Close(),
+	)
+	return errs.Err
 }
 
 // Unmarshal a Block from bytes and initialize it
