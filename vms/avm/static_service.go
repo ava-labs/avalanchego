@@ -75,6 +75,10 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
 		c.RegisterType(&secp256k1fx.MintOperation{}),
 		c.RegisterType(&secp256k1fx.Credential{}),
+		c.RegisterType(&secp256k1fx.FreezeOutput{}),                // TODO do this right
+		c.RegisterType(&secp256k1fx.FreezeOperation{}),             // TODO do this right
+		c.RegisterType(&secp256k1fx.AssetManagerOutput{}),          // TODO do this right
+		c.RegisterType(&secp256k1fx.ChangeAssetManagerOperation{}), // TODO do this right
 	)
 	if errs.Errored() {
 		return errs.Err

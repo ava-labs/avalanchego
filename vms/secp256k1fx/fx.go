@@ -61,6 +61,10 @@ func (fx *Fx) Initialize(vmIntf interface{}) error {
 		c.RegisterType(&TransferOutput{}),
 		c.RegisterType(&MintOperation{}),
 		c.RegisterType(&Credential{}),
+		c.RegisterType(&FreezeOutput{}),                // TODO do this right
+		c.RegisterType(&FreezeOperation{}),             // TODO do this right
+		c.RegisterType(&AssetManagerOutput{}),          // TODO do this right
+		c.RegisterType(&ChangeAssetManagerOperation{}), // TODO do this right
 	)
 	return errs.Err
 }
@@ -141,9 +145,15 @@ func (fx *Fx) VerifyOperation(txIntf, opIntf, credIntf interface{}, outsIntf []i
 	case *MintOperation:
 		out, ok := outsIntf[0].(*MintOutput)
 		if !ok {
-			return errWrongUTXOType
+			return fmt.Errorf("expected output to be *MintOutput but got %T", outsIntf[0])
 		}
 		return fx.verifyMintOperation(tx, op, cred, out)
+	case *FreezeOperation:
+		out, ok := outsIntf[0].(*AssetManagerOutput)
+		if !ok {
+			return fmt.Errorf("expected output to be *AssetManagerOutput but got %T", outsIntf[0])
+		}
+		return fx.verifyFreezeAssetOperation(tx, op, cred, out)
 	default:
 		return errWrongOpType
 	}
@@ -157,6 +167,13 @@ func (fx *Fx) verifyMintOperation(tx Tx, op *MintOperation, cred *Credential, ou
 		return errWrongMintCreated
 	}
 	return fx.VerifyCredentials(tx, &op.MintInput, cred, &out.OutputOwners)
+}
+
+func (fx *Fx) verifyFreezeAssetOperation(tx Tx, op *FreezeOperation, cred *Credential, out *AssetManagerOutput) error {
+	if err := verify.All(op, cred, out); err != nil {
+		return err
+	}
+	return fx.VerifyCredentials(tx, &op.Input, cred, &out.OutputOwners)
 }
 
 // VerifyTransfer ...

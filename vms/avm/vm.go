@@ -626,6 +626,11 @@ func (vm *VM) initState(genesisBytes []byte) error {
 			if err := vm.state.FundUTXO(utxo); err != nil {
 				return err
 			}
+			if _, ok := utxo.Out.(*secp256k1fx.FreezeOutput); ok {
+				if err := vm.state.FreezeAsset(utxo.AssetID(), tx.Epoch()); err != nil {
+					return fmt.Errorf("couldn't freeze asset: %w", err)
+				}
+			}
 		}
 	}
 
@@ -738,8 +743,13 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	}
 	createAssetTx, ok := tx.UnsignedTx.(*CreateAssetTx)
 	if !ok {
-		// This transaction was not an asset creation tx
-		return false
+		createManagedAssetTx, ok := tx.UnsignedTx.(*CreateManagedAssetTx)
+		if !ok {
+			// This transaction was not an asset creation tx
+			// (Neither regular nor managed)
+			return false
+		}
+		createAssetTx = &createManagedAssetTx.CreateAssetTx
 	}
 	fxIDs := ids.BitSet(0)
 	for _, state := range createAssetTx.States {
@@ -778,13 +788,19 @@ func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cr
 		return fmt.Errorf("asset %s is frozen", utxoAssetID)
 	}
 
-	// TODO: Check if this UTXO is frozen, and if so, when it was
-
 	if err := fx.VerifyTransfer(in.In, utxo.Out); err != nil {
 		return err
 	}
-	// TODO check if the asset owner allows this operation
-	return fx.VerifyPermission(tx, in.In, cred, utxo.Out)
+
+	// See if credential [cred] gives permission to spend the UTXO
+	if err := fx.VerifyPermission(tx, in.In, cred, utxo.Out); err == nil {
+		return nil
+	}
+
+	// See if this UTXO contains a managed asset. If so, see if the credential
+	// corresponds to the asset manager.
+	// TODO
+	return errors.New("TODO")
 }
 
 func (vm *VM) verifyTransfer(tx UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable) error {
@@ -820,6 +836,9 @@ func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiab
 	if !vm.verifyFxUsage(fxIndex, opAssetID) {
 		return errIncompatibleFx
 	}
+
+	// TODO check if this operation is trying to do a freeze with an invalid AssetManagerOutput
+	// that hasn't taken effect yet
 	return fx.VerifyOperation(tx, op.Op, cred, utxos)
 }
 
@@ -1124,6 +1143,62 @@ func (vm *VM) Mint(
 
 	sortOperationsWithSigners(ops, keys, vm.codec)
 	return ops, keys, nil
+}
+
+// createFreezeAssetOperation attempts to use the given UTXOs and keychain
+// to create a freeze operation that freezes asset [assetID]. The UTXOs can't
+// be consumed if they are locked at [time]
+func createFreezeAssetOperation(
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+	assetID ids.ID,
+	time uint64,
+	codec codec.Codec,
+) (
+	*Operation,
+	[]*crypto.PrivateKeySECP256K1R,
+	error,
+) {
+	for _, utxo := range utxos {
+		// makes sure that the variable isn't overwritten with the next iteration
+		utxo := utxo
+
+		// This UTXO isn't the right asset ID
+		utxoAssetID := utxo.AssetID()
+		if assetID != utxoAssetID {
+			continue
+		}
+
+		// Check whether this output is an AssetManagerOutput
+		// We need to consume this output to freeze
+		out, ok := utxo.Out.(*secp256k1fx.AssetManagerOutput)
+		if !ok {
+			continue
+		}
+
+		inIntf, signers, err := kc.Spend(out, time)
+		if err != nil {
+			continue
+		}
+
+		in, ok := inIntf.(*secp256k1fx.Input)
+		if !ok {
+			continue
+		}
+
+		// add the operation to the array
+		op := &Operation{
+			Asset:   utxo.Asset,
+			UTXOIDs: []*avax.UTXOID{&utxo.UTXOID},
+			Op: &secp256k1fx.FreezeOperation{
+				Input:              *in,
+				AssetManagerOutput: *out,
+				FreezeOutput:       secp256k1fx.FreezeOutput{},
+			},
+		}
+		return op, signers, nil
+	}
+	return nil, nil, fmt.Errorf("the given UTXOs/keys can't freeze asset %s", assetID)
 }
 
 // MintNFT ...
