@@ -48,7 +48,7 @@ func (fx *Fx) Initialize(vmIntf interface{}) error {
 	}
 
 	log := fx.VM.Logger()
-	log.Debug("Initializing secp561k1 fx")
+	log.Debug("initializing secp561k1 fx")
 
 	fx.SECPFactory = crypto.FactorySECP256K1R{
 		Cache: cache.LRU{Size: defaultCacheSize},
