@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package codec
+package linearcodec
 
 import (
 	"errors"
@@ -10,6 +10,7 @@ import (
 	"sync"
 	"unicode"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -25,15 +26,20 @@ const (
 )
 
 var (
-	errMarshalNil        = errors.New("can't marshal nil pointer or interface")
-	errUnmarshalNil      = errors.New("can't unmarshal nil")
-	errNeedPointer       = errors.New("argument to unmarshal must be a pointer")
-	errCantPackVersion   = errors.New("couldn't pack codec version")
-	errCantUnpackVersion = errors.New("couldn't unpack codec version")
+	errMarshalNil   = errors.New("can't marshal nil pointer or interface")
+	errUnmarshalNil = errors.New("can't unmarshal nil")
+	errNeedPointer  = errors.New("argument to unmarshal must be a pointer")
 )
 
+// Codec marshals and unmarshals
+type Codec interface {
+	codec.Registry
+	codec.Codec
+	SkipRegistations(int)
+}
+
 // Codec handles marshaling and unmarshaling of structs
-type codec struct {
+type linearCodec struct {
 	lock         sync.RWMutex
 	tagName      string
 	maxSliceLen  int
@@ -51,16 +57,9 @@ type codec struct {
 	serializedFieldIndices map[reflect.Type][]int
 }
 
-// Codec marshals and unmarshals
-type Codec interface {
-	Registry
-	MarshalInto(interface{}, *wrappers.Packer) error
-	Unmarshal([]byte, interface{}) error
-}
-
 // New returns a new, concurrency-safe codec
 func New(tagName string, maxSliceLen int) Codec {
-	return &codec{
+	return &linearCodec{
 		tagName:                tagName,
 		maxSliceLen:            maxSliceLen,
 		nextTypeID:             0,
@@ -74,7 +73,7 @@ func New(tagName string, maxSliceLen int) Codec {
 func NewDefault() Codec { return New(DefaultTagName, defaultMaxSliceLength) }
 
 // Skip some number of type IDs
-func (c *codec) Skip(num int) {
+func (c *linearCodec) SkipRegistations(num int) {
 	c.lock.Lock()
 	c.nextTypeID += uint32(num)
 	c.lock.Unlock()
@@ -82,7 +81,7 @@ func (c *codec) Skip(num int) {
 
 // RegisterType is used to register types that may be unmarshaled into an interface
 // [val] is a value of the type being registered
-func (c *codec) RegisterType(val interface{}) error {
+func (c *linearCodec) RegisterType(val interface{}) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -111,7 +110,7 @@ func (c *codec) RegisterType(val interface{}) error {
 // 8) nil slices are marshaled as empty slices
 
 // To marshal an interface, [value] must be a pointer to the interface
-func (c *codec) MarshalInto(value interface{}, p *wrappers.Packer) error {
+func (c *linearCodec) MarshalInto(value interface{}, p *wrappers.Packer) error {
 	if value == nil {
 		return errMarshalNil // can't marshal nil
 	}
@@ -125,7 +124,7 @@ func (c *codec) MarshalInto(value interface{}, p *wrappers.Packer) error {
 // marshal writes the byte representation of [value] to [p]
 // [value]'s underlying value must not be a nil pointer or interface
 // c.lock should be held for the duration of this function
-func (c *codec) marshal(value reflect.Value, p *wrappers.Packer) error {
+func (c *linearCodec) marshal(value reflect.Value, p *wrappers.Packer) error {
 	valueKind := value.Kind()
 	switch valueKind {
 	case reflect.Interface, reflect.Ptr, reflect.Invalid:
@@ -236,7 +235,7 @@ func (c *codec) marshal(value reflect.Value, p *wrappers.Packer) error {
 
 // Unmarshal unmarshals [bytes] into [dest], where
 // [dest] must be a pointer or interface
-func (c *codec) Unmarshal(bytes []byte, dest interface{}) error {
+func (c *linearCodec) Unmarshal(bytes []byte, dest interface{}) error {
 	if dest == nil {
 		return errUnmarshalNil
 	}
@@ -256,7 +255,7 @@ func (c *codec) Unmarshal(bytes []byte, dest interface{}) error {
 
 // Unmarshal from p.Bytes into [value]. [value] must be addressable.
 // c.lock should be held for the duration of this function
-func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
+func (c *linearCodec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 	switch value.Kind() {
 	case reflect.Uint8:
 		value.SetUint(uint64(p.UnpackByte()))
@@ -419,7 +418,7 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 // e.g. getSerializedFieldIndices(Foo) --> [1,5,8] means Foo.Field(1), Foo.Field(5), Foo.Field(8)
 // are to be serialized/deserialized
 // c.lock should be held for the duration of this method
-func (c *codec) getSerializedFieldIndices(t reflect.Type) ([]int, error) {
+func (c *linearCodec) getSerializedFieldIndices(t reflect.Type) ([]int, error) {
 	c.fieldLock.Lock()
 	defer c.fieldLock.Unlock()
 
