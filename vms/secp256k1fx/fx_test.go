@@ -1125,6 +1125,17 @@ func TestVerifyPermission(t *testing.T) {
 			},
 			true,
 		},
+		{
+			"threshold 1, 1 sig, index out of bounds",
+			&TestTx{Bytes: txBytes},
+			&Input{SigIndices: []uint32{1}},
+			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes}},
+			&OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{addr},
+			},
+			true,
+		},
 	}
 
 	for _, test := range tests {
