@@ -90,7 +90,7 @@ func (c *linearCodec) RegisterType(val interface{}) error {
 		return fmt.Errorf("type %v has already been registered", valType)
 	}
 
-	c.typeIDToType[c.nextTypeID] = reflect.TypeOf(val)
+	c.typeIDToType[c.nextTypeID] = valType
 	c.typeToTypeID[valType] = c.nextTypeID
 	c.nextTypeID++
 	return nil

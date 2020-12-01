@@ -41,14 +41,20 @@ type Codec interface {
 	NextGroupRegistations(int)
 }
 
+type typeID struct {
+	groupID uint16
+	typeID  uint16
+}
+
 // Codec handles marshaling and unmarshaling of structs
 type hierarchyCodec struct {
-	lock         sync.RWMutex
-	tagName      string
-	maxSliceLen  int
-	nextTypeID   uint32
-	typeIDToType map[uint32]reflect.Type
-	typeToTypeID map[reflect.Type]uint32
+	lock           sync.RWMutex
+	tagName        string
+	maxSliceLen    int
+	currentGroupID uint16
+	nextTypeID     uint16
+	typeIDToType   map[typeID]reflect.Type
+	typeToTypeID   map[reflect.Type]typeID
 
 	fieldLock sync.Mutex
 	// Key: a struct type
@@ -65,9 +71,10 @@ func New(tagName string, maxSliceLen int) Codec {
 	return &hierarchyCodec{
 		tagName:                tagName,
 		maxSliceLen:            maxSliceLen,
+		currentGroupID:         0,
 		nextTypeID:             0,
-		typeIDToType:           map[uint32]reflect.Type{},
-		typeToTypeID:           map[reflect.Type]uint32{},
+		typeIDToType:           map[typeID]reflect.Type{},
+		typeToTypeID:           map[reflect.Type]typeID{},
 		serializedFieldIndices: map[reflect.Type][]int{},
 	}
 }
@@ -75,10 +82,17 @@ func New(tagName string, maxSliceLen int) Codec {
 // NewDefault returns a new codec with reasonable default values
 func NewDefault() Codec { return New(DefaultTagName, defaultMaxSliceLength) }
 
-// Skip some number of type IDs
-func (c *hierarchyCodec) Skip(num int) {
+// SkipRegistations some number of type IDs
+func (c *hierarchyCodec) SkipRegistations(num int) {
 	c.lock.Lock()
-	c.nextTypeID += uint32(num)
+	c.nextTypeID += uint16(num)
+	c.lock.Unlock()
+}
+
+// NextGroupRegistations some number of group IDs
+func (c *hierarchyCodec) NextGroupRegistations(num int) {
+	c.lock.Lock()
+	c.currentGroupID += uint16(num)
 	c.lock.Unlock()
 }
 
@@ -93,9 +107,14 @@ func (c *hierarchyCodec) RegisterType(val interface{}) error {
 		return fmt.Errorf("type %v has already been registered", valType)
 	}
 
-	c.typeIDToType[c.nextTypeID] = reflect.TypeOf(val)
-	c.typeToTypeID[valType] = c.nextTypeID
+	valTypeID := typeID{
+		groupID: c.currentGroupID,
+		typeID:  c.nextTypeID,
+	}
 	c.nextTypeID++
+
+	c.typeIDToType[valTypeID] = valType
+	c.typeToTypeID[valType] = valTypeID
 	return nil
 }
 
