@@ -26,11 +26,9 @@ const (
 )
 
 var (
-	errMarshalNil        = errors.New("can't marshal nil pointer or interface")
-	errUnmarshalNil      = errors.New("can't unmarshal nil")
-	errNeedPointer       = errors.New("argument to unmarshal must be a pointer")
-	errCantPackVersion   = errors.New("couldn't pack codec version")
-	errCantUnpackVersion = errors.New("couldn't unpack codec version")
+	errMarshalNil   = errors.New("can't marshal nil pointer or interface")
+	errUnmarshalNil = errors.New("can't unmarshal nil")
+	errNeedPointer  = errors.New("argument to unmarshal must be a pointer")
 )
 
 // Codec marshals and unmarshals
@@ -38,7 +36,7 @@ type Codec interface {
 	codec.Registry
 	codec.Codec
 	SkipRegistations(int)
-	NextGroupRegistations(int)
+	NextGroup()
 }
 
 type typeID struct {
@@ -89,10 +87,11 @@ func (c *hierarchyCodec) SkipRegistations(num int) {
 	c.lock.Unlock()
 }
 
-// NextGroupRegistations some number of group IDs
-func (c *hierarchyCodec) NextGroupRegistations(num int) {
+// NextGroup moves to the next group registry
+func (c *hierarchyCodec) NextGroup() {
 	c.lock.Lock()
-	c.currentGroupID += uint16(num)
+	c.currentGroupID++
+	c.nextTypeID = 0
 	c.lock.Unlock()
 }
 
@@ -194,7 +193,9 @@ func (c *hierarchyCodec) marshal(value reflect.Value, p *wrappers.Packer) error 
 		if !ok {
 			return fmt.Errorf("can't marshal unregistered type '%v'", reflect.TypeOf(underlyingValue).String())
 		}
-		p.PackInt(typeID) // Pack type ID so we know what to unmarshal this into
+		// Pack type ID so we know what to unmarshal this into
+		p.PackShort(typeID.groupID)
+		p.PackShort(typeID.typeID)
 		if p.Err != nil {
 			return p.Err
 		}
@@ -382,14 +383,19 @@ func (c *hierarchyCodec) unmarshal(p *wrappers.Packer, value reflect.Value) erro
 		}
 		return nil
 	case reflect.Interface:
-		typeID := p.UnpackInt() // Get the type ID
+		groupID := p.UnpackShort()     // Get the group ID
+		typeIDShort := p.UnpackShort() // Get the type ID
 		if p.Err != nil {
 			return fmt.Errorf("couldn't unmarshal interface: %w", p.Err)
 		}
+		t := typeID{
+			groupID: groupID,
+			typeID:  typeIDShort,
+		}
 		// Get a type that implements the interface
-		implementingType, ok := c.typeIDToType[typeID]
+		implementingType, ok := c.typeIDToType[t]
 		if !ok {
-			return fmt.Errorf("couldn't unmarshal interface: unknown type ID %d", typeID)
+			return fmt.Errorf("couldn't unmarshal interface: unknown type ID %+v", t)
 		}
 		// Ensure type actually does implement the interface
 		if valueType := value.Type(); !implementingType.Implements(valueType) {
