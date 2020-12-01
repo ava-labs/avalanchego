@@ -1931,7 +1931,7 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 
 // GetStakeReply is the response from calling GetStake.
 type GetStakeReply struct {
-	Stake json.Uint64 `json:"stake"`
+	Staked json.Uint64 `json:"staked"`
 }
 
 // GetStake returns the amount of nAVAX that [args.Addresses] have cumulatively
@@ -2066,7 +2066,7 @@ func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, respo
 		return fmt.Errorf("iterator errored: %w", err)
 	}
 
-	response.Stake = json.Uint64(totalStake)
+	response.Staked = json.Uint64(totalStake)
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -2091,8 +2091,13 @@ func (service *Service) GetMinStake(_ *http.Request, _ *struct{}, reply *GetMinS
 	return nil
 }
 
+// GetTotalStakeReply is the response from calling GetTotalStake.
+type GetTotalStakeReply struct {
+	Stake json.Uint64 `json:"stake"`
+}
+
 // GetTotalStake returns the total amount staked on the Primary Network
-func (service *Service) GetTotalStake(_ *http.Request, _ *struct{}, reply *GetStakeReply) error {
+func (service *Service) GetTotalStake(_ *http.Request, _ *struct{}, reply *GetTotalStakeReply) error {
 	stake, err := service.vm.getTotalStake()
 	reply.Stake = json.Uint64(stake)
 	return err
