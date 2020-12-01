@@ -7,8 +7,9 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -34,7 +35,7 @@ func TestUTXOVerifyEmpty(t *testing.T) {
 }
 
 func TestUTXOSerialize(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	manager := codec.NewDefaultManager()
 
 	errs := wrappers.Errs{}

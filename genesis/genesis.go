@@ -11,8 +11,9 @@ import (
 	"sort"
 	"time"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -343,7 +344,7 @@ func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.Tx, error) {
 
 // AVAXAssetID ...
 func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
-	c := codec.New(codec.DefaultTagName, 1<<20)
+	c := linearcodec.New(linearcodec.DefaultTagName, 1<<20)
 	m := codec.NewManager(math.MaxUint32)
 	errs := wrappers.Errs{}
 	errs.Add(
