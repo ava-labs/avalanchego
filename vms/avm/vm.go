@@ -739,6 +739,7 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	if assetInCache {
 		return fxIDsIntf.(ids.BitSet).Contains(uint(fxID))
 	}
+
 	// Caches doesn't say whether this asset support this fx.
 	// Get the tx that created the asset and check.
 	tx := &UniqueTx{
@@ -748,16 +749,19 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	if status := tx.Status(); !status.Fetched() {
 		return false
 	}
-	createAssetTx, ok := tx.UnsignedTx.(*CreateAssetTx)
-	if !ok {
-		createManagedAssetTx, ok := tx.UnsignedTx.(*CreateManagedAssetTx)
-		if !ok {
-			// This transaction was not an asset creation tx
-			// (Neither regular nor managed)
-			return false
-		}
-		createAssetTx = &createManagedAssetTx.CreateAssetTx
+
+	var createAssetTx *CreateAssetTx
+	switch unsignedTx := tx.UnsignedTx.(type) {
+	case *CreateAssetTx:
+		createAssetTx = unsignedTx
+	case *CreateManagedAssetTx:
+		createAssetTx = &unsignedTx.CreateAssetTx
+	default:
+		// This transaction was not an asset creation tx
+		// (Neither regular nor managed)
+		return false
 	}
+
 	fxIDs := ids.BitSet(0)
 	for _, state := range createAssetTx.States {
 		if state.FxID == uint32(fxID) {
