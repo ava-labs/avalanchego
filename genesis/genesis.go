@@ -335,6 +335,7 @@ func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 		c.RegisterType(&avm.OperationTx{}),
 		c.RegisterType(&avm.ImportTx{}),
 		c.RegisterType(&avm.ExportTx{}),
+		c.RegisterType(&avm.CreateManagedAssetTx{}),
 		c.RegisterType(&secp256k1fx.TransferInput{}),
 		c.RegisterType(&secp256k1fx.MintOutput{}),
 		c.RegisterType(&secp256k1fx.TransferOutput{}),

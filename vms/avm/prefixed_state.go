@@ -147,11 +147,12 @@ func (s *prefixedState) addUTXO(addrs [][]byte, utxoID ids.ID) error {
 // FreezeAsset marks that all UTXOs with asset ID [assetID]
 // were frozen in the given epoch.
 func (s *prefixedState) FreezeAsset(assetID ids.ID, epoch uint32) error {
-	p := wrappers.Packer{MaxSize: wrappers.IntLen}
+	p := wrappers.Packer{MaxSize: wrappers.BoolLen + wrappers.IntLen}
+	p.PackBool(true) // Mark that asset is being frozen
 	p.PackInt(epoch)
 	if p.Errored() {
 		// Should never happen in practice
-		return fmt.Errorf("couldn't pack epoch: %w", p.Err)
+		return fmt.Errorf("couldn't pack freeze status/epoch: %w", p.Err)
 	}
 
 	key := make([]byte, len(freezeAssetPrefix)+hashing.HashLen)
@@ -160,10 +161,29 @@ func (s *prefixedState) FreezeAsset(assetID ids.ID, epoch uint32) error {
 	return s.state.DB.Put(key, p.Bytes)
 }
 
-// AssetFrozen returns the epoch during which all UTXOs with the
-// given asset ID was frozen.
-// Returns errNotFrozen if the entire asset is not frozen.
-func (s *prefixedState) AssetFrozen(assetID ids.ID) (bool, uint32, error) {
+// UnfreezeAsset marks that all UTXOs with asset ID [assetID]
+// were frozen in the given epoch.
+func (s *prefixedState) UnfreezeAsset(assetID ids.ID, epoch uint32) error {
+	p := wrappers.Packer{MaxSize: wrappers.BoolLen + wrappers.IntLen}
+	p.PackBool(false) // Mark that asset is being unfrozen
+	p.PackInt(epoch)
+	if p.Errored() {
+		// Should never happen in practice
+		return fmt.Errorf("couldn't pack freeze status/epoch: %w", p.Err)
+	}
+
+	key := make([]byte, len(freezeAssetPrefix)+hashing.HashLen)
+	copy(key, freezeAssetPrefix)
+	copy(key[len(freezeAssetPrefix):], assetID[:])
+	return s.state.DB.Put(key, p.Bytes)
+}
+
+// AssetFrozen returns:
+// 1) true if the most recent freeze/unfreeze action was freeze.
+//    false it was unfreeze, or the asset has never been frozen.
+// 2) The epoch during which the most recent freeze/unfreeze occurred.
+//    If the asset was never frozen, this is 0.
+func (s *prefixedState) AssetFreezeStatus(assetID ids.ID) (bool, uint32, error) {
 	key := make([]byte, len(freezeAssetPrefix)+hashing.HashLen)
 	copy(key, freezeAssetPrefix)
 	copy(key[len(freezeAssetPrefix):], assetID[:])
@@ -176,10 +196,11 @@ func (s *prefixedState) AssetFrozen(assetID ids.ID) (bool, uint32, error) {
 	}
 
 	p := wrappers.Packer{Bytes: epochBytes}
+	freezeStatus := p.UnpackBool()
 	epoch := p.UnpackInt()
 	if p.Errored() {
 		// Should never happen in practice
-		return false, 0, fmt.Errorf("couldn't unpack epoch from bytes: %w", err)
+		return false, 0, fmt.Errorf("couldn't unpack freeze status/epoch from bytes: %w", err)
 	}
-	return true, epoch, nil
+	return freezeStatus, epoch, nil
 }

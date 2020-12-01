@@ -22,7 +22,6 @@ var (
 	errWrongVMType                    = errors.New("wrong vm type")
 	errWrongTxType                    = errors.New("wrong tx type")
 	errWrongOpType                    = errors.New("wrong operation type")
-	errWrongUTXOType                  = errors.New("wrong utxo type")
 	errWrongInputType                 = errors.New("wrong input type")
 	errWrongCredentialType            = errors.New("wrong credential type")
 	errWrongOwnerType                 = errors.New("wrong owner type")
@@ -32,6 +31,9 @@ var (
 	errTooManySigners                 = errors.New("input has more signers than expected")
 	errTooFewSigners                  = errors.New("input has less signers than expected")
 	errInputCredentialSignersMismatch = errors.New("input expected a different number of signers than provided in the credential")
+	errNoAssetManagerOut              = errors.New("expected one output to be an *AssetManagerOutput but got none")
+	errNoFreezeOut                    = errors.New("expected one output to be a *FreezeOutput but got none")
+	errNoUnfreezeOut                  = errors.New("expected one output to be an *UnfreezeOutput but got none")
 )
 
 // Fx describes the secp256k1 feature extension
@@ -62,7 +64,9 @@ func (fx *Fx) Initialize(vmIntf interface{}) error {
 		c.RegisterType(&MintOperation{}),
 		c.RegisterType(&Credential{}),
 		c.RegisterType(&FreezeOutput{}),                // TODO do this right
+		c.RegisterType(&UnfreezeOutput{}),              // TODO do this right
 		c.RegisterType(&FreezeOperation{}),             // TODO do this right
+		c.RegisterType(&UnfreezeOperation{}),           // TODO do this right
 		c.RegisterType(&AssetManagerOutput{}),          // TODO do this right
 		c.RegisterType(&ChangeAssetManagerOperation{}), // TODO do this right
 	)
@@ -127,10 +131,6 @@ func (fx *Fx) VerifyPermission(txIntf, inIntf, credIntf, ownerIntf interface{}) 
 
 // VerifyOperation ...
 func (fx *Fx) VerifyOperation(txIntf, opIntf, credIntf interface{}, outsIntf []interface{}) error {
-	if len(outsIntf) != 1 {
-		return errWrongNumberOfUTXOs
-	}
-
 	tx, ok := txIntf.(Tx)
 	if !ok {
 		return errWrongTxType
@@ -143,17 +143,62 @@ func (fx *Fx) VerifyOperation(txIntf, opIntf, credIntf interface{}, outsIntf []i
 
 	switch op := opIntf.(type) {
 	case *MintOperation:
+		if len(outsIntf) != 1 {
+			return errWrongNumberOfUTXOs
+		}
 		out, ok := outsIntf[0].(*MintOutput)
 		if !ok {
 			return fmt.Errorf("expected output to be *MintOutput but got %T", outsIntf[0])
 		}
 		return fx.verifyMintOperation(tx, op, cred, out)
 	case *FreezeOperation:
-		out, ok := outsIntf[0].(*AssetManagerOutput)
-		if !ok {
-			return fmt.Errorf("expected output to be *AssetManagerOutput but got %T", outsIntf[0])
+		// This operation must have two outputs.
+		// One is an *AssetManagerOutput, which we check [cred] against.
+		// The other is an *UnfreezeOutput
+		if len(outsIntf) != 2 {
+			return fmt.Errorf("expected 2 outputs but got %d", len(outsIntf))
 		}
-		return fx.verifyFreezeAssetOperation(tx, op, cred, out)
+		var mgrOut *AssetManagerOutput
+		hasUnfreezeOut := false
+		for _, outIntf := range outsIntf {
+			switch out := outIntf.(type) {
+			case *AssetManagerOutput:
+				outCopy := out // TODO do we need this?
+				mgrOut = outCopy
+			case *UnfreezeOutput:
+				hasUnfreezeOut = true
+			}
+		}
+		if mgrOut == nil {
+			return errNoAssetManagerOut
+		} else if !hasUnfreezeOut {
+			return errNoUnfreezeOut
+		}
+		return fx.verifyFreezeAssetOperation(tx, op, cred, mgrOut)
+	case *UnfreezeOperation:
+		// This operation must have two outputs.
+		// One is an *AssetManagerOutput, which we check [cred] against.
+		// The other is a *FreezeOutput
+		if len(outsIntf) != 2 {
+			return fmt.Errorf("expected 2 outputs but got %d", len(outsIntf))
+		}
+		var mgrOut *AssetManagerOutput
+		hasFreezeOut := false
+		for _, outIntf := range outsIntf {
+			switch out := outIntf.(type) {
+			case *AssetManagerOutput:
+				outCopy := out // TODO do we need this?
+				mgrOut = outCopy
+			case *FreezeOutput:
+				hasFreezeOut = true
+			}
+		}
+		if mgrOut == nil {
+			return errNoAssetManagerOut
+		} else if !hasFreezeOut {
+			return errNoFreezeOut
+		}
+		return fx.verifyUnfreezeAssetOperation(tx, op, cred, mgrOut)
 	default:
 		return errWrongOpType
 	}
@@ -176,6 +221,13 @@ func (fx *Fx) verifyFreezeAssetOperation(tx Tx, op *FreezeOperation, cred *Crede
 	return fx.VerifyCredentials(tx, &op.Input, cred, &out.OutputOwners)
 }
 
+func (fx *Fx) verifyUnfreezeAssetOperation(tx Tx, op *UnfreezeOperation, cred *Credential, out *AssetManagerOutput) error {
+	if err := verify.All(op, cred, out); err != nil {
+		return err
+	}
+	return fx.VerifyCredentials(tx, &op.Input, cred, &out.OutputOwners)
+}
+
 // VerifyTransfer ...
 func (fx *Fx) VerifyTransfer(inIntf, outIntf interface{}) error {
 	in, ok := inIntf.(*TransferInput)
@@ -184,7 +236,7 @@ func (fx *Fx) VerifyTransfer(inIntf, outIntf interface{}) error {
 	}
 	out, ok := outIntf.(*TransferOutput)
 	if !ok {
-		return errWrongUTXOType
+		return fmt.Errorf("expected output to be *TransferOutput but got %T", outIntf)
 	}
 	if err := verify.All(in, out); err != nil {
 		return err

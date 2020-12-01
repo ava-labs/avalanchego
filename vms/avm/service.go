@@ -816,6 +816,12 @@ func (service *Service) CreateManagedAsset(r *http.Request, args *CreateManagedA
 	}
 	ids.SortShortIDs(manager.Addrs)
 	initialState.Outs = append(initialState.Outs, manager)
+
+	// Add an unfreeze output to the initial asset state
+	// to mark that it is not frozen on creation
+	unfreezeOutput := &secp256k1fx.UnfreezeOutput{}
+	initialState.Outs = append(initialState.Outs, unfreezeOutput)
+
 	initialState.Sort(service.vm.codec)
 
 	tx := Tx{UnsignedTx: &CreateManagedAssetTx{
@@ -1479,7 +1485,7 @@ type FreezeAssetArgs struct {
 	AssetID string `json:"assetID"`
 }
 
-// Mint issues a transaction that mints more of the asset
+// FreezeAsset issues a transaction that freezes a managed asset
 func (service *Service) FreezeAsset(r *http.Request, args *FreezeAssetArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Info("AVM: FreezeAsset called with username: %s", args.Username)
 
@@ -1546,6 +1552,107 @@ func (service *Service) FreezeAsset(r *http.Request, args *FreezeAssetArgs, repl
 	}
 
 	op, opKeys, err := createFreezeAssetOperation(
+		utxos,
+		kc,
+		assetID,
+		service.vm.Clock().Unix(),
+		service.vm.codec,
+	)
+	if err != nil {
+		return err
+	}
+	keys = append(keys, opKeys)
+
+	tx := Tx{UnsignedTx: &OperationTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    service.vm.ctx.NetworkID,
+			BlockchainID: service.vm.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+		}},
+		Ops: []*Operation{op},
+	}}
+	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
+		return err
+	}
+
+	txID, err := service.vm.IssueTx(tx.Bytes())
+	if err != nil {
+		return fmt.Errorf("problem issuing transaction: %w", err)
+	}
+
+	reply.TxID = txID
+	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
+	return err
+}
+
+// UnfreezeAsset issues a transaction that unfreezes a managed asset
+func (service *Service) UnfreezeAsset(r *http.Request, args *FreezeAssetArgs, reply *api.JSONTxIDChangeAddr) error {
+	service.vm.ctx.Log.Info("AVM: FreezeAsset called with username: %s", args.Username)
+
+	assetID, err := service.vm.lookupAssetID(args.AssetID)
+	if err != nil {
+		return err
+	}
+
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// Get the UTXOs/keys for the from addresses
+	feeUTXOs, feeKc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
+	if err != nil {
+		return err
+	}
+
+	// Parse the change address.
+	if len(feeKc.Keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr, err := service.vm.selectChangeAddr(feeKc.Keys[0].PublicKey().Address(), args.ChangeAddr)
+	if err != nil {
+		return err
+	}
+
+	amountsSpent, ins, keys, err := service.vm.Spend(
+		feeUTXOs,
+		feeKc,
+		map[ids.ID]uint64{
+			service.vm.ctx.AVAXAssetID: service.vm.txFee,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	outs := []*avax.TransferableOutput{}
+	if amountSpent := amountsSpent[service.vm.ctx.AVAXAssetID]; amountSpent > service.vm.txFee {
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amountSpent - service.vm.txFee,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{changeAddr},
+				},
+			},
+		})
+	}
+
+	// Get all UTXOs/keys for the user
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
+	if err != nil {
+		return err
+	}
+
+	op, opKeys, err := createUnfreezeAssetOperation(
 		utxos,
 		kc,
 		assetID,

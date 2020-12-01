@@ -5,3 +5,5 @@ package avm
 type CreateManagedAssetTx struct {
 	CreateAssetTx `serialize:"true"`
 }
+
+// TODO add requirement that outputs include an asset manager and unfreeze output
