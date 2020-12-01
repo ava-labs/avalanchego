@@ -417,7 +417,7 @@ func (c *Client) GetStake(addrs []string) (uint64, error) {
 	err := c.requester.SendRequest("getStake", &api.JSONAddresses{
 		Addresses: addrs,
 	}, res)
-	return uint64(res.Stake), err
+	return uint64(res.Staked), err
 }
 
 // GetMinStake returns the minimum staking amount in nAVAX for validators
@@ -430,7 +430,7 @@ func (c *Client) GetMinStake() (uint64, uint64, error) {
 
 // GetTotalStake returns the total amount (in nAVAX) staked on the network
 func (c *Client) GetTotalStake() (uint64, error) {
-	res := new(GetStakeReply)
+	res := new(GetTotalStakeReply)
 	err := c.requester.SendRequest("getTotalStake", struct{}{}, res)
 	return uint64(res.Stake), err
 }
