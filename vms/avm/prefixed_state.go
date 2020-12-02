@@ -7,12 +7,12 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 const (
@@ -144,15 +144,32 @@ func (s *prefixedState) addUTXO(addrs [][]byte, utxoID ids.ID) error {
 	return nil
 }
 
-// FreezeAsset marks that all UTXOs with asset ID [assetID]
-// were frozen in the given epoch.
-func (s *prefixedState) FreezeAsset(assetID ids.ID, epoch uint32) error {
-	p := wrappers.Packer{MaxSize: wrappers.BoolLen + wrappers.IntLen}
-	p.PackBool(true) // Mark that asset is being frozen
+// PutManagedAssetStatus records that the asset's status changed in [epoch]
+// Status changes don't go into effect until epoch [epoch + 2].
+// For example, if you update a managed asset from unfrozen to frozen
+// with a tx in epoch n then the asset can be spent in epoch n and n+1
+func (s *prefixedState) PutManagedAssetStatus(
+	assetID ids.ID,
+	epoch uint32,
+	frozen bool,
+	manager *secp256k1fx.OutputOwners,
+) error {
+	managerBytes, err := s.state.Codec.Marshal(manager)
+	if err != nil {
+		return fmt.Errorf("couldn't serialize manager: %w", err)
+	}
+
+	size := 2 * wrappers.IntLen // epoch and the size byte prepended to manager bytes
+	size += wrappers.BoolLen    // Frozen status
+	size += len(managerBytes)   // Manager
+	// Epoch, Frozen Status, Manager
+	p := wrappers.Packer{MaxSize: size}
 	p.PackInt(epoch)
+	p.PackBool(frozen) // Mark that asset is being frozen
+	p.PackBytes(managerBytes)
 	if p.Errored() {
 		// Should never happen in practice
-		return fmt.Errorf("couldn't pack freeze status/epoch: %w", p.Err)
+		return fmt.Errorf("couldn't serialize asset status: %w", p.Err)
 	}
 
 	key := make([]byte, len(freezeAssetPrefix)+hashing.HashLen)
@@ -161,46 +178,34 @@ func (s *prefixedState) FreezeAsset(assetID ids.ID, epoch uint32) error {
 	return s.state.DB.Put(key, p.Bytes)
 }
 
-// UnfreezeAsset marks that all UTXOs with asset ID [assetID]
-// were frozen in the given epoch.
-func (s *prefixedState) UnfreezeAsset(assetID ids.ID, epoch uint32) error {
-	p := wrappers.Packer{MaxSize: wrappers.BoolLen + wrappers.IntLen}
-	p.PackBool(false) // Mark that asset is being unfrozen
-	p.PackInt(epoch)
-	if p.Errored() {
-		// Should never happen in practice
-		return fmt.Errorf("couldn't pack freeze status/epoch: %w", p.Err)
-	}
-
-	key := make([]byte, len(freezeAssetPrefix)+hashing.HashLen)
-	copy(key, freezeAssetPrefix)
-	copy(key[len(freezeAssetPrefix):], assetID[:])
-	return s.state.DB.Put(key, p.Bytes)
-}
-
-// AssetFrozen returns:
-// 1) true if the most recent freeze/unfreeze action was freeze.
-//    false it was unfreeze, or the asset has never been frozen.
-// 2) The epoch during which the most recent freeze/unfreeze occurred.
-//    If the asset was never frozen, this is 0.
-func (s *prefixedState) AssetFreezeStatus(assetID ids.ID) (bool, uint32, error) {
+// ManagedAssetStatus returns:
+// 1) the epoch in which the asset was frozen/unfrozen
+// 2) true if the asset is frozen
+// 3) the manager of the asset
+// Should return nil for a managed asset that has already been created.
+// Return database.ErrNotFound if the asset ID doesn't correspond to a managed asset.
+func (s *prefixedState) ManagedAssetStatus(assetID ids.ID) (uint32, bool, *secp256k1fx.OutputOwners, error) {
 	key := make([]byte, len(freezeAssetPrefix)+hashing.HashLen)
 	copy(key, freezeAssetPrefix)
 	copy(key[len(freezeAssetPrefix):], assetID[:])
 
-	epochBytes, err := s.state.DB.Get(key)
-	if err == database.ErrNotFound {
-		return false, 0, nil
-	} else if err != nil {
-		return false, 0, err
+	statusBytes, err := s.state.DB.Get(key)
+	if err != nil {
+		return 0, false, nil, err
 	}
 
-	p := wrappers.Packer{Bytes: epochBytes}
-	freezeStatus := p.UnpackBool()
+	p := wrappers.Packer{Bytes: statusBytes}
 	epoch := p.UnpackInt()
+	frozen := p.UnpackBool()
+	managerBytes := p.UnpackBytes()
 	if p.Errored() {
 		// Should never happen in practice
-		return false, 0, fmt.Errorf("couldn't unpack freeze status/epoch from bytes: %w", err)
+		return 0, false, nil, fmt.Errorf("couldn't deserialize asset status: %w", p.Err)
 	}
-	return freezeStatus, epoch, nil
+
+	var manager secp256k1fx.OutputOwners
+	if err := s.state.Codec.Unmarshal(managerBytes, &manager); err != nil {
+		return 0, false, nil, fmt.Errorf("couldn't deserialize manager: %w", err)
+	}
+	return epoch, frozen, &manager, nil
 }

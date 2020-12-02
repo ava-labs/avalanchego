@@ -1530,9 +1530,7 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 
 // Create a managed asset, transfer it, freeze it,
 // check that transferring that asset fails
-// TODO add unfreezing to this test
 func TestManagedAsset(t *testing.T) {
-	c := setupCodec()
 	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
@@ -1551,11 +1549,13 @@ func TestManagedAsset(t *testing.T) {
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 		},
 	}
-	assetManagerOutput := &secp256k1fx.AssetManagerOutput{
-		OutputOwners: secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-		},
+	manager := secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+	}
+	assetStatusOutput := &secp256k1fx.ManagedAssetStatusOutput{
+		Frozen:  false,
+		Manager: manager,
 	}
 	createManagedAssetTx := Tx{
 		UnsignedTx: &CreateManagedAssetTx{
@@ -1595,8 +1595,7 @@ func TestManagedAsset(t *testing.T) {
 						FxID: 0,
 						Outs: []verify.State{
 							mintOutput,
-							&secp256k1fx.UnfreezeOutput{},
-							assetManagerOutput,
+							assetStatusOutput,
 						},
 					},
 				},
@@ -1606,7 +1605,7 @@ func TestManagedAsset(t *testing.T) {
 
 	// Sign/initialize the transaction
 	signer := []*crypto.PrivateKeySECP256K1R{keys[0]}
-	err := createManagedAssetTx.SignSECP256K1Fx(c, [][]*crypto.PrivateKeySECP256K1R{signer})
+	err := createManagedAssetTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{signer})
 	assert.NoError(t, err)
 
 	// Verify and accept the transaction
@@ -1680,7 +1679,7 @@ func TestManagedAsset(t *testing.T) {
 		},
 	}
 	// One signature to spend the tx fee, one signature to spend the mint output
-	err = mintTx.SignSECP256K1Fx(c, [][]*crypto.PrivateKeySECP256K1R{signer, signer})
+	err = mintTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{signer, signer})
 	assert.NoError(t, err)
 
 	// Verify and accept the transaction
@@ -1764,7 +1763,7 @@ func TestManagedAsset(t *testing.T) {
 		},
 	}}}
 	// One signature to spend the tx fee, one signature to transfer the managed asset
-	err = transferTx.SignSECP256K1Fx(c, [][]*crypto.PrivateKeySECP256K1R{signer, signer})
+	err = transferTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{signer, signer})
 	assert.NoError(t, err)
 
 	// Verify and accept the transaction
@@ -1815,28 +1814,26 @@ func TestManagedAsset(t *testing.T) {
 				{
 					Asset: avax.Asset{ID: managedAssetID},
 					UTXOIDs: []*avax.UTXOID{
-						{ // Correspongs to unfreeze output
+						{
 							TxID:        managedAssetID,
 							OutputIndex: 2,
 						},
-						{ // Correspongs to asset manager output
-							TxID:        managedAssetID,
-							OutputIndex: 3,
-						},
 					},
-					Op: &secp256k1fx.FreezeOperation{
+					Op: &secp256k1fx.UpdateManagedAssetStatusOperation{
 						Input: secp256k1fx.Input{
 							SigIndices: []uint32{0},
 						},
-						FreezeOutput:       secp256k1fx.FreezeOutput{},
-						AssetManagerOutput: *assetManagerOutput,
+						ManagedAssetStatusOutput: secp256k1fx.ManagedAssetStatusOutput{
+							Frozen:  true,
+							Manager: manager,
+						},
 					},
 				},
 			},
 		},
 	}
 	// One signature to spend the tx fee, one signature to transfer the managed asset
-	err = freezeTx.SignSECP256K1Fx(c, [][]*crypto.PrivateKeySECP256K1R{signer, signer})
+	err = freezeTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{signer, signer})
 	assert.NoError(t, err)
 
 	// Verify and accept the transaction
@@ -1908,7 +1905,7 @@ func TestManagedAsset(t *testing.T) {
 			},
 		},
 	}}}
-	err = transferTx2.SignSECP256K1Fx(c, [][]*crypto.PrivateKeySECP256K1R{signer, signer})
+	err = transferTx2.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{signer, signer})
 	assert.NoError(t, err)
 
 	// Verification should fail because the asset is frozen
@@ -1978,7 +1975,7 @@ func TestManagedAsset(t *testing.T) {
 			},
 		},
 	}}}
-	err = transferTx3.SignSECP256K1Fx(c, [][]*crypto.PrivateKeySECP256K1R{signer, signer})
+	err = transferTx3.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{signer, signer})
 	assert.NoError(t, err)
 
 	// Verification should fail because the asset is frozen
@@ -2026,28 +2023,26 @@ func TestManagedAsset(t *testing.T) {
 				{
 					Asset: avax.Asset{ID: managedAssetID},
 					UTXOIDs: []*avax.UTXOID{
-						{ // Corresponds to freeze output
+						{
 							TxID:        uniqueFreezeTx.ID(),
 							OutputIndex: 1,
 						},
-						{ // Corresponds to asset manager output
-							TxID:        uniqueFreezeTx.ID(),
-							OutputIndex: 2,
-						},
 					},
-					Op: &secp256k1fx.UnfreezeOperation{
+					Op: &secp256k1fx.UpdateManagedAssetStatusOperation{
 						Input: secp256k1fx.Input{
 							SigIndices: []uint32{0},
 						},
-						UnfreezeOutput:     secp256k1fx.UnfreezeOutput{},
-						AssetManagerOutput: *assetManagerOutput,
+						ManagedAssetStatusOutput: secp256k1fx.ManagedAssetStatusOutput{
+							Frozen:  false,
+							Manager: manager,
+						},
 					},
 				},
 			},
 		},
 	}
 	// One signature to spend the tx fee, one signature to transfer the managed asset
-	err = unfreezeTx.SignSECP256K1Fx(c, [][]*crypto.PrivateKeySECP256K1R{signer, signer})
+	err = unfreezeTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{signer, signer})
 	assert.NoError(t, err)
 
 	// Verify and accept the transaction
@@ -2119,10 +2114,9 @@ func TestManagedAsset(t *testing.T) {
 			},
 		},
 	}}}
-	err = transferTx4.SignSECP256K1Fx(c, [][]*crypto.PrivateKeySECP256K1R{signer, signer})
+	err = transferTx4.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{signer, signer})
 	assert.NoError(t, err)
 
-	// Verification should fail because the asset is frozen
 	uniqueTransferTx4, err := vm.parseTx(transferTx4.Bytes())
 	assert.NoError(t, err)
 	err = uniqueTransferTx4.Verify()

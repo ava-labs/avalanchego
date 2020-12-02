@@ -137,15 +137,9 @@ func (tx *UniqueTx) Accept() error {
 			tx.vm.ctx.Log.Error("Failed to fund utxo %s due to %s", utxo.InputID(), err)
 			return err
 		}
-		switch utxo.Out.(type) {
-		// TODO check here if it's a change asset manager output
-		case *secp256k1fx.FreezeOutput:
-			if err := tx.vm.state.FreezeAsset(utxo.AssetID(), tx.Epoch()); err != nil {
+		if out, ok := utxo.Out.(*secp256k1fx.ManagedAssetStatusOutput); ok {
+			if err := tx.vm.state.PutManagedAssetStatus(utxo.AssetID(), tx.Epoch(), out.Frozen, &out.Manager); err != nil {
 				return fmt.Errorf("couldn't freeze asset: %w", err)
-			}
-		case *secp256k1fx.UnfreezeOutput:
-			if err := tx.vm.state.UnfreezeAsset(utxo.AssetID(), tx.Epoch()); err != nil {
-				return fmt.Errorf("couldn't unfreeze asset: %w", err)
 			}
 		}
 	}

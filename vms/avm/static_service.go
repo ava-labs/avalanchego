@@ -70,18 +70,13 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		c.RegisterType(&OperationTx{}),
 		c.RegisterType(&ImportTx{}),
 		c.RegisterType(&ExportTx{}),
-		c.RegisterType(&CreateManagedAssetTx{}),
 		c.RegisterType(&secp256k1fx.TransferInput{}),
 		c.RegisterType(&secp256k1fx.MintOutput{}),
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
 		c.RegisterType(&secp256k1fx.MintOperation{}),
 		c.RegisterType(&secp256k1fx.Credential{}),
-		c.RegisterType(&secp256k1fx.FreezeOutput{}),                // TODO do this right
-		c.RegisterType(&secp256k1fx.UnfreezeOutput{}),              // TODO do this right
-		c.RegisterType(&secp256k1fx.FreezeOperation{}),             // TODO do this right
-		c.RegisterType(&secp256k1fx.UnfreezeOperation{}),           // TODO do this right
-		c.RegisterType(&secp256k1fx.AssetManagerOutput{}),          // TODO do this right
-		c.RegisterType(&secp256k1fx.ChangeAssetManagerOperation{}), // TODO do this right
+		c.RegisterType(&secp256k1fx.ManagedAssetStatusOutput{}),
+		c.RegisterType(&secp256k1fx.UpdateManagedAssetStatusOperation{}),
 	)
 	if errs.Errored() {
 		return errs.Err

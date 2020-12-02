@@ -739,11 +739,11 @@ func (service *Service) CreateManagedAsset(r *http.Request, args *CreateManagedA
 	if err != nil {
 		return err
 	}
-
-	// Parse the change address.
 	if len(kc.Keys) == 0 {
 		return errNoKeys
 	}
+
+	// Parse the change address.
 	changeAddr, err := service.vm.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
 	if err != nil {
 		return err
@@ -775,13 +775,14 @@ func (service *Service) CreateManagedAsset(r *http.Request, args *CreateManagedA
 		})
 	}
 
-	// Define the iniital asset state (its minters and amanager)
+	// Define the iniital asset state (its minters and manager)
 	initialState := &InitialState{
 		FxID: 0, // TODO: Should lookup secp256k1fx FxID
 		Outs: make([]verify.State, 0, len(args.MinterSets)),
 	}
 
 	// Add the minters to the initial asset state
+	// TODO make the asset manager the minter
 	for _, owner := range args.MinterSets {
 		minter := &secp256k1fx.MintOutput{
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -800,9 +801,10 @@ func (service *Service) CreateManagedAsset(r *http.Request, args *CreateManagedA
 		initialState.Outs = append(initialState.Outs, minter)
 	}
 
-	// Add the asset manager to the initial asset state
-	manager := &secp256k1fx.AssetManagerOutput{
-		OutputOwners: secp256k1fx.OutputOwners{
+	// Add the asset status to the initial asset state
+	status := &secp256k1fx.ManagedAssetStatusOutput{
+		Frozen: false,
+		Manager: secp256k1fx.OutputOwners{
 			Threshold: uint32(args.Manager.Threshold),
 			Addrs:     make([]ids.ShortID, 0, len(args.Manager.Addrs)),
 		},
@@ -812,16 +814,10 @@ func (service *Service) CreateManagedAsset(r *http.Request, args *CreateManagedA
 		if err != nil {
 			return err
 		}
-		manager.Addrs = append(manager.Addrs, addr)
+		status.Manager.Addrs = append(status.Manager.Addrs, addr)
 	}
-	ids.SortShortIDs(manager.Addrs)
-	initialState.Outs = append(initialState.Outs, manager)
-
-	// Add an unfreeze output to the initial asset state
-	// to mark that it is not frozen on creation
-	unfreezeOutput := &secp256k1fx.UnfreezeOutput{}
-	initialState.Outs = append(initialState.Outs, unfreezeOutput)
-
+	ids.SortShortIDs(status.Manager.Addrs)
+	initialState.Outs = append(initialState.Outs, status)
 	initialState.Sort(service.vm.codec)
 
 	tx := Tx{UnsignedTx: &CreateManagedAssetTx{
@@ -1477,17 +1473,21 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxI
 	return err
 }
 
-// FreezeAssetArgs are the arguments for FreezeAsset
-type FreezeAssetArgs struct {
+// UpdateManagedAssetArgs are the arguments for UpdateManagedAsset
+type UpdateManagedAssetArgs struct {
 	// User, password, from addrs, change addr
 	api.JSONSpendHeader
 	// ID/alias of the asset being frozen
 	AssetID string `json:"assetID"`
+	// True if the asset is to be frozen
+	Frozen bool `json:"frozen"`
+	// New manager of the asset
+	Manager `json:"manager"`
 }
 
-// FreezeAsset issues a transaction that freezes a managed asset
-func (service *Service) FreezeAsset(r *http.Request, args *FreezeAssetArgs, reply *api.JSONTxIDChangeAddr) error {
-	service.vm.ctx.Log.Info("AVM: FreezeAsset called with username: %s", args.Username)
+// UpdateManagedAsset issues a transaction that updates a managed asset
+func (service *Service) UpdateManagedAsset(r *http.Request, args *UpdateManagedAssetArgs, reply *api.JSONTxIDChangeAddr) error {
+	service.vm.ctx.Log.Info("AVM: UpdateManagedAsset called with username: %s", args.Username)
 
 	assetID, err := service.vm.lookupAssetID(args.AssetID)
 	if err != nil {
@@ -1551,108 +1551,21 @@ func (service *Service) FreezeAsset(r *http.Request, args *FreezeAssetArgs, repl
 		return err
 	}
 
-	op, opKeys, err := createFreezeAssetOperation(
-		utxos,
-		kc,
-		assetID,
-		service.vm.Clock().Unix(),
-		service.vm.codec,
-	)
-	if err != nil {
-		return err
+	manager := &secp256k1fx.OutputOwners{
+		Threshold: uint32(args.Manager.Threshold),
+		Addrs:     make([]ids.ShortID, 0, len(args.Manager.Addrs)),
 	}
-	keys = append(keys, opKeys)
-
-	tx := Tx{UnsignedTx: &OperationTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    service.vm.ctx.NetworkID,
-			BlockchainID: service.vm.ctx.ChainID,
-			Outs:         outs,
-			Ins:          ins,
-		}},
-		Ops: []*Operation{op},
-	}}
-	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
-		return err
-	}
-
-	txID, err := service.vm.IssueTx(tx.Bytes())
-	if err != nil {
-		return fmt.Errorf("problem issuing transaction: %w", err)
-	}
-
-	reply.TxID = txID
-	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
-	return err
-}
-
-// UnfreezeAsset issues a transaction that unfreezes a managed asset
-func (service *Service) UnfreezeAsset(r *http.Request, args *FreezeAssetArgs, reply *api.JSONTxIDChangeAddr) error {
-	service.vm.ctx.Log.Info("AVM: FreezeAsset called with username: %s", args.Username)
-
-	assetID, err := service.vm.lookupAssetID(args.AssetID)
-	if err != nil {
-		return err
-	}
-
-	// Parse the from addresses
-	fromAddrs := ids.ShortSet{}
-	for _, addrStr := range args.From {
-		addr, err := service.vm.ParseLocalAddress(addrStr)
+	for _, address := range args.Manager.Addrs {
+		addr, err := service.vm.ParseLocalAddress(address)
 		if err != nil {
-			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+			return err
 		}
-		fromAddrs.Add(addr)
+		manager.Addrs = append(manager.Addrs, addr)
 	}
 
-	// Get the UTXOs/keys for the from addresses
-	feeUTXOs, feeKc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
-	if err != nil {
-		return err
-	}
-
-	// Parse the change address.
-	if len(feeKc.Keys) == 0 {
-		return errNoKeys
-	}
-	changeAddr, err := service.vm.selectChangeAddr(feeKc.Keys[0].PublicKey().Address(), args.ChangeAddr)
-	if err != nil {
-		return err
-	}
-
-	amountsSpent, ins, keys, err := service.vm.Spend(
-		feeUTXOs,
-		feeKc,
-		map[ids.ID]uint64{
-			service.vm.ctx.AVAXAssetID: service.vm.txFee,
-		},
-	)
-	if err != nil {
-		return err
-	}
-
-	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[service.vm.ctx.AVAXAssetID]; amountSpent > service.vm.txFee {
-		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - service.vm.txFee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{changeAddr},
-				},
-			},
-		})
-	}
-
-	// Get all UTXOs/keys for the user
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
-	if err != nil {
-		return err
-	}
-
-	op, opKeys, err := createUnfreezeAssetOperation(
+	op, opKeys, err := newUpdateManagedAssetStatusOperation(
+		args.Frozen,
+		manager,
 		utxos,
 		kc,
 		assetID,
