@@ -15,6 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/codec"
 )
 
+const (
+	codecVersion = 0
+)
+
 // Addressable is the interface a feature extension must provide to be able to
 // be tracked as a part of the utxo set for a set of addresses
 type Addressable interface {
@@ -137,7 +141,7 @@ type PrefixedState struct {
 func NewPrefixedState(
 	db database.Database,
 	genesisCodec,
-	codec codec.Codec,
+	codec codec.Manager,
 	myChain,
 	peerChain ids.ID,
 ) *PrefixedState {
@@ -229,8 +233,8 @@ func UniqueID(id ids.ID, prefix uint64, cacher cache.Cacher) ids.ID {
 type State struct {
 	Cache        cache.Cacher
 	DB           database.Database
-	GenesisCodec codec.Codec
-	Codec        codec.Codec
+	GenesisCodec codec.Manager
+	Codec        codec.Manager
 }
 
 // UTXO attempts to load a utxo from storage.
@@ -249,7 +253,7 @@ func (s *State) UTXO(id ids.ID) (*UTXO, error) {
 
 	// The key was in the database
 	utxo := &UTXO{}
-	if err := s.Codec.Unmarshal(bytes, utxo); err != nil {
+	if _, err := s.Codec.Unmarshal(bytes, utxo); err != nil {
 		return nil, err
 	}
 
@@ -264,7 +268,7 @@ func (s *State) SetUTXO(id ids.ID, utxo *UTXO) error {
 		return s.DB.Delete(id[:])
 	}
 
-	bytes, err := s.Codec.Marshal(utxo)
+	bytes, err := s.Codec.Marshal(codecVersion, utxo)
 	if err != nil {
 		return err
 	}
@@ -288,7 +292,7 @@ func (s *State) Status(id ids.ID) (choices.Status, error) {
 	}
 
 	var status choices.Status
-	if err := s.Codec.Unmarshal(bytes, &status); err != nil {
+	if _, err := s.Codec.Unmarshal(bytes, &status); err != nil {
 		return choices.Unknown, err
 	}
 
@@ -303,7 +307,7 @@ func (s *State) SetStatus(id ids.ID, status choices.Status) error {
 		return s.DB.Delete(id[:])
 	}
 
-	bytes, err := s.Codec.Marshal(status)
+	bytes, err := s.Codec.Marshal(codecVersion, status)
 	if err != nil {
 		return err
 	}

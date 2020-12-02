@@ -571,9 +571,9 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatal(err)
-	} else if txBytes, err := Codec.Marshal(tx); err != nil {
+	} else if txBytes, err := Codec.Marshal(codecVersion, tx); err != nil {
 		t.Fatal(err)
-	} else if err := Codec.Unmarshal(txBytes, &unmarshaledTx); err != nil {
+	} else if _, err := Codec.Unmarshal(txBytes, &unmarshaledTx); err != nil {
 		t.Fatal(err)
 	} else if err := unmarshaledTx.Sign(vm.codec, nil); err != nil {
 		t.Fatal(err)

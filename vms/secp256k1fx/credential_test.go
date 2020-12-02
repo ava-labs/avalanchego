@@ -30,6 +30,10 @@ func TestCredentialVerifyNil(t *testing.T) {
 
 func TestCredentialSerialize(t *testing.T) {
 	c := codec.NewDefault()
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(0, c); err != nil {
+		t.Fatal(err)
+	}
 
 	expected := []byte{
 		// Codec version
@@ -86,7 +90,7 @@ func TestCredentialSerialize(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := c.Marshal(&cred)
+	result, err := m.Marshal(0, &cred)
 	if err != nil {
 		t.Fatal(err)
 	}

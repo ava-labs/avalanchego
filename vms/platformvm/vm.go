@@ -7,7 +7,6 @@ import (
 	"container/heap"
 	"errors"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -92,58 +91,6 @@ var (
 	_ validators.Connector = &VM{}
 )
 
-// Codec does serialization and deserialization
-var (
-	Codec        codec.Codec
-	GenesisCodec codec.Codec
-)
-
-func init() {
-	Codec = codec.NewDefault()
-	GenesisCodec = codec.New(math.MaxUint32, math.MaxUint32)
-
-	for _, c := range []codec.Codec{Codec, GenesisCodec} {
-		errs := wrappers.Errs{}
-		errs.Add(
-			c.RegisterType(&ProposalBlock{}),
-			c.RegisterType(&Abort{}),
-			c.RegisterType(&Commit{}),
-			c.RegisterType(&StandardBlock{}),
-			c.RegisterType(&AtomicBlock{}),
-
-			// The Fx is registered here because this is the same place it is
-			// registered in the AVM. This ensures that the typeIDs match up for
-			// utxos in shared memory.
-			c.RegisterType(&secp256k1fx.TransferInput{}),
-			c.RegisterType(&secp256k1fx.MintOutput{}),
-			c.RegisterType(&secp256k1fx.TransferOutput{}),
-			c.RegisterType(&secp256k1fx.MintOperation{}),
-			c.RegisterType(&secp256k1fx.Credential{}),
-			c.RegisterType(&secp256k1fx.Input{}),
-			c.RegisterType(&secp256k1fx.OutputOwners{}),
-
-			c.RegisterType(&UnsignedAddValidatorTx{}),
-			c.RegisterType(&UnsignedAddSubnetValidatorTx{}),
-			c.RegisterType(&UnsignedAddDelegatorTx{}),
-
-			c.RegisterType(&UnsignedCreateChainTx{}),
-			c.RegisterType(&UnsignedCreateSubnetTx{}),
-
-			c.RegisterType(&UnsignedImportTx{}),
-			c.RegisterType(&UnsignedExportTx{}),
-
-			c.RegisterType(&UnsignedAdvanceTimeTx{}),
-			c.RegisterType(&UnsignedRewardValidatorTx{}),
-
-			c.RegisterType(&StakeableLockIn{}),
-			c.RegisterType(&StakeableLockOut{}),
-		)
-		if errs.Errored() {
-			panic(errs.Err)
-		}
-	}
-}
-
 // VM implements the snowman.ChainVM interface
 type VM struct {
 	*core.SnowmanVM
@@ -158,16 +105,14 @@ type VM struct {
 	// The node's chain manager
 	chainManager chains.Manager
 
-	fx    Fx
-	codec codec.Codec
+	fx            Fx
+	codec         codec.Manager
+	codecRegistry codec.Registry
 
 	mempool Mempool
 
 	// Used to create and use keys.
 	factory crypto.FactorySECP256K1R
-
-	// Used to manage encoding for API calls
-	encodingManager formatting.EncodingManager
 
 	// Used to get time. Useful for faking time during tests.
 	clock timer.Clock
@@ -237,16 +182,11 @@ func (vm *VM) Initialize(
 	}
 	vm.fx = &secp256k1fx.Fx{}
 
-	vm.codec = codec.NewDefault()
+	vm.codec = Codec
+	vm.codecRegistry = codec.NewDefault()
 	if err := vm.fx.Initialize(vm); err != nil {
 		return err
 	}
-	vm.codec = Codec
-	encodingManager, err := formatting.NewEncodingManager(formatting.CB58Encoding)
-	if err != nil {
-		return fmt.Errorf("problem creating encoding manager: %w", err)
-	}
-	vm.encodingManager = encodingManager
 
 	vm.droppedTxCache = cache.LRU{Size: droppedTxCacheSize}
 	vm.connections = make(map[[20]byte]time.Time)
@@ -260,7 +200,7 @@ func (vm *VM) Initialize(
 	// the provided genesis state
 	if !vm.DBInitialized() {
 		genesis := &Genesis{}
-		if err := GenesisCodec.Unmarshal(genesisBytes, genesis); err != nil {
+		if _, err := GenesisCodec.Unmarshal(genesisBytes, genesis); err != nil {
 			return err
 		}
 		if err := genesis.Initialize(); err != nil {
@@ -375,7 +315,7 @@ func (vm *VM) Initialize(
 	}
 
 	lastAcceptedID := vm.LastAccepted()
-	vm.Ctx.Log.Info("Initializing last accepted block as %s", lastAcceptedID)
+	vm.Ctx.Log.Info("initializing last accepted block as %s", lastAcceptedID)
 
 	// Build off the most recently accepted block
 	vm.SetPreference(lastAcceptedID)
@@ -477,7 +417,7 @@ func (vm *VM) Bootstrapped() error {
 		txBytes := stopIter.Value()
 
 		tx := rewardTx{}
-		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
+		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
 		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
@@ -518,7 +458,12 @@ func (vm *VM) Bootstrapped() error {
 	if err := stopIter.Error(); err != nil {
 		return err
 	}
-	return vm.DB.Commit()
+
+	errs.Add(
+		vm.DB.Commit(),
+		stopDB.Close(),
+	)
+	return errs.Err
 }
 
 // Shutdown this blockchain
@@ -540,7 +485,7 @@ func (vm *VM) Shutdown() error {
 		txBytes := stopIter.Value()
 
 		tx := rewardTx{}
-		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
+		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
 		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
@@ -589,13 +534,17 @@ func (vm *VM) Shutdown() error {
 			vm.Ctx.Log.Error("failed to write back uptime data")
 		}
 	}
-	if err := vm.DB.Commit(); err != nil {
-		return err
-	}
 	if err := stopIter.Error(); err != nil {
 		return err
 	}
-	return vm.DB.Close()
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		vm.DB.Commit(),
+		stopDB.Close(),
+		vm.DB.Close(),
+	)
+	return errs.Err
 }
 
 // BuildBlock builds a block to be added to consensus
@@ -663,7 +612,7 @@ func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 // CreateStaticHandlers implements the snowman.ChainVM interface
 func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	// Static service's name is platform
-	staticService, _ := CreateStaticService(formatting.CB58Encoding)
+	staticService := CreateStaticService()
 	handler, _ := vm.SnowmanVM.NewHandler("platform", staticService)
 	return map[string]*common.HTTPHandler{
 		"": handler,
@@ -824,11 +773,8 @@ pendingStakerLoop:
 		txBytes := startIter.Value()
 
 		tx := Tx{}
-		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
+		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
-		}
-		if err := tx.Sign(vm.codec, nil); err != nil {
-			return err
 		}
 
 		switch staker := tx.UnsignedTx.(type) {
@@ -840,6 +786,11 @@ pendingStakerLoop:
 			if staker.StartTime().After(timestamp) {
 				break pendingStakerLoop
 			}
+
+			if err := tx.Sign(vm.codec, nil); err != nil {
+				return err
+			}
+
 			if err := vm.dequeueStaker(db, subnetID, &tx); err != nil {
 				return fmt.Errorf("couldn't dequeue staker: %w", err)
 			}
@@ -864,6 +815,11 @@ pendingStakerLoop:
 			if staker.StartTime().After(timestamp) {
 				break pendingStakerLoop
 			}
+
+			if err := tx.Sign(vm.codec, nil); err != nil {
+				return err
+			}
+
 			if err := vm.dequeueStaker(db, subnetID, &tx); err != nil {
 				return fmt.Errorf("couldn't dequeue staker: %w", err)
 			}
@@ -888,6 +844,11 @@ pendingStakerLoop:
 			if staker.StartTime().After(timestamp) {
 				break pendingStakerLoop
 			}
+
+			if err := tx.Sign(vm.codec, nil); err != nil {
+				return err
+			}
+
 			if err := vm.dequeueStaker(db, subnetID, &tx); err != nil {
 				return fmt.Errorf("couldn't dequeue staker: %w", err)
 			}
@@ -916,11 +877,8 @@ currentStakerLoop:
 		txBytes := stopIter.Value()
 
 		tx := rewardTx{}
-		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
+		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
-		}
-		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
-			return err
 		}
 
 		switch staker := tx.Tx.UnsignedTx.(type) {
@@ -948,6 +906,11 @@ currentStakerLoop:
 			if staker.EndTime().After(timestamp) {
 				break currentStakerLoop
 			}
+
+			if err := tx.Tx.Sign(vm.codec, nil); err != nil {
+				return err
+			}
+
 			if err := vm.removeStaker(db, subnetID, &tx); err != nil {
 				return fmt.Errorf("couldn't remove staker: %w", err)
 			}
@@ -959,7 +922,9 @@ currentStakerLoop:
 	errs := wrappers.Errs{}
 	errs.Add(
 		startIter.Error(),
+		startDB.Close(),
 		stopIter.Error(),
+		stopDB.Close(),
 	)
 	return errs.Err
 }
@@ -998,7 +963,7 @@ func (vm *VM) updateVdrSet(subnetID ids.ID) error {
 		txBytes := stopIter.Value()
 
 		tx := rewardTx{}
-		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
+		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
 		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
@@ -1025,12 +990,16 @@ func (vm *VM) updateVdrSet(subnetID ids.ID) error {
 	errs.Add(
 		vm.vdrMgr.Set(subnetID, vdrs),
 		stopIter.Error(),
+		stopDB.Close(),
 	)
 	return errs.Err
 }
 
 // Codec ...
-func (vm *VM) Codec() codec.Codec { return vm.codec }
+func (vm *VM) Codec() codec.Manager { return vm.codec }
+
+// CodecRegistry ...
+func (vm *VM) CodecRegistry() codec.Registry { return vm.codecRegistry }
 
 // Clock ...
 func (vm *VM) Clock() *timer.Clock { return &vm.clock }
@@ -1042,7 +1011,7 @@ func (vm *VM) Logger() logging.Logger { return vm.Ctx.Log }
 // Returns at most [limit] UTXOs.
 // If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
 // Returns:
-// * The fetched of UTXOs
+// * The fetched UTXOs
 // * true if all there are no more UTXOs in this range to fetch
 // * The address associated with the last UTXO fetched
 // * The ID of the last UTXO fetched
@@ -1088,7 +1057,7 @@ func (vm *VM) GetAtomicUTXOs(
 	utxos := make([]*avax.UTXO, len(allUTXOBytes))
 	for i, utxoBytes := range allUTXOBytes {
 		utxo := &avax.UTXO{}
-		if err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
+		if _, err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
 			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error parsing UTXO: %w", err)
 		}
 		utxos[i] = utxo
@@ -1195,11 +1164,10 @@ func (vm *VM) getStakers() ([]validators.Validator, error) {
 	defer iter.Release()
 
 	stakers := []validators.Validator{}
-
 	for iter.Next() { // Iterates in order of increasing start time
 		txBytes := iter.Value()
 		tx := rewardTx{}
-		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
+		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return nil, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		} else if err := tx.Tx.Sign(vm.codec, nil); err != nil {
 			return nil, err
@@ -1212,11 +1180,13 @@ func (vm *VM) getStakers() ([]validators.Validator, error) {
 			stakers = append(stakers, &staker.Validator)
 		}
 	}
-	if err := iter.Error(); err != nil {
-		return nil, err
-	}
 
-	return stakers, nil
+	errs := wrappers.Errs{}
+	errs.Add(
+		iter.Error(),
+		stopDB.Close(),
+	)
+	return stakers, errs.Err
 }
 
 // Returns the pending staker set of the Primary Network.
@@ -1231,11 +1201,10 @@ func (vm *VM) getPendingStakers() ([]validators.Validator, error) {
 	defer iter.Release()
 
 	stakers := []validators.Validator{}
-
 	for iter.Next() { // Iterates in order of increasing start time
 		txBytes := iter.Value()
 		tx := rewardTx{}
-		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
+		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return nil, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		} else if err := tx.Tx.Sign(vm.codec, nil); err != nil {
 			return nil, err
@@ -1248,11 +1217,13 @@ func (vm *VM) getPendingStakers() ([]validators.Validator, error) {
 			stakers = append(stakers, &staker.Validator)
 		}
 	}
-	if err := iter.Error(); err != nil {
-		return nil, err
-	}
 
-	return stakers, nil
+	errs := wrappers.Errs{}
+	errs.Add(
+		iter.Error(),
+		startDB.Close(),
+	)
+	return stakers, errs.Err
 }
 
 // Returns the total amount being staked on the Primary Network, in nAVAX.
@@ -1325,11 +1296,8 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 		txBytes := stopIter.Value()
 
 		tx := rewardTx{}
-		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
+		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return 0, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
-		}
-		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
-			return 0, err
 		}
 
 		validator := (*Validator)(nil)
@@ -1346,6 +1314,10 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 
 		if !validator.NodeID.Equals(nodeID) {
 			continue
+		}
+
+		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
+			return 0, err
 		}
 
 		newWeight, err := safemath.Add64(currentWeight, validator.Wght)
@@ -1368,11 +1340,8 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 		txBytes := startIter.Value()
 
 		tx := Tx{}
-		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
+		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return 0, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
-		}
-		if err := tx.Sign(vm.codec, nil); err != nil {
-			return 0, err
 		}
 
 		validator := (*Validator)(nil)
@@ -1393,6 +1362,10 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 
 		if !validator.NodeID.Equals(nodeID) {
 			continue
+		}
+
+		if err := tx.Sign(vm.codec, nil); err != nil {
+			return 0, err
 		}
 
 		for len(toRemoveHeap) > 0 && !toRemoveHeap[0].EndTime().After(validator.StartTime()) {
@@ -1435,8 +1408,10 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		startIter.Error(),
 		stopIter.Error(),
+		stopDB.Close(),
+		startIter.Error(),
+		startDB.Close(),
 	)
 	return maxWeight, errs.Err
 }

@@ -22,13 +22,17 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+const (
+	codecVersion = 0
+)
+
 // Wallet is a holder for keys and UTXOs for the Avalanche DAG.
 type Wallet struct {
 	networkID uint32
 	chainID   ids.ID
 
 	clock timer.Clock
-	codec codec.Codec
+	codec codec.Manager
 	log   logging.Logger
 
 	keychain *secp256k1fx.Keychain // Mapping from public address to the SigningKeys
@@ -43,6 +47,7 @@ type Wallet struct {
 // NewWallet returns a new Wallet
 func NewWallet(log logging.Logger, networkID uint32, chainID ids.ID, txFee uint64) (*Wallet, error) {
 	c := codec.NewDefault()
+	m := codec.NewDefaultManager()
 	errs := wrappers.Errs{}
 	errs.Add(
 		c.RegisterType(&avm.BaseTx{}),
@@ -55,11 +60,12 @@ func NewWallet(log logging.Logger, networkID uint32, chainID ids.ID, txFee uint6
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
 		c.RegisterType(&secp256k1fx.MintOperation{}),
 		c.RegisterType(&secp256k1fx.Credential{}),
+		m.RegisterCodec(codecVersion, c),
 	)
 	return &Wallet{
 		networkID: networkID,
 		chainID:   chainID,
-		codec:     c,
+		codec:     m,
 		log:       log,
 		keychain:  secp256k1fx.NewKeychain(),
 		utxoSet:   &UTXOSet{},
@@ -69,7 +75,7 @@ func NewWallet(log logging.Logger, networkID uint32, chainID ids.ID, txFee uint6
 }
 
 // Codec returns the codec used for serialization
-func (w *Wallet) Codec() codec.Codec { return w.codec }
+func (w *Wallet) Codec() codec.Manager { return w.codec }
 
 // GetAddress returns one of the addresses this wallet manages. If no address
 // exists, one will be created.
