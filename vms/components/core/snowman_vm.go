@@ -35,7 +35,8 @@ type SnowmanVM struct {
 	// Important note: In order for writes to [DB] to be persisted,
 	// DB.Commit() must be called
 	// We use a versionDB here so user can do atomic commits as they see fit
-	DB *versiondb.Database
+	DB     *versiondb.Database
+	BaseDB database.Database
 
 	// The context of this vm
 	Ctx *snow.Context
@@ -162,6 +163,7 @@ func (svm *SnowmanVM) Initialize(
 ) error {
 	svm.Ctx = ctx
 	svm.ToEngine = toEngine
+	svm.BaseDB = db
 	svm.DB = versiondb.New(db)
 
 	var err error

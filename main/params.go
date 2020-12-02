@@ -18,8 +18,8 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/semanticdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
@@ -37,8 +37,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-const (
-	dbVersion = "v1.0.0"
+// Database Version
+var (
+	dbMajorVersion = 1
+	dbMinorVersion = 0
+	dbPatchVersion = 1
+	dbVersion      = fmt.Sprintf("v%d.%d.%d", dbMajorVersion, dbMinorVersion, dbPatchVersion)
 )
 
 // Results of parsing the CLI
@@ -303,10 +307,10 @@ func setNodeConfig(v *viper.Viper) error {
 			dbDir = defaultDbDir
 		}
 		dbDir = os.ExpandEnv(dbDir) // parse any env variables
-		dbPath := path.Join(dbDir, constants.NetworkName(Config.NetworkID), dbVersion)
-		db, err := leveldb.New(dbPath, 0, 0, 0)
+		unversionedDBPath := path.Join(dbDir, constants.NetworkName(Config.NetworkID))
+		db, err := semanticdb.CreateFromPath(unversionedDBPath, dbMajorVersion, dbMinorVersion, dbPatchVersion)
 		if err != nil {
-			return fmt.Errorf("couldn't create db at %s: %w", dbPath, err)
+			return err
 		}
 		Config.DB = db
 	} else {

@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/encdb"
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/database/semanticdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/codec"
@@ -38,6 +38,10 @@ const (
 )
 
 var (
+	usersPrefix = []byte("users")
+	bcsPrefix   = []byte("bcs")
+	migratedKey = []byte("migrated")
+
 	errEmptyUsername = errors.New("empty username")
 	errUserMaxLength = fmt.Errorf("username exceeds maximum length of %d chars", maxUserLen)
 )
@@ -87,9 +91,75 @@ func (ks *Keystore) Initialize(log logging.Logger, db database.Database) error {
 	ks.log = log
 	ks.codec = manager
 	ks.users = make(map[string]*password.Hash)
-	ks.userDB = prefixdb.New([]byte("users"), db)
-	ks.bcDB = prefixdb.New([]byte("bcs"), db)
-	return nil
+
+	return ks.initializeDB(db)
+}
+
+func (ks *Keystore) initializeDB(db database.Database) error {
+	ks.userDB = semanticdb.New(usersPrefix, db)
+	ks.bcDB = semanticdb.New(bcsPrefix, db)
+
+	semDB, ok := db.(*semanticdb.Database)
+	if !ok {
+		return db.Put(migratedKey, []byte("no migration"))
+	}
+
+	exists, err := semDB.Has(migratedKey)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+
+	ks.log.Info("Migrating Keystore Users from Database v%d.%d.%d -> Database v%d.%d.%d", semDB.PriorMajor, semDB.PriorMinor, semDB.PriorPatch, semDB.Major, semDB.Minor, semDB.Patch)
+
+	userDB := ks.userDB.(*semanticdb.Database)
+	userIterator := userDB.PriorDB.NewIterator()
+	defer userIterator.Release()
+
+	for userIterator.Next() {
+		username := userIterator.Key()
+
+		exists, err := userDB.Has(username)
+		if err != nil {
+			return err
+		}
+		if exists {
+			continue
+		}
+
+		userBatch := userDB.NewBatch()
+		if err := userBatch.Put(username, userIterator.Value()); err != nil {
+			return err
+		}
+
+		userBCDB := semanticdb.New(username, ks.bcDB).(*semanticdb.Database)
+		bcsBatch := userBCDB.NewBatch()
+		// Use a closure in order to defer releasing the iterator
+		if err := func() error {
+			iterator := userBCDB.PriorDB.NewIterator()
+			defer iterator.Release()
+
+			for iterator.Next() {
+				if err := bcsBatch.Put(iterator.Key(), iterator.Value()); err != nil {
+					return err
+				}
+			}
+			if err := iterator.Error(); err != nil {
+				return err
+			}
+
+			return atomic.WriteAll(userBatch, bcsBatch)
+		}(); err != nil {
+			return err
+		}
+	}
+
+	if err := userIterator.Error(); err != nil {
+		return err
+	}
+	return semDB.Put(migratedKey, []byte(fmt.Sprintf("v%d.%d.%d", semDB.PriorMajor, semDB.PriorMinor, semDB.PriorPatch)))
 }
 
 // CreateHandler returns a new service object that can send requests to thisAPI.
@@ -190,7 +260,7 @@ func (ks *Keystore) ExportUser(_ *http.Request, args *ExportUserArgs, reply *Exp
 		return fmt.Errorf("incorrect password for user %q", args.Username)
 	}
 
-	userDB := prefixdb.New([]byte(args.Username), ks.bcDB)
+	userDB := semanticdb.New([]byte(args.Username), ks.bcDB)
 
 	userData := UserDB{Hash: *user}
 
@@ -271,7 +341,7 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *api
 		return err
 	}
 
-	userDataDB := prefixdb.New([]byte(args.Username), ks.bcDB)
+	userDataDB := semanticdb.New([]byte(args.Username), ks.bcDB)
 	dataBatch := userDataDB.NewBatch()
 	for _, kvp := range userData.Data {
 		if err := dataBatch.Put(kvp.Key, kvp.Value); err != nil {
@@ -315,7 +385,7 @@ func (ks *Keystore) DeleteUser(_ *http.Request, args *api.UserPass, reply *api.S
 		return err
 	}
 
-	userDataDB := prefixdb.New(userNameBytes, ks.bcDB)
+	userDataDB := semanticdb.New(userNameBytes, ks.bcDB)
 	dataBatch := userDataDB.NewBatch()
 
 	it := userDataDB.NewIterator()
@@ -365,8 +435,8 @@ func (ks *Keystore) GetDatabase(bID ids.ID, username, password string) (database
 		return nil, fmt.Errorf("incorrect password for user %q", username)
 	}
 
-	userDB := prefixdb.New([]byte(username), ks.bcDB)
-	bcDB := prefixdb.NewNested(bID[:], userDB)
+	userDB := semanticdb.New([]byte(username), ks.bcDB)
+	bcDB := semanticdb.NewNested(bID[:], userDB)
 	return encdb.New([]byte(password), bcDB)
 }
 

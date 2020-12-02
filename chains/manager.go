@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/database/semanticdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow"
@@ -393,11 +393,11 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	db := prefixdb.New(ctx.ChainID[:], m.DB)
-	vmDB := prefixdb.New([]byte("vm"), db)
-	vertexDB := prefixdb.New([]byte("vertex"), db)
-	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db)
-	txBootstrappingDB := prefixdb.New([]byte("tx_bs"), db)
+	db := semanticdb.New(ctx.ChainID[:], m.DB)
+	vmDB := semanticdb.New([]byte("vm"), db)
+	vertexDB := semanticdb.New([]byte("vertex"), db)
+	vertexBootstrappingDB := semanticdb.New([]byte("vertex_bs"), db)
+	txBootstrappingDB := semanticdb.New([]byte("tx_bs"), db)
 
 	vtxBlocker, err := queue.New(vertexBootstrappingDB)
 	if err != nil {
@@ -505,9 +505,9 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	db := prefixdb.New(ctx.ChainID[:], m.DB)
-	vmDB := prefixdb.New([]byte("vm"), db)
-	bootstrappingDB := prefixdb.New([]byte("bs"), db)
+	db := semanticdb.New(ctx.ChainID[:], m.DB)
+	vmDB := semanticdb.New([]byte("vm"), db)
+	bootstrappingDB := semanticdb.New([]byte("bs"), db)
 
 	blocked, err := queue.New(bootstrappingDB)
 	if err != nil {

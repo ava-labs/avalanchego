@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/database/semanticdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -2480,4 +2481,148 @@ func TestMaxStakeAmount(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSetUptimesAfterBootstrapping(t *testing.T) {
+	_, genesisBytes := defaultGenesis()
+
+	baseDB := memdb.New()
+	db := prefixdb.New([]byte{0}, baseDB)
+
+	vm := &VM{
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
+	}
+
+	vm.vdrMgr = validators.NewManager()
+
+	vm.clock.Set(defaultGenesisTime)
+	ctx := defaultContext()
+	ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	msgChan := make(chan common.Message, 1)
+	if err := vm.Initialize(ctx, db, genesisBytes, msgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.Bootstrapping(); err != nil {
+		t.Fatal(err)
+	}
+
+	duringBootstrappingNodeID := keys[0].PublicKey().Address()
+	afterBootstrappingNodeID := keys[1].PublicKey().Address()
+
+	connectedTime := defaultGenesisTime.Add(5 * time.Second)
+	vm.clock.Set(connectedTime)
+	vm.Connected(duringBootstrappingNodeID)
+
+	finishedBootstrappingTime := connectedTime.Add(5 * time.Second)
+	vm.clock.Set(finishedBootstrappingTime)
+	if err := vm.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
+
+	afterBootstrappingTime := finishedBootstrappingTime.Add(5 * time.Second)
+	vm.clock.Set(afterBootstrappingTime)
+	vm.Connected(afterBootstrappingNodeID)
+
+	endTime := afterBootstrappingTime.Add(5 * time.Second)
+	vm.clock.Set(endTime)
+
+	checkUptime := func(nodeID ids.ShortID, expected float64, reason string) {
+		uptime, err := vm.calculateUptime(vm.DB, nodeID, defaultGenesisTime)
+		if err != nil {
+			t.Fatalf("Failed to get uptime for %s: %s", reason, err)
+		}
+		if uptime != expected {
+			t.Fatalf("Expected uptime of %v, but found %v for %s", expected, uptime, reason)
+		}
+	}
+
+	checkUptime(duringBootstrappingNodeID, 1, "peer connected during bootstrapping")
+	checkUptime(afterBootstrappingNodeID, .75, "peer connected after bootstrapping")
+	vm.Disconnected(duringBootstrappingNodeID)
+	vm.Disconnected(afterBootstrappingNodeID)
+	checkUptime(duringBootstrappingNodeID, 1, "peer connected during bootstrapping after disconnecting")
+	checkUptime(afterBootstrappingNodeID, .75, "peer connected after bootstrapping after disconnecting")
+
+	if err := vm.Shutdown(); err != nil {
+		t.Fatal(err)
+	}
+
+	vm = &VM{
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
+	}
+
+	vm.clock.Set(endTime)
+	vm.vdrMgr = validators.NewManager()
+
+	if err := vm.Initialize(ctx, db, genesisBytes, msgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.Bootstrapping(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
+
+	checkUptime(duringBootstrappingNodeID, 1, "peer connected during bootstrapping after restart")
+	checkUptime(afterBootstrappingNodeID, .75, "peer connected after bootstrapping after restart")
+
+	if err := vm.Shutdown(); err != nil {
+		t.Fatal(err)
+	}
+
+	vm = &VM{
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
+	}
+
+	afterRestartTime := endTime.Add(5 * time.Second)
+	vm.clock.Set(afterRestartTime)
+	vm.vdrMgr = validators.NewManager()
+	newDB := memdb.New()
+	semDB := semanticdb.Create(newDB, baseDB)
+	if _, ok := semDB.(*semanticdb.Database); !ok {
+		t.Fatal("failed to create semanticdb")
+	}
+
+	upgradedDB := semanticdb.New([]byte{0}, semDB)
+	if _, ok := upgradedDB.(*semanticdb.Database); !ok {
+		t.Fatal("failed to create prefixed semanticdb")
+	}
+
+	if err := vm.Initialize(ctx, upgradedDB, genesisBytes, msgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.Bootstrapping(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
+
+	checkUptime(duringBootstrappingNodeID, 1, "peer connected during bootstrapping after database upgrade")
+	checkUptime(afterBootstrappingNodeID, .8, "peer connected after bootstrapping after database upgrade")
 }

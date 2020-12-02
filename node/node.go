@@ -26,8 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/meterdb"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/database/semanticdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
@@ -619,7 +618,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 // initSharedMemory initializes the shared memory for cross chain interation
 func (n *Node) initSharedMemory() error {
 	n.Log.Info("initializing SharedMemory")
-	sharedMemoryDB := prefixdb.New([]byte("shared memory"), n.DB)
+	sharedMemoryDB := semanticdb.New([]byte("shared memory"), n.DB)
 	return n.sharedMemory.Initialize(n.Log, sharedMemoryDB)
 }
 
@@ -627,7 +626,7 @@ func (n *Node) initSharedMemory() error {
 // Assumes n.APIServer is already set
 func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
-	keystoreDB := prefixdb.New([]byte("keystore"), n.DB)
+	keystoreDB := semanticdb.New([]byte("keystore"), n.DB)
 	if err := n.keystoreServer.Initialize(n.Log, keystoreDB); err != nil {
 		return err
 	}
@@ -658,7 +657,7 @@ func (n *Node) initMetricsAPI() error {
 	n.Log.Info("initializing metrics API")
 
 	dbNamespace := fmt.Sprintf("%s_db", constants.PlatformName)
-	db, err := meterdb.New(dbNamespace, registry, n.DB)
+	db, err := semanticdb.NewMeterDB(dbNamespace, registry, n.DB)
 	if err != nil {
 		return err
 	}

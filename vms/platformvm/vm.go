@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/database/semanticdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -78,6 +79,7 @@ var (
 	chainsKey        = ids.ID{'c', 'h', 'a', 'i', 'n', 's'}
 	subnetsKey       = ids.ID{'s', 'u', 'b', 'n', 'e', 't', 's'}
 	currentSupplyKey = ids.ID{'c', 'u', 'r', 'r', 'e', 't', ' ', 's', 'u', 'p', 'p', 'l', 'y'}
+	migratedKey      = []byte("migrated")
 
 	errRegisteringType          = errors.New("error registering type with database")
 	errInvalidLastAcceptedBlock = errors.New("last accepted block must be a decision block")
@@ -406,6 +408,11 @@ func (vm *VM) Bootstrapped() error {
 		return errs.Err
 	}
 
+	semDB, isSemDB := vm.BaseDB.(*semanticdb.Database)
+	dbInitialized, err := vm.DB.Has(migratedKey)
+	if err != nil {
+		return err
+	}
 	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, vm.DB)
 	defer stopDB.Close()
@@ -434,6 +441,18 @@ func (vm *VM) Bootstrapped() error {
 		uptime, err := vm.uptime(vm.DB, nodeID)
 		switch {
 		case err == database.ErrNotFound:
+			if isSemDB && !dbInitialized {
+				priorUptime, err := vm.uptime(semDB.PriorDB, nodeID)
+				if err == nil {
+					uptime = priorUptime
+					break
+				}
+				if err != database.ErrNotFound {
+					vm.Ctx.Log.Debug("Couldn't find uptime in prior database for %s: %s", nodeID, err)
+				}
+			}
+			// If there is no uptime in the prior database version
+			// assume that it has been online since it began staking.
 			uptime = &validatorUptime{
 				LastUpdated: uint64(unsignedTx.StartTime().Unix()),
 			}
@@ -441,6 +460,9 @@ func (vm *VM) Bootstrapped() error {
 			return err
 		}
 
+		// If the Platform Chain finishes bootstrapping with a wall
+		// clock time before the last time this staker's uptime was
+		// updated, then skip updating the uptime.
 		lastUpdated := time.Unix(int64(uptime.LastUpdated), 0)
 		if !vm.bootstrappedTime.After(lastUpdated) {
 			continue
@@ -459,6 +481,11 @@ func (vm *VM) Bootstrapped() error {
 		return err
 	}
 
+	if isSemDB && !dbInitialized {
+		errs.Add(vm.DB.Put(migratedKey, []byte(fmt.Sprintf("v%d.%d.%d", semDB.PriorMajor, semDB.PriorMinor, semDB.PriorPatch))))
+	} else if !dbInitialized {
+		errs.Add(vm.DB.Put(migratedKey, []byte("no migration")))
+	}
 	errs.Add(
 		vm.DB.Commit(),
 		stopDB.Close(),
