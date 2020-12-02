@@ -26,7 +26,7 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 	}()
 
 	state := vm.state
-	if err := vm.codec.RegisterType(&avax.TestVerifiable{}); err != nil {
+	if err := vm.CodecRegistry().RegisterType(&avax.TestVerifiable{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -88,7 +88,7 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 	if resultUTXO.OutputIndex != 1 {
 		t.Fatalf("Wrong UTXO returned")
 	}
-	if !resultTx.ID().Equals(tx.ID()) {
+	if resultTx.ID() != tx.ID() {
 		t.Fatalf("Wrong Tx returned")
 	}
 	if resultStatus != choices.Accepted {
@@ -107,7 +107,7 @@ func TestPrefixedFundingNoAddresses(t *testing.T) {
 	}()
 
 	state := vm.state
-	if err := vm.codec.RegisterType(&avax.TestVerifiable{}); err != nil {
+	if err := vm.CodecRegistry().RegisterType(&avax.TestVerifiable{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -139,7 +139,7 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 	}()
 
 	state := vm.state
-	if err := vm.codec.RegisterType(&avax.TestAddressable{}); err != nil {
+	if err := vm.CodecRegistry().RegisterType(&avax.TestAddressable{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -164,7 +164,7 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 	if len(funds) != 1 {
 		t.Fatalf("Should have returned 1 utxoIDs")
 	}
-	if utxoID := funds[0]; !utxoID.Equals(utxo.InputID()) {
+	if utxoID := funds[0]; utxoID != utxo.InputID() {
 		t.Fatalf("Returned wrong utxoID")
 	}
 	if err := state.SpendUTXO(utxo.InputID()); err != nil {

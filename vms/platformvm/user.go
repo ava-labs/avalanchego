@@ -14,7 +14,7 @@ import (
 
 // Key in the database whose corresponding value is the list of
 // addresses this user controls
-var addressesKey = ids.Empty.Bytes()
+var addressesKey = ids.Empty[:]
 
 var (
 	errDBNil        = errors.New("db uninitialized")
@@ -48,7 +48,7 @@ func (u *user) getAddresses() ([]ids.ShortID, error) {
 		return nil, err
 	}
 	addresses := []ids.ShortID{}
-	if err := Codec.Unmarshal(bytes, &addresses); err != nil {
+	if _, err := Codec.Unmarshal(bytes, &addresses); err != nil {
 		return nil, err
 	}
 	return addresses, nil
@@ -94,7 +94,7 @@ func (u *user) putAddress(privKey *crypto.PrivateKeySECP256K1R) error {
 		}
 	}
 	addresses = append(addresses, address)
-	bytes, err := Codec.Marshal(addresses)
+	bytes, err := Codec.Marshal(codecVersion, addresses)
 	if err != nil {
 		return err
 	}

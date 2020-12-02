@@ -163,7 +163,7 @@ func (j *Jobs) block(job Job, deps ids.Set) error {
 	}
 
 	jobID := job.ID()
-	for _, depID := range deps.List() {
+	for depID := range deps {
 		if err := j.state.AddBlocking(j.db, depID, jobID); err != nil {
 			return err
 		}

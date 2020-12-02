@@ -58,7 +58,7 @@ type VMClient struct {
 	conns        []*grpc.ClientConn
 
 	ctx  *snow.Context
-	blks map[[32]byte]*BlockClient
+	blks map[ids.ID]*BlockClient
 
 	lastAccepted ids.ID
 }
@@ -68,7 +68,7 @@ func NewClient(client vmproto.VMClient, broker *plugin.GRPCBroker) *VMClient {
 	return &VMClient{
 		client: client,
 		broker: broker,
-		blks:   make(map[[32]byte]*BlockClient),
+		blks:   make(map[ids.ID]*BlockClient),
 	}
 }
 
@@ -124,11 +124,11 @@ func (vm *VMClient) Initialize(
 
 	resp, err := vm.client.Initialize(context.Background(), &vmproto.InitializeRequest{
 		NetworkID:          ctx.NetworkID,
-		SubnetID:           ctx.SubnetID.Bytes(),
-		ChainID:            ctx.ChainID.Bytes(),
+		SubnetID:           ctx.SubnetID[:],
+		ChainID:            ctx.ChainID[:],
 		NodeID:             ctx.NodeID.Bytes(),
-		XChainID:           ctx.XChainID.Bytes(),
-		AvaxAssetID:        ctx.AVAXAssetID.Bytes(),
+		XChainID:           ctx.XChainID[:],
+		AvaxAssetID:        ctx.AVAXAssetID[:],
 		GenesisBytes:       genesisBytes,
 		DbServer:           dbBrokerID,
 		EngineServer:       messengerBrokerID,
@@ -271,7 +271,7 @@ func (vm *VMClient) ParseBlock(bytes []byte) (snowman.Block, error) {
 	id, err := ids.ToID(resp.Id)
 	vm.ctx.Log.AssertNoError(err)
 
-	if blk, cached := vm.blks[id.Key()]; cached {
+	if blk, cached := vm.blks[id]; cached {
 		return blk, nil
 	}
 
@@ -291,12 +291,12 @@ func (vm *VMClient) ParseBlock(bytes []byte) (snowman.Block, error) {
 
 // GetBlock ...
 func (vm *VMClient) GetBlock(id ids.ID) (snowman.Block, error) {
-	if blk, cached := vm.blks[id.Key()]; cached {
+	if blk, cached := vm.blks[id]; cached {
 		return blk, nil
 	}
 
 	resp, err := vm.client.GetBlock(context.Background(), &vmproto.GetBlockRequest{
-		Id: id.Bytes(),
+		Id: id[:],
 	})
 	if err != nil {
 		return nil, err
@@ -319,7 +319,7 @@ func (vm *VMClient) GetBlock(id ids.ID) (snowman.Block, error) {
 // SetPreference ...
 func (vm *VMClient) SetPreference(id ids.ID) {
 	_, err := vm.client.SetPreference(context.Background(), &vmproto.SetPreferenceRequest{
-		Id: id.Bytes(),
+		Id: id[:],
 	})
 	vm.ctx.Log.AssertNoError(err)
 }
@@ -350,10 +350,10 @@ func (b *BlockClient) ID() ids.ID { return b.id }
 
 // Accept ...
 func (b *BlockClient) Accept() error {
-	delete(b.vm.blks, b.id.Key())
+	delete(b.vm.blks, b.id)
 	b.status = choices.Accepted
 	_, err := b.vm.client.BlockAccept(context.Background(), &vmproto.BlockAcceptRequest{
-		Id: b.id.Bytes(),
+		Id: b.id[:],
 	})
 	if err != nil {
 		return err
@@ -365,10 +365,10 @@ func (b *BlockClient) Accept() error {
 
 // Reject ...
 func (b *BlockClient) Reject() error {
-	delete(b.vm.blks, b.id.Key())
+	delete(b.vm.blks, b.id)
 	b.status = choices.Rejected
 	_, err := b.vm.client.BlockReject(context.Background(), &vmproto.BlockRejectRequest{
-		Id: b.id.Bytes(),
+		Id: b.id[:],
 	})
 	return err
 }
@@ -387,13 +387,13 @@ func (b *BlockClient) Parent() snowman.Block {
 // Verify ...
 func (b *BlockClient) Verify() error {
 	_, err := b.vm.client.BlockVerify(context.Background(), &vmproto.BlockVerifyRequest{
-		Id: b.id.Bytes(),
+		Id: b.id[:],
 	})
 	if err != nil {
 		return err
 	}
 
-	b.vm.blks[b.id.Key()] = b
+	b.vm.blks[b.id] = b
 	return nil
 }
 

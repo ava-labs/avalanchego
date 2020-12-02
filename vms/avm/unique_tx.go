@@ -37,7 +37,7 @@ type TxState struct {
 	unique, verifiedTx, verifiedState bool
 	validity                          error
 
-	inputs     ids.Set
+	inputs     []ids.ID
 	inputUTXOs []*avax.UTXOID
 	utxos      []*avax.UTXO
 	deps       []snowstorm.Tx
@@ -219,7 +219,7 @@ func (tx *UniqueTx) Dependencies() []snowstorm.Tx {
 		})
 	}
 	consumedIDs := tx.Tx.ConsumedAssetIDs()
-	for _, assetID := range tx.Tx.AssetIDs().List() {
+	for assetID := range tx.Tx.AssetIDs() {
 		if consumedIDs.Contains(assetID) || txIDs.Contains(assetID) {
 			continue
 		}
@@ -233,14 +233,16 @@ func (tx *UniqueTx) Dependencies() []snowstorm.Tx {
 }
 
 // InputIDs returns the set of utxoIDs this transaction consumes
-func (tx *UniqueTx) InputIDs() ids.Set {
+func (tx *UniqueTx) InputIDs() []ids.ID {
 	tx.refresh()
-	if tx.Tx == nil || tx.inputs.Len() != 0 {
+	if tx.Tx == nil || len(tx.inputs) != 0 {
 		return tx.inputs
 	}
 
-	for _, utxo := range tx.InputUTXOs() {
-		tx.inputs.Add(utxo.InputID())
+	inputUTXOs := tx.InputUTXOs()
+	tx.inputs = make([]ids.ID, len(inputUTXOs))
+	for i, utxo := range inputUTXOs {
+		tx.inputs[i] = utxo.InputID()
 	}
 	return tx.inputs
 }

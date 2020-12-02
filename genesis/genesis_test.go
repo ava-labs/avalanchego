@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/evm"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 )
 
@@ -26,7 +27,7 @@ func TestAliases(t *testing.T) {
 		t.Fatalf("Should have a custom alias from the vm")
 	} else if _, exists := generalAliases["vm/"+avm.ID.String()]; !exists {
 		t.Fatalf("Should have a custom alias from the vm")
-	} else if _, exists := generalAliases["vm/"+EVMID.String()]; !exists {
+	} else if _, exists := generalAliases["vm/"+evm.ID.String()]; !exists {
 		t.Fatalf("Should have a custom alias from the vm")
 	}
 }
@@ -37,7 +38,7 @@ func TestGenesis(t *testing.T) {
 		t.Fatal(err)
 	}
 	genesis := platformvm.Genesis{}
-	if err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
+	if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -59,7 +60,7 @@ func TestVMGenesis(t *testing.T) {
 					expectedID: "2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM",
 				},
 				{
-					vmID:       EVMID,
+					vmID:       evm.ID,
 					expectedID: "2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5",
 				},
 			},
@@ -72,7 +73,7 @@ func TestVMGenesis(t *testing.T) {
 					expectedID: "2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm",
 				},
 				{
-					vmID:       EVMID,
+					vmID:       evm.ID,
 					expectedID: "yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp",
 				},
 			},
@@ -85,7 +86,7 @@ func TestVMGenesis(t *testing.T) {
 					expectedID: "2eNy1mUFdmaxXNj1eQHUe7Np4gju9sJsEtWQ4MX3ToiNKuADed",
 				},
 				{
-					vmID:       EVMID,
+					vmID:       evm.ID,
 					expectedID: "26sSDdFXoKeShAqVfvugUiUQKhMZtHYDLeBqmBfNfcdjziTrZA",
 				},
 			},

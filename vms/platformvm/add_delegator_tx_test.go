@@ -351,7 +351,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				for _, utxoID := range utxoIDs.List() {
+				for _, utxoID := range utxoIDs {
 					if err := vm.removeUTXO(db, utxoID); err != nil {
 						t.Fatal(err)
 					}

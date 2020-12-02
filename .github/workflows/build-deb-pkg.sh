@@ -18,7 +18,7 @@ OK=`cp ./build/plugins/evm $AVALANCHE_LIB_DIR`
 if [[ $OK -ne 0 ]]; then
   exit $OK;
 fi
-OK=`cp $TEMPLATE/control $DEBIAN_CONF`
+OK=`cp $TEMPLATE/control-$ARCH $DEBIAN_CONF/control`
 if [[ $OK -ne 0 ]]; then
   exit $OK;
 fi
@@ -28,9 +28,9 @@ cd $PKG_ROOT
 echo "Tag: $TAG"
 VER=$TAG
 if [[ $TAG =~ ^v ]]; then
-  VER=$(echo $TAG | cut -d'v' -f 2)
+  VER=$(echo $TAG | tr -d 'v')
 fi
 NEW_VERSION_STRING="Version: $VER"
 sed -i "s/Version.*/$NEW_VERSION_STRING/g" debian/DEBIAN/control
-dpkg-deb --build debian avalanchego-linux_$TAG.deb
-aws s3 cp avalanchego-linux_$TAG.deb s3://$BUCKET/linux/
+dpkg-deb --build debian avalanchego-linux-$ARCH_$TAG.deb
+aws s3 cp avalanchego-linux-$ARCH_$TAG.deb s3://$BUCKET/linux/deb/

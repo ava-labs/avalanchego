@@ -54,7 +54,7 @@ type UnsignedCreateChainTx struct {
 // Verify this transaction is well-formed
 func (tx *UnsignedCreateChainTx) Verify(
 	ctx *snow.Context,
-	c codec.Codec,
+	c codec.Manager,
 	feeAmount uint64,
 	feeAssetID ids.ID,
 ) error {
@@ -63,13 +63,11 @@ func (tx *UnsignedCreateChainTx) Verify(
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.SubnetID.IsZero():
-		return errNoSubnetID
-	case tx.SubnetID.Equals(constants.PrimaryNetworkID):
+	case tx.SubnetID == constants.PrimaryNetworkID:
 		return errDSCantValidate
 	case len(tx.ChainName) > maxNameLen:
 		return errNameTooLong
-	case tx.VMID.IsZero():
+	case tx.VMID == ids.Empty:
 		return errInvalidVMID
 	case !ids.IsSortedAndUniqueIDs(tx.FxIDs):
 		return errFxIDsNotSortedAndUnique
@@ -144,11 +142,11 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 
 	// Attempt to add the new chain to the database
 	currentChains, sErr := vm.getChains(db) // chains that currently exist
-	if err != nil {
+	if sErr != nil {
 		return nil, tempError{fmt.Errorf("couldn't get list of blockchains: %w", sErr)}
 	}
 	for _, chain := range currentChains {
-		if chain.ID().Equals(tx.ID()) {
+		if chain.ID() == tx.ID() {
 			return nil, permError{fmt.Errorf("chain %s already exists", chain.ID())}
 		}
 	}

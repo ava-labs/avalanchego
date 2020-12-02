@@ -32,11 +32,11 @@ func (ab *AtomicBlock) initialize(vm *VM, bytes []byte) error {
 	if err := ab.CommonDecisionBlock.initialize(vm, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	unsignedBytes, err := vm.codec.Marshal(&ab.Tx.UnsignedTx)
+	unsignedBytes, err := vm.codec.Marshal(codecVersion, &ab.Tx.UnsignedTx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
 	}
-	signedBytes, err := ab.vm.codec.Marshal(&ab.Tx)
+	signedBytes, err := ab.vm.codec.Marshal(codecVersion, &ab.Tx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
@@ -83,7 +83,7 @@ func (ab *AtomicBlock) Verify() error {
 
 	ab.onAcceptDB = versiondb.New(pdb)
 	if err := tx.SemanticVerify(ab.vm, ab.onAcceptDB, &ab.Tx); err != nil {
-		ab.vm.droppedTxCache.Put(ab.Tx.ID(), nil) // cache tx as dropped
+		ab.vm.droppedTxCache.Put(ab.Tx.ID(), err.Error()) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", tx.ID(), err)
 	}
 	txBytes := ab.Tx.Bytes()
@@ -93,7 +93,7 @@ func (ab *AtomicBlock) Verify() error {
 		return fmt.Errorf("failed to put status of tx %s: %w", tx.ID(), err)
 	}
 
-	ab.vm.currentBlocks[ab.ID().Key()] = ab
+	ab.vm.currentBlocks[ab.ID()] = ab
 	ab.parentBlock().addChild(ab)
 	return nil
 }
@@ -163,7 +163,7 @@ func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx Tx) (*AtomicBloc
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(ab)
-	bytes, err := Codec.Marshal(&blk)
+	bytes, err := Codec.Marshal(codecVersion, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}

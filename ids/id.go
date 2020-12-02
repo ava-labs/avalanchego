@@ -6,6 +6,8 @@ package ids
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"sort"
 
 	"github.com/ava-labs/avalanchego/utils"
@@ -14,67 +16,65 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// Empty is a useful all zero value
-var Empty = ID{ID: &[32]byte{}}
+const (
+	// The encoding used to convert IDs from bytes to string and vice versa
+	defaultEncoding = formatting.CB58
+)
 
-// ID wraps a 32 byte hash as an identifier
-// Internal field [ID] should never be modified
-// from outside ids package
-type ID struct {
-	ID *[32]byte `serialize:"true"`
-}
+var (
+	// Empty is a useful all zero value
+	Empty            = ID{}
+	errMissingQuotes = errors.New("first and last characters should be quotes")
+)
 
-// NewID creates an identifier from a 32 byte hash
-func NewID(id [32]byte) ID { return ID{ID: &id} }
+// ID wraps a 32 byte hash used as an identifier
+type ID [32]byte
 
 // ToID attempt to convert a byte slice into an id
 func ToID(bytes []byte) (ID, error) {
-	addrHash, err := hashing.ToHash256(bytes)
-	return NewID(addrHash), err
+	return hashing.ToHash256(bytes)
 }
 
 // FromString is the inverse of ID.String()
 func FromString(idStr string) (ID, error) {
-	cb58 := formatting.CB58{}
-	err := cb58.FromString(idStr)
+	bytes, err := formatting.Decode(defaultEncoding, idStr)
 	if err != nil {
 		return ID{}, err
 	}
-	return ToID(cb58.Bytes)
+	return ToID(bytes)
 }
 
 // MarshalJSON ...
 func (id ID) MarshalJSON() ([]byte, error) {
-	if id.IsZero() {
-		return []byte("null"), nil
+	str, err := formatting.Encode(defaultEncoding, id[:])
+	if err != nil {
+		return nil, err
 	}
-	cb58 := formatting.CB58{Bytes: id.ID[:]}
-	return cb58.MarshalJSON()
+	return []byte("\"" + str + "\""), nil
 }
 
 // UnmarshalJSON ...
 func (id *ID) UnmarshalJSON(b []byte) error {
-	if string(b) == "null" {
+	str := string(b)
+	if str == "null" { // If "null", do nothing
 		return nil
+	} else if len(str) < 2 {
+		return errMissingQuotes
 	}
-	cb58 := formatting.CB58{}
-	if err := cb58.UnmarshalJSON(b); err != nil {
-		return err
+
+	lastIndex := len(str) - 1
+	if str[0] != '"' || str[lastIndex] != '"' {
+		return errMissingQuotes
 	}
-	newID, err := ToID(cb58.Bytes)
+
+	// Parse CB58 formatted string to bytes
+	bytes, err := formatting.Decode(defaultEncoding, str[1:lastIndex])
 	if err != nil {
-		return err
+		return fmt.Errorf("couldn't decode ID to bytes: %w", err)
 	}
-	*id = newID
-	return nil
+	*id, err = ToID(bytes)
+	return err
 }
-
-// IsZero returns true if the value has not been initialized
-func (id ID) IsZero() bool { return id.ID == nil }
-
-// Key returns a 32 byte hash that this id represents. This is useful to allow
-// for this id to be used as keys in maps.
-func (id ID) Key() [32]byte { return *id.ID }
 
 // Prefix this id to create a more selective id. This can be used to store
 // multiple values under the same key. For example:
@@ -89,28 +89,17 @@ func (id ID) Prefix(prefixes ...uint64) ID {
 	for _, prefix := range prefixes {
 		packer.PackLong(prefix)
 	}
-	packer.PackFixedBytes(id.Bytes())
+	packer.PackFixedBytes(id[:])
 
-	return NewID(hashing.ComputeHash256Array(packer.Bytes))
+	return hashing.ComputeHash256Array(packer.Bytes)
 }
-
-// Equals returns true if the ids have the same byte representation
-func (id ID) Equals(oID ID) bool {
-	return id.ID == oID.ID ||
-		(id.ID != nil && oID.ID != nil && bytes.Equal(id.Bytes(), oID.Bytes()))
-}
-
-// Bytes returns the 32 byte hash as a slice. It is assumed this slice is not
-// modified.
-func (id ID) Bytes() []byte { return id.ID[:] }
 
 // Bit returns the bit value at the ith index of the byte array. Returns 0 or 1
 func (id ID) Bit(i uint) int {
 	byteIndex := i / BitsPerByte
 	bitIndex := i % BitsPerByte
 
-	bytes := id.Bytes()
-	b := bytes[byteIndex]
+	b := id[byteIndex]
 
 	// b = [7, 6, 5, 4, 3, 2, 1, 0]
 
@@ -127,23 +116,21 @@ func (id ID) Bit(i uint) int {
 }
 
 // Hex returns a hex encoded string of this id.
-func (id ID) Hex() string { return hex.EncodeToString(id.Bytes()) }
+func (id ID) Hex() string { return hex.EncodeToString(id[:]) }
 
 func (id ID) String() string {
-	if id.IsZero() {
-		return "nil"
-	}
-	bytes := id.Bytes()
-	cb58 := formatting.CB58{Bytes: bytes}
-	return cb58.String()
+	// We assume that the maximum size of a byte slice that
+	// can be stringified is at least the length of an ID
+	s, _ := formatting.Encode(defaultEncoding, id[:])
+	return s
 }
 
 type sortIDData []ID
 
 func (ids sortIDData) Less(i, j int) bool {
 	return bytes.Compare(
-		ids[i].Bytes(),
-		ids[j].Bytes()) == -1
+		ids[i][:],
+		ids[j][:]) == -1
 }
 func (ids sortIDData) Len() int      { return len(ids) }
 func (ids sortIDData) Swap(i, j int) { ids[j], ids[i] = ids[i], ids[j] }

@@ -17,10 +17,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
+const (
+	codecVersion = 0
+)
+
 // Database encrypts all values that are provided
 type Database struct {
 	lock   sync.RWMutex
-	codec  codec.Codec
+	codec  codec.Manager
 	cipher cipher.AEAD
 	db     database.Database
 }
@@ -32,11 +36,13 @@ func New(password []byte, db database.Database) (*Database, error) {
 	if err != nil {
 		return nil, err
 	}
+	c := codec.NewDefault()
+	manager := codec.NewDefaultManager()
 	return &Database{
-		codec:  codec.NewDefault(),
+		codec:  manager,
 		cipher: aead,
 		db:     db,
-	}, nil
+	}, manager.RegisterCodec(codecVersion, c)
 }
 
 // Has implements the Database interface
@@ -269,7 +275,7 @@ func (db *Database) encrypt(plaintext []byte) ([]byte, error) {
 		return nil, err
 	}
 	ciphertext := db.cipher.Seal(nil, nonce, plaintext, nil)
-	return db.codec.Marshal(&encryptedValue{
+	return db.codec.Marshal(codecVersion, &encryptedValue{
 		Ciphertext: ciphertext,
 		Nonce:      nonce,
 	})
@@ -277,7 +283,7 @@ func (db *Database) encrypt(plaintext []byte) ([]byte, error) {
 
 func (db *Database) decrypt(ciphertext []byte) ([]byte, error) {
 	val := encryptedValue{}
-	if err := db.codec.Unmarshal(ciphertext, &val); err != nil {
+	if _, err := db.codec.Unmarshal(ciphertext, &val); err != nil {
 		return nil, err
 	}
 	return db.cipher.Open(nil, val.Nonce, val.Ciphertext, nil)

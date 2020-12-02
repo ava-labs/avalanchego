@@ -54,7 +54,7 @@ func (tx *UnsignedAddSubnetValidatorTx) Weight() uint64 {
 // Verify return nil iff [tx] is valid
 func (tx *UnsignedAddSubnetValidatorTx) Verify(
 	ctx *snow.Context,
-	c codec.Codec,
+	c codec.Manager,
 	feeAmount uint64,
 	feeAssetID ids.ID,
 	minStakeDuration time.Duration,
@@ -171,7 +171,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 	subnetCred := stx.Creds[baseTxCredsLen]
 
 	subnet, timedErr := vm.getSubnet(db, tx.Validator.Subnet)
-	if err != nil {
+	if timedErr != nil {
 		return nil, nil, nil, nil, timedErr
 	}
 	unsignedSubnet := subnet.UnsignedTx.(*UnsignedCreateSubnetTx)

@@ -26,7 +26,7 @@ func (s *state) Vertex(id ids.ID) *innerVertex {
 		return vtx
 	}
 
-	if b, err := s.db.Get(id.Bytes()); err == nil {
+	if b, err := s.db.Get(id[:]); err == nil {
 		// The key was in the database
 		if vtx, err := s.serializer.parseVertex(b); err == nil {
 			s.dbCache.Put(id, vtx) // Cache the element
@@ -47,10 +47,10 @@ func (s *state) SetVertex(id ids.ID, vtx *innerVertex) error {
 	s.dbCache.Put(id, vtx)
 
 	if vtx == nil {
-		return s.db.Delete(id.Bytes())
+		return s.db.Delete(id[:])
 	}
 
-	return s.db.Put(id.Bytes(), vtx.bytes)
+	return s.db.Put(id[:], vtx.bytes)
 }
 
 func (s *state) Status(id ids.ID) choices.Status {
@@ -59,7 +59,7 @@ func (s *state) Status(id ids.ID) choices.Status {
 		return status
 	}
 
-	if b, err := s.db.Get(id.Bytes()); err == nil {
+	if b, err := s.db.Get(id[:]); err == nil {
 		// The key was in the database
 		p := wrappers.Packer{Bytes: b}
 		status := choices.Status(p.UnpackInt())
@@ -81,7 +81,7 @@ func (s *state) SetStatus(id ids.ID, status choices.Status) error {
 	s.dbCache.Put(id, status)
 
 	if status == choices.Unknown {
-		return s.db.Delete(id.Bytes())
+		return s.db.Delete(id[:])
 	}
 
 	p := wrappers.Packer{Bytes: make([]byte, 4)}
@@ -91,7 +91,7 @@ func (s *state) SetStatus(id ids.ID, status choices.Status) error {
 	s.serializer.ctx.Log.AssertNoError(p.Err)
 	s.serializer.ctx.Log.AssertTrue(p.Offset == len(p.Bytes), "Wrong offset after packing")
 
-	return s.db.Put(id.Bytes(), p.Bytes)
+	return s.db.Put(id[:], p.Bytes)
 }
 
 func (s *state) Edge(id ids.ID) []ids.ID {
@@ -100,13 +100,15 @@ func (s *state) Edge(id ids.ID) []ids.ID {
 		return frontier
 	}
 
-	if b, err := s.db.Get(id.Bytes()); err == nil {
+	if b, err := s.db.Get(id[:]); err == nil {
 		p := wrappers.Packer{Bytes: b}
 
-		frontier := []ids.ID{}
-		for i := p.UnpackInt(); i > 0 && !p.Errored(); i-- {
-			id, _ := ids.ToID(p.UnpackFixedBytes(hashing.HashLen))
-			frontier = append(frontier, id)
+		frontierSize := p.UnpackInt()
+		frontier := make([]ids.ID, frontierSize)
+		for i := 0; i < int(frontierSize) && !p.Errored(); i++ {
+			id, err := ids.ToID(p.UnpackFixedBytes(hashing.HashLen))
+			p.Add(err)
+			frontier[i] = id
 		}
 
 		if p.Offset == len(b) && !p.Errored() {
@@ -127,7 +129,7 @@ func (s *state) SetEdge(id ids.ID, frontier []ids.ID) error {
 	s.dbCache.Put(id, frontier)
 
 	if len(frontier) == 0 {
-		return s.db.Delete(id.Bytes())
+		return s.db.Delete(id[:])
 	}
 
 	size := wrappers.IntLen + hashing.HashLen*len(frontier)
@@ -135,11 +137,11 @@ func (s *state) SetEdge(id ids.ID, frontier []ids.ID) error {
 
 	p.PackInt(uint32(len(frontier)))
 	for _, id := range frontier {
-		p.PackFixedBytes(id.Bytes())
+		p.PackFixedBytes(id[:])
 	}
 
 	s.serializer.ctx.Log.AssertNoError(p.Err)
 	s.serializer.ctx.Log.AssertTrue(p.Offset == len(p.Bytes), "Wrong offset after packing")
 
-	return s.db.Put(id.Bytes(), p.Bytes)
+	return s.db.Put(id[:], p.Bytes)
 }

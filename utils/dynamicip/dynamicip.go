@@ -108,12 +108,45 @@ func (r *IFConfigResolver) Resolve() (net.IP, error) {
 	return ipResolved, nil
 }
 
+// IFConfigMeResolves resolves our public IP using website ifconfig.me
+type IFConfigMeResolver struct{}
+
+func (r *IFConfigMeResolver) IsResolver() bool {
+	return true
+}
+
+func (r *IFConfigMeResolver) Resolve() (net.IP, error) {
+	url := "http://ifconfig.me"
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	ip, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response from ifconfig.me: %w", err)
+	}
+	ipstr := string(ip)
+	ipstr = strings.ReplaceAll(ipstr, "\r\n", "")
+	ipstr = strings.ReplaceAll(ipstr, "\r", "")
+	ipstr = strings.ReplaceAll(ipstr, "\n", "")
+	ipResolved := net.ParseIP(ipstr)
+	if ipResolved == nil {
+		return nil, fmt.Errorf("invalid ip %s", ipstr)
+	}
+	return ipResolved, nil
+}
+
 func NewResolver(opt string) Resolver {
 	switch opt {
 	case "opendns":
 		return NewOpenDNSResolver()
 	case "ifconfig":
 		return &IFConfigResolver{}
+	case "ifconfigco":
+		return &IFConfigResolver{}
+	case "ifconfigme":
+		return &IFConfigMeResolver{}
 	default:
 		return &NoResolver{}
 	}

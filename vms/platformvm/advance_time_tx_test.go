@@ -91,8 +91,9 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	}
 }
 
-// Ensure semantic verification updates the current and pending validator sets correctly
-func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
+// Ensure semantic verification updates the current and pending staker set
+// for the primary network
+func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
@@ -139,7 +140,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		t.Fatal(err)
 	} else if !isValidator {
 		t.Fatalf("Should have added the validator to the validator set")
-	} else if !validatorTx.ID().Equals(addPendingValidatorTx.ID()) {
+	} else if validatorTx.ID() != addPendingValidatorTx.ID() {
 		t.Fatalf("Added the wrong tx to the validator set")
 	} else if _, willBeValidator, err := vm.willBeValidator(onCommit, constants.PrimaryNetworkID, nodeID); err != nil {
 		t.Fatal(err)
@@ -163,8 +164,259 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		t.Fatal(err)
 	case !willBeValidator:
 		t.Fatalf("Shouldn't have removed the validator from the pending validator set")
-	case !validatorTx.ID().Equals(addPendingValidatorTx.ID()):
+	case validatorTx.ID() != addPendingValidatorTx.ID():
 		t.Fatalf("Added the wrong tx to the pending validator set")
+	}
+}
+
+// Ensure semantic verification updates the current and pending staker sets correctly.
+// Namely, it should add pending stakers whose start time is at or before the timestamp.
+// It will not remove primary network stakers; that happens in rewardTxs.
+func TestAdvanceTimeTxUpdatePrimaryNetworkStakers2(t *testing.T) {
+	type staker struct {
+		nodeID             ids.ShortID
+		startTime, endTime time.Time
+	}
+	type test struct {
+		description     string
+		stakers         []staker
+		advanceTimeTo   []time.Time
+		expectedCurrent []ids.ShortID
+		expectedPending []ids.ShortID
+	}
+
+	// Chronological order: staker1 start, staker2 start, staker3 start and staker 4 start,
+	//  staker3 and staker4 end, staker2 end and staker5 start, staker1 end
+	staker1 := staker{
+		nodeID:    ids.GenerateTestShortID(),
+		startTime: defaultGenesisTime.Add(1 * time.Minute),
+		endTime:   defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute),
+	}
+	staker2 := staker{
+		nodeID:    ids.GenerateTestShortID(),
+		startTime: staker1.startTime.Add(1 * time.Minute),
+		endTime:   staker1.startTime.Add(1 * time.Minute).Add(defaultMinStakingDuration),
+	}
+	staker3 := staker{
+		nodeID:    ids.GenerateTestShortID(),
+		startTime: staker2.startTime.Add(1 * time.Minute),
+		endTime:   staker2.endTime.Add(1 * time.Minute),
+	}
+	staker4 := staker{
+		nodeID:    ids.GenerateTestShortID(),
+		startTime: staker3.startTime,
+		endTime:   staker3.endTime,
+	}
+	staker5 := staker{
+		nodeID:    ids.GenerateTestShortID(),
+		startTime: staker2.endTime,
+		endTime:   staker2.endTime.Add(defaultMinStakingDuration),
+	}
+
+	tests := []test{
+		{
+			description: "advance time to before staker1 start",
+			stakers: []staker{
+				staker1,
+				staker2,
+				staker3,
+				staker4,
+				staker5,
+			},
+			advanceTimeTo:   []time.Time{staker1.startTime.Add(-1 * time.Second)},
+			expectedPending: []ids.ShortID{staker1.nodeID, staker2.nodeID, staker3.nodeID, staker4.nodeID, staker5.nodeID},
+		},
+		{
+			description: "advance time to staker 1 start",
+			stakers: []staker{
+				staker1,
+				staker2,
+				staker3,
+				staker4,
+				staker5,
+			},
+			advanceTimeTo:   []time.Time{staker1.startTime},
+			expectedCurrent: []ids.ShortID{staker1.nodeID},
+			expectedPending: []ids.ShortID{staker2.nodeID, staker3.nodeID, staker4.nodeID, staker5.nodeID},
+		},
+		{
+			description: "advance time to the staker2 start",
+			stakers: []staker{
+				staker1,
+				staker2,
+				staker3,
+				staker4,
+				staker5,
+			},
+			advanceTimeTo:   []time.Time{staker1.startTime, staker2.startTime},
+			expectedCurrent: []ids.ShortID{staker1.nodeID},
+			expectedPending: []ids.ShortID{staker3.nodeID, staker4.nodeID, staker5.nodeID},
+		},
+		{
+			description: "advance time to staker3 and staker4 start",
+			stakers: []staker{
+				staker1,
+				staker2,
+				staker3,
+				staker4,
+				staker5,
+			},
+			advanceTimeTo:   []time.Time{staker1.startTime, staker2.startTime, staker3.startTime},
+			expectedCurrent: []ids.ShortID{staker2.nodeID, staker3.nodeID, staker4.nodeID},
+			expectedPending: []ids.ShortID{staker5.nodeID},
+		},
+		{
+			description: "advance time to staker5 start",
+			stakers: []staker{
+				staker1,
+				staker2,
+				staker3,
+				staker4,
+				staker5,
+			},
+			advanceTimeTo:   []time.Time{staker1.startTime, staker2.startTime, staker3.startTime, staker5.startTime},
+			expectedCurrent: []ids.ShortID{staker3.nodeID, staker4.nodeID, staker5.nodeID},
+		},
+	}
+
+	for _, tt := range tests {
+		vm, _ := defaultVM()
+		vm.Ctx.Lock.Lock()
+		defer func() {
+			if err := vm.Shutdown(); err != nil {
+				t.Fatal(err)
+			}
+			vm.Ctx.Lock.Unlock()
+		}()
+
+		for _, staker := range tt.stakers {
+			tx, err := vm.newAddValidatorTx(
+				vm.minValidatorStake,
+				uint64(staker.startTime.Unix()),
+				uint64(staker.endTime.Unix()),
+				staker.nodeID,  // validator ID
+				ids.ShortEmpty, // reward address
+				PercentDenominator,
+				[]*crypto.PrivateKeySECP256K1R{keys[0]},
+				ids.ShortEmpty, // change addr
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := vm.enqueueStaker(vm.DB, constants.PrimaryNetworkID, tx); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		db := vm.DB
+		for _, newTime := range tt.advanceTimeTo {
+			vm.clock.Set(newTime)
+			tx, err := vm.newAdvanceTimeTx(newTime)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			db, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, db, tx)
+			if err != nil {
+				t.Fatalf("failed test '%s': %s", tt.description, err)
+			}
+		}
+
+		// Check that the validators we expect to be in the current staker set are there
+		for _, stakerNodeID := range tt.expectedCurrent {
+			_, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, stakerNodeID)
+			if err != nil {
+				t.Fatal(err)
+			} else if !isValidator {
+				t.Fatalf("failed test '%s': expected validator to be in current validator set but it isn't", tt.description)
+			}
+		}
+		// Check that the validators we expect to be in the pending staker set are there
+		for _, stakerNodeID := range tt.expectedPending {
+			_, willBeValidator, err := vm.willBeValidator(db, constants.PrimaryNetworkID, stakerNodeID)
+			if err != nil {
+				t.Fatal(err)
+			} else if !willBeValidator {
+				t.Fatalf("failed test '%s': expected validator to be in pending validator set but it isn't", tt.description)
+			}
+		}
+	}
+}
+
+// Regression test for https://github.com/ava-labs/avalanchego/pull/584
+// that ensures it fixes a bug where subnet validators are not removed
+// when timestamp is advanced and there is a pending staker whose start time
+// is after the new timestamp
+func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
+	vm, _ := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		vm.Ctx.Lock.Unlock()
+	}()
+
+	// Add a subnet validator to the staker set
+	subnetValidatorNodeID := keys[0].PublicKey().Address()
+	// Starts after the corre
+	subnetVdr1StartTime := defaultValidateStartTime
+	subnetVdr1EndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
+	tx, err := vm.newAddSubnetValidatorTx(
+		1,                                  // Weight
+		uint64(subnetVdr1StartTime.Unix()), // Start time
+		uint64(subnetVdr1EndTime.Unix()),   // end time
+		subnetValidatorNodeID,              // Node ID
+		testSubnet1.ID(),                   // Subnet ID
+		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]}, // Keys
+		ids.ShortEmpty, // reward address
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rewardTx := &rewardTx{
+		Reward: 0,
+		Tx:     *tx,
+	}
+	if err := vm.addStaker(vm.DB, testSubnet1.ID(), rewardTx); err != nil {
+		t.Fatal(err)
+	}
+	// The above validator is now part of the staking set
+
+	// Queue a staker that joins the staker set after the above validator leaves
+	tx, err = vm.newAddSubnetValidatorTx(
+		1, // Weight
+		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                // Start time
+		uint64(subnetVdr1EndTime.Add(time.Second).Add(defaultMinStakingDuration).Unix()), // end time
+		keys[1].PublicKey().Address(),                                                    // Node ID
+		testSubnet1.ID(),                                                                 // Subnet ID
+		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},                                 // Keys
+		ids.ShortEmpty, // reward address
+	)
+	if err != nil {
+		t.Fatal(err)
+	} else if err := vm.enqueueStaker(vm.DB, testSubnet1.ID(), tx); err != nil {
+		t.Fatal(err)
+	}
+	// The above validator is now in the pending staker set
+
+	// Advance time to the first staker's end time.
+	vm.clock.Set(subnetVdr1EndTime)
+	tx, err = vm.newAdvanceTimeTx(subnetVdr1EndTime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	onCommitDB, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The first staker should now be removed. Verify that is the case.
+	_, isValidator, err := vm.isValidator(onCommitDB, testSubnet1.ID(), subnetValidatorNodeID)
+	if err != nil {
+		t.Fatal(err)
+	} else if isValidator {
+		t.Fatal("should have been removed from validator set")
 	}
 }
 
@@ -214,13 +466,13 @@ func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bytes, err := Codec.Marshal(tx)
+	bytes, err := Codec.Marshal(codecVersion, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var unmarshaledTx Tx
-	if err := Codec.Unmarshal(bytes, &unmarshaledTx); err != nil {
+	if _, err := Codec.Unmarshal(bytes, &unmarshaledTx); err != nil {
 		t.Fatal(err)
 	} else if tx.UnsignedTx.(*UnsignedAdvanceTimeTx).Time != unmarshaledTx.UnsignedTx.(*UnsignedAdvanceTimeTx).Time {
 		t.Fatal("should have same timestamp")

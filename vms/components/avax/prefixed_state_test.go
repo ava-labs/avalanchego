@@ -15,18 +15,22 @@ import (
 )
 
 func TestPrefixedFunds(t *testing.T) {
+	c := codec.NewDefault()
+	if err := c.RegisterType(&TestAddressable{}); err != nil {
+		t.Fatal(err)
+	}
+	manager := codec.NewDefaultManager()
+	if err := manager.RegisterCodec(codecVersion, c); err != nil {
+		t.Fatal(err)
+	}
+
 	chain0ID := ids.Empty.Prefix(0)
 	chain1ID := ids.Empty.Prefix(1)
 
 	db := memdb.New()
-	cc := codec.NewDefault()
 
-	if err := cc.RegisterType(&TestAddressable{}); err != nil {
-		t.Fatal(err)
-	}
-
-	st0 := NewPrefixedState(db, cc, cc, chain0ID, chain1ID)
-	st1 := NewPrefixedState(db, cc, cc, chain1ID, chain0ID)
+	st0 := NewPrefixedState(db, manager, manager, chain0ID, chain1ID)
+	st1 := NewPrefixedState(db, manager, manager, chain1ID, chain0ID)
 
 	addr := ids.GenerateTestShortID()
 	addrBytes := addr.Bytes()

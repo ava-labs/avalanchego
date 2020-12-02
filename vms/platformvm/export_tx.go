@@ -46,7 +46,7 @@ func (tx *UnsignedExportTx) InputUTXOs() ids.Set { return ids.Set{} }
 func (tx *UnsignedExportTx) Verify(
 	avmID ids.ID,
 	ctx *snow.Context,
-	c codec.Codec,
+	c codec.Manager,
 	feeAmount uint64,
 	feeAssetID ids.ID,
 ) error {
@@ -55,9 +55,7 @@ func (tx *UnsignedExportTx) Verify(
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.DestinationChain.IsZero():
-		return errWrongChainID
-	case !tx.DestinationChain.Equals(avmID):
+	case tx.DestinationChain != avmID:
 		// TODO: remove this check if we allow for P->C swaps
 		return errWrongChainID
 	case len(tx.ExportedOutputs) == 0:
@@ -144,13 +142,13 @@ func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 			Out:   out.Out,
 		}
 
-		utxoBytes, err := Codec.Marshal(utxo)
+		utxoBytes, err := Codec.Marshal(codecVersion, utxo)
 		if err != nil {
 			return fmt.Errorf("failed to marshal UTXO: %w", err)
 		}
-
+		utxoID := utxo.InputID()
 		elem := &atomic.Element{
-			Key:   utxo.InputID().Bytes(),
+			Key:   utxoID[:],
 			Value: utxoBytes,
 		}
 		if out, ok := utxo.Out.(avax.Addressable); ok {
@@ -171,7 +169,7 @@ func (vm *VM) newExportTx(
 	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee and provide the tokens
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	if !vm.Ctx.XChainID.Equals(chainID) {
+	if vm.Ctx.XChainID != chainID {
 		return nil, errWrongChainID
 	}
 

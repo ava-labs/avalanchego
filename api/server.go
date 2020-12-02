@@ -4,6 +4,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
+	"time"
 
 	"github.com/gorilla/handlers"
 
@@ -23,7 +25,8 @@ import (
 )
 
 const (
-	baseURL = "/ext"
+	baseURL               = "/ext"
+	serverShutdownTimeout = 10 * time.Second
 )
 
 var (
@@ -43,6 +46,9 @@ type Server struct {
 	// Handles authorization. Must be non-nil after initialization, even if
 	// token authorization is off.
 	auth *auth.Auth
+
+	// http server
+	srv *http.Server
 }
 
 // Initialize creates the API server at the provided host and port
@@ -82,7 +88,8 @@ func (s *Server) Dispatch() error {
 	s.log.Info("HTTP API server listening on %q", s.listenAddress)
 	handler := cors.Default().Handler(s.router)
 	handler = s.auth.WrapHandler(handler)
-	return http.Serve(listener, handler)
+	s.srv = &http.Server{Handler: handler}
+	return s.srv.Serve(listener)
 }
 
 // DispatchTLS starts the API server with the provided TLS certificate
@@ -99,21 +106,21 @@ func (s *Server) DispatchTLS(certFile, keyFile string) error {
 
 // RegisterChain registers the API endpoints associated with this chain That is,
 // add <route, handler> pairs to server so that http calls can be made to the vm
-func (s *Server) RegisterChain(ctx *snow.Context, vmIntf interface{}) {
+func (s *Server) RegisterChain(chainName string, ctx *snow.Context, vmIntf interface{}) {
 	vm, ok := vmIntf.(common.VM)
 	if !ok {
 		return
 	}
 
-	// all subroutes to a chain begin with "bc/<the chain's ID>"
-	chainID := ctx.ChainID.String()
-	defaultEndpoint := "bc/" + chainID
-	httpLogger, err := s.factory.MakeChain(chainID, "http")
+	httpLogger, err := s.factory.MakeChain(chainName, "http")
 	if err != nil {
 		s.log.Error("Failed to create new http logger: %s", err)
 		return
 	}
+
 	s.log.Verbo("About to add API endpoints for chain with ID %s", ctx.ChainID)
+	// all subroutes to a chain begin with "bc/<the chain's ID>"
+	defaultEndpoint := "bc/" + ctx.ChainID.String()
 
 	// Register each endpoint
 	for extension, service := range vm.CreateHandlers() {
@@ -244,4 +251,14 @@ func (s *Server) Call(
 	handler.ServeHTTP(writer, req)
 
 	return nil
+}
+
+// Shutdown this server
+func (s *Server) Shutdown() error {
+	if s.srv == nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), serverShutdownTimeout)
+	defer cancel()
+	return s.srv.Shutdown(ctx)
 }

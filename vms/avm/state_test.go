@@ -28,36 +28,36 @@ func TestStateIDsNoStart(t *testing.T) {
 
 	state := vm.state.state
 
-	id0 := ids.NewID([32]byte{0x00, 0})
-	id1 := ids.NewID([32]byte{0x01, 0})
-	id2 := ids.NewID([32]byte{0x02, 0})
+	id0 := ids.ID{0x01, 0}
+	id1 := ids.ID{0x02, 0}
+	id2 := ids.ID{0x03, 0}
 
-	if _, err := state.IDs(ids.Empty.Bytes(), []byte{}, math.MaxInt32); err != nil {
+	if _, err := state.IDs(ids.Empty[:], []byte{}, math.MaxInt32); err != nil {
 		t.Fatal(err)
 	}
 
 	expected := []ids.ID{id0, id1}
 	for _, id := range expected {
-		if err := state.AddID(ids.Empty.Bytes(), id); err != nil {
+		if err := state.AddID(ids.Empty[:], id); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	result, err := state.IDs(ids.Empty.Bytes(), []byte{}, 0)
+	result, err := state.IDs(ids.Empty[:], []byte{}, 0)
 	if err != nil {
 		t.Fatal(err)
 	} else if len(result) != 0 {
 		t.Fatal("result should have length 0 because limit is 0")
 	}
 
-	result, err = state.IDs(ids.Empty.Bytes(), []byte{}, 1)
+	result, err = state.IDs(ids.Empty[:], []byte{}, 1)
 	if err != nil {
 		t.Fatal(err)
 	} else if len(result) != 1 {
 		t.Fatal("result should have length 0 because limit is 1")
 	}
 
-	result, err = state.IDs(ids.Empty.Bytes(), []byte{}, math.MaxInt32)
+	result, err = state.IDs(ids.Empty[:], []byte{}, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,18 +67,18 @@ func TestStateIDsNoStart(t *testing.T) {
 	ids.SortIDs(result)
 	for i, resultID := range result {
 		expectedID := expected[i]
-		if !expectedID.Equals(resultID) {
+		if expectedID != resultID {
 			t.Fatalf("Wrong ID returned")
 		}
 	}
 
 	for _, id := range expected {
-		if err := state.RemoveID(ids.Empty.Bytes(), id); err != nil {
+		if err := state.RemoveID(ids.Empty[:], id); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	result, err = state.IDs(ids.Empty.Bytes(), []byte{}, math.MaxInt32)
+	result, err = state.IDs(ids.Empty[:], []byte{}, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	} else if len(result) != 0 {
@@ -87,12 +87,12 @@ func TestStateIDsNoStart(t *testing.T) {
 
 	expected = []ids.ID{id1, id2}
 	for _, id := range expected {
-		if err := state.AddID(ids.Empty.Bytes(), id); err != nil {
+		if err := state.AddID(ids.Empty[:], id); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	result, err = state.IDs(ids.Empty.Bytes(), []byte{}, math.MaxInt32)
+	result, err = state.IDs(ids.Empty[:], []byte{}, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	} else if len(result) != len(expected) {
@@ -102,14 +102,14 @@ func TestStateIDsNoStart(t *testing.T) {
 	ids.SortIDs(result)
 	for i, resultID := range result {
 		expectedID := expected[i]
-		if !expectedID.Equals(resultID) {
+		if expectedID != resultID {
 			t.Fatalf("Wrong ID returned")
 		}
 	}
 
 	state.Cache.Flush()
 
-	result, err = state.IDs(ids.Empty.Bytes(), []byte{}, math.MaxInt32)
+	result, err = state.IDs(ids.Empty[:], []byte{}, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	} else if len(result) != len(expected) {
@@ -119,7 +119,7 @@ func TestStateIDsNoStart(t *testing.T) {
 	ids.SortIDs(result)
 	for i, resultID := range result {
 		expectedID := expected[i]
-		if !expectedID.Equals(resultID) {
+		if expectedID != resultID {
 			t.Fatalf("Wrong ID returned")
 		}
 	}
@@ -136,20 +136,16 @@ func TestStateIDsNoStart(t *testing.T) {
 	}
 
 	for _, id := range expected {
-		if err := state.RemoveID(ids.Empty.Bytes(), id); err != nil {
+		if err := state.RemoveID(ids.Empty[:], id); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	result, err = state.IDs(ids.Empty.Bytes(), []byte{}, math.MaxInt32)
+	result, err = state.IDs(ids.Empty[:], []byte{}, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	} else if len(result) != 0 {
 		t.Fatalf("Should have returned 0 IDs")
-	} else if err := state.AddID(ids.Empty.Bytes(), ids.ID{}); err == nil {
-		t.Fatalf("Should have errored during serialization")
-	} else if err := state.RemoveID(ids.Empty.Bytes(), ids.ID{}); err == nil {
-		t.Fatalf("Should have errored during serialization")
 	}
 }
 
@@ -164,49 +160,49 @@ func TestStateIDsWithStart(t *testing.T) {
 	}()
 
 	state := vm.state.state
-	id0 := ids.NewID([32]byte{0x00, 0})
-	id1 := ids.NewID([32]byte{0x01, 0})
-	id2 := ids.NewID([32]byte{0x02, 0})
+	id0 := ids.ID{0x01, 0}
+	id1 := ids.ID{0x02, 0}
+	id2 := ids.ID{0x03, 0}
 
 	// State should be empty to start
-	if _, err := state.IDs(ids.Empty.Bytes(), []byte{}, math.MaxInt32); err != nil {
+	if _, err := state.IDs(ids.Empty[:], []byte{}, math.MaxInt32); err != nil {
 		t.Fatal(err)
 	}
 
 	// Put all three IDs
-	if err := state.AddID(ids.Empty.Bytes(), id0); err != nil {
+	if err := state.AddID(ids.Empty[:], id0); err != nil {
 		t.Fatal(err)
-	} else if err := state.AddID(ids.Empty.Bytes(), id1); err != nil {
+	} else if err := state.AddID(ids.Empty[:], id1); err != nil {
 		t.Fatal(err)
-	} else if err := state.AddID(ids.Empty.Bytes(), id2); err != nil {
+	} else if err := state.AddID(ids.Empty[:], id2); err != nil {
 		t.Fatal(err)
 	}
 
-	if result, err := state.IDs(ids.Empty.Bytes(), []byte{}, math.MaxInt32); err != nil { // start at beginning
+	if result, err := state.IDs(ids.Empty[:], []byte{}, math.MaxInt32); err != nil { // start at beginning
 		t.Fatal(err)
 	} else if len(result) != 3 {
 		t.Fatalf("result should have all 3 IDs but has %d", len(result))
 	}
 
-	result, err := state.IDs(ids.Empty.Bytes(), id0.Bytes(), math.MaxInt32)
+	result, err := state.IDs(ids.Empty[:], id0[:], math.MaxInt32)
 	switch {
 	case err != nil: // start after id0
 		t.Fatal(err)
 	case len(result) != 2:
 		t.Fatalf("result should have 2 IDs but has %d", len(result))
-	case !result[0].Equals(id1) && !result[1].Equals(id1):
+	case result[0] != id1 && result[1] != id1:
 		t.Fatal("result should have id1")
-	case !result[0].Equals(id2) && !result[1].Equals(id2):
+	case result[0] != id2 && result[1] != id2:
 		t.Fatal("result should have id2")
 	}
 
-	result, err = state.IDs(ids.Empty.Bytes(), id1.Bytes(), math.MaxInt32)
+	result, err = state.IDs(ids.Empty[:], id1[:], math.MaxInt32)
 	switch {
 	case err != nil: // start after id1
 		t.Fatal(err)
 	case len(result) != 1:
 		t.Fatalf("result should have 1 IDs but has %d", len(result))
-	case !result[0].Equals(id2):
+	case result[0] != id2:
 		t.Fatal("result should be id2")
 	}
 }
@@ -223,15 +219,16 @@ func TestStateStatuses(t *testing.T) {
 
 	state := vm.state.state
 
-	if _, err := state.Status(ids.Empty); err == nil {
+	id := ids.GenerateTestID()
+	if _, err := state.Status(id); err == nil {
 		t.Fatalf("Should have errored when reading ids")
 	}
 
-	if err := state.SetStatus(ids.Empty, choices.Accepted); err != nil {
+	if err := state.SetStatus(id, choices.Accepted); err != nil {
 		t.Fatal(err)
 	}
 
-	status, err := state.Status(ids.Empty)
+	status, err := state.Status(id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,11 +236,11 @@ func TestStateStatuses(t *testing.T) {
 		t.Fatalf("Should have returned the %s status", choices.Accepted)
 	}
 
-	if err := state.AddID(ids.Empty.Bytes(), ids.Empty); err != nil {
+	if err := state.AddID(id[:], id); err != nil {
 		t.Fatal(err)
 	}
 
-	status, err = state.Status(ids.Empty)
+	status, err = state.Status(id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,11 +248,11 @@ func TestStateStatuses(t *testing.T) {
 		t.Fatalf("Should have returned the %s status", choices.Accepted)
 	}
 
-	if err := state.SetStatus(ids.Empty, choices.Unknown); err != nil {
+	if err := state.SetStatus(id, choices.Unknown); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := state.Status(ids.Empty); err == nil {
+	if _, err := state.Status(id); err == nil {
 		t.Fatalf("Should have errored when reading ids")
 	}
 }
@@ -272,7 +269,7 @@ func TestStateUTXOs(t *testing.T) {
 
 	state := vm.state.state
 
-	if err := vm.codec.RegisterType(&avax.TestVerifiable{}); err != nil {
+	if err := vm.CodecRegistry().RegisterType(&avax.TestVerifiable{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -352,7 +349,7 @@ func TestStateTXs(t *testing.T) {
 
 	state := vm.state.state
 
-	if err := vm.codec.RegisterType(&avax.TestTransferable{}); err != nil {
+	if err := vm.CodecRegistry().RegisterType(&avax.TestTransferable{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -392,7 +389,7 @@ func TestStateTXs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !result.ID().Equals(tx.ID()) {
+	if result.ID() != tx.ID() {
 		t.Fatalf("Wrong Tx returned")
 	}
 
@@ -403,7 +400,7 @@ func TestStateTXs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !result.ID().Equals(tx.ID()) {
+	if result.ID() != tx.ID() {
 		t.Fatalf("Wrong Tx returned")
 	}
 

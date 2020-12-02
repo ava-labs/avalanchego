@@ -14,7 +14,7 @@ type voter struct {
 	t         *Transitive
 	vdr       ids.ShortID
 	requestID uint32
-	response  ids.Set
+	response  []ids.ID
 	deps      ids.Set
 }
 
@@ -34,7 +34,7 @@ func (v *voter) Update() {
 		return
 	}
 
-	results, finished := v.t.polls.Vote(v.requestID, v.vdr, v.response.List())
+	results, finished := v.t.polls.Vote(v.requestID, v.vdr, v.response)
 	if !finished {
 		return
 	}
@@ -50,8 +50,9 @@ func (v *voter) Update() {
 		return
 	}
 
-	txs := []snowstorm.Tx(nil)
-	for _, orphanID := range v.t.Consensus.Orphans().List() {
+	orphans := v.t.Consensus.Orphans()
+	txs := make([]snowstorm.Tx, 0, orphans.Len())
+	for orphanID := range orphans {
 		if tx, err := v.t.VM.GetTx(orphanID); err == nil {
 			txs = append(txs, tx)
 		} else {
@@ -78,12 +79,11 @@ func (v *voter) Update() {
 func (v *voter) bubbleVotes(votes ids.UniqueBag) (ids.UniqueBag, error) {
 	bubbledVotes := ids.UniqueBag{}
 	vertexHeap := vertex.NewHeap()
-	for _, vote := range votes.List() {
+	for vote := range votes {
 		vtx, err := v.t.Manager.GetVertex(vote)
 		if err != nil {
 			continue
 		}
-
 		vertexHeap.Push(vtx)
 	}
 

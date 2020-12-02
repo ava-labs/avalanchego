@@ -90,24 +90,31 @@ func (vm *VM) enqueueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 	default:
 		return fmt.Errorf("staker is unexpected type %T", stakerTx)
 	}
-	stakerID := staker.ID().Bytes() // Tx ID of this tx
+	stakerID := staker.ID() // Tx ID of this tx
 	txBytes := stakerTx.Bytes()
 
 	// Sorted by subnet ID then start time then tx ID
 	prefixStart := []byte(fmt.Sprintf("%s%s", subnetID, startDBPrefix))
 	prefixStartDB := prefixdb.NewNested(prefixStart, db)
-	defer prefixStartDB.Close()
 
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.StartTime().Unix()))
 	p.PackByte(priority)
-	p.PackFixedBytes(stakerID)
+	p.PackFixedBytes(stakerID[:])
 	if p.Err != nil {
+		// Close the DB, but ignore the error, as the parent error needs to be
+		// returned.
+		_ = prefixStartDB.Close()
 		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
 	}
 	startKey := p.Bytes
 
-	return prefixStartDB.Put(startKey, txBytes)
+	errs := wrappers.Errs{}
+	errs.Add(
+		prefixStartDB.Put(startKey, txBytes),
+		prefixStartDB.Close(),
+	)
+	return errs.Err
 }
 
 // Remove a staker from subnet [subnetID]'s pending validator queue. A staker
@@ -130,23 +137,30 @@ func (vm *VM) dequeueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 	default:
 		return fmt.Errorf("staker is unexpected type %T", stakerTx)
 	}
-	stakerID := staker.ID().Bytes() // Tx ID of this tx
+	stakerID := staker.ID() // Tx ID of this tx
 
 	// Sorted by subnet ID then start time then ID
 	prefixStart := []byte(fmt.Sprintf("%s%s", subnetID, startDBPrefix))
 	prefixStartDB := prefixdb.NewNested(prefixStart, db)
-	defer prefixStartDB.Close()
 
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.StartTime().Unix()))
 	p.PackByte(priority)
-	p.PackFixedBytes(stakerID)
+	p.PackFixedBytes(stakerID[:])
 	if p.Err != nil {
+		// Close the DB, but ignore the error, as the parent error needs to be
+		// returned.
+		_ = prefixStartDB.Close()
 		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
 	}
 	startKey := p.Bytes
 
-	return prefixStartDB.Delete(startKey)
+	errs := wrappers.Errs{}
+	errs.Add(
+		prefixStartDB.Delete(startKey),
+		prefixStartDB.Close(),
+	)
+	return errs.Err
 }
 
 // Add a staker to subnet [subnetID]
@@ -170,28 +184,35 @@ func (vm *VM) addStaker(db database.Database, subnetID ids.ID, tx *rewardTx) err
 		return fmt.Errorf("staker is unexpected type %T", tx.Tx.UnsignedTx)
 	}
 
-	txBytes, err := vm.codec.Marshal(tx)
+	txBytes, err := vm.codec.Marshal(codecVersion, tx)
 	if err != nil {
 		return err
 	}
 
-	txID := tx.Tx.ID().Bytes() // Tx ID of this tx
+	txID := tx.Tx.ID() // Tx ID of this tx
 
 	// Sorted by subnet ID then stop time then tx ID
 	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
 	prefixStopDB := prefixdb.NewNested(prefixStop, db)
-	defer prefixStopDB.Close()
 
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.EndTime().Unix()))
 	p.PackByte(priority)
-	p.PackFixedBytes(txID)
+	p.PackFixedBytes(txID[:])
 	if p.Err != nil {
+		// Close the DB, but ignore the error, as the parent error needs to be
+		// returned.
+		_ = prefixStopDB.Close()
 		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
 	}
 	stopKey := p.Bytes
 
-	return prefixStopDB.Put(stopKey, txBytes)
+	errs := wrappers.Errs{}
+	errs.Add(
+		prefixStopDB.Put(stopKey, txBytes),
+		prefixStopDB.Close(),
+	)
+	return errs.Err
 }
 
 // Remove a staker from subnet [subnetID]
@@ -215,23 +236,30 @@ func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, tx *rewardTx) 
 		return fmt.Errorf("staker is unexpected type %T", tx.Tx.UnsignedTx)
 	}
 
-	txID := tx.Tx.ID().Bytes() // Tx ID of this tx
+	txID := tx.Tx.ID() // Tx ID of this tx
 
 	// Sorted by subnet ID then stop time
 	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
 	prefixStopDB := prefixdb.NewNested(prefixStop, db)
-	defer prefixStopDB.Close()
 
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.EndTime().Unix()))
 	p.PackByte(priority)
-	p.PackFixedBytes(txID)
+	p.PackFixedBytes(txID[:])
 	if p.Err != nil {
+		// Close the DB, but ignore the error, as the parent error needs to be
+		// returned.
+		_ = prefixStopDB.Close()
 		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
 	}
 	stopKey := p.Bytes
 
-	return prefixStopDB.Delete(stopKey)
+	errs := wrappers.Errs{}
+	errs.Add(
+		prefixStopDB.Delete(stopKey),
+		prefixStopDB.Close(),
+	)
+	return errs.Err
 }
 
 // Returns the pending staker that will start staking next
@@ -246,7 +274,7 @@ func (vm *VM) nextStakerStart(db database.Database, subnetID ids.ID) (*Tx, error
 	// Value: Byte repr. of tx that added this validator
 
 	tx := Tx{}
-	if err := Codec.Unmarshal(iter.Value(), &tx); err != nil {
+	if _, err := Codec.Unmarshal(iter.Value(), &tx); err != nil {
 		return nil, err
 	}
 	return &tx, tx.Sign(vm.codec, nil)
@@ -264,7 +292,7 @@ func (vm *VM) nextStakerStop(db database.Database, subnetID ids.ID) (*rewardTx, 
 	// Value: Byte repr. of tx that added this validator
 
 	tx := rewardTx{}
-	if err := Codec.Unmarshal(iter.Value(), &tx); err != nil {
+	if _, err := Codec.Unmarshal(iter.Value(), &tx); err != nil {
 		return nil, err
 	}
 	return &tx, tx.Tx.Sign(vm.codec, nil)
@@ -278,20 +306,23 @@ func (vm *VM) isValidator(db database.Database, subnetID ids.ID, nodeID ids.Shor
 	for iter.Next() {
 		txBytes := iter.Value()
 		tx := rewardTx{}
-		if err := Codec.Unmarshal(txBytes, &tx); err != nil {
-			return nil, false, err
-		}
-		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
+		if _, err := Codec.Unmarshal(txBytes, &tx); err != nil {
 			return nil, false, err
 		}
 
 		switch vdr := tx.Tx.UnsignedTx.(type) {
 		case *UnsignedAddValidatorTx:
-			if subnetID.Equals(constants.PrimaryNetworkID) && vdr.Validator.NodeID.Equals(nodeID) {
+			if subnetID == constants.PrimaryNetworkID && vdr.Validator.NodeID.Equals(nodeID) {
+				if err := tx.Tx.Sign(vm.codec, nil); err != nil {
+					return nil, false, err
+				}
 				return vdr, true, nil
 			}
 		case *UnsignedAddSubnetValidatorTx:
-			if subnetID.Equals(vdr.Validator.SubnetID()) && vdr.Validator.NodeID.Equals(nodeID) {
+			if subnetID == vdr.Validator.SubnetID() && vdr.Validator.NodeID.Equals(nodeID) {
+				if err := tx.Tx.Sign(vm.codec, nil); err != nil {
+					return nil, false, err
+				}
 				return vdr, true, nil
 			}
 		}
@@ -308,20 +339,23 @@ func (vm *VM) willBeValidator(db database.Database, subnetID ids.ID, nodeID ids.
 	for iter.Next() {
 		txBytes := iter.Value()
 		tx := Tx{}
-		if err := Codec.Unmarshal(txBytes, &tx); err != nil {
-			return nil, false, err
-		}
-		if err := tx.Sign(vm.codec, nil); err != nil {
+		if _, err := Codec.Unmarshal(txBytes, &tx); err != nil {
 			return nil, false, err
 		}
 
 		switch vdr := tx.UnsignedTx.(type) {
 		case *UnsignedAddValidatorTx:
-			if subnetID.Equals(constants.PrimaryNetworkID) && vdr.Validator.NodeID.Equals(nodeID) {
+			if subnetID == constants.PrimaryNetworkID && vdr.Validator.NodeID.Equals(nodeID) {
+				if err := tx.Sign(vm.codec, nil); err != nil {
+					return nil, false, err
+				}
 				return vdr, true, nil
 			}
 		case *UnsignedAddSubnetValidatorTx:
-			if subnetID.Equals(vdr.Validator.SubnetID()) && vdr.Validator.NodeID.Equals(nodeID) {
+			if subnetID == vdr.Validator.SubnetID() && vdr.Validator.NodeID.Equals(nodeID) {
+				if err := tx.Sign(vm.codec, nil); err != nil {
+					return nil, false, err
+				}
 				return vdr, true, nil
 			}
 		}
@@ -356,7 +390,11 @@ func (vm *VM) putUTXO(db database.Database, utxo *avax.UTXO) error {
 		// For each owner of this UTXO, add to list of UTXOs owned by that addr
 		for _, addrBytes := range addressable.Addresses() {
 			if err := vm.putReferencingUTXO(db, addrBytes, utxoID); err != nil {
-				return fmt.Errorf("couldn't update UTXO set of address %s", formatting.CB58{Bytes: addrBytes})
+				// We assume that the maximum size of a byte slice that
+				// can be stringified is at least the length of an address.
+				// If conversion of address to string fails, ignore the error
+				addrStr, _ := formatting.Encode(formatting.CB58, addrBytes)
+				return fmt.Errorf("couldn't update UTXO set of address %s", addrStr)
 			}
 		}
 	}
@@ -378,7 +416,11 @@ func (vm *VM) removeUTXO(db database.Database, utxoID ids.ID) error {
 		// For each owner of this UTXO, remove from their list of UTXOs
 		for _, addrBytes := range addressable.Addresses() {
 			if err := vm.removeReferencingUTXO(db, addrBytes, utxoID); err != nil {
-				return fmt.Errorf("couldn't update UTXO set of address %s", formatting.CB58{Bytes: addrBytes})
+				// We assume that the maximum size of a byte slice that
+				// can be stringified is at least the length of an address.
+				// If conversion of address to string fails, ignore the error
+				addrStr, _ := formatting.Encode(formatting.CB58, addrBytes)
+				return fmt.Errorf("couldn't update UTXO set of address %s", addrStr)
 			}
 		}
 	}
@@ -389,42 +431,50 @@ func (vm *VM) removeUTXO(db database.Database, utxoID ids.ID) error {
 // Only returns UTXOs after [start].
 // Returns at most [limit] UTXO IDs.
 // Returns nil if no UTXOs reference [addr].
-func (vm *VM) getReferencingUTXOs(db database.Database, addr []byte, start ids.ID, limit int) (ids.Set, error) {
-	toFetch := limit
-	utxoIDs := ids.Set{}
-	iter := prefixdb.NewNested(addr, db).NewIteratorWithStart(start.Bytes())
+
+func (vm *VM) getReferencingUTXOs(db database.Database, addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
+	idSlice := []ids.ID(nil)
+
+	iter := prefixdb.NewNested(addr, db).NewIteratorWithStart(start[:])
 	defer iter.Release()
-	for toFetch > 0 && iter.Next() {
-		if utxoID, err := ids.ToID(iter.Key()); err != nil {
+	numFetched := 0
+	for numFetched < limit && iter.Next() {
+		if keyID, err := ids.ToID(iter.Key()); err != nil {
 			return nil, err
-		} else if !utxoID.Equals(start) {
-			utxoIDs.Add(utxoID)
-			toFetch--
+		} else if keyID != start {
+			idSlice = append(idSlice, keyID)
+			numFetched++
+
 		}
 	}
-	return utxoIDs, nil
+	return idSlice, nil
 }
 
 // Persist that the UTXO with ID [utxoID] references [addr]
 func (vm *VM) putReferencingUTXO(db database.Database, addrBytes []byte, utxoID ids.ID) error {
 	prefixedDB := prefixdb.NewNested(addrBytes, db)
-	return prefixedDB.Put(utxoID.Bytes(), nil)
+	errs := wrappers.Errs{}
+	errs.Add(
+		prefixedDB.Put(utxoID[:], nil),
+		prefixedDB.Close(),
+	)
+	return errs.Err
 }
 
 // Remove the UTXO with ID [utxoID] from the set of UTXOs that reference [addr]
 func (vm *VM) removeReferencingUTXO(db database.Database, addrBytes []byte, utxoID ids.ID) error {
 	prefixedDB := prefixdb.NewNested(addrBytes, db)
-	return prefixedDB.Delete(utxoID.Bytes())
+	return prefixedDB.Delete(utxoID[:])
 }
 
 // GetUTXOs returns UTXOs such that at least one of the addresses in [addrs] is referenced.
-// Assumed elements of [addrs] are unique.
 // Returns at most [limit] UTXOs.
 // If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
 // Only returns UTXOs associated with addresses >= [startAddr].
 // For address [startAddr], only returns UTXOs whose IDs are greater than [startUTXOID].
+// Given a ![paginate] input all utxos will be fetched
 // Returns:
-// * The fetched of UTXOs
+// * The fetched UTXOs
 // * The address associated with the last UTXO fetched
 // * The ID of the last UTXO fetched
 func (vm *VM) GetUTXOs(
@@ -433,17 +483,36 @@ func (vm *VM) GetUTXOs(
 	startAddr state.Marshaller,
 	startUTXOID ids.ID,
 	limit int,
+	paginate bool,
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
-	if limit <= 0 || limit > maxUTXOsToFetch { // Don't fetch more than [maxUTXOsToFetch]
+	if limit <= 0 || limit > maxUTXOsToFetch {
 		limit = maxUTXOsToFetch
 	}
 
-	seen := ids.Set{} // IDs of UTXOs already in the list
-	utxos := make([]*avax.UTXO, 0, limit)
+	if paginate {
+		return vm.getPaginatedUTXOs(db, addrs, startAddr, startUTXOID, limit)
+	}
+	return vm.getAllUTXOs(db, addrs)
+}
+
+func (vm *VM) getPaginatedUTXOs(
+	db database.Database,
+	addrs ids.ShortSet,
+	startAddr state.Marshaller,
+	startUTXOID ids.ID,
+	limit int,
+) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
 	lastAddr := ids.ShortEmpty
 	lastIndex := ids.Empty
+
+	utxos := make([]*avax.UTXO, 0, limit)
+	seen := make(ids.Set, limit) // IDs of UTXOs already in the list
+	searchSize := limit          // the limit diminishes which can impact the expected return
+
+	// enforces the same ordering for pagination
 	addrsList := addrs.List()
 	ids.SortShortIDs(addrsList)
+
 	for _, addr := range addrsList {
 		start := ids.Empty
 		if comp := bytes.Compare(addr.Bytes(), startAddr.Bytes()); comp == -1 { // Skip addresses before [startAddr]
@@ -451,34 +520,96 @@ func (vm *VM) GetUTXOs(
 		} else if comp == 0 {
 			start = startUTXOID
 		}
-		utxoIDs, err := vm.getReferencingUTXOs(db, addr.Bytes(), start, limit) // Get IDs of UTXOs to fetch
+
+		utxoIDs, err := vm.getReferencingUTXOs(vm.DB, addr.Bytes(), start, searchSize) // Get UTXOs associated with [addr]
 		if err != nil {
-			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s", addr)
+			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 		}
-		for _, utxoID := range utxoIDs.List() { // Get the UTXOs
-			if seen.Contains(utxoID) { // already have this UTXO in the list
+		for _, utxoID := range utxoIDs {
+			lastIndex = utxoID // The last searched UTXO - not the last found
+			lastAddr = addr    // The last address searched that has UTXOs (even duplicated) - not the last found
+
+			if seen.Contains(utxoID) { // Already have this UTXO in the list
 				continue
 			}
-			utxo, err := vm.getUTXO(db, utxoID)
+
+			utxo, err := vm.getUTXO(vm.DB, utxoID)
 			if err != nil {
 				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
 			}
+
 			utxos = append(utxos, utxo)
 			seen.Add(utxoID)
-			lastAddr = addr
-			lastIndex = utxoID
 			limit--
 			if limit <= 0 {
-				break // Found [limit] utxos; stop.
+				return utxos, lastAddr, lastIndex, nil // Found [limit] utxos; stop.
 			}
+		}
+	}
+	return utxos, lastAddr, lastIndex, nil // Didnt reach the [limit] utxos; no more were found
+}
+
+func (vm *VM) getAllUTXOs(
+	db database.Database,
+	addrs ids.ShortSet,
+) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
+	var err error
+	lastAddr := ids.ShortEmpty
+	lastIndex := ids.Empty
+	seen := make(ids.Set, maxUTXOsToFetch) // IDs of UTXOs already in the list
+	utxos := make([]*avax.UTXO, 0, maxUTXOsToFetch)
+
+	// enforces the same ordering for pagination
+	addrsList := addrs.List()
+	ids.SortShortIDs(addrsList)
+
+	// iterate over the addresses and get all the utxos
+	for _, addr := range addrsList {
+		lastIndex, err = vm.getAllUniqueAddressUTXOs(db, addr, &seen, &utxos)
+		if err != nil {
+			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
+		}
+
+		if lastIndex != ids.Empty {
+			lastAddr = addr // The last address searched that has UTXOs (even duplicated) - not the last found
 		}
 	}
 	return utxos, lastAddr, lastIndex, nil
 }
 
+func (vm *VM) getAllUniqueAddressUTXOs(db database.Database, addr ids.ShortID, seen *ids.Set, utxos *[]*avax.UTXO) (ids.ID, error) {
+	lastIndex := ids.Empty
+
+	for {
+		utxoIDs, err := vm.getReferencingUTXOs(db, addr.Bytes(), lastIndex, maxUTXOsToFetch) // Get UTXOs associated with [addr]
+		if err != nil {
+			return ids.ID{}, err
+		}
+
+		if len(utxoIDs) == 0 {
+			return lastIndex, nil
+		}
+
+		for _, utxoID := range utxoIDs {
+			lastIndex = utxoID // The last searched UTXO - not the last found
+
+			if seen.Contains(utxoID) { // Already have this UTXO in the list
+				continue
+			}
+
+			utxo, err := vm.getUTXO(db, utxoID)
+			if err != nil {
+				return ids.ID{}, err
+			}
+			*utxos = append(*utxos, utxo)
+			seen.Add(utxoID)
+		}
+	}
+}
+
 // getBalance returns the balance of [addrs]
 func (vm *VM) getBalance(db database.Database, addrs ids.ShortSet) (uint64, error) {
-	utxos, _, _, err := vm.GetUTXOs(db, addrs, ids.ShortEmpty, ids.Empty, -1)
+	utxos, _, _, err := vm.GetUTXOs(db, addrs, ids.ShortEmpty, ids.Empty, -1, false)
 	if err != nil {
 		return 0, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}
@@ -515,7 +646,7 @@ func (vm *VM) getChain(db database.Database, id ids.ID) (*Tx, error) {
 		return nil, err
 	}
 	for _, chain := range chains {
-		if chain.ID().Equals(id) {
+		if chain.ID() == id {
 			return chain, nil
 		}
 	}
@@ -570,7 +701,7 @@ func (vm *VM) getSubnet(db database.Database, id ids.ID) (*Tx, TxError) {
 	}
 
 	for _, subnet := range subnets {
-		if subnet.ID().Equals(id) {
+		if subnet.ID() == id {
 			return subnet, nil
 		}
 	}
@@ -597,7 +728,7 @@ func (vm *VM) registerDBTypes() {
 	}
 	unmarshalValidatorsFunc := func(bytes []byte) (interface{}, error) {
 		stakers := EventHeap{}
-		if err := Codec.Unmarshal(bytes, &stakers); err != nil {
+		if _, err := Codec.Unmarshal(bytes, &stakers); err != nil {
 			return nil, err
 		}
 		for _, tx := range stakers.Txs {
@@ -613,13 +744,13 @@ func (vm *VM) registerDBTypes() {
 
 	marshalChainsFunc := func(chainsIntf interface{}) ([]byte, error) {
 		if chains, ok := chainsIntf.([]*Tx); ok {
-			return GenesisCodec.Marshal(chains)
+			return GenesisCodec.Marshal(codecVersion, chains)
 		}
 		return nil, fmt.Errorf("expected []*CreateChainTx but got type %T", chainsIntf)
 	}
 	unmarshalChainsFunc := func(bytes []byte) (interface{}, error) {
 		var chains []*Tx
-		if err := GenesisCodec.Unmarshal(bytes, &chains); err != nil {
+		if _, err := GenesisCodec.Unmarshal(bytes, &chains); err != nil {
 			return nil, err
 		}
 		for _, tx := range chains {
@@ -635,13 +766,13 @@ func (vm *VM) registerDBTypes() {
 
 	marshalSubnetsFunc := func(subnetsIntf interface{}) ([]byte, error) {
 		if subnets, ok := subnetsIntf.([]*Tx); ok {
-			return Codec.Marshal(subnets)
+			return Codec.Marshal(codecVersion, subnets)
 		}
 		return nil, fmt.Errorf("expected []*Tx but got type %T", subnetsIntf)
 	}
 	unmarshalSubnetsFunc := func(bytes []byte) (interface{}, error) {
 		var subnets []*Tx
-		if err := Codec.Unmarshal(bytes, &subnets); err != nil {
+		if _, err := Codec.Unmarshal(bytes, &subnets); err != nil {
 			return nil, err
 		}
 		for _, tx := range subnets {
@@ -657,15 +788,15 @@ func (vm *VM) registerDBTypes() {
 
 	marshalUTXOFunc := func(utxoIntf interface{}) ([]byte, error) {
 		if utxo, ok := utxoIntf.(*avax.UTXO); ok {
-			return Codec.Marshal(utxo)
+			return Codec.Marshal(codecVersion, utxo)
 		} else if utxo, ok := utxoIntf.(avax.UTXO); ok {
-			return Codec.Marshal(utxo)
+			return Codec.Marshal(codecVersion, utxo)
 		}
 		return nil, fmt.Errorf("expected *avax.UTXO but got type %T", utxoIntf)
 	}
 	unmarshalUTXOFunc := func(bytes []byte) (interface{}, error) {
 		var utxo avax.UTXO
-		if err := Codec.Unmarshal(bytes, &utxo); err != nil {
+		if _, err := Codec.Unmarshal(bytes, &utxo); err != nil {
 			return nil, err
 		}
 		return &utxo, nil
@@ -689,13 +820,13 @@ func (vm *VM) registerDBTypes() {
 
 	marshalStatusFunc := func(statusIntf interface{}) ([]byte, error) {
 		if status, ok := statusIntf.(Status); ok {
-			return vm.codec.Marshal(status)
+			return vm.codec.Marshal(codecVersion, status)
 		}
 		return nil, fmt.Errorf("expected Status but got type %T", statusIntf)
 	}
 	unmarshalStatusFunc := func(bytes []byte) (interface{}, error) {
 		var status Status
-		if err := Codec.Unmarshal(bytes, &status); err != nil {
+		if _, err := Codec.Unmarshal(bytes, &status); err != nil {
 			return nil, err
 		}
 		return status, nil
@@ -706,13 +837,13 @@ func (vm *VM) registerDBTypes() {
 
 	marshalCurrentSupplyFunc := func(currentSupplyIntf interface{}) ([]byte, error) {
 		if currentSupply, ok := currentSupplyIntf.(uint64); ok {
-			return vm.codec.Marshal(currentSupply)
+			return vm.codec.Marshal(codecVersion, currentSupply)
 		}
 		return nil, fmt.Errorf("expected uint64 but got type %T", currentSupplyIntf)
 	}
 	unmarshalCurrentSupplyFunc := func(bytes []byte) (interface{}, error) {
 		var currentSupply uint64
-		if err := Codec.Unmarshal(bytes, &currentSupply); err != nil {
+		if _, err := Codec.Unmarshal(bytes, &currentSupply); err != nil {
 			return nil, err
 		}
 		return currentSupply, nil
@@ -752,27 +883,35 @@ func (vm *VM) uptime(db database.Database, nodeID ids.ShortID) (*validatorUptime
 	}
 
 	uptime := validatorUptime{}
-	if err := Codec.Unmarshal(uptimeBytes, &uptime); err != nil {
+	if _, err := Codec.Unmarshal(uptimeBytes, &uptime); err != nil {
 		return nil, err
 	}
-	return &uptime, nil
+	return &uptime, uptimeDB.Close()
 }
+
 func (vm *VM) setUptime(db database.Database, nodeID ids.ShortID, uptime *validatorUptime) error {
-	uptimeBytes, err := Codec.Marshal(uptime)
+	uptimeBytes, err := Codec.Marshal(codecVersion, uptime)
 	if err != nil {
 		return err
 	}
 
 	uptimeDB := prefixdb.NewNested([]byte(uptimeDBPrefix), db)
-	defer uptimeDB.Close()
-
-	return uptimeDB.Put(nodeID.Bytes(), uptimeBytes)
+	errs := wrappers.Errs{}
+	errs.Add(
+		uptimeDB.Put(nodeID.Bytes(), uptimeBytes),
+		uptimeDB.Close(),
+	)
+	return errs.Err
 }
+
 func (vm *VM) deleteUptime(db database.Database, nodeID ids.ShortID) error {
 	uptimeDB := prefixdb.NewNested([]byte(uptimeDBPrefix), db)
-	defer uptimeDB.Close()
-
-	return uptimeDB.Delete(nodeID.Bytes())
+	errs := wrappers.Errs{}
+	errs.Add(
+		uptimeDB.Delete(nodeID.Bytes()),
+		uptimeDB.Close(),
+	)
+	return errs.Err
 }
 
 // Unmarshal a Block from bytes and initialize it
@@ -786,7 +925,7 @@ func (vm *VM) deleteUptime(db database.Database, nodeID ids.ShortID) error {
 func (vm *VM) unmarshalBlockFunc(bytes []byte) (snowman.Block, error) {
 	// Parse the serialized fields from bytes into a new block
 	var block Block
-	if err := Codec.Unmarshal(bytes, &block); err != nil {
+	if _, err := Codec.Unmarshal(bytes, &block); err != nil {
 		return nil, err
 	}
 	// Populate the un-serialized fields of the block

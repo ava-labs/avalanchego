@@ -58,11 +58,11 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte) error {
 	pb.vm = vm
 	pb.Block.Initialize(bytes, vm.SnowmanVM)
 
-	unsignedBytes, err := pb.vm.codec.Marshal(&pb.Tx.UnsignedTx)
+	unsignedBytes, err := pb.vm.codec.Marshal(codecVersion, &pb.Tx.UnsignedTx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
 	}
-	signedBytes, err := pb.vm.codec.Marshal(&pb.Tx)
+	signedBytes, err := pb.vm.codec.Marshal(codecVersion, &pb.Tx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
@@ -133,7 +133,7 @@ func (pb *ProposalBlock) Verify() error {
 	var err TxError
 	pb.onCommitDB, pb.onAbortDB, pb.onCommitFunc, pb.onAbortFunc, err = tx.SemanticVerify(pb.vm, pdb, &pb.Tx)
 	if err != nil {
-		pb.vm.droppedTxCache.Put(txID, nil) // cache tx as dropped
+		pb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
 		// If this block's transaction proposes to advance the timestamp, the transaction may fail
 		// verification now but be valid in the future, so don't (permanently) mark the block as rejected.
 		if !err.Temporary() {
@@ -163,7 +163,7 @@ func (pb *ProposalBlock) Verify() error {
 		return fmt.Errorf("failed to put status of tx %s: %w", txID, err)
 	}
 
-	pb.vm.currentBlocks[pb.ID().Key()] = pb
+	pb.vm.currentBlocks[pb.ID()] = pb
 	parentIntf.addChild(pb)
 	return nil
 }
@@ -217,7 +217,7 @@ func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx Tx) (*Proposal
 	// We marshal the block in this way (as a Block) so that we can unmarshal
 	// it into a Block (rather than a *ProposalBlock)
 	block := Block(pb)
-	bytes, err := Codec.Marshal(&block)
+	bytes, err := Codec.Marshal(codecVersion, &block)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}

@@ -59,7 +59,7 @@ type Transitive struct {
 
 // Initialize implements the Engine interface
 func (t *Transitive) Initialize(config Config) error {
-	config.Ctx.Log.Info("Initializing consensus engine")
+	config.Ctx.Log.Info("initializing consensus engine")
 
 	t.Params = config.Params
 	t.Consensus = config.Consensus
@@ -230,7 +230,7 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	t.vtxBlocked.Abandon(vtxID)
 
 	if t.outstandingVtxReqs.Len() == 0 {
-		for _, txID := range t.missingTxs.List() {
+		for txID := range t.missingTxs {
 			t.txBlocked.Abandon(txID)
 		}
 		t.missingTxs.Clear()
@@ -299,7 +299,7 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, 
 }
 
 // Chits implements the Engine interface
-func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) error {
+func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) error {
 	if !t.Ctx.IsBootstrapped() {
 		t.Ctx.Log.Debug("dropping Chits(%s, %d) due to bootstrapping", vdr, requestID)
 		return nil
@@ -311,8 +311,7 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) err
 		requestID: requestID,
 		response:  votes,
 	}
-	voteList := votes.List()
-	for _, vote := range voteList {
+	for _, vote := range votes {
 		if added, err := t.issueFromByID(vdr, vote); err != nil {
 			return err
 		} else if !added {
@@ -326,7 +325,7 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) err
 
 // QueryFailed implements the Engine interface
 func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
-	return t.Chits(vdr, requestID, ids.Set{})
+	return t.Chits(vdr, requestID, nil)
 }
 
 // Notify implements the Engine interface
@@ -481,7 +480,7 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 
 	if t.outstandingVtxReqs.Len() == 0 {
 		// There are no outstanding vertex requests but we don't have these transactions, so we're not getting them.
-		for _, txID := range t.missingTxs.List() {
+		for txID := range t.missingTxs {
 			t.txBlocked.Abandon(txID)
 		}
 		t.missingTxs.Clear()
@@ -507,7 +506,8 @@ func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
 	end := 0
 	for end < len(txs) {
 		tx := txs[end]
-		inputs := tx.InputIDs()
+		inputs := ids.Set{}
+		inputs.Add(tx.InputIDs()...)
 		overlaps := consumed.Overlaps(inputs)
 		if end-start >= t.Params.BatchSize || (force && overlaps) {
 			if err := t.issueBatch(txs[start:end]); err != nil {
@@ -544,23 +544,13 @@ func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
 
 // Issues a new poll for a preferred vertex in order to move consensus along
 func (t *Transitive) issueRepoll() {
-	preferredIDs := t.Consensus.Preferences().List()
-	numPreferredIDs := len(preferredIDs)
-	if numPreferredIDs == 0 {
+	preferredIDs := t.Consensus.Preferences()
+	if preferredIDs.Len() == 0 {
 		t.Ctx.Log.Error("re-query attempt was dropped due to no pending vertices")
 		return
 	}
 
-	s := sampler.NewUniform()
-	if err := s.Initialize(uint64(numPreferredIDs)); err != nil {
-		return // Should never really happen
-	}
-	indices, err := s.Sample(1)
-	if err != nil {
-		return // Also should never really happen because the edge has positive length
-	}
-	vtxID := preferredIDs[int(indices[0])] // ID of a preferred vertex
-
+	vtxID := preferredIDs.CappedList(1)[0]
 	vdrs, err := t.Validators.Sample(t.Params.K) // Validators to sample
 	vdrBag := ids.ShortBag{}                     // IDs of validators to be sampled
 	for _, vdr := range vdrs {
@@ -584,24 +574,21 @@ func (t *Transitive) issueBatch(txs []snowstorm.Tx) error {
 	t.Ctx.Log.Verbo("batching %d transactions into a new vertex", len(txs))
 
 	// Randomly select parents of this vertex from among the virtuous set
-	virtuousIDs := t.Consensus.Virtuous().List()
+	virtuousIDs := t.Consensus.Virtuous().CappedList(t.Params.Parents)
+	numVirtuousIDs := len(virtuousIDs)
 	s := sampler.NewUniform()
-	if err := s.Initialize(uint64(len(virtuousIDs))); err != nil {
+	if err := s.Initialize(uint64(numVirtuousIDs)); err != nil {
 		return err
 	}
 
-	count := len(virtuousIDs)
-	if count > t.Params.Parents {
-		count = t.Params.Parents
-	}
-	indices, err := s.Sample(count)
+	indices, err := s.Sample(numVirtuousIDs)
 	if err != nil {
 		return err
 	}
 
-	parentIDs := ids.Set{}
-	for _, index := range indices {
-		parentIDs.Add(virtuousIDs[int(index)])
+	parentIDs := make([]ids.ID, len(indices))
+	for i, index := range indices {
+		parentIDs[i] = virtuousIDs[int(index)]
 	}
 
 	vtx, err := t.Manager.BuildVertex(parentIDs, txs)

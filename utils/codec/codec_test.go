@@ -93,24 +93,29 @@ func TestStruct(t *testing.T) {
 	}
 
 	codec := NewDefault()
+	manager := NewDefaultManager()
 	errs := wrappers.Errs{}
 	errs.Add(
 		codec.RegisterType(&MyInnerStruct{}), // Register the types that may be unmarshaled into interfaces
 		codec.RegisterType(&MyInnerStruct2{}),
+		manager.RegisterCodec(0, codec),
 	)
 	if errs.Errored() {
 		t.Fatal(errs.Err)
 	}
 
-	myStructBytes, err := codec.Marshal(myStructInstance)
+	myStructBytes, err := manager.Marshal(0, myStructInstance)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	myStructUnmarshaled := &myStruct{}
-	err = codec.Unmarshal(myStructBytes, myStructUnmarshaled)
+	version, err := manager.Unmarshal(myStructBytes, myStructUnmarshaled)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if version != 0 {
+		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
 	}
 
 	if !reflect.DeepEqual(*myStructUnmarshaled, myStructInstance) {
@@ -118,17 +123,39 @@ func TestStruct(t *testing.T) {
 	}
 }
 
+func TestRegisterStructTwice(t *testing.T) {
+	codec := NewDefault()
+	errs := wrappers.Errs{}
+	errs.Add(
+		codec.RegisterType(&MyInnerStruct{}),
+		codec.RegisterType(&MyInnerStruct{}), // Register the same struct twice
+	)
+	if !errs.Errored() {
+		t.Fatal("Registering the same struct twice should have caused an error")
+	}
+}
+
 func TestUInt32(t *testing.T) {
 	number := uint32(500)
+
 	codec := NewDefault()
-	bytes, err := codec.Marshal(number)
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
+
+	bytes, err := manager.Marshal(0, number)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var numberUnmarshaled uint32
-	if err := codec.Unmarshal(bytes, &numberUnmarshaled); err != nil {
+	version, err := manager.Unmarshal(bytes, &numberUnmarshaled)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if version != 0 {
+		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
 	}
 
 	if number != numberUnmarshaled {
@@ -139,14 +166,23 @@ func TestUInt32(t *testing.T) {
 func TestSlice(t *testing.T) {
 	mySlice := []bool{true, false, true, true}
 	codec := NewDefault()
-	bytes, err := codec.Marshal(mySlice)
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
+
+	bytes, err := manager.Marshal(0, mySlice)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var sliceUnmarshaled []bool
-	if err := codec.Unmarshal(bytes, &sliceUnmarshaled); err != nil {
+	version, err := manager.Unmarshal(bytes, &sliceUnmarshaled)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if version != 0 {
+		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
 	}
 
 	if !reflect.DeepEqual(mySlice, sliceUnmarshaled) {
@@ -160,14 +196,22 @@ func TestMaxSizeSlice(t *testing.T) {
 	mySlice[0] = "first!"
 	mySlice[math.MaxUint16-1] = "last!"
 	codec := NewDefault()
-	bytes, err := codec.Marshal(mySlice)
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
+	bytes, err := manager.Marshal(0, mySlice)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var sliceUnmarshaled []string
-	if err := codec.Unmarshal(bytes, &sliceUnmarshaled); err != nil {
+	version, err := manager.Unmarshal(bytes, &sliceUnmarshaled)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if version != 0 {
+		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
 	}
 
 	if !reflect.DeepEqual(mySlice, sliceUnmarshaled) {
@@ -179,14 +223,22 @@ func TestMaxSizeSlice(t *testing.T) {
 func TestBool(t *testing.T) {
 	myBool := true
 	codec := NewDefault()
-	bytes, err := codec.Marshal(myBool)
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
+	bytes, err := manager.Marshal(0, myBool)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var boolUnmarshaled bool
-	if err := codec.Unmarshal(bytes, &boolUnmarshaled); err != nil {
+	version, err := manager.Unmarshal(bytes, &boolUnmarshaled)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if version != 0 {
+		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
 	}
 
 	if !reflect.DeepEqual(myBool, boolUnmarshaled) {
@@ -198,14 +250,22 @@ func TestBool(t *testing.T) {
 func TestArray(t *testing.T) {
 	myArr := [5]uint64{5, 6, 7, 8, 9}
 	codec := NewDefault()
-	bytes, err := codec.Marshal(myArr)
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
+	bytes, err := manager.Marshal(0, myArr)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var myArrUnmarshaled [5]uint64
-	if err := codec.Unmarshal(bytes, &myArrUnmarshaled); err != nil {
+	version, err := manager.Unmarshal(bytes, &myArrUnmarshaled)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if version != 0 {
+		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
 	}
 
 	if !reflect.DeepEqual(myArr, myArrUnmarshaled) {
@@ -217,14 +277,22 @@ func TestArray(t *testing.T) {
 func TestBigArray(t *testing.T) {
 	myArr := [30000]uint64{5, 6, 7, 8, 9}
 	codec := NewDefault()
-	bytes, err := codec.Marshal(myArr)
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
+	bytes, err := manager.Marshal(0, myArr)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var myArrUnmarshaled [30000]uint64
-	if err := codec.Unmarshal(bytes, &myArrUnmarshaled); err != nil {
+	version, err := manager.Unmarshal(bytes, &myArrUnmarshaled)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if version != 0 {
+		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
 	}
 
 	if !reflect.DeepEqual(myArr, myArrUnmarshaled) {
@@ -236,14 +304,22 @@ func TestBigArray(t *testing.T) {
 func TestPointerToStruct(t *testing.T) {
 	myPtr := &MyInnerStruct{Str: "Hello!"}
 	codec := NewDefault()
-	bytes, err := codec.Marshal(myPtr)
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
+	bytes, err := manager.Marshal(0, myPtr)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var myPtrUnmarshaled *MyInnerStruct
-	if err := codec.Unmarshal(bytes, &myPtrUnmarshaled); err != nil {
+	version, err := manager.Unmarshal(bytes, &myPtrUnmarshaled)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if version != 0 {
+		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
 	}
 
 	if !reflect.DeepEqual(myPtr, myPtrUnmarshaled) {
@@ -269,14 +345,22 @@ func TestSliceOfStruct(t *testing.T) {
 	if err := codec.RegisterType(&MyInnerStruct{}); err != nil {
 		t.Fatal(err)
 	}
-	bytes, err := codec.Marshal(mySlice)
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
+	bytes, err := manager.Marshal(0, mySlice)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var mySliceUnmarshaled []MyInnerStruct3
-	if err := codec.Unmarshal(bytes, &mySliceUnmarshaled); err != nil {
+	version, err := manager.Unmarshal(bytes, &mySliceUnmarshaled)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if version != 0 {
+		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
 	}
 
 	if !reflect.DeepEqual(mySlice, mySliceUnmarshaled) {
@@ -290,17 +374,24 @@ func TestInterface(t *testing.T) {
 	if err := codec.RegisterType(&MyInnerStruct2{}); err != nil {
 		t.Fatal(err)
 	}
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
 
 	var f Foo = &MyInnerStruct2{true}
-	bytes, err := codec.Marshal(&f)
+	bytes, err := manager.Marshal(0, &f)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var unmarshaledFoo Foo
-	err = codec.Unmarshal(bytes, &unmarshaledFoo)
+	version, err := manager.Unmarshal(bytes, &unmarshaledFoo)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if version != 0 {
+		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
 	}
 
 	if !reflect.DeepEqual(f, unmarshaledFoo) {
@@ -322,14 +413,22 @@ func TestSliceOfInterface(t *testing.T) {
 	if err := codec.RegisterType(&MyInnerStruct{}); err != nil {
 		t.Fatal(err)
 	}
-	bytes, err := codec.Marshal(mySlice)
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
+	bytes, err := manager.Marshal(0, mySlice)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var mySliceUnmarshaled []Foo
-	if err := codec.Unmarshal(bytes, &mySliceUnmarshaled); err != nil {
+	version, err := manager.Unmarshal(bytes, &mySliceUnmarshaled)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if version != 0 {
+		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
 	}
 
 	if !reflect.DeepEqual(mySlice, mySliceUnmarshaled) {
@@ -351,14 +450,22 @@ func TestArrayOfInterface(t *testing.T) {
 	if err := codec.RegisterType(&MyInnerStruct{}); err != nil {
 		t.Fatal(err)
 	}
-	bytes, err := codec.Marshal(myArray)
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
+	bytes, err := manager.Marshal(0, myArray)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var myArrayUnmarshaled [2]Foo
-	if err := codec.Unmarshal(bytes, &myArrayUnmarshaled); err != nil {
+	version, err := manager.Unmarshal(bytes, &myArrayUnmarshaled)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if version != 0 {
+		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
 	}
 
 	if !reflect.DeepEqual(myArray, myArrayUnmarshaled) {
@@ -375,15 +482,23 @@ func TestPointerToInterface(t *testing.T) {
 	if err := codec.RegisterType(&MyInnerStruct{}); err != nil {
 		t.Fatal(err)
 	}
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
 
-	bytes, err := codec.Marshal(&myPtr)
+	bytes, err := manager.Marshal(0, &myPtr)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var myPtrUnmarshaled *Foo
-	if err := codec.Unmarshal(bytes, &myPtrUnmarshaled); err != nil {
+	version, err := manager.Unmarshal(bytes, &myPtrUnmarshaled)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if version != 0 {
+		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
 	}
 
 	if !reflect.DeepEqual(myPtr, myPtrUnmarshaled) {
@@ -395,14 +510,23 @@ func TestPointerToInterface(t *testing.T) {
 func TestString(t *testing.T) {
 	myString := "Ayy"
 	codec := NewDefault()
-	bytes, err := codec.Marshal(myString)
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
+
+	bytes, err := manager.Marshal(0, myString)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var stringUnmarshaled string
-	if err := codec.Unmarshal(bytes, &stringUnmarshaled); err != nil {
+	version, err := manager.Unmarshal(bytes, &stringUnmarshaled)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if version != 0 {
+		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
 	}
 
 	if !reflect.DeepEqual(myString, stringUnmarshaled) {
@@ -418,18 +542,27 @@ func TestNilSlice(t *testing.T) {
 
 	myStruct := structWithSlice{Slice: nil}
 	codec := NewDefault()
-	bytes, err := codec.Marshal(myStruct)
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
+
+	bytes, err := manager.Marshal(0, myStruct)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var structUnmarshaled structWithSlice
-	if err := codec.Unmarshal(bytes, &structUnmarshaled); err != nil {
+	version, err := manager.Unmarshal(bytes, &structUnmarshaled)
+	if err != nil {
 		t.Fatal(err)
 	}
+	if version != 0 {
+		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
+	}
 
-	if structUnmarshaled.Slice == nil || len(structUnmarshaled.Slice) != 0 {
-		t.Fatal("expected slice to be non-nil and length 0")
+	if len(structUnmarshaled.Slice) != 0 {
+		t.Fatal("expected slice to have length 0")
 	}
 }
 
@@ -447,7 +580,12 @@ func TestSerializeUnexportedField(t *testing.T) {
 	}
 
 	codec := NewDefault()
-	if _, err := codec.Marshal(myS); err == nil {
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := manager.Marshal(0, myS); err == nil {
 		t.Fatalf("expected err but got none")
 	}
 }
@@ -464,52 +602,82 @@ func TestSerializeOfNoSerializeField(t *testing.T) {
 		UnmarkedField:     "No declared serialize",
 	}
 	codec := NewDefault()
-	marshalled, err := codec.Marshal(myS)
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
+
+	marshalled, err := manager.Marshal(0, myS)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	unmarshalled := s{}
-	err = codec.Unmarshal(marshalled, &unmarshalled)
+	version, err := manager.Unmarshal(marshalled, &unmarshalled)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if version != 0 {
+		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
+	}
+
 	expectedUnmarshalled := s{SerializedField: "Serialize me"}
 	if !reflect.DeepEqual(unmarshalled, expectedUnmarshalled) {
 		t.Fatalf("Got %#v, expected %#v", unmarshalled, expectedUnmarshalled)
 	}
 }
 
-type simpleSliceStruct struct {
-	Arr []uint32 `serialize:"true"`
-}
-
 // Test marshalling of nil slice
 func TestNilSliceSerialization(t *testing.T) {
+	type simpleSliceStruct struct {
+		Arr []uint32 `serialize:"true"`
+	}
+
 	codec := NewDefault()
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
+
 	val := &simpleSliceStruct{}
 	expected := []byte{0, 0, 0, 0, 0, 0} // 0 for codec version, then nil slice marshaled as 0 length slice
-	result, err := codec.Marshal(val)
+	result, err := manager.Marshal(0, val)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(expected, result) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
 	}
+
 	valUnmarshaled := &simpleSliceStruct{}
-	if err = codec.Unmarshal(result, &valUnmarshaled); err != nil {
+	version, err := manager.Unmarshal(result, &valUnmarshaled)
+	if err != nil {
 		t.Fatal(err)
-	} else if len(valUnmarshaled.Arr) != 0 {
+	}
+	if version != 0 {
+		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
+	}
+
+	if len(valUnmarshaled.Arr) != 0 {
 		t.Fatal("should be 0 length")
 	}
 }
 
 // Test marshaling a slice that has 0 elements (but isn't nil)
 func TestEmptySliceSerialization(t *testing.T) {
+	type simpleSliceStruct struct {
+		Arr []uint32 `serialize:"true"`
+	}
+
 	codec := NewDefault()
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
 
 	val := &simpleSliceStruct{Arr: make([]uint32, 0, 1)}
 	expected := []byte{0, 0, 0, 0, 0, 0} // 0 for codec version (uint16) and 0 for size (uint32)
-	result, err := codec.Marshal(val)
+	result, err := manager.Marshal(0, val)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -519,68 +687,96 @@ func TestEmptySliceSerialization(t *testing.T) {
 	}
 
 	valUnmarshaled := &simpleSliceStruct{}
-	if err = codec.Unmarshal(result, &valUnmarshaled); err != nil {
+	version, err := manager.Unmarshal(result, &valUnmarshaled)
+	if err != nil {
 		t.Fatal(err)
-	} else if !reflect.DeepEqual(valUnmarshaled, val) {
+	}
+	if version != 0 {
+		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
+	}
+
+	if !reflect.DeepEqual(valUnmarshaled, val) {
 		t.Fatal("should be same")
 	}
 }
 
-type emptyStruct struct{}
-
-type nestedSliceStruct struct {
-	Arr []emptyStruct `serialize:"true"`
-}
-
 // Test marshaling slice that is not nil and not empty
 func TestSliceWithEmptySerialization(t *testing.T) {
+	type emptyStruct struct{}
+
+	type nestedSliceStruct struct {
+		Arr []emptyStruct `serialize:"true"`
+	}
+
 	codec := NewDefault()
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
 
 	val := &nestedSliceStruct{
 		Arr: make([]emptyStruct, 1000),
 	}
 	expected := []byte{0x00, 0x00, 0x00, 0x00, 0x03, 0xE8} // codec version (0x00, 0x00) then 1000 for numElts
-	result, err := codec.Marshal(val)
+	result, err := manager.Marshal(0, val)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	if !bytes.Equal(expected, result) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
 	}
 
 	unmarshaled := nestedSliceStruct{}
-	if err := codec.Unmarshal(expected, &unmarshaled); err != nil {
+	version, err := manager.Unmarshal(expected, &unmarshaled)
+	if err != nil {
 		t.Fatal(err)
 	}
+	if version != 0 {
+		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
+	}
+
 	if len(unmarshaled.Arr) != 1000 {
 		t.Fatalf("Should have created a slice of length %d", 1000)
 	}
 }
 
 func TestSliceWithEmptySerializationOutOfMemory(t *testing.T) {
+	type emptyStruct struct{}
+
+	type nestedSliceStruct struct {
+		Arr []emptyStruct `serialize:"true"`
+	}
+
 	codec := NewDefault()
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
 
 	val := &nestedSliceStruct{
 		Arr: make([]emptyStruct, defaultMaxSliceLength+1),
 	}
-	bytes, err := codec.Marshal(val)
+	bytes, err := manager.Marshal(0, val)
 	if err == nil {
 		t.Fatal("should have failed due to slice length too large")
 	}
 
 	unmarshaled := nestedSliceStruct{}
-	if err := codec.Unmarshal(bytes, &unmarshaled); err == nil {
+	if _, err := manager.Unmarshal(bytes, &unmarshaled); err == nil {
 		t.Fatalf("Should have errored due to excess memory requested")
 	}
 }
 
-func TestOutOfMemory(t *testing.T) {
+func TestSliceTooLarge(t *testing.T) {
 	codec := NewDefault()
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
 
-	val := []bool{}
-	b := []byte{0xff, 0xff, 0xff, 0xff, 0x00}
-	if err := codec.Unmarshal(b, &val); err == nil {
+	val := []struct{}{}
+	b := []byte{0x00, 0x00, 0xff, 0xff, 0xff, 0xff}
+	if _, err := manager.Unmarshal(b, &val); err == nil {
 		t.Fatalf("Should have errored due to memory usage")
 	}
 }
@@ -594,18 +790,25 @@ func TestNegativeNumbers(t *testing.T) {
 		MyInt64 int64 `serialize:"true"`
 	}
 
-	myS := s{-1, -2, -3, -4}
-
 	codec := NewDefault()
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
 
-	bytes, err := codec.Marshal(myS)
+	myS := s{-1, -2, -3, -4}
+	bytes, err := manager.Marshal(0, myS)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	mySUnmarshaled := s{}
-	if err := codec.Unmarshal(bytes, &mySUnmarshaled); err != nil {
+	version, err := manager.Unmarshal(bytes, &mySUnmarshaled)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if version != 0 {
+		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
 	}
 
 	if !reflect.DeepEqual(myS, mySUnmarshaled) {
@@ -618,12 +821,18 @@ func TestNegativeNumbers(t *testing.T) {
 // Ensure deserializing structs with too many bytes errors correctly
 func TestTooLargeUnmarshal(t *testing.T) {
 	type inner struct {
-		Long uint64 `serialize:"true"`
+		B uint16 `serialize:"true"`
 	}
 	bytes := []byte{0, 0, 0, 0}
+
+	codec := NewDefault()
+	manager := NewManager(3)
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
+
 	s := inner{}
-	codec := New(3, 1)
-	err := codec.Unmarshal(bytes, &s)
+	_, err := manager.Unmarshal(bytes, &s)
 	if err == nil {
 		t.Fatalf("Should have errored due to too many bytes provided")
 	}
@@ -639,34 +848,39 @@ type outer struct {
 
 type innerInterface struct{}
 
-func (it *innerInterface) ToInt() int {
-	return 0
-}
+func (it *innerInterface) ToInt() int { return 0 }
 
 type innerNoInterface struct{}
 
 // Ensure deserializing structs into the wrong interface errors gracefully
 func TestUnmarshalInvalidInterface(t *testing.T) {
 	codec := NewDefault()
-
-	if err := codec.RegisterType(&innerInterface{}); err != nil {
-		t.Fatal(err)
-	}
-	if err := codec.RegisterType(&innerNoInterface{}); err != nil {
-		t.Fatal(err)
+	manager := NewDefaultManager()
+	errs := wrappers.Errs{}
+	errs.Add(
+		codec.RegisterType(&innerInterface{}),
+		codec.RegisterType(&innerNoInterface{}),
+		manager.RegisterCodec(0, codec),
+	)
+	if errs.Errored() {
+		t.Fatal(errs.Err)
 	}
 
 	{
 		bytes := []byte{0, 0, 0, 0, 0, 0}
 		s := outer{}
-		if err := codec.Unmarshal(bytes, &s); err != nil {
+		version, err := manager.Unmarshal(bytes, &s)
+		if err != nil {
 			t.Fatal(err)
+		}
+		if version != 0 {
+			t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
 		}
 	}
 	{
 		bytes := []byte{0, 0, 0, 0, 0, 1}
 		s := outer{}
-		if err := codec.Unmarshal(bytes, &s); err == nil {
+		if _, err := manager.Unmarshal(bytes, &s); err == nil {
 			t.Fatalf("should have errored")
 		}
 	}

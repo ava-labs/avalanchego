@@ -4,7 +4,6 @@
 package avalanche
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -12,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 type metrics struct {
@@ -19,12 +19,12 @@ type metrics struct {
 	latAccepted, latRejected prometheus.Histogram
 
 	clock      timer.Clock
-	processing map[[32]byte]time.Time
+	processing map[ids.ID]time.Time
 }
 
 // Initialize implements the Engine interface
 func (m *metrics) Initialize(log logging.Logger, namespace string, registerer prometheus.Registerer) error {
-	m.processing = make(map[[32]byte]time.Time)
+	m.processing = make(map[ids.ID]time.Time)
 
 	m.numProcessing = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
@@ -44,40 +44,35 @@ func (m *metrics) Initialize(log logging.Logger, namespace string, registerer pr
 		Buckets:   timer.MillisecondsBuckets,
 	})
 
-	if err := registerer.Register(m.numProcessing); err != nil {
-		return fmt.Errorf("failed to register vtx_processing statistics due to %w", err)
-	}
-	if err := registerer.Register(m.latAccepted); err != nil {
-		return fmt.Errorf("failed to register vtx_accepted statistics due to %w", err)
-	}
-	if err := registerer.Register(m.latRejected); err != nil {
-		return fmt.Errorf("failed to register vtx_rejected statistics due to %w", err)
-	}
-	return nil
+	errs := wrappers.Errs{}
+	errs.Add(
+		registerer.Register(m.numProcessing),
+		registerer.Register(m.latAccepted),
+		registerer.Register(m.latRejected),
+	)
+	return errs.Err
 }
 
 func (m *metrics) Issued(id ids.ID) {
-	m.processing[id.Key()] = m.clock.Time()
+	m.processing[id] = m.clock.Time()
 	m.numProcessing.Inc()
 }
 
 func (m *metrics) Accepted(id ids.ID) {
-	key := id.Key()
-	start := m.processing[key]
+	start := m.processing[id]
 	end := m.clock.Time()
 
-	delete(m.processing, key)
+	delete(m.processing, id)
 
 	m.latAccepted.Observe(float64(end.Sub(start).Milliseconds()))
 	m.numProcessing.Dec()
 }
 
 func (m *metrics) Rejected(id ids.ID) {
-	key := id.Key()
-	start := m.processing[key]
+	start := m.processing[id]
 	end := m.clock.Time()
 
-	delete(m.processing, key)
+	delete(m.processing, id)
 
 	m.latRejected.Observe(float64(end.Sub(start).Milliseconds()))
 	m.numProcessing.Dec()

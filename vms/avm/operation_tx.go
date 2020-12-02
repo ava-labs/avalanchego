@@ -86,7 +86,7 @@ func (t *OperationTx) UTXOs() []*avax.UTXO {
 // SyntacticVerify that this transaction is well-formed.
 func (t *OperationTx) SyntacticVerify(
 	ctx *snow.Context,
-	c codec.Codec,
+	c codec.Manager,
 	txFeeAssetID ids.ID,
 	txFee uint64,
 	_ uint64,

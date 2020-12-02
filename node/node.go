@@ -47,6 +47,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/evm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
@@ -66,8 +67,9 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion(constants.PlatformName, 1, 0, 3)
-	versionParser = version.NewDefaultParser()
+	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 0, 6)
+	versionParser           = version.NewDefaultParser()
+	beaconConnectionTimeout = 1 * time.Minute
 )
 
 // Node is an instance of an Avalanche node.
@@ -121,6 +123,19 @@ type Node struct {
 
 	// channel for closing the node
 	nodeCloser chan<- os.Signal
+
+	// ensures that we only close the node once.
+	shutdownOnce sync.Once
+
+	// True if node is shutting down or is done shutting down
+	shuttingDown utils.AtomicBool
+
+	// Incremented only once on initialization.
+	// Decremented when node is done shutting down.
+	doneShuttingDown sync.WaitGroup
+
+	// Restarter can shutdown and restart the node
+	restarter utils.Restarter
 }
 
 /*
@@ -147,12 +162,12 @@ func (n *Node) initNetworking() error {
 		tlsConfig := &tls.Config{
 			Certificates: []tls.Certificate{cert},
 			ClientAuth:   tls.RequireAnyClientCert,
-			// We do not use TLS's CA functionality to authenticate a hostname.
-			// We only require an authenticated channel based on the peer's
-			// public key. Therefore, we can safely skip CA verification.
+			// We do not use the TLS CA functionality to authenticate a
+			// hostname. We only require an authenticated channel based on the
+			// peer's public key. Therefore, we can safely skip CA verification.
 			//
 			// During our security audit by Quantstamp, this was investigated
-			// and determinted to be safe and correct.
+			// and confirmed to be safe and correct.
 			InsecureSkipVerify: true,
 		}
 
@@ -186,13 +201,19 @@ func (n *Node) initNetworking() error {
 	reqWeight := (3*bootstrapWeight + 3) / 4
 
 	if reqWeight > 0 {
+		// Set a timer that will fire after a given timeout unless we connect
+		// to a suffucient portion of stake-weighted nodes. If the timeout fires,
+		// the node will shutdown.
 		timer := timer.NewTimer(func() {
-			n.Log.Fatal("Failed to connect to bootstrap nodes. Node shutting down...")
-			go n.Net.Close()
+			// If the timeout fires and we're already shutting down, nothing to do.
+			if !n.shuttingDown.GetValue() {
+				n.Log.Warn("Failed to connect to bootstrap nodes. Node shutting down...")
+				go n.Shutdown()
+			}
 		})
 
 		go timer.Dispatch()
-		timer.SetTimeoutIn(1 * time.Minute)
+		timer.SetTimeoutIn(beaconConnectionTimeout)
 
 		consensusRouter = &beaconManager{
 			Router:         consensusRouter,
@@ -219,11 +240,15 @@ func (n *Node) initNetworking() error {
 		consensusRouter,
 		n.Config.ConnMeterResetDuration,
 		n.Config.ConnMeterMaxConns,
+		n.restarter,
+		n.Config.RestartOnDisconnected,
+		n.Config.DisconnectedCheckFreq,
+		n.Config.DisconnectedRestartTimeout,
 	)
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
 		// errors are already logged internally if they are meaningful
-		_ = n.Net.Close()
+		n.Shutdown()
 	}, syscall.SIGINT, syscall.SIGTERM)
 
 	return nil
@@ -290,21 +315,27 @@ func (b *beaconManager) Disconnected(vdrID ids.ShortID) {
 // Dispatch starts the node's servers.
 // Returns when the node exits.
 func (n *Node) Dispatch() error {
-	// Start the HTTP endpoint
+	// Start the HTTP API server
 	go n.Log.RecoverAndPanic(func() {
 		if n.Config.HTTPSEnabled {
-			n.Log.Debug("Initializing API server with TLS Enabled")
+			n.Log.Debug("initializing API server with TLS")
 			err := n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
-			n.Log.Warn("Secure API server initialization failed with %s, attempting to create insecure API server", err)
+			n.Log.Warn("TLS enabled API server dispatch failed with %s. Attempting to create insecure API server", err)
 		}
 
-		n.Log.Debug("Initializing API server")
+		n.Log.Debug("initializing API server without TLS")
 		err := n.APIServer.Dispatch()
 
-		n.Log.Fatal("API server initialization failed with %s", err)
+		// When [n].Shutdown() is called, [n.APIServer].Close() is called.
+		// This causes [n.APIServer].Dispatch() to return an error.
+		// If that happened, don't log/return an error here.
+		if !n.shuttingDown.GetValue() {
+			n.Log.Fatal("API server dispatch failed with %s", err)
+		}
 
-		// errors are already logged internally if they are meaningful
-		_ = n.Net.Close() // If the server isn't up, shut down the node.
+		// If the API server isn't running, shut down the node.
+		// If node is already shutting down, this does nothing.
+		n.Shutdown()
 	})
 
 	// Add bootstrap nodes to the peer network
@@ -316,7 +347,16 @@ func (n *Node) Dispatch() error {
 		}
 	}
 
-	return n.Net.Dispatch()
+	// Start P2P connections
+	err := n.Net.Dispatch()
+
+	// If the P2P server isn't running, shut down the node.
+	// If node is already shutting down, this does nothing.
+	n.Shutdown()
+
+	// Wait until the node is done shutting down before returning
+	n.doneShuttingDown.Wait()
+	return err
 }
 
 /*
@@ -352,7 +392,7 @@ func (n *Node) initDatabase() error {
 		return err
 	}
 
-	if !genesisHash.Equals(expectedGenesisHash) {
+	if genesisHash != expectedGenesisHash {
 		return fmt.Errorf("db contains invalid genesis hash. DB Genesis: %s Generated Genesis: %s", genesisHash, expectedGenesisHash)
 	}
 	return nil
@@ -387,7 +427,7 @@ func (n *Node) initNodeID() error {
 	return nil
 }
 
-// Create the IDs of the peers this node should first connect to
+// Set the node IDs of the peers this node should first connect to
 func (n *Node) initBeacons() error {
 	n.beacons = validators.NewSet()
 	for _, peer := range n.Config.BootstrapPeers {
@@ -445,7 +485,7 @@ func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 
 // initAPIServer initializes the server that handles HTTP calls
 func (n *Node) initAPIServer() error {
-	n.Log.Info("Initializing API server")
+	n.Log.Info("initializing API server")
 
 	return n.APIServer.Initialize(
 		n.Log,
@@ -457,7 +497,7 @@ func (n *Node) initAPIServer() error {
 	)
 }
 
-// Create the vmManager, chainManager and register the following vms:
+// Create the vmManager, chainManager and register the following VMs:
 // AVM, Simple Payments DAG, Simple Payments Chain, and Platform VM
 // Assumes n.DB, n.vdrs all initialized (non-nil)
 func (n *Node) initChainManager(avaxAssetID ids.ID) error {
@@ -467,23 +507,28 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	if err != nil {
 		return err
 	}
-
 	xChainID := createAVMTx.ID()
 
+	// If any of these chains die, the node shuts down
 	criticalChains := ids.Set{}
 	criticalChains.Add(constants.PlatformChainID, createAVMTx.ID())
 
+	// Set Prometheus metrics info
 	n.Config.NetworkConfig.Namespace = constants.PlatformName
 	n.Config.NetworkConfig.Registerer = n.Config.ConsensusParams.Metrics
+
+	// Configure benchlist
 	n.Config.BenchlistConfig.Validators = n.vdrs
 	benchlistManager := benchlist.NewManager(&n.Config.BenchlistConfig)
 
+	// Manages network timeouts
 	timeoutManager := timeout.Manager{}
 	if err := timeoutManager.Initialize(&n.Config.NetworkConfig, benchlistManager); err != nil {
 		return err
 	}
 	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
 
+	// Routes incoming messages from peers to the appropriate chain
 	n.Config.ConsensusRouter.Initialize(
 		n.ID,
 		n.Log,
@@ -491,11 +536,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		n.Config.ConsensusGossipFrequency,
 		n.Config.ConsensusShutdownTimeout,
 		criticalChains,
-		func() {
-			if err := n.Net.Close(); err != nil {
-				n.Log.Debug("closing the network due to a fatal chain error resulted in: %s", err)
-			}
-		},
+		n.Shutdown,
 	)
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
@@ -523,6 +564,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		CriticalChains:          criticalChains,
 		TimeoutManager:          &timeoutManager,
 		HealthService:           n.healthService,
+		WhitelistedSubnets:      n.Config.WhitelistedSubnets,
 	})
 
 	vdrs := n.vdrs
@@ -534,6 +576,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		vdrs = validators.NewManager()
 	}
 
+	// Register the VMs that Avalanche supports
 	errs := wrappers.Errs{}
 	errs.Add(
 		n.vmManager.RegisterVMFactory(platformvm.ID, &platformvm.Factory{
@@ -555,8 +598,9 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			CreationFee: n.Config.CreationTxFee,
 			Fee:         n.Config.TxFee,
 		}),
-		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
-			Path: filepath.Join(n.Config.PluginDir, "evm"),
+		n.vmManager.RegisterVMFactory(evm.ID, &rpcchainvm.Factory{
+			Path:   filepath.Join(n.Config.PluginDir, "evm"),
+			Config: n.Config.CorethConfig,
 		}),
 		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),
 		n.vmManager.RegisterVMFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
@@ -567,29 +611,32 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		return errs.Err
 	}
 
+	// Notify the API server when new chains are created
 	n.chainManager.AddRegistrant(&n.APIServer)
 	return nil
 }
 
 // initSharedMemory initializes the shared memory for cross chain interation
-func (n *Node) initSharedMemory() {
+func (n *Node) initSharedMemory() error {
 	n.Log.Info("initializing SharedMemory")
 	sharedMemoryDB := prefixdb.New([]byte("shared memory"), n.DB)
-	n.sharedMemory.Initialize(n.Log, sharedMemoryDB)
+	return n.sharedMemory.Initialize(n.Log, sharedMemoryDB)
 }
 
-// initKeystoreAPI initializes the keystore service
+// initKeystoreAPI initializes the keystore service, which is an on-node wallet.
 // Assumes n.APIServer is already set
 func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
 	keystoreDB := prefixdb.New([]byte("keystore"), n.DB)
-	n.keystoreServer.Initialize(n.Log, keystoreDB)
+	if err := n.keystoreServer.Initialize(n.Log, keystoreDB); err != nil {
+		return err
+	}
 	keystoreHandler, err := n.keystoreServer.CreateHandler()
 	if err != nil {
 		return err
 	}
 	if !n.Config.KeystoreAPIEnabled {
-		n.Log.Info("skipping keystore API initializaion because it has been disabled")
+		n.Log.Info("skipping keystore API initialization because it has been disabled")
 		return nil
 	}
 	n.Log.Info("initializing keystore API")
@@ -703,7 +750,7 @@ func (n *Node) initHealthAPI() error {
 // Assumes n.log and n.chainManager already initialized
 func (n *Node) initIPCAPI() error {
 	if !n.Config.IPCAPIEnabled {
-		n.Log.Info("skipping ipc API initializaion because it has been disabled")
+		n.Log.Info("skipping ipc API initialization because it has been disabled")
 		return nil
 	}
 	n.Log.Info("initializing ipc API")
@@ -722,16 +769,14 @@ func (n *Node) initAliases(genesisBytes []byte) error {
 		return err
 	}
 
-	for chainIDKey, aliases := range chainAliases {
-		chainID := ids.NewID(chainIDKey)
+	for chainID, aliases := range chainAliases {
 		for _, alias := range aliases {
 			if err := n.chainManager.Alias(chainID, alias); err != nil {
 				return err
 			}
 		}
 	}
-	for vmIDKey, aliases := range vmAliases {
-		vmID := ids.NewID(vmIDKey)
+	for vmID, aliases := range vmAliases {
 		for _, alias := range aliases {
 			if err := n.vmManager.Alias(vmID, alias); err != nil {
 				return err
@@ -747,10 +792,17 @@ func (n *Node) initAliases(genesisBytes []byte) error {
 }
 
 // Initialize this node
-func (n *Node) Initialize(config *Config, logger logging.Logger, logFactory logging.Factory) error {
+func (n *Node) Initialize(
+	config *Config,
+	logger logging.Logger,
+	logFactory logging.Factory,
+	restarter utils.Restarter,
+) error {
 	n.Log = logger
 	n.LogFactory = logFactory
 	n.Config = config
+	n.restarter = restarter
+	n.doneShuttingDown.Add(1)
 	n.Log.Info("Node version is: %s", Version)
 
 	httpLog, err := logFactory.MakeSubdir("http")
@@ -762,15 +814,12 @@ func (n *Node) Initialize(config *Config, logger logging.Logger, logFactory logg
 	if err := n.initDatabase(); err != nil { // Set up the node's database
 		return fmt.Errorf("problem initializing database: %w", err)
 	}
-
 	if err = n.initNodeID(); err != nil { // Derive this node's ID
 		return fmt.Errorf("problem initializing staker ID: %w", err)
 	}
-
 	if err = n.initBeacons(); err != nil { // Configure the beacons
 		return fmt.Errorf("problem initializing node beacons: %w", err)
 	}
-
 	// Start HTTP APIs
 	if err := n.initAPIServer(); err != nil { // Start the API Server
 		return fmt.Errorf("couldn't initialize API server: %w", err)
@@ -782,16 +831,16 @@ func (n *Node) Initialize(config *Config, logger logging.Logger, logFactory logg
 		return fmt.Errorf("couldn't initialize metrics API: %w", err)
 	}
 
-	n.initSharedMemory() // Initialize shared memory
+	if err := n.initSharedMemory(); err != nil { // Initialize shared memory
+		return fmt.Errorf("problem initializing shared memory: %w", err)
+	}
 
 	if err = n.initNetworking(); err != nil { // Set up all networking
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}
-
 	if err = n.initEventDispatcher(); err != nil { // Set up the event dipatcher
 		return fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
-
 	genesisBytes, avaxAssetID, err := genesis.Genesis(n.Config.NetworkID)
 	if err != nil {
 		return fmt.Errorf("couldn't create genesis bytes: %w", err)
@@ -826,12 +875,30 @@ func (n *Node) Initialize(config *Config, logger logging.Logger, logFactory logg
 }
 
 // Shutdown this node
+// May be called multiple times
 func (n *Node) Shutdown() {
-	n.Log.Info("shutting down the node")
-	// Close already logs its own error if one occurs, so the error is ignored
-	// here
-	_ = n.Net.Close()
-	n.chainManager.Shutdown()
+	n.shuttingDown.SetValue(true)
+	n.shutdownOnce.Do(n.shutdown)
+}
+
+func (n *Node) shutdown() {
+	n.Log.Info("shutting down node")
+	if n.IPCs != nil {
+		if err := n.IPCs.Shutdown(); err != nil {
+			n.Log.Debug("error during IPC shutdown: %s", err)
+		}
+	}
+	if n.chainManager != nil {
+		n.chainManager.Shutdown()
+	}
+	if n.Net != nil {
+		// Close already logs its own error if one occurs, so the error is ignored here
+		_ = n.Net.Close()
+	}
+	if err := n.APIServer.Shutdown(); err != nil {
+		n.Log.Debug("error during API shutdown: %s", err)
+	}
 	utils.ClearSignals(n.nodeCloser)
-	n.Log.Info("node shut down successfully")
+	n.doneShuttingDown.Done()
+	n.Log.Info("finished node shutdown")
 }

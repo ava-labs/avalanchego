@@ -35,6 +35,7 @@ func TestUTXOVerifyEmpty(t *testing.T) {
 
 func TestUTXOSerialize(t *testing.T) {
 	c := codec.NewDefault()
+	manager := codec.NewDefaultManager()
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -43,6 +44,7 @@ func TestUTXOSerialize(t *testing.T) {
 		c.RegisterType(&secp256k1fx.Input{}),
 		c.RegisterType(&secp256k1fx.TransferInput{}),
 		c.RegisterType(&secp256k1fx.Credential{}),
+		manager.RegisterCodec(codecVersion, c),
 	)
 	if errs.Errored() {
 		t.Fatal(errs.Err)
@@ -76,21 +78,21 @@ func TestUTXOSerialize(t *testing.T) {
 	}
 	utxo := &UTXO{
 		UTXOID: UTXOID{
-			TxID: ids.NewID([32]byte{
+			TxID: ids.ID{
 				0xf9, 0x66, 0x75, 0x0f, 0x43, 0x88, 0x67, 0xc3,
 				0xc9, 0x82, 0x8d, 0xdc, 0xdb, 0xe6, 0x60, 0xe2,
 				0x1c, 0xcd, 0xbb, 0x36, 0xa9, 0x27, 0x69, 0x58,
 				0xf0, 0x11, 0xba, 0x47, 0x2f, 0x75, 0xd4, 0xe7,
-			}),
+			},
 			OutputIndex: 0,
 		},
 		Asset: Asset{
-			ID: ids.NewID([32]byte{
+			ID: ids.ID{
 				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 				0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
 				0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
 				0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
-			}),
+			},
 		},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: 12345,
@@ -113,7 +115,7 @@ func TestUTXOSerialize(t *testing.T) {
 		},
 	}
 
-	utxoBytes, err := c.Marshal(utxo)
+	utxoBytes, err := manager.Marshal(codecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}

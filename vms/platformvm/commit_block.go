@@ -37,7 +37,7 @@ func (c *Commit) Verify() error {
 
 	c.onAcceptDB, c.onAcceptFunc = parent.onCommit()
 
-	c.vm.currentBlocks[c.ID().Key()] = c
+	c.vm.currentBlocks[c.ID()] = c
 	c.parentBlock().addChild(c)
 	return nil
 }
@@ -59,7 +59,7 @@ func (vm *VM) newCommitBlock(parentID ids.ID, height uint64) (*Commit, error) {
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(commit)
-	bytes, err := Codec.Marshal(&blk)
+	bytes, err := Codec.Marshal(codecVersion, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal commit block: %w", err)
 	}

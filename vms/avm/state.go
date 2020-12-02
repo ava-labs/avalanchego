@@ -37,17 +37,17 @@ func (s *state) Tx(id ids.ID) (*Tx, error) {
 		return nil, errCacheTypeMismatch
 	}
 
-	bytes, err := s.DB.Get(id.Bytes())
+	bytes, err := s.DB.Get(id[:])
 	if err != nil {
 		return nil, err
 	}
 
 	// The key was in the database
 	tx := &Tx{}
-	if err := s.GenesisCodec.Unmarshal(bytes, tx); err != nil {
+	if _, err := s.GenesisCodec.Unmarshal(bytes, tx); err != nil {
 		return nil, err
 	}
-	unsignedBytes, err := s.GenesisCodec.Marshal(&tx.UnsignedTx)
+	unsignedBytes, err := s.GenesisCodec.Marshal(codecVersion, &tx.UnsignedTx)
 	if err != nil {
 		return nil, err
 	}
@@ -61,9 +61,9 @@ func (s *state) Tx(id ids.ID) (*Tx, error) {
 func (s *state) SetTx(id ids.ID, tx *Tx) error {
 	if tx == nil {
 		s.Cache.Evict(id)
-		return s.DB.Delete(id.Bytes())
+		return s.DB.Delete(id[:])
 	}
 
 	s.Cache.Put(id, tx)
-	return s.DB.Put(id.Bytes(), tx.Bytes())
+	return s.DB.Put(id[:], tx.Bytes())
 }

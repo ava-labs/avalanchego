@@ -7,6 +7,7 @@ package state
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
@@ -60,33 +61,19 @@ func (s *Serializer) Initialize(ctx *snow.Context, vm vertex.DAGVM, db database.
 
 // ParseVertex implements the avalanche.State interface
 func (s *Serializer) ParseVertex(b []byte) (avalanche.Vertex, error) {
-	vtx, err := s.parseVertex(b)
-	if err != nil {
-		return nil, err
-	}
-	if err := vtx.Verify(); err != nil {
-		return nil, err
-	}
-	uVtx := &uniqueVertex{
-		serializer: s,
-		vtxID:      vtx.ID(),
-	}
-	if uVtx.Status() == choices.Unknown {
-		if err := uVtx.setVertex(vtx); err != nil {
-			return nil, err
-		}
-	}
-
-	return uVtx, s.db.Commit()
+	return newUniqueVertex(s, b)
 }
 
 // BuildVertex implements the avalanche.State interface
-func (s *Serializer) BuildVertex(parentSet ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
+func (s *Serializer) BuildVertex(parentIDs []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
 	if len(txs) == 0 {
 		return nil, errNoTxs
+	} else if l := len(txs); l > maxTxsPerVtx {
+		return nil, fmt.Errorf("number of txs (%d) exceeds max (%d)", l, maxTxsPerVtx)
+	} else if l := len(parentIDs); l > maxNumParents {
+		return nil, fmt.Errorf("number of parents (%d) exceeds max (%d)", l, maxNumParents)
 	}
 
-	parentIDs := parentSet.List()
 	ids.SortIDs(parentIDs)
 	sortTxs(txs)
 
@@ -111,21 +98,15 @@ func (s *Serializer) BuildVertex(parentSet ids.Set, txs []snowstorm.Tx) (avalanc
 		return nil, err
 	}
 	vtx.bytes = bytes
-	vtx.id = ids.NewID(hashing.ComputeHash256Array(vtx.bytes))
+	vtx.id = hashing.ComputeHash256Array(vtx.bytes)
 
 	uVtx := &uniqueVertex{
 		serializer: s,
 		vtxID:      vtx.ID(),
 	}
-	// It is possible this vertex already exists in the database, even though we
-	// just made it.
-	if uVtx.Status() == choices.Unknown {
-		if err := uVtx.setVertex(vtx); err != nil {
-			return nil, err
-		}
-	}
-
-	return uVtx, s.db.Commit()
+	// setVertex handles the case where this vertex already exists even
+	// though we just made it
+	return uVtx, uVtx.setVertex(vtx)
 }
 
 // GetVertex implements the avalanche.State interface
@@ -138,7 +119,7 @@ func (s *Serializer) parseVertex(b []byte) (*innerVertex, error) {
 	vtx := &innerVertex{}
 	if err := vtx.Unmarshal(b, s.vm); err != nil {
 		return nil, err
-	} else if !vtx.chainID.Equals(s.ctx.ChainID) {
+	} else if vtx.chainID != s.ctx.ChainID {
 		return nil, errWrongChainID
 	}
 	return vtx, nil

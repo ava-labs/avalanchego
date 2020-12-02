@@ -7,27 +7,31 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
+const (
+	defaultCacheSize = 2048
+)
+
 var (
-	errWrongVMType         = errors.New("wrong vm type")
-	errWrongTxType         = errors.New("wrong tx type")
-	errWrongOpType         = errors.New("wrong operation type")
-	errWrongUTXOType       = errors.New("wrong utxo type")
-	errWrongInputType      = errors.New("wrong input type")
-	errWrongCredentialType = errors.New("wrong credential type")
-	errWrongOwnerType      = errors.New("wrong owner type")
-
-	errWrongNumberOfUTXOs = errors.New("wrong number of utxos for the operation")
-
+	errWrongVMType                    = errors.New("wrong vm type")
+	errWrongTxType                    = errors.New("wrong tx type")
+	errWrongOpType                    = errors.New("wrong operation type")
+	errWrongUTXOType                  = errors.New("wrong utxo type")
+	errWrongInputType                 = errors.New("wrong input type")
+	errWrongCredentialType            = errors.New("wrong credential type")
+	errWrongOwnerType                 = errors.New("wrong owner type")
+	errWrongNumberOfUTXOs             = errors.New("wrong number of utxos for the operation")
 	errWrongMintCreated               = errors.New("wrong mint output created from the operation")
 	errTimelocked                     = errors.New("output is time locked")
 	errTooManySigners                 = errors.New("input has more signers than expected")
 	errTooFewSigners                  = errors.New("input has less signers than expected")
+	errInputOutputIndexOutOfBounds    = errors.New("input referenced a nonexistent address in the output")
 	errInputCredentialSignersMismatch = errors.New("input expected a different number of signers than provided in the credential")
 )
 
@@ -45,9 +49,12 @@ func (fx *Fx) Initialize(vmIntf interface{}) error {
 	}
 
 	log := fx.VM.Logger()
-	log.Debug("Initializing secp561k1 fx")
+	log.Debug("initializing secp561k1 fx")
 
-	c := fx.VM.Codec()
+	fx.SECPFactory = crypto.FactorySECP256K1R{
+		Cache: cache.LRU{Size: defaultCacheSize},
+	}
+	c := fx.VM.CodecRegistry()
 	errs := wrappers.Errs{}
 	errs.Add(
 		c.RegisterType(&TransferInput{}),
@@ -184,8 +191,12 @@ func (fx *Fx) VerifyCredentials(tx Tx, in *Input, cred *Credential, out *OutputO
 
 	txHash := hashing.ComputeHash256(tx.UnsignedBytes())
 	for i, index := range in.SigIndices {
-		// Make sure each signature in the signature list is from
-		// an owner of the output being consumed
+		// Make sure the input references an address that exists
+		if index >= uint32(len(out.Addrs)) {
+			return errInputOutputIndexOutOfBounds
+		}
+		// Make sure each signature in the signature list is from an owner of
+		// the output being consumed
 		sig := cred.Sigs[i]
 		pk, err := fx.SECPFactory.RecoverHashPublicKey(txHash, sig[:])
 		if err != nil {

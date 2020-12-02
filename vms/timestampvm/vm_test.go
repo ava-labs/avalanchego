@@ -11,17 +11,16 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
-var blockchainID = ids.NewID([32]byte{1, 2, 3})
+var blockchainID = ids.ID{1, 2, 3}
 
 // Utility function to assert that [block] has:
 // * Parent with ID [parentID]
 // * Data [expectedData]
 // * Verify() returns nil iff passesVerify == true
 func assertBlock(block *Block, parentID ids.ID, expectedData [dataLen]byte, passesVerify bool) error {
-	if !block.ParentID().Equals(parentID) {
+	if block.ParentID() != parentID {
 		return fmt.Errorf("expect parent ID to be %s but was %s", parentID, block.ParentID())
 	}
 	if block.Data != expectedData {
@@ -56,7 +55,7 @@ func TestGenesis(t *testing.T) {
 
 	// Get lastAccepted
 	lastAccepted := vm.LastAccepted()
-	if lastAccepted.IsZero() {
+	if lastAccepted == ids.Empty {
 		t.Fatal("lastAccepted should not be empty")
 	}
 
@@ -72,7 +71,7 @@ func TestGenesis(t *testing.T) {
 	}
 
 	// Verify that the genesis block has the data we expect
-	if err := assertBlock(genesisBlock, ids.Empty, [32]byte{0, 0, 0, 0, 0}, true); err != nil {
+	if err := assertBlock(genesisBlock, ids.Empty, ids.ID{0, 0, 0, 0, 0}, true); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -180,22 +179,16 @@ func TestHappyPath(t *testing.T) {
 	// Next, check the blocks we added are there
 	if block2FromState, err := vm.GetBlock(block2.ID()); err != nil {
 		t.Fatal(err)
-	} else if !block2FromState.ID().Equals(block2.ID()) {
+	} else if block2FromState.ID() != block2.ID() {
 		t.Fatal("expected IDs to match but they don't")
 	}
 	if block3FromState, err := vm.GetBlock(block3.ID()); err != nil {
 		t.Fatal(err)
-	} else if !block3FromState.ID().Equals(block3.ID()) {
+	} else if block3FromState.ID() != block3.ID() {
 		t.Fatal("expected IDs to match but they don't")
 	}
 
 	ctx.Lock.Unlock()
-}
-
-func TestMakeStringFrom32Bytes(t *testing.T) {
-	bytes := [32]byte{'w', 'o', 'o'}
-	bytesFormatter := formatting.CB58{Bytes: bytes[:]}
-	t.Log(bytesFormatter.String())
 }
 
 func TestService(t *testing.T) {

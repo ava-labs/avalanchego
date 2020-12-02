@@ -28,8 +28,9 @@ func TestTransferableOutputVerifyNilFx(t *testing.T) {
 }
 
 func TestTransferableOutputVerify(t *testing.T) {
+	assetID := ids.GenerateTestID()
 	to := &TransferableOutput{
-		Asset: Asset{ID: ids.Empty},
+		Asset: Asset{ID: assetID},
 		Out:   &TestTransferable{Val: 1},
 	}
 	if err := to.Verify(); err != nil {
@@ -45,10 +46,15 @@ func TestTransferableOutputSorting(t *testing.T) {
 	if err := c.RegisterType(&TestTransferable{}); err != nil {
 		t.Fatal(err)
 	}
+	manager := codec.NewDefaultManager()
+	if err := manager.RegisterCodec(codecVersion, c); err != nil {
+		t.Fatal(err)
+	}
 
+	assetID1 := ids.ID{1}
 	outs := []*TransferableOutput{
 		{
-			Asset: Asset{ID: ids.NewID([32]byte{1})},
+			Asset: Asset{ID: assetID1},
 			Out:   &TestTransferable{Val: 1},
 		},
 		{
@@ -56,7 +62,7 @@ func TestTransferableOutputSorting(t *testing.T) {
 			Out:   &TestTransferable{Val: 1},
 		},
 		{
-			Asset: Asset{ID: ids.NewID([32]byte{1})},
+			Asset: Asset{ID: assetID1},
 			Out:   &TestTransferable{Val: 0},
 		},
 		{
@@ -69,11 +75,11 @@ func TestTransferableOutputSorting(t *testing.T) {
 		},
 	}
 
-	if IsSortedTransferableOutputs(outs, c) {
+	if IsSortedTransferableOutputs(outs, manager) {
 		t.Fatalf("Shouldn't be sorted")
 	}
-	SortTransferableOutputs(outs, c)
-	if !IsSortedTransferableOutputs(outs, c) {
+	SortTransferableOutputs(outs, manager)
+	if !IsSortedTransferableOutputs(outs, manager) {
 		t.Fatalf("Should be sorted")
 	}
 	if result := outs[0].Out.(*TestTransferable).Val; result != 0 {
@@ -85,17 +91,21 @@ func TestTransferableOutputSorting(t *testing.T) {
 	if result := outs[2].Out.(*TestTransferable).Val; result != 1 {
 		t.Fatalf("Val expected: %d ; result: %d", 0, result)
 	}
-	if result := outs[3].AssetID(); !result.Equals(ids.NewID([32]byte{1})) {
-		t.Fatalf("Val expected: %s ; result: %s", ids.NewID([32]byte{1}), result)
+	if result := outs[3].AssetID(); result != assetID1 {
+		t.Fatalf("Val expected: %s ; result: %s", assetID1, result)
 	}
-	if result := outs[4].AssetID(); !result.Equals(ids.NewID([32]byte{1})) {
-		t.Fatalf("Val expected: %s ; result: %s", ids.NewID([32]byte{1}), result)
+	if result := outs[4].AssetID(); result != assetID1 {
+		t.Fatalf("Val expected: %s ; result: %s", assetID1, result)
 	}
 }
 
 func TestTransferableOutputSerialization(t *testing.T) {
 	c := codec.NewDefault()
 	if err := c.RegisterType(&secp256k1fx.TransferOutput{}); err != nil {
+		t.Fatal(err)
+	}
+	manager := codec.NewDefaultManager()
+	if err := manager.RegisterCodec(codecVersion, c); err != nil {
 		t.Fatal(err)
 	}
 
@@ -121,12 +131,12 @@ func TestTransferableOutputSerialization(t *testing.T) {
 
 	out := &TransferableOutput{
 		Asset: Asset{
-			ID: ids.NewID([32]byte{
+			ID: ids.ID{
 				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 				0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
 				0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
 				0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
-			}),
+			},
 		},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: 12345,
@@ -149,7 +159,7 @@ func TestTransferableOutputSerialization(t *testing.T) {
 		},
 	}
 
-	outBytes, err := c.Marshal(out)
+	outBytes, err := manager.Marshal(codecVersion, out)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,9 +189,10 @@ func TestTransferableInputVerifyNilFx(t *testing.T) {
 }
 
 func TestTransferableInputVerify(t *testing.T) {
+	assetID := ids.GenerateTestID()
 	ti := &TransferableInput{
-		UTXOID: UTXOID{TxID: ids.Empty},
-		Asset:  Asset{ID: ids.Empty},
+		UTXOID: UTXOID{TxID: assetID},
+		Asset:  Asset{ID: assetID},
 		In:     &TestTransferable{},
 	}
 	if err := ti.Verify(); err != nil {
@@ -201,7 +212,7 @@ func TestTransferableInputSorting(t *testing.T) {
 	ins := []*TransferableInput{
 		{
 			UTXOID: UTXOID{
-				TxID:        ids.NewID([32]byte{1}),
+				TxID:        ids.ID{1},
 				OutputIndex: 1,
 			},
 			Asset: Asset{ID: ids.Empty},
@@ -209,7 +220,7 @@ func TestTransferableInputSorting(t *testing.T) {
 		},
 		{
 			UTXOID: UTXOID{
-				TxID:        ids.NewID([32]byte{1}),
+				TxID:        ids.ID{1},
 				OutputIndex: 0,
 			},
 			Asset: Asset{ID: ids.Empty},
@@ -260,6 +271,10 @@ func TestTransferableInputSerialization(t *testing.T) {
 	if err := c.RegisterType(&secp256k1fx.TransferInput{}); err != nil {
 		t.Fatal(err)
 	}
+	manager := codec.NewDefaultManager()
+	if err := manager.RegisterCodec(codecVersion, c); err != nil {
+		t.Fatal(err)
+	}
 
 	expected := []byte{
 		// Codec version
@@ -284,21 +299,21 @@ func TestTransferableInputSerialization(t *testing.T) {
 
 	in := &TransferableInput{
 		UTXOID: UTXOID{
-			TxID: ids.NewID([32]byte{
+			TxID: ids.ID{
 				0xf1, 0xe1, 0xd1, 0xc1, 0xb1, 0xa1, 0x91, 0x81,
 				0x71, 0x61, 0x51, 0x41, 0x31, 0x21, 0x11, 0x01,
 				0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x80,
 				0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00,
-			}),
+			},
 			OutputIndex: 5,
 		},
 		Asset: Asset{
-			ID: ids.NewID([32]byte{
+			ID: ids.ID{
 				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 				0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
 				0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
 				0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
-			}),
+			},
 		},
 		In: &secp256k1fx.TransferInput{
 			Amt: 123456789,
@@ -308,7 +323,7 @@ func TestTransferableInputSerialization(t *testing.T) {
 		},
 	}
 
-	inBytes, err := c.Marshal(in)
+	inBytes, err := manager.Marshal(codecVersion, in)
 	if err != nil {
 		t.Fatal(err)
 	}

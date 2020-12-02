@@ -6,6 +6,7 @@ package crypto
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -29,7 +30,7 @@ var (
 
 func init() {
 	// Setup hashes:
-	bytes := [32]byte{}
+	bytes := ids.ID{}
 	for i := uint64(0); i < NumVerifies; i++ {
 		bytes[i%32]++
 		hash := hashing.ComputeHash256(bytes[:])
