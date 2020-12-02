@@ -35,6 +35,7 @@ var (
 		TestNilSliceSerialization,
 		TestEmptySliceSerialization,
 		TestSliceWithEmptySerialization,
+		TestRestrictedSlice,
 	}
 )
 
@@ -923,5 +924,30 @@ func TestUnmarshalInvalidInterface(codec GeneralCodec, t testing.TB) {
 		if _, err := manager.Unmarshal(bytes, &s); err == nil {
 			t.Fatalf("should have errored")
 		}
+	}
+}
+
+// Ensure deserializing slices that have been length restricted errors correctly
+func TestRestrictedSlice(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
+	type inner struct {
+		Bytes []byte `serialize:"true" len:"2"`
+	}
+	bytes := []byte{0, 0, 0, 0, 0, 3, 0, 1, 2}
+
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
+
+	s := inner{}
+	if _, err := manager.Unmarshal(bytes, &s); err == nil {
+		t.Fatalf("Should have errored due to large of a slice")
+	}
+
+	s.Bytes = []byte{0, 1, 2}
+	if _, err := manager.Marshal(0, s); err == nil {
+		t.Fatalf("Should have errored due to large of a slice")
 	}
 }

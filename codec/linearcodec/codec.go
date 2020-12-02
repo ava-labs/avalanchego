@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"sync"
 	"unicode"
 
@@ -20,6 +21,9 @@ const (
 
 	// DefaultTagName that enables serialization.
 	DefaultTagName = "serialize"
+
+	// SliceLenTagName that specifies the length of a slice.
+	SliceLenTagName = "len"
 
 	// TagValue is the value the tag must have to be serialized.
 	TagValue = "true"
@@ -38,6 +42,11 @@ type Codec interface {
 	SkipRegistations(int)
 }
 
+type fieldDesc struct {
+	index       int
+	maxSliceLen int
+}
+
 // Codec handles marshaling and unmarshaling of structs
 type linearCodec struct {
 	lock         sync.RWMutex
@@ -54,7 +63,7 @@ type linearCodec struct {
 	// e.g. Foo --> [1,5,8] means Foo.Field(1), etc. are to be serialized/deserialized
 	// We assume this cache is pretty small (a few hundred keys at most)
 	// and doesn't take up much memory
-	serializedFieldIndices map[reflect.Type][]int
+	serializedFieldIndices map[reflect.Type][]fieldDesc
 }
 
 // New returns a new, concurrency-safe codec
@@ -65,7 +74,7 @@ func New(tagName string, maxSliceLen int) Codec {
 		nextTypeID:             0,
 		typeIDToType:           map[uint32]reflect.Type{},
 		typeToTypeID:           map[reflect.Type]uint32{},
-		serializedFieldIndices: map[reflect.Type][]int{},
+		serializedFieldIndices: map[reflect.Type][]fieldDesc{},
 	}
 }
 
@@ -118,13 +127,13 @@ func (c *linearCodec) MarshalInto(value interface{}, p *wrappers.Packer) error {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	return c.marshal(reflect.ValueOf(value), p)
+	return c.marshal(reflect.ValueOf(value), p, c.maxSliceLen)
 }
 
 // marshal writes the byte representation of [value] to [p]
 // [value]'s underlying value must not be a nil pointer or interface
 // c.lock should be held for the duration of this function
-func (c *linearCodec) marshal(value reflect.Value, p *wrappers.Packer) error {
+func (c *linearCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSliceLen int) error {
 	valueKind := value.Kind()
 	switch valueKind {
 	case reflect.Interface, reflect.Ptr, reflect.Invalid:
@@ -165,7 +174,7 @@ func (c *linearCodec) marshal(value reflect.Value, p *wrappers.Packer) error {
 		p.PackBool(value.Bool())
 		return p.Err
 	case reflect.Uintptr, reflect.Ptr:
-		return c.marshal(value.Elem(), p)
+		return c.marshal(value.Elem(), p, c.maxSliceLen)
 	case reflect.Interface:
 		underlyingValue := value.Interface()
 		typeID, ok := c.typeToTypeID[reflect.TypeOf(underlyingValue)] // Get the type ID of the value being marshaled
@@ -176,14 +185,14 @@ func (c *linearCodec) marshal(value reflect.Value, p *wrappers.Packer) error {
 		if p.Err != nil {
 			return p.Err
 		}
-		if err := c.marshal(value.Elem(), p); err != nil {
+		if err := c.marshal(value.Elem(), p, c.maxSliceLen); err != nil {
 			return err
 		}
 		return p.Err
 	case reflect.Slice:
 		numElts := value.Len() // # elements in the slice/array. 0 if this slice is nil.
-		if numElts > c.maxSliceLen {
-			return fmt.Errorf("slice length, %d, exceeds maximum length, %d", numElts, c.maxSliceLen)
+		if numElts > maxSliceLen {
+			return fmt.Errorf("slice length, %d, exceeds maximum length, %d", numElts, maxSliceLen)
 		}
 		p.PackInt(uint32(numElts)) // pack # elements
 		if p.Err != nil {
@@ -196,7 +205,7 @@ func (c *linearCodec) marshal(value reflect.Value, p *wrappers.Packer) error {
 			return p.Err
 		}
 		for i := 0; i < numElts; i++ { // Process each element in the slice
-			if err := c.marshal(value.Index(i), p); err != nil {
+			if err := c.marshal(value.Index(i), p, c.maxSliceLen); err != nil {
 				return err
 			}
 		}
@@ -212,18 +221,20 @@ func (c *linearCodec) marshal(value reflect.Value, p *wrappers.Packer) error {
 			return fmt.Errorf("array length, %d, exceeds maximum length, %d", numElts, c.maxSliceLen)
 		}
 		for i := 0; i < numElts; i++ { // Process each element in the array
-			if err := c.marshal(value.Index(i), p); err != nil {
+			if err := c.marshal(value.Index(i), p, c.maxSliceLen); err != nil {
 				return err
 			}
 		}
 		return nil
 	case reflect.Struct:
-		serializedFields, err := c.getSerializedFieldIndices(value.Type())
+		valueType := value.Type()
+		// Get indices of fields that will be marshaled into
+		serializedFields, err := c.getSerializedFieldIndices(valueType)
 		if err != nil {
 			return err
 		}
-		for _, fieldIndex := range serializedFields { // Go through all fields of this struct that are serialized
-			if err := c.marshal(value.Field(fieldIndex), p); err != nil { // Serialize the field and write to byte array
+		for _, fieldDesc := range serializedFields { // Go through all fields of this struct that are serialized
+			if err := c.marshal(value.Field(fieldDesc.index), p, fieldDesc.maxSliceLen); err != nil { // Serialize the field and write to byte array
 				return err
 			}
 		}
@@ -250,12 +261,12 @@ func (c *linearCodec) Unmarshal(bytes []byte, dest interface{}) error {
 	if destPtr.Kind() != reflect.Ptr {
 		return errNeedPointer
 	}
-	return c.unmarshal(&p, destPtr.Elem())
+	return c.unmarshal(&p, destPtr.Elem(), c.maxSliceLen)
 }
 
 // Unmarshal from p.Bytes into [value]. [value] must be addressable.
 // c.lock should be held for the duration of this function
-func (c *linearCodec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
+func (c *linearCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSliceLen int) error {
 	switch value.Kind() {
 	case reflect.Uint8:
 		value.SetUint(uint64(p.UnpackByte()))
@@ -316,9 +327,9 @@ func (c *linearCodec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		if p.Err != nil {
 			return fmt.Errorf("couldn't unmarshal slice: %w", p.Err)
 		}
-		if numElts > c.maxSliceLen {
+		if numElts > maxSliceLen {
 			return fmt.Errorf("array length, %d, exceeds maximum length, %d",
-				numElts, c.maxSliceLen)
+				numElts, maxSliceLen)
 		}
 		// If this is a slice of bytes, manually unpack the bytes rather
 		// than calling unmarshal on each byte. This improves performance.
@@ -330,7 +341,7 @@ func (c *linearCodec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		value.Set(reflect.MakeSlice(value.Type(), numElts, numElts))
 		// Unmarshal each element into the appropriate index of the slice
 		for i := 0; i < numElts; i++ {
-			if err := c.unmarshal(p, value.Index(i)); err != nil {
+			if err := c.unmarshal(p, value.Index(i), c.maxSliceLen); err != nil {
 				return fmt.Errorf("couldn't unmarshal slice element: %w", err)
 			}
 		}
@@ -348,7 +359,7 @@ func (c *linearCodec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 			return nil
 		}
 		for i := 0; i < numElts; i++ {
-			if err := c.unmarshal(p, value.Index(i)); err != nil {
+			if err := c.unmarshal(p, value.Index(i), c.maxSliceLen); err != nil {
 				return fmt.Errorf("couldn't unmarshal array element: %w", err)
 			}
 		}
@@ -375,21 +386,22 @@ func (c *linearCodec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		}
 		intfImplementor := reflect.New(implementingType).Elem() // instance of the proper type
 		// Unmarshal into the struct
-		if err := c.unmarshal(p, intfImplementor); err != nil {
+		if err := c.unmarshal(p, intfImplementor, c.maxSliceLen); err != nil {
 			return fmt.Errorf("couldn't unmarshal interface: %w", err)
 		}
 		// And assign the filled struct to the value
 		value.Set(intfImplementor)
 		return nil
 	case reflect.Struct:
+		valueType := value.Type()
 		// Get indices of fields that will be unmarshaled into
-		serializedFieldIndices, err := c.getSerializedFieldIndices(value.Type())
+		serializedFieldIndices, err := c.getSerializedFieldIndices(valueType)
 		if err != nil {
 			return fmt.Errorf("couldn't unmarshal struct: %w", err)
 		}
 		// Go through the fields and umarshal into them
-		for _, index := range serializedFieldIndices {
-			if err := c.unmarshal(p, value.Field(index)); err != nil {
+		for _, fieldDesc := range serializedFieldIndices {
+			if err := c.unmarshal(p, value.Field(fieldDesc.index), fieldDesc.maxSliceLen); err != nil {
 				return fmt.Errorf("couldn't unmarshal struct: %w", err)
 			}
 		}
@@ -400,7 +412,7 @@ func (c *linearCodec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		// Create a new pointer to a new value of the underlying type
 		v := reflect.New(t)
 		// Fill the value
-		if err := c.unmarshal(p, v.Elem()); err != nil {
+		if err := c.unmarshal(p, v.Elem(), c.maxSliceLen); err != nil {
 			return fmt.Errorf("couldn't unmarshal pointer: %w", err)
 		}
 		// Assign to the top-level struct's member
@@ -418,27 +430,35 @@ func (c *linearCodec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 // e.g. getSerializedFieldIndices(Foo) --> [1,5,8] means Foo.Field(1), Foo.Field(5), Foo.Field(8)
 // are to be serialized/deserialized
 // c.lock should be held for the duration of this method
-func (c *linearCodec) getSerializedFieldIndices(t reflect.Type) ([]int, error) {
+func (c *linearCodec) getSerializedFieldIndices(t reflect.Type) ([]fieldDesc, error) {
 	c.fieldLock.Lock()
 	defer c.fieldLock.Unlock()
 
 	if c.serializedFieldIndices == nil {
-		c.serializedFieldIndices = make(map[reflect.Type][]int)
+		c.serializedFieldIndices = make(map[reflect.Type][]fieldDesc)
 	}
 	if serializedFields, ok := c.serializedFieldIndices[t]; ok { // use pre-computed result
 		return serializedFields, nil
 	}
 	numFields := t.NumField()
-	serializedFields := make([]int, 0, numFields)
+	serializedFields := make([]fieldDesc, 0, numFields)
 	for i := 0; i < numFields; i++ { // Go through all fields of this struct
 		field := t.Field(i)
 		if field.Tag.Get(c.tagName) != TagValue { // Skip fields we don't need to serialize
 			continue
 		}
 		if unicode.IsLower(rune(field.Name[0])) { // Can only marshal exported fields
-			return []int{}, fmt.Errorf("can't marshal unexported field %s", field.Name)
+			return []fieldDesc{}, fmt.Errorf("can't marshal unexported field %s", field.Name)
 		}
-		serializedFields = append(serializedFields, i)
+		sliceLenField := field.Tag.Get(SliceLenTagName)
+		maxSliceLen := c.maxSliceLen
+		if newLen, err := strconv.Atoi(sliceLenField); err == nil {
+			maxSliceLen = newLen
+		}
+		serializedFields = append(serializedFields, fieldDesc{
+			index:       i,
+			maxSliceLen: maxSliceLen,
+		})
 	}
 	c.serializedFieldIndices[t] = serializedFields // cache result
 	return serializedFields, nil
