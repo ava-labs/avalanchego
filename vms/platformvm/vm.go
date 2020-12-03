@@ -550,7 +550,7 @@ func (vm *VM) Shutdown() error {
 			timeConnected = lastUpdated
 		}
 
-		if !timeConnected.Before(currentLocalTime) {
+		if currentLocalTime.Before(timeConnected) {
 			continue
 		}
 

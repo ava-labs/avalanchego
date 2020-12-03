@@ -96,8 +96,8 @@ func (ks *Keystore) Initialize(log logging.Logger, db database.Database) error {
 }
 
 func (ks *Keystore) initializeDB(db database.Database) error {
-	ks.userDB = semanticdb.New(usersPrefix, db)
-	ks.bcDB = semanticdb.New(bcsPrefix, db)
+	ks.userDB = semanticdb.NewPrefixDB(usersPrefix, db)
+	ks.bcDB = semanticdb.NewPrefixDB(bcsPrefix, db)
 
 	semDB, ok := db.(*semanticdb.Database)
 	if !ok {
@@ -134,7 +134,7 @@ func (ks *Keystore) initializeDB(db database.Database) error {
 			return err
 		}
 
-		userBCDB := semanticdb.New(username, ks.bcDB).(*semanticdb.Database)
+		userBCDB := semanticdb.NewPrefixDB(username, ks.bcDB).(*semanticdb.Database)
 		bcsBatch := userBCDB.NewBatch()
 		// Use a closure in order to defer releasing the iterator
 		if err := func() error {
@@ -260,7 +260,7 @@ func (ks *Keystore) ExportUser(_ *http.Request, args *ExportUserArgs, reply *Exp
 		return fmt.Errorf("incorrect password for user %q", args.Username)
 	}
 
-	userDB := semanticdb.New([]byte(args.Username), ks.bcDB)
+	userDB := semanticdb.NewPrefixDB([]byte(args.Username), ks.bcDB)
 
 	userData := UserDB{Hash: *user}
 
@@ -341,7 +341,7 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *api
 		return err
 	}
 
-	userDataDB := semanticdb.New([]byte(args.Username), ks.bcDB)
+	userDataDB := semanticdb.NewPrefixDB([]byte(args.Username), ks.bcDB)
 	dataBatch := userDataDB.NewBatch()
 	for _, kvp := range userData.Data {
 		if err := dataBatch.Put(kvp.Key, kvp.Value); err != nil {
@@ -385,7 +385,7 @@ func (ks *Keystore) DeleteUser(_ *http.Request, args *api.UserPass, reply *api.S
 		return err
 	}
 
-	userDataDB := semanticdb.New(userNameBytes, ks.bcDB)
+	userDataDB := semanticdb.NewPrefixDB(userNameBytes, ks.bcDB)
 	dataBatch := userDataDB.NewBatch()
 
 	it := userDataDB.NewIterator()
@@ -435,8 +435,8 @@ func (ks *Keystore) GetDatabase(bID ids.ID, username, password string) (database
 		return nil, fmt.Errorf("incorrect password for user %q", username)
 	}
 
-	userDB := semanticdb.New([]byte(username), ks.bcDB)
-	bcDB := semanticdb.NewNested(bID[:], userDB)
+	userDB := semanticdb.NewPrefixDB([]byte(username), ks.bcDB)
+	bcDB := semanticdb.NewNestedPrefixDB(bID[:], userDB)
 	return encdb.New([]byte(password), bcDB)
 }
 

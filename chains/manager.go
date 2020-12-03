@@ -393,11 +393,11 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	db := semanticdb.New(ctx.ChainID[:], m.DB)
-	vmDB := semanticdb.New([]byte("vm"), db)
-	vertexDB := semanticdb.New([]byte("vertex"), db)
-	vertexBootstrappingDB := semanticdb.New([]byte("vertex_bs"), db)
-	txBootstrappingDB := semanticdb.New([]byte("tx_bs"), db)
+	db := semanticdb.NewPrefixDB(ctx.ChainID[:], m.DB)
+	vmDB := semanticdb.NewPrefixDB([]byte("vm"), db)
+	vertexDB := semanticdb.NewPrefixDB([]byte("vertex"), db)
+	vertexBootstrappingDB := semanticdb.NewPrefixDB([]byte("vertex_bs"), db)
+	txBootstrappingDB := semanticdb.NewPrefixDB([]byte("tx_bs"), db)
 
 	vtxBlocker, err := queue.New(vertexBootstrappingDB)
 	if err != nil {
@@ -505,9 +505,9 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	db := semanticdb.New(ctx.ChainID[:], m.DB)
-	vmDB := semanticdb.New([]byte("vm"), db)
-	bootstrappingDB := semanticdb.New([]byte("bs"), db)
+	db := semanticdb.NewPrefixDB(ctx.ChainID[:], m.DB)
+	vmDB := semanticdb.NewPrefixDB([]byte("vm"), db)
+	bootstrappingDB := semanticdb.NewPrefixDB([]byte("bs"), db)
 
 	blocked, err := queue.New(bootstrappingDB)
 	if err != nil {

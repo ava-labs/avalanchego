@@ -1,3 +1,6 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package semanticdb
 
 import (
@@ -31,7 +34,9 @@ type Database struct {
 	PriorMajor, PriorMinor, PriorPatch int
 }
 
-// CreateFromPath ...
+// CreateFromPath attempts to create a database of the given semantic version
+// and scans for a prior database with the same major version. If found, it
+// it returns a semanticdb including the most recently versioned database.
 func CreateFromPath(dbDirPath string, major, minor, patch int) (database.Database, error) {
 	if major < 0 || minor < 0 || patch < 0 {
 		return nil, fmt.Errorf("invalid db version: v%d.%d.%d", major, minor, patch)
@@ -72,7 +77,8 @@ func CreateFromPath(dbDirPath string, major, minor, patch int) (database.Databas
 	return db, nil
 }
 
-// Create ...
+// Create a new semanticdb where [db] is the current version
+// and [priorDB] is the past version.
 func Create(db database.Database, priorDB database.Database) database.Database {
 	if priorDB == nil {
 		return db
@@ -84,8 +90,9 @@ func Create(db database.Database, priorDB database.Database) database.Database {
 	}
 }
 
-// New ...
-func New(prefix []byte, db database.Database) database.Database {
+// NewPrefixDB attempts to wrap [db] as a semanticdb
+// with a new prefixdb
+func NewPrefixDB(prefix []byte, db database.Database) database.Database {
 	if semanticDB, ok := db.(*Database); ok {
 		return &Database{
 			Database:   prefixdb.New(prefix, semanticDB.Database),
@@ -101,8 +108,9 @@ func New(prefix []byte, db database.Database) database.Database {
 	return prefixdb.New(prefix, db)
 }
 
-// NewNested ...
-func NewNested(prefix []byte, db database.Database) database.Database {
+// NewNestedPrefixDB attempts to wrap [db] as a semanticdb
+// with a nested prefixdb
+func NewNestedPrefixDB(prefix []byte, db database.Database) database.Database {
 	if semanticDB, ok := db.(*Database); ok {
 		return &Database{
 			Database:   prefixdb.NewNested(prefix, semanticDB.Database),

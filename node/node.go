@@ -618,7 +618,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 // initSharedMemory initializes the shared memory for cross chain interation
 func (n *Node) initSharedMemory() error {
 	n.Log.Info("initializing SharedMemory")
-	sharedMemoryDB := semanticdb.New([]byte("shared memory"), n.DB)
+	sharedMemoryDB := semanticdb.NewPrefixDB([]byte("shared memory"), n.DB)
 	return n.sharedMemory.Initialize(n.Log, sharedMemoryDB)
 }
 
@@ -626,7 +626,7 @@ func (n *Node) initSharedMemory() error {
 // Assumes n.APIServer is already set
 func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
-	keystoreDB := semanticdb.New([]byte("keystore"), n.DB)
+	keystoreDB := semanticdb.NewPrefixDB([]byte("keystore"), n.DB)
 	if err := n.keystoreServer.Initialize(n.Log, keystoreDB); err != nil {
 		return err
 	}

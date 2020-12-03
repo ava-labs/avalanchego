@@ -25,12 +25,12 @@ func TestInterface(t *testing.T) {
 func TestPrefixedDatabase(t *testing.T) {
 	for _, test := range database.Tests {
 		db := Create(memdb.New(), memdb.New())
-		test(t, New([]byte("hello"), db))
-		test(t, New([]byte("world"), db))
-		test(t, New([]byte("wor"), New([]byte("ld"), db)))
-		test(t, New([]byte("ld"), New([]byte("wor"), db)))
-		test(t, NewNested([]byte("wor"), New([]byte("ld"), db)))
-		test(t, NewNested([]byte("ld"), New([]byte("wor"), db)))
+		test(t, NewPrefixDB([]byte("hello"), db))
+		test(t, NewPrefixDB([]byte("world"), db))
+		test(t, NewPrefixDB([]byte("wor"), NewPrefixDB([]byte("ld"), db)))
+		test(t, NewPrefixDB([]byte("ld"), NewPrefixDB([]byte("wor"), db)))
+		test(t, NewNestedPrefixDB([]byte("wor"), NewPrefixDB([]byte("ld"), db)))
+		test(t, NewNestedPrefixDB([]byte("ld"), NewPrefixDB([]byte("wor"), db)))
 	}
 }
 
@@ -41,7 +41,7 @@ func TestMatchesPrefixedDB(t *testing.T) {
 
 	prefix1 := []byte("prefix1")
 	p1 := prefixdb.New(prefix1, original)
-	semP1 := New(prefix1, sem)
+	semP1 := NewPrefixDB(prefix1, sem)
 
 	k1 := []byte("hey")
 	v1 := []byte("there")
@@ -72,7 +72,7 @@ func TestMatchesPrefixedDB(t *testing.T) {
 
 	prefix2 := []byte("prefix2")
 	p2 := prefixdb.New(prefix2, p1)
-	semP2 := New(prefix2, semP1)
+	semP2 := NewPrefixDB(prefix2, semP1)
 
 	if err := p2.Put(k1, v1); err != nil {
 		t.Fatal(err)

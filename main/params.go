@@ -41,7 +41,7 @@ import (
 var (
 	dbMajorVersion = 1
 	dbMinorVersion = 0
-	dbPatchVersion = 1
+	dbPatchVersion = 0
 	dbVersion      = fmt.Sprintf("v%d.%d.%d", dbMajorVersion, dbMinorVersion, dbPatchVersion)
 )
 
