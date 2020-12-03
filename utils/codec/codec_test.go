@@ -123,6 +123,18 @@ func TestStruct(t *testing.T) {
 	}
 }
 
+func TestRegisterStructTwice(t *testing.T) {
+	codec := NewDefault()
+	errs := wrappers.Errs{}
+	errs.Add(
+		codec.RegisterType(&MyInnerStruct{}),
+		codec.RegisterType(&MyInnerStruct{}), // Register the same struct twice
+	)
+	if !errs.Errored() {
+		t.Fatal("Registering the same struct twice should have caused an error")
+	}
+}
+
 func TestUInt32(t *testing.T) {
 	number := uint32(500)
 

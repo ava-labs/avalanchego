@@ -47,7 +47,7 @@ type Manager interface {
 	Unmarshal(source []byte, destination interface{}) (version uint16, err error)
 }
 
-// NewNewManager returns a new codec manager.
+// NewManager returns a new codec manager.
 func NewManager(maxSize int) Manager {
 	return &manager{
 		maxSize: maxSize,
