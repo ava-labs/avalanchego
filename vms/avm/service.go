@@ -686,8 +686,6 @@ func (service *Service) CreateAddress(r *http.Request, args *api.UserPass, reply
 	if err != nil {
 		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
-	// Drop any potential error closing the database to report the original
-	// error
 	defer db.Close()
 
 	user := userState{vm: service.vm}
@@ -737,6 +735,8 @@ func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, respo
 	user := userState{vm: service.vm}
 	addresses, err := user.Addresses(db)
 	if err != nil {
+		// An error fetching the addresses may just mean that the user has no
+		// addresses.
 		return db.Close()
 	}
 
@@ -778,14 +778,12 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 	if err != nil {
 		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
+	defer db.Close()
 
 	user := userState{vm: service.vm}
 
 	sk, err := user.Key(db, addr)
 	if err != nil {
-		// Drop any potential error closing the database to report the original
-		// error
-		_ = db.Close()
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
 
@@ -816,9 +814,6 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	if err != nil {
 		return fmt.Errorf("problem retrieving data: %w", err)
 	}
-
-	// Drop any potential error closing the database to report the original
-	// error
 	defer db.Close()
 
 	user := userState{vm: service.vm}
