@@ -24,7 +24,7 @@ var (
 	errBadEpoch            = errors.New("invalid epoch")
 	errFutureField         = errors.New("field specified in a previous version")
 	errTooManyparentIDs    = fmt.Errorf("vertex contains more than %d parentIDs", maxNumParents)
-	errNoTxs               = errors.New("vertex contains no transactions")
+	errNoOperations        = errors.New("vertex contains no operations")
 	errTooManyTxs          = fmt.Errorf("vertex contains more than %d transactions", maxTxsPerVtx)
 	errTooManyRestrictions = fmt.Errorf("vertex contains more than %d restrictions", maxTxsPerVtx)
 	errInvalidParents      = errors.New("vertex contains non-sorted or duplicated parentIDs")
@@ -90,8 +90,8 @@ func (v innerStatelessVertex) Verify() error {
 		// TODO: Remove the above checks once the apricot release is ready
 	case len(v.ParentIDs) > maxNumParents:
 		return errTooManyparentIDs
-	case len(v.Txs) == 0:
-		return errNoTxs
+	case len(v.Txs)+len(v.Restrictions) == 0:
+		return errNoOperations
 	case len(v.Txs) > maxTxsPerVtx:
 		return errTooManyTxs
 	case len(v.Restrictions) > maxTxsPerVtx:
