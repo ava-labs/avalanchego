@@ -11,23 +11,25 @@ import (
 )
 
 var (
-	errParseVertex = errors.New("unexpectedly called ParseVertex")
+	errParse = errors.New("unexpectedly called Parse")
+
+	_ Parser = &TestParser{}
 )
 
 type TestParser struct {
-	T               *testing.T
-	CantParseVertex bool
-	ParseVertexF    func([]byte) (avalanche.Vertex, error)
+	T         *testing.T
+	CantParse bool
+	ParseF    func([]byte) (avalanche.Vertex, error)
 }
 
-func (p *TestParser) Default(cant bool) { p.CantParseVertex = cant }
+func (p *TestParser) Default(cant bool) { p.CantParse = cant }
 
-func (p *TestParser) ParseVertex(b []byte) (avalanche.Vertex, error) {
-	if p.ParseVertexF != nil {
-		return p.ParseVertexF(b)
+func (p *TestParser) Parse(b []byte) (avalanche.Vertex, error) {
+	if p.ParseF != nil {
+		return p.ParseF(b)
 	}
-	if p.CantParseVertex && p.T != nil {
-		p.T.Fatal(errParseVertex)
+	if p.CantParse && p.T != nil {
+		p.T.Fatal(errParse)
 	}
-	return nil, errParseVertex
+	return nil, errParse
 }

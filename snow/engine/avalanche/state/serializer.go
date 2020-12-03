@@ -59,13 +59,13 @@ func (s *Serializer) Initialize(ctx *snow.Context, vm vertex.DAGVM, db database.
 	s.edge.Add(s.state.Edge()...)
 }
 
-// ParseVertex implements the avalanche.State interface
-func (s *Serializer) ParseVertex(b []byte) (avalanche.Vertex, error) {
+// Parse implements the avalanche.State interface
+func (s *Serializer) Parse(b []byte) (avalanche.Vertex, error) {
 	return newUniqueVertex(s, b)
 }
 
-// BuildVertex implements the avalanche.State interface
-func (s *Serializer) BuildVertex(parentIDs []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
+// Build implements the avalanche.State interface
+func (s *Serializer) Build(parentIDs []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
 	if len(txs) == 0 {
 		return nil, errNoTxs
 	} else if l := len(txs); l > maxTxsPerVtx {
@@ -109,8 +109,8 @@ func (s *Serializer) BuildVertex(parentIDs []ids.ID, txs []snowstorm.Tx) (avalan
 	return uVtx, uVtx.setVertex(vtx)
 }
 
-// GetVertex implements the avalanche.State interface
-func (s *Serializer) GetVertex(vtxID ids.ID) (avalanche.Vertex, error) { return s.getVertex(vtxID) }
+// Get implements the avalanche.State interface
+func (s *Serializer) Get(vtxID ids.ID) (avalanche.Vertex, error) { return s.getVertex(vtxID) }
 
 // Edge implements the avalanche.State interface
 func (s *Serializer) Edge() []ids.ID { return s.edge.List() }

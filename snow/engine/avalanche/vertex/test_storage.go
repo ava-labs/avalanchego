@@ -12,30 +12,32 @@ import (
 )
 
 var (
-	errGetVertex = errors.New("unexpectedly called GetVertex")
-	errEdge      = errors.New("unexpectedly called Edge")
+	errGet  = errors.New("unexpectedly called Get")
+	errEdge = errors.New("unexpectedly called Edge")
+
+	_ Storage = &TestStorage{}
 )
 
 type TestStorage struct {
-	T                       *testing.T
-	CantGetVertex, CantEdge bool
-	GetVertexF              func(ids.ID) (avalanche.Vertex, error)
-	EdgeF                   func() []ids.ID
+	T                 *testing.T
+	CantGet, CantEdge bool
+	GetF              func(ids.ID) (avalanche.Vertex, error)
+	EdgeF             func() []ids.ID
 }
 
 func (s *TestStorage) Default(cant bool) {
-	s.CantGetVertex = cant
+	s.CantGet = cant
 	s.CantEdge = cant
 }
 
-func (s *TestStorage) GetVertex(id ids.ID) (avalanche.Vertex, error) {
-	if s.GetVertexF != nil {
-		return s.GetVertexF(id)
+func (s *TestStorage) Get(id ids.ID) (avalanche.Vertex, error) {
+	if s.GetF != nil {
+		return s.GetF(id)
 	}
-	if s.CantGetVertex && s.T != nil {
-		s.T.Fatal(errGetVertex)
+	if s.CantGet && s.T != nil {
+		s.T.Fatal(errGet)
 	}
-	return nil, errGetVertex
+	return nil, errGet
 }
 
 func (s *TestStorage) Edge() []ids.ID {

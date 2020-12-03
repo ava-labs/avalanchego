@@ -5,10 +5,23 @@ package vertex
 
 import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 // Parser parses bytes into a vertex.
 type Parser interface {
-	// Attempt to convert a stream of bytes into a vertex
-	ParseVertex(vertex []byte) (avalanche.Vertex, error)
+	// Parse a vertex from a slice of bytes
+	Parse(vertex []byte) (avalanche.Vertex, error)
+}
+
+// Parse the provided vertex bytes into a stateless vertex
+func Parse(vertex []byte) (StatelessVertex, error) {
+	vtx := innerStatelessVertex{}
+	version, err := Codec.Unmarshal(vertex, &vtx)
+	vtx.Version = version
+	return statelessVertex{
+		innerStatelessVertex: vtx,
+		id:                   hashing.ComputeHash256Array(vertex),
+		bytes:                vertex,
+	}, err
 }

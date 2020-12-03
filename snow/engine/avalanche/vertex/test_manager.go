@@ -5,6 +5,10 @@ package vertex
 
 import "testing"
 
+var (
+	_ Manager = &TestManager{}
+)
+
 type TestManager struct {
 	TestBuilder
 	TestParser

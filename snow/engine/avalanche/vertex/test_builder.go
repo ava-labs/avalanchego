@@ -13,23 +13,25 @@ import (
 )
 
 var (
-	errBuildVertex = errors.New("unexpectedly called BuildVertex")
+	errBuild = errors.New("unexpectedly called Build")
+
+	_ Builder = &TestBuilder{}
 )
 
 type TestBuilder struct {
-	T               *testing.T
-	CantBuildVertex bool
-	BuildVertexF    func([]ids.ID, []snowstorm.Tx) (avalanche.Vertex, error)
+	T         *testing.T
+	CantBuild bool
+	BuildF    func([]ids.ID, []snowstorm.Tx) (avalanche.Vertex, error)
 }
 
-func (b *TestBuilder) Default(cant bool) { b.CantBuildVertex = cant }
+func (b *TestBuilder) Default(cant bool) { b.CantBuild = cant }
 
-func (b *TestBuilder) BuildVertex(set []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
-	if b.BuildVertexF != nil {
-		return b.BuildVertexF(set, txs)
+func (b *TestBuilder) Build(set []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
+	if b.BuildF != nil {
+		return b.BuildF(set, txs)
 	}
-	if b.CantBuildVertex && b.T != nil {
-		b.T.Fatal(errBuildVertex)
+	if b.CantBuild && b.T != nil {
+		b.T.Fatal(errBuild)
 	}
-	return nil, errBuildVertex
+	return nil, errBuild
 }

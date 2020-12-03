@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
@@ -107,7 +108,7 @@ func (vtx *uniqueVertex) Evict() {
 	}
 }
 
-func (vtx *uniqueVertex) setVertex(innerVtx *innerVertex) error {
+func (vtx *uniqueVertex) setVertex(innerVtx vertex.StatelessVertex) error {
 	vtx.shallowRefresh()
 	vtx.v.vtx = innerVtx
 
@@ -283,7 +284,7 @@ func (vtx *uniqueVertex) String() string {
 type vertexState struct {
 	unique bool
 
-	vtx    *innerVertex
+	vtx    vertex.StatelessVertex
 	status choices.Status
 
 	parents []avalanche.Vertex
