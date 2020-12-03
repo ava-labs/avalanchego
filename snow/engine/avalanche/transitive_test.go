@@ -895,7 +895,7 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 		t.Fatalf("Unknown vertex")
 		panic("Should have errored")
 	}
-	manager.BuildF = func(_ []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
+	manager.BuildF = func(_ uint32, _ []ids.ID, txs []snowstorm.Tx, _ []ids.ID) (avalanche.Vertex, error) {
 		return &avalanche.TestVertex{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
@@ -1014,8 +1014,7 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 
 	vm.CantBootstrapping = true
 	vm.CantBootstrapped = true
-
-	manager.BuildF = func(_ []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
+	manager.BuildF = func(_ uint32, _ []ids.ID, txs []snowstorm.Tx, _ []ids.ID) (avalanche.Vertex, error) {
 		return &avalanche.TestVertex{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
@@ -1229,7 +1228,7 @@ func TestEngineReissue(t *testing.T) {
 	vm.CantBootstrapped = true
 
 	lastVtx := new(avalanche.TestVertex)
-	manager.BuildF = func(_ []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
+	manager.BuildF = func(_ uint32, _ []ids.ID, txs []snowstorm.Tx, _ []ids.ID) (avalanche.Vertex, error) {
 		lastVtx = &avalanche.TestVertex{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
@@ -1375,7 +1374,7 @@ func TestEngineLargeIssue(t *testing.T) {
 	vm.CantBootstrapped = true
 
 	lastVtx := new(avalanche.TestVertex)
-	manager.BuildF = func(_ []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
+	manager.BuildF = func(_ uint32, _ []ids.ID, txs []snowstorm.Tx, _ []ids.ID) (avalanche.Vertex, error) {
 		lastVtx = &avalanche.TestVertex{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
@@ -2774,7 +2773,7 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 	}
 
 	expectedVtxID := ids.GenerateTestID()
-	manager.BuildF = func(_ []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
+	manager.BuildF = func(_ uint32, _ []ids.ID, txs []snowstorm.Tx, _ []ids.ID) (avalanche.Vertex, error) {
 		return &avalanche.TestVertex{
 			TestDecidable: choices.TestDecidable{
 				IDV:     expectedVtxID,
@@ -3337,7 +3336,7 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 	vm.CantBootstrapped = true
 
 	lastVtx := new(avalanche.TestVertex)
-	manager.BuildF = func(_ []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
+	manager.BuildF = func(_ uint32, _ []ids.ID, txs []snowstorm.Tx, _ []ids.ID) (avalanche.Vertex, error) {
 		lastVtx = &avalanche.TestVertex{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
@@ -3362,7 +3361,7 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 		t.Fatalf("Should have issued txs differently")
 	}
 
-	manager.BuildF = func([]ids.ID, []snowstorm.Tx) (avalanche.Vertex, error) {
+	manager.BuildF = func(uint32, []ids.ID, []snowstorm.Tx, []ids.ID) (avalanche.Vertex, error) {
 		t.Fatalf("shouldn't have attempted to issue a duplicated tx")
 		return nil, nil
 	}

@@ -190,9 +190,10 @@ func (vtx *uniqueVertex) Parents() ([]avalanche.Vertex, error) {
 		return nil, fmt.Errorf("failed to get parents for vertex with status: %s", vtx.v.status)
 	}
 
-	if len(vtx.v.parents) != len(vtx.v.vtx.parentIDs) {
-		vtx.v.parents = make([]avalanche.Vertex, len(vtx.v.vtx.parentIDs))
-		for i, parentID := range vtx.v.vtx.parentIDs {
+	parentIDs := vtx.v.vtx.ParentIDs()
+	if len(vtx.v.parents) != len(parentIDs) {
+		vtx.v.parents = make([]avalanche.Vertex, len(parentIDs))
+		for i, parentID := range parentIDs {
 			vtx.v.parents[i] = &uniqueVertex{
 				serializer: vtx.serializer,
 				vtxID:      parentID,
@@ -210,7 +211,7 @@ func (vtx *uniqueVertex) Height() (uint64, error) {
 		return 0, fmt.Errorf("failed to get height for vertex with status: %s", vtx.v.status)
 	}
 
-	return vtx.v.vtx.height, nil
+	return vtx.v.vtx.Height(), nil
 }
 
 func (vtx *uniqueVertex) Epoch() (uint32, error) {
@@ -220,7 +221,7 @@ func (vtx *uniqueVertex) Epoch() (uint32, error) {
 		return 0, fmt.Errorf("failed to get epoch for vertex with status: %s", vtx.v.status)
 	}
 
-	return vtx.v.vtx.epoch, nil
+	return vtx.v.vtx.Epoch(), nil
 }
 
 func (vtx *uniqueVertex) Txs() ([]snowstorm.Tx, error) {
@@ -230,9 +231,14 @@ func (vtx *uniqueVertex) Txs() ([]snowstorm.Tx, error) {
 		return nil, fmt.Errorf("failed to get txs for vertex with status: %s", vtx.v.status)
 	}
 
-	if len(vtx.v.vtx.txs) != len(vtx.v.txs) {
-		vtx.v.txs = make([]snowstorm.Tx, len(vtx.v.vtx.txs))
-		for i, tx := range vtx.v.vtx.txs {
+	txs := vtx.v.vtx.Txs()
+	if len(txs) != len(vtx.v.txs) {
+		vtx.v.txs = make([]snowstorm.Tx, len(txs))
+		for i, txBytes := range txs {
+			tx, err := vtx.serializer.vm.ParseTx(txBytes)
+			if err != nil {
+				return nil, err
+			}
 			vtx.v.txs[i] = tx
 		}
 	}

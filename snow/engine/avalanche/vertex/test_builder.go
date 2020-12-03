@@ -21,14 +21,24 @@ var (
 type TestBuilder struct {
 	T         *testing.T
 	CantBuild bool
-	BuildF    func([]ids.ID, []snowstorm.Tx) (avalanche.Vertex, error)
+	BuildF    func(
+		epoch uint32,
+		parentIDs []ids.ID,
+		txs []snowstorm.Tx,
+		restrictions []ids.ID,
+	) (avalanche.Vertex, error)
 }
 
 func (b *TestBuilder) Default(cant bool) { b.CantBuild = cant }
 
-func (b *TestBuilder) Build(set []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
+func (b *TestBuilder) Build(
+	epoch uint32,
+	parentIDs []ids.ID,
+	txs []snowstorm.Tx,
+	restrictions []ids.ID,
+) (avalanche.Vertex, error) {
 	if b.BuildF != nil {
-		return b.BuildF(set, txs)
+		return b.BuildF(epoch, parentIDs, txs, restrictions)
 	}
 	if b.CantBuild && b.T != nil {
 		b.T.Fatal(errBuild)
