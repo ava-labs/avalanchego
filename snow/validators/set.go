@@ -280,7 +280,7 @@ func (s *set) removeWeight(vdrID ids.ShortID, weight uint64) error {
 			return err
 		}
 	}
-	return s.sampler.Initialize(s.vdrWeights)
+	return s.sampler.Initialize(s.vdrMaskedWeights)
 }
 
 // Get implements the Set interface.
