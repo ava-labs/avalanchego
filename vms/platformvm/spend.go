@@ -448,7 +448,6 @@ func (vm *VM) semanticVerifySpendUTXOs(
 				unlockedConsumed = newUnlockedConsumed
 				continue
 			}
-
 		} else {
 			// New rule
 			if now >= locktime {
