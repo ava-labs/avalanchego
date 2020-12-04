@@ -4,7 +4,6 @@
   hosts: avalanche_nodes
   roles:
     - name: golang_base
-    - name: gopath
     - name: avalanche_base
     - name: avalanche_build
     - name: avalanche_user
