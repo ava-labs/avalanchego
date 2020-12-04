@@ -1,4 +1,4 @@
-package platformvm
+package dates
 
 import (
 	"time"

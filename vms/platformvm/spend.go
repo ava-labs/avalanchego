@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/dates"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -433,7 +434,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		if err != nil {
 			return tempError{fmt.Errorf("couldn't get chain timestamp: %w", err)}
 		}
-		if chainTime.Before(Apricot0Time) {
+		if chainTime.Before(dates.Apricot0Time) {
 			// Old rule
 			if locktime == 0 {
 				newUnlockedConsumed, err := safemath.Add64(unlockedConsumed, amount)

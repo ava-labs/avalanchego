@@ -13,8 +13,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/dates"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 type peer struct {
@@ -330,6 +332,12 @@ func (p *peer) handle(msg Msg) {
 		}
 		return
 	}
+
+	peerVersion := p.versionStruct.GetValue().(version.Version)
+	if peerVersion.Before(minimumUnmaskedVersion) && time.Since(dates.Apricot0Time) >= 0 {
+		p.net.log.Verbo("dropping message from un-upgraded validator %s", p.id)
+	}
+
 	switch op {
 	case GetAcceptedFrontier:
 		p.getAcceptedFrontier(msg)
