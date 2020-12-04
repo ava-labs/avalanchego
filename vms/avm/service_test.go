@@ -732,15 +732,15 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	}()
 
 	reply := AssetIDChangeAddr{}
-	addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
-	if err != nil {
-		t.Fatal(err)
-	}
-	changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
+	minterAddrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
+	changeAddrStr := fromAddrsStr[0]
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	err = s.CreateVariableCapAsset(nil, &CreateAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
@@ -757,7 +757,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 			{
 				Threshold: 1,
 				Minters: []string{
-					addrStr,
+					minterAddrStr,
 				},
 			},
 		},
@@ -791,7 +791,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		},
 		Amount:  200,
 		AssetID: createdAssetID,
-		To:      addrStr,
+		To:      minterAddrStr, // Send newly minted tokens to this address
 	}
 	mintReply := &api.JSONTxIDChangeAddr{}
 	if err := s.Mint(nil, mintArgs, mintReply); err != nil {
@@ -818,13 +818,13 @@ func TestCreateVariableCapAsset(t *testing.T) {
 				Username: username,
 				Password: password,
 			},
-			JSONFromAddrs:  api.JSONFromAddrs{From: fromAddrsStr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: []string{minterAddrStr}},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
 		SendOutput: SendOutput{
 			Amount:  200,
 			AssetID: createdAssetID,
-			To:      addrStr,
+			To:      fromAddrsStr[0],
 		},
 	}
 	sendReply := &api.JSONTxIDChangeAddr{}
