@@ -684,6 +684,7 @@ func (n *network) Dispatch() error {
 			}
 		}
 		n.maskedValidators.Clear()
+		n.log.Verbo("The new staking set is:\n%s", n.vdrs)
 	}()
 	for { // Continuously accept new connections
 		conn, err := n.listener.Accept() // Returns error when n.Close() is called
@@ -1167,6 +1168,7 @@ func (n *network) connected(p *peer) {
 				n.log.Error("failed to reveal validator %s due to %s", p.id, err)
 			}
 		}
+		n.log.Verbo("The new staking set is:\n%s", n.vdrs)
 	} else {
 		if peerVersion.Before(minimumUnmaskedVersion) {
 			n.maskedValidators.Add(p.id)
@@ -1177,11 +1179,6 @@ func (n *network) connected(p *peer) {
 
 	ip := p.getIP()
 	n.log.Debug("connected to %s at %s", p.id, ip)
-
-	n.log.Debug("connected to %s at %s, the new staking set is:\n%s",
-		p.id,
-		ip,
-		n.vdrs)
 
 	if !ip.IsZero() {
 		str := ip.String()
