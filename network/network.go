@@ -56,7 +56,7 @@ var (
 	errNetworkClosed = errors.New("network closed")
 	errPeerIsMyself  = errors.New("peer is myself")
 
-	minimumUnmaskedVersion = version.NewDefaultVersion(constants.PlatformName, 1, 0, 6)
+	minimumUnmaskedVersion = version.NewDefaultVersion(constants.PlatformName, 1, 1, 0)
 )
 
 func init() { rand.Seed(time.Now().UnixNano()) }
