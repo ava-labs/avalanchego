@@ -3,6 +3,7 @@ package platformvm
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -20,6 +21,10 @@ var (
 	errWrongLocktime                = errors.New("wrong locktime reported")
 	errUnknownOwners                = errors.New("unknown owners")
 	errCantSign                     = errors.New("can't sign")
+
+	// Time at which Apricot phase 0 rules go into effect
+	// Dec 8 2020 @ 11:00:00 PM (UTC)
+	apricot0Time = time.Unix(1607468400, 0)
 )
 
 // stake the provided amount while deducting the provided fee.
@@ -428,13 +433,31 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 		amount := in.Amount()
 
-		if now >= locktime {
-			newUnlockedConsumed, err := safemath.Add64(unlockedConsumed, amount)
-			if err != nil {
-				return permError{err}
+		// Rule change for Apricot phase 0 hardfork
+		chainTime, err := vm.getTimestamp(vm.DB)
+		if err != nil {
+			return tempError{fmt.Errorf("couldn't get chain timestamp: %w", err)}
+		}
+		if chainTime.Before(apricot0Time) {
+			// Old rule
+			if locktime == 0 {
+				newUnlockedConsumed, err := safemath.Add64(unlockedConsumed, amount)
+				if err != nil {
+					return permError{err}
+				}
+				unlockedConsumed = newUnlockedConsumed
+				continue
 			}
-			unlockedConsumed = newUnlockedConsumed
-			continue
+		} else {
+			// New rule
+			if now >= locktime {
+				newUnlockedConsumed, err := safemath.Add64(unlockedConsumed, amount)
+				if err != nil {
+					return permError{err}
+				}
+				unlockedConsumed = newUnlockedConsumed
+				continue
+			}
 		}
 
 		owned, ok := out.(Owned)
