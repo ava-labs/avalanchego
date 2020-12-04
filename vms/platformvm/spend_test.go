@@ -335,6 +335,42 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 			assetID:   vm.Ctx.AVAXAssetID,
 			shouldErr: false,
 		},
+		{
+			description: "one unlock input, one locked output, zero fee, unlocked",
+			utxos: []*avax.UTXO{
+				{
+					Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+					Out: &StakeableLockOut{
+						Locktime: uint64(now.Unix()) - 1,
+						TransferableOut: &secp256k1fx.TransferOutput{
+							Amt: 1,
+						},
+					},
+				},
+			},
+			ins: []*avax.TransferableInput{
+				{
+					Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt: 1,
+					},
+				},
+			},
+			outs: []*avax.TransferableOutput{
+				{
+					Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 1,
+					},
+				},
+			},
+			creds: []verify.Verifiable{
+				&secp256k1fx.Credential{},
+			},
+			fee:       0,
+			assetID:   vm.Ctx.AVAXAssetID,
+			shouldErr: false,
+		},
 	}
 
 	for _, test := range tests {
