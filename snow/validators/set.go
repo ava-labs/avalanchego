@@ -418,7 +418,7 @@ func (s *set) string() string {
 		totalWeight += weight
 	}
 
-	sb.WriteString(fmt.Sprintf("Validator Set: (Size = %d, SamplableWeight = %d, Weight = %d)",
+	sb.WriteString(fmt.Sprintf("Validator Set: (Size = %d, SampleableWeight = %d, Weight = %d)",
 		len(s.vdrSlice),
 		s.totalWeight,
 		totalWeight,

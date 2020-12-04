@@ -126,7 +126,7 @@ func TestSamplerString(t *testing.T) {
 	err = s.AddWeight(vdr1, math.MaxInt64-1)
 	assert.NoError(t, err)
 
-	expected := "Validator Set: (Size = 2, SamplableWeight = 9223372036854775807, Weight = 9223372036854775807)\n" +
+	expected := "Validator Set: (Size = 2, SampleableWeight = 9223372036854775807, Weight = 9223372036854775807)\n" +
 		"    Validator[0]:        111111111111111111116DBWJs, 1/1\n" +
 		"    Validator[1]: QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806/9223372036854775806"
 	result := s.String()
@@ -194,7 +194,7 @@ func TestSamplerMasked(t *testing.T) {
 	assert.NoError(t, err)
 
 	{
-		expected := "Validator Set: (Size = 1, SamplableWeight = 1, Weight = 1)\n" +
+		expected := "Validator Set: (Size = 1, SampleableWeight = 1, Weight = 1)\n" +
 			"    Validator[0]:        111111111111111111116DBWJs, 1/1"
 		result := s.String()
 		assert.Equal(t, expected, result, "wrong string returned")
@@ -204,7 +204,7 @@ func TestSamplerMasked(t *testing.T) {
 	assert.NoError(t, err)
 
 	{
-		expected := "Validator Set: (Size = 2, SamplableWeight = 1, Weight = 9223372036854775807)\n" +
+		expected := "Validator Set: (Size = 2, SampleableWeight = 1, Weight = 9223372036854775807)\n" +
 			"    Validator[0]:        111111111111111111116DBWJs, 1/1\n" +
 			"    Validator[1]: QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 0/9223372036854775806"
 		result := s.String()
@@ -215,7 +215,7 @@ func TestSamplerMasked(t *testing.T) {
 	assert.NoError(t, err)
 
 	{
-		expected := "Validator Set: (Size = 2, SamplableWeight = 9223372036854775807, Weight = 9223372036854775807)\n" +
+		expected := "Validator Set: (Size = 2, SampleableWeight = 9223372036854775807, Weight = 9223372036854775807)\n" +
 			"    Validator[0]:        111111111111111111116DBWJs, 1/1\n" +
 			"    Validator[1]: QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806/9223372036854775806"
 		result := s.String()
@@ -226,7 +226,7 @@ func TestSamplerMasked(t *testing.T) {
 	assert.NoError(t, err)
 
 	{
-		expected := "Validator Set: (Size = 2, SamplableWeight = 1, Weight = 9223372036854775807)\n" +
+		expected := "Validator Set: (Size = 2, SampleableWeight = 1, Weight = 9223372036854775807)\n" +
 			"    Validator[0]:        111111111111111111116DBWJs, 1/1\n" +
 			"    Validator[1]: QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 0/9223372036854775806"
 		result := s.String()
@@ -237,7 +237,7 @@ func TestSamplerMasked(t *testing.T) {
 	assert.NoError(t, err)
 
 	{
-		expected := "Validator Set: (Size = 2, SamplableWeight = 9223372036854775807, Weight = 9223372036854775807)\n" +
+		expected := "Validator Set: (Size = 2, SampleableWeight = 9223372036854775807, Weight = 9223372036854775807)\n" +
 			"    Validator[0]:        111111111111111111116DBWJs, 1/1\n" +
 			"    Validator[1]: QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806/9223372036854775806"
 		result := s.String()
@@ -248,7 +248,7 @@ func TestSamplerMasked(t *testing.T) {
 	assert.NoError(t, err)
 
 	{
-		expected := "Validator Set: (Size = 2, SamplableWeight = 9223372036854775807, Weight = 9223372036854775807)\n" +
+		expected := "Validator Set: (Size = 2, SampleableWeight = 9223372036854775807, Weight = 9223372036854775807)\n" +
 			"    Validator[0]:        111111111111111111116DBWJs, 1/1\n" +
 			"    Validator[1]: QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806/9223372036854775806"
 		result := s.String()
