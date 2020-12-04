@@ -55,6 +55,8 @@ const (
 var (
 	errNetworkClosed = errors.New("network closed")
 	errPeerIsMyself  = errors.New("peer is myself")
+
+	minimumUnmaskedVersion = version.NewDefaultVersion(constants.PlatformName, 1, 0, 6)
 )
 
 func init() { rand.Seed(time.Now().UnixNano()) }
@@ -1127,8 +1129,24 @@ func (n *network) connected(p *peer) {
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
 
+	peerVersion := p.versionStruct.GetValue().(version.Version)
+	if peerVersion.Before(minimumUnmaskedVersion) {
+		if err := n.vdrs.MaskValidator(p.id); err != nil {
+			n.log.Error("failed to mask validator %s due to %s", p.id, err)
+		}
+	} else {
+		if err := n.vdrs.RevealValidator(p.id); err != nil {
+			n.log.Error("failed to reveal validator %s due to %s", p.id, err)
+		}
+	}
+
 	ip := p.getIP()
 	n.log.Debug("connected to %s at %s", p.id, ip)
+
+	n.log.Debug("connected to %s at %s, the new staking set is:\n%s",
+		p.id,
+		ip,
+		n.vdrs)
 
 	if !ip.IsZero() {
 		str := ip.String()

@@ -59,7 +59,7 @@ type peer struct {
 	conn net.Conn
 
 	// version that the peer reported during the handshake
-	versionStr utils.AtomicInterface
+	versionStruct, versionStr utils.AtomicInterface
 
 	// unix time of the last message sent and received respectively
 	lastSent, lastReceived int64
@@ -556,6 +556,7 @@ func (p *peer) version(msg Msg) {
 
 	p.SendPeerList()
 
+	p.versionStruct.SetValue(peerVersion)
 	p.versionStr.SetValue(peerVersion.String())
 	p.gotVersion.SetValue(true)
 

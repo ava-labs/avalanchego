@@ -202,8 +202,8 @@ func (n *Node) initNetworking() error {
 
 	if reqWeight > 0 {
 		// Set a timer that will fire after a given timeout unless we connect
-		// to a suffucient portion of stake-weighted nodes. If the timeout fires,
-		// the node will shutdown.
+		// to a sufficient portion of stake-weighted nodes. If the timeout
+		// fires, the node will shutdown.
 		timer := timer.NewTimer(func() {
 			// If the timeout fires and we're already shutting down, nothing to do.
 			if !n.shuttingDown.GetValue() {
