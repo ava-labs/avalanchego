@@ -200,6 +200,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(keystoreAPIEnabledKey, true, "If true, this node exposes the Keystore API")
 	fs.Bool(metricsAPIEnabledKey, true, "If true, this node exposes the Metrics API")
 	fs.Bool(healthAPIEnabledKey, true, "If true, this node exposes the Health API")
+	fs.Bool(xrouterAPIEnabledKey, true, "If true, this node exposes the Health API")
 	fs.Bool(ipcAPIEnabledKey, false, "If true, IPCs can be opened")
 
 	// Throughput Server
@@ -510,6 +511,7 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.KeystoreAPIEnabled = v.GetBool(keystoreAPIEnabledKey)
 	Config.MetricsAPIEnabled = v.GetBool(metricsAPIEnabledKey)
 	Config.HealthAPIEnabled = v.GetBool(healthAPIEnabledKey)
+	Config.XRouterAPIEnabled = v.GetBool(xrouterAPIEnabledKey)
 	Config.IPCAPIEnabled = v.GetBool(ipcAPIEnabledKey)
 
 	// Throughput:

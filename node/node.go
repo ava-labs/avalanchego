@@ -4,6 +4,7 @@
 package node
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
@@ -23,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
+	"github.com/ava-labs/avalanchego/api/xrouterapi"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
@@ -54,6 +56,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/timestampvm"
+	"github.com/blocknetdx/go-xrouter/blockcfg"
+	"github.com/blocknetdx/go-xrouter/xrouter"
 
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
 )
@@ -791,6 +795,42 @@ func (n *Node) initAliases(genesisBytes []byte) error {
 	return nil
 }
 
+// Allows for calls to be made to XRouter
+func (n *Node) initXRouterAPI() error {
+	if !n.Config.XRouterAPIEnabled {
+		n.Log.Info("skipping XRouter API initializaion because it has been disabled")
+		return nil
+	}
+	n.Log.Info("initializing XRouter API")
+
+	config := blockcfg.MainnetParams
+
+	client, err := xrouter.NewClient(config)
+	if err != nil {
+		n.Log.Info(err.Error())
+		return nil
+	}
+	// Start xrouter (this will begin querying the network)
+	client.Start()
+
+	if ready, err := client.WaitForXRouter(context.Background()); err != nil || !ready {
+		errStr := ""
+		if err != nil {
+			errStr = err.Error()
+		}
+		n.Log.Info("XRouter failed to connect and obtain service nodes", errStr)
+		return err
+	}
+	n.Log.Info("XRouter is ready")
+
+	service, err := xrouterapi.NewService(n.Log, config, client)
+
+	if err != nil {
+		return err
+	}
+	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "xrouterapi", "", n.HTTPLog)
+}
+
 // Initialize this node
 func (n *Node) Initialize(
 	config *Config,
@@ -852,6 +892,9 @@ func (n *Node) Initialize(
 	}
 	if err := n.initChainManager(avaxAssetID); err != nil { // Set up the chain manager
 		return fmt.Errorf("couldn't initialize chain manager: %w", err)
+	}
+	if err := n.initXRouterAPI(); err != nil { // Start the XRouter API
+		return fmt.Errorf("couldn't initialize XRouter API: %w", err)
 	}
 	if err := n.initAdminAPI(); err != nil { // Start the Admin API
 		return fmt.Errorf("couldn't initialize admin API: %w", err)

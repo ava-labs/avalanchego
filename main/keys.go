@@ -72,6 +72,7 @@ const (
 	keystoreAPIEnabledKey           = "api-keystore-enabled"
 	metricsAPIEnabledKey            = "api-metrics-enabled"
 	healthAPIEnabledKey             = "api-health-enabled"
+	xrouterAPIEnabledKey            = "api-xrouter-enabled"
 	ipcAPIEnabledKey                = "api-ipcs-enabled"
 	xputServerPortKey               = "xput-server-port"
 	xputServerEnabledKey            = "xput-server-enabled"
