@@ -882,7 +882,19 @@ func (n *network) gossip() {
 			continue
 		}
 
-		ips := n.lockedValidatorIPs()
+		ips := make([]utils.IPDesc, 0, len(allPeers))
+		for _, peer := range allPeers {
+			ip := peer.getIP()
+			if peer.connected.GetValue() &&
+				!ip.IsZero() &&
+				n.vdrs.Contains(peer.id) {
+				peerVersion := peer.versionStruct.GetValue().(version.Version)
+				if !peerVersion.Before(minimumUnmaskedVersion) || time.Since(dates.Apricot0Time) < 0 {
+					ips = append(ips, ip)
+				}
+			}
+		}
+
 		if len(ips) == 0 {
 			n.log.Debug("skipping validator gossiping as no public validators are connected")
 			continue
@@ -1121,12 +1133,6 @@ func (n *network) validatorIPs() []utils.IPDesc {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
-	return n.lockedValidatorIPs()
-}
-
-// assumes the stateLock is held. Returns the ips of connections that have valid
-// IPs that are marked as validators.
-func (n *network) lockedValidatorIPs() []utils.IPDesc {
 	ips := make([]utils.IPDesc, 0, len(n.peers))
 	for _, peer := range n.peers {
 		ip := peer.getIP()
