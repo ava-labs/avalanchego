@@ -3,7 +3,6 @@ package platformvm
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -21,10 +20,6 @@ var (
 	errWrongLocktime                = errors.New("wrong locktime reported")
 	errUnknownOwners                = errors.New("unknown owners")
 	errCantSign                     = errors.New("can't sign")
-
-	// Time at which Apricot phase 0 rules go into effect
-	// Dec 8 2020 @ 11:00:00 PM (UTC)
-	apricot0Time = time.Unix(1607468400, 0)
 )
 
 // stake the provided amount while deducting the provided fee.
@@ -438,7 +433,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		if err != nil {
 			return tempError{fmt.Errorf("couldn't get chain timestamp: %w", err)}
 		}
-		if chainTime.Before(apricot0Time) {
+		if chainTime.Before(Apricot0Time) {
 			// Old rule
 			if locktime == 0 {
 				newUnlockedConsumed, err := safemath.Add64(unlockedConsumed, amount)

@@ -339,13 +339,13 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 			shouldErr: false,
 		},
 		{
-			chainTimestamp: apricot0Time.Add(-1 * time.Second),
+			chainTimestamp: Apricot0Time.Add(-1 * time.Second),
 			description:    "one unlock input, one locked output, zero fee, unlocked, before apricot phase 0",
 			utxos: []*avax.UTXO{
 				{
 					Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 					Out: &StakeableLockOut{
-						Locktime: uint64(apricot0Time.Add(-1*time.Second).Unix()) - 1, // lock expired
+						Locktime: uint64(Apricot0Time.Add(-1*time.Second).Unix()) - 1, // lock expired
 						TransferableOut: &secp256k1fx.TransferOutput{
 							Amt: 1,
 						},
@@ -376,13 +376,13 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 			shouldErr: true,
 		},
 		{
-			chainTimestamp: apricot0Time,
+			chainTimestamp: Apricot0Time,
 			description:    "one unlock input, one locked output, zero fee, unlocked, after apricot phase 0",
 			utxos: []*avax.UTXO{
 				{
 					Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 					Out: &StakeableLockOut{
-						Locktime: uint64(apricot0Time.Unix()) - 1,
+						Locktime: uint64(Apricot0Time.Unix()) - 1,
 						TransferableOut: &secp256k1fx.TransferOutput{
 							Amt: 1,
 						},

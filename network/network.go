@@ -1129,6 +1129,8 @@ func (n *network) connected(p *peer) {
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
 
+	p.connected.SetValue(true)
+
 	peerVersion := p.versionStruct.GetValue().(version.Version)
 	if peerVersion.Before(minimumUnmaskedVersion) {
 		if err := n.vdrs.MaskValidator(p.id); err != nil {

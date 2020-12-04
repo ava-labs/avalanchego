@@ -786,8 +786,6 @@ func (p *peer) tryMarkConnected() {
 		p.gotVersion.GetValue() && // not waiting for version
 		p.gotPeerList.GetValue() && // not waiting for peerlist
 		!p.closed.GetValue() { // and not already disconnected
-
-		p.connected.SetValue(true)
 		p.net.connected(p)
 	}
 }
