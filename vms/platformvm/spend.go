@@ -3,6 +3,7 @@ package platformvm
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -428,13 +429,32 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 		amount := in.Amount()
 
-		if now >= locktime {
-			newUnlockedConsumed, err := safemath.Add64(unlockedConsumed, amount)
-			if err != nil {
-				return permError{err}
+		// Rule change for Apricot phase 0 hardfork
+		// Goes into effect Dec 8 2020 @ 11:00PM (UTC)
+		chainTime, err := vm.getTimestamp(vm.DB)
+		if err != nil {
+			return tempError{fmt.Errorf("couldn't get chain timestamp: %w", err)}
+		}
+		if chainTime.After(time.Unix(1607472000, 0).Add(-1 * time.Hour)) {
+			// New rule
+			if now >= locktime {
+				newUnlockedConsumed, err := safemath.Add64(unlockedConsumed, amount)
+				if err != nil {
+					return permError{err}
+				}
+				unlockedConsumed = newUnlockedConsumed
+				continue
 			}
-			unlockedConsumed = newUnlockedConsumed
-			continue
+		} else {
+			// Old rule
+			if locktime == 0 {
+				newUnlockedConsumed, err := safemath.Add64(unlockedConsumed, amount)
+				if err != nil {
+					return permError{err}
+				}
+				unlockedConsumed = newUnlockedConsumed
+				continue
+			}
 		}
 
 		owned, ok := out.(Owned)
