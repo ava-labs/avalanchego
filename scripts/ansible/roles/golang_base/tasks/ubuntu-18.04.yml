@@ -1,5 +1,5 @@
 # As mentioned by https://github.com/golang/go/wiki/Ubuntu
-- task: Add Go repository
+- name: Add Go repository
   become: true
   apt_repository:
     repo: ppa:longsleep/golang-backports
