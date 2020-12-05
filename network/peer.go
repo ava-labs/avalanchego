@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/dates"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -334,7 +333,7 @@ func (p *peer) handle(msg Msg) {
 	}
 
 	peerVersion := p.versionStruct.GetValue().(version.Version)
-	if peerVersion.Before(minimumUnmaskedVersion) && time.Until(dates.Apricot0Time) < 0 {
+	if peerVersion.Before(minimumUnmaskedVersion) && time.Until(p.net.apricotPhase0Time) < 0 {
 		p.net.log.Verbo("dropping message from un-upgraded validator %s", p.id)
 		return
 	}

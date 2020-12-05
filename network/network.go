@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/dates"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/sampler"
@@ -139,6 +138,8 @@ type network struct {
 	connMeter                          ConnMeter
 	executor                           timer.Executor
 	b                                  Builder
+	apricotPhase0Time                  time.Time
+
 	// stateLock should never be held when grabbing a peer lock
 	stateLock       sync.RWMutex
 	pendingBytes    int64
@@ -201,6 +202,7 @@ func NewDefaultNetwork(
 	restartOnDisconnected bool,
 	disconnectedCheckFreq time.Duration,
 	disconnectedRestartTimeout time.Duration,
+	apricotPhase0Time time.Time,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -241,6 +243,7 @@ func NewDefaultNetwork(
 		restartOnDisconnected,
 		disconnectedCheckFreq,
 		disconnectedRestartTimeout,
+		apricotPhase0Time,
 	)
 }
 
@@ -284,6 +287,7 @@ func NewNetwork(
 	restartOnDisconnected bool,
 	disconnectedCheckFreq time.Duration,
 	disconnectedRestartTimeout time.Duration,
+	apricotPhase0Time time.Time,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -333,6 +337,7 @@ func NewNetwork(
 		disconnectedCheckFreq:              disconnectedCheckFreq,
 		connectedMeter:                     timer.TimedMeter{Duration: disconnectedRestartTimeout},
 		restarter:                          restarter,
+		apricotPhase0Time:                  apricotPhase0Time,
 	}
 
 	if err := netw.initialize(registerer); err != nil {
@@ -671,7 +676,7 @@ func (n *network) GetHeartbeat() int64 { return atomic.LoadInt64(&n.lastHeartbea
 func (n *network) Dispatch() error {
 	go n.gossip() // Periodically gossip peers
 	go func() {
-		duration := time.Until(dates.Apricot0Time)
+		duration := time.Until(n.apricotPhase0Time)
 		time.Sleep(duration)
 
 		n.stateLock.Lock()
@@ -890,7 +895,7 @@ func (n *network) gossip() {
 				!ip.IsZero() &&
 				n.vdrs.Contains(peer.id) {
 				peerVersion := peer.versionStruct.GetValue().(version.Version)
-				if !peerVersion.Before(minimumUnmaskedVersion) || time.Since(dates.Apricot0Time) < 0 {
+				if !peerVersion.Before(minimumUnmaskedVersion) || time.Since(n.apricotPhase0Time) < 0 {
 					ips = append(ips, ip)
 				}
 			}
@@ -1139,7 +1144,7 @@ func (n *network) validatorIPs() []utils.IPDesc {
 		ip := peer.getIP()
 		if peer.connected.GetValue() && !ip.IsZero() && n.vdrs.Contains(peer.id) {
 			peerVersion := peer.versionStruct.GetValue().(version.Version)
-			if !peerVersion.Before(minimumUnmaskedVersion) || time.Since(dates.Apricot0Time) < 0 {
+			if !peerVersion.Before(minimumUnmaskedVersion) || time.Since(n.apricotPhase0Time) < 0 {
 				ips = append(ips, ip)
 			}
 		}

@@ -244,6 +244,7 @@ func (n *Node) initNetworking() error {
 		n.Config.RestartOnDisconnected,
 		n.Config.DisconnectedCheckFreq,
 		n.Config.DisconnectedRestartTimeout,
+		n.Config.ApricotPhase0Time,
 	)
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
@@ -593,6 +594,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			MinStakeDuration:   n.Config.MinStakeDuration,
 			MaxStakeDuration:   n.Config.MaxStakeDuration,
 			StakeMintingPeriod: n.Config.StakeMintingPeriod,
+			ApricotPhase0Time:  n.Config.ApricotPhase0Time,
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
 			CreationFee: n.Config.CreationTxFee,
