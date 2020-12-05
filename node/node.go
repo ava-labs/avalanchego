@@ -67,7 +67,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 0, 6)
+	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 1, 0)
 	versionParser           = version.NewDefaultParser()
 	beaconConnectionTimeout = 1 * time.Minute
 )
@@ -202,8 +202,8 @@ func (n *Node) initNetworking() error {
 
 	if reqWeight > 0 {
 		// Set a timer that will fire after a given timeout unless we connect
-		// to a suffucient portion of stake-weighted nodes. If the timeout fires,
-		// the node will shutdown.
+		// to a sufficient portion of stake-weighted nodes. If the timeout
+		// fires, the node will shutdown.
 		timer := timer.NewTimer(func() {
 			// If the timeout fires and we're already shutting down, nothing to do.
 			if !n.shuttingDown.GetValue() {
@@ -244,6 +244,7 @@ func (n *Node) initNetworking() error {
 		n.Config.RestartOnDisconnected,
 		n.Config.DisconnectedCheckFreq,
 		n.Config.DisconnectedRestartTimeout,
+		n.Config.ApricotPhase0Time,
 	)
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
@@ -593,6 +594,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			MinStakeDuration:   n.Config.MinStakeDuration,
 			MaxStakeDuration:   n.Config.MaxStakeDuration,
 			StakeMintingPeriod: n.Config.StakeMintingPeriod,
+			ApricotPhase0Time:  n.Config.ApricotPhase0Time,
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
 			CreationFee: n.Config.CreationTxFee,

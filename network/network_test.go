@@ -210,6 +210,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 		false,
 		0,
 		0,
+		time.Now(),
 	)
 	assert.NotNil(t, net)
 
@@ -322,6 +323,7 @@ func TestEstablishConnection(t *testing.T) {
 		false,
 		0,
 		0,
+		time.Now(),
 	)
 	assert.NotNil(t, net0)
 
@@ -346,6 +348,7 @@ func TestEstablishConnection(t *testing.T) {
 		false,
 		0,
 		0,
+		time.Now(),
 	)
 	assert.NotNil(t, net1)
 
@@ -470,6 +473,7 @@ func TestDoubleTrack(t *testing.T) {
 		false,
 		0,
 		0,
+		time.Now(),
 	)
 	assert.NotNil(t, net0)
 
@@ -494,6 +498,7 @@ func TestDoubleTrack(t *testing.T) {
 		false,
 		0,
 		0,
+		time.Now(),
 	)
 	assert.NotNil(t, net1)
 
@@ -619,6 +624,7 @@ func TestDoubleClose(t *testing.T) {
 		false,
 		0,
 		0,
+		time.Now(),
 	)
 	assert.NotNil(t, net0)
 
@@ -643,6 +649,7 @@ func TestDoubleClose(t *testing.T) {
 		false,
 		0,
 		0,
+		time.Now(),
 	)
 	assert.NotNil(t, net1)
 
@@ -773,6 +780,7 @@ func TestTrackConnected(t *testing.T) {
 		false,
 		0,
 		0,
+		time.Now(),
 	)
 	assert.NotNil(t, net0)
 
@@ -797,6 +805,7 @@ func TestTrackConnected(t *testing.T) {
 		false,
 		0,
 		0,
+		time.Now(),
 	)
 	assert.NotNil(t, net1)
 
@@ -901,6 +910,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		false,
 		0,
 		0,
+		time.Now(),
 	)
 	assert.NotNil(t, net0)
 
@@ -925,6 +935,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		false,
 		0,
 		0,
+		time.Now(),
 	)
 	assert.NotNil(t, net1)
 
