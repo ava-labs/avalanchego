@@ -55,6 +55,8 @@ const (
 var (
 	errNetworkClosed = errors.New("network closed")
 	errPeerIsMyself  = errors.New("peer is myself")
+
+	minimumUnmaskedVersion = version.NewDefaultVersion(constants.PlatformName, 1, 1, 0)
 )
 
 func init() { rand.Seed(time.Now().UnixNano()) }
@@ -136,6 +138,8 @@ type network struct {
 	connMeter                          ConnMeter
 	executor                           timer.Executor
 	b                                  Builder
+	apricotPhase0Time                  time.Time
+
 	// stateLock should never be held when grabbing a peer lock
 	stateLock       sync.RWMutex
 	pendingBytes    int64
@@ -170,6 +174,9 @@ type network struct {
 	// restarter can shutdown and restart the node.
 	// If nil, node will not restart even if it has no peers.
 	restarter utils.Restarter
+
+	hasMasked        bool
+	maskedValidators ids.ShortSet
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -195,6 +202,7 @@ func NewDefaultNetwork(
 	restartOnDisconnected bool,
 	disconnectedCheckFreq time.Duration,
 	disconnectedRestartTimeout time.Duration,
+	apricotPhase0Time time.Time,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -235,6 +243,7 @@ func NewDefaultNetwork(
 		restartOnDisconnected,
 		disconnectedCheckFreq,
 		disconnectedRestartTimeout,
+		apricotPhase0Time,
 	)
 }
 
@@ -278,6 +287,7 @@ func NewNetwork(
 	restartOnDisconnected bool,
 	disconnectedCheckFreq time.Duration,
 	disconnectedRestartTimeout time.Duration,
+	apricotPhase0Time time.Time,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -327,6 +337,7 @@ func NewNetwork(
 		disconnectedCheckFreq:              disconnectedCheckFreq,
 		connectedMeter:                     timer.TimedMeter{Duration: disconnectedRestartTimeout},
 		restarter:                          restarter,
+		apricotPhase0Time:                  apricotPhase0Time,
 	}
 
 	if err := netw.initialize(registerer); err != nil {
@@ -664,7 +675,23 @@ func (n *network) GetHeartbeat() int64 { return atomic.LoadInt64(&n.lastHeartbea
 // assumes the stateLock is not held.
 func (n *network) Dispatch() error {
 	go n.gossip() // Periodically gossip peers
-	for {         // Continuously accept new connections
+	go func() {
+		duration := time.Until(n.apricotPhase0Time)
+		time.Sleep(duration)
+
+		n.stateLock.Lock()
+		defer n.stateLock.Unlock()
+
+		n.hasMasked = true
+		for _, vdrID := range n.maskedValidators.List() {
+			if err := n.vdrs.MaskValidator(vdrID); err != nil {
+				n.log.Error("failed to mask validator %s due to %s", vdrID, err)
+			}
+		}
+		n.maskedValidators.Clear()
+		n.log.Verbo("The new staking set is:\n%s", n.vdrs)
+	}()
+	for { // Continuously accept new connections
 		conn, err := n.listener.Accept() // Returns error when n.Close() is called
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
@@ -867,7 +894,10 @@ func (n *network) gossip() {
 			if peer.connected.GetValue() &&
 				!ip.IsZero() &&
 				n.vdrs.Contains(peer.id) {
-				ips = append(ips, ip)
+				peerVersion := peer.versionStruct.GetValue().(version.Version)
+				if !peerVersion.Before(minimumUnmaskedVersion) || time.Since(n.apricotPhase0Time) < 0 {
+					ips = append(ips, ip)
+				}
 			}
 		}
 
@@ -1108,13 +1138,15 @@ func (n *network) tryAddPeer(p *peer) error {
 func (n *network) validatorIPs() []utils.IPDesc {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
+
 	ips := make([]utils.IPDesc, 0, len(n.peers))
 	for _, peer := range n.peers {
 		ip := peer.getIP()
-		if peer.connected.GetValue() &&
-			!ip.IsZero() &&
-			n.vdrs.Contains(peer.id) {
-			ips = append(ips, ip)
+		if peer.connected.GetValue() && !ip.IsZero() && n.vdrs.Contains(peer.id) {
+			peerVersion := peer.versionStruct.GetValue().(version.Version)
+			if !peerVersion.Before(minimumUnmaskedVersion) || time.Since(n.apricotPhase0Time) < 0 {
+				ips = append(ips, ip)
+			}
 		}
 	}
 	return ips
@@ -1126,6 +1158,29 @@ func (n *network) validatorIPs() []utils.IPDesc {
 func (n *network) connected(p *peer) {
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
+
+	p.connected.SetValue(true)
+
+	peerVersion := p.versionStruct.GetValue().(version.Version)
+
+	if n.hasMasked {
+		if peerVersion.Before(minimumUnmaskedVersion) {
+			if err := n.vdrs.MaskValidator(p.id); err != nil {
+				n.log.Error("failed to mask validator %s due to %s", p.id, err)
+			}
+		} else {
+			if err := n.vdrs.RevealValidator(p.id); err != nil {
+				n.log.Error("failed to reveal validator %s due to %s", p.id, err)
+			}
+		}
+		n.log.Verbo("The new staking set is:\n%s", n.vdrs)
+	} else {
+		if peerVersion.Before(minimumUnmaskedVersion) {
+			n.maskedValidators.Add(p.id)
+		} else {
+			n.maskedValidators.Remove(p.id)
+		}
+	}
 
 	ip := p.getIP()
 	n.log.Debug("connected to %s at %s", p.id, ip)
@@ -1202,8 +1257,7 @@ func (n *network) getPeers(validatorIDs ids.ShortSet) []*PeerElement {
 	return peers
 }
 
-// Safe copy the peers
-// assumes the stateLock is not held.
+// Safe copy the peers. Assumes the stateLock is not held.
 func (n *network) getAllPeers() []*peer {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
