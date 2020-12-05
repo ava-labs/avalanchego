@@ -55,6 +55,7 @@ var (
 	errWrongBlockchainID         = errors.New("wrong blockchain ID")
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
+	errNoPermission              = errors.New("the given credential does not authorize transfer of this UTXO")
 )
 
 // VM implements the avalanche.DAGVM interface
@@ -804,8 +805,23 @@ func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cr
 
 	// See if credential [cred] gives permission to spend the UTXO
 	// based on the UTXO's output
-	return fx.VerifyPermission(tx, in.In, cred, utxo.Out)
-	// TODO If this is a managed asset, check whether [cred] matches the asset manager
+	if err := fx.VerifyPermission(tx, in.In, cred, utxo.Out); err == nil {
+		return nil
+	}
+
+	// Check whether [assetID] is a managed asset, and if so, who its manager is
+	_, _, manager, err := vm.state.ManagedAssetStatus(utxoAssetID)
+	if err != nil && err != database.ErrNotFound {
+		return fmt.Errorf("couldn't get asset status: %w", err)
+	} else if err != nil {
+		return errNoPermission
+	}
+
+	// Check whether [cred] was signed by [manager]
+	if err := fx.VerifyPermission(tx, in.In, cred, manager); err != nil {
+		return errNoPermission // It wasn't
+	}
+	return nil
 }
 
 func (vm *VM) verifyTransfer(tx UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable) error {
