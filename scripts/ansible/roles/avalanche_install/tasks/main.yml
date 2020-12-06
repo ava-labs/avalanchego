@@ -40,7 +40,7 @@
   become: true
   copy:
     src: "{{ avalanche_binary }}"
-    dest: "{{ bindir }}/avalanche"
+    dest: "{{ bindir }}/{{ avalanche_binary | basename }}"
     remote_src: true
     owner: root
     group: root

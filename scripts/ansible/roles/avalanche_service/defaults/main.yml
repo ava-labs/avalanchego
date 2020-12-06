@@ -1,2 +1,3 @@
 avalanche_daemon_http_host: localhost
+avalanche_daemon_service_name: avalanchego
 log_level: info
