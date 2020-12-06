@@ -1,3 +1,5 @@
+avalanche_daemon_dynamic_public_ip: ifconfigme
 avalanche_daemon_http_host: localhost
+# This variable is ignored, if avalanche_daemon_dynamic_public_ip is not false
 avalanche_daemon_public_ip: "{{ ansible_facts.default_ipv4.address }}"
 log_level: info

@@ -13,7 +13,11 @@ Restart=always
 RestartSec=1
 User={{ avalanche_daemon_user }}
 ExecStart={{ bindir }}/avalanche \
+{% if avalanche_daemon_dynamic_public_ip %}
+            --dynamic-public-ip="{{ avalanche_daemon_dynamic_public_ip }}" \
+{% else %}
             --public-ip="{{ avalanche_daemon_public_ip }}" \
+{% endif %}
             --http-host="{{ avalanche_daemon_http_host }}" \
             --db-dir="{{ avalanche_daemon_db_dir }}" \
             --plugin-dir="{{ avalanche_daemon_plugin_dir }}" \
