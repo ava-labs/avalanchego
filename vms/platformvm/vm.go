@@ -151,6 +151,9 @@ type VM struct {
 	// Consumption period for the minting function
 	stakeMintingPeriod time.Duration
 
+	// Time of the apricot phase 0 rule change
+	apricotPhase0Time time.Time
+
 	// Contains the IDs of transactions recently dropped because they failed verification.
 	// These txs may be re-issued and put into accepted blocks, so check the database
 	// to see if it was later committed/aborted before reporting that it's dropped.

@@ -22,6 +22,10 @@ if [[ $TRAVIS_BRANCH == "master" ]]; then
   docker tag "$AVALANCHE_IMAGE" "$DOCKERHUB_REPO:latest"
 fi
 
+if [[ $TRAVIS_BRANCH == "dev" ]]; then
+  docker tag "$AVALANCHE_IMAGE" "$DOCKERHUB_REPO:dev"
+fi
+
 if [[ $TRAVIS_TAG != "" ]]; then
   docker tag "$AVALANCHE_IMAGE" "$DOCKERHUB_REPO:$TRAVIS_TAG"
 fi
