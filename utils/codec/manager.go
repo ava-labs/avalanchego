@@ -24,6 +24,8 @@ const (
 var (
 	errUnknownVersion    = errors.New("unknown codec version")
 	errDuplicatedVersion = errors.New("duplicated codec version")
+	errCantPackVersion   = errors.New("couldn't pack codec version")
+	errCantUnpackVersion = errors.New("couldn't unpack codec version")
 )
 
 // Manager describes the functionality for managing codec versions.

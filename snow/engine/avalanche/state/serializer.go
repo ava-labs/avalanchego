@@ -7,7 +7,6 @@ package state
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
@@ -18,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
 )
 
@@ -59,46 +57,43 @@ func (s *Serializer) Initialize(ctx *snow.Context, vm vertex.DAGVM, db database.
 	s.edge.Add(s.state.Edge()...)
 }
 
-// ParseVertex implements the avalanche.State interface
-func (s *Serializer) ParseVertex(b []byte) (avalanche.Vertex, error) {
+// Parse implements the avalanche.State interface
+func (s *Serializer) Parse(b []byte) (avalanche.Vertex, error) {
 	return newUniqueVertex(s, b)
 }
 
-// BuildVertex implements the avalanche.State interface
-func (s *Serializer) BuildVertex(parentIDs []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
-	if len(txs) == 0 {
-		return nil, errNoTxs
-	} else if l := len(txs); l > maxTxsPerVtx {
-		return nil, fmt.Errorf("number of txs (%d) exceeds max (%d)", l, maxTxsPerVtx)
-	} else if l := len(parentIDs); l > maxNumParents {
-		return nil, fmt.Errorf("number of parents (%d) exceeds max (%d)", l, maxNumParents)
-	}
-
-	ids.SortIDs(parentIDs)
-	sortTxs(txs)
-
+// Build implements the avalanche.State interface
+func (s *Serializer) Build(
+	epoch uint32,
+	parentIDs []ids.ID,
+	txs []snowstorm.Tx,
+	restrictions []ids.ID,
+) (avalanche.Vertex, error) {
 	height := uint64(0)
 	for _, parentID := range parentIDs {
 		parent, err := s.getVertex(parentID)
 		if err != nil {
 			return nil, err
 		}
-		height = math.Max64(height, parent.v.vtx.height)
+		height = math.Max64(height, parent.v.vtx.Height())
 	}
 
-	vtx := &innerVertex{
-		chainID:   s.ctx.ChainID,
-		height:    height + 1,
-		parentIDs: parentIDs,
-		txs:       txs,
+	txBytes := make([][]byte, len(txs))
+	for i, tx := range txs {
+		txBytes[i] = tx.Bytes()
 	}
 
-	bytes, err := vtx.Marshal()
+	vtx, err := vertex.Build(
+		s.ctx.ChainID,
+		height,
+		epoch,
+		parentIDs,
+		txBytes,
+		restrictions,
+	)
 	if err != nil {
 		return nil, err
 	}
-	vtx.bytes = bytes
-	vtx.id = hashing.ComputeHash256Array(vtx.bytes)
 
 	uVtx := &uniqueVertex{
 		serializer: s,
@@ -109,17 +104,18 @@ func (s *Serializer) BuildVertex(parentIDs []ids.ID, txs []snowstorm.Tx) (avalan
 	return uVtx, uVtx.setVertex(vtx)
 }
 
-// GetVertex implements the avalanche.State interface
-func (s *Serializer) GetVertex(vtxID ids.ID) (avalanche.Vertex, error) { return s.getVertex(vtxID) }
+// Get implements the avalanche.State interface
+func (s *Serializer) Get(vtxID ids.ID) (avalanche.Vertex, error) { return s.getVertex(vtxID) }
 
 // Edge implements the avalanche.State interface
 func (s *Serializer) Edge() []ids.ID { return s.edge.List() }
 
-func (s *Serializer) parseVertex(b []byte) (*innerVertex, error) {
-	vtx := &innerVertex{}
-	if err := vtx.Unmarshal(b, s.vm); err != nil {
+func (s *Serializer) parseVertex(b []byte) (vertex.StatelessVertex, error) {
+	vtx, err := vertex.Parse(b)
+	if err != nil {
 		return nil, err
-	} else if vtx.chainID != s.ctx.ChainID {
+	}
+	if vtx.ChainID() != s.ctx.ChainID {
 		return nil, errWrongChainID
 	}
 	return vtx, nil
