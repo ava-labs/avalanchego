@@ -39,7 +39,20 @@ type TypeCodec interface {
 	PackPrefix(*wrappers.Packer, reflect.Type) error
 }
 
-// Codec handles marshaling and unmarshaling of structs
+// genericCodec handles marshaling and unmarshaling of structs with a generic
+// implementation for interface encoding.
+//
+// A few notes:
+// 1) We use "marshal" and "serialize" interchangeably, and "unmarshal" and "deserialize" interchangeably
+// 2) To include a field of a struct in the serialized form, add the tag `{tagName}:"true"` to it. `{tagName}` defaults to `serialize`.
+// 3) These typed members of a struct may be serialized:
+//    bool, string, uint[8,16,32,64], int[8,16,32,64],
+//	  structs, slices, arrays, interface.
+//	  structs, slices and arrays can only be serialized if their constituent values can be.
+// 4) To marshal an interface, you must pass a pointer to the value
+// 5) To unmarshal an interface,  you must call codec.RegisterType([instance of the type that fulfills the interface]).
+// 6) Serialized fields must be exported
+// 7) nil slices are marshaled as empty slices
 type genericCodec struct {
 	typer       TypeCodec
 	maxSliceLen int
@@ -54,19 +67,6 @@ func New(typer TypeCodec, tagName string, maxSliceLen int) codec.Codec {
 		fielder:     NewStructFielder(tagName, maxSliceLen),
 	}
 }
-
-// A few notes:
-// 1) See codec_test.go for examples of usage
-// 2) We use "marshal" and "serialize" interchangeably, and "unmarshal" and "deserialize" interchangeably
-// 3) To include a field of a struct in the serialized form, add the tag `{tagName}:"true"` to it. `{tagName}` defaults to `serialize`.
-// 4) These typed members of a struct may be serialized:
-//    bool, string, uint[8,16,32,64], int[8,16,32,64],
-//	  structs, slices, arrays, interface.
-//	  structs, slices and arrays can only be serialized if their constituent values can be.
-// 5) To marshal an interface, you must pass a pointer to the value
-// 6) To unmarshal an interface,  you must call codec.RegisterType([instance of the type that fulfills the interface]).
-// 7) Serialized fields must be exported
-// 8) nil slices are marshaled as empty slices
 
 // To marshal an interface, [value] must be a pointer to the interface
 func (c *genericCodec) MarshalInto(value interface{}, p *wrappers.Packer) error {
