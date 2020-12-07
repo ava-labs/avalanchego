@@ -858,7 +858,7 @@ func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiab
 		return errIncompatibleFx
 	}
 
-	if _, ok := op.Op.(*secp256k1fx.UpdateManagedAssetStatusOperation); ok {
+	if _, ok := op.Op.(*secp256k1fx.UpdateManagedAssetOperation); ok {
 		// This operation updates a managed asset's status
 		// Make sure the last time the status was updated was more than 1 epoch before [tx]
 		// i.e. if [tx] is in epoch n, the latest possible epoch in which the status
@@ -1228,7 +1228,7 @@ func newUpdateManagedAssetStatusOperation(
 		op := &Operation{
 			Asset:   avax.Asset{ID: assetID},
 			UTXOIDs: []*avax.UTXOID{&utxo.UTXOID},
-			Op: &secp256k1fx.UpdateManagedAssetStatusOperation{
+			Op: &secp256k1fx.UpdateManagedAssetOperation{
 				Input: *in,
 				ManagedAssetStatusOutput: secp256k1fx.ManagedAssetStatusOutput{
 					Frozen:  frozen,

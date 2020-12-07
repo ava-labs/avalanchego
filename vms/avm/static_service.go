@@ -76,7 +76,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		c.RegisterType(&secp256k1fx.MintOperation{}),
 		c.RegisterType(&secp256k1fx.Credential{}),
 		c.RegisterType(&secp256k1fx.ManagedAssetStatusOutput{}),
-		c.RegisterType(&secp256k1fx.UpdateManagedAssetStatusOperation{}),
+		c.RegisterType(&secp256k1fx.UpdateManagedAssetOperation{}),
 	)
 	if errs.Errored() {
 		return errs.Err

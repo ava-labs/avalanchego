@@ -697,21 +697,21 @@ type Manager struct {
 
 // CreateManagedAssetArgs ...
 type CreateManagedAssetArgs struct {
-	CreateVariableCapAssetArgs
-	Manager Manager `json:"manager"`
+	api.JSONSpendHeader         // User, password, from addrs, change addr
+	Name                string  `json:"name"`
+	Symbol              string  `json:"symbol"`
+	Denomination        byte    `json:"denomination"`
+	Manager             Manager `json:"manager"`
 }
 
 // CreateManagedAsset returns ID of the newly created managed asset
 func (service *Service) CreateManagedAsset(r *http.Request, args *CreateManagedAssetArgs, reply *AssetIDChangeAddr) error {
-	service.vm.ctx.Log.Info("AVM: CreateManagedAsset called with name: %s symbol: %s number of minters: %d",
+	service.vm.ctx.Log.Info("AVM: CreateManagedAsset called with name: %s symbol: %s",
 		args.Name,
 		args.Symbol,
-		len(args.MinterSets),
 	)
 
 	switch {
-	case len(args.MinterSets) == 0:
-		return errNoMinters
 	case len(args.Manager.Addrs) == 0:
 		return errNoManagerAddrs
 	case args.Manager.Threshold == 0:
@@ -775,33 +775,7 @@ func (service *Service) CreateManagedAsset(r *http.Request, args *CreateManagedA
 		})
 	}
 
-	// Define the iniital asset state (its minters and manager)
-	initialState := &InitialState{
-		FxID: 0, // TODO: Should lookup secp256k1fx FxID
-		Outs: make([]verify.State, 0, len(args.MinterSets)),
-	}
-
-	// Add the minters to the initial asset state
-	// TODO make the asset manager the minter
-	for _, owner := range args.MinterSets {
-		minter := &secp256k1fx.MintOutput{
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: uint32(owner.Threshold),
-				Addrs:     make([]ids.ShortID, 0, len(owner.Minters)),
-			},
-		}
-		for _, address := range owner.Minters {
-			addr, err := service.vm.ParseLocalAddress(address)
-			if err != nil {
-				return err
-			}
-			minter.Addrs = append(minter.Addrs, addr)
-		}
-		ids.SortShortIDs(minter.Addrs)
-		initialState.Outs = append(initialState.Outs, minter)
-	}
-
-	// Add the asset status to the initial asset state
+	// The asset's initial status
 	status := &secp256k1fx.ManagedAssetStatusOutput{
 		Frozen: false,
 		Manager: secp256k1fx.OutputOwners{
@@ -817,8 +791,12 @@ func (service *Service) CreateManagedAsset(r *http.Request, args *CreateManagedA
 		status.Manager.Addrs = append(status.Manager.Addrs, addr)
 	}
 	ids.SortShortIDs(status.Manager.Addrs)
-	initialState.Outs = append(initialState.Outs, status)
-	initialState.Sort(service.vm.codec)
+
+	// Define the iniital asset state (its minters and manager)
+	initialState := &InitialState{
+		FxID: 0, // TODO: Should lookup secp256k1fx FxID
+		Outs: []verify.State{status},
+	}
 
 	tx := Tx{UnsignedTx: &CreateManagedAssetTx{
 		CreateAssetTx: CreateAssetTx{

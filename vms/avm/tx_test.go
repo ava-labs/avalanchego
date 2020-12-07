@@ -42,8 +42,8 @@ func setupCodec() codec.Codec {
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
 		c.RegisterType(&secp256k1fx.MintOperation{}),
 		c.RegisterType(&secp256k1fx.Credential{}),
-		c.RegisterType(&secp256k1fx.ManagedAssetStatusOutput{}),          // TODO do this right
-		c.RegisterType(&secp256k1fx.UpdateManagedAssetStatusOperation{}), // TODO do this right
+		c.RegisterType(&secp256k1fx.ManagedAssetStatusOutput{}),    // TODO do this right
+		c.RegisterType(&secp256k1fx.UpdateManagedAssetOperation{}), // TODO do this right
 	)
 	if errs.Errored() {
 		panic(errs.Err)
