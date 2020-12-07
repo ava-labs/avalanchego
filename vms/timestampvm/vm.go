@@ -8,13 +8,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/vms/components/core"
 )
 
@@ -57,7 +58,7 @@ func (vm *VM) Initialize(
 		ctx.Log.Error("error initializing SnowmanVM: %v", err)
 		return err
 	}
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	manager := codec.NewDefaultManager()
 	if err := manager.RegisterCodec(codecVersion, c); err != nil {
 		return err
