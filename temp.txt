@@ -1,1 +1,0 @@
-avalanche/1.0.6 [network=mainnet, database=v1.0.0, commit=d70a8f5d5565b9aa0cd813085d815b55a27b0f44]
