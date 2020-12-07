@@ -29,7 +29,7 @@ fi
 # Build Coreth, which is run as a subprocess
 echo "Building Coreth..."
 cd "$CORETH_PATH"
-go build -mod= -o "$BINARY_PATH" "plugin/"*.go
+go build -o "$BINARY_PATH" "plugin/"*.go
 cd "$CURRENT_DIR"
 
 # Building coreth + using go get can mess with the go.mod file.
