@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/encdb"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -79,7 +80,7 @@ type Keystore struct {
 
 // Initialize the keystore
 func (ks *Keystore) Initialize(log logging.Logger, db database.Database) error {
-	c := linearcodec.New(linearcodec.DefaultTagName, maxSliceLength)
+	c := linearcodec.New(reflectcodec.DefaultTagName, maxSliceLength)
 	manager := codec.NewManager(maxPackerSize)
 	if err := manager.RegisterCodec(codecVersion, c); err != nil {
 		return err

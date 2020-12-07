@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -133,7 +134,7 @@ func (vm *VM) Initialize(
 
 	vm.pubsub = cjson.NewPubSubServer(ctx)
 
-	genesisCodec := linearcodec.New(linearcodec.DefaultTagName, 1<<20)
+	genesisCodec := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
 	c := linearcodec.NewDefault()
 
 	vm.genesisCodec = codec.NewManager(math.MaxInt32)
