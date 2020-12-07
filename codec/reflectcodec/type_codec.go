@@ -25,7 +25,17 @@ var (
 )
 
 type TypeCodec interface {
+	// UnpackPrefix unpacks the prefix of an interface from the given packer.
+	// The prefix specifies the concrete type that the interface should be
+	// deserialized into. This function returns a new instance of that concrete
+	// type. The concrete type must implement the given type.
 	UnpackPrefix(*wrappers.Packer, reflect.Type) (reflect.Value, error)
+
+	// PackPrefix packs the prefix for the given type into the given packer.
+	// This identifies the bytes that follow, which are the byte representation
+	// of an interface, as having the given concrete type.
+	// When deserializing the bytes, the prefix specifies which concrete type
+	// to deserialize into.
 	PackPrefix(*wrappers.Packer, reflect.Type) error
 }
 
