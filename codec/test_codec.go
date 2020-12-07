@@ -955,6 +955,8 @@ func TestRestrictedSlice(codec GeneralCodec, t testing.TB) {
 
 // Test unmarshaling something with extra data
 func TestExtraSpace(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
 	manager := NewDefaultManager()
 	if err := manager.RegisterCodec(0, codec); err != nil {
 		t.Fatal(err)

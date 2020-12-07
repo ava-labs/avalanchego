@@ -24,6 +24,7 @@ type FieldDesc struct {
 	MaxSliceLen int
 }
 
+// StructFielder handles discovery of serializable fields in a struct.
 type StructFielder interface {
 	GetSerializedFields(t reflect.Type) ([]FieldDesc, error)
 }
@@ -36,7 +37,6 @@ func NewStructFielder(tagName string, maxSliceLen int) StructFielder {
 	}
 }
 
-// Codec handles marshaling and unmarshaling of structs
 type structFielder struct {
 	lock        sync.Mutex
 	tagName     string
