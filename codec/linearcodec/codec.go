@@ -79,7 +79,7 @@ func (c *linearCodec) PackPrefix(p *wrappers.Packer, valueType reflect.Type) err
 
 	typeID, ok := c.typeToTypeID[valueType] // Get the type ID of the value being marshaled
 	if !ok {
-		return fmt.Errorf("can't marshal unregistered type '%v'", valueType.String())
+		return fmt.Errorf("can't marshal unregistered type %q", valueType)
 	}
 	p.PackInt(typeID) // Pack type ID so we know what to unmarshal this into
 	return p.Err
