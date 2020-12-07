@@ -6,11 +6,11 @@ package platformvm
 import (
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -32,7 +32,7 @@ type UnsignedCreateSubnetTx struct {
 // Verify this transaction is well-formed
 func (tx *UnsignedCreateSubnetTx) Verify(
 	ctx *snow.Context,
-	c codec.Codec,
+	c codec.Manager,
 	feeAmount uint64,
 	feeAssetID ids.ID,
 ) error {

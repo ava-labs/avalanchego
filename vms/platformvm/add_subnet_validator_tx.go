@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -54,7 +54,7 @@ func (tx *UnsignedAddSubnetValidatorTx) Weight() uint64 {
 // Verify return nil iff [tx] is valid
 func (tx *UnsignedAddSubnetValidatorTx) Verify(
 	ctx *snow.Context,
-	c codec.Codec,
+	c codec.Manager,
 	feeAmount uint64,
 	feeAssetID ids.ID,
 	minStakeDuration time.Duration,

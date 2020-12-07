@@ -6,8 +6,9 @@ package avax
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/codec"
 )
 
 func TestUTXOIDVerifyNil(t *testing.T) {
@@ -19,7 +20,11 @@ func TestUTXOIDVerifyNil(t *testing.T) {
 }
 
 func TestUTXOID(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
+	manager := codec.NewDefaultManager()
+	if err := manager.RegisterCodec(codecVersion, c); err != nil {
+		t.Fatal(err)
+	}
 
 	utxoID := UTXOID{
 		TxID: ids.ID{
@@ -35,13 +40,13 @@ func TestUTXOID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bytes, err := c.Marshal(&utxoID)
+	bytes, err := manager.Marshal(codecVersion, &utxoID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	newUTXOID := UTXOID{}
-	if err := c.Unmarshal(bytes, &newUTXOID); err != nil {
+	if _, err := manager.Unmarshal(bytes, &newUTXOID); err != nil {
 		t.Fatal(err)
 	}
 

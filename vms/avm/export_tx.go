@@ -7,10 +7,10 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -34,7 +34,7 @@ type ExportTx struct {
 // SyntacticVerify that this transaction is well-formed.
 func (t *ExportTx) SyntacticVerify(
 	ctx *snow.Context,
-	c codec.Codec,
+	c codec.Manager,
 	txFeeAssetID ids.ID,
 	txFee uint64,
 	_ uint64,
@@ -105,7 +105,7 @@ func (t *ExportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 			Out:   out.Out,
 		}
 
-		utxoBytes, err := vm.codec.Marshal(utxo)
+		utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
 		if err != nil {
 			return err
 		}

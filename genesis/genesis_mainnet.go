@@ -175781,5 +175781,6 @@ var (
 		MinStakeDuration:   2 * 7 * 24 * time.Hour,
 		MaxStakeDuration:   365 * 24 * time.Hour,
 		StakeMintingPeriod: 365 * 24 * time.Hour,
+		ApricotPhase0Time:  time.Date(2020, 12, 8, 3, 00, 0, 0, time.UTC),
 	}
 )

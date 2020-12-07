@@ -22,6 +22,8 @@ PLUGIN_DIR="$BUILD_DIR/plugins" # Where plugin binaries (namely coreth) go
 
 if [[ -f "$BUILD_DIR/avalanchego" && -f "$PLUGIN_DIR/evm" ]]; then
         echo "Build Successful"
+        exit 0
 else
         echo "Build failure" 
+        exit 1
 fi

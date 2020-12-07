@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	"github.com/ava-labs/avalanchego/utils/formatting"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
@@ -89,11 +90,7 @@ func (w *WalletService) update(utxos []*avax.UTXO) ([]*avax.UTXO, error) {
 func (w *WalletService) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
 	w.vm.ctx.Log.Info("AVM Wallet: IssueTx called with %s", args.Tx)
 
-	encoding, err := w.vm.encodingManager.GetEncoding(args.Encoding)
-	if err != nil {
-		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
-	}
-	txBytes, err := encoding.ConvertString(args.Tx)
+	txBytes, err := formatting.Decode(args.Encoding, args.Tx)
 	if err != nil {
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
@@ -107,7 +104,6 @@ func (w *WalletService) Send(r *http.Request, args *SendArgs, reply *api.JSONTxI
 	return w.SendMultiple(r, &SendMultipleArgs{
 		JSONSpendHeader: args.JSONSpendHeader,
 		Outputs:         []SendOutput{args.SendOutput},
-		From:            args.From,
 		Memo:            args.Memo,
 	}, reply)
 }
