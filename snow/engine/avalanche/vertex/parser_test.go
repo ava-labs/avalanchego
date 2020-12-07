@@ -10,7 +10,7 @@ import (
 func TestParseInvalid(t *testing.T) {
 	vtxBytes := []byte{}
 	_, err := Parse(vtxBytes)
-	assert.Error(t, err, "Parse on an invalid vertex should have errored")
+	assert.Error(t, err, "parse on an invalid vertex should have errored")
 }
 
 func TestParseValid(t *testing.T) {

@@ -3,8 +3,9 @@ package vertex
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestBuildInvalid(t *testing.T) {
@@ -22,7 +23,7 @@ func TestBuildInvalid(t *testing.T) {
 		txs,
 		restrictions,
 	)
-	assert.Error(t, err, "Build should have errored, but didn't")
+	assert.Error(t, err, "build should have errored because restrictions were provided in epoch 0")
 }
 
 func TestBuildValid(t *testing.T) {
