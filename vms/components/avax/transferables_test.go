@@ -7,8 +7,9 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -42,7 +43,7 @@ func TestTransferableOutputVerify(t *testing.T) {
 }
 
 func TestTransferableOutputSorting(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	if err := c.RegisterType(&TestTransferable{}); err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +101,7 @@ func TestTransferableOutputSorting(t *testing.T) {
 }
 
 func TestTransferableOutputSerialization(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	if err := c.RegisterType(&secp256k1fx.TransferOutput{}); err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +205,7 @@ func TestTransferableInputVerify(t *testing.T) {
 }
 
 func TestTransferableInputSorting(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	if err := c.RegisterType(&TestTransferable{}); err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +268,7 @@ func TestTransferableInputSorting(t *testing.T) {
 }
 
 func TestTransferableInputSerialization(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	if err := c.RegisterType(&secp256k1fx.TransferInput{}); err != nil {
 		t.Fatal(err)
 	}

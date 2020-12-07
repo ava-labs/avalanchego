@@ -6,8 +6,9 @@ package avm
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
@@ -21,7 +22,7 @@ type testOperable struct {
 func (o *testOperable) Outs() []verify.State { return o.Outputs }
 
 func TestOperationVerifyNil(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
 	if err := m.RegisterCodec(codecVersion, c); err != nil {
 		t.Fatal(err)
@@ -34,7 +35,7 @@ func TestOperationVerifyNil(t *testing.T) {
 }
 
 func TestOperationVerifyEmpty(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
 	if err := m.RegisterCodec(codecVersion, c); err != nil {
 		t.Fatal(err)
@@ -49,7 +50,7 @@ func TestOperationVerifyEmpty(t *testing.T) {
 }
 
 func TestOperationVerifyUTXOIDsNotSorted(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
 	if err := m.RegisterCodec(codecVersion, c); err != nil {
 		t.Fatal(err)
@@ -75,7 +76,7 @@ func TestOperationVerifyUTXOIDsNotSorted(t *testing.T) {
 }
 
 func TestOperationVerify(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
 	if err := m.RegisterCodec(codecVersion, c); err != nil {
 		t.Fatal(err)
@@ -98,7 +99,7 @@ func TestOperationVerify(t *testing.T) {
 }
 
 func TestOperationSorting(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	if err := c.RegisterType(&testOperable{}); err != nil {
 		t.Fatal(err)
 	}

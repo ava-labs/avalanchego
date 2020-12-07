@@ -4,7 +4,7 @@
 package secp256k1fx
 
 import (
-	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )

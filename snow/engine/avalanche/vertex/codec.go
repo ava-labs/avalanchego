@@ -4,7 +4,8 @@
 package vertex
 
 import (
-	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -26,8 +27,8 @@ var (
 )
 
 func init() {
-	codecV0 := codec.New("serializeV0", maxSize)
-	codecV1 := codec.New("serializeV1", maxSize)
+	codecV0 := linearcodec.New("serializeV0", maxSize)
+	codecV1 := linearcodec.New("serializeV1", maxSize)
 	Codec = codec.NewManager(maxSize)
 
 	errs := wrappers.Errs{}

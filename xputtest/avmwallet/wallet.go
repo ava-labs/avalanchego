@@ -9,9 +9,10 @@ import (
 
 	stdmath "math"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -46,7 +47,7 @@ type Wallet struct {
 
 // NewWallet returns a new Wallet
 func NewWallet(log logging.Logger, networkID uint32, chainID ids.ID, txFee uint64) (*Wallet, error) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
 	errs := wrappers.Errs{}
 	errs.Add(

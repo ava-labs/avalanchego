@@ -22,10 +22,12 @@ const (
 )
 
 var (
-	errUnknownVersion    = errors.New("unknown codec version")
-	errDuplicatedVersion = errors.New("duplicated codec version")
+	errMarshalNil        = errors.New("can't marshal nil pointer or interface")
+	errUnmarshalNil      = errors.New("can't unmarshal nil")
 	errCantPackVersion   = errors.New("couldn't pack codec version")
 	errCantUnpackVersion = errors.New("couldn't unpack codec version")
+	errUnknownVersion    = errors.New("unknown codec version")
+	errDuplicatedVersion = errors.New("duplicated codec version")
 )
 
 // Manager describes the functionality for managing codec versions.
