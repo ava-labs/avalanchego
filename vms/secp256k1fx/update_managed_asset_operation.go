@@ -10,30 +10,6 @@ var (
 	errNilUpdateManagedAssetOperation = errors.New("UpdateManagedAssetOperation is nil")
 )
 
-// ManagedAssetStatusOutput represents the status of a managed asset
-// [Frozen] is true iff the asset is frozen
-// [OutputOwners] may move any UTXOs with this asset, and may freeze/unfreeze
-// all UTXOs of the asset.
-type ManagedAssetStatusOutput struct {
-	Frozen  bool         `serialize:"true"`
-	Manager OutputOwners `serialize:"true"`
-}
-
-// Verify ...
-func (s *ManagedAssetStatusOutput) Verify() error {
-	return s.Manager.Verify()
-}
-
-// VerifyState ...
-func (s *ManagedAssetStatusOutput) VerifyState() error {
-	return s.Manager.VerifyState()
-}
-
-// Verify ...
-func (s *ManagedAssetStatusOutput) Addresses() [][]byte {
-	return s.Manager.Addresses()
-}
-
 // UpdateManagedAssetStatusOperation updates the status
 // of a managed asset and/or mints more of this asset
 type UpdateManagedAssetOperation struct {
