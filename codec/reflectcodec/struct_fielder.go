@@ -26,6 +26,13 @@ type FieldDesc struct {
 
 // StructFielder handles discovery of serializable fields in a struct.
 type StructFielder interface {
+	// Returns the fields that have been marked as serializable in [t], which is
+	// a struct type. Additionally, returns the custom maximum length slice that
+	// may be serialized into the field, if any.
+	// Returns an error if a field has tag "[tagName]: [TagValue]" but the field
+	// is un-exported.
+	// GetSerializedField(Foo) --> [1,5,8] means Foo.Field(1), Foo.Field(5),
+	// Foo.Field(8) are to be serialized/deserialized.
 	GetSerializedFields(t reflect.Type) ([]FieldDesc, error)
 }
 
@@ -50,10 +57,6 @@ type structFielder struct {
 	serializedFieldIndices map[reflect.Type][]FieldDesc
 }
 
-// Returns the fields that have been marked as serializable in [t], which is a
-// struct type. Returns an error if a field has tag "[tagName]: [TagValue]" but
-// the field is un-exported. e.g. GetSerializedField(Foo) --> [1,5,8] means
-// Foo.Field(1), Foo.Field(5), Foo.Field(8) are to be serialized/deserialized
 func (s *structFielder) GetSerializedFields(t reflect.Type) ([]FieldDesc, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
