@@ -33,6 +33,7 @@ var (
 	errMarshalNil   = errors.New("can't marshal nil pointer or interface")
 	errUnmarshalNil = errors.New("can't unmarshal nil")
 	errNeedPointer  = errors.New("argument to unmarshal must be a pointer")
+	errExtraSpace   = errors.New("trailing buffer space")
 )
 
 // Codec marshals and unmarshals
@@ -284,7 +285,13 @@ func (c *hierarchyCodec) Unmarshal(bytes []byte, dest interface{}) error {
 	if destPtr.Kind() != reflect.Ptr {
 		return errNeedPointer
 	}
-	return c.unmarshal(&p, destPtr.Elem(), c.maxSliceLen)
+	if err := c.unmarshal(&p, destPtr.Elem(), c.maxSliceLen); err != nil {
+		return err
+	}
+	if p.Offset != len(bytes) {
+		return errExtraSpace
+	}
+	return nil
 }
 
 // Unmarshal from p.Bytes into [value]. [value] must be addressable.

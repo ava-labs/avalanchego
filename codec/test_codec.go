@@ -36,6 +36,7 @@ var (
 		TestEmptySliceSerialization,
 		TestSliceWithEmptySerialization,
 		TestRestrictedSlice,
+		TestExtraSpace,
 	}
 )
 
@@ -949,5 +950,20 @@ func TestRestrictedSlice(codec GeneralCodec, t testing.TB) {
 	s.Bytes = []byte{0, 1, 2}
 	if _, err := manager.Marshal(0, s); err == nil {
 		t.Fatalf("Should have errored due to large of a slice")
+	}
+}
+
+// Test unmarshaling something with extra data
+func TestExtraSpace(codec GeneralCodec, t testing.TB) {
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
+
+	byteSlice := []byte{0x00, 0x00, 0x01, 0x02} // codec version 0x0000 then 0x01 for b then 0x02 as extra data.
+	var b byte
+	_, err := manager.Unmarshal(byteSlice, &b)
+	if err == nil {
+		t.Fatalf("Should have errored due to too many bytes being passed in")
 	}
 }
