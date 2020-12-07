@@ -10,6 +10,19 @@ import (
 )
 
 func TestVertexVerify(t *testing.T) {
+	tooManyParents := make([]ids.ID, maxNumParents+1)
+	for i := range tooManyParents {
+		tooManyParents[i][0] = byte(i)
+	}
+	tooManyTxs := make([][]byte, maxTxsPerVtx+1)
+	for i := range tooManyTxs {
+		tooManyTxs[i] = []byte{byte(i)}
+	}
+	tooManyRestrictions := make([]ids.ID, maxTxsPerVtx+1)
+	for i := range tooManyRestrictions {
+		tooManyRestrictions[i][0] = byte(i)
+	}
+
 	tests := []struct {
 		name      string
 		vertex    StatelessVertex
@@ -53,7 +66,7 @@ func TestVertexVerify(t *testing.T) {
 				ChainID:      ids.ID{},
 				Height:       0,
 				Epoch:        0,
-				ParentIDs:    make([]ids.ID, maxNumParents+1),
+				ParentIDs:    tooManyParents,
 				Txs:          [][]byte{{}},
 				Restrictions: []ids.ID{},
 			}},
@@ -80,8 +93,21 @@ func TestVertexVerify(t *testing.T) {
 				Height:       0,
 				Epoch:        0,
 				ParentIDs:    []ids.ID{},
-				Txs:          make([][]byte, maxTxsPerVtx+1),
+				Txs:          tooManyTxs,
 				Restrictions: []ids.ID{},
+			}},
+			shouldErr: true,
+		},
+		{
+			name: "too many vertex restrictions",
+			vertex: statelessVertex{innerStatelessVertex: innerStatelessVertex{
+				Version:      0,
+				ChainID:      ids.ID{},
+				Height:       0,
+				Epoch:        0,
+				ParentIDs:    []ids.ID{},
+				Txs:          [][]byte{{}},
+				Restrictions: tooManyRestrictions,
 			}},
 			shouldErr: true,
 		},
@@ -120,6 +146,45 @@ func TestVertexVerify(t *testing.T) {
 				Epoch:        0,
 				ParentIDs:    []ids.ID{},
 				Txs:          [][]byte{{0}, {1}}, // note that txs are sorted by their hashes
+				Restrictions: []ids.ID{},
+			}},
+			shouldErr: true,
+		},
+		{
+			name: "duplicate vertex parents",
+			vertex: statelessVertex{innerStatelessVertex: innerStatelessVertex{
+				Version:      0,
+				ChainID:      ids.ID{},
+				Height:       0,
+				Epoch:        0,
+				ParentIDs:    []ids.ID{{0}, {0}},
+				Txs:          [][]byte{{}},
+				Restrictions: []ids.ID{},
+			}},
+			shouldErr: true,
+		},
+		{
+			name: "duplicate vertex restrictions",
+			vertex: statelessVertex{innerStatelessVertex: innerStatelessVertex{
+				Version:      0,
+				ChainID:      ids.ID{},
+				Height:       0,
+				Epoch:        0,
+				ParentIDs:    []ids.ID{},
+				Txs:          [][]byte{{}},
+				Restrictions: []ids.ID{{0}, {0}},
+			}},
+			shouldErr: true,
+		},
+		{
+			name: "duplicate vertex txs",
+			vertex: statelessVertex{innerStatelessVertex: innerStatelessVertex{
+				Version:      0,
+				ChainID:      ids.ID{},
+				Height:       0,
+				Epoch:        0,
+				ParentIDs:    []ids.ID{},
+				Txs:          [][]byte{{0}, {0}}, // note that txs are sorted by their hashes
 				Restrictions: []ids.ID{},
 			}},
 			shouldErr: true,
