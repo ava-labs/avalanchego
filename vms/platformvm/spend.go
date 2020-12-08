@@ -428,13 +428,31 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 		amount := in.Amount()
 
-		if locktime == 0 {
-			newUnlockedConsumed, err := safemath.Add64(unlockedConsumed, amount)
-			if err != nil {
-				return permError{err}
+		// Rule change for Apricot phase 0 hardfork
+		chainTime, err := vm.getTimestamp(vm.DB)
+		if err != nil {
+			return tempError{fmt.Errorf("couldn't get chain timestamp: %w", err)}
+		}
+		if chainTime.Before(vm.apricotPhase0Time) {
+			// Old rule
+			if locktime == 0 {
+				newUnlockedConsumed, err := safemath.Add64(unlockedConsumed, amount)
+				if err != nil {
+					return permError{err}
+				}
+				unlockedConsumed = newUnlockedConsumed
+				continue
 			}
-			unlockedConsumed = newUnlockedConsumed
-			continue
+		} else {
+			// New rule
+			if now >= locktime {
+				newUnlockedConsumed, err := safemath.Add64(unlockedConsumed, amount)
+				if err != nil {
+					return permError{err}
+				}
+				unlockedConsumed = newUnlockedConsumed
+				continue
+			}
 		}
 
 		owned, ok := out.(Owned)
@@ -518,7 +536,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			if producedAmount > consumedAmount {
 				increase := producedAmount - consumedAmount
 				if increase > unlockedConsumed {
-					return permError{errInvalidAmount}
+					return permError{fmt.Errorf("address %s produces %d unlocked and consumes %d unlocked for locktime %d", ownerID, increase, unlockedConsumed, locktime)}
 				}
 				unlockedConsumed -= increase
 			}
@@ -527,7 +545,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 	// More unlocked tokens produced than consumed. Invalid.
 	if unlockedProduced > unlockedConsumed {
-		return permError{errInvalidAmount}
+		return permError{fmt.Errorf("tx produces more unlocked (%d) than it consumes (%d)", unlockedProduced, unlockedConsumed)}
 	}
 
 	return nil

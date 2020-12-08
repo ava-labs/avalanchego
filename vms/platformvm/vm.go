@@ -11,6 +11,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -20,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -150,6 +151,9 @@ type VM struct {
 	// Consumption period for the minting function
 	stakeMintingPeriod time.Duration
 
+	// Time of the apricot phase 0 rule change
+	apricotPhase0Time time.Time
+
 	// Contains the IDs of transactions recently dropped because they failed verification.
 	// These txs may be re-issued and put into accepted blocks, so check the database
 	// to see if it was later committed/aborted before reporting that it's dropped.
@@ -183,7 +187,7 @@ func (vm *VM) Initialize(
 	vm.fx = &secp256k1fx.Fx{}
 
 	vm.codec = Codec
-	vm.codecRegistry = codec.NewDefault()
+	vm.codecRegistry = linearcodec.NewDefault()
 	if err := vm.fx.Initialize(vm); err != nil {
 		return err
 	}
@@ -315,7 +319,7 @@ func (vm *VM) Initialize(
 	}
 
 	lastAcceptedID := vm.LastAccepted()
-	vm.Ctx.Log.Info("Initializing last accepted block as %s", lastAcceptedID)
+	vm.Ctx.Log.Info("initializing last accepted block as %s", lastAcceptedID)
 
 	// Build off the most recently accepted block
 	vm.SetPreference(lastAcceptedID)
@@ -458,7 +462,12 @@ func (vm *VM) Bootstrapped() error {
 	if err := stopIter.Error(); err != nil {
 		return err
 	}
-	return vm.DB.Commit()
+
+	errs.Add(
+		vm.DB.Commit(),
+		stopDB.Close(),
+	)
+	return errs.Err
 }
 
 // Shutdown this blockchain
@@ -529,13 +538,17 @@ func (vm *VM) Shutdown() error {
 			vm.Ctx.Log.Error("failed to write back uptime data")
 		}
 	}
-	if err := vm.DB.Commit(); err != nil {
-		return err
-	}
 	if err := stopIter.Error(); err != nil {
 		return err
 	}
-	return vm.DB.Close()
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		vm.DB.Commit(),
+		stopDB.Close(),
+		vm.DB.Close(),
+	)
+	return errs.Err
 }
 
 // BuildBlock builds a block to be added to consensus
@@ -767,9 +780,6 @@ pendingStakerLoop:
 		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
-		if err := tx.Sign(vm.codec, nil); err != nil {
-			return err
-		}
 
 		switch staker := tx.UnsignedTx.(type) {
 		case *UnsignedAddDelegatorTx:
@@ -780,6 +790,11 @@ pendingStakerLoop:
 			if staker.StartTime().After(timestamp) {
 				break pendingStakerLoop
 			}
+
+			if err := tx.Sign(vm.codec, nil); err != nil {
+				return err
+			}
+
 			if err := vm.dequeueStaker(db, subnetID, &tx); err != nil {
 				return fmt.Errorf("couldn't dequeue staker: %w", err)
 			}
@@ -804,6 +819,11 @@ pendingStakerLoop:
 			if staker.StartTime().After(timestamp) {
 				break pendingStakerLoop
 			}
+
+			if err := tx.Sign(vm.codec, nil); err != nil {
+				return err
+			}
+
 			if err := vm.dequeueStaker(db, subnetID, &tx); err != nil {
 				return fmt.Errorf("couldn't dequeue staker: %w", err)
 			}
@@ -828,6 +848,11 @@ pendingStakerLoop:
 			if staker.StartTime().After(timestamp) {
 				break pendingStakerLoop
 			}
+
+			if err := tx.Sign(vm.codec, nil); err != nil {
+				return err
+			}
+
 			if err := vm.dequeueStaker(db, subnetID, &tx); err != nil {
 				return fmt.Errorf("couldn't dequeue staker: %w", err)
 			}
@@ -859,9 +884,6 @@ currentStakerLoop:
 		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
-		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
-			return err
-		}
 
 		switch staker := tx.Tx.UnsignedTx.(type) {
 		case *UnsignedAddDelegatorTx:
@@ -888,6 +910,11 @@ currentStakerLoop:
 			if staker.EndTime().After(timestamp) {
 				break currentStakerLoop
 			}
+
+			if err := tx.Tx.Sign(vm.codec, nil); err != nil {
+				return err
+			}
+
 			if err := vm.removeStaker(db, subnetID, &tx); err != nil {
 				return fmt.Errorf("couldn't remove staker: %w", err)
 			}
@@ -899,7 +926,9 @@ currentStakerLoop:
 	errs := wrappers.Errs{}
 	errs.Add(
 		startIter.Error(),
+		startDB.Close(),
 		stopIter.Error(),
+		stopDB.Close(),
 	)
 	return errs.Err
 }
@@ -965,6 +994,7 @@ func (vm *VM) updateVdrSet(subnetID ids.ID) error {
 	errs.Add(
 		vm.vdrMgr.Set(subnetID, vdrs),
 		stopIter.Error(),
+		stopDB.Close(),
 	)
 	return errs.Err
 }
@@ -985,7 +1015,7 @@ func (vm *VM) Logger() logging.Logger { return vm.Ctx.Log }
 // Returns at most [limit] UTXOs.
 // If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
 // Returns:
-// * The fetched of UTXOs
+// * The fetched UTXOs
 // * true if all there are no more UTXOs in this range to fetch
 // * The address associated with the last UTXO fetched
 // * The ID of the last UTXO fetched
@@ -1138,7 +1168,6 @@ func (vm *VM) getStakers() ([]validators.Validator, error) {
 	defer iter.Release()
 
 	stakers := []validators.Validator{}
-
 	for iter.Next() { // Iterates in order of increasing start time
 		txBytes := iter.Value()
 		tx := rewardTx{}
@@ -1155,11 +1184,13 @@ func (vm *VM) getStakers() ([]validators.Validator, error) {
 			stakers = append(stakers, &staker.Validator)
 		}
 	}
-	if err := iter.Error(); err != nil {
-		return nil, err
-	}
 
-	return stakers, nil
+	errs := wrappers.Errs{}
+	errs.Add(
+		iter.Error(),
+		stopDB.Close(),
+	)
+	return stakers, errs.Err
 }
 
 // Returns the pending staker set of the Primary Network.
@@ -1174,7 +1205,6 @@ func (vm *VM) getPendingStakers() ([]validators.Validator, error) {
 	defer iter.Release()
 
 	stakers := []validators.Validator{}
-
 	for iter.Next() { // Iterates in order of increasing start time
 		txBytes := iter.Value()
 		tx := rewardTx{}
@@ -1191,11 +1221,13 @@ func (vm *VM) getPendingStakers() ([]validators.Validator, error) {
 			stakers = append(stakers, &staker.Validator)
 		}
 	}
-	if err := iter.Error(); err != nil {
-		return nil, err
-	}
 
-	return stakers, nil
+	errs := wrappers.Errs{}
+	errs.Add(
+		iter.Error(),
+		startDB.Close(),
+	)
+	return stakers, errs.Err
 }
 
 // Returns the total amount being staked on the Primary Network, in nAVAX.
@@ -1271,9 +1303,6 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return 0, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
-		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
-			return 0, err
-		}
 
 		validator := (*Validator)(nil)
 		switch staker := tx.Tx.UnsignedTx.(type) {
@@ -1289,6 +1318,10 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 
 		if !validator.NodeID.Equals(nodeID) {
 			continue
+		}
+
+		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
+			return 0, err
 		}
 
 		newWeight, err := safemath.Add64(currentWeight, validator.Wght)
@@ -1314,9 +1347,6 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return 0, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
-		if err := tx.Sign(vm.codec, nil); err != nil {
-			return 0, err
-		}
 
 		validator := (*Validator)(nil)
 		switch staker := tx.UnsignedTx.(type) {
@@ -1336,6 +1366,10 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 
 		if !validator.NodeID.Equals(nodeID) {
 			continue
+		}
+
+		if err := tx.Sign(vm.codec, nil); err != nil {
+			return 0, err
 		}
 
 		for len(toRemoveHeap) > 0 && !toRemoveHeap[0].EndTime().After(validator.StartTime()) {
@@ -1378,8 +1412,10 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		startIter.Error(),
 		stopIter.Error(),
+		stopDB.Close(),
+		startIter.Error(),
+		startDB.Close(),
 	)
 	return maxWeight, errs.Err
 }

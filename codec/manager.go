@@ -22,6 +22,10 @@ const (
 )
 
 var (
+	errMarshalNil        = errors.New("can't marshal nil pointer or interface")
+	errUnmarshalNil      = errors.New("can't unmarshal nil")
+	errCantPackVersion   = errors.New("couldn't pack codec version")
+	errCantUnpackVersion = errors.New("couldn't unpack codec version")
 	errUnknownVersion    = errors.New("unknown codec version")
 	errDuplicatedVersion = errors.New("duplicated codec version")
 )
@@ -45,7 +49,7 @@ type Manager interface {
 	Unmarshal(source []byte, destination interface{}) (version uint16, err error)
 }
 
-// NewNewManager returns a new codec manager.
+// NewManager returns a new codec manager.
 func NewManager(maxSize int) Manager {
 	return &manager{
 		maxSize: maxSize,

@@ -10,10 +10,11 @@ import (
 
 	"golang.org/x/crypto/chacha20poly1305"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/nodb"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -36,7 +37,7 @@ func New(password []byte, db database.Database) (*Database, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	manager := codec.NewDefaultManager()
 	return &Database{
 		codec:  manager,

@@ -6,7 +6,9 @@ package platformvm
 import (
 	"math"
 
-	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -22,13 +24,13 @@ var (
 )
 
 func init() {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	Codec = codec.NewDefaultManager()
-	gc := codec.New(codec.DefaultTagName, math.MaxUint32)
+	gc := linearcodec.New(reflectcodec.DefaultTagName, math.MaxUint32)
 	GenesisCodec = codec.NewManager(math.MaxUint32)
 
 	errs := wrappers.Errs{}
-	for _, c := range []codec.Codec{c, gc} {
+	for _, c := range []codec.Registry{c, gc} {
 		errs.Add(
 			c.RegisterType(&ProposalBlock{}),
 			c.RegisterType(&Abort{}),

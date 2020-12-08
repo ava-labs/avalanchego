@@ -7,7 +7,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -84,7 +85,7 @@ func TestTransferInputVerifyUnsorted(t *testing.T) {
 }
 
 func TestTransferInputSerialize(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
 	if err := m.RegisterCodec(0, c); err != nil {
 		t.Fatal(err)

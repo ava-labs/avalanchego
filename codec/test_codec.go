@@ -12,6 +12,34 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
+var (
+	Tests = []func(c GeneralCodec, t testing.TB){
+		TestStruct,
+		TestRegisterStructTwice,
+		TestUInt32,
+		TestSlice,
+		TestMaxSizeSlice,
+		TestBool,
+		TestArray,
+		TestBigArray,
+		TestPointerToStruct,
+		TestSliceOfStruct,
+		TestInterface,
+		TestSliceOfInterface,
+		TestArrayOfInterface,
+		TestPointerToInterface,
+		TestString,
+		TestNilSlice,
+		TestSerializeUnexportedField,
+		TestSerializeOfNoSerializeField,
+		TestNilSliceSerialization,
+		TestEmptySliceSerialization,
+		TestSliceWithEmptySerialization,
+		TestRestrictedSlice,
+		TestExtraSpace,
+	}
+)
+
 // The below structs and interfaces exist
 // for the sake of testing
 
@@ -65,7 +93,7 @@ type myStruct struct {
 }
 
 // Test marshaling/unmarshaling a complicated struct
-func TestStruct(t *testing.T) {
+func TestStruct(codec GeneralCodec, t testing.TB) {
 	temp := Foo(&MyInnerStruct{})
 	myStructInstance := myStruct{
 		InnerStruct:  MyInnerStruct{"hello"},
@@ -92,7 +120,6 @@ func TestStruct(t *testing.T) {
 		MyPointer: &temp,
 	}
 
-	codec := NewDefault()
 	manager := NewDefaultManager()
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -123,10 +150,24 @@ func TestStruct(t *testing.T) {
 	}
 }
 
-func TestUInt32(t *testing.T) {
+func TestRegisterStructTwice(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		codec.RegisterType(&MyInnerStruct{}),
+		codec.RegisterType(&MyInnerStruct{}), // Register the same struct twice
+	)
+	if !errs.Errored() {
+		t.Fatal("Registering the same struct twice should have caused an error")
+	}
+}
+
+func TestUInt32(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
 	number := uint32(500)
 
-	codec := NewDefault()
 	manager := NewDefaultManager()
 	if err := manager.RegisterCodec(0, codec); err != nil {
 		t.Fatal(err)
@@ -151,9 +192,10 @@ func TestUInt32(t *testing.T) {
 	}
 }
 
-func TestSlice(t *testing.T) {
+func TestSlice(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
 	mySlice := []bool{true, false, true, true}
-	codec := NewDefault()
 	manager := NewDefaultManager()
 	if err := manager.RegisterCodec(0, codec); err != nil {
 		t.Fatal(err)
@@ -179,11 +221,12 @@ func TestSlice(t *testing.T) {
 }
 
 // Test marshalling/unmarshalling largest possible slice
-func TestMaxSizeSlice(t *testing.T) {
+func TestMaxSizeSlice(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
 	mySlice := make([]string, math.MaxUint16)
 	mySlice[0] = "first!"
 	mySlice[math.MaxUint16-1] = "last!"
-	codec := NewDefault()
 	manager := NewDefaultManager()
 	if err := manager.RegisterCodec(0, codec); err != nil {
 		t.Fatal(err)
@@ -208,9 +251,10 @@ func TestMaxSizeSlice(t *testing.T) {
 }
 
 // Test marshalling a bool
-func TestBool(t *testing.T) {
+func TestBool(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
 	myBool := true
-	codec := NewDefault()
 	manager := NewDefaultManager()
 	if err := manager.RegisterCodec(0, codec); err != nil {
 		t.Fatal(err)
@@ -235,9 +279,10 @@ func TestBool(t *testing.T) {
 }
 
 // Test marshalling an array
-func TestArray(t *testing.T) {
+func TestArray(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
 	myArr := [5]uint64{5, 6, 7, 8, 9}
-	codec := NewDefault()
 	manager := NewDefaultManager()
 	if err := manager.RegisterCodec(0, codec); err != nil {
 		t.Fatal(err)
@@ -262,9 +307,10 @@ func TestArray(t *testing.T) {
 }
 
 // Test marshalling a really big array
-func TestBigArray(t *testing.T) {
+func TestBigArray(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
 	myArr := [30000]uint64{5, 6, 7, 8, 9}
-	codec := NewDefault()
 	manager := NewDefaultManager()
 	if err := manager.RegisterCodec(0, codec); err != nil {
 		t.Fatal(err)
@@ -289,9 +335,10 @@ func TestBigArray(t *testing.T) {
 }
 
 // Test marshalling a pointer to a struct
-func TestPointerToStruct(t *testing.T) {
+func TestPointerToStruct(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
 	myPtr := &MyInnerStruct{Str: "Hello!"}
-	codec := NewDefault()
 	manager := NewDefaultManager()
 	if err := manager.RegisterCodec(0, codec); err != nil {
 		t.Fatal(err)
@@ -316,7 +363,7 @@ func TestPointerToStruct(t *testing.T) {
 }
 
 // Test marshalling a slice of structs
-func TestSliceOfStruct(t *testing.T) {
+func TestSliceOfStruct(codec GeneralCodec, t testing.TB) {
 	mySlice := []MyInnerStruct3{
 		{
 			Str: "One",
@@ -329,7 +376,6 @@ func TestSliceOfStruct(t *testing.T) {
 			F:   &MyInnerStruct{"Six"},
 		},
 	}
-	codec := NewDefault()
 	if err := codec.RegisterType(&MyInnerStruct{}); err != nil {
 		t.Fatal(err)
 	}
@@ -357,8 +403,7 @@ func TestSliceOfStruct(t *testing.T) {
 }
 
 // Test marshalling an interface
-func TestInterface(t *testing.T) {
-	codec := NewDefault()
+func TestInterface(codec GeneralCodec, t testing.TB) {
 	if err := codec.RegisterType(&MyInnerStruct2{}); err != nil {
 		t.Fatal(err)
 	}
@@ -388,7 +433,7 @@ func TestInterface(t *testing.T) {
 }
 
 // Test marshalling a slice of interfaces
-func TestSliceOfInterface(t *testing.T) {
+func TestSliceOfInterface(codec GeneralCodec, t testing.TB) {
 	mySlice := []Foo{
 		&MyInnerStruct{
 			Str: "Hello",
@@ -397,7 +442,6 @@ func TestSliceOfInterface(t *testing.T) {
 			Str: ", World!",
 		},
 	}
-	codec := NewDefault()
 	if err := codec.RegisterType(&MyInnerStruct{}); err != nil {
 		t.Fatal(err)
 	}
@@ -425,7 +469,7 @@ func TestSliceOfInterface(t *testing.T) {
 }
 
 // Test marshalling an array of interfaces
-func TestArrayOfInterface(t *testing.T) {
+func TestArrayOfInterface(codec GeneralCodec, t testing.TB) {
 	myArray := [2]Foo{
 		&MyInnerStruct{
 			Str: "Hello",
@@ -434,7 +478,6 @@ func TestArrayOfInterface(t *testing.T) {
 			Str: ", World!",
 		},
 	}
-	codec := NewDefault()
 	if err := codec.RegisterType(&MyInnerStruct{}); err != nil {
 		t.Fatal(err)
 	}
@@ -462,11 +505,10 @@ func TestArrayOfInterface(t *testing.T) {
 }
 
 // Test marshalling a pointer to an interface
-func TestPointerToInterface(t *testing.T) {
+func TestPointerToInterface(codec GeneralCodec, t testing.TB) {
 	var myinnerStruct Foo = &MyInnerStruct{Str: "Hello!"}
 	var myPtr *Foo = &myinnerStruct
 
-	codec := NewDefault()
 	if err := codec.RegisterType(&MyInnerStruct{}); err != nil {
 		t.Fatal(err)
 	}
@@ -495,9 +537,10 @@ func TestPointerToInterface(t *testing.T) {
 }
 
 // Test marshalling a string
-func TestString(t *testing.T) {
+func TestString(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
 	myString := "Ayy"
-	codec := NewDefault()
 	manager := NewDefaultManager()
 	if err := manager.RegisterCodec(0, codec); err != nil {
 		t.Fatal(err)
@@ -523,13 +566,14 @@ func TestString(t *testing.T) {
 }
 
 // Ensure a nil slice is unmarshaled to slice with length 0
-func TestNilSlice(t *testing.T) {
+func TestNilSlice(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
 	type structWithSlice struct {
 		Slice []byte `serialize:"true"`
 	}
 
 	myStruct := structWithSlice{Slice: nil}
-	codec := NewDefault()
 	manager := NewDefaultManager()
 	if err := manager.RegisterCodec(0, codec); err != nil {
 		t.Fatal(err)
@@ -556,7 +600,9 @@ func TestNilSlice(t *testing.T) {
 
 // Ensure that trying to serialize a struct with an unexported member
 // that has `serialize:"true"` returns error
-func TestSerializeUnexportedField(t *testing.T) {
+func TestSerializeUnexportedField(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
 	type s struct {
 		ExportedField   string `serialize:"true"`
 		unexportedField string `serialize:"true"`
@@ -567,7 +613,6 @@ func TestSerializeUnexportedField(t *testing.T) {
 		unexportedField: "world!",
 	}
 
-	codec := NewDefault()
 	manager := NewDefaultManager()
 	if err := manager.RegisterCodec(0, codec); err != nil {
 		t.Fatal(err)
@@ -578,7 +623,9 @@ func TestSerializeUnexportedField(t *testing.T) {
 	}
 }
 
-func TestSerializeOfNoSerializeField(t *testing.T) {
+func TestSerializeOfNoSerializeField(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
 	type s struct {
 		SerializedField   string `serialize:"true"`
 		UnserializedField string `serialize:"false"`
@@ -589,7 +636,6 @@ func TestSerializeOfNoSerializeField(t *testing.T) {
 		UnserializedField: "Do not serialize me",
 		UnmarkedField:     "No declared serialize",
 	}
-	codec := NewDefault()
 	manager := NewDefaultManager()
 	if err := manager.RegisterCodec(0, codec); err != nil {
 		t.Fatal(err)
@@ -616,12 +662,13 @@ func TestSerializeOfNoSerializeField(t *testing.T) {
 }
 
 // Test marshalling of nil slice
-func TestNilSliceSerialization(t *testing.T) {
+func TestNilSliceSerialization(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
 	type simpleSliceStruct struct {
 		Arr []uint32 `serialize:"true"`
 	}
 
-	codec := NewDefault()
 	manager := NewDefaultManager()
 	if err := manager.RegisterCodec(0, codec); err != nil {
 		t.Fatal(err)
@@ -652,12 +699,13 @@ func TestNilSliceSerialization(t *testing.T) {
 }
 
 // Test marshaling a slice that has 0 elements (but isn't nil)
-func TestEmptySliceSerialization(t *testing.T) {
+func TestEmptySliceSerialization(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
 	type simpleSliceStruct struct {
 		Arr []uint32 `serialize:"true"`
 	}
 
-	codec := NewDefault()
 	manager := NewDefaultManager()
 	if err := manager.RegisterCodec(0, codec); err != nil {
 		t.Fatal(err)
@@ -689,14 +737,15 @@ func TestEmptySliceSerialization(t *testing.T) {
 }
 
 // Test marshaling slice that is not nil and not empty
-func TestSliceWithEmptySerialization(t *testing.T) {
+func TestSliceWithEmptySerialization(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
 	type emptyStruct struct{}
 
 	type nestedSliceStruct struct {
 		Arr []emptyStruct `serialize:"true"`
 	}
 
-	codec := NewDefault()
 	manager := NewDefaultManager()
 	if err := manager.RegisterCodec(0, codec); err != nil {
 		t.Fatal(err)
@@ -728,21 +777,22 @@ func TestSliceWithEmptySerialization(t *testing.T) {
 	}
 }
 
-func TestSliceWithEmptySerializationOutOfMemory(t *testing.T) {
+func TestSliceWithEmptySerializationOutOfMemory(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
 	type emptyStruct struct{}
 
 	type nestedSliceStruct struct {
 		Arr []emptyStruct `serialize:"true"`
 	}
 
-	codec := NewDefault()
 	manager := NewDefaultManager()
 	if err := manager.RegisterCodec(0, codec); err != nil {
 		t.Fatal(err)
 	}
 
 	val := &nestedSliceStruct{
-		Arr: make([]emptyStruct, defaultMaxSliceLength+1),
+		Arr: make([]emptyStruct, math.MaxInt32),
 	}
 	bytes, err := manager.Marshal(0, val)
 	if err == nil {
@@ -755,8 +805,9 @@ func TestSliceWithEmptySerializationOutOfMemory(t *testing.T) {
 	}
 }
 
-func TestSliceTooLarge(t *testing.T) {
-	codec := NewDefault()
+func TestSliceTooLarge(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
 	manager := NewDefaultManager()
 	if err := manager.RegisterCodec(0, codec); err != nil {
 		t.Fatal(err)
@@ -770,7 +821,9 @@ func TestSliceTooLarge(t *testing.T) {
 }
 
 // Ensure serializing structs with negative number members works
-func TestNegativeNumbers(t *testing.T) {
+func TestNegativeNumbers(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
 	type s struct {
 		MyInt8  int8  `serialize:"true"`
 		MyInt16 int16 `serialize:"true"`
@@ -778,7 +831,6 @@ func TestNegativeNumbers(t *testing.T) {
 		MyInt64 int64 `serialize:"true"`
 	}
 
-	codec := NewDefault()
 	manager := NewDefaultManager()
 	if err := manager.RegisterCodec(0, codec); err != nil {
 		t.Fatal(err)
@@ -807,13 +859,14 @@ func TestNegativeNumbers(t *testing.T) {
 }
 
 // Ensure deserializing structs with too many bytes errors correctly
-func TestTooLargeUnmarshal(t *testing.T) {
+func TestTooLargeUnmarshal(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
 	type inner struct {
 		B uint16 `serialize:"true"`
 	}
 	bytes := []byte{0, 0, 0, 0}
 
-	codec := NewDefault()
 	manager := NewManager(3)
 	if err := manager.RegisterCodec(0, codec); err != nil {
 		t.Fatal(err)
@@ -841,8 +894,9 @@ func (it *innerInterface) ToInt() int { return 0 }
 type innerNoInterface struct{}
 
 // Ensure deserializing structs into the wrong interface errors gracefully
-func TestUnmarshalInvalidInterface(t *testing.T) {
-	codec := NewDefault()
+func TestUnmarshalInvalidInterface(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
 	manager := NewDefaultManager()
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -871,5 +925,47 @@ func TestUnmarshalInvalidInterface(t *testing.T) {
 		if _, err := manager.Unmarshal(bytes, &s); err == nil {
 			t.Fatalf("should have errored")
 		}
+	}
+}
+
+// Ensure deserializing slices that have been length restricted errors correctly
+func TestRestrictedSlice(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
+	type inner struct {
+		Bytes []byte `serialize:"true" len:"2"`
+	}
+	bytes := []byte{0, 0, 0, 0, 0, 3, 0, 1, 2}
+
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
+
+	s := inner{}
+	if _, err := manager.Unmarshal(bytes, &s); err == nil {
+		t.Fatalf("Should have errored due to large of a slice")
+	}
+
+	s.Bytes = []byte{0, 1, 2}
+	if _, err := manager.Marshal(0, s); err == nil {
+		t.Fatalf("Should have errored due to large of a slice")
+	}
+}
+
+// Test unmarshaling something with extra data
+func TestExtraSpace(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
+	manager := NewDefaultManager()
+	if err := manager.RegisterCodec(0, codec); err != nil {
+		t.Fatal(err)
+	}
+
+	byteSlice := []byte{0x00, 0x00, 0x01, 0x02} // codec version 0x0000 then 0x01 for b then 0x02 as extra data.
+	var b byte
+	_, err := manager.Unmarshal(byteSlice, &b)
+	if err == nil {
+		t.Fatalf("Should have errored due to too many bytes being passed in")
 	}
 }

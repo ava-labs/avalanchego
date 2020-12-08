@@ -156,10 +156,7 @@ type manager struct {
 	chains map[ids.ID]*router.Handler
 }
 
-// New returns a new Manager where:
-//     <db> is this node's database
-//     <sender> sends messages to other validators
-//     <validators> validate this chain
+// New returns a new Manager
 func New(config *ManagerConfig) Manager {
 	m := &manager{
 		ManagerConfig: *config,
@@ -625,6 +622,7 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 
 // Shutdown stops all the chains
 func (m *manager) Shutdown() {
+	m.Log.Info("shutting down chain manager")
 	m.ManagerConfig.Router.Shutdown()
 }
 

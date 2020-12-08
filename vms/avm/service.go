@@ -38,7 +38,7 @@ var (
 	errTxNotCreateAsset       = errors.New("transaction doesn't create an asset")
 	errNoMinters              = errors.New("no minters provided")
 	errNoHoldersOrMinters     = errors.New("no minters or initialHolders provided")
-	errInvalidAmount          = errors.New("amount must be positive")
+	errZeroAmount             = errors.New("amount must be positive")
 	errNoOutputs              = errors.New("no outputs to send")
 	errSpendOverflow          = errors.New("spent amount overflows uint64")
 	errInvalidMintAmount      = errors.New("amount minted must be positive")
@@ -686,8 +686,6 @@ func (service *Service) CreateAddress(r *http.Request, args *api.UserPass, reply
 	if err != nil {
 		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
-	// Drop any potential error closing the database to report the original
-	// error
 	defer db.Close()
 
 	user := userState{vm: service.vm}
@@ -737,6 +735,8 @@ func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, respo
 	user := userState{vm: service.vm}
 	addresses, err := user.Addresses(db)
 	if err != nil {
+		// An error fetching the addresses may just mean that the user has no
+		// addresses.
 		return db.Close()
 	}
 
@@ -778,14 +778,12 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 	if err != nil {
 		return fmt.Errorf("problem retrieving user %q: %w", args.Username, err)
 	}
+	defer db.Close()
 
 	user := userState{vm: service.vm}
 
 	sk, err := user.Key(db, addr)
 	if err != nil {
-		// Drop any potential error closing the database to report the original
-		// error
-		_ = db.Close()
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
 
@@ -816,9 +814,6 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	if err != nil {
 		return fmt.Errorf("problem retrieving data: %w", err)
 	}
-
-	// Drop any potential error closing the database to report the original
-	// error
 	defer db.Close()
 
 	user := userState{vm: service.vm}
@@ -887,11 +882,6 @@ type SendArgs struct {
 	// The amount, assetID, and destination to send funds to
 	SendOutput
 
-	// The addresses to send funds from
-	// If empty, will send from any addresses
-	// controlled by the given user
-	From []string `json:"from"`
-
 	// Memo field
 	Memo string `json:"memo"`
 }
@@ -904,11 +894,6 @@ type SendMultipleArgs struct {
 	// The outputs of the transaction
 	Outputs []SendOutput `json:"outputs"`
 
-	// The addresses to send funds from
-	// If empty, will send from any addresses
-	// controlled by the given user
-	From []string `json:"from"`
-
 	// Memo field
 	Memo string `json:"memo"`
 }
@@ -918,7 +903,6 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JSONTxI
 	return service.SendMultiple(r, &SendMultipleArgs{
 		JSONSpendHeader: args.JSONSpendHeader,
 		Outputs:         []SendOutput{args.SendOutput},
-		From:            args.From,
 		Memo:            args.Memo,
 	}, reply)
 }
@@ -969,7 +953,7 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 	outs := []*avax.TransferableOutput{}
 	for _, output := range args.Outputs {
 		if output.Amount == 0 {
-			return errInvalidAmount
+			return errZeroAmount
 		}
 		assetID, ok := assetIDs[output.AssetID] // Asset ID of next output
 		if !ok {
@@ -1586,7 +1570,7 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSO
 	}
 
 	if args.Amount == 0 {
-		return errInvalidAmount
+		return errZeroAmount
 	}
 
 	// Parse the from addresses

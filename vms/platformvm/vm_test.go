@@ -512,18 +512,32 @@ func TestGenesis(t *testing.T) {
 }
 
 func TestGenesisGetUTXOs(t *testing.T) {
-	addr := keys[0].PublicKey().Address()
+	addr0 := keys[0].PublicKey().Address()
+	addr1 := keys[1].PublicKey().Address()
+	addr2 := keys[2].PublicKey().Address()
 	hrp := constants.NetworkIDToHRP[testNetworkID]
-	addrString, _ := formatting.FormatBech32(hrp, addr.Bytes())
 
-	// Create a starting point of 1100 UTXOs
-	utxoCount := 1100
+	addr0Str, _ := formatting.FormatBech32(hrp, addr0.Bytes())
+	addr1Str, _ := formatting.FormatBech32(hrp, addr1.Bytes())
+	addr2Str, _ := formatting.FormatBech32(hrp, addr2.Bytes())
+
+	// Create a starting point of 2000 UTXOs on different addresses
+	utxoCount := 2345
 	var genesisUTXOs []APIUTXO
 	for i := 0; i < utxoCount; i++ {
-		genesisUTXOs = append(genesisUTXOs, APIUTXO{
-			Amount:  json.Uint64(defaultBalance),
-			Address: addrString,
-		})
+		genesisUTXOs = append(genesisUTXOs,
+			APIUTXO{
+				Amount:  json.Uint64(defaultBalance),
+				Address: addr0Str,
+			},
+			APIUTXO{
+				Amount:  json.Uint64(defaultBalance),
+				Address: addr1Str,
+			},
+			APIUTXO{
+				Amount:  json.Uint64(defaultBalance),
+				Address: addr2Str,
+			})
 	}
 
 	// Inject them in the Genesis build
@@ -541,7 +555,32 @@ func TestGenesisGetUTXOs(t *testing.T) {
 	_, _, vm, _ := GenesisVMWithArgs(t, &buildGenesisArgs)
 
 	addrsSet := ids.ShortSet{}
-	addrsSet.Add(addr)
+	addrsSet.Add(addr0, addr1)
+
+	var (
+		fetchedUTXOs []*avax.UTXO
+		err          error
+	)
+
+	lastAddr := ids.ShortEmpty
+	lastIdx := ids.Empty
+
+	var totalUTXOs []*avax.UTXO
+	for i := 0; i <= 3; i++ {
+		fetchedUTXOs, lastAddr, lastIdx, err = vm.GetUTXOs(vm.DB, addrsSet, lastAddr, lastIdx, -1, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(fetchedUTXOs) == utxoCount {
+			t.Fatalf("Wrong number of utxos. Should be Paginated. Expected (%d) returned (%d)", maxUTXOsToFetch, len(fetchedUTXOs))
+		}
+		totalUTXOs = append(totalUTXOs, fetchedUTXOs...)
+	}
+
+	if len(totalUTXOs) != 4*maxUTXOsToFetch {
+		t.Fatalf("Wrong number of utxos. Should have paginated through all. Expected (%d) returned (%d)", 4*maxUTXOsToFetch, len(totalUTXOs))
+	}
 
 	// Fetch all UTXOs
 	notPaginatedUTXOs, _, _, err := vm.GetUTXOs(vm.DB, addrsSet, ids.ShortEmpty, ids.Empty, -1, false)
@@ -549,29 +588,8 @@ func TestGenesisGetUTXOs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(notPaginatedUTXOs) != utxoCount {
-		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", utxoCount, len(notPaginatedUTXOs))
-	}
-
-	// First Page - using paginated calls
-	paginatedUTXOs, lastAddr, lastIdx, err := vm.GetUTXOs(vm.DB, addrsSet, ids.ShortEmpty, ids.Empty, -1, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// either fetches the utxoCount or the maxUTXOsToFetch depending on which is greater
-	if len(paginatedUTXOs) != maxUTXOsToFetch {
-		t.Fatalf("Wrong number of utxos. Should be Paginated. Expected (%d) returned (%d)", maxUTXOsToFetch, len(paginatedUTXOs))
-	}
-
-	// Last Page - using paginated calls (assuming there only 2 pages ofc)
-	paginatedUTXOsLastPage, _, _, err := vm.GetUTXOs(vm.DB, addrsSet, lastAddr, lastIdx, -1, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(paginatedUTXOs)+len(paginatedUTXOsLastPage) != utxoCount {
-		t.Fatalf("Wrong number of utxos. Should have paginated through all. Expected (%d) returned (%d)", utxoCount, len(paginatedUTXOs)+len(paginatedUTXOsLastPage))
+	if len(notPaginatedUTXOs) != 2*utxoCount {
+		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 2*utxoCount, len(notPaginatedUTXOs))
 	}
 }
 
