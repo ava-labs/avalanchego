@@ -4,9 +4,8 @@
 package snow
 
 import (
-	"io"
-	"net/http"
 	"sync"
+	"time"
 
 	stdatomic "sync/atomic"
 
@@ -16,12 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer"
 )
-
-// Callable ...
-type Callable interface {
-	Call(writer http.ResponseWriter, method, base, endpoint string, body io.Reader, headers map[string]string) error
-}
 
 // EventDispatcher ...
 type EventDispatcher interface {
@@ -67,11 +62,16 @@ type Context struct {
 	SharedMemory        atomic.SharedMemory
 	BCLookup            AliasLookup
 	SNLookup            SubnetLookup
+	Namespace           string
+	Metrics             prometheus.Registerer
+
+	// Epoch management
+	EpochFirstTransition time.Time
+	EpochDuration        time.Duration
+	Clock                timer.Clock
 
 	// Non-zero iff this chain bootstrapped. Should only be accessed atomically.
 	bootstrapped uint32
-	Namespace    string
-	Metrics      prometheus.Registerer
 }
 
 // IsBootstrapped returns true iff this chain is done bootstrapping
@@ -82,6 +82,18 @@ func (ctx *Context) IsBootstrapped() bool {
 // Bootstrapped marks this chain as done bootstrapping
 func (ctx *Context) Bootstrapped() {
 	stdatomic.StoreUint32(&ctx.bootstrapped, 1)
+}
+
+// Epoch this context thinks it's in based on the wall clock time.
+func (ctx *Context) Epoch() uint32 {
+	now := ctx.Clock.Time()
+	timeSinceFirstEpochTransition := now.Sub(ctx.EpochFirstTransition)
+	epochsSinceFirstTransition := timeSinceFirstEpochTransition / ctx.EpochDuration
+	currentEpoch := epochsSinceFirstTransition + 1
+	if currentEpoch < 0 {
+		return 0
+	}
+	return uint32(currentEpoch)
 }
 
 // DefaultContextTest ...

@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 type peer struct {
@@ -59,7 +60,7 @@ type peer struct {
 	conn net.Conn
 
 	// version that the peer reported during the handshake
-	versionStr utils.AtomicInterface
+	versionStruct, versionStr utils.AtomicInterface
 
 	// unix time of the last message sent and received respectively
 	lastSent, lastReceived int64
@@ -330,6 +331,13 @@ func (p *peer) handle(msg Msg) {
 		}
 		return
 	}
+
+	peerVersion := p.versionStruct.GetValue().(version.Version)
+	if peerVersion.Before(minimumUnmaskedVersion) && time.Until(p.net.apricotPhase0Time) < 0 {
+		p.net.log.Verbo("dropping message from un-upgraded validator %s", p.id)
+		return
+	}
+
 	switch op {
 	case GetAcceptedFrontier:
 		p.getAcceptedFrontier(msg)
@@ -556,6 +564,7 @@ func (p *peer) version(msg Msg) {
 
 	p.SendPeerList()
 
+	p.versionStruct.SetValue(peerVersion)
 	p.versionStr.SetValue(peerVersion.String())
 	p.gotVersion.SetValue(true)
 
@@ -785,8 +794,6 @@ func (p *peer) tryMarkConnected() {
 		p.gotVersion.GetValue() && // not waiting for version
 		p.gotPeerList.GetValue() && // not waiting for peerlist
 		!p.closed.GetValue() { // and not already disconnected
-
-		p.connected.SetValue(true)
 		p.net.connected(p)
 	}
 }

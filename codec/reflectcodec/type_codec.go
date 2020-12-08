@@ -1,131 +1,86 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package codec
+package reflectcodec
 
 import (
 	"errors"
 	"fmt"
 	"reflect"
-	"sync"
-	"unicode"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
-	// default max length of a slice being marshalled by Marshal(). Should be <= math.MaxUint32.
-	defaultMaxSliceLength = 1 << 18
-
 	// DefaultTagName that enables serialization.
 	DefaultTagName = "serialize"
-
-	// TagValue is the value the tag must have to be serialized.
-	TagValue = "true"
 )
 
 var (
-	errMarshalNil        = errors.New("can't marshal nil pointer or interface")
-	errUnmarshalNil      = errors.New("can't unmarshal nil")
-	errNeedPointer       = errors.New("argument to unmarshal must be a pointer")
-	errCantPackVersion   = errors.New("couldn't pack codec version")
-	errCantUnpackVersion = errors.New("couldn't unpack codec version")
+	errMarshalNil   = errors.New("can't marshal nil pointer or interface")
+	errUnmarshalNil = errors.New("can't unmarshal nil")
+	errNeedPointer  = errors.New("argument to unmarshal must be a pointer")
+	errExtraSpace   = errors.New("trailing buffer space")
 )
 
-// Codec handles marshaling and unmarshaling of structs
-type codec struct {
-	lock         sync.RWMutex
-	tagName      string
-	maxSliceLen  int
-	nextTypeID   uint32
-	typeIDToType map[uint32]reflect.Type
-	typeToTypeID map[reflect.Type]uint32
+type TypeCodec interface {
+	// UnpackPrefix unpacks the prefix of an interface from the given packer.
+	// The prefix specifies the concrete type that the interface should be
+	// deserialized into. This function returns a new instance of that concrete
+	// type. The concrete type must implement the given type.
+	UnpackPrefix(*wrappers.Packer, reflect.Type) (reflect.Value, error)
 
-	fieldLock sync.Mutex
-	// Key: a struct type
-	// Value: Slice where each element is index in the struct type
-	// of a field that is serialized/deserialized
-	// e.g. Foo --> [1,5,8] means Foo.Field(1), etc. are to be serialized/deserialized
-	// We assume this cache is pretty small (a few hundred keys at most)
-	// and doesn't take up much memory
-	serializedFieldIndices map[reflect.Type][]int
+	// PackPrefix packs the prefix for the given type into the given packer.
+	// This identifies the bytes that follow, which are the byte representation
+	// of an interface, as having the given concrete type.
+	// When deserializing the bytes, the prefix specifies which concrete type
+	// to deserialize into.
+	PackPrefix(*wrappers.Packer, reflect.Type) error
 }
 
-// Codec marshals and unmarshals
-type Codec interface {
-	Registry
-	MarshalInto(interface{}, *wrappers.Packer) error
-	Unmarshal([]byte, interface{}) error
-}
-
-// New returns a new, concurrency-safe codec
-func New(tagName string, maxSliceLen int) Codec {
-	return &codec{
-		tagName:                tagName,
-		maxSliceLen:            maxSliceLen,
-		nextTypeID:             0,
-		typeIDToType:           map[uint32]reflect.Type{},
-		typeToTypeID:           map[reflect.Type]uint32{},
-		serializedFieldIndices: map[reflect.Type][]int{},
-	}
-}
-
-// NewDefault returns a new codec with reasonable default values
-func NewDefault() Codec { return New(DefaultTagName, defaultMaxSliceLength) }
-
-// Skip some number of type IDs
-func (c *codec) Skip(num int) {
-	c.lock.Lock()
-	c.nextTypeID += uint32(num)
-	c.lock.Unlock()
-}
-
-// RegisterType is used to register types that may be unmarshaled into an interface
-// [val] is a value of the type being registered
-func (c *codec) RegisterType(val interface{}) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	valType := reflect.TypeOf(val)
-	if _, exists := c.typeToTypeID[valType]; exists {
-		return fmt.Errorf("type %v has already been registered", valType)
-	}
-
-	c.typeIDToType[c.nextTypeID] = reflect.TypeOf(val)
-	c.typeToTypeID[valType] = c.nextTypeID
-	c.nextTypeID++
-	return nil
-}
-
+// genericCodec handles marshaling and unmarshaling of structs with a generic
+// implementation for interface encoding.
+//
 // A few notes:
-// 1) See codec_test.go for examples of usage
-// 2) We use "marshal" and "serialize" interchangeably, and "unmarshal" and "deserialize" interchangeably
-// 3) To include a field of a struct in the serialized form, add the tag `{tagName}:"true"` to it. `{tagName}` defaults to `serialize`.
-// 4) These typed members of a struct may be serialized:
+// 1) We use "marshal" and "serialize" interchangeably, and "unmarshal" and "deserialize" interchangeably
+// 2) To include a field of a struct in the serialized form, add the tag `{tagName}:"true"` to it. `{tagName}` defaults to `serialize`.
+// 3) These typed members of a struct may be serialized:
 //    bool, string, uint[8,16,32,64], int[8,16,32,64],
 //	  structs, slices, arrays, interface.
 //	  structs, slices and arrays can only be serialized if their constituent values can be.
-// 5) To marshal an interface, you must pass a pointer to the value
-// 6) To unmarshal an interface,  you must call codec.RegisterType([instance of the type that fulfills the interface]).
-// 7) Serialized fields must be exported
-// 8) nil slices are marshaled as empty slices
+// 4) To marshal an interface, you must pass a pointer to the value
+// 5) To unmarshal an interface,  you must call codec.RegisterType([instance of the type that fulfills the interface]).
+// 6) Serialized fields must be exported
+// 7) nil slices are marshaled as empty slices
+type genericCodec struct {
+	typer       TypeCodec
+	maxSliceLen int
+	fielder     StructFielder
+}
+
+// New returns a new, concurrency-safe codec
+func New(typer TypeCodec, tagName string, maxSliceLen int) codec.Codec {
+	return &genericCodec{
+		typer:       typer,
+		maxSliceLen: maxSliceLen,
+		fielder:     NewStructFielder(tagName, maxSliceLen),
+	}
+}
 
 // To marshal an interface, [value] must be a pointer to the interface
-func (c *codec) MarshalInto(value interface{}, p *wrappers.Packer) error {
+func (c *genericCodec) MarshalInto(value interface{}, p *wrappers.Packer) error {
 	if value == nil {
 		return errMarshalNil // can't marshal nil
 	}
 
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
-	return c.marshal(reflect.ValueOf(value), p)
+	return c.marshal(reflect.ValueOf(value), p, c.maxSliceLen)
 }
 
 // marshal writes the byte representation of [value] to [p]
 // [value]'s underlying value must not be a nil pointer or interface
 // c.lock should be held for the duration of this function
-func (c *codec) marshal(value reflect.Value, p *wrappers.Packer) error {
+func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSliceLen int) error {
 	valueKind := value.Kind()
 	switch valueKind {
 	case reflect.Interface, reflect.Ptr, reflect.Invalid:
@@ -166,25 +121,23 @@ func (c *codec) marshal(value reflect.Value, p *wrappers.Packer) error {
 		p.PackBool(value.Bool())
 		return p.Err
 	case reflect.Uintptr, reflect.Ptr:
-		return c.marshal(value.Elem(), p)
+		return c.marshal(value.Elem(), p, c.maxSliceLen)
 	case reflect.Interface:
 		underlyingValue := value.Interface()
-		typeID, ok := c.typeToTypeID[reflect.TypeOf(underlyingValue)] // Get the type ID of the value being marshaled
-		if !ok {
-			return fmt.Errorf("can't marshal unregistered type '%v'", reflect.TypeOf(underlyingValue).String())
+		underlyingType := reflect.TypeOf(underlyingValue)
+		if err := c.typer.PackPrefix(p, underlyingType); err != nil {
+			return err
 		}
-		p.PackInt(typeID) // Pack type ID so we know what to unmarshal this into
-		if p.Err != nil {
-			return p.Err
-		}
-		if err := c.marshal(value.Elem(), p); err != nil {
+		if err := c.marshal(value.Elem(), p, c.maxSliceLen); err != nil {
 			return err
 		}
 		return p.Err
 	case reflect.Slice:
 		numElts := value.Len() // # elements in the slice/array. 0 if this slice is nil.
-		if numElts > c.maxSliceLen {
-			return fmt.Errorf("slice length, %d, exceeds maximum length, %d", numElts, c.maxSliceLen)
+		if numElts > maxSliceLen {
+			return fmt.Errorf("slice length, %d, exceeds maximum length, %d",
+				numElts,
+				maxSliceLen)
 		}
 		p.PackInt(uint32(numElts)) // pack # elements
 		if p.Err != nil {
@@ -197,7 +150,7 @@ func (c *codec) marshal(value reflect.Value, p *wrappers.Packer) error {
 			return p.Err
 		}
 		for i := 0; i < numElts; i++ { // Process each element in the slice
-			if err := c.marshal(value.Index(i), p); err != nil {
+			if err := c.marshal(value.Index(i), p, c.maxSliceLen); err != nil {
 				return err
 			}
 		}
@@ -213,18 +166,18 @@ func (c *codec) marshal(value reflect.Value, p *wrappers.Packer) error {
 			return fmt.Errorf("array length, %d, exceeds maximum length, %d", numElts, c.maxSliceLen)
 		}
 		for i := 0; i < numElts; i++ { // Process each element in the array
-			if err := c.marshal(value.Index(i), p); err != nil {
+			if err := c.marshal(value.Index(i), p, c.maxSliceLen); err != nil {
 				return err
 			}
 		}
 		return nil
 	case reflect.Struct:
-		serializedFields, err := c.getSerializedFieldIndices(value.Type())
+		serializedFields, err := c.fielder.GetSerializedFields(value.Type())
 		if err != nil {
 			return err
 		}
-		for _, fieldIndex := range serializedFields { // Go through all fields of this struct that are serialized
-			if err := c.marshal(value.Field(fieldIndex), p); err != nil { // Serialize the field and write to byte array
+		for _, fieldDesc := range serializedFields { // Go through all fields of this struct that are serialized
+			if err := c.marshal(value.Field(fieldDesc.Index), p, fieldDesc.MaxSliceLen); err != nil { // Serialize the field and write to byte array
 				return err
 			}
 		}
@@ -236,13 +189,10 @@ func (c *codec) marshal(value reflect.Value, p *wrappers.Packer) error {
 
 // Unmarshal unmarshals [bytes] into [dest], where
 // [dest] must be a pointer or interface
-func (c *codec) Unmarshal(bytes []byte, dest interface{}) error {
+func (c *genericCodec) Unmarshal(bytes []byte, dest interface{}) error {
 	if dest == nil {
 		return errUnmarshalNil
 	}
-
-	c.lock.RLock()
-	defer c.lock.RUnlock()
 
 	p := wrappers.Packer{
 		Bytes: bytes,
@@ -251,12 +201,18 @@ func (c *codec) Unmarshal(bytes []byte, dest interface{}) error {
 	if destPtr.Kind() != reflect.Ptr {
 		return errNeedPointer
 	}
-	return c.unmarshal(&p, destPtr.Elem())
+	if err := c.unmarshal(&p, destPtr.Elem(), c.maxSliceLen); err != nil {
+		return err
+	}
+	if p.Offset != len(bytes) {
+		return errExtraSpace
+	}
+	return nil
 }
 
 // Unmarshal from p.Bytes into [value]. [value] must be addressable.
 // c.lock should be held for the duration of this function
-func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
+func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSliceLen int) error {
 	switch value.Kind() {
 	case reflect.Uint8:
 		value.SetUint(uint64(p.UnpackByte()))
@@ -317,9 +273,10 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		if p.Err != nil {
 			return fmt.Errorf("couldn't unmarshal slice: %w", p.Err)
 		}
-		if numElts > c.maxSliceLen {
+		if numElts > maxSliceLen {
 			return fmt.Errorf("array length, %d, exceeds maximum length, %d",
-				numElts, c.maxSliceLen)
+				numElts,
+				maxSliceLen)
 		}
 		// If this is a slice of bytes, manually unpack the bytes rather
 		// than calling unmarshal on each byte. This improves performance.
@@ -331,7 +288,7 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		value.Set(reflect.MakeSlice(value.Type(), numElts, numElts))
 		// Unmarshal each element into the appropriate index of the slice
 		for i := 0; i < numElts; i++ {
-			if err := c.unmarshal(p, value.Index(i)); err != nil {
+			if err := c.unmarshal(p, value.Index(i), c.maxSliceLen); err != nil {
 				return fmt.Errorf("couldn't unmarshal slice element: %w", err)
 			}
 		}
@@ -349,7 +306,7 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 			return nil
 		}
 		for i := 0; i < numElts; i++ {
-			if err := c.unmarshal(p, value.Index(i)); err != nil {
+			if err := c.unmarshal(p, value.Index(i), c.maxSliceLen); err != nil {
 				return fmt.Errorf("couldn't unmarshal array element: %w", err)
 			}
 		}
@@ -361,22 +318,12 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		}
 		return nil
 	case reflect.Interface:
-		typeID := p.UnpackInt() // Get the type ID
-		if p.Err != nil {
-			return fmt.Errorf("couldn't unmarshal interface: %w", p.Err)
+		intfImplementor, err := c.typer.UnpackPrefix(p, value.Type())
+		if err != nil {
+			return err
 		}
-		// Get a type that implements the interface
-		implementingType, ok := c.typeIDToType[typeID]
-		if !ok {
-			return fmt.Errorf("couldn't unmarshal interface: unknown type ID %d", typeID)
-		}
-		// Ensure type actually does implement the interface
-		if valueType := value.Type(); !implementingType.Implements(valueType) {
-			return fmt.Errorf("couldn't unmarshal interface: %s does not implement interface %s", implementingType, valueType)
-		}
-		intfImplementor := reflect.New(implementingType).Elem() // instance of the proper type
 		// Unmarshal into the struct
-		if err := c.unmarshal(p, intfImplementor); err != nil {
+		if err := c.unmarshal(p, intfImplementor, c.maxSliceLen); err != nil {
 			return fmt.Errorf("couldn't unmarshal interface: %w", err)
 		}
 		// And assign the filled struct to the value
@@ -384,13 +331,13 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		return nil
 	case reflect.Struct:
 		// Get indices of fields that will be unmarshaled into
-		serializedFieldIndices, err := c.getSerializedFieldIndices(value.Type())
+		serializedFieldIndices, err := c.fielder.GetSerializedFields(value.Type())
 		if err != nil {
 			return fmt.Errorf("couldn't unmarshal struct: %w", err)
 		}
 		// Go through the fields and umarshal into them
-		for _, index := range serializedFieldIndices {
-			if err := c.unmarshal(p, value.Field(index)); err != nil {
+		for _, fieldDesc := range serializedFieldIndices {
+			if err := c.unmarshal(p, value.Field(fieldDesc.Index), fieldDesc.MaxSliceLen); err != nil {
 				return fmt.Errorf("couldn't unmarshal struct: %w", err)
 			}
 		}
@@ -401,7 +348,7 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		// Create a new pointer to a new value of the underlying type
 		v := reflect.New(t)
 		// Fill the value
-		if err := c.unmarshal(p, v.Elem()); err != nil {
+		if err := c.unmarshal(p, v.Elem(), c.maxSliceLen); err != nil {
 			return fmt.Errorf("couldn't unmarshal pointer: %w", err)
 		}
 		// Assign to the top-level struct's member
@@ -412,35 +359,4 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 	default:
 		return fmt.Errorf("can't unmarshal unknown type %s", value.Kind().String())
 	}
-}
-
-// Returns the indices of the serializable fields of [t], which is a struct type
-// Returns an error if a field has tag "serialize: true" but the field is unexported
-// e.g. getSerializedFieldIndices(Foo) --> [1,5,8] means Foo.Field(1), Foo.Field(5), Foo.Field(8)
-// are to be serialized/deserialized
-// c.lock should be held for the duration of this method
-func (c *codec) getSerializedFieldIndices(t reflect.Type) ([]int, error) {
-	c.fieldLock.Lock()
-	defer c.fieldLock.Unlock()
-
-	if c.serializedFieldIndices == nil {
-		c.serializedFieldIndices = make(map[reflect.Type][]int)
-	}
-	if serializedFields, ok := c.serializedFieldIndices[t]; ok { // use pre-computed result
-		return serializedFields, nil
-	}
-	numFields := t.NumField()
-	serializedFields := make([]int, 0, numFields)
-	for i := 0; i < numFields; i++ { // Go through all fields of this struct
-		field := t.Field(i)
-		if field.Tag.Get(c.tagName) != TagValue { // Skip fields we don't need to serialize
-			continue
-		}
-		if unicode.IsLower(rune(field.Name[0])) { // Can only marshal exported fields
-			return []int{}, fmt.Errorf("can't marshal unexported field %s", field.Name)
-		}
-		serializedFields = append(serializedFields, i)
-	}
-	c.serializedFieldIndices[t] = serializedFields // cache result
-	return serializedFields, nil
 }

@@ -5,6 +5,5 @@ package codec
 
 // Registry registers new types that can be marshaled into
 type Registry interface {
-	Skip(int)
 	RegisterType(interface{}) error
 }

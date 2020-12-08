@@ -10,8 +10,10 @@ import (
 	"math"
 	"net/http"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -59,7 +61,7 @@ type BuildGenesisReply struct {
 func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	errs := wrappers.Errs{}
 
-	c := codec.New(codec.DefaultTagName, 1<<20)
+	c := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
 	manager := codec.NewManager(math.MaxUint32)
 	errs.Add(
 		c.RegisterType(&BaseTx{}),

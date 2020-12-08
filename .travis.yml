@@ -1,7 +1,7 @@
 language: go
 
 go:
-- 1.13.x
+- 1.15.5
 
 env:
   global:
@@ -32,5 +32,10 @@ jobs:
   - stage: build
     os: osx
     osx_image: xcode11.4
+    script:
+    - ".ci/build_and_test.sh"
+
+  - stage: build
+    os: windows
     script:
     - ".ci/build_and_test.sh"

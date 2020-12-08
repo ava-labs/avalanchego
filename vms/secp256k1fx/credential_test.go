@@ -7,7 +7,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
@@ -29,7 +30,7 @@ func TestCredentialVerifyNil(t *testing.T) {
 }
 
 func TestCredentialSerialize(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
 	if err := m.RegisterCodec(0, c); err != nil {
 		t.Fatal(err)

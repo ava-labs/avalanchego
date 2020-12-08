@@ -15,14 +15,17 @@ import (
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -57,6 +60,8 @@ var (
 	errWrongBlockchainID         = errors.New("wrong blockchain ID")
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
+
+	_ vertex.DAGVM = &VM{}
 )
 
 // VM implements the avalanche.DAGVM interface
@@ -129,8 +134,8 @@ func (vm *VM) Initialize(
 
 	vm.pubsub = cjson.NewPubSubServer(ctx)
 
-	genesisCodec := codec.New(codec.DefaultTagName, 1<<20)
-	c := codec.NewDefault()
+	genesisCodec := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
+	c := linearcodec.NewDefault()
 
 	vm.genesisCodec = codec.NewManager(math.MaxInt32)
 	vm.codec = codec.NewDefaultManager()
@@ -175,7 +180,7 @@ func (vm *VM) Initialize(
 			Fx: fx,
 		}
 		vm.codecRegistry = &codecRegistry{
-			codecs:      []codec.Codec{genesisCodec, c},
+			codecs:      []codec.Registry{genesisCodec, c},
 			index:       i,
 			typeToIndex: vm.typeToFxIndex,
 		}

@@ -38,7 +38,7 @@ var (
 	errTxNotCreateAsset       = errors.New("transaction doesn't create an asset")
 	errNoMinters              = errors.New("no minters provided")
 	errNoHoldersOrMinters     = errors.New("no minters or initialHolders provided")
-	errInvalidAmount          = errors.New("amount must be positive")
+	errZeroAmount             = errors.New("amount must be positive")
 	errNoOutputs              = errors.New("no outputs to send")
 	errSpendOverflow          = errors.New("spent amount overflows uint64")
 	errInvalidMintAmount      = errors.New("amount minted must be positive")
@@ -882,11 +882,6 @@ type SendArgs struct {
 	// The amount, assetID, and destination to send funds to
 	SendOutput
 
-	// The addresses to send funds from
-	// If empty, will send from any addresses
-	// controlled by the given user
-	From []string `json:"from"`
-
 	// Memo field
 	Memo string `json:"memo"`
 }
@@ -899,11 +894,6 @@ type SendMultipleArgs struct {
 	// The outputs of the transaction
 	Outputs []SendOutput `json:"outputs"`
 
-	// The addresses to send funds from
-	// If empty, will send from any addresses
-	// controlled by the given user
-	From []string `json:"from"`
-
 	// Memo field
 	Memo string `json:"memo"`
 }
@@ -913,7 +903,6 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JSONTxI
 	return service.SendMultiple(r, &SendMultipleArgs{
 		JSONSpendHeader: args.JSONSpendHeader,
 		Outputs:         []SendOutput{args.SendOutput},
-		From:            args.From,
 		Memo:            args.Memo,
 	}, reply)
 }
@@ -964,7 +953,7 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 	outs := []*avax.TransferableOutput{}
 	for _, output := range args.Outputs {
 		if output.Amount == 0 {
-			return errInvalidAmount
+			return errZeroAmount
 		}
 		assetID, ok := assetIDs[output.AssetID] // Asset ID of next output
 		if !ok {
@@ -1581,7 +1570,7 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSO
 	}
 
 	if args.Amount == 0 {
-		return errInvalidAmount
+		return errZeroAmount
 	}
 
 	// Parse the from addresses

@@ -8,12 +8,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/components/core"
 )
 
@@ -25,6 +27,8 @@ const (
 var (
 	errNoPendingBlocks = errors.New("there is no block to propose")
 	errBadGenesisBytes = errors.New("genesis data should be bytes (max length 32)")
+
+	_ block.ChainVM = &VM{}
 )
 
 // VM implements the snowman.VM interface
@@ -54,7 +58,7 @@ func (vm *VM) Initialize(
 		ctx.Log.Error("error initializing SnowmanVM: %v", err)
 		return err
 	}
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	manager := codec.NewDefaultManager()
 	if err := manager.RegisterCodec(codecVersion, c); err != nil {
 		return err
@@ -120,6 +124,9 @@ func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 // Values: The handler for that static API
 // We return nil because this VM has no static API
 func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler { return nil }
+
+// Health implements the common.VM interface
+func (vm *VM) Health() (interface{}, error) { return nil, nil }
 
 // BuildBlock returns a block that this vm wants to add to consensus
 func (vm *VM) BuildBlock() (snowman.Block, error) {

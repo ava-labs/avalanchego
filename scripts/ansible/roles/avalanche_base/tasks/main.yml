@@ -1,15 +1,7 @@
-- name: Install Avalanche dependencies
-  become: true
-  apt:
-    name:
-      # Build
-      - cmake
-      - curl
-      - g++
-      - libssl-dev
-      - libuv1-dev
-      - make
-      # Staking key management
-      - openssl
-      - python3-cryptography
-    state: present
+- name: Dispatch tasks
+  include_tasks: "{{ item }}"
+  with_first_found:
+    - "{{ ansible_facts.distribution | lower }}-{{ ansible_facts.distribution_major_version }}.yml"
+    - "{{ ansible_facts.distribution | lower }}.yml"
+  tags:
+    - golang_base
