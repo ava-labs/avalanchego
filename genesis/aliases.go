@@ -38,7 +38,7 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, map
 	}
 
 	genesis := &platformvm.Genesis{} // TODO let's not re-create genesis to do aliasing
-	if err := platformvm.GenesisCodec.Unmarshal(genesisBytes, genesis); err != nil {
+	if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, genesis); err != nil {
 		return nil, nil, nil, err
 	}
 	if err := genesis.Initialize(); err != nil {

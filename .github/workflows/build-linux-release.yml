@@ -11,7 +11,7 @@ on:
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
-  build:
+  build-linux:
     # The type of runner that the job will run on
     runs-on: ubuntu-18.04 
 
@@ -19,6 +19,10 @@ jobs:
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
+    - uses: actions/setup-go@v2
+      with:
+         go-version: '1.15.5' # The Go version to download (if necessary) and use.
+    - run: go version
 
     # Runs a single command using the runners shell
     - name: Build the avalanchego binaries 
@@ -42,6 +46,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}
         TAG: ${{ steps.get_version.outputs.VERSION }}
         BUCKET: ${{ secrets.BUCKET }}
+        ARCH: "amd64"
 
     - name: Create RPM package 
       run: ./.github/workflows/build-rpm-pkg.sh
@@ -50,6 +55,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}
         TAG: ${{ steps.get_version.outputs.VERSION }}
         BUCKET: ${{ secrets.BUCKET }}
+        ARCH: "amd64"
 
     - name: Create tgz package structure
       run: ./.github/workflows/build-tgz-pkg.sh
@@ -58,3 +64,4 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}
         TAG: ${{ steps.get_version.outputs.VERSION }}
         BUCKET: ${{ secrets.BUCKET }}
+        ARCH: "amd64"

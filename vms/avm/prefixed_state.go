@@ -154,7 +154,7 @@ func (s *prefixedState) PutManagedAssetStatus(
 	frozen bool,
 	manager *secp256k1fx.OutputOwners,
 ) error {
-	managerBytes, err := s.state.Codec.Marshal(manager)
+	managerBytes, err := s.state.Codec.Marshal(codecVersion, manager)
 	if err != nil {
 		return fmt.Errorf("couldn't serialize manager: %w", err)
 	}
@@ -204,7 +204,7 @@ func (s *prefixedState) ManagedAssetStatus(assetID ids.ID) (uint32, bool, *secp2
 	}
 
 	var manager secp256k1fx.OutputOwners
-	if err := s.state.Codec.Unmarshal(managerBytes, &manager); err != nil {
+	if _, err := s.state.Codec.Unmarshal(managerBytes, &manager); err != nil {
 		return 0, false, nil, fmt.Errorf("couldn't deserialize manager: %w", err)
 	}
 	return epoch, frozen, &manager, nil

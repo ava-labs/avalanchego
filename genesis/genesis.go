@@ -11,8 +11,10 @@ import (
 	"sort"
 	"time"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -23,6 +25,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+)
+
+const (
+	defaultEncoding = formatting.Hex
+	codecVersion    = 0
 )
 
 // Genesis returns the genesis data of the Platform Chain.
@@ -43,11 +50,10 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 
 	amount := uint64(0)
 
-	encoding := formatting.Hex{}
 	// Specify the genesis state of the AVM
 	avmArgs := avm.BuildGenesisArgs{
 		NetworkID: json.Uint32(config.NetworkID),
-		Encoding:  formatting.HexEncoding,
+		Encoding:  defaultEncoding,
 	}
 	{
 		avax := avm.AssetDefinition{
@@ -79,27 +85,28 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			amount += allocation.InitialAmount
 		}
 
-		encoding.Bytes = memoBytes
-		avax.Memo = encoding.String()
+		var err error
+		avax.Memo, err = formatting.Encode(defaultEncoding, memoBytes)
+		if err != nil {
+			return nil, ids.Empty, fmt.Errorf("couldn't parse memo bytes to string: %w", err)
+		}
 		avmArgs.GenesisData = map[string]avm.AssetDefinition{
 			"AVAX": avax, // The AVM starts out with one asset: AVAX
 		}
 	}
 	avmReply := avm.BuildGenesisReply{}
 
-	avmSS, err := avm.CreateStaticService(formatting.HexEncoding)
-	if err != nil {
-		return nil, ids.ID{}, fmt.Errorf("problem creating avm Static Service: %w", err)
-	}
-	err = avmSS.BuildGenesis(nil, &avmArgs, &avmReply)
+	avmSS := avm.CreateStaticService()
+	err := avmSS.BuildGenesis(nil, &avmArgs, &avmReply)
 	if err != nil {
 		return nil, ids.ID{}, err
 	}
 
-	if err := encoding.FromString(avmReply.Bytes); err != nil {
+	bytes, err := formatting.Decode(defaultEncoding, avmReply.Bytes)
+	if err != nil {
 		return nil, ids.ID{}, fmt.Errorf("couldn't parse avm genesis reply: %w", err)
 	}
-	avaxAssetID, err := AVAXAssetID(encoding.Bytes)
+	avaxAssetID, err := AVAXAssetID(bytes)
 	if err != nil {
 		return nil, ids.ID{}, fmt.Errorf("couldn't generate AVAX asset ID: %w", err)
 	}
@@ -121,6 +128,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		Time:          json.Uint64(config.StartTime),
 		InitialSupply: json.Uint64(initialSupply),
 		Message:       config.Message,
+		Encoding:      defaultEncoding,
 	}
 	for _, allocation := range config.Allocations {
 		if initiallyStaked.Contains(allocation.AVAXAddr) {
@@ -133,12 +141,16 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		}
 		for _, unlock := range allocation.UnlockSchedule {
 			if unlock.Amount > 0 {
+				msgStr, err := formatting.Encode(defaultEncoding, allocation.ETHAddr.Bytes())
+				if err != nil {
+					return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
+				}
 				platformvmArgs.UTXOs = append(platformvmArgs.UTXOs,
 					platformvm.APIUTXO{
 						Locktime: json.Uint64(unlock.Locktime),
 						Amount:   json.Uint64(unlock.Amount),
 						Address:  addr,
-						Message:  formatting.Hex{Bytes: allocation.ETHAddr.Bytes()}.String(),
+						Message:  msgStr,
 					},
 				)
 				amount += unlock.Amount
@@ -166,11 +178,15 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				return nil, ids.ID{}, err
 			}
 			for _, unlock := range allocation.UnlockSchedule {
+				msgStr, err := formatting.Encode(defaultEncoding, allocation.ETHAddr.Bytes())
+				if err != nil {
+					return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
+				}
 				utxos = append(utxos, platformvm.APIUTXO{
 					Locktime: json.Uint64(unlock.Locktime),
 					Amount:   json.Uint64(unlock.Amount),
 					Address:  addr,
-					Message:  formatting.Hex{Bytes: allocation.ETHAddr.Bytes()}.String(),
+					Message:  msgStr,
 				})
 				amount += unlock.Amount
 			}
@@ -196,6 +212,10 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 
 	// Specify the chains that exist upon this network's creation
+	genesisStr, err := formatting.Encode(defaultEncoding, []byte(config.CChainGenesis))
+	if err != nil {
+		return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
+	}
 	platformvmArgs.Chains = []platformvm.APIChain{
 		{
 			GenesisData: avmReply.Bytes,
@@ -209,7 +229,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			Name: "X-Chain",
 		},
 		{
-			GenesisData: formatting.Hex{Bytes: []byte(config.CChainGenesis)}.String(),
+			GenesisData: genesisStr,
 			SubnetID:    constants.PrimaryNetworkID,
 			VMID:        evm.ID,
 			Name:        "C-Chain",
@@ -217,19 +237,17 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 
 	platformvmReply := platformvm.BuildGenesisReply{}
-	platformvmSS, err := platformvm.CreateStaticService(formatting.HexEncoding)
-	if err != nil {
-		return nil, ids.ID{}, fmt.Errorf("problem creating platformvm Static Service: %w", err)
-	}
+	platformvmSS := platformvm.CreateStaticService()
 	if err := platformvmSS.BuildGenesis(nil, &platformvmArgs, &platformvmReply); err != nil {
 		return nil, ids.ID{}, fmt.Errorf("problem while building platform chain's genesis state: %w", err)
 	}
 
-	if err := encoding.FromString(platformvmReply.Bytes); err != nil {
+	genesisBytes, err := formatting.Decode(platformvmReply.Encoding, platformvmReply.Bytes)
+	if err != nil {
 		return nil, ids.ID{}, fmt.Errorf("problem parsing platformvm genesis bytes: %w", err)
 	}
 
-	return encoding.Bytes, avaxAssetID, nil
+	return genesisBytes, avaxAssetID, nil
 }
 
 func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {
@@ -310,7 +328,7 @@ func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.Tx, error) {
 		return nil, err
 	}
 	genesis := platformvm.Genesis{}
-	if err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
+	if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return nil, fmt.Errorf("couldn't unmarshal genesis bytes due to: %w", err)
 	}
 	if err := genesis.Initialize(); err != nil {
@@ -327,7 +345,8 @@ func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.Tx, error) {
 
 // AVAXAssetID ...
 func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
-	c := codec.New(math.MaxUint32, 1<<20)
+	c := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
+	m := codec.NewManager(math.MaxUint32)
 	errs := wrappers.Errs{}
 	errs.Add(
 		c.RegisterType(&avm.BaseTx{}),
@@ -340,13 +359,14 @@ func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
 		c.RegisterType(&secp256k1fx.MintOperation{}),
 		c.RegisterType(&secp256k1fx.Credential{}),
+		m.RegisterCodec(codecVersion, c),
 	)
 	if errs.Errored() {
 		return ids.ID{}, errs.Err
 	}
 
 	genesis := avm.Genesis{}
-	if err := c.Unmarshal(avmGenesisBytes, &genesis); err != nil {
+	if _, err := m.Unmarshal(avmGenesisBytes, &genesis); err != nil {
 		return ids.ID{}, err
 	}
 
@@ -356,11 +376,11 @@ func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 	genesisTx := genesis.Txs[0]
 
 	tx := avm.Tx{UnsignedTx: &genesisTx.CreateAssetTx}
-	unsignedBytes, err := c.Marshal(tx.UnsignedTx)
+	unsignedBytes, err := m.Marshal(codecVersion, tx.UnsignedTx)
 	if err != nil {
 		return ids.ID{}, err
 	}
-	signedBytes, err := c.Marshal(&tx)
+	signedBytes, err := m.Marshal(codecVersion, &tx)
 	if err != nil {
 		return ids.ID{}, err
 	}

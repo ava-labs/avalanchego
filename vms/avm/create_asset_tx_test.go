@@ -7,9 +7,9 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -24,8 +24,8 @@ var (
 	denominationTooLarge = byte(maxDenomination + 1)
 )
 
-func validCreateAssetTx(t *testing.T) (*CreateAssetTx, codec.Codec, *snow.Context) {
-	c := setupCodec()
+func validCreateAssetTx(t *testing.T) (*CreateAssetTx, codec.Manager, *snow.Context) {
+	_, c := setupCodec()
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
@@ -78,7 +78,7 @@ func validCreateAssetTx(t *testing.T) (*CreateAssetTx, codec.Codec, *snow.Contex
 		},
 	}
 
-	unsignedBytes, err := c.Marshal(tx)
+	unsignedBytes, err := c.Marshal(codecVersion, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,7 +265,7 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 		},
 	}}
 
-	c := setupCodec()
+	_, c := setupCodec()
 	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -304,7 +304,7 @@ func TestCreateAssetTxGetters(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerify(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -327,7 +327,7 @@ func TestCreateAssetTxSyntacticVerify(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyNil(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := (*CreateAssetTx)(nil)
 
@@ -338,7 +338,7 @@ func TestCreateAssetTxSyntacticVerifyNil(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyNameTooShort(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -361,7 +361,7 @@ func TestCreateAssetTxSyntacticVerifyNameTooShort(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyNameTooLong(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -386,7 +386,7 @@ func TestCreateAssetTxSyntacticVerifyNameTooLong(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifySymbolTooShort(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -409,7 +409,7 @@ func TestCreateAssetTxSyntacticVerifySymbolTooShort(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifySymbolTooLong(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -432,7 +432,7 @@ func TestCreateAssetTxSyntacticVerifySymbolTooLong(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyNoFxs(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -452,7 +452,7 @@ func TestCreateAssetTxSyntacticVerifyNoFxs(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyDenominationTooLong(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -475,7 +475,7 @@ func TestCreateAssetTxSyntacticVerifyDenominationTooLong(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyNameWithWhitespace(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -498,7 +498,7 @@ func TestCreateAssetTxSyntacticVerifyNameWithWhitespace(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyNameWithInvalidCharacter(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -521,7 +521,7 @@ func TestCreateAssetTxSyntacticVerifyNameWithInvalidCharacter(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyNameWithUnicodeCharacter(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -544,7 +544,7 @@ func TestCreateAssetTxSyntacticVerifyNameWithUnicodeCharacter(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifySymbolWithInvalidCharacter(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -567,7 +567,7 @@ func TestCreateAssetTxSyntacticVerifySymbolWithInvalidCharacter(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyInvalidBaseTx(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -590,7 +590,7 @@ func TestCreateAssetTxSyntacticVerifyInvalidBaseTx(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyInvalidInitialState(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -613,7 +613,7 @@ func TestCreateAssetTxSyntacticVerifyInvalidInitialState(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyUnsortedInitialStates(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{

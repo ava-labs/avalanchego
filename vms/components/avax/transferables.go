@@ -8,9 +8,9 @@ import (
 	"errors"
 	"sort"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
@@ -70,7 +70,7 @@ func (out *TransferableOutput) Verify() error {
 
 type innerSortTransferableOutputs struct {
 	outs  []*TransferableOutput
-	codec codec.Codec
+	codec codec.Manager
 }
 
 func (outs *innerSortTransferableOutputs) Less(i, j int) bool {
@@ -87,11 +87,11 @@ func (outs *innerSortTransferableOutputs) Less(i, j int) bool {
 		return false
 	}
 
-	iBytes, err := outs.codec.Marshal(&iOut.Out)
+	iBytes, err := outs.codec.Marshal(codecVersion, &iOut.Out)
 	if err != nil {
 		return false
 	}
-	jBytes, err := outs.codec.Marshal(&jOut.Out)
+	jBytes, err := outs.codec.Marshal(codecVersion, &jOut.Out)
 	if err != nil {
 		return false
 	}
@@ -101,12 +101,12 @@ func (outs *innerSortTransferableOutputs) Len() int      { return len(outs.outs)
 func (outs *innerSortTransferableOutputs) Swap(i, j int) { o := outs.outs; o[j], o[i] = o[i], o[j] }
 
 // SortTransferableOutputs sorts output objects
-func SortTransferableOutputs(outs []*TransferableOutput, c codec.Codec) {
+func SortTransferableOutputs(outs []*TransferableOutput, c codec.Manager) {
 	sort.Sort(&innerSortTransferableOutputs{outs: outs, codec: c})
 }
 
 // IsSortedTransferableOutputs returns true if output objects are sorted
-func IsSortedTransferableOutputs(outs []*TransferableOutput, c codec.Codec) bool {
+func IsSortedTransferableOutputs(outs []*TransferableOutput, c codec.Manager) bool {
 	return sort.IsSorted(&innerSortTransferableOutputs{outs: outs, codec: c})
 }
 
@@ -202,7 +202,7 @@ func VerifyTx(
 	feeAssetID ids.ID,
 	allIns [][]*TransferableInput,
 	allOuts [][]*TransferableOutput,
-	c codec.Codec,
+	c codec.Manager,
 ) error {
 	fc := NewFlowChecker()
 

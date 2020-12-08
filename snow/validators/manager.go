@@ -23,6 +23,13 @@ type Manager interface {
 	// GetValidators returns the validator set for the given subnet
 	// Returns false if the subnet doesn't exist
 	GetValidators(ids.ID) (Set, bool)
+
+	// MaskValidator hides the named validator from future samplings
+	MaskValidator(ids.ShortID) error
+
+	// RevealValidator ensures the named validator is not hidden from future
+	// samplings
+	RevealValidator(ids.ShortID) error
 }
 
 // NewManager returns a new, empty manager
@@ -35,9 +42,12 @@ func NewManager() Manager {
 // manager implements Manager
 type manager struct {
 	lock sync.Mutex
+
 	// Key: Subnet ID
 	// Value: The validators that validate the subnet
 	subnetToVdrs map[ids.ID]Set
+
+	maskedVdrs ids.ShortSet
 }
 
 func (m *manager) Set(subnetID ids.ID, newSet Set) error {
@@ -60,6 +70,11 @@ func (m *manager) AddWeight(subnetID ids.ID, vdrID ids.ShortID, weight uint64) e
 	vdrs, ok := m.subnetToVdrs[subnetID]
 	if !ok {
 		vdrs = NewSet()
+		for _, maskedVdrID := range m.maskedVdrs.List() {
+			if err := vdrs.MaskValidator(maskedVdrID); err != nil {
+				return err
+			}
+		}
 		m.subnetToVdrs[subnetID] = vdrs
 	}
 	return vdrs.AddWeight(vdrID, weight)
@@ -83,4 +98,40 @@ func (m *manager) GetValidators(subnetID ids.ID) (Set, bool) {
 
 	vdrs, ok := m.subnetToVdrs[subnetID]
 	return vdrs, ok
+}
+
+// MaskValidator implements the Manager interface.
+func (m *manager) MaskValidator(vdrID ids.ShortID) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if m.maskedVdrs.Contains(vdrID) {
+		return nil
+	}
+	m.maskedVdrs.Add(vdrID)
+
+	for _, vdrs := range m.subnetToVdrs {
+		if err := vdrs.MaskValidator(vdrID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RevealValidator implements the Manager interface.
+func (m *manager) RevealValidator(vdrID ids.ShortID) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if !m.maskedVdrs.Contains(vdrID) {
+		return nil
+	}
+	m.maskedVdrs.Remove(vdrID)
+
+	for _, vdrs := range m.subnetToVdrs {
+		if err := vdrs.RevealValidator(vdrID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
