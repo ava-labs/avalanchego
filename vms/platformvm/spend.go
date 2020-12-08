@@ -545,7 +545,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 	// More unlocked tokens produced than consumed. Invalid.
 	if unlockedProduced > unlockedConsumed {
-		return permError{fmt.Errorf("tx produces more unlocked: %d than it consumes: %d", unlockedProduced, unlockedConsumed)}
+		return permError{fmt.Errorf("tx produces more unlocked (%d) than it consumes (%d)", unlockedProduced, unlockedConsumed)}
 	}
 
 	return nil
