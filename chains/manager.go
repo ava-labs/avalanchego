@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/health"
@@ -119,9 +120,11 @@ type ManagerConfig struct {
 	DecisionEvents          *triggers.EventDispatcher
 	ConsensusEvents         *triggers.EventDispatcher
 	DB                      database.Database
-	Router                  router.Router      // Routes incoming messages to the appropriate chain
-	Net                     network.Network    // Sends consensus messages to other validators
-	ConsensusParams         avcon.Parameters   // The consensus parameters (alpha, beta, etc.) for new chains
+	Router                  router.Router    // Routes incoming messages to the appropriate chain
+	Net                     network.Network  // Sends consensus messages to other validators
+	ConsensusParams         avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
+	EpochFirstTransition    time.Time
+	EpochDuration           time.Duration
 	Validators              validators.Manager // Validators validating on this chain
 	NodeID                  ids.ShortID        // The ID of this node
 	NetworkID               uint32             // ID of the network this node is connected to
@@ -153,10 +156,7 @@ type manager struct {
 	chains map[ids.ID]*router.Handler
 }
 
-// New returns a new Manager where:
-//     <db> is this node's database
-//     <sender> sends messages to other validators
-//     <validators> validate this chain
+// New returns a new Manager
 func New(config *ManagerConfig) Manager {
 	m := &manager{
 		ManagerConfig: *config,
@@ -240,21 +240,23 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	}
 
 	ctx := &snow.Context{
-		NetworkID:           m.NetworkID,
-		SubnetID:            chainParams.SubnetID,
-		ChainID:             chainParams.ID,
-		NodeID:              m.NodeID,
-		XChainID:            m.XChainID,
-		AVAXAssetID:         m.AVAXAssetID,
-		Log:                 chainLog,
-		DecisionDispatcher:  m.DecisionEvents,
-		ConsensusDispatcher: m.ConsensusEvents,
-		Keystore:            m.Keystore.NewBlockchainKeyStore(chainParams.ID),
-		SharedMemory:        m.AtomicMemory.NewSharedMemory(chainParams.ID),
-		BCLookup:            m,
-		SNLookup:            m,
-		Namespace:           fmt.Sprintf("%s_%s_vm", constants.PlatformName, primaryAlias),
-		Metrics:             m.ConsensusParams.Metrics,
+		NetworkID:            m.NetworkID,
+		SubnetID:             chainParams.SubnetID,
+		ChainID:              chainParams.ID,
+		NodeID:               m.NodeID,
+		XChainID:             m.XChainID,
+		AVAXAssetID:          m.AVAXAssetID,
+		Log:                  chainLog,
+		DecisionDispatcher:   m.DecisionEvents,
+		ConsensusDispatcher:  m.ConsensusEvents,
+		Keystore:             m.Keystore.NewBlockchainKeyStore(chainParams.ID),
+		SharedMemory:         m.AtomicMemory.NewSharedMemory(chainParams.ID),
+		BCLookup:             m,
+		SNLookup:             m,
+		Namespace:            fmt.Sprintf("%s_%s_vm", constants.PlatformName, primaryAlias),
+		Metrics:              m.ConsensusParams.Metrics,
+		EpochFirstTransition: m.EpochFirstTransition,
+		EpochDuration:        m.EpochDuration,
 	}
 
 	// Get a factory for the vm we want to use on our chain
@@ -620,6 +622,7 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 
 // Shutdown stops all the chains
 func (m *manager) Shutdown() {
+	m.Log.Info("shutting down chain manager")
 	m.ManagerConfig.Router.Shutdown()
 }
 

@@ -35,6 +35,13 @@ type Params struct {
 	MaxStakeDuration time.Duration
 	// StakeMintingPeriod is the amount of time for a consumption period.
 	StakeMintingPeriod time.Duration
+	// EpochFirstTransition is the time that the transition from epoch 0 to 1
+	// should occur.
+	EpochFirstTransition time.Time
+	// EpochDuration is the amount of time that an epoch runs for.
+	EpochDuration time.Duration
+	// Time that Apricot phase 0 rules go into effect
+	ApricotPhase0Time time.Time
 }
 
 // GetParams ...

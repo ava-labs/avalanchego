@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -25,7 +25,6 @@ import (
 var (
 	errDelegatorSubset = errors.New("delegator's time range must be a subset of the validator's time range")
 	errInvalidState    = errors.New("generated output isn't valid state")
-	errInvalidAmount   = errors.New("invalid amount")
 	errCapWeightBroken = errors.New("validator would surpass maximum weight")
 	errOverDelegated   = errors.New("validator would be over delegated")
 
@@ -63,7 +62,7 @@ func (tx *UnsignedAddDelegatorTx) Weight() uint64 {
 // Verify return nil iff [tx] is valid
 func (tx *UnsignedAddDelegatorTx) Verify(
 	ctx *snow.Context,
-	c codec.Codec,
+	c codec.Manager,
 	minDelegatorStake uint64,
 	minStakeDuration time.Duration,
 	maxStakeDuration time.Duration,
@@ -106,7 +105,7 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 	case !avax.IsSortedTransferableOutputs(tx.Stake, c):
 		return errOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
-		return errInvalidAmount
+		return fmt.Errorf("delegator weight %d is not equal to total stake weight %d", tx.Validator.Wght, totalStakeWeight)
 	case tx.Validator.Wght < minDelegatorStake:
 		// Ensure validator is staking at least the minimum amount
 		return errWeightTooSmall

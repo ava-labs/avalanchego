@@ -195,7 +195,7 @@ type GetNodeIPReply struct {
 	IP string `json:"ip"`
 }
 
-// GetNodeVersion returns the version this node is running
+// GetNodeIP returns the IP of this node
 func (service *Info) GetNodeIP(_ *http.Request, _ *struct{}, reply *GetNodeIPReply) error {
 	service.log.Info("Info: GetNodeIP called")
 

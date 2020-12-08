@@ -48,7 +48,10 @@ func defaultService(t *testing.T) *Service {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer vm.Ctx.Lock.Unlock()
-	ks := keystore.CreateTestKeystore()
+	ks, err := keystore.CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := ks.AddUser(testUsername, testPassword); err != nil {
 		t.Fatal(err)
 	}
@@ -129,13 +132,12 @@ func TestExportKey(t *testing.T) {
 		t.Fatalf("ExportKeyReply is missing secret key prefix: %s", constants.SecretKeyPrefix)
 	}
 	privateKeyString := strings.TrimPrefix(reply.PrivateKey, constants.SecretKeyPrefix)
-	privateKey := formatting.CB58{}
-	if err := privateKey.FromString(privateKeyString); err != nil {
+	privKeyBytes, err := formatting.Decode(formatting.CB58, privateKeyString)
+	if err != nil {
 		t.Fatalf("Failed to parse key: %s", err)
 	}
-
-	if !bytes.Equal(testPrivateKey, privateKey.Bytes) {
-		t.Fatalf("Expected %v, got %v", testPrivateKey, privateKey.Bytes)
+	if !bytes.Equal(testPrivateKey, privKeyBytes) {
+		t.Fatalf("Expected %v, got %v", testPrivateKey, privKeyBytes)
 	}
 }
 
@@ -192,15 +194,33 @@ func TestGetTxStatus(t *testing.T) {
 	}
 
 	arg := &GetTxStatusArgs{TxID: tx.ID()}
+	argIncludeReason := &GetTxStatusArgs{TxID: tx.ID(), IncludeReason: true}
+
 	var resp GetTxStatusResponse
-	if err := service.GetTxStatus(nil, arg, &resp); err != nil {
+	err = service.GetTxStatus(nil, arg, &resp)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if resp.Status != Unknown {
+	case resp.Status != Unknown:
 		t.Fatalf("status should be unknown but is %s", resp.Status)
-	} else if resp.Reason != "" {
+	case resp.Reason != "":
 		t.Fatalf("reason should be empty but is %s", resp.Reason)
-		// put the chain in existing chain list
-	} else if err := service.vm.mempool.IssueTx(tx); err != nil {
+	}
+
+	resp = GetTxStatusResponse{} // reset
+
+	err = service.GetTxStatus(nil, argIncludeReason, &resp)
+	switch {
+	case err != nil:
+		t.Fatal(err)
+	case resp.Status != Unknown:
+		t.Fatalf("status should be unknown but is %s", resp.Status)
+	case resp.Reason != "":
+		t.Fatalf("reason should be empty but is %s", resp.Reason)
+	}
+
+	// put the chain in existing chain list
+	if err := service.vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
 	} else if err := service.vm.putChains(service.vm.DB, []*Tx{tx}); err != nil {
 		t.Fatal(err)
@@ -215,12 +235,11 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	case resp.Status != Dropped:
 		t.Fatalf("status should be Dropped but is %s", resp.Status)
-	case resp.Reason == "":
-		t.Fatal("reason shouldn't be empty")
+	case resp.Reason != "":
+		t.Fatal("reason should be empty when IncludeReason is false")
 	}
 
 	resp = GetTxStatusResponse{} // reset
-	argIncludeReason := &GetTxStatusArgs{TxID: tx.ID(), IncludeReason: true}
 	err = service.GetTxStatus(nil, argIncludeReason, &resp)
 	switch {
 	case err != nil:
@@ -239,7 +258,7 @@ func TestGetTxStatus(t *testing.T) {
 	} else if block, err := service.vm.BuildBlock(); err != nil {
 		t.Fatal(err)
 	} else if blk, ok := block.(*StandardBlock); !ok {
-		t.Fatalf("should be *StandardBlock but it %T", blk)
+		t.Fatalf("should be *StandardBlock but is %T", blk)
 	} else if err := blk.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {
@@ -326,7 +345,7 @@ func TestGetTx(t *testing.T) {
 		}
 		arg := &api.GetTxArgs{
 			TxID:     tx.ID(),
-			Encoding: formatting.CB58Encoding,
+			Encoding: formatting.CB58,
 		}
 		var response api.FormattedTx
 		if err := service.GetTx(nil, arg, &response); err == nil {
@@ -352,11 +371,7 @@ func TestGetTx(t *testing.T) {
 		} else if err := service.GetTx(nil, arg, &response); err != nil {
 			t.Fatalf("failed test '%s': %s", test.description, err)
 		} else {
-			encoding, err := service.vm.encodingManager.GetEncoding(response.Encoding)
-			if err != nil {
-				t.Fatalf("failed tet '%s': %s", test.description, err)
-			}
-			responseTxBytes, err := encoding.ConvertString(response.Tx)
+			responseTxBytes, err := formatting.Decode(response.Encoding, response.Tx)
 			if err != nil {
 				t.Fatalf("failed test '%s': %s", test.description, err)
 			}
@@ -583,8 +598,6 @@ func TestGetCurrentValidators(t *testing.T) {
 		t.Fatal(err)
 	case len(response.Validators) != len(genesis.Validators):
 		t.Fatalf("should be %d validators but are %d", len(genesis.Validators), len(response.Validators))
-	case len(response.Delegators) != 0:
-		t.Fatalf("should be 0 delegators but are %d", len(response.Delegators))
 	}
 
 	for _, vdr := range genesis.Validators {
@@ -655,8 +668,6 @@ func TestGetCurrentValidators(t *testing.T) {
 		t.Fatal(err)
 	case len(response.Validators) != len(genesis.Validators):
 		t.Fatalf("should be %d validators but are %d", len(genesis.Validators), len(response.Validators))
-	case len(response.Delegators) != 1:
-		t.Fatalf("should be 1 delegators but are %d", len(response.Delegators))
 	}
 
 	// Make sure the delegator is there

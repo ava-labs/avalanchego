@@ -55,6 +55,8 @@ const (
 var (
 	errNetworkClosed = errors.New("network closed")
 	errPeerIsMyself  = errors.New("peer is myself")
+
+	minimumUnmaskedVersion = version.NewDefaultVersion(constants.PlatformName, 1, 1, 0)
 )
 
 func init() { rand.Seed(time.Now().UnixNano()) }
@@ -99,25 +101,22 @@ type network struct {
 	// The metrics that this network tracks
 	metrics
 
-	log            logging.Logger
-	id             ids.ShortID
-	ip             utils.DynamicIPDesc
-	networkID      uint32
-	version        version.Version
-	parser         version.Parser
-	listener       net.Listener
-	dialer         Dialer
-	serverUpgrader Upgrader
-	clientUpgrader Upgrader
-	vdrs           validators.Set // set of current validators in the Avalanche network
-	beacons        validators.Set // set of beacons in the Avalanche network
-	router         router.Router  // router must be thread safe
-
-	nodeID uint32
-
-	clock         timer.Clock
-	lastHeartbeat int64
-
+	log                                logging.Logger
+	id                                 ids.ShortID
+	ip                                 utils.DynamicIPDesc
+	networkID                          uint32
+	version                            version.Version
+	parser                             version.Parser
+	listener                           net.Listener
+	dialer                             Dialer
+	serverUpgrader                     Upgrader
+	clientUpgrader                     Upgrader
+	vdrs                               validators.Set // set of current validators in the Avalanche network
+	beacons                            validators.Set // set of beacons in the Avalanche network
+	router                             router.Router  // router must be thread safe
+	nodeID                             uint32
+	clock                              timer.Clock
+	lastHeartbeat                      int64
 	initialReconnectDelay              time.Duration
 	maxReconnectDelay                  time.Duration
 	maxMessageSize                     int64
@@ -137,14 +136,12 @@ type network struct {
 	readHandshakeTimeout               time.Duration
 	connMeterMaxConns                  int
 	connMeter                          ConnMeter
-
-	executor timer.Executor
-
-	b Builder
+	executor                           timer.Executor
+	b                                  Builder
+	apricotPhase0Time                  time.Time
 
 	// stateLock should never be held when grabbing a peer lock
-	stateLock sync.RWMutex
-
+	stateLock       sync.RWMutex
 	pendingBytes    int64
 	closed          utils.AtomicBool
 	disconnectedIPs map[string]struct{}
@@ -153,6 +150,33 @@ type network struct {
 	// TODO: bound the size of [myIPs] to avoid DoS. LRU caching would be ideal
 	myIPs map[string]struct{} // set of IPs that resulted in my ID.
 	peers map[[20]byte]*peer
+
+	// ensures the close of the network only happens once.
+	closeOnce sync.Once
+
+	// True if the node should restart if it detects it's disconnected from all peers
+	restartOnDisconnected bool
+
+	// Signals the connection checker to close when Network is shutdown.
+	// See restartOnDisconnect()
+	connectedCheckerCloser chan struct{}
+
+	// Used to monitor whether the node is connected to peers. If the node has
+	// been connected to at least one peer in the last [disconnectedRestartTimeout]
+	// then connectedMeter.Ticks() is non-zero.
+	connectedMeter timer.TimedMeter
+
+	// How often we check that we're connected to at least one peer.
+	// Used to update [connectedMeter].
+	// If 0, node will not restart even if it has no peers.
+	disconnectedCheckFreq time.Duration
+
+	// restarter can shutdown and restart the node.
+	// If nil, node will not restart even if it has no peers.
+	restarter utils.Restarter
+
+	hasMasked        bool
+	maskedValidators ids.ShortSet
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -174,6 +198,11 @@ func NewDefaultNetwork(
 	router router.Router,
 	connMeterResetDuration time.Duration,
 	connMeterMaxConns int,
+	restarter utils.Restarter,
+	restartOnDisconnected bool,
+	disconnectedCheckFreq time.Duration,
+	disconnectedRestartTimeout time.Duration,
+	apricotPhase0Time time.Time,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -210,6 +239,11 @@ func NewDefaultNetwork(
 		connMeterResetDuration,
 		defaultConnMeterCacheSize,
 		connMeterMaxConns,
+		restarter,
+		restartOnDisconnected,
+		disconnectedCheckFreq,
+		disconnectedRestartTimeout,
+		apricotPhase0Time,
 	)
 }
 
@@ -249,6 +283,11 @@ func NewNetwork(
 	connMeterResetDuration time.Duration,
 	connMeterCacheSize int,
 	connMeterMaxConns int,
+	restarter utils.Restarter,
+	restartOnDisconnected bool,
+	disconnectedCheckFreq time.Duration,
+	disconnectedRestartTimeout time.Duration,
+	apricotPhase0Time time.Time,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -293,13 +332,26 @@ func NewNetwork(
 		readHandshakeTimeout:               readHandshakeTimeout,
 		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize),
 		connMeterMaxConns:                  connMeterMaxConns,
+		restartOnDisconnected:              restartOnDisconnected,
+		connectedCheckerCloser:             make(chan struct{}),
+		disconnectedCheckFreq:              disconnectedCheckFreq,
+		connectedMeter:                     timer.TimedMeter{Duration: disconnectedRestartTimeout},
+		restarter:                          restarter,
+		apricotPhase0Time:                  apricotPhase0Time,
 	}
+
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
 	}
 	netw.executor.Initialize()
 	go netw.executor.Dispatch()
 	netw.heartbeat()
+	if restartOnDisconnected && disconnectedCheckFreq != 0 && disconnectedRestartTimeout != 0 {
+		log.Info("node will restart if not connected to any peers")
+		// pre-queue one tick to avoid immediate shutdown.
+		netw.connectedMeter.Tick()
+		go netw.restartOnDisconnect()
+	}
 	return netw
 }
 
@@ -622,9 +674,25 @@ func (n *network) GetHeartbeat() int64 { return atomic.LoadInt64(&n.lastHeartbea
 // to this node.
 // assumes the stateLock is not held.
 func (n *network) Dispatch() error {
-	go n.gossip()
-	for {
-		conn, err := n.listener.Accept()
+	go n.gossip() // Periodically gossip peers
+	go func() {
+		duration := time.Until(n.apricotPhase0Time)
+		time.Sleep(duration)
+
+		n.stateLock.Lock()
+		defer n.stateLock.Unlock()
+
+		n.hasMasked = true
+		for _, vdrID := range n.maskedValidators.List() {
+			if err := n.vdrs.MaskValidator(vdrID); err != nil {
+				n.log.Error("failed to mask validator %s due to %s", vdrID, err)
+			}
+		}
+		n.maskedValidators.Clear()
+		n.log.Verbo("The new staking set is:\n%s", n.vdrs)
+	}()
+	for { // Continuously accept new connections
+		conn, err := n.listener.Accept() // Returns error when n.Close() is called
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
 				// Sleep for a small amount of time to try to wait for the
@@ -633,6 +701,12 @@ func (n *network) Dispatch() error {
 				continue
 			}
 
+			// When [n].Close() is called, [n.listener].Close() is called.
+			// This causes [n.listener].Accept() to return an error.
+			// If that happened, don't log/return an error here.
+			if n.closed.GetValue() {
+				return errNetworkClosed
+			}
 			n.log.Debug("error during server accept: %s", err)
 			return err
 		}
@@ -649,7 +723,7 @@ func (n *network) Dispatch() error {
 		ticks, err := n.connMeter.Register(addr)
 		// looking for > n.connMeterMaxConns indicating the second tick
 		if err == nil && ticks > n.connMeterMaxConns {
-			n.log.Debug("connection from: %s temporarily dropped", addr)
+			n.log.Debug("connection from %s temporarily dropped", addr)
 			_ = conn.Close()
 			continue
 		}
@@ -695,19 +769,27 @@ func (n *network) Peers() []PeerID {
 // Close implements the Network interface
 // assumes the stateLock is not held.
 func (n *network) Close() error {
-	err := n.listener.Close()
-	if err != nil {
+	n.closeOnce.Do(n.close)
+	return nil
+}
+
+func (n *network) close() {
+	n.log.Info("shutting down network")
+	// Stop checking whether we're connected to peers.
+	close(n.connectedCheckerCloser)
+
+	if err := n.listener.Close(); err != nil {
 		n.log.Debug("closing network listener failed with: %s", err)
 	}
 
 	if n.closed.GetValue() {
-		return nil
+		return
 	}
 
 	n.stateLock.Lock()
 	if n.closed.GetValue() {
 		n.stateLock.Unlock()
-		return nil
+		return
 	}
 	n.closed.SetValue(true)
 
@@ -723,7 +805,6 @@ func (n *network) Close() error {
 	for _, peer := range peersToClose {
 		peer.Close() // Grabs the stateLock
 	}
-	return err
 }
 
 // Track implements the Network interface
@@ -813,7 +894,10 @@ func (n *network) gossip() {
 			if peer.connected.GetValue() &&
 				!ip.IsZero() &&
 				n.vdrs.Contains(peer.id) {
-				ips = append(ips, ip)
+				peerVersion := peer.versionStruct.GetValue().(version.Version)
+				if !peerVersion.Before(minimumUnmaskedVersion) || time.Since(n.apricotPhase0Time) < 0 {
+					ips = append(ips, ip)
+				}
 			}
 		}
 
@@ -1054,13 +1138,15 @@ func (n *network) tryAddPeer(p *peer) error {
 func (n *network) validatorIPs() []utils.IPDesc {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
+
 	ips := make([]utils.IPDesc, 0, len(n.peers))
 	for _, peer := range n.peers {
 		ip := peer.getIP()
-		if peer.connected.GetValue() &&
-			!ip.IsZero() &&
-			n.vdrs.Contains(peer.id) {
-			ips = append(ips, ip)
+		if peer.connected.GetValue() && !ip.IsZero() && n.vdrs.Contains(peer.id) {
+			peerVersion := peer.versionStruct.GetValue().(version.Version)
+			if !peerVersion.Before(minimumUnmaskedVersion) || time.Since(n.apricotPhase0Time) < 0 {
+				ips = append(ips, ip)
+			}
 		}
 	}
 	return ips
@@ -1072,6 +1158,29 @@ func (n *network) validatorIPs() []utils.IPDesc {
 func (n *network) connected(p *peer) {
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
+
+	p.connected.SetValue(true)
+
+	peerVersion := p.versionStruct.GetValue().(version.Version)
+
+	if n.hasMasked {
+		if peerVersion.Before(minimumUnmaskedVersion) {
+			if err := n.vdrs.MaskValidator(p.id); err != nil {
+				n.log.Error("failed to mask validator %s due to %s", p.id, err)
+			}
+		} else {
+			if err := n.vdrs.RevealValidator(p.id); err != nil {
+				n.log.Error("failed to reveal validator %s due to %s", p.id, err)
+			}
+		}
+		n.log.Verbo("The new staking set is:\n%s", n.vdrs)
+	} else {
+		if peerVersion.Before(minimumUnmaskedVersion) {
+			n.maskedValidators.Add(p.id)
+		} else {
+			n.maskedValidators.Remove(p.id)
+		}
+	}
 
 	ip := p.getIP()
 	n.log.Debug("connected to %s at %s", p.id, ip)
@@ -1148,8 +1257,7 @@ func (n *network) getPeers(validatorIDs ids.ShortSet) []*PeerElement {
 	return peers
 }
 
-// Safe copy the peers
-// assumes the stateLock is not held.
+// Safe copy the peers. Assumes the stateLock is not held.
 func (n *network) getAllPeers() []*peer {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
@@ -1177,4 +1285,36 @@ func (n *network) getPeer(validatorID ids.ShortID) *peer {
 		return nil
 	}
 	return n.peers[validatorID.Key()]
+}
+
+// restartOnDisconnect checks every [n.disconnectedCheckFreq] whether this node is connected
+// to any peers. If the node is not connected to any peers for [disconnectedRestartTimeout],
+// restarts the node.
+func (n *network) restartOnDisconnect() {
+	ticker := time.NewTicker(n.disconnectedCheckFreq)
+	for {
+		select {
+		case <-ticker.C:
+			if n.closed.GetValue() {
+				return
+			}
+			n.stateLock.RLock()
+			for _, peer := range n.peers {
+				if peer != nil && peer.connected.GetValue() {
+					n.connectedMeter.Tick()
+					break
+				}
+			}
+			n.stateLock.RUnlock()
+			if n.connectedMeter.Ticks() != 0 {
+				continue
+			}
+			ticker.Stop()
+			n.log.Info("restarting node due to no peers")
+			go n.restarter.Restart()
+		case <-n.connectedCheckerCloser:
+			ticker.Stop()
+			return
+		}
+	}
 }

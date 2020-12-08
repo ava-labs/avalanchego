@@ -44,10 +44,10 @@ func (s *state) Tx(id ids.ID) (*Tx, error) {
 
 	// The key was in the database
 	tx := &Tx{}
-	if err := s.GenesisCodec.Unmarshal(bytes, tx); err != nil {
+	if _, err := s.GenesisCodec.Unmarshal(bytes, tx); err != nil {
 		return nil, err
 	}
-	unsignedBytes, err := s.GenesisCodec.Marshal(&tx.UnsignedTx)
+	unsignedBytes, err := s.GenesisCodec.Marshal(codecVersion, &tx.UnsignedTx)
 	if err != nil {
 		return nil, err
 	}

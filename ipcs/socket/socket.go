@@ -31,30 +31,27 @@ var (
 
 // Socket manages sending messages over a socket to many subscribed clients
 type Socket struct {
-	log logging.Logger
-
+	log      logging.Logger
 	addr     string
 	accept   acceptFn
 	connLock *sync.RWMutex
 	conns    map[net.Conn]struct{}
-
-	quitCh chan struct{}
-	doneCh chan struct{}
+	quitCh   chan struct{}
+	doneCh   chan struct{}
+	listener net.Listener // the current listener
 }
 
 // NewSocket creates a new socket object for the given address. It does not open
 // the socket until Listen is called.
 func NewSocket(addr string, log logging.Logger) *Socket {
 	return &Socket{
-		log: log,
-
+		log:      log,
 		addr:     addr,
 		accept:   accept,
 		connLock: &sync.RWMutex{},
 		conns:    map[net.Conn]struct{}{},
-
-		quitCh: make(chan struct{}),
-		doneCh: make(chan struct{}),
+		quitCh:   make(chan struct{}),
+		doneCh:   make(chan struct{}),
 	}
 }
 
@@ -64,6 +61,7 @@ func (s *Socket) Listen() error {
 	if err != nil {
 		return err
 	}
+	s.listener = l
 
 	// Start a loop that accepts new connections until told to quit
 	go func() {
@@ -84,6 +82,7 @@ func (s *Socket) Listen() error {
 // Send writes the given message to all connection clients
 func (s *Socket) Send(msg []byte) error {
 	var conns []net.Conn = nil
+
 	// Get a copy of connections
 	s.connLock.RLock()
 	if len(s.conns) > 0 {
@@ -123,6 +122,13 @@ func (s *Socket) Send(msg []byte) error {
 func (s *Socket) Close() error {
 	// Signal to the event loop to stop and wait for it to signal back
 	close(s.quitCh)
+
+	listener := s.listener
+	s.listener = nil
+
+	// close the listener to break the loop
+	err := listener.Close()
+
 	<-s.doneCh
 
 	// Zero out the connection pool but save a reference so we can close them all
@@ -132,11 +138,17 @@ func (s *Socket) Close() error {
 	s.connLock.Unlock()
 
 	// Close all connections that were open at the time of shutdown
-	errs := wrappers.Errs{}
+	errs := wrappers.Errs{Err: err}
 	for conn := range conns {
-		errs.Add(conn.Close())
+		if conn != nil {
+			errs.Add(conn.Close())
+		}
 	}
 	return errs.Err
+}
+
+func (s *Socket) Running() bool {
+	return s.listener != nil
 }
 
 func (s *Socket) removeConn(c net.Conn) {
@@ -203,10 +215,13 @@ func (e errReadTimeout) Error() string {
 type acceptFn func(*Socket, net.Listener)
 
 // accept is the default acceptFn for sockets. It accepts the next connection
-// from the given listen and adds it to the Socket's connection list
+// from the given listener and adds it to the Socket's connection list
 func accept(s *Socket, l net.Listener) {
 	conn, err := l.Accept()
 	if err != nil {
+		if !s.Running() {
+			return
+		}
 		s.log.Error("socket accept error: %s", err.Error())
 	}
 	if conn, ok := conn.(*net.TCPConn); ok {

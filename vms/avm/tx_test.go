@@ -7,8 +7,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -16,20 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func TestTxNil(t *testing.T) {
-	ctx := NewContext(t)
-	c := codec.NewDefault()
-	tx := (*Tx)(nil)
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
-		t.Fatalf("Should have errored due to nil tx")
-	}
-	if err := tx.SemanticVerify(nil, nil); err == nil {
-		t.Fatalf("Should have errored due to nil tx")
-	}
-}
-
-func setupCodec() codec.Codec {
-	c := codec.NewDefault()
+func setupCodec() (codec.GeneralCodec, codec.Manager) {
+	c := linearcodec.NewDefault()
+	m := codec.NewDefaultManager()
 	errs := wrappers.Errs{}
 	errs.Add(
 		c.RegisterType(&BaseTx{}),
@@ -42,16 +32,34 @@ func setupCodec() codec.Codec {
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
 		c.RegisterType(&secp256k1fx.MintOperation{}),
 		c.RegisterType(&secp256k1fx.Credential{}),
+		m.RegisterCodec(codecVersion, c),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
 	}
-	return c
+	return c, m
+}
+
+func TestTxNil(t *testing.T) {
+	ctx := NewContext(t)
+	c := linearcodec.NewDefault()
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(codecVersion, c); err != nil {
+		t.Fatal(err)
+	}
+
+	tx := (*Tx)(nil)
+	if err := tx.SyntacticVerify(ctx, m, ids.Empty, 0, 0, 1); err == nil {
+		t.Fatalf("Should have errored due to nil tx")
+	}
+	if err := tx.SemanticVerify(nil, nil); err == nil {
+		t.Fatalf("Should have errored due to nil tx")
+	}
 }
 
 func TestTxEmpty(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 	tx := &Tx{}
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Should have errored due to nil tx")
@@ -60,7 +68,7 @@ func TestTxEmpty(t *testing.T) {
 
 func TestTxInvalidCredential(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	c, m := setupCodec()
 	if err := c.RegisterType(&avax.TestVerifiable{}); err != nil {
 		t.Fatal(err)
 	}
@@ -87,18 +95,18 @@ func TestTxInvalidCredential(t *testing.T) {
 		}},
 		Creds: []verify.Verifiable{&avax.TestVerifiable{Err: errors.New("")}},
 	}
-	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(m, nil); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, m, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid credential")
 	}
 }
 
 func TestTxInvalidUnsignedTx(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	c, m := setupCodec()
 	if err := c.RegisterType(&avax.TestVerifiable{}); err != nil {
 		t.Fatal(err)
 	}
@@ -145,18 +153,18 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 			&avax.TestVerifiable{},
 		},
 	}
-	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(m, nil); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, m, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid unsigned tx")
 	}
 }
 
 func TestTxInvalidNumberOfCredentials(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	c, m := setupCodec()
 	if err := c.RegisterType(&avax.TestVerifiable{}); err != nil {
 		t.Fatal(err)
 	}
@@ -194,11 +202,11 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 		}},
 		Creds: []verify.Verifiable{&avax.TestVerifiable{}},
 	}
-	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(m, nil); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, m, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid unsigned tx")
 	}
 }
