@@ -882,11 +882,6 @@ type SendArgs struct {
 	// The amount, assetID, and destination to send funds to
 	SendOutput
 
-	// The addresses to send funds from
-	// If empty, will send from any addresses
-	// controlled by the given user
-	From []string `json:"from"`
-
 	// Memo field
 	Memo string `json:"memo"`
 }
@@ -899,11 +894,6 @@ type SendMultipleArgs struct {
 	// The outputs of the transaction
 	Outputs []SendOutput `json:"outputs"`
 
-	// The addresses to send funds from
-	// If empty, will send from any addresses
-	// controlled by the given user
-	From []string `json:"from"`
-
 	// Memo field
 	Memo string `json:"memo"`
 }
@@ -913,7 +903,6 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JSONTxI
 	return service.SendMultiple(r, &SendMultipleArgs{
 		JSONSpendHeader: args.JSONSpendHeader,
 		Outputs:         []SendOutput{args.SendOutput},
-		From:            args.From,
 		Memo:            args.Memo,
 	}, reply)
 }

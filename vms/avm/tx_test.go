@@ -7,8 +7,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -16,8 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func setupCodec() (codec.Codec, codec.Manager) {
-	c := codec.NewDefault()
+func setupCodec() (codec.GeneralCodec, codec.Manager) {
+	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -41,7 +42,7 @@ func setupCodec() (codec.Codec, codec.Manager) {
 
 func TestTxNil(t *testing.T) {
 	ctx := NewContext(t)
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
 	if err := m.RegisterCodec(codecVersion, c); err != nil {
 		t.Fatal(err)

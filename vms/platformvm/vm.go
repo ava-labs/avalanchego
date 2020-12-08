@@ -11,6 +11,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -20,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -150,6 +151,9 @@ type VM struct {
 	// Consumption period for the minting function
 	stakeMintingPeriod time.Duration
 
+	// Time of the apricot phase 0 rule change
+	apricotPhase0Time time.Time
+
 	// Contains the IDs of transactions recently dropped because they failed verification.
 	// These txs may be re-issued and put into accepted blocks, so check the database
 	// to see if it was later committed/aborted before reporting that it's dropped.
@@ -183,7 +187,7 @@ func (vm *VM) Initialize(
 	vm.fx = &secp256k1fx.Fx{}
 
 	vm.codec = Codec
-	vm.codecRegistry = codec.NewDefault()
+	vm.codecRegistry = linearcodec.NewDefault()
 	if err := vm.fx.Initialize(vm); err != nil {
 		return err
 	}

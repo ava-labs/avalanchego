@@ -32,5 +32,5 @@ if [[ $TAG =~ ^v ]]; then
 fi
 NEW_VERSION_STRING="Version: $VER"
 sed -i "s/Version.*/$NEW_VERSION_STRING/g" debian/DEBIAN/control
-dpkg-deb --build debian avalanchego-linux-$ARCH_$TAG.deb
-aws s3 cp avalanchego-linux-$ARCH_$TAG.deb s3://$BUCKET/linux/deb/
+dpkg-deb --build debian avalanchego-linux-$ARCH-$TAG.deb
+aws s3 cp avalanchego-linux-$ARCH-$TAG.deb s3://$BUCKET/linux/deb/

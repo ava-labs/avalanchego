@@ -8,8 +8,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -17,7 +18,7 @@ import (
 )
 
 func TestInitialStateVerifyNil(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
 	if err := m.RegisterCodec(codecVersion, c); err != nil {
 		t.Fatal(err)
@@ -31,7 +32,7 @@ func TestInitialStateVerifyNil(t *testing.T) {
 }
 
 func TestInitialStateVerifyUnknownFxID(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
 	if err := m.RegisterCodec(codecVersion, c); err != nil {
 		t.Fatal(err)
@@ -47,7 +48,7 @@ func TestInitialStateVerifyUnknownFxID(t *testing.T) {
 }
 
 func TestInitialStateVerifyNilOutput(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
 	if err := m.RegisterCodec(codecVersion, c); err != nil {
 		t.Fatal(err)
@@ -64,7 +65,7 @@ func TestInitialStateVerifyNilOutput(t *testing.T) {
 }
 
 func TestInitialStateVerifyInvalidOutput(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	if err := c.RegisterType(&avax.TestVerifiable{}); err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +85,7 @@ func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 }
 
 func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	if err := c.RegisterType(&avax.TestTransferable{}); err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +114,7 @@ func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
 }
 
 func TestInitialStateVerifySerialization(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	if err := c.RegisterType(&secp256k1fx.TransferOutput{}); err != nil {
 		t.Fatal(err)
 	}

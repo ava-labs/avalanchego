@@ -32,6 +32,7 @@ type Factory struct {
 	MinStakeDuration   time.Duration // Min time allowed for validating
 	MaxStakeDuration   time.Duration // Max time allowed for validating
 	StakeMintingPeriod time.Duration // Staking consumption period
+	ApricotPhase0Time  time.Time     // Time of the Phase 0 upgrade
 }
 
 // New returns a new instance of the Platform Chain
@@ -50,5 +51,6 @@ func (f *Factory) New(*snow.Context) (interface{}, error) {
 		minStakeDuration:   f.MinStakeDuration,
 		maxStakeDuration:   f.MaxStakeDuration,
 		stakeMintingPeriod: f.StakeMintingPeriod,
+		apricotPhase0Time:  f.ApricotPhase0Time,
 	}, nil
 }

@@ -8,8 +8,8 @@ import (
 	"errors"
 	"sort"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
