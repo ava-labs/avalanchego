@@ -96,7 +96,6 @@ func (t *Tx) SemanticVerify(vm *VM, tx UnsignedTx) error {
 	if t == nil {
 		return errNilTx
 	}
-
 	return t.UnsignedTx.SemanticVerify(vm, tx, t.Creds)
 }
 

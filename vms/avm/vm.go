@@ -141,7 +141,7 @@ func (vm *VM) Initialize(
 
 	vm.pubsub = cjson.NewPubSubServer(ctx)
 
-	gc, err := genesisCodec(1 << 20)
+	gc, err := pre110Codec(1 << 20)
 	if err != nil {
 		return fmt.Errorf("couldn't create genesis codec: %w", err)
 	}
@@ -151,7 +151,7 @@ func (vm *VM) Initialize(
 	}
 
 	vm.codec = codec.NewDefaultManager()
-	pre110Codec, err := genesisCodec(linearcodec.DefaultMaxSliceLength)
+	pre110Codec, err := pre110Codec(linearcodec.DefaultMaxSliceLength)
 	if err != nil {
 		return fmt.Errorf("couldn't create pre-1.1.0 codec: %w", err)
 	}
@@ -160,6 +160,9 @@ func (vm *VM) Initialize(
 	}
 	c := hierarchycodec.NewDefault()
 	if err := vm.codec.RegisterCodec(currentCodecVersion, c); err != nil {
+		return fmt.Errorf("couldn't register codec: %w", err)
+	}
+	if err := vm.genesisCodec.RegisterCodec(currentCodecVersion, c); err != nil {
 		return fmt.Errorf("couldn't register codec: %w", err)
 	}
 
@@ -207,17 +210,17 @@ func (vm *VM) Initialize(
 	}
 
 	vm.state = &prefixedState{
-		state: &state{State: avax.State{
-			Cache:        &cache.LRU{Size: stateCacheSize},
-			DB:           vm.db,
-			GenesisCodec: vm.genesisCodec,
-			Codec:        vm.codec,
-		}},
-
+		state: &state{
+			State: avax.State{
+				Cache:        &cache.LRU{Size: stateCacheSize},
+				DB:           vm.db,
+				GenesisCodec: vm.genesisCodec,
+				Codec:        vm.codec,
+			},
+		},
 		tx:       &cache.LRU{Size: idCacheSize},
 		utxo:     &cache.LRU{Size: idCacheSize},
 		txStatus: &cache.LRU{Size: idCacheSize},
-
 		uniqueTx: &cache.EvictableLRU{Size: txCacheSize},
 	}
 
@@ -247,8 +250,8 @@ func (vm *VM) Initialize(
 	return vm.db.Commit()
 }
 
-// Returns the codec manager that should be used to unmarshal the genesis bytes
-func genesisCodec(maxSliceLen int) (codec.Codec, error) {
+// Returns the codec that was used before version 1.1.0
+func pre110Codec(maxSliceLen int) (codec.Codec, error) {
 	c := linearcodec.New(reflectcodec.DefaultTagName, maxSliceLen)
 	errs := wrappers.Errs{}
 	errs.Add(
