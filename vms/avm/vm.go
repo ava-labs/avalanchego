@@ -16,6 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/hierarchycodec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database"
@@ -35,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
+	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
@@ -50,7 +52,11 @@ const (
 	assetToFxCacheSize = 1024
 	maxUTXOsToFetch    = 1024
 
-	codecVersion = 0
+	// Codec version used before AvalancheGo 1.1.0
+	pre110CodecVersion = uint16(0)
+
+	// Current codec version
+	currentCodecVersion = uint16(1)
 )
 
 var (
@@ -135,11 +141,27 @@ func (vm *VM) Initialize(
 
 	vm.pubsub = cjson.NewPubSubServer(ctx)
 
-	genesisCodec := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
-	c := linearcodec.NewDefault()
+	gc, err := genesisCodec(1 << 20)
+	if err != nil {
+		return fmt.Errorf("couldn't create genesis codec: %w", err)
+	}
+	vm.genesisCodec = codec.NewManager(math.MaxUint32)
+	if err := vm.genesisCodec.RegisterCodec(pre110CodecVersion, gc); err != nil {
+		return fmt.Errorf("couldn't create genesis codec manager: %w", err)
+	}
 
-	vm.genesisCodec = codec.NewManager(math.MaxInt32)
 	vm.codec = codec.NewDefaultManager()
+	pre110Codec, err := genesisCodec(linearcodec.DefaultMaxSliceLength)
+	if err != nil {
+		return fmt.Errorf("couldn't create pre-1.1.0 codec: %w", err)
+	}
+	if err := vm.codec.RegisterCodec(pre110CodecVersion, pre110Codec); err != nil {
+		return fmt.Errorf("couldn't register pre-1.1.0 codec: %w", err)
+	}
+	c := hierarchycodec.NewDefault()
+	if err := vm.codec.RegisterCodec(currentCodecVersion, c); err != nil {
+		return fmt.Errorf("couldn't register codec: %w", err)
+	}
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -154,14 +176,7 @@ func (vm *VM) Initialize(
 		c.RegisterType(&OperationTx{}),
 		c.RegisterType(&ImportTx{}),
 		c.RegisterType(&ExportTx{}),
-		//vm.codec.RegisterCodec(codecVersion, c), TODO put back
-
-		genesisCodec.RegisterType(&BaseTx{}),
-		genesisCodec.RegisterType(&CreateAssetTx{}),
-		genesisCodec.RegisterType(&OperationTx{}),
-		genesisCodec.RegisterType(&ImportTx{}),
-		genesisCodec.RegisterType(&ExportTx{}),
-		vm.genesisCodec.RegisterCodec(codecVersion, genesisCodec),
+		c.RegisterType(&CreateManagedAssetTx{}),
 	)
 	if errs.Errored() {
 		return errs.Err
@@ -180,8 +195,9 @@ func (vm *VM) Initialize(
 			ID: fxContainer.ID,
 			Fx: fx,
 		}
+		c.NextGroup()
 		vm.codecRegistry = &codecRegistry{
-			codecs:      []codec.Registry{genesisCodec, c},
+			codecs:      []codec.Registry{c},
 			index:       i,
 			typeToIndex: vm.typeToFxIndex,
 		}
@@ -189,15 +205,6 @@ func (vm *VM) Initialize(
 			return err
 		}
 	}
-
-	// TODO do this right
-	if err := c.RegisterType(&CreateManagedAssetTx{}); err != nil {
-		return err
-	}
-	if err := vm.codec.RegisterCodec(codecVersion, c); err != nil {
-		return err
-	}
-	// end TODO
 
 	vm.state = &prefixedState{
 		state: &state{State: avax.State{
@@ -238,6 +245,35 @@ func (vm *VM) Initialize(
 	vm.walletService.pendingTxOrdering = list.New()
 
 	return vm.db.Commit()
+}
+
+// Returns the codec manager that should be used to unmarshal the genesis bytes
+func genesisCodec(maxSliceLen int) (codec.Codec, error) {
+	c := linearcodec.New(reflectcodec.DefaultTagName, maxSliceLen)
+	errs := wrappers.Errs{}
+	errs.Add(
+		c.RegisterType(&BaseTx{}),
+		c.RegisterType(&CreateAssetTx{}),
+		c.RegisterType(&OperationTx{}),
+		c.RegisterType(&ImportTx{}),
+		c.RegisterType(&ExportTx{}),
+		c.RegisterType(&secp256k1fx.TransferInput{}),
+		c.RegisterType(&secp256k1fx.MintOutput{}),
+		c.RegisterType(&secp256k1fx.TransferOutput{}),
+		c.RegisterType(&secp256k1fx.MintOperation{}),
+		c.RegisterType(&secp256k1fx.Credential{}),
+		c.RegisterType(&nftfx.MintOutput{}),
+		c.RegisterType(&nftfx.TransferOutput{}),
+		c.RegisterType(&nftfx.MintOperation{}),
+		c.RegisterType(&nftfx.TransferOperation{}),
+		c.RegisterType(&nftfx.Credential{}),
+		c.RegisterType(&propertyfx.MintOutput{}),
+		c.RegisterType(&propertyfx.OwnedOutput{}),
+		c.RegisterType(&propertyfx.MintOperation{}),
+		c.RegisterType(&propertyfx.BurnOperation{}),
+		c.RegisterType(&propertyfx.Credential{}),
+	)
+	return c, errs.Err
 }
 
 // Bootstrapping is called by the consensus engine when it starts bootstrapping
@@ -616,8 +652,10 @@ func (vm *VM) FlushTxs() {
 
 func (vm *VM) initAliases(genesisBytes []byte) error {
 	genesis := Genesis{}
-	if _, err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
+	if version, err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return err
+	} else if version != pre110CodecVersion {
+		return fmt.Errorf("expected codec version %d but got %d", pre110CodecVersion, version)
 	}
 
 	for _, genesisTx := range genesis.Txs {
@@ -628,7 +666,9 @@ func (vm *VM) initAliases(genesisBytes []byte) error {
 		tx := Tx{
 			UnsignedTx: &genesisTx.CreateAssetTx,
 		}
-		if err := tx.SignSECP256K1Fx(vm.genesisCodec, nil); err != nil {
+
+		// Use the original codec so that the derived transaction ID doesn't change
+		if err := tx.SignSECP256K1Fx(vm.genesisCodec, pre110CodecVersion, nil); err != nil {
 			return err
 		}
 
@@ -643,8 +683,10 @@ func (vm *VM) initAliases(genesisBytes []byte) error {
 
 func (vm *VM) initState(genesisBytes []byte) error {
 	genesis := Genesis{}
-	if _, err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
+	if version, err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return err
+	} else if version != pre110CodecVersion {
+		return fmt.Errorf("expected codec version %d but got %d", pre110CodecVersion, version)
 	}
 
 	for _, genesisTx := range genesis.Txs {
@@ -655,7 +697,7 @@ func (vm *VM) initState(genesisBytes []byte) error {
 		tx := Tx{
 			UnsignedTx: &genesisTx.CreateAssetTx,
 		}
-		if err := tx.SignSECP256K1Fx(vm.genesisCodec, nil); err != nil {
+		if err := tx.SignSECP256K1Fx(vm.genesisCodec, pre110CodecVersion, nil); err != nil {
 			return err
 		}
 
@@ -714,7 +756,7 @@ func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
 
 func (vm *VM) parsePrivateTx(txBytes []byte) (*Tx, error) {
 	tx := &Tx{}
-	_, err := vm.codec.Unmarshal(txBytes, tx)
+	codecVersion, err := vm.codec.Unmarshal(txBytes, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -846,15 +888,17 @@ func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cr
 
 	// See if credential [cred] gives permission to spend the UTXO
 	// based on the UTXO's output
-	if err := fx.VerifyPermission(tx, in.In, cred, utxo.Out); err == nil {
+	err = fx.VerifyPermission(tx, in.In, cred, utxo.Out)
+	if err == nil {
 		return nil
 	}
 
 	// Check whether [assetID] is a managed asset, and if so, who its manager is
 	_, _, manager, err := vm.state.ManagedAssetStatus(utxoAssetID)
-	if err != nil && err != database.ErrNotFound {
-		return fmt.Errorf("couldn't get asset status: %w", err)
-	} else if err != nil {
+	if err != nil {
+		if err != database.ErrNotFound {
+			return fmt.Errorf("couldn't get asset status: %w", err)
+		}
 		return errNoPermission
 	}
 

@@ -197,7 +197,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 
 	reply.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		b, err := service.vm.codec.Marshal(codecVersion, utxo)
+		b, err := service.vm.codec.Marshal(currentCodecVersion, utxo)
 		if err != nil {
 			return fmt.Errorf("problem marshalling UTXO: %w", err)
 		}
@@ -510,7 +510,7 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 		ids.SortShortIDs(minter.Addrs)
 		initialState.Outs = append(initialState.Outs, minter)
 	}
-	initialState.Sort(service.vm.codec)
+	initialState.Sort(service.vm.codec, currentCodecVersion)
 
 	tx := Tx{UnsignedTx: &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -524,7 +524,7 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 		Denomination: args.Denomination,
 		States:       []*InitialState{initialState},
 	}}
-	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, currentCodecVersion, keys); err != nil {
 		return err
 	}
 
@@ -662,7 +662,7 @@ func (service *Service) CreateManagedAsset(r *http.Request, args *CreateManagedA
 			States:       []*InitialState{initialState},
 		},
 	}}
-	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, currentCodecVersion, keys); err != nil {
 		return err
 	}
 
@@ -791,7 +791,7 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 		ids.SortShortIDs(minter.Addrs)
 		initialState.Outs = append(initialState.Outs, minter)
 	}
-	initialState.Sort(service.vm.codec)
+	initialState.Sort(service.vm.codec, currentCodecVersion)
 
 	tx := Tx{UnsignedTx: &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -805,7 +805,7 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 		Denomination: 0, // NFTs are non-fungible
 		States:       []*InitialState{initialState},
 	}}
-	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, currentCodecVersion, keys); err != nil {
 		return err
 	}
 
@@ -1178,7 +1178,7 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 		Ins:          ins,
 		Memo:         memoBytes,
 	}}}
-	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, currentCodecVersion, keys); err != nil {
 		return err
 	}
 
@@ -1297,7 +1297,7 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxI
 		}},
 		Ops: ops,
 	}}
-	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, currentCodecVersion, keys); err != nil {
 		return err
 	}
 
@@ -1424,7 +1424,7 @@ func (service *Service) UpdateManagedAsset(r *http.Request, args *UpdateManagedA
 		}},
 		Ops: []*Operation{op},
 	}}
-	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, currentCodecVersion, keys); err != nil {
 		return err
 	}
 
@@ -1533,7 +1533,7 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 		}},
 		Ops: ops,
 	}}
-	if err := tx.SignSECP256K1Fx(service.vm.codec, secpKeys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, currentCodecVersion, secpKeys); err != nil {
 		return err
 	}
 	if err := tx.SignNFTFx(service.vm.codec, nftKeys); err != nil {
@@ -1655,7 +1655,7 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 		}},
 		Ops: ops,
 	}}
-	if err := tx.SignSECP256K1Fx(service.vm.codec, secpKeys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, currentCodecVersion, secpKeys); err != nil {
 		return err
 	}
 	if err := tx.SignNFTFx(service.vm.codec, nftKeys); err != nil {
@@ -1778,7 +1778,7 @@ func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JSO
 		SourceChain: chainID,
 		ImportedIns: importInputs,
 	}}
-	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, currentCodecVersion, keys); err != nil {
 		return err
 	}
 
@@ -1924,7 +1924,7 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSO
 		DestinationChain: chainID,
 		ExportedOuts:     exportOuts,
 	}}
-	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, currentCodecVersion, keys); err != nil {
 		return err
 	}
 

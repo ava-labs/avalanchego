@@ -61,8 +61,8 @@ func (fx *Fx) Initialize(vmIntf interface{}) error {
 		c.RegisterType(&TransferOutput{}),
 		c.RegisterType(&MintOperation{}),
 		c.RegisterType(&Credential{}),
-		c.RegisterType(&ManagedAssetStatusOutput{}),    // TODO do this right
-		c.RegisterType(&UpdateManagedAssetOperation{}), // TODO do this right
+		c.RegisterType(&ManagedAssetStatusOutput{}),
+		c.RegisterType(&UpdateManagedAssetOperation{}),
 	)
 	return errs.Err
 }

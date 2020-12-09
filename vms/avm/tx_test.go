@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/hierarchycodec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -18,23 +19,41 @@ import (
 )
 
 func setupCodec() (codec.GeneralCodec, codec.Manager) {
-	c := linearcodec.NewDefault()
+	c := hierarchycodec.NewDefault()
+	pre110Codec := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
 	errs := wrappers.Errs{}
+
 	errs.Add(
+		pre110Codec.RegisterType(&BaseTx{}),
+		pre110Codec.RegisterType(&CreateAssetTx{}),
+		pre110Codec.RegisterType(&OperationTx{}),
+		pre110Codec.RegisterType(&ImportTx{}),
+		pre110Codec.RegisterType(&ExportTx{}),
+		pre110Codec.RegisterType(&secp256k1fx.TransferInput{}),
+		pre110Codec.RegisterType(&secp256k1fx.MintOutput{}),
+		pre110Codec.RegisterType(&secp256k1fx.TransferOutput{}),
+		pre110Codec.RegisterType(&secp256k1fx.MintOperation{}),
+		pre110Codec.RegisterType(&secp256k1fx.Credential{}),
+		m.RegisterCodec(pre110CodecVersion, pre110Codec),
+
 		c.RegisterType(&BaseTx{}),
 		c.RegisterType(&CreateAssetTx{}),
 		c.RegisterType(&OperationTx{}),
 		c.RegisterType(&ImportTx{}),
 		c.RegisterType(&ExportTx{}),
+		c.RegisterType(&CreateManagedAssetTx{}),
+	)
+	c.NextGroup()
+	errs.Add(
 		c.RegisterType(&secp256k1fx.TransferInput{}),
 		c.RegisterType(&secp256k1fx.MintOutput{}),
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
 		c.RegisterType(&secp256k1fx.MintOperation{}),
 		c.RegisterType(&secp256k1fx.Credential{}),
-		c.RegisterType(&secp256k1fx.ManagedAssetStatusOutput{}),    // TODO do this right
-		c.RegisterType(&secp256k1fx.UpdateManagedAssetOperation{}), // TODO do this right
-		m.RegisterCodec(codecVersion, c),
+		c.RegisterType(&secp256k1fx.ManagedAssetStatusOutput{}),
+		c.RegisterType(&secp256k1fx.UpdateManagedAssetOperation{}),
+		m.RegisterCodec(currentCodecVersion, c),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
@@ -46,7 +65,7 @@ func TestTxNil(t *testing.T) {
 	ctx := NewContext(t)
 	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(codecVersion, c); err != nil {
+	if err := m.RegisterCodec(currentCodecVersion, c); err != nil {
 		t.Fatal(err)
 	}
 
@@ -97,7 +116,7 @@ func TestTxInvalidCredential(t *testing.T) {
 		}},
 		Creds: []verify.Verifiable{&avax.TestVerifiable{Err: errors.New("")}},
 	}
-	if err := tx.SignSECP256K1Fx(m, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(m, currentCodecVersion, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -155,7 +174,7 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 			&avax.TestVerifiable{},
 		},
 	}
-	if err := tx.SignSECP256K1Fx(m, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(m, currentCodecVersion, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -204,7 +223,7 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 		}},
 		Creds: []verify.Verifiable{&avax.TestVerifiable{}},
 	}
-	if err := tx.SignSECP256K1Fx(m, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(m, currentCodecVersion, nil); err != nil {
 		t.Fatal(err)
 	}
 

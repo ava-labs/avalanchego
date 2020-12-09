@@ -376,7 +376,7 @@ func TestStateTXs(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 

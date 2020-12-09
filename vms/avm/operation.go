@@ -51,11 +51,11 @@ func (ops *innerSortOperation) Less(i, j int) bool {
 	iOp := ops.ops[i]
 	jOp := ops.ops[j]
 
-	iBytes, err := ops.codec.Marshal(codecVersion, iOp)
+	iBytes, err := ops.codec.Marshal(currentCodecVersion, iOp)
 	if err != nil {
 		return false
 	}
-	jBytes, err := ops.codec.Marshal(codecVersion, jOp)
+	jBytes, err := ops.codec.Marshal(currentCodecVersion, jOp)
 	if err != nil {
 		return false
 	}
@@ -81,11 +81,11 @@ func (ops *innerSortOperationsWithSigners) Less(i, j int) bool {
 	iOp := ops.ops[i]
 	jOp := ops.ops[j]
 
-	iBytes, err := ops.codec.Marshal(codecVersion, iOp)
+	iBytes, err := ops.codec.Marshal(currentCodecVersion, iOp)
 	if err != nil {
 		return false
 	}
-	jBytes, err := ops.codec.Marshal(codecVersion, jOp)
+	jBytes, err := ops.codec.Marshal(currentCodecVersion, jOp)
 	if err != nil {
 		return false
 	}

@@ -154,7 +154,7 @@ func (s *prefixedState) PutManagedAssetStatus(
 	frozen bool,
 	manager *secp256k1fx.OutputOwners,
 ) error {
-	managerBytes, err := s.state.Codec.Marshal(codecVersion, manager)
+	managerBytes, err := s.state.Codec.Marshal(currentCodecVersion, manager)
 	if err != nil {
 		return fmt.Errorf("couldn't serialize manager: %w", err)
 	}

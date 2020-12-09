@@ -12,7 +12,7 @@ import (
 )
 
 // Test managed asset functionality
-func TestManagedAsset2(t *testing.T) {
+func TestManagedAsset(t *testing.T) {
 	type create struct {
 		originalFrozen  bool
 		originalManager secp256k1fx.OutputOwners
@@ -589,7 +589,7 @@ func TestManagedAsset2(t *testing.T) {
 
 			// Sign/initialize the transaction
 			feeSigner := []*crypto.PrivateKeySECP256K1R{keys[0]}
-			err := createManagedAssetTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{feeSigner})
+			err := createManagedAssetTx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{feeSigner})
 			require.NoError(t, err)
 
 			// Verify and accept the transaction
@@ -673,9 +673,9 @@ func TestManagedAsset2(t *testing.T) {
 
 					// One signature to spend the tx fee, one signature to transfer the managed asset
 					if transferTx.UnsignedTx.(*BaseTx).Ins[0].AssetID() == avaxID {
-						err = transferTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{feeSigner, op.keys})
+						err = transferTx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{feeSigner, op.keys})
 					} else {
-						err = transferTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{op.keys, feeSigner})
+						err = transferTx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{op.keys, feeSigner})
 					}
 					require.NoError(t, err)
 
@@ -770,7 +770,7 @@ func TestManagedAsset2(t *testing.T) {
 					}
 
 					// One signature to spend the tx fee, one signature to transfer the managed asset
-					err = updateStatusTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{feeSigner, op.keys})
+					err = updateStatusTx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{feeSigner, op.keys})
 					require.NoError(t, err)
 
 					// Verify and accept the transaction

@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	codecVersion = 0
+	codecVersion = 1
 )
 
 // Addressable is the interface a feature extension must provide to be able to

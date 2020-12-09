@@ -105,7 +105,7 @@ func (t *ExportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 			Out:   out.Out,
 		}
 
-		utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
+		utxoBytes, err := vm.codec.Marshal(currentCodecVersion, utxo)
 		if err != nil {
 			return err
 		}

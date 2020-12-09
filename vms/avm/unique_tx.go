@@ -135,7 +135,7 @@ func (tx *UniqueTx) Accept() error {
 	for _, utxo := range tx.UTXOs() {
 		if err := tx.vm.state.FundUTXO(utxo); err != nil {
 			tx.vm.ctx.Log.Error("Failed to fund utxo %s due to %s", utxo.InputID(), err)
-			return err
+			return fmt.Errorf("couldn't fund UTXO: %w", err)
 		}
 		if out, ok := utxo.Out.(*secp256k1fx.ManagedAssetStatusOutput); ok {
 			if err := tx.vm.state.PutManagedAssetStatus(utxo.AssetID(), tx.Epoch(), out.Frozen, &out.Manager); err != nil {

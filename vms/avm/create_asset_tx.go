@@ -116,7 +116,7 @@ func (t *CreateAssetTx) SyntacticVerify(
 	}
 
 	for _, state := range t.States {
-		if err := state.Verify(c, numFxs); err != nil {
+		if err := state.Verify(c, currentCodecVersion, numFxs); err != nil {
 			return err
 		}
 	}

@@ -245,7 +245,7 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 		Ins:          ins,
 		Memo:         memoBytes,
 	}}}
-	if err := tx.SignSECP256K1Fx(w.vm.codec, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(w.vm.codec, currentCodecVersion, keys); err != nil {
 		return err
 	}
 

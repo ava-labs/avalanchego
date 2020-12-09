@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	codecVersion = 0
+	codecVersion = 1
 )
 
 // Wallet is a holder for keys and UTXOs for the Avalanche DAG.
@@ -56,11 +56,14 @@ func NewWallet(log logging.Logger, networkID uint32, chainID ids.ID, txFee uint6
 		c.RegisterType(&avm.OperationTx{}),
 		c.RegisterType(&avm.ImportTx{}),
 		c.RegisterType(&avm.ExportTx{}),
+		c.RegisterType(&avm.CreateManagedAssetTx{}),
 		c.RegisterType(&secp256k1fx.TransferInput{}),
 		c.RegisterType(&secp256k1fx.MintOutput{}),
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
 		c.RegisterType(&secp256k1fx.MintOperation{}),
 		c.RegisterType(&secp256k1fx.Credential{}),
+		c.RegisterType(&secp256k1fx.ManagedAssetStatusOutput{}),
+		c.RegisterType(&secp256k1fx.UpdateManagedAssetOperation{}),
 		m.RegisterCodec(codecVersion, c),
 	)
 	return &Wallet{
@@ -220,7 +223,7 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 		Outs:         outs,
 		Ins:          ins,
 	}}}
-	return tx, tx.SignSECP256K1Fx(w.codec, keys)
+	return tx, tx.SignSECP256K1Fx(w.codec, codecVersion, keys)
 }
 
 // GenerateTxs generates the transactions that will be sent

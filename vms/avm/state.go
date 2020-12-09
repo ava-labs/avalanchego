@@ -35,10 +35,14 @@ func (s *state) Tx(id ids.ID) (*Tx, error) {
 
 	// The key was in the database
 	tx := &Tx{}
-	if _, err := s.GenesisCodec.Unmarshal(bytes, tx); err != nil {
+	version, err := s.Codec.Unmarshal(bytes, tx)
+	if err != nil {
 		return nil, err
 	}
-	unsignedBytes, err := s.GenesisCodec.Marshal(codecVersion, &tx.UnsignedTx)
+	// The byte representation of this transaction, and the ID,
+	// which is derived from it, are created by serializing the
+	// transaction using the codec version it was created with
+	unsignedBytes, err := s.Codec.Marshal(version, &tx.UnsignedTx)
 	if err != nil {
 		return nil, err
 	}
