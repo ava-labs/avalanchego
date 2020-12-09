@@ -178,7 +178,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 		Outs: []EVMOutput{evmOutput},
 	}
 
-	state, err := vm.chain.BlockState(vm.lastAccepted.ethBlock)
+	state, err := vm.chain.CurrentState()
 	if err != nil {
 		t.Fatalf("Failed to get last accepted stateDB due to: %s", err)
 	}
@@ -290,6 +290,12 @@ func TestImportTxSemanticVerify(t *testing.T) {
 
 func TestNewImportTx(t *testing.T) {
 	_, vm, _, sharedMemory := GenesisVM(t, true)
+
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	importAmount := uint64(1000000)
 	utxoID := avax.UTXOID{
