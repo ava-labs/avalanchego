@@ -7,79 +7,60 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 var (
-	errParseTx = errors.New("unexpectedly called ParseTx")
-	errIssueTx = errors.New("unexpectedly called IssueTx")
-	errGetTx   = errors.New("unexpectedly called GetTx")
+	errPending = errors.New("unexpectedly called Pending")
+
+	_ DAGVM = &TestVM{}
 )
 
-// TestVM ...
 type TestVM struct {
 	common.TestVM
 
-	CantPendingTxs, CantParseTx, CantIssueTx, CantGetTx bool
+	CantPending, CantParse, CantGet bool
 
-	PendingTxsF func() []conflicts.Tx
-	ParseTxF    func([]byte) (conflicts.Tx, error)
-	IssueTxF    func([]byte, func(choices.Status), func(choices.Status)) (ids.ID, error)
-	GetTxF      func(ids.ID) (conflicts.Tx, error)
+	PendingF func() []conflicts.Tx
+	ParseF   func([]byte) (conflicts.Tx, error)
+	GetF     func(ids.ID) (conflicts.Tx, error)
 }
 
-// Default ...
 func (vm *TestVM) Default(cant bool) {
 	vm.TestVM.Default(cant)
 
-	vm.CantPendingTxs = cant
-	vm.CantParseTx = cant
-	vm.CantIssueTx = cant
-	vm.CantGetTx = cant
+	vm.CantPending = cant
+	vm.CantParse = cant
+	vm.CantGet = cant
 }
 
-// PendingTxs ...
-func (vm *TestVM) PendingTxs() []conflicts.Tx {
-	if vm.PendingTxsF != nil {
-		return vm.PendingTxsF()
+func (vm *TestVM) Pending() []conflicts.Tx {
+	if vm.PendingF != nil {
+		return vm.PendingF()
 	}
-	if vm.CantPendingTxs && vm.T != nil {
-		vm.T.Fatalf("Unexpectedly called PendingTxs")
+	if vm.CantPending && vm.T != nil {
+		vm.T.Fatal(errPending)
 	}
 	return nil
 }
 
-// ParseTx ...
-func (vm *TestVM) ParseTx(b []byte) (conflicts.Tx, error) {
-	if vm.ParseTxF != nil {
-		return vm.ParseTxF(b)
+func (vm *TestVM) Parse(b []byte) (conflicts.Tx, error) {
+	if vm.ParseF != nil {
+		return vm.ParseF(b)
 	}
-	if vm.CantParseTx && vm.T != nil {
-		vm.T.Fatal(errParseTx)
+	if vm.CantParse && vm.T != nil {
+		vm.T.Fatal(errParse)
 	}
-	return nil, errParseTx
+	return nil, errParse
 }
 
-// IssueTx ...
-func (vm *TestVM) IssueTx(b []byte, issued, finalized func(choices.Status)) (ids.ID, error) {
-	if vm.IssueTxF != nil {
-		return vm.IssueTxF(b, issued, finalized)
+func (vm *TestVM) Get(txID ids.ID) (conflicts.Tx, error) {
+	if vm.GetF != nil {
+		return vm.GetF(txID)
 	}
-	if vm.CantIssueTx && vm.T != nil {
-		vm.T.Fatal(errIssueTx)
+	if vm.CantGet && vm.T != nil {
+		vm.T.Fatal(errGet)
 	}
-	return ids.ID{}, errIssueTx
-}
-
-// GetTx ...
-func (vm *TestVM) GetTx(txID ids.ID) (conflicts.Tx, error) {
-	if vm.GetTxF != nil {
-		return vm.GetTxF(txID)
-	}
-	if vm.CantGetTx && vm.T != nil {
-		vm.T.Fatal(errGetTx)
-	}
-	return nil, errGetTx
+	return nil, errGet
 }

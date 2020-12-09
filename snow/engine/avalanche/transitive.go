@@ -337,7 +337,7 @@ func (t *Transitive) Notify(msg common.Message) error {
 
 	switch msg {
 	case common.PendingTxs:
-		txs := t.VM.PendingTxs()
+		txs := t.VM.Pending()
 		return t.batch(txs, false /*=force*/, false /*=empty*/)
 	default:
 		return nil
@@ -352,7 +352,7 @@ func (t *Transitive) repoll() error {
 		return nil
 	}
 
-	txs := t.VM.PendingTxs()
+	txs := t.VM.Pending()
 	if err := t.batch(txs, false /*=force*/, true /*=empty*/); err != nil {
 		return err
 	}

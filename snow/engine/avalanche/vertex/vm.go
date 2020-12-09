@@ -15,11 +15,11 @@ type DAGVM interface {
 	common.VM
 
 	// Return any transactions that have not been sent to consensus yet
-	PendingTxs() []conflicts.Tx
+	Pending() []conflicts.Tx
 
 	// Convert a stream of bytes to a transaction or return an error
-	ParseTx(tx []byte) (conflicts.Tx, error)
+	Parse(tx []byte) (conflicts.Tx, error)
 
 	// Retrieve a transaction that was submitted previously
-	GetTx(ids.ID) (conflicts.Tx, error)
+	Get(ids.ID) (conflicts.Tx, error)
 }

@@ -148,7 +148,7 @@ func (vtx *innerVertex) Unmarshal(b []byte, vm vertex.DAGVM) error {
 	}
 	txs := make([]conflicts.Tx, numTxs)
 	for i := 0; i < int(numTxs) && !p.Errored(); i++ {
-		tx, err := vm.ParseTx(p.UnpackBytes())
+		tx, err := vm.Parse(p.UnpackBytes())
 		p.Add(err)
 		txs[i] = tx
 	}
