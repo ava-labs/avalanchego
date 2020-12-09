@@ -78,7 +78,7 @@ var (
 	timestampKey     = ids.ID{'t', 'i', 'm', 'e'}
 	chainsKey        = ids.ID{'c', 'h', 'a', 'i', 'n', 's'}
 	subnetsKey       = ids.ID{'s', 'u', 'b', 'n', 'e', 't', 's'}
-	currentSupplyKey = ids.ID{'c', 'u', 'r', 'r', 'e', 't', ' ', 's', 'u', 'p', 'p', 'l', 'y'}
+	currentSupplyKey = ids.ID{'c', 'u', 'r', 'r', 'e', 'n', 't', ' ', 's', 'u', 'p', 'p', 'l', 'y'}
 
 	errRegisteringType          = errors.New("error registering type with database")
 	errInvalidLastAcceptedBlock = errors.New("last accepted block must be a decision block")
