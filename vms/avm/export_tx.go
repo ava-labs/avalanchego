@@ -105,7 +105,9 @@ func (t *ExportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 			Out:   out.Out,
 		}
 
-		utxoBytes, err := vm.codec.Marshal(currentCodecVersion, utxo)
+		// Use the old codec version because the P-Chain is still
+		// using the old codec version
+		utxoBytes, err := vm.codec.Marshal(pre110CodecVersion, utxo)
 		if err != nil {
 			return err
 		}
