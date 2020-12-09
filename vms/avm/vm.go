@@ -311,9 +311,9 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	}
 }
 
-// PendingTxs implements the avalanche.DAGVM interface
-func (vm *VM) PendingTxs() []snowstorm.Tx {
-	vm.metrics.numPendingTxsCalls.Inc()
+// Pending implements the avalanche.DAGVM interface
+func (vm *VM) Pending() []snowstorm.Tx {
+	vm.metrics.numPendingCalls.Inc()
 
 	vm.timer.Cancel()
 
@@ -322,16 +322,16 @@ func (vm *VM) PendingTxs() []snowstorm.Tx {
 	return txs
 }
 
-// ParseTx implements the avalanche.DAGVM interface
-func (vm *VM) ParseTx(b []byte) (snowstorm.Tx, error) {
-	vm.metrics.numParseTxCalls.Inc()
+// Parse implements the avalanche.DAGVM interface
+func (vm *VM) Parse(b []byte) (snowstorm.Tx, error) {
+	vm.metrics.numParseCalls.Inc()
 
 	return vm.parseTx(b)
 }
 
-// GetTx implements the avalanche.DAGVM interface
-func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
-	vm.metrics.numGetTxCalls.Inc()
+// Get implements the avalanche.DAGVM interface
+func (vm *VM) Get(txID ids.ID) (snowstorm.Tx, error) {
+	vm.metrics.numGetCalls.Inc()
 
 	tx := &UniqueTx{
 		vm:   vm,

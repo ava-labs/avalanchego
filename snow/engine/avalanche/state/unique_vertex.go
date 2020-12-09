@@ -235,7 +235,7 @@ func (vtx *uniqueVertex) Txs() ([]snowstorm.Tx, error) {
 	if len(txs) != len(vtx.v.txs) {
 		vtx.v.txs = make([]snowstorm.Tx, len(txs))
 		for i, txBytes := range txs {
-			tx, err := vtx.serializer.vm.ParseTx(txBytes)
+			tx, err := vtx.serializer.vm.Parse(txBytes)
 			if err != nil {
 				return nil, err
 			}

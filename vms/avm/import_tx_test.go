@@ -343,7 +343,7 @@ func TestIssueImportTx(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	txs := vm.PendingTxs()
+	txs := vm.Pending()
 	if len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}
@@ -442,7 +442,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsedTx, err := vm.ParseTx(tx.Bytes())
+	parsedTx, err := vm.Parse(tx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
