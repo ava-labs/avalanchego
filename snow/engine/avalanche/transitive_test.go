@@ -921,7 +921,7 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 
 	sender.CantPushQuery = false
 
-	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx0, tx1} }
+	vm.PendingF = func() []snowstorm.Tx { return []snowstorm.Tx{tx0, tx1} }
 	if err := te.Notify(common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}
@@ -1029,12 +1029,12 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 
 	sender.CantPushQuery = false
 
-	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx0} }
+	vm.PendingF = func() []snowstorm.Tx { return []snowstorm.Tx{tx0} }
 	if err := te.Notify(common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}
 
-	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx1} }
+	vm.PendingF = func() []snowstorm.Tx { return []snowstorm.Tx{tx1} }
 	if err := te.Notify(common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}
@@ -1242,7 +1242,7 @@ func TestEngineReissue(t *testing.T) {
 		return lastVtx, nil
 	}
 
-	vm.GetTxF = func(id ids.ID) (snowstorm.Tx, error) {
+	vm.GetF = func(id ids.ID) (snowstorm.Tx, error) {
 		if id != tx0.ID() {
 			t.Fatalf("Wrong tx")
 		}
@@ -1254,7 +1254,7 @@ func TestEngineReissue(t *testing.T) {
 		*queryRequestID = requestID
 	}
 
-	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx0, tx1} }
+	vm.PendingF = func() []snowstorm.Tx { return []snowstorm.Tx{tx0, tx1} }
 	if err := te.Notify(common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}
@@ -1270,7 +1270,7 @@ func TestEngineReissue(t *testing.T) {
 	}
 	manager.ParseF = nil
 
-	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx3} }
+	vm.PendingF = func() []snowstorm.Tx { return []snowstorm.Tx{tx3} }
 	if err := te.Notify(common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}
@@ -1390,7 +1390,7 @@ func TestEngineLargeIssue(t *testing.T) {
 
 	sender.CantPushQuery = false
 
-	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx0, tx1} }
+	vm.PendingF = func() []snowstorm.Tx { return []snowstorm.Tx{tx0, tx1} }
 	if err := te.Notify(common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}
@@ -2527,7 +2527,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	manager.GetF = nil
 	sender.GetF = nil
 
-	vm.ParseTxF = func(b []byte) (snowstorm.Tx, error) {
+	vm.ParseF = func(b []byte) (snowstorm.Tx, error) {
 		if bytes.Equal(b, txBytes0) {
 			return tx0, nil
 		}
@@ -2556,7 +2556,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.ParseTxF = nil
+	vm.ParseF = nil
 	manager.ParseF = nil
 	manager.EdgeF = nil
 	manager.GetF = nil
@@ -3241,7 +3241,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	numPullQueries := new(int)
 	sender.PullQueryF = func(ids.ShortSet, uint32, ids.ID) { *numPullQueries++ }
 
-	vm.CantPendingTxs = false
+	vm.CantPending = false
 
 	if err := te.Put(vdr, 0, vtx.ID(), vtx.Bytes()); err != nil {
 		t.Fatal(err)
@@ -3352,7 +3352,7 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 
 	sender.CantPushQuery = false
 
-	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx} }
+	vm.PendingF = func() []snowstorm.Tx { return []snowstorm.Tx{tx} }
 	if err := te.Notify(common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}

@@ -15,11 +15,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 )
 
-func newSerializer(t *testing.T, parseTx func([]byte) (snowstorm.Tx, error)) *Serializer {
+func newSerializer(t *testing.T, parse func([]byte) (snowstorm.Tx, error)) *Serializer {
 	vm := vertex.TestVM{}
 	vm.T = t
 	vm.Default(true)
-	vm.ParseTxF = parseTx
+	vm.ParseF = parse
 
 	baseDB := memdb.New()
 	ctx := snow.DefaultContextTest()
