@@ -25,6 +25,12 @@ type Health struct {
 	health health.Health
 }
 
+// CheckRegisterer is an interface that
+// can register health checks
+type CheckRegisterer interface {
+	RegisterCheck(c checks.Check) error
+}
+
 // NewService creates a new Health service
 func NewService(log logging.Logger) *Health {
 	return &Health{log, health.New()}
@@ -100,5 +106,18 @@ type GetLivenessReply struct {
 func (h *Health) GetLiveness(_ *http.Request, _ *GetLivenessArgs, reply *GetLivenessReply) error {
 	h.log.Info("Health: GetLiveness called")
 	reply.Checks, reply.Healthy = h.health.Results()
+	return nil
+}
+
+type noOp struct{}
+
+// NewNoOpService returns a NoOp version of health check
+// for when the Health API is disabled
+func NewNoOpService() CheckRegisterer {
+	return &noOp{}
+}
+
+// RegisterCheck implements the HealthCheckRegisterer interface
+func (n *noOp) RegisterCheck(_ checks.Check) error {
 	return nil
 }
