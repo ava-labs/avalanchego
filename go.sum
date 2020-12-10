@@ -35,8 +35,8 @@ github.com/bgentry/speakeasy v0.1.0/go.mod h1:+zsyZBPWlz7T6j88CTgSN5bM796AkVf0kB
 github.com/bketelsen/crypt v0.0.3-0.20200106085610-5cbc8cc4026c/go.mod h1:MKsuJmJgSg28kpZDP6UIiPt0e0Oz0kqKNGyRaWEPv84=
 github.com/blocknetdx/btcd v0.20.1-beta.0.20200618032145-59a950423708 h1:oU9D3crkSPXWYq/uKWdEmLcoW0pGQByx9ZngDW1FaLE=
 github.com/blocknetdx/btcd v0.20.1-beta.0.20200618032145-59a950423708/go.mod h1:esiLPJ9TMEqL9fc93p0jsvIcCWyD3p05dMS4lsUO7Dg=
-github.com/blocknetdx/go-xrouter v0.8.1 h1:cYhzc8gjQwlv1QObsXbAMS1ANaXqP5P6zeRKOay1LZQ=
-github.com/blocknetdx/go-xrouter v0.8.1/go.mod h1:joEj4QfadpshiDThUTe2OkdfYm+gFUHVT37u6ABP0uI=
+github.com/blocknetdx/go-xrouter v0.8.2 h1:BVXAy7pbRi6qwZ6APzckbDxMo49K2oLrjqWJHPHJ2pQ=
+github.com/blocknetdx/go-xrouter v0.8.2/go.mod h1:joEj4QfadpshiDThUTe2OkdfYm+gFUHVT37u6ABP0uI=
 github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f h1:bAs4lUbRJpnnkd9VhRV3jjAVU7DJVjMaK+IsvSeZvFo=
 github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f/go.mod h1:TdznJufoqS23FtqVCzL0ZqgP5MqXbb4fg/WgDys70nA=
 github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d/go.mod h1:+5NJ2+qvTyV9exUAL/rxXi3DcLg2Ts+ymUAY5y4NvMg=

@@ -6,10 +6,11 @@ package xrouterapi
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
-	avajson "github.com/ava-labs/avalanchego/utils/json"
+	avaxjson "github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/blocknetdx/go-xrouter/xrouter"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -28,7 +29,7 @@ type XRouterService struct {
 // NewService returns a new XRouter API service
 func NewService(log logging.Logger, config chaincfg.Params, client *xrouter.Client) (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
-	codec := avajson.NewCodec()
+	codec := avaxjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	if err := newServer.RegisterService(&XRouterService{
@@ -51,9 +52,9 @@ type GetNetworkServicesReply struct {
 func (service *XRouterService) GetNetworkServices(_ *http.Request, _ *struct{}, reply *GetNetworkServicesReply) error {
 	service.log.Info("XRouter: GetNetworkServices called")
 
-	networkServices := service.client.ListNetworkServices()
-	reply.Reply = networkServices
-
+	networkServicesReply := service.client.ListNetworkServices()
+	sort.Strings(networkServicesReply)
+	reply.Reply = networkServicesReply
 	return nil
 }
 
@@ -100,7 +101,7 @@ type DecodeTransactionRawArgs struct {
 }
 
 type DecodeTransactionRawReply struct {
-	//UUID  string                   `json:"uuid"`
+	UUID  string                 `json:"uuid"`
 	Reply map[string]interface{} `json:"reply"`
 	Error map[string]interface{} `json:"error"`
 }
@@ -108,21 +109,20 @@ type DecodeTransactionRawReply struct {
 // DecodeTransactionRaw
 func (service *XRouterService) DecodeTransactionRaw(_ *http.Request, args *DecodeTransactionRawArgs, reply *DecodeTransactionRawReply) error {
 	service.log.Info("XRouter: DecodeTransactionRaw %s called with %v", args.Blockchain, args.Tx)
-	if xrouterReply, err := service.client.DecodeTransaction(args.Blockchain, args.Tx, args.NodeCount); err != nil {
+	if uuid, xrouterReply, err := service.client.DecodeTransactionRaw(args.Blockchain, args.Tx, args.NodeCount); err != nil {
 		service.log.Fatal("error: %v", err)
 		return err
 	} else {
+		reply.UUID = string(uuid)
 		var b map[string]interface{}
-		service.log.Info("XRouter: DecodeTransactionRaw reply: %s", string(xrouterReply.Reply))
-		if strings.Contains(string(xrouterReply.Reply), "error") {
-			err = json.Unmarshal(xrouterReply.Reply, &b)
+		if strings.Contains(string(xrouterReply[0].Reply), "error") {
+			err = json.Unmarshal(xrouterReply[0].Reply, &b)
 			reply.Error = b
 			return nil
 		}
 
-		err = json.Unmarshal(xrouterReply.Reply, &b)
+		err = json.Unmarshal(xrouterReply[0].Reply, &b)
 		reply.Reply = b
-
 	}
 	return nil
 }
@@ -177,10 +177,9 @@ type GetTransactionsReply struct {
 func (service *XRouterService) GetTransactions(_ *http.Request, args *GetTransactionsArgs, reply *GetTransactionsReply) error {
 	service.log.Info("XRouter: GetTransactions called")
 	s := strings.Split(args.IDS, ",")
-	var params []interface{}
-	for i := range s {
-		params = append(params, s[i])
-		service.log.Info("ID-%v: %s", i, s[i])
+	params := make([]interface{}, len(s))
+	for i, v := range s {
+		params[i] = v
 	}
 	if uuid, xrouterReply, err := service.client.GetTransactionsRaw(args.Blockchain, params, args.NodeCount); err != nil {
 		service.log.Fatal("error: %v", err)
@@ -194,7 +193,7 @@ func (service *XRouterService) GetTransactions(_ *http.Request, args *GetTransac
 			reply.Error = e
 			return nil
 		}
-		for i := range xrouterReply {
+		for i := range s {
 			err = json.Unmarshal(xrouterReply[i].Reply, &b)
 			reply.Reply = append(reply.Reply, b[0])
 		}
@@ -223,7 +222,7 @@ type GetBlockCountArgs struct {
 
 type GetBlockCountReply struct {
 	UUID  string                 `json:"uuid"`
-	Reply []int                  `json:"reply"`
+	Reply string                 `json:"reply"`
 	Error map[string]interface{} `json:"error"`
 }
 
@@ -236,17 +235,14 @@ func (service *XRouterService) GetBlockCount(_ *http.Request, args *GetBlockCoun
 	} else {
 		reply.UUID = string(uuid)
 		var e map[string]interface{}
-		var b int
 		service.log.Info("BLOCK COUNT: %v", string(xrouterReply[0].Reply))
 		if strings.Contains(string(xrouterReply[0].Reply), "error") {
 			err = json.Unmarshal(xrouterReply[0].Reply, &e)
 			reply.Error = e
 			return nil
 		}
-		for i := range xrouterReply {
-			err = json.Unmarshal(xrouterReply[i].Reply, &b)
-			reply.Reply = append(reply.Reply, b)
-		}
+
+		reply.Reply = string(xrouterReply[0].Reply)
 	}
 	return nil
 }
@@ -302,10 +298,9 @@ type GetBlocksReply struct {
 func (service *XRouterService) GetBlocks(_ *http.Request, args *GetBlocksArgs, reply *GetBlocksReply) error {
 	service.log.Info("XRouter: GetBlocksRaw called")
 	s := strings.Split(args.IDS, ",")
-	var params []interface{}
-	for i := range s {
-		params = append(params, s[i])
-		service.log.Info("BLOCKS-%v: %s", i, s[i])
+	params := make([]interface{}, len(s))
+	for i, v := range s {
+		params[i] = v
 	}
 	if uuid, xrouterReply, err := service.client.GetBlocksRaw(args.Blockchain, params, args.NodeCount); err != nil {
 		service.log.Fatal("error: %v", err)
@@ -319,7 +314,7 @@ func (service *XRouterService) GetBlocks(_ *http.Request, args *GetBlocksArgs, r
 			reply.Error = e
 			return nil
 		}
-		for i := range xrouterReply {
+		for i := range s {
 			err = json.Unmarshal(xrouterReply[i].Reply, &b)
 			reply.Reply = append(reply.Reply, b[0])
 		}
@@ -354,10 +349,8 @@ func (service *XRouterService) GetBlock(_ *http.Request, args *GetBlockArgs, rep
 			reply.Error = b
 			return nil
 		}
-		for i := range xrouterReply {
-			err = json.Unmarshal(xrouterReply[i].Reply, &b)
-			reply.Reply = append(reply.Reply, b)
-		}
+		err = json.Unmarshal(xrouterReply[0].Reply, &b)
+		reply.Reply = append(reply.Reply, b)
 	}
 	return nil
 }
