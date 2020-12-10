@@ -104,7 +104,6 @@ func (w *WalletService) Send(r *http.Request, args *SendArgs, reply *api.JSONTxI
 	return w.SendMultiple(r, &SendMultipleArgs{
 		JSONSpendHeader: args.JSONSpendHeader,
 		Outputs:         []SendOutput{args.SendOutput},
-		From:            args.From,
 		Memo:            args.Memo,
 	}, reply)
 }

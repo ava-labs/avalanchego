@@ -1,0 +1,15 @@
+# As mentioned by https://github.com/golang/go/wiki/Ubuntu
+- task: Add Go repository
+  become: true
+  apt_repository:
+    repo: ppa:longsleep/golang-backports
+  tags:
+    - golang_base
+
+- name: Install Go
+  become: true
+  apt:
+    name:
+      - golang-go
+  tags:
+    - golang_base

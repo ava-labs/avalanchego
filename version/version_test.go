@@ -64,7 +64,7 @@ func TestComparingVersions(t *testing.T) {
 		{
 			myVersion:   NewDefaultVersion("avalanche", 1, 3, 3),
 			peerVersion: NewDefaultVersion("avalanche", 1, 2, 3),
-			compatible:  false,
+			compatible:  true,
 			before:      false,
 		},
 		{
