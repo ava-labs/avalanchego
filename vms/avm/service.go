@@ -1275,18 +1275,42 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxI
 		return err
 	}
 
-	ops, opKeys, err := service.vm.Mint(
-		utxos,
-		kc,
-		map[ids.ID]uint64{
-			assetID: uint64(args.Amount),
-		},
-		to,
-	)
-	if err != nil {
-		return err
+	var ops []*Operation
+	var opsKeys [][]*crypto.PrivateKeySECP256K1R
+	// Check if this asset is a managed asset
+	_, _, _, err = service.vm.state.ManagedAssetStatus(assetID)
+	if err == nil { // It is a managed asset
+		op, keys, err := mintManagedAsset(
+			utxos,
+			kc,
+			assetID,
+			service.vm.Clock().Unix(),
+			uint64(args.Amount),
+			[]ids.ShortID{to},
+			1,
+		)
+		if err != nil {
+			return err
+		}
+		ops = []*Operation{op}
+		opsKeys = [][]*crypto.PrivateKeySECP256K1R{keys}
+	} else { // It is not a managed asset
+		operations, keys, err := service.vm.Mint(
+			utxos,
+			kc,
+			map[ids.ID]uint64{
+				assetID: uint64(args.Amount),
+			},
+			to,
+		)
+		if err != nil {
+			return err
+		}
+		ops = operations
+		opsKeys = keys
 	}
-	keys = append(keys, opKeys...)
+
+	keys = append(keys, opsKeys...)
 
 	tx := Tx{UnsignedTx: &OperationTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -1402,13 +1426,12 @@ func (service *Service) UpdateManagedAsset(r *http.Request, args *UpdateManagedA
 	}
 
 	op, opKeys, err := newUpdateManagedAssetStatusOperation(
-		args.Frozen,
-		manager,
 		utxos,
 		kc,
 		assetID,
 		service.vm.Clock().Unix(),
-		service.vm.codec,
+		args.Frozen,
+		manager,
 	)
 	if err != nil {
 		return err

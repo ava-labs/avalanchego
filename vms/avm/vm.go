@@ -1279,22 +1279,18 @@ func (vm *VM) Mint(
 // status of asset [assetID].
 // The UTXOs can't be consumed if they are locked at [time]
 func newUpdateManagedAssetStatusOperation(
-	frozen bool,
-	manager *secp256k1fx.OutputOwners,
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
 	assetID ids.ID,
 	time uint64,
-	codec codec.Manager,
+	frozen bool,
+	manager *secp256k1fx.OutputOwners,
 ) (
 	*Operation,
 	[]*crypto.PrivateKeySECP256K1R,
 	error,
 ) {
 	for _, utxo := range utxos {
-		// makes sure that the variable isn't overwritten with the next iteration
-		utxo := utxo
-
 		// This UTXO isn't the right asset ID
 		if assetID != utxo.AssetID() {
 			continue
@@ -1328,6 +1324,69 @@ func newUpdateManagedAssetStatusOperation(
 		return op, signers, nil
 	}
 	return nil, nil, fmt.Errorf("the given UTXOs/keys can't update asset %s", assetID)
+}
+
+// mintManagedAsset attempts to use the given UTXOs and keychain
+// to create an NewUpdateManagedAssetStatusOperation that mints
+// [mintAmt] units of the asset. The minted units are spendable
+// with [mintRecipientThreshold] signatures from [mintRecipients].
+// The UTXOs can't be consumed if they are locked at [time].
+func mintManagedAsset(
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+	assetID ids.ID,
+	time uint64,
+	mintAmt uint64,
+	mintRecipients []ids.ShortID,
+	mintRecipientsThreshold uint32,
+) (
+	*Operation,
+	[]*crypto.PrivateKeySECP256K1R,
+	error,
+) {
+	for _, utxo := range utxos {
+		// This UTXO isn't the right asset ID
+		if assetID != utxo.AssetID() {
+			continue
+		}
+
+		// Need to consume a *ManagedAssetStatusOutput for this operation
+		out, ok := utxo.Out.(*secp256k1fx.ManagedAssetStatusOutput)
+		if !ok {
+			continue
+		}
+
+		inIntf, signers, err := kc.Spend(out, time)
+		if err != nil {
+			continue
+		}
+		in, ok := inIntf.(*secp256k1fx.Input)
+		if !ok {
+			continue
+		}
+		op := &Operation{
+			Asset:   avax.Asset{ID: assetID},
+			UTXOIDs: []*avax.UTXOID{&utxo.UTXOID},
+			Op: &secp256k1fx.UpdateManagedAssetOperation{
+				Input: *in,
+				ManagedAssetStatusOutput: secp256k1fx.ManagedAssetStatusOutput{
+					Frozen:  out.Frozen,
+					Manager: out.Manager,
+				},
+				Mint: true,
+				TransferOutput: secp256k1fx.TransferOutput{
+					Amt: mintAmt,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: mintRecipientsThreshold,
+						Addrs:     mintRecipients,
+					},
+				},
+			},
+		}
+		return op, signers, nil
+	}
+	return nil, nil, fmt.Errorf("the given UTXOs/keys can't mint asset %s", assetID)
 }
 
 // MintNFT ...
