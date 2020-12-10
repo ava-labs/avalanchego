@@ -78,15 +78,15 @@ func (service *XRouterService) GetTransaction(_ *http.Request, args *GetTransact
 		service.log.Fatal("error: %v", err)
 		return err
 	} else {
-		reply.UUID = string(uuid)
+		reply.UUID = uuid
 		var b map[string]interface{}
 		if strings.Contains(string(xrouterReply[0].Reply), "error") {
-			err = json.Unmarshal(xrouterReply[0].Reply, &b)
+			json.Unmarshal(xrouterReply[0].Reply, &b)
 			reply.Error = b
 			return nil
 		}
 		for i := range xrouterReply {
-			err = json.Unmarshal(xrouterReply[i].Reply, &b)
+			json.Unmarshal(xrouterReply[i].Reply, &b)
 			reply.Reply = append(reply.Reply, b)
 		}
 	}
@@ -113,15 +113,15 @@ func (service *XRouterService) DecodeTransactionRaw(_ *http.Request, args *Decod
 		service.log.Fatal("error: %v", err)
 		return err
 	} else {
-		reply.UUID = string(uuid)
+		reply.UUID = uuid
 		var b map[string]interface{}
 		if strings.Contains(string(xrouterReply[0].Reply), "error") {
-			err = json.Unmarshal(xrouterReply[0].Reply, &b)
+			json.Unmarshal(xrouterReply[0].Reply, &b)
 			reply.Error = b
 			return nil
 		}
 
-		err = json.Unmarshal(xrouterReply[0].Reply, &b)
+		json.Unmarshal(xrouterReply[0].Reply, &b)
 		reply.Reply = b
 	}
 	return nil
@@ -147,10 +147,10 @@ func (service *XRouterService) SendTransaction(_ *http.Request, args *SendTransa
 		service.log.Fatal("error: %v", err)
 		return err
 	} else {
-		reply.UUID = string(uuid)
+		reply.UUID = uuid
 		var b map[string]interface{}
 		if strings.Contains(string(xrouterReply[0].Reply), "error") {
-			err = json.Unmarshal(xrouterReply[0].Reply, &b)
+			json.Unmarshal(xrouterReply[0].Reply, &b)
 			reply.Error = b
 			return nil
 		}
@@ -185,20 +185,20 @@ func (service *XRouterService) GetTransactions(_ *http.Request, args *GetTransac
 		service.log.Fatal("error: %v", err)
 		return err
 	} else {
-		reply.UUID = string(uuid)
+		reply.UUID = uuid
 		var e map[string]interface{}
 		var b []map[string]interface{}
 		if strings.Contains(string(xrouterReply[0].Reply), "error") {
-			err = json.Unmarshal(xrouterReply[0].Reply, &e)
+			json.Unmarshal(xrouterReply[0].Reply, &e)
 			reply.Error = e
 			return nil
 		}
 		for i := range s {
-			err = json.Unmarshal(xrouterReply[i].Reply, &b)
+			json.Unmarshal(xrouterReply[i].Reply, &b)
 			reply.Reply = append(reply.Reply, b[0])
 		}
+		return nil
 	}
-	return nil
 }
 
 // GetConnectedPeers
@@ -233,18 +233,17 @@ func (service *XRouterService) GetBlockCount(_ *http.Request, args *GetBlockCoun
 		service.log.Fatal("error: %v", err)
 		return err
 	} else {
-		reply.UUID = string(uuid)
+		reply.UUID = uuid
 		var e map[string]interface{}
 		service.log.Info("BLOCK COUNT: %v", string(xrouterReply[0].Reply))
 		if strings.Contains(string(xrouterReply[0].Reply), "error") {
-			err = json.Unmarshal(xrouterReply[0].Reply, &e)
+			json.Unmarshal(xrouterReply[0].Reply, &e)
 			reply.Error = e
 			return nil
 		}
-
 		reply.Reply = string(xrouterReply[0].Reply)
+		return nil
 	}
-	return nil
 }
 
 // GetBlockHash
@@ -267,17 +266,17 @@ func (service *XRouterService) GetBlockHash(_ *http.Request, args *GetBlockHashA
 		service.log.Fatal("error: %v", err)
 		return err
 	} else {
-		reply.UUID = string(uuid)
+		reply.UUID = uuid
 		var e map[string]interface{}
 		if strings.Contains(string(xrouterReply[0].Reply), "error") {
-			err = json.Unmarshal(xrouterReply[0].Reply, &e)
+			json.Unmarshal(xrouterReply[0].Reply, &e)
 			reply.Error = e
 			return nil
 		} else {
 			reply.Reply = string(xrouterReply[0].Reply)
 		}
+		return nil
 	}
-	return nil
 }
 
 // GetBlocks
@@ -306,20 +305,20 @@ func (service *XRouterService) GetBlocks(_ *http.Request, args *GetBlocksArgs, r
 		service.log.Fatal("error: %v", err)
 		return err
 	} else {
-		reply.UUID = string(uuid)
+		reply.UUID = uuid
 		var e map[string]interface{}
 		var b []map[string]interface{}
 		if strings.Contains(string(xrouterReply[0].Reply), "error") {
-			err = json.Unmarshal(xrouterReply[0].Reply, &e)
+			json.Unmarshal(xrouterReply[0].Reply, &e)
 			reply.Error = e
 			return nil
 		}
 		for i := range s {
-			err = json.Unmarshal(xrouterReply[i].Reply, &b)
+			json.Unmarshal(xrouterReply[i].Reply, &b)
 			reply.Reply = append(reply.Reply, b[0])
 		}
+		return nil
 	}
-	return nil
 }
 
 // GetBlock
@@ -342,15 +341,15 @@ func (service *XRouterService) GetBlock(_ *http.Request, args *GetBlockArgs, rep
 		service.log.Fatal("error: %v", err)
 		return err
 	} else {
-		reply.UUID = string(uuid)
+		reply.UUID = uuid
 		var b map[string]interface{}
 		if strings.Contains(string(xrouterReply[0].Reply), "error") {
-			err = json.Unmarshal(xrouterReply[0].Reply, &b)
+			json.Unmarshal(xrouterReply[0].Reply, &b)
 			reply.Error = b
 			return nil
 		}
-		err = json.Unmarshal(xrouterReply[0].Reply, &b)
+		json.Unmarshal(xrouterReply[0].Reply, &b)
 		reply.Reply = append(reply.Reply, b)
+		return nil
 	}
-	return nil
 }
