@@ -15,10 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
-const (
-	codecVersion = 1
-)
-
 // Addressable is the interface a feature extension must provide to be able to
 // be tracked as a part of the utxo set for a set of addresses
 type Addressable interface {
@@ -142,14 +138,16 @@ func NewPrefixedState(
 	db database.Database,
 	genesisCodec,
 	codec codec.Manager,
+	currentCodecVersion uint16,
 	myChain,
 	peerChain ids.ID,
 ) *PrefixedState {
 	state := &State{
-		Cache:        &cache.LRU{Size: stateCacheSize},
-		DB:           db,
-		GenesisCodec: genesisCodec,
-		Codec:        codec,
+		Cache:               &cache.LRU{Size: stateCacheSize},
+		DB:                  db,
+		GenesisCodec:        genesisCodec,
+		Codec:               codec,
+		CurrentCodecVersion: currentCodecVersion,
 	}
 	return &PrefixedState{
 		isSmaller: bytes.Compare(myChain[:], peerChain[:]) == -1,
@@ -235,6 +233,8 @@ type State struct {
 	DB           database.Database
 	GenesisCodec codec.Manager
 	Codec        codec.Manager
+	// The codec version to use when serializing
+	CurrentCodecVersion uint16
 }
 
 // UTXO attempts to load a utxo from storage.
@@ -268,7 +268,7 @@ func (s *State) SetUTXO(id ids.ID, utxo *UTXO) error {
 		return s.DB.Delete(id[:])
 	}
 
-	bytes, err := s.Codec.Marshal(codecVersion, utxo)
+	bytes, err := s.Codec.Marshal(s.CurrentCodecVersion, utxo)
 	if err != nil {
 		return err
 	}
@@ -307,7 +307,7 @@ func (s *State) SetStatus(id ids.ID, status choices.Status) error {
 		return s.DB.Delete(id[:])
 	}
 
-	bytes, err := s.Codec.Marshal(codecVersion, status)
+	bytes, err := s.Codec.Marshal(s.CurrentCodecVersion, status)
 	if err != nil {
 		return err
 	}

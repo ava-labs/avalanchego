@@ -45,7 +45,7 @@ func TestUTXOSerialize(t *testing.T) {
 		c.RegisterType(&secp256k1fx.Input{}),
 		c.RegisterType(&secp256k1fx.TransferInput{}),
 		c.RegisterType(&secp256k1fx.Credential{}),
-		manager.RegisterCodec(codecVersion, c),
+		manager.RegisterCodec(1, c),
 	)
 	if errs.Errored() {
 		t.Fatal(errs.Err)
@@ -116,7 +116,7 @@ func TestUTXOSerialize(t *testing.T) {
 		},
 	}
 
-	utxoBytes, err := manager.Marshal(codecVersion, utxo)
+	utxoBytes, err := manager.Marshal(1, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}

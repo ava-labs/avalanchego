@@ -118,7 +118,7 @@ func (tx *UnsignedAddValidatorTx) Verify(
 	}
 
 	switch {
-	case !avax.IsSortedTransferableOutputs(tx.Stake, Codec):
+	case !avax.IsSortedTransferableOutputs(tx.Stake, c, codecVersion):
 		return errOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
 		return errInvalidAmount

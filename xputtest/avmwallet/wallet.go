@@ -215,7 +215,7 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 		})
 	}
 
-	avax.SortTransferableOutputs(outs, w.codec)
+	avax.SortTransferableOutputs(outs, w.codec, codecVersion)
 
 	tx := &avm.Tx{UnsignedTx: &avm.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    w.networkID,

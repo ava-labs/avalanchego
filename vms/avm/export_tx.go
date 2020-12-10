@@ -35,6 +35,7 @@ type ExportTx struct {
 func (t *ExportTx) SyntacticVerify(
 	ctx *snow.Context,
 	c codec.Manager,
+	codecVersion uint16,
 	txFeeAssetID ids.ID,
 	txFee uint64,
 	_ uint64,
@@ -60,6 +61,7 @@ func (t *ExportTx) SyntacticVerify(
 			t.ExportedOuts,
 		},
 		c,
+		codecVersion,
 	)
 }
 

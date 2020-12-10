@@ -319,6 +319,7 @@ func (tx *UniqueTx) SyntacticVerify() error {
 	tx.validity = tx.Tx.SyntacticVerify(
 		tx.vm.ctx,
 		tx.vm.codec,
+		currentCodecVersion,
 		tx.vm.ctx.AVAXAssetID,
 		tx.vm.txFee,
 		tx.vm.creationTxFee,

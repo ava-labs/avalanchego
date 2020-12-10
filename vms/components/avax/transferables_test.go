@@ -48,7 +48,7 @@ func TestTransferableOutputSorting(t *testing.T) {
 		t.Fatal(err)
 	}
 	manager := codec.NewDefaultManager()
-	if err := manager.RegisterCodec(codecVersion, c); err != nil {
+	if err := manager.RegisterCodec(1, c); err != nil {
 		t.Fatal(err)
 	}
 
@@ -76,11 +76,11 @@ func TestTransferableOutputSorting(t *testing.T) {
 		},
 	}
 
-	if IsSortedTransferableOutputs(outs, manager) {
+	if IsSortedTransferableOutputs(outs, manager, 1) {
 		t.Fatalf("Shouldn't be sorted")
 	}
-	SortTransferableOutputs(outs, manager)
-	if !IsSortedTransferableOutputs(outs, manager) {
+	SortTransferableOutputs(outs, manager, 1)
+	if !IsSortedTransferableOutputs(outs, manager, 1) {
 		t.Fatalf("Should be sorted")
 	}
 	if result := outs[0].Out.(*TestTransferable).Val; result != 0 {
@@ -106,7 +106,7 @@ func TestTransferableOutputSerialization(t *testing.T) {
 		t.Fatal(err)
 	}
 	manager := codec.NewDefaultManager()
-	if err := manager.RegisterCodec(codecVersion, c); err != nil {
+	if err := manager.RegisterCodec(1, c); err != nil {
 		t.Fatal(err)
 	}
 
@@ -160,7 +160,7 @@ func TestTransferableOutputSerialization(t *testing.T) {
 		},
 	}
 
-	outBytes, err := manager.Marshal(codecVersion, out)
+	outBytes, err := manager.Marshal(1, out)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,7 +273,7 @@ func TestTransferableInputSerialization(t *testing.T) {
 		t.Fatal(err)
 	}
 	manager := codec.NewDefaultManager()
-	if err := manager.RegisterCodec(codecVersion, c); err != nil {
+	if err := manager.RegisterCodec(1, c); err != nil {
 		t.Fatal(err)
 	}
 
@@ -324,7 +324,7 @@ func TestTransferableInputSerialization(t *testing.T) {
 		},
 	}
 
-	inBytes, err := manager.Marshal(codecVersion, in)
+	inBytes, err := manager.Marshal(1, in)
 	if err != nil {
 		t.Fatal(err)
 	}

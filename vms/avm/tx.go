@@ -36,6 +36,7 @@ type UnsignedTx interface {
 	SyntacticVerify(
 		ctx *snow.Context,
 		c codec.Manager,
+		codecVersion uint16,
 		txFeeAssetID ids.ID,
 		txFee uint64,
 		creationTxFee uint64,
@@ -63,6 +64,7 @@ func (t *Tx) Credentials() []verify.Verifiable { return t.Creds }
 func (t *Tx) SyntacticVerify(
 	ctx *snow.Context,
 	c codec.Manager,
+	codecVersion uint16,
 	txFeeAssetID ids.ID,
 	txFee uint64,
 	creationTxFee uint64,
@@ -72,7 +74,15 @@ func (t *Tx) SyntacticVerify(
 		return errNilTx
 	}
 
-	if err := t.UnsignedTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, creationTxFee, numFxs); err != nil {
+	if err := t.UnsignedTx.SyntacticVerify(
+		ctx,
+		c,
+		codecVersion,
+		txFeeAssetID,
+		txFee,
+		creationTxFee,
+		numFxs,
+	); err != nil {
 		return err
 	}
 

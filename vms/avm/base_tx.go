@@ -32,6 +32,7 @@ func (t *BaseTx) Epoch() uint32 {
 func (t *BaseTx) SyntacticVerify(
 	ctx *snow.Context,
 	c codec.Manager,
+	codecVersion uint16,
 	txFeeAssetID ids.ID,
 	txFee uint64,
 	_ uint64,
@@ -50,6 +51,7 @@ func (t *BaseTx) SyntacticVerify(
 		[][]*avax.TransferableInput{t.Ins},
 		[][]*avax.TransferableOutput{t.Outs},
 		c,
+		codecVersion,
 	)
 }
 

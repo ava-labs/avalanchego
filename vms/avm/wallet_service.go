@@ -236,7 +236,7 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 			})
 		}
 	}
-	avax.SortTransferableOutputs(outs, w.vm.codec)
+	avax.SortTransferableOutputs(outs, w.vm.codec, currentCodecVersion)
 
 	tx := Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    w.vm.ctx.NetworkID,

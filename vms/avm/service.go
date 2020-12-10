@@ -1169,7 +1169,7 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 			})
 		}
 	}
-	avax.SortTransferableOutputs(outs, service.vm.codec)
+	avax.SortTransferableOutputs(outs, service.vm.codec, currentCodecVersion)
 
 	tx := Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    service.vm.ctx.NetworkID,
@@ -1766,7 +1766,7 @@ func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JSO
 			})
 		}
 	}
-	avax.SortTransferableOutputs(outs, service.vm.codec)
+	avax.SortTransferableOutputs(outs, service.vm.codec, currentCodecVersion)
 
 	tx := Tx{UnsignedTx: &ImportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -1912,7 +1912,7 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSO
 			})
 		}
 	}
-	avax.SortTransferableOutputs(outs, service.vm.codec)
+	avax.SortTransferableOutputs(outs, service.vm.codec, currentCodecVersion)
 
 	tx := Tx{UnsignedTx: &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{

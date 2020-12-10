@@ -76,6 +76,7 @@ func (t *CreateAssetTx) UTXOs() []*avax.UTXO {
 func (t *CreateAssetTx) SyntacticVerify(
 	ctx *snow.Context,
 	c codec.Manager,
+	codecVersion uint16,
 	txFeeAssetID ids.ID,
 	_ uint64,
 	txFee uint64,
@@ -111,7 +112,15 @@ func (t *CreateAssetTx) SyntacticVerify(
 		}
 	}
 
-	if err := t.BaseTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, txFee, numFxs); err != nil {
+	if err := t.BaseTx.SyntacticVerify(
+		ctx,
+		c,
+		codecVersion,
+		txFeeAssetID,
+		txFee,
+		txFee,
+		numFxs,
+	); err != nil {
 		return err
 	}
 

@@ -272,9 +272,9 @@ func (vm *VM) stake(
 			amountBurned, amountStaked, fee, amount)
 	}
 
-	avax.SortTransferableInputsWithSigners(ins, signers) // sort inputs and keys
-	avax.SortTransferableOutputs(returnedOuts, vm.codec) // sort outputs
-	avax.SortTransferableOutputs(stakedOuts, vm.codec)   // sort outputs
+	avax.SortTransferableInputsWithSigners(ins, signers)               // sort inputs and keys
+	avax.SortTransferableOutputs(returnedOuts, vm.codec, codecVersion) // sort outputs
+	avax.SortTransferableOutputs(stakedOuts, vm.codec, codecVersion)   // sort outputs
 
 	return ins, returnedOuts, stakedOuts, signers, nil
 }

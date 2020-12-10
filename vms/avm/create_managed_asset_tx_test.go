@@ -669,7 +669,7 @@ func TestManagedAsset(t *testing.T) {
 					}}}
 
 					avax.SortTransferableInputs(transferTx.UnsignedTx.(*BaseTx).Ins)
-					avax.SortTransferableOutputs(transferTx.UnsignedTx.(*BaseTx).Outs, vm.codec)
+					avax.SortTransferableOutputs(transferTx.UnsignedTx.(*BaseTx).Outs, vm.codec, currentCodecVersion)
 
 					// One signature to spend the tx fee, one signature to transfer the managed asset
 					if transferTx.UnsignedTx.(*BaseTx).Ins[0].AssetID() == avaxID {

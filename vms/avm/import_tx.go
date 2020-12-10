@@ -64,6 +64,7 @@ func (t *ImportTx) NumCredentials() int { return t.BaseTx.NumCredentials() + len
 func (t *ImportTx) SyntacticVerify(
 	ctx *snow.Context,
 	c codec.Manager,
+	codecVersion uint16,
 	txFeeAssetID ids.ID,
 	txFee uint64,
 	_ uint64,
@@ -89,6 +90,7 @@ func (t *ImportTx) SyntacticVerify(
 		},
 		[][]*avax.TransferableOutput{t.Outs},
 		c,
+		codecVersion,
 	)
 }
 

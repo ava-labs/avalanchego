@@ -212,10 +212,11 @@ func (vm *VM) Initialize(
 	vm.state = &prefixedState{
 		state: &state{
 			State: avax.State{
-				Cache:        &cache.LRU{Size: stateCacheSize},
-				DB:           vm.db,
-				GenesisCodec: vm.genesisCodec,
-				Codec:        vm.codec,
+				Cache:               &cache.LRU{Size: stateCacheSize},
+				DB:                  vm.db,
+				GenesisCodec:        vm.genesisCodec,
+				Codec:               vm.codec,
+				CurrentCodecVersion: currentCodecVersion,
 			},
 		},
 		tx:       &cache.LRU{Size: idCacheSize},
