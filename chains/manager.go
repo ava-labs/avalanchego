@@ -136,7 +136,7 @@ type ManagerConfig struct {
 	CriticalChains          ids.Set          // Chains that can't exit gracefully
 	WhitelistedSubnets      ids.Set          // Subnets to validate
 	TimeoutManager          *timeout.Manager // Manages request timeouts when sending messages to other validators
-	HealthService           *health.Health
+	HealthService           health.CheckRegisterer
 }
 
 type manager struct {

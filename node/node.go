@@ -92,7 +92,7 @@ type Node struct {
 	sharedMemory atomic.Memory
 
 	// Monitors node health and runs health checks
-	healthService *health.Health
+	healthService health.CheckRegisterer
 
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
@@ -712,9 +712,11 @@ func (n *Node) initInfoAPI() error {
 // Assumes n.Log, n.Net, n.APIServer, n.HTTPLog already initialized
 func (n *Node) initHealthAPI() error {
 	if !n.Config.HealthAPIEnabled {
+		n.healthService = health.NewNoOpService()
 		n.Log.Info("skipping health API initialization because it has been disabled")
 		return nil
 	}
+
 	n.Log.Info("initializing Health API")
 	service := health.NewService(n.Log)
 	if err := service.RegisterHeartbeat("network.validators.heartbeat", n.Net, 5*time.Minute); err != nil {

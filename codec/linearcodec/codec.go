@@ -22,7 +22,7 @@ const (
 type Codec interface {
 	codec.Registry
 	codec.Codec
-	SkipRegistations(int)
+	SkipRegistrations(int)
 }
 
 // Codec handles marshaling and unmarshaling of structs
@@ -50,7 +50,7 @@ func New(tagName string, maxSliceLen int) Codec {
 func NewDefault() Codec { return New(reflectcodec.DefaultTagName, defaultMaxSliceLength) }
 
 // Skip some number of type IDs
-func (c *linearCodec) SkipRegistations(num int) {
+func (c *linearCodec) SkipRegistrations(num int) {
 	c.lock.Lock()
 	c.nextTypeID += uint32(num)
 	c.lock.Unlock()
