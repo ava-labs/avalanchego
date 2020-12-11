@@ -2,14 +2,33 @@ SCRIPTS_PATH=$(cd $(dirname "${BASH_SOURCE[0]}"); pwd)
 SRC_PATH=$(dirname "${SCRIPTS_PATH}")
 # Build the runnable Avalanche docker image
 bash "${SRC_PATH}"/scripts/build_image.sh
+
 AVALANCHE_IMAGE_REPO=$(docker image ls --format="{{.Repository}}" | head -n 1)
 AVALANCHE_IMAGE_TAG=$(docker image ls --format="{{.Tag}}" | head -n 1)
 AVALANCHE_IMAGE="$AVALANCHE_IMAGE_REPO:$AVALANCHE_IMAGE_TAG"
+
 echo "Using Avalanche Image: $AVALANCHE_IMAGE"
 
 DOCKER_REPO="avaplatform"
+AVALANCHE_TESTING_REPO=$DOCKER_REPO/avalanche-testing
+DEFAULT_TEST_SUITE_IMAGE="$AVALANCHE_TESTING_REPO:dev"
 BYZANTINE_IMAGE="$DOCKER_REPO/avalanche-byzantine:v0.1.5-rc.1"
-TEST_SUITE_IMAGE="$DOCKER_REPO/avalanche-testing:v0.10.4"
+
+
+function docker_tag_exists() {
+    TOKEN=$(curl -s -H "Content-Type: application/json" -X POST -d '{"username": "'${DOCKER_USERNAME}'", "password": "'${DOCKER_PASS}'"}' https://hub.docker.com/v2/users/login/ | jq -r .token)
+    curl --silent -f --head -lL https://hub.docker.com/v2/repositories/$1/tags/$2/ > /dev/null
+}
+
+if docker_tag_exists $AVALANCHE_TESTING_REPO $BRANCH; then
+    echo "$AVALANCHE_TESTING_REPO $BRANCH exists; using this image to run e2e tests" 
+    TEST_SUITE_IMAGE="$AVALANCHE_TESTING_REPO:$BRANCH"
+else
+    echo "$AVALANCHE_TESTING_REPO $BRANCH does NOT exist; using the default image to run e2e tests" 
+    TEST_SUITE_IMAGE=DEFAULT_TEST_SUITE_IMAGE
+fi
+
+echo "Using $TEST_SUITE_IMAGE for e2e tests"
 
 # If Docker Credentials are not available skip the Byzantine Tests
 if [[ -z ${DOCKER_USERNAME} ]]; then
