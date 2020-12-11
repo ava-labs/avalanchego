@@ -540,7 +540,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			if producedAmount > consumedAmount {
 				increase := producedAmount - consumedAmount
 				if increase > unlockedConsumed {
-					return permError{errInvalidAmount}
+					return permError{fmt.Errorf("address %s produces %d unlocked and consumes %d unlocked for locktime %d", ownerID, increase, unlockedConsumed, locktime)}
 				}
 				unlockedConsumed -= increase
 			}
@@ -549,7 +549,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 	// More unlocked tokens produced than consumed. Invalid.
 	if unlockedProduced > unlockedConsumed {
-		return permError{errInvalidAmount}
+		return permError{fmt.Errorf("tx produces more unlocked (%d) than it consumes (%d)", unlockedProduced, unlockedConsumed)}
 	}
 
 	return nil

@@ -6,6 +6,7 @@ package rpcchainvm
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -78,6 +79,11 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		return nil, err
 	}
 
+	epochFirstTransition := time.Time{}
+	if err := epochFirstTransition.UnmarshalBinary(req.EpochFirstTransition); err != nil {
+		return nil, err
+	}
+
 	dbConn, err := vm.broker.Dial(req.DbServer)
 	if err != nil {
 		return nil, err
@@ -139,19 +145,21 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	}()
 
 	vm.ctx = &snow.Context{
-		NetworkID:           req.NetworkID,
-		SubnetID:            subnetID,
-		ChainID:             chainID,
-		NodeID:              nodeID,
-		XChainID:            xChainID,
-		AVAXAssetID:         avaxAssetID,
-		Log:                 logging.NoLog{},
-		DecisionDispatcher:  nil,
-		ConsensusDispatcher: nil,
-		Keystore:            keystoreClient,
-		SharedMemory:        sharedMemoryClient,
-		BCLookup:            bcLookupClient,
-		SNLookup:            snLookupClient,
+		NetworkID:            req.NetworkID,
+		SubnetID:             subnetID,
+		ChainID:              chainID,
+		NodeID:               nodeID,
+		XChainID:             xChainID,
+		AVAXAssetID:          avaxAssetID,
+		Log:                  logging.NoLog{},
+		DecisionDispatcher:   nil,
+		ConsensusDispatcher:  nil,
+		Keystore:             keystoreClient,
+		SharedMemory:         sharedMemoryClient,
+		BCLookup:             bcLookupClient,
+		SNLookup:             snLookupClient,
+		EpochFirstTransition: epochFirstTransition,
+		EpochDuration:        time.Duration(req.EpochDuration),
 	}
 
 	if err := vm.vm.Initialize(vm.ctx, dbClient, req.GenesisBytes, toEngine, nil); err != nil {
