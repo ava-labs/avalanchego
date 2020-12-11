@@ -25,7 +25,7 @@ if docker_tag_exists $AVALANCHE_TESTING_REPO $BRANCH; then
     TEST_SUITE_IMAGE="$AVALANCHE_TESTING_REPO:$BRANCH"
 else
     echo "$AVALANCHE_TESTING_REPO $BRANCH does NOT exist; using the default image to run e2e tests" 
-    TEST_SUITE_IMAGE=DEFAULT_TEST_SUITE_IMAGE
+    TEST_SUITE_IMAGE=$DEFAULT_TEST_SUITE_IMAGE
 fi
 
 echo "Using $TEST_SUITE_IMAGE for e2e tests"
