@@ -22,7 +22,7 @@ const (
 type Codec interface {
 	codec.Registry
 	codec.Codec
-	SkipRegistations(int)
+	SkipRegistrations(int)
 	NextGroup()
 }
 
@@ -57,8 +57,8 @@ func New(tagName string, maxSliceLen int) Codec {
 // NewDefault returns a new codec with reasonable default values
 func NewDefault() Codec { return New(reflectcodec.DefaultTagName, defaultMaxSliceLength) }
 
-// SkipRegistations some number of type IDs
-func (c *hierarchyCodec) SkipRegistations(num int) {
+// SkipRegistrations some number of type IDs
+func (c *hierarchyCodec) SkipRegistrations(num int) {
 	c.lock.Lock()
 	c.nextTypeID += uint16(num)
 	c.lock.Unlock()
