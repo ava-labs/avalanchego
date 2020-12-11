@@ -1075,6 +1075,83 @@ func (vm *VM) Spend(
 	return amountsSpent, ins, keys, nil
 }
 
+// spendManagedAsset attempts to use the given keychain to spend the
+// given UTXOs to spend [amount] of the managed asset [assetID].
+// The manager of the asset is [assetManager].
+// UTXOs with locktime > [time] can't be spent.
+// Returns the inputs and keys that, together, allow
+// UTXOs whose funds exceed [amount] of [assetID] to be spent.
+// Also returns the total amount of the asset spent by these inputs.
+func spendManagedAsset(
+	assetID ids.ID,
+	assetManager *secp256k1fx.OutputOwners,
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+	amount uint64,
+	time uint64,
+) (
+	uint64,
+	[]*avax.TransferableInput,
+	[][]*crypto.PrivateKeySECP256K1R,
+	error,
+) {
+	// UTXOs of a managed asset can be spent by providing signatures from the asset manager.
+	// First, get the keys required to prove ownership of the asset manager.
+	inputIntf, signers, err := kc.Spend(assetManager, time)
+	if err != nil {
+		return 0, nil, nil, fmt.Errorf("the given keychain does not have the keys to spend managed asset %s", assetID)
+	}
+	input, ok := inputIntf.(*secp256k1fx.Input)
+	if !ok {
+		return 0, nil, nil, fmt.Errorf("expected input to be *secp256k1fx.Input but got %T", inputIntf)
+	}
+
+	amountSpent := uint64(0)
+	ins := []*avax.TransferableInput{}
+	keys := [][]*crypto.PrivateKeySECP256K1R{}
+
+	for _, utxo := range utxos {
+		// So the value isn't overwritten in the next iteration
+		utxo := utxo
+
+		if utxo.AssetID() != assetID { // Don't care about this asset
+			continue
+		}
+
+		out, ok := utxo.Out.(avax.TransferableOut)
+		if !ok {
+			// This output doesn't have funds; don't care about it
+			continue
+		}
+
+		// We can spend this UTXO. Add the funds from this UTXO to [amountSpent].
+		amountSpent, err = safemath.Add64(amountSpent, out.Amount())
+		if err != nil {
+			// there was an error calculating the consumed amount, just error
+			return 0, nil, nil, errSpendOverflow
+		}
+
+		// This input, along with the keys used to prove ownership of the asset
+		// manager, allow the UTXO to be spent.
+		ins = append(ins, &avax.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  avax.Asset{ID: assetID},
+			In: &secp256k1fx.TransferInput{
+				Amt:   out.Amount(),
+				Input: *input,
+			},
+		})
+		// add the required keys to the array
+		keys = append(keys, signers)
+
+		if amountSpent > amount {
+			break
+		}
+	}
+	avax.SortTransferableInputsWithSigners(ins, keys)
+	return amountSpent, ins, keys, nil
+}
+
 // SpendNFT ...
 func (vm *VM) SpendNFT(
 	utxos []*avax.UTXO,

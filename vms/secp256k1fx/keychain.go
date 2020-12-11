@@ -80,6 +80,13 @@ func (kc *Keychain) Spend(out verify.Verifiable, time uint64) (verify.Verifiable
 			}, keys, nil
 		}
 		return nil, nil, errCantSpend
+	case *OutputOwners:
+		if sigIndices, keys, able := kc.Match(out, time); able {
+			return &Input{
+				SigIndices: sigIndices,
+			}, keys, nil
+		}
+		return nil, nil, errCantSpend
 	case *MintOutput:
 		if sigIndices, keys, able := kc.Match(&out.OutputOwners, time); able {
 			return &Input{

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -49,6 +50,7 @@ var (
 	errNoKeys                 = errors.New("from addresses have no keys or funds")
 	errNoManagerAddrs         = errors.New("manager has no addresses")
 	errNoManagerThreshold     = errors.New("manager has threshold 0")
+	errNoFromAddrs            = errors.New("no from addresses given")
 )
 
 // Service defines the base service for the asset vm
@@ -1457,6 +1459,204 @@ func (service *Service) UpdateManagedAsset(r *http.Request, args *UpdateManagedA
 	}
 
 	reply.TxID = txID
+	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
+	return err
+}
+
+// SendManagedAssetArgs ...
+type SendManagedAssetArgs struct {
+	SendArgs
+	// Addresses that tx fee is paid from
+	FeeFrom []string `json:"feeFrom"`
+	// Address that change from the tx fee is paid to
+	FeeChangeAddr string `json:"feeChangeAddr"`
+}
+
+type SendManagedAssetResponse struct {
+	api.JSONTxIDChangeAddr
+	FeeChangeAddr string `json:"feeChangeAddr"`
+}
+
+// SendManagedAsset issues a transaction that sends a managed asset
+func (service *Service) SendManagedAsset(_ *http.Request, args *SendManagedAssetArgs, reply *SendManagedAssetResponse) error {
+	service.vm.ctx.Log.Info("AVM: SendManagedAsset called with username: %s", args.Username)
+
+	// Validate the memo field
+	memoBytes := []byte(args.Memo)
+	if l := len(memoBytes); l > avax.MaxMemoSize {
+		return fmt.Errorf("max memo length is %d but provided memo field is length %d", avax.MaxMemoSize, l)
+	}
+
+	// Ensure at least one from address given
+	if len(args.From) == 0 {
+		return errNoFromAddrs
+	}
+
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// Parse the tx fee from addresses
+	feeFromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.FeeFrom {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'feeFrom' address %s: %w", addrStr, err)
+		}
+		feeFromAddrs.Add(addr)
+	}
+
+	// Parse the asset ID
+	assetID, err := service.vm.lookupAssetID(args.AssetID)
+	if err != nil {
+		return err
+	}
+
+	// Parse the to address
+	to, err := service.vm.ParseLocalAddress(args.To)
+	if err != nil {
+		return fmt.Errorf("problem parsing 'to' address %s: %w", args.To, err)
+	}
+
+	// Load user's keys and UTXOs. We only use the UTXOs to pay the tx fee.
+	// The UTXOs containing the managed asset are owned by the from addresses.
+	feeUTXOs, kc, err := service.vm.LoadUser(args.Username, args.Password, feeFromAddrs)
+	if err != nil {
+		return err
+	}
+
+	// Parse the managed asset change address.
+	if len(kc.Keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr, err := service.vm.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
+	if err != nil {
+		return err
+	}
+
+	// Parse the fee change address
+	feeChangeAddr, err := service.vm.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.FeeChangeAddr)
+	if err != nil {
+		return err
+	}
+
+	ins := []*avax.TransferableInput{}
+	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	amountsSpent, feeIns, feeKeys, err := service.vm.Spend(
+		feeUTXOs,
+		kc,
+		map[ids.ID]uint64{
+			service.vm.ctx.AVAXAssetID: service.vm.txFee,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	ins = append(ins, feeIns...)
+	keys = append(keys, feeKeys...)
+
+	// Create an output for the fee (AVAX) change
+	outs := []*avax.TransferableOutput{}
+	if amountSpent := amountsSpent[service.vm.ctx.AVAXAssetID]; amountSpent > service.vm.txFee {
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amountSpent - service.vm.txFee,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{feeChangeAddr},
+				},
+			},
+		})
+	}
+
+	// Load UTXOs controlled by from addesses
+	utxos, _, _, err := service.vm.GetUTXOs(fromAddrs, ids.ShortEmpty, ids.Empty, -1, false)
+	if err != nil {
+		return fmt.Errorf("problem retrieving UTXOs: %w", err)
+	}
+
+	// Get the manager of this asset
+	_, _, manager, err := service.vm.state.ManagedAssetStatus(assetID)
+	if err == database.ErrNotFound {
+		return fmt.Errorf("%s is not a managed asset", assetID)
+	} else if err != nil {
+		return fmt.Errorf("couldn't get asset manager: %w", err)
+	}
+
+	amountSpent, managedAssetIns, managedAssetKeys, err := spendManagedAsset(
+		assetID,
+		manager,
+		utxos,
+		kc,
+		uint64(args.Amount),
+		service.vm.Clock().Unix(),
+	)
+	if err != nil {
+		return err
+	}
+	ins = append(ins, managedAssetIns...)
+	keys = append(keys, managedAssetKeys...)
+
+	// Create an output for the sent managed asset
+	outs = append(outs, &avax.TransferableOutput{
+		Asset: avax.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: uint64(args.Amount),
+			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  0,
+				Threshold: 1,
+				Addrs:     []ids.ShortID{to},
+			},
+		},
+	})
+
+	// Make an output for the managed asset change, if applicable
+	if amountSpent > uint64(args.Amount) {
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: assetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amountSpent - uint64(args.Amount),
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{changeAddr},
+				},
+			},
+		})
+	}
+
+	avax.SortTransferableInputsWithSigners(ins, keys)
+	avax.SortTransferableOutputs(outs, service.vm.codec, currentCodecVersion)
+
+	tx := Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    service.vm.ctx.NetworkID,
+		BlockchainID: service.vm.ctx.ChainID,
+		Outs:         outs,
+		Ins:          ins,
+		Memo:         memoBytes,
+	}}}
+	if err := tx.SignSECP256K1Fx(service.vm.codec, currentCodecVersion, keys); err != nil {
+		return err
+	}
+
+	txID, err := service.vm.IssueTx(tx.Bytes())
+	if err != nil {
+		return fmt.Errorf("problem issuing transaction: %w", err)
+	}
+
+	reply.TxID = txID
+	reply.FeeChangeAddr, err = service.vm.FormatLocalAddress(feeChangeAddr)
+	if err != nil {
+		return err
+	}
 	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
 	return err
 }
