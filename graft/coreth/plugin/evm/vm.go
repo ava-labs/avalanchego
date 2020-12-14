@@ -156,9 +156,9 @@ type VM struct {
 
 	acceptedDB database.Database
 
+	txPoolStabilizedLock         sync.Mutex
 	txPoolStabilizedHead         common.Hash
 	txPoolStabilizedOk           chan struct{}
-	txPoolStabilizedLock         sync.Mutex
 	txPoolStabilizedShutdownChan chan struct{}
 
 	metalock                     sync.Mutex
@@ -401,7 +401,10 @@ func (vm *VM) Bootstrapping() error { return vm.fx.Bootstrapping() }
 
 // Bootstrapped notifies this VM that the consensus engine has finished
 // bootstrapping
-func (vm *VM) Bootstrapped() error { return vm.fx.Bootstrapped() }
+func (vm *VM) Bootstrapped() error {
+	vm.ctx.Bootstrapped()
+	return vm.fx.Bootstrapped()
+}
 
 // Shutdown implements the snowman.ChainVM interface
 func (vm *VM) Shutdown() error {
@@ -421,10 +424,10 @@ func (vm *VM) Shutdown() error {
 func (vm *VM) BuildBlock() (snowman.Block, error) {
 	vm.chain.GenBlock()
 	block := <-vm.newBlockChan
-	if block == nil {
-		return nil, errCreateBlock
-	}
+
 	// reset the min block time timer
+	// after finishing attempt to build
+	// a block.
 	vm.bdlock.Lock()
 	vm.bdTimerState = bdTimerStateMin
 	vm.bdGenWaitFlag = false
@@ -432,7 +435,11 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	vm.blockDelayTimer.SetTimeoutIn(minBlockTime)
 	vm.bdlock.Unlock()
 
-	log.Debug(fmt.Sprintf("built block %s", block.ID()))
+	if block == nil {
+		return nil, errCreateBlock
+	}
+
+	log.Debug(fmt.Sprintf("Built block %s", block.ID()))
 	// make sure Tx Pool is updated
 	<-vm.txPoolStabilizedOk
 	return block, nil
@@ -739,7 +746,13 @@ func (vm *VM) awaitTxPoolStabilized() {
 	defer vm.shutdownWg.Done()
 	for {
 		select {
-		case e := <-vm.newMinedBlockSub.Chan():
+		case e, ok := <-vm.newMinedBlockSub.Chan():
+			if !ok {
+				return
+			}
+			if e == nil {
+				continue
+			}
 			switch h := e.Data.(type) {
 			case core.NewMinedBlockEvent:
 				vm.txPoolStabilizedLock.Lock()
