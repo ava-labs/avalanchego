@@ -30,7 +30,7 @@ import (
 	"github.com/ava-labs/coreth/accounts/external"
 	"github.com/ava-labs/coreth/accounts/keystore"
 	"github.com/ava-labs/coreth/accounts/scwallet"
-	//"github.com/ava-labs/coreth/accounts/usbwallet"
+
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
