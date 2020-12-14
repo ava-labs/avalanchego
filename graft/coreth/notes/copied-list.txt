@@ -70,10 +70,7 @@
 ./eth/filters/api.go
 ./eth/filters/filter.go
 ./eth/filters/filter_system.go
-./eth/gasprice/gasprice.go
 ./eth/metrics.go
-./eth/protocol.go
-./ethstats/ethstats.go
 ./eth/tracers/internal/tracers/tracers.go
 ./eth/tracers/tracer.go
 ./eth/tracers/tracers.go

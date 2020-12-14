@@ -55,7 +55,6 @@ type Node struct {
 
 const (
 	initializingState = iota
-	runningState
 	closedState
 )
 

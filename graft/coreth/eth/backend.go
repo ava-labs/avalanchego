@@ -23,7 +23,6 @@ import (
 	"math/big"
 	"runtime"
 	"sync"
-	//"sync/atomic"
 
 	"github.com/ava-labs/coreth/accounts"
 	"github.com/ava-labs/coreth/consensus"
@@ -51,6 +50,16 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
+)
+
+// ProtocolVersions are the supported versions of the eth protocol (first is primary).
+var ProtocolVersions = []uint{eth65, eth64, eth63}
+
+// Constants to match up protocol versions and messages
+const (
+	eth63 = 63
+	eth64 = 64
+	eth65 = 65
 )
 
 type BackendCallbacks struct {
@@ -498,13 +507,13 @@ func (s *Ethereum) Start() error {
 	s.startBloomHandlers(params.BloomBitsBlocks)
 
 	// Figure out a max peers count based on the server limits
-	maxPeers := s.p2pServer.MaxPeers
-	if s.config.LightServ > 0 {
-		if s.config.LightPeers >= s.p2pServer.MaxPeers {
-			return fmt.Errorf("invalid peer config: light peer count (%d) >= total peer count (%d)", s.config.LightPeers, s.p2pServer.MaxPeers)
-		}
-		maxPeers -= s.config.LightPeers
-	}
+	// maxPeers := s.p2pServer.MaxPeers
+	// if s.config.LightServ > 0 {
+	// 	if s.config.LightPeers >= s.p2pServer.MaxPeers {
+	// 		return fmt.Errorf("invalid peer config: light peer count (%d) >= total peer count (%d)", s.config.LightPeers, s.p2pServer.MaxPeers)
+	// 	}
+	// 	maxPeers -= s.config.LightPeers
+	// }
 	// Start the networking layer and the light server if requested
 	//s.protocolManager.Start(maxPeers)
 	return nil
