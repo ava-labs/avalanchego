@@ -156,10 +156,9 @@ type VM struct {
 
 	acceptedDB database.Database
 
-	txPoolStabilizedLock         sync.Mutex
-	txPoolStabilizedHead         common.Hash
-	txPoolStabilizedOk           chan struct{}
-	txPoolStabilizedShutdownChan chan struct{}
+	txPoolStabilizedLock sync.Mutex
+	txPoolStabilizedHead common.Hash
+	txPoolStabilizedOk   chan struct{}
 
 	metalock                     sync.Mutex
 	blockCache, blockStatusCache cache.LRU
@@ -175,7 +174,6 @@ type VM struct {
 	genlock               sync.Mutex
 	txSubmitChan          <-chan struct{}
 	atomicTxSubmitChan    chan struct{}
-	shutdownSubmitChan    chan struct{}
 	baseCodec             codec.Codec
 	codec                 codec.Manager
 	clock                 timer.Clock
@@ -183,7 +181,8 @@ type VM struct {
 	pendingAtomicTxs      chan *Tx
 	blockAtomicInputCache cache.LRU
 
-	shutdownWg sync.WaitGroup
+	shutdownChan chan struct{}
+	shutdownWg   sync.WaitGroup
 
 	fx secp256k1fx.Fx
 }
@@ -232,6 +231,7 @@ func (vm *VM) Initialize(
 		return errUnsupportedFXs
 	}
 
+	vm.shutdownChan = make(chan struct{}, 1)
 	vm.ctx = ctx
 	vm.chaindb = Database{db}
 	g := new(core.Genesis)
@@ -350,11 +350,9 @@ func (vm *VM) Initialize(
 	vm.bdTimerState = bdTimerStateLong
 	vm.bdGenWaitFlag = true
 	vm.txPoolStabilizedOk = make(chan struct{}, 1)
-	vm.txPoolStabilizedShutdownChan = make(chan struct{}, 1) // Signal goroutine to shutdown
 	// TODO: read size from options
 	vm.pendingAtomicTxs = make(chan *Tx, 1024)
 	vm.atomicTxSubmitChan = make(chan struct{}, 1)
-	vm.shutdownSubmitChan = make(chan struct{}, 1)
 	vm.newMinedBlockSub = vm.chain.SubscribeNewMinedBlockEvent()
 	vm.shutdownWg.Add(1)
 	go ctx.Log.RecoverAndPanic(vm.awaitTxPoolStabilized)
@@ -413,8 +411,8 @@ func (vm *VM) Shutdown() error {
 	}
 
 	vm.writeBackMetadata()
-	close(vm.txPoolStabilizedShutdownChan)
-	close(vm.shutdownSubmitChan)
+	vm.blockDelayTimer.Stop()
+	close(vm.shutdownChan)
 	vm.chain.Stop()
 	vm.shutdownWg.Wait()
 	return nil
@@ -763,7 +761,7 @@ func (vm *VM) awaitTxPoolStabilized() {
 				vm.txPoolStabilizedLock.Unlock()
 			default:
 			}
-		case <-vm.txPoolStabilizedShutdownChan:
+		case <-vm.shutdownChan:
 			return
 		}
 	}
@@ -782,7 +780,7 @@ func (vm *VM) awaitSubmittedTxs() {
 			vm.tryBlockGen()
 		case <-time.After(5 * time.Second):
 			vm.tryBlockGen()
-		case <-vm.shutdownSubmitChan:
+		case <-vm.shutdownChan:
 			return
 		}
 	}
