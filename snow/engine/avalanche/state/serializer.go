@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/utils/math"
 )
@@ -28,6 +27,8 @@ const (
 var (
 	errUnknownVertex = errors.New("unknown vertex")
 	errWrongChainID  = errors.New("wrong ChainID in vertex")
+
+	_ vertex.Manager = &Serializer{}
 )
 
 // Serializer manages the state of multiple vertices
@@ -66,7 +67,7 @@ func (s *Serializer) Parse(b []byte) (avalanche.Vertex, error) {
 func (s *Serializer) Build(
 	epoch uint32,
 	parentIDs []ids.ID,
-	txs []conflicts.Tx,
+	txs []vertex.Tx,
 	restrictions []ids.ID,
 ) (avalanche.Vertex, error) {
 	height := uint64(0)

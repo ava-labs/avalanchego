@@ -12,21 +12,26 @@ import (
 type Tx interface {
 	choices.Decidable
 
-	// Dependencies is a list of transactions upon which this transaction
-	// depends. Each element of Dependencies must be verified before Verify is
-	// called on this transaction.
-	//
-	// Similarly, each element of Dependencies must be accepted before this
-	// transaction is accepted.
-	Dependencies() []Tx
+	// TransitionID is a unique identifier for the transition this transaction
+	// will perform.
+	TransitionID() ids.ID
 
-	// InputIDs is a set where each element is the ID of a piece of state that
+	// Epoch this transaction was issued in.
+	Epoch() uint32
+
+	// Restrictions returns a list of transition IDs that need to be performed in
+	// this transaction's epoch or a later one if this transaction is to be accepted.
+	Restrictions() []ids.ID
+
+	// Dependencies is a list of transition IDs that need to be performed before
+	// this transaction is to be accepted, that have not already been performed.
+	// These dependencies can be executed in the same epoch as this transaction.
+	Dependencies() []ids.ID
+
+	// InputIDs is a list where each element is the ID of a piece of state that
 	// will be consumed if this transaction is accepted.
 	//
 	// In the context of a UTXO-based payments system, for example, this would
-	// be the IDs of the UTXOs consumed by this transaction
+	// be the IDs of the UTXOs consumed by this transaction.
 	InputIDs() []ids.ID
-
-	Verify() error
-	Bytes() []byte
 }

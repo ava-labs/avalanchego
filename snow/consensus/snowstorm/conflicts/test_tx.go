@@ -8,24 +8,32 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
+var (
+	_ Tx = &TestTx{}
+)
+
 // TestTx is a useful test tx
 type TestTx struct {
 	choices.TestDecidable
 
-	DependenciesV []Tx
+	TransitionIDV ids.ID
+	EpochV        uint32
+	RestrictionsV []ids.ID
+	DependenciesV []ids.ID
 	InputIDsV     []ids.ID
-	VerifyV       error
-	BytesV        []byte
 }
 
+// TransitionID implements the Tx interface
+func (t *TestTx) TransitionID() ids.ID { return t.TransitionIDV }
+
+// Epoch implements the Tx interface
+func (t *TestTx) Epoch() uint32 { return t.EpochV }
+
+// Restrictions implements the Tx interface
+func (t *TestTx) Restrictions() []ids.ID { return t.RestrictionsV }
+
 // Dependencies implements the Tx interface
-func (t *TestTx) Dependencies() []Tx { return t.DependenciesV }
+func (t *TestTx) Dependencies() []ids.ID { return t.DependenciesV }
 
 // InputIDs implements the Tx interface
 func (t *TestTx) InputIDs() []ids.ID { return t.InputIDsV }
-
-// Verify implements the Tx interface
-func (t *TestTx) Verify() error { return t.VerifyV }
-
-// Bytes implements the Tx interface
-func (t *TestTx) Bytes() []byte { return t.BytesV }

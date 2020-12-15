@@ -342,10 +342,10 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 			}
 		}
 
-		// If a status has been changed. We must perform a second iteration
+		// If a status has changed, we must perform a second iteration
 		shouldWork = len(acceptable)+len(rejectable) > 0
 
-		// If a status has been changed. So the frontiers must be recalculated.
+		// If a status has changed, the frontiers must be recalculated.
 		changed = changed || shouldWork
 	}
 	return changed, nil
