@@ -20,8 +20,11 @@ function docker_tag_exists() {
     curl --silent -f --head -lL https://hub.docker.com/v2/repositories/$1/tags/$2/ > /dev/null
 }
 
-if docker_tag_exists $AVALANCHE_TESTING_REPO $BRANCH; then
-    echo "$AVALANCHE_TESTING_REPO $BRANCH exists; using this image to run e2e tests" 
+if docker_tag_exists $AVALANCHE_TESTING_REPO $COMMIT; then
+    echo "$AVALANCHE_TESTING_REPO:$COMMIT exists; using this image to run e2e tests" 
+    TEST_SUITE_IMAGE="$AVALANCHE_TESTING_REPO:$COMMIT"
+else if docker_tag_exists $AVALANCHE_TESTING_REPO $BRANCH; then
+    echo "$AVALANCHE_TESTING_REPO:$BRANCH exists; using this image to run e2e tests" 
     TEST_SUITE_IMAGE="$AVALANCHE_TESTING_REPO:$BRANCH"
 else
     echo "$AVALANCHE_TESTING_REPO $BRANCH does NOT exist; using the default image to run e2e tests" 
@@ -68,3 +71,5 @@ docker run \
     `# It basically says, "if and only if ${1} exists, evaluate ${@}"` \
     ${1+"${@}"} \
     "${INITIALIZER_IMAGE}"
+
+docker tag $TEST_SUITE_IMAGE $AVALANCHE_TESTING_REPO:${COMMIT} 
