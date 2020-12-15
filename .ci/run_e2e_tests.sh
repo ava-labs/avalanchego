@@ -70,6 +70,8 @@ docker run \
     `# In Bash, this is how you feed arguments exactly as-is to a child script (since ${*} loses quoting and ${@} trips set -e if no arguments are passed)` \
     `# It basically says, "if and only if ${1} exists, evaluate ${@}"` \
     ${1+"${@}"} \
-    "${INITIALIZER_IMAGE}"
+    "${INITIALIZER_IMAGE}" \
 
-docker tag $TEST_SUITE_IMAGE $AVALANCHE_TESTING_REPO:${COMMIT} 
+
+docker tag "${TEST_SUITE_IMAGE}" "${AVALANCHE_TESTING_REPO}:${COMMIT}"
+
