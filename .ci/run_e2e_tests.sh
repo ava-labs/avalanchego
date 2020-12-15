@@ -23,7 +23,7 @@ function docker_tag_exists() {
 if docker_tag_exists $AVALANCHE_TESTING_REPO $COMMIT; then
     echo "$AVALANCHE_TESTING_REPO:$COMMIT exists; using this image to run e2e tests" 
     TEST_SUITE_IMAGE="$AVALANCHE_TESTING_REPO:$COMMIT"
-else if docker_tag_exists $AVALANCHE_TESTING_REPO $BRANCH; then
+elif docker_tag_exists $AVALANCHE_TESTING_REPO $BRANCH; then
     echo "$AVALANCHE_TESTING_REPO:$BRANCH exists; using this image to run e2e tests" 
     TEST_SUITE_IMAGE="$AVALANCHE_TESTING_REPO:$BRANCH"
 else
@@ -70,7 +70,7 @@ docker run \
     `# In Bash, this is how you feed arguments exactly as-is to a child script (since ${*} loses quoting and ${@} trips set -e if no arguments are passed)` \
     `# It basically says, "if and only if ${1} exists, evaluate ${@}"` \
     ${1+"${@}"} \
-    "${INITIALIZER_IMAGE}" \
+    "${INITIALIZER_IMAGE}" 
 
 
 docker tag "${TEST_SUITE_IMAGE}" "${AVALANCHE_TESTING_REPO}:${COMMIT}"
