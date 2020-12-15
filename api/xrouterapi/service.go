@@ -195,7 +195,7 @@ func (service *XRouterService) GetTransactions(_ *http.Request, args *GetTransac
 		}
 		for i := range s {
 			json.Unmarshal(xrouterReply[i].Reply, &b)
-			reply.Reply = append(reply.Reply, b[0])
+			reply.Reply = append(reply.Reply, b[i])
 		}
 		return nil
 	}
@@ -284,7 +284,6 @@ type GetBlocksArgs struct {
 	Blockchain string `json:"blockchain"`
 	IDS        string `json:"block_ids"`
 	NodeCount  int    `json:"node_count"`
-	Verbose    bool   `json:"verbose"`
 }
 
 type GetBlocksReply struct {
@@ -315,7 +314,7 @@ func (service *XRouterService) GetBlocks(_ *http.Request, args *GetBlocksArgs, r
 		}
 		for i := range s {
 			json.Unmarshal(xrouterReply[i].Reply, &b)
-			reply.Reply = append(reply.Reply, b[0])
+			reply.Reply = append(reply.Reply, b[i])
 		}
 		return nil
 	}
