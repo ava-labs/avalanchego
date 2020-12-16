@@ -76,21 +76,6 @@ func (id *ShortID) UnmarshalJSON(b []byte) error {
 	return err
 }
 
-/* TODO remove
-// IsZero returns true if the value has not been initialized
-func (id ShortID) IsZero() bool { return id.ID == nil }
-
-// Key returns a 20 byte hash that this id represents. This is useful to allow
-// for this id to be used as keys in maps.
-func (id ShortID) Key() [20]byte { return *id.ID }
-
-// Equals returns true if the ids have the same byte representation
-func (id ShortID) Equals(oID ShortID) bool {
-	return id.ID == oID.ID ||
-		(id.ID != nil && oID.ID != nil && bytes.Equal(id.Bytes(), oID.Bytes()))
-}
-*/
-
 // Bytes returns the 20 byte hash as a slice. It is assumed this slice is not
 // modified.
 func (id ShortID) Bytes() []byte { return id[:] }

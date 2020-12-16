@@ -149,7 +149,7 @@ type network struct {
 	retryDelay      map[string]time.Duration
 	// TODO: bound the size of [myIPs] to avoid DoS. LRU caching would be ideal
 	myIPs map[string]struct{} // set of IPs that resulted in my ID.
-	peers map[[20]byte]*peer
+	peers map[ids.ShortID]*peer
 
 	// ensures the close of the network only happens once.
 	closeOnce sync.Once
@@ -327,7 +327,7 @@ func NewNetwork(
 		connectedIPs:                       make(map[string]struct{}),
 		retryDelay:                         make(map[string]time.Duration),
 		myIPs:                              map[string]struct{}{ip.IP().String(): {}},
-		peers:                              make(map[[20]byte]*peer),
+		peers:                              make(map[ids.ShortID]*peer),
 		readBufferSize:                     readBufferSize,
 		readHandshakeTimeout:               readHandshakeTimeout,
 		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize),
@@ -798,7 +798,7 @@ func (n *network) close() {
 		peersToClose[i] = peer
 		i++
 	}
-	n.peers = make(map[[20]byte]*peer)
+	n.peers = make(map[ids.ShortID]*peer)
 	n.stateLock.Unlock()
 
 	for _, peer := range peersToClose {

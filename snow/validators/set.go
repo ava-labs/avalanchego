@@ -76,7 +76,7 @@ type Set interface {
 // NewSet returns a new, empty set of validators.
 func NewSet() Set {
 	return &set{
-		vdrMap:  make(map[[20]byte]int),
+		vdrMap:  make(map[ids.ShortID]int),
 		sampler: sampler.NewWeightedWithoutReplacement(),
 	}
 }
@@ -84,7 +84,7 @@ func NewSet() Set {
 // NewBestSet returns a new, empty set of validators.
 func NewBestSet(expectedSampleSize int) Set {
 	return &set{
-		vdrMap:  make(map[[20]byte]int),
+		vdrMap:  make(map[ids.ShortID]int),
 		sampler: sampler.NewBestWeightedWithoutReplacement(expectedSampleSize),
 	}
 }
@@ -94,7 +94,7 @@ func NewBestSet(expectedSampleSize int) Set {
 // validator.
 type set struct {
 	lock             sync.RWMutex
-	vdrMap           map[[20]byte]int
+	vdrMap           map[ids.ShortID]int
 	vdrSlice         []*validator
 	vdrWeights       []uint64
 	vdrMaskedWeights []uint64
@@ -128,7 +128,7 @@ func (s *set) set(vdrs []Validator) error {
 		s.vdrWeights = s.vdrWeights[:0]
 		s.vdrMaskedWeights = s.vdrMaskedWeights[:0]
 	}
-	s.vdrMap = make(map[[20]byte]int, lenVdrs)
+	s.vdrMap = make(map[ids.ShortID]int, lenVdrs)
 	s.totalWeight = 0
 
 	for _, vdr := range vdrs {

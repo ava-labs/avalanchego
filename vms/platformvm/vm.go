@@ -166,7 +166,7 @@ type VM struct {
 
 	bootstrappedTime time.Time
 
-	connections map[[20]byte]time.Time
+	connections map[ids.ShortID]time.Time
 }
 
 // Initialize this blockchain.
@@ -193,7 +193,7 @@ func (vm *VM) Initialize(
 	}
 
 	vm.droppedTxCache = cache.LRU{Size: droppedTxCacheSize}
-	vm.connections = make(map[[20]byte]time.Time)
+	vm.connections = make(map[ids.ShortID]time.Time)
 
 	// Register this VM's types with the database so we can get/put structs to/from it
 	vm.registerDBTypes()

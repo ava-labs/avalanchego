@@ -23,7 +23,7 @@ type msgTracker struct {
 	lock sync.Mutex
 
 	// Track peers outstanding messages
-	msgSpenders map[[20]byte]*msgCount
+	msgSpenders map[ids.ShortID]*msgCount
 	poolCount   uint32
 }
 
@@ -31,7 +31,7 @@ type msgTracker struct {
 // pending messages from peers
 func NewMessageTracker() CountingTracker {
 	return &msgTracker{
-		msgSpenders: make(map[[20]byte]*msgCount),
+		msgSpenders: make(map[ids.ShortID]*msgCount),
 	}
 }
 

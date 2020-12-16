@@ -21,7 +21,7 @@ var (
 // Keychain is a collection of keys that can be used to spend outputs
 type Keychain struct {
 	factory        *crypto.FactorySECP256K1R
-	addrToKeyIndex map[[20]byte]int
+	addrToKeyIndex map[ids.ShortID]int
 
 	// These can be used to iterate over. However, they should not be modified externally.
 	Addrs ids.ShortSet
@@ -32,7 +32,7 @@ type Keychain struct {
 func NewKeychain() *Keychain {
 	return &Keychain{
 		factory:        &crypto.FactorySECP256K1R{},
-		addrToKeyIndex: make(map[[20]byte]int),
+		addrToKeyIndex: make(map[ids.ShortID]int),
 	}
 }
 

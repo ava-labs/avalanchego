@@ -115,7 +115,7 @@ func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numT
 
 	// Key: Address
 	// Value: AVAX balance
-	balances := map[[20]byte]int{}
+	balances := map[ids.ShortID]int{}
 
 	for _, addr := range addrs { // get balances for all addresses
 		addrStr, err := s.vm.FormatLocalAddress(addr)

@@ -40,12 +40,12 @@ type queryBenchlist struct {
 	// Validator ID --> Request ID --> non-empty iff
 	// there is an outstanding request to this validator
 	// with the corresponding requestID
-	pendingQueries map[[20]byte]map[uint32]pendingQuery
+	pendingQueries map[ids.ShortID]map[uint32]pendingQuery
 	// Map of consecutive query failures
-	consecutiveFailures map[[20]byte]failureStreak
+	consecutiveFailures map[ids.ShortID]failureStreak
 
 	// Maintain benchlist
-	benchlistTimes map[[20]byte]time.Time
+	benchlistTimes map[ids.ShortID]time.Time
 	benchlistOrder *list.List
 	benchlistSet   ids.ShortSet
 
@@ -85,9 +85,9 @@ func NewQueryBenchlist(
 ) (QueryBenchlist, error) {
 	metrics := &metrics{}
 	return &queryBenchlist{
-		pendingQueries:         make(map[[20]byte]map[uint32]pendingQuery),
-		consecutiveFailures:    make(map[[20]byte]failureStreak),
-		benchlistTimes:         make(map[[20]byte]time.Time),
+		pendingQueries:         make(map[ids.ShortID]map[uint32]pendingQuery),
+		consecutiveFailures:    make(map[ids.ShortID]failureStreak),
+		benchlistTimes:         make(map[ids.ShortID]time.Time),
 		benchlistOrder:         list.New(),
 		benchlistSet:           ids.ShortSet{},
 		vdrs:                   validators,
@@ -286,9 +286,9 @@ func (b *queryBenchlist) cleanup() {
 }
 
 func (b *queryBenchlist) reset() {
-	b.pendingQueries = make(map[[20]byte]map[uint32]pendingQuery)
-	b.consecutiveFailures = make(map[[20]byte]failureStreak)
-	b.benchlistTimes = make(map[[20]byte]time.Time)
+	b.pendingQueries = make(map[ids.ShortID]map[uint32]pendingQuery)
+	b.consecutiveFailures = make(map[ids.ShortID]failureStreak)
+	b.benchlistTimes = make(map[ids.ShortID]time.Time)
 	b.benchlistOrder.Init()
 	b.benchlistSet.Clear()
 	b.metrics.weightBenched.Set(0)
