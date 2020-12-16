@@ -849,7 +849,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 		return fmt.Errorf("problem formatting address: %w", err)
 	}
 	for _, address := range addresses {
-		if newAddress.Equals(address) {
+		if newAddress == address {
 			return db.Close()
 		}
 	}

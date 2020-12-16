@@ -31,7 +31,7 @@ type cpuTracker struct {
 	factory         uptime.Factory
 	cumulativeMeter uptime.Meter
 	halflife        time.Duration
-	cpuSpenders     map[[20]byte]uptime.Meter
+	cpuSpenders     map[ids.ShortID]uptime.Meter
 }
 
 // NewCPUTracker ...
@@ -40,7 +40,7 @@ func NewCPUTracker(factory uptime.Factory, halflife time.Duration) TimeTracker {
 		factory:         factory,
 		cumulativeMeter: factory.New(halflife),
 		halflife:        halflife,
-		cpuSpenders:     make(map[[20]byte]uptime.Meter),
+		cpuSpenders:     make(map[ids.ShortID]uptime.Meter),
 	}
 }
 
@@ -48,14 +48,13 @@ func NewCPUTracker(factory uptime.Factory, halflife time.Duration) TimeTracker {
 // messages from [vdr]
 // assumes the lock is held
 func (ct *cpuTracker) getMeter(vdr ids.ShortID) uptime.Meter {
-	key := vdr.Key()
-	meter, exists := ct.cpuSpenders[key]
+	meter, exists := ct.cpuSpenders[vdr]
 	if exists {
 		return meter
 	}
 
 	newMeter := ct.factory.New(ct.halflife)
-	ct.cpuSpenders[key] = newMeter
+	ct.cpuSpenders[vdr] = newMeter
 	return newMeter
 }
 

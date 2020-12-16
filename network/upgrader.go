@@ -30,7 +30,7 @@ func NewIPUpgrader() Upgrader { return ipUpgrader{} }
 func (ipUpgrader) Upgrade(conn net.Conn) (ids.ShortID, net.Conn, error) {
 	addr := conn.RemoteAddr()
 	str := addr.String()
-	id := ids.NewShortID(hashing.ComputeHash160Array([]byte(str)))
+	id := ids.ShortID(hashing.ComputeHash160Array([]byte(str)))
 	return id, conn, nil
 }
 
@@ -56,7 +56,7 @@ func (t tlsServerUpgrader) Upgrade(conn net.Conn) (ids.ShortID, net.Conn, error)
 		return ids.ShortID{}, nil, errNoCert
 	}
 	peerCert := connState.PeerCertificates[0]
-	id := ids.NewShortID(
+	id := ids.ShortID(
 		hashing.ComputeHash160Array(
 			hashing.ComputeHash256(peerCert.Raw)))
 	return id, encConn, nil
@@ -84,7 +84,7 @@ func (t tlsClientUpgrader) Upgrade(conn net.Conn) (ids.ShortID, net.Conn, error)
 		return ids.ShortID{}, nil, errNoCert
 	}
 	peerCert := connState.PeerCertificates[0]
-	id := ids.NewShortID(
+	id := ids.ShortID(
 		hashing.ComputeHash160Array(
 			hashing.ComputeHash256(peerCert.Raw)))
 	return id, encConn, nil

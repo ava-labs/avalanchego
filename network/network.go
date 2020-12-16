@@ -413,8 +413,7 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 			requestID,
 			containerIDs,
 			err)
-		for validatorIDKey := range validatorIDs {
-			validatorID := ids.NewShortID(validatorIDKey)
+		for validatorID := range validatorIDs {
 			n.executor.Add(func() {
 				n.router.GetAcceptedFailed(validatorID, chainID, requestID)
 			})
@@ -571,8 +570,8 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			err,
 			len(container))
 		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
-		for validatorIDKey := range validatorIDs {
-			vID := ids.NewShortID(validatorIDKey)
+		for validatorID := range validatorIDs {
+			vID := validatorID
 			n.executor.Add(func() { n.router.QueryFailed(vID, chainID, requestID) })
 		}
 		return // Packing message failed
@@ -1090,8 +1089,6 @@ func (n *network) tryAddPeer(p *peer) error {
 
 	ip := p.getIP()
 
-	key := p.id.Key()
-
 	if n.closed.GetValue() {
 		// the network is closing, so make sure that no further reconnect
 		// attempts are made.
@@ -1100,7 +1097,7 @@ func (n *network) tryAddPeer(p *peer) error {
 
 	// if this connection is myself, then I should delete the connection and
 	// mark the IP as one of mine.
-	if p.id.Equals(n.id) {
+	if p.id == n.id {
 		if !ip.IsZero() {
 			// if n.ip is less useful than p.ip set it to this IP
 			if n.ip.IP().IsZero() {
@@ -1118,7 +1115,7 @@ func (n *network) tryAddPeer(p *peer) error {
 
 	// If I am already connected to this peer, then I should close this new
 	// connection.
-	if _, ok := n.peers[key]; ok {
+	if _, ok := n.peers[p.id]; ok {
 		if !ip.IsZero() {
 			str := ip.String()
 			delete(n.disconnectedIPs, str)
@@ -1127,7 +1124,7 @@ func (n *network) tryAddPeer(p *peer) error {
 		return fmt.Errorf("duplicated connection from %s at %s", p.id.PrefixedString(constants.NodeIDPrefix), ip)
 	}
 
-	n.peers[key] = p
+	n.peers[p.id] = p
 	n.numPeers.Set(float64(len(n.peers)))
 	p.Start()
 	return nil
@@ -1206,8 +1203,7 @@ func (n *network) disconnected(p *peer) {
 
 	n.log.Debug("disconnected from %s at %s", p.id, ip)
 
-	key := p.id.Key()
-	delete(n.peers, key)
+	delete(n.peers, p.id)
 	n.numPeers.Set(float64(len(n.peers)))
 
 	if !ip.IsZero() {
@@ -1246,10 +1242,10 @@ func (n *network) getPeers(validatorIDs ids.ShortSet) []*PeerElement {
 
 	peers := make([]*PeerElement, validatorIDs.Len())
 	i := 0
-	for validatorIDKey := range validatorIDs {
+	for validatorID := range validatorIDs {
 		peers[i] = &PeerElement{
-			peer: n.peers[validatorIDKey],
-			id:   ids.NewShortID(validatorIDKey),
+			peer: n.peers[validatorID],
+			id:   validatorID,
 		}
 		i++
 	}
@@ -1284,7 +1280,7 @@ func (n *network) getPeer(validatorID ids.ShortID) *peer {
 	if n.closed.GetValue() {
 		return nil
 	}
-	return n.peers[validatorID.Key()]
+	return n.peers[validatorID]
 }
 
 // restartOnDisconnect checks every [n.disconnectedCheckFreq] whether this node is connected

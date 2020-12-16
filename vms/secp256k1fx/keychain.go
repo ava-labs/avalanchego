@@ -39,9 +39,8 @@ func NewKeychain() *Keychain {
 // Add a new key to the key chain
 func (kc *Keychain) Add(key *crypto.PrivateKeySECP256K1R) {
 	addr := key.PublicKey().Address()
-	addrHash := addr.Key()
-	if _, ok := kc.addrToKeyIndex[addrHash]; !ok {
-		kc.addrToKeyIndex[addrHash] = len(kc.Keys)
+	if _, ok := kc.addrToKeyIndex[addr]; !ok {
+		kc.addrToKeyIndex[addr] = len(kc.Keys)
 		kc.Keys = append(kc.Keys, key)
 		kc.Addrs.Add(addr)
 	}
@@ -49,7 +48,7 @@ func (kc *Keychain) Add(key *crypto.PrivateKeySECP256K1R) {
 
 // Get a key from the keychain. If the key is unknown, the
 func (kc Keychain) Get(id ids.ShortID) (*crypto.PrivateKeySECP256K1R, bool) {
-	if i, ok := kc.addrToKeyIndex[id.Key()]; ok {
+	if i, ok := kc.addrToKeyIndex[id]; ok {
 		return kc.Keys[i], true
 	}
 	return &crypto.PrivateKeySECP256K1R{}, false

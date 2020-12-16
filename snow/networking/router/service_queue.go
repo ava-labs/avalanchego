@@ -205,14 +205,7 @@ func (ml *multiLevelQueue) pushMessage(msg message) bool {
 		return false
 	}
 
-	validatorID := msg.validatorID
-	if validatorID.IsZero() {
-		ml.metrics.dropped.Inc()
-		ml.log.Warn("Dropping message due to invalid validatorID")
-		return false
-	}
-
-	processing := ml.msgManager.AddPending(validatorID)
+	processing := ml.msgManager.AddPending(msg.validatorID)
 	if !processing {
 		ml.metrics.dropped.Inc()
 		ml.metrics.throttled.Inc()
@@ -223,7 +216,7 @@ func (ml *multiLevelQueue) pushMessage(msg message) bool {
 	if !ml.placeMessage(msg) {
 		ml.log.Verbo("Dropped message while attempting to place it in a queue: %s", msg)
 		ml.metrics.dropped.Inc()
-		ml.msgManager.RemovePending(validatorID)
+		ml.msgManager.RemovePending(msg.validatorID)
 		return false
 	}
 

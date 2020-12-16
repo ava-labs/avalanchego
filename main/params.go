@@ -455,7 +455,7 @@ func setNodeConfig(v *viper.Viper) error {
 		}
 	} else {
 		for _, peer := range Config.BootstrapPeers {
-			peer.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(peer.IP.String())))
+			peer.ID = ids.ShortID(hashing.ComputeHash160Array([]byte(peer.IP.String())))
 		}
 	}
 

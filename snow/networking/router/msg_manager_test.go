@@ -21,7 +21,7 @@ func TestAddPending(t *testing.T) {
 		vdr := validators.GenerateRandomValidator(2)
 		vdrList = append(vdrList, vdr)
 	}
-	nonStakerID := ids.NewShortID([20]byte{16})
+	nonStakerID := ids.ShortID{16}
 
 	cpuTracker := tracker.NewCPUTracker(uptime.IntervalFactory{}, time.Second)
 	msgTracker := tracker.NewMessageTracker()

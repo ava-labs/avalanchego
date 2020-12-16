@@ -114,7 +114,7 @@ func (sr *ChainRouter) AddChain(chain *Handler) {
 	sr.chains[chainID] = chain
 
 	for validatorID := range sr.peers {
-		chain.Connected(ids.NewShortID(validatorID))
+		chain.Connected(ids.ShortID(validatorID))
 	}
 }
 

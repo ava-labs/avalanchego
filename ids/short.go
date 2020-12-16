@@ -15,20 +15,14 @@ import (
 )
 
 // ShortEmpty is a useful all zero value
-var ShortEmpty = ShortID{ID: &[20]byte{}}
+var ShortEmpty = ShortID{}
 
 // ShortID wraps a 20 byte hash as an identifier
-type ShortID struct {
-	ID *[20]byte `serialize:"true"`
-}
-
-// NewShortID creates an identifier from a 20 byte hash
-func NewShortID(id [20]byte) ShortID { return ShortID{ID: &id} }
+type ShortID [20]byte
 
 // ToShortID attempt to convert a byte slice into an id
 func ToShortID(bytes []byte) (ShortID, error) {
-	addrHash, err := hashing.ToHash160(bytes)
-	return NewShortID(addrHash), err
+	return hashing.ToHash160(bytes)
 }
 
 // ShortFromString is the inverse of ShortID.String()
@@ -52,10 +46,7 @@ func ShortFromPrefixedString(idStr, prefix string) (ShortID, error) {
 
 // MarshalJSON ...
 func (id ShortID) MarshalJSON() ([]byte, error) {
-	if id.IsZero() {
-		return []byte("null"), nil
-	}
-	str, err := formatting.Encode(defaultEncoding, id.ID[:])
+	str, err := formatting.Encode(defaultEncoding, id[:])
 	if err != nil {
 		return nil, err
 	}
@@ -85,6 +76,7 @@ func (id *ShortID) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+/* TODO remove
 // IsZero returns true if the value has not been initialized
 func (id ShortID) IsZero() bool { return id.ID == nil }
 
@@ -97,18 +89,16 @@ func (id ShortID) Equals(oID ShortID) bool {
 	return id.ID == oID.ID ||
 		(id.ID != nil && oID.ID != nil && bytes.Equal(id.Bytes(), oID.Bytes()))
 }
+*/
 
 // Bytes returns the 20 byte hash as a slice. It is assumed this slice is not
 // modified.
-func (id ShortID) Bytes() []byte { return id.ID[:] }
+func (id ShortID) Bytes() []byte { return id[:] }
 
 // Hex returns a hex encoded string of this id.
 func (id ShortID) Hex() string { return hex.EncodeToString(id.Bytes()) }
 
 func (id ShortID) String() string {
-	if id.IsZero() {
-		return "nil"
-	}
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of an ID
 	str, _ := formatting.Encode(defaultEncoding, id.Bytes())

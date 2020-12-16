@@ -58,8 +58,6 @@ func (u *user) getAddresses() ([]ids.ShortID, error) {
 func (u *user) controlsAddress(address ids.ShortID) (bool, error) {
 	if u.db == nil {
 		return false, errDBNil
-	} else if address.IsZero() {
-		return false, errEmptyAddress
 	}
 	return u.db.Has(address.Bytes())
 }
@@ -108,8 +106,6 @@ func (u *user) putAddress(privKey *crypto.PrivateKeySECP256K1R) error {
 func (u *user) getKey(address ids.ShortID) (*crypto.PrivateKeySECP256K1R, error) {
 	if u.db == nil {
 		return nil, errDBNil
-	} else if address.IsZero() {
-		return nil, errEmptyAddress
 	}
 
 	factory := crypto.FactorySECP256K1R{}

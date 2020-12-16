@@ -68,7 +68,7 @@ func (mt *msgTracker) Remove(validatorID ids.ShortID) {
 	}
 
 	if msgCount.totalMessages == 0 {
-		delete(mt.msgSpenders, validatorID.Key())
+		delete(mt.msgSpenders, validatorID)
 	}
 }
 
@@ -87,13 +87,12 @@ func (mt *msgTracker) PoolCount() uint32 { return mt.poolCount }
 // getCount returns the message count for [validatorID]
 // assumes the lock is held
 func (mt *msgTracker) getCount(validatorID ids.ShortID) *msgCount {
-	key := validatorID.Key()
-	if msgCount, exists := mt.msgSpenders[key]; exists {
+	if msgCount, exists := mt.msgSpenders[validatorID]; exists {
 		return msgCount
 	}
 
 	msgCount := &msgCount{}
-	mt.msgSpenders[key] = msgCount
+	mt.msgSpenders[validatorID] = msgCount
 	return msgCount
 }
 

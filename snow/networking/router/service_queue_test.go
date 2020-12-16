@@ -59,7 +59,7 @@ func TestMultiLevelQueueSendsMessages(t *testing.T) {
 	messages := []message{}
 	for i := 0; i < bufferSize; i++ {
 		messages = append(messages, message{
-			validatorID: ids.NewShortID([20]byte{byte(i)}),
+			validatorID: ids.ShortID{byte(i)},
 		})
 	}
 
@@ -96,7 +96,7 @@ func TestExtraMessageNoDeadlock(t *testing.T) {
 	messages := []message{}
 	for i := 0; i < oversizedBuffer; i++ {
 		messages = append(messages, message{
-			validatorID: ids.NewShortID([20]byte{byte(i)}),
+			validatorID: ids.ShortID{byte(i)},
 		})
 	}
 
@@ -210,7 +210,7 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 	<-semaChan
 	if msg1, err := queue.PopMessage(); err != nil {
 		t.Fatal(err)
-	} else if !msg1.validatorID.Equals(validator1.ID()) {
+	} else if msg1.validatorID != validator1.ID() {
 		t.Fatal("Expected first message to come from the high priority validator")
 	}
 
@@ -222,14 +222,14 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 	<-semaChan
 	if msg2, err := queue.PopMessage(); err != nil {
 		t.Fatal(err)
-	} else if !msg2.validatorID.Equals(validator2.ID()) {
+	} else if msg2.validatorID != validator2.ID() {
 		t.Fatal("Expected second message to come from the low priority validator after moving on to the lower level queue")
 	}
 
 	<-semaChan
 	if msg3, err := queue.PopMessage(); err != nil {
 		t.Fatal(err)
-	} else if !msg3.validatorID.Equals(validator1.ID()) {
+	} else if msg3.validatorID != validator1.ID() {
 		t.Fatal("Expected final message to come from validator1")
 	}
 }
@@ -307,7 +307,7 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 	<-semaChan
 	if msg, err := queue.PopMessage(); err != nil {
 		t.Fatalf("Popping first message errored: %s", err)
-	} else if !msg.validatorID.Equals(vdr0.ID()) {
+	} else if msg.validatorID != vdr0.ID() {
 		t.Fatal("Expected first message to come from vdr0")
 	}
 
@@ -323,14 +323,14 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 	<-semaChan
 	if msg, err := queue.PopMessage(); err != nil {
 		t.Fatalf("Popping second message errored: %s", err)
-	} else if !msg.validatorID.Equals(vdr1.ID()) {
+	} else if msg.validatorID != vdr1.ID() {
 		t.Fatal("Expected second message to come from vdr1 after vdr0 dropped in priority")
 	}
 
 	<-semaChan
 	if msg, err := queue.PopMessage(); err != nil {
 		t.Fatalf("Popping third message errored: %s", err)
-	} else if !msg.validatorID.Equals(vdr0.ID()) {
+	} else if msg.validatorID != vdr0.ID() {
 		t.Fatal("Expected third message to come from vdr0")
 	}
 }
@@ -482,7 +482,7 @@ func TestMultiLevelQueueThrottles(t *testing.T) {
 	)
 
 	success := queue.PushMessage(message{
-		validatorID: ids.NewShortID([20]byte{1}),
+		validatorID: ids.ShortID{1},
 	})
 	if success {
 		t.Fatal("Expected multi-level queue to throttle message when there were no resources available")

@@ -48,8 +48,6 @@ func (v *Validator) Weight() uint64 { return v.Wght }
 // Verify validates the ID for this validator
 func (v *Validator) Verify() error {
 	switch {
-	case v.NodeID.IsZero(): // Ensure the validator has a valid ID
-		return errInvalidID
 	case v.Wght == 0: // Ensure the validator has some weight
 		return errWeightTooSmall
 	default:

@@ -28,11 +28,10 @@ func (r *Requests) Add(vdr ids.ShortID, requestID uint32, containerID ids.ID) {
 	if r.reqsToID == nil {
 		r.reqsToID = make(map[[20]byte]map[uint32]ids.ID, minRequestsSize)
 	}
-	vdrKey := vdr.Key()
-	vdrReqs, ok := r.reqsToID[vdrKey]
+	vdrReqs, ok := r.reqsToID[vdr]
 	if !ok {
 		vdrReqs = make(map[uint32]ids.ID)
-		r.reqsToID[vdrKey] = vdrReqs
+		r.reqsToID[vdr] = vdrReqs
 	}
 	vdrReqs[requestID] = containerID
 
@@ -49,8 +48,7 @@ func (r *Requests) Add(vdr ids.ShortID, requestID uint32, containerID ids.ID) {
 // currently outstanding, the requested ID will be returned along with true. If
 // the request isn't currently outstanding, false will be returned.
 func (r *Requests) Remove(vdr ids.ShortID, requestID uint32) (ids.ID, bool) {
-	vdrKey := vdr.Key()
-	vdrReqs, ok := r.reqsToID[vdrKey]
+	vdrReqs, ok := r.reqsToID[vdr]
 	if !ok {
 		return ids.ID{}, false
 	}
@@ -60,7 +58,7 @@ func (r *Requests) Remove(vdr ids.ShortID, requestID uint32) (ids.ID, bool) {
 	}
 
 	if len(vdrReqs) == 1 {
-		delete(r.reqsToID, vdrKey)
+		delete(r.reqsToID, vdr)
 	} else {
 		delete(vdrReqs, requestID)
 	}
