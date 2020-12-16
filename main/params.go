@@ -537,11 +537,14 @@ func setNodeConfig(v *viper.Viper) error {
 	}
 
 	// Throttling
-	Config.MaxNonStakerPendingMsgs = v.GetUint(maxNonStakerPendingMsgsKey)
+	Config.MaxNonStakerPendingMsgs = v.GetUint32(maxNonStakerPendingMsgsKey)
 	Config.StakerMSGPortion = v.GetFloat64(stakerMsgReservedKey)
 	Config.StakerCPUPortion = v.GetFloat64(stakerCPUReservedKey)
 	Config.SendQueueSize = v.GetUint32(sendQueueSizeKey)
 	Config.MaxPendingMsgs = v.GetUint32(maxPendingMsgsKey)
+	if Config.MaxPendingMsgs < Config.MaxNonStakerPendingMsgs {
+		return errors.New("maximum pending messages must be >= maximum non-staker pending messages")
+	}
 
 	// Network Timeout
 	Config.NetworkConfig.InitialTimeout = v.GetDuration(networkInitialTimeoutKey)
