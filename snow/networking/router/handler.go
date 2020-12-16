@@ -160,7 +160,7 @@ func (h *Handler) Initialize(
 		h.ctx.Log,
 		msgTracker,
 		h.cpuTracker,
-		uint32(bufferSize),
+		bufferSize,
 		maxNonStakerPendingMsgs,
 		stakerMsgPortion,
 		stakerCPUPortion,
