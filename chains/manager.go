@@ -111,6 +111,7 @@ type chain struct {
 // ManagerConfig ...
 type ManagerConfig struct {
 	StakingEnabled          bool // True iff the network has staking enabled
+	MaxPendingMsgs          uint32
 	MaxNonStakerPendingMsgs uint32
 	StakerMSGPortion        float64
 	StakerCPUPortion        float64

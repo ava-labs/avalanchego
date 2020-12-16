@@ -44,7 +44,8 @@ type multiLevelQueue struct {
 	cpuPortion    float64
 
 	// Message throttling
-	bufferSize, pendingMessages int
+	bufferSize      uint32
+	pendingMessages uint32
 
 	semaChan chan struct{}
 
@@ -60,12 +61,12 @@ func newMultiLevelQueue(
 	msgManager MsgManager,
 	consumptionRanges []float64,
 	consumptionAllotments []time.Duration,
-	bufferSize int,
+	bufferSize uint32,
 	log logging.Logger,
 	metrics *metrics,
 ) (messageQueue, chan struct{}) {
 	semaChan := make(chan struct{}, bufferSize)
-	singleLevelSize := bufferSize / len(consumptionRanges)
+	singleLevelSize := int(bufferSize) / len(consumptionRanges)
 	queues := make([]singleLevelQueue, len(consumptionRanges))
 	for index := 0; index < len(queues); index++ {
 		gauge, histogram, err := metrics.registerTierStatistics(index)

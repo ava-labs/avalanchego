@@ -245,6 +245,7 @@ func (n *Node) initNetworking() error {
 		n.Config.DisconnectedCheckFreq,
 		n.Config.DisconnectedRestartTimeout,
 		n.Config.ApricotPhase0Time,
+		n.Config.SendQueueSize,
 	)
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
@@ -542,6 +543,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
 		StakingEnabled:          n.Config.EnableStaking,
+		MaxPendingMsgs:          n.Config.MaxPendingMsgs,
 		MaxNonStakerPendingMsgs: uint32(n.Config.MaxNonStakerPendingMsgs),
 		StakerMSGPortion:        n.Config.StakerMSGPortion,
 		StakerCPUPortion:        n.Config.StakerCPUPortion,

@@ -119,7 +119,7 @@ func (h *Handler) Initialize(
 	engine common.Engine,
 	validators validators.Set,
 	msgChan <-chan common.Message,
-	bufferSize int,
+	bufferSize uint32,
 	maxNonStakerPendingMsgs uint32,
 	stakerMsgPortion,
 	stakerCPUPortion float64,
