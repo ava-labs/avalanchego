@@ -91,6 +91,7 @@ func (b *Bootstrapper) Initialize(
 		log:         config.Ctx.Log,
 		numAccepted: b.numAcceptedTxs,
 		numDropped:  b.numDroppedTxs,
+		manager:     b.Manager,
 		vm:          b.VM,
 	})
 
@@ -196,6 +197,7 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 					numAccepted: b.numAcceptedTxs,
 					numDropped:  b.numDroppedTxs,
 					tx:          tx,
+					vm:          b.VM,
 				}); err == nil {
 					b.numFetchedTxs.Inc()
 				} else {

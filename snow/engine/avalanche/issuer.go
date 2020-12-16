@@ -56,22 +56,26 @@ func (i *issuer) Update() {
 		i.t.errs.Add(err)
 		return
 	}
-	validTxs := make([]conflicts.Tx, 0, len(txs))
+	validTransitions := make([]conflicts.Transition, 0, len(txs))
 	for _, tx := range txs {
 		if err := tx.Verify(); err != nil {
 			i.t.Ctx.Log.Debug("Transaction %s failed verification due to %s", tx.ID(), err)
 		} else {
-			validTxs = append(validTxs, tx)
+			validTransitions = append(validTransitions, tx.Transition())
 		}
 	}
 
 	// Some of the transactions weren't valid. Abandon this vertex.
 	// Take the valid transactions and issue a new vertex with them.
-	if len(validTxs) != len(txs) {
+	if len(validTransitions) != len(txs) {
 		i.t.Ctx.Log.Debug("Abandoning %s due to failed transaction verification", vtxID)
-		if err := i.t.batch(validTxs, false /*=force*/, false /*=empty*/); err != nil {
+		epoch, err := i.vtx.Epoch()
+		if err != nil {
 			i.t.errs.Add(err)
+			return
 		}
+		err = i.t.batch(epoch, validTransitions, false /*=force*/, false /*=empty*/)
+		i.t.errs.Add(err)
 		i.t.vtxBlocked.Abandon(vtxID)
 		return
 	}

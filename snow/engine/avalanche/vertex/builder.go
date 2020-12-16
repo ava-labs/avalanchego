@@ -6,6 +6,7 @@ package vertex
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -15,7 +16,7 @@ type Builder interface {
 	Build(
 		epoch uint32,
 		parentIDs []ids.ID,
-		txs []Tx,
+		trs []conflicts.Transition,
 		restrictions []ids.ID,
 	) (avalanche.Vertex, error)
 }
@@ -26,11 +27,11 @@ func Build(
 	height uint64,
 	epoch uint32,
 	parentIDs []ids.ID,
-	txs [][]byte,
+	trs [][]byte,
 	restrictions []ids.ID,
 ) (StatelessVertex, error) {
 	ids.SortIDs(parentIDs)
-	SortHashOf(txs)
+	SortHashOf(trs)
 	ids.SortIDs(restrictions)
 
 	innerVtx := innerStatelessVertex{
@@ -39,7 +40,7 @@ func Build(
 		Height:       height,
 		Epoch:        epoch,
 		ParentIDs:    parentIDs,
-		Txs:          txs,
+		Transitions:  trs,
 		Restrictions: restrictions,
 	}
 	if err := innerVtx.Verify(); err != nil {

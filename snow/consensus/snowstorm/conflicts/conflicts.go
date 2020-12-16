@@ -4,15 +4,9 @@
 package conflicts
 
 import (
-	"errors"
 	"math"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
-)
-
-var (
-	errInvalidTxType = errors.New("invalid tx type")
 )
 
 type Conflicts struct {
@@ -50,10 +44,10 @@ type Conflicts struct {
 	accepted ids.Set
 
 	// track txs that have been marked as ready to accept
-	acceptable []choices.Decidable
+	acceptable []Tx
 
 	// track txs that have been marked as ready to reject
-	rejectable []choices.Decidable
+	rejectable []Tx
 }
 
 func New() *Conflicts {
@@ -70,21 +64,17 @@ func New() *Conflicts {
 // will be added to the set of processing txs. It is assumed this tx wasn't
 // already processing. This will mark the consumed utxos and register a rejector
 // that will be notified if a dependency of this tx was rejected.
-func (c *Conflicts) Add(txIntf choices.Decidable) error {
-	tx, ok := txIntf.(Tx)
-	if !ok {
-		return errInvalidTxType
-	}
-
+func (c *Conflicts) Add(tx Tx) error {
 	txID := tx.ID()
 	c.txs[txID] = tx
 
-	transitionID := tx.TransitionID()
+	transition := tx.Transition()
+	transitionID := transition.ID()
 	txIDs := c.transitions[transitionID]
 	txIDs.Add(txID)
 	c.transitions[transitionID] = txIDs
 
-	for _, inputID := range tx.InputIDs() {
+	for _, inputID := range transition.InputIDs() {
 		spenders := c.utxos[inputID]
 		spenders.Add(txID)
 		c.utxos[inputID] = spenders
@@ -96,7 +86,7 @@ func (c *Conflicts) Add(txIntf choices.Decidable) error {
 		c.restrictions[restrictionID] = restrictors
 	}
 
-	for _, dependencyID := range tx.Dependencies() {
+	for _, dependencyID := range transition.Dependencies() {
 		dependents := c.dependencies[dependencyID]
 		dependents.Add(txID)
 		c.dependencies[dependencyID] = dependents
@@ -107,16 +97,12 @@ func (c *Conflicts) Add(txIntf choices.Decidable) error {
 // IsVirtuous checks the currently processing txs for conflicts. It is allowed
 // to call this function with txs that aren't yet processing or currently
 // processing txs.
-func (c *Conflicts) IsVirtuous(txIntf choices.Decidable) (bool, error) {
-	tx, ok := txIntf.(Tx)
-	if !ok {
-		return false, errInvalidTxType
-	}
-
+func (c *Conflicts) IsVirtuous(tx Tx) (bool, error) {
 	// Check whether this transaction consumes the same state as
 	// a different processing transaction
 	txID := tx.ID()
-	for _, inputID := range tx.InputIDs() { // For each piece of state [tx] consumes
+	transition := tx.Transition()
+	for _, inputID := range transition.InputIDs() { // For each piece of state [tx] consumes
 		spenders := c.utxos[inputID] // txs that consume this state
 		if numSpenders := spenders.Len(); numSpenders > 1 ||
 			(numSpenders == 1 && !spenders.Contains(txID)) {
@@ -127,7 +113,7 @@ func (c *Conflicts) IsVirtuous(txIntf choices.Decidable) (bool, error) {
 	// Check if other transactions have marked as attempting to restrict this tx
 	// to at least their epoch.
 	epoch := tx.Epoch()
-	transitionID := tx.TransitionID()
+	transitionID := transition.ID()
 	// [restictors] is the set of transactions that require [tx]
 	// to be performed in a later epoch
 	restrictors := c.restrictions[transitionID]
@@ -159,19 +145,15 @@ func (c *Conflicts) IsVirtuous(txIntf choices.Decidable) (bool, error) {
 // Conflicts returns the collection of txs that are currently processing that
 // conflict with the provided tx. It is allowed to call with function with txs
 // that aren't yet processing or currently processing txs.
-func (c *Conflicts) Conflicts(txIntf choices.Decidable) ([]choices.Decidable, error) {
-	tx, ok := txIntf.(Tx)
-	if !ok {
-		return nil, errInvalidTxType
-	}
-
+func (c *Conflicts) Conflicts(tx Tx) ([]Tx, error) {
 	txID := tx.ID()
 	var conflictSet ids.Set
 	conflictSet.Add(txID)
-	conflicts := []choices.Decidable(nil)
+	conflicts := []Tx(nil)
+	transition := tx.Transition()
 
 	// Add to the conflict set transactions that consume the same state as [tx]
-	for _, inputID := range tx.InputIDs() {
+	for _, inputID := range transition.InputIDs() {
 		spenders := c.utxos[inputID]
 		for spenderID := range spenders {
 			if conflictSet.Contains(spenderID) {
@@ -185,7 +167,7 @@ func (c *Conflicts) Conflicts(txIntf choices.Decidable) ([]choices.Decidable, er
 	// Add to the conflict set transactions that require the transition performed
 	// by [tx] to be in at least their epoch, but which are in an epoch after [tx]'s
 	epoch := tx.Epoch()
-	transitionID := tx.TransitionID()
+	transitionID := transition.ID()
 	restrictors := c.restrictions[transitionID]
 	for restrictorID := range restrictors {
 		if conflictSet.Contains(restrictorID) {
@@ -227,8 +209,10 @@ func (c *Conflicts) Accept(txID ids.ID) {
 		return
 	}
 
+	transition := tx.Transition()
+
 	acceptable := true
-	for _, dependency := range tx.Dependencies() {
+	for _, dependency := range transition.Dependencies() {
 		if !c.accepted.Contains(dependency) {
 			// [tx] is not acceptable because a transition it requires to have
 			// been performed has not yet been
@@ -236,7 +220,7 @@ func (c *Conflicts) Accept(txID ids.ID) {
 		}
 	}
 	if acceptable {
-		transitionID := tx.TransitionID()
+		transitionID := transition.ID()
 		c.accepted.Add(transitionID)
 		c.acceptable = append(c.acceptable, tx)
 	} else {
@@ -244,7 +228,7 @@ func (c *Conflicts) Accept(txID ids.ID) {
 	}
 }
 
-func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
+func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 	accepted := c.accepted
 	c.accepted = nil
 	acceptable := c.acceptable
@@ -258,7 +242,8 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 	for _, tx := range acceptable {
 		tx := tx.(Tx)
 		txID := tx.ID()
-		transitionID := tx.TransitionID()
+		transition := tx.Transition()
+		transitionID := transition.ID()
 		epoch := tx.Epoch()
 
 		// Remove the accepted transaction from the processing tx set
@@ -274,7 +259,7 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 		}
 
 		// Remove from the UTXO map
-		for _, inputID := range tx.InputIDs() {
+		for _, inputID := range transition.InputIDs() {
 			spenders := c.utxos[inputID]
 			spenders.Remove(txID)
 			if spenders.Len() == 0 {
@@ -319,9 +304,11 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 				continue
 			}
 
+			dependentTransition := dependent.Transition()
+
 			// [dependent] has been conditionally accepted.
 			// Check whether all of its transition dependencies are met
-			for _, dependencyID := range dependent.Dependencies() {
+			for _, dependencyID := range dependentTransition.Dependencies() {
 				if !accepted.Contains(dependencyID) {
 					continue acceptedDependentLoop
 				}
@@ -330,7 +317,7 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 			// [dependent] has been conditionally accepted
 			// and its transition dependencies have been met.
 			// Therefore, it is acceptable.
-			dependentTransitionID := dependent.TransitionID()
+			dependentTransitionID := dependentTransition.ID()
 			c.conditionallyAccepted.Remove(dependentID)
 			c.accepted.Add(dependentTransitionID)
 			c.acceptable = append(c.acceptable, dependent)
@@ -356,7 +343,8 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 	for _, tx := range rejectable {
 		tx := tx.(Tx)
 		txID := tx.ID()
-		transitionID := tx.TransitionID()
+		transition := tx.Transition()
+		transitionID := transition.ID()
 
 		// Remove the rejected transaction from the processing tx set
 		delete(c.txs, txID)
@@ -371,7 +359,7 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 		}
 
 		// Remove from the UTXO map
-		for _, inputID := range tx.InputIDs() {
+		for _, inputID := range transition.InputIDs() {
 			spenders := c.utxos[inputID]
 			spenders.Remove(txID)
 			if spenders.Len() == 0 {
@@ -433,7 +421,7 @@ func (c *Conflicts) Updateable() ([]choices.Decidable, []choices.Decidable) {
 
 		// Remove this transaction from the dependency sets pointers of the
 		// transitions that this transaction depended on.
-		for _, dependency := range tx.Dependencies() {
+		for _, dependency := range transition.Dependencies() {
 			dependents, exists := c.dependencies[dependency]
 			if !exists {
 				continue

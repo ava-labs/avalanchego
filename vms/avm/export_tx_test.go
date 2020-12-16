@@ -1273,9 +1273,9 @@ func TestIssueExportTx(t *testing.T) {
 	}
 
 	parsedTx := txs[0]
-	if err := parsedTx.Verify(); err != nil {
+	if err := parsedTx.Verify(0); err != nil {
 		t.Fatal(err)
-	} else if err := parsedTx.Accept(); err != nil {
+	} else if err := parsedTx.Accept(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1404,7 +1404,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	}
 
 	parsedTx := txs[0]
-	if err := parsedTx.Verify(); err != nil {
+	if err := parsedTx.Verify(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1419,7 +1419,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := parsedTx.Accept(); err != nil {
+	if err := parsedTx.Accept(0); err != nil {
 		t.Fatal(err)
 	}
 

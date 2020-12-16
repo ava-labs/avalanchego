@@ -7,6 +7,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 )
@@ -23,7 +25,7 @@ type TestBuilder struct {
 	BuildF    func(
 		epoch uint32,
 		parentIDs []ids.ID,
-		txs []Tx,
+		trs []conflicts.Transition,
 		restrictions []ids.ID,
 	) (avalanche.Vertex, error)
 }
@@ -33,11 +35,11 @@ func (b *TestBuilder) Default(cant bool) { b.CantBuild = cant }
 func (b *TestBuilder) Build(
 	epoch uint32,
 	parentIDs []ids.ID,
-	txs []Tx,
+	trs []conflicts.Transition,
 	restrictions []ids.ID,
 ) (avalanche.Vertex, error) {
 	if b.BuildF != nil {
-		return b.BuildF(epoch, parentIDs, txs, restrictions)
+		return b.BuildF(epoch, parentIDs, trs, restrictions)
 	}
 	if b.CantBuild && b.T != nil {
 		b.T.Fatal(errBuild)

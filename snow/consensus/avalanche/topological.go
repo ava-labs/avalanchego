@@ -140,6 +140,9 @@ func (ta *Topological) VertexIssued(vtx Vertex) bool {
 // TxIssued implements the Avalanche interface
 func (ta *Topological) TxIssued(tx conflicts.Tx) bool { return ta.cg.Issued(tx) }
 
+// GetTx implements the Avalanche interface
+func (ta *Topological) GetTx(txID ids.ID) (conflicts.Tx, error) { return ta.cg.Get(txID) }
+
 // Orphans implements the Avalanche interface
 func (ta *Topological) Orphans() ids.Set { return ta.orphans }
 

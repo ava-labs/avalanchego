@@ -5,19 +5,19 @@ package snowstorm
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
 )
 
 type Conflicts interface {
 	// Add this transaction to conflict tracking
-	Add(tx choices.Decidable) error
+	Add(tx conflicts.Tx) error
 
 	// Conflicts returns true if there are no transactions currently tracked
-	IsVirtuous(tx choices.Decidable) (bool, error)
+	IsVirtuous(tx conflicts.Tx) (bool, error)
 
 	// Conflicts returns the transactions that conflict with the provided
 	// transaction
-	Conflicts(tx choices.Decidable) ([]choices.Decidable, error)
+	Conflicts(tx conflicts.Tx) ([]conflicts.Tx, error)
 
 	// Mark this transaction as conditionally accepted
 	Accept(txID ids.ID)
@@ -29,5 +29,5 @@ type Conflicts interface {
 	// transaction was marked as having a conflict, then that conflict should be
 	// returned in the same call as the acceptable transaction was returned or
 	// in a prior call.
-	Updateable() (acceptable []choices.Decidable, rejectable []choices.Decidable)
+	Updateable() (acceptable []conflicts.Tx, rejectable []conflicts.Tx)
 }

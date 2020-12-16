@@ -775,7 +775,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	if status := createAssetTx.Status(); status != choices.Processing {
 		t.Fatalf("CreateVariableCapAssetTx status should have been Processing, but was %s", status)
 	}
-	if err := createAssetTx.Accept(); err != nil {
+	if err := createAssetTx.Accept(0); err != nil {
 		t.Fatalf("Failed to accept CreateVariableCapAssetTx due to: %s", err)
 	}
 
@@ -808,7 +808,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	if status := mintTx.Status(); status != choices.Processing {
 		t.Fatalf("MintTx status should have been Processing, but was %s", status)
 	}
-	if err := mintTx.Accept(); err != nil {
+	if err := mintTx.Accept(0); err != nil {
 		t.Fatalf("Failed to accept MintTx due to: %s", err)
 	}
 
@@ -888,7 +888,7 @@ func TestNFTWorkflow(t *testing.T) {
 	if createNFTTx.Status() != choices.Processing {
 		t.Fatalf("CreateNFTTx should have been processing after creating the NFT")
 	}
-	if err := createNFTTx.Accept(); err != nil {
+	if err := createNFTTx.Accept(0); err != nil {
 		t.Fatalf("Failed to accept CreateNFT transaction: %s", err)
 	} else if err := verifyTxFeeDeducted(t, s, fromAddrs, 1); err != nil {
 		t.Fatal(err)
@@ -929,7 +929,7 @@ func TestNFTWorkflow(t *testing.T) {
 	}
 
 	// Accept the transaction so that we can send the newly minted NFT
-	if err := mintNFTTx.Accept(); err != nil {
+	if err := mintNFTTx.Accept(0); err != nil {
 		t.Fatalf("Failed to accept MintNFTTx: %s", err)
 	}
 

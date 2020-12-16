@@ -7,40 +7,30 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
-	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 )
 
 var (
-	_ conflicts.Tx = &tx{}
+	_ conflicts.Tx = &Tx{}
 )
 
-type tx struct {
-	epoch uint32
-	tx    vertex.Tx
+type Tx struct {
+	Tr conflicts.Transition
 }
 
-func (t *tx) ID() ids.ID { return ids.Empty }
+func (t *Tx) ID() ids.ID { return t.Tr.ID().Prefix(0) }
 
-func (t *tx) Accept() error {
-	return t.tx.Accept(t.epoch)
-}
+func (t *Tx) Accept() error { return t.Tr.Accept(0) }
 
-func (t *tx) Reject() error {
-	return t.tx.Reject(t.epoch)
-}
+func (t *Tx) Reject() error { return t.Tr.Reject(0) }
 
-func (t *tx) Status() choices.Status {
-	return choices.Unknown
-}
+func (t *Tx) Status() choices.Status { return t.Tr.Status() }
 
-func (t *tx) TransitionID() ids.ID { return t.tx.ID() }
+func (t *Tx) Transition() conflicts.Transition { return t.Tr }
 
-func (t *tx) Epoch() uint32 { return t.epoch }
+func (t *Tx) Epoch() uint32 { return 0 }
 
-func (t *tx) Restrictions() []ids.ID { return nil }
+func (t *Tx) Restrictions() []ids.ID { return nil }
 
-func (t *tx) Dependencies() []ids.ID {
-	return nil
-}
+func (t *Tx) Verify() error { return t.Tr.Verify(0) }
 
-func (t *tx) InputIDs() []ids.ID { return t.tx.InputIDs() }
+func (t *Tx) Bytes() []byte { return t.Tr.Bytes() }

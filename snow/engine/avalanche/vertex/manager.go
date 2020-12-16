@@ -9,4 +9,5 @@ type Manager interface {
 	Builder
 	Parser
 	Storage
+	ParserTx
 }

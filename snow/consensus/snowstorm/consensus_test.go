@@ -36,8 +36,6 @@ var (
 		AcceptingSlowDependencyTest,
 		RejectingDependencyTest,
 		RejectingSlowDependencyTest,
-		InvalidAddTest,
-		InvalidConflictsTest,
 		ConflictsTest,
 		VirtuousDependsOnRogueTest,
 		ErrorOnAcceptedTest,
@@ -51,34 +49,32 @@ var (
 
 //  R - G - B - A
 func Setup() {
-	Red = &conflicts.TestTx{}
-	Green = &conflicts.TestTx{}
-	Blue = &conflicts.TestTx{}
-	Alpha = &conflicts.TestTx{}
+	Red = &conflicts.TestTx{TransitionV: &conflicts.TestTransition{}}
+	Green = &conflicts.TestTx{TransitionV: &conflicts.TestTransition{}}
+	Blue = &conflicts.TestTx{TransitionV: &conflicts.TestTransition{}}
+	Alpha = &conflicts.TestTx{TransitionV: &conflicts.TestTransition{}}
 
 	for i, color := range []*conflicts.TestTx{Red, Green, Blue, Alpha} {
-		color.TransitionIDV = ids.Empty.Prefix(uint64(i))
-		color.IDV = color.TransitionIDV.Prefix(0)
+		transitionIntf := color.Transition()
+		transition := transitionIntf.(*conflicts.TestTransition)
+		transition.IDV = ids.Empty.Prefix(uint64(i))
+		transition.DependenciesV = nil
+
+		color.IDV = transition.IDV.Prefix(0)
 		color.AcceptV = nil
 		color.RejectV = nil
 		color.StatusV = choices.Processing
 
-		color.DependenciesV = nil
-		color.InputIDsV = nil
 	}
 
 	X := ids.Empty.Prefix(4)
 	Y := ids.Empty.Prefix(5)
 	Z := ids.Empty.Prefix(6)
 
-	Red.InputIDsV = append(Red.InputIDsV, X)
-	Green.InputIDsV = append(Green.InputIDsV, X)
-	Green.InputIDsV = append(Green.InputIDsV, Y)
-
-	Blue.InputIDsV = append(Blue.InputIDsV, Y)
-	Blue.InputIDsV = append(Blue.InputIDsV, Z)
-
-	Alpha.InputIDsV = append(Alpha.InputIDsV, Z)
+	Red.Transition().(*conflicts.TestTransition).InputIDsV = []ids.ID{X}
+	Green.Transition().(*conflicts.TestTransition).InputIDsV = []ids.ID{X, Y}
+	Blue.Transition().(*conflicts.TestTransition).InputIDsV = []ids.ID{Y, Z}
+	Alpha.Transition().(*conflicts.TestTransition).InputIDsV = []ids.ID{Z}
 }
 
 // Execute all tests against a consensus implementation
@@ -588,9 +584,11 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 			IDV:     purpleTransitionID.Prefix(0),
 			StatusV: choices.Processing,
 		},
-		TransitionIDV: purpleTransitionID,
-		DependenciesV: []ids.ID{Red.TransitionIDV},
-		InputIDsV:     []ids.ID{ids.Empty.Prefix(8)},
+		TransitionV: &conflicts.TestTransition{
+			IDV:           purpleTransitionID,
+			DependenciesV: []ids.ID{Red.Transition().ID()},
+			InputIDsV:     []ids.ID{ids.Empty.Prefix(8)},
+		},
 	}
 
 	params := sbcon.Parameters{
@@ -709,9 +707,11 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 			IDV:     purpleTransitionID.Prefix(0),
 			StatusV: choices.Processing,
 		},
-		TransitionIDV: purpleTransitionID,
-		DependenciesV: []ids.ID{Red.TransitionIDV},
-		InputIDsV:     []ids.ID{ids.Empty.Prefix(8)},
+		TransitionV: &conflicts.TestTransition{
+			IDV:           purpleTransitionID,
+			DependenciesV: []ids.ID{Red.Transition().ID()},
+			InputIDsV:     []ids.ID{ids.Empty.Prefix(8)},
+		},
 	}
 
 	params := sbcon.Parameters{
@@ -855,9 +855,11 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 			IDV:     purpleTransitionID.Prefix(0),
 			StatusV: choices.Processing,
 		},
-		TransitionIDV: purpleTransitionID,
-		DependenciesV: []ids.ID{Red.TransitionIDV, Blue.TransitionIDV},
-		InputIDsV:     []ids.ID{ids.Empty.Prefix(8)},
+		TransitionV: &conflicts.TestTransition{
+			IDV:           purpleTransitionID,
+			DependenciesV: []ids.ID{Red.Transition().ID(), Blue.Transition().ID()},
+			InputIDsV:     []ids.ID{ids.Empty.Prefix(8)},
+		},
 	}
 
 	params := sbcon.Parameters{
@@ -962,17 +964,21 @@ func RejectingSlowDependencyTest(t *testing.T, factory Factory) {
 			IDV:     purpleTransitionID.Prefix(0),
 			StatusV: choices.Processing,
 		},
-		TransitionIDV: purpleTransitionID,
-		DependenciesV: []ids.ID{Red.TransitionIDV},
-		InputIDsV:     []ids.ID{conflictID},
+		TransitionV: &conflicts.TestTransition{
+			IDV:           purpleTransitionID,
+			DependenciesV: []ids.ID{Red.Transition().ID()},
+			InputIDsV:     []ids.ID{conflictID},
+		},
 	}
 	cyan := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     cyanTransitionID.Prefix(0),
 			StatusV: choices.Processing,
 		},
-		TransitionIDV: cyanTransitionID,
-		InputIDsV:     []ids.ID{conflictID},
+		TransitionV: &conflicts.TestTransition{
+			IDV:       cyanTransitionID,
+			InputIDsV: []ids.ID{conflictID},
+		},
 	}
 
 	params := sbcon.Parameters{
@@ -1066,56 +1072,6 @@ func RejectingSlowDependencyTest(t *testing.T, factory Factory) {
 	}
 }
 
-func InvalidAddTest(t *testing.T, factory Factory) {
-	graph := factory.New()
-
-	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-	}
-	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := &choices.TestDecidable{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Processing,
-	}
-
-	err = graph.Add(tx)
-	assert.Error(t, err)
-}
-
-func InvalidConflictsTest(t *testing.T, factory Factory) {
-	graph := factory.New()
-
-	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-	}
-	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := &choices.TestDecidable{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Processing,
-	}
-
-	_, err = graph.Conflicts(tx)
-	assert.Error(t, err)
-}
-
 func ConflictsTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
@@ -1139,7 +1095,9 @@ func ConflictsTest(t *testing.T, factory Factory) {
 			IDV:     ids.Empty.Prefix(6),
 			StatusV: choices.Processing,
 		},
-		InputIDsV: []ids.ID{conflictInputID},
+		TransitionV: &conflicts.TestTransition{
+			InputIDsV: []ids.ID{conflictInputID},
+		},
 	}
 
 	orange := &conflicts.TestTx{
@@ -1147,7 +1105,9 @@ func ConflictsTest(t *testing.T, factory Factory) {
 			IDV:     ids.Empty.Prefix(7),
 			StatusV: choices.Processing,
 		},
-		InputIDsV: []ids.ID{conflictInputID},
+		TransitionV: &conflicts.TestTransition{
+			InputIDsV: []ids.ID{conflictInputID},
+		},
 	}
 
 	if err := graph.Add(purple); err != nil {
@@ -1192,25 +1152,31 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 			IDV:     rogue1TransitionID.Prefix(0),
 			StatusV: choices.Processing,
 		},
-		TransitionIDV: rogue1TransitionID,
-		InputIDsV:     []ids.ID{input1},
+		TransitionV: &conflicts.TestTransition{
+			IDV:       rogue1TransitionID,
+			InputIDsV: []ids.ID{input1},
+		},
 	}
 	rogue2 := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     rogue2TransitionID.Prefix(0),
 			StatusV: choices.Processing,
 		},
-		TransitionIDV: rogue2TransitionID,
-		InputIDsV:     []ids.ID{input1},
+		TransitionV: &conflicts.TestTransition{
+			IDV:       rogue2TransitionID,
+			InputIDsV: []ids.ID{input1},
+		},
 	}
 	virtuous := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     virtuousTransitionID.Prefix(0),
 			StatusV: choices.Processing,
 		},
-		TransitionIDV: virtuousTransitionID,
-		DependenciesV: []ids.ID{rogue1.TransitionIDV},
-		InputIDsV:     []ids.ID{input2},
+		TransitionV: &conflicts.TestTransition{
+			IDV:           virtuousTransitionID,
+			DependenciesV: []ids.ID{rogue1.Transition().ID()},
+			InputIDsV:     []ids.ID{input2},
+		},
 	}
 
 	if err := graph.Add(rogue1); err != nil {
@@ -1242,12 +1208,16 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
-	purple := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.Empty.Prefix(7),
-		AcceptV: errors.New(""),
-		StatusV: choices.Processing,
-	}}
-	purple.InputIDsV = append(purple.InputIDsV, ids.Empty.Prefix(4))
+	purple := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(7),
+			AcceptV: errors.New(""),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &conflicts.TestTransition{
+			InputIDsV: []ids.ID{ids.Empty.Prefix(4)},
+		},
+	}
 
 	params := sbcon.Parameters{
 		Metrics:           prometheus.NewRegistry(),
@@ -1278,18 +1248,26 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 
 	X := ids.Empty.Prefix(4)
 
-	purple := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.Empty.Prefix(7),
-		StatusV: choices.Processing,
-	}}
-	purple.InputIDsV = append(purple.InputIDsV, X)
+	purple := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(7),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &conflicts.TestTransition{
+			InputIDsV: []ids.ID{X},
+		},
+	}
 
-	pink := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.Empty.Prefix(8),
-		RejectV: errors.New(""),
-		StatusV: choices.Processing,
-	}}
-	pink.InputIDsV = append(pink.InputIDsV, X)
+	pink := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(8),
+			RejectV: errors.New(""),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &conflicts.TestTransition{
+			InputIDsV: []ids.ID{X},
+		},
+	}
 
 	params := sbcon.Parameters{
 		Metrics:           prometheus.NewRegistry(),
@@ -1322,18 +1300,26 @@ func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory)
 
 	X := ids.Empty.Prefix(4)
 
-	purple := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.Empty.Prefix(7),
-		StatusV: choices.Processing,
-	}}
-	purple.InputIDsV = append(purple.InputIDsV, X)
+	purple := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(7),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &conflicts.TestTransition{
+			InputIDsV: []ids.ID{X},
+		},
+	}
 
-	pink := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.Empty.Prefix(8),
-		RejectV: errors.New(""),
-		StatusV: choices.Processing,
-	}}
-	pink.InputIDsV = append(pink.InputIDsV, X)
+	pink := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(8),
+			RejectV: errors.New(""),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &conflicts.TestTransition{
+			InputIDsV: []ids.ID{X},
+		},
+	}
 
 	params := sbcon.Parameters{
 		Metrics:           prometheus.NewRegistry(),

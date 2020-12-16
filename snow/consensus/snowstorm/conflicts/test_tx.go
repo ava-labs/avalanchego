@@ -16,15 +16,15 @@ var (
 type TestTx struct {
 	choices.TestDecidable
 
-	TransitionIDV ids.ID
+	TransitionV   Transition
 	EpochV        uint32
 	RestrictionsV []ids.ID
-	DependenciesV []ids.ID
-	InputIDsV     []ids.ID
+	VerifyV       error
+	BytesV        []byte
 }
 
-// TransitionID implements the Tx interface
-func (t *TestTx) TransitionID() ids.ID { return t.TransitionIDV }
+// Transition implements the Tx interface
+func (t *TestTx) Transition() Transition { return t.TransitionV }
 
 // Epoch implements the Tx interface
 func (t *TestTx) Epoch() uint32 { return t.EpochV }
@@ -32,8 +32,8 @@ func (t *TestTx) Epoch() uint32 { return t.EpochV }
 // Restrictions implements the Tx interface
 func (t *TestTx) Restrictions() []ids.ID { return t.RestrictionsV }
 
-// Dependencies implements the Tx interface
-func (t *TestTx) Dependencies() []ids.ID { return t.DependenciesV }
+// Verify implements the Tx interface
+func (t *TestTx) Verify() error { return t.VerifyV }
 
-// InputIDs implements the Tx interface
-func (t *TestTx) InputIDs() []ids.ID { return t.InputIDsV }
+// Bytes implements the Tx interface
+func (t *TestTx) Bytes() []byte { return t.BytesV }

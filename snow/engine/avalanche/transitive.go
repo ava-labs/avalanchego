@@ -43,8 +43,8 @@ type Transitive struct {
 	// The set of vertices that have been requested in Get messages but not yet received
 	outstandingVtxReqs common.Requests
 
-	// missingTxs tracks transaction that are missing
-	missingTxs ids.Set
+	// missingTransitions tracks transaction that are missing
+	missingTransitions ids.Set
 
 	// IDs of vertices that are queued to be added to consensus but haven't yet been
 	// because of missing dependencies
@@ -230,15 +230,15 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	t.vtxBlocked.Abandon(vtxID)
 
 	if t.outstandingVtxReqs.Len() == 0 {
-		for txID := range t.missingTxs {
-			t.txBlocked.Abandon(txID)
+		for trID := range t.missingTransitions {
+			t.txBlocked.Abandon(trID)
 		}
-		t.missingTxs.Clear()
+		t.missingTransitions.Clear()
 	}
 
 	// Track performance statistics
 	t.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len()))
-	t.numMissingTxs.Set(float64(t.missingTxs.Len()))
+	t.numMissingTxs.Set(float64(t.missingTransitions.Len()))
 	return t.errs.Err
 }
 
@@ -338,7 +338,8 @@ func (t *Transitive) Notify(msg common.Message) error {
 	switch msg {
 	case common.PendingTxs:
 		txs := t.VM.Pending()
-		return t.batch(txs, false /*=force*/, false /*=empty*/)
+		epoch := t.Ctx.Epoch()
+		return t.batch(epoch, txs, false /*=force*/, false /*=empty*/)
 	default:
 		return nil
 	}
@@ -353,7 +354,8 @@ func (t *Transitive) repoll() error {
 	}
 
 	txs := t.VM.Pending()
-	if err := t.batch(txs, false /*=force*/, true /*=empty*/); err != nil {
+	epoch := t.Ctx.Epoch()
+	if err := t.batch(epoch, txs, false /*=force*/, true /*=empty*/); err != nil {
 		return err
 	}
 
@@ -460,11 +462,11 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 	}
 
 	for _, tx := range txs {
-		for _, dep := range tx.Dependencies() {
-			depID := dep.ID()
+		tr := tx.Transition()
+		for _, depID := range tr.Dependencies() {
 			if !txIDs.Contains(depID) && !t.Consensus.TxIssued(dep) {
 				// This transaction hasn't been issued yet. Add it as a dependency.
-				t.missingTxs.Add(depID)
+				t.missingTransitions.Add(depID)
 				i.txDeps.Add(depID)
 			}
 		}
@@ -480,15 +482,15 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 
 	if t.outstandingVtxReqs.Len() == 0 {
 		// There are no outstanding vertex requests but we don't have these transactions, so we're not getting them.
-		for txID := range t.missingTxs {
+		for txID := range t.missingTransitions {
 			t.txBlocked.Abandon(txID)
 		}
-		t.missingTxs.Clear()
+		t.missingTransitions.Clear()
 	}
 
 	// Track performance statistics
 	t.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len()))
-	t.numMissingTxs.Set(float64(t.missingTxs.Len()))
+	t.numMissingTxs.Set(float64(t.missingTransitions.Len()))
 	t.numPendingVts.Set(float64(t.pending.Len()))
 	return t.errs.Err
 }
@@ -497,7 +499,7 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 // If [force] is true, forces each tx to be issued.
 // Otherwise, some txs may not be put into vertices that are issued.
 // If [empty], will always result in a new poll.
-func (t *Transitive) batch(txs []conflicts.Tx, force, empty bool) error {
+func (t *Transitive) batch(epoch uint32, txs []conflicts.Transition, force, empty bool) error {
 	issuedTxs := ids.Set{}
 	consumed := ids.Set{}
 	issued := false
@@ -574,7 +576,7 @@ func (t *Transitive) issueRepoll() {
 }
 
 // Puts a batch of transactions into a vertex and issues it into consensus.
-func (t *Transitive) issueBatch(txs []conflicts.Tx) error {
+func (t *Transitive) issueBatch(txs []vertex.Tx) error {
 	t.Ctx.Log.Verbo("batching %d transactions into a new vertex", len(txs))
 
 	// Randomly select parents of this vertex from among the virtuous set

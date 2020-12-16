@@ -349,7 +349,7 @@ func TestIssueImportTx(t *testing.T) {
 	}
 
 	parsedTx := txs[0]
-	if err := parsedTx.Accept(); err != nil {
+	if err := parsedTx.Accept(0); err != nil {
 		t.Fatal(err)
 	}
 	id := utxoID.InputID()
@@ -447,11 +447,11 @@ func TestForceAcceptImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := parsedTx.Verify(); err == nil {
+	if err := parsedTx.Verify(0); err == nil {
 		t.Fatalf("Should have failed verification")
 	}
 
-	if err := parsedTx.Accept(); err != nil {
+	if err := parsedTx.Accept(0); err != nil {
 		t.Fatal(err)
 	}
 
