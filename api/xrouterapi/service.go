@@ -89,8 +89,8 @@ func (service *XRouterService) GetTransaction(_ *http.Request, args *GetTransact
 			json.Unmarshal(xrouterReply[i].Reply, &b)
 			reply.Reply = append(reply.Reply, b)
 		}
+		return nil
 	}
-	return nil
 }
 
 // DecodeTransactionRaw
@@ -193,7 +193,7 @@ func (service *XRouterService) GetTransactions(_ *http.Request, args *GetTransac
 			reply.Error = e
 			return nil
 		}
-		for i := range s {
+		for i := range xrouterReply {
 			json.Unmarshal(xrouterReply[i].Reply, &b)
 			reply.Reply = append(reply.Reply, b[i])
 		}
@@ -312,7 +312,7 @@ func (service *XRouterService) GetBlocks(_ *http.Request, args *GetBlocksArgs, r
 			reply.Error = e
 			return nil
 		}
-		for i := range s {
+		for i := range xrouterReply {
 			json.Unmarshal(xrouterReply[i].Reply, &b)
 			reply.Reply = append(reply.Reply, b[i])
 		}
