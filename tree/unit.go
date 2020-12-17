@@ -14,7 +14,7 @@ func FirstNonPrefix(basekey []Unit, otherKey []Unit) Unit {
 // returns ABC
 func SharedPrefix(address1 []Unit, address2 []Unit) []Unit {
 
-	var shared []Unit
+	shared := []Unit{}
 	smaller := address1
 	larger := address2
 

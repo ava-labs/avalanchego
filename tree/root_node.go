@@ -27,6 +27,12 @@ func (r *RootNode) SetChild(node Node) {
 }
 
 func (r *RootNode) Insert(key []Unit, value []byte) {
+	// Inserting in root means the branch/leaf needs to group in a new branch
+	newBranch := NewBranchNode(SharedPrefix(r.child.Key(), key), r)
+	newBranch.SetChild(r.child)
+	newBranch.Insert(key, value)
+	r.child = newBranch
+
 }
 
 func (r *RootNode) Print() {

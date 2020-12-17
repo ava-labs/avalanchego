@@ -36,30 +36,8 @@ func (e *EmptyNode) Insert(key []Unit, value []byte) {
 		return
 	}
 
-	prefix := SharedPrefix(e.sharedAddress, key)
-
-	// the new branch belongs above the existing branch
-	if len(e.sharedAddress) > len(prefix) {
-		parent := e.parent
-		for {
-			parent = parent.Parent()
-			if len(parent.Key()) <= len(SharedPrefix(parent.Key(), key)) {
-				branch := NewBranchNode(prefix, parent)
-				branch.Insert(key, value)
-				branch.Link(e.sharedAddress, e.parent)
-				// TODO change this no ?
-				parentBranch, _ := e.parent.(*BranchNode)
-				parentBranch.parent = branch
-				parent.SetChild(branch)
-				return
-			}
-		}
-	}
-
-	// the new branch belongs under the existing branch
-	branch := NewBranchNode(prefix, e.parent)
-	branch.Insert(key, value)
-	e.parent.SetChild(branch)
+	// the node belongs to the parent
+	e.parent.Insert(key, value)
 }
 
 func (e *EmptyNode) Print() {

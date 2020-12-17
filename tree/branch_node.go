@@ -47,6 +47,24 @@ func (b *BranchNode) GetChild(key []Unit) Node {
 
 // Insert a LeafNode
 func (b *BranchNode) Insert(key []Unit, value []byte) {
+
+	// if the node CAN'T exist in this prefix request the parent to insert
+	if !EqualUnits(SharedPrefix(b.sharedAddress, key), b.sharedAddress) {
+		b.parent.Insert(key, value)
+		return
+	}
+
+	// if the node already exists then it's a new suffixed address
+	// needs a new branchNode
+	if node, ok := b.nodes[FirstNonPrefix(b.sharedAddress, key)]; ok {
+		newBranch := NewBranchNode(SharedPrefix(node.Key(), key), b)
+		newBranch.SetChild(node)
+		newBranch.Insert(key, value)
+
+		b.nodes[FirstNonPrefix(b.sharedAddress, key)] = newBranch
+		return
+	}
+
 	b.nodes[FirstNonPrefix(b.sharedAddress, key)] = NewLeafNode(key, value, b)
 }
 
@@ -70,7 +88,7 @@ func (b *BranchNode) SetParent(node Node) {
 }
 
 func (b *BranchNode) Print() {
-	fmt.Printf("Branch ID: %p - Parent: %p \n\t↪SharedAddress: %v - Nodes: %v \n", b, b.parent, b.sharedAddress, b.nodes)
+	fmt.Printf("Branch ID: %p - SharedAddress: %v - Parent: %p \n\t↪ Nodes: %v \n", b, b.sharedAddress, b.parent, b.nodes)
 	for _, node := range b.nodes {
 		node.Print()
 	}
