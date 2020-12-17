@@ -12,6 +12,9 @@ type Conflicts interface {
 	// Add this transaction to conflict tracking
 	Add(tx conflicts.Tx) error
 
+	// Processing returns if this transition is currently being processed
+	Processing(trID ids.ID) bool
+
 	// Conflicts returns true if there are no transactions currently tracked
 	IsVirtuous(tx conflicts.Tx) (bool, error)
 

@@ -464,10 +464,13 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 	for _, tx := range txs {
 		tr := tx.Transition()
 		for _, depID := range tr.Dependencies() {
-			if !txIDs.Contains(depID) && !t.Consensus.TxIssued(dep) {
-				// This transaction hasn't been issued yet. Add it as a dependency.
-				t.missingTransitions.Add(depID)
-				i.txDeps.Add(depID)
+			if !txIDs.Contains(depID) && !t.Consensus.TransitionProcessing(depID) {
+				dep, err := t.VM.Get(depID)
+				if err != nil || !dep.Status().Decided() {
+					// This transaction hasn't been issued yet. Add it as a dependency.
+					t.missingTransitions.Add(depID)
+					i.txDeps.Add(depID)
+				}
 			}
 		}
 	}
@@ -499,20 +502,20 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 // If [force] is true, forces each tx to be issued.
 // Otherwise, some txs may not be put into vertices that are issued.
 // If [empty], will always result in a new poll.
-func (t *Transitive) batch(epoch uint32, txs []conflicts.Transition, force, empty bool) error {
-	issuedTxs := ids.Set{}
+func (t *Transitive) batch(epoch uint32, trs []conflicts.Transition, force, empty bool) error {
+	issuedTrs := ids.Set{}
 	consumed := ids.Set{}
 	issued := false
 	orphans := t.Consensus.Orphans()
 	start := 0
 	end := 0
-	for end < len(txs) {
-		tx := txs[end]
+	for end < len(trs) {
+		tr := trs[end]
 		inputs := ids.Set{}
-		inputs.Add(tx.InputIDs()...)
+		inputs.Add(tr.InputIDs()...)
 		overlaps := consumed.Overlaps(inputs)
 		if end-start >= t.Params.BatchSize || (force && overlaps) {
-			if err := t.issueBatch(txs[start:end]); err != nil {
+			if err := t.issueBatch(trs[start:end]); err != nil {
 				return err
 			}
 			start = end
@@ -521,27 +524,33 @@ func (t *Transitive) batch(epoch uint32, txs []conflicts.Transition, force, empt
 			overlaps = false
 		}
 
+		tx, err := t.Manager.Wrap(epoch, tr, nil)
+		if err != nil {
+			return err
+		}
 		isVirtuous, err := t.Consensus.IsVirtuous(tx)
 		if err != nil {
 			return err
 		}
-		if txID := tx.ID(); !overlaps && // should never allow conflicting txs in the same vertex
+
+		if trID := tr.ID(); !overlaps && // should never allow conflicting txs in the same vertex
 			(force || isVirtuous) && // force allows for a conflict to be issued
-			!issuedTxs.Contains(txID) && // shouldn't issue duplicated transactions to the same vertex
-			(!t.Consensus.TxIssued(tx) || orphans.Contains(txID)) { // should only reissue orphaned txs
+			!issuedTrs.Contains(trID) && // shouldn't issue duplicated transactions to the same vertex
+			!tr.Status().Decided() && // shouldn't re-issue a decided transaction
+			(!t.Consensus.TransitionProcessing(trID) || orphans.Contains(trID)) { // should only reissue orphaned txs
 			end++
-			issuedTxs.Add(txID)
+			issuedTrs.Add(trID)
 			consumed.Union(inputs)
 		} else {
-			newLen := len(txs) - 1
-			txs[end] = txs[newLen]
-			txs[newLen] = nil
-			txs = txs[:newLen]
+			newLen := len(trs) - 1
+			trs[end] = trs[newLen]
+			trs[newLen] = nil
+			trs = trs[:newLen]
 		}
 	}
 
 	if end > start {
-		return t.issueBatch(txs[start:end])
+		return t.issueBatch(trs[start:end])
 	} else if empty && !issued {
 		t.issueRepoll()
 	}
@@ -576,7 +585,7 @@ func (t *Transitive) issueRepoll() {
 }
 
 // Puts a batch of transactions into a vertex and issues it into consensus.
-func (t *Transitive) issueBatch(txs []vertex.Tx) error {
+func (t *Transitive) issueBatch(txs []conflicts.Transition) error {
 	t.Ctx.Log.Verbo("batching %d transactions into a new vertex", len(txs))
 
 	// Randomly select parents of this vertex from among the virtuous set

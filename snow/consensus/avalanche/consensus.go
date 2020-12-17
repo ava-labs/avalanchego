@@ -49,6 +49,10 @@ type Consensus interface {
 	// added.
 	TxIssued(conflicts.Tx) bool
 
+	// TransitionProcessing returns true if a transaction containing this
+	// transition is currently processing.
+	TransitionProcessing(ids.ID) bool
+
 	// GetTx returns the named tx. If the named tx isn't currently processing,
 	// an error will be returned.
 	GetTx(ids.ID) (conflicts.Tx, error)

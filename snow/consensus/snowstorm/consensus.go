@@ -52,6 +52,9 @@ type Consensus interface {
 	// Returns true iff transaction <Tx> has been added
 	Issued(conflicts.Tx) bool
 
+	// Returns true iff a transaction with the named transition is processing
+	Processing(ids.ID) bool
+
 	// Adds a new transaction to vote on. Returns if a critical error has
 	// occurred.
 	Add(conflicts.Tx) error

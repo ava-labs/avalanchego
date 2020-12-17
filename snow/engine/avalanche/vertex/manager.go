@@ -9,5 +9,6 @@ type Manager interface {
 	Builder
 	Parser
 	Storage
+	Wrapper
 	ParserTx
 }

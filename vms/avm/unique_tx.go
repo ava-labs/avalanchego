@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
@@ -40,7 +39,7 @@ type TxState struct {
 	inputs     []ids.ID
 	inputUTXOs []*avax.UTXOID
 	utxos      []*avax.UTXO
-	deps       []vertex.Tx
+	deps       []ids.ID
 
 	status choices.Status
 }
@@ -202,7 +201,7 @@ func (tx *UniqueTx) Epoch() uint32 {
 }
 
 // Dependencies returns the set of transactions this transaction builds on
-func (tx *UniqueTx) Dependencies() []vertex.Tx {
+func (tx *UniqueTx) Dependencies() []ids.ID {
 	tx.refresh()
 	if tx.Tx == nil || len(tx.deps) != 0 {
 		return tx.deps
@@ -218,10 +217,7 @@ func (tx *UniqueTx) Dependencies() []vertex.Tx {
 			continue
 		}
 		txIDs.Add(txID)
-		tx.deps = append(tx.deps, &UniqueTx{
-			vm:   tx.vm,
-			txID: txID,
-		})
+		tx.deps = append(tx.deps, txID)
 	}
 	consumedIDs := tx.Tx.ConsumedAssetIDs()
 	for assetID := range tx.Tx.AssetIDs() {
@@ -229,10 +225,7 @@ func (tx *UniqueTx) Dependencies() []vertex.Tx {
 			continue
 		}
 		txIDs.Add(assetID)
-		tx.deps = append(tx.deps, &UniqueTx{
-			vm:   tx.vm,
-			txID: assetID,
-		})
+		tx.deps = append(tx.deps, assetID)
 	}
 	return tx.deps
 }

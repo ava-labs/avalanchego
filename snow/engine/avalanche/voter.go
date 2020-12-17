@@ -53,10 +53,12 @@ func (v *voter) Update() {
 	orphans := v.t.Consensus.Orphans()
 	txs := make([]conflicts.Tx, 0, orphans.Len())
 	for orphanID := range orphans {
-		if tx, err := v.t.VM.Get(orphanID); err == nil {
+
+		if tx, err := v.t.Consensus.GetTx(orphanID); err == nil {
 			txs = append(txs, tx)
 		} else {
-			v.t.Ctx.Log.Warn("Failed to fetch %s during attempted re-issuance", orphanID)
+			v.t.Ctx.Log.Error("Failed to fetch %s during attempted re-issuance",
+				orphanID)
 		}
 	}
 	if len(txs) > 0 {

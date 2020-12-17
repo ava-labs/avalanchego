@@ -93,6 +93,10 @@ func (c *Conflicts) Add(tx Tx) error {
 	}
 	return nil
 }
+func (c *Conflicts) Processing(trID ids.ID) bool {
+	_, exists := c.transitions[trID]
+	return exists
+}
 
 // IsVirtuous checks the currently processing txs for conflicts. It is allowed
 // to call this function with txs that aren't yet processing or currently
