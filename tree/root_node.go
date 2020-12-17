@@ -6,16 +6,8 @@ type RootNode struct {
 	child Node
 }
 
-func NewRootNode(child Node) Node {
+func NewRootNode() Node {
 	return &RootNode{}
-}
-
-func (r *RootNode) Parent() Node {
-	return nil
-}
-
-func (r *RootNode) GetNode(key []Unit) Node {
-	return nil
 }
 
 func (r *RootNode) GetChild(key []Unit) Node {
@@ -32,7 +24,6 @@ func (r *RootNode) Insert(key []Unit, value []byte) {
 	newBranch.SetChild(r.child)
 	newBranch.Insert(key, value)
 	r.child = newBranch
-
 }
 
 func (r *RootNode) Print() {
@@ -41,8 +32,6 @@ func (r *RootNode) Print() {
 		r.child.Print()
 	}
 }
-
-func (r *RootNode) Link(address []Unit, node Node) {}
 
 func (r *RootNode) Value() []byte { return nil }
 

@@ -5,8 +5,6 @@ type Node interface {
 	Insert(key []Unit, value []byte)
 	SetChild(node Node)
 	Print()
-	Parent() Node
-	Link(address []Unit, node Node)
 	Value() []byte
 	Delete(key []Unit) bool
 	Key() []Unit

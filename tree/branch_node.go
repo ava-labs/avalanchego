@@ -79,10 +79,6 @@ func (b *BranchNode) SetChild(node Node) {
 	b.nodes[FirstNonPrefix(b.sharedAddress, node.Key())] = node
 }
 
-func (b *BranchNode) Parent() Node {
-	return b.parent
-}
-
 func (b *BranchNode) SetParent(node Node) {
 	b.parent = node
 }
@@ -92,10 +88,6 @@ func (b *BranchNode) Print() {
 	for _, node := range b.nodes {
 		node.Print()
 	}
-}
-
-func (b *BranchNode) Link(address []Unit, node Node) {
-	b.nodes[FirstNonPrefix(b.sharedAddress, address)] = node
 }
 
 func (b *BranchNode) Value() []byte {

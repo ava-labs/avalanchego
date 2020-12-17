@@ -23,10 +23,6 @@ func NewLeafNode(key []Unit, value []byte, parent Node) *LeafNode {
 	}
 }
 
-func (l *LeafNode) GetNode(key []Unit) Node {
-	return l
-}
-
 func (l *LeafNode) GetChild(key []Unit) Node {
 	return l
 }
@@ -48,12 +44,6 @@ func (l *LeafNode) Insert(key []Unit, value []byte) {
 func (l *LeafNode) Print() {
 	fmt.Printf("Leaf ID: %p - Parent: %p - Key: %v - Val: %v\n", &l, l.parent, l.key, l.value)
 }
-
-func (l *LeafNode) Parent() Node {
-	return l.parent
-}
-
-func (l *LeafNode) Link(address []Unit, node Node) {}
 
 func (l *LeafNode) Value() []byte {
 	return l.value

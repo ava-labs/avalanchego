@@ -16,10 +16,6 @@ func NewEmptyNode(parent Node, key []Unit, sharedAddress []Unit) Node {
 	}
 }
 
-func (e *EmptyNode) Parent() Node {
-	return e.parent
-}
-
 func (e *EmptyNode) GetChild(key []Unit) Node {
 	return nil
 }
@@ -43,8 +39,6 @@ func (e *EmptyNode) Insert(key []Unit, value []byte) {
 func (e *EmptyNode) Print() {
 	fmt.Printf("Empty - %v - %v\n", e.key, e.parent)
 }
-
-func (e *EmptyNode) Link(address []Unit, node Node) {}
 
 func (e *EmptyNode) Value() []byte { return nil }
 
