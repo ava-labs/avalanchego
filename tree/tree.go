@@ -9,7 +9,7 @@ type Tree struct {
 
 func NewTree() *Tree {
 	return &Tree{
-		rootNode: NewRootNode(nil),
+		rootNode: NewRootNode(),
 	}
 }
 
