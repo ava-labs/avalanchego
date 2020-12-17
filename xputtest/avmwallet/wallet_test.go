@@ -35,7 +35,7 @@ func TestWalletGetAddress(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if addr0.IsZero() || addr0.Equals(ids.ShortEmpty) {
+	if addr0 == ids.ShortEmpty {
 		t.Fatalf("expected new address but got %s", addr0)
 	}
 }
@@ -55,7 +55,7 @@ func TestWalletGetMultipleAddresses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !addr0.Equals(addr1) {
+	if addr0 != addr1 {
 		t.Fatalf("Should have returned the same address from multiple Get Address calls")
 	}
 }
@@ -183,7 +183,7 @@ func TestWalletImportKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !addr0.Equals(addr1) {
+	if addr0 != addr1 {
 		t.Fatalf("Should have returned the same address from the Get Address call")
 	}
 }

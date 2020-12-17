@@ -35,7 +35,7 @@ func TestManagerFire(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	manager.Register(ids.NewShortID([20]byte{}), ids.ID{}, 0, true, 0, wg.Done)
+	manager.Register(ids.ShortID{}, ids.ID{}, 0, true, 0, wg.Done)
 
 	wg.Wait()
 }
@@ -62,11 +62,11 @@ func TestManagerCancel(t *testing.T) {
 
 	fired := new(bool)
 
-	manager.Register(ids.NewShortID([20]byte{}), ids.ID{}, 0, true, 0, func() { *fired = true })
+	manager.Register(ids.ShortID{}, ids.ID{}, 0, true, 0, func() { *fired = true })
 
-	manager.Cancel(ids.NewShortID([20]byte{}), ids.ID{}, 0)
+	manager.Cancel(ids.ShortID{}, ids.ID{}, 0)
 
-	manager.Register(ids.NewShortID([20]byte{}), ids.ID{}, 1, true, 0, wg.Done)
+	manager.Register(ids.ShortID{}, ids.ID{}, 1, true, 0, wg.Done)
 
 	wg.Wait()
 

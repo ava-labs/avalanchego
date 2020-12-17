@@ -34,7 +34,7 @@ func TestRequests(t *testing.T) {
 	_, removed = req.Remove(ids.ShortEmpty, 1)
 	assert.False(t, removed, "shouldn't have removed the request")
 
-	_, removed = req.Remove(ids.NewShortID([20]byte{1}), 0)
+	_, removed = req.Remove(ids.ShortID{1}, 0)
 	assert.False(t, removed, "shouldn't have removed the request")
 
 	constains = req.Contains(ids.Empty)
@@ -51,7 +51,7 @@ func TestRequests(t *testing.T) {
 	_, removed = req.Remove(ids.ShortEmpty, 1)
 	assert.False(t, removed, "shouldn't have removed the request")
 
-	_, removed = req.Remove(ids.NewShortID([20]byte{1}), 0)
+	_, removed = req.Remove(ids.ShortID{1}, 0)
 	assert.False(t, removed, "shouldn't have removed the request")
 
 	constains = req.Contains(ids.Empty)

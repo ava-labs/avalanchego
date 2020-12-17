@@ -2100,7 +2100,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 	advanceTimePreference := options[0]
 
-	peerID := ids.NewShortID([20]byte{1, 2, 3, 4, 5, 4, 3, 2, 1})
+	peerID := ids.ShortID{1, 2, 3, 4, 5, 4, 3, 2, 1}
 	vdrs := validators.NewSet()
 	if err := vdrs.AddWeight(peerID, 1); err != nil {
 		t.Fatal(err)

@@ -103,7 +103,7 @@ func TestEngineAdd(t *testing.T) {
 			t.Fatalf("Asked multiple times")
 		}
 		*asked = true
-		if !vdr.Equals(inVdr) {
+		if vdr != inVdr {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
 		if vtx.ParentsV[0].ID() != vtxID {
@@ -233,7 +233,7 @@ func TestEngineQuery(t *testing.T) {
 			t.Fatalf("Asked multiple times")
 		}
 		*asked = true
-		if !vdr.Equals(inVdr) {
+		if vdr != inVdr {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
 		if vtx0.ID() != vtxID {
@@ -331,7 +331,7 @@ func TestEngineQuery(t *testing.T) {
 			t.Fatalf("Asked multiple times")
 		}
 		*asked = true
-		if !vdr.Equals(inVdr) {
+		if vdr != inVdr {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
 		if vtx1.ID() != vtxID {
@@ -547,7 +547,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 			t.Fatalf("Asked multiple times")
 		}
 		*asked = true
-		if !vdr0.Equals(inVdr) {
+		if vdr0 != inVdr {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
 		if vtx1.ID() != vtxID {
@@ -1444,7 +1444,7 @@ func TestEngineGetVertex(t *testing.T) {
 	}
 
 	sender.PutF = func(v ids.ShortID, _ uint32, vtxID ids.ID, vtx []byte) {
-		if !v.Equals(vdr.ID()) {
+		if v != vdr.ID() {
 			t.Fatalf("Wrong validator")
 		}
 		if mVtx.ID() != vtxID {
@@ -2511,7 +2511,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	}
 
 	sender.GetAncestorsF = func(inVdr ids.ShortID, reqID uint32, vtxID ids.ID) {
-		if !vdr.Equals(inVdr) {
+		if vdr != inVdr {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
 		if vtx0.ID() != vtxID {
@@ -2576,7 +2576,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		panic("Unknown bytes provided")
 	}
 	sender.ChitsF = func(inVdr ids.ShortID, _ uint32, chits []ids.ID) {
-		if !inVdr.Equals(vdr) {
+		if inVdr != vdr {
 			t.Fatalf("Sent to the wrong validator")
 		}
 
@@ -2947,7 +2947,7 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 	reqID := new(uint32)
 	sender.GetF = func(reqVdr ids.ShortID, requestID uint32, vtxID ids.ID) {
 		*reqID = requestID
-		if !reqVdr.Equals(vdr) {
+		if reqVdr != vdr {
 			t.Fatalf("Wrong validator requested")
 		}
 		if vtxID != vtx0.ID() {
@@ -3090,7 +3090,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	reqID := new(uint32)
 	sender.GetF = func(reqVdr ids.ShortID, requestID uint32, vtxID ids.ID) {
 		*reqID = requestID
-		if !reqVdr.Equals(vdr) {
+		if reqVdr != vdr {
 			t.Fatalf("Wrong validator requested")
 		}
 		if vtxID != vtx0.ID() {
