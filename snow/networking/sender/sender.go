@@ -36,7 +36,7 @@ func (s *Sender) Context() *snow.Context { return s.ctx }
 func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32) {
 	currentDeadline := time.Time{}
 	for validatorID := range validatorIDs {
-		vID := validatorID
+		vID := validatorID // Prevent overwrite in next loop iteration
 		deadline, ok := s.timeouts.Register(vID, s.ctx.ChainID, requestID, true, constants.GetAcceptedFrontierMsg, func() {
 			s.router.GetAcceptedFrontierFailed(vID, s.ctx.ChainID, requestID)
 		})
@@ -70,7 +70,7 @@ func (s *Sender) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, con
 func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, containerIDs []ids.ID) {
 	currentDeadline := time.Time{}
 	for validatorID := range validatorIDs {
-		vID := validatorID
+		vID := validatorID // Prevent overwrite in next loop iteration
 		deadline, ok := s.timeouts.Register(vID, s.ctx.ChainID, requestID, true, constants.GetAcceptedMsg, func() {
 			s.router.GetAcceptedFailed(vID, s.ctx.ChainID, requestID)
 		})
@@ -167,7 +167,7 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 
 	currentDeadline := time.Time{}
 	for validatorID := range validatorIDs {
-		vID := validatorID
+		vID := validatorID // Prevent overwrite in next loop iteration
 		deadline, ok := s.timeouts.Register(vID, s.ctx.ChainID, requestID, true, constants.PushQueryMsg, func() {
 			s.router.QueryFailed(vID, s.ctx.ChainID, requestID)
 		})
@@ -201,7 +201,7 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 
 	currentDeadline := time.Time{}
 	for validatorID := range validatorIDs {
-		vID := validatorID
+		vID := validatorID // Prevent overwrite in next loop iteration
 		deadline, ok := s.timeouts.Register(vID, s.ctx.ChainID, requestID, true, constants.PullQueryMsg, func() {
 			s.router.QueryFailed(vID, s.ctx.ChainID, requestID)
 		})
