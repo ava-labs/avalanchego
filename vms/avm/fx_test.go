@@ -95,9 +95,9 @@ func (fx *FxTest) VerifyPermission(tx, in, cred, utxo interface{}) error {
 		return nil
 	}
 	if fx.T != nil {
-		fx.T.Fatalf("Unexpectedly called VerifyTransfer")
+		fx.T.Fatalf("Unexpectedly called VerifyPermission")
 	}
-	return errors.New("Unexpectedly called VerifyTransfer")
+	return errors.New("Unexpectedly called VerifyPermission")
 }
 
 func (fx *FxTest) VerifyOperation(tx, op, cred interface{}, utxos []interface{}) error {
