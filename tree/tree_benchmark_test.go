@@ -5,11 +5,6 @@ import (
 	"testing"
 )
 
-type TestStruct struct {
-	key   []byte
-	value []byte
-}
-
 func CreateRandomValues(valueCount int) []TestStruct {
 	var tests []TestStruct
 	added := map[string]bool{}
@@ -17,8 +12,8 @@ func CreateRandomValues(valueCount int) []TestStruct {
 	for i := 0; i < valueCount; i++ {
 		key := make([]byte, 4)
 		val := make([]byte, 4)
-		rand.Read(key)
-		rand.Read(val)
+		_, _ = rand.Read(key)
+		_, _ = rand.Read(val)
 
 		if _, ok := added[string(key)]; ok {
 			i--
