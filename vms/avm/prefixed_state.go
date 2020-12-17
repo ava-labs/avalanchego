@@ -159,13 +159,13 @@ func (s *prefixedState) PutManagedAssetStatus(
 		return fmt.Errorf("couldn't serialize manager: %w", err)
 	}
 
-	size := 2 * wrappers.IntLen // epoch and the size byte prepended to manager bytes
-	size += wrappers.BoolLen    // Frozen status
-	size += len(managerBytes)   // Manager
-	// Epoch, Frozen Status, Manager
+	size := wrappers.IntLen   // epoch
+	size += wrappers.BoolLen  // Frozen status
+	size += wrappers.IntLen   // size of managerBytes
+	size += len(managerBytes) // managerBytes
 	p := wrappers.Packer{MaxSize: size}
 	p.PackInt(epoch)
-	p.PackBool(frozen) // Mark that asset is being frozen
+	p.PackBool(frozen)
 	p.PackBytes(managerBytes)
 	if p.Errored() {
 		// Should never happen in practice
