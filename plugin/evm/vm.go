@@ -769,7 +769,7 @@ func (vm *VM) writeBackMetadata() {
 // awaitTxPoolStabilized waits for a txPoolHead channel event
 // and notifies the VM when the tx pool has stabilized to the
 // expected block hash
-// Waits for signal to shutdown from txPoolStabilizedShutdownChan chan
+// Waits for signal to shutdown from [vm.shutdownChan]
 func (vm *VM) awaitTxPoolStabilized() {
 	defer vm.shutdownWg.Done()
 	for {
