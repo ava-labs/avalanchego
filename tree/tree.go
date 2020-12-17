@@ -1,8 +1,6 @@
 package tree
 
-import (
-	"fmt"
-)
+import "fmt"
 
 type Tree struct {
 	rootNode Node
@@ -11,7 +9,7 @@ type Tree struct {
 
 func NewTree() *Tree {
 	return &Tree{
-		rootNode: nil,
+		rootNode: NewRootNode(nil),
 	}
 }
 
@@ -33,13 +31,15 @@ func (t *Tree) Get(key []byte) ([]byte, bool) {
 // - When inserting in a BranchNode
 func (t *Tree) Put(key []byte, value []byte) {
 	unitKey := FromBytes(key)
-	if t.rootNode == nil {
-		t.rootNode = NewRootNode(nil)
+	if t.rootNode.GetChild([]Unit{}) == nil {
 		t.rootNode.SetChild(NewLeafNode(unitKey, value, t.rootNode))
 		return
 	}
 
 	insertNode := t.findNode(unitKey, t.rootNode)
+	if insertNode == nil {
+		fmt.Println("This should never happen")
+	}
 	insertNode.Insert(unitKey, value)
 }
 
@@ -47,10 +47,19 @@ func (t *Tree) Del(key []byte) bool {
 	unitKey := FromBytes(key)
 
 	deleteNode := t.findNode(unitKey, t.rootNode)
+	if deleteNode == nil {
+		fmt.Println("node does not exist")
+		return false
+	}
+
 	return deleteNode.Delete(unitKey)
 }
 
 func (t *Tree) findNode(key []Unit, node Node) Node {
+
+	if node == nil {
+		return nil
+	}
 
 	switch node.(type) {
 	case *EmptyNode:
@@ -58,9 +67,7 @@ func (t *Tree) findNode(key []Unit, node Node) Node {
 	case *LeafNode:
 		return node
 	}
-	if node == nil {
-		fmt.Println("This aint right")
-	}
+
 	return t.findNode(key, node.GetChild(key))
 }
 

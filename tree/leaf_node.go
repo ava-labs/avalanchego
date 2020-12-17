@@ -43,13 +43,6 @@ func (l *LeafNode) Insert(key []Unit, value []byte) {
 	}
 
 	l.parent.Insert(key, value)
-
-	branch := NewBranchNode(SharedPrefix(l.key, key), l.parent)
-	// TODO multiple insert + calc
-	branch.Insert(l.key, l.value)
-	branch.Insert(key, value)
-
-	l.parent.SetChild(branch)
 }
 
 func (l *LeafNode) Print() {
@@ -74,4 +67,6 @@ func (l *LeafNode) Key() []Unit {
 	return l.key
 }
 
-func (l *LeafNode) SetParent(node Node) {}
+func (l *LeafNode) SetParent(node Node) {
+	l.parent = node
+}
