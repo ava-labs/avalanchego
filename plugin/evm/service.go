@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	version = "coreth-v0.3.15"
+	version = "coreth-v0.3.17"
 )
 
 // test constants
@@ -330,7 +330,6 @@ func (service *AvaxAPI) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 		return fmt.Errorf("number of addresses given, %d, exceeds maximum, %d", len(args.Addresses), maxGetUTXOsAddrs)
 	}
 
-	sourceChain := ids.ID{}
 	if args.SourceChain == "" {
 		return errNoSourceChain
 	}
@@ -339,7 +338,7 @@ func (service *AvaxAPI) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 	if err != nil {
 		return fmt.Errorf("problem parsing source chainID %q: %w", args.SourceChain, err)
 	}
-	sourceChain = chainID
+	sourceChain := chainID
 
 	addrSet := ids.ShortSet{}
 	for _, addrStr := range args.Addresses {

@@ -3,10 +3,11 @@ package dummy
 import (
 	"errors"
 	"fmt"
-	"golang.org/x/crypto/sha3"
 	"math/big"
 	"runtime"
 	"time"
+
+	"golang.org/x/crypto/sha3"
 
 	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/core/state"

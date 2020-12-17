@@ -28,6 +28,7 @@
 ./eth/api_tracer.go
 ./eth/backend.go
 ./eth/config.go
+./eth/gasprice/gasprice.go
 ./eth/gen_config.go
 ./eth/tracers/internal/tracers/assets.go
 ./ethclient/ethclient.go
@@ -44,3 +45,4 @@
 ./rpc/client.go
 ./rpc/types.go
 ./interfaces.go
+./accounts/keystore/account_cache.go (minor formatting change to pass linting)

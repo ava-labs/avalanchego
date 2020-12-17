@@ -29,8 +29,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-const sampleNumber = 3 // Number of transactions sampled in a block
-
 var DefaultMaxPrice = big.NewInt(500 * params.GWei)
 
 type Config struct {

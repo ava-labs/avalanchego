@@ -40,10 +40,6 @@ type ETHChain struct {
 	bcb     *eth.BackendCallbacks
 }
 
-func isLocalBlock(block *types.Block) bool {
-	return false
-}
-
 // NewETHChain creates an Ethereum blockchain with the given configs.
 func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Address, chainDB ethdb.Database) *ETHChain {
 	if config == nil {

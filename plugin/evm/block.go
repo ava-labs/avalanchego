@@ -75,6 +75,11 @@ func (b *Block) Parent() snowman.Block {
 	return &missing.Block{BlkID: parentID}
 }
 
+// Height implements the snowman.Block interface
+func (b *Block) Height() uint64 {
+	return b.ethBlock.Number().Uint64()
+}
+
 // Verify implements the snowman.Block interface
 func (b *Block) Verify() error {
 	// Only enforce a minimum fee when bootstrapping has finished
