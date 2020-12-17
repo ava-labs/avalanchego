@@ -105,9 +105,9 @@ var (
 type mayBuildBlockStatus uint8
 
 const (
-	wait mayBuildBlockStatus = iota
-	conditionalWait
-	build
+	waitToBuild mayBuildBlockStatus = iota
+	conditionalWaitToBuild
+	mayBuild
 )
 
 func maxDuration(x, y time.Duration) time.Duration {
@@ -361,13 +361,13 @@ func (vm *VM) Initialize(
 	vm.buildBlockTimer = timer.NewTimer(func() {
 		vm.buildBlockLock.Lock()
 		switch vm.mayBuildBlock {
-		case wait:
+		case waitToBuild:
 			// Some time has passed. Allow block to be built if it has enough txs in it.
-			vm.mayBuildBlock = conditionalWait
+			vm.mayBuildBlock = conditionalWaitToBuild
 			vm.buildBlockTimer.SetTimeoutIn(maxDuration(maxBlockTime-minBlockTime, 0))
-		case conditionalWait:
+		case conditionalWaitToBuild:
 			// More time has passed. Allow block to be built regardless of tx count.
-			vm.mayBuildBlock = build
+			vm.mayBuildBlock = mayBuild
 		}
 		tryBuildBlock := vm.tryToBuildBlock
 		vm.buildBlockLock.Unlock()
@@ -377,7 +377,7 @@ func (vm *VM) Initialize(
 	})
 	go ctx.Log.RecoverAndPanic(vm.buildBlockTimer.Dispatch)
 
-	vm.mayBuildBlock = build
+	vm.mayBuildBlock = mayBuild
 	vm.tryToBuildBlock = true
 	vm.txPoolStabilizedOk = make(chan struct{}, 1)
 	// TODO: read size from options
@@ -455,7 +455,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 
 	vm.buildBlockLock.Lock()
 	// Specify that we should wait before trying to build another block.
-	vm.mayBuildBlock = wait
+	vm.mayBuildBlock = waitToBuild
 	vm.tryToBuildBlock = false
 	vm.awaitingBuildBlock = false
 	vm.buildBlockTimer.SetTimeoutIn(minBlockTime)
@@ -627,13 +627,13 @@ func (vm *VM) tryBlockGen() error {
 	}
 
 	switch vm.mayBuildBlock {
-	case wait: // Wait more time before notifying engine to building a block
+	case waitToBuild: // Wait more time before notifying engine to building a block
 		return nil
-	case conditionalWait: // Notify engine only if there are enough pending txs
+	case conditionalWaitToBuild: // Notify engine only if there are enough pending txs
 		if size < batchSize {
 			return nil
 		}
-	case build: // Notify engine
+	case mayBuild: // Notify engine
 	default:
 		panic(fmt.Sprintf("mayBuildBlock has unexpected value %d", vm.mayBuildBlock))
 	}
