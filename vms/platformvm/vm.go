@@ -527,7 +527,9 @@ func (vm *VM) Shutdown() error {
 			timeConnected = lastUpdated
 		}
 
-		if !timeConnected.Before(currentLocalTime) {
+		// If the current local time is before the time this peer
+		// was marked as connnected skip updating its uptime.
+		if currentLocalTime.Before(timeConnected) {
 			continue
 		}
 
