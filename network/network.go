@@ -35,7 +35,6 @@ const (
 	defaultInitialReconnectDelay                     = time.Second
 	defaultMaxReconnectDelay                         = time.Hour
 	DefaultMaxMessageSize                     uint32 = 1 << 21
-	defaultSendQueueSize                             = 1 << 10
 	defaultMaxNetworkPendingSendBytes                = 1 << 29 // 512MB
 	defaultNetworkPendingSendBytesToRateLimit        = defaultMaxNetworkPendingSendBytes / 4
 	defaultMaxClockDifference                        = time.Minute
@@ -120,7 +119,7 @@ type network struct {
 	initialReconnectDelay              time.Duration
 	maxReconnectDelay                  time.Duration
 	maxMessageSize                     int64
-	sendQueueSize                      int
+	sendQueueSize                      uint32
 	maxNetworkPendingSendBytes         int64
 	networkPendingSendBytesToRateLimit int64
 	maxClockDifference                 time.Duration
@@ -203,6 +202,7 @@ func NewDefaultNetwork(
 	disconnectedCheckFreq time.Duration,
 	disconnectedRestartTimeout time.Duration,
 	apricotPhase0Time time.Time,
+	sendQueueSize uint32,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -222,7 +222,7 @@ func NewDefaultNetwork(
 		defaultInitialReconnectDelay,
 		defaultMaxReconnectDelay,
 		DefaultMaxMessageSize,
-		defaultSendQueueSize,
+		sendQueueSize,
 		defaultMaxNetworkPendingSendBytes,
 		defaultNetworkPendingSendBytesToRateLimit,
 		defaultMaxClockDifference,
@@ -266,7 +266,7 @@ func NewNetwork(
 	initialReconnectDelay,
 	maxReconnectDelay time.Duration,
 	maxMessageSize uint32,
-	sendQueueSize int,
+	sendQueueSize uint32,
 	maxNetworkPendingSendBytes int,
 	networkPendingSendBytesToRateLimit int,
 	maxClockDifference time.Duration,
