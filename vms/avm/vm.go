@@ -1084,7 +1084,7 @@ func (vm *VM) Spend(
 // Also returns the total amount of the asset spent by these inputs.
 func spendManagedAsset(
 	assetID ids.ID,
-	assetManager *secp256k1fx.OutputOwners,
+	assetManager verify.Verifiable, // A *secp256k1fx.OutputOwners in practice
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
 	amount uint64,

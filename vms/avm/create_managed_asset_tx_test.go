@@ -11,6 +11,199 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Ensure that a CreateManagedAssetTx has 1 initial state,
+// which is a *secp256k1fx.ManagedAssetStatusOutput
+func TestManagedAssetInitialState(t *testing.T) {
+	// Setup; Initialize the VM
+	genesisBytes, _, vm, _ := GenesisVM(t)
+	ctx := vm.ctx
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
+	avaxID := genesisTx.ID()
+
+	baseTx := CreateManagedAssetTx{
+		CreateAssetTx: CreateAssetTx{
+			BaseTx: BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    networkID,
+				BlockchainID: chainID,
+				Outs: []*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: avaxID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: startBalance - testTxFee,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+						},
+					},
+				}},
+				Ins: []*avax.TransferableInput{{
+					// Creation tx paid for by keys[0] genesis balance
+					UTXOID: avax.UTXOID{
+						TxID:        avaxID,
+						OutputIndex: 2,
+					},
+					Asset: avax.Asset{ID: avaxID},
+					In: &secp256k1fx.TransferInput{
+						Amt: startBalance,
+						Input: secp256k1fx.Input{
+							SigIndices: []uint32{0},
+						},
+					},
+				}},
+			}},
+			Name:         "NormalName",
+			Symbol:       "TICK",
+			Denomination: byte(2),
+			States: []*InitialState{
+				{
+					FxID: 0,
+					Outs: []verify.State{},
+				},
+			},
+		},
+	}
+
+	type test struct {
+		description string
+		states      []*InitialState
+		shouldErr   bool
+	}
+
+	assetStatusOutput := &secp256k1fx.ManagedAssetStatusOutput{
+		Frozen: false,
+		Manager: secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
+	}
+
+	// Give tx various values for States and make sure only valid ones pass verification
+	tests := []test{
+		{
+			"nil states",
+			nil,
+			true,
+		},
+		{
+			"empty states",
+			[]*InitialState{},
+			true,
+		},
+		{
+			"nil outs",
+			[]*InitialState{
+				{
+					FxID: 0,
+					Outs: nil,
+				},
+			},
+			true,
+		},
+		{
+			"empty outs",
+			[]*InitialState{
+				{
+					FxID: 0,
+					Outs: []verify.State{},
+				},
+			},
+			true,
+		},
+		{
+			"wrong fx ID",
+			[]*InitialState{
+				{
+					FxID: 1,
+					Outs: []verify.State{assetStatusOutput},
+				},
+			},
+			true,
+		},
+		{
+			"too many outs",
+			[]*InitialState{
+				{
+					FxID: 0,
+					Outs: []verify.State{assetStatusOutput, assetStatusOutput},
+				},
+			},
+			true,
+		},
+		{
+			"wrong out type",
+			[]*InitialState{
+				{
+					FxID: 0,
+					Outs: []verify.State{&secp256k1fx.MintOutput{}},
+				},
+			},
+			true,
+		},
+		{
+			"too many initial states",
+			[]*InitialState{
+				{
+					FxID: 0,
+					Outs: []verify.State{&secp256k1fx.MintOutput{}},
+				},
+			},
+			true,
+		},
+		{
+			"valid",
+			[]*InitialState{
+				{
+					FxID: 0,
+					Outs: []verify.State{assetStatusOutput},
+				},
+			},
+			false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			unsignedTx := baseTx            // Copy
+			unsignedTx.States = test.states // Set states
+			// Initialize tx
+			tx := Tx{
+				UnsignedTx: &unsignedTx,
+			}
+
+			// Sign/initialize the transaction
+			feeSigner := []*crypto.PrivateKeySECP256K1R{keys[0]}
+			err := tx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{feeSigner})
+			require.NoError(t, err)
+
+			// Verify and accept the transaction
+			// uniqueCreateManagedAssetTx, err := vm.parseTx(createManagedAssetTx.Bytes())
+			// require.NoError(t, err)
+			// err = uniqueCreateManagedAssetTx.Verify()
+
+			err = tx.SyntacticVerify(
+				vm.ctx,
+				vm.codec,
+				currentCodecVersion,
+				vm.ctx.AVAXAssetID,
+				vm.txFee,
+				vm.creationTxFee,
+				1,
+			)
+			if test.shouldErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 // Test managed asset functionality
 func TestManagedAsset(t *testing.T) {
 	type create struct {
