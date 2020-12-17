@@ -753,7 +753,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		},
 		Name:   "test asset",
 		Symbol: "TEST",
-		MinterSets: []Owners{
+		MinterSets: []Minters{
 			{
 				Threshold: 1,
 				Minters: []string{
@@ -863,7 +863,7 @@ func TestNFTWorkflow(t *testing.T) {
 		},
 		Name:   "BIG COIN",
 		Symbol: "COIN",
-		MinterSets: []Owners{
+		MinterSets: []Minters{
 			{
 				Threshold: 1,
 				Minters: []string{

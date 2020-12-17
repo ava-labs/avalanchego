@@ -3,7 +3,7 @@ package secp256k1fx
 import "errors"
 
 var (
-	errManagerThresholdZero = errors.New("ManagedAssetStatusOutput.Manager can't be empty")
+	errManagerThresholdZero = errors.New("ManagedAssetStatusOutput.Manager.Threshold can't be 0")
 )
 
 // ManagedAssetStatusOutput represents the status of a managed asset

@@ -139,7 +139,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 						if err != nil {
 							return fmt.Errorf("problem marshaling state: %w", err)
 						}
-						owners := Owners{}
+						owners := Minters{}
 						if err := json.Unmarshal(b, &owners); err != nil {
 							return fmt.Errorf("problem unmarshaling Owners: %w", err)
 						}

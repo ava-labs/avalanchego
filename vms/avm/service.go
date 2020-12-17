@@ -392,10 +392,16 @@ type Holder struct {
 	Address string      `json:"address"`
 }
 
-// Owners describes who can perform an action
-type Owners struct {
+// Owners describes who can mint an asset
+type Minters struct {
 	Threshold json.Uint32 `json:"threshold"`
 	Minters   []string    `json:"minters"`
+}
+
+// Manager ...
+type Manager struct {
+	Threshold json.Uint32 `json:"threshold"`
+	Addrs     []string    `json:"addresses"`
 }
 
 // CreateAssetArgs are arguments for passing into CreateAsset
@@ -405,7 +411,7 @@ type CreateAssetArgs struct {
 	Symbol              string    `json:"symbol"`
 	Denomination        byte      `json:"denomination"`
 	InitialHolders      []*Holder `json:"initialHolders"`
-	MinterSets          []Owners  `json:"minterSets"`
+	MinterSets          []Minters `json:"minterSets"`
 }
 
 // AssetIDChangeAddr is an asset ID and a change address
@@ -538,12 +544,6 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 	reply.AssetID = assetID
 	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
 	return err
-}
-
-// Manager ...
-type Manager struct {
-	Threshold json.Uint32 `json:"threshold"`
-	Addrs     []string    `json:"addresses"`
 }
 
 // CreateManagedAssetArgs ...
@@ -703,10 +703,10 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateAsse
 
 // CreateNFTAssetArgs are arguments for passing into CreateNFTAsset requests
 type CreateNFTAssetArgs struct {
-	api.JSONSpendHeader          // User, password, from addrs, change addr
-	Name                string   `json:"name"`
-	Symbol              string   `json:"symbol"`
-	MinterSets          []Owners `json:"minterSets"`
+	api.JSONSpendHeader           // User, password, from addrs, change addr
+	Name                string    `json:"name"`
+	Symbol              string    `json:"symbol"`
+	MinterSets          []Minters `json:"minterSets"`
 }
 
 // CreateNFTAsset returns ID of the newly created asset

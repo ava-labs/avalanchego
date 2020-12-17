@@ -172,14 +172,14 @@ func BuildGenesisTest(tb testing.TB) []byte {
 				Symbol: "MVCA",
 				InitialState: map[string][]interface{}{
 					"variableCap": {
-						Owners{
+						Minters{
 							Threshold: 1,
 							Minters: []string{
 								addr0Str,
 								addr1Str,
 							},
 						},
-						Owners{
+						Minters{
 							Threshold: 2,
 							Minters: []string{
 								addr0Str,
@@ -194,7 +194,7 @@ func BuildGenesisTest(tb testing.TB) []byte {
 				Name: "myOtherVarCapAsset",
 				InitialState: map[string][]interface{}{
 					"variableCap": {
-						Owners{
+						Minters{
 							Threshold: 1,
 							Minters: []string{
 								addr0Str,
