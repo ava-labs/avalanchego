@@ -13,14 +13,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-func newSerializer(t *testing.T, parseTx func([]byte) (snowstorm.Tx, error)) *Serializer {
+func newSerializer(t *testing.T, parse func([]byte) (snowstorm.Tx, error)) *Serializer {
 	vm := vertex.TestVM{}
 	vm.T = t
 	vm.Default(true)
-	vm.ParseTxF = parseTx
+	vm.ParseF = parse
 
 	baseDB := memdb.New()
 	ctx := snow.DefaultContextTest()
@@ -59,23 +58,32 @@ func TestUnknownUniqueVertexErrors(t *testing.T) {
 }
 
 func TestUniqueVertexCacheHit(t *testing.T) {
-	s := newSerializer(t, nil)
-
 	testTx := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV: ids.ID{1},
 	}}
+
+	s := newSerializer(t, func(b []byte) (snowstorm.Tx, error) {
+		if !bytes.Equal(b, []byte{0}) {
+			t.Fatal("unknown tx")
+		}
+		return testTx, nil
+	})
 
 	vtxID := ids.ID{2}
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't'}
 	parentIDs := []ids.ID{parentID}
 	chainID := ids.ID{} // Same as chainID of serializer
 	height := uint64(1)
-	vtx := &innerVertex{
-		id:        vtxID,
-		parentIDs: parentIDs,
-		chainID:   chainID,
-		height:    height,
-		txs:       []snowstorm.Tx{testTx},
+	vtx, err := vertex.Build(
+		chainID,
+		height,
+		0,
+		parentIDs,
+		[][]byte{{0}},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	uVtx := &uniqueVertex{
@@ -146,18 +154,20 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 	parentIDs := []ids.ID{parentID}
 	chainID := ids.ID{}
 	height := uint64(1)
-	innerVertex := &innerVertex{
-		parentIDs: parentIDs,
-		chainID:   chainID,
-		height:    height,
-		txs:       []snowstorm.Tx{testTx},
-	}
-	vertexBytes, err := innerVertex.Marshal()
+	innerVertex, err := vertex.Build(
+		chainID,
+		height,
+		0,
+		parentIDs,
+		[][]byte{txBytes},
+		nil,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	vtxID := ids.ID(hashing.ComputeHash256Array(vertexBytes))
+	vtxID := innerVertex.ID()
+	vtxBytes := innerVertex.Bytes()
 
 	uVtx := uniqueVertex{
 		vtxID:      vtxID,
@@ -170,7 +180,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 	}
 
 	// Register cache hit
-	vtx, err := newUniqueVertex(s, vertexBytes)
+	vtx, err := newUniqueVertex(s, vtxBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +201,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 		// Call bytes first to check for regression bug
 		// where it's unsafe to call Bytes or Verify directly
 		// after calling Status to refresh a vertex
-		if !bytes.Equal(vtx.Bytes(), vertexBytes) {
+		if !bytes.Equal(vtx.Bytes(), vtxBytes) {
 			t.Fatalf("Found unexpected vertex bytes")
 		}
 
@@ -231,7 +241,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 	validateVertex(vtx, choices.Processing)
 
 	// Check that a newly parsed vertex refreshed from the cache is valid
-	vtx, err = newUniqueVertex(s, vertexBytes)
+	vtx, err = newUniqueVertex(s, vtxBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +258,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 	validateVertex(vtx, choices.Processing)
 
 	s.state.uniqueVtx.Flush()
-	vtx, err = newUniqueVertex(s, vertexBytes)
+	vtx, err = newUniqueVertex(s, vtxBytes)
 	if err != nil {
 		t.Fatal(err)
 	}

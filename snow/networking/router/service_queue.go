@@ -44,7 +44,8 @@ type multiLevelQueue struct {
 	cpuPortion    float64
 
 	// Message throttling
-	bufferSize, pendingMessages int
+	maxPendingMsgs  uint32
+	pendingMessages uint32
 
 	semaChan chan struct{}
 
@@ -60,12 +61,12 @@ func newMultiLevelQueue(
 	msgManager MsgManager,
 	consumptionRanges []float64,
 	consumptionAllotments []time.Duration,
-	bufferSize int,
+	maxPendingMsgs uint32,
 	log logging.Logger,
 	metrics *metrics,
 ) (messageQueue, chan struct{}) {
-	semaChan := make(chan struct{}, bufferSize)
-	singleLevelSize := bufferSize / len(consumptionRanges)
+	semaChan := make(chan struct{}, maxPendingMsgs)
+	singleLevelSize := int(maxPendingMsgs) / len(consumptionRanges)
 	queues := make([]singleLevelQueue, len(consumptionRanges))
 	for index := 0; index < len(queues); index++ {
 		gauge, histogram, err := metrics.registerTierStatistics(index)
@@ -82,14 +83,14 @@ func newMultiLevelQueue(
 	}
 
 	return &multiLevelQueue{
-		msgManager:    msgManager,
-		queues:        queues,
-		cpuRanges:     consumptionRanges,
-		cpuAllotments: consumptionAllotments,
-		log:           log,
-		metrics:       metrics,
-		bufferSize:    bufferSize,
-		semaChan:      semaChan,
+		msgManager:     msgManager,
+		queues:         queues,
+		cpuRanges:      consumptionRanges,
+		cpuAllotments:  consumptionAllotments,
+		log:            log,
+		metrics:        metrics,
+		maxPendingMsgs: maxPendingMsgs,
+		semaChan:       semaChan,
 	}, semaChan
 }
 
@@ -199,20 +200,13 @@ func (ml *multiLevelQueue) popMessage() (message, error) {
 func (ml *multiLevelQueue) pushMessage(msg message) bool {
 	// If the message queue is already full, skip asking
 	// the resource maanger for message space
-	if ml.pendingMessages >= ml.bufferSize {
+	if ml.pendingMessages >= ml.maxPendingMsgs {
 		ml.log.Debug("Dropped message due to a full message queue with %d messages", ml.pendingMessages)
 		ml.metrics.dropped.Inc()
 		return false
 	}
 
-	validatorID := msg.validatorID
-	if validatorID.IsZero() {
-		ml.metrics.dropped.Inc()
-		ml.log.Warn("Dropping message due to invalid validatorID")
-		return false
-	}
-
-	processing := ml.msgManager.AddPending(validatorID)
+	processing := ml.msgManager.AddPending(msg.validatorID)
 	if !processing {
 		ml.metrics.dropped.Inc()
 		ml.metrics.throttled.Inc()
@@ -223,7 +217,7 @@ func (ml *multiLevelQueue) pushMessage(msg message) bool {
 	if !ml.placeMessage(msg) {
 		ml.log.Verbo("Dropped message while attempting to place it in a queue: %s", msg)
 		ml.metrics.dropped.Inc()
-		ml.msgManager.RemovePending(validatorID)
+		ml.msgManager.RemovePending(msg.validatorID)
 		return false
 	}
 

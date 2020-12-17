@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/health"
@@ -110,6 +111,7 @@ type chain struct {
 // ManagerConfig ...
 type ManagerConfig struct {
 	StakingEnabled          bool // True iff the network has staking enabled
+	MaxPendingMsgs          uint32
 	MaxNonStakerPendingMsgs uint32
 	StakerMSGPortion        float64
 	StakerCPUPortion        float64
@@ -119,9 +121,11 @@ type ManagerConfig struct {
 	DecisionEvents          *triggers.EventDispatcher
 	ConsensusEvents         *triggers.EventDispatcher
 	DB                      database.Database
-	Router                  router.Router      // Routes incoming messages to the appropriate chain
-	Net                     network.Network    // Sends consensus messages to other validators
-	ConsensusParams         avcon.Parameters   // The consensus parameters (alpha, beta, etc.) for new chains
+	Router                  router.Router    // Routes incoming messages to the appropriate chain
+	Net                     network.Network  // Sends consensus messages to other validators
+	ConsensusParams         avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
+	EpochFirstTransition    time.Time
+	EpochDuration           time.Duration
 	Validators              validators.Manager // Validators validating on this chain
 	NodeID                  ids.ShortID        // The ID of this node
 	NetworkID               uint32             // ID of the network this node is connected to
@@ -133,7 +137,7 @@ type ManagerConfig struct {
 	CriticalChains          ids.Set          // Chains that can't exit gracefully
 	WhitelistedSubnets      ids.Set          // Subnets to validate
 	TimeoutManager          *timeout.Manager // Manages request timeouts when sending messages to other validators
-	HealthService           *health.Health
+	HealthService           health.CheckRegisterer
 }
 
 type manager struct {
@@ -237,21 +241,23 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	}
 
 	ctx := &snow.Context{
-		NetworkID:           m.NetworkID,
-		SubnetID:            chainParams.SubnetID,
-		ChainID:             chainParams.ID,
-		NodeID:              m.NodeID,
-		XChainID:            m.XChainID,
-		AVAXAssetID:         m.AVAXAssetID,
-		Log:                 chainLog,
-		DecisionDispatcher:  m.DecisionEvents,
-		ConsensusDispatcher: m.ConsensusEvents,
-		Keystore:            m.Keystore.NewBlockchainKeyStore(chainParams.ID),
-		SharedMemory:        m.AtomicMemory.NewSharedMemory(chainParams.ID),
-		BCLookup:            m,
-		SNLookup:            m,
-		Namespace:           fmt.Sprintf("%s_%s_vm", constants.PlatformName, primaryAlias),
-		Metrics:             m.ConsensusParams.Metrics,
+		NetworkID:            m.NetworkID,
+		SubnetID:             chainParams.SubnetID,
+		ChainID:              chainParams.ID,
+		NodeID:               m.NodeID,
+		XChainID:             m.XChainID,
+		AVAXAssetID:          m.AVAXAssetID,
+		Log:                  chainLog,
+		DecisionDispatcher:   m.DecisionEvents,
+		ConsensusDispatcher:  m.ConsensusEvents,
+		Keystore:             m.Keystore.NewBlockchainKeyStore(chainParams.ID),
+		SharedMemory:         m.AtomicMemory.NewSharedMemory(chainParams.ID),
+		BCLookup:             m,
+		SNLookup:             m,
+		Namespace:            fmt.Sprintf("%s_%s_vm", constants.PlatformName, primaryAlias),
+		Metrics:              m.ConsensusParams.Metrics,
+		EpochFirstTransition: m.EpochFirstTransition,
+		EpochDuration:        m.EpochDuration,
 	}
 
 	// Get a factory for the vm we want to use on our chain
@@ -474,7 +480,7 @@ func (m *manager) createAvalancheChain(
 		engine,
 		validators,
 		msgChan,
-		defaultChannelSize,
+		m.MaxPendingMsgs,
 		m.MaxNonStakerPendingMsgs,
 		m.StakerMSGPortion,
 		m.StakerCPUPortion,
@@ -561,7 +567,7 @@ func (m *manager) createSnowmanChain(
 		engine,
 		validators,
 		msgChan,
-		defaultChannelSize,
+		m.MaxPendingMsgs,
 		m.MaxNonStakerPendingMsgs,
 		m.StakerMSGPortion,
 		m.StakerCPUPortion,

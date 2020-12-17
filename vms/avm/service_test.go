@@ -115,7 +115,7 @@ func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numT
 
 	// Key: Address
 	// Value: AVAX balance
-	balances := map[[20]byte]int{}
+	balances := map[ids.ShortID]int{}
 
 	for _, addr := range addrs { // get balances for all addresses
 		addrStr, err := s.vm.FormatLocalAddress(addr)
@@ -133,12 +133,12 @@ func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numT
 		if err != nil {
 			return fmt.Errorf("couldn't get balance of %s: %w", addr, err)
 		}
-		balances[addr.Key()] = int(reply.Balance)
+		balances[addr] = int(reply.Balance)
 	}
 
 	fromAddrsTotalBalance := 0
 	for _, addr := range fromAddrs {
-		fromAddrsTotalBalance += balances[addr.Key()]
+		fromAddrsTotalBalance += balances[addr]
 	}
 
 	if fromAddrsTotalBalance != fromAddrsStartBalance-totalTxFee {
@@ -732,15 +732,15 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	}()
 
 	reply := AssetIDChangeAddr{}
-	addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
-	if err != nil {
-		t.Fatal(err)
-	}
-	changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
+	minterAddrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
+	changeAddrStr := fromAddrsStr[0]
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	err = s.CreateVariableCapAsset(nil, &CreateAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
@@ -757,7 +757,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 			{
 				Threshold: 1,
 				Minters: []string{
-					addrStr,
+					minterAddrStr,
 				},
 			},
 		},
@@ -791,7 +791,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		},
 		Amount:  200,
 		AssetID: createdAssetID,
-		To:      addrStr,
+		To:      minterAddrStr, // Send newly minted tokens to this address
 	}
 	mintReply := &api.JSONTxIDChangeAddr{}
 	if err := s.Mint(nil, mintArgs, mintReply); err != nil {
@@ -818,13 +818,13 @@ func TestCreateVariableCapAsset(t *testing.T) {
 				Username: username,
 				Password: password,
 			},
-			JSONFromAddrs:  api.JSONFromAddrs{From: fromAddrsStr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: []string{minterAddrStr}},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
 		SendOutput: SendOutput{
 			Amount:  200,
 			AssetID: createdAssetID,
-			To:      addrStr,
+			To:      fromAddrsStr[0],
 		},
 	}
 	sendReply := &api.JSONTxIDChangeAddr{}
@@ -1201,7 +1201,7 @@ func TestSendMultiple(t *testing.T) {
 		t.Fatal("Transaction ID returned by SendMultiple does not match the transaction found in vm's pending transactions")
 	}
 
-	if _, err = vm.GetTx(reply.TxID); err != nil {
+	if _, err = vm.Get(reply.TxID); err != nil {
 		t.Fatalf("Failed to retrieve created transaction: %s", err)
 	}
 }

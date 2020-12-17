@@ -89,6 +89,11 @@ func (vm *VMClient) Initialize(
 		return errUnsupportedFXs
 	}
 
+	epochFirstTransitionBytes, err := ctx.EpochFirstTransition.MarshalBinary()
+	if err != nil {
+		return err
+	}
+
 	vm.ctx = ctx
 
 	vm.db = rpcdb.NewServer(db)
@@ -123,19 +128,21 @@ func (vm *VMClient) Initialize(
 	go vm.broker.AcceptAndServe(snLookupBrokerID, vm.startSNLookupServer)
 
 	resp, err := vm.client.Initialize(context.Background(), &vmproto.InitializeRequest{
-		NetworkID:          ctx.NetworkID,
-		SubnetID:           ctx.SubnetID[:],
-		ChainID:            ctx.ChainID[:],
-		NodeID:             ctx.NodeID.Bytes(),
-		XChainID:           ctx.XChainID[:],
-		AvaxAssetID:        ctx.AVAXAssetID[:],
-		GenesisBytes:       genesisBytes,
-		DbServer:           dbBrokerID,
-		EngineServer:       messengerBrokerID,
-		KeystoreServer:     keystoreBrokerID,
-		SharedMemoryServer: sharedMemoryBrokerID,
-		BcLookupServer:     bcLookupBrokerID,
-		SnLookupServer:     snLookupBrokerID,
+		NetworkID:            ctx.NetworkID,
+		SubnetID:             ctx.SubnetID[:],
+		ChainID:              ctx.ChainID[:],
+		NodeID:               ctx.NodeID.Bytes(),
+		XChainID:             ctx.XChainID[:],
+		AvaxAssetID:          ctx.AVAXAssetID[:],
+		GenesisBytes:         genesisBytes,
+		DbServer:             dbBrokerID,
+		EngineServer:         messengerBrokerID,
+		KeystoreServer:       keystoreBrokerID,
+		SharedMemoryServer:   sharedMemoryBrokerID,
+		BcLookupServer:       bcLookupBrokerID,
+		SnLookupServer:       snLookupBrokerID,
+		EpochFirstTransition: epochFirstTransitionBytes,
+		EpochDuration:        uint64(ctx.EpochDuration),
 	})
 	if err != nil {
 		return err

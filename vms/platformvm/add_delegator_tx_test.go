@@ -67,32 +67,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
 
-	// Case: Missing Node ID
-	tx, err = vm.newAddDelegatorTx(
-		vm.minDelegatorStake,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateEndTime.Unix()),
-		nodeID,
-		rewardAddress,
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-		ids.ShortEmpty, // change addr
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.UnsignedTx.(*UnsignedAddDelegatorTx).Validator.NodeID = ids.ShortID{}
-	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
-		vm.Ctx,
-		vm.codec,
-		vm.minDelegatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-	); err == nil {
-		t.Fatal("should have errored because NodeID is nil")
-	}
-
 	// Case: Not enough weight
 	tx, err = vm.newAddDelegatorTx(
 		vm.minDelegatorStake,

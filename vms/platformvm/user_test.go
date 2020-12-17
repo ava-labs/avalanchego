@@ -70,16 +70,6 @@ func TestUserNilSK(t *testing.T) {
 	assert.Error(t, err, "nil key should have caused an error")
 }
 
-func TestUserNilAddress(t *testing.T) {
-	u := user{db: memdb.New()}
-
-	_, err := u.controlsAddress(ids.ShortID{})
-	assert.Error(t, err, "nil address should have caused an error")
-
-	_, err = u.getKey(ids.ShortID{})
-	assert.Error(t, err, "nil address should have caused an error")
-}
-
 func TestUser(t *testing.T) {
 	u := user{db: memdb.New()}
 
@@ -109,6 +99,5 @@ func TestUser(t *testing.T) {
 	assert.Len(t, addresses, 1, "address should have been added")
 
 	savedAddr := addresses[0]
-	equals := addr.Equals(savedAddr)
-	assert.True(t, equals, "saved address should match provided address")
+	assert.Equal(t, addr, savedAddr, "saved address should match provided address")
 }

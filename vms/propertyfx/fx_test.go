@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -25,7 +25,7 @@ var (
 		0x35, 0xbd, 0xcb, 0x29, 0x3a, 0xd1, 0x49, 0x32,
 		0x00,
 	}
-	addrBytes = [hashing.AddrLen]byte{
+	addr = [hashing.AddrLen]byte{
 		0x01, 0x5c, 0xce, 0x6c, 0x55, 0xd6, 0xb5, 0x09,
 		0x84, 0x5c, 0x8c, 0x4e, 0x30, 0xbe, 0xd9, 0x8d,
 		0x39, 0x1a, 0xe7, 0xf0,
@@ -34,7 +34,7 @@ var (
 
 func TestFxInitialize(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	fx := Fx{}
@@ -54,7 +54,7 @@ func TestFxInitializeInvalid(t *testing.T) {
 
 func TestFxVerifyMintOperation(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -75,7 +75,7 @@ func TestFxVerifyMintOperation(t *testing.T) {
 	utxo := &MintOutput{OutputOwners: secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			ids.NewShortID(addrBytes),
+			addr,
 		},
 	}}
 	op := &MintOperation{
@@ -85,7 +85,7 @@ func TestFxVerifyMintOperation(t *testing.T) {
 		MintOutput: MintOutput{OutputOwners: secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+				addr,
 			},
 		}},
 	}
@@ -98,7 +98,7 @@ func TestFxVerifyMintOperation(t *testing.T) {
 
 func TestFxVerifyMintOperationWrongTx(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -116,7 +116,7 @@ func TestFxVerifyMintOperationWrongTx(t *testing.T) {
 	utxo := &MintOutput{OutputOwners: secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			ids.NewShortID(addrBytes),
+			addr,
 		},
 	}}
 	op := &MintOperation{
@@ -133,7 +133,7 @@ func TestFxVerifyMintOperationWrongTx(t *testing.T) {
 
 func TestFxVerifyMintOperationWrongNumberUTXOs(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -165,7 +165,7 @@ func TestFxVerifyMintOperationWrongNumberUTXOs(t *testing.T) {
 
 func TestFxVerifyMintOperationWrongCredential(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -181,7 +181,7 @@ func TestFxVerifyMintOperationWrongCredential(t *testing.T) {
 	utxo := &MintOutput{OutputOwners: secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			ids.NewShortID(addrBytes),
+			addr,
 		},
 	}}
 	op := &MintOperation{
@@ -198,7 +198,7 @@ func TestFxVerifyMintOperationWrongCredential(t *testing.T) {
 
 func TestFxVerifyMintOperationInvalidUTXO(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -230,7 +230,7 @@ func TestFxVerifyMintOperationInvalidUTXO(t *testing.T) {
 
 func TestFxVerifyMintOperationFailingVerification(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -251,7 +251,7 @@ func TestFxVerifyMintOperationFailingVerification(t *testing.T) {
 	utxo := &MintOutput{OutputOwners: secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			ids.NewShortID(addrBytes),
+			addr,
 			ids.ShortEmpty,
 		},
 	}}
@@ -269,7 +269,7 @@ func TestFxVerifyMintOperationFailingVerification(t *testing.T) {
 
 func TestFxVerifyMintOperationInvalidGroupID(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -290,7 +290,7 @@ func TestFxVerifyMintOperationInvalidGroupID(t *testing.T) {
 	utxo := &MintOutput{OutputOwners: secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			ids.NewShortID(addrBytes),
+			addr,
 		},
 	}}
 	op := &MintOperation{
@@ -307,7 +307,7 @@ func TestFxVerifyMintOperationInvalidGroupID(t *testing.T) {
 
 func TestFxVerifyTransferOperation(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -328,7 +328,7 @@ func TestFxVerifyTransferOperation(t *testing.T) {
 	utxo := &OwnedOutput{OutputOwners: secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			ids.NewShortID(addrBytes),
+			addr,
 		},
 	}}
 	op := &BurnOperation{Input: secp256k1fx.Input{
@@ -343,7 +343,7 @@ func TestFxVerifyTransferOperation(t *testing.T) {
 
 func TestFxVerifyTransferOperationWrongUTXO(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -374,7 +374,7 @@ func TestFxVerifyTransferOperationWrongUTXO(t *testing.T) {
 func TestFxVerifyTransferOperationFailedVerify(t *testing.T) {
 
 	vm := secp256k1fx.TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -395,7 +395,7 @@ func TestFxVerifyTransferOperationFailedVerify(t *testing.T) {
 	utxo := &OwnedOutput{OutputOwners: secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			ids.NewShortID(addrBytes),
+			addr,
 		},
 	}}
 	op := &BurnOperation{Input: secp256k1fx.Input{
@@ -410,7 +410,7 @@ func TestFxVerifyTransferOperationFailedVerify(t *testing.T) {
 
 func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -431,7 +431,7 @@ func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 	utxo := &OwnedOutput{OutputOwners: secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			ids.NewShortID(addrBytes),
+			addr,
 		},
 	}}
 
@@ -443,7 +443,7 @@ func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 
 func TestFxVerifyTransfer(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)

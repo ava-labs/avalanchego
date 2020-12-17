@@ -11,8 +11,8 @@ import (
 func TestShortSetContains(t *testing.T) {
 	set := ShortSet{}
 
-	id0 := NewShortID([20]byte{0})
-	id1 := NewShortID([20]byte{1})
+	id0 := ShortID{0}
+	id1 := ShortID{1}
 
 	switch {
 	case set.Contains(id0):
@@ -62,8 +62,8 @@ func TestShortSetUnion(t *testing.T) {
 	set := ShortSet{}
 	unionSet := ShortSet{}
 
-	id0 := NewShortID([20]byte{0})
-	id1 := NewShortID([20]byte{1})
+	id0 := ShortID{0}
+	id1 := ShortID{1}
 
 	unionSet.Add(id0)
 	set.Union(unionSet)
@@ -115,7 +115,7 @@ func TestShortSetEquals(t *testing.T) {
 		t.Fatal("Empty sets should be equal")
 	}
 
-	set.Add(NewShortID([20]byte{1, 2, 3, 4, 5}))
+	set.Add(ShortID{1, 2, 3, 4, 5})
 	if set.Equals(otherSet) {
 		t.Fatal("Sets should be unequal")
 	}
@@ -123,7 +123,7 @@ func TestShortSetEquals(t *testing.T) {
 		t.Fatal("Sets should be unequal")
 	}
 
-	otherSet.Add(NewShortID([20]byte{1, 2, 3, 4, 5}))
+	otherSet.Add(ShortID{1, 2, 3, 4, 5})
 	if !set.Equals(otherSet) {
 		t.Fatal("sets should be equal")
 	}
@@ -131,7 +131,7 @@ func TestShortSetEquals(t *testing.T) {
 		t.Fatal("sets should be equal")
 	}
 
-	otherSet.Add(NewShortID([20]byte{6, 7, 8, 9, 10}))
+	otherSet.Add(ShortID{6, 7, 8, 9, 10})
 	if set.Equals(otherSet) {
 		t.Fatal("Sets should be unequal")
 	}
@@ -139,7 +139,7 @@ func TestShortSetEquals(t *testing.T) {
 		t.Fatal("Sets should be unequal")
 	}
 
-	set.Add(NewShortID([20]byte{6, 7, 8, 9, 10}))
+	set.Add(ShortID{6, 7, 8, 9, 10})
 	if !set.Equals(otherSet) {
 		t.Fatal("sets should be equal")
 	}
@@ -147,7 +147,7 @@ func TestShortSetEquals(t *testing.T) {
 		t.Fatal("sets should be equal")
 	}
 
-	otherSet.Add(NewShortID([20]byte{11, 12, 13, 14, 15}))
+	otherSet.Add(ShortID{11, 12, 13, 14, 15})
 	if set.Equals(otherSet) {
 		t.Fatal("Sets should be unequal")
 	}
@@ -155,7 +155,7 @@ func TestShortSetEquals(t *testing.T) {
 		t.Fatal("Sets should be unequal")
 	}
 
-	set.Add(NewShortID([20]byte{11, 12, 13, 14, 16}))
+	set.Add(ShortID{11, 12, 13, 14, 16})
 	if set.Equals(otherSet) {
 		t.Fatal("Sets should be unequal")
 	}
@@ -168,8 +168,8 @@ func TestShortSetList(t *testing.T) {
 	set := ShortSet{}
 	otherSet := ShortSet{}
 
-	id0 := NewShortID([20]byte{0})
-	id1 := NewShortID([20]byte{1})
+	id0 := ShortID{0}
+	id1 := ShortID{1}
 
 	set.Add(id0)
 	otherSet.Add(set.List()...)
@@ -202,11 +202,11 @@ func TestShortSetCappedList(t *testing.T) {
 		t.Fatalf("List should have been empty but was %v", list)
 	} else if list := set.CappedList(1); len(list) != 1 {
 		t.Fatalf("List should have had length %d but had %d", 1, len(list))
-	} else if returnedID := list[0]; !id.Equals(returnedID) {
+	} else if returnedID := list[0]; id != returnedID {
 		t.Fatalf("List should have been %s but was %s", id, returnedID)
 	} else if list := set.CappedList(2); len(list) != 1 {
 		t.Fatalf("List should have had length %d but had %d", 1, len(list))
-	} else if returnedID := list[0]; !id.Equals(returnedID) {
+	} else if returnedID := list[0]; id != returnedID {
 		t.Fatalf("List should have been %s but was %s", id, returnedID)
 	}
 }
@@ -214,8 +214,8 @@ func TestShortSetCappedList(t *testing.T) {
 func TestShortSetString(t *testing.T) {
 	set := ShortSet{}
 
-	id0 := NewShortID([20]byte{0})
-	id1 := NewShortID([20]byte{1})
+	id0 := ShortID{0}
+	id1 := ShortID{1}
 
 	if str := set.String(); str != "{}" {
 		t.Fatalf("Set should have been %s but was %s", "{}", str)

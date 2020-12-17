@@ -42,15 +42,19 @@ type Config struct {
 	DB database.Database
 
 	// Staking configuration
-	StakingIP               utils.DynamicIPDesc
-	EnableP2PTLS            bool
-	EnableStaking           bool
-	StakingKeyFile          string
-	StakingCertFile         string
-	DisabledStakingWeight   uint64
-	MaxNonStakerPendingMsgs uint
+	StakingIP             utils.DynamicIPDesc
+	EnableP2PTLS          bool
+	EnableStaking         bool
+	StakingKeyFile        string
+	StakingCertFile       string
+	DisabledStakingWeight uint64
+
+	// Throttling
+	MaxNonStakerPendingMsgs uint32
 	StakerMSGPortion        float64
 	StakerCPUPortion        float64
+	SendQueueSize           uint32
+	MaxPendingMsgs          uint32
 
 	// Network configuration
 	NetworkConfig timer.AdaptiveTimeoutConfig

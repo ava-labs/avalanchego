@@ -15,6 +15,9 @@ import (
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -23,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -132,8 +134,8 @@ func (vm *VM) Initialize(
 
 	vm.pubsub = cjson.NewPubSubServer(ctx)
 
-	genesisCodec := codec.New(codec.DefaultTagName, 1<<20)
-	c := codec.NewDefault()
+	genesisCodec := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
+	c := linearcodec.NewDefault()
 
 	vm.genesisCodec = codec.NewManager(math.MaxInt32)
 	vm.codec = codec.NewDefaultManager()
@@ -178,7 +180,7 @@ func (vm *VM) Initialize(
 			Fx: fx,
 		}
 		vm.codecRegistry = &codecRegistry{
-			codecs:      []codec.Codec{genesisCodec, c},
+			codecs:      []codec.Registry{genesisCodec, c},
 			index:       i,
 			typeToIndex: vm.typeToFxIndex,
 		}
@@ -309,9 +311,9 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	}
 }
 
-// PendingTxs implements the avalanche.DAGVM interface
-func (vm *VM) PendingTxs() []snowstorm.Tx {
-	vm.metrics.numPendingTxsCalls.Inc()
+// Pending implements the avalanche.DAGVM interface
+func (vm *VM) Pending() []snowstorm.Tx {
+	vm.metrics.numPendingCalls.Inc()
 
 	vm.timer.Cancel()
 
@@ -320,16 +322,16 @@ func (vm *VM) PendingTxs() []snowstorm.Tx {
 	return txs
 }
 
-// ParseTx implements the avalanche.DAGVM interface
-func (vm *VM) ParseTx(b []byte) (snowstorm.Tx, error) {
-	vm.metrics.numParseTxCalls.Inc()
+// Parse implements the avalanche.DAGVM interface
+func (vm *VM) Parse(b []byte) (snowstorm.Tx, error) {
+	vm.metrics.numParseCalls.Inc()
 
 	return vm.parseTx(b)
 }
 
-// GetTx implements the avalanche.DAGVM interface
-func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
-	vm.metrics.numGetTxCalls.Inc()
+// Get implements the avalanche.DAGVM interface
+func (vm *VM) Get(txID ids.ID) (snowstorm.Tx, error) {
+	vm.metrics.numGetCalls.Inc()
 
 	tx := &UniqueTx{
 		vm:   vm,

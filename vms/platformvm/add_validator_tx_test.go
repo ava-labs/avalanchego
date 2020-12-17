@@ -76,36 +76,6 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
 
-	// Case: Node ID is nil
-	tx, err = vm.newAddValidatorTx(
-		vm.minValidatorStake,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateEndTime.Unix()),
-		nodeID,
-		nodeID,
-		PercentDenominator,
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-		ids.ShortEmpty, // change addr
-
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).Validator.NodeID = ids.ShortID{ID: nil}
-	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
-		vm.Ctx,
-		vm.codec,
-		vm.minValidatorStake,
-		vm.maxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err == nil {
-		t.Fatal("should have errored because node ID is nil")
-	}
-
 	// Case: Stake owner has no addresses
 	tx, err = vm.newAddValidatorTx(
 		vm.minValidatorStake,

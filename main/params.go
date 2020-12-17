@@ -167,6 +167,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Uint(maxNonStakerPendingMsgsKey, uint(router.DefaultMaxNonStakerPendingMsgs), "Maximum number of messages a non-staker is allowed to have pending.")
 	fs.Float64(stakerMsgReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain message queue's space for stakers.")
 	fs.Float64(stakerCPUReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain's CPU time for stakers.")
+	fs.Uint(maxPendingMsgsKey, 1024, "Maximum number of pending messages. Messages after this will be dropped.")
 
 	// Network Timeouts:
 	fs.Duration(networkInitialTimeoutKey, 5*time.Second, "Initial timeout value of the adaptive timeout manager, in nanoseconds.")
@@ -174,6 +175,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Duration(networkMaximumTimeoutKey, 10*time.Second, "Maximum timeout value of the adaptive timeout manager, in nanoseconds.")
 	fs.Duration(networkTimeoutIncreaseKey, 60*time.Millisecond, "Increase of network timeout after a failed request, in nanoseconds.")
 	fs.Duration(networkTimeoutReductionKey, 12*time.Millisecond, "Decrease of network timeout after a successful request, in nanoseconds.")
+	fs.Uint(sendQueueSizeKey, 1<<10, "Max number of messages waiting to be sent to peers.")
 
 	// Benchlist Parameters:
 	fs.Int(benchlistFailThresholdKey, 10, "Number of consecutive failed queries before benchlisting a node.")
@@ -197,6 +199,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Int(snowAvalancheNumParentsKey, 5, "Number of vertexes for reference from each new vertex")
 	fs.Int(snowAvalancheBatchSizeKey, 30, "Number of operations to batch in each new vertex")
 	fs.Int(snowConcurrentRepollsKey, 4, "Minimum number of concurrent polls for finalizing consensus")
+	fs.Int64(snowEpochFirstTransition, 1607626800, "Unix timestamp of the first epoch transaction, in seconds. Defaults to 12/10/2020 @ 7:00pm (UTC)")
+	fs.Duration(snowEpochDuration, 6*time.Hour, "Duration of each epoch")
 
 	// Enable/Disable APIs:
 	fs.Bool(adminAPIEnabledKey, false, "If true, this node exposes the Admin API")
@@ -457,7 +461,7 @@ func setNodeConfig(v *viper.Viper) error {
 		}
 	} else {
 		for _, peer := range Config.BootstrapPeers {
-			peer.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(peer.IP.String())))
+			peer.ID = ids.ShortID(hashing.ComputeHash160Array([]byte(peer.IP.String())))
 		}
 	}
 
@@ -537,9 +541,14 @@ func setNodeConfig(v *viper.Viper) error {
 	}
 
 	// Throttling
-	Config.MaxNonStakerPendingMsgs = v.GetUint(maxNonStakerPendingMsgsKey)
+	Config.MaxNonStakerPendingMsgs = v.GetUint32(maxNonStakerPendingMsgsKey)
 	Config.StakerMSGPortion = v.GetFloat64(stakerMsgReservedKey)
 	Config.StakerCPUPortion = v.GetFloat64(stakerCPUReservedKey)
+	Config.SendQueueSize = v.GetUint32(sendQueueSizeKey)
+	Config.MaxPendingMsgs = v.GetUint32(maxPendingMsgsKey)
+	if Config.MaxPendingMsgs < Config.MaxNonStakerPendingMsgs {
+		return errors.New("maximum pending messages must be >= maximum non-staker pending messages")
+	}
 
 	// Network Timeout
 	Config.NetworkConfig.InitialTimeout = v.GetDuration(networkInitialTimeoutKey)
@@ -595,7 +604,6 @@ func setNodeConfig(v *viper.Viper) error {
 
 	// Network Parameters
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
-
 		txFee := v.GetUint64(txFeeKey)
 		creationTxFee := v.GetUint64(creationTxFeeKey)
 		uptimeRequirement := v.GetFloat64(uptimeRequirementKey)
@@ -629,6 +637,9 @@ func setNodeConfig(v *viper.Viper) error {
 		if Config.StakeMintingPeriod < Config.MaxStakeDuration {
 			return errors.New("stake minting period can't be less than max stake duration")
 		}
+
+		Config.EpochFirstTransition = time.Unix(v.GetInt64(snowEpochFirstTransition), 0)
+		Config.EpochDuration = v.GetDuration(snowEpochDuration)
 	} else {
 		Config.Params = *genesis.GetParams(networkID)
 	}
