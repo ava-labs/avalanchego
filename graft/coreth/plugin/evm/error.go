@@ -3,7 +3,7 @@
 
 package evm
 
-// TxError provides the ability for errors to be distinguished as permenant or
+// TxError provides the ability for errors to be distinguished as permanent or
 // temporary
 type TxError interface {
 	error

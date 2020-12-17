@@ -19,7 +19,6 @@ package node
 import (
 	"context"
 	"fmt"
-	//"strings"
 
 	"github.com/ava-labs/coreth/internal/debug"
 	"github.com/ava-labs/coreth/rpc"

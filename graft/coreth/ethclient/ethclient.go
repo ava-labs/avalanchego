@@ -324,13 +324,13 @@ func toBlockNumArg(number *big.Int) string {
 	return hexutil.EncodeBig(number)
 }
 
-type rpcProgress struct {
-	StartingBlock hexutil.Uint64
-	CurrentBlock  hexutil.Uint64
-	HighestBlock  hexutil.Uint64
-	PulledStates  hexutil.Uint64
-	KnownStates   hexutil.Uint64
-}
+// type rpcProgress struct {
+// 	StartingBlock hexutil.Uint64
+// 	CurrentBlock  hexutil.Uint64
+// 	HighestBlock  hexutil.Uint64
+// 	PulledStates  hexutil.Uint64
+// 	KnownStates   hexutil.Uint64
+// }
 
 // SyncProgress retrieves the current progress of the sync algorithm. If there's
 // no sync currently running, it returns nil.
