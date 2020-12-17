@@ -6,6 +6,17 @@ import (
 	"testing"
 )
 
+type TestStruct struct {
+	key   []byte
+	value []byte
+}
+
+type ScenarioTestStruct struct {
+	name    string
+	putData []TestStruct
+	delData []TestStruct
+}
+
 func TestTree_Put(t *testing.T) {
 	tests := []struct {
 		key   []byte
@@ -71,35 +82,119 @@ func TestTree_Del(t *testing.T) {
 
 }
 
-func TestTree_PutDelPutDel(t *testing.T) {
-	tests := []struct {
-		key   []byte
-		value []byte
-	}{
-		{[]byte{1, 1, 2}, []byte{1, 1, 2}},
-		{[]byte{1, 2, 3}, []byte{1, 2, 3}},
-		{[]byte{1, 2, 4}, []byte{1, 2, 4}},
-		{[]byte{8, 4, 4}, []byte{8, 4, 4}},
-		{[]byte{8, 3, 5}, []byte{8, 3, 5}},
-		{[]byte{8, 4, 6}, []byte{8, 4, 6}},
-	}
+func TestTree_Put_Scenarios(t *testing.T) {
 
-	tree := NewTree()
+	tests := []ScenarioTestStruct{
+		{
+			name: "OneBranch",
+			putData: []TestStruct{
+				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}},
+				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}},
+			},
+		},
+		{
+			name: "TwoBranches",
+			putData: []TestStruct{
+				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}},
+				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}},
+				{key: []byte{1, 2, 2}, value: []byte{1, 2, 2}},
+			},
+		},
+	}
 
 	for _, test := range tests {
-		tree.Put(test.key, test.value)
+		t.Run(test.name, func(t *testing.T) {
+			tree := NewTree()
+
+			for _, entry := range test.putData {
+				tree.Put(entry.key, entry.value)
+			}
+
+			for _, entry := range test.putData {
+				val, ok := tree.Get(entry.key)
+				if !ok {
+					t.Fatalf("unable to fetch %v", entry)
+				}
+				if !bytes.Equal(entry.value, val) {
+					t.Fatalf("fetched wrong val - expected: %v got: %v", entry.value, val)
+				}
+			}
+		})
+	}
+}
+
+func TestTree_Del_Scenarios(t *testing.T) {
+
+	tests := []ScenarioTestStruct{
+		{
+			name: "One Branch Revert Deletion",
+			putData: []TestStruct{
+				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}},
+				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}},
+			},
+			delData: []TestStruct{
+				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}},
+				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}},
+			},
+		},
+		{
+			name: "Two Branch Revert Deletion",
+			putData: []TestStruct{
+				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}},
+				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}},
+				{key: []byte{1, 2, 2}, value: []byte{1, 2, 2}},
+			},
+			delData: []TestStruct{
+				{key: []byte{1, 2, 2}, value: []byte{1, 2, 2}},
+				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}},
+				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}},
+			},
+		},
+		{
+			name: "Remove middle Branch",
+			putData: []TestStruct{
+				{key: []byte{1, 1, 1, 1}, value: []byte{1, 1, 1, 1}},
+				{key: []byte{1, 1, 1, 2}, value: []byte{1, 1, 1, 1}}, // has 1 branch at 1,1,1
+				{key: []byte{1, 1, 2, 0}, value: []byte{1, 1, 1, 1}}, // has another branch at 1,1
+				{key: []byte{1, 1, 2, 1}, value: []byte{1, 1, 1, 1}},
+				{key: []byte{1, 2, 0, 0}, value: []byte{1, 1, 1, 1}}, // has another branch at 1
+				{key: []byte{1, 3, 3, 3}, value: []byte{1, 1, 1, 1}},
+			},
+			delData: []TestStruct{
+				{key: []byte{1, 2, 0, 0}, value: []byte{1, 1, 1, 1}},
+				{key: []byte{1, 3, 3, 3}, value: []byte{1, 1, 1, 1}}, // deletes the 1,1 branch -
+				{key: []byte{1, 1, 1, 1}, value: []byte{1, 1, 1, 1}}, // TODO add a way to check # of branches + nodes
+				{key: []byte{1, 1, 1, 2}, value: []byte{1, 1, 1, 1}},
+				{key: []byte{1, 1, 2, 0}, value: []byte{1, 1, 1, 1}},
+				{key: []byte{1, 1, 2, 1}, value: []byte{1, 1, 1, 1}},
+			},
+		},
 	}
 
-	tree.PrintTree()
-	fmt.Printf("Full Tree -\n\n")
 	for _, test := range tests {
-		deleted := tree.Del(test.key)
-		if !deleted {
-			t.Fatalf("value not deleted in the tree as it was not found- %v", test.key)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			tree := NewTree()
 
-		tree.PrintTree()
-		fmt.Printf("deleted - %v\n\n", test.key)
+			for _, entry := range test.putData {
+				tree.Put(entry.key, entry.value)
+			}
+
+			for _, entry := range test.putData {
+				val, ok := tree.Get(entry.key)
+				if !ok {
+					t.Fatalf("unable to fetch %v", entry)
+				}
+				if !bytes.Equal(entry.value, val) {
+					t.Fatalf("fetched wrong val - expected: %v got: %v", entry.value, val)
+				}
+			}
+
+			for _, entry := range test.delData {
+				ok := tree.Del(entry.key)
+				if !ok {
+					t.Fatalf("unable to delete %v", entry)
+				}
+			}
+		})
 	}
-
 }
