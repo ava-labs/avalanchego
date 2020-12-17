@@ -44,7 +44,7 @@ type multiLevelQueue struct {
 	cpuPortion    float64
 
 	// Message throttling
-	bufferSize      uint32
+	maxPendingMsgs  uint32
 	pendingMessages uint32
 
 	semaChan chan struct{}
@@ -61,12 +61,12 @@ func newMultiLevelQueue(
 	msgManager MsgManager,
 	consumptionRanges []float64,
 	consumptionAllotments []time.Duration,
-	bufferSize uint32,
+	maxPendingMsgs uint32,
 	log logging.Logger,
 	metrics *metrics,
 ) (messageQueue, chan struct{}) {
-	semaChan := make(chan struct{}, bufferSize)
-	singleLevelSize := int(bufferSize) / len(consumptionRanges)
+	semaChan := make(chan struct{}, maxPendingMsgs)
+	singleLevelSize := int(maxPendingMsgs) / len(consumptionRanges)
 	queues := make([]singleLevelQueue, len(consumptionRanges))
 	for index := 0; index < len(queues); index++ {
 		gauge, histogram, err := metrics.registerTierStatistics(index)
@@ -83,14 +83,14 @@ func newMultiLevelQueue(
 	}
 
 	return &multiLevelQueue{
-		msgManager:    msgManager,
-		queues:        queues,
-		cpuRanges:     consumptionRanges,
-		cpuAllotments: consumptionAllotments,
-		log:           log,
-		metrics:       metrics,
-		bufferSize:    bufferSize,
-		semaChan:      semaChan,
+		msgManager:     msgManager,
+		queues:         queues,
+		cpuRanges:      consumptionRanges,
+		cpuAllotments:  consumptionAllotments,
+		log:            log,
+		metrics:        metrics,
+		maxPendingMsgs: maxPendingMsgs,
+		semaChan:       semaChan,
 	}, semaChan
 }
 
@@ -200,7 +200,7 @@ func (ml *multiLevelQueue) popMessage() (message, error) {
 func (ml *multiLevelQueue) pushMessage(msg message) bool {
 	// If the message queue is already full, skip asking
 	// the resource maanger for message space
-	if ml.pendingMessages >= ml.bufferSize {
+	if ml.pendingMessages >= ml.maxPendingMsgs {
 		ml.log.Debug("Dropped message due to a full message queue with %d messages", ml.pendingMessages)
 		ml.metrics.dropped.Inc()
 		return false
