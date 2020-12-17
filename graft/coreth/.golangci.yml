@@ -19,9 +19,7 @@ linters:
     - govet
     - ineffassign
     - misspell
-    # - staticcheck
     - unconvert
-    # - unused
     - varcheck
 
 linters-settings:

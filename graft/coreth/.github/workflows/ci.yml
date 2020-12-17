@@ -3,7 +3,7 @@ on: [pull_request, push]
 
 jobs:
   lint:
-    name: Golang v${{ matrix.go }} (${{ matrix.os }})
+    name: Lint Golang v${{ matrix.go }} (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
