@@ -1,12 +1,20 @@
 package tree
 
 import (
-	"math/rand"
+	"bytes"
+	"crypto/rand"
+	"fmt"
+	"math/big"
 	"testing"
 )
 
 func PickRandomKey(list []TestStruct) (TestStruct, []TestStruct) {
-	position := rand.Intn(len(list))
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(len(list))))
+	if err != nil {
+		fmt.Println("error:", err)
+		return TestStruct{}, nil
+	}
+	position := n.Int64()
 	test := list[position]
 	list[position] = list[len(list)-1]
 	return test, list[:len(list)-1]
@@ -26,13 +34,23 @@ func TestTreeConsistency_Del(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tree := NewTree()
+			added := map[string]bool{}
 			for _, entry := range test.data {
 				tree.Put(entry.key, entry.value)
+				added[string(entry.key)] = true
 			}
 
 			for entry, testList := PickRandomKey(test.data); len(testList) > 0; entry, testList = PickRandomKey(testList) {
 				if !tree.Del(entry.key) {
-					tree.PrintTree()
+					//tree.PrintTree()
+					i := 0
+					for _, val := range test.data {
+						if bytes.Equal(entry.key, val.key) {
+							i++
+						}
+					}
+					fmt.Printf("Number of times val exists: %d\n", i)
+					fmt.Printf("Value was added: %v\n", added[string(entry.key)])
 					t.Fatalf("value not deleted in the tree as it was not found- %v", entry.key)
 				}
 			}

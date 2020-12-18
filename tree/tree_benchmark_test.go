@@ -2,20 +2,21 @@ package tree
 
 import (
 	"crypto/rand"
+	"encoding/binary"
 	"testing"
 )
 
 func CreateRandomValues(valueCount int) []TestStruct {
 	var tests []TestStruct
-	added := map[string]bool{}
+	added := map[uint64]bool{}
 
 	for i := 0; i < valueCount; i++ {
-		key := make([]byte, 4)
-		val := make([]byte, 4)
+		key := make([]byte, 10)
+		val := make([]byte, 10)
 		_, _ = rand.Read(key)
 		_, _ = rand.Read(val)
 
-		if _, ok := added[string(key)]; ok {
+		if _, ok := added[binary.BigEndian.Uint64(key)]; ok {
 			i--
 			continue
 		}
