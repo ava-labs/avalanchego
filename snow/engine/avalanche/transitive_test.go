@@ -180,11 +180,15 @@ func TestEngineQuery(t *testing.T) {
 	vts := []avalanche.Vertex{gVtx, mVtx}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Processing,
-	}}
-	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
+	tx0 := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &conflicts.TestTransition{
+			InputIDsV: []ids.ID{utxos[0]},
+		},
+	}
 
 	vtx0 := &avalanche.TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -471,11 +475,15 @@ func TestEngineMultipleQuery(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Processing,
-	}}
-	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
+	tx0 := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &conflicts.TestTransition{
+			InputIDsV: []ids.ID{utxos[0]},
+		},
+	}
 
 	vtx0 := &avalanche.TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -612,11 +620,15 @@ func TestEngineBlockedIssue(t *testing.T) {
 	vts := []avalanche.Vertex{gVtx, mVtx}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Processing,
-	}}
-	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
+	tx0 := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &conflicts.TestTransition{
+			InputIDsV: []ids.ID{utxos[0]},
+		},
+	}
 
 	vtx0 := &avalanche.TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -694,11 +706,15 @@ func TestEngineAbandonResponse(t *testing.T) {
 	vts := []avalanche.Vertex{gVtx, mVtx}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Processing,
-	}}
-	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
+	tx0 := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &conflicts.TestTransition{
+			InputIDsV: []ids.ID{utxos[0]},
+		},
+	}
 
 	vtx := &avalanche.TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -757,11 +773,15 @@ func TestEngineScheduleRepoll(t *testing.T) {
 	vts := []avalanche.Vertex{gVtx, mVtx}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	tx0 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Processing,
-	}}
-	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
+	tx0 := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &conflicts.TestTransition{
+			InputIDsV: []ids.ID{utxos[0]},
+		},
+	}
 
 	vtx := &avalanche.TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -871,18 +891,22 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		DependenciesV: []conflicts.Tx{gTx},
+		TransitionV: &conflicts.TestTransition{
+			DependenciesV: []ids.ID{gTx.Transition().ID()},
+			InputIDsV:     []ids.ID{utxos[0]},
+		},
 	}
-	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	tx1 := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		DependenciesV: []conflicts.Tx{gTx},
+		TransitionV: &conflicts.TestTransition{
+			DependenciesV: []ids.ID{gTx.Transition().ID()},
+			InputIDsV:     []ids.ID{utxos[0]},
+		},
 	}
-	tx1.InputIDsV = append(tx1.InputIDsV, utxos[0])
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
 	manager.GetF = func(id ids.ID) (avalanche.Vertex, error) {
@@ -895,7 +919,17 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 		t.Fatalf("Unknown vertex")
 		panic("Should have errored")
 	}
-	manager.BuildF = func(_ uint32, _ []ids.ID, txs []conflicts.Tx, _ []ids.ID) (avalanche.Vertex, error) {
+	manager.BuildF = func(_ uint32, _ []ids.ID, trs []conflicts.Transition, _ []ids.ID) (avalanche.Vertex, error) {
+		txs := make([]conflicts.Tx, len(trs))
+		for i, tr := range trs {
+			if tr == tx0.Transition() {
+				txs[i] = tx0
+			} else if tr == tx1.Transition() {
+				txs[i] = tx1
+			} else {
+				return nil, errMissing
+			}
+		}
 		return &avalanche.TestVertex{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
@@ -921,7 +955,9 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 
 	sender.CantPushQuery = false
 
-	vm.PendingF = func() []conflicts.Tx { return []conflicts.Tx{tx0, tx1} }
+	vm.PendingF = func() []conflicts.Transition {
+		return []conflicts.Transition{tx0.Transition(), tx1.Transition()}
+	}
 	if err := te.Notify(common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}
@@ -979,18 +1015,22 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		DependenciesV: []conflicts.Tx{gTx},
+		TransitionV: &conflicts.TestTransition{
+			DependenciesV: []ids.ID{gTx.Transition().ID()},
+			InputIDsV:     []ids.ID{utxos[0]},
+		},
 	}
-	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	tx1 := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		DependenciesV: []conflicts.Tx{gTx},
+		TransitionV: &conflicts.TestTransition{
+			DependenciesV: []ids.ID{gTx.Transition().ID()},
+			InputIDsV:     []ids.ID{utxos[0]},
+		},
 	}
-	tx1.InputIDsV = append(tx1.InputIDsV, utxos[0])
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
 	manager.GetF = func(id ids.ID) (avalanche.Vertex, error) {
@@ -1014,7 +1054,17 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 
 	vm.CantBootstrapping = true
 	vm.CantBootstrapped = true
-	manager.BuildF = func(_ uint32, _ []ids.ID, txs []conflicts.Tx, _ []ids.ID) (avalanche.Vertex, error) {
+	manager.BuildF = func(_ uint32, _ []ids.ID, trs []conflicts.Transition, _ []ids.ID) (avalanche.Vertex, error) {
+		txs := make([]conflicts.Tx, len(trs))
+		for i, tr := range trs {
+			if tr == tx0.Transition() {
+				txs[i] = tx0
+			} else if tr == tx1.Transition() {
+				txs[i] = tx1
+			} else {
+				return nil, errMissing
+			}
+		}
 		return &avalanche.TestVertex{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
@@ -1029,12 +1079,12 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 
 	sender.CantPushQuery = false
 
-	vm.PendingF = func() []conflicts.Tx { return []conflicts.Tx{tx0} }
+	vm.PendingF = func() []conflicts.Transition { return []conflicts.Transition{tx0.Transition()} }
 	if err := te.Notify(common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}
 
-	vm.PendingF = func() []conflicts.Tx { return []conflicts.Tx{tx1} }
+	vm.PendingF = func() []conflicts.Transition { return []conflicts.Transition{tx1.Transition()} }
 	if err := te.Notify(common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}
@@ -1160,36 +1210,44 @@ func TestEngineReissue(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		DependenciesV: []conflicts.Tx{gTx},
+		TransitionV: &conflicts.TestTransition{
+			DependenciesV: []ids.ID{gTx.Transition().ID()},
+			InputIDsV:     []ids.ID{utxos[0]},
+		},
 	}
-	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	tx1 := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		DependenciesV: []conflicts.Tx{gTx},
+		TransitionV: &conflicts.TestTransition{
+			DependenciesV: []ids.ID{gTx.Transition().ID()},
+			InputIDsV:     []ids.ID{utxos[1]},
+		},
 	}
-	tx1.InputIDsV = append(tx1.InputIDsV, utxos[1])
 
 	tx2 := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		DependenciesV: []conflicts.Tx{gTx},
+		TransitionV: &conflicts.TestTransition{
+			DependenciesV: []ids.ID{gTx.Transition().ID()},
+			InputIDsV:     []ids.ID{utxos[1]},
+		},
 	}
-	tx2.InputIDsV = append(tx2.InputIDsV, utxos[1])
 
 	tx3 := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		DependenciesV: []conflicts.Tx{gTx},
+		TransitionV: &conflicts.TestTransition{
+			DependenciesV: []ids.ID{gTx.Transition().ID()},
+			InputIDsV:     []ids.ID{utxos[0]},
+		},
 	}
-	tx3.InputIDsV = append(tx3.InputIDsV, utxos[0])
 
 	vtx := &avalanche.TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -1228,7 +1286,21 @@ func TestEngineReissue(t *testing.T) {
 	vm.CantBootstrapped = true
 
 	lastVtx := new(avalanche.TestVertex)
-	manager.BuildF = func(_ uint32, _ []ids.ID, txs []conflicts.Tx, _ []ids.ID) (avalanche.Vertex, error) {
+	manager.BuildF = func(_ uint32, _ []ids.ID, trs []conflicts.Transition, _ []ids.ID) (avalanche.Vertex, error) {
+		txs := make([]conflicts.Tx, len(trs))
+		for i, tr := range trs {
+			if tr == tx0.Transition() {
+				txs[i] = tx0
+			} else if tr == tx1.Transition() {
+				txs[i] = tx1
+			} else if tr == tx2.Transition() {
+				txs[i] = tx2
+			} else if tr == tx3.Transition() {
+				txs[i] = tx3
+			} else {
+				return nil, errMissing
+			}
+		}
 		lastVtx = &avalanche.TestVertex{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
@@ -1242,11 +1314,11 @@ func TestEngineReissue(t *testing.T) {
 		return lastVtx, nil
 	}
 
-	vm.GetF = func(id ids.ID) (conflicts.Tx, error) {
+	vm.GetF = func(id ids.ID) (conflicts.Transition, error) {
 		if id != tx0.ID() {
 			t.Fatalf("Wrong tx")
 		}
-		return tx0, nil
+		return tx0.Transition(), nil
 	}
 
 	queryRequestID := new(uint32)
