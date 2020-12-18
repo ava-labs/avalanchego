@@ -96,7 +96,7 @@ func (b *BranchNode) Value() []byte {
 
 // Delete
 // the delete request comes from a child node always (upwards direction)
-// if the child is a leafNode, it requests the parent the deletion
+// if the child is a LeafNode, it requests the parent the deletion
 // if the child is a BranchNode,
 //     it either deletes + updates the tree
 //     or if there's no nodes left it deletes + requests parent the deletion
