@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 const (
@@ -34,6 +35,7 @@ var (
 	errIllegalSymbolCharacter       = errors.New("asset's symbol must be all upper case letters")
 	errUnexpectedWhitespace         = errors.New("unexpected whitespace provided")
 	errDenominationTooLarge         = errors.New("denomination is too large")
+	errMultipleManagers             = errors.New("asset can't have multiple managers")
 )
 
 // CreateAssetTx is a transaction that creates a new asset.
@@ -68,7 +70,6 @@ func (t *CreateAssetTx) UTXOs() []*avax.UTXO {
 			})
 		}
 	}
-
 	return utxos
 }
 
@@ -131,6 +132,32 @@ func (t *CreateAssetTx) SyntacticVerify(
 	}
 	if !isSortedAndUniqueInitialStates(t.States) {
 		return errInitialStatesNotSortedUnique
+	}
+
+	// If this asset has a ManagedAssetStatusOutput, it can only have one,
+	// and it can't also have MintOutputs
+	hasManager := false
+	hasMinters := false
+	for _, state := range t.States {
+		if state.FxID != 0 { // TODO lookup secp fx ID
+			continue
+		}
+		for _, out := range state.Outs {
+			switch out.(type) {
+			case *secp256k1fx.MintOutput:
+				if hasManager {
+					return errManagedAssetWithMinters
+				}
+				hasMinters = true
+			case *secp256k1fx.ManagedAssetStatusOutput:
+				if hasManager {
+					return errMultipleManagers
+				} else if hasMinters {
+					return errManagedAssetWithMinters
+				}
+				hasManager = true
+			}
+		}
 	}
 	return nil
 }

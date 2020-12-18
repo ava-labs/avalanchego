@@ -35,22 +35,21 @@ const (
 )
 
 var (
-	errUnknownAssetID         = errors.New("unknown asset ID")
-	errTxNotCreateAsset       = errors.New("transaction doesn't create an asset")
-	errNoMinters              = errors.New("no minters provided")
-	errNoHoldersOrMinters     = errors.New("no minters or initialHolders provided")
-	errZeroAmount             = errors.New("amount must be positive")
-	errNoOutputs              = errors.New("no outputs to send")
-	errSpendOverflow          = errors.New("spent amount overflows uint64")
-	errInvalidMintAmount      = errors.New("amount minted must be positive")
-	errAddressesCantMintAsset = errors.New("provided addresses don't have the authority to mint the provided asset")
-	errInvalidUTXO            = errors.New("invalid utxo")
-	errNilTxID                = errors.New("nil transaction ID")
-	errNoAddresses            = errors.New("no addresses provided")
-	errNoKeys                 = errors.New("from addresses have no keys or funds")
-	errNoManagerAddrs         = errors.New("manager has no addresses")
-	errNoManagerThreshold     = errors.New("manager has threshold 0")
-	errNoFromAddrs            = errors.New("no from addresses given")
+	errUnknownAssetID          = errors.New("unknown asset ID")
+	errTxNotCreateAsset        = errors.New("transaction doesn't create an asset")
+	errNoMinters               = errors.New("no minters provided")
+	errNoHoldersMintersManager = errors.New("no minters, initialHolders or manager provided")
+	errZeroAmount              = errors.New("amount must be positive")
+	errNoOutputs               = errors.New("no outputs to send")
+	errSpendOverflow           = errors.New("spent amount overflows uint64")
+	errInvalidMintAmount       = errors.New("amount minted must be positive")
+	errAddressesCantMintAsset  = errors.New("provided addresses don't have the authority to mint the provided asset")
+	errInvalidUTXO             = errors.New("invalid utxo")
+	errNilTxID                 = errors.New("nil transaction ID")
+	errNoAddresses             = errors.New("no addresses provided")
+	errNoKeys                  = errors.New("from addresses have no keys or funds")
+	errNoFromAddrs             = errors.New("no from addresses given")
+	errManagedAssetWithMinters = errors.New("a managed asset can't have additional minters")
 )
 
 // Service defines the base service for the asset vm
@@ -412,6 +411,7 @@ type CreateAssetArgs struct {
 	Denomination        byte      `json:"denomination"`
 	InitialHolders      []*Holder `json:"initialHolders"`
 	MinterSets          []Minters `json:"minterSets"`
+	Manager             Manager   `json:"manager"`
 }
 
 // AssetIDChangeAddr is an asset ID and a change address
@@ -422,15 +422,27 @@ type AssetIDChangeAddr struct {
 
 // CreateAsset returns ID of the newly created asset
 func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, reply *AssetIDChangeAddr) error {
-	service.vm.ctx.Log.Info("AVM: CreateAsset called with name: %s symbol: %s number of holders: %d number of minters: %d",
+	service.vm.ctx.Log.Info("AVM: CreateAsset called with name: %s. symbol: %s. number of holders: %d. number of minters: %d. has manager: %t.",
 		args.Name,
 		args.Symbol,
 		len(args.InitialHolders),
 		len(args.MinterSets),
+		len(args.Manager.Addrs) != 0,
 	)
 
-	if len(args.InitialHolders) == 0 && len(args.MinterSets) == 0 {
-		return errNoHoldersOrMinters
+	// Sanity check arguments
+	switch {
+	case len(args.InitialHolders) == 0 && len(args.MinterSets) == 0 && len(args.Manager.Addrs) == 0:
+		return errNoHoldersMintersManager
+	case len(args.MinterSets) != 0 && len(args.Manager.Addrs) != 0:
+		return errManagedAssetWithMinters
+	case int(args.Manager.Threshold) > len(args.Manager.Addrs):
+		return fmt.Errorf(
+			"manager threshold (%d) > number of manager addresses (%d)",
+			args.Manager.Threshold,
+			len(args.Manager.Addrs),
+		)
+
 	}
 
 	// Parse the from addresses
@@ -486,7 +498,7 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 
 	initialState := &InitialState{
 		FxID: 0, // TODO: Should lookup secp256k1fx FxID
-		Outs: make([]verify.State, 0, len(args.InitialHolders)+len(args.MinterSets)),
+		Outs: make([]verify.State, 0, len(args.InitialHolders)+len(args.MinterSets)+1),
 	}
 	for _, holder := range args.InitialHolders {
 		addr, err := service.vm.ParseLocalAddress(holder.Address)
@@ -518,6 +530,25 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 		ids.SortShortIDs(minter.Addrs)
 		initialState.Outs = append(initialState.Outs, minter)
 	}
+	if len(args.Manager.Addrs) != 0 { // This is a managed asset
+		status := &secp256k1fx.ManagedAssetStatusOutput{
+			Frozen: false,
+			Manager: secp256k1fx.OutputOwners{
+				Threshold: uint32(args.Manager.Threshold),
+				Addrs:     make([]ids.ShortID, 0, len(args.Manager.Addrs)),
+			},
+		}
+		for _, address := range args.Manager.Addrs {
+			addr, err := service.vm.ParseLocalAddress(address)
+			if err != nil {
+				return err
+			}
+			status.Manager.Addrs = append(status.Manager.Addrs, addr)
+		}
+		ids.SortShortIDs(status.Manager.Addrs)
+		initialState.Outs = append(initialState.Outs, status)
+	}
+
 	initialState.Sort(service.vm.codec, currentCodecVersion)
 
 	tx := Tx{UnsignedTx: &CreateAssetTx{
@@ -544,139 +575,6 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 	reply.AssetID = assetID
 	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
 	return err
-}
-
-// CreateManagedAssetArgs ...
-type CreateManagedAssetArgs struct {
-	api.JSONSpendHeader         // User, password, from addrs, change addr
-	Name                string  `json:"name"`
-	Symbol              string  `json:"symbol"`
-	Denomination        byte    `json:"denomination"`
-	Manager             Manager `json:"manager"`
-}
-
-// TODO: Share logic here with CreateAsset
-// CreateManagedAsset returns ID of the newly created managed asset
-func (service *Service) CreateManagedAsset(r *http.Request, args *CreateManagedAssetArgs, reply *AssetIDChangeAddr) error {
-	service.vm.ctx.Log.Info("AVM: CreateManagedAsset called with name: %s symbol: %s",
-		args.Name,
-		args.Symbol,
-	)
-
-	switch {
-	case len(args.Manager.Addrs) == 0:
-		return errNoManagerAddrs
-	case args.Manager.Threshold == 0:
-		return errNoManagerThreshold
-	case int(args.Manager.Threshold) > len(args.Manager.Addrs):
-		return fmt.Errorf(
-			"manager threshold (%d) > number of manager addresses (%d)",
-			args.Manager.Threshold,
-			len(args.Manager.Addrs),
-		)
-	}
-
-	// Parse the from addresses
-	fromAddrs := ids.ShortSet{}
-	for _, addrStr := range args.From {
-		addr, err := service.vm.ParseLocalAddress(addrStr)
-		if err != nil {
-			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
-		}
-		fromAddrs.Add(addr)
-	}
-
-	// Get the UTXOs/keys for the from addresses
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
-	if err != nil {
-		return err
-	}
-	if len(kc.Keys) == 0 {
-		return errNoKeys
-	}
-
-	// Parse the change address.
-	changeAddr, err := service.vm.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
-	if err != nil {
-		return err
-	}
-
-	amountsSpent, ins, keys, err := service.vm.Spend(
-		utxos,
-		kc,
-		map[ids.ID]uint64{
-			service.vm.ctx.AVAXAssetID: service.vm.creationTxFee,
-		},
-	)
-	if err != nil {
-		return err
-	}
-
-	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[service.vm.ctx.AVAXAssetID]; amountSpent > service.vm.creationTxFee {
-		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - service.vm.creationTxFee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{changeAddr},
-				},
-			},
-		})
-	}
-
-	// The asset's initial status
-	status := &secp256k1fx.ManagedAssetStatusOutput{
-		Frozen: false,
-		Manager: secp256k1fx.OutputOwners{
-			Threshold: uint32(args.Manager.Threshold),
-			Addrs:     make([]ids.ShortID, 0, len(args.Manager.Addrs)),
-		},
-	}
-	for _, address := range args.Manager.Addrs {
-		addr, err := service.vm.ParseLocalAddress(address)
-		if err != nil {
-			return err
-		}
-		status.Manager.Addrs = append(status.Manager.Addrs, addr)
-	}
-	ids.SortShortIDs(status.Manager.Addrs)
-
-	// Define the iniital asset state (its minters and manager)
-	initialState := &InitialState{
-		FxID: 0, // TODO: Should lookup secp256k1fx FxID
-		Outs: []verify.State{status},
-	}
-
-	tx := Tx{UnsignedTx: &CreateManagedAssetTx{
-		CreateAssetTx: CreateAssetTx{
-			BaseTx: BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    service.vm.ctx.NetworkID,
-				BlockchainID: service.vm.ctx.ChainID,
-				Outs:         outs,
-				Ins:          ins,
-			}},
-			Name:         args.Name,
-			Symbol:       args.Symbol,
-			Denomination: args.Denomination,
-			States:       []*InitialState{initialState},
-		},
-	}}
-	if err := tx.SignSECP256K1Fx(service.vm.codec, currentCodecVersion, keys); err != nil {
-		return err
-	}
-
-	assetID, err := service.vm.IssueTx(tx.Bytes())
-	if err != nil {
-		return fmt.Errorf("problem issuing transaction: %w", err)
-	}
-
-	reply.AssetID = assetID
-	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
-	return err
-
 }
 
 // CreateFixedCapAsset returns ID of the newly created asset
@@ -1463,8 +1361,8 @@ func (service *Service) UpdateManagedAsset(r *http.Request, args *UpdateManagedA
 	return err
 }
 
-// SendManagedAssetArgs ...
-type SendManagedAssetArgs struct {
+// SendAsManagerArgs ...
+type SendAsManagerArgs struct {
 	SendArgs
 	// Addresses that tx fee is paid from
 	FeeFrom []string `json:"feeFrom"`
@@ -1472,14 +1370,14 @@ type SendManagedAssetArgs struct {
 	FeeChangeAddr string `json:"feeChangeAddr"`
 }
 
-type SendManagedAssetResponse struct {
+type SendAsManagerResponse struct {
 	api.JSONTxIDChangeAddr
 	FeeChangeAddr string `json:"feeChangeAddr"`
 }
 
-// SendManagedAsset issues a transaction that sends a managed asset
-func (service *Service) SendManagedAsset(_ *http.Request, args *SendManagedAssetArgs, reply *SendManagedAssetResponse) error {
-	service.vm.ctx.Log.Info("AVM: SendManagedAsset called with username: %s", args.Username)
+// SendAsManager issues a transaction that sends a managed asset
+func (service *Service) SendAsManager(_ *http.Request, args *SendAsManagerArgs, reply *SendAsManagerResponse) error {
+	service.vm.ctx.Log.Info("AVM: SendAsManager called with username: %s", args.Username)
 
 	// Validate the memo field
 	memoBytes := []byte(args.Memo)

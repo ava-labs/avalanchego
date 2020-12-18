@@ -42,7 +42,6 @@ func setupCodec() (codec.GeneralCodec, codec.Manager) {
 		c.RegisterType(&OperationTx{}),
 		c.RegisterType(&ImportTx{}),
 		c.RegisterType(&ExportTx{}),
-		c.RegisterType(&CreateManagedAssetTx{}),
 	)
 	c.NextGroup()
 	errs.Add(

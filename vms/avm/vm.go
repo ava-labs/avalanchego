@@ -179,7 +179,6 @@ func (vm *VM) Initialize(
 		c.RegisterType(&OperationTx{}),
 		c.RegisterType(&ImportTx{}),
 		c.RegisterType(&ExportTx{}),
-		c.RegisterType(&CreateManagedAssetTx{}),
 	)
 	if errs.Errored() {
 		return errs.Err
@@ -838,11 +837,8 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	switch unsignedTx := tx.UnsignedTx.(type) {
 	case *CreateAssetTx:
 		createAssetTx = unsignedTx
-	case *CreateManagedAssetTx:
-		createAssetTx = &unsignedTx.CreateAssetTx
 	default:
 		// This transaction was not an asset creation tx
-		// (Neither regular nor managed)
 		return false
 	}
 
