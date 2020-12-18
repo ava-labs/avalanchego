@@ -66,11 +66,12 @@ func BenchmarkTree_Del(b *testing.B) {
 	test10M := CreateRandomValues(10000000)
 
 	b.Run("test100k_Put_Del", func(b *testing.B) {
-		b.ResetTimer()
 		tree := NewTree()
+		b.ResetTimer()
 		for _, test := range test100k {
 			tree.Put(test.key, test.value)
 		}
+
 		for _, test := range test100k {
 			if !tree.Del(test.key) {
 				b.Fatalf("value not deleted in the tree as it was not found- %v", test.key)
