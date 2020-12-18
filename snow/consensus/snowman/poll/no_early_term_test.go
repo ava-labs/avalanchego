@@ -12,7 +12,7 @@ import (
 func TestNoEarlyTermResults(t *testing.T) {
 	vtxID := ids.ID{1}
 
-	vdr1 := ids.NewShortID([20]byte{1}) // k = 1
+	vdr1 := ids.ShortID{1} // k = 1
 
 	vdrs := ids.ShortBag{}
 	vdrs.Add(vdr1)
@@ -38,8 +38,8 @@ func TestNoEarlyTermResults(t *testing.T) {
 func TestNoEarlyTermString(t *testing.T) {
 	vtxID := ids.ID{1}
 
-	vdr1 := ids.NewShortID([20]byte{1})
-	vdr2 := ids.NewShortID([20]byte{2}) // k = 2
+	vdr1 := ids.ShortID{1}
+	vdr2 := ids.ShortID{2} // k = 2
 
 	vdrs := ids.ShortBag{}
 	vdrs.Add(
@@ -62,8 +62,8 @@ func TestNoEarlyTermString(t *testing.T) {
 func TestNoEarlyTermDropsDuplicatedVotes(t *testing.T) {
 	vtxID := ids.ID{1}
 
-	vdr1 := ids.NewShortID([20]byte{1})
-	vdr2 := ids.NewShortID([20]byte{2}) // k = 2
+	vdr1 := ids.ShortID{1}
+	vdr2 := ids.ShortID{2} // k = 2
 
 	vdrs := ids.ShortBag{}
 	vdrs.Add(

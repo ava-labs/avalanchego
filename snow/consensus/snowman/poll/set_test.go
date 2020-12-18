@@ -47,8 +47,8 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 
 	vtxID := ids.ID{1}
 
-	vdr1 := ids.NewShortID([20]byte{1})
-	vdr2 := ids.NewShortID([20]byte{2}) // k = 2
+	vdr1 := ids.ShortID{1}
+	vdr2 := ids.ShortID{2} // k = 2
 
 	vdrs := ids.ShortBag{}
 	vdrs.Add(
@@ -90,8 +90,8 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
 
-	vdr1 := ids.NewShortID([20]byte{1})
-	vdr2 := ids.NewShortID([20]byte{2}) // k = 2
+	vdr1 := ids.ShortID{1}
+	vdr2 := ids.ShortID{2} // k = 2
 
 	vdrs := ids.ShortBag{}
 	vdrs.Add(
@@ -129,7 +129,7 @@ func TestSetString(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
 
-	vdr1 := ids.NewShortID([20]byte{1}) // k = 1
+	vdr1 := ids.ShortID{1} // k = 1
 
 	vdrs := ids.ShortBag{}
 	vdrs.Add(vdr1)

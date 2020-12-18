@@ -67,33 +67,6 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
 
-	// Case: Missing Node ID
-	tx, err = vm.newAddSubnetValidatorTx(
-		defaultWeight,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateEndTime.Unix()),
-		nodeID,
-		testSubnet1.ID(),
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.NodeID = ids.ShortID{ID: nil}
-	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
-		vm.Ctx,
-		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-	); err == nil {
-		t.Fatal("should have errored because NodeID is empty")
-	}
-
 	// Case: Missing Subnet ID
 	tx, err = vm.newAddSubnetValidatorTx(
 		defaultWeight,

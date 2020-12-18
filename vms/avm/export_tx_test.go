@@ -774,7 +774,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.ParseTx(rawTx.Bytes())
+	tx, err := vm.Parse(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -834,7 +834,7 @@ func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.ParseTx(rawTx.Bytes())
+	tx, err := vm.Parse(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -894,7 +894,7 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.ParseTx(rawTx.Bytes())
+	tx, err := vm.Parse(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -922,7 +922,9 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	avaxID := genesisTx.ID()
-	assetID := ids.GenerateTestID()
+	assetID := avaxID
+	// so the inputs below are sorted
+	copy(assetID[len(assetID)-5:], []byte{255, 255, 255, 255})
 	rawTx := &Tx{UnsignedTx: &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
@@ -976,7 +978,7 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.ParseTx(rawTx.Bytes())
+	tx, err := vm.Parse(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1095,7 +1097,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.ParseTx(rawTx.Bytes())
+	tx, err := vm.Parse(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1155,7 +1157,7 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.ParseTx(rawTx.Bytes())
+	tx, err := vm.Parse(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1267,7 +1269,7 @@ func TestIssueExportTx(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	txs := vm.PendingTxs()
+	txs := vm.Pending()
 	if len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}
@@ -1398,7 +1400,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	txs := vm.PendingTxs()
+	txs := vm.Pending()
 	if len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}

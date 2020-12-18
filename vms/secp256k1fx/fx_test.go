@@ -7,11 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -28,15 +27,13 @@ var (
 		0x35, 0xbd, 0xcb, 0x29, 0x3a, 0xd1, 0x49, 0x32,
 		0x00,
 	}
-	addrBytes = [hashing.AddrLen]byte{
+	addr = ids.ShortID{
 		0x01, 0x5c, 0xce, 0x6c, 0x55, 0xd6, 0xb5, 0x09,
 		0x84, 0x5c, 0x8c, 0x4e, 0x30, 0xbe, 0xd9, 0x8d,
 		0x39, 0x1a, 0xe7, 0xf0,
 	}
-	addr       = ids.NewShortID(addrBytes)
-	addr2Bytes [hashing.AddrLen]byte
-	addr2      ids.ShortID
-	sig2Bytes  [crypto.SECP256K1RSigLen]byte // signature of addr2 on txBytes
+	addr2     ids.ShortID
+	sig2Bytes [crypto.SECP256K1RSigLen]byte // signature of addr2 on txBytes
 )
 
 func init() {
@@ -44,8 +41,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	copy(addr2Bytes[:], b)
-	addr2 = ids.NewShortID(addr2Bytes)
+	copy(addr2[:], b)
 	b, err = formatting.Decode(formatting.CB58, "c7doHa86hWYyfXTVnNsdP1CG1gxhXVpZ9Q5CiHi2oFRdnaxh2YR2Mvu2cUNMgyQy4BNQaXAxWWPt36BJ5pDWX1Xeos4h9L")
 	if err != nil {
 		panic(err)
@@ -56,7 +52,7 @@ func init() {
 
 func TestFxInitialize(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	fx := Fx{}
@@ -76,7 +72,7 @@ func TestFxInitializeInvalid(t *testing.T) {
 
 func TestFxVerifyTransfer(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -98,7 +94,7 @@ func TestFxVerifyTransfer(t *testing.T) {
 			Locktime:  0,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+				addr,
 			},
 		},
 	}
@@ -121,7 +117,7 @@ func TestFxVerifyTransfer(t *testing.T) {
 
 func TestFxVerifyTransferNilTx(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -136,7 +132,7 @@ func TestFxVerifyTransferNilTx(t *testing.T) {
 			Locktime:  0,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+				addr,
 			},
 		},
 	}
@@ -159,7 +155,7 @@ func TestFxVerifyTransferNilTx(t *testing.T) {
 
 func TestFxVerifyTransferNilOutput(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -188,7 +184,7 @@ func TestFxVerifyTransferNilOutput(t *testing.T) {
 
 func TestFxVerifyTransferNilInput(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -204,7 +200,7 @@ func TestFxVerifyTransferNilInput(t *testing.T) {
 			Locktime:  0,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+				addr,
 			},
 		},
 	}
@@ -221,7 +217,7 @@ func TestFxVerifyTransferNilInput(t *testing.T) {
 
 func TestFxVerifyTransferNilCredential(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -237,7 +233,7 @@ func TestFxVerifyTransferNilCredential(t *testing.T) {
 			Locktime:  0,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+				addr,
 			},
 		},
 	}
@@ -255,7 +251,7 @@ func TestFxVerifyTransferNilCredential(t *testing.T) {
 
 func TestFxVerifyTransferInvalidOutput(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -271,7 +267,7 @@ func TestFxVerifyTransferInvalidOutput(t *testing.T) {
 			Locktime:  0,
 			Threshold: 0,
 			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+				addr,
 			},
 		},
 	}
@@ -294,7 +290,7 @@ func TestFxVerifyTransferInvalidOutput(t *testing.T) {
 
 func TestFxVerifyTransferWrongAmounts(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -310,7 +306,7 @@ func TestFxVerifyTransferWrongAmounts(t *testing.T) {
 			Locktime:  0,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+				addr,
 			},
 		},
 	}
@@ -333,7 +329,7 @@ func TestFxVerifyTransferWrongAmounts(t *testing.T) {
 
 func TestFxVerifyTransferTimelocked(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -349,7 +345,7 @@ func TestFxVerifyTransferTimelocked(t *testing.T) {
 			Locktime:  uint64(date.Add(time.Second).Unix()),
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+				addr,
 			},
 		},
 	}
@@ -372,7 +368,7 @@ func TestFxVerifyTransferTimelocked(t *testing.T) {
 
 func TestFxVerifyTransferTooManySigners(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -388,7 +384,7 @@ func TestFxVerifyTransferTooManySigners(t *testing.T) {
 			Locktime:  0,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+				addr,
 			},
 		},
 	}
@@ -412,7 +408,7 @@ func TestFxVerifyTransferTooManySigners(t *testing.T) {
 
 func TestFxVerifyTransferTooFewSigners(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -428,7 +424,7 @@ func TestFxVerifyTransferTooFewSigners(t *testing.T) {
 			Locktime:  0,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+				addr,
 			},
 		},
 	}
@@ -449,7 +445,7 @@ func TestFxVerifyTransferTooFewSigners(t *testing.T) {
 
 func TestFxVerifyTransferMismatchedSigners(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -465,7 +461,7 @@ func TestFxVerifyTransferMismatchedSigners(t *testing.T) {
 			Locktime:  0,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+				addr,
 			},
 		},
 	}
@@ -489,7 +485,7 @@ func TestFxVerifyTransferMismatchedSigners(t *testing.T) {
 
 func TestFxVerifyTransferInvalidSignature(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -508,7 +504,7 @@ func TestFxVerifyTransferInvalidSignature(t *testing.T) {
 			Locktime:  0,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+				addr,
 			},
 		},
 	}
@@ -539,7 +535,7 @@ func TestFxVerifyTransferInvalidSignature(t *testing.T) {
 
 func TestFxVerifyTransferWrongSigner(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -589,7 +585,7 @@ func TestFxVerifyTransferWrongSigner(t *testing.T) {
 
 func TestFxVerifyOperation(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -603,7 +599,7 @@ func TestFxVerifyOperation(t *testing.T) {
 		OutputOwners: OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+				addr,
 			},
 		},
 	}
@@ -615,7 +611,7 @@ func TestFxVerifyOperation(t *testing.T) {
 			OutputOwners: OutputOwners{
 				Threshold: 1,
 				Addrs: []ids.ShortID{
-					ids.NewShortID(addrBytes),
+					addr,
 				},
 			},
 		},
@@ -625,7 +621,7 @@ func TestFxVerifyOperation(t *testing.T) {
 				Locktime:  0,
 				Threshold: 1,
 				Addrs: []ids.ShortID{
-					ids.NewShortID(addrBytes),
+					addr,
 				},
 			},
 		},
@@ -645,7 +641,7 @@ func TestFxVerifyOperation(t *testing.T) {
 
 func TestFxVerifyOperationUnknownTx(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -658,7 +654,7 @@ func TestFxVerifyOperationUnknownTx(t *testing.T) {
 		OutputOwners: OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+				addr,
 			},
 		},
 	}
@@ -670,7 +666,7 @@ func TestFxVerifyOperationUnknownTx(t *testing.T) {
 			OutputOwners: OutputOwners{
 				Threshold: 1,
 				Addrs: []ids.ShortID{
-					ids.NewShortID(addrBytes),
+					addr,
 				},
 			},
 		},
@@ -680,7 +676,7 @@ func TestFxVerifyOperationUnknownTx(t *testing.T) {
 				Locktime:  0,
 				Threshold: 1,
 				Addrs: []ids.ShortID{
-					ids.NewShortID(addrBytes),
+					addr,
 				},
 			},
 		},
@@ -700,7 +696,7 @@ func TestFxVerifyOperationUnknownTx(t *testing.T) {
 
 func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -714,7 +710,7 @@ func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 		OutputOwners: OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+				addr,
 			},
 		},
 	}
@@ -733,7 +729,7 @@ func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 
 func TestFxVerifyOperationUnknownCredential(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -747,7 +743,7 @@ func TestFxVerifyOperationUnknownCredential(t *testing.T) {
 		OutputOwners: OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+				addr,
 			},
 		},
 	}
@@ -759,7 +755,7 @@ func TestFxVerifyOperationUnknownCredential(t *testing.T) {
 			OutputOwners: OutputOwners{
 				Threshold: 1,
 				Addrs: []ids.ShortID{
-					ids.NewShortID(addrBytes),
+					addr,
 				},
 			},
 		},
@@ -769,7 +765,7 @@ func TestFxVerifyOperationUnknownCredential(t *testing.T) {
 				Locktime:  0,
 				Threshold: 1,
 				Addrs: []ids.ShortID{
-					ids.NewShortID(addrBytes),
+					addr,
 				},
 			},
 		},
@@ -784,7 +780,7 @@ func TestFxVerifyOperationUnknownCredential(t *testing.T) {
 
 func TestFxVerifyOperationWrongNumberOfUTXOs(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -798,7 +794,7 @@ func TestFxVerifyOperationWrongNumberOfUTXOs(t *testing.T) {
 		OutputOwners: OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+				addr,
 			},
 		},
 	}
@@ -810,7 +806,7 @@ func TestFxVerifyOperationWrongNumberOfUTXOs(t *testing.T) {
 			OutputOwners: OutputOwners{
 				Threshold: 1,
 				Addrs: []ids.ShortID{
-					ids.NewShortID(addrBytes),
+					addr,
 				},
 			},
 		},
@@ -820,7 +816,7 @@ func TestFxVerifyOperationWrongNumberOfUTXOs(t *testing.T) {
 				Locktime:  0,
 				Threshold: 1,
 				Addrs: []ids.ShortID{
-					ids.NewShortID(addrBytes),
+					addr,
 				},
 			},
 		},
@@ -840,7 +836,7 @@ func TestFxVerifyOperationWrongNumberOfUTXOs(t *testing.T) {
 
 func TestFxVerifyOperationUnknownUTXOType(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -858,7 +854,7 @@ func TestFxVerifyOperationUnknownUTXOType(t *testing.T) {
 			OutputOwners: OutputOwners{
 				Threshold: 1,
 				Addrs: []ids.ShortID{
-					ids.NewShortID(addrBytes),
+					addr,
 				},
 			},
 		},
@@ -868,7 +864,7 @@ func TestFxVerifyOperationUnknownUTXOType(t *testing.T) {
 				Locktime:  0,
 				Threshold: 1,
 				Addrs: []ids.ShortID{
-					ids.NewShortID(addrBytes),
+					addr,
 				},
 			},
 		},
@@ -888,7 +884,7 @@ func TestFxVerifyOperationUnknownUTXOType(t *testing.T) {
 
 func TestFxVerifyOperationInvalidOperationVerify(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -902,7 +898,7 @@ func TestFxVerifyOperationInvalidOperationVerify(t *testing.T) {
 		OutputOwners: OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+				addr,
 			},
 		},
 	}
@@ -914,7 +910,7 @@ func TestFxVerifyOperationInvalidOperationVerify(t *testing.T) {
 			OutputOwners: OutputOwners{
 				Threshold: 1,
 				Addrs: []ids.ShortID{
-					ids.NewShortID(addrBytes),
+					addr,
 				},
 			},
 		},
@@ -941,7 +937,7 @@ func TestFxVerifyOperationInvalidOperationVerify(t *testing.T) {
 
 func TestFxVerifyOperationMismatchedMintOutputs(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -955,7 +951,7 @@ func TestFxVerifyOperationMismatchedMintOutputs(t *testing.T) {
 		OutputOwners: OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+				addr,
 			},
 		},
 	}
@@ -972,7 +968,7 @@ func TestFxVerifyOperationMismatchedMintOutputs(t *testing.T) {
 				Locktime:  0,
 				Threshold: 1,
 				Addrs: []ids.ShortID{
-					ids.NewShortID(addrBytes),
+					addr,
 				},
 			},
 		},
@@ -992,7 +988,7 @@ func TestFxVerifyOperationMismatchedMintOutputs(t *testing.T) {
 
 func TestVerifyPermission(t *testing.T) {
 	vm := TestVM{
-		Codec: codec.NewDefault(),
+		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	fx := Fx{}

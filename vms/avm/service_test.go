@@ -115,7 +115,7 @@ func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numT
 
 	// Key: Address
 	// Value: AVAX balance
-	balances := map[[20]byte]int{}
+	balances := map[ids.ShortID]int{}
 
 	for _, addr := range addrs { // get balances for all addresses
 		addrStr, err := s.vm.FormatLocalAddress(addr)
@@ -133,12 +133,12 @@ func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numT
 		if err != nil {
 			return fmt.Errorf("couldn't get balance of %s: %w", addr, err)
 		}
-		balances[addr.Key()] = int(reply.Balance)
+		balances[addr] = int(reply.Balance)
 	}
 
 	fromAddrsTotalBalance := 0
 	for _, addr := range fromAddrs {
-		fromAddrsTotalBalance += balances[addr.Key()]
+		fromAddrsTotalBalance += balances[addr]
 	}
 
 	if fromAddrsTotalBalance != fromAddrsStartBalance-totalTxFee {
@@ -1201,7 +1201,7 @@ func TestSendMultiple(t *testing.T) {
 		t.Fatal("Transaction ID returned by SendMultiple does not match the transaction found in vm's pending transactions")
 	}
 
-	if _, err = vm.GetTx(reply.TxID); err != nil {
+	if _, err = vm.Get(reply.TxID); err != nil {
 		t.Fatalf("Failed to retrieve created transaction: %s", err)
 	}
 }

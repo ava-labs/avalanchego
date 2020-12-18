@@ -7,8 +7,9 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -42,7 +43,7 @@ func TestTransferableOutputVerify(t *testing.T) {
 }
 
 func TestTransferableOutputSorting(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	if err := c.RegisterType(&TestTransferable{}); err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +101,7 @@ func TestTransferableOutputSorting(t *testing.T) {
 }
 
 func TestTransferableOutputSerialization(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	if err := c.RegisterType(&secp256k1fx.TransferOutput{}); err != nil {
 		t.Fatal(err)
 	}
@@ -144,16 +145,16 @@ func TestTransferableOutputSerialization(t *testing.T) {
 				Locktime:  54321,
 				Threshold: 1,
 				Addrs: []ids.ShortID{
-					ids.NewShortID([20]byte{
+					{
 						0x51, 0x02, 0x5c, 0x61, 0xfb, 0xcf, 0xc0, 0x78,
 						0xf6, 0x93, 0x34, 0xf8, 0x34, 0xbe, 0x6d, 0xd2,
 						0x6d, 0x55, 0xa9, 0x55,
-					}),
-					ids.NewShortID([20]byte{
+					},
+					{
 						0xc3, 0x34, 0x41, 0x28, 0xe0, 0x60, 0x12, 0x8e,
 						0xde, 0x35, 0x23, 0xa2, 0x4a, 0x46, 0x1c, 0x89,
 						0x43, 0xab, 0x08, 0x59,
-					}),
+					},
 				},
 			},
 		},
@@ -204,7 +205,7 @@ func TestTransferableInputVerify(t *testing.T) {
 }
 
 func TestTransferableInputSorting(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	if err := c.RegisterType(&TestTransferable{}); err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +268,7 @@ func TestTransferableInputSorting(t *testing.T) {
 }
 
 func TestTransferableInputSerialization(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	if err := c.RegisterType(&secp256k1fx.TransferInput{}); err != nil {
 		t.Fatal(err)
 	}

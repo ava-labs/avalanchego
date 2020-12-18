@@ -75,7 +75,7 @@ func (k *PublicKeyRSAPSS) VerifyHash(hash, sig []byte) bool {
 
 // Address implements the PublicKey interface
 func (k *PublicKeyRSAPSS) Address() ids.ShortID {
-	if k.addr.IsZero() {
+	if k.addr == ids.ShortEmpty {
 		addr, err := ids.ToShortID(hashing.PubkeyBytesToAddress(k.Bytes()))
 		if err != nil {
 			panic(err)

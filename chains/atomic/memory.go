@@ -7,11 +7,12 @@ import (
 	"bytes"
 	"sync"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -36,7 +37,7 @@ type Memory struct {
 
 // Initialize the SharedMemory
 func (m *Memory) Initialize(log logging.Logger, db database.Database) error {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	manager := codec.NewDefaultManager()
 	if err := manager.RegisterCodec(codecVersion, c); err != nil {
 		return err

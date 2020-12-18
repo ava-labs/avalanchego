@@ -8,6 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -20,9 +21,9 @@ type state struct {
 	db      database.Database
 }
 
-func (s *state) Vertex(id ids.ID) *innerVertex {
+func (s *state) Vertex(id ids.ID) vertex.StatelessVertex {
 	if vtxIntf, found := s.dbCache.Get(id); found {
-		vtx, _ := vtxIntf.(*innerVertex)
+		vtx, _ := vtxIntf.(vertex.StatelessVertex)
 		return vtx
 	}
 
@@ -43,14 +44,14 @@ func (s *state) Vertex(id ids.ID) *innerVertex {
 
 // SetVertex persists the vertex to the database and returns an error if it
 // fails to write to the db
-func (s *state) SetVertex(id ids.ID, vtx *innerVertex) error {
+func (s *state) SetVertex(id ids.ID, vtx vertex.StatelessVertex) error {
 	s.dbCache.Put(id, vtx)
 
 	if vtx == nil {
 		return s.db.Delete(id[:])
 	}
 
-	return s.db.Put(id[:], vtx.bytes)
+	return s.db.Put(id[:], vtx.Bytes())
 }
 
 func (s *state) Status(id ids.ID) choices.Status {

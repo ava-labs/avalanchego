@@ -6,7 +6,7 @@ package avm
 import (
 	"reflect"
 
-	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -15,15 +15,9 @@ var (
 )
 
 type codecRegistry struct {
-	codecs      []codec.Codec
+	codecs      []codec.Registry
 	index       int
 	typeToIndex map[reflect.Type]int
-}
-
-func (cr *codecRegistry) Skip(amount int) {
-	for _, c := range cr.codecs {
-		c.Skip(amount)
-	}
 }
 
 func (cr *codecRegistry) RegisterType(val interface{}) error {
