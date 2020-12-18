@@ -2,11 +2,12 @@ package tree
 
 import "fmt"
 
+// Tree holds the tree data
 type Tree struct {
 	rootNode Node
-	rootHash []byte
 }
 
+// NewTree returns a new instance of the Tree
 func NewTree() *Tree {
 	return &Tree{
 		rootNode: NewRootNode(),
@@ -14,11 +15,10 @@ func NewTree() *Tree {
 }
 
 func (t *Tree) Root() []byte {
-	return t.rootHash
+	return t.rootNode.GetHash()
 }
 
 func (t *Tree) Get(key []byte) ([]byte, bool) {
-
 	node := t.findNode(FromBytes(key), t.rootNode)
 	if _, ok := node.(*EmptyNode); ok {
 		return nil, false

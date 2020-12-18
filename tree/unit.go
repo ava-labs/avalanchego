@@ -59,3 +59,21 @@ func FromByte(b byte) []Unit {
 		Unit(b % 16),
 	}
 }
+
+// TODO Review this padding
+// ToBytes converts a slice of nibbles to a byte slice
+// assuming the nibble slice has even number of nibbles.
+func ToBytes(u []Unit) []byte {
+	length := len(u)
+	if len(u) != 0 {
+		u = append(u, Unit(0))
+	}
+	buf := make([]byte, 0, length)
+
+	for i := 0; i < length; i += 2 {
+		b := byte(u[i]<<4) + byte(u[i+1])
+		buf = append(buf, b)
+	}
+
+	return buf
+}
