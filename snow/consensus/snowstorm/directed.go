@@ -5,16 +5,21 @@ package snowstorm
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
+)
+
+var (
+	errMissingTx = errors.New("missing tx")
 )
 
 // DirectedFactory implements Factory by returning a directed struct
@@ -64,7 +69,7 @@ type directedTx struct {
 	pendingAccept bool
 
 	// tx is the actual transaction this node represents
-	tx choices.Decidable
+	tx conflicts.Tx
 
 	// ins is the set of txIDs that this tx conflicts with that are less
 	// preferred than this tx
@@ -118,7 +123,7 @@ func (dg *Directed) Finalized() bool {
 }
 
 // IsVirtuous implements the Consensus interface
-func (dg *Directed) IsVirtuous(tx choices.Decidable) (bool, error) {
+func (dg *Directed) IsVirtuous(tx conflicts.Tx) (bool, error) {
 	// If the tx is currently processing, we should just return if it is
 	// registered as rogue or not.
 	if node, exists := dg.txs[tx.ID()]; exists {
@@ -129,7 +134,7 @@ func (dg *Directed) IsVirtuous(tx choices.Decidable) (bool, error) {
 }
 
 // Conflicts implements the Consensus interface
-func (dg *Directed) Conflicts(tx choices.Decidable) (ids.Set, error) {
+func (dg *Directed) Conflicts(tx conflicts.Tx) (ids.Set, error) {
 	if node, exists := dg.txs[tx.ID()]; exists {
 		// If the tx is currently processing, the conflicting txs are just the
 		// union of the inbound conflicts and the outbound conflicts.
@@ -158,7 +163,7 @@ func (dg *Directed) Conflicts(tx choices.Decidable) (ids.Set, error) {
 }
 
 // Issued implements the Consensus interface
-func (dg *Directed) Issued(tx choices.Decidable) bool {
+func (dg *Directed) Issued(tx conflicts.Tx) bool {
 	// If the tx is either Accepted or Rejected, then it must have been issued
 	// previously.
 	if tx.Status().Decided() {
@@ -170,8 +175,13 @@ func (dg *Directed) Issued(tx choices.Decidable) bool {
 	return ok
 }
 
+// Processing implements the Consensus interface
+func (dg *Directed) Processing(trID ids.ID) bool {
+	return dg.conflicts.Processing(trID)
+}
+
 // Add implements the Consensus interface
-func (dg *Directed) Add(tx choices.Decidable) error {
+func (dg *Directed) Add(tx conflicts.Tx) error {
 	if dg.Issued(tx) {
 		// If the tx was previously inserted, it shouldn't be re-inserted.
 		return nil
@@ -219,6 +229,15 @@ func (dg *Directed) Add(tx choices.Decidable) error {
 	// Add this tx to the set of currently processing txs
 	dg.txs[txID] = txNode
 	return dg.conflicts.Add(tx)
+}
+
+// Get implements the Consensus interface
+func (dg *Directed) Get(txID ids.ID) (conflicts.Tx, error) {
+	tx, exists := dg.txs[txID]
+	if !exists {
+		return nil, errMissingTx
+	}
+	return tx.tx, nil
 }
 
 // RecordPoll implements the Consensus interface
@@ -342,10 +361,10 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 			}
 		}
 
-		// If a status has been changed. We must perform a second iteration
+		// If a status has changed, we must perform a second iteration
 		shouldWork = len(acceptable)+len(rejectable) > 0
 
-		// If a status has been changed. So the frontiers must be recalculated.
+		// If a status has changed, the frontiers must be recalculated.
 		changed = changed || shouldWork
 	}
 	return changed, nil

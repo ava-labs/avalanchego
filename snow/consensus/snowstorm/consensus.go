@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
 
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
@@ -44,17 +44,24 @@ type Consensus interface {
 
 	// Returns true if transaction <Tx> is virtuous.
 	// That is, no transaction has been added that conflicts with <Tx>
-	IsVirtuous(choices.Decidable) (bool, error)
+	IsVirtuous(conflicts.Tx) (bool, error)
 
 	// Returns the set of transactions conflicting with <Tx>
-	Conflicts(choices.Decidable) (ids.Set, error)
+	Conflicts(conflicts.Tx) (ids.Set, error)
 
 	// Returns true iff transaction <Tx> has been added
-	Issued(choices.Decidable) bool
+	Issued(conflicts.Tx) bool
+
+	// Returns true iff a transaction with the named transition is processing
+	Processing(ids.ID) bool
 
 	// Adds a new transaction to vote on. Returns if a critical error has
 	// occurred.
-	Add(choices.Decidable) error
+	Add(conflicts.Tx) error
+
+	// Get the named transaction. If the transaction isn't currently being
+	// processed by the consensus instance, then an error will be returned.
+	Get(ids.ID) (conflicts.Tx, error)
 
 	// Collects the results of a network poll. Assumes all transactions
 	// have been previously added. Returns true is any statuses or preferences

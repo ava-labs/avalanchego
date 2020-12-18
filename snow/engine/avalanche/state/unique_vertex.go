@@ -4,6 +4,7 @@
 package state
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -14,6 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+)
+
+var (
+	errFutureEpoch = errors.New("vertex names future epoch")
 )
 
 // uniqueVertex acts as a cache for vertices in the database.
@@ -50,6 +55,9 @@ func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
 	}
 	if err := innerVertex.Verify(); err != nil {
 		return nil, err
+	}
+	if epoch := innerVertex.Epoch(); epoch > s.ctx.Epoch() {
+		return nil, errFutureEpoch
 	}
 	vtx.v.vtx = innerVertex
 
@@ -231,15 +239,15 @@ func (vtx *uniqueVertex) Txs() ([]conflicts.Tx, error) {
 		return nil, fmt.Errorf("failed to get txs for vertex with status: %s", vtx.v.status)
 	}
 
-	txs := vtx.v.vtx.Txs()
-	if len(txs) != len(vtx.v.txs) {
-		vtx.v.txs = make([]conflicts.Tx, len(txs))
-		for i, txBytes := range txs {
-			tx, err := vtx.serializer.vm.Parse(txBytes)
+	transitions := vtx.v.vtx.Transitions()
+	if len(transitions) != len(vtx.v.txs) {
+		vtx.v.txs = make([]conflicts.Tx, len(transitions))
+		for i, transitionBytes := range transitions {
+			tr, err := vtx.serializer.vm.Parse(transitionBytes)
 			if err != nil {
 				return nil, err
 			}
-			vtx.v.txs[i] = tx
+			vtx.v.txs[i] = &Tx{Tr: tr}
 		}
 	}
 

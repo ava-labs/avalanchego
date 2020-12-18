@@ -5,6 +5,7 @@ package snowstorm
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
@@ -36,8 +36,6 @@ var (
 		AcceptingSlowDependencyTest,
 		RejectingDependencyTest,
 		RejectingSlowDependencyTest,
-		InvalidAddTest,
-		InvalidConflictsTest,
 		ConflictsTest,
 		VirtuousDependsOnRogueTest,
 		ErrorOnAcceptedTest,
@@ -51,56 +49,46 @@ var (
 
 //  R - G - B - A
 func Setup() {
-	Red = &conflicts.TestTx{}
-	Green = &conflicts.TestTx{}
-	Blue = &conflicts.TestTx{}
-	Alpha = &conflicts.TestTx{}
+	Red = &conflicts.TestTx{TransitionV: &conflicts.TestTransition{}}
+	Green = &conflicts.TestTx{TransitionV: &conflicts.TestTransition{}}
+	Blue = &conflicts.TestTx{TransitionV: &conflicts.TestTransition{}}
+	Alpha = &conflicts.TestTx{TransitionV: &conflicts.TestTransition{}}
 
 	for i, color := range []*conflicts.TestTx{Red, Green, Blue, Alpha} {
-		color.IDV = ids.Empty.Prefix(uint64(i))
+		transitionIntf := color.Transition()
+		transition := transitionIntf.(*conflicts.TestTransition)
+		transition.IDV = ids.Empty.Prefix(uint64(i))
+		transition.DependenciesV = nil
+
+		color.IDV = transition.IDV.Prefix(0)
 		color.AcceptV = nil
 		color.RejectV = nil
 		color.StatusV = choices.Processing
 
-		color.DependenciesV = nil
-		color.InputIDsV = nil
-		color.VerifyV = nil
-		color.BytesV = []byte{byte(i)}
 	}
 
 	X := ids.Empty.Prefix(4)
 	Y := ids.Empty.Prefix(5)
 	Z := ids.Empty.Prefix(6)
 
-	Red.InputIDsV = append(Red.InputIDsV, X)
-	Green.InputIDsV = append(Green.InputIDsV, X)
-	Green.InputIDsV = append(Green.InputIDsV, Y)
-
-	Blue.InputIDsV = append(Blue.InputIDsV, Y)
-	Blue.InputIDsV = append(Blue.InputIDsV, Z)
-
-	Alpha.InputIDsV = append(Alpha.InputIDsV, Z)
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		Red.Verify(),
-		Green.Verify(),
-		Blue.Verify(),
-		Alpha.Verify(),
-	)
-	if errs.Errored() {
-		panic(errs.Err)
-	}
+	Red.Transition().(*conflicts.TestTransition).InputIDsV = []ids.ID{X}
+	Green.Transition().(*conflicts.TestTransition).InputIDsV = []ids.ID{X, Y}
+	Blue.Transition().(*conflicts.TestTransition).InputIDsV = []ids.ID{Y, Z}
+	Alpha.Transition().(*conflicts.TestTransition).InputIDsV = []ids.ID{Z}
 }
 
 // Execute all tests against a consensus implementation
 func ConsensusTest(t *testing.T, factory Factory, prefix string) {
-	for _, test := range Tests {
-		Setup()
-		test(t, factory)
+	for i, test := range Tests {
+		t.Run(fmt.Sprintf("test-%d", i), func(t *testing.T) {
+			Setup()
+			test(t, factory)
+		})
 	}
-	Setup()
-	StringTest(t, factory, prefix)
+	t.Run("test-string", func(t *testing.T) {
+		Setup()
+		StringTest(t, factory, prefix)
+	})
 }
 
 func MetricsTest(t *testing.T, factory Factory) {
@@ -590,14 +578,18 @@ func QuiesceTest(t *testing.T, factory Factory) {
 func AcceptingDependencyTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
+	purpleTransitionID := ids.Empty.Prefix(7)
 	purple := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(7),
+			IDV:     purpleTransitionID.Prefix(0),
 			StatusV: choices.Processing,
 		},
-		DependenciesV: []conflicts.Tx{Red},
+		TransitionV: &conflicts.TestTransition{
+			IDV:           purpleTransitionID,
+			DependenciesV: []ids.ID{Red.Transition().ID()},
+			InputIDsV:     []ids.ID{ids.Empty.Prefix(8)},
+		},
 	}
-	purple.InputIDsV = append(purple.InputIDsV, ids.Empty.Prefix(8))
 
 	params := sbcon.Parameters{
 		Metrics:           prometheus.NewRegistry(),
@@ -706,36 +698,20 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 	}
 }
 
-type singleAcceptTx struct {
-	conflicts.Tx
-
-	t        *testing.T
-	accepted bool
-}
-
-func (tx *singleAcceptTx) Accept() error {
-	if tx.accepted {
-		tx.t.Fatalf("accept called multiple times")
-	}
-	tx.accepted = true
-	return tx.Tx.Accept()
-}
-
 func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
-	rawPurple := &conflicts.TestTx{
+	purpleTransitionID := ids.Empty.Prefix(7)
+	purple := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(7),
+			IDV:     purpleTransitionID.Prefix(0),
 			StatusV: choices.Processing,
 		},
-		DependenciesV: []conflicts.Tx{Red},
-	}
-	rawPurple.InputIDsV = append(rawPurple.InputIDsV, ids.Empty.Prefix(8))
-
-	purple := &singleAcceptTx{
-		Tx: rawPurple,
-		t:  t,
+		TransitionV: &conflicts.TestTransition{
+			IDV:           purpleTransitionID,
+			DependenciesV: []ids.ID{Red.Transition().ID()},
+			InputIDsV:     []ids.ID{ids.Empty.Prefix(8)},
+		},
 	}
 
 	params := sbcon.Parameters{
@@ -873,14 +849,18 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 func RejectingDependencyTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
+	purpleTransitionID := ids.Empty.Prefix(7)
 	purple := &conflicts.TestTx{
 		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(7),
+			IDV:     purpleTransitionID.Prefix(0),
 			StatusV: choices.Processing,
 		},
-		DependenciesV: []conflicts.Tx{Red, Blue},
+		TransitionV: &conflicts.TestTransition{
+			IDV:           purpleTransitionID,
+			DependenciesV: []ids.ID{Red.Transition().ID(), Blue.Transition().ID()},
+			InputIDsV:     []ids.ID{ids.Empty.Prefix(8)},
+		},
 	}
-	purple.InputIDsV = append(purple.InputIDsV, ids.Empty.Prefix(8))
 
 	params := sbcon.Parameters{
 		Metrics:           prometheus.NewRegistry(),
@@ -973,45 +953,32 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 	}
 }
 
-type singleRejectTx struct {
-	conflicts.Tx
-
-	t        *testing.T
-	rejected bool
-}
-
-func (tx *singleRejectTx) Reject() error {
-	if tx.rejected {
-		tx.t.Fatalf("reject called multiple times")
-	}
-	tx.rejected = true
-	return tx.Tx.Reject()
-}
-
 func RejectingSlowDependencyTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
+	purpleTransitionID := ids.Empty.Prefix(100)
 	conflictID := ids.Empty.Prefix(101)
-	purple := &singleAcceptTx{
-		Tx: &conflicts.TestTx{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.Empty.Prefix(100),
-				StatusV: choices.Processing,
-			},
-			InputIDsV:     []ids.ID{conflictID},
-			DependenciesV: []conflicts.Tx{Red},
+	cyanTransitionID := ids.Empty.Prefix(102)
+	purple := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     purpleTransitionID.Prefix(0),
+			StatusV: choices.Processing,
 		},
-		t: t,
+		TransitionV: &conflicts.TestTransition{
+			IDV:           purpleTransitionID,
+			DependenciesV: []ids.ID{Red.Transition().ID()},
+			InputIDsV:     []ids.ID{conflictID},
+		},
 	}
-	cyan := &singleRejectTx{
-		Tx: &conflicts.TestTx{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.Empty.Prefix(102),
-				StatusV: choices.Processing,
-			},
+	cyan := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     cyanTransitionID.Prefix(0),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &conflicts.TestTransition{
+			IDV:       cyanTransitionID,
 			InputIDsV: []ids.ID{conflictID},
 		},
-		t: t,
 	}
 
 	params := sbcon.Parameters{
@@ -1105,56 +1072,6 @@ func RejectingSlowDependencyTest(t *testing.T, factory Factory) {
 	}
 }
 
-func InvalidAddTest(t *testing.T, factory Factory) {
-	graph := factory.New()
-
-	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-	}
-	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := &choices.TestDecidable{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Processing,
-	}
-
-	err = graph.Add(tx)
-	assert.Error(t, err)
-}
-
-func InvalidConflictsTest(t *testing.T, factory Factory) {
-	graph := factory.New()
-
-	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-	}
-	err := graph.Initialize(snow.DefaultContextTest(), conflicts.New(), params)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := &choices.TestDecidable{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Processing,
-	}
-
-	_, err = graph.Conflicts(tx)
-	assert.Error(t, err)
-}
-
 func ConflictsTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
@@ -1178,7 +1095,9 @@ func ConflictsTest(t *testing.T, factory Factory) {
 			IDV:     ids.Empty.Prefix(6),
 			StatusV: choices.Processing,
 		},
-		InputIDsV: []ids.ID{conflictInputID},
+		TransitionV: &conflicts.TestTransition{
+			InputIDsV: []ids.ID{conflictInputID},
+		},
 	}
 
 	orange := &conflicts.TestTx{
@@ -1186,7 +1105,9 @@ func ConflictsTest(t *testing.T, factory Factory) {
 			IDV:     ids.Empty.Prefix(7),
 			StatusV: choices.Processing,
 		},
-		InputIDsV: []ids.ID{conflictInputID},
+		TransitionV: &conflicts.TestTransition{
+			InputIDsV: []ids.ID{conflictInputID},
+		},
 	}
 
 	if err := graph.Add(purple); err != nil {
@@ -1220,29 +1141,43 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	rogue1 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.Empty.Prefix(0),
-		StatusV: choices.Processing,
-	}}
-	rogue2 := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.Empty.Prefix(1),
-		StatusV: choices.Processing,
-	}}
-	virtuous := &conflicts.TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2),
-			StatusV: choices.Processing,
-		},
-		DependenciesV: []conflicts.Tx{rogue1},
-	}
-
+	rogue1TransitionID := ids.Empty.Prefix(0)
+	rogue2TransitionID := ids.Empty.Prefix(1)
+	virtuousTransitionID := ids.Empty.Prefix(2)
 	input1 := ids.Empty.Prefix(3)
 	input2 := ids.Empty.Prefix(4)
 
-	rogue1.InputIDsV = append(rogue1.InputIDsV, input1)
-	rogue2.InputIDsV = append(rogue2.InputIDsV, input1)
-
-	virtuous.InputIDsV = append(virtuous.InputIDsV, input2)
+	rogue1 := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     rogue1TransitionID.Prefix(0),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &conflicts.TestTransition{
+			IDV:       rogue1TransitionID,
+			InputIDsV: []ids.ID{input1},
+		},
+	}
+	rogue2 := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     rogue2TransitionID.Prefix(0),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &conflicts.TestTransition{
+			IDV:       rogue2TransitionID,
+			InputIDsV: []ids.ID{input1},
+		},
+	}
+	virtuous := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     virtuousTransitionID.Prefix(0),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &conflicts.TestTransition{
+			IDV:           virtuousTransitionID,
+			DependenciesV: []ids.ID{rogue1.Transition().ID()},
+			InputIDsV:     []ids.ID{input2},
+		},
+	}
 
 	if err := graph.Add(rogue1); err != nil {
 		t.Fatal(err)
@@ -1273,12 +1208,16 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
-	purple := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.Empty.Prefix(7),
-		AcceptV: errors.New(""),
-		StatusV: choices.Processing,
-	}}
-	purple.InputIDsV = append(purple.InputIDsV, ids.Empty.Prefix(4))
+	purple := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(7),
+			AcceptV: errors.New(""),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &conflicts.TestTransition{
+			InputIDsV: []ids.ID{ids.Empty.Prefix(4)},
+		},
+	}
 
 	params := sbcon.Parameters{
 		Metrics:           prometheus.NewRegistry(),
@@ -1309,18 +1248,26 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 
 	X := ids.Empty.Prefix(4)
 
-	purple := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.Empty.Prefix(7),
-		StatusV: choices.Processing,
-	}}
-	purple.InputIDsV = append(purple.InputIDsV, X)
+	purple := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(7),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &conflicts.TestTransition{
+			InputIDsV: []ids.ID{X},
+		},
+	}
 
-	pink := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.Empty.Prefix(8),
-		RejectV: errors.New(""),
-		StatusV: choices.Processing,
-	}}
-	pink.InputIDsV = append(pink.InputIDsV, X)
+	pink := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(8),
+			RejectV: errors.New(""),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &conflicts.TestTransition{
+			InputIDsV: []ids.ID{X},
+		},
+	}
 
 	params := sbcon.Parameters{
 		Metrics:           prometheus.NewRegistry(),
@@ -1353,18 +1300,26 @@ func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory)
 
 	X := ids.Empty.Prefix(4)
 
-	purple := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.Empty.Prefix(7),
-		StatusV: choices.Processing,
-	}}
-	purple.InputIDsV = append(purple.InputIDsV, X)
+	purple := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(7),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &conflicts.TestTransition{
+			InputIDsV: []ids.ID{X},
+		},
+	}
 
-	pink := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.Empty.Prefix(8),
-		RejectV: errors.New(""),
-		StatusV: choices.Processing,
-	}}
-	pink.InputIDsV = append(pink.InputIDsV, X)
+	pink := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(8),
+			RejectV: errors.New(""),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &conflicts.TestTransition{
+			InputIDsV: []ids.ID{X},
+		},
+	}
 
 	params := sbcon.Parameters{
 		Metrics:           prometheus.NewRegistry(),
@@ -1490,10 +1445,10 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 
 	{
 		expected := prefix + "(\n" +
-			"    Choice[0] = ID:  LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq SB(NumSuccessfulPolls = 1, Confidence = 1)\n" +
-			"    Choice[1] = ID:  TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES SB(NumSuccessfulPolls = 0, Confidence = 0)\n" +
-			"    Choice[2] = ID:  Zda4gsqTjRaX6XVZekVNi3ovMFPHDRQiGbzYuAb7Nwqy1rGBc SB(NumSuccessfulPolls = 0, Confidence = 0)\n" +
-			"    Choice[3] = ID: 2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w SB(NumSuccessfulPolls = 1, Confidence = 1)\n" +
+			"    Choice[0] = ID:  f3gVAZfDW3DjMnu2t1HWRwMQ4QmJg4Sm6nBhbsb6b7rVWFDdy SB(NumSuccessfulPolls = 1, Confidence = 1)\n" +
+			"    Choice[1] = ID:  pxM84sbqbwLzS7T3iVCygbMFLroJYMcZGf4AVKk2fDNTJMLdb SB(NumSuccessfulPolls = 0, Confidence = 0)\n" +
+			"    Choice[2] = ID: 24Sage1EvWyFFCGNuGxEPXZkh7ghyPLjHdAocBUADmeCAMhgCJ SB(NumSuccessfulPolls = 0, Confidence = 0)\n" +
+			"    Choice[3] = ID: 2gaBa2iQAps2NdgJJYpPkFtiyzWwyRPJuRcRN3kytmHXydXnsy SB(NumSuccessfulPolls = 1, Confidence = 1)\n" +
 			")"
 		if str := graph.String(); str != expected {
 			t.Fatalf("Expected %s, got %s", expected, str)
@@ -1524,10 +1479,10 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 
 	{
 		expected := prefix + "(\n" +
-			"    Choice[0] = ID:  LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
-			"    Choice[1] = ID:  TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES SB(NumSuccessfulPolls = 1, Confidence = 1)\n" +
-			"    Choice[2] = ID:  Zda4gsqTjRaX6XVZekVNi3ovMFPHDRQiGbzYuAb7Nwqy1rGBc SB(NumSuccessfulPolls = 1, Confidence = 1)\n" +
-			"    Choice[3] = ID: 2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
+			"    Choice[0] = ID:  f3gVAZfDW3DjMnu2t1HWRwMQ4QmJg4Sm6nBhbsb6b7rVWFDdy SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
+			"    Choice[1] = ID:  pxM84sbqbwLzS7T3iVCygbMFLroJYMcZGf4AVKk2fDNTJMLdb SB(NumSuccessfulPolls = 1, Confidence = 1)\n" +
+			"    Choice[2] = ID: 24Sage1EvWyFFCGNuGxEPXZkh7ghyPLjHdAocBUADmeCAMhgCJ SB(NumSuccessfulPolls = 1, Confidence = 1)\n" +
+			"    Choice[3] = ID: 2gaBa2iQAps2NdgJJYpPkFtiyzWwyRPJuRcRN3kytmHXydXnsy SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
 			")"
 		if str := graph.String(); str != expected {
 			t.Fatalf("Expected %s, got %s", expected, str)
@@ -1555,10 +1510,10 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 
 	{
 		expected := prefix + "(\n" +
-			"    Choice[0] = ID:  LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
-			"    Choice[1] = ID:  TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
-			"    Choice[2] = ID:  Zda4gsqTjRaX6XVZekVNi3ovMFPHDRQiGbzYuAb7Nwqy1rGBc SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
-			"    Choice[3] = ID: 2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
+			"    Choice[0] = ID:  f3gVAZfDW3DjMnu2t1HWRwMQ4QmJg4Sm6nBhbsb6b7rVWFDdy SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
+			"    Choice[1] = ID:  pxM84sbqbwLzS7T3iVCygbMFLroJYMcZGf4AVKk2fDNTJMLdb SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
+			"    Choice[2] = ID: 24Sage1EvWyFFCGNuGxEPXZkh7ghyPLjHdAocBUADmeCAMhgCJ SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
+			"    Choice[3] = ID: 2gaBa2iQAps2NdgJJYpPkFtiyzWwyRPJuRcRN3kytmHXydXnsy SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
 			")"
 		if str := graph.String(); str != expected {
 			t.Fatalf("Expected %s, got %s", expected, str)
@@ -1585,10 +1540,10 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 
 	{
 		expected := prefix + "(\n" +
-			"    Choice[0] = ID:  LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
-			"    Choice[1] = ID:  TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES SB(NumSuccessfulPolls = 2, Confidence = 1)\n" +
-			"    Choice[2] = ID:  Zda4gsqTjRaX6XVZekVNi3ovMFPHDRQiGbzYuAb7Nwqy1rGBc SB(NumSuccessfulPolls = 2, Confidence = 1)\n" +
-			"    Choice[3] = ID: 2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
+			"    Choice[0] = ID:  f3gVAZfDW3DjMnu2t1HWRwMQ4QmJg4Sm6nBhbsb6b7rVWFDdy SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
+			"    Choice[1] = ID:  pxM84sbqbwLzS7T3iVCygbMFLroJYMcZGf4AVKk2fDNTJMLdb SB(NumSuccessfulPolls = 2, Confidence = 1)\n" +
+			"    Choice[2] = ID: 24Sage1EvWyFFCGNuGxEPXZkh7ghyPLjHdAocBUADmeCAMhgCJ SB(NumSuccessfulPolls = 2, Confidence = 1)\n" +
+			"    Choice[3] = ID: 2gaBa2iQAps2NdgJJYpPkFtiyzWwyRPJuRcRN3kytmHXydXnsy SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
 			")"
 		if str := graph.String(); str != expected {
 			t.Fatalf("Expected %s, got %s", expected, str)

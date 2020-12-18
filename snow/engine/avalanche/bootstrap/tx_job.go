@@ -20,11 +20,12 @@ import (
 type txParser struct {
 	log                     logging.Logger
 	numAccepted, numDropped prometheus.Counter
+	manager                 vertex.Manager
 	vm                      vertex.DAGVM
 }
 
 func (p *txParser) Parse(txBytes []byte) (queue.Job, error) {
-	tx, err := p.vm.Parse(txBytes)
+	tx, err := p.manager.ParseTx(txBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -33,6 +34,7 @@ func (p *txParser) Parse(txBytes []byte) (queue.Job, error) {
 		numAccepted: p.numAccepted,
 		numDropped:  p.numDropped,
 		tx:          tx,
+		vm:          p.vm,
 	}, nil
 }
 
@@ -40,14 +42,16 @@ type txJob struct {
 	log                     logging.Logger
 	numAccepted, numDropped prometheus.Counter
 	tx                      conflicts.Tx
+	vm                      vertex.DAGVM
 }
 
-func (t *txJob) ID() ids.ID { return t.tx.ID() }
+func (t *txJob) ID() ids.ID { return t.tx.Transition().ID() }
 func (t *txJob) MissingDependencies() (ids.Set, error) {
 	missing := ids.Set{}
-	for _, dep := range t.tx.Dependencies() {
-		if dep.Status() != choices.Accepted {
-			missing.Add(dep.ID())
+	for _, depID := range t.tx.Transition().Dependencies() {
+		dep, err := t.vm.Get(depID)
+		if err != nil || dep.Status() != choices.Accepted {
+			missing.Add(depID)
 		}
 	}
 	return missing, nil

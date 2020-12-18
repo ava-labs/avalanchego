@@ -1410,13 +1410,13 @@ func TestTxVerifyAfterIssueTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := parsedSecondTx.Verify(); err != nil {
+	if err := parsedSecondTx.Verify(0); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
-	if err := parsedSecondTx.Accept(); err != nil {
+	if err := parsedSecondTx.Accept(0); err != nil {
 		t.Fatal(err)
 	}
 	ctx.Lock.Unlock()
@@ -1433,7 +1433,7 @@ func TestTxVerifyAfterIssueTx(t *testing.T) {
 	}
 	parsedFirstTx := txs[0]
 
-	if err := parsedFirstTx.Verify(); err == nil {
+	if err := parsedFirstTx.Verify(0); err == nil {
 		t.Fatalf("Should have errored due to a missing UTXO")
 	}
 }
@@ -1520,7 +1520,7 @@ func TestTxVerifyAfterGet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := parsedSecondTx.Verify(); err != nil {
+	if err := parsedSecondTx.Verify(0); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
@@ -1530,10 +1530,10 @@ func TestTxVerifyAfterGet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := parsedSecondTx.Accept(); err != nil {
+	if err := parsedSecondTx.Accept(0); err != nil {
 		t.Fatal(err)
 	}
-	if err := parsedFirstTx.Verify(); err == nil {
+	if err := parsedFirstTx.Verify(0); err == nil {
 		t.Fatalf("Should have errored due to a missing UTXO")
 	}
 }
@@ -1653,7 +1653,7 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := parsedSecondTx.Verify(); err != nil {
+	if err := parsedSecondTx.Verify(0); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
@@ -1666,10 +1666,10 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := parsedSecondTx.Accept(); err != nil {
+	if err := parsedSecondTx.Accept(0); err != nil {
 		t.Fatal(err)
 	}
-	if err := parsedFirstTx.Verify(); err == nil {
+	if err := parsedFirstTx.Verify(0); err == nil {
 		t.Fatalf("Should have errored due to a missing UTXO")
 	}
 }

@@ -28,6 +28,8 @@ const (
 var (
 	errUnknownVertex = errors.New("unknown vertex")
 	errWrongChainID  = errors.New("wrong ChainID in vertex")
+
+	_ vertex.Manager = &Serializer{}
 )
 
 // Serializer manages the state of multiple vertices
@@ -62,11 +64,25 @@ func (s *Serializer) Parse(b []byte) (avalanche.Vertex, error) {
 	return newUniqueVertex(s, b)
 }
 
+// Wrap implements the avalanche.State interface
+func (s *Serializer) Wrap(epoch uint32, tr conflicts.Transition, restrictions []ids.ID) (conflicts.Tx, error) {
+	return &Tx{Tr: tr}, nil
+}
+
+// ParseTx implements the avalanche.State interface
+func (s *Serializer) ParseTx(b []byte) (conflicts.Tx, error) {
+	tr, err := s.vm.Parse(b)
+	if err != nil {
+		return nil, err
+	}
+	return &Tx{Tr: tr}, nil
+}
+
 // Build implements the avalanche.State interface
 func (s *Serializer) Build(
 	epoch uint32,
 	parentIDs []ids.ID,
-	txs []conflicts.Tx,
+	transitions []conflicts.Transition,
 	restrictions []ids.ID,
 ) (avalanche.Vertex, error) {
 	height := uint64(0)
@@ -78,9 +94,9 @@ func (s *Serializer) Build(
 		height = math.Max64(height, parent.v.vtx.Height())
 	}
 
-	txBytes := make([][]byte, len(txs))
-	for i, tx := range txs {
-		txBytes[i] = tx.Bytes()
+	transitionBytes := make([][]byte, len(transitions))
+	for i, transition := range transitions {
+		transitionBytes[i] = transition.Bytes()
 	}
 
 	vtx, err := vertex.Build(
@@ -88,7 +104,7 @@ func (s *Serializer) Build(
 		height,
 		epoch,
 		parentIDs,
-		txBytes,
+		transitionBytes,
 		restrictions,
 	)
 	if err != nil {

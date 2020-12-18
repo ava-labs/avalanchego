@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -41,7 +40,7 @@ type TxState struct {
 	inputs     []ids.ID
 	inputUTXOs []*avax.UTXOID
 	utxos      []*avax.UTXO
-	deps       []conflicts.Tx
+	deps       []ids.ID
 
 	status choices.Status
 }
@@ -110,7 +109,7 @@ func (tx *UniqueTx) setStatus(status choices.Status) error {
 func (tx *UniqueTx) ID() ids.ID { return tx.txID }
 
 // Accept is called when the transaction was finalized as accepted by consensus
-func (tx *UniqueTx) Accept() error {
+func (tx *UniqueTx) Accept(epoch uint32) error {
 	if s := tx.Status(); s != choices.Processing {
 		tx.vm.ctx.Log.Error("Failed to accept tx %s because the tx is in state %s", tx.txID, s)
 		return fmt.Errorf("transaction has invalid status: %s", s)
@@ -172,7 +171,7 @@ func (tx *UniqueTx) Accept() error {
 }
 
 // Reject is called when the transaction was finalized as rejected by consensus
-func (tx *UniqueTx) Reject() error {
+func (tx *UniqueTx) Reject(epoch uint32) error {
 	defer tx.vm.db.Abort()
 
 	if err := tx.setStatus(choices.Rejected); err != nil {
@@ -202,8 +201,13 @@ func (tx *UniqueTx) Status() choices.Status {
 	return tx.status
 }
 
+func (tx *UniqueTx) Epoch() uint32 {
+	tx.refresh()
+	return 0
+}
+
 // Dependencies returns the set of transactions this transaction builds on
-func (tx *UniqueTx) Dependencies() []conflicts.Tx {
+func (tx *UniqueTx) Dependencies() []ids.ID {
 	tx.refresh()
 	if tx.Tx == nil || len(tx.deps) != 0 {
 		return tx.deps
@@ -219,10 +223,7 @@ func (tx *UniqueTx) Dependencies() []conflicts.Tx {
 			continue
 		}
 		txIDs.Add(txID)
-		tx.deps = append(tx.deps, &UniqueTx{
-			vm:   tx.vm,
-			txID: txID,
-		})
+		tx.deps = append(tx.deps, txID)
 	}
 	consumedIDs := tx.Tx.ConsumedAssetIDs()
 	for assetID := range tx.Tx.AssetIDs() {
@@ -230,10 +231,7 @@ func (tx *UniqueTx) Dependencies() []conflicts.Tx {
 			continue
 		}
 		txIDs.Add(assetID)
-		tx.deps = append(tx.deps, &UniqueTx{
-			vm:   tx.vm,
-			txID: assetID,
-		})
+		tx.deps = append(tx.deps, assetID)
 	}
 	return tx.deps
 }
@@ -293,7 +291,7 @@ func (tx *UniqueTx) verifyWithoutCacheWrites() error {
 }
 
 // Verify the validity of this transaction
-func (tx *UniqueTx) Verify() error {
+func (tx *UniqueTx) Verify(epoch uint32) error {
 	if err := tx.verifyWithoutCacheWrites(); err != nil {
 		return err
 	}

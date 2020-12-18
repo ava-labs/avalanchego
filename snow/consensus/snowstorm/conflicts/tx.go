@@ -8,25 +8,24 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
-// Tx consumes state.
+// Tx manages state transitions in epochs, and adds transition restrictions.
 type Tx interface {
 	choices.Decidable
 
-	// Dependencies is a list of transactions upon which this transaction
-	// depends. Each element of Dependencies must be verified before Verify is
-	// called on this transaction.
-	//
-	// Similarly, each element of Dependencies must be accepted before this
-	// transaction is accepted.
-	Dependencies() []Tx
+	// Transition is the description for the transition this transaction will
+	// perform if accepted.
+	Transition() Transition
 
-	// InputIDs is a set where each element is the ID of a piece of state that
-	// will be consumed if this transaction is accepted.
-	//
-	// In the context of a UTXO-based payments system, for example, this would
-	// be the IDs of the UTXOs consumed by this transaction
-	InputIDs() []ids.ID
+	// Epoch this transaction was issued in.
+	Epoch() uint32
 
+	// Restrictions returns a list of transition IDs that need to be performed
+	// in this transaction's epoch or later if this transaction is accepted.
+	Restrictions() []ids.ID
+
+	// Verify this transaction is currently valid to be performed.
 	Verify() error
+
+	// Bytes that fully describe this transaction.
 	Bytes() []byte
 }
