@@ -92,7 +92,7 @@ type Node struct {
 	sharedMemory atomic.Memory
 
 	// Monitors node health and runs health checks
-	healthService *health.Health
+	healthService health.CheckRegisterer
 
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
@@ -245,6 +245,7 @@ func (n *Node) initNetworking() error {
 		n.Config.DisconnectedCheckFreq,
 		n.Config.DisconnectedRestartTimeout,
 		n.Config.ApricotPhase0Time,
+		n.Config.SendQueueSize,
 	)
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
@@ -405,7 +406,7 @@ func (n *Node) initDatabase() error {
 // uses for P2P communication
 func (n *Node) initNodeID() error {
 	if !n.Config.EnableP2PTLS {
-		n.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.IP().String())))
+		n.ID = ids.ShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.IP().String())))
 		n.Log.Info("Set the node's ID to %s", n.ID)
 		return nil
 	}
@@ -542,7 +543,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
 		StakingEnabled:          n.Config.EnableStaking,
-		MaxNonStakerPendingMsgs: uint32(n.Config.MaxNonStakerPendingMsgs),
+		MaxPendingMsgs:          n.Config.MaxPendingMsgs,
+		MaxNonStakerPendingMsgs: n.Config.MaxNonStakerPendingMsgs,
 		StakerMSGPortion:        n.Config.StakerMSGPortion,
 		StakerCPUPortion:        n.Config.StakerCPUPortion,
 		Log:                     n.Log,
@@ -712,9 +714,11 @@ func (n *Node) initInfoAPI() error {
 // Assumes n.Log, n.Net, n.APIServer, n.HTTPLog already initialized
 func (n *Node) initHealthAPI() error {
 	if !n.Config.HealthAPIEnabled {
+		n.healthService = health.NewNoOpService()
 		n.Log.Info("skipping health API initialization because it has been disabled")
 		return nil
 	}
+
 	n.Log.Info("initializing Health API")
 	service := health.NewService(n.Log)
 	if err := service.RegisterHeartbeat("network.validators.heartbeat", n.Net, 5*time.Minute); err != nil {

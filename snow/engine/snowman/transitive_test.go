@@ -126,7 +126,7 @@ func TestEngineAdd(t *testing.T) {
 			t.Fatalf("Asked multiple times")
 		}
 		*asked = true
-		if !vdr.Equals(inVdr) {
+		if vdr != inVdr {
 			t.Fatalf("Asking wrong validator for block")
 		}
 		if blkID != blk.Parent().ID() {
@@ -201,7 +201,7 @@ func TestEngineQuery(t *testing.T) {
 		}
 		*asked = true
 		*getRequestID = requestID
-		if !vdr.Equals(inVdr) {
+		if vdr != inVdr {
 			t.Fatalf("Asking wrong validator for block")
 		}
 		if blk.ID() != blkID {
@@ -300,7 +300,7 @@ func TestEngineQuery(t *testing.T) {
 		}
 		*asked = true
 		*getRequestID = requestID
-		if !vdr.Equals(inVdr) {
+		if vdr != inVdr {
 			t.Fatalf("Asking wrong validator for block")
 		}
 		if blk1.ID() != blkID {
@@ -502,7 +502,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		}
 		*asked = true
 		*getRequestID = requestID
-		if !vdr0.Equals(inVdr) {
+		if vdr0 != inVdr {
 			t.Fatalf("Asking wrong validator for block")
 		}
 		if blk1.ID() != blkID {
@@ -647,7 +647,7 @@ func TestEngineFetchBlock(t *testing.T) {
 
 	added := new(bool)
 	sender.PutF = func(inVdr ids.ShortID, requestID uint32, blkID ids.ID, blk []byte) {
-		if !vdr.Equals(inVdr) {
+		if vdr != inVdr {
 			t.Fatalf("Wrong validator")
 		}
 		if requestID != 123 {
@@ -704,7 +704,7 @@ func TestEnginePushQuery(t *testing.T) {
 			t.Fatalf("Sent chit multiple times")
 		}
 		*chitted = true
-		if !inVdr.Equals(vdr) {
+		if inVdr != vdr {
 			t.Fatalf("Asking wrong validator for preference")
 		}
 		if requestID != 20 {
@@ -1471,7 +1471,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	reqID := new(uint32)
 	sender.GetF = func(reqVdr ids.ShortID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
-		if !reqVdr.Equals(vdr) {
+		if reqVdr != vdr {
 			t.Fatalf("Wrong validator requested")
 		}
 		if blkID != missingBlk.ID() {
@@ -1569,7 +1569,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	reqID := new(uint32)
 	sender.GetF = func(reqVdr ids.ShortID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
-		if !reqVdr.Equals(vdr) {
+		if reqVdr != vdr {
 			t.Fatalf("Wrong validator requested")
 		}
 		if blkID != missingBlk.ID() {

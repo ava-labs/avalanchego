@@ -111,6 +111,7 @@ type chain struct {
 // ManagerConfig ...
 type ManagerConfig struct {
 	StakingEnabled          bool // True iff the network has staking enabled
+	MaxPendingMsgs          uint32
 	MaxNonStakerPendingMsgs uint32
 	StakerMSGPortion        float64
 	StakerCPUPortion        float64
@@ -136,7 +137,7 @@ type ManagerConfig struct {
 	CriticalChains          ids.Set          // Chains that can't exit gracefully
 	WhitelistedSubnets      ids.Set          // Subnets to validate
 	TimeoutManager          *timeout.Manager // Manages request timeouts when sending messages to other validators
-	HealthService           *health.Health
+	HealthService           health.CheckRegisterer
 }
 
 type manager struct {
@@ -479,7 +480,7 @@ func (m *manager) createAvalancheChain(
 		engine,
 		validators,
 		msgChan,
-		defaultChannelSize,
+		m.MaxPendingMsgs,
 		m.MaxNonStakerPendingMsgs,
 		m.StakerMSGPortion,
 		m.StakerCPUPortion,
@@ -566,7 +567,7 @@ func (m *manager) createSnowmanChain(
 		engine,
 		validators,
 		msgChan,
-		defaultChannelSize,
+		m.MaxPendingMsgs,
 		m.MaxNonStakerPendingMsgs,
 		m.StakerMSGPortion,
 		m.StakerCPUPortion,

@@ -48,7 +48,7 @@ type msgManager struct {
 // [vdrs] is the network validator set
 // [msgTracker] tracks how many messages we've received from each peer
 // [cpuTracker] tracks how much time we spend processing messages from each peer
-// [bufferSize] is the maximum number of pending messages (those we have
+// [maxPendingMsgs] is the maximum number of pending messages (those we have
 //   received but not processed.)
 // [maxNonStakerPendingMsgs] is the maximum number of pending messages from non-validators.
 func NewMsgManager(
@@ -56,14 +56,14 @@ func NewMsgManager(
 	log logging.Logger,
 	msgTracker tracker.CountingTracker,
 	cpuTracker tracker.TimeTracker,
-	bufferSize,
+	maxPendingMsgs,
 	maxNonStakerPendingMsgs uint32,
 	stakerMsgPortion,
 	stakerCPUPortion float64,
 ) MsgManager {
 	// Number of messages reserved for stakers vs. non-stakers
-	reservedMessages := uint32(stakerMsgPortion * float64(bufferSize))
-	poolMessages := bufferSize - reservedMessages
+	reservedMessages := uint32(stakerMsgPortion * float64(maxPendingMsgs))
+	poolMessages := maxPendingMsgs - reservedMessages
 
 	return &msgManager{
 		vdrs:                    vdrs,

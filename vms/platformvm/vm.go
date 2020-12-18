@@ -166,7 +166,7 @@ type VM struct {
 
 	bootstrappedTime time.Time
 
-	connections map[[20]byte]time.Time
+	connections map[ids.ShortID]time.Time
 }
 
 // Initialize this blockchain.
@@ -193,7 +193,7 @@ func (vm *VM) Initialize(
 	}
 
 	vm.droppedTxCache = cache.LRU{Size: droppedTxCacheSize}
-	vm.connections = make(map[[20]byte]time.Time)
+	vm.connections = make(map[ids.ShortID]time.Time)
 
 	// Register this VM's types with the database so we can get/put structs to/from it
 	vm.registerDBTypes()
@@ -515,7 +515,7 @@ func (vm *VM) Shutdown() error {
 
 		currentLocalTime := vm.clock.Time()
 		timeConnected := currentLocalTime
-		if realTimeConnected, isConnected := vm.connections[nodeID.Key()]; isConnected {
+		if realTimeConnected, isConnected := vm.connections[nodeID]; isConnected {
 			timeConnected = realTimeConnected
 		}
 		if timeConnected.Before(vm.bootstrappedTime) {
@@ -625,17 +625,16 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 
 // Connected implements validators.Connector
 func (vm *VM) Connected(vdrID ids.ShortID) {
-	vm.connections[vdrID.Key()] = time.Unix(vm.clock.Time().Unix(), 0)
+	vm.connections[vdrID] = time.Unix(vm.clock.Time().Unix(), 0)
 }
 
 // Disconnected implements validators.Connector
 func (vm *VM) Disconnected(vdrID ids.ShortID) {
-	vdrKey := vdrID.Key()
-	timeConnected, ok := vm.connections[vdrKey]
+	timeConnected, ok := vm.connections[vdrID]
 	if !ok {
 		return
 	}
-	delete(vm.connections, vdrKey)
+	delete(vm.connections, vdrID)
 
 	if !vm.bootstrapped {
 		return
@@ -1137,7 +1136,7 @@ func (vm *VM) calculateUptime(db database.Database, nodeID ids.ShortID, startTim
 
 	upDuration := uptime.UpDuration
 	currentLocalTime := vm.clock.Time()
-	if timeConnected, isConnected := vm.connections[nodeID.Key()]; isConnected {
+	if timeConnected, isConnected := vm.connections[nodeID]; isConnected {
 		if timeConnected.Before(vm.bootstrappedTime) {
 			timeConnected = vm.bootstrappedTime
 		}
@@ -1263,7 +1262,7 @@ func (vm *VM) getPercentConnected() (float64, error) {
 		if err != nil {
 			return 0, err
 		}
-		if _, connected := vm.connections[staker.ID().Key()]; !connected {
+		if _, connected := vm.connections[staker.ID()]; !connected {
 			continue // not connected to use --> don't include
 		}
 		connectedStake, err = safemath.Add64(connectedStake, staker.Weight())
@@ -1316,7 +1315,7 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 			return 0, fmt.Errorf("expected validator but got %T", tx.Tx.UnsignedTx)
 		}
 
-		if !validator.NodeID.Equals(nodeID) {
+		if validator.NodeID != nodeID {
 			continue
 		}
 
@@ -1364,7 +1363,7 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 			break
 		}
 
-		if !validator.NodeID.Equals(nodeID) {
+		if validator.NodeID != nodeID {
 			continue
 		}
 
