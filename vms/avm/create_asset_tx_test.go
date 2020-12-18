@@ -1468,15 +1468,11 @@ func TestManagedAsset(t *testing.T) {
 			// The asset has been created
 			managedAssetID := uniqueCreateManagedAssetTx.ID()
 
-			//updateStatusOutput := assetStatusOutput
 			updateStatusUtxoID := avax.UTXOID{TxID: managedAssetID, OutputIndex: 1}
-
 			avaxFundedUtxoID := &avax.UTXOID{TxID: managedAssetID, OutputIndex: 0}
 			avaxFundedAmt := startBalance - testTxFee
-
 			// Address --> UTXO containing the managed asset owned by that address
-			managedAssetFundedUtxoIDs := map[[20]byte]avax.UTXOID{}
-
+			managedAssetFundedUtxoID := map[[20]byte]avax.UTXOID{}
 			// Address --> Balance of managed asset owned by that address
 			managedAssetFundedAmt := map[[20]byte]uint64{}
 
@@ -1499,7 +1495,7 @@ func TestManagedAsset(t *testing.T) {
 								},
 							},
 							{ // This input is to transfer the asset
-								UTXOID: managedAssetFundedUtxoIDs[op.from.Key()],
+								UTXOID: managedAssetFundedUtxoID[op.from.Key()],
 								Asset:  avax.Asset{ID: managedAssetID},
 								In: &secp256k1fx.TransferInput{
 									Amt: managedAssetFundedAmt[op.from.Key()],
@@ -1566,11 +1562,9 @@ func TestManagedAsset(t *testing.T) {
 					// Update test data
 					avaxFundedAmt -= testTxFee
 					avaxFundedUtxoID = &avax.UTXOID{TxID: uniqueTransferTx.txID, OutputIndex: avaxOutputIndex}
-
 					managedAssetFundedAmt[op.to.Key()] = op.amt
 					managedAssetFundedAmt[op.from.Key()] -= op.amt
-					// TODO update from
-					managedAssetFundedUtxoIDs[op.to.Key()] = avax.UTXOID{TxID: uniqueTransferTx.txID, OutputIndex: 1 - avaxOutputIndex}
+					managedAssetFundedUtxoID[op.to.Key()] = avax.UTXOID{TxID: uniqueTransferTx.txID, OutputIndex: 1 - avaxOutputIndex}
 				case updateStatus:
 					unsignedTx := &OperationTx{
 						BaseTx: BaseTx{
@@ -1658,7 +1652,7 @@ func TestManagedAsset(t *testing.T) {
 					updateStatusUtxoID = avax.UTXOID{TxID: uniqueUpdateStatusTx.ID(), OutputIndex: 1}
 					if op.mint {
 						managedAssetFundedAmt[op.mintTo.Key()] += op.mintAmt
-						managedAssetFundedUtxoIDs[op.mintTo.Key()] = avax.UTXOID{TxID: updateStatusTx.ID(), OutputIndex: 2}
+						managedAssetFundedUtxoID[op.mintTo.Key()] = avax.UTXOID{TxID: updateStatusTx.ID(), OutputIndex: 2}
 					}
 				}
 			}
