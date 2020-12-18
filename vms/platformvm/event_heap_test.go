@@ -26,8 +26,8 @@ func TestTxHeapStart(t *testing.T) {
 		vm.minValidatorStake,                                               // stake amount
 		uint64(defaultGenesisTime.Unix()+1),                                // startTime
 		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()+1), // endTime
-		ids.NewShortID([20]byte{}),                                         // node ID
-		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                      // reward address
+		ids.ShortID{},                           // node ID
+		ids.ShortID{1, 2, 3, 4, 5, 6, 7},        // reward address
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 		ids.ShortEmpty,                          // change addr
@@ -41,8 +41,8 @@ func TestTxHeapStart(t *testing.T) {
 		vm.minValidatorStake,                                               // stake amount
 		uint64(defaultGenesisTime.Unix()+2),                                // startTime
 		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()+2), // endTime
-		ids.NewShortID([20]byte{1}),                                        // node ID
-		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                      // reward address
+		ids.ShortID{1},                          // node ID
+		ids.ShortID{1, 2, 3, 4, 5, 6, 7},        // reward address
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 		ids.ShortEmpty,                          // change addr
@@ -56,8 +56,8 @@ func TestTxHeapStart(t *testing.T) {
 		vm.minValidatorStake,                                               // stake amount
 		uint64(defaultGenesisTime.Unix()+3),                                // startTime
 		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()+3), // endTime
-		ids.NewShortID([20]byte{}),                                         // node ID
-		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                      // reward address
+		ids.ShortID{},                           // node ID
+		ids.ShortID{1, 2, 3, 4, 5, 6, 7},        // reward address
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 		ids.ShortEmpty,                          // change addr
@@ -101,8 +101,8 @@ func TestTxHeapStop(t *testing.T) {
 		vm.minValidatorStake,                                               // stake amount
 		uint64(defaultGenesisTime.Unix()+1),                                // startTime
 		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()+1), // endTime
-		ids.NewShortID([20]byte{}),                                         // node ID
-		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                      // reward address
+		ids.ShortID{},                           // node ID
+		ids.ShortID{1, 2, 3, 4, 5, 6, 7},        // reward address
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 		ids.ShortEmpty,                          // change addr
@@ -116,8 +116,8 @@ func TestTxHeapStop(t *testing.T) {
 		vm.minValidatorStake,                                               // stake amount
 		uint64(defaultGenesisTime.Unix()+1),                                // startTime
 		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()+2), // endTime
-		ids.NewShortID([20]byte{1}),                                        // node ID
-		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                      // reward address
+		ids.ShortID{1},                          // node ID
+		ids.ShortID{1, 2, 3, 4, 5, 6, 7},        // reward address
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 		ids.ShortEmpty,                          // change addr
@@ -131,8 +131,8 @@ func TestTxHeapStop(t *testing.T) {
 		vm.minValidatorStake,                                               // stake amount
 		uint64(defaultGenesisTime.Unix()+1),                                // startTime
 		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()+3), // endTime
-		ids.NewShortID([20]byte{}),                                         // node ID
-		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                      // reward address
+		ids.ShortID{},                           // node ID
+		ids.ShortID{1, 2, 3, 4, 5, 6, 7},        // reward address
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 		ids.ShortEmpty,                          // change addr
@@ -176,8 +176,8 @@ func TestTxHeapStartValidatorVsDelegatorOrdering(t *testing.T) {
 		vm.minValidatorStake,                                               // stake amount
 		uint64(defaultGenesisTime.Unix()+1),                                // startTime
 		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()+1), // endTime
-		ids.NewShortID([20]byte{}),                                         // node ID
-		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                      // reward address
+		ids.ShortID{},                           // node ID
+		ids.ShortID{1, 2, 3, 4, 5, 6, 7},        // reward address
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 		ids.ShortEmpty,                          // change addr
@@ -190,10 +190,10 @@ func TestTxHeapStartValidatorVsDelegatorOrdering(t *testing.T) {
 		vm.minValidatorStake,                                               // stake amount
 		uint64(defaultGenesisTime.Unix()+1),                                // startTime
 		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()+1), // endTime
-		ids.NewShortID([20]byte{}),                                         // node ID
-		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                      // reward address
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},                            // key
-		ids.ShortEmpty,                                                     // change addr
+		ids.ShortID{},                           // node ID
+		ids.ShortID{1, 2, 3, 4, 5, 6, 7},        // reward address
+		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
+		ids.ShortEmpty,                          // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -223,8 +223,8 @@ func TestTxHeapStopValidatorVsDelegatorOrdering(t *testing.T) {
 		vm.minValidatorStake,                                               // stake amount
 		uint64(defaultGenesisTime.Unix()+1),                                // startTime
 		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()+1), // endTime
-		ids.NewShortID([20]byte{}),                                         // node ID
-		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                      // reward address
+		ids.ShortID{},                           // node ID
+		ids.ShortID{1, 2, 3, 4, 5, 6, 7},        // reward address
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 		ids.ShortEmpty,                          // change addr
@@ -237,10 +237,10 @@ func TestTxHeapStopValidatorVsDelegatorOrdering(t *testing.T) {
 		vm.minValidatorStake,                                               // stake amount
 		uint64(defaultGenesisTime.Unix()+1),                                // startTime
 		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()+1), // endTime
-		ids.NewShortID([20]byte{}),                                         // node ID
-		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                      // reward address
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},                            // key
-		ids.ShortEmpty,                                                     // change addr
+		ids.ShortID{},                           // node ID
+		ids.ShortID{1, 2, 3, 4, 5, 6, 7},        // reward address
+		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
+		ids.ShortEmpty,                          // change addr
 
 	)
 	if err != nil {

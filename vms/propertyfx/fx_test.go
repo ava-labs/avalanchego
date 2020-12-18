@@ -25,7 +25,7 @@ var (
 		0x35, 0xbd, 0xcb, 0x29, 0x3a, 0xd1, 0x49, 0x32,
 		0x00,
 	}
-	addrBytes = [hashing.AddrLen]byte{
+	addr = [hashing.AddrLen]byte{
 		0x01, 0x5c, 0xce, 0x6c, 0x55, 0xd6, 0xb5, 0x09,
 		0x84, 0x5c, 0x8c, 0x4e, 0x30, 0xbe, 0xd9, 0x8d,
 		0x39, 0x1a, 0xe7, 0xf0,
@@ -75,7 +75,7 @@ func TestFxVerifyMintOperation(t *testing.T) {
 	utxo := &MintOutput{OutputOwners: secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			ids.NewShortID(addrBytes),
+			addr,
 		},
 	}}
 	op := &MintOperation{
@@ -85,7 +85,7 @@ func TestFxVerifyMintOperation(t *testing.T) {
 		MintOutput: MintOutput{OutputOwners: secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+				addr,
 			},
 		}},
 	}
@@ -116,7 +116,7 @@ func TestFxVerifyMintOperationWrongTx(t *testing.T) {
 	utxo := &MintOutput{OutputOwners: secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			ids.NewShortID(addrBytes),
+			addr,
 		},
 	}}
 	op := &MintOperation{
@@ -181,7 +181,7 @@ func TestFxVerifyMintOperationWrongCredential(t *testing.T) {
 	utxo := &MintOutput{OutputOwners: secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			ids.NewShortID(addrBytes),
+			addr,
 		},
 	}}
 	op := &MintOperation{
@@ -251,7 +251,7 @@ func TestFxVerifyMintOperationFailingVerification(t *testing.T) {
 	utxo := &MintOutput{OutputOwners: secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			ids.NewShortID(addrBytes),
+			addr,
 			ids.ShortEmpty,
 		},
 	}}
@@ -290,7 +290,7 @@ func TestFxVerifyMintOperationInvalidGroupID(t *testing.T) {
 	utxo := &MintOutput{OutputOwners: secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			ids.NewShortID(addrBytes),
+			addr,
 		},
 	}}
 	op := &MintOperation{
@@ -328,7 +328,7 @@ func TestFxVerifyTransferOperation(t *testing.T) {
 	utxo := &OwnedOutput{OutputOwners: secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			ids.NewShortID(addrBytes),
+			addr,
 		},
 	}}
 	op := &BurnOperation{Input: secp256k1fx.Input{
@@ -395,7 +395,7 @@ func TestFxVerifyTransferOperationFailedVerify(t *testing.T) {
 	utxo := &OwnedOutput{OutputOwners: secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			ids.NewShortID(addrBytes),
+			addr,
 		},
 	}}
 	op := &BurnOperation{Input: secp256k1fx.Input{
@@ -431,7 +431,7 @@ func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 	utxo := &OwnedOutput{OutputOwners: secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			ids.NewShortID(addrBytes),
+			addr,
 		},
 	}}
 

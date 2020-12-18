@@ -241,7 +241,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	reqVtxID := ids.Empty
 	sender.GetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
 		switch {
-		case !vdr.Equals(peerID):
+		case vdr != peerID:
 			t.Fatalf("Should have requested vertex from %s, requested from %s",
 				peerID, vdr)
 		case vtxID != vtxID0:
@@ -421,7 +421,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 
 	reqIDPtr := new(uint32)
 	sender.GetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
-		if !vdr.Equals(peerID) {
+		if vdr != peerID {
 			t.Fatalf("Should have requested vertex from %s, requested from %s", peerID, vdr)
 		}
 		switch vtxID {
@@ -584,7 +584,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 
 	reqIDPtr := new(uint32)
 	sender.GetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
-		if !vdr.Equals(peerID) {
+		if vdr != peerID {
 			t.Fatalf("Should have requested vertex from %s, requested from %s", peerID, vdr)
 		}
 		switch {
@@ -821,7 +821,7 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 	reqIDPtr := new(uint32)
 	requested := ids.Empty
 	sender.GetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
-		if !vdr.Equals(peerID) {
+		if vdr != peerID {
 			t.Fatalf("Should have requested vertex from %s, requested from %s", peerID, vdr)
 		}
 		switch vtxID {
@@ -945,7 +945,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 
 	requestIDs := map[ids.ID]uint32{}
 	sender.GetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
-		if !vdr.Equals(peerID) {
+		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}
 		requestIDs[vtxID] = reqID
@@ -1085,7 +1085,7 @@ func TestBootstrapperAcceptsMultiPutParents(t *testing.T) {
 
 	requestIDs := map[ids.ID]uint32{}
 	sender.GetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
-		if !vdr.Equals(peerID) {
+		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}
 		requestIDs[vtxID] = reqID

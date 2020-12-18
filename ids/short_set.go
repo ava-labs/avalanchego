@@ -10,14 +10,14 @@ const (
 )
 
 // ShortSet is a set of ShortIDs
-type ShortSet map[[20]byte]bool
+type ShortSet map[ShortID]bool
 
 func (ids *ShortSet) init(size int) {
 	if *ids == nil {
 		if minShortSetSize > size {
 			size = minShortSetSize
 		}
-		*ids = make(map[[20]byte]bool, size)
+		*ids = make(map[ShortID]bool, size)
 	}
 }
 
@@ -25,7 +25,7 @@ func (ids *ShortSet) init(size int) {
 func (ids *ShortSet) Add(idList ...ShortID) {
 	ids.init(2 * len(idList))
 	for _, id := range idList {
-		(*ids)[id.Key()] = true
+		(*ids)[id] = true
 	}
 }
 
@@ -40,7 +40,7 @@ func (ids *ShortSet) Union(idSet ShortSet) {
 // Contains returns true if the set contains this id, false otherwise
 func (ids *ShortSet) Contains(id ShortID) bool {
 	ids.init(1)
-	return (*ids)[id.Key()]
+	return (*ids)[id]
 }
 
 // Len returns the number of ids in this set
@@ -50,7 +50,7 @@ func (ids ShortSet) Len() int { return len(ids) }
 func (ids *ShortSet) Remove(idList ...ShortID) {
 	ids.init(1)
 	for _, id := range idList {
-		delete(*ids, id.Key())
+		delete(*ids, id)
 	}
 }
 
@@ -72,7 +72,7 @@ func (ids ShortSet) CappedList(size int) []ShortID {
 		if i >= size {
 			break
 		}
-		idList[i] = NewShortID(id)
+		idList[i] = id
 		i++
 	}
 	return idList
@@ -83,7 +83,7 @@ func (ids ShortSet) List() []ShortID {
 	idList := make([]ShortID, len(ids))
 	i := 0
 	for id := range ids {
-		idList[i] = NewShortID(id)
+		idList[i] = id
 		i++
 	}
 	return idList
@@ -107,12 +107,12 @@ func (ids ShortSet) String() string {
 	sb := strings.Builder{}
 	sb.WriteString("{")
 	first := true
-	for idBytes := range ids {
+	for id := range ids {
 		if !first {
 			sb.WriteString(", ")
 		}
 		first = false
-		sb.WriteString(NewShortID(idBytes).String())
+		sb.WriteString(id.String())
 	}
 	sb.WriteString("}")
 	return sb.String()

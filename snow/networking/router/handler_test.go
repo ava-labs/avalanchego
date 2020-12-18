@@ -53,8 +53,8 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	currentTime := time.Now()
 	handler.clock.Set(currentTime)
 
-	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1, currentTime.Add(-time.Second))
-	handler.GetAccepted(ids.NewShortID([20]byte{}), 1, currentTime.Add(time.Second), nil)
+	handler.GetAcceptedFrontier(ids.ShortID{}, 1, currentTime.Add(-time.Second))
+	handler.GetAccepted(ids.ShortID{}, 1, currentTime.Add(time.Second), nil)
 
 	go handler.Dispatch()
 
@@ -93,7 +93,7 @@ func TestHandlerDoesntDrop(t *testing.T) {
 		prometheus.NewRegistry(),
 	)
 
-	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1, time.Time{})
+	handler.GetAcceptedFrontier(ids.ShortID{}, 1, time.Time{})
 	go handler.Dispatch()
 
 	ticker := time.NewTicker(20 * time.Millisecond)
@@ -135,7 +135,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	}
 	go handler.Dispatch()
 
-	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1, time.Now().Add(time.Second))
+	handler.GetAcceptedFrontier(ids.ShortID{}, 1, time.Now().Add(time.Second))
 
 	ticker := time.NewTicker(20 * time.Millisecond)
 	select {

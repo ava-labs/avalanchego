@@ -67,7 +67,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 1, 0)
+	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 1, 1)
 	versionParser           = version.NewDefaultParser()
 	beaconConnectionTimeout = 1 * time.Minute
 )
@@ -245,6 +245,7 @@ func (n *Node) initNetworking() error {
 		n.Config.DisconnectedCheckFreq,
 		n.Config.DisconnectedRestartTimeout,
 		n.Config.ApricotPhase0Time,
+		n.Config.SendQueueSize,
 	)
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
@@ -405,7 +406,7 @@ func (n *Node) initDatabase() error {
 // uses for P2P communication
 func (n *Node) initNodeID() error {
 	if !n.Config.EnableP2PTLS {
-		n.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.IP().String())))
+		n.ID = ids.ShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.IP().String())))
 		n.Log.Info("Set the node's ID to %s", n.ID)
 		return nil
 	}
@@ -542,7 +543,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
 		StakingEnabled:          n.Config.EnableStaking,
-		MaxNonStakerPendingMsgs: uint32(n.Config.MaxNonStakerPendingMsgs),
+		MaxPendingMsgs:          n.Config.MaxPendingMsgs,
+		MaxNonStakerPendingMsgs: n.Config.MaxNonStakerPendingMsgs,
 		StakerMSGPortion:        n.Config.StakerMSGPortion,
 		StakerCPUPortion:        n.Config.StakerCPUPortion,
 		Log:                     n.Log,

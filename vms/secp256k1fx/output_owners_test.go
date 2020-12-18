@@ -34,7 +34,7 @@ func TestMintOutputOwnersNotEqual(t *testing.T) {
 	out1 := &OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			ids.NewShortID([20]byte{1}),
+			{1},
 		},
 	}
 	if out0.Equals(out1) {
@@ -46,8 +46,8 @@ func TestMintOutputOwnersNotSorted(t *testing.T) {
 	out := &OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			ids.NewShortID([20]byte{1}),
-			ids.NewShortID([20]byte{0}),
+			{1},
+			{0},
 		},
 	}
 	if err := out.Verify(); err == nil {

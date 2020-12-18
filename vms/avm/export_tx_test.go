@@ -922,7 +922,9 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	avaxID := genesisTx.ID()
-	assetID := ids.GenerateTestID()
+	assetID := avaxID
+	// so the inputs below are sorted
+	copy(assetID[len(assetID)-5:], []byte{255, 255, 255, 255})
 	rawTx := &Tx{UnsignedTx: &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
