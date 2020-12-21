@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"math/big"
 	"strings"
 	"sync"
@@ -40,7 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -122,14 +124,14 @@ var Codec codec.Manager
 
 func init() {
 	Codec = codec.NewDefaultManager()
-	c := codec.NewDefault()
+	c :=  linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		c.RegisterType(&UnsignedImportTx{}),
 		c.RegisterType(&UnsignedExportTx{}),
 	)
-	c.Skip(3)
+	c.SkipRegistrations(3)
 	errs.Add(
 		c.RegisterType(&secp256k1fx.TransferInput{}),
 		c.RegisterType(&secp256k1fx.MintOutput{}),
@@ -224,9 +226,6 @@ func (vm *VM) getAtomicTx(block *types.Block) *Tx {
 
 // Codec implements the secp256k1fx interface
 func (vm *VM) Codec() codec.Manager { return vm.codec }
-
-// CodecRegistry implements the secp256k1fx interface
-func (vm *VM) CodecRegistry() codec.Registry { return vm.baseCodec }
 
 // Clock implements the secp256k1fx interface
 func (vm *VM) Clock() *timer.Clock { return &vm.clock }
@@ -418,7 +417,7 @@ func (vm *VM) Initialize(
 	// so [vm.baseCodec] is a dummy codec use to fulfill the secp256k1fx VM
 	// interface. The fx will register all of its types, which can be safely
 	// ignored by the VM's codec.
-	vm.baseCodec = codec.NewDefault()
+	vm.baseCodec = linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
 
 	return vm.fx.Initialize(vm)
 }
