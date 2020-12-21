@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core"
@@ -125,7 +124,7 @@ var Codec codec.Manager
 
 func init() {
 	Codec = codec.NewDefaultManager()
-	c := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
+	c := linearcodec.NewDefault()
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -418,7 +417,7 @@ func (vm *VM) Initialize(
 	// so [vm.baseCodec] is a dummy codec use to fulfill the secp256k1fx VM
 	// interface. The fx will register all of its types, which can be safely
 	// ignored by the VM's codec.
-	vm.baseCodec = linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
+	vm.baseCodec = linearcodec.NewDefault()
 
 	return vm.fx.Initialize(vm)
 }
