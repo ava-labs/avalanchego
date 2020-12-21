@@ -137,7 +137,7 @@ func (tx *UniqueTx) Accept(epoch uint32) error {
 			return fmt.Errorf("couldn't fund UTXO: %w", err)
 		}
 		if out, ok := utxo.Out.(*secp256k1fx.ManagedAssetStatusOutput); ok {
-			if err := tx.vm.state.PutManagedAssetStatus(utxo.AssetID(), tx.Epoch(), out.Frozen, &out.Manager); err != nil {
+			if err := tx.vm.state.PutManagedAssetStatus(utxo.AssetID(), epoch, out.Frozen, &out.Manager); err != nil {
 				return fmt.Errorf("couldn't freeze asset: %w", err)
 			}
 		}
