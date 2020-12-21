@@ -18,6 +18,11 @@ func (r *RootNode) GetChild(key []Unit) Node {
 	return r.child
 }
 
+// GetNextNode returns the child
+func (r *RootNode) GetNextNode(key []Unit) Node {
+	return r.child
+}
+
 // Insert in the RootNode means the branch/leaf needs to group in a new branch
 func (r *RootNode) Insert(key []Unit, value []byte) {
 	newBranch := NewBranchNode(SharedPrefix(r.child.Key(), key), r)

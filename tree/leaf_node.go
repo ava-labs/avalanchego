@@ -21,7 +21,6 @@ func NewLeafNode(key []Unit, value []byte, parent Node) *LeafNode {
 		parent: parent,
 	}
 	l.Hash()
-	l.parent.Hash()
 
 	return l
 }
@@ -36,13 +35,19 @@ func (l *LeafNode) GetChild(key []Unit) Node {
 func (l *LeafNode) Insert(key []Unit, value []byte) {
 	if EqualUnits(l.key, key) {
 		l.value = value
-		l.Hash()
 
+		// only the value changed - rehash + request the rehash upwards
+		l.Hash()
+		l.parent.Hash()
 		return
-		// TODO UPDATE HASH UPWARDS
 	}
 
 	l.parent.Insert(key, value)
+}
+
+// GetNextNode returns itself
+func (l *LeafNode) GetNextNode(key []Unit) Node {
+	return l
 }
 
 // Delete removes this LeafNode from the parent
@@ -65,6 +70,7 @@ func (l *LeafNode) Value() []byte {
 
 func (l *LeafNode) Hash() {
 	l.hash = Hash(l.value, ToBytes(l.key))
+	l.parent.Hash()
 }
 
 func (l *LeafNode) GetHash() []byte {

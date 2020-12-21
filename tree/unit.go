@@ -1,6 +1,6 @@
 package tree
 
-var UnitSize = 2
+const UnitSize = 16
 
 type Unit byte
 
