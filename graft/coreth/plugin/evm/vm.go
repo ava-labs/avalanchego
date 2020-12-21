@@ -201,7 +201,7 @@ type VM struct {
 	genlock               sync.Mutex
 	txSubmitChan          <-chan struct{}
 	atomicTxSubmitChan    chan struct{}
-	baseCodec             codec.Codec
+	baseCodec             codec.Registry
 	codec                 codec.Manager
 	clock                 timer.Clock
 	txFee                 uint64
@@ -226,6 +226,9 @@ func (vm *VM) getAtomicTx(block *types.Block) *Tx {
 
 // Codec implements the secp256k1fx interface
 func (vm *VM) Codec() codec.Manager { return vm.codec }
+
+// CodecRegistry implements the secp256k1fx interface
+func (vm *VM) CodecRegistry() codec.Registry { return vm.baseCodec }
 
 // Clock implements the secp256k1fx interface
 func (vm *VM) Clock() *timer.Clock { return &vm.clock }
