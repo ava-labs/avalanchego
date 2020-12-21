@@ -75,7 +75,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
 		c.RegisterType(&secp256k1fx.MintOperation{}),
 		c.RegisterType(&secp256k1fx.Credential{}),
-		manager.RegisterCodec(pre110CodecVersion, c),
+		manager.RegisterCodec(preApricotCodecVersion, c),
 	)
 	if errs.Errored() {
 		return errs.Err
@@ -168,7 +168,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 					return errUnknownAssetType
 				}
 			}
-			initialState.Sort(manager, pre110CodecVersion)
+			initialState.Sort(manager, preApricotCodecVersion)
 			asset.States = append(asset.States, initialState)
 		}
 		asset.Sort()
@@ -176,7 +176,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 	g.Sort()
 
-	b, err := manager.Marshal(pre110CodecVersion, &g)
+	b, err := manager.Marshal(preApricotCodecVersion, &g)
 	if err != nil {
 		return fmt.Errorf("problem marshaling genesis: %w", err)
 	}

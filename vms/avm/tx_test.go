@@ -20,22 +20,22 @@ import (
 
 func setupCodec() (codec.GeneralCodec, codec.Manager) {
 	c := hierarchycodec.NewDefault()
-	pre110Codec := linearcodec.NewDefault()
+	preApricotCodec := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
 	errs := wrappers.Errs{}
 
 	errs.Add(
-		pre110Codec.RegisterType(&BaseTx{}),
-		pre110Codec.RegisterType(&CreateAssetTx{}),
-		pre110Codec.RegisterType(&OperationTx{}),
-		pre110Codec.RegisterType(&ImportTx{}),
-		pre110Codec.RegisterType(&ExportTx{}),
-		pre110Codec.RegisterType(&secp256k1fx.TransferInput{}),
-		pre110Codec.RegisterType(&secp256k1fx.MintOutput{}),
-		pre110Codec.RegisterType(&secp256k1fx.TransferOutput{}),
-		pre110Codec.RegisterType(&secp256k1fx.MintOperation{}),
-		pre110Codec.RegisterType(&secp256k1fx.Credential{}),
-		m.RegisterCodec(pre110CodecVersion, pre110Codec),
+		preApricotCodec.RegisterType(&BaseTx{}),
+		preApricotCodec.RegisterType(&CreateAssetTx{}),
+		preApricotCodec.RegisterType(&OperationTx{}),
+		preApricotCodec.RegisterType(&ImportTx{}),
+		preApricotCodec.RegisterType(&ExportTx{}),
+		preApricotCodec.RegisterType(&secp256k1fx.TransferInput{}),
+		preApricotCodec.RegisterType(&secp256k1fx.MintOutput{}),
+		preApricotCodec.RegisterType(&secp256k1fx.TransferOutput{}),
+		preApricotCodec.RegisterType(&secp256k1fx.MintOperation{}),
+		preApricotCodec.RegisterType(&secp256k1fx.Credential{}),
+		m.RegisterCodec(preApricotCodecVersion, preApricotCodec),
 
 		c.RegisterType(&BaseTx{}),
 		c.RegisterType(&CreateAssetTx{}),
@@ -52,7 +52,7 @@ func setupCodec() (codec.GeneralCodec, codec.Manager) {
 		c.RegisterType(&secp256k1fx.Credential{}),
 		c.RegisterType(&secp256k1fx.ManagedAssetStatusOutput{}),
 		c.RegisterType(&secp256k1fx.UpdateManagedAssetOperation{}),
-		m.RegisterCodec(currentCodecVersion, c),
+		m.RegisterCodec(apricotCodecVersion, c),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
@@ -64,12 +64,12 @@ func TestTxNil(t *testing.T) {
 	ctx := NewContext(t)
 	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(currentCodecVersion, c); err != nil {
+	if err := m.RegisterCodec(apricotCodecVersion, c); err != nil {
 		t.Fatal(err)
 	}
 
 	tx := (*Tx)(nil)
-	if err := tx.SyntacticVerify(ctx, m, currentCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, m, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Should have errored due to nil tx")
 	}
 	if err := tx.SemanticVerify(nil, nil); err == nil {
@@ -81,7 +81,7 @@ func TestTxEmpty(t *testing.T) {
 	ctx := NewContext(t)
 	_, c := setupCodec()
 	tx := &Tx{}
-	if err := tx.SyntacticVerify(ctx, c, currentCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Should have errored due to nil tx")
 	}
 }
@@ -115,11 +115,11 @@ func TestTxInvalidCredential(t *testing.T) {
 		}},
 		Creds: []verify.Verifiable{&avax.TestVerifiable{Err: errors.New("")}},
 	}
-	if err := tx.SignSECP256K1Fx(m, currentCodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(m, apricotCodecVersion, nil); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tx.SyntacticVerify(ctx, m, currentCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, m, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid credential")
 	}
 }
@@ -173,11 +173,11 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 			&avax.TestVerifiable{},
 		},
 	}
-	if err := tx.SignSECP256K1Fx(m, currentCodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(m, apricotCodecVersion, nil); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tx.SyntacticVerify(ctx, m, currentCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, m, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid unsigned tx")
 	}
 }
@@ -222,11 +222,11 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 		}},
 		Creds: []verify.Verifiable{&avax.TestVerifiable{}},
 	}
-	if err := tx.SignSECP256K1Fx(m, currentCodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(m, apricotCodecVersion, nil); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tx.SyntacticVerify(ctx, m, currentCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, m, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid unsigned tx")
 	}
 }

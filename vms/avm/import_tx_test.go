@@ -60,7 +60,7 @@ func TestImportTxSyntacticVerify(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, currentCodecVersion, ids.Empty, 0, 0, 0); err != nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -107,7 +107,7 @@ func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, currentCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to memo field being too long")
 	}
 }
@@ -255,7 +255,7 @@ func TestImportTxSerialization(t *testing.T) {
 
 	_, c := setupCodec()
 
-	if err := tx.SignSECP256K1Fx(c, currentCodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(c, apricotCodecVersion, nil); err != nil {
 		t.Fatal(err)
 	}
 	result := tx.Bytes()
@@ -263,7 +263,7 @@ func TestImportTxSerialization(t *testing.T) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", currentCodecExpected, result)
 	}
 
-	if err := tx.SignSECP256K1Fx(c, pre110CodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(c, preApricotCodecVersion, nil); err != nil {
 		t.Fatal(err)
 	}
 	result = tx.Bytes()
@@ -347,7 +347,7 @@ func TestIssueImportTx(t *testing.T) {
 			},
 		}},
 	}}
-	if err := tx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -368,7 +368,7 @@ func TestIssueImportTx(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := vm.codec.Marshal(currentCodecVersion, utxo)
+	utxoBytes, err := vm.codec.Marshal(apricotCodecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -497,7 +497,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 			},
 		}},
 	}}
-	if err := tx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
 

@@ -109,8 +109,8 @@ func GetAVAXTxFromGenesisTest(genesisBytes []byte, tb testing.TB) *Tx {
 	genesis := Genesis{}
 	if version, err := c.Unmarshal(genesisBytes, &genesis); err != nil {
 		tb.Fatal(err)
-	} else if version != pre110CodecVersion {
-		tb.Fatalf("expected codec version %d but got %d", pre110CodecVersion, version)
+	} else if version != preApricotCodecVersion {
+		tb.Fatalf("expected codec version %d but got %d", preApricotCodecVersion, version)
 	}
 
 	if len(genesis.Txs) == 0 {
@@ -131,7 +131,7 @@ func GetAVAXTxFromGenesisTest(genesisBytes []byte, tb testing.TB) *Tx {
 	tx := Tx{
 		UnsignedTx: &avaxTx.CreateAssetTx,
 	}
-	if err := tx.SignSECP256K1Fx(c, pre110CodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(c, preApricotCodecVersion, nil); err != nil {
 		tb.Fatal(err)
 	}
 
@@ -322,7 +322,7 @@ func NewTx(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
 			},
 		}},
 	}}}
-	if err := newTx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := newTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 	return newTx
@@ -601,7 +601,7 @@ func TestTxSerialization(t *testing.T) {
 
 	_, c := setupCodec()
 
-	if err := tx.SignSECP256K1Fx(c, currentCodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(c, apricotCodecVersion, nil); err != nil {
 		t.Fatal(err)
 	}
 	result := tx.Bytes()
@@ -609,7 +609,7 @@ func TestTxSerialization(t *testing.T) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", currentCodecExpected, result)
 	}
 
-	if err := tx.SignSECP256K1Fx(c, pre110CodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(c, preApricotCodecVersion, nil); err != nil {
 		t.Fatal(err)
 	}
 	result = tx.Bytes()
@@ -882,7 +882,7 @@ func TestIssueDependentTx(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := firstTx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+	if err := firstTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -909,7 +909,7 @@ func TestIssueDependentTx(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := secondTx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+	if err := secondTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1002,7 +1002,7 @@ func TestIssueNFT(t *testing.T) {
 			},
 		}},
 	}}
-	if err := createAssetTx.SignSECP256K1Fx(vm.codec, currentCodecVersion, nil); err != nil {
+	if err := createAssetTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1031,7 +1031,7 @@ func TestIssueNFT(t *testing.T) {
 			},
 		}},
 	}}
-	if err := mintNFTTx.SignNFTFx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := mintNFTTx.SignNFTFx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1065,7 +1065,7 @@ func TestIssueNFT(t *testing.T) {
 			&nftfx.Credential{},
 		},
 	}
-	if err := transferNFTTx.SignNFTFx(vm.codec, nil); err != nil {
+	if err := transferNFTTx.SignNFTFx(vm.codec, apricotCodecVersion, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1143,7 +1143,7 @@ func TestIssueProperty(t *testing.T) {
 			},
 		}},
 	}}
-	if err := createAssetTx.SignSECP256K1Fx(vm.codec, currentCodecVersion, nil); err != nil {
+	if err := createAssetTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1177,7 +1177,7 @@ func TestIssueProperty(t *testing.T) {
 		}},
 	}}
 
-	unsignedBytes, err := vm.codec.Marshal(currentCodecVersion, &mintPropertyTx.UnsignedTx)
+	unsignedBytes, err := vm.codec.Marshal(apricotCodecVersion, &mintPropertyTx.UnsignedTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1196,7 +1196,7 @@ func TestIssueProperty(t *testing.T) {
 		}},
 	})
 
-	signedBytes, err := vm.codec.Marshal(currentCodecVersion, mintPropertyTx)
+	signedBytes, err := vm.codec.Marshal(apricotCodecVersion, mintPropertyTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1223,11 +1223,11 @@ func TestIssueProperty(t *testing.T) {
 
 	burnPropertyTx.Creds = append(burnPropertyTx.Creds, &propertyfx.Credential{})
 
-	unsignedBytes, err = vm.codec.Marshal(currentCodecVersion, burnPropertyTx.UnsignedTx)
+	unsignedBytes, err = vm.codec.Marshal(apricotCodecVersion, burnPropertyTx.UnsignedTx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	signedBytes, err = vm.codec.Marshal(currentCodecVersion, burnPropertyTx)
+	signedBytes, err = vm.codec.Marshal(apricotCodecVersion, burnPropertyTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1369,7 +1369,7 @@ func TestTxVerifyAfterIssueTx(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := firstTx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+	if err := firstTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1402,7 +1402,7 @@ func TestTxVerifyAfterIssueTx(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := secondTx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+	if err := secondTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1479,7 +1479,7 @@ func TestTxVerifyAfterGet(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := firstTx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+	if err := firstTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1512,7 +1512,7 @@ func TestTxVerifyAfterGet(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := secondTx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+	if err := secondTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1579,7 +1579,7 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := firstTx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+	if err := firstTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1612,7 +1612,7 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := firstTxDescendant.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+	if err := firstTxDescendant.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1645,7 +1645,7 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := secondTx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+	if err := secondTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
 

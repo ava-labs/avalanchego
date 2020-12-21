@@ -183,7 +183,7 @@ func TestBaseTxSerialization(t *testing.T) {
 
 	_, c := setupCodec()
 
-	if err := tx.SignSECP256K1Fx(c, currentCodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(c, apricotCodecVersion, nil); err != nil {
 		t.Fatal(err)
 	}
 	result := tx.Bytes()
@@ -191,7 +191,7 @@ func TestBaseTxSerialization(t *testing.T) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", currentCodecExpected, result)
 	}
 
-	if err := tx.SignSECP256K1Fx(c, pre110CodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(c, preApricotCodecVersion, nil); err != nil {
 		t.Fatal(err)
 	}
 	result = tx.Bytes()
@@ -294,7 +294,7 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 	}}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, currentCodecVersion, ids.Empty, 0, 0, 0); err != nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -338,7 +338,7 @@ func TestBaseTxSyntacticVerifyMemoTooLarge(t *testing.T) {
 	}}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, currentCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatal("should have failed because memo is too large")
 	}
 }
@@ -348,7 +348,7 @@ func TestBaseTxSyntacticVerifyNil(t *testing.T) {
 	_, c := setupCodec()
 
 	tx := (*BaseTx)(nil)
-	if err := tx.SyntacticVerify(ctx, c, currentCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Nil BaseTx should have errored")
 	}
 }
@@ -391,7 +391,7 @@ func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 	}}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, currentCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Wrong networkID should have errored")
 	}
 }
@@ -434,7 +434,7 @@ func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
 	}}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, currentCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Wrong chain ID should have errored")
 	}
 }
@@ -468,7 +468,7 @@ func TestBaseTxSyntacticVerifyInvalidOutput(t *testing.T) {
 	}}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, currentCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Invalid output should have errored")
 	}
 }
@@ -525,7 +525,7 @@ func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 	}}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, currentCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Unsorted outputs should have errored")
 	}
 }
@@ -551,7 +551,7 @@ func TestBaseTxSyntacticVerifyInvalidInput(t *testing.T) {
 	}}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, currentCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Invalid input should have errored")
 	}
 }
@@ -614,7 +614,7 @@ func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
 	}}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, currentCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Input overflow should have errored")
 	}
 }
@@ -669,7 +669,7 @@ func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
 	}}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, currentCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Output overflow should have errored")
 	}
 }
@@ -712,7 +712,7 @@ func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
 	}}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, currentCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Insufficient funds should have errored")
 	}
 }
@@ -754,7 +754,7 @@ func TestBaseTxSyntacticVerifyUninitialized(t *testing.T) {
 		}},
 	}}
 
-	if err := tx.SyntacticVerify(ctx, c, currentCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Uninitialized tx should have errored")
 	}
 }
@@ -790,7 +790,7 @@ func TestBaseTxSemanticVerify(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := tx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -846,7 +846,7 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 			&avax.TestVerifiable{},
 		},
 	}
-	if err := tx.SignSECP256K1Fx(vm.codec, currentCodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -898,7 +898,7 @@ func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 		}},
 	}}}
 
-	if err := tx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -979,7 +979,7 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 		}},
 	}}}
 
-	if err := tx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1034,7 +1034,7 @@ func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 			},
 		},
 	}
-	if err := tx.SignSECP256K1Fx(vm.codec, currentCodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1082,7 +1082,7 @@ func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
 		}},
 	}}}
 
-	if err := tx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1131,7 +1131,7 @@ func TestBaseTxSemanticVerifyInvalidUTXO(t *testing.T) {
 		}},
 	}}}
 
-	if err := tx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1184,7 +1184,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := pendingTx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := pendingTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1226,7 +1226,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := tx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1279,7 +1279,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := pendingTx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := pendingTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1322,7 +1322,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 		}},
 	}}}
 
-	if err := tx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1417,7 +1417,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := pendingTx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := pendingTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1464,7 +1464,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 			&avax.TestVerifiable{},
 		},
 	}
-	if err := tx.SignSECP256K1Fx(vm.codec, currentCodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1559,7 +1559,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := pendingTx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := pendingTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1608,7 +1608,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 			},
 		},
 	}
-	if err := tx.SignSECP256K1Fx(vm.codec, currentCodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1717,7 +1717,7 @@ func TestBaseTxSemanticVerifyInvalidFxOutput(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := tx.SignSECP256K1Fx(vm.codec, currentCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 

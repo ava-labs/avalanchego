@@ -402,7 +402,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 			},
 		}
 
-		utxoBytes, err := vm.codec.Marshal(currentCodecVersion, utxo)
+		utxoBytes, err := vm.codec.Marshal(apricotCodecVersion, utxo)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1269,7 +1269,7 @@ func TestImportAVAX(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := vm.codec.Marshal(currentCodecVersion, utxo)
+	utxoBytes, err := vm.codec.Marshal(apricotCodecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}

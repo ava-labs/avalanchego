@@ -36,6 +36,7 @@ var (
 	errUnexpectedWhitespace         = errors.New("unexpected whitespace provided")
 	errDenominationTooLarge         = errors.New("denomination is too large")
 	errMultipleManagers             = errors.New("asset can't have multiple managers")
+	errCreateManagedAssetBadCodec   = errors.New("create managed asset tx has invalid codec version")
 )
 
 // CreateAssetTx is a transaction that creates a new asset.
@@ -126,7 +127,7 @@ func (t *CreateAssetTx) SyntacticVerify(
 	}
 
 	for _, state := range t.States {
-		if err := state.Verify(c, currentCodecVersion, numFxs); err != nil {
+		if err := state.Verify(c, codecVersion, numFxs); err != nil {
 			return err
 		}
 	}
@@ -159,6 +160,11 @@ func (t *CreateAssetTx) SyntacticVerify(
 			}
 		}
 	}
+	// Make sure the codec version is at or after the Apricot fork codec
+	if hasManager && codecVersion == preApricotCodecVersion {
+		return errCreateManagedAssetBadCodec
+	}
+
 	return nil
 }
 

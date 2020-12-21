@@ -140,8 +140,8 @@ func (t *Tx) SignSECP256K1Fx(c codec.Manager, codecVersion uint16, signers [][]*
 }
 
 // SignNFTFx ...
-func (t *Tx) SignNFTFx(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {
-	unsignedBytes, err := c.Marshal(currentCodecVersion, &t.UnsignedTx)
+func (t *Tx) SignNFTFx(c codec.Manager, codecVersion uint16, signers [][]*crypto.PrivateKeySECP256K1R) error {
+	unsignedBytes, err := c.Marshal(codecVersion, &t.UnsignedTx)
 	if err != nil {
 		return fmt.Errorf("problem creating transaction: %w", err)
 	}
@@ -161,7 +161,7 @@ func (t *Tx) SignNFTFx(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R
 		t.Creds = append(t.Creds, cred)
 	}
 
-	signedBytes, err := c.Marshal(currentCodecVersion, t)
+	signedBytes, err := c.Marshal(codecVersion, t)
 	if err != nil {
 		return fmt.Errorf("problem creating transaction: %w", err)
 	}

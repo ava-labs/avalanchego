@@ -6,6 +6,7 @@ package avax
 import (
 	"bytes"
 	"errors"
+	"sync"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
@@ -138,16 +139,16 @@ func NewPrefixedState(
 	db database.Database,
 	genesisCodec,
 	codec codec.Manager,
-	currentCodecVersion uint16,
+	codecVersionF func() uint16,
 	myChain,
 	peerChain ids.ID,
 ) *PrefixedState {
 	state := &State{
-		Cache:               &cache.LRU{Size: stateCacheSize},
-		DB:                  db,
-		GenesisCodec:        genesisCodec,
-		Codec:               codec,
-		CurrentCodecVersion: currentCodecVersion,
+		Cache:         &cache.LRU{Size: stateCacheSize},
+		DB:            db,
+		GenesisCodec:  genesisCodec,
+		Codec:         codec,
+		CodecVersionF: codecVersionF,
 	}
 	return &PrefixedState{
 		isSmaller: bytes.Compare(myChain[:], peerChain[:]) == -1,
@@ -229,12 +230,13 @@ func UniqueID(id ids.ID, prefix uint64, cacher cache.Cacher) ids.ID {
 // State is a thin wrapper around a database to provide, caching, serialization,
 // and de-serialization.
 type State struct {
+	Lock         sync.Mutex
 	Cache        cache.Cacher
 	DB           database.Database
 	GenesisCodec codec.Manager
 	Codec        codec.Manager
-	// The codec version to use when serializing
-	CurrentCodecVersion uint16
+	// Returns the codec version to use when serializing
+	CodecVersionF func() uint16
 }
 
 // UTXO attempts to load a utxo from storage.
@@ -268,7 +270,7 @@ func (s *State) SetUTXO(id ids.ID, utxo *UTXO) error {
 		return s.DB.Delete(id[:])
 	}
 
-	bytes, err := s.Codec.Marshal(s.CurrentCodecVersion, utxo)
+	bytes, err := s.Codec.Marshal(s.CodecVersionF(), utxo)
 	if err != nil {
 		return err
 	}
@@ -307,7 +309,7 @@ func (s *State) SetStatus(id ids.ID, status choices.Status) error {
 		return s.DB.Delete(id[:])
 	}
 
-	bytes, err := s.Codec.Marshal(s.CurrentCodecVersion, status)
+	bytes, err := s.Codec.Marshal(s.CodecVersionF(), status)
 	if err != nil {
 		return err
 	}

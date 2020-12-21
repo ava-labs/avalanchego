@@ -53,11 +53,11 @@ const (
 	assetToFxCacheSize = 1024
 	maxUTXOsToFetch    = 1024
 
-	// Codec version used before AvalancheGo 1.1.0
-	pre110CodecVersion = uint16(0)
+	// Codec version used before the Apricot hard fork
+	preApricotCodecVersion = uint16(0)
 
-	// Current codec version
-	currentCodecVersion = uint16(1)
+	// Codec version used starting with Apricot hard fork
+	apricotCodecVersion = uint16(1)
 )
 
 var (
@@ -72,6 +72,35 @@ var (
 	_ vertex.DAGVM = &VM{}
 )
 
+// Returns the codec that was used before version 1.1.0
+func preApricotCodec(maxSliceLen int) (codec.Codec, error) {
+	c := linearcodec.New(reflectcodec.DefaultTagName, maxSliceLen)
+	errs := wrappers.Errs{}
+	errs.Add(
+		c.RegisterType(&BaseTx{}),
+		c.RegisterType(&CreateAssetTx{}),
+		c.RegisterType(&OperationTx{}),
+		c.RegisterType(&ImportTx{}),
+		c.RegisterType(&ExportTx{}),
+		c.RegisterType(&secp256k1fx.TransferInput{}),
+		c.RegisterType(&secp256k1fx.MintOutput{}),
+		c.RegisterType(&secp256k1fx.TransferOutput{}),
+		c.RegisterType(&secp256k1fx.MintOperation{}),
+		c.RegisterType(&secp256k1fx.Credential{}),
+		c.RegisterType(&nftfx.MintOutput{}),
+		c.RegisterType(&nftfx.TransferOutput{}),
+		c.RegisterType(&nftfx.MintOperation{}),
+		c.RegisterType(&nftfx.TransferOperation{}),
+		c.RegisterType(&nftfx.Credential{}),
+		c.RegisterType(&propertyfx.MintOutput{}),
+		c.RegisterType(&propertyfx.OwnedOutput{}),
+		c.RegisterType(&propertyfx.MintOperation{}),
+		c.RegisterType(&propertyfx.BurnOperation{}),
+		c.RegisterType(&propertyfx.Credential{}),
+	)
+	return c, errs.Err
+}
+
 // VM implements the avalanche.DAGVM interface
 type VM struct {
 	metrics
@@ -83,9 +112,13 @@ type VM struct {
 	// Used to check local time
 	clock timer.Clock
 
-	genesisCodec  codec.Manager
+	// For deserializing the genesis
+	genesisCodec codec.Manager
+	// For serializing/deserializing
 	codec         codec.Manager
 	codecRegistry codec.Registry
+	// Codec version to use when serializing
+	currentCodecVersion uint16
 
 	pubsub *cjson.PubSubServer
 
@@ -139,32 +172,49 @@ func (vm *VM) Initialize(
 	vm.typeToFxIndex = map[reflect.Type]int{}
 	vm.Aliaser.Initialize()
 	vm.assetToFxCache = &cache.LRU{Size: assetToFxCacheSize}
-
 	vm.pubsub = cjson.NewPubSubServer(ctx)
 
-	gc, err := pre110Codec(1 << 20)
+	// Set up genesis codec (used to deserialize genesis)
+	gc, err := preApricotCodec(1 << 20)
 	if err != nil {
 		return fmt.Errorf("couldn't create genesis codec: %w", err)
 	}
 	vm.genesisCodec = codec.NewManager(math.MaxUint32)
-	if err := vm.genesisCodec.RegisterCodec(pre110CodecVersion, gc); err != nil {
+	if err := vm.genesisCodec.RegisterCodec(preApricotCodecVersion, gc); err != nil {
 		return fmt.Errorf("couldn't create genesis codec manager: %w", err)
 	}
 
+	// Set up regular codec
 	vm.codec = codec.NewDefaultManager()
-	pre110Codec, err := pre110Codec(linearcodec.DefaultMaxSliceLength)
+	preApricotCodec, err := preApricotCodec(linearcodec.DefaultMaxSliceLength)
 	if err != nil {
-		return fmt.Errorf("couldn't create pre-1.1.0 codec: %w", err)
+		return fmt.Errorf("couldn't create pre-apricot codec: %w", err)
 	}
-	if err := vm.codec.RegisterCodec(pre110CodecVersion, pre110Codec); err != nil {
-		return fmt.Errorf("couldn't register pre-1.1.0 codec: %w", err)
+	if err := vm.codec.RegisterCodec(preApricotCodecVersion, preApricotCodec); err != nil {
+		return fmt.Errorf("couldn't register pre-apricot codec: %w", err)
 	}
 	c := hierarchycodec.NewDefault()
-	if err := vm.codec.RegisterCodec(currentCodecVersion, c); err != nil {
+	if err := vm.codec.RegisterCodec(apricotCodecVersion, c); err != nil {
 		return fmt.Errorf("couldn't register codec: %w", err)
 	}
-	if err := vm.genesisCodec.RegisterCodec(currentCodecVersion, c); err != nil {
+	if err := vm.genesisCodec.RegisterCodec(apricotCodecVersion, c); err != nil {
 		return fmt.Errorf("couldn't register codec: %w", err)
+	}
+	// Set the codec version to use when serializing things (e.g. txs)
+	vm.currentCodecVersion = apricotCodecVersion
+	// If the Apricot fork hasn't yet happened, use the pre-apricot codec version
+	// Set a goroutine that waits until the fork time, then updates
+	// the codec version
+	// TODO remove after Apricot fork time
+	if vm.clock.Time().Before(ctx.EpochFirstTransition) {
+		vm.currentCodecVersion = preApricotCodecVersion
+		go func() {
+			untilApricotDuration := ctx.EpochFirstTransition.Sub(vm.clock.Time())
+			time.Sleep(untilApricotDuration)
+			vm.ctx.Lock.Lock()
+			vm.currentCodecVersion = apricotCodecVersion
+			vm.ctx.Lock.Unlock()
+		}()
 	}
 
 	errs := wrappers.Errs{}
@@ -212,11 +262,11 @@ func (vm *VM) Initialize(
 	vm.state = &prefixedState{
 		state: &state{
 			State: avax.State{
-				Cache:               &cache.LRU{Size: stateCacheSize},
-				DB:                  vm.db,
-				GenesisCodec:        vm.genesisCodec,
-				Codec:               vm.codec,
-				CurrentCodecVersion: currentCodecVersion,
+				Cache:         &cache.LRU{Size: stateCacheSize},
+				DB:            vm.db,
+				GenesisCodec:  vm.genesisCodec,
+				Codec:         vm.codec,
+				CodecVersionF: func() uint16 { return vm.currentCodecVersion },
 			},
 		},
 		tx:       &cache.LRU{Size: idCacheSize},
@@ -249,35 +299,6 @@ func (vm *VM) Initialize(
 	vm.walletService.pendingTxOrdering = list.New()
 
 	return vm.db.Commit()
-}
-
-// Returns the codec that was used before version 1.1.0
-func pre110Codec(maxSliceLen int) (codec.Codec, error) {
-	c := linearcodec.New(reflectcodec.DefaultTagName, maxSliceLen)
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&BaseTx{}),
-		c.RegisterType(&CreateAssetTx{}),
-		c.RegisterType(&OperationTx{}),
-		c.RegisterType(&ImportTx{}),
-		c.RegisterType(&ExportTx{}),
-		c.RegisterType(&secp256k1fx.TransferInput{}),
-		c.RegisterType(&secp256k1fx.MintOutput{}),
-		c.RegisterType(&secp256k1fx.TransferOutput{}),
-		c.RegisterType(&secp256k1fx.MintOperation{}),
-		c.RegisterType(&secp256k1fx.Credential{}),
-		c.RegisterType(&nftfx.MintOutput{}),
-		c.RegisterType(&nftfx.TransferOutput{}),
-		c.RegisterType(&nftfx.MintOperation{}),
-		c.RegisterType(&nftfx.TransferOperation{}),
-		c.RegisterType(&nftfx.Credential{}),
-		c.RegisterType(&propertyfx.MintOutput{}),
-		c.RegisterType(&propertyfx.OwnedOutput{}),
-		c.RegisterType(&propertyfx.MintOperation{}),
-		c.RegisterType(&propertyfx.BurnOperation{}),
-		c.RegisterType(&propertyfx.Credential{}),
-	)
-	return c, errs.Err
 }
 
 // Bootstrapping is called by the consensus engine when it starts bootstrapping
@@ -658,8 +679,8 @@ func (vm *VM) initAliases(genesisBytes []byte) error {
 	genesis := Genesis{}
 	if version, err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return err
-	} else if version != pre110CodecVersion {
-		return fmt.Errorf("expected codec version %d but got %d", pre110CodecVersion, version)
+	} else if version != preApricotCodecVersion {
+		return fmt.Errorf("expected codec version %d but got %d", preApricotCodecVersion, version)
 	}
 
 	for _, genesisTx := range genesis.Txs {
@@ -672,7 +693,7 @@ func (vm *VM) initAliases(genesisBytes []byte) error {
 		}
 
 		// Use the original codec so that the derived transaction ID doesn't change
-		if err := tx.SignSECP256K1Fx(vm.genesisCodec, pre110CodecVersion, nil); err != nil {
+		if err := tx.SignSECP256K1Fx(vm.genesisCodec, preApricotCodecVersion, nil); err != nil {
 			return err
 		}
 
@@ -689,8 +710,11 @@ func (vm *VM) initState(genesisBytes []byte) error {
 	genesis := Genesis{}
 	if version, err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return err
-	} else if version != pre110CodecVersion {
-		return fmt.Errorf("expected codec version %d but got %d", pre110CodecVersion, version)
+	} else if version != preApricotCodecVersion {
+		return fmt.Errorf(
+			"expected pre-apricot codec version (%d) but got %d",
+			preApricotCodecVersion,
+			version)
 	}
 
 	for _, genesisTx := range genesis.Txs {
@@ -701,7 +725,7 @@ func (vm *VM) initState(genesisBytes []byte) error {
 		tx := Tx{
 			UnsignedTx: &genesisTx.CreateAssetTx,
 		}
-		if err := tx.SignSECP256K1Fx(vm.genesisCodec, pre110CodecVersion, nil); err != nil {
+		if err := tx.SignSECP256K1Fx(vm.genesisCodec, preApricotCodecVersion, nil); err != nil {
 			return err
 		}
 
@@ -763,6 +787,17 @@ func (vm *VM) parsePrivateTx(txBytes []byte) (*Tx, error) {
 	codecVersion, err := vm.codec.Unmarshal(txBytes, tx)
 	if err != nil {
 		return nil, err
+	} else if codecVersion != preApricotCodecVersion {
+		// Make sure transactions before the Apricot fork
+		// aren't encoded using the new codec
+		// TODO: Remove after Apricot fork
+		now := time.Now()
+		if now.Before(vm.ctx.EpochFirstTransition) {
+			return nil, fmt.Errorf(
+				"tx has new codec version at %s, before hard fork time (%s)",
+				now,
+				vm.ctx.EpochFirstTransition)
+		}
 	}
 	unsignedBytes, err := vm.codec.Marshal(codecVersion, &tx.UnsignedTx)
 	if err != nil {
@@ -1220,7 +1255,7 @@ func (vm *VM) SpendNFT(
 		return nil, nil, errInsufficientFunds
 	}
 
-	sortOperationsWithSigners(ops, keys, vm.codec)
+	sortOperationsWithSigners(ops, keys, vm.codec, vm.currentCodecVersion)
 	return ops, keys, nil
 }
 
@@ -1344,7 +1379,7 @@ func (vm *VM) Mint(
 		}
 	}
 
-	sortOperationsWithSigners(ops, keys, vm.codec)
+	sortOperationsWithSigners(ops, keys, vm.codec, vm.currentCodecVersion)
 	return ops, keys, nil
 }
 
@@ -1531,7 +1566,7 @@ func (vm *VM) MintNFT(
 		return nil, nil, errAddressesCantMintAsset
 	}
 
-	sortOperationsWithSigners(ops, keys, vm.codec)
+	sortOperationsWithSigners(ops, keys, vm.codec, vm.currentCodecVersion)
 	return ops, keys, nil
 }
 

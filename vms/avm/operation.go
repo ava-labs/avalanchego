@@ -43,19 +43,20 @@ func (op *Operation) Verify(c codec.Manager) error {
 }
 
 type innerSortOperation struct {
-	ops   []*Operation
-	codec codec.Manager
+	ops          []*Operation
+	codec        codec.Manager
+	codecVersion uint16
 }
 
 func (ops *innerSortOperation) Less(i, j int) bool {
 	iOp := ops.ops[i]
 	jOp := ops.ops[j]
 
-	iBytes, err := ops.codec.Marshal(currentCodecVersion, iOp)
+	iBytes, err := ops.codec.Marshal(ops.codecVersion, iOp)
 	if err != nil {
 		return false
 	}
-	jBytes, err := ops.codec.Marshal(currentCodecVersion, jOp)
+	jBytes, err := ops.codec.Marshal(ops.codecVersion, jOp)
 	if err != nil {
 		return false
 	}
@@ -64,28 +65,37 @@ func (ops *innerSortOperation) Less(i, j int) bool {
 func (ops *innerSortOperation) Len() int      { return len(ops.ops) }
 func (ops *innerSortOperation) Swap(i, j int) { o := ops.ops; o[j], o[i] = o[i], o[j] }
 
-func sortOperations(ops []*Operation, c codec.Manager) {
-	sort.Sort(&innerSortOperation{ops: ops, codec: c})
+func sortOperations(ops []*Operation, c codec.Manager, codecVersion uint16) {
+	sort.Sort(&innerSortOperation{
+		ops:          ops,
+		codec:        c,
+		codecVersion: codecVersion,
+	})
 }
-func isSortedAndUniqueOperations(ops []*Operation, c codec.Manager) bool {
-	return utils.IsSortedAndUnique(&innerSortOperation{ops: ops, codec: c})
+func isSortedAndUniqueOperations(ops []*Operation, c codec.Manager, codecVersion uint16) bool {
+	return utils.IsSortedAndUnique(&innerSortOperation{
+		ops:          ops,
+		codec:        c,
+		codecVersion: codecVersion,
+	})
 }
 
 type innerSortOperationsWithSigners struct {
-	ops     []*Operation
-	signers [][]*crypto.PrivateKeySECP256K1R
-	codec   codec.Manager
+	ops          []*Operation
+	signers      [][]*crypto.PrivateKeySECP256K1R
+	codec        codec.Manager
+	codecVersion uint16
 }
 
 func (ops *innerSortOperationsWithSigners) Less(i, j int) bool {
 	iOp := ops.ops[i]
 	jOp := ops.ops[j]
 
-	iBytes, err := ops.codec.Marshal(currentCodecVersion, iOp)
+	iBytes, err := ops.codec.Marshal(ops.codecVersion, iOp)
 	if err != nil {
 		return false
 	}
-	jBytes, err := ops.codec.Marshal(currentCodecVersion, jOp)
+	jBytes, err := ops.codec.Marshal(ops.codecVersion, jOp)
 	if err != nil {
 		return false
 	}
@@ -97,6 +107,16 @@ func (ops *innerSortOperationsWithSigners) Swap(i, j int) {
 	ops.signers[j], ops.signers[i] = ops.signers[i], ops.signers[j]
 }
 
-func sortOperationsWithSigners(ops []*Operation, signers [][]*crypto.PrivateKeySECP256K1R, codec codec.Manager) {
-	sort.Sort(&innerSortOperationsWithSigners{ops: ops, signers: signers, codec: codec})
+func sortOperationsWithSigners(
+	ops []*Operation,
+	signers [][]*crypto.PrivateKeySECP256K1R,
+	codec codec.Manager,
+	codecVersion uint16,
+) {
+	sort.Sort(&innerSortOperationsWithSigners{
+		ops:          ops,
+		signers:      signers,
+		codec:        codec,
+		codecVersion: codecVersion,
+	})
 }

@@ -129,7 +129,7 @@ func (t *OperationTx) SyntacticVerify(
 			inputs.Add(inputID)
 		}
 	}
-	if !isSortedAndUniqueOperations(t.Ops, c) {
+	if !isSortedAndUniqueOperations(t.Ops, c, codecVersion) {
 		return errOperationsNotSortedUnique
 	}
 	return nil
