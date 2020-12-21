@@ -10,7 +10,7 @@ import "fmt"
 //     [ not found ] -> EmptyNode
 //
 type BranchNode struct {
-	nodes         map[Unit]Node // TODO this can probably be an array if it help ?
+	nodes         [UnitSize]Node
 	sharedAddress []Unit
 	parent        Node
 	hash          []byte
@@ -20,7 +20,7 @@ type BranchNode struct {
 func NewBranchNode(sharedAddress []Unit, parent Node) Node {
 	return &BranchNode{
 		sharedAddress: sharedAddress,
-		nodes:         map[Unit]Node{},
+		nodes:         [UnitSize]Node{},
 		parent:        parent,
 	}
 }
@@ -31,10 +31,6 @@ func NewBranchNode(sharedAddress []Unit, parent Node) Node {
 // it returns EmptyNode - no node in this position
 //
 func (b *BranchNode) GetChild(key []Unit) Node {
-	// key - ABCDE
-	// b.sharedAddress - AC
-	// SharedPrefix() - A != b.sharedAddress
-	// if the node CAN'T exist in this prefix return an EmptyNode
 	if !EqualUnits(SharedPrefix(b.sharedAddress, key), b.sharedAddress) {
 		return NewEmptyNode(b, key)
 	}
@@ -46,6 +42,39 @@ func (b *BranchNode) GetChild(key []Unit) Node {
 	}
 
 	return node
+}
+
+// GetNextNode returns the next node in increasing key order
+// returns Node - one of it's children
+//
+func (b *BranchNode) GetNextNode(key []Unit) Node {
+
+	// return the first, left-most child
+	if key == nil {
+		for _, node := range b.nodes {
+			if node != nil {
+				return node
+			}
+		}
+		return NewEmptyNode(b, key)
+	}
+
+	if !EqualUnits(SharedPrefix(b.sharedAddress, key), b.sharedAddress) {
+		return NewEmptyNode(b, key)
+	}
+
+	// search the next node after the address one
+	for _, node := range b.nodes[FirstNonPrefix(b.sharedAddress, key):] {
+		if node != nil {
+			// TODO Think theres a better way of doing this
+			if EqualUnits(node.Key(), key) {
+				continue
+			}
+			return node
+		}
+	}
+	// if the node CAN exist in this sharedAddress but doesn't, return an EmptyNode
+	return NewEmptyNode(b, key)
 }
 
 // Insert adds a new node in the branch
@@ -62,17 +91,25 @@ func (b *BranchNode) Insert(key []Unit, value []byte) {
 
 	// if the node already exists then it's a new suffixed address
 	// needs a new branchNode
-	if node, ok := b.nodes[FirstNonPrefix(b.sharedAddress, key)]; ok {
+	if node := b.nodes[FirstNonPrefix(b.sharedAddress, key)]; node != nil {
 		newBranch := NewBranchNode(SharedPrefix(node.Key(), key), b)
+
 		newBranch.SetChild(node)
 		newBranch.Insert(key, value)
 
 		b.nodes[FirstNonPrefix(b.sharedAddress, key)] = newBranch
+
+		// we inserted a new BranchNode - rehash the Branch
+		newBranch.Hash()
 		return
 	}
 
 	// all good, insert a LeafNode
-	b.nodes[FirstNonPrefix(b.sharedAddress, key)] = NewLeafNode(key, value, b)
+	newLeafNode := NewLeafNode(key, value, b)
+	b.nodes[FirstNonPrefix(b.sharedAddress, key)] = newLeafNode
+
+	// we inserted a new LeafNode - rehash the Branch
+	newLeafNode.Hash()
 }
 
 // Delete
@@ -83,10 +120,11 @@ func (b *BranchNode) Insert(key []Unit, value []byte) {
 //     or if there's no nodes left it deletes + requests parent the deletion
 //
 func (b *BranchNode) Delete(key []Unit) bool {
-	if _, ok := b.nodes[FirstNonPrefix(b.sharedAddress, key)]; ok {
+
+	if node := b.nodes[FirstNonPrefix(b.sharedAddress, key)]; node != nil {
 		// the child node that called the delete
 		// is either a LeafNode or an empty BranchNode
-		delete(b.nodes, FirstNonPrefix(b.sharedAddress, key))
+		b.nodes[FirstNonPrefix(b.sharedAddress, key)] = nil
 
 		// if the current BranchNode has no children
 		// delete if from the parent
@@ -133,8 +171,9 @@ func (b *BranchNode) Hash() {
 		ToBytes(b.sharedAddress),
 	}
 	for _, child := range b.nodes {
-		hashSet = append(hashSet, child.GetHash())
-
+		if child != nil {
+			hashSet = append(hashSet, child.GetHash())
+		}
 	}
 	b.hash = Hash(hashSet...)
 	b.parent.Hash()
@@ -153,6 +192,8 @@ func (b *BranchNode) Key() []Unit {
 func (b *BranchNode) Print() {
 	fmt.Printf("Branch ID: %p - SharedAddress: %v - Parent: %p \n\t↪ Nodes: %v \n", b, b.sharedAddress, b.parent, b.nodes)
 	for _, node := range b.nodes {
-		node.Print()
+		if node != nil {
+			node.Print()
+		}
 	}
 }

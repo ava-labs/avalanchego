@@ -4,6 +4,7 @@ import "golang.org/x/crypto/sha3"
 
 type Node interface {
 	GetChild(key []Unit) Node
+	GetNextNode(key []Unit) Node
 	Insert(key []Unit, value []byte)
 	Delete(key []Unit) bool
 	SetChild(node Node)
@@ -20,9 +21,9 @@ func Hash(bs ...[]byte) []byte {
 	h := make([]byte, 32)
 	d := sha3.NewShake256()
 	for _, entry := range bs {
-		d.Write(entry)
+		_, _ = d.Write(entry)
 	}
-	d.Read(h)
+	_, _ = d.Read(h)
 
 	return h
 

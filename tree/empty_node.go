@@ -25,6 +25,11 @@ func NewEmptyNode(parent Node, key []Unit) Node {
 // GetChild should never be reached
 func (e *EmptyNode) GetChild(key []Unit) Node { return nil }
 
+// GetNextNode returns itself
+func (e *EmptyNode) GetNextNode(key []Unit) Node {
+	return nil
+}
+
 // Insert requests it's parent to insert the k/v
 func (e *EmptyNode) Insert(key []Unit, value []byte) {
 	e.parent.Insert(key, value)
