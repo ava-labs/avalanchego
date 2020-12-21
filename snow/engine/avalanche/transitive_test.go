@@ -879,10 +879,13 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	gTx := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Accepted,
-	}}
+	gTx := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		TransitionV: &conflicts.TestTransition{},
+	}
 
 	utxos := []ids.ID{ids.GenerateTestID()}
 
@@ -959,6 +962,26 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 	vm.PendingF = func() []conflicts.Transition {
 		return []conflicts.Transition{tx0.Transition(), tx1.Transition()}
 	}
+	manager.WrapF = func(epoch uint32, tr conflicts.Transition, _ []ids.ID) (conflicts.Tx, error) {
+		switch tr {
+		case tx0.Transition():
+			return tx0, nil
+		case tx1.Transition():
+			return tx1, nil
+		default:
+			return nil, errMissing
+		}
+	}
+	vm.GetF = func(trID ids.ID) (conflicts.Transition, error) {
+		switch trID {
+		case tx0.Transition().ID():
+			return tx0.Transition(), nil
+		case tx1.Transition().ID():
+			return tx1.Transition(), nil
+		default:
+			return nil, errMissing
+		}
+	}
 	if err := te.Notify(common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}
@@ -1004,10 +1027,13 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	gTx := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Accepted,
-	}}
+	gTx := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		TransitionV: &conflicts.TestTransition{},
+	}
 
 	utxos := []ids.ID{ids.GenerateTestID()}
 
@@ -3439,10 +3465,13 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	gTx := &conflicts.TestTx{TestDecidable: choices.TestDecidable{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Accepted,
-	}}
+	gTx := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		TransitionV: &conflicts.TestTransition{},
+	}
 
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
