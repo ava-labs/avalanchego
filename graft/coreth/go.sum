@@ -48,6 +48,8 @@ github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da/go.mod h1:Q73ZrmV
 github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310/go.mod h1:ufUuZ+zHj4x4TnLV4JWEpy2hxWSpsRywHrMgIH9cCH8=
 github.com/ava-labs/avalanchego v1.1.0 h1:kJuOXGI+kt/jXi1TVJ0F4z1CP68YoDfYUHb4HHpjGHU=
 github.com/ava-labs/avalanchego v1.1.0/go.mod h1:Q/I7LaMv2EYL8plNVRbcpBJsDk2py2XISfov0KK1MgU=
+github.com/ava-labs/avalanchego v1.1.1 h1:rsOlMOR5jKTFqvmKgIrHnYjYeCTEA6FarcP+WNOJZwY=
+github.com/ava-labs/avalanchego v1.1.1/go.mod h1:Q/I7LaMv2EYL8plNVRbcpBJsDk2py2XISfov0KK1MgU=
 github.com/aws/aws-sdk-go v1.25.48/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
