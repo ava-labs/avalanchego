@@ -1861,8 +1861,7 @@ func TestManagedAsset(t *testing.T) {
 	}
 }
 
-// Ensure that if an asset has a manager, it has no additional minters, and that
-// an asset has at most one manager
+// Ensure that an asset has at most one manager
 func TestManagedAssetInitialState(t *testing.T) {
 	// Setup; Initialize the VM
 	genesisBytes, _, vm, _ := GenesisVM(t)
@@ -1930,12 +1929,6 @@ func TestManagedAssetInitialState(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 	}
-	mintOutput := &secp256k1fx.MintOutput{
-		OutputOwners: secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		},
-	}
 
 	// Give tx various values for States and make sure only valid ones pass verification
 	tests := []test{
@@ -1965,54 +1958,6 @@ func TestManagedAssetInitialState(t *testing.T) {
 				{
 					FxID: 0,
 					Outs: []verify.State{assetStatusOutput},
-				},
-				{
-					FxID: 0,
-					Outs: []verify.State{assetStatusOutput},
-				},
-			},
-			true,
-		},
-		{
-			"mint output and manager output",
-			[]*InitialState{
-				{
-					FxID: 0,
-					Outs: []verify.State{mintOutput, assetStatusOutput},
-				},
-			},
-			true,
-		},
-		{
-			"mint output and manager output 2",
-			[]*InitialState{
-				{
-					FxID: 0,
-					Outs: []verify.State{assetStatusOutput, mintOutput},
-				},
-			},
-			true,
-		},
-		{
-			"mint output and manager output 3",
-			[]*InitialState{
-				{
-					FxID: 0,
-					Outs: []verify.State{assetStatusOutput},
-				},
-				{
-					FxID: 0,
-					Outs: []verify.State{mintOutput},
-				},
-			},
-			true,
-		},
-		{
-			"mint output and manager output 4",
-			[]*InitialState{
-				{
-					FxID: 0,
-					Outs: []verify.State{mintOutput},
 				},
 				{
 					FxID: 0,

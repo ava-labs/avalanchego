@@ -135,26 +135,16 @@ func (t *CreateAssetTx) SyntacticVerify(
 		return errInitialStatesNotSortedUnique
 	}
 
-	// If this asset has a ManagedAssetStatusOutput, it can only have one,
-	// and it can't also have MintOutputs
+	// An asset can have at most one ManagedAssetStatusOutput
 	hasManager := false
-	hasMinters := false
 	for _, state := range t.States {
 		if state.FxID != 0 { // TODO lookup secp fx ID
 			continue
 		}
 		for _, out := range state.Outs {
-			switch out.(type) {
-			case *secp256k1fx.MintOutput:
-				if hasManager {
-					return errManagedAssetWithMinters
-				}
-				hasMinters = true
-			case *secp256k1fx.ManagedAssetStatusOutput:
+			if _, ok := out.(*secp256k1fx.ManagedAssetStatusOutput); ok {
 				if hasManager {
 					return errMultipleManagers
-				} else if hasMinters {
-					return errManagedAssetWithMinters
 				}
 				hasManager = true
 			}
