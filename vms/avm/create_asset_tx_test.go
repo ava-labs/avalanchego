@@ -915,7 +915,7 @@ func TestManagedAsset(t *testing.T) {
 
 	tests := []test{
 		{
-			"create, wrong key mint",
+			"wrong key for status update",
 			create{
 				originalFrozen: false,
 				originalManager: secp256k1fx.OutputOwners{
@@ -933,6 +933,21 @@ func TestManagedAsset(t *testing.T) {
 						},
 						frozen:  false,
 						mint:    true,
+						mintTo:  keys[1].PublicKey().Address(),
+						mintAmt: 1000,
+						keys:    []*crypto.PrivateKeySECP256K1R{keys[1]}, // not manager key
+					},
+					true,
+					3,
+				},
+				{
+					updateStatus{
+						manager: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{addrs[0]},
+						},
+						frozen:  true,
+						mint:    false,
 						mintTo:  keys[1].PublicKey().Address(),
 						mintAmt: 1000,
 						keys:    []*crypto.PrivateKeySECP256K1R{keys[1]}, // not manager key
@@ -967,6 +982,21 @@ func TestManagedAsset(t *testing.T) {
 						keys:    []*crypto.PrivateKeySECP256K1R{keys[0]},
 					},
 					true,
+					1,
+				},
+				{
+					updateStatus{
+						manager: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{addrs[0]},
+						},
+						frozen:  false,
+						mint:    true,
+						mintTo:  keys[1].PublicKey().Address(),
+						mintAmt: 1000,
+						keys:    []*crypto.PrivateKeySECP256K1R{keys[0]},
+					},
+					true,
 					2,
 				},
 			},
@@ -982,7 +1012,7 @@ func TestManagedAsset(t *testing.T) {
 				creationEpoch: 1,
 			},
 			[]step{
-				{
+				{ // mint units of the asset
 					updateStatus{
 						manager: secp256k1fx.OutputOwners{
 							Threshold: 1,
@@ -997,7 +1027,7 @@ func TestManagedAsset(t *testing.T) {
 					false,
 					3,
 				},
-				{
+				{ // transfer the asset
 					transfer{
 						amt:  1,
 						from: keys[1].PublicKey().Address(),
@@ -1007,7 +1037,7 @@ func TestManagedAsset(t *testing.T) {
 					false,
 					3,
 				},
-				{
+				{ // transfer the asset
 					transfer{
 						amt:  1,
 						from: keys[2].PublicKey().Address(),
@@ -1017,35 +1047,7 @@ func TestManagedAsset(t *testing.T) {
 					false,
 					3,
 				},
-			},
-		},
-		{
-			"create, mint, wrong transfer key",
-			create{
-				originalFrozen: false,
-				originalManager: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{addrs[0]},
-				},
-				creationEpoch: 1,
-			},
-			[]step{
-				{ // mint
-					updateStatus{
-						manager: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{addrs[0]},
-						},
-						frozen:  false,
-						mint:    true,
-						mintTo:  keys[1].PublicKey().Address(),
-						mintAmt: 1000,
-						keys:    []*crypto.PrivateKeySECP256K1R{keys[0]},
-					},
-					false,
-					3,
-				},
-				{ // use wrong key to try to transfer
+				{ // try transfer the asset with wrong key
 					transfer{
 						amt:  1,
 						from: keys[1].PublicKey().Address(),
@@ -1058,7 +1060,7 @@ func TestManagedAsset(t *testing.T) {
 			},
 		},
 		{
-			"create, mint, asset manager transfers",
+			"asset manager transfers",
 			create{
 				originalFrozen: false,
 				originalManager: secp256k1fx.OutputOwners{
@@ -1083,7 +1085,7 @@ func TestManagedAsset(t *testing.T) {
 					false,
 					3,
 				},
-				{ // Note that the asset manager, not keys[1], is spending
+				{ // Note that the asset manager, not keys[1], is signing
 					transfer{
 						amt:  1,
 						from: keys[1].PublicKey().Address(),
@@ -1096,7 +1098,7 @@ func TestManagedAsset(t *testing.T) {
 			},
 		},
 		{
-			"create, change manager, old manager mint fails, mint, transfer, old manager transfer fails, transfer",
+			"multiple manager changes and transfers",
 			create{
 				originalFrozen: false,
 				originalManager: secp256k1fx.OutputOwners{
@@ -1106,6 +1108,19 @@ func TestManagedAsset(t *testing.T) {
 				creationEpoch: 1,
 			},
 			[]step{
+				{ // Change manager too early
+					updateStatus{
+						manager: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{keys[1].PublicKey().Address()},
+						},
+						frozen: false,
+						mint:   false,
+						keys:   []*crypto.PrivateKeySECP256K1R{keys[0]},
+					},
+					true,
+					2, // Can't update status until epoch 3 (1 + 2)
+				},
 				{ // Change manager to keys[1]
 					updateStatus{
 						manager: secp256k1fx.OutputOwners{
@@ -1146,7 +1161,7 @@ func TestManagedAsset(t *testing.T) {
 						mintAmt: 1000,
 						keys:    []*crypto.PrivateKeySECP256K1R{keys[1]},
 					},
-					true,
+					true, // can't update status again until epoch 5 (3+2)
 					3,
 				},
 				{ // old manager mints in epoch after manager update
@@ -1242,7 +1257,7 @@ func TestManagedAsset(t *testing.T) {
 			},
 		},
 		{
-			"create, mint, freeze, transfer",
+			"try to transfer while frozen",
 			create{
 				originalFrozen: false,
 				originalManager: secp256k1fx.OutputOwners{
@@ -1296,6 +1311,16 @@ func TestManagedAsset(t *testing.T) {
 					},
 					true, // Should error because asset is frozen
 					5,
+				},
+				{ // try transfer as manager
+					transfer{
+						amt:  1,
+						from: keys[1].PublicKey().Address(),
+						to:   keys[2].PublicKey().Address(),
+						keys: []*crypto.PrivateKeySECP256K1R{keys[0]},
+					},
+					true, // Should error because asset is frozen
+					6,
 				},
 			},
 		},
