@@ -162,8 +162,8 @@ func (s *prefixedState) PutManagedAssetStatus(
 		return fmt.Errorf("couldn't get old asset status: %w", err)
 	} else if err == database.ErrNotFound {
 		// There is no most recent status (i.e. this is for an asset creation)
-		// so just put an empty status
-		oldStatus = &secp256k1fx.ManagedAssetStatusOutput{}
+		// so put the same status again.
+		oldStatus = status
 	}
 
 	// Serialize the old status and new status
@@ -191,8 +191,7 @@ func (s *prefixedState) PutManagedAssetStatus(
 // ManagedAssetStatus returns:
 // 1) The epoch in which the last status update occurred (or was created, if never updated)
 // 2) The most recent status update
-// 3) The status update before that, or an empty ManagedAssetStatusOutput if none exists.
-//    Will never return nil.
+// 3) The status update before that. If none exists, also returns the most recent status update.
 // Should return nil for a managed asset that has already been created.
 // Return database.ErrNotFound if the asset ID doesn't correspond to a managed asset.
 func (s *prefixedState) ManagedAssetStatus(assetID ids.ID) (

@@ -215,9 +215,7 @@ func TestPrefixedStateManagedAssetStatus(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, testEpoch, epoch)
 	require.Equal(t, testStatus, status)
-	require.NotNil(t, oldStatus)
-	require.Equal(t, oldStatus.Frozen, false)
-	require.Len(t, oldStatus.Manager.Addrs, 0)
+	require.Equal(t, testStatus, oldStatus)
 
 	// Put a new status
 	testEpoch2 := uint32(2)
