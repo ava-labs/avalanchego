@@ -21,11 +21,12 @@ var (
 // BaseTx is the basis of all transactions.
 type BaseTx struct {
 	avax.BaseTx `serialize:"true"`
+	Epoc        uint32 // TODO remove. Just using for testing right now.
 }
 
-// Epoch ... TODO implement
+// Epoch ... TODO remove/implement
 func (t *BaseTx) Epoch() uint32 {
-	return 0
+	return t.Epoc
 }
 
 // SyntacticVerify that this transaction is well-formed.

@@ -878,7 +878,6 @@ func TestCreateAssetTxSyntacticVerifyBaseTx(t *testing.T) {
 	}
 }
 
-/* TODO put this test back
 // Test managed asset functionality
 func TestManagedAsset(t *testing.T) {
 	type create struct {
@@ -1006,7 +1005,7 @@ func TestManagedAsset(t *testing.T) {
 						keys: []*crypto.PrivateKeySECP256K1R{keys[1]},
 					},
 					false,
-					1, // TODO provide epoch
+					3,
 				},
 				{
 					transfer{
@@ -1016,7 +1015,7 @@ func TestManagedAsset(t *testing.T) {
 						keys: []*crypto.PrivateKeySECP256K1R{keys[2]},
 					},
 					false,
-					1, // TODO provide epoch
+					3,
 				},
 			},
 		},
@@ -1044,7 +1043,7 @@ func TestManagedAsset(t *testing.T) {
 						keys:    []*crypto.PrivateKeySECP256K1R{keys[0]},
 					},
 					false,
-					1, // TODO provide epoch
+					3,
 				},
 				{ // use wrong key to try to transfer
 					transfer{
@@ -1054,7 +1053,7 @@ func TestManagedAsset(t *testing.T) {
 						keys: []*crypto.PrivateKeySECP256K1R{keys[2]},
 					},
 					true,
-					1, // TODO provide epoch
+					3,
 				},
 			},
 		},
@@ -1082,7 +1081,7 @@ func TestManagedAsset(t *testing.T) {
 						keys:    []*crypto.PrivateKeySECP256K1R{keys[0]},
 					},
 					false,
-					1, // TODO provide epoch
+					3,
 				},
 				{ // Note that the asset manager, not keys[1], is spending
 					transfer{
@@ -1092,7 +1091,7 @@ func TestManagedAsset(t *testing.T) {
 						keys: []*crypto.PrivateKeySECP256K1R{keys[0]},
 					},
 					false,
-					1, // TODO provide epoch
+					3,
 				},
 			},
 		},
@@ -1107,7 +1106,7 @@ func TestManagedAsset(t *testing.T) {
 				creationEpoch: 1,
 			},
 			[]step{
-				{ // Change owner to keys[1]
+				{ // Change manager to keys[1]
 					updateStatus{
 						manager: secp256k1fx.OutputOwners{
 							Threshold: 1,
@@ -1118,9 +1117,9 @@ func TestManagedAsset(t *testing.T) {
 						keys:   []*crypto.PrivateKeySECP256K1R{keys[0]},
 					},
 					false,
-					1, // TODO provide epoch
+					3,
 				},
-				{ // old manager tries to mint
+				{ // old manager mints in same epoch as manager update
 					updateStatus{
 						manager: secp256k1fx.OutputOwners{
 							Threshold: 1,
@@ -1133,9 +1132,69 @@ func TestManagedAsset(t *testing.T) {
 						keys:    []*crypto.PrivateKeySECP256K1R{keys[0]}, // old key
 					},
 					true,
-					1, // TODO provide epoch
+					3,
 				},
-				{ // mint
+				{ // new manager mints in same epoch as manager update
+					updateStatus{
+						manager: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{addrs[1]},
+						},
+						frozen:  false,
+						mint:    true,
+						mintTo:  keys[1].PublicKey().Address(),
+						mintAmt: 1000,
+						keys:    []*crypto.PrivateKeySECP256K1R{keys[1]},
+					},
+					true,
+					3,
+				},
+				{ // old manager mints in epoch after manager update
+					updateStatus{
+						manager: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{addrs[1]},
+						},
+						frozen:  false,
+						mint:    true,
+						mintTo:  keys[1].PublicKey().Address(),
+						mintAmt: 1000,
+						keys:    []*crypto.PrivateKeySECP256K1R{keys[0]}, // old key
+					},
+					true,
+					4,
+				},
+				{ // new manager mints in epoch after manager update
+					updateStatus{
+						manager: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{addrs[1]},
+						},
+						frozen:  false,
+						mint:    true,
+						mintTo:  keys[1].PublicKey().Address(),
+						mintAmt: 1000,
+						keys:    []*crypto.PrivateKeySECP256K1R{keys[1]},
+					},
+					true,
+					4,
+				},
+				{ // old manager tries to mint 2 epochs after
+					updateStatus{
+						manager: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{addrs[1]},
+						},
+						frozen:  false,
+						mint:    true,
+						mintTo:  keys[1].PublicKey().Address(),
+						mintAmt: 1000,
+						keys:    []*crypto.PrivateKeySECP256K1R{keys[0]}, // old key
+					},
+					true,
+					5,
+				},
+				{ // new manager mints 2 epochs after manager update
 					updateStatus{
 						manager: secp256k1fx.OutputOwners{
 							Threshold: 1,
@@ -1148,7 +1207,7 @@ func TestManagedAsset(t *testing.T) {
 						keys:    []*crypto.PrivateKeySECP256K1R{keys[1]},
 					},
 					false,
-					1, // TODO provide epoch
+					5,
 				},
 				{ // transfer
 					transfer{
@@ -1158,9 +1217,9 @@ func TestManagedAsset(t *testing.T) {
 						keys: []*crypto.PrivateKeySECP256K1R{keys[2]},
 					},
 					false,
-					1, // TODO provide epoch
+					5,
 				},
-				{ // old manager tries to transfer; fails
+				{ // old manager tries to transfer
 					transfer{
 						amt:  1,
 						from: keys[1].PublicKey().Address(),
@@ -1168,7 +1227,7 @@ func TestManagedAsset(t *testing.T) {
 						keys: []*crypto.PrivateKeySECP256K1R{keys[0]},
 					},
 					true,
-					1, // TODO provide epoch
+					5,
 				},
 				{ // transfer
 					transfer{
@@ -1178,7 +1237,7 @@ func TestManagedAsset(t *testing.T) {
 						keys: []*crypto.PrivateKeySECP256K1R{keys[1]},
 					},
 					false,
-					1, // TODO provide epoch
+					5,
 				},
 			},
 		},
@@ -1193,32 +1252,40 @@ func TestManagedAsset(t *testing.T) {
 				creationEpoch: 1,
 			},
 			[]step{
-				{ // mint
+				{ // mint and freeze
 					updateStatus{
 						manager: secp256k1fx.OutputOwners{
 							Threshold: 1,
 							Addrs:     []ids.ShortID{addrs[0]},
 						},
-						frozen:  false,
+						frozen:  true,
 						mint:    true,
 						mintTo:  keys[1].PublicKey().Address(),
 						mintAmt: 1000,
 						keys:    []*crypto.PrivateKeySECP256K1R{keys[0]},
 					},
 					false,
-					1, // TODO provide epoch
+					3,
 				},
-				{ // freeze
-					updateStatus{
-						manager: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-						},
-						frozen: true,
-						keys:   []*crypto.PrivateKeySECP256K1R{keys[0]},
+				{ // transfer
+					transfer{
+						amt:  1,
+						from: keys[1].PublicKey().Address(),
+						to:   keys[2].PublicKey().Address(),
+						keys: []*crypto.PrivateKeySECP256K1R{keys[1]},
 					},
-					false,
-					1, // TODO provide epoch
+					false, // Should work because freeze doesn't take effect til epoch 5
+					3,
+				},
+				{ // transfer
+					transfer{
+						amt:  1,
+						from: keys[2].PublicKey().Address(),
+						to:   keys[1].PublicKey().Address(),
+						keys: []*crypto.PrivateKeySECP256K1R{keys[2]},
+					},
+					false, // Should work because freeze doesn't take effect til epoch 5
+					4,
 				},
 				{ // transfer
 					transfer{
@@ -1228,7 +1295,7 @@ func TestManagedAsset(t *testing.T) {
 						keys: []*crypto.PrivateKeySECP256K1R{keys[1]},
 					},
 					true, // Should error because asset is frozen
-					1,    // TODO provide epoch
+					5,
 				},
 			},
 		},
@@ -1256,7 +1323,7 @@ func TestManagedAsset(t *testing.T) {
 						keys:    []*crypto.PrivateKeySECP256K1R{keys[0]},
 					},
 					false,
-					1, // TODO provide epoch
+					3,
 				},
 				{ // freeze and change owner to keys[2]
 					updateStatus{
@@ -1268,7 +1335,7 @@ func TestManagedAsset(t *testing.T) {
 						keys:   []*crypto.PrivateKeySECP256K1R{keys[0]},
 					},
 					false,
-					1, // TODO provide epoch
+					5,
 				},
 				{ // old manager tries to transfer
 					transfer{
@@ -1278,7 +1345,7 @@ func TestManagedAsset(t *testing.T) {
 						keys: []*crypto.PrivateKeySECP256K1R{keys[0]},
 					},
 					true, // asset is frozen
-					1,    // TODO provide epoch
+					7,
 				},
 				{ // manager tries to transfer
 					transfer{
@@ -1288,7 +1355,7 @@ func TestManagedAsset(t *testing.T) {
 						keys: []*crypto.PrivateKeySECP256K1R{keys[2]},
 					},
 					true, // asset is frozen
-					1,    // TODO provide epoch
+					7,
 				},
 				{ // unfreeze
 					updateStatus{
@@ -1300,7 +1367,7 @@ func TestManagedAsset(t *testing.T) {
 						keys:   []*crypto.PrivateKeySECP256K1R{keys[2]},
 					},
 					false,
-					1, // TODO provide epoch
+					7,
 				},
 				{ // old manager tries to transfer
 					transfer{
@@ -1309,8 +1376,8 @@ func TestManagedAsset(t *testing.T) {
 						to:   keys[2].PublicKey().Address(),
 						keys: []*crypto.PrivateKeySECP256K1R{keys[0]},
 					},
-					true, // keys[0] is not the owner or the manager
-					1,    // TODO provide epoch
+					true, // keys[0] is not the UTXO owner or the manager
+					9,
 				},
 				{ // manager tries to transfer
 					transfer{
@@ -1319,8 +1386,8 @@ func TestManagedAsset(t *testing.T) {
 						to:   keys[2].PublicKey().Address(),
 						keys: []*crypto.PrivateKeySECP256K1R{keys[2]},
 					},
-					false, // keys[2] is the owner
-					1,     // TODO provide epoch
+					false, // keys[2] is the manager
+					9,
 				},
 			},
 		},
@@ -1335,32 +1402,20 @@ func TestManagedAsset(t *testing.T) {
 				creationEpoch: 1,
 			},
 			[]step{
-				{ // mint
+				{ // mint and freeze
 					updateStatus{
 						manager: secp256k1fx.OutputOwners{
 							Threshold: 1,
 							Addrs:     []ids.ShortID{addrs[0]},
 						},
-						frozen:  false,
+						frozen:  true,
 						mint:    true,
 						mintTo:  keys[1].PublicKey().Address(),
 						mintAmt: 1000,
 						keys:    []*crypto.PrivateKeySECP256K1R{keys[0]},
 					},
 					false,
-					1, // TODO provide epoch
-				},
-				{ // freeze
-					updateStatus{
-						manager: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-						},
-						frozen: true,
-						keys:   []*crypto.PrivateKeySECP256K1R{keys[0]},
-					},
-					false,
-					1, // TODO provide epoch
+					3,
 				},
 				{ // transfer
 					transfer{
@@ -1369,8 +1424,18 @@ func TestManagedAsset(t *testing.T) {
 						to:   keys[2].PublicKey().Address(),
 						keys: []*crypto.PrivateKeySECP256K1R{keys[1]},
 					},
-					true, // Should error because asset is frozen
-					1,    // TODO provide epoch
+					false, // Should succeed because freeze hasn't taken effect
+					3,
+				},
+				{ // transfer as manager
+					transfer{
+						amt:  1,
+						from: keys[2].PublicKey().Address(),
+						to:   keys[1].PublicKey().Address(),
+						keys: []*crypto.PrivateKeySECP256K1R{keys[0]},
+					},
+					false, // Should succeed because freeze hasn't taken effect
+					4,
 				},
 				{ // transfer should fail even if it's manager
 					transfer{
@@ -1380,7 +1445,7 @@ func TestManagedAsset(t *testing.T) {
 						keys: []*crypto.PrivateKeySECP256K1R{keys[0]},
 					},
 					true, // Should error because asset is frozen
-					1,    // TODO provide epoch
+					5,
 				},
 				{ // unfreeze
 					updateStatus{
@@ -1392,7 +1457,7 @@ func TestManagedAsset(t *testing.T) {
 						keys:   []*crypto.PrivateKeySECP256K1R{keys[0]},
 					},
 					false,
-					1, // TODO provide epoch
+					5,
 				},
 				{
 					transfer{
@@ -1401,8 +1466,28 @@ func TestManagedAsset(t *testing.T) {
 						to:   keys[2].PublicKey().Address(),
 						keys: []*crypto.PrivateKeySECP256K1R{keys[1]},
 					},
-					false, // Should not error because asset is unfrozen
-					1,     // TODO provide epoch
+					true, // Should error because unfreeze hasn't taken effect
+					5,
+				},
+				{
+					transfer{
+						amt:  1,
+						from: keys[1].PublicKey().Address(),
+						to:   keys[2].PublicKey().Address(),
+						keys: []*crypto.PrivateKeySECP256K1R{keys[1]},
+					},
+					true, // Should error because unfreeze hasn't taken effect
+					6,
+				},
+				{
+					transfer{
+						amt:  1,
+						from: keys[1].PublicKey().Address(),
+						to:   keys[2].PublicKey().Address(),
+						keys: []*crypto.PrivateKeySECP256K1R{keys[1]},
+					},
+					false,
+					7,
 				},
 				{ // freeze and change manager
 					updateStatus{
@@ -1414,7 +1499,7 @@ func TestManagedAsset(t *testing.T) {
 						keys:   []*crypto.PrivateKeySECP256K1R{keys[0]},
 					},
 					false,
-					1, // TODO provide epoch
+					7,
 				},
 				{
 					transfer{
@@ -1423,8 +1508,18 @@ func TestManagedAsset(t *testing.T) {
 						to:   keys[1].PublicKey().Address(),
 						keys: []*crypto.PrivateKeySECP256K1R{keys[2]},
 					},
-					true, // Should error because asset is frozen
-					1,    // TODO provide epoch
+					false, // Freeze hasn't taken effect yet
+					7,
+				},
+				{
+					transfer{
+						amt:  1,
+						from: keys[1].PublicKey().Address(),
+						to:   keys[2].PublicKey().Address(),
+						keys: []*crypto.PrivateKeySECP256K1R{keys[1]},
+					},
+					false, // Freeze hasn't taken effect yet
+					8,
 				},
 				{
 					transfer{
@@ -1434,7 +1529,7 @@ func TestManagedAsset(t *testing.T) {
 						keys: []*crypto.PrivateKeySECP256K1R{keys[1]},
 					},
 					true, // Should error because asset is frozen
-					1,    // TODO provide epoch
+					9,
 				},
 				{ // unfreeze
 					updateStatus{
@@ -1446,17 +1541,17 @@ func TestManagedAsset(t *testing.T) {
 						keys:   []*crypto.PrivateKeySECP256K1R{keys[1]},
 					},
 					false,
-					1, // TODO provide epoch
+					10,
 				},
 				{
 					transfer{
 						amt:  1,
 						from: keys[2].PublicKey().Address(),
 						to:   keys[1].PublicKey().Address(),
-						keys: []*crypto.PrivateKeySECP256K1R{keys[2]},
+						keys: []*crypto.PrivateKeySECP256K1R{keys[1]},
 					},
-					false, // Should not error because asset is unfrozen
-					1,     // TODO provide epoch
+					false,
+					12,
 				},
 			},
 		},
@@ -1554,55 +1649,56 @@ func TestManagedAsset(t *testing.T) {
 				switch op := step.op.(type) {
 				case transfer:
 					// Transfer some units of the managed asset
-					transferTx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    networkID,
-						BlockchainID: chainID,
-						Ins: []*avax.TransferableInput{
-							{ // This input is for the tx fee
-								UTXOID: *avaxFundedUtxoID,
-								Asset:  avax.Asset{ID: avaxID},
-								In: &secp256k1fx.TransferInput{
-									Amt: avaxFundedAmt,
-									Input: secp256k1fx.Input{
-										SigIndices: []uint32{0},
+					transferTx := &Tx{UnsignedTx: &BaseTx{
+						BaseTx: avax.BaseTx{
+							NetworkID:    networkID,
+							BlockchainID: chainID,
+							Ins: []*avax.TransferableInput{
+								{ // This input is for the tx fee
+									UTXOID: *avaxFundedUtxoID,
+									Asset:  avax.Asset{ID: avaxID},
+									In: &secp256k1fx.TransferInput{
+										Amt: avaxFundedAmt,
+										Input: secp256k1fx.Input{
+											SigIndices: []uint32{0},
+										},
+									},
+								},
+								{ // This input is to transfer the asset
+									UTXOID: managedAssetFundedUtxoID[op.from],
+									Asset:  avax.Asset{ID: managedAssetID},
+									In: &secp256k1fx.TransferInput{
+										Amt: managedAssetFundedAmt[op.from],
+										Input: secp256k1fx.Input{
+											SigIndices: []uint32{0},
+										},
 									},
 								},
 							},
-							{ // This input is to transfer the asset
-								UTXOID: managedAssetFundedUtxoID[op.from],
-								Asset:  avax.Asset{ID: managedAssetID},
-								In: &secp256k1fx.TransferInput{
-									Amt: managedAssetFundedAmt[op.from],
-									Input: secp256k1fx.Input{
-										SigIndices: []uint32{0},
+							Outs: []*avax.TransferableOutput{
+								{ // Send AVAX change back to keys[0]
+									Asset: avax.Asset{ID: genesisTx.ID()},
+									Out: &secp256k1fx.TransferOutput{
+										Amt: avaxFundedAmt - testTxFee,
+										OutputOwners: secp256k1fx.OutputOwners{
+											Threshold: 1,
+											Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+										},
+									},
+								},
+								{ // Transfer the managed asset
+									Asset: avax.Asset{ID: managedAssetID},
+									Out: &secp256k1fx.TransferOutput{
+										Amt: op.amt,
+										OutputOwners: secp256k1fx.OutputOwners{
+											Locktime:  0,
+											Threshold: 1,
+											Addrs:     []ids.ShortID{op.to},
+										},
 									},
 								},
 							},
-						},
-						Outs: []*avax.TransferableOutput{
-							{ // Send AVAX change back to keys[0]
-								Asset: avax.Asset{ID: genesisTx.ID()},
-								Out: &secp256k1fx.TransferOutput{
-									Amt: avaxFundedAmt - testTxFee,
-									OutputOwners: secp256k1fx.OutputOwners{
-										Threshold: 1,
-										Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-									},
-								},
-							},
-							{ // Transfer the managed asset
-								Asset: avax.Asset{ID: managedAssetID},
-								Out: &secp256k1fx.TransferOutput{
-									Amt: op.amt,
-									OutputOwners: secp256k1fx.OutputOwners{
-										Locktime:  0,
-										Threshold: 1,
-										Addrs:     []ids.ShortID{op.to},
-									},
-								},
-							},
-						},
-					}}}
+						}}}
 
 					avax.SortTransferableInputs(transferTx.UnsignedTx.(*BaseTx).Ins)
 					avax.SortTransferableOutputs(transferTx.UnsignedTx.(*BaseTx).Outs, vm.codec, apricotCodecVersion)
@@ -1618,6 +1714,10 @@ func TestManagedAsset(t *testing.T) {
 					// Verify and accept the transaction
 					uniqueTransferTx, err := vm.parseTx(transferTx.Bytes())
 					require.NoError(t, err)
+					// t.Logf("type: %T", uniqueTransferTx) TODO remove
+					// t.Logf("tx type: %T", uniqueTransferTx.Tx) TODO remove
+					// t.Logf("unsigned tx type: %T", uniqueTransferTx.Tx.UnsignedTx) TODO remove
+					uniqueTransferTx.UnsignedTx.(*BaseTx).Epoc = step.verifyEpoch // TODO remove
 					err = uniqueTransferTx.Verify(step.verifyEpoch)
 					if !step.shouldFailVerify {
 						require.NoError(t, err)
@@ -1642,7 +1742,8 @@ func TestManagedAsset(t *testing.T) {
 				case updateStatus:
 					unsignedTx := &OperationTx{
 						BaseTx: BaseTx{
-							avax.BaseTx{
+							Epoc: step.verifyEpoch, // TODO remove
+							BaseTx: avax.BaseTx{
 								NetworkID:    networkID,
 								BlockchainID: chainID,
 								Outs: []*avax.TransferableOutput{{
@@ -1710,6 +1811,7 @@ func TestManagedAsset(t *testing.T) {
 					// Verify and accept the transaction
 					uniqueUpdateStatusTx, err := vm.parseTx(updateStatusTx.Bytes())
 					require.NoError(t, err)
+					uniqueUpdateStatusTx.Tx.UnsignedTx.(*OperationTx).Epoc = step.verifyEpoch
 					err = uniqueUpdateStatusTx.Verify(step.verifyEpoch)
 					if !step.shouldFailVerify {
 						require.NoError(t, err)
@@ -1733,7 +1835,6 @@ func TestManagedAsset(t *testing.T) {
 		})
 	}
 }
-*/
 
 // Ensure that if an asset has a manager, it has no additional minters, and that
 // an asset has at most one manager
