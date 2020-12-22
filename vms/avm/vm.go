@@ -942,7 +942,7 @@ func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cr
 	case fx.VerifyPermission(tx, in.In, cred, utxo.Out) == nil:
 		return nil
 	// Check whether [cred] was signed by the asset manager
-	case fx.VerifyPermission(tx, in.In, cred, status.Manager) == nil:
+	case fx.VerifyPermission(tx, in.In, cred, &status.Manager) == nil:
 		return nil
 	default:
 		return errNoPermission
