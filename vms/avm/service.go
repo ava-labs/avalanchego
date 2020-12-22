@@ -1481,7 +1481,12 @@ func (service *Service) SendAsManager(_ *http.Request, args *SendAsManagerArgs, 
 	}
 
 	// Get the manager of this asset
-	_, _, manager, err := service.vm.state.ManagedAssetStatus(assetID)
+	// TODO: Right now this method assumes that the manager of
+	// this asset is [status.Manager] but it could actually be the manager
+	// specified in the old status because 2 epochs haven't passed
+	// since the last update. Add an argument to this method to specify
+	// an epoch to issue this transaction in.
+	_, status, _, err := service.vm.state.ManagedAssetStatus(assetID)
 	if err == database.ErrNotFound {
 		return fmt.Errorf("%s is not a managed asset", assetID)
 	} else if err != nil {
@@ -1490,7 +1495,7 @@ func (service *Service) SendAsManager(_ *http.Request, args *SendAsManagerArgs, 
 
 	amountSpent, managedAssetIns, managedAssetKeys, err := spendManagedAsset(
 		assetID,
-		manager,
+		&status.Manager,
 		utxos,
 		kc,
 		uint64(args.Amount),

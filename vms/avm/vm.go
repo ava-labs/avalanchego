@@ -742,7 +742,7 @@ func (vm *VM) initState(genesisBytes []byte) error {
 				return err
 			}
 			if out, ok := utxo.Out.(*secp256k1fx.ManagedAssetStatusOutput); ok {
-				if err := vm.state.PutManagedAssetStatus(utxo.AssetID(), tx.Epoch(), out.Frozen, &out.Manager); err != nil {
+				if err := vm.state.PutManagedAssetStatus(utxo.AssetID(), tx.Epoch(), out); err != nil {
 					return fmt.Errorf("couldn't freeze asset: %w", err)
 				}
 			}
@@ -905,44 +905,48 @@ func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cr
 		return errIncompatibleFx
 	}
 
-	// Check if the UTXO's asset if frozen
-	// TODO If the asset is frozen, compare the epoch during which
-	// it was locked to the current one. Similar for unfreeze.
-	_, frozen, _, err := vm.state.ManagedAssetStatus(utxoAssetID)
-	if err != nil && err != database.ErrNotFound {
-		// Couldn't get asset status from database
-		return err
-	}
-	if err == nil && frozen { // TODO check epoch here
-		// Got asset status from database and it's frozen
-		return fmt.Errorf("asset %s is frozen", utxoAssetID)
-	}
-
 	if err := fx.VerifyTransfer(in.In, utxo.Out); err != nil {
 		return err
 	}
 
-	// See if credential [cred] gives permission to spend the UTXO
-	// based on the UTXO's output
-	err = fx.VerifyPermission(tx, in.In, cred, utxo.Out)
-	if err == nil {
+	// Check if the UTXO's asset is managed or not.
+	lastUpdatedEpoch, status, oldStatus, err := vm.state.ManagedAssetStatus(utxoAssetID)
+	switch {
+	case err != nil && err != database.ErrNotFound:
+		return err // Database error occurred while seeing if this asset is managed
+	case err != nil:
+		// This asset is not managed. Just check if credential [cred] gives permission
+		// to spend the UTXO.
+		if err := fx.VerifyPermission(tx, in.In, cred, utxo.Out); err != nil {
+			return errNoPermission
+		}
 		return nil
 	}
 
-	// Check whether [assetID] is a managed asset, and if so, who its manager is
-	_, _, manager, err := vm.state.ManagedAssetStatus(utxoAssetID)
-	if err != nil {
-		if err != database.ErrNotFound {
-			return fmt.Errorf("couldn't get asset status: %w", err)
-		}
-		return errNoPermission
+	// This asset is managed. Check whether it is frozen.
+	// If the asset's status changed in the current epoch or the
+	// one before that, ignore that status and use the old one
+	// because the new status hasn't gone into effect yet.
+	if tx.Epoch() <= lastUpdatedEpoch+1 {
+		// New status hasn't gone into effect yet.
+		status = oldStatus
+	}
+	if status.Frozen {
+		return fmt.Errorf("asset %s is frozen", utxoAssetID)
 	}
 
-	// Check whether [cred] was signed by [manager]
-	if err := fx.VerifyPermission(tx, in.In, cred, manager); err != nil {
-		return errNoPermission // It wasn't
+	// Since this is a managed asset, the credential can be signed by the asset
+	// manager or by the UTXO's owner.
+	switch {
+	// See if it was signed by the UTXO owner.
+	case fx.VerifyPermission(tx, in.In, cred, utxo.Out) == nil:
+		return nil
+	// Check whether [cred] was signed by the asset manager
+	case fx.VerifyPermission(tx, in.In, cred, status.Manager) == nil:
+		return nil
+	default:
+		return errNoPermission
 	}
-	return nil
 }
 
 func (vm *VM) verifyTransfer(tx UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable) error {
@@ -985,15 +989,15 @@ func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiab
 		// i.e. if [tx] is in epoch n, the latest possible epoch in which the status
 		// may have been updated is [n-2] .
 		// Get the epoch in which the asset's status was most recently updated
-		epoch, _, _, err := vm.state.ManagedAssetStatus(opAssetID)
+		epochLastUpdated, _, _, err := vm.state.ManagedAssetStatus(opAssetID)
 		if err != nil {
 			return fmt.Errorf("couldn't get managed asset's status: %w", err)
 		}
-		if tx.Epoch() < epoch { // TODO change this to tx.Epoch() < epoch+2
+		if tx.Epoch() <= epochLastUpdated+1 { // TODO is tx.Epoch() the right piece of data?
 			return fmt.Errorf(
 				"asset update epoch (%d) must be >= 2 + most recent status update epoch (%d)",
 				tx.Epoch(),
-				epoch,
+				epochLastUpdated,
 			)
 		}
 	}

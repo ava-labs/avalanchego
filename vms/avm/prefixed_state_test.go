@@ -199,37 +199,63 @@ func TestPrefixedStateManagedAssetStatus(t *testing.T) {
 	// Put a status
 	testAssetID := ids.GenerateTestID()
 	testEpoch := uint32(1)
-	testFrozen := true
-	testManager := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Locktime:  2,
-		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	testStatus := &secp256k1fx.ManagedAssetStatusOutput{
+		Frozen: true,
+		Manager: secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Locktime:  2,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
 	}
-	err = state.PutManagedAssetStatus(testAssetID, testEpoch, testFrozen, testManager)
+	err = state.PutManagedAssetStatus(testAssetID, testEpoch, testStatus)
 	require.NoError(t, err)
 
 	// Get the status
-	epoch, frozen, manager, err := state.ManagedAssetStatus(testAssetID)
+	epoch, status, oldStatus, err := state.ManagedAssetStatus(testAssetID)
 	require.NoError(t, err)
 	require.Equal(t, testEpoch, epoch)
-	require.Equal(t, testFrozen, frozen)
-	require.Equal(t, testManager, manager)
+	require.Equal(t, testStatus, status)
+	require.NotNil(t, oldStatus)
+	require.Equal(t, oldStatus.Frozen, false)
+	require.Len(t, oldStatus.Manager.Addrs, 0)
 
-	// Put a different status under the same key
-	testEpoch = uint32(2)
-	testFrozen = false
-	testManager = &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Locktime:  2,
-		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	// Put a new status
+	testEpoch2 := uint32(2)
+	testStatus2 := &secp256k1fx.ManagedAssetStatusOutput{
+		Frozen: true,
+		Manager: secp256k1fx.OutputOwners{
+			Threshold: 2,
+			Locktime:  3,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID(), ids.GenerateTestShortID()},
+		},
 	}
-	err = state.PutManagedAssetStatus(testAssetID, testEpoch, testFrozen, testManager)
+	err = state.PutManagedAssetStatus(testAssetID, testEpoch2, testStatus2)
 	require.NoError(t, err)
 
-	// Get the status
-	epoch, frozen, manager, err = state.ManagedAssetStatus(testAssetID)
+	// Get the statuses
+	epoch, status, oldStatus, err = state.ManagedAssetStatus(testAssetID)
 	require.NoError(t, err)
-	require.Equal(t, testEpoch, epoch)
-	require.Equal(t, testFrozen, frozen)
-	require.Equal(t, testManager, manager)
+	require.Equal(t, testEpoch2, epoch)
+	require.Equal(t, testStatus2, status)
+	require.Equal(t, testStatus, oldStatus)
+
+	// Put a new status
+	testEpoch3 := uint32(3)
+	testStatus3 := &secp256k1fx.ManagedAssetStatusOutput{
+		Frozen: true,
+		Manager: secp256k1fx.OutputOwners{
+			Threshold: 3,
+			Locktime:  4,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID(), ids.GenerateTestShortID(), ids.GenerateTestShortID()},
+		},
+	}
+	err = state.PutManagedAssetStatus(testAssetID, testEpoch3, testStatus3)
+	require.NoError(t, err)
+
+	// Get the statuses
+	epoch, status, oldStatus, err = state.ManagedAssetStatus(testAssetID)
+	require.NoError(t, err)
+	require.Equal(t, testEpoch3, epoch)
+	require.Equal(t, testStatus3, status)
+	require.Equal(t, testStatus2, oldStatus)
 }

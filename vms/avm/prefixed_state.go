@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -147,31 +148,40 @@ func (s *prefixedState) addUTXO(addrs [][]byte, utxoID ids.ID) error {
 // PutManagedAssetStatus records that the asset's status changed in [epoch]
 // Status changes don't go into effect until epoch [epoch + 2].
 // For example, if you update a managed asset from unfrozen to frozen
-// with a tx in epoch n then the asset can be spent in epoch n and n+1
+// with a tx in epoch n then the asset can be spent in epoch n and n+1.
+// As such, we store on disk both the most recent status and the status
+// before that.
 func (s *prefixedState) PutManagedAssetStatus(
 	assetID ids.ID,
 	epoch uint32,
-	frozen bool,
-	manager *secp256k1fx.OutputOwners,
+	status *secp256k1fx.ManagedAssetStatusOutput,
 ) error {
-	managerBytes, err := s.state.Codec.Marshal(apricotCodecVersion, manager)
+	// Get the most recent status
+	_, oldStatus, _, err := s.ManagedAssetStatus(assetID)
+	if err != nil && err != database.ErrNotFound {
+		return fmt.Errorf("couldn't get old asset status: %w", err)
+	} else if err == database.ErrNotFound {
+		// There is no most recent status (i.e. this is for an asset creation)
+		// so just put an empty status
+		oldStatus = &secp256k1fx.ManagedAssetStatusOutput{}
+	}
+
+	// Serialize the old status and new status
+	bothStatuses := [2]*secp256k1fx.ManagedAssetStatusOutput{status, oldStatus}
+	bothStatusesBytes, err := s.state.Codec.Marshal(s.state.CodecVersionF(), bothStatuses)
 	if err != nil {
-		return fmt.Errorf("couldn't serialize manager: %w", err)
+		return fmt.Errorf("couldn't serialize asset status: %w", err)
 	}
 
-	size := wrappers.IntLen   // epoch
-	size += wrappers.BoolLen  // Frozen status
-	size += wrappers.IntLen   // size of managerBytes
-	size += len(managerBytes) // managerBytes
-	p := wrappers.Packer{MaxSize: size}
+	// Pack into a byte array
+	p := wrappers.Packer{MaxSize: 2*wrappers.IntLen + len(bothStatusesBytes)}
 	p.PackInt(epoch)
-	p.PackBool(frozen)
-	p.PackBytes(managerBytes)
+	p.PackBytes(bothStatusesBytes)
 	if p.Errored() {
-		// Should never happen in practice
-		return fmt.Errorf("couldn't serialize asset status: %w", p.Err)
+		return fmt.Errorf("couldn't pack statuses to byte array: %w", err)
 	}
 
+	// Put into database
 	key := make([]byte, len(freezeAssetPrefix)+hashing.HashLen)
 	copy(key, freezeAssetPrefix)
 	copy(key[len(freezeAssetPrefix):], assetID[:])
@@ -179,33 +189,41 @@ func (s *prefixedState) PutManagedAssetStatus(
 }
 
 // ManagedAssetStatus returns:
-// 1) the epoch in which the asset was frozen/unfrozen
-// 2) true if the asset is frozen
-// 3) the manager of the asset
+// 1) The epoch in which the last status update occurred (or was created, if never updated)
+// 2) The most recent status update
+// 3) The status update before that, or an empty ManagedAssetStatusOutput if none exists.
+//    Will never return nil.
 // Should return nil for a managed asset that has already been created.
 // Return database.ErrNotFound if the asset ID doesn't correspond to a managed asset.
-func (s *prefixedState) ManagedAssetStatus(assetID ids.ID) (uint32, bool, *secp256k1fx.OutputOwners, error) {
+func (s *prefixedState) ManagedAssetStatus(assetID ids.ID) (
+	uint32,
+	*secp256k1fx.ManagedAssetStatusOutput,
+	*secp256k1fx.ManagedAssetStatusOutput,
+	error,
+) {
 	key := make([]byte, len(freezeAssetPrefix)+hashing.HashLen)
 	copy(key, freezeAssetPrefix)
 	copy(key[len(freezeAssetPrefix):], assetID[:])
 
-	statusBytes, err := s.state.DB.Get(key)
+	bytes, err := s.state.DB.Get(key)
 	if err != nil {
-		return 0, false, nil, err
+		return 0, nil, nil, err
 	}
 
-	p := wrappers.Packer{Bytes: statusBytes}
+	p := wrappers.Packer{MaxSize: len(bytes)}
+	p.Bytes = bytes
 	epoch := p.UnpackInt()
-	frozen := p.UnpackBool()
-	managerBytes := p.UnpackBytes()
 	if p.Errored() {
-		// Should never happen in practice
-		return 0, false, nil, fmt.Errorf("couldn't deserialize asset status: %w", p.Err)
+		return 0, nil, nil, fmt.Errorf("couldn't unpack epoch: %w", err)
+	}
+	statusesBytes := p.UnpackBytes()
+	if p.Errored() {
+		return 0, nil, nil, fmt.Errorf("couldn't unpack statuses bytes: %w", err)
 	}
 
-	var manager secp256k1fx.OutputOwners
-	if _, err := s.state.Codec.Unmarshal(managerBytes, &manager); err != nil {
-		return 0, false, nil, fmt.Errorf("couldn't deserialize manager: %w", err)
+	var statuses [2]*secp256k1fx.ManagedAssetStatusOutput
+	if _, err := s.state.Codec.Unmarshal(statusesBytes, &statuses); err != nil {
+		return 0, nil, nil, fmt.Errorf("couldn't deserialize asset statuses: %w", err)
 	}
-	return epoch, frozen, &manager, nil
+	return epoch, statuses[0], statuses[1], nil
 }
