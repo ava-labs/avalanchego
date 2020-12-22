@@ -959,7 +959,6 @@ func (vm *VM) verifyTransfer(tx UnsignedTx, in *avax.TransferableInput, cred ver
 
 func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiable) error {
 	opAssetID := op.AssetID()
-
 	numUTXOs := len(op.UTXOIDs)
 	utxos := make([]interface{}, numUTXOs)
 	for i, utxoID := range op.UTXOIDs {
@@ -1001,9 +1000,6 @@ func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiab
 			)
 		}
 	}
-
-	// TODO check if this operation is trying to do a freeze with an invalid AssetManagerOutput
-	// that hasn't taken effect yet
 	return fx.VerifyOperation(tx, op.Op, cred, utxos)
 }
 
