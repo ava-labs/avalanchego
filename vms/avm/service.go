@@ -35,21 +35,20 @@ const (
 )
 
 var (
-	errUnknownAssetID          = errors.New("unknown asset ID")
-	errTxNotCreateAsset        = errors.New("transaction doesn't create an asset")
-	errNoMinters               = errors.New("no minters provided")
-	errNoHoldersMintersManager = errors.New("no minters, initialHolders or manager provided")
-	errZeroAmount              = errors.New("amount must be positive")
-	errNoOutputs               = errors.New("no outputs to send")
-	errSpendOverflow           = errors.New("spent amount overflows uint64")
-	errInvalidMintAmount       = errors.New("amount minted must be positive")
-	errAddressesCantMintAsset  = errors.New("provided addresses don't have the authority to mint the provided asset")
-	errInvalidUTXO             = errors.New("invalid utxo")
-	errNilTxID                 = errors.New("nil transaction ID")
-	errNoAddresses             = errors.New("no addresses provided")
-	errNoKeys                  = errors.New("from addresses have no keys or funds")
-	errNoFromAddrs             = errors.New("no from addresses given")
-	errManagedAssetWithMinters = errors.New("a managed asset can't have additional minters")
+	errUnknownAssetID         = errors.New("unknown asset ID")
+	errTxNotCreateAsset       = errors.New("transaction doesn't create an asset")
+	errNoMinters              = errors.New("no minters provided")
+	errNoHoldersMinters       = errors.New("no minters or initial holders provided")
+	errZeroAmount             = errors.New("amount must be positive")
+	errNoOutputs              = errors.New("no outputs to send")
+	errSpendOverflow          = errors.New("spent amount overflows uint64")
+	errInvalidMintAmount      = errors.New("amount minted must be positive")
+	errAddressesCantMintAsset = errors.New("provided addresses don't have the authority to mint the provided asset")
+	errInvalidUTXO            = errors.New("invalid utxo")
+	errNilTxID                = errors.New("nil transaction ID")
+	errNoAddresses            = errors.New("no addresses provided")
+	errNoKeys                 = errors.New("from addresses have no keys or funds")
+	errNoFromAddrs            = errors.New("no from addresses given")
 )
 
 // Service defines the base service for the asset vm
@@ -432,10 +431,8 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 
 	// Sanity check arguments
 	switch {
-	case len(args.InitialHolders) == 0 && len(args.MinterSets) == 0 && len(args.Manager.Addrs) == 0:
-		return errNoHoldersMintersManager
-	case len(args.MinterSets) != 0 && len(args.Manager.Addrs) != 0:
-		return errManagedAssetWithMinters
+	case len(args.InitialHolders) == 0 && len(args.MinterSets) == 0:
+		return errNoHoldersMinters
 	case int(args.Manager.Threshold) > len(args.Manager.Addrs):
 		return fmt.Errorf(
 			"manager threshold (%d) > number of manager addresses (%d)",
@@ -1174,41 +1171,18 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxI
 		return err
 	}
 
-	var ops []*Operation
 	var opsKeys [][]*crypto.PrivateKeySECP256K1R
-	// Check if this asset is a managed asset
-	_, _, _, err = service.vm.state.ManagedAssetStatus(assetID)
-	if err == nil { // It is a managed asset
-		op, keys, err := mintManagedAsset(
-			utxos,
-			kc,
-			assetID,
-			service.vm.Clock().Unix(),
-			uint64(args.Amount),
-			[]ids.ShortID{to},
-			1,
-		)
-		if err != nil {
-			return err
-		}
-		ops = []*Operation{op}
-		opsKeys = [][]*crypto.PrivateKeySECP256K1R{keys}
-	} else { // It is not a managed asset
-		operations, keys, err := service.vm.Mint(
-			utxos,
-			kc,
-			map[ids.ID]uint64{
-				assetID: uint64(args.Amount),
-			},
-			to,
-		)
-		if err != nil {
-			return err
-		}
-		ops = operations
-		opsKeys = keys
+	ops, opsKeys, err := service.vm.Mint(
+		utxos,
+		kc,
+		map[ids.ID]uint64{
+			assetID: uint64(args.Amount),
+		},
+		to,
+	)
+	if err != nil {
+		return err
 	}
-
 	keys = append(keys, opsKeys...)
 
 	tx := Tx{UnsignedTx: &OperationTx{
