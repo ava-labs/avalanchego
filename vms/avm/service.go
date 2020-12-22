@@ -529,8 +529,8 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 	}
 	if len(args.Manager.Addrs) != 0 { // This is a managed asset
 		status := &secp256k1fx.ManagedAssetStatusOutput{
-			Frozen: false,
-			Manager: secp256k1fx.OutputOwners{
+			IsFrozen: false,
+			Mgr: secp256k1fx.OutputOwners{
 				Threshold: uint32(args.Manager.Threshold),
 				Addrs:     make([]ids.ShortID, 0, len(args.Manager.Addrs)),
 			},
@@ -540,9 +540,9 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 			if err != nil {
 				return err
 			}
-			status.Manager.Addrs = append(status.Manager.Addrs, addr)
+			status.Mgr.Addrs = append(status.Mgr.Addrs, addr)
 		}
-		ids.SortShortIDs(status.Manager.Addrs)
+		ids.SortShortIDs(status.Mgr.Addrs)
 		initialState.Outs = append(initialState.Outs, status)
 	}
 	initialState.Sort(service.vm.codec, service.vm.currentCodecVersion)
@@ -1469,7 +1469,7 @@ func (service *Service) SendAsManager(_ *http.Request, args *SendAsManagerArgs, 
 
 	amountSpent, managedAssetIns, managedAssetKeys, err := spendManagedAsset(
 		assetID,
-		&status.Manager,
+		status.Manager(),
 		utxos,
 		kc,
 		uint64(args.Amount),

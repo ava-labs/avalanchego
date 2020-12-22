@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
@@ -136,7 +135,7 @@ func (tx *UniqueTx) Accept(epoch uint32) error {
 			tx.vm.ctx.Log.Error("Failed to fund utxo %s due to %s", utxo.InputID(), err)
 			return fmt.Errorf("couldn't fund UTXO: %w", err)
 		}
-		if out, ok := utxo.Out.(*secp256k1fx.ManagedAssetStatusOutput); ok {
+		if out, ok := utxo.Out.(ManagedAssetStatus); ok {
 			if err := tx.vm.state.PutManagedAssetStatus(utxo.AssetID(), epoch, out); err != nil {
 				return fmt.Errorf("couldn't update asset status: %w", err)
 			}

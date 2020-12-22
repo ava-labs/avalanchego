@@ -18,8 +18,8 @@ func TestManagedAssetStatusOutput(t *testing.T) {
 		{
 			description: "valid",
 			out: &ManagedAssetStatusOutput{
-				Frozen: false,
-				Manager: OutputOwners{
+				IsFrozen: false,
+				Mgr: OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
 					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
@@ -30,8 +30,8 @@ func TestManagedAssetStatusOutput(t *testing.T) {
 		{
 			description: "threshold > len(addrs)",
 			out: &ManagedAssetStatusOutput{
-				Frozen: false,
-				Manager: OutputOwners{
+				IsFrozen: false,
+				Mgr: OutputOwners{
 					Locktime:  0,
 					Threshold: 2,
 					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
@@ -42,8 +42,8 @@ func TestManagedAssetStatusOutput(t *testing.T) {
 		{
 			description: "threshold 0, len(addrs) > 0",
 			out: &ManagedAssetStatusOutput{
-				Frozen: false,
-				Manager: OutputOwners{
+				IsFrozen: false,
+				Mgr: OutputOwners{
 					Locktime:  0,
 					Threshold: 0,
 					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
@@ -54,8 +54,8 @@ func TestManagedAssetStatusOutput(t *testing.T) {
 		{
 			description: "threshold 0, len(addrs) 0",
 			out: &ManagedAssetStatusOutput{
-				Frozen: false,
-				Manager: OutputOwners{
+				IsFrozen: false,
+				Mgr: OutputOwners{
 					Locktime:  0,
 					Threshold: 0,
 					Addrs:     []ids.ShortID{},

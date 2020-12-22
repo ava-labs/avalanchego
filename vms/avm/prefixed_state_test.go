@@ -200,8 +200,8 @@ func TestPrefixedStateManagedAssetStatus(t *testing.T) {
 	testAssetID := ids.GenerateTestID()
 	testEpoch := uint32(1)
 	testStatus := &secp256k1fx.ManagedAssetStatusOutput{
-		Frozen: true,
-		Manager: secp256k1fx.OutputOwners{
+		IsFrozen: true,
+		Mgr: secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Locktime:  2,
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
@@ -220,8 +220,8 @@ func TestPrefixedStateManagedAssetStatus(t *testing.T) {
 	// Put a new status
 	testEpoch2 := uint32(2)
 	testStatus2 := &secp256k1fx.ManagedAssetStatusOutput{
-		Frozen: true,
-		Manager: secp256k1fx.OutputOwners{
+		IsFrozen: true,
+		Mgr: secp256k1fx.OutputOwners{
 			Threshold: 2,
 			Locktime:  3,
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID(), ids.GenerateTestShortID()},
@@ -240,8 +240,8 @@ func TestPrefixedStateManagedAssetStatus(t *testing.T) {
 	// Put a new status
 	testEpoch3 := uint32(3)
 	testStatus3 := &secp256k1fx.ManagedAssetStatusOutput{
-		Frozen: true,
-		Manager: secp256k1fx.OutputOwners{
+		IsFrozen: true,
+		Mgr: secp256k1fx.OutputOwners{
 			Threshold: 3,
 			Locktime:  4,
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID(), ids.GenerateTestShortID(), ids.GenerateTestShortID()},

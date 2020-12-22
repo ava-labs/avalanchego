@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 const (
@@ -154,7 +153,7 @@ func (s *prefixedState) addUTXO(addrs [][]byte, utxoID ids.ID) error {
 func (s *prefixedState) PutManagedAssetStatus(
 	assetID ids.ID,
 	epoch uint32,
-	status *secp256k1fx.ManagedAssetStatusOutput,
+	status ManagedAssetStatus,
 ) error {
 	// Get the most recent status
 	_, oldStatus, _, err := s.ManagedAssetStatus(assetID)
@@ -167,7 +166,7 @@ func (s *prefixedState) PutManagedAssetStatus(
 	}
 
 	// Serialize the old status and new status
-	bothStatuses := [2]*secp256k1fx.ManagedAssetStatusOutput{status, oldStatus}
+	bothStatuses := [2]ManagedAssetStatus{status, oldStatus}
 	bothStatusesBytes, err := s.state.Codec.Marshal(s.state.CodecVersionF(), bothStatuses)
 	if err != nil {
 		return fmt.Errorf("couldn't serialize asset status: %w", err)
@@ -196,8 +195,8 @@ func (s *prefixedState) PutManagedAssetStatus(
 // Return database.ErrNotFound if the asset ID doesn't correspond to a managed asset.
 func (s *prefixedState) ManagedAssetStatus(assetID ids.ID) (
 	uint32,
-	*secp256k1fx.ManagedAssetStatusOutput,
-	*secp256k1fx.ManagedAssetStatusOutput,
+	ManagedAssetStatus,
+	ManagedAssetStatus,
 	error,
 ) {
 	key := make([]byte, len(freezeAssetPrefix)+hashing.HashLen)
@@ -220,7 +219,7 @@ func (s *prefixedState) ManagedAssetStatus(assetID ids.ID) (
 		return 0, nil, nil, fmt.Errorf("couldn't unpack statuses bytes: %w", err)
 	}
 
-	var statuses [2]*secp256k1fx.ManagedAssetStatusOutput
+	var statuses [2]ManagedAssetStatus
 	if _, err := s.state.Codec.Unmarshal(statusesBytes, &statuses); err != nil {
 		return 0, nil, nil, fmt.Errorf("couldn't deserialize asset statuses: %w", err)
 	}

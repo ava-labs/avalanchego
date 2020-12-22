@@ -176,7 +176,7 @@ func (fx *Fx) verifyUpdateManagedAssetOperation(
 	if err := verify.All(op, cred, out); err != nil {
 		return err
 	}
-	return fx.VerifyCredentials(tx, &op.Input, cred, &out.Manager)
+	return fx.VerifyCredentials(tx, &op.Input, cred, &out.Mgr)
 }
 
 // VerifyTransfer ...

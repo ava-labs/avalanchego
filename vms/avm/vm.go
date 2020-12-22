@@ -741,7 +741,7 @@ func (vm *VM) initState(genesisBytes []byte) error {
 			if err := vm.state.FundUTXO(utxo); err != nil {
 				return err
 			}
-			if out, ok := utxo.Out.(*secp256k1fx.ManagedAssetStatusOutput); ok {
+			if out, ok := utxo.Out.(ManagedAssetStatus); ok {
 				if err := vm.state.PutManagedAssetStatus(utxo.AssetID(), tx.Epoch(), out); err != nil {
 					return fmt.Errorf("couldn't freeze asset: %w", err)
 				}
@@ -931,7 +931,7 @@ func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cr
 		// New status hasn't gone into effect yet.
 		status = oldStatus
 	}
-	if status.Frozen {
+	if status.Frozen() {
 		return fmt.Errorf("asset %s is frozen", utxoAssetID)
 	}
 
@@ -942,7 +942,7 @@ func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cr
 	case fx.VerifyPermission(tx, in.In, cred, utxo.Out) == nil:
 		return nil
 	// Check whether [cred] was signed by the asset manager
-	case fx.VerifyPermission(tx, in.In, cred, &status.Manager) == nil:
+	case fx.VerifyPermission(tx, in.In, cred, status.Manager()) == nil:
 		return nil
 	default:
 		return errNoPermission
@@ -1425,8 +1425,8 @@ func newUpdateManagedAssetStatusOperation(
 			Op: &secp256k1fx.UpdateManagedAssetOperation{
 				Input: *in,
 				ManagedAssetStatusOutput: secp256k1fx.ManagedAssetStatusOutput{
-					Frozen:  frozen,
-					Manager: *manager,
+					IsFrozen: frozen,
+					Mgr:      *manager,
 				},
 			},
 		}

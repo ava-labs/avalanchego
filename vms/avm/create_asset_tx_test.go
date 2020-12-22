@@ -1291,8 +1291,8 @@ func TestManagedAsset(t *testing.T) {
 
 			// Create a create a managed asset
 			assetStatusOutput := &secp256k1fx.ManagedAssetStatusOutput{
-				Frozen:  test.create.originalFrozen,
-				Manager: test.create.originalManager,
+				IsFrozen: test.create.originalFrozen,
+				Mgr:      test.create.originalManager,
 			}
 			mintOutput := &secp256k1fx.MintOutput{
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -1510,8 +1510,8 @@ func TestManagedAsset(t *testing.T) {
 										SigIndices: []uint32{0},
 									},
 									ManagedAssetStatusOutput: secp256k1fx.ManagedAssetStatusOutput{
-										Frozen:  op.frozen,
-										Manager: op.manager,
+										IsFrozen: op.frozen,
+										Mgr:      op.manager,
 									},
 								},
 							},
@@ -1698,8 +1698,8 @@ func TestManagedAssetInitialState(t *testing.T) {
 	}
 
 	assetStatusOutput := &secp256k1fx.ManagedAssetStatusOutput{
-		Frozen: false,
-		Manager: secp256k1fx.OutputOwners{
+		IsFrozen: false,
+		Mgr: secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
@@ -1838,8 +1838,8 @@ func TestManagedAssetBadCodecVersion(t *testing.T) {
 				FxID: 0,
 				Outs: []verify.State{
 					&secp256k1fx.ManagedAssetStatusOutput{
-						Frozen: false,
-						Manager: secp256k1fx.OutputOwners{
+						IsFrozen: false,
+						Mgr: secp256k1fx.OutputOwners{
 							Threshold: 1,
 							Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 						},

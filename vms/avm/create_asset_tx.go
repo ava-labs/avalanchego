@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 const (
@@ -142,7 +141,7 @@ func (t *CreateAssetTx) SyntacticVerify(
 			continue
 		}
 		for _, out := range state.Outs {
-			if _, ok := out.(*secp256k1fx.ManagedAssetStatusOutput); ok {
+			if _, ok := out.(ManagedAssetStatus); ok {
 				if hasManager {
 					return errMultipleManagers
 				}

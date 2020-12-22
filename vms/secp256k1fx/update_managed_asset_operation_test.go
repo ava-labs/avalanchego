@@ -27,8 +27,8 @@ func TestUpdateManagedAssetVerify(t *testing.T) {
 					SigIndices: []uint32{0},
 				},
 				ManagedAssetStatusOutput: ManagedAssetStatusOutput{
-					Frozen: false,
-					Manager: OutputOwners{
+					IsFrozen: false,
+					Mgr: OutputOwners{
 						Locktime:  0,
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
@@ -42,8 +42,8 @@ func TestUpdateManagedAssetVerify(t *testing.T) {
 			op: &UpdateManagedAssetOperation{
 				Input: Input{},
 				ManagedAssetStatusOutput: ManagedAssetStatusOutput{
-					Frozen: false,
-					Manager: OutputOwners{
+					IsFrozen: false,
+					Mgr: OutputOwners{
 						Locktime:  0,
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
@@ -69,8 +69,8 @@ func TestUpdateManagedAssetVerify(t *testing.T) {
 					SigIndices: []uint32{0},
 				},
 				ManagedAssetStatusOutput: ManagedAssetStatusOutput{
-					Frozen: false,
-					Manager: OutputOwners{
+					IsFrozen: false,
+					Mgr: OutputOwners{
 						Locktime:  0,
 						Threshold: 0,
 						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
@@ -86,8 +86,8 @@ func TestUpdateManagedAssetVerify(t *testing.T) {
 					SigIndices: []uint32{0},
 				},
 				ManagedAssetStatusOutput: ManagedAssetStatusOutput{
-					Frozen: false,
-					Manager: OutputOwners{
+					IsFrozen: false,
+					Mgr: OutputOwners{
 						Locktime:  0,
 						Threshold: 0,
 						Addrs:     []ids.ShortID{},
@@ -103,8 +103,8 @@ func TestUpdateManagedAssetVerify(t *testing.T) {
 					SigIndices: []uint32{0},
 				},
 				ManagedAssetStatusOutput: ManagedAssetStatusOutput{
-					Frozen: false,
-					Manager: OutputOwners{
+					IsFrozen: false,
+					Mgr: OutputOwners{
 						Locktime:  0,
 						Threshold: 1,
 						Addrs:     []ids.ShortID{},
@@ -120,8 +120,8 @@ func TestUpdateManagedAssetVerify(t *testing.T) {
 					SigIndices: []uint32{0},
 				},
 				ManagedAssetStatusOutput: ManagedAssetStatusOutput{
-					Frozen: false,
-					Manager: OutputOwners{
+					IsFrozen: false,
+					Mgr: OutputOwners{
 						Locktime:  0,
 						Threshold: 2,
 						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
