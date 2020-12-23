@@ -408,9 +408,8 @@ func (vm *VM) Get(txID ids.ID) (conflicts.Transition, error) {
 		vm:   vm,
 		txID: txID,
 	}
-	// Verify must be called in the case the that tx was flushed from the unique
-	// cache.
-	return tx, tx.verifyWithoutCacheWrites(vm.ctx.Epoch()) // TODO what epoch should be passed in here?
+	// TODO does tx.verifyWithoutCacheWrites() need to be called here?
+	return tx, nil
 }
 
 /*
@@ -431,6 +430,7 @@ func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 	if err != nil {
 		return ids.ID{}, err
 	}
+	// TODO is this the right epoch
 	if err := tx.verifyWithoutCacheWrites(vm.ctx.Epoch()); err != nil {
 		return ids.ID{}, err
 	}
@@ -831,10 +831,8 @@ func (vm *VM) getUTXO(utxoID *avax.UTXOID) (*avax.UTXO, error) {
 		txID: inputTx,
 	}
 
-	// TODO what epoch should be used as an argument below?
-	if err := parent.verifyWithoutCacheWrites(vm.ctx.Epoch()); err != nil {
-		return nil, errMissingUTXO
-	} else if status := parent.Status(); status.Decided() {
+	// TODO do we need to call parent.verifyWithoutCacheWrites here?
+	if status := parent.Status(); status != choices.Processing {
 		return nil, errMissingUTXO
 	}
 

@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -79,6 +80,8 @@ func NewContext(tb testing.TB) *snow.Context {
 	ctx.ChainID = chainID
 	ctx.AVAXAssetID = tx.ID()
 	ctx.XChainID = ids.Empty.Prefix(0)
+	ctx.EpochFirstTransition = time.Date(2020, 12, 10, 0, 0, 0, 0, time.UTC)
+	ctx.EpochDuration = time.Hour
 	aliaser := ctx.BCLookup.(*ids.Aliaser)
 
 	errs := wrappers.Errs{}

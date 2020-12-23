@@ -43,7 +43,7 @@ type TxState struct {
 	// epoch as the argument
 	syntacticVerified map[uint32]bool
 
-	// Epoch --> Error that occured while verifying the tx
+	// Epoch --> Error that occurred while verifying the tx
 	// for that epoch, or nil if no error.
 	// Invariant: If a key exists in [syntacticVerified], it exists in [validity]
 	syntacticValidity map[uint32]error
@@ -307,6 +307,9 @@ func (tx *UniqueTx) Verify(epoch uint32) error {
 		return err
 	}
 
+	if tx.verifiedState == nil {
+		tx.verifiedState = map[uint32]bool{}
+	}
 	tx.verifiedState[epoch] = true
 	tx.vm.pubsub.Publish("verified", tx.ID())
 	return nil
@@ -326,7 +329,13 @@ func (tx *UniqueTx) SyntacticVerify(epoch uint32) error {
 	}
 
 	// Cache the result of syntactic verification
+	if tx.syntacticVerified == nil {
+		tx.syntacticVerified = map[uint32]bool{}
+	}
 	tx.syntacticVerified[epoch] = true
+	if tx.syntacticValidity == nil {
+		tx.syntacticValidity = map[uint32]error{}
+	}
 	tx.syntacticValidity[epoch] = tx.Tx.SyntacticVerify(
 		tx.vm.ctx,
 		epoch,
