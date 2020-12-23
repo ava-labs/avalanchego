@@ -327,7 +327,7 @@ func (tx *UniqueTx) SyntacticVerify(epoch uint32) error {
 
 	// Cache the result of syntactic verification
 	tx.syntacticVerified[epoch] = true
-	tx.syntacticValidity[epoch] = tx.Tx.SyntacticVerify( // TODO pass in epoch
+	tx.syntacticValidity[epoch] = tx.Tx.SyntacticVerify(
 		tx.vm.ctx,
 		epoch,
 		tx.vm.codec,

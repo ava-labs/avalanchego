@@ -959,7 +959,7 @@ func (vm *VM) verifyTransfer(tx UnsignedTx, in *avax.TransferableInput, cred ver
 	return vm.verifyTransferOfUTXO(tx, in, cred, utxo)
 }
 
-func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiable) error {
+func (vm *VM) verifyOperation(tx UnsignedTx, epoch uint32, op *Operation, cred verify.Verifiable) error {
 	opAssetID := op.AssetID()
 	numUTXOs := len(op.UTXOIDs)
 	utxos := make([]interface{}, numUTXOs)
@@ -994,10 +994,10 @@ func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiab
 		if err != nil {
 			return fmt.Errorf("couldn't get managed asset's status: %w", err)
 		}
-		if tx.Epoch() <= epochLastUpdated+1 { // TODO replace tx.Epoch() with epoch passed in to this method
+		if epoch <= epochLastUpdated+1 {
 			return fmt.Errorf(
 				"asset update epoch (%d) must be >= 2 + most recent status update epoch (%d)",
-				tx.Epoch(),
+				epoch,
 				epochLastUpdated,
 			)
 		}

@@ -150,7 +150,7 @@ func (t *OperationTx) SemanticVerify(
 	offset := t.BaseTx.NumCredentials()
 	for i, op := range t.Ops {
 		cred := creds[offset+i]
-		if err := vm.verifyOperation(tx, op, cred); err != nil {
+		if err := vm.verifyOperation(tx, epoch, op, cred); err != nil {
 			return err
 		}
 	}
