@@ -992,7 +992,7 @@ func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiab
 		if err != nil {
 			return fmt.Errorf("couldn't get managed asset's status: %w", err)
 		}
-		if tx.Epoch() <= epochLastUpdated+1 { // TODO is tx.Epoch() the right piece of data?
+		if tx.Epoch() <= epochLastUpdated+1 { // TODO replace tx.Epoch() with epoch passed in to this method
 			return fmt.Errorf(
 				"asset update epoch (%d) must be >= 2 + most recent status update epoch (%d)",
 				tx.Epoch(),
