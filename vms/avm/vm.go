@@ -765,11 +765,8 @@ func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
 		vm:   vm,
 		txID: rawTx.ID(),
 	}
-	// TODO what epoch should be used as an argument below?
-	if err := tx.SyntacticVerify(vm.ctx.Epoch()); err != nil {
-		return nil, err
-	}
 
+	// TODO do we need to call SyntacticVerify here?
 	if tx.Status() == choices.Unknown {
 		if err := vm.state.SetTx(tx.ID(), tx.Tx); err != nil {
 			return nil, err
