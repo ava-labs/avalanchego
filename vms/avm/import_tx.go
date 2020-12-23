@@ -63,6 +63,7 @@ func (t *ImportTx) NumCredentials() int { return t.BaseTx.NumCredentials() + len
 // SyntacticVerify that this transaction is well-formed.
 func (t *ImportTx) SyntacticVerify(
 	ctx *snow.Context,
+	epoch uint32,
 	c codec.Manager,
 	codecVersion uint16,
 	txFeeAssetID ids.ID,
@@ -95,7 +96,12 @@ func (t *ImportTx) SyntacticVerify(
 }
 
 // SemanticVerify that this transaction is well-formed.
-func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable) error {
+func (t *ImportTx) SemanticVerify(
+	vm *VM,
+	epoch uint32,
+	tx UnsignedTx,
+	creds []verify.Verifiable,
+) error {
 	subnetID, err := vm.ctx.SNLookup.SubnetID(t.SourceChain)
 	if err != nil {
 		return err
@@ -104,7 +110,7 @@ func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 		return errWrongBlockchainID
 	}
 
-	if err := t.BaseTx.SemanticVerify(vm, tx, creds); err != nil {
+	if err := t.BaseTx.SemanticVerify(vm, epoch, tx, creds); err != nil {
 		return err
 	}
 

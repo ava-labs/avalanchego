@@ -36,6 +36,7 @@ var (
 	errDenominationTooLarge         = errors.New("denomination is too large")
 	errMultipleManagers             = errors.New("asset can't have multiple managers")
 	errCreateManagedAssetBadCodec   = errors.New("create managed asset tx has invalid codec version")
+	errManagerInEpoch0              = errors.New("assets created before epoch 1 can't have a manager")
 )
 
 // CreateAssetTx is a transaction that creates a new asset.
@@ -76,6 +77,7 @@ func (t *CreateAssetTx) UTXOs() []*avax.UTXO {
 // SyntacticVerify that this transaction is well-formed.
 func (t *CreateAssetTx) SyntacticVerify(
 	ctx *snow.Context,
+	epoch uint32,
 	c codec.Manager,
 	codecVersion uint16,
 	txFeeAssetID ids.ID,
@@ -115,6 +117,7 @@ func (t *CreateAssetTx) SyntacticVerify(
 
 	if err := t.BaseTx.SyntacticVerify(
 		ctx,
+		epoch,
 		c,
 		codecVersion,
 		txFeeAssetID,
@@ -149,11 +152,13 @@ func (t *CreateAssetTx) SyntacticVerify(
 			}
 		}
 	}
-	// Make sure the codec version is at or after the Apricot fork codec
-	if hasManager && codecVersion == preApricotCodecVersion {
+	// If there is a manager, ensure we're after the Apricot fork
+	switch {
+	case hasManager && codecVersion == preApricotCodecVersion:
 		return errCreateManagedAssetBadCodec
+	case hasManager && epoch == 0:
+		return errManagerInEpoch0
 	}
-
 	return nil
 }
 

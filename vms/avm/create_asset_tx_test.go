@@ -87,7 +87,7 @@ func validCreateAssetTx(t *testing.T) (*CreateAssetTx, codec.Manager, *snow.Cont
 	tx.Initialize(unsignedBytes, unsignedBytes)
 
 	ctx := NewContext(t)
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, assetID, 0, 0, 1); err != nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, assetID, 0, 0, 1); err != nil {
 		t.Fatalf("Valid CreateAssetTx failed syntactic verification due to: %s", err)
 	}
 	return tx, c, ctx
@@ -407,7 +407,7 @@ func TestCreateAssetTxSyntacticVerify(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err != nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -418,7 +418,7 @@ func TestCreateAssetTxSyntacticVerifyNil(t *testing.T) {
 
 	tx := (*CreateAssetTx)(nil)
 
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Nil CreateAssetTx should have errored")
 	}
 }
@@ -441,7 +441,7 @@ func TestCreateAssetTxSyntacticVerifyNameTooShort(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Too short name should have errored")
 	}
 }
@@ -466,7 +466,7 @@ func TestCreateAssetTxSyntacticVerifyNameTooLong(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Too long name should have errored")
 	}
 }
@@ -489,7 +489,7 @@ func TestCreateAssetTxSyntacticVerifySymbolTooShort(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Too short symbol should have errored")
 	}
 }
@@ -512,7 +512,7 @@ func TestCreateAssetTxSyntacticVerifySymbolTooLong(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Too long symbol should have errored")
 	}
 }
@@ -532,7 +532,7 @@ func TestCreateAssetTxSyntacticVerifyNoFxs(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("No Fxs should have errored")
 	}
 }
@@ -555,7 +555,7 @@ func TestCreateAssetTxSyntacticVerifyDenominationTooLong(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Too large denomination should have errored")
 	}
 }
@@ -578,7 +578,7 @@ func TestCreateAssetTxSyntacticVerifyNameWithWhitespace(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Whitespace at the end of the name should have errored")
 	}
 }
@@ -601,7 +601,7 @@ func TestCreateAssetTxSyntacticVerifyNameWithInvalidCharacter(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Name with an invalid character should have errored")
 	}
 }
@@ -624,7 +624,7 @@ func TestCreateAssetTxSyntacticVerifyNameWithUnicodeCharacter(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Name with an invalid character should have errored")
 	}
 }
@@ -647,7 +647,7 @@ func TestCreateAssetTxSyntacticVerifySymbolWithInvalidCharacter(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Symbol with an invalid character should have errored")
 	}
 }
@@ -670,7 +670,7 @@ func TestCreateAssetTxSyntacticVerifyInvalidBaseTx(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Invalid BaseTx should have errored")
 	}
 }
@@ -693,7 +693,7 @@ func TestCreateAssetTxSyntacticVerifyInvalidInitialState(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Invalid InitialState should have errored")
 	}
 }
@@ -721,7 +721,7 @@ func TestCreateAssetTxSyntacticVerifyUnsortedInitialStates(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 2); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 2); err == nil {
 		t.Fatalf("Unsorted InitialStates should have errored")
 	}
 }
@@ -739,17 +739,17 @@ func TestCreateAssetTxSyntacticVerifyName(t *testing.T) {
 	// String of Length 129 should fail SyntacticVerify
 	tx.Name = nameTooLong
 
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, assetID, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, assetID, 0, 0, 1); err == nil {
 		t.Fatal("CreateAssetTx should have failed syntactic verification due to name too long")
 	}
 
 	tx.Name = invalidWhitespaceStr
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, assetID, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, assetID, 0, 0, 1); err == nil {
 		t.Fatal("CreateAssetTx should have failed syntactic verification due to invalid whitespace in name")
 	}
 
 	tx.Name = invalidASCIIStr
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, assetID, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, assetID, 0, 0, 1); err == nil {
 		t.Fatal("CreateAssetTx should have failed syntactic verification due to invalid ASCII character in name")
 	}
 }
@@ -758,17 +758,17 @@ func TestCreateAssetTxSyntacticVerifySymbol(t *testing.T) {
 	tx, c, ctx := validCreateAssetTx(t)
 
 	tx.Symbol = symbolTooLong
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, assetID, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, assetID, 0, 0, 1); err == nil {
 		t.Fatal("CreateAssetTx should have failed syntactic verification due to symbol too long")
 	}
 
 	tx.Symbol = " F"
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, assetID, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, assetID, 0, 0, 1); err == nil {
 		t.Fatal("CreateAssetTx should have failed syntactic verification due to invalid whitespace in symbol")
 	}
 
 	tx.Symbol = "É"
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, assetID, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, assetID, 0, 0, 1); err == nil {
 		t.Fatal("CreateAssetTx should have failed syntactic verification due to invalid ASCII character in symbol")
 	}
 }
@@ -777,7 +777,7 @@ func TestCreateAssetTxSyntacticVerifyInvalidDenomination(t *testing.T) {
 	tx, c, ctx := validCreateAssetTx(t)
 
 	tx.Denomination = byte(33)
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, assetID, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, assetID, 0, 0, 1); err == nil {
 		t.Fatal("CreateAssetTx should have failed syntactic verification due to denomination too large")
 	}
 }
@@ -786,7 +786,7 @@ func TestCreateAssetTxSyntacticVerifyInitialStates(t *testing.T) {
 	tx, c, ctx := validCreateAssetTx(t)
 
 	tx.States = []*InitialState{}
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, assetID, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, assetID, 0, 0, 1); err == nil {
 		t.Fatal("CreateAssetTx should have failed syntactic verification due to no Initial States")
 	}
 
@@ -806,7 +806,7 @@ func TestCreateAssetTxSyntacticVerifyInitialStates(t *testing.T) {
 	}
 
 	// NumFxs is 1, so FxID 5 should cause an error
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, assetID, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, assetID, 0, 0, 1); err == nil {
 		t.Fatal("CreateAssetTx should have failed syntactic verification due to invalid Fx")
 	}
 
@@ -856,7 +856,7 @@ func TestCreateAssetTxSyntacticVerifyInitialStates(t *testing.T) {
 		uniqueStates[2],
 		uniqueStates[0],
 	}
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, assetID, 0, 0, 3); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, assetID, 0, 0, 3); err == nil {
 		t.Fatal("CreateAssetTx should have failed syntactic verification due to non-sorted initial states")
 	}
 
@@ -864,7 +864,7 @@ func TestCreateAssetTxSyntacticVerifyInitialStates(t *testing.T) {
 		uniqueStates[0],
 		uniqueStates[0],
 	}
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, assetID, 0, 0, 3); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, assetID, 0, 0, 3); err == nil {
 		t.Fatal("CreateAssetTx should have failed syntactic verification due to non-unique initial states")
 	}
 }
@@ -873,7 +873,7 @@ func TestCreateAssetTxSyntacticVerifyBaseTx(t *testing.T) {
 	tx, c, ctx := validCreateAssetTx(t)
 	var baseTx BaseTx
 	tx.BaseTx = baseTx
-	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, assetID, 0, 0, 2); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, assetID, 0, 0, 2); err == nil {
 		t.Fatal("CreateAssetTx should have failed syntactic verification due to invalid BaseTx (nil)")
 	}
 }
@@ -1769,6 +1769,7 @@ func TestManagedAssetInitialState(t *testing.T) {
 			// Verify the transaction
 			err = tx.SyntacticVerify(
 				vm.ctx,
+				1,
 				vm.codec,
 				apricotCodecVersion,
 				vm.ctx.AVAXAssetID,
@@ -1860,6 +1861,7 @@ func TestManagedAssetBadCodecVersion(t *testing.T) {
 	// Verify the transaction
 	err = tx.SyntacticVerify(
 		vm.ctx,
+		1,
 		vm.codec,
 		preApricotCodecVersion,
 		vm.ctx.AVAXAssetID,
@@ -1872,6 +1874,7 @@ func TestManagedAssetBadCodecVersion(t *testing.T) {
 	// Verify the transaction
 	err = tx.SyntacticVerify(
 		vm.ctx,
+		1,
 		vm.codec,
 		apricotCodecVersion,
 		vm.ctx.AVAXAssetID,
