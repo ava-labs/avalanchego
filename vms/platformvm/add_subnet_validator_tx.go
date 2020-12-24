@@ -114,7 +114,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, permError{err}
 	}
 
-	if vm.Ctx.IsBootstrapped() {
+	if vm.bootstrapped {
 		// Ensure the proposed validator starts after the current timestamp
 		if currentTimestamp, err := vm.getTimestamp(db); err != nil {
 			return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't get current timestamp: %v", err)}

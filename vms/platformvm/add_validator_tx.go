@@ -158,7 +158,7 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.Stake)
 
-	if vm.Ctx.IsBootstrapped() {
+	if vm.bootstrapped {
 		// Ensure the proposed validator starts after the current time
 		if currentTime, err := vm.getTimestamp(db); err != nil {
 			return nil, nil, nil, nil, tempError{
