@@ -65,17 +65,29 @@ func (s *Serializer) Parse(b []byte) (avalanche.Vertex, error) {
 }
 
 // Wrap implements the avalanche.State interface
-func (s *Serializer) Wrap(epoch uint32, tr conflicts.Transition, restrictions []ids.ID) (conflicts.Tx, error) {
-	return &Tx{Tr: tr}, nil
+func (s *Serializer) Wrap(
+	epoch uint32,
+	tr conflicts.Transition,
+	restrictions []ids.ID,
+) (conflicts.Tx, error) {
+	slTx, err := vertex.Wrap(epoch, tr.Bytes(), restrictions)
+	return &tx{
+		tx: slTx,
+		tr: tr,
+	}, err
 }
 
 // ParseTx implements the avalanche.State interface
 func (s *Serializer) ParseTx(b []byte) (conflicts.Tx, error) {
-	tr, err := s.vm.Parse(b)
+	slTx, err := vertex.ParseTx(b)
 	if err != nil {
 		return nil, err
 	}
-	return &Tx{Tr: tr}, nil
+	tr, err := s.vm.Parse(slTx.Transition())
+	return &tx{
+		tx: slTx,
+		tr: tr,
+	}, err
 }
 
 // Build implements the avalanche.State interface

@@ -125,7 +125,7 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 	if len(txs) != 1 {
 		t.Fatalf("Incorrect number of transactions")
 	}
-	if txs[0].(*Tx).Tr != testTransition {
+	if txs[0].(*tx).tr != testTransition {
 		t.Fatalf("Txs retrieved the wrong transition")
 	}
 
