@@ -175,6 +175,7 @@ func TestAcceptNoConflicts(t *testing.T) {
 	assert.Empty(t, c.utxos)
 	assert.Empty(t, c.restrictions)
 	assert.Empty(t, c.dependencies)
+	assert.Empty(t, c.missingDependencies)
 
 	toAccept := toAccepts[0]
 	assert.Equal(t, tx.ID(), toAccept.ID())
@@ -237,11 +238,180 @@ func TestAcceptNoConflictsWithDependency(t *testing.T) {
 	assert.Empty(t, c.utxos)
 	assert.Empty(t, c.restrictions)
 	assert.Empty(t, c.dependencies)
+	assert.Empty(t, c.missingDependencies)
 
 	toAccept = toAccepts[0]
 	assert.Equal(t, tx1.ID(), toAccept.ID())
 }
 
+func TestNoConflictsNoEarlyAcceptDependency(t *testing.T) {
+	c := New()
+
+	transitionID := ids.GenerateTestID()
+	tx0 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &TestTransition{
+			IDV: transitionID,
+		},
+	}
+	tx1 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &TestTransition{
+			IDV:           ids.GenerateTestID(),
+			DependenciesV: []ids.ID{transitionID},
+		},
+	}
+
+	err := c.Add(tx0)
+	assert.NoError(t, err)
+
+	err = c.Add(tx1)
+	assert.NoError(t, err)
+
+	toAccepts, toRejects := c.Updateable()
+	assert.Empty(t, toAccepts)
+	assert.Empty(t, toRejects)
+
+	c.Accept(tx0.ID())
+
+	toAccepts, toRejects = c.Updateable()
+	assert.Len(t, toAccepts, 1)
+	assert.Empty(t, toRejects)
+
+	toAccept := toAccepts[0]
+	assert.Equal(t, tx0.ID(), toAccept.ID())
+
+	toAccepts, toRejects = c.Updateable()
+	assert.Empty(t, toAccepts)
+	assert.Empty(t, toRejects)
+
+	c.Accept(tx1.ID())
+
+	toAccepts, toRejects = c.Updateable()
+	assert.Len(t, toAccepts, 1)
+	assert.Empty(t, toRejects)
+	assert.Empty(t, c.txs)
+	assert.Empty(t, c.transitions)
+	assert.Empty(t, c.utxos)
+	assert.Empty(t, c.restrictions)
+	assert.Empty(t, c.dependencies)
+	assert.Empty(t, c.missingDependencies)
+
+	toAccept = toAccepts[0]
+	assert.Equal(t, tx1.ID(), toAccept.ID())
+}
+
+func TestAcceptNoConflictsWithDependenciesAcrossMultipleRounds(t *testing.T) {
+	c := New()
+
+	transitionID0 := ids.GenerateTestID()
+	tx0 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &TestTransition{
+			IDV: transitionID0,
+		},
+	}
+	transitionID1 := ids.GenerateTestID()
+	tx1 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &TestTransition{
+			IDV: transitionID1,
+		},
+	}
+	tx2 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &TestTransition{
+			IDV:           ids.GenerateTestID(),
+			DependenciesV: []ids.ID{transitionID0, transitionID1},
+		},
+	}
+
+	err := c.Add(tx0)
+	assert.NoError(t, err)
+
+	err = c.Add(tx1)
+	assert.NoError(t, err)
+
+	err = c.Add(tx2)
+	assert.NoError(t, err)
+
+	// Check that no transactions are mistakenly marked
+	// as accepted/rejected
+	toAccepts, toRejects := c.Updateable()
+	assert.Empty(t, toAccepts)
+	assert.Empty(t, toRejects)
+
+	// Accept tx2 and ensure that it is marked
+	// as conditionally accepted pending its
+	// dependencies.
+	c.Accept(tx2.ID())
+
+	assert.Equal(t, c.conditionallyAccepted.Len(), 1)
+
+	toAccepts, toRejects = c.Updateable()
+	assert.Empty(t, toAccepts)
+	assert.Empty(t, toRejects)
+	assert.Equal(t, c.conditionallyAccepted.Len(), 1)
+
+	// Accept tx1 and ensure that it is the only
+	// transaction marked as accepted. Note: tx2
+	// still requires tx0 to be accepted.
+	c.Accept(tx1.ID())
+
+	toAccepts, toRejects = c.Updateable()
+	assert.Len(t, toAccepts, 1)
+	assert.Empty(t, toRejects)
+
+	toAccept := toAccepts[0]
+	assert.Equal(t, tx1.ID(), toAccept.ID())
+
+	// Ensure that additional call to updateable
+	// does not return any new accepted/rejected txs.
+	toAccepts, toRejects = c.Updateable()
+	assert.Len(t, toAccepts, 0)
+	assert.Len(t, toRejects, 0)
+
+	// Accept tx0 and ensure that it is
+	// returned from Updateable
+	c.Accept(tx0.ID())
+
+	toAccepts, toRejects = c.Updateable()
+	assert.Len(t, toAccepts, 1)
+	assert.Empty(t, toRejects)
+
+	toAccept = toAccepts[0]
+	assert.Equal(t, tx0.ID(), toAccept.ID())
+
+	// tx2 should be returned by the subseqeuent call
+	toAccepts, toRejects = c.Updateable()
+	assert.Len(t, toAccepts, 1)
+	assert.Empty(t, toRejects)
+
+	toAccept = toAccepts[0]
+	assert.Equal(t, tx2.ID(), toAccept.ID())
+
+	assert.Empty(t, c.txs)
+	assert.Empty(t, c.transitions)
+	assert.Empty(t, c.utxos)
+	assert.Empty(t, c.restrictions)
+	assert.Empty(t, c.dependencies)
+	assert.Empty(t, c.missingDependencies)
+}
 func TestAcceptRejectedDependency(t *testing.T) {
 	c := New()
 
@@ -389,6 +559,7 @@ func TestAcceptRejectedEpochDependency(t *testing.T) {
 	assert.Empty(t, c.utxos)
 	assert.Empty(t, c.restrictions)
 	assert.Empty(t, c.dependencies)
+	assert.Empty(t, c.missingDependencies)
 }
 
 func TestRejectedRejectedDependency(t *testing.T) {
@@ -479,6 +650,7 @@ func TestRejectedRejectedDependency(t *testing.T) {
 	assert.Empty(t, c.utxos)
 	assert.Empty(t, c.restrictions)
 	assert.Empty(t, c.dependencies)
+	assert.Empty(t, c.missingDependencies)
 }
 
 func TestAcceptVirtuousRejectedDependency(t *testing.T) {
@@ -572,4 +744,5 @@ func TestAcceptVirtuousRejectedDependency(t *testing.T) {
 	assert.Empty(t, c.utxos)
 	assert.Empty(t, c.restrictions)
 	assert.Empty(t, c.dependencies)
+	assert.Empty(t, c.missingDependencies)
 }

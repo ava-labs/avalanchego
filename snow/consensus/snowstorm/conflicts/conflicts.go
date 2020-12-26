@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+// Conflicts implements the [snowstorm.Conflicts] interface
 type Conflicts struct {
 	// track the currently processing txs. This includes
 	// transactions that have been added to the acceptable and rejectable
@@ -35,6 +36,11 @@ type Conflicts struct {
 	// performed before the transaction is accepted.
 	dependencies map[ids.ID]ids.Set
 
+	// track the dependencies of a transaction
+	// TransactionID --> IDs of transitions that must be performed prior
+	// to the transaction.
+	missingDependencies map[ids.ID]ids.Set
+
 	// conditionallyAccepted tracks the set of txIDs that have been
 	// conditionally accepted, but not returned as fully accepted.
 	conditionallyAccepted ids.Set
@@ -50,13 +56,15 @@ type Conflicts struct {
 	rejectable []Tx
 }
 
+// New returns a new Conflict Manager
 func New() *Conflicts {
 	return &Conflicts{
-		txs:          make(map[ids.ID]Tx),
-		transitions:  make(map[ids.ID]ids.Set),
-		utxos:        make(map[ids.ID]ids.Set),
-		restrictions: make(map[ids.ID]ids.Set),
-		dependencies: make(map[ids.ID]ids.Set),
+		txs:                 make(map[ids.ID]Tx),
+		transitions:         make(map[ids.ID]ids.Set),
+		utxos:               make(map[ids.ID]ids.Set),
+		restrictions:        make(map[ids.ID]ids.Set),
+		dependencies:        make(map[ids.ID]ids.Set),
+		missingDependencies: make(map[ids.ID]ids.Set),
 	}
 }
 
@@ -86,13 +94,21 @@ func (c *Conflicts) Add(tx Tx) error {
 		c.restrictions[restrictionID] = restrictors
 	}
 
-	for _, dependencyID := range transition.Dependencies() {
+	missingDependencies := transition.Dependencies()
+	for _, dependencyID := range missingDependencies {
 		dependents := c.dependencies[dependencyID]
 		dependents.Add(txID)
 		c.dependencies[dependencyID] = dependents
 	}
+
+	missingDeps := c.missingDependencies[txID]
+	missingDeps.Add(missingDependencies...)
+	c.missingDependencies[txID] = missingDeps
+
 	return nil
 }
+
+// Processing returns true if [trID] is being processed
 func (c *Conflicts) Processing(trID ids.ID) bool {
 	_, exists := c.transitions[trID]
 	return exists
@@ -214,9 +230,11 @@ func (c *Conflicts) Accept(txID ids.ID) {
 	}
 
 	transition := tx.Transition()
+	transitionID := transition.ID()
 
 	acceptable := true
-	for _, dependency := range transition.Dependencies() {
+	missingDependencies := c.missingDependencies[txID]
+	for dependency := range missingDependencies {
 		if !c.accepted.Contains(dependency) {
 			// [tx] is not acceptable because a transition it requires to have
 			// been performed has not yet been
@@ -224,7 +242,6 @@ func (c *Conflicts) Accept(txID ids.ID) {
 		}
 	}
 	if acceptable {
-		transitionID := transition.ID()
 		c.accepted.Add(transitionID)
 		c.acceptable = append(c.acceptable, tx)
 	} else {
@@ -232,6 +249,7 @@ func (c *Conflicts) Accept(txID ids.ID) {
 	}
 }
 
+// Updateable implements the [snowstorm.Conflicts] interface
 func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 	accepted := c.accepted
 	c.accepted = nil
@@ -292,52 +310,67 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 		// [transitionID] to be performed before they are accepted
 		dependents := c.dependencies[transitionID]
 		delete(c.dependencies, transitionID)
+		// Remove the set of missing dependencies. Should already be empty
+		// since [txID] has been accepted, so it is deleted from the map
+		// here.
+		delete(c.missingDependencies, txID)
+
 	acceptedDependentLoop:
-		for dependentID := range dependents {
-			dependent := c.txs[dependentID]
-			dependentEpoch := dependent.Epoch()
-			if dependentEpoch < epoch && !rejected.Contains(dependentID) {
+		for dependentTxID := range dependents {
+			dependentTx := c.txs[dependentTxID]
+			dependentEpoch := dependentTx.Epoch()
+
+			dependentTransition := dependentTx.Transition()
+			dependentTransitionID := dependentTransition.ID()
+
+			dependentTransitionMissingDeps := c.missingDependencies[dependentTxID]
+			dependentTransitionMissingDeps.Remove(transitionID)
+			if dependentTransitionMissingDeps.Len() == 0 {
+				delete(c.missingDependencies, dependentTxID)
+			} else {
+				c.missingDependencies[dependentTxID] = dependentTransitionMissingDeps
+			}
+
+			if dependentEpoch < epoch && !rejected.Contains(dependentTxID) {
 				// [dependent] requires [tx]'s transition to happen
 				// no later than [epoch] but the transition happens after.
 				// Therefore, [dependent] may no longer be accepted.
-				rejected.Add(dependentID)
-				c.rejectable = append(c.rejectable, dependent)
-			}
-
-			if !c.conditionallyAccepted.Contains(dependentID) {
+				rejected.Add(dependentTxID)
+				c.rejectable = append(c.rejectable, dependentTx)
 				continue
 			}
 
-			dependentTransition := dependent.Transition()
+			if !c.conditionallyAccepted.Contains(dependentTxID) {
+				continue
+			}
 
 			// [dependent] has been conditionally accepted.
 			// Check whether all of its transition dependencies are met
-			for _, dependencyID := range dependentTransition.Dependencies() {
-				if !accepted.Contains(dependencyID) {
+			for dependentTransitionID := range dependentTransitionMissingDeps {
+				if !accepted.Contains(dependentTransitionID) {
 					continue acceptedDependentLoop
 				}
 			}
 
-			// [dependent] has been conditionally accepted
+			// [dependentTx] has been conditionally accepted
 			// and its transition dependencies have been met.
 			// Therefore, it is acceptable.
-			dependentTransitionID := dependentTransition.ID()
-			c.conditionallyAccepted.Remove(dependentID)
+			c.conditionallyAccepted.Remove(dependentTxID)
 			c.accepted.Add(dependentTransitionID)
-			c.acceptable = append(c.acceptable, dependent)
+			c.acceptable = append(c.acceptable, dependentTx)
 		}
 
 		// Mark that the transactions that conflict with [tx] are rejectable
 		// Conflicts should never return an error, as the type has already been
 		// asserted.
-		conflicts, _ := c.Conflicts(tx)
-		for _, conflict := range conflicts {
-			conflictID := conflict.ID()
-			if rejected.Contains(conflictID) {
+		conflictTxs, _ := c.Conflicts(tx)
+		for _, conflictTx := range conflictTxs {
+			conflictTxID := conflictTx.ID()
+			if rejected.Contains(conflictTxID) {
 				continue
 			}
-			rejected.Add(conflictID)
-			c.rejectable = append(c.rejectable, conflict)
+			rejected.Add(conflictTxID)
+			c.rejectable = append(c.rejectable, conflictTx)
 		}
 	}
 
@@ -388,12 +421,12 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 			// [tx] was the only processing tx that performs transition [transitionID]
 			// Remove the dependency pointers of the transactions that depended
 			// on this transition.
-			dependents := c.dependencies[transitionID]
-			for dependentID := range dependents {
-				dependent := c.txs[dependentID]
-				if !rejected.Contains(dependentID) {
-					rejected.Add(dependentID)
-					c.rejectable = append(c.rejectable, dependent)
+			dependentTxIDs := c.dependencies[transitionID]
+			for dependentTxID := range dependentTxIDs {
+				if !rejected.Contains(dependentTxID) {
+					rejected.Add(dependentTxID)
+					dependentTx := c.txs[dependentTxID]
+					c.rejectable = append(c.rejectable, dependentTx)
 				}
 			}
 			delete(c.dependencies, transitionID)
@@ -412,20 +445,21 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 
 			// Mark as rejectable txs that require transition [transitionID] to
 			// occur earlier than it can.
-			dependents := c.dependencies[transitionID]
-			for dependentID := range dependents {
-				dependent := c.txs[dependentID]
-				dependentEpoch := dependent.Epoch()
-				if dependentEpoch < lowestRemainingEpoch && !rejected.Contains(dependentID) {
-					rejected.Add(dependentID)
-					c.rejectable = append(c.rejectable, dependent)
+			dependentTxIDs := c.dependencies[transitionID]
+			for dependentTxID := range dependentTxIDs {
+				dependentTx := c.txs[dependentTxID]
+				dependentEpoch := dependentTx.Epoch()
+				if dependentEpoch < lowestRemainingEpoch && !rejected.Contains(dependentTxID) {
+					rejected.Add(dependentTxID)
+					c.rejectable = append(c.rejectable, dependentTx)
 				}
 			}
 		}
 
 		// Remove this transaction from the dependency sets pointers of the
 		// transitions that this transaction depended on.
-		for _, dependency := range transition.Dependencies() {
+		dependencies := c.missingDependencies[txID]
+		for dependency := range dependencies {
 			dependents, exists := c.dependencies[dependency]
 			if !exists {
 				continue
@@ -433,6 +467,7 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 			dependents.Remove(txID)
 			c.dependencies[dependency] = dependents
 		}
+		delete(c.missingDependencies, txID)
 	}
 
 	return acceptable, rejectable
