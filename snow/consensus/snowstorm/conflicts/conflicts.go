@@ -101,9 +101,9 @@ func (c *Conflicts) Add(tx Tx) error {
 		c.dependencies[dependencyID] = dependents
 	}
 
-	missingDeps := c.missingDependencies[txID]
+	missingDeps := c.missingDependencies[transitionID]
 	missingDeps.Add(missingDependencies...)
-	c.missingDependencies[txID] = missingDeps
+	c.missingDependencies[transitionID] = missingDeps
 
 	return nil
 }
@@ -233,7 +233,7 @@ func (c *Conflicts) Accept(txID ids.ID) {
 	transitionID := transition.ID()
 
 	acceptable := true
-	missingDependencies := c.missingDependencies[txID]
+	missingDependencies := c.missingDependencies[transitionID]
 	for dependency := range missingDependencies {
 		if !c.accepted.Contains(dependency) {
 			// [tx] is not acceptable because a transition it requires to have
@@ -255,6 +255,8 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 	c.accepted = nil
 	acceptable := c.acceptable
 	c.acceptable = nil
+
+	toRemoveMissingDeps := ids.Set{}
 
 	// rejected tracks the set of txIDs that have been rejected but not yet
 	// removed from the graph.
@@ -310,10 +312,9 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 		// [transitionID] to be performed before they are accepted
 		dependents := c.dependencies[transitionID]
 		delete(c.dependencies, transitionID)
-		// Remove the set of missing dependencies. Should already be empty
-		// since [txID] has been accepted, so it is deleted from the map
-		// here.
-		delete(c.missingDependencies, txID)
+		// The transition has been accepted, so mark it's missing dependencies
+		// to be removed.
+		toRemoveMissingDeps.Add(transitionID)
 
 	acceptedDependentLoop:
 		for dependentTxID := range dependents {
@@ -323,13 +324,9 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 			dependentTransition := dependentTx.Transition()
 			dependentTransitionID := dependentTransition.ID()
 
-			dependentTransitionMissingDeps := c.missingDependencies[dependentTxID]
+			dependentTransitionMissingDeps := c.missingDependencies[dependentTransitionID]
 			dependentTransitionMissingDeps.Remove(transitionID)
-			if dependentTransitionMissingDeps.Len() == 0 {
-				delete(c.missingDependencies, dependentTxID)
-			} else {
-				c.missingDependencies[dependentTxID] = dependentTransitionMissingDeps
-			}
+			c.missingDependencies[dependentTransitionID] = dependentTransitionMissingDeps
 
 			if dependentEpoch < epoch && !rejected.Contains(dependentTxID) {
 				// [dependent] requires [tx]'s transition to happen
@@ -430,6 +427,10 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 				}
 			}
 			delete(c.dependencies, transitionID)
+			// If the last transaction attempting to perform [transitionID]
+			// has been rejected, then mark [transitionID] to be removed from
+			// the missing dependencies map.
+			toRemoveMissingDeps.Add(transitionID)
 		} else {
 			// There are processing tx's other than [tx] that
 			// perform transition [transitionID].
@@ -458,7 +459,7 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 
 		// Remove this transaction from the dependency sets pointers of the
 		// transitions that this transaction depended on.
-		dependencies := c.missingDependencies[txID]
+		dependencies := c.missingDependencies[transitionID]
 		for dependency := range dependencies {
 			dependents, exists := c.dependencies[dependency]
 			if !exists {
@@ -467,7 +468,13 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 			dependents.Remove(txID)
 			c.dependencies[dependency] = dependents
 		}
-		delete(c.missingDependencies, txID)
+	}
+
+	// Remove transitions from the missing dependencies map.
+	// Note this is done after the iteration to avoid removing
+	// missing dependencies
+	for transitionID := range toRemoveMissingDeps {
+		delete(c.missingDependencies, transitionID)
 	}
 
 	return acceptable, rejectable
