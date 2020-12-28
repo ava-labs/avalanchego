@@ -456,15 +456,15 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 	if err != nil {
 		return err
 	}
-	txIDs := ids.Set{}
+	trIDs := ids.Set{}
 	for _, tx := range txs {
-		txIDs.Add(tx.ID())
+		trIDs.Add(tx.Transition().ID())
 	}
 
 	for _, tx := range txs {
 		tr := tx.Transition()
 		for _, depID := range tr.Dependencies() {
-			if !txIDs.Contains(depID) && !t.Consensus.TransitionProcessing(depID) {
+			if !trIDs.Contains(depID) && !t.Consensus.TransitionProcessing(depID) {
 				dep, err := t.VM.Get(depID)
 				if err != nil || !dep.Status().Decided() {
 					// This transaction hasn't been issued yet. Add it as a dependency.
@@ -532,16 +532,19 @@ func (t *Transitive) batch(epoch uint32, trs []conflicts.Transition, force, empt
 		if err != nil {
 			return err
 		}
+		txID := tx.ID()
 
 		if trID := tr.ID(); !overlaps && // should never allow conflicting txs in the same vertex
 			(force || isVirtuous) && // force allows for a conflict to be issued
 			!issuedTrs.Contains(trID) && // shouldn't issue duplicated transactions to the same vertex
 			!tr.Status().Decided() && // shouldn't re-issue a decided transaction
-			(!t.Consensus.TransitionProcessing(trID) || orphans.Contains(trID)) { // should only reissue orphaned txs
+			(!t.Consensus.TxIssued(tx) || orphans.Contains(txID)) { // should only reissue orphaned txs
+			// Add the transition to the current batch
 			end++
 			issuedTrs.Add(trID)
 			consumed.Union(inputs)
 		} else {
+			// Drop the transition
 			newLen := len(trs) - 1
 			trs[end] = trs[newLen]
 			trs[newLen] = nil
