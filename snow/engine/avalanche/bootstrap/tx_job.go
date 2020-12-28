@@ -48,7 +48,12 @@ type txJob struct {
 func (t *txJob) ID() ids.ID { return t.tx.Transition().ID() }
 func (t *txJob) MissingDependencies() (ids.Set, error) {
 	missing := ids.Set{}
-	missing.Add(t.tx.Transition().Dependencies()...)
+	for _, depID := range t.tx.Transition().Dependencies() {
+		dep, err := t.vm.Get(depID)
+		if err != nil || dep.Status() != choices.Accepted {
+			missing.Add(depID)
+		}
+	}
 	return missing, nil
 }
 
