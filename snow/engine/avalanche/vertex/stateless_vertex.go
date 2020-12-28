@@ -20,8 +20,6 @@ const (
 )
 
 var (
-	errBadVersion          = errors.New("invalid version")
-	errBadEpoch            = errors.New("invalid epoch")
 	errFutureField         = errors.New("field specified in a previous version")
 	errTooManyparentIDs    = fmt.Errorf("vertex contains more than %d parentIDs", maxNumParents)
 	errNoOperations        = errors.New("vertex contains no operations")
