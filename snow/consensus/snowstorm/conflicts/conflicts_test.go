@@ -185,24 +185,26 @@ func TestAcceptNoConflictsWithDependency(t *testing.T) {
 	c := New()
 
 	transitionID := ids.GenerateTestID()
+	tr0 := &TestTransition{
+		IDV: transitionID,
+	}
 	tx0 := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		TransitionV: &TestTransition{
-			IDV: transitionID,
-		},
+		TransitionV: tr0,
+	}
+	tr1 := &TestTransition{
+		IDV:           ids.GenerateTestID(),
+		DependenciesV: []Transition{tr0},
 	}
 	tx1 := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		TransitionV: &TestTransition{
-			IDV:           ids.GenerateTestID(),
-			DependenciesV: []ids.ID{transitionID},
-		},
+		TransitionV: tr1,
 	}
 
 	err := c.Add(tx0)
@@ -247,25 +249,26 @@ func TestAcceptNoConflictsWithDependency(t *testing.T) {
 func TestNoConflictsNoEarlyAcceptDependency(t *testing.T) {
 	c := New()
 
-	transitionID := ids.GenerateTestID()
+	tr0 := &TestTransition{
+		IDV: ids.GenerateTestID(),
+	}
 	tx0 := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		TransitionV: &TestTransition{
-			IDV: transitionID,
-		},
+		TransitionV: tr0,
+	}
+	tr1 := &TestTransition{
+		IDV:           ids.GenerateTestID(),
+		DependenciesV: []Transition{tr0},
 	}
 	tx1 := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		TransitionV: &TestTransition{
-			IDV:           ids.GenerateTestID(),
-			DependenciesV: []ids.ID{transitionID},
-		},
+		TransitionV: tr1,
 	}
 
 	err := c.Add(tx0)
@@ -310,35 +313,36 @@ func TestNoConflictsNoEarlyAcceptDependency(t *testing.T) {
 func TestAcceptNoConflictsWithDependenciesAcrossMultipleRounds(t *testing.T) {
 	c := New()
 
-	transitionID0 := ids.GenerateTestID()
+	tr0 := &TestTransition{
+		IDV: ids.GenerateTestID(),
+	}
 	tx0 := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		TransitionV: &TestTransition{
-			IDV: transitionID0,
-		},
+		TransitionV: tr0,
 	}
-	transitionID1 := ids.GenerateTestID()
+	tr1 := &TestTransition{
+		IDV: ids.GenerateTestID(),
+	}
 	tx1 := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		TransitionV: &TestTransition{
-			IDV: transitionID1,
-		},
+		TransitionV: tr1,
+	}
+	tr2 := &TestTransition{
+		IDV:           ids.GenerateTestID(),
+		DependenciesV: []Transition{tr0, tr1},
 	}
 	tx2 := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		TransitionV: &TestTransition{
-			IDV:           ids.GenerateTestID(),
-			DependenciesV: []ids.ID{transitionID0, transitionID1},
-		},
+		TransitionV: tr2,
 	}
 
 	err := c.Add(tx0)
@@ -415,27 +419,28 @@ func TestAcceptNoConflictsWithDependenciesAcrossMultipleRounds(t *testing.T) {
 func TestAcceptRejectedDependency(t *testing.T) {
 	c := New()
 
-	transitionID := ids.GenerateTestID()
 	inputIDs := []ids.ID{ids.GenerateTestID()}
+	tr0 := &TestTransition{
+		IDV:       ids.GenerateTestID(),
+		InputIDsV: inputIDs,
+	}
 	tx0 := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		TransitionV: &TestTransition{
-			IDV:       transitionID,
-			InputIDsV: inputIDs,
-		},
+		TransitionV: tr0,
+	}
+	tr1 := &TestTransition{
+		IDV:       ids.GenerateTestID(),
+		InputIDsV: inputIDs,
 	}
 	tx1 := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		TransitionV: &TestTransition{
-			IDV:       ids.GenerateTestID(),
-			InputIDsV: inputIDs,
-		},
+		TransitionV: tr1,
 	}
 	tx2 := &TestTx{
 		TestDecidable: choices.TestDecidable{
@@ -444,7 +449,7 @@ func TestAcceptRejectedDependency(t *testing.T) {
 		},
 		TransitionV: &TestTransition{
 			IDV:           ids.GenerateTestID(),
-			DependenciesV: []ids.ID{transitionID},
+			DependenciesV: []Transition{tr0},
 		},
 	}
 
@@ -489,38 +494,32 @@ func TestAcceptRejectedDependency(t *testing.T) {
 func TestAcceptRejectedEpochDependency(t *testing.T) {
 	c := New()
 
-	transitionID := ids.GenerateTestID()
 	inputIDs := []ids.ID{ids.GenerateTestID()}
+	tr := &TestTransition{
+		IDV:       ids.GenerateTestID(),
+		InputIDsV: inputIDs,
+	}
 	tx0 := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		TransitionV: &TestTransition{
-			IDV:       transitionID,
-			InputIDsV: inputIDs,
-		},
+		TransitionV: tr,
 	}
 	tx1 := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		TransitionV: &TestTransition{
-			IDV:       transitionID,
-			InputIDsV: inputIDs,
-		},
+		TransitionV: tr,
 	}
 	tx2 := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		TransitionV: &TestTransition{
-			IDV:       transitionID,
-			InputIDsV: inputIDs,
-		},
-		EpochV: 1,
+		TransitionV: tr,
+		EpochV:      1,
 	}
 	tx3 := &TestTx{
 		TestDecidable: choices.TestDecidable{
@@ -529,7 +528,7 @@ func TestAcceptRejectedEpochDependency(t *testing.T) {
 		},
 		TransitionV: &TestTransition{
 			IDV:           ids.GenerateTestID(),
-			DependenciesV: []ids.ID{transitionID},
+			DependenciesV: []Transition{tr},
 		},
 	}
 
@@ -565,57 +564,56 @@ func TestAcceptRejectedEpochDependency(t *testing.T) {
 func TestRejectedRejectedDependency(t *testing.T) {
 	c := New()
 
-	transitionIDAX := ids.GenerateTestID()
-	transitionIDAY := ids.GenerateTestID()
-	transitionIDBX := ids.GenerateTestID()
-	transitionIDBY := ids.GenerateTestID()
-
 	inputIDA := ids.GenerateTestID()
 	inputIDB := ids.GenerateTestID()
 
 	//   A.X - A.Y
 	//          |
 	//   B.X - B.Y
+	trAX := &TestTransition{
+		IDV:       ids.GenerateTestID(),
+		InputIDsV: []ids.ID{inputIDA, ids.GenerateTestID()},
+	}
 	txAX := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		TransitionV: &TestTransition{
-			IDV:       transitionIDAX,
-			InputIDsV: []ids.ID{inputIDA, ids.GenerateTestID()},
-		},
+		TransitionV: trAX,
+	}
+	trAY := &TestTransition{
+		IDV:       ids.GenerateTestID(),
+		InputIDsV: []ids.ID{inputIDA},
 	}
 	txAY := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		TransitionV: &TestTransition{
-			IDV:       transitionIDAY,
-			InputIDsV: []ids.ID{inputIDA},
-		},
+		TransitionV: trAY,
+	}
+	trBX := &TestTransition{
+		IDV:       ids.GenerateTestID(),
+		InputIDsV: []ids.ID{inputIDB},
 	}
 	txBX := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		TransitionV: &TestTransition{
-			IDV:       transitionIDBX,
-			InputIDsV: []ids.ID{inputIDB},
-		},
+		TransitionV: trBX,
+	}
+	trBY := &TestTransition{
+		IDV:           ids.GenerateTestID(),
+		DependenciesV: []Transition{trAY},
+		InputIDsV:     []ids.ID{inputIDB},
 	}
 	txBY := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		TransitionV: &TestTransition{
-			IDV:           transitionIDBY,
-			DependenciesV: []ids.ID{transitionIDAY},
-			InputIDsV:     []ids.ID{inputIDB},
-		},
+		TransitionV: trBY,
 	}
 
 	err := c.Add(txAY)
@@ -656,56 +654,56 @@ func TestRejectedRejectedDependency(t *testing.T) {
 func TestAcceptVirtuousRejectedDependency(t *testing.T) {
 	c := New()
 
-	transitionIDAX := ids.GenerateTestID()
-	transitionIDAY := ids.GenerateTestID()
-	transitionIDBX := ids.GenerateTestID()
-	transitionIDBY := ids.GenerateTestID()
 	inputIDsA := []ids.ID{ids.GenerateTestID()}
 	inputIDsB := []ids.ID{ids.GenerateTestID()}
 
 	//   A.X - A.Y
 	//          |
 	//   B.X - B.Y
+	trAX := &TestTransition{
+		IDV:       ids.GenerateTestID(),
+		InputIDsV: inputIDsA,
+	}
 	txAX := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		TransitionV: &TestTransition{
-			IDV:       transitionIDAX,
-			InputIDsV: inputIDsA,
-		},
+		TransitionV: trAX,
+	}
+	trAY := &TestTransition{
+		IDV:       ids.GenerateTestID(),
+		InputIDsV: inputIDsA,
 	}
 	txAY := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		TransitionV: &TestTransition{
-			IDV:       transitionIDAY,
-			InputIDsV: inputIDsA,
-		},
+		TransitionV: trAY,
+	}
+	trBX := &TestTransition{
+		IDV:       ids.GenerateTestID(),
+		InputIDsV: inputIDsB,
 	}
 	txBX := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		TransitionV: &TestTransition{
-			IDV:       transitionIDBX,
-			InputIDsV: inputIDsB,
-		},
+		TransitionV: trBX,
+	}
+	trV := &TestTransition{
+		IDV:           ids.GenerateTestID(),
+		DependenciesV: []Transition{trAY},
+		InputIDsV:     inputIDsB,
 	}
 	txBY := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		TransitionV: &TestTransition{
-			IDV:           transitionIDBY,
-			DependenciesV: []ids.ID{transitionIDAY},
-			InputIDsV:     inputIDsB,
-		},
+		TransitionV: trV,
 	}
 
 	err := c.Add(txAX)

@@ -895,7 +895,7 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
-			DependenciesV: []ids.ID{gTx.Transition().ID()},
+			DependenciesV: []conflicts.Transition{gTx.Transition()},
 			InputIDsV:     []ids.ID{utxos[0]},
 		},
 	}
@@ -906,7 +906,7 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
-			DependenciesV: []ids.ID{gTx.Transition().ID()},
+			DependenciesV: []conflicts.Transition{gTx.Transition()},
 			InputIDsV:     []ids.ID{utxos[0]},
 		},
 	}
@@ -1047,7 +1047,7 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 		},
 		TransitionV: &conflicts.TestTransition{
 			IDV:           ids.GenerateTestID(),
-			DependenciesV: []ids.ID{gTx.Transition().ID()},
+			DependenciesV: []conflicts.Transition{gTx.Transition()},
 			InputIDsV:     []ids.ID{utxos[0]},
 		},
 	}
@@ -1059,7 +1059,7 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 		},
 		TransitionV: &conflicts.TestTransition{
 			IDV:           ids.GenerateTestID(),
-			DependenciesV: []ids.ID{gTx.Transition().ID()},
+			DependenciesV: []conflicts.Transition{gTx.Transition()},
 			InputIDsV:     []ids.ID{utxos[0]},
 		},
 	}
@@ -1551,7 +1551,7 @@ func TestEngineLargeIssue(t *testing.T) {
 		},
 		TransitionV: &conflicts.TestTransition{
 			IDV:           ids.GenerateTestID(),
-			DependenciesV: []ids.ID{gTx.Transition().ID()},
+			DependenciesV: []conflicts.Transition{gTx.Transition()},
 			InputIDsV:     []ids.ID{utxos[0]},
 		},
 	}
@@ -1563,7 +1563,7 @@ func TestEngineLargeIssue(t *testing.T) {
 		},
 		TransitionV: &conflicts.TestTransition{
 			IDV:           ids.GenerateTestID(),
-			DependenciesV: []ids.ID{gTx.Transition().ID()},
+			DependenciesV: []conflicts.Transition{gTx.Transition()},
 			InputIDsV:     []ids.ID{utxos[1]},
 		},
 	}
@@ -2463,7 +2463,7 @@ func TestEngineIssueBlockingTx(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
-			DependenciesV: []ids.ID{tx0.Transition().ID()},
+			DependenciesV: []conflicts.Transition{tx0.Transition()},
 			InputIDsV:     []ids.ID{utxos[1]},
 		},
 	}
@@ -2679,7 +2679,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
-			DependenciesV: []ids.ID{tx0.Transition().ID()},
+			DependenciesV: []conflicts.Transition{tx0.Transition()},
 			InputIDsV:     []ids.ID{utxos[1]},
 		},
 		BytesV: txBytes1,
@@ -3630,7 +3630,7 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
-			DependenciesV: []ids.ID{gTx.Transition().ID()},
+			DependenciesV: []conflicts.Transition{gTx.Transition()},
 			InputIDsV:     []ids.ID{utxos[0]},
 		},
 	}

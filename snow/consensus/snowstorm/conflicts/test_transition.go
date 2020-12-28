@@ -19,7 +19,7 @@ type TestTransition struct {
 	IDV           ids.ID
 	StatusV       choices.Status
 	EpochV        uint32
-	DependenciesV []ids.ID
+	DependenciesV []Transition
 	InputIDsV     []ids.ID
 	BytesV        []byte
 	VerifyV       map[uint32]error
@@ -37,7 +37,15 @@ func (t *TestTransition) Status() choices.Status { return t.StatusV }
 func (t *TestTransition) Epoch() uint32 { return t.EpochV }
 
 // Dependencies implements the Transition interface
-func (t *TestTransition) Dependencies() []ids.ID { return t.DependenciesV }
+func (t *TestTransition) Dependencies() []ids.ID {
+	dependencies := make([]ids.ID, 0, len(t.DependenciesV))
+	for _, dep := range t.DependenciesV {
+		if dep.Status() != choices.Accepted {
+			dependencies = append(dependencies, dep.ID())
+		}
+	}
+	return dependencies
+}
 
 // InputIDs implements the Transition interface
 func (t *TestTransition) InputIDs() []ids.ID { return t.InputIDsV }
