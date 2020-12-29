@@ -251,8 +251,6 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 	acceptable := c.acceptable
 	c.acceptable = nil
 
-	transitionsToRemove := ids.Set{}
-
 	// rejected tracks the set of txIDs that have been rejected but not yet
 	// removed from the graph.
 	rejected := ids.Set{}
@@ -290,9 +288,10 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 			c.transitionNodes[restrictionID] = restrictorNode
 		}
 
-		// Add the accepted transition to the set of transitions to
-		// be removed from the map.
-		transitionsToRemove.Add(transitionID)
+		// Remove the transition from the map now that it's
+		// been accepted.
+		delete(c.transitionNodes, transitionID)
+
 		// Remove the dependency pointers of the transactions that depended on
 		// [tx]'s transition. If a transaction has been conditionally accepted and
 		// it has no dependencies left, then it should be marked as accepted.
@@ -340,6 +339,13 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 			c.acceptable = append(c.acceptable, dependentTx)
 		}
 
+		// Once all of the dependencies have been updated, clear the
+		// dependencies so that a rejected transaction attempting to
+		// make the same transition will not cause this transition's
+		// dependencies to be processed again (which can cause a
+		// segfault if the tx has been removed from the txs map).
+		transitionNode.dependencies.Clear()
+
 		// Mark that the transactions that conflict with [tx] are rejectable
 		// Conflicts should never return an error, as the type has already been
 		// asserted.
@@ -368,8 +374,8 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 
 		transitionNode := c.transitionNodes[transitionID]
 
-		// Remove from the transitions map
 		transitionNode.txIDs.Remove(txID)
+		c.transitionNodes[transitionID] = transitionNode
 		// Remove from the UTXO map
 		for _, inputID := range transition.InputIDs() {
 			spenders := c.utxos[inputID]
@@ -401,9 +407,8 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 			}
 
 			// If the last transaction attempting to perform [transitionID]
-			// has been rejected, then mark [transitionID] to be removed from
-			// the transition map.
-			transitionsToRemove.Add(transitionID)
+			// has been rejected, then remove it from the transition map.
+			delete(c.transitionNodes, transitionID)
 		} else {
 			// There are processing tx's other than [tx] that
 			// perform transition [transitionID].
@@ -420,12 +425,6 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 			// Mark as rejectable txs that require transition [transitionID] to
 			// occur earlier than it can.
 			for dependentTxID := range transitionNode.dependencies {
-				// If the transaction has already been rejected in this round
-				// then it must be skipped over since it has been removed from
-				// the txs map.
-				if rejected.Contains(dependentTxID) {
-					continue
-				}
 				dependentTx := c.txs[dependentTxID]
 				dependentEpoch := dependentTx.Epoch()
 				if dependentEpoch < lowestRemainingEpoch {
@@ -445,14 +444,6 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 			dependentTransitionNode.dependencies.Remove(txID)
 			c.transitionNodes[dependency] = dependentTransitionNode
 		}
-		c.transitionNodes[transitionID] = transitionNode
-	}
-
-	// Remove transitions from the missing dependencies map.
-	// Note this is done after the iteration to avoid removing
-	// missing dependencies
-	for transitionID := range transitionsToRemove {
-		delete(c.transitionNodes, transitionID)
 	}
 
 	return acceptable, rejectable

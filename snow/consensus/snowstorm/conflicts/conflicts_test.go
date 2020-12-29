@@ -12,6 +12,29 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
+func TestProcessing(t *testing.T) {
+	c := New()
+
+	tx := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &TestTransition{
+			IDV: ids.GenerateTestID(),
+		},
+	}
+
+	processing := c.Processing(tx.Transition().ID())
+	assert.False(t, processing)
+
+	err := c.Add(tx)
+	assert.NoError(t, err)
+
+	processing = c.Processing(tx.Transition().ID())
+	assert.True(t, processing)
+}
+
 func TestNoConflicts(t *testing.T) {
 	c := New()
 
