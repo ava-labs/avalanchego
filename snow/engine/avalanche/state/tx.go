@@ -76,7 +76,7 @@ func (t *tx) Verify() error {
 	trID := t.tr.ID()
 	epoch := t.tx.Epoch()
 	restriction := t.serializer.state.TrRestriction(trID)
-	if restriction < epoch {
+	if restriction > epoch {
 		return fmt.Errorf("transition %s was restriction to epoch %d", trID, epoch)
 	}
 	return t.tr.Verify(t.tx.Epoch())

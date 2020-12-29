@@ -7,26 +7,11 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 )
-
-func newSerializer(t *testing.T, parse func([]byte) (conflicts.Transition, error)) *Serializer {
-	vm := vertex.TestVM{}
-	vm.T = t
-	vm.Default(true)
-	vm.ParseF = parse
-
-	baseDB := memdb.New()
-	ctx := snow.DefaultContextTest()
-	s := &Serializer{}
-	s.Initialize(ctx, &vm, baseDB)
-	return s
-}
 
 func TestUnknownUniqueVertexErrors(t *testing.T) {
 	s := newSerializer(t, nil)
