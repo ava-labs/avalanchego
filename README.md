@@ -1,4 +1,5 @@
 # AvalancheGo
+![Avalanche](resources/AvalancheBlack.png?raw=true)
 
 Official node implementation of the [Avalanche](https://avax.network) network -
 a blockchains platform with high throughput, and blazing fast transactions.
