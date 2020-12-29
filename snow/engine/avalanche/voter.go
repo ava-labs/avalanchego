@@ -29,6 +29,11 @@ func (v *voter) Fulfill(id ids.ID) {
 // Abandon this attempt to record chits.
 func (v *voter) Abandon(id ids.ID) { v.Fulfill(id) }
 
+type vtx struct {
+	trs []conflicts.Transition
+	rts [][]ids.ID
+}
+
 func (v *voter) Update() {
 	if v.deps.Len() != 0 || v.t.errs.Errored() {
 		return
@@ -50,22 +55,35 @@ func (v *voter) Update() {
 		return
 	}
 
+	epochs := make(map[uint32]vtx, 2)
 	orphans := v.t.Consensus.Orphans()
-	txs := make([]conflicts.Transition, 0, orphans.Len())
 	for orphanID := range orphans {
-		if tx, err := v.t.Consensus.GetTx(orphanID); err == nil {
-			txs = append(txs, tx.Transition())
-		} else {
+		tx, err := v.t.Consensus.GetTx(orphanID)
+		if err != nil {
 			v.t.Ctx.Log.Error("Failed to fetch %s during attempted re-issuance",
 				orphanID)
+			continue
 		}
+		epoch := tx.Epoch()
+		vt, exists := epochs[epoch]
+		if !exists {
+			vt.trs = make([]conflicts.Transition, 0, orphans.Len())
+			vt.rts = make([][]ids.ID, 0, orphans.Len())
+		}
+		if rts := tx.Restrictions(); len(rts) > 0 {
+			vt.rts = append(vt.rts, rts)
+		} else {
+			vt.trs = append(vt.trs, tx.Transition())
+		}
+		epochs[epoch] = vt
 	}
-	if len(txs) > 0 {
-		v.t.Ctx.Log.Debug("Re-issuing %d transactions", len(txs))
-	}
-	if err := v.t.batch(v.t.Ctx.Epoch(), txs, true /*=force*/, false /*empty*/); err != nil {
-		v.t.errs.Add(err)
-		return
+	for epoch, vt := range epochs {
+		v.t.Ctx.Log.Debug("Re-issuing %d transitions and %d restriction groups in to epoch %d",
+			len(vt.trs), len(vt.rts), epoch)
+		if err := v.t.batch(epoch, vt.trs, vt.rts, true /*=force*/, false /*empty*/, false /*=updatedEpoch*/); err != nil {
+			v.t.errs.Add(err)
+			return
+		}
 	}
 
 	if v.t.Consensus.Quiesce() {

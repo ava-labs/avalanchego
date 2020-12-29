@@ -17,6 +17,9 @@ const (
 
 	// maxTransitionsPerVtx is the max number of transitions a vertex may have
 	maxTransitionsPerVtx = 128
+
+	// maxRestrictionsPerVtx is the max number of restrictions a vertex may have
+	maxRestrictionsPerVtx = 128
 )
 
 var (
@@ -24,7 +27,7 @@ var (
 	errTooManyparentIDs    = fmt.Errorf("vertex contains more than %d parentIDs", maxNumParents)
 	errNoOperations        = errors.New("vertex contains no operations")
 	errTooManyTransitions  = fmt.Errorf("vertex contains more than %d transitions", maxTransitionsPerVtx)
-	errTooManyRestrictions = fmt.Errorf("vertex contains more than %d restrictions", maxTransitionsPerVtx)
+	errTooManyRestrictions = fmt.Errorf("vertex contains more than %d restrictions", maxRestrictionsPerVtx)
 	errInvalidParents      = errors.New("vertex contains non-sorted or duplicated parentIDs")
 	errInvalidRestrictions = errors.New("vertex contains non-sorted or duplicated restrictions")
 	errInvalidTransitions  = errors.New("vertex contains non-sorted or duplicated transitions")
@@ -106,7 +109,7 @@ func (v innerStatelessVertex) Verify() error {
 		return errNoOperations
 	case len(v.Transitions) > maxTransitionsPerVtx:
 		return errTooManyTransitions
-	case len(v.Restrictions) > maxTransitionsPerVtx:
+	case len(v.Restrictions) > maxRestrictionsPerVtx:
 		return errTooManyRestrictions
 	case !ids.IsSortedAndUniqueIDs(v.ParentIDs):
 		return errInvalidParents

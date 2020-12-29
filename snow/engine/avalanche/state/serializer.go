@@ -72,8 +72,9 @@ func (s *Serializer) Wrap(
 ) (conflicts.Tx, error) {
 	slTx, err := vertex.Wrap(epoch, tr.Bytes(), restrictions)
 	return &tx{
-		tx: slTx,
-		tr: tr,
+		serializer: s,
+		tx:         slTx,
+		tr:         tr,
 	}, err
 }
 
@@ -85,8 +86,9 @@ func (s *Serializer) ParseTx(b []byte) (conflicts.Tx, error) {
 	}
 	tr, err := s.vm.Parse(slTx.Transition())
 	return &tx{
-		tx: slTx,
-		tr: tr,
+		serializer: s,
+		tx:         slTx,
+		tr:         tr,
 	}, err
 }
 

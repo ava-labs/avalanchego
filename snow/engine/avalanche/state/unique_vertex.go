@@ -239,11 +239,17 @@ func (vtx *uniqueVertex) Txs() ([]conflicts.Tx, error) {
 		return nil, fmt.Errorf("failed to get txs for vertex with status: %s", vtx.v.status)
 	}
 
+	epoch := vtx.v.vtx.Epoch()
 	transitions := vtx.v.vtx.Transitions()
-	if len(transitions) != len(vtx.v.txs) {
-		vtx.v.txs = make([]conflicts.Tx, len(transitions))
+	restrictions := vtx.v.vtx.Restrictions()
+	numTxs := len(transitions)
+	if len(restrictions) > 0 {
+		numTxs++
+	}
+	if numTxs != len(vtx.v.txs) {
+		vtx.v.txs = make([]conflicts.Tx, numTxs)
 		for i, transitionBytes := range transitions {
-			slTx, err := vertex.Wrap(vtx.v.vtx.Epoch(), transitionBytes, nil)
+			slTx, err := vertex.Wrap(epoch, transitionBytes, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -252,8 +258,22 @@ func (vtx *uniqueVertex) Txs() ([]conflicts.Tx, error) {
 				return nil, err
 			}
 			vtx.v.txs[i] = &tx{
-				tx: slTx,
-				tr: tr,
+				serializer: vtx.serializer,
+				tx:         slTx,
+				tr:         tr,
+			}
+		}
+		if len(restrictions) > 0 {
+			slTx, err := vertex.Wrap(epoch, nil, restrictions)
+			if err != nil {
+				return nil, err
+			}
+			slTxID := slTx.ID()
+			uid := hashing.ComputeHash256Array(slTxID[:])
+			vtx.v.txs[len(transitions)] = &tx{
+				serializer: vtx.serializer,
+				tx:         slTx,
+				tr:         emptyTransition{id: uid},
 			}
 		}
 	}

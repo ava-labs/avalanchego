@@ -13,6 +13,7 @@ import (
 type issuer struct {
 	t                 *Transitive
 	vtx               avalanche.Vertex
+	updatedEpoch      bool
 	issued, abandoned bool
 	vtxDeps, txDeps   ids.Set
 }
@@ -57,13 +58,20 @@ func (i *issuer) Update() {
 		return
 	}
 	validTransitions := make([]conflicts.Transition, 0, len(txs))
+	invalidTransitions := []ids.ID(nil)
+	if i.updatedEpoch {
+		invalidTransitions = make([]ids.ID, 0, len(txs))
+	}
 	unissuedTransitions := make([]conflicts.Transition, 0, len(txs))
 	for _, tx := range txs {
+		transition := tx.Transition()
 		if err := tx.Verify(); err != nil {
 			i.t.Ctx.Log.Debug("Transaction %s failed verification due to %s", tx.ID(), err)
+			if i.updatedEpoch {
+				invalidTransitions = append(invalidTransitions, transition.ID())
+			}
 			continue
 		}
-		transition := tx.Transition()
 
 		validTransitions = append(validTransitions, transition)
 		if !i.t.Consensus.TransitionProcessing(transition.ID()) {
@@ -81,7 +89,14 @@ func (i *issuer) Update() {
 	// Take the valid transactions and issue a new vertex with them.
 	if len(validTransitions) != len(txs) {
 		i.t.Ctx.Log.Debug("Abandoning %s due to failed transaction verification", vtxID)
-		err = i.t.batch(epoch, validTransitions, false /*=force*/, false /*=empty*/)
+		err = i.t.batch(
+			epoch,
+			validTransitions,
+			[][]ids.ID{invalidTransitions},
+			false, // force
+			false, // empty
+			true,  // updatedEpoch
+		)
 		i.t.errs.Add(err)
 		i.t.vtxBlocked.Abandon(vtxID)
 		return
@@ -92,7 +107,14 @@ func (i *issuer) Update() {
 	// their current epoch
 	if currentEpoch := i.t.Ctx.Epoch(); epoch < currentEpoch && len(unissuedTransitions) > 0 {
 		i.t.Ctx.Log.Debug("Reissuing transitions from epoch %d into newer epoch %d", epoch, currentEpoch)
-		if err := i.t.batch(currentEpoch, validTransitions, true /*=force*/, false /*=empty*/); err != nil {
+		if err := i.t.batch(
+			currentEpoch,
+			unissuedTransitions,
+			nil,   // restrictions
+			true,  // force
+			false, // empty
+			true,  // updatedEpoch
+		); err != nil {
 			i.t.errs.Add(err)
 			return
 		}
