@@ -567,6 +567,135 @@ func TestAcceptRejectedEpochDependency(t *testing.T) {
 	assert.Empty(t, c.transitionNodes)
 }
 
+func TestAcceptRestrictedDependency(t *testing.T) {
+	c := New()
+
+	inputIDs := []ids.ID{ids.GenerateTestID()}
+	trA := &TestTransition{
+		IDV:       ids.GenerateTestID(),
+		InputIDsV: inputIDs,
+	}
+	trB := &TestTransition{
+		IDV:           ids.GenerateTestID(),
+		InputIDsV:     []ids.ID{ids.GenerateTestID()},
+		DependenciesV: []Transition{trA},
+	}
+	trC := &TestTransition{
+		IDV:       ids.GenerateTestID(),
+		InputIDsV: []ids.ID{ids.GenerateTestID()},
+	}
+
+	txA0 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: trA,
+	}
+	txA1 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: trA,
+		EpochV:      1,
+	}
+	txB0 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: trB,
+	}
+	txB1 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: trB,
+		EpochV:      1,
+	}
+	txC0 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV:   trC,
+		RestrictionsV: []ids.ID{trA.ID()},
+	}
+	txC1 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV:   trC,
+		EpochV:        1,
+		RestrictionsV: []ids.ID{trA.ID()},
+	}
+
+	err := c.Add(txA0)
+	assert.NoError(t, err)
+
+	err = c.Add(txA1)
+	assert.NoError(t, err)
+
+	err = c.Add(txB0)
+	assert.NoError(t, err)
+
+	err = c.Add(txB1)
+	assert.NoError(t, err)
+
+	err = c.Add(txC0)
+	assert.NoError(t, err)
+
+	err = c.Add(txC1)
+	assert.NoError(t, err)
+
+	toAccepts, toRejects := c.Updateable()
+	assert.Empty(t, toAccepts)
+	assert.Empty(t, toRejects)
+
+	// Accepting tx1 should restrict trA to epoch 1 rejecting
+	// txA0 and txB0 as a result.
+	c.Accept(txC1.ID())
+
+	toAccepts, toRejects = c.Updateable()
+	assert.Len(t, toAccepts, 1)
+	assert.Len(t, toRejects, 2)
+
+	toAccept := toAccepts[0]
+	assert.Equal(t, txC1.ID(), toAccept.ID())
+
+	toAccepts, toRejects = c.Updateable()
+	assert.Empty(t, toAccepts)
+	assert.Len(t, toRejects, 1)
+
+	toReject := toRejects[0]
+	assert.Equal(t, txB0.ID(), toReject.ID())
+
+	c.Accept(txA1.ID())
+
+	toAccepts, toRejects = c.Updateable()
+	assert.Len(t, toAccepts, 1)
+	assert.Empty(t, toRejects)
+
+	toAccept = toAccepts[0]
+	assert.Equal(t, txA1.ID(), toAccept.ID())
+
+	c.Accept(txB1.ID())
+
+	toAccepts, toRejects = c.Updateable()
+	assert.Len(t, toAccepts, 1)
+	assert.Empty(t, toRejects)
+
+	toAccept = toAccepts[0]
+	assert.Equal(t, txB1.ID(), toAccept.ID())
+
+	assert.Empty(t, c.txs)
+	assert.Empty(t, c.utxos)
+	assert.Empty(t, c.transitionNodes)
+}
+
 func TestRejectedRejectedDependency(t *testing.T) {
 	c := New()
 

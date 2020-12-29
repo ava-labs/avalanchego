@@ -409,7 +409,7 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 			// If the last transaction attempting to perform [transitionID]
 			// has been rejected, then remove it from the transition map.
 			delete(c.transitionNodes, transitionID)
-		} else {
+		} else if len(transitionNode.dependencies) > 0 {
 			// There are processing tx's other than [tx] that
 			// perform transition [transitionID].
 			// Calculate the earliest epoch in which the transition may occur.
