@@ -34,8 +34,15 @@ func Build(
 	SortHashOf(trs)
 	ids.SortIDs(restrictions)
 
+	var version uint16
+	switch epoch {
+	case 0:
+		version = noEpochTransitionsCodecVersion
+	default:
+		version = apricotCodecVersion
+	}
 	innerVtx := innerStatelessVertex{
-		Version:      noEpochTransitionsCodecVersion,
+		Version:      version,
 		ChainID:      chainID,
 		Height:       height,
 		Epoch:        epoch,

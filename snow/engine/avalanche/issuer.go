@@ -57,27 +57,45 @@ func (i *issuer) Update() {
 		return
 	}
 	validTransitions := make([]conflicts.Transition, 0, len(txs))
+	unissuedTransitions := make([]conflicts.Transition, 0, len(txs))
 	for _, tx := range txs {
 		if err := tx.Verify(); err != nil {
 			i.t.Ctx.Log.Debug("Transaction %s failed verification due to %s", tx.ID(), err)
-		} else {
-			validTransitions = append(validTransitions, tx.Transition())
+			continue
 		}
+		transition := tx.Transition()
+
+		validTransitions = append(validTransitions, transition)
+		if !i.t.Consensus.TransitionProcessing(transition.ID()) {
+			unissuedTransitions = append(unissuedTransitions, transition)
+		}
+	}
+
+	epoch, err := i.vtx.Epoch()
+	if err != nil {
+		i.t.errs.Add(err)
+		return
 	}
 
 	// Some of the transactions weren't valid. Abandon this vertex.
 	// Take the valid transactions and issue a new vertex with them.
 	if len(validTransitions) != len(txs) {
 		i.t.Ctx.Log.Debug("Abandoning %s due to failed transaction verification", vtxID)
-		epoch, err := i.vtx.Epoch()
-		if err != nil {
-			i.t.errs.Add(err)
-			return
-		}
 		err = i.t.batch(epoch, validTransitions, false /*=force*/, false /*=empty*/)
 		i.t.errs.Add(err)
 		i.t.vtxBlocked.Abandon(vtxID)
 		return
+	}
+
+	// Make sure that the first time these transitions are issued, they are
+	// being issued into the current epoch. This enforces that nodes will prefer
+	// their current epoch
+	if currentEpoch := i.t.Ctx.Epoch(); epoch < currentEpoch && len(unissuedTransitions) > 0 {
+		i.t.Ctx.Log.Debug("Reissuing transitions from epoch %d into newer epoch %d", epoch, currentEpoch)
+		if err := i.t.batch(currentEpoch, validTransitions, true /*=force*/, false /*=empty*/); err != nil {
+			i.t.errs.Add(err)
+			return
+		}
 	}
 
 	i.t.Ctx.Log.Verbo("Adding vertex to consensus:\n%s", i.vtx)

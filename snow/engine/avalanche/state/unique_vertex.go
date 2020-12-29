@@ -243,11 +243,18 @@ func (vtx *uniqueVertex) Txs() ([]conflicts.Tx, error) {
 	if len(transitions) != len(vtx.v.txs) {
 		vtx.v.txs = make([]conflicts.Tx, len(transitions))
 		for i, transitionBytes := range transitions {
+			slTx, err := vertex.Wrap(vtx.v.vtx.Epoch(), transitionBytes, nil)
+			if err != nil {
+				return nil, err
+			}
 			tr, err := vtx.serializer.vm.Parse(transitionBytes)
 			if err != nil {
 				return nil, err
 			}
-			vtx.v.txs[i] = &Tx{Tr: tr}
+			vtx.v.txs[i] = &tx{
+				tx: slTx,
+				tr: tr,
+			}
 		}
 	}
 

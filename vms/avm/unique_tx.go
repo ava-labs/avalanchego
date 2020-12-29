@@ -52,6 +52,7 @@ type TxState struct {
 	inputUTXOs []*avax.UTXOID
 	utxos      []*avax.UTXO
 	deps       []ids.ID
+	setDeps    bool
 
 	status choices.Status
 }
@@ -105,6 +106,7 @@ func (tx *UniqueTx) Evict() {
 	// Lock is already held here
 	tx.unique = false
 	tx.deps = nil
+	tx.setDeps = false
 }
 
 func (tx *UniqueTx) setStatus(status choices.Status) error {
@@ -176,7 +178,11 @@ func (tx *UniqueTx) Accept(epoch uint32) error {
 	tx.vm.pubsub.Publish("accepted", txID)
 	tx.vm.walletService.decided(txID)
 
-	tx.deps = nil // Needed to prevent a memory leak
+	// Needed to prevent a memory leak
+	// No need to mark [setDeps] as false since
+	// there are no remaining dependencies after
+	// the transaction has been accepted.
+	tx.deps = nil
 
 	return nil
 }
@@ -202,6 +208,7 @@ func (tx *UniqueTx) Reject(epoch uint32) error {
 	tx.vm.walletService.decided(txID)
 
 	tx.deps = nil // Needed to prevent a memory leak
+	tx.setDeps = false
 
 	return nil
 }
@@ -212,6 +219,7 @@ func (tx *UniqueTx) Status() choices.Status {
 	return tx.status
 }
 
+// Epoch returns the epoch of this transaction
 func (tx *UniqueTx) Epoch() uint32 {
 	tx.refresh()
 	return 0
@@ -220,7 +228,26 @@ func (tx *UniqueTx) Epoch() uint32 {
 // Dependencies returns the set of transactions this transaction builds on
 func (tx *UniqueTx) Dependencies() []ids.ID {
 	tx.refresh()
-	if tx.Tx == nil || len(tx.deps) != 0 {
+
+	if tx.Tx == nil {
+		return nil
+	}
+
+	if tx.setDeps {
+		if len(tx.deps) == 0 {
+			return nil
+		}
+		deps := tx.deps
+		tx.deps = make([]ids.ID, 0, len(deps))
+		for _, depID := range deps {
+			dependentTx := &UniqueTx{
+				vm:   tx.vm,
+				txID: depID,
+			}
+			if status := dependentTx.Status(); status != choices.Accepted {
+				tx.deps = append(tx.deps, depID)
+			}
+		}
 		return tx.deps
 	}
 
@@ -233,17 +260,16 @@ func (tx *UniqueTx) Dependencies() []ids.ID {
 		if txIDs.Contains(txID) {
 			continue
 		}
-		txIDs.Add(txID)
-		tx.deps = append(tx.deps, txID)
-	}
-	consumedIDs := tx.Tx.ConsumedAssetIDs()
-	for assetID := range tx.Tx.AssetIDs() {
-		if consumedIDs.Contains(assetID) || txIDs.Contains(assetID) {
-			continue
+		dependentTx := &UniqueTx{
+			vm:   tx.vm,
+			txID: txID,
 		}
-		txIDs.Add(assetID)
-		tx.deps = append(tx.deps, assetID)
+		if status := dependentTx.Status(); status != choices.Accepted {
+			txIDs.Add(txID)
+			tx.deps = append(tx.deps, txID)
+		}
 	}
+	tx.setDeps = true
 	return tx.deps
 }
 

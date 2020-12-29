@@ -7,30 +7,33 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 )
 
 var (
-	_ conflicts.Tx = &Tx{}
+	_ conflicts.Tx = &tx{}
 )
 
-type Tx struct {
-	Tr conflicts.Transition
+type tx struct {
+	tx vertex.StatelessTx
+	tr conflicts.Transition
 }
 
-func (t *Tx) ID() ids.ID { return t.Tr.ID().Prefix(0) }
+func (t *tx) ID() ids.ID { return t.tx.ID() }
 
-func (t *Tx) Accept() error { return t.Tr.Accept(0) }
+func (t *tx) Accept() error { return t.tr.Accept(t.tx.Epoch()) }
 
-func (t *Tx) Reject() error { return t.Tr.Reject(0) }
+func (t *tx) Reject() error { return t.tr.Reject(t.tx.Epoch()) }
 
-func (t *Tx) Status() choices.Status { return t.Tr.Status() }
+// TODO: This status implementation might not make sense
+func (t *tx) Status() choices.Status { return t.tr.Status() }
 
-func (t *Tx) Transition() conflicts.Transition { return t.Tr }
+func (t *tx) Transition() conflicts.Transition { return t.tr }
 
-func (t *Tx) Epoch() uint32 { return 0 }
+func (t *tx) Epoch() uint32 { return t.tr.Epoch() }
 
-func (t *Tx) Restrictions() []ids.ID { return nil }
+func (t *tx) Restrictions() []ids.ID { return t.tx.Restrictions() }
 
-func (t *Tx) Verify() error { return t.Tr.Verify(0) }
+func (t *tx) Verify() error { return t.tr.Verify(t.tx.Epoch()) }
 
-func (t *Tx) Bytes() []byte { return t.Tr.Bytes() }
+func (t *tx) Bytes() []byte { return t.tx.Bytes() }

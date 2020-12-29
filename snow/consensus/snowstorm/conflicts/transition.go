@@ -32,11 +32,12 @@ type Transition interface {
 	// call is undefined.
 	Epoch() uint32
 
-	// Dependencies is a list of transitions upon which this transition depends.
+	// Dependencies is a list of unfulfilled transitions upon which this transition depends.
 	//
 	// Each Dependency will be verified before Verify is called on this
 	// transition. Similarly, each element of Dependencies must be accepted
-	// before this transition is accepted.
+	// before this transition is accepted. If a dependency has already been accepted
+	// it should not be returned.
 	Dependencies() []ids.ID
 
 	// InputIDs is a set where each element is the ID of a piece of state that

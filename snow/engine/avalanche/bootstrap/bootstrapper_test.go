@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
-	"github.com/ava-labs/avalanchego/snow/engine/avalanche/state"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
@@ -342,7 +341,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	tr1 := &conflicts.TestTransition{
 		IDV:           trID1,
 		StatusV:       choices.Processing,
-		DependenciesV: []ids.ID{trID0},
+		DependenciesV: []conflicts.Transition{tr0},
 		InputIDsV:     []ids.ID{utxos[1]},
 		BytesV:        trBytes1,
 	}
@@ -369,7 +368,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 			StatusV: choices.Unknown,
 		},
 		HeightV: 0,
-		TxsV:    []conflicts.Tx{&state.Tx{Tr: tr1}},
+		TxsV:    []conflicts.Tx{&testTx{Tr: tr1}},
 		BytesV:  vtxBytes0,
 	}
 	vtx1 := &avalanche.TestVertex{
@@ -379,7 +378,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		},
 		ParentsV: []avalanche.Vertex{vtx0}, // Depends on vtx0
 		HeightV:  1,
-		TxsV:     []conflicts.Tx{&state.Tx{Tr: tr0}},
+		TxsV:     []conflicts.Tx{&testTx{Tr: tr0}},
 		BytesV:   vtxBytes1,
 	}
 
@@ -466,9 +465,9 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	manager.ParseTxF = func(b []byte) (conflicts.Tx, error) {
 		switch {
 		case bytes.Equal(b, trBytes0):
-			return &state.Tx{Tr: tr0}, nil
+			return &testTx{Tr: tr0}, nil
 		case bytes.Equal(b, trBytes1):
-			return &state.Tx{Tr: tr1}, nil
+			return &testTx{Tr: tr1}, nil
 		default:
 			return nil, errors.New("wrong tx")
 		}
@@ -515,7 +514,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 	tr1 := &conflicts.TestTransition{
 		IDV:           trID1,
 		StatusV:       choices.Processing,
-		DependenciesV: []ids.ID{tr0.ID()},
+		DependenciesV: []conflicts.Transition{tr0},
 		InputIDsV:     []ids.ID{utxos[1]},
 		BytesV:        trBytes1,
 	}
@@ -541,7 +540,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		},
 		ParentsV: []avalanche.Vertex{vtx0}, // depends on vtx0
 		HeightV:  1,
-		TxsV:     []conflicts.Tx{&state.Tx{Tr: tr1}},
+		TxsV:     []conflicts.Tx{&testTx{Tr: tr1}},
 		BytesV:   vtxBytes1,
 	}
 
@@ -1119,3 +1118,22 @@ func TestBootstrapperAcceptsMultiPutParents(t *testing.T) {
 		t.Fatalf("Vertex should be accepted")
 	}
 }
+
+var (
+	_ conflicts.Tx = &testTx{}
+)
+
+type testTx struct {
+	Ep uint32
+	Tr conflicts.Transition
+}
+
+func (t *testTx) ID() ids.ID                       { return t.Tr.ID() }
+func (t *testTx) Accept() error                    { return t.Tr.Accept(t.Ep) }
+func (t *testTx) Reject() error                    { return t.Tr.Reject(t.Ep) }
+func (t *testTx) Status() choices.Status           { return t.Tr.Status() }
+func (t *testTx) Transition() conflicts.Transition { return t.Tr }
+func (t *testTx) Epoch() uint32                    { return t.Ep }
+func (t *testTx) Restrictions() []ids.ID           { return nil }
+func (t *testTx) Verify() error                    { return t.Tr.Verify(t.Ep) }
+func (t *testTx) Bytes() []byte                    { return t.Tr.Bytes() }

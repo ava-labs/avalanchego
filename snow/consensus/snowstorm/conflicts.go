@@ -8,6 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
 )
 
+// Conflicts is an interface used to manage conflict sets
 type Conflicts interface {
 	// Add this transaction to conflict tracking
 	Add(tx conflicts.Tx) error
