@@ -339,7 +339,7 @@ func (t *Transitive) Notify(msg common.Message) error {
 	case common.PendingTxs:
 		txs := t.VM.Pending()
 		epoch := t.Ctx.Epoch()
-		return t.batch(epoch, txs, false /*=force*/, false /*=empty*/)
+		return t.batch(epoch, txs, nil, false /*=force*/, false /*=empty*/, false /*=updatedEpoch*/)
 	default:
 		return nil
 	}
@@ -355,7 +355,7 @@ func (t *Transitive) repoll() error {
 
 	txs := t.VM.Pending()
 	epoch := t.Ctx.Epoch()
-	if err := t.batch(epoch, txs, false /*=force*/, true /*=empty*/); err != nil {
+	if err := t.batch(epoch, txs, nil, false /*=force*/, true /*=empty*/, false /*=updatedEpoch*/); err != nil {
 		return err
 	}
 
@@ -419,7 +419,7 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, vtx avalanche.Vertex) (bool, err
 		}
 
 		// Queue up this vertex to be issued once its dependencies are met
-		if err := t.issue(vtx); err != nil {
+		if err := t.issue(vtx, false); err != nil {
 			return false, err
 		}
 	}
@@ -428,7 +428,7 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, vtx avalanche.Vertex) (bool, err
 
 // issue queues [vtx] to be put into consensus after its dependencies are met.
 // Assumes we have [vtx].
-func (t *Transitive) issue(vtx avalanche.Vertex) error {
+func (t *Transitive) issue(vtx avalanche.Vertex, updatedEpoch bool) error {
 	vtxID := vtx.ID()
 
 	// Add to set of vertices that have been queued up to be issued but haven't been yet
@@ -437,8 +437,9 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 
 	// Will put [vtx] into consensus once dependencies are met
 	i := &issuer{
-		t:   t,
-		vtx: vtx,
+		t:            t,
+		vtx:          vtx,
+		updatedEpoch: updatedEpoch,
 	}
 
 	parents, err := vtx.Parents()
@@ -501,8 +502,8 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 // Batchs [txs] into vertices and issue them.
 // If [force] is true, forces each tx to be issued.
 // Otherwise, some txs may not be put into vertices that are issued.
-// If [empty], will always result in a new poll.
-func (t *Transitive) batch(epoch uint32, trs []conflicts.Transition, force, empty bool) error {
+// If [mustPoll], will always result in a new poll.
+func (t *Transitive) batch(epoch uint32, trs []conflicts.Transition, restrictions [][]ids.ID, force, mustPoll bool, updatedEpoch bool) error {
 	issuedTrs := ids.Set{}
 	consumed := ids.Set{}
 	issued := false
@@ -515,7 +516,12 @@ func (t *Transitive) batch(epoch uint32, trs []conflicts.Transition, force, empt
 		inputs.Add(tr.InputIDs()...)
 		overlaps := consumed.Overlaps(inputs)
 		if end-start >= t.Params.BatchSize || (force && overlaps) {
-			if err := t.issueBatch(trs[start:end]); err != nil {
+			nextRestrictions := []ids.ID(nil)
+			if len(restrictions) > 0 {
+				nextRestrictions = restrictions[0]
+				restrictions = restrictions[1:]
+			}
+			if err := t.issueBatch(epoch, trs[start:end], nextRestrictions, updatedEpoch); err != nil {
 				return err
 			}
 			start = end
@@ -552,9 +558,21 @@ func (t *Transitive) batch(epoch uint32, trs []conflicts.Transition, force, empt
 		}
 	}
 
-	if end > start {
-		return t.issueBatch(trs[start:end])
-	} else if empty && !issued {
+	for len(restrictions) > 1 {
+		nextRestrictions := restrictions[0]
+		restrictions = restrictions[1:]
+		if err := t.issueBatch(epoch, nil, nextRestrictions, updatedEpoch); err != nil {
+			return err
+		}
+	}
+
+	if end > start || len(restrictions) > 0 {
+		nextRestrictions := []ids.ID(nil)
+		if len(restrictions) > 0 {
+			nextRestrictions = restrictions[0]
+		}
+		return t.issueBatch(epoch, trs[start:end], nextRestrictions, updatedEpoch)
+	} else if mustPoll && !issued {
 		t.issueRepoll()
 	}
 	return nil
@@ -587,9 +605,11 @@ func (t *Transitive) issueRepoll() {
 	}
 }
 
-// Puts a batch of transactions into a vertex and issues it into consensus.
-func (t *Transitive) issueBatch(txs []conflicts.Transition) error {
-	t.Ctx.Log.Verbo("batching %d transactions into a new vertex", len(txs))
+// Puts a batch of transitions and restrictions into a vertex and issues it into
+// consensus.
+func (t *Transitive) issueBatch(epoch uint32, trs []conflicts.Transition, restrictions []ids.ID, updatedEpoch bool) error {
+	t.Ctx.Log.Verbo("batching %d transitions and %d restrictions into a new vertex",
+		len(trs), len(restrictions))
 
 	// Randomly select parents of this vertex from among the virtuous set
 	virtuousIDs := t.Consensus.Virtuous().CappedList(t.Params.Parents)
@@ -609,13 +629,13 @@ func (t *Transitive) issueBatch(txs []conflicts.Transition) error {
 		parentIDs[i] = virtuousIDs[int(index)]
 	}
 
-	vtx, err := t.Manager.Build(t.Ctx.Epoch(), parentIDs, txs, nil)
+	vtx, err := t.Manager.Build(epoch, parentIDs, trs, nil)
 	if err != nil {
-		t.Ctx.Log.Warn("error building new vertex with %d parents and %d transactions: %s",
-			len(parentIDs), len(txs), err)
+		t.Ctx.Log.Warn("error building new vertex with %d parents, %d transitions, and %d restrictions",
+			len(parentIDs), len(trs), len(restrictions))
 		return nil
 	}
-	return t.issue(vtx)
+	return t.issue(vtx, updatedEpoch)
 }
 
 // Send a request to [vdr] asking them to send us vertex [vtxID]
