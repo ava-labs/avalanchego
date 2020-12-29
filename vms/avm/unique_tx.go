@@ -33,8 +33,20 @@ type UniqueTx struct {
 type TxState struct {
 	*Tx
 
-	unique, verifiedTx, verifiedState bool
-	validity                          error
+	unique bool
+
+	// Epoch --> True if Verify has been called with this epoch as the argument
+	// and verification passed
+	verifiedState map[uint32]bool
+
+	// Epoch --> True if SyntacticVerify was called with this
+	// epoch as the argument
+	syntacticVerified map[uint32]bool
+
+	// Epoch --> Error that occurred while verifying the tx
+	// for that epoch, or nil if no error.
+	// Invariant: If a key exists in [syntacticVerified], it exists in [validity]
+	syntacticValidity map[uint32]error
 
 	inputs     []ids.ID
 	inputUTXOs []*avax.UTXOID
@@ -135,7 +147,12 @@ func (tx *UniqueTx) Accept(epoch uint32) error {
 	for _, utxo := range tx.UTXOs() {
 		if err := tx.vm.state.FundUTXO(utxo); err != nil {
 			tx.vm.ctx.Log.Error("Failed to fund utxo %s due to %s", utxo.InputID(), err)
-			return err
+			return fmt.Errorf("couldn't fund UTXO: %w", err)
+		}
+		if out, ok := utxo.Out.(ManagedAssetStatus); ok {
+			if err := tx.vm.state.PutManagedAssetStatus(utxo.AssetID(), epoch, out); err != nil {
+				return fmt.Errorf("couldn't update asset status: %w", err)
+			}
 		}
 	}
 
@@ -297,7 +314,7 @@ func (tx *UniqueTx) Bytes() []byte {
 	return tx.Tx.Bytes()
 }
 
-func (tx *UniqueTx) verifyWithoutCacheWrites() error {
+func (tx *UniqueTx) verifyWithoutCacheWrites(epoch uint32) error {
 	switch status := tx.Status(); status {
 	case choices.Unknown:
 		return errUnknownTx
@@ -306,54 +323,68 @@ func (tx *UniqueTx) verifyWithoutCacheWrites() error {
 	case choices.Rejected:
 		return errRejectedTx
 	default:
-		return tx.SemanticVerify()
+		return tx.SemanticVerify(epoch)
 	}
 }
 
 // Verify the validity of this transaction
 func (tx *UniqueTx) Verify(epoch uint32) error {
-	if err := tx.verifyWithoutCacheWrites(); err != nil {
+	if err := tx.verifyWithoutCacheWrites(epoch); err != nil {
 		return err
 	}
 
-	tx.verifiedState = true
+	if tx.verifiedState == nil {
+		tx.verifiedState = map[uint32]bool{}
+	}
+	tx.verifiedState[epoch] = true
 	tx.vm.pubsub.Publish("verified", tx.ID())
 	return nil
 }
 
 // SyntacticVerify verifies that this transaction is well formed
-func (tx *UniqueTx) SyntacticVerify() error {
+func (tx *UniqueTx) SyntacticVerify(epoch uint32) error {
 	tx.refresh()
 
 	if tx.Tx == nil {
 		return errUnknownTx
 	}
 
-	if tx.verifiedTx {
-		return tx.validity
+	// Use cached result
+	if _, ok := tx.syntacticVerified[epoch]; ok {
+		return tx.syntacticValidity[epoch]
 	}
 
-	tx.verifiedTx = true
-	tx.validity = tx.Tx.SyntacticVerify(
+	// Cache the result of syntactic verification
+	if tx.syntacticVerified == nil {
+		tx.syntacticVerified = map[uint32]bool{}
+	}
+	tx.syntacticVerified[epoch] = true
+	if tx.syntacticValidity == nil {
+		tx.syntacticValidity = map[uint32]error{}
+	}
+	tx.syntacticValidity[epoch] = tx.Tx.SyntacticVerify(
 		tx.vm.ctx,
+		epoch,
 		tx.vm.codec,
+		tx.vm.currentCodecVersion,
 		tx.vm.ctx.AVAXAssetID,
 		tx.vm.txFee,
 		tx.vm.creationTxFee,
 		len(tx.vm.fxs),
 	)
-	return tx.validity
+	return tx.syntacticValidity[epoch]
 }
 
 // SemanticVerify the validity of this transaction
-func (tx *UniqueTx) SemanticVerify() error {
-	// SyntacticVerify sets the error on validity and is checked in the next
-	// statement
-	_ = tx.SyntacticVerify()
+func (tx *UniqueTx) SemanticVerify(epoch uint32) error {
+	// SyntacticVerify sets tx.syntacticallyValid[epoch],
+	// which is checked in the next statement
+	_ = tx.SyntacticVerify(epoch)
 
-	if tx.validity != nil || tx.verifiedState {
-		return tx.validity
+	syntacticallyValid := tx.syntacticValidity[epoch]
+	if syntacticallyValid != nil || tx.verifiedState[epoch] {
+		return syntacticallyValid
 	}
 
-	return tx.Tx.SemanticVerify(tx.vm, tx.UnsignedTx)
+	return tx.Tx.SemanticVerify(tx.vm, epoch, tx.UnsignedTx)
 }

@@ -34,6 +34,9 @@ var (
 	errIllegalSymbolCharacter       = errors.New("asset's symbol must be all upper case letters")
 	errUnexpectedWhitespace         = errors.New("unexpected whitespace provided")
 	errDenominationTooLarge         = errors.New("denomination is too large")
+	errMultipleManagers             = errors.New("asset can't have multiple managers")
+	errCreateManagedAssetBadCodec   = errors.New("create managed asset tx has invalid codec version")
+	errManagerInEpoch0              = errors.New("assets created before epoch 1 can't have a manager")
 )
 
 // CreateAssetTx is a transaction that creates a new asset.
@@ -68,14 +71,15 @@ func (t *CreateAssetTx) UTXOs() []*avax.UTXO {
 			})
 		}
 	}
-
 	return utxos
 }
 
 // SyntacticVerify that this transaction is well-formed.
 func (t *CreateAssetTx) SyntacticVerify(
 	ctx *snow.Context,
+	epoch uint32,
 	c codec.Manager,
+	codecVersion uint16,
 	txFeeAssetID ids.ID,
 	_ uint64,
 	txFee uint64,
@@ -111,17 +115,49 @@ func (t *CreateAssetTx) SyntacticVerify(
 		}
 	}
 
-	if err := t.BaseTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, txFee, numFxs); err != nil {
+	if err := t.BaseTx.SyntacticVerify(
+		ctx,
+		epoch,
+		c,
+		codecVersion,
+		txFeeAssetID,
+		txFee,
+		txFee,
+		numFxs,
+	); err != nil {
 		return err
 	}
 
 	for _, state := range t.States {
-		if err := state.Verify(c, numFxs); err != nil {
+		if err := state.Verify(c, codecVersion, numFxs); err != nil {
 			return err
 		}
 	}
 	if !isSortedAndUniqueInitialStates(t.States) {
 		return errInitialStatesNotSortedUnique
+	}
+
+	// An asset can have at most one ManagedAssetStatusOutput
+	hasManager := false
+	for _, state := range t.States {
+		if state.FxID != 0 { // TODO lookup secp fx ID
+			continue
+		}
+		for _, out := range state.Outs {
+			if _, ok := out.(ManagedAssetStatus); ok {
+				if hasManager {
+					return errMultipleManagers
+				}
+				hasManager = true
+			}
+		}
+	}
+	// If there is a manager, ensure we're after the Apricot fork
+	switch {
+	case hasManager && codecVersion == preApricotCodecVersion:
+		return errCreateManagedAssetBadCodec
+	case hasManager && epoch == 0:
+		return errManagerInEpoch0
 	}
 	return nil
 }

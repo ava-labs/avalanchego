@@ -24,6 +24,7 @@ type UnsignedTx interface {
 	ID() ids.ID
 	UnsignedBytes() []byte
 	Bytes() []byte
+	Epoch() uint32
 
 	ConsumedAssetIDs() ids.Set
 	AssetIDs() ids.Set
@@ -34,13 +35,20 @@ type UnsignedTx interface {
 
 	SyntacticVerify(
 		ctx *snow.Context,
+		epoch uint32,
 		c codec.Manager,
+		codecVersion uint16,
 		txFeeAssetID ids.ID,
 		txFee uint64,
 		creationTxFee uint64,
 		numFxs int,
 	) error
-	SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable) error
+	SemanticVerify(
+		vm *VM,
+		epoch uint32,
+		tx UnsignedTx,
+		creds []verify.Verifiable,
+	) error
 	ExecuteWithSideEffects(vm *VM, batch database.Batch) error
 }
 
@@ -51,8 +59,7 @@ type UnsignedTx interface {
 // outputs.
 type Tx struct {
 	UnsignedTx `serialize:"true" json:"unsignedTx"`
-
-	Creds []verify.Verifiable `serialize:"true" json:"credentials"` // The credentials of this transaction
+	Creds      []verify.Verifiable `serialize:"true" json:"credentials"` // The credentials of this transaction
 }
 
 // Credentials describes the authorization that allows the Inputs to consume the
@@ -62,7 +69,9 @@ func (t *Tx) Credentials() []verify.Verifiable { return t.Creds }
 // SyntacticVerify verifies that this transaction is well-formed.
 func (t *Tx) SyntacticVerify(
 	ctx *snow.Context,
+	epoch uint32,
 	c codec.Manager,
+	codecVersion uint16,
 	txFeeAssetID ids.ID,
 	txFee uint64,
 	creationTxFee uint64,
@@ -72,7 +81,16 @@ func (t *Tx) SyntacticVerify(
 		return errNilTx
 	}
 
-	if err := t.UnsignedTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, creationTxFee, numFxs); err != nil {
+	if err := t.UnsignedTx.SyntacticVerify(
+		ctx,
+		epoch,
+		c,
+		codecVersion,
+		txFeeAssetID,
+		txFee,
+		creationTxFee,
+		numFxs,
+	); err != nil {
 		return err
 	}
 
@@ -92,16 +110,19 @@ func (t *Tx) SyntacticVerify(
 }
 
 // SemanticVerify verifies that this transaction is well-formed.
-func (t *Tx) SemanticVerify(vm *VM, tx UnsignedTx) error {
+func (t *Tx) SemanticVerify(
+	vm *VM,
+	epoch uint32,
+	tx UnsignedTx,
+) error {
 	if t == nil {
 		return errNilTx
 	}
-
-	return t.UnsignedTx.SemanticVerify(vm, tx, t.Creds)
+	return t.UnsignedTx.SemanticVerify(vm, epoch, tx, t.Creds)
 }
 
 // SignSECP256K1Fx ...
-func (t *Tx) SignSECP256K1Fx(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {
+func (t *Tx) SignSECP256K1Fx(c codec.Manager, codecVersion uint16, signers [][]*crypto.PrivateKeySECP256K1R) error {
 	unsignedBytes, err := c.Marshal(codecVersion, &t.UnsignedTx)
 	if err != nil {
 		return fmt.Errorf("problem creating transaction: %w", err)
@@ -131,7 +152,7 @@ func (t *Tx) SignSECP256K1Fx(c codec.Manager, signers [][]*crypto.PrivateKeySECP
 }
 
 // SignNFTFx ...
-func (t *Tx) SignNFTFx(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {
+func (t *Tx) SignNFTFx(c codec.Manager, codecVersion uint16, signers [][]*crypto.PrivateKeySECP256K1R) error {
 	unsignedBytes, err := c.Marshal(codecVersion, &t.UnsignedTx)
 	if err != nil {
 		return fmt.Errorf("problem creating transaction: %w", err)

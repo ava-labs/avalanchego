@@ -133,7 +133,7 @@ func (c *Client) CreateAsset(
 	symbol string,
 	denomination byte,
 	holders []*Holder,
-	minters []Owners,
+	minters []Minters,
 ) (ids.ID, error) {
 	res := &FormattedAssetID{}
 	err := c.requester.SendRequest("createAsset", &CreateAssetArgs{
@@ -184,7 +184,7 @@ func (c *Client) CreateVariableCapAsset(
 	name,
 	symbol string,
 	denomination byte,
-	minters []Owners,
+	minters []Minters,
 ) (ids.ID, error) {
 	res := &FormattedAssetID{}
 	err := c.requester.SendRequest("createAsset", &CreateAssetArgs{
@@ -208,7 +208,7 @@ func (c *Client) CreateNFTAsset(
 	changeAddr,
 	name,
 	symbol string,
-	minters []Owners,
+	minters []Minters,
 ) (ids.ID, error) {
 	res := &FormattedAssetID{}
 	err := c.requester.SendRequest("createNFTAsset", &CreateNFTAssetArgs{

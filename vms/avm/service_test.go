@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -402,7 +403,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 			},
 		}
 
-		utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
+		utxoBytes, err := vm.codec.Marshal(apricotCodecVersion, utxo)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -753,7 +754,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		},
 		Name:   "test asset",
 		Symbol: "TEST",
-		MinterSets: []Owners{
+		MinterSets: []Minters{
 			{
 				Threshold: 1,
 				Minters: []string{
@@ -863,7 +864,7 @@ func TestNFTWorkflow(t *testing.T) {
 		},
 		Name:   "BIG COIN",
 		Symbol: "COIN",
-		MinterSets: []Owners{
+		MinterSets: []Minters{
 			{
 				Threshold: 1,
 				Minters: []string{
@@ -1269,7 +1270,7 @@ func TestImportAVAX(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
+	utxoBytes, err := vm.codec.Marshal(apricotCodecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1302,4 +1303,237 @@ func TestImportAVAX(t *testing.T) {
 	if err := s.ImportAVAX(nil, args, reply); err != nil {
 		t.Fatalf("Failed to import AVAX due to %s", err)
 	}
+}
+
+func TestManagedAssetAPI(t *testing.T) {
+	_, vm, s, _ := setupWithKeys(t)
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		vm.ctx.Lock.Unlock()
+	}()
+
+	reply := AssetIDChangeAddr{}
+	addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	minterAddrStr, err := vm.FormatLocalAddress(keys[1].PublicKey().Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
+
+	// Create a fixed cap managed asset
+	err = s.CreateAsset(nil, &CreateAssetArgs{
+		JSONSpendHeader: api.JSONSpendHeader{
+			UserPass: api.UserPass{
+				Username: username,
+				Password: password,
+			},
+			JSONFromAddrs:  api.JSONFromAddrs{From: fromAddrsStr},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: addrStr},
+		},
+		Name:         "testAsset",
+		Symbol:       "TEST",
+		Denomination: 1,
+		InitialHolders: []*Holder{{
+			Amount:  123456789,
+			Address: addrStr,
+		}},
+		MinterSets: []Minters{
+			{
+				Threshold: 1,
+				Minters:   []string{minterAddrStr},
+			},
+		},
+		Manager: Manager{
+			Threshold: 1,
+			Addrs:     []string{addrStr},
+		},
+	}, &reply)
+	require.NoError(t, err)
+
+	// Hacky way of ensuring the tx was issued and then accepting it
+	createAssetTx := UniqueTx{
+		vm:   vm,
+		txID: reply.AssetID,
+	}
+	require.Equal(t, choices.Processing, createAssetTx.Status())
+	err = createAssetTx.Accept(0) // Accept the tx, creating the asset
+	require.NoError(t, err)
+
+	// Ensure the initial holder got the asset
+	getBalanceReply := GetBalanceReply{}
+	err = s.GetBalance(
+		nil,
+		&GetBalanceArgs{
+			Address: addrStr,
+			AssetID: reply.AssetID.String(),
+		},
+		&getBalanceReply,
+	)
+	require.NoError(t, err)
+	require.Equal(t, uint64(123456789), uint64(getBalanceReply.Balance))
+
+	// Send some of the asset normally (not as manager)
+	sendReply := &api.JSONTxIDChangeAddr{}
+	formattedToAddr, _ := s.vm.FormatLocalAddress(ids.GenerateTestShortID())
+	err = s.Send(
+		nil,
+		&SendArgs{
+			JSONSpendHeader: api.JSONSpendHeader{
+				UserPass: api.UserPass{
+					Username: username,
+					Password: password,
+				},
+				JSONFromAddrs:  api.JSONFromAddrs{From: []string{addrStr}},
+				JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: addrStr},
+			},
+			SendOutput: SendOutput{
+				Amount:  1,
+				AssetID: createAssetTx.ID().String(),
+				To:      formattedToAddr,
+			},
+		},
+		sendReply,
+	)
+	require.NoError(t, err)
+
+	// Hacky way of ensuring the tx was issued and then accepting it
+	sendTx := UniqueTx{
+		vm:   vm,
+		txID: sendReply.TxID,
+	}
+	require.Equal(t, choices.Processing, sendTx.Status())
+	err = sendTx.Accept(0) // Accept the tx
+	require.NoError(t, err)
+
+	// Ensure the send worked
+	getBalanceReply = GetBalanceReply{}
+	err = s.GetBalance(
+		nil,
+		&GetBalanceArgs{
+			Address: formattedToAddr,
+			AssetID: reply.AssetID.String(),
+		},
+		&getBalanceReply,
+	)
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), uint64(getBalanceReply.Balance))
+
+	// Send the asset as manager from the address we just sent to
+	// back to the original address we minted to
+	sendAsManagerResponse := &SendAsManagerResponse{}
+	err = s.SendAsManager(
+		nil,
+		&SendAsManagerArgs{
+			SendArgs: SendArgs{
+				JSONSpendHeader: api.JSONSpendHeader{
+					UserPass: api.UserPass{
+						Username: username,
+						Password: password,
+					},
+					JSONFromAddrs:  api.JSONFromAddrs{From: []string{formattedToAddr}},
+					JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: formattedToAddr},
+				},
+				SendOutput: SendOutput{
+					Amount:  1,
+					AssetID: createAssetTx.ID().String(),
+					To:      addrStr,
+				},
+			},
+		},
+		sendAsManagerResponse,
+	)
+	require.NoError(t, err)
+
+	// Accept the tx
+	sendAsManagerTx := UniqueTx{
+		vm:   vm,
+		txID: sendAsManagerResponse.TxID,
+	}
+	require.Equal(t, choices.Processing, sendAsManagerTx.Status())
+	err = sendAsManagerTx.Accept(0) // Accept the tx
+	require.NoError(t, err)
+
+	// Ensure the balance was updated correctly
+	// Ensure the initial holder got the asset
+	getBalanceReply = GetBalanceReply{}
+	err = s.GetBalance(
+		nil,
+		&GetBalanceArgs{
+			Address: addrStr,
+			AssetID: createAssetTx.ID().String(),
+		},
+		&getBalanceReply,
+	)
+	require.NoError(t, err)
+	require.Equal(t, uint64(123456789), uint64(getBalanceReply.Balance))
+
+	// Mint some units of the asset
+	mintResponse := &api.JSONTxIDChangeAddr{}
+	err = s.Mint(
+		nil,
+		&MintArgs{
+			JSONSpendHeader: api.JSONSpendHeader{
+				UserPass: api.UserPass{
+					Username: username,
+					Password: password,
+				},
+				JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: formattedToAddr},
+			},
+			Amount:  100,
+			AssetID: createAssetTx.ID().String(),
+			To:      minterAddrStr,
+		},
+		mintResponse,
+	)
+	require.NoError(t, err)
+
+	// Accept the tx
+	mintTx := UniqueTx{
+		vm:   vm,
+		txID: mintResponse.TxID,
+	}
+	require.Equal(t, choices.Processing, mintTx.Status())
+	err = mintTx.Accept(0) // Accept the tx
+	require.NoError(t, err)
+
+	/*
+		// Freeze the asset and change the manager to minterAddrStr
+		updateResponse := &api.JSONTxIDChangeAddr{}
+		err = s.UpdateManagedAsset(
+			nil,
+			&UpdateManagedAssetArgs{
+				JSONSpendHeader: api.JSONSpendHeader{
+					UserPass: api.UserPass{
+						Username: username,
+						Password: password,
+					},
+					JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: formattedToAddr},
+				},
+				AssetID: createAssetTx.ID().String(),
+				Frozen:  true,
+				Manager: Manager{
+					Threshold: 1,
+					Addrs:     []string{minterAddrStr},
+				},
+			},
+			updateResponse,
+		)
+		require.NoError(t, err)
+
+		// Accept the tx
+		updateTx := UniqueTx{
+			vm:   vm,
+			txID: updateResponse.TxID,
+		}
+		require.Equal(t, choices.Processing, updateTx.Status())
+		err = updateTx.Accept(0) // Accept the tx
+		require.NoError(t, err)
+	*/
+
 }

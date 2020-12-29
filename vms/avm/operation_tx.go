@@ -79,14 +79,15 @@ func (t *OperationTx) UTXOs() []*avax.UTXO {
 			})
 		}
 	}
-
 	return utxos
 }
 
 // SyntacticVerify that this transaction is well-formed.
 func (t *OperationTx) SyntacticVerify(
 	ctx *snow.Context,
+	epoch uint32,
 	c codec.Manager,
+	codecVersion uint16,
 	txFeeAssetID ids.ID,
 	txFee uint64,
 	_ uint64,
@@ -99,7 +100,16 @@ func (t *OperationTx) SyntacticVerify(
 		return errNoOperations
 	}
 
-	if err := t.BaseTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, txFee, numFxs); err != nil {
+	if err := t.BaseTx.SyntacticVerify(
+		ctx,
+		epoch,
+		c,
+		codecVersion,
+		txFeeAssetID,
+		txFee,
+		txFee,
+		numFxs,
+	); err != nil {
 		return err
 	}
 
@@ -120,22 +130,27 @@ func (t *OperationTx) SyntacticVerify(
 			inputs.Add(inputID)
 		}
 	}
-	if !isSortedAndUniqueOperations(t.Ops, c) {
+	if !isSortedAndUniqueOperations(t.Ops, c, codecVersion) {
 		return errOperationsNotSortedUnique
 	}
 	return nil
 }
 
 // SemanticVerify that this transaction is well-formed.
-func (t *OperationTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable) error {
-	if err := t.BaseTx.SemanticVerify(vm, tx, creds); err != nil {
+func (t *OperationTx) SemanticVerify(
+	vm *VM,
+	epoch uint32,
+	tx UnsignedTx,
+	creds []verify.Verifiable,
+) error {
+	if err := t.BaseTx.SemanticVerify(vm, epoch, tx, creds); err != nil {
 		return err
 	}
 
 	offset := t.BaseTx.NumCredentials()
 	for i, op := range t.Ops {
 		cred := creds[offset+i]
-		if err := vm.verifyOperation(tx, op, cred); err != nil {
+		if err := vm.verifyOperation(tx, epoch, op, cred); err != nil {
 			return err
 		}
 	}
