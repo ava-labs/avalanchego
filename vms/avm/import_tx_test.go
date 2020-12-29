@@ -60,7 +60,7 @@ func TestImportTxSyntacticVerify(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err != nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -107,7 +107,7 @@ func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to memo field being too long")
 	}
 }
@@ -402,12 +402,12 @@ func TestIssueImportTx(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	txs := vm.Pending()
-	if len(txs) != 1 {
+	trs := vm.Pending()
+	if len(trs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}
 
-	parsedTx := txs[0]
+	parsedTx := trs[0]
 	if err := parsedTx.Accept(0); err != nil {
 		t.Fatal(err)
 	}

@@ -769,10 +769,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		t.Fatalf("expected change address %s but got %s", changeAddrStr, reply.ChangeAddr)
 	}
 
-	createAssetTx := UniqueTx{
-		vm:   vm,
-		txID: reply.AssetID,
-	}
+	createAssetTx := newUniqueTx(vm, reply.AssetID, nil)
 	if status := createAssetTx.Status(); status != choices.Processing {
 		t.Fatalf("CreateVariableCapAssetTx status should have been Processing, but was %s", status)
 	}
@@ -801,11 +798,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		t.Fatalf("expected change address %s but got %s", changeAddrStr, mintReply.ChangeAddr)
 	}
 
-	mintTx := UniqueTx{
-		vm:   vm,
-		txID: mintReply.TxID,
-	}
-
+	mintTx := newUniqueTx(vm, mintReply.TxID, nil)
 	if status := mintTx.Status(); status != choices.Processing {
 		t.Fatalf("MintTx status should have been Processing, but was %s", status)
 	}
@@ -881,10 +874,7 @@ func TestNFTWorkflow(t *testing.T) {
 	}
 
 	assetID := createReply.AssetID
-	createNFTTx := UniqueTx{
-		vm:   vm,
-		txID: createReply.AssetID,
-	}
+	createNFTTx := newUniqueTx(vm, assetID, nil)
 	// Accept the transaction so that we can Mint NFTs for the test
 	if createNFTTx.Status() != choices.Processing {
 		t.Fatalf("CreateNFTTx should have been processing after creating the NFT")
@@ -921,10 +911,7 @@ func TestNFTWorkflow(t *testing.T) {
 		t.Fatalf("expected change address to be %s but got %s", fromAddrsStr[0], mintReply.ChangeAddr)
 	}
 
-	mintNFTTx := UniqueTx{
-		vm:   vm,
-		txID: mintReply.TxID,
-	}
+	mintNFTTx := newUniqueTx(vm, mintReply.TxID, nil)
 	if mintNFTTx.Status() != choices.Processing {
 		t.Fatal("MintNFTTx should have been processing after minting the NFT")
 	}

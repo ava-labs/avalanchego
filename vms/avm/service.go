@@ -44,7 +44,6 @@ var (
 	errSpendOverflow          = errors.New("spent amount overflows uint64")
 	errInvalidMintAmount      = errors.New("amount minted must be positive")
 	errAddressesCantMintAsset = errors.New("provided addresses don't have the authority to mint the provided asset")
-	errInvalidUTXO            = errors.New("invalid utxo")
 	errNilTxID                = errors.New("nil transaction ID")
 	errNoAddresses            = errors.New("no addresses provided")
 	errNoKeys                 = errors.New("from addresses have no keys or funds")
@@ -89,10 +88,7 @@ func (service *Service) GetTxStatus(r *http.Request, args *api.JSONTxID, reply *
 		return errNilTxID
 	}
 
-	tx := UniqueTx{
-		vm:   service.vm,
-		txID: args.TxID,
-	}
+	tx := newUniqueTx(service.vm, args.TxID, nil)
 
 	reply.Status = tx.Status()
 	return nil
@@ -106,10 +102,7 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.F
 		return errNilTxID
 	}
 
-	tx := UniqueTx{
-		vm:   service.vm,
-		txID: args.TxID,
-	}
+	tx := newUniqueTx(service.vm, args.TxID, nil)
 	if status := tx.Status(); !status.Fetched() {
 		return errUnknownTx
 	}
@@ -241,10 +234,7 @@ func (service *Service) GetAssetDescription(_ *http.Request, args *GetAssetDescr
 		return err
 	}
 
-	tx := &UniqueTx{
-		vm:   service.vm,
-		txID: assetID,
-	}
+	tx := newUniqueTx(service.vm, assetID, nil)
 	if status := tx.Status(); !status.Fetched() {
 		return errUnknownAssetID
 	}
@@ -390,7 +380,7 @@ type Holder struct {
 	Address string      `json:"address"`
 }
 
-// Owners describes who can mint an asset
+// Minters describes who can mint an asset
 type Minters struct {
 	Threshold json.Uint32 `json:"threshold"`
 	Minters   []string    `json:"minters"`

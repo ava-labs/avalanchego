@@ -32,13 +32,13 @@ func (t *BaseTx) Epoch() uint32 {
 // SyntacticVerify that this transaction is well-formed.
 func (t *BaseTx) SyntacticVerify(
 	ctx *snow.Context,
-	codec uint32,
 	c codec.Manager,
 	codecVersion uint16,
 	txFeeAssetID ids.ID,
 	txFee uint64,
 	_ uint64,
 	_ int,
+	_ uint32,
 ) error {
 	if t == nil {
 		return errNilTx
@@ -58,12 +58,7 @@ func (t *BaseTx) SyntacticVerify(
 }
 
 // SemanticVerify that this transaction is valid to be spent.
-func (t *BaseTx) SemanticVerify(
-	vm *VM,
-	epoch uint32,
-	tx UnsignedTx,
-	creds []verify.Verifiable,
-) error {
+func (t *BaseTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable, _ uint32) error {
 	for i, in := range t.Ins {
 		cred := creds[i]
 		if err := vm.verifyTransfer(tx, in, cred); err != nil {

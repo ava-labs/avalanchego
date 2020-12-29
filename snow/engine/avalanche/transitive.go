@@ -337,9 +337,9 @@ func (t *Transitive) Notify(msg common.Message) error {
 
 	switch msg {
 	case common.PendingTxs:
-		txs := t.VM.Pending()
+		trs := t.VM.Pending()
 		epoch := t.Ctx.Epoch()
-		return t.batch(epoch, txs, nil, false /*=force*/, false /*=empty*/, false /*=updatedEpoch*/)
+		return t.batch(epoch, trs, nil, false /*=force*/, false /*=empty*/, false /*=updatedEpoch*/)
 	default:
 		return nil
 	}
@@ -353,9 +353,9 @@ func (t *Transitive) repoll() error {
 		return nil
 	}
 
-	txs := t.VM.Pending()
+	trs := t.VM.Pending()
 	epoch := t.Ctx.Epoch()
-	if err := t.batch(epoch, txs, nil, false /*=force*/, true /*=empty*/, false /*=updatedEpoch*/); err != nil {
+	if err := t.batch(epoch, trs, nil, false /*=force*/, true /*=empty*/, false /*=updatedEpoch*/); err != nil {
 		return err
 	}
 
@@ -466,12 +466,8 @@ func (t *Transitive) issue(vtx avalanche.Vertex, updatedEpoch bool) error {
 		tr := tx.Transition()
 		for _, depID := range tr.Dependencies() {
 			if !trIDs.Contains(depID) && !t.Consensus.TransitionProcessing(depID) {
-				dep, err := t.VM.Get(depID)
-				if err != nil || !dep.Status().Decided() {
-					// This transaction hasn't been issued yet. Add it as a dependency.
-					t.missingTransitions.Add(depID)
-					i.txDeps.Add(depID)
-				}
+				t.missingTransitions.Add(depID)
+				i.txDeps.Add(depID)
 			}
 		}
 	}
@@ -499,9 +495,9 @@ func (t *Transitive) issue(vtx avalanche.Vertex, updatedEpoch bool) error {
 	return t.errs.Err
 }
 
-// Batchs [txs] into vertices and issue them.
+// Batchs [trs] into vertices and issue them.
 // If [force] is true, forces each tx to be issued.
-// Otherwise, some txs may not be put into vertices that are issued.
+// Otherwise, some trs may not be put into vertices that are issued.
 // If [mustPoll], will always result in a new poll.
 func (t *Transitive) batch(epoch uint32, trs []conflicts.Transition, restrictions [][]ids.ID, force, mustPoll bool, updatedEpoch bool) error {
 	issuedTrs := ids.Set{}
