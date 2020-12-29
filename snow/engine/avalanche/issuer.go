@@ -91,7 +91,7 @@ func (i *issuer) Update() {
 	// being issued into the current epoch. This enforces that nodes will prefer
 	// their current epoch
 	if currentEpoch := i.t.Ctx.Epoch(); epoch < currentEpoch && len(unissuedTransitions) > 0 {
-		i.t.Ctx.Log.Debug("Reissuing transitions into a newer epoch")
+		i.t.Ctx.Log.Debug("Reissuing transitions from epoch %d into newer epoch %d", epoch, currentEpoch)
 		if err := i.t.batch(currentEpoch, validTransitions, true /*=force*/, false /*=empty*/); err != nil {
 			i.t.errs.Add(err)
 			return

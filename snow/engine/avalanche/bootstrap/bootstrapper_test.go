@@ -341,7 +341,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	tr1 := &conflicts.TestTransition{
 		IDV:           trID1,
 		StatusV:       choices.Processing,
-		DependenciesV: []ids.ID{trID0},
+		DependenciesV: []conflicts.Transition{tr0},
 		InputIDsV:     []ids.ID{utxos[1]},
 		BytesV:        trBytes1,
 	}
@@ -514,7 +514,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 	tr1 := &conflicts.TestTransition{
 		IDV:           trID1,
 		StatusV:       choices.Processing,
-		DependenciesV: []ids.ID{tr0.ID()},
+		DependenciesV: []conflicts.Transition{tr0},
 		InputIDsV:     []ids.ID{utxos[1]},
 		BytesV:        trBytes1,
 	}

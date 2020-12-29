@@ -20,8 +20,6 @@ const (
 )
 
 var (
-	errBadVersion          = errors.New("invalid version")
-	errBadEpoch            = errors.New("invalid epoch")
 	errFutureField         = errors.New("field specified in a previous version")
 	errTooManyparentIDs    = fmt.Errorf("vertex contains more than %d parentIDs", maxNumParents)
 	errNoOperations        = errors.New("vertex contains no operations")
@@ -80,14 +78,28 @@ type innerStatelessVertex struct {
 }
 
 func (v innerStatelessVertex) Verify() error {
+	// Version specific verification
+	switch v.Version {
+	case 0:
+		switch {
+		case v.Epoch != 0:
+			return fmt.Errorf("invalid epoch %d for v0 codec", v.Epoch)
+		case len(v.Restrictions) != 0:
+			return errFutureField
+		}
+	case 1:
+		// Cannot allow a vertex using v1 codec to be issued into 0th
+		// epoch since nodes that have not updated will not be able to
+		// parse the vertex.
+		if v.Epoch == 0 {
+			return fmt.Errorf("invalid epoch 0 for v1 codec")
+		}
+	default:
+		return fmt.Errorf("invalid version %d", v.Version)
+	}
+
+	// General verification
 	switch {
-	case v.Version != 0:
-		return errBadVersion
-	case v.Epoch != 0:
-		return errBadEpoch
-	case len(v.Restrictions) != 0:
-		return errFutureField
-		// TODO: Remove the above checks once the apricot release is ready
 	case len(v.ParentIDs) > maxNumParents:
 		return errTooManyparentIDs
 	case len(v.Transitions)+len(v.Restrictions) == 0:

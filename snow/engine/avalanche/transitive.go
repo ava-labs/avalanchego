@@ -609,10 +609,10 @@ func (t *Transitive) issueBatch(txs []conflicts.Transition) error {
 		parentIDs[i] = virtuousIDs[int(index)]
 	}
 
-	vtx, err := t.Manager.Build(0, parentIDs, txs, nil)
+	vtx, err := t.Manager.Build(t.Ctx.Epoch(), parentIDs, txs, nil)
 	if err != nil {
-		t.Ctx.Log.Warn("error building new vertex with %d parents and %d transactions",
-			len(parentIDs), len(txs))
+		t.Ctx.Log.Warn("error building new vertex with %d parents and %d transactions: %s",
+			len(parentIDs), len(txs), err)
 		return nil
 	}
 	return t.issue(vtx)

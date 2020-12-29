@@ -586,7 +586,7 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 		},
 		TransitionV: &conflicts.TestTransition{
 			IDV:           purpleTransitionID,
-			DependenciesV: []ids.ID{Red.Transition().ID()},
+			DependenciesV: []conflicts.Transition{Red.Transition()},
 			InputIDsV:     []ids.ID{ids.Empty.Prefix(8)},
 		},
 	}
@@ -709,7 +709,7 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 		},
 		TransitionV: &conflicts.TestTransition{
 			IDV:           purpleTransitionID,
-			DependenciesV: []ids.ID{Red.Transition().ID()},
+			DependenciesV: []conflicts.Transition{Red.Transition()},
 			InputIDsV:     []ids.ID{ids.Empty.Prefix(8)},
 		},
 	}
@@ -857,7 +857,7 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 		},
 		TransitionV: &conflicts.TestTransition{
 			IDV:           purpleTransitionID,
-			DependenciesV: []ids.ID{Red.Transition().ID(), Blue.Transition().ID()},
+			DependenciesV: []conflicts.Transition{Red.Transition(), Blue.Transition()},
 			InputIDsV:     []ids.ID{ids.Empty.Prefix(8)},
 		},
 	}
@@ -966,7 +966,7 @@ func RejectingSlowDependencyTest(t *testing.T, factory Factory) {
 		},
 		TransitionV: &conflicts.TestTransition{
 			IDV:           purpleTransitionID,
-			DependenciesV: []ids.ID{Red.Transition().ID()},
+			DependenciesV: []conflicts.Transition{Red.Transition()},
 			InputIDsV:     []ids.ID{conflictID},
 		},
 	}
@@ -1174,7 +1174,7 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 		},
 		TransitionV: &conflicts.TestTransition{
 			IDV:           virtuousTransitionID,
-			DependenciesV: []ids.ID{rogue1.Transition().ID()},
+			DependenciesV: []conflicts.Transition{rogue1.Transition()},
 			InputIDsV:     []ids.ID{input2},
 		},
 	}
