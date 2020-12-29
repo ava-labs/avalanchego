@@ -68,7 +68,7 @@ func TestInputConflicts(t *testing.T) {
 
 	conflicts, err := c.Conflicts(tx1)
 	assert.NoError(t, err)
-	assert.NotEmpty(t, conflicts)
+	assert.Len(t, conflicts, 1)
 }
 
 func TestOuterRestrictionConflicts(t *testing.T) {
@@ -171,11 +171,8 @@ func TestAcceptNoConflicts(t *testing.T) {
 	assert.Len(t, toAccepts, 1)
 	assert.Empty(t, toRejects)
 	assert.Empty(t, c.txs)
-	assert.Empty(t, c.transitions)
 	assert.Empty(t, c.utxos)
-	assert.Empty(t, c.restrictions)
-	assert.Empty(t, c.dependencies)
-	assert.Empty(t, c.missingDependencies)
+	assert.Empty(t, c.transitionNodes)
 
 	toAccept := toAccepts[0]
 	assert.Equal(t, tx.ID(), toAccept.ID())
@@ -236,11 +233,8 @@ func TestAcceptNoConflictsWithDependency(t *testing.T) {
 	assert.Len(t, toAccepts, 1)
 	assert.Empty(t, toRejects)
 	assert.Empty(t, c.txs)
-	assert.Empty(t, c.transitions)
 	assert.Empty(t, c.utxos)
-	assert.Empty(t, c.restrictions)
-	assert.Empty(t, c.dependencies)
-	assert.Empty(t, c.missingDependencies)
+	assert.Empty(t, c.transitionNodes)
 
 	toAccept = toAccepts[0]
 	assert.Equal(t, tx1.ID(), toAccept.ID())
@@ -300,11 +294,8 @@ func TestNoConflictsNoEarlyAcceptDependency(t *testing.T) {
 	assert.Len(t, toAccepts, 1)
 	assert.Empty(t, toRejects)
 	assert.Empty(t, c.txs)
-	assert.Empty(t, c.transitions)
 	assert.Empty(t, c.utxos)
-	assert.Empty(t, c.restrictions)
-	assert.Empty(t, c.dependencies)
-	assert.Empty(t, c.missingDependencies)
+	assert.Empty(t, c.transitionNodes)
 
 	toAccept = toAccepts[0]
 	assert.Equal(t, tx1.ID(), toAccept.ID())
@@ -410,11 +401,8 @@ func TestAcceptNoConflictsWithDependenciesAcrossMultipleRounds(t *testing.T) {
 	assert.Equal(t, tx2.ID(), toAccept.ID())
 
 	assert.Empty(t, c.txs)
-	assert.Empty(t, c.transitions)
 	assert.Empty(t, c.utxos)
-	assert.Empty(t, c.restrictions)
-	assert.Empty(t, c.dependencies)
-	assert.Empty(t, c.missingDependencies)
+	assert.Empty(t, c.transitionNodes)
 }
 func TestAcceptRejectedDependency(t *testing.T) {
 	c := New()
@@ -482,10 +470,8 @@ func TestAcceptRejectedDependency(t *testing.T) {
 	assert.Empty(t, toAccepts)
 	assert.Len(t, toRejects, 1)
 	assert.Empty(t, c.txs)
-	assert.Empty(t, c.transitions)
 	assert.Empty(t, c.utxos)
-	assert.Empty(t, c.restrictions)
-	assert.Empty(t, c.dependencies)
+	assert.Empty(t, c.transitionNodes)
 
 	toReject = toRejects[0]
 	assert.Equal(t, tx2.ID(), toReject.ID())
@@ -554,11 +540,8 @@ func TestAcceptRejectedEpochDependency(t *testing.T) {
 	assert.Len(t, toAccepts, 1)
 	assert.Len(t, toRejects, 3)
 	assert.Empty(t, c.txs)
-	assert.Empty(t, c.transitions)
 	assert.Empty(t, c.utxos)
-	assert.Empty(t, c.restrictions)
-	assert.Empty(t, c.dependencies)
-	assert.Empty(t, c.missingDependencies)
+	assert.Empty(t, c.transitionNodes)
 }
 
 func TestRejectedRejectedDependency(t *testing.T) {
@@ -644,11 +627,8 @@ func TestRejectedRejectedDependency(t *testing.T) {
 	assert.Len(t, toAccepts, 1)
 	assert.Len(t, toRejects, 1)
 	assert.Empty(t, c.txs)
-	assert.Empty(t, c.transitions)
 	assert.Empty(t, c.utxos)
-	assert.Empty(t, c.restrictions)
-	assert.Empty(t, c.dependencies)
-	assert.Empty(t, c.missingDependencies)
+	assert.Empty(t, c.transitionNodes)
 }
 
 func TestAcceptVirtuousRejectedDependency(t *testing.T) {
@@ -738,9 +718,6 @@ func TestAcceptVirtuousRejectedDependency(t *testing.T) {
 	assert.Len(t, toAccepts, 1)
 	assert.Len(t, toRejects, 0)
 	assert.Empty(t, c.txs)
-	assert.Empty(t, c.transitions)
 	assert.Empty(t, c.utxos)
-	assert.Empty(t, c.restrictions)
-	assert.Empty(t, c.dependencies)
-	assert.Empty(t, c.missingDependencies)
+	assert.Empty(t, c.transitionNodes)
 }
