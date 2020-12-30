@@ -287,6 +287,41 @@ func (c *Client) Send(
 	return res.TxID, err
 }
 
+// SendAsManager sends a managed asset using the credential of the asset manager
+// rather than the asset holder. The managed asset is sent from [from]. Managed asset
+// change is sent to [changeAddr]. Returns the ID of the tx.
+func (c *Client) SendAsManager(
+	user api.UserPass,
+	from []string,
+	changeAddr string,
+	amount uint64,
+	assetID,
+	to,
+	memo,
+	feeChangeAddr string,
+	feeFrom []string,
+) (ids.ID, error) {
+	res := &SendAsManagerResponse{}
+	err := c.requester.SendRequest("sendAsManager", &SendAsManagerArgs{
+		SendArgs: SendArgs{
+			JSONSpendHeader: api.JSONSpendHeader{
+				UserPass:       user,
+				JSONFromAddrs:  api.JSONFromAddrs{From: from},
+				JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			},
+			SendOutput: SendOutput{
+				Amount:  cjson.Uint64(amount),
+				AssetID: assetID,
+				To:      to,
+			},
+			Memo: memo,
+		},
+		FeeFrom:       feeFrom,
+		FeeChangeAddr: feeChangeAddr,
+	}, res)
+	return res.TxID, err
+}
+
 // SendMultiple sends a transaction from [user] funding all [outputs]
 func (c *Client) SendMultiple(
 	user api.UserPass,
