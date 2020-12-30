@@ -351,12 +351,10 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 		// asserted.
 		conflictTxs, _ := c.Conflicts(tx)
 		for _, conflictTx := range conflictTxs {
-			conflictTxID := conflictTx.ID()
-			if rejected.Contains(conflictTxID) {
-				continue
+			if conflictTxID := conflictTx.ID(); !rejected.Contains(conflictTxID) {
+				rejected.Add(conflictTxID)
+				c.rejectable = append(c.rejectable, conflictTx)
 			}
-			rejected.Add(conflictTxID)
-			c.rejectable = append(c.rejectable, conflictTx)
 		}
 	}
 
@@ -427,7 +425,7 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 			for dependentTxID := range transitionNode.dependencies {
 				dependentTx := c.txs[dependentTxID]
 				dependentEpoch := dependentTx.Epoch()
-				if dependentEpoch < lowestRemainingEpoch {
+				if dependentEpoch < lowestRemainingEpoch && !rejected.Contains(dependentTxID) {
 					rejected.Add(dependentTxID)
 					c.rejectable = append(c.rejectable, dependentTx)
 				}

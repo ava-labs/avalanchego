@@ -873,3 +873,161 @@ func TestAcceptVirtuousRejectedDependency(t *testing.T) {
 	assert.Empty(t, c.utxos)
 	assert.Empty(t, c.transitionNodes)
 }
+
+func TestRejectDependencyTwice(t *testing.T) {
+	c := New()
+
+	trA := &TestTransition{
+		IDV:       ids.GenerateTestID(),
+		InputIDsV: []ids.ID{ids.GenerateTestID()},
+	}
+	trB := &TestTransition{
+		IDV:           ids.GenerateTestID(),
+		InputIDsV:     []ids.ID{ids.GenerateTestID()},
+		DependenciesV: []Transition{trA},
+	}
+	trC := &TestTransition{
+		IDV:           ids.GenerateTestID(),
+		InputIDsV:     []ids.ID{ids.GenerateTestID()},
+		DependenciesV: []Transition{trB},
+	}
+
+	txA0 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: trA,
+	}
+	txA1 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: trA,
+		EpochV:      1,
+	}
+	txA2 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: trA,
+		EpochV:      2,
+	}
+	txB0 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: trB,
+	}
+	txB1 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: trB,
+		EpochV:      1,
+	}
+	txB2 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: trB,
+		EpochV:      2,
+	}
+	txC0 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: trC,
+	}
+	txC1 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: trC,
+		EpochV:      1,
+	}
+	txC2 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: trC,
+		EpochV:      2,
+	}
+
+	err := c.Add(txA0)
+	assert.NoError(t, err)
+
+	err = c.Add(txA1)
+	assert.NoError(t, err)
+
+	err = c.Add(txA2)
+	assert.NoError(t, err)
+
+	err = c.Add(txB0)
+	assert.NoError(t, err)
+
+	err = c.Add(txB1)
+	assert.NoError(t, err)
+
+	err = c.Add(txB2)
+	assert.NoError(t, err)
+
+	err = c.Add(txC0)
+	assert.NoError(t, err)
+
+	err = c.Add(txC1)
+	assert.NoError(t, err)
+
+	err = c.Add(txC2)
+	assert.NoError(t, err)
+
+	c.Accept(txA2.ID())
+
+	toAccepts, toRejects := c.Updateable()
+	assert.Len(t, toAccepts, 1)
+	assert.Len(t, toRejects, 4)
+
+	toAccept := toAccepts[0]
+	assert.Equal(t, txA2.ID(), toAccept.ID())
+
+	toAccepts, toRejects = c.Updateable()
+	assert.Empty(t, toAccepts)
+	assert.Len(t, toRejects, 2)
+
+	toAccepts, toRejects = c.Updateable()
+	assert.Empty(t, toAccepts)
+	assert.Empty(t, toRejects)
+
+	c.Accept(txB2.ID())
+
+	toAccepts, toRejects = c.Updateable()
+	assert.Len(t, toAccepts, 1)
+	assert.Empty(t, toRejects)
+	toAccept = toAccepts[0]
+
+	assert.Equal(t, txB2.ID(), toAccept.ID())
+
+	c.Accept(txC2.ID())
+
+	toAccepts, toRejects = c.Updateable()
+	assert.Len(t, toAccepts, 1)
+	assert.Empty(t, toRejects)
+	toAccept = toAccepts[0]
+
+	assert.Equal(t, txC2.ID(), toAccept.ID())
+
+	toAccepts, toRejects = c.Updateable()
+	assert.Empty(t, toAccepts)
+	assert.Empty(t, toRejects)
+	assert.Empty(t, c.txs)
+	assert.Empty(t, c.utxos)
+	assert.Empty(t, c.transitionNodes)
+}
