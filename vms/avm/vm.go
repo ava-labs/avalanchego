@@ -404,11 +404,8 @@ func (vm *VM) Parse(b []byte) (conflicts.Transition, error) {
 func (vm *VM) Get(txID ids.ID) (conflicts.Transition, error) {
 	vm.metrics.numGetCalls.Inc()
 
-	tx := &UniqueTx{
-		vm:   vm,
-		txID: txID,
-	}
-	// TODO does tx.verifyWithoutCacheWrites() need to be called here?
+	tx := newUniqueTx(vm, txID, nil)
+	tx.refresh()
 	return tx, nil
 }
 
@@ -430,7 +427,6 @@ func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 	if err != nil {
 		return ids.ID{}, err
 	}
-	// TODO is this the right epoch
 	if err := tx.verifyWithoutCacheWrites(vm.ctx.Epoch()); err != nil {
 		return ids.ID{}, err
 	}
@@ -758,13 +754,7 @@ func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
 		return nil, err
 	}
 
-	tx := &UniqueTx{
-		TxState: &TxState{
-			Tx: rawTx,
-		},
-		vm:   vm,
-		txID: rawTx.ID(),
-	}
+	tx := newUniqueTx(vm, rawTx.ID(), rawTx)
 
 	// TODO do we need to call SyntacticVerify here?
 	if tx.Status() == choices.Unknown {
@@ -822,20 +812,21 @@ func (vm *VM) getUTXO(utxoID *avax.UTXOID) (*avax.UTXO, error) {
 		return utxo, nil
 	}
 
-	inputTx, inputIndex := utxoID.InputSource()
-	parent := UniqueTx{
-		vm:   vm,
-		txID: inputTx,
-	}
+	inputTxID, inputIndex := utxoID.InputSource()
+	parent := newUniqueTx(vm, inputTxID, nil)
 
-	// TODO do we need to call parent.verifyWithoutCacheWrites here?
+	// If the transaction has been accepted and the UTXO was
+	// not found above, then it has already been consumed.
+	// If the parent was rejected, the UTXO cannot be consumed.
+	// If the parent is unknown, then it is too early to consume
+	// this UTXO.
 	if status := parent.Status(); status != choices.Processing {
 		return nil, errMissingUTXO
 	}
 
 	parentUTXOs := parent.UTXOs()
 	if uint32(len(parentUTXOs)) <= inputIndex || int(inputIndex) < 0 {
-		return nil, errInvalidUTXO
+		return nil, fmt.Errorf("invalid output index %d for parent tx %s (%d outputs)", inputIndex, inputTxID, len(parentUTXOs))
 	}
 	return parentUTXOs[int(inputIndex)], nil
 }
@@ -858,10 +849,7 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 
 	// Caches doesn't say whether this asset support this fx.
 	// Get the tx that created the asset and check.
-	tx := &UniqueTx{
-		vm:   vm,
-		txID: assetID,
-	}
+	tx := newUniqueTx(vm, assetID, nil)
 	if status := tx.Status(); !status.Fetched() {
 		return false
 	}

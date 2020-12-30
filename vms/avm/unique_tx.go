@@ -33,20 +33,8 @@ type UniqueTx struct {
 type TxState struct {
 	*Tx
 
-	unique bool
-
-	// Epoch --> True if Verify has been called with this epoch as the argument
-	// and verification passed
-	verifiedState map[uint32]bool
-
-	// Epoch --> True if SyntacticVerify was called with this
-	// epoch as the argument
-	syntacticVerified map[uint32]bool
-
-	// Epoch --> Error that occurred while verifying the tx
-	// for that epoch, or nil if no error.
-	// Invariant: If a key exists in [syntacticVerified], it exists in [validity]
-	syntacticValidity map[uint32]error
+	syntacticVerfication, semanticVerification map[uint32]error
+	unique                                     bool
 
 	inputs     []ids.ID
 	inputUTXOs []*avax.UTXOID
@@ -57,11 +45,28 @@ type TxState struct {
 	status choices.Status
 }
 
+// newUniqueTx returns the UniqueTx representation of transaction [txID].
+// [rawTx] may be nil.
+func newUniqueTx(vm *VM, txID ids.ID, rawTx *Tx) *UniqueTx {
+	return &UniqueTx{
+		vm:   vm,
+		txID: txID,
+		TxState: &TxState{
+			Tx:                   rawTx,
+			syntacticVerfication: make(map[uint32]error),
+			semanticVerification: make(map[uint32]error),
+		},
+	}
+}
+
 func (tx *UniqueTx) refresh() {
 	tx.vm.numTxRefreshes.Inc()
 
 	if tx.TxState == nil {
-		tx.TxState = &TxState{}
+		tx.TxState = &TxState{
+			syntacticVerfication: make(map[uint32]error),
+			semanticVerification: make(map[uint32]error),
+		}
 	}
 	if tx.unique {
 		return
@@ -240,10 +245,7 @@ func (tx *UniqueTx) Dependencies() []ids.ID {
 		deps := tx.deps
 		tx.deps = make([]ids.ID, 0, len(deps))
 		for _, depID := range deps {
-			dependentTx := &UniqueTx{
-				vm:   tx.vm,
-				txID: depID,
-			}
+			dependentTx := newUniqueTx(tx.vm, depID, nil)
 			if status := dependentTx.Status(); status != choices.Accepted {
 				tx.deps = append(tx.deps, depID)
 			}
@@ -260,10 +262,7 @@ func (tx *UniqueTx) Dependencies() []ids.ID {
 		if txIDs.Contains(txID) {
 			continue
 		}
-		dependentTx := &UniqueTx{
-			vm:   tx.vm,
-			txID: txID,
-		}
+		dependentTx := newUniqueTx(tx.vm, txID, nil)
 		if status := dependentTx.Status(); status != choices.Accepted {
 			txIDs.Add(txID)
 			tx.deps = append(tx.deps, txID)
@@ -333,58 +332,48 @@ func (tx *UniqueTx) Verify(epoch uint32) error {
 		return err
 	}
 
-	if tx.verifiedState == nil {
-		tx.verifiedState = map[uint32]bool{}
-	}
-	tx.verifiedState[epoch] = true
+	tx.semanticVerification[epoch] = nil
 	tx.vm.pubsub.Publish("verified", tx.ID())
 	return nil
 }
 
 // SyntacticVerify verifies that this transaction is well formed
 func (tx *UniqueTx) SyntacticVerify(epoch uint32) error {
-	tx.refresh()
-
 	if tx.Tx == nil {
 		return errUnknownTx
 	}
 
-	// Use cached result
-	if _, ok := tx.syntacticVerified[epoch]; ok {
-		return tx.syntacticValidity[epoch]
+	verified, exists := tx.syntacticVerfication[epoch]
+	if exists {
+		return verified
 	}
 
-	// Cache the result of syntactic verification
-	if tx.syntacticVerified == nil {
-		tx.syntacticVerified = map[uint32]bool{}
-	}
-	tx.syntacticVerified[epoch] = true
-	if tx.syntacticValidity == nil {
-		tx.syntacticValidity = map[uint32]error{}
-	}
-	tx.syntacticValidity[epoch] = tx.Tx.SyntacticVerify(
+	validity := tx.Tx.SyntacticVerify(
 		tx.vm.ctx,
-		epoch,
 		tx.vm.codec,
 		tx.vm.currentCodecVersion,
 		tx.vm.ctx.AVAXAssetID,
 		tx.vm.txFee,
 		tx.vm.creationTxFee,
 		len(tx.vm.fxs),
+		epoch,
 	)
-	return tx.syntacticValidity[epoch]
+	tx.syntacticVerfication[epoch] = validity
+	return validity
 }
 
 // SemanticVerify the validity of this transaction
 func (tx *UniqueTx) SemanticVerify(epoch uint32) error {
-	// SyntacticVerify sets tx.syntacticallyValid[epoch],
-	// which is checked in the next statement
-	_ = tx.SyntacticVerify(epoch)
+	validity := tx.SyntacticVerify(epoch)
 
-	syntacticallyValid := tx.syntacticValidity[epoch]
-	if syntacticallyValid != nil || tx.verifiedState[epoch] {
-		return syntacticallyValid
+	if validity != nil {
+		return validity
 	}
 
-	return tx.Tx.SemanticVerify(tx.vm, epoch, tx.UnsignedTx)
+	validity, exists := tx.semanticVerification[epoch]
+	if exists {
+		return validity
+	}
+
+	return tx.Tx.SemanticVerify(tx.vm, tx.UnsignedTx, epoch)
 }

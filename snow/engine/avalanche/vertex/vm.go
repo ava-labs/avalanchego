@@ -14,12 +14,12 @@ import (
 type DAGVM interface {
 	common.VM
 
-	// Return any transactions that have not been sent to consensus yet
+	// Return any transitions that have not been sent to consensus yet
 	Pending() []conflicts.Transition
 
-	// Convert a stream of bytes to a transaction or return an error
+	// Convert a stream of bytes to a transition or return an error
 	Parse(tr []byte) (conflicts.Transition, error)
 
-	// Retrieve a transaction that was submitted previously
+	// Retrieve a transition that was submitted previously
 	Get(ids.ID) (conflicts.Transition, error)
 }

@@ -85,13 +85,13 @@ func (t *OperationTx) UTXOs() []*avax.UTXO {
 // SyntacticVerify that this transaction is well-formed.
 func (t *OperationTx) SyntacticVerify(
 	ctx *snow.Context,
-	epoch uint32,
 	c codec.Manager,
 	codecVersion uint16,
 	txFeeAssetID ids.ID,
 	txFee uint64,
 	_ uint64,
 	numFxs int,
+	epoch uint32,
 ) error {
 	switch {
 	case t == nil:
@@ -100,16 +100,7 @@ func (t *OperationTx) SyntacticVerify(
 		return errNoOperations
 	}
 
-	if err := t.BaseTx.SyntacticVerify(
-		ctx,
-		epoch,
-		c,
-		codecVersion,
-		txFeeAssetID,
-		txFee,
-		txFee,
-		numFxs,
-	); err != nil {
+	if err := t.BaseTx.SyntacticVerify(ctx, c, codecVersion, txFeeAssetID, txFee, txFee, numFxs, epoch); err != nil {
 		return err
 	}
 
@@ -137,13 +128,8 @@ func (t *OperationTx) SyntacticVerify(
 }
 
 // SemanticVerify that this transaction is well-formed.
-func (t *OperationTx) SemanticVerify(
-	vm *VM,
-	epoch uint32,
-	tx UnsignedTx,
-	creds []verify.Verifiable,
-) error {
-	if err := t.BaseTx.SemanticVerify(vm, epoch, tx, creds); err != nil {
+func (t *OperationTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable, epoch uint32) error {
+	if err := t.BaseTx.SemanticVerify(vm, tx, creds, epoch); err != nil {
 		return err
 	}
 
