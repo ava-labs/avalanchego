@@ -69,7 +69,7 @@ func TestTxNil(t *testing.T) {
 	}
 
 	tx := (*Tx)(nil)
-	if err := tx.SyntacticVerify(ctx, 0, m, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, m, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Should have errored due to nil tx")
 	}
 	if err := tx.SemanticVerify(nil, 0, nil); err == nil {
@@ -81,7 +81,7 @@ func TestTxEmpty(t *testing.T) {
 	ctx := NewContext(t)
 	_, c := setupCodec()
 	tx := &Tx{}
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, c, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Should have errored due to nil tx")
 	}
 }
@@ -94,6 +94,7 @@ func TestTxInvalidCredential(t *testing.T) {
 	}
 
 	tx := &Tx{
+		Version: apricotCodecVersion,
 		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -115,11 +116,11 @@ func TestTxInvalidCredential(t *testing.T) {
 		}},
 		Creds: []verify.Verifiable{&avax.TestVerifiable{Err: errors.New("")}},
 	}
-	if err := tx.SignSECP256K1Fx(m, apricotCodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(m, nil); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tx.SyntacticVerify(ctx, 0, m, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, m, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid credential")
 	}
 }
@@ -132,6 +133,7 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 	}
 
 	tx := &Tx{
+		Version: apricotCodecVersion,
 		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -173,11 +175,11 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 			&avax.TestVerifiable{},
 		},
 	}
-	if err := tx.SignSECP256K1Fx(m, apricotCodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(m, nil); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tx.SyntacticVerify(ctx, 0, m, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, m, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid unsigned tx")
 	}
 }
@@ -190,6 +192,7 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 	}
 
 	tx := &Tx{
+		Version: apricotCodecVersion,
 		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -222,11 +225,11 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 		}},
 		Creds: []verify.Verifiable{&avax.TestVerifiable{}},
 	}
-	if err := tx.SignSECP256K1Fx(m, apricotCodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(m, nil); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tx.SyntacticVerify(ctx, 0, m, apricotCodecVersion, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, 0, m, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid unsigned tx")
 	}
 }

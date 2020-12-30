@@ -689,11 +689,12 @@ func (vm *VM) initAliases(genesisBytes []byte) error {
 		}
 
 		tx := Tx{
+			Version:    preApricotCodecVersion,
 			UnsignedTx: &genesisTx.CreateAssetTx,
 		}
 
 		// Use the original codec so that the derived transaction ID doesn't change
-		if err := tx.SignSECP256K1Fx(vm.genesisCodec, preApricotCodecVersion, nil); err != nil {
+		if err := tx.SignSECP256K1Fx(vm.genesisCodec, nil); err != nil {
 			return err
 		}
 
@@ -723,9 +724,10 @@ func (vm *VM) initState(genesisBytes []byte) error {
 		}
 
 		tx := Tx{
+			Version:    preApricotCodecVersion,
 			UnsignedTx: &genesisTx.CreateAssetTx,
 		}
-		if err := tx.SignSECP256K1Fx(vm.genesisCodec, preApricotCodecVersion, nil); err != nil {
+		if err := tx.SignSECP256K1Fx(vm.genesisCodec, nil); err != nil {
 			return err
 		}
 
@@ -785,18 +787,9 @@ func (vm *VM) parsePrivateTx(txBytes []byte) (*Tx, error) {
 	codecVersion, err := vm.codec.Unmarshal(txBytes, tx)
 	if err != nil {
 		return nil, err
-	} else if codecVersion != preApricotCodecVersion {
-		// Make sure transactions before the Apricot fork
-		// aren't encoded using the new codec
-		// TODO: Remove after Apricot fork
-		now := time.Now()
-		if now.Before(vm.ctx.EpochFirstTransition) {
-			return nil, fmt.Errorf(
-				"tx has new codec version at %s, before hard fork time (%s)",
-				now,
-				vm.ctx.EpochFirstTransition)
-		}
 	}
+	tx.Version = codecVersion
+
 	unsignedBytes, err := vm.codec.Marshal(codecVersion, &tx.UnsignedTx)
 	if err != nil {
 		return nil, err
