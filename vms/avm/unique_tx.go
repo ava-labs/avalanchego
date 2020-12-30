@@ -45,6 +45,8 @@ type TxState struct {
 	status choices.Status
 }
 
+// newUniqueTx returns the UniqueTx representation of transaction [txID].
+// [rawTx] may be nil.
 func newUniqueTx(vm *VM, txID ids.ID, rawTx *Tx) *UniqueTx {
 	return &UniqueTx{
 		vm:   vm,

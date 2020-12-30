@@ -208,7 +208,7 @@ func (t *CreateAssetTx) syntacticVerifyApricot(
 	}
 
 	for _, r := range t.Symbol {
-		if r > unicode.MaxASCII || r < 32 {
+		if r >= unicode.MaxASCII || r < 32 {
 			return errInvalidSymbolApricot
 		}
 	}

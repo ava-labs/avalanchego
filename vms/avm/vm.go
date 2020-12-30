@@ -826,7 +826,7 @@ func (vm *VM) getUTXO(utxoID *avax.UTXOID) (*avax.UTXO, error) {
 
 	parentUTXOs := parent.UTXOs()
 	if uint32(len(parentUTXOs)) <= inputIndex || int(inputIndex) < 0 {
-		return nil, fmt.Errorf("invalid UTXO index %d for parent with %d UTXOs", inputIndex, len(parentUTXOs))
+		return nil, fmt.Errorf("invalid output index %d for parent tx %s (%d outputs)", inputIndex, inputTxID, len(parentUTXOs))
 	}
 	return parentUTXOs[int(inputIndex)], nil
 }
