@@ -281,40 +281,51 @@ func (s *State) SetUTXO(id ids.ID, utxo *UTXO) error {
 
 // Status returns a status from storage.
 func (s *State) Status(id ids.ID) (choices.Status, error) {
-	if statusIntf, found := s.Cache.Get(id); found {
-		if status, ok := statusIntf.(choices.Status); ok {
-			return status, nil
-		}
-		return choices.Unknown, errCacheTypeMismatch
-	}
-
-	bytes, err := s.DB.Get(id[:])
-	if err != nil {
-		return choices.Unknown, err
-	}
-
-	var status choices.Status
-	if _, err := s.Codec.Unmarshal(bytes, &status); err != nil {
-		return choices.Unknown, err
-	}
-
-	s.Cache.Put(id, status)
-	return status, nil
+	val, err := s.Int(id)
+	return choices.Status(val), err
 }
 
 // SetStatus saves a status in storage.
 func (s *State) SetStatus(id ids.ID, status choices.Status) error {
-	if status == choices.Unknown {
+	return s.SetInt(id, uint32(status))
+}
+
+// Int returns an int from storage.
+func (s *State) Int(id ids.ID) (uint32, error) {
+	if valIntf, found := s.Cache.Get(id); found {
+		if val, ok := valIntf.(uint32); ok {
+			return val, nil
+		}
+		return 0, errCacheTypeMismatch
+	}
+
+	bytes, err := s.DB.Get(id[:])
+	if err != nil {
+		return 0, err
+	}
+
+	var val uint32
+	if _, err := s.Codec.Unmarshal(bytes, &val); err != nil {
+		return 0, err
+	}
+
+	s.Cache.Put(id, val)
+	return val, nil
+}
+
+// SetInt saves an int in storage.
+func (s *State) SetInt(id ids.ID, val uint32) error {
+	if val == 0 {
 		s.Cache.Evict(id)
 		return s.DB.Delete(id[:])
 	}
 
-	bytes, err := s.Codec.Marshal(s.CodecVersionF(), status)
+	bytes, err := s.Codec.Marshal(s.CodecVersionF(), val)
 	if err != nil {
 		return err
 	}
 
-	s.Cache.Put(id, status)
+	s.Cache.Put(id, val)
 	return s.DB.Put(id[:], bytes)
 }
 
