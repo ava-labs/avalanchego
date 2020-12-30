@@ -134,6 +134,7 @@ func (c *Client) CreateAsset(
 	denomination byte,
 	holders []*Holder,
 	minters []Minters,
+	manager Manager,
 ) (ids.ID, error) {
 	res := &FormattedAssetID{}
 	err := c.requester.SendRequest("createAsset", &CreateAssetArgs{
@@ -147,6 +148,7 @@ func (c *Client) CreateAsset(
 		Denomination:   denomination,
 		InitialHolders: holders,
 		MinterSets:     minters,
+		Manager:        manager,
 	}, res)
 	return res.AssetID, err
 }
