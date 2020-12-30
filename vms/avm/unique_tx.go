@@ -55,6 +55,7 @@ type TxState struct {
 	setDeps    bool
 
 	status choices.Status
+	epoch  uint32
 }
 
 func (tx *UniqueTx) refresh() {
@@ -71,10 +72,17 @@ func (tx *UniqueTx) refresh() {
 	if unique == tx {
 		tx.vm.numTxRefreshMisses.Inc()
 
+		txID := tx.ID()
+
 		// If no one was in the cache, make sure that there wasn't an
 		// intermediate object whose state I must reflect
-		if status, err := tx.vm.state.Status(tx.ID()); err == nil {
+		if status, err := tx.vm.state.Status(txID); err == nil {
 			tx.status = status
+		}
+		if tx.status == choices.Accepted {
+			if epoch, err := tx.vm.state.Epoch(txID); err == nil {
+				tx.epoch = epoch
+			}
 		}
 		tx.unique = true
 	} else {
@@ -161,6 +169,12 @@ func (tx *UniqueTx) Accept(epoch uint32) error {
 		return err
 	}
 
+	tx.epoch = epoch
+	if err := tx.vm.state.SetEpoch(tx.ID(), epoch); err != nil {
+		tx.vm.ctx.Log.Error("Failed to accept tx %s due to %s", tx.txID, err)
+		return err
+	}
+
 	txID := tx.ID()
 	commitBatch, err := tx.vm.db.CommitBatch()
 	if err != nil {
@@ -222,7 +236,7 @@ func (tx *UniqueTx) Status() choices.Status {
 // Epoch returns the epoch of this transaction
 func (tx *UniqueTx) Epoch() uint32 {
 	tx.refresh()
-	return 0
+	return tx.epoch
 }
 
 // Dependencies returns the set of transactions this transaction builds on
@@ -319,6 +333,9 @@ func (tx *UniqueTx) verifyWithoutCacheWrites(epoch uint32) error {
 	case choices.Unknown:
 		return errUnknownTx
 	case choices.Accepted:
+		if epoch != tx.Epoch() {
+			return errRejectedTx
+		}
 		return nil
 	case choices.Rejected:
 		return errRejectedTx

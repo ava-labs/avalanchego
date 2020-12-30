@@ -272,6 +272,7 @@ func (vm *VM) Initialize(
 		tx:       &cache.LRU{Size: idCacheSize},
 		utxo:     &cache.LRU{Size: idCacheSize},
 		txStatus: &cache.LRU{Size: idCacheSize},
+		txEpoch:  &cache.LRU{Size: idCacheSize},
 		uniqueTx: &cache.EvictableLRU{Size: txCacheSize},
 	}
 
