@@ -40,20 +40,15 @@ type UnsignedTx interface {
 
 	SyntacticVerify(
 		ctx *snow.Context,
-		epoch uint32,
 		c codec.Manager,
 		codecVersion uint16,
 		txFeeAssetID ids.ID,
 		txFee uint64,
 		creationTxFee uint64,
 		numFxs int,
-	) error
-	SemanticVerify(
-		vm *VM,
 		epoch uint32,
-		tx UnsignedTx,
-		creds []verify.Verifiable,
 	) error
+	SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable, epoch uint32) error
 	ExecuteWithSideEffects(vm *VM, batch database.Batch) error
 }
 
@@ -75,31 +70,22 @@ func (t *Tx) Credentials() []verify.Verifiable { return t.Creds }
 // SyntacticVerify verifies that this transaction is well-formed.
 func (t *Tx) SyntacticVerify(
 	ctx *snow.Context,
-	epoch uint32,
 	c codec.Manager,
 	txFeeAssetID ids.ID,
 	txFee uint64,
 	creationTxFee uint64,
 	numFxs int,
+	epoch uint32,
 ) error {
 	if t == nil || t.UnsignedTx == nil {
 		return errNilTx
 	}
 
-	if t.Version == 1 && epoch == 0 {
+	if t.Version == apricotCodecVersion && epoch == 0 {
 		return errUnsupportedCodecVersionInEpoch
 	}
 
-	if err := t.UnsignedTx.SyntacticVerify(
-		ctx,
-		epoch,
-		c,
-		t.Version,
-		txFeeAssetID,
-		txFee,
-		creationTxFee,
-		numFxs,
-	); err != nil {
+	if err := t.UnsignedTx.SyntacticVerify(ctx, c, t.Version, txFeeAssetID, txFee, creationTxFee, numFxs, epoch); err != nil {
 		return err
 	}
 
@@ -119,15 +105,12 @@ func (t *Tx) SyntacticVerify(
 }
 
 // SemanticVerify verifies that this transaction is well-formed.
-func (t *Tx) SemanticVerify(
-	vm *VM,
-	epoch uint32,
-	tx UnsignedTx,
-) error {
+func (t *Tx) SemanticVerify(vm *VM, tx UnsignedTx, epoch uint32) error {
 	if t == nil {
 		return errNilTx
 	}
-	return t.UnsignedTx.SemanticVerify(vm, epoch, tx, t.Creds)
+
+	return t.UnsignedTx.SemanticVerify(vm, tx, t.Creds, epoch)
 }
 
 // SignSECP256K1Fx ...

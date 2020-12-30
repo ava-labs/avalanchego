@@ -1677,3 +1677,66 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 		t.Fatalf("Should have errored due to a missing UTXO")
 	}
 }
+
+func TestTxAcceptLaterEpoch(t *testing.T) {
+	genesisBytes, _, vm, _ := GenesisVM(t)
+	ctx := vm.ctx
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	avaxTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
+	key := keys[0]
+	tx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        avaxTx.ID(),
+				OutputIndex: 2,
+			},
+			Asset: avax.Asset{ID: avaxTx.ID()},
+			In: &secp256k1fx.TransferInput{
+				Amt: startBalance,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
+					},
+				},
+			},
+		}},
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: avaxTx.ID()},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: startBalance - vm.txFee,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				},
+			},
+		}},
+	}}}
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+		t.Fatal(err)
+	}
+
+	parsedTx, err := vm.Parse(tx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := parsedTx.Verify(1); err != nil {
+		t.Fatal(err)
+	}
+	if err := parsedTx.Accept(1); err != nil {
+		t.Fatal(err)
+	}
+	if epoch := parsedTx.Epoch(); epoch != 1 {
+		t.Fatalf("Should have returned epoch %d but returned %d", 1, epoch)
+	}
+	if err := parsedTx.Verify(2); err == nil {
+		t.Fatalf("Should have errored due to having been accepted into a different epoch")
+	}
+}

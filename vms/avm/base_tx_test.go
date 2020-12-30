@@ -295,7 +295,7 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 	}}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err != nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -339,7 +339,7 @@ func TestBaseTxSyntacticVerifyMemoTooLarge(t *testing.T) {
 	}}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatal("should have failed because memo is too large")
 	}
 }
@@ -349,7 +349,7 @@ func TestBaseTxSyntacticVerifyNil(t *testing.T) {
 	_, c := setupCodec()
 
 	tx := (*BaseTx)(nil)
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("Nil BaseTx should have errored")
 	}
 }
@@ -392,7 +392,7 @@ func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 	}}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("Wrong networkID should have errored")
 	}
 }
@@ -435,7 +435,7 @@ func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
 	}}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("Wrong chain ID should have errored")
 	}
 }
@@ -469,7 +469,7 @@ func TestBaseTxSyntacticVerifyInvalidOutput(t *testing.T) {
 	}}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("Invalid output should have errored")
 	}
 }
@@ -526,7 +526,7 @@ func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 	}}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("Unsorted outputs should have errored")
 	}
 }
@@ -552,7 +552,7 @@ func TestBaseTxSyntacticVerifyInvalidInput(t *testing.T) {
 	}}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("Invalid input should have errored")
 	}
 }
@@ -615,7 +615,7 @@ func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
 	}}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("Input overflow should have errored")
 	}
 }
@@ -670,7 +670,7 @@ func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
 	}}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("Output overflow should have errored")
 	}
 }
@@ -713,7 +713,7 @@ func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
 	}}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("Insufficient funds should have errored")
 	}
 }
@@ -755,7 +755,7 @@ func TestBaseTxSyntacticVerifyUninitialized(t *testing.T) {
 		}},
 	}}
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("Uninitialized tx should have errored")
 	}
 }
@@ -795,14 +795,8 @@ func TestBaseTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uTx := &UniqueTx{
-		TxState: &TxState{
-			Tx: tx,
-		},
-		vm:   vm,
-		txID: tx.ID(),
-	}
-	if err := tx.UnsignedTx.SemanticVerify(vm, 0, uTx.UnsignedTx, tx.Creds); err != nil {
+	uTx := newUniqueTx(vm, tx.ID(), tx)
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds, 0); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -852,14 +846,8 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uTx := &UniqueTx{
-		TxState: &TxState{
-			Tx: tx,
-		},
-		vm:   vm,
-		txID: tx.ID(),
-	}
-	if err := tx.UnsignedTx.SemanticVerify(vm, 0, uTx.UnsignedTx, tx.Creds); err == nil {
+	uTx := newUniqueTx(vm, tx.ID(), tx)
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds, 0); err == nil {
 		t.Fatalf("should have errored due to an unknown feature extension")
 	}
 }
@@ -904,15 +892,9 @@ func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uTx := &UniqueTx{
-		TxState: &TxState{
-			Tx: tx,
-		},
-		vm:   vm,
-		txID: tx.ID(),
-	}
+	uTx := newUniqueTx(vm, tx.ID(), tx)
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, 0, uTx.UnsignedTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds, 0); err == nil {
 		t.Fatalf("should have errored due to an asset ID mismatch")
 	}
 }
@@ -988,15 +970,9 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uTx := &UniqueTx{
-		TxState: &TxState{
-			Tx: tx,
-		},
-		vm:   vm,
-		txID: tx.ID(),
-	}
+	uTx := newUniqueTx(vm, tx.ID(), tx)
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, 0, uTx.UnsignedTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds, 0); err == nil {
 		t.Fatalf("should have errored due to an unsupported fx")
 	}
 }
@@ -1043,14 +1019,8 @@ func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uTx := &UniqueTx{
-		TxState: &TxState{
-			Tx: tx,
-		},
-		vm:   vm,
-		txID: tx.ID(),
-	}
-	if err := tx.UnsignedTx.SemanticVerify(vm, 0, uTx.UnsignedTx, tx.Creds); err == nil {
+	uTx := newUniqueTx(vm, tx.ID(), tx)
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds, 0); err == nil {
 		t.Fatalf("Invalid credential should have failed verification")
 	}
 }
@@ -1091,15 +1061,9 @@ func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uTx := &UniqueTx{
-		TxState: &TxState{
-			Tx: tx,
-		},
-		vm:   vm,
-		txID: tx.ID(),
-	}
+	uTx := newUniqueTx(vm, tx.ID(), tx)
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, 0, uTx.UnsignedTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds, 0); err == nil {
 		t.Fatalf("Unknown UTXO should have failed verification")
 	}
 }
@@ -1140,15 +1104,9 @@ func TestBaseTxSemanticVerifyInvalidUTXO(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uTx := &UniqueTx{
-		TxState: &TxState{
-			Tx: tx,
-		},
-		vm:   vm,
-		txID: tx.ID(),
-	}
+	uTx := newUniqueTx(vm, tx.ID(), tx)
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, 0, uTx.UnsignedTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds, 0); err == nil {
 		t.Fatalf("Invalid UTXO should have failed verification")
 	}
 }
@@ -1235,15 +1193,9 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uTx := &UniqueTx{
-		TxState: &TxState{
-			Tx: tx,
-		},
-		vm:   vm,
-		txID: tx.ID(),
-	}
+	uTx := newUniqueTx(vm, tx.ID(), tx)
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, 0, uTx.UnsignedTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds, 0); err == nil {
 		t.Fatalf("Invalid UTXO should have failed verification")
 	}
 }
@@ -1331,15 +1283,9 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uTx := &UniqueTx{
-		TxState: &TxState{
-			Tx: tx,
-		},
-		vm:   vm,
-		txID: tx.ID(),
-	}
+	uTx := newUniqueTx(vm, tx.ID(), tx)
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, 0, uTx.UnsignedTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds, 0); err == nil {
 		t.Fatalf("Wrong asset ID should have failed verification")
 	}
 }
@@ -1474,15 +1420,9 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uTx := &UniqueTx{
-		TxState: &TxState{
-			Tx: tx,
-		},
-		vm:   vm,
-		txID: tx.ID(),
-	}
+	uTx := newUniqueTx(vm, tx.ID(), tx)
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, 0, uTx.UnsignedTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds, 0); err == nil {
 		t.Fatalf("Unsupported feature extension should have failed verification")
 	}
 }
@@ -1618,14 +1558,8 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uTx := &UniqueTx{
-		TxState: &TxState{
-			Tx: tx,
-		},
-		vm:   vm,
-		txID: tx.ID(),
-	}
-	if err := tx.UnsignedTx.SemanticVerify(vm, 0, uTx.UnsignedTx, tx.Creds); err == nil {
+	uTx := newUniqueTx(vm, tx.ID(), tx)
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds, 0); err == nil {
 		t.Fatalf("Invalid signature should have failed verification")
 	}
 }
@@ -1730,15 +1664,9 @@ func TestBaseTxSemanticVerifyInvalidFxOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uTx := &UniqueTx{
-		TxState: &TxState{
-			Tx: tx,
-		},
-		vm:   vm,
-		txID: tx.ID(),
-	}
+	uTx := newUniqueTx(vm, tx.ID(), tx)
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, 0, uTx.UnsignedTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds, 0); err == nil {
 		t.Fatalf("should have errored due to sending funds to an un-authorized fx")
 	}
 }

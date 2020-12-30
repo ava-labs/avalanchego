@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
@@ -16,11 +17,13 @@ import (
 )
 
 const (
-	minNameLen      = 1
-	maxNameLen      = 128
-	minSymbolLen    = 1
-	maxSymbolLen    = 4
-	maxDenomination = 32
+	minNameLen          = 1
+	maxNameLen          = 128
+	minSymbolLen        = 1
+	maxSymbolLen        = 4
+	maxSymbolLenApricot = 32
+	maxNameLenApricot   = 64
+	maxDenomination     = 32
 )
 
 var (
@@ -37,6 +40,8 @@ var (
 	errMultipleManagers             = errors.New("asset can't have multiple managers")
 	errCreateManagedAssetBadCodec   = errors.New("create managed asset tx has invalid codec version")
 	errManagerInEpoch0              = errors.New("assets created before epoch 1 can't have a manager")
+	errInvalidNameApricot           = errors.New("name must be a valid utf-8 string")
+	errInvalidSymbolApricot         = errors.New("symbol must contain only valid ASCII characters")
 )
 
 // CreateAssetTx is a transaction that creates a new asset.
@@ -77,13 +82,31 @@ func (t *CreateAssetTx) UTXOs() []*avax.UTXO {
 // SyntacticVerify that this transaction is well-formed.
 func (t *CreateAssetTx) SyntacticVerify(
 	ctx *snow.Context,
-	epoch uint32,
 	c codec.Manager,
 	codecVersion uint16,
 	txFeeAssetID ids.ID,
 	_ uint64,
 	txFee uint64,
 	numFxs int,
+	epoch uint32,
+) error {
+	switch epoch {
+	case 0:
+		return t.syntacticVerifyEpoch0(ctx, c, codecVersion, txFeeAssetID, txFee, txFee, numFxs, epoch)
+	default:
+		return t.syntacticVerifyApricot(ctx, c, codecVersion, txFeeAssetID, txFee, txFee, numFxs, epoch)
+	}
+}
+
+func (t *CreateAssetTx) syntacticVerifyEpoch0(
+	ctx *snow.Context,
+	c codec.Manager,
+	codecVersion uint16,
+	txFeeAssetID ids.ID,
+	_ uint64,
+	txFee uint64,
+	numFxs int,
+	epoch uint32,
 ) error {
 	switch {
 	case t == nil:
@@ -115,16 +138,7 @@ func (t *CreateAssetTx) SyntacticVerify(
 		}
 	}
 
-	if err := t.BaseTx.SyntacticVerify(
-		ctx,
-		epoch,
-		c,
-		codecVersion,
-		txFeeAssetID,
-		txFee,
-		txFee,
-		numFxs,
-	); err != nil {
+	if err := t.BaseTx.SyntacticVerify(ctx, c, codecVersion, txFeeAssetID, txFee, txFee, numFxs, epoch); err != nil {
 		return err
 	}
 
@@ -152,13 +166,87 @@ func (t *CreateAssetTx) SyntacticVerify(
 			}
 		}
 	}
-	// If there is a manager, ensure we're after the Apricot fork
-	switch {
-	case hasManager && codecVersion == preApricotCodecVersion:
-		return errCreateManagedAssetBadCodec
-	case hasManager && epoch == 0:
+
+	// No manager is allowed before the Apricot Upgrade
+	if hasManager {
 		return errManagerInEpoch0
 	}
+	return nil
+}
+
+func (t *CreateAssetTx) syntacticVerifyApricot(
+	ctx *snow.Context,
+	c codec.Manager,
+	codecVersion uint16,
+	txFeeAssetID ids.ID,
+	_ uint64,
+	txFee uint64,
+	numFxs int,
+	epoch uint32,
+) error {
+	switch {
+	case t == nil:
+		return errNilTx
+	case len(t.Name) < minNameLen:
+		return errNameTooShort
+	case len(t.Name) > maxNameLenApricot:
+		return errNameTooLong
+	case len(t.Symbol) < minSymbolLen:
+		return errSymbolTooShort
+	case len(t.Symbol) > maxSymbolLenApricot:
+		return errSymbolTooLong
+	case len(t.States) == 0:
+		return errNoFxs
+	case t.Denomination > maxDenomination:
+		return errDenominationTooLarge
+	case strings.TrimSpace(t.Name) != t.Name:
+		return errUnexpectedWhitespace
+	}
+
+	if !utf8.ValidString(t.Name) {
+		return errInvalidNameApricot
+	}
+
+	for _, r := range t.Symbol {
+		if r >= unicode.MaxASCII || r < 32 {
+			return errInvalidSymbolApricot
+		}
+	}
+
+	if err := t.BaseTx.SyntacticVerify(ctx, c, codecVersion, txFeeAssetID, txFee, txFee, numFxs, epoch); err != nil {
+		return err
+	}
+
+	for _, state := range t.States {
+		if err := state.Verify(c, codecVersion, numFxs); err != nil {
+			return err
+		}
+	}
+	if !isSortedAndUniqueInitialStates(t.States) {
+		return errInitialStatesNotSortedUnique
+	}
+
+	// An asset can have at most one ManagedAssetStatusOutput
+	hasManager := false
+	for _, state := range t.States {
+		if state.FxID != 0 { // TODO lookup secp fx ID
+			continue
+		}
+		for _, out := range state.Outs {
+			if _, ok := out.(ManagedAssetStatus); ok {
+				if hasManager {
+					return errMultipleManagers
+				}
+				hasManager = true
+			}
+		}
+	}
+
+	// If there is a manager, ensure we're after the Apricot fork
+	if hasManager && codecVersion == preApricotCodecVersion {
+		return errCreateManagedAssetBadCodec
+	}
+
 	return nil
 }
 

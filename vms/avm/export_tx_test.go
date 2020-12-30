@@ -62,7 +62,7 @@ func TestExportTxSyntacticVerify(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err != nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -73,7 +73,7 @@ func TestExportTxSyntacticVerifyNil(t *testing.T) {
 
 	tx := (*ExportTx)(nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to a nil ExportTx")
 	}
 }
@@ -119,7 +119,7 @@ func TestExportTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to a wrong network ID")
 	}
 }
@@ -170,7 +170,7 @@ func TestExportTxSyntacticVerifyWrongBlockchainID(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to wrong blockchain ID")
 	}
 }
@@ -217,7 +217,7 @@ func TestExportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to memo field being too long")
 	}
 }
@@ -273,7 +273,7 @@ func TestExportTxSyntacticVerifyInvalidBaseOutput(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to an invalid base output")
 	}
 }
@@ -341,7 +341,7 @@ func TestExportTxSyntacticVerifyUnsortedBaseOutputs(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to unsorted base outputs")
 	}
 }
@@ -387,7 +387,7 @@ func TestExportTxSyntacticVerifyInvalidOutput(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to invalid output")
 	}
 }
@@ -445,7 +445,7 @@ func TestExportTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to unsorted outputs")
 	}
 }
@@ -511,7 +511,7 @@ func TestExportTxSyntacticVerifyInvalidInput(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to invalid input")
 	}
 }
@@ -577,7 +577,7 @@ func TestExportTxSyntacticVerifyUnsortedInputs(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to unsorted inputs")
 	}
 }
@@ -623,7 +623,7 @@ func TestExportTxSyntacticVerifyInvalidFlowCheck(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, 0, c, apricotCodecVersion, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, apricotCodecVersion, ids.Empty, 0, 0, 0, 0); err == nil {
 		t.Fatalf("should have errored due to an invalid flow check")
 	}
 }
@@ -844,7 +844,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		t.Fatalf("wrong tx type")
 	}
 
-	if err := rawTx.UnsignedTx.SemanticVerify(vm, 0, utx.UnsignedTx, rawTx.Creds); err != nil {
+	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, rawTx.Creds, 0); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -904,7 +904,7 @@ func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
 		t.Fatalf("wrong tx type")
 	}
 
-	if err := rawTx.UnsignedTx.SemanticVerify(vm, 0, utx.UnsignedTx, []verify.Verifiable{nil}); err == nil {
+	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, []verify.Verifiable{nil}, 0); err == nil {
 		t.Fatalf("should have errored due to an unknown credential fx")
 	}
 }
@@ -964,7 +964,7 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 		t.Fatalf("wrong tx type")
 	}
 
-	if err := rawTx.UnsignedTx.SemanticVerify(vm, 0, utx.UnsignedTx, rawTx.Creds); err == nil {
+	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, rawTx.Creds, 0); err == nil {
 		t.Fatalf("should have errored due to an unknown utxo")
 	}
 }
@@ -1048,7 +1048,7 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 		t.Fatalf("wrong tx type")
 	}
 
-	if err := rawTx.UnsignedTx.SemanticVerify(vm, 0, utx.UnsignedTx, rawTx.Creds); err == nil {
+	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, rawTx.Creds, 0); err == nil {
 		t.Fatalf("should have errored due to an invalid asset ID")
 	}
 }
@@ -1167,7 +1167,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 		t.Fatalf("wrong tx type")
 	}
 
-	if err := rawTx.UnsignedTx.SemanticVerify(vm, 0, utx.UnsignedTx, []verify.Verifiable{&avax.TestVerifiable{}}); err == nil {
+	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, []verify.Verifiable{&avax.TestVerifiable{}}, 0); err == nil {
 		t.Fatalf("should have errored due to using an invalid fxID")
 	}
 }
@@ -1227,7 +1227,7 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 		t.Fatalf("wrong tx type")
 	}
 
-	if err := rawTx.UnsignedTx.SemanticVerify(vm, 0, utx.UnsignedTx, rawTx.Creds); err == nil {
+	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, rawTx.Creds, 0); err == nil {
 		t.Fatalf("should have errored due to an invalid credential")
 	}
 }
@@ -1329,12 +1329,12 @@ func TestIssueExportTx(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	txs := vm.Pending()
-	if len(txs) != 1 {
+	trs := vm.Pending()
+	if len(trs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}
 
-	parsedTx := txs[0]
+	parsedTx := trs[0]
 	if err := parsedTx.Verify(0); err != nil {
 		t.Fatal(err)
 	} else if err := parsedTx.Accept(0); err != nil {
@@ -1460,12 +1460,12 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	txs := vm.Pending()
-	if len(txs) != 1 {
+	trs := vm.Pending()
+	if len(trs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}
 
-	parsedTx := txs[0]
+	parsedTx := trs[0]
 	if err := parsedTx.Verify(0); err != nil {
 		t.Fatal(err)
 	}

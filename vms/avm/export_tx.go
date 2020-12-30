@@ -34,13 +34,13 @@ type ExportTx struct {
 // SyntacticVerify that this transaction is well-formed.
 func (t *ExportTx) SyntacticVerify(
 	ctx *snow.Context,
-	epoch uint32,
 	c codec.Manager,
 	codecVersion uint16,
 	txFeeAssetID ids.ID,
 	txFee uint64,
 	_ uint64,
 	_ int,
+	_ uint32,
 ) error {
 	switch {
 	case t == nil:
@@ -67,12 +67,7 @@ func (t *ExportTx) SyntacticVerify(
 }
 
 // SemanticVerify that this transaction is valid to be spent.
-func (t *ExportTx) SemanticVerify(
-	vm *VM,
-	epoch uint32,
-	tx UnsignedTx,
-	creds []verify.Verifiable,
-) error {
+func (t *ExportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable, epoch uint32) error {
 	subnetID, err := vm.ctx.SNLookup.SubnetID(t.DestinationChain)
 	if err != nil {
 		return err
@@ -95,7 +90,7 @@ func (t *ExportTx) SemanticVerify(
 		}
 	}
 
-	return t.BaseTx.SemanticVerify(vm, epoch, tx, creds)
+	return t.BaseTx.SemanticVerify(vm, tx, creds, epoch)
 }
 
 // ExecuteWithSideEffects writes the batch with any additional side effects

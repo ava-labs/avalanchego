@@ -20,6 +20,7 @@ const (
 	utxoID
 	txStatusID
 	dbInitializedID
+	txEpochID
 )
 
 var (
@@ -40,8 +41,8 @@ func uniqueID(id ids.ID, prefix uint64, cacher cache.Cacher) ids.ID {
 type prefixedState struct {
 	state *state
 
-	tx, utxo, txStatus cache.Cacher
-	uniqueTx           cache.Deduplicator
+	tx, utxo, txStatus, txEpoch cache.Cacher
+	uniqueTx                    cache.Deduplicator
 }
 
 // UniqueTx de-duplicates the transaction.
@@ -75,6 +76,16 @@ func (s *prefixedState) Status(id ids.ID) (choices.Status, error) {
 // SetStatus saves the provided status to storage.
 func (s *prefixedState) SetStatus(id ids.ID, status choices.Status) error {
 	return s.state.SetStatus(uniqueID(id, txStatusID, s.txStatus), status)
+}
+
+// Epoch returns the epoch from storage.
+func (s *prefixedState) Epoch(id ids.ID) (uint32, error) {
+	return s.state.Int(uniqueID(id, txEpochID, s.txEpoch))
+}
+
+// SetEpoch saves the epoch to storage.
+func (s *prefixedState) SetEpoch(id ids.ID, val uint32) error {
+	return s.state.SetInt(uniqueID(id, txEpochID, s.txEpoch), val)
 }
 
 // DBInitialized returns the status of this database. If the database is
