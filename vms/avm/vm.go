@@ -741,7 +741,7 @@ func (vm *VM) initState(genesisBytes []byte) error {
 				return err
 			}
 			if out, ok := utxo.Out.(ManagedAssetStatus); ok {
-				if err := vm.state.PutManagedAssetStatus(utxo.AssetID(), tx.Epoch(), out); err != nil {
+				if err := vm.state.PutManagedAssetStatus(utxo.AssetID(), 0, out); err != nil {
 					return fmt.Errorf("couldn't freeze asset: %w", err)
 				}
 			}
@@ -868,7 +868,7 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	return fxIDs.Contains(uint(fxID))
 }
 
-func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable, utxo *avax.UTXO) error {
+func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable, utxo *avax.UTXO, epoch uint32) error {
 	fxIndex, err := vm.getFx(cred)
 	if err != nil {
 		return err
@@ -891,25 +891,26 @@ func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cr
 	// Check if the UTXO's asset is managed or not.
 	lastUpdatedEpoch, status, oldStatus, err := vm.state.ManagedAssetStatus(utxoAssetID)
 	switch {
-	case err != nil && err != database.ErrNotFound:
-		return err // Database error occurred while seeing if this asset is managed
-	case err != nil:
+	case err == database.ErrNotFound:
 		// This asset is not managed. Just check if credential [cred] gives permission
 		// to spend the UTXO.
 		if err := fx.VerifyPermission(tx, in.In, cred, utxo.Out); err != nil {
 			return errNoPermission
 		}
 		return nil
+	case err != nil:
+		return err // Database error occurred while seeing if this asset is managed
 	}
 
 	// This asset is managed. Check whether it is frozen.
 	// If the asset's status changed in the current epoch or the
 	// one before that, ignore that status and use the old one
 	// because the new status hasn't gone into effect yet.
-	if tx.Epoch() <= lastUpdatedEpoch+1 {
+	if epoch <= lastUpdatedEpoch+1 {
 		// New status hasn't gone into effect yet.
 		status = oldStatus
 	}
+
 	if status.Frozen() {
 		return fmt.Errorf("asset %s is frozen", utxoAssetID)
 	}
@@ -928,12 +929,12 @@ func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cr
 	}
 }
 
-func (vm *VM) verifyTransfer(tx UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable) error {
+func (vm *VM) verifyTransfer(tx UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable, epoch uint32) error {
 	utxo, err := vm.getUTXO(&in.UTXOID)
 	if err != nil {
 		return err
 	}
-	return vm.verifyTransferOfUTXO(tx, in, cred, utxo)
+	return vm.verifyTransferOfUTXO(tx, in, cred, utxo, epoch)
 }
 
 func (vm *VM) verifyOperation(tx UnsignedTx, epoch uint32, op *Operation, cred verify.Verifiable) error {

@@ -1451,7 +1451,6 @@ func TestManagedAsset(t *testing.T) {
 					// Verify and accept the transaction
 					uniqueTransferTx, err := vm.parseTx(transferTx.Bytes())
 					require.NoError(t, err)
-					uniqueTransferTx.UnsignedTx.(*BaseTx).Epoc = step.verifyEpoch // TODO remove
 					err = uniqueTransferTx.Verify(step.verifyEpoch)
 					if !step.shouldFailVerify {
 						require.NoError(t, err)
@@ -1475,7 +1474,6 @@ func TestManagedAsset(t *testing.T) {
 				case updateStatus:
 					unsignedTx := &OperationTx{
 						BaseTx: BaseTx{
-							Epoc: step.verifyEpoch, // TODO remove
 							BaseTx: avax.BaseTx{
 								NetworkID:    networkID,
 								BlockchainID: chainID,
@@ -1532,7 +1530,6 @@ func TestManagedAsset(t *testing.T) {
 					// Verify and accept the transaction
 					uniqueUpdateStatusTx, err := vm.parseTx(updateStatusTx.Bytes())
 					require.NoError(t, err)
-					uniqueUpdateStatusTx.Tx.UnsignedTx.(*OperationTx).Epoc = step.verifyEpoch
 					err = uniqueUpdateStatusTx.Verify(step.verifyEpoch)
 					if !step.shouldFailVerify {
 						require.NoError(t, err)
@@ -1550,7 +1547,6 @@ func TestManagedAsset(t *testing.T) {
 				case mint:
 					unsignedTx := &OperationTx{
 						BaseTx: BaseTx{
-							Epoc: step.verifyEpoch, // TODO remove
 							BaseTx: avax.BaseTx{
 								NetworkID:    networkID,
 								BlockchainID: chainID,
@@ -1616,7 +1612,6 @@ func TestManagedAsset(t *testing.T) {
 					// Verify and accept the transaction
 					uniqueMintTx, err := vm.parseTx(mintTx.Bytes())
 					require.NoError(t, err)
-					uniqueMintTx.Tx.UnsignedTx.(*OperationTx).Epoc = step.verifyEpoch
 					err = uniqueMintTx.Verify(step.verifyEpoch)
 					if !step.shouldFailVerify {
 						require.NoError(t, err)

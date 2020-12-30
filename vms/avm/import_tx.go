@@ -128,7 +128,7 @@ func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 
 		cred := creds[i+offset]
 
-		if err := vm.verifyTransferOfUTXO(tx, in, cred, &utxo); err != nil {
+		if err := vm.verifyTransferOfUTXO(tx, in, cred, &utxo, epoch); err != nil {
 			return err
 		}
 	}

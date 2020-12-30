@@ -16,8 +16,8 @@ var (
 // all UTXOs of the asset.
 // Meets the avm's ManagedAssetStatus interface
 type ManagedAssetStatusOutput struct {
-	IsFrozen bool         `serialize:"true"`
-	Mgr      OutputOwners `serialize:"true"`
+	IsFrozen bool         `serialize:"true" json:"frozen"`
+	Mgr      OutputOwners `serialize:"true" json:"manager"`
 }
 
 // Frozen returns true iff this asset is frozen.

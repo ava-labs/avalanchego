@@ -21,12 +21,6 @@ var (
 // BaseTx is the basis of all transactions.
 type BaseTx struct {
 	avax.BaseTx `serialize:"true"`
-	Epoc        uint32 // TODO remove. Just using for testing right now.
-}
-
-// Epoch ... TODO remove/implement
-func (t *BaseTx) Epoch() uint32 {
-	return t.Epoc
 }
 
 // SyntacticVerify that this transaction is well-formed.
@@ -58,10 +52,10 @@ func (t *BaseTx) SyntacticVerify(
 }
 
 // SemanticVerify that this transaction is valid to be spent.
-func (t *BaseTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable, _ uint32) error {
+func (t *BaseTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable, epoch uint32) error {
 	for i, in := range t.Ins {
 		cred := creds[i]
-		if err := vm.verifyTransfer(tx, in, cred); err != nil {
+		if err := vm.verifyTransfer(tx, in, cred, epoch); err != nil {
 			return err
 		}
 	}

@@ -29,7 +29,6 @@ type UnsignedTx interface {
 	ID() ids.ID
 	UnsignedBytes() []byte
 	Bytes() []byte
-	Epoch() uint32
 
 	ConsumedAssetIDs() ids.Set
 	AssetIDs() ids.Set

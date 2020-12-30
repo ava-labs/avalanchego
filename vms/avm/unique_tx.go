@@ -136,6 +136,8 @@ func (tx *UniqueTx) ID() ids.ID { return tx.txID }
 
 // Accept is called when the transaction was finalized as accepted by consensus
 func (tx *UniqueTx) Accept(epoch uint32) error {
+	tx.vm.ctx.Log.Debug("Accepting tx %s into epoch %d", tx.txID, epoch)
+
 	if s := tx.Status(); s != choices.Processing {
 		tx.vm.ctx.Log.Error("Failed to accept tx %s because the tx is in state %s", tx.txID, s)
 		return fmt.Errorf("transaction has invalid status: %s", s)
