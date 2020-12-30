@@ -86,7 +86,7 @@ func (v *voter) Update() {
 		}
 	}
 
-	if v.t.Consensus.Quiesce() {
+	if v.t.Consensus.Finalized() {
 		v.t.Ctx.Log.Debug("Avalanche engine can quiesce")
 		return
 	}

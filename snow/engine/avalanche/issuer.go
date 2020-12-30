@@ -102,11 +102,12 @@ func (i *issuer) Update() {
 		return
 	}
 
+	currentEpoch := i.t.Ctx.Epoch()
 	// Make sure that the first time these transitions are issued, they are
 	// being issued into the current epoch. This enforces that nodes will prefer
 	// their current epoch
-	if currentEpoch := i.t.Ctx.Epoch(); epoch < currentEpoch && len(unissuedTransitions) > 0 {
-		i.t.Ctx.Log.Debug("Reissuing transitions from epoch %d into newer epoch %d", epoch, currentEpoch)
+	if epoch != currentEpoch && len(unissuedTransitions) > 0 {
+		i.t.Ctx.Log.Debug("Reissuing transitions from epoch %d into epoch %d", epoch, currentEpoch)
 		if err := i.t.batch(
 			currentEpoch,
 			unissuedTransitions,
@@ -118,6 +119,11 @@ func (i *issuer) Update() {
 			i.t.errs.Add(err)
 			return
 		}
+	}
+	if epoch > currentEpoch {
+		i.t.Ctx.Log.Debug("Dropping vertex from future epoch:\n%s", vtxID)
+		i.t.vtxBlocked.Abandon(vtxID)
+		return
 	}
 
 	i.t.Ctx.Log.Verbo("Adding vertex to consensus:\n%s", i.vtx)

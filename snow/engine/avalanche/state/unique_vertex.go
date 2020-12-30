@@ -4,7 +4,6 @@
 package state
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -15,10 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-)
-
-var (
-	errFutureEpoch = errors.New("vertex names future epoch")
 )
 
 // uniqueVertex acts as a cache for vertices in the database.
@@ -55,9 +50,6 @@ func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
 	}
 	if err := innerVertex.Verify(); err != nil {
 		return nil, err
-	}
-	if epoch := innerVertex.Epoch(); epoch > s.ctx.Epoch() {
-		return nil, errFutureEpoch
 	}
 	vtx.v.vtx = innerVertex
 
