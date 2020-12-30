@@ -211,6 +211,8 @@ func AddTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -241,6 +243,8 @@ func AddTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -327,6 +331,8 @@ func VertexIssuedTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -385,6 +391,8 @@ func TxIssuedTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -463,6 +471,8 @@ func VirtuousTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -483,6 +493,8 @@ func VirtuousTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -503,6 +515,8 @@ func VirtuousTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[1]},
 		},
 	}
@@ -629,6 +643,8 @@ func VirtuousSkippedUpdateTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -649,6 +665,8 @@ func VirtuousSkippedUpdateTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -722,6 +740,8 @@ func VotingTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -742,6 +762,8 @@ func VotingTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -829,6 +851,8 @@ func IgnoreInvalidVotingTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -849,6 +873,8 @@ func IgnoreInvalidVotingTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -922,6 +948,8 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -942,6 +970,8 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[1]},
 		},
 	}
@@ -1047,6 +1077,8 @@ func SplitVotingTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -1132,6 +1164,8 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -1152,6 +1186,8 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -1172,6 +1208,8 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[1]},
 		},
 	}
@@ -1289,6 +1327,8 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -1309,6 +1349,8 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -1388,6 +1430,8 @@ func QuiesceTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -1408,6 +1452,8 @@ func QuiesceTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -1428,6 +1474,8 @@ func QuiesceTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[1]},
 		},
 	}
@@ -1503,6 +1551,8 @@ func OrphansTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -1523,6 +1573,8 @@ func OrphansTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -1543,6 +1595,8 @@ func OrphansTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[1]},
 		},
 	}
@@ -1615,6 +1669,8 @@ func ErrorOnTxAcceptTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -1672,6 +1728,8 @@ func ErrorOnVtxAcceptTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -1730,6 +1788,8 @@ func ErrorOnVtxRejectTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -1750,6 +1810,8 @@ func ErrorOnVtxRejectTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -1810,6 +1872,8 @@ func ErrorOnParentVtxRejectTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -1830,6 +1894,8 @@ func ErrorOnParentVtxRejectTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -1902,6 +1968,8 @@ func ErrorOnTransitiveVtxRejectTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}
@@ -1922,6 +1990,8 @@ func ErrorOnTransitiveVtxRejectTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{utxos[0]},
 		},
 	}

@@ -23,6 +23,24 @@ type TestTx struct {
 	BytesV        []byte
 }
 
+// Accept implements the Tx interface
+func (t *TestTx) Accept() error {
+	if err := t.TestDecidable.Accept(); err != nil {
+		return err
+	}
+
+	return t.TransitionV.Accept(t.EpochV)
+}
+
+// Reject implements the Tx interface
+func (t *TestTx) Reject() error {
+	if err := t.TestDecidable.Reject(); err != nil {
+		return err
+	}
+
+	return t.TransitionV.Reject(t.EpochV)
+}
+
 // Transition implements the Tx interface
 func (t *TestTx) Transition() Transition { return t.TransitionV }
 

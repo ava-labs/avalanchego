@@ -59,6 +59,7 @@ func Setup() {
 		transition := transitionIntf.(*conflicts.TestTransition)
 		transition.IDV = ids.Empty.Prefix(uint64(i))
 		transition.DependenciesV = nil
+		transition.StatusV = choices.Processing
 
 		color.IDV = transition.IDV.Prefix(0)
 		color.AcceptV = nil
@@ -586,6 +587,7 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 		},
 		TransitionV: &conflicts.TestTransition{
 			IDV:           purpleTransitionID,
+			StatusV:       choices.Processing,
 			DependenciesV: []conflicts.Transition{Red.Transition()},
 			InputIDsV:     []ids.ID{ids.Empty.Prefix(8)},
 		},
@@ -709,6 +711,7 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 		},
 		TransitionV: &conflicts.TestTransition{
 			IDV:           purpleTransitionID,
+			StatusV:       choices.Processing,
 			DependenciesV: []conflicts.Transition{Red.Transition()},
 			InputIDsV:     []ids.ID{ids.Empty.Prefix(8)},
 		},
@@ -857,6 +860,7 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 		},
 		TransitionV: &conflicts.TestTransition{
 			IDV:           purpleTransitionID,
+			StatusV:       choices.Processing,
 			DependenciesV: []conflicts.Transition{Red.Transition(), Blue.Transition()},
 			InputIDsV:     []ids.ID{ids.Empty.Prefix(8)},
 		},
@@ -966,6 +970,7 @@ func RejectingSlowDependencyTest(t *testing.T, factory Factory) {
 		},
 		TransitionV: &conflicts.TestTransition{
 			IDV:           purpleTransitionID,
+			StatusV:       choices.Processing,
 			DependenciesV: []conflicts.Transition{Red.Transition()},
 			InputIDsV:     []ids.ID{conflictID},
 		},
@@ -977,6 +982,7 @@ func RejectingSlowDependencyTest(t *testing.T, factory Factory) {
 		},
 		TransitionV: &conflicts.TestTransition{
 			IDV:       cyanTransitionID,
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{conflictID},
 		},
 	}
@@ -1096,6 +1102,8 @@ func ConflictsTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{conflictInputID},
 		},
 	}
@@ -1106,6 +1114,8 @@ func ConflictsTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{conflictInputID},
 		},
 	}
@@ -1154,6 +1164,7 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 		},
 		TransitionV: &conflicts.TestTransition{
 			IDV:       rogue1TransitionID,
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{input1},
 		},
 	}
@@ -1164,6 +1175,7 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 		},
 		TransitionV: &conflicts.TestTransition{
 			IDV:       rogue2TransitionID,
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{input1},
 		},
 	}
@@ -1174,6 +1186,7 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 		},
 		TransitionV: &conflicts.TestTransition{
 			IDV:           virtuousTransitionID,
+			StatusV:       choices.Processing,
 			DependenciesV: []conflicts.Transition{rogue1.Transition()},
 			InputIDsV:     []ids.ID{input2},
 		},
@@ -1215,6 +1228,8 @@ func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{ids.Empty.Prefix(4)},
 		},
 	}
@@ -1254,6 +1269,8 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{X},
 		},
 	}
@@ -1265,6 +1282,8 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{X},
 		},
 	}
@@ -1306,6 +1325,8 @@ func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory)
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{X},
 		},
 	}
@@ -1317,6 +1338,8 @@ func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory)
 			StatusV: choices.Processing,
 		},
 		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
 			InputIDsV: []ids.ID{X},
 		},
 	}
