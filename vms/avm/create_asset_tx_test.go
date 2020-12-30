@@ -346,20 +346,21 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 
 	_, c := setupCodec()
 
-	if err := tx.SignSECP256K1Fx(c, apricotCodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
 	result := tx.Bytes()
-	if !bytes.Equal(currentCodecExpected, result) {
-		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", currentCodecExpected, result)
+	if !bytes.Equal(oldCodecExpected, result) {
+		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", oldCodecExpected, result)
 	}
 
-	if err := tx.SignSECP256K1Fx(c, preApricotCodecVersion, nil); err != nil {
+	tx.Version = apricotCodecVersion
+	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
 	result = tx.Bytes()
-	if !bytes.Equal(oldCodecExpected, result) {
-		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", oldCodecExpected, result)
+	if !bytes.Equal(currentCodecExpected, result) {
+		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", currentCodecExpected, result)
 	}
 }
 
@@ -1345,12 +1346,13 @@ func TestManagedAsset(t *testing.T) {
 			}
 			unsignedCreateManagedAssetTx.States[0].Sort(vm.codec, apricotCodecVersion)
 			createManagedAssetTx := Tx{
+				Version:    apricotCodecVersion,
 				UnsignedTx: unsignedCreateManagedAssetTx,
 			}
 
 			// Sign/initialize the transaction
 			feeSigner := []*crypto.PrivateKeySECP256K1R{keys[0]}
-			err := createManagedAssetTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{feeSigner})
+			err := createManagedAssetTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{feeSigner})
 			require.NoError(t, err)
 
 			// Verify and accept the transaction
@@ -1440,9 +1442,9 @@ func TestManagedAsset(t *testing.T) {
 
 					// One signature to spend the tx fee, one signature to transfer the managed asset
 					if transferTx.UnsignedTx.(*BaseTx).Ins[0].AssetID() == avaxID {
-						err = transferTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{feeSigner, op.keys})
+						err = transferTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{feeSigner, op.keys})
 					} else {
-						err = transferTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{op.keys, feeSigner})
+						err = transferTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{op.keys, feeSigner})
 					}
 					require.NoError(t, err)
 
@@ -1519,11 +1521,12 @@ func TestManagedAsset(t *testing.T) {
 					}
 
 					updateStatusTx := &Tx{
+						Version:    apricotCodecVersion,
 						UnsignedTx: unsignedTx,
 					}
 
 					// One signature to spend the tx fee, one signature to transfer the managed asset
-					err = updateStatusTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{feeSigner, op.keys})
+					err = updateStatusTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{feeSigner, op.keys})
 					require.NoError(t, err)
 
 					// Verify and accept the transaction
@@ -1607,7 +1610,7 @@ func TestManagedAsset(t *testing.T) {
 					}
 
 					// One signature to spend the tx fee, one signature to transfer the managed asset
-					err = mintTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{feeSigner, op.keys})
+					err = mintTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{feeSigner, op.keys})
 					require.NoError(t, err)
 
 					// Verify and accept the transaction
@@ -1760,17 +1763,17 @@ func TestManagedAssetInitialState(t *testing.T) {
 
 			// Sign/initialize the transaction
 			tx := Tx{
+				Version:    apricotCodecVersion,
 				UnsignedTx: &unsignedTx,
 			}
 			feeSigner := []*crypto.PrivateKeySECP256K1R{keys[0]}
-			err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{feeSigner})
+			err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{feeSigner})
 			require.NoError(t, err)
 
 			// Verify the transaction
 			err = tx.SyntacticVerify(
 				vm.ctx,
 				vm.codec,
-				apricotCodecVersion,
 				vm.ctx.AVAXAssetID,
 				vm.txFee,
 				vm.creationTxFee,
@@ -1852,17 +1855,18 @@ func TestManagedAssetBadCodecVersion(t *testing.T) {
 
 	// Sign/initialize the transaction
 	tx := Tx{
+		Version:    apricotCodecVersion,
 		UnsignedTx: &baseTx,
 	}
 	feeSigner := []*crypto.PrivateKeySECP256K1R{keys[0]}
-	err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{feeSigner})
+	err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{feeSigner})
 	require.NoError(t, err)
 
+	tx.Version = preApricotCodecVersion
 	// Verify the transaction
 	err = tx.SyntacticVerify(
 		vm.ctx,
 		vm.codec,
-		preApricotCodecVersion,
 		vm.ctx.AVAXAssetID,
 		vm.txFee,
 		vm.creationTxFee,
@@ -1871,11 +1875,11 @@ func TestManagedAssetBadCodecVersion(t *testing.T) {
 	)
 	require.Error(t, err, "should fail verification due to wrong codec")
 
+	tx.Version = apricotCodecVersion
 	// Verify the transaction
 	err = tx.SyntacticVerify(
 		vm.ctx,
 		vm.codec,
-		apricotCodecVersion,
 		vm.ctx.AVAXAssetID,
 		vm.txFee,
 		vm.creationTxFee,

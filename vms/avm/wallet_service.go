@@ -236,16 +236,19 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 			})
 		}
 	}
-	avax.SortTransferableOutputs(outs, w.vm.codec, apricotCodecVersion)
+	avax.SortTransferableOutputs(outs, w.vm.codec, w.vm.currentCodecVersion)
 
-	tx := Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    w.vm.ctx.NetworkID,
-		BlockchainID: w.vm.ctx.ChainID,
-		Outs:         outs,
-		Ins:          ins,
-		Memo:         memoBytes,
-	}}}
-	if err := tx.SignSECP256K1Fx(w.vm.codec, apricotCodecVersion, keys); err != nil {
+	tx := Tx{
+		Version: w.vm.currentCodecVersion,
+		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    w.vm.ctx.NetworkID,
+			BlockchainID: w.vm.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+			Memo:         memoBytes,
+		}},
+	}
+	if err := tx.SignSECP256K1Fx(w.vm.codec, keys); err != nil {
 		return err
 	}
 

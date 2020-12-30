@@ -183,20 +183,21 @@ func TestBaseTxSerialization(t *testing.T) {
 
 	_, c := setupCodec()
 
-	if err := tx.SignSECP256K1Fx(c, apricotCodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
 	result := tx.Bytes()
-	if !bytes.Equal(currentCodecExpected, result) {
-		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", currentCodecExpected, result)
+	if !bytes.Equal(oldCodecExpected, result) {
+		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", oldCodecExpected, result)
 	}
 
-	if err := tx.SignSECP256K1Fx(c, preApricotCodecVersion, nil); err != nil {
+	tx.Version = apricotCodecVersion
+	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
 	result = tx.Bytes()
-	if !bytes.Equal(oldCodecExpected, result) {
-		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", oldCodecExpected, result)
+	if !bytes.Equal(currentCodecExpected, result) {
+		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", currentCodecExpected, result)
 	}
 }
 
@@ -790,7 +791,7 @@ func TestBaseTxSemanticVerify(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -817,6 +818,7 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
 	tx := &Tx{
+		Version: apricotCodecVersion,
 		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -840,7 +842,7 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 			&avax.TestVerifiable{},
 		},
 	}
-	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -886,7 +888,7 @@ func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 		}},
 	}}}
 
-	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -948,20 +950,23 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
-	tx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
-		BlockchainID: chainID,
-		Ins: []*avax.TransferableInput{{
-			UTXOID: avax.UTXOID{
-				TxID:        genesisTx.ID(),
-				OutputIndex: 2,
-			},
-			Asset: avax.Asset{ID: genesisTx.ID()},
-			In:    &avax.TestTransferable{},
+	tx := &Tx{
+		Version: apricotCodecVersion,
+		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        genesisTx.ID(),
+					OutputIndex: 2,
+				},
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				In:    &avax.TestTransferable{},
+			}},
 		}},
-	}}}
+	}
 
-	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1010,7 +1015,7 @@ func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 			},
 		},
 	}
-	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1052,7 +1057,7 @@ func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
 		}},
 	}}}
 
-	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1095,7 +1100,7 @@ func TestBaseTxSemanticVerifyInvalidUTXO(t *testing.T) {
 		}},
 	}}}
 
-	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1142,7 +1147,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := pendingTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := pendingTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1184,7 +1189,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1231,7 +1236,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := pendingTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := pendingTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1274,7 +1279,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 		}},
 	}}}
 
-	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1363,7 +1368,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := pendingTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := pendingTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1387,6 +1392,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 	vm.Pending()
 
 	tx := &Tx{
+		Version: apricotCodecVersion,
 		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -1410,7 +1416,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 			&avax.TestVerifiable{},
 		},
 	}
-	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1499,7 +1505,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := pendingTx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := pendingTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1548,7 +1554,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 			},
 		},
 	}
-	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, nil); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1626,32 +1632,35 @@ func TestBaseTxSemanticVerifyInvalidFxOutput(t *testing.T) {
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
-	tx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
-		BlockchainID: chainID,
-		Ins: []*avax.TransferableInput{{
-			UTXOID: avax.UTXOID{
-				TxID:        genesisTx.ID(),
-				OutputIndex: 2,
-			},
-			Asset: avax.Asset{ID: genesisTx.ID()},
-			In: &secp256k1fx.TransferInput{
-				Amt: startBalance,
-				Input: secp256k1fx.Input{
-					SigIndices: []uint32{
-						0,
+	tx := &Tx{
+		Version: apricotCodecVersion,
+		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        genesisTx.ID(),
+					OutputIndex: 2,
+				},
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: startBalance,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
+						},
 					},
 				},
-			},
+			}},
+			Outs: []*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				Out: &avax.TestTransferable{
+					Val: 1,
+				},
+			}},
 		}},
-		Outs: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: genesisTx.ID()},
-			Out: &avax.TestTransferable{
-				Val: 1,
-			},
-		}},
-	}}}
-	if err := tx.SignSECP256K1Fx(vm.codec, apricotCodecVersion, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	}
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 

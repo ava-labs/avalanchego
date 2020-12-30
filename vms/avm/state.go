@@ -39,6 +39,8 @@ func (s *state) Tx(id ids.ID) (*Tx, error) {
 	if err != nil {
 		return nil, err
 	}
+	tx.Version = version
+
 	// The byte representation of this transaction, and the ID,
 	// which is derived from it, are created by serializing the
 	// transaction using the codec version it was created with
