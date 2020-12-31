@@ -337,7 +337,11 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 	}
 	for _, toReject := range rejectable {
 		toRejectID := toReject.ID()
-		toRejectNode := dg.txs[toRejectID]
+		toRejectNode, exists := dg.txs[toRejectID]
+		// Attempting to Reject a transaction twice is a fatal error
+		if !exists {
+			return false, fmt.Errorf("failed to find tx node %s", toRejectID)
+		}
 
 		// We can remove the rejected tx from the graph.
 		delete(dg.txs, toRejectID)

@@ -251,7 +251,7 @@ func (c *Conflicts) Accept(txID ids.ID) {
 // Updateable implements the [snowstorm.Conflicts] interface
 func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 	acceptable := make([]Tx, 0, len(c.acceptable))
-	rejectable := make([]Tx, 0, 0)
+	rejectable := make([]Tx, 0)
 	shouldWork := true
 	for shouldWork {
 		acceptableInner, rejectableInner := c.updateable()
