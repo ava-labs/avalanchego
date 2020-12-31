@@ -314,59 +314,54 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 		}
 	}
 
-	shouldWork := true
-	for shouldWork {
-		acceptable, rejectable := dg.conflicts.Updateable()
-		for _, toAccept := range acceptable {
-			toAcceptID := toAccept.ID()
+	acceptable, rejectable := dg.conflicts.Updateable()
+	for _, toAccept := range acceptable {
+		toAcceptID := toAccept.ID()
 
-			// We can remove the accepted tx from the graph.
-			delete(dg.txs, toAcceptID)
+		// We can remove the accepted tx from the graph.
+		delete(dg.txs, toAcceptID)
 
-			// This tx is now accepted, so it shouldn't be part of the virtuous
-			// set or the preferred set. Its status as Accepted implies these
-			// descriptions.
-			dg.virtuous.Remove(toAcceptID)
-			dg.preferences.Remove(toAcceptID)
+		// This tx is now accepted, so it shouldn't be part of the virtuous
+		// set or the preferred set. Its status as Accepted implies these
+		// descriptions.
+		dg.virtuous.Remove(toAcceptID)
+		dg.preferences.Remove(toAcceptID)
 
-			// Update the metrics to account for this transaction's acceptance
-			dg.metrics.Accepted(toAcceptID)
+		// Update the metrics to account for this transaction's acceptance
+		dg.metrics.Accepted(toAcceptID)
 
-			// Accept the transaction
-			if err := toAccept.Accept(); err != nil {
-				return false, err
-			}
+		// Accept the transaction
+		if err := toAccept.Accept(); err != nil {
+			return false, err
 		}
-		for _, toReject := range rejectable {
-			toRejectID := toReject.ID()
-			toRejectNode := dg.txs[toRejectID]
-
-			// We can remove the rejected tx from the graph.
-			delete(dg.txs, toRejectID)
-
-			// While it's statistically unlikely that something being rejected
-			// is preferred, it is handled for completion.
-			dg.preferences.Remove(toRejectID)
-
-			// remove the edge between this node and all its neighbors
-			dg.removeConflict(toRejectID, toRejectNode.ins)
-			dg.removeConflict(toRejectID, toRejectNode.outs)
-
-			// Update the metrics to account for this transaction's rejection
-			dg.metrics.Rejected(toRejectID)
-
-			// Reject the transaction
-			if err := toReject.Reject(); err != nil {
-				return false, err
-			}
-		}
-
-		// If a status has changed, we must perform a second iteration
-		shouldWork = len(acceptable)+len(rejectable) > 0
-
-		// If a status has changed, the frontiers must be recalculated.
-		changed = changed || shouldWork
 	}
+	for _, toReject := range rejectable {
+		toRejectID := toReject.ID()
+		toRejectNode := dg.txs[toRejectID]
+
+		// We can remove the rejected tx from the graph.
+		delete(dg.txs, toRejectID)
+
+		// While it's statistically unlikely that something being rejected
+		// is preferred, it is handled for completion.
+		dg.preferences.Remove(toRejectID)
+
+		// remove the edge between this node and all its neighbors
+		dg.removeConflict(toRejectID, toRejectNode.ins)
+		dg.removeConflict(toRejectID, toRejectNode.outs)
+
+		// Update the metrics to account for this transaction's rejection
+		dg.metrics.Rejected(toRejectID)
+
+		// Reject the transaction
+		if err := toReject.Reject(); err != nil {
+			return false, err
+		}
+	}
+
+	// If a status has changed, the frontiers must be recalculated.
+	changed = changed || len(acceptable)+len(rejectable) > 0
+
 	return changed, nil
 }
 

@@ -47,12 +47,16 @@ type Conflicts struct {
 	// conditionally accepted, but not returned as fully accepted.
 	conditionallyAccepted ids.Set
 
-	// accepted tracks the set of txIDs that have been added to the acceptable
+	// accepted tracks the set of transition IDs that have been added to the acceptable
 	// queue.
 	accepted ids.Set
 
 	// track txs that have been marked as ready to accept
 	acceptable []Tx
+
+	// rejected tracks the set of txIDs that have been added to the rejectable
+	// queue.
+	rejected ids.Set
 
 	// track txs that have been marked as ready to reject
 	rejectable []Tx
@@ -246,14 +250,25 @@ func (c *Conflicts) Accept(txID ids.ID) {
 
 // Updateable implements the [snowstorm.Conflicts] interface
 func (c *Conflicts) Updateable() ([]Tx, []Tx) {
-	accepted := c.accepted
-	c.accepted = nil
+	acceptable := make([]Tx, 0, len(c.acceptable))
+	rejectable := make([]Tx, 0, 0)
+	shouldWork := true
+	for shouldWork {
+		acceptableInner, rejectableInner := c.updateable()
+		acceptable = append(acceptable, acceptableInner...)
+		rejectable = append(rejectable, rejectableInner...)
+		shouldWork = len(acceptableInner)+len(rejectableInner) > 0
+	}
+
+	c.accepted.Clear()
+	c.rejected.Clear()
+	return acceptable, rejectable
+}
+
+// updateable implements the [snowstorm.Conflicts] interface
+func (c *Conflicts) updateable() ([]Tx, []Tx) {
 	acceptable := c.acceptable
 	c.acceptable = nil
-
-	// rejected tracks the set of txIDs that have been rejected but not yet
-	// removed from the graph.
-	rejected := ids.Set{}
 
 	// Accept each acceptable tx
 	for _, tx := range acceptable {
@@ -310,11 +325,11 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 			dependentTransitionNode.missingDependencies.Remove(transitionID)
 			c.transitionNodes[dependentTransitionID] = dependentTransitionNode
 
-			if dependentEpoch < epoch && !rejected.Contains(dependentTxID) {
+			if dependentEpoch < epoch && !c.rejected.Contains(dependentTxID) {
 				// [dependent] requires [tx]'s transition to happen
 				// no later than [epoch] but the transition happens after.
 				// Therefore, [dependent] may no longer be accepted.
-				rejected.Add(dependentTxID)
+				c.rejected.Add(dependentTxID)
 				c.rejectable = append(c.rejectable, dependentTx)
 				continue
 			}
@@ -326,7 +341,7 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 			// [dependent] has been conditionally accepted.
 			// Check whether all of its transition dependencies are met
 			for dependentTransitionID := range dependentTransitionNode.missingDependencies {
-				if !accepted.Contains(dependentTransitionID) {
+				if !c.accepted.Contains(dependentTransitionID) {
 					continue acceptedDependentLoop
 				}
 			}
@@ -351,8 +366,8 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 		// asserted.
 		conflictTxs, _ := c.Conflicts(tx)
 		for _, conflictTx := range conflictTxs {
-			if conflictTxID := conflictTx.ID(); !rejected.Contains(conflictTxID) {
-				rejected.Add(conflictTxID)
+			if conflictTxID := conflictTx.ID(); !c.rejected.Contains(conflictTxID) {
+				c.rejected.Add(conflictTxID)
 				c.rejectable = append(c.rejectable, conflictTx)
 			}
 		}
@@ -397,8 +412,8 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 			// Remove the dependency pointers of the transactions that depended
 			// on this transition.
 			for dependentTxID := range transitionNode.dependencies {
-				if !rejected.Contains(dependentTxID) {
-					rejected.Add(dependentTxID)
+				if !c.rejected.Contains(dependentTxID) {
+					c.rejected.Add(dependentTxID)
 					dependentTx := c.txs[dependentTxID]
 					c.rejectable = append(c.rejectable, dependentTx)
 				}
@@ -425,8 +440,8 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 			for dependentTxID := range transitionNode.dependencies {
 				dependentTx := c.txs[dependentTxID]
 				dependentEpoch := dependentTx.Epoch()
-				if dependentEpoch < lowestRemainingEpoch && !rejected.Contains(dependentTxID) {
-					rejected.Add(dependentTxID)
+				if dependentEpoch < lowestRemainingEpoch && !c.rejected.Contains(dependentTxID) {
+					c.rejected.Add(dependentTxID)
 					c.rejectable = append(c.rejectable, dependentTx)
 				}
 			}
