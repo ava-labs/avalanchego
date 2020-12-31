@@ -322,6 +322,28 @@ func (c *Client) SendAsManager(
 	return res.TxID, err
 }
 
+func (c *Client) UpdateManagedAsset(
+	user api.UserPass,
+	from []string,
+	changeAddr string,
+	assetID string,
+	frozen bool,
+	manager Manager,
+) (ids.ID, error) {
+	resp := &api.JSONTxIDChangeAddr{}
+	err := c.requester.SendRequest("updateManagedAsset", &UpdateManagedAssetArgs{
+		JSONSpendHeader: api.JSONSpendHeader{
+			UserPass:       user,
+			JSONFromAddrs:  api.JSONFromAddrs{From: from},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+		},
+		AssetID: assetID,
+		Frozen:  frozen,
+		Manager: manager,
+	}, resp)
+	return resp.TxID, err
+}
+
 // SendMultiple sends a transaction from [user] funding all [outputs]
 func (c *Client) SendMultiple(
 	user api.UserPass,
