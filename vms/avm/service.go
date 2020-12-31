@@ -1453,6 +1453,12 @@ func (service *Service) SendAsManager(_ *http.Request, args *SendAsManagerArgs, 
 		})
 	}
 
+	// Load all the keys held by the user
+	_, kc, err = service.vm.LoadUser(args.Username, args.Password, nil)
+	if err != nil {
+		return err
+	}
+
 	// Load UTXOs controlled by from addesses
 	utxos, _, _, err := service.vm.GetUTXOs(fromAddrs, ids.ShortEmpty, ids.Empty, -1, false)
 	if err != nil {
