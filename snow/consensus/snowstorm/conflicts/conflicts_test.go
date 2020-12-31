@@ -1169,7 +1169,7 @@ func TestRejectDependencyTwice(t *testing.T) {
 	assert.Empty(t, c.transitionNodes)
 }
 
-func TestRejectRound1RejectViaAcceptRound2BothReject(t *testing.T) {
+func TestRejectTwiceAcrossRounds(t *testing.T) {
 	c := New()
 
 	conflictInput := ids.GenerateTestID()
@@ -1263,44 +1263,36 @@ func TestRejectRound1RejectViaAcceptRound2BothReject(t *testing.T) {
 
 	// Accepting txA1 should cause txA0 (epoch conflict) and txAB0
 	// (dependency not met in time) to be rejected.
-	toAccepts, toRejects := c.updateable()
-	assert.Len(t, toAccepts, 1)
-	assert.Len(t, toRejects, 2)
+	// txC1 should be moved from conditionally accepted to accepted
+	// and txB0 should be rejected since its direct dependency trAB
+	// was rejected in the only round it was issued in.
+	toAccepts, toRejects := c.Updateable()
+	assert.Len(t, toAccepts, 2)
+	assert.Len(t, toRejects, 3)
 
-	toAccept := toAccepts[0]
-	assert.Equal(t, txA1.ID(), toAccept.ID())
-	err = toAccept.Accept()
-	assert.NoError(t, err)
+	expectedAccepts := ids.Set{}
+	expectedAccepts.Add(txC1.ID(), txA1.ID())
+
+	for i, toAccept := range toAccepts {
+		err = toAccept.Accept()
+		assert.NoError(t, err)
+		assert.True(t, expectedAccepts.Contains(toAccept.ID()), "Unexpected accepted txID: %s index %d", toAccept.ID(), i)
+	}
 
 	expectedRejects := ids.Set{}
-	expectedRejects.Add(txAB0.ID(), txA0.ID())
+	expectedRejects.Add(txAB0.ID(), txA0.ID(), txB0.ID())
 	for i, toReject := range toRejects {
 		assert.True(t, expectedRejects.Contains(toReject.ID()), "Unexpected rejected txID: %s index %d", toReject.ID(), i)
 		err = toReject.Reject()
 		assert.NoError(t, err)
 	}
 
-	// txC1 should be moved from conditionally accepted to accepted
-	// and txB0 should be rejected since its direct dependency trAB
-	// was rejected in the prior round.
-	toAccepts, toRejects = c.updateable()
-	assert.Len(t, toAccepts, 1)
-	assert.Len(t, toRejects, 1)
-
-	toAccept = toAccepts[0]
-	assert.Equal(t, txC1.ID(), toAccept.ID())
-	err = toAccept.Accept()
-	assert.NoError(t, err)
-
-	toReject := toRejects[0]
-	assert.Equal(t, txB0.ID(), toReject.ID())
-	err = toReject.Reject()
-	assert.NoError(t, err)
-
-	toAccepts, toRejects = c.updateable()
+	toAccepts, toRejects = c.Updateable()
 	assert.Empty(t, toAccepts)
 	assert.Empty(t, toRejects)
 	assert.Empty(t, c.txs)
 	assert.Empty(t, c.utxos)
 	assert.Empty(t, c.transitionNodes)
+	assert.Equal(t, 0, c.accepted.Len())
+	assert.Equal(t, 0, c.rejected.Len())
 }
