@@ -82,4 +82,6 @@ func (t *txJob) Execute() error {
 	}
 	return nil
 }
-func (t *txJob) Bytes() []byte { return t.tx.Bytes() }
+func (t *txJob) Bytes() []byte         { return t.tx.Bytes() }
+func (t *txJob) DispatchID() ids.ID    { return t.tx.Transition().ID() }
+func (t *txJob) DispatchBytes() []byte { return t.tx.Transition().Bytes() }

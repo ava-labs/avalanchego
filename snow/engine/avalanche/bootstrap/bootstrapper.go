@@ -397,7 +397,7 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher)
 			b.Ctx.Log.Info("executed %d operations", numExecuted)
 		}
 
-		events.Accept(b.Ctx, job.ID(), job.Bytes())
+		events.Accept(b.Ctx, job.DispatchID(), job.DispatchBytes())
 	}
 	b.Ctx.Log.Info("executed %d operations", numExecuted)
 	return nil

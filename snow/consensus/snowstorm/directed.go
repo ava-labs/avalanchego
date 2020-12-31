@@ -336,6 +336,9 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 			if err := toAccept.Accept(); err != nil {
 				return false, err
 			}
+
+			tr := toAccept.Transition()
+			dg.ctx.DecisionDispatcher.Accept(dg.ctx, tr.ID(), tr.Bytes())
 		}
 		for _, toReject := range rejectable {
 			toRejectID := toReject.ID()
