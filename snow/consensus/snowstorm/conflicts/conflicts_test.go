@@ -1293,6 +1293,6 @@ func TestRejectTwiceAcrossRounds(t *testing.T) {
 	assert.Empty(t, c.txs)
 	assert.Empty(t, c.utxos)
 	assert.Empty(t, c.transitionNodes)
-	assert.Equal(t, 0, c.accepted.Len())
-	assert.Equal(t, 0, c.rejected.Len())
+	assert.Equal(t, 0, c.acceptableIDs.Len())
+	assert.Equal(t, 0, c.rejectableIDs.Len())
 }
