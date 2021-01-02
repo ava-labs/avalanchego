@@ -19,8 +19,10 @@ type Tx interface {
 	// Epoch this transaction was issued in.
 	Epoch() uint32
 
-	// Restrictions returns a list of transition IDs such that this transaction can't
-	// be accepted if the transition occurs in an epoch earlier than this transaction's epoch.
+	// Restrictions returns the IDs of transitions that cannot be performed
+	// in an epoch earlier than this transaction's epoch if this transaction
+	// is accepted. If any of these transitions are performed in an epoch
+	// earlier than this transaction's epoch, this tx can't be accepted.
 	Restrictions() []ids.ID
 
 	// Verify this transaction is currently valid to be performed.

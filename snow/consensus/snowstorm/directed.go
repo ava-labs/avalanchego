@@ -284,7 +284,7 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 			// txs don't force the node to treat the rogue tx as virtuous.
 			dg.virtuousVoting.Remove(txID)
 
-			// Mark this transaction as being confitionally accepted
+			// Mark this transaction as being conditionally accepted
 			dg.conflicts.Accept(txID)
 		}
 

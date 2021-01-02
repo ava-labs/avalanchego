@@ -49,7 +49,8 @@ type Conflicts struct {
 	// consecutive successful polls but has unmet dependencies.
 	conditionallyAccepted ids.Set
 
-	// acceptableIDs is the set of IDs of transactions in [acceptable].
+	// acceptableIDs is the set of IDs of transitions that are in a
+	// transaction in [acceptable].
 	acceptableIDs ids.Set
 
 	// acceptable is the set of txs that may be accepted.
@@ -58,7 +59,7 @@ type Conflicts struct {
 	// rejectableIDs is the set of IDs of transactions in [rejectable].
 	rejectableIDs ids.Set
 
-	// acceptable is the set of txs that may be rejected.
+	// rejectable is the set of txs that may be rejected.
 	rejectable []Tx
 }
 
