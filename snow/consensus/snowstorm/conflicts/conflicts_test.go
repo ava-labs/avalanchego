@@ -1350,6 +1350,7 @@ func TestAcceptRejectedEpochDependencyFail(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: tr,
+		EpochV:      1,
 	}
 	tx2 := &TestTx{
 		TestDecidable: choices.TestDecidable{
@@ -1357,7 +1358,7 @@ func TestAcceptRejectedEpochDependencyFail(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: tr,
-		EpochV:      1,
+		EpochV:      2,
 	}
 	tx3 := &TestTx{
 		TestDecidable: choices.TestDecidable{
@@ -1369,6 +1370,7 @@ func TestAcceptRejectedEpochDependencyFail(t *testing.T) {
 			DependenciesV: []Transition{tr},
 			StatusV:       choices.Processing,
 		},
+		EpochV: 1,
 	}
 
 	err := c.Add(tx0)
