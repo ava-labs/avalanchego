@@ -12,7 +12,7 @@ import (
 type Conflicts interface {
 	// Add [tx] to conflict tracking
 	//
-	// Assumes: Add has not already been called with [tx]
+	// Assumes Add has not already been called with [tx]
 	Add(tx conflicts.Tx) error
 
 	// Processing returns if [trID] is currently being processed
