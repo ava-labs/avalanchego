@@ -54,8 +54,7 @@ func TestNoConflicts(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, virtuous)
 
-	conflicts, err := c.Conflicts(tx)
-	assert.NoError(t, err)
+	conflicts := c.Conflicts(tx)
 	assert.Empty(t, conflicts)
 }
 
@@ -93,8 +92,7 @@ func TestInputConflicts(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, virtuous)
 
-	conflicts, err := c.Conflicts(tx1)
-	assert.NoError(t, err)
+	conflicts := c.Conflicts(tx1)
 	assert.Len(t, conflicts, 1)
 }
 
@@ -132,8 +130,7 @@ func TestOuterRestrictionConflicts(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, virtuous)
 
-	conflicts, err := c.Conflicts(tx1)
-	assert.NoError(t, err)
+	conflicts := c.Conflicts(tx1)
 	assert.Len(t, conflicts, 1)
 }
 
@@ -171,8 +168,7 @@ func TestInnerRestrictionConflicts(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, virtuous)
 
-	conflicts, err := c.Conflicts(tx0)
-	assert.NoError(t, err)
+	conflicts := c.Conflicts(tx0)
 	assert.Len(t, conflicts, 1)
 }
 
@@ -193,13 +189,15 @@ func TestAcceptNoConflicts(t *testing.T) {
 	err := c.Add(tx)
 	assert.NoError(t, err)
 
-	toAccepts, toRejects := c.updateable()
+	toAccepts := c.updateAccepted()
+	toRejects := c.updateRejected()
 	assert.Empty(t, toAccepts)
 	assert.Empty(t, toRejects)
 
 	c.Accept(tx.ID())
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 1)
 	assert.Empty(t, toRejects)
 	assert.Empty(t, c.txs)
@@ -246,19 +244,22 @@ func TestAcceptNoConflictsWithDependency(t *testing.T) {
 	err = c.Add(tx1)
 	assert.NoError(t, err)
 
-	toAccepts, toRejects := c.updateable()
+	toAccepts := c.updateAccepted()
+	toRejects := c.updateRejected()
 	assert.Empty(t, toAccepts)
 	assert.Empty(t, toRejects)
 
 	c.Accept(tx1.ID())
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Empty(t, toAccepts)
 	assert.Empty(t, toRejects)
 
 	c.Accept(tx0.ID())
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 1)
 	assert.Empty(t, toRejects)
 
@@ -267,7 +268,8 @@ func TestAcceptNoConflictsWithDependency(t *testing.T) {
 	err = toAccept.Accept()
 	assert.NoError(t, err)
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 1)
 	assert.Empty(t, toRejects)
 	assert.Empty(t, c.txs)
@@ -313,13 +315,15 @@ func TestNoConflictsNoEarlyAcceptDependency(t *testing.T) {
 	err = c.Add(tx1)
 	assert.NoError(t, err)
 
-	toAccepts, toRejects := c.updateable()
+	toAccepts := c.updateAccepted()
+	toRejects := c.updateRejected()
 	assert.Empty(t, toAccepts)
 	assert.Empty(t, toRejects)
 
 	c.Accept(tx0.ID())
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 1)
 	assert.Empty(t, toRejects)
 
@@ -328,13 +332,15 @@ func TestNoConflictsNoEarlyAcceptDependency(t *testing.T) {
 	err = toAccept.Accept()
 	assert.NoError(t, err)
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Empty(t, toAccepts)
 	assert.Empty(t, toRejects)
 
 	c.Accept(tx1.ID())
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 1)
 	assert.Empty(t, toRejects)
 	assert.Empty(t, c.txs)
@@ -396,7 +402,9 @@ func TestAcceptNoConflictsWithDependenciesAcrossMultipleRounds(t *testing.T) {
 
 	// Check that no transactions are mistakenly marked
 	// as accepted/rejected
-	toAccepts, toRejects := c.updateable()
+
+	toAccepts := c.updateAccepted()
+	toRejects := c.updateRejected()
 	assert.Empty(t, toAccepts)
 	assert.Empty(t, toRejects)
 
@@ -407,7 +415,8 @@ func TestAcceptNoConflictsWithDependenciesAcrossMultipleRounds(t *testing.T) {
 
 	assert.Equal(t, c.conditionallyAccepted.Len(), 1)
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Empty(t, toAccepts)
 	assert.Empty(t, toRejects)
 	assert.Equal(t, c.conditionallyAccepted.Len(), 1)
@@ -417,7 +426,8 @@ func TestAcceptNoConflictsWithDependenciesAcrossMultipleRounds(t *testing.T) {
 	// still requires tx0 to be accepted.
 	c.Accept(tx1.ID())
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 1)
 	assert.Empty(t, toRejects)
 
@@ -428,7 +438,9 @@ func TestAcceptNoConflictsWithDependenciesAcrossMultipleRounds(t *testing.T) {
 
 	// Ensure that additional call to updateable
 	// does not return any new accepted/rejected txs.
-	toAccepts, toRejects = c.updateable()
+
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 0)
 	assert.Len(t, toRejects, 0)
 
@@ -436,7 +448,8 @@ func TestAcceptNoConflictsWithDependenciesAcrossMultipleRounds(t *testing.T) {
 	// returned from Updateable
 	c.Accept(tx0.ID())
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 1)
 	assert.Empty(t, toRejects)
 
@@ -446,7 +459,9 @@ func TestAcceptNoConflictsWithDependenciesAcrossMultipleRounds(t *testing.T) {
 	assert.NoError(t, err)
 
 	// tx2 should be returned by the subseqeuent call
-	toAccepts, toRejects = c.updateable()
+
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 1)
 	assert.Empty(t, toRejects)
 
@@ -508,13 +523,15 @@ func TestAcceptRejectedDependency(t *testing.T) {
 	err = c.Add(tx2)
 	assert.NoError(t, err)
 
-	toAccepts, toRejects := c.updateable()
+	toAccepts := c.updateAccepted()
+	toRejects := c.updateRejected()
 	assert.Empty(t, toAccepts)
 	assert.Empty(t, toRejects)
 
 	c.Accept(tx1.ID())
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 1)
 	assert.Len(t, toRejects, 1)
 
@@ -528,7 +545,8 @@ func TestAcceptRejectedDependency(t *testing.T) {
 	err = toReject.Reject()
 	assert.NoError(t, err)
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Empty(t, toAccepts)
 	assert.Len(t, toRejects, 1)
 	assert.Empty(t, c.txs)
@@ -563,16 +581,9 @@ func TestAcceptRejectedEpochDependency(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: tr,
-	}
-	tx2 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: tr,
 		EpochV:      1,
 	}
-	tx3 := &TestTx{
+	tx2 := &TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -593,29 +604,28 @@ func TestAcceptRejectedEpochDependency(t *testing.T) {
 	err = c.Add(tx2)
 	assert.NoError(t, err)
 
-	err = c.Add(tx3)
-	assert.NoError(t, err)
-
-	toAccepts, toRejects := c.updateable()
+	toAccepts := c.updateAccepted()
+	toRejects := c.updateRejected()
 	assert.Empty(t, toAccepts)
 	assert.Empty(t, toRejects)
 
-	c.Accept(tx2.ID())
+	c.Accept(tx1.ID())
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 1)
-	assert.Len(t, toRejects, 3)
+	assert.Len(t, toRejects, 2)
 	assert.Empty(t, c.txs)
 	assert.Empty(t, c.utxos)
 	assert.Empty(t, c.transitionNodes)
 
 	toAccept := toAccepts[0]
-	assert.Equal(t, tx2.ID(), toAccept.ID())
+	assert.Equal(t, tx1.ID(), toAccept.ID())
 	err = toAccept.Accept()
 	assert.NoError(t, err)
 
 	for i, toReject := range toRejects {
-		err = toReject.Reject()
+		err := toReject.Reject()
 		assert.NoError(t, err, "Error rejecting the %d rejectable transaction %s", i, toReject.ID())
 	}
 }
@@ -707,7 +717,8 @@ func TestAcceptRestrictedDependency(t *testing.T) {
 	err = c.Add(txC1)
 	assert.NoError(t, err)
 
-	toAccepts, toRejects := c.updateable()
+	toAccepts := c.updateAccepted()
+	toRejects := c.updateRejected()
 	assert.Empty(t, toAccepts)
 	assert.Empty(t, toRejects)
 
@@ -715,7 +726,8 @@ func TestAcceptRestrictedDependency(t *testing.T) {
 	// txA0 and txB0 as a result.
 	c.Accept(txC1.ID())
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 1)
 	assert.Len(t, toRejects, 2)
 
@@ -729,7 +741,8 @@ func TestAcceptRestrictedDependency(t *testing.T) {
 		assert.NoError(t, err, "Error rejecting the %d rejectable transaction %s", i, toReject.ID())
 	}
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Empty(t, toAccepts)
 	assert.Len(t, toRejects, 1)
 
@@ -740,7 +753,8 @@ func TestAcceptRestrictedDependency(t *testing.T) {
 
 	c.Accept(txA1.ID())
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 1)
 	assert.Empty(t, toRejects)
 
@@ -751,7 +765,8 @@ func TestAcceptRestrictedDependency(t *testing.T) {
 
 	c.Accept(txB1.ID())
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 1)
 	assert.Empty(t, toRejects)
 
@@ -836,13 +851,15 @@ func TestRejectedRejectedDependency(t *testing.T) {
 	err = c.Add(txBX)
 	assert.NoError(t, err)
 
-	toAccepts, toRejects := c.updateable()
+	toAccepts := c.updateAccepted()
+	toRejects := c.updateRejected()
 	assert.Empty(t, toAccepts)
 	assert.Empty(t, toRejects)
 
 	c.Accept(txBX.ID())
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 1)
 	assert.Len(t, toRejects, 1)
 
@@ -858,7 +875,8 @@ func TestRejectedRejectedDependency(t *testing.T) {
 
 	c.Accept(txAY.ID())
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 1)
 	assert.Len(t, toRejects, 1)
 	assert.Empty(t, c.txs)
@@ -947,13 +965,15 @@ func TestAcceptVirtuousRejectedDependency(t *testing.T) {
 	err = c.Add(txBY)
 	assert.NoError(t, err)
 
-	toAccepts, toRejects := c.updateable()
+	toAccepts := c.updateAccepted()
+	toRejects := c.updateRejected()
 	assert.Empty(t, toAccepts)
 	assert.Empty(t, toRejects)
 
 	c.Accept(txAX.ID())
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 1)
 	assert.Len(t, toRejects, 1)
 
@@ -967,7 +987,8 @@ func TestAcceptVirtuousRejectedDependency(t *testing.T) {
 	err = toReject.Reject()
 	assert.NoError(t, err)
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 0)
 	assert.Len(t, toRejects, 1)
 
@@ -978,7 +999,8 @@ func TestAcceptVirtuousRejectedDependency(t *testing.T) {
 
 	c.Accept(txBX.ID())
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 1)
 	assert.Len(t, toRejects, 0)
 
@@ -1112,7 +1134,8 @@ func TestRejectDependencyTwice(t *testing.T) {
 
 	c.Accept(txA2.ID())
 
-	toAccepts, toRejects := c.updateable()
+	toAccepts := c.updateAccepted()
+	toRejects := c.updateRejected()
 	assert.Len(t, toAccepts, 1)
 	assert.Len(t, toRejects, 4)
 
@@ -1126,7 +1149,8 @@ func TestRejectDependencyTwice(t *testing.T) {
 		assert.NoError(t, err, "Error rejecting the %d rejectable transaction %s", i, toReject.ID())
 	}
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Empty(t, toAccepts)
 	assert.Len(t, toRejects, 2)
 
@@ -1135,13 +1159,15 @@ func TestRejectDependencyTwice(t *testing.T) {
 		assert.NoError(t, err, "Error rejecting the %d rejectable transaction %s", i, toReject.ID())
 	}
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Empty(t, toAccepts)
 	assert.Empty(t, toRejects)
 
 	c.Accept(txB2.ID())
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 1)
 	assert.Empty(t, toRejects)
 
@@ -1152,7 +1178,8 @@ func TestRejectDependencyTwice(t *testing.T) {
 
 	c.Accept(txC2.ID())
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Len(t, toAccepts, 1)
 	assert.Empty(t, toRejects)
 
@@ -1161,7 +1188,8 @@ func TestRejectDependencyTwice(t *testing.T) {
 	err = toAccept.Accept()
 	assert.NoError(t, err)
 
-	toAccepts, toRejects = c.updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Empty(t, toAccepts)
 	assert.Empty(t, toRejects)
 	assert.Empty(t, c.txs)
@@ -1266,7 +1294,9 @@ func TestRejectTwiceAcrossRounds(t *testing.T) {
 	// txC1 should be moved from conditionally accepted to accepted
 	// and txB0 should be rejected since its direct dependency trAB
 	// was rejected in the only round it was issued in.
-	toAccepts, toRejects := c.Updateable()
+
+	toAccepts := c.updateAccepted()
+	toRejects := c.updateRejected()
 	assert.Len(t, toAccepts, 2)
 	assert.Len(t, toRejects, 3)
 
@@ -1287,7 +1317,8 @@ func TestRejectTwiceAcrossRounds(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	toAccepts, toRejects = c.Updateable()
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
 	assert.Empty(t, toAccepts)
 	assert.Empty(t, toRejects)
 	assert.Empty(t, c.txs)
@@ -1295,4 +1326,85 @@ func TestRejectTwiceAcrossRounds(t *testing.T) {
 	assert.Empty(t, c.transitionNodes)
 	assert.Equal(t, 0, c.acceptableIDs.Len())
 	assert.Equal(t, 0, c.rejectableIDs.Len())
+}
+
+func TestAcceptRejectedEpochDependencyFail(t *testing.T) {
+	c := New()
+
+	inputIDs := []ids.ID{ids.GenerateTestID()}
+	tr := &TestTransition{
+		IDV:       ids.GenerateTestID(),
+		InputIDsV: inputIDs,
+		StatusV:   choices.Processing,
+	}
+	tx0 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: tr,
+	}
+	tx1 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: tr,
+	}
+	tx2 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: tr,
+		EpochV:      1,
+	}
+	tx3 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &TestTransition{
+			IDV:           ids.GenerateTestID(),
+			DependenciesV: []Transition{tr},
+			StatusV:       choices.Processing,
+		},
+	}
+
+	err := c.Add(tx0)
+	assert.NoError(t, err)
+
+	err = c.Add(tx1)
+	assert.NoError(t, err)
+
+	err = c.Add(tx2)
+	assert.NoError(t, err)
+
+	err = c.Add(tx3)
+	assert.NoError(t, err)
+
+	toAccepts := c.updateAccepted()
+	toRejects := c.updateRejected()
+	assert.Empty(t, toAccepts)
+	assert.Empty(t, toRejects)
+
+	c.Accept(tx2.ID())
+
+	toAccepts = c.updateAccepted()
+	toRejects = c.updateRejected()
+	assert.Len(t, toAccepts, 1)
+	assert.Len(t, toRejects, 3)
+	assert.Empty(t, c.txs)
+	assert.Empty(t, c.utxos)
+	assert.Empty(t, c.transitionNodes)
+
+	toAccept := toAccepts[0]
+	assert.Equal(t, tx2.ID(), toAccept.ID())
+	err = toAccept.Accept()
+	assert.NoError(t, err)
+
+	for i, toReject := range toRejects {
+		err = toReject.Reject()
+		assert.NoError(t, err, "Error rejecting the %d rejectable transaction %s", i, toReject.ID())
+	}
 }

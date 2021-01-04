@@ -287,6 +287,11 @@ func (c *Conflicts) updateAccepted() []Tx {
 		transitionNode := c.transitionNodes[transitionID]
 		transitionNode.txIDs.Remove(txID)
 
+		// TODO: remove
+		if transitionNode.missingDependencies.Len() != 0 {
+			panic("dependencies should all have been fulfilled")
+		}
+
 		// Remove [tx] from the UTXO map
 		c.removeInputs(txID, transition)
 
@@ -352,9 +357,15 @@ outerLoop:
 		// Note: Updating the transitionNodes map isn't needed here because the
 		// missingDependencies set is a map, which wraps a pointer.
 
+		// If the dependent transaction has already been marked for rejection,
+		// we can't reject it again.
+		if c.rejectableIDs.Contains(dependentTxID) {
+			continue
+		}
+
 		// If [dependentTx] requires [tx]'s transition to happen before [epoch],
 		// then [dependent] can no longer be accepted.
-		if dependentEpoch < epoch && !c.rejectableIDs.Contains(dependentTxID) {
+		if dependentEpoch < epoch {
 			c.rejectableIDs.Add(dependentTxID)
 			c.rejectable = append(c.rejectable, dependentTx)
 			continue
