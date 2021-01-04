@@ -46,7 +46,7 @@ func (l *LeafNode) Insert(key []Unit, value []byte) {
 }
 
 // GetNextNode returns itself
-func (l *LeafNode) GetNextNode(key []Unit) Node {
+func (l *LeafNode) GetNextNode(prefix []Unit, start []Unit, key []Unit) Node {
 	return l
 }
 

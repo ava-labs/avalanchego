@@ -2,25 +2,27 @@ package tree
 
 import (
 	"crypto/rand"
-	"encoding/binary"
+	mrand "math/rand"
 	"testing"
 )
 
 func CreateRandomValues(valueCount int) []TestStruct {
 	var tests []TestStruct
-	added := map[uint64]bool{}
+	added := map[string]bool{}
 
 	for i := 0; i < valueCount; i++ {
-		key := make([]byte, 10)
-		val := make([]byte, 10)
+		key := make([]byte, mrand.Intn(31)+1)
+		val := make([]byte, mrand.Intn(31)+1)
 		_, _ = rand.Read(key)
 		_, _ = rand.Read(val)
 
-		if _, ok := added[binary.BigEndian.Uint64(key)]; ok {
+		keyString := string(key)
+		if _, ok := added[keyString]; ok {
 			i--
 			continue
 		}
 
+		added[keyString] = true
 		tests = append(tests, struct {
 			key   []byte
 			value []byte
@@ -41,21 +43,21 @@ func BenchmarkTree_Put(b *testing.B) {
 		b.ResetTimer()
 
 		for _, test := range test100k {
-			tree.Put(test.key, test.value)
+			_ = tree.Put(test.key, test.value)
 		}
 	})
 
 	b.Run("test1M", func(b *testing.B) {
 		b.ResetTimer()
 		for _, test := range test1M {
-			tree.Put(test.key, test.value)
+			_ = tree.Put(test.key, test.value)
 		}
 	})
 
 	b.Run("test10M", func(b *testing.B) {
 		b.ResetTimer()
 		for _, test := range test10M {
-			tree.Put(test.key, test.value)
+			_ = tree.Put(test.key, test.value)
 		}
 	})
 }
@@ -70,7 +72,7 @@ func BenchmarkTree_Del(b *testing.B) {
 		tree := NewTree()
 		b.ResetTimer()
 		for _, test := range test100k {
-			tree.Put(test.key, test.value)
+			_ = tree.Put(test.key, test.value)
 		}
 
 		for _, test := range test100k {
@@ -84,7 +86,7 @@ func BenchmarkTree_Del(b *testing.B) {
 		b.ResetTimer()
 		tree := NewTree()
 		for _, test := range test1M {
-			tree.Put(test.key, test.value)
+			_ = tree.Put(test.key, test.value)
 		}
 
 		for _, test := range test1M {
@@ -98,7 +100,7 @@ func BenchmarkTree_Del(b *testing.B) {
 		b.ResetTimer()
 		tree := NewTree()
 		for _, test := range test10M {
-			tree.Put(test.key, test.value)
+			_ = tree.Put(test.key, test.value)
 		}
 
 		for _, test := range test10M {

@@ -26,7 +26,7 @@ func NewEmptyNode(parent Node, key []Unit) Node {
 func (e *EmptyNode) GetChild(key []Unit) Node { return nil }
 
 // GetNextNode returns itself
-func (e *EmptyNode) GetNextNode(key []Unit) Node {
+func (e *EmptyNode) GetNextNode(prefix []Unit, start []Unit, key []Unit) Node {
 	return nil
 }
 

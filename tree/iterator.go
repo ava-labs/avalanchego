@@ -10,8 +10,11 @@ package tree
 // iterator until exhaustion. An iterator is not safe for concurrent use, but it
 // is safe to use multiple iterators concurrently.
 type Iterator struct {
-	node Node
-	tree *Tree
+	node   Node
+	tree   *Tree
+	start  []byte
+	prefix []byte
+	err    error
 }
 
 // NewIterator creates a binary-alphabetical iterator over the entire
@@ -26,48 +29,67 @@ func NewIterator(t *Tree) *Iterator {
 // NewIteratorWithStart creates a binary-alphabetical iterator over a subset
 // of database content starting at a particular initial key (or after, if it
 // does not exist).
-func NewIteratorWithStart(start []byte) *Iterator {
-	return &Iterator{}
+func NewIteratorWithStart(t *Tree, start []byte) *Iterator {
+	return &Iterator{
+		tree:  t,
+		node:  &EmptyNode{},
+		start: start,
+	}
 }
 
 // NewIteratorWithPrefix creates a binary-alphabetical iterator over a
 // subset of database content with a particular key prefix.
-func NewIteratorWithPrefix(prefix []byte) *Iterator {
-	return &Iterator{}
+func NewIteratorWithPrefix(t *Tree, prefix []byte) *Iterator {
+	return &Iterator{
+		tree:   t,
+		node:   &EmptyNode{},
+		prefix: prefix,
+	}
 }
 
 // NewIteratorWithStartAndPrefix creates a binary-alphabetical iterator over
 // a subset of database content with a particular key prefix starting at a
 // specified key.
-func NewIteratorWithStartAndPrefix(start, prefix []byte) *Iterator {
-	return &Iterator{}
+func NewIteratorWithStartAndPrefix(t *Tree, start, prefix []byte) *Iterator {
+	return &Iterator{
+		tree:   t,
+		node:   &EmptyNode{},
+		start:  start,
+		prefix: prefix,
+	}
 }
 
-// Next moves the iterator to the next key/value pair. It returns whether
-// the iterator is exhausted.
+// Next moves the iterator to the next key/value pair.
+// It returns whether the iterator is exhausted.
 func (i *Iterator) Next() bool {
-	i.node = i.tree.fetchNextNode(i.node.Key(), i.tree.rootNode)
+	i.node, i.err = i.tree.fetchNextNode(FromBytes(i.prefix), FromBytes(i.start), i.node.Key(), i.tree.rootNode)
 	return i.node != nil
 }
 
 // Error returns any accumulated error. Exhausting all the key/value pairs
 // is not considered to be an error.
 func (i *Iterator) Error() error {
-	panic("implement me")
+	return i.err
 }
 
 // Key returns the key of the current key/value pair, or nil if done.
 func (i *Iterator) Key() []byte {
+	if i.node == nil {
+		return nil
+	}
 	return ToBytes(i.node.Key())
 }
 
 // Value returns the value of the current key/value pair, or nil if done.
 func (i *Iterator) Value() []byte {
+	if i.node == nil {
+		return nil
+	}
 	return i.node.Value()
 }
 
 // Release releases associated resources. Release should always succeed and
 // can be called multiple times without causing error.
 func (i *Iterator) Release() {
-	panic("implement me")
+	i.node = &EmptyNode{}
 }

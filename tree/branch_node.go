@@ -46,14 +46,42 @@ func (b *BranchNode) GetChild(key []Unit) Node {
 
 // GetNextNode returns the next node in increasing key order
 // returns Node - one of it's children
-//
-func (b *BranchNode) GetNextNode(key []Unit) Node {
+func (b *BranchNode) GetNextNode(prefix []Unit, start []Unit, key []Unit) Node {
 
-	// return the first, left-most child
+	// check the prefix
+	if len(prefix) != 0 {
+		// this branch isn't prefixed
+		if !IsPrefixed(prefix, b.sharedAddress) {
+			return NewEmptyNode(b, key)
+		}
+	}
+
+	// return the first, left-most child if the key is nil
 	if key == nil {
+
 		for _, node := range b.nodes {
 			if node != nil {
-				return node
+
+				// no prefix + no start return the left-most child
+				if len(start) == 0 && len(prefix) == 0 {
+					return node
+				}
+
+				// check for the prefix
+				if len(prefix) != 0 && IsPrefixed(prefix, node.Key()) {
+					if len(start) == 0 {
+						return node
+					}
+					if Greater(node.Key(), start) {
+						return node
+					}
+				}
+
+				// check for a start
+				// if it's a BranchNode it will return true and drill down that BranchNode
+				if len(start) != 0 && Greater(node.Key(), start) {
+					return node
+				}
 			}
 		}
 		return NewEmptyNode(b, key)
@@ -68,6 +96,10 @@ func (b *BranchNode) GetNextNode(key []Unit) Node {
 		if node != nil {
 			// TODO Think theres a better way of doing this
 			if EqualUnits(node.Key(), key) {
+				continue
+			}
+			// if its prefixed make sure the node prefix respects it
+			if len(prefix) != 0 && !IsPrefixed(prefix, node.Key()) {
 				continue
 			}
 			return node
