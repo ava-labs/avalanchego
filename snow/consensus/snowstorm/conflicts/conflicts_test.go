@@ -1203,30 +1203,31 @@ func TestRejectTwiceAcrossRounds(t *testing.T) {
 
 	conflictInput := ids.GenerateTestID()
 
-	// Transition AB is a bridge dependency from trA
-	// to trB ie. trB depends on trAB which depends on trA
-	// Transitions B and C conflict over [conflictInput]
+	// Regression test to ensure that a transaction cannot be rejected
+	// twice across multiple iterations of the worklist. This is prevented
+	// by maintaining the set of rejected txIDs across multiple iterations
+	// of the worklist.
 	trA := &TestTransition{
 		IDV:       ids.GenerateTestID(),
 		StatusV:   choices.Processing,
 		InputIDsV: []ids.ID{conflictInput},
 	}
-	trNotA := &TestTransition{
+	trB := &TestTransition{
 		IDV:       ids.GenerateTestID(),
 		StatusV:   choices.Processing,
 		InputIDsV: []ids.ID{conflictInput},
-	}
-	trB := &TestTransition{
-		IDV:           ids.GenerateTestID(),
-		StatusV:       choices.Processing,
-		InputIDsV:     []ids.ID{ids.GenerateTestID()},
-		DependenciesV: []Transition{trA},
 	}
 	trC := &TestTransition{
 		IDV:           ids.GenerateTestID(),
 		StatusV:       choices.Processing,
 		InputIDsV:     []ids.ID{ids.GenerateTestID()},
-		DependenciesV: []Transition{trB},
+		DependenciesV: []Transition{trA},
+	}
+	trD := &TestTransition{
+		IDV:           ids.GenerateTestID(),
+		StatusV:       choices.Processing,
+		InputIDsV:     []ids.ID{ids.GenerateTestID()},
+		DependenciesV: []Transition{trC},
 	}
 
 	txA := &TestTx{
@@ -1235,13 +1236,6 @@ func TestRejectTwiceAcrossRounds(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		TransitionV: trA,
-	}
-	txNotA := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: trNotA,
 	}
 	txB := &TestTx{
 		TestDecidable: choices.TestDecidable{
@@ -1257,11 +1251,15 @@ func TestRejectTwiceAcrossRounds(t *testing.T) {
 		},
 		TransitionV: trC,
 	}
+	txD := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: trD,
+	}
 
 	err := c.Add(txA)
-	assert.NoError(t, err)
-
-	err = c.Add(txNotA)
 	assert.NoError(t, err)
 
 	err = c.Add(txB)
@@ -1270,19 +1268,22 @@ func TestRejectTwiceAcrossRounds(t *testing.T) {
 	err = c.Add(txC)
 	assert.NoError(t, err)
 
-	// Accept txNotA first, such that it is marked as accepted.
-	c.Accept(txNotA.ID())
+	err = c.Add(txD)
+	assert.NoError(t, err)
 
-	// Accepting txNotA should cause txA to be rejected. Because txA is going to
-	// be rejected, txB will be rejected due to a missing dependency, this will
-	// chain such that txC shall also be rejected.
+	// Accept txB first, such that it is marked as accepted.
+	c.Accept(txB.ID())
 
+	// Accepting txB should cause txA to be rejected due to a conflict.
+	// Since txA is rejected, txC will be rejected due to a missing dependency.
+	// Since trD depends on trC, this will transtiively cause txD to be
+	// rejected as well.
 	toAccepts, toRejects := c.Updateable()
 	assert.Len(t, toAccepts, 1)
 	assert.Len(t, toRejects, 3)
 
 	expectedAccepts := ids.Set{}
-	expectedAccepts.Add(txNotA.ID())
+	expectedAccepts.Add(txB.ID())
 	for i, toAccept := range toAccepts {
 		err := toAccept.Accept()
 		assert.NoError(t, err)
@@ -1290,7 +1291,7 @@ func TestRejectTwiceAcrossRounds(t *testing.T) {
 	}
 
 	expectedRejects := ids.Set{}
-	expectedRejects.Add(txA.ID(), txB.ID(), txC.ID())
+	expectedRejects.Add(txA.ID(), txC.ID(), txD.ID())
 	for i, toReject := range toRejects {
 		assert.True(t, expectedRejects.Contains(toReject.ID()), "Unexpected rejected txID: %s index %d", toReject.ID(), i)
 		err := toReject.Reject()
