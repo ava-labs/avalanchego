@@ -26,7 +26,8 @@ func TestTreeConsistency_Del(t *testing.T) {
 		name string
 		data []TestStruct
 	}{
-		{"test100k", CreateRandomValues(100000)},
+		{"test10k", CreateRandomValues(10000)},
+		// {"test100k", CreateRandomValues(100000)},
 		// this takes a lot of time removed from the CI
 		// {"test1M", CreateRandomValues(1000000)},
 		// {"test5M", CreateRandomValues(5000000)},
