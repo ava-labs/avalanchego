@@ -55,6 +55,14 @@ func (m *Manager) Register(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	}), true
 }
 
+// RegisterFailure registers that a request failed before completion
+// This will register the failure to the benchlist, but will not call
+// the registered [timeout].
+func (m *Manager) RegisterFailure(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
+	m.benchlist.QueryFailed(chainID, validatorID, requestID)
+	m.tm.Remove(createRequestID(validatorID, chainID, requestID))
+}
+
 // Cancel request timeout with the specified parameters.
 func (m *Manager) Cancel(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
 	m.benchlist.RegisterResponse(chainID, validatorID, requestID)

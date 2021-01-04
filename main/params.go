@@ -262,6 +262,18 @@ func getViper() (*viper.Viper, error) {
 // setNodeConfig sets attributes on [Config] based on the values
 // defined in the [viper] environment
 func setNodeConfig(v *viper.Viper) error {
+	// Consensus Parameters
+	Config.ConsensusParams.K = v.GetInt(snowSampleSizeKey)
+	Config.ConsensusParams.Alpha = v.GetInt(snowQuorumSizeKey)
+	Config.ConsensusParams.BetaVirtuous = v.GetInt(snowVirtuousCommitThresholdKey)
+	Config.ConsensusParams.BetaRogue = v.GetInt(snowRogueCommitThresholdKey)
+	Config.ConsensusParams.Parents = v.GetInt(snowAvalancheNumParentsKey)
+	Config.ConsensusParams.BatchSize = v.GetInt(snowAvalancheBatchSizeKey)
+	Config.ConsensusParams.ConcurrentRepolls = v.GetInt(snowConcurrentRepollsKey)
+
+	Config.ConsensusGossipFrequency = v.GetDuration(consensusGossipFrequencyKey)
+	Config.ConsensusShutdownTimeout = v.GetDuration(consensusShutdownTimeoutKey)
+
 	// Logging:
 	loggingConfig, err := logging.DefaultConfig()
 	if err != nil {
@@ -639,18 +651,6 @@ func setNodeConfig(v *viper.Viper) error {
 	} else {
 		Config.Params = *genesis.GetParams(networkID)
 	}
-
-	// Consensus Parameters
-	Config.ConsensusParams.K = v.GetInt(snowSampleSizeKey)
-	Config.ConsensusParams.Alpha = v.GetInt(snowQuorumSizeKey)
-	Config.ConsensusParams.BetaVirtuous = v.GetInt(snowVirtuousCommitThresholdKey)
-	Config.ConsensusParams.BetaRogue = v.GetInt(snowRogueCommitThresholdKey)
-	Config.ConsensusParams.Parents = v.GetInt(snowAvalancheNumParentsKey)
-	Config.ConsensusParams.BatchSize = v.GetInt(snowAvalancheBatchSizeKey)
-	Config.ConsensusParams.ConcurrentRepolls = v.GetInt(snowConcurrentRepollsKey)
-
-	Config.ConsensusGossipFrequency = v.GetDuration(consensusGossipFrequencyKey)
-	Config.ConsensusShutdownTimeout = v.GetDuration(consensusShutdownTimeoutKey)
 
 	// Assertions
 	Config.EnableAssertions = v.GetBool(assertionsEnabledKey)
