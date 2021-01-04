@@ -474,6 +474,7 @@ func TestAcceptNoConflictsWithDependenciesAcrossMultipleRounds(t *testing.T) {
 	assert.Empty(t, c.utxos)
 	assert.Empty(t, c.transitionNodes)
 }
+
 func TestAcceptRejectedDependency(t *testing.T) {
 	c := New()
 
@@ -1328,7 +1329,7 @@ func TestRejectTwiceAcrossRounds(t *testing.T) {
 	assert.Equal(t, 0, c.rejectableIDs.Len())
 }
 
-func TestAcceptRejectedEpochDependencyFail(t *testing.T) {
+func TestAcceptRejectedMultipleEpochDependency(t *testing.T) {
 	c := New()
 
 	inputIDs := []ids.ID{ids.GenerateTestID()}

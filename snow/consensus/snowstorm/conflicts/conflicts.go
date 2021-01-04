@@ -391,6 +391,11 @@ outerLoop:
 		c.acceptableIDs.Add(dependentTransitionID)
 		c.acceptable = append(c.acceptable, dependentTx)
 	}
+
+	// Make sure that future checks of the dependents doesn't result in multiple
+	// iterations, as the dependents should already have had their missins
+	// dependencies updated.
+	tn.dependents.Clear()
 }
 
 func (c *Conflicts) rejectConflicts(tx Tx) {
@@ -421,7 +426,8 @@ func (c *Conflicts) updateRejected() []Tx {
 
 		// Remove [tx] from set of transactions that perform this transition
 		transitionNode.txIDs.Remove(txID)
-		c.transitionNodes[transitionID] = transitionNode
+		// Note: Updating the transitionNodes map isn't needed here because the
+		// txIDs set is a map, which wraps a pointer.
 
 		// Remove [tx] from the UTXO map
 		c.removeInputs(txID, transition)
