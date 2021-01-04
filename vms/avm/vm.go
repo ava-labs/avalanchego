@@ -815,7 +815,7 @@ func (vm *VM) getUTXO(utxoID *avax.UTXOID) (*avax.UTXO, error) {
 	// If the parent is unknown, then it is too early to consume
 	// this UTXO.
 	if status := parent.Status(); status != choices.Processing {
-		return nil, errMissingUTXO
+		return nil, fmt.Errorf("missing UTXO from current state from source (TxID: %s, Index: %d, Status: %s)", inputTxID, inputIndex, status)
 	}
 
 	parentUTXOs := parent.UTXOs()
