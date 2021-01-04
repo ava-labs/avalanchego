@@ -150,10 +150,7 @@ func (dg *Directed) Conflicts(tx conflicts.Tx) (ids.Set, error) {
 
 	// If the tx isn't currently processing, the conflicting txs are the
 	// union of all the txs that spend an input that this tx spends.
-	txConflicts, err := dg.conflicts.Conflicts(tx)
-	if err != nil {
-		return nil, err
-	}
+	txConflicts := dg.conflicts.Conflicts(tx)
 
 	conflicts := make(ids.Set, len(txConflicts))
 	for _, conflict := range txConflicts {
@@ -187,10 +184,7 @@ func (dg *Directed) Add(tx conflicts.Tx) error {
 		return nil
 	}
 
-	conflicts, err := dg.conflicts.Conflicts(tx)
-	if err != nil {
-		return err
-	}
+	conflicts := dg.conflicts.Conflicts(tx)
 
 	txID := tx.ID()
 
