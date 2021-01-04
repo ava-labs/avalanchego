@@ -81,14 +81,14 @@ func (c *Conflicts) Add(tx Tx) error {
 	c.txs[txID] = tx
 
 	// Mark that this transaction contains this transition
-	transition := tx.Transition()
-	transitionID := transition.ID()
+	tr := tx.Transition()
+	trID := tr.ID()
 
-	transitionNode := c.transitionNodes[transitionID]
-	transitionNode.txIDs.Add(txID)
+	tn := c.transitionNodes[trID]
+	tn.txIDs.Add(txID)
 
 	// Mark the UTXOs that this transition consumes
-	for _, inputID := range transition.InputIDs() {
+	for _, inputID := range tr.InputIDs() {
 		spenders := c.utxos[inputID]
 		spenders.Add(txID)
 		c.utxos[inputID] = spenders
@@ -103,16 +103,16 @@ func (c *Conflicts) Add(tx Tx) error {
 	}
 
 	// Mark this transition's dependencies
-	missingDependencies := transition.Dependencies()
+	missingDependencies := tr.Dependencies()
 	for _, dependencyID := range missingDependencies {
 		dependentNode := c.transitionNodes[dependencyID]
 		dependentNode.dependents.Add(txID)
 		c.transitionNodes[dependencyID] = dependentNode
 	}
 
-	transitionNode.missingDependencies.Add(missingDependencies...)
-	c.transitionNodes[transitionID] = transitionNode
-
+	tn.missingDependencies.Add(missingDependencies...)
+	// The transition node is written back
+	c.transitionNodes[trID] = tn
 	return nil
 }
 
@@ -128,8 +128,8 @@ func (c *Conflicts) IsVirtuous(tx Tx) (bool, error) {
 	// Check whether this transaction consumes the same state as
 	// a different processing transaction
 	txID := tx.ID()
-	transition := tx.Transition()
-	for _, inputID := range transition.InputIDs() { // For each piece of state [tx] consumes
+	tr := tx.Transition()
+	for _, inputID := range tr.InputIDs() { // For each piece of state [tx] consumes
 		spenders := c.utxos[inputID] // txs that consume this state
 		if numSpenders := spenders.Len(); numSpenders > 1 ||
 			(numSpenders == 1 && !spenders.Contains(txID)) {
@@ -140,10 +140,10 @@ func (c *Conflicts) IsVirtuous(tx Tx) (bool, error) {
 	// Check if there are any transactions that attempt to
 	// restrict this transition to at least their epoch.
 	epoch := tx.Epoch()
-	transitionID := transition.ID()
-	transitionNode := c.transitionNodes[transitionID]
+	trID := tr.ID()
+	tn := c.transitionNodes[trID]
 
-	for restrictorID := range transitionNode.restrictions {
+	for restrictorID := range tn.restrictions {
 		restrictor := c.txs[restrictorID]
 		restrictorEpoch := restrictor.Epoch()
 		if restrictorEpoch > epoch {
@@ -169,15 +169,15 @@ func (c *Conflicts) IsVirtuous(tx Tx) (bool, error) {
 
 // Conflicts returns the processing txs that conflict with [tx].
 // [tx] need not be processing.
-func (c *Conflicts) Conflicts(tx Tx) ([]Tx, error) {
+func (c *Conflicts) Conflicts(tx Tx) []Tx {
 	txID := tx.ID()
 	var conflictSet ids.Set
 	conflictSet.Add(txID)
 	conflicts := []Tx(nil)
-	transition := tx.Transition()
+	tr := tx.Transition()
 
 	// Add to the conflict set transactions that consume the same state as [tx]
-	for _, inputID := range transition.InputIDs() {
+	for _, inputID := range tr.InputIDs() {
 		spenders := c.utxos[inputID]
 		for spenderID := range spenders {
 			if conflictSet.Contains(spenderID) { // already have this tx as a conflict
@@ -191,8 +191,9 @@ func (c *Conflicts) Conflicts(tx Tx) ([]Tx, error) {
 	// Add to the conflict set transactions that require the transition performed
 	// by [tx] to be in at least their epoch, but which are in an epoch after [tx]'s
 	epoch := tx.Epoch()
-	transitionID := transition.ID()
-	for restrictorID := range c.transitionNodes[transitionID].restrictions {
+	trID := tr.ID()
+	tn := c.transitionNodes[trID]
+	for restrictorID := range tn.restrictions {
 		if conflictSet.Contains(restrictorID) {
 			continue
 		}
@@ -219,7 +220,7 @@ func (c *Conflicts) Conflicts(tx Tx) ([]Tx, error) {
 			}
 		}
 	}
-	return conflicts, nil
+	return conflicts
 }
 
 // Accept notifies this conflict manager that tx [txID] has been conditionally
@@ -231,11 +232,12 @@ func (c *Conflicts) Accept(txID ids.ID) {
 		return
 	}
 
-	transition := tx.Transition()
-	transitionID := transition.ID()
+	tr := tx.Transition()
+	trID := tr.ID()
+	tn := c.transitionNodes[trID]
 
 	acceptable := true
-	for dependency := range c.transitionNodes[transitionID].missingDependencies {
+	for dependency := range tn.missingDependencies {
 		if !c.acceptableIDs.Contains(dependency) {
 			// [tx] is not acceptable because a transition it requires to have
 			// been performed has not yet been
@@ -243,7 +245,7 @@ func (c *Conflicts) Accept(txID ids.ID) {
 		}
 	}
 	if acceptable {
-		c.acceptableIDs.Add(transitionID)
+		c.acceptableIDs.Add(trID)
 		c.acceptable = append(c.acceptable, tx)
 	} else {
 		c.conditionallyAccepted.Add(txID)
@@ -256,7 +258,8 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 	rejectable := make([]Tx, 0)
 	done := false
 	for !done {
-		acceptableInner, rejectableInner := c.updateable()
+		acceptableInner := c.updateAccepted()
+		rejectableInner := c.updateRejected()
 		acceptable = append(acceptable, acceptableInner...)
 		rejectable = append(rejectable, rejectableInner...)
 		done = len(acceptableInner)+len(rejectableInner) == 0
@@ -267,8 +270,7 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 	return acceptable, rejectable
 }
 
-// updateable implements the [snowstorm.Conflicts] interface
-func (c *Conflicts) updateable() ([]Tx, []Tx) {
+func (c *Conflicts) updateAccepted() []Tx {
 	acceptable := c.acceptable
 	c.acceptable = nil
 
@@ -276,187 +278,213 @@ func (c *Conflicts) updateable() ([]Tx, []Tx) {
 	// marks conditionally acceptable txs with all dependencies met as
 	// acceptable, and marks conflicting txs as rejectable
 	for _, tx := range acceptable {
-		tx := tx.(Tx)
 		txID := tx.ID()
-		transition := tx.Transition()
-		transitionID := transition.ID()
+		tr := tx.Transition()
+		trID := tr.ID()
 		epoch := tx.Epoch()
+		tn := c.transitionNodes[trID]
 
 		// Remove the accepted transaction from the processing tx set
 		delete(c.txs, txID)
 
 		// Remove from the transitions map
-		transitionNode := c.transitionNodes[transitionID]
-		transitionNode.txIDs.Remove(txID)
+		tn.txIDs.Remove(txID)
 
-		// Remove from the UTXO map
-		for _, inputID := range transition.InputIDs() {
-			spenders := c.utxos[inputID]
-			spenders.Remove(txID)
-			if spenders.Len() == 0 {
-				delete(c.utxos, inputID)
-			} else {
-				c.utxos[inputID] = spenders
+		// Remove [tx] from the UTXO map
+		c.removeInputs(txID, tr)
+
+		// Remove from the restrictions
+		c.removeRestrictions(tx)
+
+		c.notifyDependentsAccept(epoch, trID, &tn)
+
+		// If the last transaction attempting to perform [trID] has been
+		// accepted, then remove it from the transition map.
+		if tn.txIDs.Len() == 0 {
+			delete(c.transitionNodes, trID)
+		}
+
+		c.rejectConflicts(tx)
+	}
+	return acceptable
+}
+
+// removeInputs of this transition from the UTXO set
+func (c *Conflicts) removeInputs(txID ids.ID, tr Transition) {
+	// Remove [tx] from the UTXO map
+	for _, inputID := range tr.InputIDs() {
+		spenders := c.utxos[inputID]
+		spenders.Remove(txID)
+		if spenders.Len() == 0 {
+			delete(c.utxos, inputID)
+		}
+		// Note: Updating the utxos map isn't needed here because the utxo set
+		// is a map, which wraps a pointer.
+	}
+}
+
+// removeRestrictions that this transaction names
+func (c *Conflicts) removeRestrictions(tx Tx) {
+	txID := tx.ID()
+	// Remove [tx] from the restrictions
+	for _, restrictionID := range tx.Restrictions() {
+		restrictorNode := c.transitionNodes[restrictionID]
+		restrictorNode.restrictions.Remove(txID)
+		// Note: Updating the transitionNodes map isn't needed here because the
+		// restrictions set is a map, which wraps a pointer.
+	}
+}
+
+// Remove the dependency pointers of the transactions that depended on [tx]'s
+// transition. If a transaction has been conditionally accepted and it has no
+// dependencies left, then it should be marked as acceptable. Reject
+// dependencies that are no longer valid to be accepted.
+func (c *Conflicts) notifyDependentsAccept(epoch uint32, trID ids.ID, tn *transitionNode) {
+outerLoop:
+	// [tn.dependents] is the set of transactions that require
+	// [transition] to be performed before they are accepted
+	for dependentTxID := range tn.dependents {
+		dependentTx := c.txs[dependentTxID]
+		dependentEpoch := dependentTx.Epoch()
+
+		dependentTransition := dependentTx.Transition()
+		dependentTransitionID := dependentTransition.ID()
+
+		// Mark that this dependency has been fulfilled.
+		dependentTransitionNode := c.transitionNodes[dependentTransitionID]
+		dependentTransitionNode.missingDependencies.Remove(trID)
+		// Note: Updating the transitionNodes map isn't needed here because the
+		// missingDependencies set is a map, which wraps a pointer.
+
+		// If the dependent transaction has already been marked for rejection,
+		// we can't reject it again.
+		if c.rejectableIDs.Contains(dependentTxID) {
+			continue
+		}
+
+		// If [dependentTx] requires [tx]'s transition to happen before [epoch],
+		// then [dependent] can no longer be accepted.
+		if dependentEpoch < epoch {
+			c.rejectableIDs.Add(dependentTxID)
+			c.rejectable = append(c.rejectable, dependentTx)
+			continue
+		}
+
+		// If the dependent transaction hasn't been accepted by consensus yet,
+		// it shouldn't be marked as accepted.
+		if !c.conditionallyAccepted.Contains(dependentTxID) {
+			continue
+		}
+
+		// [dependent] has been conditionally accepted.
+		// Check whether all of its transition dependencies are met
+		for dependentTransitionID := range dependentTransitionNode.missingDependencies {
+			if !c.acceptableIDs.Contains(dependentTransitionID) {
+				continue outerLoop
 			}
 		}
 
-		// Remove from the restrictions map
-		for _, restrictionID := range tx.Restrictions() {
-			restrictorNode := c.transitionNodes[restrictionID]
-			restrictorNode.restrictions.Remove(txID)
-			c.transitionNodes[restrictionID] = restrictorNode
-		}
-
-		// Remove from the transition map
-		delete(c.transitionNodes, transitionID)
-
-		// Remove the dependency pointers of the transactions that depended on
-		// [tx]'s transition. If a transaction has been conditionally accepted and
-		// it has no dependencies left, then it should be marked as acceptable.
-		// Reject dependencies that are no longer valid to be accepted.
-	acceptedDependentLoop:
-		// [transitionNode.dependents] is the set of transactions that require
-		// [transition] to be performed before they are accepted
-		for dependentTxID := range transitionNode.dependents {
-			dependentTx := c.txs[dependentTxID]
-			dependentEpoch := dependentTx.Epoch()
-
-			dependentTransition := dependentTx.Transition()
-			dependentTransitionID := dependentTransition.ID()
-
-			// Mark that this depdendency has been fulfilled.
-			dependentTransitionNode := c.transitionNodes[dependentTransitionID]
-			dependentTransitionNode.missingDependencies.Remove(transitionID)
-			c.transitionNodes[dependentTransitionID] = dependentTransitionNode
-
-			if dependentEpoch < epoch && !c.rejectableIDs.Contains(dependentTxID) {
-				// [dependentTx] requires [tx]'s transition to happen
-				// no later than [epoch] but the transition happens after.
-				// Therefore, [dependent] may no longer be accepted.
-				c.rejectableIDs.Add(dependentTxID)
-				c.rejectable = append(c.rejectable, dependentTx)
-				continue
-			}
-
-			if !c.conditionallyAccepted.Contains(dependentTxID) {
-				continue
-			}
-
-			// [dependent] has been conditionally accepted.
-			// Check whether all of its transition dependencies are met
-			for dependentTransitionID := range dependentTransitionNode.missingDependencies {
-				if !c.acceptableIDs.Contains(dependentTransitionID) {
-					continue acceptedDependentLoop
-				}
-			}
-
-			// [dependentTx] has been conditionally accepted
-			// and its transition dependencies have been met.
-			// Therefore, it is acceptable.
-			c.conditionallyAccepted.Remove(dependentTxID)
-			c.acceptableIDs.Add(dependentTransitionID)
-			c.acceptable = append(c.acceptable, dependentTx)
-		}
-
-		// Mark transactions that conflict with [tx] as rejectable.
-		// Conflicts should never return an error, as the type has already been
-		// asserted.
-		conflictTxs, _ := c.Conflicts(tx)
-		for _, conflictTx := range conflictTxs {
-			if conflictTxID := conflictTx.ID(); !c.rejectableIDs.Contains(conflictTxID) {
-				c.rejectableIDs.Add(conflictTxID)
-				c.rejectable = append(c.rejectable, conflictTx)
-			}
-		}
+		// [dependentTx] has been conditionally accepted and its transition
+		// dependencies have been met.
+		c.conditionallyAccepted.Remove(dependentTxID)
+		c.acceptableIDs.Add(dependentTransitionID)
+		c.acceptable = append(c.acceptable, dependentTx)
 	}
 
+	// Make sure that future checks of the dependents doesn't result in multiple
+	// iterations, as the dependents should already have had their missins
+	// dependencies updated.
+	tn.dependents.Clear()
+}
+
+func (c *Conflicts) rejectConflicts(tx Tx) {
+	// Mark transactions that conflict with [tx] as rejectable.
+	conflictTxs := c.Conflicts(tx)
+	for _, conflictTx := range conflictTxs {
+		if conflictTxID := conflictTx.ID(); !c.rejectableIDs.Contains(conflictTxID) {
+			c.rejectableIDs.Add(conflictTxID)
+			c.rejectable = append(c.rejectable, conflictTx)
+		}
+	}
+}
+
+func (c *Conflicts) updateRejected() []Tx {
 	rejectable := c.rejectable
 	c.rejectable = nil
 	// This loop does cleanup for the txs which are about to be rejected,
 	// and marks txs as rejectable if they have a dependency/restriction that
 	// can't be met.
 	for _, tx := range rejectable {
-		tx := tx.(Tx)
 		txID := tx.ID()
-		transition := tx.Transition()
-		transitionID := transition.ID()
-		transitionNode := c.transitionNodes[transitionID]
+		tr := tx.Transition()
+		trID := tr.ID()
+		tn := c.transitionNodes[trID]
 
 		// Remove [tx] from the processing tx set
 		delete(c.txs, txID)
 
 		// Remove [tx] from set of transactions that perform this transition
-		transitionNode.txIDs.Remove(txID)
-		c.transitionNodes[transitionID] = transitionNode
+		tn.txIDs.Remove(txID)
+		// Note: Updating the transitionNodes map isn't needed here because the
+		// txIDs set is a map, which wraps a pointer.
 
 		// Remove [tx] from the UTXO map
-		for _, inputID := range transition.InputIDs() {
-			spenders := c.utxos[inputID]
-			spenders.Remove(txID)
-			if spenders.Len() == 0 {
-				delete(c.utxos, inputID)
-			} else {
-				c.utxos[inputID] = spenders
-			}
-		}
+		c.removeInputs(txID, tr)
 
-		// Remove [tx] from the restrictions map
-		for _, restrictionID := range tx.Restrictions() {
-			restrictorNode := c.transitionNodes[restrictionID]
-			restrictorNode.restrictions.Remove(txID)
-			c.transitionNodes[restrictionID] = restrictorNode
-		}
+		// Remove [tx] from the restrictions
+		c.removeRestrictions(tx)
 
-		if transitionNode.txIDs.Len() == 0 {
-			// [tx] was the only processing tx that performs transition [transitionID].
-			// Mark as rejectable transactions that depended on this transition.
-			for dependentTxID := range transitionNode.dependents {
-				if !c.rejectableIDs.Contains(dependentTxID) {
-					c.rejectableIDs.Add(dependentTxID)
-					dependentTx := c.txs[dependentTxID]
-					c.rejectable = append(c.rejectable, dependentTx)
-				}
-			}
+		// Remove transactions that are no longer valid
+		c.rejectInvalidDependents(&tn)
 
-			// If the last transaction attempting to perform [transitionID]
-			// has been rejected, then remove it from the transition map.
-			delete(c.transitionNodes, transitionID)
-		} else if len(transitionNode.dependents) > 0 {
-			// There are processing tx's other than [tx] that
-			// perform transition [transitionID].
-			// Calculate the earliest epoch in which the transition may occur.
-			lowestRemainingEpoch := uint32(math.MaxUint32)
-			for otherTxID := range transitionNode.txIDs {
-				otherTx := c.txs[otherTxID]
-				otherEpoch := otherTx.Epoch()
-				if otherEpoch < lowestRemainingEpoch {
-					lowestRemainingEpoch = otherEpoch
-				}
-			}
+		// Since this transaction is being rejected, it's dependencies no longer
+		// need to notify it.
+		c.removeDependents(txID, &tn)
 
-			// Mark as rejectable txs that require transition [transitionID] to
-			// occur earlier than it can.
-			for dependentTxID := range transitionNode.dependents {
-				dependentTx := c.txs[dependentTxID]
-				dependentEpoch := dependentTx.Epoch()
-				if dependentEpoch < lowestRemainingEpoch && !c.rejectableIDs.Contains(dependentTxID) {
-					c.rejectableIDs.Add(dependentTxID)
-					c.rejectable = append(c.rejectable, dependentTx)
-				}
-			}
-		}
-
-		// For each missing dependency of this transition, mark that [tx]
-		// is no longer a dependent
-		for dependency := range transitionNode.missingDependencies {
-			dependentTransitionNode, exists := c.transitionNodes[dependency]
-			if !exists {
-				continue
-			}
-			dependentTransitionNode.dependents.Remove(txID)
-			c.transitionNodes[dependency] = dependentTransitionNode
+		// If the last transaction attempting to perform [trID] has been
+		// rejected, then remove it from the transition map.
+		if tn.txIDs.Len() == 0 {
+			delete(c.transitionNodes, trID)
 		}
 	}
 
-	return acceptable, rejectable
+	return rejectable
+}
+
+func (c *Conflicts) rejectInvalidDependents(tn *transitionNode) {
+	if len(tn.dependents) == 0 {
+		return
+	}
+
+	// There are processing tx's other than [tx] that
+	// perform transition [transitionID].
+	// Calculate the earliest epoch in which the transition may occur.
+	lowestRemainingEpoch := uint32(math.MaxUint32)
+	for otherTxID := range tn.txIDs {
+		otherTx := c.txs[otherTxID]
+		otherEpoch := otherTx.Epoch()
+		if otherEpoch < lowestRemainingEpoch {
+			lowestRemainingEpoch = otherEpoch
+		}
+	}
+
+	// Mark as rejectable txs that require transition [transitionID] to
+	// occur earlier than it can.
+	for dependentTxID := range tn.dependents {
+		dependentTx := c.txs[dependentTxID]
+		dependentEpoch := dependentTx.Epoch()
+		if dependentEpoch < lowestRemainingEpoch && !c.rejectableIDs.Contains(dependentTxID) {
+			c.rejectableIDs.Add(dependentTxID)
+			c.rejectable = append(c.rejectable, dependentTx)
+		}
+	}
+}
+
+// For each missing dependency of this transition, mark that [tx] is no longer a
+// dependent
+func (c *Conflicts) removeDependents(txID ids.ID, tn *transitionNode) {
+	for dependency := range tn.missingDependencies {
+		dependentTransitionNode := c.transitionNodes[dependency]
+		dependentTransitionNode.dependents.Remove(txID)
+	}
 }
