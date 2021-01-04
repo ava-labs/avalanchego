@@ -10,7 +10,7 @@ import (
 // Tree holds the tree data
 type Tree struct {
 	rootNode Node
-	status   string
+	closed   bool
 }
 
 func (t *Tree) Has(key []byte) (bool, error) {
@@ -72,7 +72,7 @@ func (t *Tree) Close() error {
 	if t.isClosed() != nil {
 		return t.isClosed()
 	}
-	t.status = "closed"
+	t.closed = true
 	return nil
 }
 
@@ -80,6 +80,7 @@ func (t *Tree) Close() error {
 func NewTree() *Tree {
 	return &Tree{
 		rootNode: NewRootNode(),
+		closed:   false,
 	}
 }
 
@@ -163,7 +164,7 @@ func (t *Tree) PrintTree() {
 }
 
 func (t *Tree) fetchNextNode(prefix []Unit, start []Unit, key []Unit, node Node) (Node, error) {
-	if node == nil || t.status == "closed" {
+	if node == nil || t.closed {
 		return nil, database.ErrClosed
 	}
 
@@ -178,7 +179,7 @@ func (t *Tree) fetchNextNode(prefix []Unit, start []Unit, key []Unit, node Node)
 }
 
 func (t *Tree) isClosed() error {
-	if t.status == "closed" {
+	if t.closed {
 		return database.ErrClosed
 	}
 	return nil

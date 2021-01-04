@@ -95,16 +95,11 @@ func TestTree_Del(t *testing.T) {
 		_ = tree.Put(test.key, test.value)
 	}
 
-	//tree.PrintTree()
-	//fmt.Printf("Full Tree -\n\n")
 	for _, test := range tests {
 		deleted := tree.Del(test.key)
 		if !deleted {
 			t.Fatalf("value not deleted in the tree as it was not found- %v", test.key)
 		}
-
-		//tree.PrintTree()
-		//fmt.Printf("deleted - %v\n\n", test.key)
 	}
 
 }
@@ -133,16 +128,11 @@ func TestTree_DelVariableKeys(t *testing.T) {
 		_ = tree.Put(test.key, test.value)
 	}
 
-	//tree.PrintTree()
-	//fmt.Printf("Full Tree -\n\n")
 	for _, test := range tests {
 		deleted := tree.Del(test.key)
 		if !deleted {
 			t.Fatalf("value not deleted in the tree as it was not found- %v", test.key)
 		}
-
-		//tree.PrintTree()
-		//fmt.Printf("deleted - %v\n\n", test.key)
 	}
 
 }

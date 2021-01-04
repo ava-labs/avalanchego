@@ -11,8 +11,8 @@ func CreateRandomValues(valueCount int) []TestStruct {
 	added := map[string]bool{}
 
 	for i := 0; i < valueCount; i++ {
-		key := make([]byte, mrand.Intn(31)+1)
-		val := make([]byte, mrand.Intn(31)+1)
+		key := make([]byte, mrand.Intn(31)+1) // #nosec G404
+		val := make([]byte, mrand.Intn(31)+1) // #nosec G404
 		_, _ = rand.Read(key)
 		_, _ = rand.Read(val)
 
