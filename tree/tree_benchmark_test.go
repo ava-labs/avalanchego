@@ -33,81 +33,53 @@ func CreateRandomValues(valueCount int) []TestStruct {
 }
 
 func BenchmarkTree_Put(b *testing.B) {
+	tests := []struct {
+		name string
+		data []TestStruct
+	}{
+		{"test100k_Put", CreateRandomValues(100000)},
+		// this takes a lot of time removed from the CI
+		// {"test1M_Put_Del", CreateRandomValues(1000000)},
+		// {"test10M_Put_Del", CreateRandomValues(10000000)},
+	}
 
-	tree := NewTree()
-	test100k := CreateRandomValues(100000)
-	test1M := CreateRandomValues(1000000)
-	test10M := CreateRandomValues(10000000)
+	for _, test := range tests {
+		tree := NewTree()
+		b.Run("test100k", func(b *testing.B) {
+			b.ResetTimer()
 
-	b.Run("test100k", func(b *testing.B) {
-		b.ResetTimer()
-
-		for _, test := range test100k {
-			_ = tree.Put(test.key, test.value)
-		}
-	})
-
-	b.Run("test1M", func(b *testing.B) {
-		b.ResetTimer()
-		for _, test := range test1M {
-			_ = tree.Put(test.key, test.value)
-		}
-	})
-
-	b.Run("test10M", func(b *testing.B) {
-		b.ResetTimer()
-		for _, test := range test10M {
-			_ = tree.Put(test.key, test.value)
-		}
-	})
+			for _, test := range test.data {
+				_ = tree.Put(test.key, test.value)
+			}
+		})
+	}
 }
 
 func BenchmarkTree_Del(b *testing.B) {
 
-	test100k := CreateRandomValues(100000)
-	test1M := CreateRandomValues(1000000)
-	test10M := CreateRandomValues(10000000)
+	tests := []struct {
+		name string
+		data []TestStruct
+	}{
+		{"test100k_Put_Del", CreateRandomValues(100000)},
+		// this takes a lot of time removed from the CI
+		// {"test1M_Put_Del", CreateRandomValues(1000000)},
+		// {"test10M_Put_Del", CreateRandomValues(10000000)},
+	}
 
-	b.Run("test100k_Put_Del", func(b *testing.B) {
-		tree := NewTree()
-		b.ResetTimer()
-		for _, test := range test100k {
-			_ = tree.Put(test.key, test.value)
-		}
-
-		for _, test := range test100k {
-			if !tree.Del(test.key) {
-				b.Fatalf("value not deleted in the tree as it was not found- %v", test.key)
+	for _, test := range tests {
+		b.Run(test.name, func(b *testing.B) {
+			tree := NewTree()
+			b.ResetTimer()
+			for _, test := range test.data {
+				_ = tree.Put(test.key, test.value)
 			}
-		}
-	})
 
-	b.Run("test1M_Put_Del", func(b *testing.B) {
-		b.ResetTimer()
-		tree := NewTree()
-		for _, test := range test1M {
-			_ = tree.Put(test.key, test.value)
-		}
-
-		for _, test := range test1M {
-			if !tree.Del(test.key) {
-				b.Fatalf("value not deleted in the tree as it was not found- %v", test.key)
+			for _, test := range test.data {
+				if !tree.Del(test.key) {
+					b.Fatalf("value not deleted in the tree as it was not found- %v", test.key)
+				}
 			}
-		}
-	})
-
-	b.Run("test10M_Put_Del", func(b *testing.B) {
-		b.ResetTimer()
-		tree := NewTree()
-		for _, test := range test10M {
-			_ = tree.Put(test.key, test.value)
-		}
-
-		for _, test := range test10M {
-			if !tree.Del(test.key) {
-				tree.PrintTree()
-				b.Fatalf("value not deleted in the tree as it was not found- %v", test.key)
-			}
-		}
-	})
+		})
+	}
 }
