@@ -72,9 +72,8 @@ func New() *Conflicts {
 	}
 }
 
-// Add this tx to the conflict set. If this tx is of the correct type,
-// this tx will be added to the set of processing txs.
-// Invariant: Add has not already been called with argument [tx].
+// Add this tx to the conflict set.
+// Assumes: Add has not already been called with argument [tx].
 func (c *Conflicts) Add(tx Tx) error {
 	// Mark that this tx is processing
 	txID := tx.ID()
@@ -123,10 +122,10 @@ func (c *Conflicts) Processing(trID ids.ID) bool {
 }
 
 // IsVirtuous checks the currently processing txs for conflicts.
-// [tx] need not be a tx that is processing.
+// [tx] need not be is processing.
 func (c *Conflicts) IsVirtuous(tx Tx) (bool, error) {
-	// Check whether this transaction consumes the same state as
-	// a different processing transaction
+	// Check whether this transaction consumes the same state as a different
+	// processing transaction
 	txID := tx.ID()
 	tr := tx.Transition()
 	for _, inputID := range tr.InputIDs() { // For each piece of state [tx] consumes
@@ -137,8 +136,8 @@ func (c *Conflicts) IsVirtuous(tx Tx) (bool, error) {
 		}
 	}
 
-	// Check if there are any transactions that attempt to
-	// restrict this transition to at least their epoch.
+	// Check if there are any transactions that attempt to restrict this
+	// transition to at least their epoch.
 	epoch := tx.Epoch()
 	trID := tr.ID()
 	tn := c.transitionNodes[trID]
@@ -154,8 +153,8 @@ func (c *Conflicts) IsVirtuous(tx Tx) (bool, error) {
 	// Check if this transaction is marked as attempting to restrict other txs
 	// to at least this epoch.
 	for _, restrictedTransitionID := range tx.Restrictions() {
-		// Iterate over the set of transactions that [tx] requires
-		// to be performed in [epoch] or a later one
+		// Iterate over the set of transactions that [tx] requires to be
+		// performed in [epoch] or a later one
 		for restrictionID := range c.transitionNodes[restrictedTransitionID].txIDs {
 			restriction := c.txs[restrictionID]
 			restrictionEpoch := restriction.Epoch()
@@ -188,8 +187,9 @@ func (c *Conflicts) Conflicts(tx Tx) []Tx {
 		}
 	}
 
-	// Add to the conflict set transactions that require the transition performed
-	// by [tx] to be in at least their epoch, but which are in an epoch after [tx]'s
+	// Add to the conflict set transactions that require the transition
+	// performed by [tx] to be in at least their epoch, but which are in an
+	// epoch after [tx]'s
 	epoch := tx.Epoch()
 	trID := tr.ID()
 	tn := c.transitionNodes[trID]
@@ -296,6 +296,8 @@ func (c *Conflicts) updateAccepted() []Tx {
 		// Remove from the restrictions
 		c.removeRestrictions(tx)
 
+		// Go though the dependent transactions to accept or reject them
+		// according to the epochs
 		c.notifyDependentsAccept(epoch, trID, &tn)
 
 		// If the last transaction attempting to perform [trID] has been
@@ -304,6 +306,8 @@ func (c *Conflicts) updateAccepted() []Tx {
 			delete(c.transitionNodes, trID)
 		}
 
+		// Since we are accepting this transaction, all the transactions that
+		// conflict with this transaction should be rejected
 		c.rejectConflicts(tx)
 	}
 	return acceptable
@@ -397,8 +401,8 @@ outerLoop:
 	tn.dependents.Clear()
 }
 
+// rejectConflicts of [tx]
 func (c *Conflicts) rejectConflicts(tx Tx) {
-	// Mark transactions that conflict with [tx] as rejectable.
 	conflictTxs := c.Conflicts(tx)
 	for _, conflictTx := range conflictTxs {
 		if conflictTxID := conflictTx.ID(); !c.rejectableIDs.Contains(conflictTxID) {
@@ -408,12 +412,11 @@ func (c *Conflicts) rejectConflicts(tx Tx) {
 	}
 }
 
+// Cleanup the transactions which are about to be rejected and mark transactions
+// as rejectable if they have a dependency/restriction that can't be met.
 func (c *Conflicts) updateRejected() []Tx {
 	rejectable := c.rejectable
 	c.rejectable = nil
-	// This loop does cleanup for the txs which are about to be rejected,
-	// and marks txs as rejectable if they have a dependency/restriction that
-	// can't be met.
 	for _, tx := range rejectable {
 		txID := tx.ID()
 		tr := tx.Transition()
@@ -451,13 +454,13 @@ func (c *Conflicts) updateRejected() []Tx {
 	return rejectable
 }
 
+// Mark as rejectable txs that require the transition to occur earlier than it
+// can.
 func (c *Conflicts) rejectInvalidDependents(tn *transitionNode) {
 	if len(tn.dependents) == 0 {
 		return
 	}
 
-	// There are processing tx's other than [tx] that
-	// perform transition [transitionID].
 	// Calculate the earliest epoch in which the transition may occur.
 	lowestRemainingEpoch := uint32(math.MaxUint32)
 	for otherTxID := range tn.txIDs {
@@ -468,8 +471,6 @@ func (c *Conflicts) rejectInvalidDependents(tn *transitionNode) {
 		}
 	}
 
-	// Mark as rejectable txs that require transition [transitionID] to
-	// occur earlier than it can.
 	for dependentTxID := range tn.dependents {
 		dependentTx := c.txs[dependentTxID]
 		dependentEpoch := dependentTx.Epoch()
