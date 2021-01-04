@@ -4,7 +4,7 @@ import "golang.org/x/crypto/sha3"
 
 type Node interface {
 	GetChild(key []Unit) Node
-	GetNextNode(key []Unit) Node
+	GetNextNode(prefix []Unit, start []Unit, key []Unit) Node
 	Insert(key []Unit, value []byte)
 	Delete(key []Unit) bool
 	SetChild(node Node)

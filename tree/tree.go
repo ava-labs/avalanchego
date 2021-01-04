@@ -1,6 +1,7 @@
 package tree
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -9,18 +10,25 @@ import (
 // Tree holds the tree data
 type Tree struct {
 	rootNode Node
+	status   string
 }
 
 func (t *Tree) Has(key []byte) (bool, error) {
+	if t.isClosed() != nil {
+		return false, t.isClosed()
+	}
+
 	node := t.findNode(FromBytes(key), t.rootNode)
-	if node == nil {
+	if node == nil || !bytes.Equal(ToBytes(node.Key()), key) {
 		return false, nil
 	}
 	return true, nil
 }
 
+// NewBatch creates a write-only database that buffers changes to its host db
+// until a final write is called.
 func (t *Tree) NewBatch() database.Batch {
-	panic("implement me")
+	return NewBatch(t)
 }
 
 // NewIterator creates a binary-alphabetical iterator over the entire
@@ -33,20 +41,20 @@ func (t *Tree) NewIterator() database.Iterator {
 // of database content starting at a particular initial key (or after, if it
 // does not exist).
 func (t *Tree) NewIteratorWithStart(start []byte) database.Iterator {
-	return NewIteratorWithStart(start)
+	return NewIteratorWithStart(t, start)
 }
 
 // NewIteratorWithPrefix creates a binary-alphabetical iterator over a
 // subset of database content with a particular key prefix.
 func (t *Tree) NewIteratorWithPrefix(prefix []byte) database.Iterator {
-	return NewIteratorWithPrefix(prefix)
+	return NewIteratorWithPrefix(t, prefix)
 }
 
 // NewIteratorWithStartAndPrefix creates a binary-alphabetical iterator over
 // a subset of database content with a particular key prefix starting at a
 // specified key.
 func (t *Tree) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
-	return NewIteratorWithStartAndPrefix(start, prefix)
+	return NewIteratorWithStartAndPrefix(t, start, prefix)
 }
 
 func (t *Tree) Stat(property string) (string, error) {
@@ -54,10 +62,17 @@ func (t *Tree) Stat(property string) (string, error) {
 }
 
 func (t *Tree) Compact(start []byte, limit []byte) error {
+	if t.isClosed() != nil {
+		return t.isClosed()
+	}
 	return nil
 }
 
 func (t *Tree) Close() error {
+	if t.isClosed() != nil {
+		return t.isClosed()
+	}
+	t.status = "closed"
 	return nil
 }
 
@@ -72,20 +87,30 @@ func (t *Tree) Root() []byte {
 	return t.rootNode.GetHash()
 }
 
-func (t *Tree) Get(key []byte) ([]byte, bool) {
-	node := t.findNode(FromBytes(key), t.rootNode)
-	if _, ok := node.(*EmptyNode); ok {
-		return nil, false
+func (t *Tree) Get(key []byte) ([]byte, error) {
+	if t.isClosed() != nil {
+		return nil, t.isClosed()
 	}
-	return node.Value(), true
+	node := t.findNode(FromBytes(key), t.rootNode)
+	if node == nil {
+		return nil, database.ErrNotFound
+	}
+	if _, ok := node.(*EmptyNode); ok {
+		return nil, database.ErrNotFound
+	}
+	return node.Value(), nil
 }
 
 // Put travels the tree and finds the node to insert the LeafNode
-func (t *Tree) Put(key []byte, value []byte) {
+func (t *Tree) Put(key []byte, value []byte) error {
+	if t.isClosed() != nil {
+		return t.isClosed()
+	}
+
 	unitKey := FromBytes(key)
 	if t.rootNode.GetChild([]Unit{}) == nil {
 		t.rootNode.SetChild(NewLeafNode(unitKey, value, t.rootNode))
-		return
+		return nil
 	}
 
 	insertNode := t.findNode(unitKey, t.rootNode)
@@ -93,10 +118,15 @@ func (t *Tree) Put(key []byte, value []byte) {
 		fmt.Println("This should never happen")
 	}
 	insertNode.Insert(unitKey, value)
+	return nil
 }
 
 // Delete is fills the implementation
 func (t *Tree) Delete(key []byte) error {
+	if t.isClosed() != nil {
+		return t.isClosed()
+	}
+
 	t.Del(key)
 	return nil
 }
@@ -106,7 +136,6 @@ func (t *Tree) Del(key []byte) bool {
 
 	deleteNode := t.findNode(unitKey, t.rootNode)
 	if deleteNode == nil {
-		fmt.Println("node does not exist")
 		return false
 	}
 
@@ -133,17 +162,24 @@ func (t *Tree) PrintTree() {
 	t.rootNode.Print()
 }
 
-func (t *Tree) fetchNextNode(key []Unit, node Node) Node {
-	if node == nil {
-		return nil
+func (t *Tree) fetchNextNode(prefix []Unit, start []Unit, key []Unit, node Node) (Node, error) {
+	if node == nil || t.status == "closed" {
+		return nil, database.ErrClosed
 	}
 
 	switch node.(type) {
 	case *EmptyNode:
-		return nil
+		return nil, nil
 	case *LeafNode:
-		return node
+		return node, nil
 	}
 
-	return t.fetchNextNode(key, node.GetNextNode(key))
+	return t.fetchNextNode(prefix, start, key, node.GetNextNode(prefix, start, key))
+}
+
+func (t *Tree) isClosed() error {
+	if t.status == "closed" {
+		return database.ErrClosed
+	}
+	return nil
 }

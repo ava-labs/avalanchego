@@ -1,11 +1,25 @@
 package tree
 
-const UnitSize = 16
+const UnitSize = 16 + 1
 
 type Unit byte
 
 func FirstNonPrefix(basekey []Unit, otherKey []Unit) Unit {
-	return otherKey[len(basekey)]
+	smaller := otherKey
+	larger := basekey
+
+	// the UnitSize - 1 position is the termination position
+	// that position will only have LeafNodes
+	if len(basekey) == len(otherKey) {
+		return Unit(UnitSize - 1)
+	}
+
+	if len(smaller) > len(larger) {
+		smaller = basekey
+		larger = otherKey
+	}
+
+	return larger[len(smaller)]
 }
 
 // SharedPrefix returns the minimum Unit shared between two Unit
@@ -60,6 +74,20 @@ func FromByte(b byte) []Unit {
 	}
 }
 
+// IsPrefixed checks if prefix is prefixed in u
+// u - 01234, 012,  001, 01
+// p - 01   , 012 , 02 , 012
+// = - T    , T   , F  , T
+func IsPrefixed(prefix []Unit, u []Unit) bool {
+	for i := 0; i < len(prefix) && i < len(u); i++ {
+		if prefix[i] != u[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
 // TODO Review this padding
 // ToBytes converts a slice of nibbles to a byte slice
 // assuming the nibble slice has even number of nibbles.
@@ -76,4 +104,14 @@ func ToBytes(u []Unit) []byte {
 	}
 
 	return buf
+}
+
+func Greater(u1 []Unit, u2 []Unit) bool {
+	for i := 0; i < len(u1) && i < len(u2); i++ {
+		if u1[i] < u2[i] {
+			return false
+		}
+	}
+
+	return true
 }

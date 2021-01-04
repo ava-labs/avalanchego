@@ -19,7 +19,7 @@ func (r *RootNode) GetChild(key []Unit) Node {
 }
 
 // GetNextNode returns the child
-func (r *RootNode) GetNextNode(key []Unit) Node {
+func (r *RootNode) GetNextNode(prefix []Unit, start []Unit, key []Unit) Node {
 	return r.child
 }
 
