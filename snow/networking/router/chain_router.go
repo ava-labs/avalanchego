@@ -381,7 +381,10 @@ func (sr *ChainRouter) QueryFailed(validatorID ids.ShortID, chainID ids.ID, requ
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
-	sr.timeouts.Cancel(validatorID, chainID, requestID)
+	// Registers a failure to the benchlist instead of canceling the timeout.
+	// This allows the benchlist to register failed queries caused by [validatorID]
+	// being unreachable.
+	sr.timeouts.RegisterFailure(validatorID, chainID, requestID)
 	if chain, exists := sr.chains[chainID]; exists {
 		chain.QueryFailed(validatorID, requestID)
 	} else {

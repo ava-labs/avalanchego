@@ -239,7 +239,6 @@ func (b *queryBenchlist) cleanup() {
 	updatedWeight := currentWeight
 	totalWeight := b.vdrs.Weight()
 	maxBenchlistWeight := uint64(float64(totalWeight) * b.maxPortion)
-
 	// Iterate over elements of the benchlist in order of expiration
 	for b.benchlistOrder.Len() > 0 {
 		e := b.benchlistOrder.Front()
@@ -273,7 +272,8 @@ func (b *queryBenchlist) cleanup() {
 	}
 
 	updatedBenchLen := b.benchlistSet.Len()
-	b.ctx.Log.Debug("Benched Weight: (%d/%d) -> (%d/%d). Benched Validators: %d -> %d.",
+	b.ctx.Log.Debug("Maximum Benchable Weight: %d. Benched Weight: (%d/%d) -> (%d/%d). Benched Validators: %d -> %d.",
+		maxBenchlistWeight,
 		currentWeight,
 		totalWeight,
 		updatedWeight,
