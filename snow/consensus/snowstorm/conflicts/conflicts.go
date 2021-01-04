@@ -112,7 +112,6 @@ func (c *Conflicts) Add(tx Tx) error {
 
 	transitionNode.missingDependencies.Add(missingDependencies...)
 	c.transitionNodes[transitionID] = transitionNode
-
 	return nil
 }
 
@@ -256,7 +255,8 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 	rejectable := make([]Tx, 0)
 	done := false
 	for !done {
-		acceptableInner, rejectableInner := c.updateable()
+		acceptableInner := c.updateAccepted()
+		rejectableInner := c.updateRejected()
 		acceptable = append(acceptable, acceptableInner...)
 		rejectable = append(rejectable, rejectableInner...)
 		done = len(acceptableInner)+len(rejectableInner) == 0
@@ -267,8 +267,7 @@ func (c *Conflicts) Updateable() ([]Tx, []Tx) {
 	return acceptable, rejectable
 }
 
-// updateable implements the [snowstorm.Conflicts] interface
-func (c *Conflicts) updateable() ([]Tx, []Tx) {
+func (c *Conflicts) updateAccepted() []Tx {
 	acceptable := c.acceptable
 	c.acceptable = nil
 
@@ -276,7 +275,6 @@ func (c *Conflicts) updateable() ([]Tx, []Tx) {
 	// marks conditionally acceptable txs with all dependencies met as
 	// acceptable, and marks conflicting txs as rejectable
 	for _, tx := range acceptable {
-		tx := tx.(Tx)
 		txID := tx.ID()
 		transition := tx.Transition()
 		transitionID := transition.ID()
@@ -289,23 +287,11 @@ func (c *Conflicts) updateable() ([]Tx, []Tx) {
 		transitionNode := c.transitionNodes[transitionID]
 		transitionNode.txIDs.Remove(txID)
 
-		// Remove from the UTXO map
-		for _, inputID := range transition.InputIDs() {
-			spenders := c.utxos[inputID]
-			spenders.Remove(txID)
-			if spenders.Len() == 0 {
-				delete(c.utxos, inputID)
-			} else {
-				c.utxos[inputID] = spenders
-			}
-		}
+		// Remove [tx] from the UTXO map
+		c.removeInputs(txID, transition)
 
-		// Remove from the restrictions map
-		for _, restrictionID := range tx.Restrictions() {
-			restrictorNode := c.transitionNodes[restrictionID]
-			restrictorNode.restrictions.Remove(txID)
-			c.transitionNodes[restrictionID] = restrictorNode
-		}
+		// Remove from the restrictions
+		c.removeRestrictions(tx)
 
 		// Remove from the transition map
 		delete(c.transitionNodes, transitionID)
@@ -358,25 +344,59 @@ func (c *Conflicts) updateable() ([]Tx, []Tx) {
 			c.acceptable = append(c.acceptable, dependentTx)
 		}
 
-		// Mark transactions that conflict with [tx] as rejectable.
-		// Conflicts should never return an error, as the type has already been
-		// asserted.
-		conflictTxs, _ := c.Conflicts(tx)
-		for _, conflictTx := range conflictTxs {
-			if conflictTxID := conflictTx.ID(); !c.rejectableIDs.Contains(conflictTxID) {
-				c.rejectableIDs.Add(conflictTxID)
-				c.rejectable = append(c.rejectable, conflictTx)
-			}
+		_ = c.rejectConflicts(tx) // TODO: handle error
+	}
+	return acceptable
+}
+
+func (c *Conflicts) removeInputs(txID ids.ID, tr Transition) {
+	// Remove [tx] from the UTXO map
+	for _, inputID := range tr.InputIDs() {
+		spenders := c.utxos[inputID]
+		spenders.Remove(txID)
+		if spenders.Len() == 0 {
+			delete(c.utxos, inputID)
+		}
+		// Updating the utxos map isn't needed here because the utxo set is a
+		// map, which wraps a pointer.
+	}
+}
+
+func (c *Conflicts) removeRestrictions(tx Tx) {
+	txID := tx.ID()
+	// Remove [tx] from the restrictions
+	for _, restrictionID := range tx.Restrictions() {
+		restrictorNode := c.transitionNodes[restrictionID]
+		restrictorNode.restrictions.Remove(txID)
+		// Updating the transitionNodes map isn't needed here because the
+		// restrictions set is a map, which wraps a pointer.
+	}
+}
+
+func (c *Conflicts) rejectConflicts(tx Tx) error {
+	// Mark transactions that conflict with [tx] as rejectable.
+	// Conflicts should never return an error, as the type has already been
+	// asserted.
+	conflictTxs, err := c.Conflicts(tx)
+	if err != nil {
+		return err
+	}
+	for _, conflictTx := range conflictTxs {
+		if conflictTxID := conflictTx.ID(); !c.rejectableIDs.Contains(conflictTxID) {
+			c.rejectableIDs.Add(conflictTxID)
+			c.rejectable = append(c.rejectable, conflictTx)
 		}
 	}
+	return nil
+}
 
+func (c *Conflicts) updateRejected() []Tx {
 	rejectable := c.rejectable
 	c.rejectable = nil
 	// This loop does cleanup for the txs which are about to be rejected,
 	// and marks txs as rejectable if they have a dependency/restriction that
 	// can't be met.
 	for _, tx := range rejectable {
-		tx := tx.(Tx)
 		txID := tx.ID()
 		transition := tx.Transition()
 		transitionID := transition.ID()
@@ -390,22 +410,10 @@ func (c *Conflicts) updateable() ([]Tx, []Tx) {
 		c.transitionNodes[transitionID] = transitionNode
 
 		// Remove [tx] from the UTXO map
-		for _, inputID := range transition.InputIDs() {
-			spenders := c.utxos[inputID]
-			spenders.Remove(txID)
-			if spenders.Len() == 0 {
-				delete(c.utxos, inputID)
-			} else {
-				c.utxos[inputID] = spenders
-			}
-		}
+		c.removeInputs(txID, transition)
 
-		// Remove [tx] from the restrictions map
-		for _, restrictionID := range tx.Restrictions() {
-			restrictorNode := c.transitionNodes[restrictionID]
-			restrictorNode.restrictions.Remove(txID)
-			c.transitionNodes[restrictionID] = restrictorNode
-		}
+		// Remove [tx] from the restrictions
+		c.removeRestrictions(tx)
 
 		if transitionNode.txIDs.Len() == 0 {
 			// [tx] was the only processing tx that performs transition [transitionID].
@@ -458,5 +466,5 @@ func (c *Conflicts) updateable() ([]Tx, []Tx) {
 		}
 	}
 
-	return acceptable, rejectable
+	return rejectable
 }
