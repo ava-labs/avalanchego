@@ -10,26 +10,33 @@ import (
 
 // Conflicts is an interface used to manage conflict sets
 type Conflicts interface {
-	// Add this transaction to conflict tracking
+	// Add [tx] to conflict tracking
+	//
+	// Assumes Add has not already been called with [tx]
 	Add(tx conflicts.Tx) error
 
-	// Processing returns if this transition is currently being processed
+	// Processing returns if [trID] is currently being processed
 	Processing(trID ids.ID) bool
 
-	// Conflicts returns true if there are no transactions currently tracked
+	// IsVirtuous returns true if there are no known conflicts with [tx]
 	IsVirtuous(tx conflicts.Tx) (bool, error)
 
-	// Conflicts returns the transactions that conflict with the provided
-	// transaction
+	// Conflicts returns the known transactions that conflict with [tx]
 	Conflicts(tx conflicts.Tx) []conflicts.Tx
 
-	// Mark this transaction as conditionally accepted
+	// Mark [txID] as conditionally accepted
 	Accept(txID ids.ID)
 
-	// Updateable returns the transactions that can be accepted and rejected.
-	// Acceptable transactions must have been identified as having been conditionally accepted.
-	// If an acceptable transaction was marked as having a conflict, then that conflict
-	// should be returned in the same call as the acceptable transaction was returned or
-	// in a prior call.
+	// Updateable returns all transactions that can be accepted or rejected
+	//
+	// Acceptable transactions must have been identified as having been
+	// conditionally accepted
+	//
+	// If an acceptable transaction was marked as having a conflict, then that
+	// conflict should be returned in rejectable in the same call the acceptable
+	// transaction was returned or in a prior call
+	//
+	// Acceptable transactions must be returned in in the order they should be
+	// accepted
 	Updateable() (acceptable []conflicts.Tx, rejectable []conflicts.Tx)
 }
