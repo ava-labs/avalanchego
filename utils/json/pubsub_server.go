@@ -100,6 +100,26 @@ func (s *PubSubServer) Publish(channel string, msg interface{}) {
 	}
 }
 
+// Publish ...
+func (s *PubSubServer) PublishRaw(channel string, msg interface{}) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	conns, exists := s.channels[channel]
+	if !exists {
+		s.ctx.Log.Warn("attempted to publush to an unknown channel %s", channel)
+		return
+	}
+
+	for conn := range conns {
+		select {
+		case conn.send <- msg:
+		default:
+			s.ctx.Log.Verbo("dropping message to subscribed connection due to too many pending messages")
+		}
+	}
+}
+
 // Register ...
 func (s *PubSubServer) Register(channel string) error {
 	s.lock.Lock()
