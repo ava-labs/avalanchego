@@ -15,7 +15,7 @@ func NewPubSubParser(tx *Tx) pubsub.Parser {
 	return &parser{tx: tx}
 }
 
-func (p *parser) Filter(param *pubsub.FilterParam) (*pubsub.FilterResponse, error) {
+func (p *parser) Filter(param *pubsub.FilterParam) *pubsub.FilterResponse {
 	for _, utxo := range p.tx.UTXOs() {
 		switch utxoOut := utxo.Out.(type) {
 		case avax.Addressable:
@@ -27,18 +27,18 @@ func (p *parser) Filter(param *pubsub.FilterParam) (*pubsub.FilterResponse, erro
 				}
 				copy(sid[:], address)
 				for _, addr := range param.Address {
-					if p.compare(addr, sid) {
-						return &pubsub.FilterResponse{TxID: p.tx.ID(), Address: sid}, nil
+					if compare(addr, sid) {
+						return &pubsub.FilterResponse{TxID: p.tx.ID(), FilteredAddress: sid}
 					}
 				}
 			}
 		default:
 		}
 	}
-	return nil, nil
+	return nil
 }
 
-func (p *parser) compare(a ids.ShortID, b ids.ShortID) bool {
+func compare(a ids.ShortID, b ids.ShortID) bool {
 	for i := 0; i < len(a); i++ {
 		if (a[i] & b[i]) != b[i] {
 			return false

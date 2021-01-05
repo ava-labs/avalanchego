@@ -81,7 +81,7 @@ type VM struct {
 	codec         codec.Manager
 	codecRegistry codec.Registry
 
-	pubsub pubsub.PubSubFilter
+	pubsub pubsub.Filter
 
 	// State management
 	state *prefixedState
