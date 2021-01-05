@@ -625,7 +625,7 @@ func (t *Transitive) issueBatch(epoch uint32, trs []conflicts.Transition, restri
 		parentIDs[i] = virtuousIDs[int(index)]
 	}
 
-	vtx, err := t.Manager.Build(epoch, parentIDs, trs, nil)
+	vtx, err := t.Manager.Build(epoch, parentIDs, trs, restrictions)
 	if err != nil {
 		t.Ctx.Log.Warn("error building new vertex with %d parents, %d transitions, and %d restrictions",
 			len(parentIDs), len(trs), len(restrictions))
