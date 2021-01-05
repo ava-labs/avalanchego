@@ -60,8 +60,8 @@ func (t *tx) Status() choices.Status {
 		return txStatus
 	}
 	trStatus := t.tr.Status()
-	if trStatus == choices.Accepted && t.tx.Epoch() == t.tr.Epoch() {
-		return choices.Accepted
+	if trStatus == choices.Accepted && t.tx.Epoch() != t.tr.Epoch() {
+		return choices.Rejected
 	}
 	return trStatus
 }
