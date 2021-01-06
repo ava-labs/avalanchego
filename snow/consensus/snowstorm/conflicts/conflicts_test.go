@@ -37,6 +37,8 @@ type TxConflicts struct {
 
 func TestVectors(t *testing.T) {
 	inputID0 := ids.GenerateTestID()
+	inputID1 := ids.GenerateTestID()
+	inputID2 := ids.GenerateTestID()
 
 	trAID := ids.GenerateTestID()
 	trA := &TestTransition{IDV: trAID}
@@ -50,10 +52,50 @@ func TestVectors(t *testing.T) {
 		IDV:       trCID,
 		InputIDsV: []ids.ID{inputID0},
 	}
+	trDID := ids.GenerateTestID()
+	trD := &TestTransition{
+		IDV:           trDID,
+		DependenciesV: []Transition{trA},
+	}
+	trEID := ids.GenerateTestID()
+	trE := &TestTransition{
+		IDV:           trEID,
+		DependenciesV: []Transition{trD},
+	}
+	trFID := ids.GenerateTestID()
+	trF := &TestTransition{
+		IDV:           trFID,
+		DependenciesV: []Transition{trB},
+	}
+	trGID := ids.GenerateTestID()
+	trG := &TestTransition{
+		IDV:           trGID,
+		DependenciesV: []Transition{trC},
+		InputIDsV:     []ids.ID{inputID1},
+	}
+	trHID := ids.GenerateTestID()
+	trH := &TestTransition{
+		IDV:       trHID,
+		InputIDsV: []ids.ID{inputID1},
+	}
+	trIID := ids.GenerateTestID()
+	trI := &TestTransition{
+		IDV:           trIID,
+		DependenciesV: []Transition{trG},
+		InputIDsV:     []ids.ID{inputID2},
+	}
+
+	//          | Dependencies | Inputs |
 	trs := []*TestTransition{
-		trA,
-		trB,
-		trC,
+		trA, // |              |        |
+		trB, // |              |      0 |
+		trC, // |              |      0 |
+		trD, // |            A |        |
+		trE, // |            D |        |
+		trF, // |            B |        |
+		trG, // |            C |      1 |
+		trH, // |              |      1 |
+		trI, // |            G |      2 |
 	}
 
 	txAEpoch0ID := ids.GenerateTestID()
@@ -66,10 +108,64 @@ func TestVectors(t *testing.T) {
 		TestDecidable: choices.TestDecidable{IDV: txBEpoch0ID},
 		TransitionV:   trB,
 	}
+	txBEpoch1ID := ids.GenerateTestID()
+	txBEpoch1 := &TestTx{
+		TestDecidable: choices.TestDecidable{IDV: txBEpoch1ID},
+		TransitionV:   trB,
+		EpochV:        1,
+	}
 	txCEpoch0ID := ids.GenerateTestID()
 	txCEpoch0 := &TestTx{
 		TestDecidable: choices.TestDecidable{IDV: txCEpoch0ID},
 		TransitionV:   trC,
+	}
+	txCEpoch1ID := ids.GenerateTestID()
+	txCEpoch1 := &TestTx{
+		TestDecidable: choices.TestDecidable{IDV: txCEpoch1ID},
+		TransitionV:   trC,
+		EpochV:        1,
+	}
+	txCEpoch2ID := ids.GenerateTestID()
+	txCEpoch2 := &TestTx{
+		TestDecidable: choices.TestDecidable{IDV: txCEpoch2ID},
+		TransitionV:   trC,
+		EpochV:        2,
+	}
+	txDEpoch0ID := ids.GenerateTestID()
+	txDEpoch0 := &TestTx{
+		TestDecidable: choices.TestDecidable{IDV: txDEpoch0ID},
+		TransitionV:   trD,
+	}
+	txEEpoch0ID := ids.GenerateTestID()
+	txEEpoch0 := &TestTx{
+		TestDecidable: choices.TestDecidable{IDV: txEEpoch0ID},
+		TransitionV:   trE,
+	}
+	txFEpoch0ID := ids.GenerateTestID()
+	txFEpoch0 := &TestTx{
+		TestDecidable: choices.TestDecidable{IDV: txFEpoch0ID},
+		TransitionV:   trF,
+	}
+	txGEpoch0ID := ids.GenerateTestID()
+	txGEpoch0 := &TestTx{
+		TestDecidable: choices.TestDecidable{IDV: txGEpoch0ID},
+		TransitionV:   trG,
+	}
+	txGEpoch1ID := ids.GenerateTestID()
+	txGEpoch1 := &TestTx{
+		TestDecidable: choices.TestDecidable{IDV: txGEpoch1ID},
+		TransitionV:   trG,
+		EpochV:        1,
+	}
+	txHEpoch0ID := ids.GenerateTestID()
+	txHEpoch0 := &TestTx{
+		TestDecidable: choices.TestDecidable{IDV: txHEpoch0ID},
+		TransitionV:   trH,
+	}
+	txIEpoch0ID := ids.GenerateTestID()
+	txIEpoch0 := &TestTx{
+		TestDecidable: choices.TestDecidable{IDV: txIEpoch0ID},
+		TransitionV:   trI,
 	}
 	txARestCEpoch1ID := ids.GenerateTestID()
 	txARestCEpoch1 := &TestTx{
@@ -78,11 +174,22 @@ func TestVectors(t *testing.T) {
 		EpochV:        1,
 		RestrictionsV: []ids.ID{trCID},
 	}
-	txs := []*TestTx{
-		txAEpoch0,
-		txARestCEpoch1,
-		txBEpoch0,
-		txCEpoch0,
+
+	txs := []*TestTx{ //   | Epoch | Restrictions | Transitions | Dependencies | Inputs |
+		txAEpoch0,      // |     0 |              |           A |              |        |
+		txBEpoch0,      // |     0 |              |           B |              |      0 |
+		txBEpoch1,      // |     1 |              |           B |              |      0 |
+		txCEpoch0,      // |     0 |              |           C |              |      0 |
+		txCEpoch1,      // |     1 |              |           C |              |      0 |
+		txCEpoch2,      // |     2 |              |           C |              |      0 |
+		txDEpoch0,      // |     0 |              |           D |            A |        |
+		txEEpoch0,      // |     0 |              |           E |            D |        |
+		txFEpoch0,      // |     0 |              |           F |            B |        |
+		txGEpoch0,      // |     0 |              |           G |            C |      1 |
+		txGEpoch1,      // |     1 |              |           G |            C |      1 |
+		txHEpoch0,      // |     0 |              |           H |              |      1 |
+		txIEpoch0,      // |     0 |              |           I |            G |      2 |
+		txARestCEpoch1, // |     1 |            C |           A |              |        |
 	}
 
 	tests := []struct {
@@ -264,6 +371,360 @@ func TestVectors(t *testing.T) {
 					Rejectable:    []ids.ID{},
 					ShouldBeEmpty: true,
 				},
+			},
+		},
+		{
+			Name: "accept no conflicts with dependency",
+			Steps: []Step{
+				{
+					Add: []Tx{
+						txAEpoch0,
+						txDEpoch0,
+					},
+					Accept: []ids.ID{
+						txAEpoch0ID,
+					},
+					Acceptable: []ids.ID{
+						txAEpoch0ID,
+					},
+					Rejectable: []ids.ID{},
+				},
+				{
+					Accept: []ids.ID{
+						txDEpoch0ID,
+					},
+					Acceptable: []ids.ID{
+						txDEpoch0ID,
+					},
+					Rejectable:    []ids.ID{},
+					ShouldBeEmpty: true,
+				},
+			},
+		},
+		{
+			Name: "accept no conflicts with pending dependency",
+			Steps: []Step{
+				{
+					Add: []Tx{
+						txAEpoch0,
+						txDEpoch0,
+					},
+					Accept: []ids.ID{
+						txDEpoch0ID,
+					},
+					Acceptable: []ids.ID{},
+					Rejectable: []ids.ID{},
+				},
+				{
+					Accept: []ids.ID{
+						txAEpoch0ID,
+					},
+					Acceptable: []ids.ID{
+						txAEpoch0ID,
+						txDEpoch0ID,
+					},
+					Rejectable:    []ids.ID{},
+					ShouldBeEmpty: true,
+				},
+			},
+		},
+		{
+			Name: "accept no conflicts with pending transitive dependency",
+			Steps: []Step{
+				{
+					Add: []Tx{
+						txAEpoch0,
+						txDEpoch0,
+						txEEpoch0,
+					},
+					Accept: []ids.ID{
+						txEEpoch0ID,
+					},
+					Acceptable: []ids.ID{},
+					Rejectable: []ids.ID{},
+				},
+				{
+					Accept: []ids.ID{
+						txDEpoch0ID,
+					},
+					Acceptable: []ids.ID{},
+					Rejectable: []ids.ID{},
+				},
+				{
+					Accept: []ids.ID{
+						txAEpoch0ID,
+					},
+					Acceptable: []ids.ID{
+						txAEpoch0ID,
+						txDEpoch0ID,
+						txEEpoch0ID,
+					},
+					Rejectable:    []ids.ID{},
+					ShouldBeEmpty: true,
+				},
+			},
+		},
+		{
+			Name: "transitively reject accepted dependency",
+			Steps: []Step{
+				{
+					Add: []Tx{
+						txBEpoch0,
+						txCEpoch0,
+						txFEpoch0,
+					},
+					Accept: []ids.ID{
+						txFEpoch0ID,
+					},
+					Acceptable: []ids.ID{},
+					Rejectable: []ids.ID{},
+				},
+				{
+					Accept: []ids.ID{
+						txCEpoch0ID,
+					},
+					Acceptable: []ids.ID{
+						txCEpoch0ID,
+					},
+					Rejectable: []ids.ID{
+						txBEpoch0ID,
+						txFEpoch0ID,
+					},
+					ShouldBeEmpty: true,
+				},
+			},
+		},
+		{
+			Name: "transitively reject accepted dependency due to epoch",
+			Steps: []Step{
+				{
+					Add: []Tx{
+						txBEpoch0,
+						txBEpoch1,
+						txFEpoch0,
+					},
+					Accept: []ids.ID{
+						txFEpoch0ID,
+					},
+					Acceptable: []ids.ID{},
+					Rejectable: []ids.ID{},
+				},
+				{
+					Accept: []ids.ID{
+						txBEpoch1ID,
+					},
+					Acceptable: []ids.ID{
+						txBEpoch1ID,
+					},
+					Rejectable: []ids.ID{
+						txBEpoch0ID,
+						txFEpoch0ID,
+					},
+					ShouldBeEmpty: true,
+				},
+			},
+		},
+		{
+			Name: "accept restricted dependency",
+			Steps: []Step{
+				{
+					Add: []Tx{
+						txCEpoch0,
+						txCEpoch1,
+						txGEpoch0,
+						txGEpoch1,
+						txARestCEpoch1,
+					},
+					Accept: []ids.ID{
+						txARestCEpoch1ID,
+					},
+					Acceptable: []ids.ID{
+						txARestCEpoch1ID,
+					},
+					Rejectable: []ids.ID{
+						txCEpoch0ID,
+						txGEpoch0ID,
+					},
+				},
+				{
+					Accept: []ids.ID{
+						txCEpoch1ID,
+					},
+					Acceptable: []ids.ID{
+						txCEpoch1ID,
+					},
+					Rejectable: []ids.ID{},
+				},
+				{
+					Accept: []ids.ID{
+						txGEpoch1ID,
+					},
+					Acceptable: []ids.ID{
+						txGEpoch1ID,
+					},
+					Rejectable:    []ids.ID{},
+					ShouldBeEmpty: true,
+				},
+			},
+		},
+		{
+			Name: "accept with rejected dependency",
+			Steps: []Step{
+				{
+					Add: []Tx{
+						txBEpoch0,
+						txCEpoch0,
+						txGEpoch0,
+						txHEpoch0,
+					},
+					Accept: []ids.ID{
+						txHEpoch0ID,
+					},
+					Acceptable: []ids.ID{
+						txHEpoch0ID,
+					},
+					Rejectable: []ids.ID{
+						txGEpoch0ID,
+					},
+				},
+				{
+					Accept: []ids.ID{
+						txCEpoch0ID,
+					},
+					Acceptable: []ids.ID{
+						txCEpoch0ID,
+					},
+					Rejectable: []ids.ID{
+						txBEpoch0ID,
+					},
+					ShouldBeEmpty: true,
+				},
+			},
+		},
+		{
+			Name: "transitively reject dependency then accept now virtuous tx",
+			Steps: []Step{
+				{
+					Add: []Tx{
+						txBEpoch0,
+						txCEpoch0,
+						txGEpoch0,
+						txHEpoch0,
+					},
+					Accept: []ids.ID{
+						txBEpoch0ID,
+					},
+					Acceptable: []ids.ID{
+						txBEpoch0ID,
+					},
+					Rejectable: []ids.ID{
+						txCEpoch0ID,
+						txGEpoch0ID,
+					},
+				},
+				{
+					Accept: []ids.ID{
+						txHEpoch0ID,
+					},
+					Acceptable: []ids.ID{
+						txHEpoch0ID,
+					},
+					Rejectable:    []ids.ID{},
+					ShouldBeEmpty: true,
+				},
+			},
+		},
+		{
+			Name: "reject multiple from multiple epoch conflicts",
+			Steps: []Step{
+				{
+					Add: []Tx{
+						txCEpoch0,
+						txCEpoch1,
+						txCEpoch2,
+						txGEpoch1,
+					},
+					Accept: []ids.ID{
+						txCEpoch2ID,
+					},
+					Acceptable: []ids.ID{
+						txCEpoch2ID,
+					},
+					Rejectable: []ids.ID{
+						txCEpoch0ID,
+						txCEpoch1ID,
+						txGEpoch1ID,
+					},
+					ShouldBeEmpty: true,
+				},
+			},
+		},
+		{
+			Name: "reject twice across epoch rounds",
+			Steps: []Step{
+				{
+					Add: []Tx{
+						txCEpoch0,
+						txCEpoch1,
+						txGEpoch0,
+						txGEpoch1,
+						txIEpoch0,
+					},
+					Accept: []ids.ID{
+						txGEpoch1ID,
+					},
+					Acceptable: []ids.ID{},
+					Rejectable: []ids.ID{},
+				},
+				{
+					Accept: []ids.ID{
+						txCEpoch1ID,
+					},
+					Acceptable: []ids.ID{
+						txCEpoch1ID,
+						txGEpoch1ID,
+					},
+					Rejectable: []ids.ID{
+						txCEpoch0ID,
+						txGEpoch0ID,
+						txIEpoch0ID,
+					},
+					ShouldBeEmpty: true,
+				},
+			},
+		},
+		{
+			Name: "reject twice across epoch rounds",
+			Steps: []Step{
+				{
+					Add: []Tx{
+						txCEpoch0,
+						txCEpoch1,
+						txGEpoch0,
+						txGEpoch1,
+						txIEpoch0,
+					},
+					Accept: []ids.ID{
+						txGEpoch1ID,
+					},
+					Acceptable: []ids.ID{},
+					Rejectable: []ids.ID{},
+				},
+				{
+					Accept: []ids.ID{
+						txCEpoch1ID,
+					},
+					Acceptable: []ids.ID{
+						txCEpoch1ID,
+						txGEpoch1ID,
+					},
+					Rejectable: []ids.ID{
+						txCEpoch0ID,
+						txGEpoch0ID,
+						txIEpoch0ID,
+					},
+					ShouldBeEmpty: true,
+				},
 				{
 					Add:           []Tx(nil),
 					Processing:    []ids.ID(nil),
@@ -358,765 +819,6 @@ func TestVectors(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestAcceptNoConflictsWithDependency(t *testing.T) {
-	c := New()
-
-	transitionID := ids.GenerateTestID()
-	tr0 := &TestTransition{
-		IDV:     transitionID,
-		StatusV: choices.Processing,
-	}
-	tx0 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: tr0,
-	}
-	tr1 := &TestTransition{
-		IDV:           ids.GenerateTestID(),
-		DependenciesV: []Transition{tr0},
-		StatusV:       choices.Processing,
-	}
-	tx1 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: tr1,
-	}
-
-	c.Add(tx0)
-	c.Add(tx1)
-
-	toAccepts := c.updateAccepted()
-	toRejects := c.updateRejected()
-	assert.Empty(t, toAccepts)
-	assert.Empty(t, toRejects)
-
-	c.Accept(tx1.ID())
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Empty(t, toAccepts)
-	assert.Empty(t, toRejects)
-
-	c.Accept(tx0.ID())
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Len(t, toAccepts, 1)
-	assert.Empty(t, toRejects)
-
-	toAccept := toAccepts[0]
-	assert.Equal(t, tx0.ID(), toAccept.ID())
-	err := toAccept.Accept()
-	assert.NoError(t, err)
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Len(t, toAccepts, 1)
-	assert.Empty(t, toRejects)
-	assert.Empty(t, c.txs)
-	assert.Empty(t, c.utxos)
-	assert.Empty(t, c.transitionNodes)
-
-	toAccept = toAccepts[0]
-	assert.Equal(t, tx1.ID(), toAccept.ID())
-	err = toAccept.Accept()
-	assert.NoError(t, err)
-}
-
-func TestNoConflictsNoEarlyAcceptDependency(t *testing.T) {
-	c := New()
-
-	tr0 := &TestTransition{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Processing,
-	}
-	tx0 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: tr0,
-	}
-	tr1 := &TestTransition{
-		IDV:           ids.GenerateTestID(),
-		StatusV:       choices.Processing,
-		DependenciesV: []Transition{tr0},
-	}
-	tx1 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: tr1,
-	}
-
-	c.Add(tx0)
-	c.Add(tx1)
-
-	toAccepts := c.updateAccepted()
-	toRejects := c.updateRejected()
-	assert.Empty(t, toAccepts)
-	assert.Empty(t, toRejects)
-
-	c.Accept(tx0.ID())
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Len(t, toAccepts, 1)
-	assert.Empty(t, toRejects)
-
-	toAccept := toAccepts[0]
-	assert.Equal(t, tx0.ID(), toAccept.ID())
-	err := toAccept.Accept()
-	assert.NoError(t, err)
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Empty(t, toAccepts)
-	assert.Empty(t, toRejects)
-
-	c.Accept(tx1.ID())
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Len(t, toAccepts, 1)
-	assert.Empty(t, toRejects)
-	assert.Empty(t, c.txs)
-	assert.Empty(t, c.utxos)
-	assert.Empty(t, c.transitionNodes)
-
-	toAccept = toAccepts[0]
-	assert.Equal(t, tx1.ID(), toAccept.ID())
-	err = toAccept.Accept()
-	assert.NoError(t, err)
-}
-
-func TestAcceptNoConflictsWithDependenciesAcrossMultipleRounds(t *testing.T) {
-	c := New()
-
-	tr0 := &TestTransition{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Processing,
-	}
-	tx0 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: tr0,
-	}
-	tr1 := &TestTransition{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Processing,
-	}
-	tx1 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: tr1,
-	}
-	tr2 := &TestTransition{
-		IDV:           ids.GenerateTestID(),
-		StatusV:       choices.Processing,
-		DependenciesV: []Transition{tr0, tr1},
-	}
-	tx2 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: tr2,
-	}
-
-	c.Add(tx0)
-	c.Add(tx1)
-	c.Add(tx2)
-
-	// Check that no transactions are mistakenly marked
-	// as accepted/rejected
-
-	toAccepts := c.updateAccepted()
-	toRejects := c.updateRejected()
-	assert.Empty(t, toAccepts)
-	assert.Empty(t, toRejects)
-
-	// Accept tx2 and ensure that it is marked
-	// as conditionally accepted pending its
-	// dependencies.
-	c.Accept(tx2.ID())
-
-	assert.Equal(t, c.conditionallyAccepted.Len(), 1)
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Empty(t, toAccepts)
-	assert.Empty(t, toRejects)
-	assert.Equal(t, c.conditionallyAccepted.Len(), 1)
-
-	// Accept tx1 and ensure that it is the only
-	// transaction marked as accepted. Note: tx2
-	// still requires tx0 to be accepted.
-	c.Accept(tx1.ID())
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Len(t, toAccepts, 1)
-	assert.Empty(t, toRejects)
-
-	toAccept := toAccepts[0]
-	assert.Equal(t, tx1.ID(), toAccept.ID())
-	err := toAccept.Accept()
-	assert.NoError(t, err)
-
-	// Ensure that additional call to updateable
-	// does not return any new accepted/rejected txs.
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Len(t, toAccepts, 0)
-	assert.Len(t, toRejects, 0)
-
-	// Accept tx0 and ensure that it is
-	// returned from Updateable
-	c.Accept(tx0.ID())
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Len(t, toAccepts, 1)
-	assert.Empty(t, toRejects)
-
-	toAccept = toAccepts[0]
-	assert.Equal(t, tx0.ID(), toAccept.ID())
-	err = toAccept.Accept()
-	assert.NoError(t, err)
-
-	// tx2 should be returned by the subseqeuent call
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Len(t, toAccepts, 1)
-	assert.Empty(t, toRejects)
-
-	toAccept = toAccepts[0]
-	assert.Equal(t, tx2.ID(), toAccept.ID())
-	err = toAccept.Accept()
-	assert.NoError(t, err)
-
-	assert.Empty(t, c.txs)
-	assert.Empty(t, c.utxos)
-	assert.Empty(t, c.transitionNodes)
-}
-
-func TestAcceptRejectedDependency(t *testing.T) {
-	c := New()
-
-	inputIDs := []ids.ID{ids.GenerateTestID()}
-	tr0 := &TestTransition{
-		IDV:       ids.GenerateTestID(),
-		InputIDsV: inputIDs,
-		StatusV:   choices.Processing,
-	}
-	tx0 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: tr0,
-	}
-	tr1 := &TestTransition{
-		IDV:       ids.GenerateTestID(),
-		InputIDsV: inputIDs,
-		StatusV:   choices.Processing,
-	}
-	tx1 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: tr1,
-	}
-	tx2 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: &TestTransition{
-			IDV:           ids.GenerateTestID(),
-			DependenciesV: []Transition{tr0},
-			StatusV:       choices.Processing,
-		},
-	}
-
-	c.Add(tx0)
-	c.Add(tx1)
-	c.Add(tx2)
-
-	toAccepts := c.updateAccepted()
-	toRejects := c.updateRejected()
-	assert.Empty(t, toAccepts)
-	assert.Empty(t, toRejects)
-
-	c.Accept(tx1.ID())
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Len(t, toAccepts, 1)
-	assert.Len(t, toRejects, 1)
-
-	toAccept := toAccepts[0]
-	assert.Equal(t, tx1.ID(), toAccept.ID())
-	err := toAccept.Accept()
-	assert.NoError(t, err)
-
-	toReject := toRejects[0]
-	assert.Equal(t, tx0.ID(), toReject.ID())
-	err = toReject.Reject()
-	assert.NoError(t, err)
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Empty(t, toAccepts)
-	assert.Len(t, toRejects, 1)
-	assert.Empty(t, c.txs)
-	assert.Empty(t, c.utxos)
-	assert.Empty(t, c.transitionNodes)
-
-	toReject = toRejects[0]
-	assert.Equal(t, tx2.ID(), toReject.ID())
-	err = toReject.Reject()
-	assert.NoError(t, err)
-}
-
-func TestAcceptRejectedEpochDependency(t *testing.T) {
-	c := New()
-
-	inputIDs := []ids.ID{ids.GenerateTestID()}
-	tr := &TestTransition{
-		IDV:       ids.GenerateTestID(),
-		InputIDsV: inputIDs,
-		StatusV:   choices.Processing,
-	}
-	tx0 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: tr,
-	}
-	tx1 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: tr,
-		EpochV:      1,
-	}
-	tx2 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: &TestTransition{
-			IDV:           ids.GenerateTestID(),
-			DependenciesV: []Transition{tr},
-			StatusV:       choices.Processing,
-		},
-	}
-
-	c.Add(tx0)
-	c.Add(tx1)
-	c.Add(tx2)
-
-	toAccepts := c.updateAccepted()
-	toRejects := c.updateRejected()
-	assert.Empty(t, toAccepts)
-	assert.Empty(t, toRejects)
-
-	c.Accept(tx1.ID())
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Len(t, toAccepts, 1)
-	assert.Len(t, toRejects, 2)
-	assert.Empty(t, c.txs)
-	assert.Empty(t, c.utxos)
-	assert.Empty(t, c.transitionNodes)
-
-	toAccept := toAccepts[0]
-	assert.Equal(t, tx1.ID(), toAccept.ID())
-	err := toAccept.Accept()
-	assert.NoError(t, err)
-
-	for i, toReject := range toRejects {
-		err := toReject.Reject()
-		assert.NoError(t, err, "Error rejecting the %d rejectable transaction %s", i, toReject.ID())
-	}
-}
-
-func TestAcceptRestrictedDependency(t *testing.T) {
-	c := New()
-
-	inputIDs := []ids.ID{ids.GenerateTestID()}
-	trA := &TestTransition{
-		IDV:       ids.GenerateTestID(),
-		StatusV:   choices.Processing,
-		InputIDsV: inputIDs,
-	}
-	trB := &TestTransition{
-		IDV:           ids.GenerateTestID(),
-		StatusV:       choices.Processing,
-		InputIDsV:     []ids.ID{ids.GenerateTestID()},
-		DependenciesV: []Transition{trA},
-	}
-	trC := &TestTransition{
-		IDV:       ids.GenerateTestID(),
-		StatusV:   choices.Processing,
-		InputIDsV: []ids.ID{ids.GenerateTestID()},
-	}
-
-	txA0 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: trA,
-	}
-	txA1 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: trA,
-		EpochV:      1,
-	}
-	txB0 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: trB,
-	}
-	txB1 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: trB,
-		EpochV:      1,
-	}
-	txC0 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV:   trC,
-		RestrictionsV: []ids.ID{trA.ID()},
-	}
-	txC1 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV:   trC,
-		EpochV:        1,
-		RestrictionsV: []ids.ID{trA.ID()},
-	}
-
-	c.Add(txA0)
-	c.Add(txA1)
-	c.Add(txB0)
-	c.Add(txB1)
-	c.Add(txC0)
-	c.Add(txC1)
-
-	toAccepts := c.updateAccepted()
-	toRejects := c.updateRejected()
-	assert.Empty(t, toAccepts)
-	assert.Empty(t, toRejects)
-
-	// Accepting tx1 should restrict trA to epoch 1 rejecting
-	// txA0 and txB0 as a result.
-	c.Accept(txC1.ID())
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Len(t, toAccepts, 1)
-	assert.Len(t, toRejects, 2)
-
-	toAccept := toAccepts[0]
-	assert.Equal(t, txC1.ID(), toAccept.ID())
-	err := toAccept.Accept()
-	assert.NoError(t, err)
-
-	for i, toReject := range toRejects {
-		err := toReject.Reject()
-		assert.NoError(t, err, "Error rejecting the %d rejectable transaction %s", i, toReject.ID())
-	}
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Empty(t, toAccepts)
-	assert.Len(t, toRejects, 1)
-
-	toReject := toRejects[0]
-	assert.Equal(t, txB0.ID(), toReject.ID())
-	err = toReject.Reject()
-	assert.NoError(t, err)
-
-	c.Accept(txA1.ID())
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Len(t, toAccepts, 1)
-	assert.Empty(t, toRejects)
-
-	toAccept = toAccepts[0]
-	assert.Equal(t, txA1.ID(), toAccept.ID())
-	err = toAccept.Accept()
-	assert.NoError(t, err)
-
-	c.Accept(txB1.ID())
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Len(t, toAccepts, 1)
-	assert.Empty(t, toRejects)
-
-	toAccept = toAccepts[0]
-	assert.Equal(t, txB1.ID(), toAccept.ID())
-	err = toAccept.Accept()
-	assert.NoError(t, err)
-
-	assert.Empty(t, c.txs)
-	assert.Empty(t, c.utxos)
-	assert.Empty(t, c.transitionNodes)
-}
-
-func TestRejectedRejectedDependency(t *testing.T) {
-	c := New()
-
-	inputIDA := ids.GenerateTestID()
-	inputIDB := ids.GenerateTestID()
-
-	//   A.X - A.Y
-	//          |
-	//   B.X - B.Y
-	trAX := &TestTransition{
-		IDV:       ids.GenerateTestID(),
-		StatusV:   choices.Processing,
-		InputIDsV: []ids.ID{inputIDA, ids.GenerateTestID()},
-	}
-	txAX := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: trAX,
-	}
-	trAY := &TestTransition{
-		IDV:       ids.GenerateTestID(),
-		StatusV:   choices.Processing,
-		InputIDsV: []ids.ID{inputIDA},
-	}
-	txAY := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: trAY,
-	}
-	trBX := &TestTransition{
-		IDV:       ids.GenerateTestID(),
-		StatusV:   choices.Processing,
-		InputIDsV: []ids.ID{inputIDB},
-	}
-	txBX := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: trBX,
-	}
-	trBY := &TestTransition{
-		IDV:           ids.GenerateTestID(),
-		StatusV:       choices.Processing,
-		DependenciesV: []Transition{trAY},
-		InputIDsV:     []ids.ID{inputIDB},
-	}
-	txBY := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: trBY,
-	}
-
-	c.Add(txAY)
-	c.Add(txAX)
-	c.Add(txBY)
-	c.Add(txBX)
-
-	toAccepts := c.updateAccepted()
-	toRejects := c.updateRejected()
-	assert.Empty(t, toAccepts)
-	assert.Empty(t, toRejects)
-
-	c.Accept(txBX.ID())
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Len(t, toAccepts, 1)
-	assert.Len(t, toRejects, 1)
-
-	toAccept := toAccepts[0]
-	assert.Equal(t, txBX.ID(), toAccept.ID())
-	err := toAccept.Accept()
-	assert.NoError(t, err)
-
-	toReject := toRejects[0]
-	// assert.Equal(t, ) TODO
-	err = toReject.Reject()
-	assert.NoError(t, err)
-
-	c.Accept(txAY.ID())
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Len(t, toAccepts, 1)
-	assert.Len(t, toRejects, 1)
-	assert.Empty(t, c.txs)
-	assert.Empty(t, c.utxos)
-	assert.Empty(t, c.transitionNodes)
-
-	toAccept = toAccepts[0]
-	assert.Equal(t, txAY.ID(), toAccept.ID())
-	err = toAccept.Accept()
-	assert.NoError(t, err)
-
-	toReject = toRejects[0]
-	// check equal to what TODO
-	err = toReject.Reject()
-	assert.NoError(t, err)
-}
-
-func TestAcceptVirtuousRejectedDependency(t *testing.T) {
-	c := New()
-
-	inputIDsA := []ids.ID{ids.GenerateTestID()}
-	inputIDsB := []ids.ID{ids.GenerateTestID()}
-
-	//   A.X - A.Y
-	//          |
-	//   B.X - B.Y
-	trAX := &TestTransition{
-		IDV:       ids.GenerateTestID(),
-		StatusV:   choices.Processing,
-		InputIDsV: inputIDsA,
-	}
-	txAX := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: trAX,
-	}
-	trAY := &TestTransition{
-		IDV:       ids.GenerateTestID(),
-		StatusV:   choices.Processing,
-		InputIDsV: inputIDsA,
-	}
-	txAY := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: trAY,
-	}
-	trBX := &TestTransition{
-		IDV:       ids.GenerateTestID(),
-		StatusV:   choices.Processing,
-		InputIDsV: inputIDsB,
-	}
-	txBX := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: trBX,
-	}
-	trV := &TestTransition{
-		IDV:           ids.GenerateTestID(),
-		StatusV:       choices.Processing,
-		DependenciesV: []Transition{trAY},
-		InputIDsV:     inputIDsB,
-	}
-	txBY := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: trV,
-	}
-
-	c.Add(txAX)
-	c.Add(txAY)
-	c.Add(txBX)
-	c.Add(txBY)
-
-	toAccepts := c.updateAccepted()
-	toRejects := c.updateRejected()
-	assert.Empty(t, toAccepts)
-	assert.Empty(t, toRejects)
-
-	c.Accept(txAX.ID())
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Len(t, toAccepts, 1)
-	assert.Len(t, toRejects, 1)
-
-	toAccept := toAccepts[0]
-	assert.Equal(t, txAX.ID(), toAccept.ID())
-	err := toAccept.Accept()
-	assert.NoError(t, err)
-
-	toReject := toRejects[0]
-	assert.Equal(t, txAY.ID(), toReject.ID())
-	err = toReject.Reject()
-	assert.NoError(t, err)
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Len(t, toAccepts, 0)
-	assert.Len(t, toRejects, 1)
-
-	toReject = toRejects[0]
-	assert.Equal(t, txBY.ID(), toReject.ID())
-	err = toReject.Reject()
-	assert.NoError(t, err)
-
-	c.Accept(txBX.ID())
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Len(t, toAccepts, 1)
-	assert.Len(t, toRejects, 0)
-
-	toAccept = toAccepts[0]
-	assert.Equal(t, txBX.ID(), toAccept.ID())
-	err = toAccept.Accept()
-	assert.NoError(t, err)
-
-	assert.Empty(t, c.txs)
-	assert.Empty(t, c.utxos)
-	assert.Empty(t, c.transitionNodes)
 }
 
 func TestRejectDependencyTwice(t *testing.T) {
@@ -1386,197 +1088,4 @@ func TestRejectTwiceAcrossRounds(t *testing.T) {
 	assert.Empty(t, c.transitionNodes)
 	assert.Equal(t, 0, c.acceptableIDs.Len())
 	assert.Equal(t, 0, c.rejectableIDs.Len())
-}
-
-func TestRejectTwiceAcrossRoundsEpochs(t *testing.T) {
-	c := New()
-
-	conflictInput := ids.GenerateTestID()
-
-	// Transition AB is a bridge dependency from trA
-	// to trB ie. trB depends on trAB which depends on trA
-	// Transitions B and C conflict over [conflictInput]
-	trA := &TestTransition{
-		IDV:       ids.GenerateTestID(),
-		StatusV:   choices.Processing,
-		InputIDsV: []ids.ID{ids.GenerateTestID()},
-	}
-	trAB := &TestTransition{
-		IDV:           ids.GenerateTestID(),
-		StatusV:       choices.Processing,
-		InputIDsV:     []ids.ID{ids.GenerateTestID()},
-		DependenciesV: []Transition{trA},
-	}
-	trB := &TestTransition{
-		IDV:           ids.GenerateTestID(),
-		StatusV:       choices.Processing,
-		InputIDsV:     []ids.ID{ids.GenerateTestID(), conflictInput},
-		DependenciesV: []Transition{trAB},
-	}
-	trC := &TestTransition{
-		IDV:           ids.GenerateTestID(),
-		StatusV:       choices.Processing,
-		InputIDsV:     []ids.ID{ids.GenerateTestID(), conflictInput},
-		DependenciesV: []Transition{trA},
-	}
-
-	txA0 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: trA,
-	}
-	txA1 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: trA,
-		EpochV:      1,
-	}
-	txAB0 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: trAB,
-	}
-	txB0 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: trB,
-	}
-	txC1 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: trC,
-		EpochV:      1,
-	}
-
-	c.Add(txA0)
-	c.Add(txA1)
-	c.Add(txAB0)
-	c.Add(txB0)
-	c.Add(txC1)
-
-	// Accept txC1 first, such that it is marked as conditionally
-	// acceptable.
-	c.Accept(txC1.ID())
-	// Accept txA1, such that txC1 will be accepted on the second
-	// iteration.
-	c.Accept(txA1.ID())
-
-	// Accepting txA1 should cause txA0 (epoch conflict) and txAB0
-	// (dependency not met in time) to be rejected.
-	// txC1 should be moved from conditionally accepted to accepted
-	// and txB0 should be rejected since its direct dependency trAB
-	// was rejected in the only round it was issued in.
-
-	toAccepts, toRejects := c.Updateable()
-	expectedAccepts := ids.Set{}
-	expectedAccepts.Add(txC1.ID(), txA1.ID())
-
-	for i, toAccept := range toAccepts {
-		err := toAccept.Accept()
-		assert.NoError(t, err)
-		assert.True(t, expectedAccepts.Contains(toAccept.ID()), "Unexpected accepted txID: %s index %d", toAccept.ID(), i)
-	}
-
-	expectedRejects := ids.Set{}
-	expectedRejects.Add(txAB0.ID(), txA0.ID(), txB0.ID())
-	for i, toReject := range toRejects {
-		assert.True(t, expectedRejects.Contains(toReject.ID()), "Unexpected rejected txID: %s index %d", toReject.ID(), i)
-		err := toReject.Reject()
-		assert.NoError(t, err)
-	}
-
-	toAccepts, toRejects = c.Updateable()
-	assert.Empty(t, toAccepts)
-	assert.Empty(t, toRejects)
-	assert.Empty(t, c.txs)
-	assert.Empty(t, c.utxos)
-	assert.Empty(t, c.transitionNodes)
-	assert.Equal(t, 0, c.acceptableIDs.Len())
-	assert.Equal(t, 0, c.rejectableIDs.Len())
-}
-
-func TestAcceptRejectedMultipleEpochDependency(t *testing.T) {
-	c := New()
-
-	inputIDs := []ids.ID{ids.GenerateTestID()}
-	tr := &TestTransition{
-		IDV:       ids.GenerateTestID(),
-		InputIDsV: inputIDs,
-		StatusV:   choices.Processing,
-	}
-	tx0 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: tr,
-	}
-	tx1 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: tr,
-		EpochV:      1,
-	}
-	tx2 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: tr,
-		EpochV:      2,
-	}
-	tx3 := &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		TransitionV: &TestTransition{
-			IDV:           ids.GenerateTestID(),
-			DependenciesV: []Transition{tr},
-			StatusV:       choices.Processing,
-		},
-		EpochV: 1,
-	}
-
-	c.Add(tx0)
-	c.Add(tx1)
-	c.Add(tx2)
-	c.Add(tx3)
-
-	toAccepts := c.updateAccepted()
-	toRejects := c.updateRejected()
-	assert.Empty(t, toAccepts)
-	assert.Empty(t, toRejects)
-
-	c.Accept(tx2.ID())
-
-	toAccepts = c.updateAccepted()
-	toRejects = c.updateRejected()
-	assert.Len(t, toAccepts, 1)
-	assert.Len(t, toRejects, 3)
-	assert.Empty(t, c.txs)
-	assert.Empty(t, c.utxos)
-	assert.Empty(t, c.transitionNodes)
-
-	toAccept := toAccepts[0]
-	assert.Equal(t, tx2.ID(), toAccept.ID())
-	err := toAccept.Accept()
-	assert.NoError(t, err)
-
-	for i, toReject := range toRejects {
-		err := toReject.Reject()
-		assert.NoError(t, err, "Error rejecting the %d rejectable transaction %s", i, toReject.ID())
-	}
 }

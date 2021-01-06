@@ -368,6 +368,10 @@ outerLoop:
 		// If [dependentTx] requires [tx]'s transition to happen before [epoch],
 		// then [dependent] can no longer be accepted.
 		if dependentEpoch < epoch {
+			// If this tx was previously conditionally accepted, it should no
+			// longer be treated as such.
+			c.conditionallyAccepted.Remove(dependentTxID)
+
 			c.rejectableIDs.Add(dependentTxID)
 			c.rejectable = append(c.rejectable, dependentTx)
 			continue
@@ -405,6 +409,10 @@ func (c *Conflicts) rejectConflicts(tx Tx) {
 	conflictTxs := c.Conflicts(tx)
 	for _, conflictTx := range conflictTxs {
 		if conflictTxID := conflictTx.ID(); !c.rejectableIDs.Contains(conflictTxID) {
+			// If this tx was previously conditionally accepted, it should no
+			// longer be treated as such.
+			c.conditionallyAccepted.Remove(conflictTxID)
+
 			c.rejectableIDs.Add(conflictTxID)
 			c.rejectable = append(c.rejectable, conflictTx)
 		}
@@ -474,6 +482,10 @@ func (c *Conflicts) rejectInvalidDependents(tn *transitionNode) {
 		dependentTx := c.txs[dependentTxID]
 		dependentEpoch := dependentTx.Epoch()
 		if dependentEpoch < lowestRemainingEpoch && !c.rejectableIDs.Contains(dependentTxID) {
+			// If this tx was previously conditionally accepted, it should no
+			// longer be treated as such.
+			c.conditionallyAccepted.Remove(dependentTxID)
+
 			c.rejectableIDs.Add(dependentTxID)
 			c.rejectable = append(c.rejectable, dependentTx)
 		}
