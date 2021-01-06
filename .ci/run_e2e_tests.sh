@@ -13,6 +13,7 @@ DOCKER_REPO="avaplatform"
 AVALANCHE_TESTING_REPO=$DOCKER_REPO/avalanche-testing
 DEFAULT_TEST_SUITE_IMAGE="$AVALANCHE_TESTING_REPO:dev"
 BYZANTINE_IMAGE="$DOCKER_REPO/avalanche-byzantine:v0.1.5-rc.1"
+CI_COMMIT_TAG="avalanchego-ci-${COMMIT}"
 
 
 function docker_tag_exists() {
@@ -20,9 +21,9 @@ function docker_tag_exists() {
     curl --silent -f --head -lL https://hub.docker.com/v2/repositories/$1/tags/$2/ > /dev/null
 }
 
-if docker_tag_exists $AVALANCHE_TESTING_REPO $COMMIT; then
-    echo "$AVALANCHE_TESTING_REPO:$COMMIT exists; using this image to run e2e tests" 
-    TEST_SUITE_IMAGE="$AVALANCHE_TESTING_REPO:$COMMIT"
+if docker_tag_exists $AVALANCHE_TESTING_REPO $CI_COMMIT_TAG; then
+    echo "$AVALANCHE_TESTING_REPO:$CI_COMMIT_TAG exists; using this image to run e2e tests" 
+    TEST_SUITE_IMAGE="$AVALANCHE_TESTING_REPO:$CI_COMMIT_TAG"
 elif docker_tag_exists $AVALANCHE_TESTING_REPO $BRANCH; then
     echo "$AVALANCHE_TESTING_REPO:$BRANCH exists; using this image to run e2e tests" 
     TEST_SUITE_IMAGE="$AVALANCHE_TESTING_REPO:$BRANCH"
@@ -70,8 +71,13 @@ docker run \
     `# In Bash, this is how you feed arguments exactly as-is to a child script (since ${*} loses quoting and ${@} trips set -e if no arguments are passed)` \
     `# It basically says, "if and only if ${1} exists, evaluate ${@}"` \
     ${1+"${@}"} \
-    "${INITIALIZER_IMAGE}" 
+    "${INITIALIZER_IMAGE}"
 
-
-docker tag "${TEST_SUITE_IMAGE}" "${AVALANCHE_TESTING_REPO}:${COMMIT}"
+# If the E2E Tests Passed, tag and push the E2E Test Suite Image
+if [[ $? ==  0 ]]; then
+    TEST_SUITE_IMAGE_TAG="${AVALANCHE_TESTING_REPO}:${CI_COMMIT_TAG}"
+    echo "Tagging E2E Tests from Successful run as ${TEST_SUITE_IMAGE_TAG}"
+    docker tag "${TEST_SUITE_IMAGE}" "${TEST_SUITE_IMAGE_TAG}"
+    docker push "${TEST_SUITE_IMAGE_TAG}"
+fi
 
