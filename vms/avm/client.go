@@ -42,13 +42,19 @@ func (c *Client) IssueTx(txBytes []byte) (ids.ID, error) {
 	return res.TxID, err
 }
 
-// GetTxStatus returns the status of [txID]
-func (c *Client) GetTxStatus(txID ids.ID) (choices.Status, error) {
+// GetTxStatus returns the status of [txID] and if accepted, the [epoch]
+// that it was accepted in. If the status is not accepted, then the value
+// of the returned [epoch] is not defined.
+func (c *Client) GetTxStatus(txID ids.ID) (choices.Status, uint32, error) {
 	res := &GetTxStatusReply{}
 	err := c.requester.SendRequest("getTxStatus", &api.JSONTxID{
 		TxID: txID,
 	}, res)
-	return res.Status, err
+	var epoch uint32
+	if res.Epoch != nil {
+		epoch = *res.Epoch
+	}
+	return res.Status, epoch, err
 }
 
 // GetTx returns the byte representation of [txID]
