@@ -51,6 +51,27 @@ func (c *Client) GetTxStatus(txID ids.ID) (choices.Status, error) {
 	return res.Status, err
 }
 
+// ConfirmTx attempts to confirm [txID] by checking its status [attempts] times
+// with a [delay] in between each attempt. If the transaction has not been decided
+// by the final attempt, it returns the status of the last attempt.
+// Note: ConfirmTx will block until either the last attempt finishes or the client
+// returns a decided status.
+func (c *Client) ConfirmTx(txID ids.ID, attempts int, delay time.Duration) (choices.Status, error) {
+	for i := 0; i < attempts-1; i++ {
+		status, err := c.GetTxStatus(txID)
+		if err != nil {
+			return status, err
+		}
+
+		if status.Decided() {
+			return status, nil
+		}
+		time.Sleep(delay)
+	}
+
+	return c.GetTxStatus(txID)
+}
+
 // GetTx returns the byte representation of [txID]
 func (c *Client) GetTx(txID ids.ID) ([]byte, error) {
 	res := &api.FormattedTx{}

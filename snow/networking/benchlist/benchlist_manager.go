@@ -50,6 +50,11 @@ type benchlistManager struct {
 
 // NewManager returns a manager for chain-specific query benchlisting
 func NewManager(config *Config) Manager {
+	// If the maximum portion of validators allowed to be benchlisted
+	// is 0, return the no-op benchlist
+	if config.MaxPortion <= 0 {
+		return NewNoBenchlist()
+	}
 	return &benchlistManager{
 		config:          config,
 		chainBenchlists: make(map[ids.ID]QueryBenchlist),
