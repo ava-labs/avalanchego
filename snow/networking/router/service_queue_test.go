@@ -18,7 +18,7 @@ import (
 )
 
 // returns a new multi-level queue that will never throttle or prioritize
-func setupMultiLevelQueue(t *testing.T, bufferSize int) (messageQueue, chan struct{}) {
+func setupMultiLevelQueue(t *testing.T, bufferSize uint32) (messageQueue, chan struct{}) {
 	metrics := &metrics{}
 	if err := metrics.Initialize("", prometheus.NewRegistry()); err != nil {
 		t.Fatal(err)
@@ -54,12 +54,12 @@ func setupMultiLevelQueue(t *testing.T, bufferSize int) (messageQueue, chan stru
 }
 
 func TestMultiLevelQueueSendsMessages(t *testing.T) {
-	bufferSize := 8
+	bufferSize := uint32(8)
 	queue, semaChan := setupMultiLevelQueue(t, bufferSize)
 	messages := []message{}
-	for i := 0; i < bufferSize; i++ {
+	for i := uint32(0); i < bufferSize; i++ {
 		messages = append(messages, message{
-			validatorID: ids.NewShortID([20]byte{byte(i)}),
+			validatorID: ids.ShortID{byte(i)},
 		})
 	}
 
@@ -67,7 +67,7 @@ func TestMultiLevelQueueSendsMessages(t *testing.T) {
 		queue.PushMessage(msg)
 	}
 
-	for count := 0; count < bufferSize; count++ {
+	for count := uint32(0); count < bufferSize; count++ {
 		select {
 		case _, ok := <-semaChan:
 			if !ok {
@@ -89,14 +89,14 @@ func TestMultiLevelQueueSendsMessages(t *testing.T) {
 }
 
 func TestExtraMessageNoDeadlock(t *testing.T) {
-	bufferSize := 8
+	bufferSize := uint32(8)
 	oversizedBuffer := bufferSize * 2
 	queue, semaChan := setupMultiLevelQueue(t, bufferSize)
 
 	messages := []message{}
-	for i := 0; i < oversizedBuffer; i++ {
+	for i := uint32(0); i < oversizedBuffer; i++ {
 		messages = append(messages, message{
-			validatorID: ids.NewShortID([20]byte{byte(i)}),
+			validatorID: ids.ShortID{byte(i)},
 		})
 	}
 
@@ -111,7 +111,7 @@ func TestExtraMessageNoDeadlock(t *testing.T) {
 	// because there is less than [bufferSize] room on the multi-level
 	// queue as a result of rounding when calculating the size of the
 	// single-level queues.
-	for i := 0; i < bufferSize; i++ {
+	for i := uint32(0); i < bufferSize; i++ {
 		<-semaChan
 	}
 	select {
@@ -122,7 +122,7 @@ func TestExtraMessageNoDeadlock(t *testing.T) {
 }
 
 func TestMultiLevelQueuePrioritizes(t *testing.T) {
-	bufferSize := 8
+	bufferSize := uint32(8)
 	vdrs := validators.NewSet()
 	validator1 := validators.GenerateRandomValidator(2000)
 	validator2 := validators.GenerateRandomValidator(2000)
@@ -164,7 +164,7 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 		logging.NoLog{},
 		msgTracker,
 		cpuTracker,
-		uint32(bufferSize),
+		bufferSize,
 		DefaultMaxNonStakerPendingMsgs,
 		DefaultStakerPortion,
 		DefaultStakerPortion,
@@ -210,7 +210,7 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 	<-semaChan
 	if msg1, err := queue.PopMessage(); err != nil {
 		t.Fatal(err)
-	} else if !msg1.validatorID.Equals(validator1.ID()) {
+	} else if msg1.validatorID != validator1.ID() {
 		t.Fatal("Expected first message to come from the high priority validator")
 	}
 
@@ -222,20 +222,20 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 	<-semaChan
 	if msg2, err := queue.PopMessage(); err != nil {
 		t.Fatal(err)
-	} else if !msg2.validatorID.Equals(validator2.ID()) {
+	} else if msg2.validatorID != validator2.ID() {
 		t.Fatal("Expected second message to come from the low priority validator after moving on to the lower level queue")
 	}
 
 	<-semaChan
 	if msg3, err := queue.PopMessage(); err != nil {
 		t.Fatal(err)
-	} else if !msg3.validatorID.Equals(validator1.ID()) {
+	} else if msg3.validatorID != validator1.ID() {
 		t.Fatal("Expected final message to come from validator1")
 	}
 }
 
 func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
-	bufferSize := 16
+	bufferSize := uint32(16)
 	vdrs := validators.NewSet()
 	vdr0 := validators.GenerateRandomValidator(2000)
 	vdr1 := validators.GenerateRandomValidator(2000)
@@ -277,7 +277,7 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 		logging.NoLog{},
 		msgTracker,
 		cpuTracker,
-		uint32(bufferSize),
+		bufferSize,
 		DefaultMaxNonStakerPendingMsgs,
 		DefaultStakerPortion,
 		DefaultStakerPortion,
@@ -307,7 +307,7 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 	<-semaChan
 	if msg, err := queue.PopMessage(); err != nil {
 		t.Fatalf("Popping first message errored: %s", err)
-	} else if !msg.validatorID.Equals(vdr0.ID()) {
+	} else if msg.validatorID != vdr0.ID() {
 		t.Fatal("Expected first message to come from vdr0")
 	}
 
@@ -323,20 +323,20 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 	<-semaChan
 	if msg, err := queue.PopMessage(); err != nil {
 		t.Fatalf("Popping second message errored: %s", err)
-	} else if !msg.validatorID.Equals(vdr1.ID()) {
+	} else if msg.validatorID != vdr1.ID() {
 		t.Fatal("Expected second message to come from vdr1 after vdr0 dropped in priority")
 	}
 
 	<-semaChan
 	if msg, err := queue.PopMessage(); err != nil {
 		t.Fatalf("Popping third message errored: %s", err)
-	} else if !msg.validatorID.Equals(vdr0.ID()) {
+	} else if msg.validatorID != vdr0.ID() {
 		t.Fatal("Expected third message to come from vdr0")
 	}
 }
 
 func TestMultiLevelQueueFreesSpace(t *testing.T) {
-	bufferSize := 8
+	bufferSize := uint32(8)
 	vdrs := validators.NewSet()
 	validator1 := validators.GenerateRandomValidator(2000)
 	validator2 := validators.GenerateRandomValidator(2000)
@@ -380,7 +380,7 @@ func TestMultiLevelQueueFreesSpace(t *testing.T) {
 		logging.NoLog{},
 		msgTracker,
 		cpuTracker,
-		uint32(bufferSize),
+		bufferSize,
 		DefaultMaxNonStakerPendingMsgs,
 		DefaultStakerPortion,
 		DefaultStakerPortion,
@@ -394,7 +394,7 @@ func TestMultiLevelQueueFreesSpace(t *testing.T) {
 		metrics,
 	)
 
-	for i := 0; i < 4; i++ {
+	for i := uint32(0); i < 4; i++ {
 		validator1.ID()
 		if success := queue.PushMessage(message{
 			validatorID: validator1.ID(),
@@ -409,7 +409,7 @@ func TestMultiLevelQueueFreesSpace(t *testing.T) {
 	}
 
 	// Empty the message pool
-	for i := 0; i < bufferSize; i++ {
+	for i := uint32(0); i < bufferSize; i++ {
 		<-semaChan
 		if _, err := queue.PopMessage(); err != nil {
 			t.Fatalf("Failed to pop message on iteration %d due to: %s", i, err)
@@ -419,7 +419,7 @@ func TestMultiLevelQueueFreesSpace(t *testing.T) {
 
 	// Fill up message pool again to ensure
 	// popping previous messages freed up space
-	for i := 0; i < 4; i++ {
+	for i := uint32(0); i < 4; i++ {
 		if success := queue.PushMessage(message{
 			validatorID: validator1.ID(),
 		}); !success {
@@ -434,7 +434,7 @@ func TestMultiLevelQueueFreesSpace(t *testing.T) {
 }
 
 func TestMultiLevelQueueThrottles(t *testing.T) {
-	bufferSize := 8
+	bufferSize := uint32(8)
 	vdrs := validators.NewSet()
 	validator1 := validators.GenerateRandomValidator(2000)
 	validator2 := validators.GenerateRandomValidator(2000)
@@ -482,7 +482,7 @@ func TestMultiLevelQueueThrottles(t *testing.T) {
 	)
 
 	success := queue.PushMessage(message{
-		validatorID: ids.NewShortID([20]byte{1}),
+		validatorID: ids.ShortID{1},
 	})
 	if success {
 		t.Fatal("Expected multi-level queue to throttle message when there were no resources available")

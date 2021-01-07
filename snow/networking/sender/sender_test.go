@@ -94,8 +94,8 @@ func TestTimeout(t *testing.T) {
 	chainRouter.AddChain(&handler)
 
 	vdrIDs := ids.ShortSet{}
-	vdrIDs.Add(ids.NewShortID([20]byte{255}))
-	vdrIDs.Add(ids.NewShortID([20]byte{254}))
+	vdrIDs.Add(ids.ShortID{255})
+	vdrIDs.Add(ids.ShortID{254})
 
 	sender.PullQuery(vdrIDs, 0, ids.Empty)
 
@@ -167,7 +167,7 @@ func TestReliableMessages(t *testing.T) {
 	go func() {
 		for i := 0; i < queriesToSend; i++ {
 			vdrIDs := ids.ShortSet{}
-			vdrIDs.Add(ids.NewShortID([20]byte{1}))
+			vdrIDs.Add(ids.ShortID{1})
 
 			sender.PullQuery(vdrIDs, uint32(i), ids.Empty)
 			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404

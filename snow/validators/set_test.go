@@ -14,9 +14,9 @@ import (
 
 func TestSetSet(t *testing.T) {
 	vdr0 := NewValidator(ids.ShortEmpty, 1)
-	vdr1 := NewValidator(ids.NewShortID([20]byte{0xFF}), math.MaxInt64-1)
+	vdr1 := NewValidator(ids.ShortID{0xFF}, math.MaxInt64-1)
 	// Should be discarded, because it has a weight of 0
-	vdr2 := NewValidator(ids.NewShortID([20]byte{0xAA}), 0)
+	vdr2 := NewValidator(ids.ShortID{0xAA}, 0)
 
 	s := NewSet()
 	err := s.Set([]Validator{vdr0, vdr1, vdr2})
@@ -114,10 +114,10 @@ func TestSamplerContains(t *testing.T) {
 
 func TestSamplerString(t *testing.T) {
 	vdr0 := ids.ShortEmpty
-	vdr1 := ids.NewShortID([20]byte{
+	vdr1 := ids.ShortID{
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-	})
+	}
 
 	s := NewSet()
 	err := s.AddWeight(vdr0, 1)
@@ -134,9 +134,9 @@ func TestSamplerString(t *testing.T) {
 }
 
 func TestSetWeight(t *testing.T) {
-	vdr0 := ids.NewShortID([20]byte{1})
+	vdr0 := ids.ShortID{1}
 	weight0 := uint64(93)
-	vdr1 := ids.NewShortID([20]byte{2})
+	vdr1 := ids.ShortID{2}
 	weight1 := uint64(123)
 
 	s := NewSet()
@@ -152,11 +152,11 @@ func TestSetWeight(t *testing.T) {
 }
 
 func TestSetSubsetWeight(t *testing.T) {
-	vdr0 := ids.NewShortID([20]byte{1})
+	vdr0 := ids.ShortID{1}
 	weight0 := uint64(93)
-	vdr1 := ids.NewShortID([20]byte{2})
+	vdr1 := ids.ShortID{2}
 	weight1 := uint64(123)
-	vdr2 := ids.NewShortID([20]byte{3})
+	vdr2 := ids.ShortID{3}
 	weight2 := uint64(810)
 	subset := ids.ShortSet{}
 	subset.Add(vdr0)
@@ -181,10 +181,10 @@ func TestSetSubsetWeight(t *testing.T) {
 
 func TestSamplerMasked(t *testing.T) {
 	vdr0 := ids.ShortEmpty
-	vdr1 := ids.NewShortID([20]byte{
+	vdr1 := ids.ShortID{
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-	})
+	}
 
 	s := NewSet()
 	err := s.AddWeight(vdr0, 1)
