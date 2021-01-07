@@ -163,7 +163,7 @@ func TestVMGenesis(t *testing.T) {
 	}
 
 	go shutdownFunc()
-	shutdownTimeout := 10 * time.Millisecond
+	shutdownTimeout := 50 * time.Millisecond
 	ticker := time.NewTicker(shutdownTimeout)
 	select {
 	case <-ticker.C:
