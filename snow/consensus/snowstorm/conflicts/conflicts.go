@@ -242,6 +242,7 @@ func (c *Conflicts) Accept(txID ids.ID) {
 			// [tx] is not acceptable because a transition it requires to have
 			// been performed has not yet been
 			acceptable = false
+			break
 		}
 	}
 	if acceptable {
