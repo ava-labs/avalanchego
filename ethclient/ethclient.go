@@ -391,7 +391,7 @@ func (ec *Client) BalanceAt(ctx context.Context, account common.Address, blockNu
 // The block number can be nil, in which case the balance is taken from the latest known block.
 func (ec *Client) AssetBalanceAt(ctx context.Context, account common.Address, assetID ids.ID, blockNumber *big.Int) (*big.Int, error) {
 	var result hexutil.Big
-	err := ec.c.CallContext(ctx, &result, "eth_getBalance", account, toBlockNumArg(blockNumber), assetID)
+	err := ec.c.CallContext(ctx, &result, "eth_getAssetBalance", account, toBlockNumArg(blockNumber), assetID)
 	return (*big.Int)(&result), err
 }
 
