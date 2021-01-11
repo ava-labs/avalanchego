@@ -55,7 +55,7 @@ func (t *BaseTx) SyntacticVerify(
 func (t *BaseTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable, epoch uint32) error {
 	for i, in := range t.Ins {
 		cred := creds[i]
-		if err := vm.verifyTransfer(tx, in, cred, epoch); err != nil {
+		if err := vm.verifyTransfer(tx, epoch, in, cred); err != nil {
 			return err
 		}
 	}
