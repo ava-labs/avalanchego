@@ -53,6 +53,10 @@ type Consensus interface {
 	// transition is currently processing.
 	TransitionProcessing(ids.ID) bool
 
+	// ProcessingTxs returns all of the processing transactions that contain the
+	// given transition ID
+	ProcessingTxs(trID ids.ID) []conflicts.Tx
+
 	// GetTx returns the named tx. If the named tx isn't currently processing,
 	// an error will be returned.
 	GetTx(ids.ID) (conflicts.Tx, error)

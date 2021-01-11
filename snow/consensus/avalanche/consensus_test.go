@@ -19,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
+// TODO add ProcessingTxs to the tests
+
 var (
 	Tests = []func(*testing.T, Factory){
 		MetricsTest,

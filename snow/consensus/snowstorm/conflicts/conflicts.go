@@ -120,6 +120,23 @@ func (c *Conflicts) Processing(trID ids.ID) bool {
 	return exists
 }
 
+// ProcessingTxs returns a list of processing transactions
+// that containtransition [trID]. If no processing
+// transactions contain [trID] returns nil.
+func (c *Conflicts) ProcessingTxs(trID ids.ID) []Tx {
+	trNode, exists := c.transitionNodes[trID]
+	if !exists {
+		return nil
+	}
+	txIDs := trNode.txIDs.List()
+	txs := make([]Tx, len(txIDs))
+	for i, txID := range txIDs {
+		tx := c.txs[txID]
+		txs[i] = tx
+	}
+	return txs
+}
+
 // IsVirtuous checks the currently processing txs for conflicts.
 // [tx] need not be is processing.
 func (c *Conflicts) IsVirtuous(tx Tx) bool {

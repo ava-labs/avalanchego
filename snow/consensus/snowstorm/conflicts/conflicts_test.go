@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
+// TODO test ProcessingTxs
+
 type Test struct {
 	Name  string
 	Steps []Step

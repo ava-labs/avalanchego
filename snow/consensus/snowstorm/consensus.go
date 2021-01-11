@@ -55,6 +55,10 @@ type Consensus interface {
 	// Returns true iff a transaction with the named transition is processing
 	Processing(ids.ID) bool
 
+	// Returns a list of processing transactions that contain
+	// transition [trID].
+	ProcessingTxs(trID ids.ID) []conflicts.Tx
+
 	// Adds a new transaction to vote on.
 	Add(conflicts.Tx)
 

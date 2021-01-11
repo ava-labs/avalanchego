@@ -20,6 +20,8 @@ import (
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
+// TODO add tests for ProcessingTxs
+
 var (
 	Tests = []func(*testing.T, Factory){
 		MetricsTest,

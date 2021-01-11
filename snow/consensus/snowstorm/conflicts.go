@@ -15,8 +15,13 @@ type Conflicts interface {
 	// Assumes Add has not already been called with [tx]
 	Add(tx conflicts.Tx)
 
-	// Processing returns if [trID] is currently being processed
+	// Processing returns if [trID] is currently being processedz
 	Processing(trID ids.ID) bool
+
+	// Returns a list of processing transactions that contain
+	// transition [trID]. If no processing transactions
+	// contain [trID] returns nil.
+	ProcessingTxs(trID ids.ID) []conflicts.Tx
 
 	// IsVirtuous returns true if there are no known conflicts with [tx]
 	IsVirtuous(tx conflicts.Tx) bool

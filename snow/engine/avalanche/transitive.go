@@ -51,8 +51,12 @@ type Transitive struct {
 	pending ids.Set
 
 	// vtxBlocked tracks operations that are blocked on vertices
-	// txBlocked tracks operations that are blocked on transactions
-	vtxBlocked, txBlocked events.Blocker
+	// trBlocked tracks operations that are blocked on transitions
+	vtxBlocked, trBlocked events.Blocker
+
+	// Tx ID --> IDs of transitions that must be accepted in an epoch earlier
+	// then the transaction's, or processing in the same epoch as the transaction.
+	txDeps map[ids.ID]ids.Set
 
 	errs wrappers.Errs
 }
@@ -231,7 +235,7 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 
 	if t.outstandingVtxReqs.Len() == 0 {
 		for trID := range t.missingTransitions {
-			t.txBlocked.Abandon(trID)
+			t.trBlocked.Abandon(trID)
 		}
 		t.missingTransitions.Clear()
 	}
@@ -464,26 +468,53 @@ func (t *Transitive) issue(vtx avalanche.Vertex, updatedEpoch bool) error {
 
 	for _, tx := range txs {
 		tr := tx.Transition()
+		epoch := tx.Epoch()
+		// Mark as unfulfilled all of the transition's dependencies
+		// that are neither accepted nor processing in this tx's epoch.
 		for _, depID := range tr.Dependencies() {
-			if !trIDs.Contains(depID) && !t.Consensus.TransitionProcessing(depID) {
+			if trIDs.Contains(depID) {
+				// This vertex contains this dependency. No need to mark
+				// as unfulfilled.
+				continue
+			}
+
+			// [processingDepTxs] is a list of processing txs that contain
+			// dependency [depID].
+			processingDepTxs := t.Consensus.ProcessingTxs(depID)
+			if len(processingDepTxs) == 0 {
+				// We don't have any processing txs with this dependency
 				t.missingTransitions.Add(depID)
-				i.txDeps.Add(depID)
+			}
+
+			// Check if any processing txs with the depenency are in
+			// the same epoch as [tx].
+			unfulfilled := true
+			for _, processingDep := range processingDepTxs {
+				if processingDep.Epoch() == epoch {
+					unfulfilled = false
+					break
+				}
+			}
+			if unfulfilled {
+				// Mark that depenency [depID] is not accepted in an earlier
+				// epoch and is not processing in the current epoch
+				i.trDeps.Add(depID)
 			}
 		}
 	}
 
 	t.Ctx.Log.Verbo("vertex %s is blocking on %d vertices and %d transactions",
-		vtxID, i.vtxDeps.Len(), i.txDeps.Len())
+		vtxID, i.vtxDeps.Len(), i.trDeps.Len())
 
 	// Wait until all the parents of [vtx] are added to consensus before adding [vtx]
 	t.vtxBlocked.Register(&vtxIssuer{i: i})
-	// Wait until all the parents of [tx] are added to consensus before adding [vtx]
-	t.txBlocked.Register(&txIssuer{i: i})
+	// Wait until all the parents of [tr] are added to consensus before adding [vtx]
+	t.trBlocked.Register(&trIssuer{i: i})
 
 	if t.outstandingVtxReqs.Len() == 0 {
 		// There are no outstanding vertex requests but we don't have these transactions, so we're not getting them.
 		for txID := range t.missingTransitions {
-			t.txBlocked.Abandon(txID)
+			t.trBlocked.Abandon(txID)
 		}
 		t.missingTransitions.Clear()
 	}

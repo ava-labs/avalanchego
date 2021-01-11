@@ -257,7 +257,7 @@ func TestEngineFulfillMissingDependencies(t *testing.T) {
 	if len(te.vtxBlocked) != 1 {
 		t.Fatalf("Should have been blocking on 1 missing vertex dependency")
 	}
-	if len(te.txBlocked) != 1 {
+	if len(te.trBlocked) != 1 {
 		t.Fatalf("Should have been blocking on 1 missing transition dependency")
 	}
 	if te.missingTransitions.Len() != 1 {
@@ -312,8 +312,8 @@ func TestEngineFulfillMissingDependencies(t *testing.T) {
 	if len(te.vtxBlocked) != 0 {
 		t.Fatalf("Expected 0 blocked vertices, but found %d blocked vertices", len(te.vtxBlocked))
 	}
-	if len(te.txBlocked) != 0 {
-		t.Fatalf("Expected 0 blocked transitions, but found %d blocked transitions", len(te.txBlocked))
+	if len(te.trBlocked) != 0 {
+		t.Fatalf("Expected 0 blocked transitions, but found %d blocked transitions", len(te.trBlocked))
 	}
 	if numMissingTransitions := te.missingTransitions.Len(); numMissingTransitions != 0 {
 		t.Fatalf("Expected 0 missing transitions, but found %d missing transitions", numMissingTransitions)

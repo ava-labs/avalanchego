@@ -177,6 +177,11 @@ func (dg *Directed) Processing(trID ids.ID) bool {
 	return dg.conflicts.Processing(trID)
 }
 
+// Processing implements the Consensus interface
+func (dg *Directed) ProcessingTxs(trID ids.ID) []conflicts.Tx {
+	return dg.conflicts.ProcessingTxs(trID)
+}
+
 // Add implements the Consensus interface
 func (dg *Directed) Add(tx conflicts.Tx) {
 	if dg.Issued(tx) {
