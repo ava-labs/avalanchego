@@ -130,7 +130,7 @@ func (dg *Directed) IsVirtuous(tx conflicts.Tx) (bool, error) {
 		return !node.rogue, nil
 	}
 
-	return dg.conflicts.IsVirtuous(tx)
+	return dg.conflicts.IsVirtuous(tx), nil
 }
 
 // Conflicts implements the Consensus interface
@@ -150,10 +150,7 @@ func (dg *Directed) Conflicts(tx conflicts.Tx) (ids.Set, error) {
 
 	// If the tx isn't currently processing, the conflicting txs are the
 	// union of all the txs that spend an input that this tx spends.
-	txConflicts, err := dg.conflicts.Conflicts(tx)
-	if err != nil {
-		return nil, err
-	}
+	txConflicts := dg.conflicts.Conflicts(tx)
 
 	conflicts := make(ids.Set, len(txConflicts))
 	for _, conflict := range txConflicts {
@@ -181,16 +178,13 @@ func (dg *Directed) Processing(trID ids.ID) bool {
 }
 
 // Add implements the Consensus interface
-func (dg *Directed) Add(tx conflicts.Tx) error {
+func (dg *Directed) Add(tx conflicts.Tx) {
 	if dg.Issued(tx) {
 		// If the tx was previously inserted, it shouldn't be re-inserted.
-		return nil
+		return
 	}
 
-	conflicts, err := dg.conflicts.Conflicts(tx)
-	if err != nil {
-		return err
-	}
+	conflicts := dg.conflicts.Conflicts(tx)
 
 	txID := tx.ID()
 
@@ -228,7 +222,7 @@ func (dg *Directed) Add(tx conflicts.Tx) error {
 
 	// Add this tx to the set of currently processing txs
 	dg.txs[txID] = txNode
-	return dg.conflicts.Add(tx)
+	dg.conflicts.Add(tx)
 }
 
 // Get implements the Consensus interface
@@ -284,7 +278,7 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 			// txs don't force the node to treat the rogue tx as virtuous.
 			dg.virtuousVoting.Remove(txID)
 
-			// Mark this transaction as being confitionally accepted
+			// Mark this transaction as being conditionally accepted
 			dg.conflicts.Accept(txID)
 		}
 
@@ -314,62 +308,61 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 		}
 	}
 
-	shouldWork := true
-	for shouldWork {
-		acceptable, rejectable := dg.conflicts.Updateable()
-		for _, toAccept := range acceptable {
-			toAcceptID := toAccept.ID()
+	acceptable, rejectable := dg.conflicts.Updateable()
+	for _, toAccept := range acceptable {
+		toAcceptID := toAccept.ID()
 
-			// We can remove the accepted tx from the graph.
-			delete(dg.txs, toAcceptID)
+		// We can remove the accepted tx from the graph.
+		delete(dg.txs, toAcceptID)
 
-			// This tx is now accepted, so it shouldn't be part of the virtuous
-			// set or the preferred set. Its status as Accepted implies these
-			// descriptions.
-			dg.virtuous.Remove(toAcceptID)
-			dg.preferences.Remove(toAcceptID)
+		// This tx is now accepted, so it shouldn't be part of the virtuous
+		// set or the preferred set. Its status as Accepted implies these
+		// descriptions.
+		dg.virtuous.Remove(toAcceptID)
+		dg.preferences.Remove(toAcceptID)
 
-			// Update the metrics to account for this transaction's acceptance
-			dg.metrics.Accepted(toAcceptID)
+		// Update the metrics to account for this transaction's acceptance
+		dg.metrics.Accepted(toAcceptID)
 
-			// Accept the transaction
-			if err := toAccept.Accept(); err != nil {
-				return false, err
-			}
-
-			tr := toAccept.Transition()
-			dg.ctx.DecisionDispatcher.Accept(dg.ctx, tr.ID(), tr.Bytes())
-		}
-		for _, toReject := range rejectable {
-			toRejectID := toReject.ID()
-			toRejectNode := dg.txs[toRejectID]
-
-			// We can remove the rejected tx from the graph.
-			delete(dg.txs, toRejectID)
-
-			// While it's statistically unlikely that something being rejected
-			// is preferred, it is handled for completion.
-			dg.preferences.Remove(toRejectID)
-
-			// remove the edge between this node and all its neighbors
-			dg.removeConflict(toRejectID, toRejectNode.ins)
-			dg.removeConflict(toRejectID, toRejectNode.outs)
-
-			// Update the metrics to account for this transaction's rejection
-			dg.metrics.Rejected(toRejectID)
-
-			// Reject the transaction
-			if err := toReject.Reject(); err != nil {
-				return false, err
-			}
+		// Accept the transaction
+		if err := toAccept.Accept(); err != nil {
+			return false, err
 		}
 
-		// If a status has changed, we must perform a second iteration
-		shouldWork = len(acceptable)+len(rejectable) > 0
-
-		// If a status has changed, the frontiers must be recalculated.
-		changed = changed || shouldWork
+		tr := toAccept.Transition()
+		dg.ctx.DecisionDispatcher.Accept(dg.ctx, tr.ID(), tr.Bytes())
 	}
+	for _, toReject := range rejectable {
+		toRejectID := toReject.ID()
+		toRejectNode, exists := dg.txs[toRejectID]
+		// Attempting to Reject a transaction twice is a fatal error
+		if !exists {
+			return false, fmt.Errorf("failed to find tx node %s", toRejectID)
+		}
+
+		// We can remove the rejected tx from the graph.
+		delete(dg.txs, toRejectID)
+
+		// While it's statistically unlikely that something being rejected
+		// is preferred, it is handled for completion.
+		dg.preferences.Remove(toRejectID)
+
+		// remove the edge between this node and all its neighbors
+		dg.removeConflict(toRejectID, toRejectNode.ins)
+		dg.removeConflict(toRejectID, toRejectNode.outs)
+
+		// Update the metrics to account for this transaction's rejection
+		dg.metrics.Rejected(toRejectID)
+
+		// Reject the transaction
+		if err := toReject.Reject(); err != nil {
+			return false, err
+		}
+	}
+
+	// If a status has changed, the frontiers must be recalculated.
+	changed = changed || len(acceptable)+len(rejectable) > 0
+
 	return changed, nil
 }
 

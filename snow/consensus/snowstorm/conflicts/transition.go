@@ -21,9 +21,9 @@ type Transition interface {
 	//
 	// If Accept has been called on a transition with this ID, Accepted should
 	// be returned. Similarly, if Reject has been called on a transition with
-	// this ID, Rejected should be returned. If the body of this transition is
-	// unknown, then Unknown should be returned. Otherwise, Processing should be
-	// returned.
+	// this ID and this transition can never be made by another transaction,
+	// Rejected should be returned. If the body of this transition is unknown,
+	// then Unknown should be returned. Otherwise, Processing should be returned.
 	Status() choices.Status
 
 	// Epoch this transition was accepted in.

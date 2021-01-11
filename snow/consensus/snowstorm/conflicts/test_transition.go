@@ -72,7 +72,7 @@ func (t *TestTransition) Accept(epoch uint32) error {
 		t.StatusV = choices.Accepted
 		return t.AcceptV[epoch]
 	default:
-		return fmt.Errorf("invalid state transaition from %s to %s",
+		return fmt.Errorf("invalid state transition from %s to %s",
 			t.StatusV, choices.Accepted)
 	}
 }
@@ -81,10 +81,14 @@ func (t *TestTransition) Accept(epoch uint32) error {
 func (t *TestTransition) Reject(epoch uint32) error {
 	switch t.StatusV {
 	case choices.Processing:
-		t.StatusV = choices.Rejected
+		return t.RejectV[epoch]
+	case choices.Accepted:
+		if t.EpochV == epoch {
+			return fmt.Errorf("invalid state transition from Accepted to Rejected in epoch %d", epoch)
+		}
 		return t.RejectV[epoch]
 	default:
-		return fmt.Errorf("invalid state transaition from %s to %s",
+		return fmt.Errorf("invalid state transition from %s to %s",
 			t.StatusV, choices.Rejected)
 	}
 }

@@ -55,9 +55,8 @@ type Consensus interface {
 	// Returns true iff a transaction with the named transition is processing
 	Processing(ids.ID) bool
 
-	// Adds a new transaction to vote on. Returns if a critical error has
-	// occurred.
-	Add(conflicts.Tx) error
+	// Adds a new transaction to vote on.
+	Add(conflicts.Tx)
 
 	// Get the named transaction. If the transaction isn't currently being
 	// processed by the consensus instance, then an error will be returned.
