@@ -145,6 +145,181 @@ func TestEngineAdd(t *testing.T) {
 	}
 }
 
+func TestEngineFulfillMissingDependencies(t *testing.T) {
+	config := DefaultConfig()
+
+	vals := validators.NewSet()
+	config.Validators = vals
+
+	vdr := ids.GenerateTestShortID()
+	if err := vals.AddWeight(vdr, 1); err != nil {
+		t.Fatal(err)
+	}
+
+	sender := &common.SenderTest{}
+	sender.T = t
+	config.Sender = sender
+
+	sender.Default(true)
+	sender.CantGetAcceptedFrontier = false
+
+	manager := vertex.NewTestManager(t)
+	config.Manager = manager
+
+	manager.Default(true)
+
+	manager.CantEdge = false
+
+	te := &Transitive{}
+	if err := te.Initialize(config); err != nil {
+		t.Fatal(err)
+	}
+
+	if te.Ctx.ChainID != ids.Empty {
+		t.Fatalf("Wrong chain ID")
+	}
+
+	trA := &conflicts.TestTransition{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Unknown,
+	}
+	txA := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: trA,
+	}
+	// [trB] depends on [trA]
+	trB := &conflicts.TestTransition{
+		IDV:           ids.GenerateTestID(),
+		StatusV:       choices.Processing,
+		DependenciesV: []conflicts.Transition{trA},
+	}
+	txB := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: trB,
+	}
+
+	parentVtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		BytesV: []byte{1},
+		TxsV:   []conflicts.Tx{txA},
+	}
+	childVtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: []avalanche.Vertex{
+			parentVtx,
+		},
+		BytesV: []byte{2},
+		TxsV:   []conflicts.Tx{txB},
+	}
+
+	asked := new(bool)
+	reqID := new(uint32)
+	sender.GetF = func(inVdr ids.ShortID, requestID uint32, vtxID ids.ID) {
+		*reqID = requestID
+		if *asked {
+			t.Fatalf("Asked multiple times")
+		}
+		*asked = true
+		if vdr != inVdr {
+			t.Fatalf("Asking wrong validator for vertex")
+		}
+		if parentVtx.ID() != vtxID {
+			t.Fatalf("Asking for wrong vertex")
+		}
+	}
+
+	manager.ParseF = func(b []byte) (avalanche.Vertex, error) {
+		if !bytes.Equal(b, childVtx.Bytes()) {
+			t.Fatalf("Wrong bytes")
+		}
+		return childVtx, nil
+	}
+
+	if err := te.Put(vdr, 0, childVtx.ID(), childVtx.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	if !*asked {
+		t.Fatalf("Didn't ask for a missing vertex")
+	}
+	if len(te.vtxBlocked) != 1 {
+		t.Fatalf("Should have been blocking on 1 missing vertex dependency")
+	}
+	if len(te.txBlocked) != 1 {
+		t.Fatalf("Should have been blocking on 1 missing transition dependency")
+	}
+	if te.missingTransitions.Len() != 1 {
+		t.Fatalf("Should have had one missing transition")
+	}
+
+	manager.ParseF = func(b []byte) (avalanche.Vertex, error) {
+		if !bytes.Equal(b, parentVtx.Bytes()) {
+			t.Fatalf("Wrong bytes")
+		}
+		return parentVtx, nil
+	}
+
+	pushedParentVtx := new(bool)
+	pushedChildVtx := new(bool)
+
+	// it should send two push queries first with parent vtx and then child vertex
+	sender.PushQueryF = func(inVdrs ids.ShortSet, requestID uint32, vtxID ids.ID, vtx []byte) {
+		if inVdrs.Len() != 1 {
+			t.Fatalf("Expected push query to be sent to one validator")
+		} else if !inVdrs.Contains(vdr) {
+			t.Fatalf("Expected to push query validator")
+		}
+
+		switch {
+		case !*pushedParentVtx:
+			if vtxID != parentVtx.ID() || !bytes.Equal(vtx, parentVtx.Bytes()) {
+				t.Fatalf("Expected to push query parent vertex")
+			}
+			*pushedParentVtx = true
+		case !*pushedChildVtx:
+			if vtxID != childVtx.ID() || !bytes.Equal(vtx, childVtx.Bytes()) {
+				t.Fatalf("Expected to push child vertex")
+			}
+			*pushedChildVtx = true
+		default:
+			t.Fatalf("Called push query more times than expected")
+		}
+	}
+
+	if err := te.Put(vdr, *reqID, parentVtx.ID(), parentVtx.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	if !*pushedParentVtx {
+		t.Fatalf("Expected to push query parent vertex")
+	}
+	if !*pushedChildVtx {
+		t.Fatalf("Expected to push query child vertex")
+	}
+
+	if len(te.vtxBlocked) != 0 {
+		t.Fatalf("Expected 0 blocked vertices, but found %d blocked vertices", len(te.vtxBlocked))
+	}
+	if len(te.txBlocked) != 0 {
+		t.Fatalf("Expected 0 blocked transitions, but found %d blocked transitions", len(te.txBlocked))
+	}
+	if numMissingTransitions := te.missingTransitions.Len(); numMissingTransitions != 0 {
+		t.Fatalf("Expected 0 missing transitions, but found %d missing transitions", numMissingTransitions)
+	}
+}
+
 func TestEngineQuery(t *testing.T) {
 	config := DefaultConfig()
 
