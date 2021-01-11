@@ -190,6 +190,7 @@ func TestEngineFulfillMissingDependencies(t *testing.T) {
 		},
 		TransitionV: trA,
 	}
+	// [trB] depends on [trA]
 	trB := &conflicts.TestTransition{
 		IDV:           ids.GenerateTestID(),
 		StatusV:       choices.Processing,
