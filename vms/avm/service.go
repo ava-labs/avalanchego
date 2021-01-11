@@ -78,6 +78,7 @@ func (service *Service) IssueTx(r *http.Request, args *api.FormattedTx, reply *a
 // GetTxStatusReply defines the GetTxStatus replies returned from the API
 type GetTxStatusReply struct {
 	Status choices.Status `json:"status"`
+	Epoch  *uint32        `json:"epoch,omitempty"`
 }
 
 // GetTxStatus returns the status of the specified transaction
@@ -91,6 +92,10 @@ func (service *Service) GetTxStatus(r *http.Request, args *api.JSONTxID, reply *
 	tx := newUniqueTx(service.vm, args.TxID, nil)
 
 	reply.Status = tx.Status()
+	if reply.Status == choices.Accepted {
+		epoch := tx.Epoch()
+		reply.Epoch = &epoch
+	}
 	return nil
 }
 
