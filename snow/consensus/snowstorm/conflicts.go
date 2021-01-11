@@ -13,13 +13,13 @@ type Conflicts interface {
 	// Add [tx] to conflict tracking
 	//
 	// Assumes Add has not already been called with [tx]
-	Add(tx conflicts.Tx) error
+	Add(tx conflicts.Tx)
 
 	// Processing returns if [trID] is currently being processed
 	Processing(trID ids.ID) bool
 
 	// IsVirtuous returns true if there are no known conflicts with [tx]
-	IsVirtuous(tx conflicts.Tx) (bool, error)
+	IsVirtuous(tx conflicts.Tx) bool
 
 	// Conflicts returns the known transactions that conflict with [tx]
 	Conflicts(tx conflicts.Tx) []conflicts.Tx

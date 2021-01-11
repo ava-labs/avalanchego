@@ -130,7 +130,7 @@ func (dg *Directed) IsVirtuous(tx conflicts.Tx) (bool, error) {
 		return !node.rogue, nil
 	}
 
-	return dg.conflicts.IsVirtuous(tx)
+	return dg.conflicts.IsVirtuous(tx), nil
 }
 
 // Conflicts implements the Consensus interface
@@ -178,10 +178,10 @@ func (dg *Directed) Processing(trID ids.ID) bool {
 }
 
 // Add implements the Consensus interface
-func (dg *Directed) Add(tx conflicts.Tx) error {
+func (dg *Directed) Add(tx conflicts.Tx) {
 	if dg.Issued(tx) {
 		// If the tx was previously inserted, it shouldn't be re-inserted.
-		return nil
+		return
 	}
 
 	conflicts := dg.conflicts.Conflicts(tx)
@@ -222,7 +222,7 @@ func (dg *Directed) Add(tx conflicts.Tx) error {
 
 	// Add this tx to the set of currently processing txs
 	dg.txs[txID] = txNode
-	return dg.conflicts.Add(tx)
+	dg.conflicts.Add(tx)
 }
 
 // Get implements the Consensus interface

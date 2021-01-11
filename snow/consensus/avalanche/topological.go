@@ -116,9 +116,7 @@ func (ta *Topological) Add(vtx Vertex) error {
 	for _, tx := range txs {
 		if !tx.Status().Decided() {
 			// Add the consumers to the conflict graph.
-			if err := ta.cg.Add(tx); err != nil {
-				return err
-			}
+			ta.cg.Add(tx)
 		}
 	}
 

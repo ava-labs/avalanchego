@@ -74,7 +74,7 @@ func New() *Conflicts {
 
 // Add this tx to the conflict set.
 // Assumes: Add has not already been called with argument [tx].
-func (c *Conflicts) Add(tx Tx) error {
+func (c *Conflicts) Add(tx Tx) {
 	// Mark that this tx is processing
 	txID := tx.ID()
 	c.txs[txID] = tx
@@ -112,7 +112,6 @@ func (c *Conflicts) Add(tx Tx) error {
 	tn.missingDependencies.Add(missingDependencies...)
 	// The transition node is written back
 	c.transitionNodes[trID] = tn
-	return nil
 }
 
 // Processing returns true if transition [trID] is processing.
@@ -123,7 +122,7 @@ func (c *Conflicts) Processing(trID ids.ID) bool {
 
 // IsVirtuous checks the currently processing txs for conflicts.
 // [tx] need not be is processing.
-func (c *Conflicts) IsVirtuous(tx Tx) (bool, error) {
+func (c *Conflicts) IsVirtuous(tx Tx) bool {
 	// Check whether this transaction consumes the same state as a different
 	// processing transaction
 	txID := tx.ID()
@@ -132,7 +131,7 @@ func (c *Conflicts) IsVirtuous(tx Tx) (bool, error) {
 		spenders := c.utxos[inputID] // txs that consume this state
 		if numSpenders := spenders.Len(); numSpenders > 1 ||
 			(numSpenders == 1 && !spenders.Contains(txID)) {
-			return false, nil // another tx consumes the same state
+			return false // another tx consumes the same state
 		}
 	}
 
@@ -146,7 +145,7 @@ func (c *Conflicts) IsVirtuous(tx Tx) (bool, error) {
 		restrictor := c.txs[restrictorID]
 		restrictorEpoch := restrictor.Epoch()
 		if restrictorEpoch > epoch {
-			return false, nil
+			return false
 		}
 	}
 
@@ -159,11 +158,11 @@ func (c *Conflicts) IsVirtuous(tx Tx) (bool, error) {
 			restriction := c.txs[restrictionID]
 			restrictionEpoch := restriction.Epoch()
 			if restrictionEpoch < epoch {
-				return false, nil
+				return false
 			}
 		}
 	}
-	return true, nil
+	return true
 }
 
 // Conflicts returns the processing txs that conflict with [tx].
@@ -370,6 +369,10 @@ outerLoop:
 		// If [dependentTx] requires [tx]'s transition to happen before [epoch],
 		// then [dependent] can no longer be accepted.
 		if dependentEpoch < epoch {
+			// If this tx was previously conditionally accepted, it should no
+			// longer be treated as such.
+			c.conditionallyAccepted.Remove(dependentTxID)
+
 			c.rejectableIDs.Add(dependentTxID)
 			c.rejectable = append(c.rejectable, dependentTx)
 			continue
@@ -407,6 +410,10 @@ func (c *Conflicts) rejectConflicts(tx Tx) {
 	conflictTxs := c.Conflicts(tx)
 	for _, conflictTx := range conflictTxs {
 		if conflictTxID := conflictTx.ID(); !c.rejectableIDs.Contains(conflictTxID) {
+			// If this tx was previously conditionally accepted, it should no
+			// longer be treated as such.
+			c.conditionallyAccepted.Remove(conflictTxID)
+
 			c.rejectableIDs.Add(conflictTxID)
 			c.rejectable = append(c.rejectable, conflictTx)
 		}
@@ -476,6 +483,10 @@ func (c *Conflicts) rejectInvalidDependents(tn *transitionNode) {
 		dependentTx := c.txs[dependentTxID]
 		dependentEpoch := dependentTx.Epoch()
 		if dependentEpoch < lowestRemainingEpoch && !c.rejectableIDs.Contains(dependentTxID) {
+			// If this tx was previously conditionally accepted, it should no
+			// longer be treated as such.
+			c.conditionallyAccepted.Remove(dependentTxID)
+
 			c.rejectableIDs.Add(dependentTxID)
 			c.rejectable = append(c.rejectable, dependentTx)
 		}
