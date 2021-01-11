@@ -75,12 +75,24 @@ func (c *Client) ListAddresses(user api.UserPass) ([]string, error) {
 	return res.Addresses, err
 }
 
-// GetUTXOs returns the byte representation of the UTXOs controlled by [addresses]
-func (c *Client) GetUTXOs(addresses []string) ([][]byte, api.Index, error) {
+// GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
+func (c *Client) GetUTXOs(addrs []string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
+	return c.GetAtomicUTXOs(addrs, "", limit, startAddress, startUTXOID)
+}
+
+// GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled by [addresses]
+// from [sourceChain]
+func (c *Client) GetAtomicUTXOs(addrs []string, sourceChain string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
 	res := &api.GetUTXOsReply{}
 	err := c.requester.SendRequest("getUTXOs", &api.GetUTXOsArgs{
-		Addresses: addresses,
-		Encoding:  formatting.Hex,
+		Addresses:   addrs,
+		SourceChain: sourceChain,
+		Limit:       cjson.Uint32(limit),
+		StartIndex: api.Index{
+			Address: startAddress,
+			UTXO:    startUTXOID,
+		},
+		Encoding: formatting.Hex,
 	}, res)
 	if err != nil {
 		return nil, api.Index{}, err
