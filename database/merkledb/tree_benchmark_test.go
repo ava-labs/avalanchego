@@ -1,4 +1,4 @@
-package tree
+package merkledb
 
 import (
 	"crypto/rand"
@@ -39,13 +39,13 @@ func BenchmarkTree_Put(b *testing.B) {
 	}{
 		{"test100k_Put", CreateRandomValues(100000)},
 		// this takes a lot of time removed from the CI
-		// {"test1M_Put_Del", CreateRandomValues(1000000)},
+		{"test1M_Put_Del", CreateRandomValues(1000000)},
 		// {"test10M_Put_Del", CreateRandomValues(10000000)},
 	}
 
 	for _, test := range tests {
-		tree := NewTree()
-		b.Run("test100k", func(b *testing.B) {
+		tree := NewMemoryTree()
+		b.Run(test.name, func(b *testing.B) {
 			b.ResetTimer()
 
 			for _, test := range test.data {
@@ -63,13 +63,13 @@ func BenchmarkTree_Del(b *testing.B) {
 	}{
 		{"test100k_Put_Del", CreateRandomValues(100000)},
 		// this takes a lot of time removed from the CI
-		// {"test1M_Put_Del", CreateRandomValues(1000000)},
+		{"test1M_Put_Del", CreateRandomValues(1000000)},
 		// {"test10M_Put_Del", CreateRandomValues(10000000)},
 	}
 
 	for _, test := range tests {
 		b.Run(test.name, func(b *testing.B) {
-			tree := NewTree()
+			tree := NewMemoryTree()
 			b.ResetTimer()
 			for _, test := range test.data {
 				_ = tree.Put(test.key, test.value)

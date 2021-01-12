@@ -1,4 +1,4 @@
-package tree
+package merkledb
 
 // Iterator iterates over a database's key/value pairs in ascending key order.
 //
@@ -62,7 +62,7 @@ func NewIteratorWithStartAndPrefix(t *Tree, start, prefix []byte) *Iterator {
 // Next moves the iterator to the next key/value pair.
 // It returns whether the iterator is exhausted.
 func (i *Iterator) Next() bool {
-	i.node, i.err = i.tree.fetchNextNode(FromBytes(i.prefix), FromBytes(i.start), i.node.Key(), i.tree.rootNode)
+	i.node, i.err = i.tree.fetchNextNode(FromBytes(i.prefix), FromBytes(i.start), i.node.Key(), Persistence.GetRootNode())
 	return i.node != nil
 }
 

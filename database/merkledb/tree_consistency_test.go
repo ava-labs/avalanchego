@@ -1,4 +1,4 @@
-package tree
+package merkledb
 
 import (
 	"bytes"
@@ -27,23 +27,35 @@ func TestTreeConsistency_Del(t *testing.T) {
 		data []TestStruct
 	}{
 		{"test10k", CreateRandomValues(10000)},
-		// {"test100k", CreateRandomValues(100000)},
+		{"test100k", CreateRandomValues(100000)},
 		// this takes a lot of time removed from the CI
 		// {"test1M", CreateRandomValues(1000000)},
 		// {"test5M", CreateRandomValues(5000000)},
 	}
 
+	var lastRootHash []byte
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tree := NewTree()
+			tree := NewMemoryTree()
 			added := map[string]bool{}
 			for _, entry := range test.data {
 				_ = tree.Put(entry.key, entry.value)
 				added[string(entry.key)] = true
+				if bytes.Equal(lastRootHash, tree.Root()) {
+					t.Fatal("Root Hash didn't change after insertion")
+				}
+				lastRootHash = tree.Root()
+
 			}
 
 			for entry, testList := PickRandomKey(test.data); len(testList) > 0; entry, testList = PickRandomKey(testList) {
 				if !tree.Del(entry.key) {
+
+					if bytes.Equal(lastRootHash, tree.Root()) {
+						t.Fatal("Root Hash didn't change after deletion")
+					}
+					lastRootHash = tree.Root()
+
 					i := 0
 					for _, val := range test.data {
 						if bytes.Equal(entry.key, val.key) {

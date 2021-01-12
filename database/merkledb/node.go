@@ -1,18 +1,21 @@
-package tree
+package merkledb
 
-import "golang.org/x/crypto/sha3"
+import (
+	"golang.org/x/crypto/sha3"
+)
 
 type Node interface {
-	GetChild(key []Unit) Node
-	GetNextNode(prefix []Unit, start []Unit, key []Unit) Node
-	Insert(key []Unit, value []byte)
+	GetChild(key []Unit) (Node, error)
+	GetNextNode(prefix []Unit, start []Unit, key []Unit) (Node, error)
+	Insert(key []Unit, value []byte) error
 	Delete(key []Unit) bool
-	SetChild(node Node)
-	SetParent(b Node)
+	SetChild(node Node) error
+	SetParent(b Node) error
 	Value() []byte
-	Hash()
+	Hash(key []Unit, hash []byte) error
 	GetHash() []byte
 	Key() []Unit
+	StorageKey() []Unit
 	Print()
 }
 

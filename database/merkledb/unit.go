@@ -1,21 +1,22 @@
-package tree
+package merkledb
 
 const UnitSize = 16 + 1
 
 type Unit byte
 
-func FirstNonPrefix(basekey []Unit, otherKey []Unit) Unit {
+// FirstNonPrefix returns the first Unit that's not common between baseKey and otherKey
+func FirstNonPrefix(baseKey []Unit, otherKey []Unit) Unit {
 	smaller := otherKey
-	larger := basekey
+	larger := baseKey
 
 	// the UnitSize - 1 position is the termination position
 	// that position will only have LeafNodes
-	if len(basekey) == len(otherKey) {
+	if len(baseKey) == len(otherKey) {
 		return Unit(UnitSize - 1)
 	}
 
 	if len(smaller) > len(larger) {
-		smaller = basekey
+		smaller = baseKey
 		larger = otherKey
 	}
 
@@ -46,6 +47,7 @@ func SharedPrefix(address1 []Unit, address2 []Unit) []Unit {
 	return shared
 }
 
+// EqualUnits returns whether the two []Unit are equal
 func EqualUnits(key []Unit, key2 []Unit) bool {
 	if len(key) != len(key2) {
 		return false
@@ -59,6 +61,7 @@ func EqualUnits(key []Unit, key2 []Unit) bool {
 	return true
 }
 
+// FromBytes converts a []byte to []Unit
 func FromBytes(bs []byte) []Unit {
 	units := make([]Unit, 0, len(bs))
 	for _, n := range bs {
@@ -67,6 +70,8 @@ func FromBytes(bs []byte) []Unit {
 	return units
 }
 
+// FromByte converts a byte to Unit
+// in this case a Unit is a Nibble with means byte -> [2]Unit
 func FromByte(b byte) []Unit {
 	return []Unit{
 		Unit(b >> 4),
@@ -88,9 +93,7 @@ func IsPrefixed(prefix []Unit, u []Unit) bool {
 	return true
 }
 
-// TODO Review this padding
 // ToBytes converts a slice of nibbles to a byte slice
-// assuming the nibble slice has even number of nibbles.
 func ToBytes(u []Unit) []byte {
 	length := len(u)
 	if len(u) != 0 {
@@ -106,6 +109,20 @@ func ToBytes(u []Unit) []byte {
 	return buf
 }
 
+// ToExpandedBytes converts a slice of nibbles to a byte slice that's a direct array conversion
+// specially useful for key storing
+func ToExpandedBytes(u []Unit) []byte {
+	length := len(u)
+	buf := make([]byte, 0, length)
+
+	for i := 0; i < length; i++ {
+		buf = append(buf, byte(u[i]))
+	}
+
+	return buf
+}
+
+// Greater returns if u1 is greater than u2
 func Greater(u1 []Unit, u2 []Unit) bool {
 	for i := 0; i < len(u1) && i < len(u2); i++ {
 		if u1[i] < u2[i] {
@@ -114,4 +131,10 @@ func Greater(u1 []Unit, u2 []Unit) bool {
 	}
 
 	return true
+}
+
+// FromStorageKey converts StorageKeys in Keys
+// removes the appended "B-" or "L-"
+func FromStorageKey(u []Unit) []Unit {
+	return u[2:]
 }

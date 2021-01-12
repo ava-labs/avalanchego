@@ -1,4 +1,4 @@
-package tree
+package merkledb
 
 import (
 	"github.com/ava-labs/avalanchego/database"

@@ -1,4 +1,4 @@
-package tree
+package merkledb
 
 import (
 	"bytes"
@@ -28,7 +28,7 @@ func TestTree_Put(t *testing.T) {
 		{[]byte{1, 2, 3, 3}, []byte{1, 2, 3, 3}},
 	}
 
-	tree := NewTree()
+	tree := NewMemoryTree()
 
 	for _, test := range tests {
 		_ = tree.Put(test.key, test.value)
@@ -56,7 +56,7 @@ func TestTree_PutVariableKeys(t *testing.T) {
 		{[]byte{1, 1, 1, 1, 3}, []byte{1, 1, 1, 1, 3}},
 	}
 
-	tree := NewTree()
+	tree := NewMemoryTree()
 
 	for _, test := range tests {
 		_ = tree.Put(test.key, test.value)
@@ -89,10 +89,20 @@ func TestTree_Del(t *testing.T) {
 		{[]byte{7, 188, 148, 22}, []byte{77, 188, 148, 22}},
 	}
 
-	tree := NewTree()
+	tree := NewMemoryTree()
 
 	for _, test := range tests {
 		_ = tree.Put(test.key, test.value)
+	}
+
+	for _, test := range tests {
+		val, err := tree.Get(test.key)
+		if err != nil {
+			t.Fatalf("value not found in the tree - %v - %v", test.key, err)
+		}
+		if !bytes.Equal(val, test.value) {
+			t.Fatalf("unexpected value found in the tree - key: %v expected:  %v got: %v", test.key, test.value, val)
+		}
 	}
 
 	for _, test := range tests {
@@ -122,7 +132,7 @@ func TestTree_DelVariableKeys(t *testing.T) {
 		{[]byte{7, 188, 148, 22}, []byte{77, 188, 148, 22}},
 	}
 
-	tree := NewTree()
+	tree := NewMemoryTree()
 
 	for _, test := range tests {
 		_ = tree.Put(test.key, test.value)
@@ -159,7 +169,7 @@ func TestTree_Put_Scenarios(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tree := NewTree()
+			tree := NewMemoryTree()
 
 			for _, entry := range test.putData {
 				_ = tree.Put(entry.key, entry.value)
@@ -195,14 +205,14 @@ func TestTree_Del_Scenarios(t *testing.T) {
 		{
 			name: "Two Branch Revert Deletion",
 			putData: []TestStruct{
-				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}},
-				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}},
-				{key: []byte{1, 2, 2}, value: []byte{1, 2, 2}},
+				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}}, // one leaf
+				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}}, // one branch [1,1] - two leaves
+				{key: []byte{1, 2, 2}, value: []byte{1, 2, 2}}, // two branches [1], [1,1] - three leaves
 			},
 			delData: []TestStruct{
-				{key: []byte{1, 2, 2}, value: []byte{1, 2, 2}},
-				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}},
-				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}},
+				{key: []byte{1, 2, 2}, value: []byte{1, 2, 2}}, // one branch [1,1] - two leaves
+				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}}, // one leaf
+				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}}, // empty
 			},
 		},
 		{
@@ -218,17 +228,34 @@ func TestTree_Del_Scenarios(t *testing.T) {
 			delData: []TestStruct{
 				{key: []byte{1, 2, 0, 0}, value: []byte{1, 1, 1, 1}},
 				{key: []byte{1, 3, 3, 3}, value: []byte{1, 1, 1, 1}}, // deletes the 1,1 branch -
-				{key: []byte{1, 1, 1, 1}, value: []byte{1, 1, 1, 1}}, // TODO add a way to check # of branches + nodes
+				{key: []byte{1, 1, 1, 1}, value: []byte{1, 1, 1, 1}}, // TODO add a way to check # of branches + Nodes
 				{key: []byte{1, 1, 1, 2}, value: []byte{1, 1, 1, 1}},
 				{key: []byte{1, 1, 2, 0}, value: []byte{1, 1, 1, 1}},
 				{key: []byte{1, 1, 2, 1}, value: []byte{1, 1, 1, 1}},
+			},
+		},
+		{
+			name: "Shared Nibbles",
+			putData: []TestStruct{
+				{key: []byte{17, 17, 1}, value: []byte{17, 17, 1}},
+				{key: []byte{17, 17, 2}, value: []byte{17, 17, 2}},
+				{key: []byte{17, 1, 1}, value: []byte{17, 1, 1}},
+				{key: []byte{17, 1, 2}, value: []byte{17, 1, 2}},
+				{key: []byte{17, 1, 3}, value: []byte{17, 1, 3}},
+			},
+			delData: []TestStruct{
+				{key: []byte{17, 17, 1}, value: []byte{17, 17, 1}},
+				{key: []byte{17, 17, 2}, value: []byte{17, 17, 2}},
+				{key: []byte{17, 1, 1}, value: []byte{17, 1, 1}},
+				{key: []byte{17, 1, 2}, value: []byte{17, 1, 2}},
+				{key: []byte{17, 1, 3}, value: []byte{17, 1, 3}},
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tree := NewTree()
+			tree := NewMemoryTree()
 
 			for _, entry := range test.putData {
 				_ = tree.Put(entry.key, entry.value)
@@ -256,7 +283,7 @@ func TestTree_Del_Scenarios(t *testing.T) {
 
 func TestInterface(t *testing.T) {
 	for _, test := range database.Tests {
-		treeDB := NewTree()
+		treeDB := NewMemoryTree()
 		test(t, treeDB)
 	}
 }

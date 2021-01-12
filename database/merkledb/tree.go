@@ -1,24 +1,26 @@
-package tree
+package merkledb
 
 import (
 	"bytes"
 	"fmt"
+
+	"github.com/ava-labs/avalanchego/database/memdb"
 
 	"github.com/ava-labs/avalanchego/database"
 )
 
 // Tree holds the tree data
 type Tree struct {
-	rootNode Node
-	closed   bool
+	closed bool
 }
 
+// Has returns whether the key exists in the tree
 func (t *Tree) Has(key []byte) (bool, error) {
 	if t.isClosed() != nil {
 		return false, t.isClosed()
 	}
 
-	node := t.findNode(FromBytes(key), t.rootNode)
+	node := t.findNode(FromBytes(key), Persistence.GetRootNode())
 	if node == nil || !bytes.Equal(ToBytes(node.Key()), key) {
 		return false, nil
 	}
@@ -76,29 +78,36 @@ func (t *Tree) Close() error {
 	return nil
 }
 
+// NewMemoryTree returns a new instance of the Tree with a in-memoryDB
+func NewMemoryTree() *Tree {
+	return NewTree(memdb.New())
+}
+
 // NewTree returns a new instance of the Tree
-func NewTree() *Tree {
+func NewTree(db database.Database) *Tree {
+	NewPersistence(db)
 	return &Tree{
-		rootNode: NewRootNode(),
-		closed:   false,
+		closed: false,
 	}
 }
 
 func (t *Tree) Root() []byte {
-	return t.rootNode.GetHash()
+	return Persistence.GetRootNode().GetHash()
 }
 
 func (t *Tree) Get(key []byte) ([]byte, error) {
 	if t.isClosed() != nil {
 		return nil, t.isClosed()
 	}
-	node := t.findNode(FromBytes(key), t.rootNode)
+
+	node := t.findNode(FromBytes(key), Persistence.GetRootNode())
 	if node == nil {
 		return nil, database.ErrNotFound
 	}
 	if _, ok := node.(*EmptyNode); ok {
 		return nil, database.ErrNotFound
 	}
+
 	return node.Value(), nil
 }
 
@@ -109,17 +118,25 @@ func (t *Tree) Put(key []byte, value []byte) error {
 	}
 
 	unitKey := FromBytes(key)
-	if t.rootNode.GetChild([]Unit{}) == nil {
-		t.rootNode.SetChild(NewLeafNode(unitKey, value, t.rootNode))
-		return nil
+	rootChild, err := Persistence.GetRootNode().GetChild([]Unit{})
+	if err != nil {
+		return err
 	}
 
-	insertNode := t.findNode(unitKey, t.rootNode)
-	if insertNode == nil {
-		fmt.Println("This should never happen")
+	if rootChild == nil {
+		newLeafNode, err := NewLeafNode(unitKey, value, Persistence.GetRootNode())
+		if err != nil {
+			return err
+		}
+		return Persistence.GetRootNode().SetChild(newLeafNode)
 	}
-	insertNode.Insert(unitKey, value)
-	return nil
+
+	insertNode := t.findNode(unitKey, Persistence.GetRootNode())
+	if insertNode == nil {
+		return fmt.Errorf("should never happen - can't insert on a nil node k: %v", unitKey)
+	}
+
+	return insertNode.Insert(unitKey, value)
 }
 
 // Delete is fills the implementation
@@ -135,7 +152,7 @@ func (t *Tree) Delete(key []byte) error {
 func (t *Tree) Del(key []byte) bool {
 	unitKey := FromBytes(key)
 
-	deleteNode := t.findNode(unitKey, t.rootNode)
+	deleteNode := t.findNode(unitKey, Persistence.GetRootNode())
 	if deleteNode == nil {
 		return false
 	}
@@ -156,11 +173,16 @@ func (t *Tree) findNode(key []Unit, node Node) Node {
 		return node
 	}
 
-	return t.findNode(key, node.GetChild(key))
+	nodeChild, err := node.GetChild(key)
+	if err != nil {
+		panic(err)
+	}
+
+	return t.findNode(key, nodeChild)
 }
 
 func (t *Tree) PrintTree() {
-	t.rootNode.Print()
+	Persistence.GetRootNode().Print()
 }
 
 func (t *Tree) fetchNextNode(prefix []Unit, start []Unit, key []Unit, node Node) (Node, error) {
@@ -175,7 +197,11 @@ func (t *Tree) fetchNextNode(prefix []Unit, start []Unit, key []Unit, node Node)
 		return node, nil
 	}
 
-	return t.fetchNextNode(prefix, start, key, node.GetNextNode(prefix, start, key))
+	nextNode, err := node.GetNextNode(prefix, start, key)
+	if err != nil {
+		return nil, err
+	}
+	return t.fetchNextNode(prefix, start, key, nextNode)
 }
 
 func (t *Tree) isClosed() error {
