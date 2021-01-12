@@ -473,10 +473,9 @@ func (t *Transitive) issue(vtx avalanche.Vertex, updatedEpoch bool) error {
 		return err
 	}
 	for _, tx := range txs {
-		tr := tx.Transition()
 		// Mark as unfulfilled all of the transition's dependencies
 		// that are neither accepted nor processing in this tx's epoch.
-		for _, depID := range tr.Dependencies() {
+		for _, depID := range tx.Transition().Dependencies() {
 			if trIDs.Contains(depID) {
 				// This vertex contains this dependency. No need to mark
 				// as unfulfilled.
@@ -491,7 +490,7 @@ func (t *Transitive) issue(vtx avalanche.Vertex, updatedEpoch bool) error {
 				t.missingTransitions.Add(depID)
 			}
 
-			// Check if any processing txs with the depenency are in
+			// Check if any processing txs with the dependency are in
 			// the same epoch as [tx].
 			unfulfilled := true
 			for _, processingDep := range processingDepTxs {

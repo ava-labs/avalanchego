@@ -91,21 +91,21 @@ func (tb *txBlocker) abandon(trID ids.ID) {
 	delete(*tb, trID)
 }
 
-// Register that [i] is waiting on all of its transition dependencies
-// to be either issued in [epoch] or accepted in an epoch <= [epoch]
-func (tb *txBlocker) register(i events.Blockable, epoch uint32) {
+// Register that [b] is waiting on all of its transition dependencies
+// to be either issued in [epoch] or accepted in an epoch <= [epoch].
+// Assumes all the transitions [b] depends on are eventually
+// issued or abandoned.
+func (tb *txBlocker) register(b events.Blockable, epoch uint32) {
 	tb.init()
 
 	// For each dependency, mark that [i] depends on this dependency
 	// being issued in [epoch] or accepted in an epoch <= [epoch]
-	for dependency := range i.Dependencies() {
+	for dependency := range b.Dependencies() {
 		epochToDependents, ok := (*tb)[dependency]
 		if !ok {
-			(*tb)[dependency] = map[uint32][]events.Blockable{epoch: {i}}
+			(*tb)[dependency] = map[uint32][]events.Blockable{epoch: {b}}
 			continue
 		}
-		dependents := epochToDependents[epoch]
-		dependents = append(dependents, i)
-		epochToDependents[epoch] = dependents
+		epochToDependents[epoch] = append(epochToDependents[epoch], b)
 	}
 }

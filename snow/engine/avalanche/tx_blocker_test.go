@@ -329,10 +329,12 @@ func TestTxBlockerAbandon(t *testing.T) {
 	assert.NotNil(t, tb[dep1])
 
 	tb.abandon(dep0)
-	assert.Len(t, tb, 0)
+	assert.Len(t, tb, 1)
+	assert.NotNil(t, tb[dep1])
 
 	tb.abandon(dep0) // abandoning again shouldn't do anything
-	assert.Len(t, tb, 0)
+	assert.Len(t, tb, 1)
+	assert.NotNil(t, tb[dep1])
 
 	tb.abandon(dep1)
 	assert.Len(t, tb, 0)
