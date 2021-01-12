@@ -51,8 +51,10 @@ type Transitive struct {
 	pending ids.Set
 
 	// vtxBlocked tracks operations that are blocked on vertices
+	vtxBlocked events.Blocker
+
 	// trBlocked tracks operations that are blocked on transitions
-	vtxBlocked, trBlocked events.Blocker
+	trBlocked txBlocker
 
 	// Tx ID --> IDs of transitions that must be accepted in an epoch earlier
 	// then the transaction's, or processing in the same epoch as the transaction.
@@ -235,7 +237,7 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 
 	if t.outstandingVtxReqs.Len() == 0 {
 		for trID := range t.missingTransitions {
-			t.trBlocked.Abandon(trID)
+			t.trBlocked.abandon(trID)
 		}
 		t.missingTransitions.Clear()
 	}
@@ -466,9 +468,12 @@ func (t *Transitive) issue(vtx avalanche.Vertex, updatedEpoch bool) error {
 		trIDs.Add(tx.Transition().ID())
 	}
 
+	epoch, err := vtx.Epoch()
+	if err != nil {
+		return err
+	}
 	for _, tx := range txs {
 		tr := tx.Transition()
-		epoch := tx.Epoch()
 		// Mark as unfulfilled all of the transition's dependencies
 		// that are neither accepted nor processing in this tx's epoch.
 		for _, depID := range tr.Dependencies() {
@@ -509,12 +514,12 @@ func (t *Transitive) issue(vtx avalanche.Vertex, updatedEpoch bool) error {
 	// Wait until all the parents of [vtx] are added to consensus before adding [vtx]
 	t.vtxBlocked.Register(&vtxIssuer{i: i})
 	// Wait until all the parents of [tr] are added to consensus before adding [vtx]
-	t.trBlocked.Register(&trIssuer{i: i})
+	t.trBlocked.register(&trIssuer{i: i}, epoch)
 
 	if t.outstandingVtxReqs.Len() == 0 {
 		// There are no outstanding vertex requests but we don't have these transactions, so we're not getting them.
-		for txID := range t.missingTransitions {
-			t.trBlocked.Abandon(txID)
+		for trID := range t.missingTransitions {
+			t.trBlocked.abandon(trID)
 		}
 		t.missingTransitions.Clear()
 	}

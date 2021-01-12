@@ -156,7 +156,7 @@ func (i *issuer) Update() {
 	// Notify vertices waiting on this one that it (and its transactions) have been issued.
 	i.t.vtxBlocked.Fulfill(vtxID)
 	for _, tx := range txs {
-		i.t.trBlocked.Fulfill(tx.Transition().ID())
+		i.t.trBlocked.markIssued(tx.Transition().ID(), epoch)
 	}
 
 	// Issue a repoll
