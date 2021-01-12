@@ -248,6 +248,7 @@ func (vm *VMServer) BuildBlock(_ context.Context, _ *vmproto.BuildBlockRequest) 
 		Id:       blkID[:],
 		ParentID: parentID[:],
 		Bytes:    blk.Bytes(),
+		Height:   blk.Height(),
 	}, nil
 }
 
@@ -263,6 +264,7 @@ func (vm *VMServer) ParseBlock(_ context.Context, req *vmproto.ParseBlockRequest
 		Id:       blkID[:],
 		ParentID: parentID[:],
 		Status:   uint32(blk.Status()),
+		Height:   blk.Height(),
 	}, nil
 }
 
@@ -281,6 +283,7 @@ func (vm *VMServer) GetBlock(_ context.Context, req *vmproto.GetBlockRequest) (*
 		ParentID: parentID[:],
 		Bytes:    blk.Bytes(),
 		Status:   uint32(blk.Status()),
+		Height:   blk.Height(),
 	}, nil
 }
 
