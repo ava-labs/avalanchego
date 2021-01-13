@@ -314,8 +314,7 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, []conflicts.Tx, error) {
 	}
 
 	acceptable, rejectable := dg.conflicts.Updateable()
-	acceptedTxs := make([]conflicts.Tx, len(acceptable))
-	for i, toAccept := range acceptable {
+	for _, toAccept := range acceptable {
 		toAcceptID := toAccept.ID()
 
 		// We can remove the accepted tx from the graph.
@@ -334,7 +333,6 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, []conflicts.Tx, error) {
 		if err := toAccept.Accept(); err != nil {
 			return false, nil, err
 		}
-		acceptedTxs[i] = toAccept
 
 		tr := toAccept.Transition()
 		dg.ctx.DecisionDispatcher.Accept(dg.ctx, tr.ID(), tr.Bytes())
@@ -370,7 +368,7 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, []conflicts.Tx, error) {
 	// If a status has changed, the frontiers must be recalculated.
 	changed = changed || len(acceptable)+len(rejectable) > 0
 
-	return changed, acceptedTxs, nil
+	return changed, acceptable, nil
 }
 
 func (dg *Directed) removeConflict(txID ids.ID, neighborIDs ids.Set) {

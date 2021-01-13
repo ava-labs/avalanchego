@@ -121,18 +121,18 @@ func (c *Conflicts) Processing(trID ids.ID) bool {
 }
 
 // ProcessingTxs returns a list of processing transactions
-// that containtransition [trID]. If no processing
+// that contains transition [trID]. If no processing
 // transactions contain [trID] returns nil.
 func (c *Conflicts) ProcessingTxs(trID ids.ID) []Tx {
 	trNode, exists := c.transitionNodes[trID]
 	if !exists {
 		return nil
 	}
-	txIDs := trNode.txIDs.List()
-	txs := make([]Tx, len(txIDs))
-	for i, txID := range txIDs {
-		tx := c.txs[txID]
-		txs[i] = tx
+	txs := make([]Tx, trNode.txIDs.Len())
+	i := 0
+	for txID := range trNode.txIDs {
+		txs[i] = c.txs[txID]
+		i++
 	}
 	return txs
 }

@@ -50,8 +50,8 @@ func (v *voter) Update() {
 	}
 
 	v.t.Ctx.Log.Debug("Finishing poll with:\n%s", &results)
-	var acceptedTxs []conflicts.Tx
-	if acceptedTxs, err = v.t.Consensus.RecordPoll(results); err != nil {
+	acceptedTxs, err := v.t.Consensus.RecordPoll(results)
+	if err != nil {
 		v.t.errs.Add(err)
 		return
 	}

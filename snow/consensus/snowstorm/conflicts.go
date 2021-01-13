@@ -15,7 +15,7 @@ type Conflicts interface {
 	// Assumes Add has not already been called with [tx]
 	Add(tx conflicts.Tx)
 
-	// Processing returns if [trID] is currently being processedz
+	// Processing returns if [trID] is currently being processed
 	Processing(trID ids.ID) bool
 
 	// Returns a list of processing transactions that contain

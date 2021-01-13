@@ -186,16 +186,12 @@ func (ta *Topological) RecordPoll(responses ids.UniqueBag) ([]conflicts.Tx, erro
 		return nil, err
 	}
 	// Update the conflict graph: O(|Transactions|)
-	var (
-		acceptedTxs []conflicts.Tx
-		updated     bool
-	)
-	if updated, acceptedTxs, err = ta.cg.RecordPoll(votes); !updated || err != nil {
+	updated, acceptedTxs, err := ta.cg.RecordPoll(votes)
+	if err != nil || !updated {
 		// If the transaction statuses weren't changed, there is no need to
 		// perform a traversal.
-		return acceptedTxs, err
+		return nil, err
 	}
-	// Update the dag: O(|Live Set|)
 	return acceptedTxs, ta.updateFrontiers()
 }
 

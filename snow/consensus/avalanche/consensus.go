@@ -67,7 +67,7 @@ type Consensus interface {
 
 	// RecordPoll collects the results of a network poll. If a result has not
 	// been added, the result is dropped. Returns:
-	// 1. The txs accepted after this poll
+	// 1. The txs accepted by this poll
 	// 2. An error, if applicable, which should be treated as critical.
 	RecordPoll(ids.UniqueBag) ([]conflicts.Tx, error)
 
