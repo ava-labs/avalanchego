@@ -70,7 +70,7 @@ type Consensus interface {
 	// have been previously added.
 	// Returns:
 	// 1. True if any statuses or preferences changed
-	// 2. The list of txs accepted after this poll
+	// 2. The list of txs accepted by this poll
 	// 3. An error, if applicable, which should be treated as critical
 	RecordPoll(ids.Bag) (bool, []conflicts.Tx, error)
 }
