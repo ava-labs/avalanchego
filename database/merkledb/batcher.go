@@ -94,7 +94,3 @@ func (b *Batch) Delete(key []byte) error {
 func (b *Batch) Inner() database.Batch {
 	return b
 }
-
-// Batcher wraps the NewBatch method of a backing data store.
-type Batcher struct {
-}
