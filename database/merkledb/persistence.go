@@ -6,13 +6,16 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 )
 
+// Persistence is the singleton to access data
 var Persistence PersistenceData
 
+// PersistenceData holds the DB + the RootNode
 type PersistenceData struct {
 	db       database.Database
 	rootNode Node
 }
 
+// GetNodeByUnitKey fetches a Node given a StorageKey
 func (p *PersistenceData) GetNodeByUnitKey(key []Unit) (Node, error) {
 	if key == nil {
 		return p.GetRootNode(), nil
