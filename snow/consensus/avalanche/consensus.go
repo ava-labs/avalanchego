@@ -66,9 +66,10 @@ type Consensus interface {
 	Orphans() ids.Set
 
 	// RecordPoll collects the results of a network poll. If a result has not
-	// been added, the result is dropped. Errors returned from this function
-	// should be treated as critical errors.
-	RecordPoll(ids.UniqueBag) error
+	// been added, the result is dropped. Returns:
+	// 1. The txs accepted after this poll
+	// 2. An error, if applicable, which should be treated as critical.
+	RecordPoll(ids.UniqueBag) ([]conflicts.Tx, error)
 
 	// Quiesce returns true iff all vertices that have been added but not been
 	// accepted or rejected are rogue. Note, it is possible that after returning

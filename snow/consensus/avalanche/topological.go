@@ -157,7 +157,7 @@ func (ta *Topological) Virtuous() ids.Set { return ta.virtuous }
 func (ta *Topological) Preferences() ids.Set { return ta.preferred }
 
 // RecordPoll implements the Avalanche interface
-func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
+func (ta *Topological) RecordPoll(responses ids.UniqueBag) ([]conflicts.Tx, error) {
 	// If it isn't possible to have alpha votes for any transaction, then we can
 	// just reset the confidence values in the conflict graph and not perform
 	// any traversals.
@@ -171,28 +171,32 @@ func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 	}
 	if partialVotes.Len() < ta.params.Alpha {
 		// Skip the traversals.
-		_, err := ta.cg.RecordPoll(ids.Bag{})
-		return err
+		_, acceptedTxs, err := ta.cg.RecordPoll(ids.Bag{})
+		return acceptedTxs, err
 	}
 
 	// Set up the topological sort: O(|Live Set|)
 	kahns, leaves, err := ta.calculateInDegree(responses)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// Collect the votes for each transaction: O(|Live Set|)
 	votes, err := ta.pushVotes(kahns, leaves)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// Update the conflict graph: O(|Transactions|)
-	if updated, err := ta.cg.RecordPoll(votes); !updated || err != nil {
+	var (
+		acceptedTxs []conflicts.Tx
+		updated     bool
+	)
+	if updated, acceptedTxs, err = ta.cg.RecordPoll(votes); !updated || err != nil {
 		// If the transaction statuses weren't changed, there is no need to
 		// perform a traversal.
-		return err
+		return acceptedTxs, err
 	}
 	// Update the dag: O(|Live Set|)
-	return ta.updateFrontiers()
+	return acceptedTxs, ta.updateFrontiers()
 }
 
 // Quiesce implements the Avalanche interface
@@ -372,11 +376,9 @@ func (ta *Topological) update(vtx Vertex) error {
 
 	switch vtx.Status() {
 	case choices.Accepted:
-		ta.preferred.Add(vtxID) // I'm preferred
-		ta.virtuous.Add(vtxID)  // Accepted is defined as virtuous
-
+		ta.preferred.Add(vtxID)  // I'm preferred
+		ta.virtuous.Add(vtxID)   // Accepted is defined as virtuous
 		ta.frontier[vtxID] = vtx // I have no descendents yet
-
 		ta.preferenceCache[vtxID] = true
 		ta.virtuousCache[vtxID] = true
 		return nil
@@ -440,7 +442,6 @@ func (ta *Topological) update(vtx Vertex) error {
 			ta.ctx.ConsensusDispatcher.Reject(ta.ctx, vtxID, vtx.Bytes())
 			delete(ta.nodes, vtxID)
 			ta.metrics.Rejected(vtxID)
-
 			ta.preferenceCache[vtxID] = false
 			ta.virtuousCache[vtxID] = false
 			return nil
@@ -460,8 +461,8 @@ func (ta *Topological) update(vtx Vertex) error {
 	for _, dep := range deps {
 		delete(ta.frontier, dep.ID())
 	}
-	ta.frontier[vtxID] = vtx // I have no descendents yet
 
+	ta.frontier[vtxID] = vtx // I have no descendents yet
 	ta.preferenceCache[vtxID] = preferred
 	ta.virtuousCache[vtxID] = virtuous
 

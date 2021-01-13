@@ -67,7 +67,10 @@ type Consensus interface {
 	Get(ids.ID) (conflicts.Tx, error)
 
 	// Collects the results of a network poll. Assumes all transactions
-	// have been previously added. Returns true is any statuses or preferences
-	// changed. Returns if a critical error has occurred.
-	RecordPoll(ids.Bag) (bool, error)
+	// have been previously added.
+	// Returns:
+	// 1. True if any statuses or preferences changed
+	// 2. The list of txs accepted after this poll
+	// 3. An error, if applicable, which should be treated as critical
+	RecordPoll(ids.Bag) (bool, []conflicts.Tx, error)
 }

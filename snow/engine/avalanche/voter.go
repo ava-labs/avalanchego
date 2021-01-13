@@ -50,9 +50,13 @@ func (v *voter) Update() {
 	}
 
 	v.t.Ctx.Log.Debug("Finishing poll with:\n%s", &results)
-	if err := v.t.Consensus.RecordPoll(results); err != nil {
+	var acceptedTxs []conflicts.Tx
+	if acceptedTxs, err = v.t.Consensus.RecordPoll(results); err != nil {
 		v.t.errs.Add(err)
 		return
+	}
+	for _, acceptedTx := range acceptedTxs {
+		v.t.trBlocked.markAccepted(acceptedTx.Transition().ID(), acceptedTx.Epoch())
 	}
 
 	epochs := make(map[uint32]vtx, 2)

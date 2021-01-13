@@ -551,8 +551,10 @@ func VirtuousTest(t *testing.T, factory Factory) {
 	votes.Add(0, vtx1.ID())
 	votes.Add(1, vtx1.ID())
 
-	if err := avl.RecordPoll(votes); err != nil {
+	if acceptedTxs, err := avl.RecordPoll(votes); err != nil {
 		t.Fatal(err)
+	} else if len(acceptedTxs) != 0 {
+		t.Fatalf("should have accepted %d tx but accepted %d", 0, len(acceptedTxs))
 	}
 
 	virtuous = avl.Virtuous()
@@ -579,8 +581,10 @@ func VirtuousTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong virtuous")
 	}
 
-	if err := avl.RecordPoll(votes); err != nil {
+	if acceptedTxs, err := avl.RecordPoll(votes); err != nil {
 		t.Fatal(err)
+	} else if len(acceptedTxs) != 0 {
+		t.Fatalf("should have accepted %d tx but accepted %d", 0, len(acceptedTxs))
 	}
 
 	virtuous = avl.Virtuous()
@@ -695,8 +699,10 @@ func VirtuousSkippedUpdateTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong number of virtuous.")
 	} else if !virtuous.Contains(vtx0.IDV) {
 		t.Fatalf("Wrong virtuous")
-	} else if err := avl.RecordPoll(ids.UniqueBag{}); err != nil {
+	} else if acceptedTxs, err := avl.RecordPoll(ids.UniqueBag{}); err != nil {
 		t.Fatal(err)
+	} else if len(acceptedTxs) != 0 {
+		t.Fatalf("should have accepted %d tx but accepted %d", 0, len(acceptedTxs))
 	} else if virtuous := avl.Virtuous(); virtuous.Len() != 1 {
 		t.Fatalf("Wrong number of virtuous.")
 	} else if !virtuous.Contains(vtx0.IDV) {
@@ -790,7 +796,7 @@ func VotingTest(t *testing.T, factory Factory) {
 	sm.Add(0, vtx1.IDV)
 	sm.Add(1, vtx1.IDV)
 
-	err = avl.RecordPoll(sm)
+	acceptedTxs, err := avl.RecordPoll(sm)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -798,9 +804,11 @@ func VotingTest(t *testing.T, factory Factory) {
 		t.Fatalf("An avalanche instance finalized too early")
 	case !ids.UnsortedEquals([]ids.ID{vtx1.IDV}, avl.Preferences().List()):
 		t.Fatalf("Initial frontier failed to be set")
+	case len(acceptedTxs) != 0:
+		t.Fatalf("should have accepted %d txs but accepted %d", 0, len(acceptedTxs))
 	}
 
-	err = avl.RecordPoll(sm)
+	acceptedTxs, err = avl.RecordPoll(sm)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -812,6 +820,8 @@ func VotingTest(t *testing.T, factory Factory) {
 		t.Fatalf("Tx should have been rejected")
 	case tx1.Status() != choices.Accepted:
 		t.Fatalf("Tx should have been accepted")
+	case len(acceptedTxs) != 1:
+		t.Fatalf("should have accepted %d txs but accepted %d", 1, len(acceptedTxs))
 	}
 }
 
@@ -905,10 +915,14 @@ func IgnoreInvalidVotingTest(t *testing.T, factory Factory) {
 	sm.Add(2, vtx0.IDV)
 	sm.Add(2, vtx1.IDV)
 
-	if err := avl.RecordPoll(sm); err != nil {
+	acceptedTxs, err := avl.RecordPoll(sm)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if avl.Finalized() {
+	case avl.Finalized():
 		t.Fatalf("An avalanche instance finalized too early")
+	case len(acceptedTxs) != 0:
+		t.Fatalf("should have accepted %d txs but accepted %d", 0, len(acceptedTxs))
 	}
 }
 
@@ -1010,7 +1024,7 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 	sm1.Add(0, vtx0.IDV)
 	sm1.Add(1, vtx2.IDV)
 
-	err = avl.RecordPoll(sm1)
+	acceptedTxs, err := avl.RecordPoll(sm1)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -1020,13 +1034,15 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 		t.Fatalf("Initial frontier failed to be set")
 	case tx0.Status() != choices.Accepted:
 		t.Fatalf("Tx should have been accepted")
+	case len(acceptedTxs) != 1:
+		t.Fatalf("should have accepted %d txs but accepted %d", 1, len(acceptedTxs))
 	}
 
 	sm2 := ids.UniqueBag{}
 	sm2.Add(0, vtx2.IDV)
 	sm2.Add(1, vtx2.IDV)
 
-	err = avl.RecordPoll(sm2)
+	acceptedTxs, err = avl.RecordPoll(sm2)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -1038,6 +1054,8 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 		t.Fatalf("Tx should have been accepted")
 	case tx1.Status() != choices.Accepted:
 		t.Fatalf("Tx should have been accepted")
+	case len(acceptedTxs) != 1:
+		t.Fatalf("should have accepted %d txs but accepted %d", 1, len(acceptedTxs))
 	}
 }
 
@@ -1115,7 +1133,7 @@ func SplitVotingTest(t *testing.T, factory Factory) {
 	sm1.Add(0, vtx0.IDV) // peer 0 votes for the tx though vtx0
 	sm1.Add(1, vtx1.IDV) // peer 1 votes for the tx though vtx1
 
-	err = avl.RecordPoll(sm1)
+	acceptedTxs, err := avl.RecordPoll(sm1)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -1125,6 +1143,8 @@ func SplitVotingTest(t *testing.T, factory Factory) {
 		t.Fatalf("Initial frontier failed to be set")
 	case tx0.Status() != choices.Accepted:
 		t.Fatalf("Tx should have been accepted")
+	case len(acceptedTxs) != 1:
+		t.Fatalf("should have accepted %d txs but accepted %d", 1, len(acceptedTxs))
 	}
 }
 
@@ -1238,7 +1258,7 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 	sm.Add(0, vtx1.IDV)
 	sm.Add(1, vtx1.IDV)
 
-	err = avl.RecordPoll(sm)
+	acceptedTxs, err := avl.RecordPoll(sm)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -1246,9 +1266,11 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 		t.Fatalf("An avalanche instance finalized too early")
 	case !ids.UnsortedEquals([]ids.ID{vtx1.IDV}, avl.Preferences().List()):
 		t.Fatalf("Initial frontier failed to be set")
+	case len(acceptedTxs) != 0:
+		t.Fatalf("should have accepted %d txs but accepted %d", 0, len(acceptedTxs))
 	}
 
-	err = avl.RecordPoll(sm)
+	acceptedTxs, err = avl.RecordPoll(sm)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -1262,9 +1284,11 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 		t.Fatalf("Tx should have been accepted")
 	case tx2.Status() != choices.Processing:
 		t.Fatalf("Tx should not have been decided")
+	case len(acceptedTxs) != 1:
+		t.Fatalf("should have accepted %d txs but accepted %d", 1, len(acceptedTxs))
 	}
 
-	err = avl.RecordPoll(sm)
+	acceptedTxs, err = avl.RecordPoll(sm)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -1278,6 +1302,8 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 		t.Fatalf("Tx should have been accepted")
 	case tx2.Status() != choices.Processing:
 		t.Fatalf("Tx should not have been decided")
+	case len(acceptedTxs) != 0:
+		t.Fatalf("should have accepted %d txs but accepted %d", 0, len(acceptedTxs))
 	}
 }
 
@@ -1508,10 +1534,14 @@ func QuiesceTest(t *testing.T, factory Factory) {
 
 	sm := ids.UniqueBag{}
 	sm.Add(0, vtx2.IDV)
-	if err := avl.RecordPoll(sm); err != nil {
+	acceptedTxs, err := avl.RecordPoll(sm)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if !avl.Quiesce() {
+	case !avl.Quiesce():
 		t.Fatalf("Should quiesce")
+	case len(acceptedTxs) != 1:
+		t.Fatalf("should have accepted %d txs but accepted %d", 1, len(acceptedTxs))
 	}
 }
 
@@ -1629,12 +1659,17 @@ func OrphansTest(t *testing.T, factory Factory) {
 
 	sm := ids.UniqueBag{}
 	sm.Add(0, vtx1.IDV)
-	if err := avl.RecordPoll(sm); err != nil {
+	acceptedTxs, err := avl.RecordPoll(sm)
+	orphans := avl.Orphans()
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if orphans := avl.Orphans(); orphans.Len() != 1 {
+	case orphans.Len() != 1:
 		t.Fatalf("Wrong number of orphans")
-	} else if !orphans.Contains(tx2.ID()) {
-		t.Fatalf("Wrong orphan")
+	case !orphans.Contains(tx2.ID()):
+		t.Fatalf("missing orphan")
+	case len(acceptedTxs) != 0:
+		t.Fatalf("should have accepted %d txs but accepted %d", 0, len(acceptedTxs))
 	}
 }
 
@@ -1693,7 +1728,7 @@ func ErrorOnTxAcceptTest(t *testing.T, factory Factory) {
 
 	votes := ids.UniqueBag{}
 	votes.Add(0, vtx0.IDV)
-	if err := avl.RecordPoll(votes); err == nil {
+	if _, err := avl.RecordPoll(votes); err == nil {
 		t.Fatalf("Should have errored on vertex acceptance")
 	}
 }
@@ -1753,7 +1788,7 @@ func ErrorOnVtxAcceptTest(t *testing.T, factory Factory) {
 
 	votes := ids.UniqueBag{}
 	votes.Add(0, vtx0.IDV)
-	if err := avl.RecordPoll(votes); err == nil {
+	if _, err := avl.RecordPoll(votes); err == nil {
 		t.Fatalf("Should have errored on vertex acceptance")
 	}
 }
@@ -1837,7 +1872,7 @@ func ErrorOnVtxRejectTest(t *testing.T, factory Factory) {
 
 	votes := ids.UniqueBag{}
 	votes.Add(0, vtx0.IDV)
-	if err := avl.RecordPoll(votes); err == nil {
+	if _, err := avl.RecordPoll(votes); err == nil {
 		t.Fatalf("Should have errored on vertex rejection")
 	}
 }
@@ -1933,7 +1968,7 @@ func ErrorOnParentVtxRejectTest(t *testing.T, factory Factory) {
 
 	votes := ids.UniqueBag{}
 	votes.Add(0, vtx0.IDV)
-	if err := avl.RecordPoll(votes); err == nil {
+	if _, err := avl.RecordPoll(votes); err == nil {
 		t.Fatalf("Should have errored on vertex rejection")
 	}
 }
@@ -2028,7 +2063,7 @@ func ErrorOnTransitiveVtxRejectTest(t *testing.T, factory Factory) {
 
 	votes := ids.UniqueBag{}
 	votes.Add(0, vtx0.IDV)
-	if err := avl.RecordPoll(votes); err == nil {
+	if _, err := avl.RecordPoll(votes); err == nil {
 		t.Fatalf("Should have errored on vertex rejection")
 	}
 }

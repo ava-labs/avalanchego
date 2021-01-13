@@ -240,7 +240,7 @@ func (dg *Directed) Get(txID ids.ID) (conflicts.Tx, error) {
 }
 
 // RecordPoll implements the Consensus interface
-func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
+func (dg *Directed) RecordPoll(votes ids.Bag) (bool, []conflicts.Tx, error) {
 	// Increase the vote ID. This is only updated here and is used to reset the
 	// confidence values of transactions lazily.
 	dg.currentVote++
@@ -314,7 +314,8 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 	}
 
 	acceptable, rejectable := dg.conflicts.Updateable()
-	for _, toAccept := range acceptable {
+	acceptedTxs := make([]conflicts.Tx, len(acceptable))
+	for i, toAccept := range acceptable {
 		toAcceptID := toAccept.ID()
 
 		// We can remove the accepted tx from the graph.
@@ -331,8 +332,9 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 
 		// Accept the transaction
 		if err := toAccept.Accept(); err != nil {
-			return false, err
+			return false, nil, err
 		}
+		acceptedTxs[i] = toAccept
 
 		tr := toAccept.Transition()
 		dg.ctx.DecisionDispatcher.Accept(dg.ctx, tr.ID(), tr.Bytes())
@@ -342,7 +344,7 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 		toRejectNode, exists := dg.txs[toRejectID]
 		// Attempting to Reject a transaction twice is a fatal error
 		if !exists {
-			return false, fmt.Errorf("failed to find tx node %s", toRejectID)
+			return false, nil, fmt.Errorf("failed to find tx node %s", toRejectID)
 		}
 
 		// We can remove the rejected tx from the graph.
@@ -361,14 +363,14 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 
 		// Reject the transaction
 		if err := toReject.Reject(); err != nil {
-			return false, err
+			return false, nil, err
 		}
 	}
 
 	// If a status has changed, the frontiers must be recalculated.
 	changed = changed || len(acceptable)+len(rejectable) > 0
 
-	return changed, nil
+	return changed, acceptedTxs, nil
 }
 
 func (dg *Directed) removeConflict(txID ids.ID, neighborIDs ids.Set) {
