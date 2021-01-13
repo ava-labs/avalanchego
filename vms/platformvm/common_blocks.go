@@ -88,9 +88,6 @@ type Block interface {
 	// [bytes] is the byte representation of this block
 	initialize(vm *VM, bytes []byte) error
 
-	// This block's height
-	Height() uint64
-
 	conflicts(ids.Set) bool
 
 	// parentBlock returns the parent block, similarly to Parent. However, it

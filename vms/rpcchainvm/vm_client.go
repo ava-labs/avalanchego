@@ -263,6 +263,7 @@ func (vm *VMClient) BuildBlock() (snowman.Block, error) {
 		parentID: parentID,
 		status:   choices.Processing,
 		bytes:    resp.Bytes,
+		height:   resp.Height,
 	}, nil
 }
 
@@ -293,6 +294,7 @@ func (vm *VMClient) ParseBlock(bytes []byte) (snowman.Block, error) {
 		parentID: parentID,
 		status:   status,
 		bytes:    bytes,
+		height:   resp.Height,
 	}, nil
 }
 
@@ -320,6 +322,7 @@ func (vm *VMClient) GetBlock(id ids.ID) (snowman.Block, error) {
 		parentID: parentID,
 		status:   status,
 		bytes:    resp.Bytes,
+		height:   resp.Height,
 	}, nil
 }
 
@@ -350,6 +353,7 @@ type BlockClient struct {
 	parentID ids.ID
 	status   choices.Status
 	bytes    []byte
+	height   uint64
 }
 
 // ID ...
@@ -406,3 +410,6 @@ func (b *BlockClient) Verify() error {
 
 // Bytes ...
 func (b *BlockClient) Bytes() []byte { return b.bytes }
+
+// Height ...
+func (b *BlockClient) Height() uint64 { return b.height }
