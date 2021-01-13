@@ -52,9 +52,9 @@ func (r *RootNode) Insert(key []Unit, value []byte) error {
 }
 
 // Delete removes the child
-func (r *RootNode) Delete(key []Unit) bool {
+func (r *RootNode) Delete(key []Unit) error {
 	r.child = nil
-	return true
+	return nil
 }
 
 // SetChild sets the RootNode child to the Node

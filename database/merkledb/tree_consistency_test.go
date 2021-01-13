@@ -69,7 +69,7 @@ func TestTreeConsistency_PutGetDel(t *testing.T) {
 					t.Fatalf("unexpected value found in the tree - key: %v expected:  %v got: %v", entry.key, entry.value, val)
 				}
 
-				if !tree.Del(entry.key) {
+				if tree.Delete(entry.key) != nil {
 					i := 0
 					for _, val := range test.data {
 						if bytes.Equal(entry.key, val.key) {
@@ -79,7 +79,7 @@ func TestTreeConsistency_PutGetDel(t *testing.T) {
 					}
 					fmt.Printf("Number of times val exists: %d\n", i)
 					fmt.Printf("Key added: %v\n", string(entry.key))
-					t.Fatalf("value not deleted in the tree as it was not found- %v", entry.key)
+					t.Fatalf("value not deleted in the tree as it was not found err: %v \nkey: %v", err, entry.key)
 				}
 
 				if bytes.Equal(lastRootHash, tree.Root()) {

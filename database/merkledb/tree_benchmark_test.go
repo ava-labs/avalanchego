@@ -121,14 +121,14 @@ func BenchmarkTree_Del(b *testing.B) {
 
 			b.ResetTimer()
 			for _, entry := range test.data {
-				var found bool
+				var err error
 				if test.traverse {
-					found = tree.DelTraverse(entry.key)
+					err = tree.DelTraverse(entry.key)
 				} else {
-					found = tree.Del(entry.key)
+					err = tree.Delete(entry.key)
 				}
 
-				if !found {
+				if err != nil {
 					b.Fatalf("value not deleted in the tree as it was not found- %v", entry.key)
 				}
 			}

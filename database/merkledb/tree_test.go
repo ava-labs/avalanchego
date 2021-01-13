@@ -106,9 +106,9 @@ func TestTree_Del(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		deleted := tree.Del(test.key)
-		if !deleted {
-			t.Fatalf("value not deleted in the tree as it was not found- %v", test.key)
+		err := tree.Delete(test.key)
+		if err != nil {
+			t.Fatalf("value not deleted in the tree as it was not found err: %v \nkey: %v", err, test.key)
 		}
 	}
 
@@ -139,9 +139,9 @@ func TestTree_DelVariableKeys(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		deleted := tree.Del(test.key)
-		if !deleted {
-			t.Fatalf("value not deleted in the tree as it was not found- %v", test.key)
+		err := tree.Delete(test.key)
+		if err != nil {
+			t.Fatalf("value not deleted in the tree as it was not found err: %v \nkey: %v", err, test.key)
 		}
 	}
 
@@ -272,9 +272,9 @@ func TestTree_Del_Scenarios(t *testing.T) {
 			}
 
 			for _, entry := range test.delData {
-				ok := tree.Del(entry.key)
-				if !ok {
-					t.Fatalf("unable to delete %v", entry)
+				err := tree.Delete(entry.key)
+				if err != nil {
+					t.Fatalf("value not deleted in the tree as it was not found err: %v \nkey: %v", err, entry.key)
 				}
 			}
 		})

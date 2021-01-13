@@ -61,14 +61,14 @@ func (l *LeafNode) GetNextNode(prefix []Unit, start []Unit, key []Unit) (Node, e
 }
 
 // Delete removes this LeafNode from the Parent
-func (l *LeafNode) Delete(key []Unit) bool {
+func (l *LeafNode) Delete(key []Unit) error {
 	parent, err := Persistence.GetNodeByUnitKey(l.Parent)
 	if err != nil {
-		return false
+		return err
 	}
 	err = Persistence.DeleteNode(l)
 	if err != nil {
-		return false
+		return err
 	}
 	return parent.Delete(key)
 }

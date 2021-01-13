@@ -39,7 +39,7 @@ func (e *EmptyNode) Insert(key []Unit, value []byte) error {
 }
 
 // Delete should never be called
-func (e *EmptyNode) Delete(key []Unit) bool { return false }
+func (e *EmptyNode) Delete(key []Unit) error { return nil }
 
 // SetChild should never be called
 func (e *EmptyNode) SetChild(node Node) error { return nil }

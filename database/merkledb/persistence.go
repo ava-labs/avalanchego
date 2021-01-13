@@ -16,12 +16,12 @@ type PersistenceData struct {
 }
 
 // GetNodeByUnitKey fetches a Node given a StorageKey
-func (p *PersistenceData) GetNodeByUnitKey(key []Unit) (Node, error) {
-	if key == nil {
+func (p *PersistenceData) GetNodeByUnitKey(storageKey []Unit) (Node, error) {
+	if storageKey == nil {
 		return p.GetRootNode(), nil
 	}
 
-	nodeBytes, err := p.db.Get(ToExpandedBytes(key))
+	nodeBytes, err := p.db.Get(ToExpandedBytes(storageKey))
 	if err != nil {
 		return nil, err
 	}
@@ -29,9 +29,10 @@ func (p *PersistenceData) GetNodeByUnitKey(key []Unit) (Node, error) {
 	return convertToNode(nodeBytes)
 }
 
+// GetLeafNodeByKey returns a LeafNode given a key
 func (p *PersistenceData) GetLeafNodeByKey(key []Unit) (Node, error) {
 	if key == nil {
-		return nil, nil
+		return nil, database.ErrNotFound
 	}
 
 	nodeBytes, err := p.db.Get(ToExpandedBytes(append([]Unit("L-"), key...)))
@@ -42,11 +43,13 @@ func (p *PersistenceData) GetLeafNodeByKey(key []Unit) (Node, error) {
 	return convertToNode(nodeBytes)
 }
 
+// GetRootNode returns the RootNode
 func (p *PersistenceData) GetRootNode() Node {
 	return p.rootNode
 
 }
 
+// StoreNode stores a in the DB Node using its StorageKey
 func (p *PersistenceData) StoreNode(n Node) error {
 	switch n.(type) {
 	case *RootNode:
@@ -65,6 +68,7 @@ func (p *PersistenceData) StoreNode(n Node) error {
 	return nil
 }
 
+// DeleteNode deletes a node using its StorageKey
 func (p *PersistenceData) DeleteNode(n Node) error {
 	switch n.(type) {
 	case *RootNode:
@@ -78,6 +82,7 @@ func (p *PersistenceData) DeleteNode(n Node) error {
 	return nil
 }
 
+// NewPersistence creates a new Persistence
 func NewPersistence(db database.Database) {
 
 	// TODO Review it if needs to be async safe

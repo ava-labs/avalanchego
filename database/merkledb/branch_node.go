@@ -1,9 +1,13 @@
 package merkledb
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/ava-labs/avalanchego/database"
+)
 
 // BranchNode represents a Node with an array of Nodes and a SharedAddress
-// SharedAddress - part of the address that it links to
+// SharedAddress is the shared prefix of all keys under this node
 // Nodes are Addresses of other Nodes, which their addresses are suffixed by SharedAddress
 // Hashes are hashes of child Nodes
 // [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, a, b, c, d, f ]
@@ -182,11 +186,11 @@ func (b *BranchNode) Insert(key []Unit, value []byte) error {
 //     it either deletes + rehashes upwards
 //     or if there's one Node left in the branch it requests Parent to take it + request the Parent rehash
 //
-func (b *BranchNode) Delete(key []Unit) bool {
+func (b *BranchNode) Delete(key []Unit) error {
 
 	// there's no node to delete here
 	if nodeKey := b.Nodes[FirstNonPrefix(b.SharedAddress, key)]; nodeKey == nil {
-		return false
+		return database.ErrNotFound
 	}
 
 	// the child nodeKey that called the delete
@@ -203,7 +207,7 @@ func (b *BranchNode) Delete(key []Unit) bool {
 			if v != nil {
 				singleNode, err = Persistence.GetNodeByUnitKey(v)
 				if err != nil {
-					return false
+					return err
 				}
 				break
 			}
@@ -211,26 +215,24 @@ func (b *BranchNode) Delete(key []Unit) bool {
 
 		parent, err := Persistence.GetNodeByUnitKey(b.Parent)
 		if err != nil {
-			return false
+			return err
 		}
 
 		err = parent.SetChild(singleNode)
 		if err != nil {
-			return false
+			return err
 		}
 
 		err = parent.Hash(key, singleNode.GetHash())
 		if err != nil {
-			return false
+			return err
 		}
 
-		err = Persistence.DeleteNode(b)
-		return err == nil
+		return Persistence.DeleteNode(b)
 	}
 
 	// node was deleted rehash the current BranchNode + parents
-	err := b.Hash(key, nil)
-	return err == nil
+	return b.Hash(key, nil)
 }
 
 // SetChild force sets a child in the BranchNode
@@ -282,11 +284,15 @@ func (b *BranchNode) Hash(nodeKey []Unit, hash []byte) error {
 
 	b.Hashes[FirstNonPrefix(b.SharedAddress, nodeKey)] = hash
 
-	hashSet := [][]byte{ToExpandedBytes(b.SharedAddress)}
+	hashSet := make([][]byte, UnitSize+1)
+	hashSet[0] = ToExpandedBytes(b.SharedAddress)
 
+	i := 1
 	for _, childHash := range b.Hashes {
-		hashSet = append(hashSet, childHash)
+		hashSet[i] = childHash
+		i++
 	}
+
 	b.StoredHash = Hash(hashSet...)
 	err := Persistence.StoreNode(b)
 	if err != nil {

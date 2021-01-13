@@ -159,33 +159,30 @@ func (t *Tree) Put(key []byte, value []byte) error {
 	return insertNode.Insert(unitKey, value)
 }
 
-// Delete is fills the implementation
+// Delete deletes an element from the tree
 func (t *Tree) Delete(key []byte) error {
 	if t.isClosed() != nil {
 		return t.isClosed()
 	}
-
-	t.Del(key)
-	return nil
-}
-
-func (t *Tree) Del(key []byte) bool {
 	unitKey := FromBytes(key)
 
 	deleteNode, err := Persistence.GetLeafNodeByKey(FromBytes(key))
-	if deleteNode == nil || err != nil {
-		return false
+	if err != nil {
+		if err != database.ErrNotFound {
+			return err
+		}
+		return nil
 	}
 
 	return deleteNode.Delete(unitKey)
 }
 
-func (t *Tree) DelTraverse(key []byte) bool {
+func (t *Tree) DelTraverse(key []byte) error {
 	unitKey := FromBytes(key)
 
 	deleteNode := t.findNode(unitKey, Persistence.GetRootNode())
 	if deleteNode == nil {
-		return false
+		return nil
 	}
 
 	return deleteNode.Delete(unitKey)
