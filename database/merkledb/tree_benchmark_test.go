@@ -37,9 +37,10 @@ func BenchmarkTree_Put(b *testing.B) {
 		name string
 		data []TestStruct
 	}{
+		{"test10k_Put", CreateRandomValues(10000)},
 		{"test100k_Put", CreateRandomValues(100000)},
 		// this takes a lot of time removed from the CI
-		{"test1M_Put_Del", CreateRandomValues(1000000)},
+		// {"test1M_Put", CreateRandomValues(1000000)},
 		// {"test10M_Put_Del", CreateRandomValues(10000000)},
 	}
 
@@ -55,29 +56,80 @@ func BenchmarkTree_Put(b *testing.B) {
 	}
 }
 
+func BenchmarkTree_Get(b *testing.B) {
+	tests := []struct {
+		name     string
+		traverse bool
+		data     []TestStruct
+	}{
+		{"test10k_Put", false, CreateRandomValues(10000)},
+		{"test10k_Put_Traverse", true, CreateRandomValues(10000)},
+		{"test50k_Put", false, CreateRandomValues(50000)},
+		{"test50k_Put_Traverse", true, CreateRandomValues(50000)},
+		// this takes a lot of time removed from the CI
+		// {"test1M_Put", CreateRandomValues(1000000)},
+		// {"test10M_Put_Del", CreateRandomValues(10000000)},
+	}
+
+	for _, test := range tests {
+		tree := NewMemoryTree()
+		b.Run(test.name, func(b *testing.B) {
+			for _, entry := range test.data {
+				_ = tree.Put(entry.key, entry.value)
+			}
+
+			b.ResetTimer()
+			for _, entry := range test.data {
+				var err error
+
+				if test.traverse {
+					_, err = tree.Get(entry.key)
+				} else {
+					_, err = tree.GetTraverse(entry.key)
+				}
+
+				if err != nil {
+					b.Fatalf("value not found in the tree - %v - %v", entry.key, err)
+				}
+			}
+		})
+	}
+}
+
 func BenchmarkTree_Del(b *testing.B) {
 
 	tests := []struct {
-		name string
-		data []TestStruct
+		name     string
+		traverse bool
+		data     []TestStruct
 	}{
-		{"test100k_Put_Del", CreateRandomValues(100000)},
+		{"test10k_Put_Del", false, CreateRandomValues(10000)},
+		{"test10k_Put_Del_Traverse", true, CreateRandomValues(10000)},
+		{"test50k_Put_Del", false, CreateRandomValues(50000)},
+		{"test50k_Put_Del_Traverse", true, CreateRandomValues(50000)},
 		// this takes a lot of time removed from the CI
-		{"test1M_Put_Del", CreateRandomValues(1000000)},
+		// {"test1M_Put_Del", CreateRandomValues(1000000)},
 		// {"test10M_Put_Del", CreateRandomValues(10000000)},
 	}
 
 	for _, test := range tests {
 		b.Run(test.name, func(b *testing.B) {
 			tree := NewMemoryTree()
-			b.ResetTimer()
 			for _, test := range test.data {
 				_ = tree.Put(test.key, test.value)
 			}
 
-			for _, test := range test.data {
-				if !tree.Del(test.key) {
-					b.Fatalf("value not deleted in the tree as it was not found- %v", test.key)
+			b.ResetTimer()
+			for _, entry := range test.data {
+				var found bool
+				if test.traverse {
+					found = tree.DelTraverse(entry.key)
+				} else {
+					found = tree.Del(entry.key)
+				}
+
+				if !found {
+					b.Fatalf("value not deleted in the tree as it was not found- %v", entry.key)
 				}
 			}
 		})

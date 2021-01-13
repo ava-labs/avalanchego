@@ -26,6 +26,19 @@ func (p *PersistenceData) GetNodeByUnitKey(key []Unit) (Node, error) {
 	return convertToNode(nodeBytes)
 }
 
+func (p *PersistenceData) GetLeafNodeByKey(key []Unit) (Node, error) {
+	if key == nil {
+		return nil, nil
+	}
+
+	nodeBytes, err := p.db.Get(ToExpandedBytes(append([]Unit("L-"), key...)))
+	if err != nil {
+		return nil, err
+	}
+
+	return convertToNode(nodeBytes)
+}
+
 func (p *PersistenceData) GetRootNode() Node {
 	return p.rootNode
 

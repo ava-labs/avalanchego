@@ -95,12 +95,32 @@ func (t *Tree) Root() []byte {
 	return Persistence.GetRootNode().GetHash()
 }
 
-func (t *Tree) Get(key []byte) ([]byte, error) {
+func (t *Tree) GetTraverse(key []byte) ([]byte, error) {
 	if t.isClosed() != nil {
 		return nil, t.isClosed()
 	}
 
 	node := t.findNode(FromBytes(key), Persistence.GetRootNode())
+	if node == nil {
+		return nil, database.ErrNotFound
+	}
+	if _, ok := node.(*EmptyNode); ok {
+		return nil, database.ErrNotFound
+	}
+
+	return node.Value(), nil
+}
+
+func (t *Tree) Get(key []byte) ([]byte, error) {
+	if t.isClosed() != nil {
+		return nil, t.isClosed()
+	}
+
+	node, err := Persistence.GetLeafNodeByKey(FromBytes(key))
+	if err != nil {
+		return nil, err
+	}
+
 	if node == nil {
 		return nil, database.ErrNotFound
 	}
@@ -150,6 +170,17 @@ func (t *Tree) Delete(key []byte) error {
 }
 
 func (t *Tree) Del(key []byte) bool {
+	unitKey := FromBytes(key)
+
+	deleteNode, err := Persistence.GetLeafNodeByKey(FromBytes(key))
+	if deleteNode == nil || err != nil {
+		return false
+	}
+
+	return deleteNode.Delete(unitKey)
+}
+
+func (t *Tree) DelTraverse(key []byte) bool {
 	unitKey := FromBytes(key)
 
 	deleteNode := t.findNode(unitKey, Persistence.GetRootNode())

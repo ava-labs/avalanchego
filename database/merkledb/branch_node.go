@@ -16,7 +16,7 @@ type BranchNode struct {
 	SharedAddress []Unit           `json:"sharedAddress"`
 	Parent        []Unit           `json:"parent,omitempty"`
 	Type          string           `json:"type"`
-	storedHash    []byte
+	StoredHash    []byte           `json:"storedHash"`
 }
 
 // NewBranchNode returns a new BranchNode
@@ -137,7 +137,7 @@ func (b *BranchNode) Insert(key []Unit, value []byte) error {
 	// needs a new branchNode
 	if nodeStorageKey := b.Nodes[FirstNonPrefix(b.SharedAddress, key)]; nodeStorageKey != nil {
 
-		// node keys and storage keys are different
+		// node keys and node storage keys are different
 		nodeKey := FromStorageKey(nodeStorageKey)
 		newBranch := NewBranchNode(SharedPrefix(nodeKey, key), b)
 
@@ -240,13 +240,13 @@ func (b *BranchNode) SetChild(node Node) error {
 	var parent Node
 	var err error
 
-	parent, err = Persistence.GetNodeByUnitKey(b.Parent)
-	if err != nil {
-		return err
-	}
-
 	// useful for deletion
 	if b.nodeLengthEquals(1) {
+		parent, err = Persistence.GetNodeByUnitKey(b.Parent)
+		if err != nil {
+			return err
+		}
+
 		err = parent.SetChild(node)
 		if err != nil {
 			return err
@@ -287,7 +287,7 @@ func (b *BranchNode) Hash(nodeKey []Unit, hash []byte) error {
 	for _, childHash := range b.Hashes {
 		hashSet = append(hashSet, childHash)
 	}
-	b.storedHash = Hash(hashSet...)
+	b.StoredHash = Hash(hashSet...)
 	err := Persistence.StoreNode(b)
 	if err != nil {
 		return err
@@ -298,11 +298,11 @@ func (b *BranchNode) Hash(nodeKey []Unit, hash []byte) error {
 		return err
 	}
 
-	return parent.Hash(b.Key(), b.storedHash)
+	return parent.Hash(b.Key(), b.StoredHash)
 }
 
 func (b *BranchNode) GetHash() []byte {
-	return b.storedHash
+	return b.StoredHash
 }
 
 // Key returns the BranchNode SharedAddress
