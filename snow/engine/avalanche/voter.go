@@ -56,7 +56,10 @@ func (v *voter) Update() {
 		return
 	}
 	for _, acceptedTx := range acceptedTxs {
-		v.t.trBlocked.markAccepted(acceptedTx.Transition().ID(), acceptedTx.Epoch())
+		acceptedTrID := acceptedTx.Transition().ID()
+		acceptedTxEpoch := acceptedTx.Epoch()
+		delete(v.t.missingTransitions[acceptedTxEpoch], acceptedTrID)
+		v.t.trBlocked.markAccepted(acceptedTx.Transition().ID(), acceptedTxEpoch)
 	}
 
 	epochs := make(map[uint32]vtx, 2)

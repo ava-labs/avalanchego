@@ -153,10 +153,15 @@ func (i *issuer) Update() {
 		i.t.Ctx.Log.Error("Query for %s was dropped due to an insufficient number of validators", vtxID)
 	}
 
-	// Notify vertices waiting on this one that it (and its transactions) have been issued.
+	// Notify vertices waiting on this one that it (and its transitions) have been issued.
 	i.t.vtxBlocked.Fulfill(vtxID)
 	for _, tx := range txs {
-		i.t.trBlocked.markIssued(tx.Transition().ID(), epoch)
+		trID := tx.Transition().ID()
+		delete(i.t.missingTransitions[epoch], trID)
+		if len(i.t.missingTransitions[epoch]) == 0 {
+			delete(i.t.missingTransitions, epoch)
+		}
+		i.t.trBlocked.markIssued(trID, epoch)
 	}
 
 	// Issue a repoll

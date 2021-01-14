@@ -77,8 +77,8 @@ func (tb *txBlocker) markAccepted(trID ids.ID, epoch uint32) {
 	}
 }
 
-// [trID] hasn't been issued in [epoch] and we don't
-// expect it to be
+// Mark that we don't expect [trID] to be issued in [epoch]
+// or accepted in an epoch <= [epoch]
 func (tb *txBlocker) abandon(trID ids.ID, epoch uint32) {
 	tb.init()
 
