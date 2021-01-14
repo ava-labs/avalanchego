@@ -163,6 +163,7 @@ func (i *issuer) Update() {
 		}
 		i.t.trBlocked.markIssued(trID, epoch)
 	}
+	i.t.updateMissingTransitions()
 
 	// Issue a repoll
 	i.t.errs.Add(i.t.repoll())

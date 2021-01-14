@@ -93,6 +93,8 @@ func (v *voter) Update() {
 		}
 	}
 
+	v.t.updateMissingTransitions()
+
 	if v.t.Consensus.Finalized() {
 		v.t.Ctx.Log.Debug("Avalanche engine can quiesce")
 		return
