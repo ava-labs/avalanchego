@@ -109,6 +109,7 @@ func (i *issuer) Update() {
 			)
 		}
 		i.t.errs.Add(err)
+		i.t.abandonedVertices = true
 		i.t.vtxBlocked.Abandon(vtxID)
 		return
 	}
@@ -133,6 +134,7 @@ func (i *issuer) Update() {
 	}
 	if epoch > currentEpoch {
 		i.t.Ctx.Log.Debug("Dropping vertex from future epoch:\n%s", vtxID)
+		i.t.abandonedVertices = true
 		i.t.vtxBlocked.Abandon(vtxID)
 		return
 	}

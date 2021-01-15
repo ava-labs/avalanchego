@@ -54,6 +54,12 @@ type Transitive struct {
 	// txBlocked tracks operations that are blocked on transactions
 	vtxBlocked, txBlocked events.Blocker
 
+	// abandonedVertices is reset to false every time [issueFrom] is called
+	// and set to true if a vertex fails verification. This serves as a flag
+	// that a vertex failed verification before a convincer or issuer that may
+	// depend on it could be registered.
+	abandonedVertices bool
+
 	errs wrappers.Errs
 }
 
@@ -261,13 +267,14 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) 
 
 	// If we have [vtxID], put it into consensus if we haven't already.
 	// If not, fetch it.
-	inConsensus, err := t.issueFromByID(vdr, vtxID)
+	issued, err := t.issueFromByID(vdr, vtxID)
 	if err != nil {
 		return err
 	}
 
-	// [vtxID] isn't in consensus yet because we don't have it or a dependency.
-	if !inConsensus {
+	// If [vtxID] was not issued to consensus and none of its ancestors were
+	// abandoned before we can register [c], then add [vtxID] as a dependency
+	if !issued && !t.abandonedVertices {
 		c.deps.Add(vtxID) // Don't send chits until [vtxID] is in consensus.
 	}
 
@@ -312,9 +319,14 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) er
 		response:  votes,
 	}
 	for _, vote := range votes {
-		if added, err := t.issueFromByID(vdr, vote); err != nil {
+		issued, err := t.issueFromByID(vdr, vote)
+		if err != nil {
 			return err
-		} else if !added {
+		}
+
+		// If [vote] was not issued to consensus and none of its ancestors were
+		// abandoned before [v] could be registered, then add [vote] as a dependency
+		if !issued && !t.abandonedVertices {
 			v.deps.Add(vote)
 		}
 	}
@@ -382,6 +394,7 @@ func (t *Transitive) issueFromByID(vdr ids.ShortID, vtxID ids.ID) (bool, error) 
 // Assumes we have [vtx] locally
 // Returns true if [vtx] has been added to consensus (now or previously)
 func (t *Transitive) issueFrom(vdr ids.ShortID, vtx avalanche.Vertex) (bool, error) {
+	t.abandonedVertices = false
 	issued := true
 	// Before we issue [vtx] into consensus, we have to issue its ancestors.
 	// Go through [vtx] and its ancestors. issue each ancestor that hasn't yet been issued.
