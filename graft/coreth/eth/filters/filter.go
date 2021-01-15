@@ -144,25 +144,10 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 	if f.end == -1 {
 		end = head
 	}
-	// Gather all indexed logs, and finish with non indexed ones
-	var (
-		logs []*types.Log
-		err  error
-	)
-	size, sections := f.backend.BloomStatus()
-	if indexed := sections * size; indexed > uint64(f.begin) {
-		if indexed > end {
-			logs, err = f.indexedLogs(ctx, end)
-		} else {
-			logs, err = f.indexedLogs(ctx, indexed-1)
-		}
-		if err != nil {
-			return logs, err
-		}
-	}
-	rest, err := f.unindexedLogs(ctx, end)
-	logs = append(logs, rest...)
-	return logs, err
+
+	// XXX switched from using indexed logs to unindexed logs
+	// to remove asynchronous logic.
+	return f.unindexedLogs(ctx, end)
 }
 
 // indexedLogs returns the logs matching the filter criteria based on the bloom
