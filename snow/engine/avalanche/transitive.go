@@ -319,14 +319,14 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) er
 		response:  votes,
 	}
 	for _, vote := range votes {
-		added, err := t.issueFromByID(vdr, vote)
+		issued, err := t.issueFromByID(vdr, vote)
 		if err != nil {
 			return err
 		}
 
 		// If [vote] was not issued to consensus and none of its ancestors were
 		// abandoned before [v] could be registered, then add [vote] as a dependency
-		if !added && !t.abandonedVertices {
+		if !issued && !t.abandonedVertices {
 			v.deps.Add(vote)
 		}
 	}

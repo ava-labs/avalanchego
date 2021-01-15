@@ -4225,7 +4225,7 @@ func TestEngineInvalidChit(t *testing.T) {
 		ParentsV: vts,
 		HeightV:  2,
 		EpochV:   0,
-		TxsV:     []conflicts.Tx{txB0},
+		TxsV:     []conflicts.Tx{txC0},
 		BytesV:   []byte{3},
 	}
 	vtxC1 := &avalanche.TestVertex{
