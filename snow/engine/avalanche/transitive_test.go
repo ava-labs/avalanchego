@@ -3942,6 +3942,81 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 	}
 }
 
+// Assert that an invalid vertex is not built when an invalid transaction is
+// issued.
+func TestEngineNoInvalidVertices(t *testing.T) {
+	config := DefaultConfig()
+
+	manager := vertex.NewTestManager(t)
+	config.Manager = manager
+
+	manager.Default(true)
+
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+
+	vts := []avalanche.Vertex{gVtx, mVtx}
+	utxos := []ids.ID{ids.GenerateTestID()}
+
+	tx := &conflicts.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Processing,
+			InputIDsV: []ids.ID{utxos[0]},
+		},
+		VerifyV: errors.New("invalid tx"),
+	}
+
+	vtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []conflicts.Tx{tx},
+		BytesV:   []byte{1, 1, 2, 3},
+	}
+	manager.BuildF = func(uint32, []ids.ID, []conflicts.Transition, []ids.ID) (avalanche.Vertex, error) {
+		t.Fatalf("invalid vertex built")
+		panic("invalid vertex built")
+	}
+
+	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
+	manager.GetF = func(id ids.ID) (avalanche.Vertex, error) {
+		switch id {
+		case gVtx.ID():
+			return gVtx, nil
+		case mVtx.ID():
+			return mVtx, nil
+		case vtx.ID():
+			return vtx, nil
+		default:
+			t.Fatalf("Unknown vertex")
+			panic("Should have errored")
+		}
+	}
+
+	te := &Transitive{}
+	if err := te.Initialize(config); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := te.issue(vtx, false); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestEngineDoubleChit(t *testing.T) {
 	config := DefaultConfig()
 
