@@ -10,8 +10,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
@@ -3949,19 +3947,6 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 func TestEngineNoInvalidVertices(t *testing.T) {
 	config := DefaultConfig()
 
-	vals := validators.NewSet()
-	config.Validators = vals
-
-	vdr0 := ids.GenerateTestShortID()
-	err := vals.AddWeight(vdr0, 1)
-	assert.NoError(t, err)
-
-	sender := &common.SenderTest{T: t}
-	config.Sender = sender
-
-	sender.Default(true)
-	sender.CantGetAcceptedFrontier = false
-
 	manager := vertex.NewTestManager(t)
 	config.Manager = manager
 
@@ -4007,34 +3992,7 @@ func TestEngineNoInvalidVertices(t *testing.T) {
 		panic("invalid vertex built")
 	}
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
-	manager.GetF = func(id ids.ID) (avalanche.Vertex, error) {
-		switch id {
-		case gVtx.ID():
-			return gVtx, nil
-		case mVtx.ID():
-			return mVtx, nil
-		default:
-			t.Fatalf("Unknown vertex")
-			panic("Should have errored")
-		}
-	}
-
-	te := &Transitive{}
-	if err := te.Initialize(config); err != nil {
-		t.Fatal(err)
-	}
-
-	reqID := new(uint32)
-	sender.PushQueryF = func(inVdrs ids.ShortSet, requestID uint32, vtxID ids.ID, _ []byte) {
-		*reqID = requestID
-		if inVdrs.Len() != 2 {
-			t.Fatalf("Wrong number of validators")
-		}
-		if vtxID != vtx.ID() {
-			t.Fatalf("Wrong vertex requested")
-		}
-	}
+	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
 	manager.GetF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -4047,6 +4005,11 @@ func TestEngineNoInvalidVertices(t *testing.T) {
 			t.Fatalf("Unknown vertex")
 			panic("Should have errored")
 		}
+	}
+
+	te := &Transitive{}
+	if err := te.Initialize(config); err != nil {
+		t.Fatal(err)
 	}
 
 	if err := te.issue(vtx, false); err != nil {
