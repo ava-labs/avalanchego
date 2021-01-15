@@ -54,6 +54,8 @@ type Transitive struct {
 	// txBlocked tracks operations that are blocked on transactions
 	vtxBlocked, txBlocked events.Blocker
 
+	abandonedVertices bool
+
 	errs wrappers.Errs
 }
 
@@ -259,15 +261,19 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) 
 		errs:      &t.errs,
 	}
 
+	// Clear abandoned vertices before issuing anything
+	t.abandonedVertices = false
+
 	// If we have [vtxID], put it into consensus if we haven't already.
 	// If not, fetch it.
-	inConsensus, err := t.issueFromByID(vdr, vtxID)
+	issued, err := t.issueFromByID(vdr, vtxID)
 	if err != nil {
 		return err
 	}
 
-	// [vtxID] isn't in consensus yet because we don't have it or a dependency.
-	if !inConsensus {
+	// If [vtxID] was not issued to consensus and none of its ancestors were
+	// abandoned before we can register [c], then add [vtxID] as a dependency
+	if !issued && !t.abandonedVertices {
 		c.deps.Add(vtxID) // Don't send chits until [vtxID] is in consensus.
 	}
 
@@ -312,9 +318,15 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) er
 		response:  votes,
 	}
 	for _, vote := range votes {
-		if added, err := t.issueFromByID(vdr, vote); err != nil {
+		t.abandonedVertices = false
+		added, err := t.issueFromByID(vdr, vote)
+		if err != nil {
 			return err
-		} else if !added {
+		}
+
+		// If [vote] was not issued to consensus and none of its ancestors were
+		// abandoned before [v] could be registered, then add [vote] as a dependency
+		if !added && !t.abandonedVertices {
 			v.deps.Add(vote)
 		}
 	}
