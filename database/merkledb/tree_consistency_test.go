@@ -23,14 +23,12 @@ func PickRandomKey(list []TestStruct) (TestStruct, []TestStruct) {
 func TestTreeConsistency_PutGetDel(t *testing.T) {
 
 	tests := []struct {
-		name      string
-		getMethod bool
-		data      []TestStruct
+		name string
+		data []TestStruct
 	}{
-		{"test1k-Get", true, CreateRandomValues(1000)},
-		{"test1k-GetTraverse", false, CreateRandomValues(1000)},
-		// {"test50k-Get", true, CreateRandomValues(100000)},
-		// {"test100k-GetTraverse", false, CreateRandomValues(100000)},
+		{"test1k-PutGetDel", CreateRandomValues(1000)},
+		{"test10k-PutGetDel", CreateRandomValues(10000)},
+		{"test100k-PutGetDel", CreateRandomValues(100000)},
 		// this takes a lot of time removed from the CI
 		// {"test1M", CreateRandomValues(1000000)},
 		// {"test5M", CreateRandomValues(5000000)},
@@ -45,7 +43,12 @@ func TestTreeConsistency_PutGetDel(t *testing.T) {
 			for _, entry := range test.data {
 				_ = tree.Put(entry.key, entry.value)
 				added[string(entry.key)] = true
-				if bytes.Equal(lastRootHash, tree.Root()) {
+				root2 := tree.Root()
+				if bytes.Equal(lastRootHash, root2) {
+
+					_ = tree.Put(entry.key, entry.value)
+					fmt.Printf("lastRootHash:%v, root2:%v, now: %v\n", lastRootHash, root2, tree.Root())
+
 					tree.PrintTree()
 					t.Fatal("Root Hash didn't change after insertion")
 				}
@@ -54,13 +57,7 @@ func TestTreeConsistency_PutGetDel(t *testing.T) {
 
 			lastRootHash = []byte{}
 			for entry, testList := PickRandomKey(test.data); len(testList) > 0; entry, testList = PickRandomKey(testList) {
-				var val []byte
-				var err error
-				if test.getMethod {
-					val, err = tree.Get(entry.key)
-				} else {
-					val, err = tree.GetTraverse(entry.key)
-				}
+				val, err := tree.Get(entry.key)
 
 				if err != nil {
 					t.Fatalf("value not found in the tree - %v - %v", entry.key, err)

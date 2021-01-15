@@ -15,21 +15,21 @@ import (
 //     [ not found ] -> EmptyNode
 //
 type BranchNode struct {
-	Nodes         [UnitSize][]Unit `json:"nodes"`
-	Hashes        [UnitSize][]byte `json:"hashes"`
-	SharedAddress []Unit           `json:"sharedAddress"`
-	Parent        []Unit           `json:"parent,omitempty"`
-	Type          string           `json:"type"`
-	StoredHash    []byte           `json:"storedHash"`
+	Nodes              [UnitSize][]byte `serialize:"true"`
+	SharedAddress      []Unit           `serialize:"true"`
+	StoredHash         []byte           `serialize:"true"`
+	previousStoredHash []byte
+	parent             Node
+	persistence        *Persistence
 }
 
 // NewBranchNode returns a new BranchNode
-func NewBranchNode(sharedAddress []Unit, parent Node) Node {
+func NewBranchNode(sharedAddress []Unit, parent Node, persistence *Persistence) Node {
 	return &BranchNode{
 		SharedAddress: sharedAddress,
-		Nodes:         [UnitSize][]Unit{},
-		Parent:        parent.StorageKey(),
-		Type:          "BranchNode",
+		Nodes:         [UnitSize][]byte{},
+		parent:        parent,
+		persistence:   persistence,
 	}
 }
 
@@ -39,19 +39,26 @@ func NewBranchNode(sharedAddress []Unit, parent Node) Node {
 //
 func (b *BranchNode) GetChild(key []Unit) (Node, error) {
 	if !EqualUnits(SharedPrefix(b.SharedAddress, key), b.SharedAddress) {
-		return NewEmptyNode(b.StorageKey(), key), nil
+		return NewEmptyNode(b, key), nil
 	}
 
 	// if the node CAN exist in this prefix but doesn't return an EmptyNode
 	// Node Key: AABBCC
 	// SharedAddress: AABBC
 	// FirstNonPrefix:  AABBCC - AABBC = C
-	nodeStorageKey := b.Nodes[FirstNonPrefix(b.SharedAddress, key)]
-	if nodeStorageKey == nil {
-		return NewEmptyNode(b.StorageKey(), key), nil
+	nodeHash := b.Nodes[FirstNonPrefix(b.SharedAddress, key)]
+	if len(nodeHash) == 0 {
+		return NewEmptyNode(b, key), nil
 	}
 
-	return Persistence.GetNodeByUnitKey(nodeStorageKey)
+	node, err := b.persistence.GetNodeByHash(nodeHash)
+	if err != nil {
+		return nil, err
+	}
+	node.SetParent(b)
+	node.SetPersistence(b.persistence)
+
+	return node, nil
 }
 
 // GetNextNode returns the next node in increasing key order
@@ -62,61 +69,69 @@ func (b *BranchNode) GetNextNode(prefix []Unit, start []Unit, key []Unit) (Node,
 	if len(prefix) != 0 {
 		// this branch isn't prefixed
 		if !IsPrefixed(prefix, b.SharedAddress) {
-			return NewEmptyNode(b.StorageKey(), key), nil
+			return NewEmptyNode(b, key), nil
 		}
 	}
 
 	// return the first, left-most child if the key is nil
 	if key == nil {
-		for _, nodeStorageKey := range b.Nodes {
-			if nodeStorageKey != nil {
+		for _, nodeHash := range b.Nodes {
+			if len(nodeHash) != 0 {
+				node, err := b.persistence.GetNodeByHash(nodeHash)
+				if err != nil {
+					return nil, err
+				}
 				// no prefix + no start return the left-most child
 				if len(start) == 0 && len(prefix) == 0 {
-					return Persistence.GetNodeByUnitKey(nodeStorageKey)
+					return node, nil
 				}
 
 				// check for the prefix
-				nodeKey := FromStorageKey(nodeStorageKey)
-				if len(prefix) != 0 && IsPrefixed(prefix, nodeKey) {
+				if len(prefix) != 0 && IsPrefixed(prefix, node.Key()) {
 					if len(start) == 0 {
-						return Persistence.GetNodeByUnitKey(nodeStorageKey)
+						return node, nil
 					}
-					if Greater(nodeKey, start) {
-						return Persistence.GetNodeByUnitKey(nodeStorageKey)
+					if Greater(node.Key(), start) {
+						return node, nil
 					}
 				}
 
 				// check for a start
 				// if it's a BranchNode it will return true and drill down that BranchNode
-				if len(start) != 0 && Greater(nodeKey, start) {
-					return Persistence.GetNodeByUnitKey(nodeStorageKey)
+				if len(start) != 0 && Greater(node.Key(), start) {
+					return node, nil
 				}
 			}
 		}
-		return NewEmptyNode(b.StorageKey(), key), nil
+		return NewEmptyNode(b, key), nil
 	}
 
 	if !EqualUnits(SharedPrefix(b.SharedAddress, key), b.SharedAddress) {
-		return NewEmptyNode(b.StorageKey(), key), nil
+		return NewEmptyNode(b, key), nil
 	}
 
 	// search the next node after the address one
-	for _, nodeStorageKey := range b.Nodes[FirstNonPrefix(b.SharedAddress, key):] {
-		if nodeStorageKey != nil {
+	for _, nodeHash := range b.Nodes[FirstNonPrefix(b.SharedAddress, key):] {
+		if len(nodeHash) != 0 {
+
+			node, err := b.persistence.GetNodeByHash(nodeHash)
+			if err != nil {
+				return nil, err
+			}
+
 			// TODO Think theres a better way of doing this
-			nodeKey := FromStorageKey(nodeStorageKey)
-			if EqualUnits(nodeKey, key) {
+			if EqualUnits(node.Key(), key) {
 				continue
 			}
 			// if its prefixed make sure the node prefix respects it
-			if len(prefix) != 0 && !IsPrefixed(prefix, nodeKey) {
+			if len(prefix) != 0 && !IsPrefixed(prefix, node.Key()) {
 				continue
 			}
-			return Persistence.GetNodeByUnitKey(nodeStorageKey)
+			return node, nil
 		}
 	}
 	// if the node CAN exist in this SharedAddress but doesn't, return an EmptyNode
-	return NewEmptyNode(b.StorageKey(), key), nil
+	return NewEmptyNode(b, key), nil
 }
 
 // Insert adds a new node in the branch
@@ -127,36 +142,23 @@ func (b *BranchNode) Insert(key []Unit, value []byte) error {
 
 	// if the node CAN'T exist in this prefix request the Parent to insert
 	if !EqualUnits(SharedPrefix(b.SharedAddress, key), b.SharedAddress) {
-		parent, err := Persistence.GetNodeByUnitKey(b.Parent)
-		if err != nil {
-			return err
-		}
 
 		// nothings changed in this node
 		// insertion will trigger a rehash from the parent upwards
-		return parent.Insert(key, value)
+		return b.parent.Insert(key, value)
 	}
 
 	// if the position already exists then it's a new suffixed address
 	// needs a new branchNode
-	if nodeStorageKey := b.Nodes[FirstNonPrefix(b.SharedAddress, key)]; nodeStorageKey != nil {
+	if nodeHash := b.Nodes[FirstNonPrefix(b.SharedAddress, key)]; len(nodeHash) != 0 {
 
-		// node keys and node storage keys are different
-		nodeKey := FromStorageKey(nodeStorageKey)
-		newBranch := NewBranchNode(SharedPrefix(nodeKey, key), b)
-
-		node, err := Persistence.GetNodeByUnitKey(nodeStorageKey)
+		node, err := b.persistence.GetNodeByHash(nodeHash)
 		if err != nil {
 			return err
 		}
 
-		// store the new branch address in the current branch before other operations
-		// existing position is now the newBranch which holds the two nodes (existing + insert)
-		b.Nodes[FirstNonPrefix(b.SharedAddress, key)] = newBranch.StorageKey()
-		err = Persistence.StoreNode(b)
-		if err != nil {
-			return err
-		}
+		// create a new branch with this BranchNode as the parent
+		newBranch := NewBranchNode(SharedPrefix(node.Key(), key), b, b.persistence)
 
 		// existing node is added to the new BranchNode
 		err = newBranch.SetChild(node)
@@ -165,18 +167,24 @@ func (b *BranchNode) Insert(key []Unit, value []byte) error {
 		}
 
 		// insertion will trigger a rehash from the newBranch upwards
+		// NewBranch: Insert - Hash - hash - Store - Parent.Hash: hash - Store - Parent.Hash, etc
 		return newBranch.Insert(key, value)
 	}
 
 	// all good, insert a LeafNode
-	newLeafNode, err := NewLeafNode(key, value, b)
+	newLeafNode, err := NewLeafNode(key, value, b, b.persistence)
 	if err != nil {
 		return err
 	}
 
-	b.Nodes[FirstNonPrefix(b.SharedAddress, key)] = newLeafNode.StorageKey()
+	b.Nodes[FirstNonPrefix(b.SharedAddress, key)] = newLeafNode.GetHash()
 
-	return b.Hash(key, newLeafNode.GetHash())
+	err = b.Hash(key, newLeafNode.GetHash())
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Delete
@@ -204,8 +212,8 @@ func (b *BranchNode) Delete(key []Unit) error {
 		var singleNode Node
 		var err error
 		for _, v := range b.Nodes {
-			if v != nil {
-				singleNode, err = Persistence.GetNodeByUnitKey(v)
+			if len(v) != 0 {
+				singleNode, err = b.persistence.GetNodeByHash(v)
 				if err != nil {
 					return err
 				}
@@ -213,22 +221,17 @@ func (b *BranchNode) Delete(key []Unit) error {
 			}
 		}
 
-		parent, err := Persistence.GetNodeByUnitKey(b.Parent)
+		err = b.parent.SetChild(singleNode)
 		if err != nil {
 			return err
 		}
 
-		err = parent.SetChild(singleNode)
+		err = b.parent.Hash(key, singleNode.GetHash())
 		if err != nil {
 			return err
 		}
 
-		err = parent.Hash(key, singleNode.GetHash())
-		if err != nil {
-			return err
-		}
-
-		return Persistence.DeleteNode(b)
+		return b.persistence.DeleteNode(b)
 	}
 
 	// node was deleted rehash the current BranchNode + parents
@@ -236,42 +239,22 @@ func (b *BranchNode) Delete(key []Unit) error {
 }
 
 // SetChild force sets a child in the BranchNode
-// if the BranchNode only has one node we can link the Parent to the child and skip this node
 func (b *BranchNode) SetChild(node Node) error {
-
-	var parent Node
-	var err error
-
-	// useful for deletion
-	if b.nodeLengthEquals(1) {
-		parent, err = Persistence.GetNodeByUnitKey(b.Parent)
-		if err != nil {
-			return err
-		}
-
-		err = parent.SetChild(node)
-		if err != nil {
-			return err
-		}
-		err = Persistence.DeleteNode(b)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-
 	// do not rehash here as it will be followed by an Insert or a Delete
 	// we also don't store here as the next call will do that for us - and the branch is in memory
-	b.Nodes[FirstNonPrefix(b.SharedAddress, node.Key())] = node.StorageKey()
-	b.Hashes[FirstNonPrefix(b.SharedAddress, node.Key())] = node.GetHash()
+	b.Nodes[FirstNonPrefix(b.SharedAddress, node.Key())] = node.GetHash()
 
-	return node.SetParent(b)
+	return nil
 }
 
 // SetParent force sets the Parent
-func (b *BranchNode) SetParent(node Node) error {
-	b.Parent = node.StorageKey()
-	return Persistence.StoreNode(b)
+func (b *BranchNode) SetParent(node Node) {
+	b.parent = node
+}
+
+// SetPersistence force sets the Persistenc
+func (b *BranchNode) SetPersistence(p *Persistence) {
+	b.persistence = p
 }
 
 // Value not used in the BranchNode
@@ -282,33 +265,36 @@ func (b *BranchNode) Value() []byte { return nil }
 // rehash the branch and requests the parent to do the same providing the BranchNodes key
 func (b *BranchNode) Hash(nodeKey []Unit, hash []byte) error {
 
-	b.Hashes[FirstNonPrefix(b.SharedAddress, nodeKey)] = hash
+	b.Nodes[FirstNonPrefix(b.SharedAddress, nodeKey)] = hash
 
 	hashSet := make([][]byte, UnitSize+1)
 	hashSet[0] = ToExpandedBytes(b.SharedAddress)
 
 	i := 1
-	for _, childHash := range b.Hashes {
+	for _, childHash := range b.Nodes {
 		hashSet[i] = childHash
 		i++
 	}
 
+	b.previousStoredHash = b.StoredHash
 	b.StoredHash = Hash(hashSet...)
-	err := Persistence.StoreNode(b)
+	err := b.persistence.StoreNode(b)
 	if err != nil {
 		return err
 	}
 
-	parent, err := Persistence.GetNodeByUnitKey(b.Parent)
-	if err != nil {
-		return err
-	}
-
-	return parent.Hash(b.Key(), b.StoredHash)
+	return b.parent.Hash(b.Key(), b.StoredHash)
 }
 
+// GetHash returns the StoredHash
 func (b *BranchNode) GetHash() []byte {
 	return b.StoredHash
+}
+
+// GetPreviousHash returns the previousStoredHash
+// for deleting unused BranchNode from the DB
+func (b *BranchNode) GetPreviousHash() []byte {
+	return b.previousStoredHash
 }
 
 // Key returns the BranchNode SharedAddress
@@ -316,17 +302,17 @@ func (b *BranchNode) Key() []Unit {
 	return b.SharedAddress
 }
 
-// StorageKey returns the BranchNode SharedAddress suffixed with B-
-func (b *BranchNode) StorageKey() []Unit {
-	return append([]Unit("B-"), b.SharedAddress...)
-}
-
 // Print prints the node
 func (b *BranchNode) Print() {
-	fmt.Printf("Branch ID: %v - SharedAddress: %v - Parent: %v \n\t↪ Nodes: %v \n", b.StorageKey(), b.SharedAddress, b.Parent, b.Nodes)
+	fmt.Printf("Branch ID: %x - SharedAddress: %v - Parent: %p \n\t↪ Nodes: ", b.GetHash(), b.SharedAddress, b.parent)
+	fmt.Printf("[")
+	for _, nodeHash := range b.Nodes {
+		fmt.Printf("[%x]", nodeHash)
+	}
+	fmt.Printf("]\n")
 	for _, nodeKey := range b.Nodes {
-		if nodeKey != nil {
-			node, err := Persistence.GetNodeByUnitKey(nodeKey)
+		if len(nodeKey) != 0 {
+			node, err := b.persistence.GetNodeByHash(nodeKey)
 			if err != nil {
 				panic(err)
 			}
@@ -336,10 +322,9 @@ func (b *BranchNode) Print() {
 }
 
 func (b *BranchNode) nodeLengthEquals(size int) bool {
-
 	i := 0
 	for _, v := range b.Nodes {
-		if v != nil {
+		if len(v) != 0 {
 			i++
 		}
 	}

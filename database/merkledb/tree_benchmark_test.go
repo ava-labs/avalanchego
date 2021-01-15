@@ -58,14 +58,11 @@ func BenchmarkTree_Put(b *testing.B) {
 
 func BenchmarkTree_Get(b *testing.B) {
 	tests := []struct {
-		name     string
-		traverse bool
-		data     []TestStruct
+		name string
+		data []TestStruct
 	}{
-		{"test10k_Put", false, CreateRandomValues(10000)},
-		{"test10k_Put_Traverse", true, CreateRandomValues(10000)},
-		{"test50k_Put", false, CreateRandomValues(50000)},
-		{"test50k_Put_Traverse", true, CreateRandomValues(50000)},
+		{"test10k_Get", CreateRandomValues(10000)},
+		{"test100k_Get", CreateRandomValues(100000)},
 		// this takes a lot of time removed from the CI
 		// {"test1M_Put", CreateRandomValues(1000000)},
 		// {"test10M_Put_Del", CreateRandomValues(10000000)},
@@ -80,13 +77,7 @@ func BenchmarkTree_Get(b *testing.B) {
 
 			b.ResetTimer()
 			for _, entry := range test.data {
-				var err error
-
-				if test.traverse {
-					_, err = tree.Get(entry.key)
-				} else {
-					_, err = tree.GetTraverse(entry.key)
-				}
+				_, err := tree.Get(entry.key)
 
 				if err != nil {
 					b.Fatalf("value not found in the tree - %v - %v", entry.key, err)
@@ -99,16 +90,13 @@ func BenchmarkTree_Get(b *testing.B) {
 func BenchmarkTree_Del(b *testing.B) {
 
 	tests := []struct {
-		name     string
-		traverse bool
-		data     []TestStruct
+		name string
+		data []TestStruct
 	}{
-		{"test10k_Put_Del", false, CreateRandomValues(10000)},
-		{"test10k_Put_Del_Traverse", true, CreateRandomValues(10000)},
-		{"test50k_Put_Del", false, CreateRandomValues(50000)},
-		{"test50k_Put_Del_Traverse", true, CreateRandomValues(50000)},
+		{"test10k_Del", CreateRandomValues(10000)},
+		{"test100k_Del", CreateRandomValues(100000)},
 		// this takes a lot of time removed from the CI
-		// {"test1M_Put_Del", CreateRandomValues(1000000)},
+		// {"test1M_Put", CreateRandomValues(1000000)},
 		// {"test10M_Put_Del", CreateRandomValues(10000000)},
 	}
 
@@ -121,12 +109,7 @@ func BenchmarkTree_Del(b *testing.B) {
 
 			b.ResetTimer()
 			for _, entry := range test.data {
-				var err error
-				if test.traverse {
-					err = tree.DelTraverse(entry.key)
-				} else {
-					err = tree.Delete(entry.key)
-				}
+				err := tree.Delete(entry.key)
 
 				if err != nil {
 					b.Fatalf("value not deleted in the tree as it was not found- %v", entry.key)

@@ -283,7 +283,9 @@ func TestTree_Del_Scenarios(t *testing.T) {
 
 func TestInterface(t *testing.T) {
 	for _, test := range database.Tests {
-		treeDB := NewMemoryTree()
-		test(t, treeDB)
+		treeA := NewMemoryTree()
+		treeB := NewMemoryTree()
+		test(t, treeA)
+		test(t, treeB)
 	}
 }

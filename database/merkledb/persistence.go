@@ -1,65 +1,113 @@
 package merkledb
 
 import (
-	"encoding/json"
+	"fmt"
 
+	"github.com/ava-labs/avalanchego/database/memdb"
+
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
+
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 )
 
-// Persistence is the singleton to access data
-var Persistence PersistenceData
+// Persistence holds the DB + the RootNode
+type Persistence struct {
+	cache      database.Database
+	db         database.Database
+	dataChange map[string][]byte
+	rootNode   Node
+	codec      codec.Manager
+}
 
-// PersistenceData holds the DB + the RootNode
-type PersistenceData struct {
-	db       database.Database
-	rootNode Node
+// NewPersistence creates a new Persistence
+func NewPersistence(db database.Database) (*Persistence, error) {
+	c := linearcodec.NewDefault()
+	_ = c.RegisterType(&BranchNode{})
+	_ = c.RegisterType(&LeafNode{})
+	codecManager := codec.NewDefaultManager()
+	if err := codecManager.RegisterCodec(0, c); err != nil {
+		return nil, err
+	}
+
+	persistence := Persistence{
+		db:    db,
+		codec: codecManager,
+		cache: memdb.New(),
+	}
+	persistence.rootNode = NewRootNode(&persistence)
+
+	return &persistence, nil
 }
 
 // GetNodeByUnitKey fetches a Node given a StorageKey
-func (p *PersistenceData) GetNodeByUnitKey(storageKey []Unit) (Node, error) {
-	if storageKey == nil {
+func (p *Persistence) GetNodeByHash(nodeHash []byte) (Node, error) {
+	if nodeHash == nil {
 		return p.GetRootNode(), nil
 	}
 
-	nodeBytes, err := p.db.Get(ToExpandedBytes(storageKey))
+	//// check the cache
+	//nodeBytes, err := p.cache.Get(nodeHash)
+	//if err != nil && err != database.ErrNotFound {
+	//	return nil, err
+	//}
+
+	//// get it from the db
+	//if err == database.ErrNotFound {
+	//
+	//}
+
+	nodeBytes, err := p.db.Get(nodeHash)
 	if err != nil {
 		return nil, err
 	}
 
-	return convertToNode(nodeBytes)
-}
+	var node Node
+	_, err = p.codec.Unmarshal(nodeBytes, &node)
+	node.SetPersistence(p)
+	//
+	//// store it in the cache
+	//// TODO dont need to store it always
+	//err = p.cache.Put(node.GetHash(), nodeBytes)
+	//if err != nil {
+	//	return nil, err
+	//}
 
-// GetLeafNodeByKey returns a LeafNode given a key
-func (p *PersistenceData) GetLeafNodeByKey(key []Unit) (Node, error) {
-	if key == nil {
-		return nil, database.ErrNotFound
-	}
-
-	nodeBytes, err := p.db.Get(ToExpandedBytes(append([]Unit("L-"), key...)))
-	if err != nil {
-		return nil, err
-	}
-
-	return convertToNode(nodeBytes)
+	return node, err
 }
 
 // GetRootNode returns the RootNode
-func (p *PersistenceData) GetRootNode() Node {
+func (p *Persistence) GetRootNode() Node {
 	return p.rootNode
 
 }
 
 // StoreNode stores a in the DB Node using its StorageKey
-func (p *PersistenceData) StoreNode(n Node) error {
+func (p *Persistence) StoreNode(n Node) error {
 	switch n.(type) {
 	case *RootNode:
 		p.rootNode = n
 	default:
-		nBytes, err := json.Marshal(n)
+		nBytes, err := p.codec.Marshal(0, &n)
 		if err != nil {
 			return err
 		}
-		err = p.db.Put(ToExpandedBytes(n.StorageKey()), nBytes)
+
+		//// store it in the cache
+		//err = p.cache.Put(n.GetHash(), nBytes)
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//// batch it to insert
+		//p.dataChange[string(n.GetHash())] = nBytes
+
+		err = p.db.Put(n.GetHash(), nBytes)
+		if err != nil {
+			return err
+		}
+
+		err = p.db.Delete(n.GetPreviousHash())
 		if err != nil {
 			return err
 		}
@@ -69,12 +117,12 @@ func (p *PersistenceData) StoreNode(n Node) error {
 }
 
 // DeleteNode deletes a node using its StorageKey
-func (p *PersistenceData) DeleteNode(n Node) error {
+func (p *Persistence) DeleteNode(n Node) error {
 	switch n.(type) {
 	case *RootNode:
-		panic("No Need to delete rootNode")
+		return fmt.Errorf("rootNode should not be deleted")
 	default:
-		err := p.db.Delete(ToExpandedBytes(n.StorageKey()))
+		err := p.db.Delete(n.GetHash())
 		if err != nil {
 			return err
 		}
@@ -82,48 +130,20 @@ func (p *PersistenceData) DeleteNode(n Node) error {
 	return nil
 }
 
-// NewPersistence creates a new Persistence
-func NewPersistence(db database.Database) {
-
-	// TODO Review it if needs to be async safe
-	// lock.Lock()
-	// defer lock.Unlock()
-
-	Persistence.db = db
-	Persistence.rootNode = NewRootNode()
+func (p *Persistence) Start() {
 }
 
-func convertToNode(nodeBytes []byte) (Node, error) {
-	var objMap map[string]*json.RawMessage
-	err := json.Unmarshal(nodeBytes, &objMap)
+func (p *Persistence) Commit(err error) error {
+
 	if err != nil {
-		return nil, err
+		return err
 	}
+	return nil
+}
 
-	var nodeType string
-	err = json.Unmarshal(*objMap["type"], &nodeType)
-	if err != nil {
-		return nil, err
+func (p *Persistence) PrintDB() {
+	iterator := p.db.NewIterator()
+	for iterator.Next() {
+		fmt.Printf("k: %x \n", iterator.Key())
 	}
-
-	var node Node
-
-	switch nodeType {
-	case "BranchNode":
-		var branchNode BranchNode
-		err = json.Unmarshal(nodeBytes, &branchNode)
-		if err != nil {
-			return nil, err
-		}
-		node = &branchNode
-	case "LeafNode":
-		var leafNode LeafNode
-		err = json.Unmarshal(nodeBytes, &leafNode)
-		if err != nil {
-			return nil, err
-		}
-		node = &leafNode
-	}
-
-	return node, nil
 }

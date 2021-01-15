@@ -11,7 +11,8 @@ import (
 
 // Tree holds the tree data
 type Tree struct {
-	closed bool
+	closed      bool
+	persistence *Persistence
 }
 
 // Has returns whether the key exists in the tree
@@ -20,7 +21,7 @@ func (t *Tree) Has(key []byte) (bool, error) {
 		return false, t.isClosed()
 	}
 
-	node := t.findNode(FromBytes(key), Persistence.GetRootNode())
+	node := t.findNode(FromBytes(key), t.persistence.GetRootNode())
 	if node == nil || !bytes.Equal(ToBytes(node.Key()), key) {
 		return false, nil
 	}
@@ -85,30 +86,15 @@ func NewMemoryTree() *Tree {
 
 // NewTree returns a new instance of the Tree
 func NewTree(db database.Database) *Tree {
-	NewPersistence(db)
+	persistence, _ := NewPersistence(db)
 	return &Tree{
-		closed: false,
+		closed:      false,
+		persistence: persistence,
 	}
 }
 
 func (t *Tree) Root() []byte {
-	return Persistence.GetRootNode().GetHash()
-}
-
-func (t *Tree) GetTraverse(key []byte) ([]byte, error) {
-	if t.isClosed() != nil {
-		return nil, t.isClosed()
-	}
-
-	node := t.findNode(FromBytes(key), Persistence.GetRootNode())
-	if node == nil {
-		return nil, database.ErrNotFound
-	}
-	if _, ok := node.(*EmptyNode); ok {
-		return nil, database.ErrNotFound
-	}
-
-	return node.Value(), nil
+	return t.persistence.GetRootNode().GetHash()
 }
 
 func (t *Tree) Get(key []byte) ([]byte, error) {
@@ -116,11 +102,7 @@ func (t *Tree) Get(key []byte) ([]byte, error) {
 		return nil, t.isClosed()
 	}
 
-	node, err := Persistence.GetLeafNodeByKey(FromBytes(key))
-	if err != nil {
-		return nil, err
-	}
-
+	node := t.findNode(FromBytes(key), t.persistence.GetRootNode())
 	if node == nil {
 		return nil, database.ErrNotFound
 	}
@@ -132,26 +114,28 @@ func (t *Tree) Get(key []byte) ([]byte, error) {
 }
 
 // Put travels the tree and finds the node to insert the LeafNode
-func (t *Tree) Put(key []byte, value []byte) error {
+func (t *Tree) Put(key []byte, value []byte) (err error) {
 	if t.isClosed() != nil {
 		return t.isClosed()
 	}
 
-	unitKey := FromBytes(key)
-	rootChild, err := Persistence.GetRootNode().GetChild([]Unit{})
-	if err != nil {
-		return err
-	}
+	t.persistence.Start()
+	defer t.persistence.Commit(err)
 
+	unitKey := FromBytes(key)
+	rootNode := t.persistence.GetRootNode()
+	// err safe to ignore
+	rootChild, _ := rootNode.GetChild([]Unit{})
 	if rootChild == nil {
-		newLeafNode, err := NewLeafNode(unitKey, value, Persistence.GetRootNode())
+		newLeafNode, err := NewLeafNode(unitKey, value, rootNode, t.persistence)
 		if err != nil {
 			return err
 		}
-		return Persistence.GetRootNode().SetChild(newLeafNode)
+
+		return rootNode.SetChild(newLeafNode)
 	}
 
-	insertNode := t.findNode(unitKey, Persistence.GetRootNode())
+	insertNode := t.findNode(unitKey, rootNode)
 	if insertNode == nil {
 		return fmt.Errorf("should never happen - can't insert on a nil node k: %v", unitKey)
 	}
@@ -159,28 +143,13 @@ func (t *Tree) Put(key []byte, value []byte) error {
 	return insertNode.Insert(unitKey, value)
 }
 
-// Delete deletes an element from the tree
 func (t *Tree) Delete(key []byte) error {
 	if t.isClosed() != nil {
 		return t.isClosed()
 	}
 	unitKey := FromBytes(key)
 
-	deleteNode, err := Persistence.GetLeafNodeByKey(FromBytes(key))
-	if err != nil {
-		if err != database.ErrNotFound {
-			return err
-		}
-		return nil
-	}
-
-	return deleteNode.Delete(unitKey)
-}
-
-func (t *Tree) DelTraverse(key []byte) error {
-	unitKey := FromBytes(key)
-
-	deleteNode := t.findNode(unitKey, Persistence.GetRootNode())
+	deleteNode := t.findNode(unitKey, t.persistence.GetRootNode())
 	if deleteNode == nil {
 		return nil
 	}
@@ -210,7 +179,7 @@ func (t *Tree) findNode(key []Unit, node Node) Node {
 }
 
 func (t *Tree) PrintTree() {
-	Persistence.GetRootNode().Print()
+	t.persistence.GetRootNode().Print()
 }
 
 func (t *Tree) fetchNextNode(prefix []Unit, start []Unit, key []Unit, node Node) (Node, error) {
@@ -233,6 +202,13 @@ func (t *Tree) fetchNextNode(prefix []Unit, start []Unit, key []Unit, node Node)
 }
 
 func (t *Tree) isClosed() error {
+	if t.closed {
+		return database.ErrClosed
+	}
+	return nil
+}
+
+func (t *Tree) GetPersistence() error {
 	if t.closed {
 		return database.ErrClosed
 	}

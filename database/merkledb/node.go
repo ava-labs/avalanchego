@@ -10,12 +10,13 @@ type Node interface {
 	Insert(key []Unit, value []byte) error
 	Delete(key []Unit) error
 	SetChild(node Node) error
-	SetParent(b Node) error
+	SetParent(b Node)
+	SetPersistence(p *Persistence)
 	Value() []byte
 	Hash(key []Unit, hash []byte) error
 	GetHash() []byte
+	GetPreviousHash() []byte
 	Key() []Unit
-	StorageKey() []Unit
 	Print()
 }
 
