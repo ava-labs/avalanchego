@@ -4078,6 +4078,9 @@ func TestEngineDoubleChit(t *testing.T) {
 	}
 }
 
+// Regression test to ensure a Chit message containing a vertex whose ancestor
+// fails verification does not cause a voter to register a dependency that has
+// already been abandoned.
 func TestEngineInvalidChit(t *testing.T) {
 	config := DefaultConfig()
 	config.Params.BetaVirtuous = 2

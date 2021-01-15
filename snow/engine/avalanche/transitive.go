@@ -54,6 +54,10 @@ type Transitive struct {
 	// txBlocked tracks operations that are blocked on transactions
 	vtxBlocked, txBlocked events.Blocker
 
+	// abandonedVertices is reset to false every time [issueFrom] is called
+	// and set to true if a vertex fails verification. This serves as a flag
+	// that a vertex failed verification before a convincer or issuer that may
+	// depend on it could be registered.
 	abandonedVertices bool
 
 	errs wrappers.Errs
@@ -261,9 +265,6 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) 
 		errs:      &t.errs,
 	}
 
-	// Clear abandoned vertices before issuing anything
-	t.abandonedVertices = false
-
 	// If we have [vtxID], put it into consensus if we haven't already.
 	// If not, fetch it.
 	issued, err := t.issueFromByID(vdr, vtxID)
@@ -318,7 +319,6 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) er
 		response:  votes,
 	}
 	for _, vote := range votes {
-		t.abandonedVertices = false
 		added, err := t.issueFromByID(vdr, vote)
 		if err != nil {
 			return err
@@ -394,6 +394,7 @@ func (t *Transitive) issueFromByID(vdr ids.ShortID, vtxID ids.ID) (bool, error) 
 // Assumes we have [vtx] locally
 // Returns true if [vtx] has been added to consensus (now or previously)
 func (t *Transitive) issueFrom(vdr ids.ShortID, vtx avalanche.Vertex) (bool, error) {
+	t.abandonedVertices = false
 	issued := true
 	// Before we issue [vtx] into consensus, we have to issue its ancestors.
 	// Go through [vtx] and its ancestors. issue each ancestor that hasn't yet been issued.
