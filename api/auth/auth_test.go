@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -15,8 +16,9 @@ import (
 )
 
 var (
-	testPassword   = "password!@#$%$#@!"
-	hashedPassword = password.Hash{}
+	testPassword              = "password!@#$%$#@!"
+	hashedPassword            = password.Hash{}
+	unAuthorizedResponseRegex = "^{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"(.*)\"},\"id\":1}$"
 )
 
 func init() {
@@ -238,6 +240,9 @@ func TestWrapHandlerRevokedToken(t *testing.T) {
 		if rr.Code != http.StatusUnauthorized {
 			t.Fatal("should have failed authorization because token was revoked")
 		}
+		if ok, _ := regexp.MatchString(unAuthorizedResponseRegex, rr.Body.String()); !ok {
+			t.Fatal("response body does not match expected")
+		}
 	}
 }
 
@@ -265,6 +270,9 @@ func TestWrapHandlerExpiredToken(t *testing.T) {
 		if rr.Code != http.StatusUnauthorized {
 			t.Fatal("should have failed authorization because token is expired")
 		}
+		if ok, _ := regexp.MatchString(unAuthorizedResponseRegex, rr.Body.String()); !ok {
+			t.Fatal("response body does not match expected")
+		}
 	}
 }
 
@@ -282,6 +290,9 @@ func TestWrapHandlerNoAuthToken(t *testing.T) {
 		wrappedHandler.ServeHTTP(rr, req)
 		if rr.Code != http.StatusUnauthorized {
 			t.Fatal("should have failed authorization since no auth token given")
+		}
+		if ok, _ := regexp.MatchString(unAuthorizedResponseRegex, rr.Body.String()); !ok {
+			t.Fatal("response body does not match expected")
 		}
 	}
 }
@@ -309,6 +320,9 @@ func TestWrapHandlerUnauthorizedEndpoint(t *testing.T) {
 		wrappedHandler.ServeHTTP(rr, req)
 		if rr.Code != http.StatusUnauthorized {
 			t.Fatal("should have failed authorization since this endpoint is not allowed by the token")
+		}
+		if ok, _ := regexp.MatchString(unAuthorizedResponseRegex, rr.Body.String()); !ok {
+			t.Fatal("response body does not match expected")
 		}
 	}
 }
