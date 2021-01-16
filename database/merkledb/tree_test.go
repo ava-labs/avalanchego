@@ -15,6 +15,7 @@ type TestStruct struct {
 type ScenarioTestStruct struct {
 	name    string
 	putData []TestStruct
+	getData []TestStruct
 	delData []TestStruct
 }
 
@@ -165,6 +166,29 @@ func TestTree_Put_Scenarios(t *testing.T) {
 				{key: []byte{1, 2, 2}, value: []byte{1, 2, 2}},
 			},
 		},
+		{
+			name: "InsertDuplicateKV",
+			putData: []TestStruct{
+				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}},
+				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}},
+				{key: []byte{1, 2, 2}, value: []byte{1, 2, 2}},
+				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}},
+			},
+		},
+		{
+			name: "InsertDuplicateKDiffVal",
+			putData: []TestStruct{
+				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}},
+				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}},
+				{key: []byte{1, 2, 2}, value: []byte{1, 2, 2}},
+				{key: []byte{1, 1, 1}, value: []byte{1, 1, 2}},
+			},
+			getData: []TestStruct{
+				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}},
+				{key: []byte{1, 2, 2}, value: []byte{1, 2, 2}},
+				{key: []byte{1, 1, 1}, value: []byte{1, 1, 2}},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -175,7 +199,11 @@ func TestTree_Put_Scenarios(t *testing.T) {
 				_ = tree.Put(entry.key, entry.value)
 			}
 
-			for _, entry := range test.putData {
+			getData := test.putData
+			if test.getData != nil {
+				getData = test.getData
+			}
+			for _, entry := range getData {
 				val, err := tree.Get(entry.key)
 				if err != nil {
 					t.Fatalf("unable to fetch %v - %v", entry, err)

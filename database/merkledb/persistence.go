@@ -46,17 +46,6 @@ func (p *Persistence) GetNodeByHash(nodeHash []byte) (Node, error) {
 		return p.GetRootNode(), nil
 	}
 
-	//// check the cache
-	//nodeBytes, err := p.cache.Get(nodeHash)
-	//if err != nil && err != database.ErrNotFound {
-	//	return nil, err
-	//}
-
-	//// get it from the db
-	//if err == database.ErrNotFound {
-	//
-	//}
-
 	nodeBytes, err := p.db.Get(nodeHash)
 	if err != nil {
 		return nil, err
@@ -65,13 +54,6 @@ func (p *Persistence) GetNodeByHash(nodeHash []byte) (Node, error) {
 	var node Node
 	_, err = p.codec.Unmarshal(nodeBytes, &node)
 	node.SetPersistence(p)
-	//
-	//// store it in the cache
-	//// TODO dont need to store it always
-	//err = p.cache.Put(node.GetHash(), nodeBytes)
-	//if err != nil {
-	//	return nil, err
-	//}
 
 	return node, err
 }
@@ -93,23 +75,17 @@ func (p *Persistence) StoreNode(n Node) error {
 			return err
 		}
 
-		//// store it in the cache
-		//err = p.cache.Put(n.GetHash(), nBytes)
-		//if err != nil {
-		//	return err
-		//}
-		//
-		//// batch it to insert
-		//p.dataChange[string(n.GetHash())] = nBytes
-
 		err = p.db.Put(n.GetHash(), nBytes)
 		if err != nil {
 			return err
 		}
 
-		err = p.db.Delete(n.GetPreviousHash())
-		if err != nil {
-			return err
+		previousID := n.GetPreviousHash()
+		if len(previousID) != 0 {
+			err = p.db.Delete(n.GetPreviousHash())
+			if err != nil {
+				return err
+			}
 		}
 	}
 

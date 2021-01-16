@@ -80,6 +80,7 @@ func BenchmarkTree_Get(b *testing.B) {
 				_, err := tree.Get(entry.key)
 
 				if err != nil {
+					tree.PrintTree()
 					b.Fatalf("value not found in the tree - %v - %v", entry.key, err)
 				}
 			}
@@ -96,7 +97,7 @@ func BenchmarkTree_Del(b *testing.B) {
 		{"test10k_Del", CreateRandomValues(10000)},
 		{"test100k_Del", CreateRandomValues(100000)},
 		// this takes a lot of time removed from the CI
-		// {"test1M_Put", CreateRandomValues(1000000)},
+		// {"test1M_Del", CreateRandomValues(1000000)},
 		// {"test10M_Put_Del", CreateRandomValues(10000000)},
 	}
 

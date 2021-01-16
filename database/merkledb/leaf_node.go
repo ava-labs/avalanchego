@@ -1,6 +1,7 @@
 package merkledb
 
 import (
+	"bytes"
 	"fmt"
 )
 
@@ -37,6 +38,9 @@ func (l *LeafNode) GetChild(key []Unit) (Node, error) {
 func (l *LeafNode) Insert(key []Unit, value []byte) error {
 	// only the LeafValue changed - rehash + request the rehash upwards
 	if EqualUnits(l.LeafKey, key) {
+		if bytes.Equal(l.LeafValue, value) {
+			return nil
+		}
 		l.LeafValue = value
 
 		err := l.Hash(nil, nil)
@@ -84,8 +88,14 @@ func (l *LeafNode) Value() []byte {
 }
 
 func (l *LeafNode) Hash(key []Unit, hash []byte) error {
+	newHash := Hash(l.LeafValue, ToExpandedBytes(l.LeafKey))
+	if bytes.Equal(l.StoredHash, newHash) {
+		return nil
+	}
+
 	l.previousStoredHash = l.StoredHash
-	l.StoredHash = Hash(l.LeafValue, ToExpandedBytes(l.LeafKey))
+	l.StoredHash = newHash
+
 	return l.persistence.StoreNode(l)
 }
 
