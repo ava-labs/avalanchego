@@ -7,14 +7,14 @@ import "fmt"
 // it pre-sets the conditions for insertion
 type EmptyNode struct {
 	parent Node
-	key    []Unit
+	key    Key
 }
 
 // NewEmptyNode returns a new EmptyNode
 // the Node will have
 //    Parent        -> typically the node that instantiates it
 //    key           -> the address that is non existent in the tree
-func NewEmptyNode(parent Node, key []Unit) Node {
+func NewEmptyNode(parent Node, key Key) Node {
 	return &EmptyNode{
 		parent: parent,
 		key:    key,
@@ -22,20 +22,20 @@ func NewEmptyNode(parent Node, key []Unit) Node {
 }
 
 // GetChild should never be reached
-func (e *EmptyNode) GetChild(key []Unit) (Node, error) { return nil, nil }
+func (e *EmptyNode) GetChild(key Key) (Node, error) { return nil, nil }
 
 // GetNextNode returns itself
-func (e *EmptyNode) GetNextNode(prefix []Unit, start []Unit, key []Unit) (Node, error) {
+func (e *EmptyNode) GetNextNode(prefix Key, start Key, key Key) (Node, error) {
 	return nil, nil
 }
 
 // Insert requests it's Parent to insert the k/v
-func (e *EmptyNode) Insert(key []Unit, value []byte) error {
+func (e *EmptyNode) Insert(key Key, value []byte) error {
 	return e.parent.Insert(key, value)
 }
 
 // Delete should never be called
-func (e *EmptyNode) Delete(key []Unit) error { return nil }
+func (e *EmptyNode) Delete(key Key) error { return nil }
 
 // SetChild should never be called
 func (e *EmptyNode) SetChild(node Node) error { return nil }
@@ -49,14 +49,14 @@ func (e *EmptyNode) SetPersistence(p *Persistence) {}
 // Value should never be called
 func (e *EmptyNode) Value() []byte { return nil }
 
-func (e *EmptyNode) Hash(key []Unit, hash []byte) error { return nil }
+func (e *EmptyNode) Hash(key Key, hash []byte) error { return nil }
 
 func (e *EmptyNode) GetHash() []byte { return nil }
 
 func (e *EmptyNode) GetPreviousHash() []byte { return nil }
 
 // Key holds the key of the to-be-inserted node
-func (e *EmptyNode) Key() []Unit {
+func (e *EmptyNode) Key() Key {
 	return e.key
 }
 

@@ -4,8 +4,10 @@ const UnitSize = 16 + 1
 
 type Unit byte
 
+type Key []Unit
+
 // FirstNonPrefix returns the first Unit that's not common between baseKey and otherKey
-func FirstNonPrefix(baseKey []Unit, otherKey []Unit) Unit {
+func FirstNonPrefix(baseKey Key, otherKey Key) Unit {
 	smaller := otherKey
 	larger := baseKey
 
@@ -23,19 +25,14 @@ func FirstNonPrefix(baseKey []Unit, otherKey []Unit) Unit {
 	return larger[len(smaller)]
 }
 
-// SharedPrefix returns the minimum Unit shared between two Unit
-// addr1 - ABC123
-// addr2 - ABC567
-// returns ABC
-func SharedPrefix(address1 []Unit, address2 []Unit) []Unit {
+func SharedPrefix(key1, key2 Key) Key {
+	shared := Key{}
+	smaller := key1
+	larger := key2
 
-	shared := []Unit{}
-	smaller := address1
-	larger := address2
-
-	if len(address1) > len(address2) {
-		smaller = address2
-		larger = address1
+	if len(key1) > len(key2) {
+		smaller = key2
+		larger = key1
 	}
 
 	for i, v := range smaller {
@@ -47,13 +44,12 @@ func SharedPrefix(address1 []Unit, address2 []Unit) []Unit {
 	return shared
 }
 
-// EqualUnits returns whether the two []Unit are equal
-func EqualUnits(key []Unit, key2 []Unit) bool {
-	if len(key) != len(key2) {
+func (k Key) Equals(otherKey Key) bool {
+	if len(k) != len(otherKey) {
 		return false
 	}
-	for i, v := range key {
-		if v != key2[i] {
+	for i, v := range k {
+		if v != otherKey[i] {
 			return false
 		}
 	}
@@ -61,71 +57,74 @@ func EqualUnits(key []Unit, key2 []Unit) bool {
 	return true
 }
 
-// FromBytes converts a []byte to []Unit
-func FromBytes(bs []byte) []Unit {
-	units := make([]Unit, 0, len(bs))
+// BytesToKey converts a []byte to Key
+func BytesToKey(bs []byte) Key {
+	units := make(Key, 0, 2*len(bs))
 	for _, n := range bs {
-		units = append(units, FromByte(n)...)
+		units = append(units, Unit(n>>4))
+		units = append(units, Unit(n%16))
 	}
 	return units
-}
-
-// FromByte converts a byte to Unit
-// in this case a Unit is a Nibble with means byte -> [2]Unit
-func FromByte(b byte) []Unit {
-	return []Unit{
-		Unit(b >> 4),
-		Unit(b % 16),
-	}
 }
 
 // IsPrefixed checks if prefix is prefixed in u
 // u - 01234, 012,  001, 01
 // p - 01   , 012 , 02 , 012
 // = - T    , T   , F  , T
-func IsPrefixed(prefix []Unit, u []Unit) bool {
+func IsPrefixed(prefix Key, u Key) bool {
 	for i := 0; i < len(prefix) && i < len(u); i++ {
 		if prefix[i] != u[i] {
 			return false
 		}
 	}
-
 	return true
 }
 
-// ToBytes converts a slice of nibbles to a byte slice
-func ToBytes(u []Unit) []byte {
-	length := len(u)
-	if len(u) != 0 {
-		u = append(u, Unit(0))
+func (k Key) HasPrefix(otherKey Key) bool {
+	if len(otherKey) > len(k) {
+		return false
 	}
-	buf := make([]byte, 0, length)
+	for i := 0; i < len(otherKey); i++ {
+		if otherKey[i] != k[i] {
+			return false
+		}
+	}
+	return true
+}
 
+// ToBytes converts a key to a byte slice
+func (k Key) ToBytes() []byte {
+	length := len(k)
+	if len(k) != 0 {
+		k = append(k, Unit(0))
+	}
+
+	buf := make([]byte, 0, length)
 	for i := 0; i < length; i += 2 {
-		b := byte(u[i]<<4) + byte(u[i+1])
+		b := byte(k[i]<<4) + byte(k[i+1])
 		buf = append(buf, b)
 	}
 
 	return buf
 }
 
-// ToExpandedBytes converts a slice of nibbles to a byte slice that's a direct array conversion
+// ToExpandedBytes converts key to a byte slice that's a direct array conversion
 // specially useful for key storing
-func ToExpandedBytes(u []Unit) []byte {
-	length := len(u)
+func (k Key) ToExpandedBytes() []byte {
+	length := len(k)
 	buf := make([]byte, 0, length)
 
 	for i := 0; i < length; i++ {
-		buf = append(buf, byte(u[i]))
+		buf = append(buf, byte(k[i]))
 	}
 
 	return buf
 }
 
-// Greater returns if u1 is greater than u2
-func Greater(u1 []Unit, u2 []Unit) bool {
-	for i := 0; i < len(u1) && i < len(u2); i++ {
-		if u1[i] < u2[i] {
+// Greater returns if k1 is greater than k2
+func Greater(k1 Key, k2 Key) bool {
+	for i := 0; i < len(k1) && i < len(k2); i++ {
+		if k1[i] < k2[i] {
 			return false
 		}
 	}
@@ -135,6 +134,6 @@ func Greater(u1 []Unit, u2 []Unit) bool {
 
 // FromStorageKey converts StorageKeys in Keys
 // removes the appended "B-" or "L-"
-func FromStorageKey(u []Unit) []Unit {
+func FromStorageKey(u Key) Key {
 	return u[2:]
 }
