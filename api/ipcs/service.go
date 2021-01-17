@@ -5,6 +5,7 @@ package ipcs
 
 import (
 	"fmt"
+	"github.com/ava-labs/avalanchego/ids"
 	"net/http"
 
 	"github.com/gorilla/rpc/v2"
@@ -96,4 +97,15 @@ func (ipc *IPCServer) UnpublishBlockchain(r *http.Request, args *UnpublishBlockc
 
 	reply.Success = true
 	return err
+}
+
+// PublishBlockchainReply are the results from calling PublishBlockchain
+type GetPublishedBlockchainsReply struct {
+	Chains []ids.ID `json:"chains"`
+}
+
+// GetPublishedBlockchains returns blockchains being published
+func (ipc *IPCServer) GetPublishedBlockchains(r *http.Request, args *struct{}, reply *GetPublishedBlockchainsReply) error {
+	reply.Chains = ipc.ipcs.GetPublishedBlockchains()
+	return nil
 }
