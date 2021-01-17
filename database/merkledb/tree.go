@@ -119,7 +119,6 @@ func (t *Tree) Put(key []byte, value []byte) (err error) {
 		return t.isClosed()
 	}
 
-
 	unitKey := BytesToKey(key)
 	rootNode := t.persistence.GetRootNode()
 	// err safe to ignore
