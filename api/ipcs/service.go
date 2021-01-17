@@ -99,7 +99,7 @@ func (ipc *IPCServer) UnpublishBlockchain(r *http.Request, args *UnpublishBlockc
 	return err
 }
 
-// PublishBlockchainReply are the results from calling PublishBlockchain
+// GetPublishedBlockchainsReply is the result from calling GetPublishedBlockchains
 type GetPublishedBlockchainsReply struct {
 	Chains []ids.ID `json:"chains"`
 }
