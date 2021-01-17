@@ -14,7 +14,7 @@ func NewRootNode(p *Persistence) Node {
 }
 
 // GetChild returns the child
-func (r *RootNode) GetChild(key []Unit) (Node, error) {
+func (r *RootNode) GetChild(key Key) (Node, error) {
 	if r.child == nil {
 		return nil, nil
 	}
@@ -28,12 +28,12 @@ func (r *RootNode) GetChild(key []Unit) (Node, error) {
 }
 
 // GetNextNode returns the child
-func (r *RootNode) GetNextNode(prefix []Unit, start []Unit, key []Unit) (Node, error) {
+func (r *RootNode) GetNextNode(prefix Key, start Key, key Key) (Node, error) {
 	return r.persistence.GetNodeByHash(r.child)
 }
 
 // Insert in the RootNode means the branch/leaf needs to group in a new branch
-func (r *RootNode) Insert(key []Unit, value []byte) error {
+func (r *RootNode) Insert(key Key, value []byte) error {
 	child, err := r.persistence.GetNodeByHash(r.child)
 	if err != nil {
 		return err
@@ -56,7 +56,7 @@ func (r *RootNode) Insert(key []Unit, value []byte) error {
 }
 
 // Delete removes the child
-func (r *RootNode) Delete(key []Unit) error {
+func (r *RootNode) Delete(key Key) error {
 	r.child = nil
 	return nil
 }
@@ -78,7 +78,7 @@ func (r *RootNode) SetPersistence(p *Persistence) {}
 // Value should never be reached
 func (r *RootNode) Value() []byte { return nil }
 
-func (r *RootNode) Hash(key []Unit, hash []byte) error {
+func (r *RootNode) Hash(key Key, hash []byte) error {
 	r.child = hash
 
 	return r.persistence.StoreNode(r)
@@ -93,7 +93,7 @@ func (r *RootNode) GetPreviousHash() []byte {
 }
 
 // Key should never be reached
-func (r *RootNode) Key() []Unit { return nil }
+func (r *RootNode) Key() Key { return nil }
 
 // Print prints the child and requests the child to print itself
 func (r *RootNode) Print() {

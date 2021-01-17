@@ -16,7 +16,7 @@ import (
 //
 type BranchNode struct {
 	Nodes              [UnitSize][]byte `serialize:"true"`
-	SharedAddress      []Unit           `serialize:"true"`
+	SharedAddress      Key              `serialize:"true"`
 	StoredHash         []byte           `serialize:"true"`
 	previousStoredHash []byte
 	parent             Node
@@ -24,7 +24,7 @@ type BranchNode struct {
 }
 
 // NewBranchNode returns a new BranchNode
-func NewBranchNode(sharedAddress []Unit, parent Node, persistence *Persistence) Node {
+func NewBranchNode(sharedAddress Key, parent Node, persistence *Persistence) Node {
 	return &BranchNode{
 		SharedAddress: sharedAddress,
 		Nodes:         [UnitSize][]byte{},
@@ -37,8 +37,8 @@ func NewBranchNode(sharedAddress []Unit, parent Node, persistence *Persistence) 
 // returns Node - one of it's children
 // returns EmptyNode - no node in this position
 //
-func (b *BranchNode) GetChild(key []Unit) (Node, error) {
-	if !EqualUnits(SharedPrefix(b.SharedAddress, key), b.SharedAddress) {
+func (b *BranchNode) GetChild(key Key) (Node, error) {
+	if !key.HasPrefix(b.SharedAddress) {
 		return NewEmptyNode(b, key), nil
 	}
 
@@ -63,8 +63,7 @@ func (b *BranchNode) GetChild(key []Unit) (Node, error) {
 
 // GetNextNode returns the next node in increasing key order
 // returns Node - one of it's children
-func (b *BranchNode) GetNextNode(prefix []Unit, start []Unit, key []Unit) (Node, error) {
-
+func (b *BranchNode) GetNextNode(prefix Key, start Key, key Key) (Node, error) {
 	// check the prefix
 	if len(prefix) != 0 {
 		// this branch isn't prefixed
@@ -106,7 +105,7 @@ func (b *BranchNode) GetNextNode(prefix []Unit, start []Unit, key []Unit) (Node,
 		return NewEmptyNode(b, key), nil
 	}
 
-	if !EqualUnits(SharedPrefix(b.SharedAddress, key), b.SharedAddress) {
+	if !key.HasPrefix(b.SharedAddress) {
 		return NewEmptyNode(b, key), nil
 	}
 
@@ -120,7 +119,7 @@ func (b *BranchNode) GetNextNode(prefix []Unit, start []Unit, key []Unit) (Node,
 			}
 
 			// TODO Think theres a better way of doing this
-			if EqualUnits(node.Key(), key) {
+			if node.Key().Equals(key) {
 				continue
 			}
 			// if its prefixed make sure the node prefix respects it
@@ -138,11 +137,10 @@ func (b *BranchNode) GetNextNode(prefix []Unit, start []Unit, key []Unit) (Node,
 // if the node doesn't belong in the branch it request the Parent to insert it
 // if there's already a node on that position it creates a BranchNode and branches the position out
 // otherwise just inserts a LeafNode, rehashes itself and request the parent to rehash itself
-func (b *BranchNode) Insert(key []Unit, value []byte) error {
+func (b *BranchNode) Insert(key Key, value []byte) error {
 
 	// if the node CAN'T exist in this prefix request the Parent to insert
-	if !EqualUnits(SharedPrefix(b.SharedAddress, key), b.SharedAddress) {
-
+	if !key.HasPrefix(b.SharedAddress) {
 		// nothings changed in this node
 		// insertion will trigger a rehash from the parent upwards
 		return b.parent.Insert(key, value)
@@ -194,7 +192,7 @@ func (b *BranchNode) Insert(key []Unit, value []byte) error {
 //     it either deletes + rehashes upwards
 //     or if there's one Node left in the branch it requests Parent to take it + request the Parent rehash
 //
-func (b *BranchNode) Delete(key []Unit) error {
+func (b *BranchNode) Delete(key Key) error {
 
 	// there's no node to delete here
 	if nodeKey := b.Nodes[FirstNonPrefix(b.SharedAddress, key)]; nodeKey == nil {
@@ -263,12 +261,12 @@ func (b *BranchNode) Value() []byte { return nil }
 // Hash takes in a key and the hash for that key
 // it sets the hash for that node in the correct position
 // rehash the branch and requests the parent to do the same providing the BranchNodes key
-func (b *BranchNode) Hash(nodeKey []Unit, hash []byte) error {
+func (b *BranchNode) Hash(nodeKey Key, hash []byte) error {
 
 	b.Nodes[FirstNonPrefix(b.SharedAddress, nodeKey)] = hash
 
 	hashSet := make([][]byte, UnitSize+1)
-	hashSet[0] = ToExpandedBytes(b.SharedAddress)
+	hashSet[0] = b.SharedAddress.ToExpandedBytes()
 
 	i := 1
 	for _, childHash := range b.Nodes {
@@ -298,7 +296,7 @@ func (b *BranchNode) GetPreviousHash() []byte {
 }
 
 // Key returns the BranchNode SharedAddress
-func (b *BranchNode) Key() []Unit {
+func (b *BranchNode) Key() Key {
 	return b.SharedAddress
 }
 

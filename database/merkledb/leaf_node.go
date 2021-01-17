@@ -7,7 +7,7 @@ import (
 // LeafNode is a representation of a Node
 // it holds key, LeafValue and a Parent pointer
 type LeafNode struct {
-	LeafKey            []Unit `serialize:"true"`
+	LeafKey            Key    `serialize:"true"`
 	LeafValue          []byte `serialize:"true"`
 	StoredHash         []byte `serialize:"true"`
 	previousStoredHash []byte
@@ -16,7 +16,7 @@ type LeafNode struct {
 }
 
 // NewLeafNode creates a new Leaf Node
-func NewLeafNode(key []Unit, value []byte, parent Node, persistence *Persistence) (Node, error) {
+func NewLeafNode(key Key, value []byte, parent Node, persistence *Persistence) (Node, error) {
 	l := &LeafNode{
 		LeafKey:     key,
 		LeafValue:   value,
@@ -27,16 +27,16 @@ func NewLeafNode(key []Unit, value []byte, parent Node, persistence *Persistence
 	return l, l.Hash(nil, nil)
 }
 
-func (l *LeafNode) GetChild(key []Unit) (Node, error) {
+func (l *LeafNode) GetChild(key Key) (Node, error) {
 	return l, nil
 }
 
 // Insert in the a LeafNode means that it's either
 // the same key - we update the LeafValue
 // otherwise - request the Parent to insert the k/v
-func (l *LeafNode) Insert(key []Unit, value []byte) error {
+func (l *LeafNode) Insert(key Key, value []byte) error {
 	// only the LeafValue changed - rehash + request the rehash upwards
-	if EqualUnits(l.LeafKey, key) {
+	if key.Equals(l.LeafKey) {
 		l.LeafValue = value
 
 		err := l.Hash(nil, nil)
@@ -52,12 +52,12 @@ func (l *LeafNode) Insert(key []Unit, value []byte) error {
 }
 
 // GetNextNode returns itself
-func (l *LeafNode) GetNextNode(prefix []Unit, start []Unit, key []Unit) (Node, error) {
+func (l *LeafNode) GetNextNode(prefix Key, start Key, key Key) (Node, error) {
 	return l, nil
 }
 
 // Delete removes this LeafNode from the Parent
-func (l *LeafNode) Delete(key []Unit) error {
+func (l *LeafNode) Delete(key Key) error {
 	err := l.persistence.DeleteNode(l)
 	if err != nil {
 		return err
@@ -83,9 +83,9 @@ func (l *LeafNode) Value() []byte {
 	return l.LeafValue
 }
 
-func (l *LeafNode) Hash(key []Unit, hash []byte) error {
+func (l *LeafNode) Hash(key Key, hash []byte) error {
 	l.previousStoredHash = l.StoredHash
-	l.StoredHash = Hash(l.LeafValue, ToExpandedBytes(l.LeafKey))
+	l.StoredHash = Hash(l.LeafValue, l.LeafKey.ToExpandedBytes())
 	return l.persistence.StoreNode(l)
 }
 
@@ -101,7 +101,7 @@ func (l *LeafNode) GetPreviousHash() []byte {
 }
 
 // Key returns the stored key
-func (l *LeafNode) Key() []Unit {
+func (l *LeafNode) Key() Key {
 	return l.LeafKey
 }
 

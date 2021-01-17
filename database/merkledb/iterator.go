@@ -62,7 +62,7 @@ func NewIteratorWithStartAndPrefix(t *Tree, start, prefix []byte) *Iterator {
 // Next moves the iterator to the next key/value pair.
 // It returns whether the iterator is exhausted.
 func (i *Iterator) Next() bool {
-	i.node, i.err = i.tree.fetchNextNode(FromBytes(i.prefix), FromBytes(i.start), i.node.Key(), i.tree.persistence.GetRootNode())
+	i.node, i.err = i.tree.fetchNextNode(BytesToKey(i.prefix), BytesToKey(i.start), i.node.Key(), i.tree.persistence.GetRootNode())
 	return i.node != nil
 }
 
@@ -77,7 +77,7 @@ func (i *Iterator) Key() []byte {
 	if i.node == nil {
 		return nil
 	}
-	return ToBytes(i.node.Key())
+	return i.node.Key().ToBytes()
 }
 
 // Value returns the value of the current key/value pair, or nil if done.

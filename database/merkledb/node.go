@@ -5,18 +5,18 @@ import (
 )
 
 type Node interface {
-	GetChild(key []Unit) (Node, error)
-	GetNextNode(prefix []Unit, start []Unit, key []Unit) (Node, error)
-	Insert(key []Unit, value []byte) error
-	Delete(key []Unit) error
+	GetChild(key Key) (Node, error)
+	GetNextNode(prefix Key, start Key, key Key) (Node, error)
+	Insert(key Key, value []byte) error
+	Delete(key Key) error
 	SetChild(node Node) error
 	SetParent(b Node)
 	SetPersistence(p *Persistence)
 	Value() []byte
-	Hash(key []Unit, hash []byte) error
+	Hash(key Key, hash []byte) error
 	GetHash() []byte
 	GetPreviousHash() []byte
-	Key() []Unit
+	Key() Key
 	Print()
 }
 

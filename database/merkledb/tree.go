@@ -21,8 +21,8 @@ func (t *Tree) Has(key []byte) (bool, error) {
 		return false, t.isClosed()
 	}
 
-	node := t.findNode(FromBytes(key), t.persistence.GetRootNode())
-	if node == nil || !bytes.Equal(ToBytes(node.Key()), key) {
+	node := t.findNode(BytesToKey(key), t.persistence.GetRootNode())
+	if node == nil || !bytes.Equal(node.Key().ToBytes(), key) {
 		return false, nil
 	}
 	return true, nil
@@ -102,7 +102,7 @@ func (t *Tree) Get(key []byte) ([]byte, error) {
 		return nil, t.isClosed()
 	}
 
-	node := t.findNode(FromBytes(key), t.persistence.GetRootNode())
+	node := t.findNode(BytesToKey(key), t.persistence.GetRootNode())
 	if node == nil {
 		return nil, database.ErrNotFound
 	}
@@ -122,10 +122,10 @@ func (t *Tree) Put(key []byte, value []byte) (err error) {
 	t.persistence.Start()
 	defer t.persistence.Commit(err)
 
-	unitKey := FromBytes(key)
+	unitKey := BytesToKey(key)
 	rootNode := t.persistence.GetRootNode()
 	// err safe to ignore
-	rootChild, _ := rootNode.GetChild([]Unit{})
+	rootChild, _ := rootNode.GetChild(Key{})
 	if rootChild == nil {
 		newLeafNode, err := NewLeafNode(unitKey, value, rootNode, t.persistence)
 		if err != nil {
@@ -147,7 +147,7 @@ func (t *Tree) Delete(key []byte) error {
 	if t.isClosed() != nil {
 		return t.isClosed()
 	}
-	unitKey := FromBytes(key)
+	unitKey := BytesToKey(key)
 
 	deleteNode := t.findNode(unitKey, t.persistence.GetRootNode())
 	if deleteNode == nil {
@@ -157,7 +157,7 @@ func (t *Tree) Delete(key []byte) error {
 	return deleteNode.Delete(unitKey)
 }
 
-func (t *Tree) findNode(key []Unit, node Node) Node {
+func (t *Tree) findNode(key Key, node Node) Node {
 
 	if node == nil {
 		return nil
@@ -182,7 +182,7 @@ func (t *Tree) PrintTree() {
 	t.persistence.GetRootNode().Print()
 }
 
-func (t *Tree) fetchNextNode(prefix []Unit, start []Unit, key []Unit, node Node) (Node, error) {
+func (t *Tree) fetchNextNode(prefix Key, start Key, key Key, node Node) (Node, error) {
 	if node == nil || t.closed {
 		return nil, database.ErrClosed
 	}
