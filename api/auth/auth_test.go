@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -391,5 +392,16 @@ func TestWrapHandlerAuthDisabled(t *testing.T) {
 		if rr.Code != http.StatusOK {
 			t.Fatal("auth is disabled so should allow access to all endpoints")
 		}
+	}
+}
+
+func TestWriteUnauthorizedResponse(t *testing.T) {
+	rr := httptest.NewRecorder()
+	writeUnauthorizedResponse(rr, errors.New("example err"))
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatal("response status should be Unauthorized")
+	}
+	if rr.Body.String() != "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"example err\"},\"id\":1}" {
+		t.Fatal("response body does not match expected")
 	}
 }
