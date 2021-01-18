@@ -9,15 +9,21 @@ import (
 // BranchNode represents a Node with an array of Nodes and a SharedAddress
 // SharedAddress is the shared prefix of all keys under this node
 // Nodes are Addresses of other Nodes, which their addresses are suffixed by SharedAddress
+//
+// LASTPOSition is always a LeafNode and it represents the case where the LeafNode has the same Address
+// as the BranchNode SharedAddress
+//
 // Hashes are hashes of child Nodes
-// [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, a, b, c, d, f ]
+// [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, a, b, c, d, f, LASTPOS ]
 //     [ x ] -> LeafNode
 //     [ not found ] -> EmptyNode
+//     [ LASTPOS ] -> LeafNode
 //
 type BranchNode struct {
 	Nodes              [UnitSize][]byte `serialize:"true"`
 	SharedAddress      Key              `serialize:"true"`
 	StoredHash         []byte           `serialize:"true"`
+	Refs               int32            `serialize:"true"`
 	previousStoredHash []byte
 	parent             Node
 	persistence        *Persistence
@@ -293,6 +299,11 @@ func (b *BranchNode) GetHash() []byte {
 // for deleting unused BranchNode from the DB
 func (b *BranchNode) GetPreviousHash() []byte {
 	return b.previousStoredHash
+}
+
+func (b *BranchNode) References(change int32) int32 {
+	b.Refs += change
+	return b.Refs
 }
 
 // Key returns the BranchNode SharedAddress

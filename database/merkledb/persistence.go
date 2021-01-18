@@ -3,8 +3,6 @@ package merkledb
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/database/memdb"
-
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -13,11 +11,11 @@ import (
 
 // Persistence holds the DB + the RootNode
 type Persistence struct {
-	cache      database.Database
-	db         database.Database
-	dataChange map[string][]byte
-	rootNode   Node
-	codec      codec.Manager
+	db          database.Database
+	dataChange  map[string][]byte
+	rootNodes   []Node
+	codec       codec.Manager
+	currentRoot int
 }
 
 // NewPersistence creates a new Persistence
@@ -31,11 +29,12 @@ func NewPersistence(db database.Database) (*Persistence, error) {
 	}
 
 	persistence := Persistence{
-		db:    db,
-		codec: codecManager,
-		cache: memdb.New(),
+		db:          db,
+		codec:       codecManager,
+		currentRoot: 0,
 	}
-	persistence.rootNode = NewRootNode(&persistence)
+
+	persistence.rootNodes = append([]Node{}, NewRootNode(&persistence))
 
 	return &persistence, nil
 }
@@ -60,7 +59,7 @@ func (p *Persistence) GetNodeByHash(nodeHash []byte) (Node, error) {
 
 // GetRootNode returns the RootNode
 func (p *Persistence) GetRootNode() Node {
-	return p.rootNode
+	return p.rootNodes[p.currentRoot]
 
 }
 
@@ -68,7 +67,7 @@ func (p *Persistence) GetRootNode() Node {
 func (p *Persistence) StoreNode(n Node) error {
 	switch n.(type) {
 	case *RootNode:
-		p.rootNode = n
+		p.rootNodes[p.currentRoot] = n
 	default:
 		nBytes, err := p.codec.Marshal(0, &n)
 		if err != nil {
@@ -80,8 +79,11 @@ func (p *Persistence) StoreNode(n Node) error {
 			return err
 		}
 
+		previousRefs := n.References(-1)
+		n.References(2)
+
 		previousID := n.GetPreviousHash()
-		if len(previousID) != 0 {
+		if len(previousID) != 0 && previousRefs == 0 {
 			err = p.db.Delete(n.GetPreviousHash())
 			if err != nil {
 				return err
@@ -98,22 +100,35 @@ func (p *Persistence) DeleteNode(n Node) error {
 	case *RootNode:
 		return fmt.Errorf("rootNode should not be deleted")
 	default:
-		err := p.db.Delete(n.GetHash())
-		if err != nil {
-			return err
+		if n.References(-1) == 0 {
+			err := p.db.Delete(n.GetHash())
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func (p *Persistence) Start() {
-}
+func (p *Persistence) SelectRoot(treeRoot int) error {
 
-func (p *Persistence) Commit(err error) error {
+	nodesLen := len(p.rootNodes)
 
-	if err != nil {
-		return err
+	if nodesLen > treeRoot {
+		p.currentRoot = treeRoot
+		return nil
 	}
+	if nodesLen < treeRoot {
+		return fmt.Errorf("NO")
+	}
+	if nodesLen == treeRoot {
+		newRoot := NewRootNode(p)
+		newRoot.(*RootNode).child = p.rootNodes[treeRoot-1].(*RootNode).child
+
+		p.currentRoot = treeRoot
+		p.rootNodes = append(p.rootNodes, newRoot)
+	}
+
 	return nil
 }
 

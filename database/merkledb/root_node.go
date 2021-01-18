@@ -92,6 +92,10 @@ func (r *RootNode) GetPreviousHash() []byte {
 	return r.child
 }
 
+func (r *RootNode) References(change int32) int32 {
+	return 0
+}
+
 // Key should never be reached
 func (r *RootNode) Key() Key { return nil }
 

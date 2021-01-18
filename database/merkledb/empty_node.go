@@ -55,6 +55,10 @@ func (e *EmptyNode) GetHash() []byte { return nil }
 
 func (e *EmptyNode) GetPreviousHash() []byte { return nil }
 
+func (e *EmptyNode) References(change int32) int32 {
+	return 0
+}
+
 // Key holds the key of the to-be-inserted node
 func (e *EmptyNode) Key() Key {
 	return e.key

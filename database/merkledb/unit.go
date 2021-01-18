@@ -25,6 +25,10 @@ func FirstNonPrefix(baseKey Key, otherKey Key) Unit {
 	return larger[len(smaller)]
 }
 
+// SharedPrefix returns the minimum Key shared between two Key instances
+// addr1 - ABC123
+// addr2 - ABC567
+// returns ABC
 func SharedPrefix(key1, key2 Key) Key {
 	shared := Key{}
 	smaller := key1
@@ -44,6 +48,7 @@ func SharedPrefix(key1, key2 Key) Key {
 	return shared
 }
 
+// Equals returns whether the two Key are equal
 func (k Key) Equals(otherKey Key) bool {
 	if len(k) != len(otherKey) {
 		return false
@@ -130,10 +135,4 @@ func Greater(k1 Key, k2 Key) bool {
 	}
 
 	return true
-}
-
-// FromStorageKey converts StorageKeys in Keys
-// removes the appended "B-" or "L-"
-func FromStorageKey(u Key) Key {
-	return u[2:]
 }

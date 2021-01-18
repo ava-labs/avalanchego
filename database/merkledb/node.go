@@ -16,6 +16,7 @@ type Node interface {
 	Hash(key Key, hash []byte) error
 	GetHash() []byte
 	GetPreviousHash() []byte
+	References(change int32) int32
 	Key() Key
 	Print()
 }

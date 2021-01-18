@@ -11,6 +11,7 @@ type LeafNode struct {
 	LeafKey            Key    `serialize:"true"`
 	LeafValue          []byte `serialize:"true"`
 	StoredHash         []byte `serialize:"true"`
+	Refs               int32  `serialize:"true"`
 	previousStoredHash []byte
 	parent             Node
 	persistence        *Persistence
@@ -108,6 +109,11 @@ func (l *LeafNode) GetHash() []byte {
 // for deleting unused LeafNode from the DB
 func (l *LeafNode) GetPreviousHash() []byte {
 	return l.previousStoredHash
+}
+
+func (l *LeafNode) References(change int32) int32 {
+	l.Refs += change
+	return l.Refs
 }
 
 // Key returns the stored key

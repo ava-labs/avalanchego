@@ -27,7 +27,7 @@ func TestTreeConsistency_PutGetDel(t *testing.T) {
 		data []TestStruct
 	}{
 		{"test1k-PutGetDel", CreateRandomValues(1000)},
-		// {"test10k-PutGetDel", CreateRandomValues(10000)},
+		{"test10k-PutGetDel", CreateRandomValues(10000)},
 		//{"test100k-PutGetDel", CreateRandomValues(100000)},
 		// this takes a lot of time removed from the CI
 		// {"test1M", CreateRandomValues(1000000)},
