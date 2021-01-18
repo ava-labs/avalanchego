@@ -263,6 +263,7 @@ func (service *Service) GetAssetDescription(_ *http.Request, args *GetAssetDescr
 type GetBalanceArgs struct {
 	Address string `json:"address"`
 	AssetID string `json:"assetID"`
+	Strict  bool   `json:"strict"`
 }
 
 // GetBalanceReply defines the GetBalance replies returned from the API
@@ -271,7 +272,11 @@ type GetBalanceReply struct {
 	UTXOIDs []avax.UTXOID `json:"utxoIDs"`
 }
 
-// GetBalance returns the amount of an asset that an address at least partially owns
+// GetBalance returns the balance of an asset held by an address.
+// If [args.Strict], returns only the balance held solely (1 out of 1 multisig)
+// by the address and with a locktime in the past. Otherwise, returned
+// balance includes assets held only partially by the address, and includes
+// balances with locktime in the future.
 func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply *GetBalanceReply) error {
 	service.vm.ctx.Log.Info("AVM: GetBalance called with address: %s assetID: %s", args.Address, args.AssetID)
 
@@ -293,13 +298,19 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
 
+	now := service.vm.Clock().Unix()
 	reply.UTXOIDs = make([]avax.UTXOID, 0, len(utxos))
 	for _, utxo := range utxos {
 		if utxo.AssetID() != assetID {
 			continue
 		}
-		transferable, ok := utxo.Out.(avax.TransferableOut)
+		// TODO make this not specific to *secp256k1fx.TransferOutput
+		transferable, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
+			continue
+		}
+		owners := transferable.OutputOwners
+		if args.Strict && (len(owners.Addrs) != 1 || owners.Locktime > now) {
 			continue
 		}
 		amt, err := safemath.Add64(transferable.Amount(), uint64(reply.Balance))
