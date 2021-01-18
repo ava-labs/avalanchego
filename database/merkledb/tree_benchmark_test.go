@@ -39,13 +39,12 @@ func BenchmarkTree_Put(b *testing.B) {
 	}{
 		{"test10k_Put", CreateRandomValues(10000)},
 		{"test100k_Put", CreateRandomValues(100000)},
-		// this takes a lot of time removed from the CI
 		// {"test1M_Put", CreateRandomValues(1000000)},
-		// {"test10M_Put_Del", CreateRandomValues(10000000)},
 	}
 
 	for _, test := range tests {
-		tree := NewMemoryTree()
+		tree := NewLevelTree(test.name)
+
 		b.Run(test.name, func(b *testing.B) {
 			b.ResetTimer()
 
@@ -53,6 +52,33 @@ func BenchmarkTree_Put(b *testing.B) {
 				_ = tree.Put(test.key, test.value)
 			}
 		})
+		_ = tree.persistence.db.Close()
+	}
+}
+
+func BenchmarkTree_PutBatch(b *testing.B) {
+	tests := []struct {
+		name string
+		data []TestStruct
+	}{
+		{"test10k_PutBatch", CreateRandomValues(10000)},
+		{"test100k_PutBatch", CreateRandomValues(100000)},
+		// {"test1M_Put", CreateRandomValues(1000000)},
+	}
+
+	for _, test := range tests {
+		tree := NewLevelTree(test.name)
+		batcher := NewBatch(tree)
+
+		b.Run(test.name, func(b *testing.B) {
+			b.ResetTimer()
+
+			for _, test := range test.data {
+				_ = batcher.Put(test.key, test.value)
+			}
+			_ = batcher.Write()
+		})
+		_ = tree.persistence.db.Close()
 	}
 }
 
@@ -63,17 +89,18 @@ func BenchmarkTree_Get(b *testing.B) {
 	}{
 		{"test10k_Get", CreateRandomValues(10000)},
 		{"test100k_Get", CreateRandomValues(100000)},
-		// this takes a lot of time removed from the CI
 		// {"test1M_Put", CreateRandomValues(1000000)},
-		// {"test10M_Put_Del", CreateRandomValues(10000000)},
 	}
 
 	for _, test := range tests {
-		tree := NewMemoryTree()
+		tree := NewLevelTree(test.name)
+		batchTree := NewBatch(tree)
+
 		b.Run(test.name, func(b *testing.B) {
 			for _, entry := range test.data {
-				_ = tree.Put(entry.key, entry.value)
+				_ = batchTree.Put(entry.key, entry.value)
 			}
+			_ = batchTree.Write()
 
 			b.ResetTimer()
 			for _, entry := range test.data {
@@ -85,6 +112,7 @@ func BenchmarkTree_Get(b *testing.B) {
 				}
 			}
 		})
+		_ = tree.persistence.db.Close()
 	}
 }
 
@@ -96,14 +124,13 @@ func BenchmarkTree_Del(b *testing.B) {
 	}{
 		{"test10k_Del", CreateRandomValues(10000)},
 		{"test100k_Del", CreateRandomValues(100000)},
-		// this takes a lot of time removed from the CI
 		// {"test1M_Del", CreateRandomValues(1000000)},
-		// {"test10M_Put_Del", CreateRandomValues(10000000)},
 	}
 
 	for _, test := range tests {
+		tree := NewLevelTree(test.name)
+
 		b.Run(test.name, func(b *testing.B) {
-			tree := NewMemoryTree()
 			for _, test := range test.data {
 				_ = tree.Put(test.key, test.value)
 			}
@@ -117,5 +144,42 @@ func BenchmarkTree_Del(b *testing.B) {
 				}
 			}
 		})
+		_ = tree.persistence.db.Close()
+	}
+}
+
+func BenchmarkTree_DelBatcher(b *testing.B) {
+
+	tests := []struct {
+		name string
+		data []TestStruct
+	}{
+		{"test10k_DelBatcher", CreateRandomValues(10000)},
+		{"test100k_DelBatcher", CreateRandomValues(100000)},
+		// {"test1M_Del", CreateRandomValues(1000000)},
+	}
+
+	for _, test := range tests {
+		tree := NewLevelTree(test.name)
+		batcher := NewBatch(tree)
+
+		b.Run(test.name, func(b *testing.B) {
+			for _, test := range test.data {
+				_ = batcher.Put(test.key, test.value)
+			}
+			_ = batcher.Write()
+
+			b.ResetTimer()
+			for _, entry := range test.data {
+				err := batcher.Delete(entry.key)
+
+				if err != nil {
+					b.Fatalf("value not deleted in the tree as it was not found- %v", entry.key)
+				}
+			}
+			_ = batcher.Write()
+
+		})
+		_ = tree.persistence.db.Close()
 	}
 }

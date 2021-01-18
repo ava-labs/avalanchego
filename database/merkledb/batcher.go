@@ -36,16 +36,16 @@ func (b *Batch) Write() error {
 
 	for _, d := range b.data {
 		if d.delete {
-			err = b.tree.Delete(d.key)
+			err = b.tree.del(d.key)
 		} else {
-			err = b.tree.Put(d.key, d.value)
+			err = b.tree.put(d.key, d.value)
 		}
 
 		if err != nil {
 			return err
 		}
 	}
-	return nil
+	return b.tree.persistence.Commit(nil)
 }
 
 // Reset resets the batch for reuse.

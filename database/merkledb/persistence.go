@@ -3,6 +3,8 @@ package merkledb
 import (
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/database/versiondb"
+
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -29,7 +31,7 @@ func NewPersistence(db database.Database) (*Persistence, error) {
 	}
 
 	persistence := Persistence{
-		db:          db,
+		db:          versiondb.New(db),
 		codec:       codecManager,
 		currentRoot: 0,
 	}
@@ -108,6 +110,15 @@ func (p *Persistence) DeleteNode(n Node) error {
 		}
 	}
 	return nil
+}
+
+// Commit commits any pending nodes
+func (p *Persistence) Commit(err error) error {
+	if err != nil {
+		p.db.(*versiondb.Database).Abort()
+		return err
+	}
+	return p.db.(*versiondb.Database).Commit()
 }
 
 func (p *Persistence) SelectRoot(treeRoot int) error {

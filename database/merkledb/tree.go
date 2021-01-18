@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/database/leveldb"
+
 	"github.com/ava-labs/avalanchego/database/memdb"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -21,7 +23,10 @@ func (t *Tree) Has(key []byte) (bool, error) {
 		return false, t.isClosed()
 	}
 
-	node := t.findNode(BytesToKey(key), t.persistence.GetRootNode())
+	node, err := t.findNode(BytesToKey(key), t.persistence.GetRootNode())
+	if err != nil {
+		return false, err
+	}
 	if node == nil || !bytes.Equal(node.Key().ToBytes(), key) {
 		return false, nil
 	}
@@ -84,6 +89,15 @@ func NewMemoryTree() *Tree {
 	return NewTree(memdb.New())
 }
 
+// NewLevelTree returns a new instance of the Tree with a in-memoryDB
+func NewLevelTree(file string) *Tree {
+	db, err := leveldb.New(file, 0, 0, 0)
+	if err != nil {
+		panic(err)
+	}
+	return NewTree(db)
+}
+
 // NewTree returns a new instance of the Tree
 func NewTree(db database.Database) *Tree {
 	persistence, _ := NewPersistence(db)
@@ -102,7 +116,10 @@ func (t *Tree) Get(key []byte) ([]byte, error) {
 		return nil, t.isClosed()
 	}
 
-	node := t.findNode(BytesToKey(key), t.persistence.GetRootNode())
+	node, err := t.findNode(BytesToKey(key), t.persistence.GetRootNode())
+	if err != nil {
+		return nil, err
+	}
 	if node == nil {
 		return nil, database.ErrNotFound
 	}
@@ -114,62 +131,30 @@ func (t *Tree) Get(key []byte) ([]byte, error) {
 }
 
 // Put travels the tree and finds the node to insert the LeafNode
-func (t *Tree) Put(key []byte, value []byte) (err error) {
-	if t.isClosed() != nil {
-		return t.isClosed()
-	}
-
-	unitKey := BytesToKey(key)
-	rootNode := t.persistence.GetRootNode()
-	// err safe to ignore
-	rootChild, _ := rootNode.GetChild(Key{})
-	if rootChild == nil {
-		newLeafNode, err := NewLeafNode(unitKey, value, rootNode, t.persistence)
-		if err != nil {
-			return err
-		}
-
-		return rootNode.SetChild(newLeafNode)
-	}
-
-	insertNode := t.findNode(unitKey, rootNode)
-	if insertNode == nil {
-		return fmt.Errorf("should never happen - can't insert on a nil node k: %v", unitKey)
-	}
-
-	return insertNode.Insert(unitKey, value)
+func (t *Tree) Put(key []byte, value []byte) error {
+	return t.persistence.Commit(t.put(key, value))
 }
 
 func (t *Tree) Delete(key []byte) error {
-	if t.isClosed() != nil {
-		return t.isClosed()
-	}
-	unitKey := BytesToKey(key)
-
-	deleteNode := t.findNode(unitKey, t.persistence.GetRootNode())
-	if deleteNode == nil {
-		return nil
-	}
-
-	return deleteNode.Delete(unitKey)
+	return t.persistence.Commit(t.del(key))
 }
 
-func (t *Tree) findNode(key Key, node Node) Node {
+func (t *Tree) findNode(key Key, node Node) (Node, error) {
 
 	if node == nil {
-		return nil
+		return nil, nil
 	}
 
 	switch node.(type) {
 	case *EmptyNode:
-		return node
+		return node, nil
 	case *LeafNode:
-		return node
+		return node, nil
 	}
 
 	nodeChild, err := node.GetChild(key)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	return t.findNode(key, nodeChild)
@@ -218,4 +203,51 @@ func (t *Tree) SelectRoot(treeRoot int) error {
 	}
 
 	return t.persistence.SelectRoot(treeRoot)
+}
+
+func (t *Tree) put(key []byte, value []byte) error {
+	if t.isClosed() != nil {
+		return t.isClosed()
+	}
+
+	unitKey := BytesToKey(key)
+	rootNode := t.persistence.GetRootNode()
+	// err safe to ignore
+	rootChild, _ := rootNode.GetChild(Key{})
+	if rootChild == nil {
+		newLeafNode, err := NewLeafNode(unitKey, value, rootNode, t.persistence)
+		if err != nil {
+			return err
+		}
+
+		return rootNode.SetChild(newLeafNode)
+	}
+
+	insertNode, err := t.findNode(unitKey, rootNode)
+	if err != nil {
+		return err
+	}
+	if insertNode == nil {
+		return fmt.Errorf("should never happen - can't insert on a nil node k: %v", unitKey)
+	}
+
+	return insertNode.Insert(unitKey, value)
+}
+
+func (t *Tree) del(key []byte) error {
+	if t.isClosed() != nil {
+		return t.isClosed()
+	}
+
+	unitKey := BytesToKey(key)
+
+	deleteNode, err := t.findNode(unitKey, t.persistence.GetRootNode())
+	if err != nil {
+		return err
+	}
+	if deleteNode == nil {
+		return nil
+	}
+
+	return deleteNode.Delete(unitKey)
 }
