@@ -234,37 +234,9 @@ func TestServiceGetTxStatus(t *testing.T) {
 	}
 }
 
-func TestServiceGetBalance(t *testing.T) {
-	genesisBytes, vm, s, _ := setup(t)
-	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-		vm.ctx.Lock.Unlock()
-	}()
-
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
-	assetID := genesisTx.ID()
-	addr := keys[0].PublicKey().Address()
-	addrStr, err := vm.FormatLocalAddress(addr)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	balanceArgs := &GetBalanceArgs{
-		Address: addrStr,
-		AssetID: assetID.String(),
-	}
-	balanceReply := &GetBalanceReply{}
-	err = s.GetBalance(nil, balanceArgs, balanceReply)
-	assert.NoError(t, err)
-	assert.Equal(t, uint64(balanceReply.Balance), startBalance)
-	assert.Len(t, balanceReply.UTXOIDs, 1, "should have only returned 1 utxoID")
-}
-
 // Test the GetBalance method when argument Strict is true
 func TestServiceGetBalanceStrict(t *testing.T) {
-	genesisBytes, vm, s, _ := setup(t)
+	_, vm, s, _ := setup(t)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -272,8 +244,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
-	assetID := genesisTx.ID()
+	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()
 	addrStr, err := vm.FormatLocalAddress(addr)
 	if err != nil {
@@ -300,10 +271,11 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	err = vm.state.FundUTXO(twoOfTwoUTXO)
 	assert.NoError(t, err)
 
-	// Check the balance with strict set to false
+	// Check the balance with IncludePartial set to true
 	balanceArgs := &GetBalanceArgs{
-		Address: addrStr,
-		AssetID: assetID.String(),
+		Address:        addrStr,
+		AssetID:        assetID.String(),
+		IncludePartial: true,
 	}
 	balanceReply := &GetBalanceReply{}
 	err = s.GetBalance(nil, balanceArgs, balanceReply)
@@ -312,11 +284,10 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	assert.Equal(t, uint64(1337), uint64(balanceReply.Balance))
 	assert.Len(t, balanceReply.UTXOIDs, 1, "should have only returned 1 utxoID")
 
-	// Check the balance with strict set to true
+	// Check the balance with IncludePartial set to false
 	balanceArgs = &GetBalanceArgs{
 		Address: addrStr,
 		AssetID: assetID.String(),
-		Strict:  true,
 	}
 	balanceReply = &GetBalanceReply{}
 	err = s.GetBalance(nil, balanceArgs, balanceReply)
@@ -345,10 +316,11 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	err = vm.state.FundUTXO(oneOfTwoUTXO)
 	assert.NoError(t, err)
 
-	// Check the balance with strict set to false
+	// Check the balance with IncludePartial set to true
 	balanceArgs = &GetBalanceArgs{
-		Address: addrStr,
-		AssetID: assetID.String(),
+		Address:        addrStr,
+		AssetID:        assetID.String(),
+		IncludePartial: true,
 	}
 	balanceReply = &GetBalanceReply{}
 	err = s.GetBalance(nil, balanceArgs, balanceReply)
@@ -357,11 +329,10 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	assert.Equal(t, uint64(1337+1337), uint64(balanceReply.Balance))
 	assert.Len(t, balanceReply.UTXOIDs, 2, "should have only returned 2 utxoIDs")
 
-	// Check the balance with strict set to true
+	// Check the balance with IncludePartial set to false
 	balanceArgs = &GetBalanceArgs{
 		Address: addrStr,
 		AssetID: assetID.String(),
-		Strict:  true,
 	}
 	balanceReply = &GetBalanceReply{}
 	err = s.GetBalance(nil, balanceArgs, balanceReply)
@@ -392,10 +363,11 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	err = vm.state.FundUTXO(futureUTXO)
 	assert.NoError(t, err)
 
-	// Check the balance with strict set to false
+	// Check the balance with IncludePartial set to true
 	balanceArgs = &GetBalanceArgs{
-		Address: addrStr,
-		AssetID: assetID.String(),
+		Address:        addrStr,
+		AssetID:        assetID.String(),
+		IncludePartial: true,
 	}
 	balanceReply = &GetBalanceReply{}
 	err = s.GetBalance(nil, balanceArgs, balanceReply)
@@ -404,11 +376,10 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	assert.Equal(t, uint64(1337*3), uint64(balanceReply.Balance))
 	assert.Len(t, balanceReply.UTXOIDs, 3, "should have returned 3 utxoIDs")
 
-	// Check the balance with strict set to true
+	// Check the balance with IncludePartial set to false
 	balanceArgs = &GetBalanceArgs{
 		Address: addrStr,
 		AssetID: assetID.String(),
-		Strict:  true,
 	}
 	balanceReply = &GetBalanceReply{}
 	err = s.GetBalance(nil, balanceArgs, balanceReply)
@@ -419,7 +390,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 }
 
 func TestServiceGetAllBalances(t *testing.T) {
-	genesisBytes, vm, s, _ := setup(t)
+	_, vm, s, _ := setup(t)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -427,32 +398,189 @@ func TestServiceGetAllBalances(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
-	assetID := genesisTx.ID()
-	addr := keys[0].PublicKey().Address()
+	assetID := ids.GenerateTestID()
+	addr := ids.GenerateTestShortID()
 	addrStr, err := vm.FormatLocalAddress(addr)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	balanceArgs := &api.JSONAddress{
-		Address: addrStr,
+	// A UTXO with a 2 out of 2 multisig
+	// where one of the addresses is [addr]
+	twoOfTwoUTXO := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        ids.GenerateTestID(),
+			OutputIndex: 0,
+		},
+		Asset: avax.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 1337,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 2,
+				Addrs:     []ids.ShortID{addr, ids.GenerateTestShortID()},
+			},
+		},
 	}
-	balanceReply := &GetAllBalancesReply{}
-	err = s.GetAllBalances(nil, balanceArgs, balanceReply)
+	// Insert the UTXO
+	err = vm.state.FundUTXO(twoOfTwoUTXO)
 	assert.NoError(t, err)
 
-	assert.Len(t, balanceReply.Balances, 1)
-
-	balance := balanceReply.Balances[0]
-	alias, err := vm.PrimaryAlias(assetID)
-	if err != nil {
-		t.Fatalf("Failed to get primary alias of genesis asset: %s", err)
+	// Check the balance with IncludePartial set to true
+	balanceArgs := &GetAllBalancesArgs{
+		JSONAddress:    api.JSONAddress{Address: addrStr},
+		IncludePartial: true,
 	}
-	assert.Equal(t, balance.AssetID, alias)
-	assert.Equal(t, uint64(balance.Balance), startBalance)
-}
+	reply := &GetAllBalancesReply{}
+	err = s.GetAllBalances(nil, balanceArgs, reply)
+	assert.NoError(t, err)
+	// The balance should include the UTXO since it is partly owned by [addr]
+	assert.Len(t, reply.Balances, 1)
+	assert.Equal(t, assetID.String(), reply.Balances[0].AssetID)
+	assert.Equal(t, uint64(1337), uint64(reply.Balances[0].Balance))
 
+	// Check the balance with IncludePartial set to false
+	balanceArgs = &GetAllBalancesArgs{
+		JSONAddress: api.JSONAddress{Address: addrStr},
+	}
+	reply = &GetAllBalancesReply{}
+	err = s.GetAllBalances(nil, balanceArgs, reply)
+	assert.NoError(t, err)
+	assert.Len(t, reply.Balances, 0)
+
+	// A UTXO with a 1 out of 2 multisig
+	// where one of the addresses is [addr]
+	oneOfTwoUTXO := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        ids.GenerateTestID(),
+			OutputIndex: 0,
+		},
+		Asset: avax.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 1337,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{addr, ids.GenerateTestShortID()},
+			},
+		},
+	}
+	// Insert the UTXO
+	err = vm.state.FundUTXO(oneOfTwoUTXO)
+	assert.NoError(t, err)
+
+	// Check the balance with IncludePartial set to true
+	balanceArgs = &GetAllBalancesArgs{
+		JSONAddress:    api.JSONAddress{Address: addrStr},
+		IncludePartial: true,
+	}
+	reply = &GetAllBalancesReply{}
+	err = s.GetAllBalances(nil, balanceArgs, reply)
+	assert.NoError(t, err)
+	// The balance should include the UTXO since it is partly owned by [addr]
+	assert.Len(t, reply.Balances, 1)
+	assert.Equal(t, assetID.String(), reply.Balances[0].AssetID)
+	assert.Equal(t, uint64(1337*2), uint64(reply.Balances[0].Balance))
+
+	// Check the balance with IncludePartial set to false
+	balanceArgs = &GetAllBalancesArgs{
+		JSONAddress: api.JSONAddress{Address: addrStr},
+	}
+	reply = &GetAllBalancesReply{}
+	err = s.GetAllBalances(nil, balanceArgs, reply)
+	assert.NoError(t, err)
+	// The balance should not include the UTXO since it is only partly owned by [addr]
+	assert.Len(t, reply.Balances, 0)
+
+	// A UTXO with a 1 out of 1 multisig
+	// but with a locktime in the future
+	now := vm.Clock().Time()
+	futureUTXO := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        ids.GenerateTestID(),
+			OutputIndex: 0,
+		},
+		Asset: avax.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 1337,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  uint64(now.Add(10 * time.Hour).Unix()),
+				Threshold: 1,
+				Addrs:     []ids.ShortID{addr},
+			},
+		},
+	}
+	// Insert the UTXO
+	err = vm.state.FundUTXO(futureUTXO)
+	assert.NoError(t, err)
+
+	// Check the balance with IncludePartial set to true
+	balanceArgs = &GetAllBalancesArgs{
+		JSONAddress:    api.JSONAddress{Address: addrStr},
+		IncludePartial: true,
+	}
+	reply = &GetAllBalancesReply{}
+	err = s.GetAllBalances(nil, balanceArgs, reply)
+	assert.NoError(t, err)
+	// The balance should include the UTXO since it is partly owned by [addr]
+	// The balance should include the UTXO since it is partly owned by [addr]
+	assert.Len(t, reply.Balances, 1)
+	assert.Equal(t, assetID.String(), reply.Balances[0].AssetID)
+	assert.Equal(t, uint64(1337*3), uint64(reply.Balances[0].Balance))
+	// Check the balance with IncludePartial set to false
+	balanceArgs = &GetAllBalancesArgs{
+		JSONAddress: api.JSONAddress{Address: addrStr},
+	}
+	reply = &GetAllBalancesReply{}
+	err = s.GetAllBalances(nil, balanceArgs, reply)
+	assert.NoError(t, err)
+	// The balance should not include the UTXO since it is only partly owned by [addr]
+	assert.Len(t, reply.Balances, 0)
+
+	// A UTXO for a different asset
+	otherAssetID := ids.GenerateTestID()
+	otherAssetUTXO := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        ids.GenerateTestID(),
+			OutputIndex: 0,
+		},
+		Asset: avax.Asset{ID: otherAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 1337,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 2,
+				Addrs:     []ids.ShortID{addr, ids.GenerateTestShortID()},
+			},
+		},
+	}
+	// Insert the UTXO
+	err = vm.state.FundUTXO(otherAssetUTXO)
+	assert.NoError(t, err)
+
+	// Check the balance with IncludePartial set to true
+	balanceArgs = &GetAllBalancesArgs{
+		JSONAddress:    api.JSONAddress{Address: addrStr},
+		IncludePartial: true,
+	}
+	reply = &GetAllBalancesReply{}
+	err = s.GetAllBalances(nil, balanceArgs, reply)
+	assert.NoError(t, err)
+	// The balance should include the UTXO since it is partly owned by [addr]
+	assert.Len(t, reply.Balances, 2)
+	gotAssetIDs := []string{reply.Balances[0].AssetID, reply.Balances[1].AssetID}
+	assert.Contains(t, gotAssetIDs, assetID.String())
+	assert.Contains(t, gotAssetIDs, otherAssetID.String())
+	gotBalances := []uint64{uint64(reply.Balances[0].Balance), uint64(reply.Balances[1].Balance)}
+	assert.Contains(t, gotBalances, uint64(1337))
+	assert.Contains(t, gotBalances, uint64(1337*3))
+
+	// Check the balance with IncludePartial set to false
+	balanceArgs = &GetAllBalancesArgs{
+		JSONAddress: api.JSONAddress{Address: addrStr},
+	}
+	reply = &GetAllBalancesReply{}
+	err = s.GetAllBalances(nil, balanceArgs, reply)
+	assert.NoError(t, err)
+	// The balance should include the UTXO since it is partly owned by [addr]
+	assert.Len(t, reply.Balances, 0)
+}
 func TestServiceGetTx(t *testing.T) {
 	genesisBytes, vm, s, _ := setup(t)
 	defer func() {
