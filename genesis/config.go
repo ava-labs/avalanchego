@@ -205,3 +205,8 @@ func GetConfig(networkID uint32) *Config {
 		return &tempConfig
 	}
 }
+
+// GetConfigFile ...
+func GetConfigFile(filepath string) (*Config, error) {
+	return nil, nil
+}

@@ -850,11 +850,11 @@ func (n *Node) Initialize(
 		return fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
-	// TODO: parse from config instead of networkID
-	genesisBytes, avaxAssetID, err := genesis.Genesis(n.Config.NetworkID)
+	genesisBytes, avaxAssetID, err := genesis.FromConfig(n.Config.Genesis)
 	if err != nil {
 		return fmt.Errorf("couldn't create genesis bytes: %w", err)
 	}
+
 	// Start the Health API
 	// Has to be initialized before chain manager
 	if err := n.initHealthAPI(); err != nil {

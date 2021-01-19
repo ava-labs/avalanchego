@@ -23,6 +23,9 @@ import (
 type Config struct {
 	genesis.Params
 
+	// Genesis config
+	GenesisConfig *genesis.Config
+
 	// protocol to use for opening the network interface
 	Nat nat.Router
 

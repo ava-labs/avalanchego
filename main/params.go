@@ -78,7 +78,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(configFileKey, defaultString, "Specifies a config file")
 
 	// Genesis Config File:
-	fs.String(genesisConfigFileKey, "", "Specifies a genesis config file")
+	fs.String(genesisConfigFileKey, defaultString, "Specifies a genesis config file")
 
 	// NetworkID:
 	fs.String(networkNameKey, defaultNetworkName, "Network ID this node will connect to")
@@ -652,9 +652,17 @@ func setNodeConfig(v *viper.Viper) error {
 		Config.EpochFirstTransition = time.Unix(v.GetInt64(snowEpochFirstTransition), 0)
 		Config.EpochDuration = v.GetDuration(snowEpochDuration)
 
-		// TODO: attempt to load genesis bytes from file (if defined) into config
-		// TODO: store config as *genesis.Config on node config
-		// TODO: unify coreth config
+		// Only load custom genesis if netowrkid isn't known.
+		// TODO: cleanup
+		if genesisFile := v.GetString(genesisConfigFileKey); genesisFile != defaultString {
+			customConfig, err := genesis.GetConfigFile(genesisFile)
+			if err != nil {
+				return fmt.Errorf("unable to load provided genesis config: %w", err)
+			}
+			Config.GenesisConfig = customConfig
+		} else {
+			Config.GenesisConfig = genesis.GetConfig(networkID)
+		}
 	} else {
 		Config.Params = *genesis.GetParams(networkID)
 	}
@@ -666,8 +674,6 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.EnableCrypto = v.GetBool(signatureVerificationEnabledKey)
 
 	// Coreth Plugin
-	// TODO: unify coreth config with genesis file...have coreth flag override
-	// genesis
 	corethConfigString := v.GetString(corethConfigKey)
 	if corethConfigString != defaultString {
 		corethConfigValue := v.Get(corethConfigKey)
