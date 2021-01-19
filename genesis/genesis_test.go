@@ -15,7 +15,7 @@ import (
 )
 
 func TestAliases(t *testing.T) {
-	genesisBytes, _, err := Genesis(constants.LocalID)
+	genesisBytes, _, err := Genesis(constants.LocalID, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +33,7 @@ func TestAliases(t *testing.T) {
 }
 
 func TestGenesis(t *testing.T) {
-	genesisBytes, _, err := Genesis(constants.MainnetID)
+	genesisBytes, _, err := Genesis(constants.MainnetID, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,12 @@ func TestVMGenesis(t *testing.T) {
 				vmTest.vmID,
 			)
 			t.Run(name, func(t *testing.T) {
-				genesisTx, err := VMGenesis(test.networkID, vmTest.vmID)
+				genesisBytes, _, err := Genesis(test.networkID, "")
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				genesisTx, err := VMGenesis(genesisBytes, vmTest.vmID)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -137,7 +142,7 @@ func TestAVAXAssetID(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(constants.NetworkIDToNetworkName[test.networkID], func(t *testing.T) {
-			_, avaxAssetID, err := Genesis(test.networkID)
+			_, avaxAssetID, err := Genesis(test.networkID, "")
 			if err != nil {
 				t.Fatal(err)
 			}
