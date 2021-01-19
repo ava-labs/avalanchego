@@ -197,12 +197,13 @@ func (t *Tree) GetPersistence() error {
 	return nil
 }
 
-func (t *Tree) SelectRoot(treeRoot int) error {
+func (t *Tree) SelectRoot(treeRoot uint32) error {
 	if t.closed {
 		return database.ErrClosed
 	}
 
-	return t.persistence.SelectRoot(treeRoot)
+	t.persistence.SelectRoot(treeRoot)
+	return nil
 }
 
 func (t *Tree) put(key []byte, value []byte) error {

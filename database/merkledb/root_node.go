@@ -4,21 +4,24 @@ import "fmt"
 
 // RootNode is the top most node of the tree
 type RootNode struct {
-	child       []byte
-	persistence *Persistence
+	Child              []byte `serialize:"true"`
+	StoredHash         []byte `serialize:"true"`
+	RootID             uint32 `serialize:"true"`
+	previousStoredHash []byte
+	persistence        *Persistence
 }
 
 // NewRootNode returns a RootNode without children
-func NewRootNode(p *Persistence) Node {
-	return &RootNode{persistence: p}
+func NewRootNode(id uint32, p *Persistence) Node {
+	return &RootNode{RootID: id, persistence: p}
 }
 
 // GetChild returns the child
 func (r *RootNode) GetChild(key Key) (Node, error) {
-	if r.child == nil {
+	if len(r.Child) == 0 {
 		return nil, nil
 	}
-	node, err := r.persistence.GetNodeByHash(r.child)
+	node, err := r.persistence.GetNodeByHash(r.Child)
 	if err != nil {
 		return nil, err
 	}
@@ -29,12 +32,12 @@ func (r *RootNode) GetChild(key Key) (Node, error) {
 
 // GetNextNode returns the child
 func (r *RootNode) GetNextNode(prefix Key, start Key, key Key) (Node, error) {
-	return r.persistence.GetNodeByHash(r.child)
+	return r.persistence.GetNodeByHash(r.Child)
 }
 
 // Insert in the RootNode means the branch/leaf needs to group in a new branch
 func (r *RootNode) Insert(key Key, value []byte) error {
-	child, err := r.persistence.GetNodeByHash(r.child)
+	child, err := r.persistence.GetNodeByHash(r.Child)
 	if err != nil {
 		return err
 	}
@@ -46,50 +49,59 @@ func (r *RootNode) Insert(key Key, value []byte) error {
 		return err
 	}
 
+	child.SetParent(newBranch)
+
 	err = newBranch.Insert(key, value)
 	if err != nil {
 		return err
 	}
 
-	child.SetParent(newBranch)
 	return nil
 }
 
 // Delete removes the child
 func (r *RootNode) Delete(key Key) error {
-	r.child = nil
-	return nil
+	return r.Hash(nil, nil)
 }
 
 // SetChild sets the RootNode child to the Node
 func (r *RootNode) SetChild(node Node) error {
-	r.child = node.GetHash()
 	node.SetParent(r)
 
-	return r.persistence.StoreNode(r)
+	return r.Hash(nil, node.GetHash())
 }
 
 // SetParent should never be reached
 func (r *RootNode) SetParent(node Node) {}
 
 // SetPersistence should never be reached
-func (r *RootNode) SetPersistence(p *Persistence) {}
+func (r *RootNode) SetPersistence(p *Persistence) {
+	r.persistence = p
+}
 
 // Value should never be reached
 func (r *RootNode) Value() []byte { return nil }
 
 func (r *RootNode) Hash(key Key, hash []byte) error {
-	r.child = hash
+	r.Child = hash
+
+	rootIDByte := []byte{
+		byte(0xff & r.RootID),
+		byte(0xff & (r.RootID >> 8)),
+		byte(0xff & (r.RootID >> 16)),
+		byte(0xff & (r.RootID >> 24))}
+
+	r.StoredHash = Hash(rootIDByte, r.Child, r.Child)
 
 	return r.persistence.StoreNode(r)
 }
 
 func (r *RootNode) GetHash() []byte {
-	return r.child
+	return r.StoredHash
 }
 
 func (r *RootNode) GetPreviousHash() []byte {
-	return r.child
+	return r.Child
 }
 
 func (r *RootNode) References(change int32) int32 {
@@ -101,12 +113,22 @@ func (r *RootNode) Key() Key { return nil }
 
 // Print prints the child and requests the child to print itself
 func (r *RootNode) Print() {
-	fmt.Printf("Root ID: %v - Child: %x \n", r.Key(), r.child)
-	if len(r.child) != 0 {
-		child, err := r.persistence.GetNodeByHash(r.child)
+	fmt.Printf("Root ID: %v - Child: %x \n", r.Key(), r.Child)
+	if len(r.Child) != 0 {
+		child, err := r.persistence.GetNodeByHash(r.Child)
 		if err != nil {
 			panic(err)
 		}
 		child.Print()
 	}
+}
+
+func rootNodeID(rootNodeID uint32) []byte {
+	rootIDByte := []byte{
+		byte(0xff & rootNodeID),
+		byte(0xff & (rootNodeID >> 8)),
+		byte(0xff & (rootNodeID >> 16)),
+		byte(0xff & (rootNodeID >> 24))}
+
+	return Hash(rootIDByte, []byte{'r', 'o', 'o', 't'})
 }

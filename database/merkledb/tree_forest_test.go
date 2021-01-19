@@ -6,7 +6,7 @@ import (
 )
 
 type ScenarioTree struct {
-	tree         int
+	tree         uint32
 	treeScenario ScenarioTestStruct
 }
 

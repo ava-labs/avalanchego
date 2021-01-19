@@ -15,9 +15,8 @@ import (
 type Persistence struct {
 	db          database.Database
 	dataChange  map[string][]byte
-	rootNodes   []Node
 	codec       codec.Manager
-	currentRoot int
+	currentRoot uint32
 }
 
 // NewPersistence creates a new Persistence
@@ -25,6 +24,7 @@ func NewPersistence(db database.Database) (*Persistence, error) {
 	c := linearcodec.NewDefault()
 	_ = c.RegisterType(&BranchNode{})
 	_ = c.RegisterType(&LeafNode{})
+	_ = c.RegisterType(&RootNode{})
 	codecManager := codec.NewDefaultManager()
 	if err := codecManager.RegisterCodec(0, c); err != nil {
 		return nil, err
@@ -36,17 +36,11 @@ func NewPersistence(db database.Database) (*Persistence, error) {
 		currentRoot: 0,
 	}
 
-	persistence.rootNodes = append([]Node{}, NewRootNode(&persistence))
-
 	return &persistence, nil
 }
 
 // GetNodeByUnitKey fetches a Node given a StorageKey
 func (p *Persistence) GetNodeByHash(nodeHash []byte) (Node, error) {
-	if nodeHash == nil {
-		return p.GetRootNode(), nil
-	}
-
 	nodeBytes, err := p.db.Get(nodeHash)
 	if err != nil {
 		return nil, err
@@ -61,21 +55,45 @@ func (p *Persistence) GetNodeByHash(nodeHash []byte) (Node, error) {
 
 // GetRootNode returns the RootNode
 func (p *Persistence) GetRootNode() Node {
-	return p.rootNodes[p.currentRoot]
+	node, err := p.GetNodeByHash(rootNodeID(p.currentRoot))
+	if err != nil {
+		if err == database.ErrNotFound {
+			newRoot := NewRootNode(p.currentRoot, p)
+			if p.currentRoot == 0 {
+				return newRoot
+			}
+
+			previousRoot, err := p.GetNodeByHash(rootNodeID(p.currentRoot - 1))
+			if err != nil {
+				panic(err)
+			}
+
+			newRoot.(*RootNode).Child = previousRoot.(*RootNode).Child
+
+			return newRoot
+		}
+		panic(err)
+	}
+
+	return node
 
 }
 
 // StoreNode stores a in the DB Node using its StorageKey
 func (p *Persistence) StoreNode(n Node) error {
-	switch n.(type) {
+	nBytes, err := p.codec.Marshal(0, &n)
+	if err != nil {
+		return err
+	}
+
+	switch node := n.(type) {
 	case *RootNode:
-		p.rootNodes[p.currentRoot] = n
-	default:
-		nBytes, err := p.codec.Marshal(0, &n)
+		err = p.db.Put(rootNodeID(node.RootID), nBytes)
 		if err != nil {
 			return err
 		}
-
+		return nil
+	default:
 		err = p.db.Put(n.GetHash(), nBytes)
 		if err != nil {
 			return err
@@ -121,26 +139,9 @@ func (p *Persistence) Commit(err error) error {
 	return p.db.(*versiondb.Database).Commit()
 }
 
-func (p *Persistence) SelectRoot(treeRoot int) error {
+func (p *Persistence) SelectRoot(treeRoot uint32) {
 
-	nodesLen := len(p.rootNodes)
-
-	if nodesLen > treeRoot {
-		p.currentRoot = treeRoot
-		return nil
-	}
-	if nodesLen < treeRoot {
-		return fmt.Errorf("NO")
-	}
-	if nodesLen == treeRoot {
-		newRoot := NewRootNode(p)
-		newRoot.(*RootNode).child = p.rootNodes[treeRoot-1].(*RootNode).child
-
-		p.currentRoot = treeRoot
-		p.rootNodes = append(p.rootNodes, newRoot)
-	}
-
-	return nil
+	p.currentRoot = treeRoot
 }
 
 func (p *Persistence) PrintDB() {
