@@ -41,6 +41,17 @@ const (
 //
 // The ID of the new network is [networkID].
 
+// Genesis returns:
+// 1) The byte representation of the genesis state of the platform chain
+//    (ie the genesis state of the network)
+// 2) The asset ID of AVAX
+func Genesis(networkID uint32) ([]byte, ids.ID, error) {
+	// TODO: change to FromNetwork
+	return FromConfig(GetConfig(networkID))
+}
+
+// TODO: FromFile (load file config and then attempt to call FromConfig
+
 // FromConfig returns:
 // 1) The byte representation of the genesis state of the platform chain
 //    (ie the genesis state of the network)
@@ -313,17 +324,9 @@ func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {
 	return append(allNodeAllocations, currentNodeAllocation)
 }
 
-// Genesis returns:
-// 1) The byte representation of the genesis state of the platform chain
-//    (ie the genesis state of the network)
-// 2) The asset ID of AVAX
-func Genesis(networkID uint32) ([]byte, ids.ID, error) {
-	return FromConfig(GetConfig(networkID))
-}
-
 // VMGenesis ...
-func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.Tx, error) {
-	genesisBytes, _, err := Genesis(networkID)
+func VMGenesis(config *Config, vmID ids.ID) (*platformvm.Tx, error) {
+	genesisBytes, _, err := FromConfig(config)
 	if err != nil {
 		return nil, err
 	}

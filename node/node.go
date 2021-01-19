@@ -370,7 +370,7 @@ func (n *Node) Dispatch() error {
 func (n *Node) initDatabase() error {
 	n.DB = n.Config.DB
 
-	expectedGenesis, _, err := genesis.Genesis(n.Config.NetworkID)
+	expectedGenesis, _, err := genesis.FromConfig(n.Config.GenesisConfig)
 	if err != nil {
 		return err
 	}
@@ -505,7 +505,7 @@ func (n *Node) initAPIServer() error {
 func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	n.vmManager = vms.NewManager(&n.APIServer, n.HTTPLog)
 
-	createAVMTx, err := genesis.VMGenesis(n.Config.NetworkID, avm.ID)
+	createAVMTx, err := genesis.VMGenesis(n.Config.GenesisConfig, avm.ID)
 	if err != nil {
 		return err
 	}
@@ -850,7 +850,7 @@ func (n *Node) Initialize(
 		return fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
-	genesisBytes, avaxAssetID, err := genesis.FromConfig(n.Config.Genesis)
+	genesisBytes, avaxAssetID, err := genesis.FromConfig(n.Config.GenesisConfig)
 	if err != nil {
 		return fmt.Errorf("couldn't create genesis bytes: %w", err)
 	}

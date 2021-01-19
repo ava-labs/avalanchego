@@ -654,13 +654,32 @@ func setNodeConfig(v *viper.Viper) error {
 
 		// Only load custom genesis if netowrkid isn't known.
 		// TODO: cleanup
+		// TODO parse in config to make sure valid file
 		if genesisFile := v.GetString(genesisConfigFileKey); genesisFile != defaultString {
 			customConfig, err := genesis.GetConfigFile(genesisFile)
 			if err != nil {
 				return fmt.Errorf("unable to load provided genesis config: %w", err)
 			}
+
+			// Confirm loaded genesis config matches expected networkID
+			if customConfig.NetworkID != networkID {
+				return fmt.Errorf(
+					"networkID %d loaded but genesis file contains networkID %d",
+					networkID,
+					customConfig.NetworkID,
+				)
+			}
+
+			// Validate loaded config is valid
+			_, _, err := genesis.FromConfig(customConfig)
+			if err != nil {
+				return fmt.Errorf("invalid genesis config: %w", err)
+			}
+
 			Config.GenesisConfig = customConfig
+			// TODO: just store genesisBytes, avaxID on node config instead of config
 		} else {
+			// TODO: use genesis.Genesis if we just store genesisBytes
 			Config.GenesisConfig = genesis.GetConfig(networkID)
 		}
 	} else {
