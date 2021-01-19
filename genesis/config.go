@@ -6,6 +6,9 @@ package genesis
 import (
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"path"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -206,7 +209,23 @@ func GetConfig(networkID uint32) *Config {
 	}
 }
 
-// GetConfigFile ...
-func GetConfigFile(filepath string) (*Config, error) {
-	return nil, nil
+// GetConfigFile loads a *Config from a provided
+// filePath.
+func GetConfigFile(filePath string) (*Config, error) {
+	b, err := ioutil.ReadFile(path.Clean(filePath))
+	if err != nil {
+		return nil, fmt.Errorf("%w: unable to load file %s", err, filePath)
+	}
+
+	var unparsedConfig UnparsedConfig
+	if err := json.Unmarshal(b, &unparsedConfig); err != nil {
+		return nil, fmt.Errorf("could not unmarshal JSON: %w", err)
+	}
+
+	config, err := unparsedConfig.Parse()
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse config: %w", err)
+	}
+
+	return &config, nil
 }

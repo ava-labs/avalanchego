@@ -55,7 +55,7 @@ func Genesis(networkID uint32, filePath string) ([]byte, ids.ID, error) {
 		return nil, ids.ID{}, fmt.Errorf("unable to load provided genesis config at %s: %w", filePath, err)
 	}
 
-	// Confirm loaded genesis config matches expected networkID
+	// Confirm loaded Config.NetworkID matches expected networkID
 	if customConfig.NetworkID != networkID {
 		return nil, ids.ID{}, fmt.Errorf(
 			"networkID %d loaded but genesis file contains networkID %d",
