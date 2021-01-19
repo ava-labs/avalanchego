@@ -849,6 +849,8 @@ func (n *Node) Initialize(
 	if err = n.initEventDispatcher(); err != nil { // Set up the event dipatcher
 		return fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
+
+	// TODO: parse from config instead of networkID
 	genesisBytes, avaxAssetID, err := genesis.Genesis(n.Config.NetworkID)
 	if err != nil {
 		return fmt.Errorf("couldn't create genesis bytes: %w", err)
