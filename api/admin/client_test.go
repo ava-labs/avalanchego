@@ -5,6 +5,7 @@ package admin
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -56,6 +57,9 @@ func (mc *mockClient) SendRequest(method string, params interface{}, reply inter
 	case *api.SuccessResponse:
 		response := mc.response.(api.SuccessResponse)
 		*p = response
+	case *GetAliasesOfChainReply:
+		response := mc.response.(*GetAliasesOfChainReply)
+		*p = *response
 	default:
 		panic("illegal type")
 	}
@@ -174,6 +178,34 @@ func TestAliasChain(t *testing.T) {
 			t.Fatalf("Expected success response to be: %v, but found: %v", test.Success, success)
 		}
 	}
+}
+
+func TestGetAliasesOfChain(t *testing.T) {
+	t.Run("successful", func(t *testing.T) {
+		expectedReply := &GetAliasesOfChainReply{
+			Aliases: []string{"alias1", "alias2"},
+		}
+		mockClient := Client{requester: NewMockClient(expectedReply, nil)}
+
+		reply, err := mockClient.GetAliasesOfChain("chain")
+
+		if err != nil {
+			t.Fatalf("Unexepcted error: %s", err)
+		}
+		if !reflect.DeepEqual(expectedReply, reply) {
+			t.Fatalf("Expected response to be: %v, but found: %v", expectedReply, reply)
+		}
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		mockClient := Client{requester: NewMockClient(&GetAliasesOfChainReply{}, errors.New("some error"))}
+
+		_, err := mockClient.GetAliasesOfChain("chain")
+
+		if err == nil {
+			t.Fatalf("Expected error but got no error.")
+		}
+	})
 }
 
 func TestStacktrace(t *testing.T) {

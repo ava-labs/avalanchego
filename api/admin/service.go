@@ -128,6 +128,29 @@ func (service *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, reply *a
 	return service.httpServer.AddAliasesWithReadLock("bc/"+chainID.String(), "bc/"+args.Alias)
 }
 
+// GetAliasesOfChainArgs are the arguments for calling GetAliasesOfChain
+type GetAliasesOfChainArgs struct {
+	Chain string `json:"chain"`
+}
+
+// GetAliasesOfChainArgs are the arguments for calling GetAliasesOfChain
+type GetAliasesOfChainReply struct {
+	Aliases []string `json:"aliases"`
+}
+
+// GetAliasesOfChain returns the all aliases of a chain
+func (service *Admin) GetAliasesOfChain(_ *http.Request, args *GetAliasesOfChainArgs, reply *GetAliasesOfChainReply) error {
+	service.log.Info("Admin: GetAliasesOfChain called with Chain: %s", args.Chain)
+
+	chainID, err := service.chainManager.Lookup(args.Chain)
+	if err != nil {
+		return err
+	}
+
+	reply.Aliases = service.chainManager.Aliases(chainID)
+	return nil
+}
+
 // Stacktrace returns the current global stacktrace
 func (service *Admin) Stacktrace(_ *http.Request, _ *struct{}, reply *api.SuccessResponse) error {
 	service.log.Info("Admin: Stacktrace called")
