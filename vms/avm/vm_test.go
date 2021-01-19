@@ -1741,6 +1741,107 @@ func TestTxAcceptLaterEpoch(t *testing.T) {
 	}
 }
 
+func TestVerifyTxEarlierEpoch(t *testing.T) {
+	genesisBytes, _, vm, _ := GenesisVM(t)
+	ctx := vm.ctx
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	avaxTxID := GetAVAXTxFromGenesisTest(genesisBytes, t).ID()
+
+	factory := crypto.FactorySECP256K1R{}
+	keyIntf, err := factory.NewPrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := keyIntf.(*crypto.PrivateKeySECP256K1R)
+
+	firstTx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        avaxTxID,
+				OutputIndex: 2,
+			},
+			Asset: avax.Asset{ID: avaxTxID},
+			In: &secp256k1fx.TransferInput{
+				Amt: startBalance,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
+					},
+				},
+			},
+		}},
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: avaxTxID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: startBalance - vm.txFee,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				},
+			},
+		}},
+	}}}
+
+	genesisKey := keys[0]
+	if err := firstTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{genesisKey}}); err != nil {
+		t.Fatal(err)
+	}
+
+	firstParsedTx, err := vm.Parse(firstTx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := firstParsedTx.Verify(1); err != nil {
+		t.Fatal(err)
+	}
+	if err := firstParsedTx.Accept(1); err != nil {
+		t.Fatal(err)
+	}
+	if epoch := firstParsedTx.Epoch(); epoch != 1 {
+		t.Fatalf("Should have returned epoch %d but returned %d", 1, epoch)
+	}
+
+	secondTx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        firstParsedTx.ID(),
+				OutputIndex: 0,
+			},
+			Asset: avax.Asset{ID: avaxTxID},
+			In: &secp256k1fx.TransferInput{
+				Amt: startBalance - vm.txFee,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
+					},
+				},
+			},
+		}},
+	}}}
+
+	if err := secondTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+		t.Fatal(err)
+	}
+
+	secondParsedTx, err := vm.Parse(secondTx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := secondParsedTx.Verify(0); err == nil {
+		t.Fatalf("Should have errored due to using a future epoch's UTXO")
+	}
+}
+
 func TestRejectionManagement(t *testing.T) {
 	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx

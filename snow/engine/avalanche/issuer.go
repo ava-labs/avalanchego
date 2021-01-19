@@ -89,15 +89,27 @@ func (i *issuer) Update() {
 	// Take the valid transactions and issue a new vertex with them.
 	if len(validTransitions) != len(txs) {
 		i.t.Ctx.Log.Debug("Abandoning %s due to failed transaction verification", vtxID)
-		err = i.t.batch(
-			epoch,
-			validTransitions,
-			[][]ids.ID{invalidTransitions},
-			false, // force
-			false, // empty
-			true,  // updatedEpoch
-		)
+		if i.updatedEpoch {
+			err = i.t.batch(
+				epoch,
+				validTransitions,
+				[][]ids.ID{invalidTransitions},
+				false, // force
+				false, // empty
+				true,  // updatedEpoch
+			)
+		} else {
+			err = i.t.batch(
+				epoch,
+				validTransitions,
+				nil,   // restrictions
+				false, // force
+				false, // empty
+				true,  // updatedEpoch
+			)
+		}
 		i.t.errs.Add(err)
+		i.t.abandonedVertices = true
 		i.t.vtxBlocked.Abandon(vtxID)
 		return
 	}
@@ -122,6 +134,7 @@ func (i *issuer) Update() {
 	}
 	if epoch > currentEpoch {
 		i.t.Ctx.Log.Debug("Dropping vertex from future epoch:\n%s", vtxID)
+		i.t.abandonedVertices = true
 		i.t.vtxBlocked.Abandon(vtxID)
 		return
 	}

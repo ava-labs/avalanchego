@@ -12,8 +12,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
-
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -26,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm/conflicts"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -68,6 +67,7 @@ var (
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
 	errNoPermission              = errors.New("the given credential does not authorize transfer of this UTXO")
+	errInvalidUTXOEpoch          = errors.New("utxo can't be used in named epoch")
 
 	_ vertex.DAGVM = &VM{}
 )
@@ -799,23 +799,30 @@ func (vm *VM) issueTx(tx conflicts.Transition) {
 	}
 }
 
-func (vm *VM) getUTXO(utxoID *avax.UTXOID) (*avax.UTXO, error) {
+func (vm *VM) getUTXO(utxoID *avax.UTXOID, epoch uint32) (*avax.UTXO, error) {
+	inputTxID, inputIndex := utxoID.InputSource()
+	parent := newUniqueTx(vm, inputTxID, nil)
+
+	parentStatus := parent.Status()
+	if parentStatus == choices.Accepted {
+		if parentEpoch := parent.Epoch(); parentEpoch > epoch {
+			return nil, errInvalidUTXOEpoch
+		}
+	}
+
 	inputID := utxoID.InputID()
 	utxo, err := vm.state.UTXO(inputID)
 	if err == nil {
 		return utxo, nil
 	}
 
-	inputTxID, inputIndex := utxoID.InputSource()
-	parent := newUniqueTx(vm, inputTxID, nil)
-
 	// If the transaction has been accepted and the UTXO was
 	// not found above, then it has already been consumed.
 	// If the parent was rejected, the UTXO cannot be consumed.
 	// If the parent is unknown, then it is too early to consume
 	// this UTXO.
-	if status := parent.Status(); status != choices.Processing {
-		return nil, fmt.Errorf("missing UTXO from current state from source (TxID: %s, Index: %d, Status: %s)", inputTxID, inputIndex, status)
+	if parentStatus != choices.Processing {
+		return nil, fmt.Errorf("missing UTXO from current state from source (TxID: %s, Index: %d, Status: %s)", inputTxID, inputIndex, parentStatus)
 	}
 
 	parentUTXOs := parent.UTXOs()
@@ -929,8 +936,8 @@ func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cr
 	}
 }
 
-func (vm *VM) verifyTransfer(tx UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable, epoch uint32) error {
-	utxo, err := vm.getUTXO(&in.UTXOID)
+func (vm *VM) verifyTransfer(tx UnsignedTx, epoch uint32, in *avax.TransferableInput, cred verify.Verifiable) error {
+	utxo, err := vm.getUTXO(&in.UTXOID, epoch)
 	if err != nil {
 		return err
 	}
@@ -942,7 +949,7 @@ func (vm *VM) verifyOperation(tx UnsignedTx, epoch uint32, op *Operation, cred v
 	numUTXOs := len(op.UTXOIDs)
 	utxos := make([]interface{}, numUTXOs)
 	for i, utxoID := range op.UTXOIDs {
-		utxo, err := vm.getUTXO(utxoID)
+		utxo, err := vm.getUTXO(utxoID, epoch)
 		if err != nil {
 			return err
 		}
