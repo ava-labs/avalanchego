@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"testing"
+	"time"
 )
 
 func PickRandomKey(list []TestStruct) (TestStruct, []TestStruct) {
@@ -216,6 +217,10 @@ func TestTreeConsistencyStorage_PutGetDel(t *testing.T) {
 				fmt.Println(count)
 				t.Fatal("Database is not empty")
 			}
+
+			t.Cleanup(func() {
+				time.Sleep(time.Second)
+			})
 		})
 	}
 }
