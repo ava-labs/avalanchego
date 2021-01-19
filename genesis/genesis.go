@@ -45,12 +45,27 @@ const (
 // 1) The byte representation of the genesis state of the platform chain
 //    (ie the genesis state of the network)
 // 2) The asset ID of AVAX
-func Genesis(networkID uint32) ([]byte, ids.ID, error) {
-	// TODO: change to FromNetwork
-	return FromConfig(GetConfig(networkID))
-}
+func Genesis(networkID uint32, filePath string) ([]byte, ids.ID, error) {
+	if len(filePath) == 0 || networkID == constants.MainnetID || networkID == constants.TestnetID {
+		return FromConfig(GetConfig(networkID))
+	}
 
-// TODO: FromFile (load file config and then attempt to call FromConfig
+	customConfig, err := GetConfigFile(filePath)
+	if err != nil {
+		return nil, ids.ID{}, fmt.Errorf("unable to load provided genesis config at %s: %w", filePath, err)
+	}
+
+	// Confirm loaded genesis config matches expected networkID
+	if customConfig.NetworkID != networkID {
+		return nil, ids.ID{}, fmt.Errorf(
+			"networkID %d loaded but genesis file contains networkID %d",
+			networkID,
+			customConfig.NetworkID,
+		)
+	}
+
+	return FromConfig(customConfig)
+}
 
 // FromConfig returns:
 // 1) The byte representation of the genesis state of the platform chain
@@ -325,11 +340,7 @@ func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {
 }
 
 // VMGenesis ...
-func VMGenesis(config *Config, vmID ids.ID) (*platformvm.Tx, error) {
-	genesisBytes, _, err := FromConfig(config)
-	if err != nil {
-		return nil, err
-	}
+func VMGenesis(genesisBytes []byte, vmID ids.ID) (*platformvm.Tx, error) {
 	genesis := platformvm.Genesis{}
 	if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return nil, fmt.Errorf("couldn't unmarshal genesis bytes due to: %w", err)

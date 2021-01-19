@@ -78,7 +78,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(configFileKey, defaultString, "Specifies a config file")
 
 	// Genesis Config File:
-	fs.String(genesisConfigFileKey, defaultString, "Specifies a genesis config file")
+	fs.String(genesisConfigFileKey, "", "Specifies a genesis config file")
 
 	// NetworkID:
 	fs.String(networkNameKey, defaultNetworkName, "Network ID this node will connect to")
@@ -651,39 +651,14 @@ func setNodeConfig(v *viper.Viper) error {
 
 		Config.EpochFirstTransition = time.Unix(v.GetInt64(snowEpochFirstTransition), 0)
 		Config.EpochDuration = v.GetDuration(snowEpochDuration)
-
-		// Only load custom genesis if netowrkid isn't known.
-		// TODO: cleanup
-		// TODO parse in config to make sure valid file
-		if genesisFile := v.GetString(genesisConfigFileKey); genesisFile != defaultString {
-			customConfig, err := genesis.GetConfigFile(genesisFile)
-			if err != nil {
-				return fmt.Errorf("unable to load provided genesis config: %w", err)
-			}
-
-			// Confirm loaded genesis config matches expected networkID
-			if customConfig.NetworkID != networkID {
-				return fmt.Errorf(
-					"networkID %d loaded but genesis file contains networkID %d",
-					networkID,
-					customConfig.NetworkID,
-				)
-			}
-
-			// Validate loaded config is valid
-			_, _, err := genesis.FromConfig(customConfig)
-			if err != nil {
-				return fmt.Errorf("invalid genesis config: %w", err)
-			}
-
-			Config.GenesisConfig = customConfig
-			// TODO: just store genesisBytes, avaxID on node config instead of config
-		} else {
-			// TODO: use genesis.Genesis if we just store genesisBytes
-			Config.GenesisConfig = genesis.GetConfig(networkID)
-		}
 	} else {
 		Config.Params = *genesis.GetParams(networkID)
+	}
+
+	// Load genesis data
+	Config.GenesisBytes, Config.AvaxAssetID, err = genesis.Genesis(networkID, v.GetString(genesisConfigFileKey))
+	if err != nil {
+		return fmt.Errorf("unable to load genesis file: %w", err)
 	}
 
 	// Assertions

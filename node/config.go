@@ -23,8 +23,9 @@ import (
 type Config struct {
 	genesis.Params
 
-	// Genesis config
-	GenesisConfig *genesis.Config
+	// Genesis information
+	GenesisBytes []byte
+	AvaxAssetID  ids.ID
 
 	// protocol to use for opening the network interface
 	Nat nat.Router
