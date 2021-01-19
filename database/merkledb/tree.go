@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/database/versiondb"
+
 	"github.com/ava-labs/avalanchego/database/leveldb"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -23,7 +25,12 @@ func (t *Tree) Has(key []byte) (bool, error) {
 		return false, t.isClosed()
 	}
 
-	node, err := t.findNode(BytesToKey(key), t.persistence.GetRootNode())
+	rootNode, err := t.persistence.GetRootNode()
+	if err != nil {
+		return false, err
+	}
+
+	node, err := t.findNode(BytesToKey(key), rootNode)
 	if err != nil {
 		return false, err
 	}
@@ -80,8 +87,9 @@ func (t *Tree) Close() error {
 	if t.isClosed() != nil {
 		return t.isClosed()
 	}
+
 	t.closed = true
-	return nil
+	return t.persistence.db.(*versiondb.Database).GetDatabase().Close()
 }
 
 // NewMemoryTree returns a new instance of the Tree with a in-memoryDB
@@ -107,8 +115,12 @@ func NewTree(db database.Database) *Tree {
 	}
 }
 
-func (t *Tree) Root() []byte {
-	return t.persistence.GetRootNode().GetHash()
+func (t *Tree) Root() ([]byte, error) {
+	rootNode, err := t.persistence.GetRootNode()
+	if err != nil {
+		return nil, err
+	}
+	return rootNode.GetHash(), nil
 }
 
 func (t *Tree) Get(key []byte) ([]byte, error) {
@@ -116,7 +128,12 @@ func (t *Tree) Get(key []byte) ([]byte, error) {
 		return nil, t.isClosed()
 	}
 
-	node, err := t.findNode(BytesToKey(key), t.persistence.GetRootNode())
+	rootNode, err := t.persistence.GetRootNode()
+	if err != nil {
+		return nil, err
+	}
+
+	node, err := t.findNode(BytesToKey(key), rootNode)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +178,8 @@ func (t *Tree) findNode(key Key, node Node) (Node, error) {
 }
 
 func (t *Tree) PrintTree() {
-	t.persistence.GetRootNode().Print()
+	rootNode, _ := t.persistence.GetRootNode()
+	rootNode.Print()
 }
 
 func (t *Tree) fetchNextNode(prefix Key, start Key, key Key, node Node) (Node, error) {
@@ -212,7 +230,11 @@ func (t *Tree) put(key []byte, value []byte) error {
 	}
 
 	unitKey := BytesToKey(key)
-	rootNode := t.persistence.GetRootNode()
+	rootNode, err := t.persistence.GetRootNode()
+	if err != nil {
+		return err
+	}
+
 	// err safe to ignore
 	rootChild, _ := rootNode.GetChild(Key{})
 	if rootChild == nil {
@@ -242,7 +264,12 @@ func (t *Tree) del(key []byte) error {
 
 	unitKey := BytesToKey(key)
 
-	deleteNode, err := t.findNode(unitKey, t.persistence.GetRootNode())
+	rootNode, err := t.persistence.GetRootNode()
+	if err != nil {
+		return err
+	}
+
+	deleteNode, err := t.findNode(unitKey, rootNode)
 	if err != nil {
 		return err
 	}

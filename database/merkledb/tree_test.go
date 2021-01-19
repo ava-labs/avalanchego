@@ -145,7 +145,6 @@ func TestTree_DelVariableKeys(t *testing.T) {
 			t.Fatalf("value not deleted in the tree as it was not found err: %v \nkey: %v", err, test.key)
 		}
 	}
-
 }
 
 func TestTree_Put_Scenarios(t *testing.T) {

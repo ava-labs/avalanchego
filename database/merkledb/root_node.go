@@ -30,8 +30,31 @@ func (r *RootNode) GetChild(key Key) (Node, error) {
 	return node, nil
 }
 
-// GetNextNode returns the child
+// GetNextNode returns the child if it respects the nextNode inputs
 func (r *RootNode) GetNextNode(prefix Key, start Key, key Key) (Node, error) {
+	node, err := r.persistence.GetNodeByHash(r.Child)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(key) != 0 {
+		if !Greater(node.Key(), key) || node.Key().Equals(key) {
+			return nil, nil
+		}
+	}
+
+	if len(start) != 0 {
+		if !Greater(node.Key(), start) || node.Key().Equals(start) {
+			return nil, nil
+		}
+	}
+
+	if len(prefix) != 0 {
+		if !IsPrefixed(prefix, node.Key()) {
+			return nil, nil
+		}
+	}
+
 	return r.persistence.GetNodeByHash(r.Child)
 }
 

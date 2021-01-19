@@ -54,28 +54,28 @@ func (p *Persistence) GetNodeByHash(nodeHash []byte) (Node, error) {
 }
 
 // GetRootNode returns the RootNode
-func (p *Persistence) GetRootNode() Node {
+func (p *Persistence) GetRootNode() (Node, error) {
 	node, err := p.GetNodeByHash(rootNodeID(p.currentRoot))
 	if err != nil {
 		if err == database.ErrNotFound {
 			newRoot := NewRootNode(p.currentRoot, p)
 			if p.currentRoot == 0 {
-				return newRoot
+				return newRoot, nil
 			}
 
 			previousRoot, err := p.GetNodeByHash(rootNodeID(p.currentRoot - 1))
 			if err != nil {
-				panic(err)
+				return nil, err
 			}
 
 			newRoot.(*RootNode).Child = previousRoot.(*RootNode).Child
 
-			return newRoot
+			return newRoot, nil
 		}
-		panic(err)
+		return nil, err
 	}
 
-	return node
+	return node, nil
 
 }
 
