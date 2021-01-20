@@ -214,7 +214,7 @@ func GetConfig(networkID uint32) *Config {
 func GetConfigFile(filePath string) (*Config, error) {
 	b, err := ioutil.ReadFile(path.Clean(filePath))
 	if err != nil {
-		return nil, fmt.Errorf("%w: unable to load file %s", err, filePath)
+		return nil, fmt.Errorf("unable to load file %s: %w", filePath, err)
 	}
 
 	var unparsedConfig UnparsedConfig

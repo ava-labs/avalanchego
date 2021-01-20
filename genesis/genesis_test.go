@@ -5,10 +5,14 @@ package genesis
 
 import (
 	"fmt"
+	"io/ioutil"
+	"path"
+	"strings"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/evm"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
@@ -32,14 +36,163 @@ func TestAliases(t *testing.T) {
 	}
 }
 
+var (
+	customGenesisConfigJSON = `{
+		"networkID": 9999,
+		"allocations": [
+			{
+				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
+				"avaxAddr": "X-local1g65uqn6t77p656w64023nh8nd9updzmxyymev2",
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 10000000000000000,
+						"locktime": 1633824000
+					}
+				]
+			},
+			{
+				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
+				"avaxAddr": "X-local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u",
+				"initialAmount": 300000000000000000,
+				"unlockSchedule": [
+					{
+						"amount": 20000000000000000
+					},
+					{
+						"amount": 10000000000000000,
+						"locktime": 1633824000
+					}
+				]
+			},
+			{
+				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
+				"avaxAddr": "X-local1ur873jhz9qnaqv5qthk5sn3e8nj3e0kmggalnu",
+				"initialAmount": 10000000000000000,
+				"unlockSchedule": [
+					{
+						"amount": 10000000000000000,
+						"locktime": 1633824000
+					}
+				]
+			}
+		],
+		"startTime": 1599696000,
+		"initialStakeDuration": 31536000,
+		"initialStakeDurationOffset": 5400,
+		"initialStakedFunds": [
+			"X-local1g65uqn6t77p656w64023nh8nd9updzmxyymev2"
+		],
+		"initialStakers": [
+			{
+				"nodeID": "NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg",
+				"rewardAddress": "X-local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u",
+				"delegationFee": 1000000
+			},
+			{
+				"nodeID": "NodeID-MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ",
+				"rewardAddress": "X-local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u",
+				"delegationFee": 500000
+			},
+			{
+				"nodeID": "NodeID-NFBbbJ4qCmNaCzeW7sxErhvWqvEQMnYcN",
+				"rewardAddress": "X-local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u",
+				"delegationFee": 250000
+			},
+			{
+				"nodeID": "NodeID-GWPcbFJZFfZreETSoWjPimr846mXEKCtu",
+				"rewardAddress": "X-local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u",
+				"delegationFee": 125000
+			},
+			{
+				"nodeID": "NodeID-P7oB2McjBGgW2NXXWVYjV8JEDFoW9xDE5",
+				"rewardAddress": "X-local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u",
+				"delegationFee": 62500
+			}
+		],
+		"cChainGenesis": "{\"config\":{\"chainId\":43112,\"homesteadBlock\":0,\"daoForkBlock\":0,\"daoForkSupport\":true,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}",
+		"message": "{{ fun_quote }}"
+	}`
+	invalidGenesisConfigJSON = `{
+		"networkID": 9999}}}}
+	}`
+)
+
 func TestGenesis(t *testing.T) {
-	genesisBytes, _, err := Genesis(constants.MainnetID, "")
-	if err != nil {
-		t.Fatal(err)
+	tests := map[string]struct {
+		networkID    uint32
+		customConfig string
+		err          string
+		expected     string
+	}{
+		"mainnet": {
+			networkID: constants.MainnetID,
+			expected:  "3e6662fdbd88bcf4c7dd82cb4699c0807f1d7315d493bc38532697e11b226276",
+		},
+		"fuji": {
+			networkID:    constants.FujiID,
+			customConfig: localGenesisConfigJSON, // won't load
+			expected:     "2e6b699298a664793bff42dae9c1af8d9c54645d8b376fd331e0b67475578e0a",
+		},
+		"local without custom": {
+			networkID: constants.LocalID,
+			expected:  "d036edc78cee38f003c529fa2ca3f95da47c7b87f5f3c0e126c9bf34e7f2285a",
+		},
+		"local with custom": {
+			networkID:    9999,
+			customConfig: customGenesisConfigJSON,
+			expected:     "a1d1838586db85fe94ab1143560c3356df9ba2445794b796bba050be89f4fcb4",
+		},
+		"local with custom (networkID mismatch)": {
+			networkID:    9999,
+			customConfig: localGenesisConfigJSON,
+			err:          "networkID 9999 loaded but genesis file contains networkID 12345",
+		},
+		"local with custom (invalid format)": {
+			networkID:    9999,
+			customConfig: invalidGenesisConfigJSON,
+			err:          "unable to load provided genesis config",
+		},
 	}
-	genesis := platformvm.Genesis{}
-	if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
-		t.Fatal(err)
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var customFile string
+			if len(test.customConfig) > 0 {
+				customFile = path.Join(t.TempDir(), "config.json")
+				err := ioutil.WriteFile(customFile, []byte(test.customConfig), 0644)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			genesisBytes, _, err := Genesis(test.networkID, customFile)
+			if len(test.err) > 0 {
+				if !strings.Contains(err.Error(), test.err) {
+					t.Fatalf("expected error %s but got %s",
+						test.err,
+						err.Error(),
+					)
+				}
+				return
+			}
+			if len(test.err) == 0 && err != nil {
+				t.Fatal(err)
+			}
+
+			genesisHash := fmt.Sprintf("%x", hashing.ComputeHash256(genesisBytes))
+			if genesisHash != test.expected {
+				t.Fatalf("expected genesis hash %s but got %s",
+					test.expected,
+					genesisHash,
+				)
+			}
+
+			genesis := platformvm.Genesis{}
+			if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 
