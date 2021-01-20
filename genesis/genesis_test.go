@@ -104,6 +104,33 @@ func TestValidateConfig(t *testing.T) {
 			}(),
 			err: "initial stake duration is 31536000 but need at least 400000000 with offset of 100000000",
 		},
+		"empty initial staked funds": {
+			networkID: 12345,
+			config: func() *Config {
+				thisConfig := LocalConfig
+				thisConfig.InitialStakedFunds = []ids.ShortID(nil)
+				return &thisConfig
+			}(),
+			err: "initial staked funds cannot be empty",
+		},
+		"duplicate initial staked funds": {
+			networkID: 12345,
+			config: func() *Config {
+				thisConfig := LocalConfig
+				thisConfig.InitialStakedFunds = append(thisConfig.InitialStakedFunds, thisConfig.InitialStakedFunds[0])
+				return &thisConfig
+			}(),
+			err: "duplicated in initial staked funds",
+		},
+		"initial staked funds not in allocations": {
+			networkID: 5,
+			config: func() *Config {
+				thisConfig := FujiConfig
+				thisConfig.InitialStakedFunds = append(thisConfig.InitialStakedFunds, LocalConfig.InitialStakedFunds[0])
+				return &thisConfig
+			}(),
+			err: "does not have an allocation to stake",
+		},
 		"empty C-Chain genesis": {
 			networkID: 12345,
 			config: func() *Config {

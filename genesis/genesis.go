@@ -44,12 +44,11 @@ func validateConfig(networkID uint32, config *Config) error {
 		))
 	}
 
-	startTime := time.Unix(int64(config.StartTime), 0)
-	if time.Since(startTime) < 0 {
-		errs.Add(fmt.Errorf(
-			"start time cannot be in the future: %s",
-			startTime,
-		))
+	allocationSet := map[ids.ShortID]struct{}{}
+	for _, allocation := range config.Allocations {
+		// It is ok to have duplicates as different
+		// ethAddrs could claim to the same avaxAddr.
+		allocationSet[allocation.AVAXAddr] = struct{}{}
 	}
 
 	initialSupply, err := config.InitialSupply()
@@ -60,8 +59,12 @@ func validateConfig(networkID uint32, config *Config) error {
 		errs.Add(errors.New("initial supply must be > 0"))
 	}
 
-	if len(config.InitialStakers) == 0 {
-		errs.Add(errors.New("initial stakers must be > 0"))
+	startTime := time.Unix(int64(config.StartTime), 0)
+	if time.Since(startTime) < 0 {
+		errs.Add(fmt.Errorf(
+			"start time cannot be in the future: %s",
+			startTime,
+		))
 	}
 
 	// We don't impose any restrictions on the minimum
@@ -72,6 +75,10 @@ func validateConfig(networkID uint32, config *Config) error {
 		errs.Add(errors.New("initial stake duration must be > 0"))
 	}
 
+	if len(config.InitialStakers) == 0 {
+		errs.Add(errors.New("initial stakers must be > 0"))
+	}
+
 	offsetTimeRequired := config.InitialStakeDurationOffset * uint64(len(config.InitialStakers)-1)
 	if offsetTimeRequired > config.InitialStakeDuration {
 		errs.Add(fmt.Errorf(
@@ -80,6 +87,54 @@ func validateConfig(networkID uint32, config *Config) error {
 			offsetTimeRequired,
 			config.InitialStakeDurationOffset,
 		))
+	}
+
+	if len(config.InitialStakedFunds) == 0 {
+		errs.Add(errors.New("initial staked funds cannot be empty"))
+	}
+
+	initialStakedFundsSet := map[ids.ShortID]struct{}{}
+	for _, staker := range config.InitialStakedFunds {
+		if _, ok := initialStakedFundsSet[staker]; ok {
+			avaxAddr, err := formatting.FormatAddress(
+				"X",
+				constants.GetHRP(networkID),
+				staker.Bytes(),
+			)
+			if err != nil {
+				errs.Add(fmt.Errorf(
+					"unable to format address from %s",
+					staker.String(),
+				))
+				continue
+			}
+
+			errs.Add(fmt.Errorf(
+				"address %s is duplicated in initial staked funds",
+				avaxAddr,
+			))
+		}
+		initialStakedFundsSet[staker] = struct{}{}
+
+		if _, ok := allocationSet[staker]; !ok {
+			avaxAddr, err := formatting.FormatAddress(
+				"X",
+				constants.GetHRP(networkID),
+				staker.Bytes(),
+			)
+			if err != nil {
+				errs.Add(fmt.Errorf(
+					"unable to format address from %s",
+					staker.String(),
+				))
+				continue
+			}
+
+			errs.Add(fmt.Errorf(
+				"address %s does not have an allocation to stake",
+				avaxAddr,
+			))
+		}
 	}
 
 	if len(config.CChainGenesis) == 0 {
