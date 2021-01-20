@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/big"
 	"testing"
-	"time"
 )
 
 func PickRandomKey(list []TestStruct) (TestStruct, []TestStruct) {
@@ -218,9 +217,10 @@ func TestTreeConsistencyStorage_PutGetDel(t *testing.T) {
 				t.Fatal("Database is not empty")
 			}
 
-			t.Cleanup(func() {
-				time.Sleep(time.Second)
-			})
+			err = tree3.Close()
+			if err != nil {
+				t.Fatal("Error closing the db")
+			}
 		})
 	}
 }
