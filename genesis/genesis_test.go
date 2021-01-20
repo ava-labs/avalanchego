@@ -120,10 +120,11 @@ var (
 
 func TestGenesis(t *testing.T) {
 	tests := map[string]struct {
-		networkID    uint32
-		customConfig string
-		err          string
-		expected     string
+		networkID       uint32
+		customConfig    string
+		missingFilePath string
+		err             string
+		expected        string
 	}{
 		"mainnet": {
 			networkID: constants.MainnetID,
@@ -153,6 +154,11 @@ func TestGenesis(t *testing.T) {
 			customConfig: invalidGenesisConfigJSON,
 			err:          "unable to load provided genesis config",
 		},
+		"local with custom (missing filepath)": {
+			networkID:       9999,
+			missingFilePath: "missing.json",
+			err:             "unable to load provided genesis config",
+		},
 	}
 
 	for name, test := range tests {
@@ -164,6 +170,10 @@ func TestGenesis(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+			}
+
+			if len(test.missingFilePath) > 0 {
+				customFile = test.missingFilePath
 			}
 
 			genesisBytes, _, err := Genesis(test.networkID, customFile)
