@@ -113,15 +113,14 @@ func validateConfig(networkID uint32, config *Config) error {
 //    (ie the genesis state of the network)
 // 2) The asset ID of AVAX
 func Genesis(networkID uint32, filepath string) ([]byte, ids.ID, error) {
-	var config *Config
+	config := GetConfig(networkID)
 	if len(filepath) > 0 && networkID != constants.MainnetID && networkID != constants.TestnetID {
 		customConfig, err := GetConfigFile(filepath)
 		if err != nil {
 			return nil, ids.ID{}, fmt.Errorf("unable to load provided genesis config at %s: %w", filepath, err)
 		}
+
 		config = customConfig
-	} else {
-		config = GetConfig(networkID)
 	}
 
 	if err := validateConfig(networkID, config); err != nil {
