@@ -94,18 +94,18 @@ func (i *issuer) Update() {
 				epoch,
 				validTransitions,
 				[][]ids.ID{invalidTransitions},
-				false, // force
-				false, // empty
-				true,  // updatedEpoch
+				false,          // force
+				false,          // empty
+				i.updatedEpoch, // updatedEpoch
 			)
 		} else {
 			err = i.t.batch(
 				epoch,
 				validTransitions,
-				nil,   // restrictions
-				false, // force
-				false, // empty
-				true,  // updatedEpoch
+				nil,            // restrictions
+				false,          // force
+				false,          // empty
+				i.updatedEpoch, // updatedEpoch
 			)
 		}
 		i.t.errs.Add(err)
