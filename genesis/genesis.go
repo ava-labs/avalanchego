@@ -32,6 +32,67 @@ const (
 	codecVersion    = 0
 )
 
+// validateConfig returns an error if the provided
+// *Config is not considered valid.
+func validateConfig(networkID uint32, config *Config) error {
+	errs := wrappers.Errs{}
+	if networkID != config.NetworkID {
+		errs.Add(fmt.Errorf(
+			"networkID %d specified but genesis config contains networkID %d",
+			networkID,
+			config.NetworkID,
+		))
+	}
+
+	startTime := time.Unix(int64(config.StartTime), 0)
+	if time.Since(startTime) < 0 {
+		errs.Add(fmt.Errorf(
+			"start time cannot be in the future: %s",
+			startTime,
+		))
+	}
+
+	initialSupply, err := config.InitialSupply()
+	switch {
+	case err != nil:
+		errs.Add(fmt.Errorf("unable to calculate initial supply: %w", err))
+	case initialSupply == 0:
+		errs.Add(errors.New("initial supply must be > 0"))
+	}
+
+	if len(config.InitialStakers) == 0 {
+		errs.Add(errors.New("initial stakers must be > 0"))
+	}
+
+	// We don't impose any restrictions on the minimum
+	// stake duration to enable complex testing configurations
+	// but recommend setting a minimum duration of at least
+	// 15 minutes.
+	if config.InitialStakeDuration == 0 {
+		errs.Add(errors.New("initial stake duration must be > 0"))
+	}
+
+	offsetTimeRequired := config.InitialStakeDurationOffset * uint64(len(config.InitialStakers)-1)
+	if offsetTimeRequired > config.InitialStakeDuration {
+		errs.Add(fmt.Errorf(
+			"initial stake duration is %s but need at least %s with offset of %s",
+			time.Duration(config.InitialStakeDuration)*time.Second,
+			time.Duration(offsetTimeRequired)*time.Second,
+			time.Duration(config.InitialStakeDurationOffset)*time.Second,
+		))
+	}
+
+	if len(config.CChainGenesis) == 0 {
+		errs.Add(errors.New("C-Chain genesis cannot be empty"))
+	}
+
+	if len(config.Message) == 0 {
+		errs.Add(errors.New("genesis message cannot be empty"))
+	}
+
+	return errs.Err
+}
+
 // Genesis returns the genesis data of the Platform Chain.
 //
 // Since an Avalanche network has exactly one Platform Chain, and the Platform
@@ -39,31 +100,35 @@ const (
 // exist, etc.), defining the genesis state of the Platform Chain is the same as
 // defining the genesis state of the network.
 //
-// The ID of the new network is [networkID].
-
+// Geneses accepts:
+// 1) The ID of the new network. [networkID]
+// 2) The location of a custom genesis config to load. [filepath]
+//
+// If [filepath] is empty or the given network ID is Mainnet or Testnet, loads the
+// network genesis state from predefined configs. If [filepath] is non-empty and networkID
+// isn't Mainnet or Testnet, loads the network genesis data from the config at [filepath].
+//
 // Genesis returns:
 // 1) The byte representation of the genesis state of the platform chain
 //    (ie the genesis state of the network)
 // 2) The asset ID of AVAX
-func Genesis(networkID uint32, filePath string) ([]byte, ids.ID, error) {
-	if len(filePath) == 0 || networkID == constants.MainnetID || networkID == constants.TestnetID {
-		return FromConfig(GetConfig(networkID))
+func Genesis(networkID uint32, filepath string) ([]byte, ids.ID, error) {
+	var config *Config
+	if len(filepath) > 0 && networkID != constants.MainnetID && networkID != constants.TestnetID {
+		customConfig, err := GetConfigFile(filepath)
+		if err != nil {
+			return nil, ids.ID{}, fmt.Errorf("unable to load provided genesis config at %s: %w", filepath, err)
+		}
+		config = customConfig
+	} else {
+		config = GetConfig(networkID)
 	}
 
-	customConfig, err := GetConfigFile(filePath)
-	if err != nil {
-		return nil, ids.ID{}, fmt.Errorf("unable to load provided genesis config at %s: %w", filePath, err)
+	if err := validateConfig(networkID, config); err != nil {
+		return nil, ids.ID{}, fmt.Errorf("genesis config validation failed: %w", err)
 	}
 
-	if customConfig.NetworkID != networkID {
-		return nil, ids.ID{}, fmt.Errorf(
-			"networkID %d specified but genesis config contains networkID %d",
-			networkID,
-			customConfig.NetworkID,
-		)
-	}
-
-	return FromConfig(customConfig)
+	return FromConfig(config)
 }
 
 // FromConfig returns:

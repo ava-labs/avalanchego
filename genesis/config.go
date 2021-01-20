@@ -78,7 +78,7 @@ type Config struct {
 	StartTime                  uint64        `json:"startTime"`
 	InitialStakeDuration       uint64        `json:"initialStakeDuration"`
 	InitialStakeDurationOffset uint64        `json:"initialStakeDurationOffset"`
-	InitialStakedFunds         []ids.ShortID `json:"unitialStakedFunds"`
+	InitialStakedFunds         []ids.ShortID `json:"initialStakedFunds"`
 	InitialStakers             []Staker      `json:"initialStakers"`
 
 	CChainGenesis string `json:"cChainGenesis"`
