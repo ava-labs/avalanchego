@@ -36,6 +36,113 @@ func TestAliases(t *testing.T) {
 	}
 }
 
+func TestValidateConfig(t *testing.T) {
+	tests := map[string]struct {
+		networkID uint32
+		config    *Config
+		err       string
+	}{
+		"mainnet": {
+			networkID: 1,
+			config:    &MainnetConfig,
+		},
+		"fuji": {
+			networkID: 5,
+			config:    &FujiConfig,
+		},
+		"local": {
+			networkID: 12345,
+			config:    &LocalConfig,
+		},
+		"mainnet (networkID mismatch)": {
+			networkID: 2,
+			config:    &MainnetConfig,
+			err:       "networkID 2 specified but genesis config contains networkID 1",
+		},
+		"invalid start time": {
+			networkID: 12345,
+			config: func() *Config {
+				thisConfig := LocalConfig
+				thisConfig.StartTime = 999999999999999
+				return &thisConfig
+			}(),
+			err: "start time cannot be in the future",
+		},
+		"no initial supply": {
+			networkID: 12345,
+			config: func() *Config {
+				thisConfig := LocalConfig
+				thisConfig.Allocations = []Allocation{}
+				return &thisConfig
+			}(),
+			err: "initial supply must be > 0",
+		},
+		"no initial stakers": {
+			networkID: 12345,
+			config: func() *Config {
+				thisConfig := LocalConfig
+				thisConfig.InitialStakers = []Staker{}
+				return &thisConfig
+			}(),
+			err: "initial stakers must be > 0",
+		},
+		"invalid initial stake duration": {
+			networkID: 12345,
+			config: func() *Config {
+				thisConfig := LocalConfig
+				thisConfig.InitialStakeDuration = 0
+				return &thisConfig
+			}(),
+			err: "initial stake duration must be > 0",
+		},
+		"invalid stake offset": {
+			networkID: 12345,
+			config: func() *Config {
+				thisConfig := LocalConfig
+				thisConfig.InitialStakeDurationOffset = 100000000
+				return &thisConfig
+			}(),
+			err: "initial stake duration is 31536000 but need at least 400000000 with offset of 100000000",
+		},
+		"empty C-Chain genesis": {
+			networkID: 12345,
+			config: func() *Config {
+				thisConfig := LocalConfig
+				thisConfig.CChainGenesis = ""
+				return &thisConfig
+			}(),
+			err: "C-Chain genesis cannot be empty",
+		},
+		"empty message": {
+			networkID: 12345,
+			config: func() *Config {
+				thisConfig := LocalConfig
+				thisConfig.Message = ""
+				return &thisConfig
+			}(),
+			err: "genesis message cannot be empty",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := validateConfig(test.networkID, test.config)
+			if len(test.err) > 0 {
+				if !strings.Contains(err.Error(), test.err) {
+					t.Fatalf(`expected error containing "%s" but got "%s"`,
+						test.err,
+						err.Error(),
+					)
+				}
+				return
+			}
+			if len(test.err) == 0 && err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 var (
 	customGenesisConfigJSON = `{
 		"networkID": 9999,
@@ -179,7 +286,7 @@ func TestGenesis(t *testing.T) {
 			genesisBytes, _, err := Genesis(test.networkID, customFile)
 			if len(test.err) > 0 {
 				if !strings.Contains(err.Error(), test.err) {
-					t.Fatalf(`expected error "%s" but got "%s"`,
+					t.Fatalf(`expected error containing "%s" but got "%s"`,
 						test.err,
 						err.Error(),
 					)

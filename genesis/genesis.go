@@ -75,10 +75,10 @@ func validateConfig(networkID uint32, config *Config) error {
 	offsetTimeRequired := config.InitialStakeDurationOffset * uint64(len(config.InitialStakers)-1)
 	if offsetTimeRequired > config.InitialStakeDuration {
 		errs.Add(fmt.Errorf(
-			"initial stake duration is %s but need at least %s with offset of %s",
-			time.Duration(config.InitialStakeDuration)*time.Second,
-			time.Duration(offsetTimeRequired)*time.Second,
-			time.Duration(config.InitialStakeDurationOffset)*time.Second,
+			"initial stake duration is %d but need at least %d with offset of %d",
+			config.InitialStakeDuration,
+			offsetTimeRequired,
+			config.InitialStakeDurationOffset,
 		))
 	}
 
