@@ -78,7 +78,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(configFileKey, defaultString, "Specifies a config file")
 
 	// Genesis Config File:
-	fs.String(genesisConfigFileKey, "", "Specifies a genesis config file")
+	fs.String(genesisConfigFileKey, "", "Specifies a genesis config file (ignored when running standard networks)")
 
 	// NetworkID:
 	fs.String(networkNameKey, defaultNetworkName, "Network ID this node will connect to")

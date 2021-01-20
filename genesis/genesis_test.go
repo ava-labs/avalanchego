@@ -146,7 +146,7 @@ func TestGenesis(t *testing.T) {
 		"local with custom (networkID mismatch)": {
 			networkID:    9999,
 			customConfig: localGenesisConfigJSON,
-			err:          "networkID 9999 loaded but genesis file contains networkID 12345",
+			err:          "networkID 9999 specified but genesis config contains networkID 12345",
 		},
 		"local with custom (invalid format)": {
 			networkID:    9999,
@@ -160,7 +160,7 @@ func TestGenesis(t *testing.T) {
 			var customFile string
 			if len(test.customConfig) > 0 {
 				customFile = path.Join(t.TempDir(), "config.json")
-				err := ioutil.WriteFile(customFile, []byte(test.customConfig), 0644)
+				err := ioutil.WriteFile(customFile, []byte(test.customConfig), 0600)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -169,7 +169,7 @@ func TestGenesis(t *testing.T) {
 			genesisBytes, _, err := Genesis(test.networkID, customFile)
 			if len(test.err) > 0 {
 				if !strings.Contains(err.Error(), test.err) {
-					t.Fatalf("expected error %s but got %s",
+					t.Fatalf(`expected error "%s" but got "%s"`,
 						test.err,
 						err.Error(),
 					)
@@ -182,7 +182,7 @@ func TestGenesis(t *testing.T) {
 
 			genesisHash := fmt.Sprintf("%x", hashing.ComputeHash256(genesisBytes))
 			if genesisHash != test.expected {
-				t.Fatalf("expected genesis hash %s but got %s",
+				t.Fatalf(`expected genesis hash "%s" but got "%s"`,
 					test.expected,
 					genesisHash,
 				)
