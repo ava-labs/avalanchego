@@ -130,11 +130,6 @@ func (service *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, reply *a
 	return service.httpServer.AddAliasesWithReadLock("bc/"+chainID.String(), "bc/"+args.Alias)
 }
 
-// GetAliasesOfChainArgs are the arguments for calling GetAliasesOfChain
-type GetAliasesOfChainArgs struct {
-	Chain string `json:"chain"`
-}
-
 // GetChainAliasesArgs are the arguments for calling GetChainAliases
 type GetChainAliasesArgs struct {
 	Chain string `json:"chain"`
