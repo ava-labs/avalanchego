@@ -10,6 +10,12 @@ if [[ $TRAVIS_REPO_SLUG != "ava-labs/avalanchego" || -z "$DOCKER_USERNAME"  ]]; 
   exit 0;
 fi
 
+# Skip if this is a non-standard branch/PR build
+if [[ $BRANCH != "master" && $BRANCH != "dev" ]]; then
+    echo "Skipping after success script for build on branch: $BRANCH"
+    exit 0
+fi
+
 FULL_COMMIT_HASH="$(git --git-dir="$AVALANCHE_HOME/.git" rev-parse HEAD)"
 COMMIT="${FULL_COMMIT_HASH::8}"
 
