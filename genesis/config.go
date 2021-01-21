@@ -210,11 +210,11 @@ func GetConfig(networkID uint32) *Config {
 }
 
 // GetConfigFile loads a *Config from a provided
-// filePath.
-func GetConfigFile(filePath string) (*Config, error) {
-	b, err := ioutil.ReadFile(path.Clean(filePath))
+// filepath.
+func GetConfigFile(filepath string) (*Config, error) {
+	b, err := ioutil.ReadFile(path.Clean(filepath))
 	if err != nil {
-		return nil, fmt.Errorf("unable to load file %s: %w", filePath, err)
+		return nil, fmt.Errorf("unable to load file %s: %w", filepath, err)
 	}
 
 	var unparsedConfig UnparsedConfig

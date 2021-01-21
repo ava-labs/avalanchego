@@ -256,7 +256,7 @@ func TestGenesis(t *testing.T) {
 	tests := map[string]struct {
 		networkID       uint32
 		customConfig    string
-		missingFilePath string
+		missingFilepath string
 		err             string
 		expected        string
 	}{
@@ -290,7 +290,7 @@ func TestGenesis(t *testing.T) {
 		},
 		"local with custom (missing filepath)": {
 			networkID:       9999,
-			missingFilePath: "missing.json",
+			missingFilepath: "missing.json",
 			err:             "unable to load provided genesis config",
 		},
 	}
@@ -306,8 +306,8 @@ func TestGenesis(t *testing.T) {
 				}
 			}
 
-			if len(test.missingFilePath) > 0 {
-				customFile = test.missingFilePath
+			if len(test.missingFilepath) > 0 {
+				customFile = test.missingFilepath
 			}
 
 			genesisBytes, _, err := Genesis(test.networkID, customFile)

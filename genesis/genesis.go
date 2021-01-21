@@ -28,43 +28,99 @@ import (
 )
 
 const (
-	defaultEncoding = formatting.Hex
-	codecVersion    = 0
+	defaultEncoding    = formatting.Hex
+	codecVersion       = 0
+	configChainIDAlias = "X"
 )
+
+// validateInitialStakedFunds ensures all staked
+// funds have allocations and that all staked
+// funds are unique.
+//
+// This function assumes that NetworkID in *Config has already
+// been checked for correctness.
+func validateInitialStakedFunds(config *Config) error {
+	if len(config.InitialStakedFunds) == 0 {
+		return errors.New("initial staked funds cannot be empty")
+	}
+
+	allocationSet := ids.ShortSet{}
+	initialStakedFundsSet := ids.ShortSet{}
+	for _, allocation := range config.Allocations {
+		// It is ok to have duplicates as different
+		// ethAddrs could claim to the same avaxAddr.
+		allocationSet.Add(allocation.AVAXAddr)
+	}
+
+	for _, staker := range config.InitialStakedFunds {
+		if initialStakedFundsSet.Contains(staker) {
+			avaxAddr, err := formatting.FormatAddress(
+				configChainIDAlias,
+				constants.GetHRP(config.NetworkID),
+				staker.Bytes(),
+			)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to format address from %s",
+					staker.String(),
+				)
+			}
+
+			return fmt.Errorf(
+				"address %s is duplicated in initial staked funds",
+				avaxAddr,
+			)
+		}
+		initialStakedFundsSet.Add(staker)
+
+		if !allocationSet.Contains(staker) {
+			avaxAddr, err := formatting.FormatAddress(
+				configChainIDAlias,
+				constants.GetHRP(config.NetworkID),
+				staker.Bytes(),
+			)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to format address from %s",
+					staker.String(),
+				)
+			}
+
+			return fmt.Errorf(
+				"address %s does not have an allocation to stake",
+				avaxAddr,
+			)
+		}
+	}
+
+	return nil
+}
 
 // validateConfig returns an error if the provided
 // *Config is not considered valid.
 func validateConfig(networkID uint32, config *Config) error {
-	errs := wrappers.Errs{}
 	if networkID != config.NetworkID {
-		errs.Add(fmt.Errorf(
+		return fmt.Errorf(
 			"networkID %d specified but genesis config contains networkID %d",
 			networkID,
 			config.NetworkID,
-		))
-	}
-
-	allocationSet := map[ids.ShortID]struct{}{}
-	for _, allocation := range config.Allocations {
-		// It is ok to have duplicates as different
-		// ethAddrs could claim to the same avaxAddr.
-		allocationSet[allocation.AVAXAddr] = struct{}{}
+		)
 	}
 
 	initialSupply, err := config.InitialSupply()
 	switch {
 	case err != nil:
-		errs.Add(fmt.Errorf("unable to calculate initial supply: %w", err))
+		return fmt.Errorf("unable to calculate initial supply: %w", err)
 	case initialSupply == 0:
-		errs.Add(errors.New("initial supply must be > 0"))
+		return errors.New("initial supply must be > 0")
 	}
 
 	startTime := time.Unix(int64(config.StartTime), 0)
 	if time.Since(startTime) < 0 {
-		errs.Add(fmt.Errorf(
+		return fmt.Errorf(
 			"start time cannot be in the future: %s",
 			startTime,
-		))
+		)
 	}
 
 	// We don't impose any restrictions on the minimum
@@ -72,80 +128,36 @@ func validateConfig(networkID uint32, config *Config) error {
 	// but recommend setting a minimum duration of at least
 	// 15 minutes.
 	if config.InitialStakeDuration == 0 {
-		errs.Add(errors.New("initial stake duration must be > 0"))
+		return errors.New("initial stake duration must be > 0")
 	}
 
 	if len(config.InitialStakers) == 0 {
-		errs.Add(errors.New("initial stakers must be > 0"))
+		return errors.New("initial stakers must be > 0")
 	}
 
 	offsetTimeRequired := config.InitialStakeDurationOffset * uint64(len(config.InitialStakers)-1)
 	if offsetTimeRequired > config.InitialStakeDuration {
-		errs.Add(fmt.Errorf(
+		return fmt.Errorf(
 			"initial stake duration is %d but need at least %d with offset of %d",
 			config.InitialStakeDuration,
 			offsetTimeRequired,
 			config.InitialStakeDurationOffset,
-		))
+		)
 	}
 
-	if len(config.InitialStakedFunds) == 0 {
-		errs.Add(errors.New("initial staked funds cannot be empty"))
-	}
-
-	initialStakedFundsSet := map[ids.ShortID]struct{}{}
-	for _, staker := range config.InitialStakedFunds {
-		if _, ok := initialStakedFundsSet[staker]; ok {
-			avaxAddr, err := formatting.FormatAddress(
-				"X",
-				constants.GetHRP(networkID),
-				staker.Bytes(),
-			)
-			if err != nil {
-				errs.Add(fmt.Errorf(
-					"unable to format address from %s",
-					staker.String(),
-				))
-				continue
-			}
-
-			errs.Add(fmt.Errorf(
-				"address %s is duplicated in initial staked funds",
-				avaxAddr,
-			))
-		}
-		initialStakedFundsSet[staker] = struct{}{}
-
-		if _, ok := allocationSet[staker]; !ok {
-			avaxAddr, err := formatting.FormatAddress(
-				"X",
-				constants.GetHRP(networkID),
-				staker.Bytes(),
-			)
-			if err != nil {
-				errs.Add(fmt.Errorf(
-					"unable to format address from %s",
-					staker.String(),
-				))
-				continue
-			}
-
-			errs.Add(fmt.Errorf(
-				"address %s does not have an allocation to stake",
-				avaxAddr,
-			))
-		}
+	if err := validateInitialStakedFunds(config); err != nil {
+		return fmt.Errorf("initial staked funds validation failed: %w", err)
 	}
 
 	if len(config.CChainGenesis) == 0 {
-		errs.Add(errors.New("C-Chain genesis cannot be empty"))
+		return errors.New("C-Chain genesis cannot be empty")
 	}
 
 	if len(config.Message) == 0 {
-		errs.Add(errors.New("genesis message cannot be empty"))
+		return errors.New("genesis message cannot be empty")
 	}
 
-	return errs.Err
+	return nil
 }
 
 // Genesis returns the genesis data of the Platform Chain.
