@@ -5,6 +5,7 @@ package admin
 
 import (
 	"errors"
+	"github.com/ava-labs/avalanchego/ids"
 	"io/ioutil"
 	"net/http"
 
@@ -133,21 +134,27 @@ type GetAliasesOfChainArgs struct {
 	Chain string `json:"chain"`
 }
 
-// GetAliasesOfChainArgs are the arguments for calling GetAliasesOfChain
-type GetAliasesOfChainReply struct {
+
+// GetChainAliasesArgs are the arguments for calling GetChainAliases
+type GetChainAliasesArgs struct{
+	Chain string `json:"chain"`
+}
+
+// GetChainAliasesReply are the aliases of the given chain
+type GetChainAliasesReply struct {
 	Aliases []string `json:"aliases"`
 }
 
-// GetAliasesOfChain returns the all aliases of a chain
-func (service *Admin) GetAliasesOfChain(_ *http.Request, args *GetAliasesOfChainArgs, reply *GetAliasesOfChainReply) error {
-	service.log.Info("Admin: GetAliasesOfChain called with Chain: %s", args.Chain)
+// GetChainAliases returns the aliases of the chain
+func (service *Admin) GetChainAliases(r *http.Request, args *GetChainAliasesArgs, reply *GetChainAliasesReply) error {
+	service.log.Info("Admin: GetChainAliases called with Chain: %s", args.Chain)
 
-	chainID, err := service.chainManager.Lookup(args.Chain)
+	ID, err := ids.FromString(args.Chain)
 	if err != nil {
 		return err
 	}
 
-	reply.Aliases = service.chainManager.Aliases(chainID)
+	reply.Aliases = service.chainManager.Aliases(ID)
 	return nil
 }
 

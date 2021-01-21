@@ -5,7 +5,7 @@ package admin
 
 import (
 	"errors"
-	"reflect"
+	"github.com/stretchr/testify/assert"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -57,8 +57,8 @@ func (mc *mockClient) SendRequest(method string, params interface{}, reply inter
 	case *api.SuccessResponse:
 		response := mc.response.(api.SuccessResponse)
 		*p = response
-	case *GetAliasesOfChainReply:
-		response := mc.response.(*GetAliasesOfChainReply)
+	case *GetChainAliasesReply:
+		response := mc.response.(*GetChainAliasesReply)
 		*p = *response
 	default:
 		panic("illegal type")
@@ -180,31 +180,25 @@ func TestAliasChain(t *testing.T) {
 	}
 }
 
-func TestGetAliasesOfChain(t *testing.T) {
+func TestGetChainAliases(t *testing.T) {
 	t.Run("successful", func(t *testing.T) {
-		expectedReply := &GetAliasesOfChainReply{
+		expectedReply := &GetChainAliasesReply{
 			Aliases: []string{"alias1", "alias2"},
 		}
 		mockClient := Client{requester: NewMockClient(expectedReply, nil)}
 
-		reply, err := mockClient.GetAliasesOfChain("chain")
+		reply, err := mockClient.GetChainAliases("chain")
 
-		if err != nil {
-			t.Fatalf("Unexepcted error: %s", err)
-		}
-		if !reflect.DeepEqual(expectedReply, reply) {
-			t.Fatalf("Expected response to be: %v, but found: %v", expectedReply, reply)
-		}
+		assert.NoError(t,err)
+		assert.ElementsMatch(t, expectedReply.Aliases, reply.Aliases)
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		mockClient := Client{requester: NewMockClient(&GetAliasesOfChainReply{}, errors.New("some error"))}
+		mockClient := Client{requester: NewMockClient(&GetChainAliasesReply{}, errors.New("some error"))}
 
-		_, err := mockClient.GetAliasesOfChain("chain")
+		_, err := mockClient.GetChainAliases("chain")
 
-		if err == nil {
-			t.Fatalf("Expected error but got no error.")
-		}
+		assert.EqualError(t, err, "some error")
 	})
 }
 

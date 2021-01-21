@@ -70,10 +70,10 @@ func (c *Client) AliasChain(chain, alias string) (bool, error) {
 	return res.Success, err
 }
 
-// GetAliasesOfChain ...
-func (c *Client) GetAliasesOfChain(chain string) (*GetAliasesOfChainReply, error) {
-	res := &GetAliasesOfChainReply{}
-	err := c.requester.SendRequest("getAliasesOfChain", &AliasChainArgs{
+// GetChainAliases ...
+func (c *Client) GetChainAliases(chain string) (*GetChainAliasesReply, error) {
+	res := &GetChainAliasesReply{}
+	err := c.requester.SendRequest("getChainAliases", &GetChainAliasesArgs{
 		Chain: chain,
 	}, res)
 	return res, err
