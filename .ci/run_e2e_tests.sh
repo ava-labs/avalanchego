@@ -3,8 +3,12 @@ SRC_PATH=$(dirname "${SCRIPTS_PATH}")
 
 # Skip the E2E Tests if this is not a PR and it 
 if [[ $BRANCH != "master" && $BRANCH != "dev" ]]; then
-    echo "Skipping E2E Tests for $BRANCH"
+    echo "Skipping E2E Tests for branch: $BRANCH"
     exit 0
+fi
+
+if [[ -n ${DOCKER_USERNAME} ]]; then
+    echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
 fi
 
 # Build the runnable Avalanche docker image
@@ -46,7 +50,6 @@ if [[ -z ${DOCKER_USERNAME} ]]; then
     echo "Skipping Byzantine Tests because Docker Credentials were not present."
     BYZANTINE_IMAGE=""
 else
-    echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
     docker pull "${BYZANTINE_IMAGE}"
 fi
 
