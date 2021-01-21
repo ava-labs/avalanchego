@@ -265,30 +265,39 @@ func TestGenesis(t *testing.T) {
 			expected:  "3e6662fdbd88bcf4c7dd82cb4699c0807f1d7315d493bc38532697e11b226276",
 		},
 		"fuji": {
+			networkID: constants.FujiID,
+			expected:  "2e6b699298a664793bff42dae9c1af8d9c54645d8b376fd331e0b67475578e0a",
+		},
+		"fuji (with custom specified)": {
 			networkID:    constants.FujiID,
 			customConfig: localGenesisConfigJSON, // won't load
-			expected:     "2e6b699298a664793bff42dae9c1af8d9c54645d8b376fd331e0b67475578e0a",
+			err:          "cannot override genesis config for standard network fuji (5)",
 		},
-		"local without custom": {
+		"local": {
 			networkID: constants.LocalID,
 			expected:  "d036edc78cee38f003c529fa2ca3f95da47c7b87f5f3c0e126c9bf34e7f2285a",
 		},
-		"local with custom": {
+		"local (with custom specified)": {
+			networkID:    constants.LocalID,
+			customConfig: customGenesisConfigJSON,
+			err:          "cannot override genesis config for standard network local (12345)",
+		},
+		"custom": {
 			networkID:    9999,
 			customConfig: customGenesisConfigJSON,
 			expected:     "a1d1838586db85fe94ab1143560c3356df9ba2445794b796bba050be89f4fcb4",
 		},
-		"local with custom (networkID mismatch)": {
+		"custom (networkID mismatch)": {
 			networkID:    9999,
 			customConfig: localGenesisConfigJSON,
 			err:          "networkID 9999 specified but genesis config contains networkID 12345",
 		},
-		"local with custom (invalid format)": {
+		"custom (invalid format)": {
 			networkID:    9999,
 			customConfig: invalidGenesisConfigJSON,
 			err:          "unable to load provided genesis config",
 		},
-		"local with custom (missing filepath)": {
+		"custom (missing filepath)": {
 			networkID:       9999,
 			missingFilepath: "missing.json",
 			err:             "unable to load provided genesis config",

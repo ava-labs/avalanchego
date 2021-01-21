@@ -171,9 +171,9 @@ func validateConfig(networkID uint32, config *Config) error {
 // 1) The ID of the new network. [networkID]
 // 2) The location of a custom genesis config to load. [filepath]
 //
-// If [filepath] is empty or the given network ID is Mainnet or Testnet, loads the
+// If [filepath] is empty or the given network ID is Mainnet, Testnet, or Local, loads the
 // network genesis state from predefined configs. If [filepath] is non-empty and networkID
-// isn't Mainnet or Testnet, loads the network genesis data from the config at [filepath].
+// isn't Mainnet, Testnet, or Local, loads the network genesis data from the config at [filepath].
 //
 // Genesis returns:
 // 1) The byte representation of the genesis state of the platform chain
@@ -181,7 +181,16 @@ func validateConfig(networkID uint32, config *Config) error {
 // 2) The asset ID of AVAX
 func Genesis(networkID uint32, filepath string) ([]byte, ids.ID, error) {
 	config := GetConfig(networkID)
-	if len(filepath) > 0 && networkID != constants.MainnetID && networkID != constants.TestnetID {
+	if len(filepath) > 0 {
+		switch networkID {
+		case constants.MainnetID, constants.TestnetID, constants.LocalID:
+			return nil, ids.ID{}, fmt.Errorf(
+				"cannot override genesis config for standard network %s (%d)",
+				constants.NetworkName(networkID),
+				networkID,
+			)
+		}
+
 		customConfig, err := GetConfigFile(filepath)
 		if err != nil {
 			return nil, ids.ID{}, fmt.Errorf("unable to load provided genesis config at %s: %w", filepath, err)
