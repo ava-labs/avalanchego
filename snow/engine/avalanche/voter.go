@@ -93,21 +93,21 @@ func (v *voter) bubbleVotes(votes ids.UniqueBag) (ids.UniqueBag, error) {
 		status := vtx.Status()
 
 		if !status.Fetched() {
-			v.t.Ctx.Log.Debug("Dropping %d vote(s) for %s because the vertex is unknown",
+			v.t.Ctx.Log.Verbo("Dropping %d vote(s) for %s because the vertex is unknown",
 				set.Len(), vtxID)
 			votes.RemoveSet(vtxID)
 			continue
 		}
 
 		if status.Decided() {
-			v.t.Ctx.Log.Debug("Dropping %d vote(s) for %s because the vertex is decided as %s",
+			v.t.Ctx.Log.Verbo("Dropping %d vote(s) for %s because the vertex is decided as %s",
 				set.Len(), vtxID, status)
 			votes.RemoveSet(vtxID)
 			continue
 		}
 
 		if !v.t.Consensus.VertexIssued(vtx) {
-			v.t.Ctx.Log.Debug("Bubbling %d vote(s) for %s because the vertex isn't issued",
+			v.t.Ctx.Log.Verbo("Bubbling %d vote(s) for %s because the vertex isn't issued",
 				set.Len(), vtxID)
 			votes.RemoveSet(vtxID) // Remove votes for this vertex because it hasn't been issued
 
