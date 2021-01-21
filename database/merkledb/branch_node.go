@@ -311,6 +311,30 @@ func (b *BranchNode) Key() Key {
 	return b.SharedAddress
 }
 
+// GetChildrenHashes returns the BranchNode Child Hashes
+func (b *BranchNode) GetChildrenHashes() [][]byte {
+	var children [][]byte
+	for _, hash := range b.Nodes {
+		if len(hash) != 0 {
+			children = append(children, hash)
+		}
+	}
+	return children
+}
+
+func (b *BranchNode) GetReHash() []byte {
+	hashSet := make([][]byte, UnitSize+1)
+	hashSet[0] = b.SharedAddress.ToExpandedBytes()
+
+	i := 1
+	for _, childHash := range b.Nodes {
+		hashSet[i] = childHash
+		i++
+	}
+
+	return Hash(hashSet...)
+}
+
 // Print prints the node
 func (b *BranchNode) Print() {
 	fmt.Printf("Branch ID: %x - SharedAddress: %v - Parent: %p \n\t↪ Nodes: ", b.GetHash(), b.SharedAddress, b.parent)

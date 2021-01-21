@@ -18,6 +18,8 @@ type Node interface {
 	GetPreviousHash() []byte
 	References(change int32) int32
 	Key() Key
+	GetChildrenHashes() [][]byte
+	GetReHash() []byte
 	Print()
 }
 

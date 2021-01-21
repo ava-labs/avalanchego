@@ -108,13 +108,7 @@ func (r *RootNode) Value() []byte { return nil }
 func (r *RootNode) Hash(key Key, hash []byte) error {
 	r.Child = hash
 
-	rootIDByte := []byte{
-		byte(0xff & r.RootID),
-		byte(0xff & (r.RootID >> 8)),
-		byte(0xff & (r.RootID >> 16)),
-		byte(0xff & (r.RootID >> 24))}
-
-	r.StoredHash = Hash(rootIDByte, r.Child, r.Child)
+	r.StoredHash = Hash(rootNodeID(r.RootID), r.Child)
 
 	return r.persistence.StoreNode(r)
 }
@@ -133,6 +127,16 @@ func (r *RootNode) References(change int32) int32 {
 
 // Key should never be reached
 func (r *RootNode) Key() Key { return nil }
+
+// GetChildrenHashes will always return nil
+func (r *RootNode) GetChildrenHashes() [][]byte {
+	return [][]byte{r.Child}
+}
+
+// GetReHash should never be called
+func (r *RootNode) GetReHash() []byte {
+	return Hash(rootNodeID(r.RootID), r.Child)
+}
 
 // Print prints the child and requests the child to print itself
 func (r *RootNode) Print() {

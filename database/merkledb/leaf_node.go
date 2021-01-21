@@ -121,6 +121,15 @@ func (l *LeafNode) Key() Key {
 	return l.LeafKey
 }
 
+// GetChildrenHashes will always return nil
+func (l *LeafNode) GetChildrenHashes() [][]byte {
+	return nil
+}
+
+func (l *LeafNode) GetReHash() []byte {
+	return Hash(l.LeafValue, l.LeafKey.ToExpandedBytes())
+}
+
 // Print prints this Node data
 func (l *LeafNode) Print() {
 	fmt.Printf("Leaf ID: %x - Parent: %p - Key: %v - Val: %v\n", l.GetHash(), l.parent, l.LeafKey, l.LeafValue)

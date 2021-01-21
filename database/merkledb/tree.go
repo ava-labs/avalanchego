@@ -224,6 +224,46 @@ func (t *Tree) SelectRoot(treeRoot uint32) error {
 	return nil
 }
 
+func (t *Tree) GetNode(hash []byte) (Node, error) {
+	if t.isClosed() != nil {
+		return nil, t.isClosed()
+	}
+
+	return t.persistence.GetNodeByHash(hash)
+}
+
+// PutRootNode inserts a rootNode
+func (t *Tree) PutRootNode(node Node) error {
+	if t.isClosed() != nil {
+		return t.isClosed()
+	}
+
+	err := t.persistence.StoreNode(node)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// PutNodeAndCheck inserts a node in the tree and checks if the hash is correct
+func (t *Tree) PutNodeAndCheck(node Node, parentHash []byte) error {
+	if t.isClosed() != nil {
+		return t.isClosed()
+	}
+
+	if !bytes.Equal(node.GetReHash(), parentHash) {
+		return fmt.Errorf("node hash is not the same as the parent Hash")
+	}
+
+	err := t.persistence.StoreNode(node)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (t *Tree) put(key []byte, value []byte) error {
 	if t.isClosed() != nil {
 		return t.isClosed()

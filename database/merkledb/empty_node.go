@@ -64,6 +64,16 @@ func (e *EmptyNode) Key() Key {
 	return e.key
 }
 
+// GetChildrenHashes should never be called
+func (e *EmptyNode) GetChildrenHashes() [][]byte {
+	return nil
+}
+
+// GetReHash should never be called
+func (e *EmptyNode) GetReHash() []byte {
+	return nil
+}
+
 // Print should never be called
 func (e *EmptyNode) Print() {
 	fmt.Printf("ERROR: should never be called EmptyNode ID: %p - Parent: %p", e, e.parent)

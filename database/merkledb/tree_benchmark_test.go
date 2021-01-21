@@ -43,7 +43,8 @@ func BenchmarkTree_Put(b *testing.B) {
 	}
 
 	for _, test := range tests {
-		tree := NewLevelTree(test.name)
+		tmpDir := b.TempDir()
+		tree := NewLevelTree(tmpDir)
 
 		b.Run(test.name, func(b *testing.B) {
 			b.ResetTimer()
@@ -52,7 +53,7 @@ func BenchmarkTree_Put(b *testing.B) {
 				_ = tree.Put(test.key, test.value)
 			}
 		})
-		_ = tree.persistence.db.Close()
+		_ = tree.Close()
 	}
 }
 
@@ -67,7 +68,8 @@ func BenchmarkTree_PutBatch(b *testing.B) {
 	}
 
 	for _, test := range tests {
-		tree := NewLevelTree(test.name)
+		tmpDir := b.TempDir()
+		tree := NewLevelTree(tmpDir)
 		batcher := NewBatch(tree)
 
 		b.Run(test.name, func(b *testing.B) {
@@ -78,7 +80,7 @@ func BenchmarkTree_PutBatch(b *testing.B) {
 			}
 			_ = batcher.Write()
 		})
-		_ = tree.persistence.db.Close()
+		_ = tree.Close()
 	}
 }
 
@@ -93,7 +95,8 @@ func BenchmarkTree_Get(b *testing.B) {
 	}
 
 	for _, test := range tests {
-		tree := NewLevelTree(test.name)
+		tmpDir := b.TempDir()
+		tree := NewLevelTree(tmpDir)
 		batchTree := NewBatch(tree)
 
 		b.Run(test.name, func(b *testing.B) {
@@ -112,7 +115,7 @@ func BenchmarkTree_Get(b *testing.B) {
 				}
 			}
 		})
-		_ = tree.persistence.db.Close()
+		_ = tree.Close()
 	}
 }
 
@@ -128,7 +131,8 @@ func BenchmarkTree_Del(b *testing.B) {
 	}
 
 	for _, test := range tests {
-		tree := NewLevelTree(test.name)
+		tmpDir := b.TempDir()
+		tree := NewLevelTree(tmpDir)
 
 		b.Run(test.name, func(b *testing.B) {
 			for _, test := range test.data {
@@ -144,7 +148,7 @@ func BenchmarkTree_Del(b *testing.B) {
 				}
 			}
 		})
-		_ = tree.persistence.db.Close()
+		_ = tree.Close()
 	}
 }
 
@@ -160,7 +164,8 @@ func BenchmarkTree_DelBatcher(b *testing.B) {
 	}
 
 	for _, test := range tests {
-		tree := NewLevelTree(test.name)
+		tmpDir := b.TempDir()
+		tree := NewLevelTree(tmpDir)
 		batcher := NewBatch(tree)
 
 		b.Run(test.name, func(b *testing.B) {
@@ -180,6 +185,6 @@ func BenchmarkTree_DelBatcher(b *testing.B) {
 			_ = batcher.Write()
 
 		})
-		_ = tree.persistence.db.Close()
+		_ = tree.Close()
 	}
 }
