@@ -5,9 +5,10 @@ package admin
 
 import (
 	"errors"
-	"github.com/ava-labs/avalanchego/ids"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/ava-labs/avalanchego/ids"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -134,9 +135,8 @@ type GetAliasesOfChainArgs struct {
 	Chain string `json:"chain"`
 }
 
-
 // GetChainAliasesArgs are the arguments for calling GetChainAliases
-type GetChainAliasesArgs struct{
+type GetChainAliasesArgs struct {
 	Chain string `json:"chain"`
 }
 

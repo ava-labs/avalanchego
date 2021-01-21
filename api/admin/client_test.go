@@ -5,8 +5,9 @@ package admin
 
 import (
 	"errors"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/utils/rpc"
@@ -189,7 +190,7 @@ func TestGetChainAliases(t *testing.T) {
 
 		reply, err := mockClient.GetChainAliases("chain")
 
-		assert.NoError(t,err)
+		assert.NoError(t, err)
 		assert.ElementsMatch(t, expectedReply.Aliases, reply.Aliases)
 	})
 
