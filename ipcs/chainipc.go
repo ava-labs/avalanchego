@@ -82,6 +82,7 @@ func (cipcs *ChainIPCs) Unpublish(chainID ids.ID) (bool, error) {
 	if !ok {
 		return false, nil
 	}
+	delete(cipcs.chains, chainID)
 	return true, chainIPCs.stop()
 }
 
