@@ -39,3 +39,10 @@ func (c *Client) UnpublishBlockchain(blockchainID string) (bool, error) {
 	}, res)
 	return res.Success, err
 }
+
+// GetPublishedBlockchains requests the node to get blockchains being published
+func (c *Client) GetPublishedBlockchains() (*GetPublishedBlockchainsReply, error) {
+	res := &GetPublishedBlockchainsReply{}
+	err := c.requester.SendRequest("getPublishedBlockchains", nil, res)
+	return res, err
+}

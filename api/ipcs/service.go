@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -96,4 +97,15 @@ func (ipc *IPCServer) UnpublishBlockchain(r *http.Request, args *UnpublishBlockc
 
 	reply.Success = true
 	return err
+}
+
+// GetPublishedBlockchainsReply is the result from calling GetPublishedBlockchains
+type GetPublishedBlockchainsReply struct {
+	Chains []ids.ID `json:"chains"`
+}
+
+// GetPublishedBlockchains returns blockchains being published
+func (ipc *IPCServer) GetPublishedBlockchains(r *http.Request, args *struct{}, reply *GetPublishedBlockchainsReply) error {
+	reply.Chains = ipc.ipcs.GetPublishedBlockchains()
+	return nil
 }
