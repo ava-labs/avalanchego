@@ -22,7 +22,7 @@ func (s *ServerCloser) Add(server *grpc.Server) {
 	defer s.lock.Unlock()
 
 	if s.closed {
-		server.Stop()
+		server.GracefulStop()
 	} else {
 		s.servers = append(s.servers, server)
 	}
@@ -35,6 +35,18 @@ func (s *ServerCloser) Stop() {
 
 	for _, server := range s.servers {
 		server.Stop()
+	}
+	s.closed = true
+	s.servers = nil
+}
+
+// GracefulStop ...
+func (s *ServerCloser) GracefulStop() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	for _, server := range s.servers {
+		server.GracefulStop()
 	}
 	s.closed = true
 	s.servers = nil

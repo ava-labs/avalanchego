@@ -31,6 +31,7 @@ func TestEngineShutdown(t *testing.T) {
 	config := DefaultConfig()
 	vmShutdownCalled := false
 	vm := &vertex.TestVM{}
+	vm.T = t
 	vm.ShutdownF = func() error { vmShutdownCalled = true; return nil }
 	config.VM = vm
 
