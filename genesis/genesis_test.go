@@ -147,7 +147,6 @@ func TestValidateConfig(t *testing.T) {
 				thisConfig.Message = ""
 				return &thisConfig
 			}(),
-			err: "genesis message cannot be empty",
 		},
 	}
 

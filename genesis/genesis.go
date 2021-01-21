@@ -153,10 +153,6 @@ func validateConfig(networkID uint32, config *Config) error {
 		return errors.New("C-Chain genesis cannot be empty")
 	}
 
-	if len(config.Message) == 0 {
-		return errors.New("genesis message cannot be empty")
-	}
-
 	return nil
 }
 
@@ -167,7 +163,7 @@ func validateConfig(networkID uint32, config *Config) error {
 // exist, etc.), defining the genesis state of the Platform Chain is the same as
 // defining the genesis state of the network.
 //
-// Geneses accepts:
+// Genesis accepts:
 // 1) The ID of the new network. [networkID]
 // 2) The location of a custom genesis config to load. [filepath]
 //
