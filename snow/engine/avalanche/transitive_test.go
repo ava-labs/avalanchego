@@ -3602,7 +3602,7 @@ func TestEngineBubbleVotes(t *testing.T) {
 		case pendingVtx1.ID():
 			return pendingVtx1, nil
 		}
-		t.Fatalf("unknown vertex")
+		assert.FailNow(t, "unknown vertex", "vtxID: %s", id)
 		panic("should have errored")
 	}
 
