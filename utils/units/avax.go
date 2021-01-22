@@ -7,8 +7,8 @@ package units
 const (
 	Gun       uint64 = 1
 	NanoAvax  uint64 = 1
-	MicroAvax uint64 = 1000 * NanoAvax
-	Schmeckle uint64 = 49*MicroAvax + 463*NanoAvax
+	MicroAvax uint64 = 1000 * Gun
+	Schmeckle uint64 = 49*MicroAvax + 463*Gun
 	MilliAvax uint64 = 1000 * MicroAvax
 	Avax      uint64 = 1000 * MilliAvax
 	KiloAvax  uint64 = 1000 * Avax
