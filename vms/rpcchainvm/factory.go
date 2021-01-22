@@ -29,10 +29,16 @@ func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 	// Ignore warning from launching an executable with a variable command
 	// because the command is a controlled and required input
 	// #nosec G204
+
+	userConfig := ""
+	if ctx != nil {
+		userConfig = ctx.Config.User
+	}
+
 	config := &plugin.ClientConfig{
 		HandshakeConfig: Handshake,
 		Plugins:         PluginMap,
-		Cmd:             exec.Command(f.Path, fmt.Sprintf("--config=%s", ctx.Config.User)),
+		Cmd:             exec.Command(f.Path, fmt.Sprintf("--config=%s", userConfig)),
 		AllowedProtocols: []plugin.Protocol{
 			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,

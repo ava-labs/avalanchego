@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/node"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
@@ -234,8 +235,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Subnet Whitelist
 	fs.String(whitelistedSubnetsKey, "", "Whitelist of subnets to validate.")
 
-	// Coreth Config
-	fs.String(corethConfigKey, defaultString, "Specifies config to pass into coreth")
+	// ChainConfigs
+	fs.String(chainConfigsKey, "", "Specifies config to pass into chains")
 
 	return fs
 }
@@ -667,22 +668,27 @@ func setNodeConfig(v *viper.Viper) error {
 	// Crypto
 	Config.EnableCrypto = v.GetBool(signatureVerificationEnabledKey)
 
-	// Coreth Plugin
-	corethConfigString := v.GetString(corethConfigKey)
-	if corethConfigString != defaultString {
-		corethConfigValue := v.Get(corethConfigKey)
-		switch value := corethConfigValue.(type) {
-		case string:
-			corethConfigString = value
-		default:
-			corethConfigBytes, err := json.Marshal(value)
-			if err != nil {
-				return fmt.Errorf("couldn't parse coreth config: %w", err)
-			}
-			corethConfigString = string(corethConfigBytes)
+	// ChainConfigs
+	chainConfigsString := v.GetString(chainConfigsKey)
+	if len(chainConfigsString) > 0 {
+		// use string because can't unmarshal ids.ID
+		m := map[string]snow.ChainConfig{}
+		if err := json.Unmarshal([]byte(chainConfigsString), &m); err != nil {
+			return fmt.Errorf("couldn't parse chain configs: %w", err)
 		}
+
+		config := map[ids.ID]snow.ChainConfig{}
+		for k, v := range m {
+			id, err := ids.FromString(k)
+			if err != nil {
+				return fmt.Errorf("couldn't parse chainID %s: %w", k, err)
+			}
+
+			config[id] = v
+		}
+
+		Config.ChainConfigs = config
 	}
-	Config.CorethConfig = corethConfigString
 
 	return nil
 }
