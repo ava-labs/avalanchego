@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
+	dbManager "github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
@@ -120,7 +120,7 @@ type ManagerConfig struct {
 	VMManager               vms.Manager // Manage mappings from vm ID --> vm
 	DecisionEvents          *triggers.EventDispatcher
 	ConsensusEvents         *triggers.EventDispatcher
-	DB                      database.Database
+	DBManager               dbManager.Manager
 	Router                  router.Router    // Routes incoming messages to the appropriate chain
 	Net                     network.Network  // Sends consensus messages to other validators
 	ConsensusParams         avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
@@ -399,8 +399,10 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	db := prefixdb.New(ctx.ChainID[:], m.DB)
-	vmDB := prefixdb.New([]byte("vm"), db)
+	dbManager := m.DBManager.NewPrefixDBManager(ctx.ChainID[:])
+	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
+
+	db := dbManager.Current()
 	vertexDB := prefixdb.New([]byte("vertex"), db)
 	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db)
 	txBootstrappingDB := prefixdb.New([]byte("tx_bs"), db)
@@ -418,7 +420,7 @@ func (m *manager) createAvalancheChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
-	if err := vm.Initialize(ctx, vmDB, genesisData, msgChan, fxs); err != nil {
+	if err := vm.Initialize(ctx, vmDBManager, genesisData, nil, nil, msgChan, fxs); err != nil {
 		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
 	}
 
@@ -511,8 +513,10 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	db := prefixdb.New(ctx.ChainID[:], m.DB)
-	vmDB := prefixdb.New([]byte("vm"), db)
+	dbManager := m.DBManager.NewPrefixDBManager(ctx.ChainID[:])
+	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
+
+	db := dbManager.Current()
 	bootstrappingDB := prefixdb.New([]byte("bs"), db)
 
 	blocked, err := queue.New(bootstrappingDB)
@@ -525,7 +529,7 @@ func (m *manager) createSnowmanChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	// Initialize the VM
-	if err := vm.Initialize(ctx, vmDB, genesisData, msgChan, fxs); err != nil {
+	if err := vm.Initialize(ctx, vmDBManager, genesisData, nil, nil, msgChan, fxs); err != nil {
 		return nil, err
 	}
 

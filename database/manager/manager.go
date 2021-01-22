@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package database
+package manager
 
 import (
 	"fmt"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -81,9 +82,28 @@ func (m *manager) wrapManager(wrap func(db *SemanticDatabase) (*SemanticDatabase
 	return &manager{databases: databases}, nil
 }
 
-// CreateManager creates a database manager at [filePath] by creating a database instance from each directory
+// NewMemDBManager creates a database manager with a single database in memory
+// with version [currentVersion]
+func NewMemDBManager(currentVersion version.Version) Manager {
+	return &manager{
+		databases: []*SemanticDatabase{
+			{
+				Database: memdb.New(),
+				Version:  currentVersion,
+			},
+		},
+	}
+}
+
+// NewDefaultMemDBManager returns a database manager with a single memory db instance
+// with a default version of v1.0.0
+func NewDefaultMemDBManager() Manager {
+	return NewMemDBManager(version.NewDefaultVersion(1, 0, 0))
+}
+
+// New creates a database manager at [filePath] by creating a database instance from each directory
 // and is less than or equal to the specified version
-func CreateManager(dbDirPath string, currentVersion version.Version) (Manager, error) {
+func New(dbDirPath string, currentVersion version.Version) (Manager, error) {
 	parser := version.NewDefaultParser()
 
 	currentDBPath := path.Join(dbDirPath, currentVersion.String())

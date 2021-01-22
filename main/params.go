@@ -18,8 +18,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/ava-labs/avalanchego/database/leveldb"
-	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
@@ -35,10 +34,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/password"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/version"
 )
 
-const (
-	dbVersion = "v1.0.0"
+var (
+	dbVersion = version.NewDefaultVersion(1, 0, 0)
 )
 
 // Results of parsing the CLI
@@ -319,14 +319,15 @@ func setNodeConfig(v *viper.Viper) error {
 			dbDir = defaultDbDir
 		}
 		dbDir = os.ExpandEnv(dbDir) // parse any env variables
-		dbPath := path.Join(dbDir, constants.NetworkName(Config.NetworkID), dbVersion)
-		db, err := leveldb.New(dbPath, 0, 0, 0)
+		dbPath := path.Join(dbDir, constants.NetworkName(Config.NetworkID))
+
+		dbManager, err := manager.New(dbPath, dbVersion)
 		if err != nil {
-			return fmt.Errorf("couldn't create db at %s: %w", dbPath, err)
+			return fmt.Errorf("couldn't create db manager at %s: %w", dbPath, err)
 		}
-		Config.DB = db
+		Config.DB = dbManager
 	} else {
-		Config.DB = memdb.New()
+		Config.DB = manager.NewMemDBManager(dbVersion)
 	}
 
 	// IP Configuration

@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package database
+package manager
 
 import (
 	"os"
@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateManagerSingleDB(t *testing.T) {
+func TestNewSingleDB(t *testing.T) {
 	dir := t.TempDir()
 
 	v1 := version.NewDefaultVersion(1, 0, 0)
@@ -32,7 +32,7 @@ func TestCreateManagerSingleDB(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager, err := CreateManager(dir, v1)
+	manager, err := New(dir, v1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,12 +51,12 @@ func TestCreateManagerSingleDB(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestCreateManagerCreatesSingleDB(t *testing.T) {
+func TestNewCreatesSingleDB(t *testing.T) {
 	dir := t.TempDir()
 
 	v1 := version.NewDefaultVersion(1, 0, 0)
 
-	manager, err := CreateManager(dir, v1)
+	manager, err := New(dir, v1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +75,7 @@ func TestCreateManagerCreatesSingleDB(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestCreateManagerInvalidMemberPresent(t *testing.T) {
+func TestNewInvalidMemberPresent(t *testing.T) {
 	dir := t.TempDir()
 
 	v1 := version.NewDefaultVersion(1, 1, 0)
@@ -98,7 +98,7 @@ func TestCreateManagerInvalidMemberPresent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = CreateManager(dir, v2)
+	_, err = New(dir, v2)
 	assert.Error(t, err, "expected to error creating the manager due to an open db")
 
 	err = db1.Close()
@@ -111,11 +111,11 @@ func TestCreateManagerInvalidMemberPresent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = CreateManager(dir, v1)
+	_, err = New(dir, v1)
 	assert.Error(t, err, "expected to error due to non-directory file being present")
 }
 
-func TestCreateManagerSortsDatabases(t *testing.T) {
+func TestNewSortsDatabases(t *testing.T) {
 	dir := t.TempDir()
 
 	vers := []version.Version{
@@ -139,7 +139,7 @@ func TestCreateManagerSortsDatabases(t *testing.T) {
 		}
 	}
 
-	manager, err := CreateManager(dir, vers[0])
+	manager, err := New(dir, vers[0])
 	if err != nil {
 		t.Fatal(err)
 	}

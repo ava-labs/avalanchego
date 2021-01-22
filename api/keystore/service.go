@@ -18,13 +18,15 @@ import (
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/encdb"
-	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/manager"
+	dbManager "github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
+	"github.com/ava-labs/avalanchego/version"
 
 	jsoncodec "github.com/ava-labs/avalanchego/utils/json"
 )
@@ -40,8 +42,13 @@ const (
 )
 
 var (
-	errEmptyUsername = errors.New("empty username")
-	errUserMaxLength = fmt.Errorf("username exceeds maximum length of %d chars", maxUserLen)
+	errEmptyUsername          = errors.New("empty username")
+	errUserMaxLength          = fmt.Errorf("username exceeds maximum length of %d chars", maxUserLen)
+	errInconsistentDBBehavior = errors.New("db manager inconsistently retrieved previous database")
+
+	usersPrefix = []byte("users")
+	bcsPrefix   = []byte("bcs")
+	migratedKey = []byte("migrated")
 )
 
 // KeyValuePair ...
@@ -79,7 +86,7 @@ type Keystore struct {
 }
 
 // Initialize the keystore
-func (ks *Keystore) Initialize(log logging.Logger, db database.Database) error {
+func (ks *Keystore) Initialize(log logging.Logger, dbManager dbManager.Manager) error {
 	c := linearcodec.New(reflectcodec.DefaultTagName, maxSliceLength)
 	manager := codec.NewManager(maxPackerSize)
 	if err := manager.RegisterCodec(codecVersion, c); err != nil {
@@ -89,9 +96,92 @@ func (ks *Keystore) Initialize(log logging.Logger, db database.Database) error {
 	ks.log = log
 	ks.codec = manager
 	ks.users = make(map[string]*password.Hash)
-	ks.userDB = prefixdb.New([]byte("users"), db)
-	ks.bcDB = prefixdb.New([]byte("bcs"), db)
+	return ks.initializeDB(dbManager)
+}
+
+func (ks *Keystore) initializeDB(manager dbManager.Manager) error {
+	// currentDB := manager.Current()
+
+	userDBManager := manager.NewPrefixDBManager(usersPrefix)
+	bcDBManager := manager.NewPrefixDBManager(bcsPrefix)
+	ks.userDB = userDBManager.Current()
+	ks.bcDB = bcDBManager.Current()
+
 	return nil
+
+	// // If the previous DB doesn't exist or a migration has already completed
+	// // skip migrating keystore users to the current database.
+	// previousDB, exists := manager.Last()
+	// if !exists {
+	// 	return currentDB.Put(migratedKey, []byte("no migration"))
+	// } else if exists {
+	// 	migrated, err := currentDB.Has(migratedKey)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	if migrated {
+	// 		return nil
+	// 	}
+	// }
+
+	// ks.log.Info("Migrating Keystore Users from %s -> %s", previousDB.Version, currentDB.Version)
+
+	// previousUserDB, exists := userDBManager.Last()
+	// if !exists {
+	// 	return errInconsistentDBBehavior
+	// }
+	// previousBCDB, exists := bcDBManager.Last()
+	// if !exists {
+	// 	return errInconsistentDBBehavior
+	// }
+
+	// userIterator := previousUserDB.NewIterator()
+	// defer userIterator.Release()
+
+	// for userIterator.Next() {
+	// 	username := userIterator.Key()
+
+	// 	exists, err := ks.userDB.Has(username)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	if exists {
+	// 		continue
+	// 	}
+
+	// 	userBatch := ks.userDB.NewBatch()
+	// 	if err := userBatch.Put(username, userIterator.Value()); err != nil {
+	// 		return err
+	// 	}
+
+	// 	// needs to do nested prefix of both databases here
+	// 	userBCDB := semanticdb.NewPrefixDB(username, ks.bcDB).(*semanticdb.Database)
+	// 	bcsBatch := userBCDB.NewBatch()
+	// 	// Use a closure in order to defer releasing the iterator
+	// 	if err := func() error {
+	// 		iterator := userBCDB.PriorDB.NewIterator()
+	// 		defer iterator.Release()
+
+	// 		for iterator.Next() {
+	// 			if err := bcsBatch.Put(iterator.Key(), iterator.Value()); err != nil {
+	// 				return err
+	// 			}
+	// 		}
+	// 		if err := iterator.Error(); err != nil {
+	// 			return err
+	// 		}
+
+	// 		return atomic.WriteAll(userBatch, bcsBatch)
+	// 	}(); err != nil {
+	// 		return err
+	// 	}
+	// }
+
+	// if err := userIterator.Error(); err != nil {
+	// 	return err
+	// }
+
+	// return semDB.Put(migratedKey, []byte(fmt.Sprintf("v%d.%d.%d", semDB.PriorMajor, semDB.PriorMinor, semDB.PriorPatch)))
 }
 
 // CreateHandler returns a new service object that can send requests to thisAPI.
@@ -411,5 +501,5 @@ func (ks *Keystore) AddUser(username, pword string) error {
 // CreateTestKeystore returns a new keystore that can be utilized for testing
 func CreateTestKeystore() (*Keystore, error) {
 	ks := &Keystore{}
-	return ks, ks.Initialize(logging.NoLog{}, memdb.New())
+	return ks, ks.Initialize(logging.NoLog{}, manager.NewMemDBManager(version.NewDefaultVersion(1, 0, 0)))
 }

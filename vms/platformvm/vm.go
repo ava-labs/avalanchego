@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -173,15 +174,17 @@ type VM struct {
 // [vm.ChainManager] and [vm.vdrMgr] must be set before this function is called.
 func (vm *VM) Initialize(
 	ctx *snow.Context,
-	db database.Database,
+	dbManager manager.Manager,
 	genesisBytes []byte,
+	upgradebytes []byte,
+	configBytes []byte,
 	msgs chan<- common.Message,
 	_ []*common.Fx,
 ) error {
 	ctx.Log.Verbo("initializing platform chain")
 	// Initialize the inner VM, which has a lot of boiler-plate logic
 	vm.SnowmanVM = &core.SnowmanVM{}
-	if err := vm.SnowmanVM.Initialize(ctx, db, vm.unmarshalBlockFunc, msgs); err != nil {
+	if err := vm.SnowmanVM.Initialize(ctx, dbManager, vm.unmarshalBlockFunc, msgs); err != nil {
 		return err
 	}
 	vm.fx = &secp256k1fx.Fx{}

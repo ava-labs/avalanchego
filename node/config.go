@@ -6,7 +6,7 @@ package node
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/database"
+	database "github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/nat"
@@ -39,7 +39,7 @@ type Config struct {
 	EnableCrypto bool
 
 	// Database to use for the node
-	DB database.Database
+	DB database.Manager
 
 	// Staking configuration
 	StakingIP             utils.DynamicIPDesc

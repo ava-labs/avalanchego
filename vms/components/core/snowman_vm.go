@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -156,13 +157,13 @@ func (svm *SnowmanVM) NewHandler(name string, service interface{}, lockOption ..
 // and sets [svm.preferred] to the last accepted block.
 func (svm *SnowmanVM) Initialize(
 	ctx *snow.Context,
-	db database.Database,
+	dbManager manager.Manager,
 	unmarshalBlockFunc func([]byte) (snowman.Block, error),
 	toEngine chan<- common.Message,
 ) error {
 	svm.Ctx = ctx
 	svm.ToEngine = toEngine
-	svm.DB = versiondb.New(db)
+	svm.DB = versiondb.New(dbManager.Current())
 
 	var err error
 	svm.State, err = NewSnowmanState(unmarshalBlockFunc)

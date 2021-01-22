@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/snow"
 )
 
@@ -23,7 +23,7 @@ type TestVM struct {
 	CantShutdown, CantCreateHandlers, CantCreateStaticHandlers,
 	CantHealth bool
 
-	InitializeF                              func(*snow.Context, database.Database, []byte, chan<- Message, []*Fx) error
+	InitializeF                              func(*snow.Context, manager.Manager, []byte, chan<- Message, []*Fx) error
 	BootstrappingF, BootstrappedF, ShutdownF func() error
 	CreateHandlersF                          func() map[string]*HTTPHandler
 	CreateStaticHandlersF                    func() map[string]*HTTPHandler
@@ -42,7 +42,7 @@ func (vm *TestVM) Default(cant bool) {
 }
 
 // Initialize ...
-func (vm *TestVM) Initialize(ctx *snow.Context, db database.Database, initState []byte, msgChan chan<- Message, fxs []*Fx) error {
+func (vm *TestVM) Initialize(ctx *snow.Context, db manager.Manager, initState, upgradeBytes, configBytes []byte, msgChan chan<- Message, fxs []*Fx) error {
 	if vm.InitializeF != nil {
 		return vm.InitializeF(ctx, db, initState, msgChan, fxs)
 	}

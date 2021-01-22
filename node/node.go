@@ -26,7 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/meterdb"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -83,7 +83,8 @@ type Node struct {
 	ID ids.ShortID
 
 	// Storage for this node
-	DB database.Database
+	DBManager manager.Manager
+	DB        database.Database
 
 	// Handles calls to Keystore API
 	keystoreServer keystore.Keystore
@@ -368,7 +369,8 @@ func (n *Node) Dispatch() error {
  */
 
 func (n *Node) initDatabase() error {
-	n.DB = n.Config.DB
+	n.DBManager = n.Config.DB
+	n.DB = n.DBManager.Current()
 
 	expectedGenesis, _, err := genesis.Genesis(n.Config.NetworkID)
 	if err != nil {
@@ -501,7 +503,7 @@ func (n *Node) initAPIServer() error {
 
 // Create the vmManager, chainManager and register the following VMs:
 // AVM, Simple Payments DAG, Simple Payments Chain, and Platform VM
-// Assumes n.DB, n.vdrs all initialized (non-nil)
+// Assumes n.DBManager, n.vdrs all initialized (non-nil)
 func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	n.vmManager = vms.NewManager(&n.APIServer, n.HTTPLog)
 
@@ -552,7 +554,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		VMManager:               n.vmManager,
 		DecisionEvents:          n.DecisionDispatcher,
 		ConsensusEvents:         n.ConsensusDispatcher,
-		DB:                      n.DB,
+		DBManager:               n.DBManager,
 		Router:                  n.Config.ConsensusRouter,
 		Net:                     n.Net,
 		ConsensusParams:         n.Config.ConsensusParams,
@@ -633,7 +635,7 @@ func (n *Node) initSharedMemory() error {
 // Assumes n.APIServer is already set
 func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
-	keystoreDB := prefixdb.New([]byte("keystore"), n.DB)
+	keystoreDB := n.DBManager.NewPrefixDBManager([]byte("keystore"))
 	if err := n.keystoreServer.Initialize(n.Log, keystoreDB); err != nil {
 		return err
 	}
@@ -664,11 +666,11 @@ func (n *Node) initMetricsAPI() error {
 	n.Log.Info("initializing metrics API")
 
 	dbNamespace := fmt.Sprintf("%s_db", constants.PlatformName)
-	db, err := meterdb.New(dbNamespace, registry, n.DB)
+	meterDBManager, err := n.DBManager.NewMeterDBManager(dbNamespace, registry)
 	if err != nil {
 		return err
 	}
-	n.DB = db
+	n.DBManager = meterDBManager
 
 	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "metrics", "", n.HTTPLog)
 }
@@ -832,11 +834,11 @@ func (n *Node) Initialize(
 	if err := n.initAPIServer(); err != nil { // Start the API Server
 		return fmt.Errorf("couldn't initialize API server: %w", err)
 	}
-	if err := n.initKeystoreAPI(); err != nil { // Start the Keystore API
-		return fmt.Errorf("couldn't initialize keystore API: %w", err)
-	}
 	if err := n.initMetricsAPI(); err != nil { // Start the Metrics API
 		return fmt.Errorf("couldn't initialize metrics API: %w", err)
+	}
+	if err := n.initKeystoreAPI(); err != nil { // Start the Keystore API
+		return fmt.Errorf("couldn't initialize keystore API: %w", err)
 	}
 
 	if err := n.initSharedMemory(); err != nil { // Initialize shared memory

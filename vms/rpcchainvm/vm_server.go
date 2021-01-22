@@ -162,7 +162,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		EpochDuration:        time.Duration(req.EpochDuration),
 	}
 
-	if err := vm.vm.Initialize(vm.ctx, dbClient, req.GenesisBytes, toEngine, nil); err != nil {
+	if err := vm.vm.Initialize(vm.ctx, dbClient, req.GenesisBytes, nil, nil, toEngine, nil); err != nil {
 		// Ignore errors closing resources to return the original error
 		_ = dbConn.Close()
 		_ = msgConn.Close()
