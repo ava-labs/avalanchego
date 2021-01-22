@@ -400,7 +400,8 @@ func TestVMGenesis(t *testing.T) {
 				assert.Equal(
 					vmTest.expectedID,
 					genesisTx.ID().String(),
-					"genesisID with networkID %d mismatch",
+					"%s genesisID with networkID %d mismatch",
+					vmTest.vmID,
 					test.networkID,
 				)
 			})
