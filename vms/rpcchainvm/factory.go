@@ -27,9 +27,9 @@ type Factory struct {
 
 // New ...
 func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
-	userConfig := f.Config
-	if ctx != nil && len(ctx.Config.User) > 0 {
-		userConfig = ctx.Config.User
+	c := f.Config
+	if ctx != nil && len(ctx.Config.Settings) > 0 {
+		c = ctx.Config.Settings
 	}
 
 	// Ignore warning from launching an executable with a variable command
@@ -38,7 +38,7 @@ func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 	config := &plugin.ClientConfig{
 		HandshakeConfig: Handshake,
 		Plugins:         PluginMap,
-		Cmd:             exec.Command(f.Path, fmt.Sprintf("--config=%s", userConfig)),
+		Cmd:             exec.Command(f.Path, fmt.Sprintf("--config=%s", c)),
 		AllowedProtocols: []plugin.Protocol{
 			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,

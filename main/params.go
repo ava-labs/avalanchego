@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
@@ -242,6 +243,39 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(chainConfigsKey, "", "Specifies config to pass into chains (overrides coreth-config)")
 
 	return fs
+}
+
+func decodeStringOrJSON(v interface{}) (string, error) {
+	switch value := v.(type) {
+	case string:
+		return value, nil
+	default:
+		b, err := json.Marshal(value)
+		if err != nil {
+			return "", fmt.Errorf("couldn't parse JSON: %w", err)
+		}
+		return string(b), nil
+	}
+}
+
+func populateStringFields(v interface{}, source map[string]interface{}) error {
+	s := reflect.ValueOf(v).Elem()
+	for i := 0; i < s.NumField(); i++ {
+		name := strings.ToLower(s.Type().Field(i).Name)
+		v, ok := source[name]
+		if !ok {
+			continue
+		}
+
+		parsedValue, err := decodeStringOrJSON(v)
+		if err != nil {
+			return fmt.Errorf("could not parse config: %w", err)
+		}
+
+		s.Field(i).Set(reflect.ValueOf(parsedValue))
+	}
+
+	return nil
 }
 
 // getViper returns the viper environment from parsing config file from default search paths
@@ -673,63 +707,32 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.EnableCrypto = v.GetBool(signatureVerificationEnabledKey)
 
 	// Coreth Plugin
-	corethConfigString := v.GetString(corethConfigKey)
-	if corethConfigString != defaultString {
-		corethConfigValue := v.Get(corethConfigKey)
-		switch value := corethConfigValue.(type) {
-		case string:
-			corethConfigString = value
-		default:
-			corethConfigBytes, err := json.Marshal(value)
-			if err != nil {
-				return fmt.Errorf("couldn't parse coreth config: %w", err)
-			}
-			corethConfigString = string(corethConfigBytes)
-		}
+	// TODO: deprecate
+	corethConfigValue := v.Get(corethConfigKey)
+	corethConfigString, err := decodeStringOrJSON(corethConfigValue)
+	if err != nil {
+		return fmt.Errorf("couldn't parse coreth config: %w", err)
 	}
 	Config.CorethConfig = corethConfigString
 
 	// ChainConfigs
+	// TODO: provide defaults for standard chains?
 	Config.ChainConfigs = map[ids.ID]snow.ChainConfig{}
-	chainConfigsRaw := v.GetStringMap(chainConfigsKey)
-	for k, v := range chainConfigsRaw {
-		parsedV, ok := v.(map[string]interface{})
+	for chainID, chainConfig := range v.GetStringMap(chainConfigsKey) {
+		id, err := ids.FromString(chainID)
+		if err != nil {
+			return fmt.Errorf("couldn't parse chainID %s: %w", chainID, err)
+		}
+
+		chainConfigMap, ok := chainConfig.(map[string]interface{})
 		if !ok {
-			return fmt.Errorf("could not parse %s %+v", k, v)
+			return fmt.Errorf("could not parse chain config for %s", chainID)
 		}
 
 		config := snow.ChainConfig{}
-		if vUser, ok := parsedV["user"]; ok {
-			switch u := vUser.(type) {
-			case string:
-				config.User = u
-			default:
-				userBytes, err := json.Marshal(u)
-				if err != nil {
-					return fmt.Errorf("couldn't parse config for %s: %w", k, err)
-				}
-				config.User = string(userBytes)
-			}
+		if err := populateStringFields(&config, chainConfigMap); err != nil {
+			return fmt.Errorf("could not parse chain config for %s: %w", chainID, err)
 		}
-
-		if vUpgrade, ok := parsedV["upgrade"]; ok {
-			switch up := vUpgrade.(type) {
-			case string:
-				config.Upgrade = up
-			default:
-				updgradeBytes, err := json.Marshal(up)
-				if err != nil {
-					return fmt.Errorf("couldn't parse config for %s: %w", k, err)
-				}
-				config.Upgrade = string(updgradeBytes)
-			}
-		}
-
-		id, err := ids.FromString(k)
-		if err != nil {
-			return fmt.Errorf("couldn't parse chainID %s: %w", k, err)
-		}
-
 		Config.ChainConfigs[id] = config
 	}
 
