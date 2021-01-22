@@ -19,7 +19,7 @@ type Batch struct {
 
 func NewBatch(t *Tree) database.Batch {
 	return &Batch{
-		data: []batchValue{},
+		data: nil,
 		tree: t,
 	}
 }
@@ -30,8 +30,10 @@ func (b *Batch) ValueSize() int {
 }
 
 // Write flushes any accumulated data to disk.
+// TODO Optimize
+// If the size of the batch is smaller than the trie, which it will be in all realistic cases,
+// then it makes sense to do some pre-processing such that the batched operations don't modify the same part of the trie multiple times.
 func (b *Batch) Write() error {
-
 	var err error
 
 	for _, d := range b.data {
@@ -50,7 +52,7 @@ func (b *Batch) Write() error {
 
 // Reset resets the batch for reuse.
 func (b *Batch) Reset() {
-	b.data = []batchValue{}
+	b.data = nil
 }
 
 // Replay replays the batch contents.
@@ -79,7 +81,6 @@ func (b *Batch) Put(key []byte, value []byte) error {
 
 // Delete removes the key from the key-value data store.
 func (b *Batch) Delete(key []byte) error {
-
 	b.data = append(b.data, batchValue{
 		key:    key,
 		value:  nil,

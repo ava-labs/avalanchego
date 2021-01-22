@@ -4,8 +4,25 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/database/memdb"
+
 	"github.com/ava-labs/avalanchego/database"
 )
+
+// NewMemoryTree returns a new instance of the Tree with a in-memoryDB
+func NewMemoryTree() *Tree {
+	return NewTree(memdb.New())
+}
+
+// NewLevelTree returns a new instance of the Tree with a in-memoryDB
+func NewLevelTree(file string) *Tree {
+	db, err := leveldb.New(file, 0, 0, 0)
+	if err != nil {
+		panic(err)
+	}
+	return NewTree(db)
+}
 
 type TestStruct struct {
 	key   []byte

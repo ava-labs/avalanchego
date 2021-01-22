@@ -44,7 +44,7 @@ func NewBranchNode(sharedAddress Key, parent Node, persistence *Persistence) Nod
 // returns EmptyNode - no node in this position
 //
 func (b *BranchNode) GetChild(key Key) (Node, error) {
-	if !key.HasPrefix(b.SharedAddress) {
+	if !key.ContainsPrefix(b.SharedAddress) {
 		return NewEmptyNode(b, key), nil
 	}
 
@@ -62,7 +62,6 @@ func (b *BranchNode) GetChild(key Key) (Node, error) {
 		return nil, err
 	}
 	node.SetParent(b)
-	node.SetPersistence(b.persistence)
 
 	return node, nil
 }
@@ -111,7 +110,7 @@ func (b *BranchNode) GetNextNode(prefix Key, start Key, key Key) (Node, error) {
 		return NewEmptyNode(b, key), nil
 	}
 
-	if !key.HasPrefix(b.SharedAddress) {
+	if !key.ContainsPrefix(b.SharedAddress) {
 		return NewEmptyNode(b, key), nil
 	}
 
@@ -146,7 +145,7 @@ func (b *BranchNode) GetNextNode(prefix Key, start Key, key Key) (Node, error) {
 func (b *BranchNode) Insert(key Key, value []byte) error {
 
 	// if the node CAN'T exist in this prefix request the Parent to insert
-	if !key.HasPrefix(b.SharedAddress) {
+	if !key.ContainsPrefix(b.SharedAddress) {
 		// nothings changed in this node
 		// insertion will trigger a rehash from the parent upwards
 		return b.parent.Insert(key, value)

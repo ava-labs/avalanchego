@@ -6,10 +6,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
 
-	"github.com/ava-labs/avalanchego/database/leveldb"
-
-	"github.com/ava-labs/avalanchego/database/memdb"
-
 	"github.com/ava-labs/avalanchego/database"
 )
 
@@ -21,8 +17,8 @@ type Tree struct {
 
 // Has returns whether the key exists in the tree
 func (t *Tree) Has(key []byte) (bool, error) {
-	if t.isClosed() != nil {
-		return false, t.isClosed()
+	if t.closed {
+		return false, database.ErrClosed
 	}
 
 	rootNode, err := t.persistence.GetRootNode()
@@ -73,37 +69,23 @@ func (t *Tree) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iter
 }
 
 func (t *Tree) Stat(property string) (string, error) {
-	return "nil", nil
+	return "", database.ErrNotFound
 }
 
 func (t *Tree) Compact(start []byte, limit []byte) error {
-	if t.isClosed() != nil {
-		return t.isClosed()
+	if t.closed {
+		return database.ErrClosed
 	}
 	return nil
 }
 
 func (t *Tree) Close() error {
-	if t.isClosed() != nil {
-		return t.isClosed()
+	if t.closed {
+		return database.ErrClosed
 	}
 
 	t.closed = true
 	return t.persistence.db.(*versiondb.Database).GetDatabase().Close()
-}
-
-// NewMemoryTree returns a new instance of the Tree with a in-memoryDB
-func NewMemoryTree() *Tree {
-	return NewTree(memdb.New())
-}
-
-// NewLevelTree returns a new instance of the Tree with a in-memoryDB
-func NewLevelTree(file string) *Tree {
-	db, err := leveldb.New(file, 0, 0, 0)
-	if err != nil {
-		panic(err)
-	}
-	return NewTree(db)
 }
 
 // NewTree returns a new instance of the Tree
@@ -124,8 +106,8 @@ func (t *Tree) Root() ([]byte, error) {
 }
 
 func (t *Tree) Get(key []byte) ([]byte, error) {
-	if t.isClosed() != nil {
-		return nil, t.isClosed()
+	if t.closed {
+		return nil, database.ErrClosed
 	}
 
 	rootNode, err := t.persistence.GetRootNode()
@@ -156,6 +138,12 @@ func (t *Tree) Delete(key []byte) error {
 	return t.persistence.Commit(t.del(key))
 }
 
+// findNode traverses the Tree and finds the most suited node for the traversal based on the given key.
+// It traverses the tree trying to find the Node where that key might exist but doesn't guarantee
+// that the key actually exists, it's the callers responsibility to handle that.
+// it will return
+// EmptyNode - if a position is found but no node exists
+// LeafNode - if there is a K/V pair in that position
 func (t *Tree) findNode(key Key, node Node) (Node, error) {
 
 	if node == nil {
@@ -183,7 +171,10 @@ func (t *Tree) PrintTree() {
 }
 
 func (t *Tree) fetchNextNode(prefix Key, start Key, key Key, node Node) (Node, error) {
-	if node == nil || t.closed {
+	if node == nil {
+		return nil, database.ErrClosed
+	}
+	if t.closed {
 		return nil, database.ErrClosed
 	}
 
@@ -201,20 +192,6 @@ func (t *Tree) fetchNextNode(prefix Key, start Key, key Key, node Node) (Node, e
 	return t.fetchNextNode(prefix, start, key, nextNode)
 }
 
-func (t *Tree) isClosed() error {
-	if t.closed {
-		return database.ErrClosed
-	}
-	return nil
-}
-
-func (t *Tree) GetPersistence() error {
-	if t.closed {
-		return database.ErrClosed
-	}
-	return nil
-}
-
 func (t *Tree) SelectRoot(treeRoot uint32) error {
 	if t.closed {
 		return database.ErrClosed
@@ -225,8 +202,8 @@ func (t *Tree) SelectRoot(treeRoot uint32) error {
 }
 
 func (t *Tree) GetNode(hash []byte) (Node, error) {
-	if t.isClosed() != nil {
-		return nil, t.isClosed()
+	if t.closed {
+		return nil, database.ErrClosed
 	}
 
 	return t.persistence.GetNodeByHash(hash)
@@ -234,8 +211,8 @@ func (t *Tree) GetNode(hash []byte) (Node, error) {
 
 // PutRootNode inserts a rootNode
 func (t *Tree) PutRootNode(node Node) error {
-	if t.isClosed() != nil {
-		return t.isClosed()
+	if t.closed {
+		return database.ErrClosed
 	}
 
 	err := t.persistence.StoreNode(node)
@@ -248,8 +225,8 @@ func (t *Tree) PutRootNode(node Node) error {
 
 // PutNodeAndCheck inserts a node in the tree and checks if the hash is correct
 func (t *Tree) PutNodeAndCheck(node Node, parentHash []byte) error {
-	if t.isClosed() != nil {
-		return t.isClosed()
+	if t.closed {
+		return database.ErrClosed
 	}
 
 	if !bytes.Equal(node.GetReHash(), parentHash) {
@@ -265,8 +242,8 @@ func (t *Tree) PutNodeAndCheck(node Node, parentHash []byte) error {
 }
 
 func (t *Tree) put(key []byte, value []byte) error {
-	if t.isClosed() != nil {
-		return t.isClosed()
+	if t.closed {
+		return database.ErrClosed
 	}
 
 	unitKey := BytesToKey(key)
@@ -275,8 +252,10 @@ func (t *Tree) put(key []byte, value []byte) error {
 		return err
 	}
 
-	// err safe to ignore
-	rootChild, _ := rootNode.GetChild(Key{})
+	rootChild, err := rootNode.GetChild(Key{})
+	if err != nil {
+		return err
+	}
 	if rootChild == nil {
 		newLeafNode, err := NewLeafNode(unitKey, value, rootNode, t.persistence)
 		if err != nil {
@@ -298,8 +277,8 @@ func (t *Tree) put(key []byte, value []byte) error {
 }
 
 func (t *Tree) del(key []byte) error {
-	if t.isClosed() != nil {
-		return t.isClosed()
+	if t.closed {
+		return database.ErrClosed
 	}
 
 	unitKey := BytesToKey(key)

@@ -1,12 +1,20 @@
 package merkledb
 
+// UnitSize reflects the 16 possible values in a hex
+// as a consequence each BranchNode will have 16 positions to store a Node.
+// Given that a BranchNode can have the same Address of a LeafNode
+// we add 1 position for that single exception.
+// In position 17 or BranchNode[16] when theres a Node, it's a LeafNode.
 const UnitSize = 16 + 1
 
 type Unit byte
 
 type Key []Unit
 
-// FirstNonPrefix returns the first Unit that's not common between baseKey and otherKey
+// FirstNonPrefix That function is only used in the BranchNode and it's purpose is to find the Node position in the BranchNode.
+// It figures out the termination Unit -> position in the array.
+// If the length of both keys are the same, the Node Position is the b.Nodes[UnitSize], the last position of the array.
+// That is the exception for when we have BranchNode.SharedAddress=AAA1 and a LeafNode.Key=AAA1.
 func FirstNonPrefix(baseKey Key, otherKey Key) Unit {
 	smaller := otherKey
 	larger := baseKey
@@ -30,7 +38,6 @@ func FirstNonPrefix(baseKey Key, otherKey Key) Unit {
 // addr2 - ABC567
 // returns ABC
 func SharedPrefix(key1, key2 Key) Key {
-	shared := Key{}
 	smaller := key1
 	larger := key2
 
@@ -39,13 +46,13 @@ func SharedPrefix(key1, key2 Key) Key {
 		larger = key1
 	}
 
-	for i, v := range smaller {
-		if v != larger[i] {
+	p := 0
+	for ; p < len(smaller); p++ {
+		if smaller[p] != larger[p] {
 			break
 		}
-		shared = append(shared, v)
 	}
-	return shared
+	return larger[:p]
 }
 
 // Equals returns whether the two Key are equal
@@ -63,6 +70,8 @@ func (k Key) Equals(otherKey Key) bool {
 }
 
 // BytesToKey converts a []byte to Key
+// hardcoded behaviour of taking the first 4 bits and inserting them in a Unit
+// and doing the same for the second set of 4 bits in a byte
 func BytesToKey(bs []byte) Key {
 	units := make(Key, 0, 2*len(bs))
 	for _, n := range bs {
@@ -72,7 +81,7 @@ func BytesToKey(bs []byte) Key {
 	return units
 }
 
-// IsPrefixed checks if prefix is prefixed in u
+// IsPrefixed checks if prefix has a prefix in u
 // u - 01234, 012,  001, 01
 // p - 01   , 012 , 02 , 012
 // = - T    , T   , F  , T
@@ -85,16 +94,15 @@ func IsPrefixed(prefix Key, u Key) bool {
 	return true
 }
 
-func (k Key) HasPrefix(otherKey Key) bool {
+// ContainsPrefix checks if key is prefixed in otherkey
+// k - 01234, 012,  001, 01
+// o - 01   , 012 , 02 , 012
+// = - T    , T   , F  , F
+func (k Key) ContainsPrefix(otherKey Key) bool {
 	if len(otherKey) > len(k) {
 		return false
 	}
-	for i := 0; i < len(otherKey); i++ {
-		if otherKey[i] != k[i] {
-			return false
-		}
-	}
-	return true
+	return IsPrefixed(k, otherKey)
 }
 
 // ToBytes converts a key to a byte slice

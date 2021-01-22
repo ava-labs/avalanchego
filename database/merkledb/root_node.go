@@ -26,31 +26,35 @@ func (r *RootNode) GetChild(key Key) (Node, error) {
 		return nil, err
 	}
 	node.SetParent(r)
-	node.SetPersistence(r.persistence)
 	return node, nil
 }
 
 // GetNextNode returns the child if it respects the nextNode inputs
+// Instead of checking all the positive condition
+// the single child Node will only be returned if it does not fail any of the negative condition
+// ie. if there's a prefix it will fail/return nil, if the child Node key does not respect that condition
 func (r *RootNode) GetNextNode(prefix Key, start Key, key Key) (Node, error) {
 	node, err := r.persistence.GetNodeByHash(r.Child)
 	if err != nil {
 		return nil, err
 	}
 
+	nodeKey := node.Key()
+
 	if len(key) != 0 {
-		if !Greater(node.Key(), key) || node.Key().Equals(key) {
+		if !Greater(nodeKey, key) || nodeKey.Equals(key) {
 			return nil, nil
 		}
 	}
 
 	if len(start) != 0 {
-		if !Greater(node.Key(), start) || node.Key().Equals(start) {
+		if !Greater(nodeKey, start) || nodeKey.Equals(start) {
 			return nil, nil
 		}
 	}
 
 	if len(prefix) != 0 {
-		if !IsPrefixed(prefix, node.Key()) {
+		if !prefix.ContainsPrefix(nodeKey) {
 			return nil, nil
 		}
 	}
@@ -74,12 +78,7 @@ func (r *RootNode) Insert(key Key, value []byte) error {
 
 	child.SetParent(newBranch)
 
-	err = newBranch.Insert(key, value)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return newBranch.Insert(key, value)
 }
 
 // Delete removes the child
@@ -152,10 +151,10 @@ func (r *RootNode) Print() {
 
 func rootNodeID(rootNodeID uint32) []byte {
 	rootIDByte := []byte{
-		byte(0xff & rootNodeID),
-		byte(0xff & (rootNodeID >> 8)),
-		byte(0xff & (rootNodeID >> 16)),
-		byte(0xff & (rootNodeID >> 24))}
+		byte(rootNodeID),
+		byte(rootNodeID >> 8),
+		byte(rootNodeID >> 16),
+		byte(rootNodeID >> 24)}
 
 	return Hash(rootIDByte, []byte{'r', 'o', 'o', 't'})
 }

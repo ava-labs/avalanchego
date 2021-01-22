@@ -6,7 +6,6 @@ require (
 	github.com/AppsFlyer/go-sundheit v0.2.0
 	github.com/Microsoft/go-winio v0.4.14
 	github.com/btcsuite/btcutil v1.0.2
-	github.com/cbergoon/merkletree v0.2.0
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0-20200627015759-01fd2de07837
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/golang/protobuf v1.4.2
@@ -25,7 +24,6 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mr-tron/base58 v1.2.0
 	github.com/nbutton23/zxcvbn-go v0.0.0-20180912185939-ae427f1e4c1d
-	github.com/onrik/gomerkle v1.0.0
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.7.1
 	github.com/rs/cors v1.7.0
