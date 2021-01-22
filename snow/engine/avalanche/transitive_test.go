@@ -3634,11 +3634,14 @@ func TestEngineBubbleVotes(t *testing.T) {
 	assert.True(t, *queried, "should have queried for %s", vtx.ID())
 	assert.True(t, *fetched, "should have fetched %s", missingVtx.ID())
 
+	// can't apply votes yet because pendingVtx0 isn't issued because missingVtx
+	// is missing
 	err = te.Chits(vdr, *queryReqID, []ids.ID{pendingVtx1.ID()})
 	assert.NoError(t, err)
 	assert.Equal(t, choices.Processing, tx0.Status(), "wrong tx status")
 	assert.Equal(t, choices.Processing, tx1.Status(), "wrong tx status")
 
+	// vote for pendingVtx1 should be bubbled up to pendingVtx0 and then to vtx
 	err = te.GetFailed(vdr, *getReqID)
 	assert.NoError(t, err)
 	assert.Equal(t, choices.Accepted, tx0.Status(), "wrong tx status")
