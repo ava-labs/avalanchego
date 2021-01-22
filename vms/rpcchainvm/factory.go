@@ -30,8 +30,8 @@ func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 	// because the command is a controlled and required input
 	// #nosec G204
 
-	userConfig := ""
-	if ctx != nil {
+	userConfig := "default"
+	if ctx != nil && len(ctx.Config.User) > 0 {
 		userConfig = ctx.Config.User
 	}
 

@@ -669,26 +669,49 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.EnableCrypto = v.GetBool(signatureVerificationEnabledKey)
 
 	// ChainConfigs
-	chainConfigsString := v.GetString(chainConfigsKey)
-	if len(chainConfigsString) > 0 {
-		// use string because can't unmarshal ids.ID
-		m := map[string]snow.ChainConfig{}
-		if err := json.Unmarshal([]byte(chainConfigsString), &m); err != nil {
-			return fmt.Errorf("couldn't parse chain configs: %w", err)
+	Config.ChainConfigs = map[ids.ID]snow.ChainConfig{}
+	chainConfigsRaw := v.GetStringMap(chainConfigsKey)
+	for k, v := range chainConfigsRaw {
+		parsedV, ok := v.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("could not parse %s %+v", k, v)
 		}
 
-		config := map[ids.ID]snow.ChainConfig{}
-		for k, v := range m {
-			id, err := ids.FromString(k)
-			if err != nil {
-				return fmt.Errorf("couldn't parse chainID %s: %w", k, err)
+		config := snow.ChainConfig{}
+		if vUser, ok := parsedV["user"]; ok {
+			switch u := vUser.(type) {
+			case string:
+				config.User = u
+			default:
+				userBytes, err := json.Marshal(u)
+				if err != nil {
+					return fmt.Errorf("couldn't parse config for %s: %w", k, err)
+				}
+				config.User = string(userBytes)
 			}
-
-			config[id] = v
 		}
 
-		Config.ChainConfigs = config
+		if vUpgrade, ok := parsedV["upgrade"]; ok {
+			switch up := vUpgrade.(type) {
+			case string:
+				config.Upgrade = up
+			default:
+				updgradeBytes, err := json.Marshal(up)
+				if err != nil {
+					return fmt.Errorf("couldn't parse config for %s: %w", k, err)
+				}
+				config.Upgrade = string(updgradeBytes)
+			}
+		}
+
+		id, err := ids.FromString(k)
+		if err != nil {
+			return fmt.Errorf("couldn't parse chainID %s: %w", k, err)
+		}
+
+		Config.ChainConfigs[id] = config
 	}
+	fmt.Println(Config.ChainConfigs)
 
 	return nil
 }
