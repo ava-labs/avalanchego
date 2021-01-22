@@ -80,7 +80,7 @@ func (s *Socket) Listen() error {
 }
 
 // Send writes the given message to all connection clients
-func (s *Socket) Send(msg []byte) error {
+func (s *Socket) Send(msg []byte) {
 	var conns []net.Conn = nil
 
 	// Get a copy of connections
@@ -97,24 +97,20 @@ func (s *Socket) Send(msg []byte) error {
 
 	// Write to each connection
 	if len(conns) == 0 {
-		return nil
+		return
 	}
 
-	var err error
-	errs := wrappers.Errs{}
 	// Prefix the message with an 8 byte length
 	lenBytes := [8]byte{}
 	binary.BigEndian.PutUint64(lenBytes[:], uint64(len(msg)))
 	for _, conn := range conns {
 		for _, byteSlice := range [][]byte{lenBytes[:], msg} {
-			if _, err = conn.Write(byteSlice); err != nil {
+			if _, err := conn.Write(byteSlice); err != nil {
 				s.removeConn(conn)
-				errs.Add(fmt.Errorf("failed to write message to %s: %w", conn.RemoteAddr(), err))
-				break
+				s.log.Debug("failed to write message to %s: %s", conn.RemoteAddr(), err)
 			}
 		}
 	}
-	return errs.Err
 }
 
 // Close closes the socket by cutting off new connections, closing all
