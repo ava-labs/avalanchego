@@ -260,6 +260,9 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 		EpochDuration:        m.EpochDuration,
 	}
 
+	// if chainID matches something kept in configs, add to snow.Context as
+	// ChainConfig/VMConfig
+
 	// Get a factory for the vm we want to use on our chain
 	vmFactory, err := m.VMManager.GetVMFactory(vmID)
 	if err != nil {

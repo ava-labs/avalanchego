@@ -72,6 +72,8 @@ type Context struct {
 
 	// Non-zero iff this chain bootstrapped. Should only be accessed atomically.
 	bootstrapped uint32
+
+	// TODO: add config to store here as string
 }
 
 // IsBootstrapped returns true iff this chain is done bootstrapping

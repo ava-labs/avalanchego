@@ -126,6 +126,11 @@ type Config struct {
 	DisconnectedCheckFreq      time.Duration
 	DisconnectedRestartTimeout time.Duration
 
-	// Coreth
-	CorethConfig string
+	// ChainConfigs
+	ChainConfigs map[ids.ID]ChainConfig
+}
+
+type ChainConfig struct {
+	UserConfig string // using string because byte will convert to base64
+	// HardforkConfig
 }
