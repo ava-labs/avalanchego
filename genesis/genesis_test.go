@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -19,20 +20,20 @@ import (
 )
 
 func TestAliases(t *testing.T) {
+	assert := assert.New(t)
+
 	genesisBytes, _, err := Genesis(constants.LocalID, "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
+
 	generalAliases, _, _, err := Aliases(genesisBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
+
 	if _, exists := generalAliases["vm/"+platformvm.ID.String()]; !exists {
-		t.Fatalf("Should have a custom alias from the vm")
+		assert.Fail("Should have a custom alias from the vm")
 	} else if _, exists := generalAliases["vm/"+avm.ID.String()]; !exists {
-		t.Fatalf("Should have a custom alias from the vm")
+		assert.Fail("Should have a custom alias from the vm")
 	} else if _, exists := generalAliases["vm/"+evm.ID.String()]; !exists {
-		t.Fatalf("Should have a custom alias from the vm")
+		assert.Fail("Should have a custom alias from the vm")
 	}
 }
 
@@ -152,19 +153,15 @@ func TestValidateConfig(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			assert := assert.New(t)
+
 			err := validateConfig(test.networkID, test.config)
 			if len(test.err) > 0 {
-				if !strings.Contains(err.Error(), test.err) {
-					t.Fatalf(`expected error containing "%s" but got "%s"`,
-						test.err,
-						err.Error(),
-					)
-				}
+				assert.Error(err)
+				assert.Contains(err.Error(), test.err)
 				return
 			}
-			if len(test.err) == 0 && err != nil {
-				t.Fatal(err)
-			}
+			assert.NoError(err)
 		})
 	}
 }
@@ -305,13 +302,12 @@ func TestGenesis(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			assert := assert.New(t)
+
 			var customFile string
 			if len(test.customConfig) > 0 {
 				customFile = path.Join(t.TempDir(), "config.json")
-				err := ioutil.WriteFile(customFile, []byte(test.customConfig), 0600)
-				if err != nil {
-					t.Fatal(err)
-				}
+				assert.NoError(ioutil.WriteFile(customFile, []byte(test.customConfig), 0600))
 			}
 
 			if len(test.missingFilepath) > 0 {
@@ -320,30 +316,18 @@ func TestGenesis(t *testing.T) {
 
 			genesisBytes, _, err := Genesis(test.networkID, customFile)
 			if len(test.err) > 0 {
-				if !strings.Contains(err.Error(), test.err) {
-					t.Fatalf(`expected error containing "%s" but got "%s"`,
-						test.err,
-						err.Error(),
-					)
-				}
+				assert.Error(err)
+				assert.Contains(err.Error(), test.err)
 				return
 			}
-			if len(test.err) == 0 && err != nil {
-				t.Fatal(err)
-			}
+			assert.NoError(err)
 
 			genesisHash := fmt.Sprintf("%x", hashing.ComputeHash256(genesisBytes))
-			if genesisHash != test.expected {
-				t.Fatalf(`expected genesis hash "%s" but got "%s"`,
-					test.expected,
-					genesisHash,
-				)
-			}
+			assert.Equal(test.expected, genesisHash, "genesis hash mismatch")
 
 			genesis := platformvm.Genesis{}
-			if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
-				t.Fatal(err)
-			}
+			_, err = platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis)
+			assert.NoError(err)
 		})
 	}
 }
@@ -405,22 +389,20 @@ func TestVMGenesis(t *testing.T) {
 				vmTest.vmID,
 			)
 			t.Run(name, func(t *testing.T) {
+				assert := assert.New(t)
+
 				genesisBytes, _, err := Genesis(test.networkID, "")
-				if err != nil {
-					t.Fatal(err)
-				}
+				assert.NoError(err)
 
 				genesisTx, err := VMGenesis(genesisBytes, vmTest.vmID)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if result := genesisTx.ID().String(); vmTest.expectedID != result {
-					t.Fatalf("%s genesisID with networkID %d was expected to be %s but was %s",
-						vmTest.vmID,
-						test.networkID,
-						vmTest.expectedID,
-						result)
-				}
+				assert.NoError(err)
+
+				assert.Equal(
+					vmTest.expectedID,
+					genesisTx.ID().String(),
+					"genesisID with networkID %d mismatch",
+					test.networkID,
+				)
 			})
 		}
 	}
@@ -447,16 +429,17 @@ func TestAVAXAssetID(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(constants.NetworkIDToNetworkName[test.networkID], func(t *testing.T) {
+			assert := assert.New(t)
+
 			_, avaxAssetID, err := Genesis(test.networkID, "")
-			if err != nil {
-				t.Fatal(err)
-			}
-			if result := avaxAssetID.String(); test.expectedID != result {
-				t.Fatalf("AVAX assetID with networkID %d was expected to be %s but was %s",
-					test.networkID,
-					test.expectedID,
-					result)
-			}
+			assert.NoError(err)
+
+			assert.Equal(
+				test.expectedID,
+				avaxAssetID.String(),
+				"AVAX assetID with networkID %d mismatch",
+				test.networkID,
+			)
 		})
 	}
 }
