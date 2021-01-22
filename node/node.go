@@ -602,7 +602,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Fee:         n.Config.TxFee,
 		}),
 		n.vmManager.RegisterVMFactory(evm.ID, &rpcchainvm.Factory{
-			Path: filepath.Join(n.Config.PluginDir, "evm"),
+			Path:   filepath.Join(n.Config.PluginDir, "evm"),
+			Config: n.Config.CorethConfig,
 		}),
 		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),
 		n.vmManager.RegisterVMFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),

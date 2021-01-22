@@ -235,8 +235,11 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Subnet Whitelist
 	fs.String(whitelistedSubnetsKey, "", "Whitelist of subnets to validate.")
 
+	// Coreth Config
+	fs.String(corethConfigKey, defaultString, "Specifies config to pass into coreth")
+
 	// ChainConfigs
-	fs.String(chainConfigsKey, "", "Specifies config to pass into chains")
+	fs.String(chainConfigsKey, "", "Specifies config to pass into chains (overrides coreth-config)")
 
 	return fs
 }
@@ -669,8 +672,24 @@ func setNodeConfig(v *viper.Viper) error {
 	// Crypto
 	Config.EnableCrypto = v.GetBool(signatureVerificationEnabledKey)
 
+	// Coreth Plugin
+	corethConfigString := v.GetString(corethConfigKey)
+	if corethConfigString != defaultString {
+		corethConfigValue := v.Get(corethConfigKey)
+		switch value := corethConfigValue.(type) {
+		case string:
+			corethConfigString = value
+		default:
+			corethConfigBytes, err := json.Marshal(value)
+			if err != nil {
+				return fmt.Errorf("couldn't parse coreth config: %w", err)
+			}
+			corethConfigString = string(corethConfigBytes)
+		}
+	}
+	Config.CorethConfig = corethConfigString
+
 	// ChainConfigs
-	// TODO: add back coreth parsing backup
 	Config.ChainConfigs = map[ids.ID]snow.ChainConfig{}
 	chainConfigsRaw := v.GetStringMap(chainConfigsKey)
 	for k, v := range chainConfigsRaw {

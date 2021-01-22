@@ -127,6 +127,9 @@ type Config struct {
 	DisconnectedCheckFreq      time.Duration
 	DisconnectedRestartTimeout time.Duration
 
+	// Coreth
+	CorethConfig string
+
 	// ChainConfigs
 	ChainConfigs map[ids.ID]snow.ChainConfig
 }

@@ -85,6 +85,7 @@ const (
 	consensusGossipFrequencyKey     = "consensus-gossip-frequency"
 	consensusShutdownTimeoutKey     = "consensus-shutdown-timeout"
 	fdLimitKey                      = "fd-limit"
+	corethConfigKey                 = "coreth-config"
 	chainConfigsKey                 = "chain-configs"
 	disconnectedCheckFreqKey        = "disconnected-check-frequency"
 	disconnectedRestartTimeoutKey   = "disconnected-restart-timeout"

@@ -21,20 +21,20 @@ var (
 
 // Factory ...
 type Factory struct {
-	Path string
+	Path   string
+	Config string
 }
 
 // New ...
 func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
-	// Ignore warning from launching an executable with a variable command
-	// because the command is a controlled and required input
-	// #nosec G204
-
-	userConfig := "default"
+	userConfig := f.Config
 	if ctx != nil && len(ctx.Config.User) > 0 {
 		userConfig = ctx.Config.User
 	}
 
+	// Ignore warning from launching an executable with a variable command
+	// because the command is a controlled and required input
+	// #nosec G204
 	config := &plugin.ClientConfig{
 		HandshakeConfig: Handshake,
 		Plugins:         PluginMap,
