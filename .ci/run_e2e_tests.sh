@@ -4,11 +4,9 @@ SRC_PATH=$(dirname "${SCRIPTS_PATH}")
 # Early auth to avoid limit rating
 # If Docker Credentials are not available skip the Byzantine Tests
 if [[ -z ${DOCKER_USERNAME} ]]; then
-    echo "Skipping Byzantine Tests because Docker Credentials were not present."
-    BYZANTINE_IMAGE=""
+    echo "No Auth provided"
 else
     echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
-    docker pull "${BYZANTINE_IMAGE}"
 fi
 
 # Build the runnable Avalanche docker image
@@ -27,7 +25,6 @@ if [[ -z ${DOCKER_USERNAME} ]]; then
     echo "Skipping Byzantine Tests because Docker Credentials were not present."
     BYZANTINE_IMAGE=""
 else
-    echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
     docker pull "${BYZANTINE_IMAGE}"
 fi
 
