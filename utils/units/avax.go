@@ -5,6 +5,7 @@ package units
 
 // Denominations of value
 const (
+	Gun       uint64 = 1
 	NanoAvax  uint64 = 1
 	MicroAvax uint64 = 1000 * NanoAvax
 	Schmeckle uint64 = 49*MicroAvax + 463*NanoAvax
