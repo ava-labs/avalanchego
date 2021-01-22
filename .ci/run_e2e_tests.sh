@@ -2,7 +2,6 @@ SCRIPTS_PATH=$(cd $(dirname "${BASH_SOURCE[0]}"); pwd)
 SRC_PATH=$(dirname "${SCRIPTS_PATH}")
 
 # Early auth to avoid limit rating
-# If Docker Credentials are not available skip the Byzantine Tests
 if [[ -z ${DOCKER_USERNAME} ]]; then
     echo "No Auth provided"
 else
