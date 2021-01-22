@@ -6,11 +6,13 @@ package version
 import (
 	"errors"
 	"fmt"
+	"sort"
 )
 
 const (
 	defaultAppSeparator     = "/"
 	defaultVersionSeparator = "."
+	defaultVersionPrefix    = "v"
 )
 
 var (
@@ -18,61 +20,32 @@ var (
 	errDifferentMajor = errors.New("different major version")
 )
 
-// Version defines what is needed to describe a version
 type Version interface {
 	fmt.Stringer
 
-	App() string
 	Major() int
 	Minor() int
 	Patch() int
-
-	Compatible(Version) error
-	Before(Version) bool
+	Compare(v Version) int
 }
 
 type version struct {
-	app   string
-	major int
-	minor int
-	patch int
-	str   string
+	major, minor, patch int
+	str                 string
 }
 
-// NewDefaultVersion returns a new version with default separators
-func NewDefaultVersion(
-	app string,
-	major int,
-	minor int,
-	patch int,
-) Version {
-	return NewVersion(
-		app,
-		defaultAppSeparator,
-		defaultVersionSeparator,
-		major,
-		minor,
-		patch,
-	)
+func NewDefaultVersion(major, minor, patch int) Version {
+	return NewVersion(major, minor, patch, defaultVersionPrefix, defaultVersionSeparator)
 }
 
-// NewVersion returns a new version
-func NewVersion(
-	app string,
-	appSeparator string,
-	versionSeparator string,
-	major int,
-	minor int,
-	patch int,
-) Version {
+func NewVersion(major, minor, patch int, prefix, versionSeparator string) Version {
 	return &version{
-		app:   app,
 		major: major,
 		minor: minor,
 		patch: patch,
-		str: fmt.Sprintf("%s%s%d%s%d%s%d",
-			app,
-			appSeparator,
+		str: fmt.Sprintf(
+			"%s%d%s%d%s%d",
+			prefix,
 			major,
 			versionSeparator,
 			minor,
@@ -82,13 +55,100 @@ func NewVersion(
 	}
 }
 
-func (v *version) App() string    { return v.app }
+func (v *version) String() string { return v.str }
 func (v *version) Major() int     { return v.major }
 func (v *version) Minor() int     { return v.minor }
 func (v *version) Patch() int     { return v.patch }
-func (v *version) String() string { return v.str }
 
-func (v *version) Compatible(o Version) error {
+func (v *version) Compare(o Version) int {
+	var (
+		vm, om int
+	)
+	{
+		vm = v.Major()
+		om = o.Major()
+
+		if vm != om {
+			return vm - om
+		}
+	}
+
+	{
+		vm = v.Minor()
+		om = o.Minor()
+
+		if vm != om {
+			return vm - om
+		}
+	}
+
+	{
+		vm = v.Patch()
+		om = o.Patch()
+
+		return vm - om
+	}
+}
+
+// ApplicationVersion defines what is needed to describe a version
+type ApplicationVersion interface {
+	Version
+
+	App() string
+
+	Compatible(ApplicationVersion) error
+	Before(ApplicationVersion) bool
+}
+
+type appVersion struct {
+	Version
+
+	app string
+	str string
+}
+
+// NewDefaultApplicationVersion returns a new version with default separators
+func NewDefaultApplicationVersion(
+	app string,
+	major int,
+	minor int,
+	patch int,
+) ApplicationVersion {
+	return NewApplicationVersion(
+		app,
+		defaultAppSeparator,
+		defaultVersionSeparator,
+		major,
+		minor,
+		patch,
+	)
+}
+
+// NewApplicationVersion returns a new version
+func NewApplicationVersion(
+	app string,
+	appSeparator string,
+	versionSeparator string,
+	major int,
+	minor int,
+	patch int,
+) ApplicationVersion {
+	v := NewVersion(major, minor, patch, "", versionSeparator)
+	return &appVersion{
+		app:     app,
+		Version: v,
+		str: fmt.Sprintf("%s%s%s",
+			app,
+			appSeparator,
+			v.String(),
+		),
+	}
+}
+
+func (v *appVersion) App() string    { return v.app }
+func (v *appVersion) String() string { return v.str }
+
+func (v *appVersion) Compatible(o ApplicationVersion) error {
 	switch {
 	case v.App() != o.App():
 		return errDifferentApps
@@ -99,40 +159,35 @@ func (v *version) Compatible(o Version) error {
 	}
 }
 
-func (v *version) Before(o Version) bool {
+func (v *appVersion) Before(o ApplicationVersion) bool {
 	if v.App() != o.App() {
 		return false
 	}
 
-	{
-		v := v.Major()
-		o := o.Major()
-		switch {
-		case v < o:
-			return true
-		case v > o:
-			return false
-		}
-	}
-
-	{
-		v := v.Minor()
-		o := o.Minor()
-		switch {
-		case v < o:
-			return true
-		case v > o:
-			return false
-		}
-	}
-
-	{
-		v := v.Patch()
-		o := o.Patch()
-		if v < o {
-			return true
-		}
-	}
-
-	return false
+	return v.Compare(o) < 0
 }
+
+type innerSortAscendingVersions []Version
+
+// Less returns true if the version at index i is less than the version at index j
+func (isv innerSortAscendingVersions) Less(i, j int) bool {
+	return isv[i].Compare(isv[j]) < 0
+}
+
+func (isv innerSortAscendingVersions) Len() int      { return len(isv) }
+func (isv innerSortAscendingVersions) Swap(i, j int) { isv[j], isv[i] = isv[i], isv[j] }
+
+func SortAscendingVersions(vers []Version) { sort.Sort(innerSortAscendingVersions(vers)) }
+
+type innerSortDescendingVersions []Version
+
+// Less returns true if the version at index i is greater than the version at index j
+// such that it will sort in descending order
+func (isv innerSortDescendingVersions) Less(i, j int) bool {
+	return isv[i].Compare(isv[j]) > 0
+}
+
+func (isv innerSortDescendingVersions) Len() int      { return len(isv) }
+func (isv innerSortDescendingVersions) Swap(i, j int) { isv[j], isv[i] = isv[i], isv[j] }
+
+func SortDescendingVersions(vers []Version) { sort.Sort(innerSortDescendingVersions(vers)) }

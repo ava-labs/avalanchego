@@ -11,7 +11,17 @@ import (
 )
 
 func TestNewDefaultVersion(t *testing.T) {
-	v := NewDefaultVersion("avalanche", 1, 2, 3)
+	v := NewDefaultVersion(1, 2, 3)
+
+	assert.NotNil(t, v)
+	assert.Equal(t, "v1.2.3", v.String())
+	assert.Equal(t, 1, v.Major())
+	assert.Equal(t, 2, v.Minor())
+	assert.Equal(t, 3, v.Patch())
+}
+
+func TestNewDefaultApplicationVersion(t *testing.T) {
+	v := NewDefaultApplicationVersion("avalanche", 1, 2, 3)
 
 	assert.NotNil(t, v)
 	assert.Equal(t, "avalanche/1.2.3", v.String())
@@ -23,8 +33,8 @@ func TestNewDefaultVersion(t *testing.T) {
 	assert.False(t, v.Before(v))
 }
 
-func TestNewVersion(t *testing.T) {
-	v := NewVersion("avalanche", ":", ",", 1, 2, 3)
+func TestNewApplicationVersion(t *testing.T) {
+	v := NewApplicationVersion("avalanche", ":", ",", 1, 2, 3)
 
 	assert.NotNil(t, v)
 	assert.Equal(t, "avalanche:1,2,3", v.String())
@@ -38,62 +48,62 @@ func TestNewVersion(t *testing.T) {
 
 func TestComparingVersions(t *testing.T) {
 	tests := []struct {
-		myVersion   Version
-		peerVersion Version
+		myVersion   ApplicationVersion
+		peerVersion ApplicationVersion
 		compatible  bool
 		before      bool
 	}{
 		{
-			myVersion:   NewDefaultVersion("avalanche", 1, 2, 3),
-			peerVersion: NewDefaultVersion("avalanche", 1, 2, 3),
+			myVersion:   NewDefaultApplicationVersion("avalanche", 1, 2, 3),
+			peerVersion: NewDefaultApplicationVersion("avalanche", 1, 2, 3),
 			compatible:  true,
 			before:      false,
 		},
 		{
-			myVersion:   NewDefaultVersion("avalanche", 1, 2, 4),
-			peerVersion: NewDefaultVersion("avalanche", 1, 2, 3),
+			myVersion:   NewDefaultApplicationVersion("avalanche", 1, 2, 4),
+			peerVersion: NewDefaultApplicationVersion("avalanche", 1, 2, 3),
 			compatible:  true,
 			before:      false,
 		},
 		{
-			myVersion:   NewDefaultVersion("avalanche", 1, 2, 3),
-			peerVersion: NewDefaultVersion("avalanche", 1, 2, 4),
+			myVersion:   NewDefaultApplicationVersion("avalanche", 1, 2, 3),
+			peerVersion: NewDefaultApplicationVersion("avalanche", 1, 2, 4),
 			compatible:  true,
 			before:      true,
 		},
 		{
-			myVersion:   NewDefaultVersion("avalanche", 1, 3, 3),
-			peerVersion: NewDefaultVersion("avalanche", 1, 2, 3),
+			myVersion:   NewDefaultApplicationVersion("avalanche", 1, 3, 3),
+			peerVersion: NewDefaultApplicationVersion("avalanche", 1, 2, 3),
 			compatible:  true,
 			before:      false,
 		},
 		{
-			myVersion:   NewDefaultVersion("avalanche", 1, 2, 3),
-			peerVersion: NewDefaultVersion("avalanche", 1, 3, 3),
+			myVersion:   NewDefaultApplicationVersion("avalanche", 1, 2, 3),
+			peerVersion: NewDefaultApplicationVersion("avalanche", 1, 3, 3),
 			compatible:  true,
 			before:      true,
 		},
 		{
-			myVersion:   NewDefaultVersion("avalanche", 2, 2, 3),
-			peerVersion: NewDefaultVersion("avalanche", 1, 2, 3),
+			myVersion:   NewDefaultApplicationVersion("avalanche", 2, 2, 3),
+			peerVersion: NewDefaultApplicationVersion("avalanche", 1, 2, 3),
 			compatible:  false,
 			before:      false,
 		},
 		{
-			myVersion:   NewDefaultVersion("avalanche", 1, 2, 3),
-			peerVersion: NewDefaultVersion("avalanche", 2, 2, 3),
+			myVersion:   NewDefaultApplicationVersion("avalanche", 1, 2, 3),
+			peerVersion: NewDefaultApplicationVersion("avalanche", 2, 2, 3),
 			compatible:  true,
 			before:      true,
 		},
 		{
-			myVersion:   NewDefaultVersion("avax", 1, 2, 4),
-			peerVersion: NewDefaultVersion("avalanche", 1, 2, 3),
+			myVersion:   NewDefaultApplicationVersion("avax", 1, 2, 4),
+			peerVersion: NewDefaultApplicationVersion("avalanche", 1, 2, 3),
 			compatible:  false,
 			before:      false,
 		},
 		{
-			myVersion:   NewDefaultVersion("avalanche", 1, 2, 3),
-			peerVersion: NewDefaultVersion("avax", 1, 2, 3),
+			myVersion:   NewDefaultApplicationVersion("avalanche", 1, 2, 3),
+			peerVersion: NewDefaultApplicationVersion("avax", 1, 2, 3),
 			compatible:  false,
 			before:      false,
 		},
@@ -115,4 +125,66 @@ func TestComparingVersions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSortVersions(t *testing.T) {
+	v0 := NewDefaultVersion(1, 0, 0)
+	v1 := NewDefaultVersion(1, 1, 0)
+	v2 := NewDefaultVersion(1, 2, 1)
+	v3 := NewDefaultVersion(2, 1, 0)
+	vers := []Version{
+		v3,
+		v0,
+		v2,
+		v1,
+	}
+
+	SortAscendingVersions(vers)
+
+	assert.Len(t, vers, 4)
+
+	assert.Equal(t, vers[0], v0)
+	assert.Equal(t, vers[1], v1)
+	assert.Equal(t, vers[2], v2)
+	assert.Equal(t, vers[3], v3)
+
+	SortDescendingVersions(vers)
+
+	assert.Len(t, vers, 4)
+
+	assert.Equal(t, vers[0], v3)
+	assert.Equal(t, vers[1], v2)
+	assert.Equal(t, vers[2], v1)
+	assert.Equal(t, vers[3], v0)
+}
+
+func TestSortApplicationVersions(t *testing.T) {
+	v0 := NewDefaultApplicationVersion("avalanche", 1, 0, 0)
+	v1 := NewDefaultApplicationVersion("avalanche", 1, 1, 0)
+	v2 := NewDefaultApplicationVersion("avalanche", 1, 2, 1)
+	v3 := NewDefaultApplicationVersion("avalanche", 2, 1, 0)
+	vers := []Version{
+		v3,
+		v0,
+		v2,
+		v1,
+	}
+
+	SortAscendingVersions(vers)
+
+	assert.Len(t, vers, 4)
+
+	assert.Equal(t, vers[0], v0)
+	assert.Equal(t, vers[1], v1)
+	assert.Equal(t, vers[2], v2)
+	assert.Equal(t, vers[3], v3)
+
+	SortDescendingVersions(vers)
+
+	assert.Len(t, vers, 4)
+
+	assert.Equal(t, vers[0], v3)
+	assert.Equal(t, vers[1], v2)
+	assert.Equal(t, vers[2], v1)
+	assert.Equal(t, vers[3], v0)
 }
