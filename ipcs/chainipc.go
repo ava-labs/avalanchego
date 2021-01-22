@@ -82,7 +82,19 @@ func (cipcs *ChainIPCs) Unpublish(chainID ids.ID) (bool, error) {
 	if !ok {
 		return false, nil
 	}
+	delete(cipcs.chains, chainID)
 	return true, chainIPCs.stop()
+}
+
+// GetPublishedBlockchains returns the chains that are currently being published
+func (cipcs *ChainIPCs) GetPublishedBlockchains() []ids.ID {
+	chainIds := make([]ids.ID, 0, len(cipcs.chains))
+
+	for id := range cipcs.chains {
+		chainIds = append(chainIds, id)
+	}
+
+	return chainIds
 }
 
 func (cipcs *ChainIPCs) Shutdown() error {
