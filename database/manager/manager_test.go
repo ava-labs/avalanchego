@@ -98,8 +98,8 @@ func TestCreateManagerInvalidMemberPresent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = CreateManager(dir, v1)
-	assert.Error(t, err, "expected to error creating the manager due to open db")
+	_, err = CreateManager(dir, v2)
+	assert.Error(t, err, "expected to error creating the manager due to an open db")
 
 	err = db1.Close()
 	if err != nil {
@@ -266,6 +266,13 @@ func TestMeterDBManager(t *testing.T) {
 		},
 	}}
 
+	// Create meterdb manager with fresh registry and confirm
+	// that there are no errors registering metrics for multiple
+	// semantic databases.
 	_, err := m.NewMeterDBManager("", registry)
 	assert.NoError(t, err)
+
+	// Confirm that the error from a name conflict is handled correctly
+	_, err = m.NewMeterDBManager("", registry)
+	assert.Error(t, err)
 }
