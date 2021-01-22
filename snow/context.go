@@ -41,6 +41,11 @@ type SubnetLookup interface {
 	SubnetID(chainID ids.ID) (ids.ID, error)
 }
 
+type ChainConfig struct {
+	User    string // using string because byte will convert to base64
+	Upgrade string
+}
+
 // Context is information about the current execution.
 // [NetworkID] is the ID of the network this context exists within.
 // [ChainID] is the ID of the chain this context exists within.
@@ -73,7 +78,8 @@ type Context struct {
 	// Non-zero iff this chain bootstrapped. Should only be accessed atomically.
 	bootstrapped uint32
 
-	// TODO: add config to store here as string
+	// Config for this network
+	Config ChainConfig
 }
 
 // IsBootstrapped returns true iff this chain is done bootstrapping

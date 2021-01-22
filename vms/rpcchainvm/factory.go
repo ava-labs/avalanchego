@@ -21,8 +21,7 @@ var (
 
 // Factory ...
 type Factory struct {
-	Path   string
-	Config string
+	Path string
 }
 
 // New ...
@@ -33,7 +32,7 @@ func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 	config := &plugin.ClientConfig{
 		HandshakeConfig: Handshake,
 		Plugins:         PluginMap,
-		Cmd:             exec.Command(f.Path, fmt.Sprintf("--config=%s", f.Config)),
+		Cmd:             exec.Command(f.Path, fmt.Sprintf("--config=%s", ctx.Config.User)),
 		AllowedProtocols: []plugin.Protocol{
 			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,

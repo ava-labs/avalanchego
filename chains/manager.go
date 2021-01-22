@@ -138,6 +138,7 @@ type ManagerConfig struct {
 	WhitelistedSubnets      ids.Set          // Subnets to validate
 	TimeoutManager          *timeout.Manager // Manages request timeouts when sending messages to other validators
 	HealthService           health.CheckRegisterer
+	ChainConfigs            map[ids.ID]snow.ChainConfig
 }
 
 type manager struct {
@@ -262,6 +263,9 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 
 	// if chainID matches something kept in configs, add to snow.Context as
 	// ChainConfig/VMConfig
+	if config, ok := m.ChainConfigs[chainParams.ID]; ok {
+		ctx.Config = config
+	}
 
 	// Get a factory for the vm we want to use on our chain
 	vmFactory, err := m.VMManager.GetVMFactory(vmID)

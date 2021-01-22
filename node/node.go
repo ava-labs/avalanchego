@@ -566,6 +566,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		TimeoutManager:          &timeoutManager,
 		HealthService:           n.healthService,
 		WhitelistedSubnets:      n.Config.WhitelistedSubnets,
+		ChainConfigs:            n.Config.ChainConfigs,
 	})
 
 	vdrs := n.vdrs
@@ -601,8 +602,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Fee:         n.Config.TxFee,
 		}),
 		n.vmManager.RegisterVMFactory(evm.ID, &rpcchainvm.Factory{
-			Path:   filepath.Join(n.Config.PluginDir, "evm"),
-			Config: n.Config.ChainConfigs[evm.ID].UserConfig, // want chainID not VM ID (need a mapping from vm to available chainID configs)...what if want different configs for different chains that use the same VM?...don't want to provide config in factory...could add to chainparameters or provide to chainManager to hold onto for when it created new chains using ForceCreateChains...get config from snow context instead of factory in generic case
+			Path: filepath.Join(n.Config.PluginDir, "evm"),
 		}),
 		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),
 		n.vmManager.RegisterVMFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),

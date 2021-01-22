@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/nat"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -127,10 +128,5 @@ type Config struct {
 	DisconnectedRestartTimeout time.Duration
 
 	// ChainConfigs
-	ChainConfigs map[ids.ID]ChainConfig
-}
-
-type ChainConfig struct {
-	UserConfig string // using string because byte will convert to base64
-	// HardforkConfig
+	ChainConfigs map[ids.ID]snow.ChainConfig
 }
