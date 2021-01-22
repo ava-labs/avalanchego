@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
@@ -41,8 +42,8 @@ func (c *Client) UnpublishBlockchain(blockchainID string) (bool, error) {
 }
 
 // GetPublishedBlockchains requests the node to get blockchains being published
-func (c *Client) GetPublishedBlockchains() (*GetPublishedBlockchainsReply, error) {
+func (c *Client) GetPublishedBlockchains() ([]ids.ID, error) {
 	res := &GetPublishedBlockchainsReply{}
 	err := c.requester.SendRequest("getPublishedBlockchains", nil, res)
-	return res, err
+	return res.Chains, err
 }
