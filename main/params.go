@@ -77,6 +77,9 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Config File:
 	fs.String(configFileKey, defaultString, "Specifies a config file")
 
+	// Genesis Config File:
+	fs.String(genesisConfigFileKey, "", "Specifies a genesis config file (ignored when running standard networks)")
+
 	// NetworkID:
 	fs.String(networkNameKey, defaultNetworkName, "Network ID this node will connect to")
 
@@ -650,6 +653,12 @@ func setNodeConfig(v *viper.Viper) error {
 		Config.EpochDuration = v.GetDuration(snowEpochDuration)
 	} else {
 		Config.Params = *genesis.GetParams(networkID)
+	}
+
+	// Load genesis data
+	Config.GenesisBytes, Config.AvaxAssetID, err = genesis.Genesis(networkID, v.GetString(genesisConfigFileKey))
+	if err != nil {
+		return fmt.Errorf("unable to load genesis file: %w", err)
 	}
 
 	// Assertions

@@ -7,6 +7,7 @@ const (
 	defaultString                   = "default"
 	configFileKey                   = "config-file"
 	versionKey                      = "version"
+	genesisConfigFileKey            = "genesis"
 	networkNameKey                  = "network-id"
 	txFeeKey                        = "tx-fee"
 	creationTxFeeKey                = "creation-tx-fee"
