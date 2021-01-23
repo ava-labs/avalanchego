@@ -71,12 +71,12 @@ func (c *Client) AliasChain(chain, alias string) (bool, error) {
 }
 
 // GetChainAliases ...
-func (c *Client) GetChainAliases(chain string) (*GetChainAliasesReply, error) {
+func (c *Client) GetChainAliases(chain string) ([]string, error) {
 	res := &GetChainAliasesReply{}
 	err := c.requester.SendRequest("getChainAliases", &GetChainAliasesArgs{
 		Chain: chain,
 	}, res)
-	return res, err
+	return res.Aliases, err
 }
 
 // Stacktrace ...

@@ -8,12 +8,11 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/ava-labs/avalanchego/ids"
-
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
@@ -144,12 +143,12 @@ type GetChainAliasesReply struct {
 func (service *Admin) GetChainAliases(r *http.Request, args *GetChainAliasesArgs, reply *GetChainAliasesReply) error {
 	service.log.Info("Admin: GetChainAliases called with Chain: %s", args.Chain)
 
-	ID, err := ids.FromString(args.Chain)
+	id, err := ids.FromString(args.Chain)
 	if err != nil {
 		return err
 	}
 
-	reply.Aliases = service.chainManager.Aliases(ID)
+	reply.Aliases = service.chainManager.Aliases(id)
 	return nil
 }
 

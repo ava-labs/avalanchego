@@ -183,15 +183,15 @@ func TestAliasChain(t *testing.T) {
 
 func TestGetChainAliases(t *testing.T) {
 	t.Run("successful", func(t *testing.T) {
-		expectedReply := &GetChainAliasesReply{
-			Aliases: []string{"alias1", "alias2"},
-		}
-		mockClient := Client{requester: NewMockClient(expectedReply, nil)}
+		expectedReply := []string{"alias1", "alias2"}
+		mockClient := Client{requester: NewMockClient(&GetChainAliasesReply{
+			Aliases: expectedReply,
+		}, nil)}
 
 		reply, err := mockClient.GetChainAliases("chain")
 
 		assert.NoError(t, err)
-		assert.ElementsMatch(t, expectedReply.Aliases, reply.Aliases)
+		assert.ElementsMatch(t, expectedReply, reply)
 	})
 
 	t.Run("failure", func(t *testing.T) {
