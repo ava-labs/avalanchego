@@ -4,7 +4,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -12,15 +11,14 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"time"
 
-	"github.com/ava-labs/avalanchego/external/viper"
 	"github.com/spf13/pflag"
 
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/external/viper"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
@@ -243,39 +241,6 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(chainConfigsKey, "", "Specifies config to pass into chains (overrides coreth-config)")
 
 	return fs
-}
-
-func decodeStringOrJSON(v interface{}) (string, error) {
-	switch value := v.(type) {
-	case string:
-		return value, nil
-	default:
-		b, err := json.Marshal(value)
-		if err != nil {
-			return "", fmt.Errorf("couldn't parse JSON: %w", err)
-		}
-		return string(b), nil
-	}
-}
-
-func populateStringFields(v interface{}, source map[string]interface{}) error {
-	s := reflect.ValueOf(v).Elem()
-	for i := 0; i < s.NumField(); i++ {
-		name := strings.ToLower(s.Type().Field(i).Name)
-		v, ok := source[name]
-		if !ok {
-			continue
-		}
-
-		parsedValue, err := decodeStringOrJSON(v)
-		if err != nil {
-			return fmt.Errorf("could not parse config: %w", err)
-		}
-
-		s.Field(i).Set(reflect.ValueOf(parsedValue))
-	}
-
-	return nil
 }
 
 // getViper returns the viper environment from parsing config file from default search paths
@@ -709,14 +674,14 @@ func setNodeConfig(v *viper.Viper) error {
 	// Coreth Plugin
 	// TODO: deprecate
 	corethConfigValue := v.Get(corethConfigKey)
-	corethConfigString, err := decodeStringOrJSON(corethConfigValue)
+	corethConfigString, err := utils.DecodeStringOrJSON(corethConfigValue)
 	if err != nil {
 		return fmt.Errorf("couldn't parse coreth config: %w", err)
 	}
 	Config.CorethConfig = corethConfigString
 
 	// ChainConfigs
-	// TODO: provide defaults for standard chains?
+	// TODO: provide defaults for standard chains
 	Config.ChainConfigs = map[ids.ID]snow.ChainConfig{}
 	for chainID, chainConfig := range v.GetStringMap(chainConfigsKey) {
 		id, err := ids.FromString(chainID)
@@ -730,7 +695,7 @@ func setNodeConfig(v *viper.Viper) error {
 		}
 
 		config := snow.ChainConfig{}
-		if err := populateStringFields(&config, chainConfigMap); err != nil {
+		if err := utils.PopulateStringFields(&config, chainConfigMap); err != nil {
 			return fmt.Errorf("could not parse chain config for %s: %w", chainID, err)
 		}
 		Config.ChainConfigs[id] = config

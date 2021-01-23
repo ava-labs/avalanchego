@@ -261,8 +261,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 		EpochDuration:        m.EpochDuration,
 	}
 
-	// if chainID matches something kept in configs, add to snow.Context as
-	// ChainConfig/VMConfig
+	// If chainID matches something in ChainConfigs, add to *snow.Context.
 	if config, ok := m.ChainConfigs[chainParams.ID]; ok {
 		ctx.Config = config
 	}
