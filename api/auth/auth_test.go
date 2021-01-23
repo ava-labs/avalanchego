@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	jwt "github.com/dgrijalva/jwt-go"
 
@@ -38,11 +38,12 @@ func TestNewTokenWrongPassword(t *testing.T) {
 		Enabled:  true,
 		Password: hashedPassword,
 	}
-	if _, err := auth.newToken("", []string{"endpoint1, endpoint2"}); err == nil {
-		t.Fatal("should have failed because password is wrong")
-	} else if _, err := auth.newToken("notThePassword", []string{"endpoint1, endpoint2"}); err == nil {
-		t.Fatal("should have failed because password is wrong")
-	}
+
+	_, err := auth.newToken("", []string{"endpoint1, endpoint2"})
+	assert.Error(t, err, "should have failed because password is wrong")
+
+	_, err = auth.newToken("notThePassword", []string{"endpoint1, endpoint2"})
+	assert.Error(t, err, "should have failed because password is wrong")
 }
 
 func TestNewTokenHappyPath(t *testing.T) {
@@ -56,9 +57,7 @@ func TestNewTokenHappyPath(t *testing.T) {
 	// Make a token
 	endpoints := []string{"endpoint1", "endpoint2", "endpoint3"}
 	tokenStr, err := auth.newToken(testPassword, endpoints)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	// Parse the token
 	token, err := jwt.ParseWithClaims(tokenStr, &endpointClaims{}, func(*jwt.Token) (interface{}, error) {
@@ -66,20 +65,14 @@ func TestNewTokenHappyPath(t *testing.T) {
 		defer auth.lock.RUnlock()
 		return auth.Password.Password[:], nil
 	})
-	if err != nil {
-		t.Fatalf("couldn't parse new token: %s", err)
-	}
+	assert.NoError(t, err, "couldn't parse new token")
 
 	claims, ok := token.Claims.(*endpointClaims)
-	if !ok {
-		t.Fatal("expected auth token's claims to be type endpointClaims but is different type")
-	}
-	if !reflect.DeepEqual(claims.Endpoints, endpoints) {
-		t.Fatal("token has wrong endpoint claims")
-	}
-	if shouldExpireAt := now.Add(TokenLifespan).Unix(); shouldExpireAt != now.Add(TokenLifespan).Unix() {
-		t.Fatalf("token expiration time is wrong")
-	}
+	assert.True(t, ok, "expected auth token's claims to be type endpointClaims but is different type")
+	assert.ElementsMatch(t, endpoints, claims.Endpoints, "token has wrong endpoint claims")
+
+	shouldExpireAt := now.Add(TokenLifespan).Unix()
+	assert.Equal(t, shouldExpireAt, claims.ExpiresAt, "token expiration time is wrong")
 }
 
 func TestTokenHasWrongSig(t *testing.T) {
@@ -91,27 +84,23 @@ func TestTokenHasWrongSig(t *testing.T) {
 	// Make a token
 	endpoints := []string{"endpoint1", "endpoint2", "endpoint3"}
 	tokenStr, err := auth.newToken(testPassword, endpoints)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	// Try to parse the token using the wrong password
-	if _, err := jwt.ParseWithClaims(tokenStr, &endpointClaims{}, func(*jwt.Token) (interface{}, error) {
+	_, err = jwt.ParseWithClaims(tokenStr, &endpointClaims{}, func(*jwt.Token) (interface{}, error) {
 		auth.lock.RLock()
 		defer auth.lock.RUnlock()
 		return []byte(""), nil
-	}); err == nil {
-		t.Fatalf("should have failed because password is wrong")
-	}
+	})
+	assert.Error(t, err, "should have failed because password is wrong")
 
 	// Try to parse the token using the wrong password
-	if _, err := jwt.ParseWithClaims(tokenStr, &endpointClaims{}, func(*jwt.Token) (interface{}, error) {
+	_, err = jwt.ParseWithClaims(tokenStr, &endpointClaims{}, func(*jwt.Token) (interface{}, error) {
 		auth.lock.RLock()
 		defer auth.lock.RUnlock()
 		return []byte("notThePassword"), nil
-	}); err == nil {
-		t.Fatalf("should have failed because password is wrong")
-	}
+	})
+	assert.Error(t, err, "should have failed because password is wrong")
 }
 
 func TestChangePassword(t *testing.T) {
@@ -121,52 +110,49 @@ func TestChangePassword(t *testing.T) {
 	}
 
 	password2 := "fejhkefjhefjhefhje" // #nosec G101
-	if err := auth.changePassword("", password2); err == nil {
-		t.Fatal("should have failed because old password is wrong")
-	} else if err := auth.changePassword("notThePassword", password2); err == nil {
-		t.Fatal("should have failed because old password is wrong")
-	} else if err := auth.changePassword(testPassword, ""); err == nil {
-		t.Fatal("should have failed because new password is empty")
-	} else if err := auth.changePassword(testPassword, password2); err != nil {
-		t.Fatal("should have succeeded")
-	}
+	var err error
 
-	if !auth.Password.Check(password2) {
-		t.Fatal("password should have been changed")
-	}
+	err = auth.changePassword("", password2)
+	assert.Error(t, err, "should have failed because old password is wrong")
+
+	err = auth.changePassword("notThePassword", password2)
+	assert.Error(t, err, "should have failed because old password is wrong")
+
+	err = auth.changePassword(testPassword, "")
+	assert.Error(t, err, "should have failed because new password is empty")
+
+	err = auth.changePassword(testPassword, password2)
+	assert.NoError(t, err, "should have succeeded")
+	assert.True(t, auth.Password.Check(password2), "password should have been changed")
 
 	password3 := "ufwhwohwfohawfhwdwd" // #nosec G101
-	if err := auth.changePassword(testPassword, password3); err == nil {
-		t.Fatal("should have failed because old password is wrong")
-	} else if err := auth.changePassword(password2, password3); err != nil {
-		t.Fatal("should have succeeded")
-	}
 
+	err = auth.changePassword(testPassword, password3)
+	assert.Error(t, err, "should have failed because old password is wrong")
+
+	err = auth.changePassword(password2, password3)
+	assert.NoError(t, err, "should have succeeded")
 }
 
 func TestGetToken(t *testing.T) {
+	var err error
 	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:9650/ext/auth", strings.NewReader(""))
-	if _, err := getToken(req); err == nil {
-		t.Fatal("should have failed because no auth token given")
-	}
+	_, err = getToken(req)
+	assert.Error(t, err, "should have failed because no auth token given")
 
 	req.Header.Add("Authorization", "")
-	if _, err := getToken(req); err == nil {
-		t.Fatal("should have failed because auth token invalid")
-	}
+	_, err = getToken(req)
+	assert.Error(t, err, "should have failed because auth token invalid")
 
 	req.Header.Set("Authorization", "this isn't an auth token!")
-	if _, err := getToken(req); err == nil {
-		t.Fatal("should have failed because auth token invalid")
-	}
+	_, err = getToken(req)
+	assert.Error(t, err, "should have failed because auth token invalid")
 
 	wellFormedToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJFbmRwb2ludHMiOlsiKiJdLCJleHAiOjE1OTM0NzU4OTR9.Cqo7TraN_CFN13q3ae4GRJCMgd8ZOlQwBzyC29M6Aps" // #nosec G101
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", wellFormedToken))
-	if token, err := getToken(req); err != nil {
-		t.Fatal("should have been able to parse valid header")
-	} else if token != wellFormedToken {
-		t.Fatal("parsed token incorrectly")
-	}
+	token, err := getToken(req)
+	assert.NoError(t, err, "should have been able to parse valid header")
+	assert.Equal(t, wellFormedToken, token, "parsed token incorrectly")
 }
 
 func TestRevokeToken(t *testing.T) {
@@ -178,15 +164,12 @@ func TestRevokeToken(t *testing.T) {
 	// Make a token
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
 	tokenStr, err := auth.newToken(testPassword, endpoints)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
-	if err := auth.revokeToken(tokenStr, testPassword); err != nil {
-		t.Fatal("should have succeeded")
-	} else if len(auth.revoked) != 1 || auth.revoked[0] != tokenStr {
-		t.Fatal("revoked token list is incorrect")
-	}
+	err = auth.revokeToken(tokenStr, testPassword)
+	assert.NoError(t, err, "should have succeeded")
+	assert.Len(t, auth.revoked, 1, "revoked token list is incorrect")
+	assert.Equal(t, tokenStr, auth.revoked[0], "revoked token list is incorrect")
 }
 
 func TestWrapHandlerHappyPath(t *testing.T) {
@@ -198,9 +181,7 @@ func TestWrapHandlerHappyPath(t *testing.T) {
 	// Make a token
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
 	tokenStr, err := auth.newToken(testPassword, endpoints)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 
@@ -209,9 +190,7 @@ func TestWrapHandlerHappyPath(t *testing.T) {
 		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr))
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
-		if rr.Code != http.StatusOK {
-			t.Fatal("should have passed authorization")
-		}
+		assert.Equal(t, http.StatusOK, rr.Code)
 	}
 }
 
@@ -224,12 +203,10 @@ func TestWrapHandlerRevokedToken(t *testing.T) {
 	// Make a token
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
 	tokenStr, err := auth.newToken(testPassword, endpoints)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := auth.revokeToken(tokenStr, testPassword); err != nil {
-		t.Fatalf("should have been able to revoke token but got: %s", err)
-	}
+	assert.NoError(t, err)
+
+	err = auth.revokeToken(tokenStr, testPassword)
+	assert.NoError(t, err)
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 
@@ -238,12 +215,9 @@ func TestWrapHandlerRevokedToken(t *testing.T) {
 		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr))
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
-		if rr.Code != http.StatusUnauthorized {
-			t.Fatal("should have failed authorization because token was revoked")
-		}
-		if ok, _ := regexp.MatchString(unAuthorizedResponseRegex, rr.Body.String()); !ok {
-			t.Fatal("response body does not match expected")
-		}
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
+		assert.Contains(t, rr.Body.String(), ErrTokenRevoked.Error())
+		assert.Regexp(t, unAuthorizedResponseRegex, rr.Body.String())
 	}
 }
 
@@ -257,9 +231,7 @@ func TestWrapHandlerExpiredToken(t *testing.T) {
 	// Make a token that expired well in the past
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
 	tokenStr, err := auth.newToken(testPassword, endpoints)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 
@@ -268,12 +240,9 @@ func TestWrapHandlerExpiredToken(t *testing.T) {
 		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr))
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
-		if rr.Code != http.StatusUnauthorized {
-			t.Fatal("should have failed authorization because token is expired")
-		}
-		if ok, _ := regexp.MatchString(unAuthorizedResponseRegex, rr.Body.String()); !ok {
-			t.Fatal("response body does not match expected")
-		}
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
+		assert.Contains(t, rr.Body.String(), ErrTokenExpired.Error())
+		assert.Regexp(t, unAuthorizedResponseRegex, rr.Body.String())
 	}
 }
 
@@ -289,12 +258,9 @@ func TestWrapHandlerNoAuthToken(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
-		if rr.Code != http.StatusUnauthorized {
-			t.Fatal("should have failed authorization since no auth token given")
-		}
-		if ok, _ := regexp.MatchString(unAuthorizedResponseRegex, rr.Body.String()); !ok {
-			t.Fatal("response body does not match expected")
-		}
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
+		assert.Contains(t, rr.Body.String(), ErrNoToken.Error())
+		assert.Regexp(t, unAuthorizedResponseRegex, rr.Body.String())
 	}
 }
 
@@ -307,9 +273,7 @@ func TestWrapHandlerUnauthorizedEndpoint(t *testing.T) {
 	// Make a token
 	endpoints := []string{"/ext/info"}
 	tokenStr, err := auth.newToken(testPassword, endpoints)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	unauthorizedEndpoints := []string{"/ext/bc/X", "/ext/metrics", "", "/foo", "/ext/info/foo"}
 
@@ -319,12 +283,9 @@ func TestWrapHandlerUnauthorizedEndpoint(t *testing.T) {
 		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr))
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
-		if rr.Code != http.StatusUnauthorized {
-			t.Fatal("should have failed authorization since this endpoint is not allowed by the token")
-		}
-		if ok, _ := regexp.MatchString(unAuthorizedResponseRegex, rr.Body.String()); !ok {
-			t.Fatal("response body does not match expected")
-		}
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
+		assert.Contains(t, rr.Body.String(), ErrTokenInsufficientPermission.Error())
+		assert.Regexp(t, unAuthorizedResponseRegex, rr.Body.String())
 	}
 }
 
@@ -337,18 +298,14 @@ func TestWrapHandlerAuthEndpoint(t *testing.T) {
 	// Make a token
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics", "", "/foo", "/ext/info/foo"}
 	tokenStr, err := auth.newToken(testPassword, endpoints)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", fmt.Sprintf("/ext/%s", Endpoint)), strings.NewReader(""))
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr))
 	rr := httptest.NewRecorder()
 	wrappedHandler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatal("should always allow access to the auth endpoint")
-	}
+	assert.Equal(t, http.StatusOK, rr.Code)
 }
 
 func TestWrapHandlerAccessAll(t *testing.T) {
@@ -360,9 +317,7 @@ func TestWrapHandlerAccessAll(t *testing.T) {
 	// Make a token that allows access to all endpoints
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics", "", "/foo", "/ext/foo/info"}
 	tokenStr, err := auth.newToken(testPassword, []string{"*"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 	for _, endpoint := range endpoints {
@@ -370,9 +325,7 @@ func TestWrapHandlerAccessAll(t *testing.T) {
 		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr))
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
-		if rr.Code != http.StatusOK {
-			t.Fatal("* in token should have allowed access to all endpoints")
-		}
+		assert.Equal(t, http.StatusOK, rr.Code)
 	}
 }
 
@@ -389,19 +342,13 @@ func TestWrapHandlerAuthDisabled(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
-		if rr.Code != http.StatusOK {
-			t.Fatal("auth is disabled so should allow access to all endpoints")
-		}
+		assert.Equal(t, http.StatusOK, rr.Code)
 	}
 }
 
 func TestWriteUnauthorizedResponse(t *testing.T) {
 	rr := httptest.NewRecorder()
 	writeUnauthorizedResponse(rr, errors.New("example err"))
-	if rr.Code != http.StatusUnauthorized {
-		t.Fatal("response status should be Unauthorized")
-	}
-	if rr.Body.String() != "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"example err\"},\"id\":1}" {
-		t.Fatal("response body does not match expected")
-	}
+	assert.Equal(t, http.StatusUnauthorized, rr.Code)
+	assert.Equal(t, "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"example err\"},\"id\":1}", rr.Body.String())
 }

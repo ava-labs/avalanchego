@@ -30,7 +30,15 @@ var (
 	TokenLifespan = time.Hour * 12
 
 	// ErrNoToken is returned by GetToken if no token is provided
-	ErrNoToken = errors.New("auth token not provided")
+	ErrNoToken               = errors.New("auth token not provided")
+	ErrAuthHeaderNotParsable = fmt.Errorf(
+		"couldn't parse auth token. Header \"%s\" should be \"%sTOKEN.GOES.HERE\"",
+		headerKey,
+		headerValStart,
+	)
+	ErrTokenExpired                = errors.New("the provided auth token was expired")
+	ErrTokenRevoked                = errors.New("the provided auth token was revoked")
+	ErrTokenInsufficientPermission = errors.New("the provided auth token does not allow access to this endpoint")
 
 	errWrongPassword      = errors.New("incorrect password")
 	errInvalidTokenFormat = errors.New("token is invalid format")
@@ -183,12 +191,7 @@ func (auth *Auth) WrapHandler(h http.Handler) http.Handler {
 		} else if err != nil {
 			// Error is intentionally dropped here as there is nothing left to
 			// do with it.
-			err := fmt.Errorf(
-				"couldn't parse auth token. Header \"%s\" should be \"%sTOKEN.GOES.HERE\"",
-				headerKey,
-				headerValStart,
-			)
-			writeUnauthorizedResponse(w, err)
+			writeUnauthorizedResponse(w, ErrAuthHeaderNotParsable)
 			return
 		}
 
@@ -199,13 +202,13 @@ func (auth *Auth) WrapHandler(h http.Handler) http.Handler {
 		if err != nil { // Probably because signature wrong
 			// Error is intentionally dropped here as there is nothing left to
 			// do with it.
+
+			if strings.Contains(err.Error(), "expired") {
+				writeUnauthorizedResponse(w, ErrTokenExpired)
+				return
+			}
+
 			writeUnauthorizedResponse(w, fmt.Errorf("invalid auth token: %s", err))
-			return
-		}
-		if !token.Valid { // Check that token isn't expired
-			// Error is intentionally dropped here as there is nothing left to
-			// do with it.
-			writeUnauthorizedResponse(w, errors.New("invalid auth token. Is it expired?"))
 			return
 		}
 
@@ -214,7 +217,8 @@ func (auth *Auth) WrapHandler(h http.Handler) http.Handler {
 		if !ok {
 			// Error is intentionally dropped here as there is nothing left to
 			// do with it.
-			writeUnauthorizedResponse(w, errors.New("expected auth token's claims to be type endpointClaims but is different type"))
+			err := fmt.Errorf("expected auth token's claims to be type endpointClaims but is %T", token.Claims)
+			writeUnauthorizedResponse(w, err)
 			return
 		}
 		canAccess := false // true iff the token authorizes access to the API
@@ -227,7 +231,7 @@ func (auth *Auth) WrapHandler(h http.Handler) http.Handler {
 		if !canAccess {
 			// Error is intentionally dropped here as there is nothing left to
 			// do with it.
-			writeUnauthorizedResponse(w, errors.New("the provided auth token does not allow access to this endpoint"))
+			writeUnauthorizedResponse(w, ErrTokenInsufficientPermission)
 			return
 		}
 
@@ -236,7 +240,7 @@ func (auth *Auth) WrapHandler(h http.Handler) http.Handler {
 			if revokedToken == tokenStr {
 				// Error is intentionally dropped here as there is nothing left
 				// to do with it.
-				writeUnauthorizedResponse(w, errors.New("the provided auth token was revoked"))
+				writeUnauthorizedResponse(w, ErrTokenRevoked)
 				auth.lock.RUnlock()
 				return
 			}
@@ -247,6 +251,9 @@ func (auth *Auth) WrapHandler(h http.Handler) http.Handler {
 	})
 }
 
+// Write a JSON-RPC formatted response saying that the API call is unauthorized.
+// The response has header http.StatusUnauthorized.
+// Errors while marshalling or writing are ignored.
 func writeUnauthorizedResponse(w http.ResponseWriter, err error) {
 	body := struct {
 		Version string `json:"jsonrpc"`
