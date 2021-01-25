@@ -1,9 +1,9 @@
 package pubsub
 
 import (
-	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"strings"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -27,14 +27,14 @@ type CommandMessage struct {
 	Unsubscribe bool `json:"unsubscribe"`
 }
 
-func NewCommandMessage(b []byte, hrp string) (*CommandMessage, error) {
-	c := &CommandMessage{}
-	err := c.Load(b)
+func NewCommandMessage(r io.Reader, hrp string) (*CommandMessage, error) {
+	c := CommandMessage{}
+	err := c.Load(r)
 	if err != nil {
 		return nil, err
 	}
 	c.TransposeAddress(hrp)
-	return c, nil
+	return &c, nil
 }
 
 func (c *CommandMessage) IsNewFilter() bool {
@@ -52,7 +52,7 @@ func (c *CommandMessage) FilterOrDefault() {
 // TransposeAddress converts any b32 address to their byte equiv ids.ShortID.
 func (c *CommandMessage) TransposeAddress(hrp string) {
 	if c.AddressIds == nil {
-		c.AddressIds = make([][]byte, 0, 1)
+		c.AddressIds = make([][]byte, 0, len(c.Addresses))
 	}
 	for _, astr := range c.Addresses {
 		// remove chain prefix if found..  X-fuji....
@@ -60,22 +60,19 @@ func (c *CommandMessage) TransposeAddress(hrp string) {
 		if len(addressParts) >= 2 {
 			astr = addressParts[1]
 		}
-		if strings.HasPrefix(astr, hrp) {
-			_, _, abytes, err := formatting.ParseAddress("X-" + astr)
-			if err != nil {
-				continue
-			}
-			c.AddressIds = append(c.AddressIds, abytes)
+		if !strings.HasPrefix(astr, hrp) {
+			continue
 		}
+		_, _, abytes, err := formatting.ParseAddress("X-" + astr)
+		if err != nil {
+			continue
+		}
+		c.AddressIds = append(c.AddressIds, abytes)
 	}
 }
 
-func (c *CommandMessage) Load(b []byte) error {
-	err := json.NewDecoder(bytes.NewReader(b)).Decode(c)
-	if err != nil {
-		return err
-	}
-	return nil
+func (c *CommandMessage) Load(r io.Reader) error {
+	return json.NewDecoder(r).Decode(c)
 }
 
 func (c *CommandMessage) ParseQuery(q map[string][]string) {

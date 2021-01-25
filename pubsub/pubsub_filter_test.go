@@ -53,7 +53,7 @@ func TestCommandMessage_Load(t *testing.T) {
 	j, _ := json.Marshal(cmdMsg)
 
 	cmdMsgTest := &CommandMessage{}
-	err := cmdMsgTest.Load(j)
+	err := cmdMsgTest.Load(bytes.NewReader(j))
 	if err != nil {
 		t.Fatalf("load command message failed")
 	}

@@ -4,7 +4,6 @@
 package pubsub
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"net/http"
@@ -324,12 +323,7 @@ func (c *Connection) readMessage() error {
 	if err != nil {
 		return err
 	}
-	var bb bytes.Buffer
-	_, err = bb.ReadFrom(r)
-	if err != nil {
-		return err
-	}
-	cmdMsg, err := NewCommandMessage(bb.Bytes(), c.s.hrp)
+	cmdMsg, err := NewCommandMessage(r, c.s.hrp)
 	if err != nil {
 		return err
 	}
