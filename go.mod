@@ -22,7 +22,6 @@ require (
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.7 // indirect
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/mr-tron/base58 v1.2.0
 	github.com/nbutton23/zxcvbn-go v0.0.0-20180912185939-ae427f1e4c1d
 	github.com/pkg/errors v0.9.1 // indirect
