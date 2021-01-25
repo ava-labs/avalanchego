@@ -31,7 +31,7 @@ func DecodeStringOrJSON(v interface{}) (string, error) {
 //
 // Note: v MUST be a pointer for this function
 // to work correctly.
-func PopulateStringFields(v interface{}, source map[string]interface{}) error {
+func PopulateStringFields(source map[string]interface{}, v interface{}) error {
 	s := reflect.ValueOf(v).Elem()
 	for i := 0; i < s.NumField(); i++ {
 		field := s.Field(i)

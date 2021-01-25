@@ -696,7 +696,7 @@ func setNodeConfig(v *viper.Viper) error {
 		}
 
 		config := snow.ChainConfig{}
-		if err := utils.PopulateStringFields(&config, chainConfigMap); err != nil {
+		if err := utils.PopulateStringFields(chainConfigMap, &config); err != nil {
 			return fmt.Errorf("could not parse chain config for %s: %w", chainID, err)
 		}
 		Config.ChainConfigs[id] = config

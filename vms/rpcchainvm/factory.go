@@ -21,15 +21,17 @@ var (
 
 // Factory ...
 type Factory struct {
-	Path   string
+	Path string
+
+	// TODO: remove once `coreth-config` is deprecated
 	Config string
 }
 
 // New ...
 func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
-	c := f.Config
+	settings := f.Config
 	if ctx != nil && len(ctx.Config.Settings) > 0 {
-		c = ctx.Config.Settings
+		settings = ctx.Config.Settings
 	}
 
 	// Ignore warning from launching an executable with a variable command
@@ -38,7 +40,7 @@ func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 	config := &plugin.ClientConfig{
 		HandshakeConfig: Handshake,
 		Plugins:         PluginMap,
-		Cmd:             exec.Command(f.Path, fmt.Sprintf("--config=%s", c)),
+		Cmd:             exec.Command(f.Path, fmt.Sprintf("--config=%s", settings)),
 		AllowedProtocols: []plugin.Protocol{
 			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,

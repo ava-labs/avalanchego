@@ -35,19 +35,19 @@ func TestPopulateStringFields(t *testing.T) {
 
 	t.Run("no fields", func(t *testing.T) {
 		t1 := type1{}
-		assert.NoError(t, PopulateStringFields(&t1, m))
+		assert.NoError(t, PopulateStringFields(m, &t1))
 		assert.Equal(t, type1{}, t1)
 	})
 
 	t.Run("mixed fields", func(t *testing.T) {
 		t2 := type2{}
-		assert.NoError(t, PopulateStringFields(&t2, m))
+		assert.NoError(t, PopulateStringFields(m, &t2))
 		assert.Equal(t, type2{A: "neat", C: `{"cool":"sweet","wow":1231}`}, t2)
 	})
 
 	t.Run("no string fields", func(t *testing.T) {
 		t3 := type3{}
-		assert.NoError(t, PopulateStringFields(&t3, m))
+		assert.NoError(t, PopulateStringFields(m, &t3))
 		assert.Equal(t, type3{}, t3)
 	})
 }
