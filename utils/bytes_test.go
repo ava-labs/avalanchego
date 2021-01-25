@@ -41,6 +41,8 @@ func TestSetByteSlices(t *testing.T) {
 		B int
 		C []byte
 		k []byte
+		D []int
+		Z []byte
 	}
 
 	type type3 struct {
