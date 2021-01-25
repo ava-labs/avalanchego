@@ -26,10 +26,10 @@ func TestChainConfigs(t *testing.T) {
 			config:   `{}`,
 			expected: map[ids.ID]chains.ChainConfig{},
 		},
-		"valid chain-id (default settings)": {
+		"valid chain-id": {
 			config: `{
 				"chain-configs": [
-					{"chain-id": "yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp", "settings": "default", "upgrades": "default"},
+					{"chain-id": "yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp"},
 					{"chain-id": "2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm", "settings": "blah1", "upgrades": "blah2"}
 				]
 			}`,
@@ -37,7 +37,7 @@ func TestChainConfigs(t *testing.T) {
 				m := map[ids.ID]chains.ChainConfig{}
 				id1, err := ids.FromString("yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp")
 				assert.NoError(t, err)
-				m[id1] = chains.ChainConfig{Settings: []byte("default"), Upgrades: []byte("default")}
+				m[id1] = chains.ChainConfig{}
 
 				id2, err := ids.FromString("2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm")
 				assert.NoError(t, err)
@@ -51,14 +51,14 @@ func TestChainConfigs(t *testing.T) {
 				"chain-configs": [
 					{"chain-id": "yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp", "settings": {
 						"snowman-api-enabled": true
-					}, "upgrades": "default"}
+					}, "upgrades": "do-stuff"}
 				]
 			}`,
 			expected: func() map[ids.ID]chains.ChainConfig {
 				m := map[ids.ID]chains.ChainConfig{}
 				id1, err := ids.FromString("yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp")
 				assert.NoError(t, err)
-				m[id1] = chains.ChainConfig{Settings: []byte(`{"snowman-api-enabled":true}`), Upgrades: []byte("default")}
+				m[id1] = chains.ChainConfig{Settings: []byte(`{"snowman-api-enabled":true}`), Upgrades: []byte("do-stuff")}
 
 				return m
 			}(),
@@ -74,7 +74,7 @@ func TestChainConfigs(t *testing.T) {
 		"invalid checksum chain-id": {
 			config: `{
 				"chain-configs": [
-					{"chain-id": "yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWq", "settings": "default", "upgrades": "default"}
+					{"chain-id": "yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWq"}
 				]
 			}`,
 			err: "could not parse chainID yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWq: invalid input checksum",
@@ -82,7 +82,7 @@ func TestChainConfigs(t *testing.T) {
 		"missing chain-id": {
 			config: `{
 				"chain-configs": [
-					{"settings": "default", "upgrades": "default"}
+					{"settings": "apis", "upgrades": "forks"}
 				]
 			}`,
 			err: "could not parse chainID from chain config 0",
@@ -90,7 +90,7 @@ func TestChainConfigs(t *testing.T) {
 		"non-string chain-id": {
 			config: `{
 				"chain-configs": [
-					{"chain-id": 1, "settings": "default", "upgrades": "default"}
+					{"chain-id": 1, "settings": "apis", "upgrades": "forks"}
 				]
 			}`,
 			err: "chainID `1` is not a string in chain config 0",
