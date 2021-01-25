@@ -4,14 +4,21 @@
 package pubsub
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/formatting"
 
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/bloom"
+	"github.com/ava-labs/avalanchego/utils/logging"
+
+	"github.com/gorilla/websocket"
 )
 
 const (
@@ -31,11 +38,29 @@ const (
 	pingPeriod = (pongWait * 9) / 10
 
 	// Maximum message size allowed from peer.
-	maxMessageSize = 512 // bytes
+	maxMessageSize = 10 * 1024 // bytes
 
 	// Maximum number of pending messages to send to a peer.
-	maxPendingMessages = 256 // messages
+	maxPendingMessages = 1024 // messages
+
+	// MaxBytes the max number of bytes for a filter
+	MaxBytes = 1 * 1024 * 1024
+
+	// MaxAddresses the max number of addresses allowed
+	MaxAddresses = 10000
+
+	CommandFilters   = "filters"
+	CommandAddresses = "addresses"
+
+	ParamAddress = "address"
+
+	DefaultFilterMax   = 1000
+	DefaultFilterError = .1
 )
+
+type errorMsg struct {
+	Error string `json:"error"`
+}
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  readBufferSize,
@@ -47,61 +72,72 @@ var (
 	errDuplicateChannel = errors.New("duplicate channel")
 )
 
-// PubSubServer maintains the set of active clients and sends messages to the clients.
-type PubSubServer struct {
-	ctx *snow.Context
+// Server maintains the set of active clients and sends messages to the clients.
+type Server struct {
+	log logging.Logger
 
-	lock     sync.Mutex
-	conns    map[*Connection]map[string]struct{}
-	channels map[string]map[*Connection]struct{}
+	hrp string
+
+	lock     sync.RWMutex
+	conns    map[*Connection]struct{}
+	channels map[string]*connContainer
 }
 
 // NewPubSubServer ...
-func NewPubSubServer(ctx *snow.Context) *PubSubServer {
-	return &PubSubServer{
-		ctx:      ctx,
-		conns:    make(map[*Connection]map[string]struct{}),
-		channels: make(map[string]map[*Connection]struct{}),
+func New(networkID uint32, log logging.Logger) *Server {
+	hrp := constants.GetHRP(networkID)
+	return &Server{
+		log:      log,
+		hrp:      hrp,
+		conns:    make(map[*Connection]struct{}),
+		channels: make(map[string]*connContainer),
 	}
 }
 
-func (s *PubSubServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	wsConn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		s.ctx.Log.Debug("Failed to upgrade %s", err)
+		s.log.Debug("Failed to upgrade %s", err)
 		return
 	}
-	conn := &Connection{s: s, conn: wsConn, send: make(chan interface{}, maxPendingMessages)}
+	conn := &Connection{s: s, conn: wsConn, send: make(chan interface{}, maxPendingMessages), fp: NewFilterParam()}
 	s.addConnection(conn)
 }
 
 // Publish ...
-func (s *PubSubServer) Publish(channel string, msg interface{}) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	conns, exists := s.channels[channel]
-	if !exists {
-		s.ctx.Log.Warn("attempted to publush to an unknown channel %s", channel)
+func (s *Server) Publish(channel string, msg interface{}, parser Parser) {
+	cContainer := s.channelConnection(channel)
+	if cContainer == nil {
 		return
 	}
 
-	pubMsg := &publish{
-		Channel: channel,
-		Value:   msg,
-	}
-
-	for conn := range conns {
-		select {
-		case conn.send <- pubMsg:
-		default:
-			s.ctx.Log.Verbo("dropping message to subscribed connection due to too many pending messages")
+	for _, conn := range cContainer.Conns() {
+		if conn.fp.HasFilter() {
+			fr := parser.Filter(conn.fp)
+			if fr == nil {
+				continue
+			}
+			fr.Channel = channel
+			fr.Address, _ = formatting.FormatBech32(s.hrp, fr.AddressID[:])
+			s.publishMsg(conn, fr)
+		} else {
+			m := &Publish{
+				Channel: channel,
+				Value:   msg,
+			}
+			s.publishMsg(conn, m)
 		}
 	}
 }
 
+func (s *Server) publishMsg(conn *Connection, msg interface{}) {
+	if !conn.Send(msg) {
+		s.log.Verbo("dropping message to subscribed connection due to too many pending messages")
+	}
+}
+
 // Register ...
-func (s *PubSubServer) Register(channel string) error {
+func (s *Server) Register(channel string) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -109,89 +145,100 @@ func (s *PubSubServer) Register(channel string) error {
 		return errDuplicateChannel
 	}
 
-	s.channels[channel] = make(map[*Connection]struct{})
+	s.channels[channel] = newConnContainer()
 	return nil
 }
 
-func (s *PubSubServer) addConnection(conn *Connection) {
+func (s *Server) addConnection(conn *Connection) {
 	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.conns[conn] = make(map[string]struct{})
+	s.conns[conn] = struct{}{}
+	s.lock.Unlock()
 
 	go conn.writePump()
 	go conn.readPump()
 }
 
-func (s *PubSubServer) removeConnection(conn *Connection) {
+func (s *Server) removeConnection(conn *Connection) {
+	s.lock.RLock()
+	for _, cContainer := range s.channels {
+		cContainer.Remove(conn)
+	}
+	s.lock.RUnlock()
+
 	s.lock.Lock()
 	defer s.lock.Unlock()
-
-	channels, exists := s.conns[conn]
-	if !exists {
-		s.ctx.Log.Warn("attempted to remove an unknown connection")
-		return
-	}
-
-	for channel := range channels {
-		delete(s.channels[channel], conn)
-	}
+	delete(s.conns, conn)
 }
 
-func (s *PubSubServer) addChannel(conn *Connection, channel string) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	channels, exists := s.conns[conn]
-	if !exists {
+func (s *Server) addChannel(conn *Connection, channel string) {
+	cContainer := s.channelConnection(channel)
+	if cContainer == nil {
 		return
 	}
-
-	conns, exists := s.channels[channel]
-	if !exists {
-		return
-	}
-
-	channels[channel] = struct{}{}
-	conns[conn] = struct{}{}
+	cContainer.Add(conn)
 }
 
-func (s *PubSubServer) removeChannel(conn *Connection, channel string) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	channels, exists := s.conns[conn]
-	if !exists {
+func (s *Server) removeChannel(conn *Connection, channel string) {
+	cContainer := s.channelConnection(channel)
+	if cContainer == nil {
 		return
 	}
-
-	conns, exists := s.channels[channel]
-	if !exists {
-		return
-	}
-
-	delete(channels, channel)
-	delete(conns, conn)
+	cContainer.Remove(conn)
 }
 
-type publish struct {
+func (s *Server) channelConnection(channel string) *connContainer {
+	s.lock.RLock()
+	cContainer, exists := s.channels[channel]
+	s.lock.RUnlock()
+	if exists {
+		return cContainer
+	}
+	return nil
+}
+
+type Publish struct {
 	Channel string      `json:"channel"`
 	Value   interface{} `json:"value"`
 }
 
-type subscribe struct {
+type Subscribe struct {
 	Channel     string `json:"channel"`
 	Unsubscribe bool   `json:"unsubscribe"`
 }
 
 // Connection is a representation of the websocket connection.
 type Connection struct {
-	s *PubSubServer
+	s *Server
 
 	// The websocket connection.
 	conn *websocket.Conn
 
 	// Buffered channel of outbound messages.
 	send chan interface{}
+
+	fp *FilterParam
+}
+
+func (c *Connection) Send(msg interface{}) bool {
+	select {
+	case c.send <- msg:
+		return true
+	default:
+	}
+	return false
+}
+
+func (c *Connection) NextMessage() ([]byte, error) {
+	_, r, err := c.conn.NextReader()
+	if err != nil {
+		return nil, err
+	}
+	var bb bytes.Buffer
+	_, err = bb.ReadFrom(r)
+	if err != nil {
+		return nil, err
+	}
+	return bb.Bytes(), nil
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -217,18 +264,19 @@ func (c *Connection) readPump() {
 	})
 
 	for {
-		msg := subscribe{}
-		err := c.conn.ReadJSON(&msg)
+		msg, err := c.readCallback()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				c.s.ctx.Log.Debug("Unexpected close in websockets: %s", err)
+				c.s.log.Debug("Unexpected close in websockets: %s", err)
 			}
 			break
 		}
-		if msg.Unsubscribe {
-			c.s.removeChannel(c, msg.Channel)
-		} else {
-			c.s.addChannel(c, msg.Channel)
+		if msg != nil {
+			if msg.Unsubscribe {
+				c.s.removeChannel(c, msg.Channel)
+			} else {
+				c.s.addChannel(c, msg.Channel)
+			}
 		}
 	}
 }
@@ -250,7 +298,7 @@ func (c *Connection) writePump() {
 		select {
 		case message, ok := <-c.send:
 			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
-				c.s.ctx.Log.Debug("failed to set the write deadline, closing the connection due to %s", err)
+				c.s.log.Debug("failed to set the write deadline, closing the connection due to %s", err)
 				return
 			}
 			if !ok {
@@ -265,7 +313,7 @@ func (c *Connection) writePump() {
 			}
 		case <-ticker.C:
 			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
-				c.s.ctx.Log.Debug("failed to set the write deadline, closing the connection due to %s", err)
+				c.s.log.Debug("failed to set the write deadline, closing the connection due to %s", err)
 				return
 			}
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
@@ -273,4 +321,71 @@ func (c *Connection) writePump() {
 			}
 		}
 	}
+}
+
+func (c *Connection) readCallback() (*Subscribe, error) {
+	b, err := c.NextMessage()
+	if err != nil {
+		return nil, err
+	}
+	cmdMsg, err := NewCommandMessage(b, c.s.hrp)
+	if err != nil {
+		return nil, err
+	}
+
+	switch cmdMsg.Command {
+	case "":
+		return &cmdMsg.Subscribe, nil
+	case CommandFilters:
+		return c.handleCommandFilterUpdate(cmdMsg)
+	case CommandAddresses:
+		return c.handleCommandAddressUpdate(cmdMsg)
+	default:
+		errmsg := &errorMsg{Error: fmt.Sprintf("command '%s' invalid", cmdMsg.Command)}
+		c.Send(errmsg)
+		return nil, fmt.Errorf(errmsg.Error)
+	}
+}
+
+func (c *Connection) handleCommandFilterUpdate(cmdMsg *CommandMessage) (*Subscribe, error) {
+	if cmdMsg.Unsubscribe {
+		c.fp.SetFilter(nil)
+		return nil, nil
+	}
+	bfilter, err := c.updateNewFilter(cmdMsg)
+	if err != nil {
+		c.Send(&errorMsg{Error: fmt.Sprintf("filter create failed %v", err)})
+		return nil, err
+	}
+	bfilter.Add(cmdMsg.AddressIds...)
+	return nil, nil
+}
+
+func (c *Connection) updateNewFilter(cmdMsg *CommandMessage) (bloom.Filter, error) {
+	bfilter := c.fp.Filter()
+	if !(bfilter == nil || cmdMsg.IsNewFilter()) {
+		return bfilter, nil
+	}
+	// no filter exists..  Or they provided filter params
+	cmdMsg.FilterOrDefault()
+	bfilter, err := bloom.New(cmdMsg.FilterMax, cmdMsg.FilterError, MaxBytes)
+	if err != nil {
+		return nil, err
+	}
+	return c.fp.SetFilter(bfilter), nil
+}
+
+func (c *Connection) handleCommandAddressUpdate(cmdMsg *CommandMessage) (*Subscribe, error) {
+	if c.fp.Len()+len(cmdMsg.AddressIds) > MaxAddresses {
+		c.Send(&errorMsg{Error: "too many adddresse"})
+		return nil, nil
+	}
+	c.fp.UpdateAddressMulti(cmdMsg.Unsubscribe, cmdMsg.AddressIds...)
+	return nil, nil
+}
+
+func ByteToID(address []byte) ids.ShortID {
+	var sid ids.ShortID
+	copy(sid[:], address)
+	return sid
 }
