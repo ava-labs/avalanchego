@@ -41,9 +41,8 @@ const (
 )
 
 var (
-	errEmptyUsername          = errors.New("empty username")
-	errUserMaxLength          = fmt.Errorf("username exceeds maximum length of %d chars", maxUserLen)
-	errInconsistentDBBehavior = errors.New("db manager inconsistently retrieved previous database")
+	errEmptyUsername = errors.New("empty username")
+	errUserMaxLength = fmt.Errorf("username exceeds maximum length of %d chars", maxUserLen)
 
 	usersPrefix = []byte("users")
 	bcsPrefix   = []byte("bcs")
@@ -99,88 +98,82 @@ func (ks *Keystore) Initialize(log logging.Logger, dbManager dbManager.Manager) 
 }
 
 func (ks *Keystore) initializeDB(manager dbManager.Manager) error {
-	// currentDB := manager.Current()
+	currentDB := manager.Current()
 
-	userDBManager := manager.NewPrefixDBManager(usersPrefix)
-	bcDBManager := manager.NewPrefixDBManager(bcsPrefix)
-	ks.userDB = userDBManager.Current()
-	ks.bcDB = bcDBManager.Current()
+	currentUserDB := prefixdb.New(usersPrefix, currentDB)
+	currentBCDB := prefixdb.New(bcsPrefix, currentDB)
+	ks.userDB = currentUserDB
+	ks.bcDB = currentBCDB
 
-	return nil
+	previousDB, exists := manager.Last()
+	if !exists {
+		return nil
+	}
 
-	// // If the previous DB doesn't exist or a migration has already completed
-	// // skip migrating keystore users to the current database.
-	// previousDB, exists := manager.Last()
-	// if !exists {
-	// 	return currentDB.Put(migratedKey, []byte("no migration"))
-	// } else if exists {
-	// 	migrated, err := currentDB.Has(migratedKey)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	if migrated {
-	// 		return nil
-	// 	}
-	// }
+	migrated, err := currentDB.Has(migratedKey)
+	if err != nil {
+		return err
+	}
+	// If the currentDB has already been marked as migrated
+	// then skip migrating the keystore users.
+	if migrated {
+		return nil
+	}
 
-	// ks.log.Info("Migrating Keystore Users from %s -> %s", previousDB.Version, currentDB.Version)
+	previousUserDB := prefixdb.New(usersPrefix, previousDB)
+	previousBCDB := prefixdb.New(bcsPrefix, previousDB)
 
-	// previousUserDB, exists := userDBManager.Last()
-	// if !exists {
-	// 	return errInconsistentDBBehavior
-	// }
-	// previousBCDB, exists := bcDBManager.Last()
-	// if !exists {
-	// 	return errInconsistentDBBehavior
-	// }
+	ks.log.Info("Migrating Keystore Users from %s -> %s", previousDB.Version, currentDB.Version)
 
-	// userIterator := previousUserDB.NewIterator()
-	// defer userIterator.Release()
+	userIterator := previousUserDB.NewIterator()
+	defer userIterator.Release()
 
-	// for userIterator.Next() {
-	// 	username := userIterator.Key()
+	for userIterator.Next() {
+		username := userIterator.Key()
 
-	// 	exists, err := ks.userDB.Has(username)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	if exists {
-	// 		continue
-	// 	}
+		exists, err := ks.userDB.Has(username)
+		if err != nil {
+			return err
+		}
+		if exists {
+			continue
+		}
 
-	// 	userBatch := ks.userDB.NewBatch()
-	// 	if err := userBatch.Put(username, userIterator.Value()); err != nil {
-	// 		return err
-	// 	}
+		userBatch := ks.userDB.NewBatch()
+		if err := userBatch.Put(username, userIterator.Value()); err != nil {
+			return err
+		}
 
-	// 	// needs to do nested prefix of both databases here
-	// 	userBCDB := semanticdb.NewPrefixDB(username, ks.bcDB).(*semanticdb.Database)
-	// 	bcsBatch := userBCDB.NewBatch()
-	// 	// Use a closure in order to defer releasing the iterator
-	// 	if err := func() error {
-	// 		iterator := userBCDB.PriorDB.NewIterator()
-	// 		defer iterator.Release()
+		currentUserBCDB := prefixdb.New(username, ks.bcDB)
+		previousUserBCDB := prefixdb.New(username, previousBCDB)
 
-	// 		for iterator.Next() {
-	// 			if err := bcsBatch.Put(iterator.Key(), iterator.Value()); err != nil {
-	// 				return err
-	// 			}
-	// 		}
-	// 		if err := iterator.Error(); err != nil {
-	// 			return err
-	// 		}
+		bcsBatch := currentUserBCDB.NewBatch()
 
-	// 		return atomic.WriteAll(userBatch, bcsBatch)
-	// 	}(); err != nil {
-	// 		return err
-	// 	}
-	// }
+		if err := func() error {
+			iterator := previousUserBCDB.NewIterator()
+			defer iterator.Release()
 
-	// if err := userIterator.Error(); err != nil {
-	// 	return err
-	// }
+			for iterator.Next() {
+				if err := bcsBatch.Put(iterator.Key(), iterator.Value()); err != nil {
+					return err
+				}
+			}
 
-	// return semDB.Put(migratedKey, []byte(fmt.Sprintf("v%d.%d.%d", semDB.PriorMajor, semDB.PriorMinor, semDB.PriorPatch)))
+			if err := iterator.Error(); err != nil {
+				return err
+			}
+
+			return atomic.WriteAll(userBatch, bcsBatch)
+		}(); err != nil {
+			return err
+		}
+	}
+
+	if err := userIterator.Error(); err != nil {
+		return err
+	}
+
+	return currentDB.Put(migratedKey, []byte(previousDB.Version.String()))
 }
 
 // CreateHandler returns a new service object that can send requests to thisAPI.

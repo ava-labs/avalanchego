@@ -182,7 +182,7 @@ func (vm *VMClient) startDBServer(opts []grpc.ServerOption) *grpc.Server {
 	return server
 }
 
-func (vm *VMClient) startDBServerFunc(db *rpcdb.DatabaseServer) func(opts []grpc.ServerOption) *grpc.Server {
+func (vm *VMClient) startDBServerFunc(db rpcdbproto.DatabaseServer) func(opts []grpc.ServerOption) *grpc.Server { // #nolint
 	return func(opts []grpc.ServerOption) *grpc.Server {
 		server := grpc.NewServer(opts...)
 		vm.serverCloser.Add(server)
