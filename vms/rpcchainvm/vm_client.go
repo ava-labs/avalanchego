@@ -11,7 +11,7 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
-	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto"
 	"github.com/ava-labs/avalanchego/ids"
@@ -80,8 +80,10 @@ func (vm *VMClient) SetProcess(proc *plugin.Client) {
 // Initialize ...
 func (vm *VMClient) Initialize(
 	ctx *snow.Context,
-	db database.Database,
+	dbManager manager.Manager,
 	genesisBytes []byte,
+	upgradeBytes []byte,
+	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 ) error {
@@ -96,10 +98,11 @@ func (vm *VMClient) Initialize(
 
 	vm.ctx = ctx
 
-	vm.db = rpcdb.NewServer(db)
+	// initialize each db
+	vm.db = rpcdb.NewServer(dbManager.Current())
 	vm.messenger = messenger.NewServer(toEngine)
 	vm.keystore = gkeystore.NewServer(ctx.Keystore, vm.broker)
-	vm.sharedMemory = gsharedmemory.NewServer(ctx.SharedMemory, db)
+	vm.sharedMemory = gsharedmemory.NewServer(ctx.SharedMemory, dbManager.Current())
 	vm.bcLookup = galiaslookup.NewServer(ctx.BCLookup)
 	vm.snLookup = gsubnetlookup.NewServer(ctx.SNLookup)
 
@@ -135,6 +138,8 @@ func (vm *VMClient) Initialize(
 		XChainID:             ctx.XChainID[:],
 		AvaxAssetID:          ctx.AVAXAssetID[:],
 		GenesisBytes:         genesisBytes,
+		UpgradeBytes:         upgradeBytes,
+		ConfigBytes:          configBytes,
 		DbServer:             dbBrokerID,
 		EngineServer:         messengerBrokerID,
 		KeystoreServer:       keystoreBrokerID,

@@ -28,8 +28,8 @@ message InitializeResponse {
 }
 
 message SemanticDBServer {
-    uint32 dbServer
-    string version
+    uint32 dbServer = 1;
+    string version = 2;
 }
 
 message BootstrappingRequest {}
