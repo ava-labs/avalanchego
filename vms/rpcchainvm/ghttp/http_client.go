@@ -35,7 +35,7 @@ func NewClient(client ghttpproto.HTTPClient, broker *plugin.GRPCBroker) *Client 
 // Handle ...
 func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	closer := grpcutils.ServerCloser{}
-	defer closer.Stop()
+	defer closer.GracefulStop()
 
 	readerID := c.broker.NextId()
 	go c.broker.AcceptAndServe(readerID, func(opts []grpc.ServerOption) *grpc.Server {
