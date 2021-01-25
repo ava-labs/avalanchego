@@ -248,6 +248,7 @@ func (c *Connection) readPump() {
 	defer func() {
 		c.deactivate()
 		c.s.removeConnection(c)
+
 		// close is called by both the writePump and the readPump so one of them
 		// will always error
 		_ = c.conn.Close()
@@ -281,7 +282,10 @@ func (c *Connection) readPump() {
 func (c *Connection) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
+		c.deactivate()
 		ticker.Stop()
+		c.s.removeConnection(c)
+
 		// close is called by both the writePump and the readPump so one of them
 		// will always error
 		_ = c.conn.Close()
