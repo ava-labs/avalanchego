@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -39,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/core"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -2502,8 +2504,17 @@ func TestUptimeReporting(t *testing.T) {
 
 	// Test that the VM reports the correct uptimes for peers
 	// connected both during and after bootstrapping completes.
-	baseDB := manager.NewDefaultMemDBManager()
-	firstDBManager := baseDB.NewPrefixDBManager([]byte{0})
+	semanticDBs := []*manager.SemanticDatabase{
+		{
+			Database: memdb.New(),
+			Version:  version.NewDefaultVersion(1, 0, 0),
+		},
+	}
+	baseDBManager, err := manager.NewManagerFromDBs(semanticDBs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
 
 	vm := &VM{
 		SnowmanVM:          &core.SnowmanVM{},
@@ -2545,12 +2556,12 @@ func TestUptimeReporting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	afterBootstrappingTime := finishedBootstrappingTime.Add(5 * time.Second)
-	vm.clock.Set(afterBootstrappingTime)
+	afterBootstrappedTime := finishedBootstrappingTime.Add(5 * time.Second)
+	vm.clock.Set(afterBootstrappedTime)
 	vm.Connected(nodeID1)
 	vm.Disconnected(nodeID2)
 
-	endTime := afterBootstrappingTime.Add(5 * time.Second)
+	endTime := afterBootstrappedTime.Add(5 * time.Second)
 	vm.clock.Set(endTime)
 
 	checkUptime(vm, nodeID0, 1, "peer connected during bootstrapping")
@@ -2561,8 +2572,7 @@ func TestUptimeReporting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Test that VM reports the correct uptimes afer
-	// restart.
+	// Test that VM reports the correct uptimes after restart.
 	vm = &VM{
 		SnowmanVM:          &core.SnowmanVM{},
 		chainManager:       chains.MockManager{},
@@ -2573,7 +2583,7 @@ func TestUptimeReporting(t *testing.T) {
 
 	vm.clock.Set(endTime)
 	vm.vdrMgr = validators.NewManager()
-	restartDBManager := baseDB.NewPrefixDBManager([]byte{0})
+	restartDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
 
 	if err := vm.Initialize(ctx, restartDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
@@ -2590,4 +2600,48 @@ func TestUptimeReporting(t *testing.T) {
 	checkUptime(vm, nodeID0, 1, "peer connected during bootstrapping after restart")
 	checkUptime(vm, nodeID1, .75, "peer connected after bootstrapping after restart")
 	checkUptime(vm, nodeID2, .75, "peer connected during bootstrapping and disconnected after bootstrapping after restart")
+
+	// Test that VM reports the correct uptimes after database migration
+	vm = &VM{
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
+	}
+
+	semanticDBs = append(semanticDBs, &manager.SemanticDatabase{
+		Database: memdb.New(),
+		Version:  version.NewDefaultVersion(1, 0, 1),
+	})
+
+	newDBManager, err := manager.NewManagerFromDBs(semanticDBs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	migrateTime := endTime.Add(5 * time.Second)
+	vm.clock.Set(migrateTime)
+	vm.vdrMgr = validators.NewManager()
+	migratedDBManager := newDBManager.NewPrefixDBManager([]byte{0})
+
+	if err := vm.Initialize(ctx, migratedDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	vm.Connected(nodeID0)
+	vm.Connected(nodeID1)
+	vm.Connected(nodeID2)
+
+	if err := vm.Bootstrapping(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
+
+	checkUptime(vm, nodeID0, 1, "peer connected during bootstrapping after db migration")
+	checkUptime(vm, nodeID1, .8, "peer connected after bootstrapping after db migration")
+	checkUptime(vm, nodeID2, .8, "peer connected during bootstrapping and disconnected after bootstrapping after db migration")
 }

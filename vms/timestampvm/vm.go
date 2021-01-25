@@ -56,7 +56,7 @@ func (vm *VM) Initialize(
 	toEngine chan<- common.Message,
 	_ []*common.Fx,
 ) error {
-	if err := vm.SnowmanVM.Initialize(ctx, dbManager, vm.ParseBlock, toEngine); err != nil {
+	if err := vm.SnowmanVM.Initialize(ctx, dbManager.Current(), vm.ParseBlock, toEngine); err != nil {
 		ctx.Log.Error("error initializing SnowmanVM: %v", err)
 		return err
 	}
