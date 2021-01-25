@@ -62,6 +62,11 @@ type errorMsg struct {
 	Error string `json:"error"`
 }
 
+type Publish struct {
+	Channel string      `json:"channel"`
+	Value   interface{} `json:"value"`
+}
+
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  readBufferSize,
 	WriteBufferSize: writeBufferSize,
@@ -198,11 +203,6 @@ func (s *Server) channelContainer(channel string) *connContainer {
 		return cContainer
 	}
 	return nil
-}
-
-type Publish struct {
-	Channel string      `json:"channel"`
-	Value   interface{} `json:"value"`
 }
 
 // Connection is a representation of the websocket connection.
@@ -378,7 +378,7 @@ func (c *Connection) updateNewFilter(cmdMsg *CommandMessage) (bloom.Filter, erro
 
 func (c *Connection) handleCommandAddressUpdate(cmdMsg *CommandMessage) {
 	if c.fp.Len()+len(cmdMsg.AddressIds) > MaxAddresses {
-		c.Send(&errorMsg{Error: "too many adddresse"})
+		c.Send(&errorMsg{Error: "address limit reached"})
 		return
 	}
 	c.fp.UpdateAddressMulti(cmdMsg.Unsubscribe, cmdMsg.AddressIds...)
