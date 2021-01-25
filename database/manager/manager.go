@@ -4,11 +4,15 @@
 package manager
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
+
+	"github.com/ava-labs/avalanchego/utils"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
@@ -18,6 +22,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/prometheus/client_golang/prometheus"
+)
+
+var (
+	errNonSortedAndUniqueDBs = errors.New("managed databases were not sorted and unique")
 )
 
 type Manager interface {
@@ -33,12 +41,6 @@ type Manager interface {
 	NewPrefixDBManager([]byte) Manager
 	NewNestedPrefixDBManager([]byte) Manager
 	NewMeterDBManager(string, prometheus.Registerer) (Manager, error)
-}
-
-type SemanticDatabase struct {
-	database.Database
-
-	version.Version
 }
 
 type manager struct {
@@ -112,8 +114,8 @@ func New(dbDirPath string, currentVersion version.Version) (Manager, error) {
 		return nil, fmt.Errorf("couldn't create db at %s: %w", currentDBPath, err)
 	}
 
-	dbsAsVersions := make([]version.Version, 1)
-	dbsAsVersions[0] = &SemanticDatabase{
+	semDBs := make([]*SemanticDatabase, 1)
+	semDBs[0] = &SemanticDatabase{
 		Database: currentDB,
 		Version:  currentVersion,
 	}
@@ -145,7 +147,7 @@ func New(dbDirPath string, currentVersion version.Version) (Manager, error) {
 			return fmt.Errorf("couldn't create db at %s: %w", path, err)
 		}
 
-		dbsAsVersions = append(dbsAsVersions, &SemanticDatabase{
+		semDBs = append(semDBs, &SemanticDatabase{
 			Database: db,
 			Version:  version,
 		})
@@ -153,14 +155,10 @@ func New(dbDirPath string, currentVersion version.Version) (Manager, error) {
 		return filepath.SkipDir
 	})
 
-	version.SortDescendingVersions(dbsAsVersions)
-	dbs := make([]*SemanticDatabase, len(dbsAsVersions))
-	for i, db := range dbsAsVersions {
-		dbs[i] = db.(*SemanticDatabase)
-	}
+	SortDescending(semDBs)
 
 	m := &manager{
-		databases: dbs,
+		databases: semDBs,
 	}
 
 	// If an error occurred, close all of the opened databases
@@ -213,3 +211,34 @@ func (m *manager) NewMeterDBManager(namespace string, registerer prometheus.Regi
 		}, nil
 	})
 }
+
+// NewManagerFromDBs
+func NewManagerFromDBs(dbs []*SemanticDatabase) (Manager, error) {
+	SortDescending(dbs)
+	sortedAndUnique := utils.IsSortedAndUnique(innerSortDescendingSemanticDBs(dbs))
+	if !sortedAndUnique {
+		return nil, errNonSortedAndUniqueDBs
+	}
+	return &manager{
+		databases: dbs,
+	}, nil
+}
+
+type SemanticDatabase struct {
+	database.Database
+
+	version.Version
+}
+
+type innerSortDescendingSemanticDBs []*SemanticDatabase
+
+// Less returns true if the version at index i is greater than the version at index j
+// such that it will sort in descending order
+func (dbs innerSortDescendingSemanticDBs) Less(i, j int) bool {
+	return dbs[i].Version.Compare(dbs[j].Version) > 0
+}
+
+func (dbs innerSortDescendingSemanticDBs) Len() int      { return len(dbs) }
+func (dbs innerSortDescendingSemanticDBs) Swap(i, j int) { dbs[j], dbs[i] = dbs[i], dbs[j] }
+
+func SortDescending(dbs []*SemanticDatabase) { sort.Sort(innerSortDescendingSemanticDBs(dbs)) }

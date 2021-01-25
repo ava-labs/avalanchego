@@ -98,8 +98,20 @@ func (vm *VMClient) Initialize(
 
 	vm.ctx = ctx
 
-	// initialize each db
-	vm.db = rpcdb.NewServer(dbManager.Current())
+	// Initialize and serve each database and construct the db manager
+	// initialize request parameters
+	semanticDBs := dbManager.GetDatabases()
+	semanticDBServers := make([]*vmproto.SemanticDBServer, len(semanticDBs))
+	for i, semDB := range semanticDBs {
+		dbBrokerID := vm.broker.NextId()
+		db := rpcdb.NewServer(semDB)
+		go vm.broker.AcceptAndServe(dbBrokerID, vm.startDBServerFunc(db))
+		semanticDBServers[i] = &vmproto.SemanticDBServer{
+			DbServer: dbBrokerID,
+			Version:  semDB.Version.String(),
+		}
+	}
+
 	vm.messenger = messenger.NewServer(toEngine)
 	vm.keystore = gkeystore.NewServer(ctx.Keystore, vm.broker)
 	vm.sharedMemory = gsharedmemory.NewServer(ctx.SharedMemory, dbManager.Current())
@@ -140,7 +152,7 @@ func (vm *VMClient) Initialize(
 		GenesisBytes:         genesisBytes,
 		UpgradeBytes:         upgradeBytes,
 		ConfigBytes:          configBytes,
-		DbServer:             dbBrokerID,
+		DbServers:            semanticDBServers,
 		EngineServer:         messengerBrokerID,
 		KeystoreServer:       keystoreBrokerID,
 		SharedMemoryServer:   sharedMemoryBrokerID,
@@ -150,8 +162,6 @@ func (vm *VMClient) Initialize(
 		EpochDuration:        uint64(ctx.EpochDuration),
 	})
 
-	// TODO create individual db server and client for each of the underlying databases
-	//
 	if err != nil {
 		return err
 	}
@@ -170,6 +180,15 @@ func (vm *VMClient) startDBServer(opts []grpc.ServerOption) *grpc.Server {
 	vm.serverCloser.Add(server)
 	rpcdbproto.RegisterDatabaseServer(server, vm.db)
 	return server
+}
+
+func (vm *VMClient) startDBServerFunc(db *rpcdb.DatabaseServer) func(opts []grpc.ServerOption) *grpc.Server {
+	return func(opts []grpc.ServerOption) *grpc.Server {
+		server := grpc.NewServer(opts...)
+		vm.serverCloser.Add(server)
+		rpcdbproto.RegisterDatabaseServer(server, db)
+		return server
+	}
 }
 
 func (vm *VMClient) startMessengerServer(opts []grpc.ServerOption) *grpc.Server {
