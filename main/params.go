@@ -675,31 +675,31 @@ func setNodeConfig(v *viper.Viper) error {
 	corethConfigValue := v.Get(corethConfigKey)
 	corethConfigString, err := utils.DecodeStringOrJSON(corethConfigValue)
 	if err != nil {
-		return fmt.Errorf("couldn't parse coreth config: %w", err)
+		return fmt.Errorf("could not parse coreth config: %w", err)
 	}
 	Config.CorethConfig = corethConfigString
 
 	// ChainConfigs
 	rawChainConfigs := []map[string]interface{}{}
 	if err := v.UnmarshalKey(chainConfigsKey, &rawChainConfigs); err != nil {
-		return fmt.Errorf("couldn't parse chain configs: %w", err)
+		return fmt.Errorf("could not parse raw chain configs: %w", err)
 	}
 
 	Config.ChainConfigs = map[ids.ID]snow.ChainConfig{}
 	for i, rawChainConfig := range rawChainConfigs {
 		rawChainID, ok := rawChainConfig[chainIDKey]
 		if !ok {
-			return fmt.Errorf("couldn't parse ChainID from chain config %d", i)
+			return fmt.Errorf("could not parse chainID from chain config %d", i)
 		}
 
 		chainID, ok := rawChainID.(string)
 		if !ok {
-			return fmt.Errorf("ChainID `%+v` is not a string in chain config %d", rawChainID, i)
+			return fmt.Errorf("chainID `%+v` is not a string in chain config %d", rawChainID, i)
 		}
 
 		id, err := ids.FromString(chainID)
 		if err != nil {
-			return fmt.Errorf("couldn't parse chainID %s: %w", chainID, err)
+			return fmt.Errorf("could not parse chainID %s: %w", chainID, err)
 		}
 
 		config := snow.ChainConfig{}

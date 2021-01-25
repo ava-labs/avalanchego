@@ -11,7 +11,7 @@ import (
 )
 
 // DecodeStringOrJSON returns v if v is a string
-// or marshals v as JSON.
+// or marshals v as JSON bytes.
 func DecodeStringOrJSON(v interface{}) (string, error) {
 	switch value := v.(type) {
 	case string:

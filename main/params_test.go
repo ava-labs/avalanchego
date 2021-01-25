@@ -62,13 +62,21 @@ func TestChainConfigs(t *testing.T) {
 				return m
 			}(),
 		},
+		"invalid structure (array of strings)": {
+			config: `{
+				"chain-configs": [
+					"hello"
+				]
+			}`,
+			err: `'[0]' expected a map, got 'string'`,
+		},
 		"invalid checksum chain-id": {
 			config: `{
 				"chain-configs": [
 					{"chain-id": "yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWq", "settings": "default", "forks": "default"}
 				]
 			}`,
-			err: "couldn't parse chainID yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWq: invalid input checksum",
+			err: "could not parse chainID yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWq: invalid input checksum",
 		},
 		"missing chain-id": {
 			config: `{
@@ -76,7 +84,7 @@ func TestChainConfigs(t *testing.T) {
 					{"settings": "default", "forks": "default"}
 				]
 			}`,
-			err: "couldn't parse ChainID from chain config 0",
+			err: "could not parse chainID from chain config 0",
 		},
 		"non-string chain-id": {
 			config: `{
@@ -84,7 +92,7 @@ func TestChainConfigs(t *testing.T) {
 					{"chain-id": 1, "settings": "default", "forks": "default"}
 				]
 			}`,
-			err: "ChainID `1` is not a string in chain config 0",
+			err: "chainID `1` is not a string in chain config 0",
 		},
 	}
 
