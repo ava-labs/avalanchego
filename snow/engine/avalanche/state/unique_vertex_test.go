@@ -14,7 +14,7 @@ import (
 )
 
 func TestUnknownUniqueVertexErrors(t *testing.T) {
-	s := newSerializer(t, nil)
+	_, s := newSerializer(t, nil)
 
 	uVtx := &uniqueVertex{
 		serializer: s,
@@ -47,7 +47,7 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 		IDV: ids.ID{1},
 	}
 
-	s := newSerializer(t, func(b []byte) (conflicts.Transition, error) {
+	_, s := newSerializer(t, func(b []byte) (conflicts.Transition, error) {
 		if !bytes.Equal(b, []byte{0}) {
 			t.Fatal("unknown tx")
 		}
@@ -132,7 +132,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 
 		return testTransition, nil
 	}
-	s := newSerializer(t, parseTransition)
+	_, s := newSerializer(t, parseTransition)
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't'}
 	parentIDs := []ids.ID{parentID}
 	chainID := ids.ID{}

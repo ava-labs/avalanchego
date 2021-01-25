@@ -75,10 +75,25 @@ func (t *tx) Restrictions() []ids.ID { return t.tx.Restrictions() }
 func (t *tx) Verify() error {
 	trID := t.tr.ID()
 	epoch := t.tx.Epoch()
-	restriction := t.serializer.state.TrRestriction(trID)
-	if restriction > epoch {
-		return fmt.Errorf("transition %s was restriction to epoch %d", trID, epoch)
+	if restriction := t.serializer.state.TrRestriction(trID); restriction > epoch {
+		return fmt.Errorf("transition %s was restricted to epoch %d", trID, epoch)
 	}
+
+	restrictions := t.tx.Restrictions()
+	for _, restriction := range restrictions {
+		restricted, err := t.serializer.vm.Get(restriction)
+		if err != nil {
+			continue
+		}
+		if status := restricted.Status(); status != choices.Accepted {
+			continue
+		}
+		restrictedEpoch := restricted.Epoch()
+		if restrictedEpoch < epoch {
+			return fmt.Errorf("transition %s was accepted in epoch %d and can't be restricted to epoch %d", restriction, restrictedEpoch, epoch)
+		}
+	}
+
 	return t.tr.Verify(t.tx.Epoch())
 }
 

@@ -15,7 +15,7 @@ import (
 )
 
 func TestTxStatus(t *testing.T) {
-	s := newSerializer(t, nil)
+	_, s := newSerializer(t, nil)
 	stx, err := vertex.Wrap(0, []byte{0}, nil)
 	assert.NoError(t, err)
 	tr := &conflicts.TestTransition{
@@ -33,4 +33,47 @@ func TestTxStatus(t *testing.T) {
 	if status := tx.Status(); status != choices.Rejected {
 		t.Fatalf("wrong tx status returned")
 	}
+}
+
+func TestTxInvalidDueToRestrictions(t *testing.T) {
+	vm, s := newSerializer(t, nil)
+
+	tr0 := &conflicts.TestTransition{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+		EpochV:  0,
+		BytesV:  []byte{0},
+	}
+	stx0, err := vertex.Wrap(0, tr0.Bytes(), nil)
+	assert.NoError(t, err)
+	tx0 := tx{
+		serializer: s,
+		tx:         stx0,
+		tr:         tr0,
+	}
+	vm.GetF = func(id ids.ID) (conflicts.Transition, error) {
+		switch id {
+		case tr0.ID():
+			return tr0, nil
+		default:
+			return nil, errUnknownVertex
+		}
+	}
+
+	tr1 := &conflicts.TestTransition{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Processing,
+		BytesV:  []byte{1},
+	}
+	stx1, err := vertex.Wrap(1, tr1.Bytes(), []ids.ID{tr0.ID()})
+	assert.NoError(t, err)
+	tx1 := tx{
+		serializer: s,
+		tx:         stx1,
+		tr:         tr1,
+	}
+
+	err = tx1.Verify()
+	assert.Error(t, err, "tx1 should have failed verification")
+	_ = tx0
 }
