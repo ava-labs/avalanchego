@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -100,33 +101,37 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.log.Debug("Failed to upgrade %s", err)
 		return
 	}
-	conn := &Connection{s: s, conn: wsConn, send: make(chan interface{}, maxPendingMessages), fp: NewFilterParam()}
+	conn := &Connection{
+		s:      s,
+		conn:   wsConn,
+		send:   make(chan interface{}, maxPendingMessages),
+		fp:     NewFilterParam(),
+		active: 1,
+	}
 	s.addConnection(conn)
 }
 
 // Publish ...
 func (s *Server) Publish(channel string, msg interface{}, parser Parser) {
-	cContainer := s.channelConnection(channel)
+	cContainer := s.channelContainer(channel)
 	if cContainer == nil {
 		return
 	}
 
 	for _, conn := range cContainer.Conns() {
+		m := &Publish{
+			Channel: channel,
+			Value:   msg,
+		}
 		if conn.fp.HasFilter() {
 			fr := parser.Filter(conn.fp)
 			if fr == nil {
 				continue
 			}
-			fr.Channel = channel
 			fr.Address, _ = formatting.FormatBech32(s.hrp, fr.AddressID[:])
-			s.publishMsg(conn, fr)
-		} else {
-			m := &Publish{
-				Channel: channel,
-				Value:   msg,
-			}
-			s.publishMsg(conn, m)
+			m.Value = fr
 		}
+		s.publishMsg(conn, m)
 	}
 }
 
@@ -171,7 +176,7 @@ func (s *Server) removeConnection(conn *Connection) {
 }
 
 func (s *Server) addChannel(conn *Connection, channel string) {
-	cContainer := s.channelConnection(channel)
+	cContainer := s.channelContainer(channel)
 	if cContainer == nil {
 		return
 	}
@@ -179,14 +184,14 @@ func (s *Server) addChannel(conn *Connection, channel string) {
 }
 
 func (s *Server) removeChannel(conn *Connection, channel string) {
-	cContainer := s.channelConnection(channel)
+	cContainer := s.channelContainer(channel)
 	if cContainer == nil {
 		return
 	}
 	cContainer.Remove(conn)
 }
 
-func (s *Server) channelConnection(channel string) *connContainer {
+func (s *Server) channelContainer(channel string) *connContainer {
 	s.lock.RLock()
 	cContainer, exists := s.channels[channel]
 	s.lock.RUnlock()
@@ -212,6 +217,17 @@ type Connection struct {
 	send chan interface{}
 
 	fp *FilterParam
+
+	active uint32
+}
+
+func (c *Connection) isActive() bool {
+	active := atomic.LoadUint32(&c.active)
+	return active != 0
+}
+
+func (c *Connection) deactivate() {
+	atomic.StoreUint32(&c.active, 0)
 }
 
 func (c *Connection) Send(msg interface{}) bool {
@@ -223,19 +239,6 @@ func (c *Connection) Send(msg interface{}) bool {
 	return false
 }
 
-func (c *Connection) NextMessage() ([]byte, error) {
-	_, r, err := c.conn.NextReader()
-	if err != nil {
-		return nil, err
-	}
-	var bb bytes.Buffer
-	_, err = bb.ReadFrom(r)
-	if err != nil {
-		return nil, err
-	}
-	return bb.Bytes(), nil
-}
-
 // readPump pumps messages from the websocket connection to the hub.
 //
 // The application runs readPump in a per-connection goroutine. The application
@@ -243,6 +246,7 @@ func (c *Connection) NextMessage() ([]byte, error) {
 // reads from this goroutine.
 func (c *Connection) readPump() {
 	defer func() {
+		c.deactivate()
 		c.s.removeConnection(c)
 		// close is called by both the writePump and the readPump so one of them
 		// will always error
@@ -312,11 +316,16 @@ func (c *Connection) writePump() {
 }
 
 func (c *Connection) readMessage() error {
-	b, err := c.NextMessage()
+	_, r, err := c.conn.NextReader()
 	if err != nil {
 		return err
 	}
-	cmdMsg, err := NewCommandMessage(b, c.s.hrp)
+	var bb bytes.Buffer
+	_, err = bb.ReadFrom(r)
+	if err != nil {
+		return err
+	}
+	cmdMsg, err := NewCommandMessage(bb.Bytes(), c.s.hrp)
 	if err != nil {
 		return err
 	}

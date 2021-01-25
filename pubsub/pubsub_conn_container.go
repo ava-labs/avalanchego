@@ -16,6 +16,10 @@ func (c *connContainer) Conns() []*Connection {
 	defer c.lock.RUnlock()
 	resp := make([]*Connection, 0, len(c.conns))
 	for c := range c.conns {
+		// only active connections
+		if !c.isActive() {
+			continue
+		}
 		resp = append(resp, c)
 	}
 	return resp
