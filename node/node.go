@@ -67,7 +67,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 1, 0)
+	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 1, 3)
 	versionParser           = version.NewDefaultParser()
 	beaconConnectionTimeout = 1 * time.Minute
 )
@@ -245,6 +245,7 @@ func (n *Node) initNetworking() error {
 		n.Config.DisconnectedCheckFreq,
 		n.Config.DisconnectedRestartTimeout,
 		n.Config.ApricotPhase0Time,
+		n.Config.SendQueueSize,
 	)
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
@@ -369,11 +370,7 @@ func (n *Node) Dispatch() error {
 func (n *Node) initDatabase() error {
 	n.DB = n.Config.DB
 
-	expectedGenesis, _, err := genesis.Genesis(n.Config.NetworkID)
-	if err != nil {
-		return err
-	}
-	rawExpectedGenesisHash := hashing.ComputeHash256(expectedGenesis)
+	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
 
 	rawGenesisHash, err := n.DB.Get(genesisHashKey)
 	if err == database.ErrNotFound {
@@ -405,7 +402,7 @@ func (n *Node) initDatabase() error {
 // uses for P2P communication
 func (n *Node) initNodeID() error {
 	if !n.Config.EnableP2PTLS {
-		n.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.IP().String())))
+		n.ID = ids.ShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.IP().String())))
 		n.Log.Info("Set the node's ID to %s", n.ID)
 		return nil
 	}
@@ -504,7 +501,7 @@ func (n *Node) initAPIServer() error {
 func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	n.vmManager = vms.NewManager(&n.APIServer, n.HTTPLog)
 
-	createAVMTx, err := genesis.VMGenesis(n.Config.NetworkID, avm.ID)
+	createAVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, avm.ID)
 	if err != nil {
 		return err
 	}
@@ -542,7 +539,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
 		StakingEnabled:          n.Config.EnableStaking,
-		MaxNonStakerPendingMsgs: uint32(n.Config.MaxNonStakerPendingMsgs),
+		MaxPendingMsgs:          n.Config.MaxPendingMsgs,
+		MaxNonStakerPendingMsgs: n.Config.MaxNonStakerPendingMsgs,
 		StakerMSGPortion:        n.Config.StakerMSGPortion,
 		StakerCPUPortion:        n.Config.StakerCPUPortion,
 		Log:                     n.Log,
@@ -847,16 +845,13 @@ func (n *Node) Initialize(
 	if err = n.initEventDispatcher(); err != nil { // Set up the event dipatcher
 		return fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
-	genesisBytes, avaxAssetID, err := genesis.Genesis(n.Config.NetworkID)
-	if err != nil {
-		return fmt.Errorf("couldn't create genesis bytes: %w", err)
-	}
+
 	// Start the Health API
 	// Has to be initialized before chain manager
 	if err := n.initHealthAPI(); err != nil {
 		return fmt.Errorf("couldn't initialize health API: %w", err)
 	}
-	if err := n.initChainManager(avaxAssetID); err != nil { // Set up the chain manager
+	if err := n.initChainManager(n.Config.AvaxAssetID); err != nil { // Set up the chain manager
 		return fmt.Errorf("couldn't initialize chain manager: %w", err)
 	}
 	if err := n.initAdminAPI(); err != nil { // Start the Admin API
@@ -871,10 +866,10 @@ func (n *Node) Initialize(
 	if err := n.initIPCAPI(); err != nil { // Start the IPC API
 		return fmt.Errorf("couldn't initialize the IPC API: %w", err)
 	}
-	if err := n.initAliases(genesisBytes); err != nil { // Set up aliases
+	if err := n.initAliases(n.Config.GenesisBytes); err != nil { // Set up aliases
 		return fmt.Errorf("couldn't initialize aliases: %w", err)
 	}
-	if err := n.initChains(genesisBytes, avaxAssetID); err != nil { // Start the Platform chain
+	if err := n.initChains(n.Config.GenesisBytes, n.Config.AvaxAssetID); err != nil { // Start the Platform chain
 		return fmt.Errorf("couldn't initialize chains: %w", err)
 	}
 	return nil

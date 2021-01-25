@@ -12,9 +12,9 @@ import (
 func TestMessageTrackerNoPool(t *testing.T) {
 	msgTracker := NewMessageTracker()
 
-	vdr1 := ids.NewShortID([20]byte{1})
-	vdr2 := ids.NewShortID([20]byte{2})
-	noMessagesVdr := ids.NewShortID([20]byte{3})
+	vdr1 := ids.ShortID{1}
+	vdr2 := ids.ShortID{2}
+	noMessagesVdr := ids.ShortID{3}
 
 	expectedVdr1Count := uint32(5)
 	expectedVdr2Count := uint32(2)
@@ -71,8 +71,8 @@ func TestMessageTrackerNoPool(t *testing.T) {
 func TestMessageTrackerWithPool(t *testing.T) {
 	msgTracker := NewMessageTracker()
 
-	vdr1 := ids.NewShortID([20]byte{1})
-	vdr2 := ids.NewShortID([20]byte{2})
+	vdr1 := ids.ShortID{1}
+	vdr2 := ids.ShortID{2}
 
 	msgTracker.AddPool(vdr1)
 	msgTracker.Add(vdr1)

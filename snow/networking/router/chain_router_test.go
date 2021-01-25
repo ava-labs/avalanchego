@@ -140,7 +140,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	shutdownFinished := make(chan struct{}, 1)
 
 	go func() {
-		handler.MultiPut(ids.NewShortID([20]byte{}), 1, nil)
+		handler.MultiPut(ids.ShortID{}, 1, nil)
 		time.Sleep(50 * time.Millisecond) // Pause to ensure message gets processed
 
 		chainRouter.Shutdown()

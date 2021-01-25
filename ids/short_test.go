@@ -9,7 +9,7 @@ import (
 )
 
 func TestShortString(t *testing.T) {
-	id := NewShortID([20]byte{1})
+	id := ShortID{1}
 
 	xPrefixedID := id.PrefixedString("X-")
 	pPrefixedID := id.PrefixedString("P-")
@@ -18,7 +18,7 @@ func TestShortString(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !newID.Equals(id) {
+	if newID != id {
 		t.Fatalf("ShortFromPrefixedString did not produce the identical ID")
 	}
 
@@ -55,9 +55,9 @@ func TestIsUniqueShortIDs(t *testing.T) {
 }
 
 func TestIsSortedAndUniqueShortIDs(t *testing.T) {
-	id0 := NewShortID([20]byte{0})
-	id1 := NewShortID([20]byte{1})
-	id2 := NewShortID([20]byte{2})
+	id0 := ShortID{0}
+	id1 := ShortID{1}
+	id2 := ShortID{2}
 
 	tests := []struct {
 		arr      []ShortID

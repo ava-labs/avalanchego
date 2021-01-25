@@ -143,7 +143,7 @@ func TestKeychainMatch(t *testing.T) {
 		t.Fatalf("Should have returned one key")
 	} else if index := indices[0]; index != 0 {
 		t.Fatalf("Should have returned index 0 for the key")
-	} else if key := keys[0]; !key.PublicKey().Address().Equals(sks[1].PublicKey().Address()) {
+	} else if key := keys[0]; key.PublicKey().Address() != sks[1].PublicKey().Address() {
 		t.Fatalf("Returned wrong key")
 	}
 
@@ -157,7 +157,7 @@ func TestKeychainMatch(t *testing.T) {
 		t.Fatalf("Should have returned one key")
 	} else if index := indices[0]; index != 0 {
 		t.Fatalf("Should have returned index 0 for the key")
-	} else if key := keys[0]; !key.PublicKey().Address().Equals(sks[1].PublicKey().Address()) {
+	} else if key := keys[0]; key.PublicKey().Address() != sks[1].PublicKey().Address() {
 		t.Fatalf("Returned wrong key")
 	}
 }
@@ -216,9 +216,9 @@ func TestKeychainSpendMint(t *testing.T) {
 		t.Fatalf("Should have returned index of secret key 2")
 	} else if numKeys := len(keys); numKeys != 2 {
 		t.Fatalf("Should have returned two keys")
-	} else if key := keys[0]; !key.PublicKey().Address().Equals(sks[1].PublicKey().Address()) {
+	} else if key := keys[0]; key.PublicKey().Address() != sks[1].PublicKey().Address() {
 		t.Fatalf("Returned wrong key")
-	} else if key := keys[1]; !key.PublicKey().Address().Equals(sks[2].PublicKey().Address()) {
+	} else if key := keys[1]; key.PublicKey().Address() != sks[2].PublicKey().Address() {
 		t.Fatalf("Returned wrong key")
 	}
 }
@@ -287,9 +287,9 @@ func TestKeychainSpendTransfer(t *testing.T) {
 		t.Fatalf("Should have returned index of secret key 2")
 	} else if numKeys := len(keys); numKeys != 2 {
 		t.Fatalf("Should have returned two keys")
-	} else if key := keys[0]; !key.PublicKey().Address().Equals(sks[1].PublicKey().Address()) {
+	} else if key := keys[0]; key.PublicKey().Address() != sks[1].PublicKey().Address() {
 		t.Fatalf("Returned wrong key")
-	} else if key := keys[1]; !key.PublicKey().Address().Equals(sks[2].PublicKey().Address()) {
+	} else if key := keys[1]; key.PublicKey().Address() != sks[2].PublicKey().Address() {
 		t.Fatalf("Returned wrong key")
 	}
 }

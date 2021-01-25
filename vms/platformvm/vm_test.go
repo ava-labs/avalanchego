@@ -2100,7 +2100,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 	advanceTimePreference := options[0]
 
-	peerID := ids.NewShortID([20]byte{1, 2, 3, 4, 5, 4, 3, 2, 1})
+	peerID := ids.ShortID{1, 2, 3, 4, 5, 4, 3, 2, 1}
 	vdrs := validators.NewSet()
 	if err := vdrs.AddWeight(peerID, 1); err != nil {
 		t.Fatal(err)
@@ -2480,4 +2480,114 @@ func TestMaxStakeAmount(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUptimeReporting(t *testing.T) {
+	_, genesisBytes := defaultGenesis()
+
+	// Assert that the uptime is correct and fail with a structured error message
+	// if the VM reports an unexpected uptime
+	checkUptime := func(vm *VM, nodeID ids.ShortID, expected float64, reason string) {
+		uptime, err := vm.calculateUptime(vm.DB, nodeID, defaultGenesisTime)
+		if err != nil {
+			t.Fatalf("Failed to get uptime for %s: %s", reason, err)
+		}
+		if uptime != expected {
+			t.Fatalf("Expected uptime of %v, but found %v for %s", expected, uptime, reason)
+		}
+	}
+	nodeID0 := keys[0].PublicKey().Address()
+	nodeID1 := keys[1].PublicKey().Address()
+	nodeID2 := keys[2].PublicKey().Address()
+
+	// Test that the VM reports the correct uptimes for peers
+	// connected both during and after bootstrapping completes.
+	baseDB := memdb.New()
+	firstDB := prefixdb.New([]byte{0}, baseDB)
+
+	vm := &VM{
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
+	}
+
+	vm.vdrMgr = validators.NewManager()
+
+	vm.clock.Set(defaultGenesisTime)
+	ctx := defaultContext()
+	ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	msgChan := make(chan common.Message, 1)
+	if err := vm.Initialize(ctx, firstDB, genesisBytes, msgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.Bootstrapping(); err != nil {
+		t.Fatal(err)
+	}
+
+	connectedTime := defaultGenesisTime.Add(5 * time.Second)
+	vm.clock.Set(connectedTime)
+	vm.Connected(nodeID0)
+	vm.Connected(nodeID2)
+
+	finishedBootstrappingTime := connectedTime.Add(5 * time.Second)
+	vm.clock.Set(finishedBootstrappingTime)
+	if err := vm.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
+
+	afterBootstrappingTime := finishedBootstrappingTime.Add(5 * time.Second)
+	vm.clock.Set(afterBootstrappingTime)
+	vm.Connected(nodeID1)
+	vm.Disconnected(nodeID2)
+
+	endTime := afterBootstrappingTime.Add(5 * time.Second)
+	vm.clock.Set(endTime)
+
+	checkUptime(vm, nodeID0, 1, "peer connected during bootstrapping")
+	checkUptime(vm, nodeID1, .75, "peer connected after bootstrapping")
+	checkUptime(vm, nodeID2, .75, "peer connected during bootstrapping and disconnected after bootstrapping")
+
+	if err := vm.Shutdown(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Test that VM reports the correct uptimes afer
+	// restart.
+	vm = &VM{
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
+	}
+
+	vm.clock.Set(endTime)
+	vm.vdrMgr = validators.NewManager()
+	restartDB := prefixdb.New([]byte{0}, baseDB)
+
+	if err := vm.Initialize(ctx, restartDB, genesisBytes, msgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.Bootstrapping(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
+
+	checkUptime(vm, nodeID0, 1, "peer connected during bootstrapping after restart")
+	checkUptime(vm, nodeID1, .75, "peer connected after bootstrapping after restart")
+	checkUptime(vm, nodeID2, .75, "peer connected during bootstrapping and disconnected after bootstrapping after restart")
 }

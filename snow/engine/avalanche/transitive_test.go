@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -31,6 +33,7 @@ func TestEngineShutdown(t *testing.T) {
 	config := DefaultConfig()
 	vmShutdownCalled := false
 	vm := &vertex.TestVM{}
+	vm.T = t
 	vm.ShutdownF = func() error { vmShutdownCalled = true; return nil }
 	config.VM = vm
 
@@ -103,7 +106,7 @@ func TestEngineAdd(t *testing.T) {
 			t.Fatalf("Asked multiple times")
 		}
 		*asked = true
-		if !vdr.Equals(inVdr) {
+		if vdr != inVdr {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
 		if vtx.ParentsV[0].ID() != vtxID {
@@ -233,7 +236,7 @@ func TestEngineQuery(t *testing.T) {
 			t.Fatalf("Asked multiple times")
 		}
 		*asked = true
-		if !vdr.Equals(inVdr) {
+		if vdr != inVdr {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
 		if vtx0.ID() != vtxID {
@@ -331,7 +334,7 @@ func TestEngineQuery(t *testing.T) {
 			t.Fatalf("Asked multiple times")
 		}
 		*asked = true
-		if !vdr.Equals(inVdr) {
+		if vdr != inVdr {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
 		if vtx1.ID() != vtxID {
@@ -547,7 +550,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 			t.Fatalf("Asked multiple times")
 		}
 		*asked = true
-		if !vdr0.Equals(inVdr) {
+		if vdr0 != inVdr {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
 		if vtx1.ID() != vtxID {
@@ -1444,7 +1447,7 @@ func TestEngineGetVertex(t *testing.T) {
 	}
 
 	sender.PutF = func(v ids.ShortID, _ uint32, vtxID ids.ID, vtx []byte) {
-		if !v.Equals(vdr.ID()) {
+		if v != vdr.ID() {
 			t.Fatalf("Wrong validator")
 		}
 		if mVtx.ID() != vtxID {
@@ -2511,7 +2514,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	}
 
 	sender.GetAncestorsF = func(inVdr ids.ShortID, reqID uint32, vtxID ids.ID) {
-		if !vdr.Equals(inVdr) {
+		if vdr != inVdr {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
 		if vtx0.ID() != vtxID {
@@ -2576,7 +2579,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		panic("Unknown bytes provided")
 	}
 	sender.ChitsF = func(inVdr ids.ShortID, _ uint32, chits []ids.ID) {
-		if !inVdr.Equals(vdr) {
+		if inVdr != vdr {
 			t.Fatalf("Sent to the wrong validator")
 		}
 
@@ -2947,7 +2950,7 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 	reqID := new(uint32)
 	sender.GetF = func(reqVdr ids.ShortID, requestID uint32, vtxID ids.ID) {
 		*reqID = requestID
-		if !reqVdr.Equals(vdr) {
+		if reqVdr != vdr {
 			t.Fatalf("Wrong validator requested")
 		}
 		if vtxID != vtx0.ID() {
@@ -3090,7 +3093,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	reqID := new(uint32)
 	sender.GetF = func(reqVdr ids.ShortID, requestID uint32, vtxID ids.ID) {
 		*reqID = requestID
-		if !reqVdr.Equals(vdr) {
+		if reqVdr != vdr {
 			t.Fatalf("Wrong validator requested")
 		}
 		if vtxID != vtx0.ID() {
@@ -3499,4 +3502,149 @@ func TestEngineDoubleChit(t *testing.T) {
 	if status := tx.Status(); status != choices.Accepted {
 		t.Fatalf("Wrong tx status: %s ; expected: %s", status, choices.Accepted)
 	}
+}
+
+func TestEngineBubbleVotes(t *testing.T) {
+	config := DefaultConfig()
+
+	vals := validators.NewSet()
+	config.Validators = vals
+
+	vdr := ids.GenerateTestShortID()
+	err := vals.AddWeight(vdr, 1)
+	assert.NoError(t, err)
+
+	sender := &common.SenderTest{}
+	sender.T = t
+	config.Sender = sender
+
+	sender.Default(true)
+	sender.CantGetAcceptedFrontier = false
+
+	manager := vertex.NewTestManager(t)
+	config.Manager = manager
+
+	manager.Default(true)
+
+	utxos := []ids.ID{
+		ids.GenerateTestID(),
+		ids.GenerateTestID(),
+		ids.GenerateTestID(),
+	}
+
+	tx0 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: utxos[:1],
+	}
+	tx1 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: utxos[1:2],
+	}
+	tx2 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: utxos[1:2],
+	}
+
+	vtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		HeightV: 0,
+		TxsV:    []snowstorm.Tx{tx0},
+		BytesV:  []byte{0},
+	}
+
+	missingVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Unknown,
+	}}
+
+	pendingVtx0 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: []avalanche.Vertex{vtx, missingVtx},
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx1},
+		BytesV:   []byte{1},
+	}
+
+	pendingVtx1 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: []avalanche.Vertex{pendingVtx0},
+		HeightV:  2,
+		TxsV:     []snowstorm.Tx{tx2},
+		BytesV:   []byte{2},
+	}
+
+	manager.EdgeF = func() []ids.ID { return nil }
+	manager.GetF = func(id ids.ID) (avalanche.Vertex, error) {
+		switch id {
+		case vtx.ID():
+			return vtx, nil
+		case missingVtx.ID():
+			return nil, errMissing
+		case pendingVtx0.ID():
+			return pendingVtx0, nil
+		case pendingVtx1.ID():
+			return pendingVtx1, nil
+		}
+		assert.FailNow(t, "unknown vertex", "vtxID: %s", id)
+		panic("should have errored")
+	}
+
+	te := &Transitive{}
+	err = te.Initialize(config)
+	assert.NoError(t, err)
+
+	queryReqID := new(uint32)
+	queried := new(bool)
+	sender.PushQueryF = func(inVdrs ids.ShortSet, requestID uint32, vtxID ids.ID, _ []byte) {
+		assert.Len(t, inVdrs, 1, "wrong number of validators")
+		*queryReqID = requestID
+		assert.Equal(t, vtx.ID(), vtxID, "wrong vertex requested")
+		*queried = true
+	}
+
+	getReqID := new(uint32)
+	fetched := new(bool)
+	sender.GetF = func(inVdr ids.ShortID, requestID uint32, vtxID ids.ID) {
+		assert.Equal(t, vdr, inVdr, "wrong validator")
+		*getReqID = requestID
+		assert.Equal(t, missingVtx.ID(), vtxID, "wrong vertex requested")
+		*fetched = true
+	}
+
+	issued, err := te.issueFrom(vdr, pendingVtx1)
+	assert.NoError(t, err)
+	assert.False(t, issued, "shouldn't have been able to issue %s", pendingVtx1.ID())
+	assert.True(t, *queried, "should have queried for %s", vtx.ID())
+	assert.True(t, *fetched, "should have fetched %s", missingVtx.ID())
+
+	// can't apply votes yet because pendingVtx0 isn't issued because missingVtx
+	// is missing
+	err = te.Chits(vdr, *queryReqID, []ids.ID{pendingVtx1.ID()})
+	assert.NoError(t, err)
+	assert.Equal(t, choices.Processing, tx0.Status(), "wrong tx status")
+	assert.Equal(t, choices.Processing, tx1.Status(), "wrong tx status")
+
+	// vote for pendingVtx1 should be bubbled up to pendingVtx0 and then to vtx
+	err = te.GetFailed(vdr, *getReqID)
+	assert.NoError(t, err)
+	assert.Equal(t, choices.Accepted, tx0.Status(), "wrong tx status")
+	assert.Equal(t, choices.Processing, tx1.Status(), "wrong tx status")
 }
