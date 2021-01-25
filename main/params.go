@@ -19,6 +19,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
@@ -327,7 +328,16 @@ func setNodeConfig(v *viper.Viper) error {
 		}
 		Config.DB = dbManager
 	} else {
-		Config.DB = manager.NewMemDBManager(dbVersion)
+		dbManager, err := manager.NewManagerFromDBs([]*manager.SemanticDatabase{
+			{
+				Database: memdb.New(),
+				Version:  dbVersion,
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("couldn't create db manager from memory db: %w", err)
+		}
+		Config.DB = dbManager
 	}
 
 	// IP Configuration

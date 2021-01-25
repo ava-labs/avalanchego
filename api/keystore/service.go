@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
-	"github.com/ava-labs/avalanchego/version"
 
 	jsoncodec "github.com/ava-labs/avalanchego/utils/json"
 )
@@ -501,5 +500,5 @@ func (ks *Keystore) AddUser(username, pword string) error {
 // CreateTestKeystore returns a new keystore that can be utilized for testing
 func CreateTestKeystore() (*Keystore, error) {
 	ks := &Keystore{}
-	return ks, ks.Initialize(logging.NoLog{}, manager.NewMemDBManager(version.NewDefaultVersion(1, 0, 0)))
+	return ks, ks.Initialize(logging.NoLog{}, manager.NewDefaultMemDBManager())
 }

@@ -276,3 +276,50 @@ func TestMeterDBManager(t *testing.T) {
 	_, err = m.NewMeterDBManager("", registry)
 	assert.Error(t, err)
 }
+
+func TestNewManagerFromDBs(t *testing.T) {
+	versions := []version.Version{
+		version.NewDefaultVersion(3, 2, 0),
+		version.NewDefaultVersion(1, 2, 0),
+		version.NewDefaultVersion(1, 1, 1),
+	}
+	m, err := NewManagerFromDBs([]*SemanticDatabase{
+		{
+			Database: memdb.New(),
+			Version:  versions[2],
+		},
+		{
+			Database: memdb.New(),
+			Version:  versions[1],
+		},
+		{
+			Database: memdb.New(),
+			Version:  versions[0],
+		},
+	})
+	assert.NoError(t, err)
+
+	dbs := m.GetDatabases()
+	assert.Len(t, dbs, len(versions))
+	for i, db := range dbs {
+		assert.Equal(t, 0, db.Version.Compare(versions[i]))
+	}
+
+}
+func TestNewManagerFromNonUniqueDBs(t *testing.T) {
+	_, err := NewManagerFromDBs([]*SemanticDatabase{
+		{
+			Database: memdb.New(),
+			Version:  version.NewDefaultVersion(1, 1, 0),
+		},
+		{
+			Database: memdb.New(),
+			Version:  version.NewDefaultVersion(1, 1, 0),
+		},
+		{
+			Database: memdb.New(),
+			Version:  version.NewDefaultVersion(1, 2, 0),
+		},
+	})
+	assert.Error(t, err)
+}

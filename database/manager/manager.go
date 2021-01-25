@@ -84,23 +84,17 @@ func (m *manager) wrapManager(wrap func(db *SemanticDatabase) (*SemanticDatabase
 	return &manager{databases: databases}, nil
 }
 
-// NewMemDBManager creates a database manager with a single database in memory
-// with version [currentVersion]
-func NewMemDBManager(currentVersion version.Version) Manager {
+// NewDefaultMemDBManager returns a database manager with a single memory db instance
+// with a default version of v1.0.0
+func NewDefaultMemDBManager() Manager {
 	return &manager{
 		databases: []*SemanticDatabase{
 			{
 				Database: memdb.New(),
-				Version:  currentVersion,
+				Version:  version.NewDefaultVersion(1, 0, 0),
 			},
 		},
 	}
-}
-
-// NewDefaultMemDBManager returns a database manager with a single memory db instance
-// with a default version of v1.0.0
-func NewDefaultMemDBManager() Manager {
-	return NewMemDBManager(version.NewDefaultVersion(1, 0, 0))
 }
 
 // New creates a database manager at [filePath] by creating a database instance from each directory
