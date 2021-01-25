@@ -86,6 +86,7 @@ const (
 	consensusShutdownTimeoutKey     = "consensus-shutdown-timeout"
 	fdLimitKey                      = "fd-limit"
 	corethConfigKey                 = "coreth-config"
+	chainIDKey                      = "chain-id"
 	chainConfigsKey                 = "chain-configs"
 	disconnectedCheckFreqKey        = "disconnected-check-frequency"
 	disconnectedRestartTimeoutKey   = "disconnected-restart-timeout"

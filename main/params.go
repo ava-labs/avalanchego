@@ -15,8 +15,7 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-
-	"github.com/ava-labs/viper"
+	"github.com/spf13/viper"
 
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -248,7 +247,6 @@ func avalancheFlagSet() *flag.FlagSet {
 // and any parsed command line flags
 func getViper() (*viper.Viper, error) {
 	v := viper.New()
-	v.SetKeysCaseSensitive(true)
 
 	fs := avalancheFlagSet()
 	pflag.CommandLine.AddGoFlagSet(fs)
@@ -682,21 +680,30 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.CorethConfig = corethConfigString
 
 	// ChainConfigs
-	// TODO: provide defaults for standard chains
+	rawChainConfigs := []map[string]interface{}{}
+	if err := v.UnmarshalKey(chainConfigsKey, &rawChainConfigs); err != nil {
+		return fmt.Errorf("couldn't parse chain configs: %w", err)
+	}
+
 	Config.ChainConfigs = map[ids.ID]snow.ChainConfig{}
-	for chainID, chainConfig := range v.GetStringMap(chainConfigsKey) {
+	for i, rawChainConfig := range rawChainConfigs {
+		rawChainID, ok := rawChainConfig[chainIDKey]
+		if !ok {
+			return fmt.Errorf("couldn't parse ChainID from chain config %d", i)
+		}
+
+		chainID, ok := rawChainID.(string)
+		if !ok {
+			return fmt.Errorf("ChainID `%+v` is not a string in chain config %d", rawChainID, i)
+		}
+
 		id, err := ids.FromString(chainID)
 		if err != nil {
 			return fmt.Errorf("couldn't parse chainID %s: %w", chainID, err)
 		}
 
-		chainConfigMap, ok := chainConfig.(map[string]interface{})
-		if !ok {
-			return fmt.Errorf("could not parse chain config for %s", chainID)
-		}
-
 		config := snow.ChainConfig{}
-		if err := utils.PopulateStringFields(chainConfigMap, &config); err != nil {
+		if err := utils.PopulateStringFields(rawChainConfig, &config); err != nil {
 			return fmt.Errorf("could not parse chain config for %s: %w", chainID, err)
 		}
 		Config.ChainConfigs[id] = config
