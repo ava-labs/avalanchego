@@ -149,6 +149,9 @@ func (vm *VMClient) Initialize(
 		EpochFirstTransition: epochFirstTransitionBytes,
 		EpochDuration:        uint64(ctx.EpochDuration),
 	})
+
+	// TODO create individual db server and client for each of the underlying databases
+	//
 	if err != nil {
 		return err
 	}
