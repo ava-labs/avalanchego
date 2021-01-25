@@ -83,6 +83,8 @@ func (t *tx) Verify() error {
 	for _, restriction := range restrictions {
 		restricted, err := t.serializer.vm.Get(restriction)
 		if err != nil {
+			// TODO: properly distinguish between fatal errors and missing
+			//       transition errors.
 			continue
 		}
 		if status := restricted.Status(); status != choices.Accepted {
