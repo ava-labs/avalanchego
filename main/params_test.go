@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 func TestChainConfigs(t *testing.T) {
@@ -115,7 +116,9 @@ func TestChainConfigs(t *testing.T) {
 
 			// Parse config
 			v.Set(logsDirKey, t.TempDir())
-			v.Set(dbDirKey, t.TempDir())
+			v.Set(networkNameKey, constants.LocalName)
+			v.Set(dbEnabledKey, false)
+			v.Set(publicIPKey, "1.1.1.1")
 			Config = node.Config{}
 			err := setNodeConfig(v)
 			if len(test.err) > 0 {
