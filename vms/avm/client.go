@@ -51,6 +51,27 @@ func (c *Client) GetTxStatus(txID ids.ID) (choices.Status, error) {
 	return res.Status, err
 }
 
+// ConfirmTx attempts to confirm [txID] by checking its status [attempts] times
+// with a [delay] in between each attempt. If the transaction has not been decided
+// by the final attempt, it returns the status of the last attempt.
+// Note: ConfirmTx will block until either the last attempt finishes or the client
+// returns a decided status.
+func (c *Client) ConfirmTx(txID ids.ID, attempts int, delay time.Duration) (choices.Status, error) {
+	for i := 0; i < attempts-1; i++ {
+		status, err := c.GetTxStatus(txID)
+		if err != nil {
+			return status, err
+		}
+
+		if status.Decided() {
+			return status, nil
+		}
+		time.Sleep(delay)
+	}
+
+	return c.GetTxStatus(txID)
+}
+
 // GetTx returns the byte representation of [txID]
 func (c *Client) GetTx(txID ids.ID) ([]byte, error) {
 	res := &api.FormattedTx{}
@@ -71,10 +92,17 @@ func (c *Client) GetTx(txID ids.ID) ([]byte, error) {
 
 // GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
 func (c *Client) GetUTXOs(addrs []string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
+	return c.GetAtomicUTXOs(addrs, "", limit, startAddress, startUTXOID)
+}
+
+// GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled by [addresses]
+// from [sourceChain]
+func (c *Client) GetAtomicUTXOs(addrs []string, sourceChain string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
 	res := &api.GetUTXOsReply{}
 	err := c.requester.SendRequest("getUTXOs", &api.GetUTXOsArgs{
-		Addresses: addrs,
-		Limit:     cjson.Uint32(limit),
+		Addresses:   addrs,
+		SourceChain: sourceChain,
+		Limit:       cjson.Uint32(limit),
 		StartIndex: api.Index{
 			Address: startAddress,
 			UTXO:    startUTXOID,
@@ -105,21 +133,24 @@ func (c *Client) GetAssetDescription(assetID string) (*GetAssetDescriptionReply,
 	return res, err
 }
 
-// GetBalance returns the balance for [addr] of [assetID]
-func (c *Client) GetBalance(addr string, assetID string) (*GetBalanceReply, error) {
+// GetBalance returns the balance of [assetID] held by [addr].
+// If [includePartial], balance includes partial owned (i.e. in a multisig) funds.
+func (c *Client) GetBalance(addr string, assetID string, includePartial bool) (*GetBalanceReply, error) {
 	res := &GetBalanceReply{}
 	err := c.requester.SendRequest("getBalance", &GetBalanceArgs{
-		Address: addr,
-		AssetID: assetID,
+		Address:        addr,
+		AssetID:        assetID,
+		IncludePartial: includePartial,
 	}, res)
 	return res, err
 }
 
 // GetAllBalances returns all asset balances for [addr]
-func (c *Client) GetAllBalances(addr string) (*GetAllBalancesReply, error) {
+func (c *Client) GetAllBalances(addr string, includePartial bool) (*GetAllBalancesReply, error) {
 	res := &GetAllBalancesReply{}
-	err := c.requester.SendRequest("getAllBalances", &api.JSONAddress{
-		Address: addr,
+	err := c.requester.SendRequest("getAllBalances", &GetAllBalancesArgs{
+		JSONAddress:    api.JSONAddress{Address: addr},
+		IncludePartial: includePartial,
 	}, res)
 	return res, err
 }

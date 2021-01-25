@@ -40,12 +40,12 @@ type queryBenchlist struct {
 	// Validator ID --> Request ID --> non-empty iff
 	// there is an outstanding request to this validator
 	// with the corresponding requestID
-	pendingQueries map[[20]byte]map[uint32]pendingQuery
+	pendingQueries map[ids.ShortID]map[uint32]pendingQuery
 	// Map of consecutive query failures
-	consecutiveFailures map[[20]byte]failureStreak
+	consecutiveFailures map[ids.ShortID]failureStreak
 
 	// Maintain benchlist
-	benchlistTimes map[[20]byte]time.Time
+	benchlistTimes map[ids.ShortID]time.Time
 	benchlistOrder *list.List
 	benchlistSet   ids.ShortSet
 
@@ -85,9 +85,9 @@ func NewQueryBenchlist(
 ) (QueryBenchlist, error) {
 	metrics := &metrics{}
 	return &queryBenchlist{
-		pendingQueries:         make(map[[20]byte]map[uint32]pendingQuery),
-		consecutiveFailures:    make(map[[20]byte]failureStreak),
-		benchlistTimes:         make(map[[20]byte]time.Time),
+		pendingQueries:         make(map[ids.ShortID]map[uint32]pendingQuery),
+		consecutiveFailures:    make(map[ids.ShortID]failureStreak),
+		benchlistTimes:         make(map[ids.ShortID]time.Time),
 		benchlistOrder:         list.New(),
 		benchlistSet:           ids.ShortSet{},
 		vdrs:                   validators,
@@ -106,15 +106,14 @@ func (b *queryBenchlist) RegisterQuery(validatorID ids.ShortID, requestID uint32
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	key := validatorID.Key()
 	if benched := b.benched(validatorID); benched {
 		return false
 	}
 
-	validatorRequests, ok := b.pendingQueries[key]
+	validatorRequests, ok := b.pendingQueries[validatorID]
 	if !ok {
 		validatorRequests = make(map[uint32]pendingQuery)
-		b.pendingQueries[key] = validatorRequests
+		b.pendingQueries[validatorID] = validatorRequests
 	}
 
 	validatorRequests[requestID] = pendingQuery{
@@ -134,7 +133,7 @@ func (b *queryBenchlist) RegisterResponse(validatorID ids.ShortID, requestID uin
 	}
 
 	// Reset consecutive failures on success
-	delete(b.consecutiveFailures, validatorID.Key())
+	delete(b.consecutiveFailures, validatorID)
 }
 
 // QueryFailed notes a failure and benchlists [validatorID] if necessary
@@ -148,14 +147,13 @@ func (b *queryBenchlist) QueryFailed(validatorID ids.ShortID, requestID uint32) 
 
 	// Track the message failure and bench [validatorID] if it has
 	// surpassed the threshold
-	key := validatorID.Key()
 	currentTime := b.clock.Time()
-	failureStreak := b.consecutiveFailures[key]
+	failureStreak := b.consecutiveFailures[validatorID]
 	if failureStreak.consecutive == 0 {
 		failureStreak.firstFailure = currentTime
 	}
 	failureStreak.consecutive++
-	b.consecutiveFailures[key] = failureStreak
+	b.consecutiveFailures[validatorID] = failureStreak
 
 	if failureStreak.consecutive >= b.threshold && !currentTime.Before(failureStreak.firstFailure.Add(b.minimumFailingDuration)) {
 		b.bench(validatorID)
@@ -167,8 +165,6 @@ func (b *queryBenchlist) bench(validatorID ids.ShortID) {
 		return
 	}
 
-	key := validatorID.Key()
-
 	// Goal:
 	// Random end time in the range:
 	// [max(lastEndTime, (currentTime + (duration/2)): currentTime + duration]
@@ -178,7 +174,7 @@ func (b *queryBenchlist) bench(validatorID ids.ShortID) {
 	minEndTime := currTime.Add(b.duration / 2)
 	if elem := b.benchlistOrder.Back(); elem != nil {
 		lastValidator := elem.Value.(ids.ShortID)
-		lastEndTime := b.benchlistTimes[lastValidator.Key()]
+		lastEndTime := b.benchlistTimes[lastValidator]
 		if lastEndTime.After(minEndTime) {
 			minEndTime = lastEndTime
 		}
@@ -191,10 +187,10 @@ func (b *queryBenchlist) bench(validatorID ids.ShortID) {
 	randomizedEndTime := minEndTime.Add(time.Duration(rand.Float64() * float64(diff))) // #nosec G404
 
 	// Add to benchlist times with randomized delay
-	b.benchlistTimes[key] = randomizedEndTime
+	b.benchlistTimes[validatorID] = randomizedEndTime
 	b.benchlistOrder.PushBack(validatorID)
 	b.benchlistSet.Add(validatorID)
-	delete(b.consecutiveFailures, key)
+	delete(b.consecutiveFailures, validatorID)
 	b.ctx.Log.Debug(
 		"benching validator %s after %d consecutive failed queries for %s",
 		validatorID,
@@ -212,9 +208,7 @@ func (b *queryBenchlist) bench(validatorID ids.ShortID) {
 // benched checks if [validatorID] is currently benched
 // and calls cleanup if its benching period has elapsed
 func (b *queryBenchlist) benched(validatorID ids.ShortID) bool {
-	key := validatorID.Key()
-
-	end, ok := b.benchlistTimes[key]
+	end, ok := b.benchlistTimes[validatorID]
 	if !ok {
 		return false
 	}
@@ -245,14 +239,12 @@ func (b *queryBenchlist) cleanup() {
 	updatedWeight := currentWeight
 	totalWeight := b.vdrs.Weight()
 	maxBenchlistWeight := uint64(float64(totalWeight) * b.maxPortion)
-
 	// Iterate over elements of the benchlist in order of expiration
 	for b.benchlistOrder.Len() > 0 {
 		e := b.benchlistOrder.Front()
 
 		validatorID := e.Value.(ids.ShortID)
-		key := validatorID.Key()
-		end := b.benchlistTimes[key]
+		end := b.benchlistTimes[validatorID]
 		// Remove elements with the next expiration until the next item has not
 		// expired and the bench has less than the maximum weight
 		// Note: this creates an edge case where benching a validator
@@ -275,12 +267,13 @@ func (b *queryBenchlist) cleanup() {
 
 		b.ctx.Log.Debug("Removed Validator: (%s, %d). EndTime: %s. CurrentTime: %s)", validatorID, removeWeight, end, currentTime)
 		b.benchlistOrder.Remove(e)
-		delete(b.benchlistTimes, key)
+		delete(b.benchlistTimes, validatorID)
 		b.benchlistSet.Remove(validatorID)
 	}
 
 	updatedBenchLen := b.benchlistSet.Len()
-	b.ctx.Log.Debug("Benched Weight: (%d/%d) -> (%d/%d). Benched Validators: %d -> %d.",
+	b.ctx.Log.Debug("Maximum Benchable Weight: %d. Benched Weight: (%d/%d) -> (%d/%d). Benched Validators: %d -> %d.",
+		maxBenchlistWeight,
 		currentWeight,
 		totalWeight,
 		updatedWeight,
@@ -293,9 +286,9 @@ func (b *queryBenchlist) cleanup() {
 }
 
 func (b *queryBenchlist) reset() {
-	b.pendingQueries = make(map[[20]byte]map[uint32]pendingQuery)
-	b.consecutiveFailures = make(map[[20]byte]failureStreak)
-	b.benchlistTimes = make(map[[20]byte]time.Time)
+	b.pendingQueries = make(map[ids.ShortID]map[uint32]pendingQuery)
+	b.consecutiveFailures = make(map[ids.ShortID]failureStreak)
+	b.benchlistTimes = make(map[ids.ShortID]time.Time)
 	b.benchlistOrder.Init()
 	b.benchlistSet.Clear()
 	b.metrics.weightBenched.Set(0)
@@ -304,9 +297,7 @@ func (b *queryBenchlist) reset() {
 
 // removeQuery returns true if the query was present
 func (b *queryBenchlist) removeQuery(validatorID ids.ShortID, requestID uint32) bool {
-	key := validatorID.Key()
-
-	validatorRequests, ok := b.pendingQueries[key]
+	validatorRequests, ok := b.pendingQueries[validatorID]
 	if !ok {
 		return false
 	}
@@ -318,7 +309,7 @@ func (b *queryBenchlist) removeQuery(validatorID ids.ShortID, requestID uint32) 
 
 	delete(validatorRequests, requestID)
 	if len(validatorRequests) == 0 {
-		delete(b.pendingQueries, key)
+		delete(b.pendingQueries, validatorID)
 	}
 	b.metrics.observe(validatorID, query.msgType, b.clock.Time().Sub(query.registered))
 	return true

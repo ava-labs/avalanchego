@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
@@ -126,6 +127,29 @@ func (service *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, reply *a
 
 	reply.Success = true
 	return service.httpServer.AddAliasesWithReadLock("bc/"+chainID.String(), "bc/"+args.Alias)
+}
+
+// GetChainAliasesArgs are the arguments for calling GetChainAliases
+type GetChainAliasesArgs struct {
+	Chain string `json:"chain"`
+}
+
+// GetChainAliasesReply are the aliases of the given chain
+type GetChainAliasesReply struct {
+	Aliases []string `json:"aliases"`
+}
+
+// GetChainAliases returns the aliases of the chain
+func (service *Admin) GetChainAliases(r *http.Request, args *GetChainAliasesArgs, reply *GetChainAliasesReply) error {
+	service.log.Info("Admin: GetChainAliases called with Chain: %s", args.Chain)
+
+	id, err := ids.FromString(args.Chain)
+	if err != nil {
+		return err
+	}
+
+	reply.Aliases = service.chainManager.Aliases(id)
+	return nil
 }
 
 // Stacktrace returns the current global stacktrace

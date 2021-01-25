@@ -154,82 +154,84 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, permError{err}
 	}
 
-	// Ensure the proposed validator starts after the current time
-	if currentTime, err := vm.getTimestamp(db); err != nil {
-		return nil, nil, nil, nil, tempError{
-			fmt.Errorf("failed to get timestamp: %w", err),
-		}
-	} else if startTime := tx.StartTime(); !currentTime.Before(startTime) {
-		return nil, nil, nil, nil, permError{
-			fmt.Errorf("validator's start time (%s) at or before current timestamp (%s)",
-				startTime,
-				currentTime,
-			),
-		}
-	} else if startTime.After(currentTime.Add(maxFutureStartTime)) {
-		return nil, nil, nil, nil, permError{
-			fmt.Errorf(
-				"validator start time (%s) more than two weeks after current chain timestamp (%s)",
-				startTime,
-				currentTime,
-			),
-		}
-	}
-
-	_, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
-	if err != nil {
-		return nil, nil, nil, nil, tempError{
-			fmt.Errorf(
-				"failed to get whether %s is a validator: %w",
-				tx.Validator.NodeID,
-				err,
-			),
-		}
-	}
-	if isValidator {
-		return nil, nil, nil, nil, permError{
-			fmt.Errorf(
-				"validator %s is already a primary network validator",
-				tx.Validator.NodeID,
-			),
-		}
-	}
-
-	// Ensure that the period this validator validates the specified subnet
-	// is a subnet of the time they will validate the primary network.
-	_, willBeValidator, err := vm.willBeValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
-	if err != nil {
-		return nil, nil, nil, nil, tempError{
-			fmt.Errorf(
-				"failed to get whether %s will be a validator: %w",
-				tx.Validator.NodeID,
-				err,
-			),
-		}
-	}
-	if willBeValidator {
-		return nil, nil, nil, nil, permError{
-			fmt.Errorf(
-				"validator %s is already a primary network validator",
-				tx.Validator.NodeID,
-			),
-		}
-	}
-
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.Stake)
 
-	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, 0, vm.Ctx.AVAXAssetID); err != nil {
-		switch err.(type) {
-		case permError:
-			return nil, nil, nil, nil, permError{
-				fmt.Errorf("failed semanticVerifySpend: %w", err),
-			}
-		default:
+	if vm.bootstrapped {
+		// Ensure the proposed validator starts after the current time
+		if currentTime, err := vm.getTimestamp(db); err != nil {
 			return nil, nil, nil, nil, tempError{
-				fmt.Errorf("failed semanticVerifySpend: %w", err),
+				fmt.Errorf("failed to get timestamp: %w", err),
+			}
+		} else if startTime := tx.StartTime(); !currentTime.Before(startTime) {
+			return nil, nil, nil, nil, permError{
+				fmt.Errorf("validator's start time (%s) at or before current timestamp (%s)",
+					startTime,
+					currentTime,
+				),
+			}
+		} else if startTime.After(currentTime.Add(maxFutureStartTime)) {
+			return nil, nil, nil, nil, permError{
+				fmt.Errorf(
+					"validator start time (%s) more than two weeks after current chain timestamp (%s)",
+					startTime,
+					currentTime,
+				),
+			}
+		}
+
+		_, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
+		if err != nil {
+			return nil, nil, nil, nil, tempError{
+				fmt.Errorf(
+					"failed to get whether %s is a validator: %w",
+					tx.Validator.NodeID,
+					err,
+				),
+			}
+		}
+		if isValidator {
+			return nil, nil, nil, nil, permError{
+				fmt.Errorf(
+					"validator %s is already a primary network validator",
+					tx.Validator.NodeID,
+				),
+			}
+		}
+
+		// Ensure that the period this validator validates the specified subnet
+		// is a subnet of the time they will validate the primary network.
+		_, willBeValidator, err := vm.willBeValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
+		if err != nil {
+			return nil, nil, nil, nil, tempError{
+				fmt.Errorf(
+					"failed to get whether %s will be a validator: %w",
+					tx.Validator.NodeID,
+					err,
+				),
+			}
+		}
+		if willBeValidator {
+			return nil, nil, nil, nil, permError{
+				fmt.Errorf(
+					"validator %s is already a primary network validator",
+					tx.Validator.NodeID,
+				),
+			}
+		}
+
+		// Verify the flowcheck
+		if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, 0, vm.Ctx.AVAXAssetID); err != nil {
+			switch err.(type) {
+			case permError:
+				return nil, nil, nil, nil, permError{
+					fmt.Errorf("failed semanticVerifySpend: %w", err),
+				}
+			default:
+				return nil, nil, nil, nil, tempError{
+					fmt.Errorf("failed semanticVerifySpend: %w", err),
+				}
 			}
 		}
 	}

@@ -13,7 +13,7 @@ import (
 )
 
 func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
-	id := ids.NewShortID([20]byte{1, 2, 3})
+	id := ids.ShortID{1, 2, 3}
 	nodeID := id.PrefixedString(constants.NodeIDPrefix)
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	addr, err := formatting.FormatBech32(hrp, id.Bytes())
@@ -61,7 +61,7 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 }
 
 func TestBuildGenesisInvalidAmount(t *testing.T) {
-	id := ids.NewShortID([20]byte{1, 2, 3})
+	id := ids.ShortID{1, 2, 3}
 	nodeID := id.PrefixedString(constants.NodeIDPrefix)
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	addr, err := formatting.FormatBech32(hrp, id.Bytes())
@@ -109,7 +109,7 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 }
 
 func TestBuildGenesisInvalidEndtime(t *testing.T) {
-	id := ids.NewShortID([20]byte{1, 2, 3})
+	id := ids.ShortID{1, 2, 3}
 	nodeID := id.PrefixedString(constants.NodeIDPrefix)
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	addr, err := formatting.FormatBech32(hrp, id.Bytes())
@@ -158,7 +158,7 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 }
 
 func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
-	id := ids.NewShortID([20]byte{1})
+	id := ids.ShortID{1}
 	nodeID := id.PrefixedString(constants.NodeIDPrefix)
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	addr, err := formatting.FormatBech32(hrp, id.Bytes())

@@ -49,7 +49,7 @@ func (out *OutputOwners) Equals(other *OutputOwners) bool {
 	}
 	for i, addr := range out.Addrs {
 		otherAddr := other.Addrs[i]
-		if !addr.Equals(otherAddr) {
+		if addr != otherAddr {
 			return false
 		}
 	}

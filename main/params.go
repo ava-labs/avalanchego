@@ -77,6 +77,9 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Config File:
 	fs.String(configFileKey, defaultString, "Specifies a config file")
 
+	// Genesis Config File:
+	fs.String(genesisConfigFileKey, "", "Specifies a genesis config file (ignored when running standard networks)")
+
 	// NetworkID:
 	fs.String(networkNameKey, defaultNetworkName, "Network ID this node will connect to")
 
@@ -163,6 +166,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Uint(maxNonStakerPendingMsgsKey, uint(router.DefaultMaxNonStakerPendingMsgs), "Maximum number of messages a non-staker is allowed to have pending.")
 	fs.Float64(stakerMsgReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain message queue's space for stakers.")
 	fs.Float64(stakerCPUReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain's CPU time for stakers.")
+	fs.Uint(maxPendingMsgsKey, 1024, "Maximum number of pending messages. Messages after this will be dropped.")
 
 	// Network Timeouts:
 	fs.Duration(networkInitialTimeoutKey, 5*time.Second, "Initial timeout value of the adaptive timeout manager, in nanoseconds.")
@@ -170,6 +174,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Duration(networkMaximumTimeoutKey, 10*time.Second, "Maximum timeout value of the adaptive timeout manager, in nanoseconds.")
 	fs.Duration(networkTimeoutIncreaseKey, 60*time.Millisecond, "Increase of network timeout after a failed request, in nanoseconds.")
 	fs.Duration(networkTimeoutReductionKey, 12*time.Millisecond, "Decrease of network timeout after a successful request, in nanoseconds.")
+	fs.Uint(sendQueueSizeKey, 1<<10, "Max number of messages waiting to be sent to peers.")
 
 	// Benchlist Parameters:
 	fs.Int(benchlistFailThresholdKey, 10, "Number of consecutive failed queries before benchlisting a node.")
@@ -260,6 +265,18 @@ func getViper() (*viper.Viper, error) {
 // setNodeConfig sets attributes on [Config] based on the values
 // defined in the [viper] environment
 func setNodeConfig(v *viper.Viper) error {
+	// Consensus Parameters
+	Config.ConsensusParams.K = v.GetInt(snowSampleSizeKey)
+	Config.ConsensusParams.Alpha = v.GetInt(snowQuorumSizeKey)
+	Config.ConsensusParams.BetaVirtuous = v.GetInt(snowVirtuousCommitThresholdKey)
+	Config.ConsensusParams.BetaRogue = v.GetInt(snowRogueCommitThresholdKey)
+	Config.ConsensusParams.Parents = v.GetInt(snowAvalancheNumParentsKey)
+	Config.ConsensusParams.BatchSize = v.GetInt(snowAvalancheBatchSizeKey)
+	Config.ConsensusParams.ConcurrentRepolls = v.GetInt(snowConcurrentRepollsKey)
+
+	Config.ConsensusGossipFrequency = v.GetDuration(consensusGossipFrequencyKey)
+	Config.ConsensusShutdownTimeout = v.GetDuration(consensusShutdownTimeoutKey)
+
 	// Logging:
 	loggingConfig, err := logging.DefaultConfig()
 	if err != nil {
@@ -455,7 +472,7 @@ func setNodeConfig(v *viper.Viper) error {
 		}
 	} else {
 		for _, peer := range Config.BootstrapPeers {
-			peer.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(peer.IP.String())))
+			peer.ID = ids.ShortID(hashing.ComputeHash160Array([]byte(peer.IP.String())))
 		}
 	}
 
@@ -535,9 +552,14 @@ func setNodeConfig(v *viper.Viper) error {
 	}
 
 	// Throttling
-	Config.MaxNonStakerPendingMsgs = v.GetUint(maxNonStakerPendingMsgsKey)
+	Config.MaxNonStakerPendingMsgs = v.GetUint32(maxNonStakerPendingMsgsKey)
 	Config.StakerMSGPortion = v.GetFloat64(stakerMsgReservedKey)
 	Config.StakerCPUPortion = v.GetFloat64(stakerCPUReservedKey)
+	Config.SendQueueSize = v.GetUint32(sendQueueSizeKey)
+	Config.MaxPendingMsgs = v.GetUint32(maxPendingMsgsKey)
+	if Config.MaxPendingMsgs < Config.MaxNonStakerPendingMsgs {
+		return errors.New("maximum pending messages must be >= maximum non-staker pending messages")
+	}
 
 	// Network Timeout
 	Config.NetworkConfig.InitialTimeout = v.GetDuration(networkInitialTimeoutKey)
@@ -633,17 +655,11 @@ func setNodeConfig(v *viper.Viper) error {
 		Config.Params = *genesis.GetParams(networkID)
 	}
 
-	// Consensus Parameters
-	Config.ConsensusParams.K = v.GetInt(snowSampleSizeKey)
-	Config.ConsensusParams.Alpha = v.GetInt(snowQuorumSizeKey)
-	Config.ConsensusParams.BetaVirtuous = v.GetInt(snowVirtuousCommitThresholdKey)
-	Config.ConsensusParams.BetaRogue = v.GetInt(snowRogueCommitThresholdKey)
-	Config.ConsensusParams.Parents = v.GetInt(snowAvalancheNumParentsKey)
-	Config.ConsensusParams.BatchSize = v.GetInt(snowAvalancheBatchSizeKey)
-	Config.ConsensusParams.ConcurrentRepolls = v.GetInt(snowConcurrentRepollsKey)
-
-	Config.ConsensusGossipFrequency = v.GetDuration(consensusGossipFrequencyKey)
-	Config.ConsensusShutdownTimeout = v.GetDuration(consensusShutdownTimeoutKey)
+	// Load genesis data
+	Config.GenesisBytes, Config.AvaxAssetID, err = genesis.Genesis(networkID, v.GetString(genesisConfigFileKey))
+	if err != nil {
+		return fmt.Errorf("unable to load genesis file: %w", err)
+	}
 
 	// Assertions
 	Config.EnableAssertions = v.GetBool(assertionsEnabledKey)

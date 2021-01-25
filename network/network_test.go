@@ -23,6 +23,10 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
+const (
+	defaultSendQueueSize = 1 << 10
+)
+
 var (
 	errClosed  = errors.New("closed")
 	errRefused = errors.New("connection refused")
@@ -163,7 +167,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 		net.IPv6loopback,
 		0,
 	)
-	id := ids.NewShortID(hashing.ComputeHash160Array([]byte(ip.IP().String())))
+	id := ids.ShortID(hashing.ComputeHash160Array([]byte(ip.IP().String())))
 	networkID := uint32(0)
 	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
 	versionParser := version.NewDefaultParser()
@@ -211,6 +215,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 		0,
 		0,
 		time.Now(),
+		defaultSendQueueSize,
 	)
 	assert.NotNil(t, net)
 
@@ -233,12 +238,12 @@ func TestEstablishConnection(t *testing.T) {
 		net.IPv6loopback,
 		0,
 	)
-	id0 := ids.NewShortID(hashing.ComputeHash160Array([]byte(ip0.IP().String())))
+	id0 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip0.IP().String())))
 	ip1 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
 		1,
 	)
-	id1 := ids.NewShortID(hashing.ComputeHash160Array([]byte(ip1.IP().String())))
+	id1 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip1.IP().String())))
 
 	listener0 := &testListener{
 		addr: &net.TCPAddr{
@@ -288,7 +293,7 @@ func TestEstablishConnection(t *testing.T) {
 
 	handler0 := &testHandler{
 		connected: func(id ids.ShortID) {
-			if !id.Equals(id0) {
+			if id != id0 {
 				wg0.Done()
 			}
 		},
@@ -296,7 +301,7 @@ func TestEstablishConnection(t *testing.T) {
 
 	handler1 := &testHandler{
 		connected: func(id ids.ShortID) {
-			if !id.Equals(id1) {
+			if id != id1 {
 				wg1.Done()
 			}
 		},
@@ -324,6 +329,7 @@ func TestEstablishConnection(t *testing.T) {
 		0,
 		0,
 		time.Now(),
+		defaultSendQueueSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -349,6 +355,7 @@ func TestEstablishConnection(t *testing.T) {
 		0,
 		0,
 		time.Now(),
+		defaultSendQueueSize,
 	)
 	assert.NotNil(t, net1)
 
@@ -383,12 +390,12 @@ func TestDoubleTrack(t *testing.T) {
 		net.IPv6loopback,
 		0,
 	)
-	id0 := ids.NewShortID(hashing.ComputeHash160Array([]byte(ip0.IP().String())))
+	id0 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip0.IP().String())))
 	ip1 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
 		1,
 	)
-	id1 := ids.NewShortID(hashing.ComputeHash160Array([]byte(ip1.IP().String())))
+	id1 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip1.IP().String())))
 
 	listener0 := &testListener{
 		addr: &net.TCPAddr{
@@ -438,7 +445,7 @@ func TestDoubleTrack(t *testing.T) {
 
 	handler0 := &testHandler{
 		connected: func(id ids.ShortID) {
-			if !id.Equals(id0) {
+			if id != id0 {
 				wg0.Done()
 			}
 		},
@@ -446,7 +453,7 @@ func TestDoubleTrack(t *testing.T) {
 
 	handler1 := &testHandler{
 		connected: func(id ids.ShortID) {
-			if !id.Equals(id1) {
+			if id != id1 {
 				wg1.Done()
 			}
 		},
@@ -474,6 +481,7 @@ func TestDoubleTrack(t *testing.T) {
 		0,
 		0,
 		time.Now(),
+		defaultSendQueueSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -499,6 +507,7 @@ func TestDoubleTrack(t *testing.T) {
 		0,
 		0,
 		time.Now(),
+		defaultSendQueueSize,
 	)
 	assert.NotNil(t, net1)
 
@@ -534,12 +543,12 @@ func TestDoubleClose(t *testing.T) {
 		net.IPv6loopback,
 		0,
 	)
-	id0 := ids.NewShortID(hashing.ComputeHash160Array([]byte(ip0.IP().String())))
+	id0 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip0.IP().String())))
 	ip1 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
 		1,
 	)
-	id1 := ids.NewShortID(hashing.ComputeHash160Array([]byte(ip1.IP().String())))
+	id1 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip1.IP().String())))
 
 	listener0 := &testListener{
 		addr: &net.TCPAddr{
@@ -589,7 +598,7 @@ func TestDoubleClose(t *testing.T) {
 
 	handler0 := &testHandler{
 		connected: func(id ids.ShortID) {
-			if !id.Equals(id0) {
+			if id != id0 {
 				wg0.Done()
 			}
 		},
@@ -597,7 +606,7 @@ func TestDoubleClose(t *testing.T) {
 
 	handler1 := &testHandler{
 		connected: func(id ids.ShortID) {
-			if !id.Equals(id1) {
+			if id != id1 {
 				wg1.Done()
 			}
 		},
@@ -625,6 +634,7 @@ func TestDoubleClose(t *testing.T) {
 		0,
 		0,
 		time.Now(),
+		defaultSendQueueSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -650,6 +660,7 @@ func TestDoubleClose(t *testing.T) {
 		0,
 		0,
 		time.Now(),
+		defaultSendQueueSize,
 	)
 	assert.NotNil(t, net1)
 
@@ -690,12 +701,12 @@ func TestTrackConnected(t *testing.T) {
 		net.IPv6loopback,
 		0,
 	)
-	id0 := ids.NewShortID(hashing.ComputeHash160Array([]byte(ip0.IP().String())))
+	id0 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip0.IP().String())))
 	ip1 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
 		1,
 	)
-	id1 := ids.NewShortID(hashing.ComputeHash160Array([]byte(ip1.IP().String())))
+	id1 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip1.IP().String())))
 
 	listener0 := &testListener{
 		addr: &net.TCPAddr{
@@ -745,7 +756,7 @@ func TestTrackConnected(t *testing.T) {
 
 	handler0 := &testHandler{
 		connected: func(id ids.ShortID) {
-			if !id.Equals(id0) {
+			if id != id0 {
 				wg0.Done()
 			}
 		},
@@ -753,7 +764,7 @@ func TestTrackConnected(t *testing.T) {
 
 	handler1 := &testHandler{
 		connected: func(id ids.ShortID) {
-			if !id.Equals(id1) {
+			if id != id1 {
 				wg1.Done()
 			}
 		},
@@ -781,6 +792,7 @@ func TestTrackConnected(t *testing.T) {
 		0,
 		0,
 		time.Now(),
+		defaultSendQueueSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -806,6 +818,7 @@ func TestTrackConnected(t *testing.T) {
 		0,
 		0,
 		time.Now(),
+		defaultSendQueueSize,
 	)
 	assert.NotNil(t, net1)
 
@@ -842,12 +855,12 @@ func TestTrackConnectedRace(t *testing.T) {
 		net.IPv6loopback,
 		0,
 	)
-	id0 := ids.NewShortID(hashing.ComputeHash160Array([]byte(ip0.IP().String())))
+	id0 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip0.IP().String())))
 	ip1 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
 		1,
 	)
-	id1 := ids.NewShortID(hashing.ComputeHash160Array([]byte(ip1.IP().String())))
+	id1 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip1.IP().String())))
 
 	listener0 := &testListener{
 		addr: &net.TCPAddr{
@@ -911,6 +924,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		0,
 		0,
 		time.Now(),
+		defaultSendQueueSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -936,6 +950,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		0,
 		0,
 		time.Now(),
+		defaultSendQueueSize,
 	)
 	assert.NotNil(t, net1)
 

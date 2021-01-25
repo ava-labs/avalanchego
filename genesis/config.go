@@ -6,6 +6,9 @@ package genesis
 import (
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"path"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -75,7 +78,7 @@ type Config struct {
 	StartTime                  uint64        `json:"startTime"`
 	InitialStakeDuration       uint64        `json:"initialStakeDuration"`
 	InitialStakeDurationOffset uint64        `json:"initialStakeDurationOffset"`
-	InitialStakedFunds         []ids.ShortID `json:"unitialStakedFunds"`
+	InitialStakedFunds         []ids.ShortID `json:"initialStakedFunds"`
 	InitialStakers             []Staker      `json:"initialStakers"`
 
 	CChainGenesis string `json:"cChainGenesis"`
@@ -204,4 +207,25 @@ func GetConfig(networkID uint32) *Config {
 		tempConfig.NetworkID = networkID
 		return &tempConfig
 	}
+}
+
+// GetConfigFile loads a *Config from a provided
+// filepath.
+func GetConfigFile(filepath string) (*Config, error) {
+	b, err := ioutil.ReadFile(path.Clean(filepath))
+	if err != nil {
+		return nil, fmt.Errorf("unable to load file %s: %w", filepath, err)
+	}
+
+	var unparsedConfig UnparsedConfig
+	if err := json.Unmarshal(b, &unparsedConfig); err != nil {
+		return nil, fmt.Errorf("could not unmarshal JSON: %w", err)
+	}
+
+	config, err := unparsedConfig.Parse()
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse config: %w", err)
+	}
+
+	return &config, nil
 }
