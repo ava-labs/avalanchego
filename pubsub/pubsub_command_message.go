@@ -21,7 +21,10 @@ type CommandMessage struct {
 	FilterMax uint64 `json:"filterMax,omitempty"`
 	// FilterError expected error rate of filter
 	FilterError float64 `json:"filterError,omitempty"`
-	Subscribe
+	// Channel subscription channel
+	Channel string `json:"channel"`
+	// Unsubscribe unsubscribe channel remove address or reset filter
+	Unsubscribe bool `json:"unsubscribe"`
 }
 
 func NewCommandMessage(b []byte, hrp string) (*CommandMessage, error) {

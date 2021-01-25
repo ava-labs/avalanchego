@@ -201,11 +201,6 @@ type Publish struct {
 	Value   interface{} `json:"value"`
 }
 
-type Subscribe struct {
-	Channel     string `json:"channel"`
-	Unsubscribe bool   `json:"unsubscribe"`
-}
-
 // Connection is a representation of the websocket connection.
 type Connection struct {
 	s *Server
@@ -264,19 +259,12 @@ func (c *Connection) readPump() {
 	})
 
 	for {
-		msg, err := c.readCallback()
+		err := c.readMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				c.s.log.Debug("Unexpected close in websockets: %s", err)
 			}
 			break
-		}
-		if msg != nil {
-			if msg.Unsubscribe {
-				c.s.removeChannel(c, msg.Channel)
-			} else {
-				c.s.addChannel(c, msg.Channel)
-			}
 		}
 	}
 }
@@ -323,42 +311,48 @@ func (c *Connection) writePump() {
 	}
 }
 
-func (c *Connection) readCallback() (*Subscribe, error) {
+func (c *Connection) readMessage() error {
 	b, err := c.NextMessage()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	cmdMsg, err := NewCommandMessage(b, c.s.hrp)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	switch cmdMsg.Command {
 	case "":
-		return &cmdMsg.Subscribe, nil
+		if cmdMsg.Unsubscribe {
+			c.s.removeChannel(c, cmdMsg.Channel)
+		} else {
+			c.s.addChannel(c, cmdMsg.Channel)
+		}
+		return nil
 	case CommandFilters:
 		return c.handleCommandFilterUpdate(cmdMsg)
 	case CommandAddresses:
-		return c.handleCommandAddressUpdate(cmdMsg)
+		c.handleCommandAddressUpdate(cmdMsg)
+		return nil
 	default:
 		errmsg := &errorMsg{Error: fmt.Sprintf("command '%s' invalid", cmdMsg.Command)}
 		c.Send(errmsg)
-		return nil, fmt.Errorf(errmsg.Error)
+		return fmt.Errorf(errmsg.Error)
 	}
 }
 
-func (c *Connection) handleCommandFilterUpdate(cmdMsg *CommandMessage) (*Subscribe, error) {
+func (c *Connection) handleCommandFilterUpdate(cmdMsg *CommandMessage) error {
 	if cmdMsg.Unsubscribe {
 		c.fp.SetFilter(nil)
-		return nil, nil
+		return nil
 	}
 	bfilter, err := c.updateNewFilter(cmdMsg)
 	if err != nil {
 		c.Send(&errorMsg{Error: fmt.Sprintf("filter create failed %v", err)})
-		return nil, err
+		return err
 	}
 	bfilter.Add(cmdMsg.AddressIds...)
-	return nil, nil
+	return nil
 }
 
 func (c *Connection) updateNewFilter(cmdMsg *CommandMessage) (bloom.Filter, error) {
@@ -375,13 +369,12 @@ func (c *Connection) updateNewFilter(cmdMsg *CommandMessage) (bloom.Filter, erro
 	return c.fp.SetFilter(bfilter), nil
 }
 
-func (c *Connection) handleCommandAddressUpdate(cmdMsg *CommandMessage) (*Subscribe, error) {
+func (c *Connection) handleCommandAddressUpdate(cmdMsg *CommandMessage) {
 	if c.fp.Len()+len(cmdMsg.AddressIds) > MaxAddresses {
 		c.Send(&errorMsg{Error: "too many adddresse"})
-		return nil, nil
+		return
 	}
 	c.fp.UpdateAddressMulti(cmdMsg.Unsubscribe, cmdMsg.AddressIds...)
-	return nil, nil
 }
 
 func ByteToID(address []byte) ids.ShortID {
