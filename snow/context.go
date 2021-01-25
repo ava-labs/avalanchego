@@ -41,14 +41,6 @@ type SubnetLookup interface {
 	SubnetID(chainID ids.ID) (ids.ID, error)
 }
 
-// ChainConfig is configuration settings for the current execution.
-// [Settings] is the user-provided settings blob of the chain.
-// [Forks] is a chain-specific blob for coordinating upgrades.
-type ChainConfig struct {
-	Settings string
-	Forks    string
-}
-
 // Context is information about the current execution.
 // [NetworkID] is the ID of the network this context exists within.
 // [ChainID] is the ID of the chain this context exists within.
@@ -61,9 +53,6 @@ type Context struct {
 
 	XChainID    ids.ID
 	AVAXAssetID ids.ID
-
-	// Config for this chain
-	Config ChainConfig
 
 	Log                 logging.Logger
 	DecisionDispatcher  EventDispatcher

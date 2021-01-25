@@ -108,6 +108,14 @@ type chain struct {
 	Beacons validators.Set
 }
 
+// ChainConfig is configuration settings for the current execution.
+// [Settings] is the user-provided settings blob for the chain.
+// [Upgrades] is a chain-specific blob for coordinating upgrades.
+type ChainConfig struct {
+	Settings []byte
+	Upgrades []byte
+}
+
 // ManagerConfig ...
 type ManagerConfig struct {
 	StakingEnabled          bool // True iff the network has staking enabled
@@ -138,7 +146,7 @@ type ManagerConfig struct {
 	WhitelistedSubnets      ids.Set          // Subnets to validate
 	TimeoutManager          *timeout.Manager // Manages request timeouts when sending messages to other validators
 	HealthService           health.CheckRegisterer
-	ChainConfigs            map[ids.ID]snow.ChainConfig
+	ChainConfigs            map[ids.ID]ChainConfig
 }
 
 type manager struct {
@@ -259,11 +267,6 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 		Metrics:              m.ConsensusParams.Metrics,
 		EpochFirstTransition: m.EpochFirstTransition,
 		EpochDuration:        m.EpochDuration,
-	}
-
-	// If chainID matches something in ChainConfigs, add to *snow.Context.
-	if config, ok := m.ChainConfigs[chainParams.ID]; ok {
-		ctx.Config = config
 	}
 
 	// Get a factory for the vm we want to use on our chain

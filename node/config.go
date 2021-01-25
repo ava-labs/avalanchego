@@ -6,11 +6,11 @@ package node
 import (
 	"time"
 
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/nat"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -131,5 +131,5 @@ type Config struct {
 	CorethConfig string
 
 	// ChainConfigs
-	ChainConfigs map[ids.ID]snow.ChainConfig
+	ChainConfigs map[ids.ID]chains.ChainConfig
 }

@@ -22,3 +22,46 @@ func TestCopyBytes(t *testing.T) {
 	input[0] = 0
 	assert.NotEqual(t, input, result, "CopyBytes should have returned independent bytes")
 }
+
+func TestSetByteSlices(t *testing.T) {
+	m := map[string]interface{}{
+		"k": "hello",
+		"d": 10,
+		"a": "neat",
+		"c": map[string]interface{}{
+			"wow":  1231,
+			"cool": "sweet",
+		},
+	}
+
+	type type1 struct{}
+
+	type type2 struct {
+		A []byte
+		B int
+		C []byte
+		k []byte
+	}
+
+	type type3 struct {
+		b int64
+	}
+
+	t.Run("no fields", func(t *testing.T) {
+		t1 := type1{}
+		assert.NoError(t, SetByteSlices(m, &t1))
+		assert.Equal(t, type1{}, t1)
+	})
+
+	t.Run("mixed fields", func(t *testing.T) {
+		t2 := type2{}
+		assert.NoError(t, SetByteSlices(m, &t2))
+		assert.Equal(t, type2{A: []byte("neat"), C: []byte(`{"cool":"sweet","wow":1231}`)}, t2)
+	})
+
+	t.Run("no string fields", func(t *testing.T) {
+		t3 := type3{}
+		assert.NoError(t, SetByteSlices(m, &t3))
+		assert.Equal(t, type3{}, t3)
+	})
+}

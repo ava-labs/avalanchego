@@ -17,6 +17,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/genesis"
@@ -24,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/node"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
@@ -673,11 +673,11 @@ func setNodeConfig(v *viper.Viper) error {
 	// Coreth Plugin
 	// TODO: deprecate
 	corethConfigValue := v.Get(corethConfigKey)
-	corethConfigString, err := utils.DecodeStringOrJSON(corethConfigValue)
+	corethConfigBytes, err := utils.MarshalBytes(corethConfigValue)
 	if err != nil {
 		return fmt.Errorf("could not parse coreth config: %w", err)
 	}
-	Config.CorethConfig = corethConfigString
+	Config.CorethConfig = string(corethConfigBytes)
 
 	// ChainConfigs
 	rawChainConfigs := []map[string]interface{}{}
@@ -685,7 +685,7 @@ func setNodeConfig(v *viper.Viper) error {
 		return fmt.Errorf("could not parse raw chain configs: %w", err)
 	}
 
-	Config.ChainConfigs = map[ids.ID]snow.ChainConfig{}
+	Config.ChainConfigs = map[ids.ID]chains.ChainConfig{}
 	for i, rawChainConfig := range rawChainConfigs {
 		rawChainID, ok := rawChainConfig[chainIDKey]
 		if !ok {
@@ -702,8 +702,8 @@ func setNodeConfig(v *viper.Viper) error {
 			return fmt.Errorf("could not parse chainID %s: %w", chainID, err)
 		}
 
-		config := snow.ChainConfig{}
-		if err := utils.PopulateStringFields(rawChainConfig, &config); err != nil {
+		config := chains.ChainConfig{}
+		if err := utils.SetByteSlices(rawChainConfig, &config); err != nil {
 			return fmt.Errorf("could not parse chain config for %s: %w", chainID, err)
 		}
 		Config.ChainConfigs[id] = config
