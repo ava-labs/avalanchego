@@ -4,7 +4,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -18,6 +17,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/genesis"
@@ -77,6 +77,9 @@ func avalancheFlagSet() *flag.FlagSet {
 
 	// Config File:
 	fs.String(configFileKey, defaultString, "Specifies a config file")
+
+	// Genesis Config File:
+	fs.String(genesisConfigFileKey, "", "Specifies a genesis config file (ignored when running standard networks)")
 
 	// NetworkID:
 	fs.String(networkNameKey, defaultNetworkName, "Network ID this node will connect to")
@@ -234,6 +237,9 @@ func avalancheFlagSet() *flag.FlagSet {
 
 	// Coreth Config
 	fs.String(corethConfigKey, defaultString, "Specifies config to pass into coreth")
+
+	// ChainConfigs
+	fs.String(chainConfigsKey, "", "Specifies config to pass into chains (overrides coreth-config)")
 
 	return fs
 }
@@ -663,6 +669,12 @@ func setNodeConfig(v *viper.Viper) error {
 		Config.Params = *genesis.GetParams(networkID)
 	}
 
+	// Load genesis data
+	Config.GenesisBytes, Config.AvaxAssetID, err = genesis.Genesis(networkID, v.GetString(genesisConfigFileKey))
+	if err != nil {
+		return fmt.Errorf("unable to load genesis file: %w", err)
+	}
+
 	// Assertions
 	Config.EnableAssertions = v.GetBool(assertionsEnabledKey)
 
@@ -670,21 +682,43 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.EnableCrypto = v.GetBool(signatureVerificationEnabledKey)
 
 	// Coreth Plugin
-	corethConfigString := v.GetString(corethConfigKey)
-	if corethConfigString != defaultString {
-		corethConfigValue := v.Get(corethConfigKey)
-		switch value := corethConfigValue.(type) {
-		case string:
-			corethConfigString = value
-		default:
-			corethConfigBytes, err := json.Marshal(value)
-			if err != nil {
-				return fmt.Errorf("couldn't parse coreth config: %w", err)
-			}
-			corethConfigString = string(corethConfigBytes)
-		}
+	// TODO: deprecate
+	corethConfigValue := v.Get(corethConfigKey)
+	corethConfigBytes, err := utils.MarshalBytes(corethConfigValue)
+	if err != nil {
+		return fmt.Errorf("could not parse coreth config: %w", err)
 	}
-	Config.CorethConfig = corethConfigString
+	Config.CorethConfig = string(corethConfigBytes)
+
+	// ChainConfigs
+	rawChainConfigs := []map[string]interface{}{}
+	if err := v.UnmarshalKey(chainConfigsKey, &rawChainConfigs); err != nil {
+		return fmt.Errorf("could not parse raw chain configs: %w", err)
+	}
+
+	Config.ChainConfigs = map[ids.ID]chains.ChainConfig{}
+	for i, rawChainConfig := range rawChainConfigs {
+		rawChainID, ok := rawChainConfig[chainIDKey]
+		if !ok {
+			return fmt.Errorf("could not parse chainID from chain config %d", i)
+		}
+
+		chainID, ok := rawChainID.(string)
+		if !ok {
+			return fmt.Errorf("chainID `%+v` is not a string in chain config %d", rawChainID, i)
+		}
+
+		id, err := ids.FromString(chainID)
+		if err != nil {
+			return fmt.Errorf("could not parse chainID %s: %w", chainID, err)
+		}
+
+		config := chains.ChainConfig{}
+		if err := utils.SetByteSlices(rawChainConfig, &config); err != nil {
+			return fmt.Errorf("could not parse chain config for %s: %w", chainID, err)
+		}
+		Config.ChainConfigs[id] = config
+	}
 
 	return nil
 }

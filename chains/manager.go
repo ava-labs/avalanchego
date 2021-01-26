@@ -108,6 +108,14 @@ type chain struct {
 	Beacons validators.Set
 }
 
+// ChainConfig is configuration settings for the current execution.
+// [Settings] is the user-provided settings blob for the chain.
+// [Upgrades] is a chain-specific blob for coordinating upgrades.
+type ChainConfig struct {
+	Settings []byte
+	Upgrades []byte
+}
+
 // ManagerConfig ...
 type ManagerConfig struct {
 	StakingEnabled          bool // True iff the network has staking enabled
@@ -138,6 +146,7 @@ type ManagerConfig struct {
 	WhitelistedSubnets      ids.Set          // Subnets to validate
 	TimeoutManager          *timeout.Manager // Manages request timeouts when sending messages to other validators
 	HealthService           health.CheckRegisterer
+	ChainConfigs            map[ids.ID]ChainConfig
 }
 
 type manager struct {

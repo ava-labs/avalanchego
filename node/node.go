@@ -372,11 +372,7 @@ func (n *Node) initDatabase() error {
 	n.DBManager = n.Config.DB
 	n.DB = n.DBManager.Current()
 
-	expectedGenesis, _, err := genesis.Genesis(n.Config.NetworkID)
-	if err != nil {
-		return err
-	}
-	rawExpectedGenesisHash := hashing.ComputeHash256(expectedGenesis)
+	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
 
 	rawGenesisHash, err := n.DB.Get(genesisHashKey)
 	if err == database.ErrNotFound {
@@ -507,7 +503,7 @@ func (n *Node) initAPIServer() error {
 func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	n.vmManager = vms.NewManager(&n.APIServer, n.HTTPLog)
 
-	createAVMTx, err := genesis.VMGenesis(n.Config.NetworkID, avm.ID)
+	createAVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, avm.ID)
 	if err != nil {
 		return err
 	}
@@ -572,6 +568,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		TimeoutManager:          &timeoutManager,
 		HealthService:           n.healthService,
 		WhitelistedSubnets:      n.Config.WhitelistedSubnets,
+		ChainConfigs:            n.Config.ChainConfigs,
 	})
 
 	vdrs := n.vdrs
@@ -851,16 +848,13 @@ func (n *Node) Initialize(
 	if err = n.initEventDispatcher(); err != nil { // Set up the event dipatcher
 		return fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
-	genesisBytes, avaxAssetID, err := genesis.Genesis(n.Config.NetworkID)
-	if err != nil {
-		return fmt.Errorf("couldn't create genesis bytes: %w", err)
-	}
+
 	// Start the Health API
 	// Has to be initialized before chain manager
 	if err := n.initHealthAPI(); err != nil {
 		return fmt.Errorf("couldn't initialize health API: %w", err)
 	}
-	if err := n.initChainManager(avaxAssetID); err != nil { // Set up the chain manager
+	if err := n.initChainManager(n.Config.AvaxAssetID); err != nil { // Set up the chain manager
 		return fmt.Errorf("couldn't initialize chain manager: %w", err)
 	}
 	if err := n.initAdminAPI(); err != nil { // Start the Admin API
@@ -875,10 +869,10 @@ func (n *Node) Initialize(
 	if err := n.initIPCAPI(); err != nil { // Start the IPC API
 		return fmt.Errorf("couldn't initialize the IPC API: %w", err)
 	}
-	if err := n.initAliases(genesisBytes); err != nil { // Set up aliases
+	if err := n.initAliases(n.Config.GenesisBytes); err != nil { // Set up aliases
 		return fmt.Errorf("couldn't initialize aliases: %w", err)
 	}
-	if err := n.initChains(genesisBytes, avaxAssetID); err != nil { // Start the Platform chain
+	if err := n.initChains(n.Config.GenesisBytes, n.Config.AvaxAssetID); err != nil { // Start the Platform chain
 		return fmt.Errorf("couldn't initialize chains: %w", err)
 	}
 	return nil

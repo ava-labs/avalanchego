@@ -77,7 +77,6 @@ func (v *voter) Update() {
 }
 
 func (v *voter) bubbleVotes(votes ids.UniqueBag) (ids.UniqueBag, error) {
-	bubbledVotes := ids.UniqueBag{}
 	vertexHeap := vertex.NewHeap()
 	for vote := range votes {
 		vtx, err := v.t.Manager.Get(vote)
@@ -96,35 +95,32 @@ func (v *voter) bubbleVotes(votes ids.UniqueBag) (ids.UniqueBag, error) {
 		if !status.Fetched() {
 			v.t.Ctx.Log.Verbo("Dropping %d vote(s) for %s because the vertex is unknown",
 				set.Len(), vtxID)
-			bubbledVotes.RemoveSet(vtx.ID())
+			votes.RemoveSet(vtxID)
 			continue
 		}
 
 		if status.Decided() {
-			v.t.Ctx.Log.Verbo("Dropping %d vote(s) for %s because the vertex is decided",
-				set.Len(), vtxID)
-			bubbledVotes.RemoveSet(vtx.ID())
+			v.t.Ctx.Log.Verbo("Dropping %d vote(s) for %s because the vertex is decided as %s",
+				set.Len(), vtxID, status)
+			votes.RemoveSet(vtxID)
 			continue
 		}
 
-		if v.t.Consensus.VertexIssued(vtx) {
-			v.t.Ctx.Log.Verbo("Applying %d vote(s) for %s", set.Len(), vtx.ID())
-			bubbledVotes.UnionSet(vtx.ID(), set)
-		} else {
+		if !v.t.Consensus.VertexIssued(vtx) {
 			v.t.Ctx.Log.Verbo("Bubbling %d vote(s) for %s because the vertex isn't issued",
-				set.Len(), vtx.ID())
-			bubbledVotes.RemoveSet(vtx.ID()) // Remove votes for this vertex because it hasn't been issued
+				set.Len(), vtxID)
+			votes.RemoveSet(vtxID) // Remove votes for this vertex because it hasn't been issued
 
 			parents, err := vtx.Parents()
 			if err != nil {
-				return bubbledVotes, err
+				return votes, err
 			}
 			for _, parentVtx := range parents {
-				bubbledVotes.UnionSet(parentVtx.ID(), set)
+				votes.UnionSet(parentVtx.ID(), set)
 				vertexHeap.Push(parentVtx)
 			}
 		}
 	}
 
-	return bubbledVotes, nil
+	return votes, nil
 }

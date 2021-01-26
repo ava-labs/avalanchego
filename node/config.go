@@ -6,7 +6,8 @@ package node
 import (
 	"time"
 
-	database "github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/nat"
@@ -22,6 +23,10 @@ import (
 // Config contains all of the configurations of an Avalanche node.
 type Config struct {
 	genesis.Params
+
+	// Genesis information
+	GenesisBytes []byte
+	AvaxAssetID  ids.ID
 
 	// protocol to use for opening the network interface
 	Nat nat.Router
@@ -39,7 +44,7 @@ type Config struct {
 	EnableCrypto bool
 
 	// Database to use for the node
-	DB database.Manager
+	DB manager.Manager
 
 	// Staking configuration
 	StakingIP             utils.DynamicIPDesc
@@ -124,4 +129,7 @@ type Config struct {
 
 	// Coreth
 	CorethConfig string
+
+	// ChainConfigs
+	ChainConfigs map[ids.ID]chains.ChainConfig
 }
