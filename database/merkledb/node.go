@@ -27,5 +27,4 @@ type Node interface {
 func Hash(bs ...[]byte) []byte {
 	hash := hashing.ByteArraysToHash256Array(bs...)
 	return hash[:]
-
 }

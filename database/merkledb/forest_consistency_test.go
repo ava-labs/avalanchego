@@ -27,7 +27,7 @@ func TestForestConsistencyCopy_PutGetDel(t *testing.T) {
 			// add values to the tree
 			putAndTestRoot(t, stakerTree, test.data)
 			// close it
-			err = stakerTree.Close()
+			err = HardCloseDB(stakerTree)
 			if err != nil {
 				t.Fatal("Error closing the db")
 			}
@@ -90,7 +90,7 @@ func TestForestConsistencyCopy_PutGetDel(t *testing.T) {
 			}
 
 			getTest(t, bootstrapTree, test.data)
-			err = bootstrapTree.Close()
+			err = HardCloseDB(bootstrapTree)
 			if err != nil {
 				t.Fatal("Error closing the db")
 			}

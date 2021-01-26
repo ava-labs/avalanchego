@@ -53,7 +53,7 @@ func BenchmarkTree_Put(b *testing.B) {
 				_ = tree.Put(test.key, test.value)
 			}
 		})
-		_ = tree.Close()
+		_ = HardCloseDB(tree)
 	}
 }
 
@@ -80,7 +80,7 @@ func BenchmarkTree_PutBatch(b *testing.B) {
 			}
 			_ = batcher.Write()
 		})
-		_ = tree.Close()
+		_ = HardCloseDB(tree)
 	}
 }
 
@@ -115,7 +115,7 @@ func BenchmarkTree_Get(b *testing.B) {
 				}
 			}
 		})
-		_ = tree.Close()
+		_ = HardCloseDB(tree)
 	}
 }
 
@@ -148,7 +148,7 @@ func BenchmarkTree_Del(b *testing.B) {
 				}
 			}
 		})
-		_ = tree.Close()
+		_ = HardCloseDB(tree)
 	}
 }
 
@@ -185,6 +185,6 @@ func BenchmarkTree_DelBatcher(b *testing.B) {
 			_ = batcher.Write()
 
 		})
-		_ = tree.Close()
+		_ = HardCloseDB(tree)
 	}
 }

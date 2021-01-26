@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/database/versiondb"
-
 	"github.com/ava-labs/avalanchego/database"
 )
 
@@ -81,7 +79,7 @@ func (t *Tree) Close() error {
 	}
 
 	t.closed = true
-	return t.persistence.GetDatabase().(*versiondb.Database).GetDatabase().Close()
+	return nil
 }
 
 // NewTree returns a new instance of the Tree

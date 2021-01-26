@@ -87,14 +87,14 @@ func TestTreeConsistencyStorage_PutGetDel(t *testing.T) {
 			tree := NewLevelTree(tmpDir)
 
 			putAndTestRoot(t, tree, test.data)
-			err := tree.Close()
+			err := HardCloseDB(tree)
 			if err != nil {
 				t.Fatal("Error closing the db")
 			}
 
 			tree2 := NewLevelTree(tmpDir)
 			getTest(t, tree2, test.data)
-			err = tree2.Close()
+			err = HardCloseDB(tree2)
 			if err != nil {
 				t.Fatal("Error closing the db")
 			}
@@ -102,14 +102,14 @@ func TestTreeConsistencyStorage_PutGetDel(t *testing.T) {
 			tree3 := NewLevelTree(tmpDir)
 			delAndTestRoot(t, tree3, test.data)
 			checkDatabaseItems(t, tree3)
-			err = tree3.Close()
+			err = HardCloseDB(tree3)
 			if err != nil {
 				t.Fatal("Error closing the db")
 			}
 
 			tree4 := NewLevelTree(tmpDir)
 			checkDatabaseItems(t, tree4)
-			err = tree4.Close()
+			err = HardCloseDB(tree4)
 			if err != nil {
 				t.Fatal("Error closing the db")
 			}

@@ -13,10 +13,8 @@ import (
 
 // TreePersistence holds the DB + the RootNode
 type TreePersistence struct {
-	db          database.Database
-	dataChange  map[string][]byte
-	codec       codec.Manager
-	currentRoot uint32
+	db    database.Database
+	codec codec.Manager
 }
 
 // NewTreePersistence creates a new TreePersistence
@@ -31,9 +29,8 @@ func NewTreePersistence(db database.Database) (Persistence, error) {
 	}
 
 	TreePersistence := TreePersistence{
-		db:          versiondb.New(db),
-		codec:       codecManager,
-		currentRoot: 0,
+		db:    versiondb.New(db),
+		codec: codecManager,
 	}
 
 	return &TreePersistence, nil
@@ -138,13 +135,7 @@ func (tp *TreePersistence) Commit(err error) error {
 	return tp.db.(*versiondb.Database).Commit()
 }
 
+// GetDatabase returns the inner DB
 func (tp *TreePersistence) GetDatabase() database.Database {
 	return tp.db
-}
-
-func (tp *TreePersistence) PrintDB() {
-	iterator := tp.db.NewIterator()
-	for iterator.Next() {
-		fmt.Printf("k: %x \n", iterator.Key())
-	}
 }

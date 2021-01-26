@@ -123,6 +123,28 @@ func (k Key) ToBytes() []byte {
 
 // ToExpandedBytes converts key to a byte slice that's a direct array conversion
 // specially useful for key storing
+// Ex.
+// 1 byte -> 2 nibbles : []byte{1} -> []nibble{0,1}
+// []byte{17} -> []nibble{1,0}
+// []byte{17, 17} -> []nibble{1, 0, 1, 0}
+//
+// We use nibbles to create the Branch Node SharedAddress
+// Having BranchNode1 - SharedAddress : []nibble{1, 0, 1}
+// This means that it holds nodes that have keys of the form []nibble{1, 0, 1, X, Y, Z, etc}
+// And you have BranchNode2 - SharedAddress : []nibble{1, 0, 1, 0}
+// Which holds nodes with keys like []nibble{1, 0, 1, 0, X, Y, etc}
+// However, when converting the SharedAddress to a []byte (to fetch from the memDB) we’re losing information here.
+// BranchNode1 - SharedAddress : []nibble{1, 0, 1}
+// And
+// BranchNode2 - SharedAddress : []nibble{1, 0, 1, 0}
+//
+// Will both turn into []byte{17, 17} which is not correct specially for fetching from the DB
+// It seems the simple, and most used solution is to have the nibble -> byte be directly expanded into an array
+//
+// []nibble{1, 0, 1} -> []byte{1, 0, 1}
+//
+// Even though this is not used anymore in db fetches, it's preferable a lossless process to feed the Hash
+//
 func (k Key) ToExpandedBytes() []byte {
 	length := len(k)
 	buf := make([]byte, 0, length)

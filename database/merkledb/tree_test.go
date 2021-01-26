@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/database/versiondb"
+
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 
@@ -13,6 +15,11 @@ import (
 // NewMemoryTree returns a new instance of the Tree with a in-memoryDB
 func NewMemoryTree() *Tree {
 	return NewTree(memdb.New())
+}
+
+func HardCloseDB(t *Tree) error {
+	t.Close()
+	return t.persistence.GetDatabase().(*versiondb.Database).GetDatabase().Close()
 }
 
 // NewLevelTree returns a new instance of the Tree with a in-memoryDB

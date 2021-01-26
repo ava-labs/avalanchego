@@ -13,9 +13,8 @@ import (
 
 // ForestPersistence holds the DB + the RootNode
 type ForestPersistence struct {
-	db         database.Database
-	dataChange map[string][]byte
-	codec      codec.Manager
+	db    database.Database
+	codec codec.Manager
 }
 
 // NewForestPersistence creates a new Persistence
@@ -53,15 +52,10 @@ func (fp *ForestPersistence) GetNodeByHash(nodeHash []byte) (Node, error) {
 
 // GetRootNode returns the RootNode
 func (fp *ForestPersistence) GetRootNode(rootNodeID uint32) (Node, error) {
-
-	node, err := fp.GetNodeByHash(genRootNodeID(rootNodeID))
-	if err != nil {
-		return nil, err
-	}
-
-	return node, nil
+	return fp.GetNodeByHash(genRootNodeID(rootNodeID))
 }
 
+// NewRoot creates a new Root and returns it - fails it it already exists
 func (fp *ForestPersistence) NewRoot(rootNodeID uint32) (Node, error) {
 
 	_, err := fp.GetRootNode(rootNodeID)
@@ -81,6 +75,7 @@ func (fp *ForestPersistence) NewRoot(rootNodeID uint32) (Node, error) {
 	return nil, fmt.Errorf("root already exists")
 }
 
+// DuplicateRoot creates a new RootNode setting its child to point at the oldRootID
 func (fp *ForestPersistence) DuplicateRoot(oldRootID uint32, newRootID uint32) (Node, error) {
 
 	oldRoot, err := fp.GetRootNode(oldRootID)
@@ -94,6 +89,11 @@ func (fp *ForestPersistence) DuplicateRoot(oldRootID uint32, newRootID uint32) (
 	}
 
 	newRoot.(*RootNode).Child = oldRoot.(*RootNode).Child
+
+	err = fp.StoreNode(newRoot)
+	if err != nil {
+		return nil, err
+	}
 
 	return newRoot, nil
 }
@@ -163,11 +163,4 @@ func (fp *ForestPersistence) Commit(err error) error {
 
 func (fp *ForestPersistence) GetDatabase() database.Database {
 	return fp.db
-}
-
-func (fp *ForestPersistence) PrintDB() {
-	iterator := fp.db.NewIterator()
-	for iterator.Next() {
-		fmt.Printf("k: %x \n", iterator.Key())
-	}
 }
