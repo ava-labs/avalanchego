@@ -44,7 +44,7 @@ func (e *EmptyNode) SetChild(node Node) error { return nil }
 func (e *EmptyNode) SetParent(node Node) {}
 
 // SetPersistence should never be called
-func (e *EmptyNode) SetPersistence(p *Persistence) {}
+func (e *EmptyNode) SetPersistence(p Persistence) {}
 
 // Value should never be called
 func (e *EmptyNode) Value() []byte { return nil }
@@ -71,6 +71,11 @@ func (e *EmptyNode) GetChildrenHashes() [][]byte {
 
 // GetReHash should never be called
 func (e *EmptyNode) GetReHash() []byte {
+	return nil
+}
+
+// Clear should never be called
+func (e *EmptyNode) Clear() error {
 	return nil
 }
 

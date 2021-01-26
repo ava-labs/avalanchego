@@ -11,7 +11,7 @@ type Node interface {
 	Delete(key Key) error
 	SetChild(node Node) error
 	SetParent(b Node)
-	SetPersistence(p *Persistence)
+	SetPersistence(p Persistence)
 	Value() []byte
 	Hash(key Key, hash []byte) error
 	GetHash() []byte
@@ -20,6 +20,7 @@ type Node interface {
 	Key() Key
 	GetChildrenHashes() [][]byte
 	GetReHash() []byte
+	Clear() error
 	Print()
 }
 

@@ -8,11 +8,11 @@ type RootNode struct {
 	StoredHash         []byte `serialize:"true"`
 	RootID             uint32 `serialize:"true"`
 	previousStoredHash []byte
-	persistence        *Persistence
+	persistence        Persistence
 }
 
 // NewRootNode returns a RootNode without children
-func NewRootNode(id uint32, p *Persistence) Node {
+func NewRootNode(id uint32, p Persistence) Node {
 	return &RootNode{RootID: id, persistence: p}
 }
 
@@ -97,7 +97,7 @@ func (r *RootNode) SetChild(node Node) error {
 func (r *RootNode) SetParent(node Node) {}
 
 // SetPersistence should never be reached
-func (r *RootNode) SetPersistence(p *Persistence) {
+func (r *RootNode) SetPersistence(p Persistence) {
 	r.persistence = p
 }
 
@@ -107,7 +107,7 @@ func (r *RootNode) Value() []byte { return nil }
 func (r *RootNode) Hash(key Key, hash []byte) error {
 	r.Child = hash
 
-	r.StoredHash = Hash(rootNodeID(r.RootID), r.Child)
+	r.StoredHash = Hash(genRootNodeID(r.RootID), r.Child)
 
 	return r.persistence.StoreNode(r)
 }
@@ -134,7 +134,25 @@ func (r *RootNode) GetChildrenHashes() [][]byte {
 
 // GetReHash should never be called
 func (r *RootNode) GetReHash() []byte {
-	return Hash(rootNodeID(r.RootID), r.Child)
+	return Hash(genRootNodeID(r.RootID), r.Child)
+}
+
+// Clear deletes all nodes attached to this root
+func (r *RootNode) Clear() error {
+	if len(r.Child) == 0 {
+		return r.persistence.DeleteNode(r)
+	}
+
+	child, err := r.persistence.GetNodeByHash(r.Child)
+	if err != nil {
+		return err
+	}
+	err = child.Clear()
+	if err != nil {
+		return err
+	}
+
+	return r.persistence.DeleteNode(r)
 }
 
 // Print prints the child and requests the child to print itself
@@ -149,7 +167,7 @@ func (r *RootNode) Print() {
 	}
 }
 
-func rootNodeID(rootNodeID uint32) []byte {
+func genRootNodeID(rootNodeID uint32) []byte {
 	rootIDByte := []byte{
 		byte(rootNodeID),
 		byte(rootNodeID >> 8),

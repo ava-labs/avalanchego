@@ -12,7 +12,8 @@ import (
 // Tree holds the tree data
 type Tree struct {
 	closed      bool
-	persistence *Persistence
+	persistence Persistence
+	rootNode    Node
 }
 
 // Has returns whether the key exists in the tree
@@ -21,12 +22,7 @@ func (t *Tree) Has(key []byte) (bool, error) {
 		return false, database.ErrClosed
 	}
 
-	rootNode, err := t.persistence.GetRootNode()
-	if err != nil {
-		return false, err
-	}
-
-	node, err := t.findNode(BytesToKey(key), rootNode)
+	node, err := t.findNode(BytesToKey(key), t.rootNode)
 	if err != nil {
 		return false, err
 	}
@@ -85,24 +81,38 @@ func (t *Tree) Close() error {
 	}
 
 	t.closed = true
-	return t.persistence.db.(*versiondb.Database).GetDatabase().Close()
+	return t.persistence.GetDatabase().(*versiondb.Database).GetDatabase().Close()
 }
 
 // NewTree returns a new instance of the Tree
 func NewTree(db database.Database) *Tree {
-	persistence, _ := NewPersistence(db)
+	persistence, err := NewTreePersistence(db)
+	if err != nil {
+		panic(err)
+	}
+	rootNode, err := persistence.NewRoot(0)
+	if err != nil {
+		panic(err)
+	}
+
 	return &Tree{
 		closed:      false,
 		persistence: persistence,
+		rootNode:    rootNode,
+	}
+}
+
+// NewTree returns a new instance of the Tree
+func NewTreeWithRoot(persistence Persistence, root Node) *Tree {
+	return &Tree{
+		closed:      false,
+		persistence: persistence,
+		rootNode:    root,
 	}
 }
 
 func (t *Tree) Root() ([]byte, error) {
-	rootNode, err := t.persistence.GetRootNode()
-	if err != nil {
-		return nil, err
-	}
-	return rootNode.GetHash(), nil
+	return t.rootNode.GetHash(), nil
 }
 
 func (t *Tree) Get(key []byte) ([]byte, error) {
@@ -110,12 +120,7 @@ func (t *Tree) Get(key []byte) ([]byte, error) {
 		return nil, database.ErrClosed
 	}
 
-	rootNode, err := t.persistence.GetRootNode()
-	if err != nil {
-		return nil, err
-	}
-
-	node, err := t.findNode(BytesToKey(key), rootNode)
+	node, err := t.findNode(BytesToKey(key), t.rootNode)
 	if err != nil {
 		return nil, err
 	}
@@ -166,8 +171,7 @@ func (t *Tree) findNode(key Key, node Node) (Node, error) {
 }
 
 func (t *Tree) PrintTree() {
-	rootNode, _ := t.persistence.GetRootNode()
-	rootNode.Print()
+	t.rootNode.Print()
 }
 
 func (t *Tree) fetchNextNode(prefix Key, start Key, key Key, node Node) (Node, error) {
@@ -192,15 +196,6 @@ func (t *Tree) fetchNextNode(prefix Key, start Key, key Key, node Node) (Node, e
 	return t.fetchNextNode(prefix, start, key, nextNode)
 }
 
-func (t *Tree) SelectRoot(treeRoot uint32) error {
-	if t.closed {
-		return database.ErrClosed
-	}
-
-	t.persistence.SelectRoot(treeRoot)
-	return nil
-}
-
 func (t *Tree) GetNode(hash []byte) (Node, error) {
 	if t.closed {
 		return nil, database.ErrClosed
@@ -215,6 +210,7 @@ func (t *Tree) PutRootNode(node Node) error {
 		return database.ErrClosed
 	}
 
+	t.rootNode = node
 	err := t.persistence.StoreNode(node)
 	if err != nil {
 		return err
@@ -247,25 +243,21 @@ func (t *Tree) put(key []byte, value []byte) error {
 	}
 
 	unitKey := BytesToKey(key)
-	rootNode, err := t.persistence.GetRootNode()
-	if err != nil {
-		return err
-	}
 
-	rootChild, err := rootNode.GetChild(Key{})
+	rootChild, err := t.rootNode.GetChild(Key{})
 	if err != nil {
 		return err
 	}
 	if rootChild == nil {
-		newLeafNode, err := NewLeafNode(unitKey, value, rootNode, t.persistence)
+		newLeafNode, err := NewLeafNode(unitKey, value, t.rootNode, t.persistence)
 		if err != nil {
 			return err
 		}
 
-		return rootNode.SetChild(newLeafNode)
+		return t.rootNode.SetChild(newLeafNode)
 	}
 
-	insertNode, err := t.findNode(unitKey, rootNode)
+	insertNode, err := t.findNode(unitKey, t.rootNode)
 	if err != nil {
 		return err
 	}
@@ -283,12 +275,7 @@ func (t *Tree) del(key []byte) error {
 
 	unitKey := BytesToKey(key)
 
-	rootNode, err := t.persistence.GetRootNode()
-	if err != nil {
-		return err
-	}
-
-	deleteNode, err := t.findNode(unitKey, rootNode)
+	deleteNode, err := t.findNode(unitKey, t.rootNode)
 	if err != nil {
 		return err
 	}

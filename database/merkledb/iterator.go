@@ -63,7 +63,7 @@ func NewIteratorWithStartAndPrefix(t *Tree, start, prefix []byte) *Iterator {
 // It returns whether the iterator is exhausted.
 func (i *Iterator) Next() bool {
 	var rootNode Node
-	rootNode, i.err = i.tree.persistence.GetRootNode()
+	rootNode, i.err = i.tree.persistence.GetRootNode(0)
 	if i.err != nil {
 		return false
 	}

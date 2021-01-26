@@ -26,11 +26,11 @@ type BranchNode struct {
 	Refs               int32            `serialize:"true"`
 	previousStoredHash []byte
 	parent             Node
-	persistence        *Persistence
+	persistence        Persistence
 }
 
 // NewBranchNode returns a new BranchNode
-func NewBranchNode(sharedAddress Key, parent Node, persistence *Persistence) Node {
+func NewBranchNode(sharedAddress Key, parent Node, persistence Persistence) Node {
 	return &BranchNode{
 		SharedAddress: sharedAddress,
 		Nodes:         [UnitSize][]byte{},
@@ -256,7 +256,7 @@ func (b *BranchNode) SetParent(node Node) {
 }
 
 // SetPersistence force sets the Persistenc
-func (b *BranchNode) SetPersistence(p *Persistence) {
+func (b *BranchNode) SetPersistence(p Persistence) {
 	b.persistence = p
 }
 
@@ -332,6 +332,26 @@ func (b *BranchNode) GetReHash() []byte {
 	}
 
 	return Hash(hashSet...)
+}
+
+// Clear deletes all nodes attached to this BranchNode
+func (b *BranchNode) Clear() error {
+	for _, nodeHash := range b.Nodes {
+		if len(nodeHash) == 0 {
+			continue
+		}
+		child, err := b.persistence.GetNodeByHash(nodeHash)
+		if err != nil {
+			return err
+		}
+
+		err = child.Clear()
+		if err != nil {
+			return err
+		}
+	}
+
+	return b.persistence.DeleteNode(b)
 }
 
 // Print prints the node

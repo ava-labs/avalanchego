@@ -14,11 +14,11 @@ type LeafNode struct {
 	Refs               int32  `serialize:"true"`
 	previousStoredHash []byte
 	parent             Node
-	persistence        *Persistence
+	persistence        Persistence
 }
 
 // NewLeafNode creates a new Leaf Node
-func NewLeafNode(key Key, value []byte, parent Node, persistence *Persistence) (Node, error) {
+func NewLeafNode(key Key, value []byte, parent Node, persistence Persistence) (Node, error) {
 	l := &LeafNode{
 		LeafKey:     key,
 		LeafValue:   value,
@@ -79,7 +79,7 @@ func (l *LeafNode) SetParent(node Node) {
 }
 
 // SetPersistence force sets the persistence in the LeafNode
-func (l *LeafNode) SetPersistence(persistence *Persistence) {
+func (l *LeafNode) SetPersistence(persistence Persistence) {
 	l.persistence = persistence
 }
 
@@ -128,6 +128,11 @@ func (l *LeafNode) GetChildrenHashes() [][]byte {
 
 func (l *LeafNode) GetReHash() []byte {
 	return Hash(l.LeafValue, l.LeafKey.ToExpandedBytes())
+}
+
+// Clear deletes all nodes attached to this BranchNode
+func (l *LeafNode) Clear() error {
+	return l.persistence.DeleteNode(l)
 }
 
 // Print prints this Node data

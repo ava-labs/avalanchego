@@ -48,6 +48,30 @@ func TestTreeConsistency_PutGetDel(t *testing.T) {
 	}
 }
 
+func TestTreeConsistency_PutGetClear(t *testing.T) {
+
+	tests := []struct {
+		name string
+		data []TestStruct
+	}{
+		{"testConsistency-1k-PutGetDel", CreateRandomValues(1000)},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tree := NewMemoryTree()
+
+			putAndTestRoot(t, tree, test.data)
+
+			getTest(t, tree, test.data)
+
+			clearTest(t, tree)
+
+			checkDatabaseItems(t, tree)
+		})
+	}
+}
+
 func TestTreeConsistencyStorage_PutGetDel(t *testing.T) {
 
 	tests := []struct {
@@ -86,80 +110,6 @@ func TestTreeConsistencyStorage_PutGetDel(t *testing.T) {
 			tree4 := NewLevelTree(tmpDir)
 			checkDatabaseItems(t, tree4)
 			err = tree4.Close()
-			if err != nil {
-				t.Fatal("Error closing the db")
-			}
-		})
-	}
-}
-
-func TestTreeConsistencyCopy_PutGetDel(t *testing.T) {
-
-	tests := []struct {
-		name string
-		data []TestStruct
-	}{
-		{"testConsistencyCopy-1k-CopyPutGetDel", CreateRandomValues(1000)},
-		// {"test10k-PutGetDel", CreateRandomValues(10000)},
-		// {"test100k-PutGetDel", CreateRandomValues(100000)},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			stakerTreeDir := t.TempDir()
-			stakerTree := NewLevelTree(stakerTreeDir)
-			bootstrapTreeDir := t.TempDir()
-			bootstrapTree := NewLevelTree(bootstrapTreeDir)
-
-			putAndTestRoot(t, stakerTree, test.data)
-			err := stakerTree.Close()
-			if err != nil {
-				t.Fatal("Error closing the db")
-			}
-
-			stakerTree2 := NewLevelTree(stakerTreeDir)
-			getTest(t, stakerTree2, test.data)
-
-			rootHash := rootNodeID(0)
-
-			node, err := stakerTree2.GetNode(rootHash)
-			if err != nil {
-				t.Fatalf("unable to fetch root Node - %v", err)
-			}
-
-			err = bootstrapTree.PutRootNode(node)
-			if err != nil {
-				t.Fatalf("unable to insert RootNode - %v", err)
-			}
-
-			var nodeStack [][]byte
-			nodeStack = append(nodeStack, node.GetChildrenHashes()...)
-
-			for len(nodeStack) != 0 {
-
-				nodeHash := nodeStack[0]
-				nodeStack = nodeStack[1:]
-
-				node, err = stakerTree2.GetNode(nodeHash)
-				if err != nil {
-					t.Fatalf("unable to Node - %v", err)
-				}
-
-				err = bootstrapTree.PutNodeAndCheck(node, nodeHash)
-				if err != nil {
-					t.Fatalf("unable to insert Node - %v", err)
-				}
-
-				nodeStack = append(nodeStack, node.GetChildrenHashes()...)
-			}
-
-			getTest(t, bootstrapTree, test.data)
-			err = bootstrapTree.Close()
-			if err != nil {
-				t.Fatal("Error closing the db")
-			}
-
-			err = stakerTree2.Close()
 			if err != nil {
 				t.Fatal("Error closing the db")
 			}
@@ -241,6 +191,13 @@ func delAndTestRoot(t *testing.T, tree *Tree, data []TestStruct) {
 			fmt.Printf("lastRootHash: %v\n tree.Root: %v\n", lastRootHash, rootHash)
 			t.Fatal("Root Hash didn't change after deletion")
 		}
+	}
+}
+
+func clearTest(t *testing.T, tree *Tree) {
+	err := tree.rootNode.Clear()
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
