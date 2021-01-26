@@ -49,6 +49,10 @@ func MarshalBytes(v interface{}) ([]byte, error) {
 // to work correctly.
 func SetByteSlices(source map[string]interface{}, v interface{}) error {
 	s := reflect.ValueOf(v).Elem()
+	if destKind := s.Kind(); destKind != reflect.Struct {
+		return fmt.Errorf("cannot set byte slices on %s", destKind)
+	}
+
 	for i := 0; i < s.NumField(); i++ {
 		field := s.Field(i)
 		fieldType := s.Type().Field(i)

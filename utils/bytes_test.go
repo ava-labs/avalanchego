@@ -66,4 +66,11 @@ func TestSetByteSlices(t *testing.T) {
 		assert.NoError(t, SetByteSlices(m, &t3))
 		assert.Equal(t, type3{}, t3)
 	})
+
+	t.Run("non-struct", func(t *testing.T) {
+		var s string
+		err := SetByteSlices(m, &s)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot set byte slices on string")
+	})
 }
