@@ -46,12 +46,9 @@ func TestChainConfigs(t *testing.T) {
 				return m
 			}(),
 		},
-		"valid chain-id (conifg as string)": {
+		"valid chain-id (entire config as string)": { // covers input from command line
 			config: `{
-				"chain-configs": [
-					"{\"chain-id\": \"yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp\"}",
-					"{\"chain-id\": \"2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm\", \"settings\": \"blah1\", \"upgrades\": \"blah2\"}"
-				]
+				"chain-configs": "[{\"chain-id\":\"yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp\"},{\"chain-id\":\"2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm\",\"settings\":\"blah1\",\"upgrades\":\"blah2\"}]"
 			}`,
 			expected: func() map[ids.ID]chains.ChainConfig {
 				m := map[ids.ID]chains.ChainConfig{}
@@ -89,7 +86,7 @@ func TestChainConfigs(t *testing.T) {
 					"hello"
 				]
 			}`,
-			err: `'[0]' expected a map, got 'string'`,
+			err: "could not unmarshal chain config `[hello]`",
 		},
 		"invalid checksum chain-id": {
 			config: `{

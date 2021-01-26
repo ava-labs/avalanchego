@@ -4,6 +4,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -681,8 +682,34 @@ func setNodeConfig(v *viper.Viper) error {
 
 	// ChainConfigs
 	rawChainConfigs := []map[string]interface{}{}
-	if err := v.UnmarshalKey(chainConfigsKey, &rawChainConfigs); err != nil {
-		return fmt.Errorf("could not parse raw chain configs: %w", err)
+	switch value := v.Get(chainConfigsKey).(type) {
+	case []interface{}:
+		for i, v := range value {
+			m, ok := v.(map[string]interface{})
+			if !ok {
+				s, ok := v.(string)
+				if !ok {
+					return fmt.Errorf("could not unmarshal chain config %d of type %T", i, value)
+				}
+				var m map[string]interface{}
+				if err := json.Unmarshal([]byte(s), &m); err != nil {
+					return fmt.Errorf("could not unmarshal chain config `%s`: %w", value, err)
+				}
+				rawChainConfigs = append(rawChainConfigs, m)
+			} else {
+				rawChainConfigs = append(rawChainConfigs, m)
+			}
+		}
+	case string:
+		if len(value) > 0 {
+			var m []map[string]interface{}
+			if err := json.Unmarshal([]byte(value), &m); err != nil {
+				return fmt.Errorf("could not unmarshal chain config `%s`: %w", value, err)
+			}
+			rawChainConfigs = append(rawChainConfigs, m...)
+		}
+	default:
+		return fmt.Errorf("could not parse chain configs for type %T", value)
 	}
 
 	Config.ChainConfigs = map[ids.ID]chains.ChainConfig{}
