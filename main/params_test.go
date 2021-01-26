@@ -1,3 +1,6 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package main
 
 import (
@@ -86,7 +89,7 @@ func TestChainConfigs(t *testing.T) {
 					"hello"
 				]
 			}`,
-			err: "could not unmarshal chain config `[hello]`",
+			err: "chain configs are not an array of JSON objects",
 		},
 		"invalid checksum chain-id": {
 			config: `{
