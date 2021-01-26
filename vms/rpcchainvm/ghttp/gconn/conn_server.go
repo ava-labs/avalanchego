@@ -54,7 +54,7 @@ func (s *Server) Write(ctx context.Context, req *gconnproto.WriteRequest) (*gcon
 // Close ...
 func (s *Server) Close(ctx context.Context, req *gconnproto.CloseRequest) (*gconnproto.CloseResponse, error) {
 	err := s.conn.Close()
-	s.closer.GracefulStop()
+	s.closer.Stop()
 	return &gconnproto.CloseResponse{}, err
 }
 
