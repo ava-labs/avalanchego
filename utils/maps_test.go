@@ -42,6 +42,10 @@ func TestMarshalMapSlice(t *testing.T) {
 			},
 			err: "could not cast object at index 0 (`1`) to map[string]interface{}",
 		},
+		"unexpected type": {
+			input: 1,
+			err:   "could not marshal []map[string]interface{} for type `int`",
+		},
 	}
 
 	for name, test := range tests {

@@ -23,15 +23,17 @@ func MarshalMapSlice(v interface{}) ([]map[string]interface{}, error) {
 			s = append(s, m)
 		}
 	case string: // command line
-		if len(value) > 0 {
-			var m []map[string]interface{}
-			if err := json.Unmarshal([]byte(value), &m); err != nil {
-				return nil, fmt.Errorf("could not unmarshal `%s` to []map[string]interface{}: %w", value, err)
-			}
-			s = append(s, m...)
+		if len(value) == 0 {
+			return s, nil
 		}
+
+		var m []map[string]interface{}
+		if err := json.Unmarshal([]byte(value), &m); err != nil {
+			return nil, fmt.Errorf("could not unmarshal `%s` to []map[string]interface{}: %w", value, err)
+		}
+		s = append(s, m...)
 	default:
-		return nil, fmt.Errorf("could not parse chain configs for type %T", value)
+		return nil, fmt.Errorf("could not marshal []map[string]interface{} for type `%T`", value)
 	}
 
 	return s, nil
