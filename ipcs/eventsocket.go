@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/ipcs/socket"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/triggers"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -132,11 +131,8 @@ func newEventIPCSocket(ctx context, chainID ids.ID, name string, events *trigger
 
 // Accept delivers a message to the eventSocket
 func (eis *eventSocket) Accept(_ *snow.Context, _ ids.ID, container []byte) error {
-	err := eis.socket.Send(container)
-	if err != nil {
-		eis.log.Error("%s while trying to send:\n%s", err, formatting.DumpBytes{Bytes: container})
-	}
-	return err
+	eis.socket.Send(container)
+	return nil
 }
 
 // stop unregisters the event handler and closes the eventSocket
