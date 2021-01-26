@@ -429,7 +429,8 @@ func (m *manager) createAvalancheChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
-	if err := vm.Initialize(ctx, vmDBManager, genesisData, nil, nil, msgChan, fxs); err != nil {
+	chainConfig := m.ChainConfigs[ctx.ChainID]
+	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrades, chainConfig.Settings, msgChan, fxs); err != nil {
 		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
 	}
 
@@ -538,7 +539,8 @@ func (m *manager) createSnowmanChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	// Initialize the VM
-	if err := vm.Initialize(ctx, vmDBManager, genesisData, nil, nil, msgChan, fxs); err != nil {
+	chainConfig := m.ChainConfigs[ctx.ChainID]
+	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrades, chainConfig.Settings, msgChan, fxs); err != nil {
 		return nil, err
 	}
 
