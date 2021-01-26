@@ -95,7 +95,7 @@ func TestForestConsistencyCopy_PutGetDel(t *testing.T) {
 				t.Fatal("Error closing the db")
 			}
 
-			err = stakerTree2.Close()
+			err = HardCloseDB(stakerTree2)
 			if err != nil {
 				t.Fatal("Error closing the db")
 			}
