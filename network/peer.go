@@ -135,7 +135,7 @@ func (p *peer) requestFinishHandshake() {
 func (p *peer) ReadMessages() {
 	defer p.Close()
 
-	if err := p.conn.SetReadDeadline(p.net.clock.Time().Add(p.net.pingPongTimeout)); err != nil {
+	if err := p.conn.SetDeadline(p.net.clock.Time().Add(p.net.pingPongTimeout)); err != nil {
 		p.net.log.Verbo("error on setting the connection read timeout %s", err)
 		return
 	}
@@ -285,7 +285,7 @@ func (p *peer) handle(msg Msg) {
 	currentTime := p.net.clock.Time()
 	atomic.StoreInt64(&p.lastReceived, currentTime.Unix())
 
-	if err := p.conn.SetReadDeadline(currentTime.Add(p.net.pingPongTimeout)); err != nil {
+	if err := p.conn.SetDeadline(currentTime.Add(p.net.pingPongTimeout)); err != nil {
 		p.net.log.Verbo("error on setting the connection read timeout %s, closing the connection", err)
 		p.Close()
 		return

@@ -1052,7 +1052,7 @@ func (n *network) attemptConnect(ip utils.IPDesc) error {
 // assumes the stateLock is not held. Returns an error if the peer's connection
 // wasn't able to be upgraded.
 func (n *network) upgrade(p *peer, upgrader Upgrader) error {
-	if err := p.conn.SetReadDeadline(time.Now().Add(n.readHandshakeTimeout)); err != nil {
+	if err := p.conn.SetDeadline(time.Now().Add(n.readHandshakeTimeout)); err != nil {
 		_ = p.conn.Close()
 		n.log.Verbo("failed to set the read deadline with %s", err)
 		return err
@@ -1065,7 +1065,7 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 		return err
 	}
 
-	if err := conn.SetReadDeadline(time.Time{}); err != nil {
+	if err := conn.SetDeadline(time.Time{}); err != nil {
 		_ = p.conn.Close()
 		n.log.Verbo("failed to clear the read deadline with %s", err)
 		return err
