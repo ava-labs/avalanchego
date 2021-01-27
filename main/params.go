@@ -691,9 +691,9 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.CorethConfig = string(corethConfigBytes)
 
 	// ChainConfigs
-	rawChainConfigs := []map[string]interface{}{}
-	if err := v.UnmarshalKey(chainConfigsKey, &rawChainConfigs); err != nil {
-		return fmt.Errorf("could not parse raw chain configs: %w", err)
+	rawChainConfigs, err := utils.MarshalMapSlice(v.Get(chainConfigsKey))
+	if err != nil {
+		return fmt.Errorf("chain configs are not an array of JSON objects: %w", err)
 	}
 
 	Config.ChainConfigs = map[ids.ID]chains.ChainConfig{}

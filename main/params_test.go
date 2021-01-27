@@ -1,3 +1,6 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package main
 
 import (
@@ -46,6 +49,23 @@ func TestChainConfigs(t *testing.T) {
 				return m
 			}(),
 		},
+		"valid chain-id (entire config as string)": { // covers input from command line
+			config: `{
+				"chain-configs": "[{\"chain-id\":\"yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp\"},{\"chain-id\":\"2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm\",\"settings\":\"blah1\",\"upgrades\":\"blah2\"}]"
+			}`,
+			expected: func() map[ids.ID]chains.ChainConfig {
+				m := map[ids.ID]chains.ChainConfig{}
+				id1, err := ids.FromString("yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp")
+				assert.NoError(t, err)
+				m[id1] = chains.ChainConfig{}
+
+				id2, err := ids.FromString("2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm")
+				assert.NoError(t, err)
+				m[id2] = chains.ChainConfig{Settings: []byte("blah1"), Upgrades: []byte("blah2")}
+
+				return m
+			}(),
+		},
 		"valid chain-id (JSON settings)": {
 			config: `{
 				"chain-configs": [
@@ -69,7 +89,7 @@ func TestChainConfigs(t *testing.T) {
 					"hello"
 				]
 			}`,
-			err: `'[0]' expected a map, got 'string'`,
+			err: "chain configs are not an array of JSON objects",
 		},
 		"invalid checksum chain-id": {
 			config: `{
@@ -126,6 +146,7 @@ func TestChainConfigs(t *testing.T) {
 				assert.Contains(err.Error(), test.err)
 				return
 			}
+			assert.NoError(err)
 			assert.Equal(test.expected, Config.ChainConfigs)
 		})
 	}
