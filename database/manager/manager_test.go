@@ -171,7 +171,6 @@ func TestNewSortsDatabases(t *testing.T) {
 	}
 }
 
-// Test that prefix/meter work correctly
 func TestPrefixDBManager(t *testing.T) {
 	db := memdb.New()
 

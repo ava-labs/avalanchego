@@ -6,7 +6,6 @@ package version
 import (
 	"errors"
 	"fmt"
-	"sort"
 )
 
 const (
@@ -166,28 +165,3 @@ func (v *appVersion) Before(o ApplicationVersion) bool {
 
 	return v.Compare(o) < 0
 }
-
-type innerSortAscendingVersions []Version
-
-// Less returns true if the version at index i is less than the version at index j
-func (isv innerSortAscendingVersions) Less(i, j int) bool {
-	return isv[i].Compare(isv[j]) < 0
-}
-
-func (isv innerSortAscendingVersions) Len() int      { return len(isv) }
-func (isv innerSortAscendingVersions) Swap(i, j int) { isv[j], isv[i] = isv[i], isv[j] }
-
-func SortAscendingVersions(vers []Version) { sort.Sort(innerSortAscendingVersions(vers)) }
-
-type innerSortDescendingVersions []Version
-
-// Less returns true if the version at index i is greater than the version at index j
-// such that it will sort in descending order
-func (isv innerSortDescendingVersions) Less(i, j int) bool {
-	return isv[i].Compare(isv[j]) > 0
-}
-
-func (isv innerSortDescendingVersions) Len() int      { return len(isv) }
-func (isv innerSortDescendingVersions) Swap(i, j int) { isv[j], isv[i] = isv[i], isv[j] }
-
-func SortDescendingVersions(vers []Version) { sort.Sort(innerSortDescendingVersions(vers)) }
