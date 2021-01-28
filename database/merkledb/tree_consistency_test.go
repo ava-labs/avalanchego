@@ -202,7 +202,7 @@ func clearTest(t *testing.T, tree *Tree) {
 }
 
 func checkDatabaseItems(t *testing.T, tree *Tree) {
-	iterator := NewIterator(tree)
+	iterator := tree.persistence.GetDatabase().NewIterator()
 	count := 0
 	for iterator.Next() {
 		fmt.Printf("Key: %x , Val: %v\n", iterator.Key(), iterator.Value())

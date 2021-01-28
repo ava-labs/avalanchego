@@ -284,6 +284,31 @@ func TestForest_Put(t *testing.T) {
 	}
 }
 
+func TestForest_DeletedTree(t *testing.T) {
+	f := NewMemoryForest()
+	t0, err := f.CreateEmptyTree(0)
+	if err != nil {
+		t.Fatalf("not expected to fail - %v", err)
+	}
+	t0Values := CreateRandomValues(100)
+	for _, data := range t0Values {
+		err = t0.Put(data.key, data.value)
+		if err != nil {
+			t.Fatalf("not expected to fail inserting data - %v", err)
+		}
+	}
+	err = f.Delete(0)
+	if err != nil {
+		t.Fatalf("not expected to fail deleting tree - %v", err)
+	}
+	for _, data := range t0Values {
+		value, err := t0.Get(data.key)
+		if err == nil && bytes.Equal(value, data.value) {
+			t.Fatalf("shouldn't have been able to fetch the correct value")
+		}
+	}
+}
+
 func TestForest_PutGetDel(t *testing.T) {
 	testSize := 1000
 	t0 := CreateRandomValues(testSize)
