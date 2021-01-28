@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/state"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -505,7 +504,7 @@ func (vm *VM) removeReferencingUTXO(db database.Database, addrBytes []byte, utxo
 func (vm *VM) GetUTXOs(
 	db database.Database,
 	addrs ids.ShortSet,
-	startAddr state.Marshaller,
+	startAddr ids.ShortID,
 	startUTXOID ids.ID,
 	limit int,
 	paginate bool,
@@ -523,7 +522,7 @@ func (vm *VM) GetUTXOs(
 func (vm *VM) getPaginatedUTXOs(
 	db database.Database,
 	addrs ids.ShortSet,
-	startAddr state.Marshaller,
+	startAddr ids.ShortID,
 	startUTXOID ids.ID,
 	limit int,
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {

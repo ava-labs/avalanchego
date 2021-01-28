@@ -19,11 +19,6 @@ const cacheSize = 1000
 
 var errWrongType = errors.New("value in the database was the wrong type")
 
-// Marshaller can marshal itself to bytes
-type Marshaller interface {
-	Bytes() []byte
-}
-
 // State is a key-value store where every value is associated with a "type ID".
 // Every different type of value must have its own type ID.
 //
