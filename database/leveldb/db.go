@@ -15,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 const (
@@ -36,6 +37,7 @@ const (
 // in binary-alphabetical order.
 type Database struct {
 	*leveldb.DB
+	log logging.Logger
 
 	// True if there was previously an error other than "not found" or "closed"
 	// while performing a db operation. If [errored] == true, Has, Get, Put,
@@ -45,7 +47,7 @@ type Database struct {
 }
 
 // New returns a wrapped LevelDB object.
-func New(file string, blockCacheSize, writeBufferSize, handleCap int) (*Database, error) {
+func New(file string, log logging.Logger, blockCacheSize, writeBufferSize, handleCap int) (*Database, error) {
 	// Enforce minimums
 	if blockCacheSize < minBlockCacheSize {
 		blockCacheSize = minBlockCacheSize
@@ -71,7 +73,10 @@ func New(file string, blockCacheSize, writeBufferSize, handleCap int) (*Database
 	if err != nil {
 		return nil, err
 	}
-	return &Database{DB: db}, nil
+	return &Database{
+		DB:  db,
+		log: log,
+	}, nil
 }
 
 // Has returns if the key is set in the database
@@ -169,6 +174,7 @@ func (db *Database) handleError(err error) error {
 	// If we get an error other than "not found" or "closed", disallow future
 	// database operations to avoid possible corruption
 	if err != nil && err != database.ErrNotFound && err != database.ErrClosed {
+		db.log.Fatal("leveldb error: %w", err)
 		db.errored = true
 	}
 	return err

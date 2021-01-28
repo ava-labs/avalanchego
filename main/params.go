@@ -18,8 +18,6 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/ava-labs/avalanchego/database/leveldb"
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
@@ -118,8 +116,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(signatureVerificationEnabledKey, true, "Turn on signature verification")
 
 	// Database:
-	fs.Bool(dbEnabledKey, true, "Turn on persistent storage")
-	fs.String(dbDirKey, defaultString, "Database directory for Avalanche state")
+	fs.Bool(dbEnabledKey, true, "If false, uses an in memory database")
+	fs.String(dbPathKey, defaultDbDir, "Path to database directory")
 
 	// IP:
 	fs.String(publicIPKey, "", "Public IP of this node for P2P communication. If empty, try to discover with NAT. Ignored if dynamic-public-ip is non-empty.")
@@ -316,21 +314,10 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.NetworkID = networkID
 
 	// DB:
-	if v.GetBool(dbEnabledKey) {
-		dbDir := v.GetString(dbDirKey)
-		if dbDir == defaultString {
-			dbDir = defaultDbDir
-		}
-		dbDir = os.ExpandEnv(dbDir) // parse any env variables
-		dbPath := path.Join(dbDir, constants.NetworkName(Config.NetworkID), dbVersion)
-		db, err := leveldb.New(dbPath, 0, 0, 0)
-		if err != nil {
-			return fmt.Errorf("couldn't create db at %s: %w", dbPath, err)
-		}
-		Config.DB = db
-	} else {
-		Config.DB = memdb.New()
-	}
+	Config.DBEnabled = v.GetBool(dbEnabledKey)
+	Config.DBPath = v.GetString(dbPathKey)
+	Config.DBPath = os.ExpandEnv(Config.DBPath) // parse any env variables
+	Config.DBPath = path.Join(Config.DBPath, constants.NetworkName(Config.NetworkID), dbVersion)
 
 	// IP Configuration
 	// Resolves our public IP, or does nothing
