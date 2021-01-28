@@ -32,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/core"
-	"github.com/ava-labs/avalanchego/vms/components/state"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -1023,7 +1022,7 @@ func (vm *VM) Logger() logging.Logger { return vm.Ctx.Log }
 func (vm *VM) GetAtomicUTXOs(
 	chainID ids.ID,
 	addrs ids.ShortSet,
-	startAddr state.Marshaller,
+	startAddr ids.ShortID,
 	startUTXOID ids.ID,
 	limit int,
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
