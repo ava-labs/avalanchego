@@ -20,8 +20,8 @@ var (
 // and de-serialization.
 type state struct {
 	txCache cache.Cacher
-	txDb    database.Database
-	avax.State
+	txDB    database.Database
+	*avax.State
 }
 
 // Tx attempts to load a transaction from storage.
@@ -33,7 +33,7 @@ func (s *state) Tx(id ids.ID) (*Tx, error) {
 		return nil, errCacheTypeMismatch
 	}
 
-	bytes, err := s.txDb.Get(id[:])
+	bytes, err := s.txDB.Get(id[:])
 	if err != nil {
 		return nil, err
 	}
@@ -57,9 +57,9 @@ func (s *state) Tx(id ids.ID) (*Tx, error) {
 func (s *state) SetTx(id ids.ID, tx *Tx) error {
 	if tx == nil {
 		s.txCache.Evict(id)
-		return s.txDb.Delete(id[:])
+		return s.txDB.Delete(id[:])
 	}
 
 	s.txCache.Put(id, tx)
-	return s.txDb.Put(id[:], tx.Bytes())
+	return s.txDB.Put(id[:], tx.Bytes())
 }
