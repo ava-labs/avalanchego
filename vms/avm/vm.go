@@ -66,6 +66,13 @@ var (
 	_ vertex.DAGVM = &VM{}
 )
 
+const (
+	utxoDbPrefix byte = iota
+	txDbPrefix
+	statusDbPrefix
+	idDbPrefix
+)
+
 // VM implements the avalanche.DAGVM interface
 type VM struct {
 	metrics
@@ -194,14 +201,14 @@ func (vm *VM) Initialize(
 	vm.state = &prefixedState{
 		state: &state{
 			txCache: &cache.LRU{Size: txCacheSize},
-			txDb:    prefixdb.NewNested([]byte("tx"), vm.db),
+			txDb:    prefixdb.NewNested([]byte{txDbPrefix}, vm.db),
 			State: avax.State{
 				UTXOCache:    &cache.LRU{Size: utxoCacheSize},
-				UTXODB:       prefixdb.NewNested([]byte("utxo"), vm.db),
+				UTXODB:       prefixdb.NewNested([]byte{utxoDbPrefix}, vm.db),
 				StatusCache:  &cache.LRU{Size: statusCacheSize},
-				StatusDB:     prefixdb.NewNested([]byte("status"), vm.db),
+				StatusDB:     prefixdb.NewNested([]byte{statusDbPrefix}, vm.db),
 				IDCache:      &cache.LRU{Size: idCacheSize},
-				IDDB:         prefixdb.NewNested([]byte("id"), vm.db),
+				IDDB:         prefixdb.NewNested([]byte{idDbPrefix}, vm.db),
 				GenesisCodec: vm.genesisCodec,
 				Codec:        vm.codec,
 			},
