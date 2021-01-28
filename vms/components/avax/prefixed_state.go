@@ -25,212 +25,21 @@ type Addressable interface {
 	Addresses() [][]byte
 }
 
-const (
-	smallerUTXOID uint64 = iota
-	smallerStatusID
-	smallerFundsID
-	largerUTXOID
-	largerStatusID
-	largerFundsID
-)
-
-const (
-	statusCacheSize = 10000
-	idCacheSize     = 10000
-	utxoCacheSize   = 10000
-)
-
-type chainState struct {
-	*State
-
-	utxoIDPrefix, statusIDPrefix, fundsIDPrefix uint64
-	utxoID, statusID, fundsID                   cache.Cacher
-}
-
-// UTXO attempts to load a utxo from platform's storage.
-func (s *chainState) UTXO(id ids.ID) (*UTXO, error) {
-	return s.State.UTXO(UniqueID(id, s.utxoIDPrefix, s.utxoID))
-}
-
-// Funds returns the mapping from the 32 byte representation of an
-// address to a list of utxo IDs that reference the address.
-// All UTXO IDs have IDs greater than [start].
-// The returned list contains at most [limit] UTXO IDs.
-func (s *chainState) Funds(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
-	var addrID ids.ID
-	copy(addrID[:], addr)
-	key := UniqueID(addrID, s.fundsIDPrefix, s.fundsID)
-	return s.IDs(key[:], start[:], limit)
-}
-
-// SpendUTXO consumes the provided platform utxo.
-func (s *chainState) SpendUTXO(utxoID ids.ID) error {
-	utxo, err := s.UTXO(utxoID)
-	if err != nil {
-		return s.setStatus(utxoID, choices.Accepted)
-	} else if err := s.setUTXO(utxoID, nil); err != nil {
-		return err
-	}
-
-	if addressable, ok := utxo.Out.(Addressable); ok {
-		return s.removeUTXO(addressable.Addresses(), utxoID)
-	}
-	return nil
-}
-
-// FundUTXO adds the provided utxo to the database
-func (s *chainState) FundUTXO(utxo *UTXO) error {
-	utxoID := utxo.InputID()
-	if _, err := s.status(utxoID); err == nil {
-		return s.setStatus(utxoID, choices.Unknown)
-	} else if err := s.setUTXO(utxoID, utxo); err != nil {
-		return err
-	}
-
-	if addressable, ok := utxo.Out.(Addressable); ok {
-		return s.addUTXO(addressable.Addresses(), utxoID)
-	}
-	return nil
-}
-
-// setUTXO saves the provided utxo to platform's storage.
-func (s *chainState) setUTXO(id ids.ID, utxo *UTXO) error {
-	return s.SetUTXO(UniqueID(id, s.utxoIDPrefix, s.utxoID), utxo)
-}
-
-func (s *chainState) status(id ids.ID) (choices.Status, error) {
-	return s.Status(UniqueID(id, s.statusIDPrefix, s.statusID))
-}
-
-// setStatus saves the provided platform status to storage.
-func (s *chainState) setStatus(id ids.ID, status choices.Status) error {
-	return s.State.SetStatus(UniqueID(id, s.statusIDPrefix, s.statusID), status)
-}
-
-func (s *chainState) removeUTXO(addrs [][]byte, utxoID ids.ID) error {
-	for _, addr := range addrs {
-		var addrID ids.ID
-		copy(addrID[:], addr)
-		addrID = UniqueID(addrID, s.fundsIDPrefix, s.fundsID)
-		if err := s.RemoveID(addrID[:], utxoID); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *chainState) addUTXO(addrs [][]byte, utxoID ids.ID) error {
-	for _, addr := range addrs {
-		var addrID ids.ID
-		copy(addrID[:], addr)
-		addrID = UniqueID(addrID, s.fundsIDPrefix, s.fundsID)
-		if err := s.AddID(addrID[:], utxoID); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// PrefixedState wraps a state object. By prefixing the state, there will
-// be no collisions between different types of objects that have the same hash.
-type PrefixedState struct {
-	isSmaller                 bool
-	smallerChain, largerChain chainState
-}
-
-// NewPrefixedState ...
-func NewPrefixedState(
-	db database.Database,
-	genesisCodec,
-	codec codec.Manager,
-	myChain,
-	peerChain ids.ID,
-) *PrefixedState {
-	state := &State{
-		UTXOCache:    &cache.LRU{Size: utxoCacheSize},
-		UTXODB:       prefixdb.NewNested([]byte("utxo"), db),
-		StatusCache:  &cache.LRU{Size: statusCacheSize},
-		StatusDB:     prefixdb.NewNested([]byte("status"), db),
-		IDCache:      &cache.LRU{Size: idCacheSize},
-		IDDB:         prefixdb.NewNested([]byte("id"), db),
-		GenesisCodec: genesisCodec,
-		Codec:        codec,
-	}
-	return &PrefixedState{
-		isSmaller: bytes.Compare(myChain[:], peerChain[:]) == -1,
-		smallerChain: chainState{
-			State: state,
-
-			utxoIDPrefix:   smallerUTXOID,
-			statusIDPrefix: smallerStatusID,
-			fundsIDPrefix:  smallerFundsID,
-
-			utxoID:   &cache.LRU{Size: idCacheSize},
-			statusID: &cache.LRU{Size: idCacheSize},
-			fundsID:  &cache.LRU{Size: idCacheSize},
-		},
-		largerChain: chainState{
-			State: state,
-
-			utxoIDPrefix:   largerUTXOID,
-			statusIDPrefix: largerStatusID,
-			fundsIDPrefix:  largerFundsID,
-
-			utxoID:   &cache.LRU{Size: idCacheSize},
-			statusID: &cache.LRU{Size: idCacheSize},
-			fundsID:  &cache.LRU{Size: idCacheSize},
-		},
-	}
-}
-
-// UTXO attempts to load a utxo from storage.
-func (s *PrefixedState) UTXO(id ids.ID) (*UTXO, error) {
-	if s.isSmaller {
-		return s.smallerChain.UTXO(id)
-	}
-	return s.largerChain.UTXO(id)
-}
-
-// Funds returns the mapping from the 32 byte representation of an address to a
-// list of utxo IDs that reference the address.
-// All returned UTXO IDs have IDs greater than [start].
-// (ids.Empty is the "least" ID.)
-// Returns at most [limit] UTXO IDs.
-func (s *PrefixedState) Funds(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
-	if s.isSmaller {
-		return s.smallerChain.Funds(addr, start, limit)
-	}
-	return s.largerChain.Funds(addr, start, limit)
-}
-
-// SpendUTXO consumes the provided utxo.
-func (s *PrefixedState) SpendUTXO(utxoID ids.ID) error {
-	if s.isSmaller {
-		return s.smallerChain.SpendUTXO(utxoID)
-	}
-	return s.largerChain.SpendUTXO(utxoID)
-}
-
-// FundUTXO adds the provided utxo to the database
-func (s *PrefixedState) FundUTXO(utxo *UTXO) error {
-	if s.isSmaller {
-		return s.largerChain.FundUTXO(utxo)
-	}
-	return s.smallerChain.FundUTXO(utxo)
-}
-
 var (
 	errCacheTypeMismatch = errors.New("type returned from cache doesn't match the expected type")
 )
 
-// UniqueID returns a unique identifier
-func UniqueID(id ids.ID, prefix uint64, cacher cache.Cacher) ids.ID {
-	if cachedIDIntf, found := cacher.Get(id); found {
-		return cachedIDIntf.(ids.ID)
+func NewState(db database.Database, genesisCodec, codec codec.Manager, utxoCacheSize, statusCacheSize, idCacheSize int) *State {
+	return &State{
+		UTXOCache:    &cache.LRU{Size: utxoCacheSize},
+		UTXODB:       prefixdb.New([]byte("utxo"), db),
+		StatusCache:  &cache.LRU{Size: statusCacheSize},
+		StatusDB:     prefixdb.New([]byte("status"), db),
+		IDCache:      &cache.LRU{Size: idCacheSize},
+		IDDB:         prefixdb.New([]byte("id"), db),
+		GenesisCodec: genesisCodec,
+		Codec:        codec,
 	}
-	uID := id.Prefix(prefix)
-	cacher.Put(id, uID)
-	return uID
 }
 
 // State is a thin wrapper around a database to provide, caching, serialization,
@@ -325,7 +134,7 @@ func (s *State) SetStatus(id ids.ID, status choices.Status) error {
 	return s.StatusDB.Put(id[:], bytes)
 }
 
-// IDs returns the slice of IDs associated with [id], starting after [start].
+// IDs returns the slice of IDs associated with [key], starting after [start].
 // If start is ids.Empty, starts at beginning.
 // Returns at most [limit] IDs.
 func (s *State) IDs(key []byte, start []byte, limit int) ([]ids.ID, error) {
@@ -347,12 +156,10 @@ func (s *State) IDs(key []byte, start []byte, limit int) ([]ids.ID, error) {
 
 // AddID saves an ID to the prefixed database
 func (s *State) AddID(key []byte, id ids.ID) error {
-	db := prefixdb.NewNested(key, s.IDDB)
-	return db.Put(id[:], nil)
+	return prefixdb.NewNested(key, s.IDDB).Put(id[:], nil)
 }
 
 // RemoveID removes an ID from the prefixed database
 func (s *State) RemoveID(key []byte, id ids.ID) error {
-	db := prefixdb.NewNested(key, s.IDDB)
-	return db.Delete(id[:])
+	return prefixdb.NewNested(key, s.IDDB).Delete(id[:])
 }
