@@ -2042,7 +2042,7 @@ func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, respo
 	startIter := startDB.NewIterator()
 	defer startIter.Release()
 
-	for startIter.Next() { // Iterates over current stakers
+	for startIter.Next() { // Iterates over pending stakers
 		stakerBytes := startIter.Value()
 
 		tx := Tx{}
