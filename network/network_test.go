@@ -5,6 +5,7 @@ package network
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"sync"
 	"testing"
@@ -18,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
@@ -58,6 +60,7 @@ func (l *testListener) Addr() net.Addr { return l.addr }
 type testDialer struct {
 	addr      net.Addr
 	outbounds map[string]*testListener
+	closer    func(net.Addr, net.Addr)
 }
 
 func (d *testDialer) Dial(ip utils.IPDesc) (net.Conn, error) {
@@ -71,6 +74,7 @@ func (d *testDialer) Dial(ip utils.IPDesc) (net.Conn, error) {
 		closed:        make(chan struct{}),
 		local:         outbound.addr,
 		remote:        d.addr,
+		closer:        d.closer,
 	}
 	client := &testConn{
 		pendingReads:  server.pendingWrites,
@@ -78,6 +82,7 @@ func (d *testDialer) Dial(ip utils.IPDesc) (net.Conn, error) {
 		closed:        make(chan struct{}),
 		local:         d.addr,
 		remote:        outbound.addr,
+		closer:        d.closer,
 	}
 
 	select {
@@ -94,6 +99,7 @@ type testConn struct {
 	pendingWrites chan []byte
 	closed        chan struct{}
 	once          sync.Once
+	closer        func(net.Addr, net.Addr)
 
 	local, remote net.Addr
 }
@@ -134,7 +140,12 @@ func (c *testConn) Write(b []byte) (int, error) {
 }
 
 func (c *testConn) Close() error {
-	c.once.Do(func() { close(c.closed) })
+	c.once.Do(func() {
+		if c.closer != nil {
+			c.closer(c.local, c.remote)
+		}
+		close(c.closed)
+	})
 	return nil
 }
 
@@ -972,9 +983,305 @@ func TestTrackConnectedRace(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestPeerAliases(testing *testing.T) {
+type testUpgrader struct {
+	m map[string]ids.ShortID
+}
+
+func (t *testUpgrader) Upgrade(conn net.Conn) (ids.ShortID, net.Conn, error) {
+	addr := conn.RemoteAddr()
+	str := addr.String()
+	return t.m[str], conn, nil
+}
+
+func TestPeerAliases(t *testing.T) {
 	// add alias on first duplicate
 	// ensure subsequent calls tracked as aliases
 	// remove an added alias via peer ticker
 	// ensure disconnect removes aliases
+
+	log := logging.NoLog{}
+	networkID := uint32(0)
+	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
+	versionParser := version.NewDefaultParser()
+
+	ip0 := utils.NewDynamicIPDesc(
+		net.IPv6loopback,
+		0,
+	)
+	id0 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip0.IP().String())))
+	ip1 := utils.NewDynamicIPDesc(
+		net.IPv6loopback,
+		1,
+	)
+	id1 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip1.IP().String())))
+	ip2 := utils.NewDynamicIPDesc(
+		net.IPv6loopback,
+		2,
+	)
+	id2 := id1
+
+	listener0 := &testListener{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 0,
+		},
+		inbound: make(chan net.Conn, 1<<10),
+		closed:  make(chan struct{}),
+	}
+	caller0 := &testDialer{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 0,
+		},
+		outbounds: make(map[string]*testListener),
+	}
+	listener1 := &testListener{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 1,
+		},
+		inbound: make(chan net.Conn, 1<<10),
+		closed:  make(chan struct{}),
+	}
+	caller1 := &testDialer{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 1,
+		},
+		outbounds: make(map[string]*testListener),
+	}
+	listener2 := &testListener{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 2,
+		},
+		inbound: make(chan net.Conn, 1<<10),
+		closed:  make(chan struct{}),
+	}
+	caller2 := &testDialer{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 2,
+		},
+		outbounds: make(map[string]*testListener),
+	}
+
+	caller0.outbounds[ip1.IP().String()] = listener1
+	caller0.outbounds[ip2.IP().String()] = listener2
+	caller1.outbounds[ip0.IP().String()] = listener0
+	caller2.outbounds[ip0.IP().String()] = listener0
+
+	upgrader := &testUpgrader{
+		m: map[string]ids.ShortID{
+			ip0.IP().String(): id0,
+			ip1.IP().String(): id1,
+			ip2.IP().String(): id2,
+		},
+	}
+	serverUpgrader := upgrader
+	clientUpgrader := upgrader
+
+	vdrs := validators.NewSet()
+
+	var (
+		wg0 sync.WaitGroup
+		wg1 sync.WaitGroup
+		wg2 sync.WaitGroup
+		wg3 sync.WaitGroup
+	)
+	wg0.Add(1)
+	wg1.Add(1)
+	wg2.Add(1)
+	wg3.Add(1)
+
+	handler0 := &testHandler{
+		connected: func(id ids.ShortID) {
+			fmt.Println("handler 0 connect", id.String())
+			if id == id1 {
+				wg0.Done()
+			}
+		},
+		disconnected: func(id ids.ShortID) {
+			fmt.Println("handler 0 disconnect", id.String())
+		},
+	}
+
+	handler1 := &testHandler{
+		connected: func(id ids.ShortID) {
+			fmt.Println("handler 1 connect", id.String())
+			if id == id0 {
+				wg1.Done()
+			}
+		},
+	}
+
+	var (
+		handler2Connected    bool
+		handler2Disconnected bool
+	)
+	handler2 := &testHandler{
+		connected: func(id ids.ShortID) {
+			fmt.Println("handler 2 connect", id.String())
+			handler2Connected = true
+		},
+		disconnected: func(id ids.ShortID) {
+			fmt.Println("disconnected", id.String())
+			handler2Disconnected = true
+		},
+	}
+
+	caller0.closer = func(local net.Addr, remote net.Addr) {
+		fmt.Println("caller 0 closed", local.String(), remote.String())
+		if remote.String() == ip2.String() {
+			wg2.Done()
+		}
+	}
+	caller1.closer = func(local net.Addr, remote net.Addr) {
+		fmt.Println("caller 1 closed", local.String(), remote.String())
+	}
+	caller2.closer = func(local net.Addr, remote net.Addr) {
+		fmt.Println("caller 2 closed", local.String(), remote.String())
+	}
+
+	net0 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
+		log,
+		id0,
+		ip0,
+		networkID,
+		appVersion,
+		versionParser,
+		listener0,
+		caller0,
+		serverUpgrader,
+		clientUpgrader,
+		vdrs,
+		vdrs,
+		handler0,
+		time.Duration(0),
+		0,
+		nil,
+		false,
+		0,
+		0,
+		time.Now(),
+		defaultSendQueueSize,
+	)
+	assert.NotNil(t, net0)
+
+	net1 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
+		log,
+		id1,
+		ip1,
+		networkID,
+		appVersion,
+		versionParser,
+		listener1,
+		caller1,
+		serverUpgrader,
+		clientUpgrader,
+		vdrs,
+		vdrs,
+		handler1,
+		time.Duration(0),
+		0,
+		nil,
+		false,
+		0,
+		0,
+		time.Now(),
+		defaultSendQueueSize,
+	)
+	assert.NotNil(t, net1)
+
+	net2 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
+		log,
+		id2,
+		ip2,
+		networkID,
+		appVersion,
+		versionParser,
+		listener2,
+		caller2,
+		serverUpgrader,
+		clientUpgrader,
+		vdrs,
+		vdrs,
+		handler2,
+		time.Duration(0),
+		0,
+		nil,
+		false,
+		0,
+		0,
+		time.Now(),
+		defaultSendQueueSize,
+	)
+	assert.NotNil(t, net1)
+
+	go func() {
+		err := net0.Dispatch()
+		assert.Error(t, err)
+	}()
+	go func() {
+		err := net1.Dispatch()
+		assert.Error(t, err)
+	}()
+	go func() {
+		err := net2.Dispatch()
+		assert.Error(t, err)
+	}()
+
+	net0.Track(ip1.IP())
+
+	wg0.Wait()
+	wg1.Wait()
+
+	// create new network with ip2 with same peer as ip1
+	net0.Track(ip2.IP())
+
+	wg2.Wait()
+
+	// Never will have been made a peer (so neither connected or disconnected)
+	assert.False(t, handler2Connected)
+	assert.False(t, handler2Disconnected)
+
+	net0Peers := net0.Peers()
+	assert.Len(t, net0Peers, 1)
+	assert.Equal(t, net0Peers[0].ID, id1.PrefixedString(constants.NodeIDPrefix))
+	assert.Equal(t, net0Peers[0].IP, ip1.String())
+	net2Peers := net2.Peers()
+	assert.Len(t, net2Peers, 0)
+
+	// Subsequent track call returns immediately with no connection attempts
+	net0.Track(ip2.IP())
+	time.Sleep(10 * time.Millisecond)
+	net0Peers = net0.Peers()
+	assert.Len(t, net0Peers, 1)
+	assert.Equal(t, net0Peers[0].ID, id1.PrefixedString(constants.NodeIDPrefix))
+	assert.Equal(t, net0Peers[0].IP, ip1.String())
+	net2Peers = net2.Peers()
+	assert.Len(t, net2Peers, 0)
+
+	// Remove alias via ticker
+	time.Sleep(10 * time.Millisecond)
+
+	// Attempt to call with same IP and different id
+	net0.Track(ip2.IP())
+
+	// Confirm connected
+	wg3.Wait()
+
+	// TODO: check peers for both net0 and net2
+
+	err := net0.Close()
+	assert.NoError(t, err)
+
+	err = net1.Close()
+	assert.NoError(t, err)
+
+	err = net2.Close()
+	assert.NoError(t, err)
 }

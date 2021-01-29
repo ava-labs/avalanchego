@@ -888,6 +888,7 @@ func (n *network) track(ip utils.IPDesc) {
 		return
 	}
 	if _, ok := n.aliasIPs[str]; ok {
+		fmt.Println("alias detected", str)
 		return
 	}
 	if _, ok := n.myIPs[str]; ok {
@@ -1239,6 +1240,16 @@ func (n *network) disconnected(p *peer) {
 	delete(n.peers, p.id)
 	n.numPeers.Set(float64(len(n.peers)))
 
+	p.ipLock.Lock() // TODO: need lock?
+	fmt.Println("total aliases", p.id.String(), len(p.ipAliases))
+	for _, alias := range p.ipAliases { // ip must be non-zero to be added
+		str := alias.ip.String()
+		delete(n.aliasIPs, str)
+		fmt.Println("deleted alias", str)
+	}
+	p.ipAliases = p.ipAliases[:0]
+	p.ipLock.Unlock()
+
 	if !ip.IsZero() {
 		str := ip.String()
 
@@ -1247,14 +1258,6 @@ func (n *network) disconnected(p *peer) {
 
 		n.track(ip)
 	}
-
-	p.ipLock.Lock()                     // TODO: need lock?
-	for _, alias := range p.ipAliases { // ip must be non-zero to be added
-		str := alias.ip.String()
-		delete(n.aliasIPs, str)
-	}
-	p.ipAliases = p.ipAliases[:0]
-	p.ipLock.Unlock()
 
 	if p.connected.GetValue() {
 		n.router.Disconnected(p.id)
