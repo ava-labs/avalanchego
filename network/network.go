@@ -146,6 +146,7 @@ type network struct {
 	closed          utils.AtomicBool
 	disconnectedIPs map[string]struct{}
 	connectedIPs    map[string]struct{}
+	aliasIPs        map[string]struct{}
 	retryDelay      map[string]time.Duration
 	// TODO: bound the size of [myIPs] to avoid DoS. LRU caching would be ideal
 	myIPs map[string]struct{} // set of IPs that resulted in my ID.
@@ -326,6 +327,7 @@ func NewNetwork(
 		pingFrequency:                      pingFrequency,
 		disconnectedIPs:                    make(map[string]struct{}),
 		connectedIPs:                       make(map[string]struct{}),
+		aliasIPs:                           make(map[string]struct{}),
 		retryDelay:                         make(map[string]time.Duration),
 		myIPs:                              map[string]struct{}{ip.IP().String(): {}},
 		peers:                              make(map[ids.ShortID]*peer),
@@ -885,6 +887,9 @@ func (n *network) track(ip utils.IPDesc) {
 	if _, ok := n.connectedIPs[str]; ok {
 		return
 	}
+	if _, ok := n.aliasIPs[str]; ok {
+		return
+	}
 	if _, ok := n.myIPs[str]; ok {
 		return
 	}
@@ -1141,9 +1146,13 @@ func (n *network) tryAddPeer(p *peer) error {
 			str := ip.String()
 			delete(n.disconnectedIPs, str)
 			delete(n.retryDelay, str)
-
-			// TODO: add to aliases for peer (create function that acquires a lock)
-			// TODO: have an aliasIP map?
+			n.aliasIPs[str] = struct{}{}
+			p.ipLock.Lock()
+			p.ipAliases = append(p.ipAliases, ipAlias{
+				ip:    ip,
+				added: n.clock.Time().Unix(),
+			})
+			p.ipLock.Unlock()
 		}
 		return fmt.Errorf("duplicated connection from %s at %s", p.id.PrefixedString(constants.NodeIDPrefix), ip)
 	}
@@ -1238,6 +1247,14 @@ func (n *network) disconnected(p *peer) {
 
 		n.track(ip)
 	}
+
+	p.ipLock.Lock()                     // TODO: need lock?
+	for _, alias := range p.ipAliases { // ip must be non-zero to be added
+		str := alias.ip.String()
+		delete(n.aliasIPs, str)
+	}
+	p.ipAliases = p.ipAliases[:0]
+	p.ipLock.Unlock()
 
 	if p.connected.GetValue() {
 		n.router.Disconnected(p.id)

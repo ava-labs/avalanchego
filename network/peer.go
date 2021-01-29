@@ -159,17 +159,21 @@ func (p *peer) releaseAliases() {
 				continue
 			}
 
-			// TODO: acquire locks
+			p.ipLock.Lock()
 			bestAlias := p.ipAliases[0]
-
-			// TODO: clean this ugliness up
 			if float64(p.net.clock.Time().Unix()-bestAlias.added) < defaultAliasTimeout.Seconds() {
+				// TODO: clean this ugliness up
+				p.ipLock.Unlock()
 				continue
 			}
-
-			delete(p.net.disconnectedIPs, bestAlias.ip.String())
-
 			p.ipAliases = p.ipAliases[1:]
+			p.ipLock.Unlock()
+
+			// TODO: acquire locks (state lock)
+			p.net.stateLock.Lock()
+			delete(p.net.aliasIPs, bestAlias.ip.String())
+			p.net.stateLock.Unlock()
+
 		case <-p.tickerCloser:
 			return
 		}
@@ -442,8 +446,6 @@ func (p *peer) close() {
 	// has been closed and will therefore not attempt to write on this channel.
 	close(p.sender)
 	p.senderLock.Unlock()
-
-	// TODO: release aliases
 
 	p.net.disconnected(p)
 }
