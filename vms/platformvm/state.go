@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -31,6 +30,7 @@ const (
 	stopDBPrefix            = "stop"
 	uptimeDBPrefix          = "uptime"
 	currentValidatorsPrefix = "currentVdrs"
+	pendingValidatorsPrefix = "pendingVdrs"
 )
 
 var (
@@ -77,6 +77,7 @@ func (vm *VM) enqueueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 	var (
 		staker   TimedTx
 		priority byte
+		nodeID   ids.ShortID
 	)
 	switch unsignedTx := stakerTx.UnsignedTx.(type) {
 	case *UnsignedAddDelegatorTx:
@@ -85,9 +86,11 @@ func (vm *VM) enqueueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 	case *UnsignedAddSubnetValidatorTx:
 		staker = unsignedTx
 		priority = 0
+		nodeID = unsignedTx.Validator.NodeID
 	case *UnsignedAddValidatorTx:
 		staker = unsignedTx
 		priority = 2
+		nodeID = unsignedTx.Validator.NodeID
 	default:
 		return fmt.Errorf("staker is unexpected type %T", stakerTx)
 	}
@@ -111,6 +114,17 @@ func (vm *VM) enqueueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 		prefixStartDB.Put(startKey, txBytes),
 		prefixStartDB.Close(),
 	)
+
+	if priority != 1 {
+		prefixPendingValidators := []byte(fmt.Sprintf("%s%s", subnetID, pendingValidatorsPrefix))
+		pendingValidatorsDB := prefixdb.NewNested(prefixPendingValidators, db)
+
+		errs.Add(
+			pendingValidatorsDB.Put(nodeID.Bytes(), txBytes),
+			pendingValidatorsDB.Close(),
+		)
+	}
+
 	return errs.Err
 }
 
@@ -120,6 +134,7 @@ func (vm *VM) dequeueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 	var (
 		staker   TimedTx
 		priority byte
+		nodeID   ids.ShortID
 	)
 	switch unsignedTx := stakerTx.UnsignedTx.(type) {
 	case *UnsignedAddDelegatorTx:
@@ -128,9 +143,11 @@ func (vm *VM) dequeueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 	case *UnsignedAddSubnetValidatorTx:
 		staker = unsignedTx
 		priority = 0
+		nodeID = unsignedTx.Validator.NodeID
 	case *UnsignedAddValidatorTx:
 		staker = unsignedTx
 		priority = 2
+		nodeID = unsignedTx.Validator.NodeID
 	default:
 		return fmt.Errorf("staker is unexpected type %T", stakerTx)
 	}
@@ -153,6 +170,16 @@ func (vm *VM) dequeueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 		prefixStartDB.Delete(startKey),
 		prefixStartDB.Close(),
 	)
+
+	if priority != 1 {
+		prefixPendingValidators := []byte(fmt.Sprintf("%s%s", subnetID, pendingValidatorsPrefix))
+		pendingValidatorsDB := prefixdb.NewNested(prefixPendingValidators, db)
+
+		errs.Add(
+			pendingValidatorsDB.Delete(nodeID.Bytes()),
+			pendingValidatorsDB.Close(),
+		)
+	}
 	return errs.Err
 }
 
@@ -206,12 +233,12 @@ func (vm *VM) addStaker(db database.Database, subnetID ids.ID, tx *rewardTx) err
 	)
 
 	if priority > 0 {
-		prefixCurrentValdiators := []byte(fmt.Sprintf("%s%s", subnetID, currentValidatorsPrefix))
-		prefixCurrentValdiatorsDB := prefixdb.NewNested(prefixCurrentValdiators, db)
+		prefixCurrentValidators := []byte(fmt.Sprintf("%s%s", subnetID, currentValidatorsPrefix))
+		currentValidatorsDB := prefixdb.NewNested(prefixCurrentValidators, db)
 
 		errs.Add(
-			prefixCurrentValdiatorsDB.Put(nodeID.Bytes(), txBytes),
-			prefixCurrentValdiatorsDB.Close(),
+			currentValidatorsDB.Put(nodeID.Bytes(), txBytes),
+			currentValidatorsDB.Close(),
 		)
 	}
 
@@ -263,12 +290,12 @@ func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, tx *rewardTx) 
 	)
 
 	if priority > 0 {
-		prefixCurrentValdiators := []byte(fmt.Sprintf("%s%s", subnetID, currentValidatorsPrefix))
-		prefixCurrentValdiatorsDB := prefixdb.NewNested(prefixCurrentValdiators, db)
+		prefixCurrentValidators := []byte(fmt.Sprintf("%s%s", subnetID, currentValidatorsPrefix))
+		currentValidatorsDB := prefixdb.NewNested(prefixCurrentValidators, db)
 
 		errs.Add(
-			prefixCurrentValdiatorsDB.Delete(nodeID.Bytes()),
-			prefixCurrentValdiatorsDB.Close(),
+			currentValidatorsDB.Delete(nodeID.Bytes()),
+			currentValidatorsDB.Close(),
 		)
 	}
 
@@ -313,11 +340,11 @@ func (vm *VM) nextStakerStop(db database.Database, subnetID ids.ID) (*rewardTx, 
 
 // Returns true if [nodeID] is a validator (not a delegator) of subnet [subnetID]
 func (vm *VM) isValidator(db database.Database, subnetID ids.ID, nodeID ids.ShortID) (TimedTx, bool, error) {
-	prefixCurrentValdiators := []byte(fmt.Sprintf("%s%s", subnetID, currentValidatorsPrefix))
-	prefixCurrentValdiatorsDB := prefixdb.NewNested(prefixCurrentValdiators, db)
-	defer prefixCurrentValdiatorsDB.Close()
+	prefixCurrentValidators := []byte(fmt.Sprintf("%s%s", subnetID, currentValidatorsPrefix))
+	currentValidatorsDB := prefixdb.NewNested(prefixCurrentValidators, db)
+	defer currentValidatorsDB.Close()
 
-	txBytes, err := prefixCurrentValdiatorsDB.Get(nodeID.Bytes())
+	txBytes, err := currentValidatorsDB.Get(nodeID.Bytes())
 	if err != nil {
 		return nil, false, nil
 	}
@@ -336,34 +363,25 @@ func (vm *VM) isValidator(db database.Database, subnetID ids.ID, nodeID ids.Shor
 // Returns true if [nodeID] will be a validator (not a delegator) of subnet
 // [subnetID]
 func (vm *VM) willBeValidator(db database.Database, subnetID ids.ID, nodeID ids.ShortID) (TimedTx, bool, error) {
-	startIter := prefixdb.NewNested([]byte(fmt.Sprintf("%s%s", subnetID, startDBPrefix)), db).NewIterator()
-	defer startIter.Release()
+	prefixPendingValidators := []byte(fmt.Sprintf("%s%s", subnetID, pendingValidatorsPrefix))
+	pendingValidatorsDB := prefixdb.NewNested(prefixPendingValidators, db)
+	defer pendingValidatorsDB.Close()
 
-	for startIter.Next() {
-		txBytes := startIter.Value()
-		tx := Tx{}
-		if _, err := Codec.Unmarshal(txBytes, &tx); err != nil {
-			return nil, false, err
-		}
-
-		switch vdr := tx.UnsignedTx.(type) {
-		case *UnsignedAddValidatorTx:
-			if subnetID == constants.PrimaryNetworkID && vdr.Validator.NodeID == nodeID {
-				if err := tx.Sign(vm.codec, nil); err != nil {
-					return nil, false, err
-				}
-				return vdr, true, nil
-			}
-		case *UnsignedAddSubnetValidatorTx:
-			if subnetID == vdr.Validator.SubnetID() && vdr.Validator.NodeID == nodeID {
-				if err := tx.Sign(vm.codec, nil); err != nil {
-					return nil, false, err
-				}
-				return vdr, true, nil
-			}
-		}
+	txBytes, err := pendingValidatorsDB.Get(nodeID.Bytes())
+	if err != nil {
+		return nil, false, nil
 	}
-	return nil, false, nil
+
+	tx := Tx{}
+	if _, err := Codec.Unmarshal(txBytes, &tx); err != nil {
+		return nil, false, err
+	}
+
+	if err := tx.Sign(vm.codec, nil); err != nil {
+		return nil, false, err
+	}
+
+	return tx.UnsignedTx.(TimedTx), true, nil
 }
 
 // getUTXO returns the UTXO with the specified ID
