@@ -83,3 +83,8 @@ func (e *EmptyNode) Clear() error {
 func (e *EmptyNode) Print() {
 	fmt.Printf("ERROR: should never be called EmptyNode ID: %p - Parent: %p", e, e.parent)
 }
+
+// String converts the node in a string format
+func (e *EmptyNode) String() string {
+	return "Empty Node"
+}

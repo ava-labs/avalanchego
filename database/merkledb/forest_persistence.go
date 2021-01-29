@@ -1,6 +1,7 @@
 package merkledb
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -61,12 +62,6 @@ func (fp *ForestPersistence) NewRoot(rootNodeID uint32) (Node, error) {
 	_, err := fp.GetRootNode(rootNodeID)
 	if err == database.ErrNotFound {
 		newRoot := NewRootNode(rootNodeID, fp)
-
-		err = fp.StoreNode(newRoot)
-		if err != nil {
-			return nil, err
-		}
-
 		return newRoot, nil
 	} else if err != nil {
 		return nil, err
@@ -88,7 +83,22 @@ func (fp *ForestPersistence) DuplicateRoot(oldRootID uint32, newRootID uint32) (
 		return nil, err
 	}
 
-	newRoot.(*RootNode).Child = oldRoot.(*RootNode).Child
+	oldRootChild, err := oldRoot.GetChild(Key{})
+	if err != nil {
+		return nil, err
+	}
+
+	oldRootChild.References(1)
+
+	err = newRoot.SetChild(oldRootChild)
+	if err != nil {
+		return nil, err
+	}
+
+	err = fp.StoreNode(oldRootChild)
+	if err != nil {
+		return nil, err
+	}
 
 	err = fp.StoreNode(newRoot)
 	if err != nil {
@@ -100,6 +110,47 @@ func (fp *ForestPersistence) DuplicateRoot(oldRootID uint32, newRootID uint32) (
 
 // StoreNode stores a in the DB Node using its StorageKey
 func (fp *ForestPersistence) StoreNode(n Node) error {
+
+	// before storing lets take care of the leftover nodes
+	err := fp.ensureRefCounting(n)
+	if err != nil {
+		return err
+	}
+
+	return fp.storeNode(n)
+}
+
+// DeleteNode deletes a node using its StorageKey
+func (fp *ForestPersistence) DeleteNode(n Node) error {
+	var hash []byte
+	switch node := n.(type) {
+	case *RootNode:
+		hash = genRootNodeID(node.RootID)
+	default:
+		hash = n.GetHash()
+	}
+
+	if n.References(-1) == 0 {
+		return fp.db.Delete(hash)
+	}
+
+	return fp.StoreNode(n)
+}
+
+// Commit commits any pending nodes
+func (fp *ForestPersistence) Commit(err error) error {
+	if err != nil {
+		fp.db.(*versiondb.Database).Abort()
+		return err
+	}
+	return fp.db.(*versiondb.Database).Commit()
+}
+
+func (fp *ForestPersistence) GetDatabase() database.Database {
+	return fp.db
+}
+
+func (fp *ForestPersistence) storeNode(n Node) error {
 	nBytes, err := fp.codec.Marshal(0, &n)
 	if err != nil {
 		return err
@@ -117,50 +168,48 @@ func (fp *ForestPersistence) StoreNode(n Node) error {
 		if err != nil {
 			return err
 		}
-
-		previousRefs := n.References(-1)
-		n.References(2)
-
-		previousID := n.GetPreviousHash()
-		if len(previousID) != 0 && previousRefs == 0 {
-			err = fp.db.Delete(n.GetPreviousHash())
-			if err != nil {
-				return err
-			}
-		}
 	}
 
 	return nil
 }
 
-// DeleteNode deletes a node using its StorageKey
-func (fp *ForestPersistence) DeleteNode(n Node) error {
-	var hash []byte
-	switch node := n.(type) {
-	case *RootNode:
-		hash = genRootNodeID(node.RootID)
-	default:
-		hash = n.GetHash()
-	}
+func (fp *ForestPersistence) ensureRefCounting(n Node) error {
+	previousID := n.GetPreviousHash()
+	if len(previousID) != 0 {
 
-	if n.References(-1) == 0 {
-		err := fp.db.Delete(hash)
+		prevNode, err := fp.GetNodeByHash(previousID)
+		if err != nil {
+			return err
+		}
+
+		// remove the new node reference from the previous node
+		// use the new node refs as a baseline - it may have the refs of a parent with more references
+		prevNode.References(n.References(0) - 1)
+
+		// increase the references of children that are shared between the Previous and the New Node
+		for _, prevChildHash := range prevNode.GetChildrenHashes() {
+			for _, newChildHash := range n.GetChildrenHashes() {
+
+				// they are the same, add a new Reference
+				if bytes.Equal(prevChildHash, newChildHash) {
+					prevChildNode, err := fp.GetNodeByHash(prevChildHash)
+					if err != nil {
+						return err
+					}
+
+					prevChildNode.References(1)
+					err = fp.storeNode(prevChildNode)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+
+		err = fp.storeNode(prevNode)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-// Commit commits any pending nodes
-func (fp *ForestPersistence) Commit(err error) error {
-	if err != nil {
-		fp.db.(*versiondb.Database).Abort()
-		return err
-	}
-	return fp.db.(*versiondb.Database).Commit()
-}
-
-func (fp *ForestPersistence) GetDatabase() database.Database {
-	return fp.db
 }

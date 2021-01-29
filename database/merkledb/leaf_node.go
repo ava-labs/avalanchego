@@ -24,6 +24,7 @@ func NewLeafNode(key Key, value []byte, parent Node, persistence Persistence) (N
 		LeafValue:   value,
 		parent:      parent,
 		persistence: persistence,
+		Refs:        1,
 	}
 
 	return l, l.Hash(nil, nil)
@@ -137,5 +138,10 @@ func (l *LeafNode) Clear() error {
 
 // Print prints this Node data
 func (l *LeafNode) Print() {
-	fmt.Printf("Leaf ID: %x - Parent: %p - Key: %v - Val: %v\n", l.GetHash(), l.parent, l.LeafKey, l.LeafValue)
+	fmt.Printf(l.String())
+}
+
+// String converts the node in a string format
+func (l *LeafNode) String() string {
+	return fmt.Sprintf("Leaf ID: %x - Parent: %p - Refs: %d - Key: %v - Val: %v\n", l.GetHash(), l.parent, l.Refs, l.LeafKey, l.LeafValue)
 }

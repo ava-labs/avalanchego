@@ -22,6 +22,7 @@ type Node interface {
 	GetReHash() []byte
 	Clear() error
 	Print()
+	String() string
 }
 
 func Hash(bs ...[]byte) []byte {

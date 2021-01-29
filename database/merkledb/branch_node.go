@@ -36,6 +36,7 @@ func NewBranchNode(sharedAddress Key, parent Node, persistence Persistence) Node
 		Nodes:         [UnitSize][]byte{},
 		parent:        parent,
 		persistence:   persistence,
+		Refs:          1,
 	}
 }
 
@@ -62,6 +63,12 @@ func (b *BranchNode) GetChild(key Key) (Node, error) {
 		return nil, err
 	}
 	node.SetParent(b)
+
+	// Passes on the parents Refs if they are greater than the childs one
+	nodeRefs := node.References(0)
+	if b.Refs > nodeRefs {
+		node.References(b.Refs - nodeRefs)
+	}
 
 	return node, nil
 }
@@ -180,9 +187,10 @@ func (b *BranchNode) Insert(key Key, value []byte) error {
 		return err
 	}
 
-	b.Nodes[FirstNonPrefix(b.SharedAddress, key)] = newLeafNode.GetHash()
+	newLeafHash := newLeafNode.GetHash()
+	b.Nodes[FirstNonPrefix(b.SharedAddress, key)] = newLeafHash
 
-	err = b.Hash(key, newLeafNode.GetHash())
+	err = b.Hash(key, newLeafHash)
 	if err != nil {
 		return err
 	}
@@ -345,6 +353,12 @@ func (b *BranchNode) Clear() error {
 			return err
 		}
 
+		// Passes on the parents Refs if they are greater than the childs one
+		nodeRefs := child.References(0)
+		if b.Refs > nodeRefs {
+			child.References(b.Refs - nodeRefs)
+		}
+
 		err = child.Clear()
 		if err != nil {
 			return err
@@ -354,9 +368,14 @@ func (b *BranchNode) Clear() error {
 	return b.persistence.DeleteNode(b)
 }
 
+// String converts the node in a string format
+func (b *BranchNode) String() string {
+	return fmt.Sprintf("Branch ID: %x - SharedAddress: %v - Refs: %d - Parent: %p \n\t↪ Nodes: ", b.GetHash(), b.SharedAddress, b.Refs, b.parent)
+}
+
 // Print prints the node
 func (b *BranchNode) Print() {
-	fmt.Printf("Branch ID: %x - SharedAddress: %v - Parent: %p \n\t↪ Nodes: ", b.GetHash(), b.SharedAddress, b.parent)
+	fmt.Printf("Branch ID: %x - SharedAddress: %v - Refs: %v - Parent: %p \n\t↪ Nodes: ", b.GetHash(), b.SharedAddress, b.Refs, b.parent)
 	fmt.Printf("[")
 	for _, nodeHash := range b.Nodes {
 		fmt.Printf("[%x]", nodeHash)

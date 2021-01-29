@@ -166,7 +166,6 @@ func delAndTestRoot(t *testing.T, tree *Tree, data []TestStruct) {
 		if len(testList) == 0 {
 			stop = true
 		}
-
 		lastRootHash, _ := tree.Root()
 
 		if err := tree.Delete(entry.key); err != nil {
@@ -206,10 +205,17 @@ func checkDatabaseItems(t *testing.T, tree *Tree) {
 	count := 0
 	for iterator.Next() {
 		fmt.Printf("Key: %x , Val: %v\n", iterator.Key(), iterator.Value())
+		derp, _ := tree.persistence.GetDatabase().Get(iterator.Key())
+		fmt.Println(derp)
+
+		var node Node
+		derp2, err := tree.persistence.(*TreePersistence).codec.Unmarshal(derp, &node)
+		fmt.Println(derp2)
+		fmt.Println(err)
 		count++
 	}
 	if count > 0 {
 		fmt.Println(count)
-		t.Fatal("Database is not empty")
+		t.Fatalf("Database is not empty - Number of Items: %d", count)
 	}
 }

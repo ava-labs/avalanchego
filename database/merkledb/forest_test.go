@@ -96,7 +96,7 @@ func TestForest_Basic(t *testing.T) {
 		t.Fatalf("not expected to fail copying tree - %v", err)
 	}
 
-	for _, data := range CreateRandomValues(100) {
+	for _, data := range CreateRandomValues(1) {
 		err = t11.Put(data.key, data.value)
 		if err != nil {
 			t.Fatalf("not expected to fail inserting data - %v", err)
@@ -388,6 +388,77 @@ func TestForest_PutGetDel(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "OutOfOrderDelete",
+			forestScenario: []ScenarioTree{
+				{
+					tree:         0,
+					shouldCreate: true,
+					treeScenario: ScenarioTestStruct{
+						name:    "PutGet Value on Tree 0",
+						putData: t0,
+					},
+				},
+				{
+					tree:         1,
+					oldTree:      0,
+					isDuplicate:  true,
+					shouldCreate: true,
+					treeScenario: ScenarioTestStruct{
+						name:    "PutGet Value on Tree 1",
+						putData: t1,
+					},
+				},
+				{
+					tree:         2,
+					oldTree:      1,
+					isDuplicate:  true,
+					shouldCreate: true,
+					treeScenario: ScenarioTestStruct{
+						name:    "PutGet Value on Tree 2",
+						putData: t2,
+					},
+				},
+				{
+					tree:         3,
+					oldTree:      2,
+					isDuplicate:  true,
+					shouldCreate: true,
+					treeScenario: ScenarioTestStruct{
+						name:    "PutGet Value on Tree 3",
+						putData: t3,
+					},
+				},
+				{
+					tree: 2,
+					treeScenario: ScenarioTestStruct{
+						name:    "Del Value on Tree 2",
+						delData: t2,
+					},
+				},
+				{
+					tree: 3,
+					treeScenario: ScenarioTestStruct{
+						name:    "Del Value on Tree 3",
+						delData: t3,
+					},
+				},
+				{
+					tree: 0,
+					treeScenario: ScenarioTestStruct{
+						name:    "Del Value on Tree 0",
+						delData: t0,
+					},
+				},
+				{
+					tree: 1,
+					treeScenario: ScenarioTestStruct{
+						name:    "Del Value on Tree 1",
+						delData: t1,
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -408,6 +479,8 @@ func testForest(t *testing.T, test ScenarioForestStruct) {
 				if err != nil {
 					t.Fatalf("unable to put %v - %v", entry, err)
 				}
+				//tree.PrintTree()
+				//fmt.Println()
 			}
 
 			getData := scenario.treeScenario.putData
@@ -429,6 +502,8 @@ func testForest(t *testing.T, test ScenarioForestStruct) {
 			for _, entry := range scenario.treeScenario.delData {
 				err = tree.Delete(entry.key)
 				if err != nil {
+					err = tree.Put(entry.key, entry.value)
+					err = tree.Delete(entry.key)
 					t.Fatalf("value not deleted in the tree as it was not found err: %v \nkey: %v", err, entry.key)
 				}
 			}

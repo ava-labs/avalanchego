@@ -106,8 +106,12 @@ func (r *RootNode) Value() []byte { return nil }
 
 func (r *RootNode) Hash(key Key, hash []byte) error {
 	r.Child = hash
-
 	r.StoredHash = Hash(genRootNodeID(r.RootID), r.Child)
+
+	if len(hash) == 0 {
+		r.StoredHash = nil
+		return r.persistence.DeleteNode(r)
+	}
 
 	return r.persistence.StoreNode(r)
 }
@@ -117,7 +121,7 @@ func (r *RootNode) GetHash() []byte {
 }
 
 func (r *RootNode) GetPreviousHash() []byte {
-	return r.Child
+	return nil
 }
 
 func (r *RootNode) References(change int32) int32 {
@@ -165,6 +169,11 @@ func (r *RootNode) Print() {
 		}
 		child.Print()
 	}
+}
+
+// String converts the node in a string format
+func (r *RootNode) String() string {
+	return fmt.Sprintf("Root ID: %v - Child: %x \n", r.Key(), r.Child)
 }
 
 func genRootNodeID(rootNodeID uint32) []byte {
