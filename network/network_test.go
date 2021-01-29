@@ -971,3 +971,10 @@ func TestTrackConnectedRace(t *testing.T) {
 	err = net1.Close()
 	assert.NoError(t, err)
 }
+
+func TestPeerAliases(testing *testing.T) {
+	// add alias on first duplicate
+	// ensure subsequent calls tracked as aliases
+	// remove an added alias via peer ticker
+	// ensure disconnect removes aliases
+}
