@@ -18,6 +18,20 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
+const (
+	// TODO: make configurable
+	defaultAliasTimeout = 10 * time.Minute
+	releaseFrequency    = 1 * time.Minute
+)
+
+type ipAlias struct {
+	// ip alias where peer is reachable
+	ip utils.IPDesc
+
+	// unix time when peer alias assigned
+	added int64
+}
+
 type peer struct {
 	net *network // network this peer is part of
 
@@ -50,8 +64,9 @@ type peer struct {
 
 	// ip may or may not be set when the peer is first started. is only modified
 	// on the connection's reader routine.
-	ip     utils.IPDesc
-	ipLock sync.RWMutex
+	ip        utils.IPDesc
+	ipAliases []ipAlias
+	ipLock    sync.RWMutex
 
 	// id should be set when the peer is first created.
 	id ids.ShortID
@@ -80,6 +95,7 @@ func (p *peer) Start() {
 func (p *peer) StartTicker() {
 	go p.requestFinishHandshake()
 	go p.sendPings()
+	go p.releaseAliases()
 }
 
 func (p *peer) sendPings() {
@@ -125,6 +141,35 @@ func (p *peer) requestFinishHandshake() {
 			if !gotPeerList {
 				p.GetPeerList()
 			}
+		case <-p.tickerCloser:
+			return
+		}
+	}
+}
+
+// release ip alieases that have timed out
+func (p *peer) releaseAliases() {
+	releaseTicker := time.NewTicker(releaseFrequency)
+	defer releaseTicker.Stop()
+
+	for {
+		select {
+		case <-releaseTicker.C:
+			if len(p.ipAliases) == 0 {
+				continue
+			}
+
+			// TODO: acquire locks
+			bestAlias := p.ipAliases[0]
+
+			// TODO: clean this ugliness up
+			if float64(p.net.clock.Time().Unix()-bestAlias.added) < defaultAliasTimeout.Seconds() {
+				continue
+			}
+
+			delete(p.net.disconnectedIPs, bestAlias.ip.String())
+
+			p.ipAliases = p.ipAliases[1:]
 		case <-p.tickerCloser:
 			return
 		}
@@ -397,6 +442,8 @@ func (p *peer) close() {
 	// has been closed and will therefore not attempt to write on this channel.
 	close(p.sender)
 	p.senderLock.Unlock()
+
+	// TODO: release aliases
 
 	p.net.disconnected(p)
 }

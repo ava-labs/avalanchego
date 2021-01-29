@@ -1141,6 +1141,9 @@ func (n *network) tryAddPeer(p *peer) error {
 			str := ip.String()
 			delete(n.disconnectedIPs, str)
 			delete(n.retryDelay, str)
+
+			// TODO: add to aliases for peer (create function that acquires a lock)
+			// TODO: have an aliasIP map?
 		}
 		return fmt.Errorf("duplicated connection from %s at %s", p.id.PrefixedString(constants.NodeIDPrefix), ip)
 	}
