@@ -1126,14 +1126,22 @@ func TestPeerAliases(t *testing.T) {
 	wg1.Add(1)
 	wg2.Add(2)
 
+	cleanup := false
 	handler0 := &testHandler{
 		connected: func(id ids.ShortID) {
 			if id == id1 {
 				wg0.Done()
+				return
 			}
 			if id == id2 {
 				wg2.Done()
+				return
 			}
+			if cleanup {
+				return
+			}
+
+			assert.Fail(t, "handler 0 unauthorized connection", id.String())
 		},
 	}
 
@@ -1141,14 +1149,23 @@ func TestPeerAliases(t *testing.T) {
 		connected: func(id ids.ShortID) {
 			if id == id0 {
 				wg0.Done()
+				return
 			}
+			if cleanup {
+				return
+			}
+
+			assert.Fail(t, "handler 1 unauthorized connection", id.String())
 		},
 	}
 
-	net2conn := false
 	handler2 := &testHandler{
 		connected: func(id ids.ShortID) {
-			net2conn = true
+			if cleanup {
+				return
+			}
+
+			assert.Fail(t, "handler 2 unauthorized connection", id.String())
 		},
 	}
 
@@ -1156,15 +1173,27 @@ func TestPeerAliases(t *testing.T) {
 		connected: func(id ids.ShortID) {
 			if id == id0 {
 				wg2.Done()
+				return
 			}
+			if cleanup {
+				return
+			}
+
+			assert.Fail(t, "handler 3 unauthorized connection", id.String())
 		},
 	}
 
-	wg1Passed := false
+	wg1Done := false
 	caller0.closer = func(local net.Addr, remote net.Addr) {
-		if remote.String() == ip2.String() && !wg1Passed {
+		if remote.String() == ip2.String() && !wg1Done {
 			wg1.Done()
+			return
 		}
+		if cleanup {
+			return
+		}
+
+		assert.Fail(t, "caller 0 unauthorized close", local.String(), remote.String())
 	}
 
 	net0 := NewDefaultNetwork(
@@ -1311,10 +1340,7 @@ func TestPeerAliases(t *testing.T) {
 	net0.Track(ip2.IP())
 
 	wg1.Wait()
-	wg1Passed = true
-
-	// Ensure net2 never connected
-	assert.False(t, net2conn)
+	wg1Done = true
 
 	// Confirm that ip2 was not added to net0 peers
 	assert.Len(t, net0.Peers(), 1)
@@ -1323,19 +1349,13 @@ func TestPeerAliases(t *testing.T) {
 	assert.Len(t, net2.Peers(), 0)
 
 	// Subsequent track call returns immediately with no connection attempts
+	// (will cause fatal error from unauthorized connection)
 	net0.Track(ip2.IP())
-	time.Sleep(100 * time.Millisecond)
 
-	// Confirm that ip2 not added to net0 peers
-	assert.Len(t, net0.Peers(), 1)
-	assert.Equal(t, net0.Peers()[0].ID, id1.PrefixedString(constants.NodeIDPrefix))
-	assert.Equal(t, net0.Peers()[0].IP, ip1.String())
-	assert.Len(t, net2.Peers(), 0)
-
-	// Wait for aliases to be removed
+	// Wait for aliases to be removed by peer
 	time.Sleep(1000 * time.Millisecond)
 
-	// Track ip2 with id2
+	// Track ip2 on net3
 	upgrader.m[ip2.String()] = id2
 	caller0.outbounds[ip2.String()] = listener3
 	net0.Track(ip2.IP())
@@ -1355,6 +1375,7 @@ func TestPeerAliases(t *testing.T) {
 	assert.Equal(t, net3.Peers()[0].IP, ip0.String())
 
 	// Cleanup
+	cleanup = true
 	err := net0.Close()
 	assert.NoError(t, err)
 
