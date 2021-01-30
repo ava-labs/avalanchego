@@ -5,6 +5,7 @@ package network
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math"
 	"net"
 	"sync"
@@ -16,12 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
-)
-
-const (
-	// TODO: make configurable
-	defaultAliasTimeout = 10 * time.Minute
-	releaseFrequency    = 1 * time.Minute
 )
 
 type ipAlias struct {
@@ -90,12 +85,12 @@ type peer struct {
 func (p *peer) Start() {
 	go p.ReadMessages()
 	go p.WriteMessages()
+	go p.releaseAliases()
 }
 
 func (p *peer) StartTicker() {
 	go p.requestFinishHandshake()
 	go p.sendPings()
-	go p.releaseAliases()
 }
 
 func (p *peer) sendPings() {
@@ -149,19 +144,21 @@ func (p *peer) requestFinishHandshake() {
 
 // release ip alieases that have timed out
 func (p *peer) releaseAliases() {
-	releaseTicker := time.NewTicker(releaseFrequency)
+	fmt.Println("alias release started", p.id.String())
+	releaseTicker := time.NewTicker(p.net.aliasReleaseFreq)
 	defer releaseTicker.Stop()
 
 	for {
 		select {
 		case <-releaseTicker.C:
+			p.ipLock.Lock()
 			if len(p.ipAliases) == 0 {
+				p.ipLock.Unlock()
 				continue
 			}
 
-			p.ipLock.Lock()
 			bestAlias := p.ipAliases[0]
-			if float64(p.net.clock.Time().Unix()-bestAlias.added) < defaultAliasTimeout.Seconds() {
+			if float64(p.net.clock.Time().Unix()-bestAlias.added) < p.net.aliasReleaseTimeout.Seconds() {
 				// TODO: clean this ugliness up
 				p.ipLock.Unlock()
 				continue
@@ -173,7 +170,7 @@ func (p *peer) releaseAliases() {
 			p.net.stateLock.Lock()
 			delete(p.net.aliasIPs, bestAlias.ip.String())
 			p.net.stateLock.Unlock()
-
+			fmt.Println("removed alias", bestAlias.ip.String(), p.id.String())
 		case <-p.tickerCloser:
 			return
 		}
