@@ -1016,7 +1016,16 @@ func TestTrackConnectedRace(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestPeerAliases(t *testing.T) {
+func assertEqualPeers(t *testing.T, expected map[string]ids.ShortID, actual []PeerID) {
+	assert.Len(t, actual, len(expected))
+	for _, p := range actual {
+		match, ok := expected[p.IP]
+		assert.True(t, ok, "peer with IP %s missing", p.IP)
+		assert.Equal(t, match.PrefixedString(constants.NodeIDPrefix), p.ID)
+	}
+}
+
+func TestPeerAliases_Ticker(t *testing.T) {
 	log := logging.NoLog{}
 	networkID := uint32(0)
 	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
@@ -1328,25 +1337,31 @@ func TestPeerAliases(t *testing.T) {
 	// Connect to peer with id1
 	net0.Track(ip1.IP())
 
+	// Confirm peers correct
 	wg0.Wait()
-
-	// Confirm net0 peers correct
-	assert.Len(t, net0.Peers(), 1)
-	assert.Equal(t, net0.Peers()[0].ID, id1.PrefixedString(constants.NodeIDPrefix))
-	assert.Equal(t, net0.Peers()[0].IP, ip1.String())
+	assertEqualPeers(t, map[string]ids.ShortID{
+		ip1.String(): id1,
+	}, net0.Peers())
+	assertEqualPeers(t, map[string]ids.ShortID{
+		ip0.String(): id0,
+	}, net1.Peers())
 	assert.Len(t, net2.Peers(), 0)
+	assert.Len(t, net3.Peers(), 0)
 
 	// Attempt to connect to ip2 (same id as ip1)
 	net0.Track(ip2.IP())
 
+	// Confirm that ip2 was not added to net0 peers
 	wg1.Wait()
 	wg1Done = true
-
-	// Confirm that ip2 was not added to net0 peers
-	assert.Len(t, net0.Peers(), 1)
-	assert.Equal(t, net0.Peers()[0].ID, id1.PrefixedString(constants.NodeIDPrefix))
-	assert.Equal(t, net0.Peers()[0].IP, ip1.String())
+	assertEqualPeers(t, map[string]ids.ShortID{
+		ip1.String(): id1,
+	}, net0.Peers())
+	assertEqualPeers(t, map[string]ids.ShortID{
+		ip0.String(): id0,
+	}, net1.Peers())
 	assert.Len(t, net2.Peers(), 0)
+	assert.Len(t, net3.Peers(), 0)
 
 	// Subsequent track call returns immediately with no connection attempts
 	// (will cause fatal error from unauthorized connection)
@@ -1360,19 +1375,19 @@ func TestPeerAliases(t *testing.T) {
 	caller0.outbounds[ip2.String()] = listener3
 	net0.Track(ip2.IP())
 
+	// Confirm that id2 was added as peer
 	wg2.Wait()
-
-	// Confirm that networks have correct peers
-	assert.Len(t, net0.Peers(), 2)
-	// TODO: need to handle map non-deterministic response
-	assert.Equal(t, net0.Peers()[0].ID, id1.PrefixedString(constants.NodeIDPrefix))
-	assert.Equal(t, net0.Peers()[0].IP, ip1.String())
-	assert.Equal(t, net0.Peers()[1].ID, id2.PrefixedString(constants.NodeIDPrefix))
-	assert.Equal(t, net0.Peers()[1].IP, ip2.String())
+	assertEqualPeers(t, map[string]ids.ShortID{
+		ip1.String(): id1,
+		ip2.String(): id2,
+	}, net0.Peers())
+	assertEqualPeers(t, map[string]ids.ShortID{
+		ip0.String(): id0,
+	}, net1.Peers())
 	assert.Len(t, net2.Peers(), 0)
-	assert.Len(t, net3.Peers(), 1)
-	assert.Equal(t, net3.Peers()[0].ID, id0.PrefixedString(constants.NodeIDPrefix))
-	assert.Equal(t, net3.Peers()[0].IP, ip0.String())
+	assertEqualPeers(t, map[string]ids.ShortID{
+		ip0.String(): id0,
+	}, net3.Peers())
 
 	// Cleanup
 	cleanup = true
