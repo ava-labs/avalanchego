@@ -868,9 +868,11 @@ func (p *peer) removeAliases() {
 	p.ipLock.Lock()
 	defer p.ipLock.Unlock()
 
-	for _, alias := range p.aliases { // ip must be non-zero to be added
+	for _, alias := range p.aliases {
 		str := alias.ip.String()
 		delete(p.net.peerAliasIPs, str)
+
+		p.net.log.Verbo("released alias %s for peer %s", str, p.id.String())
 	}
 	p.aliases = p.aliases[:0]
 }
@@ -884,8 +886,8 @@ func (p *peer) releaseAlias() {
 	}
 
 	next := p.aliases[0]
-	if float64(p.net.clock.Time().Unix()-next.added) < p.net.peerAliasReleaseTimeout.Seconds() {
-		// TODO: clean this ugliness up
+	aliasDuration := float64(p.net.clock.Time().Unix() - next.added)
+	if aliasDuration < p.net.peerAliasReleaseTimeout.Seconds() {
 		return
 	}
 	p.aliases = p.aliases[1:]
@@ -893,4 +895,6 @@ func (p *peer) releaseAlias() {
 	p.net.stateLock.Lock()
 	delete(p.net.peerAliasIPs, next.ip.String())
 	p.net.stateLock.Unlock()
+
+	p.net.log.Verbo("released alias %s for peer %s", next.ip.String(), p.id.String())
 }
