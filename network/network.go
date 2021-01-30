@@ -898,7 +898,6 @@ func (n *network) track(ip utils.IPDesc) {
 		return
 	}
 	if _, ok := n.aliasIPs[str]; ok {
-		fmt.Println("alias", str)
 		return
 	}
 	if _, ok := n.myIPs[str]; ok {

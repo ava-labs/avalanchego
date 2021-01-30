@@ -1775,6 +1775,12 @@ func TestPeerAliases_Disconnect(t *testing.T) {
 	// Track ip2 on net3
 	wg2.Wait()
 	wg2Done = true
+	assertEqualPeers(t, map[string]ids.ShortID{}, net0.Peers())
+	assertEqualPeers(t, map[string]ids.ShortID{
+		ip0.String(): id0,
+	}, net1.Peers())
+	assert.Len(t, net2.Peers(), 0)
+	assert.Len(t, net3.Peers(), 0)
 	upgrader.m[ip2.String()] = id2
 	caller0.outbounds[ip2.String()] = listener3
 	net0.Track(ip2.IP())
