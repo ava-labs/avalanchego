@@ -898,7 +898,6 @@ func (n *network) track(ip utils.IPDesc) {
 		return
 	}
 	if _, ok := n.aliasIPs[str]; ok {
-		fmt.Println("alias detected", str)
 		return
 	}
 	if _, ok := n.myIPs[str]; ok {
@@ -1163,8 +1162,6 @@ func (n *network) tryAddPeer(p *peer) error {
 				ip:    ip,
 				added: n.clock.Time().Unix(),
 			})
-			fmt.Println(n.id.String(), "added alias", str)
-			fmt.Println("aliases now:", linkedPeer.ipAliases)
 			linkedPeer.ipLock.Unlock()
 		}
 		return fmt.Errorf("duplicated connection from %s at %s", p.id.PrefixedString(constants.NodeIDPrefix), ip)
@@ -1252,12 +1249,10 @@ func (n *network) disconnected(p *peer) {
 	delete(n.peers, p.id)
 	n.numPeers.Set(float64(len(n.peers)))
 
-	p.ipLock.Lock() // TODO: need lock?
-	fmt.Println("total aliases", p.id.String(), len(p.ipAliases))
+	p.ipLock.Lock()                     // TODO: need lock?
 	for _, alias := range p.ipAliases { // ip must be non-zero to be added
 		str := alias.ip.String()
 		delete(n.aliasIPs, str)
-		fmt.Println("deleted alias", str)
 	}
 	p.ipAliases = p.ipAliases[:0]
 	p.ipLock.Unlock()

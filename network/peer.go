@@ -5,7 +5,6 @@ package network
 
 import (
 	"encoding/binary"
-	"fmt"
 	"math"
 	"net"
 	"sync"
@@ -144,7 +143,6 @@ func (p *peer) requestFinishHandshake() {
 
 // release ip alieases that have timed out
 func (p *peer) releaseAliases() {
-	fmt.Println("alias release started", p.id.String())
 	releaseTicker := time.NewTicker(p.net.aliasReleaseFreq)
 	defer releaseTicker.Stop()
 
@@ -170,7 +168,6 @@ func (p *peer) releaseAliases() {
 			p.net.stateLock.Lock()
 			delete(p.net.aliasIPs, bestAlias.ip.String())
 			p.net.stateLock.Unlock()
-			fmt.Println("removed alias", bestAlias.ip.String(), p.id.String())
 		case <-p.tickerCloser:
 			return
 		}

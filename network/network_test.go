@@ -5,7 +5,6 @@ package network
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"sync"
 	"testing"
@@ -172,6 +171,16 @@ func (h *testHandler) Disconnected(id ids.ShortID) {
 	if h.disconnected != nil {
 		h.disconnected(id)
 	}
+}
+
+type testUpgrader struct {
+	m map[string]ids.ShortID
+}
+
+func (t *testUpgrader) Upgrade(conn net.Conn) (ids.ShortID, net.Conn, error) {
+	addr := conn.RemoteAddr()
+	str := addr.String()
+	return t.m[str], conn, nil
 }
 
 func TestNewDefaultNetwork(t *testing.T) {
@@ -1007,22 +1016,7 @@ func TestTrackConnectedRace(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-type testUpgrader struct {
-	m map[string]ids.ShortID
-}
-
-func (t *testUpgrader) Upgrade(conn net.Conn) (ids.ShortID, net.Conn, error) {
-	addr := conn.RemoteAddr()
-	str := addr.String()
-	return t.m[str], conn, nil
-}
-
 func TestPeerAliases(t *testing.T) {
-	// add alias on first duplicate
-	// ensure subsequent calls tracked as aliases
-	// remove an added alias via peer ticker
-	// ensure disconnect removes aliases
-
 	log := logging.NoLog{}
 	networkID := uint32(0)
 	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
@@ -1125,73 +1119,52 @@ func TestPeerAliases(t *testing.T) {
 
 	var (
 		wg0 sync.WaitGroup
+		wg1 sync.WaitGroup
 		wg2 sync.WaitGroup
-		wg3 sync.WaitGroup
 	)
 	wg0.Add(2)
-	wg2.Add(1)
-	wg3.Add(2)
+	wg1.Add(1)
+	wg2.Add(2)
 
 	handler0 := &testHandler{
 		connected: func(id ids.ShortID) {
-			fmt.Println("handler 0 connect", id.String())
 			if id == id1 {
 				wg0.Done()
 			}
 			if id == id2 {
-				wg3.Done()
+				wg2.Done()
 			}
-		},
-		disconnected: func(id ids.ShortID) {
-			fmt.Println("handler 0 disconnect", id.String())
 		},
 	}
 
 	handler1 := &testHandler{
 		connected: func(id ids.ShortID) {
-			fmt.Println("handler 1 connect", id.String())
 			if id == id0 {
 				wg0.Done()
 			}
 		},
 	}
 
-	var (
-		handler2Connected    bool
-		handler2Disconnected bool
-	)
+	net2conn := false
 	handler2 := &testHandler{
 		connected: func(id ids.ShortID) {
-			fmt.Println("handler 2 connect", id.String())
-			handler2Connected = true
-		},
-		disconnected: func(id ids.ShortID) {
-			fmt.Println("disconnected", id.String())
-			handler2Disconnected = true
+			net2conn = true
 		},
 	}
 
 	handler3 := &testHandler{
 		connected: func(id ids.ShortID) {
-			fmt.Println("handler 3 connect", id.String())
 			if id == id0 {
-				wg3.Done()
+				wg2.Done()
 			}
 		},
 	}
 
-	wg2Passed := false
+	wg1Passed := false
 	caller0.closer = func(local net.Addr, remote net.Addr) {
-		fmt.Println("caller 0 closed", local.String(), remote.String())
-		if remote.String() == ip2.String() && !wg2Passed {
-			wg2.Done()
+		if remote.String() == ip2.String() && !wg1Passed {
+			wg1.Done()
 		}
-	}
-	caller1.closer = func(local net.Addr, remote net.Addr) {
-		fmt.Println("caller 1 closed", local.String(), remote.String())
-	}
-	caller2.closer = func(local net.Addr, remote net.Addr) {
-		fmt.Println("caller 2 closed", local.String(), remote.String())
 	}
 
 	net0 := NewDefaultNetwork(
@@ -1323,59 +1296,65 @@ func TestPeerAliases(t *testing.T) {
 		assert.Error(t, err)
 	}()
 
+	// Connect to peer with id1
 	net0.Track(ip1.IP())
 
 	wg0.Wait()
 
-	// create new network with ip2 with same peer as ip1
+	// Confirm net0 peers correct
+	assert.Len(t, net0.Peers(), 1)
+	assert.Equal(t, net0.Peers()[0].ID, id1.PrefixedString(constants.NodeIDPrefix))
+	assert.Equal(t, net0.Peers()[0].IP, ip1.String())
+	assert.Len(t, net2.Peers(), 0)
+
+	// Attempt to connect to ip2 (same id as ip1)
 	net0.Track(ip2.IP())
 
-	wg2.Wait()
-	wg2Passed = true
+	wg1.Wait()
+	wg1Passed = true
 
-	// Never will have been made a peer (so neither connected or disconnected)
-	assert.False(t, handler2Connected)
-	assert.False(t, handler2Disconnected)
+	// Ensure net2 never connected
+	assert.False(t, net2conn)
 
-	net0Peers := net0.Peers()
-	assert.Len(t, net0Peers, 1)
-	assert.Equal(t, net0Peers[0].ID, id1.PrefixedString(constants.NodeIDPrefix))
-	assert.Equal(t, net0Peers[0].IP, ip1.String())
-	net2Peers := net2.Peers()
-	assert.Len(t, net2Peers, 0)
+	// Confirm that ip2 was not added to net0 peers
+	assert.Len(t, net0.Peers(), 1)
+	assert.Equal(t, net0.Peers()[0].ID, id1.PrefixedString(constants.NodeIDPrefix))
+	assert.Equal(t, net0.Peers()[0].IP, ip1.String())
+	assert.Len(t, net2.Peers(), 0)
 
 	// Subsequent track call returns immediately with no connection attempts
 	net0.Track(ip2.IP())
 	time.Sleep(100 * time.Millisecond)
-	net0Peers = net0.Peers()
-	assert.Len(t, net0Peers, 1)
-	assert.Equal(t, net0Peers[0].ID, id1.PrefixedString(constants.NodeIDPrefix))
-	assert.Equal(t, net0Peers[0].IP, ip1.String())
-	net2Peers = net2.Peers()
-	assert.Len(t, net2Peers, 0)
 
-	// Attempt to call with same IP and different id
+	// Confirm that ip2 not added to net0 peers
+	assert.Len(t, net0.Peers(), 1)
+	assert.Equal(t, net0.Peers()[0].ID, id1.PrefixedString(constants.NodeIDPrefix))
+	assert.Equal(t, net0.Peers()[0].IP, ip1.String())
+	assert.Len(t, net2.Peers(), 0)
+
+	// Wait for aliases to be removed
 	time.Sleep(1000 * time.Millisecond)
-	// TODO: still looks like alias
+
+	// Track ip2 with id2
 	upgrader.m[ip2.String()] = id2
 	caller0.outbounds[ip2.String()] = listener3
-
 	net0.Track(ip2.IP())
 
-	// Confirm connected
-	wg3.Wait()
+	wg2.Wait()
 
-	net0Peers = net0.Peers()
-	assert.Len(t, net0Peers, 2)
-	assert.Equal(t, net0Peers[0].ID, id1.PrefixedString(constants.NodeIDPrefix))
-	assert.Equal(t, net0Peers[0].IP, ip1.String())
-	assert.Equal(t, net0Peers[1].ID, id2.PrefixedString(constants.NodeIDPrefix))
-	assert.Equal(t, net0Peers[1].IP, ip2.String())
-	net3Peers := net3.Peers()
-	assert.Len(t, net3Peers, 1)
-	assert.Equal(t, net3Peers[0].ID, id0.PrefixedString(constants.NodeIDPrefix))
-	assert.Equal(t, net3Peers[0].IP, ip0.String())
+	// Confirm that networks have correct peers
+	assert.Len(t, net0.Peers(), 2)
+	// TODO: need to handle map non-deterministic response
+	assert.Equal(t, net0.Peers()[0].ID, id1.PrefixedString(constants.NodeIDPrefix))
+	assert.Equal(t, net0.Peers()[0].IP, ip1.String())
+	assert.Equal(t, net0.Peers()[1].ID, id2.PrefixedString(constants.NodeIDPrefix))
+	assert.Equal(t, net0.Peers()[1].IP, ip2.String())
+	assert.Len(t, net2.Peers(), 0)
+	assert.Len(t, net3.Peers(), 1)
+	assert.Equal(t, net3.Peers()[0].ID, id0.PrefixedString(constants.NodeIDPrefix))
+	assert.Equal(t, net3.Peers()[0].IP, ip0.String())
 
+	// Cleanup
 	err := net0.Close()
 	assert.NoError(t, err)
 
