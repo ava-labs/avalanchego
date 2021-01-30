@@ -18,7 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-type ipAlias struct {
+// alias is secondary ip address where a peer
+// could be reached
+type alias struct {
 	// ip alias where peer is reachable
 	ip utils.IPDesc
 
@@ -58,9 +60,9 @@ type peer struct {
 
 	// ip may or may not be set when the peer is first started. is only modified
 	// on the connection's reader routine.
-	ip        utils.IPDesc
-	ipAliases []ipAlias
-	ipLock    sync.RWMutex
+	ip      utils.IPDesc
+	aliases []alias
+	ipLock  sync.RWMutex
 
 	// id should be set when the peer is first created.
 	id ids.ShortID
@@ -143,31 +145,13 @@ func (p *peer) requestFinishHandshake() {
 
 // release ip alieases that have timed out
 func (p *peer) releaseAliases() {
-	releaseTicker := time.NewTicker(p.net.aliasReleaseFreq)
+	releaseTicker := time.NewTicker(p.net.peerAliasReleaseFreq)
 	defer releaseTicker.Stop()
 
 	for {
 		select {
 		case <-releaseTicker.C:
-			p.ipLock.Lock()
-			if len(p.ipAliases) == 0 {
-				p.ipLock.Unlock()
-				continue
-			}
-
-			bestAlias := p.ipAliases[0]
-			if float64(p.net.clock.Time().Unix()-bestAlias.added) < p.net.aliasReleaseTimeout.Seconds() {
-				// TODO: clean this ugliness up
-				p.ipLock.Unlock()
-				continue
-			}
-			p.ipAliases = p.ipAliases[1:]
-			p.ipLock.Unlock()
-
-			// TODO: acquire locks (state lock)
-			p.net.stateLock.Lock()
-			delete(p.net.aliasIPs, bestAlias.ip.String())
-			p.net.stateLock.Unlock()
+			p.releaseAlias()
 		case <-p.tickerCloser:
 			return
 		}
@@ -878,4 +862,35 @@ func (p *peer) getIP() utils.IPDesc {
 	p.ipLock.RLock()
 	defer p.ipLock.RUnlock()
 	return p.ip
+}
+
+func (p *peer) removeAliases() {
+	p.ipLock.Lock()
+	defer p.ipLock.Unlock()
+
+	for _, alias := range p.aliases { // ip must be non-zero to be added
+		str := alias.ip.String()
+		delete(p.net.peerAliasIPs, str)
+	}
+	p.aliases = p.aliases[:0]
+}
+
+func (p *peer) releaseAlias() {
+	p.ipLock.Lock()
+	defer p.ipLock.Unlock()
+
+	if len(p.aliases) == 0 {
+		return
+	}
+
+	next := p.aliases[0]
+	if float64(p.net.clock.Time().Unix()-next.added) < p.net.peerAliasReleaseTimeout.Seconds() {
+		// TODO: clean this ugliness up
+		return
+	}
+	p.aliases = p.aliases[1:]
+
+	p.net.stateLock.Lock()
+	delete(p.net.peerAliasIPs, next.ip.String())
+	p.net.stateLock.Unlock()
 }
