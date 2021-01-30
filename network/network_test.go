@@ -61,6 +61,7 @@ func (l *testListener) Addr() net.Addr { return l.addr }
 type testDialer struct {
 	addr      net.Addr
 	outbounds map[string]*testListener
+	clients   map[string]*testConn
 	closer    func(net.Addr, net.Addr)
 }
 
@@ -88,6 +89,10 @@ func (d *testDialer) Dial(ip utils.IPDesc) (net.Conn, error) {
 
 	select {
 	case outbound.inbound <- server:
+		if d.clients == nil {
+			d.clients = map[string]*testConn{}
+		}
+		d.clients[ip.String()] = client
 		return client, nil
 	default:
 		return nil, errRefused
@@ -1384,6 +1389,401 @@ func TestPeerAliases_Ticker(t *testing.T) {
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
 	}, net1.Peers())
+	assert.Len(t, net2.Peers(), 0)
+	assertEqualPeers(t, map[string]ids.ShortID{
+		ip0.String(): id0,
+	}, net3.Peers())
+
+	// Cleanup
+	cleanup = true
+	err := net0.Close()
+	assert.NoError(t, err)
+
+	err = net1.Close()
+	assert.NoError(t, err)
+
+	err = net2.Close()
+	assert.NoError(t, err)
+
+	err = net3.Close()
+	assert.NoError(t, err)
+}
+
+func TestPeerAliases_Disconnect(t *testing.T) {
+	log := logging.NoLog{}
+	networkID := uint32(0)
+	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
+	versionParser := version.NewDefaultParser()
+
+	ip0 := utils.NewDynamicIPDesc(
+		net.IPv6loopback,
+		0,
+	)
+	id0 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip0.IP().String())))
+	ip1 := utils.NewDynamicIPDesc(
+		net.IPv6loopback,
+		1,
+	)
+	id1 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip1.IP().String())))
+	ip2 := utils.NewDynamicIPDesc(
+		net.IPv6loopback,
+		2,
+	)
+	id2 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip2.IP().String())))
+
+	listener0 := &testListener{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 0,
+		},
+		inbound: make(chan net.Conn, 1<<10),
+		closed:  make(chan struct{}),
+	}
+	caller0 := &testDialer{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 0,
+		},
+		outbounds: make(map[string]*testListener),
+	}
+	listener1 := &testListener{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 1,
+		},
+		inbound: make(chan net.Conn, 1<<10),
+		closed:  make(chan struct{}),
+	}
+	caller1 := &testDialer{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 1,
+		},
+		outbounds: make(map[string]*testListener),
+	}
+	listener2 := &testListener{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 2,
+		},
+		inbound: make(chan net.Conn, 1<<10),
+		closed:  make(chan struct{}),
+	}
+	caller2 := &testDialer{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 2,
+		},
+		outbounds: make(map[string]*testListener),
+	}
+	listener3 := &testListener{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 2,
+		},
+		inbound: make(chan net.Conn, 1<<10),
+		closed:  make(chan struct{}),
+	}
+	caller3 := &testDialer{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 2,
+		},
+		outbounds: make(map[string]*testListener),
+	}
+
+	caller0.outbounds[ip1.IP().String()] = listener1
+	caller0.outbounds[ip2.IP().String()] = listener2
+	caller1.outbounds[ip0.IP().String()] = listener0
+	caller2.outbounds[ip0.IP().String()] = listener0
+	caller3.outbounds[ip0.IP().String()] = listener0
+
+	upgrader := &testUpgrader{
+		m: map[string]ids.ShortID{
+			ip0.IP().String(): id0,
+			ip1.IP().String(): id1,
+			ip2.IP().String(): id1,
+		},
+	}
+	serverUpgrader := upgrader
+	clientUpgrader := upgrader
+
+	vdrs := validators.NewSet()
+
+	var (
+		wg0 sync.WaitGroup
+		wg1 sync.WaitGroup
+		wg2 sync.WaitGroup
+		wg3 sync.WaitGroup
+	)
+	wg0.Add(2)
+	wg1.Add(1)
+	wg2.Add(3)
+	wg3.Add(2)
+
+	cleanup := false
+	handler0 := &testHandler{
+		connected: func(id ids.ShortID) {
+			if id == id1 {
+				wg0.Done()
+				return
+			}
+			if id == id2 {
+				wg3.Done()
+				return
+			}
+			if cleanup {
+				return
+			}
+
+			assert.Fail(t, "handler 0 unauthorized connection", id.String())
+		},
+		disconnected: func(id ids.ShortID) {
+			if id == id1 {
+				wg2.Done()
+				return
+			}
+			if cleanup {
+				return
+			}
+
+			assert.Fail(t, "handler 0 unauthorized disconnect", id.String())
+		},
+	}
+
+	handler1 := &testHandler{
+		connected: func(id ids.ShortID) {
+			if id == id0 {
+				wg0.Done()
+				return
+			}
+			if cleanup {
+				return
+			}
+
+			assert.Fail(t, "handler 1 unauthorized connection", id.String())
+		},
+	}
+
+	handler2 := &testHandler{
+		connected: func(id ids.ShortID) {
+			if cleanup {
+				return
+			}
+
+			assert.Fail(t, "handler 2 unauthorized connection", id.String())
+		},
+	}
+
+	handler3 := &testHandler{
+		connected: func(id ids.ShortID) {
+			if id == id0 {
+				wg3.Done()
+				return
+			}
+			if cleanup {
+				return
+			}
+
+			assert.Fail(t, "handler 3 unauthorized connection", id.String())
+		},
+	}
+
+	wg1Done := false
+	wg2Done := false
+	caller0.closer = func(local net.Addr, remote net.Addr) {
+		if remote.String() == ip2.String() && !wg1Done {
+			wg1.Done()
+			return
+		}
+		if remote.String() == ip1.String() && !wg2Done {
+			wg2.Done()
+			return
+		}
+		if local.String() == ip1.String() && !wg2Done {
+			wg2.Done()
+			return
+		}
+		if cleanup {
+			return
+		}
+
+		assert.Fail(t, "caller 0 unauthorized close", local.String(), remote.String())
+	}
+
+	net0 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
+		log,
+		id0,
+		ip0,
+		networkID,
+		appVersion,
+		versionParser,
+		listener0,
+		caller0,
+		serverUpgrader,
+		clientUpgrader,
+		vdrs,
+		vdrs,
+		handler0,
+		time.Duration(0),
+		0,
+		nil,
+		false,
+		0,
+		0,
+		time.Now(),
+		defaultSendQueueSize,
+		defaultAliasReleaseFreq,
+		defaultAliasReleaseTimeout,
+	)
+	assert.NotNil(t, net0)
+
+	net1 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
+		log,
+		id1,
+		ip1,
+		networkID,
+		appVersion,
+		versionParser,
+		listener1,
+		caller1,
+		serverUpgrader,
+		clientUpgrader,
+		vdrs,
+		vdrs,
+		handler1,
+		time.Duration(0),
+		0,
+		nil,
+		false,
+		0,
+		0,
+		time.Now(),
+		defaultSendQueueSize,
+		defaultAliasReleaseFreq,
+		defaultAliasReleaseTimeout,
+	)
+	assert.NotNil(t, net1)
+
+	net2 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
+		log,
+		id1,
+		ip2,
+		networkID,
+		appVersion,
+		versionParser,
+		listener2,
+		caller2,
+		serverUpgrader,
+		clientUpgrader,
+		vdrs,
+		vdrs,
+		handler2,
+		time.Duration(0),
+		0,
+		nil,
+		false,
+		0,
+		0,
+		time.Now(),
+		defaultSendQueueSize,
+		defaultAliasReleaseFreq,
+		defaultAliasReleaseTimeout,
+	)
+	assert.NotNil(t, net2)
+
+	net3 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
+		log,
+		id2,
+		ip2,
+		networkID,
+		appVersion,
+		versionParser,
+		listener3,
+		caller3,
+		serverUpgrader,
+		clientUpgrader,
+		vdrs,
+		vdrs,
+		handler3,
+		time.Duration(0),
+		0,
+		nil,
+		false,
+		0,
+		0,
+		time.Now(),
+		defaultSendQueueSize,
+		defaultAliasReleaseFreq,
+		defaultAliasReleaseTimeout,
+	)
+	assert.NotNil(t, net3)
+
+	go func() {
+		err := net0.Dispatch()
+		assert.Error(t, err)
+	}()
+	go func() {
+		err := net1.Dispatch()
+		assert.Error(t, err)
+	}()
+	go func() {
+		err := net2.Dispatch()
+		assert.Error(t, err)
+	}()
+	go func() {
+		err := net3.Dispatch()
+		assert.Error(t, err)
+	}()
+
+	// Connect to peer with id1
+	net0.Track(ip1.IP())
+
+	// Confirm peers correct
+	wg0.Wait()
+	assertEqualPeers(t, map[string]ids.ShortID{
+		ip1.String(): id1,
+	}, net0.Peers())
+	assertEqualPeers(t, map[string]ids.ShortID{
+		ip0.String(): id0,
+	}, net1.Peers())
+	assert.Len(t, net2.Peers(), 0)
+	assert.Len(t, net3.Peers(), 0)
+
+	// Attempt to connect to ip2 (same id as ip1)
+	net0.Track(ip2.IP())
+
+	// Confirm that ip2 was not added to net0 peers
+	wg1.Wait()
+	wg1Done = true
+	assertEqualPeers(t, map[string]ids.ShortID{
+		ip1.String(): id1,
+	}, net0.Peers())
+	assertEqualPeers(t, map[string]ids.ShortID{
+		ip0.String(): id0,
+	}, net1.Peers())
+	assert.Len(t, net2.Peers(), 0)
+	assert.Len(t, net3.Peers(), 0)
+
+	// Disconnect original peer
+	caller0.clients[ip1.String()].Close()
+
+	// Track ip2 on net3
+	wg2.Wait()
+	wg2Done = true
+	upgrader.m[ip2.String()] = id2
+	caller0.outbounds[ip2.String()] = listener3
+	net0.Track(ip2.IP())
+
+	// Confirm that id2 was added as peer
+	wg3.Wait()
+	assertEqualPeers(t, map[string]ids.ShortID{
+		ip2.String(): id2,
+	}, net0.Peers())
 	assert.Len(t, net2.Peers(), 0)
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
