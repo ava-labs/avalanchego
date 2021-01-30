@@ -246,6 +246,10 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Coreth Config
 	fs.String(corethConfigKey, defaultString, "Specifies config to pass into coreth")
 
+	// Peer Alias Configuration:
+	fs.Duration(peerAliasReleaseFrequency, 1*time.Minute, "")
+	fs.Duration(peerAliasReleaseTimeout, 10*time.Minute, "")
+
 	return fs
 }
 
@@ -692,6 +696,13 @@ func setNodeConfig(v *viper.Viper) error {
 		}
 	}
 	Config.CorethConfig = corethConfigString
+
+	// Peer alias
+	Config.PeerAliasReleaseFrequency = v.GetDuration(peerAliasReleaseFrequency)
+	Config.PeerAliasReleaseTimeout = v.GetDuration(peerAliasReleaseTimeout)
+	if Config.PeerAliasReleaseFrequency > Config.PeerAliasReleaseTimeout {
+		return fmt.Errorf("[%s] can't be greater than [%s]", peerAliasReleaseFrequency, peerAliasReleaseTimeout)
+	}
 
 	return nil
 }

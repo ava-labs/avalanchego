@@ -246,6 +246,8 @@ func (n *Node) initNetworking() error {
 		n.Config.DisconnectedRestartTimeout,
 		n.Config.ApricotPhase0Time,
 		n.Config.SendQueueSize,
+		n.Config.PeerAliasReleaseFrequency,
+		n.Config.PeerAliasReleaseTimeout,
 	)
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {

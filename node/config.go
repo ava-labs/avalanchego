@@ -128,4 +128,8 @@ type Config struct {
 
 	// Coreth
 	CorethConfig string
+
+	// Peer alias configuration
+	PeerAliasReleaseFrequency time.Duration
+	PeerAliasReleaseTimeout   time.Duration
 }
