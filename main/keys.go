@@ -89,6 +89,6 @@ const (
 	disconnectedCheckFreqKey        = "disconnected-check-frequency"
 	disconnectedRestartTimeoutKey   = "disconnected-restart-timeout"
 	restartOnDisconnectedKey        = "restart-on-disconnected"
-	peerAliasReleaseFrequency       = "peer-alias-release-frequency"
-	peerAliasReleaseTimeout         = "peer-alias-release-timeout"
+	peerAliasReleaseFreqKey         = "peer-alias-release-frequency"
+	peerAliasTimeoutKey             = "peer-alias-timeout"
 )

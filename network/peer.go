@@ -18,13 +18,13 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-// alias is secondary ip address where a peer
-// could be reached
+// alias is a secondary IP address where a peer
+// was reached
 type alias struct {
-	// ip alias where peer is reachable
+	// ip where peer was reached
 	ip utils.IPDesc
 
-	// unix time when peer alias assigned
+	// added is unix time when peer was reached on alias IP
 	added int64
 }
 
@@ -86,12 +86,12 @@ type peer struct {
 func (p *peer) Start() {
 	go p.ReadMessages()
 	go p.WriteMessages()
-	go p.releaseAliases()
 }
 
 func (p *peer) StartTicker() {
 	go p.requestFinishHandshake()
 	go p.sendPings()
+	go p.monitorAliases()
 }
 
 func (p *peer) sendPings() {
@@ -143,15 +143,20 @@ func (p *peer) requestFinishHandshake() {
 	}
 }
 
-// release ip alieases that have timed out
-func (p *peer) releaseAliases() {
+func (p *peer) monitorAliases() {
+	// Exit if release frequency is 0, otherwise
+	// time.NewTicker will panic.
+	if p.net.peerAliasReleaseFreq == 0 {
+		return
+	}
+
 	releaseTicker := time.NewTicker(p.net.peerAliasReleaseFreq)
 	defer releaseTicker.Stop()
 
 	for {
 		select {
 		case <-releaseTicker.C:
-			p.releaseAlias()
+			p.releaseExpiredAliases()
 		case <-p.tickerCloser:
 			return
 		}
@@ -864,7 +869,20 @@ func (p *peer) getIP() utils.IPDesc {
 	return p.ip
 }
 
-func (p *peer) removeAliases() {
+// assumes stateLock is held
+func (p *peer) addAlias(ip utils.IPDesc) {
+	p.ipLock.Lock()
+	defer p.ipLock.Unlock()
+
+	p.net.peerAliasIPs[ip.String()] = struct{}{}
+	p.aliases = append(p.aliases, alias{
+		ip:    ip,
+		added: p.net.clock.Time().Unix(),
+	})
+}
+
+// assumes stateLock is held
+func (p *peer) releaseAliases() {
 	p.ipLock.Lock()
 	defer p.ipLock.Unlock()
 
@@ -877,24 +895,23 @@ func (p *peer) removeAliases() {
 	p.aliases = p.aliases[:0]
 }
 
-func (p *peer) releaseAlias() {
+// assumes stateLock is not held
+func (p *peer) releaseExpiredAliases() {
 	p.ipLock.Lock()
 	defer p.ipLock.Unlock()
 
-	if len(p.aliases) == 0 {
-		return
+	for len(p.aliases) > 0 {
+		next := p.aliases[0]
+		aliasAge := float64(p.net.clock.Time().Unix() - next.added)
+		if aliasAge < p.net.peerAliasTimeout.Seconds() {
+			return
+		}
+		p.aliases = p.aliases[1:]
+
+		p.net.stateLock.Lock()
+		delete(p.net.peerAliasIPs, next.ip.String())
+		p.net.stateLock.Unlock()
+
+		p.net.log.Verbo("released alias %s for peer %s", next.ip.String(), p.id.String())
 	}
-
-	next := p.aliases[0]
-	aliasDuration := float64(p.net.clock.Time().Unix() - next.added)
-	if aliasDuration < p.net.peerAliasReleaseTimeout.Seconds() {
-		return
-	}
-	p.aliases = p.aliases[1:]
-
-	p.net.stateLock.Lock()
-	delete(p.net.peerAliasIPs, next.ip.String())
-	p.net.stateLock.Unlock()
-
-	p.net.log.Verbo("released alias %s for peer %s", next.ip.String(), p.id.String())
 }

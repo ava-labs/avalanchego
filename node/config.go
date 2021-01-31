@@ -131,5 +131,5 @@ type Config struct {
 
 	// Peer alias configuration
 	PeerAliasReleaseFrequency time.Duration
-	PeerAliasReleaseTimeout   time.Duration
+	PeerAliasTimeout          time.Duration
 }

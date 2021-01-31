@@ -246,9 +246,12 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Coreth Config
 	fs.String(corethConfigKey, defaultString, "Specifies config to pass into coreth")
 
-	// Peer Alias Configuration:
-	fs.Duration(peerAliasReleaseFrequency, 1*time.Minute, "")
-	fs.Duration(peerAliasReleaseTimeout, 10*time.Minute, "")
+	// Peer alias configuration
+	fs.Duration(peerAliasReleaseFreqKey, 1*time.Minute, "How often the node attempts to release timed out peer aliases. "+
+		"See [peer-alias-timeout]. If 0, node will not release timed out peer aliases.")
+	fs.Duration(peerAliasTimeoutKey, 10*time.Minute, "How often the node will attempt to connect "+
+		"to an IP address previously associated with a peer (i.e. a peer alias). The node "+
+		"will only attempt to connect to previous aliases if [peer-alias-release-frequency] > 0.")
 
 	return fs
 }
@@ -698,10 +701,10 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.CorethConfig = corethConfigString
 
 	// Peer alias
-	Config.PeerAliasReleaseFrequency = v.GetDuration(peerAliasReleaseFrequency)
-	Config.PeerAliasReleaseTimeout = v.GetDuration(peerAliasReleaseTimeout)
-	if Config.PeerAliasReleaseFrequency > Config.PeerAliasReleaseTimeout {
-		return fmt.Errorf("[%s] can't be greater than [%s]", peerAliasReleaseFrequency, peerAliasReleaseTimeout)
+	Config.PeerAliasReleaseFrequency = v.GetDuration(peerAliasReleaseFreqKey)
+	Config.PeerAliasTimeout = v.GetDuration(peerAliasTimeoutKey)
+	if Config.PeerAliasReleaseFrequency > Config.PeerAliasTimeout {
+		return fmt.Errorf("[%s] can't be greater than [%s]", peerAliasReleaseFreqKey, peerAliasTimeoutKey)
 	}
 
 	return nil

@@ -141,18 +141,22 @@ type network struct {
 	apricotPhase0Time                  time.Time
 
 	// stateLock should never be held when grabbing a peer lock
-	stateLock               sync.RWMutex
-	pendingBytes            int64
-	closed                  utils.AtomicBool
-	disconnectedIPs         map[string]struct{}
-	connectedIPs            map[string]struct{}
-	peerAliasIPs            map[string]struct{}
-	peerAliasReleaseFreq    time.Duration
-	peerAliasReleaseTimeout time.Duration
-	retryDelay              map[string]time.Duration
+	stateLock       sync.RWMutex
+	pendingBytes    int64
+	closed          utils.AtomicBool
+	disconnectedIPs map[string]struct{}
+	connectedIPs    map[string]struct{}
+	retryDelay      map[string]time.Duration
 	// TODO: bound the size of [myIPs] to avoid DoS. LRU caching would be ideal
 	myIPs map[string]struct{} // set of IPs that resulted in my ID.
 	peers map[ids.ShortID]*peer
+
+	// tracking peerAliasIPs prevents the network
+	// from trying to open multiple connections
+	// to the same peer.
+	peerAliasIPs         map[string]struct{} // must hold stateLock to access/modify
+	peerAliasReleaseFreq time.Duration
+	peerAliasTimeout     time.Duration
 
 	// ensures the close of the network only happens once.
 	closeOnce sync.Once
@@ -208,7 +212,7 @@ func NewDefaultNetwork(
 	apricotPhase0Time time.Time,
 	sendQueueSize uint32,
 	peerAliasReleaseFreq time.Duration,
-	peerAliasReleaseTimeout time.Duration,
+	peerAliasTimeout time.Duration,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -251,7 +255,7 @@ func NewDefaultNetwork(
 		disconnectedRestartTimeout,
 		apricotPhase0Time,
 		peerAliasReleaseFreq,
-		peerAliasReleaseTimeout,
+		peerAliasTimeout,
 	)
 }
 
@@ -297,7 +301,7 @@ func NewNetwork(
 	disconnectedRestartTimeout time.Duration,
 	apricotPhase0Time time.Time,
 	peerAliasReleaseFreq time.Duration,
-	peerAliasReleaseTimeout time.Duration,
+	peerAliasTimeout time.Duration,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -337,7 +341,7 @@ func NewNetwork(
 		connectedIPs:                       make(map[string]struct{}),
 		peerAliasIPs:                       make(map[string]struct{}),
 		peerAliasReleaseFreq:               peerAliasReleaseFreq,
-		peerAliasReleaseTimeout:            peerAliasReleaseTimeout,
+		peerAliasTimeout:                   peerAliasTimeout,
 		retryDelay:                         make(map[string]time.Duration),
 		myIPs:                              map[string]struct{}{ip.IP().String(): {}},
 		peers:                              make(map[ids.ShortID]*peer),
@@ -1150,19 +1154,13 @@ func (n *network) tryAddPeer(p *peer) error {
 	}
 
 	// If I am already connected to this peer, then I should close this new
-	// connection.
+	// connection and add an alias record.
 	if existing, ok := n.peers[p.id]; ok {
 		if !ip.IsZero() {
 			str := ip.String()
 			delete(n.disconnectedIPs, str)
 			delete(n.retryDelay, str)
-			n.peerAliasIPs[str] = struct{}{}
-			existing.ipLock.Lock()
-			existing.aliases = append(existing.aliases, alias{
-				ip:    ip,
-				added: n.clock.Time().Unix(),
-			})
-			existing.ipLock.Unlock()
+			existing.addAlias(ip)
 		}
 		return fmt.Errorf("duplicated connection from %s at %s", p.id.PrefixedString(constants.NodeIDPrefix), ip)
 	}
@@ -1249,7 +1247,7 @@ func (n *network) disconnected(p *peer) {
 	delete(n.peers, p.id)
 	n.numPeers.Set(float64(len(n.peers)))
 
-	p.removeAliases()
+	p.releaseAliases()
 
 	if !ip.IsZero() {
 		str := ip.String()

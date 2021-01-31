@@ -25,9 +25,9 @@ import (
 )
 
 const (
-	defaultSendQueueSize       = 1 << 10
-	defaultAliasReleaseFreq    = 500 * time.Millisecond
-	defaultAliasReleaseTimeout = 100 * time.Millisecond
+	defaultSendQueueSize    = 1 << 10
+	defaultAliasReleaseFreq = 250 * time.Millisecond
+	defaultAliasTimeout     = 2 * time.Second
 )
 
 var (
@@ -59,16 +59,22 @@ func (l *testListener) Close() error {
 func (l *testListener) Addr() net.Addr { return l.addr }
 
 type testDialer struct {
-	addr         net.Addr
-	outbounds    map[string]*testListener
-	outboundLock sync.Mutex
-	clients      map[string]*testConn
-	closer       func(net.Addr, net.Addr)
+	addr net.Addr
+
+	outbounds     map[string]*testListener
+	outboundsLock sync.Mutex
+
+	// clients tracks opened client connections
+	// by IP
+	clients map[string]*testConn
+
+	// closer is invoked when testDialer is closed
+	closer func(net.Addr, net.Addr)
 }
 
 func (d *testDialer) Dial(ip utils.IPDesc) (net.Conn, error) {
-	d.outboundLock.Lock()
-	defer d.outboundLock.Unlock()
+	d.outboundsLock.Lock()
+	defer d.outboundsLock.Unlock()
 
 	outbound, ok := d.outbounds[ip.String()]
 	if !ok {
@@ -94,9 +100,10 @@ func (d *testDialer) Dial(ip utils.IPDesc) (net.Conn, error) {
 	select {
 	case outbound.inbound <- server:
 		if d.clients == nil {
-			d.clients = map[string]*testConn{}
+			d.clients = make(map[string]*testConn)
 		}
 		d.clients[ip.String()] = client
+
 		return client, nil
 	default:
 		return nil, errRefused
@@ -104,8 +111,8 @@ func (d *testDialer) Dial(ip utils.IPDesc) (net.Conn, error) {
 }
 
 func (d *testDialer) Update(ip utils.DynamicIPDesc, listener *testListener) {
-	d.outboundLock.Lock()
-	defer d.outboundLock.Unlock()
+	d.outboundsLock.Lock()
+	defer d.outboundsLock.Unlock()
 
 	d.outbounds[ip.String()] = listener
 }
@@ -116,7 +123,9 @@ type testConn struct {
 	pendingWrites chan []byte
 	closed        chan struct{}
 	once          sync.Once
-	closer        func(net.Addr, net.Addr)
+
+	// closer is invoked when testConn is closed
+	closer func(net.Addr, net.Addr)
 
 	local, remote net.Addr
 }
@@ -158,10 +167,11 @@ func (c *testConn) Write(b []byte) (int, error) {
 
 func (c *testConn) Close() error {
 	c.once.Do(func() {
+		close(c.closed)
+
 		if c.closer != nil {
 			c.closer(c.local, c.remote)
 		}
-		close(c.closed)
 	})
 	return nil
 }
@@ -189,24 +199,28 @@ func (h *testHandler) Disconnected(id ids.ShortID) {
 	}
 }
 
+// testUpgrader is used to provide a custom
+// id for a given IP
 type testUpgrader struct {
-	m map[string]ids.ShortID
-	l sync.Mutex
+	// ids is a mapping of IP addresses
+	// to id
+	ids     map[string]ids.ShortID
+	idsLock sync.Mutex
 }
 
-func (t *testUpgrader) Upgrade(conn net.Conn) (ids.ShortID, net.Conn, error) {
-	t.l.Lock()
-	defer t.l.Unlock()
+func (u *testUpgrader) Upgrade(conn net.Conn) (ids.ShortID, net.Conn, error) {
+	u.idsLock.Lock()
+	defer u.idsLock.Unlock()
 	addr := conn.RemoteAddr()
 	str := addr.String()
-	return t.m[str], conn, nil
+	return u.ids[str], conn, nil
 }
 
-func (t *testUpgrader) Update(ip utils.DynamicIPDesc, id ids.ShortID) {
-	t.l.Lock()
-	defer t.l.Unlock()
+func (u *testUpgrader) Update(ip utils.DynamicIPDesc, id ids.ShortID) {
+	u.idsLock.Lock()
+	defer u.idsLock.Unlock()
 
-	t.m[ip.String()] = id
+	u.ids[ip.String()] = id
 }
 
 func TestNewDefaultNetwork(t *testing.T) {
@@ -265,7 +279,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		defaultAliasReleaseFreq,
-		defaultAliasReleaseTimeout,
+		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net)
 
@@ -381,7 +395,7 @@ func TestEstablishConnection(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		defaultAliasReleaseFreq,
-		defaultAliasReleaseTimeout,
+		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net0)
 
@@ -409,7 +423,7 @@ func TestEstablishConnection(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		defaultAliasReleaseFreq,
-		defaultAliasReleaseTimeout,
+		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net1)
 
@@ -537,7 +551,7 @@ func TestDoubleTrack(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		defaultAliasReleaseFreq,
-		defaultAliasReleaseTimeout,
+		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net0)
 
@@ -565,7 +579,7 @@ func TestDoubleTrack(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		defaultAliasReleaseFreq,
-		defaultAliasReleaseTimeout,
+		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net1)
 
@@ -694,7 +708,7 @@ func TestDoubleClose(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		defaultAliasReleaseFreq,
-		defaultAliasReleaseTimeout,
+		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net0)
 
@@ -722,7 +736,7 @@ func TestDoubleClose(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		defaultAliasReleaseFreq,
-		defaultAliasReleaseTimeout,
+		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net1)
 
@@ -856,7 +870,7 @@ func TestTrackConnected(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		defaultAliasReleaseFreq,
-		defaultAliasReleaseTimeout,
+		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net0)
 
@@ -884,7 +898,7 @@ func TestTrackConnected(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		defaultAliasReleaseFreq,
-		defaultAliasReleaseTimeout,
+		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net1)
 
@@ -992,7 +1006,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		defaultAliasReleaseFreq,
-		defaultAliasReleaseTimeout,
+		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net0)
 
@@ -1020,7 +1034,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		defaultAliasReleaseFreq,
-		defaultAliasReleaseTimeout,
+		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net1)
 
@@ -1141,7 +1155,7 @@ func TestPeerAliases_Ticker(t *testing.T) {
 	caller3.outbounds[ip0.IP().String()] = listener0
 
 	upgrader := &testUpgrader{
-		m: map[string]ids.ShortID{
+		ids: map[string]ids.ShortID{
 			ip0.IP().String(): id0,
 			ip1.IP().String(): id1,
 			ip2.IP().String(): id1,
@@ -1153,15 +1167,17 @@ func TestPeerAliases_Ticker(t *testing.T) {
 	vdrs := validators.NewSet()
 
 	var (
-		wg0 sync.WaitGroup
-		wg1 sync.WaitGroup
-		wg2 sync.WaitGroup
+		wg0     sync.WaitGroup
+		wg1     sync.WaitGroup
+		wg1Done bool
+		wg2     sync.WaitGroup
+
+		cleanup bool
 	)
 	wg0.Add(2)
 	wg1.Add(1)
 	wg2.Add(2)
 
-	cleanup := false
 	handler0 := &testHandler{
 		connected: func(id ids.ShortID) {
 			if id == id1 {
@@ -1218,7 +1234,6 @@ func TestPeerAliases_Ticker(t *testing.T) {
 		},
 	}
 
-	wg1Done := false
 	caller0.closer = func(local net.Addr, remote net.Addr) {
 		if remote.String() == ip2.String() && !wg1Done {
 			wg1.Done()
@@ -1255,7 +1270,7 @@ func TestPeerAliases_Ticker(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		defaultAliasReleaseFreq,
-		defaultAliasReleaseTimeout,
+		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net0)
 
@@ -1283,7 +1298,7 @@ func TestPeerAliases_Ticker(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		defaultAliasReleaseFreq,
-		defaultAliasReleaseTimeout,
+		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net1)
 
@@ -1311,7 +1326,7 @@ func TestPeerAliases_Ticker(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		defaultAliasReleaseFreq,
-		defaultAliasReleaseTimeout,
+		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net2)
 
@@ -1339,7 +1354,7 @@ func TestPeerAliases_Ticker(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		defaultAliasReleaseFreq,
-		defaultAliasReleaseTimeout,
+		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net3)
 
@@ -1390,11 +1405,11 @@ func TestPeerAliases_Ticker(t *testing.T) {
 	assert.Len(t, net3.Peers(), 0)
 
 	// Subsequent track call returns immediately with no connection attempts
-	// (will cause fatal error from unauthorized connection)
+	// (would cause fatal error from unauthorized connection if allowed)
 	net0.Track(ip2.IP())
 
 	// Wait for aliases to be removed by peer
-	time.Sleep(2 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	// Track ip2 on net3
 	upgrader.Update(ip2, id2)
@@ -1520,7 +1535,7 @@ func TestPeerAliases_Disconnect(t *testing.T) {
 	caller3.outbounds[ip0.IP().String()] = listener0
 
 	upgrader := &testUpgrader{
-		m: map[string]ids.ShortID{
+		ids: map[string]ids.ShortID{
 			ip0.IP().String(): id0,
 			ip1.IP().String(): id1,
 			ip2.IP().String(): id1,
@@ -1532,17 +1547,20 @@ func TestPeerAliases_Disconnect(t *testing.T) {
 	vdrs := validators.NewSet()
 
 	var (
-		wg0 sync.WaitGroup
-		wg1 sync.WaitGroup
-		wg2 sync.WaitGroup
-		wg3 sync.WaitGroup
+		wg0     sync.WaitGroup
+		wg1     sync.WaitGroup
+		wg1Done bool
+		wg2     sync.WaitGroup
+		wg2Done bool
+		wg3     sync.WaitGroup
+
+		cleanup bool
 	)
 	wg0.Add(2)
 	wg1.Add(1)
 	wg2.Add(3)
 	wg3.Add(2)
 
-	cleanup := false
 	handler0 := &testHandler{
 		connected: func(id ids.ShortID) {
 			if id == id1 {
@@ -1610,8 +1628,6 @@ func TestPeerAliases_Disconnect(t *testing.T) {
 		},
 	}
 
-	wg1Done := false
-	wg2Done := false
 	caller0.closer = func(local net.Addr, remote net.Addr) {
 		if remote.String() == ip2.String() && !wg1Done {
 			wg1.Done()
@@ -1656,7 +1672,7 @@ func TestPeerAliases_Disconnect(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		defaultAliasReleaseFreq,
-		defaultAliasReleaseTimeout,
+		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net0)
 
@@ -1684,7 +1700,7 @@ func TestPeerAliases_Disconnect(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		defaultAliasReleaseFreq,
-		defaultAliasReleaseTimeout,
+		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net1)
 
@@ -1712,7 +1728,7 @@ func TestPeerAliases_Disconnect(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		defaultAliasReleaseFreq,
-		defaultAliasReleaseTimeout,
+		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net2)
 
@@ -1740,7 +1756,7 @@ func TestPeerAliases_Disconnect(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		defaultAliasReleaseFreq,
-		defaultAliasReleaseTimeout,
+		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net3)
 
@@ -1811,6 +1827,9 @@ func TestPeerAliases_Disconnect(t *testing.T) {
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip2.String(): id2,
 	}, net0.Peers())
+	assertEqualPeers(t, map[string]ids.ShortID{
+		ip0.String(): id0,
+	}, net1.Peers())
 	assert.Len(t, net2.Peers(), 0)
 	assertEqualPeers(t, map[string]ids.ShortID{
 		ip0.String(): id0,
