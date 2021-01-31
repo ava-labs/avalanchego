@@ -27,7 +27,7 @@ import (
 const (
 	defaultSendQueueSize       = 1 << 10
 	defaultAliasReleaseFreq    = 500 * time.Millisecond
-	defaultAliasReleaseTimeout = 10 * time.Millisecond
+	defaultAliasReleaseTimeout = 100 * time.Millisecond
 )
 
 var (
@@ -59,13 +59,17 @@ func (l *testListener) Close() error {
 func (l *testListener) Addr() net.Addr { return l.addr }
 
 type testDialer struct {
-	addr      net.Addr
-	outbounds map[string]*testListener
-	clients   map[string]*testConn
-	closer    func(net.Addr, net.Addr)
+	addr         net.Addr
+	outbounds    map[string]*testListener
+	outboundLock sync.Mutex
+	clients      map[string]*testConn
+	closer       func(net.Addr, net.Addr)
 }
 
 func (d *testDialer) Dial(ip utils.IPDesc) (net.Conn, error) {
+	d.outboundLock.Lock()
+	defer d.outboundLock.Unlock()
+
 	outbound, ok := d.outbounds[ip.String()]
 	if !ok {
 		return nil, errRefused
@@ -97,6 +101,13 @@ func (d *testDialer) Dial(ip utils.IPDesc) (net.Conn, error) {
 	default:
 		return nil, errRefused
 	}
+}
+
+func (d *testDialer) Update(ip utils.DynamicIPDesc, listener *testListener) {
+	d.outboundLock.Lock()
+	defer d.outboundLock.Unlock()
+
+	d.outbounds[ip.String()] = listener
 }
 
 type testConn struct {
@@ -180,12 +191,22 @@ func (h *testHandler) Disconnected(id ids.ShortID) {
 
 type testUpgrader struct {
 	m map[string]ids.ShortID
+	l sync.Mutex
 }
 
 func (t *testUpgrader) Upgrade(conn net.Conn) (ids.ShortID, net.Conn, error) {
+	t.l.Lock()
+	defer t.l.Unlock()
 	addr := conn.RemoteAddr()
 	str := addr.String()
 	return t.m[str], conn, nil
+}
+
+func (t *testUpgrader) Update(ip utils.DynamicIPDesc, id ids.ShortID) {
+	t.l.Lock()
+	defer t.l.Unlock()
+
+	t.m[ip.String()] = id
 }
 
 func TestNewDefaultNetwork(t *testing.T) {
@@ -1373,11 +1394,11 @@ func TestPeerAliases_Ticker(t *testing.T) {
 	net0.Track(ip2.IP())
 
 	// Wait for aliases to be removed by peer
-	time.Sleep(1000 * time.Millisecond)
+	time.Sleep(2 * time.Second)
 
 	// Track ip2 on net3
-	upgrader.m[ip2.String()] = id2
-	caller0.outbounds[ip2.String()] = listener3
+	upgrader.Update(ip2, id2)
+	caller0.Update(ip2, listener3)
 	net0.Track(ip2.IP())
 
 	// Confirm that id2 was added as peer
@@ -1781,8 +1802,8 @@ func TestPeerAliases_Disconnect(t *testing.T) {
 	}, net1.Peers())
 	assert.Len(t, net2.Peers(), 0)
 	assert.Len(t, net3.Peers(), 0)
-	upgrader.m[ip2.String()] = id2
-	caller0.outbounds[ip2.String()] = listener3
+	upgrader.Update(ip2, id2)
+	caller0.Update(ip2, listener3)
 	net0.Track(ip2.IP())
 
 	// Confirm that id2 was added as peer
