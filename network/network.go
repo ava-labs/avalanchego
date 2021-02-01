@@ -141,22 +141,35 @@ type network struct {
 	apricotPhase0Time                  time.Time
 
 	// stateLock should never be held when grabbing a peer lock
-	stateLock       sync.RWMutex
-	pendingBytes    int64
-	closed          utils.AtomicBool
-	disconnectedIPs map[string]struct{}
-	connectedIPs    map[string]struct{}
-	retryDelay      map[string]time.Duration
+	stateLock    sync.RWMutex
+	pendingBytes int64
+	closed       utils.AtomicBool
+	peers        map[ids.ShortID]*peer
+
+	// disconnectedIPs, connectedIPs, peerAliasIPs, and myIPs
+	// are maps with ip.String() keys that are used to determine if
+	// we should attempt to dial an IP. [stateLock] should be held
+	// whenever accessing one of these maps.
+	disconnectedIPs map[string]struct{} // set of IPs we are attempting to connect to
+	connectedIPs    map[string]struct{} // set of IPs we have open connections with
+	peerAliasIPs    map[string]struct{} // set of alternate IPs we've reached existing peers at
 	// TODO: bound the size of [myIPs] to avoid DoS. LRU caching would be ideal
 	myIPs map[string]struct{} // set of IPs that resulted in my ID.
-	peers map[ids.ShortID]*peer
 
-	// tracking peerAliasIPs prevents the network
-	// from trying to open multiple connections
-	// to the same peer.
-	peerAliasIPs         map[string]struct{} // must hold stateLock to access/modify
+	// retryDelay is a map with ip.String() keys that is used to track
+	// the backoff delay we should wait before attempting to dial an IP address
+	// again.
+	retryDelay map[string]time.Duration
+
+	// peerAliasReleaseFreq determines how often we should
+	// attempt to release aliases that are at least
+	// [peerAliasTimeout] old.
 	peerAliasReleaseFreq time.Duration
-	peerAliasTimeout     time.Duration
+
+	// peerAliasTimeout is the age a peer alias must
+	// be before we attempt to release it (so that we
+	// attempt to dial the IP again if gossiped to us).
+	peerAliasTimeout time.Duration
 
 	// ensures the close of the network only happens once.
 	closeOnce sync.Once
@@ -1155,12 +1168,12 @@ func (n *network) tryAddPeer(p *peer) error {
 
 	// If I am already connected to this peer, then I should close this new
 	// connection and add an alias record.
-	if existing, ok := n.peers[p.id]; ok {
+	if peer, ok := n.peers[p.id]; ok {
 		if !ip.IsZero() {
 			str := ip.String()
 			delete(n.disconnectedIPs, str)
 			delete(n.retryDelay, str)
-			existing.addAlias(ip)
+			peer.addAlias(ip)
 		}
 		return fmt.Errorf("duplicated connection from %s at %s", p.id.PrefixedString(constants.NodeIDPrefix), ip)
 	}
@@ -1247,7 +1260,7 @@ func (n *network) disconnected(p *peer) {
 	delete(n.peers, p.id)
 	n.numPeers.Set(float64(len(n.peers)))
 
-	p.releaseAliases()
+	p.releaseAliases(time.Time{}, true)
 
 	if !ip.IsZero() {
 		str := ip.String()

@@ -1065,7 +1065,7 @@ func assertEqualPeers(t *testing.T, expected map[string]ids.ShortID, actual []Pe
 	}
 }
 
-func TestPeerAliases_Ticker(t *testing.T) {
+func TestPeerAliasesTicker(t *testing.T) {
 	log := logging.NoLog{}
 	networkID := uint32(0)
 	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
@@ -1445,7 +1445,7 @@ func TestPeerAliases_Ticker(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestPeerAliases_Disconnect(t *testing.T) {
+func TestPeerAliasesDisconnect(t *testing.T) {
 	log := logging.NoLog{}
 	networkID := uint32(0)
 	appVersion := version.NewDefaultVersion("app", 0, 1, 0)

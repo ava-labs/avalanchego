@@ -24,8 +24,8 @@ type alias struct {
 	// ip where peer was reached
 	ip utils.IPDesc
 
-	// added is unix time when peer was reached on alias IP
-	added int64
+	// added is network time when peer was reached
+	added time.Time
 }
 
 type peer struct {
@@ -60,9 +60,14 @@ type peer struct {
 
 	// ip may or may not be set when the peer is first started. is only modified
 	// on the connection's reader routine.
-	ip      utils.IPDesc
+	ip utils.IPDesc
+
+	// aliases is a list of IPs other than [ip] that we have connected to
+	// this peer at.
 	aliases []alias
-	ipLock  sync.RWMutex
+
+	// ipLock must be held when accessing either [ip] or [aliases].
+	ipLock sync.RWMutex
 
 	// id should be set when the peer is first created.
 	id ids.ShortID
@@ -143,6 +148,12 @@ func (p *peer) requestFinishHandshake() {
 	}
 }
 
+// monitorAliases periodically attempts
+// to release timed out alias IPs of the
+// peer.
+//
+// monitorAliases will acquire stateLock
+// when an alias is released.
 func (p *peer) monitorAliases() {
 	// Exit if release frequency is 0, otherwise
 	// time.NewTicker will panic.
@@ -156,7 +167,7 @@ func (p *peer) monitorAliases() {
 	for {
 		select {
 		case <-releaseTicker.C:
-			p.releaseExpiredAliases()
+			p.releaseAliases(p.net.clock.Time(), false)
 		case <-p.tickerCloser:
 			return
 		}
@@ -869,6 +880,9 @@ func (p *peer) getIP() utils.IPDesc {
 	return p.ip
 }
 
+// addAlias marks that we have found another
+// IP that we can connect to this peer at.
+//
 // assumes stateLock is held
 func (p *peer) addAlias(ip utils.IPDesc) {
 	p.ipLock.Lock()
@@ -877,41 +891,33 @@ func (p *peer) addAlias(ip utils.IPDesc) {
 	p.net.peerAliasIPs[ip.String()] = struct{}{}
 	p.aliases = append(p.aliases, alias{
 		ip:    ip,
-		added: p.net.clock.Time().Unix(),
+		added: p.net.clock.Time(),
 	})
 }
 
-// assumes stateLock is held
-func (p *peer) releaseAliases() {
-	p.ipLock.Lock()
-	defer p.ipLock.Unlock()
-
-	for _, alias := range p.aliases {
-		str := alias.ip.String()
-		delete(p.net.peerAliasIPs, str)
-
-		p.net.log.Verbo("released alias %s for peer %s", str, p.id.String())
-	}
-	p.aliases = p.aliases[:0]
-}
-
-// assumes stateLock is not held
-func (p *peer) releaseExpiredAliases() {
+// releaseAliases removes enables network to
+// reconnect on aliases that have timed out. To
+// force all aliases to be removed, the caller
+// should set now to be the zero time.
+func (p *peer) releaseAliases(now time.Time, holdsStateLock bool) {
 	p.ipLock.Lock()
 	defer p.ipLock.Unlock()
 
 	for len(p.aliases) > 0 {
 		next := p.aliases[0]
-		aliasAge := float64(p.net.clock.Time().Unix() - next.added)
-		if aliasAge < p.net.peerAliasTimeout.Seconds() {
+		if !now.IsZero() && now.Sub(next.added) < p.net.peerAliasTimeout {
 			return
 		}
 		p.aliases = p.aliases[1:]
 
-		p.net.stateLock.Lock()
+		if !holdsStateLock {
+			p.net.stateLock.Lock()
+		}
 		delete(p.net.peerAliasIPs, next.ip.String())
-		p.net.stateLock.Unlock()
+		if !holdsStateLock {
+			p.net.stateLock.Unlock()
+		}
 
-		p.net.log.Verbo("released alias %s for peer %s", next.ip.String(), p.id.String())
+		p.net.log.Verbo("released alias %s for peer %s", next.ip, p.id)
 	}
 }
