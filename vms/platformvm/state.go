@@ -115,6 +115,7 @@ func (vm *VM) enqueueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 		prefixStartDB.Close(),
 	)
 
+	// If the staker being added is a validator, add it to the pending validators index
 	if priority != 1 {
 		prefixPendingValidators := []byte(fmt.Sprintf("%s%s", subnetID, pendingValidatorsPrefix))
 		pendingValidatorsDB := prefixdb.NewNested(prefixPendingValidators, db)
@@ -171,6 +172,7 @@ func (vm *VM) dequeueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 		prefixStartDB.Close(),
 	)
 
+	// If the staker being removed is a validator, remove it from the pending validators index
 	if priority != 1 {
 		prefixPendingValidators := []byte(fmt.Sprintf("%s%s", subnetID, pendingValidatorsPrefix))
 		pendingValidatorsDB := prefixdb.NewNested(prefixPendingValidators, db)
@@ -232,6 +234,7 @@ func (vm *VM) addStaker(db database.Database, subnetID ids.ID, tx *rewardTx) err
 		prefixStopDB.Close(),
 	)
 
+	// If the staker being added is a validator, add it to the current validators index
 	if priority > 0 {
 		prefixCurrentValidators := []byte(fmt.Sprintf("%s%s", subnetID, currentValidatorsPrefix))
 		currentValidatorsDB := prefixdb.NewNested(prefixCurrentValidators, db)
@@ -289,6 +292,7 @@ func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, tx *rewardTx) 
 		prefixStopDB.Close(),
 	)
 
+	// If the staker being removed is a validator, remove it from the current validators index
 	if priority > 0 {
 		prefixCurrentValidators := []byte(fmt.Sprintf("%s%s", subnetID, currentValidatorsPrefix))
 		currentValidatorsDB := prefixdb.NewNested(prefixCurrentValidators, db)
