@@ -26,7 +26,7 @@ type FilterType int
 var FilterTypeSteakKnife FilterType = 1
 var FilterTypeWillf FilterType = 2
 var FilterTypeBtcsuite FilterType = 3
-var FilterTypeDefault = FilterTypeWillf
+var FilterTypeDefault = FilterTypeSteakKnife
 
 var (
 	ErrMaxBytes = fmt.Errorf("too large")
