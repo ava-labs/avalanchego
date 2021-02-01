@@ -17,6 +17,8 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	"github.com/kardianos/osext"
+
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -60,6 +62,13 @@ var (
 	// GitCommit should be optionally set at compile time.
 	GitCommit string
 )
+
+func init() {
+	folderPath, err := osext.ExecutableFolder()
+	if err == nil {
+		defaultPluginDirs = append(defaultPluginDirs, filepath.Join(folderPath, "plugins"))
+	}
+}
 
 var (
 	errBootstrapMismatch    = errors.New("more bootstrap IDs provided than bootstrap IPs")

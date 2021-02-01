@@ -403,7 +403,7 @@ func (n *Node) initDatabase() error {
 func (n *Node) initNodeID() error {
 	if !n.Config.EnableP2PTLS {
 		n.ID = ids.ShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.IP().String())))
-		n.Log.Info("Set the node's ID to %s", n.ID)
+		n.Log.Info("Set the node's ID to %s", n.ID.PrefixedString(constants.NodeIDPrefix))
 		return nil
 	}
 
@@ -421,7 +421,7 @@ func (n *Node) initNodeID() error {
 	if err != nil {
 		return fmt.Errorf("problem deriving staker ID from certificate: %w", err)
 	}
-	n.Log.Info("Set node's ID to %s", n.ID)
+	n.Log.Info("Set node's ID to %s", n.ID.PrefixedString(constants.NodeIDPrefix))
 	return nil
 }
 
