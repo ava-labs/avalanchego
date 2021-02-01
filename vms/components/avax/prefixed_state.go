@@ -139,7 +139,10 @@ func (s *State) SetStatus(id ids.ID, status choices.Status) error {
 // Returns at most [limit] IDs.
 func (s *State) IDs(key []byte, start []byte, limit int) ([]ids.ID, error) {
 	idSlice := []ids.ID(nil)
-	iter := prefixdb.NewNested(key, s.IDDB).NewIteratorWithStart(start)
+	IDSliceDB := prefixdb.NewNested(key, s.IDDB)
+	defer IDSliceDB.Close()
+
+	iter := IDSliceDB.NewIteratorWithStart(start)
 	defer iter.Release()
 
 	numFetched := 0
@@ -156,10 +159,16 @@ func (s *State) IDs(key []byte, start []byte, limit int) ([]ids.ID, error) {
 
 // AddID saves an ID to the prefixed database
 func (s *State) AddID(key []byte, id ids.ID) error {
-	return prefixdb.NewNested(key, s.IDDB).Put(id[:], nil)
+	IDSliceDB := prefixdb.NewNested(key, s.IDDB)
+	defer IDSliceDB.Close()
+
+	return IDSliceDB.Put(id[:], nil)
 }
 
 // RemoveID removes an ID from the prefixed database
 func (s *State) RemoveID(key []byte, id ids.ID) error {
-	return prefixdb.NewNested(key, s.IDDB).Delete(id[:])
+	IDSliceDB := prefixdb.NewNested(key, s.IDDB)
+	defer IDSliceDB.Close()
+
+	return IDSliceDB.Delete(id[:])
 }
