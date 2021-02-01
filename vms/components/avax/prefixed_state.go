@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
@@ -139,36 +140,42 @@ func (s *State) SetStatus(id ids.ID, status choices.Status) error {
 // Returns at most [limit] IDs.
 func (s *State) IDs(key []byte, start []byte, limit int) ([]ids.ID, error) {
 	idSlice := []ids.ID(nil)
-	IDSliceDB := prefixdb.NewNested(key, s.IDDB)
-	defer IDSliceDB.Close()
-
-	iter := IDSliceDB.NewIteratorWithStart(start)
+	idSliceDB := prefixdb.NewNested(key, s.IDDB)
+	iter := idSliceDB.NewIteratorWithStart(start)
 	defer iter.Release()
 
 	numFetched := 0
 	for numFetched < limit && iter.Next() {
 		if keyID, err := ids.ToID(iter.Key()); err != nil {
+			// Ignore any database closing error to return the original error
+			_ = idSliceDB.Close()
 			return nil, err
 		} else if !bytes.Equal(keyID[:], start) { // don't return [start]
 			idSlice = append(idSlice, keyID)
 			numFetched++
 		}
 	}
-	return idSlice, nil
+	return idSlice, idSliceDB.Close()
 }
 
 // AddID saves an ID to the prefixed database
 func (s *State) AddID(key []byte, id ids.ID) error {
-	IDSliceDB := prefixdb.NewNested(key, s.IDDB)
-	defer IDSliceDB.Close()
-
-	return IDSliceDB.Put(id[:], nil)
+	idSliceDB := prefixdb.NewNested(key, s.IDDB)
+	errs := wrappers.Errs{}
+	errs.Add(
+		idSliceDB.Put(id[:], nil),
+		idSliceDB.Close(),
+	)
+	return errs.Err
 }
 
 // RemoveID removes an ID from the prefixed database
 func (s *State) RemoveID(key []byte, id ids.ID) error {
-	IDSliceDB := prefixdb.NewNested(key, s.IDDB)
-	defer IDSliceDB.Close()
-
-	return IDSliceDB.Delete(id[:])
+	idSliceDB := prefixdb.NewNested(key, s.IDDB)
+	errs := wrappers.Errs{}
+	errs.Add(
+		idSliceDB.Delete(id[:]),
+		idSliceDB.Close(),
+	)
+	return errs.Err
 }
