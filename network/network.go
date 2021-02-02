@@ -140,7 +140,7 @@ type network struct {
 	b                                  Builder
 	apricotPhase0Time                  time.Time
 
-	// stateLock should never be held when grabbing a peer lock
+	// stateLock should never be held when grabbing a peer senderLock
 	stateLock    sync.RWMutex
 	pendingBytes int64
 	closed       utils.AtomicBool
@@ -700,6 +700,28 @@ func (n *network) heartbeat() { atomic.StoreInt64(&n.lastHeartbeat, n.clock.Time
 // GetHeartbeat returns the most recent heartbeat time
 func (n *network) GetHeartbeat() int64 { return atomic.LoadInt64(&n.lastHeartbeat) }
 
+// upgradeIncoming returns a boolean indicating if we should
+// upgrade an incoming connection or drop it.
+func (n *network) upgradeIncoming(remoteAddr string) bool {
+	n.stateLock.RLock()
+	defer n.stateLock.RUnlock()
+
+	if _, ok := n.connectedIPs[remoteAddr]; ok {
+		return false
+	}
+	if _, ok := n.myIPs[remoteAddr]; ok {
+		return false
+	}
+	if _, ok := n.peerAliasIPs[remoteAddr]; ok {
+		return false
+	}
+
+	// Note that we attempt to upgrade remote addresses contained
+	// in disconnectedIPs to because that could allow us to initialize
+	// a connection with a peer we've been attempting to dial.
+	return true
+}
+
 // Dispatch starts accepting connections from other nodes attempting to connect
 // to this node.
 // assumes the stateLock is not held.
@@ -740,6 +762,21 @@ func (n *network) Dispatch() error {
 			n.log.Debug("error during server accept: %s", err)
 			return err
 		}
+
+		// We pessimistically drop an incoming connection if the remote
+		// address is found in connectedIPs, myIPs, or peerAliasIPs.
+		// This protects our node from spending CPU cycles on TLS
+		// handshakes to upgrade connections from existing peers.
+		// Specifically, this can occur when one of our existing
+		// peers attempts to connect to one our IP aliases (that they
+		// aren't yet aware is an alias).
+		addr := conn.RemoteAddr().String()
+		if !n.upgradeIncoming(addr) {
+			n.log.Debug("dropping duplicate connection from %s", addr)
+			_ = conn.Close()
+			continue
+		}
+
 		if conn, ok := conn.(*net.TCPConn); ok {
 			if err := conn.SetLinger(0); err != nil {
 				n.log.Warn("failed to set no linger due to: %s", err)
@@ -749,7 +786,6 @@ func (n *network) Dispatch() error {
 			}
 		}
 
-		addr := conn.RemoteAddr().String()
 		ticks, err := n.connMeter.Register(addr)
 		// looking for > n.connMeterMaxConns indicating the second tick
 		if err == nil && ticks > n.connMeterMaxConns {
