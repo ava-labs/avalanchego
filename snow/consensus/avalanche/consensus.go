@@ -53,6 +53,10 @@ type Consensus interface {
 	// transition is currently processing.
 	TransitionProcessing(ids.ID) bool
 
+	// ProcessingTxs returns all of the processing transactions that contain the
+	// given transition ID
+	ProcessingTxs(trID ids.ID) []conflicts.Tx
+
 	// GetTx returns the named tx. If the named tx isn't currently processing,
 	// an error will be returned.
 	GetTx(ids.ID) (conflicts.Tx, error)
@@ -62,9 +66,10 @@ type Consensus interface {
 	Orphans() ids.Set
 
 	// RecordPoll collects the results of a network poll. If a result has not
-	// been added, the result is dropped. Errors returned from this function
-	// should be treated as critical errors.
-	RecordPoll(ids.UniqueBag) error
+	// been added, the result is dropped. Returns:
+	// 1. The txs accepted by this poll
+	// 2. An error, if applicable, which should be treated as critical.
+	RecordPoll(ids.UniqueBag) ([]conflicts.Tx, error)
 
 	// Quiesce returns true iff all vertices that have been added but not been
 	// accepted or rejected are rogue. Note, it is possible that after returning

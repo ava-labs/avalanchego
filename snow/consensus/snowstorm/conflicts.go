@@ -18,6 +18,11 @@ type Conflicts interface {
 	// Processing returns if [trID] is currently being processed
 	Processing(trID ids.ID) bool
 
+	// Returns a list of processing transactions that contain
+	// transition [trID]. If no processing transactions
+	// contain [trID] returns nil.
+	ProcessingTxs(trID ids.ID) []conflicts.Tx
+
 	// IsVirtuous returns true if there are no known conflicts with [tx]
 	IsVirtuous(tx conflicts.Tx) bool
 

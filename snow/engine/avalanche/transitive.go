@@ -43,16 +43,20 @@ type Transitive struct {
 	// The set of vertices that have been requested in Get messages but not yet received
 	outstandingVtxReqs common.Requests
 
-	// missingTransitions tracks transaction that are missing
-	missingTransitions ids.Set
+	// missingTransitions tracks transitions that are missing
+	// Epoch --> Transitions with dependents waiting on the transition
+	// to be issued in that epoch or accepted no later than that epoch
+	missingTransitions map[uint32]ids.Set
 
 	// IDs of vertices that are queued to be added to consensus but haven't yet been
 	// because of missing dependencies
 	pending ids.Set
 
 	// vtxBlocked tracks operations that are blocked on vertices
-	// txBlocked tracks operations that are blocked on transactions
-	vtxBlocked, txBlocked events.Blocker
+	vtxBlocked events.Blocker
+
+	// trBlocked tracks operations that are blocked on transitions
+	trBlocked txBlocker
 
 	// abandonedVertices is reset to false every time [issueFrom] is called
 	// and set to true if a vertex fails verification. This serves as a flag
@@ -76,6 +80,7 @@ func (t *Transitive) Initialize(config Config) error {
 		config.Params.Namespace,
 		config.Params.Metrics,
 	)
+	t.missingTransitions = map[uint32]ids.Set{}
 
 	if err := t.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
 		return err
@@ -217,6 +222,7 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxByt
 		return t.GetFailed(vdr, requestID)
 	}
 	_, err = t.issueFrom(vdr, vtx)
+
 	return err
 }
 
@@ -235,16 +241,11 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 
 	t.vtxBlocked.Abandon(vtxID)
 
-	if t.outstandingVtxReqs.Len() == 0 {
-		for trID := range t.missingTransitions {
-			t.txBlocked.Abandon(trID)
-		}
-		t.missingTransitions.Clear()
-	}
+	t.updateMissingTransitions()
 
 	// Track performance statistics
 	t.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len()))
-	t.numMissingTxs.Set(float64(t.missingTransitions.Len()))
+	t.numMissingTxs.Set(float64(len(t.missingTransitions))) // TODO remove this metric?
 	return t.errs.Err
 }
 
@@ -466,44 +467,67 @@ func (t *Transitive) issue(vtx avalanche.Vertex, updatedEpoch bool) error {
 		}
 	}
 
+	epoch, err := vtx.Epoch()
+	if err != nil {
+		return err
+	}
 	txs, err := vtx.Txs()
 	if err != nil {
 		return err
 	}
 	trIDs := ids.Set{}
-	for _, tx := range txs {
+	for _, tx := range txs { // These transitions are no longer missing
 		trIDs.Add(tx.Transition().ID())
 	}
 
 	for _, tx := range txs {
-		tr := tx.Transition()
-		for _, depID := range tr.Dependencies() {
-			if !trIDs.Contains(depID) && !t.Consensus.TransitionProcessing(depID) {
-				t.missingTransitions.Add(depID)
-				i.txDeps.Add(depID)
+		// Mark as unfulfilled all of the transition's dependencies
+		// that are neither accepted nor processing in this tx's epoch.
+		for _, depID := range tx.Transition().Dependencies() {
+			if trIDs.Contains(depID) {
+				// This vertex contains this dependency. No need to mark
+				// as unfulfilled.
+				continue
+			}
+
+			// [processingDepTxs] is a list of processing txs that contain
+			// dependency [depID].
+			processingDepTxs := t.Consensus.ProcessingTxs(depID)
+
+			// Check if any processing txs with the dependency are in
+			// the same epoch as [tx].
+			unfulfilled := true
+			for _, processingDep := range processingDepTxs {
+				if processingDep.Epoch() == epoch {
+					unfulfilled = false
+					break
+				}
+			}
+			if unfulfilled {
+				// We don't have any processing txs with this dependency
+				missing := t.missingTransitions[epoch]
+				missing.Add(depID)
+				t.missingTransitions[epoch] = missing
+				// Mark that depenency [depID] is not accepted in an earlier
+				// epoch and is not processing in the current epoch
+				i.trDeps.Add(depID)
 			}
 		}
 	}
 
-	t.Ctx.Log.Verbo("vertex %s is blocking on %d vertices and %d transactions",
-		vtxID, i.vtxDeps.Len(), i.txDeps.Len())
+	t.Ctx.Log.Verbo("vertex %s is blocking on %d vertices and %d transitions",
+		vtxID, i.vtxDeps.Len(), i.trDeps.Len())
 
 	// Wait until all the parents of [vtx] are added to consensus before adding [vtx]
 	t.vtxBlocked.Register(&vtxIssuer{i: i})
-	// Wait until all the parents of [tx] are added to consensus before adding [vtx]
-	t.txBlocked.Register(&txIssuer{i: i})
+	// Wait until all the parents of [tr] are added to consensus before adding [vtx]
+	t.trBlocked.register(&trIssuer{i: i}, epoch)
 
-	if t.outstandingVtxReqs.Len() == 0 {
-		// There are no outstanding vertex requests but we don't have these transactions, so we're not getting them.
-		for txID := range t.missingTransitions {
-			t.txBlocked.Abandon(txID)
-		}
-		t.missingTransitions.Clear()
-	}
+	t.updateMissingTransitions()
 
 	// Track performance statistics
 	t.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len()))
-	t.numMissingTxs.Set(float64(t.missingTransitions.Len()))
+	t.numMissingTxs.Set(float64(len(t.missingTransitions))) // TODO remove this metric?
 	t.numPendingVts.Set(float64(t.pending.Len()))
 	return t.errs.Err
 }
@@ -663,4 +687,20 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 func (t *Transitive) Health() (interface{}, error) {
 	// TODO add more health checks
 	return t.VM.Health()
+}
+
+// Abandon dependents with dependencies we don't expect to fulfill
+func (t *Transitive) updateMissingTransitions() {
+	if t.outstandingVtxReqs.Len() != 0 || !t.Consensus.Finalized() {
+		return
+	}
+	// We're not expecting to receive any vertices and consensus is finalized
+	// Abandon all dependents waiting on a transition to be issued/accepted
+	for epoch, trIDs := range t.missingTransitions {
+		for trID := range trIDs {
+			t.trBlocked.abandon(trID, epoch)
+			delete(t.missingTransitions[epoch], trID)
+		}
+		delete(t.missingTransitions, epoch)
+	}
 }

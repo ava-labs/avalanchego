@@ -50,9 +50,16 @@ func (v *voter) Update() {
 	}
 
 	v.t.Ctx.Log.Debug("Finishing poll with:\n%s", &results)
-	if err := v.t.Consensus.RecordPoll(results); err != nil {
+	acceptedTxs, err := v.t.Consensus.RecordPoll(results)
+	if err != nil {
 		v.t.errs.Add(err)
 		return
+	}
+	for _, acceptedTx := range acceptedTxs {
+		acceptedTrID := acceptedTx.Transition().ID()
+		acceptedTxEpoch := acceptedTx.Epoch()
+		delete(v.t.missingTransitions[acceptedTxEpoch], acceptedTrID)
+		v.t.trBlocked.markAccepted(acceptedTx.Transition().ID(), acceptedTxEpoch)
 	}
 
 	epochs := make(map[uint32]vtx, 2)
@@ -85,6 +92,8 @@ func (v *voter) Update() {
 			return
 		}
 	}
+
+	v.t.updateMissingTransitions()
 
 	if v.t.Consensus.Finalized() {
 		v.t.Ctx.Log.Debug("Avalanche engine can quiesce")

@@ -6,9 +6,11 @@ package avalanche
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -18,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -257,10 +260,11 @@ func TestEngineFulfillMissingDependencies(t *testing.T) {
 	if len(te.vtxBlocked) != 1 {
 		t.Fatalf("Should have been blocking on 1 missing vertex dependency")
 	}
-	if len(te.txBlocked) != 1 {
+	if len(te.trBlocked) != 1 {
 		t.Fatalf("Should have been blocking on 1 missing transition dependency")
 	}
-	if te.missingTransitions.Len() != 1 {
+	missing, ok := te.missingTransitions[txA.Epoch()]
+	if !ok || missing.Len() != 1 || len(te.missingTransitions) > 1 {
 		t.Fatalf("Should have had one missing transition")
 	}
 
@@ -308,15 +312,15 @@ func TestEngineFulfillMissingDependencies(t *testing.T) {
 	if !*pushedChildVtx {
 		t.Fatalf("Expected to push query child vertex")
 	}
-
 	if len(te.vtxBlocked) != 0 {
 		t.Fatalf("Expected 0 blocked vertices, but found %d blocked vertices", len(te.vtxBlocked))
 	}
-	if len(te.txBlocked) != 0 {
-		t.Fatalf("Expected 0 blocked transitions, but found %d blocked transitions", len(te.txBlocked))
+	if len(te.trBlocked) != 0 {
+		t.Fatalf("Expected 0 blocked transitions, but found %d blocked transitions", len(te.trBlocked))
 	}
-	if numMissingTransitions := te.missingTransitions.Len(); numMissingTransitions != 0 {
-		t.Fatalf("Expected 0 missing transitions, but found %d missing transitions", numMissingTransitions)
+	t.Log(te.missingTransitions)
+	if len(te.missingTransitions) != 0 {
+		t.Fatalf("Expected 0 missing transitions, but found %d missing transitions", len(te.missingTransitions))
 	}
 }
 
@@ -4127,27 +4131,21 @@ func TestEngineDoubleChit(t *testing.T) {
 	if status := tx.Status(); status != choices.Processing {
 		t.Fatalf("Wrong tx status: %s ; expected: %s", status, choices.Processing)
 	}
-
 	if err := te.Chits(vdr0, *reqID, votes); err != nil {
 		t.Fatal(err)
 	}
-
 	if status := tx.Status(); status != choices.Processing {
 		t.Fatalf("Wrong tx status: %s ; expected: %s", status, choices.Processing)
 	}
-
 	if err := te.Chits(vdr0, *reqID, votes); err != nil {
 		t.Fatal(err)
 	}
-
 	if status := tx.Status(); status != choices.Processing {
 		t.Fatalf("Wrong tx status: %s ; expected: %s", status, choices.Processing)
 	}
-
 	if err := te.Chits(vdr1, *reqID, votes); err != nil {
 		t.Fatal(err)
 	}
-
 	if status := tx.Status(); status != choices.Accepted {
 		t.Fatalf("Wrong tx status: %s ; expected: %s", status, choices.Accepted)
 	}
@@ -4415,4 +4413,537 @@ func TestEngineInvalidChit(t *testing.T) {
 	if status := txA0.Status(); status != choices.Accepted {
 		t.Fatalf("Wrong tx status: %s ; expected: %s", status, choices.Accepted)
 	}
+}
+
+// Test that the engine issues a transaction only if all the transition's
+// dependencies are accepted in an earlier epoch or processing in the
+// transaction's epoch
+func TestEngineTransitionDependencyFulfilled(t *testing.T) {
+	config := DefaultConfig()
+	vals := validators.NewSet()
+	config.Validators = vals
+	vdr := ids.GenerateTestShortID()
+	err := vals.AddWeight(vdr, 1)
+	assert.NoError(t, err)
+	sender := &common.SenderTest{}
+	sender.T = t
+	sender.CantGet = false
+	config.Sender = sender
+	manager := vertex.NewTestManager(t)
+	config.Manager = manager
+	vm := &vertex.TestVM{}
+	vm.T = t
+	config.VM = vm
+	vm.Default(true)
+	manager.Default(true)
+	manager.CantEdge = false
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
+	vm.CantParse = false
+	te := &Transitive{}
+	if err := te.Initialize(config); err != nil {
+		t.Fatal(err)
+	}
+
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+
+	tx0 := &conflicts.TestTx{
+		BytesV: []byte{0},
+		EpochV: te.Ctx.Epoch(),
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Unknown,
+			InputIDsV: []ids.ID{ids.GenerateTestID()},
+		},
+	}
+	tx1 := &conflicts.TestTx{ // Depends on tx0's transition
+		BytesV: []byte{1},
+		EpochV: tx0.Epoch() + 1, // 1 epoch after tx0
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		TransitionV: &conflicts.TestTransition{
+			IDV:           ids.GenerateTestID(),
+			StatusV:       choices.Unknown,
+			InputIDsV:     []ids.ID{ids.GenerateTestID()},
+			DependenciesV: []conflicts.Transition{tx0.Transition()},
+		},
+	}
+	tx2 := &conflicts.TestTx{ // Depends on tx0 and tx1
+		BytesV: []byte{2},
+		EpochV: tx1.Epoch(), // Same epoch as tx1
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		TransitionV: &conflicts.TestTransition{
+			IDV:           ids.GenerateTestID(),
+			StatusV:       choices.Unknown,
+			InputIDsV:     []ids.ID{ids.GenerateTestID()},
+			DependenciesV: []conflicts.Transition{tx0.Transition(), tx1.Transition()},
+		},
+	}
+
+	vtx0 := &avalanche.TestVertex{ // contains tx0
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		EpochV:   tx0.Epoch(),
+		ParentsV: []avalanche.Vertex{gVtx},
+		HeightV:  1,
+		TxsV:     []conflicts.Tx{tx0},
+		BytesV:   []byte{3},
+	}
+	vtx1 := &avalanche.TestVertex{ // contains tx1 and tx2
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		EpochV:   tx1.Epoch(),
+		ParentsV: []avalanche.Vertex{vtx0},
+		HeightV:  vtx0.HeightV + 1,
+		TxsV:     []conflicts.Tx{tx1, tx2},
+		BytesV:   []byte{4},
+	}
+
+	// Tell the engine about vtx1
+	// Expect it to ask for vtx0
+	// Expect it to parse vtx1, tx1, tx2
+	sentGet := new(bool)
+	sender.GetF = func(inVdr ids.ShortID, requestID uint32, vtxID ids.ID) {
+		assert.False(t, *sentGet, "Sent get multiple times")
+		*sentGet = true
+		assert.Equal(t, vdr, inVdr)
+		assert.Equal(t, vtx0.ID(), vtxID)
+	}
+	manager.ParseF = func(b []byte) (avalanche.Vertex, error) {
+		if !bytes.Equal(b, vtx1.Bytes()) {
+			t.Fatalf("Wrong bytes")
+		}
+		return vtx1, nil
+	}
+	manager.GetF = func(id ids.ID) (avalanche.Vertex, error) {
+		switch id {
+		case vtx0.ID():
+			return nil, errors.New("not found")
+		case vtx1.ID():
+			vtx1.StatusV = choices.Processing
+			return vtx1, nil
+		default:
+			return nil, errors.New("asked for wrong vertex")
+		}
+	}
+	manager.ParseTxF = func(b []byte) (conflicts.Tx, error) {
+		switch {
+		case bytes.Equal(b, tx1.Bytes()):
+			tx1.StatusV = choices.Processing
+			tx1.TransitionV.(*conflicts.TestTransition).StatusV = choices.Processing
+			return tx0, nil
+		case bytes.Equal(b, tx2.Bytes()):
+			tx2.StatusV = choices.Processing
+			tx2.TransitionV.(*conflicts.TestTransition).StatusV = choices.Processing
+			return tx1, nil
+		default:
+			return nil, errMissing
+		}
+	}
+	err = te.PushQuery(vdr, 0, vtx1.ID(), vtx1.Bytes())
+	assert.NoError(t, err)
+	assert.True(t, *sentGet, "should have requested vtx0")
+
+	// tx1 and tx2 are both waiting on tx0's transition
+	assert.NotNil(t, te.missingTransitions[tx1.Epoch()])
+	assert.Contains(t, te.missingTransitions[tx1.Epoch()], tx0.Transition().ID())
+	assert.NotNil(t, te.trBlocked)
+	assert.Len(t, te.trBlocked, 1)
+	assert.Len(t, te.trBlocked[tx1.Epoch()], 1) // tx0
+	assert.NotNil(t, te.trBlocked[tx1.Epoch()][tx0.Transition().ID()])
+	assert.Len(t, te.trBlocked[tx1.Epoch()][tx0.Transition().ID()], 1) // vtx1
+
+	// Fulfill the dependency for vtx0
+	manager.ParseF = func(b []byte) (avalanche.Vertex, error) {
+		if !bytes.Equal(b, vtx0.Bytes()) {
+			t.Fatalf("Wrong bytes")
+		}
+		vtx0.StatusV = choices.Processing
+		tx0.StatusV = choices.Processing
+		tx0.TransitionV.(*conflicts.TestTransition).StatusV = choices.Processing
+		return vtx0, nil
+	}
+	manager.GetF = func(id ids.ID) (avalanche.Vertex, error) {
+		switch id {
+		case vtx0.ID():
+			vtx0.StatusV = choices.Processing
+			return vtx0, nil
+		case vtx1.ID():
+			return vtx1, nil
+		default:
+			return nil, errors.New("asked for wrong vertex")
+		}
+	}
+	pushQueryReqID := new(uint32)
+	pushQueryCalled := new(bool)
+	sender.PushQueryF = func(_ ids.ShortSet, reqID uint32, _ ids.ID, _ []byte) {
+		*pushQueryReqID = reqID
+		*pushQueryCalled = true
+	}
+	err = te.PushQuery(vdr, 1, vtx0.ID(), vtx0.Bytes())
+	assert.NoError(t, err)
+	// vtx1, tx1, tx2 should not be issued yet; they can't be until
+	// tx0's transition is accepted in epoch <= tx1.Epoch()
+	assert.NotNil(t, te.missingTransitions[tx1.Epoch()])
+	assert.NotNil(t, te.missingTransitions[tx1.Epoch()][tx0.Transition().ID()])
+	assert.Len(t, te.trBlocked, 1)              // tx0.Epoch()
+	assert.Len(t, te.trBlocked[tx1.Epoch()], 1) // tx0.Transition()
+	assert.NotNil(t, te.trBlocked[tx1.Epoch()][tx0.Transition().ID()])
+	assert.Len(t, te.trBlocked[tx1.Epoch()][tx0.Transition().ID()], 1) // vtx1
+
+	// vtx0 should be issued
+	assert.True(t, te.Consensus.VertexIssued(vtx0))
+	// tx0 should be issued
+	assert.True(t, te.Consensus.TxIssued(tx0))
+	assert.True(t, *pushQueryCalled)
+	assert.False(t, te.Consensus.VertexIssued(vtx1))
+	assert.False(t, te.Consensus.TxIssued(tx1))
+	assert.False(t, te.Consensus.TxIssued(tx2))
+
+	// Send chits for vtx0, which should cause it to be accepted,
+	// which will cause vtx1 to be ready to issue. vtx1's epoch is ahead
+	// of the current epoch, so the engine will re-wrap tx1 and tx2's transitions
+	// into new txs.
+	manager.CantWrap = false
+	manager.WrapF = func(epoch uint32, tr conflicts.Transition, restrictions []ids.ID) (conflicts.Tx, error) {
+		if trID := tr.ID(); trID != tx1.Transition().ID() && trID != tx2.Transition().ID() {
+			return nil, errors.New("expected to wrap tx1 or tx2's transition")
+		}
+		return &conflicts.TestTx{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Processing,
+			},
+			TransitionV:   tr,
+			RestrictionsV: restrictions,
+			EpochV:        epoch,
+			BytesV:        utils.RandomBytes(32),
+		}, nil
+	}
+	manager.CantBuild = false
+	manager.BuildF = func(epoch uint32, parentIDs []ids.ID, trs []conflicts.Transition, restrictions []ids.ID) (avalanche.Vertex, error) {
+		switch {
+		case len(trs) != 1:
+			return nil, fmt.Errorf("expected 1 transition but got %d", len(trs))
+		case trs[0].ID() != tx1.Transition().ID() && trs[0].ID() != tx2.Transition().ID():
+			return nil, errors.New("expected transition to be tx1 or tx2's")
+		}
+		return &avalanche.TestVertex{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Processing,
+			},
+			ParentsV: []avalanche.Vertex{vtx0}, // Ignore [parentIDs] and make vtx0 the parent
+			EpochV:   epoch,
+			HeightV:  vtx0.HeightV,
+			TxsV: []conflicts.Tx{
+				&conflicts.TestTx{
+					TestDecidable: choices.TestDecidable{
+						IDV:     ids.GenerateTestID(),
+						StatusV: choices.Processing,
+					},
+					TransitionV:   trs[0],
+					EpochV:        epoch,
+					BytesV:        utils.RandomBytes(32),
+					RestrictionsV: restrictions,
+				},
+			},
+			BytesV: utils.RandomBytes(32),
+		}, nil
+	}
+
+	// Send chits for vtx0, which should cause it to be accepted
+	err = te.Chits(vdr, *pushQueryReqID, []ids.ID{vtx0.ID()})
+	assert.NoError(t, err)
+
+	// vtx1, tx1, tx2 should be issued now
+	assert.True(t, te.Consensus.TransitionProcessing(tx1.Transition().ID()))
+	assert.True(t, te.Consensus.TransitionProcessing(tx2.Transition().ID()))
+}
+
+// Test that the engine abandons a vertex containing a transition
+// whose dependency is not expected to be issued
+func TestEngineTransitionDependencyAbandoned(t *testing.T) {
+	// Setup
+	config := DefaultConfig()
+	vals := validators.NewSet()
+	config.Validators = vals
+	vdr := ids.GenerateTestShortID()
+	err := vals.AddWeight(vdr, 1)
+	assert.NoError(t, err)
+	sender := &common.SenderTest{}
+	sender.T = t
+	sender.CantGet = false
+	config.Sender = sender
+	manager := vertex.NewTestManager(t)
+	config.Manager = manager
+	vm := &vertex.TestVM{}
+	vm.T = t
+	config.VM = vm
+	vm.Default(true)
+	manager.Default(true)
+	manager.CantEdge = false
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
+	vm.CantParse = false
+	te := &Transitive{}
+	if err := te.Initialize(config); err != nil {
+		t.Fatal(err)
+	}
+
+	// Scenario: gVtx is accepted
+	// vtxA contains txA
+	// vtxB contains txB0, whose transition depends on txA's transition
+	// vtxB contains txB1, whose transition depends on a non-existent transition
+	// vtxC contains txC, whose transition depends on txB1's transition
+	// Engine gets a pushquery with vtxC, then asks for and receives vtxB
+	// Engine asks for then receives vtxA
+	// Engine realizes it won't get the non-existent transition,
+	// abandons vtxB and vtxC
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	currentEpoch := te.Ctx.Epoch()
+	txA := &conflicts.TestTx{
+		BytesV: []byte{0},
+		EpochV: currentEpoch,
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		TransitionV: &conflicts.TestTransition{
+			IDV:       ids.GenerateTestID(),
+			StatusV:   choices.Unknown,
+			InputIDsV: []ids.ID{ids.GenerateTestID()},
+		},
+	}
+	txB0 := &conflicts.TestTx{ // Depends on tx0's transition
+		BytesV: utils.RandomBytes(32),
+		EpochV: currentEpoch,
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		TransitionV: &conflicts.TestTransition{
+			IDV:           ids.GenerateTestID(),
+			StatusV:       choices.Unknown,
+			InputIDsV:     []ids.ID{ids.GenerateTestID()},
+			DependenciesV: []conflicts.Transition{txA.Transition()},
+		},
+	}
+	nonexistentTr := &conflicts.TestTransition{
+		IDV:       ids.GenerateTestID(),
+		StatusV:   choices.Unknown,
+		InputIDsV: []ids.ID{ids.GenerateTestID()},
+	}
+	txB1 := &conflicts.TestTx{
+		BytesV: utils.RandomBytes(32),
+		EpochV: currentEpoch,
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		TransitionV: &conflicts.TestTransition{
+			IDV:           ids.GenerateTestID(),
+			StatusV:       choices.Unknown,
+			InputIDsV:     []ids.ID{ids.GenerateTestID()},
+			DependenciesV: []conflicts.Transition{txA.Transition(), nonexistentTr},
+		},
+	}
+	txC := &conflicts.TestTx{
+		BytesV: utils.RandomBytes(32),
+		EpochV: currentEpoch,
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		TransitionV: &conflicts.TestTransition{
+			IDV:           ids.GenerateTestID(),
+			StatusV:       choices.Unknown,
+			InputIDsV:     []ids.ID{ids.GenerateTestID()},
+			DependenciesV: []conflicts.Transition{txB1.Transition()},
+		},
+	}
+	vtxA := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		EpochV:   currentEpoch,
+		ParentsV: []avalanche.Vertex{gVtx},
+		HeightV:  1,
+		TxsV:     []conflicts.Tx{txA},
+		BytesV:   utils.RandomBytes(32),
+	}
+	vtxB := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		EpochV:   currentEpoch,
+		ParentsV: []avalanche.Vertex{vtxA},
+		HeightV:  vtxA.HeightV + 1,
+		TxsV:     []conflicts.Tx{txB0, txB1},
+		BytesV:   utils.RandomBytes(32),
+	}
+	vtxC := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		EpochV:   currentEpoch,
+		ParentsV: []avalanche.Vertex{vtxB},
+		HeightV:  vtxB.HeightV + 1,
+		TxsV:     []conflicts.Tx{txC},
+		BytesV:   utils.RandomBytes(32),
+	}
+
+	// Tell the engine about vtxC
+	// Expect it to ask for vtxB
+	// Expect it to parse vtxC, txC
+	sentGet := new(bool)
+	sender.GetF = func(inVdr ids.ShortID, requestID uint32, vtxID ids.ID) {
+		assert.False(t, *sentGet, "Sent get multiple times")
+		*sentGet = true
+		assert.Equal(t, vdr, inVdr)
+		assert.Equal(t, vtxB.ID(), vtxID)
+	}
+	manager.ParseF = func(b []byte) (avalanche.Vertex, error) {
+		assert.Equal(t, b, vtxC.Bytes())
+		vtxC.StatusV = choices.Processing
+		txC.StatusV = choices.Processing
+		txC.TransitionV.(*conflicts.TestTransition).StatusV = choices.Processing
+		return vtxC, nil
+	}
+	manager.GetF = func(id ids.ID) (avalanche.Vertex, error) {
+		assert.Contains(t, []ids.ID{vtxC.ID(), vtxB.ID()}, id)
+		if id == vtxC.ID() {
+			return vtxC, nil
+		}
+		return nil, errors.New("not found")
+	}
+	err = te.PushQuery(vdr, 0, vtxC.ID(), vtxC.Bytes())
+	assert.NoError(t, err)
+	assert.True(t, *sentGet, "should have requested vtxC")
+
+	// txC is waiting on txB1's transition
+	assert.NotNil(t, te.missingTransitions[currentEpoch])
+	assert.Contains(t, te.missingTransitions[currentEpoch], txB1.Transition().ID())
+	assert.NotNil(t, te.trBlocked)
+	assert.Len(t, te.trBlocked, 1)
+	assert.Len(t, te.trBlocked[currentEpoch], 1)                         // txB1
+	assert.Len(t, te.trBlocked[currentEpoch][txB1.Transition().ID()], 1) // vtxC
+
+	// Give the engine vtxB.
+	// Expect it to parse VtxB, txB0, txB1
+	// Expect it to ask for vtxB
+	*sentGet = false
+	sender.GetF = func(inVdr ids.ShortID, requestID uint32, vtxID ids.ID) {
+		assert.False(t, *sentGet, "Sent get multiple times")
+		*sentGet = true
+		assert.Equal(t, vdr, inVdr)
+		assert.Equal(t, vtxA.ID(), vtxID)
+	}
+	manager.ParseF = func(b []byte) (avalanche.Vertex, error) {
+		assert.Equal(t, b, vtxB.Bytes())
+		vtxB.StatusV = choices.Processing
+		txB0.StatusV = choices.Processing
+		txB0.TransitionV.(*conflicts.TestTransition).StatusV = choices.Processing
+		txB1.StatusV = choices.Processing
+		txB1.TransitionV.(*conflicts.TestTransition).StatusV = choices.Processing
+		return vtxB, nil
+	}
+	manager.GetF = func(id ids.ID) (avalanche.Vertex, error) {
+		switch id {
+		case vtxC.ID():
+			return vtxC, nil
+		case vtxB.ID():
+			return vtxB, nil
+		case vtxA.ID():
+			return nil, errors.New("asked for wrong vertex")
+		}
+		assert.FailNow(t, "tried to get wrong vertex")
+		return nil, errors.New("not found")
+	}
+	pushQueryReqID := new(uint32)
+	pushQueryCalled := new(bool)
+	sender.PushQueryF = func(_ ids.ShortSet, reqID uint32, _ ids.ID, _ []byte) {
+		*pushQueryReqID = reqID
+		*pushQueryCalled = true
+	}
+	err = te.Put(vdr, 1, vtxB.ID(), vtxB.Bytes())
+	assert.NoError(t, err)
+	assert.Len(t, te.missingTransitions[currentEpoch], 3)
+	assert.NotNil(t, te.missingTransitions[currentEpoch][txB1.Transition().ID()])
+	assert.NotNil(t, te.missingTransitions[currentEpoch][txA.Transition().ID()])
+	assert.NotNil(t, te.missingTransitions[currentEpoch][nonexistentTr.ID()])
+	assert.Len(t, te.trBlocked, 1)
+	assert.Len(t, te.trBlocked[currentEpoch], 3)                         // txB1, txA, nonExistentTr
+	assert.Len(t, te.trBlocked[currentEpoch][txA.Transition().ID()], 1)  // vtxB
+	assert.Len(t, te.trBlocked[currentEpoch][txB1.Transition().ID()], 1) // vtxC
+	assert.Len(t, te.trBlocked[currentEpoch][nonexistentTr.ID()], 1)     // vtxB
+
+	// Give the engine vtxA. Expect it to parse vtxA and txA.
+	// Expect it to send a PushQuery for vtxA
+	sender.CantGet = false
+	manager.ParseF = func(b []byte) (avalanche.Vertex, error) {
+		assert.Equal(t, b, vtxA.Bytes())
+		vtxA.StatusV = choices.Processing
+		txA.StatusV = choices.Processing
+		txA.TransitionV.(*conflicts.TestTransition).StatusV = choices.Processing
+		return vtxA, nil
+	}
+	manager.GetF = func(id ids.ID) (avalanche.Vertex, error) {
+		switch id {
+		case vtxC.ID():
+			return vtxC, nil
+		case vtxB.ID():
+			return vtxB, nil
+		case vtxA.ID():
+			return vtxA, nil
+		}
+		assert.FailNow(t, "tried to get wrong vertex")
+		return nil, errors.New("not found")
+	}
+	err = te.Put(vdr, 1, vtxA.ID(), vtxA.Bytes())
+	assert.NoError(t, err)
+	assert.NotNil(t, te.missingTransitions[currentEpoch])
+	assert.NotNil(t, te.missingTransitions[currentEpoch][txB1.Transition().ID()])
+	assert.NotNil(t, te.missingTransitions[currentEpoch][txA.Transition().ID()])
+	assert.Len(t, te.trBlocked, 1)
+	assert.Len(t, te.trBlocked[currentEpoch], 2)                         // txB1, nonExistentTr
+	assert.Len(t, te.trBlocked[currentEpoch][txB1.Transition().ID()], 1) // vtxC
+	assert.Len(t, te.trBlocked[currentEpoch][nonexistentTr.ID()], 1)     // vtxB
+	assert.True(t, te.Consensus.VertexIssued(vtxA))
+	assert.True(t, te.Consensus.TransitionProcessing(txA.Transition().ID()))
+	assert.True(t, *pushQueryCalled)
+
+	// At this point, vtxA should be issued. VtxB can't be issued because it's missing
+	// its non-existing transition dependency. We only abandon transition dependencies
+	// once consensus is finalized, so let's finalize consensus by sending chits for vtxA.
+	err = te.Chits(vdr, *pushQueryReqID, []ids.ID{vtxA.ID()})
+	assert.NoError(t, err)
+
+	// Now we should have abandoned hope of receiving nonExistentTr, and as such
+	// we have abandoned vtxB and vtxC
+	assert.True(t, te.Consensus.Finalized())
+	assert.Len(t, te.missingTransitions, 0)
+	assert.Len(t, te.trBlocked, 0)
 }

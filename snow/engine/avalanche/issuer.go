@@ -15,7 +15,7 @@ type issuer struct {
 	vtx               avalanche.Vertex
 	updatedEpoch      bool
 	issued, abandoned bool
-	vtxDeps, txDeps   ids.Set
+	vtxDeps, trDeps   ids.Set
 }
 
 // Register that a vertex we were waiting on has been issued to consensus.
@@ -24,9 +24,9 @@ func (i *issuer) FulfillVtx(id ids.ID) {
 	i.Update()
 }
 
-// Register that a transaction we were waiting on has been issued to consensus.
-func (i *issuer) FulfillTx(id ids.ID) {
-	i.txDeps.Remove(id)
+// Register that a transition we were waiting on has been issued to consensus.
+func (i *issuer) FulfillTr(id ids.ID) {
+	i.trDeps.Remove(id)
 	i.Update()
 }
 
@@ -42,7 +42,7 @@ func (i *issuer) Abandon() {
 
 // Issue the poll when all dependencies are met
 func (i *issuer) Update() {
-	if i.abandoned || i.issued || i.vtxDeps.Len() != 0 || i.txDeps.Len() != 0 || i.t.Consensus.VertexIssued(i.vtx) || i.t.errs.Errored() {
+	if i.abandoned || i.issued || i.vtxDeps.Len() != 0 || i.trDeps.Len() != 0 || i.t.Consensus.VertexIssued(i.vtx) || i.t.errs.Errored() {
 		return
 	}
 	// All dependencies have been met
@@ -166,11 +166,17 @@ func (i *issuer) Update() {
 		i.t.Ctx.Log.Error("Query for %s was dropped due to an insufficient number of validators", vtxID)
 	}
 
-	// Notify vertices waiting on this one that it (and its transactions) have been issued.
+	// Notify vertices waiting on this one that it (and its transitions) have been issued.
 	i.t.vtxBlocked.Fulfill(vtxID)
 	for _, tx := range txs {
-		i.t.txBlocked.Fulfill(tx.Transition().ID())
+		trID := tx.Transition().ID()
+		delete(i.t.missingTransitions[epoch], trID)
+		if len(i.t.missingTransitions[epoch]) == 0 {
+			delete(i.t.missingTransitions, epoch)
+		}
+		i.t.trBlocked.markIssued(trID, epoch)
 	}
+	i.t.updateMissingTransitions()
 
 	// Issue a repoll
 	i.t.errs.Add(i.t.repoll())
@@ -183,9 +189,9 @@ func (vi *vtxIssuer) Fulfill(id ids.ID)     { vi.i.FulfillVtx(id) }
 func (vi *vtxIssuer) Abandon(ids.ID)        { vi.i.Abandon() }
 func (vi *vtxIssuer) Update()               { vi.i.Update() }
 
-type txIssuer struct{ i *issuer }
+type trIssuer struct{ i *issuer }
 
-func (ti *txIssuer) Dependencies() ids.Set { return ti.i.txDeps }
-func (ti *txIssuer) Fulfill(id ids.ID)     { ti.i.FulfillTx(id) }
-func (ti *txIssuer) Abandon(ids.ID)        { ti.i.Abandon() }
-func (ti *txIssuer) Update()               { ti.i.Update() }
+func (ti *trIssuer) Dependencies() ids.Set { return ti.i.trDeps }
+func (ti *trIssuer) Fulfill(id ids.ID)     { ti.i.FulfillTr(id) }
+func (ti *trIssuer) Abandon(ids.ID)        { ti.i.Abandon() }
+func (ti *trIssuer) Update()               { ti.i.Update() }

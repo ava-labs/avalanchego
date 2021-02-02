@@ -12,15 +12,15 @@ import (
 func TestBlocker(t *testing.T) {
 	b := Blocker(nil)
 
-	a := &blockable{}
+	a := &TestBlockable{}
 	a.Default()
 
-	id0 := GenerateID()
-	id1 := GenerateID()
-	id2 := GenerateID()
+	id0 := ids.GenerateTestID()
+	id1 := ids.GenerateTestID()
+	id2 := ids.GenerateTestID()
 
 	calledDep := new(bool)
-	a.dependencies = func() ids.Set {
+	a.DependenciesF = func() ids.Set {
 		*calledDep = true
 
 		s := ids.Set{}
@@ -28,15 +28,15 @@ func TestBlocker(t *testing.T) {
 		return s
 	}
 	calledFill := new(bool)
-	a.fulfill = func(ids.ID) {
+	a.FulfillF = func(ids.ID) {
 		*calledFill = true
 	}
 	calledAbandon := new(bool)
-	a.abandon = func(ids.ID) {
+	a.AbandonF = func(ids.ID) {
 		*calledAbandon = true
 	}
 	calledUpdate := new(bool)
-	a.update = func() {
+	a.UpdateF = func() {
 		*calledUpdate = true
 	}
 
