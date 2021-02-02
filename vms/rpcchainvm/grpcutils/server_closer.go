@@ -39,3 +39,15 @@ func (s *ServerCloser) Stop() {
 	s.closed = true
 	s.servers = nil
 }
+
+// GracefulStop ...
+func (s *ServerCloser) GracefulStop() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	for _, server := range s.servers {
+		server.GracefulStop()
+	}
+	s.closed = true
+	s.servers = nil
+}

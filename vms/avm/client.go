@@ -133,21 +133,24 @@ func (c *Client) GetAssetDescription(assetID string) (*GetAssetDescriptionReply,
 	return res, err
 }
 
-// GetBalance returns the balance for [addr] of [assetID]
-func (c *Client) GetBalance(addr string, assetID string) (*GetBalanceReply, error) {
+// GetBalance returns the balance of [assetID] held by [addr].
+// If [includePartial], balance includes partial owned (i.e. in a multisig) funds.
+func (c *Client) GetBalance(addr string, assetID string, includePartial bool) (*GetBalanceReply, error) {
 	res := &GetBalanceReply{}
 	err := c.requester.SendRequest("getBalance", &GetBalanceArgs{
-		Address: addr,
-		AssetID: assetID,
+		Address:        addr,
+		AssetID:        assetID,
+		IncludePartial: includePartial,
 	}, res)
 	return res, err
 }
 
 // GetAllBalances returns all asset balances for [addr]
-func (c *Client) GetAllBalances(addr string) (*GetAllBalancesReply, error) {
+func (c *Client) GetAllBalances(addr string, includePartial bool) (*GetAllBalancesReply, error) {
 	res := &GetAllBalancesReply{}
-	err := c.requester.SendRequest("getAllBalances", &api.JSONAddress{
-		Address: addr,
+	err := c.requester.SendRequest("getAllBalances", &GetAllBalancesArgs{
+		JSONAddress:    api.JSONAddress{Address: addr},
+		IncludePartial: includePartial,
 	}, res)
 	return res, err
 }

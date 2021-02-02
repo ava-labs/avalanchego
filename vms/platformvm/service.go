@@ -603,6 +603,11 @@ type GetCurrentValidatorsArgs struct {
 	// Subnet we're listing the validators of
 	// If omitted, defaults to primary network
 	SubnetID ids.ID `json:"subnetID"`
+	// NodeIDs of validators to request. If [NodeIDs]
+	// is empty, it fetches all current validators. If
+	// some nodeIDs are not currently validators, they
+	// will be omitted from the response.
+	NodeIDs []string `json:"nodeIDs"`
 }
 
 // GetCurrentValidatorsReply are the results from calling GetCurrentValidators.
@@ -619,6 +624,17 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 
 	// Validator's node ID as string --> Delegators to them
 	vdrTodelegators := map[string][]APIPrimaryDelegator{}
+
+	// Create set of nodeIDs
+	nodeIDs := ids.ShortSet{}
+	for _, nodeID := range args.NodeIDs {
+		nID, err := ids.ShortFromPrefixedString(nodeID, constants.NodeIDPrefix)
+		if err != nil {
+			return err
+		}
+		nodeIDs.Add(nID)
+	}
+	includeAllNodes := nodeIDs.Len() == 0
 
 	stopPrefix := []byte(fmt.Sprintf("%s%s", args.SubnetID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, service.vm.DB)
@@ -640,6 +656,10 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 
 		switch staker := tx.Tx.UnsignedTx.(type) {
 		case *UnsignedAddDelegatorTx:
+			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
+				continue
+			}
+
 			weight := json.Uint64(staker.Validator.Weight())
 
 			var rewardOwner *APIOwner
@@ -672,6 +692,10 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			}
 			vdrTodelegators[delegator.NodeID] = append(vdrTodelegators[delegator.NodeID], delegator)
 		case *UnsignedAddValidatorTx:
+			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
+				continue
+			}
+
 			nodeID := staker.Validator.ID()
 			startTime := staker.StartTime()
 			weight := json.Uint64(staker.Validator.Weight())
@@ -716,6 +740,10 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				DelegationFee:   delegationFee,
 			})
 		case *UnsignedAddSubnetValidatorTx:
+			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
+				continue
+			}
+
 			weight := json.Uint64(staker.Validator.Weight())
 			reply.Validators = append(reply.Validators, APIStaker{
 				TxID:      tx.Tx.ID(),
@@ -751,6 +779,11 @@ type GetPendingValidatorsArgs struct {
 	// Subnet we're getting the pending validators of
 	// If omitted, defaults to primary network
 	SubnetID ids.ID `json:"subnetID"`
+	// NodeIDs of validators to request. If [NodeIDs]
+	// is empty, it fetches all pending validators. If
+	// some requested nodeIDs are not pending validators,
+	// they are omitted from the response.
+	NodeIDs []string `json:"nodeIDs"`
 }
 
 // GetPendingValidatorsReply are the results from calling GetPendingValidators.
@@ -766,6 +799,17 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 
 	reply.Validators = []interface{}{}
 	reply.Delegators = []interface{}{}
+
+	// Create set of nodeIDs
+	nodeIDs := ids.ShortSet{}
+	for _, nodeID := range args.NodeIDs {
+		nID, err := ids.ShortFromPrefixedString(nodeID, constants.NodeIDPrefix)
+		if err != nil {
+			return err
+		}
+		nodeIDs.Add(nID)
+	}
+	includeAllNodes := nodeIDs.Len() == 0
 
 	startPrefix := []byte(fmt.Sprintf("%s%s", args.SubnetID, startDBPrefix))
 	startDB := prefixdb.NewNested(startPrefix, service.vm.DB)
@@ -787,6 +831,10 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 
 		switch staker := tx.UnsignedTx.(type) {
 		case *UnsignedAddDelegatorTx:
+			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
+				continue
+			}
+
 			weight := json.Uint64(staker.Validator.Weight())
 			reply.Delegators = append(reply.Delegators, APIStaker{
 				TxID:        tx.ID(),
@@ -796,6 +844,10 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 				StakeAmount: &weight,
 			})
 		case *UnsignedAddValidatorTx:
+			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
+				continue
+			}
+
 			nodeID := staker.Validator.ID()
 			weight := json.Uint64(staker.Validator.Weight())
 			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(PercentDenominator))
@@ -813,6 +865,10 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 				Connected:     &connected,
 			})
 		case *UnsignedAddSubnetValidatorTx:
+			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
+				continue
+			}
+
 			weight := json.Uint64(staker.Validator.Weight())
 			reply.Validators = append(reply.Validators, APIStaker{
 				TxID:      tx.ID(),
@@ -2042,7 +2098,7 @@ func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, respo
 	startIter := startDB.NewIterator()
 	defer startIter.Release()
 
-	for startIter.Next() { // Iterates over current stakers
+	for startIter.Next() { // Iterates over pending stakers
 		stakerBytes := startIter.Value()
 
 		tx := Tx{}
