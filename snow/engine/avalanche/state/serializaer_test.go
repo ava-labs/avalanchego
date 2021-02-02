@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 )
 
-func newSerializer(t *testing.T, parse func([]byte) (conflicts.Transition, error)) *Serializer {
+func newSerializer(t *testing.T, parse func([]byte) (conflicts.Transition, error)) (*vertex.TestVM, *Serializer) {
 	vm := vertex.TestVM{}
 	vm.T = t
 	vm.Default(true)
@@ -28,7 +28,7 @@ func newSerializer(t *testing.T, parse func([]byte) (conflicts.Transition, error
 	ctx := snow.DefaultContextTest()
 	s := &Serializer{}
 	s.Initialize(ctx, &vm, baseDB)
-	return s
+	return &vm, s
 }
 
 func TestRestrictedTransition(t *testing.T) {
@@ -38,7 +38,7 @@ func TestRestrictedTransition(t *testing.T) {
 		BytesV: []byte{1},
 	}
 
-	s := newSerializer(t, func(b []byte) (conflicts.Transition, error) {
+	_, s := newSerializer(t, func(b []byte) (conflicts.Transition, error) {
 		if bytes.Equal(b, tr.Bytes()) {
 			return tr, nil
 		}
