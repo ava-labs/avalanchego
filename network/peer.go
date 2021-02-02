@@ -54,6 +54,7 @@ type peer struct {
 
 	// lock to ensure that closing of the sender queue is handled safely
 	senderLock sync.Mutex
+
 	// queue of messages this connection is attempting to send the peer. Is
 	// closed when the connection is closed.
 	sender chan []byte
@@ -62,12 +63,15 @@ type peer struct {
 	// on the connection's reader routine.
 	ip utils.IPDesc
 
+	// ipLock must be held when accessing [ip].
+	ipLock sync.RWMutex
+
 	// aliases is a list of IPs other than [ip] that we have connected to
 	// this peer at.
 	aliases []alias
 
-	// ipLock must be held when accessing either [ip] or [aliases].
-	ipLock sync.RWMutex
+	// aliasesLock must be held when accessing [aliases].
+	aliasesLock sync.Mutex
 
 	// id should be set when the peer is first created.
 	id ids.ShortID
@@ -885,8 +889,8 @@ func (p *peer) getIP() utils.IPDesc {
 //
 // assumes stateLock is held
 func (p *peer) addAlias(ip utils.IPDesc) {
-	p.ipLock.Lock()
-	defer p.ipLock.Unlock()
+	p.aliasesLock.Lock()
+	defer p.aliasesLock.Unlock()
 
 	p.net.peerAliasIPs[ip.String()] = struct{}{}
 	p.aliases = append(p.aliases, alias{
@@ -895,21 +899,44 @@ func (p *peer) addAlias(ip utils.IPDesc) {
 	})
 }
 
+// releaseNextAlias returns the next released
+// alias or nil if none was released.
+func (p *peer) releaseNextAlias(now time.Time) *alias {
+	p.aliasesLock.Lock()
+	defer p.aliasesLock.Unlock()
+
+	if len(p.aliases) == 0 {
+		return nil
+	}
+
+	next := p.aliases[0]
+	if !now.IsZero() && now.Sub(next.added) < p.net.peerAliasTimeout {
+		return nil
+	}
+	p.aliases = p.aliases[1:]
+
+	// If [aliases] is empty after removing the next element, we
+	// set it to nil so that it will be garbage collected.
+	if len(p.aliases) == 0 {
+		p.aliases = nil
+	}
+
+	return &next
+}
+
 // releaseAliases removes enables network to
 // reconnect on aliases that have timed out. To
 // force all aliases to be removed, the caller
 // should set now to be the zero time.
 func (p *peer) releaseAliases(now time.Time, holdsStateLock bool) {
-	p.ipLock.Lock()
-	defer p.ipLock.Unlock()
-
-	for len(p.aliases) > 0 {
-		next := p.aliases[0]
-		if !now.IsZero() && now.Sub(next.added) < p.net.peerAliasTimeout {
+	for {
+		next := p.releaseNextAlias(now)
+		if next == nil {
 			return
 		}
-		p.aliases = p.aliases[1:]
 
+		// We should always release aliasesLock before attempting
+		// to acquire the stateLock to avoid deadlocking on addAlias.
 		if !holdsStateLock {
 			p.net.stateLock.Lock()
 		}

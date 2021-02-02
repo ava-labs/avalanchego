@@ -702,24 +702,32 @@ func (n *network) GetHeartbeat() int64 { return atomic.LoadInt64(&n.lastHeartbea
 
 // upgradeIncoming returns a boolean indicating if we should
 // upgrade an incoming connection or drop it.
-func (n *network) upgradeIncoming(remoteAddr string) bool {
+//
+// Assumes stateLock is not held.
+func (n *network) upgradeIncoming(remoteAddr string) (bool, error) {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
-	if _, ok := n.connectedIPs[remoteAddr]; ok {
-		return false
+	ip, err := utils.ToIPDesc(remoteAddr)
+	if err != nil {
+		return false, fmt.Errorf("unable to convert remote address %s to IPDesc: %w", remoteAddr, err)
 	}
-	if _, ok := n.myIPs[remoteAddr]; ok {
-		return false
+
+	str := ip.String()
+	if _, ok := n.connectedIPs[str]; ok {
+		return false, nil
 	}
-	if _, ok := n.peerAliasIPs[remoteAddr]; ok {
-		return false
+	if _, ok := n.myIPs[str]; ok {
+		return false, nil
+	}
+	if _, ok := n.peerAliasIPs[str]; ok {
+		return false, nil
 	}
 
 	// Note that we attempt to upgrade remote addresses contained
 	// in disconnectedIPs to because that could allow us to initialize
 	// a connection with a peer we've been attempting to dial.
-	return true
+	return true, nil
 }
 
 // Dispatch starts accepting connections from other nodes attempting to connect
@@ -771,7 +779,11 @@ func (n *network) Dispatch() error {
 		// peers attempts to connect to one our IP aliases (that they
 		// aren't yet aware is an alias).
 		addr := conn.RemoteAddr().String()
-		if !n.upgradeIncoming(addr) {
+		if upgrade, err := n.upgradeIncoming(addr); err != nil {
+			n.log.Debug("error during upgrade incoming check: %s", err)
+			_ = conn.Close()
+			continue
+		} else if !upgrade {
 			n.log.Debug("dropping duplicate connection from %s", addr)
 			_ = conn.Close()
 			continue
