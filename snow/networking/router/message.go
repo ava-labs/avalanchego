@@ -46,7 +46,7 @@ func (m message) String() string {
 	case constants.GetAcceptedMsg, constants.AcceptedMsg, constants.ChitsMsg, constants.AcceptedFrontierMsg:
 		sb.WriteString(fmt.Sprintf(", ContainerIDs: %s)", m.containerIDs))
 	case constants.GetMsg, constants.GetAncestorsMsg, constants.PutMsg, constants.PushQueryMsg, constants.PullQueryMsg:
-		sb.WriteString(fmt.Sprintf(", ContainerID: %s", m.containerID))
+		sb.WriteString(fmt.Sprintf(", ContainerID: %s)", m.containerID))
 	case constants.MultiPutMsg:
 		sb.WriteString(fmt.Sprintf(", NumContainers: %d)", len(m.containers)))
 	case constants.NotifyMsg:
