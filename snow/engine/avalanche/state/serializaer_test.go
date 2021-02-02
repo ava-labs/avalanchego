@@ -38,12 +38,20 @@ func TestRestrictedTransition(t *testing.T) {
 		BytesV: []byte{1},
 	}
 
-	_, s := newSerializer(t, func(b []byte) (conflicts.Transition, error) {
+	vm, s := newSerializer(t, func(b []byte) (conflicts.Transition, error) {
 		if bytes.Equal(b, tr.Bytes()) {
 			return tr, nil
 		}
 		return nil, errors.New("unknown tx")
 	})
+	vm.GetF = func(id ids.ID) (conflicts.Transition, error) {
+		switch id {
+		case trID:
+			return tr, nil
+		default:
+			return nil, errUnknownVertex
+		}
+	}
 
 	vtx, err := s.Build(1, nil, nil, []ids.ID{trID})
 	assert.NoError(t, err)
