@@ -35,6 +35,8 @@
       --snow-rogue-commit-threshold="{{ snow_rogue_commit_threshold }}"
       --snow-avalanche-num-parents="{{ snow_avalanche_num_parents }}"
       --snow-avalanche-batch-size="{{ snow_avalanche_batch_size }}"
+      --snow-epoch-first-transition="{{ snow_epoch_first_transition }}"
+      --snow-epoch-duration="{{ snow_epoch_duration }}"
       --api-ipcs-enabled="{{ api_ipcs_enabled }}"
       --xput-server-enabled="{{ xput_server_enabled }}"
       --xput-server-port="{{ xput_server_port }}"
