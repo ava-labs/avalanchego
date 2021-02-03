@@ -12,9 +12,11 @@ type LeafNode struct {
 	LeafValue          []byte `serialize:"true"`
 	StoredHash         []byte `serialize:"true"`
 	Refs               int32  `serialize:"true"`
+	currentOp          string
 	previousStoredHash []byte
 	parent             Node
 	persistence        Persistence
+	parentRefs         int32
 }
 
 // NewLeafNode creates a new Leaf Node
@@ -25,6 +27,7 @@ func NewLeafNode(key Key, value []byte, parent Node, persistence Persistence) (N
 		parent:      parent,
 		persistence: persistence,
 		Refs:        1,
+		parentRefs:  1,
 	}
 
 	return l, l.Hash(nil, nil)
@@ -50,6 +53,7 @@ func (l *LeafNode) Insert(key Key, value []byte) error {
 			return err
 		}
 
+		l.parent.ParentReferences(l.parentRefs - l.parent.ParentReferences(0))
 		return l.parent.Hash(key, l.StoredHash)
 	}
 
@@ -117,6 +121,18 @@ func (l *LeafNode) References(change int32) int32 {
 	return l.Refs
 }
 
+func (l *LeafNode) ParentReferences(change int32) int32 {
+	l.parentRefs += change
+	return l.parentRefs
+}
+
+func (l *LeafNode) Operation(change string) string {
+	if change != "" {
+		l.currentOp = change
+	}
+	return l.currentOp
+}
+
 // Key returns the stored key
 func (l *LeafNode) Key() Key {
 	return l.LeafKey
@@ -143,5 +159,5 @@ func (l *LeafNode) Print() {
 
 // String converts the node in a string format
 func (l *LeafNode) String() string {
-	return fmt.Sprintf("Leaf ID: %x - Parent: %p - Refs: %d - Key: %v - Val: %v\n", l.GetHash(), l.parent, l.Refs, l.LeafKey, l.LeafValue)
+	return fmt.Sprintf("Leaf ID: %x - Parent: %p - Refs: %d - \n\t\t\t\tKey: %v \n\t\t\t\tVal: %v\n", l.GetHash(), l.parent, l.Refs, l.LeafKey, l.LeafValue)
 }

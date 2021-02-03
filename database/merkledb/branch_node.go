@@ -24,9 +24,11 @@ type BranchNode struct {
 	SharedAddress      Key              `serialize:"true"`
 	StoredHash         []byte           `serialize:"true"`
 	Refs               int32            `serialize:"true"`
+	currentOp          string
 	previousStoredHash []byte
 	parent             Node
 	persistence        Persistence
+	parentRefs         int32
 }
 
 // NewBranchNode returns a new BranchNode
@@ -37,6 +39,7 @@ func NewBranchNode(sharedAddress Key, parent Node, persistence Persistence) Node
 		parent:        parent,
 		persistence:   persistence,
 		Refs:          1,
+		parentRefs:    1,
 	}
 }
 
@@ -46,7 +49,9 @@ func NewBranchNode(sharedAddress Key, parent Node, persistence Persistence) Node
 //
 func (b *BranchNode) GetChild(key Key) (Node, error) {
 	if !key.ContainsPrefix(b.SharedAddress) {
-		return NewEmptyNode(b, key), nil
+		e := NewEmptyNode(b, key)
+		e.ParentReferences(b.parentRefs)
+		return e, nil
 	}
 
 	// if the node CAN exist in this prefix but doesn't return an EmptyNode
@@ -55,7 +60,9 @@ func (b *BranchNode) GetChild(key Key) (Node, error) {
 	// FirstNonPrefix:  AABBCC - AABBC = C
 	nodeHash := b.Nodes[FirstNonPrefix(b.SharedAddress, key)]
 	if len(nodeHash) == 0 {
-		return NewEmptyNode(b, key), nil
+		e := NewEmptyNode(b, key)
+		e.ParentReferences(b.parentRefs)
+		return e, nil
 	}
 
 	node, err := b.persistence.GetNodeByHash(nodeHash)
@@ -65,9 +72,13 @@ func (b *BranchNode) GetChild(key Key) (Node, error) {
 	node.SetParent(b)
 
 	// Passes on the parents Refs if they are greater than the childs one
-	nodeRefs := node.References(0)
-	if b.Refs > nodeRefs {
-		node.References(b.Refs - nodeRefs)
+	nodeParentRefs := node.ParentReferences(0)
+	parentRefs := b.parentRefs
+	if parentRefs < b.Refs {
+		parentRefs = b.Refs
+	}
+	if parentRefs > nodeParentRefs {
+		node.ParentReferences(parentRefs - nodeParentRefs)
 	}
 
 	return node, nil
@@ -176,6 +187,20 @@ func (b *BranchNode) Insert(key Key, value []byte) error {
 			return err
 		}
 
+		nodeParentRefs := newBranch.ParentReferences(0)
+		parentRefs := b.parentRefs
+		if parentRefs < b.Refs {
+			parentRefs = b.Refs
+		}
+		if parentRefs > nodeParentRefs {
+			newBranch.ParentReferences(parentRefs - nodeParentRefs)
+		}
+
+		if parentRefs > node.References(0) {
+			// TODO Review this - special situation where a new BranchNode is created and needs to refer the other roots
+			node.References(parentRefs - node.References(0))
+		}
+
 		// insertion will trigger a rehash from the newBranch upwards
 		// NewBranch: Insert - Hash - hash - Store - Parent.Hash: hash - Store - Parent.Hash, etc
 		return newBranch.Insert(key, value)
@@ -216,6 +241,7 @@ func (b *BranchNode) Delete(key Key) error {
 	// is either a LeafNode or an empty BranchNode
 	// remove it from the current branch
 	b.Nodes[FirstNonPrefix(b.SharedAddress, key)] = nil
+	b.currentOp = "delete"
 
 	// if the current BranchNode has exactly one children
 	// request the Parent to take it
@@ -226,6 +252,7 @@ func (b *BranchNode) Delete(key Key) error {
 			if len(v) != 0 {
 				singleNode, err = b.persistence.GetNodeByHash(v)
 				if err != nil {
+					fmt.Printf("\n\n NODE HAS BEEN DELETED ALREADY %x\n", v)
 					return err
 				}
 				break
@@ -235,6 +262,18 @@ func (b *BranchNode) Delete(key Key) error {
 		err = b.parent.SetChild(singleNode)
 		if err != nil {
 			return err
+		}
+
+		// when deleting the flow is upwards - the parentRefs are already set
+		b.parent.Operation("delete")
+
+		nodeParentRefs := b.parent.ParentReferences(0)
+		parentRefs := b.parentRefs
+		if parentRefs < b.Refs {
+			parentRefs = b.Refs
+		}
+		if parentRefs > nodeParentRefs {
+			b.parent.ParentReferences(parentRefs - nodeParentRefs)
 		}
 
 		err = b.parent.Hash(key, singleNode.GetHash())
@@ -289,11 +328,13 @@ func (b *BranchNode) Hash(nodeKey Key, hash []byte) error {
 
 	b.previousStoredHash = b.StoredHash
 	b.StoredHash = Hash(hashSet...)
+
 	err := b.persistence.StoreNode(b)
 	if err != nil {
 		return err
 	}
 
+	b.parent.Operation(b.Operation(""))
 	return b.parent.Hash(b.Key(), b.StoredHash)
 }
 
@@ -311,6 +352,18 @@ func (b *BranchNode) GetPreviousHash() []byte {
 func (b *BranchNode) References(change int32) int32 {
 	b.Refs += change
 	return b.Refs
+}
+
+func (b *BranchNode) ParentReferences(change int32) int32 {
+	b.parentRefs += change
+	return b.parentRefs
+}
+
+func (b *BranchNode) Operation(change string) string {
+	if change != "" {
+		b.currentOp = change
+	}
+	return b.currentOp
 }
 
 // Key returns the BranchNode SharedAddress
@@ -354,9 +407,13 @@ func (b *BranchNode) Clear() error {
 		}
 
 		// Passes on the parents Refs if they are greater than the childs one
-		nodeRefs := child.References(0)
-		if b.Refs > nodeRefs {
-			child.References(b.Refs - nodeRefs)
+		nodeParentRefs := child.ParentReferences(0)
+		parentRefs := b.parentRefs
+		if parentRefs < b.Refs {
+			parentRefs = b.Refs
+		}
+		if parentRefs > nodeParentRefs {
+			child.ParentReferences(parentRefs - nodeParentRefs)
 		}
 
 		err = child.Clear()
@@ -370,22 +427,33 @@ func (b *BranchNode) Clear() error {
 
 // String converts the node in a string format
 func (b *BranchNode) String() string {
-	return fmt.Sprintf("Branch ID: %x - SharedAddress: %v - Refs: %d - Parent: %p \n\t↪ Nodes: ", b.GetHash(), b.SharedAddress, b.Refs, b.parent)
+	nodes := fmt.Sprintf("[\n")
+	for _, nodeHash := range b.Nodes {
+		if len(nodeHash) > 0 {
+			nodes += fmt.Sprintf("\t\t[%x]\n", nodeHash)
+		}
+	}
+	nodes += fmt.Sprintf("\t\t]\n")
+	return fmt.Sprintf("Branch ID: %x - SharedAddress: %v - Refs: %d - Parent: %p \n\t↪ Nodes:%v", b.GetHash(), b.SharedAddress, b.Refs, b.parent, nodes)
 }
 
 // Print prints the node
 func (b *BranchNode) Print() {
 	fmt.Printf("Branch ID: %x - SharedAddress: %v - Refs: %v - Parent: %p \n\t↪ Nodes: ", b.GetHash(), b.SharedAddress, b.Refs, b.parent)
-	fmt.Printf("[")
+	nodes := fmt.Sprintf("[\n")
 	for _, nodeHash := range b.Nodes {
-		fmt.Printf("[%x]", nodeHash)
+		if len(nodeHash) > 0 {
+			nodes += fmt.Sprintf("\t\t[%x]\n", nodeHash)
+		}
 	}
-	fmt.Printf("]\n")
+	nodes += fmt.Sprintf("\t\t]\n")
+	fmt.Println(nodes)
 	for _, nodeKey := range b.Nodes {
 		if len(nodeKey) != 0 {
 			node, err := b.persistence.GetNodeByHash(nodeKey)
 			if err != nil {
-				panic(err)
+				continue
+				// panic(err)
 			}
 			node.Print()
 		}

@@ -85,9 +85,6 @@ func BenchmarkForestSecondTree_Put(b *testing.B) {
 		b.ResetTimer()
 		for _, test2 := range test.data2 {
 			_ = treeCopy.Put(test2.key, test2.value)
-			//fmt.Printf("Inserted k: %v , v: %v \n", test.key, test.value)
-			//tree.PrintTree()
-			//fmt.Println()
 		}
 	}
 }

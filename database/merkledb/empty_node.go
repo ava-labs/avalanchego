@@ -6,8 +6,9 @@ import "fmt"
 // it's used mainly when traversing the tree fetching a non existing key
 // it pre-sets the conditions for insertion
 type EmptyNode struct {
-	parent Node
-	key    Key
+	parent     Node
+	key        Key
+	parentRefs int32
 }
 
 // NewEmptyNode returns a new EmptyNode
@@ -31,6 +32,7 @@ func (e *EmptyNode) GetNextNode(prefix Key, start Key, key Key) (Node, error) {
 
 // Insert requests it's Parent to insert the k/v
 func (e *EmptyNode) Insert(key Key, value []byte) error {
+	e.parent.ParentReferences(e.parentRefs - e.parent.ParentReferences(0))
 	return e.parent.Insert(key, value)
 }
 
@@ -55,9 +57,12 @@ func (e *EmptyNode) GetHash() []byte { return nil }
 
 func (e *EmptyNode) GetPreviousHash() []byte { return nil }
 
-func (e *EmptyNode) References(change int32) int32 {
-	return 0
+func (e *EmptyNode) References(change int32) int32 { return 0 }
+func (e *EmptyNode) ParentReferences(change int32) int32 {
+	e.parentRefs += change
+	return e.parentRefs
 }
+func (e *EmptyNode) Operation(change string) string { return "" }
 
 // Key holds the key of the to-be-inserted node
 func (e *EmptyNode) Key() Key {

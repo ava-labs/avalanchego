@@ -204,18 +204,23 @@ func checkDatabaseItems(t *testing.T, tree *Tree) {
 	iterator := tree.persistence.GetDatabase().NewIterator()
 	count := 0
 	for iterator.Next() {
-		fmt.Printf("Key: %x , Val: %v\n", iterator.Key(), iterator.Value())
-		derp, _ := tree.persistence.GetDatabase().Get(iterator.Key())
-		fmt.Println(derp)
-
 		var node Node
-		derp2, err := tree.persistence.(*TreePersistence).codec.Unmarshal(derp, &node)
-		fmt.Println(derp2)
-		fmt.Println(err)
+		// fmt.Printf("Key: %x , Val: %v\n", iterator.Key(), iterator.Value())
+
+		nodeBytes, _ := tree.persistence.GetDatabase().Get(iterator.Key())
+
+		switch p := tree.persistence.(type) {
+		case *TreePersistence:
+			_, _ = p.codec.Unmarshal(nodeBytes, &node)
+		case *ForestPersistence:
+			_, _ = p.codec.Unmarshal(nodeBytes, &node)
+		}
+
+		fmt.Printf("Lingering - %v\n", node)
+
 		count++
 	}
 	if count > 0 {
-		fmt.Println(count)
 		t.Fatalf("Database is not empty - Number of Items: %d", count)
 	}
 }

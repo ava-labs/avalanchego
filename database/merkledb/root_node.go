@@ -26,6 +26,7 @@ func (r *RootNode) GetChild(key Key) (Node, error) {
 		return nil, err
 	}
 	node.SetParent(r)
+	node.ParentReferences(node.References(0))
 	return node, nil
 }
 
@@ -127,6 +128,10 @@ func (r *RootNode) GetPreviousHash() []byte {
 func (r *RootNode) References(change int32) int32 {
 	return 0
 }
+
+func (r *RootNode) ParentReferences(change int32) int32 { return 0 }
+
+func (r *RootNode) Operation(change string) string { return "" }
 
 // Key should never be reached
 func (r *RootNode) Key() Key { return nil }

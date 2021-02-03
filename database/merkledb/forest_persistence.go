@@ -122,19 +122,28 @@ func (fp *ForestPersistence) StoreNode(n Node) error {
 
 // DeleteNode deletes a node using its StorageKey
 func (fp *ForestPersistence) DeleteNode(n Node) error {
-	var hash []byte
-	switch node := n.(type) {
-	case *RootNode:
-		hash = genRootNodeID(node.RootID)
-	default:
-		hash = n.GetHash()
+	currentRefs := n.References(0)
+	parentRefs := n.ParentReferences(0)
+	if currentRefs-1 <= 0 && parentRefs-1 <= 0 {
+		return fp.deleteNode(n)
 	}
 
-	if n.References(-1) == 0 {
-		return fp.db.Delete(hash)
+	// if there are references to this node only change the reference count
+	// dont change it's data
+	copyNode, err := fp.GetNodeByHash(n.GetHash())
+	if err != nil {
+		return err
 	}
 
-	return fp.StoreNode(n)
+	// TODO : review
+	if parentRefs < currentRefs {
+		copyNode.References(-1)
+	} else if currentRefs > 1 {
+
+		copyNode.References(parentRefs - copyNode.References(0))
+	}
+
+	return fp.storeNode(copyNode)
 }
 
 // Commit commits any pending nodes
@@ -173,7 +182,20 @@ func (fp *ForestPersistence) storeNode(n Node) error {
 	return nil
 }
 
+func (fp *ForestPersistence) deleteNode(n Node) error {
+	var hash []byte
+	switch node := n.(type) {
+	case *RootNode:
+		hash = genRootNodeID(node.RootID)
+	default:
+		hash = n.GetHash()
+	}
+
+	return fp.db.Delete(hash)
+}
+
 func (fp *ForestPersistence) ensureRefCounting(n Node) error {
+
 	previousID := n.GetPreviousHash()
 	if len(previousID) != 0 {
 
@@ -182,34 +204,107 @@ func (fp *ForestPersistence) ensureRefCounting(n Node) error {
 			return err
 		}
 
-		// remove the new node reference from the previous node
-		// use the new node refs as a baseline - it may have the refs of a parent with more references
-		prevNode.References(n.References(0) - 1)
+		curNodeRefs := n.References(0)
+		curNodeParentRefs := n.ParentReferences(0)
 
-		// increase the references of children that are shared between the Previous and the New Node
-		for _, prevChildHash := range prevNode.GetChildrenHashes() {
-			for _, newChildHash := range n.GetChildrenHashes() {
+		prevNodeRefs := prevNode.References(0)
 
-				// they are the same, add a new Reference
-				if bytes.Equal(prevChildHash, newChildHash) {
-					prevChildNode, err := fp.GetNodeByHash(prevChildHash)
-					if err != nil {
-						return err
-					}
+		//fmt.Printf("CurrNode: %d, CurrNodeParent: %d, PrevNode: %d\n", curNodeRefs, curNodeParentRefs, prevNodeRefs)
 
+		currentNodeChildren := n.GetChildrenHashes()
+		previousNodeChildren := prevNode.GetChildrenHashes()
+
+		if n.Operation("") == "delete" {
+
+			// decrement one in relation to the upstream parent count
+			prevNodeRefs = prevNode.References(-1)
+
+			// Increment children that are not contained in the node
+			var diffHashes [][]byte
+			for _, newHash := range currentNodeChildren {
+				if !contains(previousNodeChildren, newHash) {
+					diffHashes = append(diffHashes, newHash)
+				}
+			}
+
+			for _, changedHash := range diffHashes {
+				newChildNode, err := fp.GetNodeByHash(changedHash)
+				if err != nil {
+					return err
+				}
+
+				if curNodeParentRefs > newChildNode.References(0) {
+					newChildNode.References(1)
+				} else {
+					continue
+				}
+
+				err = fp.storeNode(newChildNode)
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+
+			n.References(1 - n.References(0))
+			// only change if the references are greater than one, otherwise keep it
+			if prevNodeRefs >= curNodeParentRefs && prevNodeRefs >= curNodeRefs {
+				prevNodeRefs = prevNode.References(-1)
+			}
+
+			// Increment children that are already contained in the node
+			var diffHashes [][]byte
+			for _, oldHash := range previousNodeChildren {
+				if contains(currentNodeChildren, oldHash) {
+					diffHashes = append(diffHashes, oldHash)
+				}
+			}
+
+			for _, diffHash := range diffHashes {
+				prevChildNode, err := fp.GetNodeByHash(diffHash)
+				if err != nil {
+					return err
+				}
+
+				if curNodeParentRefs <= 1 {
+					continue
+				} else {
 					prevChildNode.References(1)
-					err = fp.storeNode(prevChildNode)
-					if err != nil {
-						return err
-					}
+				}
+
+				err = fp.storeNode(prevChildNode)
+				if err != nil {
+					return err
 				}
 			}
 		}
 
-		err = fp.storeNode(prevNode)
-		if err != nil {
-			return err
+		if prevNode.References(0) > 0 {
+			err = fp.storeNode(prevNode)
+			if err != nil {
+				return err
+			}
+		}
+
+		if prevNode.References(0) <= 0 {
+			err = fp.deleteNode(prevNode)
+			if err != nil {
+				return err
+			}
+		}
+
+		// when inserting a new branch on a root that has shared nodes
+		// should never happen when deleting
+	}
+
+	return nil
+}
+
+func contains(s [][]byte, e []byte) bool {
+	for _, a := range s {
+		if bytes.Equal(a, e) {
+			return true
 		}
 	}
-	return nil
+	return false
 }

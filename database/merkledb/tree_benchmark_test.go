@@ -2,6 +2,7 @@ package merkledb
 
 import (
 	"crypto/rand"
+	"fmt"
 	mrand "math/rand"
 	"testing"
 )
@@ -27,6 +28,31 @@ func CreateRandomValues(valueCount int) []TestStruct {
 			key   []byte
 			value []byte
 		}{key: key, value: val})
+	}
+
+	// TODO fix this
+	if false {
+		for _, test := range tests {
+			fmt.Println("{")
+			var keyBytes string
+			var valueBytes string
+			for _, k := range test.key {
+				if len(keyBytes) > 0 {
+					keyBytes += ","
+				}
+				keyBytes += fmt.Sprintf("%v", k)
+			}
+			fmt.Printf("key: []byte{%v},\n", keyBytes)
+			for _, v := range test.value {
+				if len(valueBytes) > 0 {
+					valueBytes += ","
+				}
+				valueBytes += fmt.Sprintf("%v", v)
+			}
+			fmt.Printf("value: []byte{%v},\n", valueBytes)
+			fmt.Printf("}\n")
+		}
+		fmt.Println()
 	}
 
 	return tests

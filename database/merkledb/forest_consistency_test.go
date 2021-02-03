@@ -8,7 +8,7 @@ func TestForestConsistencyCopy_PutGetDel(t *testing.T) {
 		name string
 		data []TestStruct
 	}{
-		{"testConsistencyCopy-1k-CopyPutGetDel", CreateRandomValues(1000)},
+		{"testConsistencyCopy-1k-CopyPutGetDel", CreateRandomValues(500)},
 		// {"test10k-PutGetDel", CreateRandomValues(10000)},
 		// {"test100k-PutGetDel", CreateRandomValues(100000)},
 	}
