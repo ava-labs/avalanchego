@@ -5146,6 +5146,7 @@ func TestEngineAbandonDependencyFulfilledInFutureEpoch(t *testing.T) {
 	err = te.PushQuery(vdr, 2, vtxC.ID(), vtxC.Bytes())
 	assert.NoError(t, err)
 	assert.False(t, te.Consensus.VertexIssued(vtxC), "should not have issued vtxC")
+	assert.True(t, te.pending.Contains(vtxC.ID()), "vtxC should have been in pending")
 
 	manager.GetF = func(id ids.ID) (avalanche.Vertex, error) {
 		if id != vtxA2.ID() {
@@ -5162,8 +5163,7 @@ func TestEngineAbandonDependencyFulfilledInFutureEpoch(t *testing.T) {
 	assert.NoError(t, err, "unexpected error calling Chits with vtxA2")
 	assert.Equal(t, choices.Accepted, vtxA2.Status(), "expected vtxA2 to be Processing")
 
-	// Since trA was accepted into epoch 2, vtxC (epoch 1) should be abandoned because its
-	// transaction txC has a dependency that will be fulfilled in epoch 2.
-	trToDependentsEpoch1 := te.trBlocked[priorEpoch]
-	assert.Len(t, trToDependentsEpoch1, 0)
+	// // Since trA was accepted into epoch 2, vtxC (epoch 1) should be abandoned because its
+	// // transaction txC has a dependency that will be fulfilled in epoch 2.
+	assert.False(t, te.pending.Contains(vtxC.ID()), "vtxC should have been abandoned")
 }

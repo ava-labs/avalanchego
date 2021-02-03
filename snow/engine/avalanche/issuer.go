@@ -16,6 +16,7 @@ type issuer struct {
 	updatedEpoch      bool
 	issued, abandoned bool
 	vtxDeps, trDeps   ids.Set
+	processingDeps    ids.Set
 }
 
 // Register that a vertex we were waiting on has been issued to consensus.
@@ -27,6 +28,7 @@ func (i *issuer) FulfillVtx(id ids.ID) {
 // Register that a transition we were waiting on has been issued to consensus.
 func (i *issuer) FulfillTr(id ids.ID) {
 	i.trDeps.Remove(id)
+	i.processingDeps.Remove(id)
 	i.Update()
 }
 
@@ -186,12 +188,17 @@ type vtxIssuer struct{ i *issuer }
 
 func (vi *vtxIssuer) Dependencies() ids.Set { return vi.i.vtxDeps }
 func (vi *vtxIssuer) Fulfill(id ids.ID)     { vi.i.FulfillVtx(id) }
-func (vi *vtxIssuer) Abandon(ids.ID)        { vi.i.Abandon() }
+func (vi *vtxIssuer) Abandon(id ids.ID)     { vi.i.Abandon() }
 func (vi *vtxIssuer) Update()               { vi.i.Update() }
 
 type trIssuer struct{ i *issuer }
 
-func (ti *trIssuer) Dependencies() ids.Set { return ti.i.trDeps }
-func (ti *trIssuer) Fulfill(id ids.ID)     { ti.i.FulfillTr(id) }
-func (ti *trIssuer) Abandon(ids.ID)        { ti.i.Abandon() }
-func (ti *trIssuer) Update()               { ti.i.Update() }
+func (ti *trIssuer) Dependencies() ids.Set {
+	s := ids.Set{}
+	s.Union(ti.i.trDeps)
+	s.Union(ti.i.processingDeps)
+	return s
+}
+func (ti *trIssuer) Fulfill(id ids.ID) { ti.i.FulfillTr(id) }
+func (ti *trIssuer) Abandon(id ids.ID) { ti.i.Abandon() }
+func (ti *trIssuer) Update()           { ti.i.Update() }

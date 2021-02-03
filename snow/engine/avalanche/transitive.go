@@ -511,6 +511,10 @@ func (t *Transitive) issue(vtx avalanche.Vertex, updatedEpoch bool) error {
 				// Mark that depenency [depID] is not accepted in an earlier
 				// epoch and is not processing in the current epoch
 				i.trDeps.Add(depID)
+			} else {
+				// If the dependency has already been issued, then we add the
+				// dependency to processingDeps
+				i.processingDeps.Add(depID)
 			}
 		}
 	}
