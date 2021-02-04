@@ -178,7 +178,7 @@ func (self *ETHChain) SetTail(hash common.Hash) error {
 }
 
 func (self *ETHChain) SetPreference(block *types.Block) {
-	self.backend.Miner().SetPreferred(block)
+	self.backend.Miner().SetPreference(block)
 }
 
 func (self *ETHChain) GetReceiptsByHash(hash common.Hash) types.Receipts {

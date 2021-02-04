@@ -199,8 +199,8 @@ type worker struct {
 	disableUncle   bool
 	minerCallbacks *MinerCallbacks
 
-	preferredBlock *types.Block
-	preferredMutex sync.Mutex
+	preferenceBlock *types.Block
+	preferenceMutex sync.Mutex
 }
 
 func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Block) bool, init bool, mcb *MinerCallbacks) *worker {
@@ -259,19 +259,18 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 	return worker
 }
 
-func (w *worker) SetPreferred(block *types.Block) {
-	w.preferredMutex.Lock()
-	defer w.preferredMutex.Unlock()
+func (w *worker) SetPreference(block *types.Block) {
+	w.preferenceMutex.Lock()
+	defer w.preferenceMutex.Unlock()
 
-	w.preferredBlock = block
+	w.preferenceBlock = block
 }
 
-func (w *worker) GetPreferred() *types.Block {
-	w.preferredMutex.Lock()
-	defer w.preferredMutex.Unlock()
+func (w *worker) GetPreference() *types.Block {
+	w.preferenceMutex.Lock()
+	defer w.preferenceMutex.Unlock()
 
-	// TODO: do we need to copy this?
-	return w.preferredBlock
+	return w.preferenceBlock
 }
 
 // setEtherbase sets the etherbase used to initialize the block coinbase field.
@@ -926,7 +925,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 
 	tstart := time.Now()
 	// TODO: need to get last preferred
-	parent := w.GetPreferred()
+	parent := w.GetPreference()
 	if parent == nil {
 		log.Error("Preferred parent not set")
 		return
