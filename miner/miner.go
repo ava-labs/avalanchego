@@ -139,3 +139,7 @@ func (miner *Miner) GenBlock() {
 func (miner *Miner) GetWorkerMux() *event.TypeMux {
 	return miner.worker.mux
 }
+
+func (miner *Miner) SetPreferred(block *types.Block) {
+	miner.worker.SetPreferred(block)
+}
