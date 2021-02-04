@@ -141,5 +141,5 @@ func (miner *Miner) GetWorkerMux() *event.TypeMux {
 }
 
 func (miner *Miner) SetPreference(block *types.Block) {
-	miner.worker.SetPreference(block)
+	miner.worker.setPreference(block)
 }
