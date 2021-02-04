@@ -410,6 +410,7 @@ func (vm *VM) Initialize(
 		ethBlock: lastAccepted,
 		vm:       vm,
 	}
+	vm.chain.SetPreference(lastAccepted)
 	vm.genesisHash = chain.GetGenesisBlock().Hash()
 	log.Info(fmt.Sprintf("lastAccepted = %s", vm.lastAccepted.ethBlock.Hash().Hex()))
 
