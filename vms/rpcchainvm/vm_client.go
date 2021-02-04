@@ -47,7 +47,6 @@ var (
 
 const (
 	decidedCacheSize = 500
-	missingCacheSize = 500
 )
 
 // VMClient is an implementation of VM that talks over RPC.
@@ -70,7 +69,6 @@ type VMClient struct {
 	blks map[ids.ID]*BlockClient
 
 	decidedBlocks cache.Cacher
-	missingBlocks cache.Cacher
 
 	lastAccepted ids.ID
 }
@@ -102,16 +100,6 @@ func (vm *VMClient) initializeCaches(registerer prometheus.Registerer, namespace
 		return fmt.Errorf("could not initialize decided blocks cache: %w", err)
 	}
 	vm.decidedBlocks = decidedCache
-
-	missingCache, err := metercacher.New(
-		fmt.Sprintf("%s_rpcchainvm_missing_cache", namespace),
-		registerer,
-		&cache.LRU{Size: missingCacheSize},
-	)
-	if err != nil {
-		return fmt.Errorf("could not initialize missing blocks cache: %w", err)
-	}
-	vm.missingBlocks = missingCache
 
 	return nil
 }
@@ -301,8 +289,6 @@ func (vm *VMClient) BuildBlock() (snowman.Block, error) {
 	parentID, err := ids.ToID(resp.ParentID)
 	vm.ctx.Log.AssertNoError(err)
 
-	vm.missingBlocks.Evict(id)
-
 	return &BlockClient{
 		vm:       vm,
 		id:       id,
@@ -331,7 +317,6 @@ func (vm *VMClient) ParseBlock(bytes []byte) (snowman.Block, error) {
 	if blkIntf, cached := vm.decidedBlocks.Get(id); cached {
 		return blkIntf.(*BlockClient), nil
 	}
-	vm.missingBlocks.Evict(id)
 
 	parentID, err := ids.ToID(resp.ParentID)
 	vm.ctx.Log.AssertNoError(err)
@@ -363,17 +348,10 @@ func (vm *VMClient) GetBlock(id ids.ID) (snowman.Block, error) {
 		return blkIntf.(*BlockClient), nil
 	}
 
-	if _, cached := vm.missingBlocks.Get(id); cached {
-		return nil, missing.ErrMissingBlock
-	}
-
 	resp, err := vm.client.GetBlock(context.Background(), &vmproto.GetBlockRequest{
 		Id: id[:],
 	})
 	if err != nil {
-		if errors.Is(err, missing.ErrMissingBlock) {
-			vm.missingBlocks.Put(id, struct{}{})
-		}
 		return nil, err
 	}
 
