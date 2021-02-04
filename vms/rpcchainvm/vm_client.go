@@ -44,6 +44,11 @@ var (
 	errMissingBlock   = errors.New("missing block")
 )
 
+const (
+	decidedCacheSize = 1000
+	missingCacheSize = 1000
+)
+
 // VMClient is an implementation of VM that talks over RPC.
 type VMClient struct {
 	client vmproto.VMClient
@@ -63,8 +68,8 @@ type VMClient struct {
 	ctx  *snow.Context
 	blks map[ids.ID]*BlockClient
 
-	decidedBlocks cache.LRU
-	missingBlocks cache.LRU
+	decidedBlocks *cache.LRU
+	missingBlocks *cache.LRU
 
 	lastAccepted ids.ID
 }
@@ -72,9 +77,11 @@ type VMClient struct {
 // NewClient returns a database instance connected to a remote database instance
 func NewClient(client vmproto.VMClient, broker *plugin.GRPCBroker) *VMClient {
 	return &VMClient{
-		client: client,
-		broker: broker,
-		blks:   make(map[ids.ID]*BlockClient),
+		client:        client,
+		broker:        broker,
+		blks:          make(map[ids.ID]*BlockClient),
+		decidedBlocks: &cache.LRU{Size: decidedCacheSize},
+		missingBlocks: &cache.LRU{Size: missingCacheSize},
 	}
 }
 
@@ -336,7 +343,9 @@ func (vm *VMClient) GetBlock(id ids.ID) (snowman.Block, error) {
 		Id: id[:],
 	})
 	if err != nil {
-		vm.missingBlocks.Put(id, struct{}{})
+		if errors.Is(err, errMissingBlock) {
+			vm.missingBlocks.Put(id, struct{}{})
+		}
 		return nil, err
 	}
 
