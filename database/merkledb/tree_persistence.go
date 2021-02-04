@@ -77,7 +77,7 @@ func (tp *TreePersistence) DuplicateRoot(oldRootID uint32, newRootID uint32) (No
 }
 
 // StoreNode stores a in the DB Node using its StorageKey
-func (tp *TreePersistence) StoreNode(n Node) error {
+func (tp *TreePersistence) StoreNode(n Node, force bool) error {
 	nBytes, err := tp.codec.Marshal(0, &n)
 	if err != nil {
 		return err
@@ -133,9 +133,4 @@ func (tp *TreePersistence) Commit(err error) error {
 		return err
 	}
 	return tp.db.(*versiondb.Database).Commit()
-}
-
-// GetDatabase returns the inner DB
-func (tp *TreePersistence) GetDatabase() database.Database {
-	return tp.db
 }

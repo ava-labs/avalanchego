@@ -1,6 +1,12 @@
 package merkledb
 
-import "testing"
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"testing"
+)
 
 func TestForestConsistencyCopy_PutGetDel(t *testing.T) {
 
@@ -100,5 +106,215 @@ func TestForestConsistencyCopy_PutGetDel(t *testing.T) {
 				t.Fatal("Error closing the db")
 			}
 		})
+	}
+}
+
+func TestForestConsistency_PutGetDel(t *testing.T) {
+	testSize := 1000
+	t0 := CreateRandomValues(testSize)
+	t1 := CreateRandomValues(testSize)
+	t2 := CreateRandomValues(testSize)
+
+	tests := []ScenarioForestStruct{
+		{
+			Name: "Out Of Order Full Delete",
+			ForestScenario: []ScenarioTree{
+				{
+					Tree:         0,
+					ShouldCreate: true,
+					TreeScenario: ScenarioTestStruct{
+						Name:    "PutGet Value on Tree 0",
+						PutData: t0,
+					},
+				},
+				{
+					Tree:         1,
+					OldTree:      0,
+					IsDuplicate:  true,
+					ShouldCreate: true,
+					TreeScenario: ScenarioTestStruct{
+						Name:    "PutGet Value on Tree 1",
+						PutData: t1,
+					},
+				},
+				{
+					Tree:         2,
+					OldTree:      1,
+					IsDuplicate:  true,
+					ShouldCreate: true,
+					TreeScenario: ScenarioTestStruct{
+						Name:    "PutGet Value on Tree 2",
+						PutData: t2,
+					},
+				},
+				{
+					Tree: 2,
+					TreeScenario: ScenarioTestStruct{
+						Name:    "Del t0 Values on Tree 2",
+						DelData: t0,
+					},
+				},
+				{
+					Tree: 1,
+					TreeScenario: ScenarioTestStruct{
+						Name:    "Del t0 Values on Tree 1",
+						DelData: t0,
+					},
+				},
+				{
+					Tree: 2,
+					TreeScenario: ScenarioTestStruct{
+						Name:    "Del t1 Values on Tree 2",
+						DelData: t1,
+					},
+				},
+				{
+					Tree: 0,
+					TreeScenario: ScenarioTestStruct{
+						Name:    "Del t0 Values on Tree 0",
+						DelData: t0,
+					},
+				},
+				{
+					Tree: 2,
+					TreeScenario: ScenarioTestStruct{
+						Name:    "Del t2 Values on Tree 2",
+						DelData: t2,
+					},
+				},
+				{
+					Tree:         1,
+					checkCleanDB: true,
+					TreeScenario: ScenarioTestStruct{
+						Name:    "Del t1 Values on Tree 1",
+						DelData: t1,
+					},
+				},
+			},
+		},
+	}
+
+	if false {
+		dumpTest(t, tests, "test.json")
+		tests = loadTest(t, "test.json")
+		tests[0].debugEntry = []byte{235, 6, 131, 166, 154, 73, 104, 230, 190, 102, 190, 15, 79, 36, 157, 15, 114, 81, 182, 35, 241, 55, 98, 66, 19, 97, 7, 31, 76, 98, 42}
+	}
+
+	for _, test := range tests {
+		testForest(t, test)
+	}
+}
+
+func TestForestConsistency_PutGetClear(t *testing.T) {
+	testSize := 10
+	t0 := CreateRandomValues(testSize)
+	t1 := CreateRandomValues(testSize)
+	t2 := CreateRandomValues(testSize)
+
+	tests := []ScenarioForestStruct{
+		{
+			Name: "Out Of Order Full Delete",
+			ForestScenario: []ScenarioTree{
+				{
+					Tree:         0,
+					ShouldCreate: true,
+					TreeScenario: ScenarioTestStruct{
+						Name:    "PutGet Value on Tree 0",
+						PutData: t0,
+					},
+				},
+				{
+					Tree:         1,
+					OldTree:      0,
+					IsDuplicate:  true,
+					ShouldCreate: true,
+					TreeScenario: ScenarioTestStruct{
+						Name:    "PutGet Value on Tree 1",
+						PutData: t1,
+					},
+				},
+				{
+					Tree:         2,
+					OldTree:      1,
+					IsDuplicate:  true,
+					ShouldCreate: true,
+					TreeScenario: ScenarioTestStruct{
+						Name:    "PutGet Value on Tree 2",
+						PutData: t2,
+					},
+				},
+				{
+					Tree: 2,
+					TreeScenario: ScenarioTestStruct{
+						Name:      "Del All Values on Tree 2",
+						ClearTree: true,
+					},
+				},
+				{
+					Tree: 1,
+					TreeScenario: ScenarioTestStruct{
+						Name:      "Del All Values on Tree 1",
+						ClearTree: true,
+					},
+				},
+				{
+					Tree:         0,
+					checkCleanDB: true,
+					TreeScenario: ScenarioTestStruct{
+						Name:      "Del ALL Values on Tree 0",
+						ClearTree: true,
+					},
+				},
+			},
+		},
+	}
+
+	if false {
+		dumpTest(t, tests, "test.json")
+		tests = loadTest(t, "test.json")
+		writeTest(tests)
+		tests[0].debugEntry = []byte{125, 84, 98, 23}
+	}
+
+	for _, test := range tests {
+		testForest(t, test)
+	}
+}
+
+func loadTest(t *testing.T, fileName string) []ScenarioForestStruct {
+	var tests []ScenarioForestStruct
+	data, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		t.Fatal("Couldn't open file")
+	}
+	err = json.Unmarshal(data, &tests)
+	if err != nil {
+		t.Fatal("Couldn't unmarshal file")
+	}
+	return tests
+}
+
+func dumpTest(t *testing.T, tests []ScenarioForestStruct, fileName string) {
+	f, err := os.Create(fileName)
+	if err != nil {
+		t.Fatal("Couldn't open file")
+	}
+	defer f.Close()
+
+	file, _ := json.MarshalIndent(tests, "", " ")
+	err = ioutil.WriteFile(fileName, file, 0600)
+	if err != nil {
+		t.Fatal("Couldn't open file")
+	}
+}
+
+func writeTest(tests []ScenarioForestStruct) {
+	for _, test := range tests {
+		for _, forestTest := range test.ForestScenario {
+			fmt.Printf("Tree: %v\n", forestTest.Tree)
+			for _, kv := range forestTest.TreeScenario.PutData {
+				fmt.Printf("\tkey: %v\n\tval: %v\n\n", BytesToKey(kv.Key).ToExpandedBytes(), kv.Value)
+			}
+		}
 	}
 }

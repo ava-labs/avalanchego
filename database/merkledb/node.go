@@ -17,13 +17,12 @@ type Node interface {
 	GetHash() []byte
 	GetPreviousHash() []byte
 	References(change int32) int32
-	ParentReferences(change int32) int32
-	Operation(change string) string
+	PivotPoint() *Pivot
 	Key() Key
 	GetChildrenHashes() [][]byte
 	GetReHash() []byte
 	Clear() error
-	Print()
+	Print(level int32)
 	String() string
 }
 

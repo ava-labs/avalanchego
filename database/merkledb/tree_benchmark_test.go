@@ -25,9 +25,9 @@ func CreateRandomValues(valueCount int) []TestStruct {
 
 		added[keyString] = true
 		tests = append(tests, struct {
-			key   []byte
-			value []byte
-		}{key: key, value: val})
+			Key   []byte
+			Value []byte
+		}{Key: key, Value: val})
 	}
 
 	// TODO fix this
@@ -36,21 +36,21 @@ func CreateRandomValues(valueCount int) []TestStruct {
 			fmt.Println("{")
 			var keyBytes string
 			var valueBytes string
-			for _, k := range test.key {
+			for _, k := range test.Key {
 				if len(keyBytes) > 0 {
 					keyBytes += ","
 				}
 				keyBytes += fmt.Sprintf("%v", k)
 			}
 			fmt.Printf("key: []byte{%v},\n", keyBytes)
-			for _, v := range test.value {
+			for _, v := range test.Value {
 				if len(valueBytes) > 0 {
 					valueBytes += ","
 				}
 				valueBytes += fmt.Sprintf("%v", v)
 			}
 			fmt.Printf("value: []byte{%v},\n", valueBytes)
-			fmt.Printf("}\n")
+			fmt.Printf("},\n")
 		}
 		fmt.Println()
 	}
@@ -76,7 +76,7 @@ func BenchmarkTree_Put(b *testing.B) {
 			b.ResetTimer()
 
 			for _, test := range test.data {
-				_ = tree.Put(test.key, test.value)
+				_ = tree.Put(test.Key, test.Value)
 			}
 		})
 		_ = HardCloseDB(tree)
@@ -102,7 +102,7 @@ func BenchmarkTree_PutBatch(b *testing.B) {
 			b.ResetTimer()
 
 			for _, test := range test.data {
-				_ = batcher.Put(test.key, test.value)
+				_ = batcher.Put(test.Key, test.Value)
 			}
 			_ = batcher.Write()
 		})
@@ -127,17 +127,17 @@ func BenchmarkTree_Get(b *testing.B) {
 
 		b.Run(test.name, func(b *testing.B) {
 			for _, entry := range test.data {
-				_ = batchTree.Put(entry.key, entry.value)
+				_ = batchTree.Put(entry.Key, entry.Value)
 			}
 			_ = batchTree.Write()
 
 			b.ResetTimer()
 			for _, entry := range test.data {
-				_, err := tree.Get(entry.key)
+				_, err := tree.Get(entry.Key)
 
 				if err != nil {
 					tree.PrintTree()
-					b.Fatalf("value not found in the tree - %v - %v", entry.key, err)
+					b.Fatalf("value not found in the tree - %v - %v", entry.Key, err)
 				}
 			}
 		})
@@ -162,15 +162,15 @@ func BenchmarkTree_Del(b *testing.B) {
 
 		b.Run(test.name, func(b *testing.B) {
 			for _, test := range test.data {
-				_ = tree.Put(test.key, test.value)
+				_ = tree.Put(test.Key, test.Value)
 			}
 
 			b.ResetTimer()
 			for _, entry := range test.data {
-				err := tree.Delete(entry.key)
+				err := tree.Delete(entry.Key)
 
 				if err != nil {
-					b.Fatalf("value not deleted in the tree as it was not found- %v", entry.key)
+					b.Fatalf("value not deleted in the tree as it was not found- %v", entry.Key)
 				}
 			}
 		})
@@ -196,16 +196,16 @@ func BenchmarkTree_DelBatcher(b *testing.B) {
 
 		b.Run(test.name, func(b *testing.B) {
 			for _, test := range test.data {
-				_ = batcher.Put(test.key, test.value)
+				_ = batcher.Put(test.Key, test.Value)
 			}
 			_ = batcher.Write()
 
 			b.ResetTimer()
 			for _, entry := range test.data {
-				err := batcher.Delete(entry.key)
+				err := batcher.Delete(entry.Key)
 
 				if err != nil {
-					b.Fatalf("value not deleted in the tree as it was not found- %v", entry.key)
+					b.Fatalf("value not deleted in the tree as it was not found- %v", entry.Key)
 				}
 			}
 			_ = batcher.Write()

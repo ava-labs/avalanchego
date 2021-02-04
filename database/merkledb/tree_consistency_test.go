@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math/big"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/database"
 )
 
 func PickRandomKey(list []TestStruct) (TestStruct, []TestStruct) {
@@ -120,7 +122,7 @@ func TestTreeConsistencyStorage_PutGetDel(t *testing.T) {
 func putAndTestRoot(t *testing.T, tree *Tree, data []TestStruct) {
 	var lastRootHash []byte
 	for _, entry := range data {
-		_ = tree.Put(entry.key, entry.value)
+		_ = tree.Put(entry.Key, entry.Value)
 
 		rootHash, err := tree.Root()
 		if err != nil {
@@ -145,13 +147,13 @@ func getTest(t *testing.T, tree *Tree, data []TestStruct) {
 			stop = true
 		}
 
-		val, err := tree.Get(entry.key)
+		val, err := tree.Get(entry.Key)
 
 		if err != nil {
-			t.Fatalf("value not found in the tree - %v - %v", entry.key, err)
+			t.Fatalf("value not found in the tree - %v - %v", entry.Key, err)
 		}
-		if !bytes.Equal(val, entry.value) {
-			t.Fatalf("unexpected value found in the tree - key: %v expected:  %v got: %v", entry.key, entry.value, val)
+		if !bytes.Equal(val, entry.Value) {
+			t.Fatalf("unexpected value found in the tree - key: %v expected:  %v got: %v", entry.Key, entry.Value, val)
 		}
 	}
 }
@@ -168,16 +170,16 @@ func delAndTestRoot(t *testing.T, tree *Tree, data []TestStruct) {
 		}
 		lastRootHash, _ := tree.Root()
 
-		if err := tree.Delete(entry.key); err != nil {
+		if err := tree.Delete(entry.Key); err != nil {
 			i := 0
 			for _, val := range data {
-				if bytes.Equal(entry.key, val.key) {
+				if bytes.Equal(entry.Key, val.Key) {
 					i++
-					fmt.Printf("k: %v, v: %v\n", val.key, val.value)
+					fmt.Printf("k: %v, v: %v\n", val.Key, val.Value)
 				}
 			}
 			fmt.Printf("Number of times val exists: %d\n", i)
-			t.Fatalf("value not deleted in the tree as it was not found err: %v \nkey: %v", err, entry.key)
+			t.Fatalf("value not deleted in the tree as it was not found err: %v \nkey: %v", err, entry.Key)
 		}
 
 		rootHash, err := tree.Root()
@@ -186,7 +188,7 @@ func delAndTestRoot(t *testing.T, tree *Tree, data []TestStruct) {
 		}
 
 		if bytes.Equal(lastRootHash, rootHash) {
-			fmt.Printf("Deleted key: %v\n", entry.key)
+			fmt.Printf("Deleted key: %v\n", entry.Key)
 			fmt.Printf("lastRootHash: %v\n tree.Root: %v\n", lastRootHash, rootHash)
 			t.Fatal("Root Hash didn't change after deletion")
 		}
@@ -201,13 +203,14 @@ func clearTest(t *testing.T, tree *Tree) {
 }
 
 func checkDatabaseItems(t *testing.T, tree *Tree) {
-	iterator := tree.persistence.GetDatabase().NewIterator()
+
+	db := getDatabase(tree.persistence)
+	iterator := db.NewIterator()
 	count := 0
 	for iterator.Next() {
 		var node Node
-		// fmt.Printf("Key: %x , Val: %v\n", iterator.Key(), iterator.Value())
 
-		nodeBytes, _ := tree.persistence.GetDatabase().Get(iterator.Key())
+		nodeBytes, _ := getDatabase(tree.persistence).Get(iterator.Key())
 
 		switch p := tree.persistence.(type) {
 		case *TreePersistence:
@@ -223,4 +226,16 @@ func checkDatabaseItems(t *testing.T, tree *Tree) {
 	if count > 0 {
 		t.Fatalf("Database is not empty - Number of Items: %d", count)
 	}
+}
+
+func getDatabase(persistence Persistence) database.Database {
+	switch p := persistence.(type) {
+	case *ForestPersistence:
+		return p.db
+	case *TreePersistence:
+		return p.db
+	default:
+		panic("unknown persistence type")
+	}
+	return nil
 }

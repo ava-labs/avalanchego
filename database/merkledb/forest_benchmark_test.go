@@ -23,7 +23,7 @@ func BenchmarkForest_Put(b *testing.B) {
 			b.ResetTimer()
 
 			for _, test := range test.data {
-				_ = tree.Put(test.key, test.value)
+				_ = tree.Put(test.Key, test.Value)
 			}
 		})
 		_ = HardCloseDB(tree)
@@ -50,7 +50,7 @@ func BenchmarkForest_PutBatch(b *testing.B) {
 			b.ResetTimer()
 
 			for _, test := range test.data {
-				_ = batcher.Put(test.key, test.value)
+				_ = batcher.Put(test.Key, test.Value)
 			}
 			_ = batcher.Write()
 		})
@@ -74,7 +74,7 @@ func BenchmarkForestSecondTree_Put(b *testing.B) {
 		tree, _ := forest.CreateEmptyTree(0)
 
 		for _, test := range test.data {
-			_ = tree.Put(test.key, test.value)
+			_ = tree.Put(test.Key, test.Value)
 		}
 
 		treeCopy, err := forest.Copy(0, 1)
@@ -84,7 +84,7 @@ func BenchmarkForestSecondTree_Put(b *testing.B) {
 
 		b.ResetTimer()
 		for _, test2 := range test.data2 {
-			_ = treeCopy.Put(test2.key, test2.value)
+			_ = treeCopy.Put(test2.Key, test2.Value)
 		}
 	}
 }
@@ -107,14 +107,14 @@ func BenchmarkForestSecondTree_PutBatch(b *testing.B) {
 
 		b.Run(test.name, func(b *testing.B) {
 			for _, test := range test.data {
-				_ = tree.Put(test.key, test.value)
+				_ = tree.Put(test.Key, test.Value)
 			}
 
 			treeCopy, _ := forest.Copy(0, 1)
 			batcher := NewBatch(treeCopy)
 			b.ResetTimer()
 			for _, test := range test.data2 {
-				_ = batcher.Put(test.key, test.value)
+				_ = batcher.Put(test.Key, test.Value)
 			}
 			_ = batcher.Write()
 		})
@@ -140,17 +140,16 @@ func BenchmarkForest_Get(b *testing.B) {
 
 		b.Run(test.name, func(b *testing.B) {
 			for _, entry := range test.data {
-				_ = batchTree.Put(entry.key, entry.value)
+				_ = batchTree.Put(entry.Key, entry.Value)
 			}
 			_ = batchTree.Write()
 
 			b.ResetTimer()
 			for _, entry := range test.data {
-				_, err := tree.Get(entry.key)
+				_, err := tree.Get(entry.Key)
 
 				if err != nil {
-					tree.PrintTree()
-					b.Fatalf("value not found in the tree - %v - %v", entry.key, err)
+					b.Fatalf("value not found in the tree - %v - %v", entry.Key, err)
 				}
 			}
 		})
@@ -176,15 +175,15 @@ func BenchmarkForest_Del(b *testing.B) {
 
 		b.Run(test.name, func(b *testing.B) {
 			for _, test := range test.data {
-				_ = tree.Put(test.key, test.value)
+				_ = tree.Put(test.Key, test.Value)
 			}
 
 			b.ResetTimer()
 			for _, entry := range test.data {
-				err := tree.Delete(entry.key)
+				err := tree.Delete(entry.Key)
 
 				if err != nil {
-					b.Fatalf("value not deleted in the tree as it was not found- %v", entry.key)
+					b.Fatalf("value not deleted in the tree as it was not found- %v", entry.Key)
 				}
 			}
 		})
@@ -211,16 +210,16 @@ func BenchmarkForest_DelBatcher(b *testing.B) {
 
 		b.Run(test.name, func(b *testing.B) {
 			for _, test := range test.data {
-				_ = batcher.Put(test.key, test.value)
+				_ = batcher.Put(test.Key, test.Value)
 			}
 			_ = batcher.Write()
 
 			b.ResetTimer()
 			for _, entry := range test.data {
-				err := batcher.Delete(entry.key)
+				err := batcher.Delete(entry.Key)
 
 				if err != nil {
-					b.Fatalf("value not deleted in the tree as it was not found- %v", entry.key)
+					b.Fatalf("value not deleted in the tree as it was not found- %v", entry.Key)
 				}
 			}
 			_ = batcher.Write()

@@ -19,7 +19,7 @@ func NewMemoryTree() *Tree {
 
 func HardCloseDB(t *Tree) error {
 	t.Close()
-	return t.persistence.GetDatabase().(*versiondb.Database).GetDatabase().Close()
+	return getDatabase(t.persistence).(*versiondb.Database).GetDatabase().Close()
 }
 
 // NewLevelTree returns a new instance of the Tree with a in-memoryDB
@@ -32,15 +32,16 @@ func NewLevelTree(file string) *Tree {
 }
 
 type TestStruct struct {
-	key   []byte
-	value []byte
+	Key   []byte
+	Value []byte
 }
 
 type ScenarioTestStruct struct {
-	name    string
-	putData []TestStruct
-	getData []TestStruct
-	delData []TestStruct
+	Name      string
+	PutData   []TestStruct
+	GetData   []TestStruct
+	DelData   []TestStruct
+	ClearTree bool
 }
 
 func TestTree_Put(t *testing.T) {
@@ -175,64 +176,64 @@ func TestTree_Put_Scenarios(t *testing.T) {
 
 	tests := []ScenarioTestStruct{
 		{
-			name: "OneBranch",
-			putData: []TestStruct{
-				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}},
-				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}},
+			Name: "OneBranch",
+			PutData: []TestStruct{
+				{Key: []byte{1, 1, 1}, Value: []byte{1, 1, 1}},
+				{Key: []byte{1, 1, 2}, Value: []byte{1, 1, 2}},
 			},
 		},
 		{
-			name: "TwoBranches",
-			putData: []TestStruct{
-				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}},
-				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}},
-				{key: []byte{1, 2, 2}, value: []byte{1, 2, 2}},
+			Name: "TwoBranches",
+			PutData: []TestStruct{
+				{Key: []byte{1, 1, 1}, Value: []byte{1, 1, 1}},
+				{Key: []byte{1, 1, 2}, Value: []byte{1, 1, 2}},
+				{Key: []byte{1, 2, 2}, Value: []byte{1, 2, 2}},
 			},
 		},
 		{
-			name: "InsertDuplicateKV",
-			putData: []TestStruct{
-				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}},
-				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}},
-				{key: []byte{1, 2, 2}, value: []byte{1, 2, 2}},
-				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}},
+			Name: "InsertDuplicateKV",
+			PutData: []TestStruct{
+				{Key: []byte{1, 1, 1}, Value: []byte{1, 1, 1}},
+				{Key: []byte{1, 1, 2}, Value: []byte{1, 1, 2}},
+				{Key: []byte{1, 2, 2}, Value: []byte{1, 2, 2}},
+				{Key: []byte{1, 1, 1}, Value: []byte{1, 1, 1}},
 			},
 		},
 		{
-			name: "InsertDuplicateKDiffVal",
-			putData: []TestStruct{
-				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}},
-				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}},
-				{key: []byte{1, 2, 2}, value: []byte{1, 2, 2}},
-				{key: []byte{1, 1, 1}, value: []byte{1, 1, 2}},
+			Name: "InsertDuplicateKDiffVal",
+			PutData: []TestStruct{
+				{Key: []byte{1, 1, 1}, Value: []byte{1, 1, 1}},
+				{Key: []byte{1, 1, 2}, Value: []byte{1, 1, 2}},
+				{Key: []byte{1, 2, 2}, Value: []byte{1, 2, 2}},
+				{Key: []byte{1, 1, 1}, Value: []byte{1, 1, 2}},
 			},
-			getData: []TestStruct{
-				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}},
-				{key: []byte{1, 2, 2}, value: []byte{1, 2, 2}},
-				{key: []byte{1, 1, 1}, value: []byte{1, 1, 2}},
+			GetData: []TestStruct{
+				{Key: []byte{1, 1, 2}, Value: []byte{1, 1, 2}},
+				{Key: []byte{1, 2, 2}, Value: []byte{1, 2, 2}},
+				{Key: []byte{1, 1, 1}, Value: []byte{1, 1, 2}},
 			},
 		},
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		t.Run(test.Name, func(t *testing.T) {
 			tree := NewMemoryTree()
 
-			for _, entry := range test.putData {
-				_ = tree.Put(entry.key, entry.value)
+			for _, entry := range test.PutData {
+				_ = tree.Put(entry.Key, entry.Value)
 			}
 
-			getData := test.putData
-			if test.getData != nil {
-				getData = test.getData
+			getData := test.PutData
+			if test.GetData != nil {
+				getData = test.GetData
 			}
 			for _, entry := range getData {
-				val, err := tree.Get(entry.key)
+				val, err := tree.Get(entry.Key)
 				if err != nil {
 					t.Fatalf("unable to fetch %v - %v", entry, err)
 				}
-				if !bytes.Equal(entry.value, val) {
-					t.Fatalf("fetched wrong val - expected: %v got: %v", entry.value, val)
+				if !bytes.Equal(entry.Value, val) {
+					t.Fatalf("fetched wrong val - expected: %v got: %v", entry.Value, val)
 				}
 			}
 		})
@@ -243,89 +244,89 @@ func TestTree_Del_Scenarios(t *testing.T) {
 
 	tests := []ScenarioTestStruct{
 		{
-			name: "One Branch Revert Deletion",
-			putData: []TestStruct{
-				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}},
-				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}},
+			Name: "One Branch Revert Deletion",
+			PutData: []TestStruct{
+				{Key: []byte{1, 1, 1}, Value: []byte{1, 1, 1}},
+				{Key: []byte{1, 1, 2}, Value: []byte{1, 1, 2}},
 			},
-			delData: []TestStruct{
-				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}},
-				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}},
-			},
-		},
-		{
-			name: "Two Branch Revert Deletion",
-			putData: []TestStruct{
-				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}}, // one leaf
-				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}}, // one branch [1,1] - two leaves
-				{key: []byte{1, 2, 2}, value: []byte{1, 2, 2}}, // two branches [1], [1,1] - three leaves
-			},
-			delData: []TestStruct{
-				{key: []byte{1, 2, 2}, value: []byte{1, 2, 2}}, // one branch [1,1] - two leaves
-				{key: []byte{1, 1, 2}, value: []byte{1, 1, 2}}, // one leaf
-				{key: []byte{1, 1, 1}, value: []byte{1, 1, 1}}, // empty
+			DelData: []TestStruct{
+				{Key: []byte{1, 1, 2}, Value: []byte{1, 1, 2}},
+				{Key: []byte{1, 1, 1}, Value: []byte{1, 1, 1}},
 			},
 		},
 		{
-			name: "Remove middle Branch",
-			putData: []TestStruct{
-				{key: []byte{1, 1, 1, 1}, value: []byte{1, 1, 1, 1}},
-				{key: []byte{1, 1, 1, 2}, value: []byte{1, 1, 1, 1}}, // has 1 branch at 1,1,1
-				{key: []byte{1, 1, 2, 0}, value: []byte{1, 1, 1, 1}}, // has another branch at 1,1
-				{key: []byte{1, 1, 2, 1}, value: []byte{1, 1, 1, 1}},
-				{key: []byte{1, 2, 0, 0}, value: []byte{1, 1, 1, 1}}, // has another branch at 1
-				{key: []byte{1, 3, 3, 3}, value: []byte{1, 1, 1, 1}},
+			Name: "Two Branch Revert Deletion",
+			PutData: []TestStruct{
+				{Key: []byte{1, 1, 1}, Value: []byte{1, 1, 1}}, // one leaf
+				{Key: []byte{1, 1, 2}, Value: []byte{1, 1, 2}}, // one branch [1,1] - two leaves
+				{Key: []byte{1, 2, 2}, Value: []byte{1, 2, 2}}, // two branches [1], [1,1] - three leaves
 			},
-			delData: []TestStruct{
-				{key: []byte{1, 2, 0, 0}, value: []byte{1, 1, 1, 1}},
-				{key: []byte{1, 3, 3, 3}, value: []byte{1, 1, 1, 1}}, // deletes the 1,1 branch -
-				{key: []byte{1, 1, 1, 1}, value: []byte{1, 1, 1, 1}}, // TODO add a way to check # of branches + Nodes
-				{key: []byte{1, 1, 1, 2}, value: []byte{1, 1, 1, 1}},
-				{key: []byte{1, 1, 2, 0}, value: []byte{1, 1, 1, 1}},
-				{key: []byte{1, 1, 2, 1}, value: []byte{1, 1, 1, 1}},
+			DelData: []TestStruct{
+				{Key: []byte{1, 2, 2}, Value: []byte{1, 2, 2}}, // one branch [1,1] - two leaves
+				{Key: []byte{1, 1, 2}, Value: []byte{1, 1, 2}}, // one leaf
+				{Key: []byte{1, 1, 1}, Value: []byte{1, 1, 1}}, // empty
 			},
 		},
 		{
-			name: "Shared Nibbles",
-			putData: []TestStruct{
-				{key: []byte{17, 17, 1}, value: []byte{17, 17, 1}},
-				{key: []byte{17, 17, 2}, value: []byte{17, 17, 2}},
-				{key: []byte{17, 1, 1}, value: []byte{17, 1, 1}},
-				{key: []byte{17, 1, 2}, value: []byte{17, 1, 2}},
-				{key: []byte{17, 1, 3}, value: []byte{17, 1, 3}},
+			Name: "Remove middle Branch",
+			PutData: []TestStruct{
+				{Key: []byte{1, 1, 1, 1}, Value: []byte{1, 1, 1, 1}},
+				{Key: []byte{1, 1, 1, 2}, Value: []byte{1, 1, 1, 1}}, // has 1 branch at 1,1,1
+				{Key: []byte{1, 1, 2, 0}, Value: []byte{1, 1, 1, 1}}, // has another branch at 1,1
+				{Key: []byte{1, 1, 2, 1}, Value: []byte{1, 1, 1, 1}},
+				{Key: []byte{1, 2, 0, 0}, Value: []byte{1, 1, 1, 1}}, // has another branch at 1
+				{Key: []byte{1, 3, 3, 3}, Value: []byte{1, 1, 1, 1}},
 			},
-			delData: []TestStruct{
-				{key: []byte{17, 17, 1}, value: []byte{17, 17, 1}},
-				{key: []byte{17, 17, 2}, value: []byte{17, 17, 2}},
-				{key: []byte{17, 1, 1}, value: []byte{17, 1, 1}},
-				{key: []byte{17, 1, 2}, value: []byte{17, 1, 2}},
-				{key: []byte{17, 1, 3}, value: []byte{17, 1, 3}},
+			DelData: []TestStruct{
+				{Key: []byte{1, 2, 0, 0}, Value: []byte{1, 1, 1, 1}},
+				{Key: []byte{1, 3, 3, 3}, Value: []byte{1, 1, 1, 1}}, // deletes the 1,1 branch -
+				{Key: []byte{1, 1, 1, 1}, Value: []byte{1, 1, 1, 1}}, // TODO add a way to check # of branches + Nodes
+				{Key: []byte{1, 1, 1, 2}, Value: []byte{1, 1, 1, 1}},
+				{Key: []byte{1, 1, 2, 0}, Value: []byte{1, 1, 1, 1}},
+				{Key: []byte{1, 1, 2, 1}, Value: []byte{1, 1, 1, 1}},
+			},
+		},
+		{
+			Name: "Shared Nibbles",
+			PutData: []TestStruct{
+				{Key: []byte{17, 17, 1}, Value: []byte{17, 17, 1}},
+				{Key: []byte{17, 17, 2}, Value: []byte{17, 17, 2}},
+				{Key: []byte{17, 1, 1}, Value: []byte{17, 1, 1}},
+				{Key: []byte{17, 1, 2}, Value: []byte{17, 1, 2}},
+				{Key: []byte{17, 1, 3}, Value: []byte{17, 1, 3}},
+			},
+			DelData: []TestStruct{
+				{Key: []byte{17, 17, 1}, Value: []byte{17, 17, 1}},
+				{Key: []byte{17, 17, 2}, Value: []byte{17, 17, 2}},
+				{Key: []byte{17, 1, 1}, Value: []byte{17, 1, 1}},
+				{Key: []byte{17, 1, 2}, Value: []byte{17, 1, 2}},
+				{Key: []byte{17, 1, 3}, Value: []byte{17, 1, 3}},
 			},
 		},
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		t.Run(test.Name, func(t *testing.T) {
 			tree := NewMemoryTree()
 
-			for _, entry := range test.putData {
-				_ = tree.Put(entry.key, entry.value)
+			for _, entry := range test.PutData {
+				_ = tree.Put(entry.Key, entry.Value)
 			}
 
-			for _, entry := range test.putData {
-				val, err := tree.Get(entry.key)
+			for _, entry := range test.PutData {
+				val, err := tree.Get(entry.Key)
 				if err != nil {
 					t.Fatalf("unable to fetch %v - %v", entry, err)
 				}
-				if !bytes.Equal(entry.value, val) {
-					t.Fatalf("fetched wrong val - expected: %v got: %v", entry.value, val)
+				if !bytes.Equal(entry.Value, val) {
+					t.Fatalf("fetched wrong val - expected: %v got: %v", entry.Value, val)
 				}
 			}
 
-			for _, entry := range test.delData {
-				err := tree.Delete(entry.key)
+			for _, entry := range test.DelData {
+				err := tree.Delete(entry.Key)
 				if err != nil {
-					t.Fatalf("value not deleted in the tree as it was not found err: %v \nkey: %v", err, entry.key)
+					t.Fatalf("value not deleted in the tree as it was not found err: %v \nkey: %v", err, entry.Key)
 				}
 			}
 		})

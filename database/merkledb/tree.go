@@ -168,8 +168,43 @@ func (t *Tree) findNode(key Key, node Node) (Node, error) {
 	return t.findNode(key, nodeChild)
 }
 
+// Clear deletes all values on a tree
+func (t *Tree) Clear() error {
+	var leaves []Key
+	for len(t.rootNode.GetHash()) != 0 {
+		nextNodeHash := t.rootNode.(*RootNode).Child
+
+		for {
+			node, err := t.persistence.GetNodeByHash(nextNodeHash)
+			if err != nil {
+				t.PrintTree()
+				return err
+			}
+
+			if leafNode, ok := node.(*LeafNode); ok {
+				leaves = append(leaves, leafNode.LeafKey)
+				leafKey := leafNode.Key()
+				err = t.Delete(leafKey.ToBytes())
+				if err != nil {
+					return err
+				}
+				break
+			} else {
+				branchNode, _ := node.(*BranchNode)
+				for _, childHash := range branchNode.Nodes {
+					if len(childHash) != 0 {
+						nextNodeHash = childHash
+						break
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (t *Tree) PrintTree() {
-	t.rootNode.Print()
+	t.rootNode.Print(0)
 }
 
 func (t *Tree) fetchNextNode(prefix Key, start Key, key Key, node Node) (Node, error) {
@@ -209,7 +244,7 @@ func (t *Tree) PutRootNode(node Node) error {
 	}
 
 	t.rootNode = node
-	err := t.persistence.StoreNode(node)
+	err := t.persistence.StoreNode(node, true)
 	if err != nil {
 		return err
 	}
@@ -227,7 +262,7 @@ func (t *Tree) PutNodeAndCheck(node Node, parentHash []byte) error {
 		return fmt.Errorf("node hash is not the same as the parent Hash")
 	}
 
-	err := t.persistence.StoreNode(node)
+	err := t.persistence.StoreNode(node, true)
 	if err != nil {
 		return err
 	}

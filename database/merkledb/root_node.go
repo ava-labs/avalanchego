@@ -26,7 +26,6 @@ func (r *RootNode) GetChild(key Key) (Node, error) {
 		return nil, err
 	}
 	node.SetParent(r)
-	node.ParentReferences(node.References(0))
 	return node, nil
 }
 
@@ -114,7 +113,7 @@ func (r *RootNode) Hash(key Key, hash []byte) error {
 		return r.persistence.DeleteNode(r)
 	}
 
-	return r.persistence.StoreNode(r)
+	return r.persistence.StoreNode(r, true)
 }
 
 func (r *RootNode) GetHash() []byte {
@@ -129,9 +128,7 @@ func (r *RootNode) References(change int32) int32 {
 	return 0
 }
 
-func (r *RootNode) ParentReferences(change int32) int32 { return 0 }
-
-func (r *RootNode) Operation(change string) string { return "" }
+func (r *RootNode) PivotPoint() *Pivot { return NewPivot() }
 
 // Key should never be reached
 func (r *RootNode) Key() Key { return nil }
@@ -165,14 +162,14 @@ func (r *RootNode) Clear() error {
 }
 
 // Print prints the child and requests the child to print itself
-func (r *RootNode) Print() {
+func (r *RootNode) Print(int32) {
 	fmt.Printf("Root ID: %v - Child: %x \n", r.Key(), r.Child)
 	if len(r.Child) != 0 {
 		child, err := r.persistence.GetNodeByHash(r.Child)
 		if err != nil {
 			panic(err)
 		}
-		child.Print()
+		child.Print(1)
 	}
 }
 

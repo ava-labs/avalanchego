@@ -10,25 +10,24 @@ import (
 // SharedAddress is the shared prefix of all keys under this node
 // Nodes are Addresses of other Nodes, which their addresses are suffixed by SharedAddress
 //
-// LASTPOSition is always a LeafNode and it represents the case where the LeafNode has the same Address
-// as the BranchNode SharedAddress
+// LASTPOSITION is always a LeafNode - it's the special case where
+// the LeafNode has the same Address as the BranchNode SharedAddress
 //
-// Hashes are hashes of child Nodes
-// [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, a, b, c, d, f, LASTPOS ]
+// Hashes are the hashes of child Nodes
+// [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, a, b, c, d, f, LASTPOSITION ]
 //     [ x ] -> LeafNode
 //     [ not found ] -> EmptyNode
-//     [ LASTPOS ] -> LeafNode
+//     [ LASTPOSITION ] -> LeafNode
 //
 type BranchNode struct {
 	Nodes              [UnitSize][]byte `serialize:"true"`
 	SharedAddress      Key              `serialize:"true"`
 	StoredHash         []byte           `serialize:"true"`
 	Refs               int32            `serialize:"true"`
-	currentOp          string
+	pivotNode          *Pivot
 	previousStoredHash []byte
 	parent             Node
 	persistence        Persistence
-	parentRefs         int32
 }
 
 // NewBranchNode returns a new BranchNode
@@ -38,19 +37,25 @@ func NewBranchNode(sharedAddress Key, parent Node, persistence Persistence) Node
 		Nodes:         [UnitSize][]byte{},
 		parent:        parent,
 		persistence:   persistence,
-		Refs:          1,
-		parentRefs:    1,
+		Refs:          0,
+		pivotNode:     NewPivot(),
 	}
 }
 
-// GetChild returns a child node
+// GetChild returns a child node that should contain the Key
 // returns Node - one of it's children
 // returns EmptyNode - no node in this position
 //
 func (b *BranchNode) GetChild(key Key) (Node, error) {
+
+	// checks if this BranchNode is the Pivot
+	if b.Refs > 1 {
+		b.PivotPoint().CheckAndSet(b.GetHash(), b.Refs)
+	}
+
 	if !key.ContainsPrefix(b.SharedAddress) {
 		e := NewEmptyNode(b, key)
-		e.ParentReferences(b.parentRefs)
+		e.PivotPoint().Copy(b.PivotPoint())
 		return e, nil
 	}
 
@@ -61,7 +66,7 @@ func (b *BranchNode) GetChild(key Key) (Node, error) {
 	nodeHash := b.Nodes[FirstNonPrefix(b.SharedAddress, key)]
 	if len(nodeHash) == 0 {
 		e := NewEmptyNode(b, key)
-		e.ParentReferences(b.parentRefs)
+		e.PivotPoint().Copy(b.PivotPoint())
 		return e, nil
 	}
 
@@ -71,15 +76,8 @@ func (b *BranchNode) GetChild(key Key) (Node, error) {
 	}
 	node.SetParent(b)
 
-	// Passes on the parents Refs if they are greater than the childs one
-	nodeParentRefs := node.ParentReferences(0)
-	parentRefs := b.parentRefs
-	if parentRefs < b.Refs {
-		parentRefs = b.Refs
-	}
-	if parentRefs > nodeParentRefs {
-		node.ParentReferences(parentRefs - nodeParentRefs)
-	}
+	// Propagates the Pivot to the child
+	node.PivotPoint().Copy(b.PivotPoint())
 
 	return node, nil
 }
@@ -157,28 +155,32 @@ func (b *BranchNode) GetNextNode(prefix Key, start Key, key Key) (Node, error) {
 }
 
 // Insert adds a new node in the branch
-// if the node doesn't belong in the branch it request the Parent to insert it
-// if there's already a node on that position it creates a BranchNode and branches the position out
-// otherwise just inserts a LeafNode, rehashes itself and request the parent to rehash itself
+//
+// If the node doesn't belong in this branch  - Request the Parent to insert it
+// If there's already a node in that position - Create a BranchNode with both existing and new LeafNodes
+// and insert in that position
+// Otherwise just inserts a LeafNode on the empty position
+// On each operation where this BranchNode changed - Rehash itself and request the parent to rehash
 func (b *BranchNode) Insert(key Key, value []byte) error {
 
 	// if the node CAN'T exist in this prefix request the Parent to insert
 	if !key.ContainsPrefix(b.SharedAddress) {
-		// nothings changed in this node
+		// nothing changes in this node
 		// insertion will trigger a rehash from the parent upwards
 		return b.parent.Insert(key, value)
 	}
 
-	// if the position already exists then it's a new suffixed address
-	// needs a new branchNode
+	// if the position already exists then create a new BranchNode
+	// with both values and insert it, in this position
 	if nodeHash := b.Nodes[FirstNonPrefix(b.SharedAddress, key)]; len(nodeHash) != 0 {
 
+		// get the existing node
 		node, err := b.persistence.GetNodeByHash(nodeHash)
 		if err != nil {
 			return err
 		}
 
-		// create a new branch with this BranchNode as the parent
+		// create a new branch with the current BranchNode as the parent
 		newBranch := NewBranchNode(SharedPrefix(node.Key(), key), b, b.persistence)
 
 		// existing node is added to the new BranchNode
@@ -187,18 +189,17 @@ func (b *BranchNode) Insert(key Key, value []byte) error {
 			return err
 		}
 
-		nodeParentRefs := newBranch.ParentReferences(0)
-		parentRefs := b.parentRefs
-		if parentRefs < b.Refs {
-			parentRefs = b.Refs
-		}
-		if parentRefs > nodeParentRefs {
-			newBranch.ParentReferences(parentRefs - nodeParentRefs)
-		}
+		// propagate the PivotPoint
+		newBranch.PivotPoint().Copy(b.PivotPoint())
 
-		if parentRefs > node.References(0) {
-			// TODO Review this - special situation where a new BranchNode is created and needs to refer the other roots
-			node.References(parentRefs - node.References(0))
+		// special case where a new BranchNode is created
+		// only update the existing node refs in nodes after the PivotPoint was reached
+		if newBranch.PivotPoint().reached && !newBranch.PivotPoint().Equals(nodeHash) {
+			node.References(1)
+			err = b.persistence.StoreNode(node, true)
+			if err != nil {
+				return err
+			}
 		}
 
 		// insertion will trigger a rehash from the newBranch upwards
@@ -215,16 +216,11 @@ func (b *BranchNode) Insert(key Key, value []byte) error {
 	newLeafHash := newLeafNode.GetHash()
 	b.Nodes[FirstNonPrefix(b.SharedAddress, key)] = newLeafHash
 
-	err = b.Hash(key, newLeafHash)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return b.Hash(key, newLeafHash)
 }
 
 // Delete
-// the delete request comes from a child node always (in the upwards direction)
+// the delete request comes from a child node (in the upwards direction)
 // if the child is a LeafNode, it requests the Parent the deletion
 // if the child is a BranchNode,
 //     it either deletes + rehashes upwards
@@ -233,15 +229,15 @@ func (b *BranchNode) Insert(key Key, value []byte) error {
 func (b *BranchNode) Delete(key Key) error {
 
 	// there's no node to delete here
-	if nodeKey := b.Nodes[FirstNonPrefix(b.SharedAddress, key)]; nodeKey == nil {
+	prefixedKey := FirstNonPrefix(b.SharedAddress, key)
+	if nodeKey := b.Nodes[prefixedKey]; nodeKey == nil {
 		return database.ErrNotFound
 	}
 
 	// the child nodeKey that called the delete
 	// is either a LeafNode or an empty BranchNode
 	// remove it from the current branch
-	b.Nodes[FirstNonPrefix(b.SharedAddress, key)] = nil
-	b.currentOp = "delete"
+	b.Nodes[prefixedKey] = nil
 
 	// if the current BranchNode has exactly one children
 	// request the Parent to take it
@@ -252,7 +248,6 @@ func (b *BranchNode) Delete(key Key) error {
 			if len(v) != 0 {
 				singleNode, err = b.persistence.GetNodeByHash(v)
 				if err != nil {
-					fmt.Printf("\n\n NODE HAS BEEN DELETED ALREADY %x\n", v)
 					return err
 				}
 				break
@@ -264,27 +259,19 @@ func (b *BranchNode) Delete(key Key) error {
 			return err
 		}
 
-		// when deleting the flow is upwards - the parentRefs are already set
-		b.parent.Operation("delete")
-
-		nodeParentRefs := b.parent.ParentReferences(0)
-		parentRefs := b.parentRefs
-		if parentRefs < b.Refs {
-			parentRefs = b.Refs
-		}
-		if parentRefs > nodeParentRefs {
-			b.parent.ParentReferences(parentRefs - nodeParentRefs)
-		}
-
-		err = b.parent.Hash(key, singleNode.GetHash())
+		// deleting the node will also update the pivot if it needs to be
+		err = b.persistence.DeleteNode(b)
 		if err != nil {
 			return err
 		}
 
-		return b.persistence.DeleteNode(b)
+		b.parent.PivotPoint().Copy(b.pivotNode)
+
+		return b.parent.Hash(key, singleNode.GetHash())
 	}
 
-	// node was deleted rehash the current BranchNode + parents
+	// node was deleted from the branch
+	// rehash the current BranchNode + parents
 	return b.Hash(key, nil)
 }
 
@@ -302,7 +289,7 @@ func (b *BranchNode) SetParent(node Node) {
 	b.parent = node
 }
 
-// SetPersistence force sets the Persistenc
+// SetPersistence force sets the Persistence
 func (b *BranchNode) SetPersistence(p Persistence) {
 	b.persistence = p
 }
@@ -317,7 +304,7 @@ func (b *BranchNode) Hash(nodeKey Key, hash []byte) error {
 
 	b.Nodes[FirstNonPrefix(b.SharedAddress, nodeKey)] = hash
 
-	hashSet := make([][]byte, UnitSize+1)
+	hashSet := make([][]byte, UnitSize+1+1)
 	hashSet[0] = b.SharedAddress.ToExpandedBytes()
 
 	i := 1
@@ -329,12 +316,15 @@ func (b *BranchNode) Hash(nodeKey Key, hash []byte) error {
 	b.previousStoredHash = b.StoredHash
 	b.StoredHash = Hash(hashSet...)
 
-	err := b.persistence.StoreNode(b)
+	// Hashing creates a new Node - since it has a parent (bc of call stack) we mark it with 1 Reference
+	b.Refs = 1
+	err := b.persistence.StoreNode(b, false)
 	if err != nil {
 		return err
 	}
 
-	b.parent.Operation(b.Operation(""))
+	// propagate the Pivot upwards
+	b.parent.PivotPoint().Copy(b.PivotPoint())
 	return b.parent.Hash(b.Key(), b.StoredHash)
 }
 
@@ -349,21 +339,19 @@ func (b *BranchNode) GetPreviousHash() []byte {
 	return b.previousStoredHash
 }
 
+// References increases and returns the number of references
+// providing a get and a set operation in one method
 func (b *BranchNode) References(change int32) int32 {
 	b.Refs += change
 	return b.Refs
 }
 
-func (b *BranchNode) ParentReferences(change int32) int32 {
-	b.parentRefs += change
-	return b.parentRefs
-}
-
-func (b *BranchNode) Operation(change string) string {
-	if change != "" {
-		b.currentOp = change
+// PivotPoint returns either the stored Pivot or a new Pivot
+func (b *BranchNode) PivotPoint() *Pivot {
+	if b.pivotNode == nil {
+		b.pivotNode = NewPivot()
 	}
-	return b.currentOp
+	return b.pivotNode
 }
 
 // Key returns the BranchNode SharedAddress
@@ -382,6 +370,8 @@ func (b *BranchNode) GetChildrenHashes() [][]byte {
 	return children
 }
 
+// GetReHash is mainly used for consistency checks
+// TODO review this
 func (b *BranchNode) GetReHash() []byte {
 	hashSet := make([][]byte, UnitSize+1)
 	hashSet[0] = b.SharedAddress.ToExpandedBytes()
@@ -397,7 +387,7 @@ func (b *BranchNode) GetReHash() []byte {
 
 // Clear deletes all nodes attached to this BranchNode
 func (b *BranchNode) Clear() error {
-	for _, nodeHash := range b.Nodes {
+	for _, nodeHash := range b.GetChildrenHashes() {
 		if len(nodeHash) == 0 {
 			continue
 		}
@@ -406,15 +396,12 @@ func (b *BranchNode) Clear() error {
 			return err
 		}
 
-		// Passes on the parents Refs if they are greater than the childs one
-		nodeParentRefs := child.ParentReferences(0)
-		parentRefs := b.parentRefs
-		if parentRefs < b.Refs {
-			parentRefs = b.Refs
+		if b.Refs > 1 {
+			b.PivotPoint().CheckAndSet(b.GetHash(), b.Refs)
 		}
-		if parentRefs > nodeParentRefs {
-			child.ParentReferences(parentRefs - nodeParentRefs)
-		}
+
+		// Passes on the parents Refs if they are greater than the children
+		child.PivotPoint().Copy(b.PivotPoint())
 
 		err = child.Clear()
 		if err != nil {
@@ -434,28 +421,33 @@ func (b *BranchNode) String() string {
 		}
 	}
 	nodes += fmt.Sprintf("\t\t]\n")
-	return fmt.Sprintf("Branch ID: %x - SharedAddress: %v - Refs: %d - Parent: %p \n\t↪ Nodes:%v", b.GetHash(), b.SharedAddress, b.Refs, b.parent, nodes)
+	return fmt.Sprintf("Branch ID: %x - SharedAddress: %v - Refs: %d \n\t↪ Nodes:%v", b.GetHash(), b.SharedAddress, b.Refs, nodes)
 }
 
 // Print prints the node
-func (b *BranchNode) Print() {
-	fmt.Printf("Branch ID: %x - SharedAddress: %v - Refs: %v - Parent: %p \n\t↪ Nodes: ", b.GetHash(), b.SharedAddress, b.Refs, b.parent)
-	nodes := fmt.Sprintf("[\n")
+func (b *BranchNode) Print(level int32) {
+
+	nodes := fmt.Sprint("[\n")
+	tabs := ""
+	for i := int32(0); i <= level; i++ {
+		tabs += fmt.Sprint("\t")
+	}
+	fmt.Printf("%sBranch ID: %x - SharedAddress: %v - Refs: %v \n"+
+		"%s\t↪ Nodes: ", tabs, b.GetHash(), b.SharedAddress, b.Refs, tabs)
 	for _, nodeHash := range b.Nodes {
 		if len(nodeHash) > 0 {
-			nodes += fmt.Sprintf("\t\t[%x]\n", nodeHash)
+			nodes += fmt.Sprintf("%s\t[%x]\n", tabs, nodeHash)
 		}
 	}
-	nodes += fmt.Sprintf("\t\t]\n")
+	nodes += fmt.Sprintf("%s\t]\n", tabs)
 	fmt.Println(nodes)
 	for _, nodeKey := range b.Nodes {
 		if len(nodeKey) != 0 {
 			node, err := b.persistence.GetNodeByHash(nodeKey)
 			if err != nil {
 				continue
-				// panic(err)
 			}
-			node.Print()
+			node.Print(level + 1)
 		}
 	}
 }

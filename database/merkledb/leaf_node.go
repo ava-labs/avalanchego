@@ -12,11 +12,10 @@ type LeafNode struct {
 	LeafValue          []byte `serialize:"true"`
 	StoredHash         []byte `serialize:"true"`
 	Refs               int32  `serialize:"true"`
-	currentOp          string
+	pivotNode          *Pivot
 	previousStoredHash []byte
 	parent             Node
 	persistence        Persistence
-	parentRefs         int32
 }
 
 // NewLeafNode creates a new Leaf Node
@@ -27,7 +26,6 @@ func NewLeafNode(key Key, value []byte, parent Node, persistence Persistence) (N
 		parent:      parent,
 		persistence: persistence,
 		Refs:        1,
-		parentRefs:  1,
 	}
 
 	return l, l.Hash(nil, nil)
@@ -53,10 +51,19 @@ func (l *LeafNode) Insert(key Key, value []byte) error {
 			return err
 		}
 
-		l.parent.ParentReferences(l.parentRefs - l.parent.ParentReferences(0))
+		l.parent.PivotPoint().Copy(l.PivotPoint())
 		return l.parent.Hash(key, l.StoredHash)
 	}
 
+	// when it arrives here it hasn't checked this node for the pivot
+	if l.Refs > 1 {
+		l.PivotPoint().CheckAndSet(l.GetHash(), l.Refs)
+
+		if bytes.Equal(l.PivotPoint().hash, l.GetHash()) {
+			l.PivotPoint().passed = true
+		}
+	}
+	l.parent.PivotPoint().Copy(l.PivotPoint())
 	// it's actually a new LeafNode
 	return l.parent.Insert(key, value)
 }
@@ -72,6 +79,7 @@ func (l *LeafNode) Delete(key Key) error {
 	if err != nil {
 		return err
 	}
+	l.parent.PivotPoint().Copy(l.pivotNode)
 	return l.parent.Delete(key)
 }
 
@@ -102,7 +110,9 @@ func (l *LeafNode) Hash(key Key, hash []byte) error {
 	l.previousStoredHash = l.StoredHash
 	l.StoredHash = newHash
 
-	return l.persistence.StoreNode(l)
+	// Hashing creates a new Node - since it has a parent (bc of call stack) we mark it with 1 Reference
+	l.Refs = 1
+	return l.persistence.StoreNode(l, false)
 }
 
 // GetHash returns the StoredHash
@@ -121,16 +131,11 @@ func (l *LeafNode) References(change int32) int32 {
 	return l.Refs
 }
 
-func (l *LeafNode) ParentReferences(change int32) int32 {
-	l.parentRefs += change
-	return l.parentRefs
-}
-
-func (l *LeafNode) Operation(change string) string {
-	if change != "" {
-		l.currentOp = change
+func (l *LeafNode) PivotPoint() *Pivot {
+	if l.pivotNode == nil {
+		l.pivotNode = NewPivot()
 	}
-	return l.currentOp
+	return l.pivotNode
 }
 
 // Key returns the stored key
@@ -153,11 +158,16 @@ func (l *LeafNode) Clear() error {
 }
 
 // Print prints this Node data
-func (l *LeafNode) Print() {
-	fmt.Printf(l.String())
+func (l *LeafNode) Print(level int32) {
+	tabs := ""
+	for i := int32(0); i < level; i++ {
+		tabs += fmt.Sprint("\t")
+	}
+
+	fmt.Printf(tabs + fmt.Sprintf("Leaf ID: %x - Refs: %d - \n%s\tKey: %v \n%s\tVal: %v\n", l.GetHash(), l.Refs, tabs, l.LeafKey, tabs, l.LeafValue))
 }
 
 // String converts the node in a string format
 func (l *LeafNode) String() string {
-	return fmt.Sprintf("Leaf ID: %x - Parent: %p - Refs: %d - \n\t\t\t\tKey: %v \n\t\t\t\tVal: %v\n", l.GetHash(), l.parent, l.Refs, l.LeafKey, l.LeafValue)
+	return fmt.Sprintf("Leaf ID: %x - Refs: %d - \n\t\t\t\tKey: %v \n\t\t\t\tVal: %v\n", l.GetHash(), l.Refs, l.LeafKey, l.LeafValue)
 }

@@ -9,6 +9,7 @@ type EmptyNode struct {
 	parent     Node
 	key        Key
 	parentRefs int32
+	pivotNode  *Pivot
 }
 
 // NewEmptyNode returns a new EmptyNode
@@ -32,7 +33,6 @@ func (e *EmptyNode) GetNextNode(prefix Key, start Key, key Key) (Node, error) {
 
 // Insert requests it's Parent to insert the k/v
 func (e *EmptyNode) Insert(key Key, value []byte) error {
-	e.parent.ParentReferences(e.parentRefs - e.parent.ParentReferences(0))
 	return e.parent.Insert(key, value)
 }
 
@@ -51,18 +51,25 @@ func (e *EmptyNode) SetPersistence(p Persistence) {}
 // Value should never be called
 func (e *EmptyNode) Value() []byte { return nil }
 
+// Hash should never be called
 func (e *EmptyNode) Hash(key Key, hash []byte) error { return nil }
 
+// GetHash should never be called
 func (e *EmptyNode) GetHash() []byte { return nil }
 
+// GetPreviousHash should never be called
 func (e *EmptyNode) GetPreviousHash() []byte { return nil }
 
+// References should never be called
 func (e *EmptyNode) References(change int32) int32 { return 0 }
-func (e *EmptyNode) ParentReferences(change int32) int32 {
-	e.parentRefs += change
-	return e.parentRefs
+
+// PivotPoint passes on the Pivot when creating a new Node
+func (e *EmptyNode) PivotPoint() *Pivot {
+	if e.pivotNode == nil {
+		e.pivotNode = NewPivot()
+	}
+	return e.pivotNode
 }
-func (e *EmptyNode) Operation(change string) string { return "" }
 
 // Key holds the key of the to-be-inserted node
 func (e *EmptyNode) Key() Key {
@@ -85,7 +92,7 @@ func (e *EmptyNode) Clear() error {
 }
 
 // Print should never be called
-func (e *EmptyNode) Print() {
+func (e *EmptyNode) Print(int32) {
 	fmt.Printf("ERROR: should never be called EmptyNode ID: %p - Parent: %p", e, e.parent)
 }
 

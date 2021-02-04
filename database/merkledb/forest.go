@@ -26,7 +26,7 @@ func (f *Forest) CreateEmptyTree(treeRootID uint32) (*Tree, error) {
 		return nil, err
 	}
 
-	err = f.persistence.Commit(f.persistence.StoreNode(root))
+	err = f.persistence.Commit(f.persistence.StoreNode(root, true))
 	if err != nil {
 		return nil, err
 	}
