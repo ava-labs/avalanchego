@@ -12,7 +12,13 @@ import (
 func TestLRU(t *testing.T) {
 	cache := &LRU{Size: 1}
 
-	BasicCache(t, cache)
+	TestBasic(t, cache)
+}
+
+func TestLRUEviction(t *testing.T) {
+	cache := &LRU{Size: 2}
+
+	TestEviction(t, cache)
 }
 
 func TestLRUResize(t *testing.T) {

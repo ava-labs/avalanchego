@@ -361,7 +361,6 @@ func (vm *VMClient) GetBlock(id ids.ID) (snowman.Block, error) {
 	if blk, cached := vm.blks[id]; cached {
 		return blk, nil
 	}
-
 	if blkIntf, cached := vm.decidedBlocks.Get(id); cached {
 		return blkIntf.(*BlockClient), nil
 	}

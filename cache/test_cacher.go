@@ -10,13 +10,17 @@ import (
 )
 
 var (
-	// Tests is a list of all LRU cache tests
-	CacherTests = []func(t *testing.T, c Cacher){
-		BasicCache,
+	// CacherTests is a list of all Cacher tests
+	CacherTests = []struct {
+		Size int
+		Func func(t *testing.T, c Cacher)
+	}{
+		{Size: 1, Func: TestBasic},
+		{Size: 2, Func: TestEviction},
 	}
 )
 
-func BasicCache(t *testing.T, cache Cacher) {
+func TestBasic(t *testing.T, cache Cacher) {
 	id1 := ids.ID{1}
 	if _, found := cache.Get(id1); found {
 		t.Fatalf("Retrieved value when none exists")
@@ -58,9 +62,7 @@ func BasicCache(t *testing.T, cache Cacher) {
 	}
 }
 
-func TestLRUEviction(t *testing.T) {
-	cache := LRU{Size: 2}
-
+func TestEviction(t *testing.T, cache Cacher) {
 	id1 := ids.ID{1}
 	id2 := ids.ID{2}
 	id3 := ids.ID{3}

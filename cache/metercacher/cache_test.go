@@ -10,12 +10,12 @@ import (
 
 func TestInterface(t *testing.T) {
 	for _, test := range cache.CacherTests {
-		cache := &cache.LRU{Size: 1}
+		cache := &cache.LRU{Size: test.Size}
 		c, err := New("", prometheus.NewRegistry(), cache)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		test(t, c)
+		test.Func(t, c)
 	}
 }
