@@ -183,6 +183,12 @@ func (self *ETHChain) ValidateCanonicalChain() error {
 	return self.backend.BlockChain().ValidateCanonicalChain()
 }
 
+// WriteCanonicalFromCurrentBlock writes the canonical chain from the
+// current block to the genesis.
+func (self *ETHChain) WriteCanonicalFromCurrentBlock() error {
+	return self.backend.BlockChain().WriteCanonicalFromCurrentBlock()
+}
+
 // SetTail sets the current head block to the one defined by the hash
 // irrelevant what the chain contents were prior.
 func (self *ETHChain) SetTail(hash common.Hash) error {
