@@ -6,12 +6,15 @@ package rpcchainvm
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"google.golang.org/grpc"
 
 	"github.com/hashicorp/go-plugin"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto"
@@ -67,8 +70,8 @@ type VMClient struct {
 	ctx  *snow.Context
 	blks map[ids.ID]*BlockClient
 
-	decidedBlocks *cache.LRU
-	missingBlocks *cache.LRU
+	decidedBlocks cache.Cacher
+	missingBlocks cache.Cacher
 
 	lastAccepted ids.ID
 }
@@ -76,17 +79,42 @@ type VMClient struct {
 // NewClient returns a database instance connected to a remote database instance
 func NewClient(client vmproto.VMClient, broker *plugin.GRPCBroker) *VMClient {
 	return &VMClient{
-		client:        client,
-		broker:        broker,
-		blks:          make(map[ids.ID]*BlockClient),
-		decidedBlocks: &cache.LRU{Size: decidedCacheSize},
-		missingBlocks: &cache.LRU{Size: missingCacheSize},
+		client: client,
+		broker: broker,
+		blks:   make(map[ids.ID]*BlockClient),
 	}
 }
 
 // SetProcess ...
 func (vm *VMClient) SetProcess(proc *plugin.Client) {
 	vm.proc = proc
+}
+
+// initializeCaches creates a new [decidedBlocks] and [missingBlocks] cache. It
+// wraps these caches in metercacher so that we can get prometheus metrics
+// about their performance.
+func (vm *VMClient) initializeCaches(registerer prometheus.Registerer, namespace string) error {
+	decidedCache, err := metercacher.New(
+		fmt.Sprintf("%s_rpcchainvm_decided_cache", namespace),
+		registerer,
+		&cache.LRU{Size: decidedCacheSize},
+	)
+	if err != nil {
+		return fmt.Errorf("could not initialize decided blocks cache: %w", err)
+	}
+	vm.decidedBlocks = decidedCache
+
+	missingCache, err := metercacher.New(
+		fmt.Sprintf("%s_rpcchainvm_missing_cache", namespace),
+		registerer,
+		&cache.LRU{Size: missingCacheSize},
+	)
+	if err != nil {
+		return fmt.Errorf("could not initialize missing blocks cache: %w", err)
+	}
+	vm.missingBlocks = missingCache
+
+	return nil
 }
 
 // Initialize ...
@@ -114,6 +142,10 @@ func (vm *VMClient) Initialize(
 	vm.sharedMemory = gsharedmemory.NewServer(ctx.SharedMemory, db)
 	vm.bcLookup = galiaslookup.NewServer(ctx.BCLookup)
 	vm.snLookup = gsubnetlookup.NewServer(ctx.SNLookup)
+
+	if err := vm.initializeCaches(ctx.Metrics, ctx.Namespace); err != nil {
+		return err
+	}
 
 	// start the db server
 	dbBrokerID := vm.broker.NextId()
