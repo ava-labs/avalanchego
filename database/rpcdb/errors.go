@@ -9,13 +9,11 @@ import (
 
 var (
 	errCodeToError = map[uint32]error{
-		0: nil,
 		1: database.ErrClosed,
 		2: database.ErrNotFound,
 		3: database.ErrAvoidCorruption,
 	}
 	errorToErrCode = map[error]uint32{
-		nil:                         0,
 		database.ErrClosed:          1,
 		database.ErrNotFound:        2,
 		database.ErrAvoidCorruption: 3,
