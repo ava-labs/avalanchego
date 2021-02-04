@@ -33,6 +33,9 @@ type QueryBenchlist interface {
 	RegisterResponse(validatorID ids.ShortID, requstID uint32)
 	// QueryFailed registers that a query did not receive a response within our synchrony bound
 	QueryFailed(validatorID ids.ShortID, requestID uint32)
+	// IsBenched returns true if messages to [validatorID]
+	// should not be sent over the network and should immediately fail.
+	IsBenched(validatorID ids.ShortID) bool
 }
 
 type queryBenchlist struct {
@@ -100,13 +103,39 @@ func NewQueryBenchlist(
 	}, metrics.Initialize(ctx, namespace, summaryEnabled)
 }
 
+// IsBenched returns true if messages to [validatorID]
+// should not be sent over the network and should immediately fail.
+func (b *queryBenchlist) IsBenched(validatorID ids.ShortID) bool {
+	b.lock.Lock()
+	isBenched := b.isBenched(validatorID)
+	b.lock.Unlock()
+	return isBenched
+}
+
+// isBenched checks if [validatorID] is currently benched
+// and calls cleanup if its benching period has elapsed
+func (b *queryBenchlist) isBenched(validatorID ids.ShortID) bool {
+	end, ok := b.benchlistTimes[validatorID]
+	if !ok {
+		return false
+	}
+
+	if b.clock.Time().Before(end) {
+		return true
+	}
+
+	// If a benched item has expired, cleanup the benchlist
+	b.cleanup()
+	return false
+}
+
 // RegisterQuery attempts to register a query from [validatorID] and returns true
 // if that request should be made (not subject to benchlisting)
 func (b *queryBenchlist) RegisterQuery(validatorID ids.ShortID, requestID uint32, msgType constants.MsgType) bool {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	if benched := b.benched(validatorID); benched {
+	if benched := b.isBenched(validatorID); benched {
 		return false
 	}
 
@@ -203,23 +232,6 @@ func (b *queryBenchlist) bench(validatorID ids.ShortID) {
 	// again. Due to the minimum staking amount and durations this
 	// is not a realistic concern.
 	b.cleanup()
-}
-
-// benched checks if [validatorID] is currently benched
-// and calls cleanup if its benching period has elapsed
-func (b *queryBenchlist) benched(validatorID ids.ShortID) bool {
-	end, ok := b.benchlistTimes[validatorID]
-	if !ok {
-		return false
-	}
-
-	if b.clock.Time().Before(end) {
-		return true
-	}
-
-	// If a benched item has expired, cleanup the benchlist
-	b.cleanup()
-	return false
 }
 
 // cleanup ensures that we have not benched too much stake

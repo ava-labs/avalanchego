@@ -28,6 +28,10 @@ type Manager interface {
 	QueryFailed(ids.ID, ids.ShortID, uint32)
 	// RegisterChain registers a new chain with metrics under [namespac]
 	RegisterChain(*snow.Context, string) error
+	// IsBenched returns true if messages to [validatorID] regarding chain [chainID]
+	// should not be sent over the network and should immediately fail.
+	// Returns false if such messages should be sent, or if the chain is unknown.
+	IsBenched(validatorID ids.ShortID, chainID ids.ID) bool
 }
 
 // Config defines the configuration for a benchlist
@@ -59,6 +63,19 @@ func NewManager(config *Config) Manager {
 		config:          config,
 		chainBenchlists: make(map[ids.ID]QueryBenchlist),
 	}
+}
+
+// IsBenched returns true if messages to [validatorID] regarding [chainID]
+// should not be sent over the network and should immediately fail.
+func (bm *benchlistManager) IsBenched(validatorID ids.ShortID, chainID ids.ID) bool {
+	bm.lock.Lock()
+	chain, exists := bm.chainBenchlists[chainID]
+	if !exists {
+		return false
+	}
+	isBenched := chain.IsBenched(validatorID)
+	bm.lock.Unlock()
+	return isBenched
 }
 
 func (bm *benchlistManager) RegisterChain(ctx *snow.Context, namespace string) error {
@@ -142,6 +159,7 @@ type noBenchlist struct{}
 func NewNoBenchlist() Manager { return &noBenchlist{} }
 
 func (noBenchlist) RegisterChain(*snow.Context, string) error                         { return nil }
-func (noBenchlist) RegisterQuery(ids.ID, ids.ShortID, uint32, constants.MsgType) bool { return true }
+func (noBenchlist) RegisterQuery(ids.ID, ids.ShortID, uint32, constants.MsgType) bool { return false }
 func (noBenchlist) RegisterResponse(ids.ID, ids.ShortID, uint32)                      {}
 func (noBenchlist) QueryFailed(ids.ID, ids.ShortID, uint32)                           {}
+func (noBenchlist) IsBenched(ids.ShortID, ids.ID) bool                                { return false }

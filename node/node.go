@@ -512,7 +512,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	criticalChains.Add(constants.PlatformChainID, createAVMTx.ID())
 
 	// Set Prometheus metrics info
-	n.Config.NetworkConfig.Namespace = constants.PlatformName
+	n.Config.NetworkConfig.MetricsNamespace = constants.PlatformName
 	n.Config.NetworkConfig.Registerer = n.Config.ConsensusParams.Metrics
 
 	// Configure benchlist

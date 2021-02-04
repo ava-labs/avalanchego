@@ -35,6 +35,17 @@ func (m *Manager) Dispatch() {
 	m.tm.Dispatch()
 }
 
+// TimeoutDuration returns the current network timeout duration
+func (m *Manager) TimeoutDuration() time.Duration {
+	return m.tm.TimeoutDuration()
+}
+
+// IsBenched returns true if messages to [validatorID] regarding [chainID]
+// should not be sent over the network and should immediately fail.
+func (m *Manager) IsBenched(validatorID ids.ShortID, chainID ids.ID) bool {
+	return m.benchlist.IsBenched(validatorID, chainID)
+}
+
 // RegisterChain ...
 func (m *Manager) RegisterChain(ctx *snow.Context, namespace string) error {
 	return m.benchlist.RegisterChain(ctx, namespace)
