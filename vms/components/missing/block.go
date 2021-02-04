@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	errMissingBlock = errors.New("missing block")
+	ErrMissingBlock = errors.New("missing block")
 )
 
 // Block represents a block that can't be found
@@ -25,10 +25,10 @@ func (mb *Block) ID() ids.ID { return mb.BlkID }
 func (mb *Block) Height() uint64 { return 0 }
 
 // Accept ...
-func (*Block) Accept() error { return errMissingBlock }
+func (*Block) Accept() error { return ErrMissingBlock }
 
 // Reject ...
-func (*Block) Reject() error { return errMissingBlock }
+func (*Block) Reject() error { return ErrMissingBlock }
 
 // Status ...
 func (*Block) Status() choices.Status { return choices.Unknown }
@@ -37,7 +37,7 @@ func (*Block) Status() choices.Status { return choices.Unknown }
 func (*Block) Parent() snowman.Block { return nil }
 
 // Verify ...
-func (*Block) Verify() error { return errMissingBlock }
+func (*Block) Verify() error { return ErrMissingBlock }
 
 // Bytes ...
 func (*Block) Bytes() []byte { return nil }

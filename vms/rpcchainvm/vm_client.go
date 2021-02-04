@@ -41,12 +41,11 @@ import (
 
 var (
 	errUnsupportedFXs = errors.New("unsupported feature extensions")
-	errMissingBlock   = errors.New("missing block")
 )
 
 const (
-	decidedCacheSize = 1000
-	missingCacheSize = 1000
+	decidedCacheSize = 500
+	missingCacheSize = 500
 )
 
 // VMClient is an implementation of VM that talks over RPC.
@@ -336,14 +335,14 @@ func (vm *VMClient) GetBlock(id ids.ID) (snowman.Block, error) {
 	}
 
 	if _, cached := vm.missingBlocks.Get(id); cached {
-		return nil, errMissingBlock
+		return nil, missing.ErrMissingBlock
 	}
 
 	resp, err := vm.client.GetBlock(context.Background(), &vmproto.GetBlockRequest{
 		Id: id[:],
 	})
 	if err != nil {
-		if errors.Is(err, errMissingBlock) {
+		if errors.Is(err, missing.ErrMissingBlock) {
 			vm.missingBlocks.Put(id, struct{}{})
 		}
 		return nil, err
