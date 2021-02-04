@@ -513,14 +513,12 @@ func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 
 // SetPreference sets what the current tail of the chain is
 func (vm *VM) SetPreference(blkID ids.ID) {
-	// TODO: set preference block to build on
 	block := vm.getBlock(blkID)
 	if block == nil {
-		// TODO: probably don
+		vm.ctx.Log.Error("could not get preference block %s", blkID)
 		return
 	}
 
-	// TODO: convert to eth block
 	vm.chain.SetPreference(block.ethBlock)
 }
 
