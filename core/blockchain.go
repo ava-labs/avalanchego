@@ -857,6 +857,49 @@ func (bc *BlockChain) GetBlockByNumber(number uint64) *types.Block {
 	return bc.GetBlock(hash, number)
 }
 
+func (bc *BlockChain) ValidateCanonicalChain() error {
+	current := bc.CurrentBlock()
+	for current.Hash() != bc.genesisBlock.Hash() {
+		blkByHash := bc.GetBlockByHash(current.Hash())
+		if blkByHash == nil {
+			return fmt.Errorf("couldn't find block by hash %s at height %d", current.Hash().String(), current.Number())
+		}
+		if blkByHash.Hash() != current.Hash() {
+			return fmt.Errorf("blockByHash returned a block with an unepected hash: %s, expected: %s", blkByHash.Hash().String(), current.Hash().String())
+		}
+		blkByNumber := bc.GetBlockByNumber(current.Number().Uint64())
+		if blkByNumber == nil {
+			return fmt.Errorf("couldn't find block by number at height %d", current.Number())
+		}
+		if blkByNumber.Hash() != current.Hash() {
+			return fmt.Errorf("blockByNumber returned a block with unexpected hash: %s, expected: %s", blkByNumber.Hash().String(), current.Hash().String())
+		}
+
+		// Ensure that all of the transactions have been stored correctly in the canonical
+		// chain
+		txs := current.Body().Transactions
+		for txIndex, tx := range txs {
+			txLookup := bc.GetTransactionLookup(tx.Hash())
+			if txLookup == nil {
+				return fmt.Errorf("failed to find transaction %s", tx.Hash())
+			}
+			if txLookup.BlockHash != current.Hash() {
+				return fmt.Errorf("tx lookup returned with incorrect block hash: %s, expected: %s", txLookup.BlockHash.String(), current.Hash().String())
+			}
+			if txLookup.BlockIndex != current.Number().Uint64() {
+				return fmt.Errorf("tx lookup returned with incorrect block index: %d, expected: %d", txLookup.BlockIndex, current.Number().Uint64())
+			}
+			if txLookup.Index != uint64(txIndex) {
+				return fmt.Errorf("tx lookup returned with incorrect transaction index: %d, expected: %d", txLookup.Index, txIndex)
+			}
+		}
+
+		current = bc.GetBlockByHash(current.ParentHash())
+	}
+
+	return nil
+}
+
 // GetReceiptsByHash retrieves the receipts for all transactions in a given block.
 func (bc *BlockChain) GetReceiptsByHash(hash common.Hash) types.Receipts {
 	if receipts, ok := bc.receiptsCache.Get(hash); ok {
