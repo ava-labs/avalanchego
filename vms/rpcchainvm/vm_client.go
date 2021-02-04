@@ -11,6 +11,7 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto"
@@ -19,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/missing"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup"
@@ -39,6 +41,7 @@ import (
 
 var (
 	errUnsupportedFXs = errors.New("unsupported feature extensions")
+	errMissingBlock   = errors.New("missing block")
 )
 
 // VMClient is an implementation of VM that talks over RPC.
@@ -59,6 +62,9 @@ type VMClient struct {
 
 	ctx  *snow.Context
 	blks map[ids.ID]*BlockClient
+
+	decidedBlocks cache.LRU
+	missingBlocks cache.LRU
 
 	lastAccepted ids.ID
 }
@@ -256,6 +262,7 @@ func (vm *VMClient) BuildBlock() (snowman.Block, error) {
 	vm.ctx.Log.AssertNoError(err)
 	parentID, err := ids.ToID(resp.ParentID)
 	vm.ctx.Log.AssertNoError(err)
+	vm.missingBlocks.Evict(id)
 
 	return &BlockClient{
 		vm:       vm,
@@ -269,6 +276,17 @@ func (vm *VMClient) BuildBlock() (snowman.Block, error) {
 
 // ParseBlock ...
 func (vm *VMClient) ParseBlock(bytes []byte) (snowman.Block, error) {
+	blkID := hashing.ComputeHash256Array(bytes)
+
+	if blk, cached := vm.blks[blkID]; cached {
+		return blk, nil
+	}
+	if blkIntf, cached := vm.decidedBlocks.Get(blkID); cached {
+		return blkIntf.(*BlockClient), nil
+	}
+
+	vm.missingBlocks.Evict(blkID)
+
 	resp, err := vm.client.ParseBlock(context.Background(), &vmproto.ParseBlockRequest{
 		Bytes: bytes,
 	})
@@ -278,24 +296,26 @@ func (vm *VMClient) ParseBlock(bytes []byte) (snowman.Block, error) {
 
 	id, err := ids.ToID(resp.Id)
 	vm.ctx.Log.AssertNoError(err)
-
-	if blk, cached := vm.blks[id]; cached {
-		return blk, nil
-	}
+	vm.ctx.Log.AssertTrue(id != blkID, "Unexpected blockID returned from plugin")
 
 	parentID, err := ids.ToID(resp.ParentID)
 	vm.ctx.Log.AssertNoError(err)
 	status := choices.Status(resp.Status)
 	vm.ctx.Log.AssertDeferredNoError(status.Valid)
 
-	return &BlockClient{
+	blk := &BlockClient{
 		vm:       vm,
 		id:       id,
 		parentID: parentID,
 		status:   status,
 		bytes:    bytes,
 		height:   resp.Height,
-	}, nil
+	}
+
+	if status.Decided() {
+		vm.decidedBlocks.Put(id, blk)
+	}
+	return blk, nil
 }
 
 // GetBlock ...
@@ -304,10 +324,19 @@ func (vm *VMClient) GetBlock(id ids.ID) (snowman.Block, error) {
 		return blk, nil
 	}
 
+	if blkIntf, cached := vm.decidedBlocks.Get(id); cached {
+		return blkIntf.(*BlockClient), nil
+	}
+
+	if _, cached := vm.missingBlocks.Get(id); cached {
+		return nil, errMissingBlock
+	}
+
 	resp, err := vm.client.GetBlock(context.Background(), &vmproto.GetBlockRequest{
 		Id: id[:],
 	})
 	if err != nil {
+		vm.missingBlocks.Put(id, struct{}{})
 		return nil, err
 	}
 
@@ -316,14 +345,19 @@ func (vm *VMClient) GetBlock(id ids.ID) (snowman.Block, error) {
 	status := choices.Status(resp.Status)
 	vm.ctx.Log.AssertDeferredNoError(status.Valid)
 
-	return &BlockClient{
+	blk := &BlockClient{
 		vm:       vm,
 		id:       id,
 		parentID: parentID,
 		status:   status,
 		bytes:    resp.Bytes,
 		height:   resp.Height,
-	}, nil
+	}
+
+	if status.Decided() {
+		vm.decidedBlocks.Put(id, blk)
+	}
+	return blk, nil
 }
 
 // SetPreference ...
@@ -370,6 +404,7 @@ func (b *BlockClient) Accept() error {
 		return err
 	}
 
+	b.vm.decidedBlocks.Put(b.id, b)
 	b.vm.lastAccepted = b.id
 	return nil
 }
@@ -381,6 +416,8 @@ func (b *BlockClient) Reject() error {
 	_, err := b.vm.client.BlockReject(context.Background(), &vmproto.BlockRejectRequest{
 		Id: b.id[:],
 	})
+
+	b.vm.decidedBlocks.Put(b.id, b)
 	return err
 }
 
