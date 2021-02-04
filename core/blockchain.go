@@ -900,6 +900,66 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 	return nil
 }
 
+// WriteCanonicalFromCurrentBlock writes the canonical chain from the
+// current block to the genesis.
+// WriteCanonicalFromCurrentBlock only grabs the lock as necessary to
+// write batches to disk, such that it can be run in a goroutine.
+func (bc *BlockChain) WriteCanonicalFromCurrentBlock() error {
+	current := bc.CurrentBlock()
+
+	batchSize := 10
+	currentSize := 0
+	totalUpdates := 0
+	batch := bc.db.NewBatch()
+	log.Info("writing canonical chain from current block", "hash", current.Hash().String(), "number", current.NumberU64())
+
+	for current.Hash() != bc.genesisBlock.Hash() {
+		blkNumber := current.NumberU64()
+		canonicalBlk := bc.GetBlockByNumber(blkNumber)
+		if canonicalBlk == nil {
+			return fmt.Errorf("failed to get block by number at height: %d", blkNumber)
+		}
+		if canonicalBlk.Hash() == current.Hash() {
+			parent := bc.GetBlockByHash(current.ParentHash())
+			if parent == nil {
+				return fmt.Errorf("failed to get parent of block %s, with parent hash %s", current.Hash().String(), current.ParentHash().String())
+			}
+			current = parent
+			continue
+		}
+
+		// If the canonical blockhash at [blkNumber] is incorrect
+		// repair it here.
+		rawdb.WriteCanonicalHash(batch, current.Hash(), current.NumberU64())
+		rawdb.WriteTxLookupEntriesByBlock(batch, current)
+		currentSize += 1
+		if currentSize >= batchSize {
+			bc.chainmu.Lock()
+			// Flush the whole batch into the disk, exit the node if failed
+			if err := batch.Write(); err != nil {
+				bc.chainmu.Unlock()
+				return fmt.Errorf("failed to write batch with size %d at current block height %d: %s", currentSize, current.NumberU64(), err)
+			}
+			bc.chainmu.Unlock()
+			totalUpdates += currentSize
+			currentSize = 0
+			log.Info("canonical chain update", "currentBlock", current.NumberU64(), "totalUpdates", totalUpdates)
+		}
+	}
+
+	if currentSize > 0 {
+		bc.chainmu.Lock()
+		// Flush the whole batch into the disk, exit the node if failed
+		if err := batch.Write(); err != nil {
+			bc.chainmu.Unlock()
+			log.Crit("Failed to update chain indexes and markers", "err", err)
+		}
+		bc.chainmu.Unlock()
+	}
+
+	return nil
+}
+
 // GetReceiptsByHash retrieves the receipts for all transactions in a given block.
 func (bc *BlockChain) GetReceiptsByHash(hash common.Hash) types.Receipts {
 	if receipts, ok := bc.receiptsCache.Get(hash); ok {
