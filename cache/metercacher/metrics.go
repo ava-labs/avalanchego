@@ -25,7 +25,7 @@ func newCounterMetric(namespace, name string) prometheus.Counter {
 	return prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      name,
-		Help:      fmt.Sprintf("# of times %s occurred", name),
+		Help:      fmt.Sprintf("# of times a %s occurred", name),
 	})
 }
 

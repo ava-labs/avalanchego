@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/missing"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup"
@@ -298,8 +297,10 @@ func (vm *VMClient) BuildBlock() (snowman.Block, error) {
 
 	id, err := ids.ToID(resp.Id)
 	vm.ctx.Log.AssertNoError(err)
+
 	parentID, err := ids.ToID(resp.ParentID)
 	vm.ctx.Log.AssertNoError(err)
+
 	vm.missingBlocks.Evict(id)
 
 	return &BlockClient{
@@ -314,17 +315,6 @@ func (vm *VMClient) BuildBlock() (snowman.Block, error) {
 
 // ParseBlock ...
 func (vm *VMClient) ParseBlock(bytes []byte) (snowman.Block, error) {
-	blkID := hashing.ComputeHash256Array(bytes)
-
-	if blk, cached := vm.blks[blkID]; cached {
-		return blk, nil
-	}
-	if blkIntf, cached := vm.decidedBlocks.Get(blkID); cached {
-		return blkIntf.(*BlockClient), nil
-	}
-
-	vm.missingBlocks.Evict(blkID)
-
 	resp, err := vm.client.ParseBlock(context.Background(), &vmproto.ParseBlockRequest{
 		Bytes: bytes,
 	})
@@ -334,10 +324,18 @@ func (vm *VMClient) ParseBlock(bytes []byte) (snowman.Block, error) {
 
 	id, err := ids.ToID(resp.Id)
 	vm.ctx.Log.AssertNoError(err)
-	vm.ctx.Log.AssertTrue(id != blkID, "Unexpected blockID returned from plugin")
+
+	if blk, cached := vm.blks[id]; cached {
+		return blk, nil
+	}
+	if blkIntf, cached := vm.decidedBlocks.Get(id); cached {
+		return blkIntf.(*BlockClient), nil
+	}
+	vm.missingBlocks.Evict(id)
 
 	parentID, err := ids.ToID(resp.ParentID)
 	vm.ctx.Log.AssertNoError(err)
+
 	status := choices.Status(resp.Status)
 	vm.ctx.Log.AssertDeferredNoError(status.Valid)
 
