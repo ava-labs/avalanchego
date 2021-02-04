@@ -177,6 +177,9 @@ func (self *ETHChain) SetTail(hash common.Hash) error {
 	return self.backend.BlockChain().ManualHead(hash)
 }
 
+// SetPreference sets the block we should treat as the parent
+// when building future blocks. [block] may not yet be finalized
+// when this function is called.
 func (self *ETHChain) SetPreference(block *types.Block) {
 	self.backend.Miner().SetPreference(block)
 }

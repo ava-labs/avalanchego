@@ -267,13 +267,6 @@ func (w *worker) setPreference(block *types.Block) {
 	w.preferenceBlock = block
 }
 
-func (w *worker) getPreference() *types.Block {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	return w.preferenceBlock
-}
-
 // setEtherbase sets the etherbase used to initialize the block coinbase field.
 func (w *worker) setEtherbase(addr common.Address) {
 	w.mu.Lock()
@@ -925,7 +918,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	defer w.mu.RUnlock()
 
 	tstart := time.Now()
-	parent := w.getPreference()
+	parent := w.preferenceBlock
 	if parent == nil {
 		// We should never have a nil preference as it is
 		// always initialized to be the last accepted block
