@@ -513,8 +513,15 @@ func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 
 // SetPreference sets what the current tail of the chain is
 func (vm *VM) SetPreference(blkID ids.ID) {
-	err := vm.chain.SetTail(common.Hash(blkID))
-	vm.ctx.Log.AssertNoError(err)
+	// TODO: set preference block to build on
+	block := vm.getBlock(blkID)
+	if block == nil {
+		// TODO: probably don
+		return
+	}
+
+	// TODO: convert to eth block
+	vm.chain.SetPreference(block.ethBlock)
 }
 
 // LastAccepted returns the ID of the block that was last accepted
@@ -603,6 +610,8 @@ func (vm *VM) updateStatus(blockID ids.ID, status choices.Status) {
 		if atomic.SwapUint32(&vm.writingMetadata, 1) == 0 {
 			go vm.ctx.Log.RecoverAndPanic(vm.writeBackMetadata)
 		}
+		err := vm.chain.SetTail(common.Hash(blockID))
+		vm.ctx.Log.AssertNoError(err)
 	}
 	vm.blockStatusCache.Put(blockID, status)
 }
