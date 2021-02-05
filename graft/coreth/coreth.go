@@ -171,6 +171,24 @@ func (self *ETHChain) GetBlockByHash(hash common.Hash) *types.Block {
 	return self.backend.BlockChain().GetBlockByHash(hash)
 }
 
+// Retrives a block from the database by number.
+func (self *ETHChain) GetBlockByNumber(num uint64) *types.Block {
+	return self.backend.BlockChain().GetBlockByNumber(num)
+}
+
+// Validate the canonical chain from current block to the genesis.
+// This should only be called as a convenience method in tests, not
+// in production as it traverses the entire chain.
+func (self *ETHChain) ValidateCanonicalChain() error {
+	return self.backend.BlockChain().ValidateCanonicalChain()
+}
+
+// WriteCanonicalFromCurrentBlock writes the canonical chain from the
+// current block to the genesis.
+func (self *ETHChain) WriteCanonicalFromCurrentBlock() error {
+	return self.backend.BlockChain().WriteCanonicalFromCurrentBlock()
+}
+
 // SetTail sets the current head block to the one defined by the hash
 // irrelevant what the chain contents were prior.
 func (self *ETHChain) SetTail(hash common.Hash) error {
