@@ -70,8 +70,10 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 		validatorIDs.Remove(vID)
 	}
 
-	// [validatorIDs] is now the set of validators who will not receive this message.
-	// TODO inform the benchlist manager about this message
+	for validatorID := range validatorIDs {
+		vID := validatorID // Prevent overwrite in next loop iteration
+		go s.router.GetAcceptedFrontierFailed(vID, s.ctx.ChainID, requestID)
+	}
 }
 
 // AcceptedFrontier ...
@@ -121,8 +123,10 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 		validatorIDs.Remove(vID)
 	}
 
-	// [validatorIDs] is now the set of validators who will not receive this message.
-	// TODO inform the benchlist manager about this message
+	for validatorID := range validatorIDs {
+		vID := validatorID // Prevent overwrite in next loop iteration
+		go s.router.GetAcceptedFailed(vID, s.ctx.ChainID, requestID)
+	}
 }
 
 // Accepted ...
@@ -154,7 +158,6 @@ func (s *Sender) GetAncestors(validatorID ids.ShortID, requestID uint32, contain
 		return
 	}
 	go s.router.GetAncestorsFailed(validatorID, s.ctx.ChainID, requestID)
-	// TODO inform the benchlist manager about this message
 }
 
 // MultiPut sends a MultiPut message to the consensus engine running on the specified chain
@@ -191,7 +194,6 @@ func (s *Sender) Get(validatorID ids.ShortID, requestID uint32, containerID ids.
 		return
 	}
 	go s.router.GetFailed(validatorID, s.ctx.ChainID, requestID)
-	// TODO inform the benchlist manager about this message
 }
 
 // Put sends a Put message to the consensus engine running on the specified chain
@@ -246,8 +248,10 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 		validatorIDs.Remove(vID)
 	}
 
-	// [validatorIDs] is now the set of validators who will not receive this message.
-	// TODO inform the benchlist manager about this message
+	for validatorID := range validatorIDs {
+		vID := validatorID // Prevent overwrite in next loop iteration
+		go s.router.QueryFailed(vID, s.ctx.ChainID, requestID)
+	}
 }
 
 // PullQuery sends a PullQuery message to the consensus engines running on the specified chains
@@ -293,8 +297,10 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 		validatorIDs.Remove(vID)
 	}
 
-	// [validatorIDs] is now the set of validators who will not receive this message.
-	// TODO inform the benchlist manager about this message
+	for validatorID := range validatorIDs {
+		vID := validatorID // Prevent overwrite in next loop iteration
+		go s.router.QueryFailed(vID, s.ctx.ChainID, requestID)
+	}
 }
 
 // Chits sends chits
