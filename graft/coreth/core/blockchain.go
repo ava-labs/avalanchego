@@ -83,14 +83,15 @@ var (
 )
 
 const (
-	bodyCacheLimit      = 256
-	blockCacheLimit     = 256
-	receiptsCacheLimit  = 32
-	txLookupCacheLimit  = 1024
-	maxFutureBlocks     = 256
-	maxTimeFutureBlocks = 30
-	badBlockLimit       = 10
-	TriesInMemory       = 128
+	bodyCacheLimit       = 256
+	blockCacheLimit      = 256
+	receiptsCacheLimit   = 32
+	txLookupCacheLimit   = 1024
+	maxFutureBlocks      = 256
+	maxTimeFutureBlocks  = 30
+	badBlockLimit        = 10
+	TriesInMemory        = 128
+	repairBlockBatchSize = 10
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	//
@@ -907,7 +908,6 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 func (bc *BlockChain) WriteCanonicalFromCurrentBlock() error {
 	current := bc.CurrentBlock()
 
-	batchSize := 10
 	currentSize := 0
 	totalUpdates := 0
 	batch := bc.db.NewBatch()
@@ -933,7 +933,7 @@ func (bc *BlockChain) WriteCanonicalFromCurrentBlock() error {
 		rawdb.WriteCanonicalHash(batch, current.Hash(), current.NumberU64())
 		rawdb.WriteTxLookupEntriesByBlock(batch, current)
 		currentSize += 1
-		if currentSize >= batchSize {
+		if currentSize >= repairBlockBatchSize {
 			bc.chainmu.Lock()
 			// Flush the whole batch into the disk, exit the node if failed
 			if err := batch.Write(); err != nil {
