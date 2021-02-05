@@ -91,13 +91,14 @@ func (m *manager) RegisterChain(ctx *snow.Context, namespace string) error {
 	}
 
 	benchlist, err := NewBenchlist(
+		ctx.Log,
 		vdrs,
-		ctx,
 		m.config.Threshold,
 		m.config.MinimumFailingDuration,
 		m.config.Duration,
 		m.config.MaxPortion,
 		namespace,
+		ctx.Metrics,
 	)
 	if err != nil {
 		return err

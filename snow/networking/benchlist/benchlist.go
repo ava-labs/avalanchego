@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/prometheus/client_golang/prometheus"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -38,7 +39,7 @@ type Benchlist interface {
 
 type benchlist struct {
 	lock    sync.RWMutex
-	ctx     *snow.Context
+	log     logging.Logger
 	metrics metrics
 	// Tells the time. Can be faked for testing.
 	clock timer.Clock
@@ -77,13 +78,14 @@ type failureStreak struct {
 
 // NewBenchlist ...
 func NewBenchlist(
+	log logging.Logger,
 	validators validators.Set,
-	ctx *snow.Context,
 	threshold int,
 	minimumFailingDuration,
 	duration time.Duration,
 	maxPortion float64,
 	namespace string,
+	registerer prometheus.Registerer,
 ) (Benchlist, error) {
 	if maxPortion < 0 || maxPortion >= 1 {
 		return nil, fmt.Errorf("max portion of benched stake must be in [0,1) but got %f", maxPortion)
@@ -98,9 +100,8 @@ func NewBenchlist(
 		minimumFailingDuration: minimumFailingDuration,
 		duration:               duration,
 		maxPortion:             maxPortion,
-		ctx:                    ctx,
 	}
-	return benchlist, benchlist.metrics.Initialize(ctx.Metrics, namespace)
+	return benchlist, benchlist.metrics.Initialize(registerer, namespace)
 }
 
 // IsBenched returns true if messages to [validatorID]
@@ -187,7 +188,7 @@ func (b *benchlist) bench(validatorID ids.ShortID) {
 	b.benchlistOrder.PushBack(validatorID)
 	b.benchlistSet.Add(validatorID)
 	delete(b.consecutiveFailures, validatorID)
-	b.ctx.Log.Debug(
+	b.log.Debug(
 		"benching validator %s after %d consecutive failed queries for %s",
 		validatorID,
 		b.threshold,
@@ -208,7 +209,7 @@ func (b *benchlist) cleanup() {
 	currentWeight, err := b.vdrs.SubsetWeight(b.benchlistSet)
 	if err != nil {
 		// Add log for this, should never happen
-		b.ctx.Log.Error("failed to calculate subset weight due to: %w. Resetting benchlist", err)
+		b.log.Error("failed to calculate subset weight due to: %w. Resetting benchlist", err)
 		b.reset()
 		return
 	}
@@ -238,20 +239,20 @@ func (b *benchlist) cleanup() {
 		if ok {
 			updatedWeight, err = safemath.Sub64(updatedWeight, removeWeight)
 			if err != nil {
-				b.ctx.Log.Error("failed to calculate new subset weight due to: %w. Resetting benchlist", err)
+				b.log.Error("failed to calculate new subset weight due to: %w. Resetting benchlist", err)
 				b.reset()
 				return
 			}
 		}
 
-		b.ctx.Log.Debug("Removed Validator: (%s, %d). EndTime: %s. CurrentTime: %s)", validatorID, removeWeight, end, now)
+		b.log.Debug("Removed Validator: (%s, %d). EndTime: %s. CurrentTime: %s)", validatorID, removeWeight, end, now)
 		b.benchlistOrder.Remove(e)
 		delete(b.benchlistTimes, validatorID)
 		b.benchlistSet.Remove(validatorID)
 	}
 
 	updatedBenchLen := b.benchlistSet.Len()
-	b.ctx.Log.Debug("Maximum Benchable Weight: %d. Benched Weight: (%d/%d) -> (%d/%d). Benched Validators: %d -> %d.",
+	b.log.Debug("Maximum Benchable Weight: %d. Benched Weight: (%d/%d) -> (%d/%d). Benched Validators: %d -> %d.",
 		maxBenchlistWeight,
 		currentWeight,
 		totalWeight,
