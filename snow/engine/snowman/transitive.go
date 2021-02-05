@@ -141,7 +141,7 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error 
 	blk, err := t.VM.GetBlock(blkID)
 	if err != nil {
 		// If we failed to get the block, that means either an unexpected error
-		// has occurred, the validator is not following the protocol, or the
+		// has occurred, [vdr] is not following the protocol, or the
 		// block has been pruned.
 		t.Ctx.Log.Debug("Get(%s, %d, %s) failed with: %s", vdr, requestID, blkID, err)
 		return nil

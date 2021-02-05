@@ -7,6 +7,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
@@ -56,6 +58,9 @@ func (mc *mockClient) SendRequest(method string, params interface{}, reply inter
 	case *api.SuccessResponse:
 		response := mc.response.(api.SuccessResponse)
 		*p = response
+	case *GetChainAliasesReply:
+		response := mc.response.(*GetChainAliasesReply)
+		*p = *response
 	default:
 		panic("illegal type")
 	}
@@ -174,6 +179,28 @@ func TestAliasChain(t *testing.T) {
 			t.Fatalf("Expected success response to be: %v, but found: %v", test.Success, success)
 		}
 	}
+}
+
+func TestGetChainAliases(t *testing.T) {
+	t.Run("successful", func(t *testing.T) {
+		expectedReply := []string{"alias1", "alias2"}
+		mockClient := Client{requester: NewMockClient(&GetChainAliasesReply{
+			Aliases: expectedReply,
+		}, nil)}
+
+		reply, err := mockClient.GetChainAliases("chain")
+
+		assert.NoError(t, err)
+		assert.ElementsMatch(t, expectedReply, reply)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		mockClient := Client{requester: NewMockClient(&GetChainAliasesReply{}, errors.New("some error"))}
+
+		_, err := mockClient.GetChainAliases("chain")
+
+		assert.EqualError(t, err, "some error")
+	})
 }
 
 func TestStacktrace(t *testing.T) {

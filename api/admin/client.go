@@ -70,6 +70,15 @@ func (c *Client) AliasChain(chain, alias string) (bool, error) {
 	return res.Success, err
 }
 
+// GetChainAliases ...
+func (c *Client) GetChainAliases(chain string) ([]string, error) {
+	res := &GetChainAliasesReply{}
+	err := c.requester.SendRequest("getChainAliases", &GetChainAliasesArgs{
+		Chain: chain,
+	}, res)
+	return res.Aliases, err
+}
+
 // Stacktrace ...
 func (c *Client) Stacktrace() (bool, error) {
 	res := &api.SuccessResponse{}

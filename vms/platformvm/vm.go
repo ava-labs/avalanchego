@@ -417,7 +417,7 @@ func (vm *VM) Bootstrapped() error {
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
 
-	for stopIter.Next() { // Iterates in order of increasing start time
+	for stopIter.Next() { // Iterates in order of increasing stop time
 		txBytes := stopIter.Value()
 
 		tx := rewardTx{}
@@ -485,7 +485,7 @@ func (vm *VM) Shutdown() error {
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
 
-	for stopIter.Next() { // Iterates in order of increasing start time
+	for stopIter.Next() { // Iterates in order of increasing stop time
 		txBytes := stopIter.Value()
 
 		tx := rewardTx{}
@@ -878,7 +878,7 @@ pendingStakerLoop:
 	defer stopIter.Release()
 
 currentStakerLoop:
-	for stopIter.Next() { // Iterates in order of increasing start time
+	for stopIter.Next() { // Iterates in order of increasing stop time
 		txBytes := stopIter.Value()
 
 		tx := rewardTx{}
@@ -964,7 +964,7 @@ func (vm *VM) updateVdrSet(subnetID ids.ID) error {
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
 
-	for stopIter.Next() { // Iterates in order of increasing start time
+	for stopIter.Next() { // Iterates in order of increasing stop time
 		txBytes := stopIter.Value()
 
 		tx := rewardTx{}
@@ -1165,12 +1165,12 @@ func (vm *VM) getStakers() ([]validators.Validator, error) {
 	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, vm.DB)
 	defer stopDB.Close()
-	iter := stopDB.NewIterator()
-	defer iter.Release()
+	stopIter := stopDB.NewIterator()
+	defer stopIter.Release()
 
 	stakers := []validators.Validator{}
-	for iter.Next() { // Iterates in order of increasing start time
-		txBytes := iter.Value()
+	for stopIter.Next() { // Iterates in order of increasing stop time
+		txBytes := stopIter.Value()
 		tx := rewardTx{}
 		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return nil, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
@@ -1188,7 +1188,7 @@ func (vm *VM) getStakers() ([]validators.Validator, error) {
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		iter.Error(),
+		stopIter.Error(),
 		stopDB.Close(),
 	)
 	return stakers, errs.Err
@@ -1202,12 +1202,12 @@ func (vm *VM) getPendingStakers() ([]validators.Validator, error) {
 	startDBPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, startDBPrefix))
 	startDB := prefixdb.NewNested(startDBPrefix, vm.DB)
 	defer startDB.Close()
-	iter := startDB.NewIterator()
-	defer iter.Release()
+	startIter := startDB.NewIterator()
+	defer startIter.Release()
 
 	stakers := []validators.Validator{}
-	for iter.Next() { // Iterates in order of increasing start time
-		txBytes := iter.Value()
+	for startIter.Next() { // Iterates in order of increasing start time
+		txBytes := startIter.Value()
 		tx := rewardTx{}
 		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return nil, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
@@ -1225,7 +1225,7 @@ func (vm *VM) getPendingStakers() ([]validators.Validator, error) {
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		iter.Error(),
+		startIter.Error(),
 		startDB.Close(),
 	)
 	return stakers, errs.Err

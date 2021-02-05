@@ -18,6 +18,8 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	"github.com/kardianos/osext"
+
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/genesis"
@@ -61,6 +63,13 @@ var (
 	GitCommit string
 )
 
+func init() {
+	folderPath, err := osext.ExecutableFolder()
+	if err == nil {
+		defaultPluginDirs = append(defaultPluginDirs, filepath.Join(folderPath, "plugins"))
+	}
+}
+
 var (
 	errBootstrapMismatch    = errors.New("more bootstrap IDs provided than bootstrap IPs")
 	errStakingRequiresTLS   = errors.New("if staking is enabled, network TLS must also be enabled")
@@ -76,6 +85,9 @@ func avalancheFlagSet() *flag.FlagSet {
 
 	// Config File:
 	fs.String(configFileKey, defaultString, "Specifies a config file")
+
+	// Genesis Config File:
+	fs.String(genesisConfigFileKey, "", "Specifies a genesis config file (ignored when running standard networks)")
 
 	// NetworkID:
 	fs.String(networkNameKey, defaultNetworkName, "Network ID this node will connect to")
@@ -650,6 +662,12 @@ func setNodeConfig(v *viper.Viper) error {
 		Config.EpochDuration = v.GetDuration(snowEpochDuration)
 	} else {
 		Config.Params = *genesis.GetParams(networkID)
+	}
+
+	// Load genesis data
+	Config.GenesisBytes, Config.AvaxAssetID, err = genesis.Genesis(networkID, v.GetString(genesisConfigFileKey))
+	if err != nil {
+		return fmt.Errorf("unable to load genesis file: %w", err)
 	}
 
 	// Assertions

@@ -208,6 +208,7 @@ func (vm *VMServer) Shutdown(context.Context, *vmproto.ShutdownRequest) (*vmprot
 	for _, conn := range vm.conns {
 		errs.Add(conn.Close())
 	}
+
 	return &vmproto.ShutdownResponse{}, errs.Err
 }
 

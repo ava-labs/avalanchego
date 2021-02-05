@@ -1,5 +1,13 @@
 SCRIPTS_PATH=$(cd $(dirname "${BASH_SOURCE[0]}"); pwd)
 SRC_PATH=$(dirname "${SCRIPTS_PATH}")
+
+# Early auth to avoid limit rating
+if [[ -z ${DOCKER_USERNAME} ]]; then
+    echo "No Auth provided"
+else
+    echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
+fi
+
 # Build the runnable Avalanche docker image
 bash "${SRC_PATH}"/scripts/build_image.sh
 AVALANCHE_IMAGE_REPO=$(docker image ls --format="{{.Repository}}" | head -n 1)
@@ -9,14 +17,13 @@ echo "Using Avalanche Image: $AVALANCHE_IMAGE"
 
 DOCKER_REPO="avaplatform"
 BYZANTINE_IMAGE="$DOCKER_REPO/avalanche-byzantine:v0.1.5-rc.1"
-TEST_SUITE_IMAGE="$DOCKER_REPO/avalanche-testing:v0.10.4"
+TEST_SUITE_IMAGE="$DOCKER_REPO/avalanche-testing:v0.10.5-rc.2"
 
 # If Docker Credentials are not available skip the Byzantine Tests
 if [[ -z ${DOCKER_USERNAME} ]]; then
     echo "Skipping Byzantine Tests because Docker Credentials were not present."
     BYZANTINE_IMAGE=""
 else
-    echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
     docker pull "${BYZANTINE_IMAGE}"
 fi
 

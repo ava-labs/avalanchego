@@ -28,9 +28,133 @@ import (
 )
 
 const (
-	defaultEncoding = formatting.Hex
-	codecVersion    = 0
+	defaultEncoding    = formatting.Hex
+	codecVersion       = 0
+	configChainIDAlias = "X"
 )
+
+// validateInitialStakedFunds ensures all staked
+// funds have allocations and that all staked
+// funds are unique.
+//
+// This function assumes that NetworkID in *Config has already
+// been checked for correctness.
+func validateInitialStakedFunds(config *Config) error {
+	if len(config.InitialStakedFunds) == 0 {
+		return errors.New("initial staked funds cannot be empty")
+	}
+
+	allocationSet := ids.ShortSet{}
+	initialStakedFundsSet := ids.ShortSet{}
+	for _, allocation := range config.Allocations {
+		// It is ok to have duplicates as different
+		// ethAddrs could claim to the same avaxAddr.
+		allocationSet.Add(allocation.AVAXAddr)
+	}
+
+	for _, staker := range config.InitialStakedFunds {
+		if initialStakedFundsSet.Contains(staker) {
+			avaxAddr, err := formatting.FormatAddress(
+				configChainIDAlias,
+				constants.GetHRP(config.NetworkID),
+				staker.Bytes(),
+			)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to format address from %s",
+					staker.String(),
+				)
+			}
+
+			return fmt.Errorf(
+				"address %s is duplicated in initial staked funds",
+				avaxAddr,
+			)
+		}
+		initialStakedFundsSet.Add(staker)
+
+		if !allocationSet.Contains(staker) {
+			avaxAddr, err := formatting.FormatAddress(
+				configChainIDAlias,
+				constants.GetHRP(config.NetworkID),
+				staker.Bytes(),
+			)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to format address from %s",
+					staker.String(),
+				)
+			}
+
+			return fmt.Errorf(
+				"address %s does not have an allocation to stake",
+				avaxAddr,
+			)
+		}
+	}
+
+	return nil
+}
+
+// validateConfig returns an error if the provided
+// *Config is not considered valid.
+func validateConfig(networkID uint32, config *Config) error {
+	if networkID != config.NetworkID {
+		return fmt.Errorf(
+			"networkID %d specified but genesis config contains networkID %d",
+			networkID,
+			config.NetworkID,
+		)
+	}
+
+	initialSupply, err := config.InitialSupply()
+	switch {
+	case err != nil:
+		return fmt.Errorf("unable to calculate initial supply: %w", err)
+	case initialSupply == 0:
+		return errors.New("initial supply must be > 0")
+	}
+
+	startTime := time.Unix(int64(config.StartTime), 0)
+	if time.Since(startTime) < 0 {
+		return fmt.Errorf(
+			"start time cannot be in the future: %s",
+			startTime,
+		)
+	}
+
+	// We don't impose any restrictions on the minimum
+	// stake duration to enable complex testing configurations
+	// but recommend setting a minimum duration of at least
+	// 15 minutes.
+	if config.InitialStakeDuration == 0 {
+		return errors.New("initial stake duration must be > 0")
+	}
+
+	if len(config.InitialStakers) == 0 {
+		return errors.New("initial stakers must be > 0")
+	}
+
+	offsetTimeRequired := config.InitialStakeDurationOffset * uint64(len(config.InitialStakers)-1)
+	if offsetTimeRequired > config.InitialStakeDuration {
+		return fmt.Errorf(
+			"initial stake duration is %d but need at least %d with offset of %d",
+			config.InitialStakeDuration,
+			offsetTimeRequired,
+			config.InitialStakeDurationOffset,
+		)
+	}
+
+	if err := validateInitialStakedFunds(config); err != nil {
+		return fmt.Errorf("initial staked funds validation failed: %w", err)
+	}
+
+	if len(config.CChainGenesis) == 0 {
+		return errors.New("C-Chain genesis cannot be empty")
+	}
+
+	return nil
+}
 
 // Genesis returns the genesis data of the Platform Chain.
 //
@@ -39,7 +163,44 @@ const (
 // exist, etc.), defining the genesis state of the Platform Chain is the same as
 // defining the genesis state of the network.
 //
-// The ID of the new network is [networkID].
+// Genesis accepts:
+// 1) The ID of the new network. [networkID]
+// 2) The location of a custom genesis config to load. [filepath]
+//
+// If [filepath] is empty or the given network ID is Mainnet, Testnet, or Local, loads the
+// network genesis state from predefined configs. If [filepath] is non-empty and networkID
+// isn't Mainnet, Testnet, or Local, loads the network genesis data from the config at [filepath].
+//
+// Genesis returns:
+// 1) The byte representation of the genesis state of the platform chain
+//    (ie the genesis state of the network)
+// 2) The asset ID of AVAX
+func Genesis(networkID uint32, filepath string) ([]byte, ids.ID, error) {
+	config := GetConfig(networkID)
+	if len(filepath) > 0 {
+		switch networkID {
+		case constants.MainnetID, constants.TestnetID, constants.LocalID:
+			return nil, ids.ID{}, fmt.Errorf(
+				"cannot override genesis config for standard network %s (%d)",
+				constants.NetworkName(networkID),
+				networkID,
+			)
+		}
+
+		customConfig, err := GetConfigFile(filepath)
+		if err != nil {
+			return nil, ids.ID{}, fmt.Errorf("unable to load provided genesis config at %s: %w", filepath, err)
+		}
+
+		config = customConfig
+	}
+
+	if err := validateConfig(networkID, config); err != nil {
+		return nil, ids.ID{}, fmt.Errorf("genesis config validation failed: %w", err)
+	}
+
+	return FromConfig(config)
+}
 
 // FromConfig returns:
 // 1) The byte representation of the genesis state of the platform chain
@@ -313,20 +474,8 @@ func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {
 	return append(allNodeAllocations, currentNodeAllocation)
 }
 
-// Genesis returns:
-// 1) The byte representation of the genesis state of the platform chain
-//    (ie the genesis state of the network)
-// 2) The asset ID of AVAX
-func Genesis(networkID uint32) ([]byte, ids.ID, error) {
-	return FromConfig(GetConfig(networkID))
-}
-
 // VMGenesis ...
-func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.Tx, error) {
-	genesisBytes, _, err := Genesis(networkID)
-	if err != nil {
-		return nil, err
-	}
+func VMGenesis(genesisBytes []byte, vmID ids.ID) (*platformvm.Tx, error) {
 	genesis := platformvm.Genesis{}
 	if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return nil, fmt.Errorf("couldn't unmarshal genesis bytes due to: %w", err)
