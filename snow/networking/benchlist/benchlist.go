@@ -37,7 +37,7 @@ type Benchlist interface {
 }
 
 type benchlist struct {
-	lock    sync.Mutex
+	lock    sync.RWMutex
 	ctx     *snow.Context
 	metrics metrics
 	// Tells the time. Can be faked for testing.
@@ -106,9 +106,9 @@ func NewBenchlist(
 // IsBenched returns true if messages to [validatorID]
 // should not be sent over the network and should immediately fail.
 func (b *benchlist) IsBenched(validatorID ids.ShortID) bool {
-	b.lock.Lock()
+	b.lock.RLock()
 	isBenched := b.isBenched(validatorID)
-	b.lock.Unlock()
+	b.lock.RUnlock()
 	return isBenched
 }
 
