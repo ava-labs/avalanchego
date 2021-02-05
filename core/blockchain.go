@@ -83,14 +83,15 @@ var (
 )
 
 const (
-	bodyCacheLimit      = 256
-	blockCacheLimit     = 256
-	receiptsCacheLimit  = 32
-	txLookupCacheLimit  = 1024
-	maxFutureBlocks     = 256
-	maxTimeFutureBlocks = 30
-	badBlockLimit       = 10
-	TriesInMemory       = 128
+	bodyCacheLimit       = 256
+	blockCacheLimit      = 256
+	receiptsCacheLimit   = 32
+	txLookupCacheLimit   = 1024
+	maxFutureBlocks      = 256
+	maxTimeFutureBlocks  = 30
+	badBlockLimit        = 10
+	TriesInMemory        = 128
+	repairBlockBatchSize = 10
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	//
@@ -855,6 +856,114 @@ func (bc *BlockChain) GetBlockByNumber(number uint64) *types.Block {
 		return nil
 	}
 	return bc.GetBlock(hash, number)
+}
+
+func (bc *BlockChain) ValidateCanonicalChain() error {
+	current := bc.CurrentBlock()
+	for current.Hash() != bc.genesisBlock.Hash() {
+		blkByHash := bc.GetBlockByHash(current.Hash())
+		if blkByHash == nil {
+			return fmt.Errorf("couldn't find block by hash %s at height %d", current.Hash().String(), current.Number())
+		}
+		if blkByHash.Hash() != current.Hash() {
+			return fmt.Errorf("blockByHash returned a block with an unepected hash: %s, expected: %s", blkByHash.Hash().String(), current.Hash().String())
+		}
+		blkByNumber := bc.GetBlockByNumber(current.Number().Uint64())
+		if blkByNumber == nil {
+			return fmt.Errorf("couldn't find block by number at height %d", current.Number())
+		}
+		if blkByNumber.Hash() != current.Hash() {
+			return fmt.Errorf("blockByNumber returned a block with unexpected hash: %s, expected: %s", blkByNumber.Hash().String(), current.Hash().String())
+		}
+
+		// Ensure that all of the transactions have been stored correctly in the canonical
+		// chain
+		txs := current.Body().Transactions
+		for txIndex, tx := range txs {
+			txLookup := bc.GetTransactionLookup(tx.Hash())
+			if txLookup == nil {
+				return fmt.Errorf("failed to find transaction %s", tx.Hash())
+			}
+			if txLookup.BlockHash != current.Hash() {
+				return fmt.Errorf("tx lookup returned with incorrect block hash: %s, expected: %s", txLookup.BlockHash.String(), current.Hash().String())
+			}
+			if txLookup.BlockIndex != current.Number().Uint64() {
+				return fmt.Errorf("tx lookup returned with incorrect block index: %d, expected: %d", txLookup.BlockIndex, current.Number().Uint64())
+			}
+			if txLookup.Index != uint64(txIndex) {
+				return fmt.Errorf("tx lookup returned with incorrect transaction index: %d, expected: %d", txLookup.Index, txIndex)
+			}
+		}
+
+		current = bc.GetBlockByHash(current.ParentHash())
+	}
+
+	return nil
+}
+
+// WriteCanonicalFromCurrentBlock writes the canonical chain from the
+// current block to the genesis.
+// WriteCanonicalFromCurrentBlock only grabs the lock as necessary to
+// write batches to disk, such that it can be run in a goroutine.
+func (bc *BlockChain) WriteCanonicalFromCurrentBlock() error {
+	current := bc.CurrentBlock()
+
+	currentSize := 0
+	totalUpdates := 0
+	batch := bc.db.NewBatch()
+	log.Info("writing canonical chain from current block", "hash", current.Hash().String(), "number", current.NumberU64())
+
+	for ; current.Hash() != bc.genesisBlock.Hash(); current = bc.GetBlockByHash(current.ParentHash()) {
+		if current == nil {
+			return fmt.Errorf("failed to get parent of block %s, with parent hash %s", current.Hash().String(), current.ParentHash().String())
+		}
+
+		blkNumber := current.NumberU64()
+		canonicalBlk := bc.GetBlockByNumber(blkNumber)
+		if canonicalBlk == nil {
+			return fmt.Errorf("failed to get block by number at height: %d", blkNumber)
+		}
+		if canonicalBlk.Hash() == current.Hash() {
+			continue
+		}
+
+		// If the canonical blockhash at [blkNumber] is incorrect
+		// repair it here.
+		log.Debug("repairing block", "hash", current.Hash().String(), "height", blkNumber)
+
+		rawdb.WriteCanonicalHash(batch, current.Hash(), current.NumberU64())
+		rawdb.WriteTxLookupEntriesByBlock(batch, current)
+		currentSize += 1
+		if currentSize >= repairBlockBatchSize {
+			totalUpdates += currentSize
+			log.Debug("writing repair batch", "totalUpdates", totalUpdates, "size", currentSize)
+			currentSize = 0
+
+			bc.chainmu.Lock()
+			// Flush the whole batch into the disk, exit the node if failed
+			if err := batch.Write(); err != nil {
+				bc.chainmu.Unlock()
+				return fmt.Errorf("failed to write batch with size %d at current block height %d: %s", currentSize, blkNumber, err)
+			}
+			bc.chainmu.Unlock()
+		}
+	}
+
+	if currentSize > 0 {
+		totalUpdates += currentSize
+		log.Debug("writing repair batch", "totalUpdates", totalUpdates, "size", currentSize)
+
+		bc.chainmu.Lock()
+		// Flush the whole batch into the disk, exit the node if failed
+		if err := batch.Write(); err != nil {
+			bc.chainmu.Unlock()
+			log.Crit("Failed to update chain indexes and markers", "err", err)
+		}
+		bc.chainmu.Unlock()
+	}
+	log.Info("finished repairs", "totalUpdates", totalUpdates)
+
+	return nil
 }
 
 // GetReceiptsByHash retrieves the receipts for all transactions in a given block.

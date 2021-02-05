@@ -61,9 +61,10 @@ var (
 	x2cRate = big.NewInt(1000000000)
 )
 
-const (
-	lastAcceptedKey = "snowman_lastAccepted"
-	acceptedPrefix  = "snowman_accepted"
+var (
+	lastAcceptedKey = []byte("snowman_lastAccepted")
+	acceptedPrefix  = []byte("snowman_accepted")
+	repairedKey     = []byte("repaired")
 )
 
 const (
@@ -158,6 +159,7 @@ type VM struct {
 	networkID    uint64
 	genesisHash  common.Hash
 	chain        *coreth.ETHChain
+	db           database.Database
 	chaindb      Database
 	newBlockChan chan *Block
 	// A message is sent on this channel when a new block
@@ -260,13 +262,14 @@ func (vm *VM) Initialize(
 
 	vm.shutdownChan = make(chan struct{}, 1)
 	vm.ctx = ctx
+	vm.db = db
 	vm.chaindb = Database{db}
 	g := new(core.Genesis)
 	if err := json.Unmarshal(b, g); err != nil {
 		return err
 	}
 
-	vm.acceptedDB = prefixdb.New([]byte(acceptedPrefix), db)
+	vm.acceptedDB = prefixdb.New(acceptedPrefix, db)
 
 	vm.chainID = g.Config.ChainID
 	vm.txFee = txFee
@@ -391,7 +394,7 @@ func (vm *VM) Initialize(
 	chain.Start()
 
 	var lastAccepted *types.Block
-	if b, err := vm.chaindb.Get([]byte(lastAcceptedKey)); err == nil {
+	if b, err := vm.chaindb.Get(lastAcceptedKey); err == nil {
 		var hash common.Hash
 		if err = rlp.DecodeBytes(b, &hash); err == nil {
 			if block := chain.GetBlockByHash(hash); block == nil {
@@ -410,12 +413,17 @@ func (vm *VM) Initialize(
 		ethBlock: lastAccepted,
 		vm:       vm,
 	}
+	vm.chain.SetPreference(lastAccepted)
 	vm.genesisHash = chain.GetGenesisBlock().Hash()
 	log.Info(fmt.Sprintf("lastAccepted = %s", vm.lastAccepted.ethBlock.Hash().Hex()))
 
 	vm.shutdownWg.Add(1)
 	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
 	vm.codec = Codec
+	if err := vm.repairCanonicalChain(); err != nil {
+		return fmt.Errorf("problem during repair canonical chain: %w", err)
+	}
+
 	// The Codec explicitly registers the types it requires from the secp256k1fx
 	// so [vm.baseCodec] is a dummy codec use to fulfill the secp256k1fx VM
 	// interface. The fx will register all of its types, which can be safely
@@ -423,6 +431,35 @@ func (vm *VM) Initialize(
 	vm.baseCodec = linearcodec.NewDefault()
 
 	return vm.fx.Initialize(vm)
+}
+
+// repairCanonicalChain writes the canonical chain index from the last accepted
+// block back to the genesis block to overwrite any corruption that might have
+// occurred.
+// assumes that the genesisHash and [lastAccepted] block have already been set.
+func (vm *VM) repairCanonicalChain() error {
+	// Check if the canonical chain has already been repaired
+	if has, err := vm.db.Has(repairedKey); err != nil {
+		return err
+	} else if has {
+		return nil
+	}
+
+	go func() {
+		start := time.Now()
+		log.Info("starting to repair canonical chain", "startTime", start)
+		err := vm.chain.WriteCanonicalFromCurrentBlock()
+		if err != nil {
+			log.Error("failed to repair canonical chain", "error", err, "timeElapsed", time.Since(start))
+			return
+		}
+		log.Info("finished repairing canonical chain", "timeElapsed", time.Since(start))
+		if err := vm.db.Put(repairedKey, []byte("finished")); err != nil {
+			log.Error("failed to mark flag for canonical chain repaired", "error", err)
+		}
+	}()
+
+	return nil
 }
 
 // Bootstrapping notifies this VM that the consensus engine is performing
@@ -513,8 +550,10 @@ func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 
 // SetPreference sets what the current tail of the chain is
 func (vm *VM) SetPreference(blkID ids.ID) {
-	err := vm.chain.SetTail(common.Hash(blkID))
-	vm.ctx.Log.AssertNoError(err)
+	block := vm.getBlock(blkID)
+	vm.ctx.Log.AssertTrue(block != nil, "problem setting preferred block, couldn't find blkID %s", blkID)
+
+	vm.chain.SetPreference(block.ethBlock)
 }
 
 // LastAccepted returns the ID of the block that was last accepted
@@ -603,6 +642,8 @@ func (vm *VM) updateStatus(blockID ids.ID, status choices.Status) {
 		if atomic.SwapUint32(&vm.writingMetadata, 1) == 0 {
 			go vm.ctx.Log.RecoverAndPanic(vm.writeBackMetadata)
 		}
+		err := vm.chain.SetTail(common.Hash(blockID))
+		vm.ctx.Log.AssertNoError(err)
 	}
 	vm.blockStatusCache.Put(blockID, status)
 }
@@ -764,7 +805,7 @@ func (vm *VM) writeBackMetadata() {
 		return
 	}
 	log.Debug("writing back metadata")
-	vm.chaindb.Put([]byte(lastAcceptedKey), b)
+	vm.chaindb.Put(lastAcceptedKey, b)
 	atomic.StoreUint32(&vm.writingMetadata, 0)
 }
 
