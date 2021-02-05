@@ -98,7 +98,6 @@ func (bm *benchlistManager) RegisterChain(ctx *snow.Context, namespace string) e
 		bm.config.MinimumFailingDuration,
 		bm.config.Duration,
 		bm.config.MaxPortion,
-		bm.config.PeerSummaryEnabled,
 		namespace,
 	)
 	if err != nil {
@@ -124,7 +123,7 @@ func (bm *benchlistManager) RegisterQuery(
 		return false
 	}
 
-	return chain.RegisterQuery(validatorID, requestID, msgType)
+	return chain.RegisterQuery(validatorID, requestID)
 }
 
 // RegisterResponse implements the Manager interface

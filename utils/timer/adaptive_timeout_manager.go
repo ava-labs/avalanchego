@@ -75,8 +75,8 @@ type AdaptiveTimeoutConfig struct {
 type AdaptiveTimeoutManager struct {
 	lock sync.Mutex
 	// Tells the time. Can be faked for testing.
-	clock                 Clock
-	currentDurationMetric prometheus.Gauge
+	clock                Clock
+	networkTimeoutMetric prometheus.Gauge
 	// Averages the response time from all peers
 	averager math.Averager
 	// Timeout is [timeoutCoefficient] * average response time
@@ -92,11 +92,12 @@ type AdaptiveTimeoutManager struct {
 
 // Initialize this timeout manager with the provided config
 func (tm *AdaptiveTimeoutManager) Initialize(config *AdaptiveTimeoutConfig) error {
-	tm.currentDurationMetric = prometheus.NewGauge(prometheus.GaugeOpts{
+	tm.networkTimeoutMetric = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: config.MetricsNamespace,
 		Name:      "network_timeout",
 		Help:      "Duration of current network timeout in nanoseconds",
 	})
+
 	switch {
 	case config.TimeoutCoefficient < 1:
 		return fmt.Errorf("timeout coefficient must be > 1 but got %f", config.TimeoutCoefficient)
@@ -110,7 +111,7 @@ func (tm *AdaptiveTimeoutManager) Initialize(config *AdaptiveTimeoutConfig) erro
 	tm.currentTimeout = config.InitialTimeout
 	tm.timeoutMap = make(map[ids.ID]*adaptiveTimeout)
 	tm.timer = NewTimer(tm.Timeout)
-	return config.Registerer.Register(tm.currentDurationMetric)
+	return config.Registerer.Register(tm.networkTimeoutMetric)
 }
 
 // TimeoutDuration returns the current network timeout duration
@@ -184,7 +185,7 @@ func (tm *AdaptiveTimeoutManager) remove(id ids.ID, currentTime time.Time) {
 	}
 
 	// Make sure the metrics report the current timeouts
-	tm.currentDurationMetric.Set(float64(tm.currentTimeout))
+	tm.networkTimeoutMetric.Set(float64(tm.currentTimeout))
 
 	// Remove the timeout from the map
 	delete(tm.timeoutMap, id)

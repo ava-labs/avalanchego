@@ -54,7 +54,6 @@ type InternalRouter interface {
 	GetFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
 	GetAncestorsFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
 	QueryFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
-
 	Connected(validatorID ids.ShortID)
 	Disconnected(validatorID ids.ShortID)
 }

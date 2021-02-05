@@ -4,6 +4,8 @@
 package timeout
 
 import (
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -15,23 +17,35 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
+type request struct {
+	// When this request was registered with the timeout manager
+	time.Time
+	// The type of request that was made
+	constants.MsgType
+}
+
 // Manager registers and fires timeouts for the snow API.
 type Manager struct {
-	tm        timer.AdaptiveTimeoutManager
-	benchlist benchlist.Manager
-	executor  timer.Executor
+	lock sync.Mutex
+	// Tells the time. Can be faked for testing.
+	clock        timer.Clock
+	tm           timer.AdaptiveTimeoutManager
+	benchlistMgr benchlist.Manager
+	executor     timer.Executor
+	metrics      metrics
+	// Unique-ified request ID --> Time and type of message made
+	requests map[ids.ID]request
 }
 
 // Initialize this timeout manager.
 func (m *Manager) Initialize(timeoutConfig *timer.AdaptiveTimeoutConfig, benchlist benchlist.Manager) error {
-	m.benchlist = benchlist
-	m.executor.Initialize()
+	m.benchlistMgr = benchlist
+	m.requests = map[ids.ID]request{}
 	return m.tm.Initialize(timeoutConfig)
 }
 
 // Dispatch ...
 func (m *Manager) Dispatch() {
-	go m.executor.Dispatch()
 	m.tm.Dispatch()
 }
 
@@ -43,46 +57,61 @@ func (m *Manager) TimeoutDuration() time.Duration {
 // IsBenched returns true if messages to [validatorID] regarding [chainID]
 // should not be sent over the network and should immediately fail.
 func (m *Manager) IsBenched(validatorID ids.ShortID, chainID ids.ID) bool {
-	return m.benchlist.IsBenched(validatorID, chainID)
+	return m.benchlistMgr.IsBenched(validatorID, chainID)
 }
 
 // RegisterChain ...
 func (m *Manager) RegisterChain(ctx *snow.Context, namespace string) error {
-	return m.benchlist.RegisterChain(ctx, namespace)
-}
-
-// Register request to time out unless Manager.Cancel is called
-// before the timeout duration passes, with the same request parameters.
-func (m *Manager) Register(validatorID ids.ShortID, chainID ids.ID, requestID uint32, register bool, msgType constants.MsgType, timeout func()) (time.Time, bool) {
-	if register {
-		if ok := m.benchlist.RegisterQuery(chainID, validatorID, requestID, msgType); !ok {
-			m.executor.Add(timeout)
-			return time.Time{}, false
-		}
+	if err := m.metrics.RegisterChain(ctx, namespace); err != nil {
+		return fmt.Errorf("couldn't register timeout metrics for chain %s: %w", ctx.ChainID, err)
 	}
-	return m.tm.Put(createRequestID(validatorID, chainID, requestID), func() {
-		m.benchlist.QueryFailed(chainID, validatorID, requestID) // Benchlist ignores QueryFailed if it was not registered
-		timeout()
-	}), true
+	if err := m.benchlistMgr.RegisterChain(ctx, namespace); err != nil {
+		return fmt.Errorf("couldn't register chain %s with benchlist manager: %w", ctx.ChainID, err)
+	}
+	return nil
 }
 
-// RegisterFailure registers that a request failed before completion
-// This will register the failure to the benchlist, but will not call
-// the registered [timeout].
-func (m *Manager) RegisterFailure(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
-	m.benchlist.QueryFailed(chainID, validatorID, requestID)
-	m.tm.Remove(createRequestID(validatorID, chainID, requestID))
+// RegisterRequests notes that we sent a request of type [msgType] to [validatorID]
+// regarding chain [chainID]. If we don't receive a response in time, [timeoutHandler]
+// is executed.
+func (m *Manager) RegisterRequest(
+	validatorID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+	register bool,
+	msgType constants.MsgType,
+	timeoutHandler func(),
+) (time.Time, bool) {
+	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
+	m.lock.Lock()
+	m.requests[uniqueRequestID] = request{Time: time.Now(), MsgType: msgType}
+	m.lock.Unlock()
+	m.benchlistMgr.RegisterQuery(chainID, validatorID, requestID, msgType)
+	return m.tm.Put(uniqueRequestID, timeoutHandler), true
 }
 
-// Cancel request timeout with the specified parameters.
-func (m *Manager) Cancel(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
-	m.benchlist.RegisterResponse(chainID, validatorID, requestID)
+// RegisterResponse registers that we received a response from [validatorID]
+// regarding the given request ID and chain.
+func (m *Manager) RegisterResponse(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
+	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
+	m.lock.Lock()
+	request, ok := m.requests[uniqueRequestID]
+	if !ok {
+		// This message is not in response to a request we made
+		// TODO add a log here
+		m.lock.Unlock()
+		return
+	}
+	delete(m.requests, uniqueRequestID)
+	latency := m.clock.Time().Sub(request.Time)
+	m.metrics.observe(chainID, request.MsgType, latency)
+	m.lock.Unlock()
+	m.benchlistMgr.RegisterResponse(chainID, validatorID, requestID)
 	m.tm.Remove(createRequestID(validatorID, chainID, requestID))
 }
 
 func createRequestID(validatorID ids.ShortID, chainID ids.ID, requestID uint32) ids.ID {
 	p := wrappers.Packer{Bytes: make([]byte, wrappers.IntLen)}
 	p.PackInt(requestID)
-
 	return hashing.ByteArraysToHash256Array(validatorID.Bytes(), chainID[:], p.Bytes)
 }

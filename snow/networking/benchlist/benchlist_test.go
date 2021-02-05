@@ -46,7 +46,6 @@ func TestBenchlist(t *testing.T) {
 		minimumFailingDuration,
 		duration,
 		maxPortion,
-		false,
 		"",
 	)
 	if err != nil {
@@ -114,7 +113,6 @@ func TestBenchlistDoesNotGetStuck(t *testing.T) {
 		minimumFailingDuration,
 		duration,
 		maxPortion,
-		false,
 		"",
 	)
 	if err != nil {
@@ -190,7 +188,6 @@ func TestBenchlistOverUnbench(t *testing.T) {
 		minimumFailingDuration,
 		duration,
 		maxPortion,
-		false,
 		"",
 	)
 	if err != nil {

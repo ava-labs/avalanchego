@@ -64,7 +64,7 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 	for _, validatorID := range sentTo {
 		vID := validatorID // Prevent overwrite in next loop iteration
 		// TODO do we need the return values here?
-		s.timeouts.Register(vID, s.ctx.ChainID, requestID, true, constants.GetAcceptedFrontierMsg, func() {
+		s.timeouts.RegisterRequest(vID, s.ctx.ChainID, requestID, true, constants.GetAcceptedFrontierMsg, func() {
 			s.router.GetAcceptedFrontierFailed(vID, s.ctx.ChainID, requestID)
 		})
 		validatorIDs.Remove(vID)
@@ -115,7 +115,7 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 	for _, validatorID := range sentTo {
 		vID := validatorID // Prevent overwrite in next loop iteration
 		// TODO do we need the return values here?
-		s.timeouts.Register(vID, s.ctx.ChainID, requestID, true, constants.GetAcceptedMsg, func() {
+		s.timeouts.RegisterRequest(vID, s.ctx.ChainID, requestID, true, constants.GetAcceptedMsg, func() {
 			s.router.GetAcceptedFailed(vID, s.ctx.ChainID, requestID)
 		})
 		validatorIDs.Remove(vID)
@@ -148,7 +148,7 @@ func (s *Sender) GetAncestors(validatorID ids.ShortID, requestID uint32, contain
 	sent := s.sender.GetAncestors(validatorID, s.ctx.ChainID, requestID, deadline, containerID)
 
 	if sent {
-		s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, false, constants.GetAncestorsMsg, func() {
+		s.timeouts.RegisterRequest(validatorID, s.ctx.ChainID, requestID, false, constants.GetAncestorsMsg, func() {
 			s.router.GetAncestorsFailed(validatorID, s.ctx.ChainID, requestID)
 		})
 		return
@@ -185,7 +185,7 @@ func (s *Sender) Get(validatorID ids.ShortID, requestID uint32, containerID ids.
 	if sent {
 		// Add a timeout -- if we don't get a response before the timeout expires,
 		// send this consensus engine a GetFailed message
-		s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, true, constants.GetMsg, func() {
+		s.timeouts.RegisterRequest(validatorID, s.ctx.ChainID, requestID, true, constants.GetMsg, func() {
 			s.router.GetFailed(validatorID, s.ctx.ChainID, requestID)
 		})
 		return
@@ -240,7 +240,7 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 	for _, validatorID := range sentTo {
 		vID := validatorID // Prevent overwrite in next loop iteration
 		// TODO do we need the return values here?
-		s.timeouts.Register(vID, s.ctx.ChainID, requestID, true, constants.PushQueryMsg, func() {
+		s.timeouts.RegisterRequest(vID, s.ctx.ChainID, requestID, true, constants.PushQueryMsg, func() {
 			s.router.QueryFailed(vID, s.ctx.ChainID, requestID)
 		})
 		validatorIDs.Remove(vID)
@@ -287,7 +287,7 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 	for _, validatorID := range sentTo {
 		vID := validatorID // Prevent overwrite in next loop iteration
 		// TODO do we need the return values here?
-		s.timeouts.Register(vID, s.ctx.ChainID, requestID, true, constants.PullQueryMsg, func() {
+		s.timeouts.RegisterRequest(vID, s.ctx.ChainID, requestID, true, constants.PullQueryMsg, func() {
 			s.router.QueryFailed(vID, s.ctx.ChainID, requestID)
 		})
 		validatorIDs.Remove(vID)

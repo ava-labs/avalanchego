@@ -169,7 +169,7 @@ func (sr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 
 	if chain, exists := sr.chains[chainID]; exists {
 		if chain.AcceptedFrontier(validatorID, requestID, containerIDs) {
-			sr.timeouts.Cancel(validatorID, chainID, requestID)
+			sr.timeouts.RegisterResponse(validatorID, chainID, requestID)
 		}
 	} else {
 		sr.log.Debug("AcceptedFrontier(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerIDs)
@@ -183,7 +183,6 @@ func (sr *ChainRouter) GetAcceptedFrontierFailed(validatorID ids.ShortID, chainI
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
-	sr.timeouts.Cancel(validatorID, chainID, requestID)
 	if chain, exists := sr.chains[chainID]; exists {
 		chain.GetAcceptedFrontierFailed(validatorID, requestID)
 	} else {
@@ -214,7 +213,7 @@ func (sr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 
 	if chain, exists := sr.chains[chainID]; exists {
 		if chain.Accepted(validatorID, requestID, containerIDs) {
-			sr.timeouts.Cancel(validatorID, chainID, requestID)
+			sr.timeouts.RegisterResponse(validatorID, chainID, requestID)
 		}
 	} else {
 		sr.log.Debug("Accepted(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerIDs)
@@ -228,7 +227,6 @@ func (sr *ChainRouter) GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
-	sr.timeouts.Cancel(validatorID, chainID, requestID)
 	if chain, exists := sr.chains[chainID]; exists {
 		chain.GetAcceptedFailed(validatorID, requestID)
 	} else {
@@ -260,7 +258,7 @@ func (sr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 	// message we set a timeout. Since we got a response, cancel the timeout.
 	if chain, exists := sr.chains[chainID]; exists {
 		if chain.MultiPut(validatorID, requestID, containers) {
-			sr.timeouts.Cancel(validatorID, chainID, requestID)
+			sr.timeouts.RegisterResponse(validatorID, chainID, requestID)
 		}
 	} else {
 		sr.log.Debug("MultiPut(%s, %s, %d, %d) dropped due to unknown chain", validatorID, chainID, requestID, len(containers))
@@ -273,7 +271,6 @@ func (sr *ChainRouter) GetAncestorsFailed(validatorID ids.ShortID, chainID ids.I
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
-	sr.timeouts.Cancel(validatorID, chainID, requestID)
 	if chain, exists := sr.chains[chainID]; exists {
 		chain.GetAncestorsFailed(validatorID, requestID)
 	} else {
@@ -306,7 +303,7 @@ func (sr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	switch {
 	case exists:
 		if chain.Put(validatorID, requestID, containerID, container) {
-			sr.timeouts.Cancel(validatorID, chainID, requestID)
+			sr.timeouts.RegisterResponse(validatorID, chainID, requestID)
 		}
 	case requestID == constants.GossipMsgRequestID:
 		sr.log.Verbo("Gossiped Put(%s, %s, %d, %s) dropped due to unknown chain. Container:",
@@ -324,7 +321,6 @@ func (sr *ChainRouter) GetFailed(validatorID ids.ShortID, chainID ids.ID, reques
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
-	sr.timeouts.Cancel(validatorID, chainID, requestID)
 	if chain, exists := sr.chains[chainID]; exists {
 		chain.GetFailed(validatorID, requestID)
 	} else {
@@ -368,7 +364,7 @@ func (sr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 	// Cancel timeout we set when sent the message asking for these Chits
 	if chain, exists := sr.chains[chainID]; exists {
 		if chain.Chits(validatorID, requestID, votes) {
-			sr.timeouts.Cancel(validatorID, chainID, requestID)
+			sr.timeouts.RegisterResponse(validatorID, chainID, requestID)
 		}
 	} else {
 		sr.log.Debug("Chits(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, votes)
@@ -381,10 +377,6 @@ func (sr *ChainRouter) QueryFailed(validatorID ids.ShortID, chainID ids.ID, requ
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
-	// Registers a failure to the benchlist instead of canceling the timeout.
-	// This allows the benchlist to register failed queries caused by [validatorID]
-	// being unreachable.
-	sr.timeouts.RegisterFailure(validatorID, chainID, requestID)
 	if chain, exists := sr.chains[chainID]; exists {
 		chain.QueryFailed(validatorID, requestID)
 	} else {

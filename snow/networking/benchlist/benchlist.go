@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -29,7 +28,7 @@ import (
 // QueryBenchlist ...
 type QueryBenchlist interface {
 	// RegisterQuery registers a sent query and returns whether the query is subject to benchlist
-	RegisterQuery(validatorID ids.ShortID, requestID uint32, msgType constants.MsgType) bool
+	RegisterQuery(validatorID ids.ShortID, requestID uint32) bool
 	// RegisterResponse registers the response to a query message
 	RegisterResponse(validatorID ids.ShortID, requstID uint32)
 	// QueryFailed registers that a query did not receive a response within our synchrony bound
@@ -76,7 +75,6 @@ type queryBenchlist struct {
 
 type pendingQuery struct {
 	registered time.Time
-	msgType    constants.MsgType
 }
 
 type failureStreak struct {
@@ -94,7 +92,6 @@ func NewQueryBenchlist(
 	minimumFailingDuration,
 	duration time.Duration,
 	maxPortion float64,
-	summaryEnabled bool,
 	namespace string,
 ) (QueryBenchlist, error) {
 	if maxPortion < 0 || maxPortion >= 1 {
@@ -114,7 +111,7 @@ func NewQueryBenchlist(
 		maxPortion:             maxPortion,
 		ctx:                    ctx,
 		metrics:                metrics,
-	}, metrics.Initialize(ctx, namespace, summaryEnabled)
+	}, metrics.Initialize(ctx, namespace)
 }
 
 // IsBenched returns true if messages to [validatorID]
@@ -145,7 +142,7 @@ func (b *queryBenchlist) isBenched(validatorID ids.ShortID) bool {
 
 // RegisterQuery attempts to register a query from [validatorID] and returns true
 // if that request should be made (not subject to benchlisting)
-func (b *queryBenchlist) RegisterQuery(validatorID ids.ShortID, requestID uint32, msgType constants.MsgType) bool {
+func (b *queryBenchlist) RegisterQuery(validatorID ids.ShortID, requestID uint32) bool {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
@@ -161,7 +158,6 @@ func (b *queryBenchlist) RegisterQuery(validatorID ids.ShortID, requestID uint32
 
 	validatorRequests[requestID] = pendingQuery{
 		registered: b.clock.Time(),
-		msgType:    msgType,
 	}
 	return true
 }
@@ -328,7 +324,7 @@ func (b *queryBenchlist) removeQuery(validatorID ids.ShortID, requestID uint32) 
 		return false
 	}
 
-	query, ok := validatorRequests[requestID]
+	_, ok = validatorRequests[requestID]
 	if !ok {
 		return false
 	}
@@ -337,6 +333,5 @@ func (b *queryBenchlist) removeQuery(validatorID ids.ShortID, requestID uint32) 
 	if len(validatorRequests) == 0 {
 		delete(b.pendingQueries, validatorID)
 	}
-	b.metrics.observe(validatorID, query.msgType, b.clock.Time().Sub(query.registered))
 	return true
 }
