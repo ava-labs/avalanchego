@@ -198,6 +198,10 @@ type worker struct {
 	manualUncle    bool
 	disableUncle   bool
 	minerCallbacks *MinerCallbacks
+
+	// preferenceBlock is the block we should attempt to build future
+	// blocks on. This block may not yet be accepted.
+	preferenceBlock *types.Block
 }
 
 func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Block) bool, init bool, mcb *MinerCallbacks) *worker {
@@ -254,6 +258,13 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		worker.startCh <- struct{}{}
 	}
 	return worker
+}
+
+func (w *worker) setPreference(block *types.Block) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	w.preferenceBlock = block
 }
 
 // setEtherbase sets the etherbase used to initialize the block coinbase field.
@@ -907,7 +918,15 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	defer w.mu.RUnlock()
 
 	tstart := time.Now()
-	parent := w.chain.CurrentBlock()
+	parent := w.preferenceBlock
+	if parent == nil {
+		// We should never have a nil preference as it is
+		// always initialized to be the last accepted block
+		// on startup. We are keeping this logic here to
+		// guard against a regression to this invariant.
+		log.Error("block preference not set")
+		return
+	}
 
 	if parent.Time() >= uint64(timestamp) {
 		//timestamp = int64(parent.Time() + 1)
