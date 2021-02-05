@@ -47,7 +47,7 @@ type benchlist struct {
 	// Validator set of the network
 	vdrs validators.Set
 	// Validator ID --> Consecutive failure information
-	consecutiveFailures map[ids.ShortID]failureStreak
+	failureStreaks map[ids.ShortID]failureStreak
 
 	// Validator ID --> Time they are benched until
 	// If a validator is not benched, their ID is not a key in this map
@@ -91,7 +91,7 @@ func NewBenchlist(
 		return nil, fmt.Errorf("max portion of benched stake must be in [0,1) but got %f", maxPortion)
 	}
 	benchlist := &benchlist{
-		consecutiveFailures:    make(map[ids.ShortID]failureStreak),
+		failureStreaks:         make(map[ids.ShortID]failureStreak),
 		benchlistTimes:         make(map[ids.ShortID]time.Time),
 		benchlistOrder:         list.New(),
 		benchlistSet:           ids.ShortSet{},
@@ -133,23 +133,23 @@ func (b *benchlist) isBenched(validatorID ids.ShortID) bool {
 // RegisterResponse notes that we received a response from validator [validatorID]
 func (b *benchlist) RegisterResponse(validatorID ids.ShortID) {
 	b.lock.Lock()
-	delete(b.consecutiveFailures, validatorID)
+	delete(b.failureStreaks, validatorID)
 	b.lock.Unlock()
 }
 
 // RegisterResponse notes that a request to validator [validatorID] timed out
 func (b *benchlist) RegisterFailure(validatorID ids.ShortID) {
 	b.lock.Lock()
-	consecutiveFailures := b.consecutiveFailures[validatorID]
-	consecutiveFailures.consecutive++
-	if consecutiveFailures.firstFailure.IsZero() {
+	failureStreak := b.failureStreaks[validatorID]
+	failureStreak.consecutive++
+	if failureStreak.firstFailure.IsZero() {
 		// This is the first consecutive failure
-		consecutiveFailures.firstFailure = b.clock.Time()
+		failureStreak.firstFailure = b.clock.Time()
 	}
-	b.consecutiveFailures[validatorID] = consecutiveFailures
+	b.failureStreaks[validatorID] = failureStreak
 
 	now := b.clock.Time()
-	if consecutiveFailures.consecutive >= b.threshold && now.After(consecutiveFailures.firstFailure.Add(b.minimumFailingDuration)) {
+	if failureStreak.consecutive >= b.threshold && now.After(failureStreak.firstFailure.Add(b.minimumFailingDuration)) {
 		b.bench(validatorID)
 	}
 
@@ -187,7 +187,7 @@ func (b *benchlist) bench(validatorID ids.ShortID) {
 	b.benchlistTimes[validatorID] = randomizedEndTime
 	b.benchlistOrder.PushBack(validatorID)
 	b.benchlistSet.Add(validatorID)
-	delete(b.consecutiveFailures, validatorID)
+	delete(b.failureStreaks, validatorID)
 	b.log.Debug(
 		"benching validator %s after %d consecutive failed queries for %s",
 		validatorID,
@@ -266,7 +266,7 @@ func (b *benchlist) cleanup() {
 }
 
 func (b *benchlist) reset() {
-	b.consecutiveFailures = make(map[ids.ShortID]failureStreak)
+	b.failureStreaks = make(map[ids.ShortID]failureStreak)
 	b.benchlistTimes = make(map[ids.ShortID]time.Time)
 	b.benchlistOrder.Init()
 	b.benchlistSet.Clear()
