@@ -7,20 +7,14 @@ import (
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/ava-labs/avalanchego/snow"
 )
 
 type metrics struct {
-	ctx           *snow.Context
-	numBenched    prometheus.Gauge
-	weightBenched prometheus.Gauge
+	numBenched, weightBenched prometheus.Gauge
 }
 
 // Initialize implements the Engine interface
-func (m *metrics) Initialize(ctx *snow.Context, namespace string) error {
-	m.ctx = ctx
-
+func (m *metrics) Initialize(registerer prometheus.Registerer, namespace string) error {
 	benchNamespace := fmt.Sprintf("%s_benchlist", namespace)
 
 	m.numBenched = prometheus.NewGauge(prometheus.GaugeOpts{
@@ -28,7 +22,7 @@ func (m *metrics) Initialize(ctx *snow.Context, namespace string) error {
 		Name:      "benched_num",
 		Help:      "Number of currently benched validators",
 	})
-	if err := ctx.Metrics.Register(m.numBenched); err != nil {
+	if err := registerer.Register(m.numBenched); err != nil {
 		return fmt.Errorf("failed to register num benched statistics due to %w", err)
 	}
 
@@ -37,7 +31,7 @@ func (m *metrics) Initialize(ctx *snow.Context, namespace string) error {
 		Name:      "benched_weight",
 		Help:      "Weight of currently benched validators",
 	})
-	if err := ctx.Metrics.Register(m.weightBenched); err != nil {
+	if err := registerer.Register(m.weightBenched); err != nil {
 		return fmt.Errorf("failed to register weight benched statistics due to %w", err)
 	}
 

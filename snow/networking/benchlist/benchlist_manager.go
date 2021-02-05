@@ -8,7 +8,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 var (
@@ -20,14 +19,14 @@ var (
 // consistently failing queries on a benchlist to prevent waiting up to
 // the full network timeout for their responses.
 type Manager interface {
-	// RegisterQuery registers a sent query and returns whether the query is subject to benchlist
-	RegisterQuery(ids.ID, ids.ShortID, uint32, constants.MsgType) bool
-	// RegisterResponse registers the response to a query message
-	RegisterResponse(ids.ID, ids.ShortID, uint32)
-	// QueryFailed registers that a query did not receive a response within our synchrony bound
-	QueryFailed(ids.ID, ids.ShortID, uint32)
-	// RegisterChain registers a new chain with metrics under [namespac]
-	RegisterChain(*snow.Context, string) error
+	// RegisterResponse registers that we receive a request response from [validatorID]
+	// regarding [chainID] within the timeout
+	RegisterResponse(chainID ids.ID, validatorID ids.ShortID)
+	// RegisterFailure registers that a request to [validatorID] regarding
+	// [chainID] timed out
+	RegisterFailure(chainID ids.ID, validatorID ids.ShortID)
+	// RegisterChain registers a new chain with metrics under [namespace]
+	RegisterChain(ctx *snow.Context, namespace string) error
 	// IsBenched returns true if messages to [validatorID] regarding chain [chainID]
 	// should not be sent over the network and should immediately fail.
 	// Returns false if such messages should be sent, or if the chain is unknown.
@@ -44,10 +43,10 @@ type Config struct {
 	PeerSummaryEnabled     bool
 }
 
-type benchlistManager struct {
+type manager struct {
 	config *Config
 	// Chain ID --> benchlist for that chain
-	chainBenchlists map[ids.ID]QueryBenchlist
+	chainBenchlists map[ids.ID]Benchlist
 
 	lock sync.RWMutex
 }
@@ -59,97 +58,79 @@ func NewManager(config *Config) Manager {
 	if config.MaxPortion <= 0 {
 		return NewNoBenchlist()
 	}
-	return &benchlistManager{
+	return &manager{
 		config:          config,
-		chainBenchlists: make(map[ids.ID]QueryBenchlist),
+		chainBenchlists: make(map[ids.ID]Benchlist),
 	}
 }
 
 // IsBenched returns true if messages to [validatorID] regarding [chainID]
 // should not be sent over the network and should immediately fail.
-func (bm *benchlistManager) IsBenched(validatorID ids.ShortID, chainID ids.ID) bool {
-	bm.lock.Lock()
-	chain, exists := bm.chainBenchlists[chainID]
+func (m *manager) IsBenched(validatorID ids.ShortID, chainID ids.ID) bool {
+	m.lock.Lock()
+	chain, exists := m.chainBenchlists[chainID]
 	if !exists {
 		return false
 	}
 	isBenched := chain.IsBenched(validatorID)
-	bm.lock.Unlock()
+	m.lock.Unlock()
 	return isBenched
 }
 
-func (bm *benchlistManager) RegisterChain(ctx *snow.Context, namespace string) error {
-	bm.lock.Lock()
-	defer bm.lock.Unlock()
+func (m *manager) RegisterChain(ctx *snow.Context, namespace string) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
-	if _, exists := bm.chainBenchlists[ctx.ChainID]; exists {
+	if _, exists := m.chainBenchlists[ctx.ChainID]; exists {
 		return nil
 	}
 
-	vdrs, ok := bm.config.Validators.GetValidators(ctx.SubnetID)
+	vdrs, ok := m.config.Validators.GetValidators(ctx.SubnetID)
 	if !ok {
 		return errUnknownValidators
 	}
 
-	benchlist, err := NewQueryBenchlist(
+	benchlist, err := NewBenchlist(
 		vdrs,
 		ctx,
-		bm.config.Threshold,
-		bm.config.MinimumFailingDuration,
-		bm.config.Duration,
-		bm.config.MaxPortion,
+		m.config.Threshold,
+		m.config.MinimumFailingDuration,
+		m.config.Duration,
+		m.config.MaxPortion,
 		namespace,
 	)
 	if err != nil {
 		return err
 	}
 
-	bm.chainBenchlists[ctx.ChainID] = benchlist
+	m.chainBenchlists[ctx.ChainID] = benchlist
 	return nil
 }
 
-// RegisterQuery implements the Manager interface
-func (bm *benchlistManager) RegisterQuery(
-	chainID ids.ID,
-	validatorID ids.ShortID,
-	requestID uint32,
-	msgType constants.MsgType,
-) bool {
-	bm.lock.RLock()
-	defer bm.lock.RUnlock()
-
-	chain, exists := bm.chainBenchlists[chainID]
-	if !exists {
-		return false
-	}
-
-	return chain.RegisterQuery(validatorID, requestID)
-}
-
 // RegisterResponse implements the Manager interface
-func (bm *benchlistManager) RegisterResponse(chainID ids.ID, validatorID ids.ShortID, requestID uint32) {
-	bm.lock.RLock()
-	defer bm.lock.RUnlock()
+func (m *manager) RegisterResponse(chainID ids.ID, validatorID ids.ShortID) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
-	chain, exists := bm.chainBenchlists[chainID]
+	chain, exists := m.chainBenchlists[chainID]
 	if !exists {
 		return
 	}
 
-	chain.RegisterResponse(validatorID, requestID)
+	chain.RegisterResponse(validatorID)
 }
 
-// QueryFailed implements the Manager interface
-func (bm *benchlistManager) QueryFailed(chainID ids.ID, validatorID ids.ShortID, requestID uint32) {
-	bm.lock.RLock()
-	defer bm.lock.RUnlock()
+// RegisterFailure implements the Manager interface
+func (m *manager) RegisterFailure(chainID ids.ID, validatorID ids.ShortID) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
-	chain, exists := bm.chainBenchlists[chainID]
+	chain, exists := m.chainBenchlists[chainID]
 	if !exists {
 		return
 	}
 
-	chain.QueryFailed(validatorID, requestID)
+	chain.RegisterFailure(validatorID)
 }
 
 type noBenchlist struct{}
@@ -157,8 +138,7 @@ type noBenchlist struct{}
 // NewNoBenchlist returns an empty benchlist that will never stop any queries
 func NewNoBenchlist() Manager { return &noBenchlist{} }
 
-func (noBenchlist) RegisterChain(*snow.Context, string) error                         { return nil }
-func (noBenchlist) RegisterQuery(ids.ID, ids.ShortID, uint32, constants.MsgType) bool { return false }
-func (noBenchlist) RegisterResponse(ids.ID, ids.ShortID, uint32)                      {}
-func (noBenchlist) QueryFailed(ids.ID, ids.ShortID, uint32)                           {}
-func (noBenchlist) IsBenched(ids.ShortID, ids.ID) bool                                { return false }
+func (noBenchlist) RegisterChain(*snow.Context, string) error { return nil }
+func (noBenchlist) RegisterResponse(ids.ID, ids.ShortID)      {}
+func (noBenchlist) RegisterFailure(ids.ID, ids.ShortID)       {}
+func (noBenchlist) IsBenched(ids.ShortID, ids.ID) bool        { return false }

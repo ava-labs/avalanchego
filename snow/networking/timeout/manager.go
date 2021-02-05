@@ -86,10 +86,9 @@ func (m *Manager) RegisterRequest(
 	m.lock.Lock()
 	m.requests[uniqueRequestID] = request{Time: time.Now(), MsgType: msgType}
 	m.lock.Unlock()
-	m.benchlistMgr.RegisterQuery(chainID, validatorID, requestID, msgType)
 	newTimeoutHandler := func() {
 		// If this request timed out, tell the benchlist manager
-		m.benchlistMgr.QueryFailed(chainID, validatorID, requestID)
+		m.benchlistMgr.RegisterFailure(chainID, validatorID)
 		timeoutHandler()
 	}
 	return m.tm.Put(uniqueRequestID, newTimeoutHandler), true
@@ -111,7 +110,7 @@ func (m *Manager) RegisterResponse(validatorID ids.ShortID, chainID ids.ID, requ
 	latency := m.clock.Time().Sub(request.Time)
 	m.metrics.observe(chainID, request.MsgType, latency)
 	m.lock.Unlock()
-	m.benchlistMgr.RegisterResponse(chainID, validatorID, requestID)
+	m.benchlistMgr.RegisterResponse(chainID, validatorID)
 	m.tm.Remove(createRequestID(validatorID, chainID, requestID))
 }
 
