@@ -64,7 +64,7 @@ var (
 var (
 	lastAcceptedKey = []byte("snowman_lastAccepted")
 	acceptedPrefix  = []byte("snowman_accepted")
-	repairedKey     = []byte("repaired")
+	repairedKey     = []byte("repair_chain")
 )
 
 const (
