@@ -2,6 +2,7 @@ package benchlist
 
 import (
 	"container/list"
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -39,30 +40,38 @@ type QueryBenchlist interface {
 }
 
 type queryBenchlist struct {
+	lock    sync.Mutex
+	ctx     *snow.Context
+	metrics *metrics
+	// Tells the time. Can be faked for testing.
+	clock timer.Clock
+
+	// Validator set of the network
 	vdrs validators.Set
 	// Validator ID --> Request ID --> non-empty iff
 	// there is an outstanding request to this validator
 	// with the corresponding requestID
 	pendingQueries map[ids.ShortID]map[uint32]pendingQuery
-	// Map of consecutive query failures
+	// Validator ID --> Consecutive failure information
 	consecutiveFailures map[ids.ShortID]failureStreak
 
-	// Maintain benchlist
+	// Validator ID --> Time they are benched until
+	// If a validator is not benched, their ID is not a key in this map
 	benchlistTimes map[ids.ShortID]time.Time
 	benchlistOrder *list.List
-	benchlistSet   ids.ShortSet
+	// IDs of validators that are currently benched
+	benchlistSet ids.ShortSet
 
+	// A validator will be benched if [threshold] messages in a row
+	// to them time out and the first of those messages was more than
+	// [minimumFailingDuration] ago
 	threshold              int
 	minimumFailingDuration time.Duration
-	duration               time.Duration
-	maxPortion             float64
-
-	clock timer.Clock
-
-	metrics *metrics
-	ctx     *snow.Context
-
-	lock sync.Mutex
+	// A benched validator will be benched for between [duration/2] and [duration]
+	duration time.Duration
+	// The maximum percentage of total network stake that may be benched
+	// Must be in [0,1)
+	maxPortion float64
 }
 
 type pendingQuery struct {
@@ -71,8 +80,10 @@ type pendingQuery struct {
 }
 
 type failureStreak struct {
+	// Time of first consecutive timeout
 	firstFailure time.Time
-	consecutive  int
+	// Number of consecutive message timeouts
+	consecutive int
 }
 
 // NewQueryBenchlist ...
@@ -86,6 +97,9 @@ func NewQueryBenchlist(
 	summaryEnabled bool,
 	namespace string,
 ) (QueryBenchlist, error) {
+	if maxPortion < 0 || maxPortion >= 1 {
+		return nil, fmt.Errorf("max portion of benched stake must be in [0,1) but got %f", maxPortion)
+	}
 	metrics := &metrics{}
 	return &queryBenchlist{
 		pendingQueries:         make(map[ids.ShortID]map[uint32]pendingQuery),
@@ -240,7 +254,7 @@ func (b *queryBenchlist) cleanup() {
 	currentWeight, err := b.vdrs.SubsetWeight(b.benchlistSet)
 	if err != nil {
 		// Add log for this, should never happen
-		b.ctx.Log.Error("failed to calculate subset weight due to: %s... Resetting benchlist", err)
+		b.ctx.Log.Error("failed to calculate subset weight due to: %w. Resetting benchlist", err)
 		b.reset()
 		return
 	}
@@ -270,7 +284,7 @@ func (b *queryBenchlist) cleanup() {
 		if ok {
 			newWeight, err := safemath.Sub64(updatedWeight, removeWeight)
 			if err != nil {
-				b.ctx.Log.Error("failed to calculate new subset weight due to: %s... Resetting benchlist", err)
+				b.ctx.Log.Error("failed to calculate new subset weight due to: %w. Resetting benchlist", err)
 				b.reset()
 				return
 			}
