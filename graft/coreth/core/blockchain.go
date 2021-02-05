@@ -913,41 +913,46 @@ func (bc *BlockChain) WriteCanonicalFromCurrentBlock() error {
 	batch := bc.db.NewBatch()
 	log.Info("writing canonical chain from current block", "hash", current.Hash().String(), "number", current.NumberU64())
 
-	for current.Hash() != bc.genesisBlock.Hash() {
+	for ; current.Hash() != bc.genesisBlock.Hash(); current = bc.GetBlockByHash(current.ParentHash()) {
+		if current == nil {
+			return fmt.Errorf("failed to get parent of block %s, with parent hash %s", current.Hash().String(), current.ParentHash().String())
+		}
+
 		blkNumber := current.NumberU64()
 		canonicalBlk := bc.GetBlockByNumber(blkNumber)
 		if canonicalBlk == nil {
 			return fmt.Errorf("failed to get block by number at height: %d", blkNumber)
 		}
 		if canonicalBlk.Hash() == current.Hash() {
-			parent := bc.GetBlockByHash(current.ParentHash())
-			if parent == nil {
-				return fmt.Errorf("failed to get parent of block %s, with parent hash %s", current.Hash().String(), current.ParentHash().String())
-			}
-			current = parent
 			continue
 		}
 
 		// If the canonical blockhash at [blkNumber] is incorrect
 		// repair it here.
+		log.Debug("repairing block", "hash", current.Hash().String(), "height", blkNumber)
+
 		rawdb.WriteCanonicalHash(batch, current.Hash(), current.NumberU64())
 		rawdb.WriteTxLookupEntriesByBlock(batch, current)
 		currentSize += 1
 		if currentSize >= repairBlockBatchSize {
+			totalUpdates += currentSize
+			log.Debug("writing repair batch", "totalUpdates", totalUpdates, "size", currentSize)
+			currentSize = 0
+
 			bc.chainmu.Lock()
 			// Flush the whole batch into the disk, exit the node if failed
 			if err := batch.Write(); err != nil {
 				bc.chainmu.Unlock()
-				return fmt.Errorf("failed to write batch with size %d at current block height %d: %s", currentSize, current.NumberU64(), err)
+				return fmt.Errorf("failed to write batch with size %d at current block height %d: %s", currentSize, blkNumber, err)
 			}
 			bc.chainmu.Unlock()
-			totalUpdates += currentSize
-			currentSize = 0
-			log.Info("canonical chain update", "currentBlock", current.NumberU64(), "totalUpdates", totalUpdates)
 		}
 	}
 
 	if currentSize > 0 {
+		totalUpdates += currentSize
+		log.Debug("writing repair batch", "totalUpdates", totalUpdates, "size", currentSize)
+
 		bc.chainmu.Lock()
 		// Flush the whole batch into the disk, exit the node if failed
 		if err := batch.Write(); err != nil {
@@ -955,9 +960,8 @@ func (bc *BlockChain) WriteCanonicalFromCurrentBlock() error {
 			log.Crit("Failed to update chain indexes and markers", "err", err)
 		}
 		bc.chainmu.Unlock()
-		totalUpdates += currentSize
-		log.Info("canonical chain update", "totalUpdates", totalUpdates)
 	}
+	log.Info("finished repairs", "totalUpdates", totalUpdates)
 
 	return nil
 }
