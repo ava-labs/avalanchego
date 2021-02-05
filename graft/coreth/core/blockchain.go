@@ -91,7 +91,7 @@ const (
 	maxTimeFutureBlocks  = 30
 	badBlockLimit        = 10
 	TriesInMemory        = 128
-	repairBlockBatchSize = 10
+	repairBlockBatchSize = 100
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	//
@@ -919,16 +919,6 @@ func (bc *BlockChain) WriteCanonicalFromCurrentBlock() error {
 		}
 
 		blkNumber := current.NumberU64()
-		canonicalBlk := bc.GetBlockByNumber(blkNumber)
-		if canonicalBlk == nil {
-			return fmt.Errorf("failed to get block by number at height: %d", blkNumber)
-		}
-		if canonicalBlk.Hash() == current.Hash() {
-			continue
-		}
-
-		// If the canonical blockhash at [blkNumber] is incorrect
-		// repair it here.
 		log.Debug("repairing block", "hash", current.Hash().String(), "height", blkNumber)
 
 		rawdb.WriteCanonicalHash(batch, current.Hash(), current.NumberU64())
