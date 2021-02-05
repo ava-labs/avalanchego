@@ -955,6 +955,8 @@ func (bc *BlockChain) WriteCanonicalFromCurrentBlock() error {
 			log.Crit("Failed to update chain indexes and markers", "err", err)
 		}
 		bc.chainmu.Unlock()
+		totalUpdates += currentSize
+		log.Info("canonical chain update", "totalUpdates", totalUpdates)
 	}
 
 	return nil
