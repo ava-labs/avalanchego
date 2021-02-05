@@ -87,7 +87,12 @@ func (m *Manager) RegisterRequest(
 	m.requests[uniqueRequestID] = request{Time: time.Now(), MsgType: msgType}
 	m.lock.Unlock()
 	m.benchlistMgr.RegisterQuery(chainID, validatorID, requestID, msgType)
-	return m.tm.Put(uniqueRequestID, timeoutHandler), true
+	newTimeoutHandler := func() {
+		// If this request timed out, tell the benchlist manager
+		m.benchlistMgr.QueryFailed(chainID, validatorID, requestID)
+		timeoutHandler()
+	}
+	return m.tm.Put(uniqueRequestID, newTimeoutHandler), true
 }
 
 // RegisterResponse registers that we received a response from [validatorID]
