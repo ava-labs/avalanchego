@@ -91,7 +91,7 @@ const (
 	maxTimeFutureBlocks  = 30
 	badBlockLimit        = 10
 	TriesInMemory        = 128
-	repairBlockBatchSize = 100
+	repairBlockBatchSize = 10
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	//
@@ -860,6 +860,9 @@ func (bc *BlockChain) GetBlockByNumber(number uint64) *types.Block {
 
 func (bc *BlockChain) ValidateCanonicalChain() error {
 	current := bc.CurrentBlock()
+	i := 0
+	log.Info("Beginning to validate canonical chain", "startBlock", current.NumberU64())
+
 	for current.Hash() != bc.genesisBlock.Hash() {
 		blkByHash := bc.GetBlockByHash(current.Hash())
 		if blkByHash == nil {
@@ -895,6 +898,11 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 			}
 		}
 
+		i += 1
+		if i%1000 == 0 {
+			log.Info("Validate Canonical Chain Update", "totalBlocks", i)
+		}
+
 		current = bc.GetBlockByHash(current.ParentHash())
 	}
 
@@ -927,7 +935,6 @@ func (bc *BlockChain) WriteCanonicalFromCurrentBlock() error {
 		if currentSize >= repairBlockBatchSize {
 			totalUpdates += currentSize
 			log.Debug("writing repair batch", "totalUpdates", totalUpdates, "size", currentSize)
-			currentSize = 0
 
 			bc.chainmu.Lock()
 			// Flush the whole batch into the disk, exit the node if failed
@@ -936,6 +943,7 @@ func (bc *BlockChain) WriteCanonicalFromCurrentBlock() error {
 				return fmt.Errorf("failed to write batch with size %d at current block height %d: %s", currentSize, blkNumber, err)
 			}
 			bc.chainmu.Unlock()
+			currentSize = 0
 		}
 	}
 

@@ -64,7 +64,7 @@ var (
 var (
 	lastAcceptedKey = []byte("snowman_lastAccepted")
 	acceptedPrefix  = []byte("snowman_accepted")
-	repairedKey     = []byte("repair_chain")
+	repairedKey     = []byte("chain_repaired")
 )
 
 const (
@@ -445,19 +445,21 @@ func (vm *VM) repairCanonicalChain() error {
 		return nil
 	}
 
-	go func() {
-		start := time.Now()
-		log.Info("starting to repair canonical chain", "startTime", start)
-		err := vm.chain.WriteCanonicalFromCurrentBlock()
-		if err != nil {
-			log.Error("failed to repair canonical chain", "error", err, "timeElapsed", time.Since(start))
-			return
-		}
-		log.Info("finished repairing canonical chain", "timeElapsed", time.Since(start))
-		if err := vm.db.Put(repairedKey, []byte("finished")); err != nil {
-			log.Error("failed to mark flag for canonical chain repaired", "error", err)
-		}
-	}()
+	start := time.Now()
+	log.Info("starting to repair canonical chain", "startTime", start)
+
+	if err := vm.chain.WriteCanonicalFromCurrentBlock(); err != nil {
+		return fmt.Errorf("failed to repair canonical chain after %v due to: %w", time.Since(start), err)
+	}
+	log.Info("finished repairing canonical chain", "timeElapsed", time.Since(start))
+	if err := vm.db.Put(repairedKey, []byte("finished")); err != nil {
+		return fmt.Errorf("failed to mark flag for canonical chain repaired due to: %w", err)
+	}
+	// TODO at this point, we should be in a valid state, so it may be alright to make this
+	// async
+	if err := vm.chain.ValidateCanonicalChain(); err != nil {
+		return fmt.Errorf("failed to validate canonical chain due to: %w", err)
+	}
 
 	return nil
 }
@@ -470,6 +472,9 @@ func (vm *VM) Bootstrapping() error { return vm.fx.Bootstrapping() }
 // bootstrapping
 func (vm *VM) Bootstrapped() error {
 	vm.ctx.Bootstrapped()
+	if err := vm.repairCanonicalChain(); err != nil {
+		return err
+	}
 	return vm.fx.Bootstrapped()
 }
 
