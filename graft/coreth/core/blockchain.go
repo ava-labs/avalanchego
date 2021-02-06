@@ -902,6 +902,17 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 		if blkReceipts.Len() != len(txs) {
 			return fmt.Errorf("found %d transaction receipts, expected %d", blkReceipts.Len(), len(txs))
 		}
+		for index, txReceipt := range blkReceipts {
+			if txReceipt.TxHash != txs[index].Hash() {
+				return fmt.Errorf("transaction receipt mismatch, expected %s, but found: %s", txs[index].Hash(), txReceipt.TxHash)
+			}
+			if txReceipt.BlockHash != current.Hash() {
+				return fmt.Errorf("transaction receipt had block hash %s, but expected %s", txReceipt.BlockHash, current.Hash())
+			}
+			if txReceipt.BlockNumber.Uint64() != current.NumberU64() {
+				return fmt.Errorf("transaction receipt had block number %d, but expected %d", txReceipt.BlockNumber.Uint64(), current.NumberU64())
+			}
+		}
 
 		i += 1
 		if i%1000 == 0 {
