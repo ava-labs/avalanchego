@@ -195,10 +195,11 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 	// Don't bother with the execution if there's no code.
 	if len(contract.Code) == 0 {
 		if in.cfg.Debug {
-			// Even if we've done nothing, we need to invoke CaptureState here because the
-			// tracer relies on StateDB being populated. If a transaction contains
-			// a lone empty contract deployment and we don't set CaptureState here, the
-			// tracer could panic.
+			// Even if there's nothing to execute, we need to invoke CaptureState here because the
+			// tracer assumes StateDB is populated when GetResult is invoked.
+			//
+			// If a transaction only contains an contract deployment with no code and we don't set CaptureState here, the
+			// tracer will panic if any db-related methods are invoked.
 			in.cfg.Tracer.CaptureState(in.evm, pcCopy, op, gasCopy, cost, mem, stack, returns, in.returnData, contract, in.evm.depth, nil)
 		}
 		return nil, nil
