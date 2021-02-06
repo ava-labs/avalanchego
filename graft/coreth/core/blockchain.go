@@ -898,12 +898,21 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 			}
 		}
 
+		blkReceipts := bc.GetReceiptsByHash(current.Hash())
+		if blkReceipts.Len() != len(txs) {
+			return fmt.Errorf("found %d transaction receipts, expected %d", blkReceipts.Len(), len(txs))
+		}
+
 		i += 1
 		if i%1000 == 0 {
 			log.Info("Validate Canonical Chain Update", "totalBlocks", i)
 		}
 
-		current = bc.GetBlockByHash(current.ParentHash())
+		parent := bc.GetBlockByHash(current.ParentHash())
+		if parent.Hash() != current.ParentHash() {
+			return fmt.Errorf("getBlockByHash retrieved parent block with incorrect hash, found %s, expected: %s", parent.Hash(), current.ParentHash())
+		}
+		current = parent
 	}
 
 	return nil
