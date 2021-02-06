@@ -210,25 +210,7 @@ func (dw *dbWrapper) pushObject(vm *duktape.Context) {
 
 	// Push the wrapper for statedb.GetCode
 	vm.PushGoFunction(func(ctx *duktape.Context) int {
-		var code []byte
-		if dw.db != nil {
-			// When a transaction deploys an empty contract, dw.db will
-			// be nil when querying its code.
-			code = dw.db.GetCode(common.BytesToAddress(popSlice(ctx)))
-		}
-
-		// TODO: do we need to check for nil db on other calls here to protect
-		// against other scripts.
-
-		// TODO: make sure for empty contracts, we populate nil here
-
-		// TODO: try again on fresh box -> fixed this
-
-		// TODO: will selfdestruct on contract with no code access
-		// other db?
-
-		// TODO: why does memory stay around when we exit?
-
+		code := dw.db.GetCode(common.BytesToAddress(popSlice(ctx)))
 		ptr := ctx.PushFixedBuffer(len(code))
 		copy(makeSlice(ptr, uint(len(code))), code)
 		return 1

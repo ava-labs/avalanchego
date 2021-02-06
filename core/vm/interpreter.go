@@ -169,11 +169,6 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 	// as every returning call will return new data anyway.
 	in.returnData = nil
 
-	// Don't bother with the execution if there's no code.
-	if len(contract.Code) == 0 {
-		return nil, nil
-	}
-
 	var (
 		op          OpCode             // current opcode
 		mem         = NewMemory()      // bound memory
@@ -196,6 +191,19 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		logged  bool   // deferred Tracer should ignore already logged steps
 		res     []byte // result of the opcode execution function
 	)
+
+	// Don't bother with the execution if there's no code.
+	if len(contract.Code) == 0 {
+		if in.cfg.Debug {
+			// Even if we've done nothing, we need to invoke CaptureState here because the
+			// tracer relies on StateDB being populated. If a transaction contains
+			// a lone empty contract deployment and we don't set CaptureState here, the
+			// tracer could panic.
+			in.cfg.Tracer.CaptureState(in.evm, pcCopy, op, gasCopy, cost, mem, stack, returns, in.returnData, contract, in.evm.depth, nil)
+		}
+		return nil, nil
+	}
+
 	// Don't move this deferrred function, it's placed before the capturestate-deferred method,
 	// so that it get's executed _after_: the capturestate needs the stacks before
 	// they are returned to the pools
