@@ -420,6 +420,9 @@ func (vm *VM) Initialize(
 	vm.shutdownWg.Add(1)
 	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
 	vm.codec = Codec
+	if err := vm.repairCanonicalChain(); err != nil {
+		log.Error("failed to repair canonical chain", "error", err)
+	}
 
 	// The Codec explicitly registers the types it requires from the secp256k1fx
 	// so [vm.baseCodec] is a dummy codec use to fulfill the secp256k1fx VM
@@ -452,8 +455,6 @@ func (vm *VM) repairCanonicalChain() error {
 	if err := vm.db.Put(repairedKey, []byte("finished")); err != nil {
 		return fmt.Errorf("failed to mark flag for canonical chain repaired due to: %w", err)
 	}
-	// TODO at this point, we should be in a valid state, so it may be alright to make this
-	// async
 	if err := vm.chain.ValidateCanonicalChain(); err != nil {
 		return fmt.Errorf("failed to validate canonical chain due to: %w", err)
 	}
@@ -469,9 +470,6 @@ func (vm *VM) Bootstrapping() error { return vm.fx.Bootstrapping() }
 // bootstrapping
 func (vm *VM) Bootstrapped() error {
 	vm.ctx.Bootstrapped()
-	if err := vm.repairCanonicalChain(); err != nil {
-		log.Error("failed to repair canonical chain", "error", err)
-	}
 	return vm.fx.Bootstrapped()
 }
 
