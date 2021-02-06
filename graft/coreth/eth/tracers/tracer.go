@@ -211,6 +211,7 @@ func (dw *dbWrapper) pushObject(vm *duktape.Context) {
 	// Push the wrapper for statedb.GetCode
 	vm.PushGoFunction(func(ctx *duktape.Context) int {
 		code := dw.db.GetCode(common.BytesToAddress(popSlice(ctx)))
+
 		ptr := ctx.PushFixedBuffer(len(code))
 		copy(makeSlice(ptr, uint(len(code))), code)
 		return 1
