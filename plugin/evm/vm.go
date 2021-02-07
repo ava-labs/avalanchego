@@ -448,6 +448,9 @@ func (vm *VM) repairCanonicalChain() error {
 	start := time.Now()
 	log.Info("starting to repair canonical chain", "startTime", start)
 
+	if err := vm.chain.SetTail(vm.lastAccepted.ethBlock.Hash()); err != nil {
+		return fmt.Errorf("failed to set tail to the last accepted block: %w", err)
+	}
 	if err := vm.chain.WriteCanonicalFromCurrentBlock(); err != nil {
 		return fmt.Errorf("failed to repair canonical chain after %v due to: %w", time.Since(start), err)
 	}
