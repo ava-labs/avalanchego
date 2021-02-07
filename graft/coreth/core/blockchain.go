@@ -860,6 +860,9 @@ func (bc *BlockChain) GetBlockByNumber(number uint64) *types.Block {
 
 func (bc *BlockChain) ValidateCanonicalChain() error {
 	current := bc.CurrentBlock()
+	i := 0
+	log.Info("Beginning to validate canonical chain", "startBlock", current.NumberU64())
+
 	for current.Hash() != bc.genesisBlock.Hash() {
 		blkByHash := bc.GetBlockByHash(current.Hash())
 		if blkByHash == nil {
@@ -895,7 +898,32 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 			}
 		}
 
-		current = bc.GetBlockByHash(current.ParentHash())
+		blkReceipts := bc.GetReceiptsByHash(current.Hash())
+		if blkReceipts.Len() != len(txs) {
+			return fmt.Errorf("found %d transaction receipts, expected %d", blkReceipts.Len(), len(txs))
+		}
+		for index, txReceipt := range blkReceipts {
+			if txReceipt.TxHash != txs[index].Hash() {
+				return fmt.Errorf("transaction receipt mismatch, expected %s, but found: %s", txs[index].Hash(), txReceipt.TxHash)
+			}
+			if txReceipt.BlockHash != current.Hash() {
+				return fmt.Errorf("transaction receipt had block hash %s, but expected %s", txReceipt.BlockHash, current.Hash())
+			}
+			if txReceipt.BlockNumber.Uint64() != current.NumberU64() {
+				return fmt.Errorf("transaction receipt had block number %d, but expected %d", txReceipt.BlockNumber.Uint64(), current.NumberU64())
+			}
+		}
+
+		i += 1
+		if i%1000 == 0 {
+			log.Info("Validate Canonical Chain Update", "totalBlocks", i)
+		}
+
+		parent := bc.GetBlockByHash(current.ParentHash())
+		if parent.Hash() != current.ParentHash() {
+			return fmt.Errorf("getBlockByHash retrieved parent block with incorrect hash, found %s, expected: %s", parent.Hash(), current.ParentHash())
+		}
+		current = parent
 	}
 
 	return nil
@@ -903,49 +931,64 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 
 // WriteCanonicalFromCurrentBlock writes the canonical chain from the
 // current block to the genesis.
-// WriteCanonicalFromCurrentBlock only grabs the lock as necessary to
-// write batches to disk, such that it can be run in a goroutine.
 func (bc *BlockChain) WriteCanonicalFromCurrentBlock() error {
 	current := bc.CurrentBlock()
+	if current == nil {
+		return fmt.Errorf("failed to get current block")
+	}
+	lastBlk, err := bc.writeCanonicalFromBlock(current, repairBlockBatchSize)
+	if err == nil {
+		return nil
+	}
+
+	log.Error("problem repairing canonical", "batchSize", repairBlockBatchSize, "error", err)
+	_, err = bc.writeCanonicalFromBlock(lastBlk, 1)
+	return err
+}
+
+// writeCanonicalFromBlock writes the canonical chain from [startBlock] back to the genesis
+// using [batchSize] for each write. Returns the last block that was successfully written
+// if an error occurs, which is guaranteed to be non-nil.
+func (bc *BlockChain) writeCanonicalFromBlock(startBlock *types.Block, batchSize int) (*types.Block, error) {
+	current := startBlock
+	// assumes [startBlock] is non-nil
+	lastBlk := startBlock
 
 	currentSize := 0
 	totalUpdates := 0
 	batch := bc.db.NewBatch()
-	log.Info("writing canonical chain from current block", "hash", current.Hash().String(), "number", current.NumberU64())
+
+	log.Debug("repairing canonical chain from block", "hash", current.Hash().String(), "number", current.NumberU64())
 
 	for ; current.Hash() != bc.genesisBlock.Hash(); current = bc.GetBlockByHash(current.ParentHash()) {
 		if current == nil {
-			return fmt.Errorf("failed to get parent of block %s, with parent hash %s", current.Hash().String(), current.ParentHash().String())
+			return lastBlk, fmt.Errorf("failed to get parent of block %s, with parent hash %s", current.Hash().String(), current.ParentHash().String())
 		}
 
 		blkNumber := current.NumberU64()
-		canonicalBlk := bc.GetBlockByNumber(blkNumber)
-		if canonicalBlk == nil {
-			return fmt.Errorf("failed to get block by number at height: %d", blkNumber)
-		}
-		if canonicalBlk.Hash() == current.Hash() {
-			continue
-		}
-
-		// If the canonical blockhash at [blkNumber] is incorrect
-		// repair it here.
 		log.Debug("repairing block", "hash", current.Hash().String(), "height", blkNumber)
 
 		rawdb.WriteCanonicalHash(batch, current.Hash(), current.NumberU64())
 		rawdb.WriteTxLookupEntriesByBlock(batch, current)
 		currentSize += 1
-		if currentSize >= repairBlockBatchSize {
+		if currentSize >= batchSize {
 			totalUpdates += currentSize
 			log.Debug("writing repair batch", "totalUpdates", totalUpdates, "size", currentSize)
-			currentSize = 0
 
 			bc.chainmu.Lock()
-			// Flush the whole batch into the disk, exit the node if failed
+			// Flush the whole batch into the disk
 			if err := batch.Write(); err != nil {
+				// If the batch write failed, unlock and return [lastBlk] and the error
 				bc.chainmu.Unlock()
-				return fmt.Errorf("failed to write batch with size %d at current block height %d: %s", currentSize, blkNumber, err)
+				return lastBlk, fmt.Errorf("failed to write batch with size %d at current block height %d: %s", currentSize, blkNumber, err)
 			}
 			bc.chainmu.Unlock()
+			currentSize = 0
+			// Update [lastBlk] to current since it was successfully updated
+			// [current] is guaranteed to be non-nil here because of the check
+			// at the start of the for loop.
+			lastBlk = current
+			batch = bc.db.NewBatch()
 		}
 	}
 
@@ -954,16 +997,17 @@ func (bc *BlockChain) WriteCanonicalFromCurrentBlock() error {
 		log.Debug("writing repair batch", "totalUpdates", totalUpdates, "size", currentSize)
 
 		bc.chainmu.Lock()
-		// Flush the whole batch into the disk, exit the node if failed
+		// Flush the whole batch into the disk
 		if err := batch.Write(); err != nil {
+			// If the batch write failed, unlock and return [lastBlk] and the error
 			bc.chainmu.Unlock()
-			log.Crit("Failed to update chain indexes and markers", "err", err)
+			return lastBlk, fmt.Errorf("failed to write final batch due to: %w", err)
 		}
 		bc.chainmu.Unlock()
 	}
-	log.Info("finished repairs", "totalUpdates", totalUpdates)
+	log.Debug("finished repairs", "totalUpdates", totalUpdates)
 
-	return nil
+	return bc.genesisBlock, nil
 }
 
 // GetReceiptsByHash retrieves the receipts for all transactions in a given block.
