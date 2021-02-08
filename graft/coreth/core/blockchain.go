@@ -987,9 +987,11 @@ func (bc *BlockChain) writeCanonicalFromBlock(startBlock *types.Block, batchSize
 			batch = bc.db.NewBatch()
 		}
 
-		current = bc.GetBlockByHash(current.ParentHash())
-		if current == nil {
+		parent := bc.GetBlockByHash(current.ParentHash())
+		if parent == nil {
 			return lastBlk, fmt.Errorf("failed to get parent of block %s, with parent hash %s", current.Hash().String(), current.ParentHash().String())
+		} else {
+			current = parent
 		}
 	}
 
