@@ -1,3 +1,13 @@
+// (c) 2019-2020, Ava Labs, Inc.
+//
+// This file is a derived work, based on the go-ethereum library whose original
+// notices appear below.
+//
+// It is distributed under a license compatible with the licensing terms of the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********
 // Copyright 2014 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
@@ -960,11 +970,7 @@ func (bc *BlockChain) writeCanonicalFromBlock(startBlock *types.Block, batchSize
 
 	log.Debug("repairing canonical chain from block", "hash", current.Hash().String(), "number", current.NumberU64())
 
-	for ; current.Hash() != bc.genesisBlock.Hash(); current = bc.GetBlockByHash(current.ParentHash()) {
-		if current == nil {
-			return lastBlk, fmt.Errorf("failed to get parent of block %s, with parent hash %s", current.Hash().String(), current.ParentHash().String())
-		}
-
+	for current.Hash() != bc.genesisBlock.Hash() {
 		blkNumber := current.NumberU64()
 		log.Debug("repairing block", "hash", current.Hash().String(), "height", blkNumber)
 
@@ -989,6 +995,13 @@ func (bc *BlockChain) writeCanonicalFromBlock(startBlock *types.Block, batchSize
 			// at the start of the for loop.
 			lastBlk = current
 			batch = bc.db.NewBatch()
+		}
+
+		parent := bc.GetBlockByHash(current.ParentHash())
+		if parent == nil {
+			return lastBlk, fmt.Errorf("failed to get parent of block %s, with parent hash %s", current.Hash().String(), current.ParentHash().String())
+		} else {
+			current = parent
 		}
 	}
 
