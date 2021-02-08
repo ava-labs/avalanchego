@@ -25,7 +25,7 @@ type issuer struct {
 
 	// Note:
 	// [trIssuer] must return all unfulfilled dependencies (including those
-	// that have been issued into the epoch of [vtx] in order to be notified
+	// that have been issued into the epoch of [vtx]) in order to be notified
 	// if any of these unfulfilled dependencies are accepted in a future epoch
 	// such that we can abandon [vtx].
 	// [trDeps] and [unfulfilledDeps] are kept as two separate
@@ -209,12 +209,12 @@ type vtxIssuer struct{ i *issuer }
 
 func (vi *vtxIssuer) Dependencies() ids.Set { return vi.i.vtxDeps }
 func (vi *vtxIssuer) Fulfill(id ids.ID)     { vi.i.FulfillVtx(id) }
-func (vi *vtxIssuer) Abandon(id ids.ID)     { vi.i.Abandon() }
+func (vi *vtxIssuer) Abandon(ids.ID)        { vi.i.Abandon() }
 func (vi *vtxIssuer) Update()               { vi.i.Update() }
 
 type trIssuer struct{ i *issuer }
 
 func (ti *trIssuer) Dependencies() ids.Set { return ti.i.trDeps }
 func (ti *trIssuer) Fulfill(id ids.ID)     { ti.i.FulfillTr(id) }
-func (ti *trIssuer) Abandon(id ids.ID)     { ti.i.Abandon() }
+func (ti *trIssuer) Abandon(ids.ID)        { ti.i.Abandon() }
 func (ti *trIssuer) Update()               { ti.i.Update() }

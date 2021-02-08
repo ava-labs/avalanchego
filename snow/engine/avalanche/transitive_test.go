@@ -5012,7 +5012,7 @@ func TestEngineAbandonDependencyFulfilledInFutureEpoch(t *testing.T) {
 		},
 	}
 	txA1 := &conflicts.TestTx{
-		BytesV: []byte{0},
+		BytesV: utils.RandomBytes(32),
 		EpochV: priorEpoch,
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -5021,7 +5021,7 @@ func TestEngineAbandonDependencyFulfilledInFutureEpoch(t *testing.T) {
 		TransitionV: trA,
 	}
 	txA2 := &conflicts.TestTx{
-		BytesV: []byte{1},
+		BytesV: utils.RandomBytes(32),
 		EpochV: currentEpoch,
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -5030,7 +5030,7 @@ func TestEngineAbandonDependencyFulfilledInFutureEpoch(t *testing.T) {
 		TransitionV: trA,
 	}
 	txB := &conflicts.TestTx{
-		BytesV: []byte{2},
+		BytesV: utils.RandomBytes(32),
 		EpochV: priorEpoch,
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -5039,7 +5039,7 @@ func TestEngineAbandonDependencyFulfilledInFutureEpoch(t *testing.T) {
 		TransitionV: trB,
 	}
 	txC := &conflicts.TestTx{
-		BytesV: []byte{2},
+		BytesV: utils.RandomBytes(32),
 		EpochV: priorEpoch,
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -5102,7 +5102,7 @@ func TestEngineAbandonDependencyFulfilledInFutureEpoch(t *testing.T) {
 	}
 	manager.GetF = func(id ids.ID) (avalanche.Vertex, error) {
 		if id != vtxA2.ID() {
-			t.Fatalf("Called Get for unexpected vtxID: %s", id)
+			assert.FailNow(t, "Called Get for unexpected vtxID: %s", id)
 		}
 		return vtxA2, nil
 	}
@@ -5120,7 +5120,7 @@ func TestEngineAbandonDependencyFulfilledInFutureEpoch(t *testing.T) {
 	}
 	manager.GetF = func(id ids.ID) (avalanche.Vertex, error) {
 		if id != vtxA1.ID() {
-			t.Fatalf("Called Get for unexpected vtxID: %s", id)
+			assert.FailNow(t, "Called Get for unexpected vtxID: %s", id)
 		}
 		return vtxA1, nil
 	}
@@ -5139,7 +5139,7 @@ func TestEngineAbandonDependencyFulfilledInFutureEpoch(t *testing.T) {
 	}
 	manager.GetF = func(id ids.ID) (avalanche.Vertex, error) {
 		if id != vtxC.ID() {
-			t.Fatalf("Unexpectedly called Get for vtxID: %s", id)
+			assert.FailNow(t, "Unexpectedly called Get for vtxID: %s", id)
 		}
 		return vtxC, nil
 	}
@@ -5150,7 +5150,7 @@ func TestEngineAbandonDependencyFulfilledInFutureEpoch(t *testing.T) {
 
 	manager.GetF = func(id ids.ID) (avalanche.Vertex, error) {
 		if id != vtxA2.ID() {
-			t.Fatalf("Unexpectedly called Get for vtxID: %s", id)
+			assert.FailNow(t, "Unexpectedly called Get for vtxID: %s", id)
 		}
 		return vtxA2, nil
 	}
