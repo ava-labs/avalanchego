@@ -634,7 +634,7 @@ func (m *manager) LookupVM(alias string) (ids.ID, error) { return m.VMManager.Lo
 // that the specified chain has been created
 func (m *manager) notifyRegistrants(name string, ctx *snow.Context, vm interface{}) {
 	for _, registrant := range m.registrants {
-		registrant.RegisterChain(name, ctx, vm)
+		go registrant.RegisterChain(name, ctx, vm)
 	}
 }
 
