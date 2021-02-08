@@ -45,7 +45,8 @@ type Config struct {
 
 type manager struct {
 	config *Config
-	// Chain ID --> benchlist for that chain
+	// Chain ID --> benchlist for that chain.
+	// Each benchlist is safe for concurrent access.
 	chainBenchlists map[ids.ID]Benchlist
 
 	lock sync.RWMutex
@@ -67,13 +68,14 @@ func NewManager(config *Config) Manager {
 // IsBenched returns true if messages to [validatorID] regarding [chainID]
 // should not be sent over the network and should immediately fail.
 func (m *manager) IsBenched(validatorID ids.ShortID, chainID ids.ID) bool {
-	m.lock.Lock()
+	m.lock.RLock()
 	chain, exists := m.chainBenchlists[chainID]
+	m.lock.RUnlock()
+
 	if !exists {
 		return false
 	}
 	isBenched := chain.IsBenched(validatorID)
-	m.lock.Unlock()
 	return isBenched
 }
 
@@ -111,26 +113,24 @@ func (m *manager) RegisterChain(ctx *snow.Context, namespace string) error {
 // RegisterResponse implements the Manager interface
 func (m *manager) RegisterResponse(chainID ids.ID, validatorID ids.ShortID) {
 	m.lock.RLock()
-	defer m.lock.RUnlock()
-
 	chain, exists := m.chainBenchlists[chainID]
+	m.lock.RUnlock()
+
 	if !exists {
 		return
 	}
-
 	chain.RegisterResponse(validatorID)
 }
 
 // RegisterFailure implements the Manager interface
 func (m *manager) RegisterFailure(chainID ids.ID, validatorID ids.ShortID) {
 	m.lock.RLock()
-	defer m.lock.RUnlock()
-
 	chain, exists := m.chainBenchlists[chainID]
+	m.lock.RUnlock()
+
 	if !exists {
 		return
 	}
-
 	chain.RegisterFailure(validatorID)
 }
 

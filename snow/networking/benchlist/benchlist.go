@@ -38,7 +38,7 @@ type Benchlist interface {
 }
 
 type benchlist struct {
-	lock    sync.RWMutex
+	lock    sync.Mutex
 	log     logging.Logger
 	metrics metrics
 	// Tells the time. Can be faked for testing.
@@ -107,14 +107,15 @@ func NewBenchlist(
 // IsBenched returns true if messages to [validatorID]
 // should not be sent over the network and should immediately fail.
 func (b *benchlist) IsBenched(validatorID ids.ShortID) bool {
-	b.lock.RLock()
+	b.lock.Lock()
 	isBenched := b.isBenched(validatorID)
-	b.lock.RUnlock()
+	b.lock.Unlock()
 	return isBenched
 }
 
 // isBenched checks if [validatorID] is currently benched
 // and calls cleanup if its benching period has elapsed
+// Assumes [b.lock] is held.
 func (b *benchlist) isBenched(validatorID ids.ShortID) bool {
 	end, ok := b.benchlistTimes[validatorID]
 	if !ok {
@@ -261,10 +262,13 @@ func (b *benchlist) cleanup() {
 		benchLen,
 		updatedBenchLen,
 	)
+	// Update metrics
 	b.metrics.weightBenched.Set(float64(updatedWeight))
 	b.metrics.numBenched.Set(float64(updatedBenchLen))
 }
 
+// Reset this benchlist.
+// Assumes [b.lock] is held.
 func (b *benchlist) reset() {
 	b.failureStreaks = make(map[ids.ShortID]failureStreak)
 	b.benchlistTimes = make(map[ids.ShortID]time.Time)
