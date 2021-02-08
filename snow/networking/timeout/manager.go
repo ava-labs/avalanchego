@@ -117,5 +117,5 @@ func (m *Manager) RegisterResponse(validatorID ids.ShortID, chainID ids.ID, requ
 func createRequestID(validatorID ids.ShortID, chainID ids.ID, requestID uint32) ids.ID {
 	p := wrappers.Packer{Bytes: make([]byte, wrappers.IntLen)}
 	p.PackInt(requestID)
-	return hashing.ByteArraysToHash256Array(validatorID.Bytes(), chainID[:], p.Bytes)
+	return hashing.ByteArraysToHash256Array(validatorID[:], chainID[:], p.Bytes)
 }

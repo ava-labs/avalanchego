@@ -168,8 +168,11 @@ func (sr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 	defer sr.lock.RUnlock()
 
 	if chain, exists := sr.chains[chainID]; exists {
-		if chain.AcceptedFrontier(validatorID, requestID, containerIDs) {
-			sr.timeouts.RegisterResponse(validatorID, chainID, requestID)
+		// Tell the timeout manager we got a response
+		sr.timeouts.RegisterResponse(validatorID, chainID, requestID)
+		if !chain.AcceptedFrontier(validatorID, requestID, containerIDs) {
+			// We weren't able to pass the response to the chain
+			go sr.GetAcceptedFrontierFailed(validatorID, chainID, requestID)
 		}
 	} else {
 		sr.log.Debug("AcceptedFrontier(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerIDs)
@@ -205,15 +208,18 @@ func (sr *ChainRouter) GetAccepted(validatorID ids.ShortID, chainID ids.ID, requ
 }
 
 // Accepted routes an incoming Accepted request from the validator with ID
-// [validatorID]  to the consensus engine working on the chain with ID
+// [validatorID] to the consensus engine working on the chain with ID
 // [chainID]
 func (sr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
 	if chain, exists := sr.chains[chainID]; exists {
-		if chain.Accepted(validatorID, requestID, containerIDs) {
-			sr.timeouts.RegisterResponse(validatorID, chainID, requestID)
+		// Tell the timeout manager we got a response
+		sr.timeouts.RegisterResponse(validatorID, chainID, requestID)
+		if !chain.Accepted(validatorID, requestID, containerIDs) {
+			// We weren't able to pass the response to the chain
+			go sr.GetAcceptedFailed(validatorID, chainID, requestID)
 		}
 	} else {
 		sr.log.Debug("Accepted(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerIDs)
@@ -257,8 +263,11 @@ func (sr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 	// This message came in response to a GetAncestors message from this node, and when we sent that
 	// message we set a timeout. Since we got a response, cancel the timeout.
 	if chain, exists := sr.chains[chainID]; exists {
-		if chain.MultiPut(validatorID, requestID, containers) {
-			sr.timeouts.RegisterResponse(validatorID, chainID, requestID)
+		// Tell the timeout manager we got a response
+		sr.timeouts.RegisterResponse(validatorID, chainID, requestID)
+		if !chain.MultiPut(validatorID, requestID, containers) {
+			// We weren't able to pass the response to the chain
+			go sr.GetAncestorsFailed(validatorID, chainID, requestID)
 		}
 	} else {
 		sr.log.Debug("MultiPut(%s, %s, %d, %d) dropped due to unknown chain", validatorID, chainID, requestID, len(containers))
@@ -302,8 +311,11 @@ func (sr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	chain, exists := sr.chains[chainID]
 	switch {
 	case exists:
-		if chain.Put(validatorID, requestID, containerID, container) {
-			sr.timeouts.RegisterResponse(validatorID, chainID, requestID)
+		// Tell the timeout manager we got a response
+		sr.timeouts.RegisterResponse(validatorID, chainID, requestID)
+		if !chain.Put(validatorID, requestID, containerID, container) {
+			// We weren't able to pass the response to the chain
+			go sr.GetFailed(validatorID, chainID, requestID)
 		}
 	case requestID == constants.GossipMsgRequestID:
 		sr.log.Verbo("Gossiped Put(%s, %s, %d, %s) dropped due to unknown chain. Container:",
@@ -363,8 +375,11 @@ func (sr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 
 	// Cancel timeout we set when sent the message asking for these Chits
 	if chain, exists := sr.chains[chainID]; exists {
-		if chain.Chits(validatorID, requestID, votes) {
-			sr.timeouts.RegisterResponse(validatorID, chainID, requestID)
+		// Tell the timeout manager we got a response
+		sr.timeouts.RegisterResponse(validatorID, chainID, requestID)
+		if !chain.Chits(validatorID, requestID, votes) {
+			// We weren't able to pass the response to the chain
+			go sr.QueryFailed(validatorID, chainID, requestID)
 		}
 	} else {
 		sr.log.Debug("Chits(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, votes)
