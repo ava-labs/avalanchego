@@ -69,13 +69,13 @@ func NewManager(config *Config) Manager {
 // should not be sent over the network and should immediately fail.
 func (m *manager) IsBenched(validatorID ids.ShortID, chainID ids.ID) bool {
 	m.lock.RLock()
-	chain, exists := m.chainBenchlists[chainID]
+	benchlist, exists := m.chainBenchlists[chainID]
 	m.lock.RUnlock()
 
 	if !exists {
 		return false
 	}
-	isBenched := chain.IsBenched(validatorID)
+	isBenched := benchlist.IsBenched(validatorID)
 	return isBenched
 }
 
@@ -113,25 +113,25 @@ func (m *manager) RegisterChain(ctx *snow.Context, namespace string) error {
 // RegisterResponse implements the Manager interface
 func (m *manager) RegisterResponse(chainID ids.ID, validatorID ids.ShortID) {
 	m.lock.RLock()
-	chain, exists := m.chainBenchlists[chainID]
+	benchlist, exists := m.chainBenchlists[chainID]
 	m.lock.RUnlock()
 
 	if !exists {
 		return
 	}
-	chain.RegisterResponse(validatorID)
+	benchlist.RegisterResponse(validatorID)
 }
 
 // RegisterFailure implements the Manager interface
 func (m *manager) RegisterFailure(chainID ids.ID, validatorID ids.ShortID) {
 	m.lock.RLock()
-	chain, exists := m.chainBenchlists[chainID]
+	benchlist, exists := m.chainBenchlists[chainID]
 	m.lock.RUnlock()
 
 	if !exists {
 		return
 	}
-	chain.RegisterFailure(validatorID)
+	benchlist.RegisterFailure(validatorID)
 }
 
 type noBenchlist struct{}

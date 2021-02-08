@@ -91,6 +91,7 @@ func NewBenchlist(
 		return nil, fmt.Errorf("max portion of benched stake must be in [0,1) but got %f", maxPortion)
 	}
 	benchlist := &benchlist{
+		log:                    log,
 		failureStreaks:         make(map[ids.ShortID]failureStreak),
 		benchlistTimes:         make(map[ids.ShortID]time.Time),
 		benchlistOrder:         list.New(),
