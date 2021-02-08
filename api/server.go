@@ -122,8 +122,12 @@ func (s *Server) RegisterChain(chainName string, ctx *snow.Context, vmIntf inter
 	// all subroutes to a chain begin with "bc/<the chain's ID>"
 	defaultEndpoint := "bc/" + ctx.ChainID.String()
 
+	ctx.Lock.Lock()
+	handlers := vm.CreateHandlers()
+	ctx.Lock.Unlock()
+
 	// Register each endpoint
-	for extension, service := range vm.CreateHandlers() {
+	for extension, service := range handlers {
 		// Validate that the route being added is valid
 		// e.g. "/foo" and "" are ok but "\n" is not
 		_, err := url.ParseRequestURI(extension)
