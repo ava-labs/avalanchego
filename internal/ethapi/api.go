@@ -845,6 +845,12 @@ func DoCall(ctx context.Context, b Backend, args CallArgs, blockNrOrHash rpc.Blo
 	if state == nil || err != nil {
 		return nil, err
 	}
+
+	// If the request is for the pending block, set the block timestamp to the current time
+	// so that timing assumptions will behave as if a new block were issued.
+	if blkNumber, isNum := blockNrOrHash.Number(); isNum && blkNumber == rpc.PendingBlockNumber {
+		header.Time = uint64(time.Now().Unix())
+	}
 	// Override the fields of specified contracts before execution.
 	for addr, account := range overrides {
 		// Override account nonce.
