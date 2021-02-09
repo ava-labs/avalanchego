@@ -312,7 +312,10 @@ func (b *benchlist) bench(validatorID ids.ShortID) {
 	// Add to benchlist times with randomized delay
 	b.benchlistSet.Add(validatorID)
 	delete(b.failureStreaks, validatorID)
-	heap.Push(&b.benchedQueue, &benchData{})
+	heap.Push(
+		&b.benchedQueue,
+		&benchData{validatorID: validatorID, benchedUntil: benchedUntil},
+	)
 	b.log.Debug(
 		"benching validator %s for %s after %d consecutive failed queries.",
 		validatorID,

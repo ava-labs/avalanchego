@@ -106,7 +106,7 @@ func (tm *AdaptiveTimeoutManager) Initialize(config *AdaptiveTimeoutConfig) erro
 
 	switch {
 	case config.TimeoutCoefficient < 1:
-		return fmt.Errorf("timeout coefficient must be > 1 but got %f", config.TimeoutCoefficient)
+		return fmt.Errorf("timeout coefficient must be >= 1 but got %f", config.TimeoutCoefficient)
 	case config.TimeoutHalflife == 0:
 		return errZeroHalflife
 	}
