@@ -188,7 +188,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Benchlist Parameters:
 	fs.Int(benchlistFailThresholdKey, 10, "Number of consecutive failed queries before benchlisting a node.")
 	fs.Bool(benchlistPeerSummaryEnabledKey, false, "Enables peer specific query latency metrics.")
-	fs.Duration(benchlistDurationKey, time.Hour, "Amount of time a peer is benchlisted after surpassing the threshold.")
+	fs.Duration(benchlistDurationKey, time.Hour, "Max amount of time a peer is benched after surpassing the threshold.")
 	fs.Duration(benchlistMinFailingDurationKey, 5*time.Minute, "Minimum amount of time messages to a peer must be failing before the peer is benched.")
 
 	// Plugins:

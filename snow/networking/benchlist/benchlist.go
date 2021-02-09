@@ -1,7 +1,7 @@
 package benchlist
 
 import (
-	"container/list"
+	"container/heap"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -37,36 +37,38 @@ type Benchlist interface {
 	IsBenched(validatorID ids.ShortID) bool
 }
 
-type benchlist struct {
-	lock    sync.Mutex
-	log     logging.Logger
-	metrics metrics
-	// Tells the time. Can be faked for testing.
-	clock timer.Clock
+// Data about a validator who is benched
+type benchData struct {
+	benchedUntil time.Time
+	validatorID  ids.ShortID
+	index        int
+}
 
-	// Validator set of the network
-	vdrs validators.Set
-	// Validator ID --> Consecutive failure information
-	failureStreaks map[ids.ShortID]failureStreak
+// Implements heap.Interface. Each element is a benched validator
+type benchedQueue []*benchData
 
-	// Validator ID --> Time they are benched until
-	// If a validator is not benched, their ID is not a key in this map
-	benchlistTimes map[ids.ShortID]time.Time
-	// TODO make this a heap instead of a list
-	benchlistOrder *list.List
-	// IDs of validators that are currently benched
-	benchlistSet ids.ShortSet
+func (bq benchedQueue) Len() int           { return len(bq) }
+func (bq benchedQueue) Less(i, j int) bool { return bq[i].benchedUntil.Before(bq[j].benchedUntil) }
+func (bq benchedQueue) Swap(i, j int) {
+	bq[i], bq[j] = bq[j], bq[i]
+	bq[i].index = i
+	bq[j].index = j
+}
 
-	// A validator will be benched if [threshold] messages in a row
-	// to them time out and the first of those messages was more than
-	// [minimumFailingDuration] ago
-	threshold              int
-	minimumFailingDuration time.Duration
-	// A benched validator will be benched for between [duration/2] and [duration]
-	duration time.Duration
-	// The maximum percentage of total network stake that may be benched
-	// Must be in [0,1)
-	maxPortion float64
+// Push adds an item to this  queue. x must have type *benchData
+func (bq *benchedQueue) Push(x interface{}) {
+	item := x.(*benchData)
+	item.index = len(*bq)
+	*bq = append(*bq, item)
+}
+
+// Pop returns the validator that should leave the bench next
+func (bq *benchedQueue) Pop() interface{} {
+	n := len(*bq)
+	item := (*bq)[n-1]
+	(*bq)[n-1] = nil // make sure the item is freed from memory
+	*bq = (*bq)[:n-1]
+	return item
 }
 
 type failureStreak struct {
@@ -76,7 +78,45 @@ type failureStreak struct {
 	consecutive int
 }
 
-// NewBenchlist ...
+type benchlist struct {
+	lock    sync.RWMutex
+	log     logging.Logger
+	metrics metrics
+
+	// Fires when the next validator should leave the bench
+	// Calls [update] when it fires
+	timer *timer.Timer
+
+	// Tells the time. Can be faked for testing.
+	clock timer.Clock
+
+	// Validator set of the network
+	vdrs validators.Set
+
+	// Validator ID --> Consecutive failure information
+	failureStreaks map[ids.ShortID]failureStreak
+
+	// IDs of validators that are currently benched
+	benchlistSet ids.ShortSet
+	// Min heap containing benched validators and their endtimes
+	// Pop() returns the next validator to leave
+	benchedQueue benchedQueue
+
+	// A validator will be benched if [threshold] messages in a row
+	// to them time out and the first of those messages was more than
+	// [minimumFailingDuration] ago
+	threshold              int
+	minimumFailingDuration time.Duration
+
+	// A benched validator will be benched for between [duration/2] and [duration]
+	duration time.Duration
+
+	// The maximum percentage of total network stake that may be benched
+	// Must be in [0,1)
+	maxPortion float64
+}
+
+// NewBenchlist returns a new Benchlist
 func NewBenchlist(
 	log logging.Logger,
 	validators validators.Set,
@@ -93,8 +133,6 @@ func NewBenchlist(
 	benchlist := &benchlist{
 		log:                    log,
 		failureStreaks:         make(map[ids.ShortID]failureStreak),
-		benchlistTimes:         make(map[ids.ShortID]time.Time),
-		benchlistOrder:         list.New(),
 		benchlistSet:           ids.ShortSet{},
 		vdrs:                   validators,
 		threshold:              threshold,
@@ -102,15 +140,82 @@ func NewBenchlist(
 		duration:               duration,
 		maxPortion:             maxPortion,
 	}
+	benchlist.timer = timer.NewTimer(benchlist.update)
+	benchlist.timer.Dispatch()
 	return benchlist, benchlist.metrics.Initialize(registerer, namespace)
+}
+
+// Update removes benched validators whose time on the bench is over
+func (b *benchlist) update() {
+	b.lock.Lock()
+	now := b.clock.Time()
+	for {
+		// [next] is nil when no more validators should
+		// leave the bench at this time
+		next := b.nextToLeave(now)
+		if next == nil {
+			break
+		}
+		b.remove(next)
+	}
+	// Set next time update will be called
+	b.setNextLeaveTime()
+	b.lock.Unlock()
+}
+
+// Remove [validator] from the benchlist
+// Assumes [b.lock] is held
+func (b *benchlist) remove(validator *benchData) {
+	// Update state
+	id := validator.validatorID
+	b.log.Debug("removing validator %s from benchlist", id)
+	heap.Remove(&b.benchedQueue, validator.index)
+	b.benchlistSet.Remove(id)
+
+	// Update metrics
+	b.metrics.numBenched.Set(float64(b.benchedQueue.Len()))
+	benchedStake, err := b.vdrs.SubsetWeight(b.benchlistSet)
+	if err != nil {
+		// This should never happen
+		b.log.Error("couldn't get benched stake: %w", err)
+		return
+	}
+	b.metrics.weightBenched.Set(float64(benchedStake))
+}
+
+// Returns the next validator that should leave
+// the bench at time [now]. nil if no validator should.
+// Assumes [b.lock] is held
+func (b *benchlist) nextToLeave(now time.Time) *benchData {
+	if b.benchedQueue.Len() == 0 {
+		return nil
+	}
+	next := b.benchedQueue[0]
+	if now.Before(next.benchedUntil) {
+		return nil
+	}
+	return next
+}
+
+// Set [b.timer] to fire when the next validator should leave the bench
+// Assumes [b.lock] is held
+func (b *benchlist) setNextLeaveTime() {
+	if b.benchedQueue.Len() == 0 {
+		b.timer.Cancel()
+		return
+	}
+	now := b.clock.Time()
+	next := b.benchedQueue[0]
+	nextLeave := next.benchedUntil.Sub(now)
+	b.timer.SetTimeoutIn(nextLeave)
 }
 
 // IsBenched returns true if messages to [validatorID]
 // should not be sent over the network and should immediately fail.
 func (b *benchlist) IsBenched(validatorID ids.ShortID) bool {
-	b.lock.Lock()
+	b.lock.RLock()
 	isBenched := b.isBenched(validatorID)
-	b.lock.Unlock()
+	b.lock.RUnlock()
 	return isBenched
 }
 
@@ -118,17 +223,9 @@ func (b *benchlist) IsBenched(validatorID ids.ShortID) bool {
 // and calls cleanup if its benching period has elapsed
 // Assumes [b.lock] is held.
 func (b *benchlist) isBenched(validatorID ids.ShortID) bool {
-	end, ok := b.benchlistTimes[validatorID]
-	if !ok {
-		return false
-	}
-
-	if b.clock.Time().Before(end) {
+	if _, ok := b.benchlistSet[validatorID]; ok {
 		return true
 	}
-
-	// If a benched item has expired, cleanup the benchlist
-	b.cleanup()
 	return false
 }
 
@@ -142,8 +239,17 @@ func (b *benchlist) RegisterResponse(validatorID ids.ShortID) {
 // RegisterResponse notes that a request to validator [validatorID] timed out
 func (b *benchlist) RegisterFailure(validatorID ids.ShortID) {
 	b.lock.Lock()
+
+	if b.benchlistSet.Contains(validatorID) {
+		// This validator is benched. Ignore failures until they're not.
+		b.lock.Unlock()
+		return
+	}
+
 	failureStreak := b.failureStreaks[validatorID]
+	// Increment consecutive failures
 	failureStreak.consecutive++
+	// Update first failure time
 	if failureStreak.firstFailure.IsZero() {
 		// This is the first consecutive failure
 		failureStreak.firstFailure = b.clock.Time()
@@ -159,122 +265,75 @@ func (b *benchlist) RegisterFailure(validatorID ids.ShortID) {
 }
 
 // Assumes [b.lock] is held
+// Assumes [validatorID] is not already benched
 func (b *benchlist) bench(validatorID ids.ShortID) {
-	if b.benchlistSet.Contains(validatorID) {
-		return
-	}
-
-	// Goal:
-	// Random end time in the range:
-	// [max(lastEndTime, (currentTime + (duration/2)): currentTime + duration]
-	// This maintains the invariant that validators in benchlistOrder are
-	// ordered by the time that they should be unbenched
-	now := b.clock.Time()
-	minEndTime := now.Add(b.duration / 2)
-	if elem := b.benchlistOrder.Back(); elem != nil {
-		lastValidator := elem.Value.(ids.ShortID)
-		lastEndTime := b.benchlistTimes[lastValidator]
-		if lastEndTime.After(minEndTime) {
-			minEndTime = lastEndTime
-		}
-	}
-	maxEndTime := now.Add(b.duration)
-	// Since maxEndTime is at least [duration] in the future and every element
-	// added to benchlist was added in the past with an end time at most [duration]
-	// in the future, this should never produce a negative duration.
-	diff := maxEndTime.Sub(minEndTime)
-	randomizedEndTime := minEndTime.Add(time.Duration(rand.Float64() * float64(diff))) // #nosec G404
-
-	// Add to benchlist times with randomized delay
-	b.benchlistTimes[validatorID] = randomizedEndTime
-	b.benchlistOrder.PushBack(validatorID)
-	b.benchlistSet.Add(validatorID)
-	delete(b.failureStreaks, validatorID)
-	b.log.Debug(
-		"benching validator %s after %d consecutive failed queries for %s",
-		validatorID,
-		b.threshold,
-		randomizedEndTime.Sub(now),
-	)
-
-	// Note: there could be a memory leak if a large number of
-	// validators were added, sampled, benched, and never sampled
-	// again. Due to the minimum staking amount and durations this
-	// is not a realistic concern.
-	b.cleanup()
-}
-
-// cleanup ensures that we have not benched too much stake
-// and removes anything from the benchlist whose time has expired
-// Assumes [b.lock] is held
-func (b *benchlist) cleanup() {
-	currentWeight, err := b.vdrs.SubsetWeight(b.benchlistSet)
+	benchedStake, err := b.vdrs.SubsetWeight(b.benchlistSet)
 	if err != nil {
-		// Add log for this, should never happen
-		b.log.Error("failed to calculate subset weight due to: %w. Resetting benchlist", err)
+		// This should never happen
+		b.log.Error("couldn't get benched stake: %w. Resetting benchlist", err)
 		b.reset()
 		return
 	}
 
-	now := b.clock.Time()
-
-	benchLen := b.benchlistSet.Len()
-	updatedWeight := currentWeight
-	totalWeight := b.vdrs.Weight()
-	maxBenchlistWeight := uint64(float64(totalWeight) * b.maxPortion)
-	// Iterate over elements of the benchlist in order of expiration
-	for b.benchlistOrder.Len() > 0 {
-		e := b.benchlistOrder.Front()
-
-		validatorID := e.Value.(ids.ShortID)
-		end := b.benchlistTimes[validatorID]
-		// Remove elements with the next expiration until the next item has not
-		// expired and the bench has less than the maximum weight
-		// Note: this creates an edge case where benching a validator
-		// with a sufficient stake may clear the bench if the benchlist is
-		// not parameterized correctly.
-		if now.Before(end) && updatedWeight < maxBenchlistWeight {
-			break
-		}
-
-		removeWeight, ok := b.vdrs.GetWeight(validatorID)
-		if ok {
-			updatedWeight, err = safemath.Sub64(updatedWeight, removeWeight)
-			if err != nil {
-				b.log.Error("failed to calculate new subset weight due to: %w. Resetting benchlist", err)
-				b.reset()
-				return
-			}
-		}
-
-		b.log.Debug("Removed Validator: (%s, %d). EndTime: %s. CurrentTime: %s)", validatorID, removeWeight, end, now)
-		b.benchlistOrder.Remove(e)
-		delete(b.benchlistTimes, validatorID)
-		b.benchlistSet.Remove(validatorID)
+	validatorStake, isVdr := b.vdrs.GetWeight(validatorID)
+	if !isVdr {
+		b.log.Warn("tried to bench non-validator %s", validatorID)
+		return
 	}
 
-	updatedBenchLen := b.benchlistSet.Len()
-	b.log.Debug("Maximum Benchable Weight: %d. Benched Weight: (%d/%d) -> (%d/%d). Benched Validators: %d -> %d.",
-		maxBenchlistWeight,
-		currentWeight,
-		totalWeight,
-		updatedWeight,
-		totalWeight,
-		benchLen,
-		updatedBenchLen,
+	newBenchedStake, err := safemath.Add64(benchedStake, validatorStake)
+	if err != nil {
+		// This should never happen
+		b.log.Error("overflow calculating new benched stake with validator %s", validatorID)
+		return
+	}
+
+	totalStake := b.vdrs.Weight()
+	maxBenchedStake := float64(totalStake) * b.maxPortion
+
+	if float64(newBenchedStake) > maxBenchedStake {
+		b.log.Debug(
+			"not benching %s because benched stake (%f) would exceed max (%f)",
+			validatorID,
+			float64(newBenchedStake),
+			maxBenchedStake,
+		)
+		return
+	}
+
+	// Validator is benched for between [b.duration]/2 and [b.duration]
+	now := b.clock.Time()
+	minBenchDuration := b.duration / 2
+	minBenchedUntil := now.Add(minBenchDuration)
+	maxBenchedUntil := now.Add(b.duration)
+	diff := maxBenchedUntil.Sub(minBenchedUntil)
+	benchedUntil := minBenchedUntil.Add(time.Duration(rand.Float64() * float64(diff))) // #nosec G404
+
+	// Add to benchlist times with randomized delay
+	b.benchlistSet.Add(validatorID)
+	delete(b.failureStreaks, validatorID)
+	heap.Push(&b.benchedQueue, &benchData{})
+	b.log.Debug(
+		"benching validator %s for %s after %d consecutive failed queries.",
+		validatorID,
+		benchedUntil.Sub(now),
+		b.threshold,
 	)
+
+	// Set [b.timer] to fire when next validator should leave bench
+	b.setNextLeaveTime()
+
 	// Update metrics
-	b.metrics.weightBenched.Set(float64(updatedWeight))
-	b.metrics.numBenched.Set(float64(updatedBenchLen))
+	b.metrics.numBenched.Set(float64(b.benchedQueue.Len()))
+	b.metrics.weightBenched.Set(float64(newBenchedStake))
 }
 
 // Reset this benchlist.
 // Assumes [b.lock] is held.
 func (b *benchlist) reset() {
 	b.failureStreaks = make(map[ids.ShortID]failureStreak)
-	b.benchlistTimes = make(map[ids.ShortID]time.Time)
-	b.benchlistOrder.Init()
 	b.benchlistSet.Clear()
+	b.benchedQueue = []*benchData{}
 	b.metrics.weightBenched.Set(0)
 	b.metrics.numBenched.Set(0)
 }

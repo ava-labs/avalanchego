@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
@@ -75,8 +76,8 @@ type AdaptiveTimeoutConfig struct {
 type AdaptiveTimeoutManager struct {
 	lock sync.Mutex
 	// Tells the time. Can be faked for testing.
-	clock                Clock
-	networkTimeoutMetric prometheus.Gauge
+	clock                            Clock
+	networkTimeoutMetric, avgLatency prometheus.Gauge
 	// Averages the response time from all peers
 	averager math.Averager
 	// Timeout is [timeoutCoefficient] * average response time
@@ -97,6 +98,11 @@ func (tm *AdaptiveTimeoutManager) Initialize(config *AdaptiveTimeoutConfig) erro
 		Name:      "network_timeout",
 		Help:      "Duration of current network timeout in nanoseconds",
 	})
+	tm.avgLatency = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: config.MetricsNamespace,
+		Name:      "avg_request_latency",
+		Help:      "Average network latency in nanoseconds",
+	})
 
 	switch {
 	case config.TimeoutCoefficient < 1:
@@ -104,6 +110,7 @@ func (tm *AdaptiveTimeoutManager) Initialize(config *AdaptiveTimeoutConfig) erro
 	case config.TimeoutHalflife == 0:
 		return errZeroHalflife
 	}
+
 	tm.timeoutCoefficient = config.TimeoutCoefficient
 	tm.averager = math.NewAverager(float64(config.InitialTimeout), config.TimeoutHalflife, tm.clock.Time())
 	tm.minimumTimeout = config.MinimumTimeout
@@ -111,7 +118,11 @@ func (tm *AdaptiveTimeoutManager) Initialize(config *AdaptiveTimeoutConfig) erro
 	tm.currentTimeout = config.InitialTimeout
 	tm.timeoutMap = make(map[ids.ID]*adaptiveTimeout)
 	tm.timer = NewTimer(tm.Timeout)
-	return config.Registerer.Register(tm.networkTimeoutMetric)
+
+	errs := &wrappers.Errs{}
+	errs.Add(config.Registerer.Register(tm.networkTimeoutMetric))
+	errs.Add(config.Registerer.Register(tm.avgLatency))
+	return errs.Err
 }
 
 // TimeoutDuration returns the current network timeout duration
@@ -176,22 +187,24 @@ func (tm *AdaptiveTimeoutManager) remove(id ids.ID, currentTime time.Time) {
 	timeoutRegisteredAt := timeout.deadline.Add(-1 * timeout.duration)
 	responseTime := float64(currentTime.Sub(timeoutRegisteredAt))
 	tm.averager.Observe(responseTime, currentTime)
+	avgLatency := tm.averager.Read()
 
-	tm.currentTimeout = time.Duration(tm.timeoutCoefficient * tm.averager.Read())
+	tm.currentTimeout = time.Duration(tm.timeoutCoefficient * avgLatency)
 	if tm.currentTimeout > tm.maximumTimeout {
 		tm.currentTimeout = tm.maximumTimeout
 	} else if tm.currentTimeout < tm.minimumTimeout {
 		tm.currentTimeout = tm.minimumTimeout
 	}
 
-	// Make sure the metrics report the current timeouts
-	tm.networkTimeoutMetric.Set(float64(tm.currentTimeout))
-
 	// Remove the timeout from the map
 	delete(tm.timeoutMap, id)
 
 	// Remove the timeout from the queue
 	heap.Remove(&tm.timeoutQueue, timeout.index)
+
+	// Update the metrics
+	tm.networkTimeoutMetric.Set(float64(tm.currentTimeout))
+	tm.avgLatency.Set(float64(avgLatency))
 }
 
 // Timeout registers a timeout
