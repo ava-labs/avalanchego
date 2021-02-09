@@ -21,6 +21,9 @@ type CommandLineConfig struct {
 	DebugAPIEnabled    bool `json:"debug-api-enabled"`
 	Web3APIEnabled     bool `json:"web3-api-enabled"`
 
+	// Eth Settings
+	LocalTxsEnabled bool `json:"local-txs-enabled"`
+
 	ParsingError error
 }
 
