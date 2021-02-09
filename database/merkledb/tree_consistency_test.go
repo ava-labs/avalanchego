@@ -37,7 +37,7 @@ func TestTreeConsistency_PutGetDel(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tree := NewMemoryTree()
+			tree := newMemoryTree()
 
 			putAndTestRoot(t, tree, test.data)
 
@@ -61,7 +61,7 @@ func TestTreeConsistency_PutGetClear(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tree := NewMemoryTree()
+			tree := newMemoryTree()
 
 			putAndTestRoot(t, tree, test.data)
 
@@ -86,32 +86,32 @@ func TestTreeConsistencyStorage_PutGetDel(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
-			tree := NewLevelTree(tmpDir)
+			tree := newLevelTree(tmpDir)
 
 			putAndTestRoot(t, tree, test.data)
-			err := HardCloseDB(tree)
+			err := hardCloseDB(tree)
 			if err != nil {
 				t.Fatal("Error closing the db")
 			}
 
-			tree2 := NewLevelTree(tmpDir)
+			tree2 := newLevelTree(tmpDir)
 			getTest(t, tree2, test.data)
-			err = HardCloseDB(tree2)
+			err = hardCloseDB(tree2)
 			if err != nil {
 				t.Fatal("Error closing the db")
 			}
 
-			tree3 := NewLevelTree(tmpDir)
+			tree3 := newLevelTree(tmpDir)
 			delAndTestRoot(t, tree3, test.data)
 			checkDatabaseItems(t, tree3)
-			err = HardCloseDB(tree3)
+			err = hardCloseDB(tree3)
 			if err != nil {
 				t.Fatal("Error closing the db")
 			}
 
-			tree4 := NewLevelTree(tmpDir)
+			tree4 := newLevelTree(tmpDir)
 			checkDatabaseItems(t, tree4)
-			err = HardCloseDB(tree4)
+			err = hardCloseDB(tree4)
 			if err != nil {
 				t.Fatal("Error closing the db")
 			}
@@ -237,5 +237,4 @@ func getDatabase(persistence Persistence) database.Database {
 	default:
 		panic("unknown persistence type")
 	}
-	return nil
 }

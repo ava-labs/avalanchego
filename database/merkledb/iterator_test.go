@@ -15,7 +15,7 @@ func TestNewIterator(t *testing.T) {
 		{[]byte{1, 2, 3, 3}, []byte{1, 2, 3, 3}},
 	}
 
-	tree := NewMemoryTree()
+	tree := newMemoryTree()
 
 	for _, test := range tests {
 		_ = tree.Put(test.key, test.value)
@@ -50,7 +50,7 @@ func TestNewIteratorWithPrefix(t *testing.T) {
 		{[]byte{1, 3, 3, 3}, []byte{1, 2, 3, 3}},
 	}
 
-	tree := NewMemoryTree()
+	tree := newMemoryTree()
 
 	for _, test := range tests {
 		_ = tree.Put(test.key, test.value)
@@ -89,7 +89,7 @@ func TestNewIteratorWithStart(t *testing.T) {
 		{[]byte{1, 3, 3, 3}, []byte{1, 2, 3, 3}},
 	}
 
-	tree := NewMemoryTree()
+	tree := newMemoryTree()
 
 	for _, test := range tests {
 		_ = tree.Put(test.key, test.value)
@@ -131,7 +131,7 @@ func TestNewIteratorWithPrefixAndStart(t *testing.T) {
 		{[]byte{1, 3, 3, 3}, []byte{1, 2, 3, 3}},
 	}
 
-	tree := NewMemoryTree()
+	tree := newMemoryTree()
 
 	for _, test := range tests {
 		_ = tree.Put(test.key, test.value)

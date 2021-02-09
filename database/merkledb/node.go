@@ -22,7 +22,6 @@ type Node interface {
 	GetChildrenHashes() [][]byte
 	GetReHash() []byte
 	Clear() error
-	Print(level int32)
 	String() string
 }
 

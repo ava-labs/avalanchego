@@ -161,18 +161,6 @@ func (r *RootNode) Clear() error {
 	return r.persistence.DeleteNode(r)
 }
 
-// Print prints the child and requests the child to print itself
-func (r *RootNode) Print(int32) {
-	fmt.Printf("Root ID: %v - Child: %x \n", r.Key(), r.Child)
-	if len(r.Child) != 0 {
-		child, err := r.persistence.GetNodeByHash(r.Child)
-		if err != nil {
-			panic(err)
-		}
-		child.Print(1)
-	}
-}
-
 // String converts the node in a string format
 func (r *RootNode) String() string {
 	return fmt.Sprintf("Root ID: %v - Child: %x \n", r.Key(), r.Child)

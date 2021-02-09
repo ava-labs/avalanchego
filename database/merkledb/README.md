@@ -1,5 +1,3 @@
-merkledb
-
 #Summary
 
 ##Tree

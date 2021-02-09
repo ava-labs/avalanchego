@@ -6,8 +6,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
 
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
-
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 )
@@ -22,22 +20,13 @@ type ForestPersistence struct {
 }
 
 // NewForestPersistence creates a new Persistence
-func NewForestPersistence(db database.Database) (Persistence, error) {
-	c := linearcodec.NewDefault()
-	_ = c.RegisterType(&BranchNode{})
-	_ = c.RegisterType(&LeafNode{})
-	_ = c.RegisterType(&RootNode{})
-	codecManager := codec.NewDefaultManager()
-	if err := codecManager.RegisterCodec(0, c); err != nil {
-		return nil, err
-	}
-
+func NewForestPersistence(db database.Database) Persistence {
 	persistence := ForestPersistence{
 		db:    versiondb.New(db),
 		codec: codecManager,
 	}
 
-	return &persistence, nil
+	return &persistence
 }
 
 // GetNodeByHash fetches a Node given its hash
@@ -49,6 +38,9 @@ func (fp *ForestPersistence) GetNodeByHash(nodeHash []byte) (Node, error) {
 
 	var node Node
 	_, err = fp.codec.Unmarshal(nodeBytes, &node)
+	if err != nil {
+		return nil, err
+	}
 	node.SetPersistence(fp)
 
 	return node, err
@@ -132,10 +124,10 @@ func (fp *ForestPersistence) StoreNode(n Node, force bool) error {
 
 	// if a node with the same hash already exists increment the refs
 	// and decrement the references of it's children
-	_, err = fp.GetNodeByHash(n.GetHash())
+	existingNode, err := fp.GetNodeByHash(n.GetHash())
 	if err == nil {
-		n.References(1)
-		for _, childHash := range n.GetChildrenHashes() {
+		existingNode.References(1)
+		for _, childHash := range existingNode.GetChildrenHashes() {
 			childNode, err := fp.GetNodeByHash(childHash)
 			if err != nil {
 				return err
@@ -147,14 +139,13 @@ func (fp *ForestPersistence) StoreNode(n Node, force bool) error {
 				}
 			}
 		}
-	} else {
-		if err == database.ErrNotFound {
-			return fp.storeNode(n)
-		}
-		return err
+		return fp.storeNode(existingNode)
 	}
 
-	return fp.storeNode(n)
+	if err == database.ErrNotFound {
+		return fp.storeNode(n)
+	}
+	return err
 }
 
 // DeleteNode deletes a node from the ForestPersistence
@@ -191,6 +182,7 @@ func (fp *ForestPersistence) DeleteNode(n Node) error {
 		}
 
 		if decrementOldNode {
+
 			prevNodeRefs = prevNode.References(-1)
 
 			if prevNodeRefs == 0 {
@@ -198,7 +190,7 @@ func (fp *ForestPersistence) DeleteNode(n Node) error {
 			}
 
 			// otherwise store the new references on an unchanged copy of the previous version of the node
-			// this ensures that we are modifiying the copy that other nodes are referencing
+			// this ensures that we are modifying the copy that other nodes are referencing
 			copyNode, err := fp.GetNodeByHash(n.GetHash())
 			if err != nil {
 				return err
@@ -274,6 +266,9 @@ func (fp *ForestPersistence) refCountStoreNode(n Node) error {
 
 		if incrementChildren {
 			err = fp.incrementChildren(n, prevNode)
+			if err != nil {
+				return err
+			}
 		}
 
 		if decrementOldNode {

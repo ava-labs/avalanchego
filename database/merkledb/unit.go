@@ -11,11 +11,11 @@ type Unit byte
 
 type Key []Unit
 
-// FirstNonPrefix That function is only used in the BranchNode and it's purpose is to find the Node position in the BranchNode.
+// TerminationUnit That function is only used in the BranchNode and it's purpose is to find the Node position in the BranchNode.
 // It figures out the termination Unit -> position in the array.
 // If the length of both keys are the same, the Node Position is the b.Nodes[UnitSize], the last position of the array.
 // That is the exception for when we have BranchNode.SharedAddress=AAA1 and a LeafNode.Key=AAA1.
-func FirstNonPrefix(baseKey Key, otherKey Key) Unit {
+func TerminationUnit(baseKey Key, otherKey Key) Unit {
 	smaller := otherKey
 	larger := baseKey
 

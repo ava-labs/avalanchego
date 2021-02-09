@@ -3,9 +3,35 @@ package merkledb
 import (
 	"bytes"
 	"fmt"
+	"sync"
+
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	"github.com/ava-labs/avalanchego/database"
 )
+
+var (
+	codecManager codec.Manager
+	mutex        sync.Mutex
+)
+
+// init registers the codecs that marshal/unmarshal the Nodes in the Tree
+func init() {
+	c := linearcodec.NewDefault()
+	codecManager = codec.NewDefaultManager()
+	errs := wrappers.Errs{}
+	errs.Add(
+		c.RegisterType(&BranchNode{}),
+		c.RegisterType(&LeafNode{}),
+		c.RegisterType(&RootNode{}),
+		codecManager.RegisterCodec(0, c),
+	)
+	if errs.Errored() {
+		panic(errs.Err)
+	}
+}
 
 // Tree holds the tree data
 type Tree struct {
@@ -16,6 +42,9 @@ type Tree struct {
 
 // Has returns whether the key exists in the tree
 func (t *Tree) Has(key []byte) (bool, error) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if t.closed {
 		return false, database.ErrClosed
 	}
@@ -83,37 +112,35 @@ func (t *Tree) Close() error {
 }
 
 // NewTree returns a new instance of the Tree
-func NewTree(db database.Database) *Tree {
-	persistence, err := NewTreePersistence(db)
-	if err != nil {
-		panic(err)
-	}
+func NewTree(db database.Database) (*Tree, error) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	persistence := NewTreePersistence(db)
+
 	rootNode, err := persistence.NewRoot(0)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	return &Tree{
 		closed:      false,
 		persistence: persistence,
 		rootNode:    rootNode,
-	}
-}
-
-// NewTree returns a new instance of the Tree
-func NewTreeWithRoot(persistence Persistence, root Node) *Tree {
-	return &Tree{
-		closed:      false,
-		persistence: persistence,
-		rootNode:    root,
-	}
+	}, nil
 }
 
 func (t *Tree) Root() ([]byte, error) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	return t.rootNode.GetHash(), nil
 }
 
 func (t *Tree) Get(key []byte) ([]byte, error) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if t.closed {
 		return nil, database.ErrClosed
 	}
@@ -134,12 +161,94 @@ func (t *Tree) Get(key []byte) ([]byte, error) {
 
 // Put travels the tree and finds the node to insert the LeafNode
 func (t *Tree) Put(key []byte, value []byte) error {
+	mutex.Lock()
+	defer mutex.Unlock()
 	return t.persistence.Commit(t.put(key, value))
 }
 
 func (t *Tree) Delete(key []byte) error {
-	return t.persistence.Commit(t.del(key))
+	mutex.Lock()
+	defer mutex.Unlock()
+	return t.persistence.Commit(t.delete(key))
 }
+
+// Clear deletes all values on a tree
+func (t *Tree) Clear() error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	for len(t.rootNode.GetHash()) != 0 {
+		nextNodeHash := t.rootNode.(*RootNode).Child
+		for {
+			node, err := t.persistence.GetNodeByHash(nextNodeHash)
+			if err != nil {
+				return err
+			}
+
+			if leafNode, ok := node.(*LeafNode); ok {
+				leafKey := leafNode.Key()
+				err = t.persistence.Commit(t.delete(leafKey.ToBytes()))
+				if err != nil {
+					return err
+				}
+				break
+			} else {
+				branchNode, _ := node.(*BranchNode)
+				for _, childHash := range branchNode.Nodes {
+					if len(childHash) != 0 {
+						nextNodeHash = childHash
+						break
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (t *Tree) GetNode(hash []byte) (Node, error) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if t.closed {
+		return nil, database.ErrClosed
+	}
+
+	return t.persistence.GetNodeByHash(hash)
+}
+
+// PutRootNode inserts a rootNode
+func (t *Tree) PutRootNode(node Node) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if t.closed {
+		return database.ErrClosed
+	}
+
+	t.rootNode = node
+	return t.persistence.StoreNode(node, true)
+}
+
+// PutNodeAndCheck inserts a node in the tree and checks if the hash is correct
+func (t *Tree) PutNodeAndCheck(node Node, parentHash []byte) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if t.closed {
+		return database.ErrClosed
+	}
+
+	if !bytes.Equal(node.GetReHash(), parentHash) {
+		return fmt.Errorf("node hash is not the same as the parent Hash")
+	}
+
+	return t.persistence.StoreNode(node, true)
+}
+
+///
+//  Private Methods
+///
 
 // findNode traverses the Tree and finds the most suited node for the traversal based on the given key.
 // It traverses the tree trying to find the Node where that key might exist but doesn't guarantee
@@ -147,8 +256,8 @@ func (t *Tree) Delete(key []byte) error {
 // it will return
 // EmptyNode - if a position is found but no node exists
 // LeafNode - if there is a K/V pair in that position
+//
 func (t *Tree) findNode(key Key, node Node) (Node, error) {
-
 	if node == nil {
 		return nil, nil
 	}
@@ -168,48 +277,20 @@ func (t *Tree) findNode(key Key, node Node) (Node, error) {
 	return t.findNode(key, nodeChild)
 }
 
-// Clear deletes all values on a tree
-func (t *Tree) Clear() error {
-	var leaves []Key
-	for len(t.rootNode.GetHash()) != 0 {
-		nextNodeHash := t.rootNode.(*RootNode).Child
-
-		for {
-			node, err := t.persistence.GetNodeByHash(nextNodeHash)
-			if err != nil {
-				t.PrintTree()
-				return err
-			}
-
-			if leafNode, ok := node.(*LeafNode); ok {
-				leaves = append(leaves, leafNode.LeafKey)
-				leafKey := leafNode.Key()
-				err = t.Delete(leafKey.ToBytes())
-				if err != nil {
-					return err
-				}
-				break
-			} else {
-				branchNode, _ := node.(*BranchNode)
-				for _, childHash := range branchNode.Nodes {
-					if len(childHash) != 0 {
-						nextNodeHash = childHash
-						break
-					}
-				}
-			}
-		}
-	}
-	return nil
-}
-
-func (t *Tree) PrintTree() {
-	t.rootNode.Print(0)
-}
-
+// fetchNextNode traverses the tree and returns the next LeafNode or EmptyNode (if there isn't one)
+// that is immediately greater than :
+// Prefix, Start and Key obey to the principle of finding LeafNodes with Key greater than specified.
+// ie. Prefix/Start/Key is ABB : LeafNodes with Key ABCxxx or ACxxx are greater but Keys AAxxx or ABxxx are not
+//
+// prefix - Only finds nodes which their Key is equal or greater than specified
+// start  - Only finds nodes which their Key is equal or greater than specified
+// key    - Only finds nodes which their Key is equal or greater than specified
+// These can all do the same or they can be used together to filter results.
+// ie. Give me all the nodes that have the prefix with ABB, starting at ABB123, where the key is Greater than ABC
+//
 func (t *Tree) fetchNextNode(prefix Key, start Key, key Key, node Node) (Node, error) {
 	if node == nil {
-		return nil, database.ErrClosed
+		return nil, database.ErrNotFound
 	}
 	if t.closed {
 		return nil, database.ErrClosed
@@ -229,45 +310,13 @@ func (t *Tree) fetchNextNode(prefix Key, start Key, key Key, node Node) (Node, e
 	return t.fetchNextNode(prefix, start, key, nextNode)
 }
 
-func (t *Tree) GetNode(hash []byte) (Node, error) {
-	if t.closed {
-		return nil, database.ErrClosed
+// newTreeWithRoot returns a new instance of the Tree using a specific RootNode
+func newTreeWithRoot(persistence Persistence, root Node) *Tree {
+	return &Tree{
+		closed:      false,
+		persistence: persistence,
+		rootNode:    root,
 	}
-
-	return t.persistence.GetNodeByHash(hash)
-}
-
-// PutRootNode inserts a rootNode
-func (t *Tree) PutRootNode(node Node) error {
-	if t.closed {
-		return database.ErrClosed
-	}
-
-	t.rootNode = node
-	err := t.persistence.StoreNode(node, true)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// PutNodeAndCheck inserts a node in the tree and checks if the hash is correct
-func (t *Tree) PutNodeAndCheck(node Node, parentHash []byte) error {
-	if t.closed {
-		return database.ErrClosed
-	}
-
-	if !bytes.Equal(node.GetReHash(), parentHash) {
-		return fmt.Errorf("node hash is not the same as the parent Hash")
-	}
-
-	err := t.persistence.StoreNode(node, true)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (t *Tree) put(key []byte, value []byte) error {
@@ -301,7 +350,7 @@ func (t *Tree) put(key []byte, value []byte) error {
 	return insertNode.Insert(unitKey, value)
 }
 
-func (t *Tree) del(key []byte) error {
+func (t *Tree) delete(key []byte) error {
 	if t.closed {
 		return database.ErrClosed
 	}

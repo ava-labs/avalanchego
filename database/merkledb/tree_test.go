@@ -2,6 +2,7 @@ package merkledb
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -11,25 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 )
-
-// NewMemoryTree returns a new instance of the Tree with a in-memoryDB
-func NewMemoryTree() *Tree {
-	return NewTree(memdb.New())
-}
-
-func HardCloseDB(t *Tree) error {
-	t.Close()
-	return getDatabase(t.persistence).(*versiondb.Database).GetDatabase().Close()
-}
-
-// NewLevelTree returns a new instance of the Tree with a in-memoryDB
-func NewLevelTree(file string) *Tree {
-	db, err := leveldb.New(file, 0, 0, 0)
-	if err != nil {
-		panic(err)
-	}
-	return NewTree(db)
-}
 
 type TestStruct struct {
 	Key   []byte
@@ -54,7 +36,7 @@ func TestTree_Put(t *testing.T) {
 		{[]byte{1, 2, 3, 3}, []byte{1, 2, 3, 3}},
 	}
 
-	tree := NewMemoryTree()
+	tree := newMemoryTree()
 
 	for _, test := range tests {
 		_ = tree.Put(test.key, test.value)
@@ -82,7 +64,7 @@ func TestTree_PutVariableKeys(t *testing.T) {
 		{[]byte{1, 1, 1, 1, 3}, []byte{1, 1, 1, 1, 3}},
 	}
 
-	tree := NewMemoryTree()
+	tree := newMemoryTree()
 
 	for _, test := range tests {
 		_ = tree.Put(test.key, test.value)
@@ -115,7 +97,7 @@ func TestTree_Del(t *testing.T) {
 		{[]byte{7, 188, 148, 22}, []byte{77, 188, 148, 22}},
 	}
 
-	tree := NewMemoryTree()
+	tree := newMemoryTree()
 
 	for _, test := range tests {
 		_ = tree.Put(test.key, test.value)
@@ -158,7 +140,7 @@ func TestTree_DelVariableKeys(t *testing.T) {
 		{[]byte{7, 188, 148, 22}, []byte{77, 188, 148, 22}},
 	}
 
-	tree := NewMemoryTree()
+	tree := newMemoryTree()
 
 	for _, test := range tests {
 		_ = tree.Put(test.key, test.value)
@@ -217,7 +199,7 @@ func TestTree_Put_Scenarios(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			tree := NewMemoryTree()
+			tree := newMemoryTree()
 
 			for _, entry := range test.PutData {
 				_ = tree.Put(entry.Key, entry.Value)
@@ -307,7 +289,7 @@ func TestTree_Del_Scenarios(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			tree := NewMemoryTree()
+			tree := newMemoryTree()
 
 			for _, entry := range test.PutData {
 				_ = tree.Put(entry.Key, entry.Value)
@@ -335,9 +317,86 @@ func TestTree_Del_Scenarios(t *testing.T) {
 
 func TestInterface(t *testing.T) {
 	for _, test := range database.Tests {
-		treeA := NewMemoryTree()
-		treeB := NewMemoryTree()
+		treeA := newMemoryTree()
+		treeB := newMemoryTree()
 		test(t, treeA)
 		test(t, treeB)
 	}
+}
+
+///
+//  Private test methods
+///
+
+func printTree(t *Tree) {
+	rootNode, _ := t.rootNode.(*RootNode)
+	fmt.Printf("Root ID: %v - Child: %x \n", rootNode.Key(), rootNode.Child)
+	if len(rootNode.Child) != 0 {
+		printNode(t, rootNode.GetChildrenHashes()[0], 0)
+	}
+}
+
+func printNode(t *Tree, nodeHash []byte, level int) {
+	n, err := t.persistence.GetNodeByHash(nodeHash)
+	if err != nil || n == nil {
+		return
+	}
+
+	switch node := n.(type) {
+	case *BranchNode:
+		nodes := "[\n"
+		tabs := ""
+		for i := 0; i <= level; i++ {
+			tabs += "\t"
+		}
+		fmt.Printf("%sBranch ID: %x - SharedAddress: %v - Refs: %v \n"+
+			"%s\t↪ Nodes: ", tabs, node.GetHash(), node.SharedAddress, node.Refs, tabs)
+		for _, nodeHash := range node.Nodes {
+			if len(nodeHash) > 0 {
+				nodes += fmt.Sprintf("%s\t\t\t[%x]\n", tabs, nodeHash)
+			}
+		}
+		nodes += fmt.Sprintf("%s\t\t\t]\n", tabs)
+		fmt.Println(nodes)
+		for _, nodeKey := range node.Nodes {
+			if len(nodeKey) != 0 {
+				printNode(t, nodeKey, level+1)
+			}
+		}
+	case *LeafNode:
+		fmt.Printf("%v\n", node)
+		return
+	}
+}
+
+// newMemoryTree returns a new instance of the Tree with a in-memoryDB
+func newMemoryTree() *Tree {
+	tree, err := NewTree(memdb.New())
+	if err != nil {
+		panic(err)
+	}
+	return tree
+}
+
+func hardCloseDB(t *Tree) error {
+	err := t.Close()
+	if err != nil {
+		panic(err)
+	}
+	return getDatabase(t.persistence).(*versiondb.Database).GetDatabase().Close()
+}
+
+// newLevelTree returns a new instance of the Tree with a in-memoryDB
+func newLevelTree(file string) *Tree {
+	db, err := leveldb.New(file, 0, 0, 0)
+	if err != nil {
+		panic(err)
+	}
+
+	tree, err := NewTree(db)
+	if err != nil {
+		panic(err)
+	}
+
+	return tree
 }

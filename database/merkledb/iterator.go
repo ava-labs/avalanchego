@@ -67,6 +67,7 @@ func (i *Iterator) Next() bool {
 	if i.err != nil {
 		return false
 	}
+
 	i.node, i.err = i.tree.fetchNextNode(BytesToKey(i.prefix), BytesToKey(i.start), i.node.Key(), rootNode)
 	return i.node != nil
 }

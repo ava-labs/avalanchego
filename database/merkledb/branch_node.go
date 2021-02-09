@@ -62,8 +62,8 @@ func (b *BranchNode) GetChild(key Key) (Node, error) {
 	// if the node CAN exist in this prefix but doesn't return an EmptyNode
 	// Node Key: AABBCC
 	// SharedAddress: AABBC
-	// FirstNonPrefix:  AABBCC - AABBC = C
-	nodeHash := b.Nodes[FirstNonPrefix(b.SharedAddress, key)]
+	// TerminationUnit:  AABBCC - AABBC = C
+	nodeHash := b.Nodes[TerminationUnit(b.SharedAddress, key)]
 	if len(nodeHash) == 0 {
 		e := NewEmptyNode(b, key)
 		e.PivotPoint().Copy(b.PivotPoint())
@@ -131,7 +131,7 @@ func (b *BranchNode) GetNextNode(prefix Key, start Key, key Key) (Node, error) {
 	}
 
 	// search the next node after the address one
-	for _, nodeHash := range b.Nodes[FirstNonPrefix(b.SharedAddress, key):] {
+	for _, nodeHash := range b.Nodes[TerminationUnit(b.SharedAddress, key):] {
 		if len(nodeHash) != 0 {
 
 			node, err := b.persistence.GetNodeByHash(nodeHash)
@@ -172,7 +172,7 @@ func (b *BranchNode) Insert(key Key, value []byte) error {
 
 	// if the position already exists then create a new BranchNode
 	// with both values and insert it, in this position
-	if nodeHash := b.Nodes[FirstNonPrefix(b.SharedAddress, key)]; len(nodeHash) != 0 {
+	if nodeHash := b.Nodes[TerminationUnit(b.SharedAddress, key)]; len(nodeHash) != 0 {
 
 		// get the existing node
 		node, err := b.persistence.GetNodeByHash(nodeHash)
@@ -214,7 +214,7 @@ func (b *BranchNode) Insert(key Key, value []byte) error {
 	}
 
 	newLeafHash := newLeafNode.GetHash()
-	b.Nodes[FirstNonPrefix(b.SharedAddress, key)] = newLeafHash
+	b.Nodes[TerminationUnit(b.SharedAddress, key)] = newLeafHash
 
 	return b.Hash(key, newLeafHash)
 }
@@ -229,7 +229,7 @@ func (b *BranchNode) Insert(key Key, value []byte) error {
 func (b *BranchNode) Delete(key Key) error {
 
 	// there's no node to delete here
-	prefixedKey := FirstNonPrefix(b.SharedAddress, key)
+	prefixedKey := TerminationUnit(b.SharedAddress, key)
 	if nodeKey := b.Nodes[prefixedKey]; nodeKey == nil {
 		return database.ErrNotFound
 	}
@@ -279,7 +279,7 @@ func (b *BranchNode) Delete(key Key) error {
 func (b *BranchNode) SetChild(node Node) error {
 	// do not rehash here as it will be followed by an Insert or a Delete
 	// we also don't store here as the next call will do that for us - and the branch is in memory
-	b.Nodes[FirstNonPrefix(b.SharedAddress, node.Key())] = node.GetHash()
+	b.Nodes[TerminationUnit(b.SharedAddress, node.Key())] = node.GetHash()
 
 	return nil
 }
@@ -302,7 +302,7 @@ func (b *BranchNode) Value() []byte { return nil }
 // rehash the branch and requests the parent to do the same providing the BranchNodes key
 func (b *BranchNode) Hash(nodeKey Key, hash []byte) error {
 
-	b.Nodes[FirstNonPrefix(b.SharedAddress, nodeKey)] = hash
+	b.Nodes[TerminationUnit(b.SharedAddress, nodeKey)] = hash
 
 	hashSet := make([][]byte, UnitSize+1+1)
 	hashSet[0] = b.SharedAddress.ToExpandedBytes()
@@ -316,7 +316,7 @@ func (b *BranchNode) Hash(nodeKey Key, hash []byte) error {
 	b.previousStoredHash = b.StoredHash
 	b.StoredHash = Hash(hashSet...)
 
-	// Hashing creates a new Node - since it has a parent (bc of call stack) we mark it with 1 Reference
+	// Hashing creates a new Node - since it has a parent (known because of the call stack) mark it with 1 Reference
 	b.Refs = 1
 	err := b.persistence.StoreNode(b, false)
 	if err != nil {
@@ -371,7 +371,6 @@ func (b *BranchNode) GetChildrenHashes() [][]byte {
 }
 
 // GetReHash is mainly used for consistency checks
-// TODO review this
 func (b *BranchNode) GetReHash() []byte {
 	hashSet := make([][]byte, UnitSize+1)
 	hashSet[0] = b.SharedAddress.ToExpandedBytes()
@@ -414,42 +413,14 @@ func (b *BranchNode) Clear() error {
 
 // String converts the node in a string format
 func (b *BranchNode) String() string {
-	nodes := fmt.Sprintf("[\n")
+	nodes := "[\n"
 	for _, nodeHash := range b.Nodes {
 		if len(nodeHash) > 0 {
 			nodes += fmt.Sprintf("\t\t[%x]\n", nodeHash)
 		}
 	}
-	nodes += fmt.Sprintf("\t\t]\n")
+	nodes += "\t\t]\n"
 	return fmt.Sprintf("Branch ID: %x - SharedAddress: %v - Refs: %d \n\t↪ Nodes:%v", b.GetHash(), b.SharedAddress, b.Refs, nodes)
-}
-
-// Print prints the node
-func (b *BranchNode) Print(level int32) {
-
-	nodes := fmt.Sprint("[\n")
-	tabs := ""
-	for i := int32(0); i <= level; i++ {
-		tabs += fmt.Sprint("\t")
-	}
-	fmt.Printf("%sBranch ID: %x - SharedAddress: %v - Refs: %v \n"+
-		"%s\t↪ Nodes: ", tabs, b.GetHash(), b.SharedAddress, b.Refs, tabs)
-	for _, nodeHash := range b.Nodes {
-		if len(nodeHash) > 0 {
-			nodes += fmt.Sprintf("%s\t[%x]\n", tabs, nodeHash)
-		}
-	}
-	nodes += fmt.Sprintf("%s\t]\n", tabs)
-	fmt.Println(nodes)
-	for _, nodeKey := range b.Nodes {
-		if len(nodeKey) != 0 {
-			node, err := b.persistence.GetNodeByHash(nodeKey)
-			if err != nil {
-				continue
-			}
-			node.Print(level + 1)
-		}
-	}
 }
 
 func (b *BranchNode) nodeLengthEquals(size int) bool {

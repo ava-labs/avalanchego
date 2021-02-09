@@ -33,7 +33,7 @@ func TestForestConsistencyCopy_PutGetDel(t *testing.T) {
 			// add values to the tree
 			putAndTestRoot(t, stakerTree, test.data)
 			// close it
-			err = HardCloseDB(stakerTree)
+			err = hardCloseDB(stakerTree)
 			if err != nil {
 				t.Fatal("Error closing the db")
 			}
@@ -96,12 +96,12 @@ func TestForestConsistencyCopy_PutGetDel(t *testing.T) {
 			}
 
 			getTest(t, bootstrapTree, test.data)
-			err = HardCloseDB(bootstrapTree)
+			err = hardCloseDB(bootstrapTree)
 			if err != nil {
 				t.Fatal("Error closing the db")
 			}
 
-			err = HardCloseDB(stakerTree2)
+			err = hardCloseDB(stakerTree2)
 			if err != nil {
 				t.Fatal("Error closing the db")
 			}
@@ -195,9 +195,9 @@ func TestForestConsistency_PutGetDel(t *testing.T) {
 	}
 
 	if false {
-		dumpTest(t, tests, "test.json")
-		tests = loadTest(t, "test.json")
-		tests[0].debugEntry = []byte{235, 6, 131, 166, 154, 73, 104, 230, 190, 102, 190, 15, 79, 36, 157, 15, 114, 81, 182, 35, 241, 55, 98, 66, 19, 97, 7, 31, 76, 98, 42}
+		// dumpTest(t, tests, "test.json")
+		// tests = loadTest(t, "test.json")
+		// tests[0].debugEntry = []byte{235, 6, 131, 166, 154, 73, 104, 230, 190, 102, 190, 15, 79, 36, 157, 15, 114, 81, 182, 35, 241, 55, 98, 66, 19, 97, 7, 31, 76, 98, 42}
 	}
 
 	for _, test := range tests {
@@ -206,7 +206,7 @@ func TestForestConsistency_PutGetDel(t *testing.T) {
 }
 
 func TestForestConsistency_PutGetClear(t *testing.T) {
-	testSize := 10
+	testSize := 1000
 	t0 := CreateRandomValues(testSize)
 	t1 := CreateRandomValues(testSize)
 	t2 := CreateRandomValues(testSize)
@@ -273,13 +273,20 @@ func TestForestConsistency_PutGetClear(t *testing.T) {
 		dumpTest(t, tests, "test.json")
 		tests = loadTest(t, "test.json")
 		writeTest(tests)
-		tests[0].debugEntry = []byte{125, 84, 98, 23}
+		// tests[0].debugEntry = []byte{125, 84, 98, 23}
+		// tests[0].debugInfo = true
 	}
 
 	for _, test := range tests {
 		testForest(t, test)
 	}
 }
+
+//
+//
+// Utility Test Functions
+//
+//
 
 func loadTest(t *testing.T, fileName string) []ScenarioForestStruct {
 	var tests []ScenarioForestStruct

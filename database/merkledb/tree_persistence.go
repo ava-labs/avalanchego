@@ -5,8 +5,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
 
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
-
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 )
@@ -18,22 +16,13 @@ type TreePersistence struct {
 }
 
 // NewTreePersistence creates a new TreePersistence
-func NewTreePersistence(db database.Database) (Persistence, error) {
-	c := linearcodec.NewDefault()
-	_ = c.RegisterType(&BranchNode{})
-	_ = c.RegisterType(&LeafNode{})
-	_ = c.RegisterType(&RootNode{})
-	codecManager := codec.NewDefaultManager()
-	if err := codecManager.RegisterCodec(0, c); err != nil {
-		return nil, err
-	}
-
-	TreePersistence := TreePersistence{
+func NewTreePersistence(db database.Database) Persistence {
+	treePersistence := TreePersistence{
 		db:    versiondb.New(db),
 		codec: codecManager,
 	}
 
-	return &TreePersistence, nil
+	return &treePersistence
 }
 
 // GetNodeByUnitKey fetches a Node given a StorageKey
@@ -61,7 +50,8 @@ func (tp *TreePersistence) GetRootNode(rootNodeID uint32) (Node, error) {
 	return node, nil
 }
 
-func (tp *TreePersistence) NewRoot(rootNodeID uint32) (Node, error) {
+// NewRoot returns a new RootNode for Tree 0
+func (tp *TreePersistence) NewRoot(uint32) (Node, error) {
 	rootNode, err := tp.GetRootNode(0)
 	if err == database.ErrNotFound {
 		newRoot := NewRootNode(0, tp)

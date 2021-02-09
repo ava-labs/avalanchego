@@ -297,33 +297,17 @@ func TestForest_Put(t *testing.T) {
 }
 
 func TestForest_DeletedTree(t *testing.T) {
-	debugInfo := false
 	f := NewMemoryForest()
 	t0, err := f.CreateEmptyTree(0)
 	if err != nil {
 		t.Fatalf("not expected to fail - %v", err)
 	}
-	count := 0
+
 	t0Values := CreateRandomValues(100)
 	for _, data := range t0Values {
 		err = t0.Put(data.Key, data.Value)
 		if err != nil {
 			t.Fatalf("not expected to fail inserting data - %v", err)
-		}
-
-		if debugInfo {
-			count++
-			if count < 10 {
-				fmt.Printf(
-					"\n＊ \033[32m PUT Operation \033[0m - "+
-						"\033[36m Scenario: %s \u001B[0m\n  ---> "+
-						"OperationName: %s - \033[33m Tree:%d \u001B[0m \n",
-					"TestForest_DeletedTree",
-					"--",
-					0)
-				fmt.Printf("Inserting key: %v\n", BytesToKey(data.Key).ToExpandedBytes())
-				t0.PrintTree()
-			}
 		}
 	}
 
@@ -2000,6 +1984,12 @@ func TestForest_Size_4_MultipleLeaves_PutGetDel(t *testing.T) {
 	}
 }
 
+//
+//
+// Utility Test Functions
+//
+//
+
 func testForest(t *testing.T, test ScenarioForestStruct) {
 	var err error
 	forest := NewMemoryForest()
@@ -2011,7 +2001,7 @@ func testForest(t *testing.T, test ScenarioForestStruct) {
 			if scenario.printTree || test.debugInfo {
 				fmt.Printf("\n \033[35m PrintTree Before Operation \u001B[0m ＊Scenario: %s \n  ---> "+
 					"\033[31m OperationName: %s \u001B[0m - Tree:%d\n", test.Name, scenario.TreeScenario.Name, scenario.Tree)
-				tree.PrintTree()
+				printTree(tree)
 			}
 
 			for _, entry := range scenario.TreeScenario.PutData {
@@ -2028,7 +2018,7 @@ func testForest(t *testing.T, test ScenarioForestStruct) {
 						scenario.TreeScenario.Name,
 						scenario.Tree)
 					fmt.Printf("Inserting key: %v\n", BytesToKey(entry.Key).ToExpandedBytes())
-					tree.PrintTree()
+					printTree(tree)
 				}
 				if err != nil {
 					t.Fatalf("unable to put %v - %v", entry, err)
@@ -2065,7 +2055,7 @@ func testForest(t *testing.T, test ScenarioForestStruct) {
 						scenario.TreeScenario.Name,
 						scenario.Tree)
 					fmt.Printf("Deleting key: %v\n", BytesToKey(entry.Key).ToExpandedBytes())
-					tree.PrintTree()
+					printTree(tree)
 				}
 				if err != nil {
 					t.Fatalf("scenario: %s \n value not deleted in the tree as it was not found err: %v \nkey: %v"+
@@ -2075,7 +2065,6 @@ func testForest(t *testing.T, test ScenarioForestStruct) {
 
 			if scenario.TreeScenario.ClearTree {
 				err := tree.Clear()
-				//err := forest.Delete(scenario.Tree)
 				if err != nil {
 					t.Fatalf("couldn't clear the Tree - %v", err)
 				}
@@ -2083,7 +2072,7 @@ func testForest(t *testing.T, test ScenarioForestStruct) {
 
 			if scenario.printTree || test.debugInfo {
 				fmt.Printf("\n \033[34m PrintTree After Operation \u001B[0m ＊Scenario: %s \n  ---> \033[31m OperationName: %s \u001B[0m - Tree:%d\n", test.Name, scenario.TreeScenario.Name, scenario.Tree)
-				tree.PrintTree()
+				printTree(tree)
 			}
 
 			if scenario.checkCleanDB {

@@ -157,16 +157,6 @@ func (l *LeafNode) Clear() error {
 	return l.persistence.DeleteNode(l)
 }
 
-// Print prints this Node data
-func (l *LeafNode) Print(level int32) {
-	tabs := ""
-	for i := int32(0); i < level; i++ {
-		tabs += fmt.Sprint("\t")
-	}
-
-	fmt.Printf(tabs + fmt.Sprintf("Leaf ID: %x - Refs: %d - \n%s\tKey: %v \n%s\tVal: %v\n", l.GetHash(), l.Refs, tabs, l.LeafKey, tabs, l.LeafValue))
-}
-
 // String converts the node in a string format
 func (l *LeafNode) String() string {
 	return fmt.Sprintf("Leaf ID: %x - Refs: %d - \n\t\t\t\tKey: %v \n\t\t\t\tVal: %v\n", l.GetHash(), l.Refs, l.LeafKey, l.LeafValue)

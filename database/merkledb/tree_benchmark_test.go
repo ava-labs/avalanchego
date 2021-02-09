@@ -70,7 +70,7 @@ func BenchmarkTree_Put(b *testing.B) {
 
 	for _, test := range tests {
 		tmpDir := b.TempDir()
-		tree := NewLevelTree(tmpDir)
+		tree := newLevelTree(tmpDir)
 
 		b.Run(test.name, func(b *testing.B) {
 			b.ResetTimer()
@@ -79,7 +79,7 @@ func BenchmarkTree_Put(b *testing.B) {
 				_ = tree.Put(test.Key, test.Value)
 			}
 		})
-		_ = HardCloseDB(tree)
+		_ = hardCloseDB(tree)
 	}
 }
 
@@ -95,7 +95,7 @@ func BenchmarkTree_PutBatch(b *testing.B) {
 
 	for _, test := range tests {
 		tmpDir := b.TempDir()
-		tree := NewLevelTree(tmpDir)
+		tree := newLevelTree(tmpDir)
 		batcher := NewBatch(tree)
 
 		b.Run(test.name, func(b *testing.B) {
@@ -106,7 +106,7 @@ func BenchmarkTree_PutBatch(b *testing.B) {
 			}
 			_ = batcher.Write()
 		})
-		_ = HardCloseDB(tree)
+		_ = hardCloseDB(tree)
 	}
 }
 
@@ -122,7 +122,7 @@ func BenchmarkTree_Get(b *testing.B) {
 
 	for _, test := range tests {
 		tmpDir := b.TempDir()
-		tree := NewLevelTree(tmpDir)
+		tree := newLevelTree(tmpDir)
 		batchTree := NewBatch(tree)
 
 		b.Run(test.name, func(b *testing.B) {
@@ -136,12 +136,11 @@ func BenchmarkTree_Get(b *testing.B) {
 				_, err := tree.Get(entry.Key)
 
 				if err != nil {
-					tree.PrintTree()
 					b.Fatalf("value not found in the tree - %v - %v", entry.Key, err)
 				}
 			}
 		})
-		_ = HardCloseDB(tree)
+		_ = hardCloseDB(tree)
 	}
 }
 
@@ -158,7 +157,7 @@ func BenchmarkTree_Del(b *testing.B) {
 
 	for _, test := range tests {
 		tmpDir := b.TempDir()
-		tree := NewLevelTree(tmpDir)
+		tree := newLevelTree(tmpDir)
 
 		b.Run(test.name, func(b *testing.B) {
 			for _, test := range test.data {
@@ -174,7 +173,7 @@ func BenchmarkTree_Del(b *testing.B) {
 				}
 			}
 		})
-		_ = HardCloseDB(tree)
+		_ = hardCloseDB(tree)
 	}
 }
 
@@ -191,7 +190,7 @@ func BenchmarkTree_DelBatcher(b *testing.B) {
 
 	for _, test := range tests {
 		tmpDir := b.TempDir()
-		tree := NewLevelTree(tmpDir)
+		tree := newLevelTree(tmpDir)
 		batcher := NewBatch(tree)
 
 		b.Run(test.name, func(b *testing.B) {
@@ -211,6 +210,6 @@ func BenchmarkTree_DelBatcher(b *testing.B) {
 			_ = batcher.Write()
 
 		})
-		_ = HardCloseDB(tree)
+		_ = hardCloseDB(tree)
 	}
 }

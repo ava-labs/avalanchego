@@ -9,10 +9,7 @@ type Forest struct {
 
 // NewForest creates a multi-root merkle radix tree
 func NewForest(db database.Database) *Forest {
-	persistence, err := NewForestPersistence(db)
-	if err != nil {
-		panic(err)
-	}
+	persistence := NewForestPersistence(db)
 	return &Forest{
 		persistence: persistence,
 	}
@@ -31,7 +28,7 @@ func (f *Forest) CreateEmptyTree(treeRootID uint32) (*Tree, error) {
 		return nil, err
 	}
 
-	return NewTreeWithRoot(f.persistence, root), nil
+	return newTreeWithRoot(f.persistence, root), nil
 }
 
 // Copy creates a new Tree that points to the child of oldRootID
@@ -46,7 +43,7 @@ func (f *Forest) Copy(oldRootID uint32, newRootID uint32) (*Tree, error) {
 		return nil, err
 	}
 
-	return NewTreeWithRoot(f.persistence, root), nil
+	return newTreeWithRoot(f.persistence, root), nil
 }
 
 // Get returns an existing tree root
@@ -55,7 +52,7 @@ func (f *Forest) Get(treeRootID uint32) (*Tree, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewTreeWithRoot(f.persistence, root), nil
+	return newTreeWithRoot(f.persistence, root), nil
 }
 
 // Delete deletes all elements in the given Tree

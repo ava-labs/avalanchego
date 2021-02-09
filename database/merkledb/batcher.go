@@ -10,22 +10,22 @@ type batchValue struct {
 	delete bool
 }
 
-// Batch is a write-only database that commits changes to its host database
+// batch is a write-only database that commits changes to its host database
 // when Write is called. A batch cannot be used concurrently.
-type Batch struct {
+type batch struct {
 	data []batchValue
 	tree *Tree
 }
 
 func NewBatch(t *Tree) database.Batch {
-	return &Batch{
+	return &batch{
 		data: nil,
 		tree: t,
 	}
 }
 
 // ValueSize retrieves the amount of data queued up for writing.
-func (b *Batch) ValueSize() int {
+func (b *batch) ValueSize() int {
 	return len(b.data)
 }
 
@@ -33,30 +33,28 @@ func (b *Batch) ValueSize() int {
 // TODO Optimize
 // If the size of the batch is smaller than the trie, which it will be in all realistic cases,
 // then it makes sense to do some pre-processing such that the batched operations don't modify the same part of the trie multiple times.
-func (b *Batch) Write() error {
+func (b *batch) Write() error {
 	var err error
+	mutex.Lock()
+	defer mutex.Unlock()
 
 	for _, d := range b.data {
 		if d.delete {
-			err = b.tree.del(d.key)
+			err = b.tree.delete(d.key)
 		} else {
 			err = b.tree.put(d.key, d.value)
 		}
-
-		if err != nil {
-			return err
-		}
 	}
-	return b.tree.persistence.Commit(nil)
+	return b.tree.persistence.Commit(err)
 }
 
 // Reset resets the batch for reuse.
-func (b *Batch) Reset() {
+func (b *batch) Reset() {
 	b.data = nil
 }
 
 // Replay replays the batch contents.
-func (b *Batch) Replay(w database.KeyValueWriter) error {
+func (b *batch) Replay(w database.KeyValueWriter) error {
 	for _, val := range b.data {
 		if val.delete {
 			if err := w.Delete(val.key); err != nil {
@@ -70,7 +68,7 @@ func (b *Batch) Replay(w database.KeyValueWriter) error {
 }
 
 // Put inserts the given value into the key-value data store.
-func (b *Batch) Put(key []byte, value []byte) error {
+func (b *batch) Put(key []byte, value []byte) error {
 	b.data = append(b.data, batchValue{
 		key:    key,
 		value:  value,
@@ -80,7 +78,7 @@ func (b *Batch) Put(key []byte, value []byte) error {
 }
 
 // Delete removes the key from the key-value data store.
-func (b *Batch) Delete(key []byte) error {
+func (b *batch) Delete(key []byte) error {
 	b.data = append(b.data, batchValue{
 		key:    key,
 		value:  nil,
@@ -89,9 +87,9 @@ func (b *Batch) Delete(key []byte) error {
 	return nil
 }
 
-// Inner returns a Batch writing to the inner database, if one exists. If
+// Inner returns a batch writing to the inner database, if one exists. If
 // this batch is already writing to the base DB, then itself should be
 // returned.
-func (b *Batch) Inner() database.Batch {
+func (b *batch) Inner() database.Batch {
 	return b
 }

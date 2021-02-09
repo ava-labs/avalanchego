@@ -1,7 +1,5 @@
 package merkledb
 
-import "fmt"
-
 // EmptyNode is a Node implementation that represents non existing Nodes
 // it's used mainly when traversing the tree fetching a non existing key
 // it pre-sets the conditions for insertion
@@ -89,11 +87,6 @@ func (e *EmptyNode) GetReHash() []byte {
 // Clear should never be called
 func (e *EmptyNode) Clear() error {
 	return nil
-}
-
-// Print should never be called
-func (e *EmptyNode) Print(int32) {
-	fmt.Printf("ERROR: should never be called EmptyNode ID: %p - Parent: %p", e, e.parent)
 }
 
 // String converts the node in a string format
