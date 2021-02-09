@@ -291,7 +291,7 @@ func (vm *VM) Initialize(
 	config.RPCTxFeeCap = vm.CLIConfig.RPCTxFeeCap
 	config.GPO.Default = params.MinGasPrice
 	config.TxPool.PriceLimit = params.MinGasPrice.Uint64()
-	config.TxPool.NoLocals = true
+	config.TxPool.NoLocals = !vm.CLIConfig.LocalTxsEnabled
 
 	if err := config.SetGCMode("archive"); err != nil {
 		panic(err)
