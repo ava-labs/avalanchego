@@ -31,15 +31,14 @@ type Manager struct {
 	clock        timer.Clock
 	tm           timer.AdaptiveTimeoutManager
 	benchlistMgr benchlist.Manager
-	executor     timer.Executor
 	metrics      metrics
 	// Unique-ified request ID --> Time and type of message made
 	requests map[ids.ID]request
 }
 
 // Initialize this timeout manager.
-func (m *Manager) Initialize(timeoutConfig *timer.AdaptiveTimeoutConfig, benchlist benchlist.Manager) error {
-	m.benchlistMgr = benchlist
+func (m *Manager) Initialize(timeoutConfig *timer.AdaptiveTimeoutConfig, benchlistMgr benchlist.Manager) error {
+	m.benchlistMgr = benchlistMgr
 	m.requests = map[ids.ID]request{}
 	return m.tm.Initialize(timeoutConfig)
 }

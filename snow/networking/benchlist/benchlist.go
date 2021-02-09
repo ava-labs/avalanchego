@@ -141,7 +141,7 @@ func NewBenchlist(
 		maxPortion:             maxPortion,
 	}
 	benchlist.timer = timer.NewTimer(benchlist.update)
-	benchlist.timer.Dispatch()
+	go benchlist.timer.Dispatch()
 	return benchlist, benchlist.metrics.Initialize(registerer, namespace)
 }
 
