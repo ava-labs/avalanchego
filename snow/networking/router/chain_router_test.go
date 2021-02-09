@@ -24,13 +24,13 @@ func TestShutdown(t *testing.T) {
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
 	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout: time.Millisecond,
-		MinimumTimeout: time.Millisecond,
-		MaximumTimeout: 10 * time.Second,
-		TimeoutInc:     2 * time.Millisecond,
-		TimeoutDec:     time.Millisecond,
-		Namespace:      "",
-		Registerer:     prometheus.NewRegistry(),
+		InitialTimeout:     time.Millisecond,
+		MinimumTimeout:     time.Millisecond,
+		MaximumTimeout:     10 * time.Second,
+		TimeoutCoefficient: 1.25,
+		TimeoutHalflife:    5 * time.Minute,
+		MetricsNamespace:   "",
+		Registerer:         prometheus.NewRegistry(),
 	}, benchlist)
 	if err != nil {
 		t.Fatal(err)
@@ -87,13 +87,13 @@ func TestShutdownTimesOut(t *testing.T) {
 	tm := timeout.Manager{}
 	// Ensure that the MultiPut request does not timeout
 	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout: time.Second,
-		MinimumTimeout: 500 * time.Millisecond,
-		MaximumTimeout: 10 * time.Second,
-		TimeoutInc:     2 * time.Millisecond,
-		TimeoutDec:     time.Millisecond,
-		Namespace:      "",
-		Registerer:     prometheus.NewRegistry(),
+		InitialTimeout:     time.Second,
+		MinimumTimeout:     500 * time.Millisecond,
+		MaximumTimeout:     10 * time.Second,
+		TimeoutCoefficient: 1.25,
+		TimeoutHalflife:    5 * time.Minute,
+		MetricsNamespace:   "",
+		Registerer:         prometheus.NewRegistry(),
 	}, benchlist)
 	if err != nil {
 		t.Fatal(err)
