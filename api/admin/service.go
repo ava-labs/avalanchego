@@ -33,7 +33,7 @@ var (
 // Admin is the API service for node admin management
 type Admin struct {
 	log          logging.Logger
-	performance  Performance
+	performance  *Performance
 	chainManager chains.Manager
 	httpServer   *api.Server
 }
@@ -48,6 +48,7 @@ func NewService(log logging.Logger, chainManager chains.Manager, httpServer *api
 		log:          log,
 		chainManager: chainManager,
 		httpServer:   httpServer,
+		performance:  NewDefaultPerformanceService(),
 	}, "admin"); err != nil {
 		return nil, err
 	}
