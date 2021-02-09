@@ -100,7 +100,7 @@ func (tm *AdaptiveTimeoutManager) Initialize(config *AdaptiveTimeoutConfig) erro
 	})
 	tm.avgLatency = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: config.MetricsNamespace,
-		Name:      "avg_request_latency",
+		Name:      "avg_network_latency",
 		Help:      "Average network latency in nanoseconds",
 	})
 
