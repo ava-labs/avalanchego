@@ -589,7 +589,7 @@ func newHandler(name string, service interface{}, lockOption ...commonEng.LockOp
 
 // CreateHandlers makes new http handlers that can handle API calls
 func (vm *VM) CreateHandlers() map[string]*commonEng.HTTPHandler {
-	handler := vm.chain.NewRPCHandler()
+	handler := vm.chain.NewRPCHandler(time.Duration(vm.CLIConfig.APIMaxDuration))
 	enabledAPIs := vm.CLIConfig.EthAPIs()
 	vm.chain.AttachEthService(handler, vm.CLIConfig.EthAPIs())
 
