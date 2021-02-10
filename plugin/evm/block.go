@@ -95,7 +95,8 @@ func (b *Block) Verify() error {
 	vm := b.vm
 	tx := vm.getAtomicTx(b.ethBlock)
 	if tx != nil {
-		pState, err := b.vm.chain.BlockState(b.Parent().(*Block).ethBlock)
+		ancestor := b.Parent().(*Block)
+		parentState, err := b.vm.chain.BlockState(ancestor.ethBlock)
 		if err != nil {
 			return err
 		}
@@ -106,20 +107,19 @@ func (b *Block) Verify() error {
 			}
 
 			inputs := atx.InputUTXOs()
-			p := b.Parent().(*Block)
 			for {
-				if p.Status() == choices.Accepted || p.ethBlock.Hash() == vm.genesisHash {
+				if ancestor.Status() == choices.Accepted || ancestor.ethBlock.Hash() == vm.genesisHash {
 					break
 				}
-				atx := vm.getAtomicTx(p.ethBlock)
+				atx := vm.getAtomicTx(ancestor.ethBlock)
 				if atx != nil {
-					parentInputs := atx.UnsignedTx.(UnsignedAtomicTx).InputUTXOs()
-					if inputs.Overlaps(parentInputs) {
+					ancestorInputs := atx.UnsignedTx.(UnsignedAtomicTx).InputUTXOs()
+					if inputs.Overlaps(ancestorInputs) {
 						return errors.New("invalid block due to conflicting atomic inputs")
 					}
 				}
 
-				p = p.Parent().(*Block)
+				ancestor = ancestor.Parent().(*Block)
 			}
 		case *UnsignedExportTx:
 		default:
@@ -131,7 +131,7 @@ func (b *Block) Verify() error {
 			return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
 		}
 		bc := vm.chain.BlockChain()
-		_, _, _, err = bc.Processor().Process(b.ethBlock, pState, *bc.GetVMConfig())
+		_, _, _, err = bc.Processor().Process(b.ethBlock, parentState, *bc.GetVMConfig())
 		if err != nil {
 			return fmt.Errorf("invalid block due to failed processing: %w", err)
 		}
