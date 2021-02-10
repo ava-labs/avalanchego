@@ -104,34 +104,22 @@ func (b *Block) Verify() error {
 			if b.ethBlock.Hash() == vm.genesisHash {
 				return nil
 			}
-			p := b.Parent()
-			path := []*Block{}
-			inputs := new(ids.Set)
+
+			inputs := atx.InputUTXOs()
+			p := b.Parent().(*Block)
 			for {
-				if p.Status() == choices.Accepted || p.(*Block).ethBlock.Hash() == vm.genesisHash {
+				if p.Status() == choices.Accepted || p.ethBlock.Hash() == vm.genesisHash {
 					break
 				}
-				if ret, hit := vm.blockAtomicInputCache.Get(p.ID()); hit {
-					inputs = ret.(*ids.Set)
-					break
-				}
-				path = append(path, p.(*Block))
-				p = p.Parent().(*Block)
-			}
-			for i := len(path) - 1; i >= 0; i-- {
-				inputsCopy := new(ids.Set)
-				p := path[i]
 				atx := vm.getAtomicTx(p.ethBlock)
 				if atx != nil {
-					inputs.Union(atx.UnsignedTx.(UnsignedAtomicTx).InputUTXOs())
-					inputsCopy.Union(*inputs)
+					parentInputs := atx.UnsignedTx.(UnsignedAtomicTx).InputUTXOs()
+					if inputs.Overlaps(parentInputs) {
+						return errors.New("invalid block due to conflicting atomic inputs")
+					}
 				}
-				vm.blockAtomicInputCache.Put(p.ID(), inputsCopy)
-			}
-			for _, in := range atx.InputUTXOs().List() {
-				if inputs.Contains(in) {
-					return errors.New("invalid block due to conflicting atomic inputs")
-				}
+
+				p = p.Parent().(*Block)
 			}
 		case *UnsignedExportTx:
 		default:
