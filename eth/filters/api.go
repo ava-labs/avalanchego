@@ -330,34 +330,10 @@ func (api *PublicFilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
 	return logsSub.ID, nil
 }
 
-var (
-	getLogsTimeout = 1 * time.Second
-)
-
-type contextWithDeadline struct {
-	context.Context
-	deadline time.Time
-}
-
-func (ctx contextWithDeadline) Deadline() (time.Time, bool) {
-	deadline, exists := ctx.Context.Deadline()
-	if !exists {
-		return ctx.deadline, true
-	}
-	if ctx.deadline.Before(deadline) {
-		return ctx.deadline, true
-	}
-	return deadline, true
-}
-
 // GetLogs returns logs matching the given argument that are stored within the state.
 //
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_getlogs
 func (api *PublicFilterAPI) GetLogs(ctx context.Context, crit FilterCriteria) ([]*types.Log, error) {
-	ctx = contextWithDeadline{
-		Context:  ctx,
-		deadline: time.Now().Add(getLogsTimeout),
-	}
 	var filter *Filter
 	if crit.BlockHash != nil {
 		// Block filter requested, construct a single-shot filter

@@ -30,6 +30,7 @@ import (
 	"context"
 	"io"
 	"sync/atomic"
+	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/log"
@@ -52,15 +53,37 @@ const (
 
 // Server is an RPC server.
 type Server struct {
-	services serviceRegistry
-	idgen    func() ID
-	run      int32
-	codecs   mapset.Set
+	services        serviceRegistry
+	idgen           func() ID
+	run             int32
+	codecs          mapset.Set
+	maximumDuration time.Duration
+}
+
+type contextWithDeadline struct {
+	context.Context
+	deadline time.Time
+}
+
+func (ctx contextWithDeadline) Deadline() (time.Time, bool) {
+	deadline, exists := ctx.Context.Deadline()
+	if !exists {
+		return ctx.deadline, true
+	}
+	if ctx.deadline.Before(deadline) {
+		return ctx.deadline, true
+	}
+	return deadline, true
 }
 
 // NewServer creates a new server instance with no registered handlers.
-func NewServer() *Server {
-	server := &Server{idgen: randomIDGenerator(), codecs: mapset.NewSet(), run: 1}
+func NewServer(maximumDuration time.Duration) *Server {
+	server := &Server{
+		idgen:           randomIDGenerator(),
+		codecs:          mapset.NewSet(),
+		run:             1,
+		maximumDuration: maximumDuration,
+	}
 	// Register the default service providing meta information about the RPC service such
 	// as the services and methods it offers.
 	rpcService := &RPCService{server}
@@ -105,6 +128,14 @@ func (s *Server) serveSingleRequest(ctx context.Context, codec ServerCodec) {
 	// Don't serve if server is stopped.
 	if atomic.LoadInt32(&s.run) == 0 {
 		return
+	}
+
+	// If the length of API calls should be limited, provide a deadline.
+	if s.maximumDuration > 0 {
+		ctx = contextWithDeadline{
+			Context:  ctx,
+			deadline: time.Now().Add(s.maximumDuration),
+		}
 	}
 
 	h := newHandler(ctx, codec, s.idgen, &s.services)
