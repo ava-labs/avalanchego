@@ -121,14 +121,18 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	}
 
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))
+	utxoTxIDSet := ids.Set{}
+	utxoIDSet := ids.Set{}
 	for i, in := range tx.ImportedInputs {
 		inputID := in.UTXOID.InputID()
 		utxoIDs[i] = inputID[:]
+		utxoTxIDSet.Add(in.TxID)
+		utxoIDSet.Add(inputID)
 	}
 	// allUTXOBytes is guaranteed to be the same length as utxoIDs
 	allUTXOBytes, err := vm.ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
 	if err != nil {
-		return tempError{err}
+		return tempError{fmt.Errorf("failed to fetch %s at %s from %s with %w", utxoIDSet, utxoTxIDSet, tx.SourceChain, err)}
 	}
 
 	for i, in := range tx.ImportedInputs {
