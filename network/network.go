@@ -83,9 +83,10 @@ type Network interface {
 	// IP.
 	Track(ip utils.IPDesc)
 
-	// Returns the description of the nodes this network is currently connected
-	// to externally. Thread safety must be managed internally to the network.
-	Peers() []PeerID
+	// Returns the description of the specified [nodeIDs] this network is currently
+	// connected to externally or all nodes this network is connected to if [nodeIDs]
+	// is empty. Thread safety must be managed internally to the network.
+	Peers(nodeIDs []ids.ShortID) []PeerID
 
 	// Close this network and all existing connections it has. Thread safety
 	// must be managed internally to the network. Calling close multiple times
@@ -746,21 +747,40 @@ func (n *network) Dispatch() error {
 
 // IPs implements the Network interface
 // assumes the stateLock is not held.
-func (n *network) Peers() []PeerID {
+func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
-	peers := make([]PeerID, 0, len(n.peers))
-	for _, peer := range n.peers {
-		if peer.connected.GetValue() {
-			peers = append(peers, PeerID{
-				IP:           peer.conn.RemoteAddr().String(),
-				PublicIP:     peer.getIP().String(),
-				ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
-				Version:      peer.versionStr.GetValue().(string),
-				LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
-				LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
-			})
+	var peers []PeerID
+
+	if len(nodeIDs) == 0 {
+		peers = make([]PeerID, 0, len(n.peers))
+		for _, peer := range n.peers {
+			if peer.connected.GetValue() {
+				peers = append(peers, PeerID{
+					IP:           peer.conn.RemoteAddr().String(),
+					PublicIP:     peer.getIP().String(),
+					ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
+					Version:      peer.versionStr.GetValue().(string),
+					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
+					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
+				})
+			}
+		}
+	} else {
+		peers = make([]PeerID, 0, len(nodeIDs))
+		for _, nodeID := range nodeIDs {
+			peer, ok := n.peers[nodeID]
+			if ok && peer.connected.GetValue() {
+				peers = append(peers, PeerID{
+					IP:           peer.conn.RemoteAddr().String(),
+					PublicIP:     peer.getIP().String(),
+					ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
+					Version:      peer.versionStr.GetValue().(string),
+					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
+					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
+				})
+			}
 		}
 	}
 	return peers
