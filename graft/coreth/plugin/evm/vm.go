@@ -334,9 +334,9 @@ func (vm *VM) Initialize(
 			ethBlock: block,
 			vm:       vm,
 		}
-		if blk.Verify() != nil {
+		if err := blk.Verify(); err != nil {
 			vm.newBlockChan <- nil
-			return errInvalidBlock
+			return fmt.Errorf("block failed verify: %w", err)
 		}
 		vm.newBlockChan <- blk
 		vm.updateStatus(ids.ID(block.Hash()), choices.Processing)
@@ -430,7 +430,11 @@ func (vm *VM) Initialize(
 	// ignored by the VM's codec.
 	vm.baseCodec = linearcodec.NewDefault()
 
-	return vm.fx.Initialize(vm)
+	if err := vm.fx.Initialize(vm); err != nil {
+		return err
+	}
+
+	return vm.verifyUniqueImports()
 }
 
 // repairCanonicalChain writes the canonical chain index from the last accepted
@@ -463,6 +467,64 @@ func (vm *VM) repairCanonicalChain() error {
 	}
 
 	return nil
+}
+
+func (vm *VM) verifyUniqueImports() error {
+	blkID := vm.LastAccepted()
+	blkIntf, err := vm.GetBlock(blkID)
+	if err != nil {
+		return err
+	}
+	blk := blkIntf.(*Block)
+	if blk.ethBlock.Hash() == vm.genesisHash {
+		return nil
+	}
+
+	errored := false
+	errMsg := strings.Builder{}
+	effectedFunds := uint64(0)
+
+	utxoToBlockHeight := make(map[ids.ID]uint64)
+	for {
+		height := blk.Height()
+
+		atx := vm.getAtomicTx(blk.ethBlock)
+		if atx != nil {
+			tx := atx.UnsignedTx.(UnsignedAtomicTx)
+			inputs := tx.InputUTXOs()
+			for input := range inputs {
+				prevHeight, exists := utxoToBlockHeight[input]
+				if !exists {
+					utxoToBlockHeight[input] = height
+					continue
+				}
+				utxoAmount := uint64(0)
+				switch tx := tx.(type) {
+				case *UnsignedImportTx:
+					for _, in := range tx.ImportedInputs {
+						if in.UTXOID.InputID() == input {
+							utxoAmount = in.In.Amount()
+							effectedFunds += utxoAmount
+							break
+						}
+					}
+				case *UnsignedExportTx:
+					return errors.New("duplicated exports")
+				}
+
+				errored = true
+				errMsg.WriteString(fmt.Sprintf("%s spent %d at both %d and %d\n", input, utxoAmount, height, prevHeight))
+			}
+		}
+		if blk.ethBlock.ParentHash() == vm.genesisHash {
+			if errored {
+				errMsg.WriteString(fmt.Sprintf("impacted funds = %d", effectedFunds))
+				return errors.New(errMsg.String())
+			}
+			return nil
+		}
+		blk = blk.Parent().(*Block)
+	}
 }
 
 // Bootstrapping notifies this VM that the consensus engine is performing
@@ -523,7 +585,7 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		return nil, err
 	}
 	if !vm.chain.VerifyBlock(ethBlock) {
-		return nil, errInvalidBlock
+		return nil, errors.New("block failed chain verify")
 	}
 	blockHash := ethBlock.Hash()
 	// Coinbase must be zero on C-Chain

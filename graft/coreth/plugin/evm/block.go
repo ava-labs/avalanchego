@@ -87,7 +87,7 @@ func (b *Block) Verify() error {
 		// Ensure the minimum gas price is paid for every transaction
 		for _, tx := range b.ethBlock.Transactions() {
 			if tx.GasPrice().Cmp(params.MinGasPrice) < 0 {
-				return errInvalidBlock
+				return errors.New("invalid block due to low gas")
 			}
 		}
 	}
@@ -130,7 +130,7 @@ func (b *Block) Verify() error {
 			}
 			for _, in := range atx.InputUTXOs().List() {
 				if inputs.Contains(in) {
-					return errInvalidBlock
+					return errors.New("invalid block due to conflicting atomic inputs")
 				}
 			}
 		case *UnsignedExportTx:
@@ -139,13 +139,13 @@ func (b *Block) Verify() error {
 		}
 
 		utx := tx.UnsignedTx.(UnsignedAtomicTx)
-		if utx.SemanticVerify(vm, tx) != nil {
-			return errInvalidBlock
+		if err := utx.SemanticVerify(vm, tx); err != nil {
+			return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
 		}
 		bc := vm.chain.BlockChain()
 		_, _, _, err = bc.Processor().Process(b.ethBlock, pState, *bc.GetVMConfig())
 		if err != nil {
-			return errInvalidBlock
+			return fmt.Errorf("invalid block due to failed processing: %w", err)
 		}
 	}
 	_, err := b.vm.chain.InsertChain([]*types.Block{b.ethBlock})
