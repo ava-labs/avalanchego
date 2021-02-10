@@ -200,15 +200,14 @@ type VM struct {
 	// built a block before notifying it again.
 	awaitingBuildBlock bool
 
-	genlock               sync.Mutex
-	txSubmitChan          <-chan struct{}
-	atomicTxSubmitChan    chan struct{}
-	baseCodec             codec.Registry
-	codec                 codec.Manager
-	clock                 timer.Clock
-	txFee                 uint64
-	pendingAtomicTxs      chan *Tx
-	blockAtomicInputCache cache.LRU
+	genlock            sync.Mutex
+	txSubmitChan       <-chan struct{}
+	atomicTxSubmitChan chan struct{}
+	baseCodec          codec.Registry
+	codec              codec.Manager
+	clock              timer.Clock
+	txFee              uint64
+	pendingAtomicTxs   chan *Tx
 
 	shutdownChan chan struct{}
 	shutdownWg   sync.WaitGroup
@@ -357,7 +356,6 @@ func (vm *VM) Initialize(
 	})
 	vm.blockCache = cache.LRU{Size: blockCacheSize}
 	vm.blockStatusCache = cache.LRU{Size: blockCacheSize}
-	vm.blockAtomicInputCache = cache.LRU{Size: blockCacheSize}
 	vm.newBlockChan = make(chan *Block)
 	vm.notifyBuildBlockChan = toEngine
 
@@ -513,7 +511,7 @@ func (vm *VM) verifyUniqueImports() error {
 				}
 
 				errored = true
-				errMsg.WriteString(fmt.Sprintf("%s spent %d at both %d and %d\n", input, utxoAmount, height, prevHeight))
+				errMsg.WriteString(fmt.Sprintf("%s spent %d in %s at both %d and %d\n", input, utxoAmount, tx.ID(), height, prevHeight))
 			}
 		}
 		if blk.ethBlock.ParentHash() == vm.genesisHash {

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/api/keystore"
-	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -518,10 +517,6 @@ func TestConflictingImportTxs(t *testing.T) {
 		expectedParentBlkID = blk.ID()
 		vm.SetPreference(blk.ID())
 	}
-
-	// Shrink the atomic input cache to ensure that
-	// verification handles cache misses correctly.
-	vm.blockAtomicInputCache = cache.LRU{Size: 1}
 
 	for i, tx := range conflictTxs {
 		if err := vm.issueTx(tx); err != nil {
