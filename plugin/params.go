@@ -31,9 +31,10 @@ func init() {
 		cliConfig.TxPoolAPIEnabled = true
 		cliConfig.NetAPIEnabled = true
 		cliConfig.Web3APIEnabled = true
-		cliConfig.RPCGasCap = 2500000000 // 25000000 x 100
-		cliConfig.RPCTxFeeCap = 100      // 100 AVAX
-		cliConfig.APIMaxDuration = 0     // default to no maximum
+		cliConfig.RPCGasCap = 2500000000  // 25000000 x 100
+		cliConfig.RPCTxFeeCap = 100       // 100 AVAX
+		cliConfig.APIMaxDuration = 0      // Default to no maximum API Call duration
+		cliConfig.MaxBlocksPerRequest = 0 // Default to no maximum on the number of blocks per getLogs request
 	} else {
 		// TODO only overwrite values that were explicitly set
 		cliConfig.ParsingError = json.Unmarshal([]byte(*config), &cliConfig)
