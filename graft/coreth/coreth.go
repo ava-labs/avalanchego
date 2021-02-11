@@ -45,7 +45,7 @@ type ETHChain struct {
 }
 
 // NewETHChain creates an Ethereum blockchain with the given configs.
-func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Address, chainDB ethdb.Database) *ETHChain {
+func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Address, chainDB ethdb.Database, settings eth.Settings) *ETHChain {
 	if config == nil {
 		config = &eth.DefaultConfig
 	}
@@ -63,7 +63,7 @@ func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Add
 	cb := new(dummy.ConsensusCallbacks)
 	mcb := new(miner.MinerCallbacks)
 	bcb := new(eth.BackendCallbacks)
-	backend, _ := eth.New(node, config, cb, mcb, bcb, chainDB)
+	backend, _ := eth.New(node, config, cb, mcb, bcb, chainDB, settings)
 	chain := &ETHChain{backend: backend, cb: cb, mcb: mcb, bcb: bcb}
 	if etherBase == nil {
 		etherBase = &BlackholeAddr

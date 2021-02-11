@@ -300,7 +300,7 @@ func (vm *VM) Initialize(
 		panic(err)
 	}
 	nodecfg := node.Config{NoUSB: true}
-	chain := coreth.NewETHChain(&config, &nodecfg, nil, vm.chaindb)
+	chain := coreth.NewETHChain(&config, &nodecfg, nil, vm.chaindb, vm.CLIConfig.EthBackendSettings())
 	vm.chain = chain
 	vm.networkID = config.NetworkId
 	chain.SetOnHeaderNew(func(header *types.Header) {
