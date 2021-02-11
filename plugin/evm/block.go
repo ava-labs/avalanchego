@@ -4,7 +4,6 @@
 package evm
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/coreth/core/types"
@@ -44,7 +43,7 @@ func (b *Block) Accept() error {
 	}
 	utx, ok := tx.UnsignedTx.(UnsignedAtomicTx)
 	if !ok {
-		return errors.New("unknown tx type")
+		return errUnknownAtomicTx
 	}
 
 	return utx.Accept(vm.ctx, nil)
