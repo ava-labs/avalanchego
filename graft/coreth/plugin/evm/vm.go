@@ -103,6 +103,8 @@ var (
 	errInvalidGas                 = errors.New("invalid block due to low gas")
 	errConflictingAtomicInputs    = errors.New("invalid block due to conflicting atomic inputs")
 	errUnknownAtomicTx            = errors.New("unknown atomic tx type")
+	errDuplicatedExports          = errors.New("duplicated exports")
+	errFailedChainVerify          = errors.New("block failed chain verify")
 )
 
 // mayBuildBlockStatus denotes whether the engine should be notified
@@ -510,7 +512,7 @@ func (vm *VM) verifyUniqueImports() error {
 						}
 					}
 				case *UnsignedExportTx:
-					return errors.New("duplicated exports")
+					return errDuplicatedExports
 				}
 
 				errored = true
@@ -586,7 +588,7 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		return nil, err
 	}
 	if !vm.chain.VerifyBlock(ethBlock) {
-		return nil, errors.New("block failed chain verify")
+		return nil, errFailedChainVerify
 	}
 	blockHash := ethBlock.Hash()
 	// Coinbase must be zero on C-Chain
