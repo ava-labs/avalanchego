@@ -166,7 +166,6 @@ func (tx *UnsignedImportTx) Accept(ctx *snow.Context, _ database.Batch) error {
 		inputID := in.InputID()
 		utxoIDs[i] = inputID[:]
 	}
-	log.Info("importing txs", "num", len(utxoIDs), "ids", utxoIDs[0])
 	return ctx.SharedMemory.Remove(tx.SourceChain, utxoIDs)
 }
 
