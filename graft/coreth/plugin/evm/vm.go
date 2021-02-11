@@ -100,6 +100,11 @@ var (
 	errOutputsNotSorted           = errors.New("tx outputs not sorted")
 	errOverflowExport             = errors.New("overflow when computing export amount + txFee")
 	errInvalidNonce               = errors.New("invalid nonce")
+	errInvalidGas                 = errors.New("invalid block due to low gas")
+	errConflictingAtomicInputs    = errors.New("invalid block due to conflicting atomic inputs")
+	errUnknownAtomicTx            = errors.New("unknown atomic tx type")
+	errDuplicatedExports          = errors.New("duplicated exports")
+	errFailedChainVerify          = errors.New("block failed chain verify")
 )
 
 // mayBuildBlockStatus denotes whether the engine should be notified
@@ -200,15 +205,14 @@ type VM struct {
 	// built a block before notifying it again.
 	awaitingBuildBlock bool
 
-	genlock               sync.Mutex
-	txSubmitChan          <-chan struct{}
-	atomicTxSubmitChan    chan struct{}
-	baseCodec             codec.Registry
-	codec                 codec.Manager
-	clock                 timer.Clock
-	txFee                 uint64
-	pendingAtomicTxs      chan *Tx
-	blockAtomicInputCache cache.LRU
+	genlock            sync.Mutex
+	txSubmitChan       <-chan struct{}
+	atomicTxSubmitChan chan struct{}
+	baseCodec          codec.Registry
+	codec              codec.Manager
+	clock              timer.Clock
+	txFee              uint64
+	pendingAtomicTxs   chan *Tx
 
 	shutdownChan chan struct{}
 	shutdownWg   sync.WaitGroup
@@ -334,9 +338,9 @@ func (vm *VM) Initialize(
 			ethBlock: block,
 			vm:       vm,
 		}
-		if blk.Verify() != nil {
+		if err := blk.Verify(); err != nil {
 			vm.newBlockChan <- nil
-			return errInvalidBlock
+			return fmt.Errorf("block failed verify: %w", err)
 		}
 		vm.newBlockChan <- blk
 		vm.updateStatus(ids.ID(block.Hash()), choices.Processing)
@@ -357,7 +361,6 @@ func (vm *VM) Initialize(
 	})
 	vm.blockCache = cache.LRU{Size: blockCacheSize}
 	vm.blockStatusCache = cache.LRU{Size: blockCacheSize}
-	vm.blockAtomicInputCache = cache.LRU{Size: blockCacheSize}
 	vm.newBlockChan = make(chan *Block)
 	vm.notifyBuildBlockChan = toEngine
 
@@ -421,7 +424,7 @@ func (vm *VM) Initialize(
 	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
 	vm.codec = Codec
 	if err := vm.repairCanonicalChain(); err != nil {
-		log.Error("failed to repair canonical chain", "error", err)
+		log.Error("failed to repair the canonical chain", "error", err)
 	}
 
 	// The Codec explicitly registers the types it requires from the secp256k1fx
@@ -523,7 +526,7 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		return nil, err
 	}
 	if !vm.chain.VerifyBlock(ethBlock) {
-		return nil, errInvalidBlock
+		return nil, errFailedChainVerify
 	}
 	blockHash := ethBlock.Hash()
 	// Coinbase must be zero on C-Chain
@@ -589,7 +592,7 @@ func newHandler(name string, service interface{}, lockOption ...commonEng.LockOp
 
 // CreateHandlers makes new http handlers that can handle API calls
 func (vm *VM) CreateHandlers() map[string]*commonEng.HTTPHandler {
-	handler := vm.chain.NewRPCHandler()
+	handler := vm.chain.NewRPCHandler(time.Duration(vm.CLIConfig.APIMaxDuration))
 	enabledAPIs := vm.CLIConfig.EthAPIs()
 	vm.chain.AttachEthService(handler, vm.CLIConfig.EthAPIs())
 

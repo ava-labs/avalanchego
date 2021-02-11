@@ -4,7 +4,6 @@
 package evm
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/coreth/core/types"
@@ -44,7 +43,7 @@ func (b *Block) Accept() error {
 	}
 	utx, ok := tx.UnsignedTx.(UnsignedAtomicTx)
 	if !ok {
-		return errors.New("unknown tx type")
+		return errUnknownAtomicTx
 	}
 
 	return utx.Accept(vm.ctx, nil)
@@ -82,73 +81,69 @@ func (b *Block) Height() uint64 {
 
 // Verify implements the snowman.Block interface
 func (b *Block) Verify() error {
+	vm := b.vm
+
 	// Only enforce a minimum fee when bootstrapping has finished
-	if b.vm.ctx.IsBootstrapped() {
+	if vm.ctx.IsBootstrapped() {
 		// Ensure the minimum gas price is paid for every transaction
 		for _, tx := range b.ethBlock.Transactions() {
 			if tx.GasPrice().Cmp(params.MinGasPrice) < 0 {
-				return errInvalidBlock
+				return errInvalidGas
 			}
 		}
 	}
 
-	vm := b.vm
+	// If the tx is an atomic tx, ensure that it doesn't conflict with any of
+	// its processing ancestry.
 	tx := vm.getAtomicTx(b.ethBlock)
 	if tx != nil {
-		pState, err := b.vm.chain.BlockState(b.Parent().(*Block).ethBlock)
+		ancestor := b.Parent().(*Block)
+		parentState, err := vm.chain.BlockState(ancestor.ethBlock)
 		if err != nil {
 			return err
 		}
 		switch atx := tx.UnsignedTx.(type) {
 		case *UnsignedImportTx:
-			if b.ethBlock.Hash() == vm.genesisHash {
-				return nil
-			}
-			p := b.Parent()
-			path := []*Block{}
-			inputs := new(ids.Set)
-			for {
-				if p.Status() == choices.Accepted || p.(*Block).ethBlock.Hash() == vm.genesisHash {
-					break
-				}
-				if ret, hit := vm.blockAtomicInputCache.Get(p.ID()); hit {
-					inputs = ret.(*ids.Set)
-					break
-				}
-				path = append(path, p.(*Block))
-				p = p.Parent().(*Block)
-			}
-			for i := len(path) - 1; i >= 0; i-- {
-				inputsCopy := new(ids.Set)
-				p := path[i]
-				atx := vm.getAtomicTx(p.ethBlock)
+			// If an import tx is seen, we must ensure that none of the
+			// processing ancestors consume the same UTXO.
+			inputs := atx.InputUTXOs()
+			for ancestor.Status() != choices.Accepted {
+				atx := vm.getAtomicTx(ancestor.ethBlock)
+				// If the ancestor isn't an atomic block, it can't conflict with
+				// the import tx.
 				if atx != nil {
-					inputs.Union(atx.UnsignedTx.(UnsignedAtomicTx).InputUTXOs())
-					inputsCopy.Union(*inputs)
+					ancestorInputs := atx.UnsignedTx.(UnsignedAtomicTx).InputUTXOs()
+					if inputs.Overlaps(ancestorInputs) {
+						return errConflictingAtomicInputs
+					}
 				}
-				vm.blockAtomicInputCache.Put(p.ID(), inputsCopy)
-			}
-			for _, in := range atx.InputUTXOs().List() {
-				if inputs.Contains(in) {
-					return errInvalidBlock
-				}
+
+				// Move up the chain.
+				ancestor = ancestor.Parent().(*Block)
 			}
 		case *UnsignedExportTx:
+			// Export txs are validated by the processor's nonce management.
 		default:
-			return errors.New("unknown atomic tx type")
+			return errUnknownAtomicTx
 		}
 
+		// We have verified that none of the processing ancestors conflict with
+		// the atomic transaction, so now we must ensure that the transaction is
+		// valid and doesn't have any accepted conflicts.
+
 		utx := tx.UnsignedTx.(UnsignedAtomicTx)
-		if utx.SemanticVerify(vm, tx) != nil {
-			return errInvalidBlock
+		if err := utx.SemanticVerify(vm, tx); err != nil {
+			return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
 		}
+
+		// TODO: Because InsertChain calls Process, can't this invocation be removed?
 		bc := vm.chain.BlockChain()
-		_, _, _, err = bc.Processor().Process(b.ethBlock, pState, *bc.GetVMConfig())
+		_, _, _, err = bc.Processor().Process(b.ethBlock, parentState, *bc.GetVMConfig())
 		if err != nil {
-			return errInvalidBlock
+			return fmt.Errorf("invalid block due to failed processing: %w", err)
 		}
 	}
-	_, err := b.vm.chain.InsertChain([]*types.Block{b.ethBlock})
+	_, err := vm.chain.InsertChain([]*types.Block{b.ethBlock})
 	return err
 }
 
