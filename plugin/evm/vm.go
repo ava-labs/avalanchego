@@ -64,7 +64,7 @@ var (
 var (
 	lastAcceptedKey = []byte("snowman_lastAccepted")
 	acceptedPrefix  = []byte("snowman_accepted")
-	repairedKey     = []byte("chain_is_repaired")
+	repairedKey     = []byte("chain_repaired")
 )
 
 const (
@@ -423,8 +423,8 @@ func (vm *VM) Initialize(
 	vm.shutdownWg.Add(1)
 	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
 	vm.codec = Codec
-	if err := vm.repairChain(); err != nil {
-		log.Error("failed to repair the chain", "error", err)
+	if err := vm.repairCanonicalChain(); err != nil {
+		log.Error("failed to repair the canonical chain", "error", err)
 	}
 
 	// The Codec explicitly registers the types it requires from the secp256k1fx
@@ -436,12 +436,11 @@ func (vm *VM) Initialize(
 	return vm.fx.Initialize(vm)
 }
 
-// repairChain writes the canonical chain index from the last accepted
+// repairCanonicalChain writes the canonical chain index from the last accepted
 // block back to the genesis block to overwrite any corruption that might have
-// occurred. assumes that the genesisHash and [lastAccepted] block have already
-// been set.
-// Also verifies the canonical chain index and atomic import inputs are valid.
-func (vm *VM) repairChain() error {
+// occurred.
+// assumes that the genesisHash and [lastAccepted] block have already been set.
+func (vm *VM) repairCanonicalChain() error {
 	// Check if the canonical chain has already been repaired
 	if has, err := vm.db.Has(repairedKey); err != nil {
 		return err
@@ -465,69 +464,8 @@ func (vm *VM) repairChain() error {
 	if err := vm.chain.ValidateCanonicalChain(); err != nil {
 		return fmt.Errorf("failed to validate canonical chain due to: %w", err)
 	}
-	if err := vm.verifyUniqueImports(); err != nil {
-		return fmt.Errorf("failed to validate unique atomic imports due to: %w", err)
-	}
 
 	return nil
-}
-
-func (vm *VM) verifyUniqueImports() error {
-	blkID := vm.LastAccepted()
-	blkIntf, err := vm.GetBlock(blkID)
-	if err != nil {
-		return err
-	}
-	blk := blkIntf.(*Block)
-	if blk.ethBlock.Hash() == vm.genesisHash {
-		return nil
-	}
-
-	errored := false
-	errMsg := strings.Builder{}
-	effectedFunds := uint64(0)
-
-	utxoToBlockHeight := make(map[ids.ID]uint64)
-	for {
-		height := blk.Height()
-
-		atx := vm.getAtomicTx(blk.ethBlock)
-		if atx != nil {
-			tx := atx.UnsignedTx.(UnsignedAtomicTx)
-			inputs := tx.InputUTXOs()
-			for input := range inputs {
-				prevHeight, exists := utxoToBlockHeight[input]
-				if !exists {
-					utxoToBlockHeight[input] = height
-					continue
-				}
-				utxoAmount := uint64(0)
-				switch tx := tx.(type) {
-				case *UnsignedImportTx:
-					for _, in := range tx.ImportedInputs {
-						if in.UTXOID.InputID() == input {
-							utxoAmount = in.In.Amount()
-							effectedFunds += utxoAmount
-							break
-						}
-					}
-				case *UnsignedExportTx:
-					return errDuplicatedExports
-				}
-
-				errored = true
-				errMsg.WriteString(fmt.Sprintf("%s spent %d in %s at both %d and %d\n", input, utxoAmount, tx.ID(), height, prevHeight))
-			}
-		}
-		if blk.ethBlock.ParentHash() == vm.genesisHash {
-			if errored {
-				errMsg.WriteString(fmt.Sprintf("impacted funds = %d", effectedFunds))
-				return errors.New(errMsg.String())
-			}
-			return nil
-		}
-		blk = blk.Parent().(*Block)
-	}
 }
 
 // Bootstrapping notifies this VM that the consensus engine is performing
