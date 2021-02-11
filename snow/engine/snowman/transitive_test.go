@@ -2004,3 +2004,103 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		t.Fatalf("Should have sent a query to the peer")
 	}
 }
+
+func TestEngineReceiveNewRejectedBlock(t *testing.T) {
+	vdr, _, sender, vm, te, gBlk := setup(t)
+
+	acceptedBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
+	}
+	rejectedBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{2},
+	}
+	pendingBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: rejectedBlk,
+		HeightV: 2,
+		BytesV:  []byte{3},
+	}
+
+	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, acceptedBlk.Bytes()):
+			return acceptedBlk, nil
+		case bytes.Equal(b, rejectedBlk.Bytes()):
+			return rejectedBlk, nil
+		case bytes.Equal(b, pendingBlk.Bytes()):
+			return pendingBlk, nil
+		default:
+			t.Fatalf("Unknown block bytes")
+			return nil, nil
+		}
+	}
+
+	var (
+		asked bool
+		reqID uint32
+	)
+	sender.PushQueryF = func(_ ids.ShortSet, rID uint32, _ ids.ID, blkBytes []byte) {
+		asked = true
+		reqID = rID
+	}
+
+	if err := te.Put(vdr, 0, acceptedBlk.ID(), acceptedBlk.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	if !asked {
+		t.Fatalf("Didn't query for the new block")
+	}
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		if blkID != acceptedBlk.ID() {
+			t.Fatalf("Wrong block requested")
+		}
+		return acceptedBlk, nil
+	}
+
+	if err := te.Chits(vdr, reqID, []ids.ID{acceptedBlk.ID()}); err != nil {
+		t.Fatal(err)
+	}
+
+	sender.PushQueryF = nil
+	asked = false
+
+	sender.GetF = func(_ ids.ShortID, rID uint32, _ ids.ID) {
+		asked = true
+		reqID = rID
+	}
+
+	if err := te.Put(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	if !asked {
+		t.Fatalf("Didn't request the missing block")
+	}
+
+	rejectedBlk.StatusV = choices.Rejected
+
+	if err := te.Put(vdr, reqID, rejectedBlk.ID(), rejectedBlk.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	if te.blkReqs.Len() != 0 {
+		t.Fatalf("Should have finished all requests")
+	}
+}
