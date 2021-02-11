@@ -1056,6 +1056,7 @@ func TestBonusBlocksTxs(t *testing.T) {
 	// TODO: better set/make bonus blocks dynamic
 	evmBlock := blk.(*Block)
 	evmBlock.id = ids.ID{10}
+	vm.blockCache.Put(evmBlock.id, evmBlock)
 
 	if err := blk.Verify(); err != nil {
 		t.Fatal(err)
