@@ -80,12 +80,6 @@ func (b *Block) Height() uint64 {
 	return b.ethBlock.Number().Uint64()
 }
 
-var (
-	errInvalidGas              = errors.New("invalid block due to low gas")
-	errConflictingAtomicInputs = errors.New("invalid block due to conflicting atomic inputs")
-	errUnknownAtomicTx         = errors.New("unknown atomic tx type")
-)
-
 // Verify implements the snowman.Block interface
 func (b *Block) Verify() error {
 	vm := b.vm
