@@ -1050,7 +1050,7 @@ func TestBonusBlocksTxs(t *testing.T) {
 	}
 
 	evmBlock := blk.(*Block)
-	evmBlock.id = ids.ID{10}
+	evmBlock.id = bonusBlocks.CappedList(1)[0]
 	vm.blockCache.Put(evmBlock.id, evmBlock)
 
 	if err := vm.ctx.SharedMemory.Remove(vm.ctx.XChainID, [][]byte{inputID[:]}); err != nil {
