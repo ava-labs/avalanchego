@@ -18,7 +18,10 @@ import (
 )
 
 var (
-	bonusBlocks = new(ids.Set) // TODO: populate
+	bonusBlocks = ids.Set{
+		// TODO: populate with real data
+		ids.ID{10}: true,
+	}
 )
 
 // Block implements the snowman.Block interface
@@ -51,12 +54,12 @@ func (b *Block) Accept() error {
 	}
 
 	acceptErr := utx.Accept(vm.ctx, nil)
-	log.Info("accept err", "err", acceptErr)
 	if acceptErr == nil {
 		return nil
 	}
 
 	if _, ok := utx.(*UnsignedImportTx); ok && bonusBlocks.Contains(b.id) {
+		log.Debug("skipping atomic tx verification on bonus block", "block", b.id)
 		return nil
 	}
 
@@ -146,8 +149,12 @@ func (b *Block) Verify() error {
 		// valid and doesn't have any accepted conflicts.
 
 		utx := tx.UnsignedTx.(UnsignedAtomicTx)
-		if err := utx.SemanticVerify(vm, tx); err != nil {
-			return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
+		if bonusBlocks.Contains(b.id) {
+			log.Debug("skipping atomic tx verification on bonus block", "block", b.id)
+		} else {
+			if err := utx.SemanticVerify(vm, tx); err != nil {
+				return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
+			}
 		}
 
 		// TODO: Because InsertChain calls Process, can't this invocation be removed?
