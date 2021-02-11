@@ -175,20 +175,20 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Uint(maxNonStakerPendingMsgsKey, uint(router.DefaultMaxNonStakerPendingMsgs), "Maximum number of messages a non-staker is allowed to have pending.")
 	fs.Float64(stakerMsgReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain message queue's space for stakers.")
 	fs.Float64(stakerCPUReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain's CPU time for stakers.")
-	fs.Uint(maxPendingMsgsKey, 1024, "Maximum number of pending messages. Messages after this will be dropped.")
+	fs.Uint(maxPendingMsgsKey, 4096, "Maximum number of pending messages. Messages after this will be dropped.")
 
 	// Network Timeouts:
-	fs.Duration(networkInitialTimeoutKey, 5*time.Second, "Initial timeout value of the adaptive timeout manager, in nanoseconds.")
-	fs.Duration(networkMinimumTimeoutKey, 500*time.Millisecond, "Minimum timeout value of the adaptive timeout manager, in nanoseconds.")
-	fs.Duration(networkMaximumTimeoutKey, 10*time.Second, "Maximum timeout value of the adaptive timeout manager, in nanoseconds.")
-	fs.Duration(networkTimeoutIncreaseKey, 60*time.Millisecond, "Increase of network timeout after a failed request, in nanoseconds.")
-	fs.Duration(networkTimeoutReductionKey, 12*time.Millisecond, "Decrease of network timeout after a successful request, in nanoseconds.")
-	fs.Uint(sendQueueSizeKey, 1<<10, "Max number of messages waiting to be sent to peers.")
+	fs.Duration(networkInitialTimeoutKey, 5*time.Second, "Initial timeout value of the adaptive timeout manager.")
+	fs.Duration(networkMinimumTimeoutKey, 3*time.Second, "Minimum timeout value of the adaptive timeout manager.")
+	fs.Duration(networkMaximumTimeoutKey, 10*time.Second, "Maximum timeout value of the adaptive timeout manager.")
+	fs.Duration(networkTimeoutIncreaseKey, 100*time.Millisecond, "Increase of network timeout after a failed request.")
+	fs.Duration(networkTimeoutReductionKey, 5*time.Millisecond, "Decrease of network timeout after a successful request.")
+	fs.Uint(sendQueueSizeKey, 4096, "Max number of messages waiting to be sent to peers.")
 
 	// Benchlist Parameters:
 	fs.Int(benchlistFailThresholdKey, 10, "Number of consecutive failed queries before benchlisting a node.")
 	fs.Bool(benchlistPeerSummaryEnabledKey, false, "Enables peer specific query latency metrics.")
-	fs.Duration(benchlistDurationKey, time.Hour, "Amount of time a peer is benchlisted after surpassing the threshold.")
+	fs.Duration(benchlistDurationKey, 30*time.Minute, "Amount of time a peer is benchlisted after surpassing the threshold.")
 	fs.Duration(benchlistMinFailingDurationKey, 5*time.Minute, "Minimum amount of time messages to a peer must be failing before the peer is benched.")
 
 	// Plugins:
