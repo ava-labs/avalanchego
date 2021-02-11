@@ -426,6 +426,9 @@ func (vm *VM) Initialize(
 		log.Error("failed to repair the canonical chain", "error", err)
 	}
 
+	chain.BlockChain().UnlockIndexing()
+	log.Info("unlocking indexing")
+
 	// The Codec explicitly registers the types it requires from the secp256k1fx
 	// so [vm.baseCodec] is a dummy codec use to fulfill the secp256k1fx VM
 	// interface. The fx will register all of its types, which can be safely
