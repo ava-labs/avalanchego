@@ -33,6 +33,7 @@ func init() {
 		cliConfig.Web3APIEnabled = true
 		cliConfig.RPCGasCap = 2500000000 // 25000000 x 100
 		cliConfig.RPCTxFeeCap = 100      // 100 AVAX
+		cliConfig.APIMaxDuration = 0     // default to no maximum
 	} else {
 		// TODO only overwrite values that were explicitly set
 		cliConfig.ParsingError = json.Unmarshal([]byte(*config), &cliConfig)

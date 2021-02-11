@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"io"
 	"os"
+	"time"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
@@ -217,8 +218,8 @@ func (self *ETHChain) InsertChain(chain []*types.Block) (int, error) {
 	return self.backend.BlockChain().InsertChain(chain)
 }
 
-func (self *ETHChain) NewRPCHandler() *rpc.Server {
-	return rpc.NewServer()
+func (self *ETHChain) NewRPCHandler(maximumDuration time.Duration) *rpc.Server {
+	return rpc.NewServer(maximumDuration)
 }
 
 func (self *ETHChain) AttachEthService(handler *rpc.Server, namespaces []string) {
