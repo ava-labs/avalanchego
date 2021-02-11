@@ -212,7 +212,6 @@ func (b *Block) Verify() error {
 			// We have verified that none of the processing ancestors conflict with
 			// the atomic transaction, so now we must ensure that the transaction is
 			// valid and doesn't have any accepted conflicts.
-
 			utx := tx.UnsignedTx.(UnsignedAtomicTx)
 			if err := utx.SemanticVerify(vm, tx); err != nil {
 				return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
