@@ -51,6 +51,7 @@ func (b *Block) Accept() error {
 	}
 
 	acceptErr := utx.Accept(vm.ctx, nil)
+	log.Info("accept err", "err", acceptErr)
 	if acceptErr == nil {
 		return nil
 	}
