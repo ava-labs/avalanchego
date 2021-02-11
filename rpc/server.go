@@ -77,6 +77,10 @@ func (ctx contextWithDeadline) Deadline() (time.Time, bool) {
 }
 
 // NewServer creates a new server instance with no registered handlers.
+//
+// If [maximumDuration] > 0, the deadline of incoming requests is
+// [maximumDuration] in the future. Otherwise, no deadline is assigned to
+// incoming requests.
 func NewServer(maximumDuration time.Duration) *Server {
 	server := &Server{
 		idgen:           randomIDGenerator(),
