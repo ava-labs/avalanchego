@@ -478,11 +478,14 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 	// Remove any outstanding requests for this block
 	t.blkReqs.RemoveAny(blkID)
 
-	t.blocked.Abandon(blkID)
+	issued := t.Consensus.Issued(blk)
+	if issued {
+		t.blocked.Abandon(blkID)
+	}
 
 	// Tracks performance statistics
 	t.numRequests.Set(float64(t.blkReqs.Len()))
-	return t.Consensus.Issued(blk), t.errs.Err
+	return issued, t.errs.Err
 }
 
 // issueWithAncestors attempts to issue the branch ending with [blk] to consensus.
