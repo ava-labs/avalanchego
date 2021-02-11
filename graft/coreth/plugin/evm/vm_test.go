@@ -1049,14 +1049,16 @@ func TestBonusBlocksTxs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.ctx.SharedMemory.Remove(vm.ctx.XChainID, [][]byte{inputID[:]}); err != nil {
-		t.Fatal(err)
-	}
-
 	evmBlock := blk.(*Block)
 	evmBlock.id = ids.ID{10}
 	vm.blockCache.Put(evmBlock.id, evmBlock)
 
+	if err := vm.ctx.SharedMemory.Remove(vm.ctx.XChainID, [][]byte{inputID[:]}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Semantic verify gets UTXO...if removed when first seen, then won't be able
+	// to getUTXO.
 	if err := blk.Verify(); err != nil {
 		t.Fatal(err)
 	}
