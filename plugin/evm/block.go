@@ -180,39 +180,40 @@ func (b *Block) Verify() error {
 		if err != nil {
 			return err
 		}
-		switch atx := tx.UnsignedTx.(type) {
-		case *UnsignedImportTx:
-			// If an import tx is seen, we must ensure that none of the
-			// processing ancestors consume the same UTXO.
-			inputs := atx.InputUTXOs()
-			for ancestor.Status() != choices.Accepted {
-				atx := vm.getAtomicTx(ancestor.ethBlock)
-				// If the ancestor isn't an atomic block, it can't conflict with
-				// the import tx.
-				if atx != nil {
-					ancestorInputs := atx.UnsignedTx.(UnsignedAtomicTx).InputUTXOs()
-					if inputs.Overlaps(ancestorInputs) {
-						return errConflictingAtomicInputs
-					}
-				}
 
-				// Move up the chain.
-				ancestor = ancestor.Parent().(*Block)
-			}
-		case *UnsignedExportTx:
-			// Export txs are validated by the processor's nonce management.
-		default:
-			return errUnknownAtomicTx
-		}
-
-		// We have verified that none of the processing ancestors conflict with
-		// the atomic transaction, so now we must ensure that the transaction is
-		// valid and doesn't have any accepted conflicts.
-
-		utx := tx.UnsignedTx.(UnsignedAtomicTx)
 		if bonusBlocks.Contains(b.id) {
 			log.Info("skipping atomic tx verification on bonus block", "block", b.id)
 		} else {
+			switch atx := tx.UnsignedTx.(type) {
+			case *UnsignedImportTx:
+				// If an import tx is seen, we must ensure that none of the
+				// processing ancestors consume the same UTXO.
+				inputs := atx.InputUTXOs()
+				for ancestor.Status() != choices.Accepted {
+					atx := vm.getAtomicTx(ancestor.ethBlock)
+					// If the ancestor isn't an atomic block, it can't conflict with
+					// the import tx.
+					if atx != nil {
+						ancestorInputs := atx.UnsignedTx.(UnsignedAtomicTx).InputUTXOs()
+						if inputs.Overlaps(ancestorInputs) {
+							return errConflictingAtomicInputs
+						}
+					}
+
+					// Move up the chain.
+					ancestor = ancestor.Parent().(*Block)
+				}
+			case *UnsignedExportTx:
+				// Export txs are validated by the processor's nonce management.
+			default:
+				return errUnknownAtomicTx
+			}
+
+			// We have verified that none of the processing ancestors conflict with
+			// the atomic transaction, so now we must ensure that the transaction is
+			// valid and doesn't have any accepted conflicts.
+
+			utx := tx.UnsignedTx.(UnsignedAtomicTx)
 			if err := utx.SemanticVerify(vm, tx); err != nil {
 				return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
 			}
@@ -225,6 +226,7 @@ func (b *Block) Verify() error {
 			return fmt.Errorf("invalid block due to failed processing: %w", err)
 		}
 	}
+
 	_, err := vm.chain.InsertChain([]*types.Block{b.ethBlock})
 	return err
 }
