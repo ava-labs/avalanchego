@@ -1049,11 +1049,10 @@ func TestBonusBlocksTxs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := xChainSharedMemory.Remove(vm.ctx.ChainID, [][]byte{inputID[:]}); err != nil {
+	if err := vm.ctx.SharedMemory.Remove(vm.ctx.XChainID, [][]byte{inputID[:]}); err != nil {
 		t.Fatal(err)
 	}
 
-	// TODO: better set/make bonus blocks dynamic
 	evmBlock := blk.(*Block)
 	evmBlock.id = ids.ID{10}
 	vm.blockCache.Put(evmBlock.id, evmBlock)
