@@ -100,6 +100,9 @@ var (
 	errOutputsNotSorted           = errors.New("tx outputs not sorted")
 	errOverflowExport             = errors.New("overflow when computing export amount + txFee")
 	errInvalidNonce               = errors.New("invalid nonce")
+	errInvalidGas                 = errors.New("invalid block due to low gas")
+	errConflictingAtomicInputs    = errors.New("invalid block due to conflicting atomic inputs")
+	errUnknownAtomicTx            = errors.New("unknown atomic tx type")
 )
 
 // mayBuildBlockStatus denotes whether the engine should be notified

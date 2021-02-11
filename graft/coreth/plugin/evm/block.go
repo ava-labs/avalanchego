@@ -80,6 +80,12 @@ func (b *Block) Height() uint64 {
 	return b.ethBlock.Number().Uint64()
 }
 
+var (
+	errInvalidGas              = errors.New("invalid block due to low gas")
+	errConflictingAtomicInputs = errors.New("invalid block due to conflicting atomic inputs")
+	errUnknownAtomicTx         = errors.New("unknown atomic tx type")
+)
+
 // Verify implements the snowman.Block interface
 func (b *Block) Verify() error {
 	vm := b.vm
@@ -89,7 +95,7 @@ func (b *Block) Verify() error {
 		// Ensure the minimum gas price is paid for every transaction
 		for _, tx := range b.ethBlock.Transactions() {
 			if tx.GasPrice().Cmp(params.MinGasPrice) < 0 {
-				return errors.New("invalid block due to low gas")
+				return errInvalidGas
 			}
 		}
 	}
@@ -115,7 +121,7 @@ func (b *Block) Verify() error {
 				if atx != nil {
 					ancestorInputs := atx.UnsignedTx.(UnsignedAtomicTx).InputUTXOs()
 					if inputs.Overlaps(ancestorInputs) {
-						return errors.New("invalid block due to conflicting atomic inputs")
+						return errConflictingAtomicInputs
 					}
 				}
 
@@ -125,7 +131,7 @@ func (b *Block) Verify() error {
 		case *UnsignedExportTx:
 			// Export txs are validated by the processor's nonce management.
 		default:
-			return errors.New("unknown atomic tx type")
+			return errUnknownAtomicTx
 		}
 
 		// We have verified that none of the processing ancestors conflict with
