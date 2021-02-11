@@ -207,6 +207,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Int(snowAvalancheNumParentsKey, 5, "Number of vertexes for reference from each new vertex")
 	fs.Int(snowAvalancheBatchSizeKey, 30, "Number of operations to batch in each new vertex")
 	fs.Int(snowConcurrentRepollsKey, 4, "Minimum number of concurrent polls for finalizing consensus")
+	fs.Int(snowOptimalProcessingKey, 50, "Optimal number of processing vertices in consensus")
 	fs.Int64(snowEpochFirstTransition, 1607626800, "Unix timestamp of the first epoch transaction, in seconds. Defaults to 12/10/2020 @ 7:00pm (UTC)")
 	fs.Duration(snowEpochDuration, 6*time.Hour, "Duration of each epoch")
 
@@ -282,6 +283,7 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.ConsensusParams.Parents = v.GetInt(snowAvalancheNumParentsKey)
 	Config.ConsensusParams.BatchSize = v.GetInt(snowAvalancheBatchSizeKey)
 	Config.ConsensusParams.ConcurrentRepolls = v.GetInt(snowConcurrentRepollsKey)
+	Config.ConsensusParams.OptimalProcessing = v.GetInt(snowOptimalProcessingKey)
 
 	Config.ConsensusGossipFrequency = v.GetDuration(consensusGossipFrequencyKey)
 	Config.ConsensusShutdownTimeout = v.GetDuration(consensusShutdownTimeoutKey)

@@ -1866,3 +1866,141 @@ func TestEngineDoubleChit(t *testing.T) {
 		t.Fatalf("Wrong status: %s ; expected: %s", status, choices.Accepted)
 	}
 }
+
+func TestEngineBuildBlockLimit(t *testing.T) {
+	config := DefaultConfig()
+	config.Params.K = 1
+	config.Params.Alpha = 1
+	config.Params.OptimalProcessing = 1
+
+	vals := validators.NewSet()
+	config.Validators = vals
+
+	vdr := ids.GenerateTestShortID()
+	if err := vals.AddWeight(vdr, 1); err != nil {
+		t.Fatal(err)
+	}
+
+	sender := &common.SenderTest{}
+	sender.T = t
+	config.Sender = sender
+
+	sender.Default(true)
+
+	vm := &block.TestVM{}
+	vm.T = t
+	config.VM = vm
+
+	vm.Default(true)
+	vm.CantSetPreference = false
+
+	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+		IDV:     Genesis,
+		StatusV: choices.Accepted,
+	}}
+
+	vm.LastAcceptedF = gBlk.ID
+	sender.CantGetAcceptedFrontier = false
+
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		if blkID != gBlk.ID() {
+			t.Fatalf("Wrong block requested")
+		}
+		return gBlk, nil
+	}
+
+	te := &Transitive{}
+	if err := te.Initialize(config); err != nil {
+		t.Fatal(err)
+	}
+
+	vm.CantBootstrapping = true
+	vm.CantBootstrapped = true
+
+	vm.GetBlockF = nil
+	vm.LastAcceptedF = nil
+	sender.CantGetAcceptedFrontier = true
+
+	sender.Default(true)
+
+	blk0 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
+	}
+	blk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: blk0,
+		HeightV: 2,
+		BytesV:  []byte{2},
+	}
+	blks := []snowman.Block{blk0, blk1}
+
+	var (
+		queried bool
+		reqID   uint32
+	)
+	sender.PushQueryF = func(inVdrs ids.ShortSet, rID uint32, blkID ids.ID, blkBytes []byte) {
+		reqID = rID
+		if queried {
+			t.Fatalf("Asked multiple times")
+		}
+		queried = true
+		vdrSet := ids.ShortSet{}
+		vdrSet.Add(vdr)
+		if !inVdrs.Equals(vdrSet) {
+			t.Fatalf("Asking wrong validator for preference")
+		}
+	}
+
+	blkToReturn := 0
+	vm.BuildBlockF = func() (snowman.Block, error) {
+		if blkToReturn >= len(blks) {
+			t.Fatalf("Built too many blocks")
+		}
+		blk := blks[blkToReturn]
+		blkToReturn++
+		return blk, nil
+	}
+	if err := te.Notify(common.PendingTxs); err != nil {
+		t.Fatal(err)
+	}
+
+	if !queried {
+		t.Fatalf("Should have sent a query to the peer")
+	}
+
+	queried = false
+	if err := te.Notify(common.PendingTxs); err != nil {
+		t.Fatal(err)
+	}
+
+	if queried {
+		t.Fatalf("Shouldn't have sent a query to the peer")
+	}
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		if blkID != blk0.ID() {
+			t.Fatalf("wrong block requested")
+		}
+		return blk0, nil
+	}
+
+	if err := te.Chits(vdr, reqID, []ids.ID{blk0.ID()}); err != nil {
+		t.Fatal(err)
+	}
+
+	if !queried {
+		t.Fatalf("Should have sent a query to the peer")
+	}
+}
