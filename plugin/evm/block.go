@@ -17,6 +17,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/missing"
 )
 
+var (
+	bonusBlocks = new(ids.Set) // TODO: populate
+)
+
 // Block implements the snowman.Block interface
 type Block struct {
 	id       ids.ID
@@ -46,20 +50,16 @@ func (b *Block) Accept() error {
 		return errUnknownAtomicTx
 	}
 
-	atxErr := utx.Accept(vm.ctx, nil)
-	if atxErr == nil {
+	acceptErr := utx.Accept(vm.ctx, nil)
+	if acceptErr == nil {
 		return nil
 	}
 
-	switch utx.(type) {
-	case *UnsignedImportTx:
-		// TODO: If error is removed and bonus block, return nil
+	if _, ok := utx.(*UnsignedImportTx); ok && bonusBlocks.Contains(b.id) {
 		return nil
-	case *UnsignedExportTx:
-		return atxErr
-	default:
-		return errUnknownAtomicTx
 	}
+
+	return acceptErr
 }
 
 // Reject implements the snowman.Block interface
