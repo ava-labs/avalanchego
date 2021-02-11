@@ -82,8 +82,10 @@ func (b *Block) Height() uint64 {
 
 // Verify implements the snowman.Block interface
 func (b *Block) Verify() error {
+	vm := b.vm
+
 	// Only enforce a minimum fee when bootstrapping has finished
-	if b.vm.ctx.IsBootstrapped() {
+	if vm.ctx.IsBootstrapped() {
 		// Ensure the minimum gas price is paid for every transaction
 		for _, tx := range b.ethBlock.Transactions() {
 			if tx.GasPrice().Cmp(params.MinGasPrice) < 0 {
@@ -92,26 +94,24 @@ func (b *Block) Verify() error {
 		}
 	}
 
-	vm := b.vm
+	// If the tx is an atomic tx, ensure that it doesn't conflict with any of
+	// its processing ancestry.
 	tx := vm.getAtomicTx(b.ethBlock)
 	if tx != nil {
 		ancestor := b.Parent().(*Block)
-		parentState, err := b.vm.chain.BlockState(ancestor.ethBlock)
+		parentState, err := vm.chain.BlockState(ancestor.ethBlock)
 		if err != nil {
 			return err
 		}
 		switch atx := tx.UnsignedTx.(type) {
 		case *UnsignedImportTx:
-			if b.ethBlock.Hash() == vm.genesisHash {
-				return nil
-			}
-
+			// If an import tx is seen, we must ensure that none of the
+			// processing ancestors consume the same UTXO.
 			inputs := atx.InputUTXOs()
-			for {
-				if ancestor.Status() == choices.Accepted || ancestor.ethBlock.Hash() == vm.genesisHash {
-					break
-				}
+			for ancestor.Status() != choices.Accepted {
 				atx := vm.getAtomicTx(ancestor.ethBlock)
+				// If the ancestor isn't an atomic block, it can't conflict with
+				// the import tx.
 				if atx != nil {
 					ancestorInputs := atx.UnsignedTx.(UnsignedAtomicTx).InputUTXOs()
 					if inputs.Overlaps(ancestorInputs) {
@@ -119,24 +119,32 @@ func (b *Block) Verify() error {
 					}
 				}
 
+				// Move up the chain.
 				ancestor = ancestor.Parent().(*Block)
 			}
 		case *UnsignedExportTx:
+			// Export txs are validated by the processor's nonce management.
 		default:
 			return errors.New("unknown atomic tx type")
 		}
+
+		// We have verified that none of the processing ancestors conflict with
+		// the atomic transaction, so now we must ensure that the transaction is
+		// valid and doesn't have any accepted conflicts.
 
 		utx := tx.UnsignedTx.(UnsignedAtomicTx)
 		if err := utx.SemanticVerify(vm, tx); err != nil {
 			return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
 		}
+
+		// TODO: Because InsertChain calls Process, can't this invocation be removed?
 		bc := vm.chain.BlockChain()
 		_, _, _, err = bc.Processor().Process(b.ethBlock, parentState, *bc.GetVMConfig())
 		if err != nil {
 			return fmt.Errorf("invalid block due to failed processing: %w", err)
 		}
 	}
-	_, err := b.vm.chain.InsertChain([]*types.Block{b.ethBlock})
+	_, err := vm.chain.InsertChain([]*types.Block{b.ethBlock})
 	return err
 }
 
