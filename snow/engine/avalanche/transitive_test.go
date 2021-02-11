@@ -418,6 +418,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 			BetaVirtuous:      1,
 			BetaRogue:         2,
 			ConcurrentRepolls: 1,
+			OptimalProcessing: 100,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -3647,4 +3648,150 @@ func TestEngineBubbleVotes(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, choices.Accepted, tx0.Status(), "wrong tx status")
 	assert.Equal(t, choices.Processing, tx1.Status(), "wrong tx status")
+}
+
+func TestEngineIssue(t *testing.T) {
+	config := DefaultConfig()
+	config.Params.BatchSize = 1
+	config.Params.BetaVirtuous = 1
+	config.Params.BetaRogue = 1
+	config.Params.OptimalProcessing = 1
+
+	sender := &common.SenderTest{}
+	sender.T = t
+	config.Sender = sender
+
+	sender.Default(true)
+	sender.CantGetAcceptedFrontier = false
+
+	vals := validators.NewSet()
+	config.Validators = vals
+
+	vdr := ids.GenerateTestShortID()
+	if err := vals.AddWeight(vdr, 1); err != nil {
+		t.Fatal(err)
+	}
+
+	manager := vertex.NewTestManager(t)
+	config.Manager = manager
+
+	manager.Default(true)
+
+	vm := &vertex.TestVM{}
+	vm.T = t
+	config.VM = vm
+
+	vm.Default(true)
+
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+
+	gTx := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+
+	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
+
+	tx0 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		DependenciesV: []snowstorm.Tx{gTx},
+		InputIDsV:     utxos[:1],
+	}
+	tx1 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		DependenciesV: []snowstorm.Tx{gTx},
+		InputIDsV:     utxos[1:],
+	}
+
+	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
+	manager.GetF = func(id ids.ID) (avalanche.Vertex, error) {
+		switch id {
+		case gVtx.ID():
+			return gVtx, nil
+		case mVtx.ID():
+			return mVtx, nil
+		}
+		t.Fatalf("Unknown vertex")
+		panic("Should have errored")
+	}
+
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
+
+	te := &Transitive{}
+	if err := te.Initialize(config); err != nil {
+		t.Fatal(err)
+	}
+
+	vm.CantBootstrapping = true
+	vm.CantBootstrapped = true
+
+	numBuilt := 0
+	manager.BuildF = func(_ uint32, _ []ids.ID, txs []snowstorm.Tx, _ []ids.ID) (avalanche.Vertex, error) {
+		numBuilt++
+		vtx := &avalanche.TestVertex{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Processing,
+			},
+			ParentsV: []avalanche.Vertex{gVtx, mVtx},
+			HeightV:  1,
+			TxsV:     txs,
+			BytesV:   []byte{1},
+		}
+
+		manager.GetF = func(id ids.ID) (avalanche.Vertex, error) {
+			switch id {
+			case gVtx.ID():
+				return gVtx, nil
+			case mVtx.ID():
+				return mVtx, nil
+			case vtx.ID():
+				return vtx, nil
+			}
+			t.Fatalf("Unknown vertex")
+			panic("Should have errored")
+		}
+
+		return vtx, nil
+	}
+
+	var (
+		vtxID          ids.ID
+		queryRequestID uint32
+	)
+	sender.PushQueryF = func(inVdrs ids.ShortSet, requestID uint32, vID ids.ID, vtx []byte) {
+		vtxID = vID
+		queryRequestID = requestID
+	}
+
+	vm.PendingF = func() []snowstorm.Tx { return []snowstorm.Tx{tx0, tx1} }
+	if err := te.Notify(common.PendingTxs); err != nil {
+		t.Fatal(err)
+	}
+
+	if numBuilt != 1 {
+		t.Fatalf("Should have issued txs differently")
+	}
+
+	if err := te.Chits(vdr, queryRequestID, []ids.ID{vtxID}); err != nil {
+		t.Fatal(err)
+	}
+
+	if numBuilt != 2 {
+		t.Fatalf("Should have issued txs differently")
+	}
 }

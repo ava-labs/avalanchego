@@ -28,6 +28,9 @@ type Consensus interface {
 	// Returns the parameters that describe this avalanche instance
 	Parameters() Parameters
 
+	// Returns the number of vertices processing
+	NumProcessing() int
+
 	// Returns true if the transaction is virtuous.
 	// That is, no transaction has been added that conflicts with it
 	IsVirtuous(snowstorm.Tx) bool
