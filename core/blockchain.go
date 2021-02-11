@@ -222,6 +222,8 @@ type BlockChain struct {
 	shouldPreserve  func(*types.Block) bool        // Function used to determine whether should preserve the given block.
 	terminateInsert func(common.Hash, uint64) bool // Testing hook used to terminate ancient receipt chain insertion.
 	manualCanonical bool
+
+	indexLock sync.WaitGroup
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -350,29 +352,37 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 			}
 		}
 	}
-	// Load any existing snapshot, regenerating it if loading failed
-	if bc.cacheConfig.SnapshotLimit > 0 {
-		bc.snaps = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, bc.CurrentBlock().Root(), !bc.cacheConfig.SnapshotWait)
-	}
-	// Take ownership of this particular state
-	go bc.update()
-	if txLookupLimit != nil {
-		bc.txLookupLimit = *txLookupLimit
-		go bc.maintainTxIndex(txIndexBlock)
-	}
-	// If periodic cache journal is required, spin it up.
-	if bc.cacheConfig.TrieCleanRejournal > 0 {
-		if bc.cacheConfig.TrieCleanRejournal < time.Minute {
-			log.Warn("Sanitizing invalid trie cache journal time", "provided", bc.cacheConfig.TrieCleanRejournal, "updated", time.Minute)
-			bc.cacheConfig.TrieCleanRejournal = time.Minute
+
+	// TODO: spawn goroutine and wait for repair
+	bc.indexLock.Add(1) // todo change name
+	go func() {
+		bc.indexLock.Wait()
+
+		// Load any existing snapshot, regenerating it if loading failed
+		if bc.cacheConfig.SnapshotLimit > 0 {
+			bc.snaps = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, bc.CurrentBlock().Root(), !bc.cacheConfig.SnapshotWait)
 		}
-		triedb := bc.stateCache.TrieDB()
-		bc.wg.Add(1)
-		go func() {
-			defer bc.wg.Done()
-			triedb.SaveCachePeriodically(bc.cacheConfig.TrieCleanJournal, bc.cacheConfig.TrieCleanRejournal, bc.quit)
-		}()
-	}
+		// Take ownership of this particular state
+		go bc.update()
+		if txLookupLimit != nil {
+			bc.txLookupLimit = *txLookupLimit
+			go bc.maintainTxIndex(txIndexBlock)
+		}
+		// If periodic cache journal is required, spin it up.
+		if bc.cacheConfig.TrieCleanRejournal > 0 {
+			if bc.cacheConfig.TrieCleanRejournal < time.Minute {
+				log.Warn("Sanitizing invalid trie cache journal time", "provided", bc.cacheConfig.TrieCleanRejournal, "updated", time.Minute)
+				bc.cacheConfig.TrieCleanRejournal = time.Minute
+			}
+			triedb := bc.stateCache.TrieDB()
+			bc.wg.Add(1)
+			go func() {
+				defer bc.wg.Done()
+				triedb.SaveCachePeriodically(bc.cacheConfig.TrieCleanJournal, bc.cacheConfig.TrieCleanRejournal, bc.quit)
+			}()
+		}
+	}()
+
 	return bc, nil
 }
 
@@ -2667,4 +2677,8 @@ func (bc *BlockChain) ManualHead(hash common.Hash) error {
 	defer bc.chainmu.Unlock()
 	bc.writeHeadBlock(block)
 	return nil
+}
+
+func (bc *BlockChain) UnlockIndexing() {
+	bc.indexLock.Done()
 }
