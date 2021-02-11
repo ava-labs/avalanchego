@@ -276,6 +276,10 @@ func (s *state) RemoveValue(key []byte) error {
 		return s.valueDB.Put(key, valueBytes)
 	}
 
+	if !value.Present {
+		return errDuplicatedOperation
+	}
+
 	for _, trait := range value.Traits {
 		traitDB := prefixdb.New(trait, s.indexDB)
 		if err := traitDB.Delete(key); err != nil {
