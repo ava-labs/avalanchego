@@ -418,8 +418,8 @@ func (vm *VM) Initialize(
 	vm.shutdownWg.Add(1)
 	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
 	vm.codec = Codec
-	if err := vm.repairCanonicalChain(); err != nil {
-		log.Error("failed to repair canonical chain", "error", err)
+	if err := vm.repairChain(); err != nil {
+		log.Error("failed to repair the chain", "error", err)
 	}
 
 	// The Codec explicitly registers the types it requires from the secp256k1fx
@@ -428,18 +428,15 @@ func (vm *VM) Initialize(
 	// ignored by the VM's codec.
 	vm.baseCodec = linearcodec.NewDefault()
 
-	if err := vm.fx.Initialize(vm); err != nil {
-		return err
-	}
-
-	return vm.verifyUniqueImports()
+	return vm.fx.Initialize(vm)
 }
 
-// repairCanonicalChain writes the canonical chain index from the last accepted
+// repairChain writes the canonical chain index from the last accepted
 // block back to the genesis block to overwrite any corruption that might have
-// occurred.
-// assumes that the genesisHash and [lastAccepted] block have already been set.
-func (vm *VM) repairCanonicalChain() error {
+// occurred. assumes that the genesisHash and [lastAccepted] block have already
+// been set.
+// Also verifies the canonical chain index and atomic import inputs are valid.
+func (vm *VM) repairChain() error {
 	// Check if the canonical chain has already been repaired
 	if has, err := vm.db.Has(repairedKey); err != nil {
 		return err
@@ -462,6 +459,9 @@ func (vm *VM) repairCanonicalChain() error {
 	}
 	if err := vm.chain.ValidateCanonicalChain(); err != nil {
 		return fmt.Errorf("failed to validate canonical chain due to: %w", err)
+	}
+	if err := vm.verifyUniqueImports(); err != nil {
+		return fmt.Errorf("failed to validate unique atomic imports due to: %w", err)
 	}
 
 	return nil
