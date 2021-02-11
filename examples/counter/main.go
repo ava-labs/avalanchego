@@ -8,6 +8,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"go/build"
+	"math/big"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"syscall"
+	"time"
+
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
@@ -17,13 +25,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/compiler"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"go/build"
-	"math/big"
-	"os"
-	"os/signal"
-	"path/filepath"
-	"syscall"
-	"time"
 )
 
 func checkError(err error) {
@@ -96,7 +97,7 @@ func main() {
 	gasPrice := big.NewInt(1000000000)
 
 	blockCount := 0
-	chain := coreth.NewETHChain(&config, nil, nil, nil)
+	chain := coreth.NewETHChain(&config, nil, nil, nil, eth.DefaultSettings)
 	newTxPoolHeadChan := make(chan core.NewTxPoolHeadEvent, 1)
 	log.Info(chain.GetGenesisBlock().Hash().Hex())
 	firstBlock := false
