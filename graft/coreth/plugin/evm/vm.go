@@ -103,7 +103,6 @@ var (
 	errInvalidGas                 = errors.New("invalid block due to low gas")
 	errConflictingAtomicInputs    = errors.New("invalid block due to conflicting atomic inputs")
 	errUnknownAtomicTx            = errors.New("unknown atomic tx type")
-	errDuplicatedExports          = errors.New("duplicated exports")
 	errFailedChainVerify          = errors.New("block failed chain verify")
 )
 
