@@ -46,7 +46,20 @@ func (b *Block) Accept() error {
 		return errUnknownAtomicTx
 	}
 
-	return utx.Accept(vm.ctx, nil)
+	atxErr := utx.Accept(vm.ctx, nil)
+	if atxErr == nil {
+		return nil
+	}
+
+	switch utx.(type) {
+	case *UnsignedImportTx:
+		// TODO: If error is removed and bonus block, return nil
+		return nil
+	case *UnsignedExportTx:
+		return atxErr
+	default:
+		return errUnknownAtomicTx
+	}
 }
 
 // Reject implements the snowman.Block interface
