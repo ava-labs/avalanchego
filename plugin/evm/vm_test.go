@@ -1057,8 +1057,6 @@ func TestBonusBlocksTxs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Semantic verify gets UTXO...if removed when first seen, then won't be able
-	// to getUTXO.
 	if err := blk.Verify(); err != nil {
 		t.Fatal(err)
 	}
