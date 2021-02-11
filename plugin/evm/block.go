@@ -119,17 +119,12 @@ func (b *Block) Accept() error {
 		return errUnknownAtomicTx
 	}
 
-	acceptErr := utx.Accept(vm.ctx, nil)
-	if acceptErr == nil {
+	if bonusBlocks.Contains(b.id) {
+		log.Info("skipping atomic tx verification on bonus block", "block", b.id)
 		return nil
 	}
 
-	if _, ok := utx.(*UnsignedImportTx); ok && bonusBlocks.Contains(b.id) {
-		log.Debug("skipping atomic tx verification on bonus block", "block", b.id)
-		return nil
-	}
-
-	return acceptErr
+	return utx.Accept(vm.ctx, nil)
 }
 
 // Reject implements the snowman.Block interface
@@ -216,7 +211,7 @@ func (b *Block) Verify() error {
 
 		utx := tx.UnsignedTx.(UnsignedAtomicTx)
 		if bonusBlocks.Contains(b.id) {
-			log.Debug("skipping atomic tx verification on bonus block", "block", b.id)
+			log.Info("skipping atomic tx verification on bonus block", "block", b.id)
 		} else {
 			if err := utx.SemanticVerify(vm, tx); err != nil {
 				return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
