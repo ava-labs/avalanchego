@@ -204,7 +204,7 @@ func (tm *AdaptiveTimeoutManager) remove(id ids.ID, currentTime time.Time) {
 
 	// Update the metrics
 	tm.networkTimeoutMetric.Set(float64(tm.currentTimeout))
-	tm.avgLatency.Set(float64(avgLatency))
+	tm.avgLatency.Set(avgLatency)
 }
 
 // Timeout registers a timeout
