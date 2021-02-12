@@ -223,7 +223,7 @@ type BlockChain struct {
 	terminateInsert func(common.Hash, uint64) bool // Testing hook used to terminate ancient receipt chain insertion.
 	manualCanonical bool
 
-	indexLock sync.WaitGroup
+	indexLock sync.WaitGroup // Used to coordinate go-ethereum's async indexing functionality
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -353,10 +353,11 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		}
 	}
 
-	// TODO: spawn goroutine and wait for repair
-	bc.indexLock.Add(1) // todo change name
+	// Wait until we're done repairing canonical chain indexes.
+	bc.indexLock.Add(1)
 	go func() {
 		bc.indexLock.Wait()
+		log.Debug("indexing unlocked")
 
 		// Load any existing snapshot, regenerating it if loading failed
 		if bc.cacheConfig.SnapshotLimit > 0 {
