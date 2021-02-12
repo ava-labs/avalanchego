@@ -17,7 +17,7 @@ echo "Using Avalanche Image: $AVALANCHE_IMAGE"
 
 DOCKER_REPO="avaplatform"
 BYZANTINE_IMAGE="$DOCKER_REPO/avalanche-byzantine:v0.1.5-rc.1"
-TEST_SUITE_IMAGE="$DOCKER_REPO/avalanche-testing:v0.10.5-rc.2"
+TEST_SUITE_IMAGE="$DOCKER_REPO/avalanche-testing:v0.10.5-rc.3"
 
 # If Docker Credentials are not available skip the Byzantine Tests
 if [[ -z ${DOCKER_USERNAME} ]]; then
@@ -52,6 +52,7 @@ docker run \
     --env "SUITE_EXECUTION_VOLUME=${SUITE_EXECUTION_VOLUME}" \
     --env "KURTOSIS_API_IMAGE=${API_IMAGE}" \
     --env "PARALLELISM=${PARALLELISM}" \
+    --env "TEST_NAMES=virtuousCorethTest" \
     `# In Bash, this is how you feed arguments exactly as-is to a child script (since ${*} loses quoting and ${@} trips set -e if no arguments are passed)` \
     `# It basically says, "if and only if ${1} exists, evaluate ${@}"` \
     ${1+"${@}"} \
