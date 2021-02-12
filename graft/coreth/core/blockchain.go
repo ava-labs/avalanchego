@@ -887,32 +887,32 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 	for current.Hash() != bc.genesisBlock.Hash() {
 		blkByHash := bc.GetBlockByHash(current.Hash())
 		if blkByHash == nil {
-			return fmt.Errorf("couldn't find block by hash %s at height %d", current.Hash(), current.Number())
+			return fmt.Errorf("couldn't find block by hash %s at height %d", current.Hash().String(), current.Number())
 		}
 		if blkByHash.Hash() != current.Hash() {
-			return fmt.Errorf("blockByHash returned a block with an unepected hash: %s, expected: %s", blkByHash.Hash(), current.Hash())
+			return fmt.Errorf("blockByHash returned a block with an unexpected hash: %s, expected: %s", blkByHash.Hash().String(), current.Hash().String())
 		}
 		blkByNumber := bc.GetBlockByNumber(current.Number().Uint64())
 		if blkByNumber == nil {
 			return fmt.Errorf("couldn't find block by number at height %d", current.Number())
 		}
 		if blkByNumber.Hash() != current.Hash() {
-			return fmt.Errorf("blockByNumber returned a block with unexpected hash: %s, expected: %s", blkByNumber.Hash(), current.Hash())
+			return fmt.Errorf("blockByNumber returned a block with unexpected hash: %s, expected: %s", blkByNumber.Hash().String(), current.Hash().String())
 		}
 
 		hdrByHash := bc.GetHeaderByHash(current.Hash())
 		if hdrByHash == nil {
-			return fmt.Errorf("couldn't find block header by hash %s at height %d", current.Hash(), current.Number())
+			return fmt.Errorf("couldn't find block header by hash %s at height %d", current.Hash().String(), current.Number())
 		}
 		if hdrByHash.Hash() != current.Hash() {
-			return fmt.Errorf("hdrByHash returned a block header with an unepected hash: %s, expected: %s", hdrByHash.Hash(), current.Hash())
+			return fmt.Errorf("hdrByHash returned a block header with an unexpected hash: %s, expected: %s", hdrByHash.Hash().String(), current.Hash().String())
 		}
 		hdrByNumber := bc.GetHeaderByNumber(current.Number().Uint64())
 		if hdrByNumber == nil {
 			return fmt.Errorf("couldn't find block header by number at height %d", current.Number())
 		}
 		if hdrByNumber.Hash() != current.Hash() {
-			return fmt.Errorf("hdrByNumber returned a block header with unexpected hash: %s, expected: %s", hdrByNumber.Hash(), current.Hash())
+			return fmt.Errorf("hdrByNumber returned a block header with unexpected hash: %s, expected: %s", hdrByNumber.Hash().String(), current.Hash().String())
 		}
 
 		// Ensure that all of the transactions have been stored correctly in the canonical
@@ -921,7 +921,7 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 		for txIndex, tx := range txs {
 			txLookup := bc.GetTransactionLookup(tx.Hash())
 			if txLookup == nil {
-				return fmt.Errorf("failed to find transaction %s", tx.Hash())
+				return fmt.Errorf("failed to find transaction %s", tx.Hash().String())
 			}
 			if txLookup.BlockHash != current.Hash() {
 				return fmt.Errorf("tx lookup returned with incorrect block hash: %s, expected: %s", txLookup.BlockHash.String(), current.Hash().String())
@@ -940,10 +940,10 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 		}
 		for index, txReceipt := range blkReceipts {
 			if txReceipt.TxHash != txs[index].Hash() {
-				return fmt.Errorf("transaction receipt mismatch, expected %s, but found: %s", txs[index].Hash(), txReceipt.TxHash)
+				return fmt.Errorf("transaction receipt mismatch, expected %s, but found: %s", txs[index].Hash().String(), txReceipt.TxHash.String())
 			}
 			if txReceipt.BlockHash != current.Hash() {
-				return fmt.Errorf("transaction receipt had block hash %s, but expected %s", txReceipt.BlockHash, current.Hash())
+				return fmt.Errorf("transaction receipt had block hash %s, but expected %s", txReceipt.BlockHash.String(), current.Hash().String())
 			}
 			if txReceipt.BlockNumber.Uint64() != current.NumberU64() {
 				return fmt.Errorf("transaction receipt had block number %d, but expected %d", txReceipt.BlockNumber.Uint64(), current.NumberU64())
@@ -957,7 +957,7 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 
 		parent := bc.GetBlockByHash(current.ParentHash())
 		if parent.Hash() != current.ParentHash() {
-			return fmt.Errorf("getBlockByHash retrieved parent block with incorrect hash, found %s, expected: %s", parent.Hash(), current.ParentHash())
+			return fmt.Errorf("getBlockByHash retrieved parent block with incorrect hash, found %s, expected: %s", parent.Hash().String(), current.ParentHash().String())
 		}
 		current = parent
 	}
