@@ -178,6 +178,12 @@ func (b *Block) Verify() error {
 	}
 
 	ancestorIntf := b.Parent()
+	// Ensure that the parent was verified and inserted correctly.
+	ancestorID := ancestorIntf.ID()
+	ancestorHash := common.Hash(ancestorID)
+	if !vm.chain.BlockChain().HasBlock(ancestorHash, b.Height()-1) {
+		return errRejectedParent
+	}
 
 	// If the tx is an atomic tx, ensure that it doesn't conflict with any of
 	// its processing ancestry.
@@ -250,12 +256,6 @@ func (b *Block) Verify() error {
 		_, _, _, err = bc.Processor().Process(b.ethBlock, parentState, *bc.GetVMConfig())
 		if err != nil {
 			return fmt.Errorf("invalid block due to failed processing: %w", err)
-		}
-	} else {
-		ancestorID := ancestorIntf.ID()
-		ancestorHash := common.Hash(ancestorID)
-		if !vm.chain.BlockChain().HasBlock(ancestorHash, b.Height()-1) {
-			return errRejectedParent
 		}
 	}
 
