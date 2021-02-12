@@ -886,32 +886,32 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 	for current.Hash() != bc.genesisBlock.Hash() {
 		blkByHash := bc.GetBlockByHash(current.Hash())
 		if blkByHash == nil {
-			return fmt.Errorf("couldn't find block by hash %s at height %d", current.Hash().String(), current.Number())
+			return fmt.Errorf("couldn't find block by hash %s at height %d", current.Hash(), current.Number())
 		}
 		if blkByHash.Hash() != current.Hash() {
-			return fmt.Errorf("blockByHash returned a block with an unepected hash: %s, expected: %s", blkByHash.Hash().String(), current.Hash().String())
+			return fmt.Errorf("blockByHash returned a block with an unepected hash: %s, expected: %s", blkByHash.Hash(), current.Hash())
 		}
 		blkByNumber := bc.GetBlockByNumber(current.Number().Uint64())
 		if blkByNumber == nil {
 			return fmt.Errorf("couldn't find block by number at height %d", current.Number())
 		}
 		if blkByNumber.Hash() != current.Hash() {
-			return fmt.Errorf("blockByNumber returned a block with unexpected hash: %s, expected: %s", blkByNumber.Hash().String(), current.Hash().String())
+			return fmt.Errorf("blockByNumber returned a block with unexpected hash: %s, expected: %s", blkByNumber.Hash(), current.Hash())
 		}
 
 		hdrByHash := bc.GetHeaderByHash(current.Hash())
 		if hdrByHash == nil {
-			return fmt.Errorf("couldn't find block header by hash %s at height %d", current.Hash().String(), current.Number())
+			return fmt.Errorf("couldn't find block header by hash %s at height %d", current.Hash(), current.Number())
 		}
 		if hdrByHash.Hash() != current.Hash() {
-			return fmt.Errorf("hdrByHash returned a block header with an unepected hash: %s, expected: %s", hdrByHash.Hash().String(), current.Hash().String())
+			return fmt.Errorf("hdrByHash returned a block header with an unepected hash: %s, expected: %s", hdrByHash.Hash(), current.Hash())
 		}
 		hdrByNumber := bc.GetHeaderByNumber(current.Number().Uint64())
 		if hdrByNumber == nil {
 			return fmt.Errorf("couldn't find block header by number at height %d", current.Number())
 		}
 		if hdrByNumber.Hash() != current.Hash() {
-			return fmt.Errorf("hdrByNumber returned a block header with unexpected hash: %s, expected: %s", hdrByNumber.Hash().String(), current.Hash().String())
+			return fmt.Errorf("hdrByNumber returned a block header with unexpected hash: %s, expected: %s", hdrByNumber.Hash(), current.Hash())
 		}
 
 		// Ensure that all of the transactions have been stored correctly in the canonical
