@@ -196,7 +196,10 @@ func (b *Block) Verify() error {
 		if blkStatus := ancestorIntf.Status(); blkStatus == choices.Unknown || blkStatus == choices.Rejected {
 			return errRejectedParent
 		}
-		ancestor := ancestorIntf.(*Block)
+		ancestor, ok := ancestorIntf.(*Block)
+		if !ok {
+			return fmt.Errorf("expected %s, parent of %s, to be *Block but is %T", ancestor.ID(), b.ID(), ancestorIntf)
+		}
 
 		parentState, err := vm.chain.BlockState(ancestor.ethBlock)
 		if err != nil {
@@ -234,7 +237,10 @@ func (b *Block) Verify() error {
 					if blkStatus := ancestorIntf.Status(); blkStatus == choices.Unknown || blkStatus == choices.Rejected {
 						return errRejectedParent
 					}
-					ancestor = ancestorIntf.(*Block)
+					ancestor, ok = ancestorIntf.(*Block)
+					if !ok {
+						return fmt.Errorf("expected %s, parent of %s, to be *Block but is %T", ancestor.ID(), b.ID(), ancestorIntf)
+					}
 				}
 			case *UnsignedExportTx:
 				// Export txs are validated by the processor's nonce management.
