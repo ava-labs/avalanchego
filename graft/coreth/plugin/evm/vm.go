@@ -64,7 +64,7 @@ var (
 var (
 	lastAcceptedKey = []byte("snowman_lastAccepted")
 	acceptedPrefix  = []byte("snowman_accepted")
-	repairedKey     = []byte("chain_repaired_20210211")
+	repairedKey     = []byte("chain_repaired_20210212")
 )
 
 const (
@@ -425,6 +425,9 @@ func (vm *VM) Initialize(
 	if err := vm.repairCanonicalChain(); err != nil {
 		log.Error("failed to repair the canonical chain", "error", err)
 	}
+
+	log.Debug("unlocking indexing")
+	chain.BlockChain().UnlockIndexing()
 
 	// The Codec explicitly registers the types it requires from the secp256k1fx
 	// so [vm.baseCodec] is a dummy codec use to fulfill the secp256k1fx VM
