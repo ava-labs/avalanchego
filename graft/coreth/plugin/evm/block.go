@@ -4,10 +4,12 @@
 package evm
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
@@ -157,6 +159,10 @@ func (b *Block) Height() uint64 {
 	return b.ethBlock.Number().Uint64()
 }
 
+var (
+	errRejectedParent = errors.New("rejected parent")
+)
+
 // Verify implements the snowman.Block interface
 func (b *Block) Verify() error {
 	vm := b.vm
@@ -171,11 +177,21 @@ func (b *Block) Verify() error {
 		}
 	}
 
+	ancestorIntf := b.Parent()
+
 	// If the tx is an atomic tx, ensure that it doesn't conflict with any of
 	// its processing ancestry.
 	tx := vm.getAtomicTx(b.ethBlock)
 	if tx != nil {
-		ancestor := b.Parent().(*Block)
+		// If the ancestor is unknown, then the parent failed verification when
+		// it was called.
+		// If the ancestor is rejected, then this block shouldn't be inserted
+		// into the canonical chain because the parent is will be missing.
+		if blkStatus := ancestorIntf.Status(); blkStatus == choices.Unknown || blkStatus == choices.Rejected {
+			return errRejectedParent
+		}
+		ancestor := ancestorIntf.(*Block)
+
 		parentState, err := vm.chain.BlockState(ancestor.ethBlock)
 		if err != nil {
 			return err
@@ -201,7 +217,18 @@ func (b *Block) Verify() error {
 					}
 
 					// Move up the chain.
-					ancestor = ancestor.Parent().(*Block)
+					ancestorIntf := ancestor.Parent()
+					// If the ancestor is unknown, then the parent failed
+					// verification when it was called.
+					// If the ancestor is rejected, then this block shouldn't be
+					// inserted into the canonical chain because the parent is
+					// will be missing.
+					// If the ancestor is processing, then the block may have
+					// been verified.
+					if blkStatus := ancestorIntf.Status(); blkStatus == choices.Unknown || blkStatus == choices.Rejected {
+						return errRejectedParent
+					}
+					ancestor = ancestorIntf.(*Block)
 				}
 			case *UnsignedExportTx:
 				// Export txs are validated by the processor's nonce management.
@@ -223,6 +250,12 @@ func (b *Block) Verify() error {
 		_, _, _, err = bc.Processor().Process(b.ethBlock, parentState, *bc.GetVMConfig())
 		if err != nil {
 			return fmt.Errorf("invalid block due to failed processing: %w", err)
+		}
+	} else {
+		ancestorID := ancestorIntf.ID()
+		ancestorHash := common.Hash(ancestorID)
+		if !vm.chain.BlockChain().HasBlock(ancestorHash, b.Height()-1) {
+			return errRejectedParent
 		}
 	}
 
