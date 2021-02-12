@@ -252,6 +252,8 @@ func (b *Block) Verify() error {
 			return fmt.Errorf("invalid block due to failed processing: %w", err)
 		}
 	} else {
+		// Because we aren't traversing up the processing parents, we need to
+		// ensure that the parent was verified and inserted correctly.
 		ancestorID := ancestorIntf.ID()
 		ancestorHash := common.Hash(ancestorID)
 		if !vm.chain.BlockChain().HasBlock(ancestorHash, b.Height()-1) {
