@@ -25,6 +25,7 @@ var (
 
 	Tests = []func(*testing.T, Factory){
 		InitializeTest,
+		NumProcessingTest,
 		AddToTailTest,
 		AddToNonTailTest,
 		AddToUnknownTest,
@@ -70,6 +71,7 @@ func InitializeTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      3,
 		BetaRogue:         5,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 
 	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
@@ -85,6 +87,56 @@ func InitializeTest(t *testing.T, factory Factory) {
 	}
 }
 
+// Make sure that the number of processing blocks is tracked correctly
+func NumProcessingTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         1,
+		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
+	}
+	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+		t.Fatal(err)
+	}
+
+	block := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(1),
+			StatusV: choices.Processing,
+		},
+		ParentV: Genesis,
+	}
+
+	if numProcessing := sm.NumProcessing(); numProcessing != 0 {
+		t.Fatalf("expected %d blocks to be processing but returned %d", 0, numProcessing)
+	}
+
+	// Adding to the previous preference will update the preference
+	if err := sm.Add(block); err != nil {
+		t.Fatal(err)
+	}
+
+	if numProcessing := sm.NumProcessing(); numProcessing != 1 {
+		t.Fatalf("expected %d blocks to be processing but returned %d", 1, numProcessing)
+	}
+
+	votes := ids.Bag{}
+	votes.Add(block.ID())
+	if err := sm.RecordPoll(votes); err != nil {
+		t.Fatal(err)
+	}
+
+	if numProcessing := sm.NumProcessing(); numProcessing != 0 {
+		t.Fatalf("expected %d blocks to be processing but returned %d", 0, numProcessing)
+	}
+}
+
 // Make sure that adding a block to the tail updates the preference
 func AddToTailTest(t *testing.T, factory Factory) {
 	sm := factory.New()
@@ -97,6 +149,7 @@ func AddToTailTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      3,
 		BetaRogue:         5,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
 		t.Fatal(err)
@@ -130,6 +183,7 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      3,
 		BetaRogue:         5,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
 		t.Fatal(err)
@@ -179,6 +233,7 @@ func AddToUnknownTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      3,
 		BetaRogue:         5,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
 		t.Fatal(err)
@@ -219,6 +274,7 @@ func IssuedPreviouslyAcceptedTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      3,
 		BetaRogue:         5,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
 		t.Fatal(err)
@@ -240,6 +296,7 @@ func IssuedPreviouslyRejectedTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      3,
 		BetaRogue:         5,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
 		t.Fatal(err)
@@ -269,6 +326,7 @@ func IssuedUnissuedTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      3,
 		BetaRogue:         5,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
 		t.Fatal(err)
@@ -298,6 +356,7 @@ func IssuedIssuedTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      3,
 		BetaRogue:         5,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
 		t.Fatal(err)
@@ -329,6 +388,7 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      2,
 		BetaRogue:         3,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
 		t.Fatal(err)
@@ -378,6 +438,7 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      1,
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
 		t.Fatal(err)
@@ -441,6 +502,7 @@ func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      1,
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
 		t.Fatal(err)
@@ -468,6 +530,7 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      1,
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
 		t.Fatal(err)
@@ -545,6 +608,7 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      2,
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
 		t.Fatal(err)
@@ -657,6 +721,7 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      2,
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
 		t.Fatal(err)
@@ -705,6 +770,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      1,
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
 		t.Fatal(err)
@@ -844,6 +910,7 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      1,
 		BetaRogue:         2,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
 		t.Fatal(err)
@@ -924,6 +991,7 @@ func MetricsProcessingErrorTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      1,
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 
 	numProcessing := prometheus.NewGauge(
@@ -952,6 +1020,7 @@ func MetricsAcceptedErrorTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      1,
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 
 	numAccepted := prometheus.NewGauge(
@@ -980,6 +1049,7 @@ func MetricsRejectedErrorTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      1,
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 
 	numRejected := prometheus.NewGauge(
@@ -1008,6 +1078,7 @@ func ErrorOnInitialRejectionTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      1,
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 
 	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
@@ -1044,6 +1115,7 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      1,
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 
 	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
@@ -1081,6 +1153,7 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      1,
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 
 	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
@@ -1127,6 +1200,7 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 		BetaVirtuous:      1,
 		BetaRogue:         1,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 
 	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
@@ -1175,11 +1249,13 @@ func RandomizedConsistencyTest(t *testing.T, factory Factory) {
 	numColors := 50
 	numNodes := 100
 	params := snowball.Parameters{
-		Metrics:      prometheus.NewRegistry(),
-		K:            20,
-		Alpha:        15,
-		BetaVirtuous: 20,
-		BetaRogue:    30,
+		Metrics:           prometheus.NewRegistry(),
+		K:                 20,
+		Alpha:             15,
+		BetaVirtuous:      20,
+		BetaRogue:         30,
+		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 	seed := int64(0)
 

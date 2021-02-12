@@ -79,6 +79,9 @@ func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters,
 // Parameters implements the Snowman interface
 func (ts *Topological) Parameters() snowball.Parameters { return ts.params }
 
+// NumProcessing implements the Snowman interface
+func (ts *Topological) NumProcessing() int { return len(ts.blocks) - 1 }
+
 // Add implements the Snowman interface
 func (ts *Topological) Add(blk Block) error {
 	parent := blk.Parent()
