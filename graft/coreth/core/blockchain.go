@@ -222,6 +222,8 @@ type BlockChain struct {
 	shouldPreserve  func(*types.Block) bool        // Function used to determine whether should preserve the given block.
 	terminateInsert func(common.Hash, uint64) bool // Testing hook used to terminate ancient receipt chain insertion.
 	manualCanonical bool
+
+	indexLock sync.WaitGroup // Used to coordinate go-ethereum's async indexing functionality
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -350,29 +352,38 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 			}
 		}
 	}
-	// Load any existing snapshot, regenerating it if loading failed
-	if bc.cacheConfig.SnapshotLimit > 0 {
-		bc.snaps = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, bc.CurrentBlock().Root(), !bc.cacheConfig.SnapshotWait)
-	}
-	// Take ownership of this particular state
-	go bc.update()
-	if txLookupLimit != nil {
-		bc.txLookupLimit = *txLookupLimit
-		go bc.maintainTxIndex(txIndexBlock)
-	}
-	// If periodic cache journal is required, spin it up.
-	if bc.cacheConfig.TrieCleanRejournal > 0 {
-		if bc.cacheConfig.TrieCleanRejournal < time.Minute {
-			log.Warn("Sanitizing invalid trie cache journal time", "provided", bc.cacheConfig.TrieCleanRejournal, "updated", time.Minute)
-			bc.cacheConfig.TrieCleanRejournal = time.Minute
+
+	// Wait until we're done repairing canonical chain indexes.
+	bc.indexLock.Add(1)
+	bc.wg.Add(1)
+	go func() {
+		bc.indexLock.Wait()
+		log.Debug("indexing unlocked")
+
+		// Load any existing snapshot, regenerating it if loading failed
+		if bc.cacheConfig.SnapshotLimit > 0 {
+			bc.snaps = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, bc.CurrentBlock().Root(), !bc.cacheConfig.SnapshotWait)
 		}
-		triedb := bc.stateCache.TrieDB()
-		bc.wg.Add(1)
-		go func() {
-			defer bc.wg.Done()
-			triedb.SaveCachePeriodically(bc.cacheConfig.TrieCleanJournal, bc.cacheConfig.TrieCleanRejournal, bc.quit)
-		}()
-	}
+		// Take ownership of this particular state
+		go bc.update()
+		if txLookupLimit != nil {
+			bc.txLookupLimit = *txLookupLimit
+			go bc.maintainTxIndex(txIndexBlock)
+		}
+		// If periodic cache journal is required, spin it up.
+		if bc.cacheConfig.TrieCleanRejournal > 0 {
+			if bc.cacheConfig.TrieCleanRejournal < time.Minute {
+				log.Warn("Sanitizing invalid trie cache journal time", "provided", bc.cacheConfig.TrieCleanRejournal, "updated", time.Minute)
+				bc.cacheConfig.TrieCleanRejournal = time.Minute
+			}
+			triedb := bc.stateCache.TrieDB()
+			go func() {
+				defer bc.wg.Done()
+				triedb.SaveCachePeriodically(bc.cacheConfig.TrieCleanJournal, bc.cacheConfig.TrieCleanRejournal, bc.quit)
+			}()
+		}
+	}()
+
 	return bc, nil
 }
 
@@ -879,7 +890,7 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 			return fmt.Errorf("couldn't find block by hash %s at height %d", current.Hash().String(), current.Number())
 		}
 		if blkByHash.Hash() != current.Hash() {
-			return fmt.Errorf("blockByHash returned a block with an unepected hash: %s, expected: %s", blkByHash.Hash().String(), current.Hash().String())
+			return fmt.Errorf("blockByHash returned a block with an unexpected hash: %s, expected: %s", blkByHash.Hash().String(), current.Hash().String())
 		}
 		blkByNumber := bc.GetBlockByNumber(current.Number().Uint64())
 		if blkByNumber == nil {
@@ -889,13 +900,28 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 			return fmt.Errorf("blockByNumber returned a block with unexpected hash: %s, expected: %s", blkByNumber.Hash().String(), current.Hash().String())
 		}
 
+		hdrByHash := bc.GetHeaderByHash(current.Hash())
+		if hdrByHash == nil {
+			return fmt.Errorf("couldn't find block header by hash %s at height %d", current.Hash().String(), current.Number())
+		}
+		if hdrByHash.Hash() != current.Hash() {
+			return fmt.Errorf("hdrByHash returned a block header with an unexpected hash: %s, expected: %s", hdrByHash.Hash().String(), current.Hash().String())
+		}
+		hdrByNumber := bc.GetHeaderByNumber(current.Number().Uint64())
+		if hdrByNumber == nil {
+			return fmt.Errorf("couldn't find block header by number at height %d", current.Number())
+		}
+		if hdrByNumber.Hash() != current.Hash() {
+			return fmt.Errorf("hdrByNumber returned a block header with unexpected hash: %s, expected: %s", hdrByNumber.Hash().String(), current.Hash().String())
+		}
+
 		// Ensure that all of the transactions have been stored correctly in the canonical
 		// chain
 		txs := current.Body().Transactions
 		for txIndex, tx := range txs {
 			txLookup := bc.GetTransactionLookup(tx.Hash())
 			if txLookup == nil {
-				return fmt.Errorf("failed to find transaction %s", tx.Hash())
+				return fmt.Errorf("failed to find transaction %s", tx.Hash().String())
 			}
 			if txLookup.BlockHash != current.Hash() {
 				return fmt.Errorf("tx lookup returned with incorrect block hash: %s, expected: %s", txLookup.BlockHash.String(), current.Hash().String())
@@ -914,10 +940,10 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 		}
 		for index, txReceipt := range blkReceipts {
 			if txReceipt.TxHash != txs[index].Hash() {
-				return fmt.Errorf("transaction receipt mismatch, expected %s, but found: %s", txs[index].Hash(), txReceipt.TxHash)
+				return fmt.Errorf("transaction receipt mismatch, expected %s, but found: %s", txs[index].Hash().String(), txReceipt.TxHash.String())
 			}
 			if txReceipt.BlockHash != current.Hash() {
-				return fmt.Errorf("transaction receipt had block hash %s, but expected %s", txReceipt.BlockHash, current.Hash())
+				return fmt.Errorf("transaction receipt had block hash %s, but expected %s", txReceipt.BlockHash.String(), current.Hash().String())
 			}
 			if txReceipt.BlockNumber.Uint64() != current.NumberU64() {
 				return fmt.Errorf("transaction receipt had block number %d, but expected %d", txReceipt.BlockNumber.Uint64(), current.NumberU64())
@@ -931,7 +957,7 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 
 		parent := bc.GetBlockByHash(current.ParentHash())
 		if parent.Hash() != current.ParentHash() {
-			return fmt.Errorf("getBlockByHash retrieved parent block with incorrect hash, found %s, expected: %s", parent.Hash(), current.ParentHash())
+			return fmt.Errorf("getBlockByHash retrieved parent block with incorrect hash, found %s, expected: %s", parent.Hash().String(), current.ParentHash().String())
 		}
 		current = parent
 	}
@@ -2667,4 +2693,8 @@ func (bc *BlockChain) ManualHead(hash common.Hash) error {
 	defer bc.chainmu.Unlock()
 	bc.writeHeadBlock(block)
 	return nil
+}
+
+func (bc *BlockChain) UnlockIndexing() {
+	bc.indexLock.Done()
 }

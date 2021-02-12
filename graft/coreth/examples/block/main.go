@@ -6,6 +6,8 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"math/big"
+
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
@@ -15,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
-	"math/big"
 )
 
 func checkError(err error) {
@@ -64,7 +65,7 @@ func main() {
 	config.Miner.ManualMining = true
 	config.Miner.DisableUncle = true
 
-	chain := coreth.NewETHChain(&config, nil, nil, nil)
+	chain := coreth.NewETHChain(&config, nil, nil, nil, eth.DefaultSettings)
 	buff := new(bytes.Buffer)
 	blk := chain.GetGenesisBlock()
 	err := blk.EncodeRLPEth(buff)
