@@ -899,6 +899,21 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 			return fmt.Errorf("blockByNumber returned a block with unexpected hash: %s, expected: %s", blkByNumber.Hash().String(), current.Hash().String())
 		}
 
+		hdrByHash := bc.GetHeaderByHash(current.Hash())
+		if hdrByHash == nil {
+			return fmt.Errorf("couldn't find block header by hash %s at height %d", current.Hash().String(), current.Number())
+		}
+		if hdrByHash.Hash() != current.Hash() {
+			return fmt.Errorf("hdrByHash returned a block header with an unepected hash: %s, expected: %s", hdrByHash.Hash().String(), current.Hash().String())
+		}
+		hdrByNumber := bc.GetHeaderByNumber(current.Number().Uint64())
+		if hdrByNumber == nil {
+			return fmt.Errorf("couldn't find block header by number at height %d", current.Number())
+		}
+		if hdrByNumber.Hash() != current.Hash() {
+			return fmt.Errorf("hdrByNumber returned a block header with unexpected hash: %s, expected: %s", hdrByNumber.Hash().String(), current.Hash().String())
+		}
+
 		// Ensure that all of the transactions have been stored correctly in the canonical
 		// chain
 		txs := current.Body().Transactions
