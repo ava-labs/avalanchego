@@ -355,6 +355,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 
 	// Wait until we're done repairing canonical chain indexes.
 	bc.indexLock.Add(1)
+	bc.wg.Add(1)
 	go func() {
 		bc.indexLock.Wait()
 		log.Debug("indexing unlocked")
@@ -376,7 +377,6 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 				bc.cacheConfig.TrieCleanRejournal = time.Minute
 			}
 			triedb := bc.stateCache.TrieDB()
-			bc.wg.Add(1)
 			go func() {
 				defer bc.wg.Done()
 				triedb.SaveCachePeriodically(bc.cacheConfig.TrieCleanJournal, bc.cacheConfig.TrieCleanRejournal, bc.quit)
