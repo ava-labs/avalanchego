@@ -105,6 +105,10 @@ func (tm *AdaptiveTimeoutManager) Initialize(config *AdaptiveTimeoutConfig) erro
 	})
 
 	switch {
+	case config.InitialTimeout > config.MaximumTimeout:
+		return fmt.Errorf("initial timeout (%s) > maximum timeout (%s)", config.InitialTimeout, config.MaximumTimeout)
+	case config.InitialTimeout < config.MinimumTimeout:
+		return fmt.Errorf("initial timeout (%s) < minimum timeout (%s)", config.InitialTimeout, config.MinimumTimeout)
 	case config.TimeoutCoefficient < 1:
 		return fmt.Errorf("timeout coefficient must be >= 1 but got %f", config.TimeoutCoefficient)
 	case config.TimeoutHalflife == 0:
@@ -188,7 +192,6 @@ func (tm *AdaptiveTimeoutManager) remove(id ids.ID, currentTime time.Time) {
 	responseTime := float64(currentTime.Sub(timeoutRegisteredAt))
 	tm.averager.Observe(responseTime, currentTime)
 	avgLatency := tm.averager.Read()
-
 	tm.currentTimeout = time.Duration(tm.timeoutCoefficient * avgLatency)
 	if tm.currentTimeout > tm.maximumTimeout {
 		tm.currentTimeout = tm.maximumTimeout
