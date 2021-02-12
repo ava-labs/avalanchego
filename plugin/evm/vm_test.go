@@ -14,7 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -32,6 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/trie"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -108,10 +109,11 @@ func NewContext() *snow.Context {
 func GenesisVM(t *testing.T, finishBootstrapping bool) (chan engCommon.Message, *VM, []byte, *atomic.Memory) {
 	genesisBytes := BuildGenesisTest(t)
 	ctx := NewContext()
-	baseDB := memdb.New()
+
+	baseDBManager := manager.NewDefaultMemDBManager()
 
 	m := &atomic.Memory{}
-	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current()))
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	// NB: this lock is intentionally left locked when this function returns.
@@ -133,8 +135,10 @@ func GenesisVM(t *testing.T, finishBootstrapping bool) (chan engCommon.Message, 
 	}
 	err = vm.Initialize(
 		ctx,
-		prefixdb.New([]byte{1}, baseDB),
+		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
+		nil,
+		nil,
 		issuer,
 		[]*engCommon.Fx{},
 	)
@@ -332,6 +336,19 @@ func TestIssueAtomicTxs(t *testing.T) {
 	if lastAcceptedID != blk2.ID() {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk2.ID(), lastAcceptedID)
 	}
+
+	// Check that both atomic transactions were indexed as expected.
+	indexedImportTx, height, err := vm.getAtomicTx(importTx.ID())
+	assert.NoError(t, err)
+
+	assert.Equal(t, uint64(1), height, "expected height of indexed import tx to be 1")
+	assert.Equal(t, indexedImportTx.ID(), importTx.ID(), "expected ID of indexed import tx to match original txID")
+
+	indexedExportTx, height, err := vm.getAtomicTx(exportTx.ID())
+	assert.NoError(t, err)
+
+	assert.Equal(t, uint64(2), height, "expected height of indexed export tx to be 2")
+	assert.Equal(t, indexedExportTx.ID(), exportTx.ID(), "expected ID of indexed import tx to match original txID")
 }
 
 func TestBuildEthTxBlock(t *testing.T) {
@@ -397,24 +414,24 @@ func TestBuildEthTxBlock(t *testing.T) {
 
 	<-issuer
 
-	blk, err := vm.BuildBlock()
+	blk1, err := vm.BuildBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := blk.Verify(); err != nil {
+	if err := blk1.Verify(); err != nil {
 		t.Fatal(err)
 	}
 
-	if status := blk.Status(); status != choices.Processing {
+	if status := blk1.Status(); status != choices.Processing {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm.SetPreference(blk.ID()); err != nil {
+	if err := vm.SetPreference(blk1.ID()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := blk.Accept(); err != nil {
+	if err := blk1.Accept(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -436,24 +453,24 @@ func TestBuildEthTxBlock(t *testing.T) {
 
 	<-issuer
 
-	blk, err = vm.BuildBlock()
+	blk2, err := vm.BuildBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := blk.Verify(); err != nil {
+	if err := blk2.Verify(); err != nil {
 		t.Fatal(err)
 	}
 
-	if status := blk.Status(); status != choices.Processing {
+	if status := blk2.Status(); status != choices.Processing {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := blk.Accept(); err != nil {
+	if err := blk2.Accept(); err != nil {
 		t.Fatal(err)
 	}
 
-	if status := blk.Status(); status != choices.Accepted {
+	if status := blk2.Status(); status != choices.Accepted {
 		t.Fatalf("Expected status of accepted block to be %s, but found %s", choices.Accepted, status)
 	}
 
@@ -461,8 +478,27 @@ func TestBuildEthTxBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if lastAcceptedID != blk.ID() {
-		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk.ID(), lastAcceptedID)
+	if lastAcceptedID != blk2.ID() {
+		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk2.ID(), lastAcceptedID)
+	}
+
+	// Clear the cache and ensure that GetBlock returns internal blocks with the correct status
+	vm.ChainState.FlushCaches()
+	blk2Refreshed, err := vm.GetBlockInternal(blk2.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status := blk2Refreshed.Status(); status != choices.Accepted {
+		t.Fatalf("Expected refreshed blk2 to be Accepted, but found status: %s", status)
+	}
+
+	blk1Refreshed := blk2Refreshed.Parent()
+	if status := blk1Refreshed.Status(); status != choices.Accepted {
+		t.Fatalf("Expected refreshed blk1 to be Accepted, but found status: %s", status)
+	}
+
+	if blk1Refreshed.ID() != blk1.ID() {
+		t.Fatalf("Found unexpected blkID for parent of blk2")
 	}
 }
 
@@ -1093,10 +1129,9 @@ func TestBonusBlocksTxs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	evmBlock := blk.(*Block)
-	evmBlock.id = bonusBlocks.CappedList(1)[0]
-	vm.blockCache.Put(evmBlock.id, evmBlock)
+	bonusBlocks.Add(blk.ID())
 
+	// Remove the UTXOs from shared memory, so that non-bonus blocks will fail verification
 	if err := vm.ctx.SharedMemory.Remove(vm.ctx.XChainID, [][]byte{inputID[:]}); err != nil {
 		t.Fatal(err)
 	}
@@ -1109,7 +1144,7 @@ func TestBonusBlocksTxs(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm.SetPreference(evmBlock.id); err != nil {
+	if err := vm.SetPreference(blk.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1125,7 +1160,7 @@ func TestBonusBlocksTxs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if lastAcceptedID != evmBlock.id {
+	if lastAcceptedID != blk.ID() {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk.ID(), lastAcceptedID)
 	}
 }
