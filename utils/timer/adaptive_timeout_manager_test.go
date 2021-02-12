@@ -16,13 +16,13 @@ import (
 func TestAdaptiveTimeoutManager(t *testing.T) {
 	tm := AdaptiveTimeoutManager{}
 	err := tm.Initialize(&AdaptiveTimeoutConfig{
-		InitialTimeout: time.Millisecond,
-		MinimumTimeout: time.Millisecond,
-		MaximumTimeout: time.Hour,
-		TimeoutInc:     2 * time.Millisecond,
-		TimeoutDec:     time.Microsecond,
-		Namespace:      constants.PlatformName,
-		Registerer:     prometheus.NewRegistry(),
+		InitialTimeout:     time.Millisecond,
+		MinimumTimeout:     time.Millisecond,
+		MaximumTimeout:     time.Hour,
+		TimeoutHalflife:    5 * time.Minute,
+		TimeoutCoefficient: 1.25,
+		MetricsNamespace:   constants.PlatformName,
+		Registerer:         prometheus.NewRegistry(),
 	})
 	if err != nil {
 		t.Fatal(err)

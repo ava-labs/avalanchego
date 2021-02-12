@@ -39,8 +39,7 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 	timeoutDuration := s.timeouts.TimeoutDuration()
 	deadline := time.Now().Add(timeoutDuration)
 
-	// Sending a message to myself. No need to send it over the network.
-	// Just put it right into the router. Do so asynchronously to avoid deadlock.
+	// A GetAcceptedFrontier to myself will always fail.
 	if validatorIDs.Contains(s.ctx.NodeID) {
 		validatorIDs.Remove(s.ctx.NodeID)
 		go s.router.GetAcceptedFrontierFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
@@ -92,11 +91,10 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 	timeoutDuration := s.timeouts.TimeoutDuration()
 	deadline := time.Now().Add(timeoutDuration)
 
-	// Sending a message to myself. No need to send it over the network.
-	// Just put it right into the router. Do so asynchronously to avoid deadlock.
+	// A GetAccepted to myself will always fail.
 	if validatorIDs.Contains(s.ctx.NodeID) {
 		validatorIDs.Remove(s.ctx.NodeID)
-		go s.router.GetAccepted(s.ctx.NodeID, s.ctx.ChainID, requestID, deadline, containerIDs)
+		go s.router.GetAcceptedFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
 	}
 
 	// Some of the validators in [validatorIDs] may be benched. That is, they've been unresponsive
@@ -221,6 +219,10 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 	// Just put it right into the router. Do so asynchronously to avoid deadlock.
 	if validatorIDs.Contains(s.ctx.NodeID) {
 		validatorIDs.Remove(s.ctx.NodeID)
+		// Register a timeout in case I don't respond to myself
+		s.timeouts.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, true, constants.PushQueryMsg, func() {
+			s.router.QueryFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
+		})
 		go s.router.PushQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, deadline, containerID, container)
 	}
 
@@ -270,6 +272,10 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 	// Just put it right into the router. Do so asynchronously to avoid deadlock.
 	if validatorIDs.Contains(s.ctx.NodeID) {
 		validatorIDs.Remove(s.ctx.NodeID)
+		// Register a timeout in case I don't respond to myself
+		s.timeouts.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, true, constants.PullQueryMsg, func() {
+			s.router.QueryFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
+		})
 		go s.router.PullQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, deadline, containerID)
 	}
 

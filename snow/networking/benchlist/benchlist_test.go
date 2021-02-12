@@ -172,7 +172,7 @@ func TestBenchlistMaxStake(t *testing.T) {
 	}
 
 	threshold := 3
-	duration := time.Minute
+	duration := 5 * time.Minute
 	// Shouldn't bench more than 2550 (5100/2)
 	maxPortion := 0.5
 	benchIntf, err := NewBenchlist(
@@ -303,7 +303,7 @@ func TestBenchlistRemove(t *testing.T) {
 	}
 
 	threshold := 3
-	duration := 3 * time.Second
+	duration := 2 * time.Second
 	maxPortion := 0.76 // can bench 3 of the 5 validators
 	benchIntf, err := NewBenchlist(
 		logging.NoLog{},
@@ -370,8 +370,8 @@ func TestBenchlistRemove(t *testing.T) {
 		func() bool {
 			return !b.IsBenched(vdr0.ID())
 		},
-		duration,
-		time.Second,
+		duration+time.Second, // extra time.Second as grace period
+		100*time.Millisecond,
 	)
 
 	assert.Eventually(
@@ -379,8 +379,8 @@ func TestBenchlistRemove(t *testing.T) {
 		func() bool {
 			return !b.IsBenched(vdr1.ID())
 		},
-		duration,
-		time.Second,
+		duration+time.Second,
+		100*time.Millisecond,
 	)
 
 	assert.Eventually(
@@ -388,8 +388,8 @@ func TestBenchlistRemove(t *testing.T) {
 		func() bool {
 			return !b.IsBenched(vdr2.ID())
 		},
-		duration,
-		time.Second,
+		duration+time.Second,
+		100*time.Millisecond,
 	)
 
 }
