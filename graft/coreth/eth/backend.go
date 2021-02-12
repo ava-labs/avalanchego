@@ -72,10 +72,6 @@ const (
 	eth65 = 65
 )
 
-type BackendCallbacks struct {
-	OnQueryAcceptedBlock func() *types.Block
-}
-
 var (
 	DefaultSettings Settings = Settings{MaxBlocksPerRequest: 2000}
 )
@@ -119,7 +115,6 @@ type Ethereum struct {
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
 
 	txSubmitChan chan struct{}
-	bcb          *BackendCallbacks
 
 	settings Settings // Settings for Ethereum API
 }
@@ -129,7 +124,6 @@ type Ethereum struct {
 func New(stack *node.Node, config *Config,
 	cb *dummy.ConsensusCallbacks,
 	mcb *miner.MinerCallbacks,
-	bcb *BackendCallbacks,
 	chainDb ethdb.Database,
 	settings Settings,
 ) (*Ethereum, error) {
@@ -183,7 +177,6 @@ func New(stack *node.Node, config *Config,
 		bloomIndexer:      NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
 		p2pServer:         stack.Server(),
 		txSubmitChan:      make(chan struct{}, 1),
-		bcb:               bcb,
 		settings:          settings,
 	}
 
@@ -577,9 +570,5 @@ func (s *Ethereum) GetTxSubmitCh() <-chan struct{} {
 }
 
 func (s *Ethereum) AcceptedBlock() *types.Block {
-	cb := s.bcb.OnQueryAcceptedBlock
-	if cb != nil {
-		return cb()
-	}
 	return s.blockchain.CurrentBlock()
 }

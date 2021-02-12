@@ -1,10 +1,10 @@
 module github.com/ava-labs/coreth
 
-go 1.14
+go 1.15
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.5.7
-	github.com/ava-labs/avalanchego v1.2.2-0.20210302204446-3f8e4094c10d
+	github.com/ava-labs/avalanchego v1.2.3-0.20210308161502-be2f9ba56058
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
 	github.com/edsrzf/mmap-go v1.0.0
@@ -25,6 +25,7 @@ require (
 	github.com/rjeczalik/notify v0.9.2
 	github.com/status-im/keycard-go v0.0.0-20200402102358-957c09536969
 	github.com/steakknife/bloomfilter v0.0.0-20180922174646-6819c0d2a570
+	github.com/stretchr/testify v1.4.0
 	github.com/tyler-smith/go-bip39 v1.0.2
 	github.com/wsddn/go-ecdh v0.0.0-20161211032359-48726bab9208
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9

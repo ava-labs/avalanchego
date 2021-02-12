@@ -5,6 +5,7 @@ package coreth
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"io"
 	"os"
 	"time"
@@ -40,7 +41,6 @@ type ETHChain struct {
 	backend *eth.Ethereum
 	cb      *dummy.ConsensusCallbacks
 	mcb     *miner.MinerCallbacks
-	bcb     *eth.BackendCallbacks
 }
 
 // NewETHChain creates an Ethereum blockchain with the given configs.
@@ -51,19 +51,17 @@ func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Add
 	if nodecfg == nil {
 		nodecfg = &node.Config{}
 	}
-	//mux := new(event.TypeMux)
 	node, err := node.New(nodecfg)
 	if err != nil {
 		panic(err)
 	}
-	//if ep != "" {
-	//	log.Info(fmt.Sprintf("temporary keystore = %s", ep))
-	//}
 	cb := new(dummy.ConsensusCallbacks)
 	mcb := new(miner.MinerCallbacks)
-	bcb := new(eth.BackendCallbacks)
-	backend, _ := eth.New(node, config, cb, mcb, bcb, chainDB, settings)
-	chain := &ETHChain{backend: backend, cb: cb, mcb: mcb, bcb: bcb}
+	backend, err := eth.New(node, config, cb, mcb, chainDB, settings)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create new eth backend due to %s", err))
+	}
+	chain := &ETHChain{backend: backend, cb: cb, mcb: mcb}
 	if etherBase == nil {
 		etherBase = &BlackholeAddr
 	}
@@ -147,10 +145,6 @@ func (self *ETHChain) SetOnFinalizeAndAssemble(cb dummy.OnFinalizeAndAssembleCal
 
 func (self *ETHChain) SetOnExtraStateChange(cb dummy.OnExtraStateChangeType) {
 	self.cb.OnExtraStateChange = cb
-}
-
-func (self *ETHChain) SetOnQueryAcceptedBlock(cb func() *types.Block) {
-	self.bcb.OnQueryAcceptedBlock = cb
 }
 
 // Returns a new mutable state based on the current HEAD block.
