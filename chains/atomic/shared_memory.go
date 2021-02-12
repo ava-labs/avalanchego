@@ -276,6 +276,7 @@ func (s *state) RemoveValue(key []byte) error {
 		return s.valueDB.Put(key, valueBytes)
 	}
 
+	// Don't allow the removal of something that was already removed.
 	if !value.Present {
 		return errDuplicatedOperation
 	}

@@ -480,6 +480,9 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 
 	issued := t.Consensus.Issued(blk)
 	if issued {
+		// A dependency should never be waiting on an issued block. However, if
+		// the block was marked as rejected by the VM, the dependencies may
+		// still be waiting. Therefore, they should abandoned.
 		t.blocked.Abandon(blkID)
 	}
 
