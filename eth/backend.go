@@ -76,6 +76,14 @@ type BackendCallbacks struct {
 	OnQueryAcceptedBlock func() *types.Block
 }
 
+var (
+	DefaultSettings Settings = Settings{MaxBlocksPerRequest: 2000}
+)
+
+type Settings struct {
+	MaxBlocksPerRequest int64 // Maximum number of blocks to serve per getLogs request
+}
+
 // Ethereum implements the Ethereum full node service.
 type Ethereum struct {
 	config *Config
@@ -112,6 +120,8 @@ type Ethereum struct {
 
 	txSubmitChan chan struct{}
 	bcb          *BackendCallbacks
+
+	settings Settings // Settings for Ethereum API
 }
 
 // New creates a new Ethereum object (including the
@@ -120,7 +130,9 @@ func New(stack *node.Node, config *Config,
 	cb *dummy.ConsensusCallbacks,
 	mcb *miner.MinerCallbacks,
 	bcb *BackendCallbacks,
-	chainDb ethdb.Database) (*Ethereum, error) {
+	chainDb ethdb.Database,
+	settings Settings,
+) (*Ethereum, error) {
 	// Ensure configuration values are compatible and sane
 	if config.SyncMode == downloader.LightSync {
 		return nil, errors.New("can't run eth.Ethereum in light sync mode, use les.LightEthereum")
@@ -172,6 +184,7 @@ func New(stack *node.Node, config *Config,
 		p2pServer:         stack.Server(),
 		txSubmitChan:      make(chan struct{}, 1),
 		bcb:               bcb,
+		settings:          settings,
 	}
 
 	bcVersion := rawdb.ReadDatabaseVersion(chainDb)
@@ -312,7 +325,7 @@ func (s *Ethereum) APIs() []rpc.API {
 		}, {
 			Namespace: "eth",
 			Version:   "1.0",
-			Service:   filters.NewPublicFilterAPI(s.APIBackend, false),
+			Service:   filters.NewPublicFilterAPI(s.APIBackend, false, s.settings.MaxBlocksPerRequest),
 			Public:    true,
 		}, {
 			Namespace: "admin",
