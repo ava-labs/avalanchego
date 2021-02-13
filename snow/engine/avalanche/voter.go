@@ -62,7 +62,7 @@ func (v *voter) Update() {
 	if len(txs) > 0 {
 		v.t.Ctx.Log.Debug("Re-issuing %d transactions", len(txs))
 	}
-	if err := v.t.batch(txs, true /*=force*/, false /*empty*/); err != nil {
+	if _, err := v.t.batch(txs, true /*=force*/, false /*empty*/, false /*=limit*/); err != nil {
 		v.t.errs.Add(err)
 		return
 	}

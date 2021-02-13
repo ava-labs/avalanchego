@@ -49,6 +49,10 @@ type Transitive struct {
 	// issuing another block, responding to a query, or applying votes to consensus
 	blocked events.Blocker
 
+	// number of times build block needs to be called once the number of
+	// processing blocks has gone below the optimal number.
+	pendingBuildBlocks int
+
 	// errs tracks if an error has occurred in a callback
 	errs wrappers.Errs
 }
@@ -214,8 +218,10 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkByt
 	// receive requests to fill the ancestry. dependencies that have already
 	// been fetched, but with missing dependencies themselves won't be requested
 	// from the vdr.
-	_, err = t.issueFrom(vdr, blk)
-	return err
+	if _, err := t.issueFrom(vdr, blk); err != nil {
+		return err
+	}
+	return t.buildBlocks()
 }
 
 // GetFailed implements the Engine interface
@@ -236,7 +242,7 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 
 	// Because the get request was dropped, we no longer expect blkID to be issued.
 	t.blocked.Abandon(blkID)
-	return t.errs.Err
+	return t.buildBlocks()
 }
 
 // PullQuery implements the Engine interface
@@ -269,7 +275,7 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) 
 	}
 
 	t.blocked.Register(c)
-	return t.errs.Err
+	return t.buildBlocks()
 }
 
 // PushQuery implements the Engine interface
@@ -340,7 +346,7 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) er
 	}
 
 	t.blocked.Register(v)
-	return t.errs.Err
+	return t.buildBlocks()
 }
 
 // QueryFailed implements the Engine interface
@@ -356,7 +362,7 @@ func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 		vdr:       vdr,
 		requestID: requestID,
 	})
-	return t.errs.Err
+	return t.buildBlocks()
 }
 
 // Notify implements the Engine interface
@@ -371,6 +377,23 @@ func (t *Transitive) Notify(msg common.Message) error {
 	switch msg {
 	case common.PendingTxs:
 		// the pending txs message means we should attempt to build a block.
+		t.pendingBuildBlocks++
+		return t.buildBlocks()
+	default:
+		t.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
+	}
+	return nil
+}
+
+// Build blocks if they have been requested and the number of processing blocks
+// is less than optimal.
+func (t *Transitive) buildBlocks() error {
+	if err := t.errs.Err; err != nil {
+		return err
+	}
+	for t.pendingBuildBlocks > 0 && t.Consensus.NumProcessing() < t.Params.OptimalProcessing {
+		t.pendingBuildBlocks--
+
 		blk, err := t.VM.BuildBlock()
 		if err != nil {
 			t.Ctx.Log.Debug("VM.BuildBlock errored with: %s", err)
@@ -401,8 +424,6 @@ func (t *Transitive) Notify(msg common.Message) error {
 		} else {
 			t.Ctx.Log.Warn("VM.BuildBlock returned a block with unissued ancestors")
 		}
-	default:
-		t.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
 	}
 	return nil
 }
@@ -453,7 +474,21 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 			return false, nil
 		}
 	}
-	return t.Consensus.Issued(blk), nil
+
+	// Remove any outstanding requests for this block
+	t.blkReqs.RemoveAny(blkID)
+
+	issued := t.Consensus.Issued(blk)
+	if issued {
+		// A dependency should never be waiting on an issued block. However, if
+		// the block was marked as rejected by the VM, the dependencies may
+		// still be waiting. Therefore, they should abandoned.
+		t.blocked.Abandon(blkID)
+	}
+
+	// Tracks performance statistics
+	t.numRequests.Set(float64(t.blkReqs.Len()))
+	return issued, t.errs.Err
 }
 
 // issueWithAncestors attempts to issue the branch ending with [blk] to consensus.

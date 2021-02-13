@@ -18,6 +18,9 @@ type Consensus interface {
 	// Returns the parameters that describe this snowman instance
 	Parameters() snowball.Parameters
 
+	// Returns the number of blocks processing
+	NumProcessing() int
+
 	// Adds a new decision. Assumes the dependency has already been added.
 	// Returns if a critical error has occurred.
 	Add(Block) error
