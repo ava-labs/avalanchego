@@ -5,6 +5,7 @@ package logging
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/mitchellh/go-homedir"
@@ -24,7 +25,7 @@ type Config struct {
 	DisableLogging, DisableDisplaying, DisableContextualDisplaying, DisableFlushOnWrite, Assertions bool
 	LogLevel, DisplayLevel                                                                          Level
 	DisplayHighlight                                                                                Highlight
-	Directory, MsgPrefix                                                                            string
+	Directory, MsgPrefix, FileNamePrefix                                                            string
 }
 
 // DefaultConfig ...
@@ -40,4 +41,17 @@ func DefaultConfig() (Config, error) {
 		LogLevel:         Debug,
 		Directory:        dir,
 	}, err
+}
+
+// AddFileNamePrefix adds the given prefixes to FileNamePrefix with prefixes separated by period.
+func (c *Config) AddFileNamePrefix(prefix ...string) {
+	if len(prefix) > 0 {
+		prefixStr := strings.Join(prefix, ".")
+		if c.FileNamePrefix == "" {
+			c.FileNamePrefix = prefixStr
+			return
+		}
+
+		c.FileNamePrefix = fmt.Sprintf("%s.%s", c.FileNamePrefix, prefixStr)
+	}
 }

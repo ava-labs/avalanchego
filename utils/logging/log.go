@@ -369,8 +369,18 @@ func (fw *fileWriter) Rotate() error {
 	return nil
 }
 
+// fileName determines the file name based on fileprefix and file index.
+func (fw *fileWriter) fileName() string {
+	fileName := fw.config.FileNamePrefix
+	if fileName == "" {
+		fileName = "main"
+	}
+
+	return fmt.Sprintf("%s.%d", fileName, fw.fileIndex)
+}
+
 func (fw *fileWriter) create(fileIndex int) (*bufio.Writer, *os.File, error) {
-	filename := filepath.Join(fw.config.Directory, fmt.Sprintf("%d.log", fw.fileIndex))
+	filename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log", fw.fileName()))
 	file, err := os.Create(filename)
 	if err != nil {
 		return nil, nil, err

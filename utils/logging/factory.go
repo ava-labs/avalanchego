@@ -10,6 +10,7 @@ type Factory interface {
 	Make() (Logger, error)
 	MakeChain(chainID string, subdir string) (Logger, error)
 	MakeSubdir(subdir string) (Logger, error)
+	MakeSubdirExt(subdir string) (Logger, error)
 	Close()
 }
 
@@ -40,7 +41,13 @@ func (f *factory) Make() (Logger, error) {
 func (f *factory) MakeChain(chainID string, subdir string) (Logger, error) {
 	config := f.config
 	config.MsgPrefix = chainID + " Chain"
-	config.Directory = filepath.Join(config.Directory, "chain", chainID, subdir)
+	prefixes := []string{chainID}
+	if subdir != "" {
+		// when chain is created, subdir can be empty
+		prefixes = append(prefixes, subdir)
+	}
+
+	config.AddFileNamePrefix(prefixes...)
 
 	log, err := New(config)
 	if err == nil {
@@ -56,6 +63,18 @@ func (f *factory) MakeSubdir(subdir string) (Logger, error) {
 
 	log, err := New(config)
 	if err == nil {
+		f.loggers = append(f.loggers, log)
+	}
+	return log, err
+}
+
+// MakeSubdirExt adds the subdir to the current file name prefix.
+func (f *factory) MakeSubdirExt(subdir string) (Logger, error) {
+	config := f.config
+	config.AddFileNamePrefix(subdir)
+
+	log, err := New(config)
+	if err != nil {
 		f.loggers = append(f.loggers, log)
 	}
 	return log, err
