@@ -18,8 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/stretchr/testify/assert"
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
@@ -421,32 +420,40 @@ func TestGetBalance(t *testing.T) {
 
 // Test method GetStake
 func TestGetStake(t *testing.T) {
+	assert := assert.New(t)
 	service := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.Ctx.Lock.Lock()
 	defer func() {
-		if err := service.vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
+		err := service.vm.Shutdown()
+		assert.NoError(err)
 		service.vm.Ctx.Lock.Unlock()
 	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis()
+	genesisValidatorNodeIDs := []string{}
 	addrs := []string{}
 	for _, validator := range genesis.Validators {
 		addr := fmt.Sprintf("P-%s", validator.RewardOwner.Addresses[0])
 		addrs = append(addrs, addr)
+		genesisValidatorNodeIDs = append(genesisValidatorNodeIDs, validator.NodeID)
 		args := api.JSONAddresses{
 			Addresses: []string{addr},
 		}
 		response := GetStakeReply{}
-		if err := service.GetStake(nil, &args, &response); err != nil {
-			t.Fatal(err)
-		}
-		if uint64(response.Staked) != defaultWeight {
-			t.Fatalf("expected stake to be %d but is %d", defaultWeight, response.Staked)
-		}
+		err := service.GetStake(nil, &args, &response)
+		assert.NoError(err)
+		assert.EqualValues(defaultWeight, int(response.Staked))
+		assert.Len(response.StakedOuts, 1)
+		out := response.StakedOuts[0]
+		assert.Equal(validator.NodeID, out.NodeID)
+		assert.EqualValues(validator.EndTime, out.StakedUntil)
+		assert.EqualValues(0, out.StakeOnlyUntil)
+		assert.Len(out.Owners, 1)
+		assert.Contains(out.Owners[0], validator.RewardOwner.Addresses[0])
+		assert.EqualValues(out.Threshold, 1)
+		assert.EqualValues(out.Amount, defaultWeight)
 	}
 
 	// Make sure this works for multiple addresses
@@ -454,124 +461,112 @@ func TestGetStake(t *testing.T) {
 		Addresses: addrs,
 	}
 	response := GetStakeReply{}
-	if err := service.GetStake(nil, &args, &response); err != nil {
-		t.Fatal(err)
-	}
-	if int(response.Staked) != len(genesis.Validators)*defaultWeight {
-		t.Fatalf("expected stake to be %d but is %d", len(genesis.Validators)*defaultWeight, response.Staked)
+	err := service.GetStake(nil, &args, &response)
+	assert.NoError(err)
+	assert.EqualValues(len(genesis.Validators)*defaultWeight, response.Staked)
+	assert.Len(response.StakedOuts, len(genesis.Validators))
+	for _, out := range response.StakedOuts {
+		assert.EqualValues(defaultWeight, out.Amount)
+		assert.EqualValues(defaultValidateEndTime.Unix(), out.StakedUntil)
+		assert.EqualValues(out.Threshold, 1)
+		assert.Contains(genesisValidatorNodeIDs, out.NodeID)
+		assert.EqualValues(0, out.StakeOnlyUntil)
+		assert.Len(out.Owners, 1)
+		assert.Contains(addrs, out.Owners[0])
 	}
 
-	// Make sure this works for delegators
-	// Get the old amount of stake for keys[0]
-	addr, _ := service.vm.FormatLocalAddress(keys[0].PublicKey().Address())
-	args.Addresses = []string{addr}
-	if err := service.GetStake(nil, &args, &response); err != nil {
-		t.Fatal(err)
-	}
-	oldStake := response.Staked
+	oldStake := uint64(defaultWeight)
 
 	// Add a delegator
 	stakeAmt := service.vm.minDelegatorStake + 12345
+	delegatorNodeID := ids.GenerateTestShortID()
+	delegatorEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
 	tx, err := service.vm.newAddDelegatorTx(
 		stakeAmt,
 		uint64(defaultGenesisTime.Unix()),
-		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()),
-		ids.GenerateTestShortID(),
+		delegatorEndTime,
+		delegatorNodeID,
 		ids.GenerateTestShortID(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		keys[0].PublicKey().Address(), // change addr
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := service.vm.addStaker(service.vm.DB, constants.PrimaryNetworkID, &rewardTx{
+	assert.NoError(err)
+	err = service.vm.addStaker(service.vm.DB, constants.PrimaryNetworkID, &rewardTx{
 		Reward: 0,
 		Tx:     *tx,
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	// Make sure the delegator has the right stake (old stake + stakeAmt)
-	if err := service.GetStake(nil, &args, &response); err != nil {
-		t.Fatal(err)
-	}
-	if uint64(response.Staked) != uint64(oldStake)+stakeAmt {
-		t.Fatalf("expected stake to be %d but is %d", uint64(oldStake)+stakeAmt, response.Staked)
-	}
-	oldStake = response.Staked
-
-	// Make sure this works for pending stakers
-	// Add a pending staker
-	stakeAmt = service.vm.minValidatorStake + 54321
-	tx, err = service.vm.newAddValidatorTx(
-		stakeAmt,
-		uint64(defaultGenesisTime.Unix()),
-		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()),
-		ids.GenerateTestShortID(),
-		ids.GenerateTestShortID(),
-		0,
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-		keys[0].PublicKey().Address(), // change addr
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := service.vm.enqueueStaker(service.vm.DB, constants.PrimaryNetworkID, tx); err != nil {
-		t.Fatal(err)
-	}
-	// Make sure the delegator has the right stake (old stake + stakeAmt)
-	if err := service.GetStake(nil, &args, &response); err != nil {
-		t.Fatal(err)
-	}
-	if uint64(response.Staked) != uint64(oldStake)+stakeAmt {
-		t.Fatalf("expected stake to be %d but is %d", uint64(oldStake)+stakeAmt, response.Staked)
-	}
-	oldStake += cjson.Uint64(stakeAmt)
-
-	// Make sure this works for pending stakers
-	// Add a pending staker
-	stakeAmt = service.vm.minValidatorStake + 54321
-	tx, err = service.vm.newAddValidatorTx(
-		stakeAmt,
-		uint64(defaultGenesisTime.Unix()),
-		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()),
-		ids.GenerateTestShortID(),
-		ids.GenerateTestShortID(),
-		0,
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-		keys[0].PublicKey().Address(), // change addr
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	stake := tx.UnsignedTx.(*UnsignedAddValidatorTx).Stake
-	stake = append(stake, &avax.TransferableOutput{
-		Asset: avax.Asset{ID: avaxAssetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: 1,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-			},
-		},
 	})
-	stake[0], stake[1] = stake[1], stake[0]
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).Stake = stake
-	if err := tx.Sign(service.vm.codec, nil); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
-	if err := service.vm.enqueueStaker(service.vm.DB, constants.PrimaryNetworkID, tx); err != nil {
-		t.Fatal(err)
+	// Make sure the delegator addr has the right stake (old stake + stakeAmt)
+	addr, _ := service.vm.FormatLocalAddress(keys[0].PublicKey().Address())
+	args.Addresses = []string{addr}
+	err = service.GetStake(nil, &args, &response)
+	assert.NoError(err)
+	assert.EqualValues(oldStake+stakeAmt, uint64(response.Staked))
+	assert.Len(response.StakedOuts, 2)
+	// Make sure we have the ordering of the staked outputs correct.
+	// We ensure the delegator staked output comes second for the sake of testing.
+	if uint64(response.StakedOuts[0].Amount) == stakeAmt {
+		response.StakedOuts[0], response.StakedOuts[1] = response.StakedOuts[1], response.StakedOuts[0]
 	}
+	assert.Contains(genesisValidatorNodeIDs, response.StakedOuts[0].NodeID)
+	assert.EqualValues(response.StakedOuts[0].Amount, defaultWeight)
+	assert.Len(response.StakedOuts[0].Owners, 1)
+	assert.Contains(response.StakedOuts[0].Owners[0], genesis.Validators[0].RewardOwner.Addresses[0])
+	assert.EqualValues(1, response.StakedOuts[0].Threshold)
+	assert.EqualValues(0, response.StakedOuts[0].StakeOnlyUntil)
+	assert.EqualValues(defaultValidateEndTime.Unix(), response.StakedOuts[0].StakedUntil)
+
+	assert.Contains(response.StakedOuts[1].NodeID, delegatorNodeID.String())
+	assert.EqualValues(response.StakedOuts[1].Amount, stakeAmt)
+	assert.Len(response.StakedOuts[1].Owners, 1)
+	assert.Contains(response.StakedOuts[1].Owners[0], genesis.Validators[0].RewardOwner.Addresses[0])
+	assert.EqualValues(1, response.StakedOuts[1].Threshold)
+	assert.EqualValues(0, response.StakedOuts[1].StakeOnlyUntil)
+	assert.EqualValues(delegatorEndTime, response.StakedOuts[1].StakedUntil)
+
+	oldStake = uint64(response.Staked)
+
+	// Make sure this works for pending stakers
+	// Add a pending staker
+	stakeAmt = service.vm.minValidatorStake + 54321
+	pendingStakerNodeID := ids.GenerateTestShortID()
+	pendingStakerEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
+	tx, err = service.vm.newAddValidatorTx(
+		stakeAmt,
+		uint64(defaultGenesisTime.Unix()),
+		pendingStakerEndTime,
+		pendingStakerNodeID,
+		ids.GenerateTestShortID(),
+		0,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		keys[0].PublicKey().Address(), // change addr
+	)
+	assert.NoError(err)
+	err = service.vm.enqueueStaker(service.vm.DB, constants.PrimaryNetworkID, tx)
+	assert.NoError(err)
 	// Make sure the delegator has the right stake (old stake + stakeAmt)
-	if err := service.GetStake(nil, &args, &response); err != nil {
-		t.Fatal(err)
+	err = service.GetStake(nil, &args, &response)
+	assert.NoError(err)
+	assert.EqualValues(oldStake+stakeAmt, response.Staked)
+	assert.Len(response.StakedOuts, 3)
+	// Don't check all the staked outputs this time.
+	// Just check the one associated with the pending staker
+	found := false
+	for _, out := range response.StakedOuts {
+		if !strings.Contains(out.NodeID, pendingStakerNodeID.String()) {
+			continue
+		}
+		found = true
+		assert.EqualValues(pendingStakerEndTime, out.StakedUntil)
+		assert.EqualValues(0, out.StakeOnlyUntil)
+		assert.Len(out.Owners, 1)
+		assert.Contains(out.Owners[0], genesis.Validators[0].RewardOwner.Addresses[0])
+		assert.EqualValues(1, out.Threshold)
+		assert.EqualValues(stakeAmt, out.Amount)
+
 	}
-	if uint64(response.Staked) != uint64(oldStake)+stakeAmt {
-		t.Fatalf("expected stake to be %d but is %d", uint64(oldStake)+stakeAmt, response.Staked)
-	}
+	assert.True(found, "couldn't find output associated with pending staker")
 }
 
 // Test method GetCurrentValidators
