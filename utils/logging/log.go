@@ -98,7 +98,7 @@ func (l *Log) run() {
 			// attempt to close the file
 			_ = l.writer.Close()
 
-			if err := l.writer.Rotate(); err != nil {
+			if err := l.writer.Rotate(l.config.RotationSize); err != nil {
 				panic(err)
 			}
 		}
@@ -338,8 +338,7 @@ type fileWriter struct {
 	writer *bufio.Writer
 	file   *os.File
 
-	config    Config
-	fileIndex int
+	config Config
 }
 
 func (fw *fileWriter) Flush() error {
@@ -358,9 +357,18 @@ func (fw *fileWriter) Close() error {
 	return fw.file.Close()
 }
 
-func (fw *fileWriter) Rotate() error {
-	fw.fileIndex = (fw.fileIndex + 1) % fw.config.RotationSize
-	writer, file, err := fw.create(fw.fileIndex)
+func (fw *fileWriter) Rotate(RotationSize int) error {
+	for i := RotationSize - 1; i >= 0; i-- {
+		sourceFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log.%d", fw.config.LoggerName, i))
+		destFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log.%d", fw.config.LoggerName, i+1))
+		if _, err := os.Stat(sourceFilename); !os.IsNotExist(err) {
+			os.Rename(sourceFilename, destFilename)
+		}
+	}
+	sourceFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log", fw.config.LoggerName))
+	destFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log.1", fw.config.LoggerName))
+	os.Rename(sourceFilename, destFilename)
+	writer, file, err := fw.create()
 	if err != nil {
 		return err
 	}
@@ -369,8 +377,8 @@ func (fw *fileWriter) Rotate() error {
 	return nil
 }
 
-func (fw *fileWriter) create(fileIndex int) (*bufio.Writer, *os.File, error) {
-	filename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.%d.log", fw.config.LoggerName, fw.fileIndex))
+func (fw *fileWriter) create() (*bufio.Writer, *os.File, error) {
+	filename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log", fw.config.LoggerName))
 	file, err := os.Create(filename)
 	if err != nil {
 		return nil, nil, err
@@ -381,7 +389,7 @@ func (fw *fileWriter) create(fileIndex int) (*bufio.Writer, *os.File, error) {
 
 func (fw *fileWriter) Initialize(config Config) error {
 	fw.config = config
-	writer, file, err := fw.create(fw.fileIndex)
+	writer, file, err := fw.create()
 	if err != nil {
 		return err
 	}
