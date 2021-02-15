@@ -268,7 +268,7 @@ func (l *Log) AssertDeferredNoError(f func() error) {
 // StopOnPanic ...
 func (l *Log) StopOnPanic() {
 	if r := recover(); r != nil {
-		l.Fatal("Panicing due to:\n%s\nFrom:\n%s", r, Stacktrace{})
+		l.Fatal("Panicking due to:\n%s\nFrom:\n%s", r, Stacktrace{})
 		l.Stop()
 		panic(r)
 	}
@@ -279,7 +279,7 @@ func (l *Log) RecoverAndPanic(f func()) { defer l.StopOnPanic(); f() }
 
 func (l *Log) stopAndExit(exit func()) {
 	if r := recover(); r != nil {
-		l.Fatal("Panicing due to:\n%s\nFrom:\n%s", r, Stacktrace{})
+		l.Fatal("Panicking due to:\n%s\nFrom:\n%s", r, Stacktrace{})
 		l.Stop()
 		exit()
 	}
