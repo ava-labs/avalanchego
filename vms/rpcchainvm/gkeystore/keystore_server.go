@@ -39,7 +39,7 @@ type dbCloser struct {
 
 func (db *dbCloser) Close() error {
 	err := db.Database.Close()
-	db.closer.GracefulStop()
+	db.closer.Stop()
 	return err
 }
 
