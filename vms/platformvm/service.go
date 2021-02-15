@@ -1985,9 +1985,26 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 	return nil
 }
 
+// StakedOut is a staked output
+type StakedOut struct {
+	// This output provides stake for this node ID
+	NodeID string `json:"nodeID"`
+	// Time at which this output will be returned to its owner(s).
+	// That is, the time at which the corresponding staker leaves the staker set.
+	StakedUntil json.Uint64 `json:"stakedUntil"`
+	// Time past which this output can be used for something other than staking.
+	StakeOnlyUntil json.Uint64 `json:"stakeOnlyUntil"`
+	// This output can be spent with [Threshold] signatures from [Owners]
+	Owners    []string    `json:"owners"`
+	Threshold json.Uint64 `json:"threshold"`
+	// Amount of this output
+	Amount json.Uint64 `json:"amount"`
+}
+
 // GetStakeReply is the response from calling GetStake.
 type GetStakeReply struct {
-	Staked json.Uint64 `json:"staked"`
+	Staked     json.Uint64 `json:"staked"`
+	StakedOuts []StakedOut `json:"stakedOuts"`
 }
 
 // GetStake returns the amount of nAVAX that [args.Addresses] have cumulatively
@@ -2015,32 +2032,50 @@ func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, respo
 	}
 
 	// Takes in byte repr. of a staker.
-	// Returns the amount staked that belongs to an address in [addrs]
-	helper := func(tx *Tx) (uint64, error) {
+	// Returns:
+	// 1) The total amount staked by addresses in [addrs]
+	// 2) A description of the staked outputs
+	helper := func(tx *Tx) (uint64, []StakedOut, error) {
+		var stakedUntil uint64
+		nodeID := constants.NodeIDPrefix
+
 		var outs []*avax.TransferableOutput
 		switch staker := tx.UnsignedTx.(type) {
 		case *UnsignedAddDelegatorTx:
 			outs = staker.Stake
+			stakedUntil = staker.Validator.End
+			nodeID += staker.Validator.NodeID.String()
 		case *UnsignedAddValidatorTx:
 			outs = staker.Stake
+			stakedUntil = staker.Validator.End
+			nodeID += staker.Validator.NodeID.String()
+		default:
+			service.vm.Ctx.Log.Warn("expected *UnsignedAddDelegatorTx or *UnsignedAddValidatorTx but got %T", tx.UnsignedTx)
 		}
 
 		var (
-			amount uint64
-			err    error
+			totalAmountStaked uint64
+			err               error
+			stakedOuts        []StakedOut
 		)
+		// Go through all of the staked outputs
 		for _, stake := range outs {
+			var stakeOnlyUntil uint64
+			// This output isn't AVAX. Ignore.
 			if stake.AssetID() != service.vm.Ctx.AVAXAssetID {
 				continue
 			}
 			out := stake.Out
 			if lockedOut, ok := out.(*StakeableLockOut); ok {
+				// This output can only be used for staking until [stakeOnlyUntil]
 				out = lockedOut.TransferableOut
+				stakeOnlyUntil = lockedOut.Locktime
 			}
 			secpOut, ok := out.(*secp256k1fx.TransferOutput)
 			if !ok {
 				continue
 			}
+			// Check whether this output is owned by one of the given addresses
 			contains := false
 			for _, addr := range secpOut.Addrs {
 				if addrs.Contains(addr) {
@@ -2049,17 +2084,41 @@ func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, respo
 				}
 			}
 			if !contains {
+				// This output isn't owned by one of the given addresses. Ignore.
 				continue
 			}
-			amount, err = math.Add64(amount, stake.Out.Amount())
-			if err != nil {
-				return 0, err
+			// Parse the owners of this output to their formatted string representations
+			ownersStrs := []string{}
+			for _, addr := range secpOut.Addrs {
+				addrStr, err := service.vm.FormatLocalAddress(addr)
+				if err != nil {
+					return 0, nil, fmt.Errorf("couldn't format address %s: %w", addr, err)
+				}
+				ownersStrs = append(ownersStrs, addrStr)
 			}
+			totalAmountStaked, err = math.Add64(totalAmountStaked, stake.Out.Amount())
+			if err != nil {
+				return 0, stakedOuts, err
+			}
+			stakedOuts = append(
+				stakedOuts,
+				StakedOut{
+					StakedUntil:    json.Uint64(stakedUntil),
+					StakeOnlyUntil: json.Uint64(stakeOnlyUntil),
+					Amount:         json.Uint64(stake.Out.Amount()),
+					NodeID:         nodeID,
+					Owners:         ownersStrs,
+					Threshold:      json.Uint64(secpOut.Threshold),
+				},
+			)
 		}
-		return amount, nil
+		return totalAmountStaked, stakedOuts, nil
 	}
 
-	var totalStake uint64
+	var (
+		totalStake uint64
+		stakedOuts []StakedOut
+	)
 
 	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, service.vm.DB)
@@ -2078,14 +2137,15 @@ func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, respo
 			return err
 		}
 
-		staked, err := helper(&tx.Tx)
+		stakedAmt, outs, err := helper(&tx.Tx)
 		if err != nil {
 			return err
 		}
-		totalStake, err = math.Add64(totalStake, staked)
+		totalStake, err = math.Add64(totalStake, stakedAmt)
 		if err != nil {
 			return err
 		}
+		stakedOuts = append(stakedOuts, outs...)
 	}
 	if err := stopIter.Error(); err != nil {
 		return fmt.Errorf("iterator errored: %w", err)
@@ -2109,20 +2169,22 @@ func (service *Service) GetStake(_ *http.Request, args *api.JSONAddresses, respo
 			return err
 		}
 
-		staked, err := helper(&tx)
+		stakedAmt, outs, err := helper(&tx)
 		if err != nil {
 			return err
 		}
-		totalStake, err = math.Add64(totalStake, staked)
+		totalStake, err = math.Add64(totalStake, stakedAmt)
 		if err != nil {
 			return err
 		}
+		stakedOuts = append(stakedOuts, outs...)
 	}
 	if err := startIter.Error(); err != nil {
 		return fmt.Errorf("iterator errored: %w", err)
 	}
 
 	response.Staked = json.Uint64(totalStake)
+	response.StakedOuts = stakedOuts
 
 	errs := wrappers.Errs{}
 	errs.Add(
