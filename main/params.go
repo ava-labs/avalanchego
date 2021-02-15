@@ -41,7 +41,7 @@ import (
 )
 
 var (
-	dbVersion = version.NewDefaultVersion(1, 0, 0)
+	dbVersion = version.NewDefaultVersion(1, 0, 1)
 )
 
 // Results of parsing the CLI
