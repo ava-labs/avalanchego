@@ -41,7 +41,7 @@ func main() {
 	logFactory := logging.NewFactory(Config.LoggingConfig)
 	defer logFactory.Close()
 
-	log, err := logFactory.Make()
+	log, err := logFactory.Make("main")
 	if err != nil {
 		fmt.Printf("starting logger failed with: %s\n", err)
 		return

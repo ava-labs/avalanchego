@@ -3,13 +3,11 @@
 
 package logging
 
-import "path/filepath"
-
 // Factory ...
 type Factory interface {
-	Make() (Logger, error)
-	MakeChain(chainID string, subdir string) (Logger, error)
-	MakeSubdir(subdir string) (Logger, error)
+	Make(name string) (Logger, error)
+	MakeChain(chainID string) (Logger, error)
+	MakeChainChild(chainID string, name string) (Logger, error)
 	Close()
 }
 
@@ -28,8 +26,10 @@ func NewFactory(config Config) Factory {
 }
 
 // Make ...
-func (f *factory) Make() (Logger, error) {
-	l, err := New(f.config)
+func (f *factory) Make(name string) (Logger, error) {
+	config := f.config
+	config.LoggerName = name
+	l, err := New(config)
 	if err == nil {
 		f.loggers = append(f.loggers, l)
 	}
@@ -37,11 +37,10 @@ func (f *factory) Make() (Logger, error) {
 }
 
 // MakeChain ...
-func (f *factory) MakeChain(chainID string, subdir string) (Logger, error) {
+func (f *factory) MakeChain(chainID string) (Logger, error) {
 	config := f.config
 	config.MsgPrefix = chainID + " Chain"
-	config.Directory = filepath.Join(config.Directory, "chain", chainID, subdir)
-
+	config.LoggerName = chainID
 	log, err := New(config)
 	if err == nil {
 		f.loggers = append(f.loggers, log)
@@ -49,11 +48,11 @@ func (f *factory) MakeChain(chainID string, subdir string) (Logger, error) {
 	return log, err
 }
 
-// MakeSubdir ...
-func (f *factory) MakeSubdir(subdir string) (Logger, error) {
+// MakeChainChild ...
+func (f *factory) MakeChainChild(chainID string, name string) (Logger, error) {
 	config := f.config
-	config.Directory = filepath.Join(config.Directory, subdir)
-
+	config.MsgPrefix = chainID + " Chain"
+	config.LoggerName = chainID + "." + name
 	log, err := New(config)
 	if err == nil {
 		f.loggers = append(f.loggers, log)

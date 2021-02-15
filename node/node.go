@@ -809,7 +809,7 @@ func (n *Node) Initialize(
 	n.doneShuttingDown.Add(1)
 	n.Log.Info("Node version is: %s", Version)
 
-	httpLog, err := logFactory.MakeSubdir("http")
+	httpLog, err := logFactory.Make("http")
 	if err != nil {
 		return fmt.Errorf("problem initializing HTTP logger: %w", err)
 	}

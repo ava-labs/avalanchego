@@ -24,7 +24,7 @@ type Config struct {
 	DisableLogging, DisableDisplaying, DisableContextualDisplaying, DisableFlushOnWrite, Assertions bool
 	LogLevel, DisplayLevel                                                                          Level
 	DisplayHighlight                                                                                Highlight
-	Directory, MsgPrefix                                                                            string
+	Directory, MsgPrefix, LoggerName                                                                string
 }
 
 // DefaultConfig ...

@@ -112,7 +112,7 @@ func (s *Server) RegisterChain(chainName string, ctx *snow.Context, vmIntf inter
 		return
 	}
 
-	httpLogger, err := s.factory.MakeChain(chainName, "http")
+	httpLogger, err := s.factory.MakeChainChild(chainName, "http")
 	if err != nil {
 		s.log.Error("Failed to create new http logger: %s", err)
 		return
