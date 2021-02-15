@@ -96,7 +96,7 @@ func (nw *NoIOWriter) WriteString(s string) (int, error) { return len(s), nil }
 func (nw *NoIOWriter) Close() error { return nil }
 
 // Rotate ...
-func (nw *NoIOWriter) Rotate(RotationSize int) error { return nil }
+func (nw *NoIOWriter) Rotate() error { return nil }
 
 // NewTestLog ...
 func NewTestLog(config Config) (*Log, error) {

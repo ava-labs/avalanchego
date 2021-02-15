@@ -100,7 +100,7 @@ func (l *Log) run() {
 			// attempt to close the file
 			_ = l.writer.Close()
 
-			if err := l.writer.Rotate(l.config.RotationSize); err != nil {
+			if err := l.writer.Rotate(); err != nil {
 				panic(err)
 			}
 		}
@@ -359,17 +359,21 @@ func (fw *fileWriter) Close() error {
 	return fw.file.Close()
 }
 
-func (fw *fileWriter) Rotate(RotationSize int) error {
-	for i := RotationSize - 1; i >= 0; i-- {
+func (fw *fileWriter) Rotate() error {
+	for i := fw.config.RotationSize - 1; i >= 0; i-- {
 		sourceFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log.%d", fw.config.LoggerName, i))
 		destFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log.%d", fw.config.LoggerName, i+1))
 		if _, err := os.Stat(sourceFilename); !os.IsNotExist(err) {
-			os.Rename(sourceFilename, destFilename)
+			if err := os.Rename(sourceFilename, destFilename); err != nil {
+				return err
+			}
 		}
 	}
 	sourceFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log", fw.config.LoggerName))
 	destFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log.1", fw.config.LoggerName))
-	os.Rename(sourceFilename, destFilename)
+	if err := os.Rename(sourceFilename, destFilename); err != nil {
+		return err
+	}
 	writer, file, err := fw.create()
 	if err != nil {
 		return err

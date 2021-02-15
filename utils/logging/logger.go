@@ -71,5 +71,5 @@ type RotatingWriter interface {
 	Write(b []byte) (int, error)
 	WriteString(s string) (int, error)
 	Close() error
-	Rotate(RotationSize int) error
+	Rotate() error
 }
