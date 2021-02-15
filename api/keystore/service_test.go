@@ -10,9 +10,14 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/version"
+
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var (
@@ -421,5 +426,142 @@ func TestServiceDeleteUser(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestMigrateKeystoreUser(t *testing.T) {
+	testUser := "testUser"
+	password := "passwTest@fake01ord"
+	bID := ids.Empty
+	currentDB := memdb.New()
+	semanticDBs := []*manager.SemanticDatabase{
+		{
+			Database: currentDB,
+			Version:  version.NewDefaultVersion(1, 0, 0),
+		},
+	}
+
+	dbManager, err := manager.NewManagerFromDBs(semanticDBs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ks := &Keystore{}
+	if err := ks.Initialize(logging.NoLog{}, dbManager); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ks.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.SuccessResponse{}); err != nil {
+		t.Fatalf("Failed to create user: %s", err)
+	}
+
+	userDB, err := ks.GetDatabase(bID, testUser, password)
+	if err != nil {
+		t.Fatalf("Failed to get user database: %s", err)
+	}
+	k1 := []byte("Old")
+	v1 := []byte("Dominion")
+	if err := userDB.Put(k1, v1); err != nil {
+		t.Fatalf("Failed to put value in userDB: %s", err)
+	}
+	k2 := []byte("Luke")
+	v2 := []byte("Bryan")
+	if err := userDB.Put(k2, v2); err != nil {
+		t.Fatalf("Failed to put value in userDB: %s", err)
+	}
+
+	semanticDBs = append(semanticDBs, &manager.SemanticDatabase{
+		Database: memdb.New(),
+		Version:  version.NewDefaultVersion(1, 1, 0),
+	})
+	upgradedDBManager, err := manager.NewManagerFromDBs(semanticDBs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ksUpgraded := &Keystore{}
+	if err := ksUpgraded.Initialize(logging.NoLog{}, upgradedDBManager); err != nil {
+		t.Fatal(err)
+	}
+
+	reply := &ListUsersReply{}
+	if err := ksUpgraded.ListUsers(nil, nil, reply); err != nil {
+		t.Fatalf("Failed to list users: %s", err)
+	}
+
+	if len(reply.Users) != 1 {
+		t.Fatalf("Exepcted 1 user, but found: %d", len(reply.Users))
+	}
+
+	if reply.Users[0] != testUser {
+		t.Fatalf("Expected first user to be %s, but found %s", testUser, reply.Users[0])
+	}
+
+	userDB, err = ksUpgraded.GetDatabase(bID, testUser, password)
+	if err != nil {
+		t.Fatalf("Failed to get user database from upgraded DB: %s", err)
+	}
+
+	value, err := userDB.Get(k1)
+	if err != nil {
+		t.Fatalf("Failed to get value from userDB: %s", err)
+	}
+	if !bytes.Equal(value, v1) {
+		t.Fatalf("Expected value: %s, but found %s", value, v1)
+	}
+
+	value, err = userDB.Get(k2)
+	if err != nil {
+		t.Fatalf("Failed to get value from userDB: %s", err)
+	}
+	if !bytes.Equal(value, v2) {
+		t.Fatalf("Expected value: %s, but found %s", value, v2)
+	}
+
+	semanticDBs = append(semanticDBs, &manager.SemanticDatabase{
+		Database: memdb.New(),
+		Version:  version.NewDefaultVersion(2, 1, 0),
+	})
+	secondUpgradedDBManager, err := manager.NewManagerFromDBs(semanticDBs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ksSecondUpgrade := &Keystore{}
+	if err := ksSecondUpgrade.Initialize(logging.NoLog{}, secondUpgradedDBManager); err != nil {
+		t.Fatal(err)
+	}
+
+	reply = &ListUsersReply{}
+	if err := ksSecondUpgrade.ListUsers(nil, nil, reply); err != nil {
+		t.Fatalf("Failed to list users: %s", err)
+	}
+
+	if len(reply.Users) != 1 {
+		t.Fatalf("Exepcted 1 user, but found: %d", len(reply.Users))
+	}
+
+	if reply.Users[0] != testUser {
+		t.Fatalf("Expected first user to be %s, but found %s", testUser, reply.Users[0])
+	}
+
+	userDB, err = ksSecondUpgrade.GetDatabase(bID, testUser, password)
+	if err != nil {
+		t.Fatalf("Failed to get user database from upgraded DB: %s", err)
+	}
+
+	value, err = userDB.Get(k1)
+	if err != nil {
+		t.Fatalf("Failed to get value from userDB: %s", err)
+	}
+	if !bytes.Equal(value, v1) {
+		t.Fatalf("Expected value: %s, but found %s", value, v1)
+	}
+
+	value, err = userDB.Get(k2)
+	if err != nil {
+		t.Fatalf("Failed to get value from userDB: %s", err)
+	}
+	if !bytes.Equal(value, v2) {
+		t.Fatalf("Expected value: %s, but found %s", value, v2)
 	}
 }

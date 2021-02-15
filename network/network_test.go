@@ -169,8 +169,8 @@ func TestNewDefaultNetwork(t *testing.T) {
 	)
 	id := ids.ShortID(hashing.ComputeHash160Array([]byte(ip.IP().String())))
 	networkID := uint32(0)
-	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
-	versionParser := version.NewDefaultParser()
+	appVersion := version.NewDefaultApplicationVersion("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
 
 	listener := &testListener{
 		addr: &net.TCPAddr{
@@ -231,8 +231,8 @@ func TestNewDefaultNetwork(t *testing.T) {
 func TestEstablishConnection(t *testing.T) {
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
-	versionParser := version.NewDefaultParser()
+	appVersion := version.NewDefaultApplicationVersion("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -383,8 +383,8 @@ func TestEstablishConnection(t *testing.T) {
 func TestDoubleTrack(t *testing.T) {
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
-	versionParser := version.NewDefaultParser()
+	appVersion := version.NewDefaultApplicationVersion("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -536,8 +536,8 @@ func TestDoubleTrack(t *testing.T) {
 func TestDoubleClose(t *testing.T) {
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
-	versionParser := version.NewDefaultParser()
+	appVersion := version.NewDefaultApplicationVersion("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -694,8 +694,8 @@ func TestDoubleClose(t *testing.T) {
 func TestTrackConnected(t *testing.T) {
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
-	versionParser := version.NewDefaultParser()
+	appVersion := version.NewDefaultApplicationVersion("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -848,8 +848,8 @@ func TestTrackConnected(t *testing.T) {
 func TestTrackConnectedRace(t *testing.T) {
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
-	versionParser := version.NewDefaultParser()
+	appVersion := version.NewDefaultApplicationVersion("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,

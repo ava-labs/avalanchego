@@ -6,7 +6,8 @@ package node
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/nat"
@@ -43,7 +44,7 @@ type Config struct {
 	EnableCrypto bool
 
 	// Database to use for the node
-	DB database.Database
+	DB manager.Manager
 
 	// Staking configuration
 	StakingIP             utils.DynamicIPDesc
@@ -128,4 +129,7 @@ type Config struct {
 
 	// Coreth
 	CorethConfig string
+
+	// ChainConfigs
+	ChainConfigs map[ids.ID]chains.ChainConfig
 }
