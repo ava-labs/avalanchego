@@ -6,6 +6,7 @@ package logging
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -60,13 +61,14 @@ func (l *Log) run() {
 	l.writeLock.Lock()
 	defer l.writeLock.Unlock()
 
-	if err := l.writer.Initialize(l.config); err != nil {
+	currentSize, err := l.writer.Initialize(l.config)
+	if err != nil {
 		panic(err)
 	}
 
 	closed := false
 	nextRotation := time.Now().Add(l.config.RotationInterval)
-	currentSize := 0
+
 	for !closed {
 		l.writeLock.Unlock()
 		l.flushLock.Lock()
@@ -379,7 +381,7 @@ func (fw *fileWriter) Rotate(RotationSize int) error {
 
 func (fw *fileWriter) create() (*bufio.Writer, *os.File, error) {
 	filename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log", fw.config.LoggerName))
-	file, err := os.Create(filename)
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -387,13 +389,17 @@ func (fw *fileWriter) create() (*bufio.Writer, *os.File, error) {
 	return writer, file, nil
 }
 
-func (fw *fileWriter) Initialize(config Config) error {
+func (fw *fileWriter) Initialize(config Config) (int, error) {
 	fw.config = config
 	writer, file, err := fw.create()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	fw.writer = writer
 	fw.file = file
-	return nil
+	fileSize, err := file.Seek(0, io.SeekEnd)
+	if err != nil {
+		return 0, err
+	}
+	return int(fileSize), nil
 }
