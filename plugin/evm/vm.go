@@ -544,6 +544,10 @@ func (vm *VM) repairTip() (bool, error) {
 	return true, nil
 }
 
+func (vm *VM) lastAcceptedEthBlock() *types.Block {
+	return vm.LastAcceptedBlock().Block.(*Block).ethBlock
+}
+
 // Bootstrapping notifies this VM that the consensus engine is performing
 // bootstrapping
 func (vm *VM) Bootstrapping() error { return vm.fx.Bootstrapping() }
