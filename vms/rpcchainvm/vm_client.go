@@ -124,6 +124,9 @@ func (vm *VMClient) Initialize(
 	}
 
 	vm.ctx = ctx
+	if err := vm.initializeCaches(ctx.Metrics, ctx.Namespace); err != nil {
+		return err
+	}
 
 	// Initialize and serve each database and construct the db manager
 	// initialize request parameters
