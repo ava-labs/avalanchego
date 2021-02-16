@@ -144,6 +144,12 @@ func (tx *UniqueTx) Accept() error {
 	}
 
 	txID := tx.ID()
+
+	err := tx.vm.indexer.markAccepted(txID)
+	if err != nil {
+		return fmt.Errorf("couldn't mark %s as accepted in indexer: %w", txID, err)
+	}
+
 	commitBatch, err := tx.vm.db.CommitBatch()
 	if err != nil {
 		tx.vm.ctx.Log.Error("Failed to calculate CommitBatch for %s due to %s", txID, err)
@@ -158,10 +164,7 @@ func (tx *UniqueTx) Accept() error {
 	tx.vm.ctx.Log.Verbo("Accepted Tx: %s", txID)
 
 	tx.vm.pubsub.Publish("accepted", txID)
-	err = tx.vm.indexer.markAccepted(txID)
-	if err != nil {
-		return fmt.Errorf("couldn't mark %s as accepted in indexer: %w", txID, err)
-	}
+
 	tx.vm.walletService.decided(txID)
 
 	tx.deps = nil // Needed to prevent a memory leak

@@ -80,7 +80,11 @@ type VM struct {
 	codec         codec.Manager
 	codecRegistry codec.Registry
 
-	pubsub  *cjson.PubSubServer
+	pubsub *cjson.PubSubServer
+
+	// Indexed accepted transactions by the order in which they were accepted
+	// [indexer].markAccepted should be called immediately before [vm.db] is committed
+	// in UniqueTx's Accept() method
 	indexer *indexer
 
 	// State management
