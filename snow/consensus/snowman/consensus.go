@@ -26,15 +26,13 @@ type Consensus interface {
 	// Returns the number of blocks processing
 	NumProcessing() int
 
-	// Returns the number of blocks accepted
-	Height() uint64
-
 	// Adds a new decision. Assumes the dependency has already been added.
 	// Returns if a critical error has occurred.
 	Add(Block) error
 
-	// Issued returns true if the block has been issued into consensus
-	Issued(Block) bool
+	// DecidedOrProcessing returns true if the block has been decided or is
+	// currently processing
+	DecidedOrProcessing(Block) bool
 
 	// Returns the ID of the tail of the strongly preferred sequence of
 	// decisions.

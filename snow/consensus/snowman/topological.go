@@ -86,9 +86,6 @@ func (ts *Topological) Parameters() snowball.Parameters { return ts.params }
 // NumProcessing implements the Snowman interface
 func (ts *Topological) NumProcessing() int { return len(ts.blocks) - 1 }
 
-// Height implements the Snowman interface
-func (ts *Topological) Height() uint64 { return ts.height }
-
 // Add implements the Snowman interface
 func (ts *Topological) Add(blk Block) error {
 	parent := blk.Parent()
@@ -132,10 +129,10 @@ func (ts *Topological) Add(blk Block) error {
 	return nil
 }
 
-// Issued implements the Snowman interface
-func (ts *Topological) Issued(blk Block) bool {
+// DecidedOrProcessing implements the Snowman interface
+func (ts *Topological) DecidedOrProcessing(blk Block) bool {
 	// If the block is decided, then it must have been previously issued.
-	if blk.Status().Decided() {
+	if blk.Status().Decided() || blk.Height() <= ts.height {
 		return true
 	}
 	// If the block is in the map of current blocks, then the block was issued.

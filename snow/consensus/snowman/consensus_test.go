@@ -281,8 +281,8 @@ func IssuedPreviouslyAcceptedTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if !sm.Issued(Genesis) {
-		t.Fatalf("Should have marked an accepted block as having been issued")
+	if !sm.DecidedOrProcessing(Genesis) {
+		t.Fatalf("Should have marked an accepted block as having been decided")
 	}
 }
 
@@ -311,8 +311,8 @@ func IssuedPreviouslyRejectedTest(t *testing.T, factory Factory) {
 		ParentV: Genesis,
 	}
 
-	if !sm.Issued(block) {
-		t.Fatalf("Should have marked a rejected block as having been issued")
+	if !sm.DecidedOrProcessing(block) {
+		t.Fatalf("Should have marked a rejected block as having been decided")
 	}
 }
 
@@ -339,10 +339,11 @@ func IssuedUnissuedTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis,
+		HeightV: 1,
 	}
 
-	if sm.Issued(block) {
-		t.Fatalf("Shouldn't have marked an unissued block as having been issued")
+	if sm.DecidedOrProcessing(block) {
+		t.Fatalf("Shouldn't have marked an unissued block as being processing")
 	}
 }
 
@@ -373,8 +374,8 @@ func IssuedIssuedTest(t *testing.T, factory Factory) {
 
 	if err := sm.Add(block); err != nil {
 		t.Fatal(err)
-	} else if !sm.Issued(block) {
-		t.Fatalf("Should have marked a pending block as having been issued")
+	} else if !sm.DecidedOrProcessing(block) {
+		t.Fatalf("Should have marked a the block as processing")
 	}
 }
 
