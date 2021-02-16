@@ -6,6 +6,7 @@ package snowman
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
@@ -131,11 +132,19 @@ func (ts *Topological) Add(blk Block) error {
 
 // DecidedOrProcessing implements the Snowman interface
 func (ts *Topological) DecidedOrProcessing(blk Block) bool {
+	switch blk.Status() {
 	// If the block is decided, then it must have been previously issued.
-	if blk.Status().Decided() || blk.Height() <= ts.height {
+	case choices.Accepted, choices.Rejected:
 		return true
+	// If the block is marked as fetched, we can check if it has been
+	// transitively rejected.
+	case choices.Processing:
+		if blk.Height() <= ts.height {
+			return true
+		}
 	}
-	// If the block is in the map of current blocks, then the block was issued.
+	// If the block is in the map of current blocks, then the block is currently
+	// processing.
 	_, ok := ts.blocks[blk.ID()]
 	return ok
 }
