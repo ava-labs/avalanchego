@@ -278,9 +278,7 @@ func TestIssueAtomicTxs(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm.SetPreference(blk.ID()); err != nil {
-		t.Fatal(err)
-	}
+	vm.SetPreference(blk.ID())
 
 	if err := blk.Accept(); err != nil {
 		t.Fatal(err)
@@ -290,11 +288,9 @@ func TestIssueAtomicTxs(t *testing.T) {
 		t.Fatalf("Expected status of accepted block to be %s, but found %s", choices.Accepted, status)
 	}
 
-	lastAcceptedID, err := vm.LastAccepted()
-	if err != nil {
+	if lastAcceptedID, err := vm.LastAccepted(); err != nil {
 		t.Fatal(err)
-	}
-	if lastAcceptedID != blk.ID() {
+	} else if lastAcceptedID != blk.ID() {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk.ID(), lastAcceptedID)
 	}
 
@@ -330,28 +326,25 @@ func TestIssueAtomicTxs(t *testing.T) {
 		t.Fatalf("Expected status of accepted block to be %s, but found %s", choices.Accepted, status)
 	}
 
-	lastAcceptedID, err = vm.LastAccepted()
-	if err != nil {
+	if lastAcceptedID, err := vm.LastAccepted(); err != nil {
 		t.Fatal(err)
-	}
-	if lastAcceptedID != blk2.ID() {
+	} else if lastAcceptedID != blk2.ID() {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk2.ID(), lastAcceptedID)
 	}
 
 	// Check that both atomic transactions were indexed as expected.
-	indexedImportTx, height, err := vm.getAtomicTx(importTx.ID())
+	indexedImportTx, status, height, err := vm.getAtomicTx(importTx.ID())
 	assert.NoError(t, err)
-
+	assert.Equal(t, Accepted, status)
 	assert.Equal(t, uint64(1), height, "expected height of indexed import tx to be 1")
 	assert.Equal(t, indexedImportTx.ID(), importTx.ID(), "expected ID of indexed import tx to match original txID")
 
-	indexedExportTx, height, err := vm.getAtomicTx(exportTx.ID())
+	indexedExportTx, status, height, err := vm.getAtomicTx(exportTx.ID())
 	assert.NoError(t, err)
-
+	assert.Equal(t, Accepted, status)
 	assert.Equal(t, uint64(2), height, "expected height of indexed export tx to be 2")
 	assert.Equal(t, indexedExportTx.ID(), exportTx.ID(), "expected ID of indexed import tx to match original txID")
 }
-
 func TestBuildEthTxBlock(t *testing.T) {
 	issuer, vm, _, sharedMemory := GenesisVM(t, true)
 
@@ -978,13 +971,18 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	importTx0, err := vm.newImportTx(vm.ctx.XChainID, key.Address, []*crypto.PrivateKeySECP256K1R{key0})
+	importTx0A, err := vm.newImportTx(vm.ctx.XChainID, key.Address, []*crypto.PrivateKeySECP256K1R{key0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Create a conflicting transaction
+	importTx0B, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[2], []*crypto.PrivateKeySECP256K1R{key0})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(importTx0); err != nil {
-		t.Fatal(err)
+	if err := vm.issueTx(importTx0A); err != nil {
+		t.Fatalf("Failed to issue importTx0A: %s", err)
 	}
 
 	<-issuer
@@ -1020,11 +1018,11 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 
 	blk1, err := vm.BuildBlock()
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to build blk1: %s", err)
 	}
 
 	if err := blk1.Verify(); err != nil {
-		t.Fatal(err)
+		t.Fatalf("blk1 failed verification due to %s", err)
 	}
 
 	if err := vm.SetPreference(blk1.ID()); err != nil {
@@ -1033,7 +1031,7 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 
 	importTx1, err := vm.newImportTx(vm.ctx.XChainID, key.Address, []*crypto.PrivateKeySECP256K1R{key1})
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to issue importTx1 due to: %s", err)
 	}
 
 	if err := vm.issueTx(importTx1); err != nil {
@@ -1055,8 +1053,8 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(importTx0); err != nil {
-		t.Fatal(err)
+	if err := vm.issueTx(importTx0B); err != nil {
+		t.Fatalf("Failed to issue importTx0B due to: %s", err)
 	}
 
 	<-issuer
@@ -2553,5 +2551,255 @@ func TestFutureBlock(t *testing.T) {
 		t.Fatal("Future block should have failed verification due to block timestamp too far in the future")
 	} else if !strings.Contains(err.Error(), "block timestamp is too far in the future") {
 		t.Fatalf("Expected error to be block timestamp too far in the future but found %s", err)
+	}
+}
+
+func TestReissueAtomicTx(t *testing.T) {
+	issuer, vm, _, sharedMemory := GenesisVM(t, true)
+
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	genesisBlkID, err := vm.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	importAmount := uint64(10000000)
+	utxoID := avax.UTXOID{
+		TxID: ids.ID{
+			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+			0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+			0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+		},
+	}
+
+	utxo := &avax.UTXO{
+		UTXOID: utxoID,
+		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: importAmount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{testKeys[0].PublicKey().Address()},
+			},
+		},
+	}
+	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
+	inputID := utxo.InputID()
+	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+		Key:   inputID[:],
+		Value: utxoBytes,
+		Traits: [][]byte{
+			testKeys[0].PublicKey().Address().Bytes(),
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.issueTx(importTx); err != nil {
+		t.Fatal(err)
+	}
+
+	<-issuer
+
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if status := blk.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
+	}
+
+	if err := vm.SetPreference(blk.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Reject(); err != nil {
+		t.Fatal(err)
+	}
+
+	if status := blk.Status(); status != choices.Rejected {
+		t.Fatalf("Expected status of rejected block to be %s, but found %s", choices.Rejected, status)
+	}
+
+	if err := vm.SetPreference(genesisBlkID); err != nil {
+		t.Fatal(err)
+	}
+
+	<-issuer
+	blk, err = vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if status := blk.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
+	}
+
+	if err := vm.SetPreference(blk.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
+	if status := blk.Status(); status != choices.Accepted {
+		t.Fatalf("Expected status of accepted block to be %s, but found %s", choices.Accepted, status)
+	}
+
+	if lastAcceptedID, err := vm.LastAccepted(); err != nil {
+		t.Fatal(err)
+	} else if lastAcceptedID != blk.ID() {
+		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk.ID(), lastAcceptedID)
+	}
+}
+
+func TestAtomicTxFailsEVMStateTransferBuildBlock(t *testing.T) {
+	issuer, vm, _, sharedMemory := GenesisVM(t, true)
+
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	importAmount := uint64(10000000)
+	utxoID := avax.UTXOID{
+		TxID: ids.ID{
+			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+			0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+			0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+		},
+	}
+
+	utxo := &avax.UTXO{
+		UTXOID: utxoID,
+		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: importAmount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{testKeys[0].PublicKey().Address()},
+			},
+		},
+	}
+	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
+	inputID := utxo.InputID()
+	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+		Key:   inputID[:],
+		Value: utxoBytes,
+		Traits: [][]byte{
+			testKeys[0].PublicKey().Address().Bytes(),
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.issueTx(importTx); err != nil {
+		t.Fatal(err)
+	}
+
+	<-issuer
+
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if status := blk.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
+	}
+
+	if err := vm.SetPreference(blk.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
+	if status := blk.Status(); status != choices.Accepted {
+		t.Fatalf("Expected status of accepted block to be %s, but found %s", choices.Accepted, status)
+	}
+
+	if lastAcceptedID, err := vm.LastAccepted(); err != nil {
+		t.Fatal(err)
+	} else if lastAcceptedID != blk.ID() {
+		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk.ID(), lastAcceptedID)
+	}
+
+	exportTx1, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-vm.txFee-1, vm.ctx.XChainID, testShortIDAddrs[0], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exportTx2, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-vm.txFee-1, vm.ctx.XChainID, testShortIDAddrs[1], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.issueTx(exportTx1); err != nil {
+		t.Fatal(err)
+	}
+	<-issuer
+	exportBlk1, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := exportBlk1.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.SetPreference(exportBlk1.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.issueTx(exportTx2); err != nil {
+		t.Fatal(err)
+	}
+	<-issuer
+
+	_, err = vm.BuildBlock()
+	if err == nil {
+		t.Fatal("BuildBlock should have returned an error due to invalid export transaction")
 	}
 }

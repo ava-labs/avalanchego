@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/trie"
 	"github.com/mattn/go-isatty"
 )
 
@@ -90,8 +91,14 @@ func (self *ETHChain) BlockChain() *core.BlockChain {
 	return self.backend.BlockChain()
 }
 
-func (self *ETHChain) UnlockIndexing() {
-	self.backend.BlockChain().UnlockIndexing()
+func (self *ETHChain) VerifyBlock(block *types.Block) bool {
+	txnHash := types.DeriveSha(block.Transactions(), new(trie.Trie))
+	uncleHash := types.CalcUncleHash(block.Uncles())
+	ethHeader := block.Header()
+	if txnHash != ethHeader.TxHash || uncleHash != ethHeader.UncleHash {
+		return false
+	}
+	return true
 }
 
 func (self *ETHChain) PendingSize() (int, error) {
@@ -226,9 +233,10 @@ func (self *ETHChain) AttachEthService(handler *rpc.Server, namespaces []string)
 	}
 }
 
-// TODO: use SubscribeNewTxsEvent()
-func (self *ETHChain) GetTxSubmitCh() <-chan struct{} {
-	return self.backend.GetTxSubmitCh()
+func (self *ETHChain) GetTxSubmitCh() <-chan core.NewTxsEvent {
+	newTxsChan := make(chan core.NewTxsEvent)
+	self.backend.TxPool().SubscribeNewTxsEvent(newTxsChan)
+	return newTxsChan
 }
 
 func (self *ETHChain) GetTxPool() *core.TxPool {

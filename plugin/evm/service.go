@@ -12,9 +12,7 @@ import (
 	"strings"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -87,7 +85,8 @@ func (api *SnowmanAPI) GetAcceptedFront(ctx context.Context) (*GetAcceptedFrontR
 func (api *SnowmanAPI) IssueBlock(ctx context.Context) error {
 	log.Info("Issuing a new block")
 
-	return api.vm.tryBlockGen()
+	api.vm.signalTxsReady()
+	return nil
 }
 
 // parseAssetID parses an assetID string into an ID
@@ -426,8 +425,8 @@ func (service *AvaxAPI) IssueTx(r *http.Request, args *api.FormattedTx, response
 
 // GetAtomicTxStatusReply defines the GetAtomicTxStatus replies returned from the API
 type GetAtomicTxStatusReply struct {
-	Status      choices.Status `json:"status"`
-	BlockHeight *json.Uint64   `json:"blockHeight,omitempty"`
+	Status      Status       `json:"status"`
+	BlockHeight *json.Uint64 `json:"blockHeight,omitempty"`
 }
 
 // GetAtomicTxStatus returns the status of the specified transaction
@@ -438,20 +437,14 @@ func (service *AvaxAPI) GetAtomicTxStatus(r *http.Request, args *api.JSONTxID, r
 		return errNilTxID
 	}
 
-	_, height, err := service.vm.getAtomicTx(args.TxID)
-	if err == nil {
+	_, status, height, _ := service.vm.getAtomicTx(args.TxID)
+
+	reply.Status = status
+	if status == Accepted {
 		jsonHeight := json.Uint64(height)
-		reply.Status = choices.Accepted
 		reply.BlockHeight = &jsonHeight
-		return nil
 	}
-
-	if err == database.ErrNotFound {
-		reply.Status = choices.Unknown
-		return nil
-	}
-
-	return err
+	return nil
 }
 
 type FormattedTx struct {
@@ -466,9 +459,14 @@ func (service *AvaxAPI) GetAtomicTx(r *http.Request, args *api.GetTxArgs, reply 
 	if args.TxID == ids.Empty {
 		return errNilTxID
 	}
-	tx, height, err := service.vm.getAtomicTx(args.TxID)
+
+	tx, status, height, err := service.vm.getAtomicTx(args.TxID)
 	if err != nil {
-		return fmt.Errorf("couldn't get atomic tx %s: %w", args.TxID, err)
+		return err
+	}
+
+	if status == Unknown {
+		return fmt.Errorf("could not find tx %s", args.TxID)
 	}
 
 	txBytes, err := formatting.Encode(args.Encoding, tx.Bytes())
@@ -477,7 +475,9 @@ func (service *AvaxAPI) GetAtomicTx(r *http.Request, args *api.GetTxArgs, reply 
 	}
 	reply.Tx = txBytes
 	reply.Encoding = args.Encoding
-	jsonHeight := json.Uint64(height)
-	reply.BlockHeight = &jsonHeight
+	if status == Accepted {
+		jsonHeight := json.Uint64(height)
+		reply.BlockHeight = &jsonHeight
+	}
 	return nil
 }
