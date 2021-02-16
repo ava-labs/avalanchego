@@ -6,6 +6,7 @@ package snowman
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
@@ -35,6 +36,9 @@ type Topological struct {
 	// head is the last accepted block
 	head ids.ID
 
+	// height is the height of the last accepted block
+	height uint64
+
 	// blocks stores the last accepted block and all the pending blocks
 	blocks map[ids.ID]*snowmanBlock // blockID -> snowmanBlock
 
@@ -60,7 +64,7 @@ type votes struct {
 }
 
 // Initialize implements the Snowman interface
-func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters, rootID ids.ID) error {
+func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters, rootID ids.ID, rootHeight uint64) error {
 	ts.ctx = ctx
 	ts.params = params
 
@@ -69,6 +73,7 @@ func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters,
 	}
 
 	ts.head = rootID
+	ts.height = rootHeight
 	ts.blocks = map[ids.ID]*snowmanBlock{
 		rootID: {sm: ts},
 	}
@@ -125,13 +130,21 @@ func (ts *Topological) Add(blk Block) error {
 	return nil
 }
 
-// Issued implements the Snowman interface
-func (ts *Topological) Issued(blk Block) bool {
+// DecidedOrProcessing implements the Snowman interface
+func (ts *Topological) DecidedOrProcessing(blk Block) bool {
+	switch blk.Status() {
 	// If the block is decided, then it must have been previously issued.
-	if blk.Status().Decided() {
+	case choices.Accepted, choices.Rejected:
 		return true
+	// If the block is marked as fetched, we can check if it has been
+	// transitively rejected.
+	case choices.Processing:
+		if blk.Height() <= ts.height {
+			return true
+		}
 	}
-	// If the block is in the map of current blocks, then the block was issued.
+	// If the block is in the map of current blocks, then the block is currently
+	// processing.
 	_, ok := ts.blocks[blk.ID()]
 	return ok
 }
@@ -441,6 +454,7 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 
 	// Because this is the newest accepted block, this is the new head.
 	ts.head = pref
+	ts.height = child.Height()
 
 	// Because ts.blocks contains the last accepted block, we don't delete the
 	// block from the blocks map here.

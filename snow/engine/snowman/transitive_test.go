@@ -2104,3 +2104,117 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 		t.Fatalf("Should have finished all requests")
 	}
 }
+
+func TestEngineRejectionAmplification(t *testing.T) {
+	vdr, _, sender, vm, te, gBlk := setup(t)
+
+	acceptedBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
+	}
+	rejectedBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{2},
+	}
+	pendingBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: rejectedBlk,
+		HeightV: 2,
+		BytesV:  []byte{3},
+	}
+
+	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, acceptedBlk.Bytes()):
+			return acceptedBlk, nil
+		case bytes.Equal(b, rejectedBlk.Bytes()):
+			return rejectedBlk, nil
+		case bytes.Equal(b, pendingBlk.Bytes()):
+			return pendingBlk, nil
+		default:
+			t.Fatalf("Unknown block bytes")
+			return nil, nil
+		}
+	}
+
+	var (
+		queried bool
+		reqID   uint32
+	)
+	sender.PushQueryF = func(_ ids.ShortSet, rID uint32, _ ids.ID, blkBytes []byte) {
+		queried = true
+		reqID = rID
+	}
+
+	if err := te.Put(vdr, 0, acceptedBlk.ID(), acceptedBlk.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	if !queried {
+		t.Fatalf("Didn't query for the new block")
+	}
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		if blkID != acceptedBlk.ID() {
+			t.Fatalf("Wrong block requested")
+		}
+		return acceptedBlk, nil
+	}
+
+	if err := te.Chits(vdr, reqID, []ids.ID{acceptedBlk.ID()}); err != nil {
+		t.Fatal(err)
+	}
+
+	if !te.Consensus.Finalized() {
+		t.Fatalf("Should have finalized the consensus instance")
+	}
+
+	queried = false
+	var (
+		asked bool
+	)
+	sender.PushQueryF = func(_ ids.ShortSet, rID uint32, _ ids.ID, blkBytes []byte) {
+		queried = true
+	}
+	sender.GetF = func(_ ids.ShortID, rID uint32, blkID ids.ID) {
+		asked = true
+		reqID = rID
+
+		if blkID != rejectedBlk.ID() {
+			t.Fatalf("requested %s but should have requested %s", blkID, rejectedBlk.ID())
+		}
+	}
+
+	if err := te.Put(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	if queried {
+		t.Fatalf("Queried for the pending block")
+	}
+	if !asked {
+		t.Fatalf("Should have asked for the missing block")
+	}
+
+	rejectedBlk.StatusV = choices.Processing
+	if err := te.Put(vdr, reqID, rejectedBlk.ID(), rejectedBlk.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	if queried {
+		t.Fatalf("Queried for the rejected block")
+	}
+}

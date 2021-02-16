@@ -13,7 +13,12 @@ import (
 // process a series of dependent operations.
 type Consensus interface {
 	// Takes in the context, snowball parameters, and the last accepted block.
-	Initialize(*snow.Context, snowball.Parameters, ids.ID) error
+	Initialize(
+		ctx *snow.Context,
+		params snowball.Parameters,
+		lastAcceptedID ids.ID,
+		lastAcceptedHeight uint64,
+	) error
 
 	// Returns the parameters that describe this snowman instance
 	Parameters() snowball.Parameters
@@ -25,8 +30,9 @@ type Consensus interface {
 	// Returns if a critical error has occurred.
 	Add(Block) error
 
-	// Issued returns true if the block has been issued into consensus
-	Issued(Block) bool
+	// DecidedOrProcessing returns true if the block has been decided or is
+	// currently processing
+	DecidedOrProcessing(Block) bool
 
 	// Returns the ID of the tail of the strongly preferred sequence of
 	// decisions.
