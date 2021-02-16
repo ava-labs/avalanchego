@@ -26,18 +26,9 @@ var (
 	errNoTxs           = errors.New("no transactions have been accepted")
 	indexDbPrefix      = []byte("index")
 
-	// The byte representation of the maximum uint64
-	// We use this as the key that maps to the next accepted index
-	// because it will not be overwritten by index --> tx ID mappings
-	nextAcceptedIndexKey []byte
+	// Maps to the byte representation of the next accepted index
+	nextAcceptedIndexKey []byte = []byte("next")
 )
-
-func init() {
-	nextAcceptedIndexKey = make([]byte, wrappers.LongLen)
-	for i := 0; i < len(nextAcceptedIndexKey); i++ {
-		nextAcceptedIndexKey[i] = 255
-	}
-}
 
 // indexer indexes all accepted transactions by the order in which they were accepted
 type indexer struct {
@@ -126,6 +117,7 @@ func (i *indexer) getAcceptedTxByIndex(index uint64) (ids.ID, error) {
 	case err == database.ErrNotFound:
 		return ids.Empty, errNoTxAtThatIndex
 	case err != nil:
+		i.log.Error("couldn't read transaction ID from database: %w", err)
 		return ids.Empty, fmt.Errorf("couldn't read from database: %w", err)
 	case len(txIDBytes) != 32:
 		// Should never happen
@@ -176,19 +168,21 @@ func (i *indexer) getAcceptedTxRange(startIndex uint64, n uint64) ([]ids.ID, err
 
 	// Calculate the size of the needed slice
 	var txIDs []ids.ID
-	lastIndex := math.Min64(startIndex+n-1, lastAcceptedIndex)
+	lastIndex := math.Min64(startIndex+n, lastAcceptedIndex)
 	// [lastIndex] is always >= [startIndex] so this is safe.
 	// [n] is limited to [maxFetchedByRange] so [txIDs] can't be crazy big.
-	txIDs = make([]ids.ID, 0, int(lastIndex)-int(startIndex))
+	txIDs = make([]ids.ID, 0, int(lastIndex)-int(startIndex)+1)
 
 	iter := i.db.NewIteratorWithStart(p.Bytes)
 	defer iter.Release()
-	for i := uint64(0); i < n && iter.Next(); i++ {
+
+	for len(txIDs) < int(n) && iter.Next() {
 		txIDBytes := iter.Value()
-		if bytes.Equal(txIDBytes, nextAcceptedIndexKey) {
-			// We've reached the end
-			return txIDs, nil
-		} else if len(txIDBytes) != 32 {
+		if len(txIDBytes) != 32 {
+			if bytes.Equal(txIDBytes, nextAcceptedIndexKey) {
+				// Ignore the one non-index value in the database
+				continue
+			}
 			// Should never happen
 			return nil, fmt.Errorf("expected tx ID to be 32 bytes but is %d", len(txIDBytes))
 		}
