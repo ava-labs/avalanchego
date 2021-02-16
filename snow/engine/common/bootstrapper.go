@@ -4,6 +4,7 @@
 package common
 
 import (
+	"fmt"
 	"time"
 
 	stdmath "math"
@@ -47,11 +48,27 @@ type Bootstrapper struct {
 	// current weight
 	started bool
 	weight  uint64
+
+	bootstrapAttempts int
+	// validators that failed to respond with their frontiers
+	failedAcceptedFrontierVdrs ids.ShortSet
 }
 
 // Initialize implements the Engine interface.
 func (b *Bootstrapper) Initialize(config Config) error {
 	b.Config = config
+
+	// TODO: make this configurable ?
+	if b.bootstrapAttempts > 3 {
+		b.Ctx.Log.Fatal("Failed to boostrap the chain after %d attempts - %d failedAcceptedFrontierVdrs ",
+			b.bootstrapAttempts, b.failedAcceptedFrontierVdrs.Len())
+		return fmt.Errorf("failed to boostrap the chain after %d attempts", b.bootstrapAttempts)
+	} else if b.bootstrapAttempts > 0 {
+		b.failedAcceptedFrontierVdrs = ids.ShortSet{}
+
+		// ensure it doesn't repeat non-stop
+		time.Sleep(1 * time.Second)
+	}
 
 	beacons, err := b.Beacons.Sample(config.SampleK)
 	if err != nil {
@@ -77,6 +94,8 @@ func (b *Bootstrapper) Initialize(config Config) error {
 
 // Startup implements the Engine interface.
 func (b *Bootstrapper) Startup() error {
+
+	b.bootstrapAttempts++
 	b.started = true
 	if b.pendingAcceptedFrontier.Len() == 0 {
 		b.Ctx.Log.Info("Bootstrapping skipped due to no provided bootstraps")
@@ -101,6 +120,8 @@ func (b *Bootstrapper) GetAcceptedFrontier(validatorID ids.ShortID, requestID ui
 // GetAcceptedFrontierFailed implements the Engine interface.
 func (b *Bootstrapper) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
 	// If we can't get a response from [validatorID], act as though they said their accepted frontier is empty
+	// and we add the validator to the failed list
+	b.failedAcceptedFrontierVdrs.Add(validatorID)
 	return b.AcceptedFrontier(validatorID, requestID, nil)
 }
 
@@ -121,6 +142,21 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 	// told are on the accepted frontier such that the list only contains containers
 	// they think are accepted
 	if b.pendingAcceptedFrontier.Len() == 0 {
+
+		// measure total weight
+		totalWeight := uint64(0)
+		for _, beacon := range b.Beacons.List() {
+			if !b.failedAcceptedFrontierVdrs.Contains(beacon.ID()) {
+				totalWeight += beacon.Weight()
+			}
+		}
+
+		// TODO review this weight
+		// restart the bootstrap
+		if totalWeight < b.Alpha {
+			return b.Initialize(b.Config)
+		}
+
 		vdrs := ids.ShortSet{}
 		vdrs.Union(b.pendingAccepted)
 
@@ -166,6 +202,7 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 		b.acceptedVotes[containerID] = newWeight
 	}
 
+	// wait on pending responses
 	if b.pendingAccepted.Len() != 0 {
 		return nil
 	}
@@ -179,8 +216,12 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 		}
 	}
 
+	// if we don't have enough weight for the bootstrap to be accepted then restart or fail the bootstrap
 	if size := len(accepted); size == 0 && b.Beacons.Len() > 0 {
-		b.Ctx.Log.Info("Bootstrapping finished with no accepted frontier. This is likely a result of failing to be able to connect to the specified bootstraps, or no transactions have been issued on this chain yet")
+		b.Ctx.Log.Info("Bootstrapping finished with no accepted frontier. This is likely a result of failing to "+
+			"be able to connect to the specified bootstraps, or no transactions have been issued on this chain yet"+
+			" - Number of beacons: %d", b.Beacons.Len())
+		return b.Initialize(b.Config)
 	} else {
 		b.Ctx.Log.Info("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
 	}
