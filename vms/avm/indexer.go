@@ -177,12 +177,12 @@ func (i *indexer) getAcceptedTxRange(startIndex uint64, n uint64) ([]ids.ID, err
 	defer iter.Release()
 
 	for len(txIDs) < int(n) && iter.Next() {
+		if bytes.Equal(iter.Key(), nextAcceptedIndexKey) {
+			// Ignore the one non-index value in the database
+			continue
+		}
 		txIDBytes := iter.Value()
 		if len(txIDBytes) != 32 {
-			if bytes.Equal(txIDBytes, nextAcceptedIndexKey) {
-				// Ignore the one non-index value in the database
-				continue
-			}
 			// Should never happen
 			return nil, fmt.Errorf("expected tx ID to be 32 bytes but is %d", len(txIDBytes))
 		}
