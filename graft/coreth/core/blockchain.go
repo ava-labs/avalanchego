@@ -354,36 +354,28 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		}
 	}
 
-	// Wait until we're done repairing canonical chain indexes.
-	bc.indexLock.Add(1)
-	bc.wg.Add(1)
-	go func() {
-		bc.indexLock.Wait()
-		log.Debug("indexing unlocked")
-
-		// Load any existing snapshot, regenerating it if loading failed
-		if bc.cacheConfig.SnapshotLimit > 0 {
-			bc.snaps = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, bc.CurrentBlock().Root(), !bc.cacheConfig.SnapshotWait)
+	// Load any existing snapshot, regenerating it if loading failed
+	if bc.cacheConfig.SnapshotLimit > 0 {
+		bc.snaps = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, bc.CurrentBlock().Root(), !bc.cacheConfig.SnapshotWait)
+	}
+	// Take ownership of this particular state
+	if txLookupLimit != nil {
+		bc.txLookupLimit = *txLookupLimit
+		go bc.maintainTxIndex(txIndexBlock)
+	}
+	// If periodic cache journal is required, spin it up.
+	if bc.cacheConfig.TrieCleanRejournal > 0 {
+		if bc.cacheConfig.TrieCleanRejournal < time.Minute {
+			log.Warn("Sanitizing invalid trie cache journal time", "provided", bc.cacheConfig.TrieCleanRejournal, "updated", time.Minute)
+			bc.cacheConfig.TrieCleanRejournal = time.Minute
 		}
-		// Take ownership of this particular state
-		// go bc.update()
-		if txLookupLimit != nil {
-			bc.txLookupLimit = *txLookupLimit
-			go bc.maintainTxIndex(txIndexBlock)
-		}
-		// If periodic cache journal is required, spin it up.
-		if bc.cacheConfig.TrieCleanRejournal > 0 {
-			if bc.cacheConfig.TrieCleanRejournal < time.Minute {
-				log.Warn("Sanitizing invalid trie cache journal time", "provided", bc.cacheConfig.TrieCleanRejournal, "updated", time.Minute)
-				bc.cacheConfig.TrieCleanRejournal = time.Minute
-			}
-			triedb := bc.stateCache.TrieDB()
-			go func() {
-				defer bc.wg.Done()
-				triedb.SaveCachePeriodically(bc.cacheConfig.TrieCleanJournal, bc.cacheConfig.TrieCleanRejournal, bc.quit)
-			}()
-		}
-	}()
+		triedb := bc.stateCache.TrieDB()
+		bc.wg.Add(1)
+		go func() {
+			defer bc.wg.Done()
+			triedb.SaveCachePeriodically(bc.cacheConfig.TrieCleanJournal, bc.cacheConfig.TrieCleanRejournal, bc.quit)
+		}()
+	}
 
 	return bc, nil
 }
@@ -2814,8 +2806,4 @@ func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscript
 // block processing has started while false means it has stopped.
 func (bc *BlockChain) SubscribeBlockProcessingEvent(ch chan<- bool) event.Subscription {
 	return bc.scope.Track(bc.blockProcFeed.Subscribe(ch))
-}
-
-func (bc *BlockChain) UnlockIndexing() {
-	bc.indexLock.Done()
 }
