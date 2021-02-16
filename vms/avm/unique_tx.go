@@ -158,6 +158,10 @@ func (tx *UniqueTx) Accept() error {
 	tx.vm.ctx.Log.Verbo("Accepted Tx: %s", txID)
 
 	tx.vm.pubsub.Publish("accepted", txID)
+	err = tx.vm.indexer.markAccepted(txID)
+	if err != nil {
+		return fmt.Errorf("couldn't mark %s as accepted in indexer: %w", txID, err)
+	}
 	tx.vm.walletService.decided(txID)
 
 	tx.deps = nil // Needed to prevent a memory leak
