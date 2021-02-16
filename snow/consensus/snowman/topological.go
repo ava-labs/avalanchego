@@ -35,6 +35,9 @@ type Topological struct {
 	// head is the last accepted block
 	head ids.ID
 
+	// height is the height of the last accepted block
+	height uint64
+
 	// blocks stores the last accepted block and all the pending blocks
 	blocks map[ids.ID]*snowmanBlock // blockID -> snowmanBlock
 
@@ -60,7 +63,7 @@ type votes struct {
 }
 
 // Initialize implements the Snowman interface
-func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters, rootID ids.ID) error {
+func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters, rootID ids.ID, rootHeight uint64) error {
 	ts.ctx = ctx
 	ts.params = params
 
@@ -69,6 +72,7 @@ func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters,
 	}
 
 	ts.head = rootID
+	ts.height = rootHeight
 	ts.blocks = map[ids.ID]*snowmanBlock{
 		rootID: {sm: ts},
 	}
@@ -81,6 +85,9 @@ func (ts *Topological) Parameters() snowball.Parameters { return ts.params }
 
 // NumProcessing implements the Snowman interface
 func (ts *Topological) NumProcessing() int { return len(ts.blocks) - 1 }
+
+// Height implements the Snowman interface
+func (ts *Topological) Height() uint64 { return ts.height }
 
 // Add implements the Snowman interface
 func (ts *Topological) Add(blk Block) error {
@@ -441,6 +448,7 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 
 	// Because this is the newest accepted block, this is the new head.
 	ts.head = pref
+	ts.height = child.Height()
 
 	// Because ts.blocks contains the last accepted block, we don't delete the
 	// block from the blocks map here.

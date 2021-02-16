@@ -13,13 +13,21 @@ import (
 // process a series of dependent operations.
 type Consensus interface {
 	// Takes in the context, snowball parameters, and the last accepted block.
-	Initialize(*snow.Context, snowball.Parameters, ids.ID) error
+	Initialize(
+		ctx *snow.Context,
+		params snowball.Parameters,
+		lastAcceptedID ids.ID,
+		lastAcceptedHeight uint64,
+	) error
 
 	// Returns the parameters that describe this snowman instance
 	Parameters() snowball.Parameters
 
 	// Returns the number of blocks processing
 	NumProcessing() int
+
+	// Returns the number of blocks accepted
+	Height() uint64
 
 	// Adds a new decision. Assumes the dependency has already been added.
 	// Returns if a critical error has occurred.

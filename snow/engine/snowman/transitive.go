@@ -86,17 +86,18 @@ func (t *Transitive) Initialize(config Config) error {
 // When bootstrapping is finished, this will be called.
 // This initializes the consensus engine with the last accepted block.
 func (t *Transitive) finishBootstrapping() error {
-	// initialize consensus to the last accepted blockID
 	lastAcceptedID := t.VM.LastAccepted()
-	if err := t.Consensus.Initialize(t.Ctx, t.Params, lastAcceptedID); err != nil {
-		return err
-	}
-
 	lastAccepted, err := t.VM.GetBlock(lastAcceptedID)
 	if err != nil {
 		t.Ctx.Log.Error("failed to get last accepted block due to: %s", err)
 		return err
 	}
+
+	// initialize consensus to the last accepted blockID
+	if err := t.Consensus.Initialize(t.Ctx, t.Params, lastAcceptedID, lastAccepted.Height()); err != nil {
+		return err
+	}
+
 	// to maintain the invariant that oracle blocks are issued in the correct
 	// preferences, we need to handle the case that we are bootstrapping into an oracle block
 	switch blk := lastAccepted.(type) {
@@ -460,7 +461,7 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 	// issue [blk] and its ancestors to consensus.
 	// If the block has been issued, we don't need to issue it.
 	// If the block is queued to be issued, we don't need to issue it.
-	for !t.Consensus.Issued(blk) && !t.pending.Contains(blkID) {
+	for !t.Consensus.Issued(blk) && !t.pending.Contains(blkID) && blk.Height() > t.Consensus.Height() {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
@@ -478,7 +479,7 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 	// Remove any outstanding requests for this block
 	t.blkReqs.RemoveAny(blkID)
 
-	issued := t.Consensus.Issued(blk)
+	issued := t.Consensus.Issued(blk) || blk.Height() <= t.Consensus.Height()
 	if issued {
 		// A dependency should never be waiting on an issued block. However, if
 		// the block was marked as rejected by the VM, the dependencies may
