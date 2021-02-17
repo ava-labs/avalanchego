@@ -178,7 +178,7 @@ func (tm *AdaptiveTimeoutManager) Remove(id ids.ID) {
 }
 
 // Assumes [tm.lock] is held
-func (tm *AdaptiveTimeoutManager) remove(id ids.ID, currentTime time.Time) {
+func (tm *AdaptiveTimeoutManager) remove(id ids.ID, now time.Time) {
 	timeout, exists := tm.timeoutMap[id]
 	if !exists {
 		return
@@ -186,25 +186,14 @@ func (tm *AdaptiveTimeoutManager) remove(id ids.ID, currentTime time.Time) {
 
 	// Observe the response time to update average network response time
 	timeoutRegisteredAt := timeout.deadline.Add(-1 * timeout.duration)
-	responseTime := float64(currentTime.Sub(timeoutRegisteredAt))
-	tm.averager.Observe(responseTime, currentTime)
-	avgLatency := tm.averager.Read()
-	tm.currentTimeout = time.Duration(tm.timeoutCoefficient * avgLatency)
-	if tm.currentTimeout > tm.maximumTimeout {
-		tm.currentTimeout = tm.maximumTimeout
-	} else if tm.currentTimeout < tm.minimumTimeout {
-		tm.currentTimeout = tm.minimumTimeout
-	}
+	latency := now.Sub(timeoutRegisteredAt)
+	tm.observeLatencyAndUpdateTimeout(latency, now)
 
 	// Remove the timeout from the map
 	delete(tm.timeoutMap, id)
 
 	// Remove the timeout from the queue
 	heap.Remove(&tm.timeoutQueue, timeout.index)
-
-	// Update the metrics
-	tm.networkTimeoutMetric.Set(float64(tm.currentTimeout))
-	tm.avgLatency.Set(avgLatency)
 }
 
 // Timeout registers a timeout
@@ -231,6 +220,31 @@ func (tm *AdaptiveTimeoutManager) timeout() {
 		tm.lock.Lock()
 	}
 	tm.setNextTimeoutTime()
+}
+
+// ObserveLatency allows the caller to manually register a response latency.
+// We use this to pretend that it a query to a benched validator
+// timed out when actually, we never even sent them a request.
+func (tm *AdaptiveTimeoutManager) ObserveLatency(latency time.Duration) {
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
+	tm.observeLatencyAndUpdateTimeout(latency, tm.clock.Time())
+}
+
+// Add a latency observation to the averager and update the timeout
+// Assumes [tm.lock] is held
+func (tm *AdaptiveTimeoutManager) observeLatencyAndUpdateTimeout(latency time.Duration, now time.Time) {
+	tm.averager.Observe(float64(latency), now)
+	avgLatency := tm.averager.Read()
+	tm.currentTimeout = time.Duration(tm.timeoutCoefficient * avgLatency)
+	if tm.currentTimeout > tm.maximumTimeout {
+		tm.currentTimeout = tm.maximumTimeout
+	} else if tm.currentTimeout < tm.minimumTimeout {
+		tm.currentTimeout = tm.minimumTimeout
+	}
+	// Update the metrics
+	tm.networkTimeoutMetric.Set(float64(tm.currentTimeout))
+	tm.avgLatency.Set(avgLatency)
 }
 
 // Returns the handler function associated with the next timeout.

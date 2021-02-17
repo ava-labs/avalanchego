@@ -113,6 +113,14 @@ func (m *Manager) RegisterResponse(validatorID ids.ShortID, chainID ids.ID, requ
 	m.tm.Remove(createRequestID(validatorID, chainID, requestID))
 }
 
+// RegisterRequestToBenchedValidator registers that we would have sent
+// a query to a validator but they are benched so we didn't. For the sake
+// of calculating the average latency and network timeout, we act as
+// though we sent the validator a request and it timed out.
+func (m *Manager) RegisterRequestToBenchedValidator() {
+	m.tm.ObserveLatency(m.TimeoutDuration())
+}
+
 func createRequestID(validatorID ids.ShortID, chainID ids.ID, requestID uint32) ids.ID {
 	p := wrappers.Packer{Bytes: make([]byte, wrappers.IntLen)}
 	p.PackInt(requestID)

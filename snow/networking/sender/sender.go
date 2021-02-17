@@ -34,7 +34,6 @@ func (s *Sender) Context() *snow.Context { return s.ctx }
 
 // GetAcceptedFrontier ...
 func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32) {
-
 	// A GetAcceptedFrontier to myself will always fail.
 	if validatorIDs.Contains(s.ctx.NodeID) {
 		validatorIDs.Remove(s.ctx.NodeID)
@@ -46,6 +45,7 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 	for validatorID := range validatorIDs {
 		if s.timeouts.IsBenched(validatorID, s.ctx.ChainID) {
 			validatorIDs.Remove(validatorID)
+			s.timeouts.RegisterRequestToBenchedValidator()
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
 			go s.router.GetAcceptedFrontierFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
 		}
@@ -94,6 +94,7 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 	for validatorID := range validatorIDs {
 		if s.timeouts.IsBenched(validatorID, s.ctx.ChainID) {
 			validatorIDs.Remove(validatorID)
+			s.timeouts.RegisterRequestToBenchedValidator()
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
 			go s.router.GetAcceptedFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
 		}
@@ -222,6 +223,7 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 	for validatorID := range validatorIDs {
 		if s.timeouts.IsBenched(validatorID, s.ctx.ChainID) {
 			validatorIDs.Remove(validatorID)
+			s.timeouts.RegisterRequestToBenchedValidator()
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
 			go s.router.QueryFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
 		}
@@ -272,6 +274,7 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 	for validatorID := range validatorIDs {
 		if s.timeouts.IsBenched(validatorID, s.ctx.ChainID) {
 			validatorIDs.Remove(validatorID)
+			s.timeouts.RegisterRequestToBenchedValidator()
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
 			go s.router.QueryFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
 		}
