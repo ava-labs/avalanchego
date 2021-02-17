@@ -179,10 +179,10 @@ func avalancheFlagSet() *flag.FlagSet {
 
 	// Network Timeouts:
 	fs.Duration(networkInitialTimeoutKey, 5*time.Second, "Initial timeout value of the adaptive timeout manager.")
-	fs.Duration(networkMinimumTimeoutKey, 500*time.Millisecond, "Minimum timeout value of the adaptive timeout manager.")
+	fs.Duration(networkMinimumTimeoutKey, 2*time.Second, "Minimum timeout value of the adaptive timeout manager.")
 	fs.Duration(networkMaximumTimeoutKey, 10*time.Second, "Maximum timeout value of the adaptive timeout manager.")
 	fs.Duration(networkTimeoutHalflifeKey, 5*time.Minute, "Halflife of average network response time. Higher value --> network timeout is less volatile. Can't be 0.")
-	fs.Float64(networkTimeoutCoefficientKey, 1.25, "Multiplied by average network response time to get the network timeout. Must be >= 1.")
+	fs.Float64(networkTimeoutCoefficientKey, 2, "Multiplied by average network response time to get the network timeout. Must be >= 1.")
 	fs.Uint(sendQueueSizeKey, 4096, "Max number of messages waiting to be sent to peers.")
 
 	// Benchlist Parameters:
