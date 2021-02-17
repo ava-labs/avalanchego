@@ -22,20 +22,20 @@ type ExternalSenderTest struct {
 	CantPullQuery, CantPushQuery, CantChits,
 	CantGossip bool
 
-	GetAcceptedFrontierF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time) []ids.ShortID
+	GetAcceptedFrontierF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) []ids.ShortID
 	AcceptedFrontierF    func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
 
-	GetAcceptedF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs []ids.ID) []ids.ShortID
+	GetAcceptedF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID
 	AcceptedF    func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
 
-	GetAncestorsF func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) bool
+	GetAncestorsF func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool
 	MultiPutF     func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte)
 
-	GetF func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) bool
+	GetF func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool
 	PutF func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
 
-	PushQueryF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID, container []byte) []ids.ShortID
-	PullQueryF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) []ids.ShortID
+	PushQueryF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, container []byte) []ids.ShortID
+	PullQueryF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID
 	ChitsF     func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID)
 
 	GossipF func(chainID ids.ID, containerID ids.ID, container []byte)
@@ -65,7 +65,7 @@ func (s *ExternalSenderTest) Default(cant bool) {
 // GetAcceptedFrontier calls GetAcceptedFrontierF if it was initialized. If it
 // wasn't initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *ExternalSenderTest) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time) []ids.ShortID {
+func (s *ExternalSenderTest) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) []ids.ShortID {
 	switch {
 	case s.GetAcceptedFrontierF != nil:
 		return s.GetAcceptedFrontierF(validatorIDs, chainID, requestID, deadline)
@@ -94,7 +94,7 @@ func (s *ExternalSenderTest) AcceptedFrontier(validatorID ids.ShortID, chainID i
 // GetAccepted calls GetAcceptedF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *ExternalSenderTest) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs []ids.ID) []ids.ShortID {
+func (s *ExternalSenderTest) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID {
 	switch {
 	case s.GetAcceptedF != nil:
 		return s.GetAcceptedF(validatorIDs, chainID, requestID, deadline, containerIDs)
@@ -123,7 +123,7 @@ func (s *ExternalSenderTest) Accepted(validatorID ids.ShortID, chainID ids.ID, r
 // GetAncestors calls GetAncestorsF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *ExternalSenderTest) GetAncestors(vdr ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, vtxID ids.ID) bool {
+func (s *ExternalSenderTest) GetAncestors(vdr ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, vtxID ids.ID) bool {
 	switch {
 	case s.GetAncestorsF != nil:
 		return s.GetAncestorsF(vdr, chainID, requestID, deadline, vtxID)
@@ -152,7 +152,7 @@ func (s *ExternalSenderTest) MultiPut(vdr ids.ShortID, chainID ids.ID, requestID
 // Get calls GetF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *ExternalSenderTest) Get(vdr ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, vtxID ids.ID) bool {
+func (s *ExternalSenderTest) Get(vdr ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, vtxID ids.ID) bool {
 	switch {
 	case s.GetF != nil:
 		return s.GetF(vdr, chainID, requestID, deadline, vtxID)
@@ -181,7 +181,7 @@ func (s *ExternalSenderTest) Put(vdr ids.ShortID, chainID ids.ID, requestID uint
 // PushQuery calls PushQueryF if it was initialized. If it wasn't initialized
 // and this function shouldn't be called and testing was initialized, then
 // testing will fail.
-func (s *ExternalSenderTest) PushQuery(vdrs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, vtxID ids.ID, vtx []byte) []ids.ShortID {
+func (s *ExternalSenderTest) PushQuery(vdrs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, vtxID ids.ID, vtx []byte) []ids.ShortID {
 	switch {
 	case s.PushQueryF != nil:
 		return s.PushQueryF(vdrs, chainID, requestID, deadline, vtxID, vtx)
@@ -196,7 +196,7 @@ func (s *ExternalSenderTest) PushQuery(vdrs ids.ShortSet, chainID ids.ID, reques
 // PullQuery calls PullQueryF if it was initialized. If it wasn't initialized
 // and this function shouldn't be called and testing was initialized, then
 // testing will fail.
-func (s *ExternalSenderTest) PullQuery(vdrs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, vtxID ids.ID) []ids.ShortID {
+func (s *ExternalSenderTest) PullQuery(vdrs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, vtxID ids.ID) []ids.ShortID {
 	switch {
 	case s.PullQueryF != nil:
 		return s.PullQueryF(vdrs, chainID, requestID, deadline, vtxID)

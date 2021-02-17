@@ -34,9 +34,6 @@ func (s *Sender) Context() *snow.Context { return s.ctx }
 
 // GetAcceptedFrontier ...
 func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32) {
-	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
-	timeoutDuration := s.timeouts.TimeoutDuration()
-	deadline := time.Now().Add(timeoutDuration)
 
 	// A GetAcceptedFrontier to myself will always fail.
 	if validatorIDs.Contains(s.ctx.NodeID) {
@@ -56,7 +53,9 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 
 	// Try to send the messages over the network.
 	// [sentTo] are the IDs of validators who may receive the message.
-	sentTo := s.sender.GetAcceptedFrontier(validatorIDs, s.ctx.ChainID, requestID, deadline)
+	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
+	timeoutDuration := s.timeouts.TimeoutDuration()
+	sentTo := s.sender.GetAcceptedFrontier(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration)
 
 	// Set timeouts so that if we don't hear back from these validators, we register a failure.
 	for _, validatorID := range sentTo {
@@ -84,10 +83,6 @@ func (s *Sender) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, con
 
 // GetAccepted ...
 func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, containerIDs []ids.ID) {
-	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
-	timeoutDuration := s.timeouts.TimeoutDuration()
-	deadline := time.Now().Add(timeoutDuration)
-
 	// A GetAccepted to myself will always fail.
 	if validatorIDs.Contains(s.ctx.NodeID) {
 		validatorIDs.Remove(s.ctx.NodeID)
@@ -106,7 +101,9 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 
 	// Try to send the messages over the network.
 	// [sentTo] are the IDs of validators who may receive the message.
-	sentTo := s.sender.GetAccepted(validatorIDs, s.ctx.ChainID, requestID, deadline, containerIDs)
+	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
+	timeoutDuration := s.timeouts.TimeoutDuration()
+	sentTo := s.sender.GetAccepted(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration, containerIDs)
 
 	// Set timeouts so that if we don't hear back from these validators, we register a failure.
 	for _, validatorID := range sentTo {
@@ -141,9 +138,9 @@ func (s *Sender) GetAncestors(validatorID ids.ShortID, requestID uint32, contain
 		return
 	}
 
+	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
 	timeoutDuration := s.timeouts.TimeoutDuration()
-	deadline := time.Now().Add(timeoutDuration)
-	sent := s.sender.GetAncestors(validatorID, s.ctx.ChainID, requestID, deadline, containerID)
+	sent := s.sender.GetAncestors(validatorID, s.ctx.ChainID, requestID, timeoutDuration, containerID)
 
 	if sent {
 		s.timeouts.RegisterRequest(validatorID, s.ctx.ChainID, requestID, false, constants.GetAncestorsMsg, func() {
@@ -175,9 +172,9 @@ func (s *Sender) Get(validatorID ids.ShortID, requestID uint32, containerID ids.
 		return
 	}
 
+	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
 	timeoutDuration := s.timeouts.TimeoutDuration()
-	deadline := time.Now().Add(timeoutDuration)
-	sent := s.sender.Get(validatorID, s.ctx.ChainID, requestID, deadline, containerID)
+	sent := s.sender.Get(validatorID, s.ctx.ChainID, requestID, timeoutDuration, containerID)
 
 	if sent {
 		// Add a timeout -- if we don't get a response before the timeout expires,
@@ -208,7 +205,6 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 
 	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
 	timeoutDuration := s.timeouts.TimeoutDuration()
-	deadline := time.Now().Add(timeoutDuration)
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Do so asynchronously to avoid deadlock.
@@ -218,7 +214,7 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 		s.timeouts.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, true, constants.PushQueryMsg, func() {
 			s.router.QueryFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
 		})
-		go s.router.PushQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, deadline, containerID, container)
+		go s.router.PushQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), containerID, container)
 	}
 
 	// Some of the validators in [validatorIDs] may be benched. That is, they've been unresponsive
@@ -233,7 +229,7 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 
 	// Try to send the messages over the network.
 	// [sentTo] are the IDs of validators who may receive the message.
-	sentTo := s.sender.PushQuery(validatorIDs, s.ctx.ChainID, requestID, deadline, containerID, container)
+	sentTo := s.sender.PushQuery(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration, containerID, container)
 
 	// Set timeouts so that if we don't hear back from these validators, we register a failure.
 	for _, validatorID := range sentTo {
@@ -259,7 +255,6 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 
 	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
 	timeoutDuration := s.timeouts.TimeoutDuration()
-	deadline := time.Now().Add(timeoutDuration)
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Do so asynchronously to avoid deadlock.
@@ -269,7 +264,7 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 		s.timeouts.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, true, constants.PullQueryMsg, func() {
 			s.router.QueryFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
 		})
-		go s.router.PullQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, deadline, containerID)
+		go s.router.PullQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), containerID)
 	}
 
 	// Some of the validators in [validatorIDs] may be benched. That is, they've been unresponsive
@@ -284,7 +279,7 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 
 	// Try to send the messages over the network.
 	// [sentTo] are the IDs of validators who may receive the message.
-	sentTo := s.sender.PullQuery(validatorIDs, s.ctx.ChainID, requestID, deadline, containerID)
+	sentTo := s.sender.PullQuery(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration, containerID)
 
 	// Set timeouts so that if we don't hear back from these validators, we register a failure.
 	for _, validatorID := range sentTo {

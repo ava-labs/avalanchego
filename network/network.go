@@ -355,8 +355,8 @@ func NewNetwork(
 
 // GetAcceptedFrontier implements the Sender interface.
 // assumes the stateLock is not held.
-func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time) []ids.ShortID {
-	msg, err := n.b.GetAcceptedFrontier(chainID, requestID, uint64(deadline.Sub(n.clock.Time())))
+func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) []ids.ShortID {
+	msg, err := n.b.GetAcceptedFrontier(chainID, requestID, uint64(deadline))
 	n.log.AssertNoError(err)
 
 	sentTo := make([]ids.ShortID, 0, validatorIDs.Len())
@@ -405,8 +405,8 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 
 // GetAccepted implements the Sender interface.
 // assumes the stateLock is not held.
-func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs []ids.ID) []ids.ShortID {
-	msg, err := n.b.GetAccepted(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerIDs)
+func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID {
+	msg, err := n.b.GetAccepted(chainID, requestID, uint64(deadline), containerIDs)
 	if err != nil {
 		n.log.Error("failed to build GetAccepted(%s, %d, %s): %s",
 			chainID,
@@ -463,8 +463,8 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 
 // GetAncestors implements the Sender interface.
 // assumes the stateLock is not held.
-func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) bool {
-	msg, err := n.b.GetAncestors(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerID)
+func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
+	msg, err := n.b.GetAncestors(chainID, requestID, uint64(deadline), containerID)
 	if err != nil {
 		n.log.Error("failed to build GetAncestors message: %s", err)
 		return false
@@ -508,8 +508,8 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 
 // Get implements the Sender interface.
 // assumes the stateLock is not held.
-func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) bool {
-	msg, err := n.b.Get(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerID)
+func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
+	msg, err := n.b.Get(chainID, requestID, uint64(deadline), containerID)
 	n.log.AssertNoError(err)
 
 	peer := n.getPeer(validatorID)
@@ -556,8 +556,8 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 
 // PushQuery implements the Sender interface.
 // assumes the stateLock is not held.
-func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID, container []byte) []ids.ShortID {
-	msg, err := n.b.PushQuery(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerID, container)
+func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, container []byte) []ids.ShortID {
+	msg, err := n.b.PushQuery(chainID, requestID, uint64(deadline), containerID, container)
 
 	if err != nil {
 		n.log.Error("failed to build PushQuery(%s, %d, %s): %s. len(container): %d",
@@ -592,8 +592,8 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 
 // PullQuery implements the Sender interface.
 // assumes the stateLock is not held.
-func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) []ids.ShortID {
-	msg, err := n.b.PullQuery(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerID)
+func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID {
+	msg, err := n.b.PullQuery(chainID, requestID, uint64(deadline), containerID)
 	n.log.AssertNoError(err)
 
 	sentTo := make([]ids.ShortID, 0, validatorIDs.Len())
