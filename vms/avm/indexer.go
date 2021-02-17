@@ -18,7 +18,7 @@ import (
 const (
 	// Maximum number of transaction IDs that can be fetched at a time in
 	// GetAcceptedTxIDRange
-	maxFetchedByRange = 4096
+	maxFetchedByRange = 1024
 )
 
 var (
