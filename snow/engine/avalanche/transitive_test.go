@@ -2903,6 +2903,11 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// fail the GetAcceptedFailed
+	if err := te.GetAcceptedFailed(vdr, *requestID); err != nil {
+		t.Fatal(err)
+	}
+
 	sender.GetAcceptedFrontierF = nil
 
 	if !*requested {

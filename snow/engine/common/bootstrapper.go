@@ -58,18 +58,6 @@ type Bootstrapper struct {
 func (b *Bootstrapper) Initialize(config Config) error {
 	b.Config = config
 
-	// TODO: make this configurable ?
-	if b.bootstrapAttempts > 3 {
-		b.Ctx.Log.Fatal("Failed to boostrap the chain after %d attempts - %d failedAcceptedFrontierVdrs ",
-			b.bootstrapAttempts, b.failedAcceptedFrontierVdrs.Len())
-		return fmt.Errorf("failed to boostrap the chain after %d attempts", b.bootstrapAttempts)
-	} else if b.bootstrapAttempts > 0 {
-		b.failedAcceptedFrontierVdrs = ids.ShortSet{}
-
-		// ensure it doesn't repeat non-stop
-		time.Sleep(1 * time.Second)
-	}
-
 	beacons, err := b.Beacons.Sample(config.SampleK)
 	if err != nil {
 		return err
@@ -137,32 +125,40 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 	// Union the reported accepted frontier from [validatorID] with the accepted frontier we got from others
 	b.acceptedFrontier.Add(containerIDs...)
 
+	// still waiting on requests
+	if b.pendingAcceptedFrontier.Len() != 0 {
+		return nil
+	}
+
 	// We've received the accepted frontier from every bootstrap validator
 	// Ask each bootstrap validator to filter the list of containers that we were
 	// told are on the accepted frontier such that the list only contains containers
 	// they think are accepted
-	if b.pendingAcceptedFrontier.Len() == 0 {
+	var err error
+	totalWeight := uint64(0)
 
-		// measure total weight
-		totalWeight := uint64(0)
-		for _, beacon := range b.Beacons.List() {
-			if !b.failedAcceptedFrontierVdrs.Contains(beacon.ID()) {
-				totalWeight += beacon.Weight()
+	// measure total weight
+	for _, beacon := range b.Beacons.List() {
+		if !b.failedAcceptedFrontierVdrs.Contains(beacon.ID()) {
+			totalWeight, err = math.Add64(totalWeight, beacon.Weight())
+			if err != nil {
+				totalWeight = stdmath.MaxUint64
 			}
 		}
-
-		// TODO review this weight
-		// restart the bootstrap
-		if totalWeight < b.Alpha {
-			return b.Initialize(b.Config)
-		}
-
-		vdrs := ids.ShortSet{}
-		vdrs.Union(b.pendingAccepted)
-
-		b.RequestID++
-		b.Sender.GetAccepted(vdrs, b.RequestID, b.acceptedFrontier.List())
 	}
+
+	// restart the bootstrap
+	if totalWeight < b.Alpha {
+		b.Ctx.Log.Info("Didn't receive enough AcceptedFrontier to bootstrap - bootstrap attempt: %d", b.bootstrapAttempts)
+		return b.restartBootstrap()
+	}
+
+	vdrs := ids.ShortSet{}
+	vdrs.Union(b.pendingAccepted)
+
+	b.RequestID++
+	b.Sender.GetAccepted(vdrs, b.RequestID, b.acceptedFrontier.List())
+
 	return nil
 }
 
@@ -217,14 +213,16 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 	}
 
 	// if we don't have enough weight for the bootstrap to be accepted then restart or fail the bootstrap
-	if size := len(accepted); size == 0 && b.Beacons.Len() > 0 {
+	size := len(accepted)
+
+	if size == 0 && b.Beacons.Len() > 0 {
 		b.Ctx.Log.Info("Bootstrapping finished with no accepted frontier. This is likely a result of failing to "+
 			"be able to connect to the specified bootstraps, or no transactions have been issued on this chain yet"+
-			" - Number of beacons: %d", b.Beacons.Len())
-		return b.Initialize(b.Config)
-	} else {
-		b.Ctx.Log.Info("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
+			" - Number of beacons: %d - bootstrap attempt: %d", b.Beacons.Len(), b.bootstrapAttempts)
+		return b.restartBootstrap()
 	}
+
+	b.Ctx.Log.Info("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
 
 	return b.Bootstrapable.ForceAccepted(accepted)
 }
@@ -261,4 +259,34 @@ func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
 		b.weight, _ = math.Sub64(b.weight, weight)
 	}
 	return nil
+}
+
+func (b *Bootstrapper) restartBootstrap() error {
+	if b.bootstrapAttempts > 3 {
+		return fmt.Errorf("failed to boostrap the chain after %d attempts", b.bootstrapAttempts)
+	}
+
+	// reset the failed frontier responses
+	b.failedAcceptedFrontierVdrs = ids.ShortSet{}
+
+	// ensure it doesn't repeat non-stop
+	time.Sleep(1 * time.Second)
+
+	beacons, err := b.Beacons.Sample(b.Config.SampleK)
+	if err != nil {
+		return err
+	}
+
+	for _, vdr := range beacons {
+		vdrID := vdr.ID()
+		b.pendingAcceptedFrontier.Add(vdrID)
+	}
+
+	for _, vdr := range b.Beacons.List() {
+		vdrID := vdr.ID()
+		b.pendingAccepted.Add(vdrID)
+	}
+
+	b.acceptedVotes = make(map[ids.ID]uint64)
+	return b.Startup()
 }
