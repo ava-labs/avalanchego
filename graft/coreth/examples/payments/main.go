@@ -6,6 +6,8 @@ package main
 import (
 	"crypto/rand"
 	"fmt"
+	"math/big"
+
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
@@ -14,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
-	"math/big"
 )
 
 func checkError(err error) {
@@ -70,7 +71,7 @@ func main() {
 	bob, err := coreth.NewKey(rand.Reader)
 	checkError(err)
 
-	chain := coreth.NewETHChain(&config, nil, nil, nil)
+	chain := coreth.NewETHChain(&config, nil, nil, nil, eth.DefaultSettings)
 	showBalance := func() {
 		state, err := chain.CurrentState()
 		checkError(err)

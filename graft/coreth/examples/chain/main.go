@@ -6,6 +6,9 @@ package main
 import (
 	"crypto/rand"
 	"fmt"
+	"math/big"
+	"sync"
+
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
@@ -15,8 +18,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
-	"math/big"
-	"sync"
 )
 
 func checkError(err error) {
@@ -49,7 +50,7 @@ func NewTestChain(name string, config *eth.Config,
 		hasBlock:   make(map[common.Hash]struct{}),
 		blocks:     make([]common.Hash, 0),
 		blkCount:   0,
-		chain:      coreth.NewETHChain(config, nil, nil, nil),
+		chain:      coreth.NewETHChain(config, nil, nil, nil, eth.DefaultSettings),
 		outBlockCh: outBlockCh,
 	}
 	tc.insertBlock(tc.chain.GetGenesisBlock())
