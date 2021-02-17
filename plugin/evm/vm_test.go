@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/api/keystore"
-	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -519,10 +518,6 @@ func TestConflictingImportTxs(t *testing.T) {
 		vm.SetPreference(blk.ID())
 	}
 
-	// Shrink the atomic input cache to ensure that
-	// verification handles cache misses correctly.
-	vm.blockAtomicInputCache = cache.LRU{Size: 1}
-
 	for i, tx := range conflictTxs {
 		if err := vm.issueTx(tx); err != nil {
 			t.Fatal(err)
@@ -806,5 +801,282 @@ func TestSetPreferenceRace(t *testing.T) {
 
 	if err := vm1.chain.ValidateCanonicalChain(); err != nil {
 		t.Fatalf("VM1 failed canonical chain verification due to: %s", err)
+	}
+}
+
+func TestGenesisStatus(t *testing.T) {
+	_, vm, _, _ := GenesisVM(t, true)
+
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	genesisID := vm.LastAccepted()
+	genesis, err := vm.GetBlock(genesisID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	genesisStatus := genesis.Status()
+	if genesisStatus != choices.Accepted {
+		t.Fatalf("expected genesis status to be %s but was %s", choices.Accepted, genesisStatus)
+	}
+}
+
+func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
+	issuer, vm, _, atomicMemory := GenesisVM(t, true)
+
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	key, err := coreth.NewKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	key0 := testKeys[0]
+	addr0 := key0.PublicKey().Address()
+
+	key1 := testKeys[1]
+	addr1 := key1.PublicKey().Address()
+
+	importAmount := uint64(1000000000)
+
+	utxo0ID := avax.UTXOID{}
+	utxo1ID := avax.UTXOID{OutputIndex: 1}
+
+	input0ID := utxo0ID.InputID()
+	input1ID := utxo1ID.InputID()
+
+	utxo0 := &avax.UTXO{
+		UTXOID: utxo0ID,
+		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: importAmount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{addr0},
+			},
+		},
+	}
+	utxo1 := &avax.UTXO{
+		UTXOID: utxo1ID,
+		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: importAmount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{addr1},
+			},
+		},
+	}
+	utxo0Bytes, err := vm.codec.Marshal(codecVersion, utxo0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	utxo1Bytes, err := vm.codec.Marshal(codecVersion, utxo1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	xChainSharedMemory := atomicMemory.NewSharedMemory(vm.ctx.XChainID)
+	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{
+		{
+			Key:   input0ID[:],
+			Value: utxo0Bytes,
+			Traits: [][]byte{
+				addr0.Bytes(),
+			},
+		},
+		{
+			Key:   input1ID[:],
+			Value: utxo1Bytes,
+			Traits: [][]byte{
+				addr1.Bytes(),
+			},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	importTx0, err := vm.newImportTx(vm.ctx.XChainID, key.Address, []*crypto.PrivateKeySECP256K1R{key0})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.issueTx(importTx0); err != nil {
+		t.Fatal(err)
+	}
+
+	<-issuer
+
+	blk0, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatalf("Failed to build block with import transaction: %s", err)
+	}
+
+	if err := blk0.Verify(); err != nil {
+		t.Fatalf("Block failed verification: %s", err)
+	}
+
+	vm.SetPreference(blk0.ID())
+
+	tx := types.NewTransaction(0, key.Address, big.NewInt(10), 21000, params.MinGasPrice, nil)
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainID), key.PrivateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add the remote transactions, build the block, and set VM1's preference for block A
+	errs := vm.chain.AddRemoteTxs([]*types.Transaction{signedTx})
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
+		}
+	}
+
+	<-issuer
+
+	blk1, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk1.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	vm.SetPreference(blk1.ID())
+
+	importTx1, err := vm.newImportTx(vm.ctx.XChainID, key.Address, []*crypto.PrivateKeySECP256K1R{key1})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.issueTx(importTx1); err != nil {
+		t.Fatal(err)
+	}
+
+	<-issuer
+
+	blk2, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatalf("Failed to build block with import transaction: %s", err)
+	}
+
+	if err := blk2.Verify(); err != nil {
+		t.Fatalf("Block failed verification: %s", err)
+	}
+
+	vm.SetPreference(blk2.ID())
+
+	if err := vm.issueTx(importTx0); err != nil {
+		t.Fatal(err)
+	}
+
+	<-issuer
+
+	_, err = vm.BuildBlock()
+	if err == nil {
+		t.Fatal("Shouldn't have been able to build an invalid block")
+	}
+}
+
+func TestBonusBlocksTxs(t *testing.T) {
+	issuer, vm, _, sharedMemory := GenesisVM(t, true)
+
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	importAmount := uint64(10000000)
+	utxoID := avax.UTXOID{
+		TxID: ids.ID{
+			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+			0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+			0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+		},
+	}
+
+	utxo := &avax.UTXO{
+		UTXOID: utxoID,
+		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: importAmount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{testKeys[0].PublicKey().Address()},
+			},
+		},
+	}
+	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
+	inputID := utxo.InputID()
+	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+		Key:   inputID[:],
+		Value: utxoBytes,
+		Traits: [][]byte{
+			testKeys[0].PublicKey().Address().Bytes(),
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.issueTx(importTx); err != nil {
+		t.Fatal(err)
+	}
+
+	<-issuer
+
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	evmBlock := blk.(*Block)
+	evmBlock.id = bonusBlocks.CappedList(1)[0]
+	vm.blockCache.Put(evmBlock.id, evmBlock)
+
+	if err := vm.ctx.SharedMemory.Remove(vm.ctx.XChainID, [][]byte{inputID[:]}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if status := blk.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
+	}
+
+	vm.SetPreference(evmBlock.id)
+
+	if err := blk.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
+	if status := blk.Status(); status != choices.Accepted {
+		t.Fatalf("Expected status of accepted block to be %s, but found %s", choices.Accepted, status)
+	}
+
+	lastAcceptedID := vm.LastAccepted()
+	if lastAcceptedID != evmBlock.id {
+		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk.ID(), lastAcceptedID)
 	}
 }

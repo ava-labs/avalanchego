@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"io"
 	"os"
+	"time"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
@@ -44,7 +45,7 @@ type ETHChain struct {
 }
 
 // NewETHChain creates an Ethereum blockchain with the given configs.
-func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Address, chainDB ethdb.Database) *ETHChain {
+func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Address, chainDB ethdb.Database, settings eth.Settings) *ETHChain {
 	if config == nil {
 		config = &eth.DefaultConfig
 	}
@@ -62,7 +63,7 @@ func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Add
 	cb := new(dummy.ConsensusCallbacks)
 	mcb := new(miner.MinerCallbacks)
 	bcb := new(eth.BackendCallbacks)
-	backend, _ := eth.New(node, config, cb, mcb, bcb, chainDB)
+	backend, _ := eth.New(node, config, cb, mcb, bcb, chainDB, settings)
 	chain := &ETHChain{backend: backend, cb: cb, mcb: mcb, bcb: bcb}
 	if etherBase == nil {
 		etherBase = &BlackholeAddr
@@ -90,6 +91,10 @@ func (self *ETHChain) SubscribeNewMinedBlockEvent() *event.TypeMuxSubscription {
 
 func (self *ETHChain) BlockChain() *core.BlockChain {
 	return self.backend.BlockChain()
+}
+
+func (self *ETHChain) UnlockIndexing() {
+	self.backend.BlockChain().UnlockIndexing()
 }
 
 func (self *ETHChain) VerifyBlock(block *types.Block) bool {
@@ -217,8 +222,8 @@ func (self *ETHChain) InsertChain(chain []*types.Block) (int, error) {
 	return self.backend.BlockChain().InsertChain(chain)
 }
 
-func (self *ETHChain) NewRPCHandler() *rpc.Server {
-	return rpc.NewServer()
+func (self *ETHChain) NewRPCHandler(maximumDuration time.Duration) *rpc.Server {
+	return rpc.NewServer(maximumDuration)
 }
 
 func (self *ETHChain) AttachEthService(handler *rpc.Server, namespaces []string) {
