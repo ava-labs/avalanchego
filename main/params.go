@@ -218,6 +218,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(metricsAPIEnabledKey, true, "If true, this node exposes the Metrics API")
 	fs.Bool(healthAPIEnabledKey, true, "If true, this node exposes the Health API")
 	fs.Bool(ipcAPIEnabledKey, false, "If true, IPCs can be opened")
+	fs.Bool(indexEnabledKey, false, "If true, this node indexes accepted X-Chain transactions and exposes them on the Indexer API")
 
 	// Throughput Server
 	fs.Uint(xputServerPortKey, 9652, "Port of the deprecated throughput test server")
@@ -541,6 +542,7 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.MetricsAPIEnabled = v.GetBool(metricsAPIEnabledKey)
 	Config.HealthAPIEnabled = v.GetBool(healthAPIEnabledKey)
 	Config.IPCAPIEnabled = v.GetBool(ipcAPIEnabledKey)
+	Config.IndexAPIEnabled = v.GetBool(indexEnabledKey)
 
 	// Throughput:
 	Config.ThroughputServerEnabled = v.GetBool(xputServerEnabledKey)

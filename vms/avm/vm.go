@@ -82,6 +82,8 @@ type VM struct {
 
 	pubsub *cjson.PubSubServer
 
+	// If true, index all accepted transactions
+	indexEnabled bool
 	// Indexed accepted transactions by the order in which they were accepted
 	// [indexer].markAccepted should be called immediately before [vm.db] is committed
 	// in UniqueTx's Accept() method
@@ -301,18 +303,24 @@ func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 	// name this service "wallet"
 	vm.ctx.Log.AssertNoError(walletServer.RegisterService(&vm.walletService, "wallet"))
 
+	services := map[string]*common.HTTPHandler{
+		"":        {Handler: rpcServer},
+		"/wallet": {Handler: walletServer},
+		"/pubsub": {LockOptions: common.NoLock, Handler: vm.pubsub},
+	}
+
+	if !vm.indexEnabled {
+		return services
+	}
+
 	indexerServer := rpc.NewServer()
 	indexerServer.RegisterCodec(codec, "application/json")
 	indexerServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	// name this service "indexer"
 	vm.ctx.Log.AssertNoError(indexerServer.RegisterService(&IndexerService{indexer: vm.indexer}, "indexer"))
+	services["/indexer"] = &common.HTTPHandler{Handler: indexerServer}
 
-	return map[string]*common.HTTPHandler{
-		"":         {Handler: rpcServer},
-		"/wallet":  {Handler: walletServer},
-		"/pubsub":  {LockOptions: common.NoLock, Handler: vm.pubsub},
-		"/indexer": {Handler: indexerServer},
-	}
+	return services
 }
 
 // CreateStaticHandlers implements the avalanche.DAGVM interface

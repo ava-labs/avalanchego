@@ -145,9 +145,11 @@ func (tx *UniqueTx) Accept() error {
 
 	txID := tx.ID()
 
-	err := tx.vm.indexer.markAccepted(txID)
-	if err != nil {
-		return fmt.Errorf("couldn't mark %s as accepted in indexer: %w", txID, err)
+	if tx.vm.indexEnabled {
+		err := tx.vm.indexer.markAccepted(txID)
+		if err != nil {
+			return fmt.Errorf("couldn't mark %s as accepted in indexer: %w", txID, err)
+		}
 	}
 
 	commitBatch, err := tx.vm.db.CommitBatch()

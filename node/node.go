@@ -597,8 +597,9 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			ApricotPhase0Time:  n.Config.ApricotPhase0Time,
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
-			CreationFee: n.Config.CreationTxFee,
-			Fee:         n.Config.TxFee,
+			IndexEnabled: n.Config.IndexAPIEnabled,
+			CreationFee:  n.Config.CreationTxFee,
+			Fee:          n.Config.TxFee,
 		}),
 		n.vmManager.RegisterVMFactory(evm.ID, &rpcchainvm.Factory{
 			Path:   filepath.Join(n.Config.PluginDir, "evm"),
