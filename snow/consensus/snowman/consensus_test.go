@@ -17,8 +17,9 @@ import (
 )
 
 var (
-	GenesisID = ids.Empty.Prefix(0)
-	Genesis   = &TestBlock{TestDecidable: choices.TestDecidable{
+	GenesisID     = ids.Empty.Prefix(0)
+	GenesisHeight = uint64(0)
+	Genesis       = &TestBlock{TestDecidable: choices.TestDecidable{
 		IDV:     GenesisID,
 		StatusV: choices.Accepted,
 	}}
@@ -74,7 +75,7 @@ func InitializeTest(t *testing.T, factory Factory) {
 		OptimalProcessing: 1,
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -101,7 +102,7 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 		OptimalProcessing: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -151,7 +152,7 @@ func AddToTailTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 		OptimalProcessing: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -185,7 +186,7 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 		OptimalProcessing: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -235,7 +236,7 @@ func AddToUnknownTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 		OptimalProcessing: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -276,12 +277,12 @@ func IssuedPreviouslyAcceptedTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 		OptimalProcessing: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
-	if !sm.Issued(Genesis) {
-		t.Fatalf("Should have marked an accepted block as having been issued")
+	if !sm.DecidedOrProcessing(Genesis) {
+		t.Fatalf("Should have marked an accepted block as having been decided")
 	}
 }
 
@@ -298,7 +299,7 @@ func IssuedPreviouslyRejectedTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 		OptimalProcessing: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -310,8 +311,8 @@ func IssuedPreviouslyRejectedTest(t *testing.T, factory Factory) {
 		ParentV: Genesis,
 	}
 
-	if !sm.Issued(block) {
-		t.Fatalf("Should have marked a rejected block as having been issued")
+	if !sm.DecidedOrProcessing(block) {
+		t.Fatalf("Should have marked a rejected block as having been decided")
 	}
 }
 
@@ -328,7 +329,7 @@ func IssuedUnissuedTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 		OptimalProcessing: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -338,10 +339,11 @@ func IssuedUnissuedTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis,
+		HeightV: 1,
 	}
 
-	if sm.Issued(block) {
-		t.Fatalf("Shouldn't have marked an unissued block as having been issued")
+	if sm.DecidedOrProcessing(block) {
+		t.Fatalf("Shouldn't have marked an unissued block as being processing")
 	}
 }
 
@@ -358,7 +360,7 @@ func IssuedIssuedTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 		OptimalProcessing: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -372,8 +374,8 @@ func IssuedIssuedTest(t *testing.T, factory Factory) {
 
 	if err := sm.Add(block); err != nil {
 		t.Fatal(err)
-	} else if !sm.Issued(block) {
-		t.Fatalf("Should have marked a pending block as having been issued")
+	} else if !sm.DecidedOrProcessing(block) {
+		t.Fatalf("Should have marked a the block as processing")
 	}
 }
 
@@ -390,7 +392,7 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 		OptimalProcessing: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -440,7 +442,7 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 		OptimalProcessing: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -504,7 +506,7 @@ func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 		OptimalProcessing: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -532,7 +534,7 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 		OptimalProcessing: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -610,7 +612,7 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 		OptimalProcessing: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -723,7 +725,7 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 		OptimalProcessing: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -772,7 +774,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 		OptimalProcessing: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -912,7 +914,7 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 		ConcurrentRepolls: 1,
 		OptimalProcessing: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1004,7 +1006,7 @@ func MetricsProcessingErrorTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID); err == nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err == nil {
 		t.Fatalf("should have errored during initialization due to a duplicate metric")
 	}
 }
@@ -1033,7 +1035,7 @@ func MetricsAcceptedErrorTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID); err == nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err == nil {
 		t.Fatalf("should have errored during initialization due to a duplicate metric")
 	}
 }
@@ -1062,7 +1064,7 @@ func MetricsRejectedErrorTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID); err == nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err == nil {
 		t.Fatalf("should have errored during initialization due to a duplicate metric")
 	}
 }
@@ -1081,7 +1083,7 @@ func ErrorOnInitialRejectionTest(t *testing.T, factory Factory) {
 		OptimalProcessing: 1,
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1118,7 +1120,7 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 		OptimalProcessing: 1,
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1156,7 +1158,7 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 		OptimalProcessing: 1,
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1203,7 +1205,7 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 		OptimalProcessing: 1,
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 

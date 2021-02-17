@@ -74,11 +74,11 @@ func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 			continue
 		}
 
-		for blk.Status().Fetched() && !v.t.Consensus.Issued(blk) {
+		for blk.Status().Fetched() && !v.t.Consensus.DecidedOrProcessing(blk) {
 			blk = blk.Parent()
 		}
 
-		if !blk.Status().Decided() && v.t.Consensus.Issued(blk) {
+		if !blk.Status().Decided() && v.t.Consensus.DecidedOrProcessing(blk) {
 			bubbledVotes.AddCount(blk.ID(), count)
 		}
 	}

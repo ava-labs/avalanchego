@@ -86,17 +86,18 @@ func (t *Transitive) Initialize(config Config) error {
 // When bootstrapping is finished, this will be called.
 // This initializes the consensus engine with the last accepted block.
 func (t *Transitive) finishBootstrapping() error {
-	// initialize consensus to the last accepted blockID
 	lastAcceptedID := t.VM.LastAccepted()
-	if err := t.Consensus.Initialize(t.Ctx, t.Params, lastAcceptedID); err != nil {
-		return err
-	}
-
 	lastAccepted, err := t.VM.GetBlock(lastAcceptedID)
 	if err != nil {
 		t.Ctx.Log.Error("failed to get last accepted block due to: %s", err)
 		return err
 	}
+
+	// initialize consensus to the last accepted blockID
+	if err := t.Consensus.Initialize(t.Ctx, t.Params, lastAcceptedID, lastAccepted.Height()); err != nil {
+		return err
+	}
+
 	// to maintain the invariant that oracle blocks are issued in the correct
 	// preferences, we need to handle the case that we are bootstrapping into an oracle block
 	switch blk := lastAccepted.(type) {
@@ -442,7 +443,7 @@ func (t *Transitive) repoll() {
 
 // issueFromByID attempts to issue the branch ending with a block [blkID] into consensus.
 // If we do not have [blkID], request it.
-// Returns true if the block was issued, now or previously, to consensus.
+// Returns true if the block is processing in consensus or is decided.
 func (t *Transitive) issueFromByID(vdr ids.ShortID, blkID ids.ID) (bool, error) {
 	blk, err := t.VM.GetBlock(blkID)
 	if err != nil {
@@ -453,14 +454,15 @@ func (t *Transitive) issueFromByID(vdr ids.ShortID, blkID ids.ID) (bool, error) 
 }
 
 // issueFrom attempts to issue the branch ending with block [blkID] to consensus.
-// Returns true if the block was issued, now or previously, to consensus.
+// Returns true if the block is processing in consensus or is decided.
 // If a dependency is missing, request it from [vdr].
 func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error) {
 	blkID := blk.ID()
 	// issue [blk] and its ancestors to consensus.
-	// If the block has been issued, we don't need to issue it.
+	// If the block has been decided, we don't need to issue it.
+	// If the block is processing, we don't need to issue it.
 	// If the block is queued to be issued, we don't need to issue it.
-	for !t.Consensus.Issued(blk) && !t.pending.Contains(blkID) {
+	for !t.Consensus.DecidedOrProcessing(blk) && !t.pending.Contains(blkID) {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
@@ -478,11 +480,11 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 	// Remove any outstanding requests for this block
 	t.blkReqs.RemoveAny(blkID)
 
-	issued := t.Consensus.Issued(blk)
+	issued := t.Consensus.DecidedOrProcessing(blk)
 	if issued {
-		// A dependency should never be waiting on an issued block. However, if
-		// the block was marked as rejected by the VM, the dependencies may
-		// still be waiting. Therefore, they should abandoned.
+		// A dependency should never be waiting on a decided or processing
+		// block. However, if the block was marked as rejected by the VM, the
+		// dependencies may still be waiting. Therefore, they should abandoned.
 		t.blocked.Abandon(blkID)
 	}
 
@@ -492,12 +494,12 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 }
 
 // issueWithAncestors attempts to issue the branch ending with [blk] to consensus.
-// Returns true if [blk] was issued, now or previously, to consensus.
+// Returns true if the block is processing in consensus or is decided.
 // If a dependency is missing and the dependency hasn't been requested, the issuance will be abandoned.
 func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 	blkID := blk.ID()
 	// issue [blk] and its ancestors into consensus
-	for blk.Status().Fetched() && !t.Consensus.Issued(blk) && !t.pending.Contains(blkID) {
+	for blk.Status().Fetched() && !t.Consensus.DecidedOrProcessing(blk) && !t.pending.Contains(blkID) {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
@@ -506,7 +508,7 @@ func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 	}
 
 	// The block was issued into consensus. This is the happy path.
-	if t.Consensus.Issued(blk) {
+	if t.Consensus.DecidedOrProcessing(blk) {
 		return true, nil
 	}
 
@@ -539,7 +541,7 @@ func (t *Transitive) issue(blk snowman.Block) error {
 	}
 
 	// block on the parent if needed
-	if parent := blk.Parent(); !t.Consensus.Issued(parent) {
+	if parent := blk.Parent(); !t.Consensus.DecidedOrProcessing(parent) {
 		parentID := parent.ID()
 		t.Ctx.Log.Verbo("block %s waiting for parent %s to be issued", blkID, parentID)
 		i.deps.Add(parentID)
@@ -612,7 +614,7 @@ func (t *Transitive) pushSample(blk snowman.Block) {
 
 // issue [blk] to consensus
 func (t *Transitive) deliver(blk snowman.Block) error {
-	if t.Consensus.Issued(blk) {
+	if t.Consensus.DecidedOrProcessing(blk) {
 		return nil
 	}
 
