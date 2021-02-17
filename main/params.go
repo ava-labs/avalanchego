@@ -587,10 +587,10 @@ func setNodeConfig(v *viper.Viper) error {
 	case Config.NetworkConfig.InitialTimeout < Config.NetworkConfig.MinimumTimeout ||
 		Config.NetworkConfig.InitialTimeout > Config.NetworkConfig.MaximumTimeout:
 		return errors.New("initial timeout should be in the range [minimumTimeout, maximumTimeout]")
-	case Config.NetworkConfig.TimeoutHalflife == 0:
-		return errors.New("network timeout halflife can't be 0")
+	case Config.NetworkConfig.TimeoutHalflife <= 0:
+		return errors.New("network timeout halflife must be positive")
 	case Config.NetworkConfig.TimeoutCoefficient < 1:
-		return errors.New("network timeout coefficient must be > 1")
+		return errors.New("network timeout coefficient must be >= 1")
 	}
 
 	// Restart:

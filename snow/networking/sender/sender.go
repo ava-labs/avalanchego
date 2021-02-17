@@ -34,8 +34,7 @@ func (s *Sender) Context() *snow.Context { return s.ctx }
 
 // GetAcceptedFrontier ...
 func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32) {
-	// TODO this timeout duration won't exactly match the one that gets registered.
-	// I think that's OK, but double check.
+	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
 	timeoutDuration := s.timeouts.TimeoutDuration()
 	deadline := time.Now().Add(timeoutDuration)
 
@@ -70,8 +69,7 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 	}
 
 	for validatorID := range validatorIDs {
-		vID := validatorID // Prevent overwrite in next loop iteration
-		go s.router.GetAcceptedFrontierFailed(vID, s.ctx.ChainID, requestID)
+		go s.router.GetAcceptedFrontierFailed(validatorID, s.ctx.ChainID, requestID)
 	}
 }
 
@@ -86,8 +84,7 @@ func (s *Sender) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, con
 
 // GetAccepted ...
 func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, containerIDs []ids.ID) {
-	// TODO this timeout duration won't exactly match the one that gets registered.
-	// I think that's OK, but double check.
+	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
 	timeoutDuration := s.timeouts.TimeoutDuration()
 	deadline := time.Now().Add(timeoutDuration)
 
@@ -122,8 +119,7 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 	}
 
 	for validatorID := range validatorIDs {
-		vID := validatorID // Prevent overwrite in next loop iteration
-		go s.router.GetAcceptedFailed(vID, s.ctx.ChainID, requestID)
+		go s.router.GetAcceptedFailed(validatorID, s.ctx.ChainID, requestID)
 	}
 }
 
@@ -210,8 +206,7 @@ func (s *Sender) Put(validatorID ids.ShortID, requestID uint32, containerID ids.
 func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo("Sending PushQuery to validators %v. RequestID: %d. ContainerID: %s", validatorIDs, requestID, containerID)
 
-	// TODO this timeout duration won't exactly match the one that gets registered.
-	// I think that's OK, but double check.
+	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
 	timeoutDuration := s.timeouts.TimeoutDuration()
 	deadline := time.Now().Add(timeoutDuration)
 
@@ -251,8 +246,7 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 	}
 
 	for validatorID := range validatorIDs {
-		vID := validatorID // Prevent overwrite in next loop iteration
-		go s.router.QueryFailed(vID, s.ctx.ChainID, requestID)
+		go s.router.QueryFailed(validatorID, s.ctx.ChainID, requestID)
 	}
 }
 
@@ -263,8 +257,7 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containerID ids.ID) {
 	s.ctx.Log.Verbo("Sending PullQuery. RequestID: %d. ContainerID: %s", requestID, containerID)
 
-	// TODO this timeout duration won't exactly match the one that gets registered.
-	// I think that's OK, but double check.
+	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
 	timeoutDuration := s.timeouts.TimeoutDuration()
 	deadline := time.Now().Add(timeoutDuration)
 

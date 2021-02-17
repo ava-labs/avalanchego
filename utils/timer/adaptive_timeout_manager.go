@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	errZeroHalflife = errors.New("timeout halflife must not be 0")
+	errNonPositiveHalflife = errors.New("timeout halflife must be positive")
 )
 
 type adaptiveTimeout struct {
@@ -66,7 +66,7 @@ type AdaptiveTimeoutConfig struct {
 	// [timeoutCoefficient] must be > 1
 	TimeoutCoefficient float64
 	// Larger halflife --> less volatile timeout
-	// [timeoutHalfLife] can't be the empty duration
+	// [timeoutHalfLife] must be positive
 	TimeoutHalflife  time.Duration
 	MetricsNamespace string
 	Registerer       prometheus.Registerer
@@ -111,8 +111,8 @@ func (tm *AdaptiveTimeoutManager) Initialize(config *AdaptiveTimeoutConfig) erro
 		return fmt.Errorf("initial timeout (%s) < minimum timeout (%s)", config.InitialTimeout, config.MinimumTimeout)
 	case config.TimeoutCoefficient < 1:
 		return fmt.Errorf("timeout coefficient must be >= 1 but got %f", config.TimeoutCoefficient)
-	case config.TimeoutHalflife == 0:
-		return errZeroHalflife
+	case config.TimeoutHalflife <= 0:
+		return errNonPositiveHalflife
 	}
 
 	tm.timeoutCoefficient = config.TimeoutCoefficient
@@ -132,9 +132,8 @@ func (tm *AdaptiveTimeoutManager) Initialize(config *AdaptiveTimeoutConfig) erro
 // TimeoutDuration returns the current network timeout duration
 func (tm *AdaptiveTimeoutManager) TimeoutDuration() time.Duration {
 	tm.lock.Lock()
-	duration := tm.currentTimeout
-	tm.lock.Unlock()
-	return duration
+	defer tm.lock.Unlock()
+	return tm.currentTimeout
 }
 
 // Dispatch ...
@@ -148,9 +147,8 @@ func (tm *AdaptiveTimeoutManager) Stop() { tm.timer.Stop() }
 // removed by calling [tm.Remove].
 func (tm *AdaptiveTimeoutManager) Put(id ids.ID, timeoutHandler func()) time.Time {
 	tm.lock.Lock()
-	timeoutTime := tm.put(id, timeoutHandler)
-	tm.lock.Unlock()
-	return timeoutTime
+	defer tm.lock.Unlock()
+	return tm.put(id, timeoutHandler)
 }
 
 // Assumes [tm.lock] is held
@@ -175,9 +173,8 @@ func (tm *AdaptiveTimeoutManager) put(id ids.ID, handler func()) time.Time {
 // Its timeout handler will not be called.
 func (tm *AdaptiveTimeoutManager) Remove(id ids.ID) {
 	tm.lock.Lock()
-	currentTime := tm.clock.Time()
-	tm.remove(id, currentTime)
-	tm.lock.Unlock()
+	defer tm.lock.Unlock()
+	tm.remove(id, tm.clock.Time())
 }
 
 // Assumes [tm.lock] is held
@@ -213,8 +210,8 @@ func (tm *AdaptiveTimeoutManager) remove(id ids.ID, currentTime time.Time) {
 // Timeout registers a timeout
 func (tm *AdaptiveTimeoutManager) Timeout() {
 	tm.lock.Lock()
+	defer tm.lock.Unlock()
 	tm.timeout()
-	tm.lock.Unlock()
 }
 
 // Assumes [tm.lock] is held when called

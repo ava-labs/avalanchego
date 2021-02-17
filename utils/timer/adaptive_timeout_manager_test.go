@@ -72,6 +72,17 @@ func TestAdaptiveTimeoutManagerInit(t *testing.T) {
 				MinimumTimeout:     2 * time.Second,
 				MaximumTimeout:     3 * time.Second,
 				TimeoutCoefficient: 1,
+				TimeoutHalflife:    -1 * time.Second,
+				Registerer:         prometheus.NewRegistry(),
+			},
+			shouldErrWith: "timeout halflife is negative",
+		},
+		{
+			config: AdaptiveTimeoutConfig{
+				InitialTimeout:     2 * time.Second,
+				MinimumTimeout:     2 * time.Second,
+				MaximumTimeout:     3 * time.Second,
+				TimeoutCoefficient: 1,
 				TimeoutHalflife:    5 * time.Minute,
 				Registerer:         prometheus.NewRegistry(),
 			},

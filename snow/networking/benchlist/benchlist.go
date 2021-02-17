@@ -98,6 +98,7 @@ type benchlist struct {
 
 	// IDs of validators that are currently benched
 	benchlistSet ids.ShortSet
+
 	// Min heap containing benched validators and their endtimes
 	// Pop() returns the next validator to leave
 	benchedQueue benchedQueue
@@ -148,6 +149,8 @@ func NewBenchlist(
 // Update removes benched validators whose time on the bench is over
 func (b *benchlist) update() {
 	b.lock.Lock()
+	defer b.lock.Unlock()
+
 	now := b.clock.Time()
 	for {
 		// [next] is nil when no more validators should
@@ -160,7 +163,6 @@ func (b *benchlist) update() {
 	}
 	// Set next time update will be called
 	b.setNextLeaveTime()
-	b.lock.Unlock()
 }
 
 // Remove [validator] from the benchlist
@@ -214,9 +216,8 @@ func (b *benchlist) setNextLeaveTime() {
 // should not be sent over the network and should immediately fail.
 func (b *benchlist) IsBenched(validatorID ids.ShortID) bool {
 	b.lock.RLock()
-	isBenched := b.isBenched(validatorID)
-	b.lock.RUnlock()
-	return isBenched
+	defer b.lock.RUnlock()
+	return b.isBenched(validatorID)
 }
 
 // isBenched checks if [validatorID] is currently benched
@@ -232,36 +233,35 @@ func (b *benchlist) isBenched(validatorID ids.ShortID) bool {
 // RegisterResponse notes that we received a response from validator [validatorID]
 func (b *benchlist) RegisterResponse(validatorID ids.ShortID) {
 	b.lock.Lock()
+	defer b.lock.Unlock()
 	delete(b.failureStreaks, validatorID)
-	b.lock.Unlock()
 }
 
 // RegisterResponse notes that a request to validator [validatorID] timed out
 func (b *benchlist) RegisterFailure(validatorID ids.ShortID) {
 	b.lock.Lock()
+	defer b.lock.Unlock()
 
 	if b.benchlistSet.Contains(validatorID) {
 		// This validator is benched. Ignore failures until they're not.
-		b.lock.Unlock()
 		return
 	}
 
 	failureStreak := b.failureStreaks[validatorID]
 	// Increment consecutive failures
 	failureStreak.consecutive++
+	now := b.clock.Time()
 	// Update first failure time
 	if failureStreak.firstFailure.IsZero() {
 		// This is the first consecutive failure
-		failureStreak.firstFailure = b.clock.Time()
+		failureStreak.firstFailure = now
 	}
 	b.failureStreaks[validatorID] = failureStreak
 
-	now := b.clock.Time()
 	if failureStreak.consecutive >= b.threshold && now.After(failureStreak.firstFailure.Add(b.minimumFailingDuration)) {
 		b.bench(validatorID)
 	}
 
-	b.lock.Unlock()
 }
 
 // Assumes [b.lock] is held
@@ -271,7 +271,6 @@ func (b *benchlist) bench(validatorID ids.ShortID) {
 	if err != nil {
 		// This should never happen
 		b.log.Error("couldn't get benched stake: %w. Resetting benchlist", err)
-		b.reset()
 		return
 	}
 
@@ -329,14 +328,4 @@ func (b *benchlist) bench(validatorID ids.ShortID) {
 	// Update metrics
 	b.metrics.numBenched.Set(float64(b.benchedQueue.Len()))
 	b.metrics.weightBenched.Set(float64(newBenchedStake))
-}
-
-// Reset this benchlist.
-// Assumes [b.lock] is held.
-func (b *benchlist) reset() {
-	b.failureStreaks = make(map[ids.ShortID]failureStreak)
-	b.benchlistSet.Clear()
-	b.benchedQueue = []*benchData{}
-	b.metrics.weightBenched.Set(0)
-	b.metrics.numBenched.Set(0)
 }
