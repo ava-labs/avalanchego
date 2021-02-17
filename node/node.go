@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/indexer"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
@@ -64,7 +65,8 @@ const (
 )
 
 var (
-	genesisHashKey = []byte("genesisID")
+	genesisHashKey  = []byte("genesisID")
+	indexerDbPrefix = []byte("indexer")
 
 	// Version is the version of this code
 	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 2, 0)
@@ -84,6 +86,10 @@ type Node struct {
 
 	// Storage for this node
 	DB database.Database
+
+	// Indexes accepted containers
+	// TODO populate this field
+	indexer indexer.Indexer
 
 	// Handles calls to Keystore API
 	keystoreServer keystore.Keystore
@@ -461,6 +467,14 @@ func (n *Node) initIPCs() error {
 	var err error
 	n.IPCs, err = ipcs.NewChainIPCs(n.Log, n.Config.IPCPath, n.Config.NetworkID, n.ConsensusDispatcher, n.DecisionDispatcher, chainIDs)
 	return err
+}
+
+// Initialize [n.indexer]
+// Should only be called after [n.DB] and [n.DecisionDispatcher] are populated
+func (n *Node) initIndexer() error {
+	indexerDb := prefixdb.New(indexerDbPrefix, n.DB)
+	n.indexer = indexer.NewIndexer(indexerDb, n.DecisionDispatcher)
+	return nil
 }
 
 // Initializes the Platform chain.
