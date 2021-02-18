@@ -2302,6 +2302,14 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 	if err := te.Put(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
+
+	if !te.Consensus.Finalized() {
+		t.Fatalf("Should have finalized the consensus instance")
+	}
+
+	if te.pending.Len() != 0 {
+		t.Fatalf("Shouldn't have any pending blocks")
+	}
 }
 
 // Test that the node will not issue a block into consensus that it knows will
@@ -2387,5 +2395,13 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 
 	if err := te.Put(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes()); err != nil {
 		t.Fatal(err)
+	}
+
+	if !te.Consensus.Finalized() {
+		t.Fatalf("Should have finalized the consensus instance")
+	}
+
+	if te.pending.Len() != 0 {
+		t.Fatalf("Shouldn't have any pending blocks")
 	}
 }
