@@ -17,6 +17,8 @@ elif [[ $# -ne 0 ]]; then
     exit 1
 fi
 
+GIT_COMMIT=$( git rev-list -1 HEAD )
+
 # Build Coreth, which is run as a subprocess
-echo "Building Coreth..."
-go build -o "$BINARY_PATH" "plugin/"*.go
+echo "Building Coreth from GitCommit: $GIT_COMMIT"
+go build -ldflags "-X github.com/ava-labs/coreth/plugin/evm.GitCommit=$GIT_COMMIT" -o "$BINARY_PATH" "plugin/"*.go

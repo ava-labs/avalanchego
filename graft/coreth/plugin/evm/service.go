@@ -23,10 +23,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-const (
-	version = "coreth-v0.3.23"
-)
-
 // test constants
 const (
 	GenesisTestAddr = "0x751a0b96e1042bee789452ecb20253fba40dbe85"
@@ -63,7 +59,7 @@ func (s *NetAPI) Version() string { return fmt.Sprintf("%d", s.vm.networkID) }
 type Web3API struct{}
 
 // ClientVersion returns the version of the vm running
-func (s *Web3API) ClientVersion() string { return version }
+func (s *Web3API) ClientVersion() string { return Version }
 
 // Sha3 returns the bytes returned by hashing [input] with Keccak256
 func (s *Web3API) Sha3(input hexutil.Bytes) hexutil.Bytes { return ethcrypto.Keccak256(input) }
@@ -101,9 +97,6 @@ func (service *AvaxAPI) parseAssetID(assetID string) (ids.ID, error) {
 		return ids.FromString(assetID)
 	}
 }
-
-// ClientVersion returns the version of the vm running
-func (service *AvaxAPI) ClientVersion() string { return version }
 
 // ExportKeyArgs are arguments for ExportKey
 type ExportKeyArgs struct {
