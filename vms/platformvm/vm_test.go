@@ -2592,6 +2592,8 @@ func TestUptimeReporting(t *testing.T) {
 	checkUptime(vm, nodeID2, .75, "peer connected during bootstrapping and disconnected after bootstrapping after restart")
 }
 
+// Test that calling Verify on a block with an unverified parent doesn't cause a
+// panic.
 func TestUnverifiedParentPanic(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
 

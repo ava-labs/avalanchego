@@ -2219,6 +2219,8 @@ func TestEngineRejectionAmplification(t *testing.T) {
 	}
 }
 
+// Test that the node will not issue a block into consensus that it knows will
+// be rejected because the parent is rejected.
 func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T) {
 	vdr, _, sender, vm, te, gBlk := setup(t)
 
@@ -2302,6 +2304,8 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 	}
 }
 
+// Test that the node will not issue a block into consensus that it knows will
+// be rejected because the parent is failing verification.
 func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) {
 	vdr, _, sender, vm, te, gBlk := setup(t)
 
