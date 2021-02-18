@@ -64,6 +64,7 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 		validatorIDs.Remove(vID)
 	}
 
+	// Register failures for validators we didn't even send a request to.
 	for validatorID := range validatorIDs {
 		go s.router.GetAcceptedFrontierFailed(validatorID, s.ctx.ChainID, requestID)
 	}
@@ -110,6 +111,7 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 		validatorIDs.Remove(vID)
 	}
 
+	// Register failures for validators we didn't even send a request to.
 	for validatorID := range validatorIDs {
 		go s.router.GetAcceptedFailed(validatorID, s.ctx.ChainID, requestID)
 	}
@@ -229,6 +231,7 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 		validatorIDs.Remove(vID)
 	}
 
+	// Register failures for validators we didn't even send a request to.
 	for validatorID := range validatorIDs {
 		go s.router.QueryFailed(validatorID, s.ctx.ChainID, requestID)
 	}
@@ -275,6 +278,7 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 		validatorIDs.Remove(vID)
 	}
 
+	// Register failures for validators we didn't even send a request to.
 	for validatorID := range validatorIDs {
 		vID := validatorID // Prevent overwrite in next loop iteration
 		go s.router.QueryFailed(vID, s.ctx.ChainID, requestID)

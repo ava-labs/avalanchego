@@ -88,7 +88,9 @@ func (cr *ChainRouter) Initialize(
 // RegisterRequests marks that we should expect to receive a reply from the given validator
 // regarding the given chain and the reply should have the given requestID.
 // The type of message we sent the validator was [msgType].
-// Registers a timeout to fire if we don't get a reply in time.
+// Every registered request must be cleared either by receiving a valid reply
+// and passing it to the appropriate chain or by a call to GetFailed, GetAncestorsFailed, etc.
+// This method registers a timeout that calls such methods if we don't get a reply in time.
 func (cr *ChainRouter) RegisterRequest(
 	validatorID ids.ShortID,
 	chainID ids.ID,
