@@ -254,6 +254,7 @@ func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
 	// children.
 	for block := startBlock; block.sb != nil; block = ts.blocks[ts.tail] {
 		ts.tail = block.sb.Preference()
+		ts.preferredIDs.Add(ts.tail)
 	}
 	return nil
 }

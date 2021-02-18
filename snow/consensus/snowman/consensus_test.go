@@ -42,6 +42,7 @@ var (
 		RecordPollInvalidVoteTest,
 		RecordPollTransitiveVotingTest,
 		RecordPollDivergedVotingTest,
+		RecordPollChangePreferredChainTest,
 		MetricsProcessingErrorTest,
 		MetricsAcceptedErrorTest,
 		MetricsRejectedErrorTest,
@@ -1006,6 +1007,138 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 		t.Fatalf("Finalized too late")
 	} else if status := block0.Status(); status != choices.Accepted {
 		t.Fatalf("Should be accepted")
+	}
+}
+
+func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      10,
+		BetaRogue:         10,
+		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
+	}
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+		t.Fatal(err)
+	}
+
+	a1Block := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: Genesis,
+		HeightV: 1,
+	}
+	b1Block := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: Genesis,
+		HeightV: 1,
+	}
+	a2Block := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: a1Block,
+		HeightV: 2,
+	}
+	b2Block := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: b1Block,
+		HeightV: 2,
+	}
+
+	if err := sm.Add(a1Block); err != nil {
+		t.Fatal(err)
+	}
+	if err := sm.Add(a2Block); err != nil {
+		t.Fatal(err)
+	}
+	if err := sm.Add(b1Block); err != nil {
+		t.Fatal(err)
+	}
+	if err := sm.Add(b2Block); err != nil {
+		t.Fatal(err)
+	}
+
+	if sm.Preference() != a2Block.ID() {
+		t.Fatal("Wrong preference reported")
+	}
+
+	if !sm.IsPreferred(a1Block) {
+		t.Fatalf("Should have reported a1 as being preferred")
+	}
+	if !sm.IsPreferred(a2Block) {
+		t.Fatalf("Should have reported a2 as being preferred")
+	}
+	if sm.IsPreferred(b1Block) {
+		t.Fatalf("Shouldn't have reported b1 as being preferred")
+	}
+	if sm.IsPreferred(b2Block) {
+		t.Fatalf("Shouldn't have reported b2 as being preferred")
+	}
+
+	b2Votes := ids.Bag{}
+	b2Votes.Add(b2Block.ID())
+
+	if err := sm.RecordPoll(b2Votes); err != nil {
+		t.Fatal(err)
+	}
+
+	if sm.Preference() != b2Block.ID() {
+		t.Fatal("Wrong preference reported")
+	}
+
+	if sm.IsPreferred(a1Block) {
+		t.Fatalf("Shouldn't have reported a1 as being preferred")
+	}
+	if sm.IsPreferred(a2Block) {
+		t.Fatalf("Shouldn't have reported a2 as being preferred")
+	}
+	if !sm.IsPreferred(b1Block) {
+		t.Fatalf("Should have reported b1 as being preferred")
+	}
+	if !sm.IsPreferred(b2Block) {
+		t.Fatalf("Should have reported b2 as being preferred")
+	}
+
+	a1Votes := ids.Bag{}
+	a1Votes.Add(a1Block.ID())
+
+	if err := sm.RecordPoll(a1Votes); err != nil {
+		t.Fatal(err)
+	}
+	if err := sm.RecordPoll(a1Votes); err != nil {
+		t.Fatal(err)
+	}
+
+	if sm.Preference() != a2Block.ID() {
+		t.Fatal("Wrong preference reported")
+	}
+
+	if !sm.IsPreferred(a1Block) {
+		t.Fatalf("Should have reported a1 as being preferred")
+	}
+	if !sm.IsPreferred(a2Block) {
+		t.Fatalf("Should have reported a2 as being preferred")
+	}
+	if sm.IsPreferred(b1Block) {
+		t.Fatalf("Shouldn't have reported b1 as being preferred")
+	}
+	if sm.IsPreferred(b2Block) {
+		t.Fatalf("Shouldn't have reported b2 as being preferred")
 	}
 }
 
