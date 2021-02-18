@@ -167,22 +167,9 @@ func (ts *Topological) DecidedOrProcessing(blk Block) bool {
 
 // IsPreferred implements the Snowman interface
 func (ts *Topological) IsPreferred(blk Block) bool {
-	switch blk.Status() {
 	// If the block is accepted, then it must be transitively preferred.
-	case choices.Accepted:
+	if blk.Status() == choices.Accepted {
 		return true
-	// If the block is rejected, then the accepted block at that height excludes
-	// this block from the preferred set.
-	// If the block is unknown, then it hasn't been issued into consensus yet.
-	case choices.Rejected, choices.Unknown:
-		return false
-	// If the block is marked as fetched, we can check if it has been
-	// transitively rejected. If it's rejected, it's excluded from the preferred
-	// set.
-	case choices.Processing:
-		if blk.Height() <= ts.height {
-			return true
-		}
 	}
 	return ts.preferredIDs.Contains(blk.ID())
 }
