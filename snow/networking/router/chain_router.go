@@ -39,7 +39,7 @@ type request struct {
 type ChainRouter struct {
 	clock            timer.Clock
 	log              logging.Logger
-	lock             sync.RWMutex
+	lock             sync.Mutex
 	chains           map[ids.ID]*Handler
 	timeoutManager   *timeout.Manager
 	gossiper         *timer.Repeater
@@ -199,8 +199,8 @@ func (cr *ChainRouter) RemoveChain(chainID ids.ID) {
 // validator with ID [validatorID]  to the consensus engine working on the
 // chain with ID [chainID]
 func (cr *ChainRouter) GetAcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time) {
-	cr.lock.RLock()
-	defer cr.lock.RUnlock()
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
 
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
@@ -218,8 +218,8 @@ func (cr *ChainRouter) GetAcceptedFrontier(validatorID ids.ShortID, chainID ids.
 // validator with ID [validatorID]  to the consensus engine working on the
 // chain with ID [chainID]
 func (cr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
-	cr.lock.RLock()
-	defer cr.lock.RUnlock()
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
 
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
@@ -256,8 +256,8 @@ func (cr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 // working on the chain with ID [chainID]
 func (cr *ChainRouter) GetAcceptedFrontierFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
 	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
-	cr.lock.RLock()
-	defer cr.lock.RUnlock()
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
 
 	// Remove the outstanding request
 	delete(cr.requests, uniqueRequestID)
@@ -278,8 +278,8 @@ func (cr *ChainRouter) GetAcceptedFrontierFailed(validatorID ids.ShortID, chainI
 // validator with ID [validatorID]  to the consensus engine working on the
 // chain with ID [chainID]
 func (cr *ChainRouter) GetAccepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs []ids.ID) {
-	cr.lock.RLock()
-	defer cr.lock.RUnlock()
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
 
 	chain, exists := cr.chains[chainID]
 	if !exists {
@@ -296,8 +296,8 @@ func (cr *ChainRouter) GetAccepted(validatorID ids.ShortID, chainID ids.ID, requ
 // [validatorID] to the consensus engine working on the chain with ID
 // [chainID]
 func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
-	cr.lock.RLock()
-	defer cr.lock.RUnlock()
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
 
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
@@ -334,8 +334,8 @@ func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 // chain with ID [chainID]
 func (cr *ChainRouter) GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
 	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
-	cr.lock.RLock()
-	defer cr.lock.RUnlock()
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
 
 	// Remove the outstanding request
 	delete(cr.requests, uniqueRequestID)
@@ -356,9 +356,10 @@ func (cr *ChainRouter) GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID
 // to the consensus engine working on the chain with ID [chainID]
 // The maximum number of ancestors to respond with is defined in snow/engine/commong/bootstrapper.go
 func (cr *ChainRouter) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) {
-	cr.lock.RLock()
-	defer cr.lock.RUnlock()
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
 
+	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
 	if !exists {
 		cr.log.Debug("GetAncestors(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
@@ -373,8 +374,8 @@ func (cr *ChainRouter) GetAncestors(validatorID ids.ShortID, chainID ids.ID, req
 // MultiPut routes an incoming MultiPut message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte) {
-	cr.lock.RLock()
-	defer cr.lock.RUnlock()
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
 
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
@@ -410,8 +411,8 @@ func (cr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) GetAncestorsFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
 	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
-	cr.lock.RLock()
-	defer cr.lock.RUnlock()
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
 
 	// Remove the outstanding request
 	delete(cr.requests, uniqueRequestID)
@@ -428,8 +429,8 @@ func (cr *ChainRouter) GetAncestorsFailed(validatorID ids.ShortID, chainID ids.I
 // Get routes an incoming Get request from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) {
-	cr.lock.RLock()
-	defer cr.lock.RUnlock()
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
 
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
@@ -446,8 +447,8 @@ func (cr *ChainRouter) Get(validatorID ids.ShortID, chainID ids.ID, requestID ui
 // Put routes an incoming Put request from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
-	cr.lock.RLock()
-	defer cr.lock.RUnlock()
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
 
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
@@ -494,8 +495,8 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) GetFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
 	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
-	cr.lock.RLock()
-	defer cr.lock.RUnlock()
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
 
 	// Remove the outstanding request
 	delete(cr.requests, uniqueRequestID)
@@ -514,8 +515,8 @@ func (cr *ChainRouter) GetFailed(validatorID ids.ShortID, chainID ids.ID, reques
 // PushQuery routes an incoming PushQuery request from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) PushQuery(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID, container []byte) {
-	cr.lock.RLock()
-	defer cr.lock.RUnlock()
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
 
 	chain, exists := cr.chains[chainID]
 	if !exists {
@@ -532,8 +533,8 @@ func (cr *ChainRouter) PushQuery(validatorID ids.ShortID, chainID ids.ID, reques
 // PullQuery routes an incoming PullQuery request from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) PullQuery(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) {
-	cr.lock.RLock()
-	defer cr.lock.RUnlock()
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
 
 	chain, exists := cr.chains[chainID]
 	if !exists {
@@ -549,8 +550,8 @@ func (cr *ChainRouter) PullQuery(validatorID ids.ShortID, chainID ids.ID, reques
 // Chits routes an incoming Chits message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID) {
-	cr.lock.RLock()
-	defer cr.lock.RUnlock()
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
 
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
@@ -586,8 +587,8 @@ func (cr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) QueryFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
 	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
-	cr.lock.RLock()
-	defer cr.lock.RUnlock()
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
 
 	// Remove the outstanding request
 	delete(cr.requests, uniqueRequestID)
@@ -626,8 +627,8 @@ func (cr *ChainRouter) Disconnected(validatorID ids.ShortID) {
 
 // Gossip accepted containers
 func (cr *ChainRouter) Gossip() {
-	cr.lock.RLock()
-	defer cr.lock.RUnlock()
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
 
 	for _, chain := range cr.chains {
 		chain.Gossip()
@@ -636,8 +637,8 @@ func (cr *ChainRouter) Gossip() {
 
 // EndInterval notifies the chains that the current CPU interval has ended
 func (cr *ChainRouter) EndInterval() {
-	cr.lock.RLock()
-	defer cr.lock.RUnlock()
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
 
 	for _, chain := range cr.chains {
 		chain.endInterval()

@@ -106,7 +106,7 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 	// Tell the router to expect a reply message from these validators
 	for _, validatorID := range sentTo {
 		vID := validatorID // Prevent overwrite in next loop iteration
-		s.router.RegisterRequest(validatorID, s.ctx.ChainID, requestID, constants.GetAcceptedMsg)
+		s.router.RegisterRequest(vID, s.ctx.ChainID, requestID, constants.GetAcceptedMsg)
 		validatorIDs.Remove(vID)
 	}
 
@@ -225,7 +225,7 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 	for _, validatorID := range sentTo {
 		vID := validatorID // Prevent overwrite in next loop iteration
 		// Tell the router to expect a reply message from this validator
-		s.router.RegisterRequest(validatorID, s.ctx.ChainID, requestID, constants.PushQueryMsg)
+		s.router.RegisterRequest(vID, s.ctx.ChainID, requestID, constants.PushQueryMsg)
 		validatorIDs.Remove(vID)
 	}
 
