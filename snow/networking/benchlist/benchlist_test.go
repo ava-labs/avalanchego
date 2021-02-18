@@ -172,7 +172,7 @@ func TestBenchlistMaxStake(t *testing.T) {
 	}
 
 	threshold := 3
-	duration := 5 * time.Minute
+	duration := 1 * time.Hour
 	// Shouldn't bench more than 2550 (5100/2)
 	maxPortion := 0.5
 	benchIntf, err := NewBenchlist(
