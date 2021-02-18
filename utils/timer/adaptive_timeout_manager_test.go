@@ -180,7 +180,7 @@ func TestAdaptiveTimeoutManager(t *testing.T) {
 	// The timeout should be in the future
 	assert.True(tm.timeoutQueue[0].deadline.After(tm.clock.Time()))
 	// But not too far in the future
-	assert.True(tm.timeoutQueue[0].deadline.Before(tm.clock.Time().Add(tm.maximumTimeout)))
+	assert.True(!tm.timeoutQueue[0].deadline.After(tm.clock.Time().Add(tm.maximumTimeout)))
 	// Timeout should be set to fire
 	assert.True(tm.timer.shouldExecute)
 	tm.lock.Unlock()
@@ -220,7 +220,7 @@ func TestAdaptiveTimeoutManager(t *testing.T) {
 	assert.Contains(tm.timeoutMap, id2)
 	assert.Len(tm.timeoutMap, 2)
 	assert.Len(tm.timeoutQueue, 2)
-	assert.True(tm.timeoutQueue[0].deadline.Before(tm.timeoutQueue[1].deadline))
+	assert.True(!tm.timeoutQueue[0].deadline.After(tm.timeoutQueue[1].deadline))
 	// Timeout should be set to fire
 	assert.True(tm.timer.shouldExecute)
 	tm.lock.Unlock()
