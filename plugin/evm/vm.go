@@ -59,6 +59,10 @@ import (
 
 var (
 	x2cRate = big.NewInt(1000000000)
+	// GitCommit is set by the build script
+	GitCommit string
+	// Version is the version of Coreth
+	Version = "Coreth-v0.3.24"
 )
 
 var (
@@ -68,8 +72,8 @@ var (
 )
 
 const (
-	minBlockTime    = 250 * time.Millisecond
-	maxBlockTime    = 1000 * time.Millisecond
+	minBlockTime    = 2 * time.Second
+	maxBlockTime    = 3 * time.Second
 	batchSize       = 250
 	maxUTXOsToFetch = 1024
 	blockCacheSize  = 1024
@@ -147,6 +151,10 @@ func init() {
 		c.RegisterType(&secp256k1fx.OutputOwners{}),
 		Codec.RegisterCodec(codecVersion, c),
 	)
+
+	if len(GitCommit) != 0 {
+		Version = fmt.Sprintf("%s@%s", Version, GitCommit)
+	}
 
 	if errs.Errored() {
 		panic(errs.Err)
@@ -255,6 +263,7 @@ func (vm *VM) Initialize(
 	toEngine chan<- commonEng.Message,
 	fxs []*commonEng.Fx,
 ) error {
+	log.Info("Initializing Coreth VM", "Version", Version)
 	if vm.CLIConfig.ParsingError != nil {
 		return vm.CLIConfig.ParsingError
 	}
