@@ -618,11 +618,24 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		return nil
 	}
 
-	// we are adding the block to consensus, so it is no longer pending
+	// we are no longer waiting on adding the block to consensus, so it is no
+	// longer pending
 	blkID := blk.ID()
 	t.pending.Remove(blkID)
 
-	// Make sure this block is valid
+	if !t.Consensus.AcceptedOrProcessing(blk.Parent()) {
+		// if the parent isn't processing or the last accepted block, then this
+		// block is effectively rejected
+		t.blocked.Abandon(blkID)
+		t.numBlocked.Set(float64(t.pending.Len())) // Tracks performance statistics
+		return t.errs.Err
+	}
+
+	// By ensuring that the parent is either processing or accepted, it is
+	// guaranteed that the parent was successfully verified. This means that
+	// calling Verify on this block is allowed.
+
+	// make sure this block is valid
 	if err := blk.Verify(); err != nil {
 		t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
 

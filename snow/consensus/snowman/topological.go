@@ -130,6 +130,18 @@ func (ts *Topological) Add(blk Block) error {
 	return nil
 }
 
+// AcceptedOrProcessing implements the Snowman interface
+func (ts *Topological) AcceptedOrProcessing(blk Block) bool {
+	// If the block is accepted, then it mark it as so.
+	if blk.Status() == choices.Accepted {
+		return true
+	}
+	// If the block is in the map of current blocks, then the block is currently
+	// processing.
+	_, ok := ts.blocks[blk.ID()]
+	return ok
+}
+
 // DecidedOrProcessing implements the Snowman interface
 func (ts *Topological) DecidedOrProcessing(blk Block) bool {
 	switch blk.Status() {
