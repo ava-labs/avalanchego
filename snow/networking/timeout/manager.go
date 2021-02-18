@@ -89,10 +89,11 @@ func (m *Manager) RegisterResponse(
 	m.tm.Remove(uniqueRequestID)
 }
 
-// RegisterRequestToBenchedValidator registers that we would have sent
-// a query to a validator but they are benched so we didn't. For the sake
-// of calculating the average latency and network timeout, we act as
-// though we sent the validator a request and it timed out.
-func (m *Manager) RegisterRequestToBenchedValidator() {
+// RegisterRequestToUnreachableValidator registers that we would have sent
+// a query to a validator but they are unreachable because they are bench
+// or because of network conditions (e.g. we're not connected), so we didn't
+// send the query. For the sake// of calculating the average latency and
+// network timeout, we act as though we sent the validator a request and it timed out.
+func (m *Manager) RegisterRequestToUnreachableValidator() {
 	m.tm.ObserveLatency(m.TimeoutDuration())
 }

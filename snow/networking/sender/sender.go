@@ -87,7 +87,7 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 		if s.timeouts.IsBenched(validatorID, s.ctx.ChainID) {
 			s.failedDueToBench[constants.GetAcceptedFrontierMsg].Inc() // update metric
 			validatorIDs.Remove(validatorID)
-			s.timeouts.RegisterRequestToBenchedValidator()
+			s.timeouts.RegisterRequestToUnreachableValidator()
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
 			go s.router.GetAcceptedFrontierFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
 		}
@@ -108,6 +108,9 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 
 	// Register failures for validators we didn't even send a request to.
 	for validatorID := range validatorIDs {
+		// Note: The call to RegisterRequestToUnreachableValidator is not strictly necessary.
+		// This call causes the reported network latency look larger than it actually is.
+		s.timeouts.RegisterRequestToUnreachableValidator()
 		go s.router.GetAcceptedFrontierFailed(validatorID, s.ctx.ChainID, requestID)
 	}
 }
@@ -135,7 +138,7 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 		if s.timeouts.IsBenched(validatorID, s.ctx.ChainID) {
 			s.failedDueToBench[constants.GetAcceptedMsg].Inc() // update metric
 			validatorIDs.Remove(validatorID)
-			s.timeouts.RegisterRequestToBenchedValidator()
+			s.timeouts.RegisterRequestToUnreachableValidator()
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
 			go s.router.GetAcceptedFailed(validatorID, s.ctx.ChainID, requestID)
 		}
@@ -156,6 +159,7 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 
 	// Register failures for validators we didn't even send a request to.
 	for validatorID := range validatorIDs {
+		s.timeouts.RegisterRequestToUnreachableValidator()
 		go s.router.GetAcceptedFailed(validatorID, s.ctx.ChainID, requestID)
 	}
 }
@@ -182,7 +186,7 @@ func (s *Sender) GetAncestors(validatorID ids.ShortID, requestID uint32, contain
 	// so we don't even bother sending requests to them. We just have them immediately fail.
 	if s.timeouts.IsBenched(validatorID, s.ctx.ChainID) {
 		s.failedDueToBench[constants.GetAncestorsMsg].Inc() // update metric
-		s.timeouts.RegisterRequestToBenchedValidator()
+		s.timeouts.RegisterRequestToUnreachableValidator()
 		go s.router.GetAncestorsFailed(validatorID, s.ctx.ChainID, requestID)
 		return
 	}
@@ -196,6 +200,7 @@ func (s *Sender) GetAncestors(validatorID ids.ShortID, requestID uint32, contain
 		s.router.RegisterRequest(validatorID, s.ctx.ChainID, requestID, constants.GetAncestorsMsg)
 		return
 	}
+	s.timeouts.RegisterRequestToUnreachableValidator()
 	go s.router.GetAncestorsFailed(validatorID, s.ctx.ChainID, requestID)
 }
 
@@ -224,7 +229,7 @@ func (s *Sender) Get(validatorID ids.ShortID, requestID uint32, containerID ids.
 	// so we don't even bother sending requests to them. We just have them immediately fail.
 	if s.timeouts.IsBenched(validatorID, s.ctx.ChainID) {
 		s.failedDueToBench[constants.GetMsg].Inc() // update metric
-		s.timeouts.RegisterRequestToBenchedValidator()
+		s.timeouts.RegisterRequestToUnreachableValidator()
 		go s.router.GetFailed(validatorID, s.ctx.ChainID, requestID)
 		return
 	}
@@ -238,6 +243,7 @@ func (s *Sender) Get(validatorID ids.ShortID, requestID uint32, containerID ids.
 		s.router.RegisterRequest(validatorID, s.ctx.ChainID, requestID, constants.GetMsg)
 		return
 	}
+	s.timeouts.RegisterRequestToUnreachableValidator()
 	go s.router.GetFailed(validatorID, s.ctx.ChainID, requestID)
 }
 
@@ -275,7 +281,7 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 		if s.timeouts.IsBenched(validatorID, s.ctx.ChainID) {
 			s.failedDueToBench[constants.PushQueryMsg].Inc() // update metric
 			validatorIDs.Remove(validatorID)
-			s.timeouts.RegisterRequestToBenchedValidator()
+			s.timeouts.RegisterRequestToUnreachableValidator()
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
 			go s.router.QueryFailed(validatorID, s.ctx.ChainID, requestID)
 		}
@@ -295,6 +301,7 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 
 	// Register failures for validators we didn't even send a request to.
 	for validatorID := range validatorIDs {
+		s.timeouts.RegisterRequestToUnreachableValidator()
 		go s.router.QueryFailed(validatorID, s.ctx.ChainID, requestID)
 	}
 }
@@ -324,7 +331,7 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 		if s.timeouts.IsBenched(validatorID, s.ctx.ChainID) {
 			s.failedDueToBench[constants.PullQueryMsg].Inc() // update metric
 			validatorIDs.Remove(validatorID)
-			s.timeouts.RegisterRequestToBenchedValidator()
+			s.timeouts.RegisterRequestToUnreachableValidator()
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
 			go s.router.QueryFailed(validatorID, s.ctx.ChainID, requestID)
 		}
@@ -343,8 +350,8 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 
 	// Register failures for validators we didn't even send a request to.
 	for validatorID := range validatorIDs {
-		vID := validatorID // Prevent overwrite in next loop iteration
-		go s.router.QueryFailed(vID, s.ctx.ChainID, requestID)
+		s.timeouts.RegisterRequestToUnreachableValidator()
+		go s.router.QueryFailed(validatorID, s.ctx.ChainID, requestID)
 	}
 }
 
