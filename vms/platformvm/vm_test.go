@@ -2132,8 +2132,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-
-	sender.Initialize(ctx, externalSender, chainRouter, &timeoutManager)
+	err = sender.Initialize(ctx, externalSender, chainRouter, &timeoutManager, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 
 	reqID := new(uint32)
 	externalSender.GetAcceptedFrontierF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration) []ids.ShortID {

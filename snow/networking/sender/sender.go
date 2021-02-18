@@ -4,6 +4,7 @@
 package sender
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -11,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Sender sends consensus messages to other validators
@@ -19,14 +21,53 @@ type Sender struct {
 	sender   ExternalSender // Actually does the sending over the network
 	router   router.Router
 	timeouts *timeout.Manager
+
+	// Request message type --> Counts how many of that request
+	// have failed because the validator was benched
+	failedDueToBench map[constants.MsgType]prometheus.Counter
 }
 
 // Initialize this sender
-func (s *Sender) Initialize(ctx *snow.Context, sender ExternalSender, router router.Router, timeouts *timeout.Manager) {
+func (s *Sender) Initialize(
+	ctx *snow.Context,
+	sender ExternalSender,
+	router router.Router,
+	timeouts *timeout.Manager,
+	metricsNamespace string,
+	metricsRegisterer prometheus.Registerer,
+) error {
 	s.ctx = ctx
 	s.sender = sender
 	s.router = router
 	s.timeouts = timeouts
+
+	// Register metrics
+	// Message type --> String representation for metrics
+	requestTypes := map[constants.MsgType]string{
+		constants.GetMsg:                 "get",
+		constants.GetAcceptedMsg:         "get_accepted",
+		constants.GetAcceptedFrontierMsg: "get_accepted_frontier",
+		constants.GetAncestorsMsg:        "get_ancestors",
+		constants.PullQueryMsg:           "pull_query",
+		constants.PushQueryMsg:           "push_query",
+	}
+
+	s.failedDueToBench = make(map[constants.MsgType]prometheus.Counter, len(requestTypes))
+
+	for msgType, asStr := range requestTypes {
+		counter := prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Namespace: metricsNamespace,
+				Name:      fmt.Sprintf("%s_failed_benched", asStr),
+				Help:      fmt.Sprintf("# of times a %s request was not sent because the validator was benched", asStr),
+			},
+		)
+		if err := metricsRegisterer.Register(counter); err != nil {
+			return fmt.Errorf("couldn't register metric for %s: %w", msgType, err)
+		}
+		s.failedDueToBench[msgType] = counter
+	}
+	return nil
 }
 
 // Context of this sender
@@ -44,6 +85,7 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 	// so we don't even bother sending messages to them. We just have them immediately fail.
 	for validatorID := range validatorIDs {
 		if s.timeouts.IsBenched(validatorID, s.ctx.ChainID) {
+			s.failedDueToBench[constants.GetAcceptedFrontierMsg].Inc() // update metric
 			validatorIDs.Remove(validatorID)
 			s.timeouts.RegisterRequestToBenchedValidator()
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
@@ -91,10 +133,11 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 	// so we don't even bother sending messages to them. We just have them immediately fail.
 	for validatorID := range validatorIDs {
 		if s.timeouts.IsBenched(validatorID, s.ctx.ChainID) {
+			s.failedDueToBench[constants.GetAcceptedMsg].Inc() // update metric
 			validatorIDs.Remove(validatorID)
 			s.timeouts.RegisterRequestToBenchedValidator()
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
-			go s.router.GetAcceptedFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
+			go s.router.GetAcceptedFailed(validatorID, s.ctx.ChainID, requestID)
 		}
 	}
 
@@ -135,6 +178,15 @@ func (s *Sender) GetAncestors(validatorID ids.ShortID, requestID uint32, contain
 		return
 	}
 
+	// [validatorID] may be benched. That is, they've been unresponsive
+	// so we don't even bother sending requests to them. We just have them immediately fail.
+	if s.timeouts.IsBenched(validatorID, s.ctx.ChainID) {
+		s.failedDueToBench[constants.GetAncestorsMsg].Inc() // update metric
+		s.timeouts.RegisterRequestToBenchedValidator()
+		go s.router.GetAncestorsFailed(validatorID, s.ctx.ChainID, requestID)
+		return
+	}
+
 	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
 	timeoutDuration := s.timeouts.TimeoutDuration()
 	sent := s.sender.GetAncestors(validatorID, s.ctx.ChainID, requestID, timeoutDuration, containerID)
@@ -164,6 +216,15 @@ func (s *Sender) Get(validatorID ids.ShortID, requestID uint32, containerID ids.
 
 	// Sending a Get to myself will always fail
 	if validatorID == s.ctx.NodeID {
+		go s.router.GetFailed(validatorID, s.ctx.ChainID, requestID)
+		return
+	}
+
+	// [validatorID] may be benched. That is, they've been unresponsive
+	// so we don't even bother sending requests to them. We just have them immediately fail.
+	if s.timeouts.IsBenched(validatorID, s.ctx.ChainID) {
+		s.failedDueToBench[constants.GetMsg].Inc() // update metric
+		s.timeouts.RegisterRequestToBenchedValidator()
 		go s.router.GetFailed(validatorID, s.ctx.ChainID, requestID)
 		return
 	}
@@ -208,10 +269,11 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 		go s.router.PushQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), containerID, container)
 	}
 
-	// Some of the validators in [validatorIDs] may be benched. That is, they've been unresponsive
+	// Some of [validatorIDs] may be benched. That is, they've been unresponsive
 	// so we don't even bother sending messages to them. We just have them immediately fail.
 	for validatorID := range validatorIDs {
 		if s.timeouts.IsBenched(validatorID, s.ctx.ChainID) {
+			s.failedDueToBench[constants.PushQueryMsg].Inc() // update metric
 			validatorIDs.Remove(validatorID)
 			s.timeouts.RegisterRequestToBenchedValidator()
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
@@ -260,6 +322,7 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 	// so we don't even bother sending messages to them. We just have them immediately fail.
 	for validatorID := range validatorIDs {
 		if s.timeouts.IsBenched(validatorID, s.ctx.ChainID) {
+			s.failedDueToBench[constants.PullQueryMsg].Inc() // update metric
 			validatorIDs.Remove(validatorID)
 			s.timeouts.RegisterRequestToBenchedValidator()
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.

@@ -27,12 +27,15 @@ import (
 func TestSenderContext(t *testing.T) {
 	context := snow.DefaultContextTest()
 	sender := Sender{}
-	sender.Initialize(
+	err := sender.Initialize(
 		context,
 		&ExternalSenderTest{},
 		&router.ChainRouter{},
 		&timeout.Manager{},
+		"",
+		prometheus.NewRegistry(),
 	)
+	assert.NoError(t, err)
 	if res := sender.Context(); !reflect.DeepEqual(res, context) {
 		t.Fatalf("Got %#v, expected %#v", res, context)
 	}
@@ -61,7 +64,8 @@ func TestTimeout(t *testing.T) {
 	assert.NoError(t, err)
 
 	sender := Sender{}
-	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm)
+	err = sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(true)
@@ -131,7 +135,8 @@ func TestReliableMessages(t *testing.T) {
 	assert.NoError(t, err)
 
 	sender := Sender{}
-	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm)
+	err = sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(true)
@@ -212,7 +217,8 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	assert.NoError(t, err)
 
 	sender := Sender{}
-	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm)
+	err = sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(false)
