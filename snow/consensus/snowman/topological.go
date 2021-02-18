@@ -42,6 +42,9 @@ type Topological struct {
 	// blocks stores the last accepted block and all the pending blocks
 	blocks map[ids.ID]*snowmanBlock // blockID -> snowmanBlock
 
+	// preferredIDs stores the set of IDs that are currently preferred.
+	preferredIDs ids.Set
+
 	// tail is the preferred block with no children
 	tail ids.ID
 }
@@ -126,6 +129,7 @@ func (ts *Topological) Add(blk Block) error {
 	// If we are extending the tail, this is the new tail
 	if ts.tail == parentID {
 		ts.tail = blkID
+		ts.preferredIDs.Add(blkID)
 	}
 	return nil
 }
@@ -147,6 +151,28 @@ func (ts *Topological) DecidedOrProcessing(blk Block) bool {
 	// processing.
 	_, ok := ts.blocks[blk.ID()]
 	return ok
+}
+
+// IsPreferred implements the Snowman interface
+func (ts *Topological) IsPreferred(blk Block) bool {
+	switch blk.Status() {
+	// If the block is accepted, then it must be transitively preferred.
+	case choices.Accepted:
+		return true
+	// If the block is rejected, then the accepted block at that height excludes
+	// this block from the preferred set.
+	// If the block is unknown, then it hasn't been issued into consensus yet.
+	case choices.Rejected, choices.Unknown:
+		return false
+	// If the block is marked as fetched, we can check if it has been
+	// transitively rejected. If it's rejected, it's excluded from the preferred
+	// set.
+	case choices.Processing:
+		if blk.Height() <= ts.height {
+			return true
+		}
+	}
+	return ts.preferredIDs.Contains(blk.ID())
 }
 
 // Preference implements the Snowman interface
@@ -194,8 +220,29 @@ func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
 		return err
 	}
 
+	// If the set of preferred IDs already contains the preference, then the
+	// tail is guaranteed to already be set correctly.
+	if ts.preferredIDs.Contains(preferred) {
+		return nil
+	}
+
 	// Runtime = |live set| ; Space = Constant
-	ts.tail = ts.getPreferredDescendant(preferred)
+	ts.preferredIDs.Clear()
+
+	ts.tail = preferred
+	startBlock := ts.blocks[ts.tail]
+
+	// Runtime = |live set| ; Space = Constant
+	// Traverse from the preferred ID to the last accepted ancestor.
+	for block := startBlock; !block.Accepted(); {
+		ts.preferredIDs.Add(block.blk.ID())
+		block = ts.blocks[block.blk.Parent().ID()]
+	}
+	// Traverse from the preferred ID to the preferred child until there are no
+	// children.
+	for block := startBlock; block.sb != nil; block = ts.blocks[ts.tail] {
+		ts.tail = block.sb.Preference()
+	}
 	return nil
 }
 
@@ -363,6 +410,13 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 		// apply the votes for this snowball instance
 		parentBlock.sb.RecordPoll(vote.votes)
 
+		// If we are on the preferred branch, then the parent's preference is
+		// the next block on the preferred branch.
+		parentPreference := parentBlock.sb.Preference()
+		if onPreferredBranch {
+			newPreferred = parentPreference
+		}
+
 		// Only accept when you are finalized and the head.
 		if parentBlock.sb.Finalized() && ts.head == vote.parentID {
 			if err := ts.accept(parentBlock); err != nil {
@@ -373,13 +427,6 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 			// no longer voteParentID, but its child. So, voteParentID can be
 			// removed from the tree.
 			delete(ts.blocks, vote.parentID)
-		}
-
-		// If we are on the preferred branch, then the parent's preference is
-		// the next block on the preferred branch.
-		parentPreference := parentBlock.sb.Preference()
-		if onPreferredBranch {
-			newPreferred = parentPreference
 		}
 
 		// Get the ID of the child that is having a RecordPoll called. All other
@@ -421,16 +468,6 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 	return newPreferred, nil
 }
 
-// Get the preferred descendant of the provided block ID
-func (ts *Topological) getPreferredDescendant(blkID ids.ID) ids.ID {
-	// Traverse from the provided ID to the preferred child until there are no
-	// children.
-	for block := ts.blocks[blkID]; block.sb != nil; block = ts.blocks[blkID] {
-		blkID = block.sb.Preference()
-	}
-	return blkID
-}
-
 // accept the preferred child of the provided snowman block. By accepting the
 // preferred child, all other children will be rejected. When these children are
 // rejected, all their descendants will be rejected.
@@ -455,6 +492,10 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 	// Because this is the newest accepted block, this is the new head.
 	ts.head = pref
 	ts.height = child.Height()
+
+	// Remove the decided block from the set of processing IDs, as its status
+	// now implies its preferredness.
+	ts.preferredIDs.Remove(pref)
 
 	// Because ts.blocks contains the last accepted block, we don't delete the
 	// block from the blocks map here.

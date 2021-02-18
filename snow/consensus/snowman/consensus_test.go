@@ -167,8 +167,10 @@ func AddToTailTest(t *testing.T, factory Factory) {
 	// Adding to the previous preference will update the preference
 	if err := sm.Add(block); err != nil {
 		t.Fatal(err)
-	} else if pref := sm.Preference(); pref != block.IDV {
-		t.Fatalf("Wrong preference. Expected %s, got %s", block.IDV, pref)
+	} else if pref := sm.Preference(); pref != block.ID() {
+		t.Fatalf("Wrong preference. Expected %s, got %s", block.ID(), pref)
+	} else if pref := sm.Preference(); pref != block.ID() {
+		t.Fatalf("Wrong preference. Expected %s, got %s", block.ID(), pref)
 	}
 }
 

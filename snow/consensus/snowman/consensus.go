@@ -31,8 +31,12 @@ type Consensus interface {
 	Add(Block) error
 
 	// DecidedOrProcessing returns true if the block has been decided or is
-	// currently processing
+	// currently processing.
 	DecidedOrProcessing(Block) bool
+
+	// IsPreferred returns true if the block is currently on the preferred
+	// chain.
+	IsPreferred(Block) bool
 
 	// Returns the ID of the tail of the strongly preferred sequence of
 	// decisions.
