@@ -2406,3 +2406,58 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 		t.Fatalf("Shouldn't have any pending blocks")
 	}
 }
+
+// Test that the node will not gossip a block that isn't preferred.
+func TestEngineNonPreferredAmplification(t *testing.T) {
+	vdr, _, sender, vm, te, gBlk := setup(t)
+
+	preferredBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
+	}
+	nonPreferredBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{2},
+	}
+
+	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, preferredBlk.Bytes()):
+			return preferredBlk, nil
+		case bytes.Equal(b, nonPreferredBlk.Bytes()):
+			return nonPreferredBlk, nil
+		default:
+			t.Fatalf("Unknown block bytes")
+			return nil, nil
+		}
+	}
+
+	sender.PushQueryF = func(_ ids.ShortSet, _ uint32, blkID ids.ID, _ []byte) {
+		if blkID == nonPreferredBlk.ID() {
+			t.Fatalf("gossiped non-preferred block")
+		}
+	}
+	sender.PullQueryF = func(_ ids.ShortSet, _ uint32, blkID ids.ID) {
+		if blkID == nonPreferredBlk.ID() {
+			t.Fatalf("gossiped non-preferred block")
+		}
+	}
+
+	if err := te.Put(vdr, 0, preferredBlk.ID(), preferredBlk.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := te.Put(vdr, 0, nonPreferredBlk.ID(), nonPreferredBlk.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+}
