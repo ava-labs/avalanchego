@@ -239,11 +239,15 @@ func (cr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 }
 
 // GetAcceptedFrontierFailed routes an incoming GetAcceptedFrontierFailed
-// request from the validator with ID [validatorID]  to the consensus engine
+// request from the validator with ID [validatorID] to the consensus engine
 // working on the chain with ID [chainID]
 func (cr *ChainRouter) GetAcceptedFrontierFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
+	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
+
+	// Remove the outstanding request
+	delete(cr.requests, uniqueRequestID)
 
 	if chain, exists := cr.chains[chainID]; exists {
 		chain.GetAcceptedFrontierFailed(validatorID, requestID)
@@ -299,8 +303,12 @@ func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 // validator with ID [validatorID]  to the consensus engine working on the
 // chain with ID [chainID]
 func (cr *ChainRouter) GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
+	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
+
+	// Remove the outstanding request
+	delete(cr.requests, uniqueRequestID)
 
 	if chain, exists := cr.chains[chainID]; exists {
 		chain.GetAcceptedFailed(validatorID, requestID)
@@ -356,8 +364,12 @@ func (cr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 // GetAncestorsFailed routes an incoming GetAncestorsFailed message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) GetAncestorsFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
+	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
+
+	// Remove the outstanding request
+	delete(cr.requests, uniqueRequestID)
 
 	if chain, exists := cr.chains[chainID]; exists {
 		chain.GetAncestorsFailed(validatorID, requestID)
@@ -424,8 +436,12 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 // GetFailed routes an incoming GetFailed message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) GetFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
+	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
+
+	// Remove the outstanding request
+	delete(cr.requests, uniqueRequestID)
 
 	if chain, exists := cr.chains[chainID]; exists {
 		chain.GetFailed(validatorID, requestID)
@@ -493,8 +509,12 @@ func (cr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 // QueryFailed routes an incoming QueryFailed message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) QueryFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
+	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
+
+	// Remove the outstanding request
+	delete(cr.requests, uniqueRequestID)
 
 	if chain, exists := cr.chains[chainID]; exists {
 		chain.QueryFailed(validatorID, requestID)
