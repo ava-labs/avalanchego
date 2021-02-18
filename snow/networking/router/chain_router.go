@@ -202,20 +202,33 @@ func (cr *ChainRouter) GetAcceptedFrontier(validatorID ids.ShortID, chainID ids.
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
 
-	if chain, exists := cr.chains[chainID]; exists {
-		chain.GetAcceptedFrontier(validatorID, requestID, deadline)
-	} else {
+	// Get the chain, if it exists
+	chain, exists := cr.chains[chainID]
+	if !exists {
 		cr.log.Debug("GetAcceptedFrontier(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+		return
 	}
+
+	// Pass the message to the chain
+	// Note that we don't check the return value. It's OK to drop this.
+	chain.GetAcceptedFrontier(validatorID, requestID, deadline)
 }
 
 // AcceptedFrontier routes an incoming AcceptedFrontier request from the
 // validator with ID [validatorID]  to the consensus engine working on the
 // chain with ID [chainID]
 func (cr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
+
+	// Get the chain, if it exists
+	chain, exists := cr.chains[chainID]
+	if !exists {
+		cr.log.Debug("AcceptedFrontier(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerIDs)
+		return
+	}
+
+	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 
 	// Mark that an outstanding request has been fulfilled
 	request, exists := cr.requests[uniqueRequestID]
@@ -223,18 +236,18 @@ func (cr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 		// We didn't request this message or we got back a reply of wrong type. Ignore.
 		return
 	}
+	delete(cr.requests, uniqueRequestID)
+
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.Time)
 
-	if chain, exists := cr.chains[chainID]; exists {
-		// Tell the timeout manager we got a response
-		cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAcceptedFrontierMsg, latency)
-		if !chain.AcceptedFrontier(validatorID, requestID, containerIDs) {
-			// We weren't able to pass the response to the chain
-			chain.GetAcceptedFrontierFailed(validatorID, requestID)
-		}
-	} else {
-		cr.log.Debug("AcceptedFrontier(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerIDs)
+	// Tell the timeout manager we got a response
+	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAcceptedFrontierMsg, latency)
+
+	// Pass the response to the chain
+	if !chain.AcceptedFrontier(validatorID, requestID, containerIDs) {
+		// We weren't able to pass the response to the chain
+		chain.GetAcceptedFrontierFailed(validatorID, requestID)
 	}
 }
 
@@ -249,11 +262,16 @@ func (cr *ChainRouter) GetAcceptedFrontierFailed(validatorID ids.ShortID, chainI
 	// Remove the outstanding request
 	delete(cr.requests, uniqueRequestID)
 
-	if chain, exists := cr.chains[chainID]; exists {
-		chain.GetAcceptedFrontierFailed(validatorID, requestID)
-	} else {
+	// Get the chain, if it exists
+	chain, exists := cr.chains[chainID]
+	if !exists {
+		// Should only happen if node is shutting down
 		cr.log.Debug("GetAcceptedFrontierFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+		return
 	}
+
+	// Pass the response to the chain
+	chain.GetAcceptedFrontierFailed(validatorID, requestID)
 }
 
 // GetAccepted routes an incoming GetAccepted request from the
@@ -263,20 +281,32 @@ func (cr *ChainRouter) GetAccepted(validatorID ids.ShortID, chainID ids.ID, requ
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
 
-	if chain, exists := cr.chains[chainID]; exists {
-		chain.GetAccepted(validatorID, requestID, deadline, containerIDs)
-	} else {
+	chain, exists := cr.chains[chainID]
+	if !exists {
 		cr.log.Debug("GetAccepted(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerIDs)
+		return
 	}
+
+	// Pass the message to the chain.
+	// Note that we don't check the return value. It's OK to drop this.
+	chain.GetAccepted(validatorID, requestID, deadline, containerIDs)
 }
 
 // Accepted routes an incoming Accepted request from the validator with ID
 // [validatorID] to the consensus engine working on the chain with ID
 // [chainID]
 func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
+
+	// Get the chain, if it exists
+	chain, exists := cr.chains[chainID]
+	if !exists {
+		cr.log.Debug("Accepted(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerIDs)
+		return
+	}
+
+	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 
 	// Mark that an outstanding request has been fulfilled
 	request, exists := cr.requests[uniqueRequestID]
@@ -284,18 +314,18 @@ func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 		// We didn't request this message or we got back a reply of wrong type. Ignore.
 		return
 	}
+	delete(cr.requests, uniqueRequestID)
+
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.Time)
 
-	if chain, exists := cr.chains[chainID]; exists {
-		// Tell the timeout manager we got a response
-		cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAcceptedMsg, latency)
-		if !chain.Accepted(validatorID, requestID, containerIDs) {
-			// We weren't able to pass the response to the chain
-			chain.GetAcceptedFailed(validatorID, requestID)
-		}
-	} else {
-		cr.log.Debug("Accepted(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerIDs)
+	// Tell the timeout manager we got a response
+	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAcceptedMsg, latency)
+
+	// Pass the response to the chain
+	if !chain.Accepted(validatorID, requestID, containerIDs) {
+		// We weren't able to pass the response to the chain
+		chain.GetAcceptedFailed(validatorID, requestID)
 	}
 }
 
@@ -310,33 +340,50 @@ func (cr *ChainRouter) GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID
 	// Remove the outstanding request
 	delete(cr.requests, uniqueRequestID)
 
-	if chain, exists := cr.chains[chainID]; exists {
-		chain.GetAcceptedFailed(validatorID, requestID)
-	} else {
+	// Get the chain, if it exists
+	chain, exists := cr.chains[chainID]
+	if !exists {
+		// Should only happen when shutting down
 		cr.log.Debug("GetAcceptedFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+		return
 	}
+
+	// Pass the response to the chain
+	chain.GetAcceptedFailed(validatorID, requestID)
 }
 
 // GetAncestors routes an incoming GetAncestors message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
-// The maximum number of ancestors to respond with is define in snow/engine/commong/bootstrapper.go
+// The maximum number of ancestors to respond with is defined in snow/engine/commong/bootstrapper.go
 func (cr *ChainRouter) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) {
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
 
-	if chain, exists := cr.chains[chainID]; exists {
-		chain.GetAncestors(validatorID, requestID, deadline, containerID)
-	} else {
+	chain, exists := cr.chains[chainID]
+	if !exists {
 		cr.log.Debug("GetAncestors(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+		return
 	}
+
+	// Pass the message to the chain.
+	// Note that we don't check the return value. It's OK to drop this.
+	chain.GetAncestors(validatorID, requestID, deadline, containerID)
 }
 
 // MultiPut routes an incoming MultiPut message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte) {
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
+
+	// Get the chain, if it exists
+	chain, exists := cr.chains[chainID]
+	if !exists {
+		cr.log.Debug("MultiPut(%s, %s, %d, %d) dropped due to unknown chain", validatorID, chainID, requestID, len(containers))
+		return
+	}
+
+	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 
 	// Mark that an outstanding request has been fulfilled
 	request, exists := cr.requests[uniqueRequestID]
@@ -344,20 +391,18 @@ func (cr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 		// We didn't request this message or we got back a reply of wrong type. Ignore.
 		return
 	}
+	delete(cr.requests, uniqueRequestID)
+
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.Time)
 
-	// This message came in response to a GetAncestors message from this node, and when we sent that
-	// message we set a timeout. Since we got a response, cancel the timeout.
-	if chain, exists := cr.chains[chainID]; exists {
-		// Tell the timeout manager we got a response
-		cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAncestorsMsg, latency)
-		if !chain.MultiPut(validatorID, requestID, containers) {
-			// We weren't able to pass the response to the chain
-			chain.GetAncestorsFailed(validatorID, requestID)
-		}
-	} else {
-		cr.log.Debug("MultiPut(%s, %s, %d, %d) dropped due to unknown chain", validatorID, chainID, requestID, len(containers))
+	// Tell the timeout manager we got a response
+	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAncestorsMsg, latency)
+
+	// Pass the response to the chain
+	if !chain.MultiPut(validatorID, requestID, containers) {
+		// We weren't able to pass the response to the chain
+		chain.GetAncestorsFailed(validatorID, requestID)
 	}
 }
 
@@ -371,11 +416,13 @@ func (cr *ChainRouter) GetAncestorsFailed(validatorID ids.ShortID, chainID ids.I
 	// Remove the outstanding request
 	delete(cr.requests, uniqueRequestID)
 
-	if chain, exists := cr.chains[chainID]; exists {
-		chain.GetAncestorsFailed(validatorID, requestID)
-	} else {
+	chain, exists := cr.chains[chainID]
+	if !exists {
 		cr.log.Debug("GetAncestorsFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+		return
 	}
+	// Pass the response to the chain
+	chain.GetAncestorsFailed(validatorID, requestID)
 }
 
 // Get routes an incoming Get request from the validator with ID [validatorID]
@@ -384,21 +431,41 @@ func (cr *ChainRouter) Get(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
 
-	if chain, exists := cr.chains[chainID]; exists {
-		chain.Get(validatorID, requestID, deadline, containerID)
-	} else {
+	// Get the chain, if it exists
+	chain, exists := cr.chains[chainID]
+	if !exists {
 		cr.log.Debug("Get(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
+		return
 	}
+
+	// Pass the message to the chain.
+	// Note that we don't check the return value. It's OK to drop this.
+	chain.Get(validatorID, requestID, deadline, containerID)
 }
 
 // Put routes an incoming Put request from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
 
-	// If this Put message is in response to a request we made (i.e. it isn't a gossip message)
+	// Get the chain, if it exists
+	chain, exists := cr.chains[chainID]
+	if !exists {
+		if requestID == constants.GossipMsgRequestID {
+			cr.log.Verbo("Gossiped Put(%s, %s, %d, %s) dropped due to unknown chain. Container:",
+				validatorID, chainID, requestID, containerID, formatting.DumpBytes{Bytes: container},
+			)
+		} else {
+			cr.log.Debug("Put(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
+			cr.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
+		}
+		return
+	}
+
+	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
+
+	// If this Put message is in response to a request we made (i.e. it isn't a gossip message),
 	// mark that request as fulfilled
 	var latency time.Duration // Only used if this is not a gossip message
 	if requestID != constants.GossipMsgRequestID {
@@ -411,25 +478,15 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 		// Calculate how long it took [validatorID] to reply
 		latency = cr.clock.Time().Sub(request.Time)
 	}
+	delete(cr.requests, uniqueRequestID)
 
-	// This message came in response to a Get message from this node, and when we sent that Get
-	// message we set a timeout. Since we got a response, cancel the timeout.
-	chain, exists := cr.chains[chainID]
-	switch {
-	case exists:
-		// Tell the timeout manager we got a response
-		cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetMsg, latency)
-		if !chain.Put(validatorID, requestID, containerID, container) {
-			// We weren't able to pass the response to the chain
-			chain.GetFailed(validatorID, requestID)
-		}
-	case requestID == constants.GossipMsgRequestID:
-		cr.log.Verbo("Gossiped Put(%s, %s, %d, %s) dropped due to unknown chain. Container:",
-			validatorID, chainID, requestID, containerID, formatting.DumpBytes{Bytes: container},
-		)
-	default:
-		cr.log.Debug("Put(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
-		cr.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
+	// Tell the timeout manager we got a response
+	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetMsg, latency)
+
+	// Pass the response to the chain
+	if !chain.Put(validatorID, requestID, containerID, container) {
+		// We weren't able to pass the response to the chain
+		chain.GetFailed(validatorID, requestID)
 	}
 }
 
@@ -443,11 +500,15 @@ func (cr *ChainRouter) GetFailed(validatorID ids.ShortID, chainID ids.ID, reques
 	// Remove the outstanding request
 	delete(cr.requests, uniqueRequestID)
 
-	if chain, exists := cr.chains[chainID]; exists {
-		chain.GetFailed(validatorID, requestID)
-	} else {
+	// Get the chain, if it exists
+	chain, exists := cr.chains[chainID]
+	if !exists {
 		cr.log.Debug("GetFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+		return
 	}
+
+	// Pass the response to the chain
+	chain.GetFailed(validatorID, requestID)
 }
 
 // PushQuery routes an incoming PushQuery request from the validator with ID [validatorID]
@@ -456,12 +517,16 @@ func (cr *ChainRouter) PushQuery(validatorID ids.ShortID, chainID ids.ID, reques
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
 
-	if chain, exists := cr.chains[chainID]; exists {
-		chain.PushQuery(validatorID, requestID, deadline, containerID, container)
-	} else {
+	chain, exists := cr.chains[chainID]
+	if !exists {
 		cr.log.Debug("PushQuery(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
 		cr.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
+		return
 	}
+
+	// Pass the message to the chain.
+	// Note that we don't check the return value. It's OK to drop this.
+	chain.PushQuery(validatorID, requestID, deadline, containerID, container)
 }
 
 // PullQuery routes an incoming PullQuery request from the validator with ID [validatorID]
@@ -470,19 +535,31 @@ func (cr *ChainRouter) PullQuery(validatorID ids.ShortID, chainID ids.ID, reques
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
 
-	if chain, exists := cr.chains[chainID]; exists {
-		chain.PullQuery(validatorID, requestID, deadline, containerID)
-	} else {
+	chain, exists := cr.chains[chainID]
+	if !exists {
 		cr.log.Debug("PullQuery(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
+		return
 	}
+
+	// Pass the message to the chain.
+	// Note that we don't check the return value. It's OK to drop this.
+	chain.PullQuery(validatorID, requestID, deadline, containerID)
 }
 
 // Chits routes an incoming Chits message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID) {
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
+
+	// Get the chain, if it exists
+	chain, exists := cr.chains[chainID]
+	if !exists {
+		cr.log.Debug("Chits(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, votes)
+		return
+	}
+
+	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 
 	// Mark that an outstanding request has been fulfilled
 	request, exists := cr.requests[uniqueRequestID]
@@ -490,19 +567,18 @@ func (cr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 		// We didn't request this message or we got back a reply of wrong type. Ignore.
 		return
 	}
+	delete(cr.requests, uniqueRequestID)
+
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.Time)
 
-	// Cancel timeout we set when sent the message asking for these Chits
-	if chain, exists := cr.chains[chainID]; exists {
-		// Tell the timeout manager we got a response
-		cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, request.MsgType, latency)
-		if !chain.Chits(validatorID, requestID, votes) {
-			// We weren't able to pass the response to the chain
-			chain.QueryFailed(validatorID, requestID)
-		}
-	} else {
-		cr.log.Debug("Chits(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, votes)
+	// Tell the timeout manager we got a response
+	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, request.MsgType, latency)
+
+	// Pass the response to the chain
+	if !chain.Chits(validatorID, requestID, votes) {
+		// We weren't able to pass the response to the chain
+		chain.QueryFailed(validatorID, requestID)
 	}
 }
 
@@ -516,11 +592,14 @@ func (cr *ChainRouter) QueryFailed(validatorID ids.ShortID, chainID ids.ID, requ
 	// Remove the outstanding request
 	delete(cr.requests, uniqueRequestID)
 
-	if chain, exists := cr.chains[chainID]; exists {
-		chain.QueryFailed(validatorID, requestID)
-	} else {
+	chain, exists := cr.chains[chainID]
+	if !exists {
 		cr.log.Debug("QueryFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+		return
 	}
+
+	// Pass the response to the chain
+	chain.QueryFailed(validatorID, requestID)
 }
 
 // Connected routes an incoming notification that a validator was just connected
