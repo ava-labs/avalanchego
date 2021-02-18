@@ -23,6 +23,8 @@ type CommandLineConfig struct {
 	DebugAPIEnabled    bool `json:"debug-api-enabled"`
 	Web3APIEnabled     bool `json:"web3-api-enabled"`
 
+	// Eth Settings
+	LocalTxsEnabled     bool  `json:"local-txs-enabled"`
 	APIMaxDuration      int64 `json:"api-max-duration"`
 	MaxBlocksPerRequest int64 `json:"api-max-blocks-per-request"`
 
