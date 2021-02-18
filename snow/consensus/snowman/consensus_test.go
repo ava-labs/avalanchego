@@ -289,6 +289,9 @@ func StatusOrProcessingPreviouslyAcceptedTest(t *testing.T, factory Factory) {
 	if !sm.DecidedOrProcessing(Genesis) {
 		t.Fatalf("Should have marked an accepted block as having been decided")
 	}
+	if !sm.IsPreferred(Genesis) {
+		t.Fatalf("Should have marked an accepted block as being preferred")
+	}
 }
 
 func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
@@ -321,6 +324,9 @@ func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
 	}
 	if !sm.DecidedOrProcessing(block) {
 		t.Fatalf("Should have marked a rejected block as having been decided")
+	}
+	if sm.IsPreferred(block) {
+		t.Fatalf("Shouldn't have marked a rejected block as being preferred")
 	}
 }
 
@@ -355,6 +361,9 @@ func StatusOrProcessingUnissuedTest(t *testing.T, factory Factory) {
 	}
 	if sm.DecidedOrProcessing(block) {
 		t.Fatalf("Shouldn't have marked an unissued block as being processing")
+	}
+	if sm.IsPreferred(block) {
+		t.Fatalf("Shouldn't have marked an unissued block as being preferred")
 	}
 }
 
@@ -391,6 +400,9 @@ func StatusOrProcessingIssuedTest(t *testing.T, factory Factory) {
 	}
 	if !sm.DecidedOrProcessing(block) {
 		t.Fatalf("Should have marked a the block as processing")
+	}
+	if !sm.IsPreferred(block) {
+		t.Fatalf("Should have marked the tail as being preferred")
 	}
 }
 
