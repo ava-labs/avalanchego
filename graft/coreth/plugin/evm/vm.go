@@ -62,7 +62,7 @@ var (
 	// GitCommit is set by the build script
 	GitCommit string
 	// Version is the version of Coreth
-	Version = "Coreth-v0.3.24"
+	Version = "coreth-v0.3.24"
 )
 
 var (
