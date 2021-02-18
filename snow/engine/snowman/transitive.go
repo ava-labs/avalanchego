@@ -675,12 +675,17 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 
 	t.VM.SetPreference(t.Consensus.Preference())
 
-	// Query the network for its preferences given this new block
-	t.pushSample(blk)
+	// If the block is now preferred, query the network for its preferences
+	// with this new block.
+	if t.Consensus.IsPreferred(blk) {
+		t.pushSample(blk)
+	}
 
 	t.blocked.Fulfill(blkID)
 	for _, blk := range added {
-		t.pushSample(blk)
+		if t.Consensus.IsPreferred(blk) {
+			t.pushSample(blk)
+		}
 
 		blkID := blk.ID()
 		t.pending.Remove(blkID)

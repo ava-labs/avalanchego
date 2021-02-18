@@ -1245,6 +1245,9 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	sender.PushQueryF = nil
+	sender.CantPushQuery = false
+
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch {
 		case blkID == blockingBlk.ID():
@@ -1261,9 +1264,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	if len(te.blocked) != 2 {
 		t.Fatalf("The insert and the chit should be blocking")
 	}
-
-	sender.PushQueryF = nil
-	sender.CantPushQuery = false
+	sender.CantPullQuery = false
 
 	missingBlk.StatusV = choices.Processing
 	if err := te.issue(missingBlk); err != nil {
