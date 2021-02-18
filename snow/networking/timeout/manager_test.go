@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
@@ -35,7 +36,7 @@ func TestManagerFire(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	manager.RegisterRequest(ids.ShortID{}, ids.ID{}, 0, true, 0, wg.Done)
+	manager.RegisterRequest(ids.ShortID{}, ids.ID{}, ids.GenerateTestID(), wg.Done)
 
 	wg.Wait()
 }
@@ -62,11 +63,12 @@ func TestManagerCancel(t *testing.T) {
 
 	fired := new(bool)
 
-	manager.RegisterRequest(ids.ShortID{}, ids.ID{}, 0, true, 0, func() { *fired = true })
+	id := ids.GenerateTestID()
+	manager.RegisterRequest(ids.ShortID{}, ids.ID{}, id, func() { *fired = true })
 
-	manager.RegisterResponse(ids.ShortID{}, ids.ID{}, 0)
+	manager.RegisterResponse(ids.ShortID{}, ids.ID{}, id, constants.GetMsg, 1*time.Second)
 
-	manager.RegisterRequest(ids.ShortID{}, ids.ID{}, 1, true, 0, wg.Done)
+	manager.RegisterRequest(ids.ShortID{}, ids.ID{}, ids.GenerateTestID(), wg.Done)
 
 	wg.Wait()
 
