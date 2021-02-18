@@ -12,17 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
-
-type request struct {
-	// When this request was registered with the timeout manager
-	time.Time
-	// The type of request that was made
-	constants.MsgType
-}
 
 // Manager registers and fires timeouts for the snow API.
 type Manager struct {
@@ -106,10 +97,4 @@ func (m *Manager) RegisterResponse(
 // though we sent the validator a request and it timed out.
 func (m *Manager) RegisterRequestToBenchedValidator() {
 	m.tm.ObserveLatency(m.TimeoutDuration())
-}
-
-func createRequestID(validatorID ids.ShortID, chainID ids.ID, requestID uint32) ids.ID {
-	p := wrappers.Packer{Bytes: make([]byte, wrappers.IntLen)}
-	p.PackInt(requestID)
-	return hashing.ByteArraysToHash256Array(validatorID[:], chainID[:], p.Bytes)
 }
