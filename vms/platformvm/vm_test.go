@@ -2124,7 +2124,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	go timeoutManager.Dispatch()
 
 	chainRouter := &router.ChainRouter{}
-	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &timeoutManager, time.Hour, time.Second, ids.Set{}, nil)
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &timeoutManager, time.Hour, time.Second, ids.Set{}, nil, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 
 	externalSender := &sender.ExternalSenderTest{T: t}
 	externalSender.Default(true)
