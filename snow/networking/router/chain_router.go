@@ -11,8 +11,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
@@ -23,21 +25,31 @@ var (
 	_ Router = &ChainRouter{}
 )
 
+type request struct {
+	// When this request was registered
+	time.Time
+	// The type of request that was made
+	constants.MsgType
+}
+
 // ChainRouter routes incoming messages from the validator network
 // to the consensus engines that the messages are intended for.
 // Note that consensus engines are uniquely identified by the ID of the chain
 // that they are working on.
 type ChainRouter struct {
+	clock            timer.Clock
 	log              logging.Logger
 	lock             sync.RWMutex
 	chains           map[ids.ID]*Handler
-	timeouts         *timeout.Manager
+	timeoutManager   *timeout.Manager
 	gossiper         *timer.Repeater
 	intervalNotifier *timer.Repeater
 	closeTimeout     time.Duration
 	peers            ids.ShortSet
 	criticalChains   ids.Set
 	onFatal          func()
+	// Unique-ified request ID --> Time and type of message made
+	requests map[ids.ID]request
 }
 
 // Initialize the router.
@@ -51,7 +63,7 @@ type ChainRouter struct {
 func (cr *ChainRouter) Initialize(
 	nodeID ids.ShortID,
 	log logging.Logger,
-	timeouts *timeout.Manager,
+	timeoutManager *timeout.Manager,
 	gossipFrequency time.Duration,
 	closeTimeout time.Duration,
 	criticalChains ids.Set,
@@ -59,17 +71,54 @@ func (cr *ChainRouter) Initialize(
 ) {
 	cr.log = log
 	cr.chains = make(map[ids.ID]*Handler)
-	cr.timeouts = timeouts
+	cr.timeoutManager = timeoutManager
 	cr.gossiper = timer.NewRepeater(cr.Gossip, gossipFrequency)
 	cr.intervalNotifier = timer.NewRepeater(cr.EndInterval, defaultCPUInterval)
 	cr.closeTimeout = closeTimeout
 	cr.criticalChains = criticalChains
 	cr.onFatal = onFatal
+	cr.requests = make(map[ids.ID]request)
 
 	cr.peers.Add(nodeID)
 
 	go log.RecoverAndPanic(cr.gossiper.Dispatch)
 	go log.RecoverAndPanic(cr.intervalNotifier.Dispatch)
+}
+
+// RegisterRequests marks that we should expect to receive a reply from the given validator
+// regarding the given chain and the reply should have the given requestID.
+// The type of message we sent the validator was [msgType].
+// Registers a timeout to fire if we don't get a reply in time.
+func (cr *ChainRouter) RegisterRequest(
+	validatorID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+	msgType constants.MsgType,
+) {
+	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
+	cr.lock.Lock()
+	// Add to the set of unfulfilled requests
+	cr.requests[uniqueRequestID] = request{Time: cr.clock.Time(), MsgType: msgType}
+	cr.lock.Unlock()
+	// Register a timeout to fire if we don't get a reply in time.
+	var timeoutHandler func() // Called upon timeout
+	switch msgType {
+	case constants.PullQueryMsg, constants.PushQueryMsg:
+		timeoutHandler = func() { cr.QueryFailed(validatorID, chainID, requestID) }
+	case constants.GetMsg:
+		timeoutHandler = func() { cr.GetFailed(validatorID, chainID, requestID) }
+	case constants.GetAncestorsMsg:
+		timeoutHandler = func() { cr.GetAncestorsFailed(validatorID, chainID, requestID) }
+	case constants.GetAcceptedMsg:
+		timeoutHandler = func() { cr.GetAcceptedFailed(validatorID, chainID, requestID) }
+	case constants.GetAcceptedFrontierMsg:
+		timeoutHandler = func() { cr.GetAcceptedFrontierFailed(validatorID, chainID, requestID) }
+	default:
+		// This should never happen
+		cr.log.Error("expected message type to be one of GetMsg, PullQueryMsg, PushQueryMsg, GetAcceptedFrontierMsg, GetAcceptedMsg but got %s", msgType)
+		return
+	}
+	cr.timeoutManager.RegisterRequest(validatorID, chainID, uniqueRequestID, timeoutHandler)
 }
 
 // Shutdown shuts down this router
@@ -164,12 +213,22 @@ func (cr *ChainRouter) GetAcceptedFrontier(validatorID ids.ShortID, chainID ids.
 // validator with ID [validatorID]  to the consensus engine working on the
 // chain with ID [chainID]
 func (cr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
+	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
 
+	// Mark that an outstanding request has been fulfilled
+	request, exists := cr.requests[uniqueRequestID]
+	if !exists || request.MsgType != constants.GetAcceptedFrontierMsg {
+		// We didn't request this message or we got back a reply of wrong type. Ignore.
+		return
+	}
+	// Calculate how long it took [validatorID] to reply
+	latency := cr.clock.Time().Sub(request.Time)
+
 	if chain, exists := cr.chains[chainID]; exists {
 		// Tell the timeout manager we got a response
-		cr.timeouts.RegisterResponse(validatorID, chainID, requestID)
+		cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAcceptedFrontierMsg, latency)
 		if !chain.AcceptedFrontier(validatorID, requestID, containerIDs) {
 			// We weren't able to pass the response to the chain
 			chain.GetAcceptedFrontierFailed(validatorID, requestID)
@@ -211,12 +270,22 @@ func (cr *ChainRouter) GetAccepted(validatorID ids.ShortID, chainID ids.ID, requ
 // [validatorID] to the consensus engine working on the chain with ID
 // [chainID]
 func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
+	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
 
+	// Mark that an outstanding request has been fulfilled
+	request, exists := cr.requests[uniqueRequestID]
+	if !exists || request.MsgType != constants.GetAcceptedMsg {
+		// We didn't request this message or we got back a reply of wrong type. Ignore.
+		return
+	}
+	// Calculate how long it took [validatorID] to reply
+	latency := cr.clock.Time().Sub(request.Time)
+
 	if chain, exists := cr.chains[chainID]; exists {
 		// Tell the timeout manager we got a response
-		cr.timeouts.RegisterResponse(validatorID, chainID, requestID)
+		cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAcceptedMsg, latency)
 		if !chain.Accepted(validatorID, requestID, containerIDs) {
 			// We weren't able to pass the response to the chain
 			chain.GetAcceptedFailed(validatorID, requestID)
@@ -257,14 +326,24 @@ func (cr *ChainRouter) GetAncestors(validatorID ids.ShortID, chainID ids.ID, req
 // MultiPut routes an incoming MultiPut message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte) {
+	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
+
+	// Mark that an outstanding request has been fulfilled
+	request, exists := cr.requests[uniqueRequestID]
+	if !exists || request.MsgType != constants.GetAncestorsMsg {
+		// We didn't request this message or we got back a reply of wrong type. Ignore.
+		return
+	}
+	// Calculate how long it took [validatorID] to reply
+	latency := cr.clock.Time().Sub(request.Time)
 
 	// This message came in response to a GetAncestors message from this node, and when we sent that
 	// message we set a timeout. Since we got a response, cancel the timeout.
 	if chain, exists := cr.chains[chainID]; exists {
 		// Tell the timeout manager we got a response
-		cr.timeouts.RegisterResponse(validatorID, chainID, requestID)
+		cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAncestorsMsg, latency)
 		if !chain.MultiPut(validatorID, requestID, containers) {
 			// We weren't able to pass the response to the chain
 			chain.GetAncestorsFailed(validatorID, requestID)
@@ -303,8 +382,23 @@ func (cr *ChainRouter) Get(validatorID ids.ShortID, chainID ids.ID, requestID ui
 // Put routes an incoming Put request from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
+	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
+
+	// If this Put message is in response to a request we made (i.e. it isn't a gossip message)
+	// mark that request as fulfilled
+	var latency time.Duration // Only used if this is not a gossip message
+	if requestID != constants.GossipMsgRequestID {
+		// Mark that an outstanding request has been fulfilled
+		request, exists := cr.requests[uniqueRequestID]
+		if !exists || request.MsgType != constants.GetMsg {
+			// We didn't request this message or we got back a reply of wrong type. Ignore.
+			return
+		}
+		// Calculate how long it took [validatorID] to reply
+		latency = cr.clock.Time().Sub(request.Time)
+	}
 
 	// This message came in response to a Get message from this node, and when we sent that Get
 	// message we set a timeout. Since we got a response, cancel the timeout.
@@ -312,7 +406,7 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	switch {
 	case exists:
 		// Tell the timeout manager we got a response
-		cr.timeouts.RegisterResponse(validatorID, chainID, requestID)
+		cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetMsg, latency)
 		if !chain.Put(validatorID, requestID, containerID, container) {
 			// We weren't able to pass the response to the chain
 			chain.GetFailed(validatorID, requestID)
@@ -370,13 +464,23 @@ func (cr *ChainRouter) PullQuery(validatorID ids.ShortID, chainID ids.ID, reques
 // Chits routes an incoming Chits message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID) {
+	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.RLock()
 	defer cr.lock.RUnlock()
+
+	// Mark that an outstanding request has been fulfilled
+	request, exists := cr.requests[uniqueRequestID]
+	if !exists || (request.MsgType != constants.PullQueryMsg && request.MsgType != constants.PushQueryMsg) {
+		// We didn't request this message or we got back a reply of wrong type. Ignore.
+		return
+	}
+	// Calculate how long it took [validatorID] to reply
+	latency := cr.clock.Time().Sub(request.Time)
 
 	// Cancel timeout we set when sent the message asking for these Chits
 	if chain, exists := cr.chains[chainID]; exists {
 		// Tell the timeout manager we got a response
-		cr.timeouts.RegisterResponse(validatorID, chainID, requestID)
+		cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, request.MsgType, latency)
 		if !chain.Chits(validatorID, requestID, votes) {
 			// We weren't able to pass the response to the chain
 			chain.QueryFailed(validatorID, requestID)
@@ -439,4 +543,10 @@ func (cr *ChainRouter) EndInterval() {
 	for _, chain := range cr.chains {
 		chain.endInterval()
 	}
+}
+
+func createRequestID(validatorID ids.ShortID, chainID ids.ID, requestID uint32) ids.ID {
+	p := wrappers.Packer{Bytes: make([]byte, wrappers.IntLen)}
+	p.PackInt(requestID)
+	return hashing.ByteArraysToHash256Array(validatorID[:], chainID[:], p.Bytes)
 }

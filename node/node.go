@@ -520,7 +520,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	benchlistManager := benchlist.NewManager(&n.Config.BenchlistConfig)
 
 	// Manages network timeouts
-	timeoutManager := timeout.Manager{}
+	timeoutManager := &timeout.Manager{}
 	if err := timeoutManager.Initialize(&n.Config.NetworkConfig, benchlistManager); err != nil {
 		return err
 	}
@@ -530,7 +530,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	n.Config.ConsensusRouter.Initialize(
 		n.ID,
 		n.Log,
-		&timeoutManager,
+		timeoutManager,
 		n.Config.ConsensusGossipFrequency,
 		n.Config.ConsensusShutdownTimeout,
 		criticalChains,
@@ -563,7 +563,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		AVAXAssetID:             avaxAssetID,
 		XChainID:                xChainID,
 		CriticalChains:          criticalChains,
-		TimeoutManager:          &timeoutManager,
+		TimeoutManager:          timeoutManager,
 		HealthService:           n.healthService,
 		WhitelistedSubnets:      n.Config.WhitelistedSubnets,
 	})

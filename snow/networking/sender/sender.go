@@ -57,13 +57,10 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 	timeoutDuration := s.timeouts.TimeoutDuration()
 	sentTo := s.sender.GetAcceptedFrontier(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration)
 
-	// Set timeouts so that if we don't hear back from these validators, we register a failure.
+	// Tell the router to expect a reply message from these validators
 	for _, validatorID := range sentTo {
 		vID := validatorID // Prevent overwrite in next loop iteration
-		// TODO do we need the return values here?
-		s.timeouts.RegisterRequest(vID, s.ctx.ChainID, requestID, true, constants.GetAcceptedFrontierMsg, func() {
-			s.router.GetAcceptedFrontierFailed(vID, s.ctx.ChainID, requestID)
-		})
+		s.router.RegisterRequest(validatorID, s.ctx.ChainID, requestID, constants.GetAcceptedFrontierMsg)
 		validatorIDs.Remove(vID)
 	}
 
@@ -106,13 +103,10 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 	timeoutDuration := s.timeouts.TimeoutDuration()
 	sentTo := s.sender.GetAccepted(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration, containerIDs)
 
-	// Set timeouts so that if we don't hear back from these validators, we register a failure.
+	// Tell the router to expect a reply message from these validators
 	for _, validatorID := range sentTo {
 		vID := validatorID // Prevent overwrite in next loop iteration
-		// TODO do we need the return values here?
-		s.timeouts.RegisterRequest(vID, s.ctx.ChainID, requestID, true, constants.GetAcceptedMsg, func() {
-			s.router.GetAcceptedFailed(vID, s.ctx.ChainID, requestID)
-		})
+		s.router.RegisterRequest(validatorID, s.ctx.ChainID, requestID, constants.GetAcceptedMsg)
 		validatorIDs.Remove(vID)
 	}
 
@@ -144,9 +138,8 @@ func (s *Sender) GetAncestors(validatorID ids.ShortID, requestID uint32, contain
 	sent := s.sender.GetAncestors(validatorID, s.ctx.ChainID, requestID, timeoutDuration, containerID)
 
 	if sent {
-		s.timeouts.RegisterRequest(validatorID, s.ctx.ChainID, requestID, false, constants.GetAncestorsMsg, func() {
-			s.router.GetAncestorsFailed(validatorID, s.ctx.ChainID, requestID)
-		})
+		// Tell the router to expect a reply message from this validator
+		s.router.RegisterRequest(validatorID, s.ctx.ChainID, requestID, constants.GetAncestorsMsg)
 		return
 	}
 	go s.router.GetAncestorsFailed(validatorID, s.ctx.ChainID, requestID)
@@ -178,11 +171,8 @@ func (s *Sender) Get(validatorID ids.ShortID, requestID uint32, containerID ids.
 	sent := s.sender.Get(validatorID, s.ctx.ChainID, requestID, timeoutDuration, containerID)
 
 	if sent {
-		// Add a timeout -- if we don't get a response before the timeout expires,
-		// send this consensus engine a GetFailed message
-		s.timeouts.RegisterRequest(validatorID, s.ctx.ChainID, requestID, true, constants.GetMsg, func() {
-			s.router.GetFailed(validatorID, s.ctx.ChainID, requestID)
-		})
+		// Tell the router to expect a reply message from this validator
+		s.router.RegisterRequest(validatorID, s.ctx.ChainID, requestID, constants.GetMsg)
 		return
 	}
 	go s.router.GetFailed(validatorID, s.ctx.ChainID, requestID)
@@ -211,10 +201,8 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 	// Just put it right into the router. Do so asynchronously to avoid deadlock.
 	if validatorIDs.Contains(s.ctx.NodeID) {
 		validatorIDs.Remove(s.ctx.NodeID)
-		// Register a timeout in case I don't respond to myself
-		s.timeouts.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, true, constants.PushQueryMsg, func() {
-			s.router.QueryFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
-		})
+		// Tell the router to expect a reply message from this validator
+		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.PushQueryMsg)
 		go s.router.PushQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), containerID, container)
 	}
 
@@ -236,10 +224,8 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 	// Set timeouts so that if we don't hear back from these validators, we register a failure.
 	for _, validatorID := range sentTo {
 		vID := validatorID // Prevent overwrite in next loop iteration
-		// TODO do we need the return values here?
-		s.timeouts.RegisterRequest(vID, s.ctx.ChainID, requestID, true, constants.PushQueryMsg, func() {
-			s.router.QueryFailed(vID, s.ctx.ChainID, requestID)
-		})
+		// Tell the router to expect a reply message from this validator
+		s.router.RegisterRequest(validatorID, s.ctx.ChainID, requestID, constants.PushQueryMsg)
 		validatorIDs.Remove(vID)
 	}
 
@@ -263,9 +249,7 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 	if validatorIDs.Contains(s.ctx.NodeID) {
 		validatorIDs.Remove(s.ctx.NodeID)
 		// Register a timeout in case I don't respond to myself
-		s.timeouts.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, true, constants.PullQueryMsg, func() {
-			s.router.QueryFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
-		})
+		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.PullQueryMsg)
 		go s.router.PullQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), containerID)
 	}
 
@@ -287,10 +271,7 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 	// Set timeouts so that if we don't hear back from these validators, we register a failure.
 	for _, validatorID := range sentTo {
 		vID := validatorID // Prevent overwrite in next loop iteration
-		// TODO do we need the return values here?
-		s.timeouts.RegisterRequest(vID, s.ctx.ChainID, requestID, true, constants.PullQueryMsg, func() {
-			s.router.QueryFailed(vID, s.ctx.ChainID, requestID)
-		})
+		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.PullQueryMsg)
 		validatorIDs.Remove(vID)
 	}
 

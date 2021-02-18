@@ -32,14 +32,11 @@ type Manager struct {
 	tm           timer.AdaptiveTimeoutManager
 	benchlistMgr benchlist.Manager
 	metrics      metrics
-	// Unique-ified request ID --> Time and type of message made
-	requests map[ids.ID]request
 }
 
 // Initialize this timeout manager.
 func (m *Manager) Initialize(timeoutConfig *timer.AdaptiveTimeoutConfig, benchlistMgr benchlist.Manager) error {
 	m.benchlistMgr = benchlistMgr
-	m.requests = map[ids.ID]request{}
 	return m.tm.Initialize(timeoutConfig)
 }
 
@@ -76,15 +73,9 @@ func (m *Manager) RegisterChain(ctx *snow.Context, namespace string) error {
 func (m *Manager) RegisterRequest(
 	validatorID ids.ShortID,
 	chainID ids.ID,
-	requestID uint32,
-	register bool,
-	msgType constants.MsgType,
+	uniqueRequestID ids.ID,
 	timeoutHandler func(),
 ) (time.Time, bool) {
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
-	m.lock.Lock()
-	m.requests[uniqueRequestID] = request{Time: time.Now(), MsgType: msgType}
-	m.lock.Unlock()
 	newTimeoutHandler := func() {
 		// If this request timed out, tell the benchlist manager
 		m.benchlistMgr.RegisterFailure(chainID, validatorID)
@@ -95,22 +86,18 @@ func (m *Manager) RegisterRequest(
 
 // RegisterResponse registers that we received a response from [validatorID]
 // regarding the given request ID and chain.
-func (m *Manager) RegisterResponse(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
+func (m *Manager) RegisterResponse(
+	validatorID ids.ShortID,
+	chainID ids.ID,
+	uniqueRequestID ids.ID,
+	msgType constants.MsgType,
+	latency time.Duration,
+) {
 	m.lock.Lock()
-	request, ok := m.requests[uniqueRequestID]
-	if !ok {
-		// This message is not in response to a request we made
-		// TODO add a log here
-		m.lock.Unlock()
-		return
-	}
-	delete(m.requests, uniqueRequestID)
-	latency := m.clock.Time().Sub(request.Time)
-	m.metrics.observe(chainID, request.MsgType, latency)
+	m.metrics.observe(chainID, msgType, latency)
 	m.lock.Unlock()
 	m.benchlistMgr.RegisterResponse(chainID, validatorID)
-	m.tm.Remove(createRequestID(validatorID, chainID, requestID))
+	m.tm.Remove(uniqueRequestID)
 }
 
 // RegisterRequestToBenchedValidator registers that we would have sent

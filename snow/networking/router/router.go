@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -34,6 +35,7 @@ type Router interface {
 // ExternalRouter routes messages from the network to the
 // Handler of the consensus engine that the message is intended for
 type ExternalRouter interface {
+	RegisterRequest(validatorID ids.ShortID, chainID ids.ID, requestID uint32, msgType constants.MsgType)
 	GetAcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time)
 	AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
 	GetAccepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs []ids.ID)
