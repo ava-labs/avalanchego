@@ -152,8 +152,9 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 
 	// restart the bootstrap
 	if totalWeight < b.Alpha {
-		b.Ctx.Log.Info("Didn't receive enough AcceptedFrontier to bootstrap - bootstrap attempt: %d", b.bootstrapAttempts)
-		return b.restartBootstrap()
+		b.Ctx.Log.Info("Didn't receive enough AcceptedFrontier to bootstrap - failed validators: %d, "+
+			"bootstrap attempt: %d", b.failedAcceptedFrontierVdrs.Len(), b.bootstrapAttempts)
+		return b.RestartBootstrap()
 	}
 
 	vdrs := ids.ShortSet{}
@@ -223,7 +224,7 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 		b.Ctx.Log.Info("Bootstrapping finished with no accepted frontier. This is likely a result of failing to "+
 			"be able to connect to the specified bootstraps, or no transactions have been issued on this chain yet"+
 			" - Number of beacons: %d - bootstrap attempt: %d", b.Beacons.Len(), b.bootstrapAttempts)
-		return b.restartBootstrap()
+		return b.RestartBootstrap()
 	}
 
 	b.Ctx.Log.Info("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
@@ -265,8 +266,8 @@ func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
 	return nil
 }
 
-func (b *Bootstrapper) restartBootstrap() error {
-	if b.bootstrapAttempts > 3 {
+func (b *Bootstrapper) RestartBootstrap() error {
+	if b.bootstrapAttempts > 100 {
 		return fmt.Errorf("failed to boostrap the chain after %d attempts", b.bootstrapAttempts)
 	}
 

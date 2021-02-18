@@ -45,6 +45,8 @@ type Bootstrapper struct {
 
 	// true if all of the vertices in the original accepted frontier have been processed
 	processedStartingAcceptedFrontier bool
+	// number of state transitions executed
+	executedStateTransitions int
 }
 
 // Initialize this engine.
@@ -110,7 +112,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 
 	b.processedStartingAcceptedFrontier = true
 	if numPending := b.OutstandingRequests.Len(); numPending == 0 {
-		return b.finish()
+		return b.checkFinish()
 	}
 	return nil
 }
@@ -125,7 +127,7 @@ func (b *Bootstrapper) fetch(blkID ids.ID) error {
 	// Make sure we don't already have this block
 	if _, err := b.VM.GetBlock(blkID); err == nil {
 		if numPending := b.OutstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
-			return b.finish()
+			return b.checkFinish()
 		}
 		return nil
 	}
@@ -231,21 +233,38 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 	}
 
 	if numPending := b.OutstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
-		return b.finish()
+		return b.checkFinish()
 	}
 	return nil
 }
 
-func (b *Bootstrapper) finish() error {
+// checkFinish repeatedly executes pending transactions and requests new frontier blocks until there isn't any new ones
+// after which it finishes the bootstrap process
+func (b *Bootstrapper) checkFinish() error {
 	if b.IsBootstrapped() {
 		return nil
 	}
+
 	b.Ctx.Log.Info("bootstrapping fetched %d blocks. executing state transitions...",
 		b.NumFetched)
 
-	if err := b.executeAll(b.Blocked); err != nil {
+	executedBlocks, err := b.executeAll(b.Blocked)
+	if err != nil {
 		return err
 	}
+
+	if executedBlocks >= b.executedStateTransitions {
+		b.executedStateTransitions = executedBlocks
+		b.Ctx.Log.Info("bootstrapping is checking for more blocks before finishing the bootstrap process...")
+		return b.RestartBootstrap()
+	}
+
+	b.Ctx.Log.Info("bootstrapping fetched enough blocks to finish the bootstrap process...")
+
+	return b.finish()
+}
+
+func (b *Bootstrapper) finish() error {
 
 	if err := b.VM.Bootstrapped(); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
@@ -264,14 +283,14 @@ func (b *Bootstrapper) finish() error {
 	return nil
 }
 
-func (b *Bootstrapper) executeAll(jobs *queue.Jobs) error {
+func (b *Bootstrapper) executeAll(jobs *queue.Jobs) (int, error) {
 	numExecuted := 0
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		if err := jobs.Execute(job); err != nil {
-			return err
+			return numExecuted, err
 		}
 		if err := jobs.Commit(); err != nil {
-			return err
+			return numExecuted, err
 		}
 		numExecuted++
 		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
@@ -282,7 +301,7 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs) error {
 		b.Ctx.DecisionDispatcher.Accept(b.Ctx, job.ID(), job.Bytes())
 	}
 	b.Ctx.Log.Info("executed %d blocks", numExecuted)
-	return nil
+	return numExecuted, nil
 }
 
 // Connected implements the Engine interface.

@@ -60,6 +60,8 @@ type Bootstrapper struct {
 
 	// Contains IDs of vertices that have recently been processed
 	processedCache *cache.LRU
+	// number of state transitions executed
+	executedStateTransitions int
 }
 
 // Initialize this engine.
@@ -144,7 +146,7 @@ func (b *Bootstrapper) fetch(vtxIDs ...ids.ID) error {
 		b.OutstandingRequests.Add(validatorID, b.RequestID, vtxID)
 		b.Sender.GetAncestors(validatorID, b.RequestID, vtxID) // request vertex and ancestors
 	}
-	return b.finish()
+	return b.checkFinish()
 }
 
 // Process the vertices in [vtxs].
@@ -346,24 +348,41 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	return b.process(toProcess...)
 }
 
-// Finish bootstrapping
-func (b *Bootstrapper) finish() error {
+// checkFinish repeatedly executes pending transactions and requests new frontier blocks until there isn't any new ones
+// after which it finishes the bootstrap process
+func (b *Bootstrapper) checkFinish() error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
 	if b.Ctx.IsBootstrapped() || b.OutstandingRequests.Len() > 0 || b.needToFetch.Len() > 0 {
 		return nil
 	}
 
-	b.Ctx.Log.Info("bootstrapping fetched %d vertices. executing transaction state transitions...",
+	b.Ctx.Log.Info("bootstrapping fetched %d blocks. executing state transitions...",
 		b.NumFetched)
-	if err := b.executeAll(b.TxBlocked, b.Ctx.DecisionDispatcher); err != nil {
+
+	executedBlocks, err := b.executeAll(b.TxBlocked, b.Ctx.DecisionDispatcher)
+	if err != nil {
 		return err
 	}
 
 	b.Ctx.Log.Info("executing vertex state transitions...")
-	if err := b.executeAll(b.VtxBlocked, b.Ctx.ConsensusDispatcher); err != nil {
+	executedVertices, err := b.executeAll(b.VtxBlocked, b.Ctx.ConsensusDispatcher)
+	if err != nil {
 		return err
 	}
 
+	if executedBlocks+executedVertices >= b.executedStateTransitions {
+		b.executedStateTransitions = executedBlocks + executedVertices
+		b.Ctx.Log.Info("bootstrapping is checking for more blocks before finishing the bootstrap process...")
+		return b.RestartBootstrap()
+	}
+
+	b.Ctx.Log.Info("bootstrapping fetched enough blocks to finish the bootstrap process...")
+
+	return b.finish()
+}
+
+// Finish bootstrapping
+func (b *Bootstrapper) finish() error {
 	if err := b.VM.Bootstrapped(); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
 			err)
@@ -378,17 +397,17 @@ func (b *Bootstrapper) finish() error {
 	return nil
 }
 
-func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher) error {
+func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher) (int, error) {
 	numExecuted := 0
 
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		b.Ctx.Log.Debug("Executing: %s", job.ID())
 		if err := jobs.Execute(job); err != nil {
 			b.Ctx.Log.Error("Error executing: %s", err)
-			return err
+			return numExecuted, err
 		}
 		if err := jobs.Commit(); err != nil {
-			return err
+			return numExecuted, err
 		}
 		numExecuted++
 		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
@@ -398,7 +417,7 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher)
 		events.Accept(b.Ctx, job.ID(), job.Bytes())
 	}
 	b.Ctx.Log.Info("executed %d operations", numExecuted)
-	return nil
+	return numExecuted, nil
 }
 
 // Connected implements the Engine interface.
