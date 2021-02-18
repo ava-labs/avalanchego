@@ -2591,3 +2591,89 @@ func TestUptimeReporting(t *testing.T) {
 	checkUptime(vm, nodeID1, .75, "peer connected after bootstrapping after restart")
 	checkUptime(vm, nodeID2, .75, "peer connected during bootstrapping and disconnected after bootstrapping after restart")
 }
+
+// Test that calling Verify on a block with an unverified parent doesn't cause a
+// panic.
+func TestUnverifiedParentPanic(t *testing.T) {
+	_, genesisBytes := defaultGenesis()
+
+	db := memdb.New()
+
+	vm := &VM{
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
+	}
+
+	vm.vdrMgr = validators.NewManager()
+
+	vm.clock.Set(defaultGenesisTime)
+	ctx := defaultContext()
+	ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	msgChan := make(chan common.Message, 1)
+	if err := vm.Initialize(ctx, db, genesisBytes, msgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	key0 := keys[0]
+	key1 := keys[1]
+	addr0 := key0.PublicKey().Address()
+	addr1 := key1.PublicKey().Address()
+
+	addSubnetTx0, err := vm.newCreateSubnetTx(1, []ids.ShortID{addr0}, []*crypto.PrivateKeySECP256K1R{key0}, addr0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addSubnetTx1, err := vm.newCreateSubnetTx(1, []ids.ShortID{addr1}, []*crypto.PrivateKeySECP256K1R{key1}, addr1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addSubnetTx2, err := vm.newCreateSubnetTx(1, []ids.ShortID{addr1}, []*crypto.PrivateKeySECP256K1R{key1}, addr0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	preferredHeight, err := vm.preferredHeight()
+	if err != nil {
+		t.Fatal(err)
+	}
+	addSubnetBlk0, err := vm.newStandardBlock(vm.Preferred(), preferredHeight+1, []*Tx{addSubnetTx0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	addSubnetBlk1, err := vm.newStandardBlock(vm.Preferred(), preferredHeight+1, []*Tx{addSubnetTx1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	addSubnetBlk2, err := vm.newStandardBlock(addSubnetBlk1.ID(), preferredHeight+2, []*Tx{addSubnetTx2})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := vm.ParseBlock(addSubnetBlk0.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := vm.ParseBlock(addSubnetBlk1.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := vm.ParseBlock(addSubnetBlk2.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := addSubnetBlk0.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := addSubnetBlk0.Accept(); err != nil {
+		t.Fatal(err)
+	}
+	// Doesn't matter what verify returns as long as it's not panicking.
+	_ = addSubnetBlk2.Verify()
+}

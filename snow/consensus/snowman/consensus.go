@@ -30,6 +30,10 @@ type Consensus interface {
 	// Returns if a critical error has occurred.
 	Add(Block) error
 
+	// AcceptedOrProcessing returns true if the block has been accepted or is
+	// currently processing
+	AcceptedOrProcessing(Block) bool
+
 	// DecidedOrProcessing returns true if the block has been decided or is
 	// currently processing.
 	DecidedOrProcessing(Block) bool
