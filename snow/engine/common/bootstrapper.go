@@ -49,6 +49,7 @@ type Bootstrapper struct {
 	started bool
 	weight  uint64
 
+	// number of times the bootstrap was attempted
 	bootstrapAttempts int
 	// validators that failed to respond with their frontiers
 	failedAcceptedFrontierVdrs ids.ShortSet
@@ -82,7 +83,6 @@ func (b *Bootstrapper) Initialize(config Config) error {
 
 // Startup implements the Engine interface.
 func (b *Bootstrapper) Startup() error {
-
 	b.bootstrapAttempts++
 	b.started = true
 	if b.pendingAcceptedFrontier.Len() == 0 {
@@ -137,13 +137,16 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 	var err error
 	totalWeight := uint64(0)
 
-	// measure total weight
+	// measure total weight of accepted frontiers from the validators
 	for _, beacon := range b.Beacons.List() {
-		if !b.failedAcceptedFrontierVdrs.Contains(beacon.ID()) {
-			totalWeight, err = math.Add64(totalWeight, beacon.Weight())
-			if err != nil {
-				totalWeight = stdmath.MaxUint64
-			}
+		if b.failedAcceptedFrontierVdrs.Contains(beacon.ID()) {
+			continue
+		}
+
+		totalWeight, err = math.Add64(totalWeight, beacon.Weight())
+		if err != nil {
+			b.Ctx.Log.Error("Error calculating the AcceptedFrontier beacons weight - totalWeight: %v, beacon.Weight: %v", totalWeight, beacon.Weight())
+			totalWeight = stdmath.MaxUint64
 		}
 	}
 
@@ -193,6 +196,7 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 		previousWeight := b.acceptedVotes[containerID]
 		newWeight, err := math.Add64(weight, previousWeight)
 		if err != nil {
+			b.Ctx.Log.Error("Error calculating the Accepted votes - weight: %v, previousWeight: %v", weight, previousWeight)
 			newWeight = stdmath.MaxUint64
 		}
 		b.acceptedVotes[containerID] = newWeight
