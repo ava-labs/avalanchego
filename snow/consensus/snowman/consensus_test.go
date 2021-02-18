@@ -30,10 +30,10 @@ var (
 		AddToTailTest,
 		AddToNonTailTest,
 		AddToUnknownTest,
-		IssuedPreviouslyAcceptedTest,
-		IssuedPreviouslyRejectedTest,
-		IssuedUnissuedTest,
-		IssuedIssuedTest,
+		StatusOrProcessingPreviouslyAcceptedTest,
+		StatusOrProcessingPreviouslyRejectedTest,
+		StatusOrProcessingUnissuedTest,
+		StatusOrProcessingIssuedTest,
 		RecordPollAcceptSingleBlockTest,
 		RecordPollAcceptAndRejectTest,
 		RecordPollWhenFinalizedTest,
@@ -264,7 +264,7 @@ func AddToUnknownTest(t *testing.T, factory Factory) {
 	}
 }
 
-func IssuedPreviouslyAcceptedTest(t *testing.T, factory Factory) {
+func StatusOrProcessingPreviouslyAcceptedTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
 	ctx := snow.DefaultContextTest()
@@ -281,12 +281,15 @@ func IssuedPreviouslyAcceptedTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
+	if !sm.AcceptedOrProcessing(Genesis) {
+		t.Fatalf("Should have marked an accepted block as having been decided")
+	}
 	if !sm.DecidedOrProcessing(Genesis) {
 		t.Fatalf("Should have marked an accepted block as having been decided")
 	}
 }
 
-func IssuedPreviouslyRejectedTest(t *testing.T, factory Factory) {
+func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
 	ctx := snow.DefaultContextTest()
@@ -311,12 +314,15 @@ func IssuedPreviouslyRejectedTest(t *testing.T, factory Factory) {
 		ParentV: Genesis,
 	}
 
+	if sm.AcceptedOrProcessing(block) {
+		t.Fatalf("Shouldn't have marked a rejected block as having been accepted")
+	}
 	if !sm.DecidedOrProcessing(block) {
 		t.Fatalf("Should have marked a rejected block as having been decided")
 	}
 }
 
-func IssuedUnissuedTest(t *testing.T, factory Factory) {
+func StatusOrProcessingUnissuedTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
 	ctx := snow.DefaultContextTest()
@@ -342,12 +348,15 @@ func IssuedUnissuedTest(t *testing.T, factory Factory) {
 		HeightV: 1,
 	}
 
+	if sm.AcceptedOrProcessing(block) {
+		t.Fatalf("Shouldn't have marked an unissued block as being processing")
+	}
 	if sm.DecidedOrProcessing(block) {
 		t.Fatalf("Shouldn't have marked an unissued block as being processing")
 	}
 }
 
-func IssuedIssuedTest(t *testing.T, factory Factory) {
+func StatusOrProcessingIssuedTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
 	ctx := snow.DefaultContextTest()
@@ -374,7 +383,11 @@ func IssuedIssuedTest(t *testing.T, factory Factory) {
 
 	if err := sm.Add(block); err != nil {
 		t.Fatal(err)
-	} else if !sm.DecidedOrProcessing(block) {
+	}
+	if !sm.AcceptedOrProcessing(block) {
+		t.Fatalf("Should have marked a the block as processing")
+	}
+	if !sm.DecidedOrProcessing(block) {
 		t.Fatalf("Should have marked a the block as processing")
 	}
 }
