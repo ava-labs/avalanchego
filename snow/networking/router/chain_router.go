@@ -417,11 +417,14 @@ func (cr *ChainRouter) GetAncestorsFailed(validatorID ids.ShortID, chainID ids.I
 	// Remove the outstanding request
 	delete(cr.requests, uniqueRequestID)
 
+	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
 	if !exists {
+		// Should only happen if shutting down
 		cr.log.Debug("GetAncestorsFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 		return
 	}
+
 	// Pass the response to the chain
 	chain.GetAncestorsFailed(validatorID, requestID)
 }
@@ -464,22 +467,26 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 		return
 	}
 
+	// If this is a gossip message, pass to the chain
+	if requestID == constants.GossipMsgRequestID {
+		// Note that we don't check the return value.
+		// It's ok to drop this message.
+		chain.Put(validatorID, requestID, containerID, container)
+		return
+	}
+
 	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 
-	// If this Put message is in response to a request we made (i.e. it isn't a gossip message),
-	// mark that request as fulfilled
-	var latency time.Duration // Only used if this is not a gossip message
-	if requestID != constants.GossipMsgRequestID {
-		// Mark that an outstanding request has been fulfilled
-		request, exists := cr.requests[uniqueRequestID]
-		if !exists || request.MsgType != constants.GetMsg {
-			// We didn't request this message or we got back a reply of wrong type. Ignore.
-			return
-		}
-		// Calculate how long it took [validatorID] to reply
-		latency = cr.clock.Time().Sub(request.Time)
+	// Mark that an outstanding request has been fulfilled
+	request, exists := cr.requests[uniqueRequestID]
+	if !exists || request.MsgType != constants.GetMsg {
+		// We didn't request this message or we got back a reply of wrong type. Ignore.
+		return
 	}
 	delete(cr.requests, uniqueRequestID)
+
+	// Calculate how long it took [validatorID] to reply
+	latency := cr.clock.Time().Sub(request.Time)
 
 	// Tell the timeout manager we got a response
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetMsg, latency)

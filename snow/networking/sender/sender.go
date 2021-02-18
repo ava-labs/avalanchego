@@ -60,7 +60,7 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 	// Tell the router to expect a reply message from these validators
 	for _, validatorID := range sentTo {
 		vID := validatorID // Prevent overwrite in next loop iteration
-		s.router.RegisterRequest(validatorID, s.ctx.ChainID, requestID, constants.GetAcceptedFrontierMsg)
+		s.router.RegisterRequest(vID, s.ctx.ChainID, requestID, constants.GetAcceptedFrontierMsg)
 		validatorIDs.Remove(vID)
 	}
 
@@ -271,7 +271,7 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 	// Set timeouts so that if we don't hear back from these validators, we register a failure.
 	for _, validatorID := range sentTo {
 		vID := validatorID // Prevent overwrite in next loop iteration
-		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.PullQueryMsg)
+		s.router.RegisterRequest(vID, s.ctx.ChainID, requestID, constants.PullQueryMsg)
 		validatorIDs.Remove(vID)
 	}
 
