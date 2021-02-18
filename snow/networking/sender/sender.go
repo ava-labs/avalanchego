@@ -213,7 +213,7 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 			validatorIDs.Remove(validatorID)
 			s.timeouts.RegisterRequestToBenchedValidator()
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
-			go s.router.QueryFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
+			go s.router.QueryFailed(validatorID, s.ctx.ChainID, requestID)
 		}
 	}
 
@@ -260,7 +260,7 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 			validatorIDs.Remove(validatorID)
 			s.timeouts.RegisterRequestToBenchedValidator()
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
-			go s.router.QueryFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
+			go s.router.QueryFailed(validatorID, s.ctx.ChainID, requestID)
 		}
 	}
 
