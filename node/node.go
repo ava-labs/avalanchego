@@ -527,7 +527,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
 
 	// Routes incoming messages from peers to the appropriate chain
-	n.Config.ConsensusRouter.Initialize(
+	err = n.Config.ConsensusRouter.Initialize(
 		n.ID,
 		n.Log,
 		timeoutManager,
@@ -535,7 +535,12 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		n.Config.ConsensusShutdownTimeout,
 		criticalChains,
 		n.Shutdown,
+		n.Config.NetworkConfig.MetricsNamespace,
+		n.Config.NetworkConfig.Registerer,
 	)
+	if err != nil {
+		return fmt.Errorf("couldn't initialize chain router: %w", err)
+	}
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
 		StakingEnabled:          n.Config.EnableStaking,

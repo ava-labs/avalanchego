@@ -4,6 +4,7 @@
 package router
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -48,6 +50,7 @@ type ChainRouter struct {
 	peers            ids.ShortSet
 	criticalChains   ids.Set
 	onFatal          func()
+	metrics          routerMetrics
 	// Unique-ified request ID --> Time and type of message made
 	requests map[ids.ID]request
 }
@@ -68,7 +71,9 @@ func (cr *ChainRouter) Initialize(
 	closeTimeout time.Duration,
 	criticalChains ids.Set,
 	onFatal func(),
-) {
+	metricsNamespace string,
+	metricsRegisterer prometheus.Registerer,
+) error {
 	cr.log = log
 	cr.chains = make(map[ids.ID]*Handler)
 	cr.timeoutManager = timeoutManager
@@ -78,11 +83,22 @@ func (cr *ChainRouter) Initialize(
 	cr.criticalChains = criticalChains
 	cr.onFatal = onFatal
 	cr.requests = make(map[ids.ID]request)
-
 	cr.peers.Add(nodeID)
+	cr.metrics = routerMetrics{}
+	cr.metrics.outstandingRequests = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: metricsNamespace,
+			Name:      "outstanding_requests",
+			Help:      "Number of outstanding requests (all types)",
+		},
+	)
+	if err := metricsRegisterer.Register(cr.metrics.outstandingRequests); err != nil {
+		return fmt.Errorf("couldn't register metric: %w", err)
+	}
 
 	go log.RecoverAndPanic(cr.gossiper.Dispatch)
 	go log.RecoverAndPanic(cr.intervalNotifier.Dispatch)
+	return nil
 }
 
 // RegisterRequests marks that we should expect to receive a reply from the given validator
@@ -101,6 +117,7 @@ func (cr *ChainRouter) RegisterRequest(
 	cr.lock.Lock()
 	// Add to the set of unfulfilled requests
 	cr.requests[uniqueRequestID] = request{Time: cr.clock.Time(), MsgType: msgType}
+	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
 	cr.lock.Unlock()
 	// Register a timeout to fire if we don't get a reply in time.
 	var timeoutHandler func() // Called upon timeout
@@ -239,6 +256,7 @@ func (cr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 		return
 	}
 	delete(cr.requests, uniqueRequestID)
+	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
 
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.Time)
@@ -263,6 +281,7 @@ func (cr *ChainRouter) GetAcceptedFrontierFailed(validatorID ids.ShortID, chainI
 
 	// Remove the outstanding request
 	delete(cr.requests, uniqueRequestID)
+	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
 
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
@@ -317,6 +336,7 @@ func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 		return
 	}
 	delete(cr.requests, uniqueRequestID)
+	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
 
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.Time)
@@ -341,6 +361,7 @@ func (cr *ChainRouter) GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID
 
 	// Remove the outstanding request
 	delete(cr.requests, uniqueRequestID)
+	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
 
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
@@ -395,6 +416,7 @@ func (cr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 		return
 	}
 	delete(cr.requests, uniqueRequestID)
+	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
 
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.Time)
@@ -418,6 +440,7 @@ func (cr *ChainRouter) GetAncestorsFailed(validatorID ids.ShortID, chainID ids.I
 
 	// Remove the outstanding request
 	delete(cr.requests, uniqueRequestID)
+	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
 
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
@@ -486,6 +509,7 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 		return
 	}
 	delete(cr.requests, uniqueRequestID)
+	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
 
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.Time)
@@ -509,6 +533,7 @@ func (cr *ChainRouter) GetFailed(validatorID ids.ShortID, chainID ids.ID, reques
 
 	// Remove the outstanding request
 	delete(cr.requests, uniqueRequestID)
+	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
 
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
@@ -578,6 +603,7 @@ func (cr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 		return
 	}
 	delete(cr.requests, uniqueRequestID)
+	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
 
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.Time)
@@ -601,6 +627,7 @@ func (cr *ChainRouter) QueryFailed(validatorID ids.ShortID, chainID ids.ID, requ
 
 	// Remove the outstanding request
 	delete(cr.requests, uniqueRequestID)
+	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
 
 	chain, exists := cr.chains[chainID]
 	if !exists {
@@ -658,4 +685,9 @@ func createRequestID(validatorID ids.ShortID, chainID ids.ID, requestID uint32) 
 	p := wrappers.Packer{Bytes: make([]byte, wrappers.IntLen)}
 	p.PackInt(requestID)
 	return hashing.ByteArraysToHash256Array(validatorID[:], chainID[:], p.Bytes)
+}
+
+// metrics about incoming messages
+type routerMetrics struct {
+	outstandingRequests prometheus.Gauge
 }

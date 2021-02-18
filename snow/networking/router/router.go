@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Router routes consensus messages to the Handler of the consensus
@@ -26,7 +27,9 @@ type Router interface {
 		shutdownTimeout time.Duration,
 		criticalChains ids.Set,
 		onFatal func(),
-	)
+		metricsNamespace string,
+		metricsRegisterer prometheus.Registerer,
+	) error
 	Shutdown()
 	AddChain(chain *Handler)
 	RemoveChain(chainID ids.ID)
