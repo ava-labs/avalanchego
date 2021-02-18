@@ -437,7 +437,7 @@ func (t *Transitive) repoll() {
 	prefID := t.Consensus.Preference()
 
 	for i := t.polls.Len(); i < t.Params.ConcurrentRepolls; i++ {
-		t.pullSample(prefID)
+		t.pullQuery(prefID)
 	}
 }
 
@@ -571,8 +571,8 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, blkID ids.ID) {
 	t.numRequests.Set(float64(t.blkReqs.Len()))
 }
 
-// send a pull request for this block ID
-func (t *Transitive) pullSample(blkID ids.ID) {
+// send a pull query for this block ID
+func (t *Transitive) pullQuery(blkID ids.ID) {
 	t.Ctx.Log.Verbo("about to sample from: %s", t.Validators)
 	// The validators we will query
 	vdrs, err := t.Validators.Sample(t.Params.K)
@@ -592,8 +592,8 @@ func (t *Transitive) pullSample(blkID ids.ID) {
 	}
 }
 
-// send a push request for this block
-func (t *Transitive) pushSample(blk snowman.Block) {
+// send a push query for this block
+func (t *Transitive) pushQuery(blk snowman.Block) {
 	t.Ctx.Log.Verbo("about to sample from: %s", t.Validators)
 	vdrs, err := t.Validators.Sample(t.Params.K)
 	vdrBag := ids.ShortBag{}
@@ -678,13 +678,13 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	// If the block is now preferred, query the network for its preferences
 	// with this new block.
 	if t.Consensus.IsPreferred(blk) {
-		t.pushSample(blk)
+		t.pushQuery(blk)
 	}
 
 	t.blocked.Fulfill(blkID)
 	for _, blk := range added {
 		if t.Consensus.IsPreferred(blk) {
-			t.pushSample(blk)
+			t.pushQuery(blk)
 		}
 
 		blkID := blk.ID()

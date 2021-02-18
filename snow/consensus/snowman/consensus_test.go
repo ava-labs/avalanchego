@@ -170,8 +170,8 @@ func AddToTailTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	} else if pref := sm.Preference(); pref != block.ID() {
 		t.Fatalf("Wrong preference. Expected %s, got %s", block.ID(), pref)
-	} else if pref := sm.Preference(); pref != block.ID() {
-		t.Fatalf("Wrong preference. Expected %s, got %s", block.ID(), pref)
+	} else if !sm.IsPreferred(block) {
+		t.Fatalf("Should have marked %s as being Preferred", pref)
 	}
 }
 

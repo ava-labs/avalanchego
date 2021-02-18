@@ -220,7 +220,11 @@ func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
 	}
 
 	// If the set of preferred IDs already contains the preference, then the
-	// tail is guaranteed to already be set correctly.
+	// tail is guaranteed to already be set correctly. This is because the value
+	// returned from vote reports the next preferred block after the last
+	// preferred block that was voted for. If this block was previously
+	// preferred, then we know that following the preferences down the chain
+	// will return the current tail.
 	if ts.preferredIDs.Contains(preferred) {
 		return nil
 	}
