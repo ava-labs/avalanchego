@@ -368,7 +368,9 @@ func (ts *Topological) pushVotes(
 	return voteStack
 }
 
-// apply votes to the branch that received an Alpha threshold
+// apply votes to the branch that received an Alpha threshold and returns the
+// next preferred block after the last preferred block that received an Alpha
+// threshold.
 func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 	// If the voteStack is empty, then the full tree should falter. This won't
 	// change the preferred branch.
