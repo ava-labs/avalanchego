@@ -254,3 +254,73 @@ func TestRouterTimeout(t *testing.T) {
 		maxTimeout/5,
 	)
 }
+
+func TestRouterClearTimeouts(t *testing.T) {
+	// Create a timeout manager
+	tm := timeout.Manager{}
+	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout:     3 * time.Second,
+		MinimumTimeout:     3 * time.Second,
+		MaximumTimeout:     5 * time.Minute,
+		TimeoutCoefficient: 1,
+		TimeoutHalflife:    5 * time.Minute,
+		MetricsNamespace:   "",
+		Registerer:         prometheus.NewRegistry(),
+	}, benchlist.NewNoBenchlist())
+	if err != nil {
+		t.Fatal(err)
+	}
+	go tm.Dispatch()
+
+	// Create a router
+	chainRouter := ChainRouter{}
+	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Millisecond, ids.Set{}, nil)
+
+	// Create an engine and handler
+	engine := common.EngineTest{T: t}
+	engine.Default(false)
+
+	engine.ContextF = snow.DefaultContextTest
+
+	handler := &Handler{}
+	handler.Initialize(
+		&engine,
+		validators.NewSet(),
+		nil,
+		DefaultMaxNonStakerPendingMsgs,
+		DefaultMaxNonStakerPendingMsgs,
+		DefaultStakerPortion,
+		DefaultStakerPortion,
+		"",
+		prometheus.NewRegistry(),
+	)
+
+	chainRouter.AddChain(handler)
+	go handler.Dispatch()
+
+	// Register requests for each request type
+	msgs := []constants.MsgType{
+		constants.GetMsg,
+		constants.GetAncestorsMsg,
+		constants.PullQueryMsg,
+		constants.PushQueryMsg,
+		constants.GetAcceptedMsg,
+		constants.GetAcceptedFrontierMsg,
+	}
+
+	vID := ids.GenerateTestShortID()
+	for i, msg := range msgs {
+		chainRouter.RegisterRequest(vID, handler.ctx.ChainID, uint32(i), msg)
+	}
+
+	// Clear each timeout by simulating responses to the queries
+	// Note: Depends on the ordering of [msgs]
+	chainRouter.Put(vID, handler.ctx.ChainID, 0, ids.GenerateTestID(), nil)
+	chainRouter.MultiPut(vID, handler.ctx.ChainID, 1, nil)
+	chainRouter.Chits(vID, handler.ctx.ChainID, 2, nil)
+	chainRouter.Chits(vID, handler.ctx.ChainID, 3, nil)
+	chainRouter.Accepted(vID, handler.ctx.ChainID, 4, nil)
+	chainRouter.AcceptedFrontier(vID, handler.ctx.ChainID, 5, nil)
+
+	assert.Len(t, chainRouter.requests, 0)
+}

@@ -105,8 +105,8 @@ func TestAdaptiveTimeoutManager(t *testing.T) {
 	assert := assert.New(t)
 	tm := AdaptiveTimeoutManager{}
 	config := &AdaptiveTimeoutConfig{
-		InitialTimeout:     time.Second,
-		MinimumTimeout:     100 * time.Millisecond,
+		InitialTimeout:     250 * time.Millisecond,
+		MinimumTimeout:     250 * time.Millisecond,
 		MaximumTimeout:     10 * time.Second,
 		TimeoutHalflife:    5 * time.Minute,
 		TimeoutCoefficient: 1.25,
@@ -172,7 +172,6 @@ func TestAdaptiveTimeoutManager(t *testing.T) {
 		func() { wg.Done() },
 	)
 
-	timeoutDuration := tm.TimeoutDuration()
 	tm.lock.Lock()
 	// id0 should be in the timeout map
 	assert.Contains(tm.timeoutMap, id0)
@@ -188,6 +187,9 @@ func TestAdaptiveTimeoutManager(t *testing.T) {
 
 	// Wait until timeout fires
 	wg.Wait()
+	// Give [tm.timer] a moment to set [tm.timer.shouldExecute] to false
+	// If test is being flaky, try increasing this
+	time.Sleep(100 * time.Millisecond)
 
 	// Make sure first timeout we registered then overwrote never fires
 	assert.False(timeoutZeroCalled.GetValue())
@@ -196,8 +198,6 @@ func TestAdaptiveTimeoutManager(t *testing.T) {
 	assert.Len(tm.timeoutMap, 0)
 	assert.Len(tm.timeoutQueue, 0)
 	assert.False(tm.timer.shouldExecute)
-	// Make sure the timeout duration increased after the timeout goes off
-	assert.Less(timeoutDuration.Nanoseconds(), tm.currentTimeout.Nanoseconds())
 	tm.lock.Unlock()
 
 	// Register two more timeouts
@@ -227,6 +227,9 @@ func TestAdaptiveTimeoutManager(t *testing.T) {
 
 	// Wait until both timeouts fire
 	wg.Wait()
+	// Give [tm.timer] a moment to set [tm.timer.shouldExecute] to false
+	// If test is being flaky, try increasing this
+	time.Sleep(100 * time.Millisecond)
 
 	tm.lock.Lock()
 	assert.Len(tm.timeoutMap, 0)
