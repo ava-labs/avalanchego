@@ -17,9 +17,7 @@ import (
 
 // Manager registers and fires timeouts for the snow API.
 type Manager struct {
-	lock sync.Mutex
-	// Tells the time. Can be faked for testing.
-	clock        timer.Clock
+	lock         sync.Mutex
 	tm           timer.AdaptiveTimeoutManager
 	benchlistMgr benchlist.Manager
 	metrics      metrics
