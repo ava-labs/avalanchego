@@ -410,13 +410,6 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 		// apply the votes for this snowball instance
 		parentBlock.sb.RecordPoll(vote.votes)
 
-		// If we are on the preferred branch, then the parent's preference is
-		// the next block on the preferred branch.
-		parentPreference := parentBlock.sb.Preference()
-		if onPreferredBranch {
-			newPreferred = parentPreference
-		}
-
 		// Only accept when you are finalized and the head.
 		if parentBlock.sb.Finalized() && ts.head == vote.parentID {
 			if err := ts.accept(parentBlock); err != nil {
@@ -427,6 +420,13 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 			// no longer voteParentID, but its child. So, voteParentID can be
 			// removed from the tree.
 			delete(ts.blocks, vote.parentID)
+		}
+
+		// If we are on the preferred branch, then the parent's preference is
+		// the next block on the preferred branch.
+		parentPreference := parentBlock.sb.Preference()
+		if onPreferredBranch {
+			newPreferred = parentPreference
 		}
 
 		// Get the ID of the child that is having a RecordPoll called. All other
