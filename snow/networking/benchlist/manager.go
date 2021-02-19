@@ -31,6 +31,8 @@ type Manager interface {
 	// should not be sent over the network and should immediately fail.
 	// Returns false if such messages should be sent, or if the chain is unknown.
 	IsBenched(validatorID ids.ShortID, chainID ids.ID) bool
+
+	BenchStatus(validatorID ids.ShortID) map[ids.ID]bool
 }
 
 // Config defines the configuration for a benchlist
@@ -63,6 +65,18 @@ func NewManager(config *Config) Manager {
 		config:          config,
 		chainBenchlists: make(map[ids.ID]Benchlist),
 	}
+}
+
+func (m *manager) BenchStatus(validatorID ids.ShortID) map[ids.ID]bool {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	// TODO: optimize locking
+	benchStatus := map[ids.ID]bool{}
+	for chainID, benchlist := range m.chainBenchlists {
+		benchStatus[chainID] = benchlist.IsBenched(validatorID)
+	}
+	return benchStatus
 }
 
 // IsBenched returns true if messages to [validatorID] regarding [chainID]
@@ -143,3 +157,4 @@ func (noBenchlist) RegisterChain(*snow.Context, string) error { return nil }
 func (noBenchlist) RegisterResponse(ids.ID, ids.ShortID)      {}
 func (noBenchlist) RegisterFailure(ids.ID, ids.ShortID)       {}
 func (noBenchlist) IsBenched(ids.ShortID, ids.ID) bool        { return false }
+func (noBenchlist) BenchStatus(ids.ShortID) map[ids.ID]bool   { return nil }

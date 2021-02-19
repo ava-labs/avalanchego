@@ -766,7 +766,7 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 					Version:      peer.versionStr.GetValue().(string),
 					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
-					// TOOD: add benched boolean for all chains
+					BenchStatus:  n.benchlistManager.BenchStatus(peer.id),
 				})
 			}
 		}
@@ -782,7 +782,7 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 					Version:      peer.versionStr.GetValue().(string),
 					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
-					// TOOD: add benched boolean for all chains
+					BenchStatus:  n.benchlistManager.BenchStatus(peer.id),
 				})
 			}
 		}
