@@ -12,7 +12,7 @@ jobs:
 
       - name: Lint Ansible playbooks
         # Lastest commit, as of 30 Apr 2020
-        uses: ansible/ansible-lint-action@6c8c141
+        uses: ansible/ansible-lint-action@6c8c14186662e43effbe39a678950896a46799ad
         with:
           targets: |
             scripts/ansible/kill_playbook.yml
