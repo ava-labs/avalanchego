@@ -143,6 +143,8 @@ type PeersReply struct {
 	NumPeers json.Uint64 `json:"numPeers"`
 	// Each element is a peer
 	Peers []network.PeerID `json:"peers"`
+
+	// TODO: add "benched for all chains"
 }
 
 // Peers returns the list of current validators
