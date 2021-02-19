@@ -437,7 +437,7 @@ func (t *Transitive) repoll() {
 	prefID := t.Consensus.Preference()
 
 	for i := t.polls.Len(); i < t.Params.ConcurrentRepolls; i++ {
-		t.pullSample(prefID)
+		t.pullQuery(prefID)
 	}
 }
 
@@ -571,8 +571,8 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, blkID ids.ID) {
 	t.numRequests.Set(float64(t.blkReqs.Len()))
 }
 
-// send a pull request for this block ID
-func (t *Transitive) pullSample(blkID ids.ID) {
+// send a pull query for this block ID
+func (t *Transitive) pullQuery(blkID ids.ID) {
 	t.Ctx.Log.Verbo("about to sample from: %s", t.Validators)
 	// The validators we will query
 	vdrs, err := t.Validators.Sample(t.Params.K)
@@ -592,8 +592,8 @@ func (t *Transitive) pullSample(blkID ids.ID) {
 	}
 }
 
-// send a push request for this block
-func (t *Transitive) pushSample(blk snowman.Block) {
+// send a push query for this block
+func (t *Transitive) pushQuery(blk snowman.Block) {
 	t.Ctx.Log.Verbo("about to sample from: %s", t.Validators)
 	vdrs, err := t.Validators.Sample(t.Params.K)
 	vdrBag := ids.ShortBag{}
@@ -618,11 +618,24 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		return nil
 	}
 
-	// we are adding the block to consensus, so it is no longer pending
+	// we are no longer waiting on adding the block to consensus, so it is no
+	// longer pending
 	blkID := blk.ID()
 	t.pending.Remove(blkID)
 
-	// Make sure this block is valid
+	if !t.Consensus.AcceptedOrProcessing(blk.Parent()) {
+		// if the parent isn't processing or the last accepted block, then this
+		// block is effectively rejected
+		t.blocked.Abandon(blkID)
+		t.numBlocked.Set(float64(t.pending.Len())) // Tracks performance statistics
+		return t.errs.Err
+	}
+
+	// By ensuring that the parent is either processing or accepted, it is
+	// guaranteed that the parent was successfully verified. This means that
+	// calling Verify on this block is allowed.
+
+	// make sure this block is valid
 	if err := blk.Verify(); err != nil {
 		t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
 
@@ -662,12 +675,17 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 
 	t.VM.SetPreference(t.Consensus.Preference())
 
-	// Query the network for its preferences given this new block
-	t.pushSample(blk)
+	// If the block is now preferred, query the network for its preferences
+	// with this new block.
+	if t.Consensus.IsPreferred(blk) {
+		t.pushQuery(blk)
+	}
 
 	t.blocked.Fulfill(blkID)
 	for _, blk := range added {
-		t.pushSample(blk)
+		if t.Consensus.IsPreferred(blk) {
+			t.pushQuery(blk)
+		}
 
 		blkID := blk.ID()
 		t.pending.Remove(blkID)
