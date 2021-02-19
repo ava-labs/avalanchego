@@ -429,7 +429,10 @@ func (m *manager) createAvalancheChain(
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager)
+	err = sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager, m.ConsensusParams.Namespace, m.ConsensusParams.Metrics)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
+	}
 
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
@@ -531,7 +534,17 @@ func (m *manager) createSnowmanChain(
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager)
+	err = sender.Initialize(
+		ctx,
+		m.Net,
+		m.ManagerConfig.Router,
+		m.TimeoutManager,
+		consensusParams.Namespace,
+		consensusParams.Metrics,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
+	}
 
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
