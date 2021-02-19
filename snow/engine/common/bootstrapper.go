@@ -53,6 +53,8 @@ type Bootstrapper struct {
 	bootstrapAttempts int
 	// validators that failed to respond with their frontiers
 	failedAcceptedFrontierVdrs ids.ShortSet
+	// ensures we only process the current request ID
+	currentRequestID uint32
 }
 
 // Initialize implements the Engine interface.
@@ -95,18 +97,36 @@ func (b *Bootstrapper) Startup() error {
 	vdrs.Union(b.pendingAcceptedFrontier)
 
 	b.RequestID++
+	b.currentRequestID = b.RequestID
 	b.Sender.GetAcceptedFrontier(vdrs, b.RequestID)
 	return nil
 }
 
 // GetAcceptedFrontier implements the Engine interface.
 func (b *Bootstrapper) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
+	// ignores any late responses
+	if requestID != b.RequestID {
+		b.Ctx.Log.Debug("Received an Out-of-Sync GetAcceptedFrontier - validator: %v - expectedRequestID: %v, requestID: %v",
+			validatorID,
+			b.RequestID,
+			requestID)
+		return nil
+	}
 	b.Sender.AcceptedFrontier(validatorID, requestID, b.Bootstrapable.CurrentAcceptedFrontier())
 	return nil
 }
 
 // GetAcceptedFrontierFailed implements the Engine interface.
 func (b *Bootstrapper) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
+	// ignores any late responses
+	if requestID != b.RequestID {
+		b.Ctx.Log.Debug("Received an Out-of-Sync GetAcceptedFrontierFailed - validator: %v - expectedRequestID: %v, requestID: %v",
+			validatorID,
+			b.RequestID,
+			requestID)
+		return nil
+	}
+
 	// If we can't get a response from [validatorID], act as though they said their accepted frontier is empty
 	// and we add the validator to the failed list
 	b.failedAcceptedFrontierVdrs.Add(validatorID)
@@ -119,6 +139,7 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 		b.Ctx.Log.Debug("Received an AcceptedFrontier message from %s unexpectedly", validatorID)
 		return nil
 	}
+
 	// Mark that we received a response from [validatorID]
 	b.pendingAcceptedFrontier.Remove(validatorID)
 
@@ -168,12 +189,29 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 
 // GetAccepted implements the Engine interface.
 func (b *Bootstrapper) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+	// ignores any late responses
+	if requestID != b.RequestID {
+		b.Ctx.Log.Debug("Received an Out-of-Sync GetAccepted - validator: %v - expectedRequestID: %v, requestID: %v",
+			validatorID,
+			b.RequestID,
+			requestID)
+		return nil
+	}
 	b.Sender.Accepted(validatorID, requestID, b.Bootstrapable.FilterAccepted(containerIDs))
 	return nil
 }
 
 // GetAcceptedFailed implements the Engine interface.
 func (b *Bootstrapper) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
+	// ignores any late responses
+	if requestID != b.RequestID {
+		b.Ctx.Log.Debug("Received an Out-of-Sync GetAcceptedFailed - validator: %v - expectedRequestID: %v, requestID: %v",
+			validatorID,
+			b.RequestID,
+			requestID)
+		return nil
+	}
+
 	// If we can't get a response from [validatorID], act as though they said
 	// that they think none of the containers we sent them in GetAccepted are accepted
 	return b.Accepted(validatorID, requestID, nil)
@@ -267,15 +305,15 @@ func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
 }
 
 func (b *Bootstrapper) RestartBootstrap() error {
-	if b.bootstrapAttempts > 100 {
+	if b.bootstrapAttempts >= 50 {
 		return fmt.Errorf("failed to boostrap the chain after %d attempts", b.bootstrapAttempts)
 	}
 
+	// avoid flooding the network
+	time.Sleep(time.Duration(b.bootstrapAttempts) * time.Second)
+
 	// reset the failed frontier responses
 	b.failedAcceptedFrontierVdrs = ids.ShortSet{}
-
-	// ensure it doesn't repeat non-stop
-	time.Sleep(1 * time.Second)
 
 	beacons, err := b.Beacons.Sample(b.Config.SampleK)
 	if err != nil {
@@ -284,12 +322,11 @@ func (b *Bootstrapper) RestartBootstrap() error {
 
 	for _, vdr := range beacons {
 		vdrID := vdr.ID()
-		b.pendingAcceptedFrontier.Add(vdrID)
-	}
+		b.pendingAcceptedFrontier.Add(vdrID) // necessarily emptied out
 
-	for _, vdr := range b.Beacons.List() {
-		vdrID := vdr.ID()
-		b.pendingAccepted.Add(vdrID)
+		if !b.pendingAccepted.Contains(vdrID) {
+			b.pendingAccepted.Add(vdrID) // only add a sample of beacons to avoid duplicates/list too long
+		}
 	}
 
 	b.acceptedVotes = make(map[ids.ID]uint64)
