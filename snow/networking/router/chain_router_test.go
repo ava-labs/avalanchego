@@ -197,12 +197,12 @@ func TestRouterTimeout(t *testing.T) {
 
 	engine.GetFailedF = func(validatorID ids.ShortID, requestID uint32) error { wg.Done(); calledGetFailed = true; return nil }
 	engine.GetAncestorsFailedF = func(validatorID ids.ShortID, requestID uint32) error {
-		wg.Done()
+		defer wg.Done()
 		calledGetAncestorsFailed = true
 		return nil
 	}
 	engine.QueryFailedF = func(validatorID ids.ShortID, requestID uint32) error {
-		wg.Done()
+		defer wg.Done()
 		if !calledQueryFailed {
 			calledQueryFailed = true
 			return nil
@@ -211,12 +211,12 @@ func TestRouterTimeout(t *testing.T) {
 		return nil
 	}
 	engine.GetAcceptedFailedF = func(validatorID ids.ShortID, requestID uint32) error {
-		wg.Done()
+		defer wg.Done()
 		calledGetAcceptedFailed = true
 		return nil
 	}
 	engine.GetAcceptedFrontierFailedF = func(validatorID ids.ShortID, requestID uint32) error {
-		wg.Done()
+		defer wg.Done()
 		calledGetAcceptedFrontierFailed = true
 		return nil
 	}
@@ -256,6 +256,8 @@ func TestRouterTimeout(t *testing.T) {
 	}
 
 	wg.Wait()
+	chainRouter.lock.Lock()
+	defer chainRouter.lock.Unlock()
 	assert.True(t, calledGetFailed && calledGetAncestorsFailed && calledQueryFailed2 && calledGetAcceptedFailed && calledGetAcceptedFrontierFailed)
 }
 
