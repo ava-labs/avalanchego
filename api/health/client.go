@@ -22,9 +22,16 @@ func NewClient(uri string, requestTimeout time.Duration) *Client {
 }
 
 // GetLiveness returns a health check on the Avalanche node
-func (c *Client) GetLiveness() (*GetLivenessReply, error) {
-	res := &GetLivenessReply{}
+func (c *Client) GetLiveness() (*HealthReply, error) {
+	res := &HealthReply{}
 	err := c.requester.SendRequest("getLiveness", struct{}{}, res)
+	return res, err
+}
+
+// Health returns a health check on the Avalanche node
+func (c *Client) Health() (*HealthReply, error) {
+	res := &HealthReply{}
+	err := c.requester.SendRequest("health", struct{}{}, res)
 	return res, err
 }
 
@@ -33,7 +40,7 @@ func (c *Client) GetLiveness() (*GetLivenessReply, error) {
 func (c *Client) AwaitHealthy(checks int, interval time.Duration) (bool, error) {
 	var err error
 	for i := 0; i < checks; i++ {
-		var res *GetLivenessReply
+		var res *HealthReply
 		res, err = c.GetLiveness()
 		if err == nil && res.Healthy {
 			return true, nil

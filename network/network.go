@@ -1388,11 +1388,11 @@ func (n *network) Health() (interface{}, error) {
 		details = append(details, errStr)
 	}
 
-	// Make sure the pending byte queue is not too large
+	// Make sure the pending byte queue is not too full
 	n.stateLock.RLock()
 	pendingSendBytes := n.pendingBytes
 	n.stateLock.RUnlock()
-	if pendingSendBytes > int64(n.healthConfig.MaxPctSendQueueBytesFull*float64(pendingSendBytes)) {
+	if pendingSendBytes > int64(n.healthConfig.MaxPctSendQueueBytesFull*float64(n.maxNetworkPendingSendBytes)) {
 		details = append(details, fmt.Sprintf("pending send queue is more than %f%% full", 100*n.healthConfig.MaxPctSendQueueBytesFull))
 	}
 
