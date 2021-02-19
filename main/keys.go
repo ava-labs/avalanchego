@@ -94,4 +94,6 @@ const (
 	disconnectedCheckFreqKey             = "disconnected-check-frequency"
 	disconnectedRestartTimeoutKey        = "disconnected-restart-timeout"
 	restartOnDisconnectedKey             = "restart-on-disconnected"
+	routerMaxPctMsgsDroppedKey           = "router-health-max-percent-msgs-dropped"
+	routerMaxPctMsgsDroppedDurationKey   = "router-health-max-percent-msgs-dropped-duration"
 )

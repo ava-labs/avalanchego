@@ -4,6 +4,7 @@
 package router
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -24,7 +25,8 @@ const (
 )
 
 var (
-	_ Router = &ChainRouter{}
+	_            Router = &ChainRouter{}
+	errUnhealthy        = errors.New("the router is not healthy")
 )
 
 type request struct {
@@ -51,8 +53,16 @@ type ChainRouter struct {
 	criticalChains   ids.Set
 	onFatal          func()
 	metrics          routerMetrics
+	// Parameters for doing health checks
+	healthConfig HealthConfig
 	// Unique-ified request ID --> Time and type of message made
 	requests map[ids.ID]request
+	// Counts the number of times we drop a message to any chain
+	// within a given time duration specified in [healthConfig]
+	dropMeter timer.TimedMeter
+	// Counts the number of times we successfully pass a message to any chain
+	// within a given time duration specified in [healthConfig]
+	successMeter timer.TimedMeter
 }
 
 // Initialize the router.
@@ -71,6 +81,7 @@ func (cr *ChainRouter) Initialize(
 	closeTimeout time.Duration,
 	criticalChains ids.Set,
 	onFatal func(),
+	healthConfig HealthConfig,
 	metricsNamespace string,
 	metricsRegisterer prometheus.Registerer,
 ) error {
@@ -84,6 +95,12 @@ func (cr *ChainRouter) Initialize(
 	cr.onFatal = onFatal
 	cr.requests = make(map[ids.ID]request)
 	cr.peers.Add(nodeID)
+	// Set up meter to count dropped messages
+	cr.dropMeter = timer.TimedMeter{Duration: healthConfig.MaxPercentDroppedDuration}
+	// Set up meter to count non-dropped (successful) messages
+	cr.successMeter = timer.TimedMeter{Duration: healthConfig.MaxPercentDroppedDuration}
+
+	// Register metrics
 	cr.metrics = routerMetrics{}
 	cr.metrics.outstandingRequests = prometheus.NewGauge(
 		prometheus.GaugeOpts{
@@ -228,9 +245,13 @@ func (cr *ChainRouter) GetAcceptedFrontier(validatorID ids.ShortID, chainID ids.
 		return
 	}
 
-	// Pass the message to the chain
-	// Note that we don't check the return value. It's OK to drop this.
-	chain.GetAcceptedFrontier(validatorID, requestID, deadline)
+	// Pass the message to the chain It's OK if we drop this.
+	dropped := !chain.GetAcceptedFrontier(validatorID, requestID, deadline)
+	if dropped {
+		cr.dropMeter.Tick()
+	} else {
+		cr.successMeter.Tick()
+	}
 }
 
 // AcceptedFrontier routes an incoming AcceptedFrontier request from the
@@ -265,9 +286,13 @@ func (cr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAcceptedFrontierMsg, latency)
 
 	// Pass the response to the chain
-	if !chain.AcceptedFrontier(validatorID, requestID, containerIDs) {
+	dropped := !chain.AcceptedFrontier(validatorID, requestID, containerIDs)
+	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetAcceptedFrontierFailed(validatorID, requestID)
+		cr.dropMeter.Tick()
+	} else {
+		cr.successMeter.Tick()
 	}
 }
 
@@ -308,9 +333,13 @@ func (cr *ChainRouter) GetAccepted(validatorID ids.ShortID, chainID ids.ID, requ
 		return
 	}
 
-	// Pass the message to the chain.
-	// Note that we don't check the return value. It's OK to drop this.
-	chain.GetAccepted(validatorID, requestID, deadline, containerIDs)
+	// Pass the message to the chain. It's OK if we drop this.
+	dropped := !chain.GetAccepted(validatorID, requestID, deadline, containerIDs)
+	if dropped {
+		cr.dropMeter.Tick()
+	} else {
+		cr.successMeter.Tick()
+	}
 }
 
 // Accepted routes an incoming Accepted request from the validator with ID
@@ -345,9 +374,13 @@ func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAcceptedMsg, latency)
 
 	// Pass the response to the chain
-	if !chain.Accepted(validatorID, requestID, containerIDs) {
+	dropped := !chain.Accepted(validatorID, requestID, containerIDs)
+	if !dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetAcceptedFailed(validatorID, requestID)
+		cr.dropMeter.Tick()
+	} else {
+		cr.successMeter.Tick()
 	}
 }
 
@@ -389,9 +422,13 @@ func (cr *ChainRouter) GetAncestors(validatorID ids.ShortID, chainID ids.ID, req
 		return
 	}
 
-	// Pass the message to the chain.
-	// Note that we don't check the return value. It's OK to drop this.
-	chain.GetAncestors(validatorID, requestID, deadline, containerID)
+	// Pass the message to the chain. It's OK if we drop this.
+	dropped := !chain.GetAncestors(validatorID, requestID, deadline, containerID)
+	if !dropped {
+		cr.dropMeter.Tick()
+	} else {
+		cr.successMeter.Tick()
+	}
 }
 
 // MultiPut routes an incoming MultiPut message from the validator with ID [validatorID]
@@ -425,9 +462,13 @@ func (cr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAncestorsMsg, latency)
 
 	// Pass the response to the chain
-	if !chain.MultiPut(validatorID, requestID, containers) {
+	dropped := !chain.MultiPut(validatorID, requestID, containers)
+	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetAncestorsFailed(validatorID, requestID)
+		cr.dropMeter.Tick()
+	} else {
+		cr.successMeter.Tick()
 	}
 }
 
@@ -467,9 +508,13 @@ func (cr *ChainRouter) Get(validatorID ids.ShortID, chainID ids.ID, requestID ui
 		return
 	}
 
-	// Pass the message to the chain.
-	// Note that we don't check the return value. It's OK to drop this.
-	chain.Get(validatorID, requestID, deadline, containerID)
+	// Pass the message to the chain. It's OK if we drop this.
+	dropped := !chain.Get(validatorID, requestID, deadline, containerID)
+	if dropped {
+		cr.dropMeter.Tick()
+	} else {
+		cr.successMeter.Tick()
+	}
 }
 
 // Put routes an incoming Put request from the validator with ID [validatorID]
@@ -494,9 +539,11 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 
 	// If this is a gossip message, pass to the chain
 	if requestID == constants.GossipMsgRequestID {
-		// Note that we don't check the return value.
 		// It's ok to drop this message.
-		chain.Put(validatorID, requestID, containerID, container)
+		dropped := !chain.Put(validatorID, requestID, containerID, container)
+		if dropped {
+			cr.dropMeter.Tick()
+		}
 		return
 	}
 
@@ -518,9 +565,13 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetMsg, latency)
 
 	// Pass the response to the chain
-	if !chain.Put(validatorID, requestID, containerID, container) {
+	dropped := !chain.Put(validatorID, requestID, containerID, container)
+	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetFailed(validatorID, requestID)
+		cr.dropMeter.Tick()
+	} else {
+		cr.successMeter.Tick()
 	}
 }
 
@@ -559,9 +610,13 @@ func (cr *ChainRouter) PushQuery(validatorID ids.ShortID, chainID ids.ID, reques
 		return
 	}
 
-	// Pass the message to the chain.
-	// Note that we don't check the return value. It's OK to drop this.
-	chain.PushQuery(validatorID, requestID, deadline, containerID, container)
+	// Pass the message to the chain. It's OK if we drop this.
+	dropped := !chain.PushQuery(validatorID, requestID, deadline, containerID, container)
+	if dropped {
+		cr.dropMeter.Tick()
+	} else {
+		cr.successMeter.Tick()
+	}
 }
 
 // PullQuery routes an incoming PullQuery request from the validator with ID [validatorID]
@@ -576,9 +631,13 @@ func (cr *ChainRouter) PullQuery(validatorID ids.ShortID, chainID ids.ID, reques
 		return
 	}
 
-	// Pass the message to the chain.
-	// Note that we don't check the return value. It's OK to drop this.
-	chain.PullQuery(validatorID, requestID, deadline, containerID)
+	// Pass the message to the chain. It's OK if we drop this.
+	dropped := !chain.PullQuery(validatorID, requestID, deadline, containerID)
+	if dropped {
+		cr.dropMeter.Tick()
+	} else {
+		cr.successMeter.Tick()
+	}
 }
 
 // Chits routes an incoming Chits message from the validator with ID [validatorID]
@@ -612,9 +671,13 @@ func (cr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, request.MsgType, latency)
 
 	// Pass the response to the chain
-	if !chain.Chits(validatorID, requestID, votes) {
+	dropped := !chain.Chits(validatorID, requestID, votes)
+	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.QueryFailed(validatorID, requestID)
+		cr.dropMeter.Tick()
+	} else {
+		cr.successMeter.Tick()
 	}
 }
 
@@ -679,6 +742,30 @@ func (cr *ChainRouter) EndInterval() {
 	for _, chain := range cr.chains {
 		chain.endInterval()
 	}
+}
+
+// Health returns results of router health checks.
+// Returns a nil error if healthy. Otherwise, returns
+// non-nil error and a list of strings describing why it's unhealthy.
+func (cr *ChainRouter) Health() (interface{}, error) {
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
+
+	var errors []error
+	numDropped := cr.dropMeter.Ticks()
+	numNotDropped := cr.successMeter.Ticks()
+	percentDropped := float64(numDropped) / (float64(numDropped) + float64(numNotDropped))
+
+	if percentDropped > cr.healthConfig.MaxPercentDropped {
+		errStr := fmt.Errorf("dropped %f%% messages in last %s", percentDropped, cr.healthConfig.MaxPercentDroppedDuration)
+		errors = append(errors, errStr)
+	}
+
+	if len(errors) > 0 {
+		// The router is not healthy
+		return errors, errUnhealthy
+	}
+	return nil, nil
 }
 
 func createRequestID(validatorID ids.ShortID, chainID ids.ID, requestID uint32) ids.ID {

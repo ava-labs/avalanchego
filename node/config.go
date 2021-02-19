@@ -108,6 +108,7 @@ type Config struct {
 
 	// Router that is used to handle incoming consensus messages
 	ConsensusRouter          router.Router
+	RouterHealthConfig       router.HealthConfig
 	ConsensusGossipFrequency time.Duration
 	ConsensusShutdownTimeout time.Duration
 

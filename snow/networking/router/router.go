@@ -27,6 +27,7 @@ type Router interface {
 		shutdownTimeout time.Duration,
 		criticalChains ids.Set,
 		onFatal func(),
+		healthConfig HealthConfig,
 		metricsNamespace string,
 		metricsRegisterer prometheus.Registerer,
 	) error

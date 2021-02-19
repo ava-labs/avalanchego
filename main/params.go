@@ -171,8 +171,10 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(stakingCertPathKey, defaultString, "TLS certificate for staking")
 	fs.Uint64(stakingDisabledWeightKey, 1, "Weight to provide to each peer when staking is disabled")
 
-	// Throttling:
+	// Router
 	fs.Uint(maxNonStakerPendingMsgsKey, uint(router.DefaultMaxNonStakerPendingMsgs), "Maximum number of messages a non-staker is allowed to have pending.")
+	fs.Float64(routerMaxPctMsgsDroppedKey, 0.05, fmt.Sprintf("Node reports unhealthy if it drops more than [%s] of messages in last [%s]", routerMaxPctMsgsDroppedKey, routerMaxPctMsgsDroppedDurationKey))
+	fs.Duration(routerMaxPctMsgsDroppedDurationKey, time.Minute, fmt.Sprintf("Node reports unhealthy if it drops more than [%s] of messages in last [%s]", routerMaxPctMsgsDroppedKey, routerMaxPctMsgsDroppedDurationKey))
 	fs.Float64(stakerMsgReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain message queue's space for stakers.")
 	fs.Float64(stakerCPUReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain's CPU time for stakers.")
 	fs.Uint(maxPendingMsgsKey, 4096, "Maximum number of pending messages. Messages after this will be dropped.")
@@ -180,7 +182,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Network Health Check
 	fs.Duration(networkHealthMaxTimeSinceMsgSent, time.Minute, "Network layer returns unhealthy if haven't received a message for at least this much time")
 	fs.Duration(networkHealthMaxTimeSinceMsgReceived, time.Minute, "Netowork layer returns unhealthy if haven't received a message for at least this much time")
-	fs.Float64(networkHealthMaxPctSendQueueFill, 0.9, "Network layer returns unhealthy if more than this percentage of the pending send queue is full")
+	fs.Float64(networkHealthMaxPctSendQueueFill, 0.9, "Network layer returns unhealthy if more than this portion of the pending send queue is full")
 	fs.Uint(networkHealthMinPeers, 1, "Network layer returns unhealthy if connected to less than this many peers")
 
 	// Network Timeouts:
@@ -554,6 +556,14 @@ func setNodeConfig(v *viper.Viper) error {
 
 	// Router used for consensus
 	Config.ConsensusRouter = &router.ChainRouter{}
+	Config.RouterHealthConfig.MaxPercentDropped = v.GetFloat64(routerMaxPctMsgsDroppedKey)
+	Config.RouterHealthConfig.MaxPercentDroppedDuration = v.GetDuration(routerMaxPctMsgsDroppedDurationKey)
+	switch {
+	case Config.RouterHealthConfig.MaxPercentDropped < 0 || Config.RouterHealthConfig.MaxPercentDropped > 100:
+		return fmt.Errorf("%s must be in [0,1]", routerMaxPctMsgsDroppedKey)
+	case Config.RouterHealthConfig.MaxPercentDroppedDuration <= 0:
+		return fmt.Errorf("%s must be > 0", routerMaxPctMsgsDroppedDurationKey)
+	}
 
 	// IPCs
 	ipcsChainIDs := v.GetString(ipcsChainIDsKey)

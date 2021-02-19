@@ -536,6 +536,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		n.Config.ConsensusShutdownTimeout,
 		criticalChains,
 		n.Shutdown,
+		n.Config.RouterHealthConfig,
 		n.Config.NetworkConfig.MetricsNamespace,
 		n.Config.NetworkConfig.Registerer,
 	)
