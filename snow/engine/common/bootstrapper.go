@@ -309,8 +309,8 @@ func (b *Bootstrapper) RestartBootstrap() error {
 		return fmt.Errorf("failed to boostrap the chain after %d attempts", b.bootstrapAttempts)
 	}
 
-	// avoid flooding the network
-	time.Sleep(time.Duration(b.bootstrapAttempts) * time.Second)
+	// todo: avoid flooding the network
+	// time.Sleep(time.Duration(b.bootstrapAttempts) * time.Second)
 
 	// reset the failed frontier responses
 	b.failedAcceptedFrontierVdrs = ids.ShortSet{}
