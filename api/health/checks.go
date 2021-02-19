@@ -4,16 +4,9 @@
 package health
 
 import (
-	"errors"
 	"time"
 
 	"github.com/AppsFlyer/go-sundheit/checks"
-)
-
-var (
-	// ErrHeartbeatNotDetected is returned from a HeartbeatCheckFn when the
-	// heartbeat has not been detected recently enough
-	ErrHeartbeatNotDetected = errors.New("heartbeat not detected")
 )
 
 // NewCheck creates a new check with name [name] that calls [execute]
@@ -65,26 +58,4 @@ func (mc monotonicCheck) Execute() (interface{}, error) {
 		mc.passed = true
 	}
 	return details, pass
-}
-
-// Heartbeater provides a getter to the most recently observed heartbeat
-type Heartbeater interface {
-	GetHeartbeat() int64
-}
-
-// HeartbeatCheckFn returns a CheckFn that checks the given heartbeater has
-// pulsed within the given duration
-func HeartbeatCheckFn(hb Heartbeater, max time.Duration) func() (interface{}, error) {
-	return func() (data interface{}, err error) {
-		// Get the heartbeat and create a data set to return to the caller
-		hb := hb.GetHeartbeat()
-		data = map[string]int64{"heartbeat": hb}
-
-		// If the current time is after the last known heartbeat + the limit then
-		// mark our check as failed
-		if time.Unix(hb, 0).Add(max).Before(time.Now()) {
-			err = ErrHeartbeatNotDetected
-		}
-		return data, err
-	}
 }

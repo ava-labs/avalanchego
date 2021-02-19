@@ -5,7 +5,6 @@ package health
 
 import (
 	"net/http"
-	"time"
 
 	health "github.com/AppsFlyer/go-sundheit"
 	"github.com/AppsFlyer/go-sundheit/checks"
@@ -59,17 +58,6 @@ func (h *Health) Handler() (*common.HTTPHandler, error) {
 	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: handler}, nil
 }
 
-// RegisterHeartbeat adds a check with default options and a CheckFn that checks
-// the given heartbeater for a recent heartbeat
-func (h *Health) RegisterHeartbeat(name string, hb Heartbeater, max time.Duration) error {
-	return h.RegisterCheck(&check{
-		name:            name,
-		checkFn:         HeartbeatCheckFn(hb, max),
-		initialDelay:    constants.DefaultHealthCheckInitialDelay,
-		executionPeriod: constants.DefaultHealthCheckExecutionPeriod,
-	})
-}
-
 // RegisterMonotonicCheckFunc adds a Check with default options and the given CheckFn
 // After it passes once, its logic (checkFunc) is never run again; it just passes
 func (h *Health) RegisterMonotonicCheckFunc(name string, checkFn func() (interface{}, error)) error {
@@ -93,17 +81,26 @@ func (h *Health) RegisterCheck(c checks.Check) error {
 	})
 }
 
-// GetLivenessArgs are the arguments for GetLiveness
-type GetLivenessArgs struct{}
+// HealthArgs are the arguments for Health
+type HealthArgs struct{}
 
-// GetLivenessReply is the response for GetLiveness
-type GetLivenessReply struct {
+// HealthReply is the response for Health
+type HealthReply struct {
 	Checks  map[string]health.Result `json:"checks"`
 	Healthy bool                     `json:"healthy"`
 }
 
 // GetLiveness returns a summation of the health of the node
-func (h *Health) GetLiveness(_ *http.Request, _ *GetLivenessArgs, reply *GetLivenessReply) error {
+// Deprecated in favor of Health
+func (h *Health) Health(_ *http.Request, _ *HealthArgs, reply *HealthReply) error {
+	h.log.Info("Health.health called")
+	reply.Checks, reply.Healthy = h.health.Results()
+	return nil
+}
+
+// GetLiveness returns a summation of the health of the node
+// Deprecated in favor of Health
+func (h *Health) GetLiveness(_ *http.Request, _ *HealthArgs, reply *HealthReply) error {
 	h.log.Info("Health: GetLiveness called")
 	reply.Checks, reply.Healthy = h.health.Results()
 	return nil

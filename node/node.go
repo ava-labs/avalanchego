@@ -246,6 +246,7 @@ func (n *Node) initNetworking() error {
 		n.Config.DisconnectedRestartTimeout,
 		n.Config.ApricotPhase0Time,
 		n.Config.SendQueueSize,
+		n.Config.NetworkHealthConfig,
 	)
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
@@ -722,9 +723,6 @@ func (n *Node) initHealthAPI() error {
 
 	n.Log.Info("initializing Health API")
 	service := health.NewService(n.Log)
-	if err := service.RegisterHeartbeat("network.validators.heartbeat", n.Net, 5*time.Minute); err != nil {
-		return fmt.Errorf("couldn't register heartbeat health check: %w", err)
-	}
 	isBootstrappedFunc := func() (interface{}, error) {
 		if pChainID, err := n.chainManager.Lookup("P"); err != nil {
 			return nil, errors.New("P-Chain not created")
@@ -752,6 +750,12 @@ func (n *Node) initHealthAPI() error {
 		return err
 	}
 	n.healthService = service
+
+	// Register the network layer with the health service
+	netCheck := health.NewCheck("network", n.Net.Health)
+	if err := n.healthService.RegisterCheck(netCheck); err != nil {
+		return fmt.Errorf("couldn't register network health check")
+	}
 	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "health", "", n.HTTPLog)
 }
 
@@ -853,6 +857,7 @@ func (n *Node) Initialize(
 
 	// Start the Health API
 	// Has to be initialized before chain manager
+	// [n.Net] must already be set
 	if err := n.initHealthAPI(); err != nil {
 		return fmt.Errorf("couldn't initialize health API: %w", err)
 	}

@@ -177,6 +177,12 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Float64(stakerCPUReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain's CPU time for stakers.")
 	fs.Uint(maxPendingMsgsKey, 4096, "Maximum number of pending messages. Messages after this will be dropped.")
 
+	// Network Health Check
+	fs.Duration(networkHealthMaxTimeSinceMsgSent, time.Minute, "Network layer returns unhealthy if haven't received a message for at least this much time")
+	fs.Duration(networkHealthMaxTimeSinceMsgReceived, time.Minute, "Netowork layer returns unhealthy if haven't received a message for at least this much time")
+	fs.Float64(networkHealthMaxPctSendQueueFill, 0.9, "Network layer returns unhealthy if more than this percentage of the pending send queue is full")
+	fs.Uint(networkHealthMinPeers, 1, "Network layer returns unhealthy if connected to less than this many peers")
+
 	// Network Timeouts:
 	fs.Duration(networkInitialTimeoutKey, 5*time.Second, "Initial timeout value of the adaptive timeout manager.")
 	fs.Duration(networkMinimumTimeoutKey, 2*time.Second, "Minimum timeout value of the adaptive timeout manager.")
@@ -570,6 +576,20 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.MaxPendingMsgs = v.GetUint32(maxPendingMsgsKey)
 	if Config.MaxPendingMsgs < Config.MaxNonStakerPendingMsgs {
 		return errors.New("maximum pending messages must be >= maximum non-staker pending messages")
+	}
+
+	// Network Health Check
+	Config.NetworkHealthConfig.MaxTimeSinceMsgSent = v.GetDuration(networkHealthMaxTimeSinceMsgSent)
+	Config.NetworkHealthConfig.MaxTimeSinceMsgReceived = v.GetDuration(networkHealthMaxTimeSinceMsgReceived)
+	Config.NetworkHealthConfig.MaxPctSendQueueBytesFull = v.GetFloat64(networkHealthMaxPctSendQueueFill)
+	Config.NetworkHealthConfig.MinConnectedPeers = v.GetUint(networkHealthMinPeers)
+	switch {
+	case Config.NetworkHealthConfig.MaxTimeSinceMsgSent < 0:
+		return fmt.Errorf("%s must be > 0", networkHealthMaxTimeSinceMsgSent)
+	case Config.NetworkHealthConfig.MaxTimeSinceMsgReceived < 0:
+		return fmt.Errorf("%s must be > 0", networkHealthMaxTimeSinceMsgReceived)
+	case Config.NetworkHealthConfig.MaxPctSendQueueBytesFull <= 0 || Config.NetworkHealthConfig.MaxPctSendQueueBytesFull > 1:
+		return fmt.Errorf("%s must be in (0,1]", networkHealthMaxPctSendQueueFill)
 	}
 
 	// Network Timeout

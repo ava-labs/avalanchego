@@ -14,7 +14,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -52,8 +51,9 @@ const (
 )
 
 var (
-	errNetworkClosed = errors.New("network closed")
-	errPeerIsMyself  = errors.New("peer is myself")
+	errNetworkClosed         = errors.New("network closed")
+	errPeerIsMyself          = errors.New("peer is myself")
+	errNetworkLayerUnhealthy = errors.New("network layer is unhealthy")
 
 	minimumUnmaskedVersion = version.NewDefaultVersion(constants.PlatformName, 1, 1, 0)
 )
@@ -69,10 +69,6 @@ type Network interface {
 	// The network must be able to broadcast accepted decisions to random peers.
 	// Thread safety must be managed internally in the network.
 	triggers.Acceptor
-
-	// The network should be able to report the last time the network interacted
-	// with a peer
-	health.Heartbeater
 
 	// Should only be called once, will run until either a fatal error occurs,
 	// or the network is closed. Returns a non-nil error.
@@ -95,12 +91,24 @@ type Network interface {
 
 	// Return the IP of the node
 	IP() utils.IPDesc
+
+	// Health returns nil if the network layer is healthy
+	// If not, returns non-nil and details about why it is unhealthy
+	Health() (interface{}, error)
 }
 
 type network struct {
 	// The metrics that this network tracks
 	metrics
-
+	// Define the parameters used to determine whether
+	// the networking layer is healthy
+	healthConfig HealthConfig
+	// Unix time at which last message of any type received over network
+	// Must only be accessed atomically
+	lastMsgReceivedTime int64
+	// Unix time at which last message of any type sent over network
+	// Must only be accessed atomically
+	lastMsgSentTime                    int64
 	log                                logging.Logger
 	id                                 ids.ShortID
 	ip                                 utils.DynamicIPDesc
@@ -116,7 +124,6 @@ type network struct {
 	router                             router.Router  // router must be thread safe
 	nodeID                             uint32
 	clock                              timer.Clock
-	lastHeartbeat                      int64
 	initialReconnectDelay              time.Duration
 	maxReconnectDelay                  time.Duration
 	maxMessageSize                     int64
@@ -203,6 +210,7 @@ func NewDefaultNetwork(
 	disconnectedRestartTimeout time.Duration,
 	apricotPhase0Time time.Time,
 	sendQueueSize uint32,
+	healthConfig HealthConfig,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -244,6 +252,7 @@ func NewDefaultNetwork(
 		disconnectedCheckFreq,
 		disconnectedRestartTimeout,
 		apricotPhase0Time,
+		healthConfig,
 	)
 }
 
@@ -288,6 +297,7 @@ func NewNetwork(
 	disconnectedCheckFreq time.Duration,
 	disconnectedRestartTimeout time.Duration,
 	apricotPhase0Time time.Time,
+	healthConfig HealthConfig,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -338,12 +348,12 @@ func NewNetwork(
 		connectedMeter:                     timer.TimedMeter{Duration: disconnectedRestartTimeout},
 		restarter:                          restarter,
 		apricotPhase0Time:                  apricotPhase0Time,
+		healthConfig:                       healthConfig,
 	}
 
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
 	}
-	netw.heartbeat()
 	if restartOnDisconnected && disconnectedCheckFreq != 0 && disconnectedRestartTimeout != 0 {
 		log.Info("node will restart if not connected to any peers")
 		// pre-queue one tick to avoid immediate shutdown.
@@ -659,12 +669,6 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 	}
 	return n.gossipContainer(ctx.ChainID, containerID, container)
 }
-
-// heartbeat registers a new heartbeat to signal liveness
-func (n *network) heartbeat() { atomic.StoreInt64(&n.lastHeartbeat, n.clock.Time().Unix()) }
-
-// GetHeartbeat returns the most recent heartbeat time
-func (n *network) GetHeartbeat() int64 { return atomic.LoadInt64(&n.lastHeartbeat) }
 
 // Dispatch starts accepting connections from other nodes attempting to connect
 // to this node.
@@ -1330,4 +1334,72 @@ func (n *network) restartOnDisconnect() {
 			return
 		}
 	}
+}
+
+// Health returns information about several network layer health checks.
+// Returns a nil error if the network layer is healthy. Otherwise,
+// returns non-nil error and a list of strings describing why it's unhealthy.
+// Assumes [n.stateLock] is not held
+func (n *network) Health() (interface{}, error) {
+	var details []string
+
+	// Make sure we're connected to at least the minimum number of peers
+	connectedTo := 0
+	n.stateLock.RLock()
+	for _, peer := range n.peers {
+		if peer != nil && peer.connected.GetValue() {
+			connectedTo++
+			if connectedTo > int(n.healthConfig.MinConnectedPeers) {
+				break
+			}
+		}
+	}
+	n.stateLock.RUnlock()
+	if connectedTo < int(n.healthConfig.MinConnectedPeers) {
+		errStr := fmt.Sprintf(
+			"should be connected to >= %d peers but connected to %d",
+			n.healthConfig.MinConnectedPeers,
+			connectedTo,
+		)
+		details = append(details, errStr)
+	}
+
+	// Make sure we've received an incoming message within the threshold
+	lastMsgReceivedAt := time.Unix(atomic.LoadInt64(&n.lastMsgReceivedTime), 0)
+	timeSinceLastMsgReceived := n.clock.Time().Sub(lastMsgReceivedAt)
+	if timeSinceLastMsgReceived > n.healthConfig.MaxTimeSinceMsgReceived {
+		errStr := fmt.Sprintf(
+			"should have received message in last %s but last message received %s ago",
+			n.healthConfig.MaxTimeSinceMsgReceived,
+			timeSinceLastMsgReceived,
+		)
+		details = append(details, errStr)
+	}
+
+	// Make sure we've sent an outgoing message within the threshold
+	lastMsgSentAt := time.Unix(atomic.LoadInt64(&n.lastMsgSentTime), 0)
+	timeSinceLastMsgSent := n.clock.Time().Sub(lastMsgSentAt)
+	if timeSinceLastMsgSent > n.healthConfig.MaxTimeSinceMsgSent {
+		errStr := fmt.Sprintf(
+			"should have sent message in last %s but last message sent %s ago",
+			n.healthConfig.MaxTimeSinceMsgSent,
+			timeSinceLastMsgSent,
+		)
+		details = append(details, errStr)
+	}
+
+	// Make sure the pending byte queue is not too large
+	n.stateLock.RLock()
+	pendingSendBytes := n.pendingBytes
+	n.stateLock.RUnlock()
+	if pendingSendBytes > int64(n.healthConfig.MaxPctSendQueueBytesFull*float64(pendingSendBytes)) {
+		details = append(details, fmt.Sprintf("pending send queue is more than %f%% full", 100*n.healthConfig.MaxPctSendQueueBytesFull))
+	}
+
+	if len(details) == 0 {
+		// Network layer is healthy
+		return nil, nil
+	}
+	// Network layer is unhealthy
+	return details, errNetworkLayerUnhealthy
 }
