@@ -2110,13 +2110,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	timeoutManager := timeout.Manager{}
 	benchlist := benchlist.NewNoBenchlist()
 	err = timeoutManager.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout: time.Millisecond,
-		MinimumTimeout: time.Millisecond,
-		MaximumTimeout: 10 * time.Second,
-		TimeoutInc:     2 * time.Millisecond,
-		TimeoutDec:     time.Millisecond,
-		Namespace:      "",
-		Registerer:     prometheus.NewRegistry(),
+		InitialTimeout:     time.Millisecond,
+		MinimumTimeout:     time.Millisecond,
+		MaximumTimeout:     10 * time.Second,
+		TimeoutHalflife:    5 * time.Minute,
+		TimeoutCoefficient: 1.25,
+		MetricsNamespace:   "",
+		Registerer:         prometheus.NewRegistry(),
 	}, benchlist)
 	if err != nil {
 		t.Fatal(err)
@@ -2124,19 +2124,21 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	go timeoutManager.Dispatch()
 
 	chainRouter := &router.ChainRouter{}
-	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &timeoutManager, time.Hour, time.Second, ids.Set{}, nil)
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &timeoutManager, time.Hour, time.Second, ids.Set{}, nil, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 
 	externalSender := &sender.ExternalSenderTest{T: t}
 	externalSender.Default(true)
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-
-	sender.Initialize(ctx, externalSender, chainRouter, &timeoutManager)
+	err = sender.Initialize(ctx, externalSender, chainRouter, &timeoutManager, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 
 	reqID := new(uint32)
-	externalSender.GetAcceptedFrontierF = func(_ ids.ShortSet, _ ids.ID, requestID uint32, _ time.Time) {
+	externalSender.GetAcceptedFrontierF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration) []ids.ShortID {
 		*reqID = requestID
+		return ids.List()
 	}
 
 	// The engine handles consensus
@@ -2187,8 +2189,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
 	externalSender.GetAcceptedFrontierF = nil
-	externalSender.GetAcceptedF = func(_ ids.ShortSet, _ ids.ID, requestID uint32, _ time.Time, _ []ids.ID) {
+	externalSender.GetAcceptedF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration, _ []ids.ID) []ids.ShortID {
 		*reqID = requestID
+		return ids.List()
 	}
 
 	frontier := []ids.ID{advanceTimeBlkID}
@@ -2197,11 +2200,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	externalSender.GetAcceptedF = nil
-	externalSender.GetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, _ time.Time, containerID ids.ID) {
+	externalSender.GetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, _ time.Duration, containerID ids.ID) bool {
 		*reqID = requestID
 		if containerID != advanceTimeBlkID {
 			t.Fatalf("wrong block requested")
 		}
+		return true
 	}
 
 	if err := engine.Accepted(peerID, *reqID, frontier); err != nil {

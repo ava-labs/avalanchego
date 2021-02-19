@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -15,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
@@ -24,13 +26,13 @@ func TestShutdown(t *testing.T) {
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
 	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout: time.Millisecond,
-		MinimumTimeout: time.Millisecond,
-		MaximumTimeout: 10 * time.Second,
-		TimeoutInc:     2 * time.Millisecond,
-		TimeoutDec:     time.Millisecond,
-		Namespace:      "",
-		Registerer:     prometheus.NewRegistry(),
+		InitialTimeout:     time.Millisecond,
+		MinimumTimeout:     time.Millisecond,
+		MaximumTimeout:     10 * time.Second,
+		TimeoutCoefficient: 1.25,
+		TimeoutHalflife:    5 * time.Minute,
+		MetricsNamespace:   "",
+		Registerer:         prometheus.NewRegistry(),
 	}, benchlist)
 	if err != nil {
 		t.Fatal(err)
@@ -38,7 +40,8 @@ func TestShutdown(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
-	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil)
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(false)
@@ -87,13 +90,13 @@ func TestShutdownTimesOut(t *testing.T) {
 	tm := timeout.Manager{}
 	// Ensure that the MultiPut request does not timeout
 	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout: time.Second,
-		MinimumTimeout: 500 * time.Millisecond,
-		MaximumTimeout: 10 * time.Second,
-		TimeoutInc:     2 * time.Millisecond,
-		TimeoutDec:     time.Millisecond,
-		Namespace:      "",
-		Registerer:     prometheus.NewRegistry(),
+		InitialTimeout:     time.Second,
+		MinimumTimeout:     500 * time.Millisecond,
+		MaximumTimeout:     10 * time.Second,
+		TimeoutCoefficient: 1.25,
+		TimeoutHalflife:    5 * time.Minute,
+		MetricsNamespace:   "",
+		Registerer:         prometheus.NewRegistry(),
 	}, benchlist)
 	if err != nil {
 		t.Fatal(err)
@@ -101,7 +104,8 @@ func TestShutdownTimesOut(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
-	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Millisecond, ids.Set{}, nil)
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(false)
@@ -152,4 +156,175 @@ func TestShutdownTimesOut(t *testing.T) {
 		t.Fatalf("Shutdown should have finished in one millisecond before timing out instead of waiting for engine to finish shutting down.")
 	case <-shutdownFinished:
 	}
+}
+
+// Ensure that a timeout fires if we don't get a response to a request
+func TestRouterTimeout(t *testing.T) {
+	// Create a timeout manager
+	maxTimeout := 25 * time.Millisecond
+	tm := timeout.Manager{}
+	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout:     10 * time.Millisecond,
+		MinimumTimeout:     10 * time.Millisecond,
+		MaximumTimeout:     maxTimeout,
+		TimeoutCoefficient: 1,
+		TimeoutHalflife:    5 * time.Minute,
+		MetricsNamespace:   "",
+		Registerer:         prometheus.NewRegistry(),
+	}, benchlist.NewNoBenchlist())
+	if err != nil {
+		t.Fatal(err)
+	}
+	go tm.Dispatch()
+
+	// Create a router
+	chainRouter := ChainRouter{}
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
+
+	// Create an engine and handler
+	engine := common.EngineTest{T: t}
+	engine.Default(false)
+
+	var (
+		calledGetFailed, calledGetAncestorsFailed,
+		calledQueryFailed, calledQueryFailed2,
+		calledGetAcceptedFailed, calledGetAcceptedFrontierFailed bool
+	)
+
+	engine.GetFailedF = func(validatorID ids.ShortID, requestID uint32) error { calledGetFailed = true; return nil }
+	engine.GetAncestorsFailedF = func(validatorID ids.ShortID, requestID uint32) error { calledGetAncestorsFailed = true; return nil }
+	engine.QueryFailedF = func(validatorID ids.ShortID, requestID uint32) error {
+		if !calledQueryFailed {
+			calledQueryFailed = true
+			return nil
+		}
+		calledQueryFailed2 = true
+		return nil
+	}
+	engine.GetAcceptedFailedF = func(validatorID ids.ShortID, requestID uint32) error { calledGetAcceptedFailed = true; return nil }
+	engine.GetAcceptedFrontierFailedF = func(validatorID ids.ShortID, requestID uint32) error {
+		calledGetAcceptedFrontierFailed = true
+		return nil
+	}
+
+	engine.ContextF = snow.DefaultContextTest
+
+	handler := &Handler{}
+	handler.Initialize(
+		&engine,
+		validators.NewSet(),
+		nil,
+		DefaultMaxNonStakerPendingMsgs,
+		DefaultMaxNonStakerPendingMsgs,
+		DefaultStakerPortion,
+		DefaultStakerPortion,
+		"",
+		prometheus.NewRegistry(),
+	)
+
+	chainRouter.AddChain(handler)
+	go handler.Dispatch()
+
+	// Register requests for each request type
+	msgs := []constants.MsgType{
+		constants.GetMsg,
+		constants.GetAncestorsMsg,
+		constants.PullQueryMsg,
+		constants.PushQueryMsg,
+		constants.GetAcceptedMsg,
+		constants.GetAcceptedFrontierMsg,
+	}
+
+	for i, msg := range msgs {
+		chainRouter.RegisterRequest(ids.GenerateTestShortID(), handler.ctx.ChainID, uint32(i), msg)
+	}
+
+	// Make sure that within [maxTimeout], all of the requests are cleared
+	assert.Eventually(
+		t,
+		func() bool {
+			chainRouter.lock.Lock()
+			noReqs := len(chainRouter.requests) == 0
+			chainRouter.lock.Unlock()
+			handler.ctx.Lock.Lock()
+			defer handler.ctx.Lock.Unlock()
+			return noReqs &&
+				calledGetFailed && calledGetAncestorsFailed &&
+				calledQueryFailed2 && calledGetAcceptedFailed && calledGetAcceptedFrontierFailed
+		},
+		maxTimeout,
+		maxTimeout/5,
+	)
+}
+
+func TestRouterClearTimeouts(t *testing.T) {
+	// Create a timeout manager
+	tm := timeout.Manager{}
+	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout:     3 * time.Second,
+		MinimumTimeout:     3 * time.Second,
+		MaximumTimeout:     5 * time.Minute,
+		TimeoutCoefficient: 1,
+		TimeoutHalflife:    5 * time.Minute,
+		MetricsNamespace:   "",
+		Registerer:         prometheus.NewRegistry(),
+	}, benchlist.NewNoBenchlist())
+	if err != nil {
+		t.Fatal(err)
+	}
+	go tm.Dispatch()
+
+	// Create a router
+	chainRouter := ChainRouter{}
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Millisecond, ids.Set{}, nil, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
+
+	// Create an engine and handler
+	engine := common.EngineTest{T: t}
+	engine.Default(false)
+
+	engine.ContextF = snow.DefaultContextTest
+
+	handler := &Handler{}
+	handler.Initialize(
+		&engine,
+		validators.NewSet(),
+		nil,
+		DefaultMaxNonStakerPendingMsgs,
+		DefaultMaxNonStakerPendingMsgs,
+		DefaultStakerPortion,
+		DefaultStakerPortion,
+		"",
+		prometheus.NewRegistry(),
+	)
+
+	chainRouter.AddChain(handler)
+	go handler.Dispatch()
+
+	// Register requests for each request type
+	msgs := []constants.MsgType{
+		constants.GetMsg,
+		constants.GetAncestorsMsg,
+		constants.PullQueryMsg,
+		constants.PushQueryMsg,
+		constants.GetAcceptedMsg,
+		constants.GetAcceptedFrontierMsg,
+	}
+
+	vID := ids.GenerateTestShortID()
+	for i, msg := range msgs {
+		chainRouter.RegisterRequest(vID, handler.ctx.ChainID, uint32(i), msg)
+	}
+
+	// Clear each timeout by simulating responses to the queries
+	// Note: Depends on the ordering of [msgs]
+	chainRouter.Put(vID, handler.ctx.ChainID, 0, ids.GenerateTestID(), nil)
+	chainRouter.MultiPut(vID, handler.ctx.ChainID, 1, nil)
+	chainRouter.Chits(vID, handler.ctx.ChainID, 2, nil)
+	chainRouter.Chits(vID, handler.ctx.ChainID, 3, nil)
+	chainRouter.Accepted(vID, handler.ctx.ChainID, 4, nil)
+	chainRouter.AcceptedFrontier(vID, handler.ctx.ChainID, 5, nil)
+
+	assert.Len(t, chainRouter.requests, 0)
 }
