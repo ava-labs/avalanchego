@@ -276,7 +276,8 @@ func (b *benchlist) bench(validatorID ids.ShortID) {
 
 	validatorStake, isVdr := b.vdrs.GetWeight(validatorID)
 	if !isVdr {
-		b.log.Warn("tried to bench non-validator %s", validatorID)
+		// We might want to bench a non-validator because they don't respond to
+		// my Get requests, but we choose to only bench validators.
 		return
 	}
 
