@@ -4,6 +4,7 @@
 package router
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -190,11 +191,18 @@ func TestRouterTimeout(t *testing.T) {
 		calledGetFailed, calledGetAncestorsFailed,
 		calledQueryFailed, calledQueryFailed2,
 		calledGetAcceptedFailed, calledGetAcceptedFrontierFailed bool
+
+		wg = sync.WaitGroup{}
 	)
 
-	engine.GetFailedF = func(validatorID ids.ShortID, requestID uint32) error { calledGetFailed = true; return nil }
-	engine.GetAncestorsFailedF = func(validatorID ids.ShortID, requestID uint32) error { calledGetAncestorsFailed = true; return nil }
+	engine.GetFailedF = func(validatorID ids.ShortID, requestID uint32) error { wg.Done(); calledGetFailed = true; return nil }
+	engine.GetAncestorsFailedF = func(validatorID ids.ShortID, requestID uint32) error {
+		wg.Done()
+		calledGetAncestorsFailed = true
+		return nil
+	}
 	engine.QueryFailedF = func(validatorID ids.ShortID, requestID uint32) error {
+		wg.Done()
 		if !calledQueryFailed {
 			calledQueryFailed = true
 			return nil
@@ -202,8 +210,13 @@ func TestRouterTimeout(t *testing.T) {
 		calledQueryFailed2 = true
 		return nil
 	}
-	engine.GetAcceptedFailedF = func(validatorID ids.ShortID, requestID uint32) error { calledGetAcceptedFailed = true; return nil }
+	engine.GetAcceptedFailedF = func(validatorID ids.ShortID, requestID uint32) error {
+		wg.Done()
+		calledGetAcceptedFailed = true
+		return nil
+	}
 	engine.GetAcceptedFrontierFailedF = func(validatorID ids.ShortID, requestID uint32) error {
+		wg.Done()
 		calledGetAcceptedFrontierFailed = true
 		return nil
 	}
@@ -236,26 +249,14 @@ func TestRouterTimeout(t *testing.T) {
 		constants.GetAcceptedFrontierMsg,
 	}
 
+	wg.Add(len(msgs))
+
 	for i, msg := range msgs {
 		chainRouter.RegisterRequest(ids.GenerateTestShortID(), handler.ctx.ChainID, uint32(i), msg)
 	}
 
-	// Make sure that within [maxTimeout], all of the requests are cleared
-	assert.Eventually(
-		t,
-		func() bool {
-			chainRouter.lock.Lock()
-			noReqs := len(chainRouter.requests) == 0
-			chainRouter.lock.Unlock()
-			handler.ctx.Lock.Lock()
-			defer handler.ctx.Lock.Unlock()
-			return noReqs &&
-				calledGetFailed && calledGetAncestorsFailed &&
-				calledQueryFailed2 && calledGetAcceptedFailed && calledGetAcceptedFrontierFailed
-		},
-		maxTimeout,
-		maxTimeout/5,
-	)
+	wg.Wait()
+	assert.True(t, calledGetFailed && calledGetAncestorsFailed && calledQueryFailed2 && calledGetAcceptedFailed && calledGetAcceptedFrontierFailed)
 }
 
 func TestRouterClearTimeouts(t *testing.T) {
