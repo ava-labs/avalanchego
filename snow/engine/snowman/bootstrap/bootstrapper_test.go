@@ -59,9 +59,10 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 		Sender:     sender,
 	}
 	return Config{
-		Config:  commonConfig,
-		Blocked: blocker,
-		VM:      vm,
+		Config:        commonConfig,
+		Blocked:       blocker,
+		VM:            vm,
+		BootstrapOnce: true,
 	}, peer, sender, vm
 }
 

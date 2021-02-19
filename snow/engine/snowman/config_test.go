@@ -19,9 +19,10 @@ func DefaultConfig() Config {
 	blocked, _ := queue.New(memdb.New())
 	return Config{
 		Config: bootstrap.Config{
-			Config:  common.DefaultConfigTest(),
-			Blocked: blocked,
-			VM:      &block.TestVM{},
+			Config:        common.DefaultConfigTest(),
+			Blocked:       blocked,
+			VM:            &block.TestVM{},
+			BootstrapOnce: true,
 		},
 		Params: snowball.Parameters{
 			Metrics:           prometheus.NewRegistry(),

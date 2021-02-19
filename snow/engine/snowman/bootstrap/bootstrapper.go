@@ -28,6 +28,9 @@ type Config struct {
 	VM block.ChainVM
 
 	Bootstrapped func()
+
+	// allows to configure if the bootstrap should retry until sufficiently synced
+	BootstrapOnce bool
 }
 
 // Bootstrapper ...
@@ -42,6 +45,9 @@ type Bootstrapper struct {
 	VM block.ChainVM
 
 	Bootstrapped func()
+
+	// allows to configure if the bootstrap should retry until sufficiently synced
+	BootstrapOnce bool
 
 	// true if all of the vertices in the original accepted frontier have been processed
 	processedStartingAcceptedFrontier bool
@@ -60,6 +66,7 @@ func (b *Bootstrapper) Initialize(
 	b.VM = config.VM
 	b.Bootstrapped = config.Bootstrapped
 	b.OnFinished = onFinished
+	b.BootstrapOnce = config.BootstrapOnce
 
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return err
@@ -253,7 +260,7 @@ func (b *Bootstrapper) checkFinish() error {
 		return err
 	}
 
-	if executedBlocks >= b.executedStateTransitions {
+	if executedBlocks >= b.executedStateTransitions && !b.BootstrapOnce {
 		b.executedStateTransitions = executedBlocks
 		b.Ctx.Log.Info("bootstrapping is checking for more blocks before finishing the bootstrap process...")
 		return b.RestartBootstrap()

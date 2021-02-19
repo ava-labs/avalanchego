@@ -39,6 +39,9 @@ type Config struct {
 
 	Manager vertex.Manager
 	VM      vertex.DAGVM
+
+	// allows to configure if the bootstrap should retry until sufficiently synced
+	BootstrapOnce bool
 }
 
 // Bootstrapper ...
@@ -53,6 +56,9 @@ type Bootstrapper struct {
 
 	Manager vertex.Manager
 	VM      vertex.DAGVM
+
+	// allows to configure if the bootstrap should retry until sufficiently synced
+	BootstrapOnce bool
 
 	// IDs of vertices that we will send a GetAncestors request for once we are
 	// not at the max number of outstanding requests
@@ -77,6 +83,7 @@ func (b *Bootstrapper) Initialize(
 	b.VM = config.VM
 	b.processedCache = &cache.LRU{Size: cacheSize}
 	b.OnFinished = onFinished
+	b.BootstrapOnce = config.BootstrapOnce
 
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return err
@@ -370,7 +377,7 @@ func (b *Bootstrapper) checkFinish() error {
 		return err
 	}
 
-	if executedBlocks+executedVertices >= b.executedStateTransitions {
+	if executedBlocks+executedVertices > b.executedStateTransitions && !b.BootstrapOnce {
 		b.executedStateTransitions = executedBlocks + executedVertices
 		b.Ctx.Log.Info("bootstrapping is checking for more blocks before finishing the bootstrap process...")
 		return b.RestartBootstrap()

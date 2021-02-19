@@ -2369,7 +2369,6 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 
 func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	config := DefaultConfig()
-
 	vals := validators.NewSet()
 	config.Validators = vals
 	config.Beacons = vals
@@ -2746,19 +2745,6 @@ func TestEngineReBootstrapFails(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// mimic a GetAcceptedFrontierFailedMsg
-	// only validator that was requested timed out on the request
-	if err := te.GetAcceptedFrontierFailed(vdr, *requestID); err != nil {
-		t.Fatal(err)
-	}
-
-	// mimic a GetAcceptedFrontierFailedMsg
-	// only validator that was requested timed out on the request
-	// now expects an error
-	if err := te.GetAcceptedFrontierFailed(vdr, *requestID); err == nil {
-		t.Fatal(err)
-	}
-
 	// re-register the Transitive
 	te2 := &Transitive{}
 	config.Params.Namespace = "AcceptedFrontier"
@@ -2773,14 +2759,6 @@ func TestEngineReBootstrapFails(t *testing.T) {
 	}
 
 	if err := te2.GetAcceptedFailed(vdr, *requestID); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := te2.GetAcceptedFailed(vdr, *requestID); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := te2.GetAcceptedFailed(vdr, *requestID); err == nil {
 		t.Fatal(err)
 	}
 
