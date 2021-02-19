@@ -187,6 +187,10 @@ func (n *Node) initNetworking() error {
 		return err
 	}
 
+	// Configure benchlist
+	n.Config.BenchlistConfig.Validators = n.vdrs
+	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
+
 	consensusRouter := n.Config.ConsensusRouter
 	if !n.Config.EnableStaking {
 		if err := primaryNetworkValidators.AddWeight(n.ID, n.Config.DisabledStakingWeight); err != nil {
@@ -517,10 +521,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	// Set Prometheus metrics info
 	n.Config.NetworkConfig.MetricsNamespace = constants.PlatformName
 	n.Config.NetworkConfig.Registerer = n.Config.ConsensusParams.Metrics
-
-	// Configure benchlist
-	n.Config.BenchlistConfig.Validators = n.vdrs
-	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
 
 	// Manages network timeouts
 	timeoutManager := &timeout.Manager{}

@@ -747,6 +747,17 @@ func (n *network) Dispatch() error {
 	}
 }
 
+func (n *network) wireFriendlyBenchStatus(peerID ids.ShortID) map[string]bool {
+	benchStatus := n.benchlistManager.BenchStatus(peerID)
+
+	output := map[string]bool{}
+	for chainID, status := range benchStatus {
+		output[chainID.String()] = status
+	}
+
+	return output
+}
+
 // IPs implements the Network interface
 // assumes the stateLock is not held.
 func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
@@ -766,7 +777,7 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 					Version:      peer.versionStr.GetValue().(string),
 					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
-					BenchStatus:  n.benchlistManager.BenchStatus(peer.id),
+					BenchStatus:  n.wireFriendlyBenchStatus(peer.id),
 				})
 			}
 		}
@@ -782,7 +793,7 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 					Version:      peer.versionStr.GetValue().(string),
 					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
-					BenchStatus:  n.benchlistManager.BenchStatus(peer.id),
+					// BenchStatus:  n.wireFriendlyBenchStatus(peer.id),
 				})
 			}
 		}

@@ -69,12 +69,18 @@ func NewManager(config *Config) Manager {
 
 func (m *manager) BenchStatus(validatorID ids.ShortID) map[ids.ID]bool {
 	m.lock.RLock()
-	defer m.lock.RUnlock()
+	chains := []ids.ID{}
+	benchLists := []Benchlist{}
+	for chainID, benchlist := range m.chainBenchlists {
+		chains = append(chains, chainID)
+		benchLists = append(benchLists, benchlist)
+	}
+	m.lock.RUnlock()
 
 	// TODO: optimize locking
 	benchStatus := map[ids.ID]bool{}
-	for chainID, benchlist := range m.chainBenchlists {
-		benchStatus[chainID] = benchlist.IsBenched(validatorID)
+	for i, chainID := range chains {
+		benchStatus[chainID] = benchLists[i].IsBenched(validatorID)
 	}
 	return benchStatus
 }
