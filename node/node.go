@@ -518,6 +518,10 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	n.Config.NetworkConfig.MetricsNamespace = constants.PlatformName
 	n.Config.NetworkConfig.Registerer = n.Config.ConsensusParams.Metrics
 
+	// Configure benchlist
+	n.Config.BenchlistConfig.Validators = n.vdrs
+	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
+
 	// Manages network timeouts
 	timeoutManager := &timeout.Manager{}
 	if err := timeoutManager.Initialize(&n.Config.NetworkConfig, n.benchlistManager); err != nil {
@@ -818,10 +822,6 @@ func (n *Node) Initialize(
 		return fmt.Errorf("problem initializing HTTP logger: %w", err)
 	}
 	n.HTTPLog = httpLog
-
-	// Configure benchlist
-	n.Config.BenchlistConfig.Validators = n.vdrs
-	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
 
 	if err := n.initDatabase(); err != nil { // Set up the node's database
 		return fmt.Errorf("problem initializing database: %w", err)
