@@ -100,6 +100,9 @@ type Node struct {
 	// Manages Virtual Machines
 	vmManager vms.Manager
 
+	// Manages validator benching
+	benchlistManager benchlist.Manager
+
 	// dispatcher for events as they happen in consensus
 	DecisionDispatcher  *triggers.EventDispatcher
 	ConsensusDispatcher *triggers.EventDispatcher
@@ -136,8 +139,6 @@ type Node struct {
 
 	// Restarter can shutdown and restart the node
 	restarter utils.Restarter
-
-	benchlistManager benchlist.Manager
 }
 
 /*
