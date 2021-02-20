@@ -16,6 +16,9 @@ func (vm *VM) Health() (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get percent connected: %w", err)
 	}
+
+	vm.metrics.percentConnected.Add(percentConnected)
+
 	details := map[string]float64{
 		"percentConnected": percentConnected,
 	}
