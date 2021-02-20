@@ -747,20 +747,6 @@ func (n *network) Dispatch() error {
 	}
 }
 
-func (n *network) getBenchedStatuses(peerID ids.ShortID) []BenchedStatus {
-	benchStatus := n.benchlistManager.GetBenchedStatuses(peerID)
-
-	benchedStatuses := []BenchedStatus{}
-	for chainID, benched := range benchStatus {
-		benchedStatuses = append(benchedStatuses, BenchedStatus{
-			ChainID: chainID,
-			Benched: benched,
-		})
-	}
-
-	return benchedStatuses
-}
-
 // IPs implements the Network interface
 // assumes the stateLock is not held.
 func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
@@ -774,13 +760,13 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 		for _, peer := range n.peers {
 			if peer.connected.GetValue() {
 				peers = append(peers, PeerID{
-					IP:              peer.conn.RemoteAddr().String(),
-					PublicIP:        peer.getIP().String(),
-					ID:              peer.id.PrefixedString(constants.NodeIDPrefix),
-					Version:         peer.versionStr.GetValue().(string),
-					LastSent:        time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
-					LastReceived:    time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
-					BenchedStatuses: n.getBenchedStatuses(peer.id),
+					IP:           peer.conn.RemoteAddr().String(),
+					PublicIP:     peer.getIP().String(),
+					ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
+					Version:      peer.versionStr.GetValue().(string),
+					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
+					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
+					Benched:      n.benchlistManager.GetBenched(peer.id),
 				})
 			}
 		}
@@ -790,13 +776,13 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 			peer, ok := n.peers[nodeID]
 			if ok && peer.connected.GetValue() {
 				peers = append(peers, PeerID{
-					IP:              peer.conn.RemoteAddr().String(),
-					PublicIP:        peer.getIP().String(),
-					ID:              peer.id.PrefixedString(constants.NodeIDPrefix),
-					Version:         peer.versionStr.GetValue().(string),
-					LastSent:        time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
-					LastReceived:    time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
-					BenchedStatuses: n.getBenchedStatuses(peer.id),
+					IP:           peer.conn.RemoteAddr().String(),
+					PublicIP:     peer.getIP().String(),
+					ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
+					Version:      peer.versionStr.GetValue().(string),
+					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
+					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
+					Benched:      n.benchlistManager.GetBenched(peer.id),
 				})
 			}
 		}
