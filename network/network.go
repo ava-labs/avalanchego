@@ -747,15 +747,18 @@ func (n *network) Dispatch() error {
 	}
 }
 
-func (n *network) wireFriendlyBenchStatus(peerID ids.ShortID) map[string]bool {
-	benchStatus := n.benchlistManager.BenchStatus(peerID)
+func (n *network) getBenchedStatuses(peerID ids.ShortID) []BenchedStatus {
+	benchStatus := n.benchlistManager.GetBenchedStatuses(peerID)
 
-	output := map[string]bool{}
-	for chainID, status := range benchStatus {
-		output[chainID.String()] = status
+	benchedStatuses := []BenchedStatus{}
+	for chainID, benched := range benchStatus {
+		benchedStatuses = append(benchedStatuses, BenchedStatus{
+			ChainID: chainID,
+			Benched: benched,
+		})
 	}
 
-	return output
+	return benchedStatuses
 }
 
 // IPs implements the Network interface
@@ -771,13 +774,13 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 		for _, peer := range n.peers {
 			if peer.connected.GetValue() {
 				peers = append(peers, PeerID{
-					IP:           peer.conn.RemoteAddr().String(),
-					PublicIP:     peer.getIP().String(),
-					ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
-					Version:      peer.versionStr.GetValue().(string),
-					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
-					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
-					BenchStatus:  n.wireFriendlyBenchStatus(peer.id),
+					IP:              peer.conn.RemoteAddr().String(),
+					PublicIP:        peer.getIP().String(),
+					ID:              peer.id.PrefixedString(constants.NodeIDPrefix),
+					Version:         peer.versionStr.GetValue().(string),
+					LastSent:        time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
+					LastReceived:    time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
+					BenchedStatuses: n.getBenchedStatuses(peer.id),
 				})
 			}
 		}
@@ -787,13 +790,13 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 			peer, ok := n.peers[nodeID]
 			if ok && peer.connected.GetValue() {
 				peers = append(peers, PeerID{
-					IP:           peer.conn.RemoteAddr().String(),
-					PublicIP:     peer.getIP().String(),
-					ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
-					Version:      peer.versionStr.GetValue().(string),
-					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
-					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
-					// BenchStatus:  n.wireFriendlyBenchStatus(peer.id),
+					IP:              peer.conn.RemoteAddr().String(),
+					PublicIP:        peer.getIP().String(),
+					ID:              peer.id.PrefixedString(constants.NodeIDPrefix),
+					Version:         peer.versionStr.GetValue().(string),
+					LastSent:        time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
+					LastReceived:    time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
+					BenchedStatuses: n.getBenchedStatuses(peer.id),
 				})
 			}
 		}

@@ -31,8 +31,10 @@ type Manager interface {
 	// should not be sent over the network and should immediately fail.
 	// Returns false if such messages should be sent, or if the chain is unknown.
 	IsBenched(validatorID ids.ShortID, chainID ids.ID) bool
-
-	BenchStatus(validatorID ids.ShortID) map[ids.ID]bool
+	// GetBenchedStatuses returns a map indicating which chainIDs the specified
+	// [validatorID] is benched on. If called on an id.ShortID that does
+	// not map to a validator, all map entries will be set to false.
+	GetBenchedStatuses(validatorID ids.ShortID) map[ids.ID]bool
 }
 
 // Config defines the configuration for a benchlist
@@ -67,24 +69,6 @@ func NewManager(config *Config) Manager {
 	}
 }
 
-func (m *manager) BenchStatus(validatorID ids.ShortID) map[ids.ID]bool {
-	m.lock.RLock()
-	chains := []ids.ID{}
-	benchLists := []Benchlist{}
-	for chainID, benchlist := range m.chainBenchlists {
-		chains = append(chains, chainID)
-		benchLists = append(benchLists, benchlist)
-	}
-	m.lock.RUnlock()
-
-	// TODO: optimize locking
-	benchStatus := map[ids.ID]bool{}
-	for i, chainID := range chains {
-		benchStatus[chainID] = benchLists[i].IsBenched(validatorID)
-	}
-	return benchStatus
-}
-
 // IsBenched returns true if messages to [validatorID] regarding [chainID]
 // should not be sent over the network and should immediately fail.
 func (m *manager) IsBenched(validatorID ids.ShortID, chainID ids.ID) bool {
@@ -97,6 +81,19 @@ func (m *manager) IsBenched(validatorID ids.ShortID, chainID ids.ID) bool {
 	}
 	isBenched := benchlist.IsBenched(validatorID)
 	return isBenched
+}
+
+// GetBenchedStatuses returns a map indiciating which chainIDs the specified
+// [validatorID] is benched on.
+func (m *manager) GetBenchedStatuses(validatorID ids.ShortID) map[ids.ID]bool {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	benchedStatuses := map[ids.ID]bool{}
+	for chainID, benchlist := range m.chainBenchlists {
+		benchedStatuses[chainID] = benchlist.IsBenched(validatorID)
+	}
+	return benchedStatuses
 }
 
 func (m *manager) RegisterChain(ctx *snow.Context, namespace string) error {
@@ -159,8 +156,8 @@ type noBenchlist struct{}
 // NewNoBenchlist returns an empty benchlist that will never stop any queries
 func NewNoBenchlist() Manager { return &noBenchlist{} }
 
-func (noBenchlist) RegisterChain(*snow.Context, string) error { return nil }
-func (noBenchlist) RegisterResponse(ids.ID, ids.ShortID)      {}
-func (noBenchlist) RegisterFailure(ids.ID, ids.ShortID)       {}
-func (noBenchlist) IsBenched(ids.ShortID, ids.ID) bool        { return false }
-func (noBenchlist) BenchStatus(ids.ShortID) map[ids.ID]bool   { return nil }
+func (noBenchlist) RegisterChain(*snow.Context, string) error      { return nil }
+func (noBenchlist) RegisterResponse(ids.ID, ids.ShortID)           {}
+func (noBenchlist) RegisterFailure(ids.ID, ids.ShortID)            {}
+func (noBenchlist) IsBenched(ids.ShortID, ids.ID) bool             { return false }
+func (noBenchlist) GetBenchedStatuses(ids.ShortID) map[ids.ID]bool { return nil }
