@@ -232,6 +232,8 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 			if height == prevHeight {
 				vtxHeightSet.Add(vtxID)
 			} else {
+				// Set new height and reset [vtxHeightSet]
+				prevHeight = height
 				vtxHeightSet.Clear()
 				vtxHeightSet.Add(vtxID)
 			}
