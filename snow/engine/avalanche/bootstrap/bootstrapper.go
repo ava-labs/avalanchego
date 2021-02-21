@@ -159,15 +159,11 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 		}
 	}
 
-	// Cache to ensure that we don't reprocess the same vertex within the loop below
-	// TODO remove after Apricot release?
-	dontReprocessCache := &cache.LRU{Size: 1000}
 	vtxHeightSet := ids.Set{}
 	prevHeight := uint64(0)
 	for toProcess.Len() > 0 { // While there are unprocessed vertices
 		vtx := toProcess.Pop() // Get an unknown vertex or one furthest down the DAG
 		vtxID := vtx.ID()
-		dontReprocessCache.Put(vtxID, nil)
 
 		switch vtx.Status() {
 		case choices.Unknown:
@@ -215,10 +211,8 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 			for _, parent := range parents { // Process the parents of this vertex (traverse up the DAG)
 				parentID := parent.ID()
 				if _, ok := b.processedCache.Get(parentID); !ok { // But only if we haven't processed the parent
-					if _, ok := dontReprocessCache.Get(parentID); !ok {
-						if !vtxHeightSet.Contains(parentID) {
-							toProcess.Push(parent)
-						}
+					if !vtxHeightSet.Contains(parentID) {
+						toProcess.Push(parent)
 					}
 				}
 			}
