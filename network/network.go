@@ -54,9 +54,13 @@ var (
 	errNetworkClosed         = errors.New("network closed")
 	errPeerIsMyself          = errors.New("peer is myself")
 	errNetworkLayerUnhealthy = errors.New("network layer is unhealthy")
-
-	minimumUnmaskedVersion = version.NewDefaultVersion(constants.PlatformName, 1, 1, 0)
 )
+
+// Network Upgrade
+var minimumUnmaskedVersion = version.NewDefaultVersion(constants.PlatformName, 1, 1, 0)
+
+// Use data from last [healthCheckDuration] to use when calculating send failure rate
+var healthCheckDuration = 30 * time.Second
 
 func init() { rand.Seed(time.Now().UnixNano()) }
 
@@ -353,8 +357,8 @@ func NewNetwork(
 		restarter:                          restarter,
 		apricotPhase0Time:                  apricotPhase0Time,
 		healthConfig:                       healthConfig,
-		sendSuccessMeter:                   timer.TimedMeter{Duration: constants.DefaultHealthCheckExecutionPeriod},
-		sendFailMeter:                      timer.TimedMeter{Duration: constants.DefaultHealthCheckExecutionPeriod},
+		sendSuccessMeter:                   timer.TimedMeter{Duration: healthCheckDuration},
+		sendFailMeter:                      timer.TimedMeter{Duration: healthCheckDuration},
 	}
 
 	if err := netw.initialize(registerer); err != nil {

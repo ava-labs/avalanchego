@@ -61,6 +61,9 @@ type Config struct {
 	SendQueueSize           uint32
 	MaxPendingMsgs          uint32
 
+	// Health
+	HealthCheckFreq time.Duration
+
 	// Network configuration
 	NetworkConfig       timer.AdaptiveTimeoutConfig
 	NetworkHealthConfig network.HealthConfig

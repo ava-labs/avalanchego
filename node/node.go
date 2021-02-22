@@ -723,7 +723,7 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	n.Log.Info("initializing Health API")
-	service := health.NewService(n.Log)
+	service := health.NewService(n.Log, n.Config.HealthCheckFreq)
 	isBootstrappedFunc := func() (interface{}, error) {
 		if pChainID, err := n.chainManager.Lookup("P"); err != nil {
 			return nil, errors.New("P-Chain not created")

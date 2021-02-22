@@ -5,6 +5,7 @@ package health
 
 import (
 	"net/http"
+	"time"
 
 	health "github.com/AppsFlyer/go-sundheit"
 	"github.com/AppsFlyer/go-sundheit/checks"
@@ -22,17 +23,23 @@ type Health struct {
 	log logging.Logger
 	// performs the underlying health checks
 	health health.Health
+	// Time between health checks
+	checkFreq time.Duration
 }
 
 // CheckRegisterer is an interface that
 // can register health checks
 type CheckRegisterer interface {
-	RegisterCheck(c checks.Check) error
+	RegisterCheck(check checks.Check) error
 }
 
 // NewService creates a new Health service
-func NewService(log logging.Logger) *Health {
-	return &Health{log, health.New()}
+func NewService(log logging.Logger, checkFreq time.Duration) *Health {
+	return &Health{
+		log:       log,
+		health:    health.New(),
+		checkFreq: checkFreq,
+	}
 }
 
 // Handler returns an HTTPHandler providing RPC access to the Health service
@@ -63,36 +70,34 @@ func (h *Health) Handler() (*common.HTTPHandler, error) {
 func (h *Health) RegisterMonotonicCheckFunc(name string, checkFn func() (interface{}, error)) error {
 	check := monotonicCheck{
 		check: check{
-			name:            name,
-			checkFn:         checkFn,
-			executionPeriod: constants.DefaultHealthCheckExecutionPeriod,
-			initialDelay:    constants.DefaultHealthCheckInitialDelay,
+			name:    name,
+			checkFn: checkFn,
 		},
 	}
 	return h.RegisterCheck(check)
 }
 
 // RegisterCheck adds the given Check
-func (h *Health) RegisterCheck(c checks.Check) error {
+func (h *Health) RegisterCheck(check checks.Check) error {
 	return h.health.RegisterCheck(&health.Config{
 		InitialDelay:    constants.DefaultHealthCheckInitialDelay,
-		ExecutionPeriod: constants.DefaultHealthCheckExecutionPeriod,
-		Check:           c,
+		ExecutionPeriod: h.checkFreq,
+		Check:           check,
 	})
 }
 
-// HealthArgs are the arguments for Health
-type HealthArgs struct{}
+// APIHealthArgs are the arguments for Health
+type APIHealthArgs struct{}
 
-// HealthReply is the response for Health
-type HealthReply struct {
+// APIHealthReply is the response for Health
+type APIHealthReply struct {
 	Checks  map[string]health.Result `json:"checks"`
 	Healthy bool                     `json:"healthy"`
 }
 
 // GetLiveness returns a summation of the health of the node
 // Deprecated in favor of Health
-func (h *Health) Health(_ *http.Request, _ *HealthArgs, reply *HealthReply) error {
+func (h *Health) Health(_ *http.Request, _ *APIHealthArgs, reply *APIHealthReply) error {
 	h.log.Info("Health.health called")
 	reply.Checks, reply.Healthy = h.health.Results()
 	return nil
@@ -100,7 +105,7 @@ func (h *Health) Health(_ *http.Request, _ *HealthArgs, reply *HealthReply) erro
 
 // GetLiveness returns a summation of the health of the node
 // Deprecated in favor of Health
-func (h *Health) GetLiveness(_ *http.Request, _ *HealthArgs, reply *HealthReply) error {
+func (h *Health) GetLiveness(_ *http.Request, _ *APIHealthArgs, reply *APIHealthReply) error {
 	h.log.Info("Health: GetLiveness called")
 	reply.Checks, reply.Healthy = h.health.Results()
 	return nil

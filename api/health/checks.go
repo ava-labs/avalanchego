@@ -4,8 +4,6 @@
 package health
 
 import (
-	"time"
-
 	"github.com/AppsFlyer/go-sundheit/checks"
 )
 
@@ -20,10 +18,8 @@ func NewCheck(name string, execute func() (interface{}, error)) checks.Check {
 
 // check implements the Check interface
 type check struct {
-	name                          string
-	checkFn                       func() (interface{}, error)
-	executionPeriod, initialDelay time.Duration
-	initiallyPassing              bool
+	name    string
+	checkFn func() (interface{}, error)
 }
 
 // Name is the identifier for this check and must be unique among all Checks
@@ -32,15 +28,6 @@ func (c check) Name() string { return c.name }
 // Execute performs the health check. It returns nil if the check passes.
 // It can also return additional information to marshal and display to the caller
 func (c check) Execute() (interface{}, error) { return c.checkFn() }
-
-// ExecutionPeriod is the duration to wait between executions of this Check
-func (c check) ExecutionPeriod() time.Duration { return c.executionPeriod }
-
-// InitialDelay is the duration to wait before executing the first time
-func (c check) InitialDelay() time.Duration { return c.initialDelay }
-
-// InitiallyPassing is whether or not to consider the Check healthy before the initial execution
-func (c check) InitiallyPassing() bool { return c.initiallyPassing }
 
 // monotonicCheck is a check that will run until it passes once, and after that it will
 // always pass without performing any logic. Used for bootstrapping, for example.

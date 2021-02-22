@@ -80,77 +80,80 @@ var (
 func avalancheFlagSet() *flag.FlagSet {
 	fs := flag.NewFlagSet(constants.AppName, flag.ContinueOnError)
 
-	// If this is true, print the version and quit.
+	// If true, print the version and quit.
 	fs.Bool(versionKey, false, "If true, print version and quit")
 
-	// Config File:
+	// System
+	fs.Uint64(fdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
+
+	// Config
 	fs.String(configFileKey, defaultString, "Specifies a config file")
-
-	// Genesis Config File:
+	//   Genesis Config File
 	fs.String(genesisConfigFileKey, "", "Specifies a genesis config file (ignored when running standard networks)")
-
-	// NetworkID:
+	//   Plugins
+	fs.String(pluginDirKey, defaultString, "Plugin directory for Avalanche VMs")
+	//   Network ID
 	fs.String(networkNameKey, defaultNetworkName, "Network ID this node will connect to")
-
-	// AVAX fees:
+	//   Database
+	fs.Bool(dbEnabledKey, true, "Turn on persistent storage")
+	fs.String(dbDirKey, defaultString, "Database directory for Avalanche state")
+	//   Coreth Config
+	fs.String(corethConfigKey, defaultString, "Specifies config to pass into coreth")
+	//   Logging
+	fs.String(logsDirKey, "", "Logging directory for Avalanche")
+	fs.String(logLevelKey, "info", "The log level. Should be one of {verbo, debug, info, warn, error, fatal, off}")
+	fs.String(logDisplayLevelKey, "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, info, warn, error, fatal, off}")
+	fs.String(logDisplayHighlightKey, "auto", "Whether to color/highlight display logs. Default highlights when the output is a terminal. Otherwise, should be one of {auto, plain, colors}")
+	//   Assertions
+	fs.Bool(assertionsEnabledKey, true, "Turn on assertion execution")
+	//   Signature Verification
+	fs.Bool(signatureVerificationEnabledKey, true, "Turn on signature verification")
+	// Fees
 	fs.Uint64(txFeeKey, units.MilliAvax, "Transaction fee, in nAVAX")
 	fs.Uint64(creationTxFeeKey, units.MilliAvax, "Transaction fee, in nAVAX, for transactions that create new state")
 
-	// Uptime requirement:
-	fs.Float64(uptimeRequirementKey, .6, "Fraction of time a validator must be online to receive rewards")
-
-	// Minimum stake, in nAVAX, required to validate the primary network
-	fs.Uint64(minValidatorStakeKey, 2*units.KiloAvax, "Minimum stake, in nAVAX, required to validate the primary network")
-
-	// Maximum stake amount, in nAVAX, that can be staked and delegated to a
-	// validator on the primary network
-	fs.Uint64(maxValidatorStakeKey, 3*units.MegaAvax, "Maximum stake, in nAVAX, that can be placed on a validator on the primary network")
-
-	// Minimum stake, in nAVAX, that can be delegated on the primary network
-	fs.Uint64(minDelegatorStakeKey, 25*units.Avax, "Minimum stake, in nAVAX, that can be delegated on the primary network")
-
-	fs.Uint64(minDelegatorFeeKey, 20000, "Minimum delegation fee, in the range [0, 1000000], that can be charged for delegation on the primary network")
-
-	// Minimum staking duration
-	fs.Duration(minStakeDurationKey, 24*time.Hour, "Minimum staking duration")
-
-	// Maximum staking duration
-	fs.Duration(maxStakeDurationKey, 365*24*time.Hour, "Maximum staking duration")
-
-	// Stake minting period
-	fs.Duration(stakeMintingPeriodKey, 365*24*time.Hour, "Consumption period of the staking function")
-
-	// Assertions:
-	fs.Bool(assertionsEnabledKey, true, "Turn on assertion execution")
-
-	// Crypto:
-	fs.Bool(signatureVerificationEnabledKey, true, "Turn on signature verification")
-
-	// Database:
-	fs.Bool(dbEnabledKey, true, "Turn on persistent storage")
-	fs.String(dbDirKey, defaultString, "Database directory for Avalanche state")
-
-	// IP:
+	// Networking
+	//   Public IP Resolution
 	fs.String(publicIPKey, "", "Public IP of this node for P2P communication. If empty, try to discover with NAT. Ignored if dynamic-public-ip is non-empty.")
-
-	// how often to update the dynamic IP and PnP/NAT-PMP IP and routing.
 	fs.Duration(dynamicUpdateDurationKey, 5*time.Minute, "Dynamic IP and NAT Traversal update duration")
-
 	fs.String(dynamicPublicIPResolverKey, "", "'ifconfigco' (alias 'ifconfig') or 'opendns' or 'ifconfigme'. By default does not do dynamic public IP updates. If non-empty, ignores public-ip argument.")
-
-	// Incoming connection throttling
-	// After we receive [conn-meter-max-conns] incoming connections from a given IP
-	// in the last [conn-meter-reset-duration], we close all subsequent incoming connections
-	// from the IP before upgrade.
+	//   Incoming Connection Throttling
+	//   After we receive [conn-meter-max-conns] incoming connections from a given IP
+	//   in the last [conn-meter-reset-duration], we close all subsequent incoming connections
+	//   from the IP before upgrade.
 	fs.Duration(connMeterResetDurationKey, 0*time.Second,
 		"Upgrade at most [conn-meter-max-conns] connections from a given IP per [conn-meter-reset-duration]. "+
 			"If [conn-meter-reset-duration] is 0, incoming connections are not rate-limited.")
-
 	fs.Int(connMeterMaxConnsKey, 5,
 		"Upgrade at most [conn-meter-max-conns] connections from a given IP per [conn-meter-reset-duration]. "+
 			"If [conn-meter-reset-duration] is 0, incoming connections are not rate-limited.")
+	//   Timeouts
+	fs.Duration(networkInitialTimeoutKey, 5*time.Second, "Initial timeout value of the adaptive timeout manager.")
+	fs.Duration(networkMinimumTimeoutKey, 2*time.Second, "Minimum timeout value of the adaptive timeout manager.")
+	fs.Duration(networkMaximumTimeoutKey, 10*time.Second, "Maximum timeout value of the adaptive timeout manager.")
+	fs.Duration(networkTimeoutHalflifeKey, 5*time.Minute, "Halflife of average network response time. Higher value --> network timeout is less volatile. Can't be 0.")
+	fs.Float64(networkTimeoutCoefficientKey, 2, "Multiplied by average network response time to get the network timeout. Must be >= 1.")
+	fs.Uint(sendQueueSizeKey, 4096, "Max number of messages waiting to be sent to peers.")
+	//   Restart on Disconnect
+	fs.Duration(disconnectedCheckFreqKey, 10*time.Second, "How often the node checks if it is connected to any peers. "+
+		"See [restart-on-disconnected]. If 0, node will not restart due to disconnection.")
+	fs.Duration(disconnectedRestartTimeoutKey, 1*time.Minute, "If [restart-on-disconnected], node restarts if not connected to any peers for this amount of time. "+
+		"If 0, node will not restart due to disconnection.")
+	fs.Bool(restartOnDisconnectedKey, false, "If true, this node will restart if it is not connected to any peers for [disconnected-restart-timeout].")
+	//   Benchlist
+	fs.Int(benchlistFailThresholdKey, 10, "Number of consecutive failed queries before benchlisting a node.")
+	fs.Bool(benchlistPeerSummaryEnabledKey, false, "Enables peer specific query latency metrics.")
+	fs.Duration(benchlistDurationKey, 30*time.Minute, "Max amount of time a peer is benchlisted after surpassing the threshold.")
+	fs.Duration(benchlistMinFailingDurationKey, 5*time.Minute, "Minimum amount of time messages to a peer must be failing before the peer is benched.")
+	//   Router
+	fs.Uint(maxNonStakerPendingMsgsKey, uint(router.DefaultMaxNonStakerPendingMsgs), "Maximum number of messages a non-staker is allowed to have pending.")
+	fs.Float64(stakerMsgReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain message queue's space for stakers.")
+	fs.Float64(stakerCPUReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain's CPU time for stakers.")
+	fs.Uint(maxPendingMsgsKey, 4096, "Maximum number of pending messages. Messages after this will be dropped.")
+	fs.Duration(consensusGossipFrequencyKey, 10*time.Second, "Frequency of gossiping accepted frontiers.")
+	fs.Duration(consensusShutdownTimeoutKey, 5*time.Second, "Timeout before killing an unresponsive chain.")
 
-	// HTTP Server:
+	// HTTP API
 	fs.String(httpHostKey, "127.0.0.1", "Address of the HTTP server")
 	fs.Uint(httpPortKey, 9650, "Port of the HTTP server")
 	fs.Bool(httpsEnabledKey, false, "Upgrade the HTTP server to HTTPs")
@@ -158,57 +161,57 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(httpsCertFileKey, "", "TLS certificate file for the HTTPs server")
 	fs.Bool(apiAuthRequiredKey, false, "Require authorization token to call HTTP APIs")
 	fs.String(apiAuthPasswordKey, "", "Password used to create/validate API authorization tokens. Can be changed via API call.")
+	//   Enable/Disable APIs
+	fs.Bool(adminAPIEnabledKey, false, "If true, this node exposes the Admin API")
+	fs.Bool(infoAPIEnabledKey, true, "If true, this node exposes the Info API")
+	fs.Bool(keystoreAPIEnabledKey, true, "If true, this node exposes the Keystore API")
+	fs.Bool(metricsAPIEnabledKey, true, "If true, this node exposes the Metrics API")
+	fs.Bool(healthAPIEnabledKey, true, "If true, this node exposes the Health API")
+	fs.Bool(ipcAPIEnabledKey, false, "If true, IPCs can be opened")
+	//   Throughput Server (deprecated)
+	fs.Uint(xputServerPortKey, 9652, "Port of the deprecated throughput test server")
+	fs.Bool(xputServerEnabledKey, false, "If true, throughput test server is created")
+	//   Health
+	fs.Duration(healthcheckFreqKey, 30*time.Second, "Time between health checks")
+	//     Network Layer Health
+	fs.Duration(networkHealthMaxTimeSinceMsgSentKey, time.Minute, "Network layer returns unhealthy if haven't received a message for at least this much time")
+	fs.Duration(networkHealthMaxTimeSinceMsgReceivedKey, time.Minute, "Netowork layer returns unhealthy if haven't received a message for at least this much time")
+	fs.Float64(networkHealthMaxPortionSendQueueFillKey, 0.9, "Network layer returns unhealthy if more than this portion of the pending send queue is full")
+	fs.Uint(networkHealthMinPeersKey, 1, "Network layer returns unhealthy if connected to less than this many peers")
+	fs.Float64(networkHealthMaxSendFailRateKey, .25, "Network layer reports unhealthy if more than this portion of attempted message sends fail")
+	//     Router Health
+	fs.Float64(routerHealthMaxDropRateKey, 0.25, "Node reports unhealthy if the router drops more than this portion of messages.")
+	fs.Uint(routerHealthMaxOutstandingRequestsKey, 1024, "Node reports unhealthy if there are more than this many outstanding consensus requests (Get, PullQuery, etc.) over all chains")
 
-	// Bootstrapping:
-	fs.String(bootstrapIPsKey, defaultString, "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
-	fs.String(bootstrapIDsKey, defaultString, "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
-
-	// Staking:
+	// Staking
 	fs.Uint(stakingPortKey, 9651, "Port of the consensus server")
 	fs.Bool(stakingEnabledKey, true, "Enable staking. If enabled, Network TLS is required.")
 	fs.Bool(p2pTLSEnabledKey, true, "Require TLS to authenticate network communication")
 	fs.String(stakingKeyPathKey, defaultString, "TLS private key for staking")
 	fs.String(stakingCertPathKey, defaultString, "TLS certificate for staking")
 	fs.Uint64(stakingDisabledWeightKey, 1, "Weight to provide to each peer when staking is disabled")
+	//   Uptime Requirement
+	fs.Float64(uptimeRequirementKey, .6, "Fraction of time a validator must be online to receive rewards")
+	//   Minimum Stake required to validate the Primary Network
+	fs.Uint64(minValidatorStakeKey, 2*units.KiloAvax, "Minimum stake, in nAVAX, required to validate the primary network")
+	//   Maximum Stake that can be staked and delegated to a validator on the Primary Network
+	fs.Uint64(maxValidatorStakeKey, 3*units.MegaAvax, "Maximum stake, in nAVAX, that can be placed on a validator on the primary network")
+	//   Minimum Stake that can be delegated on the Primary Network
+	fs.Uint64(minDelegatorStakeKey, 25*units.Avax, "Minimum stake, in nAVAX, that can be delegated on the primary network")
+	fs.Uint64(minDelegatorFeeKey, 20000, "Minimum delegation fee, in the range [0, 1000000], that can be charged for delegation on the primary network")
+	//   Minimum Stake Duration
+	fs.Duration(minStakeDurationKey, 24*time.Hour, "Minimum staking duration")
+	//   Maximum Stake Duration
+	fs.Duration(maxStakeDurationKey, 365*24*time.Hour, "Maximum staking duration")
+	//   Stake Minting Period
+	fs.Duration(stakeMintingPeriodKey, 365*24*time.Hour, "Consumption period of the staking function")
+	//   Subnets
+	fs.String(whitelistedSubnetsKey, "", "Whitelist of subnets to validate.")
+	//   Bootstrapping
+	fs.String(bootstrapIPsKey, defaultString, "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
+	fs.String(bootstrapIDsKey, defaultString, "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 
-	// Router
-	fs.Uint(maxNonStakerPendingMsgsKey, uint(router.DefaultMaxNonStakerPendingMsgs), "Maximum number of messages a non-staker is allowed to have pending.")
-	fs.Float64(routerHealthMaxDropRateKey, 0.25, "Node reports unhealthy if the router drops more than this portion of messages.")
-	fs.Float64(routerHealthMaxOutstandingRequestsKey, 1024, "Node reports unhealthy if there are more than this many outstanding consensus requests (Get, PullQuery, etc.) over all chains")
-	fs.Float64(stakerMsgReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain message queue's space for stakers.")
-	fs.Float64(stakerCPUReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain's CPU time for stakers.")
-	fs.Uint(maxPendingMsgsKey, 4096, "Maximum number of pending messages. Messages after this will be dropped.")
-
-	// Network Health Check
-	fs.Duration(networkHealthMaxTimeSinceMsgSentKey, time.Minute, "Network layer returns unhealthy if haven't received a message for at least this much time")
-	fs.Duration(networkHealthMaxTimeSinceMsgReceivedKey, time.Minute, "Netowork layer returns unhealthy if haven't received a message for at least this much time")
-	fs.Float64(networkHealthMaxPortionSendQueueFillKey, 0.9, "Network layer returns unhealthy if more than this portion of the pending send queue is full")
-	fs.Uint(networkHealthMinPeersKey, 1, "Network layer returns unhealthy if connected to less than this many peers")
-	fs.Float64(networkHealthMaxSendFailRateKey, .25, "Network layer reports unhealthy if more than this portion of attempted message sends fail")
-
-	// Network Timeouts:
-	fs.Duration(networkInitialTimeoutKey, 5*time.Second, "Initial timeout value of the adaptive timeout manager.")
-	fs.Duration(networkMinimumTimeoutKey, 2*time.Second, "Minimum timeout value of the adaptive timeout manager.")
-	fs.Duration(networkMaximumTimeoutKey, 10*time.Second, "Maximum timeout value of the adaptive timeout manager.")
-	fs.Duration(networkTimeoutHalflifeKey, 5*time.Minute, "Halflife of average network response time. Higher value --> network timeout is less volatile. Can't be 0.")
-	fs.Float64(networkTimeoutCoefficientKey, 2, "Multiplied by average network response time to get the network timeout. Must be >= 1.")
-	fs.Uint(sendQueueSizeKey, 4096, "Max number of messages waiting to be sent to peers.")
-
-	// Benchlist Parameters:
-	fs.Int(benchlistFailThresholdKey, 10, "Number of consecutive failed queries before benchlisting a node.")
-	fs.Bool(benchlistPeerSummaryEnabledKey, false, "Enables peer specific query latency metrics.")
-	fs.Duration(benchlistDurationKey, 30*time.Minute, "Max amount of time a peer is benchlisted after surpassing the threshold.")
-	fs.Duration(benchlistMinFailingDurationKey, 5*time.Minute, "Minimum amount of time messages to a peer must be failing before the peer is benched.")
-
-	// Plugins:
-	fs.String(pluginDirKey, defaultString, "Plugin directory for Avalanche VMs")
-
-	// Logging:
-	fs.String(logsDirKey, "", "Logging directory for Avalanche")
-	fs.String(logLevelKey, "info", "The log level. Should be one of {verbo, debug, info, warn, error, fatal, off}")
-	fs.String(logDisplayLevelKey, "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, info, warn, error, fatal, off}")
-	fs.String(logDisplayHighlightKey, "auto", "Whether to color/highlight display logs. Default highlights when the output is a terminal. Otherwise, should be one of {auto, plain, colors}")
-
+	// Consensus
 	fs.Int(snowSampleSizeKey, 20, "Number of nodes to query for each network poll")
 	fs.Int(snowQuorumSizeKey, 14, "Alpha value to use for required number positive results")
 	fs.Int(snowVirtuousCommitThresholdKey, 15, "Beta value to use for virtuous transactions")
@@ -220,41 +223,9 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Int64(snowEpochFirstTransition, 1607626800, "Unix timestamp of the first epoch transaction, in seconds. Defaults to 12/10/2020 @ 7:00pm (UTC)")
 	fs.Duration(snowEpochDuration, 6*time.Hour, "Duration of each epoch")
 
-	// Enable/Disable APIs:
-	fs.Bool(adminAPIEnabledKey, false, "If true, this node exposes the Admin API")
-	fs.Bool(infoAPIEnabledKey, true, "If true, this node exposes the Info API")
-	fs.Bool(keystoreAPIEnabledKey, true, "If true, this node exposes the Keystore API")
-	fs.Bool(metricsAPIEnabledKey, true, "If true, this node exposes the Metrics API")
-	fs.Bool(healthAPIEnabledKey, true, "If true, this node exposes the Health API")
-	fs.Bool(ipcAPIEnabledKey, false, "If true, IPCs can be opened")
-
-	// Throughput Server
-	fs.Uint(xputServerPortKey, 9652, "Port of the deprecated throughput test server")
-	fs.Bool(xputServerEnabledKey, false, "If true, throughput test server is created")
-
 	// IPC
 	fs.String(ipcsChainIDsKey, "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
 	fs.String(ipcsPathKey, defaultString, "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
-
-	// Router Configuration:
-	fs.Duration(consensusGossipFrequencyKey, 10*time.Second, "Frequency of gossiping accepted frontiers.")
-	fs.Duration(consensusShutdownTimeoutKey, 5*time.Second, "Timeout before killing an unresponsive chain.")
-
-	// Restart on disconnect configuration:
-	fs.Duration(disconnectedCheckFreqKey, 10*time.Second, "How often the node checks if it is connected to any peers. "+
-		"See [restart-on-disconnected]. If 0, node will not restart due to disconnection.")
-	fs.Duration(disconnectedRestartTimeoutKey, 1*time.Minute, "If [restart-on-disconnected], node restarts if not connected to any peers for this amount of time. "+
-		"If 0, node will not restart due to disconnection.")
-	fs.Bool(restartOnDisconnectedKey, false, "If true, this node will restart if it is not connected to any peers for [disconnected-restart-timeout].")
-
-	// File Descriptor Limit
-	fs.Uint64(fdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
-
-	// Subnet Whitelist
-	fs.String(whitelistedSubnetsKey, "", "Whitelist of subnets to validate.")
-
-	// Coreth Config
-	fs.String(corethConfigKey, defaultString, "Specifies config to pass into coreth")
 
 	return fs
 }
@@ -586,6 +557,8 @@ func setNodeConfig(v *viper.Viper) error {
 		return errors.New("maximum pending messages must be >= maximum non-staker pending messages")
 	}
 
+	// Health
+	Config.HealthCheckFreq = v.GetDuration(healthcheckFreqKey)
 	// Network Health Check
 	Config.NetworkHealthConfig.MaxTimeSinceMsgSent = v.GetDuration(networkHealthMaxTimeSinceMsgSentKey)
 	Config.NetworkHealthConfig.MaxTimeSinceMsgReceived = v.GetDuration(networkHealthMaxTimeSinceMsgReceivedKey)
