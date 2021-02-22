@@ -108,7 +108,7 @@ func TestImportTxVerify(t *testing.T) {
 	importTx.SourceChain = testXChainID
 	importedIns := importTx.ImportedInputs
 	importTx.ImportedInputs = nil
-	// // Test No Exported Outputs Errors
+	// // Test No Imported Inputs Errors
 	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID); err == nil {
 		t.Fatal("ImportTx should have failed verification due to no imported inputs")
 	}
