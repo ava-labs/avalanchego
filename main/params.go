@@ -247,6 +247,9 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Coreth Config
 	fs.String(corethConfigKey, defaultString, "Specifies config to pass into coreth")
 
+	// Bootstrap Config
+	fs.Bool(retryBootstrap, true, "Specifies whether bootstrap should be retried")
+
 	return fs
 }
 
@@ -691,6 +694,9 @@ func setNodeConfig(v *viper.Viper) error {
 		}
 	}
 	Config.CorethConfig = corethConfigString
+
+	// Bootstrap Configs
+	Config.RetryBootstrap = v.GetBool(retryBootstrap)
 
 	return nil
 }

@@ -138,6 +138,7 @@ type ManagerConfig struct {
 	WhitelistedSubnets      ids.Set          // Subnets to validate
 	TimeoutManager          *timeout.Manager // Manages request timeouts when sending messages to other validators
 	HealthService           health.CheckRegisterer
+	RetryBootstrap          bool // RetryBootstrap config
 }
 
 type manager struct {
@@ -258,6 +259,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 		Metrics:              m.ConsensusParams.Metrics,
 		EpochFirstTransition: m.EpochFirstTransition,
 		EpochDuration:        m.EpochDuration,
+		RetryBootstrap:       m.ManagerConfig.RetryBootstrap,
 	}
 
 	// Get a factory for the vm we want to use on our chain
@@ -564,9 +566,10 @@ func (m *manager) createSnowmanChain(
 				Alpha:        bootstrapWeight/2 + 1, // must be > 50%
 				Sender:       &sender,
 			},
-			Blocked:      blocked,
-			VM:           vm,
-			Bootstrapped: m.unblockChains,
+			Blocked:        blocked,
+			VM:             vm,
+			Bootstrapped:   m.unblockChains,
+			RetryBootstrap: m.ManagerConfig.RetryBootstrap,
 		},
 		Params:    consensusParams,
 		Consensus: &smcon.Topological{},

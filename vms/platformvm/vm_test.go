@@ -2153,9 +2153,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 				Alpha:      uint64(beacons.Len()/2 + 1),
 				Sender:     &sender,
 			},
-			Blocked:       blocked,
-			VM:            vm,
-			BootstrapOnce: true,
+			Blocked: blocked,
+			VM:      vm,
 		},
 		Params: snowball.Parameters{
 			Metrics:           prometheus.NewRegistry(),

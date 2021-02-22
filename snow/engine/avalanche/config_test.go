@@ -20,12 +20,11 @@ func DefaultConfig() Config {
 	txBlocked, _ := queue.New(memdb.New())
 	return Config{
 		Config: bootstrap.Config{
-			Config:        common.DefaultConfigTest(),
-			VtxBlocked:    vtxBlocked,
-			TxBlocked:     txBlocked,
-			Manager:       &vertex.TestManager{},
-			VM:            &vertex.TestVM{},
-			BootstrapOnce: true,
+			Config:     common.DefaultConfigTest(),
+			VtxBlocked: vtxBlocked,
+			TxBlocked:  txBlocked,
+			Manager:    &vertex.TestManager{},
+			VM:         &vertex.TestVM{},
 		},
 		Params: avalanche.Parameters{
 			Parameters: snowball.Parameters{

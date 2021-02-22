@@ -128,4 +128,7 @@ type Config struct {
 
 	// Coreth
 	CorethConfig string
+
+	// Bootstrap config
+	RetryBootstrap bool
 }
