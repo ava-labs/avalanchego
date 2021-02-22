@@ -18,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/stretchr/testify/assert"
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
@@ -432,47 +434,60 @@ func TestGetStake(t *testing.T) {
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis()
-	genesisValidatorNodeIDs := []string{}
-	addrs := []string{}
-	for _, validator := range genesis.Validators {
+	addrsStrs := []string{}
+	for i, validator := range genesis.Validators {
 		addr := fmt.Sprintf("P-%s", validator.RewardOwner.Addresses[0])
-		addrs = append(addrs, addr)
-		genesisValidatorNodeIDs = append(genesisValidatorNodeIDs, validator.NodeID)
-		args := api.JSONAddresses{
-			Addresses: []string{addr},
+		addrsStrs = append(addrsStrs, addr)
+		args := GetStakeArgs{
+			api.JSONAddresses{
+				Addresses: []string{addr},
+			},
+			formatting.Hex,
 		}
 		response := GetStakeReply{}
 		err := service.GetStake(nil, &args, &response)
 		assert.NoError(err)
 		assert.EqualValues(defaultWeight, int(response.Staked))
-		assert.Len(response.StakedOuts, 1)
-		out := response.StakedOuts[0]
-		assert.Equal(validator.NodeID, out.NodeID)
-		assert.EqualValues(validator.EndTime, out.StakedUntil)
-		assert.EqualValues(0, out.StakeOnlyUntil)
-		assert.Len(out.Owners, 1)
-		assert.Contains(out.Owners[0], validator.RewardOwner.Addresses[0])
+		assert.Len(response.Outputs, 1)
+		// Unmarshal into an output
+		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[0])
+		assert.NoError(err)
+		var output avax.TransferableOutput
+		_, err = service.vm.codec.Unmarshal(outputBytes, &output)
+		assert.NoError(err)
+		out, ok := output.Out.(*secp256k1fx.TransferOutput)
+		assert.True(ok)
+		assert.EqualValues(out.Amount(), defaultWeight)
 		assert.EqualValues(out.Threshold, 1)
-		assert.EqualValues(out.Amount, defaultWeight)
+		assert.Len(out.Addrs, 1)
+		assert.Equal(keys[i].PublicKey().Address(), out.Addrs[0])
+		assert.EqualValues(out.Locktime, 0)
 	}
 
 	// Make sure this works for multiple addresses
-	args := api.JSONAddresses{
-		Addresses: addrs,
+	args := GetStakeArgs{
+		api.JSONAddresses{
+			Addresses: addrsStrs,
+		},
+		formatting.Hex,
 	}
 	response := GetStakeReply{}
 	err := service.GetStake(nil, &args, &response)
 	assert.NoError(err)
 	assert.EqualValues(len(genesis.Validators)*defaultWeight, response.Staked)
-	assert.Len(response.StakedOuts, len(genesis.Validators))
-	for _, out := range response.StakedOuts {
-		assert.EqualValues(defaultWeight, out.Amount)
-		assert.EqualValues(defaultValidateEndTime.Unix(), out.StakedUntil)
+	assert.Len(response.Outputs, len(genesis.Validators))
+	for _, outputStr := range response.Outputs {
+		outputBytes, err := formatting.Decode(args.Encoding, outputStr)
+		assert.NoError(err)
+		var output avax.TransferableOutput
+		_, err = service.vm.codec.Unmarshal(outputBytes, &output)
+		assert.NoError(err)
+		out, ok := output.Out.(*secp256k1fx.TransferOutput)
+		assert.True(ok)
+		assert.EqualValues(defaultWeight, out.Amount())
 		assert.EqualValues(out.Threshold, 1)
-		assert.Contains(genesisValidatorNodeIDs, out.NodeID)
-		assert.EqualValues(0, out.StakeOnlyUntil)
-		assert.Len(out.Owners, 1)
-		assert.Contains(addrs, out.Owners[0])
+		assert.EqualValues(out.Locktime, 0)
+		assert.Len(out.Addrs, 1)
 	}
 
 	oldStake := uint64(defaultWeight)
@@ -503,27 +518,17 @@ func TestGetStake(t *testing.T) {
 	err = service.GetStake(nil, &args, &response)
 	assert.NoError(err)
 	assert.EqualValues(oldStake+stakeAmt, uint64(response.Staked))
-	assert.Len(response.StakedOuts, 2)
-	// Make sure we have the ordering of the staked outputs correct.
-	// We ensure the delegator staked output comes second for the sake of testing.
-	if uint64(response.StakedOuts[0].Amount) == stakeAmt {
-		response.StakedOuts[0], response.StakedOuts[1] = response.StakedOuts[1], response.StakedOuts[0]
+	assert.Len(response.Outputs, 2)
+	// Unmarshal into transferableoutputs
+	outputs := make([]avax.TransferableOutput, 2)
+	for i := range outputs {
+		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
+		assert.NoError(err)
+		_, err = service.vm.codec.Unmarshal(outputBytes, &outputs[i])
+		assert.NoError(err)
 	}
-	assert.Contains(genesisValidatorNodeIDs, response.StakedOuts[0].NodeID)
-	assert.EqualValues(response.StakedOuts[0].Amount, defaultWeight)
-	assert.Len(response.StakedOuts[0].Owners, 1)
-	assert.Contains(response.StakedOuts[0].Owners[0], genesis.Validators[0].RewardOwner.Addresses[0])
-	assert.EqualValues(1, response.StakedOuts[0].Threshold)
-	assert.EqualValues(0, response.StakedOuts[0].StakeOnlyUntil)
-	assert.EqualValues(defaultValidateEndTime.Unix(), response.StakedOuts[0].StakedUntil)
-
-	assert.Contains(response.StakedOuts[1].NodeID, delegatorNodeID.String())
-	assert.EqualValues(response.StakedOuts[1].Amount, stakeAmt)
-	assert.Len(response.StakedOuts[1].Owners, 1)
-	assert.Contains(response.StakedOuts[1].Owners[0], genesis.Validators[0].RewardOwner.Addresses[0])
-	assert.EqualValues(1, response.StakedOuts[1].Threshold)
-	assert.EqualValues(0, response.StakedOuts[1].StakeOnlyUntil)
-	assert.EqualValues(delegatorEndTime, response.StakedOuts[1].StakedUntil)
+	// Make sure the stake amount is as expected
+	assert.EqualValues(stakeAmt+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount())
 
 	oldStake = uint64(response.Staked)
 
@@ -549,24 +554,17 @@ func TestGetStake(t *testing.T) {
 	err = service.GetStake(nil, &args, &response)
 	assert.NoError(err)
 	assert.EqualValues(oldStake+stakeAmt, response.Staked)
-	assert.Len(response.StakedOuts, 3)
-	// Don't check all the staked outputs this time.
-	// Just check the one associated with the pending staker
-	found := false
-	for _, out := range response.StakedOuts {
-		if !strings.Contains(out.NodeID, pendingStakerNodeID.String()) {
-			continue
-		}
-		found = true
-		assert.EqualValues(pendingStakerEndTime, out.StakedUntil)
-		assert.EqualValues(0, out.StakeOnlyUntil)
-		assert.Len(out.Owners, 1)
-		assert.Contains(out.Owners[0], genesis.Validators[0].RewardOwner.Addresses[0])
-		assert.EqualValues(1, out.Threshold)
-		assert.EqualValues(stakeAmt, out.Amount)
-
+	assert.Len(response.Outputs, 3)
+	outputs = make([]avax.TransferableOutput, 3)
+	// Unmarshal
+	for i := range outputs {
+		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
+		assert.NoError(err)
+		_, err = service.vm.codec.Unmarshal(outputBytes, &outputs[i])
+		assert.NoError(err)
 	}
-	assert.True(found, "couldn't find output associated with pending staker")
+	// Make sure the stake amount is as expected
+	assert.EqualValues(stakeAmt+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount()+outputs[2].Out.Amount())
 }
 
 // Test method GetCurrentValidators
