@@ -20,17 +20,17 @@ func (mm *messageMetrics) initialize(msgType Op, registerer prometheus.Registere
 	mm.numSent = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: constants.PlatformName,
 		Name:      fmt.Sprintf("%s_sent", msgType),
-		Help:      fmt.Sprintf("Number of %s messages sent", msgType),
+		Help:      fmt.Sprintf("Number of %s messages sent over the network", msgType),
 	})
 	mm.numFailed = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: constants.PlatformName,
 		Name:      fmt.Sprintf("%s_failed", msgType),
-		Help:      fmt.Sprintf("Number of %s messages that failed to be sent", msgType),
+		Help:      fmt.Sprintf("Number of %s messages that failed to be sent over the network", msgType),
 	})
 	mm.numReceived = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: constants.PlatformName,
 		Name:      fmt.Sprintf("%s_received", msgType),
-		Help:      fmt.Sprintf("Number of %s messages received", msgType),
+		Help:      fmt.Sprintf("Number of %s messages received from the network", msgType),
 	})
 
 	if err := registerer.Register(mm.numSent); err != nil {

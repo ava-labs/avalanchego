@@ -5,6 +5,8 @@ package network
 
 import (
 	"time"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 // PeerID ...
@@ -15,4 +17,5 @@ type PeerID struct {
 	Version      string    `json:"version"`
 	LastSent     time.Time `json:"lastSent"`
 	LastReceived time.Time `json:"lastReceived"`
+	Benched      []ids.ID  `json:"benched"`
 }

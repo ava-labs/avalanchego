@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -26,12 +27,15 @@ import (
 func TestSenderContext(t *testing.T) {
 	context := snow.DefaultContextTest()
 	sender := Sender{}
-	sender.Initialize(
+	err := sender.Initialize(
 		context,
 		&ExternalSenderTest{},
 		&router.ChainRouter{},
 		&timeout.Manager{},
+		"",
+		prometheus.NewRegistry(),
 	)
+	assert.NoError(t, err)
 	if res := sender.Context(); !reflect.DeepEqual(res, context) {
 		t.Fatalf("Got %#v, expected %#v", res, context)
 	}
@@ -42,13 +46,13 @@ func TestTimeout(t *testing.T) {
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
 	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout: time.Millisecond,
-		MinimumTimeout: time.Millisecond,
-		MaximumTimeout: 10 * time.Second,
-		TimeoutInc:     2 * time.Millisecond,
-		TimeoutDec:     time.Millisecond,
-		Namespace:      "",
-		Registerer:     prometheus.NewRegistry(),
+		InitialTimeout:     time.Millisecond,
+		MinimumTimeout:     time.Millisecond,
+		MaximumTimeout:     10 * time.Second,
+		TimeoutHalflife:    5 * time.Minute,
+		TimeoutCoefficient: 1.25,
+		MetricsNamespace:   "",
+		Registerer:         prometheus.NewRegistry(),
 	}, benchlist)
 	if err != nil {
 		t.Fatal(err)
@@ -56,10 +60,12 @@ func TestTimeout(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
-	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil)
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 
 	sender := Sender{}
-	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm)
+	err = sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(true)
@@ -111,13 +117,13 @@ func TestReliableMessages(t *testing.T) {
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
 	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout: time.Millisecond,
-		MinimumTimeout: time.Millisecond,
-		MaximumTimeout: 10 * time.Second,
-		TimeoutInc:     2 * time.Millisecond,
-		TimeoutDec:     time.Millisecond,
-		Namespace:      "",
-		Registerer:     prometheus.NewRegistry(),
+		InitialTimeout:     time.Millisecond,
+		MinimumTimeout:     time.Millisecond,
+		MaximumTimeout:     10 * time.Second,
+		TimeoutHalflife:    5 * time.Minute,
+		TimeoutCoefficient: 1.25,
+		MetricsNamespace:   "",
+		Registerer:         prometheus.NewRegistry(),
 	}, benchlist)
 	if err != nil {
 		t.Fatal(err)
@@ -125,10 +131,12 @@ func TestReliableMessages(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
-	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil)
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 
 	sender := Sender{}
-	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm)
+	err = sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(true)
@@ -191,13 +199,13 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	vdrs := validators.NewSet()
 	tm := timeout.Manager{}
 	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout: time.Millisecond,
-		MinimumTimeout: time.Millisecond,
-		MaximumTimeout: 10 * time.Second,
-		TimeoutInc:     2 * time.Millisecond,
-		TimeoutDec:     time.Millisecond,
-		Namespace:      "",
-		Registerer:     prometheus.NewRegistry(),
+		InitialTimeout:     10 * time.Millisecond,
+		MinimumTimeout:     10 * time.Millisecond,
+		MaximumTimeout:     10 * time.Millisecond, // Timeout fires immediately
+		TimeoutHalflife:    5 * time.Minute,
+		TimeoutCoefficient: 1.25,
+		MetricsNamespace:   "",
+		Registerer:         prometheus.NewRegistry(),
 	}, benchlist)
 	if err != nil {
 		t.Fatal(err)
@@ -205,10 +213,12 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
-	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil)
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 
 	sender := Sender{}
-	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm)
+	err = sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(false)
@@ -246,18 +256,12 @@ func TestReliableMessagesToMyself(t *testing.T) {
 
 	go func() {
 		for i := 0; i < queriesToSend; i++ {
+			// Send a pull query to some random peer that won't respond
+			// because they don't exist. This will almost immediately trigger
+			// a query failed message
 			vdrIDs := ids.ShortSet{}
-			vdrIDs.Add(engine.Context().NodeID)
-
+			vdrIDs.Add(ids.GenerateTestShortID())
 			sender.PullQuery(vdrIDs, uint32(i), ids.Empty)
-			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
-		}
-	}()
-
-	go func() {
-		for {
-			chainRouter.Gossip()
-			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
 		}
 	}()
 
