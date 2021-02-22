@@ -96,9 +96,9 @@ func (cr *ChainRouter) Initialize(
 	cr.requests = make(map[ids.ID]request)
 	cr.peers.Add(nodeID)
 	// Set up meter to count dropped messages
-	cr.dropMeter = timer.TimedMeter{Duration: healthConfig.MaxPercentDroppedDuration}
+	cr.dropMeter = timer.TimedMeter{Duration: constants.DefaultHealthCheckExecutionPeriod}
 	// Set up meter to count non-dropped (successful) messages
-	cr.successMeter = timer.TimedMeter{Duration: healthConfig.MaxPercentDroppedDuration}
+	cr.successMeter = timer.TimedMeter{Duration: constants.DefaultHealthCheckExecutionPeriod}
 
 	// Register metrics
 	cr.metrics = routerMetrics{}
@@ -755,12 +755,15 @@ func (cr *ChainRouter) Health() (interface{}, error) {
 	healthy := true
 	numDropped := cr.dropMeter.Ticks()
 	numNotDropped := cr.successMeter.Ticks()
-	portionDropped := float64(numDropped) / (float64(numDropped) + float64(numNotDropped)) // In [0,1]
+	var dropRate float64
+	if numDropped+numNotDropped != 0 {
+		dropRate = float64(numDropped) / (float64(numDropped) + float64(numNotDropped)) // In [0,1]
+	}
 
-	if portionDropped > cr.healthConfig.MaxPercentDropped {
+	if dropRate > cr.healthConfig.MaxDropRate {
 		healthy = false
 	}
-	details["portionOfMsgsDropped"] = portionDropped
+	details["msgDropRate"] = dropRate
 
 	if !healthy {
 		// The router is not healthy

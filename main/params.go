@@ -173,17 +173,17 @@ func avalancheFlagSet() *flag.FlagSet {
 
 	// Router
 	fs.Uint(maxNonStakerPendingMsgsKey, uint(router.DefaultMaxNonStakerPendingMsgs), "Maximum number of messages a non-staker is allowed to have pending.")
-	fs.Float64(routerMaxPctMsgsDroppedKey, 0.05, fmt.Sprintf("Node reports unhealthy if it drops more than [%s] of messages in last [%s]", routerMaxPctMsgsDroppedKey, routerMaxPctMsgsDroppedDurationKey))
-	fs.Duration(routerMaxPctMsgsDroppedDurationKey, time.Minute, fmt.Sprintf("Node reports unhealthy if it drops more than [%s] of messages in last [%s]", routerMaxPctMsgsDroppedKey, routerMaxPctMsgsDroppedDurationKey))
+	fs.Float64(routerMaxDropRateKey, 0.25, "Node reports unhealthy if the router drops more than this portion of messages.")
 	fs.Float64(stakerMsgReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain message queue's space for stakers.")
 	fs.Float64(stakerCPUReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain's CPU time for stakers.")
 	fs.Uint(maxPendingMsgsKey, 4096, "Maximum number of pending messages. Messages after this will be dropped.")
 
 	// Network Health Check
-	fs.Duration(networkHealthMaxTimeSinceMsgSent, time.Minute, "Network layer returns unhealthy if haven't received a message for at least this much time")
-	fs.Duration(networkHealthMaxTimeSinceMsgReceived, time.Minute, "Netowork layer returns unhealthy if haven't received a message for at least this much time")
-	fs.Float64(networkHealthMaxPctSendQueueFill, 0.9, "Network layer returns unhealthy if more than this portion of the pending send queue is full")
-	fs.Uint(networkHealthMinPeers, 1, "Network layer returns unhealthy if connected to less than this many peers")
+	fs.Duration(networkHealthMaxTimeSinceMsgSentKey, time.Minute, "Network layer returns unhealthy if haven't received a message for at least this much time")
+	fs.Duration(networkHealthMaxTimeSinceMsgReceivedKey, time.Minute, "Netowork layer returns unhealthy if haven't received a message for at least this much time")
+	fs.Float64(networkHealthMaxPortionSendQueueFillKey, 0.9, "Network layer returns unhealthy if more than this portion of the pending send queue is full")
+	fs.Uint(networkHealthMinPeersKey, 1, "Network layer returns unhealthy if connected to less than this many peers")
+	fs.Float64(networkHealthMaxSendFailRateKey, .25, "Network layer reports unhealthy if more than this portion of attempted message sends fail")
 
 	// Network Timeouts:
 	fs.Duration(networkInitialTimeoutKey, 5*time.Second, "Initial timeout value of the adaptive timeout manager.")
@@ -556,13 +556,9 @@ func setNodeConfig(v *viper.Viper) error {
 
 	// Router used for consensus
 	Config.ConsensusRouter = &router.ChainRouter{}
-	Config.RouterHealthConfig.MaxPercentDropped = v.GetFloat64(routerMaxPctMsgsDroppedKey)
-	Config.RouterHealthConfig.MaxPercentDroppedDuration = v.GetDuration(routerMaxPctMsgsDroppedDurationKey)
-	switch {
-	case Config.RouterHealthConfig.MaxPercentDropped < 0 || Config.RouterHealthConfig.MaxPercentDropped > 100:
-		return fmt.Errorf("%s must be in [0,1]", routerMaxPctMsgsDroppedKey)
-	case Config.RouterHealthConfig.MaxPercentDroppedDuration <= 0:
-		return fmt.Errorf("%s must be > 0", routerMaxPctMsgsDroppedDurationKey)
+	Config.RouterHealthConfig.MaxDropRate = v.GetFloat64(routerMaxDropRateKey)
+	if Config.RouterHealthConfig.MaxDropRate < 0 || Config.RouterHealthConfig.MaxDropRate > 1 {
+		return fmt.Errorf("%s must be in [0,1]", routerMaxDropRateKey)
 	}
 
 	// IPCs
@@ -589,17 +585,20 @@ func setNodeConfig(v *viper.Viper) error {
 	}
 
 	// Network Health Check
-	Config.NetworkHealthConfig.MaxTimeSinceMsgSent = v.GetDuration(networkHealthMaxTimeSinceMsgSent)
-	Config.NetworkHealthConfig.MaxTimeSinceMsgReceived = v.GetDuration(networkHealthMaxTimeSinceMsgReceived)
-	Config.NetworkHealthConfig.MaxPctSendQueueBytesFull = v.GetFloat64(networkHealthMaxPctSendQueueFill)
-	Config.NetworkHealthConfig.MinConnectedPeers = v.GetUint(networkHealthMinPeers)
+	Config.NetworkHealthConfig.MaxTimeSinceMsgSent = v.GetDuration(networkHealthMaxTimeSinceMsgSentKey)
+	Config.NetworkHealthConfig.MaxTimeSinceMsgReceived = v.GetDuration(networkHealthMaxTimeSinceMsgReceivedKey)
+	Config.NetworkHealthConfig.MaxPortionSendQueueBytesFull = v.GetFloat64(networkHealthMaxPortionSendQueueFillKey)
+	Config.NetworkHealthConfig.MinConnectedPeers = v.GetUint(networkHealthMinPeersKey)
+	Config.NetworkHealthConfig.MaxSendFailRate = v.GetFloat64(networkHealthMaxSendFailRateKey)
 	switch {
 	case Config.NetworkHealthConfig.MaxTimeSinceMsgSent < 0:
-		return fmt.Errorf("%s must be > 0", networkHealthMaxTimeSinceMsgSent)
+		return fmt.Errorf("%s must be > 0", networkHealthMaxTimeSinceMsgSentKey)
 	case Config.NetworkHealthConfig.MaxTimeSinceMsgReceived < 0:
-		return fmt.Errorf("%s must be > 0", networkHealthMaxTimeSinceMsgReceived)
-	case Config.NetworkHealthConfig.MaxPctSendQueueBytesFull <= 0 || Config.NetworkHealthConfig.MaxPctSendQueueBytesFull > 1:
-		return fmt.Errorf("%s must be in (0,1]", networkHealthMaxPctSendQueueFill)
+		return fmt.Errorf("%s must be > 0", networkHealthMaxTimeSinceMsgReceivedKey)
+	case Config.NetworkHealthConfig.MaxSendFailRate < 0 || Config.NetworkHealthConfig.MaxSendFailRate > 1:
+		return fmt.Errorf("%s must be in [0,1]", networkHealthMaxSendFailRateKey)
+	case Config.NetworkHealthConfig.MaxPortionSendQueueBytesFull < 0 || Config.NetworkHealthConfig.MaxPortionSendQueueBytesFull > 1:
+		return fmt.Errorf("%s must be in [0,1]", networkHealthMaxPortionSendQueueFillKey)
 	}
 
 	// Network Timeout

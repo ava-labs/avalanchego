@@ -8,16 +8,19 @@ type HealthConfig struct {
 	MinConnectedPeers uint
 
 	// Must have received a message from the network within this duration
-	// to be considered healthy
-	// Must be positive
+	// to be considered healthy. Must be positive
 	MaxTimeSinceMsgReceived time.Duration
 
 	// Must have sent a message over the network within this duration
-	// to be considered healthy
-	// Must be positive
+	// to be considered healthy. Must be positive
 	MaxTimeSinceMsgSent time.Duration
 
 	// If greater than this portion of the pending send byte queue is full,
 	// will report unhealthy. Must be in (0,1]
 	MaxPortionSendQueueBytesFull float64
+
+	// If greater than this portion of the attempts to send a message to a peer
+	// fail, will return unhealthy. Does not include send attempts that were not
+	// made due toe benching. Must be in [0,1]
+	MaxSendFailRate float64
 }
