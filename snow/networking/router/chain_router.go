@@ -378,7 +378,7 @@ func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 
 	// Pass the response to the chain
 	dropped := !chain.Accepted(validatorID, requestID, containerIDs)
-	if !dropped {
+	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetAcceptedFailed(validatorID, requestID)
 		cr.dropMeter.Tick()
@@ -427,7 +427,7 @@ func (cr *ChainRouter) GetAncestors(validatorID ids.ShortID, chainID ids.ID, req
 
 	// Pass the message to the chain. It's OK if we drop this.
 	dropped := !chain.GetAncestors(validatorID, requestID, deadline, containerID)
-	if !dropped {
+	if dropped {
 		cr.dropMeter.Tick()
 	} else {
 		cr.successMeter.Tick()
