@@ -53,6 +53,10 @@ type Bootstrapper struct {
 	bootstrapAttempts int
 	// validators that failed to respond with their frontiers
 	failedAcceptedFrontierVdrs ids.ShortSet
+
+	// validators that failed to respond with their frontier votes
+	failedAcceptedVdrs ids.ShortSet
+
 	// ensures we only process the current request ID
 	currentRequestID uint32
 }
@@ -86,6 +90,7 @@ func (b *Bootstrapper) Initialize(config Config) error {
 // Startup implements the Engine interface.
 func (b *Bootstrapper) Startup() error {
 	b.bootstrapAttempts++
+	b.Ctx.Log.Info("Starting Bootstrap - attempt: %d", b.bootstrapAttempts)
 	b.started = true
 	if b.pendingAcceptedFrontier.Len() == 0 {
 		b.Ctx.Log.Info("Bootstrapping skipped due to no provided bootstraps")
@@ -104,14 +109,6 @@ func (b *Bootstrapper) Startup() error {
 
 // GetAcceptedFrontier implements the Engine interface.
 func (b *Bootstrapper) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
-	// ignores any late responses
-	if requestID != b.RequestID {
-		b.Ctx.Log.Debug("Received an Out-of-Sync GetAcceptedFrontier - validator: %v - expectedRequestID: %v, requestID: %v",
-			validatorID,
-			b.RequestID,
-			requestID)
-		return nil
-	}
 	b.Sender.AcceptedFrontier(validatorID, requestID, b.Bootstrapable.CurrentAcceptedFrontier())
 	return nil
 }
@@ -171,8 +168,8 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 		}
 	}
 
-	// restart the bootstrap
-	if totalWeight < b.Alpha {
+	// restart the bootstrap if the total weight is not enough and there is failed votes
+	if totalWeight < b.Alpha && b.failedAcceptedFrontierVdrs.Len() > 0 {
 		b.Ctx.Log.Info("Didn't receive enough AcceptedFrontier to bootstrap - failed validators: %d, "+
 			"bootstrap attempt: %d", b.failedAcceptedFrontierVdrs.Len(), b.bootstrapAttempts)
 		if b.Config.Ctx.RetryBootstrap {
@@ -191,14 +188,6 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 
 // GetAccepted implements the Engine interface.
 func (b *Bootstrapper) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	// ignores any late responses
-	if requestID != b.RequestID {
-		b.Ctx.Log.Debug("Received an Out-of-Sync GetAccepted - validator: %v - expectedRequestID: %v, requestID: %v",
-			validatorID,
-			b.RequestID,
-			requestID)
-		return nil
-	}
 	b.Sender.Accepted(validatorID, requestID, b.Bootstrapable.FilterAccepted(containerIDs))
 	return nil
 }
@@ -216,6 +205,7 @@ func (b *Bootstrapper) GetAcceptedFailed(validatorID ids.ShortID, requestID uint
 
 	// If we can't get a response from [validatorID], act as though they said
 	// that they think none of the containers we sent them in GetAccepted are accepted
+	b.failedAcceptedVdrs.Add(validatorID)
 	return b.Accepted(validatorID, requestID, nil)
 }
 
@@ -260,10 +250,11 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 	// if we don't have enough weight for the bootstrap to be accepted then restart or fail the bootstrap
 	size := len(accepted)
 
-	if size == 0 && b.Beacons.Len() > 0 {
+	// in a zero network there will be no accepted votes, some Beacons and no failed requests
+	if size == 0 && b.Beacons.Len() > 0 && b.failedAcceptedVdrs.Len() > 0 {
 		b.Ctx.Log.Info("Bootstrapping finished with no accepted frontier. This is likely a result of failing to "+
 			"be able to connect to the specified bootstraps, or no transactions have been issued on this chain yet"+
-			" - Number of beacons: %d - bootstrap attempt: %d", b.Beacons.Len(), b.bootstrapAttempts)
+			" - Beacons: %d - Failed Bootstrappers: %d - bootstrap attempt: %d", b.Beacons.Len(), b.failedAcceptedVdrs.Len(), b.bootstrapAttempts)
 		if b.Config.Ctx.RetryBootstrap {
 			return b.RestartBootstrap()
 		}
@@ -314,10 +305,11 @@ func (b *Bootstrapper) RestartBootstrap() error {
 	}
 
 	// todo: avoid flooding the network
-	// time.Sleep(time.Duration(b.bootstrapAttempts) * time.Second)
+	time.Sleep(time.Duration(b.bootstrapAttempts) * 100 * time.Millisecond)
 
-	// reset the failed frontier responses
+	// reset the failed responses
 	b.failedAcceptedFrontierVdrs = ids.ShortSet{}
+	b.failedAcceptedVdrs = ids.ShortSet{}
 
 	beacons, err := b.Beacons.Sample(b.Config.SampleK)
 	if err != nil {
