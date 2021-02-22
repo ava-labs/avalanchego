@@ -21,6 +21,6 @@ type HealthConfig struct {
 
 	// If greater than this portion of the attempts to send a message to a peer
 	// fail, will return unhealthy. Does not include send attempts that were not
-	// made due toe benching. Must be in [0,1]
+	// made due to benching. Must be in [0,1]
 	MaxSendFailRate float64
 }
