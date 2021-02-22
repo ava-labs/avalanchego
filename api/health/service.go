@@ -96,7 +96,6 @@ type APIHealthReply struct {
 }
 
 // GetLiveness returns a summation of the health of the node
-// Deprecated in favor of Health
 func (h *Health) Health(_ *http.Request, _ *APIHealthArgs, reply *APIHealthReply) error {
 	h.log.Info("Health.health called")
 	reply.Checks, reply.Healthy = h.health.Results()
