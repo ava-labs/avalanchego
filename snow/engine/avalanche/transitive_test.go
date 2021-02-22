@@ -2625,6 +2625,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 func TestEngineReBootstrapFails(t *testing.T) {
 	config := DefaultConfig()
 	config.Alpha = 1
+	config.Ctx.RetryBootstrap = true
 
 	vals := validators.NewSet()
 	config.Validators = vals
@@ -2770,6 +2771,7 @@ func TestEngineReBootstrapFails(t *testing.T) {
 func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 	config := DefaultConfig()
 	config.Alpha = 1
+	config.Ctx.RetryBootstrap = true
 
 	vals := validators.NewSet()
 	config.Validators = vals
