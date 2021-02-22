@@ -760,7 +760,7 @@ func (cr *ChainRouter) Health() (interface{}, error) {
 	if portionDropped > cr.healthConfig.MaxPercentDropped {
 		healthy = false
 	}
-	details["percentDropped"] = 100 * portionDropped // In [0,100]
+	details["portionOfMsgsDropped"] = portionDropped
 
 	if !healthy {
 		// The router is not healthy

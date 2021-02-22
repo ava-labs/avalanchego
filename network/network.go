@@ -1384,10 +1384,10 @@ func (n *network) Health() (interface{}, error) {
 	pendingSendBytes := n.pendingBytes
 	n.stateLock.RUnlock()
 	portionFull := float64(pendingSendBytes) / float64(n.maxNetworkPendingSendBytes) // In [0,1]
-	if portionFull > n.healthConfig.MaxPctSendQueueBytesFull {
+	if portionFull > n.healthConfig.MaxPortionSendQueueBytesFull {
 		healthy = false
 	}
-	details["sendQueuePercentFull"] = 100 * portionFull
+	details["sendQueuePortionFull"] = portionFull
 
 	// Network layer is unhealthy
 	if !healthy {

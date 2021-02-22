@@ -19,5 +19,5 @@ type HealthConfig struct {
 
 	// If greater than this portion of the pending send byte queue is full,
 	// will report unhealthy. Must be in (0,1]
-	MaxPctSendQueueBytesFull float64
+	MaxPortionSendQueueBytesFull float64
 }
