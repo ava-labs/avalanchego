@@ -765,6 +765,12 @@ func (cr *ChainRouter) Health() (interface{}, error) {
 	}
 	details["msgDropRate"] = dropRate
 
+	numOutstandingReqs := len(cr.requests)
+	if numOutstandingReqs > cr.healthConfig.MaxOutstandingRequests {
+		healthy = false
+	}
+	details["outstandingRequests"] = numOutstandingReqs
+
 	if !healthy {
 		// The router is not healthy
 		return details, errUnhealthy

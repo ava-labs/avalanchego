@@ -173,7 +173,8 @@ func avalancheFlagSet() *flag.FlagSet {
 
 	// Router
 	fs.Uint(maxNonStakerPendingMsgsKey, uint(router.DefaultMaxNonStakerPendingMsgs), "Maximum number of messages a non-staker is allowed to have pending.")
-	fs.Float64(routerMaxDropRateKey, 0.25, "Node reports unhealthy if the router drops more than this portion of messages.")
+	fs.Float64(routerHealthMaxDropRateKey, 0.25, "Node reports unhealthy if the router drops more than this portion of messages.")
+	fs.Float64(routerHealthMaxOutstandingRequestsKey, 1024, "Node reports unhealthy if there are more than this many outstanding consensus requests (Get, PullQuery, etc.) over all chains")
 	fs.Float64(stakerMsgReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain message queue's space for stakers.")
 	fs.Float64(stakerCPUReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain's CPU time for stakers.")
 	fs.Uint(maxPendingMsgsKey, 4096, "Maximum number of pending messages. Messages after this will be dropped.")
@@ -556,9 +557,10 @@ func setNodeConfig(v *viper.Viper) error {
 
 	// Router used for consensus
 	Config.ConsensusRouter = &router.ChainRouter{}
-	Config.RouterHealthConfig.MaxDropRate = v.GetFloat64(routerMaxDropRateKey)
+	Config.RouterHealthConfig.MaxDropRate = v.GetFloat64(routerHealthMaxDropRateKey)
+	Config.RouterHealthConfig.MaxOutstandingRequests = int(v.GetUint(routerHealthMaxOutstandingRequestsKey))
 	if Config.RouterHealthConfig.MaxDropRate < 0 || Config.RouterHealthConfig.MaxDropRate > 1 {
-		return fmt.Errorf("%s must be in [0,1]", routerMaxDropRateKey)
+		return fmt.Errorf("%s must be in [0,1]", routerHealthMaxDropRateKey)
 	}
 
 	// IPCs

@@ -757,6 +757,13 @@ func (n *Node) initHealthAPI() error {
 	if err := n.healthService.RegisterCheck(netCheck); err != nil {
 		return fmt.Errorf("couldn't register network health check")
 	}
+
+	// Register the router with the health service
+	routerCheck := health.NewCheck("router", n.Config.ConsensusRouter.Health)
+	if err := n.healthService.RegisterCheck(routerCheck); err != nil {
+		return fmt.Errorf("couldn't register router health check")
+	}
+
 	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "health", "", n.HTTPLog)
 }
 

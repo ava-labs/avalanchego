@@ -34,6 +34,7 @@ type Router interface {
 	Shutdown()
 	AddChain(chain *Handler)
 	RemoveChain(chainID ids.ID)
+	Health() (interface{}, error)
 }
 
 // ExternalRouter routes messages from the network to the

@@ -596,7 +596,6 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 // assumes the stateLock is not held.
 func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, container []byte) []ids.ShortID {
 	msg, err := n.b.PushQuery(chainID, requestID, uint64(deadline), containerID, container)
-
 	if err != nil {
 		n.log.Error("failed to build PushQuery(%s, %d, %s): %s. len(container): %d",
 			chainID,
