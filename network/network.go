@@ -1413,7 +1413,7 @@ func (n *network) Health() (interface{}, error) {
 	if timeSinceLastMsgReceived > n.healthConfig.MaxTimeSinceMsgReceived {
 		healthy = false
 	}
-	details["timeSinceLastMsgReceived"] = timeSinceLastMsgReceived
+	details["timeSinceLastMsgReceived"] = timeSinceLastMsgReceived.String()
 
 	// Make sure we've sent an outgoing message within the threshold
 	lastMsgSentAt := time.Unix(atomic.LoadInt64(&n.lastMsgSentTime), 0)
@@ -1421,7 +1421,7 @@ func (n *network) Health() (interface{}, error) {
 	if timeSinceLastMsgSent > n.healthConfig.MaxTimeSinceMsgSent {
 		healthy = false
 	}
-	details["timeSinceLastMsgSent"] = timeSinceLastMsgSent
+	details["timeSinceLastMsgSent"] = timeSinceLastMsgSent.String()
 
 	// Make sure the send queue isn't too full
 	portionFull := float64(pendingSendBytes) / float64(n.maxNetworkPendingSendBytes) // In [0,1]
