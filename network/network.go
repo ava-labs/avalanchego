@@ -59,8 +59,8 @@ var (
 // Network Upgrade
 var minimumUnmaskedVersion = version.NewDefaultVersion(constants.PlatformName, 1, 1, 0)
 
-// Use data from last [healthCheckDuration] to use when calculating send failure rate
-var healthCheckDuration = 30 * time.Second
+// Use data from last [healthcheckLookback] to use when calculating send failure rate
+var healthcheckLookback = 30 * time.Second
 
 func init() { rand.Seed(time.Now().UnixNano()) }
 
@@ -357,8 +357,8 @@ func NewNetwork(
 		restarter:                          restarter,
 		apricotPhase0Time:                  apricotPhase0Time,
 		healthConfig:                       healthConfig,
-		sendSuccessMeter:                   timer.TimedMeter{Duration: healthCheckDuration},
-		sendFailMeter:                      timer.TimedMeter{Duration: healthCheckDuration},
+		sendSuccessMeter:                   timer.TimedMeter{Duration: healthcheckLookback},
+		sendFailMeter:                      timer.TimedMeter{Duration: healthcheckLookback},
 	}
 
 	if err := netw.initialize(registerer); err != nil {

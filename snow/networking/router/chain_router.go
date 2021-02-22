@@ -27,8 +27,8 @@ const (
 var (
 	_            Router = &ChainRouter{}
 	errUnhealthy        = errors.New("the router is not healthy")
-	// Use data from last [healthCheckDuration] to use when calculating drop rate
-	healthCheckDuration = 30 * time.Second
+	// Use data from last [healthcheckLookback] to use when calculating drop rate
+	healthcheckLookback = 30 * time.Second
 )
 
 type request struct {
@@ -98,9 +98,9 @@ func (cr *ChainRouter) Initialize(
 	cr.requests = make(map[ids.ID]request)
 	cr.peers.Add(nodeID)
 	// Set up meter to count dropped messages
-	cr.dropMeter = timer.TimedMeter{Duration: healthCheckDuration}
+	cr.dropMeter = timer.TimedMeter{Duration: healthcheckLookback}
 	// Set up meter to count non-dropped (successful) messages
-	cr.successMeter = timer.TimedMeter{Duration: healthCheckDuration}
+	cr.successMeter = timer.TimedMeter{Duration: healthcheckLookback}
 	cr.healthConfig = healthConfig
 
 	// Register metrics
