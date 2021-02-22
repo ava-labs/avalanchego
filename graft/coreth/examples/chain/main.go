@@ -110,6 +110,7 @@ func NewTestChain(name string, config *eth.Config,
 
 func (tc *TestChain) Start() {
 	tc.chain.Start()
+	tc.chain.BlockChain().UnlockIndexing()
 }
 
 func (tc *TestChain) Stop() {
@@ -127,6 +128,7 @@ func (tc *TestChain) GenRandomTree(n int, max int) {
 		pn := pb.Int64()
 		tc.parentBlock = tc.blocks[nblocks-1-(int)(pn)]
 		tc.chain.SetTail(tc.parentBlock)
+		tc.chain.SetPreference(tc.chain.GetBlockByHash(tc.parentBlock))
 		tc.blockWait.Add(1)
 		tc.chain.GenBlock()
 		tc.blockWait.Wait()
