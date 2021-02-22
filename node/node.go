@@ -100,6 +100,9 @@ type Node struct {
 	// Manages Virtual Machines
 	vmManager vms.Manager
 
+	// Manages validator benching
+	benchlistManager benchlist.Manager
+
 	// dispatcher for events as they happen in consensus
 	DecisionDispatcher  *triggers.EventDispatcher
 	ConsensusDispatcher *triggers.EventDispatcher
@@ -185,6 +188,10 @@ func (n *Node) initNetworking() error {
 		return err
 	}
 
+	// Configure benchlist
+	n.Config.BenchlistConfig.Validators = n.vdrs
+	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
+
 	consensusRouter := n.Config.ConsensusRouter
 	if !n.Config.EnableStaking {
 		if err := primaryNetworkValidators.AddWeight(n.ID, n.Config.DisabledStakingWeight); err != nil {
@@ -246,6 +253,7 @@ func (n *Node) initNetworking() error {
 		n.Config.DisconnectedRestartTimeout,
 		n.Config.ApricotPhase0Time,
 		n.Config.SendQueueSize,
+		n.benchlistManager,
 	)
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
@@ -515,13 +523,9 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	n.Config.NetworkConfig.MetricsNamespace = constants.PlatformName
 	n.Config.NetworkConfig.Registerer = n.Config.ConsensusParams.Metrics
 
-	// Configure benchlist
-	n.Config.BenchlistConfig.Validators = n.vdrs
-	benchlistManager := benchlist.NewManager(&n.Config.BenchlistConfig)
-
 	// Manages network timeouts
 	timeoutManager := &timeout.Manager{}
-	if err := timeoutManager.Initialize(&n.Config.NetworkConfig, benchlistManager); err != nil {
+	if err := timeoutManager.Initialize(&n.Config.NetworkConfig, n.benchlistManager); err != nil {
 		return err
 	}
 	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
