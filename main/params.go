@@ -179,16 +179,16 @@ func avalancheFlagSet() *flag.FlagSet {
 
 	// Network Timeouts:
 	fs.Duration(networkInitialTimeoutKey, 5*time.Second, "Initial timeout value of the adaptive timeout manager.")
-	fs.Duration(networkMinimumTimeoutKey, 3*time.Second, "Minimum timeout value of the adaptive timeout manager.")
+	fs.Duration(networkMinimumTimeoutKey, 2*time.Second, "Minimum timeout value of the adaptive timeout manager.")
 	fs.Duration(networkMaximumTimeoutKey, 10*time.Second, "Maximum timeout value of the adaptive timeout manager.")
-	fs.Duration(networkTimeoutIncreaseKey, 100*time.Millisecond, "Increase of network timeout after a failed request.")
-	fs.Duration(networkTimeoutReductionKey, 5*time.Millisecond, "Decrease of network timeout after a successful request.")
+	fs.Duration(networkTimeoutHalflifeKey, 5*time.Minute, "Halflife of average network response time. Higher value --> network timeout is less volatile. Can't be 0.")
+	fs.Float64(networkTimeoutCoefficientKey, 2, "Multiplied by average network response time to get the network timeout. Must be >= 1.")
 	fs.Uint(sendQueueSizeKey, 4096, "Max number of messages waiting to be sent to peers.")
 
 	// Benchlist Parameters:
 	fs.Int(benchlistFailThresholdKey, 10, "Number of consecutive failed queries before benchlisting a node.")
 	fs.Bool(benchlistPeerSummaryEnabledKey, false, "Enables peer specific query latency metrics.")
-	fs.Duration(benchlistDurationKey, 30*time.Minute, "Amount of time a peer is benchlisted after surpassing the threshold.")
+	fs.Duration(benchlistDurationKey, 30*time.Minute, "Max amount of time a peer is benchlisted after surpassing the threshold.")
 	fs.Duration(benchlistMinFailingDurationKey, 5*time.Minute, "Minimum amount of time messages to a peer must be failing before the peer is benched.")
 
 	// Plugins:
@@ -203,7 +203,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Int(snowSampleSizeKey, 20, "Number of nodes to query for each network poll")
 	fs.Int(snowQuorumSizeKey, 14, "Alpha value to use for required number positive results")
 	fs.Int(snowVirtuousCommitThresholdKey, 15, "Beta value to use for virtuous transactions")
-	fs.Int(snowRogueCommitThresholdKey, 30, "Beta value to use for rogue transactions")
+	fs.Int(snowRogueCommitThresholdKey, 20, "Beta value to use for rogue transactions")
 	fs.Int(snowAvalancheNumParentsKey, 5, "Number of vertexes for reference from each new vertex")
 	fs.Int(snowAvalancheBatchSizeKey, 30, "Number of operations to batch in each new vertex")
 	fs.Int(snowConcurrentRepollsKey, 4, "Minimum number of concurrent polls for finalizing consensus")
@@ -578,24 +578,21 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.NetworkConfig.InitialTimeout = v.GetDuration(networkInitialTimeoutKey)
 	Config.NetworkConfig.MinimumTimeout = v.GetDuration(networkMinimumTimeoutKey)
 	Config.NetworkConfig.MaximumTimeout = v.GetDuration(networkMaximumTimeoutKey)
-	Config.NetworkConfig.TimeoutInc = v.GetDuration(networkTimeoutIncreaseKey)
-	Config.NetworkConfig.TimeoutDec = v.GetDuration(networkTimeoutReductionKey)
+	Config.NetworkConfig.TimeoutHalflife = v.GetDuration(networkTimeoutHalflifeKey)
+	Config.NetworkConfig.TimeoutCoefficient = v.GetFloat64(networkTimeoutCoefficientKey)
 
-	if Config.NetworkConfig.MinimumTimeout < 1 {
+	switch {
+	case Config.NetworkConfig.MinimumTimeout < 1:
 		return errors.New("minimum timeout must be positive")
-	}
-	if Config.NetworkConfig.MinimumTimeout > Config.NetworkConfig.MaximumTimeout {
+	case Config.NetworkConfig.MinimumTimeout > Config.NetworkConfig.MaximumTimeout:
 		return errors.New("maximum timeout can't be less than minimum timeout")
-	}
-	if Config.NetworkConfig.InitialTimeout < Config.NetworkConfig.MinimumTimeout ||
-		Config.NetworkConfig.InitialTimeout > Config.NetworkConfig.MaximumTimeout {
+	case Config.NetworkConfig.InitialTimeout < Config.NetworkConfig.MinimumTimeout ||
+		Config.NetworkConfig.InitialTimeout > Config.NetworkConfig.MaximumTimeout:
 		return errors.New("initial timeout should be in the range [minimumTimeout, maximumTimeout]")
-	}
-	if Config.NetworkConfig.TimeoutDec < 0 {
-		return errors.New("timeout reduction can't be negative")
-	}
-	if Config.NetworkConfig.TimeoutInc < 0 {
-		return errors.New("timeout increase can't be negative")
+	case Config.NetworkConfig.TimeoutHalflife <= 0:
+		return errors.New("network timeout halflife must be positive")
+	case Config.NetworkConfig.TimeoutCoefficient < 1:
+		return errors.New("network timeout coefficient must be >= 1")
 	}
 
 	// Restart:

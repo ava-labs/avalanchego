@@ -526,7 +526,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	criticalChains.Add(constants.PlatformChainID, createAVMTx.ID())
 
 	// Set Prometheus metrics info
-	n.Config.NetworkConfig.Namespace = constants.PlatformName
+	n.Config.NetworkConfig.MetricsNamespace = constants.PlatformName
 	n.Config.NetworkConfig.Registerer = n.Config.ConsensusParams.Metrics
 
 	// Configure benchlist
@@ -534,22 +534,27 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	benchlistManager := benchlist.NewManager(&n.Config.BenchlistConfig)
 
 	// Manages network timeouts
-	timeoutManager := timeout.Manager{}
+	timeoutManager := &timeout.Manager{}
 	if err := timeoutManager.Initialize(&n.Config.NetworkConfig, benchlistManager); err != nil {
 		return err
 	}
 	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
 
 	// Routes incoming messages from peers to the appropriate chain
-	n.Config.ConsensusRouter.Initialize(
+	err = n.Config.ConsensusRouter.Initialize(
 		n.ID,
 		n.Log,
-		&timeoutManager,
+		timeoutManager,
 		n.Config.ConsensusGossipFrequency,
 		n.Config.ConsensusShutdownTimeout,
 		criticalChains,
 		n.Shutdown,
+		n.Config.NetworkConfig.MetricsNamespace,
+		n.Config.NetworkConfig.Registerer,
 	)
+	if err != nil {
+		return fmt.Errorf("couldn't initialize chain router: %w", err)
+	}
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
 		StakingEnabled:          n.Config.EnableStaking,
@@ -577,7 +582,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		AVAXAssetID:             avaxAssetID,
 		XChainID:                xChainID,
 		CriticalChains:          criticalChains,
-		TimeoutManager:          &timeoutManager,
+		TimeoutManager:          timeoutManager,
 		HealthService:           n.healthService,
 		WhitelistedSubnets:      n.Config.WhitelistedSubnets,
 	})
