@@ -744,28 +744,29 @@ func (cr *ChainRouter) EndInterval() {
 	}
 }
 
-// Health returns results of router health checks.
-// Returns a nil error if healthy. Otherwise, returns
-// non-nil error and a list of strings describing why it's unhealthy.
+// Health returns results of router health checks. Returns:
+// 1) Information about health check results
+// 2) An error if the health check reports unhealthy
 func (cr *ChainRouter) Health() (interface{}, error) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	var errors []error
+	details := map[string]interface{}{}
+	healthy := true
 	numDropped := cr.dropMeter.Ticks()
 	numNotDropped := cr.successMeter.Ticks()
-	percentDropped := float64(numDropped) / (float64(numDropped) + float64(numNotDropped))
+	portionDropped := float64(numDropped) / (float64(numDropped) + float64(numNotDropped)) // In [0,1]
 
-	if percentDropped > cr.healthConfig.MaxPercentDropped {
-		errStr := fmt.Errorf("dropped %f%% messages in last %s", percentDropped, cr.healthConfig.MaxPercentDroppedDuration)
-		errors = append(errors, errStr)
+	if portionDropped > cr.healthConfig.MaxPercentDropped {
+		healthy = false
 	}
+	details["percentDropped"] = 100 * portionDropped // In [0,100]
 
-	if len(errors) > 0 {
+	if !healthy {
 		// The router is not healthy
-		return errors, errUnhealthy
+		return details, errUnhealthy
 	}
-	return nil, nil
+	return details, nil
 }
 
 func createRequestID(validatorID ids.ShortID, chainID ids.ID, requestID uint32) ids.ID {

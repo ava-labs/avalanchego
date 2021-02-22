@@ -1337,11 +1337,12 @@ func (n *network) restartOnDisconnect() {
 }
 
 // Health returns information about several network layer health checks.
-// Returns a nil error if the network layer is healthy. Otherwise,
-// returns non-nil error and a list of strings describing why it's unhealthy.
+// 1) Information about health check results
+// 2) An error if the health check reports unhealthy
 // Assumes [n.stateLock] is not held
 func (n *network) Health() (interface{}, error) {
-	var details []string
+	details := map[string]interface{}{}
+	healthy := true
 
 	// Make sure we're connected to at least the minimum number of peers
 	connectedTo := 0
@@ -1356,50 +1357,41 @@ func (n *network) Health() (interface{}, error) {
 	}
 	n.stateLock.RUnlock()
 	if connectedTo < int(n.healthConfig.MinConnectedPeers) {
-		errStr := fmt.Sprintf(
-			"should be connected to >= %d peers but connected to %d",
-			n.healthConfig.MinConnectedPeers,
-			connectedTo,
-		)
-		details = append(details, errStr)
+		healthy = false
+		details["connectedToMinPeers"] = false
+	} else {
+		details["connectedToMinPeers"] = true
 	}
 
 	// Make sure we've received an incoming message within the threshold
 	lastMsgReceivedAt := time.Unix(atomic.LoadInt64(&n.lastMsgReceivedTime), 0)
 	timeSinceLastMsgReceived := n.clock.Time().Sub(lastMsgReceivedAt)
 	if timeSinceLastMsgReceived > n.healthConfig.MaxTimeSinceMsgReceived {
-		errStr := fmt.Sprintf(
-			"should have received message in last %s but last message received %s ago",
-			n.healthConfig.MaxTimeSinceMsgReceived,
-			timeSinceLastMsgReceived,
-		)
-		details = append(details, errStr)
+		healthy = false
 	}
+	details["timeSinceLastMsgReceived"] = timeSinceLastMsgReceived
 
 	// Make sure we've sent an outgoing message within the threshold
 	lastMsgSentAt := time.Unix(atomic.LoadInt64(&n.lastMsgSentTime), 0)
 	timeSinceLastMsgSent := n.clock.Time().Sub(lastMsgSentAt)
 	if timeSinceLastMsgSent > n.healthConfig.MaxTimeSinceMsgSent {
-		errStr := fmt.Sprintf(
-			"should have sent message in last %s but last message sent %s ago",
-			n.healthConfig.MaxTimeSinceMsgSent,
-			timeSinceLastMsgSent,
-		)
-		details = append(details, errStr)
+		healthy = false
 	}
+	details["timeSinceLastMsgSent"] = timeSinceLastMsgSent
 
 	// Make sure the pending byte queue is not too full
 	n.stateLock.RLock()
 	pendingSendBytes := n.pendingBytes
 	n.stateLock.RUnlock()
-	if pendingSendBytes > int64(n.healthConfig.MaxPctSendQueueBytesFull*float64(n.maxNetworkPendingSendBytes)) {
-		details = append(details, fmt.Sprintf("pending send queue is more than %f%% full", 100*n.healthConfig.MaxPctSendQueueBytesFull))
+	portionFull := float64(pendingSendBytes) / float64(n.maxNetworkPendingSendBytes) // In [0,1]
+	if portionFull > n.healthConfig.MaxPctSendQueueBytesFull {
+		healthy = false
 	}
+	details["sendQueuePercentFull"] = 100 * portionFull
 
-	if len(details) == 0 {
-		// Network layer is healthy
-		return nil, nil
-	}
 	// Network layer is unhealthy
-	return details, errNetworkLayerUnhealthy
+	if !healthy {
+		return details, errNetworkLayerUnhealthy
+	}
+	return details, nil
 }
