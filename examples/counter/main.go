@@ -1,6 +1,12 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// NOTE from Ted: make sure your solc<0.8.0, as geth 1.9.21 does not support
+// the JSON output from solc>=0.8.0:
+// See:
+// - https://github.com/ethereum/go-ethereum/issues/22041
+// - https://github.com/ethereum/go-ethereum/pull/22092
+
 package main
 
 import (
@@ -146,6 +152,7 @@ func main() {
 		header.Extra = append(header.Extra, hid...)
 	})
 	chain.SetOnSealFinish(func(block *types.Block) error {
+		chain.SetPreference(block)
 		blockCount++
 		if postGen(block) {
 			return nil
@@ -160,6 +167,8 @@ func main() {
 	// start the chain
 	chain.GetTxPool().SubscribeNewHeadEvent(newTxPoolHeadChan)
 	chain.Start()
+	chain.BlockChain().UnlockIndexing()
+	chain.SetPreference(chain.GetGenesisBlock())
 
 	_ = contract
 	code := common.Hex2Bytes(contract.Code[2:])

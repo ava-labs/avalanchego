@@ -1,6 +1,16 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// NOTE from Ted: make sure your solc<0.8.0, as geth 1.9.21 does not support
+// the JSON output from solc>=0.8.0:
+// See:
+// - https://github.com/ethereum/go-ethereum/issues/22041
+// - https://github.com/ethereum/go-ethereum/pull/22092
+
+// NOTE from Ted: this is an *obsolete* example for our first revision of the
+// multi-coin implementation in coreth. It may no longer work but serves as an
+// archival purpose. Please don't remove it without notice.
+
 package main
 
 import (
@@ -211,6 +221,7 @@ func main() {
 		header.Extra = append(header.Extra, hid...)
 	})
 	chain.SetOnSealFinish(func(block *types.Block) error {
+		chain.SetPreference(block)
 		blockCount++
 		if postGen(block) {
 			return nil
@@ -226,8 +237,10 @@ func main() {
 	// start the chain
 	chain.GetTxPool().SubscribeNewHeadEvent(newTxPoolHeadChan)
 	chain.Start()
-	code := common.Hex2Bytes(contract.Code[2:])
+	chain.BlockChain().UnlockIndexing()
+	chain.SetPreference(chain.GetGenesisBlock())
 
+	code := common.Hex2Bytes(contract.Code[2:])
 	tx := types.NewContractCreation(nonce, big.NewInt(0), uint64(gasLimit), gasPrice, code)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), genKey.PrivateKey)
 
