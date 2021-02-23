@@ -227,42 +227,9 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Int64(snowEpochFirstTransition, 1607626800, "Unix timestamp of the first epoch transaction, in seconds. Defaults to 12/10/2020 @ 7:00pm (UTC)")
 	fs.Duration(snowEpochDuration, 6*time.Hour, "Duration of each epoch")
 
-	// Enable/Disable APIs:
-	fs.Bool(adminAPIEnabledKey, false, "If true, this node exposes the Admin API")
-	fs.Bool(infoAPIEnabledKey, true, "If true, this node exposes the Info API")
-	fs.Bool(keystoreAPIEnabledKey, true, "If true, this node exposes the Keystore API")
-	fs.Bool(metricsAPIEnabledKey, true, "If true, this node exposes the Metrics API")
-	fs.Bool(healthAPIEnabledKey, true, "If true, this node exposes the Health API")
-	fs.Bool(ipcAPIEnabledKey, false, "If true, IPCs can be opened")
-	fs.Bool(indexEnabledKey, false, "If true, this node indexes accepted X-Chain transactions and exposes them on the Indexer API")
-
-	// Throughput Server
-	fs.Uint(xputServerPortKey, 9652, "Port of the deprecated throughput test server")
-	fs.Bool(xputServerEnabledKey, false, "If true, throughput test server is created")
-
 	// IPC
 	fs.String(ipcsChainIDsKey, "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
 	fs.String(ipcsPathKey, defaultString, "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
-
-	// Router Configuration:
-	fs.Duration(consensusGossipFrequencyKey, 10*time.Second, "Frequency of gossiping accepted frontiers.")
-	fs.Duration(consensusShutdownTimeoutKey, 5*time.Second, "Timeout before killing an unresponsive chain.")
-
-	// Restart on disconnect configuration:
-	fs.Duration(disconnectedCheckFreqKey, 10*time.Second, "How often the node checks if it is connected to any peers. "+
-		"See [restart-on-disconnected]. If 0, node will not restart due to disconnection.")
-	fs.Duration(disconnectedRestartTimeoutKey, 1*time.Minute, "If [restart-on-disconnected], node restarts if not connected to any peers for this amount of time. "+
-		"If 0, node will not restart due to disconnection.")
-	fs.Bool(restartOnDisconnectedKey, false, "If true, this node will restart if it is not connected to any peers for [disconnected-restart-timeout].")
-
-	// File Descriptor Limit
-	fs.Uint64(fdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
-
-	// Subnet Whitelist
-	fs.String(whitelistedSubnetsKey, "", "Whitelist of subnets to validate.")
-
-	// Coreth Config
-	fs.String(corethConfigKey, defaultString, "Specifies config to pass into coreth")
 
 	// Indexer
 	fs.String(indexInitialChainsKey, "2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM,2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5,11111111111111111111111111111111LpoYY", "IDs of chains to index on startup, if indexing is enabled")

@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -74,6 +75,7 @@ func newIndex(db database.Database, log logging.Logger, codec codec.Manager) (In
 // indexer indexes all accepted transactions by the order in which they were accepted
 type index struct {
 	codec codec.Manager
+	clock timer.Clock
 	lock  *sync.RWMutex
 	// The index of the next accepted transaction
 	nextAcceptedIndex uint64
@@ -103,9 +105,10 @@ func (i *index) Accept(ctx *snow.Context, containerID ids.ID, containerBytes []b
 		return fmt.Errorf("couldn't convert next accepted index to bytes: %w", p.Err)
 	}
 	bytes, err := i.codec.Marshal(codecVersion, Container{
-		Index: i.nextAcceptedIndex,
-		Bytes: containerBytes,
-		ID:    containerID,
+		Index:     i.nextAcceptedIndex,
+		Bytes:     containerBytes,
+		ID:        containerID,
+		Timestamp: uint64(i.clock.Time().Unix()),
 	})
 	if err != nil {
 		return fmt.Errorf("couldn't serialize container %s: %w", containerID, err)
@@ -245,7 +248,12 @@ func (i *index) lastAcceptedIndex() (uint64, bool) {
 
 // Container ...
 type Container struct {
-	ID    ids.ID `serialize:"true"`
-	Index uint64 `serialize:"true"`
+	// ID of this container
+	ID ids.ID `serialize:"true"`
+	// Byte representation of this container
 	Bytes []byte `serialize:"true"`
+	// Index is the order in which this container was accepted
+	Index uint64 `serialize:"true"`
+	// Unix time at which this container was accepted
+	Timestamp uint64 `serialize:"true"`
 }
