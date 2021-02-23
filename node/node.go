@@ -92,13 +92,16 @@ type Node struct {
 	sharedMemory atomic.Memory
 
 	// Monitors node health and runs health checks
-	healthService health.CheckRegisterer
+	healthService health.Service
 
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
 
 	// Manages Virtual Machines
 	vmManager vms.Manager
+
+	// Manages validator benching
+	benchlistManager benchlist.Manager
 
 	// dispatcher for events as they happen in consensus
 	DecisionDispatcher  *triggers.EventDispatcher
@@ -185,6 +188,10 @@ func (n *Node) initNetworking() error {
 		return err
 	}
 
+	// Configure benchlist
+	n.Config.BenchlistConfig.Validators = n.vdrs
+	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
+
 	consensusRouter := n.Config.ConsensusRouter
 	if !n.Config.EnableStaking {
 		if err := primaryNetworkValidators.AddWeight(n.ID, n.Config.DisabledStakingWeight); err != nil {
@@ -246,6 +253,8 @@ func (n *Node) initNetworking() error {
 		n.Config.DisconnectedRestartTimeout,
 		n.Config.ApricotPhase0Time,
 		n.Config.SendQueueSize,
+		n.Config.NetworkHealthConfig,
+		n.benchlistManager,
 	)
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
@@ -515,13 +524,9 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	n.Config.NetworkConfig.MetricsNamespace = constants.PlatformName
 	n.Config.NetworkConfig.Registerer = n.Config.ConsensusParams.Metrics
 
-	// Configure benchlist
-	n.Config.BenchlistConfig.Validators = n.vdrs
-	benchlistManager := benchlist.NewManager(&n.Config.BenchlistConfig)
-
 	// Manages network timeouts
 	timeoutManager := &timeout.Manager{}
-	if err := timeoutManager.Initialize(&n.Config.NetworkConfig, benchlistManager); err != nil {
+	if err := timeoutManager.Initialize(&n.Config.NetworkConfig, n.benchlistManager); err != nil {
 		return err
 	}
 	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
@@ -535,6 +540,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		n.Config.ConsensusShutdownTimeout,
 		criticalChains,
 		n.Shutdown,
+		n.Config.RouterHealthConfig,
 		n.Config.NetworkConfig.MetricsNamespace,
 		n.Config.NetworkConfig.Registerer,
 	)
@@ -723,10 +729,8 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	n.Log.Info("initializing Health API")
-	service := health.NewService(n.Log)
-	if err := service.RegisterHeartbeat("network.validators.heartbeat", n.Net, 5*time.Minute); err != nil {
-		return fmt.Errorf("couldn't register heartbeat health check: %w", err)
-	}
+	n.healthService = health.NewService(n.Config.HealthCheckFreq, n.Log)
+
 	isBootstrappedFunc := func() (interface{}, error) {
 		if pChainID, err := n.chainManager.Lookup("P"); err != nil {
 			return nil, errors.New("P-Chain not created")
@@ -746,14 +750,28 @@ func (n *Node) initHealthAPI() error {
 		return nil, nil
 	}
 	// Passes if the P, X and C chains are finished bootstrapping
-	if err := service.RegisterMonotonicCheckFunc("chains.default.bootstrapped", isBootstrappedFunc); err != nil {
-		return err
+	err := n.healthService.RegisterMonotonicCheck("isBootstrapped", isBootstrappedFunc)
+	if err != nil {
+		return fmt.Errorf("couldn't register isBootstrapped health check: %w", err)
 	}
-	handler, err := service.Handler()
+
+	// Register the network layer with the health service
+	err = n.healthService.RegisterCheck("network", n.Net.HealthCheck)
+	if err != nil {
+		return fmt.Errorf("couldn't register network health check")
+	}
+
+	// Register the router with the health service
+	err = n.healthService.RegisterCheck("router", n.Config.ConsensusRouter.HealthCheck)
+	if err != nil {
+		return fmt.Errorf("couldn't register router health check")
+	}
+
+	handler, err := n.healthService.Handler()
 	if err != nil {
 		return err
 	}
-	n.healthService = service
+
 	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "health", "", n.HTTPLog)
 }
 
@@ -855,6 +873,7 @@ func (n *Node) Initialize(
 
 	// Start the Health API
 	// Has to be initialized before chain manager
+	// [n.Net] must already be set
 	if err := n.initHealthAPI(); err != nil {
 		return fmt.Errorf("couldn't initialize health API: %w", err)
 	}

@@ -435,7 +435,7 @@ func (e *EngineTest) IsBootstrapped() bool {
 }
 
 // Health ...
-func (e *EngineTest) Health() (interface{}, error) {
+func (e *EngineTest) HealthCheck() (interface{}, error) {
 	if e.HealthF != nil {
 		return e.HealthF()
 	}

@@ -114,7 +114,7 @@ func (vm *TestVM) CreateStaticHandlers() map[string]*HTTPHandler {
 }
 
 // Health ...
-func (vm *TestVM) Health() (interface{}, error) {
+func (vm *TestVM) HealthCheck() (interface{}, error) {
 	if vm.HealthF != nil {
 		return vm.HealthF()
 	}

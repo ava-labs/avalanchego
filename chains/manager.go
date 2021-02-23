@@ -110,34 +110,34 @@ type chain struct {
 
 // ManagerConfig ...
 type ManagerConfig struct {
-	StakingEnabled            bool // True iff the network has staking enabled
-	MaxPendingMsgs            uint32
-	MaxNonStakerPendingMsgs   uint32
-	StakerMSGPortion          float64
-	StakerCPUPortion          float64
-	Log                       logging.Logger
-	LogFactory                logging.Factory
-	VMManager                 vms.Manager // Manage mappings from vm ID --> vm
-	DecisionEvents            *triggers.EventDispatcher
-	ConsensusEvents           *triggers.EventDispatcher
-	DB                        database.Database
-	Router                    router.Router    // Routes incoming messages to the appropriate chain
-	Net                       network.Network  // Sends consensus messages to other validators
-	ConsensusParams           avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
-	EpochFirstTransition      time.Time
-	EpochDuration             time.Duration
-	Validators                validators.Manager // Validators validating on this chain
-	NodeID                    ids.ShortID        // The ID of this node
-	NetworkID                 uint32             // ID of the network this node is connected to
-	Server                    *api.Server        // Handles HTTP API calls
-	Keystore                  *keystore.Keystore
-	AtomicMemory              *atomic.Memory
-	AVAXAssetID               ids.ID
-	XChainID                  ids.ID
-	CriticalChains            ids.Set          // Chains that can't exit gracefully
-	WhitelistedSubnets        ids.Set          // Subnets to validate
-	TimeoutManager            *timeout.Manager // Manages request timeouts when sending messages to other validators
-	HealthService             health.CheckRegisterer
+	StakingEnabled          bool // True iff the network has staking enabled
+	MaxPendingMsgs          uint32
+	MaxNonStakerPendingMsgs uint32
+	StakerMSGPortion        float64
+	StakerCPUPortion        float64
+	Log                     logging.Logger
+	LogFactory              logging.Factory
+	VMManager               vms.Manager // Manage mappings from vm ID --> vm
+	DecisionEvents          *triggers.EventDispatcher
+	ConsensusEvents         *triggers.EventDispatcher
+	DB                      database.Database
+	Router                  router.Router    // Routes incoming messages to the appropriate chain
+	Net                     network.Network  // Sends consensus messages to other validators
+	ConsensusParams         avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
+	EpochFirstTransition    time.Time
+	EpochDuration           time.Duration
+	Validators              validators.Manager // Validators validating on this chain
+	NodeID                  ids.ShortID        // The ID of this node
+	NetworkID               uint32             // ID of the network this node is connected to
+	Server                  *api.Server        // Handles HTTP API calls
+	Keystore                *keystore.Keystore
+	AtomicMemory            *atomic.Memory
+	AVAXAssetID             ids.ID
+	XChainID                ids.ID
+	CriticalChains          ids.Set          // Chains that can't exit gracefully
+	WhitelistedSubnets      ids.Set          // Subnets to validate
+	TimeoutManager          *timeout.Manager // Manages request timeouts when sending messages to other validators
+	HealthService           health.Service
 	RetryBootstrap            bool // Should Bootstrap be retried
 	RetryBootstrapMaxAttempts int  // Max number of times to retry bootstrap
 }
@@ -467,17 +467,18 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
 	}
 
-	// Register health checks
+	// Register health check for this chain
 	chainAlias, err := m.PrimaryAlias(ctx.ChainID)
 	if err != nil {
 		chainAlias = ctx.ChainID.String()
 	}
-	wrapperHc := &healthCheckWrapper{
-		chain: chainAlias,
-		lock:  &ctx.Lock,
-		check: engine.Health,
+	// Grab the context lock before calling the chain's health check
+	checkFn := func() (interface{}, error) {
+		ctx.Lock.Lock()
+		defer ctx.Lock.Unlock()
+		return engine.HealthCheck()
 	}
-	if err := m.HealthService.RegisterCheck(wrapperHc); err != nil {
+	if err := m.HealthService.RegisterCheck(chainAlias, checkFn); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -600,12 +601,12 @@ func (m *manager) createSnowmanChain(
 		chainAlias = ctx.ChainID.String()
 	}
 
-	wrapperHc := &healthCheckWrapper{
-		chain: chainAlias,
-		lock:  &ctx.Lock,
-		check: engine.Health,
+	checkFn := func() (interface{}, error) {
+		ctx.Lock.Lock()
+		defer ctx.Lock.Unlock()
+		return engine.HealthCheck()
 	}
-	if err := m.HealthService.RegisterCheck(wrapperHc); err != nil {
+	if err := m.HealthService.RegisterCheck(chainAlias, checkFn); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -667,28 +668,4 @@ func (m *manager) isChainWithAlias(aliases ...string) (string, bool) {
 		}
 	}
 	return "", false
-}
-
-// Wraps a health check.
-// Grabs [Lock] before executing the health check
-type healthCheckWrapper struct {
-	check func() (interface{}, error)
-
-	// Grabs/releases this before/after health check func
-	lock *sync.RWMutex
-
-	// Alias/ID of chain this health check is for
-	chain string
-}
-
-// Name is this health check's formatted name
-func (hc *healthCheckWrapper) Name() string {
-	return hc.chain
-}
-
-// Execute executes the health check function with the lock
-func (hc *healthCheckWrapper) Execute() (interface{}, error) {
-	hc.lock.Lock()
-	defer hc.lock.Unlock()
-	return hc.check()
 }

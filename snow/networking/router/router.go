@@ -6,6 +6,7 @@ package router
 import (
 	"time"
 
+	"github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -27,12 +28,14 @@ type Router interface {
 		shutdownTimeout time.Duration,
 		criticalChains ids.Set,
 		onFatal func(),
+		healthConfig HealthConfig,
 		metricsNamespace string,
 		metricsRegisterer prometheus.Registerer,
 	) error
 	Shutdown()
 	AddChain(chain *Handler)
 	RemoveChain(chainID ids.ID)
+	health.Checkable
 }
 
 // ExternalRouter routes messages from the network to the
