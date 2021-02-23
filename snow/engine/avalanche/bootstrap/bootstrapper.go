@@ -40,9 +40,6 @@ type Config struct {
 
 	Manager vertex.Manager
 	VM      vertex.DAGVM
-
-	// allows to configure if the bootstrap should retry until sufficiently synced
-	RetryBootstrap bool
 }
 
 // Bootstrapper ...
@@ -57,9 +54,6 @@ type Bootstrapper struct {
 
 	Manager vertex.Manager
 	VM      vertex.DAGVM
-
-	// allows to configure if the bootstrap should retry until sufficiently synced
-	RetryBootstrap bool
 
 	// IDs of vertices that we will send a GetAncestors request for once we are
 	// not at the max number of outstanding requests
@@ -84,7 +78,7 @@ func (b *Bootstrapper) Initialize(
 	b.VM = config.VM
 	b.processedCache = &cache.LRU{Size: cacheSize}
 	b.OnFinished = onFinished
-	b.RetryBootstrap = config.RetryBootstrap
+	b.executedStateTransitions = math.MaxInt32
 
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return err
@@ -375,26 +369,13 @@ func (b *Bootstrapper) checkFinish() error {
 	}
 
 	b.Ctx.Log.Info("executing vertex state transitions...")
-	executedTxs, err := b.executeAll(b.VtxBlocked, b.Ctx.ConsensusDispatcher)
+	executedVts, err := b.executeAll(b.VtxBlocked, b.Ctx.ConsensusDispatcher)
 	if err != nil {
 		return err
 	}
 
-	// exec - 10k ; prev - 0     ; runs again because prev is math.MaxInt32
-	// exec - 20  ; prev - 10k/2 ; runs again
-	// exec - 2   ; prev - 20/2  ; runs again
-	// exec - 1   ; prev - 2/1   ; doesnt run again
-	//
-	// exec - 0   ; prev - 0     ; stops running as there's nothing fetched
-	previousStateTransitionsThreshold := b.executedStateTransitions
-	if previousStateTransitionsThreshold == 0 {
-		previousStateTransitionsThreshold = math.MaxInt32
-	} else {
-		previousStateTransitionsThreshold /= 2
-	}
-
-	if executedTxs > 0 && executedTxs < previousStateTransitionsThreshold && b.RetryBootstrap {
-		b.executedStateTransitions = executedTxs
+	if executedVts > 0 && executedVts < b.executedStateTransitions/2 && b.RetryBootstrap {
+		b.executedStateTransitions = executedVts
 		b.Ctx.Log.Info("bootstrapping is checking for more vertices before finishing the bootstrap process...")
 		return b.RestartBootstrap(true)
 	}

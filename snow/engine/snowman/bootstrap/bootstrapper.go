@@ -47,9 +47,6 @@ type Bootstrapper struct {
 
 	Bootstrapped func()
 
-	// allows to configure if the bootstrap should retry until sufficiently synced
-	RetryBootstrap bool
-
 	// true if all of the vertices in the original accepted frontier have been processed
 	processedStartingAcceptedFrontier bool
 	// number of state transitions executed
@@ -67,7 +64,7 @@ func (b *Bootstrapper) Initialize(
 	b.VM = config.VM
 	b.Bootstrapped = config.Bootstrapped
 	b.OnFinished = onFinished
-	b.RetryBootstrap = config.RetryBootstrap
+	b.executedStateTransitions = math.MaxInt32
 
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return err
@@ -261,14 +258,7 @@ func (b *Bootstrapper) checkFinish() error {
 		return err
 	}
 
-	previousStateTransitionsThreshold := b.executedStateTransitions
-	if previousStateTransitionsThreshold == 0 {
-		previousStateTransitionsThreshold = math.MaxInt32
-	} else {
-		previousStateTransitionsThreshold /= 2
-	}
-
-	if executedBlocks > 0 && executedBlocks < previousStateTransitionsThreshold && b.RetryBootstrap {
+	if executedBlocks > 0 && executedBlocks < b.executedStateTransitions/2 && b.RetryBootstrap {
 		b.executedStateTransitions = executedBlocks
 		b.Ctx.Log.Info("bootstrapping is checking for more blocks before finishing the bootstrap process...")
 		return b.RestartBootstrap(true)

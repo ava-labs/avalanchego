@@ -72,12 +72,6 @@ type Context struct {
 
 	// Non-zero iff this chain bootstrapped. Should only be accessed atomically.
 	bootstrapped uint32
-
-	// Should Bootstrap be retried
-	RetryBootstrap bool
-
-	// Max number of times to retry bootstrap
-	RetryBootstrapMaxAttempts int
 }
 
 // IsBootstrapped returns true iff this chain is done bootstrapping

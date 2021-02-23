@@ -243,25 +243,23 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	}
 
 	ctx := &snow.Context{
-		NetworkID:                 m.NetworkID,
-		SubnetID:                  chainParams.SubnetID,
-		ChainID:                   chainParams.ID,
-		NodeID:                    m.NodeID,
-		XChainID:                  m.XChainID,
-		AVAXAssetID:               m.AVAXAssetID,
-		Log:                       chainLog,
-		DecisionDispatcher:        m.DecisionEvents,
-		ConsensusDispatcher:       m.ConsensusEvents,
-		Keystore:                  m.Keystore.NewBlockchainKeyStore(chainParams.ID),
-		SharedMemory:              m.AtomicMemory.NewSharedMemory(chainParams.ID),
-		BCLookup:                  m,
-		SNLookup:                  m,
-		Namespace:                 fmt.Sprintf("%s_%s_vm", constants.PlatformName, primaryAlias),
-		Metrics:                   m.ConsensusParams.Metrics,
-		EpochFirstTransition:      m.EpochFirstTransition,
-		EpochDuration:             m.EpochDuration,
-		RetryBootstrap:            m.ManagerConfig.RetryBootstrap,
-		RetryBootstrapMaxAttempts: m.ManagerConfig.RetryBootstrapMaxAttempts,
+		NetworkID:            m.NetworkID,
+		SubnetID:             chainParams.SubnetID,
+		ChainID:              chainParams.ID,
+		NodeID:               m.NodeID,
+		XChainID:             m.XChainID,
+		AVAXAssetID:          m.AVAXAssetID,
+		Log:                  chainLog,
+		DecisionDispatcher:   m.DecisionEvents,
+		ConsensusDispatcher:  m.ConsensusEvents,
+		Keystore:             m.Keystore.NewBlockchainKeyStore(chainParams.ID),
+		SharedMemory:         m.AtomicMemory.NewSharedMemory(chainParams.ID),
+		BCLookup:             m,
+		SNLookup:             m,
+		Namespace:            fmt.Sprintf("%s_%s_vm", constants.PlatformName, primaryAlias),
+		Metrics:              m.ConsensusParams.Metrics,
+		EpochFirstTransition: m.EpochFirstTransition,
+		EpochDuration:        m.EpochDuration,
 	}
 
 	// Get a factory for the vm we want to use on our chain
@@ -448,13 +446,15 @@ func (m *manager) createAvalancheChain(
 	if err := engine.Initialize(aveng.Config{
 		Config: avbootstrap.Config{
 			Config: common.Config{
-				Ctx:          ctx,
-				Validators:   validators,
-				Beacons:      beacons,
-				SampleK:      sampleK,
-				StartupAlpha: (3*bootstrapWeight + 3) / 4,
-				Alpha:        bootstrapWeight/2 + 1, // must be > 50%
-				Sender:       &sender,
+				Ctx:                       ctx,
+				Validators:                validators,
+				Beacons:                   beacons,
+				SampleK:                   sampleK,
+				StartupAlpha:              (3*bootstrapWeight + 3) / 4,
+				Alpha:                     bootstrapWeight/2 + 1, // must be > 50%
+				Sender:                    &sender,
+				RetryBootstrap:            m.RetryBootstrap,
+				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
 			},
 			VtxBlocked: vtxBlocker,
 			TxBlocked:  txBlocker,

@@ -172,14 +172,14 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 
 	newAlpha := float64(b.sampledBeacons.Weight()*b.Alpha) / float64(b.Beacons.Weight())
 
-	failedBeaconWeight, err := b.Beacons.SubsetWeight(b.failedAcceptedVdrs)
+	failedBeaconWeight, err := b.Beacons.SubsetWeight(b.failedAcceptedFrontierVdrs)
 	if err != nil {
 		return err
 	}
 
 	// fail the bootstrap if the weight is not enough to bootstrap
 	if float64(b.sampledBeacons.Weight())-newAlpha < float64(failedBeaconWeight) {
-		if b.Config.Ctx.RetryBootstrap {
+		if b.Config.RetryBootstrap {
 			return b.RestartBootstrap(false)
 		}
 
@@ -268,7 +268,7 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 		}
 
 		// in a zero network there will be no accepted votes but the voting weight will be greater than the failed weight
-		if b.Config.Ctx.RetryBootstrap && b.Beacons.Weight()-b.Alpha < failedBeaconWeight {
+		if b.Config.RetryBootstrap && b.Beacons.Weight()-b.Alpha < failedBeaconWeight {
 			return b.RestartBootstrap(false)
 		}
 
@@ -316,19 +316,15 @@ func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
 }
 
 func (b *Bootstrapper) RestartBootstrap(reset bool) error {
-
 	// resets the attempts when we're pulling blocks/vertices
 	// we don't want to fail the bootstrap at that stage
 	if reset {
 		b.bootstrapAttempts = 0
 	}
 
-	if b.bootstrapAttempts >= 50 {
+	if b.bootstrapAttempts >= b.RetryBootstrapMaxAttempts {
 		return fmt.Errorf("failed to boostrap the chain after %d attempts", b.bootstrapAttempts)
 	}
-
-	// avoid flooding the network
-	time.Sleep(time.Duration(b.bootstrapAttempts) * 100 * time.Millisecond)
 
 	// reset the failed responses
 	b.failedAcceptedFrontierVdrs = ids.ShortSet{}

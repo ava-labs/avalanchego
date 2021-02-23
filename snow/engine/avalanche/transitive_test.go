@@ -2625,7 +2625,8 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 func TestEngineReBootstrapFails(t *testing.T) {
 	config := DefaultConfig()
 	config.Alpha = 1
-	config.Ctx.RetryBootstrap = true
+	config.RetryBootstrap = true
+	config.RetryBootstrapMaxAttempts = 4
 
 	vals := validators.NewSet()
 	config.Validators = vals
@@ -2768,273 +2769,273 @@ func TestEngineReBootstrapFails(t *testing.T) {
 	}
 }
 
-//func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
-//	config := DefaultConfig()
-//	config.Alpha = 1
-//	config.Ctx.RetryBootstrap = true
-//
-//	vals := validators.NewSet()
-//	vdr := ids.GenerateTestShortID()
-//	if err := vals.AddWeight(vdr, 1); err != nil {
-//		t.Fatal(err)
-//	}
-//
-//	config.Validators = vals
-//	config.Beacons = vals
-//
-//	config.SampleK = int(vals.Weight())
-//
-//	sender := &common.SenderTest{}
-//	sender.T = t
-//	config.Sender = sender
-//
-//	sender.Default(true)
-//
-//	manager := vertex.NewTestManager(t)
-//	config.Manager = manager
-//
-//	manager.Default(true)
-//
-//	vm := &vertex.TestVM{}
-//	vm.T = t
-//	config.VM = vm
-//
-//	vm.Default(true)
-//
-//	vm.CantBootstrapping = false
-//	vm.CantBootstrapped = false
-//
-//	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
-//
-//	txID0 := ids.GenerateTestID()
-//	txID1 := ids.GenerateTestID()
-//
-//	txBytes0 := []byte{0}
-//	txBytes1 := []byte{1}
-//
-//	tx0 := &snowstorm.TestTx{
-//		TestDecidable: choices.TestDecidable{
-//			IDV:     txID0,
-//			StatusV: choices.Processing,
-//		},
-//		BytesV: txBytes0,
-//	}
-//	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
-//
-//	tx1 := &snowstorm.TestTx{
-//		TestDecidable: choices.TestDecidable{
-//			IDV:     txID1,
-//			StatusV: choices.Processing,
-//		},
-//		DependenciesV: []snowstorm.Tx{tx0},
-//		BytesV:        txBytes1,
-//	}
-//	tx1.InputIDsV = append(tx1.InputIDsV, utxos[1])
-//
-//	vtxID0 := ids.GenerateTestID()
-//	vtxID1 := ids.GenerateTestID()
-//
-//	vtxBytes0 := []byte{2}
-//	vtxBytes1 := []byte{3}
-//
-//	vtx0 := &avalanche.TestVertex{
-//		TestDecidable: choices.TestDecidable{
-//			IDV:     vtxID0,
-//			StatusV: choices.Processing,
-//		},
-//		HeightV: 1,
-//		TxsV:    []snowstorm.Tx{tx0},
-//		BytesV:  vtxBytes0,
-//	}
-//	vtx1 := &avalanche.TestVertex{
-//		TestDecidable: choices.TestDecidable{
-//			IDV:     vtxID1,
-//			StatusV: choices.Processing,
-//		},
-//		ParentsV: []avalanche.Vertex{vtx0},
-//		HeightV:  2,
-//		TxsV:     []snowstorm.Tx{tx1},
-//		BytesV:   vtxBytes1,
-//	}
-//
-//	requested := new(bool)
-//	requestID := new(uint32)
-//	sender.GetAcceptedFrontierF = func(vdrs ids.ShortSet, reqID uint32) {
-//		if vdrs.Len() != 1 {
-//			t.Fatalf("Should have requested from the validators")
-//		}
-//		if !vdrs.Contains(vdr) {
-//			t.Fatalf("Should have requested from %s", vdr)
-//		}
-//		*requested = true
-//		*requestID = reqID
-//	}
-//
-//	te := &Transitive{}
-//	if err := te.Initialize(config); err != nil {
-//		t.Fatal(err)
-//	}
-//	if err := te.Startup(); err != nil {
-//		t.Fatal(err)
-//	}
-//
-//	// fail the AcceptedFrontier
-//	if err := te.GetAcceptedFrontierFailed(vdr, *requestID); err != nil {
-//		t.Fatal(err)
-//	}
-//
-//	// fail the GetAcceptedFailed
-//	if err := te.GetAcceptedFailed(vdr, *requestID); err != nil {
-//		t.Fatal(err)
-//	}
-//
-//	sender.GetAcceptedFrontierF = nil
-//
-//	if !*requested {
-//		t.Fatalf("Should have requested from the validators during Initialize")
-//	}
-//
-//	acceptedFrontier := []ids.ID{vtxID0}
-//
-//	*requested = false
-//	sender.GetAcceptedF = func(vdrs ids.ShortSet, reqID uint32, proposedAccepted []ids.ID) {
-//		if vdrs.Len() != 1 {
-//			t.Fatalf("Should have requested from the validators")
-//		}
-//		if !vdrs.Contains(vdr) {
-//			t.Fatalf("Should have requested from %s", vdr)
-//		}
-//		if !ids.Equals(acceptedFrontier, proposedAccepted) {
-//			t.Fatalf("Wrong proposedAccepted vertices.\nExpected: %s\nGot: %s", acceptedFrontier, proposedAccepted)
-//		}
-//		*requested = true
-//		*requestID = reqID
-//	}
-//
-//	if err := te.AcceptedFrontier(vdr, *requestID, acceptedFrontier); err != nil {
-//		t.Fatal(err)
-//	}
-//
-//	if !*requested {
-//		t.Fatalf("Should have requested from the validators during AcceptedFrontier")
-//	}
-//
-//	manager.GetF = func(vtxID ids.ID) (avalanche.Vertex, error) {
-//		if vtxID == vtxID0 {
-//			return nil, errMissing
-//		}
-//		t.Fatalf("Unknown vertex requested")
-//		panic("Unknown vertex requested")
-//	}
-//
-//	sender.GetAncestorsF = func(inVdr ids.ShortID, reqID uint32, vtxID ids.ID) {
-//		if vdr != inVdr {
-//			t.Fatalf("Asking wrong validator for vertex")
-//		}
-//		if vtx0.ID() != vtxID {
-//			t.Fatalf("Asking for wrong vertex")
-//		}
-//		*requestID = reqID
-//	}
-//
-//	if err := te.Accepted(vdr, *requestID, acceptedFrontier); err != nil {
-//		t.Fatal(err)
-//	}
-//
-//	manager.GetF = nil
-//	sender.GetF = nil
-//
-//	vm.ParseF = func(b []byte) (snowstorm.Tx, error) {
-//		if bytes.Equal(b, txBytes0) {
-//			return tx0, nil
-//		}
-//		t.Fatalf("Unknown bytes provided")
-//		panic("Unknown bytes provided")
-//	}
-//	manager.ParseF = func(b []byte) (avalanche.Vertex, error) {
-//		if bytes.Equal(b, vtxBytes0) {
-//			return vtx0, nil
-//		}
-//		t.Fatalf("Unknown bytes provided")
-//		panic("Unknown bytes provided")
-//	}
-//	manager.EdgeF = func() []ids.ID {
-//		return []ids.ID{vtxID0}
-//	}
-//	manager.GetF = func(vtxID ids.ID) (avalanche.Vertex, error) {
-//		if vtxID == vtxID0 {
-//			return vtx0, nil
-//		}
-//		t.Fatalf("Unknown bytes provided")
-//		panic("Unknown bytes provided")
-//	}
-//
-//	if err := te.MultiPut(vdr, *requestID, [][]byte{vtxBytes0}); err != nil {
-//		t.Fatal(err)
-//	}
-//
-//	vm.ParseF = nil
-//	manager.ParseF = nil
-//	manager.EdgeF = nil
-//	manager.GetF = nil
-//
-//	if tx0.Status() != choices.Accepted {
-//		t.Fatalf("Should have accepted %s", txID0)
-//	}
-//	if vtx0.Status() != choices.Accepted {
-//		t.Fatalf("Should have accepted %s", vtxID0)
-//	}
-//
-//	manager.ParseF = func(b []byte) (avalanche.Vertex, error) {
-//		if bytes.Equal(b, vtxBytes1) {
-//			return vtx1, nil
-//		}
-//		t.Fatalf("Unknown bytes provided")
-//		panic("Unknown bytes provided")
-//	}
-//	sender.ChitsF = func(inVdr ids.ShortID, _ uint32, chits []ids.ID) {
-//		if inVdr != vdr {
-//			t.Fatalf("Sent to the wrong validator")
-//		}
-//
-//		expected := []ids.ID{vtxID1}
-//
-//		if !ids.Equals(expected, chits) {
-//			t.Fatalf("Returned wrong chits")
-//		}
-//	}
-//	sender.PushQueryF = func(vdrs ids.ShortSet, _ uint32, vtxID ids.ID, vtx []byte) {
-//		if vdrs.Len() != 1 {
-//			t.Fatalf("Should have requested from the validators")
-//		}
-//		if !vdrs.Contains(vdr) {
-//			t.Fatalf("Should have requested from %s", vdr)
-//		}
-//
-//		if vtxID1 != vtxID {
-//			t.Fatalf("Sent wrong query ID")
-//		}
-//		if !bytes.Equal(vtxBytes1, vtx) {
-//			t.Fatalf("Sent wrong query bytes")
-//		}
-//	}
-//	manager.GetF = func(vtxID ids.ID) (avalanche.Vertex, error) {
-//		if vtxID == vtxID1 {
-//			return vtx1, nil
-//		}
-//		t.Fatalf("Unknown bytes provided")
-//		panic("Unknown bytes provided")
-//	}
-//
-//	if err := te.PushQuery(vdr, 0, vtxID1, vtxBytes1); err != nil {
-//		t.Fatal(err)
-//	}
-//
-//	manager.ParseF = nil
-//	sender.ChitsF = nil
-//	sender.PushQueryF = nil
-//	manager.GetF = nil
-//}
+func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
+	config := DefaultConfig()
+	config.Alpha = 1
+	config.RetryBootstrap = true
+	config.RetryBootstrapMaxAttempts = 4
+
+	vals := validators.NewSet()
+	vdr := ids.GenerateTestShortID()
+	if err := vals.AddWeight(vdr, 1); err != nil {
+		t.Fatal(err)
+	}
+
+	config.Validators = vals
+	config.Beacons = vals
+
+	config.SampleK = int(vals.Weight())
+
+	sender := &common.SenderTest{}
+	sender.T = t
+	config.Sender = sender
+
+	sender.Default(true)
+
+	manager := vertex.NewTestManager(t)
+	config.Manager = manager
+
+	manager.Default(true)
+
+	vm := &vertex.TestVM{}
+	vm.T = t
+	config.VM = vm
+
+	vm.Default(true)
+
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
+
+	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
+
+	txID0 := ids.GenerateTestID()
+	txID1 := ids.GenerateTestID()
+
+	txBytes0 := []byte{0}
+	txBytes1 := []byte{1}
+
+	tx0 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     txID0,
+			StatusV: choices.Processing,
+		},
+		BytesV: txBytes0,
+	}
+	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
+
+	tx1 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     txID1,
+			StatusV: choices.Processing,
+		},
+		DependenciesV: []snowstorm.Tx{tx0},
+		BytesV:        txBytes1,
+	}
+	tx1.InputIDsV = append(tx1.InputIDsV, utxos[1])
+
+	vtxID0 := ids.GenerateTestID()
+	vtxID1 := ids.GenerateTestID()
+
+	vtxBytes0 := []byte{2}
+	vtxBytes1 := []byte{3}
+
+	vtx0 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     vtxID0,
+			StatusV: choices.Processing,
+		},
+		HeightV: 1,
+		TxsV:    []snowstorm.Tx{tx0},
+		BytesV:  vtxBytes0,
+	}
+	vtx1 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     vtxID1,
+			StatusV: choices.Processing,
+		},
+		ParentsV: []avalanche.Vertex{vtx0},
+		HeightV:  2,
+		TxsV:     []snowstorm.Tx{tx1},
+		BytesV:   vtxBytes1,
+	}
+
+	requested := new(bool)
+	requestID := new(uint32)
+	sender.GetAcceptedFrontierF = func(vdrs ids.ShortSet, reqID uint32) {
+		if vdrs.Len() != 1 {
+			t.Fatalf("Should have requested from the validators")
+		}
+		if !vdrs.Contains(vdr) {
+			t.Fatalf("Should have requested from %s", vdr)
+		}
+		*requested = true
+		*requestID = reqID
+	}
+
+	te := &Transitive{}
+	if err := te.Initialize(config); err != nil {
+		t.Fatal(err)
+	}
+	if err := te.Startup(); err != nil {
+		t.Fatal(err)
+	}
+
+	// fail the AcceptedFrontier
+	if err := te.GetAcceptedFrontierFailed(vdr, *requestID); err != nil {
+		t.Fatal(err)
+	}
+
+	// fail the GetAcceptedFailed
+	if err := te.GetAcceptedFailed(vdr, *requestID); err != nil {
+		t.Fatal(err)
+	}
+
+	if !*requested {
+		t.Fatalf("Should have requested from the validators during Initialize")
+	}
+
+	acceptedFrontier := []ids.ID{vtxID0}
+
+	*requested = false
+	sender.GetAcceptedF = func(vdrs ids.ShortSet, reqID uint32, proposedAccepted []ids.ID) {
+		if vdrs.Len() != 1 {
+			t.Fatalf("Should have requested from the validators")
+		}
+		if !vdrs.Contains(vdr) {
+			t.Fatalf("Should have requested from %s", vdr)
+		}
+		if !ids.Equals(acceptedFrontier, proposedAccepted) {
+			t.Fatalf("Wrong proposedAccepted vertices.\nExpected: %s\nGot: %s", acceptedFrontier, proposedAccepted)
+		}
+		*requested = true
+		*requestID = reqID
+	}
+
+	if err := te.AcceptedFrontier(vdr, *requestID, acceptedFrontier); err != nil {
+		t.Fatal(err)
+	}
+
+	if !*requested {
+		t.Fatalf("Should have requested from the validators during AcceptedFrontier")
+	}
+
+	manager.GetF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+		if vtxID == vtxID0 {
+			return nil, errMissing
+		}
+		t.Fatalf("Unknown vertex requested")
+		panic("Unknown vertex requested")
+	}
+
+	sender.GetAncestorsF = func(inVdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+		if vdr != inVdr {
+			t.Fatalf("Asking wrong validator for vertex")
+		}
+		if vtx0.ID() != vtxID {
+			t.Fatalf("Asking for wrong vertex")
+		}
+		*requestID = reqID
+	}
+
+	if err := te.Accepted(vdr, *requestID, acceptedFrontier); err != nil {
+		t.Fatal(err)
+	}
+
+	manager.GetF = nil
+
+	vm.ParseF = func(b []byte) (snowstorm.Tx, error) {
+		if bytes.Equal(b, txBytes0) {
+			return tx0, nil
+		}
+		t.Fatalf("Unknown bytes provided")
+		panic("Unknown bytes provided")
+	}
+	manager.ParseF = func(b []byte) (avalanche.Vertex, error) {
+		if bytes.Equal(b, vtxBytes0) {
+			return vtx0, nil
+		}
+		t.Fatalf("Unknown bytes provided")
+		panic("Unknown bytes provided")
+	}
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{vtxID0}
+	}
+	manager.GetF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+		if vtxID == vtxID0 {
+			return vtx0, nil
+		}
+		t.Fatalf("Unknown bytes provided")
+		panic("Unknown bytes provided")
+	}
+
+	if err := te.MultiPut(vdr, *requestID, [][]byte{vtxBytes0}); err != nil {
+		t.Fatal(err)
+	}
+
+	sender.GetAcceptedFrontierF = nil
+	sender.GetF = nil
+	vm.ParseF = nil
+	manager.ParseF = nil
+	manager.EdgeF = nil
+	manager.GetF = nil
+
+	if tx0.Status() != choices.Accepted {
+		t.Fatalf("Should have accepted %s", txID0)
+	}
+	if vtx0.Status() != choices.Accepted {
+		t.Fatalf("Should have accepted %s", vtxID0)
+	}
+
+	manager.ParseF = func(b []byte) (avalanche.Vertex, error) {
+		if bytes.Equal(b, vtxBytes1) {
+			return vtx1, nil
+		}
+		t.Fatalf("Unknown bytes provided")
+		panic("Unknown bytes provided")
+	}
+	sender.ChitsF = func(inVdr ids.ShortID, _ uint32, chits []ids.ID) {
+		if inVdr != vdr {
+			t.Fatalf("Sent to the wrong validator")
+		}
+
+		expected := []ids.ID{vtxID1}
+
+		if !ids.Equals(expected, chits) {
+			t.Fatalf("Returned wrong chits")
+		}
+	}
+	sender.PushQueryF = func(vdrs ids.ShortSet, _ uint32, vtxID ids.ID, vtx []byte) {
+		if vdrs.Len() != 1 {
+			t.Fatalf("Should have requested from the validators")
+		}
+		if !vdrs.Contains(vdr) {
+			t.Fatalf("Should have requested from %s", vdr)
+		}
+
+		if vtxID1 != vtxID {
+			t.Fatalf("Sent wrong query ID")
+		}
+		if !bytes.Equal(vtxBytes1, vtx) {
+			t.Fatalf("Sent wrong query bytes")
+		}
+	}
+	manager.GetF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+		if vtxID == vtxID1 {
+			return vtx1, nil
+		}
+		t.Fatalf("Unknown bytes provided")
+		panic("Unknown bytes provided")
+	}
+
+	if err := te.PushQuery(vdr, 0, vtxID1, vtxBytes1); err != nil {
+		t.Fatal(err)
+	}
+
+	manager.ParseF = nil
+	sender.ChitsF = nil
+	sender.PushQueryF = nil
+	manager.GetF = nil
+}
 
 func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	config := DefaultConfig()
