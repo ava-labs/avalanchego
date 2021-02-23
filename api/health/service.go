@@ -103,11 +103,6 @@ func (n *noOp) Handler() (_ *common.HTTPHandler, _ error) {
 	return nil, nil
 }
 
-// // RegisterCheck implements the Service interface
-// func (n *noOp) RegisterCheck(_ string, _ healthlib.Checkable) error {
-// 	return nil
-// }
-
 // RegisterCheckFn implements the Service interface
 func (n *noOp) RegisterCheck(_ string, _ health.Check) error {
 	return nil
