@@ -248,6 +248,9 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Coreth Config
 	fs.String(corethConfigKey, defaultString, "Specifies config to pass into coreth")
 
+	// Indexer
+	fs.String(indexInitialChainsKey, "2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM,2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5,11111111111111111111111111111111LpoYY", "IDs of chains to index on startup, if indexing is enabled")
+
 	return fs
 }
 
@@ -693,6 +696,17 @@ func setNodeConfig(v *viper.Viper) error {
 		}
 	}
 	Config.CorethConfig = corethConfigString
+
+	// Indexer
+	for _, chain := range strings.Split(v.GetString(indexInitialChainsKey), ",") {
+		if chain != "" {
+			chainID, err := ids.FromString(chain)
+			if err != nil {
+				return fmt.Errorf("couldn't parse initially indexed chainID %s: %w", chain, err)
+			}
+			Config.InitiallyIndexedChains.Add(chainID)
+		}
+	}
 
 	return nil
 }

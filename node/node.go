@@ -65,8 +65,9 @@ const (
 )
 
 var (
-	genesisHashKey  = []byte("genesisID")
-	indexerDbPrefix = []byte("indexer")
+	genesisHashKey     = []byte("genesisID")
+	txIndexerDbPrefix  = []byte("txIdx2")
+	vtxIndexerDbPrefix = []byte("vtxIdx2")
 
 	// Version is the version of this code
 	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 2, 0)
@@ -87,9 +88,11 @@ type Node struct {
 	// Storage for this node
 	DB database.Database
 
-	// Indexes accepted containers
-	// TODO populate this field
-	indexer indexer.Indexer
+	// Indexes txs (Avalanche) or blocks (Snowman)
+	txIndexer indexer.Indexer
+
+	// Indexes vtxs (Avalanche) or blocks (Snowman)
+	vtxIndexer indexer.Indexer
 
 	// Handles calls to Keystore API
 	keystoreServer keystore.Keystore
@@ -472,8 +475,49 @@ func (n *Node) initIPCs() error {
 // Initialize [n.indexer]
 // Should only be called after [n.DB] and [n.DecisionDispatcher] are populated
 func (n *Node) initIndexer() error {
-	indexerDb := prefixdb.New(indexerDbPrefix, n.DB)
-	n.indexer = indexer.NewIndexer(indexerDb, n.DecisionDispatcher)
+	txIndexerDb := prefixdb.New(txIndexerDbPrefix, n.DB)
+	vtxIndexerDb := prefixdb.New(vtxIndexerDbPrefix, n.DB)
+	var err error
+	n.txIndexer, err = indexer.NewIndexer(
+		"tx",
+		txIndexerDb,
+		n.Log,
+		n.DecisionDispatcher,
+		n.Config.InitiallyIndexedChains.List(),
+		n.chainManager.Lookup,
+	)
+	if err != nil {
+		return fmt.Errorf("couldn't create index for txs: %w", err)
+	}
+	txIndexerHandler, err := n.txIndexer.Handler()
+	if err != nil {
+		return err
+	}
+	err = n.APIServer.AddRoute(txIndexerHandler, &sync.RWMutex{}, "index/", "tx", n.HTTPLog)
+	if err != nil {
+		return fmt.Errorf("couldn't add route: %w", err)
+	}
+
+	n.vtxIndexer, err = indexer.NewIndexer(
+		"vtx",
+		vtxIndexerDb,
+		n.Log,
+		n.ConsensusDispatcher,
+		n.Config.InitiallyIndexedChains.List(),
+		n.chainManager.Lookup,
+	)
+	if err != nil {
+		return fmt.Errorf("couldn't create index for vtxs: %w", err)
+	}
+	vtxIndexerHandler, err := n.vtxIndexer.Handler()
+	if err != nil {
+		return err
+	}
+	err = n.APIServer.AddRoute(vtxIndexerHandler, &sync.RWMutex{}, "index/", "vtx", n.HTTPLog)
+	if err != nil {
+		return fmt.Errorf("couldn't add route: %w", err)
+	}
+
 	return nil
 }
 
@@ -889,6 +933,9 @@ func (n *Node) Initialize(
 	if err := n.initAliases(n.Config.GenesisBytes); err != nil { // Set up aliases
 		return fmt.Errorf("couldn't initialize aliases: %w", err)
 	}
+	if err := n.initIndexer(); err != nil {
+		return fmt.Errorf("couldn't initialize indexer")
+	}
 	if err := n.initChains(n.Config.GenesisBytes, n.Config.AvaxAssetID); err != nil { // Start the Platform chain
 		return fmt.Errorf("couldn't initialize chains: %w", err)
 	}
@@ -918,6 +965,16 @@ func (n *Node) shutdown() {
 	}
 	if err := n.APIServer.Shutdown(); err != nil {
 		n.Log.Debug("error during API shutdown: %s", err)
+	}
+	if n.txIndexer != nil {
+		if err := n.txIndexer.Close(); err != nil {
+			n.Log.Debug("error closing tx indexer: %w", err)
+		}
+	}
+	if n.vtxIndexer != nil {
+		if err := n.vtxIndexer.Close(); err != nil {
+			n.Log.Debug("error closing tx indexer: %w", err)
+		}
 	}
 	utils.ClearSignals(n.nodeCloser)
 	n.doneShuttingDown.Done()

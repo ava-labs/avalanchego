@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -82,13 +81,6 @@ type VM struct {
 
 	pubsub *cjson.PubSubServer
 
-	// If true, index all accepted transactions
-	indexEnabled bool
-	// Indexed accepted transactions by the order in which they were accepted
-	// [indexer].markAccepted should be called immediately before [vm.db] is committed
-	// in UniqueTx's Accept() method
-	indexer *indexer
-
 	// State management
 	state *prefixedState
 
@@ -139,12 +131,6 @@ func (vm *VM) Initialize(
 	vm.typeToFxIndex = map[reflect.Type]int{}
 	vm.Aliaser.Initialize()
 	vm.assetToFxCache = &cache.LRU{Size: assetToFxCacheSize}
-	var err error
-	vm.indexer, err = newIndexer(prefixdb.New(indexDbPrefix, vm.db), vm.ctx.Log)
-	if err != nil {
-		return fmt.Errorf("couldn't create indexer: %w", err)
-	}
-
 	vm.pubsub = cjson.NewPubSubServer(ctx)
 
 	genesisCodec := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
@@ -303,24 +289,11 @@ func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 	// name this service "wallet"
 	vm.ctx.Log.AssertNoError(walletServer.RegisterService(&vm.walletService, "wallet"))
 
-	services := map[string]*common.HTTPHandler{
+	return map[string]*common.HTTPHandler{
 		"":        {Handler: rpcServer},
 		"/wallet": {Handler: walletServer},
 		"/pubsub": {LockOptions: common.NoLock, Handler: vm.pubsub},
 	}
-
-	if !vm.indexEnabled {
-		return services
-	}
-
-	indexerServer := rpc.NewServer()
-	indexerServer.RegisterCodec(codec, "application/json")
-	indexerServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	// name this service "indexer"
-	vm.ctx.Log.AssertNoError(indexerServer.RegisterService(&IndexerService{indexer: vm.indexer}, "indexer"))
-	services["/indexer"] = &common.HTTPHandler{Handler: indexerServer}
-
-	return services
 }
 
 // CreateStaticHandlers implements the avalanche.DAGVM interface

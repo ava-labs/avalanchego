@@ -145,13 +145,6 @@ func (tx *UniqueTx) Accept() error {
 
 	txID := tx.ID()
 
-	if tx.vm.indexEnabled {
-		err := tx.vm.indexer.markAccepted(txID)
-		if err != nil {
-			return fmt.Errorf("couldn't mark %s as accepted in indexer: %w", txID, err)
-		}
-	}
-
 	commitBatch, err := tx.vm.db.CommitBatch()
 	if err != nil {
 		tx.vm.ctx.Log.Error("Failed to calculate CommitBatch for %s due to %s", txID, err)

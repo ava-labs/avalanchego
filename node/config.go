@@ -129,4 +129,7 @@ type Config struct {
 
 	// Coreth
 	CorethConfig string
+
+	// IDs of chains that are indexed on startup, if applicable
+	InitiallyIndexedChains ids.Set
 }

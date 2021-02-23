@@ -25,6 +25,5 @@ func (f *Factory) New(*snow.Context) (interface{}, error) {
 	return &VM{
 		creationTxFee: f.CreationFee,
 		txFee:         f.Fee,
-		indexEnabled:  f.IndexEnabled,
 	}, nil
 }

@@ -91,4 +91,5 @@ const (
 	disconnectedRestartTimeoutKey   = "disconnected-restart-timeout"
 	restartOnDisconnectedKey        = "restart-on-disconnected"
 	indexEnabledKey                 = "index-enabled"
+	indexInitialChainsKey           = "index-initial-chains"
 )
