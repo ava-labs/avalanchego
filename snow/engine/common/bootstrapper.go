@@ -61,13 +61,11 @@ type Bootstrapper struct {
 
 	// validators that failed to respond with their frontier votes
 	failedAcceptedVdrs ids.ShortSet
-
-	// ensures we only process the current request ID
-	currentRequestID uint32
 }
 
 // Initialize implements the Engine interface.
 func (b *Bootstrapper) Initialize(config Config) error {
+	b.Ctx.Log.Info("Starting bootstrap...")
 	b.Config = config
 
 	b.sampledBeacons = validators.NewSet()
@@ -102,7 +100,6 @@ func (b *Bootstrapper) Initialize(config Config) error {
 // Startup implements the Engine interface.
 func (b *Bootstrapper) Startup() error {
 	b.bootstrapAttempts++
-	b.Ctx.Log.Info("Starting Bootstrap - attempt: %d", b.bootstrapAttempts)
 	b.started = true
 	if b.pendingAcceptedFrontier.Len() == 0 {
 		b.Ctx.Log.Info("Bootstrapping skipped due to no provided bootstraps")
@@ -114,7 +111,6 @@ func (b *Bootstrapper) Startup() error {
 	vdrs.Union(b.pendingAcceptedFrontier)
 
 	b.RequestID++
-	b.currentRequestID = b.RequestID
 	b.Sender.GetAcceptedFrontier(vdrs, b.RequestID)
 	return nil
 }
@@ -290,7 +286,7 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 			return b.RestartBootstrap(false)
 		}
 
-		b.Ctx.Log.Info("Bootstrapping finished with no accepted frontier -  Beacons: %d - Failed Bootstrappers: %d "+
+		b.Ctx.Log.Info("Bootstrapping finished with no accepted frontier - Beacons: %d - Failed Bootstrappers: %d "+
 			"- bootstrap attempt: %d", b.Beacons.Len(), b.failedAcceptedVdrs.Len(), b.bootstrapAttempts)
 	}
 
@@ -334,12 +330,15 @@ func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
 }
 
 func (b *Bootstrapper) RestartBootstrap(reset bool) error {
+
 	// resets the attempts when we're pulling blocks/vertices
 	// we don't want to fail the bootstrap at that stage
 	if reset {
+		b.Ctx.Log.Info("Checking for new frontiers, resetting bootstrap attempts...")
 		b.bootstrapAttempts = 0
 	}
 
+	b.Ctx.Log.Info("Restarting bootstrap - attempt: %d", b.bootstrapAttempts)
 	if b.bootstrapAttempts >= b.RetryBootstrapMaxAttempts {
 		return fmt.Errorf("failed to boostrap the chain after %d attempts", b.bootstrapAttempts)
 	}
