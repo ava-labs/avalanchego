@@ -17,7 +17,8 @@ type Service interface {
 	Results() (map[string]interface{}, bool)
 }
 
-// NewService returns a new [Service]
+// NewService returns a new [Service] where the health checks
+// run every [checkFreq]
 func NewService(checkFreq time.Duration) Service {
 	return &service{
 		health:    health.New(),
@@ -34,7 +35,7 @@ type service struct {
 }
 
 // Results returns:
-// 1) Map of name --> health check results
+// 1) Name of health check --> health check results
 // 2) true iff healthy
 func (s *service) Results() (map[string]interface{}, bool) {
 	rawResults, healthy := s.health.Results()
