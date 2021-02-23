@@ -481,9 +481,14 @@ func (n *Node) initIPCs() error {
 	return err
 }
 
-// Initialize [n.indexer]
-// Should only be called after [n.DB] and [n.DecisionDispatcher] are populated
-func (n *Node) initIndexer() error {
+// Initialize [n.txIndexer] and [n.vtxIndexer]
+// Should only be called after [n.DB], [n.DecisionDispatcher], [n.ConsensusDispatcher],
+// [n.Log], [n.APIServer], [n.chainManager] are initialized
+func (n *Node) initIndices() error {
+	if n.Config.IndexAPIEnabled {
+		return nil
+	}
+
 	txIndexerDb := prefixdb.New(txIndexerDbPrefix, n.DB)
 	vtxIndexerDb := prefixdb.New(vtxIndexerDbPrefix, n.DB)
 	var err error
@@ -499,7 +504,7 @@ func (n *Node) initIndexer() error {
 		return fmt.Errorf("couldn't create index for txs: %w", err)
 	}
 	txIndexerHandler, err := n.txIndexer.Handler()
-	if err != nil {
+	if err != nil && n.Config.IndexAPIEnabled {
 		return err
 	}
 	err = n.APIServer.AddRoute(txIndexerHandler, &sync.RWMutex{}, "index/", "tx", n.HTTPLog)
@@ -954,7 +959,7 @@ func (n *Node) Initialize(
 	if err := n.initAliases(n.Config.GenesisBytes); err != nil { // Set up aliases
 		return fmt.Errorf("couldn't initialize aliases: %w", err)
 	}
-	if err := n.initIndexer(); err != nil {
+	if err := n.initIndices(); err != nil {
 		return fmt.Errorf("couldn't initialize indexer")
 	}
 	if err := n.initChains(n.Config.GenesisBytes, n.Config.AvaxAssetID); err != nil { // Start the Platform chain
