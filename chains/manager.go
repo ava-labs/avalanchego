@@ -110,35 +110,36 @@ type chain struct {
 
 // ManagerConfig ...
 type ManagerConfig struct {
-	StakingEnabled          bool // True iff the network has staking enabled
-	MaxPendingMsgs          uint32
-	MaxNonStakerPendingMsgs uint32
-	StakerMSGPortion        float64
-	StakerCPUPortion        float64
-	Log                     logging.Logger
-	LogFactory              logging.Factory
-	VMManager               vms.Manager // Manage mappings from vm ID --> vm
-	DecisionEvents          *triggers.EventDispatcher
-	ConsensusEvents         *triggers.EventDispatcher
-	DB                      database.Database
-	Router                  router.Router    // Routes incoming messages to the appropriate chain
-	Net                     network.Network  // Sends consensus messages to other validators
-	ConsensusParams         avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
-	EpochFirstTransition    time.Time
-	EpochDuration           time.Duration
-	Validators              validators.Manager // Validators validating on this chain
-	NodeID                  ids.ShortID        // The ID of this node
-	NetworkID               uint32             // ID of the network this node is connected to
-	Server                  *api.Server        // Handles HTTP API calls
-	Keystore                *keystore.Keystore
-	AtomicMemory            *atomic.Memory
-	AVAXAssetID             ids.ID
-	XChainID                ids.ID
-	CriticalChains          ids.Set          // Chains that can't exit gracefully
-	WhitelistedSubnets      ids.Set          // Subnets to validate
-	TimeoutManager          *timeout.Manager // Manages request timeouts when sending messages to other validators
-	HealthService           health.CheckRegisterer
-	RetryBootstrap          bool // RetryBootstrap config
+	StakingEnabled            bool // True iff the network has staking enabled
+	MaxPendingMsgs            uint32
+	MaxNonStakerPendingMsgs   uint32
+	StakerMSGPortion          float64
+	StakerCPUPortion          float64
+	Log                       logging.Logger
+	LogFactory                logging.Factory
+	VMManager                 vms.Manager // Manage mappings from vm ID --> vm
+	DecisionEvents            *triggers.EventDispatcher
+	ConsensusEvents           *triggers.EventDispatcher
+	DB                        database.Database
+	Router                    router.Router    // Routes incoming messages to the appropriate chain
+	Net                       network.Network  // Sends consensus messages to other validators
+	ConsensusParams           avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
+	EpochFirstTransition      time.Time
+	EpochDuration             time.Duration
+	Validators                validators.Manager // Validators validating on this chain
+	NodeID                    ids.ShortID        // The ID of this node
+	NetworkID                 uint32             // ID of the network this node is connected to
+	Server                    *api.Server        // Handles HTTP API calls
+	Keystore                  *keystore.Keystore
+	AtomicMemory              *atomic.Memory
+	AVAXAssetID               ids.ID
+	XChainID                  ids.ID
+	CriticalChains            ids.Set          // Chains that can't exit gracefully
+	WhitelistedSubnets        ids.Set          // Subnets to validate
+	TimeoutManager            *timeout.Manager // Manages request timeouts when sending messages to other validators
+	HealthService             health.CheckRegisterer
+	RetryBootstrap            bool // Should Bootstrap be retried
+	RetryBootstrapMaxAttempts int  // Max number of times to retry bootstrap
 }
 
 type manager struct {
@@ -242,24 +243,25 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	}
 
 	ctx := &snow.Context{
-		NetworkID:            m.NetworkID,
-		SubnetID:             chainParams.SubnetID,
-		ChainID:              chainParams.ID,
-		NodeID:               m.NodeID,
-		XChainID:             m.XChainID,
-		AVAXAssetID:          m.AVAXAssetID,
-		Log:                  chainLog,
-		DecisionDispatcher:   m.DecisionEvents,
-		ConsensusDispatcher:  m.ConsensusEvents,
-		Keystore:             m.Keystore.NewBlockchainKeyStore(chainParams.ID),
-		SharedMemory:         m.AtomicMemory.NewSharedMemory(chainParams.ID),
-		BCLookup:             m,
-		SNLookup:             m,
-		Namespace:            fmt.Sprintf("%s_%s_vm", constants.PlatformName, primaryAlias),
-		Metrics:              m.ConsensusParams.Metrics,
-		EpochFirstTransition: m.EpochFirstTransition,
-		EpochDuration:        m.EpochDuration,
-		RetryBootstrap:       m.ManagerConfig.RetryBootstrap,
+		NetworkID:                 m.NetworkID,
+		SubnetID:                  chainParams.SubnetID,
+		ChainID:                   chainParams.ID,
+		NodeID:                    m.NodeID,
+		XChainID:                  m.XChainID,
+		AVAXAssetID:               m.AVAXAssetID,
+		Log:                       chainLog,
+		DecisionDispatcher:        m.DecisionEvents,
+		ConsensusDispatcher:       m.ConsensusEvents,
+		Keystore:                  m.Keystore.NewBlockchainKeyStore(chainParams.ID),
+		SharedMemory:              m.AtomicMemory.NewSharedMemory(chainParams.ID),
+		BCLookup:                  m,
+		SNLookup:                  m,
+		Namespace:                 fmt.Sprintf("%s_%s_vm", constants.PlatformName, primaryAlias),
+		Metrics:                   m.ConsensusParams.Metrics,
+		EpochFirstTransition:      m.EpochFirstTransition,
+		EpochDuration:             m.EpochDuration,
+		RetryBootstrap:            m.ManagerConfig.RetryBootstrap,
+		RetryBootstrapMaxAttempts: m.ManagerConfig.RetryBootstrapMaxAttempts,
 	}
 
 	// Get a factory for the vm we want to use on our chain

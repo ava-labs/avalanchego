@@ -264,7 +264,7 @@ func (b *Bootstrapper) checkFinish() error {
 	if executedBlocks >= b.executedStateTransitions && executedBlocks > 0 && b.RetryBootstrap {
 		b.executedStateTransitions = executedBlocks
 		b.Ctx.Log.Info("bootstrapping is checking for more blocks before finishing the bootstrap process...")
-		return b.RestartBootstrap()
+		return b.RestartBootstrap(true)
 	}
 
 	b.Ctx.Log.Info("bootstrapping fetched enough blocks to finish the bootstrap process...")

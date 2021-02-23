@@ -129,6 +129,9 @@ type Config struct {
 	// Coreth
 	CorethConfig string
 
-	// Bootstrap config
+	// Should Bootstrap be retried
 	RetryBootstrap bool
+
+	// Max number of times to retry bootstrap
+	RetryBootstrapMaxAttempts int
 }

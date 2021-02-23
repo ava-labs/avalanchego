@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/snow/validators"
+
 	stdmath "math"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -42,6 +44,8 @@ type Bootstrapper struct {
 	pendingAcceptedFrontier ids.ShortSet
 	acceptedFrontier        ids.Set
 
+	// holds the beacons that were sampled for the accepted frontier
+	sampledBeacons  validators.Set
 	pendingAccepted ids.ShortSet
 	acceptedVotes   map[ids.ID]uint64
 
@@ -51,6 +55,7 @@ type Bootstrapper struct {
 
 	// number of times the bootstrap was attempted
 	bootstrapAttempts int
+
 	// validators that failed to respond with their frontiers
 	failedAcceptedFrontierVdrs ids.ShortSet
 
@@ -65,7 +70,14 @@ type Bootstrapper struct {
 func (b *Bootstrapper) Initialize(config Config) error {
 	b.Config = config
 
+	b.sampledBeacons = validators.NewSet()
+
 	beacons, err := b.Beacons.Sample(config.SampleK)
+	if err != nil {
+		return err
+	}
+
+	err = b.sampledBeacons.Set(beacons)
 	if err != nil {
 		return err
 	}
@@ -153,28 +165,27 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 	// told are on the accepted frontier such that the list only contains containers
 	// they think are accepted
 	var err error
-	totalWeight := uint64(0)
 
-	// measure total weight of accepted frontiers from the validators
-	for _, beacon := range b.Beacons.List() {
-		if b.failedAcceptedFrontierVdrs.Contains(beacon.ID()) {
-			continue
-		}
+	// Create a newAlpha taking using the sampled beacon
+	// Keep the proportion of b.Alpha in the newAlpha
+	// newAlpha := totalSampledWeight * b.Alpha / totalWeight
 
-		totalWeight, err = math.Add64(totalWeight, beacon.Weight())
-		if err != nil {
-			b.Ctx.Log.Error("Error calculating the AcceptedFrontier beacons weight - totalWeight: %v, beacon.Weight: %v", totalWeight, beacon.Weight())
-			totalWeight = stdmath.MaxUint64
-		}
+	// TODO review this division
+	newAlpha := float64(b.sampledBeacons.Weight()*b.Alpha) / float64(b.Beacons.Weight())
+
+	failedBeaconWeight, err := b.Beacons.SubsetWeight(b.failedAcceptedVdrs)
+	if err != nil {
+		return err
 	}
 
-	// restart the bootstrap if the total weight is not enough and there is failed votes
-	if totalWeight < b.Alpha && b.failedAcceptedFrontierVdrs.Len() > 0 {
-		b.Ctx.Log.Info("Didn't receive enough AcceptedFrontier to bootstrap - failed validators: %d, "+
-			"bootstrap attempt: %d", b.failedAcceptedFrontierVdrs.Len(), b.bootstrapAttempts)
+	// fail the bootstrap if the weight is not enough to bootstrap
+	if float64(b.sampledBeacons.Weight())-newAlpha < float64(failedBeaconWeight) {
 		if b.Config.Ctx.RetryBootstrap {
-			return b.RestartBootstrap()
+			return b.RestartBootstrap(false)
 		}
+
+		b.Ctx.Log.Info("Didn't receive enough AcceptedFrontier - failed validators: %d, "+
+			"bootstrap attempt: %d", b.failedAcceptedFrontierVdrs.Len(), b.bootstrapAttempts)
 	}
 
 	vdrs := ids.ShortSet{}
@@ -247,17 +258,23 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 		}
 	}
 
-	// if we don't have enough weight for the bootstrap to be accepted then restart or fail the bootstrap
+	// if we don't have enough weight for the bootstrap to be accepted then retry or fail the bootstrap
 	size := len(accepted)
+	if size == 0 && b.Beacons.Len() > 0 {
 
-	// in a zero network there will be no accepted votes, some Beacons and no failed requests
-	if size == 0 && b.Beacons.Len() > 0 && b.failedAcceptedVdrs.Len() > 0 {
-		b.Ctx.Log.Info("Bootstrapping finished with no accepted frontier. This is likely a result of failing to "+
-			"be able to connect to the specified bootstraps, or no transactions have been issued on this chain yet"+
-			" - Beacons: %d - Failed Bootstrappers: %d - bootstrap attempt: %d", b.Beacons.Len(), b.failedAcceptedVdrs.Len(), b.bootstrapAttempts)
-		if b.Config.Ctx.RetryBootstrap {
-			return b.RestartBootstrap()
+		// retry the bootstrap if the weight is not enough to bootstrap
+		failedBeaconWeight, err := b.Beacons.SubsetWeight(b.failedAcceptedVdrs)
+		if err != nil {
+			return err
 		}
+
+		// in a zero network there will be no accepted votes but the voting weight will be greater than the failed weight
+		if b.Config.Ctx.RetryBootstrap && b.Beacons.Weight()-b.Alpha < failedBeaconWeight {
+			return b.RestartBootstrap(false)
+		}
+
+		b.Ctx.Log.Info("Bootstrapping finished with no accepted frontier. No transactions have been issued on this chain yet"+
+			" - Beacons: %d - Failed Bootstrappers: %d - bootstrap attempt: %d", b.Beacons.Len(), b.failedAcceptedVdrs.Len(), b.bootstrapAttempts)
 	}
 
 	b.Ctx.Log.Info("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
@@ -299,7 +316,14 @@ func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
 	return nil
 }
 
-func (b *Bootstrapper) RestartBootstrap() error {
+func (b *Bootstrapper) RestartBootstrap(reset bool) error {
+
+	// resets the attempts when we're pulling blocks/vertices
+	// we don't want to fail the bootstrap at that stage
+	if reset {
+		b.bootstrapAttempts = 0
+	}
+
 	if b.bootstrapAttempts >= 50 {
 		return fmt.Errorf("failed to boostrap the chain after %d attempts", b.bootstrapAttempts)
 	}
@@ -310,8 +334,14 @@ func (b *Bootstrapper) RestartBootstrap() error {
 	// reset the failed responses
 	b.failedAcceptedFrontierVdrs = ids.ShortSet{}
 	b.failedAcceptedVdrs = ids.ShortSet{}
+	b.sampledBeacons = validators.NewSet()
 
 	beacons, err := b.Beacons.Sample(b.Config.SampleK)
+	if err != nil {
+		return err
+	}
+
+	err = b.sampledBeacons.Set(beacons)
 	if err != nil {
 		return err
 	}

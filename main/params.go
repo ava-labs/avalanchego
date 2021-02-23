@@ -249,6 +249,7 @@ func avalancheFlagSet() *flag.FlagSet {
 
 	// Bootstrap Config
 	fs.Bool(retryBootstrap, true, "Specifies whether bootstrap should be retried")
+	fs.Int(retryBootstrapMaxAttempts, 50, "Specifies how many times bootstrap should be retried")
 
 	return fs
 }
@@ -697,6 +698,7 @@ func setNodeConfig(v *viper.Viper) error {
 
 	// Bootstrap Configs
 	Config.RetryBootstrap = v.GetBool(retryBootstrap)
+	Config.RetryBootstrapMaxAttempts = v.GetInt(retryBootstrapMaxAttempts)
 
 	return nil
 }

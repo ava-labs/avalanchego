@@ -91,4 +91,5 @@ const (
 	disconnectedRestartTimeoutKey   = "disconnected-restart-timeout"
 	restartOnDisconnectedKey        = "restart-on-disconnected"
 	retryBootstrap                  = "retry-bootstrap"
+	retryBootstrapMaxAttempts       = "retry-bootstrap-max-attempts"
 )
