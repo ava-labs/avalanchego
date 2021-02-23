@@ -560,13 +560,15 @@ func (m *manager) createSnowmanChain(
 	if err := engine.Initialize(smeng.Config{
 		Config: smbootstrap.Config{
 			Config: common.Config{
-				Ctx:          ctx,
-				Validators:   validators,
-				Beacons:      beacons,
-				SampleK:      sampleK,
-				StartupAlpha: (3*bootstrapWeight + 3) / 4,
-				Alpha:        bootstrapWeight/2 + 1, // must be > 50%
-				Sender:       &sender,
+				Ctx:                       ctx,
+				Validators:                validators,
+				Beacons:                   beacons,
+				SampleK:                   sampleK,
+				StartupAlpha:              (3*bootstrapWeight + 3) / 4,
+				Alpha:                     bootstrapWeight/2 + 1, // must be > 50%
+				Sender:                    &sender,
+				RetryBootstrap:            m.RetryBootstrap,
+				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
 			},
 			Blocked:        blocked,
 			VM:             vm,
