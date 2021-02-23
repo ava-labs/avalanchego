@@ -375,6 +375,7 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 	n.log.AssertNoError(err)
 
 	sentTo := make([]ids.ShortID, 0, validatorIDs.Len())
+	now := n.clock.Time()
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
@@ -384,11 +385,11 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 				chainID,
 				requestID)
 			n.getAcceptedFrontier.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, n.clock.Time())
+			n.sendFailRateCalculator.Observe(1, now)
 		} else {
 			sentTo = append(sentTo, vID)
 			n.getAcceptedFrontier.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, n.clock.Time())
+			n.sendFailRateCalculator.Observe(0, now)
 		}
 	}
 	return sentTo
@@ -397,6 +398,8 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 // AcceptedFrontier implements the Sender interface.
 // assumes the stateLock is not held.
 func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
+	now := n.clock.Time()
+
 	msg, err := n.b.AcceptedFrontier(chainID, requestID, containerIDs)
 	if err != nil {
 		n.log.Error("failed to build AcceptedFrontier(%s, %d, %s): %s",
@@ -404,7 +407,7 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 			requestID,
 			containerIDs,
 			err)
-		n.sendFailRateCalculator.Observe(1, n.clock.Time())
+		n.sendFailRateCalculator.Observe(1, now)
 		return // Packing message failed
 	}
 
@@ -416,16 +419,18 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 			requestID,
 			containerIDs)
 		n.acceptedFrontier.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, n.clock.Time())
+		n.sendFailRateCalculator.Observe(1, now)
 	} else {
 		n.acceptedFrontier.numSent.Inc()
-		n.sendFailRateCalculator.Observe(0, n.clock.Time())
+		n.sendFailRateCalculator.Observe(0, now)
 	}
 }
 
 // GetAccepted implements the Sender interface.
 // assumes the stateLock is not held.
 func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID {
+	now := n.clock.Time()
+
 	msg, err := n.b.GetAccepted(chainID, requestID, uint64(deadline), containerIDs)
 	if err != nil {
 		n.log.Error("failed to build GetAccepted(%s, %d, %s): %s",
@@ -433,7 +438,7 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 			requestID,
 			containerIDs,
 			err)
-		n.sendFailRateCalculator.Observe(1, n.clock.Time())
+		n.sendFailRateCalculator.Observe(1, now)
 		return nil
 	}
 
@@ -448,10 +453,10 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 				requestID,
 				containerIDs)
 			n.getAccepted.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, n.clock.Time())
+			n.sendFailRateCalculator.Observe(1, now)
 		} else {
 			n.getAccepted.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, n.clock.Time())
+			n.sendFailRateCalculator.Observe(0, now)
 			sentTo = append(sentTo, vID)
 		}
 	}
@@ -461,6 +466,8 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 // Accepted implements the Sender interface.
 // assumes the stateLock is not held.
 func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
+	now := n.clock.Time()
+
 	msg, err := n.b.Accepted(chainID, requestID, containerIDs)
 	if err != nil {
 		n.log.Error("failed to build Accepted(%s, %d, %s): %s",
@@ -468,7 +475,7 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 			requestID,
 			containerIDs,
 			err)
-		n.sendFailRateCalculator.Observe(1, n.clock.Time())
+		n.sendFailRateCalculator.Observe(1, now)
 		return // Packing message failed
 	}
 
@@ -480,9 +487,9 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 			requestID,
 			containerIDs)
 		n.accepted.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, n.clock.Time())
+		n.sendFailRateCalculator.Observe(1, now)
 	} else {
-		n.sendFailRateCalculator.Observe(0, n.clock.Time())
+		n.sendFailRateCalculator.Observe(0, now)
 		n.accepted.numSent.Inc()
 	}
 }
@@ -490,10 +497,12 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 // GetAncestors implements the Sender interface.
 // assumes the stateLock is not held.
 func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
+	now := n.clock.Time()
+
 	msg, err := n.b.GetAncestors(chainID, requestID, uint64(deadline), containerID)
 	if err != nil {
 		n.log.Error("failed to build GetAncestors message: %s", err)
-		n.sendFailRateCalculator.Observe(1, n.clock.Time())
+		n.sendFailRateCalculator.Observe(1, now)
 		return false
 	}
 
@@ -505,21 +514,23 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 			requestID,
 			containerID)
 		n.getAncestors.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, n.clock.Time())
+		n.sendFailRateCalculator.Observe(1, now)
 		return false
 	}
 	n.getAncestors.numSent.Inc()
-	n.sendFailRateCalculator.Observe(0, n.clock.Time())
+	n.sendFailRateCalculator.Observe(0, now)
 	return true
 }
 
 // MultiPut implements the Sender interface.
 // assumes the stateLock is not held.
 func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte) {
+	now := n.clock.Time()
+
 	msg, err := n.b.MultiPut(chainID, requestID, containers)
 	if err != nil {
 		n.log.Error("failed to build MultiPut message because of container of size %d", len(containers))
-		n.sendFailRateCalculator.Observe(1, n.clock.Time())
+		n.sendFailRateCalculator.Observe(1, now)
 		return
 	}
 
@@ -531,16 +542,18 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 			requestID,
 			len(containers))
 		n.multiPut.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, n.clock.Time())
+		n.sendFailRateCalculator.Observe(1, now)
 	} else {
 		n.multiPut.numSent.Inc()
-		n.sendFailRateCalculator.Observe(0, n.clock.Time())
+		n.sendFailRateCalculator.Observe(0, now)
 	}
 }
 
 // Get implements the Sender interface.
 // assumes the stateLock is not held.
 func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
+	now := n.clock.Time()
+
 	msg, err := n.b.Get(chainID, requestID, uint64(deadline), containerID)
 	n.log.AssertNoError(err)
 
@@ -552,17 +565,19 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 			requestID,
 			containerID)
 		n.get.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, n.clock.Time())
+		n.sendFailRateCalculator.Observe(1, now)
 		return false
 	}
 	n.get.numSent.Inc()
-	n.sendFailRateCalculator.Observe(0, n.clock.Time())
+	n.sendFailRateCalculator.Observe(0, now)
 	return true
 }
 
 // Put implements the Sender interface.
 // assumes the stateLock is not held.
 func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
+	now := n.clock.Time()
+
 	msg, err := n.b.Put(chainID, requestID, containerID, container)
 	if err != nil {
 		n.log.Error("failed to build Put(%s, %d, %s): %s. len(container) : %d",
@@ -571,7 +586,7 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 			containerID,
 			err,
 			len(container))
-		n.sendFailRateCalculator.Observe(1, n.clock.Time())
+		n.sendFailRateCalculator.Observe(1, now)
 		return
 	}
 
@@ -584,16 +599,18 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 			containerID)
 		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
 		n.put.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, n.clock.Time())
+		n.sendFailRateCalculator.Observe(1, now)
 	} else {
 		n.put.numSent.Inc()
-		n.sendFailRateCalculator.Observe(0, n.clock.Time())
+		n.sendFailRateCalculator.Observe(0, now)
 	}
 }
 
 // PushQuery implements the Sender interface.
 // assumes the stateLock is not held.
 func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, container []byte) []ids.ShortID {
+	now := n.clock.Time()
+
 	msg, err := n.b.PushQuery(chainID, requestID, uint64(deadline), containerID, container)
 	if err != nil {
 		n.log.Error("failed to build PushQuery(%s, %d, %s): %s. len(container): %d",
@@ -603,7 +620,7 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			err,
 			len(container))
 		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
-		n.sendFailRateCalculator.Observe(1, n.clock.Time())
+		n.sendFailRateCalculator.Observe(1, now)
 		return nil // Packing message failed
 	}
 
@@ -619,11 +636,11 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 				containerID)
 			n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
 			n.pushQuery.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, n.clock.Time())
+			n.sendFailRateCalculator.Observe(1, now)
 		} else {
 			n.pushQuery.numSent.Inc()
 			sentTo = append(sentTo, vID)
-			n.sendFailRateCalculator.Observe(0, n.clock.Time())
+			n.sendFailRateCalculator.Observe(0, now)
 		}
 	}
 	return sentTo
@@ -632,6 +649,8 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 // PullQuery implements the Sender interface.
 // assumes the stateLock is not held.
 func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID {
+	now := n.clock.Time()
+
 	msg, err := n.b.PullQuery(chainID, requestID, uint64(deadline), containerID)
 	n.log.AssertNoError(err)
 
@@ -646,10 +665,10 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 				requestID,
 				containerID)
 			n.pullQuery.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, n.clock.Time())
+			n.sendFailRateCalculator.Observe(1, now)
 		} else {
 			n.pullQuery.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, n.clock.Time())
+			n.sendFailRateCalculator.Observe(0, now)
 			sentTo = append(sentTo, vID)
 		}
 	}
@@ -659,6 +678,8 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 // Chits implements the Sender interface.
 // assumes the stateLock is not held.
 func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID) {
+	now := n.clock.Time()
+
 	msg, err := n.b.Chits(chainID, requestID, votes)
 	if err != nil {
 		n.log.Error("failed to build Chits(%s, %d, %s): %s",
@@ -666,7 +687,7 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 			requestID,
 			votes,
 			err)
-		n.sendFailRateCalculator.Observe(1, n.clock.Time())
+		n.sendFailRateCalculator.Observe(1, now)
 		return
 	}
 
@@ -678,9 +699,9 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 			requestID,
 			votes)
 		n.chits.numFailed.Inc()
-		n.sendFailRateCalculator.Observe(1, n.clock.Time())
+		n.sendFailRateCalculator.Observe(1, now)
 	} else {
-		n.sendFailRateCalculator.Observe(0, n.clock.Time())
+		n.sendFailRateCalculator.Observe(0, now)
 		n.chits.numSent.Inc()
 	}
 }
@@ -875,9 +896,11 @@ func (n *network) IP() utils.IPDesc {
 
 // assumes the stateLock is not held.
 func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte) error {
+	now := n.clock.Time()
+
 	msg, err := n.b.Put(chainID, constants.GossipMsgRequestID, containerID, container)
 	if err != nil {
-		n.sendFailRateCalculator.Observe(1, n.clock.Time())
+		n.sendFailRateCalculator.Observe(1, now)
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
 
@@ -899,9 +922,9 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte)
 	for _, index := range indices {
 		if allPeers[int(index)].Send(msg) {
 			n.put.numSent.Inc()
-			n.sendFailRateCalculator.Observe(0, n.clock.Time())
+			n.sendFailRateCalculator.Observe(0, now)
 		} else {
-			n.sendFailRateCalculator.Observe(1, n.clock.Time())
+			n.sendFailRateCalculator.Observe(1, now)
 			n.put.numFailed.Inc()
 		}
 	}
@@ -1379,7 +1402,6 @@ func (n *network) restartOnDisconnect() {
 // Assumes [n.stateLock] is not held
 func (n *network) HealthCheck() (interface{}, error) {
 	details := map[string]interface{}{}
-	healthy := true
 
 	// Get some data with the state lock held
 	connectedTo := 0
@@ -1398,18 +1420,20 @@ func (n *network) HealthCheck() (interface{}, error) {
 
 	// Make sure we're connected to at least the minimum number of peers
 	isSufficientlyConnected := connectedTo >= int(n.healthConfig.MinConnectedPeers)
-	healthy = healthy && isSufficientlyConnected
+	healthy := isSufficientlyConnected
 	details["connectedToMinPeers"] = isSufficientlyConnected
 
 	// Make sure we've received an incoming message within the threshold
+	now := n.clock.Time()
+
 	lastMsgReceivedAt := time.Unix(atomic.LoadInt64(&n.lastMsgReceivedTime), 0)
-	timeSinceLastMsgReceived := n.clock.Time().Sub(lastMsgReceivedAt)
+	timeSinceLastMsgReceived := now.Sub(lastMsgReceivedAt)
 	healthy = healthy && timeSinceLastMsgReceived <= n.healthConfig.MaxTimeSinceMsgReceived
 	details["timeSinceLastMsgReceived"] = timeSinceLastMsgReceived.String()
 
 	// Make sure we've sent an outgoing message within the threshold
 	lastMsgSentAt := time.Unix(atomic.LoadInt64(&n.lastMsgSentTime), 0)
-	timeSinceLastMsgSent := n.clock.Time().Sub(lastMsgSentAt)
+	timeSinceLastMsgSent := now.Sub(lastMsgSentAt)
 	healthy = healthy && timeSinceLastMsgSent <= n.healthConfig.MaxTimeSinceMsgSent
 	details["timeSinceLastMsgSent"] = timeSinceLastMsgSent.String()
 

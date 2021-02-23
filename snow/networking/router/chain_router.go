@@ -544,6 +544,8 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 		dropped := !chain.Put(validatorID, requestID, containerID, container)
 		if dropped {
 			cr.dropRateCalculator.Observe(1, cr.clock.Time())
+		} else {
+			cr.dropRateCalculator.Observe(0, cr.clock.Time())
 		}
 		return
 	}
