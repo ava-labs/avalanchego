@@ -102,6 +102,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 			err)
 	}
 
+	b.NumFetched = 0
 	for _, blkID := range acceptedContainerIDs {
 		if blk, err := b.VM.GetBlock(blkID); err == nil {
 			if err := b.process(blk); err != nil {
@@ -202,7 +203,6 @@ func (b *Bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) err
 func (b *Bootstrapper) process(blk snowman.Block) error {
 	status := blk.Status()
 	blkID := blk.ID()
-	b.NumFetched = 0
 	for status == choices.Processing {
 		if err := b.Blocked.Push(&blockJob{
 			numAccepted: b.numAccepted,
@@ -268,7 +268,6 @@ func (b *Bootstrapper) checkFinish() error {
 }
 
 func (b *Bootstrapper) finish() error {
-
 	if err := b.VM.Bootstrapped(); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
 			err)

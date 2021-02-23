@@ -334,7 +334,6 @@ func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
 }
 
 func (b *Bootstrapper) RestartBootstrap(reset bool) error {
-
 	// resets the attempts when we're pulling blocks/vertices
 	// we don't want to fail the bootstrap at that stage
 	if reset {

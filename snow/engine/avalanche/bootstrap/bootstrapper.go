@@ -163,8 +163,6 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 		}
 	}
 
-	b.NumFetched = 0
-
 	vtxHeightSet := ids.Set{}
 	prevHeight := uint64(0)
 	for toProcess.Len() > 0 { // While there are unprocessed vertices
@@ -347,6 +345,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 			err)
 	}
 
+	b.NumFetched = 0
 	toProcess := make([]avalanche.Vertex, 0, len(acceptedContainerIDs))
 	for _, vtxID := range acceptedContainerIDs {
 		if vtx, err := b.Manager.Get(vtxID); err == nil {
