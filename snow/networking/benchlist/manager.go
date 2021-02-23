@@ -31,6 +31,10 @@ type Manager interface {
 	// should not be sent over the network and should immediately fail.
 	// Returns false if such messages should be sent, or if the chain is unknown.
 	IsBenched(validatorID ids.ShortID, chainID ids.ID) bool
+	// GetBenched returns an array of chainIDs where the specified
+	// [validatorID] is benched. If called on an id.ShortID that does
+	// not map to a validator, it will return an empty array.
+	GetBenched(validatorID ids.ShortID) []ids.ID
 }
 
 // Config defines the configuration for a benchlist
@@ -77,6 +81,23 @@ func (m *manager) IsBenched(validatorID ids.ShortID, chainID ids.ID) bool {
 	}
 	isBenched := benchlist.IsBenched(validatorID)
 	return isBenched
+}
+
+// GetBenched returns an array of chainIDs where the specified
+// [validatorID] is benched. If called on an id.ShortID that does
+// not map to a validator, it will return an empty array.
+func (m *manager) GetBenched(validatorID ids.ShortID) []ids.ID {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	benched := []ids.ID{}
+	for chainID, benchlist := range m.chainBenchlists {
+		if !benchlist.IsBenched(validatorID) {
+			continue
+		}
+		benched = append(benched, chainID)
+	}
+	return benched
 }
 
 func (m *manager) RegisterChain(ctx *snow.Context, namespace string) error {
@@ -143,3 +164,4 @@ func (noBenchlist) RegisterChain(*snow.Context, string) error { return nil }
 func (noBenchlist) RegisterResponse(ids.ID, ids.ShortID)      {}
 func (noBenchlist) RegisterFailure(ids.ID, ids.ShortID)       {}
 func (noBenchlist) IsBenched(ids.ShortID, ids.ID) bool        { return false }
+func (noBenchlist) GetBenched(ids.ShortID) []ids.ID           { return nil }

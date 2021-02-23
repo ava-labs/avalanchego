@@ -2565,6 +2565,9 @@ func TestUptimeReporting(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Unregister the previously registered metrics
+	ctx.Metrics.Unregister(vm.metrics.percentConnected)
+
 	// Test that VM reports the correct uptimes afer
 	// restart.
 	vm = &VM{

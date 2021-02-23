@@ -217,7 +217,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Int(snowSampleSizeKey, 20, "Number of nodes to query for each network poll")
 	fs.Int(snowQuorumSizeKey, 14, "Alpha value to use for required number positive results")
 	fs.Int(snowVirtuousCommitThresholdKey, 15, "Beta value to use for virtuous transactions")
-	fs.Int(snowRogueCommitThresholdKey, 30, "Beta value to use for rogue transactions")
+	fs.Int(snowRogueCommitThresholdKey, 20, "Beta value to use for rogue transactions")
 	fs.Int(snowAvalancheNumParentsKey, 5, "Number of vertexes for reference from each new vertex")
 	fs.Int(snowAvalancheBatchSizeKey, 30, "Number of operations to batch in each new vertex")
 	fs.Int(snowConcurrentRepollsKey, 4, "Minimum number of concurrent polls for finalizing consensus")

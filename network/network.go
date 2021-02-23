@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/triggers"
@@ -187,6 +188,8 @@ type network struct {
 
 	hasMasked        bool
 	maskedValidators ids.ShortSet
+
+	benchlistManager benchlist.Manager
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -215,6 +218,7 @@ func NewDefaultNetwork(
 	apricotPhase0Time time.Time,
 	sendQueueSize uint32,
 	healthConfig HealthConfig,
+	benchlistManager benchlist.Manager,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -257,6 +261,7 @@ func NewDefaultNetwork(
 		disconnectedRestartTimeout,
 		apricotPhase0Time,
 		healthConfig,
+		benchlistManager,
 	)
 }
 
@@ -302,6 +307,7 @@ func NewNetwork(
 	disconnectedRestartTimeout time.Duration,
 	apricotPhase0Time time.Time,
 	healthConfig HealthConfig,
+	benchlistManager benchlist.Manager,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -353,6 +359,7 @@ func NewNetwork(
 		restarter:                          restarter,
 		apricotPhase0Time:                  apricotPhase0Time,
 		healthConfig:                       healthConfig,
+		benchlistManager:                   benchlistManager,
 	}
 	netw.sendFailRateCalculator = math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time())
 
@@ -818,6 +825,7 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 					Version:      peer.versionStr.GetValue().(string),
 					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
+					Benched:      n.benchlistManager.GetBenched(peer.id),
 				})
 			}
 		}
@@ -833,6 +841,7 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 					Version:      peer.versionStr.GetValue().(string),
 					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
+					Benched:      n.benchlistManager.GetBenched(peer.id),
 				})
 			}
 		}

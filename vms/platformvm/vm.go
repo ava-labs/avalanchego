@@ -94,6 +94,7 @@ var (
 
 // VM implements the snowman.ChainVM interface
 type VM struct {
+	metrics
 	*core.SnowmanVM
 
 	// Node's validator manager
@@ -179,6 +180,12 @@ func (vm *VM) Initialize(
 	_ []*common.Fx,
 ) error {
 	ctx.Log.Verbo("initializing platform chain")
+
+	// Initialize metrics as soon as possible
+	if err := vm.metrics.Initialize(ctx.Namespace, ctx.Metrics); err != nil {
+		return err
+	}
+
 	// Initialize the inner VM, which has a lot of boiler-plate logic
 	vm.SnowmanVM = &core.SnowmanVM{}
 	if err := vm.SnowmanVM.Initialize(ctx, db, vm.unmarshalBlockFunc, msgs); err != nil {
