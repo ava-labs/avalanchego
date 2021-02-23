@@ -385,6 +385,7 @@ func (b *Bootstrapper) checkFinish() error {
 	// exec - 2   ; prev - 20/2  ; runs again
 	// exec - 1   ; prev - 2/1   ; doesnt run again
 	//
+	// exec - 0   ; prev - 0     ; stops running as there's nothing fetched
 	previousStateTransitionsThreshold := b.executedStateTransitions
 	if previousStateTransitionsThreshold == 0 {
 		previousStateTransitionsThreshold = math.MaxInt32
@@ -392,7 +393,7 @@ func (b *Bootstrapper) checkFinish() error {
 		previousStateTransitionsThreshold /= 2
 	}
 
-	if executedTxs < previousStateTransitionsThreshold && b.RetryBootstrap {
+	if executedTxs > 0 && executedTxs < previousStateTransitionsThreshold && b.RetryBootstrap {
 		b.executedStateTransitions = executedTxs
 		b.Ctx.Log.Info("bootstrapping is checking for more vertices before finishing the bootstrap process...")
 		return b.RestartBootstrap(true)

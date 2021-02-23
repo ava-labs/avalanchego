@@ -170,7 +170,6 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 	// Keep the proportion of b.Alpha in the newAlpha
 	// newAlpha := totalSampledWeight * b.Alpha / totalWeight
 
-	// TODO review this division
 	newAlpha := float64(b.sampledBeacons.Weight()*b.Alpha) / float64(b.Beacons.Weight())
 
 	failedBeaconWeight, err := b.Beacons.SubsetWeight(b.failedAcceptedVdrs)
@@ -273,7 +272,7 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 			return b.RestartBootstrap(false)
 		}
 
-		b.Ctx.Log.Info("Bootstrapping finished with no accepted frontier. No transactions have been issued on this chain yet"+
+		b.Ctx.Log.Info("Bootstrapping finished with no accepted frontier. No transactions have been issued on this chain"+
 			" - Beacons: %d - Failed Bootstrappers: %d - bootstrap attempt: %d", b.Beacons.Len(), b.failedAcceptedVdrs.Len(), b.bootstrapAttempts)
 	}
 
@@ -328,7 +327,7 @@ func (b *Bootstrapper) RestartBootstrap(reset bool) error {
 		return fmt.Errorf("failed to boostrap the chain after %d attempts", b.bootstrapAttempts)
 	}
 
-	// todo: avoid flooding the network
+	// avoid flooding the network
 	time.Sleep(time.Duration(b.bootstrapAttempts) * 100 * time.Millisecond)
 
 	// reset the failed responses
