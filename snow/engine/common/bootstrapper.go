@@ -144,6 +144,15 @@ func (b *Bootstrapper) GetAcceptedFrontierFailed(validatorID ids.ShortID, reques
 
 // AcceptedFrontier implements the Engine interface.
 func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+	// ignores any late responses
+	if requestID != b.RequestID {
+		b.Ctx.Log.Debug("Received an Out-of-Sync AcceptedFrontier - validator: %v - expectedRequestID: %v, requestID: %v",
+			validatorID,
+			b.RequestID,
+			requestID)
+		return nil
+	}
+
 	if !b.pendingAcceptedFrontier.Contains(validatorID) {
 		b.Ctx.Log.Debug("Received an AcceptedFrontier message from %s unexpectedly", validatorID)
 		return nil
@@ -221,6 +230,15 @@ func (b *Bootstrapper) GetAcceptedFailed(validatorID ids.ShortID, requestID uint
 
 // Accepted implements the Engine interface.
 func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+	// ignores any late responses
+	if requestID != b.RequestID {
+		b.Ctx.Log.Debug("Received an Out-of-Sync Accepted - validator: %v - expectedRequestID: %v, requestID: %v",
+			validatorID,
+			b.RequestID,
+			requestID)
+		return nil
+	}
+
 	if !b.pendingAccepted.Contains(validatorID) {
 		b.Ctx.Log.Debug("Received an Accepted message from %s unexpectedly", validatorID)
 		return nil
@@ -272,8 +290,8 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 			return b.RestartBootstrap(false)
 		}
 
-		b.Ctx.Log.Info("Bootstrapping finished with no accepted frontier. No transactions have been issued on this chain"+
-			" - Beacons: %d - Failed Bootstrappers: %d - bootstrap attempt: %d", b.Beacons.Len(), b.failedAcceptedVdrs.Len(), b.bootstrapAttempts)
+		b.Ctx.Log.Info("Bootstrapping finished with no accepted frontier -  Beacons: %d - Failed Bootstrappers: %d "+
+			"- bootstrap attempt: %d", b.Beacons.Len(), b.failedAcceptedVdrs.Len(), b.bootstrapAttempts)
 	}
 
 	b.Ctx.Log.Info("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
@@ -344,10 +362,11 @@ func (b *Bootstrapper) RestartBootstrap(reset bool) error {
 	for _, vdr := range beacons {
 		vdrID := vdr.ID()
 		b.pendingAcceptedFrontier.Add(vdrID) // necessarily emptied out
+	}
 
-		if !b.pendingAccepted.Contains(vdrID) {
-			b.pendingAccepted.Add(vdrID) // only add a sample of beacons to avoid duplicates/list too long
-		}
+	for _, vdr := range b.Beacons.List() {
+		vdrID := vdr.ID()
+		b.pendingAccepted.Add(vdrID)
 	}
 
 	b.acceptedVotes = make(map[ids.ID]uint64)

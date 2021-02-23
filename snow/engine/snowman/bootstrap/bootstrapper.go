@@ -29,9 +29,6 @@ type Config struct {
 	VM block.ChainVM
 
 	Bootstrapped func()
-
-	// allows to configure if the bootstrap should retry until sufficiently synced
-	RetryBootstrap bool
 }
 
 // Bootstrapper ...
@@ -205,6 +202,7 @@ func (b *Bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) err
 func (b *Bootstrapper) process(blk snowman.Block) error {
 	status := blk.Status()
 	blkID := blk.ID()
+	b.NumFetched = 0
 	for status == choices.Processing {
 		if err := b.Blocked.Push(&blockJob{
 			numAccepted: b.numAccepted,
