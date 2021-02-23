@@ -6,11 +6,9 @@ package api
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/gorilla/mux"
 )
 
@@ -18,11 +16,6 @@ var (
 	errUnknownBaseURL  = errors.New("unknown base url")
 	errUnknownEndpoint = errors.New("unknown endpoint")
 )
-
-// Router ...
-type Router interface {
-	AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string, loggingWriter io.Writer)
-}
 
 type router struct {
 	lock   sync.RWMutex
