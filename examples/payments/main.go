@@ -96,6 +96,8 @@ func main() {
 	chain.GetTxPool().SubscribeNewHeadEvent(newTxPoolHeadChan)
 	// start the chain
 	chain.Start()
+	chain.BlockChain().UnlockIndexing()
+	chain.SetPreference(chain.GetGenesisBlock())
 	for i := 0; i < 42; i++ {
 		tx := types.NewTransaction(nonce, bob.Address, value, uint64(gasLimit), gasPrice, nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), genKey.PrivateKey)
@@ -106,6 +108,7 @@ func main() {
 		block := <-newBlockChan
 		<-newTxPoolHeadChan
 		log.Info("finished generating block, starting the next iteration", "height", block.Number())
+		chain.SetPreference(block)
 	}
 	showBalance()
 	chain.Stop()
