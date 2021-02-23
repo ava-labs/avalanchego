@@ -23,4 +23,9 @@ type HealthConfig struct {
 	// fail, will return unhealthy. Does not include send attempts that were not
 	// made due to benching. Must be in [0,1]
 	MaxSendFailRate float64
+
+	// Halflife of averager used to calculate the send fail rate
+	// Must be > 0.
+	// Larger value --> Drop rate affected less by recent messages
+	MaxSendFailRateHalflife time.Duration
 }

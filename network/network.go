@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
@@ -58,9 +59,6 @@ var (
 
 // Network Upgrade
 var minimumUnmaskedVersion = version.NewDefaultVersion(constants.PlatformName, 1, 1, 0)
-
-// Use data from last [healthcheckLookback] to use when calculating send failure rate
-var healthcheckLookback = 30 * time.Second
 
 func init() { rand.Seed(time.Now().UnixNano()) }
 
@@ -113,10 +111,8 @@ type network struct {
 	// Unix time at which last message of any type sent over network
 	// Must only be accessed atomically
 	lastMsgSentTime int64
-	// Number of send attempts that succeeded since last health check
-	sendSuccessMeter timer.TimedMeter
-	// Number of send attempts that failed since last health check
-	sendFailMeter                      timer.TimedMeter
+	// Keeps track of the percentage of sends that fail
+	sendFailRateCalculator             math.Averager
 	log                                logging.Logger
 	id                                 ids.ShortID
 	ip                                 utils.DynamicIPDesc
@@ -357,9 +353,8 @@ func NewNetwork(
 		restarter:                          restarter,
 		apricotPhase0Time:                  apricotPhase0Time,
 		healthConfig:                       healthConfig,
-		sendSuccessMeter:                   timer.TimedMeter{Duration: healthcheckLookback},
-		sendFailMeter:                      timer.TimedMeter{Duration: healthcheckLookback},
 	}
+	netw.sendFailRateCalculator = math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time())
 
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
@@ -389,11 +384,11 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 				chainID,
 				requestID)
 			n.getAcceptedFrontier.numFailed.Inc()
-			n.sendFailMeter.Tick()
+			n.sendFailRateCalculator.Observe(1, n.clock.Time())
 		} else {
 			sentTo = append(sentTo, vID)
 			n.getAcceptedFrontier.numSent.Inc()
-			n.sendSuccessMeter.Tick()
+			n.sendFailRateCalculator.Observe(0, n.clock.Time())
 		}
 	}
 	return sentTo
@@ -409,7 +404,7 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 			requestID,
 			containerIDs,
 			err)
-		n.sendFailMeter.Tick()
+		n.sendFailRateCalculator.Observe(1, n.clock.Time())
 		return // Packing message failed
 	}
 
@@ -421,10 +416,10 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 			requestID,
 			containerIDs)
 		n.acceptedFrontier.numFailed.Inc()
-		n.sendFailMeter.Tick()
+		n.sendFailRateCalculator.Observe(1, n.clock.Time())
 	} else {
 		n.acceptedFrontier.numSent.Inc()
-		n.sendSuccessMeter.Tick()
+		n.sendFailRateCalculator.Observe(0, n.clock.Time())
 	}
 }
 
@@ -438,7 +433,7 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 			requestID,
 			containerIDs,
 			err)
-		n.sendFailMeter.Tick()
+		n.sendFailRateCalculator.Observe(1, n.clock.Time())
 		return nil
 	}
 
@@ -453,10 +448,10 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 				requestID,
 				containerIDs)
 			n.getAccepted.numFailed.Inc()
-			n.sendFailMeter.Tick()
+			n.sendFailRateCalculator.Observe(1, n.clock.Time())
 		} else {
 			n.getAccepted.numSent.Inc()
-			n.sendSuccessMeter.Tick()
+			n.sendFailRateCalculator.Observe(0, n.clock.Time())
 			sentTo = append(sentTo, vID)
 		}
 	}
@@ -473,7 +468,7 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 			requestID,
 			containerIDs,
 			err)
-		n.sendFailMeter.Tick()
+		n.sendFailRateCalculator.Observe(1, n.clock.Time())
 		return // Packing message failed
 	}
 
@@ -485,9 +480,9 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 			requestID,
 			containerIDs)
 		n.accepted.numFailed.Inc()
-		n.sendFailMeter.Tick()
+		n.sendFailRateCalculator.Observe(1, n.clock.Time())
 	} else {
-		n.sendSuccessMeter.Tick()
+		n.sendFailRateCalculator.Observe(0, n.clock.Time())
 		n.accepted.numSent.Inc()
 	}
 }
@@ -498,7 +493,7 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 	msg, err := n.b.GetAncestors(chainID, requestID, uint64(deadline), containerID)
 	if err != nil {
 		n.log.Error("failed to build GetAncestors message: %s", err)
-		n.sendFailMeter.Tick()
+		n.sendFailRateCalculator.Observe(1, n.clock.Time())
 		return false
 	}
 
@@ -510,11 +505,11 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 			requestID,
 			containerID)
 		n.getAncestors.numFailed.Inc()
-		n.sendFailMeter.Tick()
+		n.sendFailRateCalculator.Observe(1, n.clock.Time())
 		return false
 	}
 	n.getAncestors.numSent.Inc()
-	n.sendSuccessMeter.Tick()
+	n.sendFailRateCalculator.Observe(0, n.clock.Time())
 	return true
 }
 
@@ -524,7 +519,7 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	msg, err := n.b.MultiPut(chainID, requestID, containers)
 	if err != nil {
 		n.log.Error("failed to build MultiPut message because of container of size %d", len(containers))
-		n.sendFailMeter.Tick()
+		n.sendFailRateCalculator.Observe(1, n.clock.Time())
 		return
 	}
 
@@ -536,10 +531,10 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 			requestID,
 			len(containers))
 		n.multiPut.numFailed.Inc()
-		n.sendFailMeter.Tick()
+		n.sendFailRateCalculator.Observe(1, n.clock.Time())
 	} else {
 		n.multiPut.numSent.Inc()
-		n.sendSuccessMeter.Tick()
+		n.sendFailRateCalculator.Observe(0, n.clock.Time())
 	}
 }
 
@@ -557,11 +552,11 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 			requestID,
 			containerID)
 		n.get.numFailed.Inc()
-		n.sendFailMeter.Tick()
+		n.sendFailRateCalculator.Observe(1, n.clock.Time())
 		return false
 	}
 	n.get.numSent.Inc()
-	n.sendSuccessMeter.Tick()
+	n.sendFailRateCalculator.Observe(0, n.clock.Time())
 	return true
 }
 
@@ -576,7 +571,7 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 			containerID,
 			err,
 			len(container))
-		n.sendFailMeter.Tick()
+		n.sendFailRateCalculator.Observe(1, n.clock.Time())
 		return
 	}
 
@@ -589,10 +584,10 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 			containerID)
 		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
 		n.put.numFailed.Inc()
-		n.sendFailMeter.Tick()
+		n.sendFailRateCalculator.Observe(1, n.clock.Time())
 	} else {
 		n.put.numSent.Inc()
-		n.sendSuccessMeter.Tick()
+		n.sendFailRateCalculator.Observe(0, n.clock.Time())
 	}
 }
 
@@ -608,7 +603,7 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			err,
 			len(container))
 		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
-		n.sendFailMeter.Tick()
+		n.sendFailRateCalculator.Observe(1, n.clock.Time())
 		return nil // Packing message failed
 	}
 
@@ -624,11 +619,11 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 				containerID)
 			n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
 			n.pushQuery.numFailed.Inc()
-			n.sendFailMeter.Tick()
+			n.sendFailRateCalculator.Observe(1, n.clock.Time())
 		} else {
 			n.pushQuery.numSent.Inc()
 			sentTo = append(sentTo, vID)
-			n.sendSuccessMeter.Tick()
+			n.sendFailRateCalculator.Observe(0, n.clock.Time())
 		}
 	}
 	return sentTo
@@ -651,10 +646,10 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 				requestID,
 				containerID)
 			n.pullQuery.numFailed.Inc()
-			n.sendFailMeter.Tick()
+			n.sendFailRateCalculator.Observe(1, n.clock.Time())
 		} else {
 			n.pullQuery.numSent.Inc()
-			n.sendSuccessMeter.Tick()
+			n.sendFailRateCalculator.Observe(0, n.clock.Time())
 			sentTo = append(sentTo, vID)
 		}
 	}
@@ -671,7 +666,7 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 			requestID,
 			votes,
 			err)
-		n.sendFailMeter.Tick()
+		n.sendFailRateCalculator.Observe(1, n.clock.Time())
 		return
 	}
 
@@ -683,9 +678,9 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 			requestID,
 			votes)
 		n.chits.numFailed.Inc()
-		n.sendFailMeter.Tick()
+		n.sendFailRateCalculator.Observe(1, n.clock.Time())
 	} else {
-		n.sendSuccessMeter.Tick()
+		n.sendFailRateCalculator.Observe(0, n.clock.Time())
 		n.chits.numSent.Inc()
 	}
 }
@@ -882,7 +877,7 @@ func (n *network) IP() utils.IPDesc {
 func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte) error {
 	msg, err := n.b.Put(chainID, constants.GossipMsgRequestID, containerID, container)
 	if err != nil {
-		n.sendFailMeter.Tick()
+		n.sendFailRateCalculator.Observe(1, n.clock.Time())
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
 
@@ -904,9 +899,9 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte)
 	for _, index := range indices {
 		if allPeers[int(index)].Send(msg) {
 			n.put.numSent.Inc()
-			n.sendSuccessMeter.Tick()
+			n.sendFailRateCalculator.Observe(0, n.clock.Time())
 		} else {
-			n.sendFailMeter.Tick()
+			n.sendFailRateCalculator.Observe(1, n.clock.Time())
 			n.put.numFailed.Inc()
 		}
 	}
@@ -1398,49 +1393,33 @@ func (n *network) Health() (interface{}, error) {
 		}
 	}
 	pendingSendBytes := n.pendingBytes
-	numSendFailed := n.sendFailMeter.Ticks()
-	numSendSuccess := n.sendSuccessMeter.Ticks()
+	sendFailRate := n.sendFailRateCalculator.Read()
 	n.stateLock.RUnlock()
 
 	// Make sure we're connected to at least the minimum number of peers
-	if connectedTo < int(n.healthConfig.MinConnectedPeers) {
-		healthy = false
-		details["connectedToMinPeers"] = false
-	} else {
-		details["connectedToMinPeers"] = true
-	}
+	isSufficientlyConnected := connectedTo >= int(n.healthConfig.MinConnectedPeers)
+	healthy = healthy && isSufficientlyConnected
+	details["connectedToMinPeers"] = isSufficientlyConnected
 
 	// Make sure we've received an incoming message within the threshold
 	lastMsgReceivedAt := time.Unix(atomic.LoadInt64(&n.lastMsgReceivedTime), 0)
 	timeSinceLastMsgReceived := n.clock.Time().Sub(lastMsgReceivedAt)
-	if timeSinceLastMsgReceived > n.healthConfig.MaxTimeSinceMsgReceived {
-		healthy = false
-	}
+	healthy = healthy && timeSinceLastMsgReceived <= n.healthConfig.MaxTimeSinceMsgReceived
 	details["timeSinceLastMsgReceived"] = timeSinceLastMsgReceived.String()
 
 	// Make sure we've sent an outgoing message within the threshold
 	lastMsgSentAt := time.Unix(atomic.LoadInt64(&n.lastMsgSentTime), 0)
 	timeSinceLastMsgSent := n.clock.Time().Sub(lastMsgSentAt)
-	if timeSinceLastMsgSent > n.healthConfig.MaxTimeSinceMsgSent {
-		healthy = false
-	}
+	healthy = healthy && timeSinceLastMsgSent <= n.healthConfig.MaxTimeSinceMsgSent
 	details["timeSinceLastMsgSent"] = timeSinceLastMsgSent.String()
 
 	// Make sure the send queue isn't too full
 	portionFull := float64(pendingSendBytes) / float64(n.maxNetworkPendingSendBytes) // In [0,1]
-	if portionFull > n.healthConfig.MaxPortionSendQueueBytesFull {
-		healthy = false
-	}
+	healthy = healthy && portionFull <= n.healthConfig.MaxPortionSendQueueBytesFull
 	details["sendQueuePortionFull"] = portionFull
 
 	// Make sure the message send failed rate isn't too high
-	var sendFailRate float64
-	if numSendFailed+numSendSuccess != 0 {
-		sendFailRate = float64(numSendFailed) / (float64(numSendFailed) + float64(numSendSuccess))
-	}
-	if sendFailRate > n.healthConfig.MaxSendFailRate {
-		healthy = false
-	}
+	healthy = healthy && sendFailRate <= n.healthConfig.MaxSendFailRate
 	details["sendFailRate"] = sendFailRate
 
 	// Network layer is unhealthy

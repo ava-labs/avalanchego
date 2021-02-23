@@ -98,5 +98,6 @@ const (
 	restartOnDisconnectedKey                = "restart-on-disconnected"
 	routerHealthMaxDropRateKey              = "router-health-max-drop-rate"
 	routerHealthMaxOutstandingRequestsKey   = "router-health-max-outstanding-requests"
-	healthcheckFreqKey                      = "health-check-frequency"
+	healthCheckFreqKey                      = "health-check-frequency"
+	healthCheckAveragerHalflifeKey          = "health-check-averager-halflife"
 )

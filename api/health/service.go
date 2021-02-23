@@ -95,7 +95,7 @@ type APIHealthReply struct {
 	Healthy bool                     `json:"healthy"`
 }
 
-// GetLiveness returns a summation of the health of the node
+// Health returns a summation of the health of the node
 func (h *Health) Health(_ *http.Request, _ *APIHealthArgs, reply *APIHealthReply) error {
 	h.log.Info("Health.health called")
 	reply.Checks, reply.Healthy = h.health.Results()

@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
@@ -27,8 +28,6 @@ const (
 var (
 	_            Router = &ChainRouter{}
 	errUnhealthy        = errors.New("the router is not healthy")
-	// Use data from last [healthcheckLookback] to use when calculating drop rate
-	healthcheckLookback = 30 * time.Second
 )
 
 type request struct {
@@ -59,12 +58,8 @@ type ChainRouter struct {
 	healthConfig HealthConfig
 	// Unique-ified request ID --> Time and type of message made
 	requests map[ids.ID]request
-	// Counts the number of times we drop a message to any chain
-	// within a given time duration specified in [healthConfig]
-	dropMeter timer.TimedMeter
-	// Counts the number of times we successfully pass a message to any chain
-	// within a given time duration specified in [healthConfig]
-	successMeter timer.TimedMeter
+	// Measures average rate at which messages are dropped
+	dropRateCalculator math.Averager
 	// Last time at which there were no outstanding requests
 	lastTimeNoOutstanding time.Time
 }
@@ -100,9 +95,7 @@ func (cr *ChainRouter) Initialize(
 	cr.requests = make(map[ids.ID]request)
 	cr.peers.Add(nodeID)
 	// Set up meter to count dropped messages
-	cr.dropMeter = timer.TimedMeter{Duration: healthcheckLookback}
-	// Set up meter to count non-dropped (successful) messages
-	cr.successMeter = timer.TimedMeter{Duration: healthcheckLookback}
+	cr.dropRateCalculator = math.NewAverager(0, cr.healthConfig.MaxDropRateHalflife, cr.clock.Time())
 	cr.healthConfig = healthConfig
 
 	// Register metrics
@@ -262,9 +255,9 @@ func (cr *ChainRouter) GetAcceptedFrontier(validatorID ids.ShortID, chainID ids.
 	// Pass the message to the chain It's OK if we drop this.
 	dropped := !chain.GetAcceptedFrontier(validatorID, requestID, deadline)
 	if dropped {
-		cr.dropMeter.Tick()
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
 	} else {
-		cr.successMeter.Tick()
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
 	}
 }
 
@@ -303,9 +296,9 @@ func (cr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetAcceptedFrontierFailed(validatorID, requestID)
-		cr.dropMeter.Tick()
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
 	} else {
-		cr.successMeter.Tick()
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
 	}
 }
 
@@ -348,9 +341,9 @@ func (cr *ChainRouter) GetAccepted(validatorID ids.ShortID, chainID ids.ID, requ
 	// Pass the message to the chain. It's OK if we drop this.
 	dropped := !chain.GetAccepted(validatorID, requestID, deadline, containerIDs)
 	if dropped {
-		cr.dropMeter.Tick()
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
 	} else {
-		cr.successMeter.Tick()
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
 	}
 }
 
@@ -389,9 +382,9 @@ func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetAcceptedFailed(validatorID, requestID)
-		cr.dropMeter.Tick()
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
 	} else {
-		cr.successMeter.Tick()
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
 	}
 }
 
@@ -435,9 +428,9 @@ func (cr *ChainRouter) GetAncestors(validatorID ids.ShortID, chainID ids.ID, req
 	// Pass the message to the chain. It's OK if we drop this.
 	dropped := !chain.GetAncestors(validatorID, requestID, deadline, containerID)
 	if dropped {
-		cr.dropMeter.Tick()
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
 	} else {
-		cr.successMeter.Tick()
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
 	}
 }
 
@@ -475,9 +468,9 @@ func (cr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetAncestorsFailed(validatorID, requestID)
-		cr.dropMeter.Tick()
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
 	} else {
-		cr.successMeter.Tick()
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
 	}
 }
 
@@ -519,9 +512,9 @@ func (cr *ChainRouter) Get(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	// Pass the message to the chain. It's OK if we drop this.
 	dropped := !chain.Get(validatorID, requestID, deadline, containerID)
 	if dropped {
-		cr.dropMeter.Tick()
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
 	} else {
-		cr.successMeter.Tick()
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
 	}
 }
 
@@ -550,7 +543,7 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 		// It's ok to drop this message.
 		dropped := !chain.Put(validatorID, requestID, containerID, container)
 		if dropped {
-			cr.dropMeter.Tick()
+			cr.dropRateCalculator.Observe(1, cr.clock.Time())
 		}
 		return
 	}
@@ -576,9 +569,9 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetFailed(validatorID, requestID)
-		cr.dropMeter.Tick()
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
 	} else {
-		cr.successMeter.Tick()
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
 	}
 }
 
@@ -619,9 +612,9 @@ func (cr *ChainRouter) PushQuery(validatorID ids.ShortID, chainID ids.ID, reques
 	// Pass the message to the chain. It's OK if we drop this.
 	dropped := !chain.PushQuery(validatorID, requestID, deadline, containerID, container)
 	if dropped {
-		cr.dropMeter.Tick()
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
 	} else {
-		cr.successMeter.Tick()
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
 	}
 }
 
@@ -640,9 +633,9 @@ func (cr *ChainRouter) PullQuery(validatorID ids.ShortID, chainID ids.ID, reques
 	// Pass the message to the chain. It's OK if we drop this.
 	dropped := !chain.PullQuery(validatorID, requestID, deadline, containerID)
 	if dropped {
-		cr.dropMeter.Tick()
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
 	} else {
-		cr.successMeter.Tick()
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
 	}
 }
 
@@ -680,9 +673,9 @@ func (cr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.QueryFailed(validatorID, requestID)
-		cr.dropMeter.Tick()
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
 	} else {
-		cr.successMeter.Tick()
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
 	}
 }
 
@@ -756,30 +749,18 @@ func (cr *ChainRouter) Health() (interface{}, error) {
 	defer cr.lock.Unlock()
 
 	details := map[string]interface{}{}
-	healthy := true
-	numDropped := cr.dropMeter.Ticks()
-	numNotDropped := cr.successMeter.Ticks()
-	var dropRate float64
-	if numDropped+numNotDropped != 0 {
-		dropRate = float64(numDropped) / (float64(numDropped) + float64(numNotDropped)) // In [0,1]
-	}
+	dropRate := cr.dropRateCalculator.Read()
 
-	if dropRate > cr.healthConfig.MaxDropRate {
-		healthy = false
-	}
+	healthy := dropRate <= cr.healthConfig.MaxDropRate
 	details["msgDropRate"] = dropRate
 
 	numOutstandingReqs := len(cr.requests)
-	if numOutstandingReqs > cr.healthConfig.MaxOutstandingRequests {
-		healthy = false
-	}
+	healthy = healthy && numOutstandingReqs <= cr.healthConfig.MaxOutstandingRequests
 	details["outstandingRequests"] = numOutstandingReqs
 
 	timeSinceNoOutstandingRequests := cr.clock.Time().Sub(cr.lastTimeNoOutstanding)
+	healthy = healthy && timeSinceNoOutstandingRequests <= cr.healthConfig.MaxTimeSinceNoOutstandingRequests
 	details["timeSinceNoOutstandingRequests"] = timeSinceNoOutstandingRequests.String()
-	if timeSinceNoOutstandingRequests > cr.healthConfig.MaxTimeSinceNoOutstandingRequests {
-		healthy = false
-	}
 
 	if !healthy {
 		// The router is not healthy
