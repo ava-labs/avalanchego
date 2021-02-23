@@ -100,4 +100,6 @@ const (
 	routerHealthMaxOutstandingRequestsKey   = "router-health-max-outstanding-requests"
 	healthCheckFreqKey                      = "health-check-frequency"
 	healthCheckAveragerHalflifeKey          = "health-check-averager-halflife"
+	retryBootstrap                          = "bootstrap-retry-enabled"
+	retryBootstrapMaxAttempts               = "bootstrap-retry-max-attempts"
 )

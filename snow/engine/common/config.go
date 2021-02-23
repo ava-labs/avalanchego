@@ -20,6 +20,11 @@ type Config struct {
 	Alpha         uint64
 	Sender        Sender
 	Bootstrapable Bootstrapable
+
+	// Should Bootstrap be retried
+	RetryBootstrap bool
+	// Max number of times to retry bootstrap
+	RetryBootstrapMaxAttempts int
 }
 
 // Context implements the Engine interface

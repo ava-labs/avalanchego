@@ -212,6 +212,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Bootstrapping
 	fs.String(bootstrapIPsKey, defaultString, "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
 	fs.String(bootstrapIDsKey, defaultString, "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	fs.Bool(retryBootstrap, true, "Specifies whether bootstrap should be retried")
+	fs.Int(retryBootstrapMaxAttempts, 50, "Specifies how many times bootstrap should be retried")
 
 	// Consensus
 	fs.Int(snowSampleSizeKey, 20, "Number of nodes to query for each network poll")
@@ -709,6 +711,10 @@ func setNodeConfig(v *viper.Viper) error {
 		}
 	}
 	Config.CorethConfig = corethConfigString
+
+	// Bootstrap Configs
+	Config.RetryBootstrap = v.GetBool(retryBootstrap)
+	Config.RetryBootstrapMaxAttempts = v.GetInt(retryBootstrapMaxAttempts)
 
 	return nil
 }

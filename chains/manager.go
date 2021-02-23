@@ -110,34 +110,36 @@ type chain struct {
 
 // ManagerConfig ...
 type ManagerConfig struct {
-	StakingEnabled          bool // True iff the network has staking enabled
-	MaxPendingMsgs          uint32
-	MaxNonStakerPendingMsgs uint32
-	StakerMSGPortion        float64
-	StakerCPUPortion        float64
-	Log                     logging.Logger
-	LogFactory              logging.Factory
-	VMManager               vms.Manager // Manage mappings from vm ID --> vm
-	DecisionEvents          *triggers.EventDispatcher
-	ConsensusEvents         *triggers.EventDispatcher
-	DB                      database.Database
-	Router                  router.Router    // Routes incoming messages to the appropriate chain
-	Net                     network.Network  // Sends consensus messages to other validators
-	ConsensusParams         avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
-	EpochFirstTransition    time.Time
-	EpochDuration           time.Duration
-	Validators              validators.Manager // Validators validating on this chain
-	NodeID                  ids.ShortID        // The ID of this node
-	NetworkID               uint32             // ID of the network this node is connected to
-	Server                  *api.Server        // Handles HTTP API calls
-	Keystore                *keystore.Keystore
-	AtomicMemory            *atomic.Memory
-	AVAXAssetID             ids.ID
-	XChainID                ids.ID
-	CriticalChains          ids.Set          // Chains that can't exit gracefully
-	WhitelistedSubnets      ids.Set          // Subnets to validate
-	TimeoutManager          *timeout.Manager // Manages request timeouts when sending messages to other validators
-	HealthService           health.Service
+	StakingEnabled            bool // True iff the network has staking enabled
+	MaxPendingMsgs            uint32
+	MaxNonStakerPendingMsgs   uint32
+	StakerMSGPortion          float64
+	StakerCPUPortion          float64
+	Log                       logging.Logger
+	LogFactory                logging.Factory
+	VMManager                 vms.Manager // Manage mappings from vm ID --> vm
+	DecisionEvents            *triggers.EventDispatcher
+	ConsensusEvents           *triggers.EventDispatcher
+	DB                        database.Database
+	Router                    router.Router    // Routes incoming messages to the appropriate chain
+	Net                       network.Network  // Sends consensus messages to other validators
+	ConsensusParams           avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
+	EpochFirstTransition      time.Time
+	EpochDuration             time.Duration
+	Validators                validators.Manager // Validators validating on this chain
+	NodeID                    ids.ShortID        // The ID of this node
+	NetworkID                 uint32             // ID of the network this node is connected to
+	Server                    *api.Server        // Handles HTTP API calls
+	Keystore                  *keystore.Keystore
+	AtomicMemory              *atomic.Memory
+	AVAXAssetID               ids.ID
+	XChainID                  ids.ID
+	CriticalChains            ids.Set          // Chains that can't exit gracefully
+	WhitelistedSubnets        ids.Set          // Subnets to validate
+	TimeoutManager            *timeout.Manager // Manages request timeouts when sending messages to other validators
+	HealthService             health.Service
+	RetryBootstrap            bool // Should Bootstrap be retried
+	RetryBootstrapMaxAttempts int  // Max number of times to retry bootstrap
 }
 
 type manager struct {
@@ -444,13 +446,15 @@ func (m *manager) createAvalancheChain(
 	if err := engine.Initialize(aveng.Config{
 		Config: avbootstrap.Config{
 			Config: common.Config{
-				Ctx:          ctx,
-				Validators:   validators,
-				Beacons:      beacons,
-				SampleK:      sampleK,
-				StartupAlpha: (3*bootstrapWeight + 3) / 4,
-				Alpha:        bootstrapWeight/2 + 1, // must be > 50%
-				Sender:       &sender,
+				Ctx:                       ctx,
+				Validators:                validators,
+				Beacons:                   beacons,
+				SampleK:                   sampleK,
+				StartupAlpha:              (3*bootstrapWeight + 3) / 4,
+				Alpha:                     bootstrapWeight/2 + 1, // must be > 50%
+				Sender:                    &sender,
+				RetryBootstrap:            m.RetryBootstrap,
+				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
 			},
 			VtxBlocked: vtxBlocker,
 			TxBlocked:  txBlocker,
@@ -557,13 +561,15 @@ func (m *manager) createSnowmanChain(
 	if err := engine.Initialize(smeng.Config{
 		Config: smbootstrap.Config{
 			Config: common.Config{
-				Ctx:          ctx,
-				Validators:   validators,
-				Beacons:      beacons,
-				SampleK:      sampleK,
-				StartupAlpha: (3*bootstrapWeight + 3) / 4,
-				Alpha:        bootstrapWeight/2 + 1, // must be > 50%
-				Sender:       &sender,
+				Ctx:                       ctx,
+				Validators:                validators,
+				Beacons:                   beacons,
+				SampleK:                   sampleK,
+				StartupAlpha:              (3*bootstrapWeight + 3) / 4,
+				Alpha:                     bootstrapWeight/2 + 1, // must be > 50%
+				Sender:                    &sender,
+				RetryBootstrap:            m.RetryBootstrap,
+				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
 			},
 			Blocked:      blocked,
 			VM:           vm,
