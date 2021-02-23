@@ -14,6 +14,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -94,9 +95,8 @@ type Network interface {
 	// Return the IP of the node
 	IP() utils.IPDesc
 
-	// Health returns nil if the network layer is healthy
-	// If not, returns non-nil and details about why it is unhealthy
-	Health() (interface{}, error)
+	// Has a health check
+	health.Checkable
 }
 
 type network struct {
@@ -1373,11 +1373,11 @@ func (n *network) restartOnDisconnect() {
 	}
 }
 
-// Health returns information about several network layer health checks.
+// HealthCheck returns information about several network layer health checks.
 // 1) Information about health check results
 // 2) An error if the health check reports unhealthy
 // Assumes [n.stateLock] is not held
-func (n *network) Health() (interface{}, error) {
+func (n *network) HealthCheck() (interface{}, error) {
 	details := map[string]interface{}{}
 	healthy := true
 

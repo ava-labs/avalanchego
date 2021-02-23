@@ -741,10 +741,10 @@ func (cr *ChainRouter) EndInterval() {
 	}
 }
 
-// Health returns results of router health checks. Returns:
+// HealthCheck returns results of router health checks. Returns:
 // 1) Information about health check results
 // 2) An error if the health check reports unhealthy
-func (cr *ChainRouter) Health() (interface{}, error) {
+func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 

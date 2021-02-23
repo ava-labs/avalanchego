@@ -92,7 +92,7 @@ type Node struct {
 	sharedMemory atomic.Memory
 
 	// Monitors node health and runs health checks
-	healthService health.CheckRegisterer
+	healthService health.Service
 
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
@@ -723,7 +723,8 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	n.Log.Info("initializing Health API")
-	service := health.NewService(n.Log, n.Config.HealthCheckFreq)
+	n.healthService = health.NewService(n.Config.HealthCheckFreq, n.Log)
+
 	isBootstrappedFunc := func() (interface{}, error) {
 		if pChainID, err := n.chainManager.Lookup("P"); err != nil {
 			return nil, errors.New("P-Chain not created")
@@ -743,25 +744,26 @@ func (n *Node) initHealthAPI() error {
 		return nil, nil
 	}
 	// Passes if the P, X and C chains are finished bootstrapping
-	if err := service.RegisterMonotonicCheckFunc("chains.default.bootstrapped", isBootstrappedFunc); err != nil {
-		return err
-	}
-	handler, err := service.Handler()
+	err := n.healthService.RegisterMonotonicCheck("isBootstrapped", isBootstrappedFunc)
 	if err != nil {
-		return err
+		return fmt.Errorf("couldn't register isBootstrapped health check: %w", err)
 	}
-	n.healthService = service
 
 	// Register the network layer with the health service
-	netCheck := health.NewCheck("network", n.Net.Health)
-	if err := n.healthService.RegisterCheck(netCheck); err != nil {
+	err = n.healthService.RegisterCheck("network", n.Net.HealthCheck)
+	if err != nil {
 		return fmt.Errorf("couldn't register network health check")
 	}
 
 	// Register the router with the health service
-	routerCheck := health.NewCheck("router", n.Config.ConsensusRouter.Health)
-	if err := n.healthService.RegisterCheck(routerCheck); err != nil {
+	err = n.healthService.RegisterCheck("router", n.Config.ConsensusRouter.HealthCheck)
+	if err != nil {
 		return fmt.Errorf("couldn't register router health check")
+	}
+
+	handler, err := n.healthService.Handler()
+	if err != nil {
+		return err
 	}
 
 	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "health", "", n.HTTPLog)

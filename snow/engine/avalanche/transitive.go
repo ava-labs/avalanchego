@@ -633,7 +633,7 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 }
 
 // Health implements the common.Engine interface
-func (t *Transitive) Health() (interface{}, error) {
+func (t *Transitive) HealthCheck() (interface{}, error) {
 	// TODO add more health checks
-	return t.VM.Health()
+	return t.VM.HealthCheck()
 }
