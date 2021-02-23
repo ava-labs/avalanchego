@@ -4,6 +4,7 @@
 package router
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
@@ -24,7 +26,8 @@ const (
 )
 
 var (
-	_ Router = &ChainRouter{}
+	_            Router = &ChainRouter{}
+	errUnhealthy        = errors.New("the router is not healthy")
 )
 
 type request struct {
@@ -51,8 +54,14 @@ type ChainRouter struct {
 	criticalChains   ids.Set
 	onFatal          func()
 	metrics          routerMetrics
+	// Parameters for doing health checks
+	healthConfig HealthConfig
 	// Unique-ified request ID --> Time and type of message made
 	requests map[ids.ID]request
+	// Measures average rate at which messages are dropped
+	dropRateCalculator math.Averager
+	// Last time at which there were no outstanding requests
+	lastTimeNoOutstanding time.Time
 }
 
 // Initialize the router.
@@ -71,6 +80,7 @@ func (cr *ChainRouter) Initialize(
 	closeTimeout time.Duration,
 	criticalChains ids.Set,
 	onFatal func(),
+	healthConfig HealthConfig,
 	metricsNamespace string,
 	metricsRegisterer prometheus.Registerer,
 ) error {
@@ -84,6 +94,11 @@ func (cr *ChainRouter) Initialize(
 	cr.onFatal = onFatal
 	cr.requests = make(map[ids.ID]request)
 	cr.peers.Add(nodeID)
+	// Set up meter to count dropped messages
+	cr.dropRateCalculator = math.NewAverager(0, cr.healthConfig.MaxDropRateHalflife, cr.clock.Time())
+	cr.healthConfig = healthConfig
+
+	// Register metrics
 	cr.metrics = routerMetrics{}
 	cr.metrics.outstandingRequests = prometheus.NewGauge(
 		prometheus.GaugeOpts{
@@ -99,6 +114,16 @@ func (cr *ChainRouter) Initialize(
 	go log.RecoverAndPanic(cr.gossiper.Dispatch)
 	go log.RecoverAndPanic(cr.intervalNotifier.Dispatch)
 	return nil
+}
+
+// Remove a request from [cr.requests]
+// Assumes [cr.lock] is held
+func (cr *ChainRouter) removeRequest(id ids.ID) {
+	delete(cr.requests, id)
+	if len(cr.requests) == 0 {
+		cr.lastTimeNoOutstanding = cr.clock.Time()
+	}
+	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
 }
 
 // RegisterRequests marks that we should expect to receive a reply from the given validator
@@ -117,7 +142,6 @@ func (cr *ChainRouter) RegisterRequest(
 	cr.lock.Lock()
 	// Add to the set of unfulfilled requests
 	cr.requests[uniqueRequestID] = request{Time: cr.clock.Time(), MsgType: msgType}
-	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
 	cr.lock.Unlock()
 	// Register a timeout to fire if we don't get a reply in time.
 	var timeoutHandler func() // Called upon timeout
@@ -228,9 +252,13 @@ func (cr *ChainRouter) GetAcceptedFrontier(validatorID ids.ShortID, chainID ids.
 		return
 	}
 
-	// Pass the message to the chain
-	// Note that we don't check the return value. It's OK to drop this.
-	chain.GetAcceptedFrontier(validatorID, requestID, deadline)
+	// Pass the message to the chain It's OK if we drop this.
+	dropped := !chain.GetAcceptedFrontier(validatorID, requestID, deadline)
+	if dropped {
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+	} else {
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
+	}
 }
 
 // AcceptedFrontier routes an incoming AcceptedFrontier request from the
@@ -255,8 +283,7 @@ func (cr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 		// We didn't request this message or we got back a reply of wrong type. Ignore.
 		return
 	}
-	delete(cr.requests, uniqueRequestID)
-	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
+	cr.removeRequest(uniqueRequestID)
 
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.Time)
@@ -265,9 +292,13 @@ func (cr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAcceptedFrontierMsg, latency)
 
 	// Pass the response to the chain
-	if !chain.AcceptedFrontier(validatorID, requestID, containerIDs) {
+	dropped := !chain.AcceptedFrontier(validatorID, requestID, containerIDs)
+	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetAcceptedFrontierFailed(validatorID, requestID)
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+	} else {
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
 	}
 }
 
@@ -280,8 +311,7 @@ func (cr *ChainRouter) GetAcceptedFrontierFailed(validatorID ids.ShortID, chainI
 	defer cr.lock.Unlock()
 
 	// Remove the outstanding request
-	delete(cr.requests, uniqueRequestID)
-	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
+	cr.removeRequest(uniqueRequestID)
 
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
@@ -308,9 +338,13 @@ func (cr *ChainRouter) GetAccepted(validatorID ids.ShortID, chainID ids.ID, requ
 		return
 	}
 
-	// Pass the message to the chain.
-	// Note that we don't check the return value. It's OK to drop this.
-	chain.GetAccepted(validatorID, requestID, deadline, containerIDs)
+	// Pass the message to the chain. It's OK if we drop this.
+	dropped := !chain.GetAccepted(validatorID, requestID, deadline, containerIDs)
+	if dropped {
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+	} else {
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
+	}
 }
 
 // Accepted routes an incoming Accepted request from the validator with ID
@@ -335,8 +369,7 @@ func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 		// We didn't request this message or we got back a reply of wrong type. Ignore.
 		return
 	}
-	delete(cr.requests, uniqueRequestID)
-	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
+	cr.removeRequest(uniqueRequestID)
 
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.Time)
@@ -345,9 +378,13 @@ func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAcceptedMsg, latency)
 
 	// Pass the response to the chain
-	if !chain.Accepted(validatorID, requestID, containerIDs) {
+	dropped := !chain.Accepted(validatorID, requestID, containerIDs)
+	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetAcceptedFailed(validatorID, requestID)
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+	} else {
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
 	}
 }
 
@@ -360,8 +397,7 @@ func (cr *ChainRouter) GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID
 	defer cr.lock.Unlock()
 
 	// Remove the outstanding request
-	delete(cr.requests, uniqueRequestID)
-	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
+	cr.removeRequest(uniqueRequestID)
 
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
@@ -389,9 +425,13 @@ func (cr *ChainRouter) GetAncestors(validatorID ids.ShortID, chainID ids.ID, req
 		return
 	}
 
-	// Pass the message to the chain.
-	// Note that we don't check the return value. It's OK to drop this.
-	chain.GetAncestors(validatorID, requestID, deadline, containerID)
+	// Pass the message to the chain. It's OK if we drop this.
+	dropped := !chain.GetAncestors(validatorID, requestID, deadline, containerID)
+	if dropped {
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+	} else {
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
+	}
 }
 
 // MultiPut routes an incoming MultiPut message from the validator with ID [validatorID]
@@ -415,8 +455,7 @@ func (cr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 		// We didn't request this message or we got back a reply of wrong type. Ignore.
 		return
 	}
-	delete(cr.requests, uniqueRequestID)
-	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
+	cr.removeRequest(uniqueRequestID)
 
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.Time)
@@ -425,9 +464,13 @@ func (cr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAncestorsMsg, latency)
 
 	// Pass the response to the chain
-	if !chain.MultiPut(validatorID, requestID, containers) {
+	dropped := !chain.MultiPut(validatorID, requestID, containers)
+	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetAncestorsFailed(validatorID, requestID)
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+	} else {
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
 	}
 }
 
@@ -439,8 +482,7 @@ func (cr *ChainRouter) GetAncestorsFailed(validatorID ids.ShortID, chainID ids.I
 	defer cr.lock.Unlock()
 
 	// Remove the outstanding request
-	delete(cr.requests, uniqueRequestID)
-	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
+	cr.removeRequest(uniqueRequestID)
 
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
@@ -467,9 +509,13 @@ func (cr *ChainRouter) Get(validatorID ids.ShortID, chainID ids.ID, requestID ui
 		return
 	}
 
-	// Pass the message to the chain.
-	// Note that we don't check the return value. It's OK to drop this.
-	chain.Get(validatorID, requestID, deadline, containerID)
+	// Pass the message to the chain. It's OK if we drop this.
+	dropped := !chain.Get(validatorID, requestID, deadline, containerID)
+	if dropped {
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+	} else {
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
+	}
 }
 
 // Put routes an incoming Put request from the validator with ID [validatorID]
@@ -494,9 +540,13 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 
 	// If this is a gossip message, pass to the chain
 	if requestID == constants.GossipMsgRequestID {
-		// Note that we don't check the return value.
 		// It's ok to drop this message.
-		chain.Put(validatorID, requestID, containerID, container)
+		dropped := !chain.Put(validatorID, requestID, containerID, container)
+		if dropped {
+			cr.dropRateCalculator.Observe(1, cr.clock.Time())
+		} else {
+			cr.dropRateCalculator.Observe(0, cr.clock.Time())
+		}
 		return
 	}
 
@@ -508,8 +558,7 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 		// We didn't request this message or we got back a reply of wrong type. Ignore.
 		return
 	}
-	delete(cr.requests, uniqueRequestID)
-	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
+	cr.removeRequest(uniqueRequestID)
 
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.Time)
@@ -518,9 +567,13 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetMsg, latency)
 
 	// Pass the response to the chain
-	if !chain.Put(validatorID, requestID, containerID, container) {
+	dropped := !chain.Put(validatorID, requestID, containerID, container)
+	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetFailed(validatorID, requestID)
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+	} else {
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
 	}
 }
 
@@ -532,8 +585,7 @@ func (cr *ChainRouter) GetFailed(validatorID ids.ShortID, chainID ids.ID, reques
 	defer cr.lock.Unlock()
 
 	// Remove the outstanding request
-	delete(cr.requests, uniqueRequestID)
-	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
+	cr.removeRequest(uniqueRequestID)
 
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
@@ -559,9 +611,13 @@ func (cr *ChainRouter) PushQuery(validatorID ids.ShortID, chainID ids.ID, reques
 		return
 	}
 
-	// Pass the message to the chain.
-	// Note that we don't check the return value. It's OK to drop this.
-	chain.PushQuery(validatorID, requestID, deadline, containerID, container)
+	// Pass the message to the chain. It's OK if we drop this.
+	dropped := !chain.PushQuery(validatorID, requestID, deadline, containerID, container)
+	if dropped {
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+	} else {
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
+	}
 }
 
 // PullQuery routes an incoming PullQuery request from the validator with ID [validatorID]
@@ -576,9 +632,13 @@ func (cr *ChainRouter) PullQuery(validatorID ids.ShortID, chainID ids.ID, reques
 		return
 	}
 
-	// Pass the message to the chain.
-	// Note that we don't check the return value. It's OK to drop this.
-	chain.PullQuery(validatorID, requestID, deadline, containerID)
+	// Pass the message to the chain. It's OK if we drop this.
+	dropped := !chain.PullQuery(validatorID, requestID, deadline, containerID)
+	if dropped {
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+	} else {
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
+	}
 }
 
 // Chits routes an incoming Chits message from the validator with ID [validatorID]
@@ -602,8 +662,7 @@ func (cr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 		// We didn't request this message or we got back a reply of wrong type. Ignore.
 		return
 	}
-	delete(cr.requests, uniqueRequestID)
-	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
+	cr.removeRequest(uniqueRequestID)
 
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.Time)
@@ -612,9 +671,13 @@ func (cr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, request.MsgType, latency)
 
 	// Pass the response to the chain
-	if !chain.Chits(validatorID, requestID, votes) {
+	dropped := !chain.Chits(validatorID, requestID, votes)
+	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.QueryFailed(validatorID, requestID)
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+	} else {
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
 	}
 }
 
@@ -626,8 +689,7 @@ func (cr *ChainRouter) QueryFailed(validatorID ids.ShortID, chainID ids.ID, requ
 	defer cr.lock.Unlock()
 
 	// Remove the outstanding request
-	delete(cr.requests, uniqueRequestID)
-	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
+	cr.removeRequest(uniqueRequestID)
 
 	chain, exists := cr.chains[chainID]
 	if !exists {
@@ -679,6 +741,34 @@ func (cr *ChainRouter) EndInterval() {
 	for _, chain := range cr.chains {
 		chain.endInterval()
 	}
+}
+
+// HealthCheck returns results of router health checks. Returns:
+// 1) Information about health check results
+// 2) An error if the health check reports unhealthy
+func (cr *ChainRouter) HealthCheck() (interface{}, error) {
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
+
+	details := map[string]interface{}{}
+	dropRate := cr.dropRateCalculator.Read()
+
+	healthy := dropRate <= cr.healthConfig.MaxDropRate
+	details["msgDropRate"] = dropRate
+
+	numOutstandingReqs := len(cr.requests)
+	healthy = healthy && numOutstandingReqs <= cr.healthConfig.MaxOutstandingRequests
+	details["outstandingRequests"] = numOutstandingReqs
+
+	timeSinceNoOutstandingRequests := cr.clock.Time().Sub(cr.lastTimeNoOutstanding)
+	healthy = healthy && timeSinceNoOutstandingRequests <= cr.healthConfig.MaxTimeSinceNoOutstandingRequests
+	details["timeSinceNoOutstandingRequests"] = timeSinceNoOutstandingRequests.String()
+
+	if !healthy {
+		// The router is not healthy
+		return details, errUnhealthy
+	}
+	return details, nil
 }
 
 func createRequestID(validatorID ids.ShortID, chainID ids.ID, requestID uint32) ids.ID {

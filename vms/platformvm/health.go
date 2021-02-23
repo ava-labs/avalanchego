@@ -10,7 +10,7 @@ import (
 )
 
 // Health implements the common.VM interface
-func (vm *VM) Health() (interface{}, error) {
+func (vm *VM) HealthCheck() (interface{}, error) {
 	// Returns nil iff this node is connected to > alpha percent of the Primary Network's stake
 	percentConnected, err := vm.getPercentConnected()
 	if err != nil {

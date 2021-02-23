@@ -137,7 +137,7 @@ type ManagerConfig struct {
 	CriticalChains          ids.Set          // Chains that can't exit gracefully
 	WhitelistedSubnets      ids.Set          // Subnets to validate
 	TimeoutManager          *timeout.Manager // Manages request timeouts when sending messages to other validators
-	HealthService           health.CheckRegisterer
+	HealthService           health.Service
 }
 
 type manager struct {
@@ -463,17 +463,18 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
 	}
 
-	// Register health checks
+	// Register health check for this chain
 	chainAlias, err := m.PrimaryAlias(ctx.ChainID)
 	if err != nil {
 		chainAlias = ctx.ChainID.String()
 	}
-	wrapperHc := &healthCheckWrapper{
-		chain: chainAlias,
-		lock:  &ctx.Lock,
-		check: engine.Health,
+	// Grab the context lock before calling the chain's health check
+	checkFn := func() (interface{}, error) {
+		ctx.Lock.Lock()
+		defer ctx.Lock.Unlock()
+		return engine.HealthCheck()
 	}
-	if err := m.HealthService.RegisterCheck(wrapperHc); err != nil {
+	if err := m.HealthService.RegisterCheck(chainAlias, checkFn); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -594,12 +595,12 @@ func (m *manager) createSnowmanChain(
 		chainAlias = ctx.ChainID.String()
 	}
 
-	wrapperHc := &healthCheckWrapper{
-		chain: chainAlias,
-		lock:  &ctx.Lock,
-		check: engine.Health,
+	checkFn := func() (interface{}, error) {
+		ctx.Lock.Lock()
+		defer ctx.Lock.Unlock()
+		return engine.HealthCheck()
 	}
-	if err := m.HealthService.RegisterCheck(wrapperHc); err != nil {
+	if err := m.HealthService.RegisterCheck(chainAlias, checkFn); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -661,28 +662,4 @@ func (m *manager) isChainWithAlias(aliases ...string) (string, bool) {
 		}
 	}
 	return "", false
-}
-
-// Wraps a health check.
-// Grabs [Lock] before executing the health check
-type healthCheckWrapper struct {
-	check func() (interface{}, error)
-
-	// Grabs/releases this before/after health check func
-	lock *sync.RWMutex
-
-	// Alias/ID of chain this health check is for
-	chain string
-}
-
-// Name is this health check's formatted name
-func (hc *healthCheckWrapper) Name() string {
-	return hc.chain
-}
-
-// Execute executes the health check function with the lock
-func (hc *healthCheckWrapper) Execute() (interface{}, error) {
-	hc.lock.Lock()
-	defer hc.lock.Unlock()
-	return hc.check()
 }
