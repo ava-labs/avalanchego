@@ -215,7 +215,6 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(retryBootstrap, true, "Specifies whether bootstrap should be retried")
 	fs.Int(retryBootstrapMaxAttempts, 50, "Specifies how many times bootstrap should be retried")
 
-
 	// Consensus
 	fs.Int(snowSampleSizeKey, 20, "Number of nodes to query for each network poll")
 	fs.Int(snowQuorumSizeKey, 14, "Alpha value to use for required number positive results")

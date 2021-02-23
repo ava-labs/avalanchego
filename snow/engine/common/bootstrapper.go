@@ -65,8 +65,8 @@ type Bootstrapper struct {
 
 // Initialize implements the Engine interface.
 func (b *Bootstrapper) Initialize(config Config) error {
-	b.Ctx.Log.Info("Starting bootstrap...")
 	b.Config = config
+	b.Ctx.Log.Info("Starting bootstrap...")
 
 	b.sampledBeacons = validators.NewSet()
 
@@ -185,10 +185,12 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 	// fail the bootstrap if the weight is not enough to bootstrap
 	if float64(b.sampledBeacons.Weight())-newAlpha < float64(failedBeaconWeight) {
 		if b.Config.RetryBootstrap {
+			b.Ctx.Log.Info("Not enough frontiers received, restarting bootstrap... - Beacons: %d - Failed Bootstrappers: %d "+
+				"- bootstrap attempt: %d", b.Beacons.Len(), b.failedAcceptedFrontierVdrs.Len(), b.bootstrapAttempts)
 			return b.RestartBootstrap(false)
 		}
 
-		b.Ctx.Log.Info("Didn't receive enough AcceptedFrontier - failed validators: %d, "+
+		b.Ctx.Log.Info("Didn't receive enough frontiers - failed validators: %d, "+
 			"bootstrap attempt: %d", b.failedAcceptedFrontierVdrs.Len(), b.bootstrapAttempts)
 	}
 
@@ -283,10 +285,12 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 
 		// in a zero network there will be no accepted votes but the voting weight will be greater than the failed weight
 		if b.Config.RetryBootstrap && b.Beacons.Weight()-b.Alpha < failedBeaconWeight {
+			b.Ctx.Log.Info("Not enough votes received, restarting bootstrap... - Beacons: %d - Failed Bootstrappers: %d "+
+				"- bootstrap attempt: %d", b.Beacons.Len(), b.failedAcceptedVdrs.Len(), b.bootstrapAttempts)
 			return b.RestartBootstrap(false)
 		}
 
-		b.Ctx.Log.Info("Bootstrapping finished with no accepted frontier - Beacons: %d - Failed Bootstrappers: %d "+
+		b.Ctx.Log.Info("No accepted frontier from beacons - Beacons: %d - Failed Bootstrappers: %d "+
 			"- bootstrap attempt: %d", b.Beacons.Len(), b.failedAcceptedVdrs.Len(), b.bootstrapAttempts)
 	}
 
