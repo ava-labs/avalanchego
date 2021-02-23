@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/triggers"
@@ -136,7 +137,6 @@ type network struct {
 	readHandshakeTimeout               time.Duration
 	connMeterMaxConns                  int
 	connMeter                          ConnMeter
-	executor                           timer.Executor
 	b                                  Builder
 	apricotPhase0Time                  time.Time
 
@@ -177,6 +177,8 @@ type network struct {
 
 	hasMasked        bool
 	maskedValidators ids.ShortSet
+
+	benchlistManager benchlist.Manager
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -204,6 +206,7 @@ func NewDefaultNetwork(
 	disconnectedRestartTimeout time.Duration,
 	apricotPhase0Time time.Time,
 	sendQueueSize uint32,
+	benchlistManager benchlist.Manager,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -245,6 +248,7 @@ func NewDefaultNetwork(
 		disconnectedCheckFreq,
 		disconnectedRestartTimeout,
 		apricotPhase0Time,
+		benchlistManager,
 	)
 }
 
@@ -289,6 +293,7 @@ func NewNetwork(
 	disconnectedCheckFreq time.Duration,
 	disconnectedRestartTimeout time.Duration,
 	apricotPhase0Time time.Time,
+	benchlistManager benchlist.Manager,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -339,13 +344,12 @@ func NewNetwork(
 		connectedMeter:                     timer.TimedMeter{Duration: disconnectedRestartTimeout},
 		restarter:                          restarter,
 		apricotPhase0Time:                  apricotPhase0Time,
+		benchlistManager:                   benchlistManager,
 	}
 
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
 	}
-	netw.executor.Initialize()
-	go netw.executor.Dispatch()
 	netw.heartbeat()
 	if restartOnDisconnected && disconnectedCheckFreq != 0 && disconnectedRestartTimeout != 0 {
 		log.Info("node will restart if not connected to any peers")
@@ -358,10 +362,11 @@ func NewNetwork(
 
 // GetAcceptedFrontier implements the Sender interface.
 // assumes the stateLock is not held.
-func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time) {
-	msg, err := n.b.GetAcceptedFrontier(chainID, requestID, uint64(deadline.Sub(n.clock.Time())))
+func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) []ids.ShortID {
+	msg, err := n.b.GetAcceptedFrontier(chainID, requestID, uint64(deadline))
 	n.log.AssertNoError(err)
 
+	sentTo := make([]ids.ShortID, 0, validatorIDs.Len())
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
@@ -370,12 +375,13 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 				vID,
 				chainID,
 				requestID)
-			n.executor.Add(func() { n.router.GetAcceptedFrontierFailed(vID, chainID, requestID) })
 			n.getAcceptedFrontier.numFailed.Inc()
 		} else {
+			sentTo = append(sentTo, vID)
 			n.getAcceptedFrontier.numSent.Inc()
 		}
 	}
+	return sentTo
 }
 
 // AcceptedFrontier implements the Sender interface.
@@ -406,23 +412,18 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 
 // GetAccepted implements the Sender interface.
 // assumes the stateLock is not held.
-func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs []ids.ID) {
-	msg, err := n.b.GetAccepted(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerIDs)
+func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID {
+	msg, err := n.b.GetAccepted(chainID, requestID, uint64(deadline), containerIDs)
 	if err != nil {
 		n.log.Error("failed to build GetAccepted(%s, %d, %s): %s",
 			chainID,
 			requestID,
 			containerIDs,
 			err)
-		for validatorID := range validatorIDs {
-			vID := validatorID // Prevent overwrite in next loop iteration
-			n.executor.Add(func() {
-				n.router.GetAcceptedFailed(vID, chainID, requestID)
-			})
-		}
-		return
+		return nil
 	}
 
+	sentTo := make([]ids.ShortID, 0, validatorIDs.Len())
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
@@ -432,12 +433,13 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 				chainID,
 				requestID,
 				containerIDs)
-			n.executor.Add(func() { n.router.GetAcceptedFailed(vID, chainID, requestID) })
 			n.getAccepted.numFailed.Inc()
 		} else {
 			n.getAccepted.numSent.Inc()
+			sentTo = append(sentTo, vID)
 		}
 	}
+	return sentTo
 }
 
 // Accepted implements the Sender interface.
@@ -468,11 +470,11 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 
 // GetAncestors implements the Sender interface.
 // assumes the stateLock is not held.
-func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) {
-	msg, err := n.b.GetAncestors(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerID)
+func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
+	msg, err := n.b.GetAncestors(chainID, requestID, uint64(deadline), containerID)
 	if err != nil {
 		n.log.Error("failed to build GetAncestors message: %s", err)
-		return
+		return false
 	}
 
 	peer := n.getPeer(validatorID)
@@ -482,11 +484,11 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 			chainID,
 			requestID,
 			containerID)
-		n.executor.Add(func() { n.router.GetAncestorsFailed(validatorID, chainID, requestID) })
 		n.getAncestors.numFailed.Inc()
-	} else {
-		n.getAncestors.numSent.Inc()
+		return false
 	}
+	n.getAncestors.numSent.Inc()
+	return true
 }
 
 // MultiPut implements the Sender interface.
@@ -513,8 +515,8 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 
 // Get implements the Sender interface.
 // assumes the stateLock is not held.
-func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) {
-	msg, err := n.b.Get(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerID)
+func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
+	msg, err := n.b.Get(chainID, requestID, uint64(deadline), containerID)
 	n.log.AssertNoError(err)
 
 	peer := n.getPeer(validatorID)
@@ -524,11 +526,11 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 			chainID,
 			requestID,
 			containerID)
-		n.executor.Add(func() { n.router.GetFailed(validatorID, chainID, requestID) })
 		n.get.numFailed.Inc()
-	} else {
-		n.get.numSent.Inc()
+		return false
 	}
+	n.get.numSent.Inc()
+	return true
 }
 
 // Put implements the Sender interface.
@@ -561,8 +563,8 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 
 // PushQuery implements the Sender interface.
 // assumes the stateLock is not held.
-func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID, container []byte) {
-	msg, err := n.b.PushQuery(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerID, container)
+func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, container []byte) []ids.ShortID {
+	msg, err := n.b.PushQuery(chainID, requestID, uint64(deadline), containerID, container)
 
 	if err != nil {
 		n.log.Error("failed to build PushQuery(%s, %d, %s): %s. len(container): %d",
@@ -572,13 +574,10 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			err,
 			len(container))
 		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
-		for validatorID := range validatorIDs {
-			vID := validatorID // Prevent overwrite in next loop iteration
-			n.executor.Add(func() { n.router.QueryFailed(vID, chainID, requestID) })
-		}
-		return // Packing message failed
+		return nil // Packing message failed
 	}
 
+	sentTo := make([]ids.ShortID, 0, validatorIDs.Len())
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
@@ -589,20 +588,22 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 				requestID,
 				containerID)
 			n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
-			n.executor.Add(func() { n.router.QueryFailed(vID, chainID, requestID) })
 			n.pushQuery.numFailed.Inc()
 		} else {
 			n.pushQuery.numSent.Inc()
+			sentTo = append(sentTo, vID)
 		}
 	}
+	return sentTo
 }
 
 // PullQuery implements the Sender interface.
 // assumes the stateLock is not held.
-func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) {
-	msg, err := n.b.PullQuery(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerID)
+func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID {
+	msg, err := n.b.PullQuery(chainID, requestID, uint64(deadline), containerID)
 	n.log.AssertNoError(err)
 
+	sentTo := make([]ids.ShortID, 0, validatorIDs.Len())
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
@@ -612,12 +613,13 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 				chainID,
 				requestID,
 				containerID)
-			n.executor.Add(func() { n.router.QueryFailed(vID, chainID, requestID) })
 			n.pullQuery.numFailed.Inc()
 		} else {
 			n.pullQuery.numSent.Inc()
+			sentTo = append(sentTo, vID)
 		}
 	}
+	return sentTo
 }
 
 // Chits implements the Sender interface.
@@ -764,6 +766,7 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 					Version:      peer.versionStr.GetValue().(string),
 					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
+					Benched:      n.benchlistManager.GetBenched(peer.id),
 				})
 			}
 		}
@@ -779,6 +782,7 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 					Version:      peer.versionStr.GetValue().(string),
 					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
+					Benched:      n.benchlistManager.GetBenched(peer.id),
 				})
 			}
 		}
