@@ -485,7 +485,7 @@ func (n *Node) initIPCs() error {
 // Should only be called after [n.DB], [n.DecisionDispatcher], [n.ConsensusDispatcher],
 // [n.Log], [n.APIServer], [n.chainManager] are initialized
 func (n *Node) initIndices() error {
-	if n.Config.IndexAPIEnabled {
+	if !n.Config.IndexAPIEnabled {
 		return nil
 	}
 
