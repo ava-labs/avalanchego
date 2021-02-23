@@ -3,6 +3,7 @@ package indexer
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -14,10 +15,11 @@ type service struct {
 
 // FormattedContainer ...
 type FormattedContainer struct {
-	ID       string              `json:"id"`
-	Index    json.Uint64         `json:"index"`
-	Bytes    string              `json:"bytes"`
-	Encoding formatting.Encoding `json:"encoding"`
+	ID        string              `json:"id"`
+	Index     json.Uint64         `json:"index"`
+	Bytes     string              `json:"bytes"`
+	Timestamp string              `json:"timestamp"`
+	Encoding  formatting.Encoding `json:"encoding"`
 }
 
 // newFormattedContainer ...
@@ -35,6 +37,8 @@ func newFormattedContainer(c Container, enc formatting.Encoding) (FormattedConta
 	if err != nil {
 		return fc, err
 	}
+	fc.Timestamp = time.Unix(int64(c.Timestamp), 0).String()
+
 	fc.Bytes = bytesStr
 	return fc, nil
 }
