@@ -2124,7 +2124,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	go timeoutManager.Dispatch()
 
 	chainRouter := &router.ChainRouter{}
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &timeoutManager, time.Hour, time.Second, ids.Set{}, nil, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &timeoutManager, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	externalSender := &sender.ExternalSenderTest{T: t}
@@ -2564,6 +2564,9 @@ func TestUptimeReporting(t *testing.T) {
 	if err := vm.Shutdown(); err != nil {
 		t.Fatal(err)
 	}
+
+	// Unregister the previously registered metrics
+	ctx.Metrics.Unregister(vm.metrics.percentConnected)
 
 	// Test that VM reports the correct uptimes afer
 	// restart.

@@ -60,7 +60,7 @@ func TestTimeout(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	sender := Sender{}
@@ -131,7 +131,7 @@ func TestReliableMessages(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	sender := Sender{}
@@ -213,7 +213,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	sender := Sender{}

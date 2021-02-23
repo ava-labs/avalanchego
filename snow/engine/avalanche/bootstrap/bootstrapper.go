@@ -5,6 +5,7 @@ package bootstrap
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -60,6 +61,8 @@ type Bootstrapper struct {
 
 	// Contains IDs of vertices that have recently been processed
 	processedCache *cache.LRU
+	// number of state transitions executed
+	executedStateTransitions int
 }
 
 // Initialize this engine.
@@ -75,6 +78,7 @@ func (b *Bootstrapper) Initialize(
 	b.VM = config.VM
 	b.processedCache = &cache.LRU{Size: cacheSize}
 	b.OnFinished = onFinished
+	b.executedStateTransitions = math.MaxInt32
 
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return err
@@ -144,7 +148,7 @@ func (b *Bootstrapper) fetch(vtxIDs ...ids.ID) error {
 		b.OutstandingRequests.Add(validatorID, b.RequestID, vtxID)
 		b.Sender.GetAncestors(validatorID, b.RequestID, vtxID) // request vertex and ancestors
 	}
-	return b.finish()
+	return b.checkFinish()
 }
 
 // Process the vertices in [vtxs].
@@ -159,13 +163,11 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 		}
 	}
 
-	// Cache to ensure that we don't reprocess the same vertex within the loop below
-	// TODO remove after Apricot release?
-	dontReprocessCache := &cache.LRU{Size: 1000}
+	vtxHeightSet := ids.Set{}
+	prevHeight := uint64(0)
 	for toProcess.Len() > 0 { // While there are unprocessed vertices
 		vtx := toProcess.Pop() // Get an unknown vertex or one furthest down the DAG
 		vtxID := vtx.ID()
-		dontReprocessCache.Put(vtxID, nil)
 
 		switch vtx.Status() {
 		case choices.Unknown:
@@ -213,7 +215,7 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 			for _, parent := range parents { // Process the parents of this vertex (traverse up the DAG)
 				parentID := parent.ID()
 				if _, ok := b.processedCache.Get(parentID); !ok { // But only if we haven't processed the parent
-					if _, ok := dontReprocessCache.Get(parentID); !ok {
+					if !vtxHeightSet.Contains(parentID) {
 						toProcess.Push(parent)
 					}
 				}
@@ -223,7 +225,15 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 				return err
 			}
 			if height%stripeDistance < stripeWidth { // See comment for stripeDistance
-				b.processedCache.Put(vtx.ID(), nil)
+				b.processedCache.Put(vtxID, nil)
+			}
+			if height == prevHeight {
+				vtxHeightSet.Add(vtxID)
+			} else {
+				// Set new height and reset [vtxHeightSet]
+				prevHeight = height
+				vtxHeightSet.Clear()
+				vtxHeightSet.Add(vtxID)
 			}
 		}
 	}
@@ -335,6 +345,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 			err)
 	}
 
+	b.NumFetched = 0
 	toProcess := make([]avalanche.Vertex, 0, len(acceptedContainerIDs))
 	for _, vtxID := range acceptedContainerIDs {
 		if vtx, err := b.Manager.Get(vtxID); err == nil {
@@ -346,8 +357,9 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	return b.process(toProcess...)
 }
 
-// Finish bootstrapping
-func (b *Bootstrapper) finish() error {
+// checkFinish repeatedly executes pending transactions and requests new frontier blocks until there aren't any new ones
+// after which it finishes the bootstrap process
+func (b *Bootstrapper) checkFinish() error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
 	if b.Ctx.IsBootstrapped() || b.OutstandingRequests.Len() > 0 || b.needToFetch.Len() > 0 {
 		return nil
@@ -355,15 +367,31 @@ func (b *Bootstrapper) finish() error {
 
 	b.Ctx.Log.Info("bootstrapping fetched %d vertices. executing transaction state transitions...",
 		b.NumFetched)
-	if err := b.executeAll(b.TxBlocked, b.Ctx.DecisionDispatcher); err != nil {
+
+	_, err := b.executeAll(b.TxBlocked, b.Ctx.DecisionDispatcher)
+	if err != nil {
 		return err
 	}
 
 	b.Ctx.Log.Info("executing vertex state transitions...")
-	if err := b.executeAll(b.VtxBlocked, b.Ctx.ConsensusDispatcher); err != nil {
+	executedVts, err := b.executeAll(b.VtxBlocked, b.Ctx.ConsensusDispatcher)
+	if err != nil {
 		return err
 	}
 
+	if executedVts > 0 && executedVts < b.executedStateTransitions/2 && b.RetryBootstrap {
+		b.executedStateTransitions = executedVts
+		b.Ctx.Log.Info("bootstrapping is checking for more vertices before finishing the bootstrap process...")
+		return b.RestartBootstrap(true)
+	}
+
+	b.Ctx.Log.Info("bootstrapping fetched enough vertices to finish the bootstrap process...")
+
+	return b.finish()
+}
+
+// Finish bootstrapping
+func (b *Bootstrapper) finish() error {
 	if err := b.VM.Bootstrapped(); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
 			err)
@@ -378,17 +406,17 @@ func (b *Bootstrapper) finish() error {
 	return nil
 }
 
-func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher) error {
+func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher) (int, error) {
 	numExecuted := 0
 
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		b.Ctx.Log.Debug("Executing: %s", job.ID())
 		if err := jobs.Execute(job); err != nil {
 			b.Ctx.Log.Error("Error executing: %s", err)
-			return err
+			return numExecuted, err
 		}
 		if err := jobs.Commit(); err != nil {
-			return err
+			return numExecuted, err
 		}
 		numExecuted++
 		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
@@ -398,7 +426,7 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher)
 		events.Accept(b.Ctx, job.ID(), job.Bytes())
 	}
 	b.Ctx.Log.Info("executed %d operations", numExecuted)
-	return nil
+	return numExecuted, nil
 }
 
 // Connected implements the Engine interface.
