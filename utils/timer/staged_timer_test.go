@@ -51,7 +51,6 @@ func TestCancelSimpleStagedStimer(t *testing.T) {
 	wg.Add(1)
 
 	msTimer := NewStagedTimer(func() (time.Duration, bool) {
-		defer wg.Done()
 		t.Fatal("Timer should have been canceled before being called")
 		return 0, false
 	})
@@ -88,8 +87,8 @@ func TestCancelStagedTimer(t *testing.T) {
 		if i > 0 {
 			t.Fatal("Timer should have been cancelled before second callback")
 		}
+		defer wg.Done()
 		i++
-		wg.Done()
 		return 10 * time.Millisecond, true
 	})
 	cancelTimer := NewTimer(func() {
