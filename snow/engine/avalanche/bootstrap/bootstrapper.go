@@ -5,6 +5,7 @@ package bootstrap
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -167,6 +168,8 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 			toProcess.Push(vtx)
 		}
 	}
+
+	b.NumFetched = 0
 
 	// Cache to ensure that we don't reprocess the same vertex within the loop below
 	// TODO remove after Apricot release?
@@ -355,7 +358,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	return b.process(toProcess...)
 }
 
-// checkFinish repeatedly executes pending transactions and requests new frontier blocks until there isn't any new ones
+// checkFinish repeatedly executes pending transactions and requests new frontier blocks until there aren't any new ones
 // after which it finishes the bootstrap process
 func (b *Bootstrapper) checkFinish() error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
@@ -363,27 +366,39 @@ func (b *Bootstrapper) checkFinish() error {
 		return nil
 	}
 
-	b.Ctx.Log.Info("bootstrapping fetched %d blocks. executing state transitions...",
+	b.Ctx.Log.Info("bootstrapping fetched %d vertices. executing transaction state transitions...",
 		b.NumFetched)
 
-	executedBlocks, err := b.executeAll(b.TxBlocked, b.Ctx.DecisionDispatcher)
+	_, err := b.executeAll(b.TxBlocked, b.Ctx.DecisionDispatcher)
 	if err != nil {
 		return err
 	}
 
 	b.Ctx.Log.Info("executing vertex state transitions...")
-	executedVertices, err := b.executeAll(b.VtxBlocked, b.Ctx.ConsensusDispatcher)
+	executedTxs, err := b.executeAll(b.VtxBlocked, b.Ctx.ConsensusDispatcher)
 	if err != nil {
 		return err
 	}
 
-	if executedBlocks+executedVertices > b.executedStateTransitions && executedBlocks+executedVertices > 0 && b.RetryBootstrap {
-		b.executedStateTransitions = executedBlocks + executedVertices
-		b.Ctx.Log.Info("bootstrapping is checking for more blocks before finishing the bootstrap process...")
+	// exec - 10k ; prev - 0     ; runs again because prev is math.MaxInt32
+	// exec - 20  ; prev - 10k/2 ; runs again
+	// exec - 2   ; prev - 20/2  ; runs again
+	// exec - 1   ; prev - 2/1   ; doesnt run again
+	//
+	previousStateTransitionsThreshold := b.executedStateTransitions
+	if previousStateTransitionsThreshold == 0 {
+		previousStateTransitionsThreshold = math.MaxInt32
+	} else {
+		previousStateTransitionsThreshold /= 2
+	}
+
+	if executedTxs < previousStateTransitionsThreshold && b.RetryBootstrap {
+		b.executedStateTransitions = executedTxs
+		b.Ctx.Log.Info("bootstrapping is checking for more vertices before finishing the bootstrap process...")
 		return b.RestartBootstrap(true)
 	}
 
-	b.Ctx.Log.Info("bootstrapping fetched enough blocks to finish the bootstrap process...")
+	b.Ctx.Log.Info("bootstrapping fetched enough vertices to finish the bootstrap process...")
 
 	return b.finish()
 }

@@ -5,6 +5,7 @@ package bootstrap
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -245,7 +246,7 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 	return nil
 }
 
-// checkFinish repeatedly executes pending transactions and requests new frontier blocks until there isn't any new ones
+// checkFinish repeatedly executes pending transactions and requests new frontier vertices until there aren't any new ones
 // after which it finishes the bootstrap process
 func (b *Bootstrapper) checkFinish() error {
 	if b.IsBootstrapped() {
@@ -260,8 +261,14 @@ func (b *Bootstrapper) checkFinish() error {
 		return err
 	}
 
-	// retry bootstrap for more blocks if flag is active more than 0 blocks were fetched
-	if executedBlocks >= b.executedStateTransitions && executedBlocks > 0 && b.RetryBootstrap {
+	previousStateTransitionsThreshold := b.executedStateTransitions
+	if previousStateTransitionsThreshold == 0 {
+		previousStateTransitionsThreshold = math.MaxInt32
+	} else {
+		previousStateTransitionsThreshold /= 2
+	}
+
+	if executedBlocks < previousStateTransitionsThreshold && b.RetryBootstrap {
 		b.executedStateTransitions = executedBlocks
 		b.Ctx.Log.Info("bootstrapping is checking for more blocks before finishing the bootstrap process...")
 		return b.RestartBootstrap(true)
