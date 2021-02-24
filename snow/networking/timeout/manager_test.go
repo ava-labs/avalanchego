@@ -36,7 +36,7 @@ func TestManagerFire(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	manager.RegisterRequest(ids.ShortID{}, ids.ID{}, ids.GenerateTestID(), wg.Done)
+	manager.RegisterRequest(ids.ShortID{}, ids.ID{}, constants.PullQueryMsg, ids.GenerateTestID(), wg.Done)
 
 	wg.Wait()
 }
@@ -64,11 +64,11 @@ func TestManagerCancel(t *testing.T) {
 	fired := new(bool)
 
 	id := ids.GenerateTestID()
-	manager.RegisterRequest(ids.ShortID{}, ids.ID{}, id, func() { *fired = true })
+	manager.RegisterRequest(ids.ShortID{}, ids.ID{}, constants.PullQueryMsg, id, func() { *fired = true })
 
 	manager.RegisterResponse(ids.ShortID{}, ids.ID{}, id, constants.GetMsg, 1*time.Second)
 
-	manager.RegisterRequest(ids.ShortID{}, ids.ID{}, ids.GenerateTestID(), wg.Done)
+	manager.RegisterRequest(ids.ShortID{}, ids.ID{}, constants.PullQueryMsg, ids.GenerateTestID(), wg.Done)
 
 	wg.Wait()
 

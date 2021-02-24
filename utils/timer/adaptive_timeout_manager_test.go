@@ -135,6 +135,7 @@ func TestAdaptiveTimeoutManager(t *testing.T) {
 	timeoutZeroCalled := utils.AtomicBool{}
 	tm.Put(
 		id0,
+		constants.PullQueryMsg,
 		func() { timeoutZeroCalled.SetValue(true) },
 	)
 
@@ -171,6 +172,7 @@ func TestAdaptiveTimeoutManager(t *testing.T) {
 	// This should overwrite the first Put for id0
 	tm.Put(
 		id0,
+		constants.PullQueryMsg,
 		func() { wg.Done() },
 	)
 
@@ -208,10 +210,12 @@ func TestAdaptiveTimeoutManager(t *testing.T) {
 	wg.Add(2)
 	tm.Put(
 		id1,
+		constants.PullQueryMsg,
 		func() { wg.Done() },
 	)
 	tm.Put(
 		id2,
+		constants.PullQueryMsg,
 		func() { wg.Done() },
 	)
 
@@ -270,14 +274,14 @@ func TestAdaptiveTimeoutManager2(t *testing.T) {
 
 		numSuccessful--
 		if numSuccessful > 0 {
-			tm.Put(ids.ID{byte(numSuccessful)}, *callback)
+			tm.Put(ids.ID{byte(numSuccessful)}, constants.PullQueryMsg, *callback)
 		}
 		if numSuccessful >= 0 {
 			wg.Done()
 		}
 		if numSuccessful%2 == 0 {
 			tm.Remove(ids.ID{byte(numSuccessful)})
-			tm.Put(ids.ID{byte(numSuccessful)}, *callback)
+			tm.Put(ids.ID{byte(numSuccessful)}, constants.PullQueryMsg, *callback)
 		}
 	}
 	(*callback)()

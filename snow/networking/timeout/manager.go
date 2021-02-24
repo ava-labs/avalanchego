@@ -62,6 +62,7 @@ func (m *Manager) RegisterChain(ctx *snow.Context, namespace string) error {
 func (m *Manager) RegisterRequest(
 	validatorID ids.ShortID,
 	chainID ids.ID,
+	msgType constants.MsgType,
 	uniqueRequestID ids.ID,
 	timeoutHandler func(),
 ) (time.Time, bool) {
@@ -70,7 +71,7 @@ func (m *Manager) RegisterRequest(
 		m.benchlistMgr.RegisterFailure(chainID, validatorID)
 		timeoutHandler()
 	}
-	return m.tm.Put(uniqueRequestID, newTimeoutHandler), true
+	return m.tm.Put(uniqueRequestID, msgType, newTimeoutHandler), true
 }
 
 // RegisterResponse registers that we received a response from [validatorID]
