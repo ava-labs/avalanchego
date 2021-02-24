@@ -346,6 +346,8 @@ func (b *Bootstrapper) RestartBootstrap(reset bool) error {
 	b.failedAcceptedVdrs = ids.ShortSet{}
 	b.sampledBeacons = validators.NewSet()
 
+	b.acceptedFrontier.Clear()
+
 	beacons, err := b.Beacons.Sample(b.Config.SampleK)
 	if err != nil {
 		return err
