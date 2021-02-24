@@ -20,6 +20,8 @@ type Config struct {
 	Alpha         uint64
 	Sender        Sender
 	Bootstrapable Bootstrapable
+	Subnet        Subnet
+	Delay         Delay
 
 	// Should Bootstrap be retried
 	RetryBootstrap bool

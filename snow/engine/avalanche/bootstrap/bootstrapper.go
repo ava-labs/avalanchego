@@ -6,6 +6,7 @@ package bootstrap
 import (
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -28,6 +29,10 @@ const (
 	stripeDistance = 2000
 	stripeWidth    = 5
 	cacheSize      = 100000
+
+	// Parameters for delaying bootstrapping to avoid potential CPU burns
+	initialBootstrappingDelay = 500 * time.Millisecond
+	maxBootstrappingDelay     = time.Minute
 )
 
 // Config ...
@@ -63,6 +68,8 @@ type Bootstrapper struct {
 	processedCache *cache.LRU
 	// number of state transitions executed
 	executedStateTransitions int
+
+	delayAmount time.Duration
 }
 
 // Initialize this engine.
@@ -79,6 +86,7 @@ func (b *Bootstrapper) Initialize(
 	b.processedCache = &cache.LRU{Size: cacheSize}
 	b.OnFinished = onFinished
 	b.executedStateTransitions = math.MaxInt32
+	b.delayAmount = initialBootstrappingDelay
 
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return err
@@ -379,13 +387,35 @@ func (b *Bootstrapper) checkFinish() error {
 		return err
 	}
 
-	if executedVts > 0 && executedVts < b.executedStateTransitions/2 && b.RetryBootstrap {
-		b.executedStateTransitions = executedVts
+	previouslyExecuted := b.executedStateTransitions
+	b.executedStateTransitions = executedVts
+
+	// Not that executedVts < c*previouslyExecuted is enforced so that the
+	// bootstrapping process will terminate even as new vertices are being
+	// issued.
+	if executedVts > 0 && executedVts < previouslyExecuted/2 && b.RetryBootstrap {
 		b.Ctx.Log.Info("bootstrapping is checking for more vertices before finishing the bootstrap process...")
 		return b.RestartBootstrap(true)
 	}
 
 	b.Ctx.Log.Info("bootstrapping fetched enough vertices to finish the bootstrap process...")
+
+	// Notify the subnet that this chain is synced
+	b.Subnet.Bootstrapped(b.Ctx.ChainID)
+
+	// If the subnet hasn't finished bootstrapping, this chain should remain
+	// syncing.
+	if !b.Subnet.IsBootstrapped() {
+		b.Ctx.Log.Info("bootstrapping is waiting for the remaining chains in this subnet to finish syncing...")
+		// Delay new incoming messages to avoid consuming unnecessary resources
+		// while keeping up to date on the latest tip.
+		b.Config.Delay.Delay(b.delayAmount)
+		b.delayAmount *= 2
+		if b.delayAmount > maxBootstrappingDelay {
+			b.delayAmount = maxBootstrappingDelay
+		}
+		return b.RestartBootstrap(true)
+	}
 
 	return b.finish()
 }

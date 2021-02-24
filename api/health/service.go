@@ -78,7 +78,7 @@ func (as *apiServer) Health(_ *http.Request, _ *APIHealthArgs, reply *APIHealthR
 }
 
 // GetLiveness returns a summation of the health of the node
-// Deprecated in favor of Health
+// Deprecated: in favor of Health
 func (as *apiServer) GetLiveness(_ *http.Request, _ *APIHealthArgs, reply *APIHealthReply) error {
 	as.log.Info("Health: GetLiveness called")
 	reply.Checks, reply.Healthy = as.Results()

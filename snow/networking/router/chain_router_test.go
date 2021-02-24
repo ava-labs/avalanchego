@@ -63,6 +63,7 @@ func TestShutdown(t *testing.T) {
 		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
+		&Delay{},
 	)
 
 	go handler.Dispatch()
@@ -136,6 +137,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
+		&Delay{},
 	)
 
 	chainRouter.AddChain(handler)
@@ -234,6 +236,7 @@ func TestRouterTimeout(t *testing.T) {
 		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
+		&Delay{},
 	)
 
 	chainRouter.AddChain(handler)
@@ -300,6 +303,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
+		&Delay{},
 	)
 
 	chainRouter.AddChain(handler)

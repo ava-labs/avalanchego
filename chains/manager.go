@@ -153,6 +153,10 @@ type manager struct {
 	unblocked     bool
 	blockedChains []ChainParameters
 
+	// Key: Subnet's ID
+	// Value: Subnet description
+	subnets map[ids.ID]Subnet
+
 	chainsLock sync.Mutex
 	// Key: Chain's ID
 	// Value: The chain
@@ -163,6 +167,7 @@ type manager struct {
 func New(config *ManagerConfig) Manager {
 	m := &manager{
 		ManagerConfig: *config,
+		subnets:       make(map[ids.ID]Subnet),
 		chains:        make(map[ids.ID]*router.Handler),
 	}
 	m.Initialize()
@@ -181,7 +186,8 @@ func (m *manager) CreateChain(chain ChainParameters) {
 	}
 }
 
-// Create a chain
+// Create a chain, this is only called from the P-chain thread, except for
+// creating the P-chain.
 func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	if !m.WhitelistedSubnets.Contains(chainParams.SubnetID) {
 		m.Log.Debug("Skipped creating non-whitelisted chain:\n"+
@@ -207,10 +213,22 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		chainParams.VMAlias,
 	)
 
-	chain, err := m.buildChain(chainParams)
+	sb, exists := m.subnets[chainParams.SubnetID]
+	if !exists {
+		sb = &subnet{}
+	}
+	sb.addChain(chainParams.ID)
+
+	chain, err := m.buildChain(chainParams, sb)
 	if err != nil {
+		sb.removeChain(chainParams.ID)
+
 		m.Log.Error("Error while creating new chain: %s", err)
 		return
+	}
+
+	if !exists {
+		m.subnets[chainParams.SubnetID] = sb
 	}
 
 	m.chainsLock.Lock()
@@ -225,7 +243,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 }
 
 // Create a chain
-func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
+func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, error) {
 	vmID, err := m.VMManager.Lookup(chainParams.VMAlias)
 	if err != nil {
 		return nil, fmt.Errorf("error while looking up VM: %w", err)
@@ -334,6 +352,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 			fxs,
 			consensusParams,
 			bootstrapWeight,
+			sb,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error while creating new avalanche vm %w", err)
@@ -348,6 +367,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 			fxs,
 			consensusParams.Parameters,
 			bootstrapWeight,
+			sb,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error while creating new snowman vm %w", err)
@@ -397,6 +417,7 @@ func (m *manager) createAvalancheChain(
 	fxs []*common.Fx,
 	consensusParams avcon.Parameters,
 	bootstrapWeight uint64,
+	sb Subnet,
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
@@ -441,6 +462,8 @@ func (m *manager) createAvalancheChain(
 		sampleK = int(bootstrapWeight)
 	}
 
+	delay := &router.Delay{}
+
 	// The engine handles consensus
 	engine := &aveng.Transitive{}
 	if err := engine.Initialize(aveng.Config{
@@ -453,6 +476,8 @@ func (m *manager) createAvalancheChain(
 				StartupAlpha:              (3*bootstrapWeight + 3) / 4,
 				Alpha:                     bootstrapWeight/2 + 1, // must be > 50%
 				Sender:                    &sender,
+				Subnet:                    sb,
+				Delay:                     delay,
 				RetryBootstrap:            m.RetryBootstrap,
 				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
 			},
@@ -494,6 +519,7 @@ func (m *manager) createAvalancheChain(
 		m.StakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
+		delay,
 	)
 
 	return &chain{
@@ -515,6 +541,7 @@ func (m *manager) createSnowmanChain(
 	fxs []*common.Fx,
 	consensusParams snowball.Parameters,
 	bootstrapWeight uint64,
+	sb Subnet,
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
@@ -556,6 +583,8 @@ func (m *manager) createSnowmanChain(
 		sampleK = int(bootstrapWeight)
 	}
 
+	delay := &router.Delay{}
+
 	// The engine handles consensus
 	engine := &smeng.Transitive{}
 	if err := engine.Initialize(smeng.Config{
@@ -568,6 +597,8 @@ func (m *manager) createSnowmanChain(
 				StartupAlpha:              (3*bootstrapWeight + 3) / 4,
 				Alpha:                     bootstrapWeight/2 + 1, // must be > 50%
 				Sender:                    &sender,
+				Subnet:                    sb,
+				Delay:                     delay,
 				RetryBootstrap:            m.RetryBootstrap,
 				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
 			},
@@ -593,6 +624,7 @@ func (m *manager) createSnowmanChain(
 		m.StakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
+		delay,
 	)
 
 	// Register health checks
