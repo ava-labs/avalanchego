@@ -2190,6 +2190,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
+		&router.Delay{},
 	)
 
 	// Allow incoming messages to be routed to the new chain
