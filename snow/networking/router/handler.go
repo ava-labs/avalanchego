@@ -111,6 +111,8 @@ type Handler struct {
 
 	toClose func()
 	closing utils.AtomicBool
+
+	delay *Delay
 }
 
 // Initialize this consensus handler
@@ -125,6 +127,7 @@ func (h *Handler) Initialize(
 	stakerCPUPortion float64,
 	namespace string,
 	metrics prometheus.Registerer,
+	delay *Delay,
 ) {
 	h.ctx = engine.Context()
 	if err := h.metrics.Initialize(namespace, metrics); err != nil {
@@ -176,6 +179,7 @@ func (h *Handler) Initialize(
 	)
 	h.engine = engine
 	h.validators = validators
+	h.delay = delay
 }
 
 // Context of this Handler
@@ -238,10 +242,21 @@ func (h *Handler) Dispatch() {
 
 // Dispatch a message to the consensus engine.
 func (h *Handler) dispatchMsg(msg message) {
-	if h.closing.GetValue() {
-		h.ctx.Log.Debug("dropping message due to closing:\n%s", msg)
-		h.metrics.dropped.Inc()
-		return
+	for {
+		if h.closing.GetValue() {
+			h.ctx.Log.Debug("dropping message due to closing:\n%s", msg)
+			h.metrics.dropped.Inc()
+			return
+		}
+		until := time.Until(h.delay.waitUntil)
+		if until <= 0 {
+			break
+		}
+		if until > 100*time.Millisecond {
+			time.Sleep(100 * time.Millisecond)
+		} else {
+			time.Sleep(until)
+		}
 	}
 
 	startTime := h.clock.Time()
