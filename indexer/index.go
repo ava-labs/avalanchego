@@ -104,7 +104,9 @@ func (i *index) Close() error {
 	if i.containerToIndex != nil {
 		errs.Add(i.containerToIndex.Close())
 	}
-	errs.Add(i.baseDb.Close())
+	if i.baseDb != nil {
+		errs.Add(i.baseDb.Close())
+	}
 	return errs.Err
 }
 

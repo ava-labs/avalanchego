@@ -66,8 +66,8 @@ const (
 
 var (
 	genesisHashKey     = []byte("genesisID")
-	txIndexerDbPrefix  = []byte("txIdx4")
-	vtxIndexerDbPrefix = []byte("vtxIdx4")
+	txIndexerDbPrefix  = []byte("txIdx6")
+	vtxIndexerDbPrefix = []byte("vtxIdx6")
 
 	// Version is the version of this code
 	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 2, 0)
@@ -485,53 +485,56 @@ func (n *Node) initIPCs() error {
 // Should only be called after [n.DB], [n.DecisionDispatcher], [n.ConsensusDispatcher],
 // [n.Log], [n.APIServer], [n.chainManager] are initialized
 func (n *Node) initIndices() error {
-	if !n.Config.IndexAPIEnabled {
-		return nil
-	}
-
 	txIndexerDb := prefixdb.New(txIndexerDbPrefix, n.DB)
 	vtxIndexerDb := prefixdb.New(vtxIndexerDbPrefix, n.DB)
 	var err error
-	n.txIndexer, err = indexer.NewIndexer(
-		"tx",
-		txIndexerDb,
-		n.Log,
-		n.DecisionDispatcher,
-		n.Config.InitiallyIndexedChains.List(),
-		n.chainManager.Lookup,
-	)
+	n.txIndexer, err = indexer.NewIndexer(indexer.Config{
+		IndexingEnabled:        n.Config.IndexAPIEnabled,
+		AllowIncompleteIndex:   n.Config.IndexAllowIncomplete,
+		Name:                   "tx",
+		Db:                     txIndexerDb,
+		Log:                    n.Log,
+		EventDispatcher:        n.DecisionDispatcher,
+		InitiallyIndexedChains: n.Config.InitiallyIndexedChains,
+		ChainLookupF:           n.chainManager.Lookup,
+	})
 	if err != nil {
 		return fmt.Errorf("couldn't create index for txs: %w", err)
 	}
-	txIndexerHandler, err := n.txIndexer.Handler()
-	if err != nil && n.Config.IndexAPIEnabled {
-		return err
-	}
-	err = n.APIServer.AddRoute(txIndexerHandler, &sync.RWMutex{}, "index/", "tx", n.HTTPLog)
-	if err != nil {
-		return fmt.Errorf("couldn't add route: %w", err)
+	if n.Config.IndexAPIEnabled { // TODO remove
+		txIndexerHandler, err := n.txIndexer.Handler()
+		if err != nil && n.Config.IndexAPIEnabled {
+			return err
+		}
+		err = n.APIServer.AddRoute(txIndexerHandler, &sync.RWMutex{}, "index/", "tx", n.HTTPLog)
+		if err != nil {
+			return fmt.Errorf("couldn't add route: %w", err)
+		}
 	}
 
-	n.vtxIndexer, err = indexer.NewIndexer(
-		"vtx",
-		vtxIndexerDb,
-		n.Log,
-		n.ConsensusDispatcher,
-		n.Config.InitiallyIndexedChains.List(),
-		n.chainManager.Lookup,
-	)
+	n.vtxIndexer, err = indexer.NewIndexer(indexer.Config{
+		IndexingEnabled:        n.Config.IndexAPIEnabled,
+		AllowIncompleteIndex:   n.Config.IndexAllowIncomplete,
+		Name:                   "vtx",
+		Db:                     vtxIndexerDb,
+		Log:                    n.Log,
+		EventDispatcher:        n.ConsensusDispatcher,
+		InitiallyIndexedChains: n.Config.InitiallyIndexedChains,
+		ChainLookupF:           n.chainManager.Lookup,
+	})
 	if err != nil {
 		return fmt.Errorf("couldn't create index for vtxs: %w", err)
 	}
-	vtxIndexerHandler, err := n.vtxIndexer.Handler()
-	if err != nil {
-		return err
+	if n.Config.IndexAPIEnabled { // TODO remove
+		vtxIndexerHandler, err := n.vtxIndexer.Handler()
+		if err != nil {
+			return err
+		}
+		err = n.APIServer.AddRoute(vtxIndexerHandler, &sync.RWMutex{}, "index/", "vtx", n.HTTPLog)
+		if err != nil {
+			return fmt.Errorf("couldn't add route: %w", err)
+		}
 	}
-	err = n.APIServer.AddRoute(vtxIndexerHandler, &sync.RWMutex{}, "index/", "vtx", n.HTTPLog)
-	if err != nil {
-		return fmt.Errorf("couldn't add route: %w", err)
-	}
-
 	return nil
 }
 
@@ -960,7 +963,7 @@ func (n *Node) Initialize(
 		return fmt.Errorf("couldn't initialize aliases: %w", err)
 	}
 	if err := n.initIndices(); err != nil {
-		return fmt.Errorf("couldn't initialize indexer")
+		return fmt.Errorf("couldn't initialize indexer: %w", err)
 	}
 	if err := n.initChains(n.Config.GenesisBytes, n.Config.AvaxAssetID); err != nil { // Start the Platform chain
 		return fmt.Errorf("couldn't initialize chains: %w", err)

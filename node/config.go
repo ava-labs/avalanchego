@@ -138,6 +138,7 @@ type Config struct {
 
 	// IDs of chains that are indexed on startup, if applicable
 	InitiallyIndexedChains ids.Set
+	IndexAllowIncomplete   bool
 
 	// Should Bootstrap be retried
 	RetryBootstrap bool

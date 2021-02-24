@@ -55,3 +55,7 @@ func (ni *noOpIndexer) Close() error {
 func (ni *noOpIndexer) GetContainerByID(_, _ ids.ID) (Container, error) {
 	return Container{}, errNoOp
 }
+
+func (ni *noOpIndexer) GetIndexedChains() []ids.ID {
+	return nil
+}

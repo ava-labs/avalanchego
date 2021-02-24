@@ -232,8 +232,10 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(ipcsPathKey, defaultString, "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
 
 	// Indexer
+	// TODO handle the below line better
 	fs.String(indexInitialChainsKey, "2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM,2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5,11111111111111111111111111111111LpoYY", "IDs of chains to index on startup, if indexing is enabled")
 	fs.Bool(indexEnabledKey, false, "If true, index all accepted containers and transactions and expose them via an API")
+	fs.Bool(indexAllowIncompleteKey, false, "If true, allow running the node in such a way that could cause an index to miss transactions. Ignored if index is disabled.")
 
 	return fs
 }
@@ -727,6 +729,7 @@ func setNodeConfig(v *viper.Viper) error {
 			Config.InitiallyIndexedChains.Add(chainID)
 		}
 	}
+	Config.IndexAllowIncomplete = v.GetBool(indexAllowIncompleteKey)
 
 	// Bootstrap Configs
 	Config.RetryBootstrap = v.GetBool(retryBootstrap)

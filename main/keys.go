@@ -92,6 +92,7 @@ const (
 	restartOnDisconnectedKey                = "restart-on-disconnected"
 	indexEnabledKey                         = "index-enabled"
 	indexInitialChainsKey                   = "index-initial-chains"
+	indexAllowIncompleteKey                 = "index-allow-incomplete"
 	networkHealthMinPeersKey                = "network-health-min-conn-peers"
 	networkHealthMaxTimeSinceMsgReceivedKey = "network-health-max-time-since-msg-received"
 	networkHealthMaxTimeSinceMsgSentKey     = "network-health-max-time-since-msg-sent"
