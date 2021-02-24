@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 )
@@ -38,7 +39,6 @@ func newFormattedContainer(c Container, enc formatting.Encoding) (FormattedConta
 		return fc, err
 	}
 	fc.Timestamp = time.Unix(int64(c.Timestamp), 0).String()
-
 	fc.Bytes = bytesStr
 	return fc, nil
 }
@@ -121,5 +121,38 @@ func (s *service) GetContainerRange(r *http.Request, args *GetContainerRange, re
 	}
 
 	*reply = formattedContainers
+	return nil
+}
+
+// GetIndexArgs ...
+type GetIndexArgs struct {
+	ChainID     string `json:"chainID"`
+	ContainerID ids.ID `json:"containerID"`
+}
+
+// GetIndexResponse ...
+type GetIndexResponse struct {
+	Index json.Uint64 `json:"index"`
+}
+
+func (s *service) GetIndex(r *http.Request, args *GetIndexArgs, reply *GetIndexResponse) error {
+	chainID, err := s.indexer.chainLookup(args.ChainID)
+	if err != nil {
+		return fmt.Errorf("couldn't find chain %s: %w", args.ChainID, err)
+	}
+
+	index, err := s.indexer.GetIndex(chainID, args.ContainerID)
+	reply.Index = json.Uint64(index)
+	return err
+}
+
+func (s *service) IsAccepted(r *http.Request, args *GetIndexArgs, reply *bool) error {
+	chainID, err := s.indexer.chainLookup(args.ChainID)
+	if err != nil {
+		return fmt.Errorf("couldn't find chain %s: %w", args.ChainID, err)
+	}
+
+	_, err = s.indexer.GetIndex(chainID, args.ContainerID)
+	*reply = err == nil
 	return nil
 }

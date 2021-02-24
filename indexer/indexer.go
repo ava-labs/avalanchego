@@ -32,6 +32,7 @@ type Indexer interface {
 	GetContainerByIndex(chainID ids.ID, containerID uint64) (Container, error)
 	GetContainerRange(chainID ids.ID, startIndex, numToFetch uint64) ([]Container, error)
 	GetLastAccepted(chainID ids.ID) (Container, error)
+	GetIndex(chainID ids.ID, containerID ids.ID) (uint64, error)
 	// Handler returns a handler that handles incoming API calls
 	Handler() (*common.HTTPHandler, error)
 	Close() error
@@ -128,7 +129,6 @@ func (i *indexer) GetContainerByIndex(chainID ids.ID, indexToFetch uint64) (Cont
 	if !exists {
 		return Container{}, fmt.Errorf("there is no index for chain %s", chainID)
 	}
-
 	return index.GetContainerByIndex(indexToFetch)
 }
 
@@ -141,8 +141,7 @@ func (i *indexer) GetContainerRange(chainID ids.ID, startIndex, numToFetch uint6
 	if !exists {
 		return nil, fmt.Errorf("there is no index for chain %s", chainID)
 	}
-
-	return index.GetContainersByRange(startIndex, numToFetch)
+	return index.GetContainerRange(startIndex, numToFetch)
 }
 
 func (i *indexer) GetLastAccepted(chainID ids.ID) (Container, error) {
@@ -153,8 +152,18 @@ func (i *indexer) GetLastAccepted(chainID ids.ID) (Container, error) {
 	if !exists {
 		return Container{}, fmt.Errorf("there is no index for chain %s", chainID)
 	}
-
 	return index.GetLastAccepted()
+}
+
+func (i *indexer) GetIndex(chainID ids.ID, containerID ids.ID) (uint64, error) {
+	i.lock.RLock()
+	defer i.lock.RUnlock()
+
+	index, exists := i.indexedChains[chainID]
+	if !exists {
+		return 0, fmt.Errorf("there is no index for chain %s", chainID)
+	}
+	return index.GetIndex(containerID)
 }
 
 func (i *indexer) Handler() (*common.HTTPHandler, error) {

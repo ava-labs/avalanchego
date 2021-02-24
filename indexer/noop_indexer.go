@@ -22,6 +22,10 @@ func (ni *noOpIndexer) IndexChain(chainID ids.ID) error {
 	return nil
 }
 
+func (ni *noOpIndexer) GetIndex(chainID ids.ID, containerID ids.ID) (uint64, error) {
+	return 0, errNoOp
+}
+
 func (ni *noOpIndexer) StopIndexingChain(chainID ids.ID) error {
 	return nil
 }

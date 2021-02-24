@@ -25,9 +25,10 @@ const (
 
 var (
 	// Maps to the byte representation of the next accepted index
-	nextAcceptedIndexKey []byte = []byte("next")
-	containerDbPrefix    []byte = []byte("cont")
-	errNoneAccepted             = errors.New("no containers have been accepted")
+	nextAcceptedIndexKey   []byte = []byte("next")
+	indexToContainerPrefix []byte = []byte("itc")
+	containerToIDPrefix    []byte = []byte("cti")
+	errNoneAccepted               = errors.New("no containers have been accepted")
 )
 
 // Index indexes container (a blob of bytes with an ID) in their order of acceptance
@@ -36,25 +37,28 @@ var (
 type Index interface {
 	Accept(ctx *snow.Context, containerID ids.ID, container []byte) error
 	GetContainerByIndex(index uint64) (Container, error)
-	GetContainersByRange(startIndex uint64, numToFetch uint64) ([]Container, error)
+	GetContainerRange(startIndex uint64, numToFetch uint64) ([]Container, error)
 	GetLastAccepted() (Container, error)
+	GetIndex(containerID ids.ID) (uint64, error)
 	Close() error
 }
 
 // Returns a new, thread-safe Index
 func newIndex(db database.Database, log logging.Logger, codec codec.Manager) (Index, error) {
 	baseDb := versiondb.New(db)
-	containerDb := prefixdb.New(containerDbPrefix, baseDb)
+	indexToContainer := prefixdb.New(indexToContainerPrefix, baseDb)
+	containerToIndex := prefixdb.New(containerToIDPrefix, baseDb)
 
 	i := &index{
 		lock:             &sync.RWMutex{},
 		codec:            codec,
 		baseDb:           baseDb,
-		indexToContainer: containerDb,
+		indexToContainer: indexToContainer,
+		containerToIndex: containerToIndex,
 		log:              log,
 	}
 
-	// Find out what the next accepted index is
+	// Get next accepted index from db
 	nextAcceptedIndexBytes, err := i.baseDb.Get(nextAcceptedIndexKey)
 	if err == database.ErrNotFound {
 		// Couldn't find it in the database. Must not have accepted any containers in previous runs.
@@ -81,8 +85,11 @@ type index struct {
 	nextAcceptedIndex uint64
 	// When [baseDb] is committed, actual write to disk happens
 	baseDb *versiondb.Database
-	// [containerIDDb] and [containerDb] have [baseDb] underneath
+	// Both [indexToContainer] and [containerToIndex] have [baseDb] underneath
+	// Index --> Container
 	indexToContainer database.Database
+	// Container ID --> Index
+	containerToIndex database.Database
 	log              logging.Logger
 }
 
@@ -118,7 +125,13 @@ func (i *index) Accept(ctx *snow.Context, containerID ids.ID, containerBytes []b
 		return fmt.Errorf("couldn't put accepted container %s into index: %w", containerID, err)
 	}
 
-	// Increment and persist next accepted index
+	// Persist container ID --> index
+	err = i.containerToIndex.Put(containerID[:], p.Bytes)
+	if err != nil {
+		return fmt.Errorf("couldn't map conainer %s to index: %w", containerID, err)
+	}
+
+	// Persist next accepted index
 	i.nextAcceptedIndex++
 	p = wrappers.Packer{MaxSize: wrappers.LongLen}
 	p.PackLong(i.nextAcceptedIndex)
@@ -168,9 +181,9 @@ func (i *index) GetContainerByIndex(index uint64) (Container, error) {
 	return container, nil
 }
 
-/// GetContainerIDsByRange returns the IDs of containers at index
+/// GetContainerRange returns the IDs of containers at index
 // [startIndex], [startIndex+1], ..., [startIndex+numToFetch-1]
-func (i *index) GetContainersByRange(startIndex, numToFetch uint64) ([]Container, error) {
+func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, error) {
 	i.log.Error("%d %d", startIndex, numToFetch) // TODO remove
 	// Check arguments for validity
 	if numToFetch == 0 {
@@ -219,6 +232,25 @@ func (i *index) GetContainersByRange(startIndex, numToFetch uint64) ([]Container
 		containers = append(containers, container)
 	}
 	return containers, nil
+}
+
+func (i *index) GetIndex(containerID ids.ID) (uint64, error) {
+	i.lock.RLock()
+	defer i.lock.RUnlock()
+
+	indexBytes, err := i.containerToIndex.Get(containerID[:])
+	if err != nil {
+		return 0, err
+	}
+
+	p := wrappers.Packer{Bytes: indexBytes}
+	index := p.UnpackLong()
+	if p.Err != nil {
+		// Should never happen
+		i.log.Error("couldn't unpack index: %w", err)
+		return 0, p.Err
+	}
+	return index, nil
 }
 
 // GetLastAccepted returns the last accepted container

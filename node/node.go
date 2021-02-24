@@ -66,8 +66,8 @@ const (
 
 var (
 	genesisHashKey     = []byte("genesisID")
-	txIndexerDbPrefix  = []byte("txIdx3")
-	vtxIndexerDbPrefix = []byte("vtxIdx3")
+	txIndexerDbPrefix  = []byte("txIdx4")
+	vtxIndexerDbPrefix = []byte("vtxIdx4")
 
 	// Version is the version of this code
 	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 2, 0)
