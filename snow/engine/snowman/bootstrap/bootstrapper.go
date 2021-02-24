@@ -289,6 +289,8 @@ func (b *Bootstrapper) checkFinish() error {
 	// syncing.
 	if !b.Subnet.IsBootstrapped() {
 		b.Ctx.Log.Info("bootstrapping is waiting for the remaining chains in this subnet to finish syncing...")
+		// Delay new incoming messages to avoid consuming unnecessary resources
+		// while keeping up to date on the latest tip.
 		b.Config.Delay.Delay(b.delayAmount)
 		b.delayAmount *= 2
 		if b.delayAmount > maxBootstrappingDelay {

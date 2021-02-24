@@ -85,6 +85,10 @@ import (
 // - how to track CPU utilization of a peer
 // - "MaxMessages"
 
+const (
+	maxSleepDuration = 100 * time.Millisecond
+)
+
 // Handler passes incoming messages from the network to the consensus engine
 // (Actually, it receives the incoming messages from a ChainRouter, but same difference)
 type Handler struct {
@@ -242,6 +246,8 @@ func (h *Handler) Dispatch() {
 
 // Dispatch a message to the consensus engine.
 func (h *Handler) dispatchMsg(msg message) {
+	// If messages should be delayed to this chain, hold the messages, but check
+	// to see if the chain should be closed at least every [maxSleepDuration].
 	for {
 		if h.closing.GetValue() {
 			h.ctx.Log.Debug("dropping message due to closing:\n%s", msg)
@@ -252,8 +258,8 @@ func (h *Handler) dispatchMsg(msg message) {
 		if until <= 0 {
 			break
 		}
-		if until > 100*time.Millisecond {
-			time.Sleep(100 * time.Millisecond)
+		if until > maxSleepDuration {
+			time.Sleep(maxSleepDuration)
 		} else {
 			time.Sleep(until)
 		}
