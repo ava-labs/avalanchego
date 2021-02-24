@@ -184,14 +184,14 @@ func (i *indexer) GetContainerByID(chainID ids.ID, containerID ids.ID) (Containe
 }
 
 func (i *indexer) Handler() (*common.HTTPHandler, error) {
-	newServer := rpc.NewServer()
+	apiServer := rpc.NewServer()
 	codec := cjson.NewCodec()
-	newServer.RegisterCodec(codec, "application/json")
-	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	if err := newServer.RegisterService(&service{indexer: i}, "index"); err != nil {
+	apiServer.RegisterCodec(codec, "application/json")
+	apiServer.RegisterCodec(codec, "application/json;charset=UTF-8")
+	if err := apiServer.RegisterService(&service{indexer: i}, "index"); err != nil {
 		return nil, err
 	}
-	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: newServer}, nil
+	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: apiServer}, nil
 }
 
 func (i *indexer) Close() error {
@@ -203,5 +203,6 @@ func (i *indexer) Close() error {
 		errs.Add(index.Close())
 		delete(i.indexedChains, chainID)
 	}
+	errs.Add(i.db.Close())
 	return errs.Err
 }

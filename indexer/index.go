@@ -97,7 +97,15 @@ type index struct {
 
 // Close this index
 func (i *index) Close() error {
-	return i.baseDb.Close()
+	errs := wrappers.Errs{}
+	if i.indexToContainer != nil {
+		errs.Add(i.indexToContainer.Close())
+	}
+	if i.containerToIndex != nil {
+		errs.Add(i.containerToIndex.Close())
+	}
+	errs.Add(i.baseDb.Close())
+	return errs.Err
 }
 
 // Index that the given transaction is accepted
