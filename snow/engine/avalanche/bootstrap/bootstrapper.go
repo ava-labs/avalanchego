@@ -29,6 +29,10 @@ const (
 	stripeDistance = 2000
 	stripeWidth    = 5
 	cacheSize      = 100000
+
+	// Parameters for delaying bootstrapping to avoid potential CPU burns
+	initialBootstrappingDelay = 500 * time.Millisecond
+	maxBootstrappingDelay     = time.Minute
 )
 
 // Config ...
@@ -82,7 +86,7 @@ func (b *Bootstrapper) Initialize(
 	b.processedCache = &cache.LRU{Size: cacheSize}
 	b.OnFinished = onFinished
 	b.executedStateTransitions = math.MaxInt32
-	b.delayAmount = 500 * time.Millisecond
+	b.delayAmount = initialBootstrappingDelay
 
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return err
@@ -402,8 +406,8 @@ func (b *Bootstrapper) checkFinish() error {
 		b.Ctx.Log.Info("bootstrapping is waiting for the remaining chains in this subnet to finish syncing...")
 		b.Config.Delay.Delay(b.delayAmount)
 		b.delayAmount *= 2
-		if b.delayAmount > time.Minute {
-			b.delayAmount = time.Minute
+		if b.delayAmount > maxBootstrappingDelay {
+			b.delayAmount = maxBootstrappingDelay
 		}
 		return b.RestartBootstrap(true)
 	}

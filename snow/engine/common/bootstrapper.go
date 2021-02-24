@@ -276,7 +276,6 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 	// if we don't have enough weight for the bootstrap to be accepted then retry or fail the bootstrap
 	size := len(accepted)
 	if size == 0 && b.Beacons.Len() > 0 {
-
 		// retry the bootstrap if the weight is not enough to bootstrap
 		failedBeaconWeight, err := b.Beacons.SubsetWeight(b.failedAcceptedVdrs)
 		if err != nil {
@@ -289,9 +288,6 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 				"- bootstrap attempt: %d", b.Beacons.Len(), b.failedAcceptedVdrs.Len(), b.bootstrapAttempts)
 			return b.RestartBootstrap(false)
 		}
-
-		b.Ctx.Log.Info("No accepted frontier from beacons - Beacons: %d - Failed Bootstrappers: %d "+
-			"- bootstrap attempt: %d", b.Beacons.Len(), b.failedAcceptedVdrs.Len(), b.bootstrapAttempts)
 	}
 
 	b.Ctx.Log.Info("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
