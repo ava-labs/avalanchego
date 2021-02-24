@@ -269,6 +269,8 @@ func (b *Bootstrapper) checkFinish() error {
 	previouslyExecuted := b.executedStateTransitions
 	b.executedStateTransitions = executedBlocks
 
+	// Note that executedVts < c*previouslyExecuted is enforced so that the
+	// bootstrapping process will terminate even as new blocks are being issued.
 	if executedBlocks > 0 && executedBlocks < previouslyExecuted/2 && b.RetryBootstrap {
 		b.Ctx.Log.Info("bootstrapping is checking for more blocks before finishing the bootstrap process...")
 
