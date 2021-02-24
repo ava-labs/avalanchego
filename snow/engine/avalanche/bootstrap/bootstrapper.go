@@ -69,7 +69,8 @@ type Bootstrapper struct {
 	// number of state transitions executed
 	executedStateTransitions int
 
-	delayAmount time.Duration
+	delayAmount     time.Duration
+	finishedSyncing bool
 }
 
 // Initialize this engine.
@@ -354,6 +355,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	}
 
 	b.NumFetched = 0
+	b.finishedSyncing = false
 	toProcess := make([]avalanche.Vertex, 0, len(acceptedContainerIDs))
 	for _, vtxID := range acceptedContainerIDs {
 		if vtx, err := b.Manager.Get(vtxID); err == nil {
@@ -369,10 +371,11 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 // after which it finishes the bootstrap process
 func (b *Bootstrapper) checkFinish() error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
-	if b.Ctx.IsBootstrapped() || b.OutstandingRequests.Len() > 0 || b.needToFetch.Len() > 0 {
+	if b.Ctx.IsBootstrapped() || b.OutstandingRequests.Len() > 0 || b.needToFetch.Len() > 0 || b.finishedSyncing {
 		return nil
 	}
 
+	b.finishedSyncing = true
 	b.Ctx.Log.Info("bootstrapping fetched %d vertices. executing transaction state transitions...",
 		b.NumFetched)
 

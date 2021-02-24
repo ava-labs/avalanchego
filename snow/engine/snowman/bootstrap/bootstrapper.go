@@ -56,7 +56,8 @@ type Bootstrapper struct {
 	// number of state transitions executed
 	executedStateTransitions int
 
-	delayAmount time.Duration
+	delayAmount     time.Duration
+	finishedSyncing bool
 }
 
 // Initialize this engine.
@@ -113,6 +114,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	}
 
 	b.NumFetched = 0
+	b.finishedSyncing = false
 	for _, blkID := range acceptedContainerIDs {
 		if blk, err := b.VM.GetBlock(blkID); err == nil {
 			if err := b.process(blk); err != nil {
@@ -254,10 +256,11 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 // checkFinish repeatedly executes pending transactions and requests new frontier vertices until there aren't any new ones
 // after which it finishes the bootstrap process
 func (b *Bootstrapper) checkFinish() error {
-	if b.IsBootstrapped() {
+	if b.IsBootstrapped() || b.finishedSyncing {
 		return nil
 	}
 
+	b.finishedSyncing = true
 	b.Ctx.Log.Info("bootstrapping fetched %d blocks. executing state transitions...",
 		b.NumFetched)
 

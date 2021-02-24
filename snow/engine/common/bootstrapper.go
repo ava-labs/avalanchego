@@ -185,12 +185,12 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 	// fail the bootstrap if the weight is not enough to bootstrap
 	if float64(b.sampledBeacons.Weight())-newAlpha < float64(failedBeaconWeight) {
 		if b.Config.RetryBootstrap {
-			b.Ctx.Log.Info("Not enough frontiers received, restarting bootstrap... - Beacons: %d - Failed Bootstrappers: %d "+
+			b.Ctx.Log.Debug("Not enough frontiers received, restarting bootstrap... - Beacons: %d - Failed Bootstrappers: %d "+
 				"- bootstrap attempt: %d", b.Beacons.Len(), b.failedAcceptedFrontierVdrs.Len(), b.bootstrapAttempts)
 			return b.RestartBootstrap(false)
 		}
 
-		b.Ctx.Log.Info("Didn't receive enough frontiers - failed validators: %d, "+
+		b.Ctx.Log.Debug("Didn't receive enough frontiers - failed validators: %d, "+
 			"bootstrap attempt: %d", b.failedAcceptedFrontierVdrs.Len(), b.bootstrapAttempts)
 	}
 
@@ -284,7 +284,7 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 
 		// in a zero network there will be no accepted votes but the voting weight will be greater than the failed weight
 		if b.Config.RetryBootstrap && b.Beacons.Weight()-b.Alpha < failedBeaconWeight {
-			b.Ctx.Log.Info("Not enough votes received, restarting bootstrap... - Beacons: %d - Failed Bootstrappers: %d "+
+			b.Ctx.Log.Debug("Not enough votes received, restarting bootstrap... - Beacons: %d - Failed Bootstrappers: %d "+
 				"- bootstrap attempt: %d", b.Beacons.Len(), b.failedAcceptedVdrs.Len(), b.bootstrapAttempts)
 			return b.RestartBootstrap(false)
 		}
@@ -333,11 +333,10 @@ func (b *Bootstrapper) RestartBootstrap(reset bool) error {
 	// resets the attempts when we're pulling blocks/vertices
 	// we don't want to fail the bootstrap at that stage
 	if reset {
-		b.Ctx.Log.Info("Checking for new frontiers, resetting bootstrap attempts...")
+		b.Ctx.Log.Info("Checking for new frontiers...")
 		b.bootstrapAttempts = 0
 	}
 
-	b.Ctx.Log.Info("Restarting bootstrap - attempt: %d", b.bootstrapAttempts)
 	if b.bootstrapAttempts >= b.RetryBootstrapMaxAttempts {
 		return fmt.Errorf("failed to boostrap the chain after %d attempts", b.bootstrapAttempts)
 	}
