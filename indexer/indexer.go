@@ -23,16 +23,21 @@ const (
 	codecVersion    = uint16(0)
 )
 
+var (
+	_ Indexer = &indexer{}
+)
+
 // Indexer causes accepted containers for a given chain
 // to be indexed by their ID and by the order in which
 // they were accepted by this node
 type Indexer interface {
 	IndexChain(chainID ids.ID) error
 	StopIndexingChain(chainID ids.ID) error
-	GetContainerByIndex(chainID ids.ID, containerID uint64) (Container, error)
+	GetContainerByIndex(chainID ids.ID, index uint64) (Container, error)
 	GetContainerRange(chainID ids.ID, startIndex, numToFetch uint64) ([]Container, error)
 	GetLastAccepted(chainID ids.ID) (Container, error)
-	GetIndex(chainID ids.ID, containerID ids.ID) (uint64, error)
+	GetIndex(chainID, containerID ids.ID) (uint64, error)
+	GetContainerByID(chainID, containerID ids.ID) (Container, error)
 	// Handler returns a handler that handles incoming API calls
 	Handler() (*common.HTTPHandler, error)
 	Close() error
@@ -164,6 +169,18 @@ func (i *indexer) GetIndex(chainID ids.ID, containerID ids.ID) (uint64, error) {
 		return 0, fmt.Errorf("there is no index for chain %s", chainID)
 	}
 	return index.GetIndex(containerID)
+}
+
+// GetContainerByID ...
+func (i *indexer) GetContainerByID(chainID ids.ID, containerID ids.ID) (Container, error) {
+	i.lock.RLock()
+	defer i.lock.RUnlock()
+
+	index, exists := i.indexedChains[chainID]
+	if !exists {
+		return Container{}, fmt.Errorf("there is no index for chain %s", chainID)
+	}
+	return index.GetContainerByID(containerID)
 }
 
 func (i *indexer) Handler() (*common.HTTPHandler, error) {

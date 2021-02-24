@@ -18,29 +18,29 @@ func NewNoOpIndexer() Indexer { return &noOpIndexer{} }
 // noOpIndexer does nothing
 type noOpIndexer struct{}
 
-func (ni *noOpIndexer) IndexChain(chainID ids.ID) error {
+func (ni *noOpIndexer) IndexChain(_ ids.ID) error {
 	return nil
 }
 
-func (ni *noOpIndexer) GetIndex(chainID ids.ID, containerID ids.ID) (uint64, error) {
+func (ni *noOpIndexer) GetIndex(_ ids.ID, _ ids.ID) (uint64, error) {
 	return 0, errNoOp
 }
 
-func (ni *noOpIndexer) StopIndexingChain(chainID ids.ID) error {
+func (ni *noOpIndexer) StopIndexingChain(_ ids.ID) error {
 	return nil
 }
 
 // GetContainersByIndex ...
-func (ni *noOpIndexer) GetContainerByIndex(chainID ids.ID, indexToFetch uint64) (Container, error) {
+func (ni *noOpIndexer) GetContainerByIndex(_ ids.ID, _ uint64) (Container, error) {
 	return Container{}, errNoOp
 }
 
 // GetContainersByIndex ...
-func (ni *noOpIndexer) GetContainerRange(chainID ids.ID, startIndex, numToFetch uint64) ([]Container, error) {
+func (ni *noOpIndexer) GetContainerRange(_ ids.ID, _, _ uint64) ([]Container, error) {
 	return nil, errNoOp
 }
 
-func (ni *noOpIndexer) GetLastAccepted(chainID ids.ID) (Container, error) {
+func (ni *noOpIndexer) GetLastAccepted(_ ids.ID) (Container, error) {
 	return Container{}, errNoOp
 }
 
@@ -50,4 +50,8 @@ func (ni *noOpIndexer) Handler() (*common.HTTPHandler, error) {
 
 func (ni *noOpIndexer) Close() error {
 	return nil
+}
+
+func (ni *noOpIndexer) GetContainerByID(_, _ ids.ID) (Container, error) {
+	return Container{}, errNoOp
 }

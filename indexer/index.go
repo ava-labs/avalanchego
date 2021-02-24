@@ -1,7 +1,6 @@
 package indexer
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"sync"
@@ -29,6 +28,8 @@ var (
 	indexToContainerPrefix []byte = []byte("itc")
 	containerToIDPrefix    []byte = []byte("cti")
 	errNoneAccepted               = errors.New("no containers have been accepted")
+
+	_ Index = &index{}
 )
 
 // Index indexes container (a blob of bytes with an ID) in their order of acceptance
@@ -40,6 +41,7 @@ type Index interface {
 	GetContainerRange(startIndex uint64, numToFetch uint64) ([]Container, error)
 	GetLastAccepted() (Container, error)
 	GetIndex(containerID ids.ID) (uint64, error)
+	GetContainerByID(containerID ids.ID) (Container, error)
 	Close() error
 }
 
@@ -218,12 +220,7 @@ func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, e
 	defer iter.Release()
 
 	for len(containers) < int(numToFetch) && iter.Next() {
-		if bytes.Equal(iter.Key(), nextAcceptedIndexKey) {
-			// Ignore the one non-index value in the database
-			continue
-		}
 		containerBytes := iter.Value()
-
 		var container Container
 		_, err := i.codec.Unmarshal(containerBytes, &container)
 		if err != nil {
@@ -251,6 +248,33 @@ func (i *index) GetIndex(containerID ids.ID) (uint64, error) {
 		return 0, p.Err
 	}
 	return index, nil
+}
+
+func (i *index) GetContainerByID(containerID ids.ID) (Container, error) {
+	i.lock.RLock()
+	defer i.lock.RUnlock()
+
+	// Read index from database
+	indexBytes, err := i.containerToIndex.Get(containerID[:])
+	if err != nil {
+		return Container{}, err
+	}
+
+	// Read container from database
+	containerBytes, err := i.indexToContainer.Get(indexBytes)
+	if err != nil {
+		err = fmt.Errorf("couldn't read container from database: %w", err)
+		i.log.Error("%s", err)
+		return Container{}, err
+	}
+
+	// Parse container
+	var container Container
+	_, err = i.codec.Unmarshal(containerBytes, &container)
+	if err != nil {
+		return Container{}, fmt.Errorf("couldn't unmarshal container: %w", err)
+	}
+	return container, nil
 }
 
 // GetLastAccepted returns the last accepted container

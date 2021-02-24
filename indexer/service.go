@@ -126,8 +126,9 @@ func (s *service) GetContainerRange(r *http.Request, args *GetContainerRange, re
 
 // GetIndexArgs ...
 type GetIndexArgs struct {
-	ChainID     string `json:"chainID"`
-	ContainerID ids.ID `json:"containerID"`
+	ChainID     string              `json:"chainID"`
+	ContainerID ids.ID              `json:"containerID"`
+	Encoding    formatting.Encoding `json:"encoding"`
 }
 
 // GetIndexResponse ...
@@ -155,4 +156,19 @@ func (s *service) IsAccepted(r *http.Request, args *GetIndexArgs, reply *bool) e
 	_, err = s.indexer.GetIndex(chainID, args.ContainerID)
 	*reply = err == nil
 	return nil
+}
+
+func (s *service) GetContainerByID(r *http.Request, args *GetIndexArgs, reply *FormattedContainer) error {
+	chainID, err := s.indexer.chainLookup(args.ChainID)
+	if err != nil {
+		return fmt.Errorf("couldn't find chain %s: %w", args.ChainID, err)
+	}
+
+	container, err := s.indexer.GetContainerByID(chainID, args.ContainerID)
+	if err != nil {
+		return err
+	}
+
+	*reply, err = newFormattedContainer(container, args.Encoding)
+	return err
 }
