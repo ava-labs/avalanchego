@@ -56,8 +56,7 @@ type Bootstrapper struct {
 	// number of state transitions executed
 	executedStateTransitions int
 
-	delayAmount     time.Duration
-	finishedSyncing bool
+	delayAmount time.Duration
 }
 
 // Initialize this engine.
@@ -114,7 +113,6 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	}
 
 	b.NumFetched = 0
-	b.finishedSyncing = false
 	for _, blkID := range acceptedContainerIDs {
 		if blk, err := b.VM.GetBlock(blkID); err == nil {
 			if err := b.process(blk); err != nil {
@@ -256,11 +254,10 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 // checkFinish repeatedly executes pending transactions and requests new frontier vertices until there aren't any new ones
 // after which it finishes the bootstrap process
 func (b *Bootstrapper) checkFinish() error {
-	if b.IsBootstrapped() || b.finishedSyncing {
+	if b.IsBootstrapped() {
 		return nil
 	}
 
-	b.finishedSyncing = true
 	b.Ctx.Log.Info("bootstrapping fetched %d blocks. executing state transitions...",
 		b.NumFetched)
 
@@ -274,6 +271,8 @@ func (b *Bootstrapper) checkFinish() error {
 
 	if executedBlocks > 0 && executedBlocks < previouslyExecuted/2 && b.RetryBootstrap {
 		b.Ctx.Log.Info("bootstrapping is checking for more blocks before finishing the bootstrap process...")
+
+		b.processedStartingAcceptedFrontier = false
 		return b.RestartBootstrap(true)
 	}
 
@@ -299,6 +298,8 @@ func (b *Bootstrapper) checkFinish() error {
 		if b.delayAmount > maxBootstrappingDelay {
 			b.delayAmount = maxBootstrappingDelay
 		}
+
+		b.processedStartingAcceptedFrontier = false
 		return b.RestartBootstrap(true)
 	}
 
