@@ -497,19 +497,10 @@ func (n *Node) initIndices() error {
 		EventDispatcher:        n.DecisionDispatcher,
 		InitiallyIndexedChains: n.Config.InitiallyIndexedChains,
 		ChainLookupF:           n.chainManager.Lookup,
+		APIServer:              &n.APIServer,
 	})
 	if err != nil {
 		return fmt.Errorf("couldn't create index for txs: %w", err)
-	}
-	if n.Config.IndexAPIEnabled { // TODO remove
-		txIndexerHandler, err := n.txIndexer.Handler()
-		if err != nil && n.Config.IndexAPIEnabled {
-			return err
-		}
-		err = n.APIServer.AddRoute(txIndexerHandler, &sync.RWMutex{}, "index/", "tx", n.HTTPLog)
-		if err != nil {
-			return fmt.Errorf("couldn't add route: %w", err)
-		}
 	}
 
 	n.vtxIndexer, err = indexer.NewIndexer(indexer.Config{
@@ -521,20 +512,12 @@ func (n *Node) initIndices() error {
 		EventDispatcher:        n.ConsensusDispatcher,
 		InitiallyIndexedChains: n.Config.InitiallyIndexedChains,
 		ChainLookupF:           n.chainManager.Lookup,
+		APIServer:              &n.APIServer,
 	})
 	if err != nil {
 		return fmt.Errorf("couldn't create index for vtxs: %w", err)
 	}
-	if n.Config.IndexAPIEnabled { // TODO remove
-		vtxIndexerHandler, err := n.vtxIndexer.Handler()
-		if err != nil {
-			return err
-		}
-		err = n.APIServer.AddRoute(vtxIndexerHandler, &sync.RWMutex{}, "index/", "vtx", n.HTTPLog)
-		if err != nil {
-			return fmt.Errorf("couldn't add route: %w", err)
-		}
-	}
+
 	return nil
 }
 

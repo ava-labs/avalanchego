@@ -140,7 +140,7 @@ func (i *index) Accept(ctx *snow.Context, containerID ids.ID, containerBytes []b
 	// Persist container ID --> index
 	err = i.containerToIndex.Put(containerID[:], p.Bytes)
 	if err != nil {
-		return fmt.Errorf("couldn't map conainer %s to index: %w", containerID, err)
+		return fmt.Errorf("couldn't map container %s to index: %w", containerID, err)
 	}
 
 	// Persist next accepted index
@@ -310,16 +310,4 @@ func (i *index) lastAcceptedIndex() (uint64, bool) {
 		return 0, false
 	}
 	return i.nextAcceptedIndex - 1, true
-}
-
-// Container ...
-type Container struct {
-	// ID of this container
-	ID ids.ID `serialize:"true"`
-	// Byte representation of this container
-	Bytes []byte `serialize:"true"`
-	// Index is the order in which this container was accepted
-	Index uint64 `serialize:"true"`
-	// Unix time at which this container was accepted
-	Timestamp uint64 `serialize:"true"`
 }

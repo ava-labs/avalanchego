@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ava-labs/avalanchego/api"
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/gorilla/rpc/v2"
@@ -36,15 +37,24 @@ var (
 	_ Indexer = &indexer{}
 )
 
+// Config for an indexer
 type Config struct {
-	IndexingEnabled        bool
-	AllowIncompleteIndex   bool
-	Name                   string
-	Db                     database.Database
-	Log                    logging.Logger
-	EventDispatcher        *triggers.EventDispatcher
+	// If false use a dummy (no-op) indexer
+	IndexingEnabled bool
+	// If true, allow indices that may be missing containers
+	AllowIncompleteIndex bool
+	// Name of this indexer, and the API endpoint
+	Name string
+	Db   database.Database
+	Log  logging.Logger
+	// Notifies indexer of newly accepted containers
+	EventDispatcher *triggers.EventDispatcher
+	// Chains indexed on startup
 	InitiallyIndexedChains ids.Set
-	ChainLookupF           func(string) (ids.ID, error)
+	// Chain's Alias --> ID of that Chain
+	ChainLookupF func(string) (ids.ID, error)
+	// Used to register the indexer's API endpoint
+	APIServer *api.Server
 }
 
 // Indexer causes accepted containers for a given chain
@@ -59,12 +69,10 @@ type Indexer interface {
 	GetIndex(chainID, containerID ids.ID) (uint64, error)
 	GetContainerByID(chainID, containerID ids.ID) (Container, error)
 	GetIndexedChains() []ids.ID
-	// Handler returns a handler that handles incoming API calls
-	Handler() (*common.HTTPHandler, error)
 	Close() error
 }
 
-// NewIndexer returns a new Indexer
+// NewIndexer returns a new Indexer and registers a new route on the given API server.
 func NewIndexer(config Config) (Indexer, error) {
 	// See if we have run with this database before
 	hasEverRunDb := prefixdb.New(hasEverRunPrefix, config.Db)
@@ -170,6 +178,20 @@ func NewIndexer(config Config) (Indexer, error) {
 		if err := indexer.IndexChain(chainID); err != nil {
 			return nil, fmt.Errorf("couldn't index chain %s: %w", chainID, err)
 		}
+	}
+
+	// Register API server
+	indexAPIServer := rpc.NewServer()
+	codec := cjson.NewCodec()
+	indexAPIServer.RegisterCodec(codec, "application/json")
+	indexAPIServer.RegisterCodec(codec, "application/json;charset=UTF-8")
+	if err := indexAPIServer.RegisterService(&service{indexer: indexer}, "index"); err != nil {
+		return nil, err
+	}
+	handler := &common.HTTPHandler{LockOptions: common.NoLock, Handler: indexAPIServer}
+	err = config.APIServer.AddRoute(handler, &sync.RWMutex{}, "index/", config.Name, config.Log)
+	if err != nil {
+		return nil, fmt.Errorf("couldnt add API route: %w", err)
 	}
 	return indexer, nil
 }
