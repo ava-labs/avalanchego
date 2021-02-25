@@ -54,7 +54,7 @@ type Config struct {
 	// Chain's Alias --> ID of that Chain
 	ChainLookupF func(string) (ids.ID, error)
 	// Used to register the indexer's API endpoint
-	APIServer *api.Server
+	APIServer api.RouteAdder
 }
 
 // Indexer causes accepted containers for a given chain
