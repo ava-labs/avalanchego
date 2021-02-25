@@ -195,7 +195,7 @@ func (tm *AdaptiveTimeoutManager) remove(id ids.ID, now time.Time) {
 
 	// Observe the response time to update average network response time
 	// Don't include Get requests in calculation, since an adversary
-	// to cause you to issue a Get request and then cause it to timeout,
+	// can cause you to issue a Get request and then cause it to timeout,
 	// increasing your timeout.
 	if timeout.msgType != constants.GetMsg {
 		timeoutRegisteredAt := timeout.deadline.Add(-1 * timeout.duration)
