@@ -161,7 +161,7 @@ func (cr *ChainRouter) RegisterRequest(
 		cr.log.Error("expected message type to be one of GetMsg, PullQueryMsg, PushQueryMsg, GetAcceptedFrontierMsg, GetAcceptedMsg but got %s", msgType)
 		return
 	}
-	cr.timeoutManager.RegisterRequest(validatorID, chainID, uniqueRequestID, timeoutHandler)
+	cr.timeoutManager.RegisterRequest(validatorID, chainID, msgType, uniqueRequestID, timeoutHandler)
 }
 
 // Shutdown shuts down this router
