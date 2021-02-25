@@ -120,9 +120,6 @@ func (cr *ChainRouter) Initialize(
 // Assumes [cr.lock] is held
 func (cr *ChainRouter) removeRequest(id ids.ID) {
 	delete(cr.requests, id)
-	if len(cr.requests) == 0 {
-		cr.lastTimeNoOutstanding = cr.clock.Time()
-	}
 	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
 }
 
@@ -140,8 +137,12 @@ func (cr *ChainRouter) RegisterRequest(
 ) {
 	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.Lock()
+	if len(cr.requests) == 0 {
+		cr.lastTimeNoOutstanding = cr.clock.Time()
+	}
 	// Add to the set of unfulfilled requests
 	cr.requests[uniqueRequestID] = request{Time: cr.clock.Time(), MsgType: msgType}
+	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
 	cr.lock.Unlock()
 	// Register a timeout to fire if we don't get a reply in time.
 	var timeoutHandler func() // Called upon timeout
@@ -760,7 +761,11 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 	healthy = healthy && numOutstandingReqs <= cr.healthConfig.MaxOutstandingRequests
 	details["outstandingRequests"] = numOutstandingReqs
 
-	timeSinceNoOutstandingRequests := cr.clock.Time().Sub(cr.lastTimeNoOutstanding)
+	now := cr.clock.Time()
+	if numOutstandingReqs == 0 {
+		cr.lastTimeNoOutstanding = now
+	}
+	timeSinceNoOutstandingRequests := now.Sub(cr.lastTimeNoOutstanding)
 	healthy = healthy && timeSinceNoOutstandingRequests <= cr.healthConfig.MaxTimeSinceNoOutstandingRequests
 	details["timeSinceNoOutstandingRequests"] = timeSinceNoOutstandingRequests.String()
 

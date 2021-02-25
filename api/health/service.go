@@ -4,6 +4,7 @@
 package health
 
 import (
+	stdjson "encoding/json"
 	"net/http"
 	"time"
 
@@ -74,15 +75,25 @@ type APIHealthReply struct {
 func (as *apiServer) Health(_ *http.Request, _ *APIHealthArgs, reply *APIHealthReply) error {
 	as.log.Info("Health.health called")
 	reply.Checks, reply.Healthy = as.Results()
-	return nil
+	if reply.Healthy {
+		return nil
+	}
+	replyStr, err := stdjson.Marshal(reply.Checks)
+	as.log.Warn("Health.health is returning an error: %s", string(replyStr))
+	return err
 }
 
 // GetLiveness returns a summation of the health of the node
 // Deprecated: in favor of Health
 func (as *apiServer) GetLiveness(_ *http.Request, _ *APIHealthArgs, reply *APIHealthReply) error {
-	as.log.Info("Health: GetLiveness called")
+	as.log.Info("Health.getLiveness called")
 	reply.Checks, reply.Healthy = as.Results()
-	return nil
+	if reply.Healthy {
+		return nil
+	}
+	replyStr, err := stdjson.Marshal(reply.Checks)
+	as.log.Warn("Health.getLiveness is returning an error: %s", string(replyStr))
+	return err
 }
 
 type noOp struct{}
