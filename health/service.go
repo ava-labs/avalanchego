@@ -4,7 +4,6 @@ import (
 	"time"
 
 	health "github.com/AppsFlyer/go-sundheit"
-	healthlib "github.com/AppsFlyer/go-sundheit"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
@@ -29,7 +28,7 @@ func NewService(checkFreq time.Duration) Service {
 // service implements Service
 type service struct {
 	// performs the underlying health checks
-	health healthlib.Health
+	health health.Health
 	// Time between health checks
 	checkFreq time.Duration
 }
@@ -53,7 +52,7 @@ func (s *service) RegisterCheck(name string, checkFn Check) error {
 		checkFn: checkFn,
 	}
 
-	return s.health.RegisterCheck(&healthlib.Config{
+	return s.health.RegisterCheck(&health.Config{
 		InitialDelay:    constants.DefaultHealthCheckInitialDelay,
 		ExecutionPeriod: s.checkFreq,
 		Check:           check,
@@ -70,7 +69,7 @@ func (s *service) RegisterMonotonicCheck(name string, checkFn Check) error {
 		},
 	}
 
-	return s.health.RegisterCheck(&healthlib.Config{
+	return s.health.RegisterCheck(&health.Config{
 		InitialDelay:    constants.DefaultHealthCheckInitialDelay,
 		ExecutionPeriod: s.checkFreq,
 		Check:           c,

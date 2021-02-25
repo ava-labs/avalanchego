@@ -7,9 +7,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/keystore"
@@ -20,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/stretchr/testify/assert"
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )

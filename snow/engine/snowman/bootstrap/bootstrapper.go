@@ -6,6 +6,7 @@ package bootstrap
 import (
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -17,6 +18,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+)
+
+const (
+	// Parameters for delaying bootstrapping to avoid potential CPU burns
+	initialBootstrappingDelay = 500 * time.Millisecond
+	maxBootstrappingDelay     = time.Minute
 )
 
 // Config ...
@@ -48,6 +55,8 @@ type Bootstrapper struct {
 	processedStartingAcceptedFrontier bool
 	// number of state transitions executed
 	executedStateTransitions int
+
+	delayAmount time.Duration
 }
 
 // Initialize this engine.
@@ -62,6 +71,7 @@ func (b *Bootstrapper) Initialize(
 	b.Bootstrapped = config.Bootstrapped
 	b.OnFinished = onFinished
 	b.executedStateTransitions = math.MaxInt32
+	b.delayAmount = initialBootstrappingDelay
 
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return err
@@ -256,13 +266,44 @@ func (b *Bootstrapper) checkFinish() error {
 		return err
 	}
 
-	if executedBlocks > 0 && executedBlocks < b.executedStateTransitions/2 && b.RetryBootstrap {
-		b.executedStateTransitions = executedBlocks
+	previouslyExecuted := b.executedStateTransitions
+	b.executedStateTransitions = executedBlocks
+
+	// Note that executedVts < c*previouslyExecuted is enforced so that the
+	// bootstrapping process will terminate even as new blocks are being issued.
+	if executedBlocks > 0 && executedBlocks < previouslyExecuted/2 && b.RetryBootstrap {
 		b.Ctx.Log.Info("bootstrapping is checking for more blocks before finishing the bootstrap process...")
+
+		b.processedStartingAcceptedFrontier = false
 		return b.RestartBootstrap(true)
 	}
 
 	b.Ctx.Log.Info("bootstrapping fetched enough blocks to finish the bootstrap process...")
+
+	// Notify the subnet that this chain is synced
+	b.Subnet.Bootstrapped(b.Ctx.ChainID)
+
+	// If there is an additional callback, notify them that this chain has been
+	// synced.
+	if b.Bootstrapped != nil {
+		b.Bootstrapped()
+	}
+
+	// If the subnet hasn't finished bootstrapping, this chain should remain
+	// syncing.
+	if !b.Subnet.IsBootstrapped() {
+		b.Ctx.Log.Info("bootstrapping is waiting for the remaining chains in this subnet to finish syncing...")
+		// Delay new incoming messages to avoid consuming unnecessary resources
+		// while keeping up to date on the latest tip.
+		b.Config.Delay.Delay(b.delayAmount)
+		b.delayAmount *= 2
+		if b.delayAmount > maxBootstrappingDelay {
+			b.delayAmount = maxBootstrappingDelay
+		}
+
+		b.processedStartingAcceptedFrontier = false
+		return b.RestartBootstrap(true)
+	}
 
 	return b.finish()
 }
@@ -278,10 +319,6 @@ func (b *Bootstrapper) finish() error {
 		return err
 	}
 	b.Ctx.Bootstrapped()
-
-	if b.Bootstrapped != nil {
-		b.Bootstrapped()
-	}
 	return nil
 }
 

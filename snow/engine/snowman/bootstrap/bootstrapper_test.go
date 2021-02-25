@@ -41,6 +41,13 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 	sender.Default(true)
 	vm.Default(true)
 
+	isBootstrapped := false
+	subnet := &common.SubnetTest{
+		T:               t,
+		IsBootstrappedF: func() bool { return isBootstrapped },
+		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
+	}
+
 	sender.CantGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestShortID()
@@ -57,6 +64,8 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 		SampleK:    int(peers.Weight()),
 		Alpha:      uint64(peers.Len()/2 + 1),
 		Sender:     sender,
+		Subnet:     subnet,
+		Delay:      &common.DelayTest{},
 	}
 	return Config{
 		Config:  commonConfig,

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -94,6 +95,7 @@ func TestTimeout(t *testing.T) {
 		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
+		&router.Delay{},
 	)
 	go handler.Dispatch()
 
@@ -167,6 +169,7 @@ func TestReliableMessages(t *testing.T) {
 		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
+		&router.Delay{},
 	)
 	go handler.Dispatch()
 
@@ -249,6 +252,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
+		&router.Delay{},
 	)
 	go handler.Dispatch()
 

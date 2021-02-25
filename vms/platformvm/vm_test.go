@@ -2141,6 +2141,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return ids.List()
 	}
 
+	isBootstrapped := false
+	subnet := &common.SubnetTest{
+		T:               t,
+		IsBootstrappedF: func() bool { return isBootstrapped },
+		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
+	}
+
 	// The engine handles consensus
 	engine := smeng.Transitive{}
 	err = engine.Initialize(smeng.Config{
@@ -2152,6 +2159,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 				SampleK:    int(beacons.Weight()),
 				Alpha:      uint64(beacons.Len()/2 + 1),
 				Sender:     &sender,
+				Subnet:     subnet,
 			},
 			Blocked: blocked,
 			VM:      vm,
@@ -2182,6 +2190,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
+		&router.Delay{},
 	)
 
 	// Allow incoming messages to be routed to the new chain
