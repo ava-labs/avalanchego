@@ -4,17 +4,19 @@
 package health
 
 import (
-	stdjson "encoding/json"
 	"net/http"
 	"time"
+
+	stdjson "encoding/json"
 
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/health"
-	healthlib "github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	healthlib "github.com/ava-labs/avalanchego/health"
 )
 
 // Service wraps a [healthlib.Service]. Handler() returns a handler
