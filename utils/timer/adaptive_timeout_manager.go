@@ -134,6 +134,7 @@ func (tm *AdaptiveTimeoutManager) Initialize(config *AdaptiveTimeoutConfig) erro
 	errs := &wrappers.Errs{}
 	errs.Add(config.Registerer.Register(tm.networkTimeoutMetric))
 	errs.Add(config.Registerer.Register(tm.avgLatency))
+	errs.Add(config.Registerer.Register(tm.numTimeouts))
 	return errs.Err
 }
 
