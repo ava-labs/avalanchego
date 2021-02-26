@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,7 +24,7 @@ func TestIndex(t *testing.T) {
 	db := memdb.New()
 	ctx := snow.DefaultContextTest()
 
-	indexIntf, err := newIndex(db, logging.NoLog{}, codec)
+	indexIntf, err := newIndex(db, logging.NoLog{}, codec, timer.Clock{})
 	assert.NoError(err)
 	idx := indexIntf.(*index)
 
@@ -77,7 +78,7 @@ func TestIndex(t *testing.T) {
 
 	// Create a new index with the same database and ensure contents still there
 	assert.NoError(idx.Close())
-	indexIntf, err = newIndex(db, logging.NoLog{}, codec)
+	indexIntf, err = newIndex(db, logging.NoLog{}, codec, timer.Clock{})
 	assert.NoError(err)
 	idx = indexIntf.(*index)
 
@@ -115,7 +116,7 @@ func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	assert.NoError(err)
 	db := memdb.New()
 	ctx := snow.DefaultContextTest()
-	indexIntf, err := newIndex(db, logging.NoLog{}, codec)
+	indexIntf, err := newIndex(db, logging.NoLog{}, codec, timer.Clock{})
 	assert.NoError(err)
 	idx := indexIntf.(*index)
 

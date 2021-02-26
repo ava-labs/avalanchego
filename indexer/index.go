@@ -46,13 +46,19 @@ type Index interface {
 }
 
 // Returns a new, thread-safe Index
-func newIndex(db database.Database, log logging.Logger, codec codec.Manager) (Index, error) {
+func newIndex(
+	db database.Database,
+	log logging.Logger,
+	codec codec.Manager,
+	clock timer.Clock,
+) (Index, error) {
 	baseDb := versiondb.New(db)
 	indexToContainer := prefixdb.New(indexToContainerPrefix, baseDb)
 	containerToIndex := prefixdb.New(containerToIDPrefix, baseDb)
 
 	i := &index{
 		lock:             &sync.RWMutex{},
+		clock:            clock,
 		codec:            codec,
 		baseDb:           baseDb,
 		indexToContainer: indexToContainer,

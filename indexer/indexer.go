@@ -7,6 +7,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	cjson "github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/gorilla/rpc/v2"
 
@@ -179,6 +180,7 @@ func NewIndexer(config Config) (Indexer, error) {
 			return nil, fmt.Errorf("couldn't index chain %s: %w", chainID, err)
 		}
 	}
+	indexer.hasRunBefore = true
 
 	// Register API server
 	indexAPIServer := rpc.NewServer()
@@ -200,6 +202,7 @@ func NewIndexer(config Config) (Indexer, error) {
 type indexer struct {
 	name                 string
 	codec                codec.Manager
+	clock                timer.Clock
 	lock                 sync.RWMutex
 	log                  logging.Logger
 	db                   database.Database
@@ -256,7 +259,7 @@ func (i *indexer) IndexChain(chainID ids.ID) error {
 
 	// Database for the index to use
 	indexDb := prefixdb.New(chainID[:], i.db)
-	index, err := newIndex(indexDb, i.log, i.codec)
+	index, err := newIndex(indexDb, i.log, i.codec, i.clock)
 	if err != nil {
 		return fmt.Errorf("couldn't create index for chain %s: %w", chainID, err)
 	}
