@@ -13,11 +13,11 @@ import (
 )
 
 var (
-	// DefaultLogDirectory ...
+	// DefaultLogDirectory is the default directory where logs are saved
 	DefaultLogDirectory = fmt.Sprintf("~/.%s/logs", constants.AppName)
 )
 
-// Config ...
+// Config defines the configuration of a logger
 type Config struct {
 	RotationInterval                                                                                time.Duration
 	FileSize, RotationSize, FlushSize                                                               int
@@ -27,7 +27,7 @@ type Config struct {
 	Directory, MsgPrefix, LoggerName                                                                string
 }
 
-// DefaultConfig ...
+// DefaultConfig returns a logger configuration with default parameters
 func DefaultConfig() (Config, error) {
 	dir, err := homedir.Expand(DefaultLogDirectory)
 	return Config{
