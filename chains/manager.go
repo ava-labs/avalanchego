@@ -110,34 +110,36 @@ type chain struct {
 
 // ManagerConfig ...
 type ManagerConfig struct {
-	StakingEnabled          bool // True iff the network has staking enabled
-	MaxPendingMsgs          uint32
-	MaxNonStakerPendingMsgs uint32
-	StakerMSGPortion        float64
-	StakerCPUPortion        float64
-	Log                     logging.Logger
-	LogFactory              logging.Factory
-	VMManager               vms.Manager // Manage mappings from vm ID --> vm
-	DecisionEvents          *triggers.EventDispatcher
-	ConsensusEvents         *triggers.EventDispatcher
-	DB                      database.Database
-	Router                  router.Router    // Routes incoming messages to the appropriate chain
-	Net                     network.Network  // Sends consensus messages to other validators
-	ConsensusParams         avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
-	EpochFirstTransition    time.Time
-	EpochDuration           time.Duration
-	Validators              validators.Manager // Validators validating on this chain
-	NodeID                  ids.ShortID        // The ID of this node
-	NetworkID               uint32             // ID of the network this node is connected to
-	Server                  *api.Server        // Handles HTTP API calls
-	Keystore                *keystore.Keystore
-	AtomicMemory            *atomic.Memory
-	AVAXAssetID             ids.ID
-	XChainID                ids.ID
-	CriticalChains          ids.Set          // Chains that can't exit gracefully
-	WhitelistedSubnets      ids.Set          // Subnets to validate
-	TimeoutManager          *timeout.Manager // Manages request timeouts when sending messages to other validators
-	HealthService           health.CheckRegisterer
+	StakingEnabled            bool // True iff the network has staking enabled
+	MaxPendingMsgs            uint32
+	MaxNonStakerPendingMsgs   uint32
+	StakerMSGPortion          float64
+	StakerCPUPortion          float64
+	Log                       logging.Logger
+	LogFactory                logging.Factory
+	VMManager                 vms.Manager // Manage mappings from vm ID --> vm
+	DecisionEvents            *triggers.EventDispatcher
+	ConsensusEvents           *triggers.EventDispatcher
+	DB                        database.Database
+	Router                    router.Router    // Routes incoming messages to the appropriate chain
+	Net                       network.Network  // Sends consensus messages to other validators
+	ConsensusParams           avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
+	EpochFirstTransition      time.Time
+	EpochDuration             time.Duration
+	Validators                validators.Manager // Validators validating on this chain
+	NodeID                    ids.ShortID        // The ID of this node
+	NetworkID                 uint32             // ID of the network this node is connected to
+	Server                    *api.Server        // Handles HTTP API calls
+	Keystore                  *keystore.Keystore
+	AtomicMemory              *atomic.Memory
+	AVAXAssetID               ids.ID
+	XChainID                  ids.ID
+	CriticalChains            ids.Set          // Chains that can't exit gracefully
+	WhitelistedSubnets        ids.Set          // Subnets to validate
+	TimeoutManager            *timeout.Manager // Manages request timeouts when sending messages to other validators
+	HealthService             health.Service
+	RetryBootstrap            bool // Should Bootstrap be retried
+	RetryBootstrapMaxAttempts int  // Max number of times to retry bootstrap
 }
 
 type manager struct {
@@ -151,6 +153,10 @@ type manager struct {
 	unblocked     bool
 	blockedChains []ChainParameters
 
+	// Key: Subnet's ID
+	// Value: Subnet description
+	subnets map[ids.ID]Subnet
+
 	chainsLock sync.Mutex
 	// Key: Chain's ID
 	// Value: The chain
@@ -161,6 +167,7 @@ type manager struct {
 func New(config *ManagerConfig) Manager {
 	m := &manager{
 		ManagerConfig: *config,
+		subnets:       make(map[ids.ID]Subnet),
 		chains:        make(map[ids.ID]*router.Handler),
 	}
 	m.Initialize()
@@ -179,7 +186,8 @@ func (m *manager) CreateChain(chain ChainParameters) {
 	}
 }
 
-// Create a chain
+// Create a chain, this is only called from the P-chain thread, except for
+// creating the P-chain.
 func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	if !m.WhitelistedSubnets.Contains(chainParams.SubnetID) {
 		m.Log.Debug("Skipped creating non-whitelisted chain:\n"+
@@ -205,10 +213,22 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		chainParams.VMAlias,
 	)
 
-	chain, err := m.buildChain(chainParams)
+	sb, exists := m.subnets[chainParams.SubnetID]
+	if !exists {
+		sb = &subnet{}
+	}
+	sb.addChain(chainParams.ID)
+
+	chain, err := m.buildChain(chainParams, sb)
 	if err != nil {
+		sb.removeChain(chainParams.ID)
+
 		m.Log.Error("Error while creating new chain: %s", err)
 		return
+	}
+
+	if !exists {
+		m.subnets[chainParams.SubnetID] = sb
 	}
 
 	m.chainsLock.Lock()
@@ -223,7 +243,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 }
 
 // Create a chain
-func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
+func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, error) {
 	vmID, err := m.VMManager.Lookup(chainParams.VMAlias)
 	if err != nil {
 		return nil, fmt.Errorf("error while looking up VM: %w", err)
@@ -332,6 +352,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 			fxs,
 			consensusParams,
 			bootstrapWeight,
+			sb,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error while creating new avalanche vm %w", err)
@@ -346,6 +367,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 			fxs,
 			consensusParams.Parameters,
 			bootstrapWeight,
+			sb,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error while creating new snowman vm %w", err)
@@ -395,6 +417,7 @@ func (m *manager) createAvalancheChain(
 	fxs []*common.Fx,
 	consensusParams avcon.Parameters,
 	bootstrapWeight uint64,
+	sb Subnet,
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
@@ -429,25 +452,34 @@ func (m *manager) createAvalancheChain(
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager)
+	err = sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager, m.ConsensusParams.Namespace, m.ConsensusParams.Metrics)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
+	}
 
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
 		sampleK = int(bootstrapWeight)
 	}
 
+	delay := &router.Delay{}
+
 	// The engine handles consensus
 	engine := &aveng.Transitive{}
 	if err := engine.Initialize(aveng.Config{
 		Config: avbootstrap.Config{
 			Config: common.Config{
-				Ctx:          ctx,
-				Validators:   validators,
-				Beacons:      beacons,
-				SampleK:      sampleK,
-				StartupAlpha: (3*bootstrapWeight + 3) / 4,
-				Alpha:        bootstrapWeight/2 + 1, // must be > 50%
-				Sender:       &sender,
+				Ctx:                       ctx,
+				Validators:                validators,
+				Beacons:                   beacons,
+				SampleK:                   sampleK,
+				StartupAlpha:              (3*bootstrapWeight + 3) / 4,
+				Alpha:                     bootstrapWeight/2 + 1, // must be > 50%
+				Sender:                    &sender,
+				Subnet:                    sb,
+				Delay:                     delay,
+				RetryBootstrap:            m.RetryBootstrap,
+				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
 			},
 			VtxBlocked: vtxBlocker,
 			TxBlocked:  txBlocker,
@@ -460,17 +492,18 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
 	}
 
-	// Register health checks
+	// Register health check for this chain
 	chainAlias, err := m.PrimaryAlias(ctx.ChainID)
 	if err != nil {
 		chainAlias = ctx.ChainID.String()
 	}
-	wrapperHc := &healthCheckWrapper{
-		chain: chainAlias,
-		lock:  &ctx.Lock,
-		check: engine.Health,
+	// Grab the context lock before calling the chain's health check
+	checkFn := func() (interface{}, error) {
+		ctx.Lock.Lock()
+		defer ctx.Lock.Unlock()
+		return engine.HealthCheck()
 	}
-	if err := m.HealthService.RegisterCheck(wrapperHc); err != nil {
+	if err := m.HealthService.RegisterCheck(chainAlias, checkFn); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -486,6 +519,7 @@ func (m *manager) createAvalancheChain(
 		m.StakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
+		delay,
 	)
 
 	return &chain{
@@ -507,6 +541,7 @@ func (m *manager) createSnowmanChain(
 	fxs []*common.Fx,
 	consensusParams snowball.Parameters,
 	bootstrapWeight uint64,
+	sb Subnet,
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
@@ -531,25 +566,41 @@ func (m *manager) createSnowmanChain(
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager)
+	err = sender.Initialize(
+		ctx,
+		m.Net,
+		m.ManagerConfig.Router,
+		m.TimeoutManager,
+		consensusParams.Namespace,
+		consensusParams.Metrics,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
+	}
 
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
 		sampleK = int(bootstrapWeight)
 	}
 
+	delay := &router.Delay{}
+
 	// The engine handles consensus
 	engine := &smeng.Transitive{}
 	if err := engine.Initialize(smeng.Config{
 		Config: smbootstrap.Config{
 			Config: common.Config{
-				Ctx:          ctx,
-				Validators:   validators,
-				Beacons:      beacons,
-				SampleK:      sampleK,
-				StartupAlpha: (3*bootstrapWeight + 3) / 4,
-				Alpha:        bootstrapWeight/2 + 1, // must be > 50%
-				Sender:       &sender,
+				Ctx:                       ctx,
+				Validators:                validators,
+				Beacons:                   beacons,
+				SampleK:                   sampleK,
+				StartupAlpha:              (3*bootstrapWeight + 3) / 4,
+				Alpha:                     bootstrapWeight/2 + 1, // must be > 50%
+				Sender:                    &sender,
+				Subnet:                    sb,
+				Delay:                     delay,
+				RetryBootstrap:            m.RetryBootstrap,
+				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
 			},
 			Blocked:      blocked,
 			VM:           vm,
@@ -573,6 +624,7 @@ func (m *manager) createSnowmanChain(
 		m.StakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
+		delay,
 	)
 
 	// Register health checks
@@ -581,12 +633,12 @@ func (m *manager) createSnowmanChain(
 		chainAlias = ctx.ChainID.String()
 	}
 
-	wrapperHc := &healthCheckWrapper{
-		chain: chainAlias,
-		lock:  &ctx.Lock,
-		check: engine.Health,
+	checkFn := func() (interface{}, error) {
+		ctx.Lock.Lock()
+		defer ctx.Lock.Unlock()
+		return engine.HealthCheck()
 	}
-	if err := m.HealthService.RegisterCheck(wrapperHc); err != nil {
+	if err := m.HealthService.RegisterCheck(chainAlias, checkFn); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -648,28 +700,4 @@ func (m *manager) isChainWithAlias(aliases ...string) (string, bool) {
 		}
 	}
 	return "", false
-}
-
-// Wraps a health check.
-// Grabs [Lock] before executing the health check
-type healthCheckWrapper struct {
-	check func() (interface{}, error)
-
-	// Grabs/releases this before/after health check func
-	lock *sync.RWMutex
-
-	// Alias/ID of chain this health check is for
-	chain string
-}
-
-// Name is this health check's formatted name
-func (hc *healthCheckWrapper) Name() string {
-	return hc.chain
-}
-
-// Execute executes the health check function with the lock
-func (hc *healthCheckWrapper) Execute() (interface{}, error) {
-	hc.lock.Lock()
-	defer hc.lock.Unlock()
-	return hc.check()
 }

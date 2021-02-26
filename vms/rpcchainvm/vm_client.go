@@ -387,7 +387,7 @@ func (vm *VMClient) SetPreference(id ids.ID) {
 func (vm *VMClient) LastAccepted() ids.ID { return vm.lastAccepted }
 
 // Health ...
-func (vm *VMClient) Health() (interface{}, error) {
+func (vm *VMClient) HealthCheck() (interface{}, error) {
 	return vm.client.Health(
 		context.Background(),
 		&vmproto.HealthRequest{},
