@@ -79,12 +79,12 @@ type checkListener struct {
 }
 
 func (c *checkListener) OnCheckStarted(name string) {
-	c.log.Debug("starting to run health check %s", name)
+	c.log.Debug("starting to run %s", name)
 }
 func (c *checkListener) OnCheckCompleted(name string, result health.Result) {
 	resultJSON, err := json.Marshal(result)
 	if err != nil {
-		c.log.Error("failed to encode health check %q when it was failing due to: %s", name, err)
+		c.log.Error("failed to encode %q when it was failing due to: %s", name, err)
 		return
 	}
 
@@ -97,16 +97,16 @@ func (c *checkListener) OnCheckCompleted(name string, result health.Result) {
 
 	if !exists || isHealthy == previouslyHealthy {
 		if isHealthy {
-			c.log.Debug("health check %q returned healthy with: %s", name, string(resultJSON))
+			c.log.Debug("%q returned healthy with: %s", name, string(resultJSON))
 		} else {
-			c.log.Debug("health check %q returned unhealthy with: %s", name, string(resultJSON))
+			c.log.Debug("%q returned unhealthy with: %s", name, string(resultJSON))
 		}
 		return
 	}
 
 	if isHealthy {
-		c.log.Info("health check %q became healthy with: %s", name, string(resultJSON))
+		c.log.Info("%q became healthy with: %s", name, string(resultJSON))
 	} else {
-		c.log.Warn("health check %q became unhealthy with: %s", name, string(resultJSON))
+		c.log.Warn("%q became unhealthy with: %s", name, string(resultJSON))
 	}
 }
