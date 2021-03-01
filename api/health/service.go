@@ -58,12 +58,12 @@ func (as *apiServer) Handler() (*common.HTTPHandler, error) {
 			newServer.ServeHTTP(w, r)
 			return
 		}
+		w.Header().Set("Content-Type", "application/json")
 
 		checks, healthy := as.Results()
 		if !healthy {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
-		w.Header().Set("Content-Type", "application/json")
 		err := stdjson.NewEncoder(w).Encode(APIHealthReply{
 			Checks:  checks,
 			Healthy: healthy,
