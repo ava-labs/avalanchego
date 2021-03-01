@@ -106,6 +106,8 @@ func (sb *StandardBlock) Verify() error {
 
 // Reject implements the snowman.Block interface
 func (sb *StandardBlock) Reject() error {
+	sb.vm.Ctx.Log.Verbo("Rejecting Standard Block %s at height %d with parent %s", sb.ID(), sb.Height(), sb.ParentID())
+
 	for _, tx := range sb.Txs {
 		if err := sb.vm.mempool.IssueTx(tx); err != nil {
 			sb.vm.Ctx.Log.Debug("failed to reissue tx %q due to: %s", tx.ID(), err)

@@ -126,7 +126,7 @@ func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler { return nil }
 
 // Health implements the common.VM interface
-func (vm *VM) Health() (interface{}, error) { return nil, nil }
+func (vm *VM) HealthCheck() (interface{}, error) { return nil, nil }
 
 // BuildBlock returns a block that this vm wants to add to consensus
 func (vm *VM) BuildBlock() (snowman.Block, error) {

@@ -63,6 +63,7 @@ type peer struct {
 	versionStruct, versionStr utils.AtomicInterface
 
 	// unix time of the last message sent and received respectively
+	// Must only be accessed atomically
 	lastSent, lastReceived int64
 
 	tickerCloser chan struct{}
@@ -229,7 +230,9 @@ func (p *peer) WriteMessages() {
 				byteSlice = byteSlice[written:]
 			}
 		}
-		atomic.StoreInt64(&p.lastSent, p.net.clock.Time().Unix())
+		now := p.net.clock.Time().Unix()
+		atomic.StoreInt64(&p.lastSent, now)
+		atomic.StoreInt64(&p.net.lastMsgSentTime, now)
 	}
 }
 
@@ -280,12 +283,11 @@ func (p *peer) Send(msg Msg) bool {
 
 // assumes the stateLock is not held
 func (p *peer) handle(msg Msg) {
-	p.net.heartbeat()
+	now := p.net.clock.Time()
+	atomic.StoreInt64(&p.lastReceived, now.Unix())
+	atomic.StoreInt64(&p.net.lastMsgReceivedTime, now.Unix())
 
-	currentTime := p.net.clock.Time()
-	atomic.StoreInt64(&p.lastReceived, currentTime.Unix())
-
-	if err := p.conn.SetReadDeadline(currentTime.Add(p.net.pingPongTimeout)); err != nil {
+	if err := p.conn.SetReadDeadline(now.Add(p.net.pingPongTimeout)); err != nil {
 		p.net.log.Verbo("error on setting the connection read timeout %s, closing the connection", err)
 		p.Close()
 		return

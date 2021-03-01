@@ -85,6 +85,10 @@ import (
 // - how to track CPU utilization of a peer
 // - "MaxMessages"
 
+const (
+	maxSleepDuration = 100 * time.Millisecond
+)
+
 // Handler passes incoming messages from the network to the consensus engine
 // (Actually, it receives the incoming messages from a ChainRouter, but same difference)
 type Handler struct {
@@ -111,6 +115,8 @@ type Handler struct {
 
 	toClose func()
 	closing utils.AtomicBool
+
+	delay *Delay
 }
 
 // Initialize this consensus handler
@@ -125,6 +131,7 @@ func (h *Handler) Initialize(
 	stakerCPUPortion float64,
 	namespace string,
 	metrics prometheus.Registerer,
+	delay *Delay,
 ) {
 	h.ctx = engine.Context()
 	if err := h.metrics.Initialize(namespace, metrics); err != nil {
@@ -176,6 +183,7 @@ func (h *Handler) Initialize(
 	)
 	h.engine = engine
 	h.validators = validators
+	h.delay = delay
 }
 
 // Context of this Handler
@@ -238,10 +246,23 @@ func (h *Handler) Dispatch() {
 
 // Dispatch a message to the consensus engine.
 func (h *Handler) dispatchMsg(msg message) {
-	if h.closing.GetValue() {
-		h.ctx.Log.Debug("dropping message due to closing:\n%s", msg)
-		h.metrics.dropped.Inc()
-		return
+	// If messages should be delayed to this chain, hold the messages, but check
+	// to see if the chain should be closed at least every [maxSleepDuration].
+	for {
+		if h.closing.GetValue() {
+			h.ctx.Log.Debug("dropping message due to closing:\n%s", msg)
+			h.metrics.dropped.Inc()
+			return
+		}
+		until := time.Until(h.delay.waitUntil)
+		if until <= 0 {
+			break
+		}
+		if until > maxSleepDuration {
+			time.Sleep(maxSleepDuration)
+		} else {
+			time.Sleep(until)
+		}
 	}
 
 	startTime := h.clock.Time()

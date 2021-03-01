@@ -5,6 +5,8 @@ package bootstrap
 
 import (
 	"fmt"
+	"math"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -16,6 +18,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+)
+
+const (
+	// Parameters for delaying bootstrapping to avoid potential CPU burns
+	initialBootstrappingDelay = 500 * time.Millisecond
+	maxBootstrappingDelay     = time.Minute
 )
 
 // Config ...
@@ -45,6 +53,10 @@ type Bootstrapper struct {
 
 	// true if all of the vertices in the original accepted frontier have been processed
 	processedStartingAcceptedFrontier bool
+	// number of state transitions executed
+	executedStateTransitions int
+
+	delayAmount time.Duration
 }
 
 // Initialize this engine.
@@ -58,6 +70,8 @@ func (b *Bootstrapper) Initialize(
 	b.VM = config.VM
 	b.Bootstrapped = config.Bootstrapped
 	b.OnFinished = onFinished
+	b.executedStateTransitions = math.MaxInt32
+	b.delayAmount = initialBootstrappingDelay
 
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return err
@@ -98,6 +112,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 			err)
 	}
 
+	b.NumFetched = 0
 	for _, blkID := range acceptedContainerIDs {
 		if blk, err := b.VM.GetBlock(blkID); err == nil {
 			if err := b.process(blk); err != nil {
@@ -110,7 +125,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 
 	b.processedStartingAcceptedFrontier = true
 	if numPending := b.OutstandingRequests.Len(); numPending == 0 {
-		return b.finish()
+		return b.checkFinish()
 	}
 	return nil
 }
@@ -125,7 +140,7 @@ func (b *Bootstrapper) fetch(blkID ids.ID) error {
 	// Make sure we don't already have this block
 	if _, err := b.VM.GetBlock(blkID); err == nil {
 		if numPending := b.OutstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
-			return b.finish()
+			return b.checkFinish()
 		}
 		return nil
 	}
@@ -231,22 +246,69 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 	}
 
 	if numPending := b.OutstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
-		return b.finish()
+		return b.checkFinish()
 	}
 	return nil
 }
 
-func (b *Bootstrapper) finish() error {
+// checkFinish repeatedly executes pending transactions and requests new frontier vertices until there aren't any new ones
+// after which it finishes the bootstrap process
+func (b *Bootstrapper) checkFinish() error {
 	if b.IsBootstrapped() {
 		return nil
 	}
+
 	b.Ctx.Log.Info("bootstrapping fetched %d blocks. executing state transitions...",
 		b.NumFetched)
 
-	if err := b.executeAll(b.Blocked); err != nil {
+	executedBlocks, err := b.executeAll(b.Blocked)
+	if err != nil {
 		return err
 	}
 
+	previouslyExecuted := b.executedStateTransitions
+	b.executedStateTransitions = executedBlocks
+
+	// Note that executedVts < c*previouslyExecuted is enforced so that the
+	// bootstrapping process will terminate even as new blocks are being issued.
+	if executedBlocks > 0 && executedBlocks < previouslyExecuted/2 && b.RetryBootstrap {
+		b.Ctx.Log.Info("bootstrapping is checking for more blocks before finishing the bootstrap process...")
+
+		b.processedStartingAcceptedFrontier = false
+		return b.RestartBootstrap(true)
+	}
+
+	b.Ctx.Log.Info("bootstrapping fetched enough blocks to finish the bootstrap process...")
+
+	// Notify the subnet that this chain is synced
+	b.Subnet.Bootstrapped(b.Ctx.ChainID)
+
+	// If there is an additional callback, notify them that this chain has been
+	// synced.
+	if b.Bootstrapped != nil {
+		b.Bootstrapped()
+	}
+
+	// If the subnet hasn't finished bootstrapping, this chain should remain
+	// syncing.
+	if !b.Subnet.IsBootstrapped() {
+		b.Ctx.Log.Info("bootstrapping is waiting for the remaining chains in this subnet to finish syncing...")
+		// Delay new incoming messages to avoid consuming unnecessary resources
+		// while keeping up to date on the latest tip.
+		b.Config.Delay.Delay(b.delayAmount)
+		b.delayAmount *= 2
+		if b.delayAmount > maxBootstrappingDelay {
+			b.delayAmount = maxBootstrappingDelay
+		}
+
+		b.processedStartingAcceptedFrontier = false
+		return b.RestartBootstrap(true)
+	}
+
+	return b.finish()
+}
+
+func (b *Bootstrapper) finish() error {
 	if err := b.VM.Bootstrapped(); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
 			err)
@@ -257,21 +319,17 @@ func (b *Bootstrapper) finish() error {
 		return err
 	}
 	b.Ctx.Bootstrapped()
-
-	if b.Bootstrapped != nil {
-		b.Bootstrapped()
-	}
 	return nil
 }
 
-func (b *Bootstrapper) executeAll(jobs *queue.Jobs) error {
+func (b *Bootstrapper) executeAll(jobs *queue.Jobs) (int, error) {
 	numExecuted := 0
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		if err := jobs.Execute(job); err != nil {
-			return err
+			return numExecuted, err
 		}
 		if err := jobs.Commit(); err != nil {
-			return err
+			return numExecuted, err
 		}
 		numExecuted++
 		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
@@ -282,7 +340,7 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs) error {
 		b.Ctx.DecisionDispatcher.Accept(b.Ctx, job.ID(), job.Bytes())
 	}
 	b.Ctx.Log.Info("executed %d blocks", numExecuted)
-	return nil
+	return numExecuted, nil
 }
 
 // Connected implements the Engine interface.

@@ -5,6 +5,7 @@ package common
 
 import (
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/snow"
 )
 
@@ -62,7 +63,7 @@ type VM interface {
 
 	// Returns nil if the VM is healthy.
 	// Periodically called and reported via the node's Health API.
-	Health() (interface{}, error)
+	health.Checkable
 }
 
 // StaticVM describes the functionality that allows a user to interact with a VM

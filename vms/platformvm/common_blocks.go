@@ -197,10 +197,14 @@ func (cdb *CommonDecisionBlock) setBaseDatabase(db database.Database) {
 }
 
 // onAccept returns:
-// 1) The state of the chain if this block is accepted
-// 2) The function to execute if this block is accepted
+// 1) The current state of the chain, if this block is decided or hasn't been
+//    verified.
+// 2) The state of the chain after this block is accepted, if this block was
+//    verified successfully.
 func (cdb *CommonDecisionBlock) onAccept() database.Database {
-	if cdb.Status().Decided() {
+	// While this function should never be called if the block isn't accepted or
+	// verified, we handle the case as a matter of precaution.
+	if cdb.Status().Decided() || cdb.onAcceptDB == nil {
 		return cdb.vm.DB
 	}
 	return cdb.onAcceptDB
