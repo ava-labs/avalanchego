@@ -23,8 +23,8 @@ type Service interface {
 func NewService(checkFreq time.Duration, log logging.Logger) Service {
 	healthChecker := health.New()
 	healthChecker.WithCheckListener(&checkListener{
-		log:          log,
-		passedChecks: make(map[string]struct{}),
+		log:    log,
+		checks: make(map[string]bool),
 	})
 	return &service{
 		Health:    healthChecker,
@@ -72,30 +72,36 @@ func (s *service) RegisterMonotonicCheck(name string, checkFn Check) error {
 }
 
 type checkListener struct {
-	log          logging.Logger
-	passedChecks map[string]struct{}
+	log    logging.Logger
+	checks map[string]bool
 }
 
 func (c *checkListener) OnCheckStarted(name string) {
 	c.log.Debug("starting to run health check %s", name)
 }
 func (c *checkListener) OnCheckCompleted(name string, result health.Result) {
-	if result.IsHealthy() {
-		c.log.Debug("health check %q returned healthy", name)
-		c.passedChecks[name] = struct{}{}
-		return
-	}
-
 	resultJSON, err := json.Marshal(result)
 	if err != nil {
 		c.log.Error("failed to encode health check %q when it was failing due to: %s", name, err)
 		return
 	}
 
-	_, previouslyPassed := c.passedChecks[name]
-	if previouslyPassed {
-		c.log.Warn("health check %q returned unhealthy with: %s", name, string(resultJSON))
+	isHealthy := result.IsHealthy()
+	previouslyHealthy, exists := c.checks[name]
+	c.checks[name] = isHealthy
+
+	if !exists || isHealthy == previouslyHealthy {
+		if isHealthy {
+			c.log.Debug("health check %q returned healthy with: %s", name, string(resultJSON))
+		} else {
+			c.log.Debug("health check %q returned unhealthy with: %s", name, string(resultJSON))
+		}
+		return
+	}
+
+	if isHealthy {
+		c.log.Info("health check %q became healthy with: %s", name, string(resultJSON))
 	} else {
-		c.log.Debug("health check %q hasn't returned healthy yet. It is currently unhealthy with: %s", name, string(resultJSON))
+		c.log.Warn("health check %q became unhealthy with: %s", name, string(resultJSON))
 	}
 }
