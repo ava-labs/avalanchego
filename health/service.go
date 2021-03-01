@@ -1,11 +1,13 @@
 package health
 
 import (
+	"encoding/json"
 	"time"
 
 	health "github.com/AppsFlyer/go-sundheit"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 // Service performs health checks. Other things register health checks
@@ -13,14 +15,19 @@ import (
 type Service interface {
 	RegisterCheck(name string, checkFn Check) error
 	RegisterMonotonicCheck(name string, checkFn Check) error
-	Results() (map[string]interface{}, bool)
+	Results() (map[string]health.Result, bool)
 }
 
 // NewService returns a new [Service] where the health checks
 // run every [checkFreq]
-func NewService(checkFreq time.Duration) Service {
+func NewService(checkFreq time.Duration, log logging.Logger) Service {
+	healthChecker := health.New()
+	healthChecker.WithCheckListener(&checkListener{
+		log:          log,
+		passedChecks: make(map[string]struct{}),
+	})
 	return &service{
-		health:    health.New(),
+		Health:    healthChecker,
 		checkFreq: checkFreq,
 	}
 }
@@ -28,21 +35,9 @@ func NewService(checkFreq time.Duration) Service {
 // service implements Service
 type service struct {
 	// performs the underlying health checks
-	health health.Health
+	health.Health
 	// Time between health checks
 	checkFreq time.Duration
-}
-
-// Results returns:
-// 1) Name of health check --> health check results
-// 2) true iff healthy
-func (s *service) Results() (map[string]interface{}, bool) {
-	rawResults, healthy := s.health.Results()
-	results := make(map[string]interface{}, len(rawResults))
-	for name, res := range rawResults {
-		results[name] = res
-	}
-	return results, healthy
 }
 
 // RegisterCheckFn adds a check that calls [checkFn] to evaluate health
@@ -52,7 +47,7 @@ func (s *service) RegisterCheck(name string, checkFn Check) error {
 		checkFn: checkFn,
 	}
 
-	return s.health.RegisterCheck(&health.Config{
+	return s.Health.RegisterCheck(&health.Config{
 		InitialDelay:    constants.DefaultHealthCheckInitialDelay,
 		ExecutionPeriod: s.checkFreq,
 		Check:           check,
@@ -69,9 +64,38 @@ func (s *service) RegisterMonotonicCheck(name string, checkFn Check) error {
 		},
 	}
 
-	return s.health.RegisterCheck(&health.Config{
+	return s.Health.RegisterCheck(&health.Config{
 		InitialDelay:    constants.DefaultHealthCheckInitialDelay,
 		ExecutionPeriod: s.checkFreq,
 		Check:           c,
 	})
+}
+
+type checkListener struct {
+	log          logging.Logger
+	passedChecks map[string]struct{}
+}
+
+func (c *checkListener) OnCheckStarted(name string) {
+	c.log.Debug("starting to run health check %s", name)
+}
+func (c *checkListener) OnCheckCompleted(name string, result health.Result) {
+	if result.IsHealthy() {
+		c.log.Debug("health check %q returned healthy", name)
+		c.passedChecks[name] = struct{}{}
+		return
+	}
+
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		c.log.Error("failed to encode health check %q when it was failing due to: %s", name, err)
+		return
+	}
+
+	_, previouslyPassed := c.passedChecks[name]
+	if previouslyPassed {
+		c.log.Warn("health check %q returned unhealthy with: %s", name, string(resultJSON))
+	} else {
+		c.log.Debug("health check %q hasn't returned healthy yet. It is currently unhealthy with: %s", name, string(resultJSON))
+	}
 }

@@ -11,7 +11,8 @@ import (
 
 	"github.com/gorilla/rpc/v2"
 
-	"github.com/ava-labs/avalanchego/health"
+	health "github.com/AppsFlyer/go-sundheit"
+
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -30,7 +31,7 @@ type Service interface {
 
 func NewService(checkFreq time.Duration, log logging.Logger) Service {
 	return &apiServer{
-		Service: healthlib.NewService(checkFreq),
+		Service: healthlib.NewService(checkFreq, log),
 		log:     log,
 	}
 }
@@ -50,15 +51,25 @@ func (as *apiServer) Handler() (*common.HTTPHandler, error) {
 		return nil, err
 	}
 
+	// If a GET request is sent, we respond with a 200 if the node is healthy or
+	// a 503 if the node isn't healthy.
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet { // GET request --> return 200 if getLiveness returns true, else 503
-			if _, healthy := as.Results(); healthy {
-				w.WriteHeader(http.StatusOK)
-			} else {
-				w.WriteHeader(http.StatusServiceUnavailable)
-			}
-		} else {
-			newServer.ServeHTTP(w, r) // Other request --> use JSON RPC
+		if r.Method != http.MethodGet {
+			newServer.ServeHTTP(w, r)
+			return
+		}
+
+		checks, healthy := as.Results()
+		if !healthy {
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		err := stdjson.NewEncoder(w).Encode(APIHealthReply{
+			Checks:  checks,
+			Healthy: healthy,
+		})
+		if err != nil {
+			as.log.Debug("failed to encode the health check response due to %s", err)
 		}
 	})
 	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: handler}, nil
@@ -69,8 +80,8 @@ type APIHealthArgs struct{}
 
 // APIHealthReply is the response for Health
 type APIHealthReply struct {
-	Checks  map[string]interface{} `json:"checks"`
-	Healthy bool                   `json:"healthy"`
+	Checks  map[string]health.Result `json:"checks"`
+	Healthy bool                     `json:"healthy"`
 }
 
 // Health returns a summation of the health of the node
@@ -107,8 +118,8 @@ func NewNoOpService() Service {
 }
 
 // RegisterCheck implements the Service interface
-func (n *noOp) Results() (map[string]interface{}, bool) {
-	return nil, true
+func (n *noOp) Results() (map[string]health.Result, bool) {
+	return map[string]health.Result{}, true
 }
 
 // RegisterCheck implements the Service interface
@@ -117,11 +128,11 @@ func (n *noOp) Handler() (_ *common.HTTPHandler, _ error) {
 }
 
 // RegisterCheckFn implements the Service interface
-func (n *noOp) RegisterCheck(_ string, _ health.Check) error {
+func (n *noOp) RegisterCheck(_ string, _ healthlib.Check) error {
 	return nil
 }
 
 // RegisterMonotonicCheckFn implements the Service interface
-func (n *noOp) RegisterMonotonicCheck(_ string, _ health.Check) error {
+func (n *noOp) RegisterMonotonicCheck(_ string, _ healthlib.Check) error {
 	return nil
 }
