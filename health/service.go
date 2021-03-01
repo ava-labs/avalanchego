@@ -2,6 +2,7 @@ package health
 
 import (
 	"encoding/json"
+	"sync"
 	"time"
 
 	health "github.com/AppsFlyer/go-sundheit"
@@ -73,6 +74,7 @@ func (s *service) RegisterMonotonicCheck(name string, checkFn Check) error {
 
 type checkListener struct {
 	log    logging.Logger
+	lock   sync.Mutex
 	checks map[string]bool
 }
 
@@ -87,8 +89,11 @@ func (c *checkListener) OnCheckCompleted(name string, result health.Result) {
 	}
 
 	isHealthy := result.IsHealthy()
+
+	c.lock.Lock()
 	previouslyHealthy, exists := c.checks[name]
 	c.checks[name] = isHealthy
+	c.lock.Unlock()
 
 	if !exists || isHealthy == previouslyHealthy {
 		if isHealthy {
