@@ -58,12 +58,17 @@ func (as *apiServer) Handler() (*common.HTTPHandler, error) {
 			newServer.ServeHTTP(w, r)
 			return
 		}
+
+		// Make sure the content type is set before writing the header.
 		w.Header().Set("Content-Type", "application/json")
 
 		checks, healthy := as.Results()
 		if !healthy {
+			// If a health check has failed, we should return a 503.
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
+		// The encoder will call write on the writer, which will write the
+		// header with a 200.
 		err := stdjson.NewEncoder(w).Encode(APIHealthReply{
 			Checks:  checks,
 			Healthy: healthy,

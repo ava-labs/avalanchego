@@ -23,6 +23,7 @@ type Service interface {
 // run every [checkFreq]
 func NewService(checkFreq time.Duration, log logging.Logger) Service {
 	healthChecker := health.New()
+	// Add the check listener to report when a check changes status.
 	healthChecker.WithCheckListener(&checkListener{
 		log:    log,
 		checks: make(map[string]bool),
@@ -73,14 +74,19 @@ func (s *service) RegisterMonotonicCheck(name string, checkFn Check) error {
 }
 
 type checkListener struct {
-	log    logging.Logger
-	lock   sync.Mutex
+	log logging.Logger
+
+	// lock ensures that updates and reads to [checks] are atomic
+	lock sync.Mutex
+	// checks maps name -> is healthy
 	checks map[string]bool
 }
 
 func (c *checkListener) OnCheckStarted(name string) {
 	c.log.Debug("starting to run %s", name)
 }
+
+// OnCheckCompleted is called concurrently with multiple health checks.
 func (c *checkListener) OnCheckCompleted(name string, result health.Result) {
 	resultJSON, err := json.Marshal(result)
 	if err != nil {
