@@ -569,9 +569,10 @@ func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 // SetPreference sets what the current tail of the chain is
 func (vm *VM) SetPreference(blkID ids.ID) error {
 	block := vm.getBlock(blkID)
-	vm.ctx.Log.AssertTrue(block != nil, "problem setting preferred block, couldn't find blkID %s", blkID)
-	vm.ctx.Log.AssertNoError(vm.chain.SetPreference(block.ethBlock))
-	return nil
+	if block == nil {
+		return errUnknownBlock
+	}
+	return vm.chain.SetPreference(block.ethBlock)
 }
 
 // LastAccepted returns the ID of the block that was last accepted
@@ -608,21 +609,25 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 	enabledAPIs := vm.CLIConfig.EthAPIs()
 	vm.chain.AttachEthService(handler, vm.CLIConfig.EthAPIs())
 
+	errs := wrappers.Errs{}
 	if vm.CLIConfig.SnowmanAPIEnabled {
-		handler.RegisterName("snowman", &SnowmanAPI{vm})
+		errs.Add(handler.RegisterName("snowman", &SnowmanAPI{vm}))
 		enabledAPIs = append(enabledAPIs, "snowman")
 	}
 	if vm.CLIConfig.CorethAdminAPIEnabled {
-		handler.RegisterName("admin", &admin.Performance{})
+		errs.Add(handler.RegisterName("admin", &admin.Performance{}))
 		enabledAPIs = append(enabledAPIs, "coreth-admin")
 	}
 	if vm.CLIConfig.NetAPIEnabled {
-		handler.RegisterName("net", &NetAPI{vm})
+		errs.Add(handler.RegisterName("net", &NetAPI{vm}))
 		enabledAPIs = append(enabledAPIs, "net")
 	}
 	if vm.CLIConfig.Web3APIEnabled {
-		handler.RegisterName("web3", &Web3API{})
+		errs.Add(handler.RegisterName("web3", &Web3API{}))
 		enabledAPIs = append(enabledAPIs, "web3")
+	}
+	if errs.Errored() {
+		return nil, errs.Err
 	}
 
 	log.Info(fmt.Sprintf("Enabled APIs: %s", strings.Join(enabledAPIs, ", ")))
@@ -637,7 +642,10 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 // CreateStaticHandlers makes new http handlers that can handle API calls
 func (vm *VM) CreateStaticHandlers() (map[string]*commonEng.HTTPHandler, error) {
 	handler := rpc.NewServer()
-	handler.RegisterName("static", &StaticService{})
+	if err := handler.RegisterName("static", &StaticService{}); err != nil {
+		return nil, err
+	}
+
 	return map[string]*commonEng.HTTPHandler{
 		"/rpc": {LockOptions: commonEng.NoLock, Handler: handler},
 		"/ws":  {LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandler([]string{"*"})},
@@ -657,7 +665,7 @@ func (vm *VM) updateStatus(blkID ids.ID, status choices.Status) error {
 	if status == choices.Accepted {
 		blk := vm.getBlock(blkID)
 		if blk == nil {
-			return fmt.Errorf("could not find blkID %s", blkID)
+			return errUnknownBlock
 		}
 		if err := vm.chain.Accept(blk.ethBlock); err != nil {
 			return fmt.Errorf("could not accept blkID %s: %w", blkID, err)
@@ -825,7 +833,7 @@ func (vm *VM) writeBackMetadata() {
 
 	b, err := rlp.EncodeToBytes(vm.lastAccepted.ethBlock.Hash())
 	// TODO: change these to return an error once vm.writingMetadata is
-	// refactored
+	// removed
 	vm.ctx.Log.AssertNoError(err)
 	vm.ctx.Log.AssertNoError(vm.chaindb.Put(lastAcceptedKey, b))
 
