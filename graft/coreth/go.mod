@@ -4,7 +4,7 @@ go 1.14
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.5.7
-	github.com/ava-labs/avalanchego v1.2.2-0.20210301205942-c58f876e9e62
+	github.com/ava-labs/avalanchego v1.2.2-0.20210302204446-3f8e4094c10d
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
 	github.com/edsrzf/mmap-go v1.0.0

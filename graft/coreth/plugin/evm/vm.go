@@ -14,8 +14,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
-
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
@@ -37,12 +35,14 @@ import (
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -63,6 +63,8 @@ var (
 	GitCommit string
 	// Version is the version of Coreth
 	Version = "coreth-v0.3.24"
+
+	_ block.ChainVM = &VM{}
 )
 
 var (
@@ -566,19 +568,20 @@ func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 }
 
 // SetPreference sets what the current tail of the chain is
-func (vm *VM) SetPreference(blkID ids.ID) {
+func (vm *VM) SetPreference(blkID ids.ID) error {
 	block := vm.getBlock(blkID)
 	vm.ctx.Log.AssertTrue(block != nil, "problem setting preferred block, couldn't find blkID %s", blkID)
 
 	vm.chain.SetPreference(block.ethBlock)
+	return nil
 }
 
 // LastAccepted returns the ID of the block that was last accepted
-func (vm *VM) LastAccepted() ids.ID {
+func (vm *VM) LastAccepted() (ids.ID, error) {
 	vm.metalock.Lock()
 	defer vm.metalock.Unlock()
 
-	return vm.lastAccepted.ID()
+	return vm.lastAccepted.ID(), nil
 }
 
 // NewHandler returns a new Handler for a service where:
@@ -602,7 +605,7 @@ func newHandler(name string, service interface{}, lockOption ...commonEng.LockOp
 }
 
 // CreateHandlers makes new http handlers that can handle API calls
-func (vm *VM) CreateHandlers() map[string]*commonEng.HTTPHandler {
+func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 	handler := vm.chain.NewRPCHandler(time.Duration(vm.CLIConfig.APIMaxDuration))
 	enabledAPIs := vm.CLIConfig.EthAPIs()
 	vm.chain.AttachEthService(handler, vm.CLIConfig.EthAPIs())
@@ -630,17 +633,17 @@ func (vm *VM) CreateHandlers() map[string]*commonEng.HTTPHandler {
 		"/rpc":  {LockOptions: commonEng.NoLock, Handler: handler},
 		"/avax": newHandler("avax", &AvaxAPI{vm}),
 		"/ws":   {LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandler([]string{"*"})},
-	}
+	}, nil
 }
 
 // CreateStaticHandlers makes new http handlers that can handle API calls
-func (vm *VM) CreateStaticHandlers() map[string]*commonEng.HTTPHandler {
+func (vm *VM) CreateStaticHandlers() (map[string]*commonEng.HTTPHandler, error) {
 	handler := rpc.NewServer()
 	handler.RegisterName("static", &StaticService{})
 	return map[string]*commonEng.HTTPHandler{
 		"/rpc": {LockOptions: commonEng.NoLock, Handler: handler},
 		"/ws":  {LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandler([]string{"*"})},
-	}
+	}, nil
 }
 
 /*
