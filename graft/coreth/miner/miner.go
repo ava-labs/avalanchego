@@ -149,10 +149,3 @@ func (miner *Miner) GenBlock() {
 func (miner *Miner) GetWorkerMux() *event.TypeMux {
 	return miner.worker.mux
 }
-
-// SetPreference sets the block we should treat as the parent
-// when building future blocks. [block] may not yet be finalized
-// when this function is called.
-func (miner *Miner) SetPreference(block *types.Block) {
-	miner.worker.setPreference(block)
-}
