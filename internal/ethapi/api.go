@@ -852,6 +852,7 @@ func DoCall(ctx context.Context, b Backend, args CallArgs, blockNrOrHash rpc.Blo
 		// Override header with a copy to ensure the original header is not modified
 		header = types.CopyHeader(header)
 		header.Time = uint64(time.Now().Unix())
+		header.Number = new(big.Int).Add(header.Number, big.NewInt(1))
 	}
 	// Override the fields of specified contracts before execution.
 	for addr, account := range overrides {
