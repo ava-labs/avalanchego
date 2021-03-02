@@ -270,7 +270,15 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		// advance the timestamp, so it can be issued.
 		maxChainStartTime := currentChainTimestamp.Add(maxFutureStartTime)
 		maxLocalStartTime := localTime.Add(maxFutureStartTime)
-		if startTime.After(maxChainStartTime) && startTime.Before(maxLocalStartTime) {
+		// If the start time is too far in the future relative to local time
+		// drop the transaction and continue
+		if startTime.After(maxLocalStartTime) {
+			m.unissuedProposalTxs.Remove()
+			m.unissuedTxIDs.Remove(txID)
+			continue
+		}
+
+		if startTime.After(maxChainStartTime) {
 			advanceTimeTx, err := m.vm.newAdvanceTimeTx(localTime)
 			if err != nil {
 				return nil, err
@@ -283,13 +291,6 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 				return nil, err
 			}
 			return blk, m.vm.DB.Commit()
-		}
-		// If the start time is too far in the future relative to local time
-		// drop the transaction and continue
-		if startTime.After(maxLocalStartTime) {
-			m.unissuedProposalTxs.Remove()
-			m.unissuedTxIDs.Remove(txID)
-			continue
 		}
 
 		// Attempt to issue the transaction
