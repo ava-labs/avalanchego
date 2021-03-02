@@ -85,7 +85,7 @@ func NewClient(client vmproto.VMClient, broker *plugin.GRPCBroker) *VMClient {
 	}
 }
 
-// SetProcess ...
+// SetProcess gives ownership of the server process to the client.
 func (vm *VMClient) SetProcess(proc *plugin.Client) {
 	vm.proc = proc
 }
@@ -107,7 +107,6 @@ func (vm *VMClient) initializeCaches(registerer prometheus.Registerer, namespace
 	return nil
 }
 
-// Initialize ...
 func (vm *VMClient) Initialize(
 	ctx *snow.Context,
 	db database.Database,
@@ -233,19 +232,16 @@ func (vm *VMClient) startSNLookupServer(opts []grpc.ServerOption) *grpc.Server {
 	return server
 }
 
-// Bootstrapping ...
 func (vm *VMClient) Bootstrapping() error {
 	_, err := vm.client.Bootstrapping(context.Background(), &vmproto.BootstrappingRequest{})
 	return err
 }
 
-// Bootstrapped ...
 func (vm *VMClient) Bootstrapped() error {
 	_, err := vm.client.Bootstrapped(context.Background(), &vmproto.BootstrappedRequest{})
 	return err
 }
 
-// Shutdown ...
 func (vm *VMClient) Shutdown() error {
 	errs := wrappers.Errs{}
 	_, err := vm.client.Shutdown(context.Background(), &vmproto.ShutdownRequest{})
@@ -260,7 +256,6 @@ func (vm *VMClient) Shutdown() error {
 	return errs.Err
 }
 
-// CreateHandlers ...
 func (vm *VMClient) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	resp, err := vm.client.CreateHandlers(context.Background(), &vmproto.CreateHandlersRequest{})
 	if err != nil {
@@ -283,7 +278,6 @@ func (vm *VMClient) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	return handlers, nil
 }
 
-// BuildBlock ...
 func (vm *VMClient) BuildBlock() (snowman.Block, error) {
 	resp, err := vm.client.BuildBlock(context.Background(), &vmproto.BuildBlockRequest{})
 	if err != nil {
@@ -306,7 +300,6 @@ func (vm *VMClient) BuildBlock() (snowman.Block, error) {
 	}, nil
 }
 
-// ParseBlock ...
 func (vm *VMClient) ParseBlock(bytes []byte) (snowman.Block, error) {
 	resp, err := vm.client.ParseBlock(context.Background(), &vmproto.ParseBlockRequest{
 		Bytes: bytes,
@@ -346,7 +339,6 @@ func (vm *VMClient) ParseBlock(bytes []byte) (snowman.Block, error) {
 	return blk, nil
 }
 
-// GetBlock ...
 func (vm *VMClient) GetBlock(id ids.ID) (snowman.Block, error) {
 	if blk, cached := vm.blks[id]; cached {
 		return blk, nil
@@ -382,7 +374,6 @@ func (vm *VMClient) GetBlock(id ids.ID) (snowman.Block, error) {
 	return blk, nil
 }
 
-// SetPreference ...
 func (vm *VMClient) SetPreference(id ids.ID) error {
 	_, err := vm.client.SetPreference(context.Background(), &vmproto.SetPreferenceRequest{
 		Id: id[:],
@@ -390,10 +381,8 @@ func (vm *VMClient) SetPreference(id ids.ID) error {
 	return err
 }
 
-// LastAccepted ...
 func (vm *VMClient) LastAccepted() (ids.ID, error) { return vm.lastAccepted, nil }
 
-// Health ...
 func (vm *VMClient) HealthCheck() (interface{}, error) {
 	return vm.client.Health(
 		context.Background(),
@@ -412,10 +401,8 @@ type BlockClient struct {
 	height   uint64
 }
 
-// ID ...
 func (b *BlockClient) ID() ids.ID { return b.id }
 
-// Accept ...
 func (b *BlockClient) Accept() error {
 	delete(b.vm.blks, b.id)
 	b.status = choices.Accepted
@@ -431,7 +418,6 @@ func (b *BlockClient) Accept() error {
 	return nil
 }
 
-// Reject ...
 func (b *BlockClient) Reject() error {
 	delete(b.vm.blks, b.id)
 	b.status = choices.Rejected
@@ -443,10 +429,8 @@ func (b *BlockClient) Reject() error {
 	return err
 }
 
-// Status ...
 func (b *BlockClient) Status() choices.Status { return b.status }
 
-// Parent ...
 func (b *BlockClient) Parent() snowman.Block {
 	if parent, err := b.vm.GetBlock(b.parentID); err == nil {
 		return parent
@@ -454,7 +438,6 @@ func (b *BlockClient) Parent() snowman.Block {
 	return &missing.Block{BlkID: b.parentID}
 }
 
-// Verify ...
 func (b *BlockClient) Verify() error {
 	_, err := b.vm.client.BlockVerify(context.Background(), &vmproto.BlockVerifyRequest{
 		Id: b.id[:],
@@ -467,8 +450,5 @@ func (b *BlockClient) Verify() error {
 	return nil
 }
 
-// Bytes ...
-func (b *BlockClient) Bytes() []byte { return b.bytes }
-
-// Height ...
+func (b *BlockClient) Bytes() []byte  { return b.bytes }
 func (b *BlockClient) Height() uint64 { return b.height }
