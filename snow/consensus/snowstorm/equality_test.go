@@ -26,6 +26,7 @@ func TestConflictGraphEquality(t *testing.T) {
 		BetaVirtuous:      20,
 		BetaRogue:         30,
 		ConcurrentRepolls: 1,
+		OptimalProcessing: 1,
 	}
 	seed := int64(0)
 
