@@ -6,11 +6,15 @@ package rpcchainvm
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"google.golang.org/grpc"
 
 	"github.com/hashicorp/go-plugin"
+	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto"
@@ -44,6 +48,10 @@ var (
 	_ block.ChainVM = &VMClient{}
 )
 
+const (
+	decidedCacheSize = 500
+)
+
 // VMClient is an implementation of VM that talks over RPC.
 type VMClient struct {
 	client vmproto.VMClient
@@ -63,6 +71,8 @@ type VMClient struct {
 	ctx  *snow.Context
 	blks map[ids.ID]*BlockClient
 
+	decidedBlocks cache.Cacher
+
 	lastAccepted ids.ID
 }
 
@@ -78,6 +88,23 @@ func NewClient(client vmproto.VMClient, broker *plugin.GRPCBroker) *VMClient {
 // SetProcess ...
 func (vm *VMClient) SetProcess(proc *plugin.Client) {
 	vm.proc = proc
+}
+
+// initializeCaches creates a new [decidedBlocks] and [missingBlocks] cache. It
+// wraps these caches in metercacher so that we can get prometheus metrics
+// about their performance.
+func (vm *VMClient) initializeCaches(registerer prometheus.Registerer, namespace string) error {
+	decidedCache, err := metercacher.New(
+		fmt.Sprintf("%s_rpcchainvm_decided_cache", namespace),
+		registerer,
+		&cache.LRU{Size: decidedCacheSize},
+	)
+	if err != nil {
+		return fmt.Errorf("could not initialize decided blocks cache: %w", err)
+	}
+	vm.decidedBlocks = decidedCache
+
+	return nil
 }
 
 // Initialize ...
@@ -105,6 +132,10 @@ func (vm *VMClient) Initialize(
 	vm.sharedMemory = gsharedmemory.NewServer(ctx.SharedMemory, db)
 	vm.bcLookup = galiaslookup.NewServer(ctx.BCLookup)
 	vm.snLookup = gsubnetlookup.NewServer(ctx.SNLookup)
+
+	if err := vm.initializeCaches(ctx.Metrics, ctx.Namespace); err != nil {
+		return err
+	}
 
 	// start the db server
 	dbBrokerID := vm.broker.NextId()
@@ -261,6 +292,7 @@ func (vm *VMClient) BuildBlock() (snowman.Block, error) {
 
 	id, err := ids.ToID(resp.Id)
 	vm.ctx.Log.AssertNoError(err)
+
 	parentID, err := ids.ToID(resp.ParentID)
 	vm.ctx.Log.AssertNoError(err)
 
@@ -289,26 +321,38 @@ func (vm *VMClient) ParseBlock(bytes []byte) (snowman.Block, error) {
 	if blk, cached := vm.blks[id]; cached {
 		return blk, nil
 	}
+	if blkIntf, cached := vm.decidedBlocks.Get(id); cached {
+		return blkIntf.(*BlockClient), nil
+	}
 
 	parentID, err := ids.ToID(resp.ParentID)
 	vm.ctx.Log.AssertNoError(err)
+
 	status := choices.Status(resp.Status)
 	vm.ctx.Log.AssertDeferredNoError(status.Valid)
 
-	return &BlockClient{
+	blk := &BlockClient{
 		vm:       vm,
 		id:       id,
 		parentID: parentID,
 		status:   status,
 		bytes:    bytes,
 		height:   resp.Height,
-	}, nil
+	}
+
+	if status.Decided() {
+		vm.decidedBlocks.Put(id, blk)
+	}
+	return blk, nil
 }
 
 // GetBlock ...
 func (vm *VMClient) GetBlock(id ids.ID) (snowman.Block, error) {
 	if blk, cached := vm.blks[id]; cached {
 		return blk, nil
+	}
+	if blkIntf, cached := vm.decidedBlocks.Get(id); cached {
+		return blkIntf.(*BlockClient), nil
 	}
 
 	resp, err := vm.client.GetBlock(context.Background(), &vmproto.GetBlockRequest{
@@ -323,14 +367,19 @@ func (vm *VMClient) GetBlock(id ids.ID) (snowman.Block, error) {
 	status := choices.Status(resp.Status)
 	vm.ctx.Log.AssertDeferredNoError(status.Valid)
 
-	return &BlockClient{
+	blk := &BlockClient{
 		vm:       vm,
 		id:       id,
 		parentID: parentID,
 		status:   status,
 		bytes:    resp.Bytes,
 		height:   resp.Height,
-	}, nil
+	}
+
+	if status.Decided() {
+		vm.decidedBlocks.Put(id, blk)
+	}
+	return blk, nil
 }
 
 // SetPreference ...
@@ -345,7 +394,7 @@ func (vm *VMClient) SetPreference(id ids.ID) error {
 func (vm *VMClient) LastAccepted() (ids.ID, error) { return vm.lastAccepted, nil }
 
 // Health ...
-func (vm *VMClient) Health() (interface{}, error) {
+func (vm *VMClient) HealthCheck() (interface{}, error) {
 	return vm.client.Health(
 		context.Background(),
 		&vmproto.HealthRequest{},
@@ -377,6 +426,7 @@ func (b *BlockClient) Accept() error {
 		return err
 	}
 
+	b.vm.decidedBlocks.Put(b.id, b)
 	b.vm.lastAccepted = b.id
 	return nil
 }
@@ -388,6 +438,8 @@ func (b *BlockClient) Reject() error {
 	_, err := b.vm.client.BlockReject(context.Background(), &vmproto.BlockRejectRequest{
 		Id: b.id[:],
 	})
+
+	b.vm.decidedBlocks.Put(b.id, b)
 	return err
 }
 

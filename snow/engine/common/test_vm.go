@@ -18,6 +18,7 @@ var (
 	errShutdown             = errors.New("unexpectedly called Shutdown")
 	errCreateHandlers       = errors.New("unexpectedly called CreateHandlers")
 	errCreateStaticHandlers = errors.New("unexpectedly called CreateStaticHandlers")
+	errHealthCheck          = errors.New("unexpectedly called HealthCheck")
 
 	_ VM = &TestVM{}
 )
@@ -28,13 +29,13 @@ type TestVM struct {
 
 	CantInitialize, CantBootstrapping, CantBootstrapped,
 	CantShutdown, CantCreateHandlers, CantCreateStaticHandlers,
-	CantHealth bool
+	CantHealthCheck bool
 
 	InitializeF                              func(*snow.Context, database.Database, []byte, chan<- Message, []*Fx) error
 	BootstrappingF, BootstrappedF, ShutdownF func() error
 	CreateHandlersF                          func() (map[string]*HTTPHandler, error)
 	CreateStaticHandlersF                    func() (map[string]*HTTPHandler, error)
-	HealthF                                  func() (interface{}, error)
+	HealthCheckF                             func() (interface{}, error)
 }
 
 func (vm *TestVM) Default(cant bool) {
@@ -44,7 +45,7 @@ func (vm *TestVM) Default(cant bool) {
 	vm.CantShutdown = cant
 	vm.CantCreateHandlers = cant
 	vm.CantCreateStaticHandlers = cant
-	vm.CantHealth = cant
+	vm.CantHealthCheck = cant
 }
 
 func (vm *TestVM) Initialize(ctx *snow.Context, db database.Database, initState []byte, msgChan chan<- Message, fxs []*Fx) error {
@@ -116,13 +117,12 @@ func (vm *TestVM) CreateStaticHandlers() (map[string]*HTTPHandler, error) {
 	return nil, nil
 }
 
-// Health ...
-func (vm *TestVM) Health() (interface{}, error) {
-	if vm.HealthF != nil {
-		return vm.HealthF()
+func (vm *TestVM) HealthCheck() (interface{}, error) {
+	if vm.HealthCheckF != nil {
+		return vm.HealthCheckF()
 	}
-	if vm.CantHealth && vm.T != nil {
-		vm.T.Fatalf("Unexpectedly called Health")
+	if vm.CantHealthCheck && vm.T != nil {
+		vm.T.Fatal(errHealthCheck)
 	}
-	return nil, errors.New("Unexpectedly called Health")
+	return nil, errHealthCheck
 }

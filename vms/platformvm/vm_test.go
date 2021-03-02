@@ -2143,13 +2143,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	timeoutManager := timeout.Manager{}
 	benchlist := benchlist.NewNoBenchlist()
 	err = timeoutManager.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout: time.Millisecond,
-		MinimumTimeout: time.Millisecond,
-		MaximumTimeout: 10 * time.Second,
-		TimeoutInc:     2 * time.Millisecond,
-		TimeoutDec:     time.Millisecond,
-		Namespace:      "",
-		Registerer:     prometheus.NewRegistry(),
+		InitialTimeout:     time.Millisecond,
+		MinimumTimeout:     time.Millisecond,
+		MaximumTimeout:     10 * time.Second,
+		TimeoutHalflife:    5 * time.Minute,
+		TimeoutCoefficient: 1.25,
+		MetricsNamespace:   "",
+		Registerer:         prometheus.NewRegistry(),
 	}, benchlist)
 	if err != nil {
 		t.Fatal(err)
@@ -2157,19 +2157,28 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	go timeoutManager.Dispatch()
 
 	chainRouter := &router.ChainRouter{}
-	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &timeoutManager, time.Hour, time.Second, ids.Set{}, nil)
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &timeoutManager, time.Hour, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 
 	externalSender := &sender.ExternalSenderTest{T: t}
 	externalSender.Default(true)
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-
-	sender.Initialize(ctx, externalSender, chainRouter, &timeoutManager)
+	err = sender.Initialize(ctx, externalSender, chainRouter, &timeoutManager, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 
 	reqID := new(uint32)
-	externalSender.GetAcceptedFrontierF = func(_ ids.ShortSet, _ ids.ID, requestID uint32, _ time.Time) {
+	externalSender.GetAcceptedFrontierF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration) []ids.ShortID {
 		*reqID = requestID
+		return ids.List()
+	}
+
+	isBootstrapped := false
+	subnet := &common.SubnetTest{
+		T:               t,
+		IsBootstrappedF: func() bool { return isBootstrapped },
+		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
 	}
 
 	// The engine handles consensus
@@ -2183,6 +2192,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 				SampleK:    int(beacons.Weight()),
 				Alpha:      uint64(beacons.Len()/2 + 1),
 				Sender:     &sender,
+				Subnet:     subnet,
 			},
 			Blocked: blocked,
 			VM:      vm,
@@ -2213,6 +2223,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
+		&router.Delay{},
 	)
 
 	// Allow incoming messages to be routed to the new chain
@@ -2220,8 +2231,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
 	externalSender.GetAcceptedFrontierF = nil
-	externalSender.GetAcceptedF = func(_ ids.ShortSet, _ ids.ID, requestID uint32, _ time.Time, _ []ids.ID) {
+	externalSender.GetAcceptedF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration, _ []ids.ID) []ids.ShortID {
 		*reqID = requestID
+		return ids.List()
 	}
 
 	frontier := []ids.ID{advanceTimeBlkID}
@@ -2230,11 +2242,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	externalSender.GetAcceptedF = nil
-	externalSender.GetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, _ time.Time, containerID ids.ID) {
+	externalSender.GetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, _ time.Duration, containerID ids.ID) bool {
 		*reqID = requestID
 		if containerID != advanceTimeBlkID {
 			t.Fatalf("wrong block requested")
 		}
+		return true
 	}
 
 	if err := engine.Accepted(peerID, *reqID, frontier); err != nil {
@@ -2594,6 +2607,9 @@ func TestUptimeReporting(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Unregister the previously registered metrics
+	ctx.Metrics.Unregister(vm.metrics.percentConnected)
+
 	// Test that VM reports the correct uptimes afer
 	// restart.
 	vm = &VM{
@@ -2623,4 +2639,90 @@ func TestUptimeReporting(t *testing.T) {
 	checkUptime(vm, nodeID0, 1, "peer connected during bootstrapping after restart")
 	checkUptime(vm, nodeID1, .75, "peer connected after bootstrapping after restart")
 	checkUptime(vm, nodeID2, .75, "peer connected during bootstrapping and disconnected after bootstrapping after restart")
+}
+
+// Test that calling Verify on a block with an unverified parent doesn't cause a
+// panic.
+func TestUnverifiedParentPanic(t *testing.T) {
+	_, genesisBytes := defaultGenesis()
+
+	db := memdb.New()
+
+	vm := &VM{
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
+	}
+
+	vm.vdrMgr = validators.NewManager()
+
+	vm.clock.Set(defaultGenesisTime)
+	ctx := defaultContext()
+	ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	msgChan := make(chan common.Message, 1)
+	if err := vm.Initialize(ctx, db, genesisBytes, msgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	key0 := keys[0]
+	key1 := keys[1]
+	addr0 := key0.PublicKey().Address()
+	addr1 := key1.PublicKey().Address()
+
+	addSubnetTx0, err := vm.newCreateSubnetTx(1, []ids.ShortID{addr0}, []*crypto.PrivateKeySECP256K1R{key0}, addr0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addSubnetTx1, err := vm.newCreateSubnetTx(1, []ids.ShortID{addr1}, []*crypto.PrivateKeySECP256K1R{key1}, addr1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addSubnetTx2, err := vm.newCreateSubnetTx(1, []ids.ShortID{addr1}, []*crypto.PrivateKeySECP256K1R{key1}, addr0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	preferredHeight, err := vm.preferredHeight()
+	if err != nil {
+		t.Fatal(err)
+	}
+	addSubnetBlk0, err := vm.newStandardBlock(vm.Preferred(), preferredHeight+1, []*Tx{addSubnetTx0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	addSubnetBlk1, err := vm.newStandardBlock(vm.Preferred(), preferredHeight+1, []*Tx{addSubnetTx1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	addSubnetBlk2, err := vm.newStandardBlock(addSubnetBlk1.ID(), preferredHeight+2, []*Tx{addSubnetTx2})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := vm.ParseBlock(addSubnetBlk0.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := vm.ParseBlock(addSubnetBlk1.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := vm.ParseBlock(addSubnetBlk2.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := addSubnetBlk0.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := addSubnetBlk0.Accept(); err != nil {
+		t.Fatal(err)
+	}
+	// Doesn't matter what verify returns as long as it's not panicking.
+	_ = addSubnetBlk2.Verify()
 }

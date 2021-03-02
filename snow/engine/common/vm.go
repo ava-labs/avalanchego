@@ -5,11 +5,16 @@ package common
 
 import (
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/snow"
 )
 
 // VM describes the interface that all consensus VMs must implement
 type VM interface {
+	// Returns nil if the VM is healthy.
+	// Periodically called and reported via the node's Health API.
+	health.Checkable
+
 	// Initialize this VM.
 	// [ctx]: Metadata about this VM.
 	//     [ctx.networkID]: The ID of the network this VM's chain is running on.
@@ -59,10 +64,6 @@ type VM interface {
 	// it have an extension called `accounts`, where clients could get
 	// information about their accounts.
 	CreateHandlers() (map[string]*HTTPHandler, error)
-
-	// Returns nil if the VM is healthy.
-	// Periodically called and reported via the node's Health API.
-	Health() (interface{}, error)
 }
 
 // StaticVM describes the functionality that allows a user to interact with a VM

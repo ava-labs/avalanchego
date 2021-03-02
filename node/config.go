@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/nat"
+	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -60,8 +61,12 @@ type Config struct {
 	SendQueueSize           uint32
 	MaxPendingMsgs          uint32
 
+	// Health
+	HealthCheckFreq time.Duration
+
 	// Network configuration
-	NetworkConfig timer.AdaptiveTimeoutConfig
+	NetworkConfig       timer.AdaptiveTimeoutConfig
+	NetworkHealthConfig network.HealthConfig
 
 	// Benchlist Configuration
 	BenchlistConfig benchlist.Config
@@ -106,6 +111,7 @@ type Config struct {
 
 	// Router that is used to handle incoming consensus messages
 	ConsensusRouter          router.Router
+	RouterHealthConfig       router.HealthConfig
 	ConsensusGossipFrequency time.Duration
 	ConsensusShutdownTimeout time.Duration
 
@@ -128,4 +134,10 @@ type Config struct {
 
 	// Coreth
 	CorethConfig string
+
+	// Should Bootstrap be retried
+	RetryBootstrap bool
+
+	// Max number of times to retry bootstrap
+	RetryBootstrapMaxAttempts int
 }

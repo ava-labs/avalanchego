@@ -112,7 +112,9 @@ func (s *Server) RegisterChain(chainName string, ctx *snow.Context, vmIntf inter
 		return
 	}
 
+	ctx.Lock.Lock()
 	handlers, err := vm.CreateHandlers()
+	ctx.Lock.Unlock()
 	if err != nil {
 		s.log.Error("Failed to create %s handlers: %s", chainName, err)
 		return

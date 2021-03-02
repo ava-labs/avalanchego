@@ -30,6 +30,7 @@ func DefaultConfig() Config {
 			BetaVirtuous:      1,
 			BetaRogue:         2,
 			ConcurrentRepolls: 1,
+			OptimalProcessing: 100,
 		},
 		Consensus: &snowman.Topological{},
 	}

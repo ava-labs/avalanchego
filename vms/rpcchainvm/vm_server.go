@@ -302,7 +302,7 @@ func (vm *VMServer) SetPreference(_ context.Context, req *vmproto.SetPreferenceR
 
 // Health ...
 func (vm *VMServer) Health(_ context.Context, req *vmproto.HealthRequest) (*vmproto.HealthResponse, error) {
-	details, err := vm.vm.Health()
+	details, err := vm.vm.HealthCheck()
 	if err != nil {
 		return &vmproto.HealthResponse{}, err
 	}
