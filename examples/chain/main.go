@@ -127,7 +127,6 @@ func (tc *TestChain) GenRandomTree(n int, max int) {
 		pb, _ := rand.Int(rand.Reader, big.NewInt((int64)(m)))
 		pn := pb.Int64()
 		tc.parentBlock = tc.blocks[nblocks-1-(int)(pn)]
-		tc.chain.SetTail(tc.parentBlock)
 		tc.chain.SetPreference(tc.chain.GetBlockByHash(tc.parentBlock))
 		tc.blockWait.Add(1)
 		tc.chain.GenBlock()
@@ -200,7 +199,6 @@ func run(config *eth.Config, a1, a2, b1, b2 int) {
 func main() {
 	// configure the chain
 	config := eth.DefaultConfig
-	config.ManualCanonical = true
 	chainConfig := &params.ChainConfig{
 		ChainID:             big.NewInt(1),
 		HomesteadBlock:      big.NewInt(0),

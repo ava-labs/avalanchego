@@ -91,8 +91,6 @@ var DefaultConfig = Config{
 	RPCGasCap:   25000000,
 	GPO:         DefaultFullGPOConfig,
 	RPCTxFeeCap: 1, // 1 ether
-
-	ManualCanonical: false,
 }
 
 func init() {
@@ -200,9 +198,6 @@ type Config struct {
 
 	// CheckpointOracle is the configuration for checkpoint oracle.
 	CheckpointOracle *params.CheckpointOracleConfig `toml:",omitempty"`
-
-	// Manually select and grow the canonical chain
-	ManualCanonical bool
 }
 
 func (cfg *Config) SetGCMode(gcmode string) error {

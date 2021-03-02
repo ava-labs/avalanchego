@@ -289,7 +289,6 @@ func (vm *VM) Initialize(
 	vm.txFee = txFee
 
 	config := eth.DefaultConfig
-	config.ManualCanonical = true
 	config.Genesis = g
 	// disable the experimental snapshot feature from geth
 	config.TrieCleanCache += config.SnapshotCache
@@ -353,7 +352,9 @@ func (vm *VM) Initialize(
 			return fmt.Errorf("block failed verify: %w", err)
 		}
 		vm.newBlockChan <- blk
-		vm.updateStatus(ids.ID(block.Hash()), choices.Processing)
+		if err := vm.updateStatus(ids.ID(block.Hash()), choices.Processing); err != nil {
+			return fmt.Errorf("cannot update block status: %w", err)
+		}
 		vm.txPoolStabilizedLock.Lock()
 		vm.txPoolStabilizedHead = block.Hash()
 		vm.txPoolStabilizedLock.Unlock()
@@ -426,7 +427,9 @@ func (vm *VM) Initialize(
 		ethBlock: lastAccepted,
 		vm:       vm,
 	}
-	vm.chain.SetPreference(lastAccepted)
+	if err := vm.chain.Accept(lastAccepted); err != nil {
+		return fmt.Errorf("could not initialize VM with last accepted blkID %s: %w", vm.lastAccepted.ID(), err)
+	}
 	vm.genesisHash = chain.GetGenesisBlock().Hash()
 	log.Info(fmt.Sprintf("lastAccepted = %s", vm.lastAccepted.ethBlock.Hash().Hex()))
 
@@ -434,7 +437,7 @@ func (vm *VM) Initialize(
 	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
 	vm.codec = Codec
 	if err := vm.repairCanonicalChain(); err != nil {
-		log.Error("failed to repair the canonical chain", "error", err)
+		return fmt.Errorf("failed to repair the canonical chain: %w", err)
 	}
 
 	log.Debug("unlocking indexing")
@@ -463,10 +466,6 @@ func (vm *VM) repairCanonicalChain() error {
 
 	start := time.Now()
 	log.Info("starting to repair canonical chain", "startTime", start)
-
-	if err := vm.chain.SetTail(vm.lastAccepted.ethBlock.Hash()); err != nil {
-		return fmt.Errorf("failed to set tail to the last accepted block: %w", err)
-	}
 	if err := vm.chain.WriteCanonicalFromCurrentBlock(); err != nil {
 		return fmt.Errorf("failed to repair canonical chain after %v due to: %w", time.Since(start), err)
 	}
@@ -571,8 +570,7 @@ func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 func (vm *VM) SetPreference(blkID ids.ID) error {
 	block := vm.getBlock(blkID)
 	vm.ctx.Log.AssertTrue(block != nil, "problem setting preferred block, couldn't find blkID %s", blkID)
-
-	vm.chain.SetPreference(block.ethBlock)
+	vm.ctx.Log.AssertNoError(vm.chain.SetPreference(block.ethBlock))
 	return nil
 }
 
@@ -652,20 +650,26 @@ func (vm *VM) CreateStaticHandlers() (map[string]*commonEng.HTTPHandler, error) 
  ******************************************************************************
  */
 
-func (vm *VM) updateStatus(blockID ids.ID, status choices.Status) {
+func (vm *VM) updateStatus(blkID ids.ID, status choices.Status) error {
 	vm.metalock.Lock()
 	defer vm.metalock.Unlock()
 
 	if status == choices.Accepted {
-		vm.lastAccepted = vm.getBlock(blockID)
+		blk := vm.getBlock(blkID)
+		if blk == nil {
+			return fmt.Errorf("could not find blkID %s", blkID)
+		}
+		if err := vm.chain.Accept(blk.ethBlock); err != nil {
+			return fmt.Errorf("could not accept blkID %s: %w", blkID, err)
+		}
+		vm.lastAccepted = blk
 		// TODO: improve this naive implementation
 		if atomic.SwapUint32(&vm.writingMetadata, 1) == 0 {
 			go vm.ctx.Log.RecoverAndPanic(vm.writeBackMetadata)
 		}
-		err := vm.chain.SetTail(common.Hash(blockID))
-		vm.ctx.Log.AssertNoError(err)
 	}
-	vm.blockStatusCache.Put(blockID, status)
+	vm.blockStatusCache.Put(blkID, status)
+	return nil
 }
 
 func (vm *VM) tryBlockGen() error {
@@ -820,12 +824,11 @@ func (vm *VM) writeBackMetadata() {
 	defer vm.metalock.Unlock()
 
 	b, err := rlp.EncodeToBytes(vm.lastAccepted.ethBlock.Hash())
-	if err != nil {
-		log.Error("snowman-eth: error while writing back metadata")
-		return
-	}
-	log.Debug("writing back metadata")
-	vm.chaindb.Put(lastAcceptedKey, b)
+	// TODO: change these to return an error once vm.writingMetadata is
+	// refactored
+	vm.ctx.Log.AssertNoError(err)
+	vm.ctx.Log.AssertNoError(vm.chaindb.Put(lastAcceptedKey, b))
+
 	atomic.StoreUint32(&vm.writingMetadata, 0)
 }
 
