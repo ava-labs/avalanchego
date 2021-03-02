@@ -17,7 +17,7 @@ var (
 // Server is a io.ReadCloser that is managed over RPC.
 type Server struct{ readCloser io.ReadCloser }
 
-// NewServer returns an io.ReadCloser instance manage remotely
+// NewServer returns an io.ReadCloser instance managed remotely
 func NewServer(readCloser io.ReadCloser) *Server {
 	return &Server{readCloser: readCloser}
 }
