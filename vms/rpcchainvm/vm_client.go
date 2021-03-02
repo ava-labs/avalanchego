@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/missing"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup"
@@ -39,6 +40,8 @@ import (
 
 var (
 	errUnsupportedFXs = errors.New("unsupported feature extensions")
+
+	_ block.ChainVM = &VMClient{}
 )
 
 // VMClient is an implementation of VM that talks over RPC.
@@ -227,14 +230,18 @@ func (vm *VMClient) Shutdown() error {
 }
 
 // CreateHandlers ...
-func (vm *VMClient) CreateHandlers() map[string]*common.HTTPHandler {
+func (vm *VMClient) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	resp, err := vm.client.CreateHandlers(context.Background(), &vmproto.CreateHandlersRequest{})
-	vm.ctx.Log.AssertNoError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	handlers := make(map[string]*common.HTTPHandler, len(resp.Handlers))
 	for _, handler := range resp.Handlers {
 		conn, err := vm.broker.Dial(handler.Server)
-		vm.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return nil, err
+		}
 
 		vm.conns = append(vm.conns, conn)
 		handlers[handler.Prefix] = &common.HTTPHandler{
@@ -242,7 +249,7 @@ func (vm *VMClient) CreateHandlers() map[string]*common.HTTPHandler {
 			Handler:     ghttp.NewClient(ghttpproto.NewHTTPClient(conn), vm.broker),
 		}
 	}
-	return handlers
+	return handlers, nil
 }
 
 // BuildBlock ...
@@ -327,15 +334,15 @@ func (vm *VMClient) GetBlock(id ids.ID) (snowman.Block, error) {
 }
 
 // SetPreference ...
-func (vm *VMClient) SetPreference(id ids.ID) {
+func (vm *VMClient) SetPreference(id ids.ID) error {
 	_, err := vm.client.SetPreference(context.Background(), &vmproto.SetPreferenceRequest{
 		Id: id[:],
 	})
-	vm.ctx.Log.AssertNoError(err)
+	return err
 }
 
 // LastAccepted ...
-func (vm *VMClient) LastAccepted() ids.ID { return vm.lastAccepted }
+func (vm *VMClient) LastAccepted() (ids.ID, error) { return vm.lastAccepted, nil }
 
 // Health ...
 func (vm *VMClient) Health() (interface{}, error) {

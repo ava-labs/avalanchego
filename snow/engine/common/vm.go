@@ -58,7 +58,7 @@ type VM interface {
 	// For example, if this VM implements an account-based payments system,
 	// it have an extension called `accounts`, where clients could get
 	// information about their accounts.
-	CreateHandlers() map[string]*HTTPHandler
+	CreateHandlers() (map[string]*HTTPHandler, error)
 
 	// Returns nil if the VM is healthy.
 	// Periodically called and reported via the node's Health API.
@@ -80,5 +80,5 @@ type StaticVM interface {
 	//
 	// For example, it might make sense to have an extension for creating
 	// genesis bytes this VM can interpret.
-	CreateStaticHandlers() map[string]*HTTPHandler
+	CreateStaticHandlers() (map[string]*HTTPHandler, error)
 }

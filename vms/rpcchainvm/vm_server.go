@@ -177,10 +177,10 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	vm.conns = append(vm.conns, dbConn)
 	vm.conns = append(vm.conns, msgConn)
 	vm.toEngine = toEngine
-	lastAccepted := vm.vm.LastAccepted()
+	lastAccepted, err := vm.vm.LastAccepted()
 	return &vmproto.InitializeResponse{
 		LastAcceptedID: lastAccepted[:],
-	}, nil
+	}, err
 }
 
 // Bootstrapping ...
@@ -214,7 +214,10 @@ func (vm *VMServer) Shutdown(context.Context, *vmproto.ShutdownRequest) (*vmprot
 
 // CreateHandlers ...
 func (vm *VMServer) CreateHandlers(_ context.Context, req *vmproto.CreateHandlersRequest) (*vmproto.CreateHandlersResponse, error) {
-	handlers := vm.vm.CreateHandlers()
+	handlers, err := vm.vm.CreateHandlers()
+	if err != nil {
+		return nil, err
+	}
 	resp := &vmproto.CreateHandlersResponse{}
 	for prefix, h := range handlers {
 		handler := h
@@ -294,8 +297,7 @@ func (vm *VMServer) SetPreference(_ context.Context, req *vmproto.SetPreferenceR
 	if err != nil {
 		return nil, err
 	}
-	vm.vm.SetPreference(id)
-	return &vmproto.SetPreferenceResponse{}, nil
+	return &vmproto.SetPreferenceResponse{}, vm.vm.SetPreference(id)
 }
 
 // Health ...

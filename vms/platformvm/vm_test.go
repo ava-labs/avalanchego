@@ -439,7 +439,10 @@ func TestGenesis(t *testing.T) {
 	}()
 
 	// Ensure the genesis block has been accepted and stored
-	genesisBlockID := vm.LastAccepted() // lastAccepted should be ID of genesis block
+	genesisBlockID, err := vm.LastAccepted() // lastAccepted should be ID of genesis block
+	if err != nil {
+		t.Fatal(err)
+	}
 	if genesisBlock, err := vm.getBlock(genesisBlockID); err != nil {
 		t.Fatalf("couldn't get genesis block: %v", err)
 	} else if genesisBlock.Status() != choices.Accepted {
@@ -820,7 +823,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	ID := key.PublicKey().Address()
 
 	// create invalid tx
-	if tx, err := vm.newAddValidatorTx(
+	tx, err := vm.newAddValidatorTx(
 		vm.minValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -829,25 +832,43 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
-	); err != nil {
+	)
+
+	if err != nil {
 		t.Fatal(err)
-	} else if preferredHeight, err := vm.preferredHeight(); err != nil {
+	}
+	preferredHeight, err := vm.preferredHeight()
+	if err != nil {
 		t.Fatal(err)
-	} else if blk, err := vm.newProposalBlock(vm.LastAccepted(), preferredHeight+1, *tx); err != nil {
+	}
+	lastAcceptedID, err := vm.LastAccepted()
+	if err != nil {
 		t.Fatal(err)
-	} else if err := vm.State.PutBlock(vm.DB, blk); err != nil {
+	}
+	blk, err := vm.newProposalBlock(lastAcceptedID, preferredHeight+1, *tx)
+	if err != nil {
 		t.Fatal(err)
-	} else if err := vm.DB.Commit(); err != nil {
+	}
+	if err := vm.State.PutBlock(vm.DB, blk); err != nil {
 		t.Fatal(err)
-	} else if err := blk.Verify(); err == nil {
+	}
+	if err := vm.DB.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := blk.Verify(); err == nil {
 		t.Fatalf("Should have errored during verification")
-	} else if status := blk.Status(); status != choices.Rejected {
+	}
+	if status := blk.Status(); status != choices.Rejected {
 		t.Fatalf("Should have marked the block as rejected")
-	} else if _, ok := vm.droppedTxCache.Get(blk.Tx.ID()); !ok {
+	}
+	if _, ok := vm.droppedTxCache.Get(blk.Tx.ID()); !ok {
 		t.Fatal("tx should be in dropped tx cache")
-	} else if parsedBlk, err := vm.GetBlock(blk.ID()); err != nil {
+	}
+	parsedBlk, err := vm.GetBlock(blk.ID())
+	if err != nil {
 		t.Fatal(err)
-	} else if status := parsedBlk.Status(); status != choices.Rejected {
+	}
+	if status := parsedBlk.Status(); status != choices.Rejected {
 		t.Fatalf("Should have marked the block as rejected")
 	}
 }
@@ -1832,7 +1853,10 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	genesisID := firstVM.LastAccepted()
+	genesisID, err := firstVM.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	firstAdvanceTimeTx, err := firstVM.newAdvanceTimeTx(defaultGenesisTime.Add(time.Second))
 	if err != nil {
@@ -1915,7 +1939,11 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if lastAccepted := secondVM.LastAccepted(); genesisID != lastAccepted {
+	lastAccepted, err := secondVM.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if genesisID != lastAccepted {
 		t.Fatalf("Shouldn't have changed the genesis")
 	}
 }
@@ -2040,7 +2068,12 @@ func TestRestartFullyAccepted(t *testing.T) {
 	secondMsgChan := make(chan common.Message, 1)
 	if err := secondVM.Initialize(secondCtx, db, genesisBytes, secondMsgChan, nil); err != nil {
 		t.Fatal(err)
-	} else if lastAccepted := secondVM.LastAccepted(); options[0].ID() != lastAccepted {
+	}
+	lastAccepted, err := secondVM.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if options[0].ID() != lastAccepted {
 		t.Fatalf("Should have changed the genesis")
 	}
 }

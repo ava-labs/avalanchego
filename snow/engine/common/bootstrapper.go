@@ -94,7 +94,11 @@ func (b *Bootstrapper) Startup() error {
 
 // GetAcceptedFrontier implements the Engine interface.
 func (b *Bootstrapper) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
-	b.Sender.AcceptedFrontier(validatorID, requestID, b.Bootstrapable.CurrentAcceptedFrontier())
+	acceptedFrontier, err := b.Bootstrapable.CurrentAcceptedFrontier()
+	if err != nil {
+		return err
+	}
+	b.Sender.AcceptedFrontier(validatorID, requestID, acceptedFrontier)
 	return nil
 }
 

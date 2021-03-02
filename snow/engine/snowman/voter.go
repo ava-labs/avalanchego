@@ -54,7 +54,10 @@ func (v *voter) Update() {
 		return
 	}
 
-	v.t.VM.SetPreference(v.t.Consensus.Preference())
+	if err := v.t.VM.SetPreference(v.t.Consensus.Preference()); err != nil {
+		v.t.errs.Add(err)
+		return
+	}
 
 	if v.t.Consensus.Finalized() {
 		v.t.Ctx.Log.Debug("Snowman engine can quiesce")
