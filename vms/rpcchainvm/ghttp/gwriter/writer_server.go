@@ -14,10 +14,10 @@ var (
 	_ gwriterproto.WriterServer = &Server{}
 )
 
-// Server is a http.Handler that is managed over RPC.
+// Server is an http.Handler that is managed over RPC.
 type Server struct{ writer io.Writer }
 
-// NewServer returns a http.Handler instance managed remotely
+// NewServer returns an http.Handler instance managed remotely
 func NewServer(writer io.Writer) *Server {
 	return &Server{writer: writer}
 }

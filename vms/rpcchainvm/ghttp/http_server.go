@@ -29,7 +29,7 @@ type Server struct {
 	broker  *plugin.GRPCBroker
 }
 
-// NewServer returns an http.Handler instance manage remotely
+// NewServer returns an http.Handler instance managed remotely
 func NewServer(handler http.Handler, broker *plugin.GRPCBroker) *Server {
 	return &Server{
 		handler: handler,

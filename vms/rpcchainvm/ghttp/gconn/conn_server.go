@@ -16,13 +16,13 @@ var (
 	_ gconnproto.ConnServer = &Server{}
 )
 
-// Server is a http.Conn that is managed over RPC.
+// Server is an http.Conn that is managed over RPC.
 type Server struct {
 	conn   net.Conn
 	closer *grpcutils.ServerCloser
 }
 
-// NewServer returns a http.Conn managed remotely
+// NewServer returns an http.Conn managed remotely
 func NewServer(conn net.Conn, closer *grpcutils.ServerCloser) *Server {
 	return &Server{
 		conn:   conn,
