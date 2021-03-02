@@ -256,7 +256,10 @@ func TestIssueAtomicTxs(t *testing.T) {
 		t.Fatalf("Expected status of accepted block to be %s, but found %s", choices.Accepted, status)
 	}
 
-	lastAcceptedID := vm.LastAccepted()
+	lastAcceptedID, err := vm.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if lastAcceptedID != blk.ID() {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk.ID(), lastAcceptedID)
 	}
@@ -293,7 +296,10 @@ func TestIssueAtomicTxs(t *testing.T) {
 		t.Fatalf("Expected status of accepted block to be %s, but found %s", choices.Accepted, status)
 	}
 
-	lastAcceptedID = vm.LastAccepted()
+	lastAcceptedID, err = vm.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if lastAcceptedID != blk2.ID() {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk2.ID(), lastAcceptedID)
 	}
@@ -420,7 +426,10 @@ func TestBuildEthTxBlock(t *testing.T) {
 		t.Fatalf("Expected status of accepted block to be %s, but found %s", choices.Accepted, status)
 	}
 
-	lastAcceptedID := vm.LastAccepted()
+	lastAcceptedID, err := vm.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if lastAcceptedID != blk.ID() {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk.ID(), lastAcceptedID)
 	}
@@ -489,7 +498,10 @@ func TestConflictingImportTxs(t *testing.T) {
 		conflictTxs = append(conflictTxs, conflictTx)
 	}
 
-	expectedParentBlkID := vm.LastAccepted()
+	expectedParentBlkID, err := vm.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
 	for i, tx := range importTxs {
 		if err := vm.issueTx(tx); err != nil {
 			t.Fatal(err)
@@ -813,7 +825,10 @@ func TestGenesisStatus(t *testing.T) {
 		}
 	}()
 
-	genesisID := vm.LastAccepted()
+	genesisID, err := vm.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
 	genesis, err := vm.GetBlock(genesisID)
 	if err != nil {
 		t.Fatal(err)
@@ -1075,7 +1090,10 @@ func TestBonusBlocksTxs(t *testing.T) {
 		t.Fatalf("Expected status of accepted block to be %s, but found %s", choices.Accepted, status)
 	}
 
-	lastAcceptedID := vm.LastAccepted()
+	lastAcceptedID, err := vm.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if lastAcceptedID != evmBlock.id {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk.ID(), lastAcceptedID)
 	}
