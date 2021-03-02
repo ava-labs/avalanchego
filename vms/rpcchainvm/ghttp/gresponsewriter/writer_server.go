@@ -32,7 +32,7 @@ type Server struct {
 	broker *plugin.GRPCBroker
 }
 
-// NewServer returns an http.ResponseWriter instance manage remotely
+// NewServer returns an http.ResponseWriter instance managed remotely
 func NewServer(writer http.ResponseWriter, broker *plugin.GRPCBroker) *Server {
 	return &Server{
 		writer: writer,

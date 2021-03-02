@@ -22,7 +22,7 @@ type Server struct {
 	closer *grpcutils.ServerCloser
 }
 
-// NewServer returns a http.Conn manage remotely
+// NewServer returns a http.Conn managed remotely
 func NewServer(conn net.Conn, closer *grpcutils.ServerCloser) *Server {
 	return &Server{
 		conn:   conn,
