@@ -19,13 +19,17 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter/gresponsewriterproto"
 )
 
-// Server is a http.Handler that is managed over RPC.
+var (
+	_ ghttpproto.HTTPServer = &Server{}
+)
+
+// Server is an http.Handler that is managed over RPC.
 type Server struct {
 	handler http.Handler
 	broker  *plugin.GRPCBroker
 }
 
-// NewServer returns a http.Handler instance manage remotely
+// NewServer returns an http.Handler instance manage remotely
 func NewServer(handler http.Handler, broker *plugin.GRPCBroker) *Server {
 	return &Server{
 		handler: handler,
@@ -33,7 +37,6 @@ func NewServer(handler http.Handler, broker *plugin.GRPCBroker) *Server {
 	}
 }
 
-// Handle ...
 func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*ghttpproto.HTTPResponse, error) {
 	writerConn, err := s.broker.Dial(req.ResponseWriter.Id)
 	if err != nil {

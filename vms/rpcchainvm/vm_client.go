@@ -76,7 +76,7 @@ type VMClient struct {
 	lastAccepted ids.ID
 }
 
-// NewClient returns a database instance connected to a remote database instance
+// NewClient returns a VM connected to a remote VM
 func NewClient(client vmproto.VMClient, broker *plugin.GRPCBroker) *VMClient {
 	return &VMClient{
 		client: client,

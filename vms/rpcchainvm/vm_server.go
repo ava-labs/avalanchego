@@ -36,6 +36,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/vmproto"
 )
 
+var (
+	_ vmproto.VMServer = &VMServer{}
+)
+
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {
 	vm     block.ChainVM
