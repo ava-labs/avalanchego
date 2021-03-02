@@ -6,7 +6,6 @@ package evm
 import (
 	"crypto/rand"
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"strings"
 	"testing"
@@ -104,13 +103,9 @@ func NewContext() *snow.Context {
 
 // GenesisVM creates a VM instance with the genesis test bytes and returns
 // the channel use to send messages to the engine, the vm, and atomic memory
-func GenesisVM(t *testing.T, finishBootstrapping bool) (chan engCommon.Message, *VM, []byte, *atomic.Memory, *error) {
+func GenesisVM(t *testing.T, finishBootstrapping bool) (chan engCommon.Message, *VM, []byte, *atomic.Memory) {
 	genesisBytes := BuildGenesisTest(t)
 	ctx := NewContext()
-
-	var logErr error
-	ctx.Log = ErrorLog{logging.NoLog{}, &logErr}
-
 	baseDB := memdb.New()
 
 	m := &atomic.Memory{}
@@ -155,18 +150,11 @@ func GenesisVM(t *testing.T, finishBootstrapping bool) (chan engCommon.Message, 
 		}
 	}
 
-	return issuer, vm, genesisBytes, m, &logErr
-}
-
-func assertNoLogError(t *testing.T, err *error) {
-	if *err != nil {
-		t.Fatalf("Expected no logging errors but got %v", err)
-	}
+	return issuer, vm, genesisBytes, m
 }
 
 func TestVMGenesis(t *testing.T) {
-	_, vm, _, _, logErr := GenesisVM(t, true)
-	defer assertNoLogError(t, logErr)
+	_, vm, _, _ := GenesisVM(t, true)
 
 	shutdownChan := make(chan error, 1)
 	shutdownFunc := func() {
@@ -188,13 +176,12 @@ func TestVMGenesis(t *testing.T) {
 }
 
 func TestIssueAtomicTxs(t *testing.T) {
-	issuer, vm, _, sharedMemory, logErr := GenesisVM(t, true)
+	issuer, vm, _, sharedMemory := GenesisVM(t, true)
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		assertNoLogError(t, logErr)
 	}()
 
 	importAmount := uint64(10000000)
@@ -259,7 +246,9 @@ func TestIssueAtomicTxs(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm.SetPreference(blk.ID())
+	if err := vm.SetPreference(blk.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := blk.Accept(); err != nil {
 		t.Fatal(err)
@@ -319,13 +308,12 @@ func TestIssueAtomicTxs(t *testing.T) {
 }
 
 func TestBuildEthTxBlock(t *testing.T) {
-	issuer, vm, _, sharedMemory, logErr := GenesisVM(t, true)
+	issuer, vm, _, sharedMemory := GenesisVM(t, true)
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		assertNoLogError(t, logErr)
 	}()
 
 	key, err := coreth.NewKey(rand.Reader)
@@ -395,7 +383,9 @@ func TestBuildEthTxBlock(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm.SetPreference(blk.ID())
+	if err := vm.SetPreference(blk.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := blk.Accept(); err != nil {
 		t.Fatal(err)
@@ -450,13 +440,12 @@ func TestBuildEthTxBlock(t *testing.T) {
 }
 
 func TestConflictingImportTxs(t *testing.T) {
-	issuer, vm, _, sharedMemory, logErr := GenesisVM(t, true)
+	issuer, vm, _, sharedMemory := GenesisVM(t, true)
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		assertNoLogError(t, logErr)
 	}()
 
 	conflictKey, err := coreth.NewKey(rand.Reader)
@@ -542,7 +531,9 @@ func TestConflictingImportTxs(t *testing.T) {
 		}
 
 		expectedParentBlkID = blk.ID()
-		vm.SetPreference(blk.ID())
+		if err := vm.SetPreference(blk.ID()); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	for i, tx := range conflictTxs {
@@ -574,19 +565,17 @@ func TestConflictingImportTxs(t *testing.T) {
 func TestSetPreferenceRace(t *testing.T) {
 	// Create two VMs which will agree on block A and then
 	// build the two distinct preferred chains above
-	issuer1, vm1, _, sharedMemory1, logErr1 := GenesisVM(t, true)
-	issuer2, vm2, _, sharedMemory2, logErr2 := GenesisVM(t, true)
+	issuer1, vm1, _, sharedMemory1 := GenesisVM(t, true)
+	issuer2, vm2, _, sharedMemory2 := GenesisVM(t, true)
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		assertNoLogError(t, logErr1)
 
 		if err := vm2.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		assertNoLogError(t, logErr2)
 	}()
 
 	key, err := coreth.NewKey(rand.Reader)
@@ -667,7 +656,9 @@ func TestSetPreferenceRace(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm1.SetPreference(vm1BlkA.ID())
+	if err := vm1.SetPreference(vm1BlkA.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	vm2BlkA, err := vm2.ParseBlock(vm1BlkA.Bytes())
 	if err != nil {
@@ -679,7 +670,9 @@ func TestSetPreferenceRace(t *testing.T) {
 	if status := vm2BlkA.Status(); status != choices.Processing {
 		t.Fatalf("Expected status of block on VM2 to be %s, but found %s", choices.Processing, status)
 	}
-	vm2.SetPreference(vm2BlkA.ID())
+	if err := vm2.SetPreference(vm2BlkA.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := vm1BlkA.Accept(); err != nil {
 		t.Fatalf("VM1 failed to accept block: %s", err)
@@ -727,7 +720,9 @@ func TestSetPreferenceRace(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm1.SetPreference(vm1BlkB.ID())
+	if err := vm1.SetPreference(vm1BlkB.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	// Split the transactions over two blocks, and set VM2's preference to them in sequence
 	// after building each block
@@ -753,7 +748,9 @@ func TestSetPreferenceRace(t *testing.T) {
 		t.Fatalf("Expected status of built block C to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm2.SetPreference(vm2BlkC.ID())
+	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	// Block D
 	errs = vm2.chain.AddRemoteTxs(txs[5:10])
@@ -777,7 +774,9 @@ func TestSetPreferenceRace(t *testing.T) {
 		t.Fatalf("Expected status of built block D to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm2.SetPreference(vm2BlkD.ID())
+	if err := vm2.SetPreference(vm2BlkD.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	// VM1 receives blkC and blkD from VM1
 	// and happens to call SetPreference on blkD without ever calling SetPreference
@@ -804,7 +803,9 @@ func TestSetPreferenceRace(t *testing.T) {
 	}
 
 	// Set VM1's preference to blockD, skipping blockC
-	vm1.SetPreference(vm1BlkD.ID())
+	if err := vm1.SetPreference(vm1BlkD.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	// Accept the longer chain on both VMs and ensure there are no errors
 	// VM1 Accepts the blocks in order
@@ -835,13 +836,12 @@ func TestSetPreferenceRace(t *testing.T) {
 }
 
 func TestGenesisStatus(t *testing.T) {
-	_, vm, _, _, logErr := GenesisVM(t, true)
+	_, vm, _, _ := GenesisVM(t, true)
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		assertNoLogError(t, logErr)
 	}()
 
 	genesisID, err := vm.LastAccepted()
@@ -859,13 +859,12 @@ func TestGenesisStatus(t *testing.T) {
 }
 
 func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
-	issuer, vm, _, atomicMemory, logErr := GenesisVM(t, true)
+	issuer, vm, _, atomicMemory := GenesisVM(t, true)
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		assertNoLogError(t, logErr)
 	}()
 
 	key, err := coreth.NewKey(rand.Reader)
@@ -958,7 +957,9 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 		t.Fatalf("Block failed verification: %s", err)
 	}
 
-	vm.SetPreference(blk0.ID())
+	if err := vm.SetPreference(blk0.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	tx := types.NewTransaction(0, key.Address, big.NewInt(10), 21000, params.MinGasPrice, nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainID), key.PrivateKey)
@@ -985,7 +986,9 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.SetPreference(blk1.ID())
+	if err := vm.SetPreference(blk1.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	importTx1, err := vm.newImportTx(vm.ctx.XChainID, key.Address, []*crypto.PrivateKeySECP256K1R{key1})
 	if err != nil {
@@ -1007,7 +1010,9 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 		t.Fatalf("Block failed verification: %s", err)
 	}
 
-	vm.SetPreference(blk2.ID())
+	if err := vm.SetPreference(blk2.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := vm.issueTx(importTx0); err != nil {
 		t.Fatal(err)
@@ -1022,13 +1027,12 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 }
 
 func TestBonusBlocksTxs(t *testing.T) {
-	issuer, vm, _, sharedMemory, logErr := GenesisVM(t, true)
+	issuer, vm, _, sharedMemory := GenesisVM(t, true)
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		assertNoLogError(t, logErr)
 	}()
 
 	importAmount := uint64(10000000)
@@ -1101,7 +1105,9 @@ func TestBonusBlocksTxs(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm.SetPreference(evmBlock.id)
+	if err := vm.SetPreference(evmBlock.id); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := blk.Accept(); err != nil {
 		t.Fatal(err)
@@ -1130,19 +1136,17 @@ func TestBonusBlocksTxs(t *testing.T) {
 //     |
 //     D
 func TestReorgProtection(t *testing.T) {
-	issuer1, vm1, _, sharedMemory1, logErr1 := GenesisVM(t, true)
-	issuer2, vm2, _, sharedMemory2, logErr2 := GenesisVM(t, true)
+	issuer1, vm1, _, sharedMemory1 := GenesisVM(t, true)
+	issuer2, vm2, _, sharedMemory2 := GenesisVM(t, true)
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		assertNoLogError(t, logErr1)
 
 		if err := vm2.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		assertNoLogError(t, logErr2)
 	}()
 
 	key, err := coreth.NewKey(rand.Reader)
@@ -1223,7 +1227,9 @@ func TestReorgProtection(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm1.SetPreference(vm1BlkA.ID())
+	if err := vm1.SetPreference(vm1BlkA.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	vm2BlkA, err := vm2.ParseBlock(vm1BlkA.Bytes())
 	if err != nil {
@@ -1235,7 +1241,9 @@ func TestReorgProtection(t *testing.T) {
 	if status := vm2BlkA.Status(); status != choices.Processing {
 		t.Fatalf("Expected status of block on VM2 to be %s, but found %s", choices.Processing, status)
 	}
-	vm2.SetPreference(vm2BlkA.ID())
+	if err := vm2.SetPreference(vm2BlkA.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := vm1BlkA.Accept(); err != nil {
 		t.Fatalf("VM1 failed to accept block: %s", err)
@@ -1283,7 +1291,9 @@ func TestReorgProtection(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm1.SetPreference(vm1BlkB.ID())
+	if err := vm1.SetPreference(vm1BlkB.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := vm1BlkB.Accept(); err != nil {
 		t.Fatalf("VM1 failed to accept block: %s", err)
@@ -1324,14 +1334,9 @@ func TestReorgProtection(t *testing.T) {
 	// with the preferred chain lower than the last finalized block)
 	// should NEVER happen. However, the VM defends against this
 	// just in case.
-	if *logErr1 != nil {
-		t.Fatal("Expected no error before setting preference that would trigger reorg")
+	if err := vm1.SetPreference(vm1BlkC.ID()); !strings.Contains(err.Error(), "cannot orphan finalized block") {
+		t.Fatalf("Unexpected error when setting preference that would trigger reorg: %s", err)
 	}
-	vm1.SetPreference(vm1BlkC.ID())
-	if !strings.Contains((*logErr1).Error(), "cannot orphan finalized block") {
-		t.Fatalf("Unexpected error when setting preference that would trigger reorg: %s", *logErr1)
-	}
-	*logErr1 = nil
 
 	if err := vm1BlkC.Accept(); !strings.Contains(err.Error(), "expected accepted parent block hash") {
 		t.Fatalf("Unexpected error when setting block at finalized height: %s", err)
@@ -1344,19 +1349,17 @@ func TestReorgProtection(t *testing.T) {
 //  / \
 // B   C
 func TestNonCanonicalAccept(t *testing.T) {
-	issuer1, vm1, _, sharedMemory1, logErr1 := GenesisVM(t, true)
-	issuer2, vm2, _, sharedMemory2, logErr2 := GenesisVM(t, true)
+	issuer1, vm1, _, sharedMemory1 := GenesisVM(t, true)
+	issuer2, vm2, _, sharedMemory2 := GenesisVM(t, true)
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		assertNoLogError(t, logErr1)
 
 		if err := vm2.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		assertNoLogError(t, logErr2)
 	}()
 
 	key, err := coreth.NewKey(rand.Reader)
@@ -1437,7 +1440,9 @@ func TestNonCanonicalAccept(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm1.SetPreference(vm1BlkA.ID())
+	if err := vm1.SetPreference(vm1BlkA.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	vm2BlkA, err := vm2.ParseBlock(vm1BlkA.Bytes())
 	if err != nil {
@@ -1449,7 +1454,9 @@ func TestNonCanonicalAccept(t *testing.T) {
 	if status := vm2BlkA.Status(); status != choices.Processing {
 		t.Fatalf("Expected status of block on VM2 to be %s, but found %s", choices.Processing, status)
 	}
-	vm2.SetPreference(vm2BlkA.ID())
+	if err := vm2.SetPreference(vm2BlkA.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := vm1BlkA.Accept(); err != nil {
 		t.Fatalf("VM1 failed to accept block: %s", err)
@@ -1497,7 +1504,9 @@ func TestNonCanonicalAccept(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm1.SetPreference(vm1BlkB.ID())
+	if err := vm1.SetPreference(vm1BlkB.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	blkBHeight := vm1BlkB.Height()
 	blkBHash := vm1BlkB.(*Block).ethBlock.Hash()
@@ -1546,19 +1555,17 @@ func TestNonCanonicalAccept(t *testing.T) {
 //     |
 //     D
 func TestStickyPreference(t *testing.T) {
-	issuer1, vm1, _, sharedMemory1, logErr1 := GenesisVM(t, true)
-	issuer2, vm2, _, sharedMemory2, logErr2 := GenesisVM(t, true)
+	issuer1, vm1, _, sharedMemory1 := GenesisVM(t, true)
+	issuer2, vm2, _, sharedMemory2 := GenesisVM(t, true)
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		assertNoLogError(t, logErr1)
 
 		if err := vm2.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		assertNoLogError(t, logErr2)
 	}()
 
 	key, err := coreth.NewKey(rand.Reader)
@@ -1639,7 +1646,9 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm1.SetPreference(vm1BlkA.ID())
+	if err := vm1.SetPreference(vm1BlkA.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	vm2BlkA, err := vm2.ParseBlock(vm1BlkA.Bytes())
 	if err != nil {
@@ -1651,7 +1660,9 @@ func TestStickyPreference(t *testing.T) {
 	if status := vm2BlkA.Status(); status != choices.Processing {
 		t.Fatalf("Expected status of block on VM2 to be %s, but found %s", choices.Processing, status)
 	}
-	vm2.SetPreference(vm2BlkA.ID())
+	if err := vm2.SetPreference(vm2BlkA.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := vm1BlkA.Accept(); err != nil {
 		t.Fatalf("VM1 failed to accept block: %s", err)
@@ -1699,7 +1710,9 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm1.SetPreference(vm1BlkB.ID())
+	if err := vm1.SetPreference(vm1BlkB.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	blkBHeight := vm1BlkB.Height()
 	blkBHash := vm1BlkB.(*Block).ethBlock.Hash()
@@ -1728,7 +1741,9 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatalf("Expected status of built block C to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm2.SetPreference(vm2BlkC.ID())
+	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	errs = vm2.chain.AddRemoteTxs(txs[5:])
 	for i, err := range errs {
@@ -1792,7 +1807,9 @@ func TestStickyPreference(t *testing.T) {
 	}
 
 	// Should be queryable after setting preference to side chain
-	vm1.SetPreference(vm1BlkD.ID())
+	if err := vm1.SetPreference(vm1BlkD.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkCHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkCHash.Hex(), b.Hash().Hex())
@@ -1827,35 +1844,4 @@ func TestStickyPreference(t *testing.T) {
 	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkDHash {
 		t.Fatalf("expected current block to have hash %s but got %s", blkDHash.Hex(), b.Hash().Hex())
 	}
-}
-
-// ErrorLog is used to confirm that errors were asserted correctly using the
-// logging.Logger interface.
-type ErrorLog struct {
-	logging.NoLog
-	err *error
-}
-
-// AssertNoError ...
-func (e ErrorLog) AssertNoError(err error) {
-	if *e.err == nil && err != nil {
-		*e.err = err
-	}
-}
-
-// AssertTrue ...
-func (e ErrorLog) AssertTrue(b bool, format string, args ...interface{}) {
-	if *e.err == nil && !b {
-		*e.err = fmt.Errorf(format, args...)
-	}
-}
-
-// AssertDeferredTrue ...
-func (e ErrorLog) AssertDeferredTrue(f func() bool, format string, args ...interface{}) {
-	e.AssertTrue(f(), format, args...)
-}
-
-// AssertDeferredNoError ...
-func (e ErrorLog) AssertDeferredNoError(f func() error) {
-	e.AssertNoError(f())
 }
