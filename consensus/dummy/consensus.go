@@ -220,6 +220,10 @@ func (self *DummyEngine) Finalize(
 
 func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
 	uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
+	if len(uncles) > 0 {
+		return nil, errUnclesUnsupported
+	}
+
 	var extdata []byte
 	if self.cb.OnFinalizeAndAssemble != nil {
 		ret, err := self.cb.OnFinalizeAndAssemble(state, txs)
