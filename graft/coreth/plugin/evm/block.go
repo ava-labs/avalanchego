@@ -188,8 +188,8 @@ func (b *Block) Verify() error {
 
 	// If the tx is an atomic tx, ensure that it doesn't conflict with any of
 	// its processing ancestry.
-	tx := vm.getAtomicTx(b.ethBlock)
-	if tx != nil {
+	atomicTx := vm.getAtomicTx(b.ethBlock)
+	if atomicTx != nil {
 		// If the ancestor is unknown, then the parent failed verification when
 		// it was called.
 		// If the ancestor is rejected, then this block shouldn't be inserted
@@ -210,7 +210,7 @@ func (b *Block) Verify() error {
 		if bonusBlocks.Contains(b.id) {
 			log.Info("skipping atomic tx verification on bonus block", "block", b.id)
 		} else {
-			switch atx := tx.UnsignedTx.(type) {
+			switch atx := atomicTx.UnsignedTx.(type) {
 			case *UnsignedImportTx:
 				// If an import tx is seen, we must ensure that none of the
 				// processing ancestors consume the same UTXO.
@@ -252,8 +252,8 @@ func (b *Block) Verify() error {
 			// We have verified that none of the processing ancestors conflict with
 			// the atomic transaction, so now we must ensure that the transaction is
 			// valid and doesn't have any accepted conflicts.
-			utx := tx.UnsignedTx.(UnsignedAtomicTx)
-			if err := utx.SemanticVerify(vm, tx); err != nil {
+			utx := atomicTx.UnsignedTx.(UnsignedAtomicTx)
+			if err := utx.SemanticVerify(vm, atomicTx); err != nil {
 				return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
 			}
 		}
