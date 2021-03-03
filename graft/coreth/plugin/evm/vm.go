@@ -11,7 +11,6 @@ import (
 	"math/big"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ava-labs/coreth"
@@ -190,7 +189,6 @@ type VM struct {
 	metalock                     sync.Mutex
 	blockCache, blockStatusCache cache.LRU
 	lastAccepted                 *Block
-	writingMetadata              uint32
 
 	// [buildBlockLock] must be held when accessing [mayBuildBlock],
 	// [tryToBuildBlock] or [awaitingBuildBlock].
@@ -497,7 +495,11 @@ func (vm *VM) Shutdown() error {
 		return nil
 	}
 
-	vm.writeBackMetadata()
+	// Make sure the lastAccepted block is written to disk on shutdown
+	if err := vm.writeBackMetadata(false); err != nil {
+		return err
+	}
+
 	vm.buildBlockTimer.Stop()
 	close(vm.shutdownChan)
 	vm.chain.Stop()
@@ -671,9 +673,8 @@ func (vm *VM) updateStatus(blkID ids.ID, status choices.Status) error {
 			return fmt.Errorf("could not accept blkID %s: %w", blkID, err)
 		}
 		vm.lastAccepted = blk
-		// TODO: improve this naive implementation
-		if atomic.SwapUint32(&vm.writingMetadata, 1) == 0 {
-			go vm.ctx.Log.RecoverAndPanic(vm.writeBackMetadata)
+		if err := vm.writeBackMetadata(true); err != nil {
+			return fmt.Errorf("could not write metadata: %w", err)
 		}
 	}
 	vm.blockStatusCache.Put(blkID, status)
@@ -827,17 +828,18 @@ func (vm *VM) getBlock(id ids.ID) *Block {
 	return block
 }
 
-func (vm *VM) writeBackMetadata() {
-	vm.metalock.Lock()
-	defer vm.metalock.Unlock()
+func (vm *VM) writeBackMetadata(unsafe bool) error {
+	if !unsafe {
+		vm.metalock.Lock()
+		defer vm.metalock.Unlock()
+	}
 
 	b, err := rlp.EncodeToBytes(vm.lastAccepted.ethBlock.Hash())
-	// TODO: change these to return an error once vm.writingMetadata is
-	// removed
-	vm.ctx.Log.AssertNoError(err)
-	vm.ctx.Log.AssertNoError(vm.chaindb.Put(lastAcceptedKey, b))
+	if err != nil {
+		return err
+	}
 
-	atomic.StoreUint32(&vm.writingMetadata, 0)
+	return vm.chaindb.Put(lastAcceptedKey, b)
 }
 
 // awaitTxPoolStabilized waits for a txPoolHead channel event
