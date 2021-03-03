@@ -525,26 +525,6 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	return block, nil
 }
 
-// syntacticVerify verifies that an *types.Block is well-formed.
-func (vm *VM) syntacticVerify(block *types.Block) error {
-	if !vm.chain.VerifyBlock(block) {
-		return errFailedChainVerify
-	}
-	// Coinbase must be zero on C-Chain
-	if block.Hash() != vm.genesisHash && block.Coinbase() != coreth.BlackholeAddr {
-		return errInvalidBlock
-	}
-	// Block must not have any uncles
-	if len(block.Uncles()) > 0 {
-		return errUnclesUnsupported
-	}
-	// Block must not be empty
-	if len(block.Transactions()) == 0 && vm.getAtomicTx(block) == nil {
-		return errEmptyBlock
-	}
-	return nil
-}
-
 // ParseBlock implements the snowman.ChainVM interface
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	vm.metalock.Lock()
@@ -554,15 +534,15 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	if err := rlp.DecodeBytes(b, ethBlock); err != nil {
 		return nil, err
 	}
-	// Performing syntactic verification in ParseBlock allows for
-	// short-circuiting bad blocks before they are processed by the VM.
-	if err := vm.syntacticVerify(ethBlock); err != nil {
-		return nil, fmt.Errorf("syntactic block verification failed: %w", err)
-	}
 	block := &Block{
 		id:       ids.ID(ethBlock.Hash()),
 		ethBlock: ethBlock,
 		vm:       vm,
+	}
+	// Performing syntactic verification in ParseBlock allows for
+	// short-circuiting bad blocks before they are processed by the VM.
+	if err := block.syntacticVerify(); err != nil {
+		return nil, fmt.Errorf("syntactic block verification failed: %w", err)
 	}
 	vm.blockCache.Put(block.ID(), block)
 	return block, nil
