@@ -168,6 +168,10 @@ var (
 func (b *Block) Verify() error {
 	vm := b.vm
 
+	if err := vm.syntacticVerify(b.ethBlock); err != nil {
+		return fmt.Errorf("syntactic block verification failed: %w", err)
+	}
+
 	// Only enforce a minimum fee when bootstrapping has finished
 	if vm.ctx.IsBootstrapped() {
 		// Ensure the minimum gas price is paid for every transaction
