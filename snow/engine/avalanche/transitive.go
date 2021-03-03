@@ -54,6 +54,11 @@ type Transitive struct {
 	// txBlocked tracks operations that are blocked on transactions
 	vtxBlocked, txBlocked events.Blocker
 
+	// transactions that have been provided from the VM but that are pending to
+	// be issued once the number of processing vertices has gone below the
+	// optimal number.
+	pendingTxs []snowstorm.Tx
+
 	errs wrappers.Errs
 }
 
@@ -210,8 +215,10 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxByt
 		t.Ctx.Log.Verbo("vertex:\n%s", formatting.DumpBytes{Bytes: vtxBytes})
 		return t.GetFailed(vdr, requestID)
 	}
-	_, err = t.issueFrom(vdr, vtx)
-	return err
+	if _, err := t.issueFrom(vdr, vtx); err != nil {
+		return err
+	}
+	return t.attemptToIssueTxs()
 }
 
 // GetFailed implements the Engine interface
@@ -239,7 +246,7 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	// Track performance statistics
 	t.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len()))
 	t.numMissingTxs.Set(float64(t.missingTxs.Len()))
-	return t.errs.Err
+	return t.attemptToIssueTxs()
 }
 
 // PullQuery implements the Engine interface
@@ -273,7 +280,7 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) 
 
 	// Wait until [vtxID] and its dependencies have been added to consensus before sending chits
 	t.vtxBlocked.Register(c)
-	return t.errs.Err
+	return t.attemptToIssueTxs()
 }
 
 // PushQuery implements the Engine interface
@@ -320,7 +327,7 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) er
 	}
 
 	t.vtxBlocked.Register(v)
-	return t.errs.Err
+	return t.attemptToIssueTxs()
 }
 
 // QueryFailed implements the Engine interface
@@ -337,11 +344,22 @@ func (t *Transitive) Notify(msg common.Message) error {
 
 	switch msg {
 	case common.PendingTxs:
-		txs := t.VM.Pending()
-		return t.batch(txs, false /*=force*/, false /*=empty*/)
+		t.pendingTxs = append(t.pendingTxs, t.VM.Pending()...)
+		return t.attemptToIssueTxs()
 	default:
-		return nil
+		t.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
 	}
+	return nil
+}
+
+func (t *Transitive) attemptToIssueTxs() error {
+	err := t.errs.Err
+	if err != nil {
+		return err
+	}
+
+	t.pendingTxs, err = t.batch(t.pendingTxs, false /*=force*/, false /*=empty*/, true /*=limit*/)
+	return err
 }
 
 // If there are pending transactions from the VM, issue them.
@@ -350,11 +368,6 @@ func (t *Transitive) Notify(msg common.Message) error {
 func (t *Transitive) repoll() error {
 	if t.polls.Len() >= t.Params.ConcurrentRepolls || t.errs.Errored() {
 		return nil
-	}
-
-	txs := t.VM.Pending()
-	if err := t.batch(txs, false /*=force*/, true /*=empty*/); err != nil {
-		return err
 	}
 
 	for i := t.polls.Len(); i < t.Params.ConcurrentRepolls; i++ {
@@ -497,7 +510,10 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 // If [force] is true, forces each tx to be issued.
 // Otherwise, some txs may not be put into vertices that are issued.
 // If [empty], will always result in a new poll.
-func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
+func (t *Transitive) batch(txs []snowstorm.Tx, force, empty, limit bool) ([]snowstorm.Tx, error) {
+	if limit && t.Params.OptimalProcessing <= t.Consensus.NumProcessing() {
+		return txs, nil
+	}
 	issuedTxs := ids.Set{}
 	consumed := ids.Set{}
 	issued := false
@@ -511,7 +527,10 @@ func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
 		overlaps := consumed.Overlaps(inputs)
 		if end-start >= t.Params.BatchSize || (force && overlaps) {
 			if err := t.issueBatch(txs[start:end]); err != nil {
-				return err
+				return nil, err
+			}
+			if limit && t.Params.OptimalProcessing <= t.Consensus.NumProcessing() {
+				return txs[end:], nil
 			}
 			start = end
 			consumed.Clear()
@@ -535,11 +554,12 @@ func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
 	}
 
 	if end > start {
-		return t.issueBatch(txs[start:end])
-	} else if empty && !issued {
+		return txs[end:], t.issueBatch(txs[start:end])
+	}
+	if empty && !issued {
 		t.issueRepoll()
 	}
-	return nil
+	return txs[end:], nil
 }
 
 // Issues a new poll for a preferred vertex in order to move consensus along
@@ -613,7 +633,7 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 }
 
 // Health implements the common.Engine interface
-func (t *Transitive) Health() (interface{}, error) {
+func (t *Transitive) HealthCheck() (interface{}, error) {
 	// TODO add more health checks
-	return t.VM.Health()
+	return t.VM.HealthCheck()
 }

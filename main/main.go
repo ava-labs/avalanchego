@@ -55,7 +55,7 @@ func main() {
 	if Config.DBEnabled {
 		db, err = leveldb.New(Config.DBPath, log, 0, 0, 0)
 		if err != nil {
-			log.Fatal("couldn't open database at %s: %s", Config.DBPath, err)
+			log.Error("couldn't open database at %s: %s", Config.DBPath, err)
 			return
 		}
 	} else {

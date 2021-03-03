@@ -273,7 +273,7 @@ func (vm *VM) Shutdown() error {
 }
 
 // CreateHandlers implements the avalanche.DAGVM interface
-func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
+func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	vm.metrics.numCreateHandlersCalls.Inc()
 
 	codec := cjson.NewCodec()
@@ -282,19 +282,21 @@ func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 	rpcServer.RegisterCodec(codec, "application/json")
 	rpcServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	// name this service "avm"
-	vm.ctx.Log.AssertNoError(rpcServer.RegisterService(&Service{vm: vm}, "avm"))
+	if err := rpcServer.RegisterService(&Service{vm: vm}, "avm"); err != nil {
+		return nil, err
+	}
 
 	walletServer := rpc.NewServer()
 	walletServer.RegisterCodec(codec, "application/json")
 	walletServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	// name this service "avm"
-	vm.ctx.Log.AssertNoError(walletServer.RegisterService(&vm.walletService, "wallet"))
+	// name this service "wallet"
+	err := walletServer.RegisterService(&vm.walletService, "wallet")
 
 	return map[string]*common.HTTPHandler{
 		"":        {Handler: rpcServer},
 		"/wallet": {Handler: walletServer},
 		"/pubsub": {LockOptions: common.NoLock, Handler: vm.pubsub},
-	}
+	}, err
 }
 
 // CreateStaticHandlers implements the avalanche.DAGVM interface

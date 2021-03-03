@@ -89,6 +89,9 @@ func (ta *Topological) Initialize(
 	return ta.updateFrontiers()
 }
 
+// NumProcessing implements the Avalanche interface
+func (ta *Topological) NumProcessing() int { return len(ta.nodes) }
+
 // Parameters implements the Avalanche interface
 func (ta *Topological) Parameters() Parameters { return ta.params }
 

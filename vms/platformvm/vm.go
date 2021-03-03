@@ -94,6 +94,7 @@ var (
 
 // VM implements the snowman.ChainVM interface
 type VM struct {
+	metrics
 	*core.SnowmanVM
 
 	// Node's validator manager
@@ -179,6 +180,12 @@ func (vm *VM) Initialize(
 	_ []*common.Fx,
 ) error {
 	ctx.Log.Verbo("initializing platform chain")
+
+	// Initialize metrics as soon as possible
+	if err := vm.metrics.Initialize(ctx.Namespace, ctx.Metrics); err != nil {
+		return err
+	}
+
 	// Initialize the inner VM, which has a lot of boiler-plate logic
 	vm.SnowmanVM = &core.SnowmanVM{}
 	if err := vm.SnowmanVM.Initialize(ctx, db, vm.unmarshalBlockFunc, msgs); err != nil {
@@ -318,11 +325,18 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	lastAcceptedID := vm.LastAccepted()
+	lastAcceptedID, err := vm.LastAccepted()
+	if err != nil {
+		vm.Ctx.Log.Error("Error fetching the last accepted block ID (%s), %s", lastAcceptedID, err)
+		return err
+	}
 	vm.Ctx.Log.Info("initializing last accepted block as %s", lastAcceptedID)
 
 	// Build off the most recently accepted block
-	vm.SetPreference(lastAcceptedID)
+	if err := vm.SetPreference(lastAcceptedID); err != nil {
+		vm.Ctx.Log.Error("Error setting the preference to the last accepted block (%s), %s", lastAcceptedID, err)
+		return err
+	}
 
 	// Sanity check to make sure the DB is in a valid state
 	lastAcceptedIntf, err := vm.getBlock(lastAcceptedID)
@@ -417,7 +431,7 @@ func (vm *VM) Bootstrapped() error {
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
 
-	for stopIter.Next() { // Iterates in order of increasing start time
+	for stopIter.Next() { // Iterates in order of increasing stop time
 		txBytes := stopIter.Value()
 
 		tx := rewardTx{}
@@ -485,7 +499,7 @@ func (vm *VM) Shutdown() error {
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
 
-	for stopIter.Next() { // Iterates in order of increasing start time
+	for stopIter.Next() { // Iterates in order of increasing stop time
 		txBytes := stopIter.Value()
 
 		tx := rewardTx{}
@@ -597,32 +611,34 @@ func (vm *VM) getBlock(blkID ids.ID) (Block, error) {
 }
 
 // SetPreference sets the preferred block to be the one with ID [blkID]
-func (vm *VM) SetPreference(blkID ids.ID) {
+func (vm *VM) SetPreference(blkID ids.ID) error {
 	if blkID != vm.Preferred() {
-		vm.SnowmanVM.SetPreference(blkID)
+		if err := vm.SnowmanVM.SetPreference(blkID); err != nil {
+			return err
+		}
 		vm.mempool.ResetTimer()
 	}
+	return nil
 }
 
 // CreateHandlers returns a map where:
 // * keys are API endpoint extensions
 // * values are API handlers
 // See API documentation for more information
-func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
+func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	// Create a service with name "platform"
 	handler, err := vm.SnowmanVM.NewHandler("platform", &Service{vm: vm})
-	vm.Ctx.Log.AssertNoError(err)
-	return map[string]*common.HTTPHandler{"": handler}
+	return map[string]*common.HTTPHandler{"": handler}, err
 }
 
 // CreateStaticHandlers implements the snowman.ChainVM interface
-func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
+func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	// Static service's name is platform
 	staticService := CreateStaticService()
-	handler, _ := vm.SnowmanVM.NewHandler("platform", staticService)
+	handler, err := vm.SnowmanVM.NewHandler("platform", staticService)
 	return map[string]*common.HTTPHandler{
 		"": handler,
-	}
+	}, err
 }
 
 // Connected implements validators.Connector
@@ -878,7 +894,7 @@ pendingStakerLoop:
 	defer stopIter.Release()
 
 currentStakerLoop:
-	for stopIter.Next() { // Iterates in order of increasing start time
+	for stopIter.Next() { // Iterates in order of increasing stop time
 		txBytes := stopIter.Value()
 
 		tx := rewardTx{}
@@ -964,7 +980,7 @@ func (vm *VM) updateVdrSet(subnetID ids.ID) error {
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
 
-	for stopIter.Next() { // Iterates in order of increasing start time
+	for stopIter.Next() { // Iterates in order of increasing stop time
 		txBytes := stopIter.Value()
 
 		tx := rewardTx{}
@@ -1165,12 +1181,12 @@ func (vm *VM) getStakers() ([]validators.Validator, error) {
 	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, vm.DB)
 	defer stopDB.Close()
-	iter := stopDB.NewIterator()
-	defer iter.Release()
+	stopIter := stopDB.NewIterator()
+	defer stopIter.Release()
 
 	stakers := []validators.Validator{}
-	for iter.Next() { // Iterates in order of increasing start time
-		txBytes := iter.Value()
+	for stopIter.Next() { // Iterates in order of increasing stop time
+		txBytes := stopIter.Value()
 		tx := rewardTx{}
 		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return nil, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
@@ -1188,7 +1204,7 @@ func (vm *VM) getStakers() ([]validators.Validator, error) {
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		iter.Error(),
+		stopIter.Error(),
 		stopDB.Close(),
 	)
 	return stakers, errs.Err
@@ -1202,12 +1218,12 @@ func (vm *VM) getPendingStakers() ([]validators.Validator, error) {
 	startDBPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, startDBPrefix))
 	startDB := prefixdb.NewNested(startDBPrefix, vm.DB)
 	defer startDB.Close()
-	iter := startDB.NewIterator()
-	defer iter.Release()
+	startIter := startDB.NewIterator()
+	defer startIter.Release()
 
 	stakers := []validators.Validator{}
-	for iter.Next() { // Iterates in order of increasing start time
-		txBytes := iter.Value()
+	for startIter.Next() { // Iterates in order of increasing start time
+		txBytes := startIter.Value()
 		tx := rewardTx{}
 		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return nil, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
@@ -1225,7 +1241,7 @@ func (vm *VM) getPendingStakers() ([]validators.Validator, error) {
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		iter.Error(),
+		startIter.Error(),
 		startDB.Close(),
 	)
 	return stakers, errs.Err

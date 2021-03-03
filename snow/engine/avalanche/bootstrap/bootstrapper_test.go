@@ -40,6 +40,13 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 	vm := &vertex.TestVM{}
 	vm.T = t
 
+	isBootstrapped := false
+	subnet := &common.SubnetTest{
+		T:               t,
+		IsBootstrappedF: func() bool { return isBootstrapped },
+		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
+	}
+
 	sender.Default(true)
 	manager.Default(true)
 	vm.Default(true)
@@ -61,6 +68,8 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 		SampleK:    int(peers.Weight()),
 		Alpha:      uint64(peers.Len()/2 + 1),
 		Sender:     sender,
+		Subnet:     subnet,
+		Delay:      &common.DelayTest{},
 	}
 	return Config{
 		Config:     commonConfig,
@@ -634,7 +643,10 @@ func TestBootstrapperAcceptedFrontier(t *testing.T) {
 		}
 	}
 
-	accepted := bs.CurrentAcceptedFrontier()
+	accepted, err := bs.CurrentAcceptedFrontier()
+	if err != nil {
+		t.Fatal(err)
+	}
 	acceptedSet := ids.Set{}
 	acceptedSet.Add(accepted...)
 

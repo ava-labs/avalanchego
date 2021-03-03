@@ -4,6 +4,7 @@
 package common
 
 import (
+	"github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 )
@@ -20,7 +21,7 @@ type Engine interface {
 
 	// Returns nil if the engine is healthy.
 	// Periodically called and reported through the health API
-	Health() (interface{}, error)
+	health.Checkable
 }
 
 // Handler defines the functions that are acted on the node

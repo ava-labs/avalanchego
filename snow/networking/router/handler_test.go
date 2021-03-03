@@ -48,6 +48,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
+		&Delay{},
 	)
 
 	currentTime := time.Now()
@@ -91,6 +92,7 @@ func TestHandlerDoesntDrop(t *testing.T) {
 		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
+		&Delay{},
 	)
 
 	handler.GetAcceptedFrontier(ids.ShortID{}, 1, time.Time{})
@@ -127,6 +129,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
+		&Delay{},
 	)
 	handler.clock.Set(time.Now())
 
@@ -170,6 +173,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
+		&Delay{},
 	)
 	handler.clock.Set(time.Now())
 
