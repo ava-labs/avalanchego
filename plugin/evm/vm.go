@@ -109,6 +109,7 @@ var (
 	errConflictingAtomicInputs    = errors.New("invalid block due to conflicting atomic inputs")
 	errUnknownAtomicTx            = errors.New("unknown atomic tx type")
 	errFailedChainVerify          = errors.New("block failed chain verify")
+	errUnclesUnsupported          = errors.New("uncles unsupported")
 )
 
 // mayBuildBlockStatus denotes whether the engine should be notified
@@ -293,7 +294,6 @@ func (vm *VM) Initialize(
 	config.SnapshotCache = 0
 
 	config.Miner.ManualMining = true
-	config.Miner.DisableUncle = true
 
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
@@ -534,18 +534,15 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	if err := rlp.DecodeBytes(b, ethBlock); err != nil {
 		return nil, err
 	}
-	if !vm.chain.VerifyBlock(ethBlock) {
-		return nil, errFailedChainVerify
-	}
-	blockHash := ethBlock.Hash()
-	// Coinbase must be zero on C-Chain
-	if blockHash != vm.genesisHash && ethBlock.Coinbase() != coreth.BlackholeAddr {
-		return nil, errInvalidBlock
-	}
 	block := &Block{
-		id:       ids.ID(blockHash),
+		id:       ids.ID(ethBlock.Hash()),
 		ethBlock: ethBlock,
 		vm:       vm,
+	}
+	// Performing syntactic verification in ParseBlock allows for
+	// short-circuiting bad blocks before they are processed by the VM.
+	if err := block.syntacticVerify(); err != nil {
+		return nil, fmt.Errorf("syntactic block verification failed: %w", err)
 	}
 	vm.blockCache.Put(block.ID(), block)
 	return block, nil
