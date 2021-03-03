@@ -151,16 +151,36 @@ type network struct {
 	b                                  Builder
 	apricotPhase0Time                  time.Time
 
-	// stateLock should never be held when grabbing a peer lock
-	stateLock       sync.RWMutex
-	pendingBytes    int64
-	closed          utils.AtomicBool
-	disconnectedIPs map[string]struct{}
-	connectedIPs    map[string]struct{}
-	retryDelay      map[string]time.Duration
+	// stateLock should never be held when grabbing a peer senderLock
+	stateLock    sync.RWMutex
+	pendingBytes int64
+	closed       utils.AtomicBool
+	peers        map[ids.ShortID]*peer
+
+	// disconnectedIPs, connectedIPs, peerAliasIPs, and myIPs
+	// are maps with ip.String() keys that are used to determine if
+	// we should attempt to dial an IP. [stateLock] should be held
+	// whenever accessing one of these maps.
+	disconnectedIPs map[string]struct{} // set of IPs we are attempting to connect to
+	connectedIPs    map[string]struct{} // set of IPs we have open connections with
+	peerAliasIPs    map[string]struct{} // set of alternate IPs we've reached existing peers at
 	// TODO: bound the size of [myIPs] to avoid DoS. LRU caching would be ideal
 	myIPs map[string]struct{} // set of IPs that resulted in my ID.
-	peers map[ids.ShortID]*peer
+
+	// retryDelay is a map with ip.String() keys that is used to track
+	// the backoff delay we should wait before attempting to dial an IP address
+	// again.
+	retryDelay map[string]time.Duration
+
+	// peerAliasReleaseFreq determines how often we should
+	// attempt to release aliases that are at least
+	// [peerAliasTimeout] old.
+	peerAliasReleaseFreq time.Duration
+
+	// peerAliasTimeout is the age a peer alias must
+	// be before we attempt to release it (so that we
+	// attempt to dial the IP again if gossiped to us).
+	peerAliasTimeout time.Duration
 
 	// ensures the close of the network only happens once.
 	closeOnce sync.Once
@@ -219,6 +239,8 @@ func NewDefaultNetwork(
 	sendQueueSize uint32,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
+	peerAliasReleaseFreq time.Duration,
+	peerAliasTimeout time.Duration,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -262,6 +284,8 @@ func NewDefaultNetwork(
 		apricotPhase0Time,
 		healthConfig,
 		benchlistManager,
+		peerAliasReleaseFreq,
+		peerAliasTimeout,
 	)
 }
 
@@ -308,6 +332,8 @@ func NewNetwork(
 	apricotPhase0Time time.Time,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
+	peerAliasReleaseFreq time.Duration,
+	peerAliasTimeout time.Duration,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -345,6 +371,9 @@ func NewNetwork(
 		pingFrequency:                      pingFrequency,
 		disconnectedIPs:                    make(map[string]struct{}),
 		connectedIPs:                       make(map[string]struct{}),
+		peerAliasIPs:                       make(map[string]struct{}),
+		peerAliasReleaseFreq:               peerAliasReleaseFreq,
+		peerAliasTimeout:                   peerAliasTimeout,
 		retryDelay:                         make(map[string]time.Duration),
 		myIPs:                              map[string]struct{}{ip.IP().String(): {}},
 		peers:                              make(map[ids.ShortID]*peer),
@@ -732,6 +761,36 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 	return n.gossipContainer(ctx.ChainID, containerID, container)
 }
 
+// upgradeIncoming returns a boolean indicating if we should
+// upgrade an incoming connection or drop it.
+//
+// Assumes stateLock is not held.
+func (n *network) upgradeIncoming(remoteAddr string) (bool, error) {
+	n.stateLock.RLock()
+	defer n.stateLock.RUnlock()
+
+	ip, err := utils.ToIPDesc(remoteAddr)
+	if err != nil {
+		return false, fmt.Errorf("unable to convert remote address %s to IPDesc: %w", remoteAddr, err)
+	}
+
+	str := ip.String()
+	if _, ok := n.connectedIPs[str]; ok {
+		return false, nil
+	}
+	if _, ok := n.myIPs[str]; ok {
+		return false, nil
+	}
+	if _, ok := n.peerAliasIPs[str]; ok {
+		return false, nil
+	}
+
+	// Note that we attempt to upgrade remote addresses contained
+	// in disconnectedIPs to because that could allow us to initialize
+	// a connection with a peer we've been attempting to dial.
+	return true, nil
+}
+
 // Dispatch starts accepting connections from other nodes attempting to connect
 // to this node.
 // assumes the stateLock is not held.
@@ -772,6 +831,25 @@ func (n *network) Dispatch() error {
 			n.log.Debug("error during server accept: %s", err)
 			return err
 		}
+
+		// We pessimistically drop an incoming connection if the remote
+		// address is found in connectedIPs, myIPs, or peerAliasIPs.
+		// This protects our node from spending CPU cycles on TLS
+		// handshakes to upgrade connections from existing peers.
+		// Specifically, this can occur when one of our existing
+		// peers attempts to connect to one our IP aliases (that they
+		// aren't yet aware is an alias).
+		addr := conn.RemoteAddr().String()
+		if upgrade, err := n.upgradeIncoming(addr); err != nil {
+			n.log.Debug("error during upgrade incoming check: %s", err)
+			_ = conn.Close()
+			continue
+		} else if !upgrade {
+			n.log.Debug("dropping duplicate connection from %s", addr)
+			_ = conn.Close()
+			continue
+		}
+
 		if conn, ok := conn.(*net.TCPConn); ok {
 			if err := conn.SetLinger(0); err != nil {
 				n.log.Warn("failed to set no linger due to: %s", err)
@@ -781,7 +859,6 @@ func (n *network) Dispatch() error {
 			}
 		}
 
-		addr := conn.RemoteAddr().String()
 		ticks, err := n.connMeter.Register(addr)
 		// looking for > n.connMeterMaxConns indicating the second tick
 		if err == nil && ticks > n.connMeterMaxConns {
@@ -951,6 +1028,9 @@ func (n *network) track(ip utils.IPDesc) {
 		return
 	}
 	if _, ok := n.connectedIPs[str]; ok {
+		return
+	}
+	if _, ok := n.peerAliasIPs[str]; ok {
 		return
 	}
 	if _, ok := n.myIPs[str]; ok {
@@ -1203,12 +1283,13 @@ func (n *network) tryAddPeer(p *peer) error {
 	}
 
 	// If I am already connected to this peer, then I should close this new
-	// connection.
-	if _, ok := n.peers[p.id]; ok {
+	// connection and add an alias record.
+	if peer, ok := n.peers[p.id]; ok {
 		if !ip.IsZero() {
 			str := ip.String()
 			delete(n.disconnectedIPs, str)
 			delete(n.retryDelay, str)
+			peer.addAlias(ip)
 		}
 		return fmt.Errorf("duplicated connection from %s at %s", p.id.PrefixedString(constants.NodeIDPrefix), ip)
 	}
@@ -1294,6 +1375,8 @@ func (n *network) disconnected(p *peer) {
 
 	delete(n.peers, p.id)
 	n.numPeers.Set(float64(len(n.peers)))
+
+	p.releaseAliases(time.Time{}, true)
 
 	if !ip.IsZero() {
 		str := ip.String()

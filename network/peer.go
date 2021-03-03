@@ -18,6 +18,16 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
+// alias is a secondary IP address where a peer
+// was reached
+type alias struct {
+	// ip where peer was reached
+	ip utils.IPDesc
+
+	// added is network time when peer was reached
+	added time.Time
+}
+
 type peer struct {
 	net *network // network this peer is part of
 
@@ -44,14 +54,24 @@ type peer struct {
 
 	// lock to ensure that closing of the sender queue is handled safely
 	senderLock sync.Mutex
+
 	// queue of messages this connection is attempting to send the peer. Is
 	// closed when the connection is closed.
 	sender chan []byte
 
 	// ip may or may not be set when the peer is first started. is only modified
 	// on the connection's reader routine.
-	ip     utils.IPDesc
+	ip utils.IPDesc
+
+	// ipLock must be held when accessing [ip].
 	ipLock sync.RWMutex
+
+	// aliases is a list of IPs other than [ip] that we have connected to
+	// this peer at.
+	aliases []alias
+
+	// aliasesLock must be held when accessing [aliases].
+	aliasesLock sync.Mutex
 
 	// id should be set when the peer is first created.
 	id ids.ShortID
@@ -81,6 +101,7 @@ func (p *peer) Start() {
 func (p *peer) StartTicker() {
 	go p.requestFinishHandshake()
 	go p.sendPings()
+	go p.monitorAliases()
 }
 
 func (p *peer) sendPings() {
@@ -126,6 +147,32 @@ func (p *peer) requestFinishHandshake() {
 			if !gotPeerList {
 				p.GetPeerList()
 			}
+		case <-p.tickerCloser:
+			return
+		}
+	}
+}
+
+// monitorAliases periodically attempts
+// to release timed out alias IPs of the
+// peer.
+//
+// monitorAliases will acquire stateLock
+// when an alias is released.
+func (p *peer) monitorAliases() {
+	// Exit if release frequency is 0, otherwise
+	// time.NewTicker will panic.
+	if p.net.peerAliasReleaseFreq == 0 {
+		return
+	}
+
+	releaseTicker := time.NewTicker(p.net.peerAliasReleaseFreq)
+	defer releaseTicker.Stop()
+
+	for {
+		select {
+		case <-releaseTicker.C:
+			p.releaseAliases(p.net.clock.Time(), false)
 		case <-p.tickerCloser:
 			return
 		}
@@ -837,4 +884,69 @@ func (p *peer) getIP() utils.IPDesc {
 	p.ipLock.RLock()
 	defer p.ipLock.RUnlock()
 	return p.ip
+}
+
+// addAlias marks that we have found another
+// IP that we can connect to this peer at.
+//
+// assumes stateLock is held
+func (p *peer) addAlias(ip utils.IPDesc) {
+	p.aliasesLock.Lock()
+	defer p.aliasesLock.Unlock()
+
+	p.net.peerAliasIPs[ip.String()] = struct{}{}
+	p.aliases = append(p.aliases, alias{
+		ip:    ip,
+		added: p.net.clock.Time(),
+	})
+}
+
+// releaseNextAlias returns the next released
+// alias or nil if none was released.
+func (p *peer) releaseNextAlias(now time.Time) *alias {
+	p.aliasesLock.Lock()
+	defer p.aliasesLock.Unlock()
+
+	if len(p.aliases) == 0 {
+		return nil
+	}
+
+	next := p.aliases[0]
+	if !now.IsZero() && now.Sub(next.added) < p.net.peerAliasTimeout {
+		return nil
+	}
+	p.aliases = p.aliases[1:]
+
+	// If [aliases] is empty after removing the next element, we
+	// set it to nil so that it will be garbage collected.
+	if len(p.aliases) == 0 {
+		p.aliases = nil
+	}
+
+	return &next
+}
+
+// releaseAliases removes enables network to
+// reconnect on aliases that have timed out. To
+// force all aliases to be removed, the caller
+// should set now to be the zero time.
+func (p *peer) releaseAliases(now time.Time, holdsStateLock bool) {
+	for {
+		next := p.releaseNextAlias(now)
+		if next == nil {
+			return
+		}
+
+		// We should always release aliasesLock before attempting
+		// to acquire the stateLock to avoid deadlocking on addAlias.
+		if !holdsStateLock {
+			p.net.stateLock.Lock()
+		}
+		delete(p.net.peerAliasIPs, next.ip.String())
+		if !holdsStateLock {
+			p.net.stateLock.Unlock()
+		}
+
+		p.net.log.Verbo("released alias %s for peer %s", next.ip, p.id)
+	}
 }
