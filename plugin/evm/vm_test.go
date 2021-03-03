@@ -1854,8 +1854,8 @@ func TestStickyPreference(t *testing.T) {
 //   A
 //  / \
 // B   C
-// +   |
-// ++++D
+//     |
+//     D
 func TestUncleBlock(t *testing.T) {
 	issuer1, vm1, _, sharedMemory1 := GenesisVM(t, true)
 	issuer2, vm2, _, sharedMemory2 := GenesisVM(t, true)
@@ -2042,25 +2042,33 @@ func TestUncleBlock(t *testing.T) {
 		t.Fatalf("Failed to build BlkD on VM2: %s", err)
 	}
 
-	// Add uncles to blkD
-	blkDevm := vm2BlkD.(*Block)
+	// Create uncle block from blkD
+	blkDEthBlock := vm2BlkD.(*Block).ethBlock
 	uncles := []*types.Header{vm1BlkB.(*Block).ethBlock.Header()}
-	blkDevm.ethBlock = types.NewBlock(
-		blkDevm.ethBlock.Header(),
-		blkDevm.ethBlock.Transactions(),
+	uncleBlockHeader := types.CopyHeader(blkDEthBlock.Header())
+	uncleBlockHeader.UncleHash = types.CalcUncleHash(uncles)
+
+	uncleEthBlock := types.NewBlock(
+		uncleBlockHeader,
+		blkDEthBlock.Transactions(),
 		uncles,
 		nil,
 		new(trie.Trie),
-		blkDevm.ethBlock.ExtraData(),
+		blkDEthBlock.ExtraData(),
 	)
-	if err := vm2BlkD.Verify(); !errors.Is(err, errUnclesUnsupported) {
-		t.Fatalf("VM2 should have failed with errUnclesUnsupported but got %s", err.Error())
+	uncleBlock := &Block{
+		vm:       vm2,
+		ethBlock: uncleEthBlock,
+		id:       ids.ID(uncleEthBlock.Hash()),
+	}
+	if err := uncleBlock.Verify(); !errors.Is(err, errUnclesUnsupported) {
+		t.Fatalf("VM2 should have failed with %q but got %q", errUnclesUnsupported, err.Error())
 	}
 	if _, err := vm1.ParseBlock(vm2BlkC.Bytes()); err != nil {
 		t.Fatalf("VM1 errored parsing blkC: %s", err)
 	}
-	if _, err := vm1.ParseBlock(vm2BlkD.Bytes()); !errors.Is(err, errUnclesUnsupported) {
-		t.Fatalf("VM1 should have failed with errUnclesUnsupported but got %s", err.Error())
+	if _, err := vm1.ParseBlock(uncleBlock.Bytes()); !errors.Is(err, errUnclesUnsupported) {
+		t.Fatalf("VM1 should have failed with %q but got %q", errUnclesUnsupported, err.Error())
 	}
 }
 
@@ -2139,20 +2147,30 @@ func TestEmptyBlock(t *testing.T) {
 		t.Fatalf("Failed to build block with import transaction: %s", err)
 	}
 
-	// Remove block transactions
-	blkAevm := vm1BlkA.(*Block)
-	blkAevm.ethBlock = types.NewBlock(
-		blkAevm.ethBlock.Header(),
+	// Create empty block from blkA
+	blkAEthBlock := vm1BlkA.(*Block).ethBlock
+
+	emptyEthBlock := types.NewBlock(
+		types.CopyHeader(blkAEthBlock.Header()),
 		nil,
 		nil,
 		nil,
 		new(trie.Trie),
 		nil,
 	)
-	if err := vm1BlkA.Verify(); !errors.Is(err, errEmptyBlock) {
+	// SetExtraData to override the extDataHash set on the previous header
+	emptyEthBlock.SetExtraData(nil)
+
+	emptyBlock := &Block{
+		vm:       vm1,
+		ethBlock: emptyEthBlock,
+		id:       ids.ID(emptyEthBlock.Hash()),
+	}
+
+	if err := emptyBlock.Verify(); !errors.Is(err, errEmptyBlock) {
 		t.Fatalf("VM1 should have failed with errEmptyBlock but got %s", err.Error())
 	}
-	if _, err := vm2.ParseBlock(vm1BlkA.Bytes()); !errors.Is(err, errEmptyBlock) {
+	if _, err := vm2.ParseBlock(emptyBlock.Bytes()); !errors.Is(err, errEmptyBlock) {
 		t.Fatalf("VM2 should have failed with errEmptyBlock but got %s", err.Error())
 	}
 }
