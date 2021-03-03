@@ -495,11 +495,6 @@ func (vm *VM) Shutdown() error {
 		return nil
 	}
 
-	// Make sure the lastAccepted block is written to disk on shutdown
-	if err := vm.writeBackMetadata(false); err != nil {
-		return err
-	}
-
 	vm.buildBlockTimer.Stop()
 	close(vm.shutdownChan)
 	vm.chain.Stop()
@@ -670,13 +665,13 @@ func (vm *VM) updateStatus(blkID ids.ID, status choices.Status) error {
 			return errUnknownBlock
 		}
 		if err := vm.chain.Accept(blk.ethBlock); err != nil {
-			return fmt.Errorf("could not accept blkID %s: %w", blkID, err)
+			return fmt.Errorf("could not accept %s: %w", blkID, err)
 		}
-		vm.lastAccepted = blk
-		if err := vm.writeBackMetadata(true); err != nil {
-			return fmt.Errorf("could not write metadata: %w", err)
+		if err := vm.setLastAccepted(blk); err != nil {
+			return fmt.Errorf("could not set %s as last accepted: %w", blkID, err)
 		}
 	}
+
 	vm.blockStatusCache.Put(blkID, status)
 	return nil
 }
@@ -828,17 +823,17 @@ func (vm *VM) getBlock(id ids.ID) *Block {
 	return block
 }
 
-func (vm *VM) writeBackMetadata(unsafe bool) error {
-	if !unsafe {
-		vm.metalock.Lock()
-		defer vm.metalock.Unlock()
-	}
+// setLastAccepted sets [blk] to be the VM's [lastAccepted] block
+// and stores its hash at [lastAcceptedKey].
+//
+// Assumes [metalock] is held.
+func (vm *VM) setLastAccepted(blk *Block) error {
+	vm.lastAccepted = blk
 
-	b, err := rlp.EncodeToBytes(vm.lastAccepted.ethBlock.Hash())
+	b, err := rlp.EncodeToBytes(blk.ethBlock.Hash())
 	if err != nil {
 		return err
 	}
-
 	return vm.chaindb.Put(lastAcceptedKey, b)
 }
 
