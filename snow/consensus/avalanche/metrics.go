@@ -4,8 +4,6 @@
 package avalanche
 
 import (
-	"time"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -17,14 +15,17 @@ import (
 type metrics struct {
 	numProcessing            prometheus.Gauge
 	latAccepted, latRejected prometheus.Histogram
+	log                      logging.Logger
 
-	clock      timer.Clock
-	processing map[ids.ID]time.Time
+	clock timer.Clock
+
+	processingTxs *ProcessingTxs
 }
 
 // Initialize implements the Engine interface
 func (m *metrics) Initialize(log logging.Logger, namespace string, registerer prometheus.Registerer) error {
-	m.processing = make(map[ids.ID]time.Time)
+	m.processingTxs = NewProcessingTxs()
+	m.log = log
 
 	m.numProcessing = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
@@ -54,26 +55,37 @@ func (m *metrics) Initialize(log logging.Logger, namespace string, registerer pr
 }
 
 func (m *metrics) Issued(id ids.ID) {
-	m.processing[id] = m.clock.Time()
+	m.processingTxs.PutTx(id, m.clock.Time())
 	m.numProcessing.Inc()
 }
 
 func (m *metrics) Accepted(id ids.ID) {
-	start := m.processing[id]
+	start, ok := m.processingTxs.GetTx(id)
+	if !ok {
+		// TODO-pedro should we log this ? I don't think this can happen though
+		m.log.Warn("unable to measure Accepted transaction %v", id.String())
+		return
+	}
+
 	end := m.clock.Time()
 
-	delete(m.processing, id)
+	m.processingTxs.Evict(id)
 
-	m.latAccepted.Observe(float64(end.Sub(start).Milliseconds()))
+	m.latAccepted.Observe(float64(end.Sub(start.Time).Milliseconds()))
 	m.numProcessing.Dec()
 }
 
 func (m *metrics) Rejected(id ids.ID) {
-	start := m.processing[id]
+	start, ok := m.processingTxs.GetTx(id)
+	if !ok {
+		// TODO-pedro should we log this ? I don't think this can happen though
+		m.log.Warn("unable to measure Rejected transaction %v", id.String())
+		return
+	}
 	end := m.clock.Time()
 
-	delete(m.processing, id)
+	m.processingTxs.Evict(id)
 
-	m.latRejected.Observe(float64(end.Sub(start).Milliseconds()))
+	m.latRejected.Observe(float64(end.Sub(start.Time).Milliseconds()))
 	m.numProcessing.Dec()
 }
