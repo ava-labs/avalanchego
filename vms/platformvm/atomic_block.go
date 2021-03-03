@@ -62,6 +62,14 @@ func (ab *AtomicBlock) conflicts(s ids.Set) bool {
 // This function also sets onAcceptDB database if the verification passes.
 func (ab *AtomicBlock) Verify() error {
 	if err := ab.CommonDecisionBlock.Verify(); err != nil {
+		if err := ab.Reject(); err == nil {
+			if err := ab.vm.DB.Commit(); err != nil {
+				ab.vm.Ctx.Log.Error("failed to commit VM's database: %w", err)
+				ab.vm.DB.Abort()
+			}
+		} else {
+			ab.vm.DB.Abort()
+		}
 		return err
 	}
 
