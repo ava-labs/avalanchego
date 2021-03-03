@@ -30,13 +30,6 @@ var (
 	errUnhealthy        = errors.New("the router is not healthy")
 )
 
-type request struct {
-	// When this request was registered
-	time.Time
-	// The type of request that was made
-	constants.MsgType
-}
-
 // ChainRouter routes incoming messages from the validator network
 // to the consensus engines that the messages are intended for.
 // Note that consensus engines are uniquely identified by the ID of the chain
@@ -56,8 +49,8 @@ type ChainRouter struct {
 	metrics          routerMetrics
 	// Parameters for doing health checks
 	healthConfig HealthConfig
-	// Unique-ified request ID --> Time and type of message made
-	requests map[ids.ID]request
+	// aggregator of requests based on their time
+	timedRequests *ProcessingRequests
 	// Measures average rate at which messages are dropped
 	dropRateCalculator math.Averager
 	// Last time at which there were no outstanding requests
@@ -92,7 +85,8 @@ func (cr *ChainRouter) Initialize(
 	cr.closeTimeout = closeTimeout
 	cr.criticalChains = criticalChains
 	cr.onFatal = onFatal
-	cr.requests = make(map[ids.ID]request)
+	// TODO-Pedro review the size allocation -defaulting at 50
+	cr.timedRequests = NewTimedRequests()
 	cr.peers.Add(nodeID)
 	// Set up meter to count dropped messages
 	cr.dropRateCalculator = math.NewAverager(0, cr.healthConfig.MaxDropRateHalflife, cr.clock.Time())
@@ -119,8 +113,8 @@ func (cr *ChainRouter) Initialize(
 // Remove a request from [cr.requests]
 // Assumes [cr.lock] is held
 func (cr *ChainRouter) removeRequest(id ids.ID) {
-	delete(cr.requests, id)
-	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
+	cr.timedRequests.Evict(id)
+	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
 }
 
 // RegisterRequests marks that we should expect to receive a reply from the given validator
@@ -137,12 +131,12 @@ func (cr *ChainRouter) RegisterRequest(
 ) {
 	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.Lock()
-	if len(cr.requests) == 0 {
+	if cr.timedRequests.Len() == 0 {
 		cr.lastTimeNoOutstanding = cr.clock.Time()
 	}
 	// Add to the set of unfulfilled requests
-	cr.requests[uniqueRequestID] = request{Time: cr.clock.Time(), MsgType: msgType}
-	cr.metrics.outstandingRequests.Set(float64(len(cr.requests)))
+	cr.timedRequests.PutRequest(uniqueRequestID, cr.clock.Time(), msgType)
+	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
 	cr.lock.Unlock()
 	// Register a timeout to fire if we don't get a reply in time.
 	var timeoutHandler func() // Called upon timeout
@@ -279,12 +273,12 @@ func (cr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 
 	// Mark that an outstanding request has been fulfilled
-	request, exists := cr.requests[uniqueRequestID]
+	request, exists := cr.timedRequests.GetRequest(uniqueRequestID)
 	if !exists || request.MsgType != constants.GetAcceptedFrontierMsg {
 		// We didn't request this message or we got back a reply of wrong type. Ignore.
 		return
 	}
-	cr.removeRequest(uniqueRequestID)
+	cr.timedRequests.Evict(uniqueRequestID)
 
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.Time)
@@ -365,12 +359,12 @@ func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 
 	// Mark that an outstanding request has been fulfilled
-	request, exists := cr.requests[uniqueRequestID]
+	request, exists := cr.timedRequests.GetRequest(uniqueRequestID)
 	if !exists || request.MsgType != constants.GetAcceptedMsg {
 		// We didn't request this message or we got back a reply of wrong type. Ignore.
 		return
 	}
-	cr.removeRequest(uniqueRequestID)
+	cr.timedRequests.Evict(uniqueRequestID)
 
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.Time)
@@ -451,12 +445,12 @@ func (cr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 
 	// Mark that an outstanding request has been fulfilled
-	request, exists := cr.requests[uniqueRequestID]
+	request, exists := cr.timedRequests.GetRequest(uniqueRequestID)
 	if !exists || request.MsgType != constants.GetAncestorsMsg {
 		// We didn't request this message or we got back a reply of wrong type. Ignore.
 		return
 	}
-	cr.removeRequest(uniqueRequestID)
+	cr.timedRequests.Evict(uniqueRequestID)
 
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.Time)
@@ -554,12 +548,12 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 
 	// Mark that an outstanding request has been fulfilled
-	request, exists := cr.requests[uniqueRequestID]
+	request, exists := cr.timedRequests.GetRequest(uniqueRequestID)
 	if !exists || request.MsgType != constants.GetMsg {
 		// We didn't request this message or we got back a reply of wrong type. Ignore.
 		return
 	}
-	cr.removeRequest(uniqueRequestID)
+	cr.timedRequests.Evict(uniqueRequestID)
 
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.Time)
@@ -658,12 +652,12 @@ func (cr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 
 	// Mark that an outstanding request has been fulfilled
-	request, exists := cr.requests[uniqueRequestID]
+	request, exists := cr.timedRequests.GetRequest(uniqueRequestID)
 	if !exists || (request.MsgType != constants.PullQueryMsg && request.MsgType != constants.PushQueryMsg) {
 		// We didn't request this message or we got back a reply of wrong type. Ignore.
 		return
 	}
-	cr.removeRequest(uniqueRequestID)
+	cr.timedRequests.Evict(uniqueRequestID)
 
 	// Calculate how long it took [validatorID] to reply
 	latency := cr.clock.Time().Sub(request.Time)
@@ -757,7 +751,7 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 	healthy := dropRate <= cr.healthConfig.MaxDropRate
 	details["msgDropRate"] = dropRate
 
-	numOutstandingReqs := len(cr.requests)
+	numOutstandingReqs := cr.timedRequests.Len()
 	healthy = healthy && numOutstandingReqs <= cr.healthConfig.MaxOutstandingRequests
 	details["outstandingRequests"] = numOutstandingReqs
 
@@ -768,6 +762,15 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 	timeSinceNoOutstandingRequests := now.Sub(cr.lastTimeNoOutstanding)
 	healthy = healthy && timeSinceNoOutstandingRequests <= cr.healthConfig.MaxTimeSinceNoOutstandingRequests
 	details["timeSinceNoOutstandingRequests"] = timeSinceNoOutstandingRequests.String()
+
+	// check for long running requests
+	processingRequest := now
+	if longOps := cr.timedRequests.OldestRequest(); longOps != nil {
+		processingRequest = longOps.Time
+	}
+	timeReqRunning := now.Sub(processingRequest)
+	healthy = healthy && timeReqRunning <= cr.healthConfig.MaxTimeSinceNoOutstandingRequests
+	details["longestRunningRequest"] = timeReqRunning.String()
 
 	if !healthy {
 		// The router is not healthy

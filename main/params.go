@@ -541,6 +541,7 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.RouterHealthConfig.MaxDropRate = v.GetFloat64(routerHealthMaxDropRateKey)
 	Config.RouterHealthConfig.MaxOutstandingRequests = int(v.GetUint(routerHealthMaxOutstandingRequestsKey))
 	Config.RouterHealthConfig.MaxTimeSinceNoOutstandingRequests = v.GetDuration(networkHealthMaxTimeSinceNoReqsKey)
+	Config.RouterHealthConfig.MaxRunTimeRequests = v.GetDuration(networkMaximumTimeoutKey)
 	Config.RouterHealthConfig.MaxDropRateHalflife = healthCheckAveragerHalflife
 	switch {
 	case Config.RouterHealthConfig.MaxDropRate < 0 || Config.RouterHealthConfig.MaxDropRate > 1:
