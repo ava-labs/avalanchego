@@ -11,7 +11,6 @@ import (
 	"math/big"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ava-labs/coreth"
@@ -190,7 +189,6 @@ type VM struct {
 	metalock                     sync.Mutex
 	blockCache, blockStatusCache cache.LRU
 	lastAccepted                 *Block
-	writingMetadata              uint32
 
 	// [buildBlockLock] must be held when accessing [mayBuildBlock],
 	// [tryToBuildBlock] or [awaitingBuildBlock].
@@ -289,7 +287,6 @@ func (vm *VM) Initialize(
 	vm.txFee = txFee
 
 	config := eth.DefaultConfig
-	config.ManualCanonical = true
 	config.Genesis = g
 	// disable the experimental snapshot feature from geth
 	config.TrieCleanCache += config.SnapshotCache
@@ -353,7 +350,9 @@ func (vm *VM) Initialize(
 			return fmt.Errorf("block failed verify: %w", err)
 		}
 		vm.newBlockChan <- blk
-		vm.updateStatus(ids.ID(block.Hash()), choices.Processing)
+		if err := vm.updateStatus(ids.ID(block.Hash()), choices.Processing); err != nil {
+			return fmt.Errorf("cannot update block status: %w", err)
+		}
 		vm.txPoolStabilizedLock.Lock()
 		vm.txPoolStabilizedHead = block.Hash()
 		vm.txPoolStabilizedLock.Unlock()
@@ -426,7 +425,9 @@ func (vm *VM) Initialize(
 		ethBlock: lastAccepted,
 		vm:       vm,
 	}
-	vm.chain.SetPreference(lastAccepted)
+	if err := vm.chain.Accept(lastAccepted); err != nil {
+		return fmt.Errorf("could not initialize VM with last accepted blkID %s: %w", vm.lastAccepted.ID(), err)
+	}
 	vm.genesisHash = chain.GetGenesisBlock().Hash()
 	log.Info(fmt.Sprintf("lastAccepted = %s", vm.lastAccepted.ethBlock.Hash().Hex()))
 
@@ -434,7 +435,7 @@ func (vm *VM) Initialize(
 	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
 	vm.codec = Codec
 	if err := vm.repairCanonicalChain(); err != nil {
-		log.Error("failed to repair the canonical chain", "error", err)
+		return fmt.Errorf("failed to repair the canonical chain: %w", err)
 	}
 
 	log.Debug("unlocking indexing")
@@ -463,10 +464,6 @@ func (vm *VM) repairCanonicalChain() error {
 
 	start := time.Now()
 	log.Info("starting to repair canonical chain", "startTime", start)
-
-	if err := vm.chain.SetTail(vm.lastAccepted.ethBlock.Hash()); err != nil {
-		return fmt.Errorf("failed to set tail to the last accepted block: %w", err)
-	}
 	if err := vm.chain.WriteCanonicalFromCurrentBlock(); err != nil {
 		return fmt.Errorf("failed to repair canonical chain after %v due to: %w", time.Since(start), err)
 	}
@@ -498,7 +495,6 @@ func (vm *VM) Shutdown() error {
 		return nil
 	}
 
-	vm.writeBackMetadata()
 	vm.buildBlockTimer.Stop()
 	close(vm.shutdownChan)
 	vm.chain.Stop()
@@ -570,10 +566,10 @@ func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 // SetPreference sets what the current tail of the chain is
 func (vm *VM) SetPreference(blkID ids.ID) error {
 	block := vm.getBlock(blkID)
-	vm.ctx.Log.AssertTrue(block != nil, "problem setting preferred block, couldn't find blkID %s", blkID)
-
-	vm.chain.SetPreference(block.ethBlock)
-	return nil
+	if block == nil {
+		return errUnknownBlock
+	}
+	return vm.chain.SetPreference(block.ethBlock)
 }
 
 // LastAccepted returns the ID of the block that was last accepted
@@ -610,21 +606,25 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 	enabledAPIs := vm.CLIConfig.EthAPIs()
 	vm.chain.AttachEthService(handler, vm.CLIConfig.EthAPIs())
 
+	errs := wrappers.Errs{}
 	if vm.CLIConfig.SnowmanAPIEnabled {
-		handler.RegisterName("snowman", &SnowmanAPI{vm})
+		errs.Add(handler.RegisterName("snowman", &SnowmanAPI{vm}))
 		enabledAPIs = append(enabledAPIs, "snowman")
 	}
 	if vm.CLIConfig.CorethAdminAPIEnabled {
-		handler.RegisterName("admin", &admin.Performance{})
+		errs.Add(handler.RegisterName("admin", &admin.Performance{}))
 		enabledAPIs = append(enabledAPIs, "coreth-admin")
 	}
 	if vm.CLIConfig.NetAPIEnabled {
-		handler.RegisterName("net", &NetAPI{vm})
+		errs.Add(handler.RegisterName("net", &NetAPI{vm}))
 		enabledAPIs = append(enabledAPIs, "net")
 	}
 	if vm.CLIConfig.Web3APIEnabled {
-		handler.RegisterName("web3", &Web3API{})
+		errs.Add(handler.RegisterName("web3", &Web3API{}))
 		enabledAPIs = append(enabledAPIs, "web3")
+	}
+	if errs.Errored() {
+		return nil, errs.Err
 	}
 
 	log.Info(fmt.Sprintf("Enabled APIs: %s", strings.Join(enabledAPIs, ", ")))
@@ -639,7 +639,10 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 // CreateStaticHandlers makes new http handlers that can handle API calls
 func (vm *VM) CreateStaticHandlers() (map[string]*commonEng.HTTPHandler, error) {
 	handler := rpc.NewServer()
-	handler.RegisterName("static", &StaticService{})
+	if err := handler.RegisterName("static", &StaticService{}); err != nil {
+		return nil, err
+	}
+
 	return map[string]*commonEng.HTTPHandler{
 		"/rpc": {LockOptions: commonEng.NoLock, Handler: handler},
 		"/ws":  {LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandler([]string{"*"})},
@@ -652,20 +655,25 @@ func (vm *VM) CreateStaticHandlers() (map[string]*commonEng.HTTPHandler, error) 
  ******************************************************************************
  */
 
-func (vm *VM) updateStatus(blockID ids.ID, status choices.Status) {
+func (vm *VM) updateStatus(blkID ids.ID, status choices.Status) error {
 	vm.metalock.Lock()
 	defer vm.metalock.Unlock()
 
 	if status == choices.Accepted {
-		vm.lastAccepted = vm.getBlock(blockID)
-		// TODO: improve this naive implementation
-		if atomic.SwapUint32(&vm.writingMetadata, 1) == 0 {
-			go vm.ctx.Log.RecoverAndPanic(vm.writeBackMetadata)
+		blk := vm.getBlock(blkID)
+		if blk == nil {
+			return errUnknownBlock
 		}
-		err := vm.chain.SetTail(common.Hash(blockID))
-		vm.ctx.Log.AssertNoError(err)
+		if err := vm.chain.Accept(blk.ethBlock); err != nil {
+			return fmt.Errorf("could not accept %s: %w", blkID, err)
+		}
+		if err := vm.setLastAccepted(blk); err != nil {
+			return fmt.Errorf("could not set %s as last accepted: %w", blkID, err)
+		}
 	}
-	vm.blockStatusCache.Put(blockID, status)
+
+	vm.blockStatusCache.Put(blkID, status)
+	return nil
 }
 
 func (vm *VM) tryBlockGen() error {
@@ -815,18 +823,18 @@ func (vm *VM) getBlock(id ids.ID) *Block {
 	return block
 }
 
-func (vm *VM) writeBackMetadata() {
-	vm.metalock.Lock()
-	defer vm.metalock.Unlock()
+// setLastAccepted sets [blk] to be the VM's [lastAccepted] block
+// and stores its hash at [lastAcceptedKey].
+//
+// Assumes [metalock] is held.
+func (vm *VM) setLastAccepted(blk *Block) error {
+	vm.lastAccepted = blk
 
-	b, err := rlp.EncodeToBytes(vm.lastAccepted.ethBlock.Hash())
+	b, err := rlp.EncodeToBytes(blk.ethBlock.Hash())
 	if err != nil {
-		log.Error("snowman-eth: error while writing back metadata")
-		return
+		return err
 	}
-	log.Debug("writing back metadata")
-	vm.chaindb.Put(lastAcceptedKey, b)
-	atomic.StoreUint32(&vm.writingMetadata, 0)
+	return vm.chaindb.Put(lastAcceptedKey, b)
 }
 
 // awaitTxPoolStabilized waits for a txPoolHead channel event

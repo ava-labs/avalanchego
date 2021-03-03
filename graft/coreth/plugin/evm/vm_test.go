@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -105,7 +106,6 @@ func NewContext() *snow.Context {
 func GenesisVM(t *testing.T, finishBootstrapping bool) (chan engCommon.Message, *VM, []byte, *atomic.Memory) {
 	genesisBytes := BuildGenesisTest(t)
 	ctx := NewContext()
-
 	baseDB := memdb.New()
 
 	m := &atomic.Memory{}
@@ -246,7 +246,9 @@ func TestIssueAtomicTxs(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm.SetPreference(blk.ID())
+	if err := vm.SetPreference(blk.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := blk.Accept(); err != nil {
 		t.Fatal(err)
@@ -381,7 +383,9 @@ func TestBuildEthTxBlock(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm.SetPreference(blk.ID())
+	if err := vm.SetPreference(blk.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := blk.Accept(); err != nil {
 		t.Fatal(err)
@@ -527,7 +531,9 @@ func TestConflictingImportTxs(t *testing.T) {
 		}
 
 		expectedParentBlkID = blk.ID()
-		vm.SetPreference(blk.ID())
+		if err := vm.SetPreference(blk.ID()); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	for i, tx := range conflictTxs {
@@ -566,6 +572,7 @@ func TestSetPreferenceRace(t *testing.T) {
 		if err := vm1.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
+
 		if err := vm2.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
@@ -649,7 +656,9 @@ func TestSetPreferenceRace(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm1.SetPreference(vm1BlkA.ID())
+	if err := vm1.SetPreference(vm1BlkA.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	vm2BlkA, err := vm2.ParseBlock(vm1BlkA.Bytes())
 	if err != nil {
@@ -661,7 +670,9 @@ func TestSetPreferenceRace(t *testing.T) {
 	if status := vm2BlkA.Status(); status != choices.Processing {
 		t.Fatalf("Expected status of block on VM2 to be %s, but found %s", choices.Processing, status)
 	}
-	vm2.SetPreference(vm2BlkA.ID())
+	if err := vm2.SetPreference(vm2BlkA.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := vm1BlkA.Accept(); err != nil {
 		t.Fatalf("VM1 failed to accept block: %s", err)
@@ -709,7 +720,9 @@ func TestSetPreferenceRace(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm1.SetPreference(vm1BlkB.ID())
+	if err := vm1.SetPreference(vm1BlkB.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	// Split the transactions over two blocks, and set VM2's preference to them in sequence
 	// after building each block
@@ -735,7 +748,9 @@ func TestSetPreferenceRace(t *testing.T) {
 		t.Fatalf("Expected status of built block C to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm2.SetPreference(vm2BlkC.ID())
+	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	// Block D
 	errs = vm2.chain.AddRemoteTxs(txs[5:10])
@@ -759,7 +774,9 @@ func TestSetPreferenceRace(t *testing.T) {
 		t.Fatalf("Expected status of built block D to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm2.SetPreference(vm2BlkD.ID())
+	if err := vm2.SetPreference(vm2BlkD.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	// VM1 receives blkC and blkD from VM1
 	// and happens to call SetPreference on blkD without ever calling SetPreference
@@ -786,7 +803,9 @@ func TestSetPreferenceRace(t *testing.T) {
 	}
 
 	// Set VM1's preference to blockD, skipping blockC
-	vm1.SetPreference(vm1BlkD.ID())
+	if err := vm1.SetPreference(vm1BlkD.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	// Accept the longer chain on both VMs and ensure there are no errors
 	// VM1 Accepts the blocks in order
@@ -938,7 +957,9 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 		t.Fatalf("Block failed verification: %s", err)
 	}
 
-	vm.SetPreference(blk0.ID())
+	if err := vm.SetPreference(blk0.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	tx := types.NewTransaction(0, key.Address, big.NewInt(10), 21000, params.MinGasPrice, nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainID), key.PrivateKey)
@@ -965,7 +986,9 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.SetPreference(blk1.ID())
+	if err := vm.SetPreference(blk1.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	importTx1, err := vm.newImportTx(vm.ctx.XChainID, key.Address, []*crypto.PrivateKeySECP256K1R{key1})
 	if err != nil {
@@ -987,7 +1010,9 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 		t.Fatalf("Block failed verification: %s", err)
 	}
 
-	vm.SetPreference(blk2.ID())
+	if err := vm.SetPreference(blk2.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := vm.issueTx(importTx0); err != nil {
 		t.Fatal(err)
@@ -1080,7 +1105,9 @@ func TestBonusBlocksTxs(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm.SetPreference(evmBlock.id)
+	if err := vm.SetPreference(evmBlock.id); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := blk.Accept(); err != nil {
 		t.Fatal(err)
@@ -1096,5 +1123,725 @@ func TestBonusBlocksTxs(t *testing.T) {
 	}
 	if lastAcceptedID != evmBlock.id {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk.ID(), lastAcceptedID)
+	}
+}
+
+// Regression test to ensure that a VM that accepts block A and B
+// will not attempt to orphan either when verifying blocks C and D
+// from another VM (which have a common ancestor under the finalized
+// frontier).
+//   A
+//  / \
+// B   C
+//     |
+//     D
+func TestReorgProtection(t *testing.T) {
+	issuer1, vm1, _, sharedMemory1 := GenesisVM(t, true)
+	issuer2, vm2, _, sharedMemory2 := GenesisVM(t, true)
+
+	defer func() {
+		if err := vm1.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := vm2.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	key, err := coreth.NewKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Import 1 AVAX
+	importAmount := uint64(1000000000)
+	utxoID := avax.UTXOID{
+		TxID: ids.ID{
+			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+			0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+			0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+		},
+	}
+
+	utxo := &avax.UTXO{
+		UTXOID: utxoID,
+		Asset:  avax.Asset{ID: vm1.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: importAmount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{testKeys[0].PublicKey().Address()},
+			},
+		},
+	}
+	utxoBytes, err := vm1.codec.Marshal(codecVersion, utxo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	xChainSharedMemory1 := sharedMemory1.NewSharedMemory(vm1.ctx.XChainID)
+	xChainSharedMemory2 := sharedMemory2.NewSharedMemory(vm2.ctx.XChainID)
+	inputID := utxo.InputID()
+	if err := xChainSharedMemory1.Put(vm1.ctx.ChainID, []*atomic.Element{{
+		Key:   inputID[:],
+		Value: utxoBytes,
+		Traits: [][]byte{
+			testKeys[0].PublicKey().Address().Bytes(),
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := xChainSharedMemory2.Put(vm2.ctx.ChainID, []*atomic.Element{{
+		Key:   inputID[:],
+		Value: utxoBytes,
+		Traits: [][]byte{
+			testKeys[0].PublicKey().Address().Bytes(),
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	importTx, err := vm1.newImportTx(vm1.ctx.XChainID, key.Address, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm1.issueTx(importTx); err != nil {
+		t.Fatal(err)
+	}
+
+	<-issuer1
+
+	vm1BlkA, err := vm1.BuildBlock()
+	if err != nil {
+		t.Fatalf("Failed to build block with import transaction: %s", err)
+	}
+
+	if err := vm1BlkA.Verify(); err != nil {
+		t.Fatalf("Block failed verification on VM1: %s", err)
+	}
+
+	if status := vm1BlkA.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
+	}
+
+	if err := vm1.SetPreference(vm1BlkA.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	vm2BlkA, err := vm2.ParseBlock(vm1BlkA.Bytes())
+	if err != nil {
+		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
+	}
+	if err := vm2BlkA.Verify(); err != nil {
+		t.Fatalf("Block failed verification on VM2: %s", err)
+	}
+	if status := vm2BlkA.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of block on VM2 to be %s, but found %s", choices.Processing, status)
+	}
+	if err := vm2.SetPreference(vm2BlkA.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm1BlkA.Accept(); err != nil {
+		t.Fatalf("VM1 failed to accept block: %s", err)
+	}
+	if err := vm2BlkA.Accept(); err != nil {
+		t.Fatalf("VM2 failed to accept block: %s", err)
+	}
+
+	// Create list of 10 successive transactions to build block A on vm1
+	// and to be split into two separate blocks on VM2
+	txs := make([]*types.Transaction, 10)
+	for i := 0; i < 10; i++ {
+		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, params.MinGasPrice, nil)
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainID), key.PrivateKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		txs[i] = signedTx
+	}
+
+	var (
+		errs []error
+	)
+
+	// Add the remote transactions, build the block, and set VM1's preference for block A
+	errs = vm1.chain.AddRemoteTxs(txs)
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
+		}
+	}
+
+	<-issuer1
+
+	vm1BlkB, err := vm1.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm1BlkB.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if status := vm1BlkB.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
+	}
+
+	if err := vm1.SetPreference(vm1BlkB.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm1BlkB.Accept(); err != nil {
+		t.Fatalf("VM1 failed to accept block: %s", err)
+	}
+
+	// Split the transactions over two blocks, and set VM2's preference to them in sequence
+	// after building each block
+	// Block C
+	errs = vm2.chain.AddRemoteTxs(txs[0:5])
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
+		}
+	}
+
+	<-issuer2
+	vm2BlkC, err := vm2.BuildBlock()
+	if err != nil {
+		t.Fatalf("Failed to build BlkC on VM2: %s", err)
+	}
+
+	if err := vm2BlkC.Verify(); err != nil {
+		t.Fatalf("Block failed verification on VM2: %s", err)
+	}
+	if status := vm2BlkC.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of block on VM2 to be %s, but found %s", choices.Processing, status)
+	}
+
+	vm1BlkC, err := vm1.ParseBlock(vm2BlkC.Bytes())
+	if err != nil {
+		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
+	}
+	if err := vm1BlkC.Verify(); err != nil {
+		t.Fatalf("Block failed verification on VM1: %s", err)
+	}
+
+	// The below (setting preference blocks that have a common ancestor
+	// with the preferred chain lower than the last finalized block)
+	// should NEVER happen. However, the VM defends against this
+	// just in case.
+	if err := vm1.SetPreference(vm1BlkC.ID()); !strings.Contains(err.Error(), "cannot orphan finalized block") {
+		t.Fatalf("Unexpected error when setting preference that would trigger reorg: %s", err)
+	}
+
+	if err := vm1BlkC.Accept(); !strings.Contains(err.Error(), "expected accepted parent block hash") {
+		t.Fatalf("Unexpected error when setting block at finalized height: %s", err)
+	}
+}
+
+// Regression test to ensure that a VM that accepts block C while preferring
+// block B will trigger a reorg.
+//   A
+//  / \
+// B   C
+func TestNonCanonicalAccept(t *testing.T) {
+	issuer1, vm1, _, sharedMemory1 := GenesisVM(t, true)
+	issuer2, vm2, _, sharedMemory2 := GenesisVM(t, true)
+
+	defer func() {
+		if err := vm1.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := vm2.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	key, err := coreth.NewKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Import 1 AVAX
+	importAmount := uint64(1000000000)
+	utxoID := avax.UTXOID{
+		TxID: ids.ID{
+			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+			0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+			0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+		},
+	}
+
+	utxo := &avax.UTXO{
+		UTXOID: utxoID,
+		Asset:  avax.Asset{ID: vm1.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: importAmount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{testKeys[0].PublicKey().Address()},
+			},
+		},
+	}
+	utxoBytes, err := vm1.codec.Marshal(codecVersion, utxo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	xChainSharedMemory1 := sharedMemory1.NewSharedMemory(vm1.ctx.XChainID)
+	xChainSharedMemory2 := sharedMemory2.NewSharedMemory(vm2.ctx.XChainID)
+	inputID := utxo.InputID()
+	if err := xChainSharedMemory1.Put(vm1.ctx.ChainID, []*atomic.Element{{
+		Key:   inputID[:],
+		Value: utxoBytes,
+		Traits: [][]byte{
+			testKeys[0].PublicKey().Address().Bytes(),
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := xChainSharedMemory2.Put(vm2.ctx.ChainID, []*atomic.Element{{
+		Key:   inputID[:],
+		Value: utxoBytes,
+		Traits: [][]byte{
+			testKeys[0].PublicKey().Address().Bytes(),
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	importTx, err := vm1.newImportTx(vm1.ctx.XChainID, key.Address, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm1.issueTx(importTx); err != nil {
+		t.Fatal(err)
+	}
+
+	<-issuer1
+
+	vm1BlkA, err := vm1.BuildBlock()
+	if err != nil {
+		t.Fatalf("Failed to build block with import transaction: %s", err)
+	}
+
+	if err := vm1BlkA.Verify(); err != nil {
+		t.Fatalf("Block failed verification on VM1: %s", err)
+	}
+
+	if status := vm1BlkA.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
+	}
+
+	if err := vm1.SetPreference(vm1BlkA.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	vm2BlkA, err := vm2.ParseBlock(vm1BlkA.Bytes())
+	if err != nil {
+		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
+	}
+	if err := vm2BlkA.Verify(); err != nil {
+		t.Fatalf("Block failed verification on VM2: %s", err)
+	}
+	if status := vm2BlkA.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of block on VM2 to be %s, but found %s", choices.Processing, status)
+	}
+	if err := vm2.SetPreference(vm2BlkA.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm1BlkA.Accept(); err != nil {
+		t.Fatalf("VM1 failed to accept block: %s", err)
+	}
+	if err := vm2BlkA.Accept(); err != nil {
+		t.Fatalf("VM2 failed to accept block: %s", err)
+	}
+
+	// Create list of 10 successive transactions to build block A on vm1
+	// and to be split into two separate blocks on VM2
+	txs := make([]*types.Transaction, 10)
+	for i := 0; i < 10; i++ {
+		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, params.MinGasPrice, nil)
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainID), key.PrivateKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		txs[i] = signedTx
+	}
+
+	var (
+		errs []error
+	)
+
+	// Add the remote transactions, build the block, and set VM1's preference for block A
+	errs = vm1.chain.AddRemoteTxs(txs)
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
+		}
+	}
+
+	<-issuer1
+
+	vm1BlkB, err := vm1.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm1BlkB.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if status := vm1BlkB.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
+	}
+
+	if err := vm1.SetPreference(vm1BlkB.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	blkBHeight := vm1BlkB.Height()
+	blkBHash := vm1BlkB.(*Block).ethBlock.Hash()
+	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
+		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
+	}
+
+	errs = vm2.chain.AddRemoteTxs(txs[0:5])
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
+		}
+	}
+
+	<-issuer2
+	vm2BlkC, err := vm2.BuildBlock()
+	if err != nil {
+		t.Fatalf("Failed to build BlkC on VM2: %s", err)
+	}
+
+	vm1BlkC, err := vm1.ParseBlock(vm2BlkC.Bytes())
+	if err != nil {
+		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
+	}
+
+	if err := vm1BlkC.Verify(); err != nil {
+		t.Fatalf("Block failed verification on VM1: %s", err)
+	}
+
+	if err := vm1BlkC.Accept(); err != nil {
+		t.Fatalf("VM1 failed to accept block: %s", err)
+	}
+
+	blkCHash := vm1BlkC.(*Block).ethBlock.Hash()
+	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkCHash {
+		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkCHash.Hex(), b.Hash().Hex())
+	}
+}
+
+// Regression test to ensure that a VM that verifies block B, C, then
+// D (preferring block B) does not trigger a reorg through the re-verification
+// of block C or D.
+//   A
+//  / \
+// B   C
+//     |
+//     D
+func TestStickyPreference(t *testing.T) {
+	issuer1, vm1, _, sharedMemory1 := GenesisVM(t, true)
+	issuer2, vm2, _, sharedMemory2 := GenesisVM(t, true)
+
+	defer func() {
+		if err := vm1.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := vm2.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	key, err := coreth.NewKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Import 1 AVAX
+	importAmount := uint64(1000000000)
+	utxoID := avax.UTXOID{
+		TxID: ids.ID{
+			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+			0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+			0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+		},
+	}
+
+	utxo := &avax.UTXO{
+		UTXOID: utxoID,
+		Asset:  avax.Asset{ID: vm1.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: importAmount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{testKeys[0].PublicKey().Address()},
+			},
+		},
+	}
+	utxoBytes, err := vm1.codec.Marshal(codecVersion, utxo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	xChainSharedMemory1 := sharedMemory1.NewSharedMemory(vm1.ctx.XChainID)
+	xChainSharedMemory2 := sharedMemory2.NewSharedMemory(vm2.ctx.XChainID)
+	inputID := utxo.InputID()
+	if err := xChainSharedMemory1.Put(vm1.ctx.ChainID, []*atomic.Element{{
+		Key:   inputID[:],
+		Value: utxoBytes,
+		Traits: [][]byte{
+			testKeys[0].PublicKey().Address().Bytes(),
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := xChainSharedMemory2.Put(vm2.ctx.ChainID, []*atomic.Element{{
+		Key:   inputID[:],
+		Value: utxoBytes,
+		Traits: [][]byte{
+			testKeys[0].PublicKey().Address().Bytes(),
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	importTx, err := vm1.newImportTx(vm1.ctx.XChainID, key.Address, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm1.issueTx(importTx); err != nil {
+		t.Fatal(err)
+	}
+
+	<-issuer1
+
+	vm1BlkA, err := vm1.BuildBlock()
+	if err != nil {
+		t.Fatalf("Failed to build block with import transaction: %s", err)
+	}
+
+	if err := vm1BlkA.Verify(); err != nil {
+		t.Fatalf("Block failed verification on VM1: %s", err)
+	}
+
+	if status := vm1BlkA.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
+	}
+
+	if err := vm1.SetPreference(vm1BlkA.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	vm2BlkA, err := vm2.ParseBlock(vm1BlkA.Bytes())
+	if err != nil {
+		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
+	}
+	if err := vm2BlkA.Verify(); err != nil {
+		t.Fatalf("Block failed verification on VM2: %s", err)
+	}
+	if status := vm2BlkA.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of block on VM2 to be %s, but found %s", choices.Processing, status)
+	}
+	if err := vm2.SetPreference(vm2BlkA.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm1BlkA.Accept(); err != nil {
+		t.Fatalf("VM1 failed to accept block: %s", err)
+	}
+	if err := vm2BlkA.Accept(); err != nil {
+		t.Fatalf("VM2 failed to accept block: %s", err)
+	}
+
+	// Create list of 10 successive transactions to build block A on vm1
+	// and to be split into two separate blocks on VM2
+	txs := make([]*types.Transaction, 10)
+	for i := 0; i < 10; i++ {
+		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, params.MinGasPrice, nil)
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainID), key.PrivateKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		txs[i] = signedTx
+	}
+
+	var (
+		errs []error
+	)
+
+	// Add the remote transactions, build the block, and set VM1's preference for block A
+	errs = vm1.chain.AddRemoteTxs(txs)
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
+		}
+	}
+
+	<-issuer1
+
+	vm1BlkB, err := vm1.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm1BlkB.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if status := vm1BlkB.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
+	}
+
+	if err := vm1.SetPreference(vm1BlkB.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	blkBHeight := vm1BlkB.Height()
+	blkBHash := vm1BlkB.(*Block).ethBlock.Hash()
+	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
+		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
+	}
+
+	errs = vm2.chain.AddRemoteTxs(txs[0:5])
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
+		}
+	}
+
+	<-issuer2
+	vm2BlkC, err := vm2.BuildBlock()
+	if err != nil {
+		t.Fatalf("Failed to build BlkC on VM2: %s", err)
+	}
+
+	if err := vm2BlkC.Verify(); err != nil {
+		t.Fatalf("BlkC failed verification on VM2: %s", err)
+	}
+
+	if status := vm2BlkC.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of built block C to be %s, but found %s", choices.Processing, status)
+	}
+
+	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	errs = vm2.chain.AddRemoteTxs(txs[5:])
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
+		}
+	}
+
+	<-issuer2
+	vm2BlkD, err := vm2.BuildBlock()
+	if err != nil {
+		t.Fatalf("Failed to build BlkD on VM2: %s", err)
+	}
+
+	// Parse blocks produced in vm2
+	vm1BlkC, err := vm1.ParseBlock(vm2BlkC.Bytes())
+	if err != nil {
+		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
+	}
+	blkCHash := vm1BlkC.(*Block).ethBlock.Hash()
+
+	vm1BlkD, err := vm1.ParseBlock(vm2BlkD.Bytes())
+	if err != nil {
+		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
+	}
+	blkDHeight := vm1BlkD.Height()
+	blkDHash := vm1BlkD.(*Block).ethBlock.Hash()
+
+	// Should be no-ops
+	if err := vm1BlkC.Verify(); err != nil {
+		t.Fatalf("Block failed verification on VM1: %s", err)
+	}
+	if err := vm1BlkD.Verify(); err != nil {
+		t.Fatalf("Block failed verification on VM1: %s", err)
+	}
+	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
+		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
+	}
+	if b := vm1.chain.GetBlockByNumber(blkDHeight); b != nil {
+		t.Fatalf("expected block at %d to be nil but got %s", blkDHeight, b.Hash().Hex())
+	}
+	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkBHash {
+		t.Fatalf("expected current block to have hash %s but got %s", blkBHash.Hex(), b.Hash().Hex())
+	}
+
+	// Should still be no-ops on re-verify
+	if err := vm1BlkC.Verify(); err != nil {
+		t.Fatalf("Block failed verification on VM1: %s", err)
+	}
+	if err := vm1BlkD.Verify(); err != nil {
+		t.Fatalf("Block failed verification on VM1: %s", err)
+	}
+	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
+		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
+	}
+	if b := vm1.chain.GetBlockByNumber(blkDHeight); b != nil {
+		t.Fatalf("expected block at %d to be nil but got %s", blkDHeight, b.Hash().Hex())
+	}
+	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkBHash {
+		t.Fatalf("expected current block to have hash %s but got %s", blkBHash.Hex(), b.Hash().Hex())
+	}
+
+	// Should be queryable after setting preference to side chain
+	if err := vm1.SetPreference(vm1BlkD.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkCHash {
+		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkCHash.Hex(), b.Hash().Hex())
+	}
+	if b := vm1.chain.GetBlockByNumber(blkDHeight); b.Hash() != blkDHash {
+		t.Fatalf("expected block at %d to have hash %s but got %s", blkDHeight, blkDHash.Hex(), b.Hash().Hex())
+	}
+	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkDHash {
+		t.Fatalf("expected current block to have hash %s but got %s", blkDHash.Hex(), b.Hash().Hex())
+	}
+
+	// Attempt to accept out of order
+	if err := vm1BlkD.Accept(); !strings.Contains(err.Error(), "expected accepted parent block hash") {
+		t.Fatalf("unexpected error when accepting out of order block: %s", err)
+	}
+
+	// Accept in order
+	if err := vm1BlkC.Accept(); err != nil {
+		t.Fatalf("Block failed verification on VM1: %s", err)
+	}
+	if err := vm1BlkD.Accept(); err != nil {
+		t.Fatalf("Block failed acceptance on VM1: %s", err)
+	}
+
+	// Ensure queryable after accepting
+	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkCHash {
+		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkCHash.Hex(), b.Hash().Hex())
+	}
+	if b := vm1.chain.GetBlockByNumber(blkDHeight); b.Hash() != blkDHash {
+		t.Fatalf("expected block at %d to have hash %s but got %s", blkDHeight, blkDHash.Hex(), b.Hash().Hex())
+	}
+	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkDHash {
+		t.Fatalf("expected current block to have hash %s but got %s", blkDHash.Hex(), b.Hash().Hex())
 	}
 }

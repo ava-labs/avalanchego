@@ -197,17 +197,17 @@ func (self *ETHChain) WriteCanonicalFromCurrentBlock() error {
 	return self.backend.BlockChain().WriteCanonicalFromCurrentBlock()
 }
 
-// SetTail sets the current head block to the one defined by the hash
-// irrelevant what the chain contents were prior.
-func (self *ETHChain) SetTail(hash common.Hash) error {
-	return self.backend.BlockChain().ManualHead(hash)
+// SetPreference sets the current head block to the one provided as an argument
+// regardless of what the chain contents were prior.
+func (self *ETHChain) SetPreference(block *types.Block) error {
+	return self.BlockChain().SetPreference(block)
 }
 
-// SetPreference sets the block we should treat as the parent
-// when building future blocks. [block] may not yet be finalized
-// when this function is called.
-func (self *ETHChain) SetPreference(block *types.Block) {
-	self.backend.Miner().SetPreference(block)
+// Accept sets a minimum height at which no reorg can pass. Additionally,
+// this function may trigger a reorg if the block being accepted is not in the
+// canonical chain.
+func (self *ETHChain) Accept(block *types.Block) error {
+	return self.BlockChain().Accept(block)
 }
 
 func (self *ETHChain) GetReceiptsByHash(hash common.Hash) types.Receipts {
