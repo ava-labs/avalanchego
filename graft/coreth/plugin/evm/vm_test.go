@@ -2053,7 +2053,9 @@ func TestUncleBlock(t *testing.T) {
 		new(trie.Trie),
 		blkDevm.ethBlock.ExtraData(),
 	)
-
+	if err := vm2BlkD.Verify(); !errors.Is(err, errUnclesUnsupported) {
+		t.Fatalf("VM2 should have failed with errUnclesUnsupported but got %s", err.Error())
+	}
 	if _, err := vm1.ParseBlock(vm2BlkC.Bytes()); err != nil {
 		t.Fatalf("VM1 errored parsing blkC: %s", err)
 	}
@@ -2147,7 +2149,9 @@ func TestEmptyBlock(t *testing.T) {
 		new(trie.Trie),
 		nil,
 	)
-
+	if err := vm1BlkA.Verify(); !errors.Is(err, errEmptyBlock) {
+		t.Fatalf("VM1 should have failed with errEmptyBlock but got %s", err.Error())
+	}
 	if _, err := vm2.ParseBlock(vm1BlkA.Bytes()); !errors.Is(err, errEmptyBlock) {
 		t.Fatalf("VM2 should have failed with errEmptyBlock but got %s", err.Error())
 	}
