@@ -112,6 +112,14 @@ func (s *Server) RegisterChain(chainName string, ctx *snow.Context, vmIntf inter
 		return
 	}
 
+	ctx.Lock.Lock()
+	handlers, err := vm.CreateHandlers()
+	ctx.Lock.Unlock()
+	if err != nil {
+		s.log.Error("Failed to create %s handlers: %s", chainName, err)
+		return
+	}
+
 	httpLogger, err := s.factory.MakeChain(chainName, "http")
 	if err != nil {
 		s.log.Error("Failed to create new http logger: %s", err)
@@ -121,10 +129,6 @@ func (s *Server) RegisterChain(chainName string, ctx *snow.Context, vmIntf inter
 	s.log.Verbo("About to add API endpoints for chain with ID %s", ctx.ChainID)
 	// all subroutes to a chain begin with "bc/<the chain's ID>"
 	defaultEndpoint := "bc/" + ctx.ChainID.String()
-
-	ctx.Lock.Lock()
-	handlers := vm.CreateHandlers()
-	ctx.Lock.Unlock()
 
 	// Register each endpoint
 	for extension, service := range handlers {

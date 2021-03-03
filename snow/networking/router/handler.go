@@ -290,6 +290,12 @@ func (h *Handler) dispatchMsg(msg message) {
 		err = h.handleValidatorMsg(msg, startTime)
 	}
 
+	if msg.IsPeriodic() {
+		h.ctx.Log.Verbo("Finished sending message to consensus: %s", msg.messageType)
+	} else {
+		h.ctx.Log.Debug("Finished sending message to consensus: %s", msg.messageType)
+	}
+
 	if err != nil {
 		h.ctx.Log.Fatal("forcing chain to shutdown due to: %s", err)
 		h.closing.SetValue(true)

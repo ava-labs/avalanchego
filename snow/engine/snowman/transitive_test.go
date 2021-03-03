@@ -56,7 +56,7 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = gBlk.ID
+	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 	sender.CantGetAcceptedFrontier = false
 
 	vm.CantBootstrapping = false
@@ -415,7 +415,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = gBlk.ID
+	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 	sender.CantGetAcceptedFrontier = false
 
 	vm.CantBootstrapping = false
@@ -856,7 +856,7 @@ func TestVoteCanceling(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = gBlk.ID
+	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
 		switch id {
 		case gBlk.ID():
@@ -956,7 +956,7 @@ func TestEngineNoQuery(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	vm.LastAcceptedF = gBlk.ID
+	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		if blkID == gBlk.ID() {
@@ -1003,7 +1003,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	vm.LastAcceptedF = gBlk.ID
+	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		if blkID == gBlk.ID() {
@@ -1391,7 +1391,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 func TestEngineGossip(t *testing.T) {
 	_, _, sender, vm, te, gBlk := setup(t)
 
-	vm.LastAcceptedF = gBlk.ID
+	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		if blkID == gBlk.ID() {
 			return gBlk, nil
@@ -1651,7 +1651,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = gBlk.ID
+	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 	sender.CantGetAcceptedFrontier = false
 
 	vm.CantBootstrapping = false
@@ -1769,7 +1769,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = gBlk.ID
+	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 	sender.CantGetAcceptedFrontier = false
 
 	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
@@ -1900,7 +1900,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = gBlk.ID
+	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 	sender.CantGetAcceptedFrontier = false
 
 	vm.CantBootstrapping = false
