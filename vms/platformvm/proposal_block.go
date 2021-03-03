@@ -110,13 +110,8 @@ func (pb *ProposalBlock) onAbort() (*versiondb.Database, func() error) {
 // If this block is valid, this function also sets pas.onCommit and pas.onAbort.
 func (pb *ProposalBlock) Verify() error {
 	if err := pb.CommonBlock.Verify(); err != nil {
-		if err := pb.Reject(); err == nil {
-			if err := pb.vm.DB.Commit(); err != nil {
-				pb.vm.Ctx.Log.Error("couldn't commit VM's database: %w", err)
-				pb.vm.DB.Abort()
-			}
-		} else {
-			pb.vm.DB.Abort()
+		if err := pb.Reject(); err != nil {
+			pb.vm.Ctx.Log.Error("failed to reject proposal block %s due to %s", pb.ID(), err)
 		}
 		return err
 	}
@@ -131,13 +126,8 @@ func (pb *ProposalBlock) Verify() error {
 	// The parent of a proposal block (ie this block) must be a decision block
 	parent, ok := parentIntf.(decision)
 	if !ok {
-		if err := pb.Reject(); err == nil {
-			if err := pb.vm.DB.Commit(); err != nil {
-				pb.vm.Ctx.Log.Error("couldn't commit VM's database: %w", err)
-				pb.vm.DB.Abort()
-			}
-		} else {
-			pb.vm.DB.Abort()
+		if err := pb.Reject(); err != nil {
+			pb.vm.Ctx.Log.Error("failed to reject proposal block %s due to %s", pb.ID(), err)
 		}
 		return errInvalidBlockType
 	}
@@ -154,13 +144,8 @@ func (pb *ProposalBlock) Verify() error {
 		// If this block's transaction proposes to advance the timestamp, the transaction may fail
 		// verification now but be valid in the future, so don't (permanently) mark the block as rejected.
 		if !err.Temporary() {
-			if err := pb.Reject(); err == nil {
-				if err := pb.vm.DB.Commit(); err != nil {
-					pb.vm.Ctx.Log.Error("couldn't commit VM's database: %w", err)
-					pb.vm.DB.Abort()
-				}
-			} else {
-				pb.vm.DB.Abort()
+			if err := pb.Reject(); err != nil {
+				pb.vm.Ctx.Log.Error("failed to reject proposal block %s due to %s", pb.ID(), err)
 			}
 		}
 		return err

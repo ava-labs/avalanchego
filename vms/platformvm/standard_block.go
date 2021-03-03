@@ -39,13 +39,8 @@ func (sb *StandardBlock) initialize(vm *VM, bytes []byte) error {
 // This function also sets onAcceptDB database if the verification passes.
 func (sb *StandardBlock) Verify() error {
 	if err := sb.SingleDecisionBlock.Verify(); err != nil {
-		if err := sb.Reject(); err == nil {
-			if err := sb.vm.DB.Commit(); err != nil {
-				sb.vm.Ctx.Log.Error("failed to commit VM's database: %w", err)
-				sb.vm.DB.Abort()
-			}
-		} else {
-			sb.vm.DB.Abort()
+		if err := sb.Reject(); err != nil {
+			sb.vm.Ctx.Log.Error("failed to reject standard block %s due to %s", sb.ID(), err)
 		}
 		return err
 	}
@@ -55,13 +50,8 @@ func (sb *StandardBlock) Verify() error {
 	// be a decision.
 	parent, ok := parentBlock.(decision)
 	if !ok {
-		if err := sb.Reject(); err == nil {
-			if err := sb.vm.DB.Commit(); err != nil {
-				sb.vm.Ctx.Log.Error("failed to commit VM's database: %w", err)
-				sb.vm.DB.Abort()
-			}
-		} else {
-			sb.vm.DB.Abort()
+		if err := sb.Reject(); err != nil {
+			sb.vm.Ctx.Log.Error("failed to reject standard block %s due to %s", sb.ID(), err)
 		}
 		return errInvalidBlockType
 	}
@@ -79,13 +69,8 @@ func (sb *StandardBlock) Verify() error {
 		onAccept, err := utx.SemanticVerify(sb.vm, sb.onAcceptDB, tx)
 		if err != nil {
 			sb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
-			if err := sb.Reject(); err == nil {
-				if err := sb.vm.DB.Commit(); err != nil {
-					sb.vm.Ctx.Log.Error("failed to commit VM's database: %w", err)
-					sb.vm.DB.Abort()
-				}
-			} else {
-				sb.vm.DB.Abort()
+			if err := sb.Reject(); err != nil {
+				sb.vm.Ctx.Log.Error("failed to reject standard block %s due to %s", sb.ID(), err)
 			}
 			return err
 		}

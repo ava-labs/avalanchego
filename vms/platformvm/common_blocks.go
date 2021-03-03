@@ -139,7 +139,11 @@ func (cb *CommonBlock) Verify() error {
 func (cb *CommonBlock) Reject() error {
 	defer cb.free() // remove this block from memory
 
-	return cb.Block.Reject()
+	if err := cb.Block.Reject(); err != nil {
+		return err
+	}
+
+	return cb.vm.DB.Commit()
 }
 
 // free removes this block from memory
