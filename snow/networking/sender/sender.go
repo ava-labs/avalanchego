@@ -79,9 +79,11 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 	// Just put it right into the router. Asynchronously to avoid deadlock.
 	if validatorIDs.Contains(s.ctx.NodeID) {
 		validatorIDs.Remove(s.ctx.NodeID)
+		// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
+		timeoutDuration := s.timeouts.TimeoutDuration()
 		// Tell the router to expect a reply message from this validator
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.GetAcceptedFrontierMsg)
-		go s.router.AcceptedFrontier(s.ctx.NodeID, s.ctx.ChainID, requestID, []ids.ID{})
+		go s.router.GetAcceptedFrontier(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration))
 	}
 
 	// Some of the validators in [validatorIDs] may be benched. That is, they've been unresponsive
@@ -133,9 +135,11 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 	// Just put it right into the router. Asynchronously to avoid deadlock.
 	if validatorIDs.Contains(s.ctx.NodeID) {
 		validatorIDs.Remove(s.ctx.NodeID)
+		// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
+		timeoutDuration := s.timeouts.TimeoutDuration()
 		// Tell the router to expect a reply message from this validator
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.GetAcceptedMsg)
-		go s.router.Accepted(s.ctx.NodeID, s.ctx.ChainID, requestID, containerIDs)
+		go s.router.GetAccepted(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), containerIDs)
 	}
 
 	// Some of the validators in [validatorIDs] may be benched. That is, they've been unresponsive
