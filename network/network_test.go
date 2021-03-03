@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -278,7 +279,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
-		nil,
+		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
@@ -396,7 +397,7 @@ func TestEstablishConnection(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
-		nil,
+		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
@@ -426,7 +427,7 @@ func TestEstablishConnection(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
-		nil,
+		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
@@ -556,7 +557,7 @@ func TestDoubleTrack(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
-		nil,
+		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
@@ -586,7 +587,7 @@ func TestDoubleTrack(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
-		nil,
+		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
@@ -717,7 +718,7 @@ func TestDoubleClose(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
-		nil,
+		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
@@ -747,7 +748,7 @@ func TestDoubleClose(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
-		nil,
+		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
@@ -883,7 +884,7 @@ func TestTrackConnected(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
-		nil,
+		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
@@ -913,7 +914,7 @@ func TestTrackConnected(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
-		nil,
+		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
@@ -1023,7 +1024,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
-		nil,
+		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
@@ -1053,7 +1054,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
-		nil,
+		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
@@ -1291,7 +1292,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
-		nil,
+		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
@@ -1321,7 +1322,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
-		nil,
+		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
@@ -1351,7 +1352,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
-		nil,
+		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
@@ -1381,7 +1382,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
-		nil,
+		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
@@ -1701,7 +1702,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
-		nil,
+		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
@@ -1731,7 +1732,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
-		nil,
+		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
@@ -1761,7 +1762,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
-		nil,
+		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
@@ -1791,7 +1792,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
-		nil,
+		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
