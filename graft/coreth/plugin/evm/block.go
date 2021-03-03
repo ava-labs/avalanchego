@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
@@ -160,6 +161,29 @@ func (b *Block) Height() uint64 {
 	return b.ethBlock.Number().Uint64()
 }
 
+// syntacticVerify verifies that a *Block is well-formed.
+func (b *Block) syntacticVerify() error {
+	if b == nil || b.ethBlock == nil {
+		return errInvalidBlock
+	}
+	if !b.vm.chain.VerifyBlock(b.ethBlock) {
+		return errFailedChainVerify
+	}
+	// Coinbase must be zero on C-Chain
+	if b.ethBlock.Hash() != b.vm.genesisHash && b.ethBlock.Coinbase() != coreth.BlackholeAddr {
+		return errInvalidBlock
+	}
+	// Block must not have any uncles
+	if len(b.ethBlock.Uncles()) > 0 {
+		return errUnclesUnsupported
+	}
+	// Block must not be empty
+	if len(b.ethBlock.Transactions()) == 0 && b.vm.getAtomicTx(b.ethBlock) == nil {
+		return errEmptyBlock
+	}
+	return nil
+}
+
 var (
 	errRejectedParent = errors.New("rejected parent")
 )
@@ -168,7 +192,7 @@ var (
 func (b *Block) Verify() error {
 	vm := b.vm
 
-	if err := vm.syntacticVerify(b.ethBlock); err != nil {
+	if err := b.syntacticVerify(); err != nil {
 		return fmt.Errorf("syntactic block verification failed: %w", err)
 	}
 
