@@ -38,6 +38,18 @@ func (sb *StandardBlock) initialize(vm *VM, bytes []byte) error {
 //
 // This function also sets onAcceptDB database if the verification passes.
 func (sb *StandardBlock) Verify() error {
+	if err := sb.SingleDecisionBlock.Verify(); err != nil {
+		if err := sb.Reject(); err == nil {
+			if err := sb.vm.DB.Commit(); err != nil {
+				sb.vm.Ctx.Log.Error("failed to commit VM's database: %w", err)
+				sb.vm.DB.Abort()
+			}
+		} else {
+			sb.vm.DB.Abort()
+		}
+		return err
+	}
+
 	parentBlock := sb.parentBlock()
 	// StandardBlock is not a modifier on a proposal block, so its parent must
 	// be a decision.
@@ -45,7 +57,8 @@ func (sb *StandardBlock) Verify() error {
 	if !ok {
 		if err := sb.Reject(); err == nil {
 			if err := sb.vm.DB.Commit(); err != nil {
-				return fmt.Errorf("failed to commit VM's database: %w", err)
+				sb.vm.Ctx.Log.Error("failed to commit VM's database: %w", err)
+				sb.vm.DB.Abort()
 			}
 		} else {
 			sb.vm.DB.Abort()
@@ -68,7 +81,8 @@ func (sb *StandardBlock) Verify() error {
 			sb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
 			if err := sb.Reject(); err == nil {
 				if err := sb.vm.DB.Commit(); err != nil {
-					return fmt.Errorf("failed to commit VM's database: %w", err)
+					sb.vm.Ctx.Log.Error("failed to commit VM's database: %w", err)
+					sb.vm.DB.Abort()
 				}
 			} else {
 				sb.vm.DB.Abort()

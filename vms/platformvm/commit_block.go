@@ -22,12 +22,25 @@ type Commit struct {
 //
 // This function also sets the onCommit databases if the verification passes.
 func (c *Commit) Verify() error {
+	if err := c.DoubleDecisionBlock.Verify(); err != nil {
+		if err := c.Reject(); err == nil {
+			if err := c.vm.DB.Commit(); err != nil {
+				c.vm.Ctx.Log.Error("failed to commit VM's database: %w", err)
+				c.vm.DB.Abort()
+			}
+		} else {
+			c.vm.DB.Abort()
+		}
+		return err
+	}
+
 	// the parent of an Commit block should always be a proposal
 	parent, ok := c.parentBlock().(*ProposalBlock)
 	if !ok {
 		if err := c.Reject(); err == nil {
 			if err := c.vm.DB.Commit(); err != nil {
-				return fmt.Errorf("failed to commit VM's database: %w", err)
+				c.vm.Ctx.Log.Error("failed to commit VM's database: %w", err)
+				c.vm.DB.Abort()
 			}
 		} else {
 			c.vm.DB.Abort()

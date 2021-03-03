@@ -109,6 +109,18 @@ func (pb *ProposalBlock) onAbort() (*versiondb.Database, func() error) {
 //
 // If this block is valid, this function also sets pas.onCommit and pas.onAbort.
 func (pb *ProposalBlock) Verify() error {
+	if err := pb.CommonBlock.Verify(); err != nil {
+		if err := pb.Reject(); err == nil {
+			if err := pb.vm.DB.Commit(); err != nil {
+				pb.vm.Ctx.Log.Error("couldn't commit VM's database: %w", err)
+				pb.vm.DB.Abort()
+			}
+		} else {
+			pb.vm.DB.Abort()
+		}
+		return err
+	}
+
 	tx, ok := pb.Tx.UnsignedTx.(UnsignedProposalTx)
 	if !ok {
 		return errWrongTxType
@@ -121,7 +133,8 @@ func (pb *ProposalBlock) Verify() error {
 	if !ok {
 		if err := pb.Reject(); err == nil {
 			if err := pb.vm.DB.Commit(); err != nil {
-				return fmt.Errorf("couldn't commit VM's database: %w", err)
+				pb.vm.Ctx.Log.Error("couldn't commit VM's database: %w", err)
+				pb.vm.DB.Abort()
 			}
 		} else {
 			pb.vm.DB.Abort()
@@ -143,7 +156,8 @@ func (pb *ProposalBlock) Verify() error {
 		if !err.Temporary() {
 			if err := pb.Reject(); err == nil {
 				if err := pb.vm.DB.Commit(); err != nil {
-					return fmt.Errorf("couldn't commit VM's database: %w", err)
+					pb.vm.Ctx.Log.Error("couldn't commit VM's database: %w", err)
+					pb.vm.DB.Abort()
 				}
 			} else {
 				pb.vm.DB.Abort()
