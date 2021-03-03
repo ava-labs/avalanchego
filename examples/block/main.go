@@ -60,9 +60,8 @@ func main() {
 		Alloc:      core.GenesisAlloc{genKey.Address: {Balance: genBalance}},
 	}
 
-	// grab the control of block generation and disable auto uncle
+	// grab the control of block generation
 	config.Miner.ManualMining = true
-	config.Miner.DisableUncle = true
 
 	chain := coreth.NewETHChain(&config, nil, nil, nil, eth.DefaultSettings)
 	buff := new(bytes.Buffer)
