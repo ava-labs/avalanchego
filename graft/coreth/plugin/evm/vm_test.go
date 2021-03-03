@@ -1344,7 +1344,7 @@ func TestReorgProtection(t *testing.T) {
 }
 
 // Regression test to ensure that a VM that accepts block C while preferring
-// block C will trigger a reorg.
+// block B will trigger a reorg.
 //   A
 //  / \
 // B   C
