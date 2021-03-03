@@ -32,7 +32,6 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	mrand "math/rand"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -221,7 +220,8 @@ type BlockChain struct {
 	badBlocks       *lru.Cache                     // Bad block cache
 	shouldPreserve  func(*types.Block) bool        // Function used to determine whether should preserve the given block.
 	terminateInsert func(common.Hash, uint64) bool // Testing hook used to terminate ancient receipt chain insertion.
-	manualCanonical bool
+
+	lastAccepted *types.Block // Prevents reorgs past this height
 
 	indexLock sync.WaitGroup // Used to coordinate go-ethereum's async indexing functionality
 }
@@ -229,7 +229,7 @@ type BlockChain struct {
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default Ethereum Validator and
 // Processor.
-func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config, shouldPreserve func(block *types.Block) bool, txLookupLimit *uint64, manualCanonical bool) (*BlockChain, error) {
+func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config, shouldPreserve func(block *types.Block) bool, txLookupLimit *uint64) (*BlockChain, error) {
 	if cacheConfig == nil {
 		cacheConfig = defaultCacheConfig
 	}
@@ -242,23 +242,22 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	badBlocks, _ := lru.New(badBlockLimit)
 
 	bc := &BlockChain{
-		chainConfig:     chainConfig,
-		cacheConfig:     cacheConfig,
-		db:              db,
-		triegc:          prque.New(nil),
-		stateCache:      state.NewDatabaseWithCache(db, cacheConfig.TrieCleanLimit, cacheConfig.TrieCleanJournal),
-		quit:            make(chan struct{}),
-		shouldPreserve:  shouldPreserve,
-		bodyCache:       bodyCache,
-		bodyRLPCache:    bodyRLPCache,
-		receiptsCache:   receiptsCache,
-		blockCache:      blockCache,
-		txLookupCache:   txLookupCache,
-		futureBlocks:    futureBlocks,
-		engine:          engine,
-		vmConfig:        vmConfig,
-		badBlocks:       badBlocks,
-		manualCanonical: manualCanonical,
+		chainConfig:    chainConfig,
+		cacheConfig:    cacheConfig,
+		db:             db,
+		triegc:         prque.New(nil),
+		stateCache:     state.NewDatabaseWithCache(db, cacheConfig.TrieCleanLimit, cacheConfig.TrieCleanJournal),
+		quit:           make(chan struct{}),
+		shouldPreserve: shouldPreserve,
+		bodyCache:      bodyCache,
+		bodyRLPCache:   bodyRLPCache,
+		receiptsCache:  receiptsCache,
+		blockCache:     blockCache,
+		txLookupCache:  txLookupCache,
+		futureBlocks:   futureBlocks,
+		engine:         engine,
+		vmConfig:       vmConfig,
+		badBlocks:      badBlocks,
 	}
 	bc.validator = NewBlockValidator(chainConfig, bc, engine)
 	bc.prefetcher = newStatePrefetcher(chainConfig, bc, engine)
@@ -1294,9 +1293,6 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 	// updateHead updates the head fast sync block if the inserted blocks are better
 	// and returns an indicator whether the inserted blocks are canonical.
 	updateHead := func(head *types.Block) bool {
-		if bc.manualCanonical {
-			return false
-		}
 		bc.chainmu.Lock()
 
 		// Rewind may have occurred, skip in that case.
@@ -1605,6 +1601,86 @@ func (bc *BlockChain) writeBlockWithoutState(block *types.Block, td *big.Int) (e
 	return nil
 }
 
+// SetPreference attempts to update the head block to be the provided block and
+// emits a ChainHeadEvent if successful. This function will handle all reorg
+// side effects, if necessary.
+//
+// Note: This function should ONLY be called on blocks that have already been
+// inserted into the chain.
+//
+// Assumes [bc.chainmu] is not held by the caller.
+func (bc *BlockChain) SetPreference(block *types.Block) error {
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
+
+	return bc.setPreference(block)
+}
+
+// setPreference attempts to update the head block to be the provided block and
+// emits a ChainHeadEvent if successful. This function will handle all reorg
+// side effects, if necessary.
+//
+// Assumes [bc.chainmu] is held by the caller.
+func (bc *BlockChain) setPreference(block *types.Block) error {
+	current := bc.CurrentBlock()
+
+	// Return early if the current block is already the block
+	// we are trying to write.
+	if current.Hash() == block.Hash() {
+		return nil
+	}
+
+	log.Debug("Setting preference", "number", block.Number(), "hash", block.Hash())
+
+	// writeKnownBlock updates the head block and will handle any reorg side
+	// effects automatically.
+	if err := bc.writeKnownBlock(block); err != nil {
+		return fmt.Errorf("unable to invoke writeKnownBlock: %w", err)
+	}
+
+	// Send an ChainHeadEvent if we end up altering
+	// the head block. Many internal aysnc processes rely on
+	// receiving these events (i.e. the TxPool).
+	bc.chainHeadFeed.Send(ChainHeadEvent{Block: block})
+	return nil
+}
+
+// Accept sets a minimum height at which no reorg can pass. Additionally,
+// this function may trigger a reorg if the block being accepted is not in the
+// canonical chain.
+//
+// Assumes [bc.chainmu] is not held by the caller.
+func (bc *BlockChain) Accept(block *types.Block) error {
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
+
+	// If the lastAccepted block is non-nil (nil during initialization), the
+	// block we are accepting must have a parent hash equal to it.
+	if bc.lastAccepted != nil && bc.lastAccepted.Hash() != block.ParentHash() {
+		return fmt.Errorf(
+			"expected accepted parent block hash %s but got %s",
+			bc.lastAccepted.Hash().Hex(),
+			block.ParentHash().Hex(),
+		)
+	}
+
+	// If the canonical hash at the block height does not match the block we are
+	// accepting, we need to trigger a reorg.
+	canonical := bc.GetCanonicalHash(block.NumberU64())
+	if canonical == (common.Hash{}) {
+		return fmt.Errorf("unable to get block at number %d", block.Number())
+	}
+	if canonical != block.Hash() {
+		log.Debug("Accepting block in non-canonical chain", "number", block.Number(), "hash", block.Hash())
+		if err := bc.setPreference(block); err != nil {
+			return fmt.Errorf("could not set block %d:%s as preferred: %w", block.Number(), block.Hash(), err)
+		}
+	}
+
+	bc.lastAccepted = block
+	return nil
+}
+
 // writeKnownBlock updates the head block flag with a known block
 // and introduces chain reorg if necessary.
 func (bc *BlockChain) writeKnownBlock(block *types.Block) error {
@@ -1612,7 +1688,7 @@ func (bc *BlockChain) writeKnownBlock(block *types.Block) error {
 	defer bc.wg.Done()
 
 	current := bc.CurrentBlock()
-	if !bc.manualCanonical && block.ParentHash() != current.Hash() {
+	if block.ParentHash() != current.Hash() {
 		if err := bc.reorg(current, block); err != nil {
 			return err
 		}
@@ -1641,8 +1717,8 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 		return NonStatTy, consensus.ErrUnknownAncestor
 	}
 	// Make sure no inconsistent state is leaked during insertion
-	currentBlock := bc.CurrentBlock()
-	localTd := bc.GetTd(currentBlock.Hash(), currentBlock.NumberU64())
+	// currentBlock := bc.CurrentBlock()
+	// localTd := bc.GetTd(currentBlock.Hash(), currentBlock.NumberU64())
 	externTd := new(big.Int).Add(block.Difficulty(), ptd)
 
 	// Irrelevant of the canonical status, write the block itself to the database.
@@ -1716,31 +1792,31 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 			}
 		}
 	}
-	// If the total difficulty is higher than our known, add it to the canonical chain
-	// Second clause in the if statement reduces the vulnerability to selfish mining.
-	// Please refer to http://www.cs.cornell.edu/~ie53/publications/btcProcFC.pdf
-	reorg := externTd.Cmp(localTd) > 0
-	currentBlock = bc.CurrentBlock()
-	if !bc.manualCanonical && (!reorg && externTd.Cmp(localTd) == 0) {
-		// Split same-difficulty blocks by number, then preferentially select
-		// the block generated by the local miner as the canonical block.
-		if block.NumberU64() < currentBlock.NumberU64() {
-			reorg = true
-		} else if block.NumberU64() == currentBlock.NumberU64() {
-			var currentPreserve, blockPreserve bool
-			if bc.shouldPreserve != nil {
-				currentPreserve, blockPreserve = bc.shouldPreserve(currentBlock), bc.shouldPreserve(block)
-			}
-			reorg = !currentPreserve && (blockPreserve || mrand.Float64() < 0.5)
-		}
-	}
-	if reorg {
-		// Reorganise the chain if the parent is not the head block
-		if !bc.manualCanonical && block.ParentHash() != currentBlock.Hash() {
-			if err := bc.reorg(currentBlock, block); err != nil {
-				return NonStatTy, err
-			}
-		}
+
+	// Original code:
+	// // If the total difficulty is higher than our known, add it to the canonical chain
+	// // Second clause in the if statement reduces the vulnerability to selfish mining.
+	// // Please refer to http://www.cs.cornell.edu/~ie53/publications/btcProcFC.pdf
+	// reorg := externTd.Cmp(localTd) > 0
+	// currentBlock = bc.CurrentBlock()
+	// if !reorg && externTd.Cmp(localTd) == 0 {
+	// 	// Split same-difficulty blocks by number, then preferentially select
+	// 	// the block generated by the local miner as the canonical block.
+	// 	if block.NumberU64() < currentBlock.NumberU64() {
+	// 		reorg = true
+	// 	} else if block.NumberU64() == currentBlock.NumberU64() {
+	// 		var currentPreserve, blockPreserve bool
+	// 		if bc.shouldPreserve != nil {
+	// 			currentPreserve, blockPreserve = bc.shouldPreserve(currentBlock), bc.shouldPreserve(block)
+	// 		}
+	// 		reorg = !currentPreserve && (blockPreserve || mrand.Float64() < 0.5)
+	// 	}
+	// }
+
+	// If a new block references the current block, we consider it canonical.
+	// Otherwise, we mark it as a side chain block.
+	currentBlock := bc.CurrentBlock()
+	if block.ParentHash() == currentBlock.Hash() {
 		status = CanonStatTy
 	} else {
 		status = SideStatTy
@@ -1873,45 +1949,68 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, er
 		//   2. The block is stored as a sidechain, and is lying about it's stateroot, and passes a stateroot
 		// 	    from the canonical chain, which has not been verified.
 		// Skip all known blocks that are behind us
-		var (
-			current  = bc.CurrentBlock()
-			localTd  = bc.GetTd(current.Hash(), current.NumberU64())
-			externTd = bc.GetTd(block.ParentHash(), block.NumberU64()-1) // The first block can't be nil
-		)
+
+		// Original Code:
+		// var (
+		// current = bc.CurrentBlock()
+		// localTd  = bc.GetTd(current.Hash(), current.NumberU64())
+		// externTd = bc.GetTd(block.ParentHash(), block.NumberU64()-1) // The first block can't be nil
+		// )
+		// for block != nil && err == ErrKnownBlock {
+		// 	externTd = new(big.Int).Add(externTd, block.Difficulty())
+		// 	if localTd.Cmp(externTd) < 0 {
+		// 		break
+		// 	}
+		// 	log.Debug("Ignoring already known block", "number", block.Number(), "hash", block.Hash())
+		// 	stats.ignored++
+
+		// 	block, err = it.next()
+		// }
+		// // The remaining blocks are still known blocks, the only scenario here is:
+		// // During the fast sync, the pivot point is already submitted but rollback
+		// // happens. Then node resets the head full block to a lower height via `rollback`
+		// // and leaves a few known blocks in the database.
+		// //
+		// // When node runs a fast sync again, it can re-import a batch of known blocks via
+		// // `insertChain` while a part of them have higher total difficulty than current
+		// // head full block(new pivot point).
+		// for block != nil && err == ErrKnownBlock {
+		// 	log.Debug("Writing previously known block", "number", block.Number(), "hash", block.Hash())
+		// 	if err := bc.writeKnownBlock(block); err != nil {
+		// 		return it.index, err
+		// 	}
+		// 	lastCanon = block
+
+		// 	block, err = it.next()
+		// }
+		// // Falls through to the block import
+
+		// Re-inserting previously known blocks should not update the head block or
+		// trigger a reorg. Rather, a reorg should only be triggered on previously
+		// known blocks using [SetPreference] or [Accept].
 		for block != nil && err == ErrKnownBlock {
-			externTd = new(big.Int).Add(externTd, block.Difficulty())
-			if !bc.manualCanonical && localTd.Cmp(externTd) < 0 {
-				break
-			}
 			log.Debug("Ignoring already known block", "number", block.Number(), "hash", block.Hash())
 			stats.ignored++
-
-			block, err = it.next()
-		}
-		// The remaining blocks are still known blocks, the only scenario here is:
-		// During the fast sync, the pivot point is already submitted but rollback
-		// happens. Then node resets the head full block to a lower height via `rollback`
-		// and leaves a few known blocks in the database.
-		//
-		// When node runs a fast sync again, it can re-import a batch of known blocks via
-		// `insertChain` while a part of them have higher total difficulty than current
-		// head full block(new pivot point).
-		for block != nil && err == ErrKnownBlock {
-			log.Debug("Writing previously known block", "number", block.Number(), "hash", block.Hash())
-			if err := bc.writeKnownBlock(block); err != nil {
-				return it.index, err
-			}
-			lastCanon = block
 
 			block, err = it.next()
 		}
 		// Falls through to the block import
 	}
 	switch {
-	// First block is pruned, insert as sidechain and reorg only if TD grows enough
+	// Original Code:
+	// // First block is pruned, insert as sidechain and reorg only if TD grows enough
+	// case errors.Is(err, consensus.ErrPrunedAncestor):
+	// 	log.Debug("Pruned ancestor, inserting as sidechain", "number", block.Number(), "hash", block.Hash())
+	// 	return bc.insertSideChain(block, it)
+
+	// Pruning of the EVM is disabled, so we should never encounter this case.
+	// Because side chain insertion can have complex side effects, we error when
+	// we encounter it to prevent the accidental execution of these side effects.
+	//
+	// When supporting EVM pruning, we must re-enable this and ensure it is
+	// compatible with external consensus invariants.
 	case errors.Is(err, consensus.ErrPrunedAncestor):
-		log.Debug("Pruned ancestor, inserting as sidechain", "number", block.Number(), "hash", block.Hash())
-		return bc.insertSideChain(block, it)
+		return 0, errors.New("side chain insertion is not supported")
 
 	// First block is future, shove it (and all children) to the future queue (unknown ancestor)
 	case errors.Is(err, consensus.ErrFutureBlock) || (errors.Is(err, consensus.ErrUnknownAncestor) && bc.futureBlocks.Contains(it.first().ParentHash())):
@@ -2116,134 +2215,140 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, er
 	return it.index, err
 }
 
-// insertSideChain is called when an import batch hits upon a pruned ancestor
-// error, which happens when a sidechain with a sufficiently old fork-block is
-// found.
+// Original Code:
+// // insertSideChain is called when an import batch hits upon a pruned ancestor
+// // error, which happens when a sidechain with a sufficiently old fork-block is
+// // found.
+// //
+// // The method writes all (header-and-body-valid) blocks to disk, then tries to
+// // switch over to the new chain if the TD exceeded the current chain.
+// func (bc *BlockChain) insertSideChain(block *types.Block, it *insertIterator) (int, error) {
+// 	var (
+// 		externTd *big.Int
+// 		current  = bc.CurrentBlock()
+// 	)
+// 	// The first sidechain block error is already verified to be ErrPrunedAncestor.
+// 	// Since we don't import them here, we expect ErrUnknownAncestor for the remaining
+// 	// ones. Any other errors means that the block is invalid, and should not be written
+// 	// to disk.
+// 	err := consensus.ErrPrunedAncestor
+// 	for ; block != nil && errors.Is(err, consensus.ErrPrunedAncestor); block, err = it.next() {
+// 		// Check the canonical state root for that number
+// 		if number := block.NumberU64(); current.NumberU64() >= number {
+// 			canonical := bc.GetBlockByNumber(number)
+// 			if canonical != nil && canonical.Hash() == block.Hash() {
+// 				// Not a sidechain block, this is a re-import of a canon block which has it's state pruned
 //
-// The method writes all (header-and-body-valid) blocks to disk, then tries to
-// switch over to the new chain if the TD exceeded the current chain.
-func (bc *BlockChain) insertSideChain(block *types.Block, it *insertIterator) (int, error) {
-	var (
-		externTd *big.Int
-		current  = bc.CurrentBlock()
-	)
-	// The first sidechain block error is already verified to be ErrPrunedAncestor.
-	// Since we don't import them here, we expect ErrUnknownAncestor for the remaining
-	// ones. Any other errors means that the block is invalid, and should not be written
-	// to disk.
-	err := consensus.ErrPrunedAncestor
-	for ; block != nil && errors.Is(err, consensus.ErrPrunedAncestor); block, err = it.next() {
-		// Check the canonical state root for that number
-		if number := block.NumberU64(); current.NumberU64() >= number {
-			canonical := bc.GetBlockByNumber(number)
-			if canonical != nil && canonical.Hash() == block.Hash() {
-				// Not a sidechain block, this is a re-import of a canon block which has it's state pruned
-
-				// Collect the TD of the block. Since we know it's a canon one,
-				// we can get it directly, and not (like further below) use
-				// the parent and then add the block on top
-				externTd = bc.GetTd(block.Hash(), block.NumberU64())
-				continue
-			}
-			if canonical != nil && canonical.Root() == block.Root() {
-				// This is most likely a shadow-state attack. When a fork is imported into the
-				// database, and it eventually reaches a block height which is not pruned, we
-				// just found that the state already exist! This means that the sidechain block
-				// refers to a state which already exists in our canon chain.
-				//
-				// If left unchecked, we would now proceed importing the blocks, without actually
-				// having verified the state of the previous blocks.
-				log.Warn("Sidechain ghost-state attack detected", "number", block.NumberU64(), "sideroot", block.Root(), "canonroot", canonical.Root())
-
-				// If someone legitimately side-mines blocks, they would still be imported as usual. However,
-				// we cannot risk writing unverified blocks to disk when they obviously target the pruning
-				// mechanism.
-				return it.index, errors.New("sidechain ghost-state attack")
-			}
-		}
-		if externTd == nil {
-			externTd = bc.GetTd(block.ParentHash(), block.NumberU64()-1)
-		}
-		externTd = new(big.Int).Add(externTd, block.Difficulty())
-
-		if !bc.HasBlock(block.Hash(), block.NumberU64()) {
-			start := time.Now()
-			if err := bc.writeBlockWithoutState(block, externTd); err != nil {
-				return it.index, err
-			}
-			log.Debug("Injected sidechain block", "number", block.Number(), "hash", block.Hash(),
-				"diff", block.Difficulty(), "elapsed", common.PrettyDuration(time.Since(start)),
-				"txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()),
-				"root", block.Root())
-		}
-	}
-	// At this point, we've written all sidechain blocks to database. Loop ended
-	// either on some other error or all were processed. If there was some other
-	// error, we can ignore the rest of those blocks.
-	//
-	// If the externTd was larger than our local TD, we now need to reimport the previous
-	// blocks to regenerate the required state
-	localTd := bc.GetTd(current.Hash(), current.NumberU64())
-	if bc.manualCanonical || localTd.Cmp(externTd) > 0 {
-		log.Info("Sidechain written to disk", "start", it.first().NumberU64(), "end", it.previous().Number, "sidetd", externTd, "localtd", localTd)
-		return it.index, err
-	}
-	// Gather all the sidechain hashes (full blocks may be memory heavy)
-	var (
-		hashes  []common.Hash
-		numbers []uint64
-	)
-	parent := it.previous()
-	for parent != nil && !bc.HasState(parent.Root) {
-		hashes = append(hashes, parent.Hash())
-		numbers = append(numbers, parent.Number.Uint64())
-
-		parent = bc.GetHeader(parent.ParentHash, parent.Number.Uint64()-1)
-	}
-	if parent == nil {
-		return it.index, errors.New("missing parent")
-	}
-	// Import all the pruned blocks to make the state available
-	var (
-		blocks []*types.Block
-		memory common.StorageSize
-	)
-	for i := len(hashes) - 1; i >= 0; i-- {
-		// Append the next block to our batch
-		block := bc.GetBlock(hashes[i], numbers[i])
-
-		blocks = append(blocks, block)
-		memory += block.Size()
-
-		// If memory use grew too large, import and continue. Sadly we need to discard
-		// all raised events and logs from notifications since we're too heavy on the
-		// memory here.
-		if len(blocks) >= 2048 || memory > 64*1024*1024 {
-			log.Info("Importing heavy sidechain segment", "blocks", len(blocks), "start", blocks[0].NumberU64(), "end", block.NumberU64())
-			if _, err := bc.insertChain(blocks, false); err != nil {
-				return 0, err
-			}
-			blocks, memory = blocks[:0], 0
-
-			// If the chain is terminating, stop processing blocks
-			if bc.insertStopped() {
-				log.Debug("Abort during blocks processing")
-				return 0, nil
-			}
-		}
-	}
-	if len(blocks) > 0 {
-		log.Info("Importing sidechain segment", "start", blocks[0].NumberU64(), "end", blocks[len(blocks)-1].NumberU64())
-		return bc.insertChain(blocks, false)
-	}
-	return 0, nil
-}
+// 				// Collect the TD of the block. Since we know it's a canon one,
+// 				// we can get it directly, and not (like further below) use
+// 				// the parent and then add the block on top
+// 				externTd = bc.GetTd(block.Hash(), block.NumberU64())
+// 				continue
+// 			}
+// 			if canonical != nil && canonical.Root() == block.Root() {
+// 				// This is most likely a shadow-state attack. When a fork is imported into the
+// 				// database, and it eventually reaches a block height which is not pruned, we
+// 				// just found that the state already exist! This means that the sidechain block
+// 				// refers to a state which already exists in our canon chain.
+// 				//
+// 				// If left unchecked, we would now proceed importing the blocks, without actually
+// 				// having verified the state of the previous blocks.
+// 				log.Warn("Sidechain ghost-state attack detected", "number", block.NumberU64(), "sideroot", block.Root(), "canonroot", canonical.Root())
+//
+// 				// If someone legitimately side-mines blocks, they would still be imported as usual. However,
+// 				// we cannot risk writing unverified blocks to disk when they obviously target the pruning
+// 				// mechanism.
+// 				return it.index, errors.New("sidechain ghost-state attack")
+// 			}
+// 		}
+// 		if externTd == nil {
+// 			externTd = bc.GetTd(block.ParentHash(), block.NumberU64()-1)
+// 		}
+// 		externTd = new(big.Int).Add(externTd, block.Difficulty())
+//
+// 		if !bc.HasBlock(block.Hash(), block.NumberU64()) {
+// 			start := time.Now()
+// 			if err := bc.writeBlockWithoutState(block, externTd); err != nil {
+// 				return it.index, err
+// 			}
+// 			log.Debug("Injected sidechain block", "number", block.Number(), "hash", block.Hash(),
+// 				"diff", block.Difficulty(), "elapsed", common.PrettyDuration(time.Since(start)),
+// 				"txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()),
+// 				"root", block.Root())
+// 		}
+// 	}
+// 	// At this point, we've written all sidechain blocks to database. Loop ended
+// 	// either on some other error or all were processed. If there was some other
+// 	// error, we can ignore the rest of those blocks.
+// 	//
+// 	// If the externTd was larger than our local TD, we now need to reimport the previous
+// 	// blocks to regenerate the required state
+// 	localTd := bc.GetTd(current.Hash(), current.NumberU64())
+// 	if localTd.Cmp(externTd) > 0 {
+// 		log.Info("Sidechain written to disk", "start", it.first().NumberU64(), "end", it.previous().Number, "sidetd", externTd, "localtd", localTd)
+// 		return it.index, err
+// 	}
+// 	// Gather all the sidechain hashes (full blocks may be memory heavy)
+// 	var (
+// 		hashes  []common.Hash
+// 		numbers []uint64
+// 	)
+// 	parent := it.previous()
+// 	for parent != nil && !bc.HasState(parent.Root) {
+// 		hashes = append(hashes, parent.Hash())
+// 		numbers = append(numbers, parent.Number.Uint64())
+//
+// 		parent = bc.GetHeader(parent.ParentHash, parent.Number.Uint64()-1)
+// 	}
+// 	if parent == nil {
+// 		return it.index, errors.New("missing parent")
+// 	}
+// 	// Import all the pruned blocks to make the state available
+// 	var (
+// 		blocks []*types.Block
+// 		memory common.StorageSize
+// 	)
+// 	for i := len(hashes) - 1; i >= 0; i-- {
+// 		// Append the next block to our batch
+// 		block := bc.GetBlock(hashes[i], numbers[i])
+//
+// 		blocks = append(blocks, block)
+// 		memory += block.Size()
+//
+// 		// If memory use grew too large, import and continue. Sadly we need to discard
+// 		// all raised events and logs from notifications since we're too heavy on the
+// 		// memory here.
+// 		if len(blocks) >= 2048 || memory > 64*1024*1024 {
+// 			log.Info("Importing heavy sidechain segment", "blocks", len(blocks), "start", blocks[0].NumberU64(), "end", block.NumberU64())
+// 			if _, err := bc.insertChain(blocks, false); err != nil {
+// 				return 0, err
+// 			}
+// 			blocks, memory = blocks[:0], 0
+//
+// 			// If the chain is terminating, stop processing blocks
+// 			if bc.insertStopped() {
+// 				log.Debug("Abort during blocks processing")
+// 				return 0, nil
+// 			}
+// 		}
+// 	}
+// 	if len(blocks) > 0 {
+// 		log.Info("Importing sidechain segment", "start", blocks[0].NumberU64(), "end", blocks[len(blocks)-1].NumberU64())
+// 		return bc.insertChain(blocks, false)
+// 	}
+// 	return 0, nil
+// }
 
 // reorg takes two blocks, an old chain and a new chain and will reconstruct the
 // blocks and inserts them to be part of the new canonical chain and accumulates
 // potential missing transactions and post an event about them.
 func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
-	log.Error("reorg shouldn't happen!!!")
+	// We must have populated lastAccepted before attempting a reorg
+	// to ensure we don't orphan accepted blocks.
+	if bc.lastAccepted == nil {
+		return errors.New("cannot perform reorg if lastAccepted is nil")
+	}
+
 	var (
 		newChain    types.Blocks
 		oldChain    types.Blocks
@@ -2344,6 +2449,14 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 			return fmt.Errorf("invalid new chain")
 		}
 	}
+
+	// If the commonBlock is less than the last accepted height, we return an error
+	// because performing a reorg would mean removing an accepted block from the
+	// canonical chain.
+	if commonBlock.NumberU64() < bc.lastAccepted.NumberU64() {
+		return errors.New("cannot orphan finalized block")
+	}
+
 	// Ensure the user sees large reorgs
 	if len(oldChain) > 0 && len(newChain) > 0 {
 		logFn := log.Info
@@ -2682,17 +2795,6 @@ func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscript
 // block processing has started while false means it has stopped.
 func (bc *BlockChain) SubscribeBlockProcessingEvent(ch chan<- bool) event.Subscription {
 	return bc.scope.Track(bc.blockProcFeed.Subscribe(ch))
-}
-
-func (bc *BlockChain) ManualHead(hash common.Hash) error {
-	block := bc.GetBlockByHash(hash)
-	if block == nil {
-		return errors.New("block not found")
-	}
-	bc.chainmu.Lock()
-	defer bc.chainmu.Unlock()
-	bc.writeHeadBlock(block)
-	return nil
 }
 
 func (bc *BlockChain) UnlockIndexing() {

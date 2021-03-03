@@ -130,6 +130,12 @@ func TestImportTxVerify(t *testing.T) {
 func TestImportTxSemanticVerify(t *testing.T) {
 	_, vm, _, sharedMemory := GenesisVM(t, false)
 
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
 	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
 
 	importAmount := uint64(1000000)

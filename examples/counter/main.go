@@ -42,7 +42,6 @@ func checkError(err error) {
 func main() {
 	// configure the chain
 	config := eth.DefaultConfig
-	config.ManualCanonical = true
 	chainConfig := &params.ChainConfig{
 		ChainID:             big.NewInt(1),
 		HomesteadBlock:      big.NewInt(0),
