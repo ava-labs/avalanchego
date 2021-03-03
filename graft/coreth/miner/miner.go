@@ -59,8 +59,6 @@ type Config struct {
 	Recommit     time.Duration  // The time interval for miner to re-create mining work.
 	Noverify     bool           // Disable remote mining solution verification(only useful in ethash).
 	ManualMining bool
-	ManualUncle  bool
-	DisableUncle bool
 }
 
 type Miner struct {

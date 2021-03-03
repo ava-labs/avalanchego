@@ -31,7 +31,6 @@ package miner
 
 import (
 	"bytes"
-	"errors"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -43,7 +42,6 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
-	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -94,12 +92,12 @@ const (
 type environment struct {
 	signer types.Signer
 
-	state     *state.StateDB // apply state changes here
-	ancestors mapset.Set     // ancestor set (used for checking uncle parent validity)
-	family    mapset.Set     // family set (used for checking uncle invalidity)
-	uncles    mapset.Set     // uncle set
-	tcount    int            // tx count in cycle
-	gasPool   *core.GasPool  // available gas used to pack transactions
+	state *state.StateDB // apply state changes here
+	// ancestors mapset.Set     // ancestor set (used for checking uncle parent validity)
+	// family    mapset.Set     // family set (used for checking uncle invalidity)
+	// uncles    mapset.Set     // uncle set
+	tcount  int           // tx count in cycle
+	gasPool *core.GasPool // available gas used to pack transactions
 
 	header   *types.Header
 	txs      []*types.Transaction
@@ -200,13 +198,12 @@ type worker struct {
 	isLocalBlock func(block *types.Block) bool // Function used to determine whether the specified block is mined by local miner.
 
 	// Test hooks
-	newTaskHook    func(*task)                        // Method to call upon receiving a new sealing task.
-	skipSealHook   func(*task) bool                   // Method to decide whether skipping the sealing.
-	fullTaskHook   func()                             // Method to call before pushing the full sealing task.
-	resubmitHook   func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
+	newTaskHook  func(*task)                        // Method to call upon receiving a new sealing task.
+	skipSealHook func(*task) bool                   // Method to decide whether skipping the sealing.
+	fullTaskHook func()                             // Method to call before pushing the full sealing task.
+	resubmitHook func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
+
 	manualMining   bool
-	manualUncle    bool
-	disableUncle   bool
 	minerCallbacks *MinerCallbacks
 }
 
@@ -234,12 +231,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		resubmitIntervalCh: make(chan time.Duration),
 		resubmitAdjustCh:   make(chan *intervalAdjust, resubmitAdjustChanSize),
 		manualMining:       config.ManualMining,
-		manualUncle:        config.ManualUncle,
-		disableUncle:       config.DisableUncle,
 		minerCallbacks:     mcb,
-	}
-	if worker.disableUncle {
-		worker.manualUncle = true
 	}
 	// Subscribe NewTxsEvent for tx pool
 	worker.txsSub = eth.TxPool().SubscribeNewTxsEvent(worker.txsCh)
@@ -479,48 +471,47 @@ func (w *worker) mainLoop() {
 		select {
 		case req := <-w.newWorkCh:
 			w.commitNewWork(req.interrupt, req.noempty, req.timestamp)
-
-		case ev := <-w.chainSideCh:
-			// Short circuit for duplicate side blocks
-			if _, exist := w.localUncles[ev.Block.Hash()]; exist {
-				continue
-			}
-			if _, exist := w.remoteUncles[ev.Block.Hash()]; exist {
-				continue
-			}
-			// Add side block to possible uncle block set depending on the author.
-			if w.isLocalBlock != nil && w.isLocalBlock(ev.Block) {
-				w.localUncles[ev.Block.Hash()] = ev.Block
-			} else {
-				w.remoteUncles[ev.Block.Hash()] = ev.Block
-			}
-			// If our mining block contains less than 2 uncle blocks,
-			// add the new uncle block if valid and regenerate a mining block.
-			if w.isRunning() && w.current != nil && w.current.uncles.Cardinality() < 2 && !w.manualUncle {
-				start := time.Now()
-				if err := w.commitUncle(w.current, ev.Block.Header()); err == nil {
-					var uncles []*types.Header
-					w.current.uncles.Each(func(item interface{}) bool {
-						hash, ok := item.(common.Hash)
-						if !ok {
-							return false
-						}
-						uncle, exist := w.localUncles[hash]
-						if !exist {
-							uncle, exist = w.remoteUncles[hash]
-						}
-						if !exist {
-							return false
-						}
-						uncles = append(uncles, uncle.Header())
-						return false
-					})
-					if !w.manualUncle {
-						w.commit(uncles, nil, true, start)
-					}
-				}
-			}
-
+		// Original code:
+		// case ev := <-w.chainSideCh:
+		// 	// Short circuit for duplicate side blocks
+		// 	if _, exist := w.localUncles[ev.Block.Hash()]; exist {
+		// 		continue
+		// 	}
+		// 	if _, exist := w.remoteUncles[ev.Block.Hash()]; exist {
+		// 		continue
+		// 	}
+		// 	// Add side block to possible uncle block set depending on the author.
+		// 	if w.isLocalBlock != nil && w.isLocalBlock(ev.Block) {
+		// 		w.localUncles[ev.Block.Hash()] = ev.Block
+		// 	} else {
+		// 		w.remoteUncles[ev.Block.Hash()] = ev.Block
+		// 	}
+		// 	// If our mining block contains less than 2 uncle blocks,
+		// 	// add the new uncle block if valid and regenerate a mining block.
+		// 	if w.isRunning() && w.current != nil && w.current.uncles.Cardinality() < 2 {
+		// 		start := time.Now()
+		// 		if err := w.commitUncle(w.current, ev.Block.Header()); err == nil {
+		// 			var uncles []*types.Header
+		// 			w.current.uncles.Each(func(item interface{}) bool {
+		// 				hash, ok := item.(common.Hash)
+		// 				if !ok {
+		// 					return false
+		// 				}
+		// 				uncle, exist := w.localUncles[hash]
+		// 				if !exist {
+		// 					uncle, exist = w.remoteUncles[hash]
+		// 				}
+		// 				if !exist {
+		// 					return false
+		// 				}
+		// 				uncles = append(uncles, uncle.Header())
+		// 				return false
+		// 			})
+		// 			w.commit(uncles, nil, true, start)
+		// 		}
+		// 	}
+		case <-w.chainSideCh:
+			// Remove blocks from chainSideCh to prevent backup on channel.
 		case ev := <-w.txsCh:
 			// Apply transactions to the pending state if we're not mining.
 			//
@@ -704,22 +695,23 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 		return err
 	}
 	env := &environment{
-		signer:    types.NewEIP155Signer(w.chainConfig.ChainID),
-		state:     state,
-		ancestors: mapset.NewSet(),
-		family:    mapset.NewSet(),
-		uncles:    mapset.NewSet(),
-		header:    header,
+		signer: types.NewEIP155Signer(w.chainConfig.ChainID),
+		state:  state,
+		// ancestors: mapset.NewSet(),
+		// family:    mapset.NewSet(),
+		// uncles:    mapset.NewSet(),
+		header: header,
 	}
 
-	// when 08 is processed ancestors contain 07 (quick block)
-	for _, ancestor := range w.chain.GetBlocksFromHash(parent.Hash(), 7) {
-		for _, uncle := range ancestor.Uncles() {
-			env.family.Add(uncle.Hash())
-		}
-		env.family.Add(ancestor.Hash())
-		env.ancestors.Add(ancestor.Hash())
-	}
+	// Original code:
+	// // when 08 is processed ancestors contain 07 (quick block)
+	// for _, ancestor := range w.chain.GetBlocksFromHash(parent.Hash(), 7) {
+	// 	for _, uncle := range ancestor.Uncles() {
+	// 		env.family.Add(uncle.Hash())
+	// 	}
+	// 	env.family.Add(ancestor.Hash())
+	// 	env.ancestors.Add(ancestor.Hash())
+	// }
 
 	// Keep track of transactions which return errors so they can be removed
 	env.tcount = 0
@@ -727,27 +719,25 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	return nil
 }
 
-// commitUncle adds the given block to uncle block set, returns error if failed to add.
-func (w *worker) commitUncle(env *environment, uncle *types.Header) error {
-	if w.disableUncle {
-		return nil
-	}
-	hash := uncle.Hash()
-	if env.uncles.Contains(hash) {
-		return errors.New("uncle not unique")
-	}
-	if env.header.ParentHash == uncle.ParentHash {
-		return errors.New("uncle is sibling")
-	}
-	if !env.ancestors.Contains(uncle.ParentHash) {
-		return errors.New("uncle's parent unknown")
-	}
-	if env.family.Contains(hash) {
-		return errors.New("uncle already included")
-	}
-	env.uncles.Add(uncle.Hash())
-	return nil
-}
+// Original code:
+// // commitUncle adds the given block to uncle block set, returns error if failed to add.
+// func (w *worker) commitUncle(env *environment, uncle *types.Header) error {
+// 	hash := uncle.Hash()
+// 	if env.uncles.Contains(hash) {
+// 		return errors.New("uncle not unique")
+// 	}
+// 	if env.header.ParentHash == uncle.ParentHash {
+// 		return errors.New("uncle is sibling")
+// 	}
+// 	if !env.ancestors.Contains(uncle.ParentHash) {
+// 		return errors.New("uncle's parent unknown")
+// 	}
+// 	if env.family.Contains(hash) {
+// 		return errors.New("uncle already included")
+// 	}
+// 	env.uncles.Add(uncle.Hash())
+// 	return nil
+// }
 
 // updateSnapshot updates pending snapshot block and state.
 // Note this function assumes the current variable is thread safe.
@@ -755,27 +745,37 @@ func (w *worker) updateSnapshot() {
 	w.snapshotMu.Lock()
 	defer w.snapshotMu.Unlock()
 
-	var uncles []*types.Header
-	w.current.uncles.Each(func(item interface{}) bool {
-		hash, ok := item.(common.Hash)
-		if !ok {
-			return false
-		}
-		uncle, exist := w.localUncles[hash]
-		if !exist {
-			uncle, exist = w.remoteUncles[hash]
-		}
-		if !exist {
-			return false
-		}
-		uncles = append(uncles, uncle.Header())
-		return false
-	})
+	// Original code:
+	// var uncles []*types.Header
+	// w.current.uncles.Each(func(item interface{}) bool {
+	// 	hash, ok := item.(common.Hash)
+	// 	if !ok {
+	// 		return false
+	// 	}
+	// 	uncle, exist := w.localUncles[hash]
+	// 	if !exist {
+	// 		uncle, exist = w.remoteUncles[hash]
+	// 	}
+	// 	if !exist {
+	// 		return false
+	// 	}
+	// 	uncles = append(uncles, uncle.Header())
+	// 	return false
+	// })
+	//
+	// w.snapshotBlock = types.NewBlock(
+	// 	w.current.header,
+	// 	w.current.txs,
+	// 	uncles,
+	// 	w.current.receipts,
+	// 	new(trie.Trie),
+	// 	nil,
+	// )
 
 	w.snapshotBlock = types.NewBlock(
 		w.current.header,
 		w.current.txs,
-		uncles,
+		nil,
 		w.current.receipts,
 		new(trie.Trie),
 		nil,
@@ -979,38 +979,38 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	if w.chainConfig.DAOForkSupport && w.chainConfig.DAOForkBlock != nil && w.chainConfig.DAOForkBlock.Cmp(header.Number) == 0 {
 		misc.ApplyDAOHardFork(env.state)
 	}
-	// Accumulate the uncles for the current block
-	uncles := make([]*types.Header, 0, 2)
-	commitUncles := func(blocks map[common.Hash]*types.Block) {
-		// Clean up stale uncle blocks first
-		for hash, uncle := range blocks {
-			if uncle.NumberU64()+staleThreshold <= header.Number.Uint64() {
-				delete(blocks, hash)
-			}
-		}
-		if w.disableUncle {
-			return
-		}
-		for hash, uncle := range blocks {
-			if len(uncles) == 2 {
-				break
-			}
-			if err := w.commitUncle(env, uncle.Header()); err != nil {
-				log.Trace("Possible uncle rejected", "hash", hash, "reason", err)
-			} else {
-				log.Debug("Committing new uncle to block", "hash", hash)
-				uncles = append(uncles, uncle.Header())
-			}
-		}
-	}
-	// Prefer to locally generated uncle
-	commitUncles(w.localUncles)
-	commitUncles(w.remoteUncles)
+	// Original code:
+	// // Accumulate the uncles for the current block
+	// uncles := make([]*types.Header, 0, 2)
+	// commitUncles := func(blocks map[common.Hash]*types.Block) {
+	// 	// Clean up stale uncle blocks first
+	// 	for hash, uncle := range blocks {
+	// 		if uncle.NumberU64()+staleThreshold <= header.Number.Uint64() {
+	// 			delete(blocks, hash)
+	// 		}
+	// 	}
+	// 	for hash, uncle := range blocks {
+	// 		if len(uncles) == 2 {
+	// 			break
+	// 		}
+	// 		if err := w.commitUncle(env, uncle.Header()); err != nil {
+	// 			log.Trace("Possible uncle rejected", "hash", hash, "reason", err)
+	// 		} else {
+	// 			log.Debug("Committing new uncle to block", "hash", hash)
+	// 			uncles = append(uncles, uncle.Header())
+	// 		}
+	// 	}
+	// }
+	// // Prefer to locally generated uncle
+	// commitUncles(w.localUncles)
+	// commitUncles(w.remoteUncles)
 
 	// Create an empty block based on temporary copied state for
 	// sealing in advance without waiting block execution finished.
 	if !noempty && atomic.LoadUint32(&w.noempty) == 0 && !w.manualMining {
-		w.commit(uncles, nil, false, tstart)
+		// Original code:
+		// w.commit(uncles, nil, false, tstart)
+		w.commit(nil, nil, false, tstart)
 	}
 
 	// Fill the block with all available pending transactions.
@@ -1046,7 +1046,9 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			return
 		}
 	}
-	w.commit(uncles, w.fullTaskHook, true, tstart)
+	// Original code:
+	// w.commit(uncles, w.fullTaskHook, true, tstart)
+	w.commit(nil, w.fullTaskHook, true, tstart)
 }
 
 // commit runs any post-transaction state modifications, assembles the final block

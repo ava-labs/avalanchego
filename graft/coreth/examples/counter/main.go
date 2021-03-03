@@ -80,9 +80,8 @@ func main() {
 	//	Alloc:      core.GenesisAlloc{genKey.Address: {Balance: genBalance}},
 	//}
 
-	// grab the control of block generation and disable auto uncle
+	// grab the control of block generation
 	config.Miner.ManualMining = true
-	config.Miner.ManualUncle = true
 
 	// compile the smart contract
 	gopath := os.Getenv("GOPATH")
