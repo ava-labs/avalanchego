@@ -472,45 +472,44 @@ func (w *worker) mainLoop() {
 		case req := <-w.newWorkCh:
 			w.commitNewWork(req.interrupt, req.noempty, req.timestamp)
 		// Original code:
-		// 		case ev := <-w.chainSideCh:
-		// 			// Short circuit for duplicate side blocks
-		// 			if _, exist := w.localUncles[ev.Block.Hash()]; exist {
-		// 				continue
-		// 			}
-		// 			if _, exist := w.remoteUncles[ev.Block.Hash()]; exist {
-		// 				continue
-		// 			}
-		// 			// Add side block to possible uncle block set depending on the author.
-		// 			if w.isLocalBlock != nil && w.isLocalBlock(ev.Block) {
-		// 				w.localUncles[ev.Block.Hash()] = ev.Block
-		// 			} else {
-		// 				w.remoteUncles[ev.Block.Hash()] = ev.Block
-		// 			}
-		// 			// If our mining block contains less than 2 uncle blocks,
-		// 			// add the new uncle block if valid and regenerate a mining block.
-		// 			if w.isRunning() && w.current != nil && w.current.uncles.Cardinality() < 2 {
-		// 				start := time.Now()
-		// 				if err := w.commitUncle(w.current, ev.Block.Header()); err == nil {
-		// 					var uncles []*types.Header
-		// 					w.current.uncles.Each(func(item interface{}) bool {
-		// 						hash, ok := item.(common.Hash)
-		// 						if !ok {
-		// 							return false
-		// 						}
-		// 						uncle, exist := w.localUncles[hash]
-		// 						if !exist {
-		// 							uncle, exist = w.remoteUncles[hash]
-		// 						}
-		// 						if !exist {
-		// 							return false
-		// 						}
-		// 						uncles = append(uncles, uncle.Header())
-		// 						return false
-		// 					})
-		// 					w.commit(uncles, nil, true, start)
+		// case ev := <-w.chainSideCh:
+		// 	// Short circuit for duplicate side blocks
+		// 	if _, exist := w.localUncles[ev.Block.Hash()]; exist {
+		// 		continue
+		// 	}
+		// 	if _, exist := w.remoteUncles[ev.Block.Hash()]; exist {
+		// 		continue
+		// 	}
+		// 	// Add side block to possible uncle block set depending on the author.
+		// 	if w.isLocalBlock != nil && w.isLocalBlock(ev.Block) {
+		// 		w.localUncles[ev.Block.Hash()] = ev.Block
+		// 	} else {
+		// 		w.remoteUncles[ev.Block.Hash()] = ev.Block
+		// 	}
+		// 	// If our mining block contains less than 2 uncle blocks,
+		// 	// add the new uncle block if valid and regenerate a mining block.
+		// 	if w.isRunning() && w.current != nil && w.current.uncles.Cardinality() < 2 {
+		// 		start := time.Now()
+		// 		if err := w.commitUncle(w.current, ev.Block.Header()); err == nil {
+		// 			var uncles []*types.Header
+		// 			w.current.uncles.Each(func(item interface{}) bool {
+		// 				hash, ok := item.(common.Hash)
+		// 				if !ok {
+		// 					return false
 		// 				}
-		// 			}
-		//
+		// 				uncle, exist := w.localUncles[hash]
+		// 				if !exist {
+		// 					uncle, exist = w.remoteUncles[hash]
+		// 				}
+		// 				if !exist {
+		// 					return false
+		// 				}
+		// 				uncles = append(uncles, uncle.Header())
+		// 				return false
+		// 			})
+		// 			w.commit(uncles, nil, true, start)
+		// 		}
+		// 	}
 		case <-w.chainSideCh:
 			// Remove blocks from chainSideCh to prevent backup on channel.
 		case ev := <-w.txsCh:

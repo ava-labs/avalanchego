@@ -534,15 +534,14 @@ func (vm *VM) syntacticVerify(block *types.Block) error {
 	if block.Hash() != vm.genesisHash && block.Coinbase() != coreth.BlackholeAddr {
 		return errInvalidBlock
 	}
-	// Block must not be empty
-	if vm.getAtomicTx(block) == nil && len(block.Transactions()) == 0 {
-		return errEmptyBlock
-	}
 	// Block must not have any uncles
 	if len(block.Uncles()) > 0 {
 		return errUnclesUnsupported
 	}
-
+	// Block must not be empty
+	if len(block.Transactions()) == 0 && vm.getAtomicTx(block) == nil {
+		return errEmptyBlock
+	}
 	return nil
 }
 

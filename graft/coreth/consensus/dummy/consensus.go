@@ -55,7 +55,7 @@ var (
 
 // modified from consensus.go
 func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header, parent *types.Header, uncle bool, seal bool) error {
-	// Verify that we are not verifying an uncle
+	// Ensure that we do not verify an uncle
 	if uncle {
 		return errUnclesUnsupported
 	}
@@ -220,10 +220,6 @@ func (self *DummyEngine) Finalize(
 
 func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
 	uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
-	if len(uncles) > 0 {
-		return nil, errUnclesUnsupported
-	}
-
 	var extdata []byte
 	if self.cb.OnFinalizeAndAssemble != nil {
 		ret, err := self.cb.OnFinalizeAndAssemble(state, txs)
