@@ -109,6 +109,7 @@ var (
 	errConflictingAtomicInputs    = errors.New("invalid block due to conflicting atomic inputs")
 	errUnknownAtomicTx            = errors.New("unknown atomic tx type")
 	errFailedChainVerify          = errors.New("block failed chain verify")
+	errUnclesUnsupported          = errors.New("uncles unsupported")
 )
 
 // mayBuildBlockStatus denotes whether the engine should be notified
@@ -293,7 +294,6 @@ func (vm *VM) Initialize(
 	config.SnapshotCache = 0
 
 	config.Miner.ManualMining = true
-	config.Miner.DisableUncle = true
 
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
@@ -542,6 +542,15 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	if blockHash != vm.genesisHash && ethBlock.Coinbase() != coreth.BlackholeAddr {
 		return nil, errInvalidBlock
 	}
+	// Block must not be empty
+	if vm.getAtomicTx(ethBlock) == nil && len(ethBlock.Transactions()) == 0 {
+		return nil, errEmptyBlock
+	}
+	// Block must not have any uncles
+	if len(ethBlock.Uncles()) > 0 {
+		return nil, errUnclesUnsupported
+	}
+
 	block := &Block{
 		id:       ids.ID(blockHash),
 		ethBlock: ethBlock,
