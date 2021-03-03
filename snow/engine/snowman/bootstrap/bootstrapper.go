@@ -89,9 +89,9 @@ func (b *Bootstrapper) Initialize(
 }
 
 // CurrentAcceptedFrontier returns the last accepted block
-func (b *Bootstrapper) CurrentAcceptedFrontier() []ids.ID {
-	acceptedFrontier := []ids.ID{b.VM.LastAccepted()}
-	return acceptedFrontier
+func (b *Bootstrapper) CurrentAcceptedFrontier() ([]ids.ID, error) {
+	lastAccepted, err := b.VM.LastAccepted()
+	return []ids.ID{lastAccepted}, err
 }
 
 // FilterAccepted returns the blocks in [containerIDs] that we have accepted
