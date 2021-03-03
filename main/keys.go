@@ -22,7 +22,7 @@ const (
 	assertionsEnabledKey                    = "assertions-enabled"
 	signatureVerificationEnabledKey         = "signature-verification-enabled"
 	dbEnabledKey                            = "db-enabled"
-	dbDirKey                                = "db-dir"
+	dbPathKey                               = "db-dir"
 	publicIPKey                             = "public-ip"
 	dynamicUpdateDurationKey                = "dynamic-update-duration"
 	dynamicPublicIPResolverKey              = "dynamic-public-ip"
