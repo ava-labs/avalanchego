@@ -75,10 +75,13 @@ func (s *Sender) Context() *snow.Context { return s.ctx }
 
 // GetAcceptedFrontier ...
 func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32) {
-	// A GetAcceptedFrontier to myself will always fail.
+	// Sending a message to myself. No need to send it over the network.
+	// Just put it right into the router. Asynchronously to avoid deadlock.
 	if validatorIDs.Contains(s.ctx.NodeID) {
 		validatorIDs.Remove(s.ctx.NodeID)
-		go s.router.GetAcceptedFrontierFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
+		// Tell the router to expect a reply message from this validator
+		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.GetAcceptedFrontierMsg)
+		go s.router.AcceptedFrontier(s.ctx.NodeID, s.ctx.ChainID, requestID, []ids.ID{})
 	}
 
 	// Some of the validators in [validatorIDs] may be benched. That is, they've been unresponsive
@@ -126,10 +129,13 @@ func (s *Sender) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, con
 
 // GetAccepted ...
 func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, containerIDs []ids.ID) {
-	// A GetAccepted to myself will always fail.
+	// Sending a message to myself. No need to send it over the network.
+	// Just put it right into the router. Asynchronously to avoid deadlock.
 	if validatorIDs.Contains(s.ctx.NodeID) {
 		validatorIDs.Remove(s.ctx.NodeID)
-		go s.router.GetAcceptedFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
+		// Tell the router to expect a reply message from this validator
+		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.GetAcceptedMsg)
+		go s.router.Accepted(s.ctx.NodeID, s.ctx.ChainID, requestID, containerIDs)
 	}
 
 	// Some of the validators in [validatorIDs] may be benched. That is, they've been unresponsive
