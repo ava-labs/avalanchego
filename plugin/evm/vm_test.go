@@ -158,22 +158,47 @@ func GenesisVM(t *testing.T, finishBootstrapping bool) (chan engCommon.Message, 
 func TestVMGenesis(t *testing.T) {
 	_, vm, _, _ := GenesisVM(t, true)
 
-	shutdownChan := make(chan error, 1)
-	shutdownFunc := func() {
-		err := vm.Shutdown()
-		shutdownChan <- err
+	defer func() {
+		shutdownChan := make(chan error, 1)
+		shutdownFunc := func() {
+			err := vm.Shutdown()
+			shutdownChan <- err
+		}
+
+		go shutdownFunc()
+		shutdownTimeout := 50 * time.Millisecond
+		ticker := time.NewTicker(shutdownTimeout)
+		select {
+		case <-ticker.C:
+			t.Fatalf("VM shutdown took longer than timeout: %v", shutdownTimeout)
+		case err := <-shutdownChan:
+			if err != nil {
+				t.Fatalf("Shutdown errored: %s", err)
+			}
+		}
+	}()
+
+	lastAcceptedID, err := vm.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	go shutdownFunc()
-	shutdownTimeout := 50 * time.Millisecond
-	ticker := time.NewTicker(shutdownTimeout)
-	select {
-	case <-ticker.C:
-		t.Fatalf("VM shutdown took longer than timeout: %v", shutdownTimeout)
-	case err := <-shutdownChan:
-		if err != nil {
-			t.Fatalf("Shutdown errored: %s", err)
-		}
+	if lastAcceptedID != ids.ID(vm.genesisHash) {
+		t.Fatal("Expected last accepted block to match the genesis block hash")
+	}
+
+	genesisBlk, err := vm.GetBlock(lastAcceptedID)
+	if err != nil {
+		t.Fatalf("Failed to get genesis block due to %s", err)
+	}
+
+	if _, err := vm.ParseBlock(genesisBlk.Bytes()); err != nil {
+		t.Fatalf("Failed to parse genesis block due to %s", err)
+	}
+
+	genesisStatus := genesisBlk.Status()
+	if genesisStatus != choices.Accepted {
+		t.Fatalf("expected genesis status to be %s but was %s", choices.Accepted, genesisStatus)
 	}
 }
 
@@ -834,29 +859,6 @@ func TestSetPreferenceRace(t *testing.T) {
 
 	if err := vm1.chain.ValidateCanonicalChain(); err != nil {
 		t.Fatalf("VM1 failed canonical chain verification due to: %s", err)
-	}
-}
-
-func TestGenesisStatus(t *testing.T) {
-	_, vm, _, _ := GenesisVM(t, true)
-
-	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	genesisID, err := vm.LastAccepted()
-	if err != nil {
-		t.Fatal(err)
-	}
-	genesis, err := vm.GetBlock(genesisID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	genesisStatus := genesis.Status()
-	if genesisStatus != choices.Accepted {
-		t.Fatalf("expected genesis status to be %s but was %s", choices.Accepted, genesisStatus)
 	}
 }
 
