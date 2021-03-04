@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/consensus/sharedconsensus"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/state"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
@@ -122,10 +121,9 @@ type ManagerConfig struct {
 	DecisionEvents            *triggers.EventDispatcher
 	ConsensusEvents           *triggers.EventDispatcher
 	DB                        database.Database
-	Router                    router.Router                // Routes incoming messages to the appropriate chain
-	Net                       network.Network              // Sends consensus messages to other validators
-	ConsensusParams           avcon.Parameters             // The consensus parameters (alpha, beta, etc.) for new chains
-	ConsensusHealthChecks     sharedconsensus.HealthConfig // The consensus health check params
+	Router                    router.Router    // Routes incoming messages to the appropriate chain
+	Net                       network.Network  // Sends consensus messages to other validators
+	ConsensusParams           avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
 	EpochFirstTransition      time.Time
 	EpochDuration             time.Duration
 	Validators                validators.Manager // Validators validating on this chain
@@ -488,10 +486,8 @@ func (m *manager) createAvalancheChain(
 			Manager:    vtxManager,
 			VM:         vm,
 		},
-		Params: consensusParams,
-		Consensus: &avcon.Topological{
-			HealthConfig: m.ConsensusHealthChecks,
-		},
+		Params:    consensusParams,
+		Consensus: &avcon.Topological{},
 	}); err != nil {
 		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
 	}
@@ -610,10 +606,8 @@ func (m *manager) createSnowmanChain(
 			VM:           vm,
 			Bootstrapped: m.unblockChains,
 		},
-		Params: consensusParams,
-		Consensus: &smcon.Topological{
-			HealthConfig: m.ConsensusHealthChecks,
-		},
+		Params:    consensusParams,
+		Consensus: &smcon.Topological{},
 	}); err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}

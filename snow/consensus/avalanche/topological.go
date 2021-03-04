@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/sharedconsensus"
+	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 )
 
@@ -36,7 +36,7 @@ func (TopologicalFactory) New() Consensus { return &Topological{} }
 // of the voting results. Assumes that vertices are inserted in topological
 // order.
 type Topological struct {
-	sharedconsensus.Metrics
+	metrics.Metrics
 
 	// Context used for logging
 	ctx *snow.Context
@@ -57,9 +57,6 @@ type Topological struct {
 	// preferenceCache is the cache for strongly preferred checks
 	// virtuousCache is the cache for strongly virtuous checks
 	preferenceCache, virtuousCache map[ids.ID]bool
-
-	// healthConfig describes parameters for health checks.
-	HealthConfig sharedconsensus.HealthConfig
 }
 
 type kahnNode struct {
@@ -208,7 +205,7 @@ func (ta *Topological) Finalized() bool { return ta.cg.Finalized() }
 // HealthCheck returns information about the consensus health.
 func (ta *Topological) HealthCheck() (interface{}, error) {
 	numOutstandingVtx := ta.Metrics.ProcessingEntries.Len()
-	healthy := numOutstandingVtx <= ta.HealthConfig.MaxOutstandingItems
+	healthy := numOutstandingVtx <= ta.params.MaxOutstandingItems
 	details := map[string]interface{}{
 		"outstandingVertices": numOutstandingVtx,
 	}
@@ -221,8 +218,12 @@ func (ta *Topological) HealthCheck() (interface{}, error) {
 	}
 
 	timeReqRunning := now.Sub(oldestStartTime)
-	healthy = healthy && timeReqRunning <= ta.HealthConfig.MaxRunTimeItems
+	healthy = healthy && timeReqRunning <= ta.params.MaxItemProcessingTime
 	details["longestRunningVertex"] = timeReqRunning.String()
+
+	snowstormReport, err := ta.cg.HealthCheck()
+	healthy = healthy && err == nil
+	details["snowstorm"] = snowstormReport
 
 	if !healthy {
 		return details, errUnhealthy

@@ -564,7 +564,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		Router:                    n.Config.ConsensusRouter,
 		Net:                       n.Net,
 		ConsensusParams:           n.Config.ConsensusParams,
-		ConsensusHealthChecks:     n.Config.ConsensusHealthChecks,
 		EpochFirstTransition:      n.Config.EpochFirstTransition,
 		EpochDuration:             n.Config.EpochDuration,
 		Validators:                n.vdrs,

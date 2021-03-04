@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/sharedconsensus"
+	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
@@ -30,7 +30,7 @@ func (TopologicalFactory) New() Consensus { return &Topological{} }
 // strongly preferred branch. This tree structure amortizes network polls to
 // vote on more than just the next block.
 type Topological struct {
-	sharedconsensus.Metrics
+	metrics.Metrics
 
 	// ctx is the context this snowman instance is executing in
 	ctx *snow.Context
@@ -53,9 +53,6 @@ type Topological struct {
 
 	// tail is the preferred block with no children
 	tail ids.ID
-
-	// healthConfig describes parameters for health checks.
-	HealthConfig sharedconsensus.HealthConfig
 }
 
 // Used to track the kahn topological sort status
@@ -77,13 +74,15 @@ type votes struct {
 
 // Initialize implements the Snowman interface
 func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters, rootID ids.ID, rootHeight uint64) error {
-	ts.ctx = ctx
-	ts.params = params
-
+	if err := params.Verify(); err != nil {
+		return err
+	}
 	if err := ts.Metrics.Initialize("blks", "block(s)", ctx.Log, params.Namespace, params.Metrics); err != nil {
 		return err
 	}
 
+	ts.ctx = ctx
+	ts.params = params
 	ts.head = rootID
 	ts.height = rootHeight
 	ts.blocks = map[ids.ID]*snowmanBlock{
@@ -265,7 +264,7 @@ func (ts *Topological) Finalized() bool { return len(ts.blocks) == 1 }
 // HealthCheck returns information about the consensus health.
 func (ts *Topological) HealthCheck() (interface{}, error) {
 	numOutstandingBlks := ts.Metrics.ProcessingEntries.Len()
-	healthy := numOutstandingBlks <= ts.HealthConfig.MaxOutstandingItems
+	healthy := numOutstandingBlks <= ts.params.MaxOutstandingItems
 	details := map[string]interface{}{
 		"outstandingBlocks": numOutstandingBlks,
 	}
@@ -278,7 +277,7 @@ func (ts *Topological) HealthCheck() (interface{}, error) {
 	}
 
 	timeReqRunning := now.Sub(oldestStartTime)
-	healthy = healthy && timeReqRunning <= ts.HealthConfig.MaxRunTimeItems
+	healthy = healthy && timeReqRunning <= ts.params.MaxItemProcessingTime
 	details["longestRunningBlock"] = timeReqRunning.String()
 
 	if !healthy {

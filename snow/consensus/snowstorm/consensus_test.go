@@ -168,13 +168,15 @@ func ParamsTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 2,
-		Alpha:             2,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     2,
+		Alpha:                 2,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultContextTest(), params)
 	if err != nil {
@@ -196,13 +198,15 @@ func IssuedTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 2,
-		Alpha:             2,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     2,
+		Alpha:                 2,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultContextTest(), params)
 	if err != nil {
@@ -228,13 +232,15 @@ func LeftoverInputTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 2,
-		Alpha:             2,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     2,
+		Alpha:                 2,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultContextTest(), params)
 	if err != nil {
@@ -283,13 +289,15 @@ func LowerConfidenceTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 2,
-		Alpha:             2,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     2,
+		Alpha:                 2,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultContextTest(), params)
 	if err != nil {
@@ -340,13 +348,15 @@ func MiddleConfidenceTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 2,
-		Alpha:             2,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     2,
+		Alpha:                 2,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultContextTest(), params)
 	if err != nil {
@@ -402,13 +412,15 @@ func IndependentTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 2,
-		Alpha:             2,
-		BetaVirtuous:      2,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     2,
+		Alpha:                 2,
+		BetaVirtuous:          2,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultContextTest(), params)
 	if err != nil {
@@ -465,13 +477,15 @@ func VirtuousTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 2,
-		Alpha:             2,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     2,
+		Alpha:                 2,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultContextTest(), params)
 	if err != nil {
@@ -509,13 +523,15 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 2,
-		Alpha:             2,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     2,
+		Alpha:                 2,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	if err := graph.Initialize(snow.DefaultContextTest(), params); err != nil {
 		t.Fatal(err)
@@ -563,13 +579,15 @@ func QuiesceTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 2,
-		Alpha:             2,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     2,
+		Alpha:                 2,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultContextTest(), params)
 	if err != nil {
@@ -602,13 +620,15 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 	purple.InputIDsV = append(purple.InputIDsV, ids.Empty.Prefix(8))
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	if err := graph.Initialize(snow.DefaultContextTest(), params); err != nil {
 		t.Fatal(err)
@@ -742,13 +762,15 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 	}
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultContextTest(), params)
 	if err != nil {
@@ -887,13 +909,15 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 	purple.InputIDsV = append(purple.InputIDsV, ids.Empty.Prefix(8))
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultContextTest(), params)
 	if err != nil {
@@ -987,13 +1011,15 @@ func VacuouslyAcceptedTest(t *testing.T, factory Factory) {
 	}}
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultContextTest(), params)
 	if err != nil {
@@ -1013,13 +1039,15 @@ func ConflictsTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultContextTest(), params)
 	if err != nil {
@@ -1063,13 +1091,15 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultContextTest(), params)
 	if err != nil {
@@ -1136,13 +1166,15 @@ func ErrorOnVacuouslyAcceptedTest(t *testing.T, factory Factory) {
 	}}
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultContextTest(), params)
 	if err != nil {
@@ -1165,13 +1197,15 @@ func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 	purple.InputIDsV = append(purple.InputIDsV, ids.Empty.Prefix(4))
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultContextTest(), params)
 	if err != nil {
@@ -1208,13 +1242,15 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 	pink.InputIDsV = append(pink.InputIDsV, X)
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultContextTest(), params)
 	if err != nil {
@@ -1253,13 +1289,15 @@ func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory)
 	pink.InputIDsV = append(pink.InputIDsV, X)
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultContextTest(), params)
 	if err != nil {
@@ -1283,13 +1321,15 @@ func UTXOCleanupTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultContextTest(), params)
 	assert.NoError(t, err)
@@ -1329,13 +1369,15 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 	graph := factory.New()
 
 	params := sbcon.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 2,
-		Alpha:             2,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     2,
+		Alpha:                 2,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultContextTest(), params)
 	if err != nil {

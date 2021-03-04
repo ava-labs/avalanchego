@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/sharedconsensus"
+	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/events"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -26,7 +26,7 @@ var errUnhealthy = errors.New("snowstorm consensus is not healthy")
 
 type common struct {
 	// metrics that describe this consensus instance
-	sharedconsensus.Metrics
+	metrics.Metrics
 
 	// context that this consensus instance is executing in
 	ctx *snow.Context
@@ -54,9 +54,6 @@ type common struct {
 
 	// track any errors that occurred during callbacks
 	errs wrappers.Errs
-
-	// healthConfig describes parameters for health checks.
-	HealthConfig sharedconsensus.HealthConfig
 }
 
 // Initialize implements the ConflictGraph interface
@@ -98,7 +95,7 @@ func (c *common) Finalized() bool {
 // HealthCheck returns information about the consensus health.
 func (c *common) HealthCheck() (interface{}, error) {
 	numOutstandingTxs := c.Metrics.ProcessingEntries.Len()
-	healthy := numOutstandingTxs <= c.HealthConfig.MaxOutstandingItems
+	healthy := numOutstandingTxs <= c.params.MaxOutstandingItems
 	details := map[string]interface{}{
 		"outstandingTransactions": numOutstandingTxs,
 	}
@@ -111,7 +108,7 @@ func (c *common) HealthCheck() (interface{}, error) {
 	}
 
 	timeReqRunning := now.Sub(oldestStartTime)
-	healthy = healthy && timeReqRunning <= c.HealthConfig.MaxRunTimeItems
+	healthy = healthy && timeReqRunning <= c.params.MaxItemProcessingTime
 	details["longestRunningTx"] = timeReqRunning.String()
 
 	if !healthy {

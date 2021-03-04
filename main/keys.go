@@ -76,6 +76,8 @@ const (
 	snowAvalancheBatchSizeKey               = "snow-avalanche-batch-size"
 	snowConcurrentRepollsKey                = "snow-concurrent-repolls"
 	snowOptimalProcessingKey                = "snow-optimal-processing"
+	snowMaxProcessingKey                    = "snow-max-processing"
+	snowMaxTimeProcessingKey                = "snow-max-time-processing"
 	snowEpochFirstTransition                = "snow-epoch-first-transition"
 	snowEpochDuration                       = "snow-epoch-duration"
 	whitelistedSubnetsKey                   = "whitelisted-subnets"

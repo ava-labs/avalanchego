@@ -1,62 +1,66 @@
 // (c) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package sharedconsensus
+package metrics
 
 import (
 	"fmt"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
+// Metrics reports commonly used consensus metrics.
 type Metrics struct {
-	// numProcessing keeps track of the number of items processing
-	numProcessing prometheus.Gauge
-
-	// latAccepted tracks the number of milliseconds that an item was
-	// processing before being accepted
-	latAccepted prometheus.Histogram
-
-	// rejected tracks the number of milliseconds that an item was
-	// processing before being rejected
-	latRejected prometheus.Histogram
-	log         logging.Logger
-
 	// Clock gives access to the current wall clock time
 	Clock timer.Clock
 
-	// ProcessingEntries keeps track of the time that each transaction was issued into
+	// ProcessingEntries keeps track of the time that each item was issued into
 	// the consensus instance. This is used to calculate the amount of time to
-	// accept or reject the item
+	// accept or reject the item.
 	ProcessingEntries linkedhashmap.LinkedHashmap
+
+	// log reports anomalous events.
+	log logging.Logger
+
+	// numProcessing keeps track of the number of items processing
+	numProcessing prometheus.Gauge
+
+	// latAccepted tracks the number of milliseconds that an item was processing
+	// before being accepted
+	latAccepted prometheus.Histogram
+
+	// rejected tracks the number of milliseconds that an item was processing
+	// before being rejected
+	latRejected prometheus.Histogram
 }
 
-// Initialize implements the Engine interface
-func (m *Metrics) Initialize(shortName, unitName string, log logging.Logger, namespace string, registerer prometheus.Registerer) error {
+// Initialize the metrics with the provided names.
+func (m *Metrics) Initialize(metricName, descriptionName string, log logging.Logger, namespace string, registerer prometheus.Registerer) error {
 	m.ProcessingEntries = linkedhashmap.New()
 	m.log = log
 
 	m.numProcessing = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_processing", shortName),
-		Help:      fmt.Sprintf("Number of currently processing %s", unitName),
+		Name:      fmt.Sprintf("%s_processing", metricName),
+		Help:      fmt.Sprintf("Number of currently processing %s", metricName),
 	})
 	m.latAccepted = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_accepted", shortName),
-		Help:      fmt.Sprintf("Latency of accepting from the time the %s was issued in milliseconds", unitName),
+		Name:      fmt.Sprintf("%s_accepted", metricName),
+		Help:      fmt.Sprintf("Latency of accepting from the time the %s was issued in milliseconds", descriptionName),
 		Buckets:   timer.MillisecondsBuckets,
 	})
 	m.latRejected = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_rejected", shortName),
-		Help:      fmt.Sprintf("Latency of rejecting from the time the %s was issued in milliseconds", unitName),
+		Name:      fmt.Sprintf("%s_rejected", metricName),
+		Help:      fmt.Sprintf("Latency of rejecting from the time the %s was issued in milliseconds", descriptionName),
 		Buckets:   timer.MillisecondsBuckets,
 	})
 
@@ -69,11 +73,13 @@ func (m *Metrics) Initialize(shortName, unitName string, log logging.Logger, nam
 	return errs.Err
 }
 
+// Issued marks the item as having been issued.
 func (m *Metrics) Issued(id ids.ID) {
 	m.ProcessingEntries.Put(id, m.Clock.Time())
 	m.numProcessing.Inc()
 }
 
+// Accepted marks the item as having been accepted.
 func (m *Metrics) Accepted(id ids.ID) {
 	startTime, ok := m.ProcessingEntries.Get(id)
 	if !ok {
@@ -88,6 +94,7 @@ func (m *Metrics) Accepted(id ids.ID) {
 	m.numProcessing.Dec()
 }
 
+// Rejected marks the item as having been rejected.
 func (m *Metrics) Rejected(id ids.ID) {
 	startTime, ok := m.ProcessingEntries.Get(id)
 	if !ok {
