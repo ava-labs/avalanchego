@@ -5,6 +5,7 @@ package avalanche
 
 import (
 	"errors"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -206,30 +207,24 @@ func (ta *Topological) Finalized() bool { return ta.cg.Finalized() }
 
 // HealthCheck returns information about the consensus health.
 func (ta *Topological) HealthCheck() (interface{}, error) {
-	// ignore the health check if the ProcessingEntries are not ready
-	if ta.Metrics.ProcessingEntries == nil {
-		return nil, nil
-	}
-	details := map[string]interface{}{}
-	healthy := true
-
 	numOutstandingVtx := ta.Metrics.ProcessingEntries.Len()
-	healthy = healthy && numOutstandingVtx <= ta.HealthConfig.MaxOutstandingItems
-	details["outstandingVertices"] = numOutstandingVtx
+	healthy := numOutstandingVtx <= ta.HealthConfig.MaxOutstandingItems
+	details := map[string]interface{}{
+		"outstandingVertices": numOutstandingVtx,
+	}
 
 	// check for long running vertices
 	now := ta.Metrics.Clock.Time()
-	processingRequest := now
-	if longTxs := ta.Metrics.ProcessingEntries.OldestRequest(); longTxs != nil {
-		processingRequest = longTxs.Time
+	oldestStartTime := now
+	if startTime, exists := ta.Metrics.ProcessingEntries.Oldest(); exists {
+		oldestStartTime = startTime.(time.Time)
 	}
 
-	timeReqRunning := now.Sub(processingRequest)
+	timeReqRunning := now.Sub(oldestStartTime)
 	healthy = healthy && timeReqRunning <= ta.HealthConfig.MaxRunTimeItems
 	details["longestRunningVertex"] = timeReqRunning.String()
 
 	if !healthy {
-		// The router is not healthy
 		return details, errUnhealthy
 	}
 	return details, nil

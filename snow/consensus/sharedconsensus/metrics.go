@@ -5,8 +5,10 @@ package sharedconsensus
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -32,12 +34,12 @@ type Metrics struct {
 	// ProcessingEntries keeps track of the time that each transaction was issued into
 	// the consensus instance. This is used to calculate the amount of time to
 	// accept or reject the item
-	ProcessingEntries *ProcessingEntries
+	ProcessingEntries linkedhashmap.LinkedHashmap
 }
 
 // Initialize implements the Engine interface
 func (m *Metrics) Initialize(shortName, unitName string, log logging.Logger, namespace string, registerer prometheus.Registerer) error {
-	m.ProcessingEntries = NewProcessingEntries()
+	m.ProcessingEntries = linkedhashmap.New()
 	m.log = log
 
 	m.numProcessing = prometheus.NewGauge(prometheus.GaugeOpts{
@@ -68,35 +70,34 @@ func (m *Metrics) Initialize(shortName, unitName string, log logging.Logger, nam
 }
 
 func (m *Metrics) Issued(id ids.ID) {
-	m.ProcessingEntries.PutEntry(id, m.Clock.Time())
+	m.ProcessingEntries.Put(id, m.Clock.Time())
 	m.numProcessing.Inc()
 }
 
 func (m *Metrics) Accepted(id ids.ID) {
-	start, ok := m.ProcessingEntries.GetEntry(id)
+	startTime, ok := m.ProcessingEntries.Get(id)
 	if !ok {
 		m.log.Debug("unable to measure Accepted transaction %v", id.String())
 		return
 	}
+	m.ProcessingEntries.Delete(id)
 
-	end := m.Clock.Time()
-
-	m.ProcessingEntries.Evict(id)
-
-	m.latAccepted.Observe(float64(end.Sub(start.Time).Milliseconds()))
+	endTime := m.Clock.Time()
+	duration := endTime.Sub(startTime.(time.Time))
+	m.latAccepted.Observe(float64(duration.Milliseconds()))
 	m.numProcessing.Dec()
 }
 
 func (m *Metrics) Rejected(id ids.ID) {
-	start, ok := m.ProcessingEntries.GetEntry(id)
+	startTime, ok := m.ProcessingEntries.Get(id)
 	if !ok {
 		m.log.Debug("unable to measure Rejected transaction %v", id.String())
 		return
 	}
-	end := m.Clock.Time()
+	m.ProcessingEntries.Delete(id)
 
-	m.ProcessingEntries.Evict(id)
-
-	m.latRejected.Observe(float64(end.Sub(start.Time).Milliseconds()))
+	endTime := m.Clock.Time()
+	duration := endTime.Sub(startTime.(time.Time))
+	m.latRejected.Observe(float64(duration.Milliseconds()))
 	m.numProcessing.Dec()
 }
