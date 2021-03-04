@@ -140,6 +140,9 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Duration(disconnectedRestartTimeoutKey, 1*time.Minute, "If [restart-on-disconnected], node restarts if not connected to any peers for this amount of time. "+
 		"If 0, node will not restart due to disconnection.")
 	fs.Bool(restartOnDisconnectedKey, false, "If true, this node will restart if it is not connected to any peers for [disconnected-restart-timeout].")
+	// Peer alias configuration
+	fs.Duration(peerAliasTimeoutKey, 10*time.Minute, "How often the node will attempt to connect "+
+		"to an IP address previously associated with a peer (i.e. a peer alias).")
 	// Benchlist
 	fs.Int(benchlistFailThresholdKey, 10, "Number of consecutive failed queries before benchlisting a node.")
 	fs.Bool(benchlistPeerSummaryEnabledKey, false, "Enables peer specific query latency metrics.")
@@ -715,6 +718,9 @@ func setNodeConfig(v *viper.Viper) error {
 	// Bootstrap Configs
 	Config.RetryBootstrap = v.GetBool(retryBootstrap)
 	Config.RetryBootstrapMaxAttempts = v.GetInt(retryBootstrapMaxAttempts)
+
+	// Peer alias
+	Config.PeerAliasTimeout = v.GetDuration(peerAliasTimeoutKey)
 
 	return nil
 }
