@@ -967,6 +967,8 @@ func (p *peer) releaseAllAliases() {
 
 	for _, alias := range p.aliases {
 		delete(p.net.peerAliasIPs, alias.ip.String())
+
+		p.net.log.Verbo("released alias %s for peer %s", alias.ip, p.id)
 	}
 	p.aliases = nil
 }
