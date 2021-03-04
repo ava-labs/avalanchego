@@ -372,12 +372,15 @@ func TestEngineMultipleQuery(t *testing.T) {
 	config := DefaultConfig()
 
 	config.Params = snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 3,
-		Alpha:             2,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     3,
+		Alpha:                 2,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
 	vals := validators.NewSet()
@@ -813,12 +816,15 @@ func TestVoteCanceling(t *testing.T) {
 	config := DefaultConfig()
 
 	config.Params = snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 3,
-		Alpha:             2,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     3,
+		Alpha:                 2,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
 	vals := validators.NewSet()
@@ -1731,11 +1737,15 @@ func TestEngineDoubleChit(t *testing.T) {
 	config := DefaultConfig()
 
 	config.Params = snowball.Parameters{
-		Metrics:      prometheus.NewRegistry(),
-		K:            2,
-		Alpha:        2,
-		BetaVirtuous: 1,
-		BetaRogue:    2,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     2,
+		Alpha:                 2,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
 	vals := validators.NewSet()

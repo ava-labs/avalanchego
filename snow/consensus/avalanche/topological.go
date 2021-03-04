@@ -4,15 +4,21 @@
 package avalanche
 
 import (
+	"errors"
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 )
 
 const (
 	minMapSize = 16
 )
+
+var errUnhealthy = errors.New("avalanche consensus is not healthy")
 
 // TopologicalFactory implements Factory by returning a topological struct
 type TopologicalFactory struct{}
@@ -30,7 +36,7 @@ func (TopologicalFactory) New() Consensus { return &Topological{} }
 // of the voting results. Assumes that vertices are inserted in topological
 // order.
 type Topological struct {
-	metrics
+	metrics.Metrics
 
 	// Context used for logging
 	ctx *snow.Context
@@ -71,7 +77,7 @@ func (ta *Topological) Initialize(
 	ta.ctx = ctx
 	ta.params = params
 
-	if err := ta.metrics.Initialize(ctx.Log, params.Namespace, params.Metrics); err != nil {
+	if err := ta.Metrics.Initialize("vtx", "vertex/vertices", ctx.Log, params.Namespace, params.Metrics); err != nil {
 		return err
 	}
 
@@ -125,7 +131,7 @@ func (ta *Topological) Add(vtx Vertex) error {
 	}
 
 	ta.nodes[vtxID] = vtx // Add this vertex to the set of nodes
-	ta.metrics.Issued(vtxID)
+	ta.Metrics.Issued(vtxID)
 
 	return ta.update(vtx) // Update the vertex and it's ancestry
 }
@@ -195,6 +201,35 @@ func (ta *Topological) Quiesce() bool { return ta.cg.Quiesce() }
 
 // Finalized implements the Avalanche interface
 func (ta *Topological) Finalized() bool { return ta.cg.Finalized() }
+
+// HealthCheck returns information about the consensus health.
+func (ta *Topological) HealthCheck() (interface{}, error) {
+	numOutstandingVtx := ta.Metrics.ProcessingEntries.Len()
+	healthy := numOutstandingVtx <= ta.params.MaxOutstandingItems
+	details := map[string]interface{}{
+		"outstandingVertices": numOutstandingVtx,
+	}
+
+	// check for long running vertices
+	now := ta.Metrics.Clock.Time()
+	oldestStartTime := now
+	if startTime, exists := ta.Metrics.ProcessingEntries.Oldest(); exists {
+		oldestStartTime = startTime.(time.Time)
+	}
+
+	timeReqRunning := now.Sub(oldestStartTime)
+	healthy = healthy && timeReqRunning <= ta.params.MaxItemProcessingTime
+	details["longestRunningVertex"] = timeReqRunning.String()
+
+	snowstormReport, err := ta.cg.HealthCheck()
+	healthy = healthy && err == nil
+	details["snowstorm"] = snowstormReport
+
+	if !healthy {
+		return details, errUnhealthy
+	}
+	return details, nil
+}
 
 // Takes in a list of votes and sets up the topological ordering. Returns the
 // reachable section of the graph annotated with the number of inbound edges and
@@ -431,7 +466,7 @@ func (ta *Topological) update(vtx Vertex) error {
 			}
 			ta.ctx.ConsensusDispatcher.Reject(ta.ctx, vtxID, vtx.Bytes())
 			delete(ta.nodes, vtxID)
-			ta.metrics.Rejected(vtxID)
+			ta.Metrics.Rejected(vtxID)
 
 			ta.preferenceCache[vtxID] = false
 			ta.virtuousCache[vtxID] = false
@@ -485,7 +520,7 @@ func (ta *Topological) update(vtx Vertex) error {
 		}
 		ta.ctx.ConsensusDispatcher.Accept(ta.ctx, vtxID, vtx.Bytes())
 		delete(ta.nodes, vtxID)
-		ta.metrics.Accepted(vtxID)
+		ta.Metrics.Accepted(vtxID)
 	case rejectable:
 		// I'm rejectable, why not reject?
 		if err := vtx.Reject(); err != nil {
@@ -493,7 +528,7 @@ func (ta *Topological) update(vtx Vertex) error {
 		}
 		ta.ctx.ConsensusDispatcher.Reject(ta.ctx, vtxID, vtx.Bytes())
 		delete(ta.nodes, vtxID)
-		ta.metrics.Rejected(vtxID)
+		ta.Metrics.Rejected(vtxID)
 	}
 	return nil
 }

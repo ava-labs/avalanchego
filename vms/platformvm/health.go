@@ -11,7 +11,7 @@ import (
 
 // Health implements the common.VM interface
 func (vm *VM) HealthCheck() (interface{}, error) {
-	// Returns nil iff this node is connected to > alpha percent of the Primary Network's stake
+	// Returns nil if this node is connected to > alpha percent of the Primary Network's stake
 	percentConnected, err := vm.getPercentConnected()
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get percent connected: %w", err)

@@ -124,7 +124,7 @@ func (j *Jobs) Execute(job Job) error {
 		}
 	}
 
-	return j.state.DeleteJob(j.db, jobID)
+	return nil
 }
 
 // Commit ...
