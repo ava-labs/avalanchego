@@ -6,7 +6,6 @@ package logging
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -409,9 +408,10 @@ func (fw *fileWriter) Initialize(config Config) (int, error) {
 	}
 	fw.writer = writer
 	fw.file = file
-	fileSize, err := file.Seek(0, io.SeekEnd)
+	fileinfo, err := file.Stat()
 	if err != nil {
 		return 0, err
 	}
+	fileSize := fileinfo.Size()
 	return int(fileSize), nil
 }
