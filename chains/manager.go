@@ -488,8 +488,10 @@ func (m *manager) createAvalancheChain(
 			Manager:    vtxManager,
 			VM:         vm,
 		},
-		Params:    consensusParams,
-		Consensus: &avcon.Topological{},
+		Params: consensusParams,
+		Consensus: &avcon.Topological{
+			HealthConfig: m.ConsensusHealthChecks,
+		},
 	}); err != nil {
 		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
 	}
