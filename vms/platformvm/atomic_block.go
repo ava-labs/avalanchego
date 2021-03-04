@@ -61,6 +61,13 @@ func (ab *AtomicBlock) conflicts(s ids.Set) bool {
 //
 // This function also sets onAcceptDB database if the verification passes.
 func (ab *AtomicBlock) Verify() error {
+	if err := ab.CommonDecisionBlock.Verify(); err != nil {
+		if err := ab.Reject(); err != nil {
+			ab.vm.Ctx.Log.Error("failed to reject atomic block %s due to %s", ab.ID(), err)
+		}
+		return err
+	}
+
 	tx, ok := ab.Tx.UnsignedTx.(UnsignedAtomicTx)
 	if !ok {
 		return errWrongTxType

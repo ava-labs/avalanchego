@@ -102,4 +102,5 @@ const (
 	healthCheckAveragerHalflifeKey          = "health-check-averager-halflife"
 	retryBootstrap                          = "bootstrap-retry-enabled"
 	retryBootstrapMaxAttempts               = "bootstrap-retry-max-attempts"
+	peerAliasTimeoutKey                     = "peer-alias-timeout"
 )

@@ -255,6 +255,7 @@ func (n *Node) initNetworking() error {
 		n.Config.SendQueueSize,
 		n.Config.NetworkHealthConfig,
 		n.benchlistManager,
+		n.Config.PeerAliasTimeout,
 	)
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {

@@ -142,4 +142,7 @@ type Config struct {
 
 	// Max number of times to retry bootstrap
 	RetryBootstrapMaxAttempts int
+
+	// Peer alias configuration
+	PeerAliasTimeout time.Duration
 }
