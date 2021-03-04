@@ -366,7 +366,7 @@ func (fw *fileWriter) Close() error {
 
 // Rotate implements the RotatingWriter interface
 func (fw *fileWriter) Rotate() error {
-	for i := fw.config.RotationSize - 1; i >= 0; i-- {
+	for i := fw.config.RotationSize - 1; i > 0; i-- {
 		sourceFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log.%d", fw.config.LoggerName, i))
 		destFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log.%d", fw.config.LoggerName, i+1))
 		if _, err := os.Stat(sourceFilename); !os.IsNotExist(err) {
