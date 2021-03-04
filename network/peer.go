@@ -913,8 +913,9 @@ func (p *peer) addAlias(ip utils.IPDesc) {
 	}
 }
 
-// releaseNextAlias returns the next released
-// alias or nil if none was released.
+// releaseNextAlias returns the next released alias or nil if none was released.
+// If none was released, then this will schedule the next time to remove an
+// alias.
 //
 // assumes [stateLock] is held
 func (p *peer) releaseNextAlias(now time.Time) *alias {
@@ -926,8 +927,7 @@ func (p *peer) releaseNextAlias(now time.Time) *alias {
 	}
 
 	next := p.aliases[0]
-	timeUntilExpiry := now.Sub(next.expiry)
-	if !now.IsZero() && timeUntilExpiry <= 0 {
+	if timeUntilExpiry := next.expiry.Sub(now); timeUntilExpiry > 0 {
 		p.aliasTimer.SetTimeoutIn(timeUntilExpiry)
 		return nil
 	}
@@ -937,7 +937,8 @@ func (p *peer) releaseNextAlias(now time.Time) *alias {
 	return &next
 }
 
-// releaseExpiredAliases frees expired alias IPs.
+// releaseExpiredAliases frees expired IP aliases. If there is an IP pending
+// expiration, then the expiration is scheduled.
 //
 // assumes [stateLock] is not held
 func (p *peer) releaseExpiredAliases() {
@@ -961,12 +962,13 @@ func (p *peer) releaseExpiredAliases() {
 // assumes [stateLock] is held and that [aliasTimer]
 // has been stopped
 func (p *peer) releaseAllAliases() {
-	for {
-		next := p.releaseNextAlias(time.Time{})
-		if next == nil {
-			return
-		}
+	p.aliasLock.Lock()
+	defer p.aliasLock.Unlock()
 
-		delete(p.net.peerAliasIPs, next.ip.String())
+	for _, alias := range p.aliases {
+		delete(p.net.peerAliasIPs, alias.ip.String())
+
+		p.net.log.Verbo("released alias %s for peer %s", alias.ip, p.id)
 	}
+	p.aliases = nil
 }
