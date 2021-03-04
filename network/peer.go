@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -24,8 +25,8 @@ type alias struct {
 	// ip where peer was reached
 	ip utils.IPDesc
 
-	// added is network time when peer was reached
-	added time.Time
+	// expiry is network time when the ip should be released
+	expiry time.Time
 }
 
 type peer struct {
@@ -70,8 +71,11 @@ type peer struct {
 	// this peer at.
 	aliases []alias
 
-	// aliasesLock must be held when accessing [aliases].
-	aliasesLock sync.Mutex
+	// aliasTimer triggers the release of expired records from [aliases].
+	aliasTimer *timer.Timer
+
+	// aliasLock must be held when accessing [aliases] or [aliasTimer].
+	aliasLock sync.Mutex
 
 	// id should be set when the peer is first created.
 	id ids.ShortID
@@ -92,7 +96,20 @@ type peer struct {
 	tickerOnce sync.Once
 }
 
-// assume the stateLock is held
+// newPeer returns a properly initialized *peer.
+func newPeer(net *network, conn net.Conn, ip utils.IPDesc) *peer {
+	p := &peer{
+		net:          net,
+		conn:         conn,
+		ip:           ip,
+		tickerCloser: make(chan struct{}),
+	}
+	p.aliasTimer = timer.NewTimer(p.releaseExpiredAliases)
+
+	return p
+}
+
+// assume the [stateLock] is held
 func (p *peer) Start() {
 	go p.ReadMessages()
 	go p.WriteMessages()
@@ -157,26 +174,15 @@ func (p *peer) requestFinishHandshake() {
 // to release timed out alias IPs of the
 // peer.
 //
-// monitorAliases will acquire stateLock
+// monitorAliases will acquire [stateLock]
 // when an alias is released.
 func (p *peer) monitorAliases() {
-	// Exit if release frequency is 0, otherwise
-	// time.NewTicker will panic.
-	if p.net.peerAliasReleaseFreq == 0 {
-		return
-	}
+	go func() {
+		<-p.tickerCloser
+		p.aliasTimer.Stop()
+	}()
 
-	releaseTicker := time.NewTicker(p.net.peerAliasReleaseFreq)
-	defer releaseTicker.Stop()
-
-	for {
-		select {
-		case <-releaseTicker.C:
-			p.releaseAliases(p.net.clock.Time(), false)
-		case <-p.tickerCloser:
-			return
-		}
-	}
+	p.aliasTimer.Dispatch()
 }
 
 // attempt to read messages from the peer
@@ -283,7 +289,7 @@ func (p *peer) WriteMessages() {
 	}
 }
 
-// send assumes that the stateLock is not held.
+// send assumes that the [stateLock] is not held.
 func (p *peer) Send(msg Msg) bool {
 	p.senderLock.Lock()
 	defer p.senderLock.Unlock()
@@ -328,7 +334,7 @@ func (p *peer) Send(msg Msg) bool {
 	}
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) handle(msg Msg) {
 	now := p.net.clock.Time()
 	atomic.StoreInt64(&p.lastReceived, now.Unix())
@@ -426,7 +432,7 @@ func (p *peer) dropMessage(connPendingLen, networkPendingLen int64) bool {
 			connPendingLen > p.net.maxNetworkPendingSendBytes/20) // Check to see if this connection is using too much memory
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) Close() { p.once.Do(p.close) }
 
 // assumes only `peer.Close` calls this
@@ -450,14 +456,14 @@ func (p *peer) close() {
 	p.net.disconnected(p)
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) GetVersion() {
 	msg, err := p.net.b.GetVersion()
 	p.net.log.AssertNoError(err)
 	p.Send(msg)
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) Version() {
 	p.net.stateLock.RLock()
 	msg, err := p.net.b.Version(
@@ -472,7 +478,7 @@ func (p *peer) Version() {
 	p.Send(msg)
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) GetPeerList() {
 	msg, err := p.net.b.GetPeerList()
 	p.net.log.AssertNoError(err)
@@ -485,7 +491,7 @@ func (p *peer) SendPeerList() {
 	p.PeerList(ips)
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) PeerList(peers []utils.IPDesc) {
 	msg, err := p.net.b.PeerList(peers)
 	if err != nil {
@@ -495,7 +501,7 @@ func (p *peer) PeerList(peers []utils.IPDesc) {
 	p.Send(msg)
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) Ping() {
 	msg, err := p.net.b.Ping()
 	p.net.log.AssertNoError(err)
@@ -506,7 +512,7 @@ func (p *peer) Ping() {
 	}
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) Pong() {
 	msg, err := p.net.b.Pong()
 	p.net.log.AssertNoError(err)
@@ -517,10 +523,10 @@ func (p *peer) Pong() {
 	}
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) getVersion(_ Msg) { p.Version() }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) version(msg Msg) {
 	if p.gotVersion.GetValue() {
 		p.net.log.Verbo("dropping duplicated version message from %s", p.id)
@@ -620,14 +626,14 @@ func (p *peer) version(msg Msg) {
 	p.tryMarkConnected()
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) getPeerList(_ Msg) {
 	if p.gotVersion.GetValue() {
 		p.SendPeerList()
 	}
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) peerList(msg Msg) {
 	ips := msg.Get(Peers).([]utils.IPDesc)
 
@@ -646,13 +652,13 @@ func (p *peer) peerList(msg Msg) {
 	}
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) ping(_ Msg) { p.Pong() }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) pong(_ Msg) {}
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) getAcceptedFrontier(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
@@ -662,7 +668,7 @@ func (p *peer) getAcceptedFrontier(msg Msg) {
 	p.net.router.GetAcceptedFrontier(p.id, chainID, requestID, deadline)
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) acceptedFrontier(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
@@ -688,7 +694,7 @@ func (p *peer) acceptedFrontier(msg Msg) {
 	p.net.router.AcceptedFrontier(p.id, chainID, requestID, containerIDs)
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) getAccepted(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
@@ -715,7 +721,7 @@ func (p *peer) getAccepted(msg Msg) {
 	p.net.router.GetAccepted(p.id, chainID, requestID, deadline, containerIDs)
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) accepted(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
@@ -741,7 +747,7 @@ func (p *peer) accepted(msg Msg) {
 	p.net.router.Accepted(p.id, chainID, requestID, containerIDs)
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) get(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
@@ -764,7 +770,7 @@ func (p *peer) getAncestors(msg Msg) {
 	p.net.router.GetAncestors(p.id, chainID, requestID, deadline, containerID)
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) put(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
@@ -776,7 +782,7 @@ func (p *peer) put(msg Msg) {
 	p.net.router.Put(p.id, chainID, requestID, containerID, container)
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) multiPut(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
@@ -786,7 +792,7 @@ func (p *peer) multiPut(msg Msg) {
 	p.net.router.MultiPut(p.id, chainID, requestID, containers)
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) pushQuery(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
@@ -799,7 +805,7 @@ func (p *peer) pushQuery(msg Msg) {
 	p.net.router.PushQuery(p.id, chainID, requestID, deadline, containerID, container)
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) pullQuery(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
@@ -811,7 +817,7 @@ func (p *peer) pullQuery(msg Msg) {
 	p.net.router.PullQuery(p.id, chainID, requestID, deadline, containerID)
 }
 
-// assumes the stateLock is not held
+// assumes the [stateLock] is not held
 func (p *peer) chits(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
@@ -837,7 +843,7 @@ func (p *peer) chits(msg Msg) {
 	p.net.router.Chits(p.id, chainID, requestID, containerIDs)
 }
 
-// assumes the stateLock is held
+// assumes the [stateLock] is held
 func (p *peer) tryMarkConnected() {
 	if !p.connected.GetValue() && // not already connected
 		p.gotVersion.GetValue() && // not waiting for version
@@ -889,64 +895,78 @@ func (p *peer) getIP() utils.IPDesc {
 // addAlias marks that we have found another
 // IP that we can connect to this peer at.
 //
-// assumes stateLock is held
+// assumes [stateLock] is held
 func (p *peer) addAlias(ip utils.IPDesc) {
-	p.aliasesLock.Lock()
-	defer p.aliasesLock.Unlock()
+	p.aliasLock.Lock()
+	defer p.aliasLock.Unlock()
 
 	p.net.peerAliasIPs[ip.String()] = struct{}{}
 	p.aliases = append(p.aliases, alias{
-		ip:    ip,
-		added: p.net.clock.Time(),
+		ip:     ip,
+		expiry: p.net.clock.Time().Add(p.net.peerAliasTimeout),
 	})
+
+	// Set the [aliasTimer] if this ip is the first alias we put
+	// in [aliases].
+	if len(p.aliases) == 1 {
+		p.aliasTimer.SetTimeoutIn(p.net.peerAliasTimeout)
+	}
 }
 
 // releaseNextAlias returns the next released
 // alias or nil if none was released.
+//
+// assumes [stateLock] is held
 func (p *peer) releaseNextAlias(now time.Time) *alias {
-	p.aliasesLock.Lock()
-	defer p.aliasesLock.Unlock()
+	p.aliasLock.Lock()
+	defer p.aliasLock.Unlock()
 
 	if len(p.aliases) == 0 {
 		return nil
 	}
 
 	next := p.aliases[0]
-	if !now.IsZero() && now.Sub(next.added) < p.net.peerAliasTimeout {
+	timeUntilExpiry := now.Sub(next.expiry)
+	if !now.IsZero() && timeUntilExpiry <= 0 {
+		p.aliasTimer.SetTimeoutIn(timeUntilExpiry)
 		return nil
 	}
 	p.aliases = p.aliases[1:]
 
-	// If [aliases] is empty after removing the next element, we
-	// set it to nil so that it will be garbage collected.
-	if len(p.aliases) == 0 {
-		p.aliases = nil
-	}
-
+	p.net.log.Verbo("released alias %s for peer %s", next.ip, p.id)
 	return &next
 }
 
-// releaseAliases removes enables network to
-// reconnect on aliases that have timed out. To
-// force all aliases to be removed, the caller
-// should set now to be the zero time.
-func (p *peer) releaseAliases(now time.Time, holdsStateLock bool) {
+// releaseExpiredAliases frees expired alias IPs.
+//
+// assumes [stateLock] is not held
+func (p *peer) releaseExpiredAliases() {
+	currentTime := p.net.clock.Time()
 	for {
-		next := p.releaseNextAlias(now)
+		next := p.releaseNextAlias(currentTime)
 		if next == nil {
 			return
 		}
 
-		// We should always release aliasesLock before attempting
-		// to acquire the stateLock to avoid deadlocking on addAlias.
-		if !holdsStateLock {
-			p.net.stateLock.Lock()
-		}
+		// We should always release [aliasLock] before attempting
+		// to acquire the [stateLock] to avoid deadlocking on addAlias.
+		p.net.stateLock.Lock()
 		delete(p.net.peerAliasIPs, next.ip.String())
-		if !holdsStateLock {
-			p.net.stateLock.Unlock()
+		p.net.stateLock.Unlock()
+	}
+}
+
+// releaseAllAliases frees all alias IPs.
+//
+// assumes [stateLock] is held and that [aliasTimer]
+// has been stopped
+func (p *peer) releaseAllAliases() {
+	for {
+		next := p.releaseNextAlias(time.Time{})
+		if next == nil {
+			return
 		}
 
-		p.net.log.Verbo("released alias %s for peer %s", next.ip, p.id)
+		delete(p.net.peerAliasIPs, next.ip.String())
 	}
 }

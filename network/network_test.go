@@ -26,9 +26,8 @@ import (
 )
 
 const (
-	defaultSendQueueSize    = 1 << 10
-	defaultAliasReleaseFreq = 250 * time.Millisecond
-	defaultAliasTimeout     = 2 * time.Second
+	defaultSendQueueSize = 1 << 10
+	defaultAliasTimeout  = 2 * time.Second
 )
 
 var (
@@ -280,7 +279,6 @@ func TestNewDefaultNetwork(t *testing.T) {
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net)
@@ -398,7 +396,6 @@ func TestEstablishConnection(t *testing.T) {
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net0)
@@ -428,7 +425,6 @@ func TestEstablishConnection(t *testing.T) {
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net1)
@@ -558,7 +554,6 @@ func TestDoubleTrack(t *testing.T) {
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net0)
@@ -588,7 +583,6 @@ func TestDoubleTrack(t *testing.T) {
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net1)
@@ -719,7 +713,6 @@ func TestDoubleClose(t *testing.T) {
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net0)
@@ -749,7 +742,6 @@ func TestDoubleClose(t *testing.T) {
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net1)
@@ -885,7 +877,6 @@ func TestTrackConnected(t *testing.T) {
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net0)
@@ -915,7 +906,6 @@ func TestTrackConnected(t *testing.T) {
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net1)
@@ -1025,7 +1015,6 @@ func TestTrackConnectedRace(t *testing.T) {
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net0)
@@ -1055,7 +1044,6 @@ func TestTrackConnectedRace(t *testing.T) {
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net1)
@@ -1293,7 +1281,6 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net0)
@@ -1323,7 +1310,6 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net1)
@@ -1353,7 +1339,6 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net2)
@@ -1383,7 +1368,6 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net3)
@@ -1703,7 +1687,6 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net0)
@@ -1733,7 +1716,6 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net1)
@@ -1763,7 +1745,6 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net2)
@@ -1793,7 +1774,6 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasReleaseFreq,
 		defaultAliasTimeout,
 	)
 	assert.NotNil(t, net3)

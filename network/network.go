@@ -172,11 +172,6 @@ type network struct {
 	// again.
 	retryDelay map[string]time.Duration
 
-	// peerAliasReleaseFreq determines how often we should
-	// attempt to release aliases that are at least
-	// [peerAliasTimeout] old.
-	peerAliasReleaseFreq time.Duration
-
 	// peerAliasTimeout is the age a peer alias must
 	// be before we attempt to release it (so that we
 	// attempt to dial the IP again if gossiped to us).
@@ -239,7 +234,6 @@ func NewDefaultNetwork(
 	sendQueueSize uint32,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
-	peerAliasReleaseFreq time.Duration,
 	peerAliasTimeout time.Duration,
 ) Network {
 	return NewNetwork(
@@ -284,7 +278,6 @@ func NewDefaultNetwork(
 		apricotPhase0Time,
 		healthConfig,
 		benchlistManager,
-		peerAliasReleaseFreq,
 		peerAliasTimeout,
 	)
 }
@@ -332,7 +325,6 @@ func NewNetwork(
 	apricotPhase0Time time.Time,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
-	peerAliasReleaseFreq time.Duration,
 	peerAliasTimeout time.Duration,
 ) Network {
 	// #nosec G404
@@ -372,7 +364,6 @@ func NewNetwork(
 		disconnectedIPs:                    make(map[string]struct{}),
 		connectedIPs:                       make(map[string]struct{}),
 		peerAliasIPs:                       make(map[string]struct{}),
-		peerAliasReleaseFreq:               peerAliasReleaseFreq,
 		peerAliasTimeout:                   peerAliasTimeout,
 		retryDelay:                         make(map[string]time.Duration),
 		myIPs:                              map[string]struct{}{ip.IP().String(): {}},
@@ -868,15 +859,7 @@ func (n *network) Dispatch() error {
 		}
 
 		go func() {
-			err := n.upgrade(
-				&peer{
-					net:          n,
-					conn:         conn,
-					tickerCloser: make(chan struct{}),
-				},
-				n.serverUpgrader,
-			)
-			if err != nil {
+			if err := n.upgrade(newPeer(n, conn, utils.IPDesc{}), n.serverUpgrader); err != nil {
 				n.log.Verbo("failed to upgrade connection: %s", err)
 			}
 		}()
@@ -1209,12 +1192,7 @@ func (n *network) attemptConnect(ip utils.IPDesc) error {
 			n.log.Warn("failed to set socket nodelay due to: %s", err)
 		}
 	}
-	return n.upgrade(&peer{
-		net:          n,
-		ip:           ip,
-		conn:         conn,
-		tickerCloser: make(chan struct{}),
-	}, n.clientUpgrader)
+	return n.upgrade(newPeer(n, conn, ip), n.clientUpgrader)
 }
 
 // assumes the stateLock is not held. Returns an error if the peer's connection
@@ -1376,7 +1354,7 @@ func (n *network) disconnected(p *peer) {
 	delete(n.peers, p.id)
 	n.numPeers.Set(float64(len(n.peers)))
 
-	p.releaseAliases(time.Time{}, true)
+	p.releaseAllAliases()
 
 	if !ip.IsZero() {
 		str := ip.String()

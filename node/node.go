@@ -255,7 +255,6 @@ func (n *Node) initNetworking() error {
 		n.Config.SendQueueSize,
 		n.Config.NetworkHealthConfig,
 		n.benchlistManager,
-		n.Config.PeerAliasReleaseFrequency,
 		n.Config.PeerAliasTimeout,
 	)
 
