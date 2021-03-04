@@ -4,9 +4,12 @@
 package avalanche
 
 import (
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -19,12 +22,12 @@ type metrics struct {
 
 	clock timer.Clock
 
-	processingTxs *ProcessingTxs
+	processingVts linkedhashmap.LinkedHashmap
 }
 
 // Initialize implements the Engine interface
 func (m *metrics) Initialize(log logging.Logger, namespace string, registerer prometheus.Registerer) error {
-	m.processingTxs = NewProcessingTxs()
+	m.processingVts = linkedhashmap.New()
 	m.log = log
 
 	m.numProcessing = prometheus.NewGauge(prometheus.GaugeOpts{
@@ -55,35 +58,34 @@ func (m *metrics) Initialize(log logging.Logger, namespace string, registerer pr
 }
 
 func (m *metrics) Issued(id ids.ID) {
-	m.processingTxs.PutTx(id, m.clock.Time())
+	m.processingVts.Put(id, m.clock.Time())
 	m.numProcessing.Inc()
 }
 
 func (m *metrics) Accepted(id ids.ID) {
-	start, ok := m.processingTxs.GetTx(id)
+	startTime, ok := m.processingVts.Get(id)
 	if !ok {
 		m.log.Debug("unable to measure Accepted transaction %v", id.String())
 		return
 	}
+	m.processingVts.Delete(id)
 
-	end := m.clock.Time()
-
-	m.processingTxs.Evict(id)
-
-	m.latAccepted.Observe(float64(end.Sub(start.Time).Milliseconds()))
+	endTime := m.clock.Time()
+	duration := endTime.Sub(startTime.(time.Time))
+	m.latAccepted.Observe(float64(duration.Milliseconds()))
 	m.numProcessing.Dec()
 }
 
 func (m *metrics) Rejected(id ids.ID) {
-	start, ok := m.processingTxs.GetTx(id)
+	startTime, ok := m.processingVts.Get(id)
 	if !ok {
 		m.log.Debug("unable to measure Rejected transaction %v", id.String())
 		return
 	}
-	end := m.clock.Time()
+	m.processingVts.Delete(id)
 
-	m.processingTxs.Evict(id)
-
-	m.latRejected.Observe(float64(end.Sub(start.Time).Milliseconds()))
+	endTime := m.clock.Time()
+	duration := endTime.Sub(startTime.(time.Time))
+	m.latRejected.Observe(float64(duration.Milliseconds()))
 	m.numProcessing.Dec()
 }

@@ -5,6 +5,7 @@ package snowman
 
 import (
 	"errors"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -262,31 +263,24 @@ func (ts *Topological) Finalized() bool { return len(ts.blocks) == 1 }
 
 // HealthCheck returns information about the consensus health.
 func (ts *Topological) HealthCheck() (interface{}, error) {
-	// ignore the health check if the processingTx are not ready
-	if ts.processingTxs == nil {
-		return nil, nil
+	numOutstandingBlks := ts.processingBlks.Len()
+	healthy := numOutstandingBlks <= ts.HealthConfig.MaxOutstandingRequests
+	details := map[string]interface{}{
+		"outstandingRequests": numOutstandingBlks,
 	}
-
-	details := map[string]interface{}{}
-	healthy := true
-
-	numOutstandingTxs := ts.processingTxs.Len()
-	healthy = healthy && numOutstandingTxs <= ts.HealthConfig.MaxOutstandingRequests
-	details["outstandingRequests"] = numOutstandingTxs
 
 	// check for long running requests
 	now := ts.clock.Time()
-	processingRequest := ts.clock.Time()
-	if longTxs := ts.processingTxs.OldestRequest(); longTxs != nil {
-		processingRequest = longTxs.Time
+	processingRequest := now
+	if startTime, exists := ts.processingBlks.Oldest(); exists {
+		processingRequest = startTime.(time.Time)
 	}
 
 	timeReqRunning := now.Sub(processingRequest)
 	healthy = healthy && timeReqRunning <= ts.HealthConfig.MaxRunTimeTxs
-	details["longestRunningTx"] = timeReqRunning.String()
+	details["longestRunningBlk"] = timeReqRunning.String()
 
 	if !healthy {
-		// The router is not healthy
 		return details, errUnhealthy
 	}
 	return details, nil

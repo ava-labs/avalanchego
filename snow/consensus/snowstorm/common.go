@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -95,22 +96,17 @@ func (c *common) Finalized() bool {
 
 // HealthCheck returns information about the consensus health.
 func (c *common) HealthCheck() (interface{}, error) {
-	// ignore the health check if the processingTx are not ready
-	if c.processingTxs == nil {
-		return nil, nil
-	}
-	details := map[string]interface{}{}
-	healthy := true
-
 	numOutstandingTxs := c.processingTxs.Len()
-	healthy = healthy && numOutstandingTxs <= c.HealthConfig.MaxOutstandingRequests
-	details["outstandingRequests"] = numOutstandingTxs
+	healthy := numOutstandingTxs <= c.HealthConfig.MaxOutstandingRequests
+	details := map[string]interface{}{
+		"outstandingRequests": numOutstandingTxs,
+	}
 
 	// check for long running requests
 	now := c.clock.Time()
-	processingRequest := c.clock.Time()
-	if longTxs := c.processingTxs.OldestRequest(); longTxs != nil {
-		processingRequest = longTxs.Time
+	processingRequest := now
+	if startTime, exists := c.processingTxs.Oldest(); exists {
+		processingRequest = startTime.(time.Time)
 	}
 
 	timeReqRunning := now.Sub(processingRequest)
@@ -118,7 +114,6 @@ func (c *common) HealthCheck() (interface{}, error) {
 	details["longestRunningTx"] = timeReqRunning.String()
 
 	if !healthy {
-		// The router is not healthy
 		return details, errUnhealthy
 	}
 	return details, nil

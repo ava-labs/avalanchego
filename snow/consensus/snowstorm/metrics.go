@@ -4,7 +4,10 @@
 package snowstorm
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -30,7 +33,7 @@ type metrics struct {
 	// processing keeps track of the time that each transaction was issued into
 	// the snowstorm instance. This is used to calculate the amount of time to
 	// accept or reject the transaction
-	processingTxs *ProcessingTxs
+	processingTxs linkedhashmap.LinkedHashmap
 
 	log logging.Logger
 }
@@ -41,7 +44,7 @@ func (m *metrics) Initialize(
 	namespace string,
 	registerer prometheus.Registerer,
 ) error {
-	m.processingTxs = NewProcessingTxs()
+	m.processingTxs = linkedhashmap.New()
 	m.log = log
 
 	m.numProcessing = prometheus.NewGauge(prometheus.GaugeOpts{
@@ -75,38 +78,38 @@ func (m *metrics) Initialize(
 // snowstorm consensus instance. It is assumed that either Accept or Reject will
 // be called with this same ID in the future.
 func (m *metrics) Issued(id ids.ID) {
-	m.processingTxs.PutTx(id, m.clock.Time())
+	m.processingTxs.Put(id, m.clock.Time())
 	m.numProcessing.Inc()
 }
 
 // Accepted marks that a transaction with the provided ID was accepted. It is
 // assumed that Issued was previously called with this ID.
 func (m *metrics) Accepted(id ids.ID) {
-	start, ok := m.processingTxs.GetTx(id)
+	startTime, ok := m.processingTxs.Get(id)
 	if !ok {
 		m.log.Debug("unable to measure Accepted transaction %v", id.String())
 		return
 	}
-	end := m.clock.Time()
+	m.processingTxs.Delete(id)
 
-	m.processingTxs.Evict(id)
-
-	m.accepted.Observe(float64(end.Sub(start.Time).Milliseconds()))
+	endTime := m.clock.Time()
+	duration := endTime.Sub(startTime.(time.Time))
+	m.accepted.Observe(float64(duration.Milliseconds()))
 	m.numProcessing.Dec()
 }
 
 // Rejected marks that a transaction with the provided ID was rejected. It is
 // assumed that Issued was previously called with this ID.
 func (m *metrics) Rejected(id ids.ID) {
-	start, ok := m.processingTxs.GetTx(id)
+	startTime, ok := m.processingTxs.Get(id)
 	if !ok {
 		m.log.Debug("unable to measure Rejected transaction %v", id.String())
 		return
 	}
-	end := m.clock.Time()
+	m.processingTxs.Delete(id)
 
-	m.processingTxs.Evict(id)
-
-	m.rejected.Observe(float64(end.Sub(start.Time).Milliseconds()))
+	endTime := m.clock.Time()
+	duration := endTime.Sub(startTime.(time.Time))
+	m.rejected.Observe(float64(duration.Milliseconds()))
 	m.numProcessing.Dec()
 }
