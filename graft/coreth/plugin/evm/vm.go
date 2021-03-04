@@ -108,8 +108,10 @@ var (
 	errInvalidGas                 = errors.New("invalid block due to low gas")
 	errConflictingAtomicInputs    = errors.New("invalid block due to conflicting atomic inputs")
 	errUnknownAtomicTx            = errors.New("unknown atomic tx type")
-	errFailedChainVerify          = errors.New("block failed chain verify")
 	errUnclesUnsupported          = errors.New("uncles unsupported")
+	errTxHashMismatch             = errors.New("txs hash does not match header")
+	errUncleHashMismatch          = errors.New("uncle hash mismatch")
+	errRejectedParent             = errors.New("rejected parent")
 )
 
 // mayBuildBlockStatus denotes whether the engine should be notified
