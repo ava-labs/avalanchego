@@ -27,11 +27,6 @@ type LinkedHashmap interface {
 	Newest() (val interface{}, exists bool)
 }
 
-type entry struct {
-	key   ids.ID
-	value interface{}
-}
-
 type linkedHashmap struct {
 	lock      sync.Mutex
 	entryMap  map[ids.ID]*list.Element
@@ -90,20 +85,15 @@ func (lh *linkedHashmap) Newest() (interface{}, bool) {
 func (lh *linkedHashmap) put(key ids.ID, value interface{}) {
 	if e, ok := lh.entryMap[key]; ok {
 		lh.entryList.MoveToBack(e)
-
-		val := e.Value.(*entry)
-		val.value = value
+		e.Value = value
 	} else {
-		lh.entryMap[key] = lh.entryList.PushBack(&entry{
-			key:   key,
-			value: value,
-		})
+		lh.entryMap[key] = lh.entryList.PushBack(value)
 	}
 }
 
 func (lh *linkedHashmap) get(key ids.ID) (interface{}, bool) {
 	if e, ok := lh.entryMap[key]; ok {
-		return e.Value.(*entry).value, true
+		return e.Value, true
 	}
 	return nil, false
 }
@@ -119,14 +109,14 @@ func (lh *linkedHashmap) len() int { return len(lh.entryMap) }
 
 func (lh *linkedHashmap) oldest() (interface{}, bool) {
 	if val := lh.entryList.Front(); val != nil {
-		return val.Value.(*entry).value, true
+		return val.Value, true
 	}
 	return nil, false
 }
 
 func (lh *linkedHashmap) newest() (interface{}, bool) {
 	if val := lh.entryList.Back(); val != nil {
-		return val.Value.(*entry).value, true
+		return val.Value, true
 	}
 	return nil, false
 }
