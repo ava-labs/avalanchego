@@ -4,7 +4,6 @@
 package evm
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/coreth"
@@ -13,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/trie"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -166,11 +166,25 @@ func (b *Block) syntacticVerify() error {
 	if b == nil || b.ethBlock == nil {
 		return errInvalidBlock
 	}
-	if !b.vm.chain.VerifyBlock(b.ethBlock) {
-		return errFailedChainVerify
+
+	// Skip verification of the genesis block since it
+	// should already be marked as accepted
+	if b.ethBlock.Hash() == b.vm.genesisHash {
+		return nil
+	}
+	txsHash := types.DeriveSha(b.ethBlock.Transactions(), new(trie.Trie))
+	uncleHash := types.CalcUncleHash(b.ethBlock.Uncles())
+	ethHeader := b.ethBlock.Header()
+	// Check that the tx hash in the header matches the body
+	if txsHash != ethHeader.TxHash {
+		return errTxHashMismatch
+	}
+	// Check that the uncle hash in the header matches the body
+	if uncleHash != ethHeader.UncleHash {
+		return errUncleHashMismatch
 	}
 	// Coinbase must be zero on C-Chain
-	if b.ethBlock.Hash() != b.vm.genesisHash && b.ethBlock.Coinbase() != coreth.BlackholeAddr {
+	if b.ethBlock.Coinbase() != coreth.BlackholeAddr {
 		return errInvalidBlock
 	}
 	// Block must not have any uncles
@@ -184,17 +198,13 @@ func (b *Block) syntacticVerify() error {
 	return nil
 }
 
-var (
-	errRejectedParent = errors.New("rejected parent")
-)
-
 // Verify implements the snowman.Block interface
 func (b *Block) Verify() error {
-	vm := b.vm
-
 	if err := b.syntacticVerify(); err != nil {
 		return fmt.Errorf("syntactic block verification failed: %w", err)
 	}
+
+	vm := b.vm
 
 	// Only enforce a minimum fee when bootstrapping has finished
 	if vm.ctx.IsBootstrapped() {
