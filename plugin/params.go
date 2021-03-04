@@ -13,12 +13,14 @@ import (
 
 var (
 	cliConfig evm.CommandLineConfig
+	version   bool
 )
 
 func init() {
 	fs := flag.NewFlagSet("coreth", flag.ContinueOnError)
 
 	config := fs.String("config", "default", "Pass in CLI Config to set runtime attributes for Coreth")
+	fs.BoolVar(&version, "version", false, "If true, print version and quit")
 
 	if err := fs.Parse(os.Args[1:]); err != nil {
 		cliConfig.ParsingError = err
