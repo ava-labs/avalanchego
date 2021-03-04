@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/sharedconsensus"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/utils"
@@ -100,7 +100,7 @@ type Config struct {
 
 	// Consensus configuration
 	ConsensusParams       avalanche.Parameters
-	ConsensusHealthChecks snowman.HealthConfig
+	ConsensusHealthChecks sharedconsensus.HealthConfig
 
 	// Throughput configuration
 	ThroughputPort          uint16
