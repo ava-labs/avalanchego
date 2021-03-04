@@ -725,17 +725,23 @@ func (t *Transitive) IsBootstrapped() bool {
 
 // Health implements the common.Engine interface
 func (t *Transitive) HealthCheck() (interface{}, error) {
-	vmIntf, vmErr := t.VM.HealthCheck()
-	consensusIntf, consensusErr := t.Consensus.HealthCheck()
-	intf := map[string]interface{}{
-		"vm":        vmIntf,
-		"consensus": consensusIntf,
+	var (
+		consensusIntf interface{} = struct{}{}
+		consensusErr  error
+	)
+	if t.Ctx.IsBootstrapped() {
+		consensusIntf, consensusErr = t.Consensus.HealthCheck()
 	}
-	if vmErr == nil {
-		return intf, consensusErr
+	vmIntf, vmErr := t.VM.HealthCheck()
+	intf := map[string]interface{}{
+		"consensus": consensusIntf,
+		"vm":        vmIntf,
 	}
 	if consensusErr == nil {
 		return intf, vmErr
+	}
+	if vmErr == nil {
+		return intf, consensusErr
 	}
 	return intf, fmt.Errorf("vm: %s ; consensus: %s", vmErr, consensusErr)
 }

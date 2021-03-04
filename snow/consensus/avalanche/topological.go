@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/sharedconsensus"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 )
 
@@ -35,7 +36,7 @@ func (TopologicalFactory) New() Consensus { return &Topological{} }
 // of the voting results. Assumes that vertices are inserted in topological
 // order.
 type Topological struct {
-	metrics
+	sharedconsensus.Metrics
 
 	// Context used for logging
 	ctx *snow.Context
@@ -58,7 +59,7 @@ type Topological struct {
 	preferenceCache, virtuousCache map[ids.ID]bool
 
 	// healthConfig describes parameters for health checks.
-	HealthConfig HealthConfig
+	HealthConfig sharedconsensus.HealthConfig
 }
 
 type kahnNode struct {
@@ -79,7 +80,7 @@ func (ta *Topological) Initialize(
 	ta.ctx = ctx
 	ta.params = params
 
-	if err := ta.metrics.Initialize(ctx.Log, params.Namespace, params.Metrics); err != nil {
+	if err := ta.Metrics.Initialize("vtx", "vertex/vertices", ctx.Log, params.Namespace, params.Metrics); err != nil {
 		return err
 	}
 
@@ -133,7 +134,7 @@ func (ta *Topological) Add(vtx Vertex) error {
 	}
 
 	ta.nodes[vtxID] = vtx // Add this vertex to the set of nodes
-	ta.metrics.Issued(vtxID)
+	ta.Metrics.Issued(vtxID)
 
 	return ta.update(vtx) // Update the vertex and it's ancestry
 }
@@ -206,22 +207,22 @@ func (ta *Topological) Finalized() bool { return ta.cg.Finalized() }
 
 // HealthCheck returns information about the consensus health.
 func (ta *Topological) HealthCheck() (interface{}, error) {
-	numOutstandingTxs := ta.processingVts.Len()
-	healthy := numOutstandingTxs <= ta.HealthConfig.MaxOutstandingRequests
+	numOutstandingVtx := ta.Metrics.ProcessingEntries.Len()
+	healthy := numOutstandingVtx <= ta.HealthConfig.MaxOutstandingItems
 	details := map[string]interface{}{
-		"outstandingRequests": numOutstandingTxs,
+		"outstandingVertices": numOutstandingVtx,
 	}
 
-	// check for long running requests
-	now := ta.clock.Time()
-	processingRequest := now
-	if startTime, exists := ta.processingVts.Oldest(); exists {
-		processingRequest = startTime.(time.Time)
+	// check for long running vertices
+	now := ta.Metrics.Clock.Time()
+	oldestStartTime := now
+	if startTime, exists := ta.Metrics.ProcessingEntries.Oldest(); exists {
+		oldestStartTime = startTime.(time.Time)
 	}
 
-	timeReqRunning := now.Sub(processingRequest)
-	healthy = healthy && timeReqRunning <= ta.HealthConfig.MaxRunTimeTxs
-	details["longestProcessingVtx"] = timeReqRunning.String()
+	timeReqRunning := now.Sub(oldestStartTime)
+	healthy = healthy && timeReqRunning <= ta.HealthConfig.MaxRunTimeItems
+	details["longestRunningVertex"] = timeReqRunning.String()
 
 	if !healthy {
 		return details, errUnhealthy
@@ -464,7 +465,7 @@ func (ta *Topological) update(vtx Vertex) error {
 			}
 			ta.ctx.ConsensusDispatcher.Reject(ta.ctx, vtxID, vtx.Bytes())
 			delete(ta.nodes, vtxID)
-			ta.metrics.Rejected(vtxID)
+			ta.Metrics.Rejected(vtxID)
 
 			ta.preferenceCache[vtxID] = false
 			ta.virtuousCache[vtxID] = false
@@ -518,7 +519,7 @@ func (ta *Topological) update(vtx Vertex) error {
 		}
 		ta.ctx.ConsensusDispatcher.Accept(ta.ctx, vtxID, vtx.Bytes())
 		delete(ta.nodes, vtxID)
-		ta.metrics.Accepted(vtxID)
+		ta.Metrics.Accepted(vtxID)
 	case rejectable:
 		// I'm rejectable, why not reject?
 		if err := vtx.Reject(); err != nil {
@@ -526,7 +527,7 @@ func (ta *Topological) update(vtx Vertex) error {
 		}
 		ta.ctx.ConsensusDispatcher.Reject(ta.ctx, vtxID, vtx.Bytes())
 		delete(ta.nodes, vtxID)
-		ta.metrics.Rejected(vtxID)
+		ta.Metrics.Rejected(vtxID)
 	}
 	return nil
 }

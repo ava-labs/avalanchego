@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/sharedconsensus"
 	"github.com/ava-labs/avalanchego/snow/events"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -25,7 +26,7 @@ var errUnhealthy = errors.New("snowstorm consensus is not healthy")
 
 type common struct {
 	// metrics that describe this consensus instance
-	metrics
+	sharedconsensus.Metrics
 
 	// context that this consensus instance is executing in
 	ctx *snow.Context
@@ -55,7 +56,7 @@ type common struct {
 	errs wrappers.Errs
 
 	// healthConfig describes parameters for health checks.
-	HealthConfig HealthConfig
+	HealthConfig sharedconsensus.HealthConfig
 }
 
 // Initialize implements the ConflictGraph interface
@@ -63,7 +64,7 @@ func (c *common) Initialize(ctx *snow.Context, params sbcon.Parameters) error {
 	c.ctx = ctx
 	c.params = params
 
-	if err := c.metrics.Initialize(ctx.Log, params.Namespace, params.Metrics); err != nil {
+	if err := c.Metrics.Initialize("txs", "transaction(s)", ctx.Log, params.Namespace, params.Metrics); err != nil {
 		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}
 	return params.Verify()
@@ -96,21 +97,21 @@ func (c *common) Finalized() bool {
 
 // HealthCheck returns information about the consensus health.
 func (c *common) HealthCheck() (interface{}, error) {
-	numOutstandingTxs := c.processingTxs.Len()
-	healthy := numOutstandingTxs <= c.HealthConfig.MaxOutstandingRequests
+	numOutstandingTxs := c.Metrics.ProcessingEntries.Len()
+	healthy := numOutstandingTxs <= c.HealthConfig.MaxOutstandingItems
 	details := map[string]interface{}{
-		"outstandingRequests": numOutstandingTxs,
+		"outstandingTransactions": numOutstandingTxs,
 	}
 
-	// check for long running requests
-	now := c.clock.Time()
-	processingRequest := now
-	if startTime, exists := c.processingTxs.Oldest(); exists {
-		processingRequest = startTime.(time.Time)
+	// check for long running transactions
+	now := c.Metrics.Clock.Time()
+	oldestStartTime := now
+	if startTime, exists := c.Metrics.ProcessingEntries.Oldest(); exists {
+		oldestStartTime = startTime.(time.Time)
 	}
 
-	timeReqRunning := now.Sub(processingRequest)
-	healthy = healthy && timeReqRunning <= c.HealthConfig.MaxRunTimeTxs
+	timeReqRunning := now.Sub(oldestStartTime)
+	healthy = healthy && timeReqRunning <= c.HealthConfig.MaxRunTimeItems
 	details["longestRunningTx"] = timeReqRunning.String()
 
 	if !healthy {
@@ -135,7 +136,7 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 	c.ctx.DecisionDispatcher.Issue(c.ctx, txID, bytes)
 
 	// Notify the metrics that this transaction is being issued.
-	c.metrics.Issued(txID)
+	c.Metrics.Issued(txID)
 
 	// If this tx has inputs, it needs to be voted on before being accepted.
 	if inputs := tx.InputIDs(); len(inputs) != 0 {
@@ -156,7 +157,7 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 	c.ctx.DecisionDispatcher.Accept(c.ctx, txID, bytes)
 
 	// Notify the metrics that this transaction was just accepted.
-	c.metrics.Accepted(txID)
+	c.Metrics.Accepted(txID)
 	return false, nil
 }
 
@@ -174,7 +175,7 @@ func (c *common) acceptTx(tx Tx) error {
 	c.ctx.DecisionDispatcher.Accept(c.ctx, txID, tx.Bytes())
 
 	// Update the metrics to account for this transaction's acceptance
-	c.metrics.Accepted(txID)
+	c.Metrics.Accepted(txID)
 
 	// If there is a tx that was accepted pending on this tx, the ancestor
 	// should be notified that it doesn't need to block on this tx anymore.
@@ -199,7 +200,7 @@ func (c *common) rejectTx(tx Tx) error {
 	c.ctx.DecisionDispatcher.Reject(c.ctx, txID, tx.Bytes())
 
 	// Update the metrics to account for this transaction's rejection
-	c.metrics.Rejected(txID)
+	c.Metrics.Rejected(txID)
 
 	// If there is a tx that was accepted pending on this tx, the ancestor
 	// tx can't be accepted.
