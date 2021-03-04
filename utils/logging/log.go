@@ -5,6 +5,7 @@ package logging
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -368,7 +369,7 @@ func (fw *fileWriter) Rotate() error {
 	for i := fw.config.RotationSize - 1; i > 0; i-- {
 		sourceFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log.%d", fw.config.LoggerName, i))
 		destFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log.%d", fw.config.LoggerName, i+1))
-		if _, err := os.Stat(sourceFilename); !os.IsNotExist(err) {
+		if _, err := os.Stat(sourceFilename); !errors.Is(err, os.ErrNotExist) {
 			if err := os.Rename(sourceFilename, destFilename); err != nil {
 				return err
 			}
