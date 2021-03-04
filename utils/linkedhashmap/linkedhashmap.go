@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+// Hashmap provides an O(1) mapping from an [ids.ID] to any value.
 type Hashmap interface {
 	Put(key ids.ID, val interface{})
 	Get(key ids.ID) (val interface{}, exists bool)
@@ -17,6 +18,8 @@ type Hashmap interface {
 	Len() int
 }
 
+// LinkedHashmap is a hashmap that keeps track of the oldest pairing an the
+// newest pairing.
 type LinkedHashmap interface {
 	Hashmap
 
@@ -29,9 +32,6 @@ type entry struct {
 	value interface{}
 }
 
-// TimedEntries is a key value store with bounded size. If the size is attempted to be
-// exceeded, then an element is removed from the cache before the insertion is
-// done, based on evicting the least recently used value.
 type linkedHashmap struct {
 	lock      sync.Mutex
 	entryMap  map[ids.ID]*list.Element
