@@ -31,7 +31,6 @@ import (
 
 	avalancheRPC "github.com/gorilla/rpc/v2"
 
-	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -611,7 +610,11 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 		enabledAPIs = append(enabledAPIs, "snowman")
 	}
 	if vm.CLIConfig.CorethAdminAPIEnabled {
-		errs.Add(handler.RegisterName("admin", &admin.Performance{}))
+		primaryAlias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get primary alias for chain due to %w", err)
+		}
+		errs.Add(handler.RegisterName("admin", NewPerformanceService(fmt.Sprintf("coreth_%s_", primaryAlias))))
 		enabledAPIs = append(enabledAPIs, "coreth-admin")
 	}
 	if vm.CLIConfig.NetAPIEnabled {
