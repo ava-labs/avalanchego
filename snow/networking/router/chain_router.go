@@ -256,9 +256,9 @@ func (cr *ChainRouter) GetAcceptedFrontier(validatorID ids.ShortID, chainID ids.
 	// Pass the message to the chain It's OK if we drop this.
 	dropped := !chain.GetAcceptedFrontier(validatorID, requestID, deadline)
 	if dropped {
-		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
 	} else {
-		cr.dropRateCalculator.Observe(0, cr.clock.Time())
+		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
 	}
 }
 
@@ -297,9 +297,9 @@ func (cr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetAcceptedFrontierFailed(validatorID, requestID)
-		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
 	} else {
-		cr.dropRateCalculator.Observe(0, cr.clock.Time())
+		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
 	}
 }
 
@@ -342,9 +342,9 @@ func (cr *ChainRouter) GetAccepted(validatorID ids.ShortID, chainID ids.ID, requ
 	// Pass the message to the chain. It's OK if we drop this.
 	dropped := !chain.GetAccepted(validatorID, requestID, deadline, containerIDs)
 	if dropped {
-		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
 	} else {
-		cr.dropRateCalculator.Observe(0, cr.clock.Time())
+		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
 	}
 }
 
@@ -383,9 +383,9 @@ func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetAcceptedFailed(validatorID, requestID)
-		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
 	} else {
-		cr.dropRateCalculator.Observe(0, cr.clock.Time())
+		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
 	}
 }
 
@@ -429,9 +429,9 @@ func (cr *ChainRouter) GetAncestors(validatorID ids.ShortID, chainID ids.ID, req
 	// Pass the message to the chain. It's OK if we drop this.
 	dropped := !chain.GetAncestors(validatorID, requestID, deadline, containerID)
 	if dropped {
-		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
 	} else {
-		cr.dropRateCalculator.Observe(0, cr.clock.Time())
+		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
 	}
 }
 
@@ -469,9 +469,9 @@ func (cr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetAncestorsFailed(validatorID, requestID)
-		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
 	} else {
-		cr.dropRateCalculator.Observe(0, cr.clock.Time())
+		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
 	}
 }
 
@@ -513,9 +513,9 @@ func (cr *ChainRouter) Get(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	// Pass the message to the chain. It's OK if we drop this.
 	dropped := !chain.Get(validatorID, requestID, deadline, containerID)
 	if dropped {
-		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
 	} else {
-		cr.dropRateCalculator.Observe(0, cr.clock.Time())
+		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
 	}
 }
 
@@ -544,9 +544,9 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 		// It's ok to drop this message.
 		dropped := !chain.Put(validatorID, requestID, containerID, container)
 		if dropped {
-			cr.dropRateCalculator.Observe(1, cr.clock.Time())
+			cr.registerMsgDrop(chain.ctx.IsBootstrapped())
 		} else {
-			cr.dropRateCalculator.Observe(0, cr.clock.Time())
+			cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
 		}
 		return
 	}
@@ -572,10 +572,11 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetFailed(validatorID, requestID)
-		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
 	} else {
-		cr.dropRateCalculator.Observe(0, cr.clock.Time())
+		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
 	}
+
 }
 
 // GetFailed routes an incoming GetFailed message from the validator with ID [validatorID]
@@ -615,9 +616,9 @@ func (cr *ChainRouter) PushQuery(validatorID ids.ShortID, chainID ids.ID, reques
 	// Pass the message to the chain. It's OK if we drop this.
 	dropped := !chain.PushQuery(validatorID, requestID, deadline, containerID, container)
 	if dropped {
-		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
 	} else {
-		cr.dropRateCalculator.Observe(0, cr.clock.Time())
+		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
 	}
 }
 
@@ -636,9 +637,9 @@ func (cr *ChainRouter) PullQuery(validatorID ids.ShortID, chainID ids.ID, reques
 	// Pass the message to the chain. It's OK if we drop this.
 	dropped := !chain.PullQuery(validatorID, requestID, deadline, containerID)
 	if dropped {
-		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
 	} else {
-		cr.dropRateCalculator.Observe(0, cr.clock.Time())
+		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
 	}
 }
 
@@ -676,9 +677,9 @@ func (cr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.QueryFailed(validatorID, requestID)
-		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
 	} else {
-		cr.dropRateCalculator.Observe(0, cr.clock.Time())
+		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
 	}
 }
 
@@ -774,6 +775,18 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 		return details, errUnhealthy
 	}
 	return details, nil
+}
+
+func (cr *ChainRouter) registerMsgDrop(isBootstrapped bool) {
+	if isBootstrapped {
+		cr.dropRateCalculator.Observe(1, cr.clock.Time())
+	}
+}
+
+func (cr *ChainRouter) registerMsgSuccess(isBootstrapped bool) {
+	if isBootstrapped {
+		cr.dropRateCalculator.Observe(0, cr.clock.Time())
+	}
 }
 
 func createRequestID(validatorID ids.ShortID, chainID ids.ID, requestID uint32) ids.ID {
