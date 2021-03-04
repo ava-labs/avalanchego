@@ -643,7 +643,10 @@ func TestBootstrapperAcceptedFrontier(t *testing.T) {
 		}
 	}
 
-	accepted := bs.CurrentAcceptedFrontier()
+	accepted, err := bs.CurrentAcceptedFrontier()
+	if err != nil {
+		t.Fatal(err)
+	}
 	acceptedSet := ids.Set{}
 	acceptedSet.Add(accepted...)
 
