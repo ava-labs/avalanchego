@@ -4,6 +4,8 @@
 package snowman
 
 import (
+	"errors"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -13,6 +15,8 @@ import (
 const (
 	minMapSize = 16
 )
+
+var errUnhealthy = errors.New("snowman consensus is not healthy")
 
 // TopologicalFactory implements Factory by returning a topological struct
 type TopologicalFactory struct{}
@@ -47,6 +51,9 @@ type Topological struct {
 
 	// tail is the preferred block with no children
 	tail ids.ID
+
+	// healthConfig describes parameters for health checks.
+	HealthConfig HealthConfig
 }
 
 // Used to track the kahn topological sort status
@@ -252,6 +259,38 @@ func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
 
 // Finalized implements the Snowman interface
 func (ts *Topological) Finalized() bool { return len(ts.blocks) == 1 }
+
+// HealthCheck returns information about the consensus health.
+func (ts *Topological) HealthCheck() (interface{}, error) {
+	// ignore the health check if the processingTx are not ready
+	if ts.processingTxs == nil {
+		return nil, nil
+	}
+
+	details := map[string]interface{}{}
+	healthy := true
+
+	numOutstandingTxs := ts.processingTxs.Len()
+	healthy = healthy && numOutstandingTxs <= ts.HealthConfig.MaxOutstandingRequests
+	details["outstandingRequests"] = numOutstandingTxs
+
+	// check for long running requests
+	now := ts.clock.Time()
+	processingRequest := ts.clock.Time()
+	if longTxs := ts.processingTxs.OldestRequest(); longTxs != nil {
+		processingRequest = longTxs.Time
+	}
+
+	timeReqRunning := now.Sub(processingRequest)
+	healthy = healthy && timeReqRunning <= ts.HealthConfig.MaxRunTimeTxs
+	details["longestRunningTx"] = timeReqRunning.String()
+
+	if !healthy {
+		// The router is not healthy
+		return details, errUnhealthy
+	}
+	return details, nil
+}
 
 // takes in a list of votes and sets up the topological ordering. Returns the
 // reachable section of the graph annotated with the number of inbound edges and

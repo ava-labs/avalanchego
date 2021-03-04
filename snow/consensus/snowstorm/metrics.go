@@ -84,8 +84,7 @@ func (m *metrics) Issued(id ids.ID) {
 func (m *metrics) Accepted(id ids.ID) {
 	start, ok := m.processingTxs.GetTx(id)
 	if !ok {
-		// TODO-pedro should we log this ? I don't think this can happen though
-		m.log.Warn("unable to measure Accepted transaction %v", id.String())
+		m.log.Debug("unable to measure Accepted transaction %v", id.String())
 		return
 	}
 	end := m.clock.Time()
@@ -101,8 +100,7 @@ func (m *metrics) Accepted(id ids.ID) {
 func (m *metrics) Rejected(id ids.ID) {
 	start, ok := m.processingTxs.GetTx(id)
 	if !ok {
-		// TODO-pedro should we log this ? I don't think this can happen though
-		m.log.Warn("unable to measure Rejected transaction %v", id.String())
+		m.log.Debug("unable to measure Rejected transaction %v", id.String())
 		return
 	}
 	end := m.clock.Time()

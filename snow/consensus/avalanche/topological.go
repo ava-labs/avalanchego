@@ -4,6 +4,8 @@
 package avalanche
 
 import (
+	"errors"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -13,6 +15,8 @@ import (
 const (
 	minMapSize = 16
 )
+
+var errUnhealthy = errors.New("avalanche consensus is not healthy")
 
 // TopologicalFactory implements Factory by returning a topological struct
 type TopologicalFactory struct{}
@@ -51,6 +55,9 @@ type Topological struct {
 	// preferenceCache is the cache for strongly preferred checks
 	// virtuousCache is the cache for strongly virtuous checks
 	preferenceCache, virtuousCache map[ids.ID]bool
+
+	// healthConfig describes parameters for health checks.
+	HealthConfig HealthConfig
 }
 
 type kahnNode struct {
@@ -195,6 +202,37 @@ func (ta *Topological) Quiesce() bool { return ta.cg.Quiesce() }
 
 // Finalized implements the Avalanche interface
 func (ta *Topological) Finalized() bool { return ta.cg.Finalized() }
+
+// HealthCheck returns information about the consensus health.
+func (ta *Topological) HealthCheck() (interface{}, error) {
+	// ignore the health check if the processingTx are not ready
+	if ta.processingTxs == nil {
+		return nil, nil
+	}
+	details := map[string]interface{}{}
+	healthy := true
+
+	numOutstandingTxs := ta.processingTxs.Len()
+	healthy = healthy && numOutstandingTxs <= ta.HealthConfig.MaxOutstandingRequests
+	details["outstandingRequests"] = numOutstandingTxs
+
+	// check for long running requests
+	now := ta.clock.Time()
+	processingRequest := ta.clock.Time()
+	if longTxs := ta.processingTxs.OldestRequest(); longTxs != nil {
+		processingRequest = longTxs.Time
+	}
+
+	timeReqRunning := now.Sub(processingRequest)
+	healthy = healthy && timeReqRunning <= ta.HealthConfig.MaxRunTimeTxs
+	details["longestRunningTx"] = timeReqRunning.String()
+
+	if !healthy {
+		// The router is not healthy
+		return details, errUnhealthy
+	}
+	return details, nil
+}
 
 // Takes in a list of votes and sets up the topological ordering. Returns the
 // reachable section of the graph annotated with the number of inbound edges and

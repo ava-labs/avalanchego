@@ -634,6 +634,17 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 
 // Health implements the common.Engine interface
 func (t *Transitive) HealthCheck() (interface{}, error) {
-	// TODO add more health checks
-	return t.VM.HealthCheck()
+	vmIntf, vmErr := t.VM.HealthCheck()
+	consensusIntf, consensusErr := t.Consensus.HealthCheck()
+	intf := map[string]interface{}{
+		"vm":        vmIntf,
+		"consensus": consensusIntf,
+	}
+	if vmErr == nil {
+		return intf, consensusErr
+	}
+	if consensusErr == nil {
+		return intf, vmErr
+	}
+	return intf, fmt.Errorf("vm: %s ; consensus: %s", vmErr, consensusErr)
 }

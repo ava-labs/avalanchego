@@ -5,6 +5,7 @@ package snowstorm
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -18,6 +19,8 @@ import (
 
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
+
+var errUnhealthy = errors.New("snowstorm consensus is not healthy")
 
 type common struct {
 	// metrics that describe this consensus instance
@@ -49,6 +52,9 @@ type common struct {
 
 	// track any errors that occurred during callbacks
 	errs wrappers.Errs
+
+	// healthConfig describes parameters for health checks.
+	HealthConfig HealthConfig
 }
 
 // Initialize implements the ConflictGraph interface
@@ -85,6 +91,37 @@ func (c *common) Finalized() bool {
 	c.ctx.Log.Verbo("Conflict graph has %d preferred transactions",
 		numPreferences)
 	return numPreferences == 0
+}
+
+// HealthCheck returns information about the consensus health.
+func (c *common) HealthCheck() (interface{}, error) {
+	// ignore the health check if the processingTx are not ready
+	if c.processingTxs == nil {
+		return nil, nil
+	}
+	details := map[string]interface{}{}
+	healthy := true
+
+	numOutstandingTxs := c.processingTxs.Len()
+	healthy = healthy && numOutstandingTxs <= c.HealthConfig.MaxOutstandingRequests
+	details["outstandingRequests"] = numOutstandingTxs
+
+	// check for long running requests
+	now := c.clock.Time()
+	processingRequest := c.clock.Time()
+	if longTxs := c.processingTxs.OldestRequest(); longTxs != nil {
+		processingRequest = longTxs.Time
+	}
+
+	timeReqRunning := now.Sub(processingRequest)
+	healthy = healthy && timeReqRunning <= c.HealthConfig.MaxRunTimeTxs
+	details["longestRunningTx"] = timeReqRunning.String()
+
+	if !healthy {
+		// The router is not healthy
+		return details, errUnhealthy
+	}
+	return details, nil
 }
 
 // shouldVote returns if the provided tx should be voted on to determine if it

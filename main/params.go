@@ -636,6 +636,10 @@ func setNodeConfig(v *viper.Viper) error {
 		return errors.New("gossip frequency can't be negative")
 	}
 
+	// TODO-pedro add flags ?
+	Config.ConsensusHealthChecks.MaxOutstandingRequests = v.GetInt(routerHealthMaxOutstandingRequestsKey)
+	Config.ConsensusHealthChecks.MaxRunTimeTxs = v.GetDuration(networkMaximumTimeoutKey)
+
 	// File Descriptor Limit
 	fdLimit := v.GetUint64(fdLimitKey)
 	if err := ulimit.Set(fdLimit); err != nil {

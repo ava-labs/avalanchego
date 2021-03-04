@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-type request struct {
+type RequestEntry struct {
 	// When this request was registered
 	time.Time
 	// The type of request that was made
@@ -34,16 +34,16 @@ func NewTimedRequests() *ProcessingRequests {
 
 // PutRequest formats the data into a Request and inserts it in the cache
 func (te *ProcessingRequests) PutRequest(key ids.ID, reqRegisteredTime time.Time, msgType constants.MsgType) {
-	te.cache.Put(key, &request{
+	te.cache.Put(key, &RequestEntry{
 		Time:    reqRegisteredTime,
 		MsgType: msgType,
 	})
 }
 
 // GetRequest returns a request from the cache
-func (te *ProcessingRequests) GetRequest(key ids.ID) (*request, bool) {
+func (te *ProcessingRequests) GetRequest(key ids.ID) (*RequestEntry, bool) {
 	if val, ok := te.cache.Get(key); ok {
-		return val.(*request), ok
+		return val.(*RequestEntry), ok
 	}
 	return nil, false
 }
@@ -59,13 +59,13 @@ func (te *ProcessingRequests) Flush() {
 }
 
 // OldestRequest returns the oldest element in the cache
-func (te *ProcessingRequests) OldestRequest() *request {
+func (te *ProcessingRequests) OldestRequest() *RequestEntry {
 	if te.cache == nil {
 		return nil
 	}
 
 	if val := te.cache.OldestRequest(); val != nil {
-		return val.(*request)
+		return val.(*RequestEntry)
 	}
 
 	return nil
