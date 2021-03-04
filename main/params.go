@@ -20,8 +20,6 @@ import (
 
 	"github.com/kardianos/osext"
 
-	"github.com/ava-labs/avalanchego/database/leveldb"
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
@@ -94,9 +92,12 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(pluginDirKey, defaultString, "Plugin directory for Avalanche VMs")
 	// Network ID
 	fs.String(networkNameKey, defaultNetworkName, "Network ID this node will connect to")
+	// AVAX fees
+	fs.Uint64(txFeeKey, units.MilliAvax, "Transaction fee, in nAVAX")
+	fs.Uint64(creationTxFeeKey, units.MilliAvax, "Transaction fee, in nAVAX, for transactions that create new state")
 	// Database
 	fs.Bool(dbEnabledKey, true, "Turn on persistent storage")
-	fs.String(dbDirKey, defaultString, "Database directory for Avalanche state")
+	fs.String(dbPathKey, defaultDbDir, "Path to database directory")
 	// Coreth Config
 	fs.String(corethConfigKey, defaultString, "Specifies config to pass into coreth")
 	// Logging
@@ -108,9 +109,6 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(assertionsEnabledKey, true, "Turn on assertion execution")
 	// Signature Verification
 	fs.Bool(signatureVerificationEnabledKey, true, "Turn on signature verification")
-	// Fees
-	fs.Uint64(txFeeKey, units.MilliAvax, "Transaction fee, in nAVAX")
-	fs.Uint64(creationTxFeeKey, units.MilliAvax, "Transaction fee, in nAVAX, for transactions that create new state")
 
 	// Networking
 	// Public IP Resolution
@@ -179,7 +177,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Duration(healthCheckAveragerHalflifeKey, 10*time.Second, "Halflife of averager when calculating a running average in a health check")
 	// Network Layer Health
 	fs.Duration(networkHealthMaxTimeSinceMsgSentKey, time.Minute, "Network layer returns unhealthy if haven't received a message for at least this much time")
-	fs.Duration(networkHealthMaxTimeSinceMsgReceivedKey, time.Minute, "Netowork layer returns unhealthy if haven't received a message for at least this much time")
+	fs.Duration(networkHealthMaxTimeSinceMsgReceivedKey, time.Minute, "Network layer returns unhealthy if haven't received a message for at least this much time")
 	fs.Float64(networkHealthMaxPortionSendQueueFillKey, 0.9, "Network layer returns unhealthy if more than this portion of the pending send queue is full")
 	fs.Uint(networkHealthMinPeersKey, 1, "Network layer returns unhealthy if connected to less than this many peers")
 	fs.Float64(networkHealthMaxSendFailRateKey, .25, "Network layer reports unhealthy if more than this portion of attempted message sends fail")
@@ -314,21 +312,10 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.NetworkID = networkID
 
 	// DB:
-	if v.GetBool(dbEnabledKey) {
-		dbDir := v.GetString(dbDirKey)
-		if dbDir == defaultString {
-			dbDir = defaultDbDir
-		}
-		dbDir = os.ExpandEnv(dbDir) // parse any env variables
-		dbPath := path.Join(dbDir, constants.NetworkName(Config.NetworkID), dbVersion)
-		db, err := leveldb.New(dbPath, 0, 0, 0)
-		if err != nil {
-			return fmt.Errorf("couldn't create db at %s: %w", dbPath, err)
-		}
-		Config.DB = db
-	} else {
-		Config.DB = memdb.New()
-	}
+	Config.DBEnabled = v.GetBool(dbEnabledKey)
+	Config.DBPath = v.GetString(dbPathKey)
+	Config.DBPath = os.ExpandEnv(Config.DBPath) // parse any env variables
+	Config.DBPath = path.Join(Config.DBPath, constants.NetworkName(Config.NetworkID), dbVersion)
 
 	// IP Configuration
 	// Resolves our public IP, or does nothing
