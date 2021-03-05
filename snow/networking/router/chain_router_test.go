@@ -333,5 +333,5 @@ func TestRouterClearTimeouts(t *testing.T) {
 	chainRouter.Accepted(vID, handler.ctx.ChainID, 4, nil)
 	chainRouter.AcceptedFrontier(vID, handler.ctx.ChainID, 5, nil)
 
-	assert.Len(t, chainRouter.requests, 0)
+	assert.Equal(t, chainRouter.timedRequests.Len(), 0)
 }

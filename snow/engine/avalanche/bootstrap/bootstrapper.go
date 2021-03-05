@@ -112,8 +112,8 @@ func (b *Bootstrapper) Initialize(
 
 // CurrentAcceptedFrontier returns the set of vertices that this node has accepted
 // that have no accepted children
-func (b *Bootstrapper) CurrentAcceptedFrontier() []ids.ID {
-	return b.Manager.Edge()
+func (b *Bootstrapper) CurrentAcceptedFrontier() ([]ids.ID, error) {
+	return b.Manager.Edge(), nil
 }
 
 // FilterAccepted returns the IDs of vertices in [containerIDs] that this node has accepted

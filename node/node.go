@@ -70,7 +70,7 @@ var (
 	vtxIndexerDbPrefix = []byte("vtxIdx6")
 
 	// Version is the version of this code
-	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 2, 0)
+	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 2, 1)
 	versionParser           = version.NewDefaultParser()
 	beaconConnectionTimeout = 1 * time.Minute
 )
@@ -264,6 +264,7 @@ func (n *Node) initNetworking() error {
 		n.Config.SendQueueSize,
 		n.Config.NetworkHealthConfig,
 		n.benchlistManager,
+		n.Config.PeerAliasTimeout,
 	)
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
@@ -385,8 +386,8 @@ func (n *Node) Dispatch() error {
  ******************************************************************************
  */
 
-func (n *Node) initDatabase() error {
-	n.DB = n.Config.DB
+func (n *Node) initDatabase(db database.Database) error {
+	n.DB = db
 
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
 
@@ -873,6 +874,7 @@ func (n *Node) initAliases(genesisBytes []byte) error {
 // Initialize this node
 func (n *Node) Initialize(
 	config *Config,
+	db database.Database,
 	logger logging.Logger,
 	logFactory logging.Factory,
 	restarter utils.Restarter,
@@ -890,7 +892,7 @@ func (n *Node) Initialize(
 	}
 	n.HTTPLog = httpLog
 
-	if err := n.initDatabase(); err != nil { // Set up the node's database
+	if err := n.initDatabase(db); err != nil { // Set up the node's database
 		return fmt.Errorf("problem initializing database: %w", err)
 	}
 	if err = n.initNodeID(); err != nil { // Derive this node's ID

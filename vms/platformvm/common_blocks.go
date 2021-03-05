@@ -127,11 +127,23 @@ type CommonBlock struct {
 	children []Block
 }
 
+// Verify implements the snowman.Block interface
+func (cb *CommonBlock) Verify() error {
+	if expectedHeight := cb.Parent().Height() + 1; expectedHeight != cb.Height() {
+		return fmt.Errorf("expected block to have height %d, but found %d", expectedHeight, cb.Height())
+	}
+	return nil
+}
+
 // Reject implements the snowman.Block interface
 func (cb *CommonBlock) Reject() error {
 	defer cb.free() // remove this block from memory
 
-	return cb.Block.Reject()
+	if err := cb.Block.Reject(); err != nil {
+		return err
+	}
+
+	return cb.vm.DB.Commit()
 }
 
 // free removes this block from memory

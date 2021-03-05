@@ -20,8 +20,6 @@ import (
 
 	"github.com/kardianos/osext"
 
-	"github.com/ava-labs/avalanchego/database/leveldb"
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
@@ -94,9 +92,12 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(pluginDirKey, defaultString, "Plugin directory for Avalanche VMs")
 	// Network ID
 	fs.String(networkNameKey, defaultNetworkName, "Network ID this node will connect to")
+	// AVAX fees
+	fs.Uint64(txFeeKey, units.MilliAvax, "Transaction fee, in nAVAX")
+	fs.Uint64(creationTxFeeKey, units.MilliAvax, "Transaction fee, in nAVAX, for transactions that create new state")
 	// Database
 	fs.Bool(dbEnabledKey, true, "Turn on persistent storage")
-	fs.String(dbDirKey, defaultString, "Database directory for Avalanche state")
+	fs.String(dbPathKey, defaultDbDir, "Path to database directory")
 	// Coreth Config
 	fs.String(corethConfigKey, defaultString, "Specifies config to pass into coreth")
 	// Logging
@@ -108,9 +109,6 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(assertionsEnabledKey, true, "Turn on assertion execution")
 	// Signature Verification
 	fs.Bool(signatureVerificationEnabledKey, true, "Turn on signature verification")
-	// Fees
-	fs.Uint64(txFeeKey, units.MilliAvax, "Transaction fee, in nAVAX")
-	fs.Uint64(creationTxFeeKey, units.MilliAvax, "Transaction fee, in nAVAX, for transactions that create new state")
 
 	// Networking
 	// Public IP Resolution
@@ -140,6 +138,9 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Duration(disconnectedRestartTimeoutKey, 1*time.Minute, "If [restart-on-disconnected], node restarts if not connected to any peers for this amount of time. "+
 		"If 0, node will not restart due to disconnection.")
 	fs.Bool(restartOnDisconnectedKey, false, "If true, this node will restart if it is not connected to any peers for [disconnected-restart-timeout].")
+	// Peer alias configuration
+	fs.Duration(peerAliasTimeoutKey, 10*time.Minute, "How often the node will attempt to connect "+
+		"to an IP address previously associated with a peer (i.e. a peer alias).")
 	// Benchlist
 	fs.Int(benchlistFailThresholdKey, 10, "Number of consecutive failed queries before benchlisting a node.")
 	fs.Bool(benchlistPeerSummaryEnabledKey, false, "Enables peer specific query latency metrics.")
@@ -176,7 +177,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Duration(healthCheckAveragerHalflifeKey, 10*time.Second, "Halflife of averager when calculating a running average in a health check")
 	// Network Layer Health
 	fs.Duration(networkHealthMaxTimeSinceMsgSentKey, time.Minute, "Network layer returns unhealthy if haven't received a message for at least this much time")
-	fs.Duration(networkHealthMaxTimeSinceMsgReceivedKey, time.Minute, "Netowork layer returns unhealthy if haven't received a message for at least this much time")
+	fs.Duration(networkHealthMaxTimeSinceMsgReceivedKey, time.Minute, "Network layer returns unhealthy if haven't received a message for at least this much time")
 	fs.Float64(networkHealthMaxPortionSendQueueFillKey, 0.9, "Network layer returns unhealthy if more than this portion of the pending send queue is full")
 	fs.Uint(networkHealthMinPeersKey, 1, "Network layer returns unhealthy if connected to less than this many peers")
 	fs.Float64(networkHealthMaxSendFailRateKey, .25, "Network layer reports unhealthy if more than this portion of attempted message sends fail")
@@ -224,6 +225,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Int(snowAvalancheBatchSizeKey, 30, "Number of operations to batch in each new vertex")
 	fs.Int(snowConcurrentRepollsKey, 4, "Minimum number of concurrent polls for finalizing consensus")
 	fs.Int(snowOptimalProcessingKey, 50, "Optimal number of processing vertices in consensus")
+	fs.Int(snowMaxProcessingKey, 1024, "Maximum number of processing items to be considered healthy")
+	fs.Duration(snowMaxTimeProcessingKey, 10*time.Second, "Maximum amount of time an item should be processing and still be healthy")
 	fs.Int64(snowEpochFirstTransition, 1607626800, "Unix timestamp of the first epoch transaction, in seconds. Defaults to 12/10/2020 @ 7:00pm (UTC)")
 	fs.Duration(snowEpochDuration, 6*time.Hour, "Duration of each epoch")
 
@@ -274,7 +277,8 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.ConsensusParams.BatchSize = v.GetInt(snowAvalancheBatchSizeKey)
 	Config.ConsensusParams.ConcurrentRepolls = v.GetInt(snowConcurrentRepollsKey)
 	Config.ConsensusParams.OptimalProcessing = v.GetInt(snowOptimalProcessingKey)
-
+	Config.ConsensusParams.MaxOutstandingItems = v.GetInt(snowMaxProcessingKey)
+	Config.ConsensusParams.MaxItemProcessingTime = v.GetDuration(snowMaxTimeProcessingKey)
 	Config.ConsensusGossipFrequency = v.GetDuration(consensusGossipFrequencyKey)
 	Config.ConsensusShutdownTimeout = v.GetDuration(consensusShutdownTimeoutKey)
 
@@ -317,21 +321,10 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.NetworkID = networkID
 
 	// DB:
-	if v.GetBool(dbEnabledKey) {
-		dbDir := v.GetString(dbDirKey)
-		if dbDir == defaultString {
-			dbDir = defaultDbDir
-		}
-		dbDir = os.ExpandEnv(dbDir) // parse any env variables
-		dbPath := path.Join(dbDir, constants.NetworkName(Config.NetworkID), dbVersion)
-		db, err := leveldb.New(dbPath, 0, 0, 0)
-		if err != nil {
-			return fmt.Errorf("couldn't create db at %s: %w", dbPath, err)
-		}
-		Config.DB = db
-	} else {
-		Config.DB = memdb.New()
-	}
+	Config.DBEnabled = v.GetBool(dbEnabledKey)
+	Config.DBPath = v.GetString(dbPathKey)
+	Config.DBPath = os.ExpandEnv(Config.DBPath) // parse any env variables
+	Config.DBPath = path.Join(Config.DBPath, constants.NetworkName(Config.NetworkID), dbVersion)
 
 	// IP Configuration
 	// Resolves our public IP, or does nothing
@@ -548,6 +541,7 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.RouterHealthConfig.MaxDropRate = v.GetFloat64(routerHealthMaxDropRateKey)
 	Config.RouterHealthConfig.MaxOutstandingRequests = int(v.GetUint(routerHealthMaxOutstandingRequestsKey))
 	Config.RouterHealthConfig.MaxTimeSinceNoOutstandingRequests = v.GetDuration(networkHealthMaxTimeSinceNoReqsKey)
+	Config.RouterHealthConfig.MaxRunTimeRequests = v.GetDuration(networkMaximumTimeoutKey)
 	Config.RouterHealthConfig.MaxDropRateHalflife = healthCheckAveragerHalflife
 	switch {
 	case Config.RouterHealthConfig.MaxDropRate < 0 || Config.RouterHealthConfig.MaxDropRate > 1:
@@ -734,6 +728,9 @@ func setNodeConfig(v *viper.Viper) error {
 	// Bootstrap Configs
 	Config.RetryBootstrap = v.GetBool(retryBootstrap)
 	Config.RetryBootstrapMaxAttempts = v.GetInt(retryBootstrapMaxAttempts)
+
+	// Peer alias
+	Config.PeerAliasTimeout = v.GetDuration(peerAliasTimeoutKey)
 
 	return nil
 }

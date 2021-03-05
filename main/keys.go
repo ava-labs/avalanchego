@@ -22,7 +22,7 @@ const (
 	assertionsEnabledKey                    = "assertions-enabled"
 	signatureVerificationEnabledKey         = "signature-verification-enabled"
 	dbEnabledKey                            = "db-enabled"
-	dbDirKey                                = "db-dir"
+	dbPathKey                               = "db-dir"
 	publicIPKey                             = "public-ip"
 	dynamicUpdateDurationKey                = "dynamic-update-duration"
 	dynamicPublicIPResolverKey              = "dynamic-public-ip"
@@ -70,6 +70,8 @@ const (
 	snowAvalancheBatchSizeKey               = "snow-avalanche-batch-size"
 	snowConcurrentRepollsKey                = "snow-concurrent-repolls"
 	snowOptimalProcessingKey                = "snow-optimal-processing"
+	snowMaxProcessingKey                    = "snow-max-processing"
+	snowMaxTimeProcessingKey                = "snow-max-time-processing"
 	snowEpochFirstTransition                = "snow-epoch-first-transition"
 	snowEpochDuration                       = "snow-epoch-duration"
 	whitelistedSubnetsKey                   = "whitelisted-subnets"
@@ -105,4 +107,5 @@ const (
 	healthCheckAveragerHalflifeKey          = "health-check-averager-halflife"
 	retryBootstrap                          = "bootstrap-retry-enabled"
 	retryBootstrapMaxAttempts               = "bootstrap-retry-max-attempts"
+	peerAliasTimeoutKey                     = "peer-alias-timeout"
 )
