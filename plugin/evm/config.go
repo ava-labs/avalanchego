@@ -34,7 +34,7 @@ type CommandLineConfig struct {
 	KeystoreExternalSigner        string `json:"keystore-external-signer"`
 	KeystoreInsecureUnlockAllowed bool   `json:"keystore-insecure-unlock-allowed"`
 
-	ParsingError error
+	FlagError error
 }
 
 // EthAPIs returns an array of strings representing the Eth APIs that should be enabled
