@@ -316,8 +316,10 @@ func setNodeConfig(v *viper.Viper) error {
 
 	// DB:
 	Config.DBEnabled = v.GetBool(dbEnabledKey)
-	Config.DBPath = v.GetString(dbPathKey)
-	Config.DBPath = os.ExpandEnv(Config.DBPath) // parse any env variables
+	Config.DBPath = os.ExpandEnv(v.GetString(dbPathKey))
+	if Config.DBPath == defaultString {
+		Config.DBPath = defaultDbDir
+	}
 	Config.DBPath = path.Join(Config.DBPath, constants.NetworkName(Config.NetworkID), dbVersion)
 
 	// IP Configuration
