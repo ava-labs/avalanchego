@@ -32,6 +32,12 @@ const (
 	pendingValidatorsPrefix = "pendingVdrs"
 )
 
+const (
+	lowPriority byte = iota
+	mediumPriority
+	topPriority
+)
+
 var (
 	errNoValidators = errors.New("there are no validators")
 )
@@ -81,14 +87,14 @@ func (vm *VM) enqueueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 	switch unsignedTx := stakerTx.UnsignedTx.(type) {
 	case *UnsignedAddDelegatorTx:
 		staker = unsignedTx
-		priority = 1
+		priority = mediumPriority
 	case *UnsignedAddSubnetValidatorTx:
 		staker = unsignedTx
-		priority = 0
+		priority = lowPriority
 		nodeID = unsignedTx.Validator.NodeID
 	case *UnsignedAddValidatorTx:
 		staker = unsignedTx
-		priority = 2
+		priority = topPriority
 		nodeID = unsignedTx.Validator.NodeID
 	default:
 		return fmt.Errorf("staker is unexpected type %T", stakerTx)
@@ -139,14 +145,14 @@ func (vm *VM) dequeueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 	switch unsignedTx := stakerTx.UnsignedTx.(type) {
 	case *UnsignedAddDelegatorTx:
 		staker = unsignedTx
-		priority = 1
+		priority = mediumPriority
 	case *UnsignedAddSubnetValidatorTx:
 		staker = unsignedTx
-		priority = 0
+		priority = lowPriority
 		nodeID = unsignedTx.Validator.NodeID
 	case *UnsignedAddValidatorTx:
 		staker = unsignedTx
-		priority = 2
+		priority = topPriority
 		nodeID = unsignedTx.Validator.NodeID
 	default:
 		return fmt.Errorf("staker is unexpected type %T", stakerTx)
@@ -195,14 +201,14 @@ func (vm *VM) addStaker(db database.Database, subnetID ids.ID, tx *rewardTx) err
 	switch unsignedTx := tx.Tx.UnsignedTx.(type) {
 	case *UnsignedAddDelegatorTx:
 		staker = unsignedTx
-		priority = 0
+		priority = lowPriority
 	case *UnsignedAddSubnetValidatorTx:
 		staker = unsignedTx
-		priority = 1
+		priority = mediumPriority
 		nodeID = unsignedTx.Validator.NodeID
 	case *UnsignedAddValidatorTx:
 		staker = unsignedTx
-		priority = 2
+		priority = topPriority
 		nodeID = unsignedTx.Validator.NodeID
 	default:
 		return fmt.Errorf("staker is unexpected type %T", tx.Tx.UnsignedTx)
@@ -258,14 +264,14 @@ func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, tx *rewardTx) 
 	switch unsignedTx := tx.Tx.UnsignedTx.(type) {
 	case *UnsignedAddDelegatorTx:
 		staker = unsignedTx
-		priority = 0
+		priority = lowPriority
 	case *UnsignedAddSubnetValidatorTx:
 		staker = unsignedTx
-		priority = 1
+		priority = mediumPriority
 		nodeID = unsignedTx.Validator.NodeID
 	case *UnsignedAddValidatorTx:
 		staker = unsignedTx
-		priority = 2
+		priority = topPriority
 		nodeID = unsignedTx.Validator.NodeID
 	default:
 		return fmt.Errorf("staker is unexpected type %T", tx.Tx.UnsignedTx)
