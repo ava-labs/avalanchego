@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -60,10 +61,11 @@ type Config struct {
 
 // Indexer causes accepted containers for a given chain
 // to be indexed by their ID and by the order in which
-// they were accepted by this node
+// they were accepted by this node.
+// Indexer is threadsafe.
 type Indexer interface {
 	IndexChain(chainID ids.ID) error
-	StopIndexingChain(chainID ids.ID) error
+	CloseIndex(chainID ids.ID) error
 	GetContainerByIndex(chainID ids.ID, index uint64) (Container, error)
 	GetContainerRange(chainID ids.ID, startIndex, numToFetch uint64) ([]Container, error)
 	GetLastAccepted(chainID ids.ID) (Container, error)
@@ -78,20 +80,15 @@ func NewIndexer(config Config) (Indexer, error) {
 	// See if we have run with this database before
 	hasEverRunDb := prefixdb.New(hasEverRunPrefix, config.Db)
 	defer hasEverRunDb.Close()
-	hasRunBefore := false
-	has, err := hasEverRunDb.Has(hasEverRunKey)
-	switch {
-	case err != nil && err != database.ErrNotFound:
+	hasRunBefore, err := hasEverRunDb.Has(hasEverRunKey)
+	if err != nil {
 		return nil, fmt.Errorf("couldn't read from database: %w", err)
-	case err == nil && has:
-		// We have run with this database before
-		hasRunBefore = true
-	default:
-		// Mark that we have run with this database before
-		err = hasEverRunDb.Put(hasEverRunKey, nil)
-		if err != nil {
-			return nil, err
-		}
+	}
+
+	// Mark that we have now run with this database
+	err = hasEverRunDb.Put(hasEverRunKey, nil)
+	if err != nil {
+		return nil, err
 	}
 
 	indexedChainsDb := prefixdb.New(indexedChainsPrefix, config.Db)
@@ -120,7 +117,7 @@ func NewIndexer(config Config) (Indexer, error) {
 		for iter.Next() {
 			// Parse chain ID from bytes
 			chainIDBytes := iter.Key()
-			if len(chainIDBytes) != 32 {
+			if len(chainIDBytes) != hashing.HashLen {
 				// Sanity check; this should never happen
 				return nil, fmt.Errorf("unexpectedly got chain ID with %d bytes", len(chainIDBytes))
 			}
@@ -163,7 +160,6 @@ func NewIndexer(config Config) (Indexer, error) {
 		codec:                codec.NewDefaultManager(),
 		log:                  config.Log,
 		db:                   config.Db,
-		hasRunBefore:         hasRunBefore,
 		allowIncompleteIndex: config.AllowIncompleteIndex,
 		indexedChains:        indexedChainsDb,
 		eventDispatcher:      config.EventDispatcher,
@@ -176,11 +172,10 @@ func NewIndexer(config Config) (Indexer, error) {
 	}
 
 	for _, chainID := range config.InitiallyIndexedChains.List() {
-		if err := indexer.IndexChain(chainID); err != nil {
+		if err := indexer.indexChain(chainID, hasRunBefore); err != nil {
 			return nil, fmt.Errorf("couldn't index chain %s: %w", chainID, err)
 		}
 	}
-	indexer.hasRunBefore = true
 
 	// Register API server
 	indexAPIServer := rpc.NewServer()
@@ -200,14 +195,15 @@ func NewIndexer(config Config) (Indexer, error) {
 
 // indexer implements Indexer
 type indexer struct {
-	name                 string
-	codec                codec.Manager
-	clock                timer.Clock
-	lock                 sync.RWMutex
-	log                  logging.Logger
-	db                   database.Database
+	name  string
+	codec codec.Manager
+	clock timer.Clock
+	lock  sync.RWMutex
+	log   logging.Logger
+	db    database.Database
+	// If true, allow running in such a way that could allow the creation
+	// of an index which could be missing accepted containers.
 	allowIncompleteIndex bool
-	hasRunBefore         bool
 
 	// A chain ID is present as a key in this database if it has ever been indexed
 	// If this node has ever run while not indexing this chain, maps to false
@@ -225,18 +221,34 @@ type indexer struct {
 	eventDispatcher *triggers.EventDispatcher
 }
 
+// IndexChain causes the indexer to start indexing the given chain.
+// Returns an error if the chain is already being indexed.
 func (i *indexer) IndexChain(chainID ids.ID) error {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
-	// See if this chain's index is complete
-	b, err := i.indexedChains.Get(chainID[:])
-	if err != nil && err != database.ErrNotFound {
-		return fmt.Errorf("couldn't read from database: %w", err)
+	return i.indexChain(chainID, true)
+}
+
+// [hasRunBefore] is true iff the node has run with this database before
+func (i *indexer) indexChain(chainID ids.ID, hasRunBefore bool) error {
+	if _, exists := i.chainToIndex[chainID]; exists {
+		return fmt.Errorf("chain %s is already being indexed", chainID)
 	}
 
-	// Mark that this index is complete
-	indexComplete := !i.hasRunBefore || err == nil && bytes.Equal(b, completeIndexVal)
+	// See if this chain's index is complete
+	indexComplete := true
+
+	if hasRunBefore { // If this is a fresh database, index must be complete
+		b, err := i.indexedChains.Get(chainID[:])
+		if err != nil && err != database.ErrNotFound {
+			return fmt.Errorf("couldn't read from database: %w", err)
+		}
+
+		// Mark that this index is incomplete, if applicable
+		indexComplete = err == nil && bytes.Equal(b, completeIndexVal)
+	}
+
 	if indexComplete {
 		err := i.indexedChains.Put(chainID[:], completeIndexVal)
 		if err != nil {
@@ -267,6 +279,7 @@ func (i *indexer) IndexChain(chainID ids.ID) error {
 	// Register index to learn about new accepted containers
 	err = i.eventDispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name), index)
 	if err != nil {
+		_ = index.Close()
 		return fmt.Errorf("couldn't register index for chain %s with event dispatcher: %w", chainID, err)
 	}
 	i.chainToIndex[chainID] = index
@@ -274,25 +287,32 @@ func (i *indexer) IndexChain(chainID ids.ID) error {
 	return nil
 }
 
-func (i *indexer) StopIndexingChain(chainID ids.ID) error {
+// CloseIndex closes the index for the given chain. No more accepted containers
+// will be indexed on this chain.
+func (i *indexer) CloseIndex(chainID ids.ID) error {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
+	return i.closeIndex(chainID)
+}
+
+// Assumes [i.lock] is held
+func (i *indexer) closeIndex(chainID ids.ID) error {
 	index, exists := i.chainToIndex[chainID]
 	if !exists {
 		return nil
 	}
 	delete(i.chainToIndex, chainID)
-	err := index.Close()
-	if err != nil {
-		return fmt.Errorf("error while closing index for chain %s: %w", chainID, err)
-	}
+	errs := wrappers.Errs{}
+	errs.Add(i.eventDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name)))
+	errs.Add(index.Close())
 
 	// Mark that this index is no longer complete
-	return i.indexedChains.Put(chainID[:], incompleteIndexVal)
+	errs.Add(i.indexedChains.Put(chainID[:], incompleteIndexVal))
+	return errs.Err
 }
 
-// GetContainersByIndex ...
+// GetContainersByIndex returns a container from the given chain by its index.
 func (i *indexer) GetContainerByIndex(chainID ids.ID, indexToFetch uint64) (Container, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
@@ -304,7 +324,8 @@ func (i *indexer) GetContainerByIndex(chainID ids.ID, indexToFetch uint64) (Cont
 	return index.GetContainerByIndex(indexToFetch)
 }
 
-// GetContainersByIndex ...
+// GetContainerRange returns the containers at indices [startIndex], [startIndex+1],...,[startIndex+numToFetch-1]
+// on the given chain.
 func (i *indexer) GetContainerRange(chainID ids.ID, startIndex, numToFetch uint64) ([]Container, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
@@ -316,6 +337,8 @@ func (i *indexer) GetContainerRange(chainID ids.ID, startIndex, numToFetch uint6
 	return index.GetContainerRange(startIndex, numToFetch)
 }
 
+// GetLastAccepted returns the most recently accepted container
+// on the given chain.
 func (i *indexer) GetLastAccepted(chainID ids.ID) (Container, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
@@ -327,6 +350,9 @@ func (i *indexer) GetLastAccepted(chainID ids.ID) (Container, error) {
 	return index.GetLastAccepted()
 }
 
+// GetIndex returns the index of the given container on the given chain.
+// The index is the number of containers that were accepted before the given one.
+// For example, the second container accepted on a chain has index 1.
 func (i *indexer) GetIndex(chainID ids.ID, containerID ids.ID) (uint64, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
@@ -338,7 +364,7 @@ func (i *indexer) GetIndex(chainID ids.ID, containerID ids.ID) (uint64, error) {
 	return index.GetIndex(containerID)
 }
 
-// GetContainerByID ...
+// GetContainerByID returns the container with the given ID, which exists on the given chain.
 func (i *indexer) GetContainerByID(chainID ids.ID, containerID ids.ID) (Container, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
@@ -350,7 +376,8 @@ func (i *indexer) GetContainerByID(chainID ids.ID, containerID ids.ID) (Containe
 	return index.GetContainerByID(containerID)
 }
 
-// GetIndexedChains returns the list of chains currently being indexed
+// GetIndexedChains returns the list of chains that are currently being indexed
+// and which can be queried.
 func (i *indexer) GetIndexedChains() []ids.ID {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
@@ -367,25 +394,17 @@ func (i *indexer) GetIndexedChains() []ids.ID {
 	return chainIDs
 }
 
-func (i *indexer) Handler() (*common.HTTPHandler, error) {
-	apiServer := rpc.NewServer()
-	codec := cjson.NewCodec()
-	apiServer.RegisterCodec(codec, "application/json")
-	apiServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	if err := apiServer.RegisterService(&service{indexer: i}, "index"); err != nil {
-		return nil, err
-	}
-	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: apiServer}, nil
-}
-
+// Close this indexer. Stops indexing all chains.
+// Closes this indexer's database. Assumes no containers
+// are accepted between Close() being called and the
+// node shutting down.
 func (i *indexer) Close() error {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
 	errs := &wrappers.Errs{}
-	for chainID, index := range i.chainToIndex {
-		errs.Add(index.Close())
-		delete(i.chainToIndex, chainID)
+	for chainID := range i.chainToIndex {
+		errs.Add(i.closeIndex(chainID))
 	}
 	errs.Add(i.indexedChains.Close())
 	errs.Add(i.db.Close())

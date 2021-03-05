@@ -485,7 +485,7 @@ func (n *Node) initIPCs() error {
 // Initialize [n.txIndexer] and [n.vtxIndexer]
 // Should only be called after [n.DB], [n.DecisionDispatcher], [n.ConsensusDispatcher],
 // [n.Log], [n.APIServer], [n.chainManager] are initialized
-func (n *Node) initIndices() error {
+func (n *Node) initIndexer() error {
 	txIndexerDb := prefixdb.New(txIndexerDbPrefix, n.DB)
 	vtxIndexerDb := prefixdb.New(vtxIndexerDbPrefix, n.DB)
 	var err error
@@ -947,7 +947,7 @@ func (n *Node) Initialize(
 	if err := n.initAliases(n.Config.GenesisBytes); err != nil { // Set up aliases
 		return fmt.Errorf("couldn't initialize aliases: %w", err)
 	}
-	if err := n.initIndices(); err != nil {
+	if err := n.initIndexer(); err != nil {
 		return fmt.Errorf("couldn't initialize indexer: %w", err)
 	}
 	if err := n.initChains(n.Config.GenesisBytes, n.Config.AvaxAssetID); err != nil { // Start the Platform chain

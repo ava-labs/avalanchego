@@ -26,7 +26,7 @@ func (ni *noOpIndexer) GetIndex(_ ids.ID, _ ids.ID) (uint64, error) {
 	return 0, errNoOp
 }
 
-func (ni *noOpIndexer) StopIndexingChain(_ ids.ID) error {
+func (ni *noOpIndexer) CloseIndex(_ ids.ID) error {
 	return nil
 }
 
