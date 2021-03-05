@@ -5,11 +5,11 @@ package queue
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
@@ -25,6 +25,8 @@ type Jobs struct {
 	// Dynamic sized stack of ready to execute items
 	// Map from itemID to list of itemIDs that are blocked on this item
 	state prefixedState
+	// keep [stackSize] in memory to avoid unnecessary database reads
+	stackSize uint32
 }
 
 // New ...
@@ -35,10 +37,17 @@ func New(db database.Database) (*Jobs, error) {
 	}
 	jobs.state.jobs = jobs
 
-	if _, err := jobs.HasNext(); err == nil {
+	stackSize, err := jobs.state.StackSize(jobs.db)
+	if err == nil {
+		jobs.stackSize = stackSize
 		return jobs, nil
 	}
-	return jobs, jobs.state.SetStackSize(jobs.db, 0)
+
+	jobs.stackSize = 0
+	if err := jobs.state.SetStackSize(jobs.db, jobs.stackSize); err != nil {
+		return nil, err
+	}
+	return jobs, nil
 }
 
 // SetParser ...
@@ -59,114 +68,124 @@ func (j *Jobs) Push(job Job) error {
 
 // Pop ...
 func (j *Jobs) Pop() (Job, error) {
-	size, err := j.state.StackSize(j.db)
-	if err != nil {
-		return nil, err
-	}
-	if size == 0 {
+	if j.stackSize == 0 {
 		return nil, errEmpty
 	}
-	if err := j.state.SetStackSize(j.db, size-1); err != nil {
-		return nil, err
+
+	j.stackSize--
+	if err := j.state.SetStackSize(j.db, j.stackSize); err != nil {
+		j.stackSize++
+		return nil, fmt.Errorf("failed to set stack size due to %w", err)
 	}
-	job, err := j.state.StackIndex(j.db, size-1)
+	job, err := j.state.StackIndex(j.db, j.stackSize)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read stack index due to %w", err)
 	}
-	return job, j.state.DeleteStackIndex(j.db, size-1)
+	err = j.state.DeleteStackIndex(j.db, j.stackSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to delete stack index due to %w", err)
+	}
+	return job, nil
 }
 
 // HasNext ...
 func (j *Jobs) HasNext() (bool, error) {
-	size, err := j.state.StackSize(j.db)
-	return size > 0, err
+	return j.stackSize > 0, nil
 }
 
 // Execute ...
 func (j *Jobs) Execute(job Job) error {
-	if err := job.Execute(); err != nil {
-		return err
-	}
-
 	jobID := job.ID()
+
+	if err := job.Execute(); err != nil {
+		return fmt.Errorf("failed to execute job %s due to %w", job.ID(), err)
+	}
 
 	blocking, err := j.state.Blocking(j.db, jobID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to retrieve blocking jobs for %s due to %w", jobID, err)
 	}
 	if err := j.state.DeleteBlocking(j.db, jobID, blocking); err != nil {
-		return err
+		return fmt.Errorf("failed to delete blocking %w", err)
 	}
 
 	for _, blockedID := range blocking {
 		job, err := j.state.Job(j.db, blockedID)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get job %s from blocking jobs due to %w", blockedID, err)
 		}
 		deps, err := job.MissingDependencies()
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get missing dependencies for %s due to %w", job.ID(), err)
 		}
 		if deps.Len() > 0 {
 			continue
 		}
-		// TODO: Calling execute here ensures that double decision blocks are
-		//       always called atomically with their proposal blocks. This is
-		//       only a quick fix and should be handled in a more robust manner.
-		if err := job.Execute(); err != nil {
-			return err
-		}
-		if err := j.state.DeleteJob(j.db, blockedID); err != nil {
-			return err
-		}
-		if err := j.push(job); err != nil {
+		if err := j.pushUnblockedJob(job); err != nil {
 			return err
 		}
 	}
 
-	return nil
+	err = j.state.DeleteJob(j.db, jobID)
+	if err != nil {
+		return fmt.Errorf("failed to delete job %s due to %w", jobID, err)
+	}
+
+	return err
 }
 
 // Commit ...
 func (j *Jobs) Commit() error { return j.db.Commit() }
 
 func (j *Jobs) push(job Job) error {
-	if has, err := j.state.HasJob(j.db, job.ID()); err != nil {
-		return err
-	} else if has {
-		return errDuplicate
-	}
-
-	if err := j.state.SetJob(j.db, job); err != nil {
+	if err := j.storeJob(job); err != nil {
 		return err
 	}
 
-	errs := wrappers.Errs{}
+	return j.pushUnblockedJob(job)
+}
 
-	size, err := j.state.StackSize(j.db)
-	errs.Add(err)
-	errs.Add(j.state.SetStackIndex(j.db, size, job))
-	errs.Add(j.state.SetStackSize(j.db, size+1))
+// pushUnblockedJob pushes a new job with no remaining dependencies to the queue
+// to be executed
+func (j *Jobs) pushUnblockedJob(job Job) error {
+	err := j.state.SetStackIndex(j.db, j.stackSize, job)
+	if err != nil {
+		return fmt.Errorf("failed to set stack index due to %w", err)
+	}
+	j.stackSize++
+	err = j.state.SetStackSize(j.db, j.stackSize)
+	if err != nil {
+		j.stackSize--
+		return fmt.Errorf("failed to set stack size due to %w", err)
+	}
 
-	return errs.Err
+	return nil
 }
 
 func (j *Jobs) block(job Job, deps ids.Set) error {
-	if has, err := j.state.HasJob(j.db, job.ID()); err != nil {
-		return err
-	} else if has {
-		return errDuplicate
-	}
-
-	if err := j.state.SetJob(j.db, job); err != nil {
+	if err := j.storeJob(job); err != nil {
 		return err
 	}
 
 	jobID := job.ID()
 	for depID := range deps {
 		if err := j.state.AddBlocking(j.db, depID, jobID); err != nil {
-			return err
+			return fmt.Errorf("failed to add blocking for depID %s, jobID %s", depID, jobID)
 		}
+	}
+
+	return nil
+}
+
+func (j *Jobs) storeJob(job Job) error {
+	if has, err := j.state.HasJob(j.db, job.ID()); err != nil {
+		return fmt.Errorf("failed to check for existing job %s due to %w", job.ID(), err)
+	} else if has {
+		return errDuplicate
+	}
+
+	if err := j.state.SetJob(j.db, job); err != nil {
+		return fmt.Errorf("failed to write job due to %w", err)
 	}
 
 	return nil
