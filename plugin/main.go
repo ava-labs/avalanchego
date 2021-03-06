@@ -4,6 +4,9 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
@@ -12,6 +15,10 @@ import (
 )
 
 func main() {
+	if version {
+		fmt.Println(evm.Version)
+		os.Exit(0)
+	}
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: rpcchainvm.Handshake,
 		Plugins: map[string]plugin.Plugin{

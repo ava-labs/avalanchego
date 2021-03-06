@@ -553,10 +553,18 @@ func (s *stateObject) Balance() *big.Int {
 //	return key[0]&0x01 == 0x01
 //}
 
+// NormalizeCoinID ORs the 0th bit of the first byte in
+// [coinID], which ensures this bit will be 1 and all other
+// bits are left the same.
+// This partitions multicoin storage from normal state storage.
 func NormalizeCoinID(coinID *common.Hash) {
 	coinID[0] |= 0x01
 }
 
+// NormalizeStateKey ANDs the 0th bit of the first byte in
+// [key], which ensures this bit will be 0 and all other bits
+// are left the same.
+// This partitions normal state storage from multicoin storage.
 func NormalizeStateKey(key *common.Hash) {
 	key[0] &= 0xfe
 }

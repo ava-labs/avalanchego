@@ -95,9 +95,7 @@ func NewTestChain(name string, config *eth.Config,
 				if err != nil {
 					panic(err)
 				}
-				if !tc.chain.VerifyBlock(block) {
-					panic("invalid block")
-				}
+				// TODO: verify block is well formed
 				tc.chain.InsertChain([]*types.Block{block})
 				tc.insertBlock(block)
 				log.Info(fmt.Sprintf("%s: got block %s, sending ack", name, block.Hash().Hex()))
@@ -127,7 +125,6 @@ func (tc *TestChain) GenRandomTree(n int, max int) {
 		pb, _ := rand.Int(rand.Reader, big.NewInt((int64)(m)))
 		pn := pb.Int64()
 		tc.parentBlock = tc.blocks[nblocks-1-(int)(pn)]
-		tc.chain.SetTail(tc.parentBlock)
 		tc.chain.SetPreference(tc.chain.GetBlockByHash(tc.parentBlock))
 		tc.blockWait.Add(1)
 		tc.chain.GenBlock()
@@ -200,7 +197,6 @@ func run(config *eth.Config, a1, a2, b1, b2 int) {
 func main() {
 	// configure the chain
 	config := eth.DefaultConfig
-	config.ManualCanonical = true
 	chainConfig := &params.ChainConfig{
 		ChainID:             big.NewInt(1),
 		HomesteadBlock:      big.NewInt(0),
@@ -231,9 +227,8 @@ func main() {
 		Alloc:      core.GenesisAlloc{genKey.Address: {Balance: genBalance}},
 	}
 
-	// grab the control of block generation and disable auto uncle
+	// grab the control of block generation
 	config.Miner.ManualMining = true
-	config.Miner.DisableUncle = true
 
 	run(&config, 60, 1, 60, 1)
 	run(&config, 500, 10, 500, 5)
