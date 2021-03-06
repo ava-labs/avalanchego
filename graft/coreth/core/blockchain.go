@@ -1667,9 +1667,6 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 	// If the canonical hash at the block height does not match the block we are
 	// accepting, we need to trigger a reorg.
 	canonical := bc.GetCanonicalHash(block.NumberU64())
-	if canonical == (common.Hash{}) {
-		return fmt.Errorf("unable to get block at number %d", block.Number())
-	}
 	if canonical != block.Hash() {
 		log.Debug("Accepting block in non-canonical chain", "number", block.Number(), "hash", block.Hash())
 		if err := bc.setPreference(block); err != nil {
