@@ -966,25 +966,26 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 
 // WriteCanonicalFromCurrentBlock writes the canonical chain from the
 // current block to the genesis.
-func (bc *BlockChain) WriteCanonicalFromCurrentBlock() error {
+func (bc *BlockChain) WriteCanonicalFromCurrentBlock(toBlock *types.Block) error {
 	current := bc.CurrentBlock()
 	if current == nil {
 		return fmt.Errorf("failed to get current block")
 	}
-	lastBlk, err := bc.writeCanonicalFromBlock(current, repairBlockBatchSize)
+	lastBlk, err := bc.writeCanonicalFromBlock(current, toBlock, repairBlockBatchSize)
 	if err == nil {
 		return nil
 	}
 
 	log.Error("problem repairing canonical", "batchSize", repairBlockBatchSize, "error", err)
-	_, err = bc.writeCanonicalFromBlock(lastBlk, 1)
+	_, err = bc.writeCanonicalFromBlock(lastBlk, toBlock, 1)
 	return err
 }
 
 // writeCanonicalFromBlock writes the canonical chain from [startBlock] back to the genesis
 // using [batchSize] for each write. Returns the last block that was successfully written
 // if an error occurs, which is guaranteed to be non-nil.
-func (bc *BlockChain) writeCanonicalFromBlock(startBlock *types.Block, batchSize int) (*types.Block, error) {
+// assumes that [startBlock] and [toBlock] are non-nil
+func (bc *BlockChain) writeCanonicalFromBlock(startBlock, toBlock *types.Block, batchSize int) (*types.Block, error) {
 	current := startBlock
 	// assumes [startBlock] is non-nil
 	lastBlk := startBlock
@@ -995,7 +996,7 @@ func (bc *BlockChain) writeCanonicalFromBlock(startBlock *types.Block, batchSize
 
 	log.Debug("repairing canonical chain from block", "hash", current.Hash().String(), "number", current.NumberU64())
 
-	for current.Hash() != bc.genesisBlock.Hash() {
+	for current.Hash() != toBlock.Hash() {
 		blkNumber := current.NumberU64()
 		log.Debug("repairing block", "hash", current.Hash().String(), "height", blkNumber)
 
@@ -1045,7 +1046,7 @@ func (bc *BlockChain) writeCanonicalFromBlock(startBlock *types.Block, batchSize
 	}
 	log.Debug("finished repairs", "totalUpdates", totalUpdates)
 
-	return bc.genesisBlock, nil
+	return toBlock, nil
 }
 
 // GetReceiptsByHash retrieves the receipts for all transactions in a given block.
