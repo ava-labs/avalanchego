@@ -68,7 +68,8 @@ var (
 var (
 	lastAcceptedKey = []byte("snowman_lastAccepted")
 	acceptedPrefix  = []byte("snowman_accepted")
-	repairedKey     = []byte("chain_repaired_20210212")
+	repairedKey1    = []byte("chain_repaired_20210212")
+	repairedKey2    = []byte("chain_repaired_20210305")
 )
 
 const (
@@ -456,24 +457,56 @@ func (vm *VM) Initialize(
 // occurred.
 // assumes that the genesisHash and [lastAccepted] block have already been set.
 func (vm *VM) repairCanonicalChain() error {
-	// Check if the canonical chain has already been repaired
-	if has, err := vm.db.Has(repairedKey); err != nil {
+	if err := vm.repair1(); err != nil {
+		return err
+	}
+
+	return vm.repair2()
+}
+
+// repair1 writes the canonical chain index from the last accepted block back to the
+// genesis block to overwrite any corruption that might have occurred.
+// assumes that the genesis hash and [lastAccepted] block have already been set.
+func (vm *VM) repair1() error {
+	// Check if the canonical chain repair 1 has already occurred.
+	if has, err := vm.db.Has(repairedKey1); err != nil {
 		return err
 	} else if has {
 		return nil
 	}
 
 	start := time.Now()
-	log.Info("starting to repair canonical chain", "startTime", start)
-	if err := vm.chain.WriteCanonicalFromCurrentBlock(); err != nil {
-		return fmt.Errorf("failed to repair canonical chain after %v due to: %w", time.Since(start), err)
+	log.Info("starting canonical chain repair 1", "startTime", start)
+	if err := vm.chain.WriteCanonicalFromCurrentBlock(nil); err != nil {
+		return fmt.Errorf("canonical chain repair 1 failed after %v due to: %w", time.Since(start), err)
 	}
-	log.Info("finished repairing canonical chain", "timeElapsed", time.Since(start))
-	if err := vm.db.Put(repairedKey, []byte("finished")); err != nil {
-		return fmt.Errorf("failed to mark flag for canonical chain repaired due to: %w", err)
+	log.Info("finished canonical chain repair 1", "timeElapsed", time.Since(start))
+	if err := vm.db.Put(repairedKey1, []byte("finished")); err != nil {
+		return fmt.Errorf("failed to mark flag for cnaonical chain repair 1: %w", err)
 	}
 	if err := vm.chain.ValidateCanonicalChain(); err != nil {
-		return fmt.Errorf("failed to validate canonical chain due to: %w", err)
+		return fmt.Errorf("failed to validate canonical chain after repair 1due to: %w", err)
+	}
+
+	return nil
+}
+
+func (vm *VM) repair2() error {
+	// Check if the canonical chain repair 2 has already occurred.
+	if has, err := vm.db.Has(repairedKey2); err != nil {
+		return err
+	} else if has {
+		return nil
+	}
+
+	start := time.Now()
+	log.Info("starting canonical chain repair 2", "startTime", start)
+	if err := vm.chain.WriteCanonicalFromCurrentBlock(vm.lastAccepted.ethBlock); err != nil {
+		return fmt.Errorf("canonical chain repair 2 failed after %v due to: %w", time.Since(start), err)
+	}
+	log.Info("finished canonical chain repair 2", "timeElapsed", time.Since(start))
+	if err := vm.db.Put(repairedKey2, []byte("finished")); err != nil {
+		return fmt.Errorf("failed to mark flag for canonical chain repair 2 due to: %w", err)
 	}
 
 	return nil
