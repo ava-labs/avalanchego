@@ -457,59 +457,62 @@ func (vm *VM) Initialize(
 // occurred.
 // assumes that the genesisHash and [lastAccepted] block have already been set.
 func (vm *VM) repairCanonicalChain() error {
-	if err := vm.repair1(); err != nil {
+	if ran, err := vm.repair1(); err != nil {
 		return err
+	} else if ran {
+		return nil
 	}
 
-	return vm.repair2()
+	_, err := vm.repair2()
+	return err
 }
 
 // repair1 writes the canonical chain index from the last accepted block back to the
 // genesis block to overwrite any corruption that might have occurred.
 // assumes that the genesis hash and [lastAccepted] block have already been set.
-func (vm *VM) repair1() error {
+func (vm *VM) repair1() (bool, error) {
 	// Check if the canonical chain repair 1 has already occurred.
 	if has, err := vm.db.Has(repairedKey1); err != nil {
-		return err
+		return false, err
 	} else if has {
-		return nil
+		return false, nil
 	}
 
 	start := time.Now()
 	log.Info("starting canonical chain repair 1", "startTime", start)
 	if err := vm.chain.WriteCanonicalFromCurrentBlock(nil); err != nil {
-		return fmt.Errorf("canonical chain repair 1 failed after %v due to: %w", time.Since(start), err)
+		return false, fmt.Errorf("canonical chain repair 1 failed after %v due to: %w", time.Since(start), err)
 	}
 	log.Info("finished canonical chain repair 1", "timeElapsed", time.Since(start))
 	if err := vm.db.Put(repairedKey1, []byte("finished")); err != nil {
-		return fmt.Errorf("failed to mark flag for cnaonical chain repair 1: %w", err)
+		return false, fmt.Errorf("failed to mark flag for canonical chain repair 1: %w", err)
 	}
 	if err := vm.chain.ValidateCanonicalChain(); err != nil {
-		return fmt.Errorf("failed to validate canonical chain after repair 1due to: %w", err)
+		return false, fmt.Errorf("failed to validate canonical chain after repair 1 due to: %w", err)
 	}
 
-	return nil
+	return true, nil
 }
 
-func (vm *VM) repair2() error {
+func (vm *VM) repair2() (bool, error) {
 	// Check if the canonical chain repair 2 has already occurred.
 	if has, err := vm.db.Has(repairedKey2); err != nil {
-		return err
+		return false, err
 	} else if has {
-		return nil
+		return false, nil
 	}
 
 	start := time.Now()
 	log.Info("starting canonical chain repair 2", "startTime", start)
 	if err := vm.chain.WriteCanonicalFromCurrentBlock(vm.lastAccepted.ethBlock); err != nil {
-		return fmt.Errorf("canonical chain repair 2 failed after %v due to: %w", time.Since(start), err)
+		return false, fmt.Errorf("canonical chain repair 2 failed after %v due to: %w", time.Since(start), err)
 	}
 	log.Info("finished canonical chain repair 2", "timeElapsed", time.Since(start))
 	if err := vm.db.Put(repairedKey2, []byte("finished")); err != nil {
-		return fmt.Errorf("failed to mark flag for canonical chain repair 2 due to: %w", err)
+		return false, fmt.Errorf("failed to mark flag for canonical chain repair 2 due to: %w", err)
 	}
 
-	return nil
+	return true, nil
 }
 
 // Bootstrapping notifies this VM that the consensus engine is performing
