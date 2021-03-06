@@ -6,7 +6,6 @@ package node
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/nat"
@@ -43,8 +42,11 @@ type Config struct {
 	// Crypto configuration
 	EnableCrypto bool
 
-	// Database to use for the node
-	DB database.Database
+	// Path to database
+	DBPath string
+
+	// If false, uses an in memory database
+	DBEnabled bool
 
 	// Staking configuration
 	StakingIP             utils.DynamicIPDesc
@@ -140,4 +142,7 @@ type Config struct {
 
 	// Max number of times to retry bootstrap
 	RetryBootstrapMaxAttempts int
+
+	// Peer alias configuration
+	PeerAliasTimeout time.Duration
 }

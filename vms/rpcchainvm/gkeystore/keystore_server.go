@@ -18,13 +18,17 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
 
-// Server is a messenger that is managed over RPC.
+var (
+	_ gkeystoreproto.KeystoreServer = &Server{}
+)
+
+// Server is a snow.Keystore that is managed over RPC.
 type Server struct {
 	ks     snow.Keystore
 	broker *plugin.GRPCBroker
 }
 
-// NewServer returns a vm instance connected to a remote vm instance
+// NewServer returns a keystore connected to a remote keystore
 func NewServer(ks snow.Keystore, broker *plugin.GRPCBroker) *Server {
 	return &Server{
 		ks:     ks,
@@ -32,18 +36,6 @@ func NewServer(ks snow.Keystore, broker *plugin.GRPCBroker) *Server {
 	}
 }
 
-type dbCloser struct {
-	database.Database
-	closer grpcutils.ServerCloser
-}
-
-func (db *dbCloser) Close() error {
-	err := db.Database.Close()
-	db.closer.Stop()
-	return err
-}
-
-// GetDatabase ...
 func (s *Server) GetDatabase(
 	_ context.Context,
 	req *gkeystoreproto.GetDatabaseRequest,
@@ -65,4 +57,15 @@ func (s *Server) GetDatabase(
 		return server
 	})
 	return &gkeystoreproto.GetDatabaseResponse{DbServer: dbBrokerID}, nil
+}
+
+type dbCloser struct {
+	database.Database
+	closer grpcutils.ServerCloser
+}
+
+func (db *dbCloser) Close() error {
+	err := db.Database.Close()
+	db.closer.Stop()
+	return err
 }

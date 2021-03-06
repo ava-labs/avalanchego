@@ -19,7 +19,7 @@ var (
 	_ snow.Keystore = &Client{}
 )
 
-// Client is an implementation of a messenger channel that talks over RPC.
+// Client is a snow.Keystore that talks over RPC.
 type Client struct {
 	client gkeystoreproto.KeystoreClient
 	broker *plugin.GRPCBroker
@@ -33,7 +33,6 @@ func NewClient(client gkeystoreproto.KeystoreClient, broker *plugin.GRPCBroker) 
 	}
 }
 
-// GetDatabase ...
 func (c *Client) GetDatabase(username, password string) (database.Database, error) {
 	resp, err := c.client.GetDatabase(context.Background(), &gkeystoreproto.GetDatabaseRequest{
 		Username: username,
