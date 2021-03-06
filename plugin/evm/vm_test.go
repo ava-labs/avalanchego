@@ -2403,6 +2403,12 @@ func TestAcceptReorg(t *testing.T) {
 	if err := vm1BlkC.Accept(); err != nil {
 		t.Fatal(err)
 	}
+
+	blkCHash := vm1BlkC.(*Block).ethBlock.Hash()
+	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkCHash {
+		t.Fatalf("expected current block to have hash %s but got %s", blkCHash.Hex(), b.Hash().Hex())
+	}
+
 	if err := vm1BlkD.Accept(); err != nil {
 		t.Fatal(err)
 	}
