@@ -984,6 +984,7 @@ func (bc *BlockChain) WriteCanonicalFromCurrentBlock(toBlock *types.Block) error
 // writeCanonicalFromBlock writes the canonical chain from [startBlock] back to the genesis
 // using [batchSize] for each write. Returns the last block that was successfully written
 // if an error occurs, which is guaranteed to be non-nil.
+// assumes that [startBlock] and [toBlock] are non-nil
 func (bc *BlockChain) writeCanonicalFromBlock(startBlock, toBlock *types.Block, batchSize int) (*types.Block, error) {
 	current := startBlock
 	// assumes [startBlock] is non-nil
@@ -995,14 +996,7 @@ func (bc *BlockChain) writeCanonicalFromBlock(startBlock, toBlock *types.Block, 
 
 	log.Debug("repairing canonical chain from block", "hash", current.Hash().String(), "number", current.NumberU64())
 
-	// if [toBlock] is nil repair all the way back to the genesis block.
-	// if [toBlock] is non-nil then only repair back to [toBlock]
-	repairToBlock := bc.genesisBlock
-	if toBlock != nil {
-		repairToBlock = toBlock
-	}
-
-	for current.Hash() != repairToBlock.Hash() {
+	for current.Hash() != toBlock.Hash() {
 		blkNumber := current.NumberU64()
 		log.Debug("repairing block", "hash", current.Hash().String(), "height", blkNumber)
 
@@ -1052,7 +1046,7 @@ func (bc *BlockChain) writeCanonicalFromBlock(startBlock, toBlock *types.Block, 
 	}
 	log.Debug("finished repairs", "totalUpdates", totalUpdates)
 
-	return repairToBlock, nil
+	return toBlock, nil
 }
 
 // GetReceiptsByHash retrieves the receipts for all transactions in a given block.

@@ -470,6 +470,8 @@ func (vm *VM) repairCanonicalChain() error {
 // repair1 writes the canonical chain index from the last accepted block back to the
 // genesis block to overwrite any corruption that might have occurred.
 // assumes that the genesis hash and [lastAccepted] block have already been set.
+// returns true if the repair occurs during this call. If the repair occurred on a
+// prior run, then false is returned.
 func (vm *VM) repair1() (bool, error) {
 	// Check if the canonical chain repair 1 has already occurred.
 	if has, err := vm.db.Has(repairedKey1); err != nil {
@@ -480,7 +482,11 @@ func (vm *VM) repair1() (bool, error) {
 
 	start := time.Now()
 	log.Info("starting canonical chain repair 1", "startTime", start)
-	if err := vm.chain.WriteCanonicalFromCurrentBlock(nil); err != nil {
+	genesisBlock := vm.chain.GetGenesisBlock()
+	if genesisBlock == nil {
+		return false, fmt.Errorf("failed to fetch genesis block from chain during repair 1")
+	}
+	if err := vm.chain.WriteCanonicalFromCurrentBlock(genesisBlock); err != nil {
 		return false, fmt.Errorf("canonical chain repair 1 failed after %v due to: %w", time.Since(start), err)
 	}
 	log.Info("finished canonical chain repair 1", "timeElapsed", time.Since(start))
@@ -494,6 +500,12 @@ func (vm *VM) repair1() (bool, error) {
 	return true, nil
 }
 
+// repair2 writes the canonical chain index from the current block in the canonical chain
+// back to the last accepted block to overwrite any corruption of non-finalized blocks that
+// might have occurred.
+// assumes that the genesis hash and [lastAccepted] block have already been set.
+// returns true if the repair occurs during this call. If the repair occurred on a
+// prior run, then false is returned.
 func (vm *VM) repair2() (bool, error) {
 	// Check if the canonical chain repair 2 has already occurred.
 	if has, err := vm.db.Has(repairedKey2); err != nil {
