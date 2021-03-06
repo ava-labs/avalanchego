@@ -22,7 +22,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/trie"
 	"github.com/mattn/go-isatty"
 )
 
@@ -95,16 +94,6 @@ func (self *ETHChain) BlockChain() *core.BlockChain {
 
 func (self *ETHChain) UnlockIndexing() {
 	self.backend.BlockChain().UnlockIndexing()
-}
-
-func (self *ETHChain) VerifyBlock(block *types.Block) bool {
-	txnHash := types.DeriveSha(block.Transactions(), new(trie.Trie))
-	uncleHash := types.CalcUncleHash(block.Uncles())
-	ethHeader := block.Header()
-	if txnHash != ethHeader.TxHash || uncleHash != ethHeader.UncleHash {
-		return false
-	}
-	return true
 }
 
 func (self *ETHChain) PendingSize() (int, error) {
@@ -193,21 +182,21 @@ func (self *ETHChain) ValidateCanonicalChain() error {
 
 // WriteCanonicalFromCurrentBlock writes the canonical chain from the
 // current block to the genesis.
-func (self *ETHChain) WriteCanonicalFromCurrentBlock() error {
-	return self.backend.BlockChain().WriteCanonicalFromCurrentBlock()
+func (self *ETHChain) WriteCanonicalFromCurrentBlock(toBlock *types.Block) error {
+	return self.backend.BlockChain().WriteCanonicalFromCurrentBlock(toBlock)
 }
 
-// SetTail sets the current head block to the one defined by the hash
-// irrelevant what the chain contents were prior.
-func (self *ETHChain) SetTail(hash common.Hash) error {
-	return self.backend.BlockChain().ManualHead(hash)
+// SetPreference sets the current head block to the one provided as an argument
+// regardless of what the chain contents were prior.
+func (self *ETHChain) SetPreference(block *types.Block) error {
+	return self.BlockChain().SetPreference(block)
 }
 
-// SetPreference sets the block we should treat as the parent
-// when building future blocks. [block] may not yet be finalized
-// when this function is called.
-func (self *ETHChain) SetPreference(block *types.Block) {
-	self.backend.Miner().SetPreference(block)
+// Accept sets a minimum height at which no reorg can pass. Additionally,
+// this function may trigger a reorg if the block being accepted is not in the
+// canonical chain.
+func (self *ETHChain) Accept(block *types.Block) error {
+	return self.BlockChain().Accept(block)
 }
 
 func (self *ETHChain) GetReceiptsByHash(hash common.Hash) types.Receipts {

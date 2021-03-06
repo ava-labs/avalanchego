@@ -64,7 +64,6 @@ func main() {
 
 	// configure the chain
 	config := eth.DefaultConfig
-	config.ManualCanonical = true
 	chainConfig := &params.ChainConfig{
 		ChainID:             big.NewInt(1),
 		HomesteadBlock:      big.NewInt(0),
@@ -98,9 +97,8 @@ func main() {
 	config.TrieCleanCache += config.SnapshotCache
 	config.SnapshotCache = 0
 
-	// grab the control of block generation and disable auto uncle
+	// grab the control of block generation
 	config.Miner.ManualMining = true
-	config.Miner.ManualUncle = true
 
 	// compile the smart contract
 	gopath := os.Getenv("GOPATH")

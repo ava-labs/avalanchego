@@ -11,10 +11,7 @@ import (
 	"math/big"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
-
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
 
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core"
@@ -34,15 +31,16 @@ import (
 
 	avalancheRPC "github.com/gorilla/rpc/v2"
 
-	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -62,13 +60,16 @@ var (
 	// GitCommit is set by the build script
 	GitCommit string
 	// Version is the version of Coreth
-	Version = "coreth-v0.3.24"
+	Version = "coreth-v0.3.25"
+
+	_ block.ChainVM = &VM{}
 )
 
 var (
-	lastAcceptedKey = []byte("snowman_lastAccepted")
-	acceptedPrefix  = []byte("snowman_accepted")
-	repairedKey     = []byte("chain_repaired_20210212")
+	lastAcceptedKey              = []byte("snowman_lastAccepted")
+	acceptedPrefix               = []byte("snowman_accepted")
+	historicalCanonicalRepairKey = []byte("chain_repaired_20210212")
+	tipCanonicalRepairKey        = []byte("chain_repaired_20210305")
 )
 
 const (
@@ -107,7 +108,10 @@ var (
 	errInvalidGas                 = errors.New("invalid block due to low gas")
 	errConflictingAtomicInputs    = errors.New("invalid block due to conflicting atomic inputs")
 	errUnknownAtomicTx            = errors.New("unknown atomic tx type")
-	errFailedChainVerify          = errors.New("block failed chain verify")
+	errUnclesUnsupported          = errors.New("uncles unsupported")
+	errTxHashMismatch             = errors.New("txs hash does not match header")
+	errUncleHashMismatch          = errors.New("uncle hash mismatch")
+	errRejectedParent             = errors.New("rejected parent")
 )
 
 // mayBuildBlockStatus denotes whether the engine should be notified
@@ -188,7 +192,6 @@ type VM struct {
 	metalock                     sync.Mutex
 	blockCache, blockStatusCache cache.LRU
 	lastAccepted                 *Block
-	writingMetadata              uint32
 
 	// [buildBlockLock] must be held when accessing [mayBuildBlock],
 	// [tryToBuildBlock] or [awaitingBuildBlock].
@@ -287,14 +290,12 @@ func (vm *VM) Initialize(
 	vm.txFee = txFee
 
 	config := eth.DefaultConfig
-	config.ManualCanonical = true
 	config.Genesis = g
 	// disable the experimental snapshot feature from geth
 	config.TrieCleanCache += config.SnapshotCache
 	config.SnapshotCache = 0
 
 	config.Miner.ManualMining = true
-	config.Miner.DisableUncle = true
 
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
@@ -351,7 +352,9 @@ func (vm *VM) Initialize(
 			return fmt.Errorf("block failed verify: %w", err)
 		}
 		vm.newBlockChan <- blk
-		vm.updateStatus(ids.ID(block.Hash()), choices.Processing)
+		if err := vm.updateStatus(ids.ID(block.Hash()), choices.Processing); err != nil {
+			return fmt.Errorf("cannot update block status: %w", err)
+		}
 		vm.txPoolStabilizedLock.Lock()
 		vm.txPoolStabilizedHead = block.Hash()
 		vm.txPoolStabilizedLock.Unlock()
@@ -424,7 +427,9 @@ func (vm *VM) Initialize(
 		ethBlock: lastAccepted,
 		vm:       vm,
 	}
-	vm.chain.SetPreference(lastAccepted)
+	if err := vm.chain.Accept(lastAccepted); err != nil {
+		return fmt.Errorf("could not initialize VM with last accepted blkID %s: %w", vm.lastAccepted.ID(), err)
+	}
 	vm.genesisHash = chain.GetGenesisBlock().Hash()
 	log.Info(fmt.Sprintf("lastAccepted = %s", vm.lastAccepted.ethBlock.Hash().Hex()))
 
@@ -432,7 +437,7 @@ func (vm *VM) Initialize(
 	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
 	vm.codec = Codec
 	if err := vm.repairCanonicalChain(); err != nil {
-		log.Error("failed to repair the canonical chain", "error", err)
+		return fmt.Errorf("failed to repair the canonical chain: %w", err)
 	}
 
 	log.Debug("unlocking indexing")
@@ -452,31 +457,74 @@ func (vm *VM) Initialize(
 // occurred.
 // assumes that the genesisHash and [lastAccepted] block have already been set.
 func (vm *VM) repairCanonicalChain() error {
-	// Check if the canonical chain has already been repaired
-	if has, err := vm.db.Has(repairedKey); err != nil {
+	if ran, err := vm.repairHistorical(); err != nil {
 		return err
-	} else if has {
+	} else if ran {
 		return nil
 	}
 
-	start := time.Now()
-	log.Info("starting to repair canonical chain", "startTime", start)
+	_, err := vm.repairTip()
+	return err
+}
 
-	if err := vm.chain.SetTail(vm.lastAccepted.ethBlock.Hash()); err != nil {
-		return fmt.Errorf("failed to set tail to the last accepted block: %w", err)
+// repairHistorical writes the canonical chain index from the last accepted block back to the
+// genesis block to overwrite any corruption that might have occurred.
+// assumes that the genesis hash and [lastAccepted] block have already been set.
+// returns true if the repair occurs during this call. If the repair occurred on a
+// prior run, then false is returned.
+func (vm *VM) repairHistorical() (bool, error) {
+	// Check if the historical canonical chain repair has already occurred.
+	if has, err := vm.db.Has(historicalCanonicalRepairKey); err != nil {
+		return false, err
+	} else if has {
+		return false, nil
 	}
-	if err := vm.chain.WriteCanonicalFromCurrentBlock(); err != nil {
-		return fmt.Errorf("failed to repair canonical chain after %v due to: %w", time.Since(start), err)
+
+	start := time.Now()
+	log.Info("starting historical canonical chain repair", "startTime", start)
+	genesisBlock := vm.chain.GetGenesisBlock()
+	if genesisBlock == nil {
+		return false, fmt.Errorf("failed to fetch genesis block from chain during historical chain repair")
 	}
-	log.Info("finished repairing canonical chain", "timeElapsed", time.Since(start))
-	if err := vm.db.Put(repairedKey, []byte("finished")); err != nil {
-		return fmt.Errorf("failed to mark flag for canonical chain repaired due to: %w", err)
+	if err := vm.chain.WriteCanonicalFromCurrentBlock(genesisBlock); err != nil {
+		return false, fmt.Errorf("historical canonical chain repair failed after %v due to: %w", time.Since(start), err)
+	}
+	log.Info("finished historical canonical chain repair", "timeElapsed", time.Since(start))
+	if err := vm.db.Put(historicalCanonicalRepairKey, []byte("finished")); err != nil {
+		return false, fmt.Errorf("failed to mark flag for historical canonical chain repair: %w", err)
 	}
 	if err := vm.chain.ValidateCanonicalChain(); err != nil {
-		return fmt.Errorf("failed to validate canonical chain due to: %w", err)
+		return false, fmt.Errorf("failed to validate historical canonical chain repair due to: %w", err)
 	}
 
-	return nil
+	return true, nil
+}
+
+// repairTip writes the canonical chain index from the current block in the canonical chain
+// back to the last accepted block to overwrite any corruption of non-finalized blocks that
+// might have occurred.
+// assumes that the genesis hash and [lastAccepted] block have already been set.
+// returns true if the repair occurs during this call. If the repair occurred on a
+// prior run, then false is returned.
+func (vm *VM) repairTip() (bool, error) {
+	// Check if the canonical chain tip repair has already occurred.
+	if has, err := vm.db.Has(tipCanonicalRepairKey); err != nil {
+		return false, err
+	} else if has {
+		return false, nil
+	}
+
+	start := time.Now()
+	log.Info("starting canonical chain tip repair", "startTime", start)
+	if err := vm.chain.WriteCanonicalFromCurrentBlock(vm.lastAccepted.ethBlock); err != nil {
+		return false, fmt.Errorf("canonical chain tip repair failed after %v due to: %w", time.Since(start), err)
+	}
+	log.Info("finished canonical chain tip repair", "timeElapsed", time.Since(start))
+	if err := vm.db.Put(tipCanonicalRepairKey, []byte("finished")); err != nil {
+		return false, fmt.Errorf("failed to mark flag for canonical chain tip repair due to: %w", err)
+	}
+
+	return true, nil
 }
 
 // Bootstrapping notifies this VM that the consensus engine is performing
@@ -496,7 +544,6 @@ func (vm *VM) Shutdown() error {
 		return nil
 	}
 
-	vm.writeBackMetadata()
 	vm.buildBlockTimer.Stop()
 	close(vm.shutdownChan)
 	vm.chain.Stop()
@@ -536,18 +583,15 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	if err := rlp.DecodeBytes(b, ethBlock); err != nil {
 		return nil, err
 	}
-	if !vm.chain.VerifyBlock(ethBlock) {
-		return nil, errFailedChainVerify
-	}
-	blockHash := ethBlock.Hash()
-	// Coinbase must be zero on C-Chain
-	if blockHash != vm.genesisHash && ethBlock.Coinbase() != coreth.BlackholeAddr {
-		return nil, errInvalidBlock
-	}
 	block := &Block{
-		id:       ids.ID(blockHash),
+		id:       ids.ID(ethBlock.Hash()),
 		ethBlock: ethBlock,
 		vm:       vm,
+	}
+	// Performing syntactic verification in ParseBlock allows for
+	// short-circuiting bad blocks before they are processed by the VM.
+	if err := block.syntacticVerify(); err != nil {
+		return nil, fmt.Errorf("syntactic block verification failed: %w", err)
 	}
 	vm.blockCache.Put(block.ID(), block)
 	return block, nil
@@ -566,19 +610,20 @@ func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 }
 
 // SetPreference sets what the current tail of the chain is
-func (vm *VM) SetPreference(blkID ids.ID) {
+func (vm *VM) SetPreference(blkID ids.ID) error {
 	block := vm.getBlock(blkID)
-	vm.ctx.Log.AssertTrue(block != nil, "problem setting preferred block, couldn't find blkID %s", blkID)
-
-	vm.chain.SetPreference(block.ethBlock)
+	if block == nil {
+		return errUnknownBlock
+	}
+	return vm.chain.SetPreference(block.ethBlock)
 }
 
 // LastAccepted returns the ID of the block that was last accepted
-func (vm *VM) LastAccepted() ids.ID {
+func (vm *VM) LastAccepted() (ids.ID, error) {
 	vm.metalock.Lock()
 	defer vm.metalock.Unlock()
 
-	return vm.lastAccepted.ID()
+	return vm.lastAccepted.ID(), nil
 }
 
 // NewHandler returns a new Handler for a service where:
@@ -602,26 +647,34 @@ func newHandler(name string, service interface{}, lockOption ...commonEng.LockOp
 }
 
 // CreateHandlers makes new http handlers that can handle API calls
-func (vm *VM) CreateHandlers() map[string]*commonEng.HTTPHandler {
+func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 	handler := vm.chain.NewRPCHandler(time.Duration(vm.CLIConfig.APIMaxDuration))
 	enabledAPIs := vm.CLIConfig.EthAPIs()
 	vm.chain.AttachEthService(handler, vm.CLIConfig.EthAPIs())
 
+	errs := wrappers.Errs{}
 	if vm.CLIConfig.SnowmanAPIEnabled {
-		handler.RegisterName("snowman", &SnowmanAPI{vm})
+		errs.Add(handler.RegisterName("snowman", &SnowmanAPI{vm}))
 		enabledAPIs = append(enabledAPIs, "snowman")
 	}
 	if vm.CLIConfig.CorethAdminAPIEnabled {
-		handler.RegisterName("admin", &admin.Performance{})
+		primaryAlias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get primary alias for chain due to %w", err)
+		}
+		errs.Add(handler.RegisterName("admin", NewPerformanceService(fmt.Sprintf("coreth_%s_", primaryAlias))))
 		enabledAPIs = append(enabledAPIs, "coreth-admin")
 	}
 	if vm.CLIConfig.NetAPIEnabled {
-		handler.RegisterName("net", &NetAPI{vm})
+		errs.Add(handler.RegisterName("net", &NetAPI{vm}))
 		enabledAPIs = append(enabledAPIs, "net")
 	}
 	if vm.CLIConfig.Web3APIEnabled {
-		handler.RegisterName("web3", &Web3API{})
+		errs.Add(handler.RegisterName("web3", &Web3API{}))
 		enabledAPIs = append(enabledAPIs, "web3")
+	}
+	if errs.Errored() {
+		return nil, errs.Err
 	}
 
 	log.Info(fmt.Sprintf("Enabled APIs: %s", strings.Join(enabledAPIs, ", ")))
@@ -630,17 +683,20 @@ func (vm *VM) CreateHandlers() map[string]*commonEng.HTTPHandler {
 		"/rpc":  {LockOptions: commonEng.NoLock, Handler: handler},
 		"/avax": newHandler("avax", &AvaxAPI{vm}),
 		"/ws":   {LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandler([]string{"*"})},
-	}
+	}, nil
 }
 
 // CreateStaticHandlers makes new http handlers that can handle API calls
-func (vm *VM) CreateStaticHandlers() map[string]*commonEng.HTTPHandler {
+func (vm *VM) CreateStaticHandlers() (map[string]*commonEng.HTTPHandler, error) {
 	handler := rpc.NewServer()
-	handler.RegisterName("static", &StaticService{})
+	if err := handler.RegisterName("static", &StaticService{}); err != nil {
+		return nil, err
+	}
+
 	return map[string]*commonEng.HTTPHandler{
 		"/rpc": {LockOptions: commonEng.NoLock, Handler: handler},
 		"/ws":  {LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandler([]string{"*"})},
-	}
+	}, nil
 }
 
 /*
@@ -649,20 +705,25 @@ func (vm *VM) CreateStaticHandlers() map[string]*commonEng.HTTPHandler {
  ******************************************************************************
  */
 
-func (vm *VM) updateStatus(blockID ids.ID, status choices.Status) {
+func (vm *VM) updateStatus(blkID ids.ID, status choices.Status) error {
 	vm.metalock.Lock()
 	defer vm.metalock.Unlock()
 
 	if status == choices.Accepted {
-		vm.lastAccepted = vm.getBlock(blockID)
-		// TODO: improve this naive implementation
-		if atomic.SwapUint32(&vm.writingMetadata, 1) == 0 {
-			go vm.ctx.Log.RecoverAndPanic(vm.writeBackMetadata)
+		blk := vm.getBlock(blkID)
+		if blk == nil {
+			return errUnknownBlock
 		}
-		err := vm.chain.SetTail(common.Hash(blockID))
-		vm.ctx.Log.AssertNoError(err)
+		if err := vm.chain.Accept(blk.ethBlock); err != nil {
+			return fmt.Errorf("could not accept %s: %w", blkID, err)
+		}
+		if err := vm.setLastAccepted(blk); err != nil {
+			return fmt.Errorf("could not set %s as last accepted: %w", blkID, err)
+		}
 	}
-	vm.blockStatusCache.Put(blockID, status)
+
+	vm.blockStatusCache.Put(blkID, status)
+	return nil
 }
 
 func (vm *VM) tryBlockGen() error {
@@ -812,18 +873,18 @@ func (vm *VM) getBlock(id ids.ID) *Block {
 	return block
 }
 
-func (vm *VM) writeBackMetadata() {
-	vm.metalock.Lock()
-	defer vm.metalock.Unlock()
+// setLastAccepted sets [blk] to be the VM's [lastAccepted] block
+// and stores its hash at [lastAcceptedKey].
+//
+// Assumes [metalock] is held.
+func (vm *VM) setLastAccepted(blk *Block) error {
+	vm.lastAccepted = blk
 
-	b, err := rlp.EncodeToBytes(vm.lastAccepted.ethBlock.Hash())
+	b, err := rlp.EncodeToBytes(blk.ethBlock.Hash())
 	if err != nil {
-		log.Error("snowman-eth: error while writing back metadata")
-		return
+		return err
 	}
-	log.Debug("writing back metadata")
-	vm.chaindb.Put(lastAcceptedKey, b)
-	atomic.StoreUint32(&vm.writingMetadata, 0)
+	return vm.chaindb.Put(lastAcceptedKey, b)
 }
 
 // awaitTxPoolStabilized waits for a txPoolHead channel event

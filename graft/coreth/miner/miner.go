@@ -59,8 +59,6 @@ type Config struct {
 	Recommit     time.Duration  // The time interval for miner to re-create mining work.
 	Noverify     bool           // Disable remote mining solution verification(only useful in ethash).
 	ManualMining bool
-	ManualUncle  bool
-	DisableUncle bool
 }
 
 type Miner struct {
@@ -148,11 +146,4 @@ func (miner *Miner) GenBlock() {
 
 func (miner *Miner) GetWorkerMux() *event.TypeMux {
 	return miner.worker.mux
-}
-
-// SetPreference sets the block we should treat as the parent
-// when building future blocks. [block] may not yet be finalized
-// when this function is called.
-func (miner *Miner) SetPreference(block *types.Block) {
-	miner.worker.setPreference(block)
 }

@@ -4,14 +4,15 @@
 package evm
 
 import (
-	"errors"
 	"fmt"
 
+	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/trie"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -106,8 +107,10 @@ func (b *Block) ID() ids.ID { return b.id }
 func (b *Block) Accept() error {
 	vm := b.vm
 
-	log.Trace(fmt.Sprintf("Block %s is accepted", b.ID()))
-	vm.updateStatus(b.id, choices.Accepted)
+	log.Trace(fmt.Sprintf("Accepting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
+	if err := vm.updateStatus(b.id, choices.Accepted); err != nil {
+		return err
+	}
 	if err := vm.acceptedDB.Put(b.ethBlock.Number().Bytes(), b.id[:]); err != nil {
 		return err
 	}
@@ -131,9 +134,8 @@ func (b *Block) Accept() error {
 
 // Reject implements the snowman.Block interface
 func (b *Block) Reject() error {
-	log.Trace(fmt.Sprintf("Block %s is rejected", b.ID()))
-	b.vm.updateStatus(b.ID(), choices.Rejected)
-	return nil
+	log.Trace(fmt.Sprintf("Rejecting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
+	return b.vm.updateStatus(b.ID(), choices.Rejected)
 }
 
 // Status implements the snowman.Block interface
@@ -159,12 +161,49 @@ func (b *Block) Height() uint64 {
 	return b.ethBlock.Number().Uint64()
 }
 
-var (
-	errRejectedParent = errors.New("rejected parent")
-)
+// syntacticVerify verifies that a *Block is well-formed.
+func (b *Block) syntacticVerify() error {
+	if b == nil || b.ethBlock == nil {
+		return errInvalidBlock
+	}
+
+	// Skip verification of the genesis block since it
+	// should already be marked as accepted
+	if b.ethBlock.Hash() == b.vm.genesisHash {
+		return nil
+	}
+	txsHash := types.DeriveSha(b.ethBlock.Transactions(), new(trie.Trie))
+	uncleHash := types.CalcUncleHash(b.ethBlock.Uncles())
+	ethHeader := b.ethBlock.Header()
+	// Check that the tx hash in the header matches the body
+	if txsHash != ethHeader.TxHash {
+		return errTxHashMismatch
+	}
+	// Check that the uncle hash in the header matches the body
+	if uncleHash != ethHeader.UncleHash {
+		return errUncleHashMismatch
+	}
+	// Coinbase must be zero on C-Chain
+	if b.ethBlock.Coinbase() != coreth.BlackholeAddr {
+		return errInvalidBlock
+	}
+	// Block must not have any uncles
+	if len(b.ethBlock.Uncles()) > 0 {
+		return errUnclesUnsupported
+	}
+	// Block must not be empty
+	if len(b.ethBlock.Transactions()) == 0 && b.vm.getAtomicTx(b.ethBlock) == nil {
+		return errEmptyBlock
+	}
+	return nil
+}
 
 // Verify implements the snowman.Block interface
 func (b *Block) Verify() error {
+	if err := b.syntacticVerify(); err != nil {
+		return fmt.Errorf("syntactic block verification failed: %w", err)
+	}
+
 	vm := b.vm
 
 	// Only enforce a minimum fee when bootstrapping has finished
@@ -187,8 +226,8 @@ func (b *Block) Verify() error {
 
 	// If the tx is an atomic tx, ensure that it doesn't conflict with any of
 	// its processing ancestry.
-	tx := vm.getAtomicTx(b.ethBlock)
-	if tx != nil {
+	atomicTx := vm.getAtomicTx(b.ethBlock)
+	if atomicTx != nil {
 		// If the ancestor is unknown, then the parent failed verification when
 		// it was called.
 		// If the ancestor is rejected, then this block shouldn't be inserted
@@ -209,7 +248,7 @@ func (b *Block) Verify() error {
 		if bonusBlocks.Contains(b.id) {
 			log.Info("skipping atomic tx verification on bonus block", "block", b.id)
 		} else {
-			switch atx := tx.UnsignedTx.(type) {
+			switch atx := atomicTx.UnsignedTx.(type) {
 			case *UnsignedImportTx:
 				// If an import tx is seen, we must ensure that none of the
 				// processing ancestors consume the same UTXO.
@@ -251,8 +290,8 @@ func (b *Block) Verify() error {
 			// We have verified that none of the processing ancestors conflict with
 			// the atomic transaction, so now we must ensure that the transaction is
 			// valid and doesn't have any accepted conflicts.
-			utx := tx.UnsignedTx.(UnsignedAtomicTx)
-			if err := utx.SemanticVerify(vm, tx); err != nil {
+			utx := atomicTx.UnsignedTx.(UnsignedAtomicTx)
+			if err := utx.SemanticVerify(vm, atomicTx); err != nil {
 				return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
 			}
 		}

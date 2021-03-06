@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
-	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
@@ -50,30 +49,27 @@ var (
 )
 
 var (
-	maxUncles = 2 // Maximum number of uncles allowed in a single block
-
-	errTooManyUncles   = errors.New("too many uncles")
-	errZeroBlockTime   = errors.New("timestamp equals parent's")
-	errDuplicateUncle  = errors.New("duplicate uncle")
-	errUncleIsAncestor = errors.New("uncle is ancestor")
-	errDanglingUncle   = errors.New("uncle's parent is not ancestor")
+	errInvalidBlockTime  = errors.New("timestamp less than parent's")
+	errUnclesUnsupported = errors.New("uncles unsupported")
 )
 
 // modified from consensus.go
 func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header, parent *types.Header, uncle bool, seal bool) error {
+	// Ensure that we do not verify an uncle
+	if uncle {
+		return errUnclesUnsupported
+	}
 	// Ensure that the header's extra-data section is of a reasonable size
 	if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
 		return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
 	}
 	// Verify the header's timestamp
-	if !uncle {
-		if header.Time > uint64(time.Now().Add(allowedFutureBlockTime).Unix()) {
-			return consensus.ErrFutureBlock
-		}
+	if header.Time > uint64(time.Now().Add(allowedFutureBlockTime).Unix()) {
+		return consensus.ErrFutureBlock
 	}
 	//if header.Time <= parent.Time {
 	if header.Time < parent.Time {
-		return errZeroBlockTime
+		return errInvalidBlockTime
 	}
 	// Verify that the gas limit is <= 2^63-1
 	cap := uint64(0x7fffffffffffffff)
@@ -196,50 +192,8 @@ func (self *DummyEngine) VerifyHeaders(chain consensus.ChainHeaderReader, header
 }
 
 func (self *DummyEngine) VerifyUncles(chain consensus.ChainReader, block *types.Block) error {
-	// Verify that there are at most 2 uncles included in this block
-	if len(block.Uncles()) > maxUncles {
-		return errTooManyUncles
-	}
-	if len(block.Uncles()) == 0 {
-		return nil
-	}
-	// Gather the set of past uncles and ancestors
-	uncles, ancestors := mapset.NewSet(), make(map[common.Hash]*types.Header)
-
-	number, parent := block.NumberU64()-1, block.ParentHash()
-	for i := 0; i < 7; i++ {
-		ancestor := chain.GetBlock(parent, number)
-		if ancestor == nil {
-			break
-		}
-		ancestors[ancestor.Hash()] = ancestor.Header()
-		for _, uncle := range ancestor.Uncles() {
-			uncles.Add(uncle.Hash())
-		}
-		parent, number = ancestor.ParentHash(), number-1
-	}
-	ancestors[block.Hash()] = block.Header()
-	uncles.Add(block.Hash())
-
-	// Verify each of the uncles that it's recent, but not an ancestor
-	for _, uncle := range block.Uncles() {
-		// Make sure every uncle is rewarded only once
-		hash := uncle.Hash()
-		if uncles.Contains(hash) {
-			return errDuplicateUncle
-		}
-		uncles.Add(hash)
-
-		// Make sure the uncle has a valid ancestry
-		if ancestors[hash] != nil {
-			return errUncleIsAncestor
-		}
-		if ancestors[uncle.ParentHash] == nil || uncle.ParentHash == block.ParentHash() {
-			return errDanglingUncle
-		}
-		if err := self.verifyHeader(chain, uncle, ancestors[uncle.ParentHash], true, true); err != nil {
-			return err
-		}
+	if len(block.Uncles()) > 0 {
+		return errUnclesUnsupported
 	}
 	return nil
 }
