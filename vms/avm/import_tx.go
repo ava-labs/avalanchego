@@ -106,6 +106,10 @@ func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 		return err
 	}
 
+	if !vm.bootstrapped {
+		return nil
+	}
+
 	utxoIDs := make([][]byte, len(t.ImportedIns))
 	for i, in := range t.ImportedIns {
 		inputID := in.UTXOID.InputID()
