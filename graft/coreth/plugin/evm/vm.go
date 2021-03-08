@@ -60,7 +60,7 @@ var (
 	// GitCommit is set by the build script
 	GitCommit string
 	// Version is the version of Coreth
-	Version = "coreth-v0.3.25"
+	Version = "coreth-v0.3.26"
 
 	_ block.ChainVM = &VM{}
 )
@@ -73,12 +73,15 @@ var (
 )
 
 const (
-	minBlockTime    = 2 * time.Second
-	maxBlockTime    = 3 * time.Second
-	batchSize       = 250
-	maxUTXOsToFetch = 1024
-	blockCacheSize  = 1024
-	codecVersion    = uint16(0)
+	minBlockTime = 2 * time.Second
+	maxBlockTime = 3 * time.Second
+	// maxFutureBlockTime should be smaller than the max allowed future time (15s) used
+	// in dummy consensus engine's verifyHeader
+	maxFutureBlockTime = 10 * time.Second
+	batchSize          = 250
+	maxUTXOsToFetch    = 1024
+	blockCacheSize     = 1024
+	codecVersion       = uint16(0)
 )
 
 const (
