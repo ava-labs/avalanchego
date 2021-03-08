@@ -2418,3 +2418,104 @@ func TestAcceptReorg(t *testing.T) {
 		t.Fatalf("expected current block to have hash %s but got %s", blkDHash.Hex(), b.Hash().Hex())
 	}
 }
+
+func TestFutureBlock(t *testing.T) {
+	issuer, vm, _, sharedMemory := GenesisVM(t, true)
+
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	key, err := coreth.NewKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Import 1 AVAX
+	importAmount := uint64(1000000000)
+	utxoID := avax.UTXOID{
+		TxID: ids.ID{
+			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+			0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+			0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+		},
+	}
+
+	utxo := &avax.UTXO{
+		UTXOID: utxoID,
+		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: importAmount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{testKeys[0].PublicKey().Address()},
+			},
+		},
+	}
+	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
+	inputID := utxo.InputID()
+	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+		Key:   inputID[:],
+		Value: utxoBytes,
+		Traits: [][]byte{
+			testKeys[0].PublicKey().Address().Bytes(),
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	importTx, err := vm.newImportTx(vm.ctx.XChainID, key.Address, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.issueTx(importTx); err != nil {
+		t.Fatal(err)
+	}
+
+	<-issuer
+
+	blkA, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatalf("Failed to build block with import transaction: %s", err)
+	}
+
+	// Create empty block from blkA
+	blkAEthBlock := blkA.(*Block).ethBlock
+
+	modifiedHeader := types.CopyHeader(blkAEthBlock.Header())
+	// Set the VM's clock to the time of the produced block
+	vm.clock.Set(time.Unix(int64(modifiedHeader.Time), 0))
+	// Set the modified time to exceed the allowed future time
+	modifiedTime := modifiedHeader.Time + uint64(maxFutureBlockTime.Seconds()+1)
+	modifiedHeader.Time = modifiedTime
+	modifiedBlock := types.NewBlock(
+		modifiedHeader,
+		nil,
+		nil,
+		nil,
+		new(trie.Trie),
+		nil,
+	)
+	modifiedBlock.SetExtraData(blkAEthBlock.ExtraData())
+
+	futureBlock := &Block{
+		vm:       vm,
+		ethBlock: modifiedBlock,
+		id:       ids.ID(modifiedBlock.Hash()),
+	}
+
+	if err := futureBlock.Verify(); err == nil {
+		t.Fatal("Future block should have failed verification due to block timestamp too far in the future")
+	} else if !strings.Contains(err.Error(), "block timestamp is too far in the future") {
+		t.Fatalf("Expected error to be block timestamp too far in the future but found %s", err)
+	}
+}
