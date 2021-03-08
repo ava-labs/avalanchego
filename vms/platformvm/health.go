@@ -23,7 +23,7 @@ func (vm *VM) HealthCheck() (interface{}, error) {
 		"percentConnected": percentConnected,
 	}
 	if percentConnected < constants.MinConnectedStake { // Use alpha from consensus instead of const
-		return details, fmt.Errorf("connected to %f percent of the stake; should be connected to at least %f",
+		return details, fmt.Errorf("not connected to enough stake - connected to %f percent of the stake; should be connected to at least %f",
 			percentConnected,
 			constants.MinConnectedStake,
 		)

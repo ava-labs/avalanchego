@@ -38,12 +38,12 @@ func newMetrics(metricName, descriptionName string, log logging.Logger, namespac
 	return metrics, errs.Err
 }
 
-// Healthy handles the metrics for the healthy cases
-func (m *Metrics) Healthy(json health.Result) {
+// healthy handles the metrics for the healthy cases
+func (m *Metrics) healthy(json health.Result) {
 	m.failingChecks.Dec()
 }
 
-// UnHealthy handles the metrics for the unhealthy cases
-func (m *Metrics) UnHealthy(result health.Result) {
+// unHealthy handles the metrics for the unhealthy cases
+func (m *Metrics) unHealthy(result health.Result) {
 	m.failingChecks.Inc()
 }
