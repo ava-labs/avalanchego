@@ -730,7 +730,11 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	n.Log.Info("initializing Health API")
-	n.healthService = health.NewService(n.Config.HealthCheckFreq, n.Log)
+	healthService, err := health.NewService(n.Config.HealthCheckFreq, n.Log, n.Config.ConsensusParams.Metrics)
+	if err != nil {
+		return err
+	}
+	n.healthService = healthService
 
 	isBootstrappedFunc := func() (interface{}, error) {
 		if pChainID, err := n.chainManager.Lookup("P"); err != nil {
@@ -751,7 +755,7 @@ func (n *Node) initHealthAPI() error {
 		return nil, nil
 	}
 	// Passes if the P, X and C chains are finished bootstrapping
-	err := n.healthService.RegisterMonotonicCheck("isBootstrapped", isBootstrappedFunc)
+	err = n.healthService.RegisterMonotonicCheck("isBootstrapped", isBootstrappedFunc)
 	if err != nil {
 		return fmt.Errorf("couldn't register isBootstrapped health check: %w", err)
 	}

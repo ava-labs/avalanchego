@@ -7,16 +7,14 @@ import (
 	"net/http"
 	"time"
 
-	stdjson "encoding/json"
-
-	"github.com/gorilla/rpc/v2"
-
-	health "github.com/AppsFlyer/go-sundheit"
-
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/gorilla/rpc/v2"
+	"github.com/prometheus/client_golang/prometheus"
 
+	stdjson "encoding/json"
+	health "github.com/AppsFlyer/go-sundheit"
 	healthlib "github.com/ava-labs/avalanchego/health"
 )
 
@@ -29,11 +27,15 @@ type Service interface {
 	Handler() (*common.HTTPHandler, error)
 }
 
-func NewService(checkFreq time.Duration, log logging.Logger) Service {
-	return &apiServer{
-		Service: healthlib.NewService(checkFreq, log),
-		log:     log,
+func NewService(checkFreq time.Duration, log logging.Logger, registry prometheus.Registerer) (Service, error) {
+	healthL, err := healthlib.NewService(checkFreq, log, registry)
+	if err != nil {
+		return nil, err
 	}
+	return &apiServer{
+		Service: healthL,
+		log:     log,
+	}, nil
 }
 
 // APIServer serves HTTP for a health service
