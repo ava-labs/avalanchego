@@ -206,6 +206,10 @@ func (b *Block) Verify() error {
 
 	vm := b.vm
 
+	if maxBlockTime := uint64(b.vm.clock.Time().Add(maxFutureBlockTime).Unix()); b.ethBlock.Time() > maxBlockTime {
+		return fmt.Errorf("block timestamp is too far in the future: %d > allowed %d", b.ethBlock.Time(), maxBlockTime)
+	}
+
 	// Only enforce a minimum fee when bootstrapping has finished
 	if vm.ctx.IsBootstrapped() {
 		// Ensure the minimum gas price is paid for every transaction

@@ -32,7 +32,6 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -91,13 +90,16 @@ var (
 	errInsertionInterrupted = errors.New("insertion is interrupted")
 )
 
+var (
+	errFutureBlockUnsupported = errors.New("future block insertion not supported")
+)
+
 const (
-	bodyCacheLimit       = 256
-	blockCacheLimit      = 256
-	receiptsCacheLimit   = 32
-	txLookupCacheLimit   = 1024
-	maxFutureBlocks      = 256
-	maxTimeFutureBlocks  = 30
+	bodyCacheLimit     = 256
+	blockCacheLimit    = 256
+	receiptsCacheLimit = 32
+	txLookupCacheLimit = 1024
+	// maxFutureBlocks      = 256
 	badBlockLimit        = 10
 	TriesInMemory        = 128
 	repairBlockBatchSize = 10
@@ -204,7 +206,7 @@ type BlockChain struct {
 	receiptsCache *lru.Cache     // Cache for the most recent receipts per block
 	blockCache    *lru.Cache     // Cache for the most recent entire blocks
 	txLookupCache *lru.Cache     // Cache for the most recent transaction lookup data.
-	futureBlocks  *lru.Cache     // future blocks are blocks added for later processing
+	// futureBlocks  *lru.Cache     // future blocks are blocks added for later processing
 
 	quit          chan struct{}  // blockchain quit channel
 	wg            sync.WaitGroup // chain processing wait group for shutting down
@@ -238,7 +240,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	receiptsCache, _ := lru.New(receiptsCacheLimit)
 	blockCache, _ := lru.New(blockCacheLimit)
 	txLookupCache, _ := lru.New(txLookupCacheLimit)
-	futureBlocks, _ := lru.New(maxFutureBlocks)
+	// futureBlocks, _ := lru.New(maxFutureBlocks)
 	badBlocks, _ := lru.New(badBlockLimit)
 
 	bc := &BlockChain{
@@ -254,10 +256,10 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		receiptsCache:  receiptsCache,
 		blockCache:     blockCache,
 		txLookupCache:  txLookupCache,
-		futureBlocks:   futureBlocks,
-		engine:         engine,
-		vmConfig:       vmConfig,
-		badBlocks:      badBlocks,
+		// futureBlocks:   futureBlocks,
+		engine:    engine,
+		vmConfig:  vmConfig,
+		badBlocks: badBlocks,
 	}
 	bc.validator = NewBlockValidator(chainConfig, bc, engine)
 	bc.prefetcher = newStatePrefetcher(chainConfig, bc, engine)
@@ -364,7 +366,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 			bc.snaps = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, bc.CurrentBlock().Root(), !bc.cacheConfig.SnapshotWait)
 		}
 		// Take ownership of this particular state
-		go bc.update()
+		// go bc.update()
 		if txLookupLimit != nil {
 			bc.txLookupLimit = *txLookupLimit
 			go bc.maintainTxIndex(txIndexBlock)
@@ -574,7 +576,7 @@ func (bc *BlockChain) SetHead(head uint64) error {
 	bc.receiptsCache.Purge()
 	bc.blockCache.Purge()
 	bc.txLookupCache.Purge()
-	bc.futureBlocks.Purge()
+	// bc.futureBlocks.Purge()
 
 	return bc.loadLastState()
 }
@@ -1192,23 +1194,26 @@ func (bc *BlockChain) insertStopped() bool {
 	return atomic.LoadInt32(&bc.procInterrupt) == 1
 }
 
-func (bc *BlockChain) procFutureBlocks() {
-	blocks := make([]*types.Block, 0, bc.futureBlocks.Len())
-	for _, hash := range bc.futureBlocks.Keys() {
-		if block, exist := bc.futureBlocks.Peek(hash); exist {
-			blocks = append(blocks, block.(*types.Block))
-		}
-	}
-	if len(blocks) > 0 {
-		sort.Slice(blocks, func(i, j int) bool {
-			return blocks[i].NumberU64() < blocks[j].NumberU64()
-		})
-		// Insert one by one as chain insertion needs contiguous ancestry between blocks
-		for i := range blocks {
-			bc.InsertChain(blocks[i : i+1])
-		}
-	}
-}
+// procFutureBlocks has been removed because there is no need for a concept
+// of future blocks in the context of coreth.
+// Original Code:
+// func (bc *BlockChain) procFutureBlocks() {
+// 	blocks := make([]*types.Block, 0, bc.futureBlocks.Len())
+// 	for _, hash := range bc.futureBlocks.Keys() {
+// 		if block, exist := bc.futureBlocks.Peek(hash); exist {
+// 			blocks = append(blocks, block.(*types.Block))
+// 		}
+// 	}
+// 	if len(blocks) > 0 {
+// 		sort.Slice(blocks, func(i, j int) bool {
+// 			return blocks[i].NumberU64() < blocks[j].NumberU64()
+// 		})
+// 		// Insert one by one as chain insertion needs contiguous ancestry between blocks
+// 		for i := range blocks {
+// 			bc.InsertChain(blocks[i : i+1])
+// 		}
+// 	}
+// }
 
 // WriteStatus status of write
 type WriteStatus byte
@@ -1245,7 +1250,7 @@ func (bc *BlockChain) truncateAncient(head uint64) error {
 	bc.receiptsCache.Purge()
 	bc.blockCache.Purge()
 	bc.txLookupCache.Purge()
-	bc.futureBlocks.Purge()
+	// bc.futureBlocks.Purge()
 
 	log.Info("Rewind ancient data", "number", head)
 	return nil
@@ -1823,7 +1828,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	if status == CanonStatTy {
 		bc.writeHeadBlock(block)
 	}
-	bc.futureBlocks.Remove(block.Hash())
+	// bc.futureBlocks.Remove(block.Hash())
 
 	if status == CanonStatTy {
 		bc.chainFeed.Send(ChainEvent{Block: block, Hash: block.Hash(), Logs: logs})
@@ -1844,17 +1849,18 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	return status, nil
 }
 
+// Original Code:
 // addFutureBlock checks if the block is within the max allowed window to get
 // accepted for future processing, and returns an error if the block is too far
 // ahead and was not added.
-func (bc *BlockChain) addFutureBlock(block *types.Block) error {
-	max := uint64(time.Now().Unix() + maxTimeFutureBlocks)
-	if block.Time() > max {
-		return fmt.Errorf("future block timestamp %v > allowed %v", block.Time(), max)
-	}
-	bc.futureBlocks.Add(block.Hash(), block)
-	return nil
-}
+// func (bc *BlockChain) addFutureBlock(block *types.Block) error {
+// 	max := uint64(time.Now().Unix() + maxTimeFutureBlocks)
+// 	if block.Time() > max {
+// 		return fmt.Errorf("future block timestamp %v > allowed %v", block.Time(), max)
+// 	}
+// 	bc.futureBlocks.Add(block.Hash(), block)
+// 	return nil
+// }
 
 // InsertChain attempts to insert the given batch of blocks in to the canonical
 // chain or, otherwise, create a fork. If an error is returned it will return
@@ -2011,23 +2017,25 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, er
 		return 0, errors.New("side chain insertion is not supported")
 
 	// First block is future, shove it (and all children) to the future queue (unknown ancestor)
-	case errors.Is(err, consensus.ErrFutureBlock) || (errors.Is(err, consensus.ErrUnknownAncestor) && bc.futureBlocks.Contains(it.first().ParentHash())):
-		for block != nil && (it.index == 0 || errors.Is(err, consensus.ErrUnknownAncestor)) {
-			log.Debug("Future block, postponing import", "number", block.Number(), "hash", block.Hash())
-			if err := bc.addFutureBlock(block); err != nil {
-				return it.index, err
-			}
-			block, err = it.next()
-		}
-		stats.queued += it.processed()
-		stats.ignored += it.remaining()
+	case errors.Is(err, consensus.ErrFutureBlock):
+		// Original Code:
+		// for block != nil && (it.index == 0 || errors.Is(err, consensus.ErrUnknownAncestor)) {
+		// 	log.Debug("Future block, postponing import", "number", block.Number(), "hash", block.Hash())
+		// 	if err := bc.addFutureBlock(block); err != nil {
+		// 		return it.index, err
+		// 	}
+		// 	block, err = it.next()
+		// }
+		// stats.queued += it.processed()
+		// stats.ignored += it.remaining()
 
-		// If there are any still remaining, mark as ignored
-		return it.index, err
+		// // If there are any still remaining, mark as ignored
+		// return it.index, err
+		return 0, errFutureBlockUnsupported
 
 	// Some other error occurred, abort
 	case err != nil:
-		bc.futureBlocks.Remove(block.Hash())
+		// bc.futureBlocks.Remove(block.Hash())
 		stats.ignored += len(it.chain)
 		bc.reportBlock(block, nil, err)
 		return it.index, err
@@ -2196,17 +2204,19 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, er
 	}
 	// Any blocks remaining here? The only ones we care about are the future ones
 	if block != nil && errors.Is(err, consensus.ErrFutureBlock) {
-		if err := bc.addFutureBlock(block); err != nil {
-			return it.index, err
-		}
-		block, err = it.next()
+		// Original Code:
+		// if err := bc.addFutureBlock(block); err != nil {
+		// 	return it.index, err
+		// }
+		// block, err = it.next()
 
-		for ; block != nil && errors.Is(err, consensus.ErrUnknownAncestor); block, err = it.next() {
-			if err := bc.addFutureBlock(block); err != nil {
-				return it.index, err
-			}
-			stats.queued++
-		}
+		// for ; block != nil && errors.Is(err, consensus.ErrUnknownAncestor); block, err = it.next() {
+		// 	if err := bc.addFutureBlock(block); err != nil {
+		// 		return it.index, err
+		// 	}
+		// 	stats.queued++
+		// }
+		return 0, errFutureBlockUnsupported
 	}
 	stats.ignored += it.remaining()
 
@@ -2519,18 +2529,21 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	return nil
 }
 
-func (bc *BlockChain) update() {
-	futureTimer := time.NewTicker(5 * time.Second)
-	defer futureTimer.Stop()
-	for {
-		select {
-		case <-futureTimer.C:
-			bc.procFutureBlocks()
-		case <-bc.quit:
-			return
-		}
-	}
-}
+// update has been removed since there is no need for a concept of future blocks
+// in the context of coreth.
+// Original Code:
+// func (bc *BlockChain) update() {
+// 	futureTimer := time.NewTicker(5 * time.Second)
+// 	defer futureTimer.Stop()
+// 	for {
+// 		select {
+// 		case <-futureTimer.C:
+// 			bc.procFutureBlocks()
+// 		case <-bc.quit:
+// 			return
+// 		}
+// 	}
+// }
 
 // maintainTxIndex is responsible for the construction and deletion of the
 // transaction index.
