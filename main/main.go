@@ -69,7 +69,7 @@ func main() {
 	}()
 
 	defer func() {
-		if err := db.Close(); err != nil {
+		if err := Config.DBManager.Close(); err != nil {
 			log.Warn("failed to close the node's DB: %s", err)
 		}
 		log.StopOnPanic()

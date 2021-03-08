@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/encdb"
-	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -42,6 +42,10 @@ const (
 var (
 	errEmptyUsername = errors.New("empty username")
 	errUserMaxLength = fmt.Errorf("username exceeds maximum length of %d chars", maxUserLen)
+
+	usersPrefix = []byte("users")
+	bcsPrefix   = []byte("bcs")
+	migratedKey = []byte("migrated")
 )
 
 // KeyValuePair ...
@@ -79,7 +83,7 @@ type Keystore struct {
 }
 
 // Initialize the keystore
-func (ks *Keystore) Initialize(log logging.Logger, db database.Database) error {
+func (ks *Keystore) Initialize(log logging.Logger, dbManager manager.Manager) error {
 	c := linearcodec.New(reflectcodec.DefaultTagName, maxSliceLength)
 	manager := codec.NewManager(maxPackerSize)
 	if err := manager.RegisterCodec(codecVersion, c); err != nil {
@@ -89,9 +93,86 @@ func (ks *Keystore) Initialize(log logging.Logger, db database.Database) error {
 	ks.log = log
 	ks.codec = manager
 	ks.users = make(map[string]*password.Hash)
-	ks.userDB = prefixdb.New([]byte("users"), db)
-	ks.bcDB = prefixdb.New([]byte("bcs"), db)
-	return nil
+	return ks.initializeDB(dbManager)
+}
+
+func (ks *Keystore) initializeDB(manager manager.Manager) error {
+	currentDB := manager.Current()
+
+	ks.userDB = prefixdb.New(usersPrefix, currentDB)
+	ks.bcDB = prefixdb.New(bcsPrefix, currentDB)
+
+	previousDB, exists := manager.Previous()
+	if !exists {
+		return nil
+	}
+
+	migrated, err := currentDB.Has(migratedKey)
+	if err != nil {
+		return err
+	}
+	// If the currentDB has already been marked as migrated
+	// then skip migrating the keystore users.
+	if migrated {
+		return nil
+	}
+
+	previousUserDB := prefixdb.New(usersPrefix, previousDB)
+	previousBCDB := prefixdb.New(bcsPrefix, previousDB)
+
+	ks.log.Info("Migrating Keystore Users from %s -> %s", previousDB.Version, currentDB.Version)
+
+	userIterator := previousUserDB.NewIterator()
+	defer userIterator.Release()
+
+	for userIterator.Next() {
+		username := userIterator.Key()
+
+		exists, err := ks.userDB.Has(username)
+		if err != nil {
+			return err
+		}
+		if exists {
+			continue
+		}
+
+		userBatch := ks.userDB.NewBatch()
+		if err := userBatch.Put(username, userIterator.Value()); err != nil {
+			return err
+		}
+
+		currentUserBCDB := prefixdb.New(username, ks.bcDB)
+		previousUserBCDB := prefixdb.New(username, previousBCDB)
+
+		bcsBatch := currentUserBCDB.NewBatch()
+
+		if err := ks.migrateUserBCDB(previousUserBCDB, bcsBatch, userBatch); err != nil {
+			return err
+		}
+	}
+
+	if err := userIterator.Error(); err != nil {
+		return err
+	}
+
+	return currentDB.Put(migratedKey, []byte(previousDB.Version.String()))
+}
+
+func (ks *Keystore) migrateUserBCDB(previousUserBCDB database.Database, bcsBatch database.Batch, userBatch database.Batch) error {
+	iterator := previousUserBCDB.NewIterator()
+	defer iterator.Release()
+
+	for iterator.Next() {
+		if err := bcsBatch.Put(iterator.Key(), iterator.Value()); err != nil {
+			return err
+		}
+	}
+
+	if err := iterator.Error(); err != nil {
+		return err
+	}
+
+	return atomic.WriteAll(userBatch, bcsBatch)
 }
 
 // CreateHandler returns a new service object that can send requests to thisAPI.
@@ -411,5 +492,5 @@ func (ks *Keystore) AddUser(username, pword string) error {
 // CreateTestKeystore returns a new keystore that can be utilized for testing
 func CreateTestKeystore() (*Keystore, error) {
 	ks := &Keystore{}
-	return ks, ks.Initialize(logging.NoLog{}, memdb.New())
+	return ks, ks.Initialize(logging.NoLog{}, manager.NewDefaultMemDBManager())
 }

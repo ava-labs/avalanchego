@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
@@ -32,6 +31,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
+
+	dbManager "github.com/ava-labs/avalanchego/database/manager"
 
 	avcon "github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
@@ -108,6 +109,14 @@ type chain struct {
 	Beacons validators.Set
 }
 
+// ChainConfig is configuration settings for the current execution.
+// [Settings] is the user-provided settings blob for the chain.
+// [Upgrades] is a chain-specific blob for coordinating upgrades.
+type ChainConfig struct {
+	Settings []byte
+	Upgrades []byte
+}
+
 // ManagerConfig ...
 type ManagerConfig struct {
 	StakingEnabled            bool // True iff the network has staking enabled
@@ -120,7 +129,7 @@ type ManagerConfig struct {
 	VMManager                 vms.Manager // Manage mappings from vm ID --> vm
 	DecisionEvents            *triggers.EventDispatcher
 	ConsensusEvents           *triggers.EventDispatcher
-	DB                        database.Database
+	DBManager                 dbManager.Manager
 	Router                    router.Router    // Routes incoming messages to the appropriate chain
 	Net                       network.Network  // Sends consensus messages to other validators
 	ConsensusParams           avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
@@ -140,6 +149,7 @@ type ManagerConfig struct {
 	HealthService             health.Service
 	RetryBootstrap            bool // Should Bootstrap be retried
 	RetryBootstrapMaxAttempts int  // Max number of times to retry bootstrap
+	ChainConfigs              map[ids.ID]ChainConfig
 }
 
 type manager struct {
@@ -422,8 +432,10 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	db := prefixdb.New(ctx.ChainID[:], m.DB)
-	vmDB := prefixdb.New([]byte("vm"), db)
+	dbManager := m.DBManager.NewPrefixDBManager(ctx.ChainID[:])
+	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
+
+	db := dbManager.Current()
 	vertexDB := prefixdb.New([]byte("vertex"), db)
 	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db)
 	txBootstrappingDB := prefixdb.New([]byte("tx_bs"), db)
@@ -441,7 +453,8 @@ func (m *manager) createAvalancheChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
-	if err := vm.Initialize(ctx, vmDB, genesisData, msgChan, fxs); err != nil {
+	chainConfig := m.ChainConfigs[ctx.ChainID]
+	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrades, chainConfig.Settings, msgChan, fxs); err != nil {
 		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
 	}
 
@@ -546,8 +559,10 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	db := prefixdb.New(ctx.ChainID[:], m.DB)
-	vmDB := prefixdb.New([]byte("vm"), db)
+	dbManager := m.DBManager.NewPrefixDBManager(ctx.ChainID[:])
+	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
+
+	db := dbManager.Current()
 	bootstrappingDB := prefixdb.New([]byte("bs"), db)
 
 	blocked, err := queue.New(bootstrappingDB)
@@ -560,7 +575,8 @@ func (m *manager) createSnowmanChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	// Initialize the VM
-	if err := vm.Initialize(ctx, vmDB, genesisData, msgChan, fxs); err != nil {
+	chainConfig := m.ChainConfigs[ctx.ChainID]
+	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrades, chainConfig.Settings, msgChan, fxs); err != nil {
 		return nil, err
 	}
 

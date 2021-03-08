@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -43,18 +43,20 @@ type VM struct {
 
 // Initialize this vm
 // [ctx] is this vm's context
-// [db] is this vm's database
+// [dbManager] is the manager of this vm's database
 // [toEngine] is used to notify the consensus engine that new blocks are
 //   ready to be added to consensus
 // The data in the genesis block is [genesisData]
 func (vm *VM) Initialize(
 	ctx *snow.Context,
-	db database.Database,
+	dbManager manager.Manager,
 	genesisData []byte,
+	upgradeData []byte,
+	configData []byte,
 	toEngine chan<- common.Message,
 	_ []*common.Fx,
 ) error {
-	if err := vm.SnowmanVM.Initialize(ctx, db, vm.ParseBlock, toEngine); err != nil {
+	if err := vm.SnowmanVM.Initialize(ctx, dbManager.Current(), vm.ParseBlock, toEngine); err != nil {
 		ctx.Log.Error("error initializing SnowmanVM: %v", err)
 		return err
 	}

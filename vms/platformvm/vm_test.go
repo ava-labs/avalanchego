@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -39,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/core"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -298,9 +300,9 @@ func defaultVM() (*VM, database.Database) {
 		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 
-	baseDB := memdb.New()
-	chainDB := prefixdb.New([]byte{0}, baseDB)
-	atomicDB := prefixdb.New([]byte{1}, baseDB)
+	baseDBManager := manager.NewDefaultMemDBManager()
+	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
+	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current())
 
 	vm.vdrMgr = validators.NewManager()
 
@@ -319,7 +321,7 @@ func defaultVM() (*VM, database.Database) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 	_, genesisBytes := defaultGenesis()
-	if err := vm.Initialize(ctx, chainDB, genesisBytes, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
 		panic(err)
 	}
 	if err := vm.Bootstrapped(); err != nil {
@@ -347,7 +349,7 @@ func defaultVM() (*VM, database.Database) {
 		testSubnet1 = tx.UnsignedTx.(*UnsignedCreateSubnetTx)
 	}
 
-	return vm, baseDB
+	return vm, baseDBManager.Current()
 }
 
 func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) {
@@ -375,9 +377,9 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 
-	baseDB := memdb.New()
-	chainDB := prefixdb.New([]byte{0}, baseDB)
-	atomicDB := prefixdb.New([]byte{1}, baseDB)
+	baseDBManager := manager.NewDefaultMemDBManager()
+	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
+	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current())
 
 	vm.vdrMgr = validators.NewManager()
 
@@ -395,8 +397,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-	// _, genesisBytes := defaultGenesis()
-	if err := vm.Initialize(ctx, chainDB, genesisBytes, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := vm.Bootstrapped(); err != nil {
@@ -1834,7 +1835,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 // test restarting the node
 func TestRestartPartiallyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	db := memdb.New()
+	db := manager.NewDefaultMemDBManager()
 
 	firstVM := &VM{
 		SnowmanVM:          &core.SnowmanVM{},
@@ -1849,7 +1850,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
-	if err := firstVM.Initialize(firstCtx, db, genesisBytes, firstMsgChan, nil); err != nil {
+	if err := firstVM.Initialize(firstCtx, db, genesisBytes, nil, nil, firstMsgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1935,7 +1936,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	}()
 
 	secondMsgChan := make(chan common.Message, 1)
-	if err := secondVM.Initialize(secondCtx, db, genesisBytes, secondMsgChan, nil); err != nil {
+	if err := secondVM.Initialize(secondCtx, db, genesisBytes, nil, nil, secondMsgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1952,7 +1953,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 func TestRestartFullyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
 
-	db := memdb.New()
+	db := manager.NewDefaultMemDBManager()
 
 	firstVM := &VM{
 		SnowmanVM:          &core.SnowmanVM{},
@@ -1969,7 +1970,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
-	if err := firstVM.Initialize(firstCtx, db, genesisBytes, firstMsgChan, nil); err != nil {
+	if err := firstVM.Initialize(firstCtx, db, genesisBytes, nil, nil, firstMsgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2066,7 +2067,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	}()
 
 	secondMsgChan := make(chan common.Message, 1)
-	if err := secondVM.Initialize(secondCtx, db, genesisBytes, secondMsgChan, nil); err != nil {
+	if err := secondVM.Initialize(secondCtx, db, genesisBytes, nil, nil, secondMsgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 	lastAccepted, err := secondVM.LastAccepted()
@@ -2082,9 +2083,10 @@ func TestRestartFullyAccepted(t *testing.T) {
 func TestBootstrapPartiallyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
 
-	db := memdb.New()
-	vmDB := prefixdb.New([]byte("vm"), db)
-	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), db)
+	baseDBManager := manager.NewDefaultMemDBManager()
+
+	vmDBManager := baseDBManager.NewPrefixDBManager([]byte("vm"))
+	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), baseDBManager.Current())
 
 	blocked, err := queue.New(bootstrappingDB)
 	if err != nil {
@@ -2106,7 +2108,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
-	if err := vm.Initialize(ctx, vmDB, genesisBytes, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, vmDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2281,7 +2283,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 func TestUnverifiedParent(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
 
-	db := memdb.New()
+	dbManager := manager.NewDefaultMemDBManager()
 
 	vm := &VM{
 		SnowmanVM:          &core.SnowmanVM{},
@@ -2304,7 +2306,7 @@ func TestUnverifiedParent(t *testing.T) {
 	}()
 
 	msgChan := make(chan common.Message, 1)
-	if err := vm.Initialize(ctx, db, genesisBytes, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, dbManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2551,8 +2553,17 @@ func TestUptimeReporting(t *testing.T) {
 
 	// Test that the VM reports the correct uptimes for peers
 	// connected both during and after bootstrapping completes.
-	baseDB := memdb.New()
-	firstDB := prefixdb.New([]byte{0}, baseDB)
+	versionedDBs := []*manager.VersionedDatabase{
+		{
+			Database: memdb.New(),
+			Version:  version.DefaultVersion1,
+		},
+	}
+	baseDBManager, err := manager.NewManagerFromDBs(versionedDBs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
 
 	vm := &VM{
 		SnowmanVM:          &core.SnowmanVM{},
@@ -2575,7 +2586,7 @@ func TestUptimeReporting(t *testing.T) {
 	}()
 
 	msgChan := make(chan common.Message, 1)
-	if err := vm.Initialize(ctx, firstDB, genesisBytes, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, firstDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2594,12 +2605,12 @@ func TestUptimeReporting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	afterBootstrappingTime := finishedBootstrappingTime.Add(5 * time.Second)
-	vm.clock.Set(afterBootstrappingTime)
+	afterBootstrappedTime := finishedBootstrappingTime.Add(5 * time.Second)
+	vm.clock.Set(afterBootstrappedTime)
 	vm.Connected(nodeID1)
 	vm.Disconnected(nodeID2)
 
-	endTime := afterBootstrappingTime.Add(5 * time.Second)
+	endTime := afterBootstrappedTime.Add(5 * time.Second)
 	vm.clock.Set(endTime)
 
 	checkUptime(vm, nodeID0, 1, "peer connected during bootstrapping")
@@ -2625,9 +2636,9 @@ func TestUptimeReporting(t *testing.T) {
 
 	vm.clock.Set(endTime)
 	vm.vdrMgr = validators.NewManager()
-	restartDB := prefixdb.New([]byte{0}, baseDB)
+	restartDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
 
-	if err := vm.Initialize(ctx, restartDB, genesisBytes, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, restartDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2642,6 +2653,50 @@ func TestUptimeReporting(t *testing.T) {
 	checkUptime(vm, nodeID0, 1, "peer connected during bootstrapping after restart")
 	checkUptime(vm, nodeID1, .75, "peer connected after bootstrapping after restart")
 	checkUptime(vm, nodeID2, .75, "peer connected during bootstrapping and disconnected after bootstrapping after restart")
+
+	// Test that VM reports the correct uptimes after database migration
+	vm = &VM{
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
+	}
+
+	versionedDBs = append(versionedDBs, &manager.VersionedDatabase{
+		Database: memdb.New(),
+		Version:  version.NewDefaultVersion(1, 0, 1),
+	})
+
+	newDBManager, err := manager.NewManagerFromDBs(versionedDBs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	migrateTime := endTime.Add(5 * time.Second)
+	vm.clock.Set(migrateTime)
+	vm.vdrMgr = validators.NewManager()
+	migratedDBManager := newDBManager.NewPrefixDBManager([]byte{0})
+
+	if err := vm.Initialize(ctx, migratedDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	vm.Connected(nodeID0)
+	vm.Connected(nodeID1)
+	vm.Connected(nodeID2)
+
+	if err := vm.Bootstrapping(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
+
+	checkUptime(vm, nodeID0, 1, "peer connected during bootstrapping after db migration")
+	checkUptime(vm, nodeID1, .8, "peer connected after bootstrapping after db migration")
+	checkUptime(vm, nodeID2, .8, "peer connected during bootstrapping and disconnected after bootstrapping after db migration")
 }
 
 // Test that calling Verify on a block with an unverified parent doesn't cause a
