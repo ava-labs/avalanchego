@@ -180,9 +180,9 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Duration(networkHealthMaxTimeSinceMsgReceivedKey, time.Minute, "Network layer returns unhealthy if haven't received a message for at least this much time")
 	fs.Float64(networkHealthMaxPortionSendQueueFillKey, 0.9, "Network layer returns unhealthy if more than this portion of the pending send queue is full")
 	fs.Uint(networkHealthMinPeersKey, 1, "Network layer returns unhealthy if connected to less than this many peers")
-	fs.Float64(networkHealthMaxSendFailRateKey, .25, "Network layer reports unhealthy if more than this portion of attempted message sends fail")
+	fs.Float64(networkHealthMaxSendFailRateKey, .9, "Network layer reports unhealthy if more than this portion of attempted message sends fail")
 	// Router Health
-	fs.Float64(routerHealthMaxDropRateKey, 0.25, "Node reports unhealthy if the router drops more than this portion of messages.")
+	fs.Float64(routerHealthMaxDropRateKey, 1, "Node reports unhealthy if the router drops more than this portion of messages.")
 	fs.Uint(routerHealthMaxOutstandingRequestsKey, 1024, "Node reports unhealthy if there are more than this many outstanding consensus requests (Get, PullQuery, etc.) over all chains")
 	fs.Duration(networkHealthMaxTimeSinceNoReqsKey, 5*time.Minute, "Node reports unhealthy if there is at least 1 outstanding request continuously for this duration")
 
@@ -226,7 +226,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Int(snowConcurrentRepollsKey, 4, "Minimum number of concurrent polls for finalizing consensus")
 	fs.Int(snowOptimalProcessingKey, 50, "Optimal number of processing vertices in consensus")
 	fs.Int(snowMaxProcessingKey, 1024, "Maximum number of processing items to be considered healthy")
-	fs.Duration(snowMaxTimeProcessingKey, 10*time.Second, "Maximum amount of time an item should be processing and still be healthy")
+	fs.Duration(snowMaxTimeProcessingKey, 2*time.Minute, "Maximum amount of time an item should be processing and still be healthy")
 	fs.Int64(snowEpochFirstTransition, 1607626800, "Unix timestamp of the first epoch transaction, in seconds. Defaults to 12/10/2020 @ 7:00pm (UTC)")
 	fs.Duration(snowEpochDuration, 6*time.Hour, "Duration of each epoch")
 

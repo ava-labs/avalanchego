@@ -1471,17 +1471,12 @@ func (n *network) restartOnDisconnect() {
 // 2) An error if the health check reports unhealthy
 // Assumes [n.stateLock] is not held
 func (n *network) HealthCheck() (interface{}, error) {
-	details := map[string]interface{}{}
-
 	// Get some data with the state lock held
 	connectedTo := 0
 	n.stateLock.RLock()
 	for _, peer := range n.peers {
 		if peer != nil && peer.connected.GetValue() {
 			connectedTo++
-			if connectedTo > int(n.healthConfig.MinConnectedPeers) {
-				break
-			}
 		}
 	}
 	pendingSendBytes := n.pendingBytes
@@ -1489,9 +1484,10 @@ func (n *network) HealthCheck() (interface{}, error) {
 	n.stateLock.RUnlock()
 
 	// Make sure we're connected to at least the minimum number of peers
-	isSufficientlyConnected := connectedTo >= int(n.healthConfig.MinConnectedPeers)
-	healthy := isSufficientlyConnected
-	details["connectedToMinPeers"] = isSufficientlyConnected
+	healthy := connectedTo >= int(n.healthConfig.MinConnectedPeers)
+	details := map[string]interface{}{
+		"connectedPeers": connectedTo,
+	}
 
 	// Make sure we've received an incoming message within the threshold
 	now := n.clock.Time()
