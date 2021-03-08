@@ -378,9 +378,9 @@ func (n *Node) Dispatch() error {
  ******************************************************************************
  */
 
-func (n *Node) initDatabase() error {
-	n.DBManager = n.Config.DBManager
-	n.DB = n.DBManager.Current()
+func (n *Node) initDatabase(dbManager manager.Manager) error {
+	n.DBManager = dbManager
+	n.DB = dbManager.Current()
 
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
 
@@ -562,7 +562,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		VMManager:                 n.vmManager,
 		DecisionEvents:            n.DecisionDispatcher,
 		ConsensusEvents:           n.ConsensusDispatcher,
-		DB:                        n.DBManager,
+		DBManager:                 n.DBManager,
 		Router:                    n.Config.ConsensusRouter,
 		Net:                       n.Net,
 		ConsensusParams:           n.Config.ConsensusParams,
@@ -826,7 +826,7 @@ func (n *Node) initAliases(genesisBytes []byte) error {
 // Initialize this node
 func (n *Node) Initialize(
 	config *Config,
-	db database.Database,
+	dbManager manager.Manager,
 	logger logging.Logger,
 	logFactory logging.Factory,
 	restarter utils.Restarter,
@@ -844,7 +844,7 @@ func (n *Node) Initialize(
 	}
 	n.HTTPLog = httpLog
 
-	if err := n.initDatabase(db); err != nil { // Set up the node's database
+	if err := n.initDatabase(dbManager); err != nil { // Set up the node's database
 		return fmt.Errorf("problem initializing database: %w", err)
 	}
 	if err = n.initNodeID(); err != nil { // Derive this node's ID

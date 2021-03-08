@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -116,11 +117,11 @@ func NewDefaultMemDBManager() Manager {
 
 // New creates a database manager at [filePath] by creating a database instance from each directory
 // with a version <= [currentVersion]
-func New(dbDirPath string, currentVersion version.Version) (Manager, error) {
+func New(dbDirPath string, log logging.Logger, currentVersion version.Version) (Manager, error) {
 	parser := version.NewDefaultParser()
 
 	currentDBPath := path.Join(dbDirPath, currentVersion.String())
-	currentDB, err := leveldb.New(currentDBPath, 0, 0, 0)
+	currentDB, err := leveldb.New(currentDBPath, log, 0, 0, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create db at %s: %w", currentDBPath, err)
 	}
@@ -160,7 +161,7 @@ func New(dbDirPath string, currentVersion version.Version) (Manager, error) {
 			return filepath.SkipDir
 		}
 
-		db, err := leveldb.New(path, 0, 0, 0)
+		db, err := leveldb.New(path, log, 0, 0, 0)
 		if err != nil {
 			return fmt.Errorf("couldn't create db at %s: %w", path, err)
 		}

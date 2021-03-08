@@ -2621,8 +2621,8 @@ func TestUptimeReporting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Unregister the previously registered metrics
-	ctx.Metrics.Unregister(vm.metrics.percentConnected)
+	// Replace the metrics registry to prevent conflicts
+	ctx.Metrics = prometheus.NewRegistry()
 
 	// Test that VM reports the correct uptimes afer
 	// restart.
@@ -2678,6 +2678,9 @@ func TestUptimeReporting(t *testing.T) {
 	vm.vdrMgr = validators.NewManager()
 	migratedDBManager := newDBManager.NewPrefixDBManager([]byte{0})
 
+	// Replace the metrics registry to prevent conflicts
+	ctx.Metrics = prometheus.NewRegistry()
+
 	if err := vm.Initialize(ctx, migratedDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -2704,7 +2707,7 @@ func TestUptimeReporting(t *testing.T) {
 func TestUnverifiedParentPanic(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
 
-	db := memdb.New()
+	baseDBManager := manager.NewDefaultMemDBManager()
 
 	vm := &VM{
 		SnowmanVM:          &core.SnowmanVM{},
@@ -2727,7 +2730,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	}()
 
 	msgChan := make(chan common.Message, 1)
-	if err := vm.Initialize(ctx, db, genesisBytes, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, baseDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 

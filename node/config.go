@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/nat"
@@ -49,8 +48,6 @@ type Config struct {
 
 	// If false, uses an in memory database
 	DBEnabled bool
-	// Database to use for the node
-	DBManager manager.Manager
 
 	// Staking configuration
 	StakingIP             utils.DynamicIPDesc

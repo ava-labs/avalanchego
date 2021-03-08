@@ -1078,8 +1078,8 @@ func assertEqualPeers(t *testing.T, expected map[string]ids.ShortID, actual []Pe
 func TestPeerAliasesTicker(t *testing.T) {
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
-	versionParser := version.NewDefaultParser()
+	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -1462,8 +1462,8 @@ func TestPeerAliasesTicker(t *testing.T) {
 func TestPeerAliasesDisconnect(t *testing.T) {
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
-	versionParser := version.NewDefaultParser()
+	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
