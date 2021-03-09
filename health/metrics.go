@@ -4,11 +4,11 @@
 package health
 
 import (
-	health "github.com/AppsFlyer/go-sundheit"
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/prometheus/client_golang/prometheus"
+
+	health "github.com/AppsFlyer/go-sundheit"
 )
 
 // metrics reports commonly used health check metrics.
@@ -40,7 +40,7 @@ func newMetrics(log logging.Logger, namespace string, registerer prometheus.Regi
 
 // healthy handles the metrics for the healthy cases
 func (m *metrics) healthy(health.Result) {
-	m.failingChecks.Dec()
+	m.failingChecks.Set(0)
 }
 
 // unHealthy handles the metrics for the unhealthy cases
