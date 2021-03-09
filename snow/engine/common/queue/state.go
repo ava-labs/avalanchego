@@ -30,6 +30,19 @@ func (s *state) Int(db database.Database, key []byte) (uint32, error) {
 	return p.UnpackInt(), p.Err
 }
 
+func (s *state) SetJobID(db database.Database, key []byte, jobID ids.ID) error {
+	return db.Put(key, jobID[:])
+}
+
+func (s *state) JobID(db database.Database, key []byte) (ids.ID, error) {
+	jobIDBytes, err := db.Get(key)
+	if err != nil {
+		return ids.ID{}, err
+	}
+
+	return ids.ToID(jobIDBytes)
+}
+
 func (s *state) SetJob(db database.Database, key []byte, job Job) error {
 	return db.Put(key, job.Bytes())
 }

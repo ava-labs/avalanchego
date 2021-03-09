@@ -148,7 +148,7 @@ func (j *Jobs) push(job Job) error {
 // pushUnblockedJob pushes a new job with no remaining dependencies to the queue
 // to be executed
 func (j *Jobs) pushUnblockedJob(job Job) error {
-	err := j.state.SetStackIndex(j.db, j.stackSize, job)
+	err := j.state.SetStackIndex(j.db, j.stackSize, job.ID())
 	if err != nil {
 		return fmt.Errorf("failed to set stack index due to %w", err)
 	}

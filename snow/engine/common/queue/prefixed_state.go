@@ -35,13 +35,13 @@ func (ps *prefixedState) StackSize(db database.Database) (uint32, error) {
 }
 
 // SetStackIndex sets the job at [index] to [job]
-func (ps *prefixedState) SetStackIndex(db database.Database, index uint32, job Job) error {
+func (ps *prefixedState) SetStackIndex(db database.Database, index uint32, jobID ids.ID) error {
 	p := wrappers.Packer{Bytes: make([]byte, 1+wrappers.IntLen)}
 
 	p.PackByte(stackID)
 	p.PackInt(index)
 
-	return ps.state.SetJob(db, p.Bytes, job)
+	return ps.state.SetJobID(db, p.Bytes, jobID)
 }
 
 // DeleteStackIndex deletes the job at [index] from [db]
@@ -61,7 +61,12 @@ func (ps *prefixedState) StackIndex(db database.Database, index uint32) (Job, er
 	p.PackByte(stackID)
 	p.PackInt(index)
 
-	return ps.state.Job(db, p.Bytes)
+	jobID, err := ps.state.JobID(db, p.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return ps.Job(db, jobID)
 }
 
 // SetJob writes [job] to [db]
