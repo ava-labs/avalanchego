@@ -209,6 +209,7 @@ func (ta *Topological) HealthCheck() (interface{}, error) {
 	details := map[string]interface{}{
 		"outstandingVertices": numOutstandingVtx,
 	}
+	ta.Metrics.OutstandingItems(numOutstandingVtx)
 
 	// check for long running vertices
 	now := ta.Metrics.Clock.Time()
@@ -220,6 +221,7 @@ func (ta *Topological) HealthCheck() (interface{}, error) {
 	timeReqRunning := now.Sub(oldestStartTime)
 	healthy = healthy && timeReqRunning <= ta.params.MaxItemProcessingTime
 	details["longestRunningVertex"] = timeReqRunning.String()
+	ta.Metrics.LongestRunningItem(timeReqRunning.Milliseconds())
 
 	snowstormReport, err := ta.cg.HealthCheck()
 	healthy = healthy && err == nil

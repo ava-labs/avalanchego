@@ -38,7 +38,9 @@ type Metrics struct {
 
 	// rejected tracks the number of milliseconds that an item was processing
 	// before being rejected
-	latRejected prometheus.Histogram
+	latRejected        prometheus.Histogram
+	outstandingItems   prometheus.Gauge
+	longestRunningItem prometheus.Histogram
 }
 
 // Initialize the metrics with the provided names.
@@ -61,6 +63,17 @@ func (m *Metrics) Initialize(metricName, descriptionName string, log logging.Log
 		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_rejected", metricName),
 		Help:      fmt.Sprintf("Latency of rejecting from the time the %s was issued in milliseconds", descriptionName),
+		Buckets:   timer.MillisecondsBuckets,
+	})
+	m.outstandingItems = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      fmt.Sprintf("%s_outstanding_transactions", metricName),
+		Help:      fmt.Sprintf("Number of unprocessed %s", metricName),
+	})
+	m.longestRunningItem = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      fmt.Sprintf("%s_longest_running_tx", metricName),
+		Help:      fmt.Sprintf("Latency of processing the issued %s in milliseconds", descriptionName),
 		Buckets:   timer.MillisecondsBuckets,
 	})
 
@@ -107,4 +120,12 @@ func (m *Metrics) Rejected(id ids.ID) {
 	duration := endTime.Sub(startTime.(time.Time))
 	m.latRejected.Observe(float64(duration.Milliseconds()))
 	m.numProcessing.Dec()
+}
+
+func (m *Metrics) OutstandingItems(txs int) {
+	m.outstandingItems.Set(float64(txs))
+}
+
+func (m *Metrics) LongestRunningItem(milliseconds int64) {
+	m.longestRunningItem.Observe(float64(milliseconds))
 }

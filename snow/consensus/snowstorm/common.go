@@ -99,6 +99,7 @@ func (c *common) HealthCheck() (interface{}, error) {
 	details := map[string]interface{}{
 		"outstandingTransactions": numOutstandingTxs,
 	}
+	c.Metrics.OutstandingItems(numOutstandingTxs)
 
 	// check for long running transactions
 	now := c.Metrics.Clock.Time()
@@ -110,6 +111,7 @@ func (c *common) HealthCheck() (interface{}, error) {
 	timeReqRunning := now.Sub(oldestStartTime)
 	healthy = healthy && timeReqRunning <= c.params.MaxItemProcessingTime
 	details["longestRunningTx"] = timeReqRunning.String()
+	c.Metrics.LongestRunningItem(timeReqRunning.Milliseconds())
 
 	if !healthy {
 		return details, errUnhealthy

@@ -268,6 +268,7 @@ func (ts *Topological) HealthCheck() (interface{}, error) {
 	details := map[string]interface{}{
 		"outstandingBlocks": numOutstandingBlks,
 	}
+	ts.Metrics.OutstandingItems(numOutstandingBlks)
 
 	// check for long running blocks
 	now := ts.Metrics.Clock.Time()
@@ -279,6 +280,7 @@ func (ts *Topological) HealthCheck() (interface{}, error) {
 	timeReqRunning := now.Sub(oldestStartTime)
 	healthy = healthy && timeReqRunning <= ts.params.MaxItemProcessingTime
 	details["longestRunningBlock"] = timeReqRunning.String()
+	ts.Metrics.LongestRunningItem(timeReqRunning.Milliseconds())
 
 	if !healthy {
 		return details, errUnhealthy

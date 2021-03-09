@@ -5,7 +5,6 @@ package router
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -56,7 +55,7 @@ type ChainRouter struct {
 	peers            ids.ShortSet
 	criticalChains   ids.Set
 	onFatal          func()
-	metrics          routerMetrics
+	metrics          *routerMetrics
 	// Parameters for doing health checks
 	healthConfig HealthConfig
 	// aggregator of requests based on their time
@@ -102,17 +101,11 @@ func (cr *ChainRouter) Initialize(
 	cr.healthConfig = healthConfig
 
 	// Register metrics
-	cr.metrics = routerMetrics{}
-	cr.metrics.outstandingRequests = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: metricsNamespace,
-			Name:      "outstanding_requests",
-			Help:      "Number of outstanding requests (all types)",
-		},
-	)
-	if err := metricsRegisterer.Register(cr.metrics.outstandingRequests); err != nil {
-		return fmt.Errorf("couldn't register metric: %w", err)
+	rMetrics, err := newRouterMetrics(cr.log, metricsNamespace, metricsRegisterer)
+	if err != nil {
+		return err
 	}
+	cr.metrics = rMetrics
 
 	go log.RecoverAndPanic(cr.gossiper.Dispatch)
 	go log.RecoverAndPanic(cr.intervalNotifier.Dispatch)
@@ -788,6 +781,7 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 	details := map[string]interface{}{
 		"msgDropRate": dropRate,
 	}
+	cr.metrics.msgDropRate.Set(dropRate)
 
 	numOutstandingReqs := cr.timedRequests.Len()
 	healthy = healthy && numOutstandingReqs <= cr.healthConfig.MaxOutstandingRequests
@@ -800,6 +794,7 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 	timeSinceNoOutstandingRequests := now.Sub(cr.lastTimeNoOutstanding)
 	healthy = healthy && timeSinceNoOutstandingRequests <= cr.healthConfig.MaxTimeSinceNoOutstandingRequests
 	details["timeSinceNoOutstandingRequests"] = timeSinceNoOutstandingRequests.String()
+	cr.metrics.timeSinceNoOutstandingRequests.Set(float64(timeSinceNoOutstandingRequests.Milliseconds()))
 
 	// check for long running requests
 	processingRequest := now
@@ -809,6 +804,7 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 	timeReqRunning := now.Sub(processingRequest)
 	healthy = healthy && timeReqRunning <= cr.healthConfig.MaxTimeSinceNoOutstandingRequests
 	details["longestRunningRequest"] = timeReqRunning.String()
+	cr.metrics.longestRunningRequest.Set(float64(timeReqRunning.Milliseconds()))
 
 	if !healthy {
 		// The router is not healthy
@@ -833,9 +829,4 @@ func createRequestID(validatorID ids.ShortID, chainID ids.ID, requestID uint32) 
 	p := wrappers.Packer{Bytes: make([]byte, wrappers.IntLen)}
 	p.PackInt(requestID)
 	return hashing.ByteArraysToHash256Array(validatorID[:], chainID[:], p.Bytes)
-}
-
-// metrics about incoming messages
-type routerMetrics struct {
-	outstandingRequests prometheus.Gauge
 }
