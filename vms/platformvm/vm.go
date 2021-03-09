@@ -1007,6 +1007,10 @@ func (vm *VM) updateVdrSet(subnetID ids.ID) error {
 		}
 	}
 
+	if subnetID == constants.PrimaryNetworkID {
+		vm.totalStake.Set(float64(vdrs.Weight()) / float64(units.Avax))
+	}
+
 	errs := wrappers.Errs{}
 	errs.Add(
 		vm.vdrMgr.Set(subnetID, vdrs),

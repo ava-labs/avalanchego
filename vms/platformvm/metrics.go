@@ -4,11 +4,13 @@
 package platformvm
 
 import (
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 type metrics struct {
 	percentConnected prometheus.Gauge
+	totalStake       prometheus.Gauge
 }
 
 // Initialize platformvm metrics
@@ -21,6 +23,16 @@ func (m *metrics) Initialize(
 		Name:      "percent_connected",
 		Help:      "Percent of connected stake",
 	})
+	m.totalStake = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "total_staked",
+		Help:      "Total amount of AVAX staked",
+	})
 
-	return registerer.Register(m.percentConnected)
+	errs := wrappers.Errs{}
+	errs.Add(
+		registerer.Register(m.percentConnected),
+		registerer.Register(m.totalStake),
+	)
+	return errs.Err
 }

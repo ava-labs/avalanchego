@@ -2612,9 +2612,9 @@ func TestUptimeReporting(t *testing.T) {
 
 	// Unregister the previously registered metrics
 	ctx.Metrics.Unregister(vm.metrics.percentConnected)
+	ctx.Metrics.Unregister(vm.metrics.totalStake)
 
-	// Test that VM reports the correct uptimes afer
-	// restart.
+	// Test that VM reports the correct uptimes after restart.
 	vm = &VM{
 		SnowmanVM:          &core.SnowmanVM{},
 		chainManager:       chains.MockManager{},
