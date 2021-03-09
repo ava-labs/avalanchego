@@ -1251,24 +1251,6 @@ func (vm *VM) getPendingStakers() ([]validators.Validator, error) {
 	return stakers, errs.Err
 }
 
-// Returns the total amount being staked on the Primary Network, in nAVAX.
-// Does not include stake of pending stakers.
-func (vm *VM) getTotalStake() (uint64, error) {
-	stakers, err := vm.getStakers()
-	if err != nil {
-		return 0, fmt.Errorf("couldn't get stakers: %w", err)
-	}
-
-	totalStake := uint64(0)
-	for _, staker := range stakers {
-		totalStake, err = safemath.Add64(totalStake, staker.Weight())
-		if err != nil {
-			return 0, err
-		}
-	}
-	return totalStake, nil
-}
-
 // Returns the percentage of the total stake on the Primary Network
 // of nodes connected to this node.
 func (vm *VM) getPercentConnected() (float64, error) {
