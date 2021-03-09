@@ -77,7 +77,7 @@ func NewChainState(db database.Database, cacheSize int) *ChainState {
 }
 
 // Initialize sets the genesis block, last accepted block, and the functions for retrieving blocks from the VM layer.
-func (c *ChainState) Initialize(lastAcceptedBlock Block, getBlockIDAtHeight GetBlockIDAtHeightType, getBlock GetBlockType, unmarshalBlock UnmarshalType, buildBlock BuildBlockType) error {
+func (c *ChainState) Initialize(lastAcceptedBlock Block, getBlockIDAtHeight GetBlockIDAtHeightType, getBlock GetBlockType, unmarshalBlock UnmarshalType, buildBlock BuildBlockType) {
 	// Set the functions for retrieving blocks from the VM
 	c.getBlockIDAtHeight = getBlockIDAtHeight
 	c.getBlock = getBlock
@@ -89,8 +89,8 @@ func (c *ChainState) Initialize(lastAcceptedBlock Block, getBlockIDAtHeight GetB
 		Block: lastAcceptedBlock,
 		state: c,
 	}
+	c.lastAcceptedBlock.SetStatus(choices.Accepted)
 	c.decidedBlocks.Put(lastAcceptedBlock.ID(), c.lastAcceptedBlock)
-	return nil
 }
 
 // FlushCaches flushes each block cache completely.
