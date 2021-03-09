@@ -24,7 +24,7 @@ type Service interface {
 // run every [checkFreq]
 func NewService(checkFreq time.Duration, log logging.Logger, registry prometheus.Registerer) (Service, error) {
 	healthChecker := health.New()
-	metrics, err := newMetrics("healthCheck", "healthCheck metrics", log, "healthcheck", registry)
+	metrics, err := newMetrics(log, "healthcheck", registry)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ type checkListener struct {
 	lock sync.Mutex
 	// checks maps name -> is healthy
 	checks  map[string]bool
-	metrics *Metrics
+	metrics *metrics
 }
 
 func (c *checkListener) OnCheckStarted(name string) {

@@ -11,8 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// Metrics reports commonly used health check metrics.
-type Metrics struct {
+// metrics reports commonly used health check metrics.
+type metrics struct {
 	// log reports anomalous events.
 	log logging.Logger
 
@@ -20,8 +20,8 @@ type Metrics struct {
 	failingChecks prometheus.Gauge
 }
 
-func newMetrics(metricName, descriptionName string, log logging.Logger, namespace string, registerer prometheus.Registerer) (*Metrics, error) {
-	metrics := &Metrics{
+func newMetrics(log logging.Logger, namespace string, registerer prometheus.Registerer) (*metrics, error) {
+	metrics := &metrics{
 		log: log,
 		failingChecks: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -39,11 +39,11 @@ func newMetrics(metricName, descriptionName string, log logging.Logger, namespac
 }
 
 // healthy handles the metrics for the healthy cases
-func (m *Metrics) healthy(health.Result) {
+func (m *metrics) healthy(health.Result) {
 	m.failingChecks.Dec()
 }
 
 // unHealthy handles the metrics for the unhealthy cases
-func (m *Metrics) unHealthy(health.Result) {
+func (m *metrics) unHealthy(health.Result) {
 	m.failingChecks.Inc()
 }
