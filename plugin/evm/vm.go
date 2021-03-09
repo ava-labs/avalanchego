@@ -66,7 +66,8 @@ var (
 )
 
 var (
-	lastAcceptedKey              = []byte("snowman_lastAccepted")
+	// Set last accepted key to be longer than the keys used to store accepted block IDs.
+	lastAcceptedKey              = []byte("last_accepted_key")
 	acceptedPrefix               = []byte("snowman_accepted")
 	historicalCanonicalRepairKey = []byte("chain_repaired_20210212")
 	tipCanonicalRepairKey        = []byte("chain_repaired_20210305")
@@ -184,6 +185,7 @@ type VM struct {
 	chain              *coreth.ETHChain
 	db                 database.Database
 	chaindb            Database
+	acceptedBlockDB    database.Database
 	acceptedAtomicTxDB database.Database
 
 	newBlockChan chan *Block
@@ -276,6 +278,7 @@ func (vm *VM) Initialize(
 	vm.ctx = ctx
 	vm.db = vm.ChainState.ExternalDB()
 	vm.chaindb = Database{prefixdb.New(ethDBPrefix, vm.db)}
+	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
 	vm.acceptedAtomicTxDB = prefixdb.New(atomicTxPrefix, vm.db)
 	g := new(core.Genesis)
 	if err := json.Unmarshal(genesisBytes, g); err != nil {
@@ -403,20 +406,39 @@ func (vm *VM) Initialize(
 	go ctx.Log.RecoverAndPanic(vm.awaitTxPoolStabilized)
 	chain.Start()
 
+	var lastAcceptedBlk *Block
 	ethGenesisBlock := chain.GetGenesisBlock()
-	ethLastAcceptedBlock := chain.LastAcceptedBlock()
-	lastAcceptedBlock := &Block{
-		ethBlock: ethLastAcceptedBlock,
-		id:       ids.ID(ethLastAcceptedBlock.Hash()),
-		vm:       vm,
-		status:   choices.Accepted,
-	}
-	if err := vm.chain.Accept(lastAccepted); err != nil {
-		return fmt.Errorf("could not initialize VM with last accepted blkID %s: %w", vm.lastAccepted.ID(), err)
-	}
 	vm.genesisHash = chain.GetGenesisBlock().Hash()
-	vm.ChainState.Initialize(lastAcceptedBlock, vm.internalGetBlockIDAtHeight, vm.internalGetBlock, vm.internalParseBlock, vm.internalBuildBlock)
-	log.Info("Initializing Coreth VM", "Last Accepted", ethLastAcceptedBlock.Hash().Hex())
+	blkIDBytes, err := vm.acceptedBlockDB.Get(lastAcceptedKey)
+	if err == nil {
+		blkHash := common.BytesToHash(blkIDBytes)
+		ethLastAcceptedBlock := vm.chain.GetBlockByHash(blkHash)
+		if ethLastAcceptedBlock == nil {
+			return fmt.Errorf("failed to get block by hash of last accepted blk %s", blkHash)
+		}
+		lastAcceptedBlk = &Block{
+			ethBlock: ethLastAcceptedBlock,
+			id:       ids.ID(ethLastAcceptedBlock.Hash()),
+			vm:       vm,
+			status:   choices.Accepted,
+		}
+	} else if err == database.ErrNotFound {
+		// The VM is being initialized for the first time. Create the genesis block and mark it as accepted.
+		lastAcceptedBlk = &Block{
+			ethBlock: ethGenesisBlock,
+			id:       ids.ID(vm.genesisHash),
+			vm:       vm,
+			status:   choices.Accepted,
+		}
+	} else {
+		return fmt.Errorf("failed to get last accepted block due to %w", err)
+	}
+
+	vm.ChainState.Initialize(lastAcceptedBlk, vm.internalGetBlockIDAtHeight, vm.internalGetBlock, vm.internalParseBlock, vm.internalBuildBlock)
+	if err := vm.chain.Accept(lastAcceptedBlk.ethBlock); err != nil {
+		return fmt.Errorf("could not initialize VM with last accepted blkID %s: %w", lastAcceptedBlk.ethBlock.Hash().Hex(), err)
+	}
+	log.Info("Initializing Coreth VM", "Last Accepted", lastAcceptedBlk.ethBlock.Hash().Hex())
 
 	vm.shutdownWg.Add(1)
 	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
@@ -501,7 +523,8 @@ func (vm *VM) repairTip() (bool, error) {
 
 	start := time.Now()
 	log.Info("starting canonical chain tip repair", "startTime", start)
-	if err := vm.chain.WriteCanonicalFromCurrentBlock(vm.lastAccepted.ethBlock); err != nil {
+	blk := vm.LastAcceptedBlockInternal().(*Block)
+	if err := vm.chain.WriteCanonicalFromCurrentBlock(blk.ethBlock); err != nil {
 		return false, fmt.Errorf("canonical chain tip repair failed after %v due to: %w", time.Since(start), err)
 	}
 	log.Info("finished canonical chain tip repair", "timeElapsed", time.Since(start))
@@ -514,7 +537,7 @@ func (vm *VM) repairTip() (bool, error) {
 
 // TODO remove once unused by repairCanonicalChain
 func (vm *VM) lastAcceptedEthBlock() *types.Block {
-	return vm.LastAcceptedBlock().Block.(*Block).ethBlock
+	return vm.LastAcceptedBlockInternal().(*Block).ethBlock
 }
 
 // Bootstrapping notifies this VM that the consensus engine is performing
@@ -832,7 +855,7 @@ func (vm *VM) awaitSubmittedTxs() {
 		case <-vm.atomicTxSubmitChan:
 			log.Trace("New atomic Tx detected, trying to generate a block")
 			vm.tryBlockGen()
-		case <-time.After(5 * time.Second):
+		case <-time.After(1 * time.Second):
 			vm.tryBlockGen()
 		case <-vm.shutdownChan:
 			return
