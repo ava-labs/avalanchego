@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// Metrics reports commonly used consensus metrics.
+// Metrics reports commonly used health check metrics.
 type Metrics struct {
 	// log reports anomalous events.
 	log logging.Logger
@@ -39,11 +39,11 @@ func newMetrics(metricName, descriptionName string, log logging.Logger, namespac
 }
 
 // healthy handles the metrics for the healthy cases
-func (m *Metrics) healthy(json health.Result) {
+func (m *Metrics) healthy(health.Result) {
 	m.failingChecks.Dec()
 }
 
 // unHealthy handles the metrics for the unhealthy cases
-func (m *Metrics) unHealthy(result health.Result) {
+func (m *Metrics) unHealthy(health.Result) {
 	m.failingChecks.Inc()
 }
