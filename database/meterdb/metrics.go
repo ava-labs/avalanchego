@@ -56,11 +56,10 @@ type metrics struct {
 	bReplay,
 	bInner,
 	iNext,
+	iNextSize,
 	iError,
 	iKey,
-	iKeySize,
 	iValue,
-	iValueSize,
 	iRelease prometheus.Histogram
 }
 
@@ -94,11 +93,10 @@ func (m *metrics) Initialize(
 	m.bReplay = newLatencyMetric(namespace, "batch_replay")
 	m.bInner = newLatencyMetric(namespace, "batch_inner")
 	m.iNext = newLatencyMetric(namespace, "iterator_next")
+	m.iNextSize = newSizeMetric(namespace, "iterator_next")
 	m.iError = newLatencyMetric(namespace, "iterator_error")
 	m.iKey = newSizeMetric(namespace, "iterator_key")
-	m.iKeySize = newLatencyMetric(namespace, "iterator_key")
 	m.iValue = newLatencyMetric(namespace, "iterator_value")
-	m.iValueSize = newSizeMetric(namespace, "iterator_value")
 	m.iRelease = newLatencyMetric(namespace, "iterator_release")
 
 	errs := wrappers.Errs{}
@@ -129,11 +127,10 @@ func (m *metrics) Initialize(
 		registerer.Register(m.bReplay),
 		registerer.Register(m.bInner),
 		registerer.Register(m.iNext),
+		registerer.Register(m.iNextSize),
 		registerer.Register(m.iError),
 		registerer.Register(m.iKey),
-		registerer.Register(m.iKeySize),
 		registerer.Register(m.iValue),
-		registerer.Register(m.iValueSize),
 		registerer.Register(m.iRelease),
 	)
 	return errs.Err
