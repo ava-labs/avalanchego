@@ -308,8 +308,6 @@ func (i *indexer) closeIndex(chainID ids.ID) error {
 	errs.Add(i.eventDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name)))
 	errs.Add(index.Close())
 
-	// Mark that this index is no longer complete
-	errs.Add(i.indexedChains.Put(chainID[:], incompleteIndexVal))
 	return errs.Err
 }
 
