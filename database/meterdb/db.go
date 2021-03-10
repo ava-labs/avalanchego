@@ -204,7 +204,9 @@ func (it *iterator) Next() bool {
 	next := it.iterator.Next()
 	end := it.db.clock.Time()
 	it.db.iNext.Observe(float64(end.Sub(start)))
-	it.db.iNextSize.Observe(float64(len(it.iterator.Key()) + len(it.iterator.Value())))
+	size := float64(len(it.iterator.Key()) + len(it.iterator.Value()))
+	it.db.readSize.Observe(size)
+	it.db.iNextSize.Observe(size)
 	return next
 }
 
@@ -220,7 +222,6 @@ func (it *iterator) Key() []byte {
 	start := it.db.clock.Time()
 	key := it.iterator.Key()
 	end := it.db.clock.Time()
-	it.db.readSize.Observe(float64(len(key)))
 	it.db.iKey.Observe(float64(end.Sub(start)))
 	return key
 }
@@ -229,7 +230,6 @@ func (it *iterator) Value() []byte {
 	start := it.db.clock.Time()
 	value := it.iterator.Value()
 	end := it.db.clock.Time()
-	it.db.readSize.Observe(float64(len(value)))
 	it.db.iValue.Observe(float64(end.Sub(start)))
 	return value
 }
