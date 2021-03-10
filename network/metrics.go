@@ -14,6 +14,7 @@ import (
 
 type messageMetrics struct {
 	numSent, numFailed, numReceived prometheus.Counter
+	receivedBytes, sentBytes        prometheus.Gauge
 }
 
 func (mm *messageMetrics) initialize(msgType Op, registerer prometheus.Registerer) error {
@@ -33,19 +34,27 @@ func (mm *messageMetrics) initialize(msgType Op, registerer prometheus.Registere
 		Help:      fmt.Sprintf("Number of %s messages received from the network", msgType),
 	})
 
-	if err := registerer.Register(mm.numSent); err != nil {
-		return fmt.Errorf("failed to register sent statistics of %s due to %s",
-			msgType, err)
-	}
-	if err := registerer.Register(mm.numFailed); err != nil {
-		return fmt.Errorf("failed to register failed statistics of %s due to %s",
-			msgType, err)
-	}
-	if err := registerer.Register(mm.numReceived); err != nil {
-		return fmt.Errorf("failed to register received statistics of %s due to %s",
-			msgType, err)
-	}
-	return nil
+	mm.receivedBytes = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: constants.PlatformName,
+		Name:      fmt.Sprintf("%s_received_bytes", msgType),
+		Help:      fmt.Sprintf("Size of bytes of %s messages received from the network", msgType),
+	})
+	mm.sentBytes = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: constants.PlatformName,
+		Name:      fmt.Sprintf("%s_received_bytes", msgType),
+		Help:      fmt.Sprintf("Size of bytes of %s messages received from the network", msgType),
+	})
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		registerer.Register(mm.numSent),
+		registerer.Register(mm.numFailed),
+		registerer.Register(mm.numReceived),
+		registerer.Register(mm.receivedBytes),
+		registerer.Register(mm.sentBytes),
+	)
+
+	return errs.Err
 }
 
 type metrics struct {
@@ -55,7 +64,7 @@ type metrics struct {
 	sendQueuePortionFull     prometheus.Gauge
 	sendFailRate             prometheus.Gauge
 
-	getVersion, version,
+	getVersion, versionMetric,
 	getPeerlist, peerlist,
 	ping, pong,
 	getAcceptedFrontier, acceptedFrontier,
@@ -99,8 +108,9 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 		registerer.Register(m.timeSinceLastMsgSent),
 		registerer.Register(m.sendQueuePortionFull),
 		registerer.Register(m.sendFailRate),
+
 		m.getVersion.initialize(GetVersion, registerer),
-		m.version.initialize(Version, registerer),
+		m.versionMetric.initialize(Version, registerer),
 		m.getPeerlist.initialize(GetPeerList, registerer),
 		m.peerlist.initialize(PeerList, registerer),
 		m.ping.initialize(Ping, registerer),
@@ -125,7 +135,7 @@ func (m *metrics) message(msgType Op) *messageMetrics {
 	case GetVersion:
 		return &m.getVersion
 	case Version:
-		return &m.version
+		return &m.versionMetric
 	case GetPeerList:
 		return &m.getPeerlist
 	case PeerList:

@@ -460,6 +460,8 @@ func (p *peer) close() {
 func (p *peer) GetVersion() {
 	msg, err := p.net.b.GetVersion()
 	p.net.log.AssertNoError(err)
+	p.net.getVersion.numSent.Inc()
+	p.net.getVersion.sentBytes.Add(float64(len(msg.Bytes())))
 	p.Send(msg)
 }
 
@@ -483,6 +485,8 @@ func (p *peer) GetPeerList() {
 	msg, err := p.net.b.GetPeerList()
 	p.net.log.AssertNoError(err)
 	p.Send(msg)
+	p.net.getPeerlist.numReceived.Inc()
+	p.net.getPeerlist.sentBytes.Add(float64(len(msg.Bytes())))
 }
 
 // assumes the stateLock is not held
@@ -507,6 +511,7 @@ func (p *peer) Ping() {
 	p.net.log.AssertNoError(err)
 	if p.Send(msg) {
 		p.net.ping.numSent.Inc()
+		p.net.ping.sentBytes.Add(float64(len(msg.Bytes())))
 	} else {
 		p.net.ping.numFailed.Inc()
 	}
@@ -518,13 +523,18 @@ func (p *peer) Pong() {
 	p.net.log.AssertNoError(err)
 	if p.Send(msg) {
 		p.net.pong.numSent.Inc()
+		p.net.pong.sentBytes.Add(float64(len(msg.Bytes())))
 	} else {
 		p.net.pong.numFailed.Inc()
 	}
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) getVersion(_ Msg) { p.Version() }
+func (p *peer) getVersion(msg Msg) {
+	p.net.getVersion.numReceived.Inc()
+	p.net.getVersion.receivedBytes.Add(float64(len(msg.Bytes())))
+	p.Version()
+}
 
 // assumes the [stateLock] is not held
 func (p *peer) version(msg Msg) {
@@ -624,12 +634,17 @@ func (p *peer) version(msg Msg) {
 	p.gotVersion.SetValue(true)
 
 	p.tryMarkConnected()
+
+	p.net.versionMetric.numReceived.Inc()
+	p.net.versionMetric.receivedBytes.Add(float64(len(msg.Bytes())))
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) getPeerList(_ Msg) {
+func (p *peer) getPeerList(msg Msg) {
 	if p.gotVersion.GetValue() {
 		p.SendPeerList()
+		p.net.getPeerlist.numReceived.Inc()
+		p.net.getPeerlist.receivedBytes.Add(float64(len(msg.Bytes())))
 	}
 }
 
@@ -650,10 +665,17 @@ func (p *peer) peerList(msg Msg) {
 		}
 		p.net.stateLock.Unlock()
 	}
+
+	p.net.peerlist.numReceived.Inc()
+	p.net.peerlist.receivedBytes.Add(float64(len(msg.Bytes())))
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) ping(_ Msg) { p.Pong() }
+func (p *peer) ping(msg Msg) {
+	p.net.ping.numReceived.Inc()
+	p.net.ping.receivedBytes.Add(float64(len(msg.Bytes())))
+	p.Pong()
+}
 
 // assumes the [stateLock] is not held
 func (p *peer) pong(_ Msg) {}

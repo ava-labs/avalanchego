@@ -417,6 +417,7 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 			sentTo = append(sentTo, vID)
 			n.getAcceptedFrontier.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
+			n.getAcceptedFrontier.sentBytes.Add(float64(len(msg.Bytes())))
 		}
 	}
 	return sentTo
@@ -450,6 +451,7 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 	} else {
 		n.acceptedFrontier.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
+		n.getAcceptedFrontier.sentBytes.Add(float64(len(msg.Bytes())))
 	}
 }
 
@@ -484,6 +486,7 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 		} else {
 			n.getAccepted.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
+			n.getAccepted.sentBytes.Add(float64(len(msg.Bytes())))
 			sentTo = append(sentTo, vID)
 		}
 	}
@@ -518,6 +521,7 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	} else {
 		n.sendFailRateCalculator.Observe(0, now)
 		n.accepted.numSent.Inc()
+		n.accepted.sentBytes.Add(float64(len(msg.Bytes())))
 	}
 }
 
@@ -546,6 +550,7 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 	}
 	n.getAncestors.numSent.Inc()
 	n.sendFailRateCalculator.Observe(0, now)
+	n.getAncestors.sentBytes.Add(float64(len(msg.Bytes())))
 	return true
 }
 
@@ -573,6 +578,7 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	} else {
 		n.multiPut.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
+		n.multiPut.sentBytes.Add(float64(len(msg.Bytes())))
 	}
 }
 
@@ -597,6 +603,7 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	}
 	n.get.numSent.Inc()
 	n.sendFailRateCalculator.Observe(0, now)
+	n.get.sentBytes.Add(float64(len(msg.Bytes())))
 	return true
 }
 
@@ -630,6 +637,7 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	} else {
 		n.put.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
+		n.put.sentBytes.Add(float64(len(msg.Bytes())))
 	}
 }
 
@@ -668,6 +676,7 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			n.pushQuery.numSent.Inc()
 			sentTo = append(sentTo, vID)
 			n.sendFailRateCalculator.Observe(0, now)
+			n.pushQuery.sentBytes.Add(float64(len(msg.Bytes())))
 		}
 	}
 	return sentTo
@@ -697,6 +706,7 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			n.pullQuery.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
 			sentTo = append(sentTo, vID)
+			n.pullQuery.sentBytes.Add(float64(len(msg.Bytes())))
 		}
 	}
 	return sentTo
@@ -730,6 +740,7 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 	} else {
 		n.sendFailRateCalculator.Observe(0, now)
 		n.chits.numSent.Inc()
+		n.chits.sentBytes.Add(float64(len(msg.Bytes())))
 	}
 }
 
