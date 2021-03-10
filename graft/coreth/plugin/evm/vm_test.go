@@ -278,7 +278,9 @@ func TestIssueAtomicTxs(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm.SetPreference(blk.ID())
+	if vm.SetPreference(blk.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := blk.Accept(); err != nil {
 		t.Fatal(err)
@@ -1983,7 +1985,9 @@ func TestUncleBlock(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm1.SetPreference(vm1BlkA.ID())
+	if err := vm1.SetPreference(vm1BlkA.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	vm2BlkA, err := vm2.ParseBlock(vm1BlkA.Bytes())
 	if err != nil {
@@ -1995,7 +1999,9 @@ func TestUncleBlock(t *testing.T) {
 	if status := vm2BlkA.Status(); status != choices.Processing {
 		t.Fatalf("Expected status of block on VM2 to be %s, but found %s", choices.Processing, status)
 	}
-	vm2.SetPreference(vm2BlkA.ID())
+	if err := vm2.SetPreference(vm2BlkA.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := vm1BlkA.Accept(); err != nil {
 		t.Fatalf("VM1 failed to accept block: %s", err)
@@ -2040,7 +2046,9 @@ func TestUncleBlock(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm1.SetPreference(vm1BlkB.ID())
+	if err := vm1.SetPreference(vm1BlkB.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	errs = vm2.chain.AddRemoteTxs(txs[0:5])
 	for i, err := range errs {
@@ -2063,7 +2071,9 @@ func TestUncleBlock(t *testing.T) {
 		t.Fatalf("Expected status of built block C to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm2.SetPreference(vm2BlkC.ID())
+	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	errs = vm2.chain.AddRemoteTxs(txs[5:10])
 	for i, err := range errs {
