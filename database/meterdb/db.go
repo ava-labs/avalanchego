@@ -10,14 +10,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
-// Database tracks the amount of time each operation takes
+// Database tracks the amount of time each operation takes and how many bytes
+// are read/written to the underlying database instance.
 type Database struct {
 	metrics
 	db    database.Database
 	clock timer.Clock
 }
 
-// New returns a new encrypted database
+// New returns a new database with added metrics
 func New(
 	namespace string,
 	registerer prometheus.Registerer,
@@ -27,7 +28,6 @@ func New(
 	return meterDB, meterDB.metrics.Initialize(namespace, registerer)
 }
 
-// Has implements the Database interface
 func (db *Database) Has(key []byte) (bool, error) {
 	start := db.clock.Time()
 	has, err := db.db.Has(key)
@@ -38,7 +38,6 @@ func (db *Database) Has(key []byte) (bool, error) {
 	return has, err
 }
 
-// Get implements the Database interface
 func (db *Database) Get(key []byte) ([]byte, error) {
 	start := db.clock.Time()
 	value, err := db.db.Get(key)
@@ -49,7 +48,6 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	return value, err
 }
 
-// Put implements the Database interface
 func (db *Database) Put(key, value []byte) error {
 	start := db.clock.Time()
 	err := db.db.Put(key, value)
@@ -60,7 +58,6 @@ func (db *Database) Put(key, value []byte) error {
 	return err
 }
 
-// Delete implements the Database interface
 func (db *Database) Delete(key []byte) error {
 	start := db.clock.Time()
 	err := db.db.Delete(key)
@@ -71,7 +68,6 @@ func (db *Database) Delete(key []byte) error {
 	return err
 }
 
-// NewBatch implements the Database interface
 func (db *Database) NewBatch() database.Batch {
 	start := db.clock.Time()
 	b := &batch{
@@ -83,22 +79,18 @@ func (db *Database) NewBatch() database.Batch {
 	return b
 }
 
-// NewIterator implements the Database interface
 func (db *Database) NewIterator() database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(nil, nil)
 }
 
-// NewIteratorWithStart implements the Database interface
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(start, nil)
 }
 
-// NewIteratorWithPrefix implements the Database interface
 func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(nil, prefix)
 }
 
-// NewIteratorWithStartAndPrefix implements the Database interface
 func (db *Database) NewIteratorWithStartAndPrefix(
 	start,
 	prefix []byte,
@@ -113,7 +105,6 @@ func (db *Database) NewIteratorWithStartAndPrefix(
 	return it
 }
 
-// Stat implements the Database interface
 func (db *Database) Stat(stat string) (string, error) {
 	start := db.clock.Time()
 	result, err := db.db.Stat(stat)
@@ -122,7 +113,6 @@ func (db *Database) Stat(stat string) (string, error) {
 	return result, err
 }
 
-// Compact implements the Database interface
 func (db *Database) Compact(start, limit []byte) error {
 	startTime := db.clock.Time()
 	err := db.db.Compact(start, limit)
@@ -131,7 +121,6 @@ func (db *Database) Compact(start, limit []byte) error {
 	return err
 }
 
-// Close implements the Database interface
 func (db *Database) Close() error {
 	start := db.clock.Time()
 	err := db.db.Close()
