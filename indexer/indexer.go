@@ -396,9 +396,9 @@ func (i *indexer) GetIndexedChains() []ids.ID {
 }
 
 // Close this indexer. Stops indexing all chains.
-// Closes this indexer's database. Assumes no containers
-// are accepted between Close() being called and the
-// node shutting down.
+// Closes this indexer's database.
+// Assumes Close is only called after the node is
+// done making decisions.
 func (i *indexer) Close() error {
 	i.lock.Lock()
 	defer i.lock.Unlock()
