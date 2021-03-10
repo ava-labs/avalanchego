@@ -173,8 +173,8 @@ func init() {
 // VM implements the snowman.ChainVM interface
 type VM struct {
 	ctx *snow.Context
-	// ChainState helps to implement the VM interface by wrapping fetching
-	// with an efficient cache.
+	// ChainState helps to implement the VM interface by wrapping blocks
+	// with an efficient caching layer.
 	*chainState.ChainState
 
 	CLIConfig CommandLineConfig
@@ -535,11 +535,6 @@ func (vm *VM) repairTip() (bool, error) {
 	return true, nil
 }
 
-// TODO remove once unused by repairCanonicalChain
-func (vm *VM) lastAcceptedEthBlock() *types.Block {
-	return vm.LastAcceptedBlockInternal().(*Block).ethBlock
-}
-
 // Bootstrapping notifies this VM that the consensus engine is performing
 // bootstrapping
 func (vm *VM) Bootstrapping() error { return vm.fx.Bootstrapping() }
@@ -855,7 +850,7 @@ func (vm *VM) awaitSubmittedTxs() {
 		case <-vm.atomicTxSubmitChan:
 			log.Trace("New atomic Tx detected, trying to generate a block")
 			vm.tryBlockGen()
-		case <-time.After(1 * time.Second):
+		case <-time.After(5 * time.Second):
 			vm.tryBlockGen()
 		case <-vm.shutdownChan:
 			return
@@ -956,7 +951,7 @@ func (vm *VM) GetAtomicUTXOs(
 // TODO switch to returning a list of private keys
 // since there are no multisig inputs in Ethereum
 func (vm *VM) GetSpendableFunds(keys []*crypto.PrivateKeySECP256K1R, assetID ids.ID, amount uint64) ([]EVMInput, [][]*crypto.PrivateKeySECP256K1R, error) {
-	// NOTE: should we use HEAD block or lastAccepted?
+	// Note: current state uses the state of the preferred block.
 	state, err := vm.chain.CurrentState()
 	if err != nil {
 		return nil, nil, err
@@ -1005,6 +1000,7 @@ func (vm *VM) GetSpendableFunds(keys []*crypto.PrivateKeySECP256K1R, assetID ids
 
 // GetAcceptedNonce returns the nonce associated with the address at the last accepted block
 func (vm *VM) GetAcceptedNonce(address common.Address) (uint64, error) {
+	// Note: current state uses the state of the preferred block.
 	state, err := vm.chain.CurrentState()
 	if err != nil {
 		return 0, err

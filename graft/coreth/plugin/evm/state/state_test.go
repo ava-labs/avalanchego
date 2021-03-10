@@ -125,12 +125,13 @@ func TestChainState(t *testing.T) {
 		blks[blk.ID()] = blk
 		return blk, nil
 	}
-	err := chainState.Initialize(genesisBlock, getCanonicalBlockID, getBlock, parseBlock, cantBuildBlock)
+	chainState.Initialize(genesisBlock, getCanonicalBlockID, getBlock, parseBlock, cantBuildBlock)
+
+	lastAccepted, err := chainState.LastAccepted()
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if lastAccepted := chainState.LastAccepted(); lastAccepted != genesisBlock.ID() {
+	if lastAccepted != genesisBlock.ID() {
 		t.Fatal("Expected last accepted block to be the genesis block")
 	}
 
@@ -208,7 +209,11 @@ func TestChainState(t *testing.T) {
 	}
 
 	// Check that the last accepted block was updated correctly
-	if lastAcceptedID := chainState.LastAccepted(); lastAcceptedID != blk2.ID() {
+	lastAcceptedID, err := chainState.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lastAcceptedID != blk2.ID() {
 		t.Fatal("Expected last accepted block to be blk2")
 	}
 	if lastAcceptedID := chainState.LastAcceptedBlock().ID(); lastAcceptedID != blk2.ID() {
@@ -265,10 +270,7 @@ func TestBuildBlock(t *testing.T) {
 		return blk1, nil
 	}
 
-	err := chainState.Initialize(genesisBlock, getCanonicalBlockID, getBlock, parseBlock, buildBlock)
-	if err != nil {
-		t.Fatal(err)
-	}
+	chainState.Initialize(genesisBlock, getCanonicalBlockID, getBlock, parseBlock, buildBlock)
 
 	builtBlk, err := chainState.BuildBlock()
 	if err != nil {

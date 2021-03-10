@@ -166,8 +166,8 @@ func (c *ChainState) ParseBlock(b []byte) (snowman.Block, error) {
 	// Check for an existing block, so we can return a unique block
 	// if processing or simply allow this block to be immediately
 	// garbage collected if it is already cached.
-	if blk, ok := c.getCachedBlock(blkID); ok {
-		return blk, nil
+	if cachedBlk, ok := c.getCachedBlock(blkID); ok {
+		return cachedBlk, nil
 	}
 
 	c.missingBlocks.Evict(blkID)

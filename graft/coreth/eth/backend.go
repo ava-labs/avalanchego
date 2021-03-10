@@ -570,5 +570,5 @@ func (s *Ethereum) GetTxSubmitCh() <-chan struct{} {
 }
 
 func (s *Ethereum) AcceptedBlock() *types.Block {
-	return s.blockchain.CurrentBlock()
+	return s.blockchain.LastAcceptedBlock()
 }
