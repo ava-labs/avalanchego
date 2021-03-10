@@ -165,7 +165,6 @@ func main() {
 	// start the chain
 	chain.GetTxPool().SubscribeNewHeadEvent(newTxPoolHeadChan)
 	chain.Start()
-	chain.BlockChain().UnlockIndexing()
 	chain.SetPreference(chain.GetGenesisBlock())
 
 	_ = contract
