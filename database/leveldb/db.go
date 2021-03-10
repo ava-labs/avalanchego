@@ -30,6 +30,10 @@ const (
 	// minHandleCap is the minimum number of files descriptors to cap levelDB to
 	// use
 	minHandleCap = 16
+
+	// levelDBByteOverhead is the number of bytes of constant overhead that
+	// should be added to a batch size per operation.
+	levelDBByteOverhead = 8
 )
 
 // Database is a persistent key-value store. Apart from basic data storage
@@ -190,19 +194,19 @@ type batch struct {
 // Put the value into the batch for later writing
 func (b *batch) Put(key, value []byte) error {
 	b.Batch.Put(key, value)
-	b.size += len(value)
+	b.size += len(key) + len(value) + levelDBByteOverhead
 	return nil
 }
 
 // Delete the key during writing
 func (b *batch) Delete(key []byte) error {
 	b.Batch.Delete(key)
-	b.size++
+	b.size += len(key) + levelDBByteOverhead
 	return nil
 }
 
-// ValueSize retrieves the amount of data queued up for writing.
-func (b *batch) ValueSize() int { return b.size }
+// Size retrieves the amount of data queued up for writing.
+func (b *batch) Size() int { return b.size }
 
 // Write flushes any accumulated data to disk.
 func (b *batch) Write() error {

@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -55,13 +56,13 @@ func (m *Metrics) Initialize(metricName, descriptionName string, log logging.Log
 		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_accepted", metricName),
 		Help:      fmt.Sprintf("Latency of accepting from the time the %s was issued in milliseconds", descriptionName),
-		Buckets:   timer.MillisecondsBuckets,
+		Buckets:   utils.MillisecondsBuckets,
 	})
 	m.latRejected = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_rejected", metricName),
 		Help:      fmt.Sprintf("Latency of rejecting from the time the %s was issued in milliseconds", descriptionName),
-		Buckets:   timer.MillisecondsBuckets,
+		Buckets:   utils.MillisecondsBuckets,
 	})
 
 	errs := wrappers.Errs{}

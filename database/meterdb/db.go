@@ -32,7 +32,9 @@ func (db *Database) Has(key []byte) (bool, error) {
 	start := db.clock.Time()
 	has, err := db.db.Has(key)
 	end := db.clock.Time()
+	db.readSize.Observe(float64(len(key)))
 	db.has.Observe(float64(end.Sub(start)))
+	db.hasSize.Observe(float64(len(key)))
 	return has, err
 }
 
@@ -41,7 +43,9 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	start := db.clock.Time()
 	value, err := db.db.Get(key)
 	end := db.clock.Time()
+	db.readSize.Observe(float64(len(key) + len(value)))
 	db.get.Observe(float64(end.Sub(start)))
+	db.getSize.Observe(float64(len(key) + len(value)))
 	return value, err
 }
 
@@ -50,7 +54,9 @@ func (db *Database) Put(key, value []byte) error {
 	start := db.clock.Time()
 	err := db.db.Put(key, value)
 	end := db.clock.Time()
+	db.writeSize.Observe(float64(len(key) + len(value)))
 	db.put.Observe(float64(end.Sub(start)))
+	db.putSize.Observe(float64(len(key) + len(value)))
 	return err
 }
 
@@ -59,7 +65,9 @@ func (db *Database) Delete(key []byte) error {
 	start := db.clock.Time()
 	err := db.db.Delete(key)
 	end := db.clock.Time()
+	db.writeSize.Observe(float64(len(key)))
 	db.delete.Observe(float64(end.Sub(start)))
+	db.deleteSize.Observe(float64(len(key)))
 	return err
 }
 
@@ -142,6 +150,7 @@ func (b *batch) Put(key, value []byte) error {
 	err := b.batch.Put(key, value)
 	end := b.db.clock.Time()
 	b.db.bPut.Observe(float64(end.Sub(start)))
+	b.db.bPutSize.Observe(float64(len(key) + len(value)))
 	return err
 }
 
@@ -150,14 +159,15 @@ func (b *batch) Delete(key []byte) error {
 	err := b.batch.Delete(key)
 	end := b.db.clock.Time()
 	b.db.bDelete.Observe(float64(end.Sub(start)))
+	b.db.bDeleteSize.Observe(float64(len(key)))
 	return err
 }
 
-func (b *batch) ValueSize() int {
+func (b *batch) Size() int {
 	start := b.db.clock.Time()
-	size := b.batch.ValueSize()
+	size := b.batch.Size()
 	end := b.db.clock.Time()
-	b.db.bValueSize.Observe(float64(end.Sub(start)))
+	b.db.bSize.Observe(float64(end.Sub(start)))
 	return size
 }
 
@@ -165,7 +175,10 @@ func (b *batch) Write() error {
 	start := b.db.clock.Time()
 	err := b.batch.Write()
 	end := b.db.clock.Time()
+	batchSize := float64(b.batch.Size())
+	b.db.writeSize.Observe(batchSize)
 	b.db.bWrite.Observe(float64(end.Sub(start)))
+	b.db.bWriteSize.Observe(batchSize)
 	return err
 }
 
@@ -217,7 +230,9 @@ func (it *iterator) Key() []byte {
 	start := it.db.clock.Time()
 	key := it.iterator.Key()
 	end := it.db.clock.Time()
+	it.db.readSize.Observe(float64(len(key)))
 	it.db.iKey.Observe(float64(end.Sub(start)))
+	it.db.iKeySize.Observe(float64(len(key)))
 	return key
 }
 
@@ -225,7 +240,9 @@ func (it *iterator) Value() []byte {
 	start := it.db.clock.Time()
 	value := it.iterator.Value()
 	end := it.db.clock.Time()
+	it.db.readSize.Observe(float64(len(value)))
 	it.db.iValue.Observe(float64(end.Sub(start)))
+	it.db.iValueSize.Observe(float64(len(value)))
 	return value
 }
 

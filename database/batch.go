@@ -12,8 +12,8 @@ package database
 type Batch interface {
 	KeyValueWriter
 
-	// ValueSize retrieves the amount of data queued up for writing.
-	ValueSize() int
+	// Size retrieves the amount of data queued up for writing.
+	Size() int
 
 	// Write flushes any accumulated data to disk.
 	Write() error
