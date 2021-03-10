@@ -41,14 +41,14 @@ var (
 
 // Config for an indexer
 type Config struct {
-	// If false use a dummy (no-op) indexer
+	Db  database.Database
+	Log logging.Logger
+	// If false, use a dummy (no-op) indexer
 	IndexingEnabled bool
 	// If true, allow indices that may be missing containers
 	AllowIncompleteIndex bool
-	// Name of this indexer, and the API endpoint
+	// Name of this indexer and the API endpoint
 	Name string
-	Db   database.Database
-	Log  logging.Logger
 	// Notifies indexer of newly accepted containers
 	EventDispatcher *triggers.EventDispatcher
 	// Chains indexed on startup
@@ -75,7 +75,7 @@ type Indexer interface {
 	Close() error
 }
 
-// NewIndexer returns a new Indexer and registers a new route on the given API server.
+// NewIndexer returns a new Indexer and registers a new endpoint on the given API server.
 func NewIndexer(config Config) (Indexer, error) {
 	// See if we have run with this database before
 	hasEverRunDb := prefixdb.New(hasEverRunPrefix, config.Db)
@@ -99,10 +99,10 @@ func NewIndexer(config Config) (Indexer, error) {
 		}
 	}()
 
-	// If a node runs for a period of time, and during that time is not indexing a chain,
-	// then the index for that chain will be incomplete (it will be missing containers.)
-	// By default, creation of incomplete indices is disallowed. That is, if the node indexes
-	// a chain during one run, then it must always index that chain so as to avoid being incomplete.
+	// If a node runs while not indexing a chain then the index for that chain will be
+	// incomplete (it will be missing containers.) By default, creation of incomplete
+	// indices is disallowed. That is, if the node indexes a chain during one run,
+	// then it must always index that chain so as to avoid being incomplete.
 	// Creation of incomplete indices can be explicitly allowed in the config.
 	if hasRunBefore {
 		// Key: Chain ID. Present if this chain was ever indexed by this indexer.
@@ -121,6 +121,7 @@ func NewIndexer(config Config) (Indexer, error) {
 				// Sanity check; this should never happen
 				return nil, fmt.Errorf("unexpectedly got chain ID with %d bytes", len(chainIDBytes))
 			}
+			// We indexed chain [chainID] in a previous run
 			var chainID ids.ID
 			copy(chainID[:], chainIDBytes)
 
