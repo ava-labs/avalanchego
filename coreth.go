@@ -23,7 +23,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/trie"
 	"github.com/mattn/go-isatty"
 )
 
@@ -89,16 +88,6 @@ func (self *ETHChain) SubscribeNewMinedBlockEvent() *event.TypeMuxSubscription {
 
 func (self *ETHChain) BlockChain() *core.BlockChain {
 	return self.backend.BlockChain()
-}
-
-func (self *ETHChain) VerifyBlock(block *types.Block) bool {
-	txnHash := types.DeriveSha(block.Transactions(), new(trie.Trie))
-	uncleHash := types.CalcUncleHash(block.Uncles())
-	ethHeader := block.Header()
-	if txnHash != ethHeader.TxHash || uncleHash != ethHeader.UncleHash {
-		return false
-	}
-	return true
 }
 
 func (self *ETHChain) PendingSize() (int, error) {
