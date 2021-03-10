@@ -70,7 +70,7 @@ var (
 	vtxIndexerDbPrefix = []byte("vtxIdx6")
 
 	// Version is the version of this code
-	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 2, 1)
+	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 2, 3)
 	versionParser           = version.NewDefaultParser()
 	beaconConnectionTimeout = 1 * time.Minute
 )
