@@ -13,8 +13,7 @@ import (
 )
 
 type messageMetrics struct {
-	numSent, numFailed, numReceived prometheus.Counter
-	receivedBytes, sentBytes        prometheus.Gauge
+	receivedBytes, sentBytes, numSent, numFailed, numReceived prometheus.Counter
 }
 
 func (mm *messageMetrics) initialize(msgType Op, registerer prometheus.Registerer) error {
@@ -34,14 +33,14 @@ func (mm *messageMetrics) initialize(msgType Op, registerer prometheus.Registere
 		Help:      fmt.Sprintf("Number of %s messages received from the network", msgType),
 	})
 
-	mm.receivedBytes = prometheus.NewGauge(prometheus.GaugeOpts{
+	mm.receivedBytes = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: constants.PlatformName,
 		Name:      fmt.Sprintf("%s_received_bytes", msgType),
-		Help:      fmt.Sprintf("Size of bytes of %s messages received from the network", msgType),
+		Help:      fmt.Sprintf("Number of bytes of %s messages received from the network", msgType),
 	})
-	mm.sentBytes = prometheus.NewGauge(prometheus.GaugeOpts{
+	mm.sentBytes = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: constants.PlatformName,
-		Name:      fmt.Sprintf("%s_received_bytes", msgType),
+		Name:      fmt.Sprintf("%s_sent_bytes", msgType),
 		Help:      fmt.Sprintf("Size of bytes of %s messages received from the network", msgType),
 	})
 

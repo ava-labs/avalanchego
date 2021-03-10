@@ -353,6 +353,7 @@ func (p *peer) handle(msg Msg) {
 		return
 	}
 	msgMetrics.numReceived.Inc()
+	msgMetrics.receivedBytes.Add(float64(len(msg.Bytes())))
 
 	switch op {
 	case Version:

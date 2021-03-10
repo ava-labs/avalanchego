@@ -451,7 +451,7 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 	} else {
 		n.acceptedFrontier.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
-		n.getAcceptedFrontier.sentBytes.Add(float64(len(msg.Bytes())))
+		n.acceptedFrontier.sentBytes.Add(float64(len(msg.Bytes())))
 	}
 }
 
