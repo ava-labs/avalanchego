@@ -29,12 +29,12 @@ type Service interface {
 }
 
 func NewService(checkFreq time.Duration, log logging.Logger, registry prometheus.Registerer) (Service, error) {
-	healthL, err := healthlib.NewService(checkFreq, log, registry)
+	service, err := healthlib.NewService(checkFreq, log, registry)
 	if err != nil {
 		return nil, err
 	}
 	return &apiServer{
-		Service: healthL,
+		Service: service,
 		log:     log,
 	}, nil
 }

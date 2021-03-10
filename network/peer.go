@@ -487,7 +487,7 @@ func (p *peer) GetPeerList() {
 	p.net.log.AssertNoError(err)
 	p.Send(msg)
 	p.net.getPeerlist.numReceived.Inc()
-	p.net.getPeerlist.sentBytes.Add(float64(len(msg.Bytes())))
+	p.net.getPeerlist.receivedBytes.Add(float64(len(msg.Bytes())))
 }
 
 // assumes the stateLock is not held
