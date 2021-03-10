@@ -155,7 +155,13 @@ func (s *State) IDs(key []byte, start []byte, limit int) ([]ids.ID, error) {
 			numFetched++
 		}
 	}
-	return idSlice, idSliceDB.Close()
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		iter.Error(),
+		idSliceDB.Close(),
+	)
+	return idSlice, errs.Err
 }
 
 // AddID saves an ID to the prefixed database

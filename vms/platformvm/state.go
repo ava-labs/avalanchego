@@ -33,6 +33,8 @@ const (
 )
 
 const (
+	// priority values are used as part of the keys in the pending/current validator DBs
+	// to ensure they are sorted in the order that they should be added/removed.
 	lowPriority byte = iota
 	mediumPriority
 	topPriority
@@ -121,7 +123,9 @@ func (vm *VM) enqueueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 	)
 
 	// If the staker being added is a validator, add it to the pending validators index
-	if priority != 1 {
+	// Note: this check ensures that we do not add a delegator transaction to this index since
+	// delegators are assigned this priority in the pending validators db.
+	if priority != mediumPriority {
 		prefixPendingValidators := []byte(fmt.Sprintf("%s%s", subnetID, pendingValidatorsPrefix))
 		pendingValidatorsDB := prefixdb.NewNested(prefixPendingValidators, db)
 
@@ -178,7 +182,9 @@ func (vm *VM) dequeueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 	)
 
 	// If the staker being removed is a validator, remove it from the pending validators index
-	if priority != 1 {
+	// Note: this check ensures that we do not add a delegator transaction to this index since
+	// delegators are assigned this priority in the pending validators db.
+	if priority != mediumPriority {
 		prefixPendingValidators := []byte(fmt.Sprintf("%s%s", subnetID, pendingValidatorsPrefix))
 		pendingValidatorsDB := prefixdb.NewNested(prefixPendingValidators, db)
 
@@ -240,7 +246,9 @@ func (vm *VM) addStaker(db database.Database, subnetID ids.ID, tx *rewardTx) err
 	)
 
 	// If the staker being added is a validator, add it to the current validators index
-	if priority > 0 {
+	// Note: this check ensures that we do not add a delegator transaction to this index since
+	// delegators are assigned this priority in the current validators db.
+	if priority > lowPriority {
 		prefixCurrentValidators := []byte(fmt.Sprintf("%s%s", subnetID, currentValidatorsPrefix))
 		currentValidatorsDB := prefixdb.NewNested(prefixCurrentValidators, db)
 
@@ -298,7 +306,9 @@ func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, tx *rewardTx) 
 	)
 
 	// If the staker being removed is a validator, remove it from the current validators index
-	if priority > 0 {
+	// Note: this check ensures that we do not add a delegator transaction to this index since
+	// delegators are assigned this priority in the current validators db.
+	if priority > lowPriority {
 		prefixCurrentValidators := []byte(fmt.Sprintf("%s%s", subnetID, currentValidatorsPrefix))
 		currentValidatorsDB := prefixdb.NewNested(prefixCurrentValidators, db)
 
