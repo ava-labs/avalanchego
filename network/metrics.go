@@ -89,7 +89,7 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 	m.sendFailRate = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
 		Name:      "send_fail_rate",
-		Help:      "Rate of fail in Send",
+		Help:      "Portion of messages that recently failed to be sent over the network",
 	})
 
 	errs := wrappers.Errs{}
