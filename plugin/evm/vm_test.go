@@ -2525,7 +2525,7 @@ func TestFutureBlock(t *testing.T) {
 	}
 
 	// Create empty block from blkA
-	blkAEthBlock := blkA.(*Block).ethBlock
+	blkAEthBlock := blkA.(*state.BlockWrapper).Block.(*Block).ethBlock
 
 	modifiedHeader := types.CopyHeader(blkAEthBlock.Header())
 	// Set the VM's clock to the time of the produced block

@@ -193,6 +193,11 @@ func (self *ETHChain) Accept(block *types.Block) error {
 	return self.BlockChain().Accept(block)
 }
 
+// LastAcceptedBlock returns the last block to be marked as accepted.
+func (self *ETHChain) LastAcceptedBlock() *types.Block {
+	return self.BlockChain().LastAcceptedBlock()
+}
+
 func (self *ETHChain) GetReceiptsByHash(hash common.Hash) types.Receipts {
 	return self.backend.BlockChain().GetReceiptsByHash(hash)
 }

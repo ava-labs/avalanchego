@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -74,20 +75,20 @@ type GetAcceptedFrontReply struct {
 }
 
 // GetAcceptedFront returns the last accepted block's hash and height
-// func (api *SnowmanAPI) GetAcceptedFront(ctx context.Context) (*GetAcceptedFrontReply, error) {
-// 	blk := api.vm.chain.LastAcceptedBlock()
-// 	return &GetAcceptedFrontReply{
-// 		Hash:   blk.Hash(),
-// 		Number: blk.Number(),
-// 	}, nil
-// }
+func (api *SnowmanAPI) GetAcceptedFront(ctx context.Context) (*GetAcceptedFrontReply, error) {
+	blk := api.vm.chain.LastAcceptedBlock()
+	return &GetAcceptedFrontReply{
+		Hash:   blk.Hash(),
+		Number: blk.Number(),
+	}, nil
+}
 
-// // IssueBlock to the chain
-// func (api *SnowmanAPI) IssueBlock(ctx context.Context) error {
-// 	log.Info("Issuing a new block")
+// IssueBlock to the chain
+func (api *SnowmanAPI) IssueBlock(ctx context.Context) error {
+	log.Info("Issuing a new block")
 
-// 	return api.vm.tryBlockGen()
-// }
+	return api.vm.tryBlockGen()
+}
 
 // parseAssetID parses an assetID string into an ID
 func (service *AvaxAPI) parseAssetID(assetID string) (ids.ID, error) {
@@ -423,15 +424,15 @@ func (service *AvaxAPI) IssueTx(r *http.Request, args *api.FormattedTx, response
 	return service.vm.issueTx(tx)
 }
 
-// GetTxStatusReply defines the GetTxStatus replies returned from the API
-type GetTxStatusReply struct {
+// GetAtomicTxStatusReply defines the GetAtomicTxStatus replies returned from the API
+type GetAtomicTxStatusReply struct {
 	Status      choices.Status `json:"status"`
 	BlockHeight *uint64        `json:"blockHeight,omitempty"`
 }
 
-// GetTxStatus returns the status of the specified transaction
-func (service *AvaxAPI) GetTxStatus(r *http.Request, args *api.JSONTxID, reply *GetTxStatusReply) error {
-	log.Info("EVM: GetTxStatus called with %s", args.TxID)
+// GetAtomicTxStatus returns the status of the specified transaction
+func (service *AvaxAPI) GetAtomicTxStatus(r *http.Request, args *api.JSONTxID, reply *GetAtomicTxStatusReply) error {
+	log.Info("EVM: GetAtomicTxStatus called with %s", args.TxID)
 
 	if args.TxID == ids.Empty {
 		return errNilTxID
@@ -457,9 +458,9 @@ type FormattedTx struct {
 	BlockHeight *uint64 `json:"blockHeight,omitempty"`
 }
 
-// GetTx returns the specified transaction
-func (service *AvaxAPI) GetTx(r *http.Request, args *api.GetTxArgs, reply *FormattedTx) error {
-	log.Info("EVM: GetTx called with %s", args.TxID)
+// GetAtomicTx returns the specified transaction
+func (service *AvaxAPI) GetAtomicTx(r *http.Request, args *api.GetTxArgs, reply *FormattedTx) error {
+	log.Info("EVM: GetAtomicTx called with %s", args.TxID)
 
 	if args.TxID == ids.Empty {
 		return errNilTxID
