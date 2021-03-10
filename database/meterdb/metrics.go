@@ -95,7 +95,7 @@ func (m *metrics) Initialize(
 	m.iNext = newLatencyMetric(namespace, "iterator_next")
 	m.iNextSize = newSizeMetric(namespace, "iterator_next")
 	m.iError = newLatencyMetric(namespace, "iterator_error")
-	m.iKey = newSizeMetric(namespace, "iterator_key")
+	m.iKey = newLatencyMetric(namespace, "iterator_key")
 	m.iValue = newLatencyMetric(namespace, "iterator_value")
 	m.iRelease = newLatencyMetric(namespace, "iterator_release")
 
