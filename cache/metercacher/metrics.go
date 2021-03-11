@@ -8,7 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -17,7 +17,7 @@ func newHistogramMetric(namespace, name string) prometheus.Histogram {
 		Namespace: namespace,
 		Name:      name,
 		Help:      fmt.Sprintf("Latency of a %s call in nanoseconds", name),
-		Buckets:   timer.NanosecondsBuckets,
+		Buckets:   utils.NanosecondsBuckets,
 	})
 }
 
