@@ -3,7 +3,8 @@
 
 package cache
 
-// Cacher acts as a best effort key value store
+// Cacher acts as a best effort key value store. Keys must be comparable, as
+// defined by https://golang.org/ref/spec#Comparison_operators.
 type Cacher interface {
 	// Put inserts an element into the cache. If spaced is required, elements will
 	// be evicted.
@@ -22,6 +23,8 @@ type Cacher interface {
 
 // Evictable allows the object to be notified when it is evicted
 type Evictable interface {
+	// Key must return a comparable value as defined by
+	// https://golang.org/ref/spec#Comparison_operators.
 	Key() interface{}
 	Evict()
 }
