@@ -144,59 +144,46 @@ func (ldb *linkedDB) Delete(key []byte) error {
 		return err
 	}
 
-	if !currentNode.HasPrevious {
-		// This node was the head, so we must change the head.
-		if !currentNode.HasNext {
-			// This is the only node, so we can just delete it.
-			if err := ldb.deleteHeadKey(); err != nil {
+	switch {
+	case currentNode.HasPrevious:
+		// We aren't modifying the head.
+		previousNode, err := ldb.getNode(currentNode.Previous)
+		if err != nil {
+			return err
+		}
+		previousNode.HasNext = currentNode.HasNext
+		previousNode.Next = currentNode.Next
+		if err := ldb.putNode(currentNode.Previous, previousNode); err != nil {
+			return err
+		}
+		if currentNode.HasNext {
+			// We aren't modifying the tail.
+			nextNode, err := ldb.getNode(currentNode.Next)
+			if err != nil {
 				return err
 			}
-			return ldb.writeBatch()
+			nextNode.HasPrevious = true
+			nextNode.Previous = currentNode.Previous
+			if err := ldb.putNode(currentNode.Next, nextNode); err != nil {
+				return err
+			}
 		}
-
+	case !currentNode.HasNext:
+		// This is the only node, so we don't have a head anymore.
+		if err := ldb.deleteHeadKey(); err != nil {
+			return err
+		}
+	default:
 		// The next node will be the new head.
 		if err := ldb.putHeadKey(currentNode.Next); err != nil {
 			return err
 		}
-
-		// The next node is going to be the new head, so we must configure that
-		// node.
-		newHead, err := ldb.getNode(currentNode.Next)
-		if err != nil {
-			return err
-		}
-		newHead.HasPrevious = false
-		newHead.Previous = nil
-
-		if err := ldb.putNode(currentNode.Next, newHead); err != nil {
-			return err
-		}
-
-		return ldb.writeBatch()
-	}
-
-	// The node we are deleting isn't the head node, so we must update the
-	// previous node.
-
-	previousNode, err := ldb.getNode(currentNode.Previous)
-	if err != nil {
-		return err
-	}
-	previousNode.HasNext = currentNode.HasNext
-	previousNode.Next = currentNode.Next
-	if err := ldb.putNode(currentNode.Previous, previousNode); err != nil {
-		return err
-	}
-
-	if currentNode.HasNext {
-		// If the node we are deleting isn't the tail, we need to notify the
-		// next node who it should now point to.
 		nextNode, err := ldb.getNode(currentNode.Next)
 		if err != nil {
 			return err
 		}
-		nextNode.HasPrevious = true
-		nextNode.Previous = currentNode.Previous
+		nextNode.HasPrevious = false
+		nextNode.Previous = nil
 		if err := ldb.putNode(currentNode.Next, nextNode); err != nil {
 			return err
 		}
