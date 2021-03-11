@@ -278,7 +278,7 @@ func TestIssueAtomicTxs(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	if vm.SetPreference(blk.ID()); err != nil {
+	if err := vm.SetPreference(blk.ID()); err != nil {
 		t.Fatal(err)
 	}
 
