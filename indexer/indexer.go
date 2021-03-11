@@ -88,8 +88,7 @@ func NewIndexer(config Config) (Indexer, error) {
 	}
 
 	// Mark that we have now run with this database
-	err = hasEverRunDb.Put(hasEverRunKey, nil)
-	if err != nil {
+	if err := hasEverRunDb.Put(hasEverRunKey, nil); err != nil {
 		return nil, err
 	}
 
@@ -144,8 +143,7 @@ func NewIndexer(config Config) (Indexer, error) {
 
 		// Mark that these indices are incomplete
 		for _, chainID := range incompleteIndices {
-			err := indexedChainsDb.Put(chainID[:], incompleteIndexVal)
-			if err != nil {
+			if err := indexedChainsDb.Put(chainID[:], incompleteIndexVal); err != nil {
 				return nil, err
 			}
 		}
@@ -169,8 +167,7 @@ func NewIndexer(config Config) (Indexer, error) {
 		chainToIndex:         make(map[ids.ID]Index),
 		chainLookup:          config.ChainLookupF,
 	}
-	err = indexer.codec.RegisterCodec(codecVersion, linearcodec.NewDefault())
-	if err != nil {
+	if err := indexer.codec.RegisterCodec(codecVersion, linearcodec.NewDefault()); err != nil {
 		return nil, fmt.Errorf("couldn't register codec: %w", err)
 	}
 
@@ -189,8 +186,7 @@ func NewIndexer(config Config) (Indexer, error) {
 		return nil, err
 	}
 	handler := &common.HTTPHandler{LockOptions: common.NoLock, Handler: indexAPIServer}
-	err = config.APIServer.AddRoute(handler, &sync.RWMutex{}, "index/", config.Name, config.Log)
-	if err != nil {
+	if err := config.APIServer.AddRoute(handler, &sync.RWMutex{}, "index/", config.Name, config.Log); err != nil {
 		return nil, fmt.Errorf("couldnt add API route: %w", err)
 	}
 	return indexer, nil
@@ -257,13 +253,11 @@ func (i *indexer) indexChain(chainID ids.ID, hasRunBefore bool) error {
 	}
 
 	if indexComplete {
-		err := i.indexedChains.Put(chainID[:], completeIndexVal)
-		if err != nil {
+		if err := i.indexedChains.Put(chainID[:], completeIndexVal); err != nil {
 			return err
 		}
 	} else { // Or incomplete
-		err := i.indexedChains.Put(chainID[:], incompleteIndexVal)
-		if err != nil {
+		if err := i.indexedChains.Put(chainID[:], incompleteIndexVal); err != nil {
 			return err
 		}
 	}
@@ -284,8 +278,7 @@ func (i *indexer) indexChain(chainID ids.ID, hasRunBefore bool) error {
 	}
 
 	// Register index to learn about new accepted containers
-	err = i.eventDispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name), index)
-	if err != nil {
+	if err := i.eventDispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name), index); err != nil {
 		_ = index.Close()
 		return fmt.Errorf("couldn't register index for chain %s with event dispatcher: %w", chainID, err)
 	}

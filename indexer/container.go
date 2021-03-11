@@ -2,14 +2,13 @@ package indexer
 
 import "github.com/ava-labs/avalanchego/ids"
 
-// Container ...
+// Container is something that gets accepted
+// (a block, transaction or vertex)
 type Container struct {
 	// ID of this container
 	ID ids.ID `serialize:"true"`
 	// Byte representation of this container
 	Bytes []byte `serialize:"true"`
-	// Index is the order in which this container was accepted
-	Index uint64 `serialize:"true"`
 	// Unix time at which this container was accepted
-	Timestamp uint64 `serialize:"true"`
+	Timestamp int64 `serialize:"true"`
 }

@@ -14,19 +14,15 @@ type service struct {
 	*indexer
 }
 
-// FormattedContainer ...
 type FormattedContainer struct {
 	ID        string              `json:"id"`
-	Index     json.Uint64         `json:"index"`
 	Bytes     string              `json:"bytes"`
 	Timestamp string              `json:"timestamp"`
 	Encoding  formatting.Encoding `json:"encoding"`
 }
 
-// newFormattedContainer ...
 func newFormattedContainer(c Container, enc formatting.Encoding) (FormattedContainer, error) {
 	fc := FormattedContainer{
-		Index:    json.Uint64(c.Index),
 		Encoding: enc,
 	}
 	idStr, err := formatting.Encode(enc, c.ID[:])
@@ -38,18 +34,16 @@ func newFormattedContainer(c Container, enc formatting.Encoding) (FormattedConta
 	if err != nil {
 		return fc, err
 	}
-	fc.Timestamp = time.Unix(int64(c.Timestamp), 0).String()
+	fc.Timestamp = time.Unix(c.Timestamp, 0).String()
 	fc.Bytes = bytesStr
 	return fc, nil
 }
 
-// GetLastAcceptedArgs ...
 type GetLastAcceptedArgs struct {
 	ChainID  string              `json:"chainID"`
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-// GetLastAccepted ...
 func (s *service) GetLastAccepted(_ *http.Request, args *GetLastAcceptedArgs, reply *FormattedContainer) error {
 	chainID, err := s.indexer.chainLookup(args.ChainID)
 	if err != nil {
@@ -65,14 +59,12 @@ func (s *service) GetLastAccepted(_ *http.Request, args *GetLastAcceptedArgs, re
 	return err
 }
 
-// GetContainer ...
 type GetContainer struct {
 	ChainID  string              `json:"chainID"`
 	Index    json.Uint64         `json:"index"`
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-// GetContainerByIndex ...
 func (s *service) GetContainerByIndex(_ *http.Request, args *GetContainer, reply *FormattedContainer) error {
 	chainID, err := s.indexer.chainLookup(args.ChainID)
 	if err != nil {
@@ -88,7 +80,6 @@ func (s *service) GetContainerByIndex(_ *http.Request, args *GetContainer, reply
 	return err
 }
 
-// GetContainerRange ...
 type GetContainerRange struct {
 	ChainID    string              `json:"chainID"`
 	StartIndex json.Uint64         `json:"startIndex"`
@@ -124,14 +115,12 @@ func (s *service) GetContainerRange(r *http.Request, args *GetContainerRange, re
 	return nil
 }
 
-// GetIndexArgs ...
 type GetIndexArgs struct {
 	ChainID     string              `json:"chainID"`
 	ContainerID ids.ID              `json:"containerID"`
 	Encoding    formatting.Encoding `json:"encoding"`
 }
 
-// GetIndexResponse ...
 type GetIndexResponse struct {
 	Index json.Uint64 `json:"index"`
 }

@@ -98,8 +98,7 @@ func TestIndexInitialChains(t *testing.T) {
 		expectedContainer := Container{
 			ID:        test.containerID,
 			Bytes:     test.containerBytes,
-			Index:     uint64(0),
-			Timestamp: uint64(now.Unix()),
+			Timestamp: now.Unix(),
 		}
 
 		// Accept a container
@@ -181,8 +180,7 @@ func TestIndexChain(t *testing.T) {
 	expectedContainer := Container{
 		ID:        containerID,
 		Bytes:     containerBytes,
-		Index:     uint64(0),
-		Timestamp: uint64(now.Unix()),
+		Timestamp: now.Unix(),
 	}
 
 	// Accept a container

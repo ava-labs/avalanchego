@@ -30,12 +30,10 @@ func (ni *noOpIndexer) CloseIndex(_ ids.ID) error {
 	return nil
 }
 
-// GetContainersByIndex ...
 func (ni *noOpIndexer) GetContainerByIndex(_ ids.ID, _ uint64) (Container, error) {
 	return Container{}, errNoOp
 }
 
-// GetContainersByIndex ...
 func (ni *noOpIndexer) GetContainerRange(_ ids.ID, _, _ uint64) ([]Container, error) {
 	return nil, errNoOp
 }

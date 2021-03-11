@@ -52,27 +52,27 @@ func newIndex(
 	codec codec.Manager,
 	clock timer.Clock,
 ) (Index, error) {
-	baseDb := versiondb.New(db)
-	indexToContainer := prefixdb.New(indexToContainerPrefix, baseDb)
-	containerToIndex := prefixdb.New(containerToIDPrefix, baseDb)
+	baseDB := versiondb.New(db)
+	indexToContainer := prefixdb.New(indexToContainerPrefix, baseDB)
+	containerToIndex := prefixdb.New(containerToIDPrefix, baseDB)
 
 	i := &index{
-		lock:             &sync.RWMutex{},
 		clock:            clock,
 		codec:            codec,
-		baseDb:           baseDb,
+		baseDB:           baseDB,
 		indexToContainer: indexToContainer,
 		containerToIndex: containerToIndex,
 		log:              log,
 	}
 
 	// Get next accepted index from db
-	nextAcceptedIndexBytes, err := i.baseDb.Get(nextAcceptedIndexKey)
+	nextAcceptedIndexBytes, err := i.baseDB.Get(nextAcceptedIndexKey)
 	if err == database.ErrNotFound {
 		// Couldn't find it in the database. Must not have accepted any containers in previous runs.
 		i.log.Info("next accepted index %d", i.nextAcceptedIndex)
 		return i, nil
-	} else if err != nil {
+	}
+	if err != nil {
 		return nil, fmt.Errorf("couldn't get next accepted index from database: %w", err)
 	}
 	p := wrappers.Packer{Bytes: nextAcceptedIndexBytes}
@@ -88,12 +88,12 @@ func newIndex(
 type index struct {
 	codec codec.Manager
 	clock timer.Clock
-	lock  *sync.RWMutex
+	lock  sync.RWMutex
 	// The index of the next accepted transaction
 	nextAcceptedIndex uint64
-	// When [baseDb] is committed, actual write to disk happens
-	baseDb *versiondb.Database
-	// Both [indexToContainer] and [containerToIndex] have [baseDb] underneath
+	// When [baseDB] is committed, actual write to disk happens
+	baseDB *versiondb.Database
+	// Both [indexToContainer] and [containerToIndex] have [baseDB] underneath
 	// Index --> Container
 	indexToContainer database.Database
 	// Container ID --> Index
@@ -104,15 +104,9 @@ type index struct {
 // Close this index
 func (i *index) Close() error {
 	errs := wrappers.Errs{}
-	if i.indexToContainer != nil {
-		errs.Add(i.indexToContainer.Close())
-	}
-	if i.containerToIndex != nil {
-		errs.Add(i.containerToIndex.Close())
-	}
-	if i.baseDb != nil {
-		errs.Add(i.baseDb.Close())
-	}
+	errs.Add(i.indexToContainer.Close())
+	errs.Add(i.containerToIndex.Close())
+	errs.Add(i.baseDB.Close())
 	return errs.Err
 }
 
@@ -122,7 +116,7 @@ func (i *index) Accept(ctx *snow.Context, containerID ids.ID, containerBytes []b
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
-	ctx.Log.Error("indexing %d --> %s", i.nextAcceptedIndex, containerID)
+	ctx.Log.Debug("indexing %d --> container %s", i.nextAcceptedIndex, containerID)
 	// Persist index --> Container
 	p := wrappers.Packer{MaxSize: wrappers.LongLen}
 	p.PackLong(i.nextAcceptedIndex)
@@ -130,22 +124,19 @@ func (i *index) Accept(ctx *snow.Context, containerID ids.ID, containerBytes []b
 		return fmt.Errorf("couldn't convert next accepted index to bytes: %w", p.Err)
 	}
 	bytes, err := i.codec.Marshal(codecVersion, Container{
-		Index:     i.nextAcceptedIndex,
 		Bytes:     containerBytes,
 		ID:        containerID,
-		Timestamp: uint64(i.clock.Time().Unix()),
+		Timestamp: i.clock.Time().Unix(),
 	})
 	if err != nil {
 		return fmt.Errorf("couldn't serialize container %s: %w", containerID, err)
 	}
-	err = i.indexToContainer.Put(p.Bytes, bytes)
-	if err != nil {
+	if err := i.indexToContainer.Put(p.Bytes, bytes); err != nil {
 		return fmt.Errorf("couldn't put accepted container %s into index: %w", containerID, err)
 	}
 
 	// Persist container ID --> index
-	err = i.containerToIndex.Put(containerID[:], p.Bytes)
-	if err != nil {
+	if err := i.containerToIndex.Put(containerID[:], p.Bytes); err != nil {
 		return fmt.Errorf("couldn't map container %s to index: %w", containerID, err)
 	}
 
@@ -156,12 +147,11 @@ func (i *index) Accept(ctx *snow.Context, containerID ids.ID, containerBytes []b
 	if p.Err != nil {
 		return fmt.Errorf("couldn't convert next accepted index to bytes: %w", p.Err)
 	}
-	err = i.baseDb.Put(nextAcceptedIndexKey, p.Bytes)
-	if err != nil {
+	if err := i.baseDB.Put(nextAcceptedIndexKey, p.Bytes); err != nil {
 		return fmt.Errorf("couldn't put accepted container %s into index: %w", containerID, err)
 	}
 
-	return i.baseDb.Commit()
+	return i.baseDB.Commit()
 }
 
 // Returns the ID of the [index]th accepted container and the container itself.
@@ -192,14 +182,13 @@ func (i *index) GetContainerByIndex(index uint64) (Container, error) {
 	}
 
 	var container Container
-	_, err = i.codec.Unmarshal(containerBytes, &container)
-	if err != nil {
+	if _, err = i.codec.Unmarshal(containerBytes, &container); err != nil {
 		return Container{}, fmt.Errorf("couldn't unmarshal container: %w", err)
 	}
 	return container, nil
 }
 
-/// GetContainerRange returns the IDs of containers at index
+// GetContainerRange returns the IDs of containers at index
 // [startIndex], [startIndex+1], ..., [startIndex+numToFetch-1]
 func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, error) {
 	i.log.Error("%d %d", startIndex, numToFetch) // TODO remove
@@ -214,7 +203,7 @@ func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, e
 
 	lastAcceptedIndex, ok := i.lastAcceptedIndex()
 	if !ok {
-		return nil, fmt.Errorf("start index (%d) > last accepted index (-1)", startIndex)
+		return nil, errNoneAccepted
 	} else if startIndex > lastAcceptedIndex {
 		return nil, fmt.Errorf("start index (%d) > last accepted index (%d)", startIndex, lastAcceptedIndex)
 	}
@@ -238,8 +227,7 @@ func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, e
 	for len(containers) < int(numToFetch) && iter.Next() {
 		containerBytes := iter.Value()
 		var container Container
-		_, err := i.codec.Unmarshal(containerBytes, &container)
-		if err != nil {
+		if _, err := i.codec.Unmarshal(containerBytes, &container); err != nil {
 			return nil, fmt.Errorf("couldn't unmarshal container: %w", err)
 		}
 		containers = append(containers, container)
@@ -286,8 +274,7 @@ func (i *index) GetContainerByID(containerID ids.ID) (Container, error) {
 
 	// Parse container
 	var container Container
-	_, err = i.codec.Unmarshal(containerBytes, &container)
-	if err != nil {
+	if _, err = i.codec.Unmarshal(containerBytes, &container); err != nil {
 		return Container{}, fmt.Errorf("couldn't unmarshal container: %w", err)
 	}
 	return container, nil

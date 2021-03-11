@@ -65,13 +65,11 @@ func TestIndex(t *testing.T) {
 		assert.NoError(err)
 		assert.Len(containers, 1)
 		assert.Equal(containerBytes, containers[0].Bytes)
-		assert.EqualValues(i, containers[0].Index)
 
 		containers, err = idx.GetContainerRange(i, 2)
 		assert.NoError(err)
 		assert.Len(containers, 1)
 		assert.Equal(containerBytes, containers[0].Bytes)
-		assert.EqualValues(i, containers[0].Index)
 
 		i++
 	}
@@ -92,8 +90,7 @@ func TestIndex(t *testing.T) {
 	containersList = append(containersList, containersList2...)
 
 	// Ensure that the data is correct
-	lastTimestamp := uint64(0)
-	lastIndex := -1
+	lastTimestamp := int64(0)
 	sawContainers := ids.Set{}
 	for _, container := range containersList {
 		assert.False(sawContainers.Contains(container.ID)) // Should only see this container once
@@ -101,9 +98,7 @@ func TestIndex(t *testing.T) {
 		assert.EqualValues(containers[container.ID], container.Bytes)
 		// Timestamps should be non-decreasing
 		assert.True(container.Timestamp >= lastTimestamp)
-		assert.EqualValues(lastIndex+1, container.Index)
 		lastTimestamp = container.Timestamp
-		lastIndex = int(container.Index)
 		sawContainers.Add(container.ID)
 	}
 }
