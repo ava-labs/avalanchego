@@ -7,7 +7,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
@@ -26,14 +25,14 @@ func New(
 	return meterCache, meterCache.metrics.Initialize(namespace, registerer)
 }
 
-func (c *Cache) Put(key ids.ID, value interface{}) {
+func (c *Cache) Put(key, value interface{}) {
 	start := c.clock.Time()
 	c.cache.Put(key, value)
 	end := c.clock.Time()
 	c.put.Observe(float64(end.Sub(start)))
 }
 
-func (c *Cache) Get(key ids.ID) (interface{}, bool) {
+func (c *Cache) Get(key interface{}) (interface{}, bool) {
 	start := c.clock.Time()
 	value, has := c.cache.Get(key)
 	end := c.clock.Time()
@@ -47,7 +46,7 @@ func (c *Cache) Get(key ids.ID) (interface{}, bool) {
 	return value, has
 }
 
-func (c *Cache) Evict(key ids.ID) {
+func (c *Cache) Evict(key interface{}) {
 	start := c.clock.Time()
 	c.cache.Evict(key)
 	end := c.clock.Time()
