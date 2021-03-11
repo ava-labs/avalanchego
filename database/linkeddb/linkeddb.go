@@ -22,12 +22,18 @@ type LinkedDB interface {
 }
 
 type linkedDB struct {
-	lock                                                                   sync.RWMutex
+	// lock ensure that this datastructure handles its thread safety correctly.
+	lock sync.RWMutex
+
+	// these variables provide caching for the head key.
 	headKeyLock                                                            sync.Mutex
 	headKeyIsSynced, headKeyExists, headKeyIsUpdated, updatedHeadKeyExists bool
 	headKey, updatedHeadKey                                                []byte
-	db                                                                     database.Database
-	batch                                                                  database.Batch
+
+	// db is the underlying database that this list is stored in.
+	db database.Database
+	// batch writes to [db] atomically.
+	batch database.Batch
 }
 
 type node struct {
@@ -80,9 +86,7 @@ func (ldb *linkedDB) Put(key, value []byte) error {
 	}
 
 	// The key isn't currently in the list, so we should add it as the head.
-	newHead := node{
-		Value: value,
-	}
+	newHead := node{Value: value}
 	if headKey, err := ldb.getHeadKey(); err == nil {
 		// The list currently has a head, so we need to update the old head.
 		oldHead, err := ldb.getNode(headKey)
@@ -318,17 +322,10 @@ func (it *iterator) Next() bool {
 	return false
 }
 
-// Error implements the Iterator interface
-func (it *iterator) Error() error { return it.err }
-
-// Key implements the Iterator interface
-func (it *iterator) Key() []byte { return it.key }
-
-// Value implements the Iterator interface
+func (it *iterator) Error() error  { return it.err }
+func (it *iterator) Key() []byte   { return it.key }
 func (it *iterator) Value() []byte { return it.value }
-
-// Release implements the Iterator interface
-func (it *iterator) Release() {}
+func (it *iterator) Release()      {}
 
 func nodeKey(key []byte) []byte {
 	newKey := make([]byte, len(key)+1)
