@@ -208,29 +208,32 @@ func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, e
 		return nil, fmt.Errorf("start index (%d) > last accepted index (%d)", startIndex, lastAcceptedIndex)
 	}
 
-	// Convert start index to bytes
-	p := wrappers.Packer{MaxSize: wrappers.LongLen}
-	p.PackLong(startIndex)
-	if p.Err != nil {
-		return nil, fmt.Errorf("couldn't convert start index to bytes: %w", p.Err)
-	}
-
-	// Calculate the size of the needed slice
-	lastIndex := math.Min64(startIndex+numToFetch, lastAcceptedIndex)
+	// Calculate the last index we will fetch
+	lastIndex := math.Min64(startIndex+numToFetch-1, lastAcceptedIndex)
 	// [lastIndex] is always >= [startIndex] so this is safe.
 	// [n] is limited to [maxFetchedByRange] so [containerIDs] can't be crazy big.
-	containers := make([]Container, 0, int(lastIndex)-int(startIndex)+1)
+	containers := make([]Container, int(lastIndex)-int(startIndex)+1)
 
-	iter := i.indexToContainer.NewIteratorWithStart(p.Bytes)
-	defer iter.Release()
+	n := 0
+	for j := startIndex; j <= lastIndex; j++ {
+		// Convert index to bytes
+		p := wrappers.Packer{MaxSize: wrappers.LongLen}
+		p.PackLong(j)
+		if p.Err != nil {
+			return nil, fmt.Errorf("couldn't convert index %d to bytes: %w", j, p.Err)
+		}
 
-	for len(containers) < int(numToFetch) && iter.Next() {
-		containerBytes := iter.Value()
+		// Get container from database and deserialize
+		containerBytes, err := i.indexToContainer.Get(p.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't get container from database: %w", err)
+		}
 		var container Container
 		if _, err := i.codec.Unmarshal(containerBytes, &container); err != nil {
 			return nil, fmt.Errorf("couldn't unmarshal container: %w", err)
 		}
-		containers = append(containers, container)
+		containers[n] = container
+		n++
 	}
 	return containers, nil
 }
