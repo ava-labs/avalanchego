@@ -42,7 +42,7 @@ func TestIndexInitialChains(t *testing.T) {
 		AllowIncompleteIndex:   false,
 		Log:                    logging.NoLog{},
 		Name:                   "test",
-		Db:                     memdb.New(),
+		DB:                     memdb.New(),
 		EventDispatcher:        ed,
 		InitiallyIndexedChains: initiallyIndexed,
 		ChainLookupF:           func(string) (ids.ID, error) { return ids.ID{}, nil },
@@ -143,7 +143,7 @@ func TestIndexChain(t *testing.T) {
 		AllowIncompleteIndex:   false,
 		Log:                    logging.NoLog{},
 		Name:                   "test",
-		Db:                     memdb.New(),
+		DB:                     memdb.New(),
 		EventDispatcher:        ed,
 		InitiallyIndexedChains: ids.Set{}, // No chains indexed at start
 		ChainLookupF:           func(string) (ids.ID, error) { return ids.ID{}, nil },
@@ -231,7 +231,7 @@ func TestCloseIndex(t *testing.T) {
 		AllowIncompleteIndex:   false,
 		Log:                    logging.NoLog{},
 		Name:                   "test",
-		Db:                     memdb.New(),
+		DB:                     memdb.New(),
 		EventDispatcher:        ed,
 		InitiallyIndexedChains: initiallyIndexed,
 		ChainLookupF:           func(string) (ids.ID, error) { return ids.ID{}, nil },
@@ -289,7 +289,7 @@ func TestIncompleteIndexStartup(t *testing.T) {
 		AllowIncompleteIndex:   false,
 		Log:                    logging.NoLog{},
 		Name:                   "test",
-		Db:                     dbCopy,
+		DB:                     dbCopy,
 		EventDispatcher:        ed,
 		InitiallyIndexedChains: initiallyIndexed,
 		ChainLookupF:           func(string) (ids.ID, error) { return ids.ID{}, nil },
@@ -308,7 +308,7 @@ func TestIncompleteIndexStartup(t *testing.T) {
 
 	// Re-open the indexer. Should be allowed since we never ran without indexing chain1.
 	dbCopy = versiondb.New(db) // Because [dbCopy] was closed when indexer closed
-	config.Db = dbCopy
+	config.DB = dbCopy
 	idxrIntf, err = NewIndexer(config)
 	assert.NoError(err)
 	idxr, ok = idxrIntf.(*indexer)
@@ -319,7 +319,7 @@ func TestIncompleteIndexStartup(t *testing.T) {
 
 	// Re-open the indexer with indexing disabled.
 	dbCopy = versiondb.New(db) // Because [dbCopy] was closed when indexer closed
-	config.Db = dbCopy
+	config.DB = dbCopy
 	config.IndexingEnabled = false
 	_, err = NewIndexer(config)
 	assert.NoError(dbCopy.Commit())
@@ -332,7 +332,7 @@ func TestIncompleteIndexStartup(t *testing.T) {
 	assert.NoError(idxrIntf.Close()) // close the indexer
 
 	dbCopy = versiondb.New(db) // Because [dbCopy] was closed when indexer closed
-	config.Db = dbCopy
+	config.DB = dbCopy
 	config.AllowIncompleteIndex = false
 	config.IndexingEnabled = true
 	_, err = NewIndexer(config)
@@ -356,7 +356,7 @@ func TestIncompleteIndexNewChain(t *testing.T) {
 		AllowIncompleteIndex:   false,
 		Log:                    logging.NoLog{},
 		Name:                   "test",
-		Db:                     dbCopy,
+		DB:                     dbCopy,
 		EventDispatcher:        ed,
 		InitiallyIndexedChains: nil, // no initially indexed chains
 		ChainLookupF:           func(string) (ids.ID, error) { return ids.ID{}, nil },
@@ -376,7 +376,7 @@ func TestIncompleteIndexNewChain(t *testing.T) {
 
 	// Allow incomplete index
 	dbCopy = versiondb.New(db)
-	config.Db = dbCopy
+	config.DB = dbCopy
 	config.AllowIncompleteIndex = true
 	idxrIntf, err = NewIndexer(config)
 	assert.NoError(err)

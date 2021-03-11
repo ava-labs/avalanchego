@@ -43,7 +43,7 @@ var (
 
 // Config for an indexer
 type Config struct {
-	Db  database.Database
+	DB  database.Database
 	Log logging.Logger
 	// If false, use a dummy (no-op) indexer
 	IndexingEnabled bool
@@ -80,23 +80,23 @@ type Indexer interface {
 // NewIndexer returns a new Indexer and registers a new endpoint on the given API server.
 func NewIndexer(config Config) (Indexer, error) {
 	// See if we have run with this database before
-	hasEverRunDb := prefixdb.New(hasEverRunPrefix, config.Db)
-	defer hasEverRunDb.Close()
-	hasRunBefore, err := hasEverRunDb.Has(hasEverRunKey)
+	hasEverRunDB := prefixdb.New(hasEverRunPrefix, config.DB)
+	defer hasEverRunDB.Close()
+	hasRunBefore, err := hasEverRunDB.Has(hasEverRunKey)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't read from database: %w", err)
 	}
 
 	// Mark that we have now run with this database
-	if err := hasEverRunDb.Put(hasEverRunKey, nil); err != nil {
+	if err := hasEverRunDB.Put(hasEverRunKey, nil); err != nil {
 		return nil, err
 	}
 
-	indexedChainsDb := prefixdb.New(indexedChainsPrefix, config.Db)
-	needToCloseIndexedChainsDb := true
+	indexedChainsDB := prefixdb.New(indexedChainsPrefix, config.DB)
+	needToCloseIndexedChainsDB := true
 	defer func() {
-		if needToCloseIndexedChainsDb {
-			indexedChainsDb.Close()
+		if needToCloseIndexedChainsDB {
+			indexedChainsDB.Close()
 		}
 	}()
 
@@ -110,7 +110,7 @@ func NewIndexer(config Config) (Indexer, error) {
 		// Value:
 		//   [incompleteIndexVal] if this index may be incomplete
 		//   [completeIndexVal] if this index is complete
-		iter := indexedChainsDb.NewIterator()
+		iter := indexedChainsDB.NewIterator()
 		defer iter.Release()
 
 		// IDs of chains that now have incomplete indices
@@ -143,7 +143,7 @@ func NewIndexer(config Config) (Indexer, error) {
 
 		// Mark that these indices are incomplete
 		for _, chainID := range incompleteIndices {
-			if err := indexedChainsDb.Put(chainID[:], incompleteIndexVal); err != nil {
+			if err := indexedChainsDB.Put(chainID[:], incompleteIndexVal); err != nil {
 				return nil, err
 			}
 		}
@@ -154,15 +154,15 @@ func NewIndexer(config Config) (Indexer, error) {
 	}
 
 	// Want this database to stay open since we continue to use it in [indexer]
-	needToCloseIndexedChainsDb = false
+	needToCloseIndexedChainsDB = false
 
 	indexer := &indexer{
 		name:                 config.Name,
 		codec:                codec.NewDefaultManager(),
 		log:                  config.Log,
-		db:                   config.Db,
+		db:                   config.DB,
 		allowIncompleteIndex: config.AllowIncompleteIndex,
-		indexedChains:        indexedChainsDb,
+		indexedChains:        indexedChainsDB,
 		eventDispatcher:      config.EventDispatcher,
 		chainToIndex:         make(map[ids.ID]Index),
 		chainLookup:          config.ChainLookupF,
@@ -271,8 +271,8 @@ func (i *indexer) indexChain(chainID ids.ID, hasRunBefore bool) error {
 	}
 
 	// Database for the index to use
-	indexDb := prefixdb.New(chainID[:], i.db)
-	index, err := newIndex(indexDb, i.log, i.codec, i.clock)
+	indexDB := prefixdb.New(chainID[:], i.db)
+	index, err := newIndex(indexDB, i.log, i.codec, i.clock)
 	if err != nil {
 		return fmt.Errorf("couldn't create index for chain %s: %w", chainID, err)
 	}
