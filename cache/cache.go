@@ -3,22 +3,18 @@
 
 package cache
 
-import (
-	"github.com/ava-labs/avalanchego/ids"
-)
-
 // Cacher acts as a best effort key value store
 type Cacher interface {
 	// Put inserts an element into the cache. If spaced is required, elements will
 	// be evicted.
-	Put(key ids.ID, value interface{})
+	Put(key, value interface{})
 
 	// Get returns the entry in the cache with the key specified, if no value
 	// exists, false is returned.
-	Get(key ids.ID) (interface{}, bool)
+	Get(key interface{}) (interface{}, bool)
 
 	// Evict removes the specified entry from the cache
-	Evict(key ids.ID)
+	Evict(key interface{})
 
 	// Flush removes all entries from the cache
 	Flush()
@@ -26,7 +22,7 @@ type Cacher interface {
 
 // Evictable allows the object to be notified when it is evicted
 type Evictable interface {
-	ID() ids.ID
+	Key() interface{}
 	Evict()
 }
 
