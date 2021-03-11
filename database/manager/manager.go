@@ -36,7 +36,7 @@ type Manager interface {
 	Previous() (*VersionedDatabase, bool)
 	// GetDatabases returns all the managed databases in order from current to the oldest version
 	GetDatabases() []*VersionedDatabase
-	// Close closes all of the databases
+	// Close all of the databases controlled by the manager
 	Close() error
 
 	// NewPrefixDBManager returns a new database manager with each of its databases
@@ -69,13 +69,8 @@ func (m *manager) Previous() (*VersionedDatabase, bool) {
 func (m *manager) GetDatabases() []*VersionedDatabase { return m.databases }
 
 func (m *manager) Close() error {
-	return closeDBs(m.databases)
-}
-
-func closeDBs(dbs []*VersionedDatabase) error {
 	errs := wrappers.Errs{}
-
-	for _, db := range dbs {
+	for _, db := range m.databases {
 		errs.Add(db.Close())
 	}
 
@@ -89,17 +84,20 @@ func closeDBs(dbs []*VersionedDatabase) error {
 // the function wrap must return a database that can be closed without closing the
 // underlying database.
 func (m *manager) wrapManager(wrap func(db *VersionedDatabase) (*VersionedDatabase, error)) (*manager, error) {
-	databases := make([]*VersionedDatabase, 0, len(m.databases))
+	newManager := &manager{
+		databases: make([]*VersionedDatabase, 0, len(m.databases)),
+	}
+
 	for _, db := range m.databases {
 		wrappedDB, err := wrap(db)
 		if err != nil {
 			// ignore additional errors in favor of returning the original error
-			_ = closeDBs(databases)
+			_ = newManager.Close()
 			return nil, err
 		}
-		databases = append(databases, wrappedDB)
+		newManager.databases = append(newManager.databases, wrappedDB)
 	}
-	return &manager{databases: databases}, nil
+	return newManager, nil
 }
 
 // NewDefaultMemDBManager returns a database manager with a single memory db instance
@@ -126,16 +124,19 @@ func New(dbDirPath string, log logging.Logger, currentVersion version.Version) (
 		return nil, fmt.Errorf("couldn't create db at %s: %w", currentDBPath, err)
 	}
 
-	versionedDBs := []*VersionedDatabase{
-		{
-			Database: currentDB,
-			Version:  currentVersion,
+	manager := &manager{
+		databases: []*VersionedDatabase{
+			{
+				Database: currentDB,
+				Version:  currentVersion,
+			},
 		},
 	}
 	err = filepath.Walk(dbDirPath, func(path string, info os.FileInfo, err error) error {
 		// the walkFn is called with a non-nil error argument if an os.Lstat
 		// or Readdirnames call returns an error. Both cases are considered
 		// fatal in the traversal.
+		// Reference: https://golang.org/pkg/path/filepath/#WalkFunc
 		if err != nil {
 			return err
 		}
@@ -166,27 +167,23 @@ func New(dbDirPath string, log logging.Logger, currentVersion version.Version) (
 			return fmt.Errorf("couldn't create db at %s: %w", path, err)
 		}
 
-		versionedDBs = append(versionedDBs, &VersionedDatabase{
+		manager.databases = append(manager.databases, &VersionedDatabase{
 			Database: db,
 			Version:  version,
 		})
 
 		return filepath.SkipDir
 	})
-
-	SortDescending(versionedDBs)
-	m := &manager{
-		databases: versionedDBs,
-	}
+	SortDescending(manager.databases)
 
 	// If an error occurred walking [dbDirPath] close the
 	// database manager and return the original error here.
 	if err != nil {
-		_ = m.Close()
+		_ = manager.Close()
 		return nil, err
 	}
 
-	return m, nil
+	return manager, nil
 }
 
 // NewPrefixDBManager creates a new manager with each database instance prefixed
