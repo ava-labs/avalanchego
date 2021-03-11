@@ -250,6 +250,8 @@ func (ldb *linkedDB) getNode(key []byte) (node, error) {
 
 	nodeBytes, err := ldb.db.Get(nodeKey(key))
 	if err == database.ErrNotFound {
+		// Passing [nil] without the pointer cast would result in a panic when
+		// performing the type assertion in the above cache check.
 		ldb.nodeCache.Put(keyStr, (*node)(nil))
 		return node{}, err
 	}
