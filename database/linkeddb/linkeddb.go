@@ -22,17 +22,20 @@ type LinkedDB interface {
 }
 
 type linkedDB struct {
-	lock  sync.RWMutex
-	db    database.Database
-	batch database.Batch
+	lock                                                                   sync.RWMutex
+	headKeyLock                                                            sync.Mutex
+	headKeyIsSynced, headKeyExists, headKeyIsUpdated, updatedHeadKeyExists bool
+	headKey, updatedHeadKey                                                []byte
+	db                                                                     database.Database
+	batch                                                                  database.Batch
 }
 
 type node struct {
-	Value       []byte `serialize:"true" json:"value"`
-	HasNext     bool   `serialize:"true" json:"hasNext"`
-	Next        []byte `serialize:"true" json:"next"`
-	HasPrevious bool   `serialize:"true" json:"hasPrevious"`
-	Previous    []byte `serialize:"true" json:"previous"`
+	Value       []byte `serialize:"true"`
+	HasNext     bool   `serialize:"true"`
+	Next        []byte `serialize:"true"`
+	HasPrevious bool   `serialize:"true"`
+	Previous    []byte `serialize:"true"`
 }
 
 func New(db database.Database) LinkedDB {
@@ -61,7 +64,7 @@ func (ldb *linkedDB) Put(key, value []byte) error {
 	ldb.lock.Lock()
 	defer ldb.lock.Unlock()
 
-	ldb.batch.Reset()
+	ldb.resetBatch()
 
 	// If the key already has a node in the list, update that node.
 	existingNode, err := ldb.getNode(key)
@@ -70,7 +73,7 @@ func (ldb *linkedDB) Put(key, value []byte) error {
 		if err := ldb.putNode(key, existingNode); err != nil {
 			return err
 		}
-		return ldb.batch.Write()
+		return ldb.writeBatch()
 	}
 	if err != database.ErrNotFound {
 		return err
@@ -103,7 +106,7 @@ func (ldb *linkedDB) Put(key, value []byte) error {
 	if err := ldb.putHeadKey(key); err != nil {
 		return err
 	}
-	return ldb.batch.Write()
+	return ldb.writeBatch()
 }
 
 func (ldb *linkedDB) Delete(key []byte) error {
@@ -118,7 +121,7 @@ func (ldb *linkedDB) Delete(key []byte) error {
 		return err
 	}
 
-	ldb.batch.Reset()
+	ldb.resetBatch()
 
 	// We're trying to delete this node.
 	if err := ldb.deleteNode(key); err != nil {
@@ -132,7 +135,7 @@ func (ldb *linkedDB) Delete(key []byte) error {
 			if err := ldb.deleteHeadKey(); err != nil {
 				return err
 			}
-			return ldb.batch.Write()
+			return ldb.writeBatch()
 		}
 
 		// The next node will be the new head.
@@ -153,7 +156,7 @@ func (ldb *linkedDB) Delete(key []byte) error {
 			return err
 		}
 
-		return ldb.batch.Write()
+		return ldb.writeBatch()
 	}
 
 	// The node we are deleting isn't the head node, so we must update the
@@ -182,14 +185,50 @@ func (ldb *linkedDB) Delete(key []byte) error {
 			return err
 		}
 	}
-	return ldb.batch.Write()
+	return ldb.writeBatch()
 }
 
 func (ldb *linkedDB) NewIterator() database.Iterator { return &iterator{ldb: ldb} }
 
-func (ldb *linkedDB) getHeadKey() ([]byte, error) { return ldb.db.Get(headKey) }
-func (ldb *linkedDB) putHeadKey(key []byte) error { return ldb.batch.Put(headKey, key) }
-func (ldb *linkedDB) deleteHeadKey() error        { return ldb.batch.Delete(headKey) }
+func (ldb *linkedDB) getHeadKey() ([]byte, error) {
+	// If the ldb read lock is held, then there needs to be additional
+	// synchronization here to avoid racy behavior.
+	ldb.headKeyLock.Lock()
+	defer ldb.headKeyLock.Unlock()
+
+	if ldb.headKeyIsSynced {
+		if ldb.headKeyExists {
+			return ldb.headKey, nil
+		}
+		return nil, database.ErrNotFound
+	}
+	headKey, err := ldb.db.Get(headKey)
+	if err == nil {
+		ldb.headKeyIsSynced = true
+		ldb.headKeyExists = true
+		ldb.headKey = headKey
+		return headKey, nil
+	}
+	if err == database.ErrNotFound {
+		ldb.headKeyIsSynced = true
+		ldb.headKeyExists = false
+		return nil, database.ErrNotFound
+	}
+	return headKey, err
+}
+
+func (ldb *linkedDB) putHeadKey(key []byte) error {
+	ldb.headKeyIsUpdated = true
+	ldb.updatedHeadKeyExists = true
+	ldb.updatedHeadKey = key
+	return ldb.batch.Put(headKey, key)
+}
+
+func (ldb *linkedDB) deleteHeadKey() error {
+	ldb.headKeyIsUpdated = true
+	ldb.updatedHeadKeyExists = false
+	return ldb.batch.Delete(headKey)
+}
 
 func (ldb *linkedDB) getNode(key []byte) (node, error) {
 	nodeBytes, err := ldb.db.Get(nodeKey(key))
@@ -210,6 +249,20 @@ func (ldb *linkedDB) putNode(key []byte, n node) error {
 }
 
 func (ldb *linkedDB) deleteNode(key []byte) error { return ldb.batch.Delete(nodeKey(key)) }
+
+func (ldb *linkedDB) resetBatch() {
+	ldb.headKeyIsUpdated = false
+	ldb.batch.Reset()
+}
+func (ldb *linkedDB) writeBatch() error {
+	if err := ldb.batch.Write(); err != nil || !ldb.headKeyIsUpdated {
+		return err
+	}
+	ldb.headKeyIsSynced = true
+	ldb.headKeyExists = ldb.updatedHeadKeyExists
+	ldb.headKey = ldb.updatedHeadKey
+	return nil
+}
 
 type iterator struct {
 	ldb                    *linkedDB

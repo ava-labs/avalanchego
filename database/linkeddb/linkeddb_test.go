@@ -160,6 +160,45 @@ func TestEmptyLinkedDBIterator(t *testing.T) {
 	iterator.Release()
 }
 
+func TestLinkedDBLoadHeadKey(t *testing.T) {
+	assert := assert.New(t)
+
+	db := memdb.New()
+	ldb := New(db)
+
+	key := []byte("hello")
+	value := []byte("world")
+
+	err := ldb.Put(key, value)
+	assert.NoError(err)
+
+	ldb = New(db)
+
+	iterator := ldb.NewIterator()
+	next := iterator.Next()
+	assert.False(next, "The iterator should be exhausted yet")
+
+	k := iterator.Key()
+	assert.Equal(key, k, "The iterator returned the wrong key")
+
+	v := iterator.Value()
+	assert.Equal(value, v, "The iterator returned the wrong value")
+
+	next = iterator.Next()
+	assert.True(next, "The iterator should now be exhausted")
+
+	k = iterator.Key()
+	assert.Nil(k, "The iterator returned the wrong key")
+
+	v = iterator.Value()
+	assert.Nil(v, "The iterator returned the wrong value")
+
+	err = iterator.Error()
+	assert.NoError(err)
+
+	iterator.Release()
+}
+
 func TestSingleLinkedDBIterator(t *testing.T) {
 	assert := assert.New(t)
 
