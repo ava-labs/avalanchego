@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -33,6 +34,7 @@ var (
 	hasEverRunKey       = []byte("hasEverRun")
 	incompleteIndexVal  = []byte{0}
 	completeIndexVal    = []byte{1}
+	errClosed           = errors.New("indexer is closed")
 )
 
 var (
@@ -196,12 +198,13 @@ func NewIndexer(config Config) (Indexer, error) {
 
 // indexer implements Indexer
 type indexer struct {
-	name  string
-	codec codec.Manager
-	clock timer.Clock
-	lock  sync.RWMutex
-	log   logging.Logger
-	db    database.Database
+	name   string
+	codec  codec.Manager
+	clock  timer.Clock
+	lock   sync.RWMutex
+	log    logging.Logger
+	db     database.Database
+	closed bool
 	// If true, allow running in such a way that could allow the creation
 	// of an index which could be missing accepted containers.
 	allowIncompleteIndex bool
@@ -228,6 +231,9 @@ func (i *indexer) IndexChain(chainID ids.ID) error {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
+	if i.closed {
+		return errClosed
+	}
 	return i.indexChain(chainID, true)
 }
 
@@ -294,6 +300,9 @@ func (i *indexer) CloseIndex(chainID ids.ID) error {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
+	if i.closed {
+		return errClosed
+	}
 	return i.closeIndex(chainID)
 }
 
@@ -316,6 +325,10 @@ func (i *indexer) GetContainerByIndex(chainID ids.ID, indexToFetch uint64) (Cont
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
+	if i.closed {
+		return Container{}, errClosed
+	}
+
 	index, exists := i.chainToIndex[chainID]
 	if !exists {
 		return Container{}, fmt.Errorf("there is no index for chain %s", chainID)
@@ -329,6 +342,10 @@ func (i *indexer) GetContainerRange(chainID ids.ID, startIndex, numToFetch uint6
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
+	if i.closed {
+		return nil, errClosed
+	}
+
 	index, exists := i.chainToIndex[chainID]
 	if !exists {
 		return nil, fmt.Errorf("there is no index for chain %s", chainID)
@@ -341,6 +358,10 @@ func (i *indexer) GetContainerRange(chainID ids.ID, startIndex, numToFetch uint6
 func (i *indexer) GetLastAccepted(chainID ids.ID) (Container, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
+
+	if i.closed {
+		return Container{}, errClosed
+	}
 
 	index, exists := i.chainToIndex[chainID]
 	if !exists {
@@ -356,6 +377,10 @@ func (i *indexer) GetIndex(chainID ids.ID, containerID ids.ID) (uint64, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
+	if i.closed {
+		return 0, errClosed
+	}
+
 	index, exists := i.chainToIndex[chainID]
 	if !exists {
 		return 0, fmt.Errorf("there is no index for chain %s", chainID)
@@ -367,6 +392,10 @@ func (i *indexer) GetIndex(chainID ids.ID, containerID ids.ID) (uint64, error) {
 func (i *indexer) GetContainerByID(chainID ids.ID, containerID ids.ID) (Container, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
+
+	if i.closed {
+		return Container{}, errClosed
+	}
 
 	index, exists := i.chainToIndex[chainID]
 	if !exists {
@@ -380,6 +409,10 @@ func (i *indexer) GetContainerByID(chainID ids.ID, containerID ids.ID) (Containe
 func (i *indexer) GetIndexedChains() []ids.ID {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
+
+	if i.closed {
+		return nil
+	}
 
 	if i.chainToIndex == nil || len(i.chainToIndex) == 0 {
 		return nil
@@ -401,6 +434,11 @@ func (i *indexer) Close() error {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
+	if i.closed {
+		return nil
+	}
+
+	i.closed = true
 	errs := &wrappers.Errs{}
 	for chainID := range i.chainToIndex {
 		errs.Add(i.closeIndex(chainID))

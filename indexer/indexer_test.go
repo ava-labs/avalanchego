@@ -266,40 +266,14 @@ func TestCloseIndex(t *testing.T) {
 	assert.NoError(err)
 	assert.Len(idxr.GetIndexedChains(), 0)
 
-	// Accept a container
-	ctx := snow.DefaultContextTest()
-	ctx.ChainID = chain1ID
-	containerID, containerBytes := ids.GenerateTestID(), utils.RandomBytes(32)
-	ed.Accept(ctx, containerID, containerBytes)
-
 	// Shouldn't be able to get things from this index anymore
 	_, err = idxr.GetLastAccepted(chain1ID)
 	assert.Error(err)
-
-	// Re-index this chain
-	err = idxr.IndexChain(chain1ID)
-	// Should fail because this would cause an incomplete index
-	assert.Error(err)
-	// Allow incomplete index
-	idxr.allowIncompleteIndex = true
-	// Should work now
-	err = idxr.IndexChain(chain1ID)
-	assert.NoError(err)
-
-	// Accept another container
-	containerID, containerBytes = ids.GenerateTestID(), utils.RandomBytes(32)
-	ed.Accept(ctx, containerID, containerBytes)
-	// Should have been indexed
-	container, err := idxr.GetLastAccepted(chain1ID)
-	assert.NoError(err)
-	assert.Equal(containerID, container.ID)
-
-	assert.NoError(idxr.Close())
 }
 
 // Test that indexer doesn't allow an incomplete index
 // unless that is allowed in the config
-func TestIncompleteIndex(t *testing.T) {
+func TestIncompleteIndexStartup(t *testing.T) {
 	// Setup
 	assert := assert.New(t)
 	ed := &triggers.EventDispatcher{}
@@ -310,6 +284,7 @@ func TestIncompleteIndex(t *testing.T) {
 	chain1Ctx := snow.DefaultContextTest()
 	chain1Ctx.ChainID = chain1ID
 	db := memdb.New()
+	defer db.Close()
 	dbCopy := versiondb.New(db) // Will be written to [db]
 	config := Config{
 		IndexingEnabled:        true,
@@ -340,6 +315,77 @@ func TestIncompleteIndex(t *testing.T) {
 	assert.NoError(err)
 	idxr, ok = idxrIntf.(*indexer)
 	assert.True(ok)
+	// Close the indexer again
+	assert.NoError(dbCopy.Commit())
+	assert.NoError(idxr.Close())
 
-	assert.NoError(db.Close())
+	// Re-open the indexer with indexing disabled.
+	dbCopy = versiondb.New(db) // Because [dbCopy] was closed when indexer closed
+	config.Db = dbCopy
+	config.IndexingEnabled = false
+	_, err = NewIndexer(config)
+	assert.NoError(dbCopy.Commit())
+	assert.Error(err) // Should error because running would cause incomplete index
+
+	config.AllowIncompleteIndex = true // allow incomplete index
+	idxrIntf, err = NewIndexer(config)
+	assert.NoError(err)
+	assert.NoError(dbCopy.Commit())
+	assert.NoError(idxrIntf.Close()) // close the indexer
+
+	dbCopy = versiondb.New(db) // Because [dbCopy] was closed when indexer closed
+	config.Db = dbCopy
+	config.AllowIncompleteIndex = false
+	config.IndexingEnabled = true
+	_, err = NewIndexer(config)
+	assert.NoError(dbCopy.Commit())
+	assert.Error(err) // Should error because we have an incomplete index
+}
+
+// Test that indexer doesn't allow an incomplete index
+// unless that is allowed in the config
+func TestIncompleteIndexNewChain(t *testing.T) {
+	// Setup
+	assert := assert.New(t)
+	ed := &triggers.EventDispatcher{}
+	ed.Initialize(logging.NoLog{})
+
+	db := memdb.New()
+	defer db.Close()
+	dbCopy := versiondb.New(db) // Will be written to [db]
+	config := Config{
+		IndexingEnabled:        true,
+		AllowIncompleteIndex:   false,
+		Log:                    logging.NoLog{},
+		Name:                   "test",
+		Db:                     dbCopy,
+		EventDispatcher:        ed,
+		InitiallyIndexedChains: nil, // no initially indexed chains
+		ChainLookupF:           func(string) (ids.ID, error) { return ids.ID{}, nil },
+		APIServer:              &apiServerMock{},
+	}
+
+	// Create indexer with incomplete index disallowed
+	idxrIntf, err := NewIndexer(config)
+	assert.NoError(err)
+	idxr, ok := idxrIntf.(*indexer)
+	assert.True(ok)
+
+	// Should error because indexing new chain would cause incomplete index
+	err = idxr.IndexChain(ids.GenerateTestID())
+	assert.Error(err)
+	assert.NoError(idxr.Close())
+
+	// Allow incomplete index
+	dbCopy = versiondb.New(db)
+	config.Db = dbCopy
+	config.AllowIncompleteIndex = true
+	idxrIntf, err = NewIndexer(config)
+	assert.NoError(err)
+	idxr, ok = idxrIntf.(*indexer)
+	assert.True(ok)
+
+	err = idxr.IndexChain(ids.GenerateTestID()) // Should allow incomplete index
+	assert.NoError(err)
+	assert.NoError(idxr.Close())
 }
