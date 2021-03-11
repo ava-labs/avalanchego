@@ -1007,6 +1007,10 @@ func (vm *VM) updateVdrSet(subnetID ids.ID) error {
 		}
 	}
 
+	if subnetID == constants.PrimaryNetworkID {
+		vm.totalStake.Set(float64(vdrs.Weight()) / float64(units.Avax))
+	}
+
 	errs := wrappers.Errs{}
 	errs.Add(
 		vm.vdrMgr.Set(subnetID, vdrs),
@@ -1245,24 +1249,6 @@ func (vm *VM) getPendingStakers() ([]validators.Validator, error) {
 		startDB.Close(),
 	)
 	return stakers, errs.Err
-}
-
-// Returns the total amount being staked on the Primary Network, in nAVAX.
-// Does not include stake of pending stakers.
-func (vm *VM) getTotalStake() (uint64, error) {
-	stakers, err := vm.getStakers()
-	if err != nil {
-		return 0, fmt.Errorf("couldn't get stakers: %w", err)
-	}
-
-	totalStake := uint64(0)
-	for _, staker := range stakers {
-		totalStake, err = safemath.Add64(totalStake, staker.Weight())
-		if err != nil {
-			return 0, err
-		}
-	}
-	return totalStake, nil
 }
 
 // Returns the percentage of the total stake on the Primary Network
