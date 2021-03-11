@@ -16,7 +16,7 @@ func TestLinkedDB(t *testing.T) {
 	assert := assert.New(t)
 
 	db := memdb.New()
-	ldb := New(db)
+	ldb := NewDefault(db)
 
 	key := []byte("hello")
 	value := []byte("world")
@@ -62,7 +62,7 @@ func TestLinkedDBDuplicatedPut(t *testing.T) {
 	assert := assert.New(t)
 
 	db := memdb.New()
-	ldb := New(db)
+	ldb := NewDefault(db)
 
 	key := []byte("hello")
 	value1 := []byte("world1")
@@ -91,7 +91,7 @@ func TestLinkedDBMultiplePuts(t *testing.T) {
 	assert := assert.New(t)
 
 	db := memdb.New()
-	ldb := New(db)
+	ldb := NewDefault(db)
 
 	key1 := []byte("hello1")
 	key2 := []byte("hello2")
@@ -142,7 +142,7 @@ func TestEmptyLinkedDBIterator(t *testing.T) {
 	assert := assert.New(t)
 
 	db := memdb.New()
-	ldb := New(db)
+	ldb := NewDefault(db)
 
 	iterator := ldb.NewIterator()
 	next := iterator.Next()
@@ -164,7 +164,7 @@ func TestLinkedDBLoadHeadKey(t *testing.T) {
 	assert := assert.New(t)
 
 	db := memdb.New()
-	ldb := New(db)
+	ldb := NewDefault(db)
 
 	key := []byte("hello")
 	value := []byte("world")
@@ -172,7 +172,7 @@ func TestLinkedDBLoadHeadKey(t *testing.T) {
 	err := ldb.Put(key, value)
 	assert.NoError(err)
 
-	ldb = New(db)
+	ldb = NewDefault(db)
 
 	iterator := ldb.NewIterator()
 	next := iterator.Next()
@@ -203,7 +203,7 @@ func TestSingleLinkedDBIterator(t *testing.T) {
 	assert := assert.New(t)
 
 	db := memdb.New()
-	ldb := New(db)
+	ldb := NewDefault(db)
 
 	key := []byte("hello")
 	value := []byte("world")

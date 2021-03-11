@@ -6,7 +6,12 @@ package linkeddb
 import (
 	"sync"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
+)
+
+const (
+	defaultCacheSize = 1024
 )
 
 var (
@@ -25,10 +30,13 @@ type linkedDB struct {
 	// lock ensure that this datastructure handles its thread safety correctly.
 	lock sync.RWMutex
 
+	cacheLock sync.Mutex
 	// these variables provide caching for the head key.
-	headKeyLock                                                            sync.Mutex
 	headKeyIsSynced, headKeyExists, headKeyIsUpdated, updatedHeadKeyExists bool
 	headKey, updatedHeadKey                                                []byte
+	// these variables provide caching for the nodes.
+	nodeCache    cache.Cacher // key -> *node
+	updatedNodes map[string]*node
 
 	// db is the underlying database that this list is stored in.
 	db database.Database
@@ -44,12 +52,16 @@ type node struct {
 	Previous    []byte `serialize:"true"`
 }
 
-func New(db database.Database) LinkedDB {
+func New(db database.Database, cacheSize int) LinkedDB {
 	return &linkedDB{
-		db:    db,
-		batch: db.NewBatch(),
+		nodeCache:    &cache.LRU{Size: cacheSize},
+		updatedNodes: make(map[string]*node),
+		db:           db,
+		batch:        db.NewBatch(),
 	}
 }
+
+func NewDefault(db database.Database) LinkedDB { return New(db, defaultCacheSize) }
 
 func (ldb *linkedDB) Has(key []byte) (bool, error) {
 	ldb.lock.RLock()
@@ -197,8 +209,8 @@ func (ldb *linkedDB) NewIterator() database.Iterator { return &iterator{ldb: ldb
 func (ldb *linkedDB) getHeadKey() ([]byte, error) {
 	// If the ldb read lock is held, then there needs to be additional
 	// synchronization here to avoid racy behavior.
-	ldb.headKeyLock.Lock()
-	defer ldb.headKeyLock.Unlock()
+	ldb.cacheLock.Lock()
+	defer ldb.cacheLock.Unlock()
 
 	if ldb.headKeyIsSynced {
 		if ldb.headKeyExists {
@@ -235,16 +247,38 @@ func (ldb *linkedDB) deleteHeadKey() error {
 }
 
 func (ldb *linkedDB) getNode(key []byte) (node, error) {
+	// If the ldb read lock is held, then there needs to be additional
+	// synchronization here to avoid racy behavior.
+	ldb.cacheLock.Lock()
+	defer ldb.cacheLock.Unlock()
+
+	keyStr := string(key)
+	if nodeIntf, exists := ldb.nodeCache.Get(keyStr); exists {
+		n := nodeIntf.(*node)
+		if n == nil {
+			return node{}, database.ErrNotFound
+		}
+		return *n, nil
+	}
+
 	nodeBytes, err := ldb.db.Get(nodeKey(key))
+	if err == database.ErrNotFound {
+		ldb.nodeCache.Put(keyStr, (*node)(nil))
+		return node{}, err
+	}
 	if err != nil {
 		return node{}, err
 	}
 	n := node{}
 	_, err = c.Unmarshal(nodeBytes, &n)
+	if err == nil {
+		ldb.nodeCache.Put(keyStr, n)
+	}
 	return n, err
 }
 
 func (ldb *linkedDB) putNode(key []byte, n node) error {
+	ldb.updatedNodes[string(key)] = &n
 	nodeBytes, err := c.Marshal(codecVersion, n)
 	if err != nil {
 		return err
@@ -252,19 +286,30 @@ func (ldb *linkedDB) putNode(key []byte, n node) error {
 	return ldb.batch.Put(nodeKey(key), nodeBytes)
 }
 
-func (ldb *linkedDB) deleteNode(key []byte) error { return ldb.batch.Delete(nodeKey(key)) }
+func (ldb *linkedDB) deleteNode(key []byte) error {
+	ldb.updatedNodes[string(key)] = nil
+	return ldb.batch.Delete(nodeKey(key))
+}
 
 func (ldb *linkedDB) resetBatch() {
 	ldb.headKeyIsUpdated = false
+	for key := range ldb.updatedNodes {
+		delete(ldb.updatedNodes, key)
+	}
 	ldb.batch.Reset()
 }
 func (ldb *linkedDB) writeBatch() error {
-	if err := ldb.batch.Write(); err != nil || !ldb.headKeyIsUpdated {
+	if err := ldb.batch.Write(); err != nil {
 		return err
 	}
-	ldb.headKeyIsSynced = true
-	ldb.headKeyExists = ldb.updatedHeadKeyExists
-	ldb.headKey = ldb.updatedHeadKey
+	if ldb.headKeyIsUpdated {
+		ldb.headKeyIsSynced = true
+		ldb.headKeyExists = ldb.updatedHeadKeyExists
+		ldb.headKey = ldb.updatedHeadKey
+	}
+	for key, n := range ldb.updatedNodes {
+		ldb.nodeCache.Put(key, n)
+	}
 	return nil
 }
 
