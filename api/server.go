@@ -20,7 +20,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/auth"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -106,15 +108,28 @@ func (s *Server) DispatchTLS(certFile, keyFile string) error {
 
 // RegisterChain registers the API endpoints associated with this chain That is,
 // add <route, handler> pairs to server so that http calls can be made to the vm
-func (s *Server) RegisterChain(chainName string, ctx *snow.Context, vmIntf interface{}) {
-	vm, ok := vmIntf.(common.VM)
-	if !ok {
+func (s *Server) RegisterChain(chainName string, engineIntf interface{}) {
+	var (
+		ctx      *snow.Context
+		handlers map[string]*common.HTTPHandler
+		err      error
+	)
+
+	switch engine := engineIntf.(type) {
+	case snowman.Engine:
+		ctx = engine.Context()
+		ctx.Lock.Lock()
+		handlers, err = engine.GetVM().CreateHandlers()
+		ctx.Lock.Unlock()
+	case avalanche.Engine:
+		ctx = engine.Context()
+		ctx.Lock.Lock()
+		handlers, err = engine.GetVM().CreateHandlers()
+		ctx.Lock.Unlock()
+	default:
+		s.log.Error("engine has unexpected type %T", engineIntf)
 		return
 	}
-
-	ctx.Lock.Lock()
-	handlers, err := vm.CreateHandlers()
-	ctx.Lock.Unlock()
 	if err != nil {
 		s.log.Error("Failed to create %s handlers: %s", chainName, err)
 		return

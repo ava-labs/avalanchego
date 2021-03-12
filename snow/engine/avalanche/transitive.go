@@ -29,6 +29,8 @@ const (
 	maxContainersLen = int(4 * network.DefaultMaxMessageSize / 5)
 )
 
+var _ Engine = &Transitive{}
+
 // Transitive implements the Engine interface by attempting to fetch all
 // transitive dependencies.
 type Transitive struct {
@@ -659,4 +661,8 @@ func (t *Transitive) HealthCheck() (interface{}, error) {
 // Returns database.ErrNotFound if unknown.
 func (t *Transitive) GetVtx(vtxID ids.ID) (avalanche.Vertex, error) {
 	return t.Manager.Get(vtxID)
+}
+
+func (t *Transitive) GetVM() vertex.DAGVM {
+	return t.VM
 }

@@ -3,11 +3,7 @@
 
 package chains
 
-import (
-	"github.com/ava-labs/avalanchego/snow"
-)
-
 // Registrant can register the existence of a chain
 type Registrant interface {
-	RegisterChain(name string, ctx *snow.Context, vm interface{})
+	RegisterChain(name string, engine interface{})
 }

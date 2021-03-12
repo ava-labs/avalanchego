@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/poll"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 	"github.com/ava-labs/avalanchego/snow/events"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -26,6 +27,8 @@ const (
 	// Max containers size in a MultiPut message
 	maxContainersLen = int(4 * network.DefaultMaxMessageSize / 5)
 )
+
+var _ Engine = &Transitive{}
 
 // Transitive implements the Engine interface by attempting to fetch all
 // transitive dependencies.
@@ -749,4 +752,9 @@ func (t *Transitive) HealthCheck() (interface{}, error) {
 // GetBlock implements the snowman.Engine interface
 func (t *Transitive) GetBlock(blkID ids.ID) (snowman.Block, error) {
 	return t.VM.GetBlock(blkID)
+}
+
+// GetVM implements the snowman.Engine interface
+func (t *Transitive) GetVM() block.ChainVM {
+	return t.VM
 }
