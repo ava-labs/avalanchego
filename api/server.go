@@ -109,7 +109,7 @@ func (s *Server) DispatchTLS(certFile, keyFile string) error {
 
 // RegisterChain registers the API endpoints associated with this chain That is,
 // add <route, handler> pairs to server so that http calls can be made to the vm
-func (s *Server) RegisterChain(chainName string, chainID ids.ID, engineIntf interface{}) {
+func (s *Server) RegisterChain(chainName string, chainID ids.ID, engineIntf interface{}) error {
 	var (
 		ctx      *snow.Context
 		handlers map[string]*common.HTTPHandler
@@ -128,18 +128,16 @@ func (s *Server) RegisterChain(chainName string, chainID ids.ID, engineIntf inte
 		handlers, err = engine.GetVM().CreateHandlers()
 		ctx.Lock.Unlock()
 	default:
-		s.log.Error("engine has unexpected type %T", engineIntf)
-		return
+		return fmt.Errorf("engine has unexpected type %T", engineIntf)
 	}
 	if err != nil {
-		s.log.Error("Failed to create %s handlers: %s", chainName, err)
-		return
+		return fmt.Errorf("Failed to create %s handlers: %s", chainName, err)
+
 	}
 
 	httpLogger, err := s.factory.MakeChain(chainName, "http")
 	if err != nil {
-		s.log.Error("Failed to create new http logger: %s", err)
-		return
+		return fmt.Errorf("Failed to create new http logger: %s", err)
 	}
 
 	s.log.Verbo("About to add API endpoints for chain with ID %s", chainID)
@@ -159,6 +157,7 @@ func (s *Server) RegisterChain(chainName string, chainID ids.ID, engineIntf inte
 			s.log.Error("error adding route: %s", err)
 		}
 	}
+	return nil
 }
 
 // AddChainRoute registers a route to a chain's handler

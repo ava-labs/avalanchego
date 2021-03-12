@@ -12,7 +12,7 @@ type MockManager struct{}
 func (mm MockManager) Router() router.Router            { return nil }
 func (mm MockManager) CreateChain(ChainParameters)      {}
 func (mm MockManager) ForceCreateChain(ChainParameters) {}
-func (mm MockManager) AddRegistrant(Registrant)         {}
+func (mm MockManager) AddRegistrant(Registrant, bool)   {}
 func (mm MockManager) Aliases(ids.ID) []string          { return nil }
 func (mm MockManager) Alias(ids.ID, string) error       { return nil }
 func (mm MockManager) Shutdown()                        {}

@@ -500,7 +500,7 @@ func (n *Node) initIndexer() error {
 	}
 
 	// Chain manager will notify indexer when a chain is created
-	n.chainManager.AddRegistrant(n.indexer)
+	n.chainManager.AddRegistrant(n.indexer, true)
 
 	return nil
 }
@@ -661,7 +661,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	}
 
 	// Notify the API server when new chains are created
-	n.chainManager.AddRegistrant(&n.APIServer)
+	n.chainManager.AddRegistrant(&n.APIServer, false)
 	return nil
 }
 

@@ -65,8 +65,12 @@ type Manager interface {
 	ForceCreateChain(ChainParameters)
 
 	// Add a registrant [r]. Every time a chain is
-	// created, [r].RegisterChain([new chain]) is called
-	AddRegistrant(Registrant)
+	// created, [r].RegisterChain([new chain]) is called.
+	// If the second argument is false, calls [r].RegisterChain([new chain])
+	// in a goroutine and the returned error is just logged.
+	// Otherwise,  [r].RegisterChain([new chain]) is called synchronously
+	// and a returned error is treated as fatal.
+	AddRegistrant(Registrant, bool)
 
 	// Given an alias, return the ID of the chain associated with that alias
 	Lookup(string) (ids.ID, error)
@@ -149,7 +153,8 @@ type manager struct {
 	ids.Aliaser
 	ManagerConfig
 
-	registrants []Registrant // Those notified when a chain is created
+	// Those notified when a chain is created
+	synchronousRegistrants, asynchronousRegistrants []Registrant
 
 	unblocked     bool
 	blockedChains []ChainParameters
@@ -240,7 +245,10 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	m.Log.AssertNoError(m.Alias(chainParams.ID, chainParams.ID.String()))
 
 	// Notify those that registered to be notified when a new chain is created
-	m.notifyRegistrants(chain.Name, chain.Ctx.ChainID, chain.Engine)
+	if err := m.notifyRegistrants(chain.Name, chain.Ctx.ChainID, chain.Engine); err != nil {
+		// TODO find a way to actually shut down the node
+		m.Shutdown()
+	}
 }
 
 // Create a chain
@@ -397,7 +405,13 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 }
 
 // Implements Manager.AddRegistrant
-func (m *manager) AddRegistrant(r Registrant) { m.registrants = append(m.registrants, r) }
+func (m *manager) AddRegistrant(r Registrant, synchronously bool) {
+	if synchronously {
+		m.synchronousRegistrants = append(m.synchronousRegistrants, r)
+	} else {
+		m.asynchronousRegistrants = append(m.asynchronousRegistrants, r)
+	}
+}
 
 func (m *manager) unblockChains() {
 	m.unblocked = true
@@ -693,10 +707,23 @@ func (m *manager) LookupVM(alias string) (ids.ID, error) { return m.VMManager.Lo
 
 // Notify registrants [those who want to know about the creation of chains]
 // that the specified chain has been created
-func (m *manager) notifyRegistrants(name string, chainID ids.ID, engine interface{}) {
-	for _, registrant := range m.registrants {
-		go registrant.RegisterChain(name, chainID, engine)
+func (m *manager) notifyRegistrants(name string, chainID ids.ID, engine interface{}) error {
+	for _, registrant := range m.asynchronousRegistrants {
+		r := registrant
+		go func() {
+			err := r.RegisterChain(name, chainID, engine)
+			if err != nil {
+				m.Log.Debug(err.Error())
+			}
+		}()
 	}
+	for _, registrant := range m.synchronousRegistrants {
+		if err := registrant.RegisterChain(name, chainID, engine); err != nil {
+			m.Log.Fatal(err.Error())
+			return err
+		}
+	}
+	return nil
 }
 
 // Returns:

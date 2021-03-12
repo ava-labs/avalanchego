@@ -60,7 +60,7 @@ type Config struct {
 // they were accepted by this node.
 // Indexer is threadsafe.
 type Indexer interface {
-	RegisterChain(name string, chainID ids.ID, engine interface{})
+	RegisterChain(name string, chainID ids.ID, engine interface{}) error
 	Close() error
 }
 
@@ -114,32 +114,32 @@ type indexer struct {
 }
 
 // TODO comment
-func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interface{}) {
+func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interface{}) error {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
 	if i.closed {
 		i.log.Debug("not registering chain %s because indexer is closed")
-		return
+		return nil
 	}
 
-	// If indexing is turned off, mark this index as incomplete and return
-	if !i.indexingEnabled {
-		err := i.markIncomplete(chainID)
-		if err != nil {
-			i.log.Error("couldn't mark chain %s as incomplete: %s", name, err)
+	if !i.indexingEnabled { // Indexing is disabled
+		if i.allowIncompleteIndex { // Creating an incomplete index is OK
+			if err := i.markIncomplete(chainID); err != nil {
+				return fmt.Errorf("couldn't mark chain %s as incomplete: %s", name, err)
+			}
+			return nil
 		}
-		return
+		// Creating an incomplete index is not OK
+		return fmt.Errorf("running would cause index %s would become incomplete but incomplete indices are disabled", name)
 	}
 
-	// If the index is incomplete, make sure that's OK. Otherwise, die.
+	// If the index is incomplete, make sure that's OK. Otherwise, cause node to die.
 	isIncomplete, err := i.isIncomplete(chainID)
 	if err != nil {
-		// TODO how to handle this?
-		return
+		return err
 	} else if isIncomplete && !i.allowIncompleteIndex {
-		// TODO cause the node to die
-		return
+		return fmt.Errorf("index %s is incomplete but incomplete indices are disabled", name)
 	}
 
 	switch engine := engineIntf.(type) {
@@ -152,9 +152,7 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 		index, err := newIndex(indexDB, i.log, i.codec, i.clock)
 		if err != nil {
 			_ = indexDB.Close()
-			// TODO what to do here?
-			i.log.Error("couldn't create index for chain %s: %s", name, err)
-			return
+			return fmt.Errorf("couldn't create index for chain %s: %s", name, err)
 		}
 
 		// Register index to learn about new accepted blocks
@@ -162,8 +160,7 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 			// TODO what to do here?
 			_ = index.Close()
 			_ = indexDB.Close()
-			i.log.Error("couldn't register chain %s to dispatcher: %s", name, err)
-			return
+			return fmt.Errorf("couldn't register chain %s to dispatcher: %s", name, err)
 		}
 
 		// Create an API endpoint for this index
@@ -175,16 +172,15 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 			// TODO what to do here?
 			_ = index.Close()
 			_ = indexDB.Close()
-			i.log.Error("couldn't create index API server for chain %s: %s", name, err)
-			return
+			return fmt.Errorf("couldn't create index API server for chain %s: %s", name, err)
 		}
 		handler := &common.HTTPHandler{LockOptions: common.NoLock, Handler: indexAPIServer}
 		if err := i.routeAdder.AddRoute(handler, &sync.RWMutex{}, "index/"+name, "/block", i.log); err != nil {
 			// TODO what to do here?
 			_ = index.Close()
 			_ = indexDB.Close()
-			i.log.Error("couldn't create index API server for chain %s: %s", name, err)
-			return
+			return fmt.Errorf("couldn't create index API server for chain %s: %s", name, err)
+
 		}
 
 		i.blockIndices[chainID] = index
@@ -198,18 +194,14 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 			txIndex, err := newIndex(txIndexDB, i.log, i.codec, i.clock)
 			if err != nil {
 				_ = txIndexDB.Close()
-				// TODO what to do here?
-				i.log.Error("couldn't create tx index for chain %s: %s", name, err)
-				return
+				return fmt.Errorf("couldn't create tx index for chain %s: %s", name, err)
 			}
 
 			// Register index to learn about new accepted txs
 			if err := i.decisionDispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name), txIndex); err != nil {
-				// TODO what to do here?
 				_ = txIndex.Close()
 				_ = txIndexDB.Close()
-				i.log.Error("couldn't register chain %s to decision dispatcher: %s", name, err)
-				return
+				return fmt.Errorf("couldn't register chain %s to decision dispatcher: %s", name, err)
 			}
 
 			// Create an API endpoint for this index
@@ -218,18 +210,14 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 			indexAPIServer.RegisterCodec(codec, "application/json")
 			indexAPIServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 			if err := indexAPIServer.RegisterService(&service{Index: txIndex}, "index"); err != nil {
-				// TODO what to do here?
 				_ = txIndex.Close()
 				_ = txIndexDB.Close()
-				i.log.Error("couldn't create index API server for chain %s: %s", name, err)
-				return
+				return fmt.Errorf("couldn't create index API server for chain %s: %s", name, err)
 			}
 			handler := &common.HTTPHandler{LockOptions: common.NoLock, Handler: indexAPIServer}
 			if err := i.routeAdder.AddRoute(handler, &sync.RWMutex{}, "index/"+name, "/tx", i.log); err != nil {
-				// TODO what to do here?
 				_ = txIndex.Close()
-				i.log.Error("couldn't create index API server for chain %s: %s", name, err)
-				return
+				return fmt.Errorf("couldn't create index API server for chain %s: %s", name, err)
 			}
 
 			i.txIndices[chainID] = txIndex
@@ -242,18 +230,15 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 			vtxIndex, err := newIndex(vtxIndexDB, i.log, i.codec, i.clock)
 			if err != nil {
 				_ = vtxIndexDB.Close()
-				// TODO what to do here?
-				i.log.Error("couldn't create tx index for chain %s: %s", name, err)
-				return
+				return fmt.Errorf("couldn't create tx index for chain %s: %s", name, err)
 			}
 
 			// Register index to learn about new accepted vertices
 			if err := i.consensusDispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name), vtxIndex); err != nil {
-				// TODO what to do here?
 				_ = vtxIndex.Close()
 				_ = vtxIndexDB.Close()
-				i.log.Error("couldn't register chain %s to decision dispatcher: %s", name, err)
-				return
+				return fmt.Errorf("couldn't register chain %s to decision dispatcher: %s", name, err)
+
 			}
 
 			// Create an API endpoint for this index
@@ -265,22 +250,21 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 				// TODO what to do here?
 				_ = vtxIndex.Close()
 				_ = vtxIndexDB.Close()
-				i.log.Error("couldn't create index API server for chain %s: %s", name, err)
-				return
+				return fmt.Errorf("couldn't create index API server for chain %s: %s", name, err)
 			}
 			handler := &common.HTTPHandler{LockOptions: common.NoLock, Handler: indexAPIServer}
 			if err := i.routeAdder.AddRoute(handler, &sync.RWMutex{}, "index/"+name, "/vtx", i.log); err != nil {
 				// TODO what to do here?
 				_ = vtxIndex.Close()
-				i.log.Error("couldn't create index API server for chain %s: %s", name, err)
-				return
+				return fmt.Errorf("couldn't create index API server for chain %s: %s", name, err)
 			}
 
 			i.vtxIndices[chainID] = vtxIndex
 		}
 	default:
-		i.log.Error("expected snowman.Engine or avalanche.Engine byt got %T", engineIntf)
+		return fmt.Errorf("expected snowman.Engine or avalanche.Engine but got %T", engineIntf)
 	}
+	return nil
 }
 
 // Close this indexer. Stops indexing all chains.
