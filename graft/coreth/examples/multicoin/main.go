@@ -235,7 +235,6 @@ func main() {
 	// start the chain
 	chain.GetTxPool().SubscribeNewHeadEvent(newTxPoolHeadChan)
 	chain.Start()
-	chain.BlockChain().UnlockIndexing()
 	chain.SetPreference(chain.GetGenesisBlock())
 
 	code := common.Hex2Bytes(contract.Code[2:])

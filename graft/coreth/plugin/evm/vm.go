@@ -64,14 +64,6 @@ var (
 	_ block.ChainVM = &VM{}
 )
 
-var (
-	// Set last accepted key to be longer than the keys used to store accepted block IDs.
-	lastAcceptedKey              = []byte("last_accepted_key")
-	acceptedPrefix               = []byte("snowman_accepted")
-	historicalCanonicalRepairKey = []byte("chain_repaired_20210212")
-	tipCanonicalRepairKey        = []byte("chain_repaired_20210305")
-)
-
 const (
 	minBlockTime = 2 * time.Second
 	maxBlockTime = 3 * time.Second
@@ -81,19 +73,22 @@ const (
 	batchSize           = 250
 	maxUTXOsToFetch     = 1024
 	chainStateCacheSize = 1024
+	defaultMempoolSize  = 1024
 	codecVersion        = uint16(0)
 	txFee               = units.MilliAvax
 )
 
 var (
-	ethDBPrefix    = []byte("ethdb")
-	atomicTxPrefix = []byte("atomicTxDB")
+	// Set last accepted key to be longer than the keys used to store accepted block IDs.
+	lastAcceptedKey = []byte("last_accepted_key")
+	acceptedPrefix  = []byte("snowman_accepted")
+	ethDBPrefix     = []byte("ethdb")
+	atomicTxPrefix  = []byte("atomicTxDB")
 )
 
 var (
 	errEmptyBlock                 = errors.New("empty block")
 	errCreateBlock                = errors.New("couldn't create block")
-	errBlockFrequency             = errors.New("too frequent block issuance")
 	errUnsupportedFXs             = errors.New("unsupported feature extensions")
 	errInvalidBlock               = errors.New("invalid block")
 	errInvalidAddr                = errors.New("invalid hex address")
@@ -118,23 +113,15 @@ var (
 	errRejectedParent             = errors.New("rejected parent")
 )
 
-// mayBuildBlockStatus denotes whether the engine should be notified
-// that a block should be built, or whether more time has to pass
-// before doing so. See VM's [mayBuildBlock].
-type mayBuildBlockStatus uint8
+// buildingBlkStatus denotes the current status of the VM in block production.
+type buildingBlkStatus uint8
 
 const (
-	waitToBuild mayBuildBlockStatus = iota
-	conditionalWaitToBuild
+	dontBuild buildingBlkStatus = iota
+	conditionalBuild
 	mayBuild
+	building
 )
-
-func maxDuration(x, y time.Duration) time.Duration {
-	if x > y {
-		return x
-	}
-	return y
-}
 
 // Codec does serialization and deserialization
 var Codec codec.Manager
@@ -202,36 +189,24 @@ type VM struct {
 	txPoolStabilizedHead common.Hash
 	txPoolStabilizedOk   chan struct{}
 
-	// [buildBlockLock] must be held when accessing [mayBuildBlock],
-	// [tryToBuildBlock] or [awaitingBuildBlock].
+	// [buildBlockLock] must be held when accessing [buildStatus]
 	buildBlockLock sync.Mutex
-	// [buildBlockTimer] periodically fires in order to update [mayBuildBlock]
-	// and to try to build a block, if applicable.
+	// [buildBlockTimer] is a two stage timer handling block production.
+	// Stage1 build a block if the batch size has been reached.
+	// Stage2 build a block regardless of the size.
 	buildBlockTimer *timer.Timer
-	// [mayBuildBlock] == [wait] means that the next block may be built
-	// only after more time has elapsed.
-	// [mayBuildBlock] == [conditionalWait] means that the next block may be built
-	// only if it has more than [batchSize] txs in it. Otherwise, wait until more
-	// time has elapsed.
-	// [mayBuildBlock] == [build] means that the next block may be built
-	// at any time.
-	mayBuildBlock mayBuildBlockStatus
-	// If true, try to notify the engine that a block should be built.
-	// Engine may not be notified because [mayBuildBlock] says to wait.
-	tryToBuildBlock bool
-	// If true, the engine has been notified that it should build a block
-	// but has not done so yet. If this is the case, wait until it has
-	// built a block before notifying it again.
-	awaitingBuildBlock bool
+	// buildStatus signals the phase of block building the VM is currently in.
+	// [dontBuild] indicates there's no need to build a block.
+	// [conditionalBuild] indicates build a block if the batch size has been reached.
+	// [mayBuild] indicates the VM should proceed to build a block.
+	// [building] indicates the VM has sent a request to the engine to build a block.
+	buildStatus buildingBlkStatus
 
-	genlock            sync.Mutex
-	txSubmitChan       <-chan struct{}
-	atomicTxSubmitChan chan struct{}
-	baseCodec          codec.Registry
-	codec              codec.Manager
-	clock              timer.Clock
-	txFee              uint64
-	pendingAtomicTxs   chan *Tx
+	baseCodec codec.Registry
+	codec     codec.Manager
+	clock     timer.Clock
+	txFee     uint64
+	mempool   *Mempool
 
 	shutdownChan chan struct{}
 	shutdownWg   sync.WaitGroup
@@ -324,21 +299,31 @@ func (vm *VM) Initialize(
 		header.Extra = append(header.Extra, hid...)
 	})
 	chain.SetOnFinalizeAndAssemble(func(state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
-		select {
-		case atx := <-vm.pendingAtomicTxs:
-			if err := atx.UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(vm, state); err != nil {
+		if tx, exists := vm.mempool.NextTx(); exists {
+			if err := tx.UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(vm, state); err != nil {
+				log.Error("Atomic transaction failed verification", "txID", tx.ID(), "error", err)
+				// Discard the transaction from the mempool on failed verification.
+				vm.mempool.DiscardCurrentTx()
 				vm.newBlockChan <- nil
 				return nil, err
 			}
-			raw, _ := vm.codec.Marshal(codecVersion, atx)
-			return raw, nil
-		default:
-			if len(txs) == 0 {
-				// this could happen due to the async logic of geth tx pool
+			atomicTxBytes, err := vm.codec.Marshal(codecVersion, tx)
+			if err != nil {
+				log.Error("Failed to marshal atomic transaction", "txID", tx.ID(), "error", err)
+				// Discard the transaction from the mempool on failed verification.
+				vm.mempool.DiscardCurrentTx()
 				vm.newBlockChan <- nil
-				return nil, errEmptyBlock
+				return nil, err
 			}
+			return atomicTxBytes, nil
 		}
+
+		if len(txs) == 0 {
+			// this could happen due to the async logic of geth tx pool
+			vm.newBlockChan <- nil
+			return nil, errEmptyBlock
+		}
+
 		return nil, nil
 	})
 	chain.SetOnSealFinish(func(block *types.Block) error {
@@ -359,9 +344,10 @@ func (vm *VM) Initialize(
 		// that produce a large number of blocks.
 		if err := blk.Verify(); err != nil {
 			vm.newBlockChan <- nil
-			return fmt.Errorf("block failed verify: %w", err)
+			return fmt.Errorf("block failed verification due to: %w", err)
 		}
 		vm.newBlockChan <- blk
+		// TODO clean up tx pool stabilization logic
 		vm.txPoolStabilizedLock.Lock()
 		vm.txPoolStabilizedHead = block.Hash()
 		vm.txPoolStabilizedLock.Unlock()
@@ -377,33 +363,14 @@ func (vm *VM) Initialize(
 	vm.newBlockChan = make(chan *Block)
 	vm.notifyBuildBlockChan = toEngine
 
-	// Periodically updates [vm.mayBuildBlock] and tries to notify the engine to build
-	// a new block, if applicable.
-	vm.buildBlockTimer = timer.NewTimer(func() {
-		vm.buildBlockLock.Lock()
-		switch vm.mayBuildBlock {
-		case waitToBuild:
-			// Some time has passed. Allow block to be built if it has enough txs in it.
-			vm.mayBuildBlock = conditionalWaitToBuild
-			vm.buildBlockTimer.SetTimeoutIn(maxDuration(maxBlockTime-minBlockTime, 0))
-		case conditionalWaitToBuild:
-			// More time has passed. Allow block to be built regardless of tx count.
-			vm.mayBuildBlock = mayBuild
-		}
-		tryBuildBlock := vm.tryToBuildBlock
-		vm.buildBlockLock.Unlock()
-		if tryBuildBlock {
-			vm.tryBlockGen()
-		}
-	})
+	// buildBlockTimer handles passing PendingTxs messages to the consensus engine.
+	vm.buildBlockTimer = timer.NewStagedTimer(vm.buildBlockTwoStageTimer)
+	vm.buildStatus = dontBuild
 	go ctx.Log.RecoverAndPanic(vm.buildBlockTimer.Dispatch)
 
-	vm.mayBuildBlock = mayBuild
-	vm.tryToBuildBlock = true
 	vm.txPoolStabilizedOk = make(chan struct{}, 1)
-	// TODO: read size from options
-	vm.pendingAtomicTxs = make(chan *Tx, 1024)
-	vm.atomicTxSubmitChan = make(chan struct{}, 1)
+	// TODO: read size from settings
+	vm.mempool = NewMempool(defaultMempoolSize)
 	vm.newMinedBlockSub = vm.chain.SubscribeNewMinedBlockEvent()
 	vm.shutdownWg.Add(1)
 	go ctx.Log.RecoverAndPanic(vm.awaitTxPoolStabilized)
@@ -452,12 +419,6 @@ func (vm *VM) Initialize(
 	vm.shutdownWg.Add(1)
 	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
 	vm.codec = Codec
-	if err := vm.repairCanonicalChain(); err != nil {
-		return fmt.Errorf("failed to repair the canonical chain: %w", err)
-	}
-
-	log.Debug("unlocking indexing")
-	chain.BlockChain().UnlockIndexing()
 
 	// The Codec explicitly registers the types it requires from the secp256k1fx
 	// so [vm.baseCodec] is a dummy codec use to fulfill the secp256k1fx VM
@@ -466,82 +427,6 @@ func (vm *VM) Initialize(
 	vm.baseCodec = linearcodec.NewDefault()
 
 	return vm.fx.Initialize(vm)
-}
-
-// repairCanonicalChain writes the canonical chain index from the last accepted
-// block back to the genesis block to overwrite any corruption that might have
-// occurred.
-// assumes that the genesisHash and [lastAccepted] block have already been set.
-func (vm *VM) repairCanonicalChain() error {
-	if ran, err := vm.repairHistorical(); err != nil {
-		return err
-	} else if ran {
-		return nil
-	}
-
-	_, err := vm.repairTip()
-	return err
-}
-
-// repairHistorical writes the canonical chain index from the last accepted block back to the
-// genesis block to overwrite any corruption that might have occurred.
-// assumes that the genesis hash and [lastAccepted] block have already been set.
-// returns true if the repair occurs during this call. If the repair occurred on a
-// prior run, then false is returned.
-func (vm *VM) repairHistorical() (bool, error) {
-	// Check if the historical canonical chain repair has already occurred.
-	if has, err := vm.db.Has(historicalCanonicalRepairKey); err != nil {
-		return false, err
-	} else if has {
-		return false, nil
-	}
-
-	start := time.Now()
-	log.Info("starting historical canonical chain repair", "startTime", start)
-	genesisBlock := vm.chain.GetGenesisBlock()
-	if genesisBlock == nil {
-		return false, fmt.Errorf("failed to fetch genesis block from chain during historical chain repair")
-	}
-	if err := vm.chain.WriteCanonicalFromCurrentBlock(genesisBlock); err != nil {
-		return false, fmt.Errorf("historical canonical chain repair failed after %v due to: %w", time.Since(start), err)
-	}
-	log.Info("finished historical canonical chain repair", "timeElapsed", time.Since(start))
-	if err := vm.db.Put(historicalCanonicalRepairKey, []byte("finished")); err != nil {
-		return false, fmt.Errorf("failed to mark flag for historical canonical chain repair: %w", err)
-	}
-	if err := vm.chain.ValidateCanonicalChain(); err != nil {
-		return false, fmt.Errorf("failed to validate historical canonical chain repair due to: %w", err)
-	}
-
-	return true, nil
-}
-
-// repairTip writes the canonical chain index from the current block in the canonical chain
-// back to the last accepted block to overwrite any corruption of non-finalized blocks that
-// might have occurred.
-// assumes that the genesis hash and [lastAccepted] block have already been set.
-// returns true if the repair occurs during this call. If the repair occurred on a
-// prior run, then false is returned.
-func (vm *VM) repairTip() (bool, error) {
-	// Check if the canonical chain tip repair has already occurred.
-	if has, err := vm.db.Has(tipCanonicalRepairKey); err != nil {
-		return false, err
-	} else if has {
-		return false, nil
-	}
-
-	start := time.Now()
-	log.Info("starting canonical chain tip repair", "startTime", start)
-	blk := vm.LastAcceptedBlockInternal().(*Block)
-	if err := vm.chain.WriteCanonicalFromCurrentBlock(blk.ethBlock); err != nil {
-		return false, fmt.Errorf("canonical chain tip repair failed after %v due to: %w", time.Since(start), err)
-	}
-	log.Info("finished canonical chain tip repair", "timeElapsed", time.Since(start))
-	if err := vm.db.Put(tipCanonicalRepairKey, []byte("finished")); err != nil {
-		return false, fmt.Errorf("failed to mark flag for canonical chain tip repair due to: %w", err)
-	}
-
-	return true, nil
 }
 
 // Bootstrapping notifies this VM that the consensus engine is performing
@@ -573,18 +458,30 @@ func (vm *VM) internalBuildBlock() (chainState.Block, error) {
 	vm.chain.GenBlock()
 	block := <-vm.newBlockChan
 
+	// Set the buildStatus before calling Cancel or Issue on
+	// the mempool, so that when the mempool adds a new item to Pending
+	// it will be handled appropriately by [signalTxsReady]
 	vm.buildBlockLock.Lock()
-	// Specify that we should wait before trying to build another block.
-	vm.mayBuildBlock = waitToBuild
-	vm.tryToBuildBlock = false
-	vm.awaitingBuildBlock = false
-	vm.buildBlockTimer.SetTimeoutIn(minBlockTime)
+	if vm.needToBuild() {
+		vm.buildStatus = conditionalBuild
+		vm.buildBlockTimer.SetTimeoutIn(minBlockTime)
+	} else {
+		vm.buildStatus = dontBuild
+	}
 	vm.buildBlockLock.Unlock()
 
 	if block == nil {
+		// Signal the mempool that if it was attempting to issue an atomic
+		// transaction into the next block, block building failed and the
+		// transaction should be re-issued unless it was discarded during
+		// atomic tx verification.
+		vm.mempool.CancelCurrentTx()
 		return nil, errCreateBlock
 	}
 
+	// Marks the current tx from the mempool as being successfully issued
+	// into a block.
+	vm.mempool.IssueCurrentTx()
 	log.Debug(fmt.Sprintf("Built block %s", block.ID()))
 	// make sure Tx Pool is updated
 	<-vm.txPoolStabilizedOk
@@ -728,48 +625,6 @@ func (vm *VM) CreateStaticHandlers() (map[string]*commonEng.HTTPHandler, error) 
  *********************************** Helpers **********************************
  ******************************************************************************
  */
-func (vm *VM) tryBlockGen() error {
-	vm.buildBlockLock.Lock()
-	defer vm.buildBlockLock.Unlock()
-	if vm.awaitingBuildBlock {
-		// We notified the engine that a block should be built but it hasn't
-		// done so yet. Wait until it has done so before notifying again.
-		return nil
-	}
-	vm.tryToBuildBlock = true
-
-	vm.genlock.Lock()
-	defer vm.genlock.Unlock()
-	// get pending size
-	size, err := vm.chain.PendingSize()
-	if err != nil {
-		return err
-	}
-	if size == 0 && len(vm.pendingAtomicTxs) == 0 {
-		return nil
-	}
-
-	switch vm.mayBuildBlock {
-	case waitToBuild: // Wait more time before notifying engine to building a block
-		return nil
-	case conditionalWaitToBuild: // Notify engine only if there are enough pending txs
-		if size < batchSize {
-			return nil
-		}
-	case mayBuild: // Notify engine
-	default:
-		panic(fmt.Sprintf("mayBuildBlock has unexpected value %d", vm.mayBuildBlock))
-	}
-	select {
-	case vm.notifyBuildBlockChan <- commonEng.PendingTxs:
-		// Notify engine to build a block
-		vm.awaitingBuildBlock = true
-	default:
-		return errBlockFrequency
-	}
-	return nil
-}
-
 // extractAtomicTx returns the atomic transaction in [block] if
 // one exists.
 func (vm *VM) extractAtomicTx(block *types.Block) *Tx {
@@ -782,8 +637,8 @@ func (vm *VM) extractAtomicTx(block *types.Block) *Tx {
 	return atx
 }
 
-// getAtomicTx attempts to get [txID] from the database.
-func (vm *VM) getAtomicTx(txID ids.ID) (*Tx, uint64, error) {
+// getAcceptedAtomicTx attempts to get [txID] from the database.
+func (vm *VM) getAcceptedAtomicTx(txID ids.ID) (*Tx, uint64, error) {
 	indexedTxBytes, err := vm.acceptedAtomicTxDB.Get(txID[:])
 	if err != nil {
 		return nil, 0, err
@@ -802,6 +657,26 @@ func (vm *VM) getAtomicTx(txID ids.ID) (*Tx, uint64, error) {
 	}
 
 	return tx, height, nil
+}
+
+// getAtomicTx returns the requested transaction, status, and height.
+// If the status is Unknown, then the returned transaction will be nil.
+func (vm *VM) getAtomicTx(txID ids.ID) (*Tx, Status, uint64, error) {
+	if tx, height, err := vm.getAcceptedAtomicTx(txID); err == nil {
+		return tx, Accepted, height, nil
+	} else if err != database.ErrNotFound {
+		return nil, Unknown, 0, err
+	}
+
+	tx, dropped, found := vm.mempool.GetTx(txID)
+	switch {
+	case found && dropped:
+		return tx, Dropped, 0, nil
+	case found:
+		return tx, Processing, 0, nil
+	default:
+		return nil, Unknown, 0, nil
+	}
 }
 
 // writeAtomicTx writes indexes [tx] in [blk]
@@ -849,22 +724,95 @@ func (vm *VM) awaitTxPoolStabilized() {
 	}
 }
 
+// needToBuild returns true if there are outstanding transactions to be issued
+// into a block.
+func (vm *VM) needToBuild() bool {
+	size, err := vm.chain.PendingSize()
+	if err != nil {
+		log.Error("Failed to get chain pending size", "error", err)
+		return false
+	}
+	return size > 0 || vm.mempool.Len() > 0
+}
+
+// buildEarly returns true if there are sufficient outstanding transactions to
+// be issued into a block to build a block early.
+func (vm *VM) buildEarly() bool {
+	size, err := vm.chain.PendingSize()
+	if err != nil {
+		log.Error("Failed to get chain pending size", "error", err)
+		return false
+	}
+	return size > batchSize || vm.mempool.Len() > 1
+}
+
+// buildBlockTwoStageTimer is a two stage timer that sends a notification
+// to the engine when the VM is ready to build a block.
+// If it should be called back again, it returns the timeout duration at
+// which it should be called again.
+func (vm *VM) buildBlockTwoStageTimer() (time.Duration, bool) {
+	vm.buildBlockLock.Lock()
+	defer vm.buildBlockLock.Unlock()
+
+	switch vm.buildStatus {
+	case dontBuild:
+		return 0, false
+	case conditionalBuild:
+		if !vm.buildEarly() {
+			vm.buildStatus = mayBuild
+			return (maxBlockTime - minBlockTime), true
+		}
+	case mayBuild:
+	case building:
+		// If the status has already been set to building, there is no need
+		// to send an additional request to the consensus engine until the call
+		// to BuildBlock resets the block status.
+		return 0, false
+	default:
+		// Log an error if an invalid status is found.
+		log.Error("Found invalid build status in build block timer", "buildStatus", vm.buildStatus)
+	}
+
+	select {
+	case vm.notifyBuildBlockChan <- commonEng.PendingTxs:
+		vm.buildStatus = building
+	default:
+		log.Error("Failed to push PendingTxs notification to the consensus engine.")
+	}
+
+	// No need for the timeout to fire again until BuildBlock is called.
+	return 0, false
+}
+
+// signalTxsReady sets the initial timeout on the two stage timer if the process
+// has not already begun from an earlier notification. If [buildStatus] is anything
+// other than [dontBuild], then the attempt has already begun and this notification
+// can be safely skipped.
+func (vm *VM) signalTxsReady() {
+	vm.buildBlockLock.Lock()
+	defer vm.buildBlockLock.Unlock()
+
+	// Set the build block timer in motion if it has not been started.
+	if vm.buildStatus == dontBuild {
+		vm.buildStatus = conditionalBuild
+		vm.buildBlockTimer.SetTimeoutIn(minBlockTime)
+	}
+}
+
 // awaitSubmittedTxs waits for new transactions to be submitted
 // and notifies the VM when the tx pool has transactions to be
 // put into a new block.
 func (vm *VM) awaitSubmittedTxs() {
 	defer vm.shutdownWg.Done()
-	vm.txSubmitChan = vm.chain.GetTxSubmitCh()
+	txSubmitChan := vm.chain.GetTxSubmitCh()
 	for {
 		select {
-		case <-vm.txSubmitChan:
+		case <-txSubmitChan:
 			log.Trace("New tx detected, trying to generate a block")
-			vm.tryBlockGen()
-		case <-vm.atomicTxSubmitChan:
+			vm.signalTxsReady()
+		case <-vm.mempool.Pending:
 			log.Trace("New atomic Tx detected, trying to generate a block")
-			vm.tryBlockGen()
-		case <-time.After(5 * time.Second):
-			vm.tryBlockGen()
+			vm.signalTxsReady()
 		case <-vm.shutdownChan:
 			return
 		}
@@ -897,17 +845,11 @@ func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
 	return chainID, addr, nil
 }
 
+// issueTx adds [tx] to the mempool and signals the goroutine waiting on
+// atomic transactions that there is an atomic transaction ready to be
+// put into a block.
 func (vm *VM) issueTx(tx *Tx) error {
-	select {
-	case vm.pendingAtomicTxs <- tx:
-		select {
-		case vm.atomicTxSubmitChan <- struct{}{}:
-		default:
-		}
-	default:
-		return errTooManyAtomicTx
-	}
-	return nil
+	return vm.mempool.AddTx(tx)
 }
 
 // GetAtomicUTXOs returns the utxos that at least one of the provided addresses is

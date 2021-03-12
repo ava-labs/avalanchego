@@ -90,10 +90,6 @@ func (self *ETHChain) BlockChain() *core.BlockChain {
 	return self.backend.BlockChain()
 }
 
-func (self *ETHChain) UnlockIndexing() {
-	self.backend.BlockChain().UnlockIndexing()
-}
-
 func (self *ETHChain) PendingSize() (int, error) {
 	pending, err := self.backend.TxPool().Pending()
 	count := 0
@@ -226,9 +222,10 @@ func (self *ETHChain) AttachEthService(handler *rpc.Server, namespaces []string)
 	}
 }
 
-// TODO: use SubscribeNewTxsEvent()
-func (self *ETHChain) GetTxSubmitCh() <-chan struct{} {
-	return self.backend.GetTxSubmitCh()
+func (self *ETHChain) GetTxSubmitCh() <-chan core.NewTxsEvent {
+	newTxsChan := make(chan core.NewTxsEvent)
+	self.backend.TxPool().SubscribeNewTxsEvent(newTxsChan)
+	return newTxsChan
 }
 
 func (self *ETHChain) GetTxPool() *core.TxPool {
