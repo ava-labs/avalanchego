@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package timer
+package utils
 
 import (
 	"time"
@@ -32,5 +32,20 @@ var (
 		float64(100 * time.Millisecond),
 		float64(time.Second),
 		// anything larger than a second will be bucketed together
+	}
+)
+
+// Useful bytes buckets
+var (
+	BytesBuckets = []float64{
+		1 << 8,
+		1 << 10, // 1 KiB
+		1 << 12,
+		1 << 14,
+		1 << 16,
+		1 << 18,
+		1 << 20, // 1 MiB
+		1 << 22,
+		// anything larger than 4 MiB will be bucketed together
 	}
 )

@@ -43,6 +43,7 @@ var (
 	errInvalidDelegationRate = errors.New("argument 'delegationFeeRate' must be between 0 and 100, inclusive")
 	errNoAddresses           = errors.New("no addresses provided")
 	errNoKeys                = errors.New("user has no keys or funds")
+	errNoPrimaryValidators   = errors.New("no default subnet validators")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -2221,9 +2222,12 @@ type GetTotalStakeReply struct {
 
 // GetTotalStake returns the total amount staked on the Primary Network
 func (service *Service) GetTotalStake(_ *http.Request, _ *struct{}, reply *GetTotalStakeReply) error {
-	stake, err := service.vm.getTotalStake()
-	reply.Stake = json.Uint64(stake)
-	return err
+	vdrs, ok := service.vm.vdrMgr.GetValidators(constants.PrimaryNetworkID)
+	if !ok {
+		return errNoPrimaryValidators
+	}
+	reply.Stake = json.Uint64(vdrs.Weight())
+	return nil
 }
 
 // GetMaxStakeAmountArgs is the request for calling GetMaxStakeAmount.
