@@ -3,7 +3,9 @@
 
 package chains
 
+import "github.com/ava-labs/avalanchego/ids"
+
 // Registrant can register the existence of a chain
 type Registrant interface {
-	RegisterChain(name string, engine interface{})
+	RegisterChain(name string, chainID ids.ID, engine interface{})
 }

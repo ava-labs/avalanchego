@@ -19,6 +19,7 @@ import (
 	"github.com/rs/cors"
 
 	"github.com/ava-labs/avalanchego/api/auth"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -108,7 +109,7 @@ func (s *Server) DispatchTLS(certFile, keyFile string) error {
 
 // RegisterChain registers the API endpoints associated with this chain That is,
 // add <route, handler> pairs to server so that http calls can be made to the vm
-func (s *Server) RegisterChain(chainName string, engineIntf interface{}) {
+func (s *Server) RegisterChain(chainName string, chainID ids.ID, engineIntf interface{}) {
 	var (
 		ctx      *snow.Context
 		handlers map[string]*common.HTTPHandler
@@ -141,9 +142,9 @@ func (s *Server) RegisterChain(chainName string, engineIntf interface{}) {
 		return
 	}
 
-	s.log.Verbo("About to add API endpoints for chain with ID %s", ctx.ChainID)
+	s.log.Verbo("About to add API endpoints for chain with ID %s", chainID)
 	// all subroutes to a chain begin with "bc/<the chain's ID>"
-	defaultEndpoint := "bc/" + ctx.ChainID.String()
+	defaultEndpoint := "bc/" + chainID.String()
 
 	// Register each endpoint
 	for extension, service := range handlers {

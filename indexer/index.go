@@ -24,9 +24,9 @@ const (
 
 var (
 	// Maps to the byte representation of the next accepted index
-	nextAcceptedIndexKey   []byte = []byte("next")
-	indexToContainerPrefix []byte = []byte("itc")
-	containerToIDPrefix    []byte = []byte("cti")
+	nextAcceptedIndexKey   []byte = []byte{0x00}
+	indexToContainerPrefix []byte = []byte{0x01}
+	containerToIDPrefix    []byte = []byte{0x02}
 	errNoneAccepted               = errors.New("no containers have been accepted")
 
 	_ Index = &index{}
@@ -191,7 +191,6 @@ func (i *index) GetContainerByIndex(index uint64) (Container, error) {
 // GetContainerRange returns the IDs of containers at index
 // [startIndex], [startIndex+1], ..., [startIndex+numToFetch-1]
 func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, error) {
-	i.log.Error("%d %d", startIndex, numToFetch) // TODO remove
 	// Check arguments for validity
 	if numToFetch == 0 {
 		return nil, nil

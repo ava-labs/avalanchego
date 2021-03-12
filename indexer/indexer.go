@@ -1,26 +1,27 @@
 package indexer
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	cjson "github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman"
 	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/gorilla/rpc/v2"
 )
 
 const (
@@ -29,12 +30,10 @@ const (
 )
 
 var (
-	indexedChainsPrefix = []byte("indexed")
-	hasEverRunPrefix    = []byte("hasEverRun")
-	hasEverRunKey       = []byte("hasEverRun")
-	incompleteIndexVal  = []byte{0}
-	completeIndexVal    = []byte{1}
-	errClosed           = errors.New("indexer is closed")
+	txPrefix    = []byte{0x01}
+	vtxPrefix   = []byte{0x02}
+	blockPrefix = []byte{0x03}
+	errClosed   = errors.New("indexer is closed")
 )
 
 var (
@@ -51,14 +50,9 @@ type Config struct {
 	AllowIncompleteIndex bool
 	// Name of this indexer and the API endpoint
 	Name string
-	// Notifies indexer of newly accepted containers
-	EventDispatcher *triggers.EventDispatcher
-	// Chains indexed on startup
-	InitiallyIndexedChains ids.Set
-	// Chain's Alias --> ID of that Chain
-	ChainLookupF func(string) (ids.ID, error)
-	// Used to register the indexer's API endpoint
-	APIServer api.RouteAdder
+	// TODO comment
+	DecisionDispatcher, ConsensusDispatcher *triggers.EventDispatcher
+	APIServer                               api.RouteAdder
 }
 
 // Indexer causes accepted containers for a given chain
@@ -66,357 +60,227 @@ type Config struct {
 // they were accepted by this node.
 // Indexer is threadsafe.
 type Indexer interface {
-	IndexChain(chainID ids.ID) error
-	CloseIndex(chainID ids.ID) error
-	GetContainerByIndex(chainID ids.ID, index uint64) (Container, error)
-	GetContainerRange(chainID ids.ID, startIndex, numToFetch uint64) ([]Container, error)
-	GetLastAccepted(chainID ids.ID) (Container, error)
-	GetIndex(chainID, containerID ids.ID) (uint64, error)
-	GetContainerByID(chainID, containerID ids.ID) (Container, error)
-	GetIndexedChains() []ids.ID
+	RegisterChain(name string, chainID ids.ID, engine interface{})
 	Close() error
 }
 
 // NewIndexer returns a new Indexer and registers a new endpoint on the given API server.
 func NewIndexer(config Config) (Indexer, error) {
-	// See if we have run with this database before
-	hasEverRunDB := prefixdb.New(hasEverRunPrefix, config.DB)
-	defer hasEverRunDB.Close()
-	hasRunBefore, err := hasEverRunDB.Has(hasEverRunKey)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't read from database: %w", err)
-	}
-
-	// Mark that we have now run with this database
-	if err := hasEverRunDB.Put(hasEverRunKey, nil); err != nil {
-		return nil, err
-	}
-
-	indexedChainsDB := prefixdb.New(indexedChainsPrefix, config.DB)
-	needToCloseIndexedChainsDB := true
-	defer func() {
-		if needToCloseIndexedChainsDB {
-			indexedChainsDB.Close()
-		}
-	}()
-
-	// If a node runs while not indexing a chain then the index for that chain will be
-	// incomplete (it will be missing containers.) By default, creation of incomplete
-	// indices is disallowed. That is, if the node indexes a chain during one run,
-	// then it must always index that chain so as to avoid being incomplete.
-	// Creation of incomplete indices can be explicitly allowed in the config.
-	if hasRunBefore {
-		// Key: Chain ID. Present if this chain was ever indexed by this indexer.
-		// Value:
-		//   [incompleteIndexVal] if this index may be incomplete
-		//   [completeIndexVal] if this index is complete
-		iter := indexedChainsDB.NewIterator()
-		defer iter.Release()
-
-		// IDs of chains that now have incomplete indices
-		var incompleteIndices []ids.ID
-		for iter.Next() {
-			// Parse chain ID from bytes
-			chainIDBytes := iter.Key()
-			if len(chainIDBytes) != hashing.HashLen {
-				// Sanity check; this should never happen
-				return nil, fmt.Errorf("unexpectedly got chain ID with %d bytes", len(chainIDBytes))
-			}
-			// We indexed chain [chainID] in a previous run
-			var chainID ids.ID
-			copy(chainID[:], chainIDBytes)
-
-			if !config.InitiallyIndexedChains.Contains(chainID) || !config.IndexingEnabled {
-				// This chain was previously indexed but now will not be.
-				// This would make it incomplete.
-				if !config.AllowIncompleteIndex {
-					// Disallow node from running in order to prevent incomplete index.
-					return nil, fmt.Errorf(
-						"chain %s was previously indexed but now not requested to be indexed. "+
-							"This would result in an incomplete index. Incomplete indices "+
-							"can be explicitly allowed in the node config", chainID)
-				}
-				// Allow the node to run but mark indices as incomplete
-				incompleteIndices = append(incompleteIndices, chainID)
-			}
-		}
-
-		// Mark that these indices are incomplete
-		for _, chainID := range incompleteIndices {
-			if err := indexedChainsDB.Put(chainID[:], incompleteIndexVal); err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	if !config.IndexingEnabled {
-		return NewNoOpIndexer(), nil
-	}
-
-	// Want this database to stay open since we continue to use it in [indexer]
-	needToCloseIndexedChainsDB = false
-
 	indexer := &indexer{
 		name:                 config.Name,
 		codec:                codec.NewDefaultManager(),
 		log:                  config.Log,
 		db:                   config.DB,
 		allowIncompleteIndex: config.AllowIncompleteIndex,
-		indexedChains:        indexedChainsDB,
-		eventDispatcher:      config.EventDispatcher,
-		chainToIndex:         make(map[ids.ID]Index),
-		chainLookup:          config.ChainLookupF,
+		indexingEnabled:      config.IndexingEnabled,
+		consensusDispatcher:  config.ConsensusDispatcher,
+		decisionDispatcher:   config.DecisionDispatcher,
+		txIndices:            map[ids.ID]Index{},
+		vtxIndices:           map[ids.ID]Index{},
+		blockIndices:         map[ids.ID]Index{},
+		routeAdder:           config.APIServer,
 	}
 	if err := indexer.codec.RegisterCodec(codecVersion, linearcodec.NewDefault()); err != nil {
-		return nil, fmt.Errorf("couldn't register codec: %w", err)
+		return nil, fmt.Errorf("couldn't register codec: %s", err)
 	}
 
-	for _, chainID := range config.InitiallyIndexedChains.List() {
-		if err := indexer.indexChain(chainID, hasRunBefore); err != nil {
-			return nil, fmt.Errorf("couldn't index chain %s: %w", chainID, err)
-		}
-	}
-
-	// Register API server
-	indexAPIServer := rpc.NewServer()
-	codec := cjson.NewCodec()
-	indexAPIServer.RegisterCodec(codec, "application/json")
-	indexAPIServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	if err := indexAPIServer.RegisterService(&service{indexer: indexer}, "index"); err != nil {
-		return nil, err
-	}
-	handler := &common.HTTPHandler{LockOptions: common.NoLock, Handler: indexAPIServer}
-	if err := config.APIServer.AddRoute(handler, &sync.RWMutex{}, "index/", config.Name, config.Log); err != nil {
-		return nil, fmt.Errorf("couldnt add API route: %w", err)
-	}
 	return indexer, nil
 }
 
 // indexer implements Indexer
 type indexer struct {
-	name   string
-	codec  codec.Manager
-	clock  timer.Clock
-	lock   sync.RWMutex
-	log    logging.Logger
-	db     database.Database
-	closed bool
+	name       string
+	codec      codec.Manager
+	clock      timer.Clock
+	lock       sync.RWMutex
+	log        logging.Logger
+	db         database.Database
+	closed     bool
+	routeAdder api.RouteAdder
+
 	// If true, allow running in such a way that could allow the creation
 	// of an index which could be missing accepted containers.
 	allowIncompleteIndex bool
 
-	// A chain ID is present as a key in this database if it has ever been indexed
-	// If this node has ever run while not indexing this chain, maps to false
-	// Otherwise, maps to true
-	indexedChains database.Database
+	indexingEnabled bool
 
-	// Given a chain's alias, returns the chain's ID
-	chainLookup func(string) (ids.ID, error)
+	blockIndices map[ids.ID]Index
+	vtxIndices   map[ids.ID]Index
+	txIndices    map[ids.ID]Index
 
-	// Chain ID --> Index for that chain
-	chainToIndex map[ids.ID]Index
-
-	// Indices are hooked up to the event dispatcher,
-	// which notifies them of accepted containers
-	eventDispatcher *triggers.EventDispatcher
+	// TODO comment
+	consensusDispatcher *triggers.EventDispatcher
+	decisionDispatcher  *triggers.EventDispatcher
 }
 
-// IndexChain causes the indexer to start indexing the given chain.
-// Returns an error if the chain is already being indexed.
-func (i *indexer) IndexChain(chainID ids.ID) error {
+// TODO comment
+func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interface{}) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
 	if i.closed {
-		return errClosed
-	}
-	return i.indexChain(chainID, true)
-}
-
-// [hasRunBefore] is true iff the node has run with this database before
-func (i *indexer) indexChain(chainID ids.ID, hasRunBefore bool) error {
-	if _, exists := i.chainToIndex[chainID]; exists {
-		return fmt.Errorf("chain %s is already being indexed", chainID)
+		i.log.Debug("not registering chain %s because indexer is closed")
+		return
 	}
 
-	// See if this chain's index is complete
-	indexComplete := true
-
-	if hasRunBefore { // If this is a fresh database, index must be complete
-		b, err := i.indexedChains.Get(chainID[:])
-		if err != nil && err != database.ErrNotFound {
-			return fmt.Errorf("couldn't read from database: %w", err)
+	// If indexing is turned off, mark this index as incomplete and return
+	if !i.indexingEnabled {
+		err := i.markIncomplete(chainID)
+		if err != nil {
+			i.log.Error("couldn't mark chain %s as incomplete: %s", name, err)
 		}
-
-		// Mark that this index is incomplete, if applicable
-		indexComplete = err == nil && bytes.Equal(b, completeIndexVal)
+		return
 	}
 
-	if indexComplete {
-		if err := i.indexedChains.Put(chainID[:], completeIndexVal); err != nil {
-			return err
-		}
-	} else { // Or incomplete
-		if err := i.indexedChains.Put(chainID[:], incompleteIndexVal); err != nil {
-			return err
-		}
-	}
-
-	// If this index is incomplete and this is not allowed, error.
-	if !indexComplete && !i.allowIncompleteIndex {
-		return fmt.Errorf(
-			"attempted to index previously non-indexed chain %s. "+
-				"This would cause an incomplete index.  Incomplete indices "+
-				"can be explicitly allowed in the node config", chainID)
-	}
-
-	// Database for the index to use
-	indexDB := prefixdb.New(chainID[:], i.db)
-	index, err := newIndex(indexDB, i.log, i.codec, i.clock)
+	// If the index is incomplete, make sure that's OK. Otherwise, die.
+	isIncomplete, err := i.isIncomplete(chainID)
 	if err != nil {
-		return fmt.Errorf("couldn't create index for chain %s: %w", chainID, err)
+		// TODO how to handle this?
+		return
+	} else if isIncomplete && !i.allowIncompleteIndex {
+		// TODO cause the node to die
+		return
 	}
 
-	// Register index to learn about new accepted containers
-	if err := i.eventDispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name), index); err != nil {
-		_ = index.Close()
-		return fmt.Errorf("couldn't register index for chain %s with event dispatcher: %w", chainID, err)
+	switch engine := engineIntf.(type) {
+	case snowman.Engine:
+		chainID := engine.Context().ChainID
+		prefix := make([]byte, hashing.HashLen+wrappers.ByteLen)
+		copy(prefix[:], chainID[:])
+		copy(prefix[hashing.HashLen:], blockPrefix)
+		indexDB := prefixdb.New(chainID[:], i.db)
+		index, err := newIndex(indexDB, i.log, i.codec, i.clock)
+		if err != nil {
+			_ = indexDB.Close()
+			// TODO what to do here?
+			i.log.Error("couldn't create index for chain %s: %s", name, err)
+			return
+		}
+
+		// Register index to learn about new accepted blocks
+		if err := i.consensusDispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name), index); err != nil {
+			// TODO what to do here?
+			_ = index.Close()
+			_ = indexDB.Close()
+			i.log.Error("couldn't register chain %s to dispatcher: %s", name, err)
+			return
+		}
+
+		// Create an API endpoint for this index
+		indexAPIServer := rpc.NewServer()
+		codec := json.NewCodec()
+		indexAPIServer.RegisterCodec(codec, "application/json")
+		indexAPIServer.RegisterCodec(codec, "application/json;charset=UTF-8")
+		if err := indexAPIServer.RegisterService(&service{Index: index}, "index"); err != nil {
+			// TODO what to do here?
+			_ = index.Close()
+			_ = indexDB.Close()
+			i.log.Error("couldn't create index API server for chain %s: %s", name, err)
+			return
+		}
+		handler := &common.HTTPHandler{LockOptions: common.NoLock, Handler: indexAPIServer}
+		if err := i.routeAdder.AddRoute(handler, &sync.RWMutex{}, "index/"+name, "/block", i.log); err != nil {
+			// TODO what to do here?
+			_ = index.Close()
+			_ = indexDB.Close()
+			i.log.Error("couldn't create index API server for chain %s: %s", name, err)
+			return
+		}
+
+		i.blockIndices[chainID] = index
+	case avalanche.Engine:
+		chainID := engine.Context().ChainID
+		{ // Create the tx index
+			prefix := make([]byte, hashing.HashLen+wrappers.ByteLen)
+			copy(prefix[:], chainID[:])
+			copy(prefix[hashing.HashLen:], txPrefix)
+			txIndexDB := prefixdb.New(prefix, i.db)
+			txIndex, err := newIndex(txIndexDB, i.log, i.codec, i.clock)
+			if err != nil {
+				_ = txIndexDB.Close()
+				// TODO what to do here?
+				i.log.Error("couldn't create tx index for chain %s: %s", name, err)
+				return
+			}
+
+			// Register index to learn about new accepted txs
+			if err := i.decisionDispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name), txIndex); err != nil {
+				// TODO what to do here?
+				_ = txIndex.Close()
+				_ = txIndexDB.Close()
+				i.log.Error("couldn't register chain %s to decision dispatcher: %s", name, err)
+				return
+			}
+
+			// Create an API endpoint for this index
+			indexAPIServer := rpc.NewServer()
+			codec := json.NewCodec()
+			indexAPIServer.RegisterCodec(codec, "application/json")
+			indexAPIServer.RegisterCodec(codec, "application/json;charset=UTF-8")
+			if err := indexAPIServer.RegisterService(&service{Index: txIndex}, "index"); err != nil {
+				// TODO what to do here?
+				_ = txIndex.Close()
+				_ = txIndexDB.Close()
+				i.log.Error("couldn't create index API server for chain %s: %s", name, err)
+				return
+			}
+			handler := &common.HTTPHandler{LockOptions: common.NoLock, Handler: indexAPIServer}
+			if err := i.routeAdder.AddRoute(handler, &sync.RWMutex{}, "index/"+name, "/tx", i.log); err != nil {
+				// TODO what to do here?
+				_ = txIndex.Close()
+				i.log.Error("couldn't create index API server for chain %s: %s", name, err)
+				return
+			}
+
+			i.txIndices[chainID] = txIndex
+		}
+		{ // Create the vtx index
+			prefix := make([]byte, hashing.HashLen+wrappers.ByteLen)
+			copy(prefix[:], chainID[:])
+			copy(prefix[hashing.HashLen:], txPrefix)
+			vtxIndexDB := prefixdb.New(prefix, i.db)
+			vtxIndex, err := newIndex(vtxIndexDB, i.log, i.codec, i.clock)
+			if err != nil {
+				_ = vtxIndexDB.Close()
+				// TODO what to do here?
+				i.log.Error("couldn't create tx index for chain %s: %s", name, err)
+				return
+			}
+
+			// Register index to learn about new accepted vertices
+			if err := i.consensusDispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name), vtxIndex); err != nil {
+				// TODO what to do here?
+				_ = vtxIndex.Close()
+				_ = vtxIndexDB.Close()
+				i.log.Error("couldn't register chain %s to decision dispatcher: %s", name, err)
+				return
+			}
+
+			// Create an API endpoint for this index
+			indexAPIServer := rpc.NewServer()
+			codec := json.NewCodec()
+			indexAPIServer.RegisterCodec(codec, "application/json")
+			indexAPIServer.RegisterCodec(codec, "application/json;charset=UTF-8")
+			if err := indexAPIServer.RegisterService(&service{Index: vtxIndex}, "index"); err != nil {
+				// TODO what to do here?
+				_ = vtxIndex.Close()
+				_ = vtxIndexDB.Close()
+				i.log.Error("couldn't create index API server for chain %s: %s", name, err)
+				return
+			}
+			handler := &common.HTTPHandler{LockOptions: common.NoLock, Handler: indexAPIServer}
+			if err := i.routeAdder.AddRoute(handler, &sync.RWMutex{}, "index/"+name, "/vtx", i.log); err != nil {
+				// TODO what to do here?
+				_ = vtxIndex.Close()
+				i.log.Error("couldn't create index API server for chain %s: %s", name, err)
+				return
+			}
+
+			i.vtxIndices[chainID] = vtxIndex
+		}
+	default:
+		i.log.Error("expected snowman.Engine or avalanche.Engine byt got %T", engineIntf)
 	}
-	i.chainToIndex[chainID] = index
-
-	return nil
-}
-
-// CloseIndex closes the index for the given chain. No more accepted containers
-// will be indexed on this chain.
-func (i *indexer) CloseIndex(chainID ids.ID) error {
-	i.lock.Lock()
-	defer i.lock.Unlock()
-
-	if i.closed {
-		return errClosed
-	}
-	return i.closeIndex(chainID)
-}
-
-// Assumes [i.lock] is held
-func (i *indexer) closeIndex(chainID ids.ID) error {
-	index, exists := i.chainToIndex[chainID]
-	if !exists {
-		return nil
-	}
-	delete(i.chainToIndex, chainID)
-	errs := wrappers.Errs{}
-	errs.Add(i.eventDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name)))
-	errs.Add(index.Close())
-
-	return errs.Err
-}
-
-// GetContainersByIndex returns a container from the given chain by its index.
-func (i *indexer) GetContainerByIndex(chainID ids.ID, indexToFetch uint64) (Container, error) {
-	i.lock.RLock()
-	defer i.lock.RUnlock()
-
-	if i.closed {
-		return Container{}, errClosed
-	}
-
-	index, exists := i.chainToIndex[chainID]
-	if !exists {
-		return Container{}, fmt.Errorf("there is no index for chain %s", chainID)
-	}
-	return index.GetContainerByIndex(indexToFetch)
-}
-
-// GetContainerRange returns the containers at indices [startIndex], [startIndex+1],...,[startIndex+numToFetch-1]
-// on the given chain.
-func (i *indexer) GetContainerRange(chainID ids.ID, startIndex, numToFetch uint64) ([]Container, error) {
-	i.lock.RLock()
-	defer i.lock.RUnlock()
-
-	if i.closed {
-		return nil, errClosed
-	}
-
-	index, exists := i.chainToIndex[chainID]
-	if !exists {
-		return nil, fmt.Errorf("there is no index for chain %s", chainID)
-	}
-	return index.GetContainerRange(startIndex, numToFetch)
-}
-
-// GetLastAccepted returns the most recently accepted container
-// on the given chain.
-func (i *indexer) GetLastAccepted(chainID ids.ID) (Container, error) {
-	i.lock.RLock()
-	defer i.lock.RUnlock()
-
-	if i.closed {
-		return Container{}, errClosed
-	}
-
-	index, exists := i.chainToIndex[chainID]
-	if !exists {
-		return Container{}, fmt.Errorf("there is no index for chain %s", chainID)
-	}
-	return index.GetLastAccepted()
-}
-
-// GetIndex returns the index of the given container on the given chain.
-// The index is the number of containers that were accepted before the given one.
-// For example, the second container accepted on a chain has index 1.
-func (i *indexer) GetIndex(chainID ids.ID, containerID ids.ID) (uint64, error) {
-	i.lock.RLock()
-	defer i.lock.RUnlock()
-
-	if i.closed {
-		return 0, errClosed
-	}
-
-	index, exists := i.chainToIndex[chainID]
-	if !exists {
-		return 0, fmt.Errorf("there is no index for chain %s", chainID)
-	}
-	return index.GetIndex(containerID)
-}
-
-// GetContainerByID returns the container with the given ID, which exists on the given chain.
-func (i *indexer) GetContainerByID(chainID ids.ID, containerID ids.ID) (Container, error) {
-	i.lock.RLock()
-	defer i.lock.RUnlock()
-
-	if i.closed {
-		return Container{}, errClosed
-	}
-
-	index, exists := i.chainToIndex[chainID]
-	if !exists {
-		return Container{}, fmt.Errorf("there is no index for chain %s", chainID)
-	}
-	return index.GetContainerByID(containerID)
-}
-
-// GetIndexedChains returns the list of chains that are currently being indexed
-// and which can be queried.
-func (i *indexer) GetIndexedChains() []ids.ID {
-	i.lock.RLock()
-	defer i.lock.RUnlock()
-
-	if i.closed {
-		return nil
-	}
-
-	if i.chainToIndex == nil || len(i.chainToIndex) == 0 {
-		return nil
-	}
-	chainIDs := make([]ids.ID, len(i.chainToIndex))
-	j := 0
-	for chainID := range i.chainToIndex {
-		chainIDs[j] = chainID
-		j++
-	}
-	return chainIDs
 }
 
 // Close this indexer. Stops indexing all chains.
@@ -433,10 +297,26 @@ func (i *indexer) Close() error {
 
 	i.closed = true
 	errs := &wrappers.Errs{}
-	for chainID := range i.chainToIndex {
-		errs.Add(i.closeIndex(chainID))
+	for chainID, txIndex := range i.txIndices {
+		errs.Add(txIndex.Close())
+		errs.Add(i.decisionDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name)))
 	}
-	errs.Add(i.indexedChains.Close())
+	for chainID, vtxIndex := range i.vtxIndices {
+		errs.Add(vtxIndex.Close())
+		errs.Add(i.consensusDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name)))
+	}
+	for chainID, blockIndex := range i.blockIndices {
+		errs.Add(blockIndex.Close())
+		errs.Add(i.consensusDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name)))
+	}
 	errs.Add(i.db.Close())
 	return errs.Err
+}
+
+func (i *indexer) markIncomplete(chainID ids.ID) error {
+	return i.db.Put(chainID[:], nil)
+}
+
+func (i *indexer) isIncomplete(chainID ids.ID) (bool, error) {
+	return i.db.Has(chainID[:])
 }

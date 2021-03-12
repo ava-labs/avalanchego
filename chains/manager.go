@@ -240,7 +240,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	m.Log.AssertNoError(m.Alias(chainParams.ID, chainParams.ID.String()))
 
 	// Notify those that registered to be notified when a new chain is created
-	m.notifyRegistrants(chain.Name, chain.Engine)
+	m.notifyRegistrants(chain.Name, chain.Ctx.ChainID, chain.Engine)
 }
 
 // Create a chain
@@ -693,9 +693,9 @@ func (m *manager) LookupVM(alias string) (ids.ID, error) { return m.VMManager.Lo
 
 // Notify registrants [those who want to know about the creation of chains]
 // that the specified chain has been created
-func (m *manager) notifyRegistrants(name string, engine interface{}) {
+func (m *manager) notifyRegistrants(name string, chainID ids.ID, engine interface{}) {
 	for _, registrant := range m.registrants {
-		go registrant.RegisterChain(name, engine)
+		go registrant.RegisterChain(name, chainID, engine)
 	}
 }
 
