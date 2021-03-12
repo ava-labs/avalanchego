@@ -17,6 +17,6 @@ type Engine interface {
 	Initialize(Config)
 
 	// GetVtx returns a vertex by its ID.
-	// Returns database.ErrNotFound if unknown.
+	// Returns an error if unknown.
 	GetVtx(vtxID ids.ID) (avalanche.Vertex, error)
 }

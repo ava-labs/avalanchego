@@ -4,6 +4,8 @@
 package snowman
 
 import (
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
@@ -20,4 +22,8 @@ type Engine interface {
 
 	// Initialize this engine.
 	Initialize(Config)
+
+	// GetBlock returns a block by its ID.
+	// Returns an error if unknown.
+	GetBlock(blkID ids.ID) (snowman.Block, error)
 }

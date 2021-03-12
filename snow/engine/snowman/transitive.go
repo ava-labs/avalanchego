@@ -745,3 +745,8 @@ func (t *Transitive) HealthCheck() (interface{}, error) {
 	}
 	return intf, fmt.Errorf("vm: %s ; consensus: %s", vmErr, consensusErr)
 }
+
+// GetBlock implements the snowman.Engine interface
+func (t *Transitive) GetBlock(blkID ids.ID) (snowman.Block, error) {
+	return t.VM.GetBlock(blkID)
+}
