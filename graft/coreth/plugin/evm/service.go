@@ -427,7 +427,7 @@ func (service *AvaxAPI) IssueTx(r *http.Request, args *api.FormattedTx, response
 // GetAtomicTxStatusReply defines the GetAtomicTxStatus replies returned from the API
 type GetAtomicTxStatusReply struct {
 	Status      choices.Status `json:"status"`
-	BlockHeight *uint64        `json:"blockHeight,omitempty"`
+	BlockHeight *json.Uint64   `json:"blockHeight,omitempty"`
 }
 
 // GetAtomicTxStatus returns the status of the specified transaction
@@ -440,8 +440,9 @@ func (service *AvaxAPI) GetAtomicTxStatus(r *http.Request, args *api.JSONTxID, r
 
 	_, height, err := service.vm.getAtomicTx(args.TxID)
 	if err == nil {
+		jsonHeight := json.Uint64(height)
 		reply.Status = choices.Accepted
-		reply.BlockHeight = &height
+		reply.BlockHeight = &jsonHeight
 		return nil
 	}
 
@@ -455,7 +456,7 @@ func (service *AvaxAPI) GetAtomicTxStatus(r *http.Request, args *api.JSONTxID, r
 
 type FormattedTx struct {
 	api.FormattedTx
-	BlockHeight *uint64 `json:"blockHeight,omitempty"`
+	BlockHeight *json.Uint64 `json:"blockHeight,omitempty"`
 }
 
 // GetAtomicTx returns the specified transaction
@@ -476,6 +477,7 @@ func (service *AvaxAPI) GetAtomicTx(r *http.Request, args *api.GetTxArgs, reply 
 	}
 	reply.Tx = txBytes
 	reply.Encoding = args.Encoding
-	reply.BlockHeight = &height
+	jsonHeight := json.Uint64(height)
+	reply.BlockHeight = &jsonHeight
 	return nil
 }
