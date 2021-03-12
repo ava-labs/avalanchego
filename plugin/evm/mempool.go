@@ -11,9 +11,13 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+const (
+	discardedTxsCacheSize = 50
+)
+
 // Mempool is a simple mempool for atomic transactions
 type Mempool struct {
-	lock sync.Mutex
+	lock sync.RWMutex
 	// maxSize is the maximum number of transactions allowed to be kept in mempool
 	maxSize int
 	// currentTx is the transaction about to be added to a block.
@@ -34,7 +38,7 @@ func NewMempool(maxSize int) *Mempool {
 	return &Mempool{
 		txs:          make(map[ids.ID]*Tx),
 		issuedTxs:    make(map[ids.ID]*Tx),
-		discardedTxs: &cache.LRU{Size: 10},
+		discardedTxs: &cache.LRU{Size: discardedTxsCacheSize},
 		Pending:      make(chan struct{}, 1),
 		maxSize:      maxSize,
 	}
@@ -42,8 +46,8 @@ func NewMempool(maxSize int) *Mempool {
 
 // Len returns the number of transactions in the mempool
 func (m *Mempool) Len() int {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
 	return m.length()
 }
@@ -53,8 +57,8 @@ func (m *Mempool) length() int {
 	return len(m.txs) + len(m.issuedTxs)
 }
 
-// Add attempts to add [tx] to the mempool and returns true if the
-// mempool requires a new block to be built.
+// Add attempts to add [tx] to the mempool and returns an error if
+// it could not be addeed to the mempool.
 func (m *Mempool) AddTx(tx *Tx) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -114,8 +118,8 @@ func (m *Mempool) NextTx() (*Tx, bool) {
 // by this node and returns whether it was dropped and whether
 // it exists.
 func (m *Mempool) GetTx(txID ids.ID) (*Tx, bool, bool) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
 	if tx, ok := m.txs[txID]; ok {
 		return tx, false, true
