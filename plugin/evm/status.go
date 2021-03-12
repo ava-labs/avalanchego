@@ -42,13 +42,13 @@ func (s *Status) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	switch str {
-	case "\"Unknown\"":
+	case `"Unknown"`:
 		*s = Unknown
-	case "\"Dropped\"":
+	case `"Dropped"`:
 		*s = Dropped
-	case "\"Processing\"":
+	case `"Processing"`:
 		*s = Processing
-	case "\"Accepted\"":
+	case `"Accepted"`:
 		*s = Accepted
 	default:
 		return errUnknownStatus
