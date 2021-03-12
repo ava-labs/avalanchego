@@ -14,7 +14,7 @@ import (
 
 var (
 	errEmpty     = errors.New("no available containers")
-	errDuplicate = errors.New("duplicated container")
+	ErrDuplicate = errors.New("duplicated container")
 )
 
 // Jobs ...
@@ -24,7 +24,9 @@ type Jobs struct {
 	db     *versiondb.Database
 	// Dynamic sized stack of ready to execute items
 	// Map from itemID to list of itemIDs that are blocked on this item
-	state prefixedState
+	state                           prefixedState
+	pending                         ids.Set
+	removeFromPending, addToPending ids.Set
 }
 
 // New ...
@@ -34,6 +36,11 @@ func New(db database.Database) (*Jobs, error) {
 		db:     versiondb.New(db),
 	}
 	jobs.state.jobs = jobs
+	pending, err := jobs.state.Pending(jobs.db)
+	if err != nil {
+		return nil, err
+	}
+	jobs.pending.Add(pending...)
 
 	if _, err := jobs.HasNext(); err == nil {
 		return jobs, nil
@@ -128,13 +135,69 @@ func (j *Jobs) Execute(job Job) error {
 }
 
 // Commit ...
-func (j *Jobs) Commit() error { return j.db.Commit() }
+func (j *Jobs) Commit() error {
+	// Batch pending jobs into Commit to avoid making an unnecessary number
+	// of put/deletes in the rapidly changing set.
+	if err := j.updatePending(); err != nil {
+		return err
+	}
+	return j.db.Commit()
+}
+
+// AddPendingID adds [jobID] to pending
+func (j *Jobs) AddPendingID(jobIDs ...ids.ID) {
+	for _, jobID := range jobIDs {
+		if !j.pending.Contains(jobID) {
+			j.pending.Add(jobID)
+			j.addToPending.Add(jobID)
+			j.removeFromPending.Remove(jobID)
+		}
+	}
+}
+
+// RemovePendingID removes [jobID] from pending
+func (j *Jobs) RemovePendingID(jobIDs ...ids.ID) {
+	for _, jobID := range jobIDs {
+		if j.pending.Contains(jobID) {
+			j.pending.Remove(jobID)
+			j.addToPending.Remove(jobID)
+			j.removeFromPending.Add(jobID)
+		}
+	}
+}
+
+func (j *Jobs) Pending() []ids.ID {
+	return j.pending.List()
+}
+
+func (j *Jobs) PendingJobs() int { return j.pending.Len() }
+
+// updatePending updates the set of pending jobs
+func (j *Jobs) updatePending() error {
+	// If there are no updates to be made return immediately
+	if j.addToPending.Len()+j.removeFromPending.Len() == 0 {
+		return nil
+	}
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		j.state.AddPending(j.db, j.addToPending),
+		j.state.RemovePending(j.db, j.removeFromPending),
+	)
+
+	// Clear the change sets once they've been written through
+	// to the database.
+	j.addToPending.Clear()
+	j.removeFromPending.Clear()
+
+	return errs.Err
+}
 
 func (j *Jobs) push(job Job) error {
 	if has, err := j.state.HasJob(j.db, job.ID()); err != nil {
 		return err
 	} else if has {
-		return errDuplicate
+		return ErrDuplicate
 	}
 
 	if err := j.state.SetJob(j.db, job); err != nil {
@@ -155,7 +218,7 @@ func (j *Jobs) block(job Job, deps ids.Set) error {
 	if has, err := j.state.HasJob(j.db, job.ID()); err != nil {
 		return err
 	} else if has {
-		return errDuplicate
+		return ErrDuplicate
 	}
 
 	if err := j.state.SetJob(j.db, job); err != nil {

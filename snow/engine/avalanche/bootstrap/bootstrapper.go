@@ -166,45 +166,59 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 	// to reduce the number of repeated DAG traversals.
 	toProcess := vertex.NewHeap()
 	for _, vtx := range vtxs {
-		if _, ok := b.processedCache.Get(vtx.ID()); !ok { // only process a vertex if we haven't already
+		vtxID := vtx.ID()
+		if _, ok := b.processedCache.Get(vtxID); !ok { // only process a vertex if we haven't already
 			toProcess.Push(vtx)
+		} else {
+			b.VtxBlocked.RemovePendingID(vtxID)
 		}
 	}
 
 	vtxHeightSet := ids.Set{}
 	prevHeight := uint64(0)
+
 	for toProcess.Len() > 0 { // While there are unprocessed vertices
 		vtx := toProcess.Pop() // Get an unknown vertex or one furthest down the DAG
 		vtxID := vtx.ID()
 
 		switch vtx.Status() {
 		case choices.Unknown:
+			b.VtxBlocked.AddPendingID(vtxID)
 			b.needToFetch.Add(vtxID) // We don't have this vertex locally. Mark that we need to fetch it.
 		case choices.Rejected:
-			b.needToFetch.Remove(vtxID) // We have this vertex locally. Mark that we don't need to fetch it.
 			return fmt.Errorf("tried to accept %s even though it was previously rejected", vtx.ID())
 		case choices.Processing:
 			b.needToFetch.Remove(vtxID)
+			b.VtxBlocked.RemovePendingID(vtxID)
 
-			if err := b.VtxBlocked.Push(&vertexJob{ // Add to queue of vertices to execute when bootstrapping finishes.
+			b.Ctx.Log.Info("Pushing vertex job %s", vtx.ID())
+			err := b.VtxBlocked.Push(&vertexJob{ // Add to queue of vertices to execute when bootstrapping finishes.
 				log:         b.Ctx.Log,
 				numAccepted: b.numAcceptedVts,
 				numDropped:  b.numDroppedVts,
 				vtx:         vtx,
-			}); err == nil {
+			})
+			switch {
+			case err == nil:
 				b.numFetchedVts.Inc()
 				b.NumFetched++ // Progress tracker
 				if b.NumFetched%common.StatusUpdateFrequency == 0 {
 					b.Ctx.Log.Info("fetched %d vertices", b.NumFetched)
 				}
-			} else {
-				b.Ctx.Log.Verbo("couldn't push to vtxBlocked: %s", err)
+			case err == queue.ErrDuplicate:
+				// If the vertex is already on the queue, then we have already pushed [vtx]'s transactions
+				// and traversed into its parents.
+				continue
+			default:
+				// Any other error is considered a fatal error.
+				return err
 			}
 			txs, err := vtx.Txs()
 			if err != nil {
 				return err
 			}
 			for _, tx := range txs { // Add transactions to queue of transactions to execute when bootstrapping finishes.
+				b.Ctx.Log.Info("Pushing tx job %s", tx.ID())
 				if err := b.TxBlocked.Push(&txJob{
 					log:         b.Ctx.Log,
 					numAccepted: b.numAcceptedTxs,
@@ -246,10 +260,10 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 		}
 	}
 
-	if err := b.VtxBlocked.Commit(); err != nil {
+	if err := b.TxBlocked.Commit(); err != nil {
 		return err
 	}
-	if err := b.TxBlocked.Commit(); err != nil {
+	if err := b.VtxBlocked.Commit(); err != nil {
 		return err
 	}
 
@@ -354,10 +368,18 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	}
 
 	b.NumFetched = 0
-	toProcess := make([]avalanche.Vertex, 0, len(acceptedContainerIDs))
-	for _, vtxID := range acceptedContainerIDs {
+	b.VtxBlocked.AddPendingID(acceptedContainerIDs...)
+	pendingVtxs := b.VtxBlocked.Pending()
+	b.Ctx.Log.Debug("Starting bootstrapping with %d pending vertices %d from accepted frontier", len(pendingVtxs), len(acceptedContainerIDs))
+
+	toProcess := make([]avalanche.Vertex, 0, len(pendingVtxs))
+	for _, vtxID := range pendingVtxs {
 		if vtx, err := b.Manager.Get(vtxID); err == nil {
-			toProcess = append(toProcess, vtx) // Process this vertex.
+			if vtx.Status() == choices.Accepted {
+				b.VtxBlocked.RemovePendingID(vtxID)
+			} else {
+				toProcess = append(toProcess, vtx) // Process this vertex.
+			}
 		} else {
 			b.needToFetch.Add(vtxID) // We don't have this vertex. Mark that we have to fetch it.
 		}
@@ -369,7 +391,8 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 // after which it finishes the bootstrap process
 func (b *Bootstrapper) checkFinish() error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
-	if b.Ctx.IsBootstrapped() || b.OutstandingRequests.Len() > 0 || b.needToFetch.Len() > 0 {
+	pendingJobs := b.VtxBlocked.Pending()
+	if b.Ctx.IsBootstrapped() || len(pendingJobs) > 0 {
 		return nil
 	}
 
@@ -440,7 +463,7 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher)
 	numExecuted := 0
 
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
-		b.Ctx.Log.Debug("Executing: %s", job.ID())
+		b.Ctx.Log.Info("Executing: %s", job.ID())
 		if err := jobs.Execute(job); err != nil {
 			b.Ctx.Log.Error("Error executing: %s", err)
 			return numExecuted, err
@@ -456,6 +479,7 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher)
 		events.Accept(b.Ctx, job.ID(), job.Bytes())
 	}
 	b.Ctx.Log.Info("executed %d operations", numExecuted)
+
 	return numExecuted, nil
 }
 

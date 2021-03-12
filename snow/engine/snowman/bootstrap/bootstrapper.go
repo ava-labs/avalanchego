@@ -51,8 +51,6 @@ type Bootstrapper struct {
 
 	Bootstrapped func()
 
-	// true if all of the vertices in the original accepted frontier have been processed
-	processedStartingAcceptedFrontier bool
 	// number of state transitions executed
 	executedStateTransitions int
 
@@ -113,9 +111,14 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	}
 
 	b.NumFetched = 0
-	for _, blkID := range acceptedContainerIDs {
+	b.Blocked.AddPendingID(acceptedContainerIDs...)
+	pendingContainerIDs := b.Blocked.Pending()
+	b.Ctx.Log.Debug("Starting bootstrapping with %d pending blocks and %d from accepted frontier", len(pendingContainerIDs), len(acceptedContainerIDs))
+	for _, blkID := range pendingContainerIDs {
 		if blk, err := b.VM.GetBlock(blkID); err == nil {
-			if err := b.process(blk); err != nil {
+			if blk.Status() == choices.Accepted {
+				b.Blocked.RemovePendingID(blkID)
+			} else if err := b.process(blk); err != nil {
 				return err
 			}
 		} else if err := b.fetch(blkID); err != nil {
@@ -123,8 +126,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 		}
 	}
 
-	b.processedStartingAcceptedFrontier = true
-	if numPending := b.OutstandingRequests.Len(); numPending == 0 {
+	if numPending := b.Blocked.PendingJobs(); numPending == 0 {
 		return b.checkFinish()
 	}
 	return nil
@@ -139,7 +141,7 @@ func (b *Bootstrapper) fetch(blkID ids.ID) error {
 
 	// Make sure we don't already have this block
 	if _, err := b.VM.GetBlock(blkID); err == nil {
-		if numPending := b.OutstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
+		if numPending := b.Blocked.PendingJobs(); numPending == 0 {
 			return b.checkFinish()
 		}
 		return nil
@@ -187,7 +189,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 		return b.fetch(wantedBlkID)
 	}
 
-	for _, blkBytes := range blks {
+	for _, blkBytes := range blks[1:] {
 		if _, err := b.VM.ParseBlock(blkBytes); err != nil { // persists the block
 			b.Ctx.Log.Debug("Failed to parse block: %s", err)
 			b.Ctx.Log.Verbo("block: %s", formatting.DumpBytes{Bytes: blkBytes})
@@ -213,31 +215,40 @@ func (b *Bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) err
 func (b *Bootstrapper) process(blk snowman.Block) error {
 	status := blk.Status()
 	blkID := blk.ID()
+processLoop:
 	for status == choices.Processing {
-		if err := b.Blocked.Push(&blockJob{
+		b.Blocked.RemovePendingID(blkID)
+
+		err := b.Blocked.Push(&blockJob{
 			numAccepted: b.numAccepted,
 			numDropped:  b.numDropped,
 			blk:         blk,
-		}); err == nil {
+		})
+
+		// Traverse to the next block regardless of the result of Push
+		blk = blk.Parent()
+		status = blk.Status()
+		blkID = blk.ID()
+
+		switch {
+		case err == nil:
 			b.numFetched.Inc()
 			b.NumFetched++                                      // Progress tracker
 			if b.NumFetched%common.StatusUpdateFrequency == 0 { // Periodically print progress
 				b.Ctx.Log.Info("fetched %d blocks", b.NumFetched)
 			}
-		}
-
-		if err := b.Blocked.Commit(); err != nil {
+		case err == queue.ErrDuplicate:
+			// If this block is already on the queue, then we can stop traversing here.
+			break processLoop
+		default:
+			// Treat all other errors as fatal.
 			return err
 		}
-
-		// Process this block's parent
-		blk = blk.Parent()
-		status = blk.Status()
-		blkID = blk.ID()
 	}
 
-	switch status := blk.Status(); status {
+	switch status {
 	case choices.Unknown:
+		b.Blocked.AddPendingID(blkID)
 		if err := b.fetch(blkID); err != nil {
 			return err
 		}
@@ -245,7 +256,11 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 		return fmt.Errorf("bootstrapping wants to accept %s, however it was previously rejected", blkID)
 	}
 
-	if numPending := b.OutstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
+	if err := b.Blocked.Commit(); err != nil {
+		return err
+	}
+
+	if numPending := b.Blocked.PendingJobs(); numPending == 0 {
 		return b.checkFinish()
 	}
 	return nil
@@ -257,7 +272,6 @@ func (b *Bootstrapper) checkFinish() error {
 	if b.IsBootstrapped() {
 		return nil
 	}
-
 	b.Ctx.Log.Info("bootstrapping fetched %d blocks. executing state transitions...",
 		b.NumFetched)
 
@@ -274,7 +288,6 @@ func (b *Bootstrapper) checkFinish() error {
 	if executedBlocks > 0 && executedBlocks < previouslyExecuted/2 && b.RetryBootstrap {
 		b.Ctx.Log.Info("bootstrapping is checking for more blocks before finishing the bootstrap process...")
 
-		b.processedStartingAcceptedFrontier = false
 		return b.RestartBootstrap(true)
 	}
 
@@ -301,7 +314,6 @@ func (b *Bootstrapper) checkFinish() error {
 			b.delayAmount = maxBootstrappingDelay
 		}
 
-		b.processedStartingAcceptedFrontier = false
 		return b.RestartBootstrap(true)
 	}
 

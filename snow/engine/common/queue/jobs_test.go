@@ -370,3 +370,59 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 		t.Fatalf("Shouldn't have a container ready to pop")
 	}
 }
+
+func TestPendingJobs(t *testing.T) {
+	parser := &TestParser{T: t}
+	db := memdb.New()
+
+	jobs, err := New(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	jobs.SetParser(parser)
+
+	id0 := ids.Empty.Prefix(0)
+	id1 := ids.Empty.Prefix(1)
+
+	jobs.AddPendingID(id0)
+	jobs.AddPendingID(id1)
+
+	if err := jobs.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	if pending := jobs.PendingJobs(); pending != 2 {
+		t.Fatalf("Expected number of pending jobs to be 2, but was %d", pending)
+	}
+
+	pendingSet := ids.Set{}
+	pendingSet.Add(jobs.Pending()...)
+
+	if !pendingSet.Contains(id0) {
+		t.Fatal("Expected pending to contain id0")
+	}
+
+	if !pendingSet.Contains(id1) {
+		t.Fatal("Expected pending to contain id1")
+	}
+
+	jobs.RemovePendingID(id1)
+
+	if err := jobs.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	newJobs, err := New(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newJobs.SetParser(parser)
+
+	pendingSet.Clear()
+	pendingSet.Add(newJobs.Pending()...)
+	if !pendingSet.Contains(id0) {
+		t.Fatal("Expected pending to contain id0")
+	}
+}

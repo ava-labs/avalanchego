@@ -16,10 +16,12 @@ const (
 	stackID
 	jobID
 	blockingID
+	pendingID
 )
 
 var (
-	stackSize = []byte{stackSizeID}
+	stackSize     = []byte{stackSizeID}
+	pendingPrefix = []byte{pendingID}
 )
 
 type prefixedState struct{ state }
@@ -30,6 +32,10 @@ func (ps *prefixedState) SetStackSize(db database.Database, size uint32) error {
 
 func (ps *prefixedState) StackSize(db database.Database) (uint32, error) {
 	return ps.state.Int(db, stackSize)
+}
+
+func (ps *prefixedState) DeleteStackSize(db database.Database) error {
+	return ps.state.DeleteInt(db, stackSize)
 }
 
 func (ps *prefixedState) SetStackIndex(db database.Database, index uint32, job Job) error {
@@ -127,4 +133,16 @@ func (ps *prefixedState) Blocking(db database.Database, id ids.ID) ([]ids.ID, er
 	p.PackFixedBytes(id[:])
 
 	return ps.state.IDs(db, p.Bytes)
+}
+
+func (ps *prefixedState) AddPending(db database.Database, pendingIDs ids.Set) error {
+	return ps.state.AddIDs(db, pendingPrefix, pendingIDs)
+}
+
+func (ps *prefixedState) RemovePending(db database.Database, pendingIDs ids.Set) error {
+	return ps.state.RemoveIDs(db, pendingPrefix, pendingIDs)
+}
+
+func (ps *prefixedState) Pending(db database.Database) ([]ids.ID, error) {
+	return ps.state.IDs(db, pendingPrefix)
 }

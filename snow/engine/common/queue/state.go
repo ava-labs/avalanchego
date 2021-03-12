@@ -20,6 +20,10 @@ func (s *state) SetInt(db database.Database, key []byte, size uint32) error {
 	return db.Put(key, p.Bytes)
 }
 
+func (s *state) DeleteInt(db database.Database, key []byte) error {
+	return db.Delete(key)
+}
+
 func (s *state) Int(db database.Database, key []byte) (uint32, error) {
 	value, err := db.Get(key)
 	if err != nil {
@@ -69,4 +73,28 @@ func (s *state) AddID(db database.Database, prefix []byte, key ids.ID) error {
 func (s *state) RemoveID(db database.Database, prefix []byte, key ids.ID) error {
 	pdb := prefixdb.NewNested(prefix, db)
 	return pdb.Delete(key[:])
+}
+
+// AddIDs saves a set of IDs to the prefixed database
+func (s *state) AddIDs(db database.Database, prefix []byte, ids ids.Set) error {
+	pdb := prefixdb.NewNested(prefix, db)
+	for id := range ids {
+		if err := pdb.Put(id[:], nil); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// RemoveIDs removes a set of IDs from the prefixed database
+func (s *state) RemoveIDs(db database.Database, prefix []byte, ids ids.Set) error {
+	pdb := prefixdb.NewNested(prefix, db)
+	for id := range ids {
+		if err := pdb.Delete(id[:]); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
