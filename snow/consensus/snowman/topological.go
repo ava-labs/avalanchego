@@ -5,7 +5,6 @@ package snowman
 
 import (
 	"errors"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -263,24 +262,17 @@ func (ts *Topological) Finalized() bool { return len(ts.blocks) == 1 }
 
 // HealthCheck returns information about the consensus health.
 func (ts *Topological) HealthCheck() (interface{}, error) {
-	numOutstandingBlks := ts.Metrics.ProcessingEntries.Len()
+	numOutstandingBlks := ts.Metrics.ContainersLen()
 	healthy := numOutstandingBlks <= ts.params.MaxOutstandingItems
 	details := map[string]interface{}{
 		"outstandingBlocks": numOutstandingBlks,
 	}
-	ts.Metrics.OutstandingContainers(numOutstandingBlks)
 
 	// check for long running blocks
 	now := ts.Metrics.Clock.Time()
-	oldestStartTime := now
-	if startTime, exists := ts.Metrics.ProcessingEntries.Oldest(); exists {
-		oldestStartTime = startTime.(time.Time)
-	}
-
-	timeReqRunning := now.Sub(oldestStartTime)
+	timeReqRunning := now.Sub(ts.Metrics.MeasureAndGetOldest())
 	healthy = healthy && timeReqRunning <= ts.params.MaxItemProcessingTime
 	details["longestRunningBlock"] = timeReqRunning.String()
-	ts.Metrics.LongestRunningContainer(timeReqRunning.Milliseconds())
 
 	if !healthy {
 		return details, errUnhealthy

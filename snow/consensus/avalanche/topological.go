@@ -5,7 +5,6 @@ package avalanche
 
 import (
 	"errors"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -204,24 +203,17 @@ func (ta *Topological) Finalized() bool { return ta.cg.Finalized() }
 
 // HealthCheck returns information about the consensus health.
 func (ta *Topological) HealthCheck() (interface{}, error) {
-	numOutstandingVtx := ta.Metrics.ProcessingEntries.Len()
+	numOutstandingVtx := ta.Metrics.ContainersLen()
 	healthy := numOutstandingVtx <= ta.params.MaxOutstandingItems
 	details := map[string]interface{}{
 		"outstandingVertices": numOutstandingVtx,
 	}
-	ta.Metrics.OutstandingContainers(numOutstandingVtx)
 
 	// check for long running vertices
 	now := ta.Metrics.Clock.Time()
-	oldestStartTime := now
-	if startTime, exists := ta.Metrics.ProcessingEntries.Oldest(); exists {
-		oldestStartTime = startTime.(time.Time)
-	}
-
-	timeReqRunning := now.Sub(oldestStartTime)
+	timeReqRunning := now.Sub(ta.Metrics.MeasureAndGetOldest())
 	healthy = healthy && timeReqRunning <= ta.params.MaxItemProcessingTime
 	details["longestRunningVertex"] = timeReqRunning.String()
-	ta.Metrics.LongestRunningContainer(timeReqRunning.Milliseconds())
 
 	snowstormReport, err := ta.cg.HealthCheck()
 	healthy = healthy && err == nil

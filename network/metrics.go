@@ -63,7 +63,7 @@ type metrics struct {
 	sendQueuePortionFull     prometheus.Gauge
 	sendFailRate             prometheus.Gauge
 
-	getVersion, versionMetric,
+	getVersion, version,
 	getPeerlist, peerlist,
 	ping, pong,
 	getAcceptedFrontier, acceptedFrontier,
@@ -109,7 +109,7 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 		registerer.Register(m.sendFailRate),
 
 		m.getVersion.initialize(GetVersion, registerer),
-		m.versionMetric.initialize(Version, registerer),
+		m.version.initialize(Version, registerer),
 		m.getPeerlist.initialize(GetPeerList, registerer),
 		m.peerlist.initialize(PeerList, registerer),
 		m.ping.initialize(Ping, registerer),
@@ -134,7 +134,7 @@ func (m *metrics) message(msgType Op) *messageMetrics {
 	case GetVersion:
 		return &m.getVersion
 	case Version:
-		return &m.versionMetric
+		return &m.version
 	case GetPeerList:
 		return &m.getPeerlist
 	case PeerList:

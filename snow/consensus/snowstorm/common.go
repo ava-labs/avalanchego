@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -94,24 +93,17 @@ func (c *common) Finalized() bool {
 
 // HealthCheck returns information about the consensus health.
 func (c *common) HealthCheck() (interface{}, error) {
-	numOutstandingTxs := c.Metrics.ProcessingEntries.Len()
+	numOutstandingTxs := c.Metrics.ContainersLen()
 	healthy := numOutstandingTxs <= c.params.MaxOutstandingItems
 	details := map[string]interface{}{
 		"outstandingTransactions": numOutstandingTxs,
 	}
-	c.Metrics.OutstandingContainers(numOutstandingTxs)
 
 	// check for long running transactions
 	now := c.Metrics.Clock.Time()
-	oldestStartTime := now
-	if startTime, exists := c.Metrics.ProcessingEntries.Oldest(); exists {
-		oldestStartTime = startTime.(time.Time)
-	}
-
-	timeReqRunning := now.Sub(oldestStartTime)
+	timeReqRunning := now.Sub(c.Metrics.MeasureAndGetOldest())
 	healthy = healthy && timeReqRunning <= c.params.MaxItemProcessingTime
 	details["longestRunningTx"] = timeReqRunning.String()
-	c.Metrics.LongestRunningContainer(timeReqRunning.Milliseconds())
 
 	if !healthy {
 		return details, errUnhealthy

@@ -24,7 +24,7 @@ type Metrics struct {
 	// ProcessingEntries keeps track of the time that each item was issued into
 	// the consensus instance. This is used to calculate the amount of time to
 	// accept or reject the item.
-	ProcessingEntries linkedhashmap.LinkedHashmap
+	processingEntries linkedhashmap.LinkedHashmap
 
 	// log reports anomalous events.
 	log logging.Logger
@@ -39,13 +39,12 @@ type Metrics struct {
 	// rejected tracks the number of milliseconds that an item was processing
 	// before being rejected
 	latRejected             prometheus.Histogram
-	outstandingContainers   prometheus.Gauge
 	longestRunningContainer prometheus.Histogram
 }
 
 // Initialize the metrics with the provided names.
 func (m *Metrics) Initialize(metricName, descriptionName string, log logging.Logger, namespace string, registerer prometheus.Registerer) error {
-	m.ProcessingEntries = linkedhashmap.New()
+	m.processingEntries = linkedhashmap.New()
 	m.log = log
 
 	m.numProcessing = prometheus.NewGauge(prometheus.GaugeOpts{
@@ -65,11 +64,6 @@ func (m *Metrics) Initialize(metricName, descriptionName string, log logging.Log
 		Help:      fmt.Sprintf("Latency of rejecting from the time the %s was issued in milliseconds", descriptionName),
 		Buckets:   timer.MillisecondsBuckets,
 	})
-	m.outstandingContainers = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_outstanding", metricName),
-		Help:      fmt.Sprintf("Number of %s waiting to be processed", descriptionName),
-	})
 	m.longestRunningContainer = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_longest_running", metricName),
@@ -88,18 +82,18 @@ func (m *Metrics) Initialize(metricName, descriptionName string, log logging.Log
 
 // Issued marks the item as having been issued.
 func (m *Metrics) Issued(id ids.ID) {
-	m.ProcessingEntries.Put(id, m.Clock.Time())
+	m.processingEntries.Put(id, m.Clock.Time())
 	m.numProcessing.Inc()
 }
 
 // Accepted marks the item as having been accepted.
 func (m *Metrics) Accepted(id ids.ID) {
-	startTime, ok := m.ProcessingEntries.Get(id)
+	startTime, ok := m.processingEntries.Get(id)
 	if !ok {
 		m.log.Debug("unable to measure Accepted transaction %v", id.String())
 		return
 	}
-	m.ProcessingEntries.Delete(id)
+	m.processingEntries.Delete(id)
 
 	endTime := m.Clock.Time()
 	duration := endTime.Sub(startTime.(time.Time))
@@ -109,12 +103,12 @@ func (m *Metrics) Accepted(id ids.ID) {
 
 // Rejected marks the item as having been rejected.
 func (m *Metrics) Rejected(id ids.ID) {
-	startTime, ok := m.ProcessingEntries.Get(id)
+	startTime, ok := m.processingEntries.Get(id)
 	if !ok {
 		m.log.Debug("unable to measure Rejected transaction %v", id.String())
 		return
 	}
-	m.ProcessingEntries.Delete(id)
+	m.processingEntries.Delete(id)
 
 	endTime := m.Clock.Time()
 	duration := endTime.Sub(startTime.(time.Time))
@@ -122,10 +116,17 @@ func (m *Metrics) Rejected(id ids.ID) {
 	m.numProcessing.Dec()
 }
 
-func (m *Metrics) OutstandingContainers(txs int) {
-	m.outstandingContainers.Set(float64(txs))
+func (m *Metrics) MeasureAndGetOldest() time.Time {
+	now := m.Clock.Time()
+	if startTime, exists := m.processingEntries.Oldest(); exists {
+		oldestTime := startTime.(time.Time)
+		m.longestRunningContainer.Observe(float64(m.Clock.Time().Sub(oldestTime)))
+		return oldestTime
+	}
+
+	return now
 }
 
-func (m *Metrics) LongestRunningContainer(milliseconds int64) {
-	m.longestRunningContainer.Observe(float64(milliseconds))
+func (m *Metrics) ContainersLen() int {
+	return m.processingEntries.Len()
 }
