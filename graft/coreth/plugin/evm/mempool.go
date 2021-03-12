@@ -26,7 +26,8 @@ type Mempool struct {
 	txs map[ids.ID]*Tx
 	// issuedTxs is the set of transactions that have been issued into a new block
 	issuedTxs map[ids.ID]*Tx
-	// discardedTxs is an LRU Cache of recently discarded transactions
+	// discardedTxs is an LRU Cache of transactions that have been discarded after failing
+	// verification.
 	discardedTxs *cache.LRU
 	// Pending is a channel of length one, which the mempool ensures has an item on
 	// it as long as there is an unissued transaction remaining in [txs]
@@ -69,7 +70,7 @@ func (m *Mempool) AddTx(tx *Tx) error {
 	if _, exists := m.issuedTxs[txID]; exists {
 		return nil
 	}
-	if m.currentTx != nil && m.currentTx.ID() == tx.ID() {
+	if m.currentTx != nil && m.currentTx.ID() == txID {
 		return nil
 	}
 
