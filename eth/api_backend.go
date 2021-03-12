@@ -70,8 +70,8 @@ func (b *EthAPIBackend) CurrentBlock() *types.Block {
 	return b.eth.blockchain.CurrentBlock()
 }
 
-func (b *EthAPIBackend) AcceptedBlock() *types.Block {
-	return b.eth.AcceptedBlock()
+func (b *EthAPIBackend) LastAcceptedBlock() *types.Block {
+	return b.eth.LastAcceptedBlock()
 }
 
 func (b *EthAPIBackend) SetHead(number uint64) {
@@ -86,7 +86,7 @@ func (b *EthAPIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumb
 	// Treat requests for the pending, latest, or accepted block
 	// identically.
 	if number.IsAccepted() {
-		return b.eth.AcceptedBlock().Header(), nil
+		return b.eth.LastAcceptedBlock().Header(), nil
 	}
 
 	return b.eth.blockchain.GetHeaderByNumber(uint64(number)), nil
@@ -123,7 +123,7 @@ func (b *EthAPIBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumbe
 	// Treat requests for the pending, latest, or accepted block
 	// identically.
 	if number.IsAccepted() {
-		return b.eth.AcceptedBlock(), nil
+		return b.eth.LastAcceptedBlock(), nil
 	}
 
 	return b.eth.blockchain.GetBlockByNumber(uint64(number)), nil

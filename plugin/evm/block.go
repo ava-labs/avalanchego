@@ -113,9 +113,6 @@ func (b *Block) Accept() error {
 	if err := vm.chain.Accept(b.ethBlock); err != nil {
 		return fmt.Errorf("chain could not accept %s: %w", b.ID(), err)
 	}
-	if err := vm.acceptedBlockDB.Put(b.ethBlock.Number().Bytes(), b.id[:]); err != nil {
-		return fmt.Errorf("failed to put block %s in accepted db: %w", b.ID(), err)
-	}
 	if err := vm.acceptedBlockDB.Put(lastAcceptedKey, b.id[:]); err != nil {
 		return fmt.Errorf("failed to put %s as the last accepted block: %w", b.ID(), err)
 	}

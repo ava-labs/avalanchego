@@ -290,7 +290,7 @@ func NewPublicDebugAPI(eth *Ethereum) *PublicDebugAPI {
 func (api *PublicDebugAPI) DumpBlock(blockNr rpc.BlockNumber) (state.Dump, error) {
 	var block *types.Block
 	if blockNr.IsAccepted() {
-		block = api.eth.AcceptedBlock()
+		block = api.eth.LastAcceptedBlock()
 	} else {
 		block = api.eth.blockchain.GetBlockByNumber(uint64(blockNr))
 	}
@@ -366,7 +366,7 @@ func (api *PublicDebugAPI) AccountRange(blockNrOrHash rpc.BlockNumberOrHash, sta
 	if number, ok := blockNrOrHash.Number(); ok {
 		var block *types.Block
 		if number.IsAccepted() {
-			block = api.eth.AcceptedBlock()
+			block = api.eth.LastAcceptedBlock()
 		} else {
 			block = api.eth.blockchain.GetBlockByNumber(uint64(number))
 		}

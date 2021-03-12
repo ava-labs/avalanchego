@@ -16,20 +16,11 @@ import (
 )
 
 var (
-	errUnknownBlock = errors.New("unknown block")
+	// ErrBlockNotFound indicates that the VM was not able to retrieve a block. If this error is returned
+	// from getBlock then the miss will be considered cacheable. Any other error will not be considered a
+	// cacheable miss.
+	ErrBlockNotFound = errors.New("block not found")
 )
-
-// UnmarshalType ...
-type UnmarshalType func([]byte) (Block, error)
-
-// BuildBlockType ...
-type BuildBlockType func() (Block, error)
-
-// GetBlockType ...
-type GetBlockType func(ids.ID) (Block, error)
-
-// GetBlockIDAtHeightType ...
-type GetBlockIDAtHeightType func(uint64) (ids.ID, error)
 
 // ChainState defines the canonical state of the chain
 // it tracks the accepted blocks and wraps a VM's implementation
@@ -43,54 +34,59 @@ type ChainState struct {
 
 	// ChainState keeps these function types to request operations
 	// from the VM implementation.
-	getBlockIDAtHeight GetBlockIDAtHeightType
-	getBlock           GetBlockType
-	unmarshalBlock     UnmarshalType
-	buildBlock         BuildBlockType
-	genesisBlock       snowman.Block
+	getBlockIDAtHeight func(uint64) (ids.ID, error)
+	getBlock           func(ids.ID) (Block, error)
+	unmarshalBlock     func([]byte) (Block, error)
+	buildBlock         func() (Block, error)
 
 	// processingBlocks are the verified blocks that have entered
 	// consensus
 	processingBlocks map[ids.ID]*BlockWrapper
 	// decidedBlocks is an LRU cache of decided blocks.
-	decidedBlocks *cache.LRU
+	decidedBlocks cache.Cacher
 	// unverifiedBlocks is an LRU cache of blocks with status processing
 	// that have not yet been verified.
-	unverifiedBlocks *cache.LRU
+	unverifiedBlocks cache.Cacher
 	// missingBlocks is an LRU cache of missing blocks
-	missingBlocks     *cache.LRU
+	missingBlocks     cache.Cacher
 	lastAcceptedBlock *BlockWrapper
 }
 
-// NewChainState ...
-func NewChainState(db database.Database, cacheSize int) *ChainState {
-	baseDB := versiondb.New(db)
+// Config defines all of the parameters necessary to initialize ChainState
+type Config struct {
+	LastAcceptedBlock  Block
+	GetBlockIDAtHeight func(uint64) (ids.ID, error)
+	GetBlock           func(ids.ID) (Block, error)
+	UnmarshalBlock     func([]byte) (Block, error)
+	BuildBlock         func() (Block, error)
+}
 
-	state := &ChainState{
-		baseDB:           baseDB,
+// NewChainState returns a new uninitialized ChainState
+func NewChainState(db database.Database, cacheSize int) *ChainState {
+	return &ChainState{
+		baseDB:           versiondb.New(db),
 		processingBlocks: make(map[ids.ID]*BlockWrapper, cacheSize),
 		decidedBlocks:    &cache.LRU{Size: cacheSize},
 		missingBlocks:    &cache.LRU{Size: cacheSize},
 		unverifiedBlocks: &cache.LRU{Size: cacheSize},
 	}
-	return state
 }
 
-// Initialize sets the genesis block, last accepted block, and the functions for retrieving blocks from the VM layer.
-func (c *ChainState) Initialize(lastAcceptedBlock Block, getBlockIDAtHeight GetBlockIDAtHeightType, getBlock GetBlockType, unmarshalBlock UnmarshalType, buildBlock BuildBlockType) {
+// Initialize sets the last accepted block, and the internal functions for retrieving/parsing/building
+// blocks from the VM layer.
+func (c *ChainState) Initialize(config *Config) {
 	// Set the functions for retrieving blocks from the VM
-	c.getBlockIDAtHeight = getBlockIDAtHeight
-	c.getBlock = getBlock
-	c.unmarshalBlock = unmarshalBlock
-	c.buildBlock = buildBlock
+	c.getBlockIDAtHeight = config.GetBlockIDAtHeight
+	c.getBlock = config.GetBlock
+	c.unmarshalBlock = config.UnmarshalBlock
+	c.buildBlock = config.BuildBlock
 
-	lastAcceptedBlock.SetStatus(choices.Accepted)
+	config.LastAcceptedBlock.SetStatus(choices.Accepted)
 	c.lastAcceptedBlock = &BlockWrapper{
-		Block: lastAcceptedBlock,
+		Block: config.LastAcceptedBlock,
 		state: c,
 	}
-	c.lastAcceptedBlock.SetStatus(choices.Accepted)
-	c.decidedBlocks.Put(lastAcceptedBlock.ID(), c.lastAcceptedBlock)
+	c.decidedBlocks.Put(config.LastAcceptedBlock.ID(), c.lastAcceptedBlock)
 }
 
 // FlushCaches flushes each block cache completely.
@@ -112,12 +108,14 @@ func (c *ChainState) GetBlock(blkID ids.ID) (snowman.Block, error) {
 	}
 
 	if _, ok := c.missingBlocks.Get(blkID); ok {
-		return nil, errUnknownBlock
+		return nil, ErrBlockNotFound
 	}
 
 	blk, err := c.getBlock(blkID)
-	if err != nil {
+	if err == ErrBlockNotFound {
 		c.missingBlocks.Put(blkID, struct{}{})
+		return nil, err
+	} else if err != nil {
 		return nil, err
 	}
 
@@ -185,8 +183,9 @@ func (c *ChainState) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 
+	blkID := blk.ID()
 	// Evict the produced block from missing blocks.
-	c.missingBlocks.Evict(blk.ID())
+	c.missingBlocks.Evict(blkID)
 
 	// Blocks built by BuildBlock are built on top of the
 	// preferred block, so it is guaranteed to be in Processing.
@@ -197,7 +196,7 @@ func (c *ChainState) BuildBlock() (snowman.Block, error) {
 	}
 	// Since the consensus engine has not called Verify on this
 	// block yet, we can add it directly as a non-processing block.
-	c.unverifiedBlocks.Put(blk.ID(), wrappedBlk)
+	c.unverifiedBlocks.Put(blkID, wrappedBlk)
 	return wrappedBlk, nil
 }
 
@@ -205,7 +204,6 @@ func (c *ChainState) BuildBlock() (snowman.Block, error) {
 // a wrapped version of [blk]
 // assumes [blk] is a known, non-wrapped block that is not currently
 // being processed in consensus.
-// assumes lock is held.
 func (c *ChainState) addNonProcessingBlock(blk Block) (snowman.Block, error) {
 	wrappedBlk := &BlockWrapper{
 		Block: blk,
@@ -223,7 +221,7 @@ func (c *ChainState) addNonProcessingBlock(blk Block) (snowman.Block, error) {
 	case choices.Accepted, choices.Rejected:
 		c.decidedBlocks.Put(blkID, wrappedBlk)
 	case choices.Processing:
-		c.unverifiedBlocks.Put(blk.ID(), wrappedBlk)
+		c.unverifiedBlocks.Put(blkID, wrappedBlk)
 	default:
 		return nil, fmt.Errorf("found unexpected status for blk %s: %s", blkID, status)
 	}
@@ -247,7 +245,6 @@ func (c *ChainState) LastAcceptedBlockInternal() snowman.Block {
 }
 
 // getStatus returns the status of [blk]. Assumes that [blk] is a known block.
-// assumes lock is held.
 func (c *ChainState) getStatus(blk snowman.Block) (choices.Status, error) {
 	blkHeight := blk.Height()
 	lastAcceptedHeight := c.lastAcceptedBlock.Height()

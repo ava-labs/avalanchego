@@ -39,7 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -179,13 +178,18 @@ type VM struct {
 
 	CLIConfig CommandLineConfig
 
-	chainID            *big.Int
-	networkID          uint64
-	genesisHash        common.Hash
-	chain              *coreth.ETHChain
-	db                 database.Database
-	chaindb            Database
-	acceptedBlockDB    database.Database
+	chainID     *big.Int
+	networkID   uint64
+	genesisHash common.Hash
+	chain       *coreth.ETHChain
+	// [db] is the VM's current database managed by ChainState
+	db database.Database
+	// [chaindb] is the database supplied to the Ethereum backend
+	chaindb Database
+	// [acceptedBlockDB] is the database to store the last accepted
+	// block.
+	acceptedBlockDB database.Database
+	// [acceptedAtomicTxDB] maintains an index of accepted atomic txs.
 	acceptedAtomicTxDB database.Database
 
 	newBlockChan chan *Block
@@ -272,8 +276,7 @@ func (vm *VM) Initialize(
 		return errUnsupportedFXs
 	}
 
-	db := dbManager.Current()
-	vm.ChainState = chainState.NewChainState(db, chainStateCacheSize)
+	vm.ChainState = chainState.NewChainState(dbManager.Current(), chainStateCacheSize)
 	vm.shutdownChan = make(chan struct{}, 1)
 	vm.ctx = ctx
 	vm.db = vm.ChainState.ExternalDB()
@@ -341,11 +344,11 @@ func (vm *VM) Initialize(
 	chain.SetOnSealFinish(func(block *types.Block) error {
 		log.Trace("EVM sealed a block")
 
+		// Note: the status of block is set by ChainState
 		blk := &Block{
 			id:       ids.ID(block.Hash()),
 			ethBlock: block,
 			vm:       vm,
-			status:   choices.Processing,
 		}
 		// Verify is called on a non-wrapped block here, such that this
 		// does not add [blk] to the processing blocks map in ChainState.
@@ -406,11 +409,13 @@ func (vm *VM) Initialize(
 	go ctx.Log.RecoverAndPanic(vm.awaitTxPoolStabilized)
 	chain.Start()
 
+	// Note: the sttus of [lastAcceptedBlk] will be set within ChainState initialization.
 	var lastAcceptedBlk *Block
 	ethGenesisBlock := chain.GetGenesisBlock()
 	vm.genesisHash = chain.GetGenesisBlock().Hash()
 	blkIDBytes, err := vm.acceptedBlockDB.Get(lastAcceptedKey)
-	if err == nil {
+	switch {
+	case err == nil:
 		blkHash := common.BytesToHash(blkIDBytes)
 		ethLastAcceptedBlock := vm.chain.GetBlockByHash(blkHash)
 		if ethLastAcceptedBlock == nil {
@@ -420,21 +425,25 @@ func (vm *VM) Initialize(
 			ethBlock: ethLastAcceptedBlock,
 			id:       ids.ID(ethLastAcceptedBlock.Hash()),
 			vm:       vm,
-			status:   choices.Accepted,
 		}
-	} else if err == database.ErrNotFound {
+	case err == database.ErrNotFound:
 		// The VM is being initialized for the first time. Create the genesis block and mark it as accepted.
 		lastAcceptedBlk = &Block{
 			ethBlock: ethGenesisBlock,
 			id:       ids.ID(vm.genesisHash),
 			vm:       vm,
-			status:   choices.Accepted,
 		}
-	} else {
+	default:
 		return fmt.Errorf("failed to get last accepted block due to %w", err)
 	}
 
-	vm.ChainState.Initialize(lastAcceptedBlk, vm.internalGetBlockIDAtHeight, vm.internalGetBlock, vm.internalParseBlock, vm.internalBuildBlock)
+	vm.ChainState.Initialize(&chainState.Config{
+		LastAcceptedBlock:  lastAcceptedBlk,
+		GetBlockIDAtHeight: vm.internalGetBlockIDAtHeight,
+		GetBlock:           vm.internalGetBlock,
+		UnmarshalBlock:     vm.internalParseBlock,
+		BuildBlock:         vm.internalBuildBlock,
+	})
 	if err := vm.chain.Accept(lastAcceptedBlk.ethBlock); err != nil {
 		return fmt.Errorf("could not initialize VM with last accepted blkID %s: %w", lastAcceptedBlk.ethBlock.Hash().Hex(), err)
 	}
@@ -559,7 +568,7 @@ func (vm *VM) Shutdown() error {
 	return nil
 }
 
-// internalBuildBlock ...
+// internalBuildBlock builds a block to be wrapped by ChainState
 func (vm *VM) internalBuildBlock() (chainState.Block, error) {
 	vm.chain.GenBlock()
 	block := <-vm.newBlockChan
@@ -582,17 +591,17 @@ func (vm *VM) internalBuildBlock() (chainState.Block, error) {
 	return block, nil
 }
 
-// internalParseBlock
+// internalParseBlock parses [b] into a block to be wrapped by ChainState.
 func (vm *VM) internalParseBlock(b []byte) (chainState.Block, error) {
 	ethBlock := new(types.Block)
 	if err := rlp.DecodeBytes(b, ethBlock); err != nil {
 		return nil, err
 	}
+	// Note: the status of block is set by ChainState
 	block := &Block{
 		id:       ids.ID(ethBlock.Hash()),
 		ethBlock: ethBlock,
 		vm:       vm,
-		status:   choices.Processing,
 	}
 	// Performing syntactic verification in ParseBlock allows for
 	// short-circuiting bad blocks before they are processed by the VM.
@@ -602,16 +611,20 @@ func (vm *VM) internalParseBlock(b []byte) (chainState.Block, error) {
 	return block, nil
 }
 
+// internalGetBlock attempts to retrieve block [id] from the VM to be wrapped
+// by ChainState.
 func (vm *VM) internalGetBlock(id ids.ID) (chainState.Block, error) {
 	ethBlock := vm.chain.GetBlockByHash(common.Hash(id))
+	// If [ethBlock] is nil, return [chainState.ErrBlockNotFound] here
+	// so that the miss is considered cacheable.
 	if ethBlock == nil {
-		return nil, fmt.Errorf("block %s not found", id)
+		return nil, chainState.ErrBlockNotFound
 	}
+	// Note: the status of block is set by ChainState
 	blk := &Block{
 		id:       ids.ID(ethBlock.Hash()),
 		ethBlock: ethBlock,
 		vm:       vm,
-		status:   choices.Processing,
 	}
 	return blk, nil
 }

@@ -48,7 +48,7 @@ func newTestBlocks(numBlocks int) []*TestBlock {
 	return blks
 }
 
-func getAcceptedBlockAtHeight(blks map[ids.ID]*TestBlock) GetBlockIDAtHeightType {
+func getAcceptedBlockAtHeight(blks map[ids.ID]*TestBlock) func(height uint64) (ids.ID, error) {
 	return func(blkHeight uint64) (ids.ID, error) {
 		for _, blk := range blks {
 			if blk.Height() != blkHeight {
@@ -125,7 +125,13 @@ func TestChainState(t *testing.T) {
 		blks[blk.ID()] = blk
 		return blk, nil
 	}
-	chainState.Initialize(genesisBlock, getCanonicalBlockID, getBlock, parseBlock, cantBuildBlock)
+	chainState.Initialize(&Config{
+		LastAcceptedBlock:  genesisBlock,
+		GetBlockIDAtHeight: getCanonicalBlockID,
+		GetBlock:           getBlock,
+		UnmarshalBlock:     parseBlock,
+		BuildBlock:         cantBuildBlock,
+	})
 
 	lastAccepted, err := chainState.LastAccepted()
 	if err != nil {
@@ -270,7 +276,13 @@ func TestBuildBlock(t *testing.T) {
 		return blk1, nil
 	}
 
-	chainState.Initialize(genesisBlock, getCanonicalBlockID, getBlock, parseBlock, buildBlock)
+	chainState.Initialize(&Config{
+		LastAcceptedBlock:  genesisBlock,
+		GetBlockIDAtHeight: getCanonicalBlockID,
+		GetBlock:           getBlock,
+		UnmarshalBlock:     parseBlock,
+		BuildBlock:         buildBlock,
+	})
 
 	builtBlk, err := chainState.BuildBlock()
 	if err != nil {
