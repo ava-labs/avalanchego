@@ -774,7 +774,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.Parse(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -834,7 +834,7 @@ func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.Parse(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -894,7 +894,7 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.Parse(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -978,7 +978,7 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.Parse(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1097,7 +1097,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.Parse(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1157,7 +1157,7 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.Parse(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}

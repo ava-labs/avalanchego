@@ -442,7 +442,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsedTx, err := vm.Parse(tx.Bytes())
+	parsedTx, err := vm.ParseTx(tx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -23,8 +23,8 @@ type TestVM struct {
 	CantPending, CantParse, CantGet bool
 
 	PendingF func() []snowstorm.Tx
-	ParseF   func([]byte) (snowstorm.Tx, error)
-	GetF     func(ids.ID) (snowstorm.Tx, error)
+	ParseTxF func([]byte) (snowstorm.Tx, error)
+	GetTxF   func(ids.ID) (snowstorm.Tx, error)
 }
 
 func (vm *TestVM) Default(cant bool) {
@@ -45,9 +45,9 @@ func (vm *TestVM) Pending() []snowstorm.Tx {
 	return nil
 }
 
-func (vm *TestVM) Parse(b []byte) (snowstorm.Tx, error) {
-	if vm.ParseF != nil {
-		return vm.ParseF(b)
+func (vm *TestVM) ParseTx(b []byte) (snowstorm.Tx, error) {
+	if vm.ParseTxF != nil {
+		return vm.ParseTxF(b)
 	}
 	if vm.CantParse && vm.T != nil {
 		vm.T.Fatal(errParse)
@@ -55,9 +55,9 @@ func (vm *TestVM) Parse(b []byte) (snowstorm.Tx, error) {
 	return nil, errParse
 }
 
-func (vm *TestVM) Get(txID ids.ID) (snowstorm.Tx, error) {
-	if vm.GetF != nil {
-		return vm.GetF(txID)
+func (vm *TestVM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
+	if vm.GetTxF != nil {
+		return vm.GetTxF(txID)
 	}
 	if vm.CantGet && vm.T != nil {
 		vm.T.Fatal(errGet)

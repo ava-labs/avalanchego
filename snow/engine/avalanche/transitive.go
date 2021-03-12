@@ -654,3 +654,9 @@ func (t *Transitive) HealthCheck() (interface{}, error) {
 	}
 	return intf, fmt.Errorf("vm: %s ; consensus: %s", vmErr, consensusErr)
 }
+
+// GetVtx returns a vertex by its ID.
+// Returns database.ErrNotFound if unknown.
+func (t *Transitive) GetVtx(vtxID ids.ID) (avalanche.Vertex, error) {
+	return t.Manager.Get(vtxID)
+}

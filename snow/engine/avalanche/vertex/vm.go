@@ -18,8 +18,8 @@ type DAGVM interface {
 	Pending() []snowstorm.Tx
 
 	// Convert a stream of bytes to a transaction or return an error
-	Parse(tx []byte) (snowstorm.Tx, error)
+	ParseTx(tx []byte) (snowstorm.Tx, error)
 
 	// Retrieve a transaction that was submitted previously
-	Get(ids.ID) (snowstorm.Tx, error)
+	GetTx(ids.ID) (snowstorm.Tx, error)
 }

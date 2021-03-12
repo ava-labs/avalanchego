@@ -1248,7 +1248,7 @@ func TestEngineReissue(t *testing.T) {
 		return lastVtx, nil
 	}
 
-	vm.GetF = func(id ids.ID) (snowstorm.Tx, error) {
+	vm.GetTxF = func(id ids.ID) (snowstorm.Tx, error) {
 		if id != tx0.ID() {
 			t.Fatalf("Wrong tx")
 		}
@@ -2532,7 +2532,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	manager.GetF = nil
 	sender.GetF = nil
 
-	vm.ParseF = func(b []byte) (snowstorm.Tx, error) {
+	vm.ParseTxF = func(b []byte) (snowstorm.Tx, error) {
 		if bytes.Equal(b, txBytes0) {
 			return tx0, nil
 		}
@@ -2561,7 +2561,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.ParseF = nil
+	vm.ParseTxF = nil
 	manager.ParseF = nil
 	manager.EdgeF = nil
 	manager.GetF = nil
@@ -2945,7 +2945,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 
 	manager.GetF = nil
 
-	vm.ParseF = func(b []byte) (snowstorm.Tx, error) {
+	vm.ParseTxF = func(b []byte) (snowstorm.Tx, error) {
 		if bytes.Equal(b, txBytes0) {
 			return tx0, nil
 		}
@@ -2976,7 +2976,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 
 	sender.GetAcceptedFrontierF = nil
 	sender.GetF = nil
-	vm.ParseF = nil
+	vm.ParseTxF = nil
 	manager.ParseF = nil
 	manager.EdgeF = nil
 	manager.GetF = nil

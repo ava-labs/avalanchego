@@ -1154,7 +1154,7 @@ func TestTxCached(t *testing.T) {
 	newTx := NewTx(t, genesisBytes, vm)
 	txBytes := newTx.Bytes()
 
-	_, err := vm.Parse(txBytes)
+	_, err := vm.ParseTx(txBytes)
 	assert.NoError(t, err)
 
 	db := mockdb.New()
@@ -1166,7 +1166,7 @@ func TestTxCached(t *testing.T) {
 	vm.state.state.DB = db
 	vm.state.state.Cache.Flush()
 
-	_, err = vm.Parse(txBytes)
+	_, err = vm.ParseTx(txBytes)
 	assert.NoError(t, err)
 	assert.False(t, *called, "shouldn't have called the DB")
 }
@@ -1184,7 +1184,7 @@ func TestTxNotCached(t *testing.T) {
 	newTx := NewTx(t, genesisBytes, vm)
 	txBytes := newTx.Bytes()
 
-	_, err := vm.Parse(txBytes)
+	_, err := vm.ParseTx(txBytes)
 	assert.NoError(t, err)
 
 	db := mockdb.New()
@@ -1198,7 +1198,7 @@ func TestTxNotCached(t *testing.T) {
 	vm.state.uniqueTx.Flush()
 	vm.state.state.Cache.Flush()
 
-	_, err = vm.Parse(txBytes)
+	_, err = vm.ParseTx(txBytes)
 	assert.NoError(t, err)
 	assert.True(t, *called, "should have called the DB")
 }
@@ -1281,7 +1281,7 @@ func TestTxVerifyAfterIssueTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsedSecondTx, err := vm.Parse(secondTx.Bytes())
+	parsedSecondTx, err := vm.ParseTx(secondTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1391,7 +1391,7 @@ func TestTxVerifyAfterGet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsedSecondTx, err := vm.Parse(secondTx.Bytes())
+	parsedSecondTx, err := vm.ParseTx(secondTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1401,7 +1401,7 @@ func TestTxVerifyAfterGet(t *testing.T) {
 	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
-	parsedFirstTx, err := vm.Get(firstTx.ID())
+	parsedFirstTx, err := vm.GetTx(firstTx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1524,7 +1524,7 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsedSecondTx, err := vm.Parse(secondTx.Bytes())
+	parsedSecondTx, err := vm.ParseTx(secondTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1537,7 +1537,7 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 	if _, err := vm.IssueTx(firstTxDescendant.Bytes()); err != nil {
 		t.Fatal(err)
 	}
-	parsedFirstTx, err := vm.Get(firstTx.ID())
+	parsedFirstTx, err := vm.GetTx(firstTx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}

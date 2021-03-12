@@ -363,7 +363,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 
 	vtxBytes0 := []byte{2}
 	vtxBytes1 := []byte{3}
-	vm.ParseF = func(b []byte) (snowstorm.Tx, error) {
+	vm.ParseTxF = func(b []byte) (snowstorm.Tx, error) {
 		switch {
 		case bytes.Equal(b, txBytes0):
 			return tx0, nil
