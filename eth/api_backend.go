@@ -259,10 +259,6 @@ func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction)
 		return errExpired
 	}
 	err := b.eth.txPool.AddLocal(signedTx)
-	select {
-	case b.eth.txSubmitChan <- struct{}{}:
-	default:
-	}
 	return err
 }
 

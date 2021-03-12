@@ -94,7 +94,6 @@ func main() {
 	chain.GetTxPool().SubscribeNewHeadEvent(newTxPoolHeadChan)
 	// start the chain
 	chain.Start()
-	chain.BlockChain().UnlockIndexing()
 	chain.SetPreference(chain.GetGenesisBlock())
 	for i := 0; i < 42; i++ {
 		tx := types.NewTransaction(nonce, bob.Address, value, uint64(gasLimit), gasPrice, nil)
