@@ -116,17 +116,19 @@ func (m *Metrics) Rejected(id ids.ID) {
 	m.numProcessing.Dec()
 }
 
-func (m *Metrics) MeasureAndGetOldest() time.Time {
+func (m *Metrics) MeasureAndGetOldestDuration() time.Duration {
 	now := m.Clock.Time()
-	if startTime, exists := m.processingEntries.Oldest(); exists {
-		oldestTime := startTime.(time.Time)
-		m.longestRunningContainer.Observe(float64(m.Clock.Time().Sub(oldestTime)))
-		return oldestTime
+	oldestTimeIntf, exists := m.processingEntries.Oldest()
+	oldestTime := now
+	if exists {
+		oldestTime = oldestTimeIntf.(time.Time)
 	}
 
-	return now
+	duration := now.Sub(oldestTime)
+	m.longestRunningContainer.Observe(float64(duration.Milliseconds()))
+	return duration
 }
 
-func (m *Metrics) ContainersLen() int {
+func (m *Metrics) ProcessingLen() int {
 	return m.processingEntries.Len()
 }

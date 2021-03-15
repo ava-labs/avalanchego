@@ -108,6 +108,10 @@ func (c *checkListener) OnCheckCompleted(name string, result health.Result) {
 	c.checks[name] = isHealthy
 	c.lock.Unlock()
 
+	if !exists && !isHealthy {
+		c.metrics.unHealthy()
+	}
+
 	if !exists || isHealthy == previouslyHealthy {
 		if isHealthy {
 			c.log.Debug("%q returned healthy with: %s", name, string(resultJSON))

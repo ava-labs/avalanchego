@@ -118,7 +118,7 @@ type network struct {
 	id                                 ids.ShortID
 	ip                                 utils.DynamicIPDesc
 	networkID                          uint32
-	version                            version.Version
+	msgVersion                         version.Version
 	parser                             version.Parser
 	listener                           net.Listener
 	dialer                             Dialer
@@ -333,7 +333,7 @@ func NewNetwork(
 		id:             id,
 		ip:             ip,
 		networkID:      networkID,
-		version:        version,
+		msgVersion:     version,
 		parser:         parser,
 		listener:       listener,
 		dialer:         dialer,

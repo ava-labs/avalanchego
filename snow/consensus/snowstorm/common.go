@@ -93,15 +93,14 @@ func (c *common) Finalized() bool {
 
 // HealthCheck returns information about the consensus health.
 func (c *common) HealthCheck() (interface{}, error) {
-	numOutstandingTxs := c.Metrics.ContainersLen()
+	numOutstandingTxs := c.Metrics.ProcessingLen()
 	healthy := numOutstandingTxs <= c.params.MaxOutstandingItems
 	details := map[string]interface{}{
 		"outstandingTransactions": numOutstandingTxs,
 	}
 
 	// check for long running transactions
-	now := c.Metrics.Clock.Time()
-	timeReqRunning := now.Sub(c.Metrics.MeasureAndGetOldest())
+	timeReqRunning := c.Metrics.MeasureAndGetOldestDuration()
 	healthy = healthy && timeReqRunning <= c.params.MaxItemProcessingTime
 	details["longestRunningTx"] = timeReqRunning.String()
 

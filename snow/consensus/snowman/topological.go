@@ -262,15 +262,14 @@ func (ts *Topological) Finalized() bool { return len(ts.blocks) == 1 }
 
 // HealthCheck returns information about the consensus health.
 func (ts *Topological) HealthCheck() (interface{}, error) {
-	numOutstandingBlks := ts.Metrics.ContainersLen()
+	numOutstandingBlks := ts.Metrics.ProcessingLen()
 	healthy := numOutstandingBlks <= ts.params.MaxOutstandingItems
 	details := map[string]interface{}{
 		"outstandingBlocks": numOutstandingBlks,
 	}
 
 	// check for long running blocks
-	now := ts.Metrics.Clock.Time()
-	timeReqRunning := now.Sub(ts.Metrics.MeasureAndGetOldest())
+	timeReqRunning := ts.Metrics.MeasureAndGetOldestDuration()
 	healthy = healthy && timeReqRunning <= ts.params.MaxItemProcessingTime
 	details["longestRunningBlock"] = timeReqRunning.String()
 
