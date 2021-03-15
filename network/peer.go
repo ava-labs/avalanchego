@@ -437,9 +437,6 @@ func (p *peer) Close() { p.once.Do(p.close) }
 
 // assumes only `peer.Close` calls this
 func (p *peer) close() {
-	peerPending := atomic.LoadInt64(&p.pendingBytes)
-	atomic.AddInt64(&p.net.pendingBytes, -peerPending)
-
 	// If the connection is closing, we can immediately cancel the ticker
 	// goroutines.
 	close(p.tickerCloser)
@@ -455,6 +452,9 @@ func (p *peer) close() {
 	// has been closed and will therefore not attempt to write on this channel.
 	close(p.sender)
 	p.senderLock.Unlock()
+
+	peerPending := atomic.LoadInt64(&p.pendingBytes)
+	atomic.AddInt64(&p.net.pendingBytes, -peerPending)
 
 	p.net.disconnected(p)
 }
