@@ -115,7 +115,10 @@ func (b *Block) Accept() error {
 		return err
 	}
 
-	tx := vm.getAtomicTx(b.ethBlock)
+	tx, err := vm.getAtomicTx(b.ethBlock)
+	if err != nil {
+		return err
+	}
 	if tx == nil {
 		return nil
 	}
@@ -172,6 +175,10 @@ func (b *Block) syntacticVerify() error {
 	if b.ethBlock.Hash() == b.vm.genesisHash {
 		return nil
 	}
+
+	if err := b.ethBlock.SanityCheck(); err != nil {
+		return err
+	}
 	txsHash := types.DeriveSha(b.ethBlock.Transactions(), new(trie.Trie))
 	uncleHash := types.CalcUncleHash(b.ethBlock.Uncles())
 	ethHeader := b.ethBlock.Header()
@@ -192,7 +199,11 @@ func (b *Block) syntacticVerify() error {
 		return errUnclesUnsupported
 	}
 	// Block must not be empty
-	if len(b.ethBlock.Transactions()) == 0 && b.vm.getAtomicTx(b.ethBlock) == nil {
+	atomicTx, err := b.vm.getAtomicTx(b.ethBlock)
+	if err != nil {
+		return err
+	}
+	if len(b.ethBlock.Transactions()) == 0 && atomicTx == nil {
 		return errEmptyBlock
 	}
 	return nil
@@ -230,7 +241,10 @@ func (b *Block) Verify() error {
 
 	// If the tx is an atomic tx, ensure that it doesn't conflict with any of
 	// its processing ancestry.
-	atomicTx := vm.getAtomicTx(b.ethBlock)
+	atomicTx, err := vm.getAtomicTx(b.ethBlock)
+	if err != nil {
+		return err
+	}
 	if atomicTx != nil {
 		// If the ancestor is unknown, then the parent failed verification when
 		// it was called.
@@ -258,7 +272,10 @@ func (b *Block) Verify() error {
 				// processing ancestors consume the same UTXO.
 				inputs := atx.InputUTXOs()
 				for ancestor.Status() != choices.Accepted {
-					atx := vm.getAtomicTx(ancestor.ethBlock)
+					atx, err := vm.getAtomicTx(ancestor.ethBlock)
+					if err != nil {
+						return fmt.Errorf("block %s failed verification while parsing atomic tx from ancestor %s", b.ethBlock.Hash().Hex(), ancestor.ethBlock.Hash().Hex())
+					}
 					// If the ancestor isn't an atomic block, it can't conflict with
 					// the import tx.
 					if atx != nil {
@@ -308,7 +325,7 @@ func (b *Block) Verify() error {
 		}
 	}
 
-	_, err := vm.chain.InsertChain([]*types.Block{b.ethBlock})
+	_, err = vm.chain.InsertChain([]*types.Block{b.ethBlock})
 	return err
 }
 
