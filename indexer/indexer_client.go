@@ -112,7 +112,7 @@ func (c *Client) getClientReqeust(method string, args interface{}) (*bytes.Buffe
 	return &buf, nil
 }
 
-func (c *Client) getRequest(indexType IndexType, err error, buf *bytes.Buffer) (*http.Request, error) {
+func (c *Client) getRequest(indexType IndexType, err error, buf io.Reader) (*http.Request, error) {
 	req, err := http.NewRequest("POST", c.toURL(indexType), buf)
 	if err != nil {
 		return nil, err
