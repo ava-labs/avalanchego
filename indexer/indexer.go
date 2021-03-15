@@ -142,7 +142,7 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 		}
 		return
 	} else if isIncomplete && !i.allowIncompleteIndex {
-		i.log.Fatal("index %s is incomplete but incomplete indices are disabled", name)
+		i.log.Fatal("index %s is incomplete but incomplete indices are disabled. Shutting down", name)
 		if err := i.close(); err != nil {
 			i.log.Error("error while closing indexer: %s", err)
 		}
@@ -163,7 +163,7 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 		if previouslyIndexed && !i.allowIncompleteIndex {
 			// We indexed this chain in a previous run but not in this run.
 			// This would create an incomplete index, which is not allowed, so exit.
-			i.log.Error("running would cause index %s would become incomplete but incomplete indices are disabled", name)
+			i.log.Fatal("running would cause index %s would become incomplete but incomplete indices are disabled", name)
 			if err := i.close(); err != nil {
 				i.log.Error("error while closing indexer: %s", err)
 			}
@@ -175,7 +175,7 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 		if err == nil {
 			return
 		}
-		i.log.Error("couldn't mark chain %s as incomplete: %s", name, err)
+		i.log.Fatal("couldn't mark chain %s as incomplete: %s", name, err)
 		if err := i.close(); err != nil {
 			i.log.Error("error while closing indexer: %s", err)
 		}
@@ -200,7 +200,7 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 		index, err := newIndex(indexDB, i.log, i.codec, i.clock)
 		if err != nil {
 			_ = indexDB.Close()
-			i.log.Error("couldn't create index for chain %s: %s", name, err)
+			i.log.Fatal("couldn't create index for chain %s: %s", name, err)
 			if err := i.close(); err != nil {
 				i.log.Error("error while closing indexer: %s", err)
 			}
@@ -211,7 +211,7 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 		if err := i.consensusDispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name), index); err != nil {
 			_ = index.Close()
 			_ = indexDB.Close()
-			i.log.Error("couldn't register chain %s to dispatcher: %s", name, err)
+			i.log.Fatal("couldn't register chain %s to dispatcher: %s", name, err)
 			if err := i.close(); err != nil {
 				i.log.Error("error while closing indexer: %s", err)
 			}
@@ -226,7 +226,7 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 		if err := indexAPIServer.RegisterService(&service{Index: index}, "index"); err != nil {
 			_ = index.Close()
 			_ = indexDB.Close()
-			i.log.Error("couldn't create index API server for chain %s: %s", name, err)
+			i.log.Fatal("couldn't create index API server for chain %s: %s", name, err)
 			if err := i.close(); err != nil {
 				i.log.Error("error while closing indexer: %s", err)
 			}
@@ -236,7 +236,7 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 		if err := i.routeAdder.AddRoute(handler, &sync.RWMutex{}, "index/"+name, "/block", i.log); err != nil {
 			_ = index.Close()
 			_ = indexDB.Close()
-			i.log.Error("couldn't create index API server for chain %s: %s", name, err)
+			i.log.Fatal("couldn't create index API server for chain %s: %s", name, err)
 			if err := i.close(); err != nil {
 				i.log.Error("error while closing indexer: %s", err)
 			}
@@ -254,7 +254,7 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 			txIndex, err := newIndex(txIndexDB, i.log, i.codec, i.clock)
 			if err != nil {
 				_ = txIndexDB.Close()
-				i.log.Error("couldn't create tx index for chain %s: %s", name, err)
+				i.log.Fatal("couldn't create tx index for chain %s: %s", name, err)
 				if err := i.close(); err != nil {
 					i.log.Error("error while closing indexer: %s", err)
 				}
@@ -265,7 +265,7 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 			if err := i.decisionDispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name), txIndex); err != nil {
 				_ = txIndex.Close()
 				_ = txIndexDB.Close()
-				i.log.Error("couldn't register chain %s to decision dispatcher: %s", name, err)
+				i.log.Fatal("couldn't register chain %s to decision dispatcher: %s", name, err)
 				if err := i.close(); err != nil {
 					i.log.Error("error while closing indexer: %s", err)
 				}
@@ -280,7 +280,7 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 			if err := indexAPIServer.RegisterService(&service{Index: txIndex}, "index"); err != nil {
 				_ = txIndex.Close()
 				_ = txIndexDB.Close()
-				i.log.Error("couldn't create index API server for chain %s: %s", name, err)
+				i.log.Fatal("couldn't create index API server for chain %s: %s", name, err)
 				if err := i.close(); err != nil {
 					i.log.Error("error while closing indexer: %s", err)
 				}
@@ -289,7 +289,7 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 			handler := &common.HTTPHandler{LockOptions: common.NoLock, Handler: indexAPIServer}
 			if err := i.routeAdder.AddRoute(handler, &sync.RWMutex{}, "index/"+name, "/tx", i.log); err != nil {
 				_ = txIndex.Close()
-				i.log.Error("couldn't create index API server for chain %s: %s", name, err)
+				i.log.Fatal("couldn't create index API server for chain %s: %s", name, err)
 				if err := i.close(); err != nil {
 					i.log.Error("error while closing indexer: %s", err)
 				}
@@ -306,7 +306,7 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 			vtxIndex, err := newIndex(vtxIndexDB, i.log, i.codec, i.clock)
 			if err != nil {
 				_ = vtxIndexDB.Close()
-				i.log.Error("couldn't create vtx index for chain %s: %s", name, err)
+				i.log.Fatal("couldn't create vtx index for chain %s: %s", name, err)
 				if err := i.close(); err != nil {
 					i.log.Error("error while closing indexer: %s", err)
 				}
@@ -317,7 +317,7 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 			if err := i.consensusDispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name), vtxIndex); err != nil {
 				_ = vtxIndex.Close()
 				_ = vtxIndexDB.Close()
-				i.log.Error("couldn't register chain %s to decision dispatcher: %s", name, err)
+				i.log.Fatal("couldn't register chain %s to decision dispatcher: %s", name, err)
 				if err := i.close(); err != nil {
 					i.log.Error("error while closing indexer: %s", err)
 				}
@@ -332,7 +332,7 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 			if err := indexAPIServer.RegisterService(&service{Index: vtxIndex}, "index"); err != nil {
 				_ = vtxIndex.Close()
 				_ = vtxIndexDB.Close()
-				i.log.Error("couldn't create index API server for chain %s: %s", name, err)
+				i.log.Fatal("couldn't create index API server for chain %s: %s", name, err)
 				if err := i.close(); err != nil {
 					i.log.Error("error while closing indexer: %s", err)
 				}
@@ -341,7 +341,7 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 			handler := &common.HTTPHandler{LockOptions: common.NoLock, Handler: indexAPIServer}
 			if err := i.routeAdder.AddRoute(handler, &sync.RWMutex{}, "index/"+name, "/vtx", i.log); err != nil {
 				_ = vtxIndex.Close()
-				i.log.Error("couldn't create index API server for chain %s: %s", name, err)
+				i.log.Fatal("couldn't create index API server for chain %s: %s", name, err)
 				if err := i.close(); err != nil {
 					i.log.Error("error while closing indexer: %s", err)
 				}
