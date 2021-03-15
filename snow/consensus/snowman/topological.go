@@ -518,14 +518,14 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 
 	// Get the child and accept it
 	child := n.children[pref]
-	if err := child.Accept(); err != nil {
-		return err
-	}
-
 	// Notify anyone listening that this block was accepted.
 	bytes := child.Bytes()
 	ts.ctx.DecisionDispatcher.Accept(ts.ctx, pref, bytes)
 	ts.ctx.ConsensusDispatcher.Accept(ts.ctx, pref, bytes)
+	if err := child.Accept(); err != nil {
+		return err
+	}
+
 	ts.Metrics.Accepted(pref)
 
 	// Because this is the newest accepted block, this is the new head.

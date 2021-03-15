@@ -144,14 +144,12 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 	// any conflicting transactions. Therefore, this transaction is treated as
 	// vacuously accepted and doesn't need to be voted on.
 
-	// Accept is called before notifying the IPC so that acceptances that
-	// cause fatal errors aren't sent to an IPC peer.
+	// Notify those listening for accepted txs
+	c.ctx.DecisionDispatcher.Accept(c.ctx, txID, bytes)
+
 	if err := tx.Accept(); err != nil {
 		return false, err
 	}
-
-	// Notify the IPC socket that this tx has been accepted.
-	c.ctx.DecisionDispatcher.Accept(c.ctx, txID, bytes)
 
 	// Notify the metrics that this transaction was just accepted.
 	c.Metrics.Accepted(txID)
@@ -160,16 +158,16 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 
 // accept the provided tx.
 func (c *common) acceptTx(tx Tx) error {
+	txID := tx.ID()
+
+	// Notify those listening that this tx has been accepted.
+	c.ctx.DecisionDispatcher.Accept(c.ctx, txID, tx.Bytes())
+
 	// Accept is called before notifying the IPC so that acceptances that cause
 	// fatal errors aren't sent to an IPC peer.
 	if err := tx.Accept(); err != nil {
 		return err
 	}
-
-	txID := tx.ID()
-
-	// Notify the IPC socket that this tx has been accepted.
-	c.ctx.DecisionDispatcher.Accept(c.ctx, txID, tx.Bytes())
 
 	// Update the metrics to account for this transaction's acceptance
 	c.Metrics.Accepted(txID)
