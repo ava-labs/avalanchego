@@ -64,10 +64,14 @@ const (
 )
 
 var (
+	errPrimarySubnetNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
+)
+
+var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 2, 2)
+	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 2, 3)
 	versionParser           = version.NewDefaultParser()
 	beaconConnectionTimeout = 1 * time.Minute
 )
@@ -739,19 +743,14 @@ func (n *Node) initHealthAPI() error {
 	isBootstrappedFunc := func() (interface{}, error) {
 		if pChainID, err := n.chainManager.Lookup("P"); err != nil {
 			return nil, errors.New("P-Chain not created")
-		} else if !n.chainManager.IsBootstrapped(pChainID) {
-			return nil, errors.New("P-Chain not bootstrapped")
-		}
-		if xChainID, err := n.chainManager.Lookup("X"); err != nil {
+		} else if xChainID, err := n.chainManager.Lookup("X"); err != nil {
 			return nil, errors.New("X-Chain not created")
-		} else if !n.chainManager.IsBootstrapped(xChainID) {
-			return nil, errors.New("X-Chain not bootstrapped")
-		}
-		if cChainID, err := n.chainManager.Lookup("C"); err != nil {
+		} else if cChainID, err := n.chainManager.Lookup("C"); err != nil {
 			return nil, errors.New("C-Chain not created")
-		} else if !n.chainManager.IsBootstrapped(cChainID) {
-			return nil, errors.New("C-Chain not bootstrapped")
+		} else if !n.chainManager.IsBootstrapped(pChainID) || !n.chainManager.IsBootstrapped(xChainID) || !n.chainManager.IsBootstrapped(cChainID) {
+			return nil, errPrimarySubnetNotBootstrapped
 		}
+
 		return nil, nil
 	}
 	// Passes if the P, X and C chains are finished bootstrapping
