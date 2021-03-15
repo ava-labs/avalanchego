@@ -185,36 +185,53 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 		case choices.Processing:
 			b.needToFetch.Remove(vtxID)
 
-			if err := b.VtxBlocked.Push(&vertexJob{ // Add to queue of vertices to execute when bootstrapping finishes.
+			jobVtx := &vertexJob{
 				log:         b.Ctx.Log,
 				numAccepted: b.numAcceptedVts,
 				numDropped:  b.numDroppedVts,
 				vtx:         vtx,
-			}); err == nil {
+			}
+			has, err := b.VtxBlocked.Has(jobVtx)
+			if err != nil {
+				return err
+			}
+			if !has {
+				txs, err := vtx.Txs()
+				if err != nil {
+					return err
+				}
+				for _, tx := range txs {
+					jobTx := &txJob{
+						log:         b.Ctx.Log,
+						numAccepted: b.numAcceptedTxs,
+						numDropped:  b.numDroppedTxs,
+						tx:          tx,
+					}
+					has, err := b.TxBlocked.Has(jobTx)
+					if err != nil {
+						return err
+					}
+					if !has {
+						// Add to queue of txs to execute when bootstrapping finishes.
+						if err := b.TxBlocked.Push(jobTx); err != nil {
+							return err
+						}
+						b.numFetchedTxs.Inc()
+					}
+				}
+
+				// Add to queue of vertices to execute when bootstrapping finishes.
+				if err := b.VtxBlocked.Push(jobVtx); err != nil {
+					return err
+				}
+
 				b.numFetchedVts.Inc()
 				b.NumFetched++ // Progress tracker
 				if b.NumFetched%queue.StatusUpdateFrequency == 0 {
 					b.Ctx.Log.Info("fetched %d vertices", b.NumFetched)
 				}
-			} else {
-				b.Ctx.Log.Verbo("couldn't push to vtxBlocked: %s", err)
 			}
-			txs, err := vtx.Txs()
-			if err != nil {
-				return err
-			}
-			for _, tx := range txs { // Add transactions to queue of transactions to execute when bootstrapping finishes.
-				if err := b.TxBlocked.Push(&txJob{
-					log:         b.Ctx.Log,
-					numAccepted: b.numAcceptedTxs,
-					numDropped:  b.numDroppedTxs,
-					tx:          tx,
-				}); err == nil {
-					b.numFetchedTxs.Inc()
-				} else {
-					b.Ctx.Log.Verbo("couldn't push to txBlocked: %s", err)
-				}
-			}
+
 			parents, err := vtx.Parents()
 			if err != nil {
 				return err
@@ -245,10 +262,10 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 		}
 	}
 
-	if err := b.VtxBlocked.Commit(); err != nil {
+	if err := b.TxBlocked.Commit(); err != nil {
 		return err
 	}
-	if err := b.TxBlocked.Commit(); err != nil {
+	if err := b.VtxBlocked.Commit(); err != nil {
 		return err
 	}
 

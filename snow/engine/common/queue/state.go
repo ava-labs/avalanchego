@@ -10,7 +10,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-type state struct{ jobs *Jobs }
+type state struct {
+	// parser is able to parse a job from bytes.
+	parser Parser
+}
 
 func (s *state) SetInt(db database.Database, key []byte, size uint32) error {
 	p := wrappers.Packer{Bytes: make([]byte, wrappers.IntLen)}
@@ -52,7 +55,7 @@ func (s *state) Job(db database.Database, key []byte) (Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s.jobs.parser.Parse(value)
+	return s.parser.Parse(value)
 }
 
 // IDs returns a slice of IDs from storage

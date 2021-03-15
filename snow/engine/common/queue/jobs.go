@@ -24,8 +24,6 @@ var (
 
 // Jobs tracks a series of jobs that form a DAG of dependencies.
 type Jobs struct {
-	// parser is able to parse a job from bytes.
-	parser Parser
 	// baseDB is the DB that we are flushing data to.
 	baseDB database.Database
 	// db ensures that [baseDB] is atomically updated.
@@ -42,7 +40,6 @@ func New(db database.Database) (*Jobs, error) {
 		baseDB: db,
 		db:     versiondb.New(db),
 	}
-	jobs.state.jobs = jobs
 
 	stackSize, err := jobs.state.StackSize(jobs.db)
 	if err == nil {
@@ -56,7 +53,11 @@ func New(db database.Database) (*Jobs, error) {
 }
 
 // SetParser tells this job queue how to parse jobs from the database.
-func (j *Jobs) SetParser(parser Parser) { j.parser = parser }
+func (j *Jobs) SetParser(parser Parser) { j.state.parser = parser }
+
+func (j *Jobs) Has(job Job) (bool, error) {
+	return j.state.HasJob(j.db, job.ID())
+}
 
 // Push adds a new job to the queue.
 func (j *Jobs) Push(job Job) error {
@@ -64,9 +65,10 @@ func (j *Jobs) Push(job Job) error {
 	if err != nil {
 		return err
 	}
+	jobID := job.ID()
 	// Store this job into the database.
-	if has, err := j.state.HasJob(j.db, job.ID()); err != nil {
-		return fmt.Errorf("failed to check for existing job %s due to %w", job.ID(), err)
+	if has, err := j.state.HasJob(j.db, jobID); err != nil {
+		return fmt.Errorf("failed to check for existing job %s due to %w", jobID, err)
 	} else if has {
 		return errDuplicate
 	}
@@ -76,7 +78,6 @@ func (j *Jobs) Push(job Job) error {
 
 	if deps.Len() != 0 {
 		// This job needs to block on a set of dependencies.
-		jobID := job.ID()
 		for depID := range deps {
 			if err := j.state.AddBlocking(j.db, depID, jobID); err != nil {
 				return fmt.Errorf("failed to add blocking for depID %s, jobID %s", depID, jobID)

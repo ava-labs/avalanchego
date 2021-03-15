@@ -214,11 +214,20 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 	status := blk.Status()
 	blkID := blk.ID()
 	for status == choices.Processing {
-		if err := b.Blocked.Push(&blockJob{
+		jobBlock := &blockJob{
 			numAccepted: b.numAccepted,
 			numDropped:  b.numDropped,
 			blk:         blk,
-		}); err == nil {
+		}
+		has, err := b.Blocked.Has(jobBlock)
+		if err != nil {
+			return err
+		}
+		if !has {
+			if err := b.Blocked.Push(jobBlock); err != nil {
+				return err
+			}
+
 			b.numFetched.Inc()
 			b.NumFetched++                                     // Progress tracker
 			if b.NumFetched%queue.StatusUpdateFrequency == 0 { // Periodically print progress
