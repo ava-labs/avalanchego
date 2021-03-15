@@ -48,7 +48,7 @@ func (c *Client) IssueTx(txBytes []byte) (ids.ID, error) {
 // GetAtomicTxStatus returns the status of [txID]
 func (c *Client) GetAtomicTxStatus(txID ids.ID) (Status, error) {
 	res := &GetAtomicTxStatusReply{}
-	err := c.requester.SendRequest("getTxStatus", &api.JSONTxID{
+	err := c.requester.SendRequest("getAtomicTxStatus", &api.JSONTxID{
 		TxID: txID,
 	}, res)
 	return res.Status, err
@@ -57,7 +57,7 @@ func (c *Client) GetAtomicTxStatus(txID ids.ID) (Status, error) {
 // GetAtomicTx returns the byte representation of [txID]
 func (c *Client) GetAtomicTx(txID ids.ID) ([]byte, error) {
 	res := &api.FormattedTx{}
-	err := c.requester.SendRequest("getTx", &api.GetTxArgs{
+	err := c.requester.SendRequest("getAtomicTx", &api.GetTxArgs{
 		TxID:     txID,
 		Encoding: formatting.Hex,
 	}, res)
