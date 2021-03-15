@@ -68,7 +68,7 @@ func (m *Metrics) Initialize(metricName, descriptionName string, log logging.Log
 		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_longest_running", metricName),
 		Help:      fmt.Sprintf("Latency of processing the issued %s in milliseconds", descriptionName),
-		Buckets:   timer.MillisecondsBuckets,
+		Buckets:   utils.MillisecondsBuckets,
 	})
 
 	errs := wrappers.Errs{}
