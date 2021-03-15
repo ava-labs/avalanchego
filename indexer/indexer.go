@@ -1,7 +1,6 @@
 package indexer
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman"
@@ -33,10 +33,9 @@ var (
 	txPrefix                = byte(0x01)
 	vtxPrefix               = byte(0x02)
 	blockPrefix             = byte(0x03)
-	isIncompletePrefix      = []byte{0x04}
-	previouslyIndexedPrefix = []byte{0x05}
+	isIncompletePrefix      = byte(0x04)
+	previouslyIndexedPrefix = byte(0x05)
 	hasRunKey               = []byte{0x06}
-	errClosed               = errors.New("indexer is closed")
 )
 
 var (
@@ -127,7 +126,7 @@ type indexer struct {
 	decisionDispatcher  *triggers.EventDispatcher
 }
 
-// TODO comment
+// Assumes [engineIntf]'s context lock is not held
 func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interface{}) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
@@ -200,9 +199,20 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 		return
 	}
 
-	switch engineIntf.(type) {
+	switch engine := engineIntf.(type) {
 	case snowman.Engine:
-		index, err := i.registerChainHelper(chainID, blockPrefix, name, "block", i.consensusDispatcher)
+		isAcceptedFunc := func(blkID ids.ID) bool {
+			engine.Context().Lock.Lock()
+			defer engine.Context().Lock.Unlock()
+
+			blk, err := engine.GetVM().GetBlock(blkID)
+			if err != nil || blk.Status() != choices.Accepted {
+				return false
+			}
+			return true
+		}
+
+		index, err := i.registerChainHelper(chainID, blockPrefix, name, "block", i.consensusDispatcher, isAcceptedFunc)
 		if err != nil {
 			i.log.Fatal("couldn't create block index for %s: %s", name, err)
 			if err := i.close(); err != nil {
@@ -211,8 +221,20 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 			return
 		}
 		i.blockIndices[chainID] = index
+
 	case avalanche.Engine:
-		vtxIndex, err := i.registerChainHelper(chainID, blockPrefix, name, "vtx", i.consensusDispatcher)
+		isAcceptedFunc := func(txID ids.ID) bool {
+			engine.Context().Lock.Lock()
+			defer engine.Context().Lock.Unlock()
+
+			blk, err := engine.GetVM().GetTx(txID)
+			if err != nil || blk.Status() != choices.Accepted {
+				return false
+			}
+			return true
+		}
+
+		vtxIndex, err := i.registerChainHelper(chainID, vtxPrefix, name, "vtx", i.consensusDispatcher, isAcceptedFunc)
 		if err != nil {
 			i.log.Fatal("couldn't create vertex index for %s: %s", name, err)
 			if err := i.close(); err != nil {
@@ -221,7 +243,7 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 			return
 		}
 		i.vtxIndices[chainID] = vtxIndex
-		txIndex, err := i.registerChainHelper(chainID, blockPrefix, name, "tx", i.decisionDispatcher)
+		txIndex, err := i.registerChainHelper(chainID, txPrefix, name, "tx", i.decisionDispatcher, isAcceptedFunc)
 		if err != nil {
 			i.log.Fatal("couldn't create tx index for %s: %s", name, err)
 			if err := i.close(); err != nil {
@@ -232,7 +254,12 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 		i.txIndices[chainID] = txIndex
 	default:
 		i.log.Error("expected snowman.Engine or avalanche.Engine but got %T", engineIntf)
+		if err := i.close(); err != nil {
+			i.log.Error("error while closing indexer: %s", err)
+		}
+		return
 	}
+
 }
 
 func (i *indexer) registerChainHelper(
@@ -240,12 +267,13 @@ func (i *indexer) registerChainHelper(
 	prefixEnd byte,
 	name, endpoint string,
 	dispatcher *triggers.EventDispatcher,
+	isAcceptedF func(containerID ids.ID) bool,
 ) (Index, error) {
 	prefix := make([]byte, hashing.HashLen+wrappers.ByteLen)
-	copy(prefix[:], chainID[:])
+	copy(prefix, chainID[:])
 	prefix[hashing.HashLen] = prefixEnd
 	indexDB := prefixdb.New(prefix, i.db)
-	index, err := newIndex(indexDB, i.log, i.codec, i.clock)
+	index, err := newIndex(indexDB, i.log, i.codec, i.clock, isAcceptedF)
 	if err != nil {
 		_ = indexDB.Close()
 		return nil, err
@@ -312,31 +340,31 @@ func (i *indexer) close() error {
 
 func (i *indexer) markIncomplete(chainID ids.ID) error {
 	key := make([]byte, hashing.HashLen+wrappers.ByteLen)
-	copy(key[:], chainID[:])
-	copy(key[hashing.HashLen:], isIncompletePrefix)
+	copy(key, chainID[:])
+	key[hashing.HashLen] = isIncompletePrefix
 	return i.db.Put(key, nil)
 }
 
 // Returns true if this chain is incomplete
 func (i *indexer) isIncomplete(chainID ids.ID) (bool, error) {
 	key := make([]byte, hashing.HashLen+wrappers.ByteLen)
-	copy(key[:], chainID[:])
-	copy(key[hashing.HashLen:], isIncompletePrefix)
+	copy(key, chainID[:])
+	key[hashing.HashLen] = isIncompletePrefix
 	return i.db.Has(key)
 }
 
 func (i *indexer) markPreviouslyIndexed(chainID ids.ID) error {
 	key := make([]byte, hashing.HashLen+wrappers.ByteLen)
-	copy(key[:], chainID[:])
-	copy(key[hashing.HashLen:], previouslyIndexedPrefix)
+	copy(key, chainID[:])
+	key[hashing.HashLen] = previouslyIndexedPrefix
 	return i.db.Put(key, nil)
 }
 
 // Returns true if this chain is incomplete
 func (i *indexer) wasPreviouslyIndexed(chainID ids.ID) (bool, error) {
 	key := make([]byte, hashing.HashLen+wrappers.ByteLen)
-	copy(key[:], chainID[:])
-	copy(key[hashing.HashLen:], previouslyIndexedPrefix)
+	copy(key, chainID[:])
+	key[hashing.HashLen] = previouslyIndexedPrefix
 	return i.db.Has(key)
 }
 

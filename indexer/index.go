@@ -52,6 +52,7 @@ func newIndex(
 	log logging.Logger,
 	codec codec.Manager,
 	clock timer.Clock,
+	isAcceptedFunc func(containerID ids.ID) bool,
 ) (Index, error) {
 	vDB := versiondb.New(baseDB)
 	indexToContainer := prefixdb.New(indexToContainerPrefix, vDB)
@@ -65,6 +66,7 @@ func newIndex(
 		indexToContainer: indexToContainer,
 		containerToIndex: containerToIndex,
 		log:              log,
+		isAcceptedFunc:   isAcceptedFunc,
 	}
 
 	// Get next accepted index from db
@@ -83,14 +85,32 @@ func newIndex(
 		return nil, fmt.Errorf("couldn't parse next accepted index from bytes: %w", err)
 	}
 	i.log.Info("next accepted index %d", i.nextAcceptedIndex)
+
+	// We may have committed some containers in the index's db that were not committed at
+	// the VM's db. Go back through recently accepted things and make sure they're accepted.
+
+	for j := i.nextAcceptedIndex; j >= 1; j-- {
+		lastAccepted, err := i.getContainerByIndex(j - 1)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't get container at index %d", j-1)
+		}
+		if isAcceptedFunc(lastAccepted.ID) {
+			break
+		}
+		if err := i.removeLastAccepted(lastAccepted.ID); err != nil {
+			return nil, fmt.Errorf("couldn't remove container: %s", err)
+		}
+	}
+
 	return i, nil
 }
 
 // indexer indexes all accepted transactions by the order in which they were accepted
 type index struct {
-	codec codec.Manager
-	clock timer.Clock
-	lock  sync.RWMutex
+	codec          codec.Manager
+	isAcceptedFunc func(containerID ids.ID) bool
+	clock          timer.Clock
+	lock           sync.RWMutex
 	// The index of the next accepted transaction
 	nextAcceptedIndex uint64
 	// When [baseDB] is committed, actual write to disk happens
@@ -165,6 +185,10 @@ func (i *index) GetContainerByIndex(index uint64) (Container, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
+	return i.getContainerByIndex(index)
+}
+
+func (i *index) getContainerByIndex(index uint64) (Container, error) {
 	lastAcceptedIndex, ok := i.lastAcceptedIndex()
 	if !ok || index > lastAcceptedIndex {
 		return Container{}, fmt.Errorf("no container at index %d", index)
@@ -309,4 +333,38 @@ func (i *index) lastAcceptedIndex() (uint64, bool) {
 		return 0, false
 	}
 	return i.nextAcceptedIndex - 1, true
+}
+
+// Remove the last accepted container, whose ID is given, from the databases
+// Assumes [p.nextAcceptedIndex] >= 1
+// Assumes [containerID] is actually the ID of the last accepted container
+func (i *index) removeLastAccepted(containerID ids.ID) error {
+	i.lock.Lock()
+	defer i.lock.Unlock()
+
+	if err := i.containerToIndex.Delete(containerID[:]); err != nil {
+		return err
+	}
+
+	p := wrappers.Packer{MaxSize: wrappers.LongLen}
+	p.PackLong(i.nextAcceptedIndex - 1)
+	if p.Err != nil {
+		return fmt.Errorf("couldn't convert last accepted index to bytes: %w", p.Err)
+	}
+
+	if err := i.indexToContainer.Delete(p.Bytes); err != nil {
+		return fmt.Errorf("couldn't remove last accepted: %w", err)
+	}
+
+	i.nextAcceptedIndex--
+
+	p = wrappers.Packer{MaxSize: wrappers.LongLen}
+	p.PackLong(i.nextAcceptedIndex)
+	if p.Err != nil {
+		return fmt.Errorf("couldn't convert next accepted index to bytes: %w", p.Err)
+	}
+	if err := i.vDB.Put(nextAcceptedIndexKey, p.Bytes); err != nil {
+		return fmt.Errorf("couldn't put next accepted key: %s", err)
+	}
+	return i.vDB.Commit()
 }
