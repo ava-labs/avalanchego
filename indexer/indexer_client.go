@@ -92,7 +92,7 @@ func (c *Client) copy(reader io.Reader) (*bytes.Buffer, error) {
 	return &outb, err
 }
 
-func (c *Client) getClientReqeust(method string, args interface{}) (*bytes.Buffer, error) {
+func (c *Client) getClientRequest(method string, args interface{}) (*bytes.Buffer, error) {
 	cr := &clientRequest{
 		RPC:    "2.0",
 		Method: "index." + method,
@@ -122,7 +122,7 @@ func (c *Client) getRequest(indexType IndexType, err error, buf io.Reader) (*htt
 }
 
 func (c *Client) send(indexType IndexType, method string, args interface{}, output *interface{}) (int, error) {
-	buf, err := c.getClientReqeust(method, args)
+	buf, err := c.getClientRequest(method, args)
 	if err != nil {
 		return 0, err
 	}
