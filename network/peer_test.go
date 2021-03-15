@@ -105,13 +105,19 @@ func TestPeer_Close(t *testing.T) {
 
 	basenetwork := netwrk.(*network)
 
+	newmsgbytes := []byte("hello")
+
 	// fake a peer, and write a message
 	peer := newPeer(basenetwork, conn, ip1.IP())
 	peer.sender = make(chan []byte, 10)
-	testMsg := newTestMsg(GetVersion, []byte("hello"))
+	testMsg := newTestMsg(GetVersion, newmsgbytes)
 	peer.Send(testMsg)
 
-	if basenetwork.pendingBytes != 5 {
+	// make sure the net pending and peer pending bytes updated
+	if basenetwork.pendingBytes != int64(len(newmsgbytes)) {
+		t.Fatalf("pending bytes invalid")
+	}
+	if peer.pendingBytes != int64(len(newmsgbytes)) {
 		t.Fatalf("pending bytes invalid")
 	}
 
@@ -122,7 +128,11 @@ func TestPeer_Close(t *testing.T) {
 
 	peer.close()
 
-	if basenetwork.pendingBytes != 0 {
+	// The network pending bytes should be reduced back to zero on close.
+	if basenetwork.pendingBytes != int64(0) {
+		t.Fatalf("pending bytes invalid")
+	}
+	if peer.pendingBytes != int64(len(newmsgbytes)) {
 		t.Fatalf("pending bytes invalid")
 	}
 }
