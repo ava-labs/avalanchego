@@ -17,12 +17,12 @@ import (
 )
 
 type TestMsg struct {
-	op   Op
-	bits []byte
+	op    Op
+	bytes []byte
 }
 
 func newTestMsg(op Op, bits []byte) *TestMsg {
-	return &TestMsg{op: op, bits: bits}
+	return &TestMsg{op: op, bytes: bits}
 }
 
 func (m *TestMsg) Op() Op {
@@ -32,7 +32,7 @@ func (*TestMsg) Get(Field) interface{} {
 	return nil
 }
 func (m *TestMsg) Bytes() []byte {
-	return m.bits
+	return m.bytes
 }
 
 func TestPeer_Close(t *testing.T) {
