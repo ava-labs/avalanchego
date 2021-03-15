@@ -33,7 +33,7 @@ type Client struct {
 	client httpClient
 }
 
-// NewClient creates a client that uses the given RPC client.
+// NewClient creates a client.
 func NewClient(rawurl string) *Client {
 	return &Client{
 		rawurl: rawurl,
