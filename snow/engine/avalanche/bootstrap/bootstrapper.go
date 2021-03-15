@@ -12,7 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
@@ -194,7 +193,7 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 			}); err == nil {
 				b.numFetchedVts.Inc()
 				b.NumFetched++ // Progress tracker
-				if b.NumFetched%common.StatusUpdateFrequency == 0 {
+				if b.NumFetched%queue.StatusUpdateFrequency == 0 {
 					b.Ctx.Log.Info("fetched %d vertices", b.NumFetched)
 				}
 			} else {
@@ -376,13 +375,13 @@ func (b *Bootstrapper) checkFinish() error {
 	b.Ctx.Log.Info("bootstrapping fetched %d vertices. executing transaction state transitions...",
 		b.NumFetched)
 
-	_, err := b.executeAll(b.TxBlocked, b.Ctx.DecisionDispatcher)
+	_, err := b.TxBlocked.ExecuteAll(b.Ctx, b.Ctx.DecisionDispatcher)
 	if err != nil {
 		return err
 	}
 
 	b.Ctx.Log.Info("executing vertex state transitions...")
-	executedVts, err := b.executeAll(b.VtxBlocked, b.Ctx.ConsensusDispatcher)
+	executedVts, err := b.VtxBlocked.ExecuteAll(b.Ctx, b.Ctx.ConsensusDispatcher)
 	if err != nil {
 		return err
 	}
@@ -434,29 +433,6 @@ func (b *Bootstrapper) finish() error {
 	b.Ctx.Bootstrapped()
 
 	return nil
-}
-
-func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher) (int, error) {
-	numExecuted := 0
-
-	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
-		b.Ctx.Log.Debug("Executing: %s", job.ID())
-		if err := jobs.Execute(job); err != nil {
-			b.Ctx.Log.Error("Error executing: %s", err)
-			return numExecuted, err
-		}
-		if err := jobs.Commit(); err != nil {
-			return numExecuted, err
-		}
-		numExecuted++
-		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
-			b.Ctx.Log.Info("executed %d operations", numExecuted)
-		}
-
-		events.Accept(b.Ctx, job.ID(), job.Bytes())
-	}
-	b.Ctx.Log.Info("executed %d operations", numExecuted)
-	return numExecuted, nil
 }
 
 // Connected implements the Engine interface.

@@ -220,8 +220,8 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 			blk:         blk,
 		}); err == nil {
 			b.numFetched.Inc()
-			b.NumFetched++                                      // Progress tracker
-			if b.NumFetched%common.StatusUpdateFrequency == 0 { // Periodically print progress
+			b.NumFetched++                                     // Progress tracker
+			if b.NumFetched%queue.StatusUpdateFrequency == 0 { // Periodically print progress
 				b.Ctx.Log.Info("fetched %d blocks", b.NumFetched)
 			}
 		}
@@ -261,7 +261,7 @@ func (b *Bootstrapper) checkFinish() error {
 	b.Ctx.Log.Info("bootstrapping fetched %d blocks. executing state transitions...",
 		b.NumFetched)
 
-	executedBlocks, err := b.executeAll(b.Blocked)
+	executedBlocks, err := b.Blocked.ExecuteAll(b.Ctx, b.Ctx.ConsensusDispatcher, b.Ctx.DecisionDispatcher)
 	if err != nil {
 		return err
 	}
@@ -320,27 +320,6 @@ func (b *Bootstrapper) finish() error {
 	}
 	b.Ctx.Bootstrapped()
 	return nil
-}
-
-func (b *Bootstrapper) executeAll(jobs *queue.Jobs) (int, error) {
-	numExecuted := 0
-	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
-		if err := jobs.Execute(job); err != nil {
-			return numExecuted, err
-		}
-		if err := jobs.Commit(); err != nil {
-			return numExecuted, err
-		}
-		numExecuted++
-		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
-			b.Ctx.Log.Info("executed %d blocks", numExecuted)
-		}
-
-		b.Ctx.ConsensusDispatcher.Accept(b.Ctx, job.ID(), job.Bytes())
-		b.Ctx.DecisionDispatcher.Accept(b.Ctx, job.ID(), job.Bytes())
-	}
-	b.Ctx.Log.Info("executed %d blocks", numExecuted)
-	return numExecuted, nil
 }
 
 // Connected implements the Engine interface.

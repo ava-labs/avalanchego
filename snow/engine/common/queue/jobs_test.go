@@ -24,10 +24,8 @@ func TestNew(t *testing.T) {
 
 	jobs.SetParser(parser)
 
-	if hasNext, err := jobs.HasNext(); err != nil {
-		t.Fatal(err)
-	} else if hasNext {
-		t.Fatalf("Haven't pushed anything yet, shouldn't be able to pop")
+	if jobs.stackSize > 0 {
+		t.Fatalf("Shouldn't have a container ready to pop")
 	}
 }
 
@@ -69,9 +67,7 @@ func TestPushPop(t *testing.T) {
 
 	jobs.SetParser(parser)
 
-	if hasNext, err := jobs.HasNext(); err != nil {
-		t.Fatal(err)
-	} else if !hasNext {
+	if jobs.stackSize <= 0 {
 		t.Fatalf("Should have a container ready to pop")
 	}
 
@@ -91,9 +87,7 @@ func TestPushPop(t *testing.T) {
 		t.Fatalf("Returned wrong job")
 	}
 
-	if hasNext, err := jobs.HasNext(); err != nil {
-		t.Fatal(err)
-	} else if hasNext {
+	if jobs.stackSize > 0 {
 		t.Fatalf("Shouldn't have a container ready to pop")
 	}
 }
@@ -141,9 +135,7 @@ func TestExecute(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if hasNext, err := jobs.HasNext(); err != nil {
-		t.Fatal(err)
-	} else if !hasNext {
+	if jobs.stackSize <= 0 {
 		t.Fatalf("Should have a container ready to pop")
 	}
 
@@ -181,9 +173,7 @@ func TestExecute(t *testing.T) {
 		t.Fatalf("Should have executed the container")
 	}
 
-	if hasNext, err := jobs.HasNext(); err != nil {
-		t.Fatal(err)
-	} else if !hasNext {
+	if jobs.stackSize <= 0 {
 		t.Fatalf("Should have a container ready to pop")
 	}
 }
@@ -229,9 +219,7 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 
 	jobs.SetParser(parser)
 
-	if hasNext, err := jobs.HasNext(); err != nil {
-		t.Fatal(err)
-	} else if !hasNext {
+	if jobs.stackSize <= 0 {
 		t.Fatalf("Should have a container ready to pop")
 	}
 
@@ -251,9 +239,7 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 		t.Fatalf("Returned wrong job")
 	}
 
-	if hasNext, err := jobs.HasNext(); err != nil {
-		t.Fatal(err)
-	} else if hasNext {
+	if jobs.stackSize > 0 {
 		t.Fatalf("Shouldn't have a container ready to pop")
 	}
 }
@@ -319,9 +305,7 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if hasNext, err := jobs.HasNext(); err != nil {
-		t.Fatal(err)
-	} else if !hasNext {
+	if jobs.stackSize <= 0 {
 		t.Fatalf("Should have a container ready to pop")
 	}
 
@@ -349,9 +333,7 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if hasNext, err := jobs.HasNext(); err != nil {
-		t.Fatal(err)
-	} else if !hasNext {
+	if jobs.stackSize <= 0 {
 		t.Fatalf("Should have a container ready to pop")
 	}
 
@@ -364,9 +346,7 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 		t.Fatalf("Returned wrong job")
 	}
 
-	if hasNext, err := jobs.HasNext(); err != nil {
-		t.Fatal(err)
-	} else if hasNext {
+	if jobs.stackSize > 0 {
 		t.Fatalf("Shouldn't have a container ready to pop")
 	}
 }
