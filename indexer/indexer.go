@@ -30,11 +30,12 @@ const (
 )
 
 var (
-	txPrefix                = []byte{0x01}
-	vtxPrefix               = []byte{0x02}
-	blockPrefix             = []byte{0x03}
+	txPrefix                = byte(0x01)
+	vtxPrefix               = byte(0x02)
+	blockPrefix             = byte(0x03)
 	isIncompletePrefix      = []byte{0x04}
 	previouslyIndexedPrefix = []byte{0x05}
+	hasRunKey               = []byte{0x06}
 	errClosed               = errors.New("indexer is closed")
 )
 
@@ -88,8 +89,12 @@ func NewIndexer(config Config) (Indexer, error) {
 	if err := indexer.codec.RegisterCodec(codecVersion, linearcodec.NewDefault()); err != nil {
 		return nil, fmt.Errorf("couldn't register codec: %s", err)
 	}
-
-	return indexer, nil
+	hasRun, err := indexer.hasRun()
+	if err != nil {
+		return nil, err
+	}
+	indexer.hasRunBefore = hasRun
+	return indexer, indexer.markHasRun()
 }
 
 // indexer implements Indexer
@@ -102,6 +107,8 @@ type indexer struct {
 	db        database.Database
 	closed    bool
 	shutdownF func()
+	// true if this is not the first run using this database
+	hasRunBefore bool
 
 	routeAdder api.RouteAdder
 
@@ -141,18 +148,20 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 			i.log.Error("error while closing indexer: %s", err)
 		}
 		return
-	} else if isIncomplete && !i.allowIncompleteIndex {
-		i.log.Fatal("index %s is incomplete but incomplete indices are disabled. Shutting down", name)
-		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
-		}
-		return
 	}
 
 	// See if this chain was indexed in a previous run
 	previouslyIndexed, err := i.wasPreviouslyIndexed(chainID)
 	if err != nil {
 		i.log.Error("couldn't get whether chain %s was previously indexed: %s", name, err)
+		if err := i.close(); err != nil {
+			i.log.Error("error while closing indexer: %s", err)
+		}
+		return
+	}
+
+	if !i.allowIncompleteIndex && isIncomplete && (previouslyIndexed || i.hasRunBefore) {
+		i.log.Fatal("index %s is incomplete but incomplete indices are disabled. Shutting down", name)
 		if err := i.close(); err != nil {
 			i.log.Error("error while closing indexer: %s", err)
 		}
@@ -193,166 +202,76 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 
 	switch engineIntf.(type) {
 	case snowman.Engine:
-		prefix := make([]byte, hashing.HashLen+wrappers.ByteLen)
-		copy(prefix[:], chainID[:])
-		copy(prefix[hashing.HashLen:], blockPrefix)
-		indexDB := prefixdb.New(prefix, i.db)
-		index, err := newIndex(indexDB, i.log, i.codec, i.clock)
+		index, err := i.registerChainHelper(chainID, blockPrefix, name, "block", i.consensusDispatcher)
 		if err != nil {
-			_ = indexDB.Close()
-			i.log.Fatal("couldn't create index for chain %s: %s", name, err)
+			i.log.Fatal("couldn't create block index for %s: %s", name, err)
 			if err := i.close(); err != nil {
 				i.log.Error("error while closing indexer: %s", err)
 			}
 			return
 		}
-
-		// Register index to learn about new accepted blocks
-		if err := i.consensusDispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name), index); err != nil {
-			_ = index.Close()
-			_ = indexDB.Close()
-			i.log.Fatal("couldn't register chain %s to dispatcher: %s", name, err)
-			if err := i.close(); err != nil {
-				i.log.Error("error while closing indexer: %s", err)
-			}
-			return
-		}
-
-		// Create an API endpoint for this index
-		indexAPIServer := rpc.NewServer()
-		codec := json.NewCodec()
-		indexAPIServer.RegisterCodec(codec, "application/json")
-		indexAPIServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-		if err := indexAPIServer.RegisterService(&service{Index: index}, "index"); err != nil {
-			_ = index.Close()
-			_ = indexDB.Close()
-			i.log.Fatal("couldn't create index API server for chain %s: %s", name, err)
-			if err := i.close(); err != nil {
-				i.log.Error("error while closing indexer: %s", err)
-			}
-			return
-		}
-		handler := &common.HTTPHandler{LockOptions: common.NoLock, Handler: indexAPIServer}
-		if err := i.routeAdder.AddRoute(handler, &sync.RWMutex{}, "index/"+name, "/block", i.log); err != nil {
-			_ = index.Close()
-			_ = indexDB.Close()
-			i.log.Fatal("couldn't create index API server for chain %s: %s", name, err)
-			if err := i.close(); err != nil {
-				i.log.Error("error while closing indexer: %s", err)
-			}
-			return
-
-		}
-
 		i.blockIndices[chainID] = index
 	case avalanche.Engine:
-		{ // Create the tx index
-			prefix := make([]byte, hashing.HashLen+wrappers.ByteLen)
-			copy(prefix[:], chainID[:])
-			copy(prefix[hashing.HashLen:], txPrefix)
-			txIndexDB := prefixdb.New(prefix, i.db)
-			txIndex, err := newIndex(txIndexDB, i.log, i.codec, i.clock)
-			if err != nil {
-				_ = txIndexDB.Close()
-				i.log.Fatal("couldn't create tx index for chain %s: %s", name, err)
-				if err := i.close(); err != nil {
-					i.log.Error("error while closing indexer: %s", err)
-				}
-				return
+		vtxIndex, err := i.registerChainHelper(chainID, blockPrefix, name, "vtx", i.consensusDispatcher)
+		if err != nil {
+			i.log.Fatal("couldn't create vertex index for %s: %s", name, err)
+			if err := i.close(); err != nil {
+				i.log.Error("error while closing indexer: %s", err)
 			}
-
-			// Register index to learn about new accepted txs
-			if err := i.decisionDispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name), txIndex); err != nil {
-				_ = txIndex.Close()
-				_ = txIndexDB.Close()
-				i.log.Fatal("couldn't register chain %s to decision dispatcher: %s", name, err)
-				if err := i.close(); err != nil {
-					i.log.Error("error while closing indexer: %s", err)
-				}
-				return
-			}
-
-			// Create an API endpoint for this index
-			indexAPIServer := rpc.NewServer()
-			codec := json.NewCodec()
-			indexAPIServer.RegisterCodec(codec, "application/json")
-			indexAPIServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-			if err := indexAPIServer.RegisterService(&service{Index: txIndex}, "index"); err != nil {
-				_ = txIndex.Close()
-				_ = txIndexDB.Close()
-				i.log.Fatal("couldn't create index API server for chain %s: %s", name, err)
-				if err := i.close(); err != nil {
-					i.log.Error("error while closing indexer: %s", err)
-				}
-				return
-			}
-			handler := &common.HTTPHandler{LockOptions: common.NoLock, Handler: indexAPIServer}
-			if err := i.routeAdder.AddRoute(handler, &sync.RWMutex{}, "index/"+name, "/tx", i.log); err != nil {
-				_ = txIndex.Close()
-				i.log.Fatal("couldn't create index API server for chain %s: %s", name, err)
-				if err := i.close(); err != nil {
-					i.log.Error("error while closing indexer: %s", err)
-				}
-				return
-			}
-
-			i.txIndices[chainID] = txIndex
+			return
 		}
-		{ // Create the vtx index
-			prefix := make([]byte, hashing.HashLen+wrappers.ByteLen)
-			copy(prefix[:], chainID[:])
-			copy(prefix[hashing.HashLen:], vtxPrefix)
-			vtxIndexDB := prefixdb.New(prefix, i.db)
-			vtxIndex, err := newIndex(vtxIndexDB, i.log, i.codec, i.clock)
-			if err != nil {
-				_ = vtxIndexDB.Close()
-				i.log.Fatal("couldn't create vtx index for chain %s: %s", name, err)
-				if err := i.close(); err != nil {
-					i.log.Error("error while closing indexer: %s", err)
-				}
-				return
+		i.vtxIndices[chainID] = vtxIndex
+		txIndex, err := i.registerChainHelper(chainID, blockPrefix, name, "tx", i.decisionDispatcher)
+		if err != nil {
+			i.log.Fatal("couldn't create tx index for %s: %s", name, err)
+			if err := i.close(); err != nil {
+				i.log.Error("error while closing indexer: %s", err)
 			}
-
-			// Register index to learn about new accepted vertices
-			if err := i.consensusDispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name), vtxIndex); err != nil {
-				_ = vtxIndex.Close()
-				_ = vtxIndexDB.Close()
-				i.log.Fatal("couldn't register chain %s to decision dispatcher: %s", name, err)
-				if err := i.close(); err != nil {
-					i.log.Error("error while closing indexer: %s", err)
-				}
-				return
-			}
-
-			// Create an API endpoint for this index
-			indexAPIServer := rpc.NewServer()
-			codec := json.NewCodec()
-			indexAPIServer.RegisterCodec(codec, "application/json")
-			indexAPIServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-			if err := indexAPIServer.RegisterService(&service{Index: vtxIndex}, "index"); err != nil {
-				_ = vtxIndex.Close()
-				_ = vtxIndexDB.Close()
-				i.log.Fatal("couldn't create index API server for chain %s: %s", name, err)
-				if err := i.close(); err != nil {
-					i.log.Error("error while closing indexer: %s", err)
-				}
-				return
-			}
-			handler := &common.HTTPHandler{LockOptions: common.NoLock, Handler: indexAPIServer}
-			if err := i.routeAdder.AddRoute(handler, &sync.RWMutex{}, "index/"+name, "/vtx", i.log); err != nil {
-				_ = vtxIndex.Close()
-				i.log.Fatal("couldn't create index API server for chain %s: %s", name, err)
-				if err := i.close(); err != nil {
-					i.log.Error("error while closing indexer: %s", err)
-				}
-				return
-			}
-
-			i.vtxIndices[chainID] = vtxIndex
+			return
 		}
+		i.txIndices[chainID] = txIndex
 	default:
 		i.log.Error("expected snowman.Engine or avalanche.Engine but got %T", engineIntf)
 	}
+}
+
+func (i *indexer) registerChainHelper(
+	chainID ids.ID,
+	prefixEnd byte,
+	name, endpoint string,
+	dispatcher *triggers.EventDispatcher,
+) (Index, error) {
+	prefix := make([]byte, hashing.HashLen+wrappers.ByteLen)
+	copy(prefix[:], chainID[:])
+	prefix[hashing.HashLen] = prefixEnd
+	indexDB := prefixdb.New(prefix, i.db)
+	index, err := newIndex(indexDB, i.log, i.codec, i.clock)
+	if err != nil {
+		_ = indexDB.Close()
+		return nil, err
+	}
+
+	// Register index to learn about new accepted vertices
+	if err := dispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, name), index); err != nil {
+		_ = index.Close()
+		return nil, err
+	}
+
+	// Create an API endpoint for this index
+	apiServer := rpc.NewServer()
+	codec := json.NewCodec()
+	apiServer.RegisterCodec(codec, "application/json")
+	apiServer.RegisterCodec(codec, "application/json;charset=UTF-8")
+	if err := apiServer.RegisterService(&service{Index: index}, "index"); err != nil {
+		_ = index.Close()
+		return nil, err
+	}
+	handler := &common.HTTPHandler{LockOptions: common.NoLock, Handler: apiServer}
+	if err := i.routeAdder.AddRoute(handler, &sync.RWMutex{}, "index/"+name, "/"+endpoint, i.log); err != nil {
+		_ = index.Close()
+		return nil, err
+	}
+	return index, nil
 }
 
 // Close this indexer. Stops indexing all chains.
@@ -419,4 +338,14 @@ func (i *indexer) wasPreviouslyIndexed(chainID ids.ID) (bool, error) {
 	copy(key[:], chainID[:])
 	copy(key[hashing.HashLen:], previouslyIndexedPrefix)
 	return i.db.Has(key)
+}
+
+// Mark that the node has run at least once
+func (i *indexer) markHasRun() error {
+	return i.db.Put(hasRunKey, nil)
+}
+
+// Returns true if the node has run before
+func (i *indexer) hasRun() (bool, error) {
+	return i.db.Has(hasRunKey)
 }

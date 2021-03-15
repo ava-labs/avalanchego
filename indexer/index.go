@@ -45,28 +45,30 @@ type Index interface {
 	Close() error
 }
 
-// Returns a new, thread-safe Index
+// Returns a new, thread-safe Index.
+// Closes [baseDB] on close.
 func newIndex(
-	db database.Database,
+	baseDB database.Database,
 	log logging.Logger,
 	codec codec.Manager,
 	clock timer.Clock,
 ) (Index, error) {
-	baseDB := versiondb.New(db)
-	indexToContainer := prefixdb.New(indexToContainerPrefix, baseDB)
-	containerToIndex := prefixdb.New(containerToIDPrefix, baseDB)
+	vDB := versiondb.New(baseDB)
+	indexToContainer := prefixdb.New(indexToContainerPrefix, vDB)
+	containerToIndex := prefixdb.New(containerToIDPrefix, vDB)
 
 	i := &index{
 		clock:            clock,
 		codec:            codec,
 		baseDB:           baseDB,
+		vDB:              vDB,
 		indexToContainer: indexToContainer,
 		containerToIndex: containerToIndex,
 		log:              log,
 	}
 
 	// Get next accepted index from db
-	nextAcceptedIndexBytes, err := i.baseDB.Get(nextAcceptedIndexKey)
+	nextAcceptedIndexBytes, err := i.vDB.Get(nextAcceptedIndexKey)
 	if err == database.ErrNotFound {
 		// Couldn't find it in the database. Must not have accepted any containers in previous runs.
 		i.log.Info("next accepted index %d", i.nextAcceptedIndex)
@@ -92,7 +94,8 @@ type index struct {
 	// The index of the next accepted transaction
 	nextAcceptedIndex uint64
 	// When [baseDB] is committed, actual write to disk happens
-	baseDB *versiondb.Database
+	vDB    *versiondb.Database
+	baseDB database.Database
 	// Both [indexToContainer] and [containerToIndex] have [baseDB] underneath
 	// Index --> Container
 	indexToContainer database.Database
@@ -106,6 +109,7 @@ func (i *index) Close() error {
 	errs := wrappers.Errs{}
 	errs.Add(i.indexToContainer.Close())
 	errs.Add(i.containerToIndex.Close())
+	errs.Add(i.vDB.Close())
 	errs.Add(i.baseDB.Close())
 	return errs.Err
 }
@@ -147,11 +151,11 @@ func (i *index) Accept(ctx *snow.Context, containerID ids.ID, containerBytes []b
 	if p.Err != nil {
 		return fmt.Errorf("couldn't convert next accepted index to bytes: %w", p.Err)
 	}
-	if err := i.baseDB.Put(nextAcceptedIndexKey, p.Bytes); err != nil {
+	if err := i.vDB.Put(nextAcceptedIndexKey, p.Bytes); err != nil {
 		return fmt.Errorf("couldn't put accepted container %s into index: %w", containerID, err)
 	}
 
-	return i.baseDB.Commit()
+	return i.vDB.Commit()
 }
 
 // Returns the ID of the [index]th accepted container and the container itself.
