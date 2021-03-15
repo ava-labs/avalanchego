@@ -494,13 +494,14 @@ func (n *Node) initIndexer() error {
 		DecisionDispatcher:   n.DecisionDispatcher,
 		ConsensusDispatcher:  n.ConsensusDispatcher,
 		APIServer:            &n.APIServer,
+		ShutdownF:            n.Shutdown,
 	})
 	if err != nil {
 		return fmt.Errorf("couldn't create index for txs: %w", err)
 	}
 
 	// Chain manager will notify indexer when a chain is created
-	n.chainManager.AddRegistrant(n.indexer, true)
+	n.chainManager.AddRegistrant(n.indexer)
 
 	return nil
 }
@@ -661,7 +662,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	}
 
 	// Notify the API server when new chains are created
-	n.chainManager.AddRegistrant(&n.APIServer, false)
+	n.chainManager.AddRegistrant(&n.APIServer)
 	return nil
 }
 

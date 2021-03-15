@@ -66,11 +66,7 @@ type Manager interface {
 
 	// Add a registrant [r]. Every time a chain is
 	// created, [r].RegisterChain([new chain]) is called.
-	// If the second argument is false, calls [r].RegisterChain([new chain])
-	// in a goroutine and the returned error is just logged.
-	// Otherwise,  [r].RegisterChain([new chain]) is called synchronously
-	// and a returned error is treated as fatal.
-	AddRegistrant(Registrant, bool)
+	AddRegistrant(Registrant)
 
 	// Given an alias, return the ID of the chain associated with that alias
 	Lookup(string) (ids.ID, error)
@@ -145,6 +141,7 @@ type ManagerConfig struct {
 	HealthService             health.Service
 	RetryBootstrap            bool // Should Bootstrap be retried
 	RetryBootstrapMaxAttempts int  // Max number of times to retry bootstrap
+	NodeShutdownF             func()
 }
 
 type manager struct {
@@ -154,7 +151,7 @@ type manager struct {
 	ManagerConfig
 
 	// Those notified when a chain is created
-	synchronousRegistrants, asynchronousRegistrants []Registrant
+	registrants []Registrant
 
 	unblocked     bool
 	blockedChains []ChainParameters
@@ -245,10 +242,20 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	m.Log.AssertNoError(m.Alias(chainParams.ID, chainParams.ID.String()))
 
 	// Notify those that registered to be notified when a new chain is created
-	if err := m.notifyRegistrants(chain.Name, chain.Ctx.ChainID, chain.Engine); err != nil {
-		// TODO find a way to actually shut down the node
-		m.Shutdown()
+	m.notifyRegistrants(chain.Name, chain.Ctx.ChainID, chain.Engine)
+
+	// Tell the chain to start processing messages.
+	// If the X or P Chain panics, do not attempt to recover
+	if m.CriticalChains.Contains(chainParams.ID) {
+		go chain.Ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
+	} else {
+		go chain.Ctx.Log.RecoverAndExit(chain.Handler.Dispatch, func() {
+			chain.Ctx.Log.Error("Chain with ID: %s was shutdown due to a panic", chainParams.ID)
+		})
 	}
+
+	// Allows messages to be routed to the new chain
+	m.ManagerConfig.Router.AddChain(chain.Handler)
 }
 
 // Create a chain
@@ -390,27 +397,12 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		return nil, err
 	}
 
-	// Allows messages to be routed to the new chain
-	m.ManagerConfig.Router.AddChain(chain.Handler)
-
-	// If the X or P Chain panics, do not attempt to recover
-	if m.CriticalChains.Contains(chainParams.ID) {
-		go ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
-	} else {
-		go ctx.Log.RecoverAndExit(chain.Handler.Dispatch, func() {
-			ctx.Log.Error("Chain with ID: %s was shutdown due to a panic", chainParams.ID)
-		})
-	}
 	return chain, nil
 }
 
 // Implements Manager.AddRegistrant
-func (m *manager) AddRegistrant(r Registrant, synchronously bool) {
-	if synchronously {
-		m.synchronousRegistrants = append(m.synchronousRegistrants, r)
-	} else {
-		m.asynchronousRegistrants = append(m.asynchronousRegistrants, r)
-	}
+func (m *manager) AddRegistrant(r Registrant) {
+	m.registrants = append(m.registrants, r)
 }
 
 func (m *manager) unblockChains() {
@@ -707,23 +699,10 @@ func (m *manager) LookupVM(alias string) (ids.ID, error) { return m.VMManager.Lo
 
 // Notify registrants [those who want to know about the creation of chains]
 // that the specified chain has been created
-func (m *manager) notifyRegistrants(name string, chainID ids.ID, engine interface{}) error {
-	for _, registrant := range m.asynchronousRegistrants {
-		r := registrant
-		go func() {
-			err := r.RegisterChain(name, chainID, engine)
-			if err != nil {
-				m.Log.Debug(err.Error())
-			}
-		}()
+func (m *manager) notifyRegistrants(name string, chainID ids.ID, engine interface{}) {
+	for _, registrant := range m.registrants {
+		registrant.RegisterChain(name, chainID, engine)
 	}
-	for _, registrant := range m.synchronousRegistrants {
-		if err := registrant.RegisterChain(name, chainID, engine); err != nil {
-			m.Log.Fatal(err.Error())
-			return err
-		}
-	}
-	return nil
 }
 
 // Returns:
