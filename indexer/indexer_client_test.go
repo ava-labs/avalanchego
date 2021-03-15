@@ -80,14 +80,14 @@ func TestClientSend(t *testing.T) {
 	}
 
 	bodydata, _ := cl.copy(mock.Req.Body)
-	cr := &clientRequest{
+
+	clientRequestEncoded, _ := json.Marshal(&clientRequest{
 		RPC:    "2.0",
 		Method: "index." + "testMethod",
 		ID:     1,
 		Params: [1]interface{}{args},
-	}
-	crdata, _ := json.Marshal(cr)
-	if bodydata.String() != string(crdata) {
+	})
+	if bodydata.String() != string(clientRequestEncoded) {
 		t.Fatal("body request invalid")
 	}
 

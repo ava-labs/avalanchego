@@ -92,16 +92,7 @@ func (c *Client) copy(reader io.Reader) (*bytes.Buffer, error) {
 	return &outb, err
 }
 
-func (c *Client) getRequest(indexType IndexType, err error, buf bytes.Buffer) (*http.Request, error) {
-	req, err := http.NewRequest("POST", c.toURL(indexType), &buf)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Add("Content-Type", contentType)
-	return req, nil
-}
-
-func (c *Client) send(indexType IndexType, method string, args interface{}, output *interface{}) (int, error) {
+func (c *Client) getClientReqeust(method string, args interface{}) (*bytes.Buffer, error) {
 	cr := &clientRequest{
 		RPC:    "2.0",
 		Method: "index." + method,
@@ -111,10 +102,30 @@ func (c *Client) send(indexType IndexType, method string, args interface{}, outp
 
 	bits, err := json.Marshal(cr)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	var buf bytes.Buffer
-	buf.Write(bits)
+	_, err = buf.Write(bits)
+	if err != nil {
+		return nil, err
+	}
+	return &buf, nil
+}
+
+func (c *Client) getRequest(indexType IndexType, err error, buf *bytes.Buffer) (*http.Request, error) {
+	req, err := http.NewRequest("POST", c.toURL(indexType), buf)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Content-Type", contentType)
+	return req, nil
+}
+
+func (c *Client) send(indexType IndexType, method string, args interface{}, output *interface{}) (int, error) {
+	buf, err := c.getClientReqeust(method, args)
+	if err != nil {
+		return 0, err
+	}
 
 	req, err := c.getRequest(indexType, err, buf)
 	if err != nil {
