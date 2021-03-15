@@ -54,7 +54,7 @@ func main() {
 	if Config.DBEnabled {
 		dbManager, err = manager.New(Config.DBPath, log, dbVersion)
 		if err != nil {
-			fmt.Printf("couldn't create db manager at %s: %s\n", Config.DBPath, err)
+			log.Error("couldn't create db manager at %s: %s\n", Config.DBPath, err)
 			return
 		}
 	} else {
@@ -65,7 +65,8 @@ func main() {
 			},
 		})
 		if err != nil {
-			fmt.Printf("couldn't create db manager from memory db: %s\n", err)
+			log.Error("couldn't create db manager from memory db: %s\n", err)
+			return
 		}
 	}
 
