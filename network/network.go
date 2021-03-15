@@ -381,7 +381,7 @@ func NewNetwork(
 		healthConfig:                       healthConfig,
 		benchlistManager:                   benchlistManager,
 	}
-	netw.sendFailRateCalculator = math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time())
+	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time()))
 
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
