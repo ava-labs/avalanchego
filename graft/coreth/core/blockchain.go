@@ -2665,33 +2665,34 @@ Error: %v
 `, bc.chainConfig, block.Number(), block.Hash(), receiptString, err))
 }
 
-// InsertHeaderChain attempts to insert the given header chain in to the local
-// chain, possibly creating a reorg. If an error is returned, it will return the
-// index number of the failing header as well an error describing what went wrong.
+// Original Code:
+// // InsertHeaderChain attempts to insert the given header chain in to the local
+// // chain, possibly creating a reorg. If an error is returned, it will return the
+// // index number of the failing header as well an error describing what went wrong.
+// //
+// // The verify parameter can be used to fine tune whether nonce verification
+// // should be done or not. The reason behind the optional check is because some
+// // of the header retrieval mechanisms already need to verify nonces, as well as
+// // because nonces can be verified sparsely, not needing to check each.
+// func (bc *BlockChain) InsertHeaderChain(chain []*types.Header, checkFreq int) (int, error) {
+// 	start := time.Now()
+// 	if i, err := bc.hc.ValidateHeaderChain(chain, checkFreq); err != nil {
+// 		return i, err
+// 	}
 //
-// The verify parameter can be used to fine tune whether nonce verification
-// should be done or not. The reason behind the optional check is because some
-// of the header retrieval mechanisms already need to verify nonces, as well as
-// because nonces can be verified sparsely, not needing to check each.
-func (bc *BlockChain) InsertHeaderChain(chain []*types.Header, checkFreq int) (int, error) {
-	start := time.Now()
-	if i, err := bc.hc.ValidateHeaderChain(chain, checkFreq); err != nil {
-		return i, err
-	}
-
-	// Make sure only one thread manipulates the chain at once
-	bc.chainmu.Lock()
-	defer bc.chainmu.Unlock()
-
-	bc.wg.Add(1)
-	defer bc.wg.Done()
-
-	whFunc := func(header *types.Header) error {
-		_, err := bc.hc.WriteHeader(header)
-		return err
-	}
-	return bc.hc.InsertHeaderChain(chain, whFunc, start)
-}
+// 	// Make sure only one thread manipulates the chain at once
+// 	bc.chainmu.Lock()
+// 	defer bc.chainmu.Unlock()
+//
+// 	bc.wg.Add(1)
+// 	defer bc.wg.Done()
+//
+// 	whFunc := func(header *types.Header) error {
+// 		_, err := bc.hc.WriteHeader(header)
+// 		return err
+// 	}
+// 	return bc.hc.InsertHeaderChain(chain, whFunc, start)
+// }
 
 // CurrentHeader retrieves the current head header of the canonical chain. The
 // header is retrieved from the HeaderChain's internal cache.
