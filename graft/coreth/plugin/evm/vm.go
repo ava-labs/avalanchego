@@ -233,14 +233,20 @@ type VM struct {
 	fx secp256k1fx.Fx
 }
 
-func (vm *VM) getAtomicTx(block *types.Block) *Tx {
+func (vm *VM) getAtomicTx(block *types.Block) (*Tx, error) {
 	extdata := block.ExtraData()
+	if len(extdata) == 0 {
+		return nil, nil
+	}
 	atx := new(Tx)
 	if _, err := vm.codec.Unmarshal(extdata, atx); err != nil {
-		return nil
+		return nil, fmt.Errorf("failed to unmarshal atomic tx due to %w", err)
 	}
-	atx.Sign(vm.codec, nil)
-	return atx
+	if err := atx.Sign(vm.codec, nil); err != nil {
+		return nil, fmt.Errorf("failed to initialize atomic tx in block %s", block.Hash().Hex())
+	}
+
+	return atx, nil
 }
 
 // Codec implements the secp256k1fx interface
@@ -367,7 +373,10 @@ func (vm *VM) Initialize(
 		return vm.getLastAccepted().ethBlock
 	})
 	chain.SetOnExtraStateChange(func(block *types.Block, state *state.StateDB) error {
-		tx := vm.getAtomicTx(block)
+		tx, err := vm.getAtomicTx(block)
+		if err != nil {
+			return err
+		}
 		if tx == nil {
 			return nil
 		}
