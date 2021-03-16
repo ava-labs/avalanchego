@@ -125,17 +125,18 @@ func (cm *chainMetrics) Initialize(ctx *snow.Context, namespace string, summaryE
 }
 
 func (cm *chainMetrics) observe(validatorID ids.ShortID, msgType constants.MsgType, latency time.Duration) {
+	lat := float64(latency.Milliseconds())
 	switch msgType {
 	case constants.GetAcceptedFrontierMsg:
-		cm.getAcceptedFrontier.Observe(float64(latency))
+		cm.getAcceptedFrontier.Observe(lat)
 	case constants.GetAcceptedMsg:
-		cm.getAccepted.Observe(float64(latency))
+		cm.getAccepted.Observe(lat)
 	case constants.GetMsg:
-		cm.get.Observe(float64(latency))
+		cm.get.Observe(lat)
 	case constants.PushQueryMsg:
-		cm.pushQuery.Observe(float64(latency))
+		cm.pushQuery.Observe(lat)
 	case constants.PullQueryMsg:
-		cm.pullQuery.Observe(float64(latency))
+		cm.pullQuery.Observe(lat)
 	}
 
 	if !cm.summaryEnabled {
@@ -165,7 +166,7 @@ func (cm *chainMetrics) observe(validatorID ids.ShortID, msgType constants.MsgTy
 	}
 
 	if err == nil {
-		observer.Observe(float64(latency))
+		observer.Observe(lat)
 	} else {
 		cm.ctx.Log.Warn("Failed to get observer with validatorID label due to %s", err)
 	}

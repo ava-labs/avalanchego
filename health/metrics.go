@@ -5,7 +5,6 @@ package health
 
 import (
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -27,13 +26,7 @@ func newMetrics(log logging.Logger, namespace string, registerer prometheus.Regi
 			Help:      "number of currently failing health checks",
 		}),
 	}
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		registerer.Register(metrics.failingChecks),
-	)
-
-	return metrics, errs.Err
+	return metrics, registerer.Register(metrics.failingChecks)
 }
 
 // healthy handles the metrics for the healthy cases
