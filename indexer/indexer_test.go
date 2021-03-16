@@ -514,3 +514,43 @@ func TestIncompleteIndex(t *testing.T) {
 	idxr.RegisterChain("chain1", chain1Ctx, chainEngine)
 	assert.True(idxr.closed)
 }
+
+// Ensure we only index chains in the primary network
+func TestIgnoreNonDefaultChains(t *testing.T) {
+	assert := assert.New(t)
+	cd := &triggers.EventDispatcher{}
+	cd.Initialize(logging.NoLog{})
+	dd := &triggers.EventDispatcher{}
+	dd.Initialize(logging.NoLog{})
+	baseDB := memdb.New()
+	db := versiondb.New(baseDB)
+	config := Config{
+		IndexingEnabled:      true,
+		AllowIncompleteIndex: false,
+		Log:                  logging.NoLog{},
+		Name:                 "test",
+		DB:                   db,
+		ConsensusDispatcher:  cd,
+		DecisionDispatcher:   dd,
+		APIServer:            &apiServerMock{},
+		ShutdownF:            func() {},
+	}
+
+	// Create indexer
+	idxrIntf, err := NewIndexer(config)
+	assert.NoError(err)
+	idxr, ok := idxrIntf.(*indexer)
+	assert.True(ok)
+
+	// Assert state is right
+	chain1Ctx := snow.DefaultContextTest()
+	chain1Ctx.ChainID = ids.GenerateTestID()
+	chain1Ctx.SubnetID = ids.GenerateTestID()
+
+	// RegisterChain should return without adding an index for this chain
+	chainVM := &smblockmocks.ChainVM{}
+	chainEngine := &smengmocks.SnowmanEngine{}
+	chainEngine.On("GetVM").Return(chainVM)
+	idxr.RegisterChain("chain1", chain1Ctx, chainEngine)
+	assert.Len(idxr.blockIndices, 0)
+}

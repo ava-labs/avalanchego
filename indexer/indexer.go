@@ -6,6 +6,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -45,19 +46,14 @@ var (
 
 // Config for an indexer
 type Config struct {
-	DB  database.Database
-	Log logging.Logger
-	// If false, use a dummy (no-op) indexer
-	IndexingEnabled bool
-	// If true, allow indices that may be missing containers
-	AllowIncompleteIndex bool
-	// Name of this indexer and the API endpoint
-	Name string
-	// TODO comment
+	DB                                      database.Database
+	Log                                     logging.Logger
+	IndexingEnabled                         bool
+	AllowIncompleteIndex                    bool
+	Name                                    string
 	DecisionDispatcher, ConsensusDispatcher *triggers.EventDispatcher
 	APIServer                               api.RouteAdder
-	// Called once in a goroutine when closing
-	ShutdownF func()
+	ShutdownF                               func()
 }
 
 // Indexer causes accepted containers for a given chain
@@ -66,6 +62,7 @@ type Config struct {
 // Indexer is threadsafe.
 type Indexer interface {
 	RegisterChain(name string, ctx *snow.Context, vm interface{})
+	// Close will do nothing and return nil after the first call
 	Close() error
 }
 
@@ -99,32 +96,42 @@ func NewIndexer(config Config) (Indexer, error) {
 
 // indexer implements Indexer
 type indexer struct {
-	name      string
-	codec     codec.Manager
-	clock     timer.Clock
-	lock      sync.RWMutex
-	log       logging.Logger
-	db        database.Database
-	closed    bool
+	// Name of endpoint
+	name   string
+	codec  codec.Manager
+	clock  timer.Clock
+	lock   sync.RWMutex
+	log    logging.Logger
+	db     database.Database
+	closed bool
+
+	// Called in a goroutine on shutdown
 	shutdownF func()
+
 	// true if this is not the first run using this database
 	hasRunBefore bool
 
+	// Used to add API endpoint for new indices
 	routeAdder api.RouteAdder
 
 	// If true, allow running in such a way that could allow the creation
 	// of an index which could be missing accepted containers.
 	allowIncompleteIndex bool
 
+	// If false, don't create index for a chain when RegisterChain is called
 	indexingEnabled bool
 
+	// Chain ID --> index of blocks of that chain (if applicable)
 	blockIndices map[ids.ID]Index
-	vtxIndices   map[ids.ID]Index
-	txIndices    map[ids.ID]Index
+	// Chain ID --> index of vertices of that chain (if applicable)
+	vtxIndices map[ids.ID]Index
+	// Chain ID --> index of txs of that chain (if applicable)
+	txIndices map[ids.ID]Index
 
-	// TODO comment
+	// Notifies of newly accepted blocks and vertices
 	consensusDispatcher *triggers.EventDispatcher
-	decisionDispatcher  *triggers.EventDispatcher
+	// Notifies of newly accepted transactions
+	decisionDispatcher *triggers.EventDispatcher
 }
 
 // Assumes [engineIntf]'s context lock is not held
@@ -134,6 +141,9 @@ func (i *indexer) RegisterChain(name string, ctx *snow.Context, engineIntf inter
 
 	if i.closed {
 		i.log.Debug("not registering chain %s because indexer is closed", name)
+		return
+	} else if ctx.SubnetID != constants.PrimaryNetworkID {
+		i.log.Debug("not registering chain %s because it's not in primary network", name)
 		return
 	}
 
