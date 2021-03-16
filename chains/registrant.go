@@ -9,6 +9,8 @@ import (
 
 // Registrant can register the existence of a chain
 type Registrant interface {
-	// If RegisterChain grabs [engine]'s lock, it must do so in a goroutine
+	// Called when the chain described by [ctx] and [engine] is created
+	// This function is called before the chain starts processing messages
+	// [engine] should be an avalanche.Engine or snowman.Engine
 	RegisterChain(name string, ctx *snow.Context, engine interface{})
 }

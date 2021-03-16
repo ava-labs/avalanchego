@@ -87,8 +87,7 @@ func newIndex(
 	i.log.Info("next accepted index %d", i.nextAcceptedIndex)
 
 	// We may have committed some containers in the index's db that were not committed at
-	// the VM's db. Go back through recently accepted things and make sure they're accepted.
-
+	// the VM's DB. Go back through recently accepted things and make sure they're accepted.
 	for j := i.nextAcceptedIndex; j >= 1; j-- {
 		lastAccepted, err := i.getContainerByIndex(j - 1)
 		if err != nil {
@@ -101,7 +100,6 @@ func newIndex(
 			return nil, fmt.Errorf("couldn't remove container: %s", err)
 		}
 	}
-
 	return i, nil
 }
 

@@ -141,7 +141,6 @@ type ManagerConfig struct {
 	HealthService             health.Service
 	RetryBootstrap            bool // Should Bootstrap be retried
 	RetryBootstrapMaxAttempts int  // Max number of times to retry bootstrap
-	NodeShutdownF             func()
 }
 
 type manager struct {
@@ -401,9 +400,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 }
 
 // Implements Manager.AddRegistrant
-func (m *manager) AddRegistrant(r Registrant) {
-	m.registrants = append(m.registrants, r)
-}
+func (m *manager) AddRegistrant(r Registrant) { m.registrants = append(m.registrants, r) }
 
 func (m *manager) unblockChains() {
 	m.unblocked = true

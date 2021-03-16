@@ -110,8 +110,9 @@ func (s *Server) DispatchTLS(certFile, keyFile string) error {
 // add <route, handler> pairs to server so that API calls can be made to the VM.
 // This method runs in a goroutine to avoid a deadlock in the event that the caller
 // holds the engine's context lock. Namely, this could happen when the P-Chain is
-// creating a new chain and holds the engine context lock when this function is held,
-// and at the same time the server's lock is held due to an API call.
+// creating a new chain and holds the P-Chain's lock when this function is held,
+// and at the same time the server's lock is held due to an API call and is trying
+// to grab the P-Chain's lock.
 func (s *Server) RegisterChain(chainName string, ctx *snow.Context, engineIntf interface{}) {
 	go func() {
 		var (
@@ -149,7 +150,7 @@ func (s *Server) RegisterChain(chainName string, ctx *snow.Context, engineIntf i
 		defaultEndpoint := "bc/" + chainID.String()
 
 		// Register each endpoint
-		for extension, service := range handlers {
+		for extension, handler := range handlers {
 			// Validate that the route being added is valid
 			// e.g. "/foo" and "" are ok but "\n" is not
 			_, err := url.ParseRequestURI(extension)
@@ -157,7 +158,7 @@ func (s *Server) RegisterChain(chainName string, ctx *snow.Context, engineIntf i
 				s.log.Error("could not add route to chain's API handler because route is malformed: %s", err)
 				continue
 			}
-			if err := s.AddChainRoute(service, ctx, defaultEndpoint, extension, httpLogger); err != nil {
+			if err := s.AddChainRoute(handler, ctx, defaultEndpoint, extension, httpLogger); err != nil {
 				s.log.Error("error adding route: %s", err)
 			}
 		}
