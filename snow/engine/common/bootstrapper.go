@@ -19,10 +19,6 @@ const (
 	// sent in a MultiPut message
 	MaxContainersPerMultiPut = 2000
 
-	// StatusUpdateFrequency is how many containers should be processed between
-	// logs
-	StatusUpdateFrequency = 2500
-
 	// MaxOutstandingRequests is the maximum number of GetAncestors sent but not
 	// responded to/failed
 	MaxOutstandingRequests = 8

@@ -10,7 +10,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-type state struct{ jobs *Jobs }
+type state struct {
+	// parser is able to parse a job from bytes.
+	parser Parser
+}
 
 func (s *state) SetInt(db database.Database, key []byte, size uint32) error {
 	p := wrappers.Packer{Bytes: make([]byte, wrappers.IntLen)}
@@ -30,6 +33,19 @@ func (s *state) Int(db database.Database, key []byte) (uint32, error) {
 	return p.UnpackInt(), p.Err
 }
 
+func (s *state) SetJobID(db database.Database, key []byte, jobID ids.ID) error {
+	return db.Put(key, jobID[:])
+}
+
+func (s *state) JobID(db database.Database, key []byte) (ids.ID, error) {
+	jobIDBytes, err := db.Get(key)
+	if err != nil {
+		return ids.ID{}, err
+	}
+
+	return ids.ToID(jobIDBytes)
+}
+
 func (s *state) SetJob(db database.Database, key []byte, job Job) error {
 	return db.Put(key, job.Bytes())
 }
@@ -39,7 +55,7 @@ func (s *state) Job(db database.Database, key []byte) (Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s.jobs.parser.Parse(value)
+	return s.parser.Parse(value)
 }
 
 // IDs returns a slice of IDs from storage
