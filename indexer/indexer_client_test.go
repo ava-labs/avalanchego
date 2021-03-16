@@ -1,111 +1,70 @@
 package indexer
 
 import (
-	"bufio"
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"net/http"
+	"reflect"
 	"testing"
 	"time"
+
+	"github.com/ava-labs/avalanchego/utils/rpc"
 )
-
-type mockHTTPClient struct {
-	Req   *http.Request
-	Resp  *http.Response
-	Error error
-}
-
-func (r *mockHTTPClient) Do(req *http.Request) (*http.Response, error) {
-	r.Req = req
-	return r.Resp, r.Error
-}
-
-func TestClientUrl(t *testing.T) {
-	cl := NewClient("http://localhost:1234/abc")
-
-	mock := &mockHTTPClient{}
-	cl.client = mock
-
-	if cl.toURL(IndexTypeTransactions) != "http://localhost:1234/abc/tx" {
-		t.Fatal("invalid toUrl")
-	}
-	if cl.toURL(IndexTypeVertices) != "http://localhost:1234/abc/vtx" {
-		t.Fatal("invalid toUrl")
-	}
-}
-
-type WrappedReaderCloser struct {
-	reader *bufio.Reader
-}
-
-func (w *WrappedReaderCloser) Read(p []byte) (n int, err error) {
-	return w.reader.Read(p)
-}
-
-func (w *WrappedReaderCloser) Close() error {
-	return nil
-}
 
 type TestClientOutput struct {
 	Out1 string
 }
 
-func TestClientSend(t *testing.T) {
-	cl := NewClient("http://localhost:1234/abc")
+type mockClient struct {
+	response interface{}
+	err      error
+}
 
-	mock := &mockHTTPClient{}
-	cl.client = mock
+// NewMockClient returns a mock client for testing
+func NewMockClient(response interface{}, err error) rpc.EndpointRequester {
+	return &mockClient{
+		response: response,
+		err:      err,
+	}
+}
+
+func (mc *mockClient) SendRequest(method string, params interface{}, reply interface{}) error {
+	if mc.err != nil {
+		return mc.err
+	}
+
+	switch p := reply.(type) {
+	case *interface{}:
+		response := mc.response.(*TestClientOutput)
+		*p = response
+	default:
+		panic(fmt.Sprintf("illegal type %s", reflect.TypeOf(reply)))
+	}
+	return nil
+}
+
+func TestClientSend(t *testing.T) {
+	cl := NewClient("http://localhost:1234", IndexTypeTransactions, 1*time.Minute)
+
+	testingArgumentValue := fmt.Sprintf("%v", time.Now().String())
+
+	resp := &TestClientOutput{Out1: testingArgumentValue}
+
+	mock := NewMockClient(resp, nil)
+	cl.requester = mock
 
 	type Args struct {
 		Arg1 string
 	}
 
-	testingArgumentValue := fmt.Sprintf("%v", time.Now().String())
-
-	outbody := buildTestOutput(&TestClientOutput{Out1: testingArgumentValue})
-
 	args := &Args{Arg1: "arg1"}
 	var output *TestClientOutput
 	var outputif interface{} = &output
 
-	mock.Resp = &http.Response{
-		Body:          &WrappedReaderCloser{reader: bufio.NewReader(&outbody)},
-		ContentLength: int64(outbody.Len()),
-	}
-
-	rc, err := cl.send(IndexTypeTransactions, "testMethod", args, &outputif)
-	if rc != 0 || err != nil {
+	err := cl.send("testMethod", args, &outputif)
+	if err != nil {
 		t.Fatal("invalid send")
 	}
 
-	bodydata, _ := cl.copy(mock.Req.Body)
-
-	clientRequestEncoded, _ := json.Marshal(&clientRequest{
-		RPC:    "2.0",
-		Method: "index." + "testMethod",
-		ID:     1,
-		Params: [1]interface{}{args},
-	})
-	if bodydata.String() != string(clientRequestEncoded) {
-		t.Fatal("body request invalid")
-	}
-
-	if output.Out1 != testingArgumentValue {
+	if outputif.(*TestClientOutput).Out1 != testingArgumentValue {
 		t.Fatal("output.Out1 invalid")
 	}
-}
-
-func buildTestOutput(o *TestClientOutput) bytes.Buffer {
-	clientResp, _ := json.Marshal(&o)
-	jclientResp := json.RawMessage(clientResp)
-	cresp := &clientResponse{
-		RPC:    "2.0",
-		ID:     0,
-		Result: &jclientResp,
-	}
-	bits, _ := json.Marshal(&cresp)
-	var outbody bytes.Buffer
-	outbody.Write(bits)
-	return outbody
 }
