@@ -454,6 +454,9 @@ func (p *peer) close() {
 	close(p.sender)
 	p.senderLock.Unlock()
 
+	peerPending := atomic.LoadInt64(&p.pendingBytes)
+	atomic.AddInt64(&p.net.pendingBytes, -peerPending)
+
 	p.net.disconnected(p)
 }
 
