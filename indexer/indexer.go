@@ -136,6 +136,7 @@ func (i *indexer) RegisterChain(name string, ctx *snow.Context, vmIntf interface
 		i.log.Debug("not registering chain %s because indexer is closed", name)
 		return
 	}
+
 	chainID := ctx.ChainID
 	if i.blockIndices[chainID] != nil || i.txIndices[chainID] != nil || i.vtxIndices[chainID] != nil {
 		i.log.Warn("chain %s is already being indexed", chainID)
@@ -276,7 +277,7 @@ func (i *indexer) registerChainHelper(
 	}
 
 	// Register index to learn about new accepted vertices
-	if err := dispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, name), index); err != nil {
+	if err := dispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID), index); err != nil {
 		_ = index.Close()
 		return nil, err
 	}
@@ -318,15 +319,15 @@ func (i *indexer) close() error {
 	errs := &wrappers.Errs{}
 	for chainID, txIndex := range i.txIndices {
 		errs.Add(txIndex.Close())
-		errs.Add(i.decisionDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name)))
+		errs.Add(i.decisionDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)))
 	}
 	for chainID, vtxIndex := range i.vtxIndices {
 		errs.Add(vtxIndex.Close())
-		errs.Add(i.consensusDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name)))
+		errs.Add(i.consensusDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)))
 	}
 	for chainID, blockIndex := range i.blockIndices {
 		errs.Add(blockIndex.Close())
-		errs.Add(i.consensusDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, i.name)))
+		errs.Add(i.consensusDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)))
 	}
 	errs.Add(i.db.Close())
 
