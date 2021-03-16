@@ -179,6 +179,18 @@ func (b *Block) syntacticVerify() error {
 	if err := b.ethBlock.SanityCheck(); err != nil {
 		return err
 	}
+	if b.ethBlock.Difficulty().Uint64() != 1 {
+		return errInvalidDifficulty
+	}
+	if b.ethBlock.Nonce() != 0 {
+		return errInvalidNonce
+	}
+	if b.ethBlock.Version() != 0 {
+		return errInvalidBlockVersion
+	}
+	if b.ethBlock.MixDigest() != (common.Hash{}) {
+		return errInvalidMixDigest
+	}
 	txsHash := types.DeriveSha(b.ethBlock.Transactions(), new(trie.Trie))
 	uncleHash := types.CalcUncleHash(b.ethBlock.Uncles())
 	ethHeader := b.ethBlock.Header()
