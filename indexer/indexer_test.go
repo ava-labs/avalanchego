@@ -7,6 +7,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -52,8 +54,11 @@ func TestNewIndexer(t *testing.T) {
 	assert.True(idxr.indexingEnabled)
 	assert.True(idxr.allowIncompleteIndex)
 	assert.NotNil(idxr.blockIndices)
+	assert.Len(idxr.blockIndices, 0)
 	assert.NotNil(idxr.txIndices)
+	assert.Len(idxr.txIndices, 0)
 	assert.NotNil(idxr.vtxIndices)
+	assert.Len(idxr.vtxIndices, 0)
 	assert.NotNil(idxr.consensusDispatcher)
 	assert.NotNil(idxr.decisionDispatcher)
 	assert.NotNil(idxr.shutdownF)
@@ -63,26 +68,32 @@ func TestNewIndexer(t *testing.T) {
 // Test that [hasRunBefore] is set correctly
 func TestMarkHasRun(t *testing.T) {
 	assert := assert.New(t)
-	ed := &triggers.EventDispatcher{}
-	ed.Initialize(logging.NoLog{})
+	cd := &triggers.EventDispatcher{}
+	cd.Initialize(logging.NoLog{})
+	dd := &triggers.EventDispatcher{}
+	dd.Initialize(logging.NoLog{})
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
+	shutdown := &sync.WaitGroup{}
+	shutdown.Add(1)
 	config := Config{
-		IndexingEnabled:      true,
-		AllowIncompleteIndex: true,
-		Log:                  logging.NoLog{},
-		Name:                 "test",
-		DB:                   db,
-		ConsensusDispatcher:  ed,
-		DecisionDispatcher:   ed,
-		APIServer:            &apiServerMock{},
-		ShutdownF:            func() {},
+		IndexingEnabled:     true,
+		Log:                 logging.NoLog{},
+		Name:                "test",
+		DB:                  db,
+		ConsensusDispatcher: cd,
+		DecisionDispatcher:  dd,
+		APIServer:           &apiServerMock{},
+		ShutdownF:           func() { shutdown.Done() },
 	}
 
 	idxrIntf, err := NewIndexer(config)
 	assert.NoError(err)
+	assert.False(idxrIntf.(*indexer).hasRunBefore)
 	assert.NoError(db.Commit())
 	assert.NoError(idxrIntf.Close())
+	shutdown.Wait()
+	shutdown.Add(1)
 
 	config.DB = versiondb.New(baseDB)
 	idxrIntf, err = NewIndexer(config)
@@ -90,25 +101,27 @@ func TestMarkHasRun(t *testing.T) {
 	idxr, ok := idxrIntf.(*indexer)
 	assert.True(ok)
 	assert.True(idxr.hasRunBefore)
+	assert.NoError(idxr.Close())
+	shutdown.Wait()
 }
 
-/*
-
 // Test that chains added to indexer with IndexChain work
-func TestIndexChain(t *testing.T) {
+func TestRegisterSnowmanChain(t *testing.T) {
 	assert := assert.New(t)
-	ed := &triggers.EventDispatcher{}
-	ed.Initialize(logging.NoLog{})
+	cd := &triggers.EventDispatcher{}
+	cd.Initialize(logging.NoLog{})
+	dd := &triggers.EventDispatcher{}
+	dd.Initialize(logging.NoLog{})
 	config := Config{
-		IndexingEnabled:        true,
-		AllowIncompleteIndex:   false,
-		Log:                    logging.NoLog{},
-		Name:                   "test",
-		DB:                     memdb.New(),
-		ConsensusDispatcher:        ed,
-		DecisionsDispatcher: ed,
-		InitiallyIndexedChains: ids.Set{}, // No chains indexed at start
-		APIServer:              &apiServerMock{},
+		IndexingEnabled:      true,
+		AllowIncompleteIndex: false,
+		Log:                  logging.NoLog{},
+		Name:                 "test",
+		DB:                   memdb.New(),
+		ConsensusDispatcher:  cd,
+		DecisionDispatcher:   dd,
+		APIServer:            &apiServerMock{},
+		ShutdownF:            func() { t.Fatal("shouldn't have shut down") },
 	}
 
 	// Create indexer and make sure its state is right
@@ -116,66 +129,60 @@ func TestIndexChain(t *testing.T) {
 	assert.NoError(err)
 	idxr, ok := idxrIntf.(*indexer)
 	assert.True(ok)
-	assert.Equal(config.Name, idxr.name)
-	assert.NotNil(idxr.log)
-	assert.NotNil(idxr.db)
-	assert.NotNil(idxr.indexedChains)
-	assert.False(idxr.allowIncompleteIndex)
-	assert.NotNil(idxr.chainLookup)
-	assert.NotNil(idxr.codec)
-	assert.NotNil(idxr.chainToIndex)
-	assert.Equal(1, config.APIServer.(*apiServerMock).timesCalled)
-	assert.Len(idxr.GetIndexedChains(), 0)
 
 	ctx := snow.DefaultContextTest()
 	ctx.ChainID = ids.GenerateTestID()
-	err = idxr.IndexChain(ctx.ChainID)
-	assert.Error(err)                // Should error because incomplete indices not allowed
-	idxr.allowIncompleteIndex = true // Allow incomplete index
-	err = idxr.IndexChain(ctx.ChainID)
-	assert.NoError(err) // Should succeed now
-
-	containerID, containerBytes := ids.GenerateTestID(), utils.RandomBytes(32)
-	now := time.Now()
-	idxr.clock.Set(now)
-	expectedContainer := Container{
-		ID:        containerID,
-		Bytes:     containerBytes,
-		Timestamp: now.Unix(),
-	}
-
-	// Accept a container
-	ed.Accept(ctx, containerID, containerBytes)
-
-	// Verify GetLastAccepted is right
-	gotLastAccepted, err := idxr.GetLastAccepted(ctx.ChainID)
+	isIncomplete, err := idxr.isIncomplete(ctx.ChainID)
 	assert.NoError(err)
-	assert.Equal(expectedContainer, gotLastAccepted)
-
-	// Verify GetContainerByID is right
-	container, err := idxr.GetContainerByID(ctx.ChainID, containerID)
+	assert.False(isIncomplete)
+	previouslyIndexed, err := idxr.previouslyIndexed(ctx.ChainID)
 	assert.NoError(err)
-	assert.Equal(expectedContainer, container)
+	assert.False(previouslyIndexed)
 
-	// Verify GetIndex is right
-	index, err := idxr.GetIndex(ctx.ChainID, containerID)
-	assert.NoError(err)
-	assert.EqualValues(0, index)
+	//idxr.RegisterChain("chain1", ctx.ChainID, eng)
 
-	// Verify GetContainerByIndex is right
-	container, err = idxr.GetContainerByIndex(ctx.ChainID, 0)
-	assert.NoError(err)
-	assert.Equal(expectedContainer, container)
+	// containerID, containerBytes := ids.GenerateTestID(), utils.RandomBytes(32)
+	// now := time.Now()
+	// idxr.clock.Set(now)
+	// expectedContainer := Container{
+	// 	ID:        containerID,
+	// 	Bytes:     containerBytes,
+	// 	Timestamp: now.Unix(),
+	// }
 
-	// Verify GetContainerRange is right
-	containers, err := idxr.GetContainerRange(ctx.ChainID, 0, 1)
-	assert.NoError(err)
-	assert.Len(containers, 1)
-	assert.Equal(expectedContainer, containers[0])
+	// // Accept a container
+	// ed.Accept(ctx, containerID, containerBytes)
 
-	assert.NoError(idxr.Close())
+	// // Verify GetLastAccepted is right
+	// gotLastAccepted, err := idxr.GetLastAccepted(ctx.ChainID)
+	// assert.NoError(err)
+	// assert.Equal(expectedContainer, gotLastAccepted)
+
+	// // Verify GetContainerByID is right
+	// container, err := idxr.GetContainerByID(ctx.ChainID, containerID)
+	// assert.NoError(err)
+	// assert.Equal(expectedContainer, container)
+
+	// // Verify GetIndex is right
+	// index, err := idxr.GetIndex(ctx.ChainID, containerID)
+	// assert.NoError(err)
+	// assert.EqualValues(0, index)
+
+	// // Verify GetContainerByIndex is right
+	// container, err = idxr.GetContainerByIndex(ctx.ChainID, 0)
+	// assert.NoError(err)
+	// assert.Equal(expectedContainer, container)
+
+	// // Verify GetContainerRange is right
+	// containers, err := idxr.GetContainerRange(ctx.ChainID, 0, 1)
+	// assert.NoError(err)
+	// assert.Len(containers, 1)
+	// assert.Equal(expectedContainer, containers[0])
+
+	// assert.NoError(idxr.Close())
 }
 
+/*
 // Test method CloseIndex
 func TestCloseIndex(t *testing.T) {
 	// Setup
@@ -194,7 +201,7 @@ func TestCloseIndex(t *testing.T) {
 		Name:                   "test",
 		DB:                     memdb.New(),
 		ConsensusDispatcher:        ed,
-		DecisionsDispatcher: ed,
+		DecisionDispatcher: ed,
 		APIServer:              &apiServerMock{},
 	}
 
@@ -251,7 +258,7 @@ func TestIncompleteIndexStartup(t *testing.T) {
 		Name:                   "test",
 		DB:                     dbCopy,
 		ConsensusDispatcher:        ed,
-		DecisionsDispatcher: ed,
+		DecisionDispatcher: ed,
 		APIServer:              &apiServerMock{},
 	}
 
@@ -317,7 +324,7 @@ func TestIncompleteIndexNewChain(t *testing.T) {
 		Name:                   "test",
 		DB:                     dbCopy,
 		ConsensusDispatcher:        ed,
-		DecisionsDispatcher: ed,
+		DecisionDispatcher: ed,
 		InitiallyIndexedChains: nil, // no initially indexed chains
 		APIServer:              &apiServerMock{},
 	}

@@ -150,7 +150,7 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 	}
 
 	// See if this chain was indexed in a previous run
-	previouslyIndexed, err := i.wasPreviouslyIndexed(chainID)
+	previouslyIndexed, err := i.previouslyIndexed(chainID)
 	if err != nil {
 		i.log.Error("couldn't get whether chain %s was previously indexed: %s", name, err)
 		if err := i.close(); err != nil {
@@ -361,7 +361,7 @@ func (i *indexer) markPreviouslyIndexed(chainID ids.ID) error {
 }
 
 // Returns true if this chain is incomplete
-func (i *indexer) wasPreviouslyIndexed(chainID ids.ID) (bool, error) {
+func (i *indexer) previouslyIndexed(chainID ids.ID) (bool, error) {
 	key := make([]byte, hashing.HashLen+wrappers.ByteLen)
 	copy(key, chainID[:])
 	key[hashing.HashLen] = previouslyIndexedPrefix
