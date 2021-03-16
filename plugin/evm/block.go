@@ -176,17 +176,57 @@ func (b *Block) syntacticVerify() error {
 		return nil
 	}
 
-	if err := b.ethBlock.SanityCheck(); err != nil {
-		return err
-	}
-	txsHash := types.DeriveSha(b.ethBlock.Transactions(), new(trie.Trie))
-	uncleHash := types.CalcUncleHash(b.ethBlock.Uncles())
+	// Perform block and header sanity checks
 	ethHeader := b.ethBlock.Header()
+	if ethHeader.Number == nil || !ethHeader.Number.IsUint64() {
+		return errInvalidBlock
+	}
+	if ethHeader.Difficulty == nil || !ethHeader.Difficulty.IsUint64() ||
+		ethHeader.Difficulty.Uint64() != 1 {
+		return fmt.Errorf(
+			"expected difficulty to be 1 but got %v: %w",
+			ethHeader.Difficulty, errInvalidDifficulty,
+		)
+	}
+	if ethHeader.Nonce.Uint64() != 0 {
+		return fmt.Errorf(
+			"expected nonce to be 0 but got %d: %w",
+			ethHeader.Nonce.Uint64(), errInvalidNonce,
+		)
+	}
+	if ethHeader.MixDigest != (common.Hash{}) {
+		return fmt.Errorf(
+			"expected MixDigest to be empty but got %x: %w",
+			ethHeader.MixDigest, errInvalidMixDigest,
+		)
+	}
+	if ethHeader.ExtDataHash != (common.Hash{}) {
+		return fmt.Errorf(
+			"expected ExtDataHash to be empty but got %x: %w",
+			ethHeader.ExtDataHash, errInvalidExtDataHash,
+		)
+	}
+	headerExtraDataSize := uint64(len(ethHeader.Extra))
+	if headerExtraDataSize > params.MaximumExtraDataSize {
+		return fmt.Errorf(
+			"expected header ExtraData to be <= %d but got %d: %w",
+			params.MaximumExtraDataSize, headerExtraDataSize, errHeaderExtraDataTooBig,
+		)
+	}
+	if b.ethBlock.Version() != 0 {
+		return fmt.Errorf(
+			"expected block version to be 0 but got %d: %w",
+			b.ethBlock.Version(), errInvalidBlockVersion,
+		)
+	}
+
 	// Check that the tx hash in the header matches the body
+	txsHash := types.DeriveSha(b.ethBlock.Transactions(), new(trie.Trie))
 	if txsHash != ethHeader.TxHash {
 		return errTxHashMismatch
 	}
 	// Check that the uncle hash in the header matches the body
+	uncleHash := types.CalcUncleHash(b.ethBlock.Uncles())
 	if uncleHash != ethHeader.UncleHash {
 		return errUncleHashMismatch
 	}
@@ -199,6 +239,8 @@ func (b *Block) syntacticVerify() error {
 		return errUnclesUnsupported
 	}
 	// Block must not be empty
+	//
+	// Note: getAtomicTx also asserts a maximum size
 	atomicTx, err := b.vm.getAtomicTx(b.ethBlock)
 	if err != nil {
 		return err

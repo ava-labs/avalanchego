@@ -4,7 +4,6 @@
 package evm
 
 import (
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -115,6 +114,11 @@ var (
 	errTxHashMismatch             = errors.New("txs hash does not match header")
 	errUncleHashMismatch          = errors.New("uncle hash mismatch")
 	errRejectedParent             = errors.New("rejected parent")
+	errInvalidDifficulty          = errors.New("invalid difficulty")
+	errInvalidBlockVersion        = errors.New("invalid block version")
+	errInvalidMixDigest           = errors.New("invalid mix digest")
+	errInvalidExtDataHash         = errors.New("invalid extra data hash")
+	errHeaderExtraDataTooBig      = errors.New("header extra data too big")
 )
 
 // mayBuildBlockStatus denotes whether the engine should be notified
@@ -322,14 +326,6 @@ func (vm *VM) Initialize(
 	chain := coreth.NewETHChain(&config, &nodecfg, nil, vm.chaindb, vm.CLIConfig.EthBackendSettings())
 	vm.chain = chain
 	vm.networkID = config.NetworkId
-	chain.SetOnHeaderNew(func(header *types.Header) {
-		hid := make([]byte, 32)
-		_, err := rand.Read(hid)
-		if err != nil {
-			panic("cannot generate hid")
-		}
-		header.Extra = append(header.Extra, hid...)
-	})
 	chain.SetOnFinalizeAndAssemble(func(state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
 		select {
 		case atx := <-vm.pendingAtomicTxs:
