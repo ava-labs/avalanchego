@@ -28,8 +28,8 @@ type Service interface {
 	Handler() (*common.HTTPHandler, error)
 }
 
-func NewService(checkFreq time.Duration, log logging.Logger, registry prometheus.Registerer) (Service, error) {
-	service, err := healthlib.NewService(checkFreq, log, registry)
+func NewService(checkFreq time.Duration, log logging.Logger, namespace string, registry prometheus.Registerer) (Service, error) {
+	service, err := healthlib.NewService(checkFreq, log, namespace, registry)
 	if err != nil {
 		return nil, err
 	}
