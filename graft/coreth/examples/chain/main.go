@@ -54,14 +54,6 @@ func NewTestChain(name string, config *eth.Config,
 		outBlockCh: outBlockCh,
 	}
 	tc.insertBlock(tc.chain.GetGenesisBlock())
-	tc.chain.SetOnHeaderNew(func(header *types.Header) {
-		hid := make([]byte, 32)
-		_, err := rand.Read(hid)
-		if err != nil {
-			panic("cannot generate hid")
-		}
-		header.Extra = append(header.Extra, hid...)
-	})
 	tc.chain.SetOnSealFinish(func(block *types.Block) error {
 		blkID := tc.blkCount
 		tc.blkCount++
