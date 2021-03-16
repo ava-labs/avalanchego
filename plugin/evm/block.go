@@ -206,8 +206,12 @@ func (b *Block) syntacticVerify() error {
 			ethHeader.ExtDataHash, errInvalidExtDataHash,
 		)
 	}
-	if uint64(len(ethHeader.Extra)) > params.MaximumExtraDataSize {
-		return errInvalidHeaderData
+	headerExtraDataSize := uint64(len(ethHeader.Extra))
+	if headerExtraDataSize > params.MaximumExtraDataSize {
+		return fmt.Errorf(
+			"expected header ExtraData to be <= %d but got %d: %w",
+			params.MaximumExtraDataSize, headerExtraDataSize, errHeaderExtraDataTooBig,
+		)
 	}
 	if b.ethBlock.Version() != 0 {
 		return fmt.Errorf(
