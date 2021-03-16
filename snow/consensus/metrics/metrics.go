@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Metrics reports commonly used consensus metrics.
@@ -24,7 +24,7 @@ type Metrics struct {
 	// ProcessingEntries keeps track of the time that each item was issued into
 	// the consensus instance. This is used to calculate the amount of time to
 	// accept or reject the item.
-	ProcessingEntries linkedhashmap.LinkedHashmap
+	processingEntries linkedhashmap.LinkedHashmap
 
 	// log reports anomalous events.
 	log logging.Logger
@@ -38,12 +38,13 @@ type Metrics struct {
 
 	// rejected tracks the number of milliseconds that an item was processing
 	// before being rejected
-	latRejected prometheus.Histogram
+	latRejected             prometheus.Histogram
+	longestRunningContainer prometheus.Histogram
 }
 
 // Initialize the metrics with the provided names.
 func (m *Metrics) Initialize(metricName, descriptionName string, log logging.Logger, namespace string, registerer prometheus.Registerer) error {
-	m.ProcessingEntries = linkedhashmap.New()
+	m.processingEntries = linkedhashmap.New()
 	m.log = log
 
 	m.numProcessing = prometheus.NewGauge(prometheus.GaugeOpts{
@@ -55,13 +56,19 @@ func (m *Metrics) Initialize(metricName, descriptionName string, log logging.Log
 		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_accepted", metricName),
 		Help:      fmt.Sprintf("Latency of accepting from the time the %s was issued in milliseconds", descriptionName),
-		Buckets:   timer.MillisecondsBuckets,
+		Buckets:   utils.MillisecondsBuckets,
 	})
 	m.latRejected = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_rejected", metricName),
 		Help:      fmt.Sprintf("Latency of rejecting from the time the %s was issued in milliseconds", descriptionName),
-		Buckets:   timer.MillisecondsBuckets,
+		Buckets:   utils.MillisecondsBuckets,
+	})
+	m.longestRunningContainer = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      fmt.Sprintf("%s_longest_running", metricName),
+		Help:      fmt.Sprintf("Latency of processing the issued %s in milliseconds", descriptionName),
+		Buckets:   utils.MillisecondsBuckets,
 	})
 
 	errs := wrappers.Errs{}
@@ -75,18 +82,18 @@ func (m *Metrics) Initialize(metricName, descriptionName string, log logging.Log
 
 // Issued marks the item as having been issued.
 func (m *Metrics) Issued(id ids.ID) {
-	m.ProcessingEntries.Put(id, m.Clock.Time())
+	m.processingEntries.Put(id, m.Clock.Time())
 	m.numProcessing.Inc()
 }
 
 // Accepted marks the item as having been accepted.
 func (m *Metrics) Accepted(id ids.ID) {
-	startTime, ok := m.ProcessingEntries.Get(id)
+	startTime, ok := m.processingEntries.Get(id)
 	if !ok {
 		m.log.Debug("unable to measure Accepted transaction %v", id.String())
 		return
 	}
-	m.ProcessingEntries.Delete(id)
+	m.processingEntries.Delete(id)
 
 	endTime := m.Clock.Time()
 	duration := endTime.Sub(startTime.(time.Time))
@@ -96,15 +103,32 @@ func (m *Metrics) Accepted(id ids.ID) {
 
 // Rejected marks the item as having been rejected.
 func (m *Metrics) Rejected(id ids.ID) {
-	startTime, ok := m.ProcessingEntries.Get(id)
+	startTime, ok := m.processingEntries.Get(id)
 	if !ok {
 		m.log.Debug("unable to measure Rejected transaction %v", id.String())
 		return
 	}
-	m.ProcessingEntries.Delete(id)
+	m.processingEntries.Delete(id)
 
 	endTime := m.Clock.Time()
 	duration := endTime.Sub(startTime.(time.Time))
 	m.latRejected.Observe(float64(duration.Milliseconds()))
 	m.numProcessing.Dec()
+}
+
+func (m *Metrics) MeasureAndGetOldestDuration() time.Duration {
+	now := m.Clock.Time()
+	oldestTimeIntf, exists := m.processingEntries.Oldest()
+	oldestTime := now
+	if exists {
+		oldestTime = oldestTimeIntf.(time.Time)
+	}
+
+	duration := now.Sub(oldestTime)
+	m.longestRunningContainer.Observe(float64(duration.Milliseconds()))
+	return duration
+}
+
+func (m *Metrics) ProcessingLen() int {
+	return m.processingEntries.Len()
 }

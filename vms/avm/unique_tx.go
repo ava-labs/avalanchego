@@ -106,7 +106,8 @@ func (tx *UniqueTx) setStatus(status choices.Status) error {
 }
 
 // ID returns the wrapped txID
-func (tx *UniqueTx) ID() ids.ID { return tx.txID }
+func (tx *UniqueTx) ID() ids.ID       { return tx.txID }
+func (tx *UniqueTx) Key() interface{} { return tx.txID }
 
 // Accept is called when the transaction was finalized as accepted by consensus
 func (tx *UniqueTx) Accept() error {

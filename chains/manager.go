@@ -432,7 +432,11 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	dbManager := m.DBManager.NewPrefixDBManager(ctx.ChainID[:])
+	metricsManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+	if err != nil {
+		return nil, err
+	}
+	dbManager := metricsManager.NewPrefixDBManager(ctx.ChainID[:])
 	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
 
 	db := dbManager.Current()
@@ -559,7 +563,11 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	dbManager := m.DBManager.NewPrefixDBManager(ctx.ChainID[:])
+	metricsManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+	if err != nil {
+		return nil, err
+	}
+	dbManager := metricsManager.NewPrefixDBManager(ctx.ChainID[:])
 	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
 
 	db := dbManager.Current()
