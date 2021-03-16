@@ -17,9 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman"
 	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/gorilla/rpc/v2"
@@ -128,7 +128,7 @@ type indexer struct {
 }
 
 // Assumes [engineIntf]'s context lock is not held
-func (i *indexer) RegisterChain(name string, ctx *snow.Context, vmIntf interface{}) {
+func (i *indexer) RegisterChain(name string, ctx *snow.Context, engineIntf interface{}) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
@@ -203,13 +203,13 @@ func (i *indexer) RegisterChain(name string, ctx *snow.Context, vmIntf interface
 		return
 	}
 
-	switch vm := vmIntf.(type) {
-	case block.ChainVM:
+	switch engine := engineIntf.(type) {
+	case snowman.Engine:
 		isAcceptedFunc := func(blkID ids.ID) bool {
 			ctx.Lock.Lock()
 			defer ctx.Lock.Unlock()
 
-			blk, err := vm.GetBlock(blkID)
+			blk, err := engine.GetVM().GetBlock(blkID)
 			return err == nil && blk.Status() == choices.Accepted
 		}
 
@@ -222,16 +222,16 @@ func (i *indexer) RegisterChain(name string, ctx *snow.Context, vmIntf interface
 			return
 		}
 		i.blockIndices[chainID] = index
-	case vertex.DAGVM:
-		isAcceptedFunc := func(txID ids.ID) bool {
+	case avalanche.Engine:
+		isVtxAcceptedFunc := func(vtxID ids.ID) bool {
 			ctx.Lock.Lock()
 			defer ctx.Lock.Unlock()
 
-			tx, err := vm.GetTx(txID)
+			tx, err := engine.GetVtx(vtxID)
 			return err == nil && tx.Status() == choices.Accepted
 		}
 
-		vtxIndex, err := i.registerChainHelper(chainID, vtxPrefix, name, "vtx", i.consensusDispatcher, isAcceptedFunc)
+		vtxIndex, err := i.registerChainHelper(chainID, vtxPrefix, name, "vtx", i.consensusDispatcher, isVtxAcceptedFunc)
 		if err != nil {
 			i.log.Fatal("couldn't create vertex index for %s: %s", name, err)
 			if err := i.close(); err != nil {
@@ -240,7 +240,15 @@ func (i *indexer) RegisterChain(name string, ctx *snow.Context, vmIntf interface
 			return
 		}
 		i.vtxIndices[chainID] = vtxIndex
-		txIndex, err := i.registerChainHelper(chainID, txPrefix, name, "tx", i.decisionDispatcher, isAcceptedFunc)
+
+		isTxAcceptedFunc := func(txID ids.ID) bool {
+			ctx.Lock.Lock()
+			defer ctx.Lock.Unlock()
+
+			tx, err := engine.GetVM().GetTx(txID)
+			return err == nil && tx.Status() == choices.Accepted
+		}
+		txIndex, err := i.registerChainHelper(chainID, txPrefix, name, "tx", i.decisionDispatcher, isTxAcceptedFunc)
 		if err != nil {
 			i.log.Fatal("couldn't create tx index for %s: %s", name, err)
 			if err := i.close(); err != nil {
@@ -250,7 +258,7 @@ func (i *indexer) RegisterChain(name string, ctx *snow.Context, vmIntf interface
 		}
 		i.txIndices[chainID] = txIndex
 	default:
-		i.log.Error("expected block.ChainVM or vertex.DAGVM but got %T", vmIntf)
+		i.log.Error("got unexpected engine type %T", engineIntf)
 		if err := i.close(); err != nil {
 			i.log.Error("error while closing indexer: %s", err)
 		}

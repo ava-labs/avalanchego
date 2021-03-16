@@ -20,9 +20,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/auth"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -106,13 +106,13 @@ func (s *Server) DispatchTLS(certFile, keyFile string) error {
 	return http.ServeTLS(listener, handler, certFile, keyFile)
 }
 
-// RegisterChain registers the API endpoints associated with this chain That is,
+// RegisterChain registers the API endpoints associated with this chain. That is,
 // add <route, handler> pairs to server so that API calls can be made to the VM.
 // This method runs in a goroutine to avoid a deadlock in the event that the caller
 // holds the engine's context lock. Namely, this could happen when the P-Chain is
 // creating a new chain and holds the engine context lock when this function is held,
 // and at the same time the server's lock is held due to an API call.
-func (s *Server) RegisterChain(chainName string, ctx *snow.Context, vmIntf interface{}) {
+func (s *Server) RegisterChain(chainName string, ctx *snow.Context, engineIntf interface{}) {
 	go func() {
 		var (
 			ctx      *snow.Context
@@ -120,17 +120,17 @@ func (s *Server) RegisterChain(chainName string, ctx *snow.Context, vmIntf inter
 			err      error
 		)
 
-		switch vm := vmIntf.(type) {
-		case block.ChainVM:
+		switch engine := engineIntf.(type) {
+		case snowman.Engine:
 			ctx.Lock.Lock()
-			handlers, err = vm.CreateHandlers()
+			handlers, err = engine.GetVM().CreateHandlers()
 			ctx.Lock.Unlock()
-		case vertex.DAGVM:
+		case avalanche.Engine:
 			ctx.Lock.Lock()
-			handlers, err = vm.CreateHandlers()
+			handlers, err = engine.GetVM().CreateHandlers()
 			ctx.Lock.Unlock()
 		default:
-			s.log.Error("VM has unexpected type %T", vmIntf)
+			s.log.Error("engine has unexpected type %T", engineIntf)
 			return
 		}
 		if err != nil {

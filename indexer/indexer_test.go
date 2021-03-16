@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/mocks"
 	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -151,7 +152,10 @@ func TestRegisterSnowmanChain(t *testing.T) {
 
 	// Register this chain, creating a new index
 	vm := &block.TestVM{}
-	idxr.RegisterChain("chain1", ctx, vm)
+	engine := &mocks.SnowmanEngine{}
+	engine.On("GetVM").Return(vm)
+
+	idxr.RegisterChain("chain1", ctx, engine)
 	isIncomplete, err = idxr.isIncomplete(ctx.ChainID)
 	assert.NoError(err)
 	assert.False(isIncomplete)

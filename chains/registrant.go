@@ -10,5 +10,5 @@ import (
 // Registrant can register the existence of a chain
 type Registrant interface {
 	// If RegisterChain grabs [engine]'s lock, it must do so in a goroutine
-	RegisterChain(name string, ctx *snow.Context, vm interface{})
+	RegisterChain(name string, ctx *snow.Context, engine interface{})
 }
