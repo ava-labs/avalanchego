@@ -342,7 +342,6 @@ func (b *Block) SetExtraData(data []byte) {
 	} else {
 		b.extdata = nil
 	}
-	b.header.ExtDataHash = rlpHash(data)
 	b.hash = atomic.Value{}
 }
 
