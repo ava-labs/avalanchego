@@ -227,8 +227,8 @@ func (i *indexer) RegisterChain(name string, ctx *snow.Context, engineIntf inter
 			ctx.Lock.Lock()
 			defer ctx.Lock.Unlock()
 
-			tx, err := engine.GetVtx(vtxID)
-			return err == nil && tx.Status() == choices.Accepted
+			vtx, err := engine.GetVtx(vtxID)
+			return err == nil && vtx.Status() == choices.Accepted
 		}
 
 		vtxIndex, err := i.registerChainHelper(chainID, vtxPrefix, name, "vtx", i.consensusDispatcher, isVtxAcceptedFunc)
