@@ -34,7 +34,7 @@ var (
 
 // Index indexes container (a blob of bytes with an ID) in their order of acceptance
 // Index implements triggers.Acceptor
-// Index is thread-safe
+// Index is thread-safe.
 type Index interface {
 	Accept(ctx *snow.Context, containerID ids.ID, container []byte) error
 	GetContainerByIndex(index uint64) (Container, error)
@@ -86,7 +86,7 @@ func newIndex(
 	}
 	i.log.Info("next accepted index %d", i.nextAcceptedIndex)
 
-	// We may have committed some containers in the index's db that were not committed at
+	// We may have committed some containers in the index's DB that were not committed at
 	// the VM's DB. Go back through recently accepted things and make sure they're accepted.
 	for j := i.nextAcceptedIndex; j >= 1; j-- {
 		lastAccepted, err := i.getContainerByIndex(j - 1)
@@ -315,7 +315,6 @@ func (i *index) GetLastAccepted() (Container, error) {
 	if !exists {
 		return Container{}, errNoneAccepted
 	}
-
 	return i.GetContainerByIndex(lastAcceptedIndex)
 }
 
@@ -327,10 +326,7 @@ func (i *index) lastAcceptedIndex() (uint64, bool) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
-	if i.nextAcceptedIndex == 0 {
-		return 0, false
-	}
-	return i.nextAcceptedIndex - 1, true
+	return i.nextAcceptedIndex - 1, i.nextAcceptedIndex == 0
 }
 
 // Remove the last accepted container, whose ID is given, from the databases
