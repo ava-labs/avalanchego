@@ -1591,21 +1591,22 @@ func (bc *BlockChain) TxLookupLimit() uint64 {
 
 var lastWrite uint64
 
-// writeBlockWithoutState writes only the block and its metadata to the database,
-// but does not write any state. This is used to construct competing side forks
-// up to the point where they exceed the canonical total difficulty.
-func (bc *BlockChain) writeBlockWithoutState(block *types.Block, td *big.Int) (err error) {
-	bc.wg.Add(1)
-	defer bc.wg.Done()
-
-	batch := bc.db.NewBatch()
-	rawdb.WriteTd(batch, block.Hash(), block.NumberU64(), td)
-	rawdb.WriteBlock(batch, block)
-	if err := batch.Write(); err != nil {
-		log.Crit("Failed to write block into disk", "err", err)
-	}
-	return nil
-}
+// Original Code:
+// // writeBlockWithoutState writes only the block and its metadata to the database,
+// // but does not write any state. This is used to construct competing side forks
+// // up to the point where they exceed the canonical total difficulty.
+// func (bc *BlockChain) writeBlockWithoutState(block *types.Block, td *big.Int) (err error) {
+// 	bc.wg.Add(1)
+// 	defer bc.wg.Done()
+//
+// 	batch := bc.db.NewBatch()
+// 	rawdb.WriteTd(batch, block.Hash(), block.NumberU64(), td)
+// 	rawdb.WriteBlock(batch, block)
+// 	if err := batch.Write(); err != nil {
+// 		log.Crit("Failed to write block into disk", "err", err)
+// 	}
+// 	return nil
+// }
 
 // SetPreference attempts to update the head block to be the provided block and
 // emits a ChainHeadEvent if successful. This function will handle all reorg
@@ -2384,7 +2385,6 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 					l := *log
 					if removed {
 						l.Removed = true
-					} else {
 					}
 					logs = append(logs, &l)
 				}

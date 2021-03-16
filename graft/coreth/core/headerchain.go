@@ -28,8 +28,6 @@ package core
 
 import (
 	crand "crypto/rand"
-	"errors"
-	"fmt"
 	"math"
 	"math/big"
 	mrand "math/rand"
@@ -234,63 +232,64 @@ func (hc *HeaderChain) GetBlockNumber(hash common.Hash) *uint64 {
 // 	return
 // }
 
-// WhCallback is a callback function for inserting individual headers.
-// A callback is used for two reasons: first, in a LightChain, status should be
-// processed and light chain events sent, while in a BlockChain this is not
-// necessary since chain events are sent after inserting blocks. Second, the
-// header writes should be protected by the parent chain mutex individually.
-type WhCallback func(*types.Header) error
-
-func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int) (int, error) {
-	// Do a sanity check that the provided chain is actually ordered and linked
-	for i := 1; i < len(chain); i++ {
-		if chain[i].Number.Uint64() != chain[i-1].Number.Uint64()+1 || chain[i].ParentHash != chain[i-1].Hash() {
-			// Chain broke ancestry, log a message (programming error) and skip insertion
-			log.Error("Non contiguous header insert", "number", chain[i].Number, "hash", chain[i].Hash(),
-				"parent", chain[i].ParentHash, "prevnumber", chain[i-1].Number, "prevhash", chain[i-1].Hash())
-
-			return 0, fmt.Errorf("non contiguous insert: item %d is #%d [%x…], item %d is #%d [%x…] (parent [%x…])", i-1, chain[i-1].Number,
-				chain[i-1].Hash().Bytes()[:4], i, chain[i].Number, chain[i].Hash().Bytes()[:4], chain[i].ParentHash[:4])
-		}
-	}
-
-	// Generate the list of seal verification requests, and start the parallel verifier
-	seals := make([]bool, len(chain))
-	if checkFreq != 0 {
-		// In case of checkFreq == 0 all seals are left false.
-		for i := 0; i < len(seals)/checkFreq; i++ {
-			index := i*checkFreq + hc.rand.Intn(checkFreq)
-			if index >= len(seals) {
-				index = len(seals) - 1
-			}
-			seals[index] = true
-		}
-		// Last should always be verified to avoid junk.
-		seals[len(seals)-1] = true
-	}
-
-	abort, results := hc.engine.VerifyHeaders(hc, chain, seals)
-	defer close(abort)
-
-	// Iterate over the headers and ensure they all check out
-	for i, header := range chain {
-		// If the chain is terminating, stop processing blocks
-		if hc.procInterrupt() {
-			log.Debug("Premature abort during headers verification")
-			return 0, errors.New("aborted")
-		}
-		// If the header is a banned one, straight out abort
-		if BadHashes[header.Hash()] {
-			return i, ErrBlacklistedHash
-		}
-		// Otherwise wait for headers checks and ensure they pass
-		if err := <-results; err != nil {
-			return i, err
-		}
-	}
-
-	return 0, nil
-}
+// Original code:
+// // WhCallback is a callback function for inserting individual headers.
+// // A callback is used for two reasons: first, in a LightChain, status should be
+// // processed and light chain events sent, while in a BlockChain this is not
+// // necessary since chain events are sent after inserting blocks. Second, the
+// // header writes should be protected by the parent chain mutex individually.
+// type WhCallback func(*types.Header) error
+//
+// func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int) (int, error) {
+// 	// Do a sanity check that the provided chain is actually ordered and linked
+// 	for i := 1; i < len(chain); i++ {
+// 		if chain[i].Number.Uint64() != chain[i-1].Number.Uint64()+1 || chain[i].ParentHash != chain[i-1].Hash() {
+// 			// Chain broke ancestry, log a message (programming error) and skip insertion
+// 			log.Error("Non contiguous header insert", "number", chain[i].Number, "hash", chain[i].Hash(),
+// 				"parent", chain[i].ParentHash, "prevnumber", chain[i-1].Number, "prevhash", chain[i-1].Hash())
+//
+// 			return 0, fmt.Errorf("non contiguous insert: item %d is #%d [%x…], item %d is #%d [%x…] (parent [%x…])", i-1, chain[i-1].Number,
+// 				chain[i-1].Hash().Bytes()[:4], i, chain[i].Number, chain[i].Hash().Bytes()[:4], chain[i].ParentHash[:4])
+// 		}
+// 	}
+//
+// 	// Generate the list of seal verification requests, and start the parallel verifier
+// 	seals := make([]bool, len(chain))
+// 	if checkFreq != 0 {
+// 		// In case of checkFreq == 0 all seals are left false.
+// 		for i := 0; i < len(seals)/checkFreq; i++ {
+// 			index := i*checkFreq + hc.rand.Intn(checkFreq)
+// 			if index >= len(seals) {
+// 				index = len(seals) - 1
+// 			}
+// 			seals[index] = true
+// 		}
+// 		// Last should always be verified to avoid junk.
+// 		seals[len(seals)-1] = true
+// 	}
+//
+// 	abort, results := hc.engine.VerifyHeaders(hc, chain, seals)
+// 	defer close(abort)
+//
+// 	// Iterate over the headers and ensure they all check out
+// 	for i, header := range chain {
+// 		// If the chain is terminating, stop processing blocks
+// 		if hc.procInterrupt() {
+// 			log.Debug("Premature abort during headers verification")
+// 			return 0, errors.New("aborted")
+// 		}
+// 		// If the header is a banned one, straight out abort
+// 		if BadHashes[header.Hash()] {
+// 			return i, ErrBlacklistedHash
+// 		}
+// 		// Otherwise wait for headers checks and ensure they pass
+// 		if err := <-results; err != nil {
+// 			return i, err
+// 		}
+// 	}
+//
+// 	return 0, nil
+// }
 
 // Original Code:
 // // InsertHeaderChain attempts to insert the given header chain in to the local
