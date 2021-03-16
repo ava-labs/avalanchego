@@ -115,6 +115,9 @@ var (
 	errTxHashMismatch             = errors.New("txs hash does not match header")
 	errUncleHashMismatch          = errors.New("uncle hash mismatch")
 	errRejectedParent             = errors.New("rejected parent")
+	errInvalidDifficulty          = errors.New("invalid difficulty")
+	errInvalidBlockVersion        = errors.New("invalid block version")
+	errInvalidMixDigest           = errors.New("invalid mix digest")
 )
 
 // mayBuildBlockStatus denotes whether the engine should be notified
