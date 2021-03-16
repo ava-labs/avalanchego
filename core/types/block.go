@@ -123,7 +123,7 @@ func (h *Header) Size() common.StorageSize {
 	return headerSize + common.StorageSize(len(h.Extra)+(h.Difficulty.BitLen()+h.Number.BitLen())/8)
 }
 
-// Orignal code:
+// Orignal code: (has been moved to syntacticVerify in plugin/evm/block.go)
 // // SanityCheck checks a few basic things -- these checks are way beyond what
 // // any 'sane' production values should hold, and can mainly be used to prevent
 // // that the unbounded fields are stuffed with junk data to add processing
@@ -449,7 +449,7 @@ func (b *Block) Size() common.StorageSize {
 	return common.StorageSize(c)
 }
 
-// Original code:
+// Original code: (has been moved to syntacticVerify in plugin/evm/block.go)
 // // SanityCheck can be used to prevent that unbounded fields are
 // // stuffed with junk data to add processing overhead
 // func (b *Block) SanityCheck() error {
