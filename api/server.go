@@ -116,7 +116,6 @@ func (s *Server) DispatchTLS(certFile, keyFile string) error {
 func (s *Server) RegisterChain(chainName string, ctx *snow.Context, engineIntf interface{}) {
 	go func() {
 		var (
-			ctx      *snow.Context
 			handlers map[string]*common.HTTPHandler
 			err      error
 		)
