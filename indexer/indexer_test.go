@@ -79,8 +79,8 @@ func TestNewIndexer(t *testing.T) {
 	assert.False(idxr.hasRunBefore)
 }
 
-// Test that [hasRunBefore] is set correctly
-func TestMarkHasRun(t *testing.T) {
+// Test that [hasRunBefore] is set correctly and that Shutdown is called on close
+func TestMarkHasRunAndShutdown(t *testing.T) {
 	assert := assert.New(t)
 	cd := &triggers.EventDispatcher{}
 	cd.Initialize(logging.NoLog{})
@@ -426,175 +426,91 @@ func TestIndexer(t *testing.T) {
 	assert.EqualValues(blkID, lastAcceptedBlk.ID)
 }
 
-/*
-// Test method CloseIndex
-func TestCloseIndex(t *testing.T) {
-	// Setup
+// Make sure the indexer doesn't allow incomplete indices unless explicitly allowed
+func TestIncompleteIndex(t *testing.T) {
+	// Create an indexer with indexing disabled
 	assert := assert.New(t)
-	ed := &triggers.EventDispatcher{}
-	ed.Initialize(logging.NoLog{})
-	chain1ID := ids.GenerateTestID()
-	initiallyIndexed := ids.Set{}
-	initiallyIndexed.Add(chain1ID)
-	chain1Ctx := snow.DefaultContextTest()
-	chain1Ctx.ChainID = chain1ID
+	cd := &triggers.EventDispatcher{}
+	cd.Initialize(logging.NoLog{})
+	dd := &triggers.EventDispatcher{}
+	dd.Initialize(logging.NoLog{})
+	baseDB := memdb.New()
 	config := Config{
-		IndexingEnabled:        true,
-		AllowIncompleteIndex:   false,
-		Log:                    logging.NoLog{},
-		Name:                   "test",
-		DB:                     memdb.New(),
-		ConsensusDispatcher:        ed,
-		DecisionDispatcher: ed,
-		APIServer:              &apiServerMock{},
+		IndexingEnabled:      false,
+		AllowIncompleteIndex: false,
+		Log:                  logging.NoLog{},
+		Name:                 "test",
+		DB:                   versiondb.New(baseDB),
+		ConsensusDispatcher:  cd,
+		DecisionDispatcher:   dd,
+		APIServer:            &apiServerMock{},
+		ShutdownF:            func() {},
 	}
-
-	// Create indexer and make sure its state is right
 	idxrIntf, err := NewIndexer(config)
 	assert.NoError(err)
 	idxr, ok := idxrIntf.(*indexer)
 	assert.True(ok)
-	assert.Equal(config.Name, idxr.name)
-	assert.NotNil(idxr.log)
-	assert.NotNil(idxr.db)
-	assert.NotNil(idxr.indexedChains)
-	assert.False(idxr.allowIncompleteIndex)
-	assert.NotNil(idxr.chainLookup)
-	assert.NotNil(idxr.codec)
-	assert.NotNil(idxr.chainToIndex)
-	assert.Equal(1, config.APIServer.(*apiServerMock).timesCalled)
-	assert.Len(idxr.GetIndexedChains(), 1)
+	assert.False(idxr.indexingEnabled)
 
-	// Stop indexing a non-existent chain (shouldn't do anything)
-	err = idxr.CloseIndex(ids.GenerateTestID())
-	assert.NoError(err)
-	assert.Len(idxr.GetIndexedChains(), 1)
-
-	// Stop indexing a chain
-	err = idxr.CloseIndex(chain1ID)
-	assert.NoError(err)
-	assert.Len(idxr.GetIndexedChains(), 0)
-
-	// Shouldn't be able to get things from this index anymore
-	_, err = idxr.GetLastAccepted(chain1ID)
-	assert.Error(err)
-}
-
-// Test that indexer doesn't allow an incomplete index
-// unless that is allowed in the config
-func TestIncompleteIndexStartup(t *testing.T) {
-	// Setup
-	assert := assert.New(t)
-	ed := &triggers.EventDispatcher{}
-	ed.Initialize(logging.NoLog{})
-	chain1ID := ids.GenerateTestID()
-	initiallyIndexed := ids.Set{}
-	initiallyIndexed.Add(chain1ID)
+	// Register a chain
 	chain1Ctx := snow.DefaultContextTest()
-	chain1Ctx.ChainID = chain1ID
-	db := memdb.New()
-	defer db.Close()
-	dbCopy := versiondb.New(db) // Will be written to [db]
-	config := Config{
-		IndexingEnabled:        true,
-		AllowIncompleteIndex:   false,
-		Log:                    logging.NoLog{},
-		Name:                   "test",
-		DB:                     dbCopy,
-		ConsensusDispatcher:        ed,
-		DecisionDispatcher: ed,
-		APIServer:              &apiServerMock{},
-	}
-
-	// Create indexer with incomplete index disallowed
-	idxrIntf, err := NewIndexer(config)
+	chain1Ctx.ChainID = ids.GenerateTestID()
+	isIncomplete, err := idxr.isIncomplete(chain1Ctx.ChainID)
 	assert.NoError(err)
-	idxr, ok := idxrIntf.(*indexer)
-	assert.True(ok)
+	assert.False(isIncomplete)
+	previouslyIndexed, err := idxr.previouslyIndexed(chain1Ctx.ChainID)
+	assert.NoError(err)
+	assert.False(previouslyIndexed)
+	chainEngine := &smengmocks.SnowmanEngine{}
+	idxr.RegisterChain("chain1", chain1Ctx, chainEngine)
+	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
+	assert.NoError(err)
+	assert.True(isIncomplete)
+	assert.Len(idxr.blockIndices, 0)
 
-	// Close the indexer after copying its contents to [db]
-	assert.NoError(dbCopy.Commit())
+	// Close and re-open the indexer, this time with indexing enabled
+	assert.NoError(config.DB.(*versiondb.Database).Commit())
 	assert.NoError(idxr.Close())
-
-	// Re-open the indexer. Should be allowed since we never ran without indexing chain1.
-	dbCopy = versiondb.New(db) // Because [dbCopy] was closed when indexer closed
-	config.DB = dbCopy
-	idxrIntf, err = NewIndexer(config)
-	assert.NoError(err)
-	idxr, ok = idxrIntf.(*indexer)
-	assert.True(ok)
-	// Close the indexer again
-	assert.NoError(dbCopy.Commit())
-	assert.NoError(idxr.Close())
-
-	// Re-open the indexer with indexing disabled.
-	dbCopy = versiondb.New(db) // Because [dbCopy] was closed when indexer closed
-	config.DB = dbCopy
-	config.IndexingEnabled = false
-	_, err = NewIndexer(config)
-	assert.NoError(dbCopy.Commit())
-	assert.Error(err) // Should error because running would cause incomplete index
-
-	config.AllowIncompleteIndex = true // allow incomplete index
-	idxrIntf, err = NewIndexer(config)
-	assert.NoError(err)
-	assert.NoError(dbCopy.Commit())
-	assert.NoError(idxrIntf.Close()) // close the indexer
-
-	dbCopy = versiondb.New(db) // Because [dbCopy] was closed when indexer closed
-	config.DB = dbCopy
-	config.AllowIncompleteIndex = false
 	config.IndexingEnabled = true
-	_, err = NewIndexer(config)
-	assert.NoError(dbCopy.Commit())
-	assert.Error(err) // Should error because we have an incomplete index
-}
-
-// Test that indexer doesn't allow an incomplete index
-// unless that is allowed in the config
-func TestIncompleteIndexNewChain(t *testing.T) {
-	// Setup
-	assert := assert.New(t)
-	ed := &triggers.EventDispatcher{}
-	ed.Initialize(logging.NoLog{})
-
-	db := memdb.New()
-	defer db.Close()
-	dbCopy := versiondb.New(db) // Will be written to [db]
-	config := Config{
-		IndexingEnabled:        true,
-		AllowIncompleteIndex:   false,
-		Log:                    logging.NoLog{},
-		Name:                   "test",
-		DB:                     dbCopy,
-		ConsensusDispatcher:        ed,
-		DecisionDispatcher: ed,
-		InitiallyIndexedChains: nil, // no initially indexed chains
-		APIServer:              &apiServerMock{},
-	}
-
-	// Create indexer with incomplete index disallowed
-	idxrIntf, err := NewIndexer(config)
+	config.DB = versiondb.New(baseDB)
+	idxrIntf, err = NewIndexer(config)
 	assert.NoError(err)
-	idxr, ok := idxrIntf.(*indexer)
+	idxr, ok = idxrIntf.(*indexer)
 	assert.True(ok)
+	assert.True(idxr.indexingEnabled)
 
-	// Should error because indexing new chain would cause incomplete index
-	err = idxr.IndexChain(ids.GenerateTestID())
-	assert.Error(err)
+	// Register the chain again. Should die due to incomplete index.
+	assert.NoError(config.DB.(*versiondb.Database).Commit())
+	idxr.RegisterChain("chain1", chain1Ctx, chainEngine)
+	assert.True(idxr.closed)
+
+	// Close and re-open the indexer, this time with indexing enabled
+	// and incomplete index allowed.
 	assert.NoError(idxr.Close())
-
-	// Allow incomplete index
-	dbCopy = versiondb.New(db)
-	config.DB = dbCopy
 	config.AllowIncompleteIndex = true
+	config.DB = versiondb.New(baseDB)
+	idxrIntf, err = NewIndexer(config)
+	assert.NoError(err)
+	idxr, ok = idxrIntf.(*indexer)
+	assert.True(ok)
+	assert.True(idxr.allowIncompleteIndex)
+
+	// Register the chain again. Should be OK
+	idxr.RegisterChain("chain1", chain1Ctx, chainEngine)
+	assert.False(idxr.closed)
+
+	// Close the indexer and re-open with indexing disabled and
+	// incomplete index not allowed.
+	assert.NoError(idxr.Close())
+	config.AllowIncompleteIndex = false
+	config.IndexingEnabled = false
+	config.DB = versiondb.New(baseDB)
 	idxrIntf, err = NewIndexer(config)
 	assert.NoError(err)
 	idxr, ok = idxrIntf.(*indexer)
 	assert.True(ok)
 
-	err = idxr.IndexChain(ids.GenerateTestID()) // Should allow incomplete index
-	assert.NoError(err)
-	assert.NoError(idxr.Close())
+	// Register the chain again. Should still die due to incomplete index.
+	idxr.RegisterChain("chain1", chain1Ctx, chainEngine)
+	assert.True(idxr.closed)
 }
-*/

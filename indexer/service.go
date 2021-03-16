@@ -60,11 +60,6 @@ type GetContainer struct {
 }
 
 func (s *service) GetContainerByIndex(_ *http.Request, args *GetContainer, reply *FormattedContainer) error {
-	// chainID, err := s.Index.chainLookup(args.ChainID)
-	// if err != nil {
-	// 	return fmt.Errorf("couldn't find chain %s: %w", args.ChainID, err)
-	// }
-
 	container, err := s.Index.GetContainerByIndex(uint64(args.Index))
 	if err != nil {
 		return err
