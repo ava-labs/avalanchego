@@ -24,6 +24,7 @@ type LinkedDB interface {
 	database.KeyValueWriter
 
 	NewIterator() database.Iterator
+	NewIteratorWithStart(start []byte) database.Iterator
 }
 
 type linkedDB struct {
@@ -193,6 +194,14 @@ func (ldb *linkedDB) Delete(key []byte) error {
 
 func (ldb *linkedDB) NewIterator() database.Iterator { return &iterator{ldb: ldb} }
 
+func (ldb *linkedDB) NewIteratorWithStart(start []byte) database.Iterator {
+	return &iterator{
+		ldb:         ldb,
+		initialized: true,
+		nextKey:     start,
+	}
+}
+
 func (ldb *linkedDB) getHeadKey() ([]byte, error) {
 	// If the ldb read lock is held, then there needs to be additional
 	// synchronization here to avoid racy behavior.
@@ -315,7 +324,7 @@ func (it *iterator) Next() bool {
 	if it.exhausted {
 		it.key = nil
 		it.value = nil
-		return true
+		return false
 	}
 
 	it.ldb.lock.RLock()
@@ -329,31 +338,37 @@ func (it *iterator) Next() bool {
 			it.exhausted = true
 			it.key = nil
 			it.value = nil
-			return true
+			return false
 		}
 		if err != nil {
 			it.exhausted = true
 			it.key = nil
 			it.value = nil
 			it.err = err
-			return true
+			return false
 		}
 		it.nextKey = headKey
 	}
 
 	nextNode, err := it.ldb.getNode(it.nextKey)
+	if err == database.ErrNotFound {
+		it.exhausted = true
+		it.key = nil
+		it.value = nil
+		return false
+	}
 	if err != nil {
 		it.exhausted = true
 		it.key = nil
 		it.value = nil
 		it.err = err
-		return true
+		return false
 	}
 	it.key = it.nextKey
 	it.value = nextNode.Value
 	it.nextKey = nextNode.Next
 	it.exhausted = !nextNode.HasNext
-	return false
+	return true
 }
 
 func (it *iterator) Error() error  { return it.err }
