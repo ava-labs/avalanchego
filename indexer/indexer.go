@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -16,9 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/engine/avalanche"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/gorilla/rpc/v2"
@@ -64,7 +65,7 @@ type Config struct {
 // they were accepted by this node.
 // Indexer is threadsafe.
 type Indexer interface {
-	RegisterChain(name string, chainID ids.ID, engine interface{})
+	RegisterChain(name string, ctx *snow.Context, vm interface{})
 	Close() error
 }
 
@@ -127,14 +128,16 @@ type indexer struct {
 }
 
 // Assumes [engineIntf]'s context lock is not held
-func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interface{}) {
+func (i *indexer) RegisterChain(name string, ctx *snow.Context, vmIntf interface{}) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
 	if i.closed {
 		i.log.Debug("not registering chain %s because indexer is closed", name)
 		return
-	} else if i.blockIndices[chainID] != nil || i.txIndices[chainID] != nil || i.vtxIndices[chainID] != nil {
+	}
+	chainID := ctx.ChainID
+	if i.blockIndices[chainID] != nil || i.txIndices[chainID] != nil || i.vtxIndices[chainID] != nil {
 		i.log.Warn("chain %s is already being indexed", chainID)
 		return
 	}
@@ -199,17 +202,14 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 		return
 	}
 
-	switch engine := engineIntf.(type) {
-	case snowman.Engine:
+	switch vm := vmIntf.(type) {
+	case block.ChainVM:
 		isAcceptedFunc := func(blkID ids.ID) bool {
-			engine.Context().Lock.Lock()
-			defer engine.Context().Lock.Unlock()
+			ctx.Lock.Lock()
+			defer ctx.Lock.Unlock()
 
-			blk, err := engine.GetVM().GetBlock(blkID)
-			if err != nil || blk.Status() != choices.Accepted {
-				return false
-			}
-			return true
+			blk, err := vm.GetBlock(blkID)
+			return err == nil && blk.Status() == choices.Accepted
 		}
 
 		index, err := i.registerChainHelper(chainID, blockPrefix, name, "block", i.consensusDispatcher, isAcceptedFunc)
@@ -221,17 +221,13 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 			return
 		}
 		i.blockIndices[chainID] = index
-
-	case avalanche.Engine:
+	case vertex.DAGVM:
 		isAcceptedFunc := func(txID ids.ID) bool {
-			engine.Context().Lock.Lock()
-			defer engine.Context().Lock.Unlock()
+			ctx.Lock.Lock()
+			defer ctx.Lock.Unlock()
 
-			blk, err := engine.GetVM().GetTx(txID)
-			if err != nil || blk.Status() != choices.Accepted {
-				return false
-			}
-			return true
+			tx, err := vm.GetTx(txID)
+			return err == nil && tx.Status() == choices.Accepted
 		}
 
 		vtxIndex, err := i.registerChainHelper(chainID, vtxPrefix, name, "vtx", i.consensusDispatcher, isAcceptedFunc)
@@ -253,7 +249,7 @@ func (i *indexer) RegisterChain(name string, chainID ids.ID, engineIntf interfac
 		}
 		i.txIndices[chainID] = txIndex
 	default:
-		i.log.Error("expected snowman.Engine or avalanche.Engine but got %T", engineIntf)
+		i.log.Error("expected block.ChainVM or vertex.DAGVM but got %T", vmIntf)
 		if err := i.close(); err != nil {
 			i.log.Error("error while closing indexer: %s", err)
 		}

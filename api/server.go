@@ -19,11 +19,10 @@ import (
 	"github.com/rs/cors"
 
 	"github.com/ava-labs/avalanchego/api/auth"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/avalanche"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -113,7 +112,7 @@ func (s *Server) DispatchTLS(certFile, keyFile string) error {
 // holds the engine's context lock. Namely, this could happen when the P-Chain is
 // creating a new chain and holds the engine context lock when this function is held,
 // and at the same time the server's lock is held due to an API call.
-func (s *Server) RegisterChain(chainName string, chainID ids.ID, engineIntf interface{}) {
+func (s *Server) RegisterChain(chainName string, ctx *snow.Context, vmIntf interface{}) {
 	go func() {
 		var (
 			ctx      *snow.Context
@@ -121,19 +120,17 @@ func (s *Server) RegisterChain(chainName string, chainID ids.ID, engineIntf inte
 			err      error
 		)
 
-		switch engine := engineIntf.(type) {
-		case snowman.Engine:
-			ctx = engine.Context()
+		switch vm := vmIntf.(type) {
+		case block.ChainVM:
 			ctx.Lock.Lock()
-			handlers, err = engine.GetVM().CreateHandlers()
+			handlers, err = vm.CreateHandlers()
 			ctx.Lock.Unlock()
-		case avalanche.Engine:
-			ctx = engine.Context()
+		case vertex.DAGVM:
 			ctx.Lock.Lock()
-			handlers, err = engine.GetVM().CreateHandlers()
+			handlers, err = vm.CreateHandlers()
 			ctx.Lock.Unlock()
 		default:
-			s.log.Error("engine has unexpected type %T", engineIntf)
+			s.log.Error("VM has unexpected type %T", vmIntf)
 			return
 		}
 		if err != nil {
@@ -146,6 +143,7 @@ func (s *Server) RegisterChain(chainName string, chainID ids.ID, engineIntf inte
 			s.log.Error("failed to create new http logger: %s", err)
 		}
 
+		chainID := ctx.ChainID
 		s.log.Verbo("About to add API endpoints for chain with ID %s", chainID)
 		// all subroutes to a chain begin with "bc/<the chain's ID>"
 		defaultEndpoint := "bc/" + chainID.String()
