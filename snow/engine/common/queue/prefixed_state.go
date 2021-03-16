@@ -44,18 +44,8 @@ func (ps *prefixedState) SetStackIndex(db database.Database, index uint32, jobID
 	return ps.state.SetJobID(db, p.Bytes, jobID)
 }
 
-// DeleteStackIndex deletes the job at [index] from [db]
-func (ps *prefixedState) DeleteStackIndex(db database.Database, index uint32) error {
-	p := wrappers.Packer{Bytes: make([]byte, 1+wrappers.IntLen)}
-
-	p.PackByte(stackID)
-	p.PackInt(index)
-
-	return db.Delete(p.Bytes)
-}
-
-// StackIndex returns the job at [index] in [db]
-func (ps *prefixedState) StackIndex(db database.Database, index uint32) (Job, error) {
+// RemoveStackIndex fetches and deletes the job at [index] from [db]
+func (ps *prefixedState) RemoveStackIndex(db database.Database, index uint32) (Job, error) {
 	p := wrappers.Packer{Bytes: make([]byte, 1+wrappers.IntLen)}
 
 	p.PackByte(stackID)
@@ -66,7 +56,11 @@ func (ps *prefixedState) StackIndex(db database.Database, index uint32) (Job, er
 		return nil, err
 	}
 
-	return ps.Job(db, jobID)
+	job, err := ps.Job(db, jobID)
+	if err != nil {
+		return nil, err
+	}
+	return job, db.Delete(p.Bytes)
 }
 
 // SetJob writes [job] to [db]
@@ -120,29 +114,22 @@ func (ps *prefixedState) AddBlocking(db database.Database, id ids.ID, blocking i
 	return ps.state.AddID(db, p.Bytes, blocking)
 }
 
-// DeleteBlocking removes each item in [blocking] from the set of IDs that are blocked
-// on the completion of [id]
-func (ps *prefixedState) DeleteBlocking(db database.Database, id ids.ID, blocking []ids.ID) error {
+// Blocking returns the set of IDs that are blocking on the completion of [id]
+// and removes them from the database.
+func (ps *prefixedState) RemoveBlocking(db database.Database, id ids.ID) ([]ids.ID, error) {
 	p := wrappers.Packer{Bytes: make([]byte, 1+hashing.HashLen)}
 
 	p.PackByte(blockingID)
 	p.PackFixedBytes(id[:])
 
+	blocking, err := ps.state.IDs(db, p.Bytes)
+	if err != nil {
+		return nil, err
+	}
 	for _, blocked := range blocking {
 		if err := ps.state.RemoveID(db, p.Bytes, blocked); err != nil {
-			return err
+			return nil, err
 		}
 	}
-
-	return nil
-}
-
-// Blocking returns the set of IDs that are blocking on the completion of [id]
-func (ps *prefixedState) Blocking(db database.Database, id ids.ID) ([]ids.ID, error) {
-	p := wrappers.Packer{Bytes: make([]byte, 1+hashing.HashLen)}
-
-	p.PackByte(blockingID)
-	p.PackFixedBytes(id[:])
-
-	return ps.state.IDs(db, p.Bytes)
+	return blocking, nil
 }

@@ -9,104 +9,118 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
-	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+)
+
+const (
+	// StatusUpdateFrequency is how many containers should be processed between
+	// logs
+	StatusUpdateFrequency = 2500
 )
 
 var (
-	errEmpty     = errors.New("no available containers")
 	errDuplicate = errors.New("duplicated container")
 )
 
-// Jobs ...
+// Jobs tracks a series of jobs that form a DAG of dependencies.
 type Jobs struct {
-	parser Parser
+	// baseDB is the DB that we are flushing data to.
 	baseDB database.Database
-	db     *versiondb.Database
-	// Dynamic sized stack of ready to execute items
-	// Map from itemID to list of itemIDs that are blocked on this item
+	// db ensures that [baseDB] is atomically updated.
+	db *versiondb.Database
+	// state prefixes different values to avoid namespace collisions.
 	state prefixedState
-	// keep [stackSize] in memory to avoid unnecessary database reads
+	// keeps the stackSize in memory to avoid unnecessary database reads.
 	stackSize uint32
 }
 
-// New ...
+// New attempts to create a new job queue from the provided database.
 func New(db database.Database) (*Jobs, error) {
 	jobs := &Jobs{
 		baseDB: db,
 		db:     versiondb.New(db),
 	}
-	jobs.state.jobs = jobs
 
 	stackSize, err := jobs.state.StackSize(jobs.db)
 	if err == nil {
 		jobs.stackSize = stackSize
 		return jobs, nil
 	}
-
-	jobs.stackSize = 0
-	if err := jobs.state.SetStackSize(jobs.db, jobs.stackSize); err != nil {
+	if err != database.ErrNotFound {
 		return nil, err
 	}
-	return jobs, nil
+	return jobs, jobs.state.SetStackSize(jobs.db, 0)
 }
 
-// SetParser ...
-func (j *Jobs) SetParser(parser Parser) { j.parser = parser }
+// SetParser tells this job queue how to parse jobs from the database.
+func (j *Jobs) SetParser(parser Parser) { j.state.parser = parser }
 
-// Push ...
+func (j *Jobs) Has(job Job) (bool, error) {
+	return j.state.HasJob(j.db, job.ID())
+}
+
+// Push adds a new job to the queue.
 func (j *Jobs) Push(job Job) error {
 	deps, err := job.MissingDependencies()
 	if err != nil {
 		return err
 	}
-	if deps.Len() != 0 {
-		return j.block(job, deps)
+	jobID := job.ID()
+	// Store this job into the database.
+	if has, err := j.state.HasJob(j.db, jobID); err != nil {
+		return fmt.Errorf("failed to check for existing job %s due to %w", jobID, err)
+	} else if has {
+		return errDuplicate
+	}
+	if err := j.state.SetJob(j.db, job); err != nil {
+		return fmt.Errorf("failed to write job due to %w", err)
 	}
 
-	return j.push(job)
+	if deps.Len() != 0 {
+		// This job needs to block on a set of dependencies.
+		for depID := range deps {
+			if err := j.state.AddBlocking(j.db, depID, jobID); err != nil {
+				return fmt.Errorf("failed to add blocking for depID %s, jobID %s", depID, jobID)
+			}
+		}
+		return nil
+	}
+	// This job doesn't have any dependencies, so it should be placed onto the
+	// executable stack.
+	return j.pushUnblockedJob(job)
 }
 
-// Pop ...
+// Pop removes a job from the queue, if there are no jobs left on the queue, a
+// [database.ErrNotFound] error will be returned.
 func (j *Jobs) Pop() (Job, error) {
 	if j.stackSize == 0 {
-		return nil, errEmpty
+		return nil, database.ErrNotFound
 	}
 
 	j.stackSize--
 	if err := j.state.SetStackSize(j.db, j.stackSize); err != nil {
-		j.stackSize++
 		return nil, fmt.Errorf("failed to set stack size due to %w", err)
 	}
-	job, err := j.state.StackIndex(j.db, j.stackSize)
+
+	job, err := j.state.RemoveStackIndex(j.db, j.stackSize)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read stack index due to %w", err)
-	}
-	err = j.state.DeleteStackIndex(j.db, j.stackSize)
-	if err != nil {
-		return nil, fmt.Errorf("failed to delete stack index due to %w", err)
+		return nil, fmt.Errorf("failed to remove stack index due to %w", err)
 	}
 	return job, nil
 }
 
-// HasNext ...
-func (j *Jobs) HasNext() (bool, error) {
-	return j.stackSize > 0, nil
-}
-
-// Execute ...
+// Execute takes a job that is ready to execute, and executes it. After
+// execution, if there are any jobs that were blocking on this job, unblock
+// those jobs.
 func (j *Jobs) Execute(job Job) error {
 	jobID := job.ID()
-
 	if err := job.Execute(); err != nil {
-		return fmt.Errorf("failed to execute job %s due to %w", job.ID(), err)
+		return fmt.Errorf("failed to execute job %s due to %w", jobID, err)
 	}
 
-	blocking, err := j.state.Blocking(j.db, jobID)
+	blocking, err := j.state.RemoveBlocking(j.db, jobID)
 	if err != nil {
-		return fmt.Errorf("failed to retrieve blocking jobs for %s due to %w", jobID, err)
-	}
-	if err := j.state.DeleteBlocking(j.db, jobID, blocking); err != nil {
-		return fmt.Errorf("failed to delete blocking %w", err)
+		return fmt.Errorf("failed to remove blocking jobs for %s due to %w", jobID, err)
 	}
 
 	for _, blockedID := range blocking {
@@ -125,68 +139,54 @@ func (j *Jobs) Execute(job Job) error {
 			return err
 		}
 	}
-
-	err = j.state.DeleteJob(j.db, jobID)
-	if err != nil {
+	if err := j.state.DeleteJob(j.db, jobID); err != nil {
 		return fmt.Errorf("failed to delete job %s due to %w", jobID, err)
 	}
-
-	return err
-}
-
-// Commit ...
-func (j *Jobs) Commit() error { return j.db.Commit() }
-
-func (j *Jobs) push(job Job) error {
-	if err := j.storeJob(job); err != nil {
-		return err
-	}
-
-	return j.pushUnblockedJob(job)
-}
-
-// pushUnblockedJob pushes a new job with no remaining dependencies to the queue
-// to be executed
-func (j *Jobs) pushUnblockedJob(job Job) error {
-	err := j.state.SetStackIndex(j.db, j.stackSize, job.ID())
-	if err != nil {
-		return fmt.Errorf("failed to set stack index due to %w", err)
-	}
-	j.stackSize++
-	err = j.state.SetStackSize(j.db, j.stackSize)
-	if err != nil {
-		j.stackSize--
-		return fmt.Errorf("failed to set stack size due to %w", err)
-	}
-
 	return nil
 }
 
-func (j *Jobs) block(job Job, deps ids.Set) error {
-	if err := j.storeJob(job); err != nil {
-		return err
-	}
+func (j *Jobs) ExecuteAll(ctx *snow.Context, events ...snow.EventDispatcher) (int, error) {
+	numExecuted := 0
+	for j.stackSize > 0 {
+		job, err := j.Pop()
+		if err != nil {
+			return 0, err
+		}
 
-	jobID := job.ID()
-	for depID := range deps {
-		if err := j.state.AddBlocking(j.db, depID, jobID); err != nil {
-			return fmt.Errorf("failed to add blocking for depID %s, jobID %s", depID, jobID)
+		ctx.Log.Debug("Executing: %s", job.ID())
+		if err := j.Execute(job); err != nil {
+			return 0, err
+		}
+		if err := j.Commit(); err != nil {
+			return 0, err
+		}
+
+		numExecuted++
+		if numExecuted%StatusUpdateFrequency == 0 { // Periodically print progress
+			ctx.Log.Info("executed %d operations", numExecuted)
+		}
+
+		for _, event := range events {
+			event.Accept(ctx, job.ID(), job.Bytes())
 		}
 	}
 
-	return nil
+	ctx.Log.Info("executed %d operations", numExecuted)
+	return numExecuted, nil
 }
 
-func (j *Jobs) storeJob(job Job) error {
-	if has, err := j.state.HasJob(j.db, job.ID()); err != nil {
-		return fmt.Errorf("failed to check for existing job %s due to %w", job.ID(), err)
-	} else if has {
-		return errDuplicate
-	}
+// Commit the versionDB to the underlying database.
+func (j *Jobs) Commit() error { return j.db.Commit() }
 
-	if err := j.state.SetJob(j.db, job); err != nil {
-		return fmt.Errorf("failed to write job due to %w", err)
+// pushUnblockedJob pushes a job with no remaining dependencies to the queue to
+// be executed
+func (j *Jobs) pushUnblockedJob(job Job) error {
+	if err := j.state.SetStackIndex(j.db, j.stackSize, job.ID()); err != nil {
+		return fmt.Errorf("failed to set stack index due to %w", err)
 	}
-
+	j.stackSize++
+	if err := j.state.SetStackSize(j.db, j.stackSize); err != nil {
+		return fmt.Errorf("failed to set stack size due to %w", err)
+	}
 	return nil
 }
