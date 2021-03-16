@@ -176,10 +176,13 @@ func (b *Block) syntacticVerify() error {
 		return nil
 	}
 
-	if err := b.ethBlock.SanityCheck(); err != nil {
-		return err
+	// Perform block and header sanity checks
+	ethHeader := b.ethBlock.Header()
+	if ethHeader.Number == nil || !ethHeader.Number.IsUint64() {
+		return errInvalidBlock
 	}
-	if b.ethBlock.Difficulty().Uint64() != 1 {
+	if ethHeader.Difficulty == nil || !ethHeader.Difficulty.IsUint64() ||
+		ethHeader.Difficulty.Uint64() != 1 {
 		return errInvalidDifficulty
 	}
 	if b.ethBlock.Nonce() != 0 {
@@ -191,14 +194,20 @@ func (b *Block) syntacticVerify() error {
 	if b.ethBlock.MixDigest() != (common.Hash{}) {
 		return errInvalidMixDigest
 	}
-	txsHash := types.DeriveSha(b.ethBlock.Transactions(), new(trie.Trie))
-	uncleHash := types.CalcUncleHash(b.ethBlock.Uncles())
-	ethHeader := b.ethBlock.Header()
+	if ethHeader.ExtDataHash != (common.Hash{}) {
+		return errInvalidExtDataHash
+	}
+	if uint64(len(ethHeader.Extra)) > params.MaximumExtraDataSize {
+		return errInvalidHeaderData
+	}
+
 	// Check that the tx hash in the header matches the body
+	txsHash := types.DeriveSha(b.ethBlock.Transactions(), new(trie.Trie))
 	if txsHash != ethHeader.TxHash {
 		return errTxHashMismatch
 	}
 	// Check that the uncle hash in the header matches the body
+	uncleHash := types.CalcUncleHash(b.ethBlock.Uncles())
 	if uncleHash != ethHeader.UncleHash {
 		return errUncleHashMismatch
 	}
@@ -211,6 +220,8 @@ func (b *Block) syntacticVerify() error {
 		return errUnclesUnsupported
 	}
 	// Block must not be empty
+	//
+	// Note: getAtomicTx also asserts a maximum size
 	atomicTx, err := b.vm.getAtomicTx(b.ethBlock)
 	if err != nil {
 		return err
