@@ -91,7 +91,7 @@ func newIndex(
 	for j := i.nextAcceptedIndex; j >= 1; j-- {
 		lastAccepted, err := i.getContainerByIndex(j - 1)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't get container at index %d", j-1)
+			return nil, fmt.Errorf("couldn't get container at index %d: %s", j-1, err)
 		}
 		if isAcceptedFunc(lastAccepted.ID) {
 			break
@@ -326,7 +326,7 @@ func (i *index) lastAcceptedIndex() (uint64, bool) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
-	return i.nextAcceptedIndex - 1, i.nextAcceptedIndex == 0
+	return i.nextAcceptedIndex - 1, i.nextAcceptedIndex != 0
 }
 
 // Remove the last accepted container, whose ID is given, from the databases

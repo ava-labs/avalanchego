@@ -143,10 +143,9 @@ func (s *Server) RegisterChain(chainName string, ctx *snow.Context, engineIntf i
 			s.log.Error("failed to create new http logger: %s", err)
 		}
 
-		chainID := ctx.ChainID
-		s.log.Verbo("About to add API endpoints for chain with ID %s", chainID)
+		s.log.Verbo("About to add API endpoints for chain with ID %s", ctx.ChainID)
 		// all subroutes to a chain begin with "bc/<the chain's ID>"
-		defaultEndpoint := "bc/" + chainID.String()
+		defaultEndpoint := "bc/" + ctx.ChainID.String()
 
 		// Register each endpoint
 		for extension, handler := range handlers {

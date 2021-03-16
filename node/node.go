@@ -66,7 +66,7 @@ const (
 
 var (
 	genesisHashKey                  = []byte("genesisID")
-	indexerDbPrefix                 = []byte{0x00} // TODO change?
+	indexerDBPrefix                 = []byte{0x00}
 	errPrimarySubnetNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
 
 	// Version is the version of this code
@@ -483,13 +483,13 @@ func (n *Node) initIPCs() error {
 // Should only be called after [n.DB], [n.DecisionDispatcher], [n.ConsensusDispatcher],
 // [n.Log], [n.APIServer], [n.chainManager] are initialized
 func (n *Node) initIndexer() error {
-	txIndexerDb := prefixdb.New(indexerDbPrefix, n.DB)
+	txIndexerDB := prefixdb.New(indexerDBPrefix, n.DB)
 	var err error
 	n.indexer, err = indexer.NewIndexer(indexer.Config{
 		IndexingEnabled:      n.Config.IndexAPIEnabled,
 		AllowIncompleteIndex: n.Config.IndexAllowIncomplete,
 		Name:                 "tx",
-		DB:                   txIndexerDb,
+		DB:                   txIndexerDB,
 		Log:                  n.Log,
 		DecisionDispatcher:   n.DecisionDispatcher,
 		ConsensusDispatcher:  n.ConsensusDispatcher,
