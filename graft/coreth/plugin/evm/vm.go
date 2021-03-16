@@ -118,7 +118,7 @@ var (
 	errInvalidBlockVersion        = errors.New("invalid block version")
 	errInvalidMixDigest           = errors.New("invalid mix digest")
 	errInvalidExtDataHash         = errors.New("invalid extra data hash")
-	errInvalidHeaderData          = errors.New("invalid header data")
+	errHeaderExtraDataTooBig      = errors.New("header extra data too big")
 )
 
 // mayBuildBlockStatus denotes whether the engine should be notified
