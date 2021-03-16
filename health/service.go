@@ -22,9 +22,9 @@ type Service interface {
 
 // NewService returns a new [Service] where the health checks
 // run every [checkFreq]
-func NewService(checkFreq time.Duration, log logging.Logger, registry prometheus.Registerer) (Service, error) {
+func NewService(checkFreq time.Duration, log logging.Logger, namespace string, registry prometheus.Registerer) (Service, error) {
 	healthChecker := health.New()
-	metrics, err := newMetrics(log, "healthcheck", registry)
+	metrics, err := newMetrics(log, namespace, registry)
 	if err != nil {
 		return nil, err
 	}
