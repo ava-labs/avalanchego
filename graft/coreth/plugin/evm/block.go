@@ -183,22 +183,37 @@ func (b *Block) syntacticVerify() error {
 	}
 	if ethHeader.Difficulty == nil || !ethHeader.Difficulty.IsUint64() ||
 		ethHeader.Difficulty.Uint64() != 1 {
-		return errInvalidDifficulty
+		return fmt.Errorf(
+			"expected difficulty to be 1 but got %v: %w",
+			ethHeader.Difficulty, errInvalidDifficulty,
+		)
 	}
-	if b.ethBlock.Nonce() != 0 {
-		return errInvalidNonce
+	if ethHeader.Nonce.Uint64() != 0 {
+		return fmt.Errorf(
+			"expected nonce to be 0 but got %d: %w",
+			ethHeader.Nonce.Uint64(), errInvalidNonce,
+		)
 	}
-	if b.ethBlock.Version() != 0 {
-		return errInvalidBlockVersion
-	}
-	if b.ethBlock.MixDigest() != (common.Hash{}) {
-		return errInvalidMixDigest
+	if ethHeader.MixDigest != (common.Hash{}) {
+		return fmt.Errorf(
+			"expected MixDigest to be empty but got %x: %w",
+			ethHeader.MixDigest, errInvalidMixDigest,
+		)
 	}
 	if ethHeader.ExtDataHash != (common.Hash{}) {
-		return errInvalidExtDataHash
+		return fmt.Errorf(
+			"expected ExtDataHash to be empty but got %x: %w",
+			ethHeader.ExtDataHash, errInvalidExtDataHash,
+		)
 	}
 	if uint64(len(ethHeader.Extra)) > params.MaximumExtraDataSize {
 		return errInvalidHeaderData
+	}
+	if b.ethBlock.Version() != 0 {
+		return fmt.Errorf(
+			"expected block version to be 0 but got %d: %w",
+			b.ethBlock.Version(), errInvalidBlockVersion,
+		)
 	}
 
 	// Check that the tx hash in the header matches the body
