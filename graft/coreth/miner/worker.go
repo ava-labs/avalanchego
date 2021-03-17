@@ -134,7 +134,6 @@ type intervalAdjust struct {
 type MinerCallbacks struct {
 	OnSealFinish func(*types.Block) error
 	OnSealDrop   func(*types.Block)
-	OnHeaderNew  func(*types.Header)
 }
 
 // worker is the main object which takes care of submitting new work to consensus engine
@@ -964,9 +963,6 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 				header.Extra = []byte{} // If miner opposes, don't let it use the reserved extra-data
 			}
 		}
-	}
-	if w.minerCallbacks.OnHeaderNew != nil {
-		w.minerCallbacks.OnHeaderNew(header)
 	}
 	// Could potentially happen if starting to mine in an odd state.
 	err := w.makeCurrent(parent, header)
