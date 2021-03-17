@@ -157,24 +157,24 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 	if err := state.FundUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
-	funds, err := state.Funds([]byte{0}, ids.Empty, math.MaxInt32)
+	utxos, err := state.GetUTXOIDs([]byte{0}, ids.Empty, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(funds) != 1 {
+	if len(utxos) != 1 {
 		t.Fatalf("Should have returned 1 utxoIDs")
 	}
-	if utxoID := funds[0]; utxoID != utxo.InputID() {
+	if utxoID := utxos[0]; utxoID != utxo.InputID() {
 		t.Fatalf("Returned wrong utxoID")
 	}
 	if err := state.SpendUTXO(utxo.InputID()); err != nil {
 		t.Fatal(err)
 	}
-	funds, err = state.Funds([]byte{0}, ids.Empty, math.MaxInt32)
+	utxos, err = state.GetUTXOIDs([]byte{0}, ids.Empty, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(funds) != 0 {
+	if len(utxos) != 0 {
 		t.Fatalf("Should have returned 0 utxoIDs")
 	}
 }

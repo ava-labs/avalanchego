@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/stretchr/testify/assert"
 )
 
 // Test function IDs when argument start is empty
@@ -163,6 +164,7 @@ func TestStateIDsWithStart(t *testing.T) {
 	id0 := ids.ID{0x01, 0}
 	id1 := ids.ID{0x02, 0}
 	id2 := ids.ID{0x03, 0}
+	expectedIDs := []ids.ID{id0, id1, id2}
 
 	// State should be empty to start
 	if _, err := state.IDs(ids.Empty[:], []byte{}, math.MaxInt32); err != nil {
@@ -170,41 +172,35 @@ func TestStateIDsWithStart(t *testing.T) {
 	}
 
 	// Put all three IDs
-	if err := state.AddID(ids.Empty[:], id0); err != nil {
-		t.Fatal(err)
-	} else if err := state.AddID(ids.Empty[:], id1); err != nil {
-		t.Fatal(err)
-	} else if err := state.AddID(ids.Empty[:], id2); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, state.AddID(ids.Empty[:], id0))
+	assert.NoError(t, state.AddID(ids.Empty[:], id1))
+	assert.NoError(t, state.AddID(ids.Empty[:], id2))
 
-	if result, err := state.IDs(ids.Empty[:], []byte{}, math.MaxInt32); err != nil { // start at beginning
-		t.Fatal(err)
-	} else if len(result) != 3 {
-		t.Fatalf("result should have all 3 IDs but has %d", len(result))
-	}
+	// nil start should fetch all
+	result, err := state.IDs(ids.Empty[:], nil, math.MaxInt32) // start at beginning
+	assert.NoError(t, err)
+	assert.Len(t, result, 3)
+	assert.ElementsMatch(t, expectedIDs, result)
 
-	result, err := state.IDs(ids.Empty[:], id0[:], math.MaxInt32)
-	switch {
-	case err != nil: // start after id0
-		t.Fatal(err)
-	case len(result) != 2:
-		t.Fatalf("result should have 2 IDs but has %d", len(result))
-	case result[0] != id1 && result[1] != id1:
-		t.Fatal("result should have id1")
-	case result[0] != id2 && result[1] != id2:
-		t.Fatal("result should have id2")
-	}
+	// Unknown start should fetch all
+	testID := ids.GenerateTestID()
+	result, err = state.IDs(ids.Empty[:], testID[:], math.MaxInt32) // start at beginning
+	assert.NoError(t, err)
+	assert.Len(t, result, 3)
+	assert.ElementsMatch(t, expectedIDs, result)
 
-	result, err = state.IDs(ids.Empty[:], id1[:], math.MaxInt32)
-	switch {
-	case err != nil: // start after id1
-		t.Fatal(err)
-	case len(result) != 1:
-		t.Fatalf("result should have 1 IDs but has %d", len(result))
-	case result[0] != id2:
-		t.Fatal("result should be id2")
+	numExpected := 6 // 3 from one call to IDs, 2 from another, 1 from a third
+	numFound := 0
+	for _, id := range expectedIDs {
+		gotIDs, err := state.IDs(ids.Empty[:], id[:], math.MaxInt32)
+		assert.NoError(t, err)
+		assert.True(t, len(gotIDs) <= 3)
+		for _, gotID := range gotIDs {
+			assert.Contains(t, expectedIDs, gotID)
+			numFound++
+		}
 	}
+	assert.Equal(t, numExpected, numFound)
 }
 
 func TestStateStatuses(t *testing.T) {

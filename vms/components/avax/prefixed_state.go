@@ -4,7 +4,6 @@
 package avax
 
 import (
-	"bytes"
 	"errors"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -136,32 +135,33 @@ func (s *State) SetStatus(id ids.ID, status choices.Status) error {
 	return s.StatusDB.Put(id[:], bytes)
 }
 
-// IDs returns the slice of IDs associated with [key], starting after [start].
-// If start is ids.Empty, starts at beginning.
+// IDs returns the slice of IDs associated with [key], starting at [start].
+// If start is not in the list, starts at beginning.
 // Returns at most [limit] IDs.
-func (s *State) IDs(key []byte, start []byte, limit int) ([]ids.ID, error) {
+func (s *State) IDs(key []byte, start []byte, limit uint) ([]ids.ID, error) {
 	idSlice := []ids.ID(nil)
 	idSliceDB := prefixdb.NewNested(key, s.IDDB)
 	idList := linkeddb.NewDefault(idSliceDB)
 	var iter database.Iterator
-	hasStart, err := idSliceDB.Has(start)
+	hasStart, err := idList.Has(start)
 	if err == nil && hasStart {
 		iter = idList.NewIteratorWithStart(start)
-	} else { // TODO what should we do if the start key isn't in the database?
+	} else {
 		iter = idList.NewIterator()
 	}
 	defer iter.Release()
 
-	numFetched := 0
+	numFetched := uint(0)
 	for numFetched < limit && iter.Next() {
-		if keyID, err := ids.ToID(iter.Key()); err != nil {
+		keyID, err := ids.ToID(iter.Key())
+		if err != nil {
+			// This should never happen
 			// Ignore any database closing error to return the original error
 			_ = idSliceDB.Close()
 			return nil, err
-		} else if !bytes.Equal(keyID[:], start) { // don't return [start]
-			idSlice = append(idSlice, keyID)
-			numFetched++
 		}
+		idSlice = append(idSlice, keyID)
+		numFetched++
 	}
 
 	errs := wrappers.Errs{}
@@ -188,7 +188,7 @@ func (s *State) RemoveID(key []byte, id ids.ID) error {
 	idSliceDB := prefixdb.NewNested(key, s.IDDB)
 	errs := wrappers.Errs{}
 	errs.Add(
-		idSliceDB.Delete(id[:]),
+		linkeddb.NewDefault(idSliceDB).Delete(id[:]),
 		idSliceDB.Close(),
 	)
 	return errs.Err

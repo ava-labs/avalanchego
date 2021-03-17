@@ -40,10 +40,11 @@ func (s *prefixedState) SetDBInitialized(status choices.Status) error {
 }
 
 // Funds returns a list of UTXO IDs such that each UTXO references [addr].
-// All returned UTXO IDs have IDs greater than [start], where ids.Empty is the "least" ID.
+// If [startUTXOID] is in [addr]'s list of UTXOs, returned UTXO IDs start with [startUTXOID].
+// Otherwise, starts from the beginning of [addr]'s UTXO list.
 // Returns at most [limit] UTXO IDs.
-func (s *prefixedState) Funds(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
-	return s.state.IDs(addr, start[:], limit)
+func (s *prefixedState) GetUTXOIDs(addr []byte, startUTXOID ids.ID, limit uint) ([]ids.ID, error) {
+	return s.state.IDs(addr, startUTXOID[:], limit)
 }
 
 // SpendUTXO consumes the provided utxo.

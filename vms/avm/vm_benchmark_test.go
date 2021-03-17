@@ -122,7 +122,7 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 
 	for i := 0; i < b.N; i++ {
 		// Fetch all UTXOs older version
-		notPaginatedUTXOs, _, _, err = vm.getAllUTXOs(addrsSet)
+		notPaginatedUTXOs, err = vm.getAllUTXOs(addrsSet)
 		if err != nil {
 			b.Fatal(err)
 		}

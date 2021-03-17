@@ -617,11 +617,27 @@ func TestGenesisGetUTXOs(t *testing.T) {
 
 	addrsSet := ids.ShortSet{}
 	addrsSet.Add(addrs[0])
-	utxos, _, _, err := vm.GetUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, -1, true)
+
+	utxos, _, _, err := vm.getPaginatedUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(utxos) != 4 {
+		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 4, len(utxos))
+	}
 
+	utxos, err = vm.getAllUTXOs(addrsSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(utxos) != 4 {
+		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 4, len(utxos))
+	}
+
+	utxos, _, _, err = vm.getPaginatedUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(utxos) != 4 {
 		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 4, len(utxos))
 	}
@@ -686,7 +702,7 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 
 	var totalUTXOs []*avax.UTXO
 	for i := 0; i <= 3; i++ {
-		fetchedUTXOs, lastAddr, lastIdx, err = vm.GetUTXOs(addrsSet, lastAddr, lastIdx, -1, true)
+		fetchedUTXOs, lastAddr, lastIdx, err = vm.getPaginatedUTXOs(addrsSet, lastAddr, lastIdx, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -702,7 +718,7 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 	}
 
 	// Fetch all UTXOs
-	notPaginatedUTXOs, _, _, err := vm.GetUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, -1, false)
+	notPaginatedUTXOs, err := vm.getAllUTXOs(addrsSet)
 	if err != nil {
 		t.Fatal(err)
 	}
