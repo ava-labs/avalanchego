@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -141,7 +142,14 @@ func (s *State) SetStatus(id ids.ID, status choices.Status) error {
 func (s *State) IDs(key []byte, start []byte, limit int) ([]ids.ID, error) {
 	idSlice := []ids.ID(nil)
 	idSliceDB := prefixdb.NewNested(key, s.IDDB)
-	iter := idSliceDB.NewIteratorWithStart(start)
+	idList := linkeddb.NewDefault(idSliceDB)
+	var iter database.Iterator
+	hasStart, err := idSliceDB.Has(start)
+	if err == nil && hasStart {
+		iter = idList.NewIteratorWithStart(start)
+	} else { // TODO what should we do if the start key isn't in the database?
+		iter = idList.NewIterator()
+	}
 	defer iter.Release()
 
 	numFetched := 0
@@ -169,7 +177,7 @@ func (s *State) AddID(key []byte, id ids.ID) error {
 	idSliceDB := prefixdb.NewNested(key, s.IDDB)
 	errs := wrappers.Errs{}
 	errs.Add(
-		idSliceDB.Put(id[:], nil),
+		linkeddb.NewDefault(idSliceDB).Put(id[:], nil),
 		idSliceDB.Close(),
 	)
 	return errs.Err
