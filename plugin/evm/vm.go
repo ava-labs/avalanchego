@@ -4,7 +4,6 @@
 package evm
 
 import (
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -60,7 +59,7 @@ var (
 	// GitCommit is set by the build script
 	GitCommit string
 	// Version is the version of Coreth
-	Version = "coreth-v0.3.26"
+	Version = "coreth-v0.3.27"
 
 	_ block.ChainVM = &VM{}
 )
@@ -115,6 +114,11 @@ var (
 	errTxHashMismatch             = errors.New("txs hash does not match header")
 	errUncleHashMismatch          = errors.New("uncle hash mismatch")
 	errRejectedParent             = errors.New("rejected parent")
+	errInvalidDifficulty          = errors.New("invalid difficulty")
+	errInvalidBlockVersion        = errors.New("invalid block version")
+	errInvalidMixDigest           = errors.New("invalid mix digest")
+	errInvalidExtDataHash         = errors.New("invalid extra data hash")
+	errHeaderExtraDataTooBig      = errors.New("header extra data too big")
 )
 
 // mayBuildBlockStatus denotes whether the engine should be notified
@@ -233,14 +237,20 @@ type VM struct {
 	fx secp256k1fx.Fx
 }
 
-func (vm *VM) getAtomicTx(block *types.Block) *Tx {
+func (vm *VM) getAtomicTx(block *types.Block) (*Tx, error) {
 	extdata := block.ExtraData()
+	if len(extdata) == 0 {
+		return nil, nil
+	}
 	atx := new(Tx)
 	if _, err := vm.codec.Unmarshal(extdata, atx); err != nil {
-		return nil
+		return nil, fmt.Errorf("failed to unmarshal atomic tx due to %w", err)
 	}
-	atx.Sign(vm.codec, nil)
-	return atx
+	if err := atx.Sign(vm.codec, nil); err != nil {
+		return nil, fmt.Errorf("failed to initialize atomic tx in block %s", block.Hash().Hex())
+	}
+
+	return atx, nil
 }
 
 // Codec implements the secp256k1fx interface
@@ -316,14 +326,6 @@ func (vm *VM) Initialize(
 	chain := coreth.NewETHChain(&config, &nodecfg, nil, vm.chaindb, vm.CLIConfig.EthBackendSettings())
 	vm.chain = chain
 	vm.networkID = config.NetworkId
-	chain.SetOnHeaderNew(func(header *types.Header) {
-		hid := make([]byte, 32)
-		_, err := rand.Read(hid)
-		if err != nil {
-			panic("cannot generate hid")
-		}
-		header.Extra = append(header.Extra, hid...)
-	})
 	chain.SetOnFinalizeAndAssemble(func(state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
 		select {
 		case atx := <-vm.pendingAtomicTxs:
@@ -367,7 +369,10 @@ func (vm *VM) Initialize(
 		return vm.getLastAccepted().ethBlock
 	})
 	chain.SetOnExtraStateChange(func(block *types.Block, state *state.StateDB) error {
-		tx := vm.getAtomicTx(block)
+		tx, err := vm.getAtomicTx(block)
+		if err != nil {
+			return err
+		}
 		if tx == nil {
 			return nil
 		}
