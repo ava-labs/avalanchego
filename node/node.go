@@ -71,7 +71,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 2, 3)
+	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 2, 4)
 	versionParser           = version.NewDefaultParser()
 	beaconConnectionTimeout = 1 * time.Minute
 )
@@ -521,9 +521,19 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	}
 	xChainID := createAVMTx.ID()
 
+	createEVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, evm.ID)
+	if err != nil {
+		return err
+	}
+	cChainID := createEVMTx.ID()
+
 	// If any of these chains die, the node shuts down
 	criticalChains := ids.Set{}
-	criticalChains.Add(constants.PlatformChainID, createAVMTx.ID())
+	criticalChains.Add(
+		constants.PlatformChainID,
+		xChainID,
+		cChainID,
+	)
 
 	// Manages network timeouts
 	timeoutManager := &timeout.Manager{}
