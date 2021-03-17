@@ -5,10 +5,11 @@ import (
 	"sync"
 	"time"
 
-	health "github.com/AppsFlyer/go-sundheit"
-
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/prometheus/client_golang/prometheus"
+
+	health "github.com/AppsFlyer/go-sundheit"
 )
 
 // Service performs health checks. Other things register health checks
@@ -21,17 +22,22 @@ type Service interface {
 
 // NewService returns a new [Service] where the health checks
 // run every [checkFreq]
-func NewService(checkFreq time.Duration, log logging.Logger) Service {
+func NewService(checkFreq time.Duration, log logging.Logger, namespace string, registry prometheus.Registerer) (Service, error) {
 	healthChecker := health.New()
+	metrics, err := newMetrics(log, namespace, registry)
+	if err != nil {
+		return nil, err
+	}
 	// Add the check listener to report when a check changes status.
 	healthChecker.WithCheckListener(&checkListener{
-		log:    log,
-		checks: make(map[string]bool),
+		log:     log,
+		checks:  make(map[string]bool),
+		metrics: metrics,
 	})
 	return &service{
 		Health:    healthChecker,
 		checkFreq: checkFreq,
-	}
+	}, nil
 }
 
 // service implements Service
@@ -79,7 +85,8 @@ type checkListener struct {
 	// lock ensures that updates and reads to [checks] are atomic
 	lock sync.Mutex
 	// checks maps name -> is healthy
-	checks map[string]bool
+	checks  map[string]bool
+	metrics *metrics
 }
 
 func (c *checkListener) OnCheckStarted(name string) {
@@ -101,6 +108,10 @@ func (c *checkListener) OnCheckCompleted(name string, result health.Result) {
 	c.checks[name] = isHealthy
 	c.lock.Unlock()
 
+	if !exists && !isHealthy {
+		c.metrics.unHealthy()
+	}
+
 	if !exists || isHealthy == previouslyHealthy {
 		if isHealthy {
 			c.log.Debug("%q returned healthy with: %s", name, string(resultJSON))
@@ -112,7 +123,9 @@ func (c *checkListener) OnCheckCompleted(name string, result health.Result) {
 
 	if isHealthy {
 		c.log.Info("%q became healthy with: %s", name, string(resultJSON))
+		c.metrics.healthy()
 	} else {
 		c.log.Warn("%q became unhealthy with: %s", name, string(resultJSON))
+		c.metrics.unHealthy()
 	}
 }

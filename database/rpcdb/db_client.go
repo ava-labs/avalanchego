@@ -145,17 +145,17 @@ type batch struct {
 
 func (b *batch) Put(key, value []byte) error {
 	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), utils.CopyBytes(value), false})
-	b.size += len(value)
+	b.size += len(key) + len(value)
 	return nil
 }
 
 func (b *batch) Delete(key []byte) error {
 	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), nil, true})
-	b.size++
+	b.size += len(key)
 	return nil
 }
 
-func (b *batch) ValueSize() int { return b.size }
+func (b *batch) Size() int { return b.size }
 
 func (b *batch) Write() error {
 	request := &rpcdbproto.WriteBatchRequest{}

@@ -64,10 +64,14 @@ const (
 )
 
 var (
+	errPrimarySubnetNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
+)
+
+var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 2, 3)
+	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 2, 4)
 	versionParser           = version.NewDefaultParser()
 	beaconConnectionTimeout = 1 * time.Minute
 )
@@ -517,13 +521,19 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	}
 	xChainID := createAVMTx.ID()
 
+	createEVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, evm.ID)
+	if err != nil {
+		return err
+	}
+	cChainID := createEVMTx.ID()
+
 	// If any of these chains die, the node shuts down
 	criticalChains := ids.Set{}
-	criticalChains.Add(constants.PlatformChainID, createAVMTx.ID())
-
-	// Set Prometheus metrics info
-	n.Config.NetworkConfig.MetricsNamespace = constants.PlatformName
-	n.Config.NetworkConfig.Registerer = n.Config.ConsensusParams.Metrics
+	criticalChains.Add(
+		constants.PlatformChainID,
+		xChainID,
+		cChainID,
+	)
 
 	// Manages network timeouts
 	timeoutManager := &timeout.Manager{}
@@ -666,6 +676,9 @@ func (n *Node) initMetricsAPI() error {
 	// It is assumed by components of the system that the Metrics interface is
 	// non-nil. So, it is set regardless of if the metrics API is available or not.
 	n.Config.ConsensusParams.Metrics = registry
+	n.Config.NetworkConfig.MetricsNamespace = constants.PlatformName
+	n.Config.NetworkConfig.Registerer = registry
+
 	if !n.Config.MetricsAPIEnabled {
 		n.Log.Info("skipping metrics API initialization because it has been disabled")
 		return nil
@@ -730,28 +743,27 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	n.Log.Info("initializing Health API")
-	n.healthService = health.NewService(n.Config.HealthCheckFreq, n.Log)
+	healthService, err := health.NewService(n.Config.HealthCheckFreq, n.Log, n.Config.NetworkConfig.MetricsNamespace, n.Config.ConsensusParams.Metrics)
+	if err != nil {
+		return err
+	}
+	n.healthService = healthService
 
 	isBootstrappedFunc := func() (interface{}, error) {
 		if pChainID, err := n.chainManager.Lookup("P"); err != nil {
 			return nil, errors.New("P-Chain not created")
-		} else if !n.chainManager.IsBootstrapped(pChainID) {
-			return nil, errors.New("P-Chain not bootstrapped")
-		}
-		if xChainID, err := n.chainManager.Lookup("X"); err != nil {
+		} else if xChainID, err := n.chainManager.Lookup("X"); err != nil {
 			return nil, errors.New("X-Chain not created")
-		} else if !n.chainManager.IsBootstrapped(xChainID) {
-			return nil, errors.New("X-Chain not bootstrapped")
-		}
-		if cChainID, err := n.chainManager.Lookup("C"); err != nil {
+		} else if cChainID, err := n.chainManager.Lookup("C"); err != nil {
 			return nil, errors.New("C-Chain not created")
-		} else if !n.chainManager.IsBootstrapped(cChainID) {
-			return nil, errors.New("C-Chain not bootstrapped")
+		} else if !n.chainManager.IsBootstrapped(pChainID) || !n.chainManager.IsBootstrapped(xChainID) || !n.chainManager.IsBootstrapped(cChainID) {
+			return nil, errPrimarySubnetNotBootstrapped
 		}
+
 		return nil, nil
 	}
 	// Passes if the P, X and C chains are finished bootstrapping
-	err := n.healthService.RegisterMonotonicCheck("isBootstrapped", isBootstrappedFunc)
+	err = n.healthService.RegisterMonotonicCheck("isBootstrapped", isBootstrappedFunc)
 	if err != nil {
 		return fmt.Errorf("couldn't register isBootstrapped health check: %w", err)
 	}
