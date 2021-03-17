@@ -119,10 +119,6 @@ func (self *ETHChain) SetOnSealFinish(cb func(*types.Block) error) {
 	self.mcb.OnSealFinish = cb
 }
 
-func (self *ETHChain) SetOnHeaderNew(cb func(*types.Header)) {
-	self.mcb.OnHeaderNew = cb
-}
-
 func (self *ETHChain) SetOnSealDrop(cb func(*types.Block)) {
 	self.mcb.OnSealDrop = cb
 }
