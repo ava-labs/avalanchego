@@ -76,14 +76,6 @@ func main() {
 		log.Info(fmt.Sprintf("genesis balance = %s", state.GetBalance(genKey.Address)))
 		log.Info(fmt.Sprintf("bob's balance = %s", state.GetBalance(bob.Address)))
 	}
-	chain.SetOnHeaderNew(func(header *types.Header) {
-		hid := make([]byte, 32)
-		_, err := rand.Read(hid)
-		if err != nil {
-			panic("cannot generate hid")
-		}
-		header.Extra = append(header.Extra, hid...)
-	})
 	newBlockChan := make(chan *types.Block)
 	newTxPoolHeadChan := make(chan core.NewTxPoolHeadEvent, 1)
 	chain.SetOnSealFinish(func(block *types.Block) error {

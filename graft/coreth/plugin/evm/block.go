@@ -117,7 +117,10 @@ func (b *Block) Accept() error {
 		return fmt.Errorf("failed to put %s as the last accepted block: %w", b.ID(), err)
 	}
 
-	tx := vm.extractAtomicTx(b.ethBlock)
+	tx, err := vm.extractAtomicTx(b.ethBlock)
+	if err != nil {
+		return err
+	}
 	if tx == nil {
 		return nil
 	}
@@ -147,7 +150,7 @@ func (b *Block) Accept() error {
 func (b *Block) Reject() error {
 	b.status = choices.Rejected
 	log.Trace(fmt.Sprintf("Rejecting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
-	tx := b.vm.extractAtomicTx(b.ethBlock)
+	tx, _ := b.vm.extractAtomicTx(b.ethBlock)
 	if tx != nil {
 		b.vm.mempool.RejectTx(tx.ID())
 	}
@@ -191,14 +194,58 @@ func (b *Block) syntacticVerify() error {
 	if b.ethBlock.Hash() == b.vm.genesisHash {
 		return nil
 	}
-	txsHash := types.DeriveSha(b.ethBlock.Transactions(), new(trie.Trie))
-	uncleHash := types.CalcUncleHash(b.ethBlock.Uncles())
+
+	// Perform block and header sanity checks
 	ethHeader := b.ethBlock.Header()
+	if ethHeader.Number == nil || !ethHeader.Number.IsUint64() {
+		return errInvalidBlock
+	}
+	if ethHeader.Difficulty == nil || !ethHeader.Difficulty.IsUint64() ||
+		ethHeader.Difficulty.Uint64() != 1 {
+		return fmt.Errorf(
+			"expected difficulty to be 1 but got %v: %w",
+			ethHeader.Difficulty, errInvalidDifficulty,
+		)
+	}
+	if ethHeader.Nonce.Uint64() != 0 {
+		return fmt.Errorf(
+			"expected nonce to be 0 but got %d: %w",
+			ethHeader.Nonce.Uint64(), errInvalidNonce,
+		)
+	}
+	if ethHeader.MixDigest != (common.Hash{}) {
+		return fmt.Errorf(
+			"expected MixDigest to be empty but got %x: %w",
+			ethHeader.MixDigest, errInvalidMixDigest,
+		)
+	}
+	if ethHeader.ExtDataHash != (common.Hash{}) {
+		return fmt.Errorf(
+			"expected ExtDataHash to be empty but got %x: %w",
+			ethHeader.ExtDataHash, errInvalidExtDataHash,
+		)
+	}
+	headerExtraDataSize := uint64(len(ethHeader.Extra))
+	if headerExtraDataSize > params.MaximumExtraDataSize {
+		return fmt.Errorf(
+			"expected header ExtraData to be <= %d but got %d: %w",
+			params.MaximumExtraDataSize, headerExtraDataSize, errHeaderExtraDataTooBig,
+		)
+	}
+	if b.ethBlock.Version() != 0 {
+		return fmt.Errorf(
+			"expected block version to be 0 but got %d: %w",
+			b.ethBlock.Version(), errInvalidBlockVersion,
+		)
+	}
+
 	// Check that the tx hash in the header matches the body
+	txsHash := types.DeriveSha(b.ethBlock.Transactions(), new(trie.Trie))
 	if txsHash != ethHeader.TxHash {
 		return errTxHashMismatch
 	}
 	// Check that the uncle hash in the header matches the body
+	uncleHash := types.CalcUncleHash(b.ethBlock.Uncles())
 	if uncleHash != ethHeader.UncleHash {
 		return errUncleHashMismatch
 	}
@@ -211,7 +258,13 @@ func (b *Block) syntacticVerify() error {
 		return errUnclesUnsupported
 	}
 	// Block must not be empty
-	if len(b.ethBlock.Transactions()) == 0 && b.vm.extractAtomicTx(b.ethBlock) == nil {
+	//
+	// Note: extractAtomicTx also asserts a maximum size
+	atomicTx, err := b.vm.extractAtomicTx(b.ethBlock)
+	if err != nil {
+		return err
+	}
+	if len(b.ethBlock.Transactions()) == 0 && atomicTx == nil {
 		return errEmptyBlock
 	}
 	return nil
@@ -249,7 +302,10 @@ func (b *Block) Verify() error {
 
 	// If the tx is an atomic tx, ensure that it doesn't conflict with any of
 	// its processing ancestry.
-	atomicTx := vm.extractAtomicTx(b.ethBlock)
+	atomicTx, err := vm.extractAtomicTx(b.ethBlock)
+	if err != nil {
+		return err
+	}
 	if atomicTx != nil {
 		// If the ancestor is unknown, then the parent failed verification when
 		// it was called.
@@ -277,7 +333,10 @@ func (b *Block) Verify() error {
 				// processing ancestors consume the same UTXO.
 				inputs := atx.InputUTXOs()
 				for ancestor.Status() != choices.Accepted {
-					atx := vm.extractAtomicTx(ancestor.ethBlock)
+					atx, err := vm.extractAtomicTx(ancestor.ethBlock)
+					if err != nil {
+						return fmt.Errorf("block %s failed verification while parsing atomic tx from ancestor %s", b.ethBlock.Hash().Hex(), ancestor.ethBlock.Hash().Hex())
+					}
 					// If the ancestor isn't an atomic block, it can't conflict with
 					// the import tx.
 					if atx != nil {
@@ -327,7 +386,7 @@ func (b *Block) Verify() error {
 		}
 	}
 
-	_, err := vm.chain.InsertChain([]*types.Block{b.ethBlock})
+	_, err = vm.chain.InsertChain([]*types.Block{b.ethBlock})
 	return err
 }
 

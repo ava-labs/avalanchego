@@ -4,7 +4,6 @@
 package evm
 
 import (
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -111,6 +110,11 @@ var (
 	errTxHashMismatch             = errors.New("txs hash does not match header")
 	errUncleHashMismatch          = errors.New("uncle hash mismatch")
 	errRejectedParent             = errors.New("rejected parent")
+	errInvalidDifficulty          = errors.New("invalid difficulty")
+	errInvalidBlockVersion        = errors.New("invalid block version")
+	errInvalidMixDigest           = errors.New("invalid mix digest")
+	errInvalidExtDataHash         = errors.New("invalid extra data hash")
+	errHeaderExtraDataTooBig      = errors.New("header extra data too big")
 )
 
 // buildingBlkStatus denotes the current status of the VM in block production.
@@ -290,14 +294,6 @@ func (vm *VM) Initialize(
 	chain := coreth.NewETHChain(&config, &nodecfg, nil, vm.chaindb, vm.CLIConfig.EthBackendSettings())
 	vm.chain = chain
 	vm.networkID = config.NetworkId
-	chain.SetOnHeaderNew(func(header *types.Header) {
-		hid := make([]byte, 32)
-		_, err := rand.Read(hid)
-		if err != nil {
-			panic("cannot generate hid")
-		}
-		header.Extra = append(header.Extra, hid...)
-	})
 	chain.SetOnFinalizeAndAssemble(func(state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
 		if tx, exists := vm.mempool.NextTx(); exists {
 			if err := tx.UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(vm, state); err != nil {
@@ -354,7 +350,10 @@ func (vm *VM) Initialize(
 		return nil
 	})
 	chain.SetOnExtraStateChange(func(block *types.Block, state *state.StateDB) error {
-		tx := vm.extractAtomicTx(block)
+		tx, err := vm.extractAtomicTx(block)
+		if err != nil {
+			return err
+		}
 		if tx == nil {
 			return nil
 		}
@@ -627,14 +626,20 @@ func (vm *VM) CreateStaticHandlers() (map[string]*commonEng.HTTPHandler, error) 
  */
 // extractAtomicTx returns the atomic transaction in [block] if
 // one exists.
-func (vm *VM) extractAtomicTx(block *types.Block) *Tx {
+func (vm *VM) extractAtomicTx(block *types.Block) (*Tx, error) {
 	extdata := block.ExtraData()
+	if len(extdata) == 0 {
+		return nil, nil
+	}
 	atx := new(Tx)
 	if _, err := vm.codec.Unmarshal(extdata, atx); err != nil {
-		return nil
+		return nil, fmt.Errorf("failed to unmarshal atomic tx due to %w", err)
 	}
-	atx.Sign(vm.codec, nil)
-	return atx
+	if err := atx.Sign(vm.codec, nil); err != nil {
+		return nil, fmt.Errorf("failed to initialize atomic tx in block %s", block.Hash().Hex())
+	}
+
+	return atx, nil
 }
 
 // getAcceptedAtomicTx attempts to get [txID] from the database.
