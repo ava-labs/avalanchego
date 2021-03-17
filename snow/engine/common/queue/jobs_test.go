@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 )
 
 // Test that creating a new queue can be created and that it is initially empty.
@@ -24,10 +25,8 @@ func TestNew(t *testing.T) {
 
 	jobs.SetParser(parser)
 
-	if hasNext, err := jobs.HasNext(); err != nil {
-		t.Fatal(err)
-	} else if hasNext {
-		t.Fatalf("Haven't pushed anything yet, shouldn't be able to pop")
+	if jobs.stackSize > 0 {
+		t.Fatalf("Shouldn't have a container ready to pop")
 	}
 }
 
@@ -69,9 +68,7 @@ func TestPushPop(t *testing.T) {
 
 	jobs.SetParser(parser)
 
-	if hasNext, err := jobs.HasNext(); err != nil {
-		t.Fatal(err)
-	} else if !hasNext {
+	if jobs.stackSize <= 0 {
 		t.Fatalf("Should have a container ready to pop")
 	}
 
@@ -91,9 +88,7 @@ func TestPushPop(t *testing.T) {
 		t.Fatalf("Returned wrong job")
 	}
 
-	if hasNext, err := jobs.HasNext(); err != nil {
-		t.Fatal(err)
-	} else if hasNext {
+	if jobs.stackSize > 0 {
 		t.Fatalf("Shouldn't have a container ready to pop")
 	}
 }
@@ -141,9 +136,7 @@ func TestExecute(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if hasNext, err := jobs.HasNext(); err != nil {
-		t.Fatal(err)
-	} else if !hasNext {
+	if jobs.stackSize <= 0 {
 		t.Fatalf("Should have a container ready to pop")
 	}
 
@@ -181,9 +174,7 @@ func TestExecute(t *testing.T) {
 		t.Fatalf("Should have executed the container")
 	}
 
-	if hasNext, err := jobs.HasNext(); err != nil {
-		t.Fatal(err)
-	} else if !hasNext {
+	if jobs.stackSize <= 0 {
 		t.Fatalf("Should have a container ready to pop")
 	}
 }
@@ -229,9 +220,7 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 
 	jobs.SetParser(parser)
 
-	if hasNext, err := jobs.HasNext(); err != nil {
-		t.Fatal(err)
-	} else if !hasNext {
+	if jobs.stackSize <= 0 {
 		t.Fatalf("Should have a container ready to pop")
 	}
 
@@ -251,9 +240,7 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 		t.Fatalf("Returned wrong job")
 	}
 
-	if hasNext, err := jobs.HasNext(); err != nil {
-		t.Fatal(err)
-	} else if hasNext {
+	if jobs.stackSize > 0 {
 		t.Fatalf("Shouldn't have a container ready to pop")
 	}
 }
@@ -319,9 +306,7 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if hasNext, err := jobs.HasNext(); err != nil {
-		t.Fatal(err)
-	} else if !hasNext {
+	if jobs.stackSize <= 0 {
 		t.Fatalf("Should have a container ready to pop")
 	}
 
@@ -349,9 +334,7 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if hasNext, err := jobs.HasNext(); err != nil {
-		t.Fatal(err)
-	} else if !hasNext {
+	if jobs.stackSize <= 0 {
 		t.Fatalf("Should have a container ready to pop")
 	}
 
@@ -364,9 +347,81 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 		t.Fatalf("Returned wrong job")
 	}
 
-	if hasNext, err := jobs.HasNext(); err != nil {
+	if jobs.stackSize > 0 {
+		t.Fatalf("Shouldn't have a container ready to pop")
+	}
+}
+
+// Test that executing all jobes  job that isn't ready to be executed can only be added once
+func TestExecuteAll(t *testing.T) {
+	parser := &TestParser{T: t}
+	db := memdb.New()
+
+	jobs, err := New(db)
+	if err != nil {
 		t.Fatal(err)
-	} else if hasNext {
+	}
+
+	jobs.SetParser(parser)
+
+	id0 := ids.GenerateTestID()
+	id1 := ids.GenerateTestID()
+	job1 := &TestJob{
+		T: t,
+
+		IDF: func() ids.ID { return id1 },
+		MissingDependenciesF: func() (ids.Set, error) {
+			s := ids.Set{}
+			s.Add(id0)
+			return s, nil
+		},
+		ExecuteF: func() error { return nil },
+		BytesF:   func() []byte { return []byte{1} },
+	}
+	job0 := &TestJob{
+		T: t,
+
+		IDF:                  func() ids.ID { return id0 },
+		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{}, nil },
+		ExecuteF: func() error {
+			job1.MissingDependenciesF = func() (ids.Set, error) { return ids.Set{}, nil }
+			return nil
+		},
+		BytesF: func() []byte { return []byte{0} },
+	}
+
+	if err := jobs.Push(job1); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := jobs.Push(job0); err != nil {
+		t.Fatal(err)
+	}
+
+	if jobs.stackSize <= 0 {
+		t.Fatalf("Should have a container ready to pop")
+	}
+
+	parser.ParseF = func(b []byte) (Job, error) {
+		if bytes.Equal(b, []byte{0}) {
+			return job0, nil
+		}
+		if bytes.Equal(b, []byte{1}) {
+			return job1, nil
+		}
+		t.Fatalf("Unknown job")
+		return nil, errors.New("Unknown job")
+	}
+
+	count, err := jobs.ExecuteAll(snow.DefaultContextTest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Fatalf("Expected to have executed %d jobs but executed %d", 2, count)
+	}
+
+	if jobs.stackSize > 0 {
 		t.Fatalf("Shouldn't have a container ready to pop")
 	}
 }

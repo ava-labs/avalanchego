@@ -87,9 +87,9 @@ func (b *Bootstrapper) Initialize(
 }
 
 // CurrentAcceptedFrontier returns the last accepted block
-func (b *Bootstrapper) CurrentAcceptedFrontier() []ids.ID {
-	acceptedFrontier := []ids.ID{b.VM.LastAccepted()}
-	return acceptedFrontier
+func (b *Bootstrapper) CurrentAcceptedFrontier() ([]ids.ID, error) {
+	lastAccepted, err := b.VM.LastAccepted()
+	return []ids.ID{lastAccepted}, err
 }
 
 // FilterAccepted returns the blocks in [containerIDs] that we have accepted
@@ -215,34 +215,39 @@ func (b *Bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) err
 func (b *Bootstrapper) process(blk snowman.Block) error {
 	status := blk.Status()
 	blkID := blk.ID()
-processLoop:
 	for status == choices.Processing {
 		b.Blocked.RemovePendingID(blkID)
 
-		err := b.Blocked.Push(&blockJob{
+		jobBlock := &blockJob{
 			numAccepted: b.numAccepted,
 			numDropped:  b.numDropped,
 			blk:         blk,
-		})
+		}
 
-		// Traverse to the next block regardless of the result of Push
+		has, err := b.Blocked.Has(jobBlock)
+		if err != nil {
+			return err
+		}
+
+		// Traverse to the next block regardless of if the block is pushed
 		blk = blk.Parent()
 		status = blk.Status()
 		blkID = blk.ID()
 
-		switch {
-		case err == nil:
-			b.numFetched.Inc()
-			b.NumFetched++                                      // Progress tracker
-			if b.NumFetched%common.StatusUpdateFrequency == 0 { // Periodically print progress
-				b.Ctx.Log.Info("fetched %d blocks", b.NumFetched)
-			}
-		case err == queue.ErrDuplicate:
-			// If this block is already on the queue, then we can stop traversing here.
-			break processLoop
-		default:
-			// Treat all other errors as fatal.
+		if has {
+			// If this block is already on the queue, then we can stop
+			// traversing here.
+			break
+		}
+
+		if err := b.Blocked.Push(jobBlock); err != nil {
 			return err
+		}
+
+		b.numFetched.Inc()
+		b.NumFetched++                                     // Progress tracker
+		if b.NumFetched%queue.StatusUpdateFrequency == 0 { // Periodically print progress
+			b.Ctx.Log.Info("fetched %d blocks", b.NumFetched)
 		}
 	}
 
@@ -275,7 +280,7 @@ func (b *Bootstrapper) checkFinish() error {
 	b.Ctx.Log.Info("bootstrapping fetched %d blocks. executing state transitions...",
 		b.NumFetched)
 
-	executedBlocks, err := b.executeAll(b.Blocked)
+	executedBlocks, err := b.Blocked.ExecuteAll(b.Ctx, b.Ctx.ConsensusDispatcher, b.Ctx.DecisionDispatcher)
 	if err != nil {
 		return err
 	}
@@ -332,27 +337,6 @@ func (b *Bootstrapper) finish() error {
 	}
 	b.Ctx.Bootstrapped()
 	return nil
-}
-
-func (b *Bootstrapper) executeAll(jobs *queue.Jobs) (int, error) {
-	numExecuted := 0
-	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
-		if err := jobs.Execute(job); err != nil {
-			return numExecuted, err
-		}
-		if err := jobs.Commit(); err != nil {
-			return numExecuted, err
-		}
-		numExecuted++
-		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
-			b.Ctx.Log.Info("executed %d blocks", numExecuted)
-		}
-
-		b.Ctx.ConsensusDispatcher.Accept(b.Ctx, job.ID(), job.Bytes())
-		b.Ctx.DecisionDispatcher.Accept(b.Ctx, job.ID(), job.Bytes())
-	}
-	b.Ctx.Log.Info("executed %d blocks", numExecuted)
-	return numExecuted, nil
 }
 
 // Connected implements the Engine interface.

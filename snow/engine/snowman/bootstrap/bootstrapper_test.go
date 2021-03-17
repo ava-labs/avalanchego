@@ -610,9 +610,12 @@ func TestBootstrapperAcceptedFrontier(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.LastAcceptedF = func() ids.ID { return blkID }
+	vm.LastAcceptedF = func() (ids.ID, error) { return blkID, nil }
 
-	accepted := bs.CurrentAcceptedFrontier()
+	accepted, err := bs.CurrentAcceptedFrontier()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if len(accepted) != 1 {
 		t.Fatalf("Only one block should be accepted")

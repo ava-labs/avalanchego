@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
@@ -422,7 +423,11 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	db := prefixdb.New(ctx.ChainID[:], m.DB)
+	metricsDB, err := meterdb.New(consensusParams.Namespace+"_db", ctx.Metrics, m.DB)
+	if err != nil {
+		return nil, err
+	}
+	db := prefixdb.New(ctx.ChainID[:], metricsDB)
 	vmDB := prefixdb.New([]byte("vm"), db)
 	vertexDB := prefixdb.New([]byte("vertex"), db)
 	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db)
@@ -452,7 +457,7 @@ func (m *manager) createAvalancheChain(
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	err = sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager, m.ConsensusParams.Namespace, m.ConsensusParams.Metrics)
+	err = sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager, consensusParams.Namespace, consensusParams.Metrics)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
 	}
@@ -546,7 +551,11 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	db := prefixdb.New(ctx.ChainID[:], m.DB)
+	metricsDB, err := meterdb.New(consensusParams.Namespace+"_db", ctx.Metrics, m.DB)
+	if err != nil {
+		return nil, err
+	}
+	db := prefixdb.New(ctx.ChainID[:], metricsDB)
 	vmDB := prefixdb.New([]byte("vm"), db)
 	bootstrappingDB := prefixdb.New([]byte("bs"), db)
 

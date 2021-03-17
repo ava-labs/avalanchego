@@ -4,62 +4,63 @@
 package avax
 
 import (
-	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func TestPrefixedFunds(t *testing.T) {
-	c := linearcodec.NewDefault()
-	if err := c.RegisterType(&TestAddressable{}); err != nil {
-		t.Fatal(err)
-	}
-	manager := codec.NewDefaultManager()
-	if err := manager.RegisterCodec(codecVersion, c); err != nil {
-		t.Fatal(err)
-	}
+func TestStateIDs(t *testing.T) {
+	state := NewState(memdb.New(), nil, nil, 0, 0, 10)
 
-	chain0ID := ids.Empty.Prefix(0)
-	chain1ID := ids.Empty.Prefix(1)
+	keyA := []byte{'a'}
+	keyB := []byte{'b'}
 
-	db := memdb.New()
+	IDA1 := ids.GenerateTestID()
+	IDA2 := ids.GenerateTestID()
 
-	st0 := NewPrefixedState(db, manager, manager, chain0ID, chain1ID)
-	st1 := NewPrefixedState(db, manager, manager, chain1ID, chain0ID)
-
-	addr := ids.GenerateTestShortID()
-	addrBytes := addr.Bytes()
-
-	utxo := &UTXO{
-		UTXOID: UTXOID{
-			TxID:        ids.Empty,
-			OutputIndex: 0,
-		},
-		Asset: Asset{
-			ID: ids.Empty,
-		},
-		Out: &TestAddressable{
-			Addrs: [][]byte{
-				addrBytes,
-			},
-		},
-	}
-
-	assert.NoError(t, st0.FundUTXO(utxo))
-
-	utxoIDs, err := st1.Funds(addr.Bytes(), ids.Empty, math.MaxInt32)
+	err := state.AddID(keyA, IDA1)
 	assert.NoError(t, err)
-	assert.Equal(t, []ids.ID{utxo.InputID()}, utxoIDs)
 
-	assert.NoError(t, st1.SpendUTXO(utxo.InputID()))
-
-	utxoIDs, err = st1.Funds(addr.Bytes(), ids.Empty, math.MaxInt32)
+	err = state.AddID(keyA, IDA2)
 	assert.NoError(t, err)
-	assert.Len(t, utxoIDs, 0)
+
+	// Test State returns all of the added IDs
+	IDs, err := state.IDs(keyA, nil, 5)
+	assert.NoError(t, err)
+
+	assert.Len(t, IDs, 2)
+	set := ids.Set{}
+	set.Add(IDs...)
+
+	assert.True(t, set.Contains(IDA1))
+	assert.True(t, set.Contains(IDA2))
+
+	// Test State only returns up to [limit] IDs
+	IDs, err = state.IDs(keyA, nil, 1)
+	assert.NoError(t, err)
+
+	assert.Len(t, IDs, 1)
+	set = ids.Set{}
+	set.Add(IDs[0])
+
+	assert.True(t, set.Contains(IDA1) || set.Contains(IDA2))
+
+	// Test State RemoveID removes the ID from the added IDs
+	err = state.RemoveID(keyA, IDA1)
+	assert.NoError(t, err)
+
+	IDs, err = state.IDs(keyA, nil, 1)
+	assert.NoError(t, err)
+
+	assert.Len(t, IDs, 1)
+
+	assert.True(t, IDs[0] == IDA2)
+
+	// Test State does not return any IDs added for a different key
+	IDs, err = state.IDs(keyB, nil, 5)
+	assert.NoError(t, err)
+	assert.Len(t, IDs, 0)
 }

@@ -32,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/core"
-	"github.com/ava-labs/avalanchego/vms/components/state"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -78,7 +77,7 @@ var (
 	timestampKey     = ids.ID{'t', 'i', 'm', 'e'}
 	chainsKey        = ids.ID{'c', 'h', 'a', 'i', 'n', 's'}
 	subnetsKey       = ids.ID{'s', 'u', 'b', 'n', 'e', 't', 's'}
-	currentSupplyKey = ids.ID{'c', 'u', 'r', 'r', 'e', 't', ' ', 's', 'u', 'p', 'p', 'l', 'y'}
+	currentSupplyKey = ids.ID{'c', 'u', 'r', 'r', 'e', 'n', 't', ' ', 's', 'u', 'p', 'p', 'l', 'y'}
 
 	errRegisteringType          = errors.New("error registering type with database")
 	errInvalidLastAcceptedBlock = errors.New("last accepted block must be a decision block")
@@ -325,11 +324,18 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	lastAcceptedID := vm.LastAccepted()
+	lastAcceptedID, err := vm.LastAccepted()
+	if err != nil {
+		vm.Ctx.Log.Error("Error fetching the last accepted block ID (%s), %s", lastAcceptedID, err)
+		return err
+	}
 	vm.Ctx.Log.Info("initializing last accepted block as %s", lastAcceptedID)
 
 	// Build off the most recently accepted block
-	vm.SetPreference(lastAcceptedID)
+	if err := vm.SetPreference(lastAcceptedID); err != nil {
+		vm.Ctx.Log.Error("Error setting the preference to the last accepted block (%s), %s", lastAcceptedID, err)
+		return err
+	}
 
 	// Sanity check to make sure the DB is in a valid state
 	lastAcceptedIntf, err := vm.getBlock(lastAcceptedID)
@@ -604,32 +610,34 @@ func (vm *VM) getBlock(blkID ids.ID) (Block, error) {
 }
 
 // SetPreference sets the preferred block to be the one with ID [blkID]
-func (vm *VM) SetPreference(blkID ids.ID) {
+func (vm *VM) SetPreference(blkID ids.ID) error {
 	if blkID != vm.Preferred() {
-		vm.SnowmanVM.SetPreference(blkID)
+		if err := vm.SnowmanVM.SetPreference(blkID); err != nil {
+			return err
+		}
 		vm.mempool.ResetTimer()
 	}
+	return nil
 }
 
 // CreateHandlers returns a map where:
 // * keys are API endpoint extensions
 // * values are API handlers
 // See API documentation for more information
-func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
+func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	// Create a service with name "platform"
 	handler, err := vm.SnowmanVM.NewHandler("platform", &Service{vm: vm})
-	vm.Ctx.Log.AssertNoError(err)
-	return map[string]*common.HTTPHandler{"": handler}
+	return map[string]*common.HTTPHandler{"": handler}, err
 }
 
 // CreateStaticHandlers implements the snowman.ChainVM interface
-func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
+func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	// Static service's name is platform
 	staticService := CreateStaticService()
-	handler, _ := vm.SnowmanVM.NewHandler("platform", staticService)
+	handler, err := vm.SnowmanVM.NewHandler("platform", staticService)
 	return map[string]*common.HTTPHandler{
 		"": handler,
-	}
+	}, err
 }
 
 // Connected implements validators.Connector
@@ -998,6 +1006,10 @@ func (vm *VM) updateVdrSet(subnetID ids.ID) error {
 		}
 	}
 
+	if subnetID == constants.PrimaryNetworkID {
+		vm.totalStake.Set(float64(vdrs.Weight()) / float64(units.Avax))
+	}
+
 	errs := wrappers.Errs{}
 	errs.Add(
 		vm.vdrMgr.Set(subnetID, vdrs),
@@ -1030,7 +1042,7 @@ func (vm *VM) Logger() logging.Logger { return vm.Ctx.Log }
 func (vm *VM) GetAtomicUTXOs(
 	chainID ids.ID,
 	addrs ids.ShortSet,
-	startAddr state.Marshaller,
+	startAddr ids.ShortID,
 	startUTXOID ids.ID,
 	limit int,
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
@@ -1236,24 +1248,6 @@ func (vm *VM) getPendingStakers() ([]validators.Validator, error) {
 		startDB.Close(),
 	)
 	return stakers, errs.Err
-}
-
-// Returns the total amount being staked on the Primary Network, in nAVAX.
-// Does not include stake of pending stakers.
-func (vm *VM) getTotalStake() (uint64, error) {
-	stakers, err := vm.getStakers()
-	if err != nil {
-		return 0, fmt.Errorf("couldn't get stakers: %w", err)
-	}
-
-	totalStake := uint64(0)
-	for _, staker := range stakers {
-		totalStake, err = safemath.Add64(totalStake, staker.Weight())
-		if err != nil {
-			return 0, err
-		}
-	}
-	return totalStake, nil
 }
 
 // Returns the percentage of the total stake on the Primary Network

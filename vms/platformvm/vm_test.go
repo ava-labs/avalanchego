@@ -439,7 +439,10 @@ func TestGenesis(t *testing.T) {
 	}()
 
 	// Ensure the genesis block has been accepted and stored
-	genesisBlockID := vm.LastAccepted() // lastAccepted should be ID of genesis block
+	genesisBlockID, err := vm.LastAccepted() // lastAccepted should be ID of genesis block
+	if err != nil {
+		t.Fatal(err)
+	}
 	if genesisBlock, err := vm.getBlock(genesisBlockID); err != nil {
 		t.Fatalf("couldn't get genesis block: %v", err)
 	} else if genesisBlock.Status() != choices.Accepted {
@@ -593,134 +596,6 @@ func TestGenesisGetUTXOs(t *testing.T) {
 	}
 }
 
-// Test method getTotalStake
-func TestGetTotalStake(t *testing.T) {
-	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
-	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-		vm.Ctx.Lock.Unlock()
-	}()
-
-	// Make sure stake is right after genesis
-	stake, err := vm.getTotalStake()
-	if err != nil {
-		t.Fatal(err)
-	}
-	expectedStake := len(keys) * defaultWeight
-	if expectedStake != int(stake) {
-		t.Fatalf("expected total stake to be %d but is %d",
-			expectedStake,
-			stake,
-		)
-	}
-
-	// add a validator
-	vdrID := ids.GenerateTestShortID()
-	vdrStakeAmt := vm.minValidatorStake
-	addValidatorTx, err := vm.newAddValidatorTx(
-		vdrStakeAmt,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateEndTime.Unix()),
-		vdrID,
-		ids.GenerateTestShortID(),
-		0,
-		keys,
-		keys[0].PublicKey().Address(),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	validatorRewardTx := &rewardTx{
-		Reward: 100,
-		Tx:     *addValidatorTx,
-	}
-	if err := vm.addStaker(vm.DB, constants.PrimaryNetworkID, validatorRewardTx); err != nil {
-		t.Fatal(err)
-	}
-
-	// Ensure the stake increased
-	oldStake := stake
-	stake, err = vm.getTotalStake()
-	if err != nil {
-		t.Fatal(err)
-	} else if stake != oldStake+vdrStakeAmt {
-		t.Fatalf("excpected ottal stake to be %d but is %d",
-			oldStake+vdrStakeAmt,
-			stake,
-		)
-	}
-
-	// add a delegator
-	delegatorStakeAmt := 2 * vm.minDelegatorStake
-	addDelegatorTx, err := vm.newAddDelegatorTx(
-		delegatorStakeAmt,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateEndTime.Unix()),
-		vdrID,
-		ids.GenerateTestShortID(),
-		keys,
-		keys[0].PublicKey().Address(),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	delegatorRewardTx := &rewardTx{
-		Reward: 100,
-		Tx:     *addDelegatorTx,
-	}
-	if err := vm.addStaker(vm.DB, constants.PrimaryNetworkID, delegatorRewardTx); err != nil {
-		t.Fatal(err)
-	}
-
-	// Ensure the stake increased
-	oldStake = stake
-	stake, err = vm.getTotalStake()
-	if err != nil {
-		t.Fatal(err)
-	} else if stake != oldStake+delegatorStakeAmt {
-		t.Fatalf("expected total stake to be %d but is %d",
-			oldStake+delegatorStakeAmt,
-			stake,
-		)
-	}
-
-	// Remove the delegator
-	if err := vm.removeStaker(vm.DB, constants.PrimaryNetworkID, delegatorRewardTx); err != nil {
-		t.Fatal(err)
-	}
-	// Ensure the stake decreased
-	oldStake = stake
-	stake, err = vm.getTotalStake()
-	if err != nil {
-		t.Fatal(err)
-	} else if stake != oldStake-delegatorStakeAmt {
-		t.Fatalf("expected total stake to be %d but is %d",
-			oldStake-delegatorStakeAmt,
-			stake,
-		)
-	}
-
-	// Remove the validator
-	if err := vm.removeStaker(vm.DB, constants.PrimaryNetworkID, validatorRewardTx); err != nil {
-		t.Fatal(err)
-	}
-	// Ensure the stake decreased
-	oldStake = stake
-	stake, err = vm.getTotalStake()
-	if err != nil {
-		t.Fatal(err)
-	} else if stake != oldStake-vdrStakeAmt {
-		t.Fatalf("expected total stake to be %d but is %d",
-			oldStake-vdrStakeAmt,
-			stake,
-		)
-	}
-
-}
-
 // accept proposal to add validator to primary network
 func TestAddValidatorCommit(t *testing.T) {
 	vm, _ := defaultVM()
@@ -820,7 +695,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	ID := key.PublicKey().Address()
 
 	// create invalid tx
-	if tx, err := vm.newAddValidatorTx(
+	tx, err := vm.newAddValidatorTx(
 		vm.minValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -829,25 +704,43 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
-	); err != nil {
+	)
+
+	if err != nil {
 		t.Fatal(err)
-	} else if preferredHeight, err := vm.preferredHeight(); err != nil {
+	}
+	preferredHeight, err := vm.preferredHeight()
+	if err != nil {
 		t.Fatal(err)
-	} else if blk, err := vm.newProposalBlock(vm.LastAccepted(), preferredHeight+1, *tx); err != nil {
+	}
+	lastAcceptedID, err := vm.LastAccepted()
+	if err != nil {
 		t.Fatal(err)
-	} else if err := vm.State.PutBlock(vm.DB, blk); err != nil {
+	}
+	blk, err := vm.newProposalBlock(lastAcceptedID, preferredHeight+1, *tx)
+	if err != nil {
 		t.Fatal(err)
-	} else if err := vm.DB.Commit(); err != nil {
+	}
+	if err := vm.State.PutBlock(vm.DB, blk); err != nil {
 		t.Fatal(err)
-	} else if err := blk.Verify(); err == nil {
+	}
+	if err := vm.DB.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := blk.Verify(); err == nil {
 		t.Fatalf("Should have errored during verification")
-	} else if status := blk.Status(); status != choices.Rejected {
+	}
+	if status := blk.Status(); status != choices.Rejected {
 		t.Fatalf("Should have marked the block as rejected")
-	} else if _, ok := vm.droppedTxCache.Get(blk.Tx.ID()); !ok {
+	}
+	if _, ok := vm.droppedTxCache.Get(blk.Tx.ID()); !ok {
 		t.Fatal("tx should be in dropped tx cache")
-	} else if parsedBlk, err := vm.GetBlock(blk.ID()); err != nil {
+	}
+	parsedBlk, err := vm.GetBlock(blk.ID())
+	if err != nil {
 		t.Fatal(err)
-	} else if status := parsedBlk.Status(); status != choices.Rejected {
+	}
+	if status := parsedBlk.Status(); status != choices.Rejected {
 		t.Fatalf("Should have marked the block as rejected")
 	}
 }
@@ -1832,7 +1725,10 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	genesisID := firstVM.LastAccepted()
+	genesisID, err := firstVM.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	firstAdvanceTimeTx, err := firstVM.newAdvanceTimeTx(defaultGenesisTime.Add(time.Second))
 	if err != nil {
@@ -1915,7 +1811,11 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if lastAccepted := secondVM.LastAccepted(); genesisID != lastAccepted {
+	lastAccepted, err := secondVM.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if genesisID != lastAccepted {
 		t.Fatalf("Shouldn't have changed the genesis")
 	}
 }
@@ -2040,7 +1940,12 @@ func TestRestartFullyAccepted(t *testing.T) {
 	secondMsgChan := make(chan common.Message, 1)
 	if err := secondVM.Initialize(secondCtx, db, genesisBytes, secondMsgChan, nil); err != nil {
 		t.Fatal(err)
-	} else if lastAccepted := secondVM.LastAccepted(); options[0].ID() != lastAccepted {
+	}
+	lastAccepted, err := secondVM.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if options[0].ID() != lastAccepted {
 		t.Fatalf("Should have changed the genesis")
 	}
 }
@@ -2165,12 +2070,15 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			VM:      vm,
 		},
 		Params: snowball.Parameters{
-			Metrics:           prometheus.NewRegistry(),
-			K:                 1,
-			Alpha:             1,
-			BetaVirtuous:      20,
-			BetaRogue:         20,
-			ConcurrentRepolls: 1,
+			Metrics:               prometheus.NewRegistry(),
+			K:                     1,
+			Alpha:                 1,
+			BetaVirtuous:          20,
+			BetaRogue:             20,
+			ConcurrentRepolls:     1,
+			OptimalProcessing:     1,
+			MaxOutstandingItems:   1,
+			MaxItemProcessingTime: 1,
 		},
 		Consensus: &smcon.Topological{},
 	})
@@ -2576,9 +2484,9 @@ func TestUptimeReporting(t *testing.T) {
 
 	// Unregister the previously registered metrics
 	ctx.Metrics.Unregister(vm.metrics.percentConnected)
+	ctx.Metrics.Unregister(vm.metrics.totalStake)
 
-	// Test that VM reports the correct uptimes afer
-	// restart.
+	// Test that VM reports the correct uptimes after restart.
 	vm = &VM{
 		SnowmanVM:          &core.SnowmanVM{},
 		chainManager:       chains.MockManager{},

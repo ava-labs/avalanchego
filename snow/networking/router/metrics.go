@@ -8,8 +8,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -23,7 +23,7 @@ func initHistogram(namespace, name string, registerer prometheus.Registerer, err
 			Namespace: namespace,
 			Name:      name,
 			Help:      defaultRequestHelpMsg,
-			Buckets:   timer.NanosecondsBuckets,
+			Buckets:   utils.NanosecondsBuckets,
 		})
 
 	if err := registerer.Register(histogram); err != nil {
@@ -117,7 +117,7 @@ func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer)
 		Namespace: namespace,
 		Name:      "cpu_utilization",
 		Help:      "Time this handler's engine spent processing messages for a single CPU interval in milliseconds",
-		Buckets:   timer.MillisecondsBuckets,
+		Buckets:   utils.MillisecondsBuckets,
 	})
 	if err := registerer.Register(m.cpu); err != nil {
 		errs.Add(fmt.Errorf("failed to register shutdown statistics due to %w", err))
@@ -126,7 +126,7 @@ func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer)
 		Namespace: namespace,
 		Name:      "shutdown",
 		Help:      "Time spent in the process of shutting down in nanoseconds",
-		Buckets:   timer.NanosecondsBuckets,
+		Buckets:   utils.NanosecondsBuckets,
 	})
 	if err := registerer.Register(m.shutdown); err != nil {
 		errs.Add(fmt.Errorf("failed to register shutdown statistics due to %w", err))
@@ -151,7 +151,7 @@ func (m *metrics) registerTierStatistics(tier int) (prometheus.Gauge, prometheus
 		Namespace: m.namespace,
 		Name:      fmt.Sprintf("tier_%d_wait_time", tier),
 		Help:      fmt.Sprintf("Amount of time a message waits on tier %d queue before being processed", tier),
-		Buckets:   timer.NanosecondsBuckets,
+		Buckets:   utils.NanosecondsBuckets,
 	})
 	if err := m.registerer.Register(histogram); err != nil {
 		errs.Add(fmt.Errorf("failed to register tier_%d_wait_time statistics due to %w", tier, err))

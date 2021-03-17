@@ -19,10 +19,6 @@ const (
 	// sent in a MultiPut message
 	MaxContainersPerMultiPut = 2000
 
-	// StatusUpdateFrequency is how many containers should be processed between
-	// logs
-	StatusUpdateFrequency = 2500
-
 	// MaxOutstandingRequests is the maximum number of GetAncestors sent but not
 	// responded to/failed
 	MaxOutstandingRequests = 8
@@ -116,7 +112,11 @@ func (b *Bootstrapper) Startup() error {
 
 // GetAcceptedFrontier implements the Engine interface.
 func (b *Bootstrapper) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
-	b.Sender.AcceptedFrontier(validatorID, requestID, b.Bootstrapable.CurrentAcceptedFrontier())
+	acceptedFrontier, err := b.Bootstrapable.CurrentAcceptedFrontier()
+	if err != nil {
+		return err
+	}
+	b.Sender.AcceptedFrontier(validatorID, requestID, acceptedFrontier)
 	return nil
 }
 

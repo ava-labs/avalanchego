@@ -86,7 +86,10 @@ func (t *Transitive) Initialize(config Config) error {
 // When bootstrapping is finished, this will be called.
 // This initializes the consensus engine with the last accepted block.
 func (t *Transitive) finishBootstrapping() error {
-	lastAcceptedID := t.VM.LastAccepted()
+	lastAcceptedID, err := t.VM.LastAccepted()
+	if err != nil {
+		return err
+	}
 	lastAccepted, err := t.VM.GetBlock(lastAcceptedID)
 	if err != nil {
 		t.Ctx.Log.Error("failed to get last accepted block due to: %s", err)
@@ -115,7 +118,9 @@ func (t *Transitive) finishBootstrapping() error {
 	default:
 		// if there aren't blocks we need to deliver on startup, we need to set
 		// the preference to the last accepted block
-		t.VM.SetPreference(lastAcceptedID)
+		if err := t.VM.SetPreference(lastAcceptedID); err != nil {
+			return err
+		}
 	}
 
 	t.Ctx.Log.Info("bootstrapping finished with %s as the last accepted block", lastAcceptedID)
@@ -124,7 +129,10 @@ func (t *Transitive) finishBootstrapping() error {
 
 // Gossip implements the Engine interface
 func (t *Transitive) Gossip() error {
-	blkID := t.VM.LastAccepted()
+	blkID, err := t.VM.LastAccepted()
+	if err != nil {
+		return err
+	}
 	blk, err := t.VM.GetBlock(blkID)
 	if err != nil {
 		t.Ctx.Log.Warn("dropping gossip request as %s couldn't be loaded due to %s", blkID, err)
@@ -673,7 +681,9 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		}
 	}
 
-	t.VM.SetPreference(t.Consensus.Preference())
+	if err := t.VM.SetPreference(t.Consensus.Preference()); err != nil {
+		return err
+	}
 
 	// If the block is now preferred, query the network for its preferences
 	// with this new block.
@@ -715,6 +725,23 @@ func (t *Transitive) IsBootstrapped() bool {
 
 // Health implements the common.Engine interface
 func (t *Transitive) HealthCheck() (interface{}, error) {
-	// TODO add more health checks
-	return t.VM.HealthCheck()
+	var (
+		consensusIntf interface{} = struct{}{}
+		consensusErr  error
+	)
+	if t.Ctx.IsBootstrapped() {
+		consensusIntf, consensusErr = t.Consensus.HealthCheck()
+	}
+	vmIntf, vmErr := t.VM.HealthCheck()
+	intf := map[string]interface{}{
+		"consensus": consensusIntf,
+		"vm":        vmIntf,
+	}
+	if consensusErr == nil {
+		return intf, vmErr
+	}
+	if vmErr == nil {
+		return intf, consensusErr
+	}
+	return intf, fmt.Errorf("vm: %s ; consensus: %s", vmErr, consensusErr)
 }

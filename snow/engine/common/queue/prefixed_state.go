@@ -26,10 +26,12 @@ var (
 
 type prefixedState struct{ state }
 
+// SetStackSize sets the size of the stack stored in [db] to [size]
 func (ps *prefixedState) SetStackSize(db database.Database, size uint32) error {
 	return ps.state.SetInt(db, stackSize, size)
 }
 
+// StackSize returns the size of the stack stored in [db]
 func (ps *prefixedState) StackSize(db database.Database) (uint32, error) {
 	return ps.state.Int(db, stackSize)
 }
@@ -38,33 +40,36 @@ func (ps *prefixedState) DeleteStackSize(db database.Database) error {
 	return ps.state.DeleteInt(db, stackSize)
 }
 
-func (ps *prefixedState) SetStackIndex(db database.Database, index uint32, job Job) error {
+// SetStackIndex sets the job at [index] to [job]
+func (ps *prefixedState) SetStackIndex(db database.Database, index uint32, jobID ids.ID) error {
 	p := wrappers.Packer{Bytes: make([]byte, 1+wrappers.IntLen)}
 
 	p.PackByte(stackID)
 	p.PackInt(index)
 
-	return ps.state.SetJob(db, p.Bytes, job)
+	return ps.state.SetJobID(db, p.Bytes, jobID)
 }
 
-func (ps *prefixedState) DeleteStackIndex(db database.Database, index uint32) error {
+// RemoveStackIndex fetches and deletes the job at [index] from [db]
+func (ps *prefixedState) RemoveStackIndex(db database.Database, index uint32) (Job, error) {
 	p := wrappers.Packer{Bytes: make([]byte, 1+wrappers.IntLen)}
 
 	p.PackByte(stackID)
 	p.PackInt(index)
 
-	return db.Delete(p.Bytes)
+	jobID, err := ps.state.JobID(db, p.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	job, err := ps.Job(db, jobID)
+	if err != nil {
+		return nil, err
+	}
+	return job, db.Delete(p.Bytes)
 }
 
-func (ps *prefixedState) StackIndex(db database.Database, index uint32) (Job, error) {
-	p := wrappers.Packer{Bytes: make([]byte, 1+wrappers.IntLen)}
-
-	p.PackByte(stackID)
-	p.PackInt(index)
-
-	return ps.state.Job(db, p.Bytes)
-}
-
+// SetJob writes [job] to [db]
 func (ps *prefixedState) SetJob(db database.Database, job Job) error {
 	p := wrappers.Packer{Bytes: make([]byte, 1+hashing.HashLen)}
 
@@ -75,6 +80,7 @@ func (ps *prefixedState) SetJob(db database.Database, job Job) error {
 	return ps.state.SetJob(db, p.Bytes, job)
 }
 
+// HasJob returns true if [db] has job [id]
 func (ps *prefixedState) HasJob(db database.Database, id ids.ID) (bool, error) {
 	p := wrappers.Packer{Bytes: make([]byte, 1+hashing.HashLen)}
 
@@ -84,6 +90,7 @@ func (ps *prefixedState) HasJob(db database.Database, id ids.ID) (bool, error) {
 	return db.Has(p.Bytes)
 }
 
+// DeleteJob deletes job [id] from [db]
 func (ps *prefixedState) DeleteJob(db database.Database, id ids.ID) error {
 	p := wrappers.Packer{Bytes: make([]byte, 1+hashing.HashLen)}
 
@@ -93,6 +100,7 @@ func (ps *prefixedState) DeleteJob(db database.Database, id ids.ID) error {
 	return db.Delete(p.Bytes)
 }
 
+// Job returns job [id] from [db]
 func (ps *prefixedState) Job(db database.Database, id ids.ID) (Job, error) {
 	p := wrappers.Packer{Bytes: make([]byte, 1+hashing.HashLen)}
 
@@ -102,6 +110,7 @@ func (ps *prefixedState) Job(db database.Database, id ids.ID) (Job, error) {
 	return ps.state.Job(db, p.Bytes)
 }
 
+// AddBlocking adds [blocking] as dependent on [id] being completed
 func (ps *prefixedState) AddBlocking(db database.Database, id ids.ID, blocking ids.ID) error {
 	p := wrappers.Packer{Bytes: make([]byte, 1+hashing.HashLen)}
 
@@ -111,28 +120,24 @@ func (ps *prefixedState) AddBlocking(db database.Database, id ids.ID, blocking i
 	return ps.state.AddID(db, p.Bytes, blocking)
 }
 
-func (ps *prefixedState) DeleteBlocking(db database.Database, id ids.ID, blocking []ids.ID) error {
+// Blocking returns the set of IDs that are blocking on the completion of [id]
+// and removes them from the database.
+func (ps *prefixedState) RemoveBlocking(db database.Database, id ids.ID) ([]ids.ID, error) {
 	p := wrappers.Packer{Bytes: make([]byte, 1+hashing.HashLen)}
 
 	p.PackByte(blockingID)
 	p.PackFixedBytes(id[:])
 
+	blocking, err := ps.state.IDs(db, p.Bytes)
+	if err != nil {
+		return nil, err
+	}
 	for _, blocked := range blocking {
 		if err := ps.state.RemoveID(db, p.Bytes, blocked); err != nil {
-			return err
+			return nil, err
 		}
 	}
-
-	return nil
-}
-
-func (ps *prefixedState) Blocking(db database.Database, id ids.ID) ([]ids.ID, error) {
-	p := wrappers.Packer{Bytes: make([]byte, 1+hashing.HashLen)}
-
-	p.PackByte(blockingID)
-	p.PackFixedBytes(id[:])
-
-	return ps.state.IDs(db, p.Bytes)
+	return blocking, nil
 }
 
 func (ps *prefixedState) AddPending(db database.Database, pendingIDs ids.Set) error {

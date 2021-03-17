@@ -43,6 +43,7 @@ var (
 	errInvalidDelegationRate = errors.New("argument 'delegationFeeRate' must be between 0 and 100, inclusive")
 	errNoAddresses           = errors.New("no addresses provided")
 	errNoKeys                = errors.New("user has no keys or funds")
+	errNoPrimaryValidators   = errors.New("no default subnet validators")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -55,7 +56,11 @@ type GetHeightResponse struct {
 
 // GetHeight returns the height of the last accepted block
 func (service *Service) GetHeight(r *http.Request, args *struct{}, response *GetHeightResponse) error {
-	lastAccepted, err := service.vm.getBlock(service.vm.LastAccepted())
+	lastAcceptedID, err := service.vm.LastAccepted()
+	if err != nil {
+		return fmt.Errorf("couldn't get last accepted block ID: %w", err)
+	}
+	lastAccepted, err := service.vm.getBlock(lastAcceptedID)
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted block: %w", err)
 	}
@@ -1738,18 +1743,30 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 	if _, err := service.vm.chainManager.Lookup(args.BlockchainID); err == nil {
 		reply.Status = Validating
 		return nil
-	} else if blockchainID, err := ids.FromString(args.BlockchainID); err != nil {
+	}
+	blockchainID, err := ids.FromString(args.BlockchainID)
+	if err != nil {
 		return fmt.Errorf("problem parsing blockchainID %q: %w", args.BlockchainID, err)
-	} else if exists, err := service.chainExists(service.vm.LastAccepted(), blockchainID); err != nil {
+	}
+	lastAcceptedID, err := service.vm.LastAccepted()
+	if err != nil {
+		return fmt.Errorf("problem loading last accepted ID: %w", err)
+	}
+
+	exists, err := service.chainExists(lastAcceptedID, blockchainID)
+	if err != nil {
 		return fmt.Errorf("problem looking up blockchain: %w", err)
-	} else if exists {
+	}
+	if exists {
 		reply.Status = Created
 		return nil
-	} else if exists, err := service.chainExists(service.vm.Preferred(), blockchainID); err != nil {
+	}
+	exists, err = service.chainExists(service.vm.Preferred(), blockchainID)
+	if err != nil {
 		return fmt.Errorf("problem looking up blockchain: %w", err)
-	} else if exists {
+	}
+	if exists {
 		reply.Status = Preferred
-		return nil
 	}
 	return nil
 }
@@ -2205,9 +2222,12 @@ type GetTotalStakeReply struct {
 
 // GetTotalStake returns the total amount staked on the Primary Network
 func (service *Service) GetTotalStake(_ *http.Request, _ *struct{}, reply *GetTotalStakeReply) error {
-	stake, err := service.vm.getTotalStake()
-	reply.Stake = json.Uint64(stake)
-	return err
+	vdrs, ok := service.vm.vdrMgr.GetValidators(constants.PrimaryNetworkID)
+	if !ok {
+		return errNoPrimaryValidators
+	}
+	reply.Stake = json.Uint64(vdrs.Weight())
+	return nil
 }
 
 // GetMaxStakeAmountArgs is the request for calling GetMaxStakeAmount.

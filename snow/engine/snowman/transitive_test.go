@@ -56,7 +56,7 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = gBlk.ID
+	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 	sender.CantGetAcceptedFrontier = false
 
 	vm.CantBootstrapping = false
@@ -372,12 +372,15 @@ func TestEngineMultipleQuery(t *testing.T) {
 	config := DefaultConfig()
 
 	config.Params = snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 3,
-		Alpha:             2,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     3,
+		Alpha:                 2,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
 	vals := validators.NewSet()
@@ -415,7 +418,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = gBlk.ID
+	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 	sender.CantGetAcceptedFrontier = false
 
 	vm.CantBootstrapping = false
@@ -813,12 +816,15 @@ func TestVoteCanceling(t *testing.T) {
 	config := DefaultConfig()
 
 	config.Params = snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 3,
-		Alpha:             2,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     3,
+		Alpha:                 2,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
 	vals := validators.NewSet()
@@ -856,7 +862,7 @@ func TestVoteCanceling(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = gBlk.ID
+	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
 		switch id {
 		case gBlk.ID():
@@ -956,7 +962,7 @@ func TestEngineNoQuery(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	vm.LastAcceptedF = gBlk.ID
+	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		if blkID == gBlk.ID() {
@@ -1003,7 +1009,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	vm.LastAcceptedF = gBlk.ID
+	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		if blkID == gBlk.ID() {
@@ -1391,7 +1397,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 func TestEngineGossip(t *testing.T) {
 	_, _, sender, vm, te, gBlk := setup(t)
 
-	vm.LastAcceptedF = gBlk.ID
+	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		if blkID == gBlk.ID() {
 			return gBlk, nil
@@ -1651,7 +1657,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = gBlk.ID
+	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 	sender.CantGetAcceptedFrontier = false
 
 	vm.CantBootstrapping = false
@@ -1731,11 +1737,15 @@ func TestEngineDoubleChit(t *testing.T) {
 	config := DefaultConfig()
 
 	config.Params = snowball.Parameters{
-		Metrics:      prometheus.NewRegistry(),
-		K:            2,
-		Alpha:        2,
-		BetaVirtuous: 1,
-		BetaRogue:    2,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     2,
+		Alpha:                 2,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
 	vals := validators.NewSet()
@@ -1769,7 +1779,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = gBlk.ID
+	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 	sender.CantGetAcceptedFrontier = false
 
 	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
@@ -1900,7 +1910,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = gBlk.ID
+	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 	sender.CantGetAcceptedFrontier = false
 
 	vm.CantBootstrapping = false

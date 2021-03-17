@@ -4,15 +4,20 @@
 package snowman
 
 import (
+	"errors"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
 const (
 	minMapSize = 16
 )
+
+var errUnhealthy = errors.New("snowman consensus is not healthy")
 
 // TopologicalFactory implements Factory by returning a topological struct
 type TopologicalFactory struct{}
@@ -24,7 +29,7 @@ func (TopologicalFactory) New() Consensus { return &Topological{} }
 // strongly preferred branch. This tree structure amortizes network polls to
 // vote on more than just the next block.
 type Topological struct {
-	metrics
+	metrics.Metrics
 
 	// ctx is the context this snowman instance is executing in
 	ctx *snow.Context
@@ -68,13 +73,15 @@ type votes struct {
 
 // Initialize implements the Snowman interface
 func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters, rootID ids.ID, rootHeight uint64) error {
-	ts.ctx = ctx
-	ts.params = params
-
-	if err := ts.metrics.Initialize(ctx.Log, params.Namespace, params.Metrics); err != nil {
+	if err := params.Verify(); err != nil {
+		return err
+	}
+	if err := ts.Metrics.Initialize("blks", "block(s)", ctx.Log, params.Namespace, params.Metrics); err != nil {
 		return err
 	}
 
+	ts.ctx = ctx
+	ts.params = params
 	ts.head = rootID
 	ts.height = rootHeight
 	ts.blocks = map[ids.ID]*snowmanBlock{
@@ -101,7 +108,7 @@ func (ts *Topological) Add(blk Block) error {
 	// Notify anyone listening that this block was issued.
 	ts.ctx.DecisionDispatcher.Issue(ts.ctx, blkID, blkBytes)
 	ts.ctx.ConsensusDispatcher.Issue(ts.ctx, blkID, blkBytes)
-	ts.metrics.Issued(blkID)
+	ts.Metrics.Issued(blkID)
 
 	parentNode, ok := ts.blocks[parentID]
 	if !ok {
@@ -115,7 +122,7 @@ func (ts *Topological) Add(blk Block) error {
 		// Notify anyone listening that this block was rejected.
 		ts.ctx.DecisionDispatcher.Reject(ts.ctx, blkID, blkBytes)
 		ts.ctx.ConsensusDispatcher.Reject(ts.ctx, blkID, blkBytes)
-		ts.metrics.Rejected(blkID)
+		ts.Metrics.Rejected(blkID)
 		return nil
 	}
 
@@ -252,6 +259,25 @@ func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
 
 // Finalized implements the Snowman interface
 func (ts *Topological) Finalized() bool { return len(ts.blocks) == 1 }
+
+// HealthCheck returns information about the consensus health.
+func (ts *Topological) HealthCheck() (interface{}, error) {
+	numOutstandingBlks := ts.Metrics.ProcessingLen()
+	healthy := numOutstandingBlks <= ts.params.MaxOutstandingItems
+	details := map[string]interface{}{
+		"outstandingBlocks": numOutstandingBlks,
+	}
+
+	// check for long running blocks
+	timeReqRunning := ts.Metrics.MeasureAndGetOldestDuration()
+	healthy = healthy && timeReqRunning <= ts.params.MaxItemProcessingTime
+	details["longestRunningBlock"] = timeReqRunning.String()
+
+	if !healthy {
+		return details, errUnhealthy
+	}
+	return details, nil
+}
 
 // takes in a list of votes and sets up the topological ordering. Returns the
 // reachable section of the graph annotated with the number of inbound edges and
@@ -493,7 +519,7 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 	bytes := child.Bytes()
 	ts.ctx.DecisionDispatcher.Accept(ts.ctx, pref, bytes)
 	ts.ctx.ConsensusDispatcher.Accept(ts.ctx, pref, bytes)
-	ts.metrics.Accepted(pref)
+	ts.Metrics.Accepted(pref)
 
 	// Because this is the newest accepted block, this is the new head.
 	ts.head = pref
@@ -521,7 +547,7 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 		bytes := child.Bytes()
 		ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes)
 		ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes)
-		ts.metrics.Rejected(childID)
+		ts.Metrics.Rejected(childID)
 
 		// Track which blocks have been directly rejected
 		rejects = append(rejects, childID)
@@ -554,7 +580,7 @@ func (ts *Topological) rejectTransitively(rejected []ids.ID) error {
 			bytes := child.Bytes()
 			ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes)
 			ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes)
-			ts.metrics.Rejected(childID)
+			ts.Metrics.Rejected(childID)
 
 			// add the newly rejected block to the end of the queue
 			rejected = append(rejected, childID)

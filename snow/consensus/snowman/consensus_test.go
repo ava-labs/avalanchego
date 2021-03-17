@@ -67,13 +67,15 @@ func InitializeTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      3,
-		BetaRogue:         5,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          3,
+		BetaRogue:             5,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
@@ -95,13 +97,15 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
@@ -145,13 +149,15 @@ func AddToTailTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      3,
-		BetaRogue:         5,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          3,
+		BetaRogue:             5,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
@@ -181,13 +187,15 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      3,
-		BetaRogue:         5,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          3,
+		BetaRogue:             5,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
@@ -231,13 +239,15 @@ func AddToUnknownTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      3,
-		BetaRogue:         5,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          3,
+		BetaRogue:             5,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
@@ -272,13 +282,15 @@ func StatusOrProcessingPreviouslyAcceptedTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      3,
-		BetaRogue:         5,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          3,
+		BetaRogue:             5,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
@@ -300,13 +312,15 @@ func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      3,
-		BetaRogue:         5,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          3,
+		BetaRogue:             5,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
@@ -336,13 +350,15 @@ func StatusOrProcessingUnissuedTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      3,
-		BetaRogue:         5,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          3,
+		BetaRogue:             5,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
@@ -373,13 +389,15 @@ func StatusOrProcessingIssuedTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      3,
-		BetaRogue:         5,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          3,
+		BetaRogue:             5,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
@@ -412,13 +430,15 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      2,
-		BetaRogue:         3,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          2,
+		BetaRogue:             3,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
@@ -462,13 +482,15 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
@@ -526,13 +548,15 @@ func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
@@ -554,13 +578,15 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
@@ -632,13 +658,15 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      2,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          2,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
@@ -745,13 +773,15 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      2,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          2,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
@@ -794,13 +824,15 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 3,
-		Alpha:             3,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     3,
+		Alpha:                 3,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
@@ -934,13 +966,15 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
@@ -1015,13 +1049,15 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      10,
-		BetaRogue:         10,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          10,
+		BetaRogue:             10,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
@@ -1147,19 +1183,21 @@ func MetricsProcessingErrorTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
 	numProcessing := prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: params.Namespace,
-			Name:      "processing",
+			Name:      "blks_processing",
 		})
 
 	if err := params.Metrics.Register(numProcessing); err != nil {
@@ -1176,19 +1214,21 @@ func MetricsAcceptedErrorTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
 	numAccepted := prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: params.Namespace,
-			Name:      "accepted",
+			Name:      "blks_accepted",
 		})
 
 	if err := params.Metrics.Register(numAccepted); err != nil {
@@ -1205,19 +1245,21 @@ func MetricsRejectedErrorTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
 	numRejected := prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: params.Namespace,
-			Name:      "rejected",
+			Name:      "blks_rejected",
 		})
 
 	if err := params.Metrics.Register(numRejected); err != nil {
@@ -1234,13 +1276,15 @@ func ErrorOnInitialRejectionTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
@@ -1271,13 +1315,15 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
@@ -1309,13 +1355,15 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
@@ -1356,13 +1404,15 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
 	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
@@ -1411,13 +1461,15 @@ func RandomizedConsistencyTest(t *testing.T, factory Factory) {
 	numColors := 50
 	numNodes := 100
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 20,
-		Alpha:             15,
-		BetaVirtuous:      20,
-		BetaRogue:         30,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     20,
+		Alpha:                 15,
+		BetaVirtuous:          20,
+		BetaRogue:             30,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	seed := int64(0)
 

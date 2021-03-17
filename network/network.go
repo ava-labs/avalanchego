@@ -118,7 +118,7 @@ type network struct {
 	id                                 ids.ShortID
 	ip                                 utils.DynamicIPDesc
 	networkID                          uint32
-	version                            version.Version
+	msgVersion                         version.Version
 	parser                             version.Parser
 	listener                           net.Listener
 	dialer                             Dialer
@@ -151,16 +151,31 @@ type network struct {
 	b                                  Builder
 	apricotPhase0Time                  time.Time
 
-	// stateLock should never be held when grabbing a peer lock
-	stateLock       sync.RWMutex
-	pendingBytes    int64
-	closed          utils.AtomicBool
-	disconnectedIPs map[string]struct{}
-	connectedIPs    map[string]struct{}
-	retryDelay      map[string]time.Duration
+	// stateLock should never be held when grabbing a peer senderLock
+	stateLock    sync.RWMutex
+	pendingBytes int64
+	closed       utils.AtomicBool
+	peers        map[ids.ShortID]*peer
+
+	// disconnectedIPs, connectedIPs, peerAliasIPs, and myIPs
+	// are maps with ip.String() keys that are used to determine if
+	// we should attempt to dial an IP. [stateLock] should be held
+	// whenever accessing one of these maps.
+	disconnectedIPs map[string]struct{} // set of IPs we are attempting to connect to
+	connectedIPs    map[string]struct{} // set of IPs we have open connections with
+	peerAliasIPs    map[string]struct{} // set of alternate IPs we've reached existing peers at
 	// TODO: bound the size of [myIPs] to avoid DoS. LRU caching would be ideal
 	myIPs map[string]struct{} // set of IPs that resulted in my ID.
-	peers map[ids.ShortID]*peer
+
+	// retryDelay is a map with ip.String() keys that is used to track
+	// the backoff delay we should wait before attempting to dial an IP address
+	// again.
+	retryDelay map[string]time.Duration
+
+	// peerAliasTimeout is the age a peer alias must
+	// be before we attempt to release it (so that we
+	// attempt to dial the IP again if gossiped to us).
+	peerAliasTimeout time.Duration
 
 	// ensures the close of the network only happens once.
 	closeOnce sync.Once
@@ -219,6 +234,7 @@ func NewDefaultNetwork(
 	sendQueueSize uint32,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
+	peerAliasTimeout time.Duration,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -262,6 +278,7 @@ func NewDefaultNetwork(
 		apricotPhase0Time,
 		healthConfig,
 		benchlistManager,
+		peerAliasTimeout,
 	)
 }
 
@@ -308,6 +325,7 @@ func NewNetwork(
 	apricotPhase0Time time.Time,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
+	peerAliasTimeout time.Duration,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -315,7 +333,7 @@ func NewNetwork(
 		id:             id,
 		ip:             ip,
 		networkID:      networkID,
-		version:        version,
+		msgVersion:     version,
 		parser:         parser,
 		listener:       listener,
 		dialer:         dialer,
@@ -345,6 +363,8 @@ func NewNetwork(
 		pingFrequency:                      pingFrequency,
 		disconnectedIPs:                    make(map[string]struct{}),
 		connectedIPs:                       make(map[string]struct{}),
+		peerAliasIPs:                       make(map[string]struct{}),
+		peerAliasTimeout:                   peerAliasTimeout,
 		retryDelay:                         make(map[string]time.Duration),
 		myIPs:                              map[string]struct{}{ip.IP().String(): {}},
 		peers:                              make(map[ids.ShortID]*peer),
@@ -361,7 +381,7 @@ func NewNetwork(
 		healthConfig:                       healthConfig,
 		benchlistManager:                   benchlistManager,
 	}
-	netw.sendFailRateCalculator = math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time())
+	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time()))
 
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
@@ -397,6 +417,7 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 			sentTo = append(sentTo, vID)
 			n.getAcceptedFrontier.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
+			n.getAcceptedFrontier.sentBytes.Add(float64(len(msg.Bytes())))
 		}
 	}
 	return sentTo
@@ -430,6 +451,7 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 	} else {
 		n.acceptedFrontier.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
+		n.acceptedFrontier.sentBytes.Add(float64(len(msg.Bytes())))
 	}
 }
 
@@ -464,6 +486,7 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 		} else {
 			n.getAccepted.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
+			n.getAccepted.sentBytes.Add(float64(len(msg.Bytes())))
 			sentTo = append(sentTo, vID)
 		}
 	}
@@ -498,6 +521,7 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	} else {
 		n.sendFailRateCalculator.Observe(0, now)
 		n.accepted.numSent.Inc()
+		n.accepted.sentBytes.Add(float64(len(msg.Bytes())))
 	}
 }
 
@@ -526,6 +550,7 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 	}
 	n.getAncestors.numSent.Inc()
 	n.sendFailRateCalculator.Observe(0, now)
+	n.getAncestors.sentBytes.Add(float64(len(msg.Bytes())))
 	return true
 }
 
@@ -553,6 +578,7 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	} else {
 		n.multiPut.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
+		n.multiPut.sentBytes.Add(float64(len(msg.Bytes())))
 	}
 }
 
@@ -577,6 +603,7 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	}
 	n.get.numSent.Inc()
 	n.sendFailRateCalculator.Observe(0, now)
+	n.get.sentBytes.Add(float64(len(msg.Bytes())))
 	return true
 }
 
@@ -610,6 +637,7 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	} else {
 		n.put.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
+		n.put.sentBytes.Add(float64(len(msg.Bytes())))
 	}
 }
 
@@ -648,6 +676,7 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			n.pushQuery.numSent.Inc()
 			sentTo = append(sentTo, vID)
 			n.sendFailRateCalculator.Observe(0, now)
+			n.pushQuery.sentBytes.Add(float64(len(msg.Bytes())))
 		}
 	}
 	return sentTo
@@ -677,6 +706,7 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			n.pullQuery.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
 			sentTo = append(sentTo, vID)
+			n.pullQuery.sentBytes.Add(float64(len(msg.Bytes())))
 		}
 	}
 	return sentTo
@@ -710,6 +740,7 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 	} else {
 		n.sendFailRateCalculator.Observe(0, now)
 		n.chits.numSent.Inc()
+		n.chits.sentBytes.Add(float64(len(msg.Bytes())))
 	}
 }
 
@@ -730,6 +761,36 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 		return nil
 	}
 	return n.gossipContainer(ctx.ChainID, containerID, container)
+}
+
+// upgradeIncoming returns a boolean indicating if we should
+// upgrade an incoming connection or drop it.
+//
+// Assumes stateLock is not held.
+func (n *network) upgradeIncoming(remoteAddr string) (bool, error) {
+	n.stateLock.RLock()
+	defer n.stateLock.RUnlock()
+
+	ip, err := utils.ToIPDesc(remoteAddr)
+	if err != nil {
+		return false, fmt.Errorf("unable to convert remote address %s to IPDesc: %w", remoteAddr, err)
+	}
+
+	str := ip.String()
+	if _, ok := n.connectedIPs[str]; ok {
+		return false, nil
+	}
+	if _, ok := n.myIPs[str]; ok {
+		return false, nil
+	}
+	if _, ok := n.peerAliasIPs[str]; ok {
+		return false, nil
+	}
+
+	// Note that we attempt to upgrade remote addresses contained
+	// in disconnectedIPs to because that could allow us to initialize
+	// a connection with a peer we've been attempting to dial.
+	return true, nil
 }
 
 // Dispatch starts accepting connections from other nodes attempting to connect
@@ -772,6 +833,25 @@ func (n *network) Dispatch() error {
 			n.log.Debug("error during server accept: %s", err)
 			return err
 		}
+
+		// We pessimistically drop an incoming connection if the remote
+		// address is found in connectedIPs, myIPs, or peerAliasIPs.
+		// This protects our node from spending CPU cycles on TLS
+		// handshakes to upgrade connections from existing peers.
+		// Specifically, this can occur when one of our existing
+		// peers attempts to connect to one our IP aliases (that they
+		// aren't yet aware is an alias).
+		addr := conn.RemoteAddr().String()
+		if upgrade, err := n.upgradeIncoming(addr); err != nil {
+			n.log.Debug("error during upgrade incoming check: %s", err)
+			_ = conn.Close()
+			continue
+		} else if !upgrade {
+			n.log.Debug("dropping duplicate connection from %s", addr)
+			_ = conn.Close()
+			continue
+		}
+
 		if conn, ok := conn.(*net.TCPConn); ok {
 			if err := conn.SetLinger(0); err != nil {
 				n.log.Warn("failed to set no linger due to: %s", err)
@@ -781,7 +861,6 @@ func (n *network) Dispatch() error {
 			}
 		}
 
-		addr := conn.RemoteAddr().String()
 		ticks, err := n.connMeter.Register(addr)
 		// looking for > n.connMeterMaxConns indicating the second tick
 		if err == nil && ticks > n.connMeterMaxConns {
@@ -791,15 +870,7 @@ func (n *network) Dispatch() error {
 		}
 
 		go func() {
-			err := n.upgrade(
-				&peer{
-					net:          n,
-					conn:         conn,
-					tickerCloser: make(chan struct{}),
-				},
-				n.serverUpgrader,
-			)
-			if err != nil {
+			if err := n.upgrade(newPeer(n, conn, utils.IPDesc{}), n.serverUpgrader); err != nil {
 				n.log.Verbo("failed to upgrade connection: %s", err)
 			}
 		}()
@@ -951,6 +1022,9 @@ func (n *network) track(ip utils.IPDesc) {
 		return
 	}
 	if _, ok := n.connectedIPs[str]; ok {
+		return
+	}
+	if _, ok := n.peerAliasIPs[str]; ok {
 		return
 	}
 	if _, ok := n.myIPs[str]; ok {
@@ -1129,12 +1203,7 @@ func (n *network) attemptConnect(ip utils.IPDesc) error {
 			n.log.Warn("failed to set socket nodelay due to: %s", err)
 		}
 	}
-	return n.upgrade(&peer{
-		net:          n,
-		ip:           ip,
-		conn:         conn,
-		tickerCloser: make(chan struct{}),
-	}, n.clientUpgrader)
+	return n.upgrade(newPeer(n, conn, ip), n.clientUpgrader)
 }
 
 // assumes the stateLock is not held. Returns an error if the peer's connection
@@ -1203,12 +1272,13 @@ func (n *network) tryAddPeer(p *peer) error {
 	}
 
 	// If I am already connected to this peer, then I should close this new
-	// connection.
-	if _, ok := n.peers[p.id]; ok {
+	// connection and add an alias record.
+	if peer, ok := n.peers[p.id]; ok {
 		if !ip.IsZero() {
 			str := ip.String()
 			delete(n.disconnectedIPs, str)
 			delete(n.retryDelay, str)
+			peer.addAlias(ip)
 		}
 		return fmt.Errorf("duplicated connection from %s at %s", p.id.PrefixedString(constants.NodeIDPrefix), ip)
 	}
@@ -1294,6 +1364,8 @@ func (n *network) disconnected(p *peer) {
 
 	delete(n.peers, p.id)
 	n.numPeers.Set(float64(len(n.peers)))
+
+	p.releaseAllAliases()
 
 	if !ip.IsZero() {
 		str := ip.String()
@@ -1410,17 +1482,12 @@ func (n *network) restartOnDisconnect() {
 // 2) An error if the health check reports unhealthy
 // Assumes [n.stateLock] is not held
 func (n *network) HealthCheck() (interface{}, error) {
-	details := map[string]interface{}{}
-
 	// Get some data with the state lock held
 	connectedTo := 0
 	n.stateLock.RLock()
 	for _, peer := range n.peers {
 		if peer != nil && peer.connected.GetValue() {
 			connectedTo++
-			if connectedTo > int(n.healthConfig.MinConnectedPeers) {
-				break
-			}
 		}
 	}
 	pendingSendBytes := n.pendingBytes
@@ -1428,9 +1495,10 @@ func (n *network) HealthCheck() (interface{}, error) {
 	n.stateLock.RUnlock()
 
 	// Make sure we're connected to at least the minimum number of peers
-	isSufficientlyConnected := connectedTo >= int(n.healthConfig.MinConnectedPeers)
-	healthy := isSufficientlyConnected
-	details["connectedToMinPeers"] = isSufficientlyConnected
+	healthy := connectedTo >= int(n.healthConfig.MinConnectedPeers)
+	details := map[string]interface{}{
+		"connectedPeers": connectedTo,
+	}
 
 	// Make sure we've received an incoming message within the threshold
 	now := n.clock.Time()
@@ -1439,21 +1507,25 @@ func (n *network) HealthCheck() (interface{}, error) {
 	timeSinceLastMsgReceived := now.Sub(lastMsgReceivedAt)
 	healthy = healthy && timeSinceLastMsgReceived <= n.healthConfig.MaxTimeSinceMsgReceived
 	details["timeSinceLastMsgReceived"] = timeSinceLastMsgReceived.String()
+	n.metrics.timeSinceLastMsgReceived.Set(float64(timeSinceLastMsgReceived.Milliseconds()))
 
 	// Make sure we've sent an outgoing message within the threshold
 	lastMsgSentAt := time.Unix(atomic.LoadInt64(&n.lastMsgSentTime), 0)
 	timeSinceLastMsgSent := now.Sub(lastMsgSentAt)
 	healthy = healthy && timeSinceLastMsgSent <= n.healthConfig.MaxTimeSinceMsgSent
 	details["timeSinceLastMsgSent"] = timeSinceLastMsgSent.String()
+	n.metrics.timeSinceLastMsgSent.Set(float64(timeSinceLastMsgSent.Milliseconds()))
 
 	// Make sure the send queue isn't too full
 	portionFull := float64(pendingSendBytes) / float64(n.maxNetworkPendingSendBytes) // In [0,1]
 	healthy = healthy && portionFull <= n.healthConfig.MaxPortionSendQueueBytesFull
 	details["sendQueuePortionFull"] = portionFull
+	n.metrics.sendQueuePortionFull.Set(portionFull)
 
 	// Make sure the message send failed rate isn't too high
 	healthy = healthy && sendFailRate <= n.healthConfig.MaxSendFailRate
 	details["sendFailRate"] = sendFailRate
+	n.metrics.sendFailRate.Set(sendFailRate)
 
 	// Network layer is unhealthy
 	if !healthy {

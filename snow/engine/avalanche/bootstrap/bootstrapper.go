@@ -12,7 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
@@ -112,8 +111,8 @@ func (b *Bootstrapper) Initialize(
 
 // CurrentAcceptedFrontier returns the set of vertices that this node has accepted
 // that have no accepted children
-func (b *Bootstrapper) CurrentAcceptedFrontier() []ids.ID {
-	return b.Manager.Edge()
+func (b *Bootstrapper) CurrentAcceptedFrontier() ([]ids.ID, error) {
+	return b.Manager.Edge(), nil
 }
 
 // FilterAccepted returns the IDs of vertices in [containerIDs] that this node has accepted
@@ -186,50 +185,62 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 			b.VtxBlocked.AddPendingID(vtxID)
 			b.needToFetch.Add(vtxID) // We don't have this vertex locally. Mark that we need to fetch it.
 		case choices.Rejected:
-			return fmt.Errorf("tried to accept %s even though it was previously rejected", vtx.ID())
+			return fmt.Errorf("tried to accept %s even though it was previously rejected", vtxID)
 		case choices.Processing:
 			b.needToFetch.Remove(vtxID)
 			b.VtxBlocked.RemovePendingID(vtxID)
 
-			b.Ctx.Log.Info("Pushing vertex job %s", vtx.ID())
-			err := b.VtxBlocked.Push(&vertexJob{ // Add to queue of vertices to execute when bootstrapping finishes.
+			jobVtx := &vertexJob{
 				log:         b.Ctx.Log,
 				numAccepted: b.numAcceptedVts,
 				numDropped:  b.numDroppedVts,
 				vtx:         vtx,
-			})
-			switch {
-			case err == nil:
-				b.numFetchedVts.Inc()
-				b.NumFetched++ // Progress tracker
-				if b.NumFetched%common.StatusUpdateFrequency == 0 {
-					b.Ctx.Log.Info("fetched %d vertices", b.NumFetched)
-				}
-			case err == queue.ErrDuplicate:
-				// If the vertex is already on the queue, then we have already pushed [vtx]'s transactions
-				// and traversed into its parents.
-				continue
-			default:
-				// Any other error is considered a fatal error.
+			}
+			has, err := b.VtxBlocked.Has(jobVtx)
+			if err != nil {
 				return err
+			}
+			if has {
+				// If the vertex is already on the queue, then we have already
+				// pushed [vtx]'s transactions and traversed into its parents.
+				continue
 			}
 			txs, err := vtx.Txs()
 			if err != nil {
 				return err
 			}
-			for _, tx := range txs { // Add transactions to queue of transactions to execute when bootstrapping finishes.
-				b.Ctx.Log.Info("Pushing tx job %s", tx.ID())
-				if err := b.TxBlocked.Push(&txJob{
+			for _, tx := range txs {
+				jobTx := &txJob{
 					log:         b.Ctx.Log,
 					numAccepted: b.numAcceptedTxs,
 					numDropped:  b.numDroppedTxs,
 					tx:          tx,
-				}); err == nil {
-					b.numFetchedTxs.Inc()
-				} else {
-					b.Ctx.Log.Verbo("couldn't push to txBlocked: %s", err)
 				}
+				has, err := b.TxBlocked.Has(jobTx)
+				if err != nil {
+					return err
+				}
+				if has {
+					continue
+				}
+				// Add to queue of txs to execute when bootstrapping finishes.
+				if err := b.TxBlocked.Push(jobTx); err != nil {
+					return err
+				}
+				b.numFetchedTxs.Inc()
 			}
+
+			// Add to queue of vertices to execute when bootstrapping finishes.
+			if err := b.VtxBlocked.Push(jobVtx); err != nil {
+				return err
+			}
+
+			b.numFetchedVts.Inc()
+			b.NumFetched++ // Progress tracker
+			if b.NumFetched%queue.StatusUpdateFrequency == 0 {
+				b.Ctx.Log.Info("fetched %d vertices", b.NumFetched)
+			}
+
 			parents, err := vtx.Parents()
 			if err != nil {
 				return err
@@ -399,13 +410,13 @@ func (b *Bootstrapper) checkFinish() error {
 	b.Ctx.Log.Info("bootstrapping fetched %d vertices. executing transaction state transitions...",
 		b.NumFetched)
 
-	_, err := b.executeAll(b.TxBlocked, b.Ctx.DecisionDispatcher)
+	_, err := b.TxBlocked.ExecuteAll(b.Ctx, b.Ctx.DecisionDispatcher)
 	if err != nil {
 		return err
 	}
 
 	b.Ctx.Log.Info("executing vertex state transitions...")
-	executedVts, err := b.executeAll(b.VtxBlocked, b.Ctx.ConsensusDispatcher)
+	executedVts, err := b.VtxBlocked.ExecuteAll(b.Ctx, b.Ctx.ConsensusDispatcher)
 	if err != nil {
 		return err
 	}
@@ -457,30 +468,6 @@ func (b *Bootstrapper) finish() error {
 	b.Ctx.Bootstrapped()
 
 	return nil
-}
-
-func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher) (int, error) {
-	numExecuted := 0
-
-	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
-		b.Ctx.Log.Info("Executing: %s", job.ID())
-		if err := jobs.Execute(job); err != nil {
-			b.Ctx.Log.Error("Error executing: %s", err)
-			return numExecuted, err
-		}
-		if err := jobs.Commit(); err != nil {
-			return numExecuted, err
-		}
-		numExecuted++
-		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
-			b.Ctx.Log.Info("executed %d operations", numExecuted)
-		}
-
-		events.Accept(b.Ctx, job.ID(), job.Bytes())
-	}
-	b.Ctx.Log.Info("executed %d operations", numExecuted)
-
-	return numExecuted, nil
 }
 
 // Connected implements the Engine interface.
