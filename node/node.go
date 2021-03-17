@@ -506,6 +506,7 @@ func (n *Node) initAPIServer() error {
 		n.Config.HTTPPort,
 		n.Config.APIRequireAuthToken,
 		n.Config.APIAuthPassword,
+		n.Config.APIAllowedOrigins,
 	)
 }
 
