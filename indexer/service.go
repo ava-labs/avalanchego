@@ -1,7 +1,6 @@
 package indexer
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -11,7 +10,7 @@ import (
 )
 
 type service struct {
-	*indexer
+	Index
 }
 
 type FormattedContainer struct {
@@ -34,7 +33,7 @@ func newFormattedContainer(c Container, enc formatting.Encoding) (FormattedConta
 	if err != nil {
 		return fc, err
 	}
-	fc.Timestamp = time.Unix(c.Timestamp, 0).UTC()
+	fc.Timestamp = time.Unix(c.Timestamp, 0)
 	fc.Bytes = bytesStr
 	return fc, nil
 }
@@ -45,12 +44,7 @@ type GetLastAcceptedArgs struct {
 }
 
 func (s *service) GetLastAccepted(_ *http.Request, args *GetLastAcceptedArgs, reply *FormattedContainer) error {
-	chainID, err := s.indexer.chainLookup(args.ChainID)
-	if err != nil {
-		return fmt.Errorf("couldn't find chain %s: %w", args.ChainID, err)
-	}
-
-	container, err := s.indexer.GetLastAccepted(chainID)
+	container, err := s.Index.GetLastAccepted()
 	if err != nil {
 		return err
 	}
@@ -66,12 +60,7 @@ type GetContainer struct {
 }
 
 func (s *service) GetContainerByIndex(_ *http.Request, args *GetContainer, reply *FormattedContainer) error {
-	chainID, err := s.indexer.chainLookup(args.ChainID)
-	if err != nil {
-		return fmt.Errorf("couldn't find chain %s: %w", args.ChainID, err)
-	}
-
-	container, err := s.indexer.GetContainerByIndex(chainID, uint64(args.Index))
+	container, err := s.Index.GetContainerByIndex(uint64(args.Index))
 	if err != nil {
 		return err
 	}
@@ -93,12 +82,7 @@ type GetContainerRange struct {
 // If [n] > [maxFetchedByRange], returns an error.
 // If we run out of transactions, returns the ones fetched before running out.
 func (s *service) GetContainerRange(r *http.Request, args *GetContainerRange, reply *[]FormattedContainer) error {
-	chainID, err := s.indexer.chainLookup(args.ChainID)
-	if err != nil {
-		return fmt.Errorf("couldn't find chain %s: %w", args.ChainID, err)
-	}
-
-	containers, err := s.indexer.GetContainerRange(chainID, uint64(args.StartIndex), uint64(args.NumToFetch))
+	containers, err := s.Index.GetContainerRange(uint64(args.StartIndex), uint64(args.NumToFetch))
 	if err != nil {
 		return err
 	}
@@ -126,34 +110,19 @@ type GetIndexResponse struct {
 }
 
 func (s *service) GetIndex(r *http.Request, args *GetIndexArgs, reply *GetIndexResponse) error {
-	chainID, err := s.indexer.chainLookup(args.ChainID)
-	if err != nil {
-		return fmt.Errorf("couldn't find chain %s: %w", args.ChainID, err)
-	}
-
-	index, err := s.indexer.GetIndex(chainID, args.ContainerID)
+	index, err := s.Index.GetIndex(args.ContainerID)
 	reply.Index = json.Uint64(index)
 	return err
 }
 
 func (s *service) IsAccepted(r *http.Request, args *GetIndexArgs, reply *bool) error {
-	chainID, err := s.indexer.chainLookup(args.ChainID)
-	if err != nil {
-		return fmt.Errorf("couldn't find chain %s: %w", args.ChainID, err)
-	}
-
-	_, err = s.indexer.GetIndex(chainID, args.ContainerID)
+	_, err := s.Index.GetIndex(args.ContainerID)
 	*reply = err == nil
 	return nil
 }
 
 func (s *service) GetContainerByID(r *http.Request, args *GetIndexArgs, reply *FormattedContainer) error {
-	chainID, err := s.indexer.chainLookup(args.ChainID)
-	if err != nil {
-		return fmt.Errorf("couldn't find chain %s: %w", args.ChainID, err)
-	}
-
-	container, err := s.indexer.GetContainerByID(chainID, args.ContainerID)
+	container, err := s.Index.GetContainerByID(args.ContainerID)
 	if err != nil {
 		return err
 	}

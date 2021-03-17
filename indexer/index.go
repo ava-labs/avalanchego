@@ -24,9 +24,9 @@ const (
 
 var (
 	// Maps to the byte representation of the next accepted index
-	nextAcceptedIndexKey   []byte = []byte("next")
-	indexToContainerPrefix []byte = []byte("itc")
-	containerToIDPrefix    []byte = []byte("cti")
+	nextAcceptedIndexKey   []byte = []byte{0x00}
+	indexToContainerPrefix []byte = []byte{0x01}
+	containerToIDPrefix    []byte = []byte{0x02}
 	errNoneAccepted               = errors.New("no containers have been accepted")
 
 	_ Index = &index{}
@@ -34,7 +34,7 @@ var (
 
 // Index indexes container (a blob of bytes with an ID) in their order of acceptance
 // Index implements triggers.Acceptor
-// Index is thread-safe
+// Index is thread-safe.
 type Index interface {
 	Accept(ctx *snow.Context, containerID ids.ID, container []byte) error
 	GetContainerByIndex(index uint64) (Container, error)
@@ -45,28 +45,32 @@ type Index interface {
 	Close() error
 }
 
-// Returns a new, thread-safe Index
+// Returns a new, thread-safe Index.
+// Closes [baseDB] on close.
 func newIndex(
-	db database.Database,
+	baseDB database.Database,
 	log logging.Logger,
 	codec codec.Manager,
 	clock timer.Clock,
+	isAcceptedFunc func(containerID ids.ID) bool,
 ) (Index, error) {
-	baseDB := versiondb.New(db)
-	indexToContainer := prefixdb.New(indexToContainerPrefix, baseDB)
-	containerToIndex := prefixdb.New(containerToIDPrefix, baseDB)
+	vDB := versiondb.New(baseDB)
+	indexToContainer := prefixdb.New(indexToContainerPrefix, vDB)
+	containerToIndex := prefixdb.New(containerToIDPrefix, vDB)
 
 	i := &index{
 		clock:            clock,
 		codec:            codec,
 		baseDB:           baseDB,
+		vDB:              vDB,
 		indexToContainer: indexToContainer,
 		containerToIndex: containerToIndex,
 		log:              log,
+		isAcceptedFunc:   isAcceptedFunc,
 	}
 
 	// Get next accepted index from db
-	nextAcceptedIndexBytes, err := i.baseDB.Get(nextAcceptedIndexKey)
+	nextAcceptedIndexBytes, err := i.vDB.Get(nextAcceptedIndexKey)
 	if err == database.ErrNotFound {
 		// Couldn't find it in the database. Must not have accepted any containers in previous runs.
 		i.log.Info("next accepted index %d", i.nextAcceptedIndex)
@@ -81,18 +85,35 @@ func newIndex(
 		return nil, fmt.Errorf("couldn't parse next accepted index from bytes: %w", err)
 	}
 	i.log.Info("next accepted index %d", i.nextAcceptedIndex)
+
+	// We may have committed some containers in the index's DB that were not committed at
+	// the VM's DB. Go back through recently accepted things and make sure they're accepted.
+	for j := i.nextAcceptedIndex; j >= 1; j-- {
+		lastAccepted, err := i.getContainerByIndex(j - 1)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't get container at index %d: %s", j-1, err)
+		}
+		if isAcceptedFunc(lastAccepted.ID) {
+			break
+		}
+		if err := i.removeLastAccepted(lastAccepted.ID); err != nil {
+			return nil, fmt.Errorf("couldn't remove container: %s", err)
+		}
+	}
 	return i, nil
 }
 
 // indexer indexes all accepted transactions by the order in which they were accepted
 type index struct {
-	codec codec.Manager
-	clock timer.Clock
-	lock  sync.RWMutex
+	codec          codec.Manager
+	isAcceptedFunc func(containerID ids.ID) bool
+	clock          timer.Clock
+	lock           sync.RWMutex
 	// The index of the next accepted transaction
 	nextAcceptedIndex uint64
 	// When [baseDB] is committed, actual write to disk happens
-	baseDB *versiondb.Database
+	vDB    *versiondb.Database
+	baseDB database.Database
 	// Both [indexToContainer] and [containerToIndex] have [baseDB] underneath
 	// Index --> Container
 	indexToContainer database.Database
@@ -106,6 +127,7 @@ func (i *index) Close() error {
 	errs := wrappers.Errs{}
 	errs.Add(i.indexToContainer.Close())
 	errs.Add(i.containerToIndex.Close())
+	errs.Add(i.vDB.Close())
 	errs.Add(i.baseDB.Close())
 	return errs.Err
 }
@@ -147,11 +169,11 @@ func (i *index) Accept(ctx *snow.Context, containerID ids.ID, containerBytes []b
 	if p.Err != nil {
 		return fmt.Errorf("couldn't convert next accepted index to bytes: %w", p.Err)
 	}
-	if err := i.baseDB.Put(nextAcceptedIndexKey, p.Bytes); err != nil {
+	if err := i.vDB.Put(nextAcceptedIndexKey, p.Bytes); err != nil {
 		return fmt.Errorf("couldn't put accepted container %s into index: %w", containerID, err)
 	}
 
-	return i.baseDB.Commit()
+	return i.vDB.Commit()
 }
 
 // Returns the ID of the [index]th accepted container and the container itself.
@@ -161,6 +183,10 @@ func (i *index) GetContainerByIndex(index uint64) (Container, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
+	return i.getContainerByIndex(index)
+}
+
+func (i *index) getContainerByIndex(index uint64) (Container, error) {
 	lastAcceptedIndex, ok := i.lastAcceptedIndex()
 	if !ok || index > lastAcceptedIndex {
 		return Container{}, fmt.Errorf("no container at index %d", index)
@@ -191,7 +217,6 @@ func (i *index) GetContainerByIndex(index uint64) (Container, error) {
 // GetContainerRange returns the IDs of containers at index
 // [startIndex], [startIndex+1], ..., [startIndex+numToFetch-1]
 func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, error) {
-	i.log.Error("%d %d", startIndex, numToFetch) // TODO remove
 	// Check arguments for validity
 	if numToFetch == 0 {
 		return nil, nil
@@ -290,7 +315,6 @@ func (i *index) GetLastAccepted() (Container, error) {
 	if !exists {
 		return Container{}, errNoneAccepted
 	}
-
 	return i.GetContainerByIndex(lastAcceptedIndex)
 }
 
@@ -302,8 +326,39 @@ func (i *index) lastAcceptedIndex() (uint64, bool) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
-	if i.nextAcceptedIndex == 0 {
-		return 0, false
+	return i.nextAcceptedIndex - 1, i.nextAcceptedIndex != 0
+}
+
+// Remove the last accepted container, whose ID is given, from the databases
+// Assumes [p.nextAcceptedIndex] >= 1
+// Assumes [containerID] is actually the ID of the last accepted container
+func (i *index) removeLastAccepted(containerID ids.ID) error {
+	i.lock.Lock()
+	defer i.lock.Unlock()
+
+	if err := i.containerToIndex.Delete(containerID[:]); err != nil {
+		return err
 	}
-	return i.nextAcceptedIndex - 1, true
+
+	p := wrappers.Packer{MaxSize: wrappers.LongLen}
+	p.PackLong(i.nextAcceptedIndex - 1)
+	if p.Err != nil {
+		return fmt.Errorf("couldn't convert last accepted index to bytes: %w", p.Err)
+	}
+
+	if err := i.indexToContainer.Delete(p.Bytes); err != nil {
+		return fmt.Errorf("couldn't remove last accepted: %w", err)
+	}
+
+	i.nextAcceptedIndex--
+
+	p = wrappers.Packer{MaxSize: wrappers.LongLen}
+	p.PackLong(i.nextAcceptedIndex)
+	if p.Err != nil {
+		return fmt.Errorf("couldn't convert next accepted index to bytes: %w", p.Err)
+	}
+	if err := i.vDB.Put(nextAcceptedIndexKey, p.Bytes); err != nil {
+		return fmt.Errorf("couldn't put next accepted key: %s", err)
+	}
+	return i.vDB.Commit()
 }

@@ -3,7 +3,14 @@
 
 package chains
 
+import (
+	"github.com/ava-labs/avalanchego/snow"
+)
+
 // Registrant can register the existence of a chain
 type Registrant interface {
-	RegisterChain(name string, engine interface{})
+	// Called when the chain described by [ctx] and [engine] is created
+	// This function is called before the chain starts processing messages
+	// [engine] should be an avalanche.Engine or snowman.Engine
+	RegisterChain(name string, ctx *snow.Context, engine interface{})
 }

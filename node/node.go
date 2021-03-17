@@ -66,8 +66,7 @@ const (
 
 var (
 	genesisHashKey                  = []byte("genesisID")
-	txIndexerDbPrefix               = []byte("txIdx6")  // TODO change
-	vtxIndexerDbPrefix              = []byte("vtxIdx6") // TODO change
+	indexerDBPrefix                 = []byte{0x00}
 	errPrimarySubnetNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
 
 	// Version is the version of this code
@@ -89,11 +88,8 @@ type Node struct {
 	// Storage for this node
 	DB database.Database
 
-	// Indexes txs (Avalanche) or blocks (Snowman)
-	txIndexer indexer.Indexer
-
-	// Indexes vtxs (Avalanche) or blocks (Snowman)
-	vtxIndexer indexer.Indexer
+	// Indexes blocks, transactions and blocks
+	indexer indexer.Indexer
 
 	// Handles calls to Keystore API
 	keystoreServer keystore.Keystore
@@ -487,38 +483,25 @@ func (n *Node) initIPCs() error {
 // Should only be called after [n.DB], [n.DecisionDispatcher], [n.ConsensusDispatcher],
 // [n.Log], [n.APIServer], [n.chainManager] are initialized
 func (n *Node) initIndexer() error {
-	txIndexerDb := prefixdb.New(txIndexerDbPrefix, n.DB)
-	vtxIndexerDb := prefixdb.New(vtxIndexerDbPrefix, n.DB)
+	txIndexerDB := prefixdb.New(indexerDBPrefix, n.DB)
 	var err error
-	n.txIndexer, err = indexer.NewIndexer(indexer.Config{
-		IndexingEnabled:        n.Config.IndexAPIEnabled,
-		AllowIncompleteIndex:   n.Config.IndexAllowIncomplete,
-		Name:                   "tx",
-		DB:                     txIndexerDb,
-		Log:                    n.Log,
-		EventDispatcher:        n.DecisionDispatcher,
-		InitiallyIndexedChains: n.Config.InitiallyIndexedChains,
-		ChainLookupF:           n.chainManager.Lookup,
-		APIServer:              &n.APIServer,
+	n.indexer, err = indexer.NewIndexer(indexer.Config{
+		IndexingEnabled:      n.Config.IndexAPIEnabled,
+		AllowIncompleteIndex: n.Config.IndexAllowIncomplete,
+		Name:                 "tx",
+		DB:                   txIndexerDB,
+		Log:                  n.Log,
+		DecisionDispatcher:   n.DecisionDispatcher,
+		ConsensusDispatcher:  n.ConsensusDispatcher,
+		APIServer:            &n.APIServer,
+		ShutdownF:            n.Shutdown,
 	})
 	if err != nil {
 		return fmt.Errorf("couldn't create index for txs: %w", err)
 	}
 
-	n.vtxIndexer, err = indexer.NewIndexer(indexer.Config{
-		IndexingEnabled:        n.Config.IndexAPIEnabled,
-		AllowIncompleteIndex:   n.Config.IndexAllowIncomplete,
-		Name:                   "vtx",
-		DB:                     vtxIndexerDb,
-		Log:                    n.Log,
-		EventDispatcher:        n.ConsensusDispatcher,
-		InitiallyIndexedChains: n.Config.InitiallyIndexedChains,
-		ChainLookupF:           n.chainManager.Lookup,
-		APIServer:              &n.APIServer,
-	})
-	if err != nil {
-		return fmt.Errorf("couldn't create index for vtxs: %w", err)
-	}
+	// Chain manager will notify indexer when a chain is created
+	n.chainManager.AddRegistrant(n.indexer)
 
 	return nil
 }
@@ -976,15 +959,8 @@ func (n *Node) shutdown() {
 	if err := n.APIServer.Shutdown(); err != nil {
 		n.Log.Debug("error during API shutdown: %s", err)
 	}
-	if n.txIndexer != nil {
-		if err := n.txIndexer.Close(); err != nil {
-			n.Log.Debug("error closing tx indexer: %w", err)
-		}
-	}
-	if n.vtxIndexer != nil {
-		if err := n.vtxIndexer.Close(); err != nil {
-			n.Log.Debug("error closing tx indexer: %w", err)
-		}
+	if err := n.indexer.Close(); err != nil {
+		n.Log.Debug("error closing tx indexer: %w", err)
 	}
 	utils.ClearSignals(n.nodeCloser)
 	n.doneShuttingDown.Done()
