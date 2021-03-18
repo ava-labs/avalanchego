@@ -363,6 +363,8 @@ func TestSingleLinkedDBIteratorStart(t *testing.T) {
 	iterator.Release()
 }
 
+// Test that if we call NewIteratorWithStart with a key that is not
+// in the database, the iterator will start at the head
 func TestEmptyLinkedDBIteratorStart(t *testing.T) {
 	assert := assert.New(t)
 
@@ -381,13 +383,18 @@ func TestEmptyLinkedDBIteratorStart(t *testing.T) {
 	err = ldb.Put(key1, value1)
 	assert.NoError(err)
 
-	iterator := ldb.NewIteratorWithStart(key2)
+	iter := ldb.NewIteratorWithStart(key2)
 
-	next := iterator.Next()
-	assert.False(next, "The iterator should now be exhausted")
+	i := 0
+	for iter.Next() {
+		assert.Contains([][]byte{key0, key1}, iter.Key())
+		assert.Contains([][]byte{value0, value1}, iter.Value())
+		i++
+	}
+	assert.Equal(2, i)
 
-	err = iterator.Error()
+	err = iter.Error()
 	assert.NoError(err)
 
-	iterator.Release()
+	iter.Release()
 }

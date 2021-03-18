@@ -192,14 +192,23 @@ func (ldb *linkedDB) Delete(key []byte) error {
 	return ldb.writeBatch()
 }
 
+// This iterator does not guarantee that keys are returned in lexicographic order.
 func (ldb *linkedDB) NewIterator() database.Iterator { return &iterator{ldb: ldb} }
 
+// NewIteratorWithStart returns an iterator that starts at [start].
+// This iterator does not guarantee that keys are returned in lexicographic order.
+// If [start] is not in the list, starts iterating from the list head.
 func (ldb *linkedDB) NewIteratorWithStart(start []byte) database.Iterator {
-	return &iterator{
-		ldb:         ldb,
-		initialized: true,
-		nextKey:     start,
+	hasStartKey, err := ldb.Has(start)
+	if err == nil && hasStartKey {
+		return &iterator{
+			ldb:         ldb,
+			initialized: true,
+			nextKey:     start,
+		}
 	}
+	// If the start key isn't present, start from the head
+	return ldb.NewIterator()
 }
 
 func (ldb *linkedDB) getHeadKey() ([]byte, error) {
