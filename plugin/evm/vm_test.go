@@ -1514,9 +1514,6 @@ func TestNonCanonicalAccept(t *testing.T) {
 
 	blkBHeight := vm1BlkB.Height()
 	blkBHash := vm1BlkB.(*Block).ethBlock.Hash()
-	if err := vm1.chain.Accept(vm1BlkB.(*Block).ethBlock); err != nil {
-		t.Fatal(err)
-	}
 	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}
