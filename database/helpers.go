@@ -14,6 +14,11 @@ var (
 	errWrongSize = errors.New("value has unexpected size")
 )
 
+const (
+	// kvPairOverhead is an estimated overhead for a kv pair in a database.
+	kvPairOverhead = 8 // bytes
+)
+
 func PutID(db KeyValueWriter, key []byte, val ids.ID) error {
 	return db.Put(key, val[:])
 }
@@ -65,7 +70,7 @@ func Size(db Iteratee) (int, error) {
 
 	size := 0
 	for iterator.Next() {
-		size += len(iterator.Key()) + len(iterator.Value())
+		size += len(iterator.Key()) + len(iterator.Value()) + kvPairOverhead
 	}
 	return size, iterator.Error()
 }
