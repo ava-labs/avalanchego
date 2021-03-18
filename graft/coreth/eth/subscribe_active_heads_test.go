@@ -3,8 +3,10 @@ package eth
 import (
 	"crypto/ecdsa"
 	"crypto/rand"
+	"fmt"
 	"io"
 	"math/big"
+	"os"
 	"testing"
 	"time"
 
@@ -318,12 +320,22 @@ func TestActiveHeadSubscriptions(t *testing.T) {
 		t.Fatal(err)
 	}
 	chain.AddRemoteTxs([]*types.Transaction{signedTx})
-	time.Sleep(1000 * time.Millisecond)
+	time.Sleep(time.Second)
 
 	chain.GenBlock()
 
-	time.Sleep(5000 * time.Millisecond)
-	cbx := backend.blockchain.CurrentBlock()
+	time.Sleep(1 * time.Second)
+	var cbx *types.Block
+	for icnt := 0; icnt < 10; icnt++ {
+		cbx = backend.blockchain.CurrentBlock()
+		if cbx.NumberU64() == 1 {
+			break
+		}
+	}
+	if cbx == nil {
+		t.Fatal("block not created")
+	}
+	cbx = backend.blockchain.CurrentBlock()
 	if cbx.NumberU64() != 1 {
 		t.Fatal("block not created")
 	}
