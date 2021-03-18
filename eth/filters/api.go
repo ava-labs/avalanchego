@@ -256,9 +256,7 @@ func (api *PublicFilterAPI) AcceptedHeads(ctx context.Context) (*rpc.Subscriptio
 
 	go func() {
 		headers := make(chan *types.Header)
-		headersSub := api.events.SubscribeAcc
-
-		eptedHeads(headers)
+		headersSub := api.events.SubscribeAcceptedHeads(headers)
 
 		for {
 			select {
