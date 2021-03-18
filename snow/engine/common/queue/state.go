@@ -5,110 +5,129 @@ package queue
 
 import (
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+)
+
+var (
+	runnableJobIDsKey = []byte("runnable")
+	jobsKey           = []byte("jobs")
+	dependenciesKey   = []byte("dependencies")
+	missingJobIDsKey  = []byte("missing job IDs")
 )
 
 type state struct {
-	// parser is able to parse a job from bytes.
-	parser Parser
+	parser         Parser
+	runnableJobIDs linkeddb.LinkedDB
+	jobs           database.Database
+	// Should be prefixed with the jobID that we are attempting to find the
+	// dependencies of. This prefixdb.Database should then be wrapped in a
+	// linkeddb.LinkedDB to read the dependencies.
+	dependencies  database.Database
+	missingJobIDs linkeddb.LinkedDB
 }
 
-func (s *state) SetInt(db database.Database, key []byte, size uint32) error {
-	p := wrappers.Packer{Bytes: make([]byte, wrappers.IntLen)}
-
-	p.PackInt(size)
-
-	return db.Put(key, p.Bytes)
-}
-
-func (s *state) DeleteInt(db database.Database, key []byte) error {
-	return db.Delete(key)
-}
-
-func (s *state) Int(db database.Database, key []byte) (uint32, error) {
-	value, err := db.Get(key)
-	if err != nil {
-		return 0, err
+func newState(db database.Database) *state {
+	return &state{
+		runnableJobIDs: linkeddb.NewDefault(prefixdb.New(runnableJobIDsKey, db)),
+		jobs:           prefixdb.New(jobsKey, db),
+		dependencies:   prefixdb.New(dependenciesKey, db),
+		missingJobIDs:  linkeddb.NewDefault(prefixdb.New(missingJobIDsKey, db)),
 	}
-
-	p := wrappers.Packer{Bytes: value}
-	return p.UnpackInt(), p.Err
 }
 
-func (s *state) SetJobID(db database.Database, key []byte, jobID ids.ID) error {
-	return db.Put(key, jobID[:])
+// AddRunnableJob adds [jobID] to the runnable queue
+func (ps *state) AddRunnableJob(jobID ids.ID) error {
+	return ps.runnableJobIDs.Put(jobID[:], nil)
 }
 
-func (s *state) JobID(db database.Database, key []byte) (ids.ID, error) {
-	jobIDBytes, err := db.Get(key)
-	if err != nil {
-		return ids.ID{}, err
-	}
-
-	return ids.ToID(jobIDBytes)
+// HasRunnableJob returns if there is a job that can be run on the queue.
+func (ps *state) HasRunnableJob() (bool, error) {
+	isEmpty, err := ps.runnableJobIDs.IsEmpty()
+	return !isEmpty, err
 }
 
-func (s *state) SetJob(db database.Database, key []byte, job Job) error {
-	return db.Put(key, job.Bytes())
-}
-
-func (s *state) Job(db database.Database, key []byte) (Job, error) {
-	value, err := db.Get(key)
+// RemoveRunnableJob fetches and deletes the next job from the runnable queue
+func (ps *state) RemoveRunnableJob() (Job, error) {
+	key, err := ps.runnableJobIDs.HeadKey()
 	if err != nil {
 		return nil, err
 	}
-	return s.parser.Parse(value)
+	if err := ps.runnableJobIDs.Delete(key); err != nil {
+		return nil, err
+	}
+
+	jobBytes, err := ps.jobs.Get(key)
+	if err != nil {
+		return nil, err
+	}
+	job, err := ps.parser.Parse(jobBytes)
+	if err != nil {
+		return nil, err
+	}
+	return job, ps.jobs.Delete(key)
 }
 
-// IDs returns a slice of IDs from storage
-func (s *state) IDs(db database.Database, prefix []byte) ([]ids.ID, error) {
-	idSlice := []ids.ID(nil)
-	iter := prefixdb.NewNested(prefix, db).NewIterator()
-	defer iter.Release()
+// PutJob adds the job to the queue
+func (ps *state) PutJob(job Job) error {
+	id := job.ID()
+	return ps.jobs.Put(id[:], job.Bytes())
+}
 
-	for iter.Next() {
-		keyID, err := ids.ToID(iter.Key())
-		if err != nil {
+// HasJob returns true if the job [id] is in the queue
+func (ps *state) HasJob(id ids.ID) (bool, error) {
+	return ps.jobs.Has(id[:])
+}
+
+// AddBlocking adds [dependent] as blocking on [dependency] being completed
+func (ps *state) AddDependency(dependency, dependent ids.ID) error {
+	dependencyDB := prefixdb.New(dependency[:], ps.dependencies)
+	dependentsDB := linkeddb.NewDefault(dependencyDB)
+	if err := dependentsDB.Put(dependent[:], nil); err != nil {
+		return err
+	}
+	return dependencyDB.Close()
+}
+
+// Blocking returns the set of IDs that are blocking on the completion of
+// [dependency] and removes them from the database.
+func (ps *state) RemoveDependencies(dependency ids.ID) ([]ids.ID, error) {
+	dependencyDB := prefixdb.New(dependency[:], ps.dependencies)
+	dependentsDB := linkeddb.NewDefault(dependencyDB)
+
+	iterator := dependentsDB.NewIterator()
+	defer iterator.Release()
+
+	dependents := []ids.ID(nil)
+	for iterator.Next() {
+		dependentKey := iterator.Key()
+		if err := dependentsDB.Delete(dependentKey); err != nil {
+			_ = dependencyDB.Close()
 			return nil, err
 		}
-
-		idSlice = append(idSlice, keyID)
-	}
-	return idSlice, nil
-}
-
-// AddID saves an ID to the prefixed database
-func (s *state) AddID(db database.Database, prefix []byte, key ids.ID) error {
-	pdb := prefixdb.NewNested(prefix, db)
-	return pdb.Put(key[:], nil)
-}
-
-// RemoveID removes an ID from the prefixed database
-func (s *state) RemoveID(db database.Database, prefix []byte, key ids.ID) error {
-	pdb := prefixdb.NewNested(prefix, db)
-	return pdb.Delete(key[:])
-}
-
-// AddIDs saves a set of IDs to the prefixed database
-func (s *state) AddIDs(db database.Database, prefix []byte, ids ids.Set) error {
-	pdb := prefixdb.NewNested(prefix, db)
-	for id := range ids {
-		if err := pdb.Put(id[:], nil); err != nil {
-			return err
+		dependent, err := ids.ToID(dependentKey)
+		if err != nil {
+			_ = dependencyDB.Close()
+			return nil, err
 		}
+		dependents = append(dependents, dependent)
 	}
-	return nil
+
+	if err := dependencyDB.Close(); err != nil {
+		return nil, err
+	}
+	return dependents, iterator.Error()
 }
 
-// RemoveIDs removes a set of IDs from the prefixed database
-func (s *state) RemoveIDs(db database.Database, prefix []byte, ids ids.Set) error {
-	pdb := prefixdb.NewNested(prefix, db)
-	for id := range ids {
-		if err := pdb.Delete(id[:]); err != nil {
-			return err
-		}
-	}
-	return nil
+func (ps *state) AddPending(db database.Database, pendingIDs ids.Set) error {
+	return ps.state.AddIDs(db, pendingPrefix, pendingIDs)
+}
+
+func (ps *state) RemovePending(db database.Database, pendingIDs ids.Set) error {
+	return ps.state.RemoveIDs(db, pendingPrefix, pendingIDs)
+}
+
+func (ps *state) Pending(db database.Database) ([]ids.ID, error) {
+	return ps.state.IDs(db, pendingPrefix)
 }

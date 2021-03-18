@@ -25,9 +25,7 @@ var (
 
 // Jobs tracks a series of jobs that form a DAG of dependencies.
 type Jobs struct {
-	// baseDB is the DB that we are flushing data to.
-	baseDB database.Database
-	// db ensures that [baseDB] is atomically updated.
+	// db ensures that database updates are atomically updated.
 	db *versiondb.Database
 	// state prefixes different values to avoid namespace collisions.
 	state prefixedState
@@ -42,8 +40,7 @@ type Jobs struct {
 // New attempts to create a new job queue from the provided database.
 func New(db database.Database) (*Jobs, error) {
 	jobs := &Jobs{
-		baseDB: db,
-		db:     versiondb.New(db),
+		db: versiondb.New(db),
 	}
 
 	pending, err := jobs.state.Pending(jobs.db)
@@ -66,9 +63,7 @@ func New(db database.Database) (*Jobs, error) {
 // SetParser tells this job queue how to parse jobs from the database.
 func (j *Jobs) SetParser(parser Parser) { j.state.parser = parser }
 
-func (j *Jobs) Has(job Job) (bool, error) {
-	return j.state.HasJob(j.db, job.ID())
-}
+func (j *Jobs) Has(job Job) (bool, error) { return j.state.HasJob(j.db, job.ID()) }
 
 // Push adds a new job to the queue.
 func (j *Jobs) Push(job Job) error {
@@ -178,9 +173,7 @@ func (j *Jobs) RemovePendingID(jobIDs ...ids.ID) {
 	}
 }
 
-func (j *Jobs) Pending() []ids.ID {
-	return j.pending.List()
-}
+func (j *Jobs) Pending() []ids.ID { return j.pending.List() }
 
 func (j *Jobs) PendingJobs() int { return j.pending.Len() }
 
