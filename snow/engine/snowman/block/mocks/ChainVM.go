@@ -13,6 +13,7 @@ import (
 	snow "github.com/ava-labs/avalanchego/snow"
 
 	snowman "github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	block "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var _ block.ChainVM = &ChainVM{}

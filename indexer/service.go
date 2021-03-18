@@ -39,7 +39,6 @@ func newFormattedContainer(c Container, enc formatting.Encoding) (FormattedConta
 }
 
 type GetLastAcceptedArgs struct {
-	ChainID  string              `json:"chainID"`
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
@@ -54,7 +53,6 @@ func (s *service) GetLastAccepted(_ *http.Request, args *GetLastAcceptedArgs, re
 }
 
 type GetContainer struct {
-	ChainID  string              `json:"chainID"`
 	Index    json.Uint64         `json:"index"`
 	Encoding formatting.Encoding `json:"encoding"`
 }
@@ -70,7 +68,6 @@ func (s *service) GetContainerByIndex(_ *http.Request, args *GetContainer, reply
 }
 
 type GetContainerRange struct {
-	ChainID    string              `json:"chainID"`
 	StartIndex json.Uint64         `json:"startIndex"`
 	NumToFetch json.Uint64         `json:"numToFetch"`
 	Encoding   formatting.Encoding `json:"encoding"`
@@ -100,7 +97,6 @@ func (s *service) GetContainerRange(r *http.Request, args *GetContainerRange, re
 }
 
 type GetIndexArgs struct {
-	ChainID     string              `json:"chainID"`
 	ContainerID ids.ID              `json:"containerID"`
 	Encoding    formatting.Encoding `json:"encoding"`
 }

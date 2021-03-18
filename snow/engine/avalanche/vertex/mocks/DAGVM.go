@@ -11,8 +11,8 @@ import (
 	mock "github.com/stretchr/testify/mock"
 
 	snow "github.com/ava-labs/avalanchego/snow"
-
 	snowstorm "github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	vertex "github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 )
 
 var _ vertex.DAGVM = &DAGVM{}
