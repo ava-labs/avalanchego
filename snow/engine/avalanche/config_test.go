@@ -16,8 +16,8 @@ import (
 )
 
 func DefaultConfig() Config {
-	vtxBlocked, _ := queue.New(memdb.New())
-	txBlocked, _ := queue.New(memdb.New())
+	vtxBlocked, _ := queue.NewWithMissing(memdb.New())
+	txBlocked := queue.New(memdb.New())
 	return Config{
 		Config: bootstrap.Config{
 			Config:     common.DefaultConfigTest(),

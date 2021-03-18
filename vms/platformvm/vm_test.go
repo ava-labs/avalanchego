@@ -1958,7 +1958,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	vmDB := prefixdb.New([]byte("vm"), db)
 	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), db)
 
-	blocked, err := queue.New(bootstrappingDB)
+	blocked, err := queue.NewWithMissing(bootstrappingDB)
 	if err != nil {
 		t.Fatal(err)
 	}

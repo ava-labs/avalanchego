@@ -40,7 +40,8 @@ type Config struct {
 
 	// VtxBlocked tracks operations that are blocked on vertices
 	// TxBlocked tracks operations that are blocked on transactions
-	VtxBlocked, TxBlocked *queue.Jobs
+	VtxBlocked *queue.JobsWithMissing
+	TxBlocked  *queue.Jobs
 
 	Manager vertex.Manager
 	VM      vertex.DAGVM
@@ -54,7 +55,8 @@ type Bootstrapper struct {
 
 	// VtxBlocked tracks operations that are blocked on vertices
 	// TxBlocked tracks operations that are blocked on transactions
-	VtxBlocked, TxBlocked *queue.Jobs
+	VtxBlocked *queue.JobsWithMissing
+	TxBlocked  *queue.Jobs
 
 	Manager vertex.Manager
 	VM      vertex.DAGVM

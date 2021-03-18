@@ -58,8 +58,8 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 		t.Fatal(err)
 	}
 
-	vtxBlocker, _ := queue.New(prefixdb.New([]byte("vtx"), db))
-	txBlocker, _ := queue.New(prefixdb.New([]byte("tx"), db))
+	vtxBlocker, _ := queue.NewWithMissing(prefixdb.New([]byte("vtx"), db))
+	txBlocker := queue.New(prefixdb.New([]byte("tx"), db))
 
 	commonConfig := common.Config{
 		Ctx:        ctx,

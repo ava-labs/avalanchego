@@ -16,7 +16,7 @@ import (
 )
 
 func DefaultConfig() Config {
-	blocked, _ := queue.New(memdb.New())
+	blocked, _ := queue.NewWithMissing(memdb.New())
 	return Config{
 		Config: bootstrap.Config{
 			Config:  common.DefaultConfigTest(),

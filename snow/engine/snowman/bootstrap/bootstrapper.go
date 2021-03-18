@@ -31,7 +31,7 @@ type Config struct {
 	common.Config
 
 	// Blocked tracks operations that are blocked on blocks
-	Blocked *queue.Jobs
+	Blocked *queue.JobsWithMissing
 
 	VM block.ChainVM
 
@@ -45,7 +45,7 @@ type Bootstrapper struct {
 	metrics
 
 	// Blocked tracks operations that are blocked on blocks
-	Blocked *queue.Jobs
+	Blocked *queue.JobsWithMissing
 
 	VM block.ChainVM
 

@@ -29,23 +29,15 @@ type Jobs struct {
 	db *versiondb.Database
 	// state writes the job queue to [db].
 	state *state
-	// keep the missing ID set in memory to avoid unnecessary database reads and
-	// writes.
-	missingIDs                            ids.Set
-	removeFromMissingIDs, addToMissingIDs ids.Set
 }
 
 // New attempts to create a new job queue from the provided database.
-func New(db database.Database) (*Jobs, error) {
+func New(db database.Database) *Jobs {
 	vdb := versiondb.New(db)
-	jobs := &Jobs{
+	return &Jobs{
 		db:    vdb,
 		state: newState(vdb),
 	}
-
-	missingIDs, err := jobs.state.MissingJobIDs()
-	jobs.missingIDs.Add(missingIDs...)
-	return jobs, err
 }
 
 // SetParser tells this job queue how to parse jobs from the database.
@@ -86,32 +78,6 @@ func (j *Jobs) Push(job Job) error {
 	}
 	return nil
 }
-
-// AddMissingID adds [jobID] to missingIDs
-func (j *Jobs) AddMissingID(jobIDs ...ids.ID) {
-	for _, jobID := range jobIDs {
-		if !j.missingIDs.Contains(jobID) {
-			j.missingIDs.Add(jobID)
-			j.addToMissingIDs.Add(jobID)
-			j.removeFromMissingIDs.Remove(jobID)
-		}
-	}
-}
-
-// RemoveMissingID removes [jobID] from missingIDs
-func (j *Jobs) RemoveMissingID(jobIDs ...ids.ID) {
-	for _, jobID := range jobIDs {
-		if j.missingIDs.Contains(jobID) {
-			j.missingIDs.Remove(jobID)
-			j.addToMissingIDs.Remove(jobID)
-			j.removeFromMissingIDs.Add(jobID)
-		}
-	}
-}
-
-func (j *Jobs) MissingIDs() []ids.ID { return j.missingIDs.List() }
-
-func (j *Jobs) NumMissingIDs() int { return j.missingIDs.Len() }
 
 func (j *Jobs) ExecuteAll(ctx *snow.Context, events ...snow.EventDispatcher) (int, error) {
 	numExecuted := 0
@@ -171,17 +137,109 @@ func (j *Jobs) ExecuteAll(ctx *snow.Context, events ...snow.EventDispatcher) (in
 
 // Commit the versionDB to the underlying database.
 func (j *Jobs) Commit() error {
-	if j.addToMissingIDs.Len() != 0 {
-		if err := j.state.AddMissingJobIDs(j.addToMissingIDs); err != nil {
-			return err
-		}
-		j.addToMissingIDs.Clear()
-	}
-	if j.removeFromMissingIDs.Len() != 0 {
-		if err := j.state.RemoveMissingJobIDs(j.removeFromMissingIDs); err != nil {
-			return err
-		}
-		j.removeFromMissingIDs.Clear()
-	}
 	return j.db.Commit()
+}
+
+type JobsWithMissing struct {
+	*Jobs
+
+	// keep the missing ID set in memory to avoid unnecessary database reads and
+	// writes.
+	missingIDs                            ids.Set
+	removeFromMissingIDs, addToMissingIDs ids.Set
+}
+
+func NewWithMissing(db database.Database) (*JobsWithMissing, error) {
+	jobs := &JobsWithMissing{
+		Jobs: New(db),
+	}
+
+	missingIDs, err := jobs.state.MissingJobIDs()
+	jobs.missingIDs.Add(missingIDs...)
+	return jobs, err
+}
+
+func (jm *JobsWithMissing) Has(jobID ids.ID) (bool, error) {
+	if jm.missingIDs.Contains(jobID) {
+		return false, nil
+	}
+
+	return jm.Jobs.Has(jobID)
+}
+
+// Push adds a new job to the queue.
+func (jm *JobsWithMissing) Push(job Job) error {
+	deps, err := job.MissingDependencies()
+	if err != nil {
+		return err
+	}
+	jobID := job.ID()
+	// Store this job into the database.
+	if has, err := jm.Has(jobID); err != nil {
+		return fmt.Errorf("failed to check for existing job %s due to %w", jobID, err)
+	} else if has {
+		return errDuplicate
+	}
+	if err := jm.state.PutJob(job); err != nil {
+		return fmt.Errorf("failed to write job due to %w", err)
+	}
+
+	if deps.Len() != 0 {
+		// This job needs to block on a set of dependencies.
+		for depID := range deps {
+			if err := jm.state.AddDependency(depID, jobID); err != nil {
+				return fmt.Errorf("failed to add blocking for depID %s, jobID %s", depID, jobID)
+			}
+		}
+		return nil
+	}
+	// This job doesn't have any dependencies, so it should be placed onto the
+	// executable stack.
+	if err := jm.state.AddRunnableJob(jobID); err != nil {
+		return fmt.Errorf("failed to add %s as a runnable job due to %w", jobID, err)
+	}
+	return nil
+}
+
+// AddMissingID adds [jobID] to missingIDs
+func (jm *JobsWithMissing) AddMissingID(jobIDs ...ids.ID) {
+	for _, jobID := range jobIDs {
+		if !jm.missingIDs.Contains(jobID) {
+			jm.missingIDs.Add(jobID)
+			jm.addToMissingIDs.Add(jobID)
+			jm.removeFromMissingIDs.Remove(jobID)
+		}
+	}
+}
+
+// RemoveMissingID removes [jobID] from missingIDs
+func (jm *JobsWithMissing) RemoveMissingID(jobIDs ...ids.ID) {
+	for _, jobID := range jobIDs {
+		if jm.missingIDs.Contains(jobID) {
+			jm.missingIDs.Remove(jobID)
+			jm.addToMissingIDs.Remove(jobID)
+			jm.removeFromMissingIDs.Add(jobID)
+		}
+	}
+}
+
+func (jm *JobsWithMissing) MissingIDs() []ids.ID { return jm.missingIDs.List() }
+
+func (jm *JobsWithMissing) NumMissingIDs() int { return jm.missingIDs.Len() }
+
+// Commit the versionDB to the underlying database.
+func (jm *JobsWithMissing) Commit() error {
+	if jm.addToMissingIDs.Len() != 0 {
+		if err := jm.state.AddMissingJobIDs(jm.addToMissingIDs); err != nil {
+			return err
+		}
+		jm.addToMissingIDs.Clear()
+	}
+	if jm.removeFromMissingIDs.Len() != 0 {
+		if err := jm.state.RemoveMissingJobIDs(jm.removeFromMissingIDs); err != nil {
+			return err
+		}
+		jm.removeFromMissingIDs.Clear()
+	}
+	return jm.Jobs.Commit()
 }

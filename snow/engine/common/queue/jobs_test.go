@@ -21,8 +21,7 @@ func TestNew(t *testing.T) {
 	parser := &TestParser{T: t}
 	db := memdb.New()
 
-	jobs, err := New(db)
-	assert.NoError(err)
+	jobs := New(db)
 	jobs.SetParser(parser)
 
 	dbSize, err := database.Size(db)
@@ -38,8 +37,7 @@ func TestPushAndExecute(t *testing.T) {
 	parser := &TestParser{T: t}
 	db := memdb.New()
 
-	jobs, err := New(db)
-	assert.NoError(err)
+	jobs := New(db)
 	jobs.SetParser(parser)
 
 	jobID := ids.GenerateTestID()
@@ -66,8 +64,7 @@ func TestPushAndExecute(t *testing.T) {
 	err = jobs.Commit()
 	assert.NoError(err)
 
-	jobs, err = New(db)
-	assert.NoError(err)
+	jobs = New(db)
 	jobs.SetParser(parser)
 
 	has, err = jobs.Has(jobID)
@@ -108,8 +105,7 @@ func TestRemoveDependency(t *testing.T) {
 	parser := &TestParser{T: t}
 	db := memdb.New()
 
-	jobs, err := New(db)
-	assert.NoError(err)
+	jobs := New(db)
 	jobs.SetParser(parser)
 
 	job0ID := ids.GenerateTestID()
@@ -140,7 +136,7 @@ func TestRemoveDependency(t *testing.T) {
 		BytesF: func() []byte { return []byte{0} },
 	}
 
-	err = jobs.Push(job1)
+	err := jobs.Push(job1)
 	assert.NoError(err)
 
 	hasNext, err := jobs.state.HasRunnableJob()
@@ -187,8 +183,7 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 
 	db := memdb.New()
 
-	jobs, err := New(db)
-	assert.NoError(err)
+	jobs := New(db)
 
 	jobID := ids.GenerateTestID()
 	job := &TestJob{
@@ -200,7 +195,7 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 		BytesF:               func() []byte { return []byte{0} },
 	}
 
-	err = jobs.Push(job)
+	err := jobs.Push(job)
 	assert.NoError(err)
 
 	err = jobs.Push(job)
@@ -209,8 +204,7 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 	err = jobs.Commit()
 	assert.NoError(err)
 
-	jobs, err = New(db)
-	assert.NoError(err)
+	jobs = New(db)
 
 	err = jobs.Push(job)
 	assert.Error(err)
@@ -222,8 +216,7 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 
 	db := memdb.New()
 
-	jobs, err := New(db)
-	assert.NoError(err)
+	jobs := New(db)
 
 	job0ID := ids.GenerateTestID()
 	job1ID := ids.GenerateTestID()
@@ -236,7 +229,7 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 		BytesF:               func() []byte { return []byte{1} },
 	}
 
-	err = jobs.Push(job1)
+	err := jobs.Push(job1)
 	assert.NoError(err)
 
 	err = jobs.Push(job1)
@@ -245,20 +238,19 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 	err = jobs.Commit()
 	assert.NoError(err)
 
-	jobs, err = New(db)
-	assert.NoError(err)
+	jobs = New(db)
 
 	err = jobs.Push(job1)
 	assert.Error(err)
 }
 
-func TestPendingJobs(t *testing.T) {
+func TestMissingJobs(t *testing.T) {
 	assert := assert.New(t)
 
 	parser := &TestParser{T: t}
 	db := memdb.New()
 
-	jobs, err := New(db)
+	jobs, err := NewWithMissing(db)
 	assert.NoError(err)
 	jobs.SetParser(parser)
 
@@ -288,7 +280,7 @@ func TestPendingJobs(t *testing.T) {
 	err = jobs.Commit()
 	assert.NoError(err)
 
-	jobs, err = New(db)
+	jobs, err = NewWithMissing(db)
 	assert.NoError(err)
 	jobs.SetParser(parser)
 
