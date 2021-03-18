@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,17 +16,6 @@ const (
 	IndexTypeBlocks
 )
 
-type Client struct {
-	rpc.EndpointRequester
-}
-
-// NewClient creates a client.
-func NewClient(uri string, indexType fmt.Stringer, requestTimeout time.Duration) *Client {
-	return &Client{
-		EndpointRequester: rpc.NewEndpointRequester(uri, fmt.Sprintf("ext/index/%s", indexType), "index", requestTimeout),
-	}
-}
-
 func (t IndexType) String() string {
 	switch t {
 	case IndexTypeTransactions:
@@ -36,6 +26,49 @@ func (t IndexType) String() string {
 		return "block"
 	}
 	return "unknown"
+}
+
+type IndexedChain byte
+
+const (
+	XChain IndexedChain = iota
+	PChain
+	CChain
+)
+
+func (t IndexedChain) String() string {
+	switch t {
+	case XChain:
+		return "X"
+	case PChain:
+		return "P"
+	case CChain:
+		return "C"
+	}
+	// Should never happen
+	return "unknown"
+}
+
+type Client struct {
+	rpc.EndpointRequester
+}
+
+// NewClient creates a client.
+func NewClient(uri string, chain IndexedChain, indexType IndexType, requestTimeout time.Duration) (*Client, error) {
+	switch {
+	case chain == XChain && indexType == IndexTypeBlocks:
+		return nil, errors.New("X-Chain doesn't have blocks")
+	case (chain == PChain || chain == CChain) && indexType != IndexTypeBlocks:
+		return nil, errors.New("P-Chain and C-Chain only blocks")
+	case chain != XChain && chain != PChain && chain != CChain:
+		return nil, errors.New("invalid chain given")
+	case indexType != IndexTypeTransactions && indexType != IndexTypeVertices && indexType != IndexTypeBlocks:
+		return nil, errors.New("invalid chain given")
+	}
+
+	return &Client{
+		EndpointRequester: rpc.NewEndpointRequester(uri, fmt.Sprintf("ext/index/%s/%s", chain, indexType), "index", requestTimeout),
+	}, nil
 }
 
 func (c *Client) GetContainerRange(args *GetContainerRange) ([]FormattedContainer, error) {
