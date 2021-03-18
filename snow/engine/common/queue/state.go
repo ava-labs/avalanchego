@@ -100,25 +100,14 @@ func (ps *state) GetJob(id ids.ID) (Job, error) {
 
 // AddBlocking adds [dependent] as blocking on [dependency] being completed
 func (ps *state) AddDependency(dependency, dependent ids.ID) error {
-	dependencyDB := prefixdb.New(dependency[:], ps.dependencies)
-	dependentsDB := linkeddb.NewDefault(dependencyDB)
+	dependentsDB := ps.getDependents(dependency)
 	return dependentsDB.Put(dependent[:], nil)
 }
 
 // Blocking returns the set of IDs that are blocking on the completion of
 // [dependency] and removes them from the database.
 func (ps *state) RemoveDependencies(dependency ids.ID) ([]ids.ID, error) {
-	var (
-		dependentsDB linkeddb.LinkedDB
-	)
-	if dependentsDBIntf, ok := ps.dependentsCache.Get(dependency); ok {
-		dependentsDB = dependentsDBIntf.(linkeddb.LinkedDB)
-	} else {
-		dependencyDB := prefixdb.New(dependency[:], ps.dependencies)
-		dependentsDB = linkeddb.NewDefault(dependencyDB)
-		ps.dependentsCache.Put(dependency, dependentsDB)
-	}
-
+	dependentsDB := ps.getDependents(dependency)
 	iterator := dependentsDB.NewIterator()
 	defer iterator.Release()
 
@@ -170,4 +159,14 @@ func (ps *state) MissingJobIDs() ([]ids.ID, error) {
 		missingIDs = append(missingIDs, missingID)
 	}
 	return missingIDs, nil
+}
+
+func (ps *state) getDependents(dependency ids.ID) linkeddb.LinkedDB {
+	if dependentsDBIntf, ok := ps.dependentsCache.Get(dependency); ok {
+		return dependentsDBIntf.(linkeddb.LinkedDB)
+	}
+	dependencyDB := prefixdb.New(dependency[:], ps.dependencies)
+	dependentsDB := linkeddb.NewDefault(dependencyDB)
+	ps.dependentsCache.Put(dependency, dependentsDB)
+	return dependentsDB
 }
