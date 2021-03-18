@@ -111,13 +111,13 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	}
 
 	b.NumFetched = 0
-	b.Blocked.AddPendingID(acceptedContainerIDs...)
-	pendingContainerIDs := b.Blocked.Pending()
+	b.Blocked.AddMissingID(acceptedContainerIDs...)
+	pendingContainerIDs := b.Blocked.MissingIDs()
 	b.Ctx.Log.Debug("Starting bootstrapping with %d pending blocks and %d from accepted frontier", len(pendingContainerIDs), len(acceptedContainerIDs))
 	for _, blkID := range pendingContainerIDs {
 		if blk, err := b.VM.GetBlock(blkID); err == nil {
 			if blk.Status() == choices.Accepted {
-				b.Blocked.RemovePendingID(blkID)
+				b.Blocked.RemoveMissingID(blkID)
 			} else if err := b.process(blk); err != nil {
 				return err
 			}
@@ -126,7 +126,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 		}
 	}
 
-	if numPending := b.Blocked.PendingJobs(); numPending == 0 {
+	if numPending := b.Blocked.NumMissingIDs(); numPending == 0 {
 		return b.checkFinish()
 	}
 	return nil
@@ -141,7 +141,7 @@ func (b *Bootstrapper) fetch(blkID ids.ID) error {
 
 	// Make sure we don't already have this block
 	if _, err := b.VM.GetBlock(blkID); err == nil {
-		if numPending := b.Blocked.PendingJobs(); numPending == 0 {
+		if numPending := b.Blocked.NumMissingIDs(); numPending == 0 {
 			return b.checkFinish()
 		}
 		return nil
@@ -216,17 +216,17 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 	status := blk.Status()
 	blkID := blk.ID()
 	for status == choices.Processing {
-		b.Blocked.RemovePendingID(blkID)
+		b.Blocked.RemoveMissingID(blkID)
 
-		jobBlock := &blockJob{
+		has, err := b.Blocked.Has(blkID)
+		if err != nil {
+			return err
+		}
+
+		job := &blockJob{
 			numAccepted: b.numAccepted,
 			numDropped:  b.numDropped,
 			blk:         blk,
-		}
-
-		has, err := b.Blocked.Has(jobBlock)
-		if err != nil {
-			return err
 		}
 
 		// Traverse to the next block regardless of if the block is pushed
@@ -240,7 +240,7 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 			break
 		}
 
-		if err := b.Blocked.Push(jobBlock); err != nil {
+		if err := b.Blocked.Push(job); err != nil {
 			return err
 		}
 
@@ -253,7 +253,7 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 
 	switch status {
 	case choices.Unknown:
-		b.Blocked.AddPendingID(blkID)
+		b.Blocked.AddMissingID(blkID)
 		if err := b.fetch(blkID); err != nil {
 			return err
 		}
@@ -265,7 +265,7 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 		return err
 	}
 
-	if numPending := b.Blocked.PendingJobs(); numPending == 0 {
+	if numPending := b.Blocked.NumMissingIDs(); numPending == 0 {
 		return b.checkFinish()
 	}
 	return nil

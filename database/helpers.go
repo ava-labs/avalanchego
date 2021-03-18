@@ -58,3 +58,14 @@ func GetUInt32(db KeyValueReader, key []byte) (uint32, error) {
 	p := wrappers.Packer{Bytes: bytes}
 	return p.UnpackInt(), nil
 }
+
+func Size(db Iteratee) (int, error) {
+	iterator := db.NewIterator()
+	defer iterator.Release()
+
+	size := 0
+	for iterator.Next() {
+		size += len(iterator.Key()) + len(iterator.Value())
+	}
+	return size, iterator.Error()
+}

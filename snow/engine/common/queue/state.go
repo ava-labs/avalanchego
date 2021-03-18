@@ -42,7 +42,7 @@ func (ps *state) AddRunnableJob(jobID ids.ID) error {
 	return ps.runnableJobIDs.Put(jobID[:], nil)
 }
 
-// HasRunnableJob returns if there is a job that can be run on the queue.
+// HasRunnableJob returns if there is a job that can be run on the queue
 func (ps *state) HasRunnableJob() (bool, error) {
 	isEmpty, err := ps.runnableJobIDs.IsEmpty()
 	return !isEmpty, err
@@ -78,6 +78,15 @@ func (ps *state) PutJob(job Job) error {
 // HasJob returns true if the job [id] is in the queue
 func (ps *state) HasJob(id ids.ID) (bool, error) {
 	return ps.jobs.Has(id[:])
+}
+
+// GetJob returns the job [id]
+func (ps *state) GetJob(id ids.ID) (Job, error) {
+	jobBytes, err := ps.jobs.Get(id[:])
+	if err != nil {
+		return nil, err
+	}
+	return ps.parser.Parse(jobBytes)
 }
 
 // AddBlocking adds [dependent] as blocking on [dependency] being completed
@@ -120,14 +129,37 @@ func (ps *state) RemoveDependencies(dependency ids.ID) ([]ids.ID, error) {
 	return dependents, iterator.Error()
 }
 
-func (ps *state) AddPending(db database.Database, pendingIDs ids.Set) error {
-	return ps.state.AddIDs(db, pendingPrefix, pendingIDs)
+func (ps *state) AddMissingJobIDs(missingIDs ids.Set) error {
+	for missingID := range missingIDs {
+		missingID := missingID
+		if err := ps.missingJobIDs.Put(missingID[:], nil); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func (ps *state) RemovePending(db database.Database, pendingIDs ids.Set) error {
-	return ps.state.RemoveIDs(db, pendingPrefix, pendingIDs)
+func (ps *state) RemoveMissingJobIDs(missingIDs ids.Set) error {
+	for missingID := range missingIDs {
+		missingID := missingID
+		if err := ps.missingJobIDs.Delete(missingID[:]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func (ps *state) Pending(db database.Database) ([]ids.ID, error) {
-	return ps.state.IDs(db, pendingPrefix)
+func (ps *state) MissingJobIDs() ([]ids.ID, error) {
+	iterator := ps.missingJobIDs.NewIterator()
+	defer iterator.Release()
+
+	missingIDs := []ids.ID(nil)
+	for iterator.Next() {
+		missingID, err := ids.ToID(iterator.Key())
+		if err != nil {
+			return nil, err
+		}
+		missingIDs = append(missingIDs, missingID)
+	}
+	return missingIDs, nil
 }

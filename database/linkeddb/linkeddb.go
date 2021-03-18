@@ -301,7 +301,7 @@ func (ldb *linkedDB) getNode(key []byte) (node, error) {
 	n := node{}
 	_, err = c.Unmarshal(nodeBytes, &n)
 	if err == nil {
-		ldb.nodeCache.Put(keyStr, n)
+		ldb.nodeCache.Put(keyStr, &n)
 	}
 	return n, err
 }

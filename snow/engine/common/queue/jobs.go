@@ -27,43 +27,31 @@ var (
 type Jobs struct {
 	// db ensures that database updates are atomically updated.
 	db *versiondb.Database
-	// state prefixes different values to avoid namespace collisions.
-	state prefixedState
-	// keeps the stackSize in memory to avoid unnecessary database reads.
-	stackSize uint32
-	// keep the pending ID set in memory to avoid unnecessary database reads and
+	// state writes the job queue to [db].
+	state *state
+	// keep the missing ID set in memory to avoid unnecessary database reads and
 	// writes.
-	pending                         ids.Set
-	removeFromPending, addToPending ids.Set
+	missingIDs                            ids.Set
+	removeFromMissingIDs, addToMissingIDs ids.Set
 }
 
 // New attempts to create a new job queue from the provided database.
 func New(db database.Database) (*Jobs, error) {
+	vdb := versiondb.New(db)
 	jobs := &Jobs{
-		db: versiondb.New(db),
+		db:    vdb,
+		state: newState(vdb),
 	}
 
-	pending, err := jobs.state.Pending(jobs.db)
-	if err != nil {
-		return nil, err
-	}
-	jobs.pending.Add(pending...)
-
-	stackSize, err := jobs.state.StackSize(jobs.db)
-	if err == nil {
-		jobs.stackSize = stackSize
-		return jobs, nil
-	}
-	if err != database.ErrNotFound {
-		return nil, err
-	}
-	return jobs, jobs.state.SetStackSize(jobs.db, 0)
+	missingIDs, err := jobs.state.MissingJobIDs()
+	jobs.missingIDs.Add(missingIDs...)
+	return jobs, err
 }
 
 // SetParser tells this job queue how to parse jobs from the database.
 func (j *Jobs) SetParser(parser Parser) { j.state.parser = parser }
 
-func (j *Jobs) Has(job Job) (bool, error) { return j.state.HasJob(j.db, job.ID()) }
+func (j *Jobs) Has(jobID ids.ID) (bool, error) { return j.state.HasJob(jobID) }
 
 // Push adds a new job to the queue.
 func (j *Jobs) Push(job Job) error {
@@ -73,19 +61,19 @@ func (j *Jobs) Push(job Job) error {
 	}
 	jobID := job.ID()
 	// Store this job into the database.
-	if has, err := j.state.HasJob(j.db, jobID); err != nil {
+	if has, err := j.state.HasJob(jobID); err != nil {
 		return fmt.Errorf("failed to check for existing job %s due to %w", jobID, err)
 	} else if has {
 		return errDuplicate
 	}
-	if err := j.state.SetJob(j.db, job); err != nil {
+	if err := j.state.PutJob(job); err != nil {
 		return fmt.Errorf("failed to write job due to %w", err)
 	}
 
 	if deps.Len() != 0 {
 		// This job needs to block on a set of dependencies.
 		for depID := range deps {
-			if err := j.state.AddBlocking(j.db, depID, jobID); err != nil {
+			if err := j.state.AddDependency(depID, jobID); err != nil {
 				return fmt.Errorf("failed to add blocking for depID %s, jobID %s", depID, jobID)
 			}
 		}
@@ -93,101 +81,75 @@ func (j *Jobs) Push(job Job) error {
 	}
 	// This job doesn't have any dependencies, so it should be placed onto the
 	// executable stack.
-	return j.pushUnblockedJob(job)
-}
-
-// Pop removes a job from the queue, if there are no jobs left on the queue, a
-// [database.ErrNotFound] error will be returned.
-func (j *Jobs) Pop() (Job, error) {
-	if j.stackSize == 0 {
-		return nil, database.ErrNotFound
-	}
-
-	j.stackSize--
-	if err := j.state.SetStackSize(j.db, j.stackSize); err != nil {
-		return nil, fmt.Errorf("failed to set stack size due to %w", err)
-	}
-
-	job, err := j.state.RemoveStackIndex(j.db, j.stackSize)
-	if err != nil {
-		return nil, fmt.Errorf("failed to remove stack index due to %w", err)
-	}
-	return job, nil
-}
-
-// Execute takes a job that is ready to execute, and executes it. After
-// execution, if there are any jobs that were blocking on this job, unblock
-// those jobs.
-func (j *Jobs) Execute(job Job) error {
-	jobID := job.ID()
-	if err := job.Execute(); err != nil {
-		return fmt.Errorf("failed to execute job %s due to %w", jobID, err)
-	}
-
-	blocking, err := j.state.RemoveBlocking(j.db, jobID)
-	if err != nil {
-		return fmt.Errorf("failed to remove blocking jobs for %s due to %w", jobID, err)
-	}
-
-	for _, blockedID := range blocking {
-		job, err := j.state.Job(j.db, blockedID)
-		if err != nil {
-			return fmt.Errorf("failed to get job %s from blocking jobs due to %w", blockedID, err)
-		}
-		deps, err := job.MissingDependencies()
-		if err != nil {
-			return fmt.Errorf("failed to get missing dependencies for %s due to %w", job.ID(), err)
-		}
-		if deps.Len() > 0 {
-			continue
-		}
-		if err := j.pushUnblockedJob(job); err != nil {
-			return err
-		}
-	}
-	if err := j.state.DeleteJob(j.db, jobID); err != nil {
-		return fmt.Errorf("failed to delete job %s due to %w", jobID, err)
+	if err := j.state.AddRunnableJob(jobID); err != nil {
+		return fmt.Errorf("failed to add %s as a runnable job due to %w", jobID, err)
 	}
 	return nil
 }
 
-// AddPendingID adds [jobID] to pending
-func (j *Jobs) AddPendingID(jobIDs ...ids.ID) {
+// AddMissingID adds [jobID] to missingIDs
+func (j *Jobs) AddMissingID(jobIDs ...ids.ID) {
 	for _, jobID := range jobIDs {
-		if !j.pending.Contains(jobID) {
-			j.pending.Add(jobID)
-			j.addToPending.Add(jobID)
-			j.removeFromPending.Remove(jobID)
+		if !j.missingIDs.Contains(jobID) {
+			j.missingIDs.Add(jobID)
+			j.addToMissingIDs.Add(jobID)
+			j.removeFromMissingIDs.Remove(jobID)
 		}
 	}
 }
 
-// RemovePendingID removes [jobID] from pending
-func (j *Jobs) RemovePendingID(jobIDs ...ids.ID) {
+// RemoveMissingID removes [jobID] from missingIDs
+func (j *Jobs) RemoveMissingID(jobIDs ...ids.ID) {
 	for _, jobID := range jobIDs {
-		if j.pending.Contains(jobID) {
-			j.pending.Remove(jobID)
-			j.addToPending.Remove(jobID)
-			j.removeFromPending.Add(jobID)
+		if j.missingIDs.Contains(jobID) {
+			j.missingIDs.Remove(jobID)
+			j.addToMissingIDs.Remove(jobID)
+			j.removeFromMissingIDs.Add(jobID)
 		}
 	}
 }
 
-func (j *Jobs) Pending() []ids.ID { return j.pending.List() }
+func (j *Jobs) MissingIDs() []ids.ID { return j.missingIDs.List() }
 
-func (j *Jobs) PendingJobs() int { return j.pending.Len() }
+func (j *Jobs) NumMissingIDs() int { return j.missingIDs.Len() }
 
 func (j *Jobs) ExecuteAll(ctx *snow.Context, events ...snow.EventDispatcher) (int, error) {
 	numExecuted := 0
-	for j.stackSize > 0 {
-		job, err := j.Pop()
+	for {
+		job, err := j.state.RemoveRunnableJob()
+		if err == database.ErrNotFound {
+			break
+		}
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("failed to removing runnable job with %w", err)
 		}
 
-		ctx.Log.Debug("Executing: %s", job.ID())
-		if err := j.Execute(job); err != nil {
-			return 0, err
+		jobID := job.ID()
+		ctx.Log.Debug("Executing: %s", jobID)
+		if err := job.Execute(); err != nil {
+			return 0, fmt.Errorf("failed to execute job %s due to %w", jobID, err)
+		}
+
+		dependentIDs, err := j.state.RemoveDependencies(jobID)
+		if err != nil {
+			return 0, fmt.Errorf("failed to remove blocking jobs for %s due to %w", jobID, err)
+		}
+
+		for _, dependentID := range dependentIDs {
+			job, err := j.state.GetJob(dependentID)
+			if err != nil {
+				return 0, fmt.Errorf("failed to get job %s from blocking jobs due to %w", dependentID, err)
+			}
+			deps, err := job.MissingDependencies()
+			if err != nil {
+				return 0, fmt.Errorf("failed to get missing dependencies for %s due to %w", dependentID, err)
+			}
+			if deps.Len() > 0 {
+				continue
+			}
+			if err := j.state.AddRunnableJob(dependentID); err != nil {
+				return 0, fmt.Errorf("failed to add %s as a runnable job due to %w", dependentID, err)
+			}
 		}
 		if err := j.Commit(); err != nil {
 			return 0, err
@@ -209,30 +171,17 @@ func (j *Jobs) ExecuteAll(ctx *snow.Context, events ...snow.EventDispatcher) (in
 
 // Commit the versionDB to the underlying database.
 func (j *Jobs) Commit() error {
-	if j.addToPending.Len() != 0 {
-		if err := j.state.AddPending(j.db, j.addToPending); err != nil {
+	if j.addToMissingIDs.Len() != 0 {
+		if err := j.state.AddMissingJobIDs(j.addToMissingIDs); err != nil {
 			return err
 		}
-		j.addToPending.Clear()
+		j.addToMissingIDs.Clear()
 	}
-	if j.removeFromPending.Len() != 0 {
-		if err := j.state.RemovePending(j.db, j.removeFromPending); err != nil {
+	if j.removeFromMissingIDs.Len() != 0 {
+		if err := j.state.RemoveMissingJobIDs(j.removeFromMissingIDs); err != nil {
 			return err
 		}
-		j.removeFromPending.Clear()
+		j.removeFromMissingIDs.Clear()
 	}
 	return j.db.Commit()
-}
-
-// pushUnblockedJob pushes a job with no remaining dependencies to the queue to
-// be executed
-func (j *Jobs) pushUnblockedJob(job Job) error {
-	if err := j.state.SetStackIndex(j.db, j.stackSize, job.ID()); err != nil {
-		return fmt.Errorf("failed to set stack index due to %w", err)
-	}
-	j.stackSize++
-	if err := j.state.SetStackSize(j.db, j.stackSize); err != nil {
-		return fmt.Errorf("failed to set stack size due to %w", err)
-	}
-	return nil
 }
