@@ -4,10 +4,15 @@
 package queue
 
 import (
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+)
+
+const (
+	cacheSize = 1024
 )
 
 var (
@@ -24,16 +29,20 @@ type state struct {
 	// Should be prefixed with the jobID that we are attempting to find the
 	// dependencies of. This prefixdb.Database should then be wrapped in a
 	// linkeddb.LinkedDB to read the dependencies.
-	dependencies  database.Database
-	missingJobIDs linkeddb.LinkedDB
+	dependencies database.Database
+	// This is a cache that tracks LinkedDB iterators that have recently been
+	// made.
+	dependentsCache cache.Cacher
+	missingJobIDs   linkeddb.LinkedDB
 }
 
 func newState(db database.Database) *state {
 	return &state{
-		runnableJobIDs: linkeddb.NewDefault(prefixdb.New(runnableJobIDsKey, db)),
-		jobs:           prefixdb.New(jobsKey, db),
-		dependencies:   prefixdb.New(dependenciesKey, db),
-		missingJobIDs:  linkeddb.NewDefault(prefixdb.New(missingJobIDsKey, db)),
+		runnableJobIDs:  linkeddb.NewDefault(prefixdb.New(runnableJobIDsKey, db)),
+		jobs:            prefixdb.New(jobsKey, db),
+		dependencies:    prefixdb.New(dependenciesKey, db),
+		dependentsCache: &cache.LRU{Size: cacheSize},
+		missingJobIDs:   linkeddb.NewDefault(prefixdb.New(missingJobIDsKey, db)),
 	}
 }
 
@@ -93,17 +102,22 @@ func (ps *state) GetJob(id ids.ID) (Job, error) {
 func (ps *state) AddDependency(dependency, dependent ids.ID) error {
 	dependencyDB := prefixdb.New(dependency[:], ps.dependencies)
 	dependentsDB := linkeddb.NewDefault(dependencyDB)
-	if err := dependentsDB.Put(dependent[:], nil); err != nil {
-		return err
-	}
-	return dependencyDB.Close()
+	return dependentsDB.Put(dependent[:], nil)
 }
 
 // Blocking returns the set of IDs that are blocking on the completion of
 // [dependency] and removes them from the database.
 func (ps *state) RemoveDependencies(dependency ids.ID) ([]ids.ID, error) {
-	dependencyDB := prefixdb.New(dependency[:], ps.dependencies)
-	dependentsDB := linkeddb.NewDefault(dependencyDB)
+	var (
+		dependentsDB linkeddb.LinkedDB
+	)
+	if dependentsDBIntf, ok := ps.dependentsCache.Get(dependency); ok {
+		dependentsDB = dependentsDBIntf.(linkeddb.LinkedDB)
+	} else {
+		dependencyDB := prefixdb.New(dependency[:], ps.dependencies)
+		dependentsDB = linkeddb.NewDefault(dependencyDB)
+		ps.dependentsCache.Put(dependency, dependentsDB)
+	}
 
 	iterator := dependentsDB.NewIterator()
 	defer iterator.Release()
@@ -112,19 +126,13 @@ func (ps *state) RemoveDependencies(dependency ids.ID) ([]ids.ID, error) {
 	for iterator.Next() {
 		dependentKey := iterator.Key()
 		if err := dependentsDB.Delete(dependentKey); err != nil {
-			_ = dependencyDB.Close()
 			return nil, err
 		}
 		dependent, err := ids.ToID(dependentKey)
 		if err != nil {
-			_ = dependencyDB.Close()
 			return nil, err
 		}
 		dependents = append(dependents, dependent)
-	}
-
-	if err := dependencyDB.Close(); err != nil {
-		return nil, err
 	}
 	return dependents, iterator.Error()
 }
