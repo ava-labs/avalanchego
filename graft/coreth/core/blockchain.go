@@ -184,15 +184,16 @@ type BlockChain struct {
 	//  * nil: disable tx reindexer/deleter, but still index new blocks
 	txLookupLimit uint64
 
-	hc            *HeaderChain
-	rmLogsFeed    event.Feed
-	chainFeed     event.Feed
-	chainSideFeed event.Feed
-	chainHeadFeed event.Feed
-	logsFeed      event.Feed
-	blockProcFeed event.Feed
-	scope         event.SubscriptionScope
-	genesisBlock  *types.Block
+	hc                *HeaderChain
+	rmLogsFeed        event.Feed
+	chainFeed         event.Feed
+	chainSideFeed     event.Feed
+	chainHeadFeed     event.Feed
+	chainAcceptedFeed event.Feed
+	logsFeed          event.Feed
+	blockProcFeed     event.Feed
+	scope             event.SubscriptionScope
+	genesisBlock      *types.Block
 
 	chainmu sync.RWMutex // blockchain insertion lock
 
@@ -873,6 +874,9 @@ func (bc *BlockChain) GetBlockByHash(hash common.Hash) *types.Block {
 func (bc *BlockChain) GetBlockByNumber(number uint64) *types.Block {
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
+	if number > (*bc.lastAccepted).NumberU64() {
+		return nil
+	}
 	hash := rawdb.ReadCanonicalHash(bc.db, number)
 	if hash == (common.Hash{}) {
 		return nil
@@ -1684,6 +1688,7 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 	}
 
 	bc.lastAccepted = block
+	bc.chainAcceptedFeed.Send(ChainEvent{Block: block, Hash: block.Hash()})
 	return nil
 }
 
@@ -2790,6 +2795,11 @@ func (bc *BlockChain) SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) even
 // SubscribeChainEvent registers a subscription of ChainEvent.
 func (bc *BlockChain) SubscribeChainEvent(ch chan<- ChainEvent) event.Subscription {
 	return bc.scope.Track(bc.chainFeed.Subscribe(ch))
+}
+
+// SubscribeChainAcceptedEvent registers a subscription of ChainEvent.
+func (bc *BlockChain) SubscribeChainAcceptedEvent(ch chan<- ChainEvent) event.Subscription {
+	return bc.scope.Track(bc.chainAcceptedFeed.Subscribe(ch))
 }
 
 // SubscribeChainHeadEvent registers a subscription of ChainHeadEvent.
