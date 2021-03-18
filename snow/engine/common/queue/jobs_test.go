@@ -5,479 +5,299 @@ package queue
 
 import (
 	"bytes"
-	"errors"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/stretchr/testify/assert"
 )
 
 // Test that creating a new queue can be created and that it is initially empty.
 func TestNew(t *testing.T) {
+	assert := assert.New(t)
+
 	parser := &TestParser{T: t}
 	db := memdb.New()
 
 	jobs, err := New(db)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	assert.NoError(err)
 	jobs.SetParser(parser)
 
-	if jobs.stackSize > 0 {
-		t.Fatalf("Shouldn't have a container ready to pop")
-	}
+	dbSize, err := database.Size(db)
+	assert.NoError(err)
+	assert.Zero(dbSize)
 }
 
-// Test that a job can be added to a queue, and then the job can be removed from
-// the queue after a shutdown.
-func TestPushPop(t *testing.T) {
+// Test that a job can be added to a queue, and then the job can be executed
+// from the queue after a shutdown.
+func TestPushAndExecute(t *testing.T) {
+	assert := assert.New(t)
+
 	parser := &TestParser{T: t}
 	db := memdb.New()
 
 	jobs, err := New(db)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	assert.NoError(err)
 	jobs.SetParser(parser)
 
-	id := ids.Empty.Prefix(0)
+	jobID := ids.GenerateTestID()
 	job := &TestJob{
 		T: t,
 
-		IDF:                  func() ids.ID { return id },
+		IDF:                  func() ids.ID { return jobID },
 		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{}, nil },
 		ExecuteF:             func() error { return nil },
 		BytesF:               func() []byte { return []byte{0} },
 	}
 
-	if err := jobs.Push(job); err != nil {
-		t.Fatal(err)
-	}
+	has, err := jobs.Has(jobID)
+	assert.NoError(err)
+	assert.False(has)
 
-	if err := jobs.Commit(); err != nil {
-		t.Fatal(err)
-	}
+	err = jobs.Push(job)
+	assert.NoError(err)
+
+	has, err = jobs.Has(jobID)
+	assert.NoError(err)
+	assert.True(has)
+
+	err = jobs.Commit()
+	assert.NoError(err)
 
 	jobs, err = New(db)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	assert.NoError(err)
 	jobs.SetParser(parser)
 
-	if jobs.stackSize <= 0 {
-		t.Fatalf("Should have a container ready to pop")
-	}
+	has, err = jobs.Has(jobID)
+	assert.NoError(err)
+	assert.True(has)
+
+	hasNext, err := jobs.state.HasRunnableJob()
+	assert.NoError(err)
+	assert.True(hasNext)
 
 	parser.ParseF = func(b []byte) (Job, error) {
-		if !bytes.Equal(b, []byte{0}) {
-			t.Fatalf("Unknown job")
-		}
+		assert.Equal([]byte{0}, b)
 		return job, nil
 	}
 
-	returnedBlockable, err := jobs.Pop()
-	if err != nil {
-		t.Fatal(err)
-	}
+	count, err := jobs.ExecuteAll(snow.DefaultContextTest())
+	assert.NoError(err)
+	assert.Equal(1, count)
 
-	if returnedBlockable != job {
-		t.Fatalf("Returned wrong job")
-	}
+	has, err = jobs.Has(jobID)
+	assert.NoError(err)
+	assert.False(has)
 
-	if jobs.stackSize > 0 {
-		t.Fatalf("Shouldn't have a container ready to pop")
-	}
+	hasNext, err = jobs.state.HasRunnableJob()
+	assert.NoError(err)
+	assert.False(hasNext)
+
+	dbSize, err := database.Size(db)
+	assert.NoError(err)
+	assert.Zero(dbSize)
 }
 
 // Test that executing a job will cause a dependent job to be placed on to the
 // ready queue
-func TestExecute(t *testing.T) {
+func TestRemoveDependency(t *testing.T) {
+	assert := assert.New(t)
+
 	parser := &TestParser{T: t}
 	db := memdb.New()
 
 	jobs, err := New(db)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	assert.NoError(err)
 	jobs.SetParser(parser)
 
-	id0 := ids.Empty.Prefix(0)
-	executed0 := new(bool)
-	job0 := &TestJob{
-		T: t,
+	job0ID := ids.GenerateTestID()
+	executed0 := false
+	job1ID := ids.GenerateTestID()
+	executed1 := false
 
-		IDF:                  func() ids.ID { return id0 },
-		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{}, nil },
-		ExecuteF:             func() error { *executed0 = true; return nil },
-		BytesF:               func() []byte { return []byte{0} },
-	}
-
-	id1 := ids.Empty.Prefix(1)
-	executed1 := new(bool)
 	job1 := &TestJob{
 		T: t,
 
-		IDF:                  func() ids.ID { return id1 },
-		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{id0: true}, nil },
-		ExecuteF:             func() error { *executed1 = true; return nil },
+		IDF:                  func() ids.ID { return job1ID },
+		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{job0ID: true}, nil },
+		ExecuteF:             func() error { executed1 = true; return nil },
 		BytesF:               func() []byte { return []byte{1} },
 	}
+	job0 := &TestJob{
+		T: t,
 
-	if err := jobs.Push(job0); err != nil {
-		t.Fatal(err)
+		IDF:                  func() ids.ID { return job0ID },
+		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{}, nil },
+		ExecuteF: func() error {
+			executed0 = true
+			job1.MissingDependenciesF = func() (ids.Set, error) {
+				return ids.Set{}, nil
+			}
+			return nil
+		},
+		BytesF: func() []byte { return []byte{0} },
 	}
 
-	if err := jobs.Push(job1); err != nil {
-		t.Fatal(err)
-	}
+	err = jobs.Push(job1)
+	assert.NoError(err)
 
-	if jobs.stackSize <= 0 {
-		t.Fatalf("Should have a container ready to pop")
-	}
+	hasNext, err := jobs.state.HasRunnableJob()
+	assert.NoError(err)
+	assert.False(hasNext)
+
+	err = jobs.Push(job0)
+	assert.NoError(err)
+
+	hasNext, err = jobs.state.HasRunnableJob()
+	assert.NoError(err)
+	assert.True(hasNext)
 
 	parser.ParseF = func(b []byte) (Job, error) {
-		if !bytes.Equal(b, []byte{0}) {
-			t.Fatalf("Unknown job")
+		switch {
+		case bytes.Equal(b, []byte{0}):
+			return job0, nil
+		case bytes.Equal(b, []byte{1}):
+			return job1, nil
+		default:
+			assert.FailNow("Unknown job")
+			return nil, nil
 		}
-		return job0, nil
 	}
 
-	returnedBlockable, err := jobs.Pop()
-	if err != nil {
-		t.Fatal(err)
-	}
+	count, err := jobs.ExecuteAll(snow.DefaultContextTest())
+	assert.NoError(err)
+	assert.Equal(2, count)
+	assert.True(executed0)
+	assert.True(executed1)
 
-	parser.ParseF = nil
+	hasNext, err = jobs.state.HasRunnableJob()
+	assert.NoError(err)
+	assert.False(hasNext)
 
-	if returnedBlockable != job0 {
-		t.Fatalf("Returned wrong job")
-	}
-
-	job1.MissingDependenciesF = func() (ids.Set, error) { return ids.Set{}, nil }
-	parser.ParseF = func(b []byte) (Job, error) {
-		if !bytes.Equal(b, []byte{1}) {
-			t.Fatalf("Unknown job")
-		}
-		return job1, nil
-	}
-
-	if err := jobs.Execute(job0); err != nil {
-		t.Fatal(err)
-	}
-
-	if !*executed0 {
-		t.Fatalf("Should have executed the container")
-	}
-
-	if jobs.stackSize <= 0 {
-		t.Fatalf("Should have a container ready to pop")
-	}
+	dbSize, err := database.Size(db)
+	assert.NoError(err)
+	assert.Zero(dbSize)
 }
 
 // Test that a job that is ready to be executed can only be added once
 func TestDuplicatedExecutablePush(t *testing.T) {
-	parser := &TestParser{T: t}
+	assert := assert.New(t)
+
 	db := memdb.New()
 
 	jobs, err := New(db)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
-	jobs.SetParser(parser)
-
-	id := ids.Empty.Prefix(0)
+	jobID := ids.GenerateTestID()
 	job := &TestJob{
 		T: t,
 
-		IDF:                  func() ids.ID { return id },
+		IDF:                  func() ids.ID { return jobID },
 		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{}, nil },
 		ExecuteF:             func() error { return nil },
 		BytesF:               func() []byte { return []byte{0} },
 	}
 
-	if err := jobs.Push(job); err != nil {
-		t.Fatal(err)
-	}
+	err = jobs.Push(job)
+	assert.NoError(err)
 
-	if err := jobs.Push(job); err == nil {
-		t.Fatalf("Should have failed on push")
-	}
+	err = jobs.Push(job)
+	assert.Error(err)
 
-	if err := jobs.Commit(); err != nil {
-		t.Fatal(err)
-	}
+	err = jobs.Commit()
+	assert.NoError(err)
 
 	jobs, err = New(db)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
-	jobs.SetParser(parser)
-
-	if jobs.stackSize <= 0 {
-		t.Fatalf("Should have a container ready to pop")
-	}
-
-	parser.ParseF = func(b []byte) (Job, error) {
-		if !bytes.Equal(b, []byte{0}) {
-			t.Fatalf("Unknown job")
-		}
-		return job, nil
-	}
-
-	returnedBlockable, err := jobs.Pop()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if returnedBlockable != job {
-		t.Fatalf("Returned wrong job")
-	}
-
-	if jobs.stackSize > 0 {
-		t.Fatalf("Shouldn't have a container ready to pop")
-	}
+	err = jobs.Push(job)
+	assert.Error(err)
 }
 
 // Test that a job that isn't ready to be executed can only be added once
 func TestDuplicatedNotExecutablePush(t *testing.T) {
-	parser := &TestParser{T: t}
+	assert := assert.New(t)
+
 	db := memdb.New()
 
 	jobs, err := New(db)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
-	jobs.SetParser(parser)
-
-	id0 := ids.Empty.Prefix(0)
-	id1 := ids.Empty.Prefix(1)
+	job0ID := ids.GenerateTestID()
+	job1ID := ids.GenerateTestID()
 	job1 := &TestJob{
 		T: t,
 
-		IDF: func() ids.ID { return id1 },
-		MissingDependenciesF: func() (ids.Set, error) {
-			s := ids.Set{}
-			s.Add(id0)
-			return s, nil
-		},
-		ExecuteF: func() error { return nil },
-		BytesF:   func() []byte { return []byte{1} },
-	}
-	job0 := &TestJob{
-		T: t,
-
-		IDF:                  func() ids.ID { return id0 },
-		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{}, nil },
-		ExecuteF: func() error {
-			job1.MissingDependenciesF = func() (ids.Set, error) { return ids.Set{}, nil }
-			return nil
-		},
-		BytesF: func() []byte { return []byte{0} },
+		IDF:                  func() ids.ID { return job1ID },
+		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{job0ID: true}, nil },
+		ExecuteF:             func() error { return nil },
+		BytesF:               func() []byte { return []byte{1} },
 	}
 
-	if err := jobs.Push(job1); err != nil {
-		t.Fatal(err)
-	}
+	err = jobs.Push(job1)
+	assert.NoError(err)
 
-	if err := jobs.Push(job1); err == nil {
-		t.Fatalf("should have errored on pushing a duplicate job")
-	}
+	err = jobs.Push(job1)
+	assert.Error(err)
 
-	if err := jobs.Commit(); err != nil {
-		t.Fatal(err)
-	}
+	err = jobs.Commit()
+	assert.NoError(err)
 
 	jobs, err = New(db)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
-	jobs.SetParser(parser)
-
-	if err := jobs.Push(job0); err != nil {
-		t.Fatal(err)
-	}
-
-	if jobs.stackSize <= 0 {
-		t.Fatalf("Should have a container ready to pop")
-	}
-
-	parser.ParseF = func(b []byte) (Job, error) {
-		if bytes.Equal(b, []byte{0}) {
-			return job0, nil
-		}
-		if bytes.Equal(b, []byte{1}) {
-			return job1, nil
-		}
-		t.Fatalf("Unknown job")
-		return nil, errors.New("Unknown job")
-	}
-
-	returnedBlockable, err := jobs.Pop()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if returnedBlockable != job0 {
-		t.Fatalf("Returned wrong job")
-	}
-
-	if err := jobs.Execute(job0); err != nil {
-		t.Fatal(err)
-	}
-
-	if jobs.stackSize <= 0 {
-		t.Fatalf("Should have a container ready to pop")
-	}
-
-	returnedBlockable, err = jobs.Pop()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if returnedBlockable != job1 {
-		t.Fatalf("Returned wrong job")
-	}
-
-	if jobs.stackSize > 0 {
-		t.Fatalf("Shouldn't have a container ready to pop")
-	}
-}
-
-// Test that executing all jobes  job that isn't ready to be executed can only be added once
-func TestExecuteAll(t *testing.T) {
-	parser := &TestParser{T: t}
-	db := memdb.New()
-
-	jobs, err := New(db)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	jobs.SetParser(parser)
-
-	id0 := ids.GenerateTestID()
-	id1 := ids.GenerateTestID()
-	job1 := &TestJob{
-		T: t,
-
-		IDF: func() ids.ID { return id1 },
-		MissingDependenciesF: func() (ids.Set, error) {
-			s := ids.Set{}
-			s.Add(id0)
-			return s, nil
-		},
-		ExecuteF: func() error { return nil },
-		BytesF:   func() []byte { return []byte{1} },
-	}
-	job0 := &TestJob{
-		T: t,
-
-		IDF:                  func() ids.ID { return id0 },
-		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{}, nil },
-		ExecuteF: func() error {
-			job1.MissingDependenciesF = func() (ids.Set, error) { return ids.Set{}, nil }
-			return nil
-		},
-		BytesF: func() []byte { return []byte{0} },
-	}
-
-	if err := jobs.Push(job1); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := jobs.Push(job0); err != nil {
-		t.Fatal(err)
-	}
-
-	if jobs.stackSize <= 0 {
-		t.Fatalf("Should have a container ready to pop")
-	}
-
-	parser.ParseF = func(b []byte) (Job, error) {
-		if bytes.Equal(b, []byte{0}) {
-			return job0, nil
-		}
-		if bytes.Equal(b, []byte{1}) {
-			return job1, nil
-		}
-		t.Fatalf("Unknown job")
-		return nil, errors.New("Unknown job")
-	}
-
-	count, err := jobs.ExecuteAll(snow.DefaultContextTest())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if count != 2 {
-		t.Fatalf("Expected to have executed %d jobs but executed %d", 2, count)
-	}
-
-	if jobs.stackSize > 0 {
-		t.Fatalf("Shouldn't have a container ready to pop")
-	}
+	err = jobs.Push(job1)
+	assert.Error(err)
 }
 
 func TestPendingJobs(t *testing.T) {
+	assert := assert.New(t)
+
 	parser := &TestParser{T: t}
 	db := memdb.New()
 
 	jobs, err := New(db)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	assert.NoError(err)
 	jobs.SetParser(parser)
 
-	id0 := ids.Empty.Prefix(0)
-	id1 := ids.Empty.Prefix(1)
+	job0ID := ids.GenerateTestID()
+	job1ID := ids.GenerateTestID()
 
-	jobs.AddPendingID(id0)
-	jobs.AddPendingID(id1)
+	jobs.AddMissingID(job0ID)
+	jobs.AddMissingID(job1ID)
 
-	if err := jobs.Commit(); err != nil {
-		t.Fatal(err)
-	}
+	err = jobs.Commit()
+	assert.NoError(err)
 
-	if pending := jobs.PendingJobs(); pending != 2 {
-		t.Fatalf("Expected number of pending jobs to be 2, but was %d", pending)
-	}
+	numMissingIDs := jobs.NumMissingIDs()
+	assert.Equal(2, numMissingIDs)
 
-	pendingSet := ids.Set{}
-	pendingSet.Add(jobs.Pending()...)
+	missingIDSet := ids.Set{}
+	missingIDSet.Add(jobs.MissingIDs()...)
 
-	if !pendingSet.Contains(id0) {
-		t.Fatal("Expected pending to contain id0")
-	}
+	containsJob0ID := missingIDSet.Contains(job0ID)
+	assert.True(containsJob0ID)
 
-	if !pendingSet.Contains(id1) {
-		t.Fatal("Expected pending to contain id1")
-	}
+	containsJob1ID := missingIDSet.Contains(job1ID)
+	assert.True(containsJob1ID)
 
-	jobs.RemovePendingID(id1)
+	jobs.RemoveMissingID(job1ID)
 
-	if err := jobs.Commit(); err != nil {
-		t.Fatal(err)
-	}
+	err = jobs.Commit()
+	assert.NoError(err)
 
-	newJobs, err := New(db)
-	if err != nil {
-		t.Fatal(err)
-	}
+	jobs, err = New(db)
+	assert.NoError(err)
+	jobs.SetParser(parser)
 
-	newJobs.SetParser(parser)
+	missingIDSet = ids.Set{}
+	missingIDSet.Add(jobs.MissingIDs()...)
 
-	pendingSet.Clear()
-	pendingSet.Add(newJobs.Pending()...)
-	if !pendingSet.Contains(id0) {
-		t.Fatal("Expected pending to contain id0")
-	}
+	containsJob0ID = missingIDSet.Contains(job0ID)
+	assert.True(containsJob0ID)
+
+	containsJob1ID = missingIDSet.Contains(job1ID)
+	assert.False(containsJob1ID)
 }
