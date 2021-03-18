@@ -4,7 +4,6 @@
 package queue
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -17,10 +16,6 @@ const (
 	// StatusUpdateFrequency is how many containers should be processed between
 	// logs
 	StatusUpdateFrequency = 2500
-)
-
-var (
-	errDuplicate = errors.New("duplicated container")
 )
 
 // Jobs tracks a series of jobs that form a DAG of dependencies.
