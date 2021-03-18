@@ -1514,7 +1514,7 @@ func TestNonCanonicalAccept(t *testing.T) {
 
 	blkBHeight := vm1BlkB.Height()
 	blkBHash := vm1BlkB.(*Block).ethBlock.Hash()
-	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
+	if b := vm1.chain.GetBlockByNumberAny(blkBHeight); b.Hash() != blkBHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}
 
@@ -1720,7 +1720,7 @@ func TestStickyPreference(t *testing.T) {
 
 	blkBHeight := vm1BlkB.Height()
 	blkBHash := vm1BlkB.(*Block).ethBlock.Hash()
-	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
+	if b := vm1.chain.GetBlockByNumberAny(blkBHeight); b.Hash() != blkBHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}
 
@@ -1783,10 +1783,10 @@ func TestStickyPreference(t *testing.T) {
 	if err := vm1BlkD.Verify(); err != nil {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
-	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
+	if b := vm1.chain.GetBlockByNumberAny(blkBHeight); b.Hash() != blkBHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}
-	if b := vm1.chain.GetBlockByNumber(blkDHeight); b != nil {
+	if b := vm1.chain.GetBlockByNumberAny(blkDHeight); b != nil {
 		t.Fatalf("expected block at %d to be nil but got %s", blkDHeight, b.Hash().Hex())
 	}
 	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkBHash {
@@ -1800,10 +1800,10 @@ func TestStickyPreference(t *testing.T) {
 	if err := vm1BlkD.Verify(); err != nil {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
-	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
+	if b := vm1.chain.GetBlockByNumberAny(blkBHeight); b.Hash() != blkBHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}
-	if b := vm1.chain.GetBlockByNumber(blkDHeight); b != nil {
+	if b := vm1.chain.GetBlockByNumberAny(blkDHeight); b != nil {
 		t.Fatalf("expected block at %d to be nil but got %s", blkDHeight, b.Hash().Hex())
 	}
 	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkBHash {
@@ -1815,10 +1815,10 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkCHash {
+	if b := vm1.chain.GetBlockByNumberAny(blkBHeight); b.Hash() != blkCHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkCHash.Hex(), b.Hash().Hex())
 	}
-	if b := vm1.chain.GetBlockByNumber(blkDHeight); b.Hash() != blkDHash {
+	if b := vm1.chain.GetBlockByNumberAny(blkDHeight); b.Hash() != blkDHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkDHeight, blkDHash.Hex(), b.Hash().Hex())
 	}
 	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkDHash {

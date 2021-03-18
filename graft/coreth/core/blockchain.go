@@ -873,6 +873,21 @@ func (bc *BlockChain) GetBlockByHash(hash common.Hash) *types.Block {
 func (bc *BlockChain) GetBlockByNumber(number uint64) *types.Block {
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
+	if bc.lastAccepted != nil && number > (*bc.lastAccepted).NumberU64() {
+		return nil
+	}
+	hash := rawdb.ReadCanonicalHash(bc.db, number)
+	if hash == (common.Hash{}) {
+		return nil
+	}
+	return bc.GetBlock(hash, number)
+}
+
+// GetBlockByNumber retrieves a block from the database by number, caching it
+// (associated with its hash) if found.
+func (bc *BlockChain) GetBlockByNumberAny(number uint64) *types.Block {
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
 	hash := rawdb.ReadCanonicalHash(bc.db, number)
 	if hash == (common.Hash{}) {
 		return nil
