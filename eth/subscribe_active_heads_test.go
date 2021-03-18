@@ -3,10 +3,8 @@ package eth
 import (
 	"crypto/ecdsa"
 	"crypto/rand"
-	"fmt"
 	"io"
 	"math/big"
-	"os"
 	"testing"
 	"time"
 
@@ -284,6 +282,12 @@ func TestActiveHeadSubscriptions(t *testing.T) {
 	chain.BlockChain().UnlockIndexing()
 	chain.SetPreference(chain.GetGenesisBlock())
 
+	chainID := chainConfig.ChainID
+	nonce := uint64(0)
+	gasLimit := 10000000
+	gasPrice := big.NewInt(1000000000)
+
+	// *NOTE* this was pre-compiled for the test..
 	// src := `pragma solidity >=0.6.0;
 	//
 	// contract Counter {
@@ -302,11 +306,6 @@ func TestActiveHeadSubscriptions(t *testing.T) {
 	// checkError(err)
 	// contract, _ := contracts[fmt.Sprintf("%s:%s", ".", "Counter")]
 	// _ = contract
-
-	chainID := chainConfig.ChainID
-	nonce := uint64(0)
-	gasLimit := 10000000
-	gasPrice := big.NewInt(1000000000)
 
 	// solc-linux-amd64-v0.6.12+commit.27d51765 --bin -o counter.bin counter.sol
 
