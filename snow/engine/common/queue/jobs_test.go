@@ -54,7 +54,8 @@ func TestPushAndExecute(t *testing.T) {
 	assert.NoError(err)
 	assert.False(has)
 
-	err = jobs.Push(job)
+	pushed, err := jobs.Push(job)
+	assert.True(pushed)
 	assert.NoError(err)
 
 	has, err = jobs.Has(jobID)
@@ -136,14 +137,16 @@ func TestRemoveDependency(t *testing.T) {
 		BytesF: func() []byte { return []byte{0} },
 	}
 
-	err := jobs.Push(job1)
+	pushed, err := jobs.Push(job1)
+	assert.True(pushed)
 	assert.NoError(err)
 
 	hasNext, err := jobs.state.HasRunnableJob()
 	assert.NoError(err)
 	assert.False(hasNext)
 
-	err = jobs.Push(job0)
+	pushed, err = jobs.Push(job0)
+	assert.True(pushed)
 	assert.NoError(err)
 
 	hasNext, err = jobs.state.HasRunnableJob()
@@ -195,19 +198,22 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 		BytesF:               func() []byte { return []byte{0} },
 	}
 
-	err := jobs.Push(job)
+	pushed, err := jobs.Push(job)
+	assert.True(pushed)
 	assert.NoError(err)
 
-	err = jobs.Push(job)
-	assert.Error(err)
+	pushed, err = jobs.Push(job)
+	assert.False(pushed)
+	assert.NoError(err)
 
 	err = jobs.Commit()
 	assert.NoError(err)
 
 	jobs = New(db)
 
-	err = jobs.Push(job)
-	assert.Error(err)
+	pushed, err = jobs.Push(job)
+	assert.False(pushed)
+	assert.NoError(err)
 }
 
 // Test that a job that isn't ready to be executed can only be added once
@@ -229,19 +235,22 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 		BytesF:               func() []byte { return []byte{1} },
 	}
 
-	err := jobs.Push(job1)
+	pushed, err := jobs.Push(job1)
+	assert.True(pushed)
 	assert.NoError(err)
 
-	err = jobs.Push(job1)
-	assert.Error(err)
+	pushed, err = jobs.Push(job1)
+	assert.False(pushed)
+	assert.NoError(err)
 
 	err = jobs.Commit()
 	assert.NoError(err)
 
 	jobs = New(db)
 
-	err = jobs.Push(job1)
-	assert.Error(err)
+	pushed, err = jobs.Push(job1)
+	assert.False(pushed)
+	assert.NoError(err)
 }
 
 func TestMissingJobs(t *testing.T) {

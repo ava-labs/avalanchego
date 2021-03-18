@@ -46,37 +46,38 @@ func (j *Jobs) SetParser(parser Parser) { j.state.parser = parser }
 func (j *Jobs) Has(jobID ids.ID) (bool, error) { return j.state.HasJob(jobID) }
 
 // Push adds a new job to the queue.
-func (j *Jobs) Push(job Job) error {
+func (j *Jobs) Push(job Job) (bool, error) {
+	jobID := job.ID()
+	if has, err := j.state.HasJob(jobID); err != nil {
+		return false, fmt.Errorf("failed to check for existing job %s due to %w", jobID, err)
+	} else if has {
+		return false, nil
+	}
+
 	deps, err := job.MissingDependencies()
 	if err != nil {
-		return err
+		return false, err
 	}
-	jobID := job.ID()
 	// Store this job into the database.
-	if has, err := j.state.HasJob(jobID); err != nil {
-		return fmt.Errorf("failed to check for existing job %s due to %w", jobID, err)
-	} else if has {
-		return errDuplicate
-	}
 	if err := j.state.PutJob(job); err != nil {
-		return fmt.Errorf("failed to write job due to %w", err)
+		return false, fmt.Errorf("failed to write job due to %w", err)
 	}
 
 	if deps.Len() != 0 {
 		// This job needs to block on a set of dependencies.
 		for depID := range deps {
 			if err := j.state.AddDependency(depID, jobID); err != nil {
-				return fmt.Errorf("failed to add blocking for depID %s, jobID %s", depID, jobID)
+				return false, fmt.Errorf("failed to add blocking for depID %s, jobID %s", depID, jobID)
 			}
 		}
-		return nil
+		return true, nil
 	}
 	// This job doesn't have any dependencies, so it should be placed onto the
 	// executable stack.
 	if err := j.state.AddRunnableJob(jobID); err != nil {
-		return fmt.Errorf("failed to add %s as a runnable job due to %w", jobID, err)
+		return false, fmt.Errorf("failed to add %s as a runnable job due to %w", jobID, err)
 	}
-	return nil
+	return true, nil
 }
 
 func (j *Jobs) ExecuteAll(ctx *snow.Context, events ...snow.EventDispatcher) (int, error) {
@@ -168,37 +169,38 @@ func (jm *JobsWithMissing) Has(jobID ids.ID) (bool, error) {
 }
 
 // Push adds a new job to the queue.
-func (jm *JobsWithMissing) Push(job Job) error {
+func (jm *JobsWithMissing) Push(job Job) (bool, error) {
+	jobID := job.ID()
+	if has, err := jm.Has(jobID); err != nil {
+		return false, fmt.Errorf("failed to check for existing job %s due to %w", jobID, err)
+	} else if has {
+		return false, nil
+	}
+
 	deps, err := job.MissingDependencies()
 	if err != nil {
-		return err
+		return false, err
 	}
-	jobID := job.ID()
 	// Store this job into the database.
-	if has, err := jm.Has(jobID); err != nil {
-		return fmt.Errorf("failed to check for existing job %s due to %w", jobID, err)
-	} else if has {
-		return errDuplicate
-	}
 	if err := jm.state.PutJob(job); err != nil {
-		return fmt.Errorf("failed to write job due to %w", err)
+		return false, fmt.Errorf("failed to write job due to %w", err)
 	}
 
 	if deps.Len() != 0 {
 		// This job needs to block on a set of dependencies.
 		for depID := range deps {
 			if err := jm.state.AddDependency(depID, jobID); err != nil {
-				return fmt.Errorf("failed to add blocking for depID %s, jobID %s", depID, jobID)
+				return false, fmt.Errorf("failed to add blocking for depID %s, jobID %s", depID, jobID)
 			}
 		}
-		return nil
+		return true, nil
 	}
 	// This job doesn't have any dependencies, so it should be placed onto the
 	// executable stack.
 	if err := jm.state.AddRunnableJob(jobID); err != nil {
-		return fmt.Errorf("failed to add %s as a runnable job due to %w", jobID, err)
+		return false, fmt.Errorf("failed to add %s as a runnable job due to %w", jobID, err)
 	}
-	return nil
+	return true, nil
 }
 
 // AddMissingID adds [jobID] to missingIDs

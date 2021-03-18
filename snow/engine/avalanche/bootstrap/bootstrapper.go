@@ -192,47 +192,36 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 			b.needToFetch.Remove(vtxID)
 			b.VtxBlocked.RemoveMissingID(vtxID)
 
-			has, err := b.VtxBlocked.Has(vtxID)
-			if err != nil {
-				return err
-			}
-			if has {
-				// If the vertex is already on the queue, then we have already
-				// pushed [vtx]'s transactions and traversed into its parents.
-				continue
-			}
-			txs, err := vtx.Txs()
-			if err != nil {
-				return err
-			}
-			for _, tx := range txs {
-				has, err := b.TxBlocked.Has(tx.ID())
-				if err != nil {
-					return err
-				}
-				if has {
-					continue
-				}
-				// Add to queue of txs to execute when bootstrapping finishes.
-				if err := b.TxBlocked.Push(&txJob{
-					log:         b.Ctx.Log,
-					numAccepted: b.numAcceptedTxs,
-					numDropped:  b.numDroppedTxs,
-					tx:          tx,
-				}); err != nil {
-					return err
-				}
-				b.numFetchedTxs.Inc()
-			}
-
 			// Add to queue of vertices to execute when bootstrapping finishes.
-			if err := b.VtxBlocked.Push(&vertexJob{
+			if pushed, err := b.VtxBlocked.Push(&vertexJob{
 				log:         b.Ctx.Log,
 				numAccepted: b.numAcceptedVts,
 				numDropped:  b.numDroppedVts,
 				vtx:         vtx,
 			}); err != nil {
 				return err
+			} else if !pushed {
+				// If the vertex is already on the queue, then we have already
+				// pushed [vtx]'s transactions and traversed into its parents.
+				continue
+			}
+
+			txs, err := vtx.Txs()
+			if err != nil {
+				return err
+			}
+			for _, tx := range txs {
+				// Add to queue of txs to execute when bootstrapping finishes.
+				if pushed, err := b.TxBlocked.Push(&txJob{
+					log:         b.Ctx.Log,
+					numAccepted: b.numAcceptedTxs,
+					numDropped:  b.numDroppedTxs,
+					tx:          tx,
+				}); err != nil {
+					return err
+				} else if pushed {
+					b.numFetchedTxs.Inc()
+				}
 			}
 
 			b.numFetchedVts.Inc()

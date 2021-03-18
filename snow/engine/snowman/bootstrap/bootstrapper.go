@@ -218,15 +218,13 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 	for status == choices.Processing {
 		b.Blocked.RemoveMissingID(blkID)
 
-		has, err := b.Blocked.Has(blkID)
-		if err != nil {
-			return err
-		}
-
-		job := &blockJob{
+		pushed, err := b.Blocked.Push(&blockJob{
 			numAccepted: b.numAccepted,
 			numDropped:  b.numDropped,
 			blk:         blk,
+		})
+		if err != nil {
+			return err
 		}
 
 		// Traverse to the next block regardless of if the block is pushed
@@ -234,14 +232,10 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 		status = blk.Status()
 		blkID = blk.ID()
 
-		if has {
+		if !pushed {
 			// If this block is already on the queue, then we can stop
 			// traversing here.
 			break
-		}
-
-		if err := b.Blocked.Push(job); err != nil {
-			return err
 		}
 
 		b.numFetched.Inc()
