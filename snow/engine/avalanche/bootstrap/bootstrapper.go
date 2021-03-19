@@ -388,7 +388,7 @@ func (b *Bootstrapper) checkFinish() error {
 		return err
 	}
 
-	if b.Restarted {
+	if !b.Restarted {
 		b.Ctx.Log.Info("executing vertex state transitions...")
 	} else {
 		b.Ctx.Log.Debug("executing vertex state transitions...")
@@ -416,9 +416,9 @@ func (b *Bootstrapper) checkFinish() error {
 	// syncing.
 	if !b.Subnet.IsBootstrapped() {
 		if !b.Restarted {
-			b.Ctx.Log.Info("bootstrapping is waiting for the remaining chains in this subnet to finish syncing...")
+			b.Ctx.Log.Info("waiting for the remaining chains in this subnet to finish syncing")
 		} else {
-			b.Ctx.Log.Debug("bootstrapping is waiting for the remaining chains in this subnet to finish syncing...")
+			b.Ctx.Log.Debug("waiting for the remaining chains in this subnet to finish syncing")
 		}
 		// Delay new incoming messages to avoid consuming unnecessary resources
 		// while keeping up to date on the latest tip.
