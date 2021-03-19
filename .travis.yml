@@ -30,14 +30,14 @@ jobs:
     - ".ci/after_success.sh"
 
   - stage: build
-    if: $TRAVIS_REPO_SLUG = ava-labs/avalanchego-internal
+    if: repo = "ava-labs/avalanchego-internal"
     os: osx
     osx_image: xcode11.4
     script:
     - ".ci/build_and_test.sh"
 
   - stage: build
-    if: $TRAVIS_REPO_SLUG = ava-labs/avalanchego-internal
+    if: repo = "ava-labs/avalanchego-internal"
     os: windows
     script:
     - ".ci/build_and_test.sh"
