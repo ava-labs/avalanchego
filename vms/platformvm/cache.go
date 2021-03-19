@@ -5,6 +5,9 @@ package platformvm
 
 import (
 	"time"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
 // var (
@@ -48,6 +51,21 @@ import (
 // }
 
 type totalState interface {
-	Timestamp() time.Time
-	CurrentSupply() uint64
+	GetTimestamp() time.Time
+	SetTimestamp(time.Time)
+
+	GetCurrentSupply() uint64
+	SetCurrentSupply(uint64)
+
+	GetSubnets() ([]*Tx, error)
+	GetSubnet(subnetID ids.ID) (*Tx, error)
+	AddSubnet(createSubnetTx *Tx)
+
+	GetChains(subnetID ids.ID) ([]*Tx, error)
+	GetChain(subnetID, chainID ids.ID) (*Tx, error)
+	AddChain(createChainTx *Tx)
+
+	GetUTXO(utxoID avax.UTXOID) (*avax.UTXO, error)
+	DeleteUTXO(utxoID avax.UTXOID)
+	AddUTXO(utxo *avax.UTXO)
 }
