@@ -161,6 +161,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(httpsEnabledKey, false, "Upgrade the HTTP server to HTTPs")
 	fs.String(httpsKeyFileKey, "", "TLS private key file for the HTTPs server")
 	fs.String(httpsCertFileKey, "", "TLS certificate file for the HTTPs server")
+	fs.String(httpAllowedOrigins, "*", "Origins to allow on the HTTP port. Defaults to * which allows all origins. Example: https://*.avax.network https://*.avax-test.network")
 	fs.Bool(apiAuthRequiredKey, false, "Require authorization token to call HTTP APIs")
 	fs.String(apiAuthPasswordKey, "", "Password used to create/validate API authorization tokens. Can be changed via API call.")
 	// Enable/Disable APIs
@@ -509,6 +510,7 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.HTTPSEnabled = v.GetBool(httpsEnabledKey)
 	Config.HTTPSKeyFile = v.GetString(httpsKeyFileKey)
 	Config.HTTPSCertFile = v.GetString(httpsCertFileKey)
+	Config.APIAllowedOrigins = v.GetStringSlice(httpAllowedOrigins)
 
 	// API Auth
 	Config.APIRequireAuthToken = v.GetBool(apiAuthRequiredKey)

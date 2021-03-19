@@ -458,6 +458,7 @@ func (b *Bootstrapper) finish() error {
 		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
 			err)
 	}
+	b.processedCache.Flush()
 
 	// Start consensus
 	if err := b.OnFinished(); err != nil {
