@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -43,6 +44,13 @@ type Bootstrapper struct {
 	common.Bootstrapper
 	common.Fetcher
 	metrics
+
+	// Greatest height of the blocks passed in ForceAccepted
+	tipHeight uint64
+	// Height of the last accepted block when bootstrapping starts
+	startingHeight uint64
+	// Blocks passed into ForceAccepted
+	startingAcceptedFrontier ids.Set
 
 	// Blocked tracks operations that are blocked on blocks
 	Blocked *queue.Jobs
@@ -72,6 +80,16 @@ func (b *Bootstrapper) Initialize(
 	b.OnFinished = onFinished
 	b.executedStateTransitions = math.MaxInt32
 	b.delayAmount = initialBootstrappingDelay
+	b.startingAcceptedFrontier = ids.Set{}
+	lastAcceptedID, err := b.VM.LastAccepted()
+	if err != nil {
+		return fmt.Errorf("couldn't get last accepted ID: %s", err)
+	}
+	lastAccepted, err := b.VM.GetBlock(lastAcceptedID)
+	if err != nil {
+		return fmt.Errorf("couldn't get last accepted block: %s", err)
+	}
+	b.startingHeight = lastAccepted.Height()
 
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return err
@@ -114,7 +132,11 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 
 	b.NumFetched = 0
 	for _, blkID := range acceptedContainerIDs {
+		b.startingAcceptedFrontier.Add(blkID)
 		if blk, err := b.VM.GetBlock(blkID); err == nil {
+			if height := blk.Height(); height > b.tipHeight {
+				b.tipHeight = height
+			}
 			if err := b.process(blk); err != nil {
 				return err
 			}
@@ -213,6 +235,10 @@ func (b *Bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) err
 func (b *Bootstrapper) process(blk snowman.Block) error {
 	status := blk.Status()
 	blkID := blk.ID()
+	blkHeight := blk.Height()
+	if blkHeight > b.tipHeight && b.startingAcceptedFrontier.Contains(blkID) {
+		b.tipHeight = blkHeight
+	}
 	for status == choices.Processing {
 		if err := b.Blocked.Push(&blockJob{
 			numAccepted: b.numAccepted,
@@ -222,7 +248,7 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 			b.numFetched.Inc()
 			b.NumFetched++                                      // Progress tracker
 			if b.NumFetched%common.StatusUpdateFrequency == 0 { // Periodically print progress
-				b.Ctx.Log.Info("fetched %d blocks", b.NumFetched)
+				b.Ctx.Log.Info("fetched %d of %d blocks", b.NumFetched, safemath.Max64(0, b.tipHeight-b.startingHeight))
 			}
 		}
 
@@ -333,7 +359,7 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs) (int, error) {
 		}
 		numExecuted++
 		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
-			b.Ctx.Log.Info("executed %d blocks", numExecuted)
+			b.Ctx.Log.Info("executed %d of %d blocks", numExecuted, safemath.Max64(0, b.tipHeight-b.startingHeight))
 		}
 
 		b.Ctx.ConsensusDispatcher.Accept(b.Ctx, job.ID(), job.Bytes())

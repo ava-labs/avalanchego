@@ -21,11 +21,11 @@ const (
 
 	// StatusUpdateFrequency is how many containers should be processed between
 	// logs
-	StatusUpdateFrequency = 2500
+	StatusUpdateFrequency = 5000
 
 	// MaxOutstandingRequests is the maximum number of GetAncestors sent but not
 	// responded to/failed
-	MaxOutstandingRequests = 8
+	MaxOutstandingRequests = 10
 
 	// MaxTimeFetchingAncestors is the maximum amount of time to spend fetching
 	// vertices during a call to GetAncestors
