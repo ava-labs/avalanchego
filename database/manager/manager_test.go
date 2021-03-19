@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
@@ -271,11 +272,60 @@ func TestMeterDBManager(t *testing.T) {
 	// Create meterdb manager with fresh registry and confirm
 	// that there are no errors registering metrics for multiple
 	// versioned databases.
-	_, err := m.NewMeterDBManager("", registry)
+	manager, err := m.NewMeterDBManager("", registry)
 	assert.NoError(t, err)
+
+	dbs := manager.GetDatabases()
+	assert.Len(t, dbs, 3)
+
+	_, ok := dbs[0].Database.(*meterdb.Database)
+	assert.True(t, ok)
+	_, ok = dbs[1].Database.(*meterdb.Database)
+	assert.False(t, ok)
+	_, ok = dbs[2].Database.(*meterdb.Database)
+	assert.False(t, ok)
 
 	// Confirm that the error from a name conflict is handled correctly
 	_, err = m.NewMeterDBManager("", registry)
+	assert.Error(t, err)
+}
+
+func TestCompleteMeterDBManager(t *testing.T) {
+	registry := prometheus.NewRegistry()
+
+	m := &manager{databases: []*VersionedDatabase{
+		{
+			Database: memdb.New(),
+			Version:  version.NewDefaultVersion(2, 0, 0),
+		},
+		{
+			Database: memdb.New(),
+			Version:  version.NewDefaultVersion(1, 5, 0),
+		},
+		{
+			Database: memdb.New(),
+			Version:  version.DefaultVersion1,
+		},
+	}}
+
+	// Create complete meterdb manager with fresh registry and confirm
+	// that there are no errors registering metrics for multiple
+	// versioned databases.
+	manager, err := m.NewCompleteMeterDBManager("", registry)
+	assert.NoError(t, err)
+
+	dbs := manager.GetDatabases()
+	assert.Len(t, dbs, 3)
+
+	_, ok := dbs[0].Database.(*meterdb.Database)
+	assert.True(t, ok)
+	_, ok = dbs[1].Database.(*meterdb.Database)
+	assert.True(t, ok)
+	_, ok = dbs[2].Database.(*meterdb.Database)
+	assert.True(t, ok)
+
+	// Confirm that the error from a name conflict is handled correctly
+	_, err = m.NewCompleteMeterDBManager("", registry)
 	assert.Error(t, err)
 }
 
