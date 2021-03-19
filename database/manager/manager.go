@@ -218,15 +218,15 @@ func (m *manager) NewMeterDBManager(namespace string, registerer prometheus.Regi
 	if err != nil {
 		return nil, err
 	}
-	// Create an identical manager
-	newManager, err := m.wrapManager(func(vdb *VersionedDatabase) (*VersionedDatabase, error) {
-		return vdb, nil
-	})
-	if err != nil {
-		return nil, err
+	newManager := &manager{
+		databases: make([]*VersionedDatabase, len(m.databases)),
 	}
+	copy(newManager.databases, m.databases)
 	// Overwrite the current database with the meter DB
-	newManager.databases[0].Database = currentMeterDB
+	newManager.databases[0] = &VersionedDatabase{
+		Database: currentMeterDB,
+		Version:  currentDB.Version,
+	}
 	return newManager, nil
 }
 
