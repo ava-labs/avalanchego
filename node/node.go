@@ -334,22 +334,20 @@ func (b *beaconManager) Disconnected(vdrID ids.ShortID) {
 func (n *Node) Dispatch() error {
 	// Start the HTTP API server
 	go n.Log.RecoverAndPanic(func() {
+		var err error
 		if n.Config.HTTPSEnabled {
 			n.Log.Debug("initializing API server with TLS")
-			err := n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
-			n.Log.Warn("TLS enabled API server dispatch failed with %s. Attempting to create insecure API server", err)
+			err = n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
+		} else {
+			n.Log.Debug("initializing API server without TLS")
+			err = n.APIServer.Dispatch()
 		}
-
-		n.Log.Debug("initializing API server without TLS")
-		err := n.APIServer.Dispatch()
-
 		// When [n].Shutdown() is called, [n.APIServer].Close() is called.
 		// This causes [n.APIServer].Dispatch() to return an error.
 		// If that happened, don't log/return an error here.
 		if !n.shuttingDown.GetValue() {
 			n.Log.Fatal("API server dispatch failed with %s", err)
 		}
-
 		// If the API server isn't running, shut down the node.
 		// If node is already shutting down, this does nothing.
 		n.Shutdown()
@@ -523,9 +521,19 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	}
 	xChainID := createAVMTx.ID()
 
+	createEVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, evm.ID)
+	if err != nil {
+		return err
+	}
+	cChainID := createEVMTx.ID()
+
 	// If any of these chains die, the node shuts down
 	criticalChains := ids.Set{}
-	criticalChains.Add(constants.PlatformChainID, createAVMTx.ID())
+	criticalChains.Add(
+		constants.PlatformChainID,
+		xChainID,
+		cChainID,
+	)
 
 	// Manages network timeouts
 	timeoutManager := &timeout.Manager{}
