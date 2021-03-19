@@ -7,7 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// Job ...
+// Job defines the interface required to be placed on the job queue.
 type Job interface {
 	ID() ids.ID
 
