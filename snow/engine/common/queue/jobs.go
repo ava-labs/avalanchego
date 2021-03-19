@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -27,12 +28,21 @@ type Jobs struct {
 }
 
 // New attempts to create a new job queue from the provided database.
-func New(db database.Database) *Jobs {
+func New(
+	db database.Database,
+	metricsNamespace string,
+	metricsRegisterer prometheus.Registerer,
+) (*Jobs, error) {
 	vdb := versiondb.New(db)
+	state, err := newState(vdb, metricsNamespace, metricsRegisterer)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create new jobs state: %s", err)
+	}
+
 	return &Jobs{
 		db:    vdb,
-		state: newState(vdb),
-	}
+		state: state,
+	}, nil
 }
 
 // SetParser tells this job queue how to parse jobs from the database.
@@ -145,9 +155,18 @@ type JobsWithMissing struct {
 	removeFromMissingIDs, addToMissingIDs ids.Set
 }
 
-func NewWithMissing(db database.Database) (*JobsWithMissing, error) {
+func NewWithMissing(
+	db database.Database,
+	metricsNamespace string,
+	metricsRegisterer prometheus.Registerer,
+) (*JobsWithMissing, error) {
+	innerJobs, err := New(db, metricsNamespace, metricsRegisterer)
+	if err != nil {
+		return nil, err
+	}
+
 	jobs := &JobsWithMissing{
-		Jobs: New(db),
+		Jobs: innerJobs,
 	}
 
 	missingIDs, err := jobs.state.MissingJobIDs()

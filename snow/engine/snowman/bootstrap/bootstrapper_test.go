@@ -55,7 +55,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 		t.Fatal(err)
 	}
 
-	blocker, _ := queue.NewWithMissing(db)
+	blocker, _ := queue.NewWithMissing(db, "", prometheus.NewRegistry())
 
 	commonConfig := common.Config{
 		Ctx:        ctx,

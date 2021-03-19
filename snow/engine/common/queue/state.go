@@ -4,11 +4,15 @@
 package queue
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -38,15 +42,24 @@ type state struct {
 	missingJobIDs   linkeddb.LinkedDB
 }
 
-func newState(db database.Database) *state {
+func newState(
+	db database.Database,
+	metricsNamespace string,
+	metricsRegisterer prometheus.Registerer,
+) (*state, error) {
+	jobsCacheMetricsNamespace := fmt.Sprintf("%s_jobs_cache", metricsNamespace)
+	jobsCache, err := metercacher.New(jobsCacheMetricsNamespace, metricsRegisterer, &cache.LRU{Size: jobsCacheSize})
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create metered cache: %s", err)
+	}
 	return &state{
 		runnableJobIDs:  linkeddb.NewDefault(prefixdb.New(runnableJobIDsKey, db)),
-		jobsCache:       &cache.LRU{Size: jobsCacheSize},
+		jobsCache:       jobsCache,
 		jobs:            prefixdb.New(jobsKey, db),
 		dependencies:    prefixdb.New(dependenciesKey, db),
 		dependentsCache: &cache.LRU{Size: dependentsCacheSize},
 		missingJobIDs:   linkeddb.NewDefault(prefixdb.New(missingJobIDsKey, db)),
-	}
+	}, nil
 }
 
 // AddRunnableJob adds [jobID] to the runnable queue
@@ -62,20 +75,24 @@ func (ps *state) HasRunnableJob() (bool, error) {
 
 // RemoveRunnableJob fetches and deletes the next job from the runnable queue
 func (ps *state) RemoveRunnableJob() (Job, error) {
-	jobID, err := ps.runnableJobIDs.HeadKey()
+	jobIDBytes, err := ps.runnableJobIDs.HeadKey()
 	if err != nil {
 		return nil, err
 	}
-	if err := ps.runnableJobIDs.Delete(jobID); err != nil {
+	if err := ps.runnableJobIDs.Delete(jobIDBytes); err != nil {
 		return nil, err
 	}
 
+	jobID, err := ids.ToID(jobIDBytes)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't convert job ID bytes to job ID: %s", err)
+	}
 	jobIntf, exists := ps.jobsCache.Get(jobID)
 	if exists {
-		return jobIntf.(Job), ps.jobs.Delete(jobID)
+		return jobIntf.(Job), ps.jobs.Delete(jobIDBytes)
 	}
 
-	jobBytes, err := ps.jobs.Get(jobID)
+	jobBytes, err := ps.jobs.Get(jobIDBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +100,7 @@ func (ps *state) RemoveRunnableJob() (Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	return job, ps.jobs.Delete(jobID)
+	return job, ps.jobs.Delete(jobIDBytes)
 }
 
 // PutJob adds the job to the queue
