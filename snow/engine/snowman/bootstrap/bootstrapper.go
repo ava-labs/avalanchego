@@ -111,17 +111,34 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	}
 
 	b.NumFetched = 0
-	b.Blocked.AddMissingID(acceptedContainerIDs...)
+
 	pendingContainerIDs := b.Blocked.MissingIDs()
+	// Copy all of the missingIDs and the newly received [acceptedContainerIDs] into the same list
+	// to kick off bootstrapping.
+	checkIDs := make([]ids.ID, len(pendingContainerIDs)+len(acceptedContainerIDs))
+	copy(checkIDs, pendingContainerIDs)
+	copy(checkIDs[len(pendingContainerIDs):], acceptedContainerIDs)
+	toProcess := make([]snowman.Block, 0, len(acceptedContainerIDs))
+
 	b.Ctx.Log.Debug("Starting bootstrapping with %d pending blocks and %d from accepted frontier", len(pendingContainerIDs), len(acceptedContainerIDs))
-	for _, blkID := range pendingContainerIDs {
+	for _, blkID := range checkIDs {
 		if blk, err := b.VM.GetBlock(blkID); err == nil {
 			if blk.Status() == choices.Accepted {
 				b.Blocked.RemoveMissingID(blkID)
-			} else if err := b.process(blk); err != nil {
+			} else {
+				toProcess = append(toProcess, blk)
+			}
+		} else {
+			b.Blocked.AddMissingID(blkID)
+			if err := b.fetch(blkID); err != nil {
 				return err
 			}
-		} else if err := b.fetch(blkID); err != nil {
+		}
+	}
+
+	// Process received blocks
+	for _, blk := range toProcess {
+		if err := b.process(blk); err != nil {
 			return err
 		}
 	}
