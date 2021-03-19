@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -38,13 +38,13 @@ func assertBlock(block *Block, parentID ids.ID, expectedData [dataLen]byte, pass
 // Assert that after initialization, the vm has the state we expect
 func TestGenesis(t *testing.T) {
 	// Initialize the vm
-	db := memdb.New()
+	dbManager := manager.NewDefaultMemDBManager()
 	msgChan := make(chan common.Message, 1)
 	vm := &VM{}
 	ctx := snow.DefaultContextTest()
 	ctx.ChainID = blockchainID
 
-	if err := vm.Initialize(ctx, db, []byte{0, 0, 0, 0, 0}, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, dbManager, []byte{0, 0, 0, 0, 0}, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -81,12 +81,12 @@ func TestGenesis(t *testing.T) {
 
 func TestHappyPath(t *testing.T) {
 	// Initialize the vm
-	db := memdb.New()
+	dbManager := manager.NewDefaultMemDBManager()
 	msgChan := make(chan common.Message, 1)
 	vm := &VM{}
 	ctx := snow.DefaultContextTest()
 	ctx.ChainID = blockchainID
-	if err := vm.Initialize(ctx, db, []byte{0, 0, 0, 0, 0}, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, dbManager, []byte{0, 0, 0, 0, 0}, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -214,12 +214,12 @@ func TestHappyPath(t *testing.T) {
 
 func TestService(t *testing.T) {
 	// Initialize the vm
-	db := memdb.New()
+	dbManager := manager.NewDefaultMemDBManager()
 	msgChan := make(chan common.Message, 1)
 	vm := &VM{}
 	ctx := snow.DefaultContextTest()
 	ctx.ChainID = blockchainID
-	if err := vm.Initialize(ctx, db, []byte{0, 0, 0, 0, 0}, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, dbManager, []byte{0, 0, 0, 0, 0}, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 

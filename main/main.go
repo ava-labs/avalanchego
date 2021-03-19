@@ -6,8 +6,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/node"
@@ -51,15 +50,24 @@ func main() {
 	}
 	fmt.Println(header)
 
-	var db database.Database
+	var dbManager manager.Manager
 	if Config.DBEnabled {
-		db, err = leveldb.New(Config.DBPath, log, 0, 0, 0)
+		dbManager, err = manager.New(Config.DBPath, log, dbVersion)
 		if err != nil {
-			log.Error("couldn't open database at %s: %s", Config.DBPath, err)
+			log.Error("couldn't create db manager at %s: %s", Config.DBPath, err)
 			return
 		}
 	} else {
-		db = memdb.New()
+		dbManager, err = manager.NewManagerFromDBs([]*manager.VersionedDatabase{
+			{
+				Database: memdb.New(),
+				Version:  dbVersion,
+			},
+		})
+		if err != nil {
+			log.Error("couldn't create db manager from memory db: %s", err)
+			return
+		}
 	}
 
 	defer func() {
@@ -69,7 +77,7 @@ func main() {
 	}()
 
 	defer func() {
-		if err := db.Close(); err != nil {
+		if err := dbManager.Close(); err != nil {
 			log.Warn("failed to close the node's DB: %s", err)
 		}
 		log.StopOnPanic()
@@ -148,7 +156,7 @@ func main() {
 	log.Info("this node's IP is set to: %s", Config.StakingIP.IP())
 
 	for {
-		shouldRestart, err := run(db, log, logFactory)
+		shouldRestart, err := run(dbManager, log, logFactory)
 		if err != nil {
 			break
 		}
@@ -162,14 +170,14 @@ func main() {
 
 // Initialize and run the node.
 // Returns true if the node should restart after this function returns.
-func run(db database.Database, log logging.Logger, logFactory logging.Factory) (bool, error) {
+func run(dbManager manager.Manager, log logging.Logger, logFactory logging.Factory) (bool, error) {
 	log.Info("initializing node")
 	node := node.Node{}
 	restarter := &restarter{
 		node:          &node,
 		shouldRestart: &utils.AtomicBool{},
 	}
-	if err := node.Initialize(&Config, db, log, logFactory, restarter); err != nil {
+	if err := node.Initialize(&Config, dbManager, log, logFactory, restarter); err != nil {
 		log.Error("error initializing node: %s", err)
 		return restarter.shouldRestart.GetValue(), err
 	}

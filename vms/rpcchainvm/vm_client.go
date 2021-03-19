@@ -15,7 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
-	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto"
 	"github.com/ava-labs/avalanchego/ids"
@@ -109,8 +109,10 @@ func (vm *VMClient) initializeCaches(registerer prometheus.Registerer, namespace
 
 func (vm *VMClient) Initialize(
 	ctx *snow.Context,
-	db database.Database,
+	dbManager manager.Manager,
 	genesisBytes []byte,
+	upgradeBytes []byte,
+	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 ) error {
@@ -124,17 +126,29 @@ func (vm *VMClient) Initialize(
 	}
 
 	vm.ctx = ctx
-
-	vm.db = rpcdb.NewServer(db)
-	vm.messenger = messenger.NewServer(toEngine)
-	vm.keystore = gkeystore.NewServer(ctx.Keystore, vm.broker)
-	vm.sharedMemory = gsharedmemory.NewServer(ctx.SharedMemory, db)
-	vm.bcLookup = galiaslookup.NewServer(ctx.BCLookup)
-	vm.snLookup = gsubnetlookup.NewServer(ctx.SNLookup)
-
 	if err := vm.initializeCaches(ctx.Metrics, ctx.Namespace); err != nil {
 		return err
 	}
+
+	// Initialize and serve each database and construct the db manager
+	// initialize request parameters
+	versionedDBs := dbManager.GetDatabases()
+	versionedDBServers := make([]*vmproto.VersionedDBServer, len(versionedDBs))
+	for i, semDB := range versionedDBs {
+		dbBrokerID := vm.broker.NextId()
+		db := rpcdb.NewServer(semDB)
+		go vm.broker.AcceptAndServe(dbBrokerID, vm.startDBServerFunc(db))
+		versionedDBServers[i] = &vmproto.VersionedDBServer{
+			DbServer: dbBrokerID,
+			Version:  semDB.Version.String(),
+		}
+	}
+
+	vm.messenger = messenger.NewServer(toEngine)
+	vm.keystore = gkeystore.NewServer(ctx.Keystore, vm.broker)
+	vm.sharedMemory = gsharedmemory.NewServer(ctx.SharedMemory, dbManager.Current())
+	vm.bcLookup = galiaslookup.NewServer(ctx.BCLookup)
+	vm.snLookup = gsubnetlookup.NewServer(ctx.SNLookup)
 
 	// start the db server
 	dbBrokerID := vm.broker.NextId()
@@ -168,7 +182,9 @@ func (vm *VMClient) Initialize(
 		XChainID:             ctx.XChainID[:],
 		AvaxAssetID:          ctx.AVAXAssetID[:],
 		GenesisBytes:         genesisBytes,
-		DbServer:             dbBrokerID,
+		UpgradeBytes:         upgradeBytes,
+		ConfigBytes:          configBytes,
+		DbServers:            versionedDBServers,
 		EngineServer:         messengerBrokerID,
 		KeystoreServer:       keystoreBrokerID,
 		SharedMemoryServer:   sharedMemoryBrokerID,
@@ -177,6 +193,7 @@ func (vm *VMClient) Initialize(
 		EpochFirstTransition: epochFirstTransitionBytes,
 		EpochDuration:        uint64(ctx.EpochDuration),
 	})
+
 	if err != nil {
 		return err
 	}
@@ -195,6 +212,15 @@ func (vm *VMClient) startDBServer(opts []grpc.ServerOption) *grpc.Server {
 	vm.serverCloser.Add(server)
 	rpcdbproto.RegisterDatabaseServer(server, vm.db)
 	return server
+}
+
+func (vm *VMClient) startDBServerFunc(db rpcdbproto.DatabaseServer) func(opts []grpc.ServerOption) *grpc.Server { // #nolint
+	return func(opts []grpc.ServerOption) *grpc.Server {
+		server := grpc.NewServer(opts...)
+		vm.serverCloser.Add(server)
+		rpcdbproto.RegisterDatabaseServer(server, db)
+		return server
+	}
 }
 
 func (vm *VMClient) startMessengerServer(opts []grpc.ServerOption) *grpc.Server {

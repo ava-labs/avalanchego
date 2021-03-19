@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -77,7 +78,9 @@ var (
 	timestampKey     = ids.ID{'t', 'i', 'm', 'e'}
 	chainsKey        = ids.ID{'c', 'h', 'a', 'i', 'n', 's'}
 	subnetsKey       = ids.ID{'s', 'u', 'b', 'n', 'e', 't', 's'}
-	currentSupplyKey = ids.ID{'c', 'u', 'r', 'r', 'e', 'n', 't', ' ', 's', 'u', 'p', 'p', 'l', 'y'}
+	currentSupplyKey = ids.ID{'c', 'u', 'r', 'r', 'e', 't', ' ', 's', 'u', 'p', 'p', 'l', 'y'}
+	migratedKey      = []byte("migrated")
+	noMigration      = []byte("no migration")
 
 	errRegisteringType          = errors.New("error registering type with database")
 	errInvalidLastAcceptedBlock = errors.New("last accepted block must be a decision block")
@@ -95,6 +98,8 @@ var (
 type VM struct {
 	metrics
 	*core.SnowmanVM
+
+	dbManager manager.Manager
 
 	// Node's validator manager
 	// Maps Subnets --> validators of the Subnet
@@ -173,8 +178,10 @@ type VM struct {
 // [vm.ChainManager] and [vm.vdrMgr] must be set before this function is called.
 func (vm *VM) Initialize(
 	ctx *snow.Context,
-	db database.Database,
+	dbManager manager.Manager,
 	genesisBytes []byte,
+	upgradebytes []byte,
+	configBytes []byte,
 	msgs chan<- common.Message,
 	_ []*common.Fx,
 ) error {
@@ -187,10 +194,12 @@ func (vm *VM) Initialize(
 
 	// Initialize the inner VM, which has a lot of boiler-plate logic
 	vm.SnowmanVM = &core.SnowmanVM{}
-	if err := vm.SnowmanVM.Initialize(ctx, db, vm.unmarshalBlockFunc, msgs); err != nil {
+	if err := vm.SnowmanVM.Initialize(ctx, dbManager.Current(), vm.unmarshalBlockFunc, msgs); err != nil {
 		return err
 	}
 	vm.fx = &secp256k1fx.Fx{}
+
+	vm.dbManager = dbManager
 
 	vm.codec = Codec
 	vm.codecRegistry = linearcodec.NewDefault()
@@ -430,6 +439,12 @@ func (vm *VM) Bootstrapped() error {
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
 
+	previousDB, previousDBExists := vm.dbManager.Previous()
+	completedMigration, err := vm.DB.Has(migratedKey)
+	if err != nil {
+		return err
+	}
+
 	for stopIter.Next() { // Iterates in order of increasing stop time
 		txBytes := stopIter.Value()
 
@@ -451,6 +466,16 @@ func (vm *VM) Bootstrapped() error {
 		uptime, err := vm.uptime(vm.DB, nodeID)
 		switch {
 		case err == database.ErrNotFound:
+			if previousDBExists && !completedMigration {
+				priorUptime, err := vm.uptime(previousDB, nodeID)
+				if err == nil {
+					uptime = priorUptime
+					break
+				}
+				if err != database.ErrNotFound {
+					vm.Ctx.Log.Debug("Couldn't find uptime in prior database for %s: %s", nodeID, err)
+				}
+			}
 			uptime = &validatorUptime{
 				LastUpdated: uint64(unsignedTx.StartTime().Unix()),
 			}
@@ -474,6 +499,12 @@ func (vm *VM) Bootstrapped() error {
 	}
 	if err := stopIter.Error(); err != nil {
 		return err
+	}
+
+	if previousDBExists && !completedMigration {
+		errs.Add(vm.DB.Put(migratedKey, []byte(previousDB.Version.String())))
+	} else if !completedMigration {
+		errs.Add(vm.DB.Put(migratedKey, noMigration))
 	}
 
 	errs.Add(

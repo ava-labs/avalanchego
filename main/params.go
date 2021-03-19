@@ -35,10 +35,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/password"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/version"
 )
 
-const (
-	dbVersion = "v1.0.0"
+var (
+	dbVersion = version.NewDefaultVersion(1, 2, 5)
 )
 
 // Results of parsing the CLI
@@ -320,7 +321,7 @@ func setNodeConfig(v *viper.Viper) error {
 	if Config.DBPath == defaultString {
 		Config.DBPath = defaultDbDir
 	}
-	Config.DBPath = path.Join(Config.DBPath, constants.NetworkName(Config.NetworkID), dbVersion)
+	Config.DBPath = path.Join(Config.DBPath, constants.NetworkName(Config.NetworkID))
 
 	// IP Configuration
 	// Resolves our public IP, or does nothing
