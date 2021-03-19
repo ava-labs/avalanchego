@@ -42,6 +42,8 @@ type Bootstrapper struct {
 	// received a reply from
 	pendingAcceptedFrontier ids.ShortSet
 	acceptedFrontier        ids.Set
+	// True if RestartBootstrap has been called at least once
+	Restarted bool
 
 	// holds the beacons that were sampled for the accepted frontier
 	sampledBeacons  validators.Set
@@ -293,7 +295,11 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 		}
 	}
 
-	b.Ctx.Log.Info("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
+	if !b.Restarted {
+		b.Ctx.Log.Info("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
+	} else {
+		b.Ctx.Log.Debug("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
+	}
 
 	return b.Bootstrapable.ForceAccepted(accepted)
 }
@@ -333,10 +339,12 @@ func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
 }
 
 func (b *Bootstrapper) RestartBootstrap(reset bool) error {
+	b.Restarted = true
+
 	// resets the attempts when we're pulling blocks/vertices
 	// we don't want to fail the bootstrap at that stage
 	if reset {
-		b.Ctx.Log.Info("Checking for new frontiers...")
+		b.Ctx.Log.Debug("Checking for new frontiers")
 		b.bootstrapAttempts = 0
 	}
 

@@ -195,7 +195,11 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 				b.numFetchedVts.Inc()
 				b.NumFetched++ // Progress tracker
 				if b.NumFetched%common.StatusUpdateFrequency == 0 {
-					b.Ctx.Log.Info("fetched %d vertices", b.NumFetched)
+					if !b.Restarted {
+						b.Ctx.Log.Info("fetched %d vertices", b.NumFetched)
+					} else {
+						b.Ctx.Log.Debug("fetched %d vertices", b.NumFetched)
+					}
 				}
 			} else {
 				b.Ctx.Log.Verbo("couldn't push to vtxBlocked: %s", err)
@@ -373,15 +377,22 @@ func (b *Bootstrapper) checkFinish() error {
 		return nil
 	}
 
-	b.Ctx.Log.Info("bootstrapping fetched %d vertices. executing transaction state transitions...",
-		b.NumFetched)
+	if !b.Restarted {
+		b.Ctx.Log.Info("bootstrapping fetched %d vertices. Executing transaction state transitions...", b.NumFetched)
+	} else {
+		b.Ctx.Log.Debug("bootstrapping fetched %d vertices. Executing transaction state transitions...", b.NumFetched)
+	}
 
 	_, err := b.executeAll(b.TxBlocked, b.Ctx.DecisionDispatcher)
 	if err != nil {
 		return err
 	}
 
-	b.Ctx.Log.Info("executing vertex state transitions...")
+	if b.Restarted {
+		b.Ctx.Log.Info("executing vertex state transitions...")
+	} else {
+		b.Ctx.Log.Debug("executing vertex state transitions...")
+	}
 	executedVts, err := b.executeAll(b.VtxBlocked, b.Ctx.ConsensusDispatcher)
 	if err != nil {
 		return err
@@ -394,11 +405,9 @@ func (b *Bootstrapper) checkFinish() error {
 	// bootstrapping process will terminate even as new vertices are being
 	// issued.
 	if executedVts > 0 && executedVts < previouslyExecuted/2 && b.RetryBootstrap {
-		b.Ctx.Log.Info("bootstrapping is checking for more vertices before finishing the bootstrap process...")
+		b.Ctx.Log.Debug("checking for more vertices before finishing bootstrapping")
 		return b.RestartBootstrap(true)
 	}
-
-	b.Ctx.Log.Info("bootstrapping fetched enough vertices to finish the bootstrap process...")
 
 	// Notify the subnet that this chain is synced
 	b.Subnet.Bootstrapped(b.Ctx.ChainID)
@@ -406,7 +415,11 @@ func (b *Bootstrapper) checkFinish() error {
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
 	if !b.Subnet.IsBootstrapped() {
-		b.Ctx.Log.Info("bootstrapping is waiting for the remaining chains in this subnet to finish syncing...")
+		if !b.Restarted {
+			b.Ctx.Log.Info("bootstrapping is waiting for the remaining chains in this subnet to finish syncing...")
+		} else {
+			b.Ctx.Log.Debug("bootstrapping is waiting for the remaining chains in this subnet to finish syncing...")
+		}
 		// Delay new incoming messages to avoid consuming unnecessary resources
 		// while keeping up to date on the latest tip.
 		b.Config.Delay.Delay(b.delayAmount)
@@ -450,12 +463,20 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher)
 		}
 		numExecuted++
 		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
-			b.Ctx.Log.Info("executed %d operations", numExecuted)
+			if !b.Restarted {
+				b.Ctx.Log.Info("executed %d operations", numExecuted)
+			} else {
+				b.Ctx.Log.Debug("executed %d operations", numExecuted)
+			}
 		}
 
 		events.Accept(b.Ctx, job.ID(), job.Bytes())
 	}
-	b.Ctx.Log.Info("executed %d operations", numExecuted)
+	if !b.Restarted {
+		b.Ctx.Log.Info("executed %d operations", numExecuted)
+	} else {
+		b.Ctx.Log.Debug("executed %d operations", numExecuted)
+	}
 	return numExecuted, nil
 }
 
