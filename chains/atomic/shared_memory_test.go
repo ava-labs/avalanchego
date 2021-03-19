@@ -90,6 +90,16 @@ func TestSharedMemory(t *testing.T) {
 	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{2}, {3}, {8}}, nil, nil, 3)
 	assert.NoError(err)
 	assert.ElementsMatch([][]byte{{1}, {5}, {7}}, values, "wrong indexed values returned")
+
+	// Delete 2 entries
+	err = sm1.Remove(chainID0, [][]byte{{4}, {6}})
+	assert.NoError(err)
+	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{2}, {3}}, nil, nil, 3)
+	assert.NoError(err)
+	assert.ElementsMatch([][]byte{{1}}, values, "wrong indexed values returned")
+	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{2}, {3}, {8}}, nil, nil, 3)
+	assert.NoError(err)
+	assert.ElementsMatch([][]byte{{1}}, values, "wrong indexed values returned")
 }
 
 func TestSharedMemoryCantDuplicatePut(t *testing.T) {
