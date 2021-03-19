@@ -62,15 +62,20 @@ func (ps *state) HasRunnableJob() (bool, error) {
 
 // RemoveRunnableJob fetches and deletes the next job from the runnable queue
 func (ps *state) RemoveRunnableJob() (Job, error) {
-	key, err := ps.runnableJobIDs.HeadKey()
+	jobID, err := ps.runnableJobIDs.HeadKey()
 	if err != nil {
 		return nil, err
 	}
-	if err := ps.runnableJobIDs.Delete(key); err != nil {
+	if err := ps.runnableJobIDs.Delete(jobID); err != nil {
 		return nil, err
 	}
 
-	jobBytes, err := ps.jobs.Get(key)
+	jobIntf, exists := ps.jobsCache.Get(jobID)
+	if exists {
+		return jobIntf.(Job), ps.jobs.Delete(jobID)
+	}
+
+	jobBytes, err := ps.jobs.Get(jobID)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +83,7 @@ func (ps *state) RemoveRunnableJob() (Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	return job, ps.jobs.Delete(key)
+	return job, ps.jobs.Delete(jobID)
 }
 
 // PutJob adds the job to the queue
