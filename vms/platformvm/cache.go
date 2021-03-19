@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
@@ -50,7 +51,7 @@ import (
 // 	singletonDB  database.Database
 // }
 
-type totalState interface {
+type versionedState interface {
 	GetTimestamp() time.Time
 	SetTimestamp(time.Time)
 
@@ -66,6 +67,33 @@ type totalState interface {
 	AddChain(createChainTx *Tx)
 
 	GetUTXO(utxoID avax.UTXOID) (*avax.UTXO, error)
-	DeleteUTXO(utxoID avax.UTXOID)
 	AddUTXO(utxo *avax.UTXO)
+	DeleteUTXO(utxoID avax.UTXOID)
+
+	GetCurrentValidator(txID ids.ID) (addValidatorTx *Tx, potentialReward uint64)
+	GetCurrentValidatorByNodeID(nodeID ids.ShortID) (addValidatorTx *Tx, potentialReward uint64)
+	AddCurrentValidator(addValidatorTx *Tx, potentialReward uint64)
+	DeleteCurrentValidator(txID ids.ID)
+
+	GetCurrentDelegator(txID ids.ID) (addDelegatorTx *Tx, potentialReward uint64)
+	GetCurrentDelegatorsByNodeID(nodeID ids.ShortID) []*Tx
+	AddCurrentDelegator(addDelegatorTx *Tx, potentialReward uint64)
+	DeleteCurrentDelegator(txID ids.ID)
+
+	GetPendingValidator(txID ids.ID) *Tx
+	GetPendingValidatorByNodeID(nodeID ids.ShortID) *Tx
+	AddPendingValidator(*Tx)
+	DeletePendingValidator(txID ids.ID)
+
+	GetPendingDelegator(txID ids.ID) *Tx
+	GetPendingDelegatorByNodeID(nodeID ids.ShortID) *Tx
+	AddPendingDelegator(*Tx)
+	DeletePendingDelegator(txID ids.ID)
+}
+
+type internalState interface {
+	versionedState
+
+	GetBlock(blockID ids.ID) (snowman.Block, error)
+	AddBlock(block snowman.Block)
 }
