@@ -23,3 +23,17 @@ func TestInterface(t *testing.T) {
 		test(t, db)
 	}
 }
+
+func BenchmarkInterface(b *testing.B) {
+	for _, bench := range database.Benchmarks {
+		baseDB := memdb.New()
+		db, err := New("", prometheus.NewRegistry(), baseDB)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		for _, size := range []int{1, 10, 100, 1000, 10000, 100000} {
+			bench(b, db, "meterdb", size)
+		}
+	}
+}

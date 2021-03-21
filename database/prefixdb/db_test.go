@@ -21,3 +21,13 @@ func TestInterface(t *testing.T) {
 		test(t, NewNested([]byte("ld"), New([]byte("wor"), db)))
 	}
 }
+
+func BenchmarkInterface(b *testing.B) {
+	for _, bench := range database.Benchmarks {
+		db := memdb.New()
+
+		for _, size := range []int{1, 10, 100, 1000, 10000, 100000} {
+			bench(b, db, "prefixdb", size)
+		}
+	}
+}

@@ -22,3 +22,18 @@ func TestInterface(t *testing.T) {
 		test(t, db)
 	}
 }
+
+func BenchmarkInterface(b *testing.B) {
+	pw := "lol totally a secure password"
+	for _, bench := range database.Benchmarks {
+		unencryptedDB := memdb.New()
+		db, err := New([]byte(pw), unencryptedDB)
+		if err != nil {
+			b.Fatal(err)
+		}
+		// note: >262144 size crashes memdb
+		for _, size := range []int{1, 10, 100, 1000, 10000, 100000} {
+			bench(b, db, "encdb", size)
+		}
+	}
+}

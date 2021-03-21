@@ -371,3 +371,15 @@ func TestSetDatabaseClosed(t *testing.T) {
 		t.Fatalf("Unexpected database from db.GetDatabase")
 	}
 }
+
+func BenchmarkInterface(b *testing.B) {
+	for _, bench := range database.Benchmarks {
+		baseDB := memdb.New()
+		db := New(baseDB)
+		defer db.Close()
+
+		for _, size := range []int{1, 10, 100, 1000, 10000, 100000} {
+			bench(b, db, "versiondb", size)
+		}
+	}
+}
