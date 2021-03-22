@@ -172,7 +172,10 @@ type BlockChain struct {
 	chainConfig *params.ChainConfig // Chain & network configuration
 	cacheConfig *CacheConfig        // Cache configuration for pruning
 
-	db     ethdb.Database // Low level persistent database to store final content in
+	db ethdb.Database // Low level persistent database to store final content in
+
+	snapslock sync.Mutex
+
 	snaps  *snapshot.Tree // Snapshot tree for fast trie leaf access
 	triegc *prque.Prque   // Priority queue mapping block numbers to tries to gc
 	gcproc time.Duration  // Accumulates canonical block processing for trie dumping
@@ -363,7 +366,9 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 
 		// Load any existing snapshot, regenerating it if loading failed
 		if bc.cacheConfig.SnapshotLimit > 0 {
+			bc.snapslock.Lock()
 			bc.snaps = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, bc.CurrentBlock().Root(), !bc.cacheConfig.SnapshotWait)
+			bc.snapslock.Unlock()
 		}
 		// Take ownership of this particular state
 		// go bc.update()
@@ -650,6 +655,8 @@ func (bc *BlockChain) State() (*state.StateDB, error) {
 
 // StateAt returns a new mutable state based on a particular point in time.
 func (bc *BlockChain) StateAt(root common.Hash) (*state.StateDB, error) {
+	bc.snapslock.Lock()
+	defer bc.snapslock.Unlock()
 	return state.New(root, bc.stateCache, bc.snaps)
 }
 

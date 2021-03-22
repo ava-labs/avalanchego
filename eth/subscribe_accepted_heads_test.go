@@ -218,7 +218,7 @@ func NewKey(rand io.Reader) (*Key, error) {
 	return NewKeyFromECDSA(privateKeyECDSA), nil
 }
 
-func TestActiveHeadSubscriptions(t *testing.T) {
+func TestAcceptedHeadSubscriptions(t *testing.T) {
 	config := DefaultConfig
 	chainConfig := &params.ChainConfig{
 		ChainID:             big.NewInt(1),
@@ -274,8 +274,11 @@ func TestActiveHeadSubscriptions(t *testing.T) {
 
 	ethbackend := EthAPIBackend{eth: backend, gpo: nil}
 
-	ch := make(chan core.ChainEvent, 1000)
-	ethbackend.SubscribeChainAcceptedEvent(ch)
+	acceptedChainCh := make(chan core.ChainEvent, 1000)
+	chainCh := make(chan core.ChainEvent, 1000)
+
+	ethbackend.SubscribeChainAcceptedEvent(acceptedChainCh)
+	ethbackend.SubscribeChainEvent(chainCh)
 
 	chain.Start()
 
@@ -330,6 +333,7 @@ func TestActiveHeadSubscriptions(t *testing.T) {
 		if cbx.NumberU64() == 1 {
 			break
 		}
+		time.Sleep(1 * time.Second)
 	}
 	if cbx == nil {
 		t.Fatal("block not created")
@@ -338,12 +342,22 @@ func TestActiveHeadSubscriptions(t *testing.T) {
 	if cbx.NumberU64() != 1 {
 		t.Fatal("block not created")
 	}
+
+	select {
+	case fb := <-chainCh:
+		if fb.Block.NumberU64() != 1 {
+			t.Fatal("block not created")
+		}
+	default:
+		t.Fatal("block not created")
+	}
+
 	backend.blockchain.Accept(cbx)
 
 	chain.Stop()
 
 	select {
-	case fb := <-ch:
+	case fb := <-acceptedChainCh:
 		if fb.Block.NumberU64() != 1 {
 			t.Fatal("block not created")
 		}
