@@ -26,8 +26,8 @@ func BenchmarkInterface(b *testing.B) {
 	for _, bench := range database.Benchmarks {
 		db := memdb.New()
 
-		for _, size := range []int{1, 10, 100, 1000, 10000, 100000} {
-			bench(b, db, "prefixdb", size)
+		for _, size := range []int{32, 64, 128, 256, 512, 1024, 2048, 4096} {
+			bench(b, db, "prefixdb", 1000, size)
 		}
 	}
 }

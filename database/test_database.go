@@ -35,7 +35,7 @@ var (
 	}
 
 	// Benchmarks is a list of all database benchmarks
-	Benchmarks = []func(b *testing.B, db Database, name string, size int){
+	Benchmarks = []func(b *testing.B, db Database, name string, count int, size int){
 		BenchmarkGet,
 		BenchmarkPut,
 		BenchmarkDelete,
@@ -883,25 +883,27 @@ func TestCompactNoPanic(t *testing.T, db Database) {
 }
 
 // Writes size data into the db in order to setup reads in subsequent tests.
-func benchmarkSetup(b *testing.B, size int) ([][]byte, [][]byte) {
-	keys := make([][]byte, size)
-	values := make([][]byte, size)
+func benchmarkSetup(b *testing.B, count int, size int) ([][]byte, [][]byte) {
+	keys := make([][]byte, count)
+	values := make([][]byte, count)
 	for i := 0; i < b.N; i++ {
-		bytes := make([]byte, size)
-		rand.Read(bytes)
-		keys[i], values[i] = bytes, bytes
+		keyBytes := make([]byte, b.N)
+		valueBytes := make([]byte, size)
+		rand.Read(keyBytes)
+		rand.Read(valueBytes)
+		keys[i], values[i] = keyBytes, valueBytes
 	}
 	return keys, values
 }
 
 // BenchmarkGet measures the time it takes to get an operation from a database.
-func BenchmarkGet(b *testing.B, db Database, name string, size int) {
-	keys, values := benchmarkSetup(b, size)
+func BenchmarkGet(b *testing.B, db Database, name string, count int, size int) {
+	keys, values := benchmarkSetup(b, count, size)
 
-	b.Run(fmt.Sprintf("%s_%d_get", name, size), func(b *testing.B) {
+	b.Run(fmt.Sprintf("%s_%d_%dbytes_get", name, count, size), func(b *testing.B) {
 		// Writes random values of size _size_ to the database
 		for i := 0; i < b.N; i++ {
-			if err := db.Put(keys[i%size], values[i%size]); err != nil {
+			if err := db.Put(keys[i%count], values[i%count]); err != nil {
 				b.Fatalf("Unexpected error in Put %s", err)
 			}
 		}
@@ -909,7 +911,7 @@ func BenchmarkGet(b *testing.B, db Database, name string, size int) {
 
 		// Reads b.N values from the db
 		for i := 0; i < b.N; i++ {
-			if _, err := db.Get(keys[i%size]); err != nil {
+			if _, err := db.Get(keys[i%count]); err != nil {
 				b.Fatalf("Unexpected error in Get %s", err)
 			}
 		}
@@ -917,13 +919,13 @@ func BenchmarkGet(b *testing.B, db Database, name string, size int) {
 }
 
 // BenchmarkPut measures the time it takes to write an operation to a database.
-func BenchmarkPut(b *testing.B, db Database, name string, size int) {
-	keys, values := benchmarkSetup(b, size)
+func BenchmarkPut(b *testing.B, db Database, name string, count int, size int) {
+	keys, values := benchmarkSetup(b, count, size)
 
-	b.Run(fmt.Sprintf("%s_%d_put", name, size), func(b *testing.B) {
+	b.Run(fmt.Sprintf("%s_%d_%dbytes_put", name, count, size), func(b *testing.B) {
 		// Writes b.N values to the db
 		for i := 0; i < b.N; i++ {
-			if err := db.Put(keys[i%size], values[i%size]); err != nil {
+			if err := db.Put(keys[i%count], values[i%count]); err != nil {
 				b.Fatalf("Unexpected error in Put %s", err)
 			}
 		}
@@ -931,13 +933,13 @@ func BenchmarkPut(b *testing.B, db Database, name string, size int) {
 }
 
 // BenchmarkDelete measures the time it takes to delete a (k, v) from a database.
-func BenchmarkDelete(b *testing.B, db Database, name string, size int) {
-	keys, values := benchmarkSetup(b, size)
+func BenchmarkDelete(b *testing.B, db Database, name string, count int, size int) {
+	keys, values := benchmarkSetup(b, count, size)
 
-	b.Run(fmt.Sprintf("%s_%d_delete", name, size), func(b *testing.B) {
+	b.Run(fmt.Sprintf("%s_%d_%dbytes_delete", name, count, size), func(b *testing.B) {
 		// Writes random values of size _size_ to the database
 		for i := 0; i < b.N; i++ {
-			if err := db.Put(keys[i%size], values[i%size]); err != nil {
+			if err := db.Put(keys[i%count], values[i%count]); err != nil {
 				b.Fatalf("Unexpected error in Put %s", err)
 			}
 		}
@@ -945,7 +947,7 @@ func BenchmarkDelete(b *testing.B, db Database, name string, size int) {
 
 		// Deletes b.N values from the db
 		for i := 0; i < b.N; i++ {
-			if err := db.Delete(keys[i%size]); err != nil {
+			if err := db.Delete(keys[i%count]); err != nil {
 				b.Fatalf("Unexpected error in Delete %s", err)
 			}
 		}
@@ -953,15 +955,16 @@ func BenchmarkDelete(b *testing.B, db Database, name string, size int) {
 }
 
 // BenchmarkBatchPut measures the time it takes to batch write.
-func BenchmarkBatchPut(b *testing.B, db Database, name string, size int) {
-	keys, values := benchmarkSetup(b, size)
-	b.Run(fmt.Sprintf("%s_%d_write_batch", name, size), func(b *testing.B) {
+func BenchmarkBatchPut(b *testing.B, db Database, name string, count int, size int) {
+	keys, values := benchmarkSetup(b, count, size)
+
+	b.Run(fmt.Sprintf("%s_%d_%dbytes_write_batch", name, count, size), func(b *testing.B) {
 		batch := db.NewBatch()
 		if batch == nil {
 			b.Fatalf("db.NewBatch returned nil")
 		}
 		for i := 0; i < b.N; i++ {
-			if err := batch.Put(keys[i%size], values[i%size]); err != nil {
+			if err := batch.Put(keys[i%count], values[i%count]); err != nil {
 				b.Fatalf("Unexpected error in db.Put: %s", err)
 			}
 			if err := batch.Write(); err != nil {
@@ -972,20 +975,20 @@ func BenchmarkBatchPut(b *testing.B, db Database, name string, size int) {
 }
 
 // BenchmarkParallelGet measures the time it takes to read in parallel.
-func BenchmarkParallelGet(b *testing.B, db Database, name string, size int) {
-	keys, values := benchmarkSetup(b, size)
+func BenchmarkParallelGet(b *testing.B, db Database, name string, count int, size int) {
+	keys, values := benchmarkSetup(b, count, size)
 
-	b.Run(fmt.Sprintf("%s_%d_get_par", name, size), func(b *testing.B) {
+	b.Run(fmt.Sprintf("%s_%d_%dbytes_get_par", name, count, size), func(b *testing.B) {
 		b.RunParallel(func(pb *testing.PB) {
 			for i := 0; i < b.N; i++ {
-				if err := db.Put(keys[i%size], values[i%size]); err != nil {
+				if err := db.Put(keys[i%count], values[i%count]); err != nil {
 					b.Fatalf("Unexpected error in Put %s", err)
 				}
 			}
 			b.ResetTimer()
 
 			for i := 0; pb.Next(); i++ {
-				if _, err := db.Get(keys[i%size]); err != nil {
+				if _, err := db.Get(keys[i%count]); err != nil {
 					b.Fatalf("Unexpected error in Get %s", err)
 				}
 			}
@@ -994,14 +997,14 @@ func BenchmarkParallelGet(b *testing.B, db Database, name string, size int) {
 }
 
 // BenchmarkParallelPut measures the time it takes to write to the db in parallel.
-func BenchmarkParallelPut(b *testing.B, db Database, name string, size int) {
-	keys, values := benchmarkSetup(b, size)
+func BenchmarkParallelPut(b *testing.B, db Database, name string, count int, size int) {
+	keys, values := benchmarkSetup(b, count, size)
 
-	b.Run(fmt.Sprintf("%s_%d_write_par", name, size), func(b *testing.B) {
+	b.Run(fmt.Sprintf("%s_%d_%dbytes_write_par", name, count, size), func(b *testing.B) {
 		b.RunParallel(func(pb *testing.PB) {
 			// Write N values to the db
 			for i := 0; pb.Next(); i++ {
-				if err := db.Put(keys[i%size], values[i%size]); err != nil {
+				if err := db.Put(keys[i%count], values[i%count]); err != nil {
 					b.Fatalf("Unexpected error in Put %s", err)
 				}
 			}
@@ -1010,14 +1013,14 @@ func BenchmarkParallelPut(b *testing.B, db Database, name string, size int) {
 }
 
 // BenchmarkParallelDelete measures the time it takes to delete a (k, v) from the db.
-func BenchmarkParallelDelete(b *testing.B, db Database, name string, size int) {
-	keys, values := benchmarkSetup(b, size)
+func BenchmarkParallelDelete(b *testing.B, db Database, name string, count int, size int) {
+	keys, values := benchmarkSetup(b, count, size)
 
-	b.Run(fmt.Sprintf("%s_%d_delete_par", name, size), func(b *testing.B) {
+	b.Run(fmt.Sprintf("%s_%d_%dbytes_delete_par", name, count, size), func(b *testing.B) {
 		b.RunParallel(func(pb *testing.PB) {
-			// Writes random values of size _size_ to the database
+			// Writes random values of dbSize _dbSize_ to the database
 			for i := 0; pb.Next(); i++ {
-				if err := db.Put(keys[i%size], values[i%size]); err != nil {
+				if err := db.Put(keys[i%count], values[i%count]); err != nil {
 					b.Fatalf("Unexpected error in Put %s", err)
 				}
 			}
@@ -1025,7 +1028,7 @@ func BenchmarkParallelDelete(b *testing.B, db Database, name string, size int) {
 
 			// Deletes b.N values from the db
 			for i := 0; pb.Next(); i++ {
-				if err := db.Delete(keys[i%size]); err != nil {
+				if err := db.Delete(keys[i%count]); err != nil {
 					b.Fatalf("Unexpected error in Delete %s", err)
 				}
 			}

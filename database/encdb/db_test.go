@@ -31,9 +31,9 @@ func BenchmarkInterface(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		// note: >262144 size crashes memdb
-		for _, size := range []int{1, 10, 100, 1000, 10000, 100000} {
-			bench(b, db, "encdb", size)
+
+		for _, size := range []int{32, 64, 128, 256, 512, 1024, 2048, 4096} {
+			bench(b, db, "encdb", 1000, size)
 		}
 	}
 }

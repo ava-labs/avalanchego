@@ -74,8 +74,8 @@ func BenchmarkInterface(b *testing.B) {
 
 		db := NewClient(rpcdbproto.NewDatabaseClient(conn))
 
-		for _, size := range []int{1, 10, 100, 1000, 10000, 100000} {
-			bench(b, db, "rpcdb", size)
+		for _, size := range []int{32, 64, 128, 256, 512, 1024, 2048, 4096} {
+			bench(b, db, "rpcdb", 1000, size)
 		}
 		conn.Close()
 	}
