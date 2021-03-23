@@ -204,6 +204,7 @@ func New(stack *node.Node, config *Config,
 			EnablePreimageRecording: config.EnablePreimageRecording,
 			EWASMInterpreter:        config.EWASMInterpreter,
 			EVMInterpreter:          config.EVMInterpreter,
+			LastAcceptedBlockNumber: config.LastAcceptedBlockNumber,
 		}
 		cacheConfig = &core.CacheConfig{
 			TrieCleanLimit:      config.TrieCleanCache,

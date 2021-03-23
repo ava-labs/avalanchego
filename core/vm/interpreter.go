@@ -55,6 +55,9 @@ type Config struct {
 	EVMInterpreter   string // External EVM interpreter options
 
 	ExtraEips []int // Additional EIPS that are to be enabled
+
+	// LastAcceptedBlockNumber check last accepted for block number
+	LastAcceptedBlockNumber bool
 }
 
 // Interpreter is used to run Ethereum based contracts and will utilise the
