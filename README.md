@@ -9,8 +9,6 @@ a blockchains platform with high throughput, and blazing fast transactions.
 
 ## Installation
 
----
-
 Avalanche is an incredibly lightweight protocol, so the minimum computer requirements are quite modest.
 
 - Hardware: 2 GHz or faster CPU, 4 GB RAM, 20 GB hard disk.
@@ -48,8 +46,6 @@ The Avalanche binary, named `avalanchego`, is in the `build` directory.
   staking.
 
 ## Running Avalanche
-
----
 
 ### Connecting to Mainnet
 
