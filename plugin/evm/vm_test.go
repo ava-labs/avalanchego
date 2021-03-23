@@ -2619,4 +2619,3 @@ func TestBlockNumber(t *testing.T) {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}
 }
-
