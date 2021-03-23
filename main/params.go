@@ -8,6 +8,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"path"
@@ -163,7 +164,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(httpsCertFileKey, "", "TLS certificate file for the HTTPs server")
 	fs.String(httpAllowedOrigins, "*", "Origins to allow on the HTTP port. Defaults to * which allows all origins. Example: https://*.avax.network https://*.avax-test.network")
 	fs.Bool(apiAuthRequiredKey, false, "Require authorization token to call HTTP APIs")
-	fs.String(apiAuthPasswordKey, "", "Password used to create/validate API authorization tokens. Can be changed via API call.")
+	fs.String(apiAuthPasswordFileKey, "", "Password file used to initially create/validate API authorization tokens. Can be changed via API call.")
 	// Enable/Disable APIs
 	fs.Bool(adminAPIEnabledKey, false, "If true, this node exposes the Admin API")
 	fs.Bool(infoAPIEnabledKey, true, "If true, this node exposes the Info API")
@@ -192,8 +193,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Uint(stakingPortKey, 9651, "Port of the consensus server")
 	fs.Bool(stakingEnabledKey, true, "Enable staking. If enabled, Network TLS is required.")
 	fs.Bool(p2pTLSEnabledKey, true, "Require TLS to authenticate network communication")
-	fs.String(stakingKeyPathKey, defaultString, "TLS private key for staking")
-	fs.String(stakingCertPathKey, defaultString, "TLS certificate for staking")
+	fs.String(stakingKeyPathKey, defaultString, "Path to the TLS private key for staking")
+	fs.String(stakingCertPathKey, defaultString, "Path to the TLS certificate for staking")
 	fs.Uint64(stakingDisabledWeightKey, 1, "Weight to provide to each peer when staking is disabled")
 	// Uptime Requirement
 	fs.Float64(uptimeRequirementKey, .6, "Fraction of time a validator must be online to receive rewards")
@@ -498,14 +499,6 @@ func setNodeConfig(v *viper.Viper) error {
 	// HTTP:
 	Config.HTTPHost = v.GetString(httpHostKey)
 	Config.HTTPPort = uint16(v.GetUint(httpPortKey))
-	if Config.APIRequireAuthToken {
-		if Config.APIAuthPassword == "" {
-			return errors.New("api-auth-password must be provided if api-auth-required is true")
-		}
-		if !password.SufficientlyStrong(Config.APIAuthPassword, password.OK) {
-			return errors.New("api-auth-password is not strong enough. Add more characters")
-		}
-	}
 
 	Config.HTTPSEnabled = v.GetBool(httpsEnabledKey)
 	Config.HTTPSKeyFile = v.GetString(httpsKeyFileKey)
@@ -514,7 +507,17 @@ func setNodeConfig(v *viper.Viper) error {
 
 	// API Auth
 	Config.APIRequireAuthToken = v.GetBool(apiAuthRequiredKey)
-	Config.APIAuthPassword = v.GetString(apiAuthPasswordKey)
+	if Config.APIRequireAuthToken {
+		passwordFile := v.GetString(apiAuthPasswordFileKey)
+		pwBytes, err := ioutil.ReadFile(passwordFile)
+		if err != nil {
+			return fmt.Errorf("api-auth-password-file %q failed to be read with: %w", passwordFile, err)
+		}
+		Config.APIAuthPassword = string(pwBytes)
+		if !password.SufficientlyStrong(Config.APIAuthPassword, password.OK) {
+			return errors.New("api-auth-password is not strong enough")
+		}
+	}
 
 	// APIs
 	Config.AdminAPIEnabled = v.GetBool(adminAPIEnabledKey)
