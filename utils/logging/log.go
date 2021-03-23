@@ -155,6 +155,8 @@ func (l *Log) log(level Level, format string, args ...interface{}) {
 		return
 	}
 
+	args = SanitizeArgs(args)
+
 	output := l.format(level, format, args...)
 
 	if shouldLog {
