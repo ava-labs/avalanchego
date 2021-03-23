@@ -5,7 +5,6 @@ package constants
 
 import (
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 
@@ -118,12 +117,9 @@ func NetworkID(networkName string) (uint32, error) {
 	if strings.HasPrefix(networkName, ValidNetworkPrefix) {
 		idStr = networkName[len(ValidNetworkPrefix):]
 	}
-	id, err := strconv.ParseUint(idStr, 10, 0)
+	id, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse %q as a network name", networkName)
-	}
-	if id > math.MaxUint32 {
-		return 0, fmt.Errorf("networkID %q not in [0, 2^32)", networkName)
 	}
 	return uint32(id), nil
 }

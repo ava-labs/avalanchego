@@ -447,7 +447,7 @@ func TestGetStake(t *testing.T) {
 		response := GetStakeReply{}
 		err := service.GetStake(nil, &args, &response)
 		assert.NoError(err)
-		assert.EqualValues(defaultWeight, int(response.Staked))
+		assert.EqualValues(uint64(defaultWeight), uint64(response.Staked))
 		assert.Len(response.Outputs, 1)
 		// Unmarshal into an output
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[0])
