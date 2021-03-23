@@ -42,11 +42,10 @@ The Avalanche binary, named `avalanchego`, is in the `build` directory.
 - Make sure you have docker installed on your machine (so commands like `docker run` etc. are available).
 - Build the docker image of latest avalanchego branch by `./scripts/build_image.sh`.
 - Check the built image by `docker image ls`, you should see some image tagged
-  `avalanchego-xxxxxxxx`, where `xxxxxxxx` is the commit id of the Avalanche source it was built from.
-- Test Avalanche by `docker run -ti -p 9650:9650 -p 9651:9651 avalanchego-xxxxxxxx /avalanchego/build/avalanchego
-   --network-id=local --staking-enabled=false --snow-sample-size=1 --snow-quorum-size=1`. (For a production deployment,
+  `avaplatform/avalanchego:xxxxxxxx`, where `xxxxxxxx` is the commit id of the Avalanche source it was built from.
+- Test Avalanche by `docker run -ti -p 9650:9650 -p 9651:9651 avaplatform/avalanchego:xxxxxxxx /avalanchego/build/avalanchego`. For running a validator,
   you may want to extend the docker image with required credentials for
-  staking and TLS.)
+  staking.
 
 ## Running Avalanche
 
