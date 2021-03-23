@@ -28,7 +28,7 @@ type CommandLineConfig struct {
 	APIMaxDuration      int64 `json:"api-max-duration"`
 	MaxBlocksPerRequest int64 `json:"api-max-blocks-per-request"`
 
-	LastAcceptedBlockNumber bool `json"last-accepted-block-number-enabled""`
+	LastAcceptedBlockNumber bool `json:"last-accepted-block-number-enabled"`
 
 	ParsingError error
 }
