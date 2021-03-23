@@ -18,10 +18,10 @@ func TestInterface(t *testing.T) {
 			t.Fatalf("leveldb.New(%q, logging.NoLog{}, 0, 0, 0) errored with %s", folder, err)
 		}
 
-		test(t, db)
-
 		// The database may have been closed by the test, so we don't care if it
 		// errors here.
-		_ = db.Close()
+		defer db.Close()
+
+		test(t, db)
 	}
 }
