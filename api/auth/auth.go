@@ -41,7 +41,7 @@ var (
 		headerKey,
 		headerValStart,
 	)
-	ErrTokenExpired                = errors.New("the provided auth token was expired")
+	ErrInvalidSigningMethod        = fmt.Errorf("auth token didn't specify the HS256 signing method correctly")
 	ErrTokenRevoked                = errors.New("the provided auth token was revoked")
 	ErrTokenInsufficientPermission = errors.New("the provided auth token does not allow access to this endpoint")
 
@@ -85,7 +85,10 @@ type endpointClaims struct {
 }
 
 // getTokenKey returns the key to use when making and parsing tokens
-func (auth *Auth) getTokenKey(*jwt.Token) (interface{}, error) {
+func (auth *Auth) getTokenKey(t *jwt.Token) (interface{}, error) {
+	if t.Method != jwt.SigningMethodHS256 {
+		return nil, ErrInvalidSigningMethod
+	}
 	return auth.password.Password[:], nil
 }
 
@@ -169,12 +172,7 @@ func (auth *Auth) authenticateToken(tokenStr, url string) error {
 
 	token, err := jwt.ParseWithClaims(tokenStr, &endpointClaims{}, auth.getTokenKey)
 	if err != nil { // Probably because signature wrong
-		// Error is intentionally dropped here as there is nothing left to do
-		// with it.
-		if strings.Contains(err.Error(), "expired") {
-			return ErrTokenExpired
-		}
-		return fmt.Errorf("invalid auth token: %s", err)
+		return err
 	}
 
 	// Make sure this token gives access to the requested endpoint

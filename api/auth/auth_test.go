@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -197,7 +199,7 @@ func TestWrapHandlerExpiredToken(t *testing.T) {
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
 		assert.Equal(t, http.StatusUnauthorized, rr.Code)
-		assert.Contains(t, rr.Body.String(), ErrTokenExpired.Error())
+		assert.Contains(t, rr.Body.String(), "expired")
 		assert.Regexp(t, unAuthorizedResponseRegex, rr.Body.String())
 	}
 }
@@ -314,6 +316,43 @@ func TestWrapHandlerMutatedRevokedToken(t *testing.T) {
 		wrappedHandler.ServeHTTP(rr, req)
 		assert.Equal(t, http.StatusUnauthorized, rr.Code)
 		assert.Contains(t, rr.Body.String(), ErrTokenRevoked.Error())
+		assert.Regexp(t, unAuthorizedResponseRegex, rr.Body.String())
+	}
+}
+
+func TestWrapHandlerInvalidSigningMethod(t *testing.T) {
+	auth := NewFromHash(true, hashedPassword)
+
+	// Make a token
+	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
+	idBytes := [tokenIDByteLen]byte{}
+	if _, err := rand.Read(idBytes[:]); err != nil {
+		t.Fatal(err)
+	}
+	id := base64.URLEncoding.EncodeToString(idBytes[:])
+
+	claims := endpointClaims{
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: auth.clock.Time().Add(TokenLifespan).Unix(),
+			Id:        id,
+		},
+		Endpoints: endpoints,
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, &claims)
+	tokenStr, err := token.SignedString(auth.password.Password[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wrappedHandler := auth.WrapHandler(dummyHandler)
+
+	for _, endpoint := range endpoints {
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr+"="))
+		rr := httptest.NewRecorder()
+		wrappedHandler.ServeHTTP(rr, req)
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
+		assert.Contains(t, rr.Body.String(), ErrInvalidSigningMethod.Error())
 		assert.Regexp(t, unAuthorizedResponseRegex, rr.Body.String())
 	}
 }
