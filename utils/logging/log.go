@@ -374,11 +374,8 @@ func (fw *fileWriter) Rotate() error {
 
 func (fw *fileWriter) create(fileIndex int) (*bufio.Writer, *os.File, error) {
 	filename := filepath.Join(fw.config.Directory, fmt.Sprintf("%d.log", fw.fileIndex))
-	file, err := os.Create(filename)
+	file, err := perms.Create(filename, perms.ReadWrite)
 	if err != nil {
-		return nil, nil, err
-	}
-	if err := file.Chmod(perms.ReadWrite); err != nil {
 		return nil, nil, err
 	}
 	writer := bufio.NewWriter(file)

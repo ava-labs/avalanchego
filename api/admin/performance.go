@@ -49,11 +49,8 @@ func (p *Performance) StartCPUProfiler() error {
 		return errCPUProfilerRunning
 	}
 
-	file, err := os.Create(p.cpuProfileName)
+	file, err := perms.Create(p.cpuProfileName, perms.ReadWrite)
 	if err != nil {
-		return err
-	}
-	if err := file.Chmod(perms.ReadWrite); err != nil {
 		return err
 	}
 	if err := pprof.StartCPUProfile(file); err != nil {
@@ -80,11 +77,8 @@ func (p *Performance) StopCPUProfiler() error {
 
 // MemoryProfile dumps the current memory utilization of this node
 func (p *Performance) MemoryProfile() error {
-	file, err := os.Create(p.memProfileName)
+	file, err := perms.Create(p.memProfileName, perms.ReadWrite)
 	if err != nil {
-		return err
-	}
-	if err := file.Chmod(perms.ReadWrite); err != nil {
 		return err
 	}
 	runtime.GC() // get up-to-date statistics
@@ -97,11 +91,8 @@ func (p *Performance) MemoryProfile() error {
 
 // LockProfile dumps the current lock statistics of this node
 func (p *Performance) LockProfile() error {
-	file, err := os.Create(p.lockProfileName)
+	file, err := perms.Create(p.lockProfileName, perms.ReadWrite)
 	if err != nil {
-		return err
-	}
-	if err := file.Chmod(perms.ReadWrite); err != nil {
 		return err
 	}
 
