@@ -8,6 +8,8 @@ import (
 	"os"
 	"runtime"
 	"runtime/pprof"
+
+	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
 const (
@@ -51,6 +53,9 @@ func (p *Performance) StartCPUProfiler() error {
 	if err != nil {
 		return err
 	}
+	if err := file.Chmod(perms.ReadWrite); err != nil {
+		return err
+	}
 	if err := pprof.StartCPUProfile(file); err != nil {
 		_ = file.Close() // Return the original error
 		return err
@@ -79,6 +84,9 @@ func (p *Performance) MemoryProfile() error {
 	if err != nil {
 		return err
 	}
+	if err := file.Chmod(perms.ReadWrite); err != nil {
+		return err
+	}
 	runtime.GC() // get up-to-date statistics
 	if err := pprof.WriteHeapProfile(file); err != nil {
 		_ = file.Close() // Return the original error
@@ -91,6 +99,9 @@ func (p *Performance) MemoryProfile() error {
 func (p *Performance) LockProfile() error {
 	file, err := os.Create(p.lockProfileName)
 	if err != nil {
+		return err
+	}
+	if err := file.Chmod(perms.ReadWrite); err != nil {
 		return err
 	}
 

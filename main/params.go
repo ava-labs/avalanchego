@@ -48,14 +48,15 @@ var (
 
 	homeDir                = os.ExpandEnv("$HOME")
 	prefixedAppName        = fmt.Sprintf(".%s", constants.AppName)
-	defaultDbDir           = filepath.Join(homeDir, prefixedAppName, "db")
-	defaultStakingKeyPath  = filepath.Join(homeDir, prefixedAppName, "staking", "staker.key")
-	defaultStakingCertPath = filepath.Join(homeDir, prefixedAppName, "staking", "staker.crt")
+	defaultDataDir         = filepath.Join(homeDir, prefixedAppName)
+	defaultDbDir           = filepath.Join(defaultDataDir, "db")
+	defaultStakingKeyPath  = filepath.Join(defaultDataDir, "staking", "staker.key")
+	defaultStakingCertPath = filepath.Join(defaultDataDir, "staking", "staker.crt")
 	defaultPluginDirs      = []string{
 		filepath.Join(".", "build", "plugins"),
 		filepath.Join(".", "plugins"),
 		filepath.Join("/", "usr", "local", "lib", constants.AppName),
-		filepath.Join(homeDir, prefixedAppName, "plugins"),
+		filepath.Join(defaultDataDir, "plugins"),
 	}
 	// GitCommit should be optionally set at compile time.
 	GitCommit string

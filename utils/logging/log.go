@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
 var (
@@ -38,7 +39,7 @@ type Log struct {
 
 // New ...
 func New(config Config) (*Log, error) {
-	if err := os.MkdirAll(config.Directory, os.ModePerm); err != nil {
+	if err := os.MkdirAll(config.Directory, perms.ReadWriteExecute); err != nil {
 		return nil, err
 	}
 	l := &Log{
@@ -373,6 +374,9 @@ func (fw *fileWriter) create(fileIndex int) (*bufio.Writer, *os.File, error) {
 	filename := filepath.Join(fw.config.Directory, fmt.Sprintf("%d.log", fw.fileIndex))
 	file, err := os.Create(filename)
 	if err != nil {
+		return nil, nil, err
+	}
+	if err := file.Chmod(perms.ReadWrite); err != nil {
 		return nil, nil, err
 	}
 	writer := bufio.NewWriter(file)
