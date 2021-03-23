@@ -875,21 +875,21 @@ func (bc *BlockChain) GetBlockByNumber(number uint64) *types.Block {
 	defer bc.chainmu.Unlock()
 	if bc.vmConfig.LastAcceptedBlockNumber &&
 		bc.lastAccepted != nil &&
-		number > (*bc.lastAccepted).NumberU64() {
+		number > bc.lastAccepted.NumberU64() {
 		return nil
 	}
-	hash := rawdb.ReadCanonicalHash(bc.db, number)
-	if hash == (common.Hash{}) {
-		return nil
-	}
-	return bc.GetBlock(hash, number)
+	return bc.getBlockByNumberInternal(number)
 }
 
-// GetBlockByNumber retrieves a block from the database by number, caching it
-// (associated with its hash) if found.
-func (bc *BlockChain) GetBlockByNumberAny(number uint64) *types.Block {
+// GetBlockByNumberUnfinalized retrieves a block from the canonical chain by number, caching it
+// (associated with its hash) if found. It may return an unfinalized block if it requests a block above the last accepted height.
+func (bc *BlockChain) GetBlockByNumberUnfinalized(number uint64) *types.Block {
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
+	return bc.getBlockByNumberInternal(number)
+}
+
+func (bc *BlockChain) getBlockByNumberInternal(number uint64) *types.Block {
 	hash := rawdb.ReadCanonicalHash(bc.db, number)
 	if hash == (common.Hash{}) {
 		return nil

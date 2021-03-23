@@ -170,8 +170,8 @@ func (self *ETHChain) GetBlockByNumber(num uint64) *types.Block {
 }
 
 // Retrives a block from the database by number.
-func (self *ETHChain) GetBlockByNumberAny(num uint64) *types.Block {
-	return self.backend.BlockChain().GetBlockByNumberAny(num)
+func (self *ETHChain) GetBlockByNumberUnfinalized(num uint64) *types.Block {
+	return self.backend.BlockChain().GetBlockByNumberUnfinalized(num)
 }
 
 // Validate the canonical chain from current block to the genesis.
