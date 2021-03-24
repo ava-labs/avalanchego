@@ -4,9 +4,9 @@
 package database
 
 import (
-	"testing"
-	"math/rand"
 	"fmt"
+	"math/rand"
+	"testing"
 )
 
 var (
