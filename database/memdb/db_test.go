@@ -14,3 +14,13 @@ func TestInterface(t *testing.T) {
 		test(t, New())
 	}
 }
+
+func BenchmarkInterface(b *testing.B) {
+	for _, bench := range database.Benchmarks {
+		db := New()
+
+		for _, size := range []int{32, 64, 128, 256, 512, 1024, 2048, 4096} {
+			bench(b, db, "memdb", 1000, size)
+		}
+	}
+}
