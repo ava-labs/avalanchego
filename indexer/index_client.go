@@ -59,11 +59,11 @@ func NewClient(uri string, chain IndexedChain, indexType IndexType, requestTimeo
 	case chain == XChain && indexType == IndexTypeBlocks:
 		return nil, errors.New("X-Chain doesn't have blocks")
 	case (chain == PChain || chain == CChain) && indexType != IndexTypeBlocks:
-		return nil, errors.New("P-Chain and C-Chain only blocks")
+		return nil, errors.New("P-Chain and C-Chain only have blocks")
 	case chain != XChain && chain != PChain && chain != CChain:
 		return nil, errors.New("invalid chain given")
 	case indexType != IndexTypeTransactions && indexType != IndexTypeVertices && indexType != IndexTypeBlocks:
-		return nil, errors.New("invalid chain given")
+		return nil, errors.New("invalid index type given")
 	}
 
 	return &Client{
