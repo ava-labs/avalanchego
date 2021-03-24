@@ -5,7 +5,6 @@ package genesis
 
 import (
 	"fmt"
-	"io/ioutil"
 	"path"
 	"testing"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/evm"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
@@ -307,7 +307,7 @@ func TestGenesis(t *testing.T) {
 			var customFile string
 			if len(test.customConfig) > 0 {
 				customFile = path.Join(t.TempDir(), "config.json")
-				assert.NoError(ioutil.WriteFile(customFile, []byte(test.customConfig), 0600))
+				assert.NoError(perms.WriteFile(customFile, []byte(test.customConfig), perms.ReadWrite))
 			}
 
 			if len(test.missingFilepath) > 0 {
