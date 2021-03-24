@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"fmt"
+	"math"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -29,6 +31,13 @@ import (
 const (
 	indexNamePrefix = "index-"
 	codecVersion    = uint16(0)
+	// Max size, in bytes, of something serialized by this indexer
+	// Assumes no containers are larger than math.MaxUint32
+	// wrappers.IntLen accounts for the size of the container bytes
+	// wrappers.LongLen accounts for the timestamp of the container
+	// hashing.HashLen accounts for the container ID
+	// wrappers.ShortLen accounts for the codec version
+	codecMaxSize = math.MaxUint32 + wrappers.IntLen + wrappers.LongLen + hashing.HashLen + wrappers.ShortLen
 )
 
 var (
@@ -70,7 +79,7 @@ type Indexer interface {
 func NewIndexer(config Config) (Indexer, error) {
 	indexer := &indexer{
 		name:                 config.Name,
-		codec:                codec.NewDefaultManager(),
+		codec:                codec.NewManager(codecMaxSize),
 		log:                  config.Log,
 		db:                   config.DB,
 		allowIncompleteIndex: config.AllowIncompleteIndex,
@@ -83,7 +92,10 @@ func NewIndexer(config Config) (Indexer, error) {
 		routeAdder:           config.APIServer,
 		shutdownF:            config.ShutdownF,
 	}
-	if err := indexer.codec.RegisterCodec(codecVersion, linearcodec.NewDefault()); err != nil {
+	if err := indexer.codec.RegisterCodec(
+		codecVersion,
+		linearcodec.New(reflectcodec.DefaultTagName, math.MaxUint32),
+	); err != nil {
 		return nil, fmt.Errorf("couldn't register codec: %s", err)
 	}
 	hasRun, err := indexer.hasRun()
