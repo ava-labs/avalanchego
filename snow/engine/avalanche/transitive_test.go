@@ -2380,7 +2380,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	config.SampleK = int(vals.Weight())
+	config.SampleK = vals.Len()
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -2639,7 +2639,7 @@ func TestEngineReBootstrapFails(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	config.SampleK = int(vals.Weight())
+	config.SampleK = vals.Len()
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -2786,7 +2786,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 	config.Validators = vals
 	config.Beacons = vals
 
-	config.SampleK = int(vals.Weight())
+	config.SampleK = vals.Len()
 
 	sender := &common.SenderTest{}
 	sender.T = t

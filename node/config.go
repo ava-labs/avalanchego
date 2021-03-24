@@ -86,6 +86,7 @@ type Config struct {
 	HTTPSCertFile       string
 	APIRequireAuthToken bool
 	APIAuthPassword     string
+	APIAllowedOrigins   []string
 
 	// Enable/Disable APIs
 	AdminAPIEnabled    bool

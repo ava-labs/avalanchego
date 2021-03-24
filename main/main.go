@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
 const (
@@ -37,6 +38,12 @@ func main() {
 	// parse config using viper
 	if err := parseViper(); err != nil {
 		fmt.Printf("parsing parameters returned with error %s\n", err)
+		return
+	}
+
+	// Set the data directory permissions to be read write.
+	if err := perms.ChmodR(defaultDataDir, true, perms.ReadWriteExecute); err != nil {
+		fmt.Printf("failed to restrict the permissions of the data directory with error %s\n", err)
 		return
 	}
 
