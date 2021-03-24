@@ -34,27 +34,29 @@ func TestIndexClient(t *testing.T) {
 	assert.EqualValues(5, index.Index)
 
 	// Test GetLastAccepted
+	id := ids.GenerateTestID()
 	client.EndpointRequester = &mockClient{
 		f: func(reply interface{}) error {
-			*(reply.(*FormattedContainer)) = FormattedContainer{ID: "hi"}
+			*(reply.(*FormattedContainer)) = FormattedContainer{ID: id}
 			return nil
 		},
 	}
 	container, err := client.GetLastAccepted(&GetLastAcceptedArgs{Encoding: formatting.Hex})
 	assert.NoError(err)
-	assert.EqualValues("hi", container.ID)
+	assert.EqualValues(id, container.ID)
 
 	// Test GetContainerRange
+	id = ids.GenerateTestID()
 	client.EndpointRequester = &mockClient{
 		f: func(reply interface{}) error {
-			*(reply.(*[]FormattedContainer)) = []FormattedContainer{{ID: "yeet"}}
+			*(reply.(*[]FormattedContainer)) = []FormattedContainer{{ID: id}}
 			return nil
 		},
 	}
 	containers, err := client.GetContainerRange(&GetContainerRange{StartIndex: 1, NumToFetch: 10, Encoding: formatting.Hex})
 	assert.NoError(err)
 	assert.Len(containers, 1)
-	assert.EqualValues("yeet", containers[0].ID)
+	assert.EqualValues(id, containers[0].ID)
 
 	// Test IsAccepted
 	client.EndpointRequester = &mockClient{

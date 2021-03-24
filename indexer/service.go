@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -14,27 +15,25 @@ type service struct {
 }
 
 type FormattedContainer struct {
-	ID        string              `json:"id"`
+	ID        ids.ID              `json:"id"`
 	Bytes     string              `json:"bytes"`
 	Timestamp time.Time           `json:"timestamp"`
 	Encoding  formatting.Encoding `json:"encoding"`
+	Index     json.Uint64         `json:"index"`
 }
 
-func newFormattedContainer(c Container, enc formatting.Encoding) (FormattedContainer, error) {
+func newFormattedContainer(c Container, index uint64, enc formatting.Encoding) (FormattedContainer, error) {
 	fc := FormattedContainer{
 		Encoding: enc,
+		ID:       c.ID,
+		Index:    json.Uint64(index),
 	}
-	idStr, err := formatting.Encode(enc, c.ID[:])
-	if err != nil {
-		return fc, err
-	}
-	fc.ID = idStr
 	bytesStr, err := formatting.Encode(enc, c.Bytes)
 	if err != nil {
 		return fc, err
 	}
-	fc.Timestamp = time.Unix(c.Timestamp, 0)
 	fc.Bytes = bytesStr
+	fc.Timestamp = time.Unix(c.Timestamp, 0)
 	return fc, nil
 }
 
@@ -47,8 +46,11 @@ func (s *service) GetLastAccepted(_ *http.Request, args *GetLastAcceptedArgs, re
 	if err != nil {
 		return err
 	}
-
-	*reply, err = newFormattedContainer(container, args.Encoding)
+	index, err := s.Index.GetIndex(container.ID)
+	if err != nil {
+		return fmt.Errorf("couldn't get index: %s", err)
+	}
+	*reply, err = newFormattedContainer(container, index, args.Encoding)
 	return err
 }
 
@@ -62,8 +64,11 @@ func (s *service) GetContainerByIndex(_ *http.Request, args *GetContainer, reply
 	if err != nil {
 		return err
 	}
-
-	*reply, err = newFormattedContainer(container, args.Encoding)
+	index, err := s.Index.GetIndex(container.ID)
+	if err != nil {
+		return fmt.Errorf("couldn't get index: %s", err)
+	}
+	*reply, err = newFormattedContainer(container, index, args.Encoding)
 	return err
 }
 
@@ -86,7 +91,11 @@ func (s *service) GetContainerRange(r *http.Request, args *GetContainerRange, re
 
 	formattedContainers := make([]FormattedContainer, len(containers))
 	for i, container := range containers {
-		formattedContainers[i], err = newFormattedContainer(container, args.Encoding)
+		index, err := s.Index.GetIndex(container.ID)
+		if err != nil {
+			return fmt.Errorf("couldn't get index: %s", err)
+		}
+		formattedContainers[i], err = newFormattedContainer(container, index, args.Encoding)
 		if err != nil {
 			return err
 		}
@@ -122,7 +131,10 @@ func (s *service) GetContainerByID(r *http.Request, args *GetIndexArgs, reply *F
 	if err != nil {
 		return err
 	}
-
-	*reply, err = newFormattedContainer(container, args.Encoding)
+	index, err := s.Index.GetIndex(container.ID)
+	if err != nil {
+		return fmt.Errorf("couldn't get index: %s", err)
+	}
+	*reply, err = newFormattedContainer(container, index, args.Encoding)
 	return err
 }
