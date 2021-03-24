@@ -210,10 +210,30 @@ func (m *manager) NewNestedPrefixDBManager(prefix []byte) Manager {
 	return m
 }
 
-// NewMeterDBManager wraps each database instance with a meterdb instance. The namespace
+// NewMeterDBManager wraps the current database instance with a meterdb instance.
+// Note: calling this more than once with the same [namespace] will cause a conflict error for the [registerer]
+func (m *manager) NewMeterDBManager(namespace string, registerer prometheus.Registerer) (Manager, error) {
+	currentDB := m.Current()
+	currentMeterDB, err := meterdb.New(namespace, registerer, currentDB.Database)
+	if err != nil {
+		return nil, err
+	}
+	newManager := &manager{
+		databases: make([]*VersionedDatabase, len(m.databases)),
+	}
+	copy(newManager.databases[1:], m.databases[1:])
+	// Overwrite the current database with the meter DB
+	newManager.databases[0] = &VersionedDatabase{
+		Database: currentMeterDB,
+		Version:  currentDB.Version,
+	}
+	return newManager, nil
+}
+
+// NewCompleteMeterDBManager wraps each database instance with a meterdb instance. The namespace
 // is concatenated with the version of the database. Note: calling this more than once
 // with the same [namespace] will cause a conflict error for the [registerer]
-func (m *manager) NewMeterDBManager(namespace string, registerer prometheus.Registerer) (Manager, error) {
+func (m *manager) NewCompleteMeterDBManager(namespace string, registerer prometheus.Registerer) (Manager, error) {
 	return m.wrapManager(func(vdb *VersionedDatabase) (*VersionedDatabase, error) {
 		mdb, err := meterdb.New(fmt.Sprintf("%s_%s", namespace, strings.ReplaceAll(vdb.Version.String(), ".", "_")), registerer, vdb.Database)
 		if err != nil {
