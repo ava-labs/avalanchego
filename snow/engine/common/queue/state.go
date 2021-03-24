@@ -89,6 +89,7 @@ func (ps *state) RemoveRunnableJob() (Job, error) {
 	}
 	jobIntf, exists := ps.jobsCache.Get(jobID)
 	if exists {
+		ps.jobsCache.Evict(jobID)
 		return jobIntf.(Job), ps.jobs.Delete(jobIDBytes)
 	}
 
@@ -100,6 +101,7 @@ func (ps *state) RemoveRunnableJob() (Job, error) {
 	if err != nil {
 		return nil, err
 	}
+	ps.jobsCache.Evict(jobID)
 	return job, ps.jobs.Delete(jobIDBytes)
 }
 
