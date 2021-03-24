@@ -150,7 +150,7 @@ func (i *index) Accept(ctx *snow.Context, containerID ids.ID, containerBytes []b
 	bytes, err := i.codec.Marshal(codecVersion, Container{
 		Bytes:     containerBytes,
 		ID:        containerID,
-		Timestamp: i.clock.Time().Unix(),
+		Timestamp: i.clock.Time().UnixNano(),
 	})
 	if err != nil {
 		return fmt.Errorf("couldn't serialize container %s: %w", containerID, err)

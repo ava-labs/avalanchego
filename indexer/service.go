@@ -33,7 +33,7 @@ func newFormattedContainer(c Container, index uint64, enc formatting.Encoding) (
 		return fc, err
 	}
 	fc.Bytes = bytesStr
-	fc.Timestamp = time.Unix(c.Timestamp, 0)
+	fc.Timestamp = time.Unix(0, c.Timestamp)
 	return fc, nil
 }
 
