@@ -67,10 +67,12 @@ func (s *Server) Initialize(
 	s.factory = factory
 	s.listenAddress = fmt.Sprintf("%s:%d", host, port)
 	s.router = newRouter()
-	s.auth = &auth.Auth{Enabled: authEnabled}
-	if err := s.auth.Password.Set(authPassword); err != nil {
+
+	a, err := auth.New(authEnabled, authPassword)
+	if err != nil {
 		return err
 	}
+	s.auth = a
 
 	s.log.Info("API created with allowed origins: %v", allowedOrigins)
 	corsWrapper := cors.New(cors.Options{
