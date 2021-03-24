@@ -130,13 +130,14 @@ func (api *PrivateMinerAPI) Stop() {
 	api.e.StopMining()
 }
 
-// SetExtra sets the extra data string that is included when this miner mines a block.
-func (api *PrivateMinerAPI) SetExtra(extra string) (bool, error) {
-	if err := api.e.Miner().SetExtra([]byte(extra)); err != nil {
-		return false, err
-	}
-	return true, nil
-}
+// Original Code:
+// // SetExtra sets the extra data string that is included when this miner mines a block.
+// func (api *PrivateMinerAPI) SetExtra(extra string) (bool, error) {
+// 	if err := api.e.Miner().SetExtra([]byte(extra)); err != nil {
+// 		return false, err
+// 	}
+// 	return true, nil
+// }
 
 // SetGasPrice sets the minimum accepted gas price for the miner.
 func (api *PrivateMinerAPI) SetGasPrice(gasPrice hexutil.Big) bool {
