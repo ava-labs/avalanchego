@@ -549,10 +549,6 @@ func (s *stateObject) Balance() *big.Int {
 	return s.data.Balance
 }
 
-//func IsMultiCoinKey(key common.Hash) bool {
-//	return key[0]&0x01 == 0x01
-//}
-
 // NormalizeCoinID ORs the 0th bit of the first byte in
 // [coinID], which ensures this bit will be 1 and all other
 // bits are left the same.
@@ -584,10 +580,6 @@ func (s *stateObject) EnableMultiCoin() bool {
 	s.enableMultiCoin()
 	return true
 }
-
-//func (s *stateObject) IsMultiCoin() bool {
-//	return s.data.IsMultiCoin
-//}
 
 func (s *stateObject) Nonce() uint64 {
 	return s.data.Nonce
