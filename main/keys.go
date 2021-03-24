@@ -33,8 +33,9 @@ const (
 	httpsEnabledKey                         = "http-tls-enabled"
 	httpsKeyFileKey                         = "http-tls-key-file"
 	httpsCertFileKey                        = "http-tls-cert-file"
+	httpAllowedOrigins                      = "http-allowed-origins"
 	apiAuthRequiredKey                      = "api-auth-required"
-	apiAuthPasswordKey                      = "api-auth-password" // #nosec G101
+	apiAuthPasswordFileKey                  = "api-auth-password-file" // #nosec G101
 	bootstrapIPsKey                         = "bootstrap-ips"
 	bootstrapIDsKey                         = "bootstrap-ids"
 	stakingPortKey                          = "staking-port"

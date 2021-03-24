@@ -249,7 +249,7 @@ func (p *peer) ReadMessages() {
 				p.id,
 				formatting.DumpBytes{Bytes: msgBytes},
 				err)
-			return
+			continue
 		}
 
 		p.handle(msg)
@@ -353,6 +353,7 @@ func (p *peer) handle(msg Msg) {
 		return
 	}
 	msgMetrics.numReceived.Inc()
+	msgMetrics.receivedBytes.Add(float64(len(msg.Bytes())))
 
 	switch op {
 	case Version:
@@ -453,6 +454,9 @@ func (p *peer) close() {
 	close(p.sender)
 	p.senderLock.Unlock()
 
+	peerPending := atomic.LoadInt64(&p.pendingBytes)
+	atomic.AddInt64(&p.net.pendingBytes, -peerPending)
+
 	p.net.disconnected(p)
 }
 
@@ -460,7 +464,14 @@ func (p *peer) close() {
 func (p *peer) GetVersion() {
 	msg, err := p.net.b.GetVersion()
 	p.net.log.AssertNoError(err)
-	p.Send(msg)
+	if p.Send(msg) {
+		p.net.getVersion.numSent.Inc()
+		p.net.getVersion.sentBytes.Add(float64(len(msg.Bytes())))
+		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
+	} else {
+		p.net.getVersion.numFailed.Inc()
+		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
+	}
 }
 
 // assumes the [stateLock] is not held
@@ -471,18 +482,32 @@ func (p *peer) Version() {
 		p.net.nodeID,
 		p.net.clock.Unix(),
 		p.net.ip.IP(),
-		p.net.version.String(),
+		p.net.msgVersion.String(),
 	)
 	p.net.stateLock.RUnlock()
 	p.net.log.AssertNoError(err)
-	p.Send(msg)
+	if p.Send(msg) {
+		p.net.version.numSent.Inc()
+		p.net.version.sentBytes.Add(float64(len(msg.Bytes())))
+		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
+	} else {
+		p.net.version.numFailed.Inc()
+		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
+	}
 }
 
 // assumes the [stateLock] is not held
 func (p *peer) GetPeerList() {
 	msg, err := p.net.b.GetPeerList()
 	p.net.log.AssertNoError(err)
-	p.Send(msg)
+	if p.Send(msg) {
+		p.net.getPeerlist.numSent.Inc()
+		p.net.getPeerlist.sentBytes.Add(float64(len(msg.Bytes())))
+		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
+	} else {
+		p.net.getPeerlist.numFailed.Inc()
+		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
+	}
 }
 
 // assumes the stateLock is not held
@@ -498,7 +523,14 @@ func (p *peer) PeerList(peers []utils.IPDesc) {
 		p.net.log.Warn("failed to send PeerList message due to %s", err)
 		return
 	}
-	p.Send(msg)
+	if p.Send(msg) {
+		p.net.peerlist.numSent.Inc()
+		p.net.peerlist.sentBytes.Add(float64(len(msg.Bytes())))
+		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
+	} else {
+		p.net.peerlist.numFailed.Inc()
+		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
+	}
 }
 
 // assumes the [stateLock] is not held
@@ -507,8 +539,11 @@ func (p *peer) Ping() {
 	p.net.log.AssertNoError(err)
 	if p.Send(msg) {
 		p.net.ping.numSent.Inc()
+		p.net.ping.sentBytes.Add(float64(len(msg.Bytes())))
+		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
 	} else {
 		p.net.ping.numFailed.Inc()
+		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
 	}
 }
 
@@ -518,13 +553,18 @@ func (p *peer) Pong() {
 	p.net.log.AssertNoError(err)
 	if p.Send(msg) {
 		p.net.pong.numSent.Inc()
+		p.net.pong.sentBytes.Add(float64(len(msg.Bytes())))
+		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
 	} else {
 		p.net.pong.numFailed.Inc()
+		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
 	}
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) getVersion(_ Msg) { p.Version() }
+func (p *peer) getVersion(msg Msg) {
+	p.Version()
+}
 
 // assumes the [stateLock] is not held
 func (p *peer) version(msg Msg) {
@@ -576,7 +616,7 @@ func (p *peer) version(msg Msg) {
 		return
 	}
 
-	if p.net.version.Before(peerVersion) {
+	if p.net.msgVersion.Before(peerVersion) {
 		if p.net.beacons.Contains(p.id) {
 			p.net.log.Info("beacon %s attempting to connect with newer version %s. You may want to update your client",
 				p.id,
@@ -588,7 +628,7 @@ func (p *peer) version(msg Msg) {
 		}
 	}
 
-	if err := p.net.version.Compatible(peerVersion); err != nil {
+	if err := p.net.msgVersion.Compatible(peerVersion); err != nil {
 		p.net.log.Debug("peer version not compatible due to %s", err)
 
 		if !p.net.beacons.Contains(p.id) {
@@ -627,7 +667,7 @@ func (p *peer) version(msg Msg) {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) getPeerList(_ Msg) {
+func (p *peer) getPeerList(msg Msg) {
 	if p.gotVersion.GetValue() {
 		p.SendPeerList()
 	}
@@ -653,7 +693,9 @@ func (p *peer) peerList(msg Msg) {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) ping(_ Msg) { p.Pong() }
+func (p *peer) ping(_ Msg) {
+	p.Pong()
+}
 
 // assumes the [stateLock] is not held
 func (p *peer) pong(_ Msg) {}

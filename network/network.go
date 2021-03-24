@@ -118,7 +118,7 @@ type network struct {
 	id                                 ids.ShortID
 	ip                                 utils.DynamicIPDesc
 	networkID                          uint32
-	version                            version.Version
+	msgVersion                         version.Version
 	parser                             version.Parser
 	listener                           net.Listener
 	dialer                             Dialer
@@ -333,7 +333,7 @@ func NewNetwork(
 		id:             id,
 		ip:             ip,
 		networkID:      networkID,
-		version:        version,
+		msgVersion:     version,
 		parser:         parser,
 		listener:       listener,
 		dialer:         dialer,
@@ -381,7 +381,7 @@ func NewNetwork(
 		healthConfig:                       healthConfig,
 		benchlistManager:                   benchlistManager,
 	}
-	netw.sendFailRateCalculator = math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time())
+	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time()))
 
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
@@ -417,6 +417,7 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 			sentTo = append(sentTo, vID)
 			n.getAcceptedFrontier.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
+			n.getAcceptedFrontier.sentBytes.Add(float64(len(msg.Bytes())))
 		}
 	}
 	return sentTo
@@ -450,6 +451,7 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 	} else {
 		n.acceptedFrontier.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
+		n.acceptedFrontier.sentBytes.Add(float64(len(msg.Bytes())))
 	}
 }
 
@@ -484,6 +486,7 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 		} else {
 			n.getAccepted.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
+			n.getAccepted.sentBytes.Add(float64(len(msg.Bytes())))
 			sentTo = append(sentTo, vID)
 		}
 	}
@@ -518,6 +521,7 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	} else {
 		n.sendFailRateCalculator.Observe(0, now)
 		n.accepted.numSent.Inc()
+		n.accepted.sentBytes.Add(float64(len(msg.Bytes())))
 	}
 }
 
@@ -546,6 +550,7 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 	}
 	n.getAncestors.numSent.Inc()
 	n.sendFailRateCalculator.Observe(0, now)
+	n.getAncestors.sentBytes.Add(float64(len(msg.Bytes())))
 	return true
 }
 
@@ -573,6 +578,7 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	} else {
 		n.multiPut.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
+		n.multiPut.sentBytes.Add(float64(len(msg.Bytes())))
 	}
 }
 
@@ -597,6 +603,7 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	}
 	n.get.numSent.Inc()
 	n.sendFailRateCalculator.Observe(0, now)
+	n.get.sentBytes.Add(float64(len(msg.Bytes())))
 	return true
 }
 
@@ -630,6 +637,7 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	} else {
 		n.put.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
+		n.put.sentBytes.Add(float64(len(msg.Bytes())))
 	}
 }
 
@@ -668,6 +676,7 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			n.pushQuery.numSent.Inc()
 			sentTo = append(sentTo, vID)
 			n.sendFailRateCalculator.Observe(0, now)
+			n.pushQuery.sentBytes.Add(float64(len(msg.Bytes())))
 		}
 	}
 	return sentTo
@@ -697,6 +706,7 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			n.pullQuery.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
 			sentTo = append(sentTo, vID)
+			n.pullQuery.sentBytes.Add(float64(len(msg.Bytes())))
 		}
 	}
 	return sentTo
@@ -730,6 +740,7 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 	} else {
 		n.sendFailRateCalculator.Observe(0, now)
 		n.chits.numSent.Inc()
+		n.chits.sentBytes.Add(float64(len(msg.Bytes())))
 	}
 }
 
@@ -1496,21 +1507,25 @@ func (n *network) HealthCheck() (interface{}, error) {
 	timeSinceLastMsgReceived := now.Sub(lastMsgReceivedAt)
 	healthy = healthy && timeSinceLastMsgReceived <= n.healthConfig.MaxTimeSinceMsgReceived
 	details["timeSinceLastMsgReceived"] = timeSinceLastMsgReceived.String()
+	n.metrics.timeSinceLastMsgReceived.Set(float64(timeSinceLastMsgReceived.Milliseconds()))
 
 	// Make sure we've sent an outgoing message within the threshold
 	lastMsgSentAt := time.Unix(atomic.LoadInt64(&n.lastMsgSentTime), 0)
 	timeSinceLastMsgSent := now.Sub(lastMsgSentAt)
 	healthy = healthy && timeSinceLastMsgSent <= n.healthConfig.MaxTimeSinceMsgSent
 	details["timeSinceLastMsgSent"] = timeSinceLastMsgSent.String()
+	n.metrics.timeSinceLastMsgSent.Set(float64(timeSinceLastMsgSent.Milliseconds()))
 
 	// Make sure the send queue isn't too full
 	portionFull := float64(pendingSendBytes) / float64(n.maxNetworkPendingSendBytes) // In [0,1]
 	healthy = healthy && portionFull <= n.healthConfig.MaxPortionSendQueueBytesFull
 	details["sendQueuePortionFull"] = portionFull
+	n.metrics.sendQueuePortionFull.Set(portionFull)
 
 	// Make sure the message send failed rate isn't too high
 	healthy = healthy && sendFailRate <= n.healthConfig.MaxSendFailRate
 	details["sendFailRate"] = sendFailRate
+	n.metrics.sendFailRate.Set(sendFailRate)
 
 	// Network layer is unhealthy
 	if !healthy {

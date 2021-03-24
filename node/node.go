@@ -70,7 +70,7 @@ var (
 	errPrimarySubnetNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
 
 	// Version is the version of this code
-	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 2, 3)
+	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 3, 0)
 	versionParser           = version.NewDefaultParser()
 	beaconConnectionTimeout = 1 * time.Minute
 )
@@ -335,22 +335,20 @@ func (b *beaconManager) Disconnected(vdrID ids.ShortID) {
 func (n *Node) Dispatch() error {
 	// Start the HTTP API server
 	go n.Log.RecoverAndPanic(func() {
+		var err error
 		if n.Config.HTTPSEnabled {
 			n.Log.Debug("initializing API server with TLS")
-			err := n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
-			n.Log.Warn("TLS enabled API server dispatch failed with %s. Attempting to create insecure API server", err)
+			err = n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
+		} else {
+			n.Log.Debug("initializing API server without TLS")
+			err = n.APIServer.Dispatch()
 		}
-
-		n.Log.Debug("initializing API server without TLS")
-		err := n.APIServer.Dispatch()
-
 		// When [n].Shutdown() is called, [n.APIServer].Close() is called.
 		// This causes [n.APIServer].Dispatch() to return an error.
 		// If that happened, don't log/return an error here.
 		if !n.shuttingDown.GetValue() {
 			n.Log.Fatal("API server dispatch failed with %s", err)
 		}
-
 		// If the API server isn't running, shut down the node.
 		// If node is already shutting down, this does nothing.
 		n.Shutdown()
@@ -535,6 +533,7 @@ func (n *Node) initAPIServer() error {
 		n.Config.HTTPPort,
 		n.Config.APIRequireAuthToken,
 		n.Config.APIAuthPassword,
+		n.Config.APIAllowedOrigins,
 	)
 }
 
@@ -550,13 +549,19 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	}
 	xChainID := createAVMTx.ID()
 
+	createEVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, evm.ID)
+	if err != nil {
+		return err
+	}
+	cChainID := createEVMTx.ID()
+
 	// If any of these chains die, the node shuts down
 	criticalChains := ids.Set{}
-	criticalChains.Add(constants.PlatformChainID, createAVMTx.ID())
-
-	// Set Prometheus metrics info
-	n.Config.NetworkConfig.MetricsNamespace = constants.PlatformName
-	n.Config.NetworkConfig.Registerer = n.Config.ConsensusParams.Metrics
+	criticalChains.Add(
+		constants.PlatformChainID,
+		xChainID,
+		cChainID,
+	)
 
 	// Manages network timeouts
 	timeoutManager := &timeout.Manager{}
@@ -700,6 +705,9 @@ func (n *Node) initMetricsAPI() error {
 	// It is assumed by components of the system that the Metrics interface is
 	// non-nil. So, it is set regardless of if the metrics API is available or not.
 	n.Config.ConsensusParams.Metrics = registry
+	n.Config.NetworkConfig.MetricsNamespace = constants.PlatformName
+	n.Config.NetworkConfig.Registerer = registry
+
 	if !n.Config.MetricsAPIEnabled {
 		n.Log.Info("skipping metrics API initialization because it has been disabled")
 		return nil
@@ -764,7 +772,11 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	n.Log.Info("initializing Health API")
-	n.healthService = health.NewService(n.Config.HealthCheckFreq, n.Log)
+	healthService, err := health.NewService(n.Config.HealthCheckFreq, n.Log, n.Config.NetworkConfig.MetricsNamespace, n.Config.ConsensusParams.Metrics)
+	if err != nil {
+		return err
+	}
+	n.healthService = healthService
 
 	isBootstrappedFunc := func() (interface{}, error) {
 		if pChainID, err := n.chainManager.Lookup("P"); err != nil {
@@ -780,7 +792,7 @@ func (n *Node) initHealthAPI() error {
 		return nil, nil
 	}
 	// Passes if the P, X and C chains are finished bootstrapping
-	err := n.healthService.RegisterMonotonicCheck("isBootstrapped", isBootstrappedFunc)
+	err = n.healthService.RegisterMonotonicCheck("isBootstrapped", isBootstrappedFunc)
 	if err != nil {
 		return fmt.Errorf("couldn't register isBootstrapped health check: %w", err)
 	}
