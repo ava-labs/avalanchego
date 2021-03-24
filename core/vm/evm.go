@@ -45,7 +45,7 @@ var emptyCodeHash = crypto.Keccak256Hash(nil)
 type (
 	// CanTransferFunc is the signature of a transfer guard function
 	CanTransferFunc   func(StateDB, common.Address, *big.Int) bool
-	CanTransferMCFunc func(StateDB, common.Address, common.Address, *common.Hash, *big.Int) int
+	CanTransferMCFunc func(StateDB, common.Address, common.Address, *common.Hash, *big.Int) bool
 	// TransferFunc is the signature of a transfer function
 	TransferFunc   func(StateDB, common.Address, common.Address, *big.Int)
 	TransferMCFunc func(StateDB, common.Address, common.Address, *common.Hash, *big.Int)
@@ -158,7 +158,7 @@ func NewEVM(ctx Context, statedb StateDB, chainConfig *params.ChainConfig, vmCon
 		StateDB:      statedb,
 		vmConfig:     vmConfig,
 		chainConfig:  chainConfig,
-		chainRules:   chainConfig.Rules(ctx.BlockNumber),
+		chainRules:   chainConfig.AvalancheRules(ctx.BlockNumber, ctx.Time),
 		interpreters: make([]Interpreter, 0, 1),
 	}
 
@@ -290,11 +290,8 @@ func (evm *EVM) CallExpert(caller ContractRef, addr common.Address, input []byte
 		return nil, gas, ErrInsufficientBalance
 	}
 
-	mcerr := evm.Context.CanTransferMC(evm.StateDB, caller.Address(), addr, coinID, value2)
-	if mcerr == 1 {
+	if value2.Sign() != 0 && !evm.Context.CanTransferMC(evm.StateDB, caller.Address(), addr, coinID, value2) {
 		return nil, gas, ErrInsufficientBalance
-	} else if mcerr != 0 {
-		return nil, gas, ErrIncompatibleAccount
 	}
 
 	snapshot := evm.StateDB.Snapshot()
