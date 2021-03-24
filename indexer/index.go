@@ -18,8 +18,9 @@ import (
 )
 
 const (
-	// Maximum number of transaction IDs that can be fetched at a time
-	maxFetchedByRange = 1024
+	// Maximum number of containers IDs that can be fetched at a time
+	// in a call to GetContainerRange
+	MaxFetchedByRange = 1024
 )
 
 var (
@@ -28,6 +29,7 @@ var (
 	indexToContainerPrefix []byte = []byte{0x01}
 	containerToIDPrefix    []byte = []byte{0x02}
 	errNoneAccepted               = errors.New("no containers have been accepted")
+	errNumToFetchZero             = fmt.Errorf("numToFetch must be in [1,%d]", MaxFetchedByRange)
 
 	_ Index = &index{}
 )
@@ -219,9 +221,9 @@ func (i *index) getContainerByIndex(index uint64) (Container, error) {
 func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, error) {
 	// Check arguments for validity
 	if numToFetch == 0 {
-		return nil, nil
-	} else if numToFetch > maxFetchedByRange {
-		return nil, fmt.Errorf("requested %d but maximum page size is %d", numToFetch, maxFetchedByRange)
+		return nil, errNumToFetchZero
+	} else if numToFetch > MaxFetchedByRange {
+		return nil, fmt.Errorf("requested %d but maximum page size is %d", numToFetch, MaxFetchedByRange)
 	}
 	i.lock.RLock()
 	defer i.lock.RUnlock()
@@ -236,7 +238,7 @@ func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, e
 	// Calculate the last index we will fetch
 	lastIndex := math.Min64(startIndex+numToFetch-1, lastAcceptedIndex)
 	// [lastIndex] is always >= [startIndex] so this is safe.
-	// [n] is limited to [maxFetchedByRange] so [containerIDs] can't be crazy big.
+	// [n] is limited to [MaxFetchedByRange] so [containerIDs] can't be crazy big.
 	containers := make([]Container, int(lastIndex)-int(startIndex)+1)
 
 	n := 0

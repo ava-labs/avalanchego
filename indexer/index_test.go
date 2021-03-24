@@ -121,34 +121,34 @@ func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	assert.NoError(err)
 	idx := indexIntf.(*index)
 
-	// Insert [maxFetchedByRange] + 1 containers
-	for i := uint64(0); i < maxFetchedByRange+1; i++ {
+	// Insert [MaxFetchedByRange] + 1 containers
+	for i := uint64(0); i < MaxFetchedByRange+1; i++ {
 		err = idx.Accept(ctx, ids.GenerateTestID(), utils.RandomBytes(32))
 		assert.NoError(err)
 	}
 
 	// Page size too large
-	_, err = idx.GetContainerRange(0, maxFetchedByRange+1)
+	_, err = idx.GetContainerRange(0, MaxFetchedByRange+1)
 	assert.Error(err)
 
 	// Make sure data is right
-	containers, err := idx.GetContainerRange(0, maxFetchedByRange)
+	containers, err := idx.GetContainerRange(0, MaxFetchedByRange)
 	assert.NoError(err)
-	assert.Len(containers, maxFetchedByRange)
+	assert.Len(containers, MaxFetchedByRange)
 
-	containers2, err := idx.GetContainerRange(1, maxFetchedByRange)
+	containers2, err := idx.GetContainerRange(1, MaxFetchedByRange)
 	assert.NoError(err)
-	assert.Len(containers2, maxFetchedByRange)
+	assert.Len(containers2, MaxFetchedByRange)
 
 	assert.Equal(containers[1], containers2[0])
-	assert.Equal(containers[maxFetchedByRange-1], containers2[maxFetchedByRange-2])
+	assert.Equal(containers[MaxFetchedByRange-1], containers2[MaxFetchedByRange-2])
 
 	// Should have last 2 elements
-	containers, err = idx.GetContainerRange(maxFetchedByRange-1, maxFetchedByRange)
+	containers, err = idx.GetContainerRange(MaxFetchedByRange-1, MaxFetchedByRange)
 	assert.NoError(err)
 	assert.Len(containers, 2)
-	assert.EqualValues(containers[1], containers2[maxFetchedByRange-1])
-	assert.EqualValues(containers[0], containers2[maxFetchedByRange-2])
+	assert.EqualValues(containers[1], containers2[MaxFetchedByRange-1])
+	assert.EqualValues(containers[0], containers2[MaxFetchedByRange-2])
 }
 
 func TestIndexRollBackAccepted(t *testing.T) {

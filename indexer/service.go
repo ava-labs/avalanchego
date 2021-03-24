@@ -76,7 +76,7 @@ type GetContainerRange struct {
 // GetContainerRange returns the transactions at index [startIndex], [startIndex+1], ... , [startIndex+n-1]
 // If [n] == 0, returns an empty response (i.e. null).
 // If [startIndex] > the last accepted index, returns an error (unless the above apply.)
-// If [n] > [maxFetchedByRange], returns an error.
+// If [n] > [MaxFetchedByRange], returns an error.
 // If we run out of transactions, returns the ones fetched before running out.
 func (s *service) GetContainerRange(r *http.Request, args *GetContainerRange, reply *[]FormattedContainer) error {
 	containers, err := s.Index.GetContainerRange(uint64(args.StartIndex), uint64(args.NumToFetch))
