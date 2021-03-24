@@ -24,10 +24,17 @@ func TestInterface(t *testing.T) {
 
 func BenchmarkInterface(b *testing.B) {
 	for _, bench := range database.Benchmarks {
-		db := memdb.New()
+		db := New([]byte("hello"), memdb.New())
 
 		for _, size := range []int{32, 64, 128, 256, 512, 1024, 2048, 4096} {
 			bench(b, db, "prefixdb", 1000, size)
+		}
+	}
+	for _, bench := range database.Benchmarks {
+		db := NewNested([]byte("hello"), memdb.New())
+
+		for _, size := range []int{32, 64, 128, 256, 512, 1024, 2048, 4096} {
+			bench(b, db, "prefixdb_nested", 1000, size)
 		}
 	}
 }
