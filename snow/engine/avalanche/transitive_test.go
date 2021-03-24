@@ -727,6 +727,7 @@ func TestEngineAbandonResponse(t *testing.T) {
 	sender.GetF = func(vID ids.ShortID, requestID uint32, vtxID ids.ID) {
 		*reqID = requestID
 	}
+	sender.CantChits = false
 
 	if err := te.PullQuery(vdr, 0, vtx.ID()); err != nil {
 		t.Fatal(err)
@@ -2341,6 +2342,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 
 	sender.GetF = nil
 	manager.ParseF = nil
+	sender.CantChits = false
 
 	if err := te.GetFailed(vdr, *requestID); err != nil {
 		t.Fatal(err)
