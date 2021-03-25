@@ -5,6 +5,7 @@ package database
 
 import (
 	"errors"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -62,6 +63,25 @@ func GetUInt32(db KeyValueReader, key []byte) (uint32, error) {
 	}
 	p := wrappers.Packer{Bytes: bytes}
 	return p.UnpackInt(), nil
+}
+
+func PutTimestamp(db KeyValueWriter, key []byte, val time.Time) error {
+	valBytes, err := val.MarshalBinary()
+	if err != nil {
+		return err
+	}
+	return db.Put(key, valBytes)
+}
+func GetTimestamp(db KeyValueReader, key []byte) (time.Time, error) {
+	valBytes, err := db.Get(key)
+	if err != nil {
+		return time.Time{}, err
+	}
+	val := time.Time{}
+	if err := val.UnmarshalBinary(valBytes); err != nil {
+		return time.Time{}, err
+	}
+	return val, nil
 }
 
 func Size(db Iteratee) (int, error) {
