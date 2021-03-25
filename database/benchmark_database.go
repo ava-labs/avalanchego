@@ -110,6 +110,7 @@ func BenchmarkBatchPut(b *testing.B, db Database, name string, count int, size i
 			if err := batch.Write(); err != nil {
 				b.Fatalf("Unexpected error in batch.Write: %s", err)
 			}
+			batch.Reset()
 		}
 	})
 }
