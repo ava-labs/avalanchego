@@ -318,7 +318,7 @@ func (vm *VM) Initialize(
 	config.GPO.Default = params.MinGasPrice
 	config.TxPool.PriceLimit = params.MinGasPrice.Uint64()
 	config.TxPool.NoLocals = !vm.CLIConfig.LocalTxsEnabled
-	config.LastAcceptedBlockNumber = vm.CLIConfig.LastAcceptedBlockNumber
+	config.AllowUnfinalizedQueries = vm.CLIConfig.AllowUnfinalizedQueries
 
 	if err := config.SetGCMode("archive"); err != nil {
 		panic(err)
