@@ -1170,6 +1170,7 @@ func RPCMarshalHeader(head *types.Header) map[string]interface{} {
 		"timestamp":        hexutil.Uint64(head.Time),
 		"transactionsRoot": head.TxHash,
 		"receiptsRoot":     head.ReceiptHash,
+		"extDataHash":      head.ExtDataHash,
 	}
 }
 
@@ -1179,10 +1180,7 @@ func RPCMarshalHeader(head *types.Header) map[string]interface{} {
 func RPCMarshalBlock(block *types.Block, inclTx bool, fullTx bool) (map[string]interface{}, error) {
 	fields := RPCMarshalHeader(block.Header())
 	fields["size"] = hexutil.Uint64(block.Size())
-
-	if len(block.ExtraData()) != 0 {
-		fields["blockExtraData"] = hexutil.Encode(block.ExtraData())
-	}
+	fields["blockExtraData"] = hexutil.Bytes(block.ExtData())
 
 	if inclTx {
 		formatTx := func(tx *types.Transaction) (interface{}, error) {

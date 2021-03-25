@@ -41,7 +41,6 @@ import (
 	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 )
 
@@ -59,38 +58,43 @@ var DefaultLightGPOConfig = gasprice.Config{
 	MaxPrice:   gasprice.DefaultMaxPrice,
 }
 
-// DefaultConfig contains default settings for use on the Ethereum main net.
-var DefaultConfig = Config{
-	SyncMode: downloader.FastSync,
-	Ethash: ethash.Config{
-		CacheDir:         "ethash",
-		CachesInMem:      2,
-		CachesOnDisk:     3,
-		CachesLockMmap:   false,
-		DatasetsInMem:    1,
-		DatasetsOnDisk:   2,
-		DatasetsLockMmap: false,
-	},
-	NetworkId:               1,
-	LightPeers:              100,
-	UltraLightFraction:      75,
-	DatabaseCache:           512,
-	TrieCleanCache:          154,
-	TrieCleanCacheJournal:   "triecache",
-	TrieCleanCacheRejournal: 60 * time.Minute,
-	TrieDirtyCache:          256,
-	TrieTimeout:             60 * time.Minute,
-	SnapshotCache:           102,
-	Miner: miner.Config{
-		GasFloor: 8000000,
-		GasCeil:  8000000,
-		GasPrice: big.NewInt(params.GWei),
-		Recommit: 3 * time.Second,
-	},
-	TxPool:      core.DefaultTxPoolConfig,
-	RPCGasCap:   25000000,
-	GPO:         DefaultFullGPOConfig,
-	RPCTxFeeCap: 1, // 1 ether
+// DefaultConfig contains default settings for use on the Avalanche main net.
+var DefaultConfig = NewDefaultConfig()
+
+func NewDefaultConfig() Config {
+	return Config{
+		SyncMode: downloader.FastSync,
+		Ethash: ethash.Config{
+			CacheDir:         "ethash",
+			CachesInMem:      2,
+			CachesOnDisk:     3,
+			CachesLockMmap:   false,
+			DatasetsInMem:    1,
+			DatasetsOnDisk:   2,
+			DatasetsLockMmap: false,
+		},
+		NetworkId:               1,
+		LightPeers:              100,
+		UltraLightFraction:      75,
+		DatabaseCache:           512,
+		TrieCleanCache:          154,
+		TrieCleanCacheJournal:   "triecache",
+		TrieCleanCacheRejournal: 60 * time.Minute,
+		TrieDirtyCache:          256,
+		TrieTimeout:             60 * time.Minute,
+		SnapshotCache:           102,
+		Miner: miner.Config{
+			GasFloor:              8000000,
+			GasCeil:               8000000,
+			ApricotPhase1GasLimit: params.ApricotPhase1GasLimit,
+			GasPrice:              big.NewInt(params.GWei),
+			Recommit:              3 * time.Second,
+		},
+		TxPool:      core.DefaultTxPoolConfig,
+		RPCGasCap:   25000000,
+		GPO:         DefaultFullGPOConfig,
+		RPCTxFeeCap: 1, // 1 ether
+	}
 }
 
 func init() {
@@ -210,35 +214,4 @@ func (cfg *Config) SetGCMode(gcmode string) error {
 		return errors.New("invalid gcmode value")
 	}
 	return nil
-}
-
-func MyDefaultConfig() Config {
-	config := DefaultConfig
-	chainConfig := &params.ChainConfig{
-		ChainID:             big.NewInt(42222),
-		HomesteadBlock:      big.NewInt(0),
-		DAOForkBlock:        big.NewInt(0),
-		DAOForkSupport:      true,
-		EIP150Block:         big.NewInt(0),
-		EIP150Hash:          common.HexToHash("0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0"),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
-		IstanbulBlock:       big.NewInt(0),
-		Ethash:              nil,
-	}
-	genBalance := big.NewInt(1000000000000000000)
-
-	config.Genesis = &core.Genesis{
-		Config:     chainConfig,
-		Nonce:      0,
-		Number:     0,
-		ExtraData:  hexutil.MustDecode("0x00"),
-		GasLimit:   100000000,
-		Difficulty: big.NewInt(0),
-		Alloc:      core.GenesisAlloc{common.Address{}: {Balance: genBalance}},
-	}
-	return config
 }
