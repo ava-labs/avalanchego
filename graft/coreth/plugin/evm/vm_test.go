@@ -2524,7 +2524,7 @@ func TestFutureBlock(t *testing.T) {
 	}
 }
 
-func TestBlockNumber(t *testing.T) {
+func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 	issuer1, vm1, _, sharedMemory1 := GenesisVM(t, true)
 
 	defer func() {
