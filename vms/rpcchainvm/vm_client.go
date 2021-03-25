@@ -443,9 +443,16 @@ func (b *BlockClient) Verify() error {
 		Id: b.id[:],
 	})
 	if err != nil {
-		return err
+		// This block could have failed verification because the block was evicted from
+		// the VM's cache and now the VM doesn't know about it.
+		// Have the VM re-parse the block and try again.
+		_, err := b.vm.client.BlockVerifyWithBytes(context.Background(), &vmproto.BlockVerifyWithBytesRequest{
+			BlockBytes: b.bytes,
+		})
+		if err != nil {
+			return err
+		}
 	}
-
 	b.vm.blks[b.id] = b
 	return nil
 }

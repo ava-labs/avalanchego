@@ -334,6 +334,17 @@ func (vm *VMServer) BlockVerify(_ context.Context, req *vmproto.BlockVerifyReque
 	return &vmproto.BlockVerifyResponse{}, blk.Verify()
 }
 
+func (vm *VMServer) BlockVerifyWithBytes(
+	_ context.Context,
+	req *vmproto.BlockVerifyWithBytesRequest,
+) (*vmproto.BlockVerifyResponse, error) {
+	blk, err := vm.vm.ParseBlock(req.BlockBytes)
+	if err != nil {
+		return nil, err
+	}
+	return &vmproto.BlockVerifyResponse{}, blk.Verify()
+}
+
 func (vm *VMServer) BlockAccept(_ context.Context, req *vmproto.BlockAcceptRequest) (*vmproto.BlockAcceptResponse, error) {
 	id, err := ids.ToID(req.Id)
 	if err != nil {

@@ -38,6 +38,5 @@ require (
 	golang.org/x/sys v0.0.0-20200824131525-c12d262b63d8 // indirect
 	google.golang.org/genproto v0.0.0-20200218151345-dad8c97a84f5 // indirect
 	google.golang.org/grpc v1.29.1
-	google.golang.org/protobuf v1.23.0
 	gotest.tools v2.2.0+incompatible
 )
