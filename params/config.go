@@ -85,7 +85,7 @@ var (
 		PetersburgBlock:             big.NewInt(0),
 		IstanbulBlock:               big.NewInt(0),
 		MuirGlacierBlock:            big.NewInt(0),
-		ApricotPhase1BlockTimestamp: big.NewInt(1617134400), // 4pm EST 3/30/2021
+		ApricotPhase1BlockTimestamp: big.NewInt(1617199200), // 10am EST 3/31/2021
 	}
 
 	// AvalancheApricotFujiChainConfig is the configuration for the Fuji Test Network
@@ -102,7 +102,7 @@ var (
 		PetersburgBlock:             big.NewInt(0),
 		IstanbulBlock:               big.NewInt(0),
 		MuirGlacierBlock:            big.NewInt(0),
-		ApricotPhase1BlockTimestamp: big.NewInt(1616702400), // 4pm EST 3/25/2021
+		ApricotPhase1BlockTimestamp: big.NewInt(1616767200), // 10am EST 3/26/2021
 	}
 
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
