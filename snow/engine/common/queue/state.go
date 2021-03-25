@@ -17,7 +17,7 @@ import (
 
 const (
 	dependentsCacheSize = 1024
-	jobsCacheSize       = 2048
+	jobsCacheSize       = 4096
 )
 
 var (

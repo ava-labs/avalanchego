@@ -136,6 +136,9 @@ func (j *Jobs) ExecuteAll(ctx *snow.Context, events ...snow.EventDispatcher) (in
 			event.Accept(ctx, job.ID(), job.Bytes())
 		}
 	}
+	// Clear caches
+	j.state.jobsCache.Flush()
+	j.state.dependentsCache.Flush()
 
 	ctx.Log.Info("executed %d operations", numExecuted)
 	return numExecuted, nil
