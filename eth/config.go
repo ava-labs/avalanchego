@@ -199,8 +199,8 @@ type Config struct {
 	// CheckpointOracle is the configuration for checkpoint oracle.
 	CheckpointOracle *params.CheckpointOracleConfig `toml:",omitempty"`
 
-	// LastAcceptedBlockNumber check last accepted for block number
-	LastAcceptedBlockNumber bool
+	// AllowUnfinalizedQueries allow unfinalized queries
+	AllowUnfinalizedQueries bool
 }
 
 func (cfg *Config) SetGCMode(gcmode string) error {

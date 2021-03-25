@@ -1512,6 +1512,8 @@ func TestNonCanonicalAccept(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	vm1.chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = true
+
 	blkBHeight := vm1BlkB.Height()
 	blkBHash := vm1BlkB.(*Block).ethBlock.Hash()
 	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
@@ -1717,6 +1719,8 @@ func TestStickyPreference(t *testing.T) {
 	if err := vm1.SetPreference(vm1BlkB.ID()); err != nil {
 		t.Fatal(err)
 	}
+
+	vm1.chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = true
 
 	blkBHeight := vm1BlkB.Height()
 	blkBHash := vm1BlkB.(*Block).ethBlock.Hash()
@@ -2603,10 +2607,15 @@ func TestBlockNumber(t *testing.T) {
 
 	blkBHeight := vm1BlkA.Height()
 	blkBHash := vm1BlkA.(*Block).ethBlock.Hash()
+
+	vm1.chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = true
+
 	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}
-	vm1.chain.BlockChain().GetVMConfig().LastAcceptedBlockNumber = true
+
+	vm1.chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = false
+
 	if b := vm1.chain.GetBlockByNumber(blkBHeight); b != nil {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}

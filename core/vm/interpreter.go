@@ -56,8 +56,8 @@ type Config struct {
 
 	ExtraEips []int // Additional EIPS that are to be enabled
 
-	// LastAcceptedBlockNumber check last accepted for block number
-	LastAcceptedBlockNumber bool
+	// AllowUnfinalizedQueries allow unfinalized queries
+	AllowUnfinalizedQueries bool
 }
 
 // Interpreter is used to run Ethereum based contracts and will utilise the
