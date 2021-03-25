@@ -249,7 +249,7 @@ func (p *peer) ReadMessages() {
 				p.id,
 				formatting.DumpBytes{Bytes: msgBytes},
 				err)
-			return
+			continue
 		}
 
 		p.handle(msg)

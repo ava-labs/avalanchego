@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,6 +25,9 @@ const (
 
 	headerKey      = "Authorization"
 	headerValStart = "Bearer "
+
+	// number of bytes to use when generating a new random token ID
+	tokenIDByteLen = 20
 )
 
 var (
@@ -36,23 +41,37 @@ var (
 		headerKey,
 		headerValStart,
 	)
-	ErrTokenExpired                = errors.New("the provided auth token was expired")
+	ErrInvalidSigningMethod        = fmt.Errorf("auth token didn't specify the HS256 signing method correctly")
 	ErrTokenRevoked                = errors.New("the provided auth token was revoked")
 	ErrTokenInsufficientPermission = errors.New("the provided auth token does not allow access to this endpoint")
 
-	errWrongPassword      = errors.New("incorrect password")
-	errInvalidTokenFormat = errors.New("token is invalid format")
-	errSamePassword       = errors.New("new password can't be same as old password")
+	errWrongPassword = errors.New("incorrect password")
+	errSamePassword  = errors.New("new password can't be same as old password")
 )
 
 // Auth handles HTTP API authorization for this node
 type Auth struct {
-	Enabled  bool          // True iff API calls need auth token
-	Password password.Hash // Hash of the password. Can be changed via API call.
+	lock     sync.RWMutex        // Prevent race condition when accessing password
+	enabled  bool                // True iff API calls need auth token
+	password password.Hash       // Hash of the password. Can be changed via API call.
+	clock    timer.Clock         // Tells the time. Can be faked for testing
+	revoked  map[string]struct{} // Set of token IDs that have been revoked
+}
 
-	lock    sync.RWMutex // Prevent race condition when accessing password
-	clock   timer.Clock  // Tells the time. Can be faked for testing
-	revoked []string     // List of tokens that have been revoked
+func New(enabled bool, password string) (*Auth, error) {
+	auth := &Auth{
+		enabled: enabled,
+		revoked: make(map[string]struct{}),
+	}
+	return auth, auth.password.Set(password)
+}
+
+func NewFromHash(enabled bool, password password.Hash) *Auth {
+	return &Auth{
+		enabled:  enabled,
+		password: password,
+		revoked:  make(map[string]struct{}),
+	}
 }
 
 // Custom claim type used for API access token
@@ -62,26 +81,15 @@ type endpointClaims struct {
 	// Each element is an endpoint that the token allows access to
 	// If endpoints has an element "*", allows access to all API endpoints
 	// In this case, "*" should be the only element of [endpoints]
-	Endpoints []string
+	Endpoints []string `json:"endpoints,omitempty"`
 }
 
 // getTokenKey returns the key to use when making and parsing tokens
-func (auth *Auth) getTokenKey(*jwt.Token) (interface{}, error) {
-	return auth.Password.Password[:], nil
-}
-
-// getToken gets the JWT token from the request header
-// Assumes the header is this form:
-// "Authorization": "Bearer TOKEN.GOES.HERE"
-func getToken(r *http.Request) (string, error) {
-	rawHeader := r.Header.Get(headerKey) // Should be "Bearer AUTH.TOKEN.HERE"
-	if rawHeader == "" {
-		return "", ErrNoToken
+func (auth *Auth) getTokenKey(t *jwt.Token) (interface{}, error) {
+	if t.Method != jwt.SigningMethodHS256 {
+		return nil, ErrInvalidSigningMethod
 	}
-	if !strings.HasPrefix(rawHeader, headerValStart) {
-		return "", errInvalidTokenFormat
-	}
-	return rawHeader[len(headerValStart):], nil // Returns actual auth token. Slice guaranteed to not go OOB
+	return auth.password.Password[:], nil
 }
 
 // Create and return a new token that allows access to each API endpoint such
@@ -90,9 +98,11 @@ func getToken(r *http.Request) (string, error) {
 func (auth *Auth) newToken(password string, endpoints []string) (string, error) {
 	auth.lock.RLock()
 	defer auth.lock.RUnlock()
-	if !auth.Password.Check(password) {
+
+	if !auth.password.Check(password) {
 		return "", errWrongPassword
 	}
+
 	canAccessAll := false
 	for _, endpoint := range endpoints {
 		if endpoint == "*" {
@@ -100,9 +110,17 @@ func (auth *Auth) newToken(password string, endpoints []string) (string, error) 
 			break
 		}
 	}
+
+	idBytes := [tokenIDByteLen]byte{}
+	if _, err := rand.Read(idBytes[:]); err != nil {
+		return "", fmt.Errorf("failed to generate the unique token ID due to %w", err)
+	}
+	id := base64.URLEncoding.EncodeToString(idBytes[:])
+
 	claims := endpointClaims{
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: auth.clock.Time().Add(TokenLifespan).Unix(),
+			Id:        id,
 		},
 	}
 	if canAccessAll {
@@ -110,9 +128,8 @@ func (auth *Auth) newToken(password string, endpoints []string) (string, error) 
 	} else {
 		claims.Endpoints = endpoints
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(auth.Password.Password[:]) // Sign the token and return its string repr.
-
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, &claims)
+	return token.SignedString(auth.password.Password[:]) // Sign the token and return its string repr.
 }
 
 // Revokes the token whose string repr. is [tokenStr]; it will not be accepted as authorization for future API calls.
@@ -124,21 +141,59 @@ func (auth *Auth) newToken(password string, endpoints []string) (string, error) 
 func (auth *Auth) revokeToken(tokenStr string, password string) error {
 	auth.lock.Lock()
 	defer auth.lock.Unlock()
-	if !auth.Password.Check(password) {
+
+	if !auth.password.Check(password) {
 		return errWrongPassword
 	}
 
 	// See if token is well-formed and signature is right
-	token, err := jwt.Parse(tokenStr, auth.getTokenKey)
+	token, err := jwt.ParseWithClaims(tokenStr, &endpointClaims{}, auth.getTokenKey)
 	if err != nil {
 		return err
 	}
 
-	// Only need to revoke if the token is valid
-	if token.Valid {
-		auth.revoked = append(auth.revoked, tokenStr)
+	// If the token isn't valid, it has essentially already been revoked.
+	if !token.Valid {
+		return nil
 	}
+
+	claims, ok := token.Claims.(*endpointClaims)
+	if !ok {
+		return fmt.Errorf("expected auth token's claims to be type endpointClaims but is %T", token.Claims)
+	}
+	auth.revoked[claims.Id] = struct{}{}
 	return nil
+}
+
+// Authenticates [tokenStr] for access to [url].
+func (auth *Auth) authenticateToken(tokenStr, url string) error {
+	auth.lock.RLock()
+	defer auth.lock.RUnlock()
+
+	token, err := jwt.ParseWithClaims(tokenStr, &endpointClaims{}, auth.getTokenKey)
+	if err != nil { // Probably because signature wrong
+		return err
+	}
+
+	// Make sure this token gives access to the requested endpoint
+	claims, ok := token.Claims.(*endpointClaims)
+	if !ok {
+		// Error is intentionally dropped here as there is nothing left to do
+		// with it.
+		return fmt.Errorf("expected auth token's claims to be type endpointClaims but is %T", token.Claims)
+	}
+
+	_, revoked := auth.revoked[claims.Id]
+	if revoked {
+		return ErrTokenRevoked
+	}
+
+	for _, endpoint := range claims.Endpoints {
+		if endpoint == "*" || strings.HasSuffix(url, endpoint) {
+			return nil
+		}
+	}
+	return ErrTokenInsufficientPermission
 }
 
 // Change the password required to create and revoke tokens.
@@ -154,100 +209,56 @@ func (auth *Auth) changePassword(oldPassword, newPassword string) error {
 	auth.lock.Lock()
 	defer auth.lock.Unlock()
 
-	if !auth.Password.Check(oldPassword) {
+	if !auth.password.Check(oldPassword) {
 		return errWrongPassword
 	}
 	if err := password.IsValid(newPassword, password.OK); err != nil {
 		return err
 	}
-	if err := auth.Password.Set(newPassword); err != nil {
+	if err := auth.password.Set(newPassword); err != nil {
 		return err
 	}
 
 	// All the revoked tokens are now invalid; no need to mark specifically as
 	// revoked.
-	auth.revoked = nil
+	auth.revoked = make(map[string]struct{})
 	return nil
 }
 
 // WrapHandler wraps a handler. Before passing a request to the handler, check that
 // an auth token was provided (if necessary) and that it is valid/unexpired.
 func (auth *Auth) WrapHandler(h http.Handler) http.Handler {
-	if !auth.Enabled { // Auth tokens aren't in use. Do nothing.
+	if !auth.enabled { // Auth tokens aren't in use. Do nothing.
 		return h
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if path.Base(r.URL.Path) == Endpoint { // Don't require auth token to hit auth endpoint
+		// Don't require auth token to hit auth endpoint
+		if path.Base(r.URL.Path) == Endpoint {
 			h.ServeHTTP(w, r)
 			return
 		}
 
-		tokenStr, err := getToken(r) // Get the token from the header
-		if err == ErrNoToken {
-			// Error is intentionally dropped here as there is nothing left to
-			// do with it.
-			writeUnauthorizedResponse(w, err)
+		// Should be "Bearer AUTH.TOKEN.HERE"
+		rawHeader := r.Header.Get(headerKey)
+		if rawHeader == "" {
+			writeUnauthorizedResponse(w, ErrNoToken)
 			return
-		} else if err != nil {
+		}
+		if !strings.HasPrefix(rawHeader, headerValStart) {
 			// Error is intentionally dropped here as there is nothing left to
 			// do with it.
 			writeUnauthorizedResponse(w, ErrAuthHeaderNotParsable)
 			return
 		}
+		// Returns actual auth token. Slice guaranteed to not go OOB
+		tokenStr := rawHeader[len(headerValStart):]
 
-		auth.lock.RLock()
-		token, err := jwt.ParseWithClaims(tokenStr, &endpointClaims{}, auth.getTokenKey)
-		auth.lock.RUnlock()
-
-		if err != nil { // Probably because signature wrong
-			// Error is intentionally dropped here as there is nothing left to
-			// do with it.
-
-			if strings.Contains(err.Error(), "expired") {
-				writeUnauthorizedResponse(w, ErrTokenExpired)
-				return
-			}
-
-			writeUnauthorizedResponse(w, fmt.Errorf("invalid auth token: %s", err))
-			return
-		}
-
-		// Make sure this token gives access to the requested endpoint
-		claims, ok := token.Claims.(*endpointClaims)
-		if !ok {
-			// Error is intentionally dropped here as there is nothing left to
-			// do with it.
-			err := fmt.Errorf("expected auth token's claims to be type endpointClaims but is %T", token.Claims)
+		if err := auth.authenticateToken(tokenStr, r.URL.Path); err != nil {
 			writeUnauthorizedResponse(w, err)
 			return
 		}
-		canAccess := false // true iff the token authorizes access to the API
-		for _, endpoint := range claims.Endpoints {
-			if endpoint == "*" || strings.HasSuffix(r.URL.Path, endpoint) {
-				canAccess = true
-				break
-			}
-		}
-		if !canAccess {
-			// Error is intentionally dropped here as there is nothing left to
-			// do with it.
-			writeUnauthorizedResponse(w, ErrTokenInsufficientPermission)
-			return
-		}
 
-		auth.lock.RLock()
-		for _, revokedToken := range auth.revoked { // Make sure this token wasn't revoked
-			if revokedToken == tokenStr {
-				// Error is intentionally dropped here as there is nothing left
-				// to do with it.
-				writeUnauthorizedResponse(w, ErrTokenRevoked)
-				auth.lock.RUnlock()
-				return
-			}
-		}
-		auth.lock.RUnlock()
-
-		h.ServeHTTP(w, r) // Authorization successful
+		h.ServeHTTP(w, r)
 	})
 }
 
