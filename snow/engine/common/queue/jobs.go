@@ -50,7 +50,8 @@ func (j *Jobs) SetParser(parser Parser) { j.state.parser = parser }
 
 func (j *Jobs) Has(jobID ids.ID) (bool, error) { return j.state.HasJob(jobID) }
 
-// Push adds a new job to the queue.
+// Push adds a new job to the queue. Returns true if [job] was added to the queue and false
+// if [job] was already in the queue.
 func (j *Jobs) Push(job Job) (bool, error) {
 	jobID := job.ID()
 	if has, err := j.state.HasJob(jobID); err != nil {
@@ -185,7 +186,8 @@ func (jm *JobsWithMissing) Has(jobID ids.ID) (bool, error) {
 	return jm.Jobs.Has(jobID)
 }
 
-// Push adds a new job to the queue.
+// Push adds a new job to the queue. Returns true if [job] was added to the queue and false
+// if [job] was already in the queue.
 func (jm *JobsWithMissing) Push(job Job) (bool, error) {
 	jobID := job.ID()
 	if has, err := jm.Has(jobID); err != nil {
