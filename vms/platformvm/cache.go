@@ -147,8 +147,9 @@ type internalStateImpl struct {
 	subnetBaseDB database.Database
 	subnetDB     linkeddb.LinkedDB
 
-	chainCache cache.Cacher
-	chainDB    database.Database
+	addedChains map[ids.ID][]*Tx
+	chainCache  cache.Cacher
+	chainDB     database.Database
 
 	originalTimestamp, timestamp         time.Time
 	originalCurrentSupply, currentSupply uint64
@@ -188,8 +189,9 @@ func loadState(db database.Database) (internalState, error) {
 		subnetBaseDB: subnetBaseDB,
 		subnetDB:     linkeddb.NewDefault(subnetBaseDB),
 
-		chainCache: &cache.LRU{Size: chainCacheSize},
-		chainDB:    prefixdb.New(chainPrefix, baseDB),
+		addedChains: make(map[ids.ID][]*Tx),
+		chainCache:  &cache.LRU{Size: chainCacheSize},
+		chainDB:     prefixdb.New(chainPrefix, baseDB),
 
 		singletonDB: prefixdb.New(singletonPrefix, baseDB),
 	}
@@ -259,10 +261,13 @@ func (st *internalStateImpl) SetCurrentSupply(currentSupply uint64) { st.current
 func (st *internalStateImpl) GetLastAccepted() ids.ID             { return st.lastAccepted }
 func (st *internalStateImpl) SetLastAccepted(lastAccepted ids.ID) { st.lastAccepted = lastAccepted }
 
+func (st *internalStateImpl) GetChains(subnetID ids.ID) ([]*Tx, error) {
+}
 func (st *internalStateImpl) AddChain(createChainTxIntf *Tx) {
 	createChainTx := createChainTxIntf.UnsignedTx.(*UnsignedCreateChainTx)
-	_ = createChainTx
-
+	subnetID := createChainTx.SubnetID
+	st.addedChains[subnetID] = append(st.addedChains[subnetID], createChainTxIntf)
+	st.AddTx(createChainTxIntf, Committed)
 }
 
 // GetChains(subnetID ids.ID) ([]*Tx, error)
