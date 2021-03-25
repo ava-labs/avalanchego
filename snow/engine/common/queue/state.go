@@ -101,7 +101,6 @@ func (ps *state) RemoveRunnableJob() (Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	ps.jobsCache.Evict(jobID)
 	return job, ps.jobs.Delete(jobIDBytes)
 }
 
