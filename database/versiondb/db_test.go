@@ -374,12 +374,11 @@ func TestSetDatabaseClosed(t *testing.T) {
 
 func BenchmarkInterface(b *testing.B) {
 	for _, bench := range database.Benchmarks {
-		baseDB := memdb.New()
-		db := New(baseDB)
-		defer db.Close()
-
 		for _, size := range []int{32, 64, 128, 256, 512, 1024, 2048, 4096} {
+			baseDB := memdb.New()
+			db := New(baseDB)
 			bench(b, db, "versiondb", 1000, size)
+			db.Close()
 		}
 	}
 }

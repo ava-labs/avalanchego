@@ -51,32 +51,32 @@ func TestInterface(t *testing.T) {
 }
 
 func BenchmarkInterface(b *testing.B) {
-	for _, bench := range database.Benchmarks {
-		listener := bufconn.Listen(bufSize)
-		server := grpc.NewServer()
-		rpcdbproto.RegisterDatabaseServer(server, NewServer(memdb.New()))
-		go func() {
-			if err := server.Serve(listener); err != nil {
-				log.Fatalf("Server exited with error: %v", err)
-			}
-		}()
-
-		dialer := grpc.WithContextDialer(
-			func(context.Context, string) (net.Conn, error) {
-				return listener.Dial()
-			})
-
-		ctx := context.Background()
-		conn, err := grpc.DialContext(ctx, "", dialer, grpc.WithInsecure())
-		if err != nil {
-			b.Fatalf("Failed to dial: %s", err)
+	listener := bufconn.Listen(bufSize)
+	server := grpc.NewServer()
+	rpcdbproto.RegisterDatabaseServer(server, NewServer(memdb.New()))
+	go func() {
+		if err := server.Serve(listener); err != nil {
+			log.Fatalf("Server exited with error: %v", err)
 		}
+	}()
 
-		db := NewClient(rpcdbproto.NewDatabaseClient(conn))
+	dialer := grpc.WithContextDialer(
+		func(context.Context, string) (net.Conn, error) {
+			return listener.Dial()
+		})
 
+	ctx := context.Background()
+	conn, err := grpc.DialContext(ctx, "", dialer, grpc.WithInsecure())
+	if err != nil {
+		b.Fatalf("Failed to dial: %s", err)
+	}
+
+	defer conn.Close()
+
+	for _, bench := range database.Benchmarks {
 		for _, size := range []int{32, 64, 128, 256, 512, 1024, 2048, 4096} {
+			db := NewClient(rpcdbproto.NewDatabaseClient(conn))
 			bench(b, db, "rpcdb", 1000, size)
 		}
-		conn.Close()
 	}
 }
