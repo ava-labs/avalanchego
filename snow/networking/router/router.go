@@ -67,4 +67,5 @@ type InternalRouter interface {
 	QueryFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
 	Connected(validatorID ids.ShortID)
 	Disconnected(validatorID ids.ShortID)
+	AppRequestFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
 }

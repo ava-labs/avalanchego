@@ -39,8 +39,8 @@ type ExternalSender interface {
 
 	// Send an application-level request
 	AppRequest(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, appRequestBytes []byte) []ids.ShortID
-	AppResponse(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, appResponseBytes []byte)
-	AppGossip(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, appRequestBytes []byte)
+	AppResponse(nodeIDs ids.ShortID, chainID ids.ID, requestID uint32, appResponseBytes []byte)
+	AppGossip(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, appGossipBytes []byte)
 
 	Gossip(chainID ids.ID, containerID ids.ID, container []byte)
 }

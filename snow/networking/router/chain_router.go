@@ -817,6 +817,26 @@ func (cr *ChainRouter) QueryFailed(validatorID ids.ShortID, chainID ids.ID, requ
 	chain.QueryFailed(validatorID, requestID)
 }
 
+// AppRequestFailed notifies the given chain that it will not receive a response to its request
+// with the given ID to the given node.
+func (cr *ChainRouter) AppRequestFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32) {
+	uniqueRequestID := createRequestID(nodeID, chainID, requestID)
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
+
+	// Remove the outstanding request
+	cr.removeRequest(uniqueRequestID)
+
+	chain, exists := cr.chains[chainID]
+	if !exists {
+		cr.log.Debug("AppRequestFailed(%s, %s, %d) dropped due to unknown chain", nodeID, chainID, requestID)
+		return
+	}
+
+	// Pass the response to the chain
+	chain.AppRequestFailed(nodeID, requestID)
+}
+
 // Connected routes an incoming notification that a validator was just connected
 func (cr *ChainRouter) Connected(validatorID ids.ShortID) {
 	cr.lock.Lock()

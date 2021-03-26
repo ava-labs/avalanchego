@@ -40,7 +40,7 @@ type ExternalSenderTest struct {
 	ChitsF     func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID)
 
 	AppRequestF  func(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, appRequestBytes []byte) []ids.ShortID
-	AppResponseF func(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, appResponseBytyes []byte)
+	AppResponseF func(nodeIDs ids.ShortID, chainID ids.ID, requestID uint32, appResponseBytyes []byte)
 	AppGossipF   func(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, appGossipBytyes []byte)
 
 	GossipF func(chainID ids.ID, containerID ids.ID, container []byte)
@@ -247,7 +247,7 @@ func (s *ExternalSenderTest) AppRequest(nodeIDs ids.ShortSet, chainID ids.ID, re
 // AppResponse calls AppResponseF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *ExternalSenderTest) AppResponse(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, appResponseBytes []byte) {
+func (s *ExternalSenderTest) AppResponse(nodeIDs ids.ShortID, chainID ids.ID, requestID uint32, appResponseBytes []byte) {
 	switch {
 	case s.AppResponseF != nil:
 		s.AppResponseF(nodeIDs, chainID, requestID, appResponseBytes)

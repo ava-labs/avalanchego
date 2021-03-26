@@ -781,7 +781,7 @@ func (n *network) AppRequest(nodeIDs ids.ShortSet, chainID ids.ID, requestID uin
 
 // AppResponse implements the Sender interface.
 // assumes the stateLock is not held.
-func (n *network) AppResponse(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, appResponse []byte) {
+func (n *network) AppResponse(nodeID ids.ShortID, chainID ids.ID, requestID uint32, appResponse []byte) {
 	now := n.clock.Time()
 
 	msg, err := n.b.AppResponse(chainID, requestID, appResponse)
@@ -794,19 +794,19 @@ func (n *network) AppResponse(nodeIDs ids.ShortSet, chainID ids.ID, requestID ui
 		n.sendFailRateCalculator.Observe(1, now)
 	}
 
-	for _, peerElement := range n.getPeers(nodeIDs) {
-		peer := peerElement.peer
-		nodeID := peerElement.id
-		if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
-			n.log.Debug("failed to send AppResponse(%s, %s, %d)", nodeID, chainID, requestID)
-			n.log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appResponse})
-			n.appResponse.numFailed.Inc()
-			n.sendFailRateCalculator.Observe(1, now)
-		} else {
-			n.appResponse.numSent.Inc()
-			n.appResponse.sentBytes.Add(float64(len(msg.Bytes())))
-			n.sendFailRateCalculator.Observe(0, now)
-		}
+	peer := n.getPeer(nodeID)
+	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+		n.log.Debug("failed to send AppResponse(%s, %s, %d)",
+			nodeID,
+			chainID,
+			requestID)
+		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: appResponse})
+		n.appResponse.numFailed.Inc()
+		n.sendFailRateCalculator.Observe(1, now)
+	} else {
+		n.appResponse.numSent.Inc()
+		n.sendFailRateCalculator.Observe(0, now)
+		n.appResponse.sentBytes.Add(float64(len(msg.Bytes())))
 	}
 }
 
