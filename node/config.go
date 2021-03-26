@@ -6,6 +6,7 @@ package node
 import (
 	"time"
 
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/nat"
@@ -146,4 +147,6 @@ type Config struct {
 
 	// Peer alias configuration
 	PeerAliasTimeout time.Duration
+	// ChainConfigs
+	ChainConfigs map[ids.ID]chains.ChainConfig
 }

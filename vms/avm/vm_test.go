@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/mockdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -239,10 +239,10 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 
 	ctx := NewContext(tb)
 
-	baseDB := memdb.New()
+	baseDBManager := manager.NewDefaultMemDBManager()
 
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current()))
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -268,8 +268,10 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 	}
 	err = vm.Initialize(
 		ctx,
-		prefixdb.New([]byte{1}, baseDB),
+		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
+		nil,
+		nil,
 		issuer,
 		[]*common.Fx{
 			{
@@ -506,8 +508,10 @@ func TestInvalidGenesis(t *testing.T) {
 
 	err := vm.Initialize(
 		/*context=*/ ctx,
-		/*db=*/ memdb.New(),
+		/*dbManager=*/ manager.NewDefaultMemDBManager(),
 		/*genesisState=*/ nil,
+		/*upgradeBytes=*/ nil,
+		/*configBytes=*/ nil,
 		/*engineMessenger=*/ make(chan common.Message, 1),
 		/*fxs=*/ nil,
 	)
@@ -530,8 +534,10 @@ func TestInvalidFx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 	err := vm.Initialize(
 		/*context=*/ ctx,
-		/*db=*/ memdb.New(),
+		/*dbManager=*/ manager.NewDefaultMemDBManager(),
 		/*genesisState=*/ genesisBytes,
+		/*upgradeBytes=*/ nil,
+		/*configBytes=*/ nil,
 		/*engineMessenger=*/ make(chan common.Message, 1),
 		/*fxs=*/ []*common.Fx{
 			nil,
@@ -556,8 +562,10 @@ func TestFxInitializationFailure(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 	err := vm.Initialize(
 		/*context=*/ ctx,
-		/*db=*/ memdb.New(),
+		/*dbManager=*/ manager.NewDefaultMemDBManager(),
 		/*genesisState=*/ genesisBytes,
+		/*upgradeBytes=*/ nil,
+		/*configBytes=*/ nil,
 		/*engineMessenger=*/ make(chan common.Message, 1),
 		/*fxs=*/ []*common.Fx{{
 			ID: ids.Empty,
@@ -836,8 +844,10 @@ func TestIssueNFT(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		memdb.New(),
+		manager.NewDefaultMemDBManager(),
 		genesisBytes,
+		nil,
+		nil,
 		issuer,
 		[]*common.Fx{
 			{
@@ -981,8 +991,10 @@ func TestIssueProperty(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		memdb.New(),
+		manager.NewDefaultMemDBManager(),
 		genesisBytes,
+		nil,
+		nil,
 		issuer,
 		[]*common.Fx{
 			{

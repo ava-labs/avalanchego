@@ -165,71 +165,78 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 	// to reduce the number of repeated DAG traversals.
 	toProcess := vertex.NewHeap()
 	for _, vtx := range vtxs {
-		if _, ok := b.processedCache.Get(vtx.ID()); !ok { // only process a vertex if we haven't already
+		vtxID := vtx.ID()
+		if _, ok := b.processedCache.Get(vtxID); !ok { // only process a vertex if we haven't already
 			toProcess.Push(vtx)
+		} else {
+			b.VtxBlocked.RemoveMissingID(vtxID)
 		}
 	}
 
 	vtxHeightSet := ids.Set{}
 	prevHeight := uint64(0)
+
 	for toProcess.Len() > 0 { // While there are unprocessed vertices
 		vtx := toProcess.Pop() // Get an unknown vertex or one furthest down the DAG
 		vtxID := vtx.ID()
 
 		switch vtx.Status() {
 		case choices.Unknown:
+			b.VtxBlocked.AddMissingID(vtxID)
 			b.needToFetch.Add(vtxID) // We don't have this vertex locally. Mark that we need to fetch it.
 		case choices.Rejected:
-			b.needToFetch.Remove(vtxID) // We have this vertex locally. Mark that we don't need to fetch it.
-			return fmt.Errorf("tried to accept %s even though it was previously rejected", vtx.ID())
+			return fmt.Errorf("tried to accept %s even though it was previously rejected", vtxID)
 		case choices.Processing:
 			b.needToFetch.Remove(vtxID)
+			b.VtxBlocked.RemoveMissingID(vtxID)
 
-			jobVtx := &vertexJob{
+			has, err := b.VtxBlocked.Has(vtxID)
+			if err != nil {
+				return err
+			}
+			if has {
+				// If the vertex is already on the queue, then we have already
+				// pushed [vtx]'s transactions and traversed into its parents.
+				continue
+			}
+			txs, err := vtx.Txs()
+			if err != nil {
+				return err
+			}
+			for _, tx := range txs {
+				has, err := b.TxBlocked.Has(tx.ID())
+				if err != nil {
+					return err
+				}
+				if has {
+					continue
+				}
+				// Add to queue of txs to execute when bootstrapping finishes.
+				if err := b.TxBlocked.Push(&txJob{
+					log:         b.Ctx.Log,
+					numAccepted: b.numAcceptedTxs,
+					numDropped:  b.numDroppedTxs,
+					tx:          tx,
+				}); err != nil {
+					return err
+				}
+				b.numFetchedTxs.Inc()
+			}
+
+			// Add to queue of vertices to execute when bootstrapping finishes.
+			if err := b.VtxBlocked.Push(&vertexJob{
 				log:         b.Ctx.Log,
 				numAccepted: b.numAcceptedVts,
 				numDropped:  b.numDroppedVts,
 				vtx:         vtx,
-			}
-			has, err := b.VtxBlocked.Has(jobVtx)
-			if err != nil {
+			}); err != nil {
 				return err
 			}
-			if !has {
-				txs, err := vtx.Txs()
-				if err != nil {
-					return err
-				}
-				for _, tx := range txs {
-					jobTx := &txJob{
-						log:         b.Ctx.Log,
-						numAccepted: b.numAcceptedTxs,
-						numDropped:  b.numDroppedTxs,
-						tx:          tx,
-					}
-					has, err := b.TxBlocked.Has(jobTx)
-					if err != nil {
-						return err
-					}
-					if !has {
-						// Add to queue of txs to execute when bootstrapping finishes.
-						if err := b.TxBlocked.Push(jobTx); err != nil {
-							return err
-						}
-						b.numFetchedTxs.Inc()
-					}
-				}
 
-				// Add to queue of vertices to execute when bootstrapping finishes.
-				if err := b.VtxBlocked.Push(jobVtx); err != nil {
-					return err
-				}
-
-				b.numFetchedVts.Inc()
-				b.NumFetched++ // Progress tracker
-				if b.NumFetched%queue.StatusUpdateFrequency == 0 {
-					b.Ctx.Log.Info("fetched %d vertices", b.NumFetched)
-				}
+			b.numFetchedVts.Inc()
+			b.NumFetched++ // Progress tracker
+			if b.NumFetched%queue.StatusUpdateFrequency == 0 {
+				b.Ctx.Log.Info("fetched %d vertices", b.NumFetched)
 			}
 
 			parents, err := vtx.Parents()
@@ -370,10 +377,18 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	}
 
 	b.NumFetched = 0
-	toProcess := make([]avalanche.Vertex, 0, len(acceptedContainerIDs))
-	for _, vtxID := range acceptedContainerIDs {
+	b.VtxBlocked.AddMissingID(acceptedContainerIDs...)
+	pendingVtxs := b.VtxBlocked.MissingIDs()
+	b.Ctx.Log.Debug("Starting bootstrapping with %d pending vertices %d from accepted frontier", len(pendingVtxs), len(acceptedContainerIDs))
+
+	toProcess := make([]avalanche.Vertex, 0, len(pendingVtxs))
+	for _, vtxID := range pendingVtxs {
 		if vtx, err := b.Manager.Get(vtxID); err == nil {
-			toProcess = append(toProcess, vtx) // Process this vertex.
+			if vtx.Status() == choices.Accepted {
+				b.VtxBlocked.RemoveMissingID(vtxID)
+			} else {
+				toProcess = append(toProcess, vtx) // Process this vertex.
+			}
 		} else {
 			b.needToFetch.Add(vtxID) // We don't have this vertex. Mark that we have to fetch it.
 		}
@@ -385,7 +400,8 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 // after which it finishes the bootstrap process
 func (b *Bootstrapper) checkFinish() error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
-	if b.Ctx.IsBootstrapped() || b.OutstandingRequests.Len() > 0 || b.needToFetch.Len() > 0 {
+	pendingJobs := b.VtxBlocked.MissingIDs()
+	if b.Ctx.IsBootstrapped() || len(pendingJobs) > 0 {
 		return nil
 	}
 

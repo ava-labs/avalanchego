@@ -23,6 +23,10 @@ type LinkedDB interface {
 	database.KeyValueReader
 	database.KeyValueWriter
 
+	IsEmpty() (bool, error)
+	HeadKey() ([]byte, error)
+	Head() (key []byte, value []byte, err error)
+
 	NewIterator() database.Iterator
 	NewIteratorWithStart(start []byte) database.Iterator
 }
@@ -192,6 +196,33 @@ func (ldb *linkedDB) Delete(key []byte) error {
 	return ldb.writeBatch()
 }
 
+func (ldb *linkedDB) IsEmpty() (bool, error) {
+	_, err := ldb.HeadKey()
+	if err == database.ErrNotFound {
+		return true, nil
+	}
+	return false, err
+}
+
+func (ldb *linkedDB) HeadKey() ([]byte, error) {
+	ldb.lock.RLock()
+	defer ldb.lock.RUnlock()
+
+	return ldb.getHeadKey()
+}
+
+func (ldb *linkedDB) Head() ([]byte, []byte, error) {
+	ldb.lock.RLock()
+	defer ldb.lock.RUnlock()
+
+	headKey, err := ldb.getHeadKey()
+	if err != nil {
+		return nil, nil, err
+	}
+	head, err := ldb.getNode(headKey)
+	return headKey, head.Value, err
+}
+
 func (ldb *linkedDB) NewIterator() database.Iterator { return &iterator{ldb: ldb} }
 
 func (ldb *linkedDB) NewIteratorWithStart(start []byte) database.Iterator {
@@ -270,7 +301,7 @@ func (ldb *linkedDB) getNode(key []byte) (node, error) {
 	n := node{}
 	_, err = c.Unmarshal(nodeBytes, &n)
 	if err == nil {
-		ldb.nodeCache.Put(keyStr, n)
+		ldb.nodeCache.Put(keyStr, &n)
 	}
 	return n, err
 }
