@@ -25,7 +25,10 @@ const (
 	ContainerBytes                   // Used for gossiping
 	ContainerIDs                     // Used for querying
 	MultiContainerBytes              // Used in MultiPut
-	AppMsgBytes                      // Used at application level
+	AppRequestBytes                  // Used at application level
+	AppResponseBytes                 // Used at application level
+	AppGossipBytes                   // Used at application level
+
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -57,7 +60,7 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackHashes
 	case MultiContainerBytes:
 		return wrappers.TryPack2DBytes
-	case AppMsgBytes:
+	case AppRequestBytes, AppResponseBytes, AppGossipBytes:
 		return wrappers.TryPackBytes
 	default:
 		return nil
@@ -93,7 +96,7 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackHashes
 	case MultiContainerBytes:
 		return wrappers.TryUnpack2DBytes
-	case AppMsgBytes:
+	case AppRequestBytes, AppResponseBytes, AppGossipBytes:
 		return wrappers.TryUnpackBytes
 	default:
 		return nil
@@ -128,8 +131,12 @@ func (f Field) String() string {
 		return "Container IDs"
 	case MultiContainerBytes:
 		return "MultiContainerBytes"
-	case AppMsgBytes:
-		return "AppMsgBytes"
+	case AppRequestBytes:
+		return "AppRequestBytes"
+	case AppResponseBytes:
+		return "AppResponseBytes"
+	case AppGossipBytes:
+		return "AppGossipBytes"
 	default:
 		return "Unknown Field"
 	}
@@ -161,7 +168,9 @@ const (
 	PullQuery
 	Chits
 	// Application level:
-	AppMsg
+	AppRequest
+	AppResponse
+	AppGossip
 )
 
 func (op Op) String() string {
@@ -200,8 +209,12 @@ func (op Op) String() string {
 		return "pull_query"
 	case Chits:
 		return "chits"
-	case AppMsg:
-		return "app_msg"
+	case AppRequest:
+		return "app_request"
+	case AppResponse:
+		return "app_response"
+	case AppGossip:
+		return "app_gossip"
 	default:
 		return "Unknown Op"
 	}
@@ -231,6 +244,9 @@ var (
 		PullQuery: {ChainID, RequestID, Deadline, ContainerID},
 		Chits:     {ChainID, RequestID, ContainerIDs},
 		// Application level:
-		AppMsg: {ChainID, AppMsgBytes},
+		AppRequest:  {ChainID, RequestID, Deadline, AppRequestBytes},
+		AppResponse: {ChainID, RequestID, AppResponseBytes},
+		// TODO does AppGossip need a request ID?
+		AppGossip: {ChainID, RequestID, AppGossipBytes},
 	}
 )

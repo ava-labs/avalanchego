@@ -6,6 +6,7 @@ package network
 import (
 	"net"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -317,25 +318,80 @@ func TestBuildChits(t *testing.T) {
 	assert.Equal(t, containerIDs, parsedMsg.Get(ContainerIDs))
 }
 
-func TestBuildAppMsg(t *testing.T) {
+func TestBuildAppRequestMsg(t *testing.T) {
 	chainID := ids.GenerateTestID()
-	appMsgBytes := make([]byte, 1024)
-	appMsgBytes[0] = 1
-	appMsgBytes[len(appMsgBytes)-1] = 1
+	appRequestBytes := make([]byte, 1024)
+	appRequestBytes[0] = 1
+	appRequestBytes[len(appRequestBytes)-1] = 1
+	deadline := uint64(time.Now().Unix())
 
 	// Build the message
-	msg, err := TestBuilder.AppMsg(chainID, appMsgBytes)
+	msg, err := TestBuilder.AppRequest(chainID, 1, deadline, appRequestBytes)
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
-	assert.Equal(t, AppMsg, msg.Op())
-	assert.Equal(t, appMsgBytes, msg.Get(AppMsgBytes))
+	assert.Equal(t, AppRequest, msg.Op())
+	assert.Equal(t, deadline, msg.Get(Deadline))
+	assert.EqualValues(t, 1, msg.Get(RequestID))
+	assert.Equal(t, appRequestBytes, msg.Get(AppRequestBytes))
 	assert.Equal(t, chainID[:], msg.Get(ChainID))
 
 	// Parse the message
 	msg, err = TestBuilder.Parse(msg.Bytes())
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
-	assert.Equal(t, AppMsg, msg.Op())
-	assert.Equal(t, appMsgBytes, msg.Get(AppMsgBytes))
+	assert.Equal(t, AppRequest, msg.Op())
+	assert.Equal(t, deadline, msg.Get(Deadline))
+	assert.EqualValues(t, 1, msg.Get(RequestID))
+	assert.Equal(t, appRequestBytes, msg.Get(AppRequestBytes))
+	assert.Equal(t, chainID[:], msg.Get(ChainID))
+}
+
+func TestBuildAppResponseMsg(t *testing.T) {
+	chainID := ids.GenerateTestID()
+	appResponseBytes := make([]byte, 1024)
+	appResponseBytes[0] = 1
+	appResponseBytes[len(appResponseBytes)-1] = 1
+
+	// Build the message
+	msg, err := TestBuilder.AppResponse(chainID, 1, appResponseBytes)
+	assert.NoError(t, err)
+	assert.NotNil(t, msg)
+	assert.Equal(t, AppResponse, msg.Op())
+	assert.EqualValues(t, 1, msg.Get(RequestID))
+	assert.Equal(t, appResponseBytes, msg.Get(AppResponseBytes))
+	assert.Equal(t, chainID[:], msg.Get(ChainID))
+
+	// Parse the message
+	msg, err = TestBuilder.Parse(msg.Bytes())
+	assert.NoError(t, err)
+	assert.NotNil(t, msg)
+	assert.Equal(t, AppResponse, msg.Op())
+	assert.EqualValues(t, 1, msg.Get(RequestID))
+	assert.Equal(t, appResponseBytes, msg.Get(AppResponseBytes))
+	assert.Equal(t, chainID[:], msg.Get(ChainID))
+}
+
+func TestBuildAppGossipMsg(t *testing.T) {
+	chainID := ids.GenerateTestID()
+	appGossipBytes := make([]byte, 1024)
+	appGossipBytes[0] = 1
+	appGossipBytes[len(appGossipBytes)-1] = 1
+
+	// Build the message
+	msg, err := TestBuilder.AppGossip(chainID, 1, appGossipBytes)
+	assert.NoError(t, err)
+	assert.NotNil(t, msg)
+	assert.Equal(t, AppGossip, msg.Op())
+	assert.EqualValues(t, 1, msg.Get(RequestID))
+	assert.Equal(t, appGossipBytes, msg.Get(AppGossipBytes))
+	assert.Equal(t, chainID[:], msg.Get(ChainID))
+
+	// Parse the message
+	msg, err = TestBuilder.Parse(msg.Bytes())
+	assert.NoError(t, err)
+	assert.NotNil(t, msg)
+	assert.Equal(t, AppGossip, msg.Op())
+	assert.EqualValues(t, 1, msg.Get(RequestID))
+	assert.Equal(t, appGossipBytes, msg.Get(AppGossipBytes))
 	assert.Equal(t, chainID[:], msg.Get(ChainID))
 }

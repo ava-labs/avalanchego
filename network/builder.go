@@ -165,10 +165,30 @@ func (m Builder) Chits(chainID ids.ID, requestID uint32, containerIDs []ids.ID) 
 	})
 }
 
-// Application level messgae
-func (m Builder) AppMsg(chainID ids.ID, msg []byte) (Msg, error) {
-	return m.Pack(AppMsg, map[Field]interface{}{
-		ChainID:     chainID[:],
-		AppMsgBytes: msg,
+// Application level request
+func (m Builder) AppRequest(chainID ids.ID, requestID uint32, deadline uint64, msg []byte) (Msg, error) {
+	return m.Pack(AppRequest, map[Field]interface{}{
+		ChainID:         chainID[:],
+		RequestID:       requestID,
+		Deadline:        deadline,
+		AppRequestBytes: msg,
+	})
+}
+
+// Application level response
+func (m Builder) AppResponse(chainID ids.ID, requestID uint32, msg []byte) (Msg, error) {
+	return m.Pack(AppResponse, map[Field]interface{}{
+		ChainID:          chainID[:],
+		RequestID:        requestID,
+		AppResponseBytes: msg,
+	})
+}
+
+// Application level gossiped message
+func (m Builder) AppGossip(chainID ids.ID, requestID uint32, msg []byte) (Msg, error) {
+	return m.Pack(AppGossip, map[Field]interface{}{
+		ChainID:        chainID[:],
+		RequestID:      requestID,
+		AppGossipBytes: msg,
 	})
 }
