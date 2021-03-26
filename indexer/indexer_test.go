@@ -146,6 +146,8 @@ func TestIndexer(t *testing.T) {
 	assert.NoError(err)
 	idxr, ok := idxrIntf.(*indexer)
 	assert.True(ok)
+	now := time.Now()
+	idxr.clock.Set(now)
 
 	// Assert state is right
 	chain1Ctx := snow.DefaultContextTest()
@@ -179,12 +181,10 @@ func TestIndexer(t *testing.T) {
 
 	// Accept a container
 	blkID, blkBytes := ids.GenerateTestID(), utils.RandomBytes(32)
-	now := time.Now()
-	idxr.clock.Set(now)
 	expectedContainer := Container{
 		ID:        blkID,
 		Bytes:     blkBytes,
-		Timestamp: now.Unix(),
+		Timestamp: now.UnixNano(),
 	}
 	// Mocked VM knows about this block now
 	chainVM.On("GetBlock", blkID).Return(
@@ -241,6 +241,8 @@ func TestIndexer(t *testing.T) {
 	idxrIntf, err = NewIndexer(config)
 	assert.NoError(err)
 	idxr, ok = idxrIntf.(*indexer)
+	now = time.Now()
+	idxr.clock.Set(now)
 	assert.True(ok)
 	assert.Len(idxr.blockIndices, 0)
 	assert.Len(idxr.txIndices, 0)
@@ -289,12 +291,10 @@ func TestIndexer(t *testing.T) {
 
 	// Accept a vertex
 	vtxID, vtxBytes := ids.GenerateTestID(), utils.RandomBytes(32)
-	now = time.Now()
-	idxr.clock.Set(now)
 	expectedVtx := Container{
 		ID:        vtxID,
 		Bytes:     blkBytes,
-		Timestamp: now.Unix(),
+		Timestamp: now.UnixNano(),
 	}
 	// Mocked VM knows about this block now
 	dagEngine.On("GetVtx", vtxID).Return(
@@ -340,12 +340,10 @@ func TestIndexer(t *testing.T) {
 
 	// Accept a tx
 	txID, txBytes := ids.GenerateTestID(), utils.RandomBytes(32)
-	now = time.Now()
-	idxr.clock.Set(now)
 	expectedTx := Container{
 		ID:        txID,
 		Bytes:     blkBytes,
-		Timestamp: now.Unix(),
+		Timestamp: now.UnixNano(),
 	}
 	// Mocked VM knows about this tx now
 	dagVM.On("GetTx", txID).Return(
