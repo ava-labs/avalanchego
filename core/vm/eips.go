@@ -144,3 +144,12 @@ func enable2315(jt *JumpTable) {
 		jumps:       true,
 	}
 }
+
+// enableAP1 disables gas refunds for SSTORE and SELFDESTRUCT. It is very
+// similar to EIP-3298: Removal of Refunds [DRAFT]
+// (https://eips.ethereum.org/EIPS/eip-3298).
+func enableAP1(jt *JumpTable) {
+	jt[SSTORE].dynamicGas = gasSStoreAP1
+	jt[SELFDESTRUCT].dynamicGas = gasSelfdestructAP1
+	jt[CALLEX].dynamicGas = gasCallExpertAP1
+}

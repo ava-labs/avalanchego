@@ -24,8 +24,6 @@ import (
 // UnsignedExportTx is an unsigned ExportTx
 type UnsignedExportTx struct {
 	avax.Metadata
-	// true iff this transaction has already passed syntactic verification
-	syntacticallyVerified bool
 	// ID of the network on which this tx was issued
 	NetworkID uint32 `serialize:"true" json:"networkID"`
 	// ID of this blockchain.
@@ -47,12 +45,11 @@ func (tx *UnsignedExportTx) Verify(
 	ctx *snow.Context,
 	feeAmount uint64,
 	feeAssetID ids.ID,
+	ap1 bool,
 ) error {
 	switch {
 	case tx == nil:
 		return errNilTx
-	case tx.syntacticallyVerified: // already passed syntactic verification
-		return nil
 	case tx.DestinationChain != avmID:
 		return errWrongChainID
 	case len(tx.ExportedOutputs) == 0:
@@ -77,8 +74,10 @@ func (tx *UnsignedExportTx) Verify(
 	if !avax.IsSortedTransferableOutputs(tx.ExportedOutputs, Codec) {
 		return errOutputsNotSorted
 	}
+	if ap1 && !IsSortedAndUniqueEVMInputs(tx.Ins) {
+		return errInputsNotSortedUnique
+	}
 
-	tx.syntacticallyVerified = true
 	return nil
 }
 
@@ -86,8 +85,9 @@ func (tx *UnsignedExportTx) Verify(
 func (tx *UnsignedExportTx) SemanticVerify(
 	vm *VM,
 	stx *Tx,
+	ap1 bool,
 ) TxError {
-	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID); err != nil {
+	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, ap1); err != nil {
 		return permError{err}
 	}
 
@@ -233,7 +233,7 @@ func (vm *VM) newExportTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID)
+	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, vm.useApricotPhase1())
 }
 
 // EVMStateTransfer executes the state update from the atomic export transaction

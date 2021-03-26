@@ -41,7 +41,9 @@ type DummyEngine struct {
 }
 
 func NewDummyEngine(cb *ConsensusCallbacks) *DummyEngine {
-	return &DummyEngine{cb: cb}
+	return &DummyEngine{
+		cb: cb,
+	}
 }
 
 var (
@@ -81,16 +83,23 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header,
 		return fmt.Errorf("invalid gasUsed: have %d, gasLimit %d", header.GasUsed, header.GasLimit)
 	}
 
-	// Verify that the gas limit remains within allowed bounds
-	diff := int64(parent.GasLimit) - int64(header.GasLimit)
-	if diff < 0 {
-		diff *= -1
-	}
-	limit := parent.GasLimit / params.GasLimitBoundDivisor
+	if config := chain.Config(); config.IsApricotPhase1(new(big.Int).SetUint64((header.Time))) {
+		if header.GasLimit != params.ApricotPhase1GasLimit {
+			return fmt.Errorf("expected gas limit to be %d, but found %d", params.ApricotPhase1GasLimit, header.GasLimit)
+		}
+	} else {
+		// Verify that the gas limit remains within allowed bounds
+		diff := int64(parent.GasLimit) - int64(header.GasLimit)
+		if diff < 0 {
+			diff *= -1
+		}
+		limit := parent.GasLimit / params.GasLimitBoundDivisor
 
-	if uint64(diff) >= limit || header.GasLimit < params.MinGasLimit {
-		return fmt.Errorf("invalid gas limit: have %d, want %d += %d", header.GasLimit, parent.GasLimit, limit)
+		if uint64(diff) >= limit || header.GasLimit < params.MinGasLimit {
+			return fmt.Errorf("invalid gas limit: have %d, want %d += %d", header.GasLimit, parent.GasLimit, limit)
+		}
 	}
+
 	// Verify that the block number is parent's +1
 	if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
 		return consensus.ErrInvalidNumber
@@ -232,7 +241,10 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 
 	// Header seems complete, assemble into a block and return
-	return types.NewBlock(header, txs, uncles, receipts, new(trie.Trie), extdata), nil
+	return types.NewBlock(
+		header, txs, uncles, receipts, new(trie.Trie), extdata,
+		chain.Config().IsApricotPhase1(new(big.Int).SetUint64(header.Time)),
+	), nil
 }
 
 func (self *DummyEngine) Seal(chain consensus.ChainHeaderReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) (err error) {
