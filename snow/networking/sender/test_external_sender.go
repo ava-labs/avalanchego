@@ -247,10 +247,10 @@ func (s *ExternalSenderTest) AppRequest(nodeIDs ids.ShortSet, chainID ids.ID, re
 // AppResponse calls AppResponseF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *ExternalSenderTest) AppResponse(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, AppResponseBytes []byte) {
+func (s *ExternalSenderTest) AppResponse(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, appResponseBytes []byte) {
 	switch {
 	case s.AppResponseF != nil:
-		s.AppResponseF(nodeIDs, chainID, requestID, AppResponseBytes)
+		s.AppResponseF(nodeIDs, chainID, requestID, appResponseBytes)
 	case s.CantAppResponse && s.T != nil:
 		s.T.Fatalf("Unexpectedly called AppResponse")
 	case s.CantAppResponse && s.B != nil:
@@ -261,10 +261,10 @@ func (s *ExternalSenderTest) AppResponse(nodeIDs ids.ShortSet, chainID ids.ID, r
 // AppGossip calls AppGossipF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *ExternalSenderTest) AppGossip(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, AppGossipBytes []byte) {
+func (s *ExternalSenderTest) AppGossip(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, appGossipBytes []byte) {
 	switch {
 	case s.AppGossipF != nil:
-		s.AppGossipF(nodeIDs, chainID, requestID, AppGossipBytes)
+		s.AppGossipF(nodeIDs, chainID, requestID, appGossipBytes)
 	case s.CantAppGossip && s.T != nil:
 		s.T.Fatalf("Unexpectedly called AppGossip")
 	case s.CantAppGossip && s.B != nil:
