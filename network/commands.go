@@ -25,6 +25,7 @@ const (
 	ContainerBytes                   // Used for gossiping
 	ContainerIDs                     // Used for querying
 	MultiContainerBytes              // Used in MultiPut
+	AppMsgBytes                      // Used at application level
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -56,6 +57,8 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackHashes
 	case MultiContainerBytes:
 		return wrappers.TryPack2DBytes
+	case AppMsgBytes:
+		return wrappers.TryPackBytes
 	default:
 		return nil
 	}
@@ -90,6 +93,8 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackHashes
 	case MultiContainerBytes:
 		return wrappers.TryUnpack2DBytes
+	case AppMsgBytes:
+		return wrappers.TryUnpackBytes
 	default:
 		return nil
 	}
@@ -123,6 +128,8 @@ func (f Field) String() string {
 		return "Container IDs"
 	case MultiContainerBytes:
 		return "MultiContainerBytes"
+	case AppMsgBytes:
+		return "AppMsgBytes"
 	default:
 		return "Unknown Field"
 	}
@@ -130,6 +137,32 @@ func (f Field) String() string {
 
 // Op is an opcode
 type Op byte
+
+// Public commands that may be sent between nodes
+const (
+	// Handshake:
+	GetVersion Op = iota
+	Version
+	GetPeerList
+	PeerList
+	Ping
+	Pong
+	// Bootstrapping:
+	GetAcceptedFrontier
+	AcceptedFrontier
+	GetAccepted
+	Accepted
+	GetAncestors
+	MultiPut
+	// Consensus:
+	Get
+	Put
+	PushQuery
+	PullQuery
+	Chits
+	// Application level:
+	AppMsg
+)
 
 func (op Op) String() string {
 	switch op {
@@ -167,34 +200,12 @@ func (op Op) String() string {
 		return "pull_query"
 	case Chits:
 		return "chits"
+	case AppMsg:
+		return "app_msg"
 	default:
 		return "Unknown Op"
 	}
 }
-
-// Public commands that may be sent between stakers
-const (
-	// Handshake:
-	GetVersion Op = iota
-	Version
-	GetPeerList
-	PeerList
-	Ping
-	Pong
-	// Bootstrapping:
-	GetAcceptedFrontier
-	AcceptedFrontier
-	GetAccepted
-	Accepted
-	GetAncestors
-	MultiPut
-	// Consensus:
-	Get
-	Put
-	PushQuery
-	PullQuery
-	Chits
-)
 
 // Defines the messages that can be sent/received with this network
 var (
@@ -219,5 +230,7 @@ var (
 		PushQuery: {ChainID, RequestID, Deadline, ContainerID, ContainerBytes},
 		PullQuery: {ChainID, RequestID, Deadline, ContainerID},
 		Chits:     {ChainID, RequestID, ContainerIDs},
+		// Application level:
+		AppMsg: {ChainID, AppMsgBytes},
 	}
 )

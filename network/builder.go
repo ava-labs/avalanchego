@@ -164,3 +164,11 @@ func (m Builder) Chits(chainID ids.ID, requestID uint32, containerIDs []ids.ID) 
 		ContainerIDs: containerIDBytes,
 	})
 }
+
+// Application level messgae
+func (m Builder) AppMsg(chainID ids.ID, msg []byte) (Msg, error) {
+	return m.Pack(AppMsg, map[Field]interface{}{
+		ChainID:     chainID[:],
+		AppMsgBytes: msg,
+	})
+}
