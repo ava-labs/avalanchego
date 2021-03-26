@@ -888,7 +888,7 @@ func (bc *BlockChain) GetBlockByNumber(number uint64) *types.Block {
 		number > bc.lastAccepted.NumberU64() {
 		return nil
 	}
-	return bc.getBlockByNumberInternal(number)
+	return bc.getBlockByNumber(number)
 }
 
 // GetBlockByNumberUnfinalized retrieves a block from the canonical chain by number, caching it
@@ -896,10 +896,6 @@ func (bc *BlockChain) GetBlockByNumber(number uint64) *types.Block {
 func (bc *BlockChain) GetBlockByNumberUnfinalized(number uint64) *types.Block {
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
-	return bc.getBlockByNumberInternal(number)
-}
-
-func (bc *BlockChain) getBlockByNumberInternal(number uint64) *types.Block {
 	return bc.getBlockByNumber(number)
 }
 
