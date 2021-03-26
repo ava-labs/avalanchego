@@ -14,7 +14,7 @@ import (
 )
 
 func TestAcceptSubscription(t *testing.T) {
-	issuer1, vm1, _, sharedMemory1 := GenesisVM(t, true)
+	issuer1, vm1, _, sharedMemory1 := GenesisVM(t, true, genesisJSONApricotPhase0)
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
