@@ -21,15 +21,15 @@ import (
 const (
 	// minBlockCacheSize is the minimum number of bytes to use for block caching
 	// in leveldb.
-	minBlockCacheSize = 8 * opt.MiB
+	minBlockCacheSize = 12 * opt.MiB
 
 	// minWriteBufferSize is the minimum number of bytes to use for buffers in
 	// leveldb.
-	minWriteBufferSize = 8 * opt.MiB
+	minWriteBufferSize = 12 * opt.MiB
 
 	// minHandleCap is the minimum number of files descriptors to cap levelDB to
 	// use
-	minHandleCap = 16
+	minHandleCap = 64
 
 	// levelDBByteOverhead is the number of bytes of constant overhead that
 	// should be added to a batch size per operation.
