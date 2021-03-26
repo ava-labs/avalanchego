@@ -5,7 +5,6 @@ package admin
 
 import (
 	"errors"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/gorilla/rpc/v2"
@@ -15,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/perms"
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
@@ -159,5 +159,5 @@ func (service *Admin) Stacktrace(_ *http.Request, _ *struct{}, reply *api.Succes
 
 	reply.Success = true
 	stacktrace := []byte(logging.Stacktrace{Global: true}.String())
-	return ioutil.WriteFile(stacktraceFile, stacktrace, 0600)
+	return perms.WriteFile(stacktraceFile, stacktrace, perms.ReadWrite)
 }
