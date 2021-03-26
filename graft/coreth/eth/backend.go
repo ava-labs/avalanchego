@@ -35,9 +35,7 @@ import (
 
 	"github.com/ava-labs/coreth/accounts"
 	"github.com/ava-labs/coreth/consensus"
-	"github.com/ava-labs/coreth/consensus/clique"
 	"github.com/ava-labs/coreth/consensus/dummy"
-	"github.com/ava-labs/coreth/consensus/ethash"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/bloombits"
 	"github.com/ava-labs/coreth/core/rawdb"
@@ -161,7 +159,7 @@ func New(stack *node.Node, config *Config,
 		}
 	}
 	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis)
-	if _, ok := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !ok {
+	if genesisErr != nil {
 		return nil, genesisErr
 	}
 	log.Info("Initialised chain configuration", "config", chainConfig)
@@ -171,7 +169,7 @@ func New(stack *node.Node, config *Config,
 		chainDb:           chainDb,
 		eventMux:          stack.EventMux(),
 		accountManager:    stack.AccountManager(),
-		engine:            CreateConsensusEngine(stack, chainConfig, &config.Ethash, config.Miner.Notify, config.Miner.Noverify, chainDb, cb),
+		engine:            CreateConsensusEngine(cb),
 		closeBloomHandler: make(chan struct{}),
 		networkID:         config.NetworkId,
 		gasPrice:          config.Miner.GasPrice,
@@ -287,7 +285,7 @@ func New(stack *node.Node, config *Config,
 // }
 
 // CreateConsensusEngine creates the required type of consensus engine instance for an Ethereum service
-func CreateConsensusEngine(stack *node.Node, chainConfig *params.ChainConfig, config *ethash.Config, notify []string, noverify bool, db ethdb.Database, cb *dummy.ConsensusCallbacks) consensus.Engine {
+func CreateConsensusEngine(cb *dummy.ConsensusCallbacks) consensus.Engine {
 	return dummy.NewDummyEngine(cb)
 }
 
@@ -349,7 +347,7 @@ func (s *Ethereum) APIs() []rpc.API {
 }
 
 func (s *Ethereum) ResetWithGenesisBlock(gb *types.Block) {
-	s.blockchain.ResetWithGenesisBlock(gb)
+	s.blockchain.ResetWithGenesisBlock(gb, false)
 }
 
 func (s *Ethereum) Etherbase() (eb common.Address, err error) {
@@ -423,9 +421,10 @@ func (s *Ethereum) shouldPreserve(block *types.Block) bool {
 	// is A, F and G sign the block of round5 and reject the block of opponents
 	// and in the round6, the last available signer B is offline, the whole
 	// network is stuck.
-	if _, ok := s.engine.(*clique.Clique); ok {
-		return false
-	}
+	// Original Code:
+	// if _, ok := s.engine.(*clique.Clique); ok {
+	// 	return false
+	// }
 	return s.isLocalBlock(block)
 }
 
@@ -581,4 +580,14 @@ func (s *Ethereum) AcceptedBlock() *types.Block {
 		return cb()
 	}
 	return s.blockchain.CurrentBlock()
+}
+
+// SetGasPrice sets the minimum gas price to [newGasPrice]
+// sets the price on [s], [txPool], and the gas price oracle
+func (s *Ethereum) SetGasPrice(newGasPrice *big.Int) {
+	s.lock.Lock()
+	s.gasPrice = newGasPrice
+	s.lock.Unlock()
+	s.txPool.SetGasPrice(newGasPrice)
+	s.APIBackend.gpo.SetGasPrice(newGasPrice)
 }

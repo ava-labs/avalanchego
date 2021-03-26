@@ -59,5 +59,8 @@ func (db Database) NewIteratorWithStart(start []byte) ethdb.Iterator {
 // Batch implements ethdb.Batch
 type Batch struct{ database.Batch }
 
+// ValueSize implements ethdb.Batch
+func (batch Batch) ValueSize() int { return batch.Batch.Size() }
+
 // Replay implements ethdb.Batch
 func (batch Batch) Replay(w ethdb.KeyValueWriter) error { return batch.Batch.Replay(w) }
