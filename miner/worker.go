@@ -30,7 +30,6 @@
 package miner
 
 import (
-	"bytes"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -173,7 +172,8 @@ type worker struct {
 
 	mu       sync.RWMutex // The lock used to protect the coinbase and extra fields
 	coinbase common.Address
-	extra    []byte
+	// Original Code:
+	// extra    []byte
 
 	pendingMu    sync.RWMutex
 	pendingTasks map[common.Hash]*task
@@ -264,12 +264,13 @@ func (w *worker) setEtherbase(addr common.Address) {
 	w.coinbase = addr
 }
 
-// setExtra sets the content used to initialize the block extra field.
-func (w *worker) setExtra(extra []byte) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	w.extra = extra
-}
+// Original Code:
+// // setExtra sets the content used to initialize the block extra field.
+// func (w *worker) setExtra(extra []byte) {
+// 	w.mu.Lock()
+// 	defer w.mu.Unlock()
+// 	w.extra = extra
+// }
 
 // setRecommitInterval updates the interval for miner sealing work recommitting.
 func (w *worker) setRecommitInterval(interval time.Duration) {
@@ -778,6 +779,7 @@ func (w *worker) updateSnapshot() {
 		w.current.receipts,
 		new(trie.Trie),
 		nil,
+		false,
 	)
 
 	w.snapshotState = w.current.state.Copy()
@@ -870,7 +872,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 
 		case core.ErrNonceTooHigh:
 			// Reorg notification data race between the transaction pool and miner, skip account =
-			log.Trace("Skipping account with hight nonce", "sender", from, "nonce", tx.Nonce())
+			log.Trace("Skipping account with high nonce", "sender", from, "nonce", tx.Nonce())
 			txs.Pop()
 
 		case nil:
@@ -931,12 +933,18 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	// 	time.Sleep(wait)
 	// }
 
+	var gasLimit uint64
+	if w.chainConfig.IsApricotPhase1(big.NewInt(timestamp)) {
+		gasLimit = w.config.ApricotPhase1GasLimit
+	} else {
+		gasLimit = core.CalcGasLimit(parent, w.config.GasFloor, w.config.GasCeil)
+	}
 	num := parent.Number()
 	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     num.Add(num, common.Big1),
-		GasLimit:   core.CalcGasLimit(parent, w.config.GasFloor, w.config.GasCeil),
-		Extra:      w.extra,
+		GasLimit:   gasLimit,
+		Extra:      nil,
 		Time:       uint64(timestamp),
 	}
 	// Only set the coinbase if our consensus engine is running (avoid spurious block rewards)
@@ -951,19 +959,20 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		log.Error("Failed to prepare header for mining", "err", err)
 		return
 	}
-	// If we are care about TheDAO hard-fork check whether to override the extra-data or not
-	if daoBlock := w.chainConfig.DAOForkBlock; daoBlock != nil {
-		// Check whether the block is among the fork extra-override range
-		limit := new(big.Int).Add(daoBlock, params.DAOForkExtraRange)
-		if header.Number.Cmp(daoBlock) >= 0 && header.Number.Cmp(limit) < 0 {
-			// Depending whether we support or oppose the fork, override differently
-			if w.chainConfig.DAOForkSupport {
-				header.Extra = common.CopyBytes(params.DAOForkBlockExtra)
-			} else if bytes.Equal(header.Extra, params.DAOForkBlockExtra) {
-				header.Extra = []byte{} // If miner opposes, don't let it use the reserved extra-data
-			}
-		}
-	}
+	// Original code:
+	// // If we are care about TheDAO hard-fork check whether to override the extra-data or not
+	// if daoBlock := w.chainConfig.DAOForkBlock; daoBlock != nil {
+	// 	// Check whether the block is among the fork extra-override range
+	// 	limit := new(big.Int).Add(daoBlock, params.DAOForkExtraRange)
+	// 	if header.Number.Cmp(daoBlock) >= 0 && header.Number.Cmp(limit) < 0 {
+	// 		// Depending whether we support or oppose the fork, override differently
+	// 		if w.chainConfig.DAOForkSupport {
+	// 			header.Extra = common.CopyBytes(params.DAOForkBlockExtra)
+	// 		} else if bytes.Equal(header.Extra, params.DAOForkBlockExtra) {
+	// 			header.Extra = []byte{} // If miner opposes, don't let it use the reserved extra-data
+	// 		}
+	// 	}
+	// }
 	// Could potentially happen if starting to mine in an odd state.
 	err := w.makeCurrent(parent, header)
 	if err != nil {

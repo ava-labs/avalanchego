@@ -42,7 +42,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -163,11 +162,9 @@ func (e *GenesisMismatchError) Error() string {
 // The stored chain configuration will be updated if it is compatible (i.e. does not
 // specify a fork block below the local head block). In case of a conflict, the
 // error is a *params.ConfigCompatError and the new, unwritten config is returned.
-//
-// The returned chain configuration is never nil.
 func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig, common.Hash, error) {
 	if genesis != nil && genesis.Config == nil {
-		return params.AllEthashProtocolChanges, common.Hash{}, errGenesisNoConfig
+		return nil, common.Hash{}, errGenesisNoConfig
 	}
 	// Just commit the new block if there is no stored genesis block.
 	stored := rawdb.ReadCanonicalHash(db, 0)
@@ -213,7 +210,10 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 	}
 
 	// Get the existing chain configuration.
-	newcfg := configOrDefault(genesis, stored)
+	newcfg, err := getConfig(genesis, stored)
+	if err != nil {
+		return nil, common.Hash{}, err
+	}
 	if err := newcfg.CheckConfigForkOrder(); err != nil {
 		return newcfg, common.Hash{}, err
 	}
@@ -244,22 +244,22 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 	return newcfg, stored, nil
 }
 
-func configOrDefault(g *Genesis, ghash common.Hash) *params.ChainConfig {
+func getConfig(g *Genesis, ghash common.Hash) (*params.ChainConfig, error) {
 	switch {
 	case g != nil:
-		return g.Config
+		return g.Config, nil
 	case ghash == params.MainnetGenesisHash:
-		return params.MainnetChainConfig
+		return params.MainnetChainConfig, nil
 	case ghash == params.RopstenGenesisHash:
-		return params.RopstenChainConfig
+		return params.RopstenChainConfig, nil
 	case ghash == params.RinkebyGenesisHash:
-		return params.RinkebyChainConfig
+		return params.RinkebyChainConfig, nil
 	case ghash == params.GoerliGenesisHash:
-		return params.GoerliChainConfig
+		return params.GoerliChainConfig, nil
 	case ghash == params.YoloV1GenesisHash:
-		return params.YoloV1ChainConfig
+		return params.YoloV1ChainConfig, nil
 	default:
-		return params.AllEthashProtocolChanges
+		return nil, errGenesisNoConfig
 	}
 }
 
@@ -307,7 +307,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	statedb.Commit(false)
 	statedb.Database().TrieDB().Commit(root, true, nil)
 
-	return types.NewBlock(head, nil, nil, nil, new(trie.Trie), nil)
+	return types.NewBlock(head, nil, nil, nil, new(trie.Trie), nil, false)
 }
 
 // Commit writes the block and state of a genesis specification to the database.
@@ -319,7 +319,7 @@ func (g *Genesis) Commit(db ethdb.Database) (*types.Block, error) {
 	}
 	config := g.Config
 	if config == nil {
-		config = params.AllEthashProtocolChanges
+		return nil, errGenesisNoConfig
 	}
 	if err := config.CheckConfigForkOrder(); err != nil {
 		return nil, err
@@ -410,32 +410,33 @@ func DefaultYoloV1GenesisBlock() *Genesis {
 	}
 }
 
-// DeveloperGenesisBlock returns the 'geth --dev' genesis block.
-func DeveloperGenesisBlock(period uint64, faucet common.Address) *Genesis {
-	// Override the default period to the user requested one
-	config := *params.AllCliqueProtocolChanges
-	config.Clique.Period = period
+// Original Code:
+// // DeveloperGenesisBlock returns the 'geth --dev' genesis block.
+// func DeveloperGenesisBlock(period uint64, faucet common.Address) *Genesis {
+// 	// Override the default period to the user requested one
+// 	config := *params.AllCliqueProtocolChanges
+// 	config.Clique.Period = period
 
-	// Assemble and return the genesis with the precompiles and faucet pre-funded
-	return &Genesis{
-		Config:     &config,
-		ExtraData:  append(append(make([]byte, 32), faucet[:]...), make([]byte, crypto.SignatureLength)...),
-		GasLimit:   11500000,
-		Difficulty: big.NewInt(1),
-		Alloc: map[common.Address]GenesisAccount{
-			common.BytesToAddress([]byte{1}): {Balance: big.NewInt(1)}, // ECRecover
-			common.BytesToAddress([]byte{2}): {Balance: big.NewInt(1)}, // SHA256
-			common.BytesToAddress([]byte{3}): {Balance: big.NewInt(1)}, // RIPEMD
-			common.BytesToAddress([]byte{4}): {Balance: big.NewInt(1)}, // Identity
-			common.BytesToAddress([]byte{5}): {Balance: big.NewInt(1)}, // ModExp
-			common.BytesToAddress([]byte{6}): {Balance: big.NewInt(1)}, // ECAdd
-			common.BytesToAddress([]byte{7}): {Balance: big.NewInt(1)}, // ECScalarMul
-			common.BytesToAddress([]byte{8}): {Balance: big.NewInt(1)}, // ECPairing
-			common.BytesToAddress([]byte{9}): {Balance: big.NewInt(1)}, // BLAKE2b
-			faucet:                           {Balance: new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(9))},
-		},
-	}
-}
+// 	// Assemble and return the genesis with the precompiles and faucet pre-funded
+// 	return &Genesis{
+// 		Config:     &config,
+// 		ExtraData:  append(append(make([]byte, 32), faucet[:]...), make([]byte, crypto.SignatureLength)...),
+// 		GasLimit:   11500000,
+// 		Difficulty: big.NewInt(1),
+// 		Alloc: map[common.Address]GenesisAccount{
+// 			common.BytesToAddress([]byte{1}): {Balance: big.NewInt(1)}, // ECRecover
+// 			common.BytesToAddress([]byte{2}): {Balance: big.NewInt(1)}, // SHA256
+// 			common.BytesToAddress([]byte{3}): {Balance: big.NewInt(1)}, // RIPEMD
+// 			common.BytesToAddress([]byte{4}): {Balance: big.NewInt(1)}, // Identity
+// 			common.BytesToAddress([]byte{5}): {Balance: big.NewInt(1)}, // ModExp
+// 			common.BytesToAddress([]byte{6}): {Balance: big.NewInt(1)}, // ECAdd
+// 			common.BytesToAddress([]byte{7}): {Balance: big.NewInt(1)}, // ECScalarMul
+// 			common.BytesToAddress([]byte{8}): {Balance: big.NewInt(1)}, // ECPairing
+// 			common.BytesToAddress([]byte{9}): {Balance: big.NewInt(1)}, // BLAKE2b
+// 			faucet:                           {Balance: new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(9))},
+// 		},
+// 	}
+// }
 
 func decodePrealloc(data string) GenesisAlloc {
 	var p []struct{ Addr, Balance *big.Int }

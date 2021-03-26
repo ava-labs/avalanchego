@@ -29,8 +29,6 @@ func init() {
 
 	if *config == "default" {
 		cliConfig.EthAPIEnabled = true
-		cliConfig.PersonalAPIEnabled = true
-		cliConfig.TxPoolAPIEnabled = true
 		cliConfig.NetAPIEnabled = true
 		cliConfig.Web3APIEnabled = true
 		cliConfig.RPCGasCap = 2500000000  // 25000000 x 100

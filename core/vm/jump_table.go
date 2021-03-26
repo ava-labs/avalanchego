@@ -67,10 +67,19 @@ var (
 	constantinopleInstructionSet   = newConstantinopleInstructionSet()
 	istanbulInstructionSet         = newIstanbulInstructionSet()
 	yoloV1InstructionSet           = newYoloV1InstructionSet()
+	apricotPhase1InstructionSet    = newApricotPhase1InstructionSet()
 )
 
 // JumpTable contains the EVM opcodes supported at a given fork.
 type JumpTable [256]*operation
+
+func newApricotPhase1InstructionSet() JumpTable {
+	instructionSet := newIstanbulInstructionSet()
+
+	enableAP1(&instructionSet)
+
+	return instructionSet
+}
 
 func newYoloV1InstructionSet() JumpTable {
 	instructionSet := newIstanbulInstructionSet()
