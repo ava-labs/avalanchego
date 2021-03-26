@@ -53,6 +53,9 @@ type ExternalRouter interface {
 	PushQuery(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID, container []byte)
 	PullQuery(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID)
 	Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID)
+	AppRequest(nodeID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, appRequestBytes []byte)
+	AppResponse(nodeID ids.ShortID, chainID ids.ID, requestID uint32, appResponseBytes []byte)
+	AppGossip(nodeID ids.ShortID, chainID ids.ID, requestID uint32, appGossipBytes []byte)
 }
 
 // InternalRouter deals with messages internal to this node

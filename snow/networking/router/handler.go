@@ -481,6 +481,53 @@ func (h *Handler) QueryFailed(validatorID ids.ShortID, requestID uint32) {
 	})
 }
 
+// AppRequest passes an application-level request from the given node to the consensus engine.
+// Returns true if the message will eventually be processed, or false if the message was dropped.
+func (h *Handler) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, appRequestBytes []byte) bool {
+	return h.serviceQueue.PushMessage(message{
+		messageType: constants.AppRequestMsg,
+		validatorID: nodeID,
+		deadline:    deadline,
+		requestID:   requestID,
+		appMsgBytes: appRequestBytes,
+		received:    h.clock.Time(),
+	})
+}
+
+// AppRequest passes an application-level response from the given node to the consensus engine.
+// Returns true if the message will eventually be processed, or false if the message was dropped.
+func (h *Handler) AppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) bool {
+	return h.serviceQueue.PushMessage(message{
+		messageType: constants.AppResponseMsg,
+		validatorID: nodeID,
+		requestID:   requestID,
+		appMsgBytes: appResponseBytes,
+		received:    h.clock.Time(),
+	})
+}
+
+// AppGossip passes an application-level gossip message from the given node to the consensus engine.
+// Returns true if the message will eventually be processed, or false if the message was dropped.
+func (h *Handler) AppGossip(nodeID ids.ShortID, requestID uint32, appRequestBytes []byte) bool {
+	return h.serviceQueue.PushMessage(message{
+		messageType: constants.AppGossipMsg,
+		validatorID: nodeID,
+		requestID:   requestID,
+		appMsgBytes: appRequestBytes,
+		received:    h.clock.Time(),
+	})
+}
+
+// AppRequestFailed notifies the consensus engine that an application-level request failed
+// and it won't receive a response to the request.
+func (h *Handler) AppRequestFailed(validatorID ids.ShortID, requestID uint32) {
+	h.sendReliableMsg(message{
+		messageType: constants.AppRequestFailedMsg,
+		validatorID: validatorID,
+		requestID:   requestID,
+	})
+}
+
 // Connected passes a new connection notification to the consensus engine
 func (h *Handler) Connected(validatorID ids.ShortID) {
 	h.sendReliableMsg(message{
