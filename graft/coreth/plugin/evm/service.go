@@ -413,7 +413,7 @@ func (service *AvaxAPI) IssueTx(r *http.Request, args *api.FormattedTx, response
 		return errors.New("cannot issue non-atomic transaction through IssueTx API")
 	}
 
-	if err := utx.SemanticVerify(service.vm, tx); err != nil {
+	if err := utx.SemanticVerify(service.vm, tx, service.vm.useApricotPhase1()); err != nil {
 		return err
 	}
 

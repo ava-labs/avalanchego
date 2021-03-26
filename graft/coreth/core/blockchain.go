@@ -474,7 +474,11 @@ func (bc *BlockChain) loadLastState() error {
 func (bc *BlockChain) SetHead(head uint64) error {
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
+	return bc.setHead(head)
+}
 
+// setHead assumes [chainmu] is held when invoked.
+func (bc *BlockChain) setHead(head uint64) error {
 	// Retrieve the last pivot block to short circuit rollbacks beyond it and the
 	// current freezer limit to start nuking id underflown
 	pivot := rawdb.ReadLastPivotNumber(bc.db)
@@ -666,19 +670,25 @@ func (bc *BlockChain) StateCache() state.Database {
 }
 
 // Reset purges the entire blockchain, restoring it to its genesis state.
+// Assumes that caller holds [chainmu].
 func (bc *BlockChain) Reset() error {
-	return bc.ResetWithGenesisBlock(bc.genesisBlock)
+	return bc.ResetWithGenesisBlock(bc.genesisBlock, true)
 }
 
 // ResetWithGenesisBlock purges the entire blockchain, restoring it to the
 // specified genesis state.
-func (bc *BlockChain) ResetWithGenesisBlock(genesis *types.Block) error {
+func (bc *BlockChain) ResetWithGenesisBlock(genesis *types.Block, chainmuHeld bool) error {
+	// To prevent deadlock, we must allow the caller to specify if chainmu should
+	// be acquired.
+	if !chainmuHeld {
+		bc.chainmu.Lock()
+		defer bc.chainmu.Unlock()
+	}
+
 	// Dump the entire block chain and purge the caches
-	if err := bc.SetHead(0); err != nil {
+	if err := bc.setHead(0); err != nil {
 		return err
 	}
-	bc.chainmu.Lock()
-	defer bc.chainmu.Unlock()
 
 	// Prepare the genesis block and reinitialise the chain
 	batch := bc.db.NewBatch()
@@ -717,7 +727,7 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 
 	start, reported := time.Now(), time.Now()
 	for nr := first; nr <= last; nr++ {
-		block := bc.GetBlockByNumber(nr)
+		block := bc.getBlockByNumber(nr)
 		if block == nil {
 			return fmt.Errorf("export failed on #%d: not found", nr)
 		}
@@ -881,6 +891,10 @@ func (bc *BlockChain) GetBlockByHash(hash common.Hash) *types.Block {
 func (bc *BlockChain) GetBlockByNumber(number uint64) *types.Block {
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
+	return bc.getBlockByNumber(number)
+}
+
+func (bc *BlockChain) getBlockByNumber(number uint64) *types.Block {
 	hash := rawdb.ReadCanonicalHash(bc.db, number)
 	if hash == (common.Hash{}) {
 		return nil
