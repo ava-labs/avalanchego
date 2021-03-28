@@ -53,7 +53,7 @@ type versionedState interface {
 	DeletePendingValidator(txID ids.ID)
 
 	GetPendingDelegator(txID ids.ID) *Tx
-	GetPendingDelegatorByNodeID(nodeID ids.ShortID) *Tx
+	GetPendingDelegatorsByNodeID(nodeID ids.ShortID) []*Tx
 	AddPendingDelegator(*Tx)
 	DeletePendingDelegator(txID ids.ID)
 }
@@ -84,9 +84,9 @@ var (
 	chainPrefix     = []byte("chain")
 	singletonPrefix = []byte("singleton")
 
-	timestampKey     = []byte("timestamp")
-	currentSupplyKey = []byte("current supply")
-	lastAcceptedKey  = []byte("last accepted")
+	timestampKey2     = []byte("timestamp")
+	currentSupplyKey2 = []byte("current supply")
+	lastAcceptedKey   = []byte("last accepted")
 )
 
 const (
@@ -95,6 +95,7 @@ const (
 	utxoCacheSize    = 2048
 	addressCacheSize = 2048
 	chainCacheSize   = 2048
+	chainDBCacheSize = 2048
 )
 
 /*
@@ -130,26 +131,29 @@ type internalStateImpl struct {
 	validatorBaseDB database.Database
 	validatorDB     linkeddb.LinkedDB
 
-	blockCache cache.Cacher
+	blockCache cache.Cacher // cache of blockID -> *Block
 	blockDB    database.Database
 
-	addedTxs map[ids.ID]*stateTx
-	txCache  cache.Cacher
+	addedTxs map[ids.ID]*stateTx // map of txID -> {*Tx, Status}
+	txCache  cache.Cacher        // cache of txID -> {*Tx, Status} if the entry is nil, it is not in the database
 	txDB     database.Database
 
-	modifiedUTXOs map[ids.ID]*avax.UTXO
-	utxoCache     cache.Cacher
+	modifiedUTXOs map[ids.ID]*avax.UTXO // map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
+	utxoCache     cache.Cacher          // cache of UTXOID -> *UTXO if the UTXO is nil then it does not exist in the database
 	utxoDB        database.Database
 
-	addressCache cache.Cacher
+	addressCache cache.Cacher // cache of address -> linkedDB
 	addressDB    database.Database
 
-	subnetBaseDB database.Database
-	subnetDB     linkeddb.LinkedDB
+	cachedSubnets []*Tx // nil if the subnets haven't been loaded
+	addedSubnets  []*Tx
+	subnetBaseDB  database.Database
+	subnetDB      linkeddb.LinkedDB
 
-	addedChains map[ids.ID][]*Tx
-	chainCache  cache.Cacher
-	chainDB     database.Database
+	addedChains  map[ids.ID][]*Tx // maps subnetID -> the newly added chains to the subnet
+	chainCache   cache.Cacher     // cache of subnetID -> the chains after all local modifications []*Tx
+	chainDBCache cache.Cacher     // cache of subnetID -> linkedDB
+	chainDB      database.Database
 
 	originalTimestamp, timestamp         time.Time
 	originalCurrentSupply, currentSupply uint64
@@ -162,11 +166,11 @@ type stateTx struct {
 	Status Status `serialize:"true"`
 }
 
-func loadState(db database.Database) (internalState, error) {
+func createInternalState(db database.Database) *internalStateImpl {
 	baseDB := versiondb.New(db)
 	validatorBaseDB := prefixdb.New(validatorPrefix, baseDB)
 	subnetBaseDB := prefixdb.New(subnetPrefix, baseDB)
-	st := &internalStateImpl{
+	return &internalStateImpl{
 		baseDB: baseDB,
 
 		validatorBaseDB: validatorBaseDB,
@@ -189,14 +193,24 @@ func loadState(db database.Database) (internalState, error) {
 		subnetBaseDB: subnetBaseDB,
 		subnetDB:     linkeddb.NewDefault(subnetBaseDB),
 
-		addedChains: make(map[ids.ID][]*Tx),
-		chainCache:  &cache.LRU{Size: chainCacheSize},
-		chainDB:     prefixdb.New(chainPrefix, baseDB),
+		addedChains:  make(map[ids.ID][]*Tx),
+		chainCache:   &cache.LRU{Size: chainCacheSize},
+		chainDBCache: &cache.LRU{Size: chainDBCacheSize},
+		chainDB:      prefixdb.New(chainPrefix, baseDB),
 
 		singletonDB: prefixdb.New(singletonPrefix, baseDB),
 	}
+}
 
-	timestamp, err := database.GetTimestamp(st.singletonDB, timestampKey)
+func initState(db database.Database) (internalState, error) {
+	st := createInternalState(db)
+	return st, nil
+}
+
+func loadState(db database.Database) (internalState, error) {
+	st := createInternalState(db)
+
+	timestamp, err := database.GetTimestamp(st.singletonDB, timestampKey2)
 	if err != nil {
 		// Drop the close error to report the original error
 		_ = st.Close()
@@ -205,7 +219,7 @@ func loadState(db database.Database) (internalState, error) {
 	st.originalTimestamp = timestamp
 	st.timestamp = timestamp
 
-	currentSupply, err := database.GetUInt64(st.singletonDB, currentSupplyKey)
+	currentSupply, err := database.GetUInt64(st.singletonDB, currentSupplyKey2)
 	if err != nil {
 		// Drop the close error to report the original error
 		_ = st.Close()
@@ -249,7 +263,7 @@ func loadState(db database.Database) (internalState, error) {
 		return nil, err
 	}
 
-	return st
+	return st, nil
 }
 
 func (st *internalStateImpl) GetTimestamp() time.Time          { return st.timestamp }
@@ -261,17 +275,89 @@ func (st *internalStateImpl) SetCurrentSupply(currentSupply uint64) { st.current
 func (st *internalStateImpl) GetLastAccepted() ids.ID             { return st.lastAccepted }
 func (st *internalStateImpl) SetLastAccepted(lastAccepted ids.ID) { st.lastAccepted = lastAccepted }
 
+func (st *internalStateImpl) GetSubnets() ([]*Tx, error) {
+	if st.cachedSubnets != nil {
+		return st.cachedSubnets, nil
+	}
+
+	subnetDBIt := st.subnetDB.NewIterator()
+	defer subnetDBIt.Release()
+
+	txs := []*Tx(nil)
+	for subnetDBIt.Next() {
+		subnetIDBytes := subnetDBIt.Key()
+		subnetID, err := ids.ToID(subnetIDBytes)
+		if err != nil {
+			return nil, err
+		}
+		subnetTx, _, err := st.GetTx(subnetID)
+		if err != nil {
+			return nil, err
+		}
+		txs = append(txs, subnetTx)
+	}
+	if err := subnetDBIt.Error(); err != nil {
+		return nil, err
+	}
+	txs = append(txs, st.addedSubnets...)
+	st.cachedSubnets = txs
+	return txs, nil
+}
+func (st *internalStateImpl) AddSubnet(createSubnetTx *Tx) {
+	st.addedSubnets = append(st.addedSubnets, createSubnetTx)
+	if st.cachedSubnets != nil {
+		st.cachedSubnets = append(st.cachedSubnets, createSubnetTx)
+	}
+}
+
 func (st *internalStateImpl) GetChains(subnetID ids.ID) ([]*Tx, error) {
+	if chainsIntf, cached := st.chainCache.Get(subnetID); cached {
+		return chainsIntf.([]*Tx), nil
+	}
+	chainDB := st.getChainDB(subnetID)
+	chainDBIt := chainDB.NewIterator()
+	defer chainDBIt.Release()
+
+	txs := []*Tx(nil)
+	for chainDBIt.Next() {
+		chainIDBytes := chainDBIt.Key()
+		chainID, err := ids.ToID(chainIDBytes)
+		if err != nil {
+			return nil, err
+		}
+		chainTx, _, err := st.GetTx(chainID)
+		if err != nil {
+			return nil, err
+		}
+		txs = append(txs, chainTx)
+	}
+	if err := chainDBIt.Error(); err != nil {
+		return nil, err
+	}
+	txs = append(txs, st.addedChains[subnetID]...)
+	st.chainCache.Put(subnetID, txs)
+	return txs, nil
 }
 func (st *internalStateImpl) AddChain(createChainTxIntf *Tx) {
 	createChainTx := createChainTxIntf.UnsignedTx.(*UnsignedCreateChainTx)
 	subnetID := createChainTx.SubnetID
 	st.addedChains[subnetID] = append(st.addedChains[subnetID], createChainTxIntf)
 	st.AddTx(createChainTxIntf, Committed)
+	if chainsIntf, cached := st.chainCache.Get(subnetID); cached {
+		chains := chainsIntf.([]*Tx)
+		chains = append(chains, createChainTxIntf)
+		st.chainCache.Put(subnetID, chains)
+	}
 }
-
-// GetChains(subnetID ids.ID) ([]*Tx, error)
-// AddChain(createChainTx *Tx)
+func (st *internalStateImpl) getChainDB(subnetID ids.ID) linkeddb.LinkedDB {
+	if chainDBIntf, cached := st.chainDBCache.Get(subnetID); cached {
+		return chainDBIntf.(linkeddb.LinkedDB)
+	}
+	rawChainDB := prefixdb.New(subnetID[:], st.chainDB)
+	chainDB := linkeddb.NewDefault(rawChainDB)
+	st.chainDBCache.Put(subnetID, chainDB)
+	return chainDB
+}
 
 func (st *internalStateImpl) GetTx(txID ids.ID) (*Tx, Status, error) {
 	if tx, exists := st.addedTxs[txID]; exists {
@@ -343,6 +429,87 @@ func (st *internalStateImpl) AddUTXO(utxo *avax.UTXO) {
 func (st *internalStateImpl) DeleteUTXO(utxoID avax.UTXOID) {
 	st.modifiedUTXOs[utxoID.InputID()] = nil
 }
+
+type currentValidator struct {
+	addValidatorTx  *Tx
+	potentialReward uint64
+	upDuration      time.Duration
+	lastUpdated     time.Time
+}
+
+// TODO: Implement
+func (st *internalStateImpl) GetCurrentValidator(txID ids.ID) (addValidatorTx *Tx, potentialReward uint64) {
+
+	// validatorBaseDB database.Database
+	// validatorDB     linkeddb.LinkedDB
+	return nil, 0
+}
+
+// TODO: Implement
+func (st *internalStateImpl) GetCurrentValidatorByNodeID(nodeID ids.ShortID) (addValidatorTx *Tx, potentialReward uint64) {
+	return nil, 0
+}
+
+// TODO: Implement
+func (st *internalStateImpl) AddCurrentValidator(addValidatorTx *Tx, potentialReward uint64) {}
+
+// TODO: Implement
+func (st *internalStateImpl) DeleteCurrentValidator(txID ids.ID) {}
+
+// TODO: Implement
+func (st *internalStateImpl) GetCurrentDelegator(txID ids.ID) (addDelegatorTx *Tx, potentialReward uint64) {
+	return nil, 0
+}
+
+// TODO: Implement
+func (st *internalStateImpl) GetCurrentDelegatorsByNodeID(nodeID ids.ShortID) []*Tx { return nil }
+
+// TODO: Implement
+func (st *internalStateImpl) AddCurrentDelegator(addDelegatorTx *Tx, potentialReward uint64) {}
+
+// TODO: Implement
+func (st *internalStateImpl) DeleteCurrentDelegator(txID ids.ID) {}
+
+// TODO: Implement
+func (st *internalStateImpl) GetPendingValidator(txID ids.ID) *Tx { return nil }
+
+// TODO: Implement
+func (st *internalStateImpl) GetPendingValidatorByNodeID(nodeID ids.ShortID) *Tx { return nil }
+
+// TODO: Implement
+func (st *internalStateImpl) AddPendingValidator(*Tx) {}
+
+// TODO: Implement
+func (st *internalStateImpl) DeletePendingValidator(txID ids.ID) {}
+
+// TODO: Implement
+func (st *internalStateImpl) GetPendingDelegator(txID ids.ID) *Tx { return nil }
+
+// TODO: Implement
+func (st *internalStateImpl) GetPendingDelegatorsByNodeID(nodeID ids.ShortID) []*Tx { return nil }
+
+// TODO: Implement
+func (st *internalStateImpl) AddPendingDelegator(*Tx) {}
+
+// TODO: Implement
+func (st *internalStateImpl) DeletePendingDelegator(txID ids.ID) {}
+
+// TODO: Implement
+func (st *internalStateImpl) GetBlock(blockID ids.ID) (snowman.Block, error) { return nil, nil }
+
+// TODO: Implement
+func (st *internalStateImpl) AddBlock(block snowman.Block) {}
+
+// TODO: Implement
+func (st *internalStateImpl) GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time) {
+	return 0, time.Time{}
+}
+
+// TODO: Implement
+func (st *internalStateImpl) SetUptime(upDuration time.Duration, lastUpdated time.Time) {}
+
+// TODO: Implement
+func (st *internalStateImpl) Commit() error { return nil }
 
 func (st *internalStateImpl) Close() error {
 	errs := wrappers.Errs{}
