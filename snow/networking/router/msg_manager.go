@@ -96,6 +96,7 @@ func (rm *msgManager) AddPending(vdr ids.ShortID) bool {
 	outstandingPoolMessages := rm.msgTracker.PoolCount()
 	totalPeerMessages, peerPoolMessages := rm.msgTracker.OutstandingCount(vdr)
 
+	rm.metrics.poolMsgsAvailable.Set(float64(rm.poolMessages - rm.msgTracker.PoolCount()))
 	// True if the all the messages in the at-large message pool have been used
 	poolEmpty := outstandingPoolMessages >= rm.poolMessages
 	// True if this node has used the maximum number of messages from the at-large message pool
@@ -127,7 +128,7 @@ func (rm *msgManager) AddPending(vdr ids.ShortID) bool {
 		rm.msgTracker.Add(vdr)
 		return true
 	}
-	rm.metrics.throttledVdrAllocUsed.Inc()
+	rm.metrics.throttledVdrAllocExhausted.Inc()
 
 	rm.log.Debug("Throttling message from staker %s. %d/%d. %d/%d.", vdr, messageCount, messageAllotment, peerPoolMessages, rm.poolMessages)
 	return false
@@ -159,13 +160,23 @@ func (rm *msgManager) Utilization(vdr ids.ShortID) float64 {
 }
 
 type msgManagerMetrics struct {
+	poolMsgsAvailable prometheus.Gauge
 	throttledPoolEmpty,
 	throttledPoolAllocExhausted,
-	throttledVdrAllocUsed prometheus.Counter
+	throttledVdrAllocExhausted prometheus.Counter
 }
 
 func (m *msgManagerMetrics) initialize(namespace string, registerer prometheus.Registerer) error {
 	errs := wrappers.Errs{}
+	m.poolMsgsAvailable = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "pool_msgs_available",
+		Help:      "Number of available messages in the at-large pending message pool",
+	})
+	if err := registerer.Register(m.poolMsgsAvailable); err != nil {
+		errs.Add(fmt.Errorf("failed to register throttled statistics due to %w", err))
+	}
+
 	m.throttledPoolEmpty = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "throttled_pool_empty",
@@ -184,12 +195,12 @@ func (m *msgManagerMetrics) initialize(namespace string, registerer prometheus.R
 		errs.Add(fmt.Errorf("failed to register throttled statistics due to %w", err))
 	}
 
-	m.throttledVdrAllocUsed = prometheus.NewCounter(prometheus.CounterOpts{
+	m.throttledVdrAllocExhausted = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "throttled_validator_alloc_exhausted",
 		Help:      "Number of incoming messages dropped because a validator used the max number of pending messages allocated to them",
 	})
-	if err := registerer.Register(m.throttledVdrAllocUsed); err != nil {
+	if err := registerer.Register(m.throttledVdrAllocExhausted); err != nil {
 		errs.Add(fmt.Errorf("failed to register throttled statistics due to %w", err))
 	}
 	return errs.Err
