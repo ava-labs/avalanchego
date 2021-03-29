@@ -9,6 +9,8 @@ import (
 	"math/big"
 	"sync"
 
+	"github.com/ava-labs/coreth/accounts/keystore"
+
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
@@ -207,7 +209,7 @@ func main() {
 
 	// configure the genesis block
 	genBalance := big.NewInt(100000000000000000)
-	genKey, _ := coreth.NewKey(rand.Reader)
+	genKey, _ := keystore.NewKey(rand.Reader)
 
 	config.Genesis = &core.Genesis{
 		Config:     chainConfig,

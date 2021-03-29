@@ -4,12 +4,13 @@ import (
 	"crypto/rand"
 	"testing"
 
+	accountKeystore "github.com/ava-labs/coreth/accounts/keystore"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core"
 )
 
@@ -22,7 +23,7 @@ func TestAcceptSubscription(t *testing.T) {
 		}
 	}()
 
-	key, err := coreth.NewKey(rand.Reader)
+	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
