@@ -5,8 +5,10 @@ name: build-linux-release
 # Controls when the action will run.
 on:
   push:
-    tags:
-      - '*' # Push events to every tag
+    branches:
+     - testing
+#    tags:
+#      - '*' # Push events to every tag
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -35,6 +37,12 @@ jobs:
 
     - name: Install rpmbuild
       run: sudo apt-get install rpm 
+
+    - name: get key
+      run: echo $AWS_SECRET_ACCESS_KEY
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.UPLOAD_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}
 
     - name: Get the version
       id: get_version
