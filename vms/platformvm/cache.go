@@ -17,7 +17,48 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
+type immutableValidatorChainState interface {
+	MutableValidatorChainState() validatorChainState
+
+	GetCurrentValidator(txID ids.ID) (addValidatorTx *Tx, potentialReward uint64, err error)
+	GetCurrentValidatorByNodeID(nodeID ids.ShortID) (addValidatorTx *Tx, potentialReward uint64, err error)
+
+	GetCurrentDelegator(txID ids.ID) (addDelegatorTx *Tx, potentialReward uint64, err error)
+	GetCurrentDelegatorsByNodeID(nodeID ids.ShortID) ([]*Tx, error)
+
+	GetPendingValidator(txID ids.ID) (*Tx, error)
+	GetPendingValidatorByNodeID(nodeID ids.ShortID) (*Tx, error)
+
+	GetPendingDelegator(txID ids.ID) (*Tx, error)
+	GetPendingDelegatorsByNodeID(nodeID ids.ShortID) ([]*Tx, error)
+}
+
+type validatorChainState interface {
+	immutableValidatorChainState
+
+	AddCurrentValidator(addValidatorTx *Tx, potentialReward uint64)
+	DeleteCurrentValidator(txID ids.ID)
+
+	AddCurrentDelegator(addDelegatorTx *Tx, potentialReward uint64) error
+	DeleteCurrentDelegator(txID ids.ID)
+
+	AddPendingValidator(*Tx)
+	DeletePendingValidator(txID ids.ID)
+
+	AddPendingDelegator(*Tx) error
+	DeletePendingDelegator(txID ids.ID)
+}
+
+type validatorState interface {
+	validatorChainState
+
+	GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time, err error)
+	SetUptime(upDuration time.Duration, lastUpdated time.Time) error
+}
+
 type versionedState interface {
+	immutableValidatorChainState
+
 	GetTimestamp() time.Time
 	SetTimestamp(time.Time)
 
@@ -36,39 +77,17 @@ type versionedState interface {
 	GetUTXO(utxoID avax.UTXOID) (*avax.UTXO, error)
 	AddUTXO(utxo *avax.UTXO)
 	DeleteUTXO(utxoID avax.UTXOID)
-
-	GetCurrentValidator(txID ids.ID) (addValidatorTx *Tx, potentialReward uint64)
-	GetCurrentValidatorByNodeID(nodeID ids.ShortID) (addValidatorTx *Tx, potentialReward uint64)
-	AddCurrentValidator(addValidatorTx *Tx, potentialReward uint64)
-	DeleteCurrentValidator(txID ids.ID)
-
-	GetCurrentDelegator(txID ids.ID) (addDelegatorTx *Tx, potentialReward uint64)
-	GetCurrentDelegatorsByNodeID(nodeID ids.ShortID) []*Tx
-	AddCurrentDelegator(addDelegatorTx *Tx, potentialReward uint64)
-	DeleteCurrentDelegator(txID ids.ID)
-
-	GetPendingValidator(txID ids.ID) *Tx
-	GetPendingValidatorByNodeID(nodeID ids.ShortID) *Tx
-	AddPendingValidator(*Tx)
-	DeletePendingValidator(txID ids.ID)
-
-	GetPendingDelegator(txID ids.ID) *Tx
-	GetPendingDelegatorsByNodeID(nodeID ids.ShortID) []*Tx
-	AddPendingDelegator(*Tx)
-	DeletePendingDelegator(txID ids.ID)
 }
 
 type internalState interface {
 	versionedState
+	validatorState
 
 	GetLastAccepted() ids.ID
 	SetLastAccepted(ids.ID)
 
 	GetBlock(blockID ids.ID) (snowman.Block, error)
 	AddBlock(block snowman.Block)
-
-	GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time)
-	SetUptime(upDuration time.Duration, lastUpdated time.Time)
 
 	Commit() error
 	Close() error
@@ -128,8 +147,12 @@ const (
 type internalStateImpl struct {
 	baseDB *versiondb.Database
 
-	validatorBaseDB database.Database
-	validatorDB     linkeddb.LinkedDB
+	currentValidators       map[ids.ID]*currentValidator // nodeID -> tx
+	currentValidatorsByTxID map[ids.ID]ids.ID            // txID -> nodeID
+	pendingValidators       map[ids.ID]*pendingValidator // nodeID -> tx
+	pendingValidatorsByTxID map[ids.ID]ids.ID            // txID -> nodeID
+	validatorBaseDB         database.Database
+	validatorDB             linkeddb.LinkedDB
 
 	blockCache cache.Cacher // cache of blockID -> *Block
 	blockDB    database.Database
@@ -159,6 +182,25 @@ type internalStateImpl struct {
 	originalCurrentSupply, currentSupply uint64
 	originalLastAccepted, lastAccepted   ids.ID
 	singletonDB                          database.Database
+}
+
+type currentValidator struct {
+	addValidatorTx    *Tx
+	potentialReward   uint64
+	upDuration        time.Duration
+	lastUpdated       time.Time
+	currentDelegators map[ids.ID]*currentDelegator // txID -> tx
+	pendingDelegators map[ids.ID]*Tx               // txID -> tx
+}
+
+type currentDelegator struct {
+	addDelegatorTx  *Tx
+	potentialReward uint64
+}
+
+type pendingValidator struct {
+	addValidatorTx    *Tx
+	pendingDelegators map[ids.ID]*Tx // txID -> tx
 }
 
 type stateTx struct {
@@ -430,24 +472,17 @@ func (st *internalStateImpl) DeleteUTXO(utxoID avax.UTXOID) {
 	st.modifiedUTXOs[utxoID.InputID()] = nil
 }
 
-type currentValidator struct {
-	addValidatorTx  *Tx
-	potentialReward uint64
-	upDuration      time.Duration
-	lastUpdated     time.Time
-}
-
 // TODO: Implement
-func (st *internalStateImpl) GetCurrentValidator(txID ids.ID) (addValidatorTx *Tx, potentialReward uint64) {
+func (st *internalStateImpl) GetCurrentValidator(txID ids.ID) (addValidatorTx *Tx, potentialReward uint64, err error) {
 
 	// validatorBaseDB database.Database
 	// validatorDB     linkeddb.LinkedDB
-	return nil, 0
+	return nil, 0, nil
 }
 
 // TODO: Implement
-func (st *internalStateImpl) GetCurrentValidatorByNodeID(nodeID ids.ShortID) (addValidatorTx *Tx, potentialReward uint64) {
-	return nil, 0
+func (st *internalStateImpl) GetCurrentValidatorByNodeID(nodeID ids.ShortID) (addValidatorTx *Tx, potentialReward uint64, err error) {
+	return nil, 0, nil
 }
 
 // TODO: Implement
@@ -457,24 +492,30 @@ func (st *internalStateImpl) AddCurrentValidator(addValidatorTx *Tx, potentialRe
 func (st *internalStateImpl) DeleteCurrentValidator(txID ids.ID) {}
 
 // TODO: Implement
-func (st *internalStateImpl) GetCurrentDelegator(txID ids.ID) (addDelegatorTx *Tx, potentialReward uint64) {
-	return nil, 0
+func (st *internalStateImpl) GetCurrentDelegator(txID ids.ID) (addDelegatorTx *Tx, potentialReward uint64, err error) {
+	return nil, 0, nil
 }
 
 // TODO: Implement
-func (st *internalStateImpl) GetCurrentDelegatorsByNodeID(nodeID ids.ShortID) []*Tx { return nil }
+func (st *internalStateImpl) GetCurrentDelegatorsByNodeID(nodeID ids.ShortID) ([]*Tx, error) {
+	return nil, nil
+}
 
 // TODO: Implement
-func (st *internalStateImpl) AddCurrentDelegator(addDelegatorTx *Tx, potentialReward uint64) {}
+func (st *internalStateImpl) AddCurrentDelegator(addDelegatorTx *Tx, potentialReward uint64) error {
+	return nil
+}
 
 // TODO: Implement
 func (st *internalStateImpl) DeleteCurrentDelegator(txID ids.ID) {}
 
 // TODO: Implement
-func (st *internalStateImpl) GetPendingValidator(txID ids.ID) *Tx { return nil }
+func (st *internalStateImpl) GetPendingValidator(txID ids.ID) (*Tx, error) { return nil, nil }
 
 // TODO: Implement
-func (st *internalStateImpl) GetPendingValidatorByNodeID(nodeID ids.ShortID) *Tx { return nil }
+func (st *internalStateImpl) GetPendingValidatorByNodeID(nodeID ids.ShortID) (*Tx, error) {
+	return nil, nil
+}
 
 // TODO: Implement
 func (st *internalStateImpl) AddPendingValidator(*Tx) {}
@@ -483,13 +524,15 @@ func (st *internalStateImpl) AddPendingValidator(*Tx) {}
 func (st *internalStateImpl) DeletePendingValidator(txID ids.ID) {}
 
 // TODO: Implement
-func (st *internalStateImpl) GetPendingDelegator(txID ids.ID) *Tx { return nil }
+func (st *internalStateImpl) GetPendingDelegator(txID ids.ID) (*Tx, error) { return nil, nil }
 
 // TODO: Implement
-func (st *internalStateImpl) GetPendingDelegatorsByNodeID(nodeID ids.ShortID) []*Tx { return nil }
+func (st *internalStateImpl) GetPendingDelegatorsByNodeID(nodeID ids.ShortID) ([]*Tx, error) {
+	return nil, nil
+}
 
 // TODO: Implement
-func (st *internalStateImpl) AddPendingDelegator(*Tx) {}
+func (st *internalStateImpl) AddPendingDelegator(*Tx) error { return nil }
 
 // TODO: Implement
 func (st *internalStateImpl) DeletePendingDelegator(txID ids.ID) {}
@@ -501,12 +544,14 @@ func (st *internalStateImpl) GetBlock(blockID ids.ID) (snowman.Block, error) { r
 func (st *internalStateImpl) AddBlock(block snowman.Block) {}
 
 // TODO: Implement
-func (st *internalStateImpl) GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time) {
-	return 0, time.Time{}
+func (st *internalStateImpl) GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time, err error) {
+	return 0, time.Time{}, nil
 }
 
 // TODO: Implement
-func (st *internalStateImpl) SetUptime(upDuration time.Duration, lastUpdated time.Time) {}
+func (st *internalStateImpl) SetUptime(upDuration time.Duration, lastUpdated time.Time) error {
+	return nil
+}
 
 // TODO: Implement
 func (st *internalStateImpl) Commit() error { return nil }
