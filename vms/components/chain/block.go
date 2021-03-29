@@ -37,7 +37,7 @@ func (bw *BlockWrapper) Verify() error {
 		return err
 	}
 	bw.state.processingBlocks[blkID] = bw
-	return nil
+	return bw.state.baseDB.Commit()
 }
 
 // Accept accepts the underlying block, removes it from processingBlocks, caches it as a decided
