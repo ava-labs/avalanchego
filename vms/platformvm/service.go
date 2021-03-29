@@ -2035,7 +2035,7 @@ func (service *Service) getStakeHelper(tx *Tx, addrs ids.ShortSet) (uint64, []av
 	var (
 		totalAmountStaked uint64
 		err               error
-		stakedOuts        []avax.TransferableOutput
+		stakedOuts        = make([]avax.TransferableOutput, 0, len(outs))
 	)
 	// Go through all of the staked outputs
 	for _, stake := range outs {
@@ -2063,15 +2063,6 @@ func (service *Service) getStakeHelper(tx *Tx, addrs ids.ShortSet) (uint64, []av
 		if !contains {
 			// This output isn't owned by one of the given addresses. Ignore.
 			continue
-		}
-		// Parse the owners of this output to their formatted string representations
-		ownersStrs := []string{}
-		for _, addr := range secpOut.Addrs {
-			addrStr, err := service.vm.FormatLocalAddress(addr)
-			if err != nil {
-				return 0, nil, fmt.Errorf("couldn't format address %s: %w", addr, err)
-			}
-			ownersStrs = append(ownersStrs, addrStr)
 		}
 		totalAmountStaked, err = math.Add64(totalAmountStaked, stake.Out.Amount())
 		if err != nil {
