@@ -370,7 +370,7 @@ func (vm *VM) Initialize(
 	chain.SetOnFinalizeAndAssemble(func(state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
 		select {
 		case atx := <-vm.pendingAtomicTxs:
-			if err := atx.UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(vm, state); err != nil {
+			if err := atx.UnsignedAtomicTx.EVMStateTransfer(vm, state); err != nil {
 				vm.newBlockChan <- nil
 				return nil, err
 			}
@@ -421,7 +421,7 @@ func (vm *VM) Initialize(
 		if tx == nil {
 			return nil
 		}
-		return tx.UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(vm, state)
+		return tx.UnsignedAtomicTx.EVMStateTransfer(vm, state)
 	})
 	vm.blockCache = cache.LRU{Size: blockCacheSize}
 	vm.blockStatusCache = cache.LRU{Size: blockCacheSize}
@@ -1206,11 +1206,10 @@ func FormatEthAddress(addr common.Address) string {
 
 // GetEthAddress returns the ethereum address derived from [privKey]
 func GetEthAddress(privKey *crypto.PrivateKeySECP256K1R) common.Address {
-	return PublicKeyToEthAddress(privKey.PublicKey())
+	return PublicKeyToEthAddress(privKey.PublicKey().(*crypto.PublicKeySECP256K1R))
 }
 
 // PublicKeyToEthAddress returns the ethereum address derived from [pubKey]
-func PublicKeyToEthAddress(pubKey crypto.PublicKey) common.Address {
-	return ethcrypto.PubkeyToAddress(
-		(*pubKey.(*crypto.PublicKeySECP256K1R).ToECDSA()))
+func PublicKeyToEthAddress(pubKey *crypto.PublicKeySECP256K1R) common.Address {
+	return ethcrypto.PubkeyToAddress(*(pubKey.ToECDSA()))
 }
