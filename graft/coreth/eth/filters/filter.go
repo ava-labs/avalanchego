@@ -31,6 +31,8 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/ava-labs/coreth/core/vm"
+
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/bloombits"
 	"github.com/ava-labs/coreth/core/types"
@@ -55,6 +57,9 @@ type Backend interface {
 
 	BloomStatus() (uint64, uint64)
 	ServiceFilter(ctx context.Context, session *bloombits.MatcherSession)
+
+	GetBlockchainVmConfig() *vm.Config
+	GetBlockchainLastAccepted() *types.Block
 }
 
 // Filter can be used to retrieve and filter logs.
@@ -68,12 +73,14 @@ type Filter struct {
 	block      common.Hash // Block hash if filtering a single block
 	begin, end int64       // Range interval if filtering multiple blocks
 
+	acceptedEnd *uint64 // The accepted end block when !allowUnfinalizedQueries
+
 	matcher *bloombits.Matcher
 }
 
 // NewRangeFilter creates a new filter which uses a bloom filter on blocks to
 // figure out whether a particular block is interesting or not.
-func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Address, topics [][]common.Hash) *Filter {
+func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Address, topics [][]common.Hash, acceptedEnd *uint64) *Filter {
 	// Flatten the address and topic filter clauses into a single bloombits filter
 	// system. Since the bloombits are not positional, nil topics are permitted,
 	// which get flattened into a nil byte slice.
@@ -100,6 +107,7 @@ func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Addres
 	filter.matcher = bloombits.NewMatcher(size, filters)
 	filter.begin = begin
 	filter.end = end
+	filter.acceptedEnd = acceptedEnd
 
 	return filter
 }
@@ -154,6 +162,10 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 	if f.end == -1 {
 		end = head
 	}
+	if f.acceptedEnd != nil && end > *f.acceptedEnd {
+		end = *f.acceptedEnd
+	}
+
 	// Gather all indexed logs, and finish with non indexed ones
 	var (
 		logs []*types.Log

@@ -392,6 +392,11 @@ func (bc *BlockChain) GetVMConfig() *vm.Config {
 	return &bc.vmConfig
 }
 
+// GetLastAccepted return the last accepted block.
+func (bc *BlockChain) GetLastAccepted() *types.Block {
+	return bc.lastAccepted
+}
+
 // empty returns an indicator whether the blockchain is empty.
 // Note, it's a special case that we connect a non-empty ancient
 // database with an empty node, so that we can plugin the ancient
