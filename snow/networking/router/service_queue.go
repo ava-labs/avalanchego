@@ -41,7 +41,6 @@ type multiLevelQueue struct {
 	queues        []singleLevelQueue
 	cpuRanges     []float64       // CPU Utilization ranges that should be attributed to a corresponding queue
 	cpuAllotments []time.Duration // Allotments of CPU time per cycle that should be spent on each level of queue
-	cpuPortion    float64
 
 	// Message throttling
 	maxPendingMsgs  uint32

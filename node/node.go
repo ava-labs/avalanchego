@@ -71,7 +71,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 3, 0)
+	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 3, 1)
 	versionParser           = version.NewDefaultParser()
 	beaconConnectionTimeout = 1 * time.Minute
 )
@@ -476,9 +476,8 @@ func (n *Node) initIPCs() error {
 }
 
 // Initializes the Platform chain.
-// Its genesis data specifies the other chains that should
-// be created.
-func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
+// Its genesis data specifies the other chains that should be created.
+func (n *Node) initChains(genesisBytes []byte) {
 	n.Log.Info("initializing chains")
 
 	// Create the Platform Chain
@@ -489,8 +488,6 @@ func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 		VMAlias:       platformvm.ID.String(),
 		CustomBeacons: n.beacons,
 	})
-
-	return nil
 }
 
 // initAPIServer initializes the server that handles HTTP calls
@@ -908,9 +905,8 @@ func (n *Node) Initialize(
 	if err := n.initAliases(n.Config.GenesisBytes); err != nil { // Set up aliases
 		return fmt.Errorf("couldn't initialize aliases: %w", err)
 	}
-	if err := n.initChains(n.Config.GenesisBytes, n.Config.AvaxAssetID); err != nil { // Start the Platform chain
-		return fmt.Errorf("couldn't initialize chains: %w", err)
-	}
+	// Start the Platform chain
+	n.initChains(n.Config.GenesisBytes)
 	return nil
 }
 

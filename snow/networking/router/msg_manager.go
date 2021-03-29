@@ -41,7 +41,6 @@ type msgManager struct {
 	vdrs                           validators.Set
 	maxNonStakerPendingMsgs        uint32
 	poolMessages, reservedMessages uint32
-	stakerMsgPortion               float64
 	msgTracker                     tracker.CountingTracker
 	stakerCPUPortion               float64
 	cpuTracker                     tracker.TimeTracker
