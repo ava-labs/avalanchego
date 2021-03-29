@@ -108,9 +108,14 @@ func (tx *UnsignedExportTx) SemanticVerify(
 		if len(cred.Sigs) != 1 {
 			return permError{fmt.Errorf("expected one signature for EVM Input Credential, but found: %d", len(cred.Sigs))}
 		}
-		pubKey, err := f.RecoverPublicKey(tx.UnsignedBytes(), cred.Sigs[0][:])
+		pubKeyIntf, err := f.RecoverPublicKey(tx.UnsignedBytes(), cred.Sigs[0][:])
 		if err != nil {
 			return permError{err}
+		}
+		pubKey, ok := pubKeyIntf.(*crypto.PublicKeySECP256K1R)
+		if !ok {
+			// This should never happen
+			return permError{fmt.Errorf("expected *crypto.PublicKeySECP256K1R but got %T", pubKeyIntf)}
 		}
 		if input.Address != PublicKeyToEthAddress(pubKey) {
 			return permError{errPublicKeySignatureMismatch}
@@ -132,8 +137,6 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	if err := fc.Verify(); err != nil {
 		return permError{err}
 	}
-
-	// TODO: verify UTXO outputs via gRPC
 	return nil
 }
 
