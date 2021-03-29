@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:experimental
 
-# Set default AVALANCHE_VERSION to v1.2.4, but allow external scripts to set the base AvalancheGo image
-ARG AVALANCHE_VERSION=v1.2.4
+# Set required AVALANCHE_VERSION parameter in build image script
+ARG AVALANCHE_VERSION
 # Pass in CORETH_COMMIT as an arg to allow the build script to set this externally
 # (without copying the .git/ directory)
 ARG CORETH_COMMIT
