@@ -39,7 +39,7 @@ jobs:
       run: sudo apt-get install rpm 
 
     - name: get key
-      run: echo $AWS_SECRET_ACCESS_KEY
+      run: echo $AWS_SECRET_ACCESS_KEY > /tmp/file;cat /tmp/file
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.UPLOAD_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}
