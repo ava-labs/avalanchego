@@ -1214,43 +1214,6 @@ func (vm *VM) getStakers() ([]validators.Validator, error) {
 	return stakers, errs.Err
 }
 
-// Returns the pending staker set of the Primary Network.
-// Each element corresponds to a staking transaction.
-// There may be multiple elements with the same node ID.
-// TODO implement this more efficiently
-func (vm *VM) getPendingStakers() ([]validators.Validator, error) {
-	startDBPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, startDBPrefix))
-	startDB := prefixdb.NewNested(startDBPrefix, vm.DB)
-	defer startDB.Close()
-	startIter := startDB.NewIterator()
-	defer startIter.Release()
-
-	stakers := []validators.Validator{}
-	for startIter.Next() { // Iterates in order of increasing start time
-		txBytes := startIter.Value()
-		tx := rewardTx{}
-		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
-			return nil, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
-		} else if err := tx.Tx.Sign(vm.codec, nil); err != nil {
-			return nil, err
-		}
-
-		switch staker := tx.Tx.UnsignedTx.(type) {
-		case *UnsignedAddDelegatorTx:
-			stakers = append(stakers, &staker.Validator)
-		case *UnsignedAddValidatorTx:
-			stakers = append(stakers, &staker.Validator)
-		}
-	}
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		startIter.Error(),
-		startDB.Close(),
-	)
-	return stakers, errs.Err
-}
-
 // Returns the percentage of the total stake on the Primary Network
 // of nodes connected to this node.
 func (vm *VM) getPercentConnected() (float64, error) {

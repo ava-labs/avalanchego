@@ -92,7 +92,7 @@ const (
 // Handler passes incoming messages from the network to the consensus engine
 // (Actually, it receives the incoming messages from a ChainRouter, but same difference)
 type Handler struct {
-	metrics
+	metrics handlerMetrics
 
 	validators validators.Set
 
@@ -132,7 +132,7 @@ func (h *Handler) Initialize(
 	namespace string,
 	metrics prometheus.Registerer,
 	delay *Delay,
-) {
+) error {
 	h.ctx = engine.Context()
 	if err := h.metrics.Initialize(namespace, metrics); err != nil {
 		h.ctx.Log.Warn("initializing handler metrics errored with: %s", err)
@@ -162,7 +162,7 @@ func (h *Handler) Initialize(
 
 	h.cpuTracker = tracker.NewCPUTracker(uptime.IntervalFactory{}, cpuInterval)
 	msgTracker := tracker.NewMessageTracker()
-	msgManager := NewMsgManager(
+	msgManager, err := NewMsgManager(
 		validators,
 		h.ctx.Log,
 		msgTracker,
@@ -171,7 +171,12 @@ func (h *Handler) Initialize(
 		maxNonStakerPendingMsgs,
 		stakerMsgPortion,
 		stakerCPUPortion,
+		namespace,
+		metrics,
 	)
+	if err != nil {
+		return err
+	}
 
 	h.serviceQueue, h.msgSema = newMultiLevelQueue(
 		msgManager,
@@ -184,6 +189,7 @@ func (h *Handler) Initialize(
 	h.engine = engine
 	h.validators = validators
 	h.delay = delay
+	return nil
 }
 
 // Context of this Handler
@@ -282,10 +288,10 @@ func (h *Handler) dispatchMsg(msg message) {
 	switch msg.messageType {
 	case constants.NotifyMsg:
 		err = h.engine.Notify(msg.notification)
-		h.notify.Observe(float64(h.clock.Time().Sub(startTime)))
+		h.metrics.notify.Observe(float64(h.clock.Time().Sub(startTime)))
 	case constants.GossipMsg:
 		err = h.engine.Gossip()
-		h.gossip.Observe(float64(h.clock.Time().Sub(startTime)))
+		h.metrics.gossip.Observe(float64(h.clock.Time().Sub(startTime)))
 	default:
 		err = h.handleValidatorMsg(msg, startTime)
 	}
@@ -583,7 +589,7 @@ func (h *Handler) shutdownDispatch() {
 		go h.toClose()
 	}
 	h.closing.SetValue(true)
-	h.shutdown.Observe(float64(time.Since(startTime)))
+	h.metrics.shutdown.Observe(float64(time.Since(startTime)))
 	close(h.closed)
 }
 
@@ -632,7 +638,7 @@ func (h *Handler) handleValidatorMsg(msg message, startTime time.Time) error {
 	endTime := h.clock.Time()
 	timeConsumed := endTime.Sub(startTime)
 
-	histogram := h.getMSGHistogram(msg.messageType)
+	histogram := h.metrics.getMSGHistogram(msg.messageType)
 	histogram.Observe(float64(timeConsumed))
 
 	h.cpuTracker.UtilizeTime(msg.validatorID, startTime, endTime)

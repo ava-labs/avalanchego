@@ -101,7 +101,7 @@ func (cr *ChainRouter) Initialize(
 	cr.healthConfig = healthConfig
 
 	// Register metrics
-	rMetrics, err := newRouterMetrics(cr.log, metricsNamespace, metricsRegisterer)
+	rMetrics, err := newRouterMetrics(metricsNamespace, metricsRegisterer)
 	if err != nil {
 		return err
 	}
@@ -897,22 +897,14 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 	healthy = healthy && numOutstandingReqs <= cr.healthConfig.MaxOutstandingRequests
 	details["outstandingRequests"] = numOutstandingReqs
 
-	now := cr.clock.Time()
-	if numOutstandingReqs == 0 {
-		cr.lastTimeNoOutstanding = now
-	}
-	timeSinceNoOutstandingRequests := now.Sub(cr.lastTimeNoOutstanding)
-	healthy = healthy && timeSinceNoOutstandingRequests <= cr.healthConfig.MaxTimeSinceNoOutstandingRequests
-	details["timeSinceNoOutstandingRequests"] = timeSinceNoOutstandingRequests.String()
-	cr.metrics.timeSinceNoOutstandingRequests.Set(float64(timeSinceNoOutstandingRequests.Milliseconds()))
-
 	// check for long running requests
+	now := cr.clock.Time()
 	processingRequest := now
 	if longestRunning, exists := cr.timedRequests.Oldest(); exists {
 		processingRequest = longestRunning.(requestEntry).time
 	}
 	timeReqRunning := now.Sub(processingRequest)
-	healthy = healthy && timeReqRunning <= cr.healthConfig.MaxTimeSinceNoOutstandingRequests
+	healthy = healthy && timeReqRunning <= cr.healthConfig.MaxOutstandingDuration
 	details["longestRunningRequest"] = timeReqRunning.String()
 	cr.metrics.longestRunningRequest.Set(float64(timeReqRunning.Milliseconds()))
 
