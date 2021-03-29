@@ -891,6 +891,19 @@ func (bc *BlockChain) GetBlockByHash(hash common.Hash) *types.Block {
 func (bc *BlockChain) GetBlockByNumber(number uint64) *types.Block {
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
+	if !bc.vmConfig.AllowUnfinalizedQueries &&
+		bc.lastAccepted != nil &&
+		number > bc.lastAccepted.NumberU64() {
+		return nil
+	}
+	return bc.getBlockByNumber(number)
+}
+
+// GetBlockByNumberUnfinalized retrieves a block from the canonical chain by number, caching it
+// (associated with its hash) if found. It may return an unfinalized block if it requests a block above the last accepted height.
+func (bc *BlockChain) GetBlockByNumberUnfinalized(number uint64) *types.Block {
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
 	return bc.getBlockByNumber(number)
 }
 

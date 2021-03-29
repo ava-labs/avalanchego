@@ -97,7 +97,10 @@ func (tx *UnsignedExportTx) SemanticVerify(
 
 	f := crypto.FactorySECP256K1R{}
 	for i, input := range tx.Ins {
-		cred := stx.Creds[i].(*secp256k1fx.Credential)
+		cred, ok := stx.Creds[i].(*secp256k1fx.Credential)
+		if !ok {
+			return permError{fmt.Errorf("expected *secp256k1fx.Credential but got %T", cred)}
+		}
 		if err := cred.Verify(); err != nil {
 			return permError{err}
 		}

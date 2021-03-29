@@ -350,6 +350,7 @@ func (vm *VM) Initialize(
 	config.RPCGasCap = vm.CLIConfig.RPCGasCap
 	config.RPCTxFeeCap = vm.CLIConfig.RPCTxFeeCap
 	config.TxPool.NoLocals = !vm.CLIConfig.LocalTxsEnabled
+	config.AllowUnfinalizedQueries = vm.CLIConfig.AllowUnfinalizedQueries
 	vm.chainConfig = g.Config
 
 	if err := config.SetGCMode("archive"); err != nil {
@@ -373,7 +374,11 @@ func (vm *VM) Initialize(
 				vm.newBlockChan <- nil
 				return nil, err
 			}
-			raw, _ := vm.codec.Marshal(codecVersion, atx)
+			raw, err := vm.codec.Marshal(codecVersion, atx)
+			if err != nil {
+				vm.newBlockChan <- nil
+				return nil, fmt.Errorf("couldn't marshal atomic tx: %s", err)
+			}
 			return raw, nil
 		default:
 			if len(txs) == 0 {
