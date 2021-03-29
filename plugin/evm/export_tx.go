@@ -235,7 +235,7 @@ func (vm *VM) newExportTx(
 		Ins:              ins,
 		ExportedOutputs:  exportOuts,
 	}
-	tx := &Tx{UnsignedTx: utx}
+	tx := &Tx{UnsignedAtomicTx: utx}
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}

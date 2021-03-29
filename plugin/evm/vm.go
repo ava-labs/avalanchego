@@ -369,11 +369,7 @@ func (vm *VM) Initialize(
 	chain.SetOnFinalizeAndAssemble(func(state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
 		select {
 		case atx := <-vm.pendingAtomicTxs:
-			uatx, ok := atx.UnsignedTx.(UnsignedAtomicTx)
-			if !ok {
-				return nil, fmt.Errorf("expected UnsignedAtomicTx but got %T", atx.UnsignedTx)
-			}
-			if err := uatx.EVMStateTransfer(vm, state); err != nil {
+			if err := atx.UnsignedAtomicTx.EVMStateTransfer(vm, state); err != nil {
 				vm.newBlockChan <- nil
 				return nil, err
 			}
@@ -424,7 +420,7 @@ func (vm *VM) Initialize(
 		if tx == nil {
 			return nil
 		}
-		return tx.UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(vm, state)
+		return tx.UnsignedAtomicTx.EVMStateTransfer(vm, state)
 	})
 	vm.blockCache = cache.LRU{Size: blockCacheSize}
 	vm.blockStatusCache = cache.LRU{Size: blockCacheSize}

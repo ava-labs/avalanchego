@@ -259,7 +259,7 @@ func (vm *VM) newImportTx(
 		ImportedInputs: importedInputs,
 		SourceChain:    chainID,
 	}
-	tx := &Tx{UnsignedTx: utx}
+	tx := &Tx{UnsignedAtomicTx: utx}
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}

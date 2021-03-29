@@ -202,7 +202,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx := &Tx{UnsignedTx: unsignedImportTx}
+	tx := &Tx{UnsignedAtomicTx: unsignedImportTx}
 
 	// Sign with the correct key
 	if err := tx.Sign(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}}); err != nil {
@@ -350,7 +350,7 @@ func TestNewImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	importTx, ok := tx.UnsignedTx.(UnsignedAtomicTx)
+	importTx, ok := tx.UnsignedAtomicTx.(UnsignedAtomicTx)
 	if !ok {
 		t.Fatal("newImportTx did not return an atomic transaction")
 	}
