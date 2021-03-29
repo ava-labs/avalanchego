@@ -187,7 +187,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Router Health
 	fs.Float64(routerHealthMaxDropRateKey, 1, "Node reports unhealthy if the router drops more than this portion of messages.")
 	fs.Uint(routerHealthMaxOutstandingRequestsKey, 1024, "Node reports unhealthy if there are more than this many outstanding consensus requests (Get, PullQuery, etc.) over all chains")
-	fs.Duration(networkHealthMaxTimeSinceNoReqsKey, 5*time.Minute, "Node reports unhealthy if there is at least 1 outstanding request continuously for this duration")
+	fs.Duration(networkHealthMaxOutstandingDurationKey, 5*time.Minute, "Node reports unhealthy if there has been a request outstanding for this duration")
 
 	// Staking
 	fs.Uint(stakingPortKey, 9651, "Port of the consensus server")
@@ -541,14 +541,14 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.ConsensusRouter = &router.ChainRouter{}
 	Config.RouterHealthConfig.MaxDropRate = v.GetFloat64(routerHealthMaxDropRateKey)
 	Config.RouterHealthConfig.MaxOutstandingRequests = int(v.GetUint(routerHealthMaxOutstandingRequestsKey))
-	Config.RouterHealthConfig.MaxTimeSinceNoOutstandingRequests = v.GetDuration(networkHealthMaxTimeSinceNoReqsKey)
+	Config.RouterHealthConfig.MaxOutstandingDuration = v.GetDuration(networkHealthMaxOutstandingDurationKey)
 	Config.RouterHealthConfig.MaxRunTimeRequests = v.GetDuration(networkMaximumTimeoutKey)
 	Config.RouterHealthConfig.MaxDropRateHalflife = healthCheckAveragerHalflife
 	switch {
 	case Config.RouterHealthConfig.MaxDropRate < 0 || Config.RouterHealthConfig.MaxDropRate > 1:
 		return fmt.Errorf("%s must be in [0,1]", routerHealthMaxDropRateKey)
-	case Config.RouterHealthConfig.MaxTimeSinceNoOutstandingRequests <= 0:
-		return fmt.Errorf("%s must be positive", networkHealthMaxTimeSinceNoReqsKey)
+	case Config.RouterHealthConfig.MaxOutstandingDuration <= 0:
+		return fmt.Errorf("%s must be positive", networkHealthMaxOutstandingDurationKey)
 	}
 
 	// IPCs
