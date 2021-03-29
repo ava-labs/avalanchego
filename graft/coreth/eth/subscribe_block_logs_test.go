@@ -2,12 +2,12 @@ package eth
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"crypto/rand"
-	"io"
 	"math/big"
 	"testing"
 	"time"
+
+	"github.com/ava-labs/coreth/accounts/keystore"
 
 	"github.com/ava-labs/coreth/core/rawdb"
 
@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 var (
@@ -30,27 +29,6 @@ var (
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	}
 )
-
-type Key struct {
-	Address    common.Address
-	PrivateKey *ecdsa.PrivateKey
-}
-
-func NewKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *Key {
-	key := &Key{
-		Address:    crypto.PubkeyToAddress(privateKeyECDSA.PublicKey),
-		PrivateKey: privateKeyECDSA,
-	}
-	return key
-}
-
-func NewKey(rand io.Reader) (*Key, error) {
-	privateKeyECDSA, err := ecdsa.GenerateKey(crypto.S256(), rand)
-	if err != nil {
-		return nil, err
-	}
-	return NewKeyFromECDSA(privateKeyECDSA), nil
-}
 
 func TestBlockLogsAllowUnfinalized(t *testing.T) {
 	config := DefaultConfig
@@ -73,7 +51,7 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 
 	// configure the genesis block
 	genBalance := big.NewInt(100000000000000000)
-	genKey, err := NewKey(rand.Reader)
+	genKey, err := keystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
