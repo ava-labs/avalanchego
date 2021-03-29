@@ -30,7 +30,7 @@ message InitializeResponse {
     bytes parentID = 2;
     uint32 status = 3;
     uint64 height = 4;
-    bytes bytes = 5
+    bytes bytes = 5;
 }
 
 message VersionedDBServer {
