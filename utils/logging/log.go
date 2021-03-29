@@ -363,7 +363,7 @@ func (fw *fileWriter) Close() error {
 
 func (fw *fileWriter) Rotate() error {
 	fw.fileIndex = (fw.fileIndex + 1) % fw.config.RotationSize
-	writer, file, err := fw.create(fw.fileIndex)
+	writer, file, err := fw.create()
 	if err != nil {
 		return err
 	}
@@ -372,7 +372,7 @@ func (fw *fileWriter) Rotate() error {
 	return nil
 }
 
-func (fw *fileWriter) create(fileIndex int) (*bufio.Writer, *os.File, error) {
+func (fw *fileWriter) create() (*bufio.Writer, *os.File, error) {
 	filename := filepath.Join(fw.config.Directory, fmt.Sprintf("%d.log", fw.fileIndex))
 	file, err := perms.Create(filename, perms.ReadWrite)
 	if err != nil {
@@ -384,7 +384,7 @@ func (fw *fileWriter) create(fileIndex int) (*bufio.Writer, *os.File, error) {
 
 func (fw *fileWriter) Initialize(config Config) error {
 	fw.config = config
-	writer, file, err := fw.create(fw.fileIndex)
+	writer, file, err := fw.create()
 	if err != nil {
 		return err
 	}

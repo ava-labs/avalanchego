@@ -4,7 +4,6 @@
 package router
 
 import (
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -17,7 +16,7 @@ type routerMetrics struct {
 	longestRunningRequest          prometheus.Gauge
 }
 
-func newRouterMetrics(log logging.Logger, namespace string, registerer prometheus.Registerer) (*routerMetrics, error) {
+func newRouterMetrics(namespace string, registerer prometheus.Registerer) (*routerMetrics, error) {
 	rMetrics := &routerMetrics{}
 	rMetrics.outstandingRequests = prometheus.NewGauge(
 		prometheus.GaugeOpts{

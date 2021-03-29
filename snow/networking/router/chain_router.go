@@ -101,7 +101,7 @@ func (cr *ChainRouter) Initialize(
 	cr.healthConfig = healthConfig
 
 	// Register metrics
-	rMetrics, err := newRouterMetrics(cr.log, metricsNamespace, metricsRegisterer)
+	rMetrics, err := newRouterMetrics(metricsNamespace, metricsRegisterer)
 	if err != nil {
 		return err
 	}
