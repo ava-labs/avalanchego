@@ -66,7 +66,7 @@ func main() {
 	chain := coreth.NewETHChain(&config, nil, nil, nil, eth.DefaultSettings)
 	buff := new(bytes.Buffer)
 	blk := chain.GetGenesisBlock()
-	err := blk.EncodeRLPEth(buff)
+	err := blk.EncodeRLP(buff)
 	buff.WriteString("somesuffix")
 	checkError(err)
 	var blk2 *types.Block
@@ -78,7 +78,7 @@ func main() {
 	fmt.Println(buff.Len())
 	checkError(err)
 	buff.Reset()
-	err = blk2.EncodeRLPEth(buff)
+	err = blk2.EncodeRLP(buff)
 	checkError(err)
 	fmt.Println(buff.Len())
 	fmt.Println(common.ToHex(buff.Bytes()))
