@@ -27,6 +27,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ava-labs/coreth/accounts/keystore"
+
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
@@ -59,7 +61,7 @@ func main() {
 	chainID2 := big.NewInt(fChainID)
 	_pkey, err := crypto.HexToECDSA(fKey[2:])
 	checkError(err)
-	pkey := coreth.NewKeyFromECDSA(_pkey)
+	pkey := keystore.NewKeyFromECDSA(_pkey)
 	flag.Parse()
 
 	// configure the chain
@@ -86,12 +88,12 @@ func main() {
 	mcAbiJSON := `[{"inputs":[{"internalType":"uint256","name":"coinid","type":"uint256"}],"name":"getBalance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address payable","name":"recipient","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"coinid","type":"uint256"},{"internalType":"uint256","name":"amount2","type":"uint256"}],"name":"transfer","outputs":[],"stateMutability":"nonpayable","type":"function"}]`
 	genesisKey := "0xabd71b35d559563fea757f0f5edbde286fb8c043105b15abb7cd57189306d7d1"
 
-	bobKey, _ := coreth.NewKey(rand.Reader)
+	bobKey, _ := keystore.NewKey(rand.Reader)
 	genesisBlock := new(core.Genesis)
 	err = json.Unmarshal([]byte(genesisJSON), genesisBlock)
 	checkError(err)
 	hk, _ := crypto.HexToECDSA(genesisKey[2:])
-	genKey := coreth.NewKeyFromECDSA(hk)
+	genKey := keystore.NewKeyFromECDSA(hk)
 
 	config.Genesis = genesisBlock
 	config.TrieCleanCache += config.SnapshotCache

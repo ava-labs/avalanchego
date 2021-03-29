@@ -9,8 +9,9 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/ava-labs/coreth/accounts/keystore"
+
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -49,7 +50,7 @@ func main() {
 
 	_pkey, err := crypto.HexToECDSA(fKey[2:])
 	checkError(err)
-	pkey := coreth.NewKeyFromECDSA(_pkey)
+	pkey := keystore.NewKeyFromECDSA(_pkey)
 
 	// info required to generate a transaction
 	chainID := big.NewInt(fChainID)

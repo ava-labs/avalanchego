@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/coreth/accounts/keystore"
+
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
@@ -48,7 +50,7 @@ func main() {
 	genBalance := big.NewInt(100000000000000000)
 	hk, _ := crypto.HexToECDSA(
 		"abd71b35d559563fea757f0f5edbde286fb8c043105b15abb7cd57189306d7d1")
-	genKey := coreth.NewKeyFromECDSA(hk)
+	genKey := keystore.NewKeyFromECDSA(hk)
 
 	config.Genesis = &core.Genesis{
 		Config:     chainConfig,
