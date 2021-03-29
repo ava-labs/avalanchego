@@ -164,7 +164,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(httpsCertFileKey, "", "TLS certificate file for the HTTPs server")
 	fs.String(httpAllowedOrigins, "*", "Origins to allow on the HTTP port. Defaults to * which allows all origins. Example: https://*.avax.network https://*.avax-test.network")
 	fs.Bool(apiAuthRequiredKey, false, "Require authorization token to call HTTP APIs")
-	fs.String(apiAuthPasswordFileKey, "", "Password file used to initially create/validate API authorization tokens. Can be changed via API call.")
+	fs.String(apiAuthPasswordFileKey, "", "Password file used to initially create/validate API authorization tokens. Leading and trailing whitespace is removed from the password. Can be changed via API call.")
 	// Enable/Disable APIs
 	fs.Bool(adminAPIEnabledKey, false, "If true, this node exposes the Admin API")
 	fs.Bool(infoAPIEnabledKey, true, "If true, this node exposes the Info API")
@@ -513,7 +513,7 @@ func setNodeConfig(v *viper.Viper) error {
 		if err != nil {
 			return fmt.Errorf("api-auth-password-file %q failed to be read with: %w", passwordFile, err)
 		}
-		Config.APIAuthPassword = string(pwBytes)
+		Config.APIAuthPassword = strings.TrimSpace(string(pwBytes))
 		if !password.SufficientlyStrong(Config.APIAuthPassword, password.OK) {
 			return errors.New("api-auth-password is not strong enough")
 		}
