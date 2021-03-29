@@ -17,45 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
-type immutableValidatorChainState interface {
-	MutableValidatorChainState() validatorChainState
-
-	GetCurrentValidator(txID ids.ID) (addValidatorTx *Tx, potentialReward uint64, err error)
-	GetCurrentValidatorByNodeID(nodeID ids.ShortID) (addValidatorTx *Tx, potentialReward uint64, err error)
-
-	GetCurrentDelegator(txID ids.ID) (addDelegatorTx *Tx, potentialReward uint64, err error)
-	GetCurrentDelegatorsByNodeID(nodeID ids.ShortID) ([]*Tx, error)
-
-	GetPendingValidator(txID ids.ID) (*Tx, error)
-	GetPendingValidatorByNodeID(nodeID ids.ShortID) (*Tx, error)
-
-	GetPendingDelegator(txID ids.ID) (*Tx, error)
-	GetPendingDelegatorsByNodeID(nodeID ids.ShortID) ([]*Tx, error)
-}
-
-type validatorChainState interface {
-	immutableValidatorChainState
-
-	AddCurrentValidator(addValidatorTx *Tx, potentialReward uint64)
-	DeleteCurrentValidator(txID ids.ID)
-
-	AddCurrentDelegator(addDelegatorTx *Tx, potentialReward uint64) error
-	DeleteCurrentDelegator(txID ids.ID)
-
-	AddPendingValidator(*Tx)
-	DeletePendingValidator(txID ids.ID)
-
-	AddPendingDelegator(*Tx) error
-	DeletePendingDelegator(txID ids.ID)
-}
-
-type validatorState interface {
-	validatorChainState
-
-	GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time, err error)
-	SetUptime(upDuration time.Duration, lastUpdated time.Time) error
-}
-
 type versionedState interface {
 	immutableValidatorChainState
 
@@ -473,85 +434,10 @@ func (st *internalStateImpl) DeleteUTXO(utxoID avax.UTXOID) {
 }
 
 // TODO: Implement
-func (st *internalStateImpl) GetCurrentValidator(txID ids.ID) (addValidatorTx *Tx, potentialReward uint64, err error) {
-
-	// validatorBaseDB database.Database
-	// validatorDB     linkeddb.LinkedDB
-	return nil, 0, nil
-}
-
-// TODO: Implement
-func (st *internalStateImpl) GetCurrentValidatorByNodeID(nodeID ids.ShortID) (addValidatorTx *Tx, potentialReward uint64, err error) {
-	return nil, 0, nil
-}
-
-// TODO: Implement
-func (st *internalStateImpl) AddCurrentValidator(addValidatorTx *Tx, potentialReward uint64) {}
-
-// TODO: Implement
-func (st *internalStateImpl) DeleteCurrentValidator(txID ids.ID) {}
-
-// TODO: Implement
-func (st *internalStateImpl) GetCurrentDelegator(txID ids.ID) (addDelegatorTx *Tx, potentialReward uint64, err error) {
-	return nil, 0, nil
-}
-
-// TODO: Implement
-func (st *internalStateImpl) GetCurrentDelegatorsByNodeID(nodeID ids.ShortID) ([]*Tx, error) {
-	return nil, nil
-}
-
-// TODO: Implement
-func (st *internalStateImpl) AddCurrentDelegator(addDelegatorTx *Tx, potentialReward uint64) error {
-	return nil
-}
-
-// TODO: Implement
-func (st *internalStateImpl) DeleteCurrentDelegator(txID ids.ID) {}
-
-// TODO: Implement
-func (st *internalStateImpl) GetPendingValidator(txID ids.ID) (*Tx, error) { return nil, nil }
-
-// TODO: Implement
-func (st *internalStateImpl) GetPendingValidatorByNodeID(nodeID ids.ShortID) (*Tx, error) {
-	return nil, nil
-}
-
-// TODO: Implement
-func (st *internalStateImpl) AddPendingValidator(*Tx) {}
-
-// TODO: Implement
-func (st *internalStateImpl) DeletePendingValidator(txID ids.ID) {}
-
-// TODO: Implement
-func (st *internalStateImpl) GetPendingDelegator(txID ids.ID) (*Tx, error) { return nil, nil }
-
-// TODO: Implement
-func (st *internalStateImpl) GetPendingDelegatorsByNodeID(nodeID ids.ShortID) ([]*Tx, error) {
-	return nil, nil
-}
-
-// TODO: Implement
-func (st *internalStateImpl) AddPendingDelegator(*Tx) error { return nil }
-
-// TODO: Implement
-func (st *internalStateImpl) DeletePendingDelegator(txID ids.ID) {}
-
-// TODO: Implement
 func (st *internalStateImpl) GetBlock(blockID ids.ID) (snowman.Block, error) { return nil, nil }
 
 // TODO: Implement
 func (st *internalStateImpl) AddBlock(block snowman.Block) {}
-
-// TODO: Implement
-func (st *internalStateImpl) GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time, err error) {
-	return 0, time.Time{}, nil
-}
-
-// TODO: Implement
-func (st *internalStateImpl) SetUptime(upDuration time.Duration, lastUpdated time.Time) error {
-	return nil
-}
 
 // TODO: Implement
 func (st *internalStateImpl) Commit() error { return nil }
