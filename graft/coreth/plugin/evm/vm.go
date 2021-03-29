@@ -373,7 +373,11 @@ func (vm *VM) Initialize(
 				vm.newBlockChan <- nil
 				return nil, err
 			}
-			raw, _ := vm.codec.Marshal(codecVersion, atx)
+			raw, err := vm.codec.Marshal(codecVersion, atx)
+			if err != nil {
+				vm.newBlockChan <- nil
+				return nil, fmt.Errorf("couldn't marshal atomic tx: %s", err)
+			}
 			return raw, nil
 		default:
 			if len(txs) == 0 {
