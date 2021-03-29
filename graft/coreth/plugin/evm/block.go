@@ -119,17 +119,13 @@ func (b *Block) Accept() error {
 	if tx == nil {
 		return nil
 	}
-	utx, ok := tx.UnsignedTx.(UnsignedAtomicTx)
-	if !ok {
-		return errUnknownAtomicTx
-	}
 
 	if bonusBlocks.Contains(b.id) {
 		log.Info("skipping atomic tx verification on bonus block", "block", b.id)
 		return nil
 	}
 
-	return utx.Accept(vm.ctx, nil)
+	return tx.UnsignedAtomicTx.Accept(vm.ctx, nil)
 }
 
 // Reject implements the snowman.Block interface
@@ -213,7 +209,7 @@ func (b *Block) Verify() error {
 		if bonusBlocks.Contains(b.id) {
 			log.Info("skipping atomic tx verification on bonus block", "block", b.id)
 		} else {
-			switch atx := atomicTx.UnsignedTx.(type) {
+			switch atx := atomicTx.UnsignedAtomicTx.(type) {
 			case *UnsignedImportTx:
 				// If an import tx is seen, we must ensure that none of the
 				// processing ancestors consume the same UTXO.
@@ -226,7 +222,7 @@ func (b *Block) Verify() error {
 					// If the ancestor isn't an atomic block, it can't conflict with
 					// the import tx.
 					if atx != nil {
-						ancestorInputs := atx.UnsignedTx.(UnsignedAtomicTx).InputUTXOs()
+						ancestorInputs := atx.UnsignedAtomicTx.InputUTXOs()
 						if inputs.Overlaps(ancestorInputs) {
 							return errConflictingAtomicInputs
 						}
@@ -258,7 +254,7 @@ func (b *Block) Verify() error {
 			// We have verified that none of the processing ancestors conflict with
 			// the atomic transaction, so now we must ensure that the transaction is
 			// valid and doesn't have any accepted conflicts.
-			utx := atomicTx.UnsignedTx.(UnsignedAtomicTx)
+			utx := atomicTx.UnsignedAtomicTx
 			if err := utx.SemanticVerify(vm, atomicTx, b.vm.IsApricotPhase1(b.ethBlock.Time())); err != nil {
 				return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
 			}
