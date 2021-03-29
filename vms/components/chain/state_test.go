@@ -183,7 +183,7 @@ func TestChainState(t *testing.T) {
 	}
 	testBlks = append(testBlks, blk3)
 
-	chainState := NewChainState(prefixdb.New([]byte{1}, db), 2)
+	chainState := NewChainState(prefixdb.New([]byte{1}, db), 2, 2, 2)
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 	chainState.Initialize(&Config{
@@ -321,7 +321,7 @@ func TestBuildBlock(t *testing.T) {
 	blk1 := testBlks[1]
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
-	chainState := NewChainState(prefixdb.New([]byte{1}, db), 2)
+	chainState := NewChainState(prefixdb.New([]byte{1}, db), 2, 2, 2)
 	buildBlock := func() (Block, error) {
 		// Once the block is built, mark it as processing
 		blk1.SetStatus(choices.Processing)
@@ -372,7 +372,7 @@ func TestChainStateDecideBlock(t *testing.T) {
 	badRejectBlk := testBlks[3]
 	badRejectBlk.RejectV = errors.New("this block should fail on reject")
 
-	chainState := NewChainState(prefixdb.New([]byte{1}, db), 2)
+	chainState := NewChainState(prefixdb.New([]byte{1}, db), 2, 2, 2)
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 
 	chainState.Initialize(&Config{
@@ -440,7 +440,7 @@ func TestChainStateParent(t *testing.T) {
 	blk1 := testBlks[1]
 	blk2 := testBlks[2]
 
-	chainState := NewChainState(prefixdb.New([]byte{1}, db), 5)
+	chainState := NewChainState(prefixdb.New([]byte{1}, db), 2, 2, 2)
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 
 	chainState.Initialize(&Config{
@@ -482,7 +482,7 @@ func TestGetBlockInternal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chainState := NewChainState(prefixdb.New([]byte{1}, db), 5)
+	chainState := NewChainState(prefixdb.New([]byte{1}, db), 2, 2, 2)
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 
 	chainState.Initialize(&Config{
@@ -525,7 +525,7 @@ func TestGetBlockError(t *testing.T) {
 	}
 	blk1 := testBlks[1]
 
-	chainState := NewChainState(prefixdb.New([]byte{1}, db), 5)
+	chainState := NewChainState(prefixdb.New([]byte{1}, db), 2, 2, 2)
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 	wrappedGetBlock := func(id ids.ID) (Block, error) {
 		blk, err := getBlock(id)
@@ -571,7 +571,7 @@ func TestParseBlockError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chainState := NewChainState(prefixdb.New([]byte{1}, db), 5)
+	chainState := NewChainState(prefixdb.New([]byte{1}, db), 2, 2, 2)
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 
 	chainState.Initialize(&Config{
@@ -598,7 +598,7 @@ func TestBuildBlockError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chainState := NewChainState(prefixdb.New([]byte{1}, db), 5)
+	chainState := NewChainState(prefixdb.New([]byte{1}, db), 2, 2, 2)
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 
 	chainState.Initialize(&Config{

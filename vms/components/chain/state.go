@@ -8,11 +8,13 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -62,14 +64,56 @@ type Config struct {
 }
 
 // NewChainState returns a new uninitialized ChainState
-func NewChainState(db database.Database, cacheSize int) *ChainState {
+func NewChainState(db database.Database, decidedCacheSize, missingCacheSize, unverifiedCacheSize int) *ChainState {
 	return &ChainState{
 		baseDB:           versiondb.New(db),
-		processingBlocks: make(map[ids.ID]*BlockWrapper, cacheSize),
-		decidedBlocks:    &cache.LRU{Size: cacheSize},
-		missingBlocks:    &cache.LRU{Size: cacheSize},
-		unverifiedBlocks: &cache.LRU{Size: cacheSize},
+		processingBlocks: make(map[ids.ID]*BlockWrapper),
+		decidedBlocks:    &cache.LRU{Size: decidedCacheSize},
+		missingBlocks:    &cache.LRU{Size: missingCacheSize},
+		unverifiedBlocks: &cache.LRU{Size: unverifiedCacheSize},
 	}
+}
+
+func NewMeteredChainState(
+	db database.Database,
+	registerer prometheus.Registerer,
+	namespace string,
+	decidedCacheSize,
+	missingCacheSize,
+	unverifiedCacheSize int,
+) (*ChainState, error) {
+	decidedCache, err := metercacher.New(
+		fmt.Sprintf("%s_decided_cache", namespace),
+		registerer,
+		&cache.LRU{Size: decidedCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
+	missingCache, err := metercacher.New(
+		fmt.Sprintf("%s_missing_cache", namespace),
+		registerer,
+		&cache.LRU{Size: missingCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
+	unverifiedCache, err := metercacher.New(
+		fmt.Sprintf("%s_unverified_cache", namespace),
+		registerer,
+		&cache.LRU{Size: unverifiedCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ChainState{
+		baseDB:           versiondb.New(db),
+		processingBlocks: make(map[ids.ID]*BlockWrapper),
+		decidedBlocks:    decidedCache,
+		missingBlocks:    missingCache,
+		unverifiedBlocks: unverifiedCache,
+	}, nil
 }
 
 // Initialize sets the last accepted block, and the internal functions for retrieving/parsing/building
