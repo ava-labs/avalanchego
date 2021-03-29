@@ -76,11 +76,12 @@ const (
 	maxBlockTime = 3 * time.Second
 	// maxFutureBlockTime should be smaller than the max allowed future time (15s) used
 	// in dummy consensus engine's verifyHeader
-	maxFutureBlockTime = 10 * time.Second
-	batchSize          = 250
-	maxUTXOsToFetch    = 1024
-	blockCacheSize     = 1024
-	codecVersion       = uint16(0)
+	maxFutureBlockTime   = 10 * time.Second
+	batchSize            = 250
+	maxUTXOsToFetch      = 1024
+	blockCacheSize       = 1024
+	codecVersion         = uint16(0)
+	secpFactoryCacheSize = 1024
 )
 
 const (
@@ -353,6 +354,7 @@ func (vm *VM) Initialize(
 	config.TxPool.NoLocals = !vm.CLIConfig.LocalTxsEnabled
 	config.AllowUnfinalizedQueries = vm.CLIConfig.AllowUnfinalizedQueries
 	vm.chainConfig = g.Config
+	vm.secpFactory = crypto.FactorySECP256K1R{Cache: cache.LRU{Size: secpFactoryCacheSize}}
 
 	if err := config.SetGCMode("archive"); err != nil {
 		panic(err)
