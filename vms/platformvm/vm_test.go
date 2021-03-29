@@ -350,10 +350,6 @@ func defaultVM() (*VM, database.Database) {
 	return vm, baseDB
 }
 
-func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) {
-	return GenesisVMWithArgs(t, nil)
-}
-
 func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
 	var genesisBytes []byte
 
