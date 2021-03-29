@@ -336,6 +336,9 @@ func (api *PublicFilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
 //
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_getlogs
 func (api *PublicFilterAPI) GetLogs(ctx context.Context, crit FilterCriteria) ([]*types.Log, error) {
+	allowUnfinalizedQueries := api.backend.GetBlockchainVmConfig().AllowUnfinalizedQueries
+	lastAccepted := api.backend.GetBlockchainLastAccepted()
+
 	var filter *Filter
 	if crit.BlockHash != nil {
 		// Block filter requested, construct a single-shot filter
@@ -346,17 +349,19 @@ func (api *PublicFilterAPI) GetLogs(ctx context.Context, crit FilterCriteria) ([
 		// correctly within NewRangeFilter
 		begin := rpc.LatestBlockNumber.Int64()
 		if crit.FromBlock != nil {
-			begin = crit.FromBlock.Int64()
+			begin = int64(adjustByLastAccepted(allowUnfinalizedQueries, lastAccepted, crit.FromBlock.Uint64()))
 		}
 		end := rpc.LatestBlockNumber.Int64()
 		if crit.ToBlock != nil {
-			end = crit.ToBlock.Int64()
+			end = int64(adjustByLastAccepted(allowUnfinalizedQueries, lastAccepted, crit.ToBlock.Uint64()))
 		}
 		// Construct the range filter
 		if end-begin > api.maxBlocksPerRequest && api.maxBlocksPerRequest > 0 {
 			return nil, fmt.Errorf("requested too many blocks from %d to %d, maximum is set to %d", begin, end, api.maxBlocksPerRequest)
 		}
-		filter = NewRangeFilter(api.backend, begin, end, crit.Addresses, crit.Topics)
+		filter = NewRangeFilter(api.backend, begin, end, crit.Addresses, crit.Topics,
+			computeAcceptedEnd(allowUnfinalizedQueries, lastAccepted),
+		)
 	}
 	// Run the filter and return all the logs
 	logs, err := filter.Logs(ctx)
@@ -388,6 +393,9 @@ func (api *PublicFilterAPI) UninstallFilter(id rpc.ID) bool {
 //
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_getfilterlogs
 func (api *PublicFilterAPI) GetFilterLogs(ctx context.Context, id rpc.ID) ([]*types.Log, error) {
+	allowUnfinalizedQueries := api.backend.GetBlockchainVmConfig().AllowUnfinalizedQueries
+	lastAccepted := api.backend.GetBlockchainLastAccepted()
+
 	api.filtersMu.Lock()
 	f, found := api.filters[id]
 	api.filtersMu.Unlock()
@@ -407,17 +415,19 @@ func (api *PublicFilterAPI) GetFilterLogs(ctx context.Context, id rpc.ID) ([]*ty
 		// accepted block instead throughout all APIs.
 		begin := rpc.LatestBlockNumber.Int64()
 		if f.crit.FromBlock != nil {
-			begin = f.crit.FromBlock.Int64()
+			begin = int64(adjustByLastAccepted(allowUnfinalizedQueries, lastAccepted, f.crit.FromBlock.Uint64()))
 		}
 		end := rpc.LatestBlockNumber.Int64()
 		if f.crit.ToBlock != nil {
-			end = f.crit.ToBlock.Int64()
+			end = int64(adjustByLastAccepted(allowUnfinalizedQueries, lastAccepted, f.crit.ToBlock.Uint64()))
 		}
 		// Construct the range filter
 		if end-begin > api.maxBlocksPerRequest && api.maxBlocksPerRequest > 0 {
 			return nil, fmt.Errorf("requested too many blocks from %d to %d, maximum is set to %d", begin, end, api.maxBlocksPerRequest)
 		}
-		filter = NewRangeFilter(api.backend, begin, end, f.crit.Addresses, f.crit.Topics)
+		filter = NewRangeFilter(api.backend, begin, end, f.crit.Addresses, f.crit.Topics,
+			computeAcceptedEnd(allowUnfinalizedQueries, lastAccepted),
+		)
 	}
 	// Run the filter and return all the logs
 	logs, err := filter.Logs(ctx)
@@ -596,4 +606,19 @@ func decodeTopic(s string) (common.Hash, error) {
 		err = fmt.Errorf("hex has invalid length %d after decoding; expected %d for topic", len(b), common.HashLength)
 	}
 	return common.BytesToHash(b), err
+}
+
+func adjustByLastAccepted(allowUnfinalizedQueries bool, lastAccepted *types.Block, blockNum uint64) uint64 {
+	if !allowUnfinalizedQueries && lastAccepted != nil && blockNum > lastAccepted.NumberU64() {
+		return lastAccepted.NumberU64()
+	}
+	return blockNum
+}
+
+func computeAcceptedEnd(allowUnfinalizedQueries bool, lastAccepted *types.Block) *uint64 {
+	if !allowUnfinalizedQueries && lastAccepted != nil {
+		acceptedEndTmp := lastAccepted.NumberU64()
+		return &acceptedEndTmp
+	}
+	return nil
 }
