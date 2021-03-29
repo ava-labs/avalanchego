@@ -165,7 +165,10 @@ func (service *AvaxAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	if err != nil {
 		return fmt.Errorf("problem parsing private key: %w", err)
 	}
-	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
+	sk, ok := skIntf.(*crypto.PrivateKeySECP256K1R)
+	if !ok {
+		return fmt.Errorf("expected *crypto.PrivateKeySECP256K1R but got %T", skIntf)
+	}
 
 	// TODO: return eth address here
 	reply.Address = FormatEthAddress(GetEthAddress(sk))
@@ -408,12 +411,7 @@ func (service *AvaxAPI) IssueTx(r *http.Request, args *api.FormattedTx, response
 		return fmt.Errorf("problem initializing transaction: %w", err)
 	}
 
-	utx, ok := tx.UnsignedTx.(UnsignedAtomicTx)
-	if !ok {
-		return errors.New("cannot issue non-atomic transaction through IssueTx API")
-	}
-
-	if err := utx.SemanticVerify(service.vm, tx, service.vm.useApricotPhase1()); err != nil {
+	if err := tx.UnsignedAtomicTx.SemanticVerify(service.vm, tx, service.vm.useApricotPhase1()); err != nil {
 		return err
 	}
 
