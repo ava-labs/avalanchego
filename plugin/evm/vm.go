@@ -234,7 +234,8 @@ type VM struct {
 	shutdownChan chan struct{}
 	shutdownWg   sync.WaitGroup
 
-	fx secp256k1fx.Fx
+	fx          secp256k1fx.Fx
+	secpFactory crypto.FactorySECP256K1R
 }
 
 func (vm *VM) getAtomicTx(block *types.Block) (*Tx, error) {

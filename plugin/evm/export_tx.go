@@ -95,7 +95,6 @@ func (tx *UnsignedExportTx) SemanticVerify(
 		return permError{errSignatureInputsMismatch}
 	}
 
-	f := crypto.FactorySECP256K1R{}
 	for i, input := range tx.Ins {
 		cred, ok := stx.Creds[i].(*secp256k1fx.Credential)
 		if !ok {
@@ -108,7 +107,7 @@ func (tx *UnsignedExportTx) SemanticVerify(
 		if len(cred.Sigs) != 1 {
 			return permError{fmt.Errorf("expected one signature for EVM Input Credential, but found: %d", len(cred.Sigs))}
 		}
-		pubKeyIntf, err := f.RecoverPublicKey(tx.UnsignedBytes(), cred.Sigs[0][:])
+		pubKeyIntf, err := vm.secpFactory.RecoverPublicKey(tx.UnsignedBytes(), cred.Sigs[0][:])
 		if err != nil {
 			return permError{err}
 		}
