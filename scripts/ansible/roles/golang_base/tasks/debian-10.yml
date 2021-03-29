@@ -1,12 +1,23 @@
 # Debian 10.x (buster) includes golang 1.11.x.
 # The testing repository tracks https://golang.org releases more closely.
 
-- name: Configure default release
+- name: Configure Apt
   become: true
   copy:
-    content: |
-      APT::Default-Release "stable";
-    dest: /etc/apt/apt.conf.d/99defaultrelease
+    content: "{{ golang_base_apt_conf.content }}"
+    dest: "{{ golang_base_apt_conf.dest }}"
+  loop:
+    - content: |
+        APT::Default-Release "stable";
+      dest: /etc/apt/apt.conf.d/99defaultrelease
+    - content: |
+        Package: *
+        Pin: release o=Debian,a=testing,n=bullseye
+        Pin-Priority: 400
+      dest: /etc/apt/preferences.d/99pin-bullseye
+  loop_control:
+    label: "{{ golang_base_apt_conf.dest }}"
+    loop_var: golang_base_apt_conf
   tags:
     - golang_base
 
