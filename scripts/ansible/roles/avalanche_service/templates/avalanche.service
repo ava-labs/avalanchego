@@ -1,7 +1,7 @@
 # {{ ansible_managed }}
 
 [Unit]
-Description=Avalanche test node
+Description=AvalancheGo node for Avalanche consensus network
 Documentation=https://docs.avax.network/
 After=network.target
 StartLimitIntervalSec=0
@@ -12,7 +12,7 @@ WorkingDirectory={{ avalanche_daemon_home_dir }}
 Restart=always
 RestartSec=1
 User={{ avalanche_daemon_user }}
-ExecStart={{ bindir }}/avalanche \
+ExecStart={{ bindir }}/{{ avalanche_binary | basename }} \
 {% if avalanche_daemon_dynamic_public_ip %}
             --dynamic-public-ip="{{ avalanche_daemon_dynamic_public_ip }}" \
 {% else %}

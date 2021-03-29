@@ -8,4 +8,5 @@
     - name: avalanche_build
     - name: avalanche_user
     - name: avalanche_install
+    - name: avalanche_staker
     - name: avalanche_service
