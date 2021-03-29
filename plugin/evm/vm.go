@@ -350,6 +350,7 @@ func (vm *VM) Initialize(
 	config.RPCGasCap = vm.CLIConfig.RPCGasCap
 	config.RPCTxFeeCap = vm.CLIConfig.RPCTxFeeCap
 	config.TxPool.NoLocals = !vm.CLIConfig.LocalTxsEnabled
+	config.AllowUnfinalizedQueries = vm.CLIConfig.AllowUnfinalizedQueries
 	vm.chainConfig = g.Config
 
 	if err := config.SetGCMode("archive"); err != nil {
