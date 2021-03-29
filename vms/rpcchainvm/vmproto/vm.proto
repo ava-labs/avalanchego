@@ -26,7 +26,11 @@ message InitializeRequest {
 }
 
 message InitializeResponse {
-    bytes lastAcceptedID = 1;
+    bytes id = 1;
+    bytes parentID = 2;
+    uint32 status = 3;
+    uint64 height = 4;
+    bytes bytes = 5
 }
 
 message VersionedDBServer {
@@ -90,6 +94,14 @@ message GetBlockResponse {
     uint64 height = 4;
 }
 
+message GetBlockIDAtHeightRequest {
+    uint64 height = 1;
+}
+
+message GetBlockIDAtHeightResponse {
+    bytes blockID = 1;
+}
+
 message SetPreferenceRequest {
     bytes id = 1;
 }
@@ -129,6 +141,7 @@ service VM {
     rpc BuildBlock(BuildBlockRequest) returns (BuildBlockResponse);
     rpc ParseBlock(ParseBlockRequest) returns (ParseBlockResponse);
     rpc GetBlock(GetBlockRequest) returns (GetBlockResponse);
+    rpc GetBlockIDAtHeight(GetBlockIDAtHeightRequest) returns (GetBlockIDAtHeightResponse);
     rpc SetPreference(SetPreferenceRequest) returns (SetPreferenceResponse);
     rpc Health(HealthRequest) returns (HealthResponse);
 

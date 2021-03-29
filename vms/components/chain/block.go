@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evm
+package chain
 
 import (
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -12,7 +12,7 @@ import (
 // Block is the internal representation of a Block to be wrapped by BlockWrapper
 type Block interface {
 	snowman.Block
-	// SetStatus sets the internal status of an existing block. This is used by ChainState
+	// SetStatus sets the internal status of an existing block. This is used by State
 	// to allow internal blocks to keep their status up to date.
 	SetStatus(choices.Status)
 }
@@ -21,7 +21,7 @@ type Block interface {
 type BlockWrapper struct {
 	Block
 
-	state *ChainState
+	state *State
 }
 
 // Verify verifies the underlying block, evicts from the unverified block cache

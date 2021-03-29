@@ -1,4 +1,4 @@
-package evm
+package chain
 
 import (
 	"bytes"
@@ -75,7 +75,7 @@ func cantBuildBlock() (Block, error) {
 
 // checkProcessingBlock checks that [blk] is of the correct type and is
 // correctly uniquified when calling GetBlock and ParseBlock.
-func checkProcessingBlock(t *testing.T, c *ChainState, blk snowman.Block) {
+func checkProcessingBlock(t *testing.T, c *State, blk snowman.Block) {
 	if _, ok := blk.(*BlockWrapper); !ok {
 		t.Fatalf("Expected block to be of type (*BlockWrapper)")
 	}
@@ -108,7 +108,7 @@ func checkProcessingBlock(t *testing.T, c *ChainState, blk snowman.Block) {
 
 // checkDecidedBlock asserts that [blk] is returned with the correct status by ParseBlock
 // and GetBlock.
-func checkDecidedBlock(t *testing.T, c *ChainState, blk snowman.Block, expectedStatus choices.Status, cached bool) {
+func checkDecidedBlock(t *testing.T, c *State, blk snowman.Block, expectedStatus choices.Status, cached bool) {
 	if _, ok := blk.(*BlockWrapper); !ok {
 		t.Fatalf("Expected block to be of type (*BlockWrapper)")
 	}
@@ -152,15 +152,15 @@ func checkDecidedBlock(t *testing.T, c *ChainState, blk snowman.Block, expectedS
 	}
 }
 
-func checkAcceptedBlock(t *testing.T, c *ChainState, blk snowman.Block, cached bool) {
+func checkAcceptedBlock(t *testing.T, c *State, blk snowman.Block, cached bool) {
 	checkDecidedBlock(t, c, blk, choices.Accepted, cached)
 }
 
-func checkRejectedBlock(t *testing.T, c *ChainState, blk snowman.Block, cached bool) {
+func checkRejectedBlock(t *testing.T, c *State, blk snowman.Block, cached bool) {
 	checkDecidedBlock(t, c, blk, choices.Rejected, cached)
 }
 
-func TestChainState(t *testing.T) {
+func TestState(t *testing.T) {
 	db := memdb.New()
 
 	testBlks := snowman.NewTestBlocks(3, nil)
@@ -183,7 +183,7 @@ func TestChainState(t *testing.T) {
 	}
 	testBlks = append(testBlks, blk3)
 
-	chainState := NewChainState(prefixdb.New([]byte{1}, db), 2, 2, 2)
+	chainState := NewState(prefixdb.New([]byte{1}, db), 2, 2, 2)
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 	chainState.Initialize(&Config{
@@ -244,12 +244,12 @@ func TestChainState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get blk3 due to %s", err)
 	}
-	assert.Equal(t, parsedBlk3.ID(), getBlk3.ID(), "ChainState GetBlock returned the wrong block")
+	assert.Equal(t, parsedBlk3.ID(), getBlk3.ID(), "State GetBlock returned the wrong block")
 
 	// Check that parsing blk3 does not add it to processing blocks since it has
 	// not been verified.
 	if numProcessing := len(chainState.processingBlocks); numProcessing != 2 {
-		t.Fatalf("Expected ChainState to have 2 processing blocks, but found: %d", numProcessing)
+		t.Fatalf("Expected State to have 2 processing blocks, but found: %d", numProcessing)
 	}
 
 	if err := parsedBlk3.Verify(); err != nil {
@@ -321,7 +321,7 @@ func TestBuildBlock(t *testing.T) {
 	blk1 := testBlks[1]
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
-	chainState := NewChainState(prefixdb.New([]byte{1}, db), 2, 2, 2)
+	chainState := NewState(prefixdb.New([]byte{1}, db), 2, 2, 2)
 	buildBlock := func() (Block, error) {
 		// Once the block is built, mark it as processing
 		blk1.SetStatus(choices.Processing)
@@ -356,7 +356,7 @@ func TestBuildBlock(t *testing.T) {
 	checkAcceptedBlock(t, chainState, builtBlk, true)
 }
 
-func TestChainStateDecideBlock(t *testing.T) {
+func TestStateDecideBlock(t *testing.T) {
 	db := memdb.New()
 
 	testBlks := snowman.NewTestBlocks(4, nil)
@@ -372,7 +372,7 @@ func TestChainStateDecideBlock(t *testing.T) {
 	badRejectBlk := testBlks[3]
 	badRejectBlk.RejectV = errors.New("this block should fail on reject")
 
-	chainState := NewChainState(prefixdb.New([]byte{1}, db), 2, 2, 2)
+	chainState := NewState(prefixdb.New([]byte{1}, db), 2, 2, 2)
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 
 	chainState.Initialize(&Config{
@@ -428,7 +428,7 @@ func TestChainStateDecideBlock(t *testing.T) {
 	}
 }
 
-func TestChainStateParent(t *testing.T) {
+func TestStateParent(t *testing.T) {
 	db := memdb.New()
 
 	testBlks := snowman.NewTestBlocks(3, nil)
@@ -440,7 +440,7 @@ func TestChainStateParent(t *testing.T) {
 	blk1 := testBlks[1]
 	blk2 := testBlks[2]
 
-	chainState := NewChainState(prefixdb.New([]byte{1}, db), 2, 2, 2)
+	chainState := NewState(prefixdb.New([]byte{1}, db), 2, 2, 2)
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 
 	chainState.Initialize(&Config{
@@ -482,7 +482,7 @@ func TestGetBlockInternal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chainState := NewChainState(prefixdb.New([]byte{1}, db), 2, 2, 2)
+	chainState := NewState(prefixdb.New([]byte{1}, db), 2, 2, 2)
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 
 	chainState.Initialize(&Config{
@@ -525,7 +525,7 @@ func TestGetBlockError(t *testing.T) {
 	}
 	blk1 := testBlks[1]
 
-	chainState := NewChainState(prefixdb.New([]byte{1}, db), 2, 2, 2)
+	chainState := NewState(prefixdb.New([]byte{1}, db), 2, 2, 2)
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 	wrappedGetBlock := func(id ids.ID) (Block, error) {
 		blk, err := getBlock(id)
@@ -571,7 +571,7 @@ func TestParseBlockError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chainState := NewChainState(prefixdb.New([]byte{1}, db), 2, 2, 2)
+	chainState := NewState(prefixdb.New([]byte{1}, db), 2, 2, 2)
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 
 	chainState.Initialize(&Config{
@@ -598,7 +598,7 @@ func TestBuildBlockError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chainState := NewChainState(prefixdb.New([]byte{1}, db), 2, 2, 2)
+	chainState := NewState(prefixdb.New([]byte{1}, db), 2, 2, 2)
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 
 	chainState.Initialize(&Config{

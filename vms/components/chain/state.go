@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evm
+package chain
 
 import (
 	"errors"
@@ -14,8 +14,17 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/prometheus/client_golang/prometheus"
 )
+
+// Add GetBlockIDAtHeight to support
+type VM interface {
+	block.ChainVM
+
+	// Add GetBlockIDAtHeight to support ChainState block status lookups.
+	GetBlockIDAtHeight(height uint64) (ids.ID, error)
+}
 
 var (
 	// ErrBlockNotFound indicates that the VM was not able to retrieve a block. If this error is returned
@@ -24,17 +33,17 @@ var (
 	ErrBlockNotFound = errors.New("block not found")
 )
 
-// ChainState defines the canonical state of the chain
+// State defines the canonical state of the chain
 // it tracks the accepted blocks and wraps a VM's implementation
 // of snowman.Block in order to take care of writing blocks to
 // the database and adding a caching layer for both the blocks
 // and their statuses.
-type ChainState struct {
+type State struct {
 	// baseDB is the base level database used to make
 	// atomic commits on block acceptance.
 	baseDB *versiondb.Database
 
-	// ChainState keeps these function types to request operations
+	// State keeps these function types to request operations
 	// from the VM implementation.
 	getBlockIDAtHeight func(uint64) (ids.ID, error)
 	getBlock           func(ids.ID) (Block, error)
@@ -54,7 +63,7 @@ type ChainState struct {
 	lastAcceptedBlock *BlockWrapper
 }
 
-// Config defines all of the parameters necessary to initialize ChainState
+// Config defines all of the parameters necessary to initialize State
 type Config struct {
 	LastAcceptedBlock  Block
 	GetBlockIDAtHeight func(uint64) (ids.ID, error)
@@ -63,9 +72,9 @@ type Config struct {
 	BuildBlock         func() (Block, error)
 }
 
-// NewChainState returns a new uninitialized ChainState
-func NewChainState(db database.Database, decidedCacheSize, missingCacheSize, unverifiedCacheSize int) *ChainState {
-	return &ChainState{
+// NewState returns a new uninitialized State
+func NewState(db database.Database, decidedCacheSize, missingCacheSize, unverifiedCacheSize int) *State {
+	return &State{
 		baseDB:           versiondb.New(db),
 		processingBlocks: make(map[ids.ID]*BlockWrapper),
 		decidedBlocks:    &cache.LRU{Size: decidedCacheSize},
@@ -74,14 +83,14 @@ func NewChainState(db database.Database, decidedCacheSize, missingCacheSize, unv
 	}
 }
 
-func NewMeteredChainState(
+func NewMeteredState(
 	db database.Database,
 	registerer prometheus.Registerer,
 	namespace string,
 	decidedCacheSize,
 	missingCacheSize,
 	unverifiedCacheSize int,
-) (*ChainState, error) {
+) (*State, error) {
 	decidedCache, err := metercacher.New(
 		fmt.Sprintf("%s_decided_cache", namespace),
 		registerer,
@@ -107,7 +116,7 @@ func NewMeteredChainState(
 		return nil, err
 	}
 
-	return &ChainState{
+	return &State{
 		baseDB:           versiondb.New(db),
 		processingBlocks: make(map[ids.ID]*BlockWrapper),
 		decidedBlocks:    decidedCache,
@@ -118,7 +127,7 @@ func NewMeteredChainState(
 
 // Initialize sets the last accepted block, and the internal functions for retrieving/parsing/building
 // blocks from the VM layer.
-func (c *ChainState) Initialize(config *Config) {
+func (c *State) Initialize(config *Config) {
 	// Set the functions for retrieving blocks from the VM
 	c.getBlockIDAtHeight = config.GetBlockIDAtHeight
 	c.getBlock = config.GetBlock
@@ -134,19 +143,19 @@ func (c *ChainState) Initialize(config *Config) {
 }
 
 // FlushCaches flushes each block cache completely.
-func (c *ChainState) FlushCaches() {
+func (c *State) FlushCaches() {
 	c.decidedBlocks.Flush()
 	c.missingBlocks.Flush()
 	c.unverifiedBlocks.Flush()
 }
 
-// ExternalDB returns a database to be used external to ChainState
+// ExternalDB returns a database to be used external to State
 // Any operations that occur on the returned database during Accept/Reject
-// of blocks will be automatically batched by ChainState.
-func (c *ChainState) ExternalDB() database.Database { return c.baseDB }
+// of blocks will be automatically batched by State.
+func (c *State) ExternalDB() database.Database { return c.baseDB }
 
 // GetBlock returns the BlockWrapper as snowman.Block corresponding to [blkID]
-func (c *ChainState) GetBlock(blkID ids.ID) (snowman.Block, error) {
+func (c *State) GetBlock(blkID ids.ID) (snowman.Block, error) {
 	if blk, ok := c.getCachedBlock(blkID); ok {
 		return blk, nil
 	}
@@ -170,7 +179,7 @@ func (c *ChainState) GetBlock(blkID ids.ID) (snowman.Block, error) {
 
 // getCachedBlock checks the caches for [blkID] by priority. Returning
 // true if [blkID] is found in one of the caches.
-func (c *ChainState) getCachedBlock(blkID ids.ID) (snowman.Block, bool) {
+func (c *State) getCachedBlock(blkID ids.ID) (snowman.Block, bool) {
 	if blk, ok := c.processingBlocks[blkID]; ok {
 		return blk, true
 	}
@@ -187,7 +196,7 @@ func (c *ChainState) getCachedBlock(blkID ids.ID) (snowman.Block, bool) {
 }
 
 // GetBlockInternal returns the internal representation of [blkID]
-func (c *ChainState) GetBlockInternal(blkID ids.ID) (Block, error) {
+func (c *State) GetBlockInternal(blkID ids.ID) (Block, error) {
 	wrappedBlk, err := c.GetBlock(blkID)
 	if err != nil {
 		return nil, err
@@ -198,7 +207,7 @@ func (c *ChainState) GetBlockInternal(blkID ids.ID) (Block, error) {
 
 // ParseBlock attempts to parse [b] into an internal Block and adds it to the appropriate
 // caching layer if successful.
-func (c *ChainState) ParseBlock(b []byte) (snowman.Block, error) {
+func (c *State) ParseBlock(b []byte) (snowman.Block, error) {
 	blk, err := c.unmarshalBlock(b)
 	if err != nil {
 		return nil, err
@@ -221,7 +230,7 @@ func (c *ChainState) ParseBlock(b []byte) (snowman.Block, error) {
 
 // BuildBlock attempts to build a new internal Block, wraps it, and adds it
 // to the appropriate caching layer if successful.
-func (c *ChainState) BuildBlock() (snowman.Block, error) {
+func (c *State) BuildBlock() (snowman.Block, error) {
 	blk, err := c.buildBlock()
 	if err != nil {
 		return nil, err
@@ -248,7 +257,7 @@ func (c *ChainState) BuildBlock() (snowman.Block, error) {
 // a wrapped version of [blk]
 // assumes [blk] is a known, non-wrapped block that is not currently
 // being processed in consensus.
-func (c *ChainState) addNonProcessingBlock(blk Block) (snowman.Block, error) {
+func (c *State) addNonProcessingBlock(blk Block) (snowman.Block, error) {
 	wrappedBlk := &BlockWrapper{
 		Block: blk,
 		state: c,
@@ -274,22 +283,22 @@ func (c *ChainState) addNonProcessingBlock(blk Block) (snowman.Block, error) {
 }
 
 // LastAccepted ...
-func (c *ChainState) LastAccepted() (ids.ID, error) {
+func (c *State) LastAccepted() (ids.ID, error) {
 	return c.lastAcceptedBlock.ID(), nil
 }
 
 // LastAcceptedBlock returns the last accepted wrapped block
-func (c *ChainState) LastAcceptedBlock() *BlockWrapper {
+func (c *State) LastAcceptedBlock() *BlockWrapper {
 	return c.lastAcceptedBlock
 }
 
 // LastAcceptedBlockInternal returns the internal snowman.Block that was last last accepted
-func (c *ChainState) LastAcceptedBlockInternal() snowman.Block {
+func (c *State) LastAcceptedBlockInternal() snowman.Block {
 	return c.LastAcceptedBlock().Block
 }
 
 // getStatus returns the status of [blk]. Assumes that [blk] is a known block.
-func (c *ChainState) getStatus(blk snowman.Block) (choices.Status, error) {
+func (c *State) getStatus(blk snowman.Block) (choices.Status, error) {
 	blkHeight := blk.Height()
 	lastAcceptedHeight := c.lastAcceptedBlock.Height()
 	if blkHeight > lastAcceptedHeight {

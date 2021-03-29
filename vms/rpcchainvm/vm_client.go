@@ -11,10 +11,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/hashicorp/go-plugin"
-	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto"
@@ -25,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/components/missing"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup/galiaslookupproto"
@@ -49,11 +47,14 @@ var (
 )
 
 const (
-	decidedCacheSize = 500
+	decidedCacheSize    = 100
+	missingCacheSize    = 100
+	unverifiedCacheSize = 100
 )
 
 // VMClient is an implementation of VM that talks over RPC.
 type VMClient struct {
+	*chain.State
 	client vmproto.VMClient
 	broker *plugin.GRPCBroker
 	proc   *plugin.Client
@@ -68,12 +69,7 @@ type VMClient struct {
 	serverCloser grpcutils.ServerCloser
 	conns        []*grpc.ClientConn
 
-	ctx  *snow.Context
-	blks map[ids.ID]*BlockClient
-
-	decidedBlocks cache.Cacher
-
-	lastAccepted ids.ID
+	ctx *snow.Context
 }
 
 // NewClient returns a VM connected to a remote VM
@@ -81,30 +77,12 @@ func NewClient(client vmproto.VMClient, broker *plugin.GRPCBroker) *VMClient {
 	return &VMClient{
 		client: client,
 		broker: broker,
-		blks:   make(map[ids.ID]*BlockClient),
 	}
 }
 
 // SetProcess gives ownership of the server process to the client.
 func (vm *VMClient) SetProcess(proc *plugin.Client) {
 	vm.proc = proc
-}
-
-// initializeCaches creates a new [decidedBlocks] and [missingBlocks] cache. It
-// wraps these caches in metercacher so that we can get prometheus metrics
-// about their performance.
-func (vm *VMClient) initializeCaches(registerer prometheus.Registerer, namespace string) error {
-	decidedCache, err := metercacher.New(
-		fmt.Sprintf("%s_rpcchainvm_decided_cache", namespace),
-		registerer,
-		&cache.LRU{Size: decidedCacheSize},
-	)
-	if err != nil {
-		return fmt.Errorf("could not initialize decided blocks cache: %w", err)
-	}
-	vm.decidedBlocks = decidedCache
-
-	return nil
 }
 
 func (vm *VMClient) Initialize(
@@ -126,9 +104,6 @@ func (vm *VMClient) Initialize(
 	}
 
 	vm.ctx = ctx
-	if err := vm.initializeCaches(ctx.Metrics, ctx.Namespace); err != nil {
-		return err
-	}
 
 	// Initialize and serve each database and construct the db manager
 	// initialize request parameters
@@ -202,8 +177,31 @@ func (vm *VMClient) Initialize(
 	if err != nil {
 		return err
 	}
+	lastAcceptedBlk, err := vm.internalGetBlock(lastAccepted)
+	if err != nil {
+		return err
+	}
 
-	vm.lastAccepted = lastAccepted
+	chainState, err := chain.NewMeteredState(
+		dbManager.Current(),
+		ctx.Metrics,
+		fmt.Sprintf("%s_rpcchainvm_", ctx.Namespace),
+		decidedCacheSize,
+		missingCacheSize,
+		unverifiedCacheSize,
+	)
+	if err != nil {
+		return err
+	}
+	chainState.Initialize(&chain.Config{
+		LastAcceptedBlock:  lastAcceptedBlk,
+		GetBlockIDAtHeight: nil, // TODO requires a change to coreth
+		GetBlock:           vm.internalGetBlock,
+		UnmarshalBlock:     vm.internalParseBlock,
+		BuildBlock:         vm.internalBuildBlock,
+	})
+
+	// initialize ChainState here
 	return nil
 }
 
@@ -304,7 +302,7 @@ func (vm *VMClient) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	return handlers, nil
 }
 
-func (vm *VMClient) BuildBlock() (snowman.Block, error) {
+func (vm *VMClient) internalBuildBlock() (chain.Block, error) {
 	resp, err := vm.client.BuildBlock(context.Background(), &vmproto.BuildBlockRequest{})
 	if err != nil {
 		return nil, err
@@ -326,7 +324,7 @@ func (vm *VMClient) BuildBlock() (snowman.Block, error) {
 	}, nil
 }
 
-func (vm *VMClient) ParseBlock(bytes []byte) (snowman.Block, error) {
+func (vm *VMClient) internalParseBlock(bytes []byte) (chain.Block, error) {
 	resp, err := vm.client.ParseBlock(context.Background(), &vmproto.ParseBlockRequest{
 		Bytes: bytes,
 	})
@@ -336,13 +334,6 @@ func (vm *VMClient) ParseBlock(bytes []byte) (snowman.Block, error) {
 
 	id, err := ids.ToID(resp.Id)
 	vm.ctx.Log.AssertNoError(err)
-
-	if blk, cached := vm.blks[id]; cached {
-		return blk, nil
-	}
-	if blkIntf, cached := vm.decidedBlocks.Get(id); cached {
-		return blkIntf.(*BlockClient), nil
-	}
 
 	parentID, err := ids.ToID(resp.ParentID)
 	vm.ctx.Log.AssertNoError(err)
@@ -359,20 +350,38 @@ func (vm *VMClient) ParseBlock(bytes []byte) (snowman.Block, error) {
 		height:   resp.Height,
 	}
 
-	if status.Decided() {
-		vm.decidedBlocks.Put(id, blk)
-	}
 	return blk, nil
 }
 
-func (vm *VMClient) GetBlock(id ids.ID) (snowman.Block, error) {
-	if blk, cached := vm.blks[id]; cached {
-		return blk, nil
-	}
-	if blkIntf, cached := vm.decidedBlocks.Get(id); cached {
-		return blkIntf.(*BlockClient), nil
-	}
+// TODO getBlockIDATHeight here and in vm_server
+// add the definitino into vm.proto and recompile
+// update to a version of coreth that implements this new interface (should be easy since it's already impelemented)
+// func (vm *VMClient) internalGetBlock(id ids.ID) (chain.Block, error) {
+// 	resp, err := vm.client.GetBlock(context.Background(), &vmproto.GetBlockRequest{
+// 		Id: id[:],
+// 	})
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
+// 	parentID, err := ids.ToID(resp.ParentID)
+// 	vm.ctx.Log.AssertNoError(err)
+// 	status := choices.Status(resp.Status)
+// 	vm.ctx.Log.AssertDeferredNoError(status.Valid)
+
+// 	blk := &BlockClient{
+// 		vm:       vm,
+// 		id:       id,
+// 		parentID: parentID,
+// 		status:   status,
+// 		bytes:    resp.Bytes,
+// 		height:   resp.Height,
+// 	}
+
+// 	return blk, nil
+// }
+
+func (vm *VMClient) internalGetBlock(id ids.ID) (chain.Block, error) {
 	resp, err := vm.client.GetBlock(context.Background(), &vmproto.GetBlockRequest{
 		Id: id[:],
 	})
@@ -394,9 +403,6 @@ func (vm *VMClient) GetBlock(id ids.ID) (snowman.Block, error) {
 		height:   resp.Height,
 	}
 
-	if status.Decided() {
-		vm.decidedBlocks.Put(id, blk)
-	}
 	return blk, nil
 }
 
@@ -406,8 +412,6 @@ func (vm *VMClient) SetPreference(id ids.ID) error {
 	})
 	return err
 }
-
-func (vm *VMClient) LastAccepted() (ids.ID, error) { return vm.lastAccepted, nil }
 
 func (vm *VMClient) HealthCheck() (interface{}, error) {
 	return vm.client.Health(
@@ -430,7 +434,6 @@ type BlockClient struct {
 func (b *BlockClient) ID() ids.ID { return b.id }
 
 func (b *BlockClient) Accept() error {
-	delete(b.vm.blks, b.id)
 	b.status = choices.Accepted
 	_, err := b.vm.client.BlockAccept(context.Background(), &vmproto.BlockAcceptRequest{
 		Id: b.id[:],
@@ -439,26 +442,24 @@ func (b *BlockClient) Accept() error {
 		return err
 	}
 
-	b.vm.decidedBlocks.Put(b.id, b)
-	b.vm.lastAccepted = b.id
 	return nil
 }
 
 func (b *BlockClient) Reject() error {
-	delete(b.vm.blks, b.id)
 	b.status = choices.Rejected
 	_, err := b.vm.client.BlockReject(context.Background(), &vmproto.BlockRejectRequest{
 		Id: b.id[:],
 	})
 
-	b.vm.decidedBlocks.Put(b.id, b)
 	return err
 }
+
+func (b *BlockClient) SetStatus(status choices.Status) { b.status = status }
 
 func (b *BlockClient) Status() choices.Status { return b.status }
 
 func (b *BlockClient) Parent() snowman.Block {
-	if parent, err := b.vm.GetBlock(b.parentID); err == nil {
+	if parent, err := b.vm.GetBlockInternal(b.parentID); err == nil {
 		return parent
 	}
 	return &missing.Block{BlkID: b.parentID}
@@ -472,7 +473,6 @@ func (b *BlockClient) Verify() error {
 		return err
 	}
 
-	b.vm.blks[b.id] = b
 	return nil
 }
 
