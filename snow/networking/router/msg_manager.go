@@ -4,16 +4,20 @@
 package router
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
 	// DefaultMaxNonStakerPendingMsgs is the default number of messages that can be taken from
-	// the shared message pool by a single validator
+	// the shared message pool by a single node
 	DefaultMaxNonStakerPendingMsgs uint32 = 20
 	// DefaultStakerPortion is the default portion of resources to reserve for stakers
 	DefaultStakerPortion float64 = 0.375
@@ -42,6 +46,7 @@ type msgManager struct {
 	stakerCPUPortion               float64
 	cpuTracker                     tracker.TimeTracker
 	clock                          timer.Clock
+	metrics                        msgManagerMetrics
 }
 
 // NewMsgManager returns a new MsgManager
@@ -60,10 +65,16 @@ func NewMsgManager(
 	maxNonStakerPendingMsgs uint32,
 	stakerMsgPortion,
 	stakerCPUPortion float64,
-) MsgManager {
+	metricsNamespace string,
+	metricsRegisterer prometheus.Registerer,
+) (MsgManager, error) {
 	// Number of messages reserved for stakers vs. non-stakers
 	reservedMessages := uint32(stakerMsgPortion * float64(maxPendingMsgs))
 	poolMessages := maxPendingMsgs - reservedMessages
+	metrics := msgManagerMetrics{}
+	if err := metrics.initialize(metricsNamespace, metricsRegisterer); err != nil {
+		return nil, err
+	}
 
 	return &msgManager{
 		vdrs:                    vdrs,
@@ -74,7 +85,8 @@ func NewMsgManager(
 		poolMessages:            poolMessages,
 		maxNonStakerPendingMsgs: maxNonStakerPendingMsgs,
 		stakerCPUPortion:        stakerCPUPortion,
-	}
+		metrics:                 metrics,
+	}, nil
 }
 
 // AddPending marks that there is a message from [vdr] ready to be processed.
@@ -83,7 +95,13 @@ func (rm *msgManager) AddPending(vdr ids.ShortID) bool {
 	// Attempt to take the message from the pool
 	outstandingPoolMessages := rm.msgTracker.PoolCount()
 	totalPeerMessages, peerPoolMessages := rm.msgTracker.OutstandingCount(vdr)
-	if outstandingPoolMessages < rm.poolMessages && peerPoolMessages < rm.maxNonStakerPendingMsgs {
+
+	// True if the all the messages in the at-large message pool have been used
+	poolEmpty := outstandingPoolMessages >= rm.poolMessages
+	// True if this node has used the maximum number of messages from the at-large message pool
+	poolAllocUsed := peerPoolMessages >= rm.maxNonStakerPendingMsgs
+	if !poolEmpty && !poolAllocUsed {
+		// This node can use a message from the at-large message pool
 		rm.msgTracker.AddPool(vdr)
 		return true
 	}
@@ -91,6 +109,11 @@ func (rm *msgManager) AddPending(vdr ids.ShortID) bool {
 	// Attempt to take the message from the individual allotment
 	weight, isStaker := rm.vdrs.GetWeight(vdr)
 	if !isStaker {
+		if poolEmpty {
+			rm.metrics.throttledPoolEmpty.Inc()
+		} else if poolAllocUsed {
+			rm.metrics.throttledPoolAllocExhausted.Inc()
+		}
 		rm.log.Verbo("Throttling message from non-staker %s. %d/%d.", vdr, peerPoolMessages, rm.poolMessages)
 		return false
 	}
@@ -104,6 +127,7 @@ func (rm *msgManager) AddPending(vdr ids.ShortID) bool {
 		rm.msgTracker.Add(vdr)
 		return true
 	}
+	rm.metrics.throttledVdrAllocUsed.Inc()
 
 	rm.log.Debug("Throttling message from staker %s. %d/%d. %d/%d.", vdr, messageCount, messageAllotment, peerPoolMessages, rm.poolMessages)
 	return false
@@ -132,4 +156,41 @@ func (rm *msgManager) Utilization(vdr ids.ShortID) float64 {
 	stakerAllotment := stakerPortion*rm.stakerCPUPortion + poolAllotment
 
 	return vdrUtilization / stakerAllotment
+}
+
+type msgManagerMetrics struct {
+	throttledPoolEmpty,
+	throttledPoolAllocExhausted,
+	throttledVdrAllocUsed prometheus.Counter
+}
+
+func (m *msgManagerMetrics) initialize(namespace string, registerer prometheus.Registerer) error {
+	errs := wrappers.Errs{}
+	m.throttledPoolEmpty = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "throttled_pool_empty",
+		Help:      "Number of incoming messages dropped because at-large pending message pool is empty",
+	})
+	if err := registerer.Register(m.throttledPoolEmpty); err != nil {
+		errs.Add(fmt.Errorf("failed to register throttled statistics due to %w", err))
+	}
+
+	m.throttledPoolAllocExhausted = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "throttled_pool_alloc_exhausted",
+		Help:      "Number of incoming messages dropped because a non-validator used the max number of messages from the at-large pool",
+	})
+	if err := registerer.Register(m.throttledPoolAllocExhausted); err != nil {
+		errs.Add(fmt.Errorf("failed to register throttled statistics due to %w", err))
+	}
+
+	m.throttledVdrAllocUsed = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "throttled_validator_alloc_exhausted",
+		Help:      "Number of incoming messages dropped because a validator used the max number of pending messages allocated to them",
+	})
+	if err := registerer.Register(m.throttledVdrAllocUsed); err != nil {
+		errs.Add(fmt.Errorf("failed to register throttled statistics due to %w", err))
+	}
+	return errs.Err
 }
