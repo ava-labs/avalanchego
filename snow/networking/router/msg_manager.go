@@ -96,7 +96,7 @@ func (rm *msgManager) AddPending(vdr ids.ShortID) bool {
 	outstandingPoolMessages := rm.msgTracker.PoolCount()
 	totalPeerMessages, peerPoolMessages := rm.msgTracker.OutstandingCount(vdr)
 
-	rm.metrics.poolMsgsAvailable.Set(float64(rm.poolMessages - rm.msgTracker.PoolCount()))
+	rm.metrics.poolMsgsAvailable.Set(float64(rm.poolMessages - outstandingPoolMessages))
 	// True if the all the messages in the at-large message pool have been used
 	poolEmpty := outstandingPoolMessages >= rm.poolMessages
 	// True if this node has used the maximum number of messages from the at-large message pool
