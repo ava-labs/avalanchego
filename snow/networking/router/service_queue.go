@@ -49,7 +49,7 @@ type multiLevelQueue struct {
 	semaChan chan struct{}
 
 	log     logging.Logger
-	metrics *metrics
+	metrics *handlerMetrics
 }
 
 // newMultiLevelQueue creates a new MultilevelQueue and counting semaphore for signaling when messages are available
@@ -62,7 +62,7 @@ func newMultiLevelQueue(
 	consumptionAllotments []time.Duration,
 	maxPendingMsgs uint32,
 	log logging.Logger,
-	metrics *metrics,
+	metrics *handlerMetrics,
 ) (messageQueue, chan struct{}) {
 	semaChan := make(chan struct{}, maxPendingMsgs)
 	singleLevelSize := int(maxPendingMsgs) / len(consumptionRanges)
@@ -208,7 +208,6 @@ func (ml *multiLevelQueue) pushMessage(msg message) bool {
 	processing := ml.msgManager.AddPending(msg.validatorID)
 	if !processing {
 		ml.metrics.dropped.Inc()
-		ml.metrics.throttled.Inc()
 		return false
 	}
 
