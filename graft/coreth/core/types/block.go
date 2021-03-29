@@ -28,7 +28,6 @@
 package types
 
 import (
-	"bytes"
 	"encoding/binary"
 	"io"
 	"math/big"
@@ -210,20 +209,15 @@ func (b *Block) DeprecatedTd() *big.Int {
 	return b.td
 }
 
-// [deprecated by eth/63]
-// StorageBlock defines the RLP encoding of a Block stored in the
-// state database. The StorageBlock encoding contains fields that
-// would otherwise need to be recomputed.
-type StorageBlock Block
+// Original Code:
+// // [deprecated by eth/63]
+// // StorageBlock defines the RLP encoding of a Block stored in the
+// // state database. The StorageBlock encoding contains fields that
+// // would otherwise need to be recomputed.
+// type StorageBlock Block
 
 // "external" block encoding. used for eth protocol, etc.
 type extblock struct {
-	Header *Header
-	Txs    []*Transaction
-	Uncles []*Header
-}
-
-type myextblock struct {
 	Header  *Header
 	Txs     []*Transaction
 	Uncles  []*Header
@@ -231,14 +225,15 @@ type myextblock struct {
 	ExtData *[]byte `rlp:"nil"`
 }
 
-// [deprecated by eth/63]
-// "storage" block encoding. used for database.
-type storageblock struct {
-	Header *Header
-	Txs    []*Transaction
-	Uncles []*Header
-	TD     *big.Int
-}
+// Original Code:
+// // [deprecated by eth/63]
+// // "storage" block encoding. used for database.
+// type storageblock struct {
+// 	Header *Header
+// 	Txs    []*Transaction
+// 	Uncles []*Header
+// 	TD     *big.Int
+// }
 
 // NewBlock creates a new block. The input data is copied,
 // changes to header and to the field values will not affect the
@@ -309,25 +304,12 @@ func CopyHeader(h *Header) *Header {
 
 // DecodeRLP decodes the Ethereum
 func (b *Block) DecodeRLP(s *rlp.Stream) error {
-	bs, _ := s.Raw()
-	copied := make([]byte, len(bs))
-	copy(copied, bs)
-	ss := rlp.NewStream(bytes.NewReader(bs), 0)
-
 	var eb extblock
-	_, size, _ := ss.Kind()
-	if err := ss.Decode(&eb); err != nil {
-		var meb myextblock
-		ss = rlp.NewStream(bytes.NewReader(copied), 0)
-		if err := ss.Decode(&meb); err != nil {
-			return err
-		}
-		b.header, b.uncles, b.transactions = meb.Header, meb.Uncles, meb.Txs
-		b.extdata = meb.ExtData
-	} else {
-		b.header, b.uncles, b.transactions = eb.Header, eb.Uncles, eb.Txs
-		b.extdata = nil
+	_, size, _ := s.Kind()
+	if err := s.Decode(&eb); err != nil {
+		return err
 	}
+	b.header, b.uncles, b.transactions, b.version, b.extdata = eb.Header, eb.Uncles, eb.Txs, eb.Version, eb.ExtData
 	b.size.Store(common.StorageSize(rlp.ListSize(size)))
 	return nil
 }
@@ -364,17 +346,8 @@ func (b *Block) Version() uint32 {
 	return b.version
 }
 
-// EncodeRLPEth serializes b into the Ethereum RLP block format.
-func (b *Block) EncodeRLPEth(w io.Writer) error {
-	return rlp.Encode(w, extblock{
-		Header: b.header,
-		Txs:    b.transactions,
-		Uncles: b.uncles,
-	})
-}
-
 func (b *Block) EncodeRLPTest(w io.Writer, ver uint32) error {
-	return rlp.Encode(w, myextblock{
+	return rlp.Encode(w, extblock{
 		Header:  b.header,
 		Txs:     b.transactions,
 		Uncles:  b.uncles,
@@ -385,7 +358,7 @@ func (b *Block) EncodeRLPTest(w io.Writer, ver uint32) error {
 
 // EncodeRLP serializes b into an extended format.
 func (b *Block) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, myextblock{
+	return rlp.Encode(w, extblock{
 		Header:  b.header,
 		Txs:     b.transactions,
 		Uncles:  b.uncles,
@@ -394,15 +367,16 @@ func (b *Block) EncodeRLP(w io.Writer) error {
 	})
 }
 
-// [deprecated by eth/63]
-func (b *StorageBlock) DecodeRLP(s *rlp.Stream) error {
-	var sb storageblock
-	if err := s.Decode(&sb); err != nil {
-		return err
-	}
-	b.header, b.uncles, b.transactions, b.td = sb.Header, sb.Uncles, sb.Txs, sb.TD
-	return nil
-}
+// Original Code:
+// // [deprecated by eth/63]
+// func (b *StorageBlock) DecodeRLP(s *rlp.Stream) error {
+// 	var sb storageblock
+// 	if err := s.Decode(&sb); err != nil {
+// 		return err
+// 	}
+// 	b.header, b.uncles, b.transactions, b.td = sb.Header, sb.Uncles, sb.Txs, sb.TD
+// 	return nil
+// }
 
 // TODO: copies
 
