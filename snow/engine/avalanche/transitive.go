@@ -335,6 +335,30 @@ func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 	return t.Chits(vdr, requestID, nil)
 }
 
+// AppRequestFailed implements the Engine interface
+func (t *Transitive) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	// TODO implement
+	return nil
+}
+
+// AppRequest implements the Engine interface
+func (t *Transitive) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	// TODO implement
+	return nil
+}
+
+// AppResponse implements the Engine interface
+func (t *Transitive) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	// TODO implement
+	return nil
+}
+
+// AppGossip implements the Engine interface
+func (t *Transitive) AppGossip(nodeID ids.ShortID, requestID uint32, msg []byte) error {
+	// TODO implement
+	return nil
+}
+
 // Notify implements the Engine interface
 func (t *Transitive) Notify(msg common.Message) error {
 	if !t.Ctx.IsBootstrapped() {

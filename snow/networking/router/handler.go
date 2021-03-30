@@ -514,12 +514,12 @@ func (h *Handler) AppResponse(nodeID ids.ShortID, requestID uint32, appResponseB
 
 // AppGossip passes an application-level gossip message from the given node to the consensus engine.
 // Returns true if the message will eventually be processed, or false if the message was dropped.
-func (h *Handler) AppGossip(nodeID ids.ShortID, requestID uint32, appRequestBytes []byte) bool {
+func (h *Handler) AppGossip(nodeID ids.ShortID, requestID uint32, appGossipBytes []byte) bool {
 	return h.serviceQueue.PushMessage(message{
 		messageType: constants.AppGossipMsg,
 		validatorID: nodeID,
 		requestID:   requestID,
-		appMsgBytes: appRequestBytes,
+		appMsgBytes: appGossipBytes,
 		received:    h.clock.Time(),
 	})
 }
@@ -634,6 +634,14 @@ func (h *Handler) handleValidatorMsg(msg message, startTime time.Time) error {
 		err = h.engine.Connected(msg.validatorID)
 	case constants.DisconnectedMsg:
 		err = h.engine.Disconnected(msg.validatorID)
+	case constants.AppGossipMsg:
+		err = h.engine.AppGossip(msg.validatorID, msg.requestID, msg.appMsgBytes)
+	case constants.AppRequestMsg:
+		err = h.engine.AppRequest(msg.validatorID, msg.requestID, msg.appMsgBytes)
+	case constants.AppResponseMsg:
+		err = h.engine.AppResponse(msg.validatorID, msg.requestID, msg.appMsgBytes)
+	default:
+		h.ctx.Log.Debug("got unexpected message type %s", msg.messageType)
 	}
 	endTime := h.clock.Time()
 	timeConsumed := endTime.Sub(startTime)

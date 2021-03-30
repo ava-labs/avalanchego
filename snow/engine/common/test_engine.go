@@ -47,7 +47,12 @@ type EngineTest struct {
 	CantConnected,
 	CantDisconnected,
 
-	CantHealth bool
+	CantHealth,
+
+	CantAppRequest,
+	CantAppResponse,
+	CantAppGossip,
+	CantAppRequestFailed bool
 
 	IsBootstrappedF                                    func() bool
 	ContextF                                           func() *snow.Context
@@ -58,9 +63,11 @@ type EngineTest struct {
 	MultiPutF                                          func(validatorID ids.ShortID, requestID uint32, containers [][]byte) error
 	AcceptedFrontierF, GetAcceptedF, AcceptedF, ChitsF func(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
-	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(validatorID ids.ShortID, requestID uint32) error
-	ConnectedF, DisconnectedF func(validatorID ids.ShortID) error
-	HealthF                   func() (interface{}, error)
+	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF,
+	AppRequestFailedF func(validatorID ids.ShortID, requestID uint32) error
+	AppRequestF, AppGossipF, AppResponseF func(validatorID ids.ShortID, requestID uint32, msg []byte) error
+	ConnectedF, DisconnectedF             func(validatorID ids.ShortID) error
+	HealthF                               func() (interface{}, error)
 }
 
 var _ Engine = &EngineTest{}
@@ -379,6 +386,58 @@ func (e *EngineTest) QueryFailed(validatorID ids.ShortID, requestID uint32) erro
 		e.T.Fatalf("Unexpectedly called QueryFailed")
 	}
 	return errors.New("unexpectedly called QueryFailed")
+}
+
+func (e *EngineTest) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	if e.AppRequestFailedF != nil {
+		return e.AppRequestFailedF(nodeID, requestID)
+	}
+	if !e.CantAppRequestFailed {
+		return nil
+	}
+	if e.T != nil {
+		e.T.Fatalf("Unexpectedly called AppRequestFailed")
+	}
+	return errors.New("unexpectedly called AppRequestFailed")
+}
+
+func (e *EngineTest) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	if e.AppRequestF != nil {
+		return e.AppRequestF(nodeID, requestID, request)
+	}
+	if !e.CantAppRequest {
+		return nil
+	}
+	if e.T != nil {
+		e.T.Fatalf("Unexpectedly called AppRequest")
+	}
+	return errors.New("unexpectedly called AppRequest")
+}
+
+func (e *EngineTest) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	if e.AppResponseF != nil {
+		return e.AppResponseF(nodeID, requestID, response)
+	}
+	if !e.CantAppResponse {
+		return nil
+	}
+	if e.T != nil {
+		e.T.Fatalf("Unexpectedly called AppResponse")
+	}
+	return errors.New("unexpectedly called AppResponse")
+}
+
+func (e *EngineTest) AppGossip(nodeID ids.ShortID, requestID uint32, msg []byte) error {
+	if e.AppGossipF != nil {
+		return e.AppGossipF(nodeID, requestID, msg)
+	}
+	if !e.CantAppGossip {
+		return nil
+	}
+	if e.T != nil {
+		e.T.Fatalf("Unexpectedly called AppGossip")
+	}
+	return errors.New("unexpectedly called AppGossip")
 }
 
 // Chits ...
