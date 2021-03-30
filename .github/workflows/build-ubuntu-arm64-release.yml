@@ -36,7 +36,7 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: us-east-1
 
-    - name: Create debian package structure
+    - name: Create debian package
       run: ./.github/workflows/build-deb-pkg.sh
       env:
         TAG: ${{ steps.get_version.outputs.VERSION }}
@@ -77,7 +77,7 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: us-east-1
 
-    - name: Create debian package structure
+    - name: Create debian package
       run: ./.github/workflows/build-deb-pkg.sh
       env:
 #        TAG: ${{ steps.get_version.outputs.VERSION }}
