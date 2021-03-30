@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
-	chainState "github.com/ava-labs/coreth/plugin/evm/state"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
@@ -47,6 +46,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	chainState "github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -75,6 +75,10 @@ const (
 	defaultMempoolSize  = 1024
 	codecVersion        = uint16(0)
 	txFee               = units.MilliAvax
+
+	decidedCacheSize    = 100
+	missingCacheSize    = 50
+	unverifiedCacheSize = 10
 )
 
 var (
@@ -164,7 +168,7 @@ type VM struct {
 	ctx *snow.Context
 	// ChainState helps to implement the VM interface by wrapping blocks
 	// with an efficient caching layer.
-	*chainState.ChainState
+	*chainState.State
 
 	CLIConfig CommandLineConfig
 
@@ -255,10 +259,10 @@ func (vm *VM) Initialize(
 		return errUnsupportedFXs
 	}
 
-	vm.ChainState = chainState.NewChainState(dbManager.Current(), chainStateCacheSize)
+	vm.State = chainState.NewState(dbManager.Current(), decidedCacheSize, missingCacheSize, unverifiedCacheSize)
 	vm.shutdownChan = make(chan struct{}, 1)
 	vm.ctx = ctx
-	vm.db = vm.ChainState.ExternalDB()
+	vm.db = vm.State.ExternalDB()
 	vm.chaindb = Database{prefixdb.New(ethDBPrefix, vm.db)}
 	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
 	vm.acceptedAtomicTxDB = prefixdb.New(atomicTxPrefix, vm.db)
@@ -444,7 +448,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to get last accepted block due to %w", err)
 	}
 
-	vm.ChainState.Initialize(&chainState.Config{
+	vm.State.Initialize(&chainState.Config{
 		LastAcceptedBlock:  lastAcceptedBlk,
 		GetBlockIDAtHeight: vm.internalGetBlockIDAtHeight,
 		GetBlock:           vm.internalGetBlock,
