@@ -24,9 +24,6 @@ jobs:
         sudo apt update
         sudo apt-get install awscli
 
-    - name: Install rpmbuild
-      run: sudo apt-get install rpm 
-
     - name: Get the version
       id: get_version
       run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}

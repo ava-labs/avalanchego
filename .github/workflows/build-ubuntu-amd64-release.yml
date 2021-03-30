@@ -1,4 +1,4 @@
-name: build-amd64-deian-packages
+name: build-amd64-debian-packages
 
 on:
   push:
@@ -23,9 +23,6 @@ jobs:
       run: |
         sudo apt update
         sudo apt-get install awscli
-
-    - name: Install rpmbuild
-      run: sudo apt-get install rpm 
 
     - name: Get the version
       id: get_version
