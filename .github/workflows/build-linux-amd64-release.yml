@@ -1,4 +1,4 @@
-name: build-arm64-debian-packages
+name: build-amd64-deian-packages
 
 on:
   push:
@@ -6,8 +6,8 @@ on:
       - auto-build # Push events to every tag
 
 jobs:
-  build-bionic-arm64-package:
-    runs-on: self-hosted 
+  build-bionic-amd64-package:
+    runs-on: ubuntu-18.04 
 
     steps:
     - uses: actions/checkout@v2
@@ -44,10 +44,10 @@ jobs:
       env:
         TAG: ${{ steps.get_version.outputs.VERSION }}
         BUCKET: ${{ secrets.BUCKET }}
-        ARCH: "arm64"
+        ARCH: "amd64"
         RELEASE: "bionic"
 
-  build-focal-arm64-package:
+  build-focal-amd64-package:
     runs-on: ubuntu-20.04
 
     steps:
@@ -85,6 +85,6 @@ jobs:
       env:
         TAG: ${{ steps.get_version.outputs.VERSION }}
         BUCKET: ${{ secrets.BUCKET }}
-        ARCH: "arm64"
+        ARCH: "amd64"
         RELEASE: "focal"
 

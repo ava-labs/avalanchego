@@ -31,6 +31,8 @@ if [[ $TAG =~ ^v ]]; then
   VER=$(echo $TAG | tr -d 'v')
 fi
 NEW_VERSION_STRING="Version: $VER"
+NEW_ARCH_STRING="Architecture: $ARCH"
 sed -i "s/Version.*/$NEW_VERSION_STRING/g" debian/DEBIAN/control
-dpkg-deb --build debian avalanchego-linux-$ARCH-$TAG.deb
-aws s3 cp avalanchego-linux-$ARCH-$TAG.deb s3://$BUCKET/linux/deb/
+sed -i "s/Architecture.*/$NEW_ARCH_STRING/g" debian/DEBIAN/control
+dpkg-deb --build debian avalanchego-$TAG-$ARCH.deb
+aws s3 cp avalanchego-$TAG-$ARCH.deb s3://$BUCKET/linux/debs/ubuntu/$RELEASE/$ARCH/
