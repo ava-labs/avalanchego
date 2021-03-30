@@ -24,12 +24,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
-	state "github.com/ava-labs/coreth/plugin/evm/state"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/trie"
@@ -479,7 +479,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 	}
 
 	// Clear the cache and ensure that GetBlock returns internal blocks with the correct status
-	vm.ChainState.FlushCaches()
+	vm.State.FlushCaches()
 	blk2Refreshed, err := vm.GetBlockInternal(blk2.ID())
 	if err != nil {
 		t.Fatal(err)
@@ -1551,7 +1551,7 @@ func TestNonCanonicalAccept(t *testing.T) {
 	vm1.chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = true
 
 	blkBHeight := vm1BlkB.Height()
-	blkBHash := vm1BlkB.(*state.BlockWrapper).Block.(*Block).ethBlock.Hash()
+	blkBHash := vm1BlkB.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
 	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}
@@ -1582,7 +1582,7 @@ func TestNonCanonicalAccept(t *testing.T) {
 		t.Fatalf("VM1 failed to accept block: %s", err)
 	}
 
-	blkCHash := vm1BlkC.(*state.BlockWrapper).Block.(*Block).ethBlock.Hash()
+	blkCHash := vm1BlkC.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
 	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkCHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkCHash.Hex(), b.Hash().Hex())
 	}
@@ -1759,7 +1759,7 @@ func TestStickyPreference(t *testing.T) {
 	vm1.chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = true
 
 	blkBHeight := vm1BlkB.Height()
-	blkBHash := vm1BlkB.(*state.BlockWrapper).Block.(*Block).ethBlock.Hash()
+	blkBHash := vm1BlkB.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
 	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}
@@ -1807,14 +1807,14 @@ func TestStickyPreference(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
 	}
-	blkCHash := vm1BlkC.(*state.BlockWrapper).Block.(*Block).ethBlock.Hash()
+	blkCHash := vm1BlkC.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
 
 	vm1BlkD, err := vm1.ParseBlock(vm2BlkD.Bytes())
 	if err != nil {
 		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
 	}
 	blkDHeight := vm1BlkD.Height()
-	blkDHash := vm1BlkD.(*state.BlockWrapper).Block.(*Block).ethBlock.Hash()
+	blkDHash := vm1BlkD.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
 
 	// Should be no-ops
 	if err := vm1BlkC.Verify(); err != nil {
@@ -2093,8 +2093,8 @@ func TestUncleBlock(t *testing.T) {
 	}
 
 	// Create uncle block from blkD
-	blkDEthBlock := vm2BlkD.(*state.BlockWrapper).Block.(*Block).ethBlock
-	uncles := []*types.Header{vm1BlkB.(*state.BlockWrapper).Block.(*Block).ethBlock.Header()}
+	blkDEthBlock := vm2BlkD.(*chain.BlockWrapper).Block.(*Block).ethBlock
+	uncles := []*types.Header{vm1BlkB.(*chain.BlockWrapper).Block.(*Block).ethBlock.Header()}
 	uncleBlockHeader := types.CopyHeader(blkDEthBlock.Header())
 	uncleBlockHeader.UncleHash = types.CalcUncleHash(uncles)
 
@@ -2195,7 +2195,7 @@ func TestEmptyBlock(t *testing.T) {
 	}
 
 	// Create empty block from blkA
-	ethBlock := blk.(*state.BlockWrapper).Block.(*Block).ethBlock
+	ethBlock := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
 
 	emptyEthBlock := types.NewBlock(
 		types.CopyHeader(ethBlock.Header()),
@@ -2443,7 +2443,7 @@ func TestAcceptReorg(t *testing.T) {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
 
-	blkBHash := vm1BlkB.(*state.BlockWrapper).Block.(*Block).ethBlock.Hash()
+	blkBHash := vm1BlkB.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
 	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkBHash {
 		t.Fatalf("expected current block to have hash %s but got %s", blkBHash.Hex(), b.Hash().Hex())
 	}
@@ -2452,7 +2452,7 @@ func TestAcceptReorg(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	blkCHash := vm1BlkC.(*state.BlockWrapper).Block.(*Block).ethBlock.Hash()
+	blkCHash := vm1BlkC.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
 	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkCHash {
 		t.Fatalf("expected current block to have hash %s but got %s", blkCHash.Hex(), b.Hash().Hex())
 	}
@@ -2461,7 +2461,7 @@ func TestAcceptReorg(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	blkDHash := vm1BlkD.(*state.BlockWrapper).Block.(*Block).ethBlock.Hash()
+	blkDHash := vm1BlkD.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
 	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkDHash {
 		t.Fatalf("expected current block to have hash %s but got %s", blkDHash.Hex(), b.Hash().Hex())
 	}
@@ -2537,7 +2537,7 @@ func TestFutureBlock(t *testing.T) {
 	}
 
 	// Create empty block from blkA
-	blkAEthBlock := blkA.(*state.BlockWrapper).Block.(*Block).ethBlock
+	blkAEthBlock := blkA.(*chain.BlockWrapper).Block.(*Block).ethBlock
 
 	modifiedHeader := types.CopyHeader(blkAEthBlock.Header())
 	// Set the VM's clock to the time of the produced block
@@ -3089,7 +3089,7 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 	}
 
 	blkHeight := blk.Height()
-	blkHash := blk.(*state.BlockWrapper).Block.(*Block).ethBlock.Hash()
+	blkHash := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
 
 	vm.chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = true
 
