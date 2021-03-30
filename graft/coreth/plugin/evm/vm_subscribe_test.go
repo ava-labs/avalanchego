@@ -15,10 +15,10 @@ import (
 )
 
 func TestAcceptSubscription(t *testing.T) {
-	issuer1, vm1, _, sharedMemory1 := GenesisVM(t, true, genesisJSONApricotPhase0)
+	issuer, vm, _, sharedMemory := GenesisVM(t, true, genesisJSONApricotPhase1)
 
 	defer func() {
-		if err := vm1.Shutdown(); err != nil {
+		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -41,7 +41,7 @@ func TestAcceptSubscription(t *testing.T) {
 
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
-		Asset:  avax.Asset{ID: vm1.ctx.AVAXAssetID},
+		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: importAmount,
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -50,14 +50,14 @@ func TestAcceptSubscription(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := vm1.codec.Marshal(codecVersion, utxo)
+	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	xChainSharedMemory1 := sharedMemory1.NewSharedMemory(vm1.ctx.XChainID)
+	xChainSharedMemory1 := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory1.Put(vm1.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory1.Put(vm.ctx.ChainID, []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
@@ -80,20 +80,20 @@ func TestAcceptSubscription(t *testing.T) {
 			}
 		}
 	}()
-	vm1.Chain().BlockChain().SubscribeChainAcceptedEvent(ch)
+	vm.Chain().BlockChain().SubscribeChainAcceptedEvent(ch)
 
-	importTx, err := vm1.newImportTx(vm1.ctx.XChainID, key.Address, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	importTx, err := vm.newImportTx(vm.ctx.XChainID, key.Address, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm1.issueTx(importTx); err != nil {
+	if err := vm.issueTx(importTx); err != nil {
 		t.Fatal(err)
 	}
 
-	<-issuer1
+	<-issuer
 
-	vm1BlkA, err := vm1.BuildBlock()
+	vm1BlkA, err := vm.BuildBlock()
 	if err != nil {
 		t.Fatalf("Failed to build block with import transaction: %s", err)
 	}
