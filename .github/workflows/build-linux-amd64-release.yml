@@ -83,7 +83,8 @@ jobs:
     - name: Create debian package structure
       run: ./.github/workflows/build-deb-pkg.sh
       env:
-        TAG: ${{ steps.get_version.outputs.VERSION }}
+#        TAG: ${{ steps.get_version.outputs.VERSION }}
+        TAG: "1.3.0"
         BUCKET: ${{ secrets.BUCKET }}
         ARCH: "amd64"
         RELEASE: "focal"

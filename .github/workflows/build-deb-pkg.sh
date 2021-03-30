@@ -18,7 +18,7 @@ OK=`cp ./build/plugins/evm $AVALANCHE_LIB_DIR`
 if [[ $OK -ne 0 ]]; then
   exit $OK;
 fi
-OK=`cp $TEMPLATE/control-$ARCH $DEBIAN_CONF/control`
+OK=`cp $TEMPLATE/control $DEBIAN_CONF/control`
 if [[ $OK -ne 0 ]]; then
   exit $OK;
 fi
