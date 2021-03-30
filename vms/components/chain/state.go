@@ -297,6 +297,12 @@ func (c *State) LastAcceptedBlockInternal() snowman.Block {
 	return c.LastAcceptedBlock().Block
 }
 
+// GetBlockIDAtHeight returns the blockID at the given height by passing through to the internal
+// function.
+func (c *State) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
+	return c.getBlockIDAtHeight(height)
+}
+
 // getStatus returns the status of [blk]. Assumes that [blk] is a known block.
 func (c *State) getStatus(blk snowman.Block) (choices.Status, error) {
 	blkHeight := blk.Height()
