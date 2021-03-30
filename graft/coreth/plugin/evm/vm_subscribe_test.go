@@ -55,9 +55,9 @@ func TestAcceptSubscription(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	xChainSharedMemory1 := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
+	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory1.Put(vm.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
