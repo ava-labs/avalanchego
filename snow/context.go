@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/encdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -25,9 +26,15 @@ type EventDispatcher interface {
 	Reject(ctx *Context, containerID ids.ID, container []byte)
 }
 
-// Keystore ...
-type Keystore interface {
-	GetDatabase(username, password string) (database.Database, error)
+type BlockchainKeystore interface {
+	// Get a database that is able to read and write unencrypted values from the
+	// underlying database.
+	GetDatabase(username, password string) (*encdb.Database, error)
+
+	// Get the underlying database that is able to read and write encrypted
+	// values. This Database will not perform any encrypting or decrypting of
+	// values and is not recommended to be used when implementing a VM.
+	GetRawDatabase(username, password string) (database.Database, error)
 }
 
 // AliasLookup ...
@@ -58,7 +65,7 @@ type Context struct {
 	DecisionDispatcher  EventDispatcher
 	ConsensusDispatcher EventDispatcher
 	Lock                sync.RWMutex
-	Keystore            Keystore
+	Keystore            BlockchainKeystore
 	SharedMemory        atomic.SharedMemory
 	BCLookup            AliasLookup
 	SNLookup            SubnetLookup

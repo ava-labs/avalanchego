@@ -90,7 +90,7 @@ type Node struct {
 	DB database.Database
 
 	// Handles calls to Keystore API
-	keystoreServer keystore.Keystore
+	keystore keystore.Keystore
 
 	// Manages shared memory
 	sharedMemory atomic.Memory
@@ -576,7 +576,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		NodeID:                    n.ID,
 		NetworkID:                 n.Config.NetworkID,
 		Server:                    &n.APIServer,
-		Keystore:                  &n.keystoreServer,
+		Keystore:                  n.keystore,
 		AtomicMemory:              &n.sharedMemory,
 		AVAXAssetID:               avaxAssetID,
 		XChainID:                  xChainID,
@@ -650,10 +650,8 @@ func (n *Node) initSharedMemory() error {
 func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
 	keystoreDB := prefixdb.New([]byte("keystore"), n.DB)
-	if err := n.keystoreServer.Initialize(n.Log, keystoreDB); err != nil {
-		return err
-	}
-	keystoreHandler, err := n.keystoreServer.CreateHandler()
+	n.keystore = keystore.New(n.Log, keystoreDB)
+	keystoreHandler, err := n.keystore.CreateHandler()
 	if err != nil {
 		return err
 	}

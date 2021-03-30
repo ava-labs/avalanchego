@@ -131,7 +131,7 @@ type ManagerConfig struct {
 	NodeID                    ids.ShortID        // The ID of this node
 	NetworkID                 uint32             // ID of the network this node is connected to
 	Server                    *api.Server        // Handles HTTP API calls
-	Keystore                  *keystore.Keystore
+	Keystore                  keystore.Keystore
 	AtomicMemory              *atomic.Memory
 	AVAXAssetID               ids.ID
 	XChainID                  ids.ID

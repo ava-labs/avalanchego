@@ -14,10 +14,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -49,10 +51,7 @@ func defaultService(t *testing.T) *Service {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer vm.Ctx.Lock.Unlock()
-	ks, err := keystore.CreateTestKeystore()
-	if err != nil {
-		t.Fatal(err)
-	}
+	ks := keystore.New(logging.NoLog{}, memdb.New())
 	if err := ks.AddUser(testUsername, testPassword); err != nil {
 		t.Fatal(err)
 	}
