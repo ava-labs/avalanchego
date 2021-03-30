@@ -278,32 +278,6 @@ func (self *StateDB) GetBalanceMultiCoin(addr common.Address, coinID common.Hash
 	return common.Big0
 }
 
-//func (self *StateDB) EnableMultiCoin(addr common.Address) error {
-//	stateObject := self.GetOrNewStateObject(addr)
-//	if stateObject.data.Root != emptyRoot && stateObject.data.Root != zeroRoot {
-//		return errors.New(fmt.Sprintf("not a fresh account: %s", stateObject.data.Root.Hex()))
-//	}
-//	if !stateObject.EnableMultiCoin() {
-//		return errors.New("multi-coin mode already enabled")
-//	}
-//	log.Debug(fmt.Sprintf("enabled MC for %s", addr.Hex()))
-//	return nil
-//}
-//
-//func (self *StateDB) ForceEnableMultiCoin(addr common.Address) {
-//	stateObject := self.GetOrNewStateObject(addr)
-//	stateObject.EnableMultiCoin()
-//}
-
-func (self *StateDB) IsMultiCoin(addr common.Address) bool {
-	return true
-	//stateObject := self.getStateObject(addr)
-	//if stateObject != nil {
-	//	return stateObject.IsMultiCoin()
-	//}
-	//return false
-}
-
 func (s *StateDB) GetNonce(addr common.Address) uint64 {
 	stateObject := s.getStateObject(addr)
 	if stateObject != nil {
@@ -351,10 +325,7 @@ func (s *StateDB) GetCodeHash(addr common.Address) common.Hash {
 func (s *StateDB) GetState(addr common.Address, hash common.Hash) common.Hash {
 	stateObject := s.getStateObject(addr)
 	if stateObject != nil {
-		// NOTE: last-minute fix: just universally enable MC
-		//if stateObject.data.IsMultiCoin {
 		NormalizeStateKey(&hash)
-		//}
 		return stateObject.GetState(s.db, hash)
 	}
 	return common.Hash{}
@@ -382,6 +353,16 @@ func (s *StateDB) GetStorageProof(a common.Address, key common.Hash) ([][]byte, 
 func (s *StateDB) GetCommittedState(addr common.Address, hash common.Hash) common.Hash {
 	stateObject := s.getStateObject(addr)
 	if stateObject != nil {
+		return stateObject.GetCommittedState(s.db, hash)
+	}
+	return common.Hash{}
+}
+
+// GetCommittedStateAP1 retrieves a value from the given account's committed storage trie.
+func (s *StateDB) GetCommittedStateAP1(addr common.Address, hash common.Hash) common.Hash {
+	stateObject := s.getStateObject(addr)
+	if stateObject != nil {
+		NormalizeStateKey(&hash)
 		return stateObject.GetCommittedState(s.db, hash)
 	}
 	return common.Hash{}
@@ -480,10 +461,7 @@ func (s *StateDB) SetState(addr common.Address, key, value common.Hash) (res err
 	res = nil
 	stateObject := s.GetOrNewStateObject(addr)
 	if stateObject != nil {
-		// NOTE: last-minute fix: just universally enable MC
-		//if stateObject.data.IsMultiCoin {
 		NormalizeStateKey(&key)
-		//}
 		stateObject.SetState(s.db, key, value)
 	}
 	return

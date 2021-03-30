@@ -24,8 +24,6 @@ import (
 // UnsignedExportTx is an unsigned ExportTx
 type UnsignedExportTx struct {
 	avax.Metadata
-	// true iff this transaction has already passed syntactic verification
-	syntacticallyVerified bool
 	// ID of the network on which this tx was issued
 	NetworkID uint32 `serialize:"true" json:"networkID"`
 	// ID of this blockchain.
@@ -47,12 +45,11 @@ func (tx *UnsignedExportTx) Verify(
 	ctx *snow.Context,
 	feeAmount uint64,
 	feeAssetID ids.ID,
+	ap1 bool,
 ) error {
 	switch {
 	case tx == nil:
 		return errNilTx
-	case tx.syntacticallyVerified: // already passed syntactic verification
-		return nil
 	case tx.DestinationChain != avmID:
 		return errWrongChainID
 	case len(tx.ExportedOutputs) == 0:
@@ -77,8 +74,10 @@ func (tx *UnsignedExportTx) Verify(
 	if !avax.IsSortedTransferableOutputs(tx.ExportedOutputs, Codec) {
 		return errOutputsNotSorted
 	}
+	if ap1 && !IsSortedAndUniqueEVMInputs(tx.Ins) {
+		return errInputsNotSortedUnique
+	}
 
-	tx.syntacticallyVerified = true
 	return nil
 }
 
@@ -86,8 +85,9 @@ func (tx *UnsignedExportTx) Verify(
 func (tx *UnsignedExportTx) SemanticVerify(
 	vm *VM,
 	stx *Tx,
+	ap1 bool,
 ) TxError {
-	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID); err != nil {
+	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, ap1); err != nil {
 		return permError{err}
 	}
 
@@ -97,7 +97,10 @@ func (tx *UnsignedExportTx) SemanticVerify(
 
 	f := crypto.FactorySECP256K1R{}
 	for i, input := range tx.Ins {
-		cred := stx.Creds[i].(*secp256k1fx.Credential)
+		cred, ok := stx.Creds[i].(*secp256k1fx.Credential)
+		if !ok {
+			return permError{fmt.Errorf("expected *secp256k1fx.Credential but got %T", cred)}
+		}
 		if err := cred.Verify(); err != nil {
 			return permError{err}
 		}
@@ -105,9 +108,14 @@ func (tx *UnsignedExportTx) SemanticVerify(
 		if len(cred.Sigs) != 1 {
 			return permError{fmt.Errorf("expected one signature for EVM Input Credential, but found: %d", len(cred.Sigs))}
 		}
-		pubKey, err := f.RecoverPublicKey(tx.UnsignedBytes(), cred.Sigs[0][:])
+		pubKeyIntf, err := f.RecoverPublicKey(tx.UnsignedBytes(), cred.Sigs[0][:])
 		if err != nil {
 			return permError{err}
+		}
+		pubKey, ok := pubKeyIntf.(*crypto.PublicKeySECP256K1R)
+		if !ok {
+			// This should never happen
+			return permError{fmt.Errorf("expected *crypto.PublicKeySECP256K1R but got %T", pubKeyIntf)}
 		}
 		if input.Address != PublicKeyToEthAddress(pubKey) {
 			return permError{errPublicKeySignatureMismatch}
@@ -129,8 +137,6 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	if err := fc.Verify(); err != nil {
 		return permError{err}
 	}
-
-	// TODO: verify UTXO outputs via gRPC
 	return nil
 }
 
@@ -229,11 +235,11 @@ func (vm *VM) newExportTx(
 		Ins:              ins,
 		ExportedOutputs:  exportOuts,
 	}
-	tx := &Tx{UnsignedTx: utx}
+	tx := &Tx{UnsignedAtomicTx: utx}
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID)
+	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, vm.useApricotPhase1())
 }
 
 // EVMStateTransfer executes the state update from the atomic export transaction

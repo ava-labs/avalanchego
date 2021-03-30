@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"time"
 
@@ -159,6 +160,11 @@ func (self *ETHChain) GetBlockByNumber(num uint64) *types.Block {
 	return self.backend.BlockChain().GetBlockByNumber(num)
 }
 
+// Retrives a block from the database by number.
+func (self *ETHChain) GetBlockByNumberUnfinalized(num uint64) *types.Block {
+	return self.backend.BlockChain().GetBlockByNumberUnfinalized(num)
+}
+
 // Validate the canonical chain from current block to the genesis.
 // This should only be called as a convenience method in tests, not
 // in production as it traverses the entire chain.
@@ -226,6 +232,11 @@ func (self *ETHChain) GetTxSubmitCh() <-chan core.NewTxsEvent {
 
 func (self *ETHChain) GetTxPool() *core.TxPool {
 	return self.backend.TxPool()
+}
+
+// SetGasPrice sets the gas price on the backend
+func (self *ETHChain) SetGasPrice(newGasPrice *big.Int) {
+	self.backend.SetGasPrice(newGasPrice)
 }
 
 type Key struct {
