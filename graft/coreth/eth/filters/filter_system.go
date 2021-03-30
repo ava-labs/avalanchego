@@ -306,7 +306,7 @@ func (es *EventSystem) SubscribeNewHeads(headers chan *types.Header) *Subscripti
 	return es.subscribe(sub)
 }
 
-// SubscribeNewHeads creates a subscription that writes the header of a block that is
+// SubscribeAcceptedHeads creates a subscription that writes the header of an accepted block that is
 // imported in the chain.
 func (es *EventSystem) SubscribeAcceptedHeads(headers chan *types.Header) *Subscription {
 	sub := &subscription{
