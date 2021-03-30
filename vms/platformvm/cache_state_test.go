@@ -1,21 +1,14 @@
 package platformvm
 
-import (
-	"testing"
+// func TestCache(t *testing.T) {
+// 	assert := assert.New(t)
 
-	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/stretchr/testify/assert"
-)
+// 	db := memdb.New()
+// 	_, err := initState(db)
+// 	assert.NoError(err)
 
-func TestCache(t *testing.T) {
-	assert := assert.New(t)
+// 	is, err := loadState(db)
+// 	assert.NoError(err)
 
-	db := memdb.New()
-	_, err := initState(db)
-	assert.NoError(err)
-
-	is, err := loadState(db)
-	assert.NoError(err)
-
-	_ = is
-}
+// 	_ = is
+// }
