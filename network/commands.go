@@ -246,7 +246,6 @@ var (
 		// Application level:
 		AppRequest:  {ChainID, RequestID, Deadline, AppRequestBytes},
 		AppResponse: {ChainID, RequestID, AppResponseBytes},
-		// TODO does AppGossip need a request ID?
-		AppGossip: {ChainID, RequestID, AppGossipBytes},
+		AppGossip:   {ChainID, RequestID, AppGossipBytes},
 	}
 )
