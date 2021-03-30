@@ -66,11 +66,11 @@ func (b *EthAPIBackend) ChainConfig() *params.ChainConfig {
 	return b.eth.blockchain.Config()
 }
 
-func (b *EthAPIBackend) GetBlockchainVmConfig() *vm.Config {
+func (b *EthAPIBackend) GetVMConfig() *vm.Config {
 	return b.eth.blockchain.GetVMConfig()
 }
 
-func (b *EthAPIBackend) GetBlockchainLastAccepted() *types.Block {
+func (b *EthAPIBackend) LastAcceptedBLock() *types.Block {
 	return b.eth.blockchain.LastAcceptedBlock()
 }
 
