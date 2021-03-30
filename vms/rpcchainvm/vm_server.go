@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -200,8 +201,20 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 
 	vm.toEngine = toEngine
 	lastAccepted, err := vm.vm.LastAccepted()
+	if err != nil {
+		return nil, err
+	}
+	blk, err := vm.vm.GetBlock(lastAccepted)
+	if err != nil {
+		return nil, err
+	}
+	parentID := blk.Parent().ID()
 	return &vmproto.InitializeResponse{
-		LastAcceptedID: lastAccepted[:],
+		Id:       lastAccepted[:],
+		ParentID: parentID[:],
+		Status:   uint32(choices.Accepted),
+		Height:   blk.Height(),
+		Bytes:    blk.Bytes(),
 	}, err
 }
 
@@ -304,24 +317,15 @@ func (vm *VMServer) GetBlock(_ context.Context, req *vmproto.GetBlockRequest) (*
 	}, nil
 }
 
-// TODO add GetBlockIDAtHeight
-// func (vm *VMServer) GetBlockIDAtHeight(_ context.Context, req *vmproto.GetBlockRequest) (*vmproto.GetBlockResponse, error) {
-// 	id, err := ids.ToID(req.Id)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	blk, err := vm.vm.GetBlock(id)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	parentID := blk.Parent().ID()
-// 	return &vmproto.GetBlockResponse{
-// 		ParentID: parentID[:],
-// 		Bytes:    blk.Bytes(),
-// 		Status:   uint32(blk.Status()),
-// 		Height:   blk.Height(),
-// 	}, nil
-// }
+func (vm *VMServer) GetBlockIDAtHeight(_ context.Context, req *vmproto.GetBlockIDAtHeightRequest) (*vmproto.GetBlockIDAtHeightResponse, error) {
+	blkID, err := vm.vm.GetBlockIDAtHeight(req.Height)
+	if err != nil {
+		return nil, err
+	}
+	return &vmproto.GetBlockIDAtHeightResponse{
+		BlockID: blkID[:],
+	}, nil
+}
 
 func (vm *VMServer) SetPreference(_ context.Context, req *vmproto.SetPreferenceRequest) (*vmproto.SetPreferenceResponse, error) {
 	id, err := ids.ToID(req.Id)

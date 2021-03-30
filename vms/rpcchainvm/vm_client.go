@@ -173,19 +173,31 @@ func (vm *VMClient) Initialize(
 		return err
 	}
 
-	lastAccepted, err := ids.ToID(resp.LastAcceptedID)
+	id, err := ids.ToID(resp.Id)
 	if err != nil {
 		return err
 	}
-	lastAcceptedBlk, err := vm.internalGetBlock(lastAccepted)
+	parentID, err := ids.ToID(resp.ParentID)
 	if err != nil {
 		return err
+	}
+
+	status := choices.Status(resp.Status)
+	vm.ctx.Log.AssertDeferredNoError(status.Valid)
+
+	lastAcceptedBlk := &BlockClient{
+		vm:       vm,
+		id:       id,
+		parentID: parentID,
+		status:   status,
+		bytes:    resp.Bytes,
+		height:   resp.Height,
 	}
 
 	chainState, err := chain.NewMeteredState(
 		dbManager.Current(),
 		ctx.Metrics,
-		fmt.Sprintf("%s_rpcchainvm_", ctx.Namespace),
+		fmt.Sprintf("%s_rpcchainvm", ctx.Namespace),
 		decidedCacheSize,
 		missingCacheSize,
 		unverifiedCacheSize,
@@ -193,15 +205,15 @@ func (vm *VMClient) Initialize(
 	if err != nil {
 		return err
 	}
+
 	chainState.Initialize(&chain.Config{
 		LastAcceptedBlock:  lastAcceptedBlk,
-		GetBlockIDAtHeight: nil, // TODO requires a change to coreth
+		GetBlockIDAtHeight: vm.internalGetBlockIDAtHeight,
 		GetBlock:           vm.internalGetBlock,
 		UnmarshalBlock:     vm.internalParseBlock,
 		BuildBlock:         vm.internalBuildBlock,
 	})
 
-	// initialize ChainState here
 	return nil
 }
 
@@ -353,33 +365,15 @@ func (vm *VMClient) internalParseBlock(bytes []byte) (chain.Block, error) {
 	return blk, nil
 }
 
-// TODO getBlockIDATHeight here and in vm_server
-// add the definitino into vm.proto and recompile
-// update to a version of coreth that implements this new interface (should be easy since it's already impelemented)
-// func (vm *VMClient) internalGetBlock(id ids.ID) (chain.Block, error) {
-// 	resp, err := vm.client.GetBlock(context.Background(), &vmproto.GetBlockRequest{
-// 		Id: id[:],
-// 	})
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	parentID, err := ids.ToID(resp.ParentID)
-// 	vm.ctx.Log.AssertNoError(err)
-// 	status := choices.Status(resp.Status)
-// 	vm.ctx.Log.AssertDeferredNoError(status.Valid)
-
-// 	blk := &BlockClient{
-// 		vm:       vm,
-// 		id:       id,
-// 		parentID: parentID,
-// 		status:   status,
-// 		bytes:    resp.Bytes,
-// 		height:   resp.Height,
-// 	}
-
-// 	return blk, nil
-// }
+func (vm *VMClient) internalGetBlockIDAtHeight(height uint64) (ids.ID, error) {
+	resp, err := vm.client.GetBlockIDAtHeight(context.Background(), &vmproto.GetBlockIDAtHeightRequest{
+		Height: height,
+	})
+	if err != nil {
+		return ids.ID{}, err
+	}
+	return ids.ToID(resp.BlockID)
+}
 
 func (vm *VMClient) internalGetBlock(id ids.ID) (chain.Block, error) {
 	resp, err := vm.client.GetBlock(context.Background(), &vmproto.GetBlockRequest{
