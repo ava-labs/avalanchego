@@ -69,7 +69,7 @@ type UnsignedAtomicTx interface {
 	// UTXOs this tx consumes
 	InputUTXOs() ids.Set
 	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(vm *VM, stx *Tx) TxError
+	SemanticVerify(vm *VM, stx *Tx, ap1 bool) TxError
 
 	// Accept this transaction with the additionally provided state transitions.
 	Accept(ctx *snow.Context, batch database.Batch) error
@@ -80,7 +80,7 @@ type UnsignedAtomicTx interface {
 // Tx is a signed transaction
 type Tx struct {
 	// The body of this transaction
-	UnsignedTx `serialize:"true" json:"unsignedTx"`
+	UnsignedAtomicTx `serialize:"true" json:"unsignedTx"`
 
 	// The credentials of this transaction
 	Creds []verify.Verifiable `serialize:"true" json:"credentials"`
@@ -90,9 +90,9 @@ type Tx struct {
 
 // Sign this transaction with the provided signers
 func (tx *Tx) Sign(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {
-	unsignedBytes, err := c.Marshal(codecVersion, &tx.UnsignedTx)
+	unsignedBytes, err := c.Marshal(codecVersion, &tx.UnsignedAtomicTx)
 	if err != nil {
-		return fmt.Errorf("couldn't marshal UnsignedTx: %w", err)
+		return fmt.Errorf("couldn't marshal UnsignedAtomicTx: %w", err)
 	}
 
 	// Attach credentials
@@ -176,8 +176,8 @@ func SortEVMOutputs(outputs []EVMOutput) {
 	sort.Sort(&innerSortEVMOutputs{outputs: outputs})
 }
 
-// IsSortedAndUniqueEVMOutputs returns true if the EVMOutputs are sorted and unique
+// IsSortedEVMOutputs returns true if the EVMOutputs are sorted
 // based on the account addresses and assetIDs
-func IsSortedAndUniqueEVMOutputs(outputs []EVMOutput) bool {
-	return utils.IsSortedAndUnique(&innerSortEVMOutputs{outputs: outputs})
+func IsSortedEVMOutputs(outputs []EVMOutput) bool {
+	return sort.IsSorted(&innerSortEVMOutputs{outputs: outputs})
 }

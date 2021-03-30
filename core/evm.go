@@ -111,15 +111,15 @@ func CanTransfer(db vm.StateDB, addr common.Address, amount *big.Int) bool {
 	return db.GetBalance(addr).Cmp(amount) >= 0
 }
 
-func CanTransferMC(db vm.StateDB, addr common.Address, to common.Address, coinID *common.Hash, amount *big.Int) int {
+func CanTransferMC(db vm.StateDB, addr common.Address, to common.Address, coinID *common.Hash, amount *big.Int) bool {
 	if coinID == nil {
-		return 0
+		return true
 	}
 	if db.GetBalanceMultiCoin(addr, *coinID).Cmp(amount) >= 0 {
-		return 0
+		return true
 	}
 	// insufficient balance
-	return 1
+	return false
 }
 
 // Transfer subtracts amount from sender and adds amount to recipient using the given Db

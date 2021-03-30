@@ -58,7 +58,7 @@ var (
 	// GitCommit is set by the build script
 	GitCommit string
 	// Version is the version of Coreth
-	Version = "coreth-v0.3.26"
+	Version = "coreth-v0.4.1"
 
 	_ block.ChainVM = &VM{}
 )
@@ -103,7 +103,6 @@ var (
 	errOutputsNotSorted           = errors.New("tx outputs not sorted")
 	errOverflowExport             = errors.New("overflow when computing export amount + txFee")
 	errInvalidNonce               = errors.New("invalid nonce")
-	errInvalidGas                 = errors.New("invalid block due to low gas")
 	errConflictingAtomicInputs    = errors.New("invalid block due to conflicting atomic inputs")
 	errUnknownAtomicTx            = errors.New("unknown atomic tx type")
 	errUnclesUnsupported          = errors.New("uncles unsupported")
@@ -173,6 +172,7 @@ type VM struct {
 	networkID   uint64
 	genesisHash common.Hash
 	chain       *coreth.ETHChain
+	chainConfig *params.ChainConfig
 	// [db] is the VM's current database managed by ChainState
 	db database.Database
 	// [chaindb] is the database supplied to the Ethereum backend
@@ -267,10 +267,18 @@ func (vm *VM) Initialize(
 		return err
 	}
 
+	// Set the ApricotPhase1BlockTimestamp for mainnet/fuji
+	switch {
+	case g.Config.ChainID.Cmp(params.AvalancheMainnetChainID) == 0:
+		g.Config.ApricotPhase1BlockTimestamp = params.AvalancheApricotMainnetChainConfig.ApricotPhase1BlockTimestamp
+	case g.Config.ChainID.Cmp(params.AvalancheFujiChainID) == 0:
+		g.Config.ApricotPhase1BlockTimestamp = params.AvalancheApricotFujiChainConfig.ApricotPhase1BlockTimestamp
+	}
+
 	vm.chainID = g.Config.ChainID
 	vm.txFee = txFee
 
-	config := eth.DefaultConfig
+	config := eth.NewDefaultConfig()
 	config.Genesis = g
 	// disable the experimental snapshot feature from geth
 	config.TrieCleanCache += config.SnapshotCache
@@ -278,14 +286,40 @@ func (vm *VM) Initialize(
 
 	config.Miner.ManualMining = true
 
+	// Set minimum gas price and launch goroutine to sleep until
+	// network upgrade when the gas price must be changed
+	var gasPriceUpdate func() // must call after coreth.NewETHChain to avoid race
+	if g.Config.ApricotPhase1BlockTimestamp == nil {
+		config.Miner.GasPrice = params.LaunchMinGasPrice
+		config.GPO.Default = params.LaunchMinGasPrice
+		config.TxPool.PriceLimit = params.LaunchMinGasPrice.Uint64()
+	} else {
+		apricotTime := time.Unix(g.Config.ApricotPhase1BlockTimestamp.Int64(), 0)
+		log.Info(fmt.Sprintf("Apricot Upgrade Time %v.", apricotTime))
+		if time.Now().Before(apricotTime) {
+			untilApricot := time.Until(apricotTime)
+			log.Info(fmt.Sprintf("Upgrade will occur in %v", untilApricot))
+			config.Miner.GasPrice = params.LaunchMinGasPrice
+			config.GPO.Default = params.LaunchMinGasPrice
+			config.TxPool.PriceLimit = params.LaunchMinGasPrice.Uint64()
+			gasPriceUpdate = func() {
+				time.Sleep(untilApricot)
+				vm.chain.SetGasPrice(params.ApricotPhase1MinGasPrice)
+			}
+		} else {
+			config.Miner.GasPrice = params.ApricotPhase1MinGasPrice
+			config.GPO.Default = params.ApricotPhase1MinGasPrice
+			config.TxPool.PriceLimit = params.ApricotPhase1MinGasPrice.Uint64()
+		}
+	}
+
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
-	config.Miner.GasPrice = params.MinGasPrice
 	config.RPCGasCap = vm.CLIConfig.RPCGasCap
 	config.RPCTxFeeCap = vm.CLIConfig.RPCTxFeeCap
-	config.GPO.Default = params.MinGasPrice
-	config.TxPool.PriceLimit = params.MinGasPrice.Uint64()
 	config.TxPool.NoLocals = !vm.CLIConfig.LocalTxsEnabled
+	config.AllowUnfinalizedQueries = vm.CLIConfig.AllowUnfinalizedQueries
+	vm.chainConfig = g.Config
 
 	if err := config.SetGCMode("archive"); err != nil {
 		panic(err)
@@ -294,9 +328,16 @@ func (vm *VM) Initialize(
 	chain := coreth.NewETHChain(&config, &nodecfg, nil, vm.chaindb, vm.CLIConfig.EthBackendSettings())
 	vm.chain = chain
 	vm.networkID = config.NetworkId
+
+	// Kickoff gasPriceUpdate goroutine once the backend is initialized, if it
+	// exists
+	if gasPriceUpdate != nil {
+		go gasPriceUpdate()
+	}
+
 	chain.SetOnFinalizeAndAssemble(func(state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
 		if tx, exists := vm.mempool.NextTx(); exists {
-			if err := tx.UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(vm, state); err != nil {
+			if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm, state); err != nil {
 				log.Error("Atomic transaction failed verification", "txID", tx.ID(), "error", err)
 				// Discard the transaction from the mempool on failed verification.
 				vm.mempool.DiscardCurrentTx()
@@ -357,7 +398,7 @@ func (vm *VM) Initialize(
 		if tx == nil {
 			return nil
 		}
-		return tx.UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(vm, state)
+		return tx.UnsignedAtomicTx.EVMStateTransfer(vm, state)
 	})
 	vm.newBlockChan = make(chan *Block)
 	vm.notifyBuildBlockChan = toEngine
@@ -627,7 +668,7 @@ func (vm *VM) CreateStaticHandlers() (map[string]*commonEng.HTTPHandler, error) 
 // extractAtomicTx returns the atomic transaction in [block] if
 // one exists.
 func (vm *VM) extractAtomicTx(block *types.Block) (*Tx, error) {
-	extdata := block.ExtraData()
+	extdata := block.ExtData()
 	if len(extdata) == 0 {
 		return nil, nil
 	}
@@ -968,6 +1009,22 @@ func (vm *VM) GetAcceptedNonce(address common.Address) (uint64, error) {
 	return state.GetNonce(address), nil
 }
 
+func (vm *VM) IsApricotPhase1(timestamp uint64) bool {
+	return vm.chainConfig.IsApricotPhase1(new(big.Int).SetUint64(timestamp))
+}
+
+func (vm *VM) useApricotPhase1() bool {
+	return vm.IsApricotPhase1(vm.chain.BlockChain().CurrentHeader().Time)
+}
+
+func (vm *VM) getBlockValidator(timestamp uint64) BlockValidator {
+	if vm.IsApricotPhase1(timestamp) {
+		return phase1BlockValidator
+	} else {
+		return phase0BlockValidator
+	}
+}
+
 // ParseLocalAddress takes in an address for this chain and produces the ID
 func (vm *VM) ParseLocalAddress(addrStr string) (ids.ShortID, error) {
 	chainID, addr, err := vm.ParseAddress(addrStr)
@@ -1012,11 +1069,10 @@ func FormatEthAddress(addr common.Address) string {
 
 // GetEthAddress returns the ethereum address derived from [privKey]
 func GetEthAddress(privKey *crypto.PrivateKeySECP256K1R) common.Address {
-	return PublicKeyToEthAddress(privKey.PublicKey())
+	return PublicKeyToEthAddress(privKey.PublicKey().(*crypto.PublicKeySECP256K1R))
 }
 
 // PublicKeyToEthAddress returns the ethereum address derived from [pubKey]
-func PublicKeyToEthAddress(pubKey crypto.PublicKey) common.Address {
-	return ethcrypto.PubkeyToAddress(
-		(*pubKey.(*crypto.PublicKeySECP256K1R).ToECDSA()))
+func PublicKeyToEthAddress(pubKey *crypto.PublicKeySECP256K1R) common.Address {
+	return ethcrypto.PubkeyToAddress(*(pubKey.ToECDSA()))
 }
