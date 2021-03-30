@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 )
 
@@ -29,13 +30,16 @@ type TestVM struct {
 
 	CantInitialize, CantBootstrapping, CantBootstrapped,
 	CantShutdown, CantCreateHandlers, CantCreateStaticHandlers,
-	CantHealthCheck bool
+	CantHealthCheck, CantAppRequest, CantAppResponse,
+	CantAppGossip, CantAppRequestFailed bool
 
 	InitializeF                              func(*snow.Context, database.Database, []byte, chan<- Message, []*Fx) error
 	BootstrappingF, BootstrappedF, ShutdownF func() error
 	CreateHandlersF                          func() (map[string]*HTTPHandler, error)
 	CreateStaticHandlersF                    func() (map[string]*HTTPHandler, error)
 	HealthCheckF                             func() (interface{}, error)
+	AppRequestF, AppGossipF, AppResponseF    func(nodeID ids.ShortID, requestID uint32, msg []byte) error
+	AppRequestFailedF                        func(nodeID ids.ShortID, requestID uint32) error
 }
 
 func (vm *TestVM) Default(cant bool) {
@@ -46,6 +50,11 @@ func (vm *TestVM) Default(cant bool) {
 	vm.CantCreateHandlers = cant
 	vm.CantCreateStaticHandlers = cant
 	vm.CantHealthCheck = cant
+	vm.CantAppRequest = cant
+	vm.CantAppRequestFailed = cant
+	vm.CantAppResponse = cant
+	vm.CantAppGossip = cant
+
 }
 
 func (vm *TestVM) Initialize(ctx *snow.Context, db database.Database, initState []byte, msgChan chan<- Message, fxs []*Fx) error {
@@ -125,4 +134,56 @@ func (vm *TestVM) HealthCheck() (interface{}, error) {
 		vm.T.Fatal(errHealthCheck)
 	}
 	return nil, errHealthCheck
+}
+
+func (vm *TestVM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	if vm.AppRequestFailedF != nil {
+		return vm.AppRequestFailedF(nodeID, requestID)
+	}
+	if !vm.CantAppRequestFailed {
+		return nil
+	}
+	if vm.T != nil {
+		vm.T.Fatalf("Unexpectedly called AppRequestFailed")
+	}
+	return errors.New("unexpectedly called AppRequestFailed")
+}
+
+func (vm *TestVM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	if vm.AppRequestF != nil {
+		return vm.AppRequestF(nodeID, requestID, request)
+	}
+	if !vm.CantAppRequest {
+		return nil
+	}
+	if vm.T != nil {
+		vm.T.Fatalf("Unexpectedly called AppRequest")
+	}
+	return errors.New("unexpectedly called AppRequest")
+}
+
+func (vm *TestVM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	if vm.AppResponseF != nil {
+		return vm.AppResponseF(nodeID, requestID, response)
+	}
+	if !vm.CantAppResponse {
+		return nil
+	}
+	if vm.T != nil {
+		vm.T.Fatalf("Unexpectedly called AppResponse")
+	}
+	return errors.New("unexpectedly called AppResponse")
+}
+
+func (vm *TestVM) AppGossip(nodeID ids.ShortID, requestID uint32, msg []byte) error {
+	if vm.AppGossipF != nil {
+		return vm.AppGossipF(nodeID, requestID, msg)
+	}
+	if !vm.CantAppGossip {
+		return nil
+	}
+	if vm.T != nil {
+		vm.T.Fatalf("Unexpectedly called AppGossip")
+	}
+	return errors.New("unexpectedly called AppGossip")
 }

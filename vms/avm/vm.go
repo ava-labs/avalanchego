@@ -1301,3 +1301,23 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 	}
 	return ids.ID{}, fmt.Errorf("asset '%s' not found", asset)
 }
+
+func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	// TODO implement
+	return nil
+}
+
+func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	// TODO implement
+	return nil
+}
+
+func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	// TODO implement
+	return nil
+}
+
+func (vm *VM) AppGossip(nodeID ids.ShortID, requestID uint32, msg []byte) error {
+	// TODO implement
+	return nil
+}

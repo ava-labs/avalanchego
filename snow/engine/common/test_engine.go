@@ -64,7 +64,7 @@ type EngineTest struct {
 	AcceptedFrontierF, GetAcceptedF, AcceptedF, ChitsF func(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF,
-	AppRequestFailedF func(validatorID ids.ShortID, requestID uint32) error
+	AppRequestFailedF func(nodeID ids.ShortID, requestID uint32) error
 	AppRequestF, AppGossipF, AppResponseF func(validatorID ids.ShortID, requestID uint32, msg []byte) error
 	ConnectedF, DisconnectedF             func(validatorID ids.ShortID) error
 	HealthF                               func() (interface{}, error)
@@ -108,6 +108,11 @@ func (e *EngineTest) Default(cant bool) {
 	e.CantDisconnected = cant
 
 	e.CantHealth = cant
+
+	e.CantAppRequest = cant
+	e.CantAppRequestFailed = cant
+	e.CantAppResponse = cant
+	e.CantAppGossip = cant
 }
 
 // Context ...

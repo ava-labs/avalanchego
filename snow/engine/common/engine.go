@@ -125,7 +125,7 @@ type AcceptedHandler interface {
 	GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error
 }
 
-type AppFetchHandler interface {
+type App interface {
 	// Notify this engine of a request for data from [nodeID].
 	// This node should send an AppResponse to [nodeID] in response to
 	// this message using the same request ID.
@@ -159,7 +159,7 @@ type AppFetchHandler interface {
 // FetchHandler defines how a consensus engine reacts to retrieval messages from
 // other validators. Functions only return fatal errors if they occur.
 type FetchHandler interface {
-	AppFetchHandler
+	App
 
 	// Notify this engine of a request for a container.
 	//

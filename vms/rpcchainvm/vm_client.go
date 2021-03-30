@@ -390,6 +390,26 @@ func (vm *VMClient) HealthCheck() (interface{}, error) {
 	)
 }
 
+func (vm *VMClient) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	// TODO implement
+	return nil
+}
+
+func (vm *VMClient) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	// TODO implement
+	return nil
+}
+
+func (vm *VMClient) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	// TODO implement
+	return nil
+}
+
+func (vm *VMClient) AppGossip(nodeID ids.ShortID, requestID uint32, msg []byte) error {
+	// TODO implement
+	return nil
+}
+
 // BlockClient is an implementation of Block that talks over RPC.
 type BlockClient struct {
 	vm *VMClient
