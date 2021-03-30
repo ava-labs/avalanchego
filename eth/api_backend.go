@@ -71,7 +71,7 @@ func (b *EthAPIBackend) GetBlockchainVmConfig() *vm.Config {
 }
 
 func (b *EthAPIBackend) GetBlockchainLastAccepted() *types.Block {
-	return b.eth.blockchain.GetLastAccepted()
+	return b.eth.blockchain.LastAcceptedBlock()
 }
 
 func (b *EthAPIBackend) CurrentBlock() *types.Block {

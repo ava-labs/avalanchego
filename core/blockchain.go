@@ -393,7 +393,10 @@ func (bc *BlockChain) GetVMConfig() *vm.Config {
 }
 
 // GetLastAccepted return the last accepted block.
-func (bc *BlockChain) GetLastAccepted() *types.Block {
+func (bc *BlockChain) LastAcceptedBlock() *types.Block {
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
+
 	return bc.lastAccepted
 }
 
