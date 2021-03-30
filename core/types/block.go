@@ -346,16 +346,6 @@ func (b *Block) Version() uint32 {
 	return b.version
 }
 
-func (b *Block) EncodeRLPTest(w io.Writer, ver uint32) error {
-	return rlp.Encode(w, extblock{
-		Header:  b.header,
-		Txs:     b.transactions,
-		Uncles:  b.uncles,
-		Version: ver,
-		ExtData: b.extdata,
-	})
-}
-
 // EncodeRLP serializes b into an extended format.
 func (b *Block) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, extblock{
