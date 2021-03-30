@@ -349,11 +349,17 @@ func (api *PublicFilterAPI) GetLogs(ctx context.Context, crit FilterCriteria) ([
 		// correctly within NewRangeFilter
 		begin := rpc.LatestBlockNumber.Int64()
 		if crit.FromBlock != nil {
-			begin = int64(adjustByLastAccepted(allowUnfinalizedQueries, lastAccepted, crit.FromBlock.Uint64()))
+			if isUnfinalized(allowUnfinalizedQueries, lastAccepted, crit.FromBlock) {
+				return nil, fmt.Errorf("requested from block %s after last accepted block %s", crit.FromBlock.String(), lastAccepted.Number().String())
+			}
+			begin = crit.FromBlock.Int64()
 		}
 		end := rpc.LatestBlockNumber.Int64()
 		if crit.ToBlock != nil {
-			end = int64(adjustByLastAccepted(allowUnfinalizedQueries, lastAccepted, crit.ToBlock.Uint64()))
+			if isUnfinalized(allowUnfinalizedQueries, lastAccepted, crit.ToBlock) {
+				return nil, fmt.Errorf("requested to block %s after last accepted block %s", crit.ToBlock.String(), lastAccepted.Number().String())
+			}
+			end = crit.ToBlock.Int64()
 		}
 		// Construct the range filter
 		if end-begin > api.maxBlocksPerRequest && api.maxBlocksPerRequest > 0 {
@@ -415,11 +421,17 @@ func (api *PublicFilterAPI) GetFilterLogs(ctx context.Context, id rpc.ID) ([]*ty
 		// accepted block instead throughout all APIs.
 		begin := rpc.LatestBlockNumber.Int64()
 		if f.crit.FromBlock != nil {
-			begin = int64(adjustByLastAccepted(allowUnfinalizedQueries, lastAccepted, f.crit.FromBlock.Uint64()))
+			if isUnfinalized(allowUnfinalizedQueries, lastAccepted, f.crit.FromBlock) {
+				return nil, fmt.Errorf("requested from block %s after last accepted block %s", f.crit.FromBlock.String(), lastAccepted.Number().String())
+			}
+			begin = f.crit.FromBlock.Int64()
 		}
 		end := rpc.LatestBlockNumber.Int64()
 		if f.crit.ToBlock != nil {
-			end = int64(adjustByLastAccepted(allowUnfinalizedQueries, lastAccepted, f.crit.ToBlock.Uint64()))
+			if isUnfinalized(allowUnfinalizedQueries, lastAccepted, f.crit.ToBlock) {
+				return nil, fmt.Errorf("requested to block %s after last accepted block %s", f.crit.ToBlock.String(), lastAccepted.Number().String())
+			}
+			end = f.crit.ToBlock.Int64()
 		}
 		// Construct the range filter
 		if end-begin > api.maxBlocksPerRequest && api.maxBlocksPerRequest > 0 {
@@ -608,11 +620,11 @@ func decodeTopic(s string) (common.Hash, error) {
 	return common.BytesToHash(b), err
 }
 
-func adjustByLastAccepted(allowUnfinalizedQueries bool, lastAccepted *types.Block, blockNum uint64) uint64 {
-	if !allowUnfinalizedQueries && lastAccepted != nil && blockNum > lastAccepted.NumberU64() {
-		return lastAccepted.NumberU64()
+func isUnfinalized(allowUnfinalizedQueries bool, lastAccepted *types.Block, blockNum *big.Int) bool {
+	if !allowUnfinalizedQueries && lastAccepted != nil && blockNum.Cmp(lastAccepted.Number()) > 0 {
+		return true
 	}
-	return blockNum
+	return false
 }
 
 func computeAcceptedEnd(allowUnfinalizedQueries bool, lastAccepted *types.Block) *uint64 {

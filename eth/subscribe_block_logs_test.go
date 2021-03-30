@@ -215,19 +215,43 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 
 	backend.BlockChain().GetVMConfig().AllowUnfinalizedQueries = false
 	lgs, lgserr = api.GetLogs(ctxbg, fc)
-	if lgserr != nil {
+	if lgs != nil {
+		t.Fatalf("GetLogs failed")
+	}
+	if lgserr == nil || lgserr.Error() != "requested from block 1 after last accepted block 0" {
 		t.Fatalf("GetLogs failed %s", lgserr)
 	}
-	if len(lgs) != 0 {
+
+	fc2 := filters.FilterCriteria{
+		FromBlock: big.NewInt(0),
+		ToBlock:   big.NewInt(1),
+	}
+	lgs, lgserr = api.GetLogs(ctxbg, fc2)
+	if lgs != nil {
 		t.Fatalf("GetLogs failed")
+	}
+	if lgserr == nil || lgserr.Error() != "requested to block 1 after last accepted block 0" {
+		t.Fatalf("GetLogs failed %s", lgserr)
 	}
 
 	lgs, lgserr = api.GetFilterLogs(ctxbg, fid)
-	if lgserr != nil {
+	if lgs != nil {
+		t.Fatalf("GetLogs failed")
+	}
+	if lgserr == nil || lgserr.Error() != "requested from block 1 after last accepted block 0" {
 		t.Fatalf("GetLogs failed %s", lgserr)
 	}
-	if len(lgs) != 0 {
+
+	fid2, err := api.NewFilter(fc2)
+	if err != nil {
+		t.Fatalf("NewFilter failed %s", err)
+	}
+	lgs, lgserr = api.GetFilterLogs(ctxbg, fid2)
+	if lgs != nil {
 		t.Fatalf("GetLogs failed")
+	}
+	if lgserr == nil || lgserr.Error() != "requested to block 1 after last accepted block 0" {
+		t.Fatalf("GetLogs failed %s", lgserr)
 	}
 
 	backend.blockchain.Accept(cbx)
