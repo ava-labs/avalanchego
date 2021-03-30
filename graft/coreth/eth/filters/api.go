@@ -336,8 +336,8 @@ func (api *PublicFilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
 //
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_getlogs
 func (api *PublicFilterAPI) GetLogs(ctx context.Context, crit FilterCriteria) ([]*types.Log, error) {
-	allowUnfinalizedQueries := api.backend.GetBlockchainVmConfig().AllowUnfinalizedQueries
-	lastAccepted := api.backend.GetBlockchainLastAccepted()
+	allowUnfinalizedQueries := api.backend.GetVMConfig().AllowUnfinalizedQueries
+	lastAccepted := api.backend.LastAcceptedBLock()
 
 	var filter *Filter
 	if crit.BlockHash != nil {
@@ -399,8 +399,8 @@ func (api *PublicFilterAPI) UninstallFilter(id rpc.ID) bool {
 //
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_getfilterlogs
 func (api *PublicFilterAPI) GetFilterLogs(ctx context.Context, id rpc.ID) ([]*types.Log, error) {
-	allowUnfinalizedQueries := api.backend.GetBlockchainVmConfig().AllowUnfinalizedQueries
-	lastAccepted := api.backend.GetBlockchainLastAccepted()
+	allowUnfinalizedQueries := api.backend.GetVMConfig().AllowUnfinalizedQueries
+	lastAccepted := api.backend.LastAcceptedBLock()
 
 	api.filtersMu.Lock()
 	f, found := api.filters[id]

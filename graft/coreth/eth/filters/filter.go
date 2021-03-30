@@ -58,8 +58,8 @@ type Backend interface {
 	BloomStatus() (uint64, uint64)
 	ServiceFilter(ctx context.Context, session *bloombits.MatcherSession)
 
-	GetBlockchainVmConfig() *vm.Config
-	GetBlockchainLastAccepted() *types.Block
+	GetVMConfig() *vm.Config
+	LastAcceptedBLock() *types.Block
 }
 
 // Filter can be used to retrieve and filter logs.
