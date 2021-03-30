@@ -2,8 +2,8 @@ name: build-amd64-debian-packages
 
 on:
   push:
-    branches:
-      - auto-build # Push events to every tag
+    tags:
+      - '*'
 
 jobs:
   build-bionic-amd64-package:
@@ -39,8 +39,7 @@ jobs:
     - name: Create debian package
       run: ./.github/workflows/build-deb-pkg.sh
       env:
-#        TAG: ${{ steps.get_version.outputs.VERSION }}
-        TAG: "1.3.0"
+        TAG: ${{ steps.get_version.outputs.VERSION }}
         BUCKET: ${{ secrets.BUCKET }}
         ARCH: "amd64"
         RELEASE: "bionic"
@@ -63,9 +62,6 @@ jobs:
         sudo apt update
         sudo apt-get install awscli
 
-    - name: Install rpmbuild
-      run: sudo apt-get install rpm
-
     - name: Get the version
       id: get_version
       run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
@@ -81,8 +77,7 @@ jobs:
     - name: Create debian package
       run: ./.github/workflows/build-deb-pkg.sh
       env:
-#        TAG: ${{ steps.get_version.outputs.VERSION }}
-        TAG: "1.3.0"
+        TAG: ${{ steps.get_version.outputs.VERSION }}
         BUCKET: ${{ secrets.BUCKET }}
         ARCH: "amd64"
         RELEASE: "focal"
