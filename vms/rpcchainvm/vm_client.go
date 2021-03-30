@@ -213,6 +213,7 @@ func (vm *VMClient) Initialize(
 		UnmarshalBlock:     vm.internalParseBlock,
 		BuildBlock:         vm.internalBuildBlock,
 	})
+	vm.State = chainState
 
 	return nil
 }
