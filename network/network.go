@@ -59,9 +59,6 @@ var (
 	errNetworkLayerUnhealthy = errors.New("network layer is unhealthy")
 )
 
-// Network Upgrade
-var minimumUnmaskedVersion = version.NewDefaultVersion(constants.PlatformName, 1, 1, 0)
-
 func init() { rand.Seed(time.Now().UnixNano()) }
 
 // Network defines the functionality of the networking library.
@@ -118,7 +115,10 @@ type network struct {
 	id                                 ids.ShortID
 	ip                                 utils.DynamicIPDesc
 	networkID                          uint32
-	msgVersion                         version.Version
+	version                            version.Version
+	minCompatibleVersion               version.Version
+	minUnmaskedVersion                 version.Version
+	maskTime                           time.Time
 	parser                             version.Parser
 	listener                           net.Listener
 	dialer                             Dialer
@@ -149,7 +149,6 @@ type network struct {
 	connMeterMaxConns                  int
 	connMeter                          ConnMeter
 	b                                  Builder
-	apricotPhase0Time                  time.Time
 
 	// stateLock should never be held when grabbing a peer senderLock
 	stateLock    sync.RWMutex
@@ -215,7 +214,10 @@ func NewDefaultNetwork(
 	id ids.ShortID,
 	ip utils.DynamicIPDesc,
 	networkID uint32,
-	version version.Version,
+	version,
+	minCompatibleVersion,
+	minUnmaskedVersion version.Version,
+	maskTime time.Time,
 	parser version.Parser,
 	listener net.Listener,
 	dialer Dialer,
@@ -230,7 +232,6 @@ func NewDefaultNetwork(
 	restartOnDisconnected bool,
 	disconnectedCheckFreq time.Duration,
 	disconnectedRestartTimeout time.Duration,
-	apricotPhase0Time time.Time,
 	sendQueueSize uint32,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
@@ -243,6 +244,9 @@ func NewDefaultNetwork(
 		ip,
 		networkID,
 		version,
+		minCompatibleVersion,
+		minUnmaskedVersion,
+		maskTime,
 		parser,
 		listener,
 		dialer,
@@ -275,7 +279,6 @@ func NewDefaultNetwork(
 		restartOnDisconnected,
 		disconnectedCheckFreq,
 		disconnectedRestartTimeout,
-		apricotPhase0Time,
 		healthConfig,
 		benchlistManager,
 		peerAliasTimeout,
@@ -289,7 +292,10 @@ func NewNetwork(
 	id ids.ShortID,
 	ip utils.DynamicIPDesc,
 	networkID uint32,
-	version version.Version,
+	version,
+	minCompatibleVersion,
+	minUnmaskedVersion version.Version,
+	maskTime time.Time,
 	parser version.Parser,
 	listener net.Listener,
 	dialer Dialer,
@@ -322,26 +328,28 @@ func NewNetwork(
 	restartOnDisconnected bool,
 	disconnectedCheckFreq time.Duration,
 	disconnectedRestartTimeout time.Duration,
-	apricotPhase0Time time.Time,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
 ) Network {
 	// #nosec G404
 	netw := &network{
-		log:            log,
-		id:             id,
-		ip:             ip,
-		networkID:      networkID,
-		msgVersion:     version,
-		parser:         parser,
-		listener:       listener,
-		dialer:         dialer,
-		serverUpgrader: serverUpgrader,
-		clientUpgrader: clientUpgrader,
-		vdrs:           vdrs,
-		beacons:        beacons,
-		router:         router,
+		log:                  log,
+		id:                   id,
+		ip:                   ip,
+		networkID:            networkID,
+		version:              version,
+		minCompatibleVersion: minCompatibleVersion,
+		minUnmaskedVersion:   minUnmaskedVersion,
+		maskTime:             maskTime,
+		parser:               parser,
+		listener:             listener,
+		dialer:               dialer,
+		serverUpgrader:       serverUpgrader,
+		clientUpgrader:       clientUpgrader,
+		vdrs:                 vdrs,
+		beacons:              beacons,
+		router:               router,
 		// This field just makes sure we don't connect to ourselves when TLS is
 		// disabled. So, cryptographically secure random number generation isn't
 		// used here.
@@ -377,7 +385,6 @@ func NewNetwork(
 		disconnectedCheckFreq:              disconnectedCheckFreq,
 		connectedMeter:                     timer.TimedMeter{Duration: disconnectedRestartTimeout},
 		restarter:                          restarter,
-		apricotPhase0Time:                  apricotPhase0Time,
 		healthConfig:                       healthConfig,
 		benchlistManager:                   benchlistManager,
 	}
@@ -799,7 +806,7 @@ func (n *network) upgradeIncoming(remoteAddr string) (bool, error) {
 func (n *network) Dispatch() error {
 	go n.gossip() // Periodically gossip peers
 	go func() {
-		duration := time.Until(n.apricotPhase0Time)
+		duration := time.Until(n.maskTime)
 		time.Sleep(duration)
 
 		n.stateLock.Lock()
@@ -1057,7 +1064,7 @@ func (n *network) gossip() {
 				!ip.IsZero() &&
 				n.vdrs.Contains(peer.id) {
 				peerVersion := peer.versionStruct.GetValue().(version.Version)
-				if !peerVersion.Before(minimumUnmaskedVersion) || time.Since(n.apricotPhase0Time) < 0 {
+				if !peerVersion.Before(n.minUnmaskedVersion) || time.Since(n.maskTime) < 0 {
 					ips = append(ips, ip)
 				}
 			}
@@ -1300,7 +1307,7 @@ func (n *network) validatorIPs() []utils.IPDesc {
 		ip := peer.getIP()
 		if peer.connected.GetValue() && !ip.IsZero() && n.vdrs.Contains(peer.id) {
 			peerVersion := peer.versionStruct.GetValue().(version.Version)
-			if !peerVersion.Before(minimumUnmaskedVersion) || time.Since(n.apricotPhase0Time) < 0 {
+			if !peerVersion.Before(n.minUnmaskedVersion) || time.Since(n.maskTime) < 0 {
 				ips = append(ips, ip)
 			}
 		}
@@ -1320,7 +1327,7 @@ func (n *network) connected(p *peer) {
 	peerVersion := p.versionStruct.GetValue().(version.Version)
 
 	if n.hasMasked {
-		if peerVersion.Before(minimumUnmaskedVersion) {
+		if peerVersion.Before(n.minUnmaskedVersion) {
 			if err := n.vdrs.MaskValidator(p.id); err != nil {
 				n.log.Error("failed to mask validator %s due to %s", p.id, err)
 			}
@@ -1331,7 +1338,7 @@ func (n *network) connected(p *peer) {
 		}
 		n.log.Verbo("The new staking set is:\n%s", n.vdrs)
 	} else {
-		if peerVersion.Before(minimumUnmaskedVersion) {
+		if peerVersion.Before(n.minUnmaskedVersion) {
 			n.maskedValidators.Add(p.id)
 		} else {
 			n.maskedValidators.Remove(p.id)

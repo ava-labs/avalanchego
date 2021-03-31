@@ -389,7 +389,7 @@ func (p *peer) handle(msg Msg) {
 	}
 
 	peerVersion := p.versionStruct.GetValue().(version.Version)
-	if peerVersion.Before(minimumUnmaskedVersion) && time.Until(p.net.apricotPhase0Time) < 0 {
+	if peerVersion.Before(p.net.minUnmaskedVersion) && time.Until(p.net.maskTime) < 0 {
 		p.net.log.Verbo("dropping message from un-upgraded validator %s", p.id)
 		return
 	}

@@ -70,10 +70,13 @@ var (
 var (
 	genesisHashKey = []byte("genesisID")
 
-	// Version is the version of this code
-	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 3, 1)
-	versionParser           = version.NewDefaultParser()
-	beaconConnectionTimeout = 1 * time.Minute
+	Version                      = version.NewDefaultVersion(constants.PlatformName, 1, 3, 1)
+	MinimumCompatibleVersion     = version.NewDefaultVersion(constants.PlatformName, 1, 3, 0)
+	PrevMinimumCompatibleVersion = version.NewDefaultVersion(constants.PlatformName, 1, 2, 0)
+	MinimumUnmaskedVersion       = version.NewDefaultVersion(constants.PlatformName, 1, 1, 0)
+	PrevMinimumUnmaskedVersion   = version.NewDefaultVersion(constants.PlatformName, 1, 0, 0)
+	versionParser                = version.NewDefaultParser()
+	beaconConnectionTimeout      = 1 * time.Minute
 )
 
 // Node is an instance of an Avalanche node.
@@ -234,6 +237,14 @@ func (n *Node) initNetworking() error {
 		}
 	}
 
+	versionManager := version.NewCompatibility(
+		Version,
+		MinimumCompatibleVersion,
+		PrevMinimumCompatibleVersion,
+		MinimumUnmaskedVersion,
+		PrevMinimumUnmaskedVersion,
+	)
+
 	n.Net = network.NewDefaultNetwork(
 		n.Config.ConsensusParams.Metrics,
 		n.Log,
@@ -241,6 +252,8 @@ func (n *Node) initNetworking() error {
 		n.Config.StakingIP,
 		n.Config.NetworkID,
 		Version,
+		MinimumCompatibleVersion,
+		MinimumUnmaskedVersion,
 		versionParser,
 		listener,
 		dialer,
