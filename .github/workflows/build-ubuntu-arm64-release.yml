@@ -9,8 +9,7 @@ on:
 
 jobs:
   build-bionic-arm64-package:
-    runs-on: [self-hosted, linux, ARM64] 
-      os: ubuntu-18.04
+    runs-on: [self-hosted, linux, ARM64, bionic] 
 
     steps:
     - uses: actions/checkout@v2
@@ -48,8 +47,7 @@ jobs:
         RELEASE: "bionic"
 
   build-focal-arm64-package:
-    runs-on: [self-hosted, linux, ARM64] 
-      os: ubuntu-20.04
+    runs-on: [self-hosted, linux, ARM64, focal] 
 
     steps:
     - uses: actions/checkout@v2
