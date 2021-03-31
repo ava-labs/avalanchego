@@ -1,0 +1,47 @@
+name: build-linux-release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build-source-tarball:
+    runs-on: ubuntu-18.04 
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-go@v2
+      with:
+         go-version: '1.15.5' # The Go version to download (if necessary) and use.
+    - run: go version
+
+    - name: Build the avalanchego binaries 
+      run: ./scripts/build.sh 
+
+    - name: Install aws cli
+      run: |
+        sudo apt update
+        sudo apt-get install awscli
+
+    - name: Get the version
+      id: get_version
+      run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+      shell: bash
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    - name: Create tgz package structure
+      run: ./.github/workflows/build-tgz-pkg.sh
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.UPLOAD_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}
+        TAG: ${{ steps.get_version.outputs.VERSION }}
+        BUCKET: ${{ secrets.BUCKET }}
+        ARCH: "amd64"
+
