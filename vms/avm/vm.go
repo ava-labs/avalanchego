@@ -62,7 +62,8 @@ var (
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
 
-	_ vertex.DAGVM = &VM{}
+	_ vertex.DAGVM    = &VM{}
+	_ common.StaticVM = &VM{}
 )
 
 // VM implements the avalanche.DAGVM interface
@@ -301,17 +302,16 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 }
 
 // CreateStaticHandlers implements the avalanche.DAGVM interface
-func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
+func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	// name this service "avm"
 	staticService := CreateStaticService()
-	_ = newServer.RegisterService(staticService, "avm")
 	return map[string]*common.HTTPHandler{
 		"": {LockOptions: common.WriteLock, Handler: newServer},
-	}
+	}, newServer.RegisterService(staticService, "avm")
 }
 
 // Pending implements the avalanche.DAGVM interface
