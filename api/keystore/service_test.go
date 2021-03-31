@@ -87,7 +87,7 @@ func TestServiceCreateUserArgsCheck(t *testing.T) {
 			Password: strongPassword,
 		}, &reply)
 
-		if reply.Success || err != errUserMaxLength {
+		if err != errUserMaxLength {
 			t.Fatal("User was created when it should have been rejected due to too long a Username, err =", err)
 		}
 	}
@@ -99,7 +99,7 @@ func TestServiceCreateUserArgsCheck(t *testing.T) {
 			Password: genStr(maxUserLen + 1),
 		}, &reply)
 
-		if reply.Success || err == nil {
+		if err == nil {
 			t.Fatal("User was created when it should have been rejected due to too long a Password, err =", err)
 		}
 	}
@@ -131,10 +131,6 @@ func TestServiceCreateUserWeakPassword(t *testing.T) {
 
 		if err == nil {
 			t.Error("Expected error when testing weak password")
-		}
-
-		if reply.Success {
-			t.Fatal("User was created when it should have been rejected due to weak password")
 		}
 	}
 }

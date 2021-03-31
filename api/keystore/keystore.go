@@ -51,14 +51,27 @@ type Keystore interface {
 	// values and is not recommended to be used when implementing a VM.
 	GetRawDatabase(bID ids.ID, username, password string) (database.Database, error)
 
-	// AddUser attempts to register this username and password as a new user of
-	// the keystore.
-	AddUser(username, pw string) error
+	// CreateUser attempts to register this username and password as a new user
+	// of the keystore.
+	CreateUser(username, pw string) error
 
 	// DeleteUser attempts to remove the provided username and all of its data
 	// from the keystore.
 	DeleteUser(username, pw string) error
 
+	// ListUsers returns all the users that currently exist in this keystore.
+	ListUsers() ([]string, error)
+
+	// ImportUser imports a serialized encoding of a user's information complete
+	// with encrypted database values. The password is integrity checked.
+	ImportUser(username, pw string, user []byte) error
+
+	// ExportUser exports a serialized encoding of a user's information complete
+	// with encrypted database values.
+	ExportUser(username, pw string) ([]byte, error)
+
+	// Get the password that is used by [username]. If [username] doesn't exist,
+	// no error is returned and a nil password hash is returned.
 	getPassword(username string) (*password.Hash, error)
 }
 
@@ -103,7 +116,6 @@ func New(log logging.Logger, db database.Database) Keystore {
 	}
 }
 
-// CreateHandler returns a new service object that can send requests to thisAPI.
 func (ks *keystore) CreateHandler() (http.Handler, error) {
 	newServer := rpc.NewServer()
 	codec := jsoncodec.NewCodec()
@@ -115,7 +127,6 @@ func (ks *keystore) CreateHandler() (http.Handler, error) {
 	return newServer, nil
 }
 
-// NewBlockchainKeyStore ...
 func (ks *keystore) NewBlockchainKeyStore(blockchainID ids.ID) BlockchainKeystore {
 	return &blockchainKeystore{
 		blockchainID: blockchainID,
@@ -123,7 +134,6 @@ func (ks *keystore) NewBlockchainKeyStore(blockchainID ids.ID) BlockchainKeystor
 	}
 }
 
-// GetDatabase ...
 func (ks *keystore) GetDatabase(bID ids.ID, username, password string) (*encdb.Database, error) {
 	bcDB, err := ks.GetRawDatabase(bID, username, password)
 	if err != nil {
@@ -132,8 +142,7 @@ func (ks *keystore) GetDatabase(bID ids.ID, username, password string) (*encdb.D
 	return encdb.New([]byte(password), bcDB)
 }
 
-// GetRawDatabase ...
-func (ks *keystore) GetRawDatabase(bID ids.ID, username, password string) (database.Database, error) {
+func (ks *keystore) GetRawDatabase(bID ids.ID, username, pw string) (database.Database, error) {
 	if username == "" {
 		return nil, errEmptyUsername
 	}
@@ -145,7 +154,7 @@ func (ks *keystore) GetRawDatabase(bID ids.ID, username, password string) (datab
 	if err != nil {
 		return nil, err
 	}
-	if !passwordHash.Check(password) {
+	if passwordHash == nil || !passwordHash.Check(pw) {
 		return nil, fmt.Errorf("incorrect password for user %q", username)
 	}
 
@@ -154,7 +163,7 @@ func (ks *keystore) GetRawDatabase(bID ids.ID, username, password string) (datab
 	return bcDB, nil
 }
 
-func (ks *keystore) AddUser(username, pw string) error {
+func (ks *keystore) CreateUser(username, pw string) error {
 	if username == "" {
 		return errEmptyUsername
 	}
@@ -165,7 +174,11 @@ func (ks *keystore) AddUser(username, pw string) error {
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
-	if passwordHash, err := ks.getPassword(username); err == nil || passwordHash != nil {
+	passwordHash, err := ks.getPassword(username)
+	if err != nil {
+		return err
+	}
+	if passwordHash != nil {
 		return fmt.Errorf("user already exists: %s", username)
 	}
 
@@ -173,7 +186,7 @@ func (ks *keystore) AddUser(username, pw string) error {
 		return err
 	}
 
-	passwordHash := &password.Hash{}
+	passwordHash = &password.Hash{}
 	if err := passwordHash.Set(pw); err != nil {
 		return err
 	}
@@ -195,6 +208,9 @@ func (ks *keystore) DeleteUser(username, pw string) error {
 	if username == "" {
 		return errEmptyUsername
 	}
+	if len(username) > maxUserLen {
+		return errUserMaxLength
+	}
 
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
@@ -202,7 +218,9 @@ func (ks *keystore) DeleteUser(username, pw string) error {
 	// check if user exists and valid user.
 	passwordHash, err := ks.getPassword(username)
 	switch {
-	case err != nil || passwordHash == nil:
+	case err != nil:
+		return err
+	case passwordHash == nil:
 		return fmt.Errorf("user doesn't exist: %s", username)
 	case !passwordHash.Check(pw):
 		return fmt.Errorf("incorrect password for user %q", username)
@@ -239,16 +257,125 @@ func (ks *keystore) DeleteUser(username, pw string) error {
 	return nil
 }
 
-// Get the password that is used by [username]
+func (ks *keystore) ListUsers() ([]string, error) {
+	users := []string{}
+
+	ks.lock.Lock()
+	defer ks.lock.Unlock()
+
+	it := ks.userDB.NewIterator()
+	defer it.Release()
+	for it.Next() {
+		users = append(users, string(it.Key()))
+	}
+	return users, it.Error()
+}
+
+func (ks *keystore) ImportUser(username, pw string, userBytes []byte) error {
+	if username == "" {
+		return errEmptyUsername
+	}
+	if len(username) > maxUserLen {
+		return errUserMaxLength
+	}
+
+	ks.lock.Lock()
+	defer ks.lock.Unlock()
+
+	passwordHash, err := ks.getPassword(username)
+	if err != nil {
+		return err
+	}
+	if passwordHash != nil {
+		return fmt.Errorf("user already exists: %s", username)
+	}
+
+	userData := user{}
+	if _, err := c.Unmarshal(userBytes, &userData); err != nil {
+		return err
+	}
+	if !userData.Hash.Check(pw) {
+		return fmt.Errorf("incorrect password for user %q", username)
+	}
+
+	usrBytes, err := c.Marshal(codecVersion, &userData.Hash)
+	if err != nil {
+		return err
+	}
+
+	userBatch := ks.userDB.NewBatch()
+	if err := userBatch.Put([]byte(username), usrBytes); err != nil {
+		return err
+	}
+
+	userDataDB := prefixdb.New([]byte(username), ks.bcDB)
+	dataBatch := userDataDB.NewBatch()
+	for _, kvp := range userData.Data {
+		if err := dataBatch.Put(kvp.Key, kvp.Value); err != nil {
+			return fmt.Errorf("error on database put: %w", err)
+		}
+	}
+
+	if err := atomic.WriteAll(dataBatch, userBatch); err != nil {
+		return err
+	}
+	ks.usernameToPassword[username] = &userData.Hash
+	return nil
+}
+
+func (ks *keystore) ExportUser(username, pw string) ([]byte, error) {
+	if username == "" {
+		return nil, errEmptyUsername
+	}
+	if len(username) > maxUserLen {
+		return nil, errUserMaxLength
+	}
+
+	ks.lock.Lock()
+	defer ks.lock.Unlock()
+
+	passwordHash, err := ks.getPassword(username)
+	if err != nil {
+		return nil, err
+	}
+	if passwordHash == nil || !passwordHash.Check(pw) {
+		return nil, fmt.Errorf("incorrect password for user %q", username)
+	}
+
+	userDB := prefixdb.New([]byte(username), ks.bcDB)
+
+	userData := user{Hash: *passwordHash}
+	it := userDB.NewIterator()
+	defer it.Release()
+	for it.Next() {
+		userData.Data = append(userData.Data, kvPair{
+			Key:   it.Key(),
+			Value: it.Value(),
+		})
+	}
+	if err := it.Error(); err != nil {
+		return nil, err
+	}
+
+	// Return the byte representation of the user
+	return c.Marshal(codecVersion, &userData)
+}
+
 func (ks *keystore) getPassword(username string) (*password.Hash, error) {
 	// If the user is already in memory, return it
 	passwordHash, exists := ks.usernameToPassword[username]
 	if exists {
 		return passwordHash, nil
 	}
+
 	// The user is not in memory; try the database
 	userBytes, err := ks.userDB.Get([]byte(username))
-	if err != nil { // Most likely bc user doesn't exist in database
+	if err == database.ErrNotFound {
+		// The user doesn't exist
+		return nil, nil
+	}
+	if err != nil {
+		// An unexpected database error occurred
 		return nil, err
 	}
 
