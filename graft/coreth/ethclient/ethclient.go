@@ -111,7 +111,7 @@ type rpcBlock struct {
 	Transactions   []rpcTransaction `json:"transactions"`
 	UncleHashes    []common.Hash    `json:"uncles"`
 	Version        uint32           `json:"version"`
-	BlockExtraData string           `json:"blockExtraData"`
+	BlockExtraData *hexutil.Bytes   `json:"blockExtraData"`
 }
 
 func (ec *Client) getBlock(ctx context.Context, method string, args ...interface{}) (*types.Block, error) {
@@ -130,15 +130,6 @@ func (ec *Client) getBlock(ctx context.Context, method string, args ...interface
 	}
 	if err := json.Unmarshal(raw, &body); err != nil {
 		return nil, err
-	}
-
-	var blockExtraData *[]byte
-	if len(body.BlockExtraData) != 0 {
-		blockExtraDataDecoded, err := hexutil.Decode(body.BlockExtraData)
-		if err != nil {
-			return nil, fmt.Errorf("problem parsing block extra data: %w", err)
-		}
-		blockExtraData = &blockExtraDataDecoded
 	}
 
 	// Quick-verify transaction and uncle lists. This mostly helps with debugging the server.
@@ -186,7 +177,7 @@ func (ec *Client) getBlock(ctx context.Context, method string, args ...interface
 		}
 		txs[i] = tx.tx
 	}
-	return types.NewBlockWithHeader(head).WithBody(txs, uncles, body.Version, blockExtraData), nil
+	return types.NewBlockWithHeader(head).WithBody(txs, uncles, body.Version, (*[]byte)(body.BlockExtraData)), nil
 }
 
 // HeaderByHash returns the block header with the given hash.
