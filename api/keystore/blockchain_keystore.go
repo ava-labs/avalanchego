@@ -9,6 +9,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+var (
+	_ BlockchainKeystore = &blockchainKeystore{}
+)
+
 type BlockchainKeystore interface {
 	// Get a database that is able to read and write unencrypted values from the
 	// underlying database.

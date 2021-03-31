@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/meterdb"
@@ -130,7 +130,7 @@ type ManagerConfig struct {
 	Validators                validators.Manager // Validators validating on this chain
 	NodeID                    ids.ShortID        // The ID of this node
 	NetworkID                 uint32             // ID of the network this node is connected to
-	Server                    *api.Server        // Handles HTTP API calls
+	Server                    *server.Server     // Handles HTTP API calls
 	Keystore                  keystore.Keystore
 	AtomicMemory              *atomic.Memory
 	AVAXAssetID               ids.ID

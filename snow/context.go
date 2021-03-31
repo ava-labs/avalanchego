@@ -11,6 +11,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/encdb"
@@ -65,7 +66,7 @@ type Context struct {
 	DecisionDispatcher  EventDispatcher
 	ConsensusDispatcher EventDispatcher
 	Lock                sync.RWMutex
-	Keystore            BlockchainKeystore
+	Keystore            keystore.BlockchainKeystore
 	SharedMemory        atomic.SharedMemory
 	BCLookup            AliasLookup
 	SNLookup            SubnetLookup

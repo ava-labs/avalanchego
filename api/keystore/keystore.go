@@ -6,6 +6,7 @@ package keystore
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 
 	"github.com/gorilla/rpc/v2"
@@ -15,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/encdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
 
@@ -30,11 +30,13 @@ const (
 var (
 	errEmptyUsername = errors.New("empty username")
 	errUserMaxLength = fmt.Errorf("username exceeds maximum length of %d chars", maxUserLen)
+
+	_ Keystore = &keystore{}
 )
 
 type Keystore interface {
 	// Create the API endpoints for this keystore.
-	CreateHandler() (*common.HTTPHandler, error)
+	CreateHandler() (http.Handler, error)
 
 	// NewBlockchainKeyStore returns this keystore limiting the functionality to
 	// a single blockchain database.
@@ -102,7 +104,7 @@ func New(log logging.Logger, db database.Database) Keystore {
 }
 
 // CreateHandler returns a new service object that can send requests to thisAPI.
-func (ks *keystore) CreateHandler() (*common.HTTPHandler, error) {
+func (ks *keystore) CreateHandler() (http.Handler, error) {
 	newServer := rpc.NewServer()
 	codec := jsoncodec.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
@@ -110,7 +112,7 @@ func (ks *keystore) CreateHandler() (*common.HTTPHandler, error) {
 	if err := newServer.RegisterService(ks, "keystore"); err != nil {
 		return nil, err
 	}
-	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: newServer}, nil
+	return newServer, nil
 }
 
 // NewBlockchainKeyStore ...

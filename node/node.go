@@ -17,12 +17,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
+	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
@@ -123,7 +124,7 @@ type Node struct {
 	vdrs validators.Manager
 
 	// Handles HTTP API calls
-	APIServer api.Server
+	APIServer server.Server
 
 	// This node's configuration
 	Config *Config
@@ -660,7 +661,11 @@ func (n *Node) initKeystoreAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing keystore API")
-	return n.APIServer.AddRoute(keystoreHandler, &sync.RWMutex{}, "keystore", "", n.HTTPLog)
+	handler := &common.HTTPHandler{
+		LockOptions: common.NoLock,
+		Handler:     keystoreHandler,
+	}
+	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "keystore", "", n.HTTPLog)
 }
 
 // initMetricsAPI initializes the Metrics API
