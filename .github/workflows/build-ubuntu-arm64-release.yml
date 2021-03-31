@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-bionic-arm64-package:
-    runs-on: self-hosted 
+    runs-on: [self-hosted, ubuntu-18.04, ARM64] 
 
     steps:
     - uses: actions/checkout@v2
@@ -45,7 +45,7 @@ jobs:
         RELEASE: "bionic"
 
   build-focal-arm64-package:
-    runs-on: ubuntu-20.04
+    runs-on: [self-hosted, ubuntu-18.04, ARM64] 
 
     steps:
     - uses: actions/checkout@v2
