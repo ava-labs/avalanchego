@@ -65,18 +65,10 @@ const (
 
 var (
 	errPrimarySubnetNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
-)
 
-var (
 	genesisHashKey = []byte("genesisID")
 
-	Version                      = version.NewDefaultVersion(constants.PlatformName, 1, 3, 1)
-	MinimumCompatibleVersion     = version.NewDefaultVersion(constants.PlatformName, 1, 3, 0)
-	PrevMinimumCompatibleVersion = version.NewDefaultVersion(constants.PlatformName, 1, 2, 0)
-	MinimumUnmaskedVersion       = version.NewDefaultVersion(constants.PlatformName, 1, 1, 0)
-	PrevMinimumUnmaskedVersion   = version.NewDefaultVersion(constants.PlatformName, 1, 0, 0)
-	versionParser                = version.NewDefaultParser()
-	beaconConnectionTimeout      = 1 * time.Minute
+	beaconConnectionTimeout = 1 * time.Minute
 )
 
 // Node is an instance of an Avalanche node.
