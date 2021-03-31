@@ -253,7 +253,7 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 	ctx.Lock.Lock()
 
 	userKeystore := keystore.New(logging.NoLog{}, memdb.New())
-	if err := userKeystore.AddUser(username, password); err != nil {
+	if err := userKeystore.CreateUser(username, password); err != nil {
 		tb.Fatal(err)
 	}
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)

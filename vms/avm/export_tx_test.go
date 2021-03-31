@@ -1009,7 +1009,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	ctx.Lock.Lock()
 
 	userKeystore := keystore.New(logging.NoLog{}, memdb.New())
-	if err := userKeystore.AddUser(username, password); err != nil {
+	if err := userKeystore.CreateUser(username, password); err != nil {
 		t.Fatal(err)
 	}
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)

@@ -52,7 +52,7 @@ func defaultService(t *testing.T) *Service {
 	vm.Ctx.Lock.Lock()
 	defer vm.Ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, memdb.New())
-	if err := ks.AddUser(testUsername, testPassword); err != nil {
+	if err := ks.CreateUser(testUsername, testPassword); err != nil {
 		t.Fatal(err)
 	}
 	vm.SnowmanVM.Ctx.Keystore = ks.NewBlockchainKeyStore(vm.SnowmanVM.Ctx.ChainID)
