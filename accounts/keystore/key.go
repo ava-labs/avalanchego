@@ -137,7 +137,7 @@ func (k *Key) UnmarshalJSON(j []byte) (err error) {
 	return nil
 }
 
-func newKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *Key {
+func NewKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *Key {
 	id := uuid.NewRandom()
 	key := &Key{
 		Id:         id,
@@ -161,23 +161,23 @@ func NewKeyForDirectICAP(rand io.Reader) *Key {
 	if err != nil {
 		panic("key generation: ecdsa.GenerateKey failed: " + err.Error())
 	}
-	key := newKeyFromECDSA(privateKeyECDSA)
+	key := NewKeyFromECDSA(privateKeyECDSA)
 	if !strings.HasPrefix(key.Address.Hex(), "0x00") {
 		return NewKeyForDirectICAP(rand)
 	}
 	return key
 }
 
-func newKey(rand io.Reader) (*Key, error) {
+func NewKey(rand io.Reader) (*Key, error) {
 	privateKeyECDSA, err := ecdsa.GenerateKey(crypto.S256(), rand)
 	if err != nil {
 		return nil, err
 	}
-	return newKeyFromECDSA(privateKeyECDSA), nil
+	return NewKeyFromECDSA(privateKeyECDSA), nil
 }
 
 func storeNewKey(ks keyStore, rand io.Reader, auth string) (*Key, accounts.Account, error) {
-	key, err := newKey(rand)
+	key, err := NewKey(rand)
 	if err != nil {
 		return nil, accounts.Account{}, err
 	}

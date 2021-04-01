@@ -473,7 +473,7 @@ func (ks *KeyStore) ImportECDSA(priv *ecdsa.PrivateKey, passphrase string) (acco
 	ks.importMu.Lock()
 	defer ks.importMu.Unlock()
 
-	key := newKeyFromECDSA(priv)
+	key := NewKeyFromECDSA(priv)
 	if ks.cache.hasAddress(key.Address) {
 		return accounts.Account{
 			Address: key.Address,
