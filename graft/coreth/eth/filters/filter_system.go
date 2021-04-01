@@ -538,6 +538,8 @@ func (es *EventSystem) eventLoop() {
 			return
 		case <-es.chainSub.Err():
 			return
+		case <-es.chainAcceptedSub.Err():
+			return
 		}
 	}
 }
