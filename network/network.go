@@ -115,10 +115,7 @@ type network struct {
 	id                                 ids.ShortID
 	ip                                 utils.DynamicIPDesc
 	networkID                          uint32
-	version                            version.Version
-	minCompatibleVersion               version.Version
-	minUnmaskedVersion                 version.Version
-	maskTime                           time.Time
+	versionCompatibility               version.Compatibility
 	parser                             version.Parser
 	listener                           net.Listener
 	dialer                             Dialer
@@ -214,10 +211,7 @@ func NewDefaultNetwork(
 	id ids.ShortID,
 	ip utils.DynamicIPDesc,
 	networkID uint32,
-	version,
-	minCompatibleVersion,
-	minUnmaskedVersion version.Version,
-	maskTime time.Time,
+	versionCompatibility version.Compatibility,
 	parser version.Parser,
 	listener net.Listener,
 	dialer Dialer,
@@ -243,10 +237,7 @@ func NewDefaultNetwork(
 		id,
 		ip,
 		networkID,
-		version,
-		minCompatibleVersion,
-		minUnmaskedVersion,
-		maskTime,
+		versionCompatibility,
 		parser,
 		listener,
 		dialer,
@@ -292,10 +283,7 @@ func NewNetwork(
 	id ids.ShortID,
 	ip utils.DynamicIPDesc,
 	networkID uint32,
-	version,
-	minCompatibleVersion,
-	minUnmaskedVersion version.Version,
-	maskTime time.Time,
+	versionCompatibility version.Compatibility,
 	parser version.Parser,
 	listener net.Listener,
 	dialer Dialer,
@@ -338,10 +326,7 @@ func NewNetwork(
 		id:                   id,
 		ip:                   ip,
 		networkID:            networkID,
-		version:              version,
-		minCompatibleVersion: minCompatibleVersion,
-		minUnmaskedVersion:   minUnmaskedVersion,
-		maskTime:             maskTime,
+		versionCompatibility: versionCompatibility,
 		parser:               parser,
 		listener:             listener,
 		dialer:               dialer,
@@ -413,7 +398,7 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 			n.log.Debug("failed to send GetAcceptedFrontier(%s, %s, %d)",
 				vID,
 				chainID,
@@ -447,7 +432,7 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 		n.log.Debug("failed to send AcceptedFrontier(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -482,7 +467,7 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 			n.log.Debug("failed to send GetAccepted(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -517,7 +502,7 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 		n.log.Debug("failed to send Accepted(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -545,7 +530,7 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 		n.log.Debug("failed to send GetAncestors(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -574,7 +559,7 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 		n.log.Debug("failed to send MultiPut(%s, %s, %d, %d)",
 			validatorID,
 			chainID,
@@ -598,7 +583,7 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	n.log.AssertNoError(err)
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 		n.log.Debug("failed to send Get(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -632,7 +617,7 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 		n.log.Debug("failed to send Put(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -670,7 +655,7 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -701,7 +686,7 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 			n.log.Debug("failed to send PullQuery(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -736,7 +721,7 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 		n.log.Debug("failed to send Chits(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -806,7 +791,7 @@ func (n *network) upgradeIncoming(remoteAddr string) (bool, error) {
 func (n *network) Dispatch() error {
 	go n.gossip() // Periodically gossip peers
 	go func() {
-		duration := time.Until(n.maskTime)
+		duration := time.Until(n.versionCompatibility.MaskTime())
 		time.Sleep(duration)
 
 		n.stateLock.Lock()
@@ -901,6 +886,7 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 					PublicIP:     peer.getIP().String(),
 					ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
 					Version:      peer.versionStr.GetValue().(string),
+					Up:           peer.compatible.GetValue(),
 					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
 					Benched:      n.benchlistManager.GetBenched(peer.id),
@@ -917,6 +903,7 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 					PublicIP:     peer.getIP().String(),
 					ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
 					Version:      peer.versionStr.GetValue().(string),
+					Up:           peer.compatible.GetValue(),
 					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
 					Benched:      n.benchlistManager.GetBenched(peer.id),
@@ -1064,7 +1051,7 @@ func (n *network) gossip() {
 				!ip.IsZero() &&
 				n.vdrs.Contains(peer.id) {
 				peerVersion := peer.versionStruct.GetValue().(version.Version)
-				if !peerVersion.Before(n.minUnmaskedVersion) || time.Since(n.maskTime) < 0 {
+				if n.versionCompatibility.Unmaskable(peerVersion) == nil {
 					ips = append(ips, ip)
 				}
 			}
@@ -1307,7 +1294,7 @@ func (n *network) validatorIPs() []utils.IPDesc {
 		ip := peer.getIP()
 		if peer.connected.GetValue() && !ip.IsZero() && n.vdrs.Contains(peer.id) {
 			peerVersion := peer.versionStruct.GetValue().(version.Version)
-			if !peerVersion.Before(n.minUnmaskedVersion) || time.Since(n.maskTime) < 0 {
+			if n.versionCompatibility.Unmaskable(peerVersion) == nil {
 				ips = append(ips, ip)
 			}
 		}
@@ -1327,7 +1314,7 @@ func (n *network) connected(p *peer) {
 	peerVersion := p.versionStruct.GetValue().(version.Version)
 
 	if n.hasMasked {
-		if peerVersion.Before(n.minUnmaskedVersion) {
+		if n.versionCompatibility.Unmaskable(peerVersion) != nil {
 			if err := n.vdrs.MaskValidator(p.id); err != nil {
 				n.log.Error("failed to mask validator %s due to %s", p.id, err)
 			}
@@ -1338,7 +1325,7 @@ func (n *network) connected(p *peer) {
 		}
 		n.log.Verbo("The new staking set is:\n%s", n.vdrs)
 	} else {
-		if peerVersion.Before(n.minUnmaskedVersion) {
+		if n.versionCompatibility.WontMask(peerVersion) != nil {
 			n.maskedValidators.Add(p.id)
 		} else {
 			n.maskedValidators.Remove(p.id)
@@ -1356,7 +1343,12 @@ func (n *network) connected(p *peer) {
 		n.connectedIPs[str] = struct{}{}
 	}
 
-	n.router.Connected(p.id)
+	compatible := n.versionCompatibility.Compatible(peerVersion) == nil
+	p.compatible.SetValue(compatible)
+
+	if compatible {
+		n.router.Connected(p.id)
+	}
 }
 
 // should only be called after the peer is marked as connected.
@@ -1383,7 +1375,8 @@ func (n *network) disconnected(p *peer) {
 		n.track(ip)
 	}
 
-	if p.connected.GetValue() {
+	if p.compatible.GetValue() {
+		p.compatible.SetValue(false)
 		n.router.Disconnected(p.id)
 	}
 }
