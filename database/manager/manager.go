@@ -10,7 +10,6 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -26,9 +25,13 @@ import (
 )
 
 var (
-	metaDBName = "meta"
-
 	errNonSortedAndUniqueDBs = errors.New("managed databases were not sorted and unique")
+	bootstrappedKey          = []byte{0x00}
+	dbPrefix                 = []byte{0x01}
+
+	// First database version where we put [bootstrappedKey] in the top level db
+	// to mark that the database has been bootstrapped at least once
+	firstVersionWithBootstrappedFlag = version.NewDefaultVersion(1, 1, 0)
 )
 
 type Manager interface {
@@ -42,7 +45,7 @@ type Manager interface {
 	GetDatabases() []*VersionedDatabase
 	// Close all of the databases controlled by the manager
 	Close() error
-	MarkBootstapped(version.Version) error
+	MarkBootstrapped(version.Version) error
 	Bootstrapped(version.Version) (bool, error)
 
 	// NewPrefixDBManager returns a new database manager with each of its databases
@@ -64,11 +67,6 @@ type manager struct {
 	// descending order
 	// invariant: len(databases) > 0
 	databases []*VersionedDatabase
-
-	// Keys: Byte repr. of string repr. of a database version e.g. []byte("v1.1.0")
-	// A key is present in this database if the Primary Network has ever finished bootstrapping
-	// while using this database version
-	metaDB database.Database
 }
 
 func (m *manager) Current() *VersionedDatabase { return m.databases[0] }
@@ -91,18 +89,22 @@ func (m *manager) Close() error {
 	return errs.Err
 }
 
-func (m *manager) MarkBootstapped(v version.Version) error {
-	return m.metaDB.Put([]byte(v.String()), nil)
+func (m *manager) MarkBootstrapped(v version.Version) error {
+	for i := 0; i < len(m.databases); i++ {
+		if m.databases[i].Version.Compare(v) == 0 {
+			return m.databases[i].MarkBootstrapped()
+		}
+	}
+	return nil
 }
 
 func (m *manager) Bootstrapped(v version.Version) (bool, error) {
-	has, err := m.metaDB.Has([]byte(v.String()))
-	if err != nil && err != database.ErrNotFound {
-		return has, fmt.Errorf("couldn't get whether database bootstrapped with version %s", v)
-	} else if err == database.ErrNotFound {
-		return false, nil
+	for i := 0; i < len(m.databases); i++ {
+		if m.databases[i].Version.Compare(v) == 0 {
+			return m.databases[i].Bootstrapped()
+		}
 	}
-	return has, nil
+	return false, nil
 }
 
 // wrapManager returns a new database manager with each managed database wrapped by
@@ -113,7 +115,6 @@ func (m *manager) Bootstrapped(v version.Version) (bool, error) {
 // underlying database.
 func (m *manager) wrapManager(wrap func(db *VersionedDatabase) (*VersionedDatabase, error)) (*manager, error) {
 	newManager := &manager{
-		metaDB:    m.metaDB,
 		databases: make([]*VersionedDatabase, 0, len(m.databases)),
 	}
 
@@ -135,11 +136,11 @@ func NewDefaultMemDBManager() Manager {
 	return &manager{
 		databases: []*VersionedDatabase{
 			{
+				rawDB:    memdb.New(),
 				Database: memdb.New(),
 				Version:  version.DefaultVersion1,
 			},
 		},
-		metaDB: memdb.New(),
 	}
 }
 
@@ -148,25 +149,17 @@ func NewDefaultMemDBManager() Manager {
 func New(dbDirPath string, log logging.Logger, currentVersion version.Version) (Manager, error) {
 	parser := version.NewDefaultParser()
 
-	// Keys: Byte repr. of string repr. of a database version e.g. []byte("v1.1.0")
-	// A key is present in this database if the Primary Network has ever finished bootstrapping
-	// while using this database version
-	metaDBPath := path.Join(dbDirPath, metaDBName)
-	metaDB, err := leveldb.New(metaDBPath, log, 0, 0, 0)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't create db at %s: %w", metaDBPath, err)
-	}
-
 	currentDBPath := path.Join(dbDirPath, currentVersion.String())
-	currentDB, err := leveldb.New(currentDBPath, log, 0, 0, 0)
+	rawCurrentDB, err := leveldb.New(currentDBPath, log, 0, 0, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create db at %s: %w", currentDBPath, err)
 	}
+	currentDB := prefixdb.New(dbPrefix, rawCurrentDB)
 
 	manager := &manager{
-		metaDB: metaDB,
 		databases: []*VersionedDatabase{
 			{
+				rawDB:    rawCurrentDB,
 				Database: currentDB,
 				Version:  currentVersion,
 			},
@@ -181,8 +174,8 @@ func New(dbDirPath string, log logging.Logger, currentVersion version.Version) (
 		if err != nil {
 			return err
 		}
-		// Skip the root directory and the meta DB
-		if path == dbDirPath || strings.Contains(path, metaDBPath) {
+		// Skip the root directory
+		if path == dbDirPath {
 			return nil
 		}
 
@@ -208,10 +201,18 @@ func New(dbDirPath string, log logging.Logger, currentVersion version.Version) (
 			return fmt.Errorf("couldn't create db at %s: %w", path, err)
 		}
 
-		manager.databases = append(manager.databases, &VersionedDatabase{
-			Database: db,
-			Version:  version,
-		})
+		if version.Compare(firstVersionWithBootstrappedFlag) >= 0 {
+			manager.databases = append(manager.databases, &VersionedDatabase{
+				rawDB:    db,
+				Database: prefixdb.New(dbPrefix, db),
+				Version:  version,
+			})
+		} else {
+			manager.databases = append(manager.databases, &VersionedDatabase{
+				Database: db,
+				Version:  version,
+			})
+		}
 
 		return filepath.SkipDir
 	})
@@ -243,6 +244,7 @@ func (m *manager) PreviouslyUsedDBVersion(v version.Version) bool {
 func (m *manager) NewPrefixDBManager(prefix []byte) Manager {
 	m, _ = m.wrapManager(func(vdb *VersionedDatabase) (*VersionedDatabase, error) {
 		return &VersionedDatabase{
+			rawDB:    vdb.rawDB,
 			Database: prefixdb.New(prefix, vdb.Database),
 			Version:  vdb.Version,
 		}, nil
@@ -272,12 +274,12 @@ func (m *manager) NewMeterDBManager(namespace string, registerer prometheus.Regi
 		return nil, err
 	}
 	newManager := &manager{
-		metaDB:    m.metaDB,
 		databases: make([]*VersionedDatabase, len(m.databases)),
 	}
 	copy(newManager.databases[1:], m.databases[1:])
 	// Overwrite the current database with the meter DB
 	newManager.databases[0] = &VersionedDatabase{
+		rawDB:    currentDB.rawDB,
 		Database: currentMeterDB,
 		Version:  currentDB.Version,
 	}
@@ -314,8 +316,23 @@ func NewManagerFromDBs(dbs []*VersionedDatabase) (Manager, error) {
 }
 
 type VersionedDatabase struct {
+	rawDB database.Database
 	database.Database
 	version.Version
+}
+
+func (db *VersionedDatabase) Bootstrapped() (bool, error) {
+	if db.rawDB == nil {
+		return false, nil
+	}
+	return db.rawDB.Has(bootstrappedKey)
+}
+
+func (db *VersionedDatabase) MarkBootstrapped() error {
+	if db.rawDB == nil {
+		return nil
+	}
+	return db.rawDB.Put(bootstrappedKey, nil)
 }
 
 type innerSortDescendingVersionedDBs []*VersionedDatabase

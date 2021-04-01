@@ -229,7 +229,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	if !exists {
 		sb = &subnet{
 			onFinish: func() {
-				m.Log.AssertNoError(m.DBManager.MarkBootstapped(m.DBManager.Current()))
+				m.Log.AssertNoError(m.DBManager.MarkBootstrapped(m.DBManager.Current()))
 				if m.ManagerConfig.DBPreupgrade {
 					m.Shutdown()
 				}
