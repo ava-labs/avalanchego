@@ -1512,6 +1512,8 @@ func TestNonCanonicalAccept(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	vm1.chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = true
+
 	blkBHeight := vm1BlkB.Height()
 	blkBHash := vm1BlkB.(*Block).ethBlock.Hash()
 	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
@@ -1717,6 +1719,8 @@ func TestStickyPreference(t *testing.T) {
 	if err := vm1.SetPreference(vm1BlkB.ID()); err != nil {
 		t.Fatal(err)
 	}
+
+	vm1.chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = true
 
 	blkBHeight := vm1BlkB.Height()
 	blkBHash := vm1BlkB.(*Block).ethBlock.Hash()
@@ -2078,14 +2082,10 @@ func TestUncleBlock(t *testing.T) {
 // Regression test to ensure that a VM that is not able to parse a block that
 // contains no transactions.
 func TestEmptyBlock(t *testing.T) {
-	issuer1, vm1, _, sharedMemory1 := GenesisVM(t, true, genesisJSONApricotPhase0)
-	_, vm2, _, _ := GenesisVM(t, true, genesisJSONApricotPhase0)
+	issuer, vm, _, sharedMemory := GenesisVM(t, true, genesisJSONApricotPhase0)
 
 	defer func() {
-		if err := vm1.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-		if err := vm2.Shutdown(); err != nil {
+		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -2108,7 +2108,7 @@ func TestEmptyBlock(t *testing.T) {
 
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
-		Asset:  avax.Asset{ID: vm1.ctx.AVAXAssetID},
+		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: importAmount,
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -2117,14 +2117,14 @@ func TestEmptyBlock(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := vm1.codec.Marshal(codecVersion, utxo)
+	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	xChainSharedMemory1 := sharedMemory1.NewSharedMemory(vm1.ctx.XChainID)
+	xChainSharedMemory1 := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory1.Put(vm1.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory1.Put(vm.ctx.ChainID, []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
@@ -2134,27 +2134,27 @@ func TestEmptyBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	importTx, err := vm1.newImportTx(vm1.ctx.XChainID, key.Address, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	importTx, err := vm.newImportTx(vm.ctx.XChainID, key.Address, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm1.issueTx(importTx); err != nil {
+	if err := vm.issueTx(importTx); err != nil {
 		t.Fatal(err)
 	}
 
-	<-issuer1
+	<-issuer
 
-	vm1BlkA, err := vm1.BuildBlock()
+	blk, err := vm.BuildBlock()
 	if err != nil {
 		t.Fatalf("Failed to build block with import transaction: %s", err)
 	}
 
 	// Create empty block from blkA
-	blkAEthBlock := vm1BlkA.(*Block).ethBlock
+	ethBlock := blk.(*Block).ethBlock
 
 	emptyEthBlock := types.NewBlock(
-		types.CopyHeader(blkAEthBlock.Header()),
+		types.CopyHeader(ethBlock.Header()),
 		nil,
 		nil,
 		nil,
@@ -2168,16 +2168,16 @@ func TestEmptyBlock(t *testing.T) {
 	}
 
 	emptyBlock := &Block{
-		vm:       vm1,
+		vm:       vm,
 		ethBlock: emptyEthBlock,
 		id:       ids.ID(emptyEthBlock.Hash()),
 	}
 
-	if err := emptyBlock.Verify(); !errors.Is(err, errEmptyBlock) {
-		t.Fatalf("VM1 should have failed with errEmptyBlock but got %s", err.Error())
+	if _, err := vm.ParseBlock(emptyBlock.Bytes()); !errors.Is(err, errEmptyBlock) {
+		t.Fatalf("VM should have failed with errEmptyBlock but got %s", err.Error())
 	}
-	if _, err := vm2.ParseBlock(emptyBlock.Bytes()); !errors.Is(err, errEmptyBlock) {
-		t.Fatalf("VM2 should have failed with errEmptyBlock but got %s", err.Error())
+	if err := emptyBlock.Verify(); !errors.Is(err, errEmptyBlock) {
+		t.Fatalf("block should have failed verification with errEmptyBlock but got %s", err.Error())
 	}
 }
 
@@ -2960,5 +2960,110 @@ func TestApricotPhase1Transition(t *testing.T) {
 	}
 	if err := vm2BlkC.Accept(); err != nil {
 		t.Fatalf("VM2 failed to accept block: %s", err)
+	}
+}
+
+func TestLastAcceptedBlockNumberAllow(t *testing.T) {
+	issuer, vm, _, sharedMemory := GenesisVM(t, true, genesisJSONApricotPhase0)
+
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	key, err := coreth.NewKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Import 1 AVAX
+	importAmount := uint64(1000000000)
+	utxoID := avax.UTXOID{
+		TxID: ids.ID{
+			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+			0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+			0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+		},
+	}
+
+	utxo := &avax.UTXO{
+		UTXOID: utxoID,
+		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: importAmount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{testKeys[0].PublicKey().Address()},
+			},
+		},
+	}
+	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
+	inputID := utxo.InputID()
+	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+		Key:   inputID[:],
+		Value: utxoBytes,
+		Traits: [][]byte{
+			testKeys[0].PublicKey().Address().Bytes(),
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	importTx, err := vm.newImportTx(vm.ctx.XChainID, key.Address, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.issueTx(importTx); err != nil {
+		t.Fatal(err)
+	}
+
+	<-issuer
+
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatalf("Failed to build block with import transaction: %s", err)
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatalf("Block failed verification on VM: %s", err)
+	}
+
+	if status := blk.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
+	}
+
+	if err := vm.SetPreference(blk.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	blkHeight := blk.Height()
+	blkHash := blk.(*Block).ethBlock.Hash()
+
+	vm.chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = true
+
+	if b := vm.chain.GetBlockByNumber(blkHeight); b.Hash() != blkHash {
+		t.Fatalf("expected block at %d to have hash %s but got %s", blkHeight, blkHash.Hex(), b.Hash().Hex())
+	}
+
+	vm.chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = false
+
+	if b := vm.chain.GetBlockByNumber(blkHeight); b != nil {
+		t.Fatalf("expected block at %d to have hash %s but got %s", blkHeight, blkHash.Hex(), b.Hash().Hex())
+	}
+
+	if err := blk.Accept(); err != nil {
+		t.Fatalf("VM failed to accept block: %s", err)
+	}
+
+	if b := vm.chain.GetBlockByNumber(blkHeight); b.Hash() != blkHash {
+		t.Fatalf("expected block at %d to have hash %s but got %s", blkHeight, blkHash.Hex(), b.Hash().Hex())
 	}
 }
