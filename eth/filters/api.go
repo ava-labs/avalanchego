@@ -226,7 +226,9 @@ func (api *PublicFilterAPI) NewHeads(ctx context.Context) (*rpc.Subscription, er
 
 	go func() {
 		headers := make(chan *types.Header)
-		headersSub := api.events.SubscribeNewHeads(headers)
+		// The public NewHeads will follow the accepted heads subscription
+		// this will be finalized blocks only.
+		headersSub := api.events.SubscribeAcceptedHeads(headers)
 
 		for {
 			select {

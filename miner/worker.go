@@ -658,7 +658,7 @@ func (w *worker) resultLoop() {
 				// Update the block hash in all logs since it is now available and not when the
 				// receipt/log of individual transactions were created.
 				for _, log := range receipt.Logs {
-					log.BlockHash = hash
+					log.SetBlockHash(hash)
 				}
 				logs = append(logs, receipt.Logs...)
 			}
@@ -900,7 +900,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 		cpy := make([]*types.Log, len(coalescedLogs))
 		for i, l := range coalescedLogs {
 			cpy[i] = new(types.Log)
-			*cpy[i] = *l
+			cpy[i].Clone(l)
 		}
 		w.pendingLogsFeed.Send(cpy)
 	}

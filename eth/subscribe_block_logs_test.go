@@ -1,5 +1,3 @@
-// +build !race
-
 package eth
 
 import (
@@ -87,10 +85,6 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 
 	api := filters.NewPublicFilterAPI(&ethbackend, true, 10)
 
-	chainCh := make(chan core.ChainEvent, 1000)
-
-	ethbackend.SubscribeChainEvent(chainCh)
-
 	backend.StartMining(0)
 	backend.Start()
 
@@ -160,15 +154,6 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 	}
 	cbx = backend.blockchain.CurrentBlock()
 	if cbx.NumberU64() != uint64(1) {
-		t.Fatal("block not created")
-	}
-
-	select {
-	case fb := <-chainCh:
-		if fb.Block.NumberU64() != 1 {
-			t.Fatal("block not created")
-		}
-	default:
 		t.Fatal("block not created")
 	}
 
