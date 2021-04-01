@@ -18,6 +18,7 @@ func GenerateStakingCert() ([]byte, []byte, error) {
 	return generateStakingCert()
 }
 
+// Returns the byte reprs. of the pem-encoded RSA key and certificate
 func generateStakingCert() ([]byte, []byte, error) {
 	// Create key to sign cert with
 	key, err := rsa.GenerateKey(rand.Reader, 4096)
