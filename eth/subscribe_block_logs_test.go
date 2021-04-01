@@ -23,13 +23,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
-var (
-	BlackholeAddr = common.Address{
-		1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	}
-)
-
 func TestBlockLogsAllowUnfinalized(t *testing.T) {
 	config := DefaultConfig
 
