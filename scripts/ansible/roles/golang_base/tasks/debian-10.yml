@@ -6,6 +6,9 @@
   copy:
     content: "{{ golang_base_apt_conf.content }}"
     dest: "{{ golang_base_apt_conf.dest }}"
+    owner: root
+    group: root
+    mode: u=rw,go=r
   loop:
     - content: |
         APT::Default-Release "stable";
