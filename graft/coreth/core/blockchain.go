@@ -2428,11 +2428,11 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 			var logs []*types.Log
 			for _, receipt := range receipts {
 				for _, log := range receipt.Logs {
-					l := *log
+					l := log.Copy()
 					if removed {
 						l.Removed = true
 					}
-					logs = append(logs, &l)
+					logs = append(logs, l)
 				}
 			}
 			if len(logs) > 0 {

@@ -450,9 +450,9 @@ func (es *EventSystem) lightFilterLogs(header *types.Header, addresses []common.
 		var unfiltered []*types.Log
 		for _, logs := range logsList {
 			for _, log := range logs {
-				logcopy := *log
+				logcopy := log.Copy()
 				logcopy.Removed = remove
-				unfiltered = append(unfiltered, &logcopy)
+				unfiltered = append(unfiltered, logcopy)
 			}
 		}
 		logs := filterLogs(unfiltered, nil, nil, addresses, topics)
@@ -465,9 +465,9 @@ func (es *EventSystem) lightFilterLogs(header *types.Header, addresses []common.
 			unfiltered = unfiltered[:0]
 			for _, receipt := range receipts {
 				for _, log := range receipt.Logs {
-					logcopy := *log
+					logcopy := log.Copy()
 					logcopy.Removed = remove
-					unfiltered = append(unfiltered, &logcopy)
+					unfiltered = append(unfiltered, logcopy)
 				}
 			}
 			logs = filterLogs(unfiltered, nil, nil, addresses, topics)

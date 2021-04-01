@@ -28,6 +28,7 @@ package types
 
 import (
 	"io"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -63,6 +64,40 @@ type Log struct {
 	// The Removed field is true if this log was reverted due to a chain reorganisation.
 	// You must pay attention to this field if you receive logs through a filter query.
 	Removed bool `json:"removed"`
+
+	// lock for clone
+	lock sync.Mutex
+}
+
+func (l *Log) Copy() *Log {
+	rl := new(Log)
+	rl.Clone(l)
+	return rl
+}
+
+func (l *Log) Clone(rl *Log) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	// double lock is required to avoid collision with SetBlockHash when reading rl.BlockNumber
+	rl.lock.Lock()
+	defer rl.lock.Unlock()
+
+	l.Address = rl.Address
+	l.Topics = rl.Topics
+	l.Data = rl.Data
+	l.BlockNumber = rl.BlockNumber
+	l.TxHash = rl.TxHash
+	l.TxIndex = rl.TxIndex
+	l.BlockHash = rl.BlockHash
+	l.Index = rl.Index
+	l.Removed = rl.Removed
+}
+
+func (l *Log) SetBlockHash(blockHash common.Hash) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	l.BlockHash = blockHash
 }
 
 type logMarshaling struct {

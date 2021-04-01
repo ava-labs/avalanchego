@@ -749,7 +749,7 @@ func (s *StateDB) Copy() *StateDB {
 		cpy := make([]*types.Log, len(logs))
 		for i, l := range logs {
 			cpy[i] = new(types.Log)
-			*cpy[i] = *l
+			cpy[i].Clone(l)
 		}
 		state.logs[hash] = cpy
 	}
