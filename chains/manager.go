@@ -231,7 +231,8 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 			onFinish: func() {
 				m.Log.AssertNoError(m.DBManager.MarkBootstrapped(m.DBManager.Current()))
 				if m.ManagerConfig.DBPreupgrade {
-					m.Shutdown()
+					m.Log.Info("\n\nDone with database upgrade. Restart without flag --db-upgrade to run normally.\n\n")
+					go m.Shutdown()
 				}
 			},
 		}

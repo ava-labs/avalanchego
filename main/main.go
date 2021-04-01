@@ -77,12 +77,13 @@ func main() {
 		}
 	}
 
+	// Database Pre-Upgrade
 	currentDBBootstrapped, err := dbManager.Bootstrapped(dbVersion)
 	if err != nil {
 		log.Error("couldn't get whether database version %s ever bootstrapped: %s", dbVersion)
 		return
 	}
-	log.Info("currentDBBootstrapped: %v", currentDBBootstrapped) // TODO remove
+	log.Info("bootstrapped with current database version: %v", currentDBBootstrapped)
 
 	if Config.DBPreUpgrade {
 		// Flag says to do a database pre-upgrade
@@ -90,27 +91,42 @@ func main() {
 		// However, we may not have finished bootstrapping with this database version
 		if currentDBBootstrapped {
 			// We previously finished bootstrapping with this database version.
-			log.Info("current database version has previously bootstrapped. Pre-migration done.")
+			log.Info("Database upgrade mode done. Restart this node without --db-pre-upgrade to finish database upgrade and run normally.")
 			return
 		}
 		// We have not previously run the node using the database version we are attempting to upgrade to,
 		// or we never finished bootstrapping with that database version.
 		log.Info(
-			"Node running in pre-upgrade mode.\n" +
-				"This node will bootstrap to populate the new database.\n" +
-				"When it is done, this node will die.\n" +
-				"Restart the node without the --db-pre-upgrade flag to complete the database migration." +
-				"After that, your database has been migrated and you do not need to run with `--db-pre-upgrade again.",
+			"\nNode running in database upgrade mode.\n" +
+				"It will bootstrap a new database version and then stop.\n" +
+				"After running to completion in database upgrade mode, run without --db-pre-upgrade flag to run node normally.\n" +
+				"If you run a node, leave it running on this computer and restart this binary with --db-upgrade.\n" +
+				"This will ensure that your node maintains its uptime if it is a validator.\n" +
+				"The node in database upgrade mode will by default not interfere with the node already running.\n" +
+				"When the node in database upgrade mode finishes, stop the other node running on this computer (if applicable) and run without --db-pre-upgrade flag to run node normally.\n" +
+				"The database upgrade will not change this node's staking key/certificate.\n" +
+				"Note that populating the new database version will approximately double the amount of disk space required by AvalancheGo.\n" +
+				"Ensure that this computer has at least enough disk space available.\n" +
+				"You should not delete the old database version unless advised to by the Avalanche team.\n",
 		)
-	} else {
-		// Flag does not say to do a database pre-upgrade
-		log.Error("not pre-upgrading") // TODO remove
-		if !currentDBBootstrapped && dbManager.PreviouslyUsedDBVersion(prevDBVersion) {
-			log.Error("database must be upgraded. Run node with flag TODO. When done, restart without that flag.")
-			return
-		}
-		// Already did migration or there is nothing to migrate
+	} else if !currentDBBootstrapped && dbManager.PreviouslyUsedDBVersion(prevDBVersion) {
+		log.Error(
+			"\nThis version of AvalancheGo requires a database upgrade before running.\n" +
+				"To do the database upgrade, restart this node with argument --db-pre-upgrade.\n" +
+				"This will start the node in database upgrade mode. It will bootstrap a new database version and then stop.\n" +
+				"After running to completion in database upgrade mode, run without --db-pre-upgrade flag to run node normally.\n" +
+				"If you run a node, leave it running on this computer and restart this binary with --db-upgrade.\n" +
+				"This will ensure that your node maintains its uptime if it is a validator.\n" +
+				"The node in database upgrade mode will by default not interfere with the node already running.\n" +
+				"When the node in database upgrade mode finishes, stop the other node running on this computer (if applicable) and run without --db-pre-upgrade flag to run node normally.\n" +
+				"The database upgrade will not change this node's staking key/certificate.\n" +
+				"Note that populating the new database version will approximately double the amount of disk space required by AvalancheGo.\n" +
+				"Ensure that this computer has at least enough disk space available.\n" +
+				"You should not delete the old database version.",
+		)
+		return
 	}
+	// Already did migration or there is nothing to migrate
 
 	defer func() {
 		if r := recover(); r != nil {
