@@ -28,7 +28,7 @@ var (
 		constants.MainnetID: time.Date(2021, time.March, 31, 14, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC),
 	}
-	ApricotPhase1DefaultTime = time.Date(1970, 0, 0, 0, 0, 0, 0, time.UTC)
+	ApricotPhase1DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 )
 
 func GetApricotPhase0Time(networkID uint32) time.Time {
