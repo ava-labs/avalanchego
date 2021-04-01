@@ -29,6 +29,7 @@ package filters
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/ava-labs/coreth/core/vm"
@@ -81,7 +82,10 @@ type Filter struct {
 
 // NewRangeFilter creates a new filter which uses a bloom filter on blocks to
 // figure out whether a particular block is interesting or not.
-func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Address, topics [][]common.Hash, acceptedEnd *uint64) *Filter {
+func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Address, topics [][]common.Hash) (*Filter, error) {
+	allowUnfinalizedQueries := backend.GetVMConfig().AllowUnfinalizedQueries
+	lastAccepted := backend.LastAcceptedBLock()
+
 	// Flatten the address and topic filter clauses into a single bloombits filter
 	// system. Since the bloombits are not positional, nil topics are permitted,
 	// which get flattened into a nil byte slice.
@@ -105,12 +109,34 @@ func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Addres
 	// Create a generic filter and convert it into a range filter
 	filter := newFilter(backend, addresses, topics)
 
+	isUnfinalized := func(allowUnfinalizedQueries bool, lastAccepted *types.Block, blockNum int64) bool {
+		if !allowUnfinalizedQueries && lastAccepted != nil && blockNum > lastAccepted.Number().Int64() {
+			return true
+		}
+		return false
+	}
+
+	if begin >= 0 && isUnfinalized(allowUnfinalizedQueries, lastAccepted, begin) {
+		return nil, fmt.Errorf("requested from block %d after last accepted block %s", begin, lastAccepted.Number().String())
+	}
+	if end >= 0 && isUnfinalized(allowUnfinalizedQueries, lastAccepted, end) {
+		return nil, fmt.Errorf("requested to block %d after last accepted block %s", end, lastAccepted.Number().String())
+	}
+
 	filter.matcher = bloombits.NewMatcher(size, filters)
 	filter.begin = begin
 	filter.end = end
-	filter.acceptedEnd = acceptedEnd
 
-	return filter
+	computeAcceptedEnd := func(allowUnfinalizedQueries bool, lastAccepted *types.Block) *uint64 {
+		if !allowUnfinalizedQueries && lastAccepted != nil {
+			acceptedEndTmp := lastAccepted.NumberU64()
+			return &acceptedEndTmp
+		}
+		return nil
+	}
+	filter.acceptedEnd = computeAcceptedEnd(allowUnfinalizedQueries, lastAccepted)
+
+	return filter, nil
 }
 
 // NewBlockFilter creates a new filter which directly inspects the contents of
