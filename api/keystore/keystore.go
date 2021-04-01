@@ -35,7 +35,7 @@ var (
 )
 
 type Keystore interface {
-	// Create the API endpoints for this keystore.
+	// Create the API endpoint for this keystore.
 	CreateHandler() (http.Handler, error)
 
 	// NewBlockchainKeyStore returns this keystore limiting the functionality to
