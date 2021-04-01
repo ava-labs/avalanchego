@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/coreth/accounts/keystore"
+
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
@@ -45,7 +47,7 @@ func main() {
 
 	// configure the genesis block
 	genBalance := big.NewInt(100000000000000000)
-	genKey, _ := coreth.NewKey(rand.Reader)
+	genKey, _ := keystore.NewKey(rand.Reader)
 
 	config.Genesis = &core.Genesis{
 		Config:     chainConfig,
@@ -66,7 +68,7 @@ func main() {
 	value := big.NewInt(1000000000000)
 	gasLimit := 21000
 	gasPrice := big.NewInt(1000000000)
-	bob, err := coreth.NewKey(rand.Reader)
+	bob, err := keystore.NewKey(rand.Reader)
 	checkError(err)
 
 	chain := coreth.NewETHChain(&config, nil, nil, nil, eth.DefaultSettings)

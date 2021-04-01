@@ -172,7 +172,10 @@ type BlockChain struct {
 	chainConfig *params.ChainConfig // Chain & network configuration
 	cacheConfig *CacheConfig        // Cache configuration for pruning
 
-	db     ethdb.Database // Low level persistent database to store final content in
+	db ethdb.Database // Low level persistent database to store final content in
+
+	snapslock sync.Mutex
+
 	snaps  *snapshot.Tree // Snapshot tree for fast trie leaf access
 	triegc *prque.Prque   // Priority queue mapping block numbers to tries to gc
 	gcproc time.Duration  // Accumulates canonical block processing for trie dumping
@@ -184,15 +187,16 @@ type BlockChain struct {
 	//  * nil: disable tx reindexer/deleter, but still index new blocks
 	txLookupLimit uint64
 
-	hc            *HeaderChain
-	rmLogsFeed    event.Feed
-	chainFeed     event.Feed
-	chainSideFeed event.Feed
-	chainHeadFeed event.Feed
-	logsFeed      event.Feed
-	blockProcFeed event.Feed
-	scope         event.SubscriptionScope
-	genesisBlock  *types.Block
+	hc                *HeaderChain
+	rmLogsFeed        event.Feed
+	chainFeed         event.Feed
+	chainSideFeed     event.Feed
+	chainHeadFeed     event.Feed
+	chainAcceptedFeed event.Feed
+	logsFeed          event.Feed
+	blockProcFeed     event.Feed
+	scope             event.SubscriptionScope
+	genesisBlock      *types.Block
 
 	chainmu sync.RWMutex // blockchain insertion lock
 
@@ -362,7 +366,9 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 
 		// Load any existing snapshot, regenerating it if loading failed
 		if bc.cacheConfig.SnapshotLimit > 0 {
+			bc.snapslock.Lock()
 			bc.snaps = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, bc.CurrentBlock().Root(), !bc.cacheConfig.SnapshotWait)
+			bc.snapslock.Unlock()
 		}
 		// Take ownership of this particular state
 		// go bc.update()
@@ -653,6 +659,8 @@ func (bc *BlockChain) State() (*state.StateDB, error) {
 
 // StateAt returns a new mutable state based on a particular point in time.
 func (bc *BlockChain) StateAt(root common.Hash) (*state.StateDB, error) {
+	bc.snapslock.Lock()
+	defer bc.snapslock.Unlock()
 	return state.New(root, bc.stateCache, bc.snaps)
 }
 
@@ -1711,6 +1719,7 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 	}
 
 	bc.lastAccepted = block
+	bc.chainAcceptedFeed.Send(ChainEvent{Block: block, Hash: block.Hash()})
 	return nil
 }
 
@@ -2817,6 +2826,11 @@ func (bc *BlockChain) SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) even
 // SubscribeChainEvent registers a subscription of ChainEvent.
 func (bc *BlockChain) SubscribeChainEvent(ch chan<- ChainEvent) event.Subscription {
 	return bc.scope.Track(bc.chainFeed.Subscribe(ch))
+}
+
+// SubscribeChainAcceptedEvent registers a subscription of ChainEvent.
+func (bc *BlockChain) SubscribeChainAcceptedEvent(ch chan<- ChainEvent) event.Subscription {
+	return bc.scope.Track(bc.chainAcceptedFeed.Subscribe(ch))
 }
 
 // SubscribeChainHeadEvent registers a subscription of ChainHeadEvent.

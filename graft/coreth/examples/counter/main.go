@@ -22,6 +22,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ava-labs/coreth/accounts/keystore"
+
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
@@ -60,7 +62,7 @@ func main() {
 
 	// configure the genesis block
 	//genBalance := big.NewInt(100000000000000000)
-	genKey, _ := coreth.NewKey(rand.Reader)
+	genKey, _ := keystore.NewKey(rand.Reader)
 
 	g := new(core.Genesis)
 	b := `{"config":{"chainId":1,"homesteadBlock":0,"daoForkBlock":0,"daoForkSupport":true,"eip150Block":0,"eip150Hash":"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0","eip155Block":0,"eip158Block":0,"byzantiumBlock":0,"constantinopleBlock":0,"petersburgBlock":0},"nonce":"0x0","timestamp":"0x0","extraData":"0x00","gasLimit":"0x5f5e100","difficulty":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","coinbase":"0x0000000000000000000000000000000000000000","alloc":{"751a0b96e1042bee789452ecb20253fba40dbe85":{"balance":"0x16345785d8a0000"}},"number":"0x0","gasUsed":"0x0","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000"}`
@@ -69,7 +71,7 @@ func main() {
 	checkError(err)
 	config.Genesis = g
 	hk, _ := crypto.HexToECDSA(k[2:])
-	genKey = coreth.NewKeyFromECDSA(hk)
+	genKey = keystore.NewKeyFromECDSA(hk)
 	//config.Genesis = &core.Genesis{
 	//	Config:     chainConfig,
 	//	Nonce:      0,

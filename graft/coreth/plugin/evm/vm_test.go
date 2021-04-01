@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/coreth"
+	accountKeystore "github.com/ava-labs/coreth/accounts/keystore"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
@@ -343,7 +343,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 		}
 	}()
 
-	key, err := coreth.NewKey(rand.Reader)
+	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -475,7 +475,7 @@ func TestConflictingImportTxs(t *testing.T) {
 		}
 	}()
 
-	conflictKey, err := coreth.NewKey(rand.Reader)
+	conflictKey, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -605,7 +605,7 @@ func TestSetPreferenceRace(t *testing.T) {
 		}
 	}()
 
-	key, err := coreth.NewKey(rand.Reader)
+	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -871,7 +871,7 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 		}
 	}()
 
-	key, err := coreth.NewKey(rand.Reader)
+	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1153,7 +1153,7 @@ func TestReorgProtection(t *testing.T) {
 		}
 	}()
 
-	key, err := coreth.NewKey(rand.Reader)
+	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1366,7 +1366,7 @@ func TestNonCanonicalAccept(t *testing.T) {
 		}
 	}()
 
-	key, err := coreth.NewKey(rand.Reader)
+	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1574,7 +1574,7 @@ func TestStickyPreference(t *testing.T) {
 		}
 	}()
 
-	key, err := coreth.NewKey(rand.Reader)
+	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1875,7 +1875,7 @@ func TestUncleBlock(t *testing.T) {
 		}
 	}()
 
-	key, err := coreth.NewKey(rand.Reader)
+	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2090,7 +2090,7 @@ func TestEmptyBlock(t *testing.T) {
 		}
 	}()
 
-	key, err := coreth.NewKey(rand.Reader)
+	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2202,7 +2202,7 @@ func TestAcceptReorg(t *testing.T) {
 		}
 	}()
 
-	key, err := coreth.NewKey(rand.Reader)
+	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2432,7 +2432,7 @@ func TestFutureBlock(t *testing.T) {
 		}
 	}()
 
-	key, err := coreth.NewKey(rand.Reader)
+	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2535,7 +2535,7 @@ func TestBuildApricotPhase1Block(t *testing.T) {
 		}
 	}()
 
-	key, err := coreth.NewKey(rand.Reader)
+	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2700,7 +2700,7 @@ func TestApricotPhase1Transition(t *testing.T) {
 		}
 	}()
 
-	key, err := coreth.NewKey(rand.Reader)
+	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2972,7 +2972,7 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 		}
 	}()
 
-	key, err := coreth.NewKey(rand.Reader)
+	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}

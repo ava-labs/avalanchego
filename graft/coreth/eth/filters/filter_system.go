@@ -62,6 +62,8 @@ const (
 	PendingTransactionsSubscription
 	// BlocksSubscription queries hashes for blocks that are imported
 	BlocksSubscription
+	// AcceptedBlocksSubscription queries hashes for blocks that are accepted
+	AcceptedBlocksSubscription
 	// LastSubscription keeps track of the last index
 	LastIndexSubscription
 )
@@ -98,20 +100,22 @@ type EventSystem struct {
 	lastHead  *types.Header
 
 	// Subscriptions
-	txsSub         event.Subscription // Subscription for new transaction event
-	logsSub        event.Subscription // Subscription for new log event
-	rmLogsSub      event.Subscription // Subscription for removed log event
-	pendingLogsSub event.Subscription // Subscription for pending log event
-	chainSub       event.Subscription // Subscription for new chain event
+	txsSub           event.Subscription // Subscription for new transaction event
+	logsSub          event.Subscription // Subscription for new log event
+	rmLogsSub        event.Subscription // Subscription for removed log event
+	pendingLogsSub   event.Subscription // Subscription for pending log event
+	chainSub         event.Subscription // Subscription for new chain event
+	chainAcceptedSub event.Subscription // Subscription for new chain accepted event
 
 	// Channels
-	install       chan *subscription         // install filter for event notification
-	uninstall     chan *subscription         // remove filter for event notification
-	txsCh         chan core.NewTxsEvent      // Channel to receive new transactions event
-	logsCh        chan []*types.Log          // Channel to receive new log event
-	pendingLogsCh chan []*types.Log          // Channel to receive new log event
-	rmLogsCh      chan core.RemovedLogsEvent // Channel to receive removed log event
-	chainCh       chan core.ChainEvent       // Channel to receive new chain event
+	install         chan *subscription         // install filter for event notification
+	uninstall       chan *subscription         // remove filter for event notification
+	txsCh           chan core.NewTxsEvent      // Channel to receive new transactions event
+	logsCh          chan []*types.Log          // Channel to receive new log event
+	pendingLogsCh   chan []*types.Log          // Channel to receive new log event
+	rmLogsCh        chan core.RemovedLogsEvent // Channel to receive removed log event
+	chainCh         chan core.ChainEvent       // Channel to receive new chain event
+	chainAcceptedCh chan core.ChainEvent       // Channel to receive new chain accepted event
 }
 
 // NewEventSystem creates a new manager that listens for event on the given mux,
@@ -122,15 +126,16 @@ type EventSystem struct {
 // or by stopping the given mux.
 func NewEventSystem(backend Backend, lightMode bool) *EventSystem {
 	m := &EventSystem{
-		backend:       backend,
-		lightMode:     lightMode,
-		install:       make(chan *subscription),
-		uninstall:     make(chan *subscription),
-		txsCh:         make(chan core.NewTxsEvent, txChanSize),
-		logsCh:        make(chan []*types.Log, logsChanSize),
-		rmLogsCh:      make(chan core.RemovedLogsEvent, rmLogsChanSize),
-		pendingLogsCh: make(chan []*types.Log, logsChanSize),
-		chainCh:       make(chan core.ChainEvent, chainEvChanSize),
+		backend:         backend,
+		lightMode:       lightMode,
+		install:         make(chan *subscription),
+		uninstall:       make(chan *subscription),
+		txsCh:           make(chan core.NewTxsEvent, txChanSize),
+		logsCh:          make(chan []*types.Log, logsChanSize),
+		rmLogsCh:        make(chan core.RemovedLogsEvent, rmLogsChanSize),
+		pendingLogsCh:   make(chan []*types.Log, logsChanSize),
+		chainCh:         make(chan core.ChainEvent, chainEvChanSize),
+		chainAcceptedCh: make(chan core.ChainEvent, chainEvChanSize),
 	}
 
 	// Subscribe events
@@ -138,10 +143,11 @@ func NewEventSystem(backend Backend, lightMode bool) *EventSystem {
 	m.logsSub = m.backend.SubscribeLogsEvent(m.logsCh)
 	m.rmLogsSub = m.backend.SubscribeRemovedLogsEvent(m.rmLogsCh)
 	m.chainSub = m.backend.SubscribeChainEvent(m.chainCh)
+	m.chainAcceptedSub = m.backend.SubscribeChainAcceptedEvent(m.chainAcceptedCh)
 	m.pendingLogsSub = m.backend.SubscribePendingLogsEvent(m.pendingLogsCh)
 
 	// Make sure none of the subscriptions are empty
-	if m.txsSub == nil || m.logsSub == nil || m.rmLogsSub == nil || m.chainSub == nil || m.pendingLogsSub == nil {
+	if m.txsSub == nil || m.logsSub == nil || m.rmLogsSub == nil || m.chainSub == nil || m.chainAcceptedSub == nil || m.pendingLogsSub == nil {
 		log.Crit("Subscribe for event system failed")
 	}
 
@@ -300,6 +306,22 @@ func (es *EventSystem) SubscribeNewHeads(headers chan *types.Header) *Subscripti
 	return es.subscribe(sub)
 }
 
+// SubscribeAcceptedHeads creates a subscription that writes the header of an accepted block that is
+// imported in the chain.
+func (es *EventSystem) SubscribeAcceptedHeads(headers chan *types.Header) *Subscription {
+	sub := &subscription{
+		id:        rpc.NewID(),
+		typ:       AcceptedBlocksSubscription,
+		created:   time.Now(),
+		logs:      make(chan []*types.Log),
+		hashes:    make(chan []common.Hash),
+		headers:   headers,
+		installed: make(chan struct{}),
+		err:       make(chan error),
+	}
+	return es.subscribe(sub)
+}
+
 // SubscribePendingTxs creates a subscription that writes transaction hashes for
 // transactions that enter the transaction pool.
 func (es *EventSystem) SubscribePendingTxs(hashes chan []common.Hash) *Subscription {
@@ -373,6 +395,12 @@ func (es *EventSystem) handleChainEvent(filters filterIndex, ev core.ChainEvent)
 				}
 			}
 		})
+	}
+}
+
+func (es *EventSystem) handleChainAcceptedEvent(filters filterIndex, ev core.ChainEvent) {
+	for _, f := range filters[AcceptedBlocksSubscription] {
+		f.headers <- ev.Block.Header()
 	}
 }
 
@@ -458,6 +486,7 @@ func (es *EventSystem) eventLoop() {
 		es.rmLogsSub.Unsubscribe()
 		es.pendingLogsSub.Unsubscribe()
 		es.chainSub.Unsubscribe()
+		es.chainAcceptedSub.Unsubscribe()
 	}()
 
 	index := make(filterIndex)
@@ -477,6 +506,8 @@ func (es *EventSystem) eventLoop() {
 			es.handlePendingLogs(index, ev)
 		case ev := <-es.chainCh:
 			es.handleChainEvent(index, ev)
+		case ev := <-es.chainAcceptedCh:
+			es.handleChainAcceptedEvent(index, ev)
 
 		case f := <-es.install:
 			if f.typ == MinedAndPendingLogsSubscription {
