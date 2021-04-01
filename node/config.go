@@ -4,6 +4,8 @@
 package node
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -23,6 +25,14 @@ import (
 // Config contains all of the configurations of an Avalanche node.
 type Config struct {
 	genesis.Params
+
+	// Attempt to do a database pre-upgrade.
+	// Will bootstrap using the current database version and then end the node.
+	DBPreUpgrade            bool
+	DBPreUpgradeStakingPort uint16
+	DBPreUpgradeHTTPPort    uint16
+	DBPreUpgradeDBDir       string
+	DBPreUpgradeLogDir      string
 
 	// Genesis information
 	GenesisBytes []byte
@@ -53,8 +63,10 @@ type Config struct {
 	StakingIP             utils.DynamicIPDesc
 	EnableP2PTLS          bool
 	EnableStaking         bool
-	StakingKeyFile        string
 	StakingCertFile       string
+	StakingKeyFile        string
+	Stakingx509Cert       *x509.Certificate
+	StakingTLSCert        tls.Certificate
 	DisabledStakingWeight uint64
 
 	// Throttling

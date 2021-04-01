@@ -5,6 +5,10 @@ package main
 
 const (
 	defaultString                           = "default"
+	dbPreUpgradeKey                         = "db-pre-upgrade"
+	dbPreUpgradeHTTPPortPKey                = "db-pre-upgrade-http-port"
+	dbPreUpgradeStakingPortKey              = "db-pre-upgrade-staking-port"
+	dbPreUpgradeLogDirKey                   = "db-pre-upgrade-log-dir"
 	configFileKey                           = "config-file"
 	versionKey                              = "version"
 	genesisConfigFileKey                    = "genesis"

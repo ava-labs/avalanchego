@@ -14,10 +14,43 @@ import (
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
-// GenerateStakingKeyCert generates a self-signed TLS key/cert pair to use in staking
+func GenerateStakingCert() ([]byte, []byte, error) {
+	return generateStakingCert()
+}
+
+func generateStakingCert() ([]byte, []byte, error) {
+	// Create key to sign cert with
+	key, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return nil, nil, fmt.Errorf("couldn't generate rsa key: %w", err)
+	}
+	keyBytes, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		return nil, nil, fmt.Errorf("couldn't marshal private key: %w", err)
+	}
+
+	// Create self-signed staking cert
+	certTemplate := &x509.Certificate{
+		SerialNumber:          big.NewInt(0),
+		NotBefore:             time.Date(2000, time.January, 0, 0, 0, 0, 0, time.UTC),
+		NotAfter:              time.Now().AddDate(100, 0, 0),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageDataEncipherment,
+		BasicConstraintsValid: true,
+	}
+	certBytes, err := x509.CreateCertificate(rand.Reader, certTemplate, certTemplate, &key.PublicKey, key)
+	if err != nil {
+		return nil, nil, fmt.Errorf("couldn't create certificate: %w", err)
+	}
+	certPemBytes := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certBytes})
+	keyPemBytes := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes})
+
+	return keyPemBytes, certPemBytes, err
+}
+
+// InitNodeStakingKeyPair generates a self-signed TLS key/cert pair to use in staking
 // The key and files will be placed at [keyPath] and [certPath], respectively
 // If there is already a file at [keyPath], returns nil
-func GenerateStakingKeyCert(keyPath, certPath string) error {
+func InitNodeStakingKeyPair(keyPath, certPath string) error {
 	// If there is already a file at [keyPath], do nothing
 	if _, err := os.Stat(keyPath); !os.IsNotExist(err) {
 		return nil
@@ -28,7 +61,6 @@ func GenerateStakingKeyCert(keyPath, certPath string) error {
 	if err != nil {
 		return fmt.Errorf("couldn't generate rsa key: %w", err)
 	}
-
 	// Create self-signed staking cert
 	certTemplate := &x509.Certificate{
 		SerialNumber:          big.NewInt(0),

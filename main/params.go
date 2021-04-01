@@ -4,7 +4,10 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"flag"
 	"fmt"
@@ -16,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/common/log"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
@@ -40,7 +44,8 @@ import (
 )
 
 var (
-	dbVersion = version.NewDefaultVersion(1, 2, 5)
+	prevDBVersion = version.NewDefaultVersion(1, 0, 0)
+	dbVersion     = version.NewDefaultVersion(1, 1, 0)
 )
 
 // Results of parsing the CLI
@@ -83,6 +88,12 @@ func avalancheFlagSet() *flag.FlagSet {
 
 	// If true, print the version and quit.
 	fs.Bool(versionKey, false, "If true, print version and quit")
+
+	// Database Pre-Upgrade
+	fs.Bool(dbPreUpgradeKey, false, "If true, attempts to do a database pre-upgrade")
+	fs.Uint(dbPreUpgradeHTTPPortPKey, 9652, fmt.Sprintf("Port used for HTTP API calls during node executions where --%s=true.", dbPreUpgradeKey))
+	fs.Uint(dbPreUpgradeStakingPortKey, 9653, fmt.Sprintf("Port used for P2P communication during node executions where --%s=true.", dbPreUpgradeKey))
+	fs.String(dbPreUpgradeLogDirKey, logging.DefaultLogDirectory+"/db-pre-upgrade", fmt.Sprintf("Path logs are sent to during node executions where --%s=true.", dbPreUpgradeKey))
 
 	// System
 	fs.Uint64(fdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
@@ -266,6 +277,8 @@ func getViper() (*viper.Viper, error) {
 // setNodeConfig sets attributes on [Config] based on the values
 // defined in the [viper] environment
 func setNodeConfig(v *viper.Viper) error {
+	Config.DBPreUpgrade = v.GetBool(dbPreUpgradeKey)
+
 	// Consensus Parameters
 	Config.ConsensusParams.K = v.GetInt(snowSampleSizeKey)
 	Config.ConsensusParams.Alpha = v.GetInt(snowQuorumSizeKey)
@@ -285,7 +298,12 @@ func setNodeConfig(v *viper.Viper) error {
 	if err != nil {
 		return err
 	}
-	logsDir := v.GetString(logsDirKey)
+	logsDir := ""
+	if Config.DBPreUpgrade {
+		logsDir = v.GetString(logsDirKey)
+	} else {
+		logsDir = v.GetString(dbPreUpgradeLogDirKey)
+	}
 	if logsDir != "" {
 		loggingConfig.Directory = logsDir
 	}
@@ -359,10 +377,11 @@ func setNodeConfig(v *viper.Viper) error {
 		return fmt.Errorf("invalid IP Address %s", publicIP)
 	}
 
-	Config.StakingIP = utils.NewDynamicIPDesc(
-		ip,
-		uint16(v.GetUint(stakingPortKey)),
-	)
+	if !Config.DBPreUpgrade {
+		Config.StakingIP = utils.NewDynamicIPDesc(ip, uint16(v.GetUint(stakingPortKey)))
+	} else {
+		Config.StakingIP = utils.NewDynamicIPDesc(ip, uint16(v.GetUint(dbPreUpgradeStakingPortKey)))
+	}
 
 	Config.DynamicUpdateDuration = v.GetDuration(dynamicUpdateDurationKey)
 
@@ -406,8 +425,38 @@ func setNodeConfig(v *viper.Viper) error {
 		}
 	default:
 		// Only creates staking key/cert if [stakingKeyPath] doesn't exist
-		if err := staking.GenerateStakingKeyCert(Config.StakingKeyFile, Config.StakingCertFile); err != nil {
+		if err := staking.InitNodeStakingKeyPair(Config.StakingKeyFile, Config.StakingCertFile); err != nil {
 			return fmt.Errorf("couldn't generate staking key/cert: %w", err)
+		}
+	}
+
+	if !Config.DBPreUpgrade {
+		stakeCert, err := ioutil.ReadFile(Config.StakingCertFile)
+		if err != nil {
+			return fmt.Errorf("problem reading staking certificate: %w", err)
+		}
+		block, _ := pem.Decode(stakeCert)
+		Config.StakingTLSCert, err = tls.LoadX509KeyPair(Config.StakingCertFile, Config.StakingKeyFile)
+		if err != nil {
+			return err
+		}
+		Config.Stakingx509Cert, err = x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return fmt.Errorf("problem parsing staking certificate: %w", err)
+		}
+	} else {
+		keyBytes, certBytes, err := staking.GenerateStakingCert()
+		if err != nil {
+			log.Errorf("couldn't generate dummy staking key/cert: %s", err)
+		}
+		Config.StakingTLSCert, err = tls.X509KeyPair(certBytes, keyBytes)
+		if err != nil {
+			log.Errorf("couldn't create TLS cert: %s", err)
+		}
+		block, _ := pem.Decode(certBytes)
+		Config.Stakingx509Cert, err = x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return fmt.Errorf("problem parsing staking certificate: %w", err)
 		}
 	}
 
@@ -499,7 +548,11 @@ func setNodeConfig(v *viper.Viper) error {
 
 	// HTTP:
 	Config.HTTPHost = v.GetString(httpHostKey)
-	Config.HTTPPort = uint16(v.GetUint(httpPortKey))
+	if !Config.DBPreUpgrade {
+		Config.HTTPPort = uint16(v.GetUint(httpPortKey))
+	} else {
+		Config.HTTPPort = uint16(v.GetUint(dbPreUpgradeHTTPPortPKey))
+	}
 
 	Config.HTTPSEnabled = v.GetBool(httpsEnabledKey)
 	Config.HTTPSKeyFile = v.GetString(httpsKeyFileKey)

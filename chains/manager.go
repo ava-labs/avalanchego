@@ -150,6 +150,8 @@ type ManagerConfig struct {
 	RetryBootstrap            bool // Should Bootstrap be retried
 	RetryBootstrapMaxAttempts int  // Max number of times to retry bootstrap
 	ChainConfigs              map[ids.ID]ChainConfig
+	// If true, shut down the node after the Primary Network has bootstrapped
+	DBPreupgrade bool
 }
 
 type manager struct {
@@ -225,7 +227,14 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 
 	sb, exists := m.subnets[chainParams.SubnetID]
 	if !exists {
-		sb = &subnet{}
+		sb = &subnet{
+			onFinish: func() {
+				m.Log.AssertNoError(m.DBManager.MarkBootstapped(m.DBManager.Current()))
+				if m.ManagerConfig.DBPreupgrade {
+					m.Shutdown()
+				}
+			},
+		}
 	}
 	sb.addChain(chainParams.ID)
 

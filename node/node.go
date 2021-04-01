@@ -5,11 +5,8 @@ package node
 
 import (
 	"crypto/tls"
-	"crypto/x509"
-	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -161,14 +158,9 @@ func (n *Node) initNetworking() error {
 
 	var serverUpgrader, clientUpgrader network.Upgrader
 	if n.Config.EnableP2PTLS {
-		cert, err := tls.LoadX509KeyPair(n.Config.StakingCertFile, n.Config.StakingKeyFile)
-		if err != nil {
-			return err
-		}
-
 		// #nosec G402
 		tlsConfig := &tls.Config{
-			Certificates: []tls.Certificate{cert},
+			Certificates: []tls.Certificate{n.Config.StakingTLSCert},
 			ClientAuth:   tls.RequireAnyClientCert,
 			// We do not use the TLS CA functionality to authenticate a
 			// hostname. We only require an authenticated channel based on the
@@ -421,17 +413,8 @@ func (n *Node) initNodeID() error {
 		return nil
 	}
 
-	stakeCert, err := ioutil.ReadFile(n.Config.StakingCertFile)
-	if err != nil {
-		return fmt.Errorf("problem reading staking certificate: %w", err)
-	}
-
-	block, _ := pem.Decode(stakeCert)
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return fmt.Errorf("problem parsing staking certificate: %w", err)
-	}
-	n.ID, err = ids.ToShortID(hashing.PubkeyBytesToAddress(cert.Raw))
+	var err error
+	n.ID, err = ids.ToShortID(hashing.PubkeyBytesToAddress(n.Config.Stakingx509Cert.Raw))
 	if err != nil {
 		return fmt.Errorf("problem deriving staker ID from certificate: %w", err)
 	}
@@ -558,6 +541,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	}
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
+		DBPreupgrade:              n.Config.DBPreUpgrade,
 		StakingEnabled:            n.Config.EnableStaking,
 		MaxPendingMsgs:            n.Config.MaxPendingMsgs,
 		MaxNonStakerPendingMsgs:   n.Config.MaxNonStakerPendingMsgs,

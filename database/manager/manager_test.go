@@ -213,43 +213,44 @@ func TestPrefixDBManager(t *testing.T) {
 	assert.Equal(t, v1, val)
 }
 
-func TestNestedPrefixDBManager(t *testing.T) {
-	db := memdb.New()
+// TODO remove test for dead code?
+// func TestNestedPrefixDBManager(t *testing.T) {
+// 	db := memdb.New()
 
-	prefix0 := []byte{0}
-	db0 := prefixdb.NewNested(prefix0, db)
+// 	prefix0 := []byte{0}
+// 	db0 := prefixdb.NewNested(prefix0, db)
 
-	prefix1 := []byte{1}
-	db1 := prefixdb.NewNested(prefix1, db0)
+// 	prefix1 := []byte{1}
+// 	db1 := prefixdb.NewNested(prefix1, db0)
 
-	k0 := []byte{'s', 'c', 'h', 'n', 'i'}
-	v0 := []byte{'t', 'z', 'e', 'l'}
-	k1 := []byte{'c', 'u', 'r', 'r', 'y'}
-	v1 := []byte{'w', 'u', 'r', 's', 't'}
+// 	k0 := []byte{'s', 'c', 'h', 'n', 'i'}
+// 	v0 := []byte{'t', 'z', 'e', 'l'}
+// 	k1 := []byte{'c', 'u', 'r', 'r', 'y'}
+// 	v1 := []byte{'w', 'u', 'r', 's', 't'}
 
-	assert.NoError(t, db0.Put(k0, v0))
-	assert.NoError(t, db1.Put(k1, v1))
-	assert.NoError(t, db0.Close())
-	assert.NoError(t, db1.Close())
+// 	assert.NoError(t, db0.Put(k0, v0))
+// 	assert.NoError(t, db1.Put(k1, v1))
+// 	assert.NoError(t, db0.Close())
+// 	assert.NoError(t, db1.Close())
 
-	m := &manager{databases: []*VersionedDatabase{
-		{
-			Database: db,
-			Version:  version.DefaultVersion1,
-		},
-	}}
+// 	m := &manager{databases: []*VersionedDatabase{
+// 		{
+// 			Database: db,
+// 			Version:  version.DefaultVersion1,
+// 		},
+// 	}}
 
-	m0 := m.NewNestedPrefixDBManager(prefix0)
-	m1 := m0.NewNestedPrefixDBManager(prefix1)
+// 	m0 := m.NewNestedPrefixDBManager(prefix0)
+// 	m1 := m0.NewNestedPrefixDBManager(prefix1)
 
-	val, err := m0.Current().Get(k0)
-	assert.NoError(t, err)
-	assert.Equal(t, v0, val)
+// 	val, err := m0.Current().Get(k0)
+// 	assert.NoError(t, err)
+// 	assert.Equal(t, v0, val)
 
-	val, err = m1.Current().Get(k1)
-	assert.NoError(t, err)
-	assert.Equal(t, v1, val)
-}
+// 	val, err = m1.Current().Get(k1)
+// 	assert.NoError(t, err)
+// 	assert.Equal(t, v1, val)
+// }
 
 func TestMeterDBManager(t *testing.T) {
 	registry := prometheus.NewRegistry()
@@ -290,44 +291,45 @@ func TestMeterDBManager(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestCompleteMeterDBManager(t *testing.T) {
-	registry := prometheus.NewRegistry()
+// TODO can we remove this test for dead code?
+// func TestCompleteMeterDBManager(t *testing.T) {
+// 	registry := prometheus.NewRegistry()
 
-	m := &manager{databases: []*VersionedDatabase{
-		{
-			Database: memdb.New(),
-			Version:  version.NewDefaultVersion(2, 0, 0),
-		},
-		{
-			Database: memdb.New(),
-			Version:  version.NewDefaultVersion(1, 5, 0),
-		},
-		{
-			Database: memdb.New(),
-			Version:  version.DefaultVersion1,
-		},
-	}}
+// 	m := &manager{databases: []*VersionedDatabase{
+// 		{
+// 			Database: memdb.New(),
+// 			Version:  version.NewDefaultVersion(2, 0, 0),
+// 		},
+// 		{
+// 			Database: memdb.New(),
+// 			Version:  version.NewDefaultVersion(1, 5, 0),
+// 		},
+// 		{
+// 			Database: memdb.New(),
+// 			Version:  version.DefaultVersion1,
+// 		},
+// 	}}
 
-	// Create complete meterdb manager with fresh registry and confirm
-	// that there are no errors registering metrics for multiple
-	// versioned databases.
-	manager, err := m.NewCompleteMeterDBManager("", registry)
-	assert.NoError(t, err)
+// 	// Create complete meterdb manager with fresh registry and confirm
+// 	// that there are no errors registering metrics for multiple
+// 	// versioned databases.
+// 	manager, err := m.NewCompleteMeterDBManager("", registry)
+// 	assert.NoError(t, err)
 
-	dbs := manager.GetDatabases()
-	assert.Len(t, dbs, 3)
+// 	dbs := manager.GetDatabases()
+// 	assert.Len(t, dbs, 3)
 
-	_, ok := dbs[0].Database.(*meterdb.Database)
-	assert.True(t, ok)
-	_, ok = dbs[1].Database.(*meterdb.Database)
-	assert.True(t, ok)
-	_, ok = dbs[2].Database.(*meterdb.Database)
-	assert.True(t, ok)
+// 	_, ok := dbs[0].Database.(*meterdb.Database)
+// 	assert.True(t, ok)
+// 	_, ok = dbs[1].Database.(*meterdb.Database)
+// 	assert.True(t, ok)
+// 	_, ok = dbs[2].Database.(*meterdb.Database)
+// 	assert.True(t, ok)
 
-	// Confirm that the error from a name conflict is handled correctly
-	_, err = m.NewCompleteMeterDBManager("", registry)
-	assert.Error(t, err)
-}
+// 	// Confirm that the error from a name conflict is handled correctly
+// 	_, err = m.NewCompleteMeterDBManager("", registry)
+// 	assert.Error(t, err)
+// }
 
 func TestNewManagerFromDBs(t *testing.T) {
 	versions := []version.Version{

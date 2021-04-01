@@ -77,6 +77,41 @@ func main() {
 		}
 	}
 
+	currentDBBootstrapped, err := dbManager.Bootstrapped(dbVersion)
+	if err != nil {
+		log.Error("couldn't get whether database version %s ever bootstrapped: %s", dbVersion)
+		return
+	}
+	log.Info("currentDBBootstrapped: %v", currentDBBootstrapped) // TODO remove
+
+	if Config.DBPreUpgrade {
+		// Flag says to do a database pre-upgrade
+		// We have previously run the node using the database version we are attempting to upgrade to
+		// However, we may not have finished bootstrapping with this database version
+		if currentDBBootstrapped {
+			// We previously finished bootstrapping with this database version.
+			log.Info("current database version has previously bootstrapped. Pre-migration done.")
+			return
+		}
+		// We have not previously run the node using the database version we are attempting to upgrade to,
+		// or we never finished bootstrapping with that database version.
+		log.Info(
+			"Node running in pre-upgrade mode.\n" +
+				"This node will bootstrap to populate the new database.\n" +
+				"When it is done, this node will die.\n" +
+				"Restart the node without the --db-pre-upgrade flag to complete the database migration." +
+				"After that, your database has been migrated and you do not need to run with `--db-pre-upgrade again.",
+		)
+	} else {
+		// Flag does not say to do a database pre-upgrade
+		log.Error("not pre-upgrading") // TODO remove
+		if !currentDBBootstrapped && dbManager.PreviouslyUsedDBVersion(prevDBVersion) {
+			log.Error("database must be upgraded. Run node with flag TODO. When done, restart without that flag.")
+			return
+		}
+		// Already did migration or there is nothing to migrate
+	}
+
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered panic from", r)
