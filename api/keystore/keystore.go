@@ -121,7 +121,7 @@ func (ks *keystore) CreateHandler() (http.Handler, error) {
 	codec := jsoncodec.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	if err := newServer.RegisterService(ks, "keystore"); err != nil {
+	if err := newServer.RegisterService(&service{ks: ks}, "keystore"); err != nil {
 		return nil, err
 	}
 	return newServer, nil
