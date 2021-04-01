@@ -80,7 +80,7 @@ type UnsignedAtomicTx interface {
 // Tx is a signed transaction
 type Tx struct {
 	// The body of this transaction
-	UnsignedTx `serialize:"true" json:"unsignedTx"`
+	UnsignedAtomicTx `serialize:"true" json:"unsignedTx"`
 
 	// The credentials of this transaction
 	Creds []verify.Verifiable `serialize:"true" json:"credentials"`
@@ -90,9 +90,9 @@ type Tx struct {
 
 // Sign this transaction with the provided signers
 func (tx *Tx) Sign(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {
-	unsignedBytes, err := c.Marshal(codecVersion, &tx.UnsignedTx)
+	unsignedBytes, err := c.Marshal(codecVersion, &tx.UnsignedAtomicTx)
 	if err != nil {
-		return fmt.Errorf("couldn't marshal UnsignedTx: %w", err)
+		return fmt.Errorf("couldn't marshal UnsignedAtomicTx: %w", err)
 	}
 
 	// Attach credentials
