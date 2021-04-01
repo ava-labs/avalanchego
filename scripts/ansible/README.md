@@ -67,7 +67,7 @@ the first line of output should be like `ansible 2.9.x`, or `ansible 2.10.x`
 or an earlier version (e.g. `ansible 2.8.16`), then you need to install a
 supported version.
 
-To install a supportted version
+To install a supported version
 
 1. Create a Python Virtualenv
     ```
