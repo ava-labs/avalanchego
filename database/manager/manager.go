@@ -146,9 +146,13 @@ func NewDefaultMemDBManager() Manager {
 
 // New creates a database manager at [filePath] by creating a database instance from each directory
 // with a version <= [currentVersion]
-func New(dbDirPath string, log logging.Logger, currentVersion version.Version) (Manager, error) {
+func New(
+	dbDirPath string,
+	log logging.Logger,
+	currentVersion version.Version,
+	dbPreUpgrade bool,
+) (Manager, error) {
 	parser := version.NewDefaultParser()
-
 	currentDBPath := path.Join(dbDirPath, currentVersion.String())
 	rawCurrentDB, err := leveldb.New(currentDBPath, log, 0, 0, 0)
 	if err != nil {
@@ -166,56 +170,59 @@ func New(dbDirPath string, log logging.Logger, currentVersion version.Version) (
 		},
 	}
 
-	err = filepath.Walk(dbDirPath, func(path string, info os.FileInfo, err error) error {
-		// the walkFn is called with a non-nil error argument if an os.Lstat
-		// or Readdirnames call returns an error. Both cases are considered
-		// fatal in the traversal.
-		// Reference: https://golang.org/pkg/path/filepath/#WalkFunc
-		if err != nil {
-			return err
-		}
-		// Skip the root directory
-		if path == dbDirPath {
-			return nil
-		}
+	// If we're doing a database upgrade, ignore old databases
+	if !dbPreUpgrade {
+		err = filepath.Walk(dbDirPath, func(path string, info os.FileInfo, err error) error {
+			// the walkFn is called with a non-nil error argument if an os.Lstat
+			// or Readdirnames call returns an error. Both cases are considered
+			// fatal in the traversal.
+			// Reference: https://golang.org/pkg/path/filepath/#WalkFunc
+			if err != nil {
+				return err
+			}
+			// Skip the root directory
+			if path == dbDirPath {
+				return nil
+			}
 
-		// The database directory should only contain database directories, no files.
-		if !info.IsDir() {
-			return fmt.Errorf("unexpectedly found non-directory at %s", path)
-		}
-		_, dbName := filepath.Split(path)
-		version, err := parser.Parse(dbName)
-		if err != nil {
-			return err
-		}
+			// The database directory should only contain database directories, no files.
+			if !info.IsDir() {
+				return fmt.Errorf("unexpectedly found non-directory at %s", path)
+			}
+			_, dbName := filepath.Split(path)
+			version, err := parser.Parse(dbName)
+			if err != nil {
+				return err
+			}
 
-		// If [version] is greater than or equal to the specified version
-		// skip over creating the new database to avoid creating the same db
-		// twice or creating a database with a version ahead of the desired one.
-		if cmp := version.Compare(currentVersion); cmp >= 0 {
+			// If [version] is greater than or equal to the specified version
+			// skip over creating the new database to avoid creating the same db
+			// twice or creating a database with a version ahead of the desired one.
+			if cmp := version.Compare(currentVersion); cmp >= 0 {
+				return filepath.SkipDir
+			}
+
+			db, err := leveldb.New(path, log, 0, 0, 0)
+			if err != nil {
+				return fmt.Errorf("couldn't create db at %s: %w", path, err)
+			}
+
+			if version.Compare(firstVersionWithBootstrappedFlag) >= 0 {
+				manager.databases = append(manager.databases, &VersionedDatabase{
+					rawDB:    db,
+					Database: prefixdb.New(dbPrefix, db),
+					Version:  version,
+				})
+			} else {
+				manager.databases = append(manager.databases, &VersionedDatabase{
+					Database: db,
+					Version:  version,
+				})
+			}
+
 			return filepath.SkipDir
-		}
-
-		db, err := leveldb.New(path, log, 0, 0, 0)
-		if err != nil {
-			return fmt.Errorf("couldn't create db at %s: %w", path, err)
-		}
-
-		if version.Compare(firstVersionWithBootstrappedFlag) >= 0 {
-			manager.databases = append(manager.databases, &VersionedDatabase{
-				rawDB:    db,
-				Database: prefixdb.New(dbPrefix, db),
-				Version:  version,
-			})
-		} else {
-			manager.databases = append(manager.databases, &VersionedDatabase{
-				Database: db,
-				Version:  version,
-			})
-		}
-
-		return filepath.SkipDir
-	})
+		})
+	}
 	SortDescending(manager.databases)
 
 	// If an error occurred walking [dbDirPath] close the

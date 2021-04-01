@@ -59,7 +59,7 @@ func main() {
 
 	var dbManager manager.Manager
 	if Config.DBEnabled {
-		dbManager, err = manager.New(Config.DBPath, log, dbVersion)
+		dbManager, err = manager.New(Config.DBPath, log, dbVersion, Config.DBPreUpgrade)
 		if err != nil {
 			log.Error("couldn't create db manager at %s: %s", Config.DBPath, err)
 			return
