@@ -1,7 +1,7 @@
 # {{ ansible_managed }}
 
 [Unit]
-Description=AvalancheGo node for Avalanche consensus network
+Description=AvalancheGo node
 Documentation=https://docs.avax.network/
 After=network.target
 StartLimitIntervalSec=0
