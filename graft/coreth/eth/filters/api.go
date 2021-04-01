@@ -215,7 +215,7 @@ func (api *PublicFilterAPI) NewBlockFilter() rpc.ID {
 	return headerSub.ID
 }
 
-// NewHeads send a notification each time a new (header) block is appended to the chain.
+// NewHeads send a notification each time a new accepted (header) block is appended to the chain.
 func (api *PublicFilterAPI) NewHeads(ctx context.Context) (*rpc.Subscription, error) {
 	notifier, supported := rpc.NotifierFromContext(ctx)
 	if !supported {
@@ -247,8 +247,8 @@ func (api *PublicFilterAPI) NewHeads(ctx context.Context) (*rpc.Subscription, er
 	return rpcSub, nil
 }
 
-// NewHeads send a notification each time a new (header) block is appended to the chain.
-func (api *PublicFilterAPI) AcceptedHeads(ctx context.Context) (*rpc.Subscription, error) {
+// UnfinalizedHeads send a notification each time a new (header) block is appended to the chain.
+func (api *PublicFilterAPI) UnfinalizedHeads(ctx context.Context) (*rpc.Subscription, error) {
 	notifier, supported := rpc.NotifierFromContext(ctx)
 	if !supported {
 		return &rpc.Subscription{}, rpc.ErrNotificationsUnsupported
@@ -258,7 +258,7 @@ func (api *PublicFilterAPI) AcceptedHeads(ctx context.Context) (*rpc.Subscriptio
 
 	go func() {
 		headers := make(chan *types.Header)
-		headersSub := api.events.SubscribeAcceptedHeads(headers)
+		headersSub := api.events.SubscribeNewHeads(headers)
 
 		for {
 			select {
