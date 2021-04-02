@@ -26,13 +26,12 @@ import (
 type Config struct {
 	genesis.Params
 
-	// Attempt to do a database pre-upgrade.
 	// Will bootstrap using the current database version and then end the node.
-	DBPreUpgrade            bool
-	DBPreUpgradeStakingPort uint16
-	DBPreUpgradeHTTPPort    uint16
-	DBPreUpgradeDBDir       string
-	DBPreUpgradeLogDir      string
+	FetchOnly            bool
+	FetchOnlyStakingPort uint16
+	FetchOnlyHTTPPort    uint16
+	FetchOnlyDBDir       string
+	FetchOnlyLogDir      string
 
 	// Genesis information
 	GenesisBytes []byte

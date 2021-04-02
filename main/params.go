@@ -89,11 +89,11 @@ func avalancheFlagSet() *flag.FlagSet {
 	// If true, print the version and quit.
 	fs.Bool(versionKey, false, "If true, print version and quit")
 
-	// Database Pre-Upgrade
-	fs.Bool(dbPreUpgradeKey, false, "If true, attempts to do a database pre-upgrade")
-	fs.Uint(dbPreUpgradeHTTPPortPKey, 9652, fmt.Sprintf("Port used for HTTP API calls during node executions where --%s=true.", dbPreUpgradeKey))
-	fs.Uint(dbPreUpgradeStakingPortKey, 9653, fmt.Sprintf("Port used for P2P communication during node executions where --%s=true.", dbPreUpgradeKey))
-	fs.String(dbPreUpgradeLogDirKey, logging.DefaultLogDirectory+"/db-pre-upgrade", fmt.Sprintf("Path logs are sent to during node executions where --%s=true.", dbPreUpgradeKey))
+	// Fetch only mode
+	fs.Bool(fetchOnlyKey, false, "If true, bootstrap the current database version then stop")
+	fs.Uint(fetchOnlyHTTPPortPKey, 9652, fmt.Sprintf("Port used for HTTP API calls during node executions where --%s=true.", fetchOnlyKey))
+	fs.Uint(fetchOnlyStakingPortKey, 9653, fmt.Sprintf("Port used for P2P communication during node executions where --%s=true.", fetchOnlyKey))
+	fs.String(fetchOnlyLogDirKey, logging.DefaultLogDirectory+"/db-fetch-only", fmt.Sprintf("Path logs are sent to during node executions where --%s=true.", fetchOnlyKey))
 
 	// System
 	fs.Uint64(fdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
@@ -277,7 +277,7 @@ func getViper() (*viper.Viper, error) {
 // setNodeConfig sets attributes on [Config] based on the values
 // defined in the [viper] environment
 func setNodeConfig(v *viper.Viper) error {
-	Config.DBPreUpgrade = v.GetBool(dbPreUpgradeKey)
+	Config.FetchOnly = v.GetBool(fetchOnlyKey)
 
 	// Consensus Parameters
 	Config.ConsensusParams.K = v.GetInt(snowSampleSizeKey)
@@ -299,8 +299,8 @@ func setNodeConfig(v *viper.Viper) error {
 		return err
 	}
 	logsDir := ""
-	if Config.DBPreUpgrade {
-		logsDir = v.GetString(dbPreUpgradeLogDirKey)
+	if Config.FetchOnly {
+		logsDir = v.GetString(fetchOnlyLogDirKey)
 	} else {
 		logsDir = v.GetString(logsDirKey)
 	}
@@ -377,10 +377,10 @@ func setNodeConfig(v *viper.Viper) error {
 		return fmt.Errorf("invalid IP Address %s", publicIP)
 	}
 
-	if !Config.DBPreUpgrade {
+	if !Config.FetchOnly {
 		Config.StakingIP = utils.NewDynamicIPDesc(ip, uint16(v.GetUint(stakingPortKey)))
 	} else {
-		Config.StakingIP = utils.NewDynamicIPDesc(ip, uint16(v.GetUint(dbPreUpgradeStakingPortKey)))
+		Config.StakingIP = utils.NewDynamicIPDesc(ip, uint16(v.GetUint(fetchOnlyStakingPortKey)))
 	}
 
 	Config.DynamicUpdateDuration = v.GetDuration(dynamicUpdateDurationKey)
@@ -430,7 +430,7 @@ func setNodeConfig(v *viper.Viper) error {
 		}
 	}
 
-	if !Config.DBPreUpgrade {
+	if !Config.FetchOnly {
 		certBytes, err := ioutil.ReadFile(Config.StakingCertFile)
 		if err != nil {
 			return fmt.Errorf("problem reading staking certificate: %w", err)
@@ -548,10 +548,10 @@ func setNodeConfig(v *viper.Viper) error {
 
 	// HTTP:
 	Config.HTTPHost = v.GetString(httpHostKey)
-	if !Config.DBPreUpgrade {
+	if !Config.FetchOnly {
 		Config.HTTPPort = uint16(v.GetUint(httpPortKey))
 	} else {
-		Config.HTTPPort = uint16(v.GetUint(dbPreUpgradeHTTPPortPKey))
+		Config.HTTPPort = uint16(v.GetUint(fetchOnlyHTTPPortPKey))
 	}
 
 	Config.HTTPSEnabled = v.GetBool(httpsEnabledKey)

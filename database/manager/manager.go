@@ -150,7 +150,7 @@ func New(
 	dbDirPath string,
 	log logging.Logger,
 	currentVersion version.Version,
-	dbPreUpgrade bool,
+	includePreviousVersions bool,
 ) (Manager, error) {
 	parser := version.NewDefaultParser()
 	currentDBPath := path.Join(dbDirPath, currentVersion.String())
@@ -170,8 +170,8 @@ func New(
 		},
 	}
 
-	// If we're doing a database upgrade, ignore old databases
-	if !dbPreUpgrade {
+	// Conditionally ignore old databases
+	if !includePreviousVersions {
 		err = filepath.Walk(dbDirPath, func(path string, info os.FileInfo, err error) error {
 			// the walkFn is called with a non-nil error argument if an os.Lstat
 			// or Readdirnames call returns an error. Both cases are considered

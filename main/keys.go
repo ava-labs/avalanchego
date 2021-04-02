@@ -5,10 +5,10 @@ package main
 
 const (
 	defaultString                           = "default"
-	dbPreUpgradeKey                         = "db-pre-upgrade"
-	dbPreUpgradeHTTPPortPKey                = "db-pre-upgrade-http-port"
-	dbPreUpgradeStakingPortKey              = "db-pre-upgrade-staking-port"
-	dbPreUpgradeLogDirKey                   = "db-pre-upgrade-log-dir"
+	fetchOnlyKey                            = "fetch-only"
+	fetchOnlyHTTPPortPKey                   = "fetch-only-http-port"
+	fetchOnlyStakingPortKey                 = "fetch-only-staking-port"
+	fetchOnlyLogDirKey                      = "fetch-only-log-dir"
 	configFileKey                           = "config-file"
 	versionKey                              = "version"
 	genesisConfigFileKey                    = "genesis"

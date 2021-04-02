@@ -32,29 +32,29 @@ var (
 	stakingPortName = fmt.Sprintf("%s-staking", constants.AppName)
 	httpPortName    = fmt.Sprintf("%s-http", constants.AppName)
 	mustUpgradeMsg  = "\nThis version of AvalancheGo requires a database upgrade before running.\n" +
-		"To do the database upgrade, restart this node with argument --db-pre-upgrade.\n" +
-		"This will start the node in database upgrade mode. It will bootstrap a new database version and then stop.\n" +
-		"After running to completion in database upgrade mode, run without --db-pre-upgrade flag to run node normally.\n" +
-		"If you run a node, leave it running on this computer and restart this binary with --db-upgrade.\n" +
+		"To do the database upgrade, restart this node with argument --fetch-only.\n" +
+		"This will start the node in fetch only mode. It will bootstrap a new database version and then stop.\n" +
+		"After running to completion in fetch only mode, run without --fetch-only flag to run node normally.\n" +
+		"If you run a node, leave it running on this computer and restart this binary with --fetch-only.\n" +
 		"This will ensure that your node maintains its uptime if it is a validator.\n" +
-		"The node in database upgrade mode will by default not interfere with the node already running.\n" +
-		"When the node in database upgrade mode finishes, stop the other node running on this computer (if applicable) and run without --db-pre-upgrade flag to run node normally.\n" +
+		"The node in fetch only mode will by default not interfere with the node already running.\n" +
+		"When the node in fetch only mode finishes, stop the other node running on this computer (if applicable) and run without --fetch-only flag to run node normally.\n" +
 		"The database upgrade will not change this node's staking key/certificate.\n" +
 		"Note that populating the new database version will approximately double the amount of disk space required by AvalancheGo.\n" +
 		"Ensure that this computer has at least enough disk space available.\n" +
 		"You should not delete the old database version."
-	upgradingMsg = "\nNode running in database upgrade mode.\n" +
+	upgradingMsg = "\nNode running in fetch only mode.\n" +
 		"It will bootstrap a new database version and then stop.\n" +
-		"After running to completion in database upgrade mode, run without --db-pre-upgrade flag to run node normally.\n" +
-		"If you run a node, leave it running on this computer and restart this binary with --db-upgrade.\n" +
+		"After running to completion in fetch only mode, run without --fetch-only flag to run node normally.\n" +
+		"If you run a node, leave it running on this computer and restart this binary with --fetch-only.\n" +
 		"This will ensure that your node maintains its uptime if it is a validator.\n" +
-		"The node in database upgrade mode will by default not interfere with the node already running.\n" +
-		"When the node in database upgrade mode finishes, stop the other node running on this computer (if applicable) and run without --db-pre-upgrade flag to run node normally.\n" +
+		"The node in fetch only mode will by default not interfere with the node already running.\n" +
+		"When the node in fetch only mode finishes, stop the other node running on this computer (if applicable) and run without --fetch-only flag to run node normally.\n" +
 		"The database upgrade will not change this node's staking key/certificate.\n" +
 		"Note that populating the new database version will approximately double the amount of disk space required by AvalancheGo.\n" +
 		"Ensure that this computer has at least enough disk space available.\n" +
 		"You should not delete the old database version unless advised to by the Avalanche team.\n"
-	alreadyUpgradedMsg = "database upgrade mode done. Restart this node without --db-pre-upgrade to finish database upgrade and run normally"
+	alreadyUpgradedMsg = "fetch only mode done. Restart this node without --fetch-only to finish database upgrade and run normally"
 )
 
 // main is the primary entry point to Avalanche.
@@ -83,7 +83,7 @@ func main() {
 
 	var dbManager manager.Manager
 	if Config.DBEnabled {
-		dbManager, err = manager.New(Config.DBPath, log, dbVersion, Config.DBPreUpgrade)
+		dbManager, err = manager.New(Config.DBPath, log, dbVersion, !Config.FetchOnly)
 		if err != nil {
 			log.Error("couldn't create db manager at %s: %s", Config.DBPath, err)
 			return
@@ -101,7 +101,7 @@ func main() {
 		}
 	}
 
-	// Database Pre-Upgrade
+	// Fetch only
 	currentDBBootstrapped, err := dbManager.Bootstrapped(dbVersion)
 	if err != nil {
 		log.Error("couldn't get whether database version %s ever bootstrapped: %s", dbVersion)
@@ -109,23 +109,20 @@ func main() {
 	}
 	log.Info("bootstrapped with current database version: %v", currentDBBootstrapped)
 
-	if Config.DBPreUpgrade {
-		// Flag says to do a database pre-upgrade
-		// We have previously run the node using the database version we are attempting to upgrade to
-		// However, we may not have finished bootstrapping with this database version
+	if Config.FetchOnly {
+		// Flag says to run in fetch only mode
+		// Check if we have already have the current database
 		if currentDBBootstrapped {
-			// We previously finished bootstrapping with this database version.
+			// We already have the current database
 			log.Info(alreadyUpgradedMsg)
 			return
 		}
-		// We have not previously run the node using the database version we are attempting to upgrade to,
-		// or we never finished bootstrapping with that database version.
 		log.Info(upgradingMsg)
 	} else if !currentDBBootstrapped && dbManager.PreviouslyUsedDBVersion(prevDBVersion) {
 		log.Error(mustUpgradeMsg)
 		return
 	}
-	// Already did migration or there is nothing to migrate
+	// Already fetched or don't need to fetch
 
 	defer func() {
 		if r := recover(); r != nil {
