@@ -19,7 +19,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/prometheus/common/log"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
@@ -384,7 +383,6 @@ func setNodeConfig(v *viper.Viper) error {
 	}
 
 	Config.DynamicUpdateDuration = v.GetDuration(dynamicUpdateDurationKey)
-
 	Config.ConnMeterResetDuration = v.GetDuration(connMeterResetDurationKey)
 	Config.ConnMeterMaxConns = v.GetInt(connMeterMaxConnsKey)
 
@@ -394,10 +392,15 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.StakingKeyFile = v.GetString(stakingKeyPathKey)
 	Config.StakingCertFile = v.GetString(stakingCertPathKey)
 	Config.DisabledStakingWeight = v.GetUint64(stakingDisabledWeightKey)
-
 	Config.MinStakeDuration = v.GetDuration(minStakeDurationKey)
 	Config.MaxStakeDuration = v.GetDuration(maxStakeDurationKey)
 	Config.StakeMintingPeriod = v.GetDuration(stakeMintingPeriodKey)
+	if Config.EnableStaking && !Config.EnableP2PTLS {
+		return errStakingRequiresTLS
+	}
+	if !Config.EnableStaking && Config.DisabledStakingWeight == 0 {
+		return errInvalidStakerWeights
+	}
 
 	stakingKeyPath := v.GetString(stakingKeyPathKey)
 	if stakingKeyPath == defaultString {
@@ -430,93 +433,54 @@ func setNodeConfig(v *viper.Viper) error {
 		}
 	}
 
-	if !Config.FetchOnly {
-		certBytes, err := ioutil.ReadFile(Config.StakingCertFile)
-		if err != nil {
-			return fmt.Errorf("problem reading staking certificate: %w", err)
-		}
-		block, _ := pem.Decode(certBytes)
-		Config.StakingTLSCert, err = tls.LoadX509KeyPair(Config.StakingCertFile, Config.StakingKeyFile)
-		if err != nil {
-			return err
-		}
-		Config.Stakingx509Cert, err = x509.ParseCertificate(block.Bytes)
-		if err != nil {
-			return fmt.Errorf("problem parsing staking certificate: %w", err)
-		}
-	} else {
+	// Parse staking certificate from file
+	certBytes, err := ioutil.ReadFile(Config.StakingCertFile)
+	if err != nil {
+		return fmt.Errorf("problem reading staking certificate: %w", err)
+	}
+	Config.StakingTLSCert, err = tls.LoadX509KeyPair(Config.StakingCertFile, Config.StakingKeyFile)
+	if err != nil {
+		return err
+	}
+	block, _ := pem.Decode(certBytes)
+	x509Cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return fmt.Errorf("problem parsing staking certificate: %w", err)
+	}
+	nodeIDFromFile, err := ids.ToShortID(hashing.PubkeyBytesToAddress(x509Cert.Raw))
+	if err != nil {
+		return fmt.Errorf("problem deriving node ID from certificate: %w", err)
+	}
+	switch {
+	case !Config.EnableP2PTLS:
+		// If TLS disable, my node ID is the my IP
+		Config.NodeID = ids.ShortID(hashing.ComputeHash160Array([]byte(Config.StakingIP.IP().String())))
+	case !Config.FetchOnly:
+		// If TLS is enabled and we're not in fetch only mode, my node ID is derived from my staking key/cert
+		Config.NodeID = nodeIDFromFile
+	case Config.FetchOnly:
+		// If TLS is enabled and we're in fetch only mode, my node ID is derived a new, temporary staking key/cert
 		keyBytes, certBytes, err := staking.GenerateStakingCert()
 		if err != nil {
-			log.Errorf("couldn't generate dummy staking key/cert: %s", err)
+			return fmt.Errorf("couldn't generate dummy staking key/cert: %s", err)
 		}
 		Config.StakingTLSCert, err = tls.X509KeyPair(certBytes, keyBytes)
 		if err != nil {
-			log.Errorf("couldn't create TLS cert: %s", err)
+			return fmt.Errorf("couldn't create TLS cert: %s", err)
 		}
 		block, _ := pem.Decode(certBytes)
-		Config.Stakingx509Cert, err = x509.ParseCertificate(block.Bytes)
+		x509Cert, err = x509.ParseCertificate(block.Bytes)
 		if err != nil {
 			return fmt.Errorf("problem parsing staking certificate: %w", err)
 		}
-	}
-
-	// Bootstrapping:
-	defaultBootstrapIPs, defaultBootstrapIDs := genesis.SampleBeacons(Config.NetworkID, 5)
-	bootstrapIPs := v.GetString(bootstrapIPsKey)
-	if bootstrapIPs == defaultString {
-		bootstrapIPs = strings.Join(defaultBootstrapIPs, ",")
-	}
-	for _, ip := range strings.Split(bootstrapIPs, ",") {
-		if ip != "" {
-			addr, err := utils.ToIPDesc(ip)
-			if err != nil {
-				return fmt.Errorf("couldn't parse bootstrap ip %s: %w", ip, err)
-			}
-			Config.BootstrapPeers = append(Config.BootstrapPeers, &node.Peer{
-				IP: addr,
-			})
+		Config.NodeID, err = ids.ToShortID(hashing.PubkeyBytesToAddress(x509Cert.Raw))
+		if err != nil {
+			return fmt.Errorf("problem deriving node ID from certificate: %w", err)
 		}
 	}
 
-	bootstrapIDs := v.GetString(bootstrapIDsKey)
-	if bootstrapIDs == defaultString {
-		if bootstrapIPs == "" {
-			bootstrapIDs = ""
-		} else {
-			bootstrapIDs = strings.Join(defaultBootstrapIDs, ",")
-		}
-	}
-
-	if Config.EnableStaking && !Config.EnableP2PTLS {
-		return errStakingRequiresTLS
-	}
-
-	if !Config.EnableStaking && Config.DisabledStakingWeight == 0 {
-		return errInvalidStakerWeights
-	}
-
-	if Config.EnableP2PTLS {
-		i := 0
-		for _, id := range strings.Split(bootstrapIDs, ",") {
-			if id != "" {
-				peerID, err := ids.ShortFromPrefixedString(id, constants.NodeIDPrefix)
-				if err != nil {
-					return fmt.Errorf("couldn't parse bootstrap peer id: %w", err)
-				}
-				if len(Config.BootstrapPeers) <= i {
-					return errBootstrapMismatch
-				}
-				Config.BootstrapPeers[i].ID = peerID
-				i++
-			}
-		}
-		if len(Config.BootstrapPeers) != i {
-			return fmt.Errorf("more bootstrap IPs, %d, provided than bootstrap IDs, %d", len(Config.BootstrapPeers), i)
-		}
-	} else {
-		for _, peer := range Config.BootstrapPeers {
-			peer.ID = ids.ShortID(hashing.ComputeHash160Array([]byte(peer.IP.String())))
-		}
+	if err := initBootstrapPeers(v, nodeIDFromFile); err != nil {
+		return err
 	}
 
 	Config.WhitelistedSubnets.Add(constants.PrimaryNetworkID)
@@ -775,6 +739,71 @@ func setNodeConfig(v *viper.Viper) error {
 	// Peer alias
 	Config.PeerAliasTimeout = v.GetDuration(peerAliasTimeoutKey)
 
+	return nil
+}
+
+// Initialize Config.BootstrapPeers
+func initBootstrapPeers(v *viper.Viper, fetchOnlyFrom ids.ShortID) error {
+	bootstrapIPs := ""
+	bootstrapIDs := ""
+
+	if Config.FetchOnly {
+		parsedBootstrapIPs := v.GetString(bootstrapIPsKey)
+		if parsedBootstrapIPs == defaultString {
+			bootstrapIPs = "127.0.0.1:9651"
+		}
+		bootstrapIDs = fetchOnlyFrom.PrefixedString(constants.NodeIDPrefix)
+	} else {
+		defaultBootstrapIPs, defaultBootstrapIDs := genesis.SampleBeacons(Config.NetworkID, 5)
+		parsedBootstrapIPs := v.GetString(bootstrapIPsKey)
+		if parsedBootstrapIPs == defaultString {
+			bootstrapIPs = strings.Join(defaultBootstrapIPs, ",")
+		}
+		parsedBootstrapIDs := v.GetString(bootstrapIDsKey)
+		if parsedBootstrapIDs == defaultString {
+			if bootstrapIPs == "" {
+				bootstrapIDs = ""
+			} else {
+				bootstrapIDs = strings.Join(defaultBootstrapIDs, ",")
+			}
+		}
+	}
+
+	for _, ip := range strings.Split(bootstrapIPs, ",") {
+		if ip != "" {
+			addr, err := utils.ToIPDesc(ip)
+			if err != nil {
+				return fmt.Errorf("couldn't parse bootstrap ip %s: %w", ip, err)
+			}
+			Config.BootstrapPeers = append(Config.BootstrapPeers, &node.Peer{
+				IP: addr,
+			})
+		}
+	}
+
+	if Config.EnableP2PTLS {
+		i := 0
+		for _, id := range strings.Split(bootstrapIDs, ",") {
+			if id != "" {
+				peerID, err := ids.ShortFromPrefixedString(id, constants.NodeIDPrefix)
+				if err != nil {
+					return fmt.Errorf("couldn't parse bootstrap peer id: %w", err)
+				}
+				if len(Config.BootstrapPeers) <= i {
+					return errBootstrapMismatch
+				}
+				Config.BootstrapPeers[i].ID = peerID
+				i++
+			}
+		}
+		if len(Config.BootstrapPeers) != i {
+			return fmt.Errorf("more bootstrap IPs, %d, provided than bootstrap IDs, %d", len(Config.BootstrapPeers), i)
+		}
+	} else {
+		for _, peer := range Config.BootstrapPeers {
+			peer.ID = ids.ShortID(hashing.ComputeHash160Array([]byte(peer.IP.String())))
+		}
+	}
 	return nil
 }
 

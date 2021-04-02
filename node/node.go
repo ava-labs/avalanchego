@@ -402,26 +402,6 @@ func (n *Node) initDatabase(dbManager manager.Manager) error {
 	return nil
 }
 
-// Initialize this node's ID
-// If staking is disabled, a node's ID is a hash of its IP
-// Otherwise, it is a hash of the TLS certificate that this node
-// uses for P2P communication
-func (n *Node) initNodeID() error {
-	if !n.Config.EnableP2PTLS {
-		n.ID = ids.ShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.IP().String())))
-		n.Log.Info("Set the node's ID to %s", n.ID.PrefixedString(constants.NodeIDPrefix))
-		return nil
-	}
-
-	var err error
-	n.ID, err = ids.ToShortID(hashing.PubkeyBytesToAddress(n.Config.Stakingx509Cert.Raw))
-	if err != nil {
-		return fmt.Errorf("problem deriving staker ID from certificate: %w", err)
-	}
-	n.Log.Info("Set node's ID to %s", n.ID.PrefixedString(constants.NodeIDPrefix))
-	return nil
-}
-
 // Set the node IDs of the peers this node should first connect to
 func (n *Node) initBeacons() error {
 	n.beacons = validators.NewSet()
@@ -540,8 +520,16 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		return fmt.Errorf("couldn't initialize chain router: %w", err)
 	}
 
+	fetchOnlyFrom := validators.NewSet()
+	for _, peer := range n.Config.BootstrapPeers {
+		if err := fetchOnlyFrom.AddWeight(peer.ID, 1); err != nil {
+			return fmt.Errorf("couldn't initialize fetch from set: %w", err)
+		}
+	}
+
 	n.chainManager = chains.New(&chains.ManagerConfig{
-		DBPreupgrade:              n.Config.DBPreUpgrade,
+		FetchOnly:                 n.Config.FetchOnly,
+		FetchOnlyFrom:             fetchOnlyFrom,
 		StakingEnabled:            n.Config.EnableStaking,
 		MaxPendingMsgs:            n.Config.MaxPendingMsgs,
 		MaxNonStakerPendingMsgs:   n.Config.MaxNonStakerPendingMsgs,
@@ -824,11 +812,13 @@ func (n *Node) Initialize(
 	restarter utils.Restarter,
 ) error {
 	n.Log = logger
+	n.ID = config.NodeID
 	n.LogFactory = logFactory
 	n.Config = config
 	n.restarter = restarter
 	n.doneShuttingDown.Add(1)
 	n.Log.Info("Node version is: %s", Version)
+	n.Log.Info("Node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))
 
 	httpLog, err := logFactory.MakeSubdir("http")
 	if err != nil {
@@ -839,9 +829,7 @@ func (n *Node) Initialize(
 	if err := n.initDatabase(dbManager); err != nil { // Set up the node's database
 		return fmt.Errorf("problem initializing database: %w", err)
 	}
-	if err = n.initNodeID(); err != nil { // Derive this node's ID
-		return fmt.Errorf("problem initializing staker ID: %w", err)
-	}
+
 	if err = n.initBeacons(); err != nil { // Configure the beacons
 		return fmt.Errorf("problem initializing node beacons: %w", err)
 	}

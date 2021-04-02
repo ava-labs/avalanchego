@@ -27,7 +27,6 @@ require (
 	github.com/nbutton23/zxcvbn-go v0.0.0-20180912185939-ae427f1e4c1d
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.7.1
-	github.com/prometheus/common v0.10.0
 	github.com/rs/cors v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.7.1

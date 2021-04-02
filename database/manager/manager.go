@@ -171,7 +171,7 @@ func New(
 	}
 
 	// Conditionally ignore old databases
-	if !includePreviousVersions {
+	if includePreviousVersions {
 		err = filepath.Walk(dbDirPath, func(path string, info os.FileInfo, err error) error {
 			// the walkFn is called with a non-nil error argument if an os.Lstat
 			// or Readdirnames call returns an error. Both cases are considered

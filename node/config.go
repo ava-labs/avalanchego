@@ -5,7 +5,6 @@ package node
 
 import (
 	"crypto/tls"
-	"crypto/x509"
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -16,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -26,12 +26,15 @@ import (
 type Config struct {
 	genesis.Params
 
+	NodeID ids.ShortID
+
 	// Will bootstrap using the current database version and then end the node.
 	FetchOnly            bool
 	FetchOnlyStakingPort uint16
 	FetchOnlyHTTPPort    uint16
 	FetchOnlyDBDir       string
 	FetchOnlyLogDir      string
+	FetchOnlyFrom        validators.Set
 
 	// Genesis information
 	GenesisBytes []byte
@@ -64,7 +67,6 @@ type Config struct {
 	EnableStaking         bool
 	StakingCertFile       string
 	StakingKeyFile        string
-	Stakingx509Cert       *x509.Certificate
 	StakingTLSCert        tls.Certificate
 	DisabledStakingWeight uint64
 

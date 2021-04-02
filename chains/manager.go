@@ -151,7 +151,8 @@ type ManagerConfig struct {
 	RetryBootstrapMaxAttempts int  // Max number of times to retry bootstrap
 	ChainConfigs              map[ids.ID]ChainConfig
 	// If true, shut down the node after the Primary Network has bootstrapped
-	DBPreupgrade bool
+	FetchOnly     bool
+	FetchOnlyFrom validators.Set
 }
 
 type manager struct {
@@ -230,7 +231,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		sb = &subnet{
 			onFinish: func() {
 				m.Log.AssertNoError(m.DBManager.MarkBootstrapped(m.DBManager.Current()))
-				if m.ManagerConfig.DBPreupgrade {
+				if m.ManagerConfig.FetchOnly {
 					m.Log.Info("\n\ndone with fetch only mode. Restart without flag --fetch-only to run normally.\n\n")
 					go m.Shutdown()
 				}
@@ -238,6 +239,11 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		}
 	}
 	sb.addChain(chainParams.ID)
+
+	// In fetch-only mode, always fetch from a local node
+	if m.FetchOnly {
+		chainParams.CustomBeacons = m.FetchOnlyFrom
+	}
 
 	chain, err := m.buildChain(chainParams, sb)
 	if err != nil {
