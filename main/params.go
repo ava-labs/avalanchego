@@ -300,9 +300,9 @@ func setNodeConfig(v *viper.Viper) error {
 	}
 	logsDir := ""
 	if Config.DBPreUpgrade {
-		logsDir = v.GetString(logsDirKey)
-	} else {
 		logsDir = v.GetString(dbPreUpgradeLogDirKey)
+	} else {
+		logsDir = v.GetString(logsDirKey)
 	}
 	if logsDir != "" {
 		loggingConfig.Directory = logsDir
@@ -431,11 +431,11 @@ func setNodeConfig(v *viper.Viper) error {
 	}
 
 	if !Config.DBPreUpgrade {
-		stakeCert, err := ioutil.ReadFile(Config.StakingCertFile)
+		certBytes, err := ioutil.ReadFile(Config.StakingCertFile)
 		if err != nil {
 			return fmt.Errorf("problem reading staking certificate: %w", err)
 		}
-		block, _ := pem.Decode(stakeCert)
+		block, _ := pem.Decode(certBytes)
 		Config.StakingTLSCert, err = tls.LoadX509KeyPair(Config.StakingCertFile, Config.StakingKeyFile)
 		if err != nil {
 			return err
