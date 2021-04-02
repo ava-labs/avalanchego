@@ -365,15 +365,10 @@ func (t *Transitive) attemptToIssueTxs() error {
 // If there are pending transactions from the VM, issue them.
 // If we're not already at the limit for number of concurrent polls, issue a new
 // query.
-func (t *Transitive) repoll() error {
-	if t.polls.Len() >= t.Params.ConcurrentRepolls || t.errs.Errored() {
-		return nil
-	}
-
-	for i := t.polls.Len(); i < t.Params.ConcurrentRepolls; i++ {
+func (t *Transitive) repoll() {
+	for i := t.polls.Len(); i < t.Params.ConcurrentRepolls && !t.errs.Errored(); i++ {
 		t.issueRepoll()
 	}
-	return nil
 }
 
 // issueFromByID issues the branch ending with vertex [vtxID] to consensus.
