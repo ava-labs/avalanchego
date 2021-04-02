@@ -31,6 +31,30 @@ const (
 var (
 	stakingPortName = fmt.Sprintf("%s-staking", constants.AppName)
 	httpPortName    = fmt.Sprintf("%s-http", constants.AppName)
+	mustUpgradeMsg  = "\nThis version of AvalancheGo requires a database upgrade before running.\n" +
+		"To do the database upgrade, restart this node with argument --db-pre-upgrade.\n" +
+		"This will start the node in database upgrade mode. It will bootstrap a new database version and then stop.\n" +
+		"After running to completion in database upgrade mode, run without --db-pre-upgrade flag to run node normally.\n" +
+		"If you run a node, leave it running on this computer and restart this binary with --db-upgrade.\n" +
+		"This will ensure that your node maintains its uptime if it is a validator.\n" +
+		"The node in database upgrade mode will by default not interfere with the node already running.\n" +
+		"When the node in database upgrade mode finishes, stop the other node running on this computer (if applicable) and run without --db-pre-upgrade flag to run node normally.\n" +
+		"The database upgrade will not change this node's staking key/certificate.\n" +
+		"Note that populating the new database version will approximately double the amount of disk space required by AvalancheGo.\n" +
+		"Ensure that this computer has at least enough disk space available.\n" +
+		"You should not delete the old database version."
+	upgradingMsg = "\nNode running in database upgrade mode.\n" +
+		"It will bootstrap a new database version and then stop.\n" +
+		"After running to completion in database upgrade mode, run without --db-pre-upgrade flag to run node normally.\n" +
+		"If you run a node, leave it running on this computer and restart this binary with --db-upgrade.\n" +
+		"This will ensure that your node maintains its uptime if it is a validator.\n" +
+		"The node in database upgrade mode will by default not interfere with the node already running.\n" +
+		"When the node in database upgrade mode finishes, stop the other node running on this computer (if applicable) and run without --db-pre-upgrade flag to run node normally.\n" +
+		"The database upgrade will not change this node's staking key/certificate.\n" +
+		"Note that populating the new database version will approximately double the amount of disk space required by AvalancheGo.\n" +
+		"Ensure that this computer has at least enough disk space available.\n" +
+		"You should not delete the old database version unless advised to by the Avalanche team.\n"
+	alreadyUpgradedMsg = "database upgrade mode done. Restart this node without --db-pre-upgrade to finish database upgrade and run normally"
 )
 
 // main is the primary entry point to Avalanche.
@@ -91,39 +115,14 @@ func main() {
 		// However, we may not have finished bootstrapping with this database version
 		if currentDBBootstrapped {
 			// We previously finished bootstrapping with this database version.
-			log.Info("Database upgrade mode done. Restart this node without --db-pre-upgrade to finish database upgrade and run normally.")
+			log.Info(alreadyUpgradedMsg)
 			return
 		}
 		// We have not previously run the node using the database version we are attempting to upgrade to,
 		// or we never finished bootstrapping with that database version.
-		log.Info(
-			"\nNode running in database upgrade mode.\n" +
-				"It will bootstrap a new database version and then stop.\n" +
-				"After running to completion in database upgrade mode, run without --db-pre-upgrade flag to run node normally.\n" +
-				"If you run a node, leave it running on this computer and restart this binary with --db-upgrade.\n" +
-				"This will ensure that your node maintains its uptime if it is a validator.\n" +
-				"The node in database upgrade mode will by default not interfere with the node already running.\n" +
-				"When the node in database upgrade mode finishes, stop the other node running on this computer (if applicable) and run without --db-pre-upgrade flag to run node normally.\n" +
-				"The database upgrade will not change this node's staking key/certificate.\n" +
-				"Note that populating the new database version will approximately double the amount of disk space required by AvalancheGo.\n" +
-				"Ensure that this computer has at least enough disk space available.\n" +
-				"You should not delete the old database version unless advised to by the Avalanche team.\n",
-		)
+		log.Info(upgradingMsg)
 	} else if !currentDBBootstrapped && dbManager.PreviouslyUsedDBVersion(prevDBVersion) {
-		log.Error(
-			"\nThis version of AvalancheGo requires a database upgrade before running.\n" +
-				"To do the database upgrade, restart this node with argument --db-pre-upgrade.\n" +
-				"This will start the node in database upgrade mode. It will bootstrap a new database version and then stop.\n" +
-				"After running to completion in database upgrade mode, run without --db-pre-upgrade flag to run node normally.\n" +
-				"If you run a node, leave it running on this computer and restart this binary with --db-upgrade.\n" +
-				"This will ensure that your node maintains its uptime if it is a validator.\n" +
-				"The node in database upgrade mode will by default not interfere with the node already running.\n" +
-				"When the node in database upgrade mode finishes, stop the other node running on this computer (if applicable) and run without --db-pre-upgrade flag to run node normally.\n" +
-				"The database upgrade will not change this node's staking key/certificate.\n" +
-				"Note that populating the new database version will approximately double the amount of disk space required by AvalancheGo.\n" +
-				"Ensure that this computer has at least enough disk space available.\n" +
-				"You should not delete the old database version.",
-		)
+		log.Error(mustUpgradeMsg)
 		return
 	}
 	// Already did migration or there is nothing to migrate
