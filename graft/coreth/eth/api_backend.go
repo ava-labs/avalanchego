@@ -93,8 +93,15 @@ func (b *EthAPIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumb
 	}
 	// Treat requests for the pending, latest, or accepted block
 	// identically.
+	acceptedBlock := b.eth.AcceptedBlock()
 	if number.IsAccepted() {
 		return b.eth.AcceptedBlock().Header(), nil
+	}
+
+	if !b.GetVMConfig().AllowUnfinalizedQueries && acceptedBlock != nil {
+		if number.Int64() > acceptedBlock.Number().Int64() {
+			return nil, errors.New("cannot query unfinalized data")
+		}
 	}
 
 	return b.eth.blockchain.GetHeaderByNumber(uint64(number)), nil
@@ -130,8 +137,15 @@ func (b *EthAPIBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumbe
 	}
 	// Treat requests for the pending, latest, or accepted block
 	// identically.
+	acceptedBlock := b.eth.AcceptedBlock()
 	if number.IsAccepted() {
 		return b.eth.AcceptedBlock(), nil
+	}
+
+	if !b.GetVMConfig().AllowUnfinalizedQueries && acceptedBlock != nil {
+		if number.Int64() > acceptedBlock.Number().Int64() {
+			return nil, errors.New("cannot query unfinalized data")
+		}
 	}
 
 	return b.eth.blockchain.GetBlockByNumber(uint64(number)), nil
@@ -264,6 +278,10 @@ func (b *EthAPIBackend) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) e
 
 func (b *EthAPIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
 	return b.eth.BlockChain().SubscribeLogsEvent(ch)
+}
+
+func (b *EthAPIBackend) SubscribeAcceptedLogsEvent(ch chan<- []*types.Log) event.Subscription {
+	return b.eth.BlockChain().SubscribeAcceptedLogsEvent(ch)
 }
 
 func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {

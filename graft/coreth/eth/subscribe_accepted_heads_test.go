@@ -83,7 +83,6 @@ func TestAcceptedHeadSubscriptions(t *testing.T) {
 
 	acceptedChainCh := make(chan core.ChainEvent, 1000)
 	chainCh := make(chan core.ChainEvent, 1000)
-
 	ethbackend.SubscribeChainAcceptedEvent(acceptedChainCh)
 	ethbackend.SubscribeChainEvent(chainCh)
 

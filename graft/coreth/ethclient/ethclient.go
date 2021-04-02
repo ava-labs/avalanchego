@@ -374,12 +374,6 @@ func (ec *Client) SubscribeNewHead(ctx context.Context, ch chan<- *types.Header)
 	return ec.c.EthSubscribe(ctx, ch, "newHeads")
 }
 
-// SubscribeAcceptedHead subscribes to notifications about the current blockchain head
-// on the given channel.
-func (ec *Client) SubscribeAcceptedHead(ctx context.Context, ch chan<- *types.Header) (coreth.Subscription, error) {
-	return ec.c.EthSubscribe(ctx, ch, "acceptedHeads")
-}
-
 // State Access
 
 // NetworkID returns the network ID (also known as the chain ID) for this chain.

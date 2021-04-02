@@ -83,6 +83,9 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 
 	ethbackend := EthAPIBackend{eth: backend, gpo: nil}
 
+	acceptedLogsCh := make(chan []*types.Log, 1000)
+	ethbackend.SubscribeAcceptedLogsEvent(acceptedLogsCh)
+
 	api := filters.NewPublicFilterAPI(&ethbackend, true, 10)
 
 	backend.StartMining(0)
@@ -231,6 +234,12 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 		t.Fatalf("GetLogs failed %s", err)
 	}
 
+	select {
+	case <-acceptedLogsCh:
+		t.Fatal("GetLogs created")
+	default:
+	}
+
 	backend.blockchain.Accept(cbx)
 
 	backend.BlockChain().GetVMConfig().AllowUnfinalizedQueries = false
@@ -257,4 +266,16 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 	}
 
 	backend.StopPart()
+
+	select {
+	case acceptedLogs := <-acceptedLogsCh:
+		if len(acceptedLogs) != 1 {
+			t.Fatal("GetLogs failed")
+		}
+		if acceptedLogs[0].BlockNumber != 1 {
+			t.Fatalf("GetLogs failed")
+		}
+	default:
+		t.Fatal("GetLogs not created")
+	}
 }

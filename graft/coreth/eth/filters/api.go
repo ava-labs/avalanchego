@@ -187,8 +187,14 @@ func (api *PublicFilterAPI) NewPendingTransactions(ctx context.Context) (*rpc.Su
 func (api *PublicFilterAPI) NewBlockFilter() rpc.ID {
 	var (
 		headers   = make(chan *types.Header)
-		headerSub = api.events.SubscribeNewHeads(headers)
+		headerSub *Subscription
 	)
+
+	if api.backend.GetVMConfig().AllowUnfinalizedQueries {
+		headerSub = api.events.SubscribeNewHeads(headers)
+	} else {
+		headerSub = api.events.SubscribeAcceptedHeads(headers)
+	}
 
 	api.filtersMu.Lock()
 	api.filters[headerSub.ID] = &filter{typ: BlocksSubscription, deadline: time.NewTimer(deadline), hashes: make([]common.Hash, 0), s: headerSub}
@@ -225,40 +231,16 @@ func (api *PublicFilterAPI) NewHeads(ctx context.Context) (*rpc.Subscription, er
 	rpcSub := notifier.CreateSubscription()
 
 	go func() {
-		headers := make(chan *types.Header)
-		// The public NewHeads will follow the accepted heads subscription
-		// this will be finalized blocks only.
-		headersSub := api.events.SubscribeAcceptedHeads(headers)
+		var (
+			headers    = make(chan *types.Header)
+			headersSub event.Subscription
+		)
 
-		for {
-			select {
-			case h := <-headers:
-				notifier.Notify(rpcSub.ID, h)
-			case <-rpcSub.Err():
-				headersSub.Unsubscribe()
-				return
-			case <-notifier.Closed():
-				headersSub.Unsubscribe()
-				return
-			}
+		if api.backend.GetVMConfig().AllowUnfinalizedQueries {
+			headersSub = api.events.SubscribeNewHeads(headers)
+		} else {
+			headersSub = api.events.SubscribeAcceptedHeads(headers)
 		}
-	}()
-
-	return rpcSub, nil
-}
-
-// UnfinalizedHeads send a notification each time a new (header) block is appended to the chain.
-func (api *PublicFilterAPI) UnfinalizedHeads(ctx context.Context) (*rpc.Subscription, error) {
-	notifier, supported := rpc.NotifierFromContext(ctx)
-	if !supported {
-		return &rpc.Subscription{}, rpc.ErrNotificationsUnsupported
-	}
-
-	rpcSub := notifier.CreateSubscription()
-
-	go func() {
-		headers := make(chan *types.Header)
-		headersSub := api.events.SubscribeNewHeads(headers)
 
 		for {
 			select {
@@ -287,15 +269,20 @@ func (api *PublicFilterAPI) Logs(ctx context.Context, crit FilterCriteria) (*rpc
 	var (
 		rpcSub      = notifier.CreateSubscription()
 		matchedLogs = make(chan []*types.Log)
+		logsSub     event.Subscription
+		err         error
 	)
 
-	logsSub, err := api.events.SubscribeLogs(ethereum.FilterQuery(crit), matchedLogs)
-	if err != nil {
-		return nil, err
+	if api.backend.GetVMConfig().AllowUnfinalizedQueries {
+		logsSub, err = api.events.SubscribeLogs(ethereum.FilterQuery(crit), matchedLogs)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		logsSub, err = api.events.SubscribeAcceptedLogs(ethereum.FilterQuery(crit), matchedLogs)
 	}
 
 	go func() {
-
 		for {
 			select {
 			case logs := <-matchedLogs:
@@ -333,10 +320,22 @@ type FilterCriteria ethereum.FilterQuery
 //
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_newfilter
 func (api *PublicFilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
-	logs := make(chan []*types.Log)
-	logsSub, err := api.events.SubscribeLogs(ethereum.FilterQuery(crit), logs)
-	if err != nil {
-		return rpc.ID(""), err
+	var (
+		matchedLogs = make(chan []*types.Log)
+		logsSub     *Subscription
+		err         error
+	)
+
+	if api.backend.GetVMConfig().AllowUnfinalizedQueries {
+		logsSub, err = api.events.SubscribeLogs(ethereum.FilterQuery(crit), matchedLogs)
+		if err != nil {
+			return rpc.ID(""), err
+		}
+	} else {
+		logsSub, err = api.events.SubscribeAcceptedLogs(ethereum.FilterQuery(crit), matchedLogs)
+		if err != nil {
+			return rpc.ID(""), err
+		}
 	}
 
 	api.filtersMu.Lock()
@@ -346,7 +345,7 @@ func (api *PublicFilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
 	go func() {
 		for {
 			select {
-			case l := <-logs:
+			case l := <-matchedLogs:
 				api.filtersMu.Lock()
 				if f, found := api.filters[logsSub.ID]; found {
 					f.logs = append(f.logs, l...)
@@ -491,7 +490,7 @@ func (api *PublicFilterAPI) GetFilterChanges(id rpc.ID) (interface{}, error) {
 			hashes := f.hashes
 			f.hashes = nil
 			return returnHashes(hashes), nil
-		case LogsSubscription, MinedAndPendingLogsSubscription:
+		case LogsSubscription, AcceptedLogsSubscription, MinedAndPendingLogsSubscription:
 			logs := f.logs
 			f.logs = nil
 			return returnLogs(logs), nil

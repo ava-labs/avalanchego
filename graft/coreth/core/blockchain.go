@@ -194,6 +194,7 @@ type BlockChain struct {
 	chainHeadFeed     event.Feed
 	chainAcceptedFeed event.Feed
 	logsFeed          event.Feed
+	logsAcceptedFeed  event.Feed
 	blockProcFeed     event.Feed
 	scope             event.SubscriptionScope
 	genesisBlock      *types.Block
@@ -899,19 +900,7 @@ func (bc *BlockChain) GetBlockByHash(hash common.Hash) *types.Block {
 func (bc *BlockChain) GetBlockByNumber(number uint64) *types.Block {
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
-	if !bc.vmConfig.AllowUnfinalizedQueries &&
-		bc.lastAccepted != nil &&
-		number > bc.lastAccepted.NumberU64() {
-		return nil
-	}
-	return bc.getBlockByNumber(number)
-}
 
-// GetBlockByNumberUnfinalized retrieves a block from the canonical chain by number, caching it
-// (associated with its hash) if found. It may return an unfinalized block if it requests a block above the last accepted height.
-func (bc *BlockChain) GetBlockByNumberUnfinalized(number uint64) *types.Block {
-	bc.chainmu.Lock()
-	defer bc.chainmu.Unlock()
 	return bc.getBlockByNumber(number)
 }
 
@@ -1727,7 +1716,23 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 	}
 
 	bc.lastAccepted = block
-	bc.chainAcceptedFeed.Send(ChainEvent{Block: block, Hash: block.Hash()})
+
+	// Fetch block logs
+	receipts := rawdb.ReadReceipts(bc.db, block.Hash(), block.NumberU64(), bc.chainConfig)
+	var logs []*types.Log
+	for _, receipt := range receipts {
+		for _, log := range receipt.Logs {
+			l := log.Copy()
+			logs = append(logs, l)
+		}
+	}
+
+	// Update accepted feeds
+	bc.chainAcceptedFeed.Send(ChainEvent{Block: block, Hash: block.Hash(), Logs: logs})
+	if len(logs) > 0 {
+		bc.logsAcceptedFeed.Send(logs)
+	}
+
 	return nil
 }
 
@@ -2854,6 +2859,11 @@ func (bc *BlockChain) SubscribeChainSideEvent(ch chan<- ChainSideEvent) event.Su
 // SubscribeLogsEvent registers a subscription of []*types.Log.
 func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
 	return bc.scope.Track(bc.logsFeed.Subscribe(ch))
+}
+
+// SubscribeAcceptedLogsEvent registers a subscription of accepted []*types.Log.
+func (bc *BlockChain) SubscribeAcceptedLogsEvent(ch chan<- []*types.Log) event.Subscription {
+	return bc.scope.Track(bc.logsAcceptedFeed.Subscribe(ch))
 }
 
 // SubscribeBlockProcessingEvent registers a subscription of bool where true means
