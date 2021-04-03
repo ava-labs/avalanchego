@@ -280,6 +280,9 @@ func (api *PublicFilterAPI) Logs(ctx context.Context, crit FilterCriteria) (*rpc
 		}
 	} else {
 		logsSub, err = api.events.SubscribeAcceptedLogs(ethereum.FilterQuery(crit), matchedLogs)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	go func() {

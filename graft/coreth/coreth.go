@@ -91,6 +91,10 @@ func (self *ETHChain) BlockChain() *core.BlockChain {
 	return self.backend.BlockChain()
 }
 
+func (self *ETHChain) Backend() *eth.Ethereum {
+	return self.backend
+}
+
 func (self *ETHChain) UnlockIndexing() {
 	self.backend.BlockChain().UnlockIndexing()
 }
@@ -166,11 +170,6 @@ func (self *ETHChain) GetBlockByHash(hash common.Hash) *types.Block {
 // Retrives a block from the database by number.
 func (self *ETHChain) GetBlockByNumber(num uint64) *types.Block {
 	return self.backend.BlockChain().GetBlockByNumber(num)
-}
-
-// Retrives a block from the database by number.
-func (self *ETHChain) GetBlockByNumberUnfinalized(num uint64) *types.Block {
-	return self.backend.BlockChain().GetBlockByNumberUnfinalized(num)
 }
 
 // Validate the canonical chain from current block to the genesis.
