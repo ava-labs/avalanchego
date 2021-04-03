@@ -71,7 +71,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 2, 4)
+	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 3, 1)
 	versionParser           = version.NewDefaultParser()
 	beaconConnectionTimeout = 1 * time.Minute
 )
@@ -333,22 +333,20 @@ func (b *beaconManager) Disconnected(vdrID ids.ShortID) {
 func (n *Node) Dispatch() error {
 	// Start the HTTP API server
 	go n.Log.RecoverAndPanic(func() {
+		var err error
 		if n.Config.HTTPSEnabled {
 			n.Log.Debug("initializing API server with TLS")
-			err := n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
-			n.Log.Warn("TLS enabled API server dispatch failed with %s. Attempting to create insecure API server", err)
+			err = n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
+		} else {
+			n.Log.Debug("initializing API server without TLS")
+			err = n.APIServer.Dispatch()
 		}
-
-		n.Log.Debug("initializing API server without TLS")
-		err := n.APIServer.Dispatch()
-
 		// When [n].Shutdown() is called, [n.APIServer].Close() is called.
 		// This causes [n.APIServer].Dispatch() to return an error.
 		// If that happened, don't log/return an error here.
 		if !n.shuttingDown.GetValue() {
 			n.Log.Fatal("API server dispatch failed with %s", err)
 		}
-
 		// If the API server isn't running, shut down the node.
 		// If node is already shutting down, this does nothing.
 		n.Shutdown()
@@ -478,9 +476,8 @@ func (n *Node) initIPCs() error {
 }
 
 // Initializes the Platform chain.
-// Its genesis data specifies the other chains that should
-// be created.
-func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
+// Its genesis data specifies the other chains that should be created.
+func (n *Node) initChains(genesisBytes []byte) {
 	n.Log.Info("initializing chains")
 
 	// Create the Platform Chain
@@ -491,8 +488,6 @@ func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 		VMAlias:       platformvm.ID.String(),
 		CustomBeacons: n.beacons,
 	})
-
-	return nil
 }
 
 // initAPIServer initializes the server that handles HTTP calls
@@ -506,6 +501,7 @@ func (n *Node) initAPIServer() error {
 		n.Config.HTTPPort,
 		n.Config.APIRequireAuthToken,
 		n.Config.APIAuthPassword,
+		n.Config.APIAllowedOrigins,
 	)
 }
 
@@ -909,9 +905,8 @@ func (n *Node) Initialize(
 	if err := n.initAliases(n.Config.GenesisBytes); err != nil { // Set up aliases
 		return fmt.Errorf("couldn't initialize aliases: %w", err)
 	}
-	if err := n.initChains(n.Config.GenesisBytes, n.Config.AvaxAssetID); err != nil { // Start the Platform chain
-		return fmt.Errorf("couldn't initialize chains: %w", err)
-	}
+	// Start the Platform chain
+	n.initChains(n.Config.GenesisBytes)
 	return nil
 }
 

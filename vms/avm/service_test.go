@@ -111,12 +111,12 @@ func sampleAddrs(t *testing.T, vm *VM, addrs []ids.ShortID) ([]ids.ShortID, []st
 // Returns error if [numTxFees] tx fees was not deducted from the addresses in [fromAddrs]
 // relative to their starting balance
 func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numTxFees int) error {
-	totalTxFee := numTxFees * int(s.vm.txFee)
-	fromAddrsStartBalance := int(startBalance) * len(fromAddrs)
+	totalTxFee := uint64(numTxFees) * s.vm.txFee
+	fromAddrsStartBalance := startBalance * uint64(len(fromAddrs))
 
 	// Key: Address
 	// Value: AVAX balance
-	balances := map[ids.ShortID]int{}
+	balances := map[ids.ShortID]uint64{}
 
 	for _, addr := range addrs { // get balances for all addresses
 		addrStr, err := s.vm.FormatLocalAddress(addr)
@@ -134,10 +134,10 @@ func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numT
 		if err != nil {
 			return fmt.Errorf("couldn't get balance of %s: %w", addr, err)
 		}
-		balances[addr] = int(reply.Balance)
+		balances[addr] = uint64(reply.Balance)
 	}
 
-	fromAddrsTotalBalance := 0
+	fromAddrsTotalBalance := uint64(0)
 	for _, addr := range fromAddrs {
 		fromAddrsTotalBalance += balances[addr]
 	}

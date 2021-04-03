@@ -37,6 +37,7 @@ func TestCall(t *testing.T) {
 		8080,
 		false,
 		"",
+		[]string{"*"},
 	)
 	if err != nil {
 		t.Fatal(err)

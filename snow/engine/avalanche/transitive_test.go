@@ -727,6 +727,7 @@ func TestEngineAbandonResponse(t *testing.T) {
 	sender.GetF = func(vID ids.ShortID, requestID uint32, vtxID ids.ID) {
 		*reqID = requestID
 	}
+	sender.CantChits = false
 
 	if err := te.PullQuery(vdr, 0, vtx.ID()); err != nil {
 		t.Fatal(err)
@@ -1108,7 +1109,8 @@ func TestEngineIssueRepoll(t *testing.T) {
 		}
 	}
 
-	if err := te.repoll(); err != nil {
+	te.repoll()
+	if err := te.errs.Err; err != nil {
 		t.Fatal(err)
 	}
 }
@@ -2341,6 +2343,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 
 	sender.GetF = nil
 	manager.ParseF = nil
+	sender.CantChits = false
 
 	if err := te.GetFailed(vdr, *requestID); err != nil {
 		t.Fatal(err)
@@ -2380,7 +2383,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	config.SampleK = int(vals.Weight())
+	config.SampleK = vals.Len()
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -2639,7 +2642,7 @@ func TestEngineReBootstrapFails(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	config.SampleK = int(vals.Weight())
+	config.SampleK = vals.Len()
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -2786,7 +2789,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 	config.Validators = vals
 	config.Beacons = vals
 
-	config.SampleK = int(vals.Weight())
+	config.SampleK = vals.Len()
 
 	sender := &common.SenderTest{}
 	sender.T = t

@@ -73,7 +73,7 @@ func (v *voter) Update() {
 	}
 
 	v.t.Ctx.Log.Debug("Avalanche engine can't quiesce")
-	v.t.errs.Add(v.t.repoll())
+	v.t.repoll()
 }
 
 func (v *voter) bubbleVotes(votes ids.UniqueBag) (ids.UniqueBag, error) {

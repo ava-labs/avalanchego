@@ -8,6 +8,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"path"
@@ -48,14 +49,15 @@ var (
 
 	homeDir                = os.ExpandEnv("$HOME")
 	prefixedAppName        = fmt.Sprintf(".%s", constants.AppName)
-	defaultDbDir           = filepath.Join(homeDir, prefixedAppName, "db")
-	defaultStakingKeyPath  = filepath.Join(homeDir, prefixedAppName, "staking", "staker.key")
-	defaultStakingCertPath = filepath.Join(homeDir, prefixedAppName, "staking", "staker.crt")
+	defaultDataDir         = filepath.Join(homeDir, prefixedAppName)
+	defaultDbDir           = filepath.Join(defaultDataDir, "db")
+	defaultStakingKeyPath  = filepath.Join(defaultDataDir, "staking", "staker.key")
+	defaultStakingCertPath = filepath.Join(defaultDataDir, "staking", "staker.crt")
 	defaultPluginDirs      = []string{
 		filepath.Join(".", "build", "plugins"),
 		filepath.Join(".", "plugins"),
 		filepath.Join("/", "usr", "local", "lib", constants.AppName),
-		filepath.Join(homeDir, prefixedAppName, "plugins"),
+		filepath.Join(defaultDataDir, "plugins"),
 	}
 	// GitCommit should be optionally set at compile time.
 	GitCommit string
@@ -160,8 +162,9 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(httpsEnabledKey, false, "Upgrade the HTTP server to HTTPs")
 	fs.String(httpsKeyFileKey, "", "TLS private key file for the HTTPs server")
 	fs.String(httpsCertFileKey, "", "TLS certificate file for the HTTPs server")
+	fs.String(httpAllowedOrigins, "*", "Origins to allow on the HTTP port. Defaults to * which allows all origins. Example: https://*.avax.network https://*.avax-test.network")
 	fs.Bool(apiAuthRequiredKey, false, "Require authorization token to call HTTP APIs")
-	fs.String(apiAuthPasswordKey, "", "Password used to create/validate API authorization tokens. Can be changed via API call.")
+	fs.String(apiAuthPasswordFileKey, "", "Password file used to initially create/validate API authorization tokens. Leading and trailing whitespace is removed from the password. Can be changed via API call.")
 	// Enable/Disable APIs
 	fs.Bool(adminAPIEnabledKey, false, "If true, this node exposes the Admin API")
 	fs.Bool(infoAPIEnabledKey, true, "If true, this node exposes the Info API")
@@ -184,14 +187,14 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Router Health
 	fs.Float64(routerHealthMaxDropRateKey, 1, "Node reports unhealthy if the router drops more than this portion of messages.")
 	fs.Uint(routerHealthMaxOutstandingRequestsKey, 1024, "Node reports unhealthy if there are more than this many outstanding consensus requests (Get, PullQuery, etc.) over all chains")
-	fs.Duration(networkHealthMaxTimeSinceNoReqsKey, 5*time.Minute, "Node reports unhealthy if there is at least 1 outstanding request continuously for this duration")
+	fs.Duration(networkHealthMaxOutstandingDurationKey, 5*time.Minute, "Node reports unhealthy if there has been a request outstanding for this duration")
 
 	// Staking
 	fs.Uint(stakingPortKey, 9651, "Port of the consensus server")
 	fs.Bool(stakingEnabledKey, true, "Enable staking. If enabled, Network TLS is required.")
 	fs.Bool(p2pTLSEnabledKey, true, "Require TLS to authenticate network communication")
-	fs.String(stakingKeyPathKey, defaultString, "TLS private key for staking")
-	fs.String(stakingCertPathKey, defaultString, "TLS certificate for staking")
+	fs.String(stakingKeyPathKey, defaultString, "Path to the TLS private key for staking")
+	fs.String(stakingCertPathKey, defaultString, "Path to the TLS certificate for staking")
 	fs.Uint64(stakingDisabledWeightKey, 1, "Weight to provide to each peer when staking is disabled")
 	// Uptime Requirement
 	fs.Float64(uptimeRequirementKey, .6, "Fraction of time a validator must be online to receive rewards")
@@ -496,22 +499,25 @@ func setNodeConfig(v *viper.Viper) error {
 	// HTTP:
 	Config.HTTPHost = v.GetString(httpHostKey)
 	Config.HTTPPort = uint16(v.GetUint(httpPortKey))
-	if Config.APIRequireAuthToken {
-		if Config.APIAuthPassword == "" {
-			return errors.New("api-auth-password must be provided if api-auth-required is true")
-		}
-		if !password.SufficientlyStrong(Config.APIAuthPassword, password.OK) {
-			return errors.New("api-auth-password is not strong enough. Add more characters")
-		}
-	}
 
 	Config.HTTPSEnabled = v.GetBool(httpsEnabledKey)
 	Config.HTTPSKeyFile = v.GetString(httpsKeyFileKey)
 	Config.HTTPSCertFile = v.GetString(httpsCertFileKey)
+	Config.APIAllowedOrigins = v.GetStringSlice(httpAllowedOrigins)
 
 	// API Auth
 	Config.APIRequireAuthToken = v.GetBool(apiAuthRequiredKey)
-	Config.APIAuthPassword = v.GetString(apiAuthPasswordKey)
+	if Config.APIRequireAuthToken {
+		passwordFile := v.GetString(apiAuthPasswordFileKey)
+		pwBytes, err := ioutil.ReadFile(passwordFile)
+		if err != nil {
+			return fmt.Errorf("api-auth-password-file %q failed to be read with: %w", passwordFile, err)
+		}
+		Config.APIAuthPassword = strings.TrimSpace(string(pwBytes))
+		if !password.SufficientlyStrong(Config.APIAuthPassword, password.OK) {
+			return errors.New("api-auth-password is not strong enough")
+		}
+	}
 
 	// APIs
 	Config.AdminAPIEnabled = v.GetBool(adminAPIEnabledKey)
@@ -535,14 +541,14 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.ConsensusRouter = &router.ChainRouter{}
 	Config.RouterHealthConfig.MaxDropRate = v.GetFloat64(routerHealthMaxDropRateKey)
 	Config.RouterHealthConfig.MaxOutstandingRequests = int(v.GetUint(routerHealthMaxOutstandingRequestsKey))
-	Config.RouterHealthConfig.MaxTimeSinceNoOutstandingRequests = v.GetDuration(networkHealthMaxTimeSinceNoReqsKey)
+	Config.RouterHealthConfig.MaxOutstandingDuration = v.GetDuration(networkHealthMaxOutstandingDurationKey)
 	Config.RouterHealthConfig.MaxRunTimeRequests = v.GetDuration(networkMaximumTimeoutKey)
 	Config.RouterHealthConfig.MaxDropRateHalflife = healthCheckAveragerHalflife
 	switch {
 	case Config.RouterHealthConfig.MaxDropRate < 0 || Config.RouterHealthConfig.MaxDropRate > 1:
 		return fmt.Errorf("%s must be in [0,1]", routerHealthMaxDropRateKey)
-	case Config.RouterHealthConfig.MaxTimeSinceNoOutstandingRequests <= 0:
-		return fmt.Errorf("%s must be positive", networkHealthMaxTimeSinceNoReqsKey)
+	case Config.RouterHealthConfig.MaxOutstandingDuration <= 0:
+		return fmt.Errorf("%s must be positive", networkHealthMaxOutstandingDurationKey)
 	}
 
 	// IPCs

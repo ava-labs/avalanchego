@@ -521,7 +521,7 @@ func (vm *VM) getPaginatedUTXOs(
 			start = startUTXOID
 		}
 
-		utxoIDs, err := vm.getReferencingUTXOs(vm.DB, addr.Bytes(), start, searchSize) // Get UTXOs associated with [addr]
+		utxoIDs, err := vm.getReferencingUTXOs(db, addr.Bytes(), start, searchSize) // Get UTXOs associated with [addr]
 		if err != nil {
 			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 		}
@@ -533,7 +533,7 @@ func (vm *VM) getPaginatedUTXOs(
 				continue
 			}
 
-			utxo, err := vm.getUTXO(vm.DB, utxoID)
+			utxo, err := vm.getUTXO(db, utxoID)
 			if err != nil {
 				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
 			}
