@@ -51,7 +51,8 @@ import (
 )
 
 var (
-	errExpired = errors.New("request expired")
+	ErrUnfinalizedData = errors.New("cannot query unfinalized data")
+	errExpired         = errors.New("request expired")
 )
 
 // EthAPIBackend implements ethapi.Backend for full nodes
@@ -100,7 +101,7 @@ func (b *EthAPIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumb
 
 	if !b.GetVMConfig().AllowUnfinalizedQueries && acceptedBlock != nil {
 		if number.Int64() > acceptedBlock.Number().Int64() {
-			return nil, errors.New("cannot query unfinalized data")
+			return nil, ErrUnfinalizedData
 		}
 	}
 
@@ -144,7 +145,7 @@ func (b *EthAPIBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumbe
 
 	if !b.GetVMConfig().AllowUnfinalizedQueries && acceptedBlock != nil {
 		if number.Int64() > acceptedBlock.Number().Int64() {
-			return nil, errors.New("cannot query unfinalized data")
+			return nil, ErrUnfinalizedData
 		}
 	}
 

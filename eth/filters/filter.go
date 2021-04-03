@@ -77,8 +77,6 @@ type Filter struct {
 	block      common.Hash // Block hash if filtering a single block
 	begin, end int64       // Range interval if filtering multiple blocks
 
-	acceptedEnd *uint64 // The accepted end block when !allowUnfinalizedQueries
-
 	matcher *bloombits.Matcher
 }
 
@@ -108,36 +106,21 @@ func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Addres
 	}
 	size, _ := backend.BloomStatus()
 
+	if !allowUnfinalizedQueries && lastAccepted != nil {
+		lastAcceptedNum := lastAccepted.Number().Int64()
+		if begin >= 0 && begin > lastAcceptedNum {
+			return nil, fmt.Errorf("requested from block %d after last accepted block %d", begin, lastAcceptedNum)
+		}
+		if end >= 0 && end > lastAcceptedNum {
+			return nil, fmt.Errorf("requested to block %d after last accepted block %d", end, lastAcceptedNum)
+		}
+	}
+
 	// Create a generic filter and convert it into a range filter
 	filter := newFilter(backend, addresses, topics)
-
-	isUnfinalized := func(allowUnfinalizedQueries bool, lastAccepted *types.Block, blockNum int64) bool {
-		if !allowUnfinalizedQueries && lastAccepted != nil && blockNum > lastAccepted.Number().Int64() {
-			return true
-		}
-		return false
-	}
-
-	if begin >= 0 && isUnfinalized(allowUnfinalizedQueries, lastAccepted, begin) {
-		return nil, fmt.Errorf("requested from block %d after last accepted block %s", begin, lastAccepted.Number().String())
-	}
-	if end >= 0 && isUnfinalized(allowUnfinalizedQueries, lastAccepted, end) {
-		return nil, fmt.Errorf("requested to block %d after last accepted block %s", end, lastAccepted.Number().String())
-	}
-
 	filter.matcher = bloombits.NewMatcher(size, filters)
 	filter.begin = begin
 	filter.end = end
-
-	computeAcceptedEnd := func(allowUnfinalizedQueries bool, lastAccepted *types.Block) *uint64 {
-		if !allowUnfinalizedQueries && lastAccepted != nil {
-			acceptedEndTmp := lastAccepted.NumberU64()
-			return &acceptedEndTmp
-		}
-		return nil
-	}
-	filter.acceptedEnd = computeAcceptedEnd(allowUnfinalizedQueries, lastAccepted)
-
 	return filter, nil
 }
 
@@ -176,7 +159,7 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 		return f.blockLogs(ctx, header)
 	}
 	// Figure out the limits of the filter range
-	// LatestBlockNumber is handled appropriately in HeaderByNumber
+	// LatestBlockNumber is transformed into the last accepted block in HeaderByNumber
 	// so it is left in place here.
 	header, _ := f.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
 	if header == nil {
@@ -190,9 +173,6 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 	end := uint64(f.end)
 	if f.end == -1 {
 		end = head
-	}
-	if f.acceptedEnd != nil && end > *f.acceptedEnd {
-		end = *f.acceptedEnd
 	}
 
 	// Gather all indexed logs, and finish with non indexed ones

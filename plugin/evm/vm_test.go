@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -28,7 +29,9 @@ import (
 	accountKeystore "github.com/ava-labs/coreth/accounts/keystore"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/trie"
@@ -3049,14 +3052,20 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 
 	vm.chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = true
 
-	if b := vm.chain.GetBlockByNumber(blkHeight); b.Hash() != blkHash {
+	ctx := context.Background()
+	b, err := vm.chain.Backend().APIBackend.BlockByNumber(ctx, rpc.BlockNumber(blkHeight))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.Hash() != blkHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkHeight, blkHash.Hex(), b.Hash().Hex())
 	}
 
 	vm.chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = false
 
-	if b := vm.chain.GetBlockByNumber(blkHeight); b != nil {
-		t.Fatalf("expected block at %d to have hash %s but got %s", blkHeight, blkHash.Hex(), b.Hash().Hex())
+	_, err = vm.chain.Backend().APIBackend.BlockByNumber(ctx, rpc.BlockNumber(blkHeight))
+	if !errors.Is(err, eth.ErrUnfinalizedData) {
+		t.Fatalf("expected ErrUnfinalizedData but got %s", err.Error())
 	}
 
 	if err := blk.Accept(); err != nil {
