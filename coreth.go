@@ -76,7 +76,7 @@ func (self *ETHChain) Start() {
 }
 
 func (self *ETHChain) Stop() {
-	self.backend.StopPart()
+	self.backend.Stop()
 }
 
 func (self *ETHChain) GenBlock() {
@@ -226,9 +226,10 @@ func (self *ETHChain) AttachEthService(handler *rpc.Server, namespaces []string)
 	}
 }
 
-// TODO: use SubscribeNewTxsEvent()
-func (self *ETHChain) GetTxSubmitCh() <-chan struct{} {
-	return self.backend.GetTxSubmitCh()
+func (self *ETHChain) GetTxSubmitCh() <-chan core.NewTxsEvent {
+	newTxsChan := make(chan core.NewTxsEvent)
+	self.backend.TxPool().SubscribeNewTxsEvent(newTxsChan)
+	return newTxsChan
 }
 
 func (self *ETHChain) GetTxPool() *core.TxPool {

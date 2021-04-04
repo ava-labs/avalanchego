@@ -1,36 +1,56 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package main
+package tests
 
 import (
 	"crypto/rand"
-	"fmt"
 	"math/big"
-
-	"github.com/ava-labs/coreth/accounts/keystore"
+	"testing"
 
 	"github.com/ava-labs/coreth"
+	"github.com/ava-labs/coreth/accounts/keystore"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/log"
 )
 
-func checkError(err error) {
+var (
+	basicTxGasLimit       = 21000
+	fundedKey, bob, alice *keystore.Key
+	initialBalance        = big.NewInt(100000000000000000)
+	chainID               = big.NewInt(1)
+	value                 = big.NewInt(1000000000000)
+	gasLimit              = 10000000
+	gasPrice              = big.NewInt(1000000000)
+)
+
+func init() {
+	genKey, err := keystore.NewKey(rand.Reader)
 	if err != nil {
 		panic(err)
 	}
+	fundedKey = genKey
+	genKey, err = keystore.NewKey(rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+	bob = genKey
+	genKey, err = keystore.NewKey(rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+	alice = genKey
 }
 
-func main() {
+func NewDefaultChain(t *testing.T) (*coreth.ETHChain, chan *types.Block, chan core.NewTxPoolHeadEvent, <-chan core.NewTxsEvent) {
 	// configure the chain
-	config := eth.DefaultConfig
+	config := eth.NewDefaultConfig()
 	chainConfig := &params.ChainConfig{
-		ChainID:             big.NewInt(1),
+		ChainID:             chainID,
 		HomesteadBlock:      big.NewInt(0),
 		DAOForkBlock:        big.NewInt(0),
 		DAOForkSupport:      true,
@@ -45,10 +65,6 @@ func main() {
 		Ethash:              nil,
 	}
 
-	// configure the genesis block
-	genBalance := big.NewInt(100000000000000000)
-	genKey, _ := keystore.NewKey(rand.Reader)
-
 	config.Genesis = &core.Genesis{
 		Config:     chainConfig,
 		Nonce:      0,
@@ -56,52 +72,34 @@ func main() {
 		ExtraData:  hexutil.MustDecode("0x00"),
 		GasLimit:   100000000,
 		Difficulty: big.NewInt(0),
-		Alloc:      core.GenesisAlloc{genKey.Address: {Balance: genBalance}},
+		Alloc:      core.GenesisAlloc{fundedKey.Address: {Balance: initialBalance}},
 	}
 
 	// grab the control of block generation
 	config.Miner.ManualMining = true
 
-	// info required to generate a transaction
-	chainID := chainConfig.ChainID
-	nonce := uint64(0)
-	value := big.NewInt(1000000000000)
-	gasLimit := 21000
-	gasPrice := big.NewInt(1000000000)
-	bob, err := keystore.NewKey(rand.Reader)
-	checkError(err)
-
 	chain := coreth.NewETHChain(&config, nil, nil, nil, eth.DefaultSettings)
-	showBalance := func() {
-		state, err := chain.CurrentState()
-		checkError(err)
-		log.Info(fmt.Sprintf("genesis balance = %s", state.GetBalance(genKey.Address)))
-		log.Info(fmt.Sprintf("bob's balance = %s", state.GetBalance(bob.Address)))
+
+	if err := chain.Accept(chain.GetGenesisBlock()); err != nil {
+		t.Fatal(err)
 	}
+
 	newBlockChan := make(chan *types.Block)
-	newTxPoolHeadChan := make(chan core.NewTxPoolHeadEvent, 1)
 	chain.SetOnSealFinish(func(block *types.Block) error {
+		if err := chain.SetPreference(block); err != nil {
+			t.Fatal(err)
+		}
+		if err := chain.Accept(block); err != nil {
+			t.Fatal(err)
+		}
 		newBlockChan <- block
 		return nil
 	})
 
+	newTxPoolHeadChan := make(chan core.NewTxPoolHeadEvent, 1)
 	chain.GetTxPool().SubscribeNewHeadEvent(newTxPoolHeadChan)
-	// start the chain
-	chain.Start()
+
 	chain.BlockChain().UnlockIndexing()
-	chain.SetPreference(chain.GetGenesisBlock())
-	for i := 0; i < 42; i++ {
-		tx := types.NewTransaction(nonce, bob.Address, value, uint64(gasLimit), gasPrice, nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), genKey.PrivateKey)
-		checkError(err)
-		chain.AddRemoteTxs([]*types.Transaction{signedTx})
-		nonce++
-		chain.GenBlock()
-		block := <-newBlockChan
-		<-newTxPoolHeadChan
-		log.Info("finished generating block, starting the next iteration", "height", block.Number())
-		chain.SetPreference(block)
-	}
-	showBalance()
-	chain.Stop()
+	txSubmitCh := chain.GetTxSubmitCh()
+	return chain, newBlockChan, newTxPoolHeadChan, txSubmitCh
 }
