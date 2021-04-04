@@ -23,6 +23,7 @@ var (
 )
 
 type user struct {
+	secpFactory *crypto.FactorySECP256K1R
 	// This user's database, acquired from the keystore
 	db database.Database
 }
@@ -112,12 +113,11 @@ func (u *user) getKey(address common.Address) (*crypto.PrivateKeySECP256K1R, err
 		//	return nil, errEmptyAddress
 	}
 
-	factory := crypto.FactorySECP256K1R{}
 	bytes, err := u.db.Get(address.Bytes())
 	if err != nil {
 		return nil, err
 	}
-	sk, err := factory.ToPrivateKey(bytes)
+	sk, err := u.secpFactory.ToPrivateKey(bytes)
 	if err != nil {
 		return nil, err
 	}
