@@ -10,13 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-var (
-	BlackholeAddr = common.Address{
-		1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	}
-)
-
 func TestAcceptedHeadSubscriptions(t *testing.T) {
 	chain, newBlockChan, newTxPoolHeadChan, txSubmitCh := NewDefaultChain(t)
 
