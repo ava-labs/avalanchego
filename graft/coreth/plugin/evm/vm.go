@@ -223,7 +223,6 @@ type VM struct {
 	awaitingBuildBlock bool
 
 	genlock            sync.Mutex
-	txSubmitChan       <-chan struct{}
 	atomicTxSubmitChan chan struct{}
 	baseCodec          codec.Registry
 	codec              codec.Manager
@@ -973,10 +972,10 @@ func (vm *VM) awaitTxPoolStabilized() {
 
 func (vm *VM) awaitSubmittedTxs() {
 	defer vm.shutdownWg.Done()
-	vm.txSubmitChan = vm.chain.GetTxSubmitCh()
+	txSubmitChan := vm.chain.GetTxSubmitCh()
 	for {
 		select {
-		case <-vm.txSubmitChan:
+		case <-txSubmitChan:
 			log.Trace("New tx detected, trying to generate a block")
 			vm.tryBlockGen()
 		case <-vm.atomicTxSubmitChan:

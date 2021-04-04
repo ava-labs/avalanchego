@@ -558,18 +558,6 @@ func (s *Ethereum) Stop() error {
 	return nil
 }
 
-func (s *Ethereum) StopPart() error {
-	s.bloomIndexer.Close()
-	close(s.closeBloomHandler)
-	s.txPool.Stop()
-	s.miner.Stop()
-	s.blockchain.Stop()
-	s.engine.Close()
-	s.chainDb.Close()
-	s.eventMux.Stop()
-	return nil
-}
-
 func (s *Ethereum) GetTxSubmitCh() <-chan struct{} {
 	return s.txSubmitChan
 }
