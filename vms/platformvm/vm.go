@@ -432,18 +432,17 @@ func (vm *VM) Bootstrapped() error {
 		return errs.Err
 	}
 
+	err := vm.Migrate()
+	if err != nil {
+		return err
+	}
+
 	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, vm.DB)
 	defer stopDB.Close()
 
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
-
-	previousDB, previousDBExists := vm.dbManager.Previous()
-	completedMigration, err := vm.DB.Has(migratedKey)
-	if err != nil {
-		return err
-	}
 
 	for stopIter.Next() { // Iterates in order of increasing stop time
 		txBytes := stopIter.Value()
@@ -466,16 +465,6 @@ func (vm *VM) Bootstrapped() error {
 		uptime, err := vm.uptime(vm.DB, nodeID)
 		switch {
 		case err == database.ErrNotFound:
-			if previousDBExists && !completedMigration {
-				priorUptime, err := vm.uptime(previousDB, nodeID)
-				if err == nil {
-					uptime = priorUptime
-					break
-				}
-				if err != database.ErrNotFound {
-					vm.Ctx.Log.Debug("Couldn't find uptime in prior database for %s: %s", nodeID, err)
-				}
-			}
 			uptime = &validatorUptime{
 				LastUpdated: uint64(unsignedTx.StartTime().Unix()),
 			}
@@ -499,12 +488,6 @@ func (vm *VM) Bootstrapped() error {
 	}
 	if err := stopIter.Error(); err != nil {
 		return err
-	}
-
-	if previousDBExists && !completedMigration {
-		errs.Add(vm.DB.Put(migratedKey, []byte(previousDB.Version.String())))
-	} else if !completedMigration {
-		errs.Add(vm.DB.Put(migratedKey, noMigration))
 	}
 
 	errs.Add(
