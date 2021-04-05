@@ -232,7 +232,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 			onFinish: func() {
 				m.Log.AssertNoError(m.DBManager.MarkBootstrapped(m.DBManager.Current()))
 				if m.ManagerConfig.FetchOnly {
-					m.Log.Info("\n\ndone with fetch only mode. Restart without flag --fetch-only to run normally. Starting node shutdown.\n\n")
+					m.Log.Info("\n\ndone with fetch only mode. Restart without flag --fetch-only to run normally. Starting node shutdown.\n")
 					go m.Shutdown()
 				}
 			},

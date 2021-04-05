@@ -34,27 +34,25 @@ var (
 	mustUpgradeMsg  = "\nThis version of AvalancheGo requires a database upgrade before running.\n" +
 		"To do the database upgrade, restart this node with argument --fetch-only.\n" +
 		"This will start the node in fetch only mode. It will bootstrap a new database version and then stop.\n" +
-		"After running to completion in fetch only mode, run without --fetch-only flag to run node normally.\n" +
-		"If you run a node, leave it running on this computer and restart this binary with --fetch-only.\n" +
-		"This will ensure that your node maintains its uptime if it is a validator.\n" +
+		"By default, this node will attempt to bootstrap from a node running on the same machine (localhost) with staking port 9651.\n" +
+		"If no such node exists, fetch only mode will be unable to complete.\n" +
 		"The node in fetch only mode will by default not interfere with the node already running.\n" +
-		"When the node in fetch only mode finishes, stop the other node running on this computer (if applicable) and run without --fetch-only flag to run node normally.\n" +
-		"The database upgrade will not change this node's staking key/certificate.\n" +
+		"When the node in fetch only mode finishes, stop the other node running on this computer and run without --fetch-only flag to run node normally.\n" +
+		"Fetch only mode will not change this node's staking key/certificate.\n" +
 		"Note that populating the new database version will approximately double the amount of disk space required by AvalancheGo.\n" +
 		"Ensure that this computer has at least enough disk space available.\n" +
-		"You should not delete the old database version."
+		"You should not delete the old database version unless advised to by the Avalanche team."
 	upgradingMsg = "\nNode running in fetch only mode.\n" +
 		"It will bootstrap a new database version and then stop.\n" +
-		"After running to completion in fetch only mode, run without --fetch-only flag to run node normally.\n" +
-		"If you run a node, leave it running on this computer and restart this binary with --fetch-only.\n" +
-		"This will ensure that your node maintains its uptime if it is a validator.\n" +
-		"The node in fetch only mode will by default not interfere with the node already running.\n" +
-		"When the node in fetch only mode finishes, stop the other node running on this computer (if applicable) and run without --fetch-only flag to run node normally.\n" +
-		"The database upgrade will not change this node's staking key/certificate.\n" +
+		"By default, this node will attempt to bootstrap from a node running on the same machine (localhost) with staking port 9651.\n" +
+		"If no such node exists, fetch only mode will be unable to complete.\n" +
+		"The node in fetch only mode will not by default interfere with the node already running on this machine.\n" +
+		"When the node in fetch only mode finishes, stop the other node running on this computer and run without --fetch-only flag to run node normally.\n" +
+		"Fetch only mode will not change this node's staking key/certificate.\n" +
 		"Note that populating the new database version will approximately double the amount of disk space required by AvalancheGo.\n" +
 		"Ensure that this computer has at least enough disk space available.\n" +
 		"You should not delete the old database version unless advised to by the Avalanche team.\n"
-	alreadyUpgradedMsg = "fetch only mode done. Restart this node without --fetch-only to finish database upgrade and run normally"
+	alreadyUpgradedMsg = "fetch only mode done. Restart this node without --fetch-only to run normally"
 )
 
 // main is the primary entry point to Avalanche.
