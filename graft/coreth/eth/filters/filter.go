@@ -63,7 +63,7 @@ type Backend interface {
 	ServiceFilter(ctx context.Context, session *bloombits.MatcherSession)
 
 	GetVMConfig() *vm.Config
-	LastAcceptedBLock() *types.Block
+	AcceptedBlock() *types.Block
 }
 
 // Filter can be used to retrieve and filter logs.
@@ -84,7 +84,7 @@ type Filter struct {
 // figure out whether a particular block is interesting or not.
 func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Address, topics [][]common.Hash) (*Filter, error) {
 	allowUnfinalizedQueries := backend.GetVMConfig().AllowUnfinalizedQueries
-	lastAccepted := backend.LastAcceptedBLock()
+	acceptedBlock := backend.AcceptedBlock()
 
 	// Flatten the address and topic filter clauses into a single bloombits filter
 	// system. Since the bloombits are not positional, nil topics are permitted,
@@ -106,13 +106,13 @@ func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Addres
 	}
 	size, _ := backend.BloomStatus()
 
-	if !allowUnfinalizedQueries && lastAccepted != nil {
-		lastAcceptedNum := lastAccepted.Number().Int64()
-		if begin >= 0 && begin > lastAcceptedNum {
-			return nil, fmt.Errorf("requested from block %d after last accepted block %d", begin, lastAcceptedNum)
+	if !allowUnfinalizedQueries && acceptedBlock != nil {
+		lastAccepted := acceptedBlock.Number().Int64()
+		if begin >= 0 && begin > lastAccepted {
+			return nil, fmt.Errorf("requested from block %d after last accepted block %d", begin, lastAccepted)
 		}
-		if end >= 0 && end > lastAcceptedNum {
-			return nil, fmt.Errorf("requested to block %d after last accepted block %d", end, lastAcceptedNum)
+		if end >= 0 && end > lastAccepted {
+			return nil, fmt.Errorf("requested to block %d after last accepted block %d", end, lastAccepted)
 		}
 	}
 
