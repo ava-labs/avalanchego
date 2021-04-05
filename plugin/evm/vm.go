@@ -30,6 +30,7 @@ import (
 
 	avalancheRPC "github.com/gorilla/rpc/v2"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
@@ -68,13 +69,14 @@ const (
 	maxBlockTime = 3 * time.Second
 	// maxFutureBlockTime should be smaller than the max allowed future time (15s) used
 	// in dummy consensus engine's verifyHeader
-	maxFutureBlockTime  = 10 * time.Second
-	batchSize           = 250
-	maxUTXOsToFetch     = 1024
-	chainStateCacheSize = 1024
-	defaultMempoolSize  = 1024
-	codecVersion        = uint16(0)
-	txFee               = units.MilliAvax
+	maxFutureBlockTime   = 10 * time.Second
+	batchSize            = 250
+	maxUTXOsToFetch      = 1024
+	chainStateCacheSize  = 1024
+	defaultMempoolSize   = 1024
+	codecVersion         = uint16(0)
+	txFee                = units.MilliAvax
+	secpFactoryCacheSize = 1024
 
 	decidedCacheSize    = 100
 	missingCacheSize    = 50
@@ -219,7 +221,8 @@ type VM struct {
 	shutdownChan chan struct{}
 	shutdownWg   sync.WaitGroup
 
-	fx secp256k1fx.Fx
+	fx          secp256k1fx.Fx
+	secpFactory crypto.FactorySECP256K1R
 }
 
 // Codec implements the secp256k1fx interface
@@ -284,11 +287,6 @@ func (vm *VM) Initialize(
 
 	config := eth.NewDefaultConfig()
 	config.Genesis = g
-	// disable the experimental snapshot feature from geth
-	config.TrieCleanCache += config.SnapshotCache
-	config.SnapshotCache = 0
-
-	config.Miner.ManualMining = true
 
 	// Set minimum gas price and launch goroutine to sleep until
 	// network upgrade when the gas price must be changed
@@ -324,12 +322,13 @@ func (vm *VM) Initialize(
 	config.TxPool.NoLocals = !vm.CLIConfig.LocalTxsEnabled
 	config.AllowUnfinalizedQueries = vm.CLIConfig.AllowUnfinalizedQueries
 	vm.chainConfig = g.Config
+	vm.secpFactory = crypto.FactorySECP256K1R{Cache: cache.LRU{Size: secpFactoryCacheSize}}
 
 	if err := config.SetGCMode("archive"); err != nil {
 		panic(err)
 	}
 	nodecfg := node.Config{NoUSB: true}
-	chain := coreth.NewETHChain(&config, &nodecfg, nil, vm.chaindb, vm.CLIConfig.EthBackendSettings())
+	chain := coreth.NewETHChain(&config, &nodecfg, vm.chaindb, vm.CLIConfig.EthBackendSettings())
 	vm.chain = chain
 	vm.networkID = config.NetworkId
 
