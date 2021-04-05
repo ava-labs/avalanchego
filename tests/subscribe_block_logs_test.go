@@ -92,7 +92,9 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 
 	ctx := context.Background()
 	fc := filters.FilterCriteria{
+		// TODO: this works if you specify a to block
 		FromBlock: big.NewInt(1),
+		ToBlock:   big.NewInt(1),
 	}
 
 	fid, err := api.NewFilter(fc)
