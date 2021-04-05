@@ -93,6 +93,7 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 	ctx := context.Background()
 	fc := filters.FilterCriteria{
 		FromBlock: big.NewInt(1),
+		ToBlock:   big.NewInt(1),
 	}
 
 	fid, err := api.NewFilter(fc)
@@ -123,6 +124,34 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 		t.Fatalf("Expected GetFilterLogs to return 1 log with BlockNumber 1, but found BlockNumber %d", logs[0].BlockNumber)
 	}
 
+	// Fetching blocks from an unfinalized height without specifying a to height
+	// will not yield any logs because the to block is populated using the last
+	// accepted block.
+	fc2 := filters.FilterCriteria{
+		FromBlock: big.NewInt(1),
+	}
+
+	fid2, err := api.NewFilter(fc2)
+	if err != nil {
+		t.Fatalf("Failed to create NewFilter due to %s", err)
+	}
+
+	logs, err = api.GetLogs(ctx, fc2)
+	if err == nil || err.Error() != "begin block 1 is greater than end block 0" {
+		t.Fatalf("Expected GetLogs to error about invalid range, but found error %s", err)
+	}
+	if len(logs) != 0 {
+		t.Fatalf("Expected GetLogs to return 0 log, but found %d", len(logs))
+	}
+
+	logs, err = api.GetFilterLogs(ctx, fid2)
+	if err == nil || err.Error() != "begin block 1 is greater than end block 0" {
+		t.Fatalf("Expected GetLogs to error about invalid range, but found error %s", err)
+	}
+	if len(logs) != 0 {
+		t.Fatalf("Expected GetFilterLogs to return 0 log, but found %d", len(logs))
+	}
+
 	chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = false
 	logs, err = api.GetLogs(ctx, fc)
 	if logs != nil {
@@ -130,18 +159,6 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 	}
 	if err == nil || err.Error() != "requested from block 1 after last accepted block 0" {
 		t.Fatalf("Expected GetLogs to error due to requesting above last accepted block, but found error %s", err)
-	}
-
-	fc2 := filters.FilterCriteria{
-		FromBlock: big.NewInt(0),
-		ToBlock:   big.NewInt(1),
-	}
-	logs, err = api.GetLogs(ctx, fc2)
-	if logs != nil {
-		t.Fatalf("Expected GetLogs to return empty, but found %d logs", len(logs))
-	}
-	if err == nil || err.Error() != "requested to block 1 after last accepted block 0" {
-		t.Fatalf("Expected GetLogs to error due to requesting block above last accepted block, but found error %s", err)
 	}
 
 	logs, err = api.GetFilterLogs(ctx, fid)
@@ -152,11 +169,39 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 		t.Fatalf("Expected GetLogs to fail due to requesting block above last accepted block, but found error %s", err)
 	}
 
-	fid2, err := api.NewFilter(fc2)
+	logs, err = api.GetLogs(ctx, fc2)
+	if logs != nil {
+		t.Fatalf("Expected logs to be empty, but found %d logs", len(logs))
+	}
+	if err == nil || err.Error() != "requested from block 1 after last accepted block 0" {
+		t.Fatalf("Expected GetLogs to error due to requesting above last accepted block, but found error %s", err)
+	}
+
+	logs, err = api.GetFilterLogs(ctx, fid2)
+	if logs != nil {
+		t.Fatalf("Expected GetFilterLogs to return empty logs, but found %d logs", len(logs))
+	}
+	if err == nil || err.Error() != "requested from block 1 after last accepted block 0" {
+		t.Fatalf("Expected GetLogs to fail due to requesting block above last accepted block, but found error %s", err)
+	}
+
+	fc3 := filters.FilterCriteria{
+		FromBlock: big.NewInt(0),
+		ToBlock:   big.NewInt(1),
+	}
+	logs, err = api.GetLogs(ctx, fc3)
+	if logs != nil {
+		t.Fatalf("Expected GetLogs to return empty, but found %d logs", len(logs))
+	}
+	if err == nil || err.Error() != "requested to block 1 after last accepted block 0" {
+		t.Fatalf("Expected GetLogs to error due to requesting block above last accepted block, but found error %s", err)
+	}
+
+	fid3, err := api.NewFilter(fc3)
 	if err != nil {
 		t.Fatalf("NewFilter failed due to %s", err)
 	}
-	logs, err = api.GetFilterLogs(ctx, fid2)
+	logs, err = api.GetFilterLogs(ctx, fid3)
 	if logs != nil {
 		t.Fatalf("Expected GetFilterLogs to return empty logs but found %d logs", len(logs))
 	}
