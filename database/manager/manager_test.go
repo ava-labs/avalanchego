@@ -36,7 +36,7 @@ func TestNewSingleDB(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager, err := New(dir, logging.NoLog{}, v1)
+	manager, err := New(dir, logging.NoLog{}, v1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestNewCreatesSingleDB(t *testing.T) {
 
 	v1 := version.DefaultVersion1
 
-	manager, err := New(dir, logging.NoLog{}, v1)
+	manager, err := New(dir, logging.NoLog{}, v1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = New(dir, logging.NoLog{}, v2)
+	_, err = New(dir, logging.NoLog{}, v2, true)
 	assert.Error(t, err, "expected to error creating the manager due to an open db")
 
 	err = db1.Close()
@@ -115,7 +115,7 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = New(dir, logging.NoLog{}, v1)
+	_, err = New(dir, logging.NoLog{}, v1, true)
 	assert.Error(t, err, "expected to error due to non-directory file being present")
 }
 
@@ -143,7 +143,7 @@ func TestNewSortsDatabases(t *testing.T) {
 		}
 	}
 
-	manager, err := New(dir, logging.NoLog{}, vers[0])
+	manager, err := New(dir, logging.NoLog{}, vers[0], true)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -52,11 +52,6 @@ type Manager interface {
 	// prefixed with [prefix]
 	NewPrefixDBManager(prefix []byte) Manager
 
-	// TODO can we remove this dead code?
-	// NewNestedPrefixDBManager returns a new database manager where each of its databases
-	// has the nested prefix [prefix] applied to it.
-	// NewNestedPrefixDBManager(prefix []byte) Manager
-
 	// NewMeterDBManager returns a new database manager with each of its databases
 	// wrapped with a meterdb instance to support metrics on database performance.
 	NewMeterDBManager(namespace string, registerer prometheus.Registerer) (Manager, error)
@@ -259,19 +254,6 @@ func (m *manager) NewPrefixDBManager(prefix []byte) Manager {
 	return m
 }
 
-// TODO can we remove this dead code?
-// NewNestedPrefixDBManager creates a new manager with each database instance
-// wrapped with a nested prfix of [prefix]
-// func (m *manager) NewNestedPrefixDBManager(prefix []byte) Manager {
-// 	m, _ = m.wrapManager(func(vdb *VersionedDatabase) (*VersionedDatabase, error) {
-// 		return &VersionedDatabase{
-// 			Database: prefixdb.NewNested(prefix, vdb.Database),
-// 			Version:  vdb.Version,
-// 		}, nil
-// 	})
-// 	return m
-// }
-
 // NewMeterDBManager wraps the current database instance with a meterdb instance.
 // Note: calling this more than once with the same [namespace] will cause a conflict error for the [registerer]
 func (m *manager) NewMeterDBManager(namespace string, registerer prometheus.Registerer) (Manager, error) {
@@ -292,23 +274,6 @@ func (m *manager) NewMeterDBManager(namespace string, registerer prometheus.Regi
 	}
 	return newManager, nil
 }
-
-// TODO can we remove this dead code?
-// NewCompleteMeterDBManager wraps each database instance with a meterdb instance. The namespace
-// is concatenated with the version of the database. Note: calling this more than once
-// with the same [namespace] will cause a conflict error for the [registerer]
-// func (m *manager) NewCompleteMeterDBManager(namespace string, registerer prometheus.Registerer) (Manager, error) {
-// 	return m.wrapManager(func(vdb *VersionedDatabase) (*VersionedDatabase, error) {
-// 		mdb, err := meterdb.New(fmt.Sprintf("%s_%s", namespace, strings.ReplaceAll(vdb.Version.String(), ".", "_")), registerer, vdb.Database)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		return &VersionedDatabase{
-// 			Database: mdb,
-// 			Version:  vdb.Version,
-// 		}, nil
-// 	})
-// }
 
 // NewManagerFromDBs
 func NewManagerFromDBs(dbs []*VersionedDatabase) (Manager, error) {

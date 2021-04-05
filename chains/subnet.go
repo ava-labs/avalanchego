@@ -24,7 +24,7 @@ type subnet struct {
 	lock sync.RWMutex
 	sync.Once
 	bootstrapping ids.Set
-	// Called once when IsBootstrapped returns true for the first time
+	// If not nil, called when IsBootstrapped returns true for the first time
 	onFinish func()
 }
 
@@ -33,7 +33,7 @@ func (s *subnet) IsBootstrapped() bool {
 	defer s.lock.RUnlock()
 
 	done := s.bootstrapping.Len() == 0
-	if done {
+	if done && s.onFinish != nil {
 		s.Once.Do(s.onFinish)
 	}
 	return done
