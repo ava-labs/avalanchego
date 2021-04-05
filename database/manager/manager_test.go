@@ -106,14 +106,10 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 	assert.Error(t, err, "expected to error creating the manager due to an open db")
 
 	err = db1.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	_, err = os.Create(path.Join(dir, "dummy"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	_, err = New(dir, logging.NoLog{}, v1, true)
 	assert.Error(t, err, "expected to error due to non-directory file being present")
@@ -298,4 +294,22 @@ func TestNewManagerFromNonUniqueDBs(t *testing.T) {
 		},
 	})
 	assert.Error(t, err)
+}
+
+func TestDontIncludePreviousVersions(t *testing.T) {
+	dir := t.TempDir()
+	v1 := version.NewDefaultVersion(1, 1, 0)
+	v2 := version.NewDefaultVersion(1, 2, 0)
+	db1Path := path.Join(dir, v1.String())
+	_, err := leveldb.New(db1Path, logging.NoLog{}, 0, 0, 0)
+	assert.NoError(t, err)
+	db2Path := path.Join(dir, v2.String())
+	db2, err := leveldb.New(db2Path, logging.NoLog{}, 0, 0, 0)
+	assert.NoError(t, err)
+
+	err = db2.Close()
+	assert.NoError(t, err)
+
+	_, err = New(dir, logging.NoLog{}, v2, false)
+	assert.NoError(t, err, "shouldn't error because shouldn't try to open previous database version")
 }

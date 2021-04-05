@@ -2532,7 +2532,7 @@ func TestUptimeReporting(t *testing.T) {
 
 	versionedDBs = append(versionedDBs, &manager.VersionedDatabase{
 		Database: memdb.New(),
-		Version:  version.NewDefaultVersion(1, 0, 1),
+		Version:  version.NewDefaultVersion(1, 1, 0),
 	})
 
 	newDBManager, err := manager.NewManagerFromDBs(versionedDBs)
