@@ -39,8 +39,6 @@ type Manager interface {
 	Current() *VersionedDatabase
 	// Previous returns the database prior to the current database and true if a previous database exists.
 	Previous() (*VersionedDatabase, bool)
-	// True if the given database version existed on disk before this run
-	PreviouslyUsedDBVersion(v version.Version) bool
 	// GetDatabases returns all the managed databases in order from current to the oldest version
 	GetDatabases() []*VersionedDatabase
 	// Close all of the databases controlled by the manager
@@ -228,17 +226,6 @@ func New(
 	}
 
 	return manager, nil
-}
-
-// Returns true if database version [v] existed on disk before this run,
-// or if [v] is the current database
-func (m *manager) PreviouslyUsedDBVersion(v version.Version) bool {
-	for i := 0; i < len(m.databases); i++ {
-		if m.databases[i].Compare(v) == 0 {
-			return true
-		}
-	}
-	return false
 }
 
 // NewPrefixDBManager creates a new manager with each database instance prefixed
