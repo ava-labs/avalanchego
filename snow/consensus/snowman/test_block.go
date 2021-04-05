@@ -61,7 +61,7 @@ func NewTestBlock(i uint64, parent *TestBlock) *TestBlock {
 }
 
 // NewTestBlocks generates [numBlocks] consecutive blocks starting
-// at height 0.
+// at height [parent.Height() + 1].
 func NewTestBlocks(numBlocks uint64, parent *TestBlock) []*TestBlock {
 	blks := make([]*TestBlock, 0, numBlocks)
 	var startHeight uint64

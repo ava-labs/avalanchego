@@ -46,13 +46,14 @@ type State struct {
 	// State keeps these function types to request operations
 	// from the VM implementation.
 	getBlockIDAtHeight func(uint64) (ids.ID, error)
-	getBlock           func(ids.ID) (Block, error)
-	unmarshalBlock     func([]byte) (Block, error)
-	buildBlock         func() (Block, error)
+	// getBlock retrieves a block from the VM's storage. If getBlock retunrs
+	getBlock       func(ids.ID) (Block, error)
+	unmarshalBlock func([]byte) (Block, error)
+	buildBlock     func() (Block, error)
 
-	// processingBlocks are the verified blocks that have entered
+	// verifiedBlocks are the verified blocks that have entered
 	// consensus
-	processingBlocks map[ids.ID]*BlockWrapper
+	verifiedBlocks map[ids.ID]*BlockWrapper
 	// decidedBlocks is an LRU cache of decided blocks.
 	decidedBlocks cache.Cacher
 	// unverifiedBlocks is an LRU cache of blocks with status processing
@@ -76,7 +77,7 @@ type Config struct {
 func NewState(db database.Database, decidedCacheSize, missingCacheSize, unverifiedCacheSize int) *State {
 	return &State{
 		baseDB:           versiondb.New(db),
-		processingBlocks: make(map[ids.ID]*BlockWrapper),
+		verifiedBlocks:   make(map[ids.ID]*BlockWrapper),
 		decidedBlocks:    &cache.LRU{Size: decidedCacheSize},
 		missingBlocks:    &cache.LRU{Size: missingCacheSize},
 		unverifiedBlocks: &cache.LRU{Size: unverifiedCacheSize},
@@ -118,7 +119,7 @@ func NewMeteredState(
 
 	return &State{
 		baseDB:           versiondb.New(db),
-		processingBlocks: make(map[ids.ID]*BlockWrapper),
+		verifiedBlocks:   make(map[ids.ID]*BlockWrapper),
 		decidedBlocks:    decidedCache,
 		missingBlocks:    missingCache,
 		unverifiedBlocks: unverifiedCache,
@@ -172,15 +173,15 @@ func (c *State) GetBlock(blkID ids.ID) (snowman.Block, error) {
 		return nil, err
 	}
 
-	// Since this block is not in processing, we can add it as
-	// a non-processing block to the correct cache.
-	return c.addNonProcessingBlock(blk)
+	// Since this block is not in consensus, addBlockOutsideConsensus
+	// is called to add [blk] to the correct cache.
+	return c.addBlockOutsideConsensus(blk)
 }
 
 // getCachedBlock checks the caches for [blkID] by priority. Returning
 // true if [blkID] is found in one of the caches.
 func (c *State) getCachedBlock(blkID ids.ID) (snowman.Block, bool) {
-	if blk, ok := c.processingBlocks[blkID]; ok {
+	if blk, ok := c.verifiedBlocks[blkID]; ok {
 		return blk, true
 	}
 
@@ -223,9 +224,9 @@ func (c *State) ParseBlock(b []byte) (snowman.Block, error) {
 
 	c.missingBlocks.Evict(blkID)
 
-	// Since we've checked above if it's in processing we can add [blk]
-	// as a non-processing block here.
-	return c.addNonProcessingBlock(blk)
+	// Since this block is not in consensus, addBlockOutsideConsensus
+	// is called to add [blk] to the correct cache.
+	return c.addBlockOutsideConsensus(blk)
 }
 
 // BuildBlock attempts to build a new internal Block, wraps it, and adds it
@@ -253,11 +254,12 @@ func (c *State) BuildBlock() (snowman.Block, error) {
 	return wrappedBlk, nil
 }
 
-// addNonProcessingBlock adds [blk] to the correct cache and returns
+// addBlockOutsideConsensus adds [blk] to the correct cache and returns
 // a wrapped version of [blk]
 // assumes [blk] is a known, non-wrapped block that is not currently
-// being processed in consensus.
-func (c *State) addNonProcessingBlock(blk Block) (snowman.Block, error) {
+// in consensus. [blk] could be either decided or a block that has not yet
+// been verified and added to consensus.
+func (c *State) addBlockOutsideConsensus(blk Block) (snowman.Block, error) {
 	wrappedBlk := &BlockWrapper{
 		Block: blk,
 		state: c,

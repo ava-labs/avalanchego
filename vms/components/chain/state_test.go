@@ -232,7 +232,7 @@ func TestState(t *testing.T) {
 	}
 
 	// Check that the verified blocks have been placed in the processing map
-	if numProcessing := len(chainState.processingBlocks); numProcessing != 2 {
+	if numProcessing := len(chainState.verifiedBlocks); numProcessing != 2 {
 		t.Fatalf("Expected chain state to have 2 processing blocks, but found: %d", numProcessing)
 	}
 
@@ -248,7 +248,7 @@ func TestState(t *testing.T) {
 
 	// Check that parsing blk3 does not add it to processing blocks since it has
 	// not been verified.
-	if numProcessing := len(chainState.processingBlocks); numProcessing != 2 {
+	if numProcessing := len(chainState.verifiedBlocks); numProcessing != 2 {
 		t.Fatalf("Expected State to have 2 processing blocks, but found: %d", numProcessing)
 	}
 
@@ -256,7 +256,7 @@ func TestState(t *testing.T) {
 		t.Fatalf("Parsed blk3 failed verification unexpectedly due to %s", err)
 	}
 	// Check that blk3 has been added to processing blocks.
-	if numProcessing := len(chainState.processingBlocks); numProcessing != 3 {
+	if numProcessing := len(chainState.verifiedBlocks); numProcessing != 3 {
 		t.Fatalf("Expected chain state to have 3 processing blocks, but found: %d", numProcessing)
 	}
 
@@ -271,7 +271,7 @@ func TestState(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if numProcessing := len(chainState.processingBlocks); numProcessing != 0 {
+	if numProcessing := len(chainState.verifiedBlocks); numProcessing != 0 {
 		t.Fatalf("Expected chain state to have 0 processing blocks, but found: %d", numProcessing)
 	}
 
@@ -287,22 +287,8 @@ func TestState(t *testing.T) {
 		t.Fatal("Expected last accepted block to be blk2")
 	}
 
-	// Check that parsedBlk1 (which should have been evicted from the decided block cache of size 2)
-	// is retrieved correctly by GetBlock
-	// Note: checkDecidedBlock calls ParseBlock first resulting in it never testing a cache miss of
-	// a decided block.
-	getBlk1, err := chainState.GetBlock(parsedBlk1.ID())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if status := getBlk1.Status(); status != choices.Accepted {
-		t.Fatalf("Expected retrieved blk1 to have status %s, but found %s", choices.Accepted, status)
-	}
-	if getBlk1.ID() != parsedBlk1.ID() {
-		t.Fatalf("Expected GetBlock to retrieve blk %s, but found %s", parsedBlk1.ID(), getBlk1.ID())
-	}
-
-	// Check each block
+	// Flush the caches to ensure decided blocks are handled correctly on cache misses.
+	chainState.FlushCaches()
 	checkAcceptedBlock(t, chainState, wrappedGenesisBlk, false)
 	checkAcceptedBlock(t, chainState, parsedBlk1, false)
 	checkAcceptedBlock(t, chainState, parsedBlk2, false)
@@ -340,12 +326,12 @@ func TestBuildBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Len(t, chainState.processingBlocks, 0)
+	assert.Len(t, chainState.verifiedBlocks, 0)
 
 	if err := builtBlk.Verify(); err != nil {
 		t.Fatalf("Built block failed verification due to %s", err)
 	}
-	assert.Len(t, chainState.processingBlocks, 1)
+	assert.Len(t, chainState.verifiedBlocks, 1)
 
 	checkProcessingBlock(t, chainState, builtBlk)
 
@@ -392,7 +378,7 @@ func TestStateDecideBlock(t *testing.T) {
 		t.Fatal("Bad block should have failed verification")
 	}
 	// Ensure a block that fails verification is not marked as processing
-	assert.Len(t, chainState.processingBlocks, 0)
+	assert.Len(t, chainState.verifiedBlocks, 0)
 
 	// Ensure that an error during block acceptance is propagated correctly
 	badBlk, err = chainState.ParseBlock(badAcceptBlk.Bytes())
@@ -402,7 +388,7 @@ func TestStateDecideBlock(t *testing.T) {
 	if err := badBlk.Verify(); err != nil {
 		t.Fatal(err)
 	}
-	assert.Len(t, chainState.processingBlocks, 1)
+	assert.Len(t, chainState.verifiedBlocks, 1)
 
 	if err := badBlk.Accept(); err == nil {
 		t.Fatal("Block should have errored on Accept")
@@ -419,7 +405,7 @@ func TestStateDecideBlock(t *testing.T) {
 	// Note: an error during block Accept/Reject is fatal, so it is undefined whether
 	// the block that failed on Accept should be removed from processing or not. We allow
 	// either case here to make this test more flexible.
-	if numProcessing := len(chainState.processingBlocks); numProcessing > 2 || numProcessing == 0 {
+	if numProcessing := len(chainState.verifiedBlocks); numProcessing > 2 || numProcessing == 0 {
 		t.Fatalf("Expected number of processing blocks to be either 1 or 2, but found %d", numProcessing)
 	}
 

@@ -25,7 +25,7 @@ type BlockWrapper struct {
 }
 
 // Verify verifies the underlying block, evicts from the unverified block cache
-// and if the block passes verification, adds it to [state] processingBlocks.
+// and if the block passes verification, adds it to [state] verifiedBlocks.
 // Note: it is guaranteed that if a block passes verification it will be added to
 // consensus and have either Accept or Reject called on it.
 func (bw *BlockWrapper) Verify() error {
@@ -36,11 +36,11 @@ func (bw *BlockWrapper) Verify() error {
 	if err != nil {
 		return err
 	}
-	bw.state.processingBlocks[blkID] = bw
+	bw.state.verifiedBlocks[blkID] = bw
 	return bw.state.baseDB.Commit()
 }
 
-// Accept accepts the underlying block, removes it from processingBlocks, caches it as a decided
+// Accept accepts the underlying block, removes it from verifiedBlocks, caches it as a decided
 // block, sets the last accepted block, and commits the underlying database atomically
 // after block acceptance has been performed.
 func (bw *BlockWrapper) Accept() error {
@@ -51,7 +51,7 @@ func (bw *BlockWrapper) Accept() error {
 	}
 
 	blkID := bw.ID()
-	delete(bw.state.processingBlocks, blkID)
+	delete(bw.state.verifiedBlocks, blkID)
 	bw.state.decidedBlocks.Put(blkID, bw)
 	bw.state.lastAcceptedBlock = bw
 
@@ -59,7 +59,7 @@ func (bw *BlockWrapper) Accept() error {
 }
 
 // Reject rejects the underlying block, removes it from processing blocks, caches it as a decided
-// block, sets the last accepted block, and commits the underlying database atomically after the
+// block, and commits the underlying database atomically after the
 // block has been rejected.
 func (bw *BlockWrapper) Reject() error {
 	// TODO set flag on baseDB so that operations taking place within [bw]
@@ -68,7 +68,7 @@ func (bw *BlockWrapper) Reject() error {
 		return err
 	}
 
-	delete(bw.state.processingBlocks, bw.ID())
+	delete(bw.state.verifiedBlocks, bw.ID())
 	bw.state.decidedBlocks.Put(bw.ID(), bw)
 	return bw.state.baseDB.Commit()
 }
