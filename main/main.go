@@ -118,11 +118,17 @@ func main() {
 			return
 		}
 		log.Info(upgradingMsg)
-	} else if !currentDBBootstrapped && dbManager.PreviouslyUsedDBVersion(prevDBVersion) {
-		log.Error(mustUpgradeMsg)
-		return
+	} else {
+		prevDB, exists := dbManager.Previous()
+		if !currentDBBootstrapped && exists && prevDB.Version.Compare(prevDBVersion) == 0 {
+			// If we have the previous database version but not the current one then node
+			// must run in fetch only mode (--fetch-only). The default behavior for a node in
+			// fetch only mode is to bootstrap from a node on the same machine (127.0.0.1) whose
+			// staking port is 9650. Tell the user to run in fetch only mode.
+			log.Error(mustUpgradeMsg)
+			return
+		}
 	}
-	// Already fetched or don't need to fetch
 
 	defer func() {
 		if r := recover(); r != nil {
