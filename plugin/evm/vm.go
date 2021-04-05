@@ -1185,10 +1185,6 @@ func (vm *VM) FormatAddress(chainID ids.ID, addr ids.ShortID) (string, error) {
 	return formatting.FormatAddress(chainIDAlias, hrp, addr.Bytes())
 }
 
-func (vm *VM) Chain() *coreth.ETHChain {
-	return vm.chain
-}
-
 // ParseEthAddress parses [addrStr] and returns an Ethereum address
 func ParseEthAddress(addrStr string) (common.Address, error) {
 	if !common.IsHexAddress(addrStr) {
