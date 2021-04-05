@@ -209,6 +209,28 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 		t.Fatalf("Expected GetFilterLogs to fail due to requesting block above last accepted block, but found error %s", err)
 	}
 
+	// Unless otherwise specified, getting the latest will still return the last
+	// accepted logs even when AllowUnfinalizedQueries = true.
+	fc4 := filters.FilterCriteria{}
+	logs, err = api.GetLogs(ctx, fc4)
+	if err != nil {
+		t.Fatalf("Failed to GetLogs for FilterCriteria with empty from and to block due to %s", err)
+	}
+	if len(logs) != 0 {
+		t.Fatalf("Expected GetLogs to return 0 log, but found %d", len(logs))
+	}
+	fid4, err := api.NewFilter(fc4)
+	if err != nil {
+		t.Fatalf("NewFilter failed due to %s", err)
+	}
+	logs, err = api.GetFilterLogs(ctx, fid4)
+	if err != nil {
+		t.Fatalf("GetFilterLogs failed due to %s", err)
+	}
+	if len(logs) != 0 {
+		t.Fatalf("Expected GetFilterLogs to return 0 log, but found %d", len(logs))
+	}
+
 	select {
 	case <-acceptedLogsCh:
 		t.Fatal("Received accepted logs event before Accepting block")
@@ -243,7 +265,6 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 		t.Fatalf("Expected GetFilterLogs to return 1 log with BlocKNumber 1, but found BlockNumber %d", logs[0].BlockNumber)
 	}
 
-	fc4 := filters.FilterCriteria{}
 	logs, err = api.GetLogs(ctx, fc4)
 	if err != nil {
 		t.Fatalf("Failed to GetLogs for FilterCriteria with empty from and to block due to %s", err)
@@ -254,7 +275,7 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 	if logs[0].BlockNumber != 1 {
 		t.Fatalf("Expected single log to have block number 1, but found %d", logs[0].BlockNumber)
 	}
-	fid4, err := api.NewFilter(fc4)
+	fid4, err = api.NewFilter(fc4)
 	if err != nil {
 		t.Fatalf("NewFilter failed due to %s", err)
 	}
