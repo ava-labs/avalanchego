@@ -71,9 +71,8 @@ type Keystore struct {
 	users map[string]*password.Hash
 
 	// Used to persist users and their data
-	userDB    database.Database
-	bcDB      database.Database
-	dbManager manager.Manager
+	userDB database.Database
+	bcDB   database.Database
 
 	//           BaseDB
 	//          /      \
@@ -91,35 +90,12 @@ func (ks *Keystore) Initialize(log logging.Logger, dbManager manager.Manager) er
 	if err := manager.RegisterCodec(codecVersion, c); err != nil {
 		return err
 	}
-
 	ks.log = log
 	ks.codec = manager
 	ks.users = make(map[string]*password.Hash)
-	ks.dbManager = dbManager
-	return ks.initializeDB()
-}
-
-func (ks *Keystore) initializeDB() error {
-	ks.userDB = prefixdb.New(usersPrefix, ks.dbManager.Current())
-	ks.bcDB = prefixdb.New(bcsPrefix, ks.dbManager.Current())
-	return ks.migrate()
-}
-
-func (ks *Keystore) migrateUserBCDB(previousUserBCDB database.Database, bcsBatch database.Batch, userBatch database.Batch) error {
-	iterator := previousUserBCDB.NewIterator()
-	defer iterator.Release()
-
-	for iterator.Next() {
-		if err := bcsBatch.Put(iterator.Key(), iterator.Value()); err != nil {
-			return err
-		}
-	}
-
-	if err := iterator.Error(); err != nil {
-		return err
-	}
-
-	return atomic.WriteAll(userBatch, bcsBatch)
+	ks.userDB = prefixdb.New(usersPrefix, dbManager.Current())
+	ks.bcDB = prefixdb.New(bcsPrefix, dbManager.Current())
+	return ks.migrate(dbManager)
 }
 
 // CreateHandler returns a new service object that can send requests to thisAPI.

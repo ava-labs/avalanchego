@@ -3,20 +3,22 @@
 package keystore
 
 import (
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/version"
 )
 
 // Perform a database migration if required
-func (ks *Keystore) migrate() error {
-	prevDB, prevDBExists := ks.dbManager.Previous()
+func (ks *Keystore) migrate(dbManager manager.Manager) error {
+	prevDB, prevDBExists := dbManager.Previous()
 	if !prevDBExists {
 		// There is nothing to migrate
 		return nil
 	}
 	prevDBVersion := prevDB.Version
-	currentDB := ks.dbManager.Current()
+	currentDB := dbManager.Current()
 	currentDBVersion := currentDB.Version
 	// Right now the only valid migration is from database version 1.0.0 to 1.1.0
 	if prevDBVersion.Compare(version.NewDefaultVersion(1, 0, 0)) == 0 &&
@@ -40,7 +42,6 @@ func (ks *Keystore) migrate110(prevDB, currentDB *manager.VersionedDatabase) err
 	previousBCDB := prefixdb.New(bcsPrefix, prevDB)
 	userIterator := previousUserDB.NewIterator()
 	defer userIterator.Release()
-
 	for userIterator.Next() {
 		username := userIterator.Key()
 		exists, err := ks.userDB.Has(username)
@@ -66,11 +67,25 @@ func (ks *Keystore) migrate110(prevDB, currentDB *manager.VersionedDatabase) err
 	if err := userIterator.Error(); err != nil {
 		return err
 	}
-
 	if err := currentDB.Put(migratedKey, []byte(prevDB.Version.String())); err != nil {
 		return err
 	}
-
 	ks.log.Info("finished migrating keystore from database version %s to %s", prevDB.Version, currentDB.Version)
 	return nil
+}
+
+func (ks *Keystore) migrateUserBCDB(previousUserBCDB database.Database, bcsBatch database.Batch, userBatch database.Batch) error {
+	iterator := previousUserBCDB.NewIterator()
+	defer iterator.Release()
+
+	for iterator.Next() {
+		if err := bcsBatch.Put(iterator.Key(), iterator.Value()); err != nil {
+			return err
+		}
+	}
+
+	if err := iterator.Error(); err != nil {
+		return err
+	}
+	return atomic.WriteAll(userBatch, bcsBatch)
 }
