@@ -131,7 +131,7 @@ func NewDefaultMemDBManager() Manager {
 			{
 				rawDB:    memdb.New(),
 				Database: memdb.New(),
-				Version:  version.DefaultVersion1,
+				Version:  version.DefaultVersion2,
 			},
 		},
 	}

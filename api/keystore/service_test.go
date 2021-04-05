@@ -436,7 +436,7 @@ func TestMigrateKeystoreUser(t *testing.T) {
 	versionedDBs := []*manager.VersionedDatabase{
 		{
 			Database: currentDB,
-			Version:  version.DefaultVersion1,
+			Version:  version.DefaultVersion2,
 		},
 	}
 
@@ -470,7 +470,7 @@ func TestMigrateKeystoreUser(t *testing.T) {
 
 	versionedDBs = append(versionedDBs, &manager.VersionedDatabase{
 		Database: memdb.New(),
-		Version:  version.NewDefaultVersion(1, 1, 0),
+		Version:  version.NewDefaultVersion(1, 0, 0),
 	})
 	upgradedDBManager, err := manager.NewManagerFromDBs(versionedDBs)
 	if err != nil {

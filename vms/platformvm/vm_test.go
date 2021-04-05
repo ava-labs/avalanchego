@@ -315,7 +315,6 @@ func defaultVM() (*VM, database.Database) {
 	if err != nil {
 		panic(err)
 	}
-
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	ctx.Lock.Lock()
@@ -2442,7 +2441,6 @@ func TestUptimeReporting(t *testing.T) {
 	}
 
 	vm.vdrMgr = validators.NewManager()
-
 	vm.clock.Set(defaultGenesisTime)
 	ctx := defaultContext()
 	ctx.Lock.Lock()
@@ -2530,10 +2528,13 @@ func TestUptimeReporting(t *testing.T) {
 		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 
-	versionedDBs = append(versionedDBs, &manager.VersionedDatabase{
+	newVersionedDBs := make([]*manager.VersionedDatabase, len(versionedDBs)+1)
+	newVersionedDBs[0] = &manager.VersionedDatabase{
 		Database: memdb.New(),
-		Version:  version.NewDefaultVersion(1, 1, 0),
-	})
+		Version:  version.DefaultVersion2,
+	}
+	copy(newVersionedDBs[1:], versionedDBs)
+	versionedDBs = newVersionedDBs
 
 	newDBManager, err := manager.NewManagerFromDBs(versionedDBs)
 	if err != nil {
@@ -2547,7 +2548,6 @@ func TestUptimeReporting(t *testing.T) {
 
 	// Replace the metrics registry to prevent conflicts
 	ctx.Metrics = prometheus.NewRegistry()
-
 	if err := vm.Initialize(ctx, migratedDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -2559,7 +2559,6 @@ func TestUptimeReporting(t *testing.T) {
 	if err := vm.Bootstrapping(); err != nil {
 		t.Fatal(err)
 	}
-
 	if err := vm.Bootstrapped(); err != nil {
 		t.Fatal(err)
 	}
@@ -2569,8 +2568,7 @@ func TestUptimeReporting(t *testing.T) {
 	checkUptime(vm, nodeID2, .8, "peer connected during bootstrapping and disconnected after bootstrapping after db migration")
 }
 
-// Test that calling Verify on a block with an unverified parent doesn't cause a
-// panic.
+// Test that calling Verify on a block with an unverified parent doesn't cause a panic.
 func TestUnverifiedParentPanic(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
 
