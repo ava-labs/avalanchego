@@ -72,7 +72,6 @@ const (
 	maxFutureBlockTime   = 10 * time.Second
 	batchSize            = 250
 	maxUTXOsToFetch      = 1024
-	chainStateCacheSize  = 1024
 	defaultMempoolSize   = 1024
 	codecVersion         = uint16(0)
 	txFee                = units.MilliAvax
