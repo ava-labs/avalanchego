@@ -41,7 +41,6 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/eth/gasprice"
-	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
@@ -51,7 +50,8 @@ import (
 )
 
 var (
-	errExpired = errors.New("request expired")
+	ErrUnfinalizedData = errors.New("cannot query unfinalized data")
+	errExpired         = errors.New("request expired")
 )
 
 // EthAPIBackend implements ethapi.Backend for full nodes
@@ -64,6 +64,10 @@ type EthAPIBackend struct {
 // ChainConfig returns the active chain configuration.
 func (b *EthAPIBackend) ChainConfig() *params.ChainConfig {
 	return b.eth.blockchain.Config()
+}
+
+func (b *EthAPIBackend) GetVMConfig() *vm.Config {
+	return b.eth.blockchain.GetVMConfig()
 }
 
 func (b *EthAPIBackend) CurrentBlock() *types.Block {
@@ -85,8 +89,15 @@ func (b *EthAPIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumb
 	}
 	// Treat requests for the pending, latest, or accepted block
 	// identically.
+	acceptedBlock := b.eth.LastAcceptedBlock()
 	if number.IsAccepted() {
-		return b.eth.LastAcceptedBlock().Header(), nil
+		return acceptedBlock.Header(), nil
+	}
+
+	if !b.GetVMConfig().AllowUnfinalizedQueries && acceptedBlock != nil {
+		if number.Int64() > acceptedBlock.Number().Int64() {
+			return nil, ErrUnfinalizedData
+		}
 	}
 
 	return b.eth.blockchain.GetHeaderByNumber(uint64(number)), nil
@@ -122,8 +133,15 @@ func (b *EthAPIBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumbe
 	}
 	// Treat requests for the pending, latest, or accepted block
 	// identically.
+	acceptedBlock := b.eth.LastAcceptedBlock()
 	if number.IsAccepted() {
-		return b.eth.LastAcceptedBlock(), nil
+		return acceptedBlock, nil
+	}
+
+	if !b.GetVMConfig().AllowUnfinalizedQueries && acceptedBlock != nil {
+		if number.Int64() > acceptedBlock.Number().Int64() {
+			return nil, ErrUnfinalizedData
+		}
 	}
 
 	return b.eth.blockchain.GetBlockByNumber(uint64(number)), nil
@@ -242,6 +260,10 @@ func (b *EthAPIBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Sub
 	return b.eth.BlockChain().SubscribeChainEvent(ch)
 }
 
+func (b *EthAPIBackend) SubscribeChainAcceptedEvent(ch chan<- core.ChainEvent) event.Subscription {
+	return b.eth.BlockChain().SubscribeChainAcceptedEvent(ch)
+}
+
 func (b *EthAPIBackend) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
 	return b.eth.BlockChain().SubscribeChainHeadEvent(ch)
 }
@@ -252,6 +274,10 @@ func (b *EthAPIBackend) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) e
 
 func (b *EthAPIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
 	return b.eth.BlockChain().SubscribeLogsEvent(ch)
+}
+
+func (b *EthAPIBackend) SubscribeAcceptedLogsEvent(ch chan<- []*types.Log) event.Subscription {
+	return b.eth.BlockChain().SubscribeAcceptedLogsEvent(ch)
 }
 
 func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
@@ -358,10 +384,11 @@ func (b *EthAPIBackend) CurrentHeader() *types.Header {
 	return b.eth.blockchain.CurrentHeader()
 }
 
-func (b *EthAPIBackend) Miner() *miner.Miner {
-	return b.eth.Miner()
-}
-
-func (b *EthAPIBackend) StartMining(threads int) error {
-	return b.eth.StartMining(threads)
-}
+// Original code:
+// func (b *EthAPIBackend) Miner() *miner.Miner {
+// 	return b.eth.Miner()
+// }
+//
+// func (b *EthAPIBackend) StartMining(threads int) error {
+// 	return b.eth.StartMining(threads)
+// }
