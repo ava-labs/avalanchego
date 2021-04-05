@@ -453,13 +453,13 @@ func setNodeConfig(v *viper.Viper) error {
 	}
 	switch {
 	case !Config.EnableP2PTLS:
-		// If TLS disable, my node ID is the my IP
+		// If TLS is disabled, my node ID is the hash of my IP
 		Config.NodeID = ids.ShortID(hashing.ComputeHash160Array([]byte(Config.StakingIP.IP().String())))
 	case !Config.FetchOnly:
-		// If TLS is enabled and we're not in fetch only mode, my node ID is derived from my staking key/cert
+		// If TLS is enabled and I'm not in fetch only mode, my node ID is derived from my staking key/cert
 		Config.NodeID = nodeIDFromFile
 	case Config.FetchOnly:
-		// If TLS is enabled and we're in fetch only mode, my node ID is derived a new, temporary staking key/cert
+		// If TLS is enabled and I'm in fetch only mode, my node ID is derived from a new, ephemeral staking key/cert
 		keyBytes, certBytes, err := staking.GenerateStakingCert()
 		if err != nil {
 			return fmt.Errorf("couldn't generate dummy staking key/cert: %s", err)
@@ -742,26 +742,28 @@ func setNodeConfig(v *viper.Viper) error {
 	return nil
 }
 
-// Initialize Config.BootstrapPeers
+// Initialize Config.BootstrapPeers.
+// If in fetch only mode,
 func initBootstrapPeers(v *viper.Viper, fetchOnlyFrom ids.ShortID) error {
-	bootstrapIPs := ""
-	bootstrapIDs := ""
+	bootstrapIPs := v.GetString(bootstrapIPsKey)
+	bootstrapIDs := v.GetString(bootstrapIDsKey)
 
 	if Config.FetchOnly {
-		parsedBootstrapIPs := v.GetString(bootstrapIPsKey)
-		if parsedBootstrapIPs == defaultString {
+		// In fetch only mode, bootstrap by default from a local node whose staking port is 9651.
+		if bootstrapIPs == defaultString {
 			bootstrapIPs = "127.0.0.1:9651"
 		}
-		bootstrapIDs = fetchOnlyFrom.PrefixedString(constants.NodeIDPrefix)
+		if bootstrapIDs == defaultString {
+			bootstrapIDs = fetchOnlyFrom.PrefixedString(constants.NodeIDPrefix)
+		}
 	} else {
+		// Not in fetch only mode
 		defaultBootstrapIPs, defaultBootstrapIDs := genesis.SampleBeacons(Config.NetworkID, 5)
-		parsedBootstrapIPs := v.GetString(bootstrapIPsKey)
-		if parsedBootstrapIPs == defaultString {
+		if bootstrapIPs == defaultString { // If no IPs specified, use default bootstrap node IPs
 			bootstrapIPs = strings.Join(defaultBootstrapIPs, ",")
 		}
-		parsedBootstrapIDs := v.GetString(bootstrapIDsKey)
-		if parsedBootstrapIDs == defaultString {
-			if bootstrapIPs == "" {
+		if bootstrapIDs == defaultString { // If no node IDs given, use node IDs of nodes in [bootstrapIPs]
+			if bootstrapIPs == "" { // If user specified no bootstrap IPs, default to no bootstrap IDs either
 				bootstrapIDs = ""
 			} else {
 				bootstrapIDs = strings.Join(defaultBootstrapIDs, ",")
@@ -770,34 +772,36 @@ func initBootstrapPeers(v *viper.Viper, fetchOnlyFrom ids.ShortID) error {
 	}
 
 	for _, ip := range strings.Split(bootstrapIPs, ",") {
-		if ip != "" {
-			addr, err := utils.ToIPDesc(ip)
-			if err != nil {
-				return fmt.Errorf("couldn't parse bootstrap ip %s: %w", ip, err)
-			}
-			Config.BootstrapPeers = append(Config.BootstrapPeers, &node.Peer{
-				IP: addr,
-			})
+		if ip == "" {
+			continue
 		}
+		addr, err := utils.ToIPDesc(ip)
+		if err != nil {
+			return fmt.Errorf("couldn't parse bootstrap ip %s: %w", ip, err)
+		}
+		Config.BootstrapPeers = append(Config.BootstrapPeers, &node.Peer{
+			IP: addr,
+		})
 	}
 
 	if Config.EnableP2PTLS {
 		i := 0
 		for _, id := range strings.Split(bootstrapIDs, ",") {
-			if id != "" {
-				peerID, err := ids.ShortFromPrefixedString(id, constants.NodeIDPrefix)
-				if err != nil {
-					return fmt.Errorf("couldn't parse bootstrap peer id: %w", err)
-				}
-				if len(Config.BootstrapPeers) <= i {
-					return errBootstrapMismatch
-				}
-				Config.BootstrapPeers[i].ID = peerID
-				i++
+			if id == "" {
+				continue
 			}
+			nodeID, err := ids.ShortFromPrefixedString(id, constants.NodeIDPrefix)
+			if err != nil {
+				return fmt.Errorf("couldn't parse bootstrap peer id: %w", err)
+			}
+			if len(Config.BootstrapPeers) <= i {
+				return errBootstrapMismatch
+			}
+			Config.BootstrapPeers[i].ID = nodeID
+			i++
 		}
 		if len(Config.BootstrapPeers) != i {
-			return fmt.Errorf("more bootstrap IPs, %d, provided than bootstrap IDs, %d", len(Config.BootstrapPeers), i)
+			return fmt.Errorf("got %d bootstrap IPs but %d bootstrap IDs", len(Config.BootstrapPeers), i)
 		}
 	} else {
 		for _, peer := range Config.BootstrapPeers {
