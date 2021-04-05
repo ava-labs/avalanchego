@@ -178,6 +178,16 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 		end = head
 	}
 
+	// When querying unfinalized data without a populated end block, it is
+	// possible that the begin will be greater than the end.
+	//
+	// We error in this case to prevent a bad UX where the caller thinks there
+	// are no logs from the specified beginning to end (when in reality there may
+	// be some).
+	if end < uint64(f.begin) {
+		return nil, fmt.Errorf("begin block %d is greater than end block %d", f.begin, end)
+	}
+
 	// Gather all indexed logs, and finish with non indexed ones
 	var logs []*types.Log
 	size, sections := f.backend.BloomStatus()
