@@ -139,9 +139,9 @@ type CacheConfig struct {
 	TrieDirtyLimit      int           // Memory limit (MB) at which to start flushing dirty trie nodes to disk
 	TrieDirtyDisabled   bool          // Whether to disable trie write caching and GC altogether (archive node)
 	TrieTimeLimit       time.Duration // Time limit after which to flush the current in-memory trie to disk
-	SnapshotLimit       int           // Memory allowance (MB) to use for caching snapshot entries in memory
 
-	SnapshotWait bool // Wait for snapshot construction on startup. TODO(karalabe): This is a dirty hack for testing, nuke it
+	// SnapshotLimit       int           // Memory allowance (MB) to use for caching snapshot entries in memory
+	// SnapshotWait bool // Wait for snapshot construction on startup. TODO(karalabe): This is a dirty hack for testing, nuke it
 }
 
 // defaultCacheConfig are the default caching values if none are specified by the
@@ -150,8 +150,8 @@ var defaultCacheConfig = &CacheConfig{
 	TrieCleanLimit: 256,
 	TrieDirtyLimit: 256,
 	TrieTimeLimit:  5 * time.Minute,
-	SnapshotLimit:  256,
-	SnapshotWait:   true,
+	// SnapshotLimit:  256,
+	// SnapshotWait:   true,
 }
 
 // BlockChain represents the canonical chain given a database with a genesis
@@ -173,8 +173,6 @@ type BlockChain struct {
 	cacheConfig *CacheConfig        // Cache configuration for pruning
 
 	db ethdb.Database // Low level persistent database to store final content in
-
-	snapslock sync.Mutex
 
 	snaps  *snapshot.Tree // Snapshot tree for fast trie leaf access
 	triegc *prque.Prque   // Priority queue mapping block numbers to tries to gc
@@ -365,12 +363,14 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		bc.indexLock.Wait()
 		log.Debug("indexing unlocked")
 
-		// Load any existing snapshot, regenerating it if loading failed
-		if bc.cacheConfig.SnapshotLimit > 0 {
-			bc.snapslock.Lock()
-			bc.snaps = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, bc.CurrentBlock().Root(), !bc.cacheConfig.SnapshotWait)
-			bc.snapslock.Unlock()
-		}
+		// Always disable snapshots (experimental feature)
+		//
+		// Original code:
+		// // Load any existing snapshot, regenerating it if loading failed
+		// if bc.cacheConfig.SnapshotLimit > 0 {
+		// 	bc.snaps = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, bc.CurrentBlock().Root(), !bc.cacheConfig.SnapshotWait)
+		// }
+
 		// Take ownership of this particular state
 		// go bc.update()
 		if txLookupLimit != nil {
@@ -668,8 +668,6 @@ func (bc *BlockChain) State() (*state.StateDB, error) {
 
 // StateAt returns a new mutable state based on a particular point in time.
 func (bc *BlockChain) StateAt(root common.Hash) (*state.StateDB, error) {
-	bc.snapslock.Lock()
-	defer bc.snapslock.Unlock()
 	return state.New(root, bc.stateCache, bc.snaps)
 }
 
@@ -1722,8 +1720,8 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 	var logs []*types.Log
 	for _, receipt := range receipts {
 		for _, log := range receipt.Logs {
-			l := log.Copy()
-			logs = append(logs, l)
+			l := *log
+			logs = append(logs, &l)
 		}
 	}
 
@@ -2433,11 +2431,11 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 			var logs []*types.Log
 			for _, receipt := range receipts {
 				for _, log := range receipt.Logs {
-					l := log.Copy()
+					l := *log
 					if removed {
 						l.Removed = true
 					}
-					logs = append(logs, l)
+					logs = append(logs, &l)
 				}
 			}
 			if len(logs) > 0 {

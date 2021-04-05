@@ -311,11 +311,6 @@ func (vm *VM) Initialize(
 
 	config := eth.NewDefaultConfig()
 	config.Genesis = g
-	// disable the experimental snapshot feature from geth
-	config.TrieCleanCache += config.SnapshotCache
-	config.SnapshotCache = 0
-
-	config.Miner.ManualMining = true
 
 	// Set minimum gas price and launch goroutine to sleep until
 	// network upgrade when the gas price must be changed

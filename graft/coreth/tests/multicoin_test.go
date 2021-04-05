@@ -50,11 +50,6 @@ func TestMulticoin(t *testing.T) {
 	genKey := keystore.NewKeyFromECDSA(hk)
 
 	config.Genesis = genesisBlock
-	config.TrieCleanCache += config.SnapshotCache
-	config.SnapshotCache = 0
-
-	// grab the control of block generation
-	config.Miner.ManualMining = true
 
 	newBlockChan := make(chan *types.Block)
 

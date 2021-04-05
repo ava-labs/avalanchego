@@ -186,7 +186,8 @@ type Block struct {
 	uncles       []*Header
 	transactions Transactions
 	version      uint32
-	extdata      *[]byte
+
+	extdata *[]byte
 
 	// caches
 	hash atomic.Value
@@ -279,7 +280,7 @@ func NewBlock(
 		}
 	}
 
-	b.SetExtData(extdata, recalc)
+	b.setExtData(extdata, recalc)
 	return b
 }
 
@@ -332,15 +333,15 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 	return nil
 }
 
-func (b *Block) SetExtDataHelper(data *[]byte, recalc bool) {
+func (b *Block) setExtDataHelper(data *[]byte, recalc bool) {
 	if data == nil {
-		b.SetExtData(nil, recalc)
+		b.setExtData(nil, recalc)
 		return
 	}
-	b.SetExtData(*data, recalc)
+	b.setExtData(*data, recalc)
 }
 
-func (b *Block) SetExtData(data []byte, recalc bool) {
+func (b *Block) setExtData(data []byte, recalc bool) {
 	_data := make([]byte, len(data))
 	b.extdata = &_data
 	copy(*b.extdata, data)
@@ -505,7 +506,7 @@ func (b *Block) WithBody(transactions []*Transaction, uncles []*Header, version 
 	for i := range uncles {
 		block.uncles[i] = CopyHeader(uncles[i])
 	}
-	block.SetExtDataHelper(extdata, false)
+	block.setExtDataHelper(extdata, false)
 	return block
 }
 

@@ -71,7 +71,7 @@ func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Add
 }
 
 func (self *ETHChain) Start() {
-	self.backend.StartMining(0)
+	self.backend.StartMining()
 	self.backend.Start()
 }
 

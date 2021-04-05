@@ -33,7 +33,6 @@ import (
 
 	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
@@ -57,7 +56,6 @@ type Config struct {
 	GasPrice              *big.Int      // Minimum gas price for mining a transaction
 	Recommit              time.Duration // The time interval for miner to re-create mining work.
 	Noverify              bool          // Disable remote mining solution verification(only useful in ethash).
-	ManualMining          bool
 }
 
 type Miner struct {
@@ -100,19 +98,20 @@ func (miner *Miner) SetRecommitInterval(interval time.Duration) {
 	miner.worker.setRecommitInterval(interval)
 }
 
+// Original code:
 // Pending returns the currently pending block and associated state.
-func (miner *Miner) Pending() (*types.Block, *state.StateDB) {
-	return miner.worker.pending()
-}
-
+// func (miner *Miner) Pending() (*types.Block, *state.StateDB) {
+// 	return miner.worker.pending()
+// }
+//
 // PendingBlock returns the currently pending block.
 //
 // Note, to access both the pending block and the pending state
 // simultaneously, please use Pending(), as the pending state can
 // change between multiple method calls
-func (miner *Miner) PendingBlock() *types.Block {
-	return miner.worker.pendingBlock()
-}
+// func (miner *Miner) PendingBlock() *types.Block {
+// 	return miner.worker.pendingBlock()
+// }
 
 func (miner *Miner) SetEtherbase(addr common.Address) {
 	miner.worker.setEtherbase(addr)
