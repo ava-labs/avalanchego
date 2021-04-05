@@ -26,8 +26,8 @@ message InitializeRequest {
 }
 
 message InitializeResponse {
-    bytes id = 1;
-    bytes parentID = 2;
+    bytes lastAcceptedID = 1;
+    bytes lastAcceptedParentID = 2;
     uint32 status = 3;
     uint64 height = 4;
     bytes bytes = 5;
