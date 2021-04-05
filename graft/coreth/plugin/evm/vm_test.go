@@ -3053,7 +3053,7 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 	vm.chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = true
 
 	ctx := context.Background()
-	b, err := vm.chain.Backend().APIBackend.BlockByNumber(ctx, rpc.BlockNumber(blkHeight))
+	b, err := vm.chain.APIBackend().BlockByNumber(ctx, rpc.BlockNumber(blkHeight))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3063,7 +3063,7 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 
 	vm.chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = false
 
-	_, err = vm.chain.Backend().APIBackend.BlockByNumber(ctx, rpc.BlockNumber(blkHeight))
+	_, err = vm.chain.APIBackend().BlockByNumber(ctx, rpc.BlockNumber(blkHeight))
 	if !errors.Is(err, eth.ErrUnfinalizedData) {
 		t.Fatalf("expected ErrUnfinalizedData but got %s", err.Error())
 	}

@@ -91,8 +91,8 @@ func (self *ETHChain) BlockChain() *core.BlockChain {
 	return self.backend.BlockChain()
 }
 
-func (self *ETHChain) Backend() *eth.Ethereum {
-	return self.backend
+func (self *ETHChain) APIBackend() *eth.EthAPIBackend {
+	return self.backend.APIBackend
 }
 
 func (self *ETHChain) UnlockIndexing() {
