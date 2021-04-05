@@ -161,7 +161,10 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 	// Figure out the limits of the filter range
 	// LatestBlockNumber is transformed into the last accepted block in HeaderByNumber
 	// so it is left in place here.
-	header, _ := f.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	header, err := f.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	if err != nil {
+		return nil, err
+	}
 	if header == nil {
 		return nil, nil
 	}
@@ -176,10 +179,7 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 	}
 
 	// Gather all indexed logs, and finish with non indexed ones
-	var (
-		logs []*types.Log
-		err  error
-	)
+	var logs []*types.Log
 	size, sections := f.backend.BloomStatus()
 	if indexed := sections * size; indexed > uint64(f.begin) {
 		if indexed > end {

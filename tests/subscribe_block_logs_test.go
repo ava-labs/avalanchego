@@ -23,12 +23,16 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 		newBlockChan <- block
 		return nil
 	})
+	acceptedBlock := chain.GetGenesisBlock()
+	chain.SetOnQueryAcceptedBlock(func() *types.Block {
+		return acceptedBlock
+	})
 
 	chain.Start()
 	defer chain.Stop()
 
 	acceptedLogsCh := make(chan []*types.Log, 1000)
-	ethBackend := chain.Backend().APIBackend
+	ethBackend := chain.APIBackend()
 	ethBackend.SubscribeAcceptedLogsEvent(acceptedLogsCh)
 
 	api := filters.NewPublicFilterAPI(ethBackend, true, 10)
@@ -169,6 +173,7 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 	if err := chain.Accept(block); err != nil {
 		t.Fatal(err)
 	}
+	acceptedBlock = block
 
 	chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = false
 	logs, err = api.GetLogs(ctx, fc)
