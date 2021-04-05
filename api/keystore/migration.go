@@ -3,56 +3,53 @@
 package keystore
 
 import (
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/version"
 )
 
-func (ks *Keystore) Migrate() error {
-	latestDBVersion := ks.dbManager.Current().Version.String()
-	_, prevDBExists := ks.dbManager.Previous()
+// Perform a database migration if required
+func (ks *Keystore) migrate() error {
+	prevDB, prevDBExists := ks.dbManager.Previous()
 	if !prevDBExists {
+		// There is nothing to migrate
 		return nil
 	}
-
-	switch latestDBVersion {
-	case "v1.1.0":
-		return ks.migrate110()
+	prevDBVersion := prevDB.Version
+	currentDB := ks.dbManager.Current()
+	currentDBVersion := currentDB.Version
+	// Right now the only valid migration is from database version 1.0.0 to 1.1.0
+	if prevDBVersion.Compare(version.NewDefaultVersion(1, 0, 0)) == 0 &&
+		currentDBVersion.Compare(version.NewDefaultVersion(1, 1, 0)) == 0 {
+		return ks.migrate110(prevDB, currentDB)
 	}
 	return nil
 }
 
-func (ks *Keystore) migrate110() error {
-	currentDB := ks.dbManager.Current()
-	previousDB, exists := ks.dbManager.Previous()
-	if !exists {
-		return nil
-	}
-
+func (ks *Keystore) migrate110(prevDB, currentDB *manager.VersionedDatabase) error {
 	migrated, err := currentDB.Has(migratedKey)
 	if err != nil {
 		return err
-	}
-	// If the currentDB has already been marked as migrated
-	// then skip migrating the keystore users.
-	if migrated {
+	} else if migrated {
+		// Skip migration if previously done.
 		return nil
 	}
+	ks.log.Info("migrating keystore from database version %s to %s", prevDB.Version, currentDB.Version)
+	defer func() {
+		ks.log.Info("done migrating keystore")
+	}()
 
-	previousUserDB := prefixdb.New(usersPrefix, previousDB)
-	previousBCDB := prefixdb.New(bcsPrefix, previousDB)
-
-	ks.log.Info("Migrating Keystore Users from %s -> %s", previousDB.Version, currentDB.Version)
-
+	previousUserDB := prefixdb.New(usersPrefix, prevDB)
+	previousBCDB := prefixdb.New(bcsPrefix, prevDB)
 	userIterator := previousUserDB.NewIterator()
 	defer userIterator.Release()
 
 	for userIterator.Next() {
 		username := userIterator.Key()
-
 		exists, err := ks.userDB.Has(username)
 		if err != nil {
 			return err
-		}
-		if exists {
+		} else if exists { // already have this username in the keystore
 			continue
 		}
 
@@ -63,9 +60,7 @@ func (ks *Keystore) migrate110() error {
 
 		currentUserBCDB := prefixdb.New(username, ks.bcDB)
 		previousUserBCDB := prefixdb.New(username, previousBCDB)
-
 		bcsBatch := currentUserBCDB.NewBatch()
-
 		if err := ks.migrateUserBCDB(previousUserBCDB, bcsBatch, userBatch); err != nil {
 			return err
 		}
@@ -75,5 +70,5 @@ func (ks *Keystore) migrate110() error {
 		return err
 	}
 
-	return currentDB.Put(migratedKey, []byte(previousDB.Version.String()))
+	return currentDB.Put(migratedKey, []byte(prevDB.Version.String()))
 }

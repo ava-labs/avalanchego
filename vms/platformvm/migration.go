@@ -7,33 +7,34 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 )
 
-func (vm *VM) Migrate() error {
-	latestDBVersion := vm.dbManager.Current().Version.String()
-	_, prevDBExists := vm.dbManager.Previous()
-	if !prevDBExists {
+func (vm *VM) migrate() error {
+	prevDB, prevDBExists := vm.dbManager.Previous()
+	if !prevDBExists { // there is nothing to migrate
 		return nil
 	}
-
-	switch latestDBVersion {
-	case "v1.1.0":
-		return vm.migrate110()
+	prevDBVersion := prevDB.Version
+	currentDB := vm.dbManager.Current()
+	currentDBVersion := currentDB.Version
+	// Only valid migration is from database version 1.0.0 to 1.1.0
+	if prevDBVersion.Compare(version.NewDefaultVersion(1, 0, 0)) == 0 &&
+		currentDBVersion.Compare(version.NewDefaultVersion(1, 1, 0)) == 0 {
+		return vm.migrate110(prevDB, currentDB)
 	}
 	return nil
 }
 
-func (vm *VM) migrate110() error {
-	previousDB, _ := vm.dbManager.Previous()
-	completedMigration, err := vm.DB.Has(migratedKey)
+func (vm *VM) migrate110(prevDB, currentDB *manager.VersionedDatabase) error {
+	migrated, err := vm.DB.Has(migratedKey)
 	if err != nil {
 		return err
-	}
-
-	if completedMigration {
+	} else if migrated { // already did migration
 		return nil
 	}
 
@@ -46,7 +47,6 @@ func (vm *VM) migrate110() error {
 
 	for stopIter.Next() { // Iterates in order of increasing stop time
 		txBytes := stopIter.Value()
-
 		tx := rewardTx{}
 		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
@@ -61,8 +61,7 @@ func (vm *VM) migrate110() error {
 		}
 
 		nodeID := unsignedTx.Validator.ID()
-
-		uptime, err := vm.uptime(previousDB, nodeID)
+		uptime, err := vm.uptime(prevDB, nodeID)
 		switch {
 		case err == database.ErrNotFound:
 			vm.Ctx.Log.Debug("Couldn't find uptime in prior database for %s: %s", nodeID, err)
@@ -74,17 +73,13 @@ func (vm *VM) migrate110() error {
 		}
 
 		lastUpdated := time.Unix(int64(uptime.LastUpdated), 0)
-
 		// todo review this
 		if !vm.bootstrappedTime.After(lastUpdated) {
 			continue
 		}
-
 		durationOffline := vm.bootstrappedTime.Sub(lastUpdated)
-
 		uptime.UpDuration += uint64(durationOffline / time.Second)
 		uptime.LastUpdated = uint64(vm.bootstrappedTime.Unix())
-
 		if err := vm.setUptime(vm.DB, nodeID, uptime); err != nil {
 			return err
 		}
@@ -95,7 +90,7 @@ func (vm *VM) migrate110() error {
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		vm.DB.Put(migratedKey, []byte(previousDB.Version.String())),
+		vm.DB.Put(migratedKey, []byte(prevDB.Version.String())),
 		vm.DB.Commit(),
 		stopDB.Close(),
 	)

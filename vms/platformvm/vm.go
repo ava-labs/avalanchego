@@ -80,7 +80,6 @@ var (
 	subnetsKey       = ids.ID{'s', 'u', 'b', 'n', 'e', 't', 's'}
 	currentSupplyKey = ids.ID{'c', 'u', 'r', 'r', 'e', 't', ' ', 's', 'u', 'p', 'p', 'l', 'y'}
 	migratedKey      = []byte("migrated")
-	noMigration      = []byte("no migration")
 
 	errRegisteringType          = errors.New("error registering type with database")
 	errInvalidLastAcceptedBlock = errors.New("last accepted block must be a decision block")
@@ -432,7 +431,7 @@ func (vm *VM) Bootstrapped() error {
 		return errs.Err
 	}
 
-	err := vm.Migrate()
+	err := vm.migrate()
 	if err != nil {
 		return err
 	}
@@ -478,10 +477,8 @@ func (vm *VM) Bootstrapped() error {
 		}
 
 		durationOffline := vm.bootstrappedTime.Sub(lastUpdated)
-
 		uptime.UpDuration += uint64(durationOffline / time.Second)
 		uptime.LastUpdated = uint64(vm.bootstrappedTime.Unix())
-
 		if err := vm.setUptime(vm.DB, nodeID, uptime); err != nil {
 			return err
 		}
@@ -529,7 +526,6 @@ func (vm *VM) Shutdown() error {
 		}
 		nodeID := staker.Validator.ID()
 		startTime := staker.StartTime()
-
 		uptime, err := vm.uptime(vm.DB, nodeID)
 		switch {
 		case err == database.ErrNotFound:
@@ -540,15 +536,14 @@ func (vm *VM) Shutdown() error {
 			return err
 		}
 
-		currentLocalTime := vm.clock.Time()
-		timeConnected := currentLocalTime
+		now := vm.clock.Time()
+		timeConnected := now
 		if realTimeConnected, isConnected := vm.connections[nodeID]; isConnected {
 			timeConnected = realTimeConnected
 		}
 		if timeConnected.Before(vm.bootstrappedTime) {
 			timeConnected = vm.bootstrappedTime
 		}
-
 		lastUpdated := time.Unix(int64(uptime.LastUpdated), 0)
 		if timeConnected.Before(lastUpdated) {
 			timeConnected = lastUpdated
@@ -556,13 +551,12 @@ func (vm *VM) Shutdown() error {
 
 		// If the current local time is before the time this peer
 		// was marked as connnected skip updating its uptime.
-		if currentLocalTime.Before(timeConnected) {
+		if now.Before(timeConnected) {
 			continue
 		}
 
-		uptime.UpDuration += uint64(currentLocalTime.Sub(timeConnected) / time.Second)
-		uptime.LastUpdated = uint64(currentLocalTime.Unix())
-
+		uptime.UpDuration += uint64(now.Sub(timeConnected) / time.Second)
+		uptime.LastUpdated = uint64(now.Unix())
 		if err := vm.setUptime(vm.DB, nodeID, uptime); err != nil {
 			vm.Ctx.Log.Error("failed to write back uptime data")
 		}

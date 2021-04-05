@@ -102,7 +102,7 @@ func (ks *Keystore) Initialize(log logging.Logger, dbManager manager.Manager) er
 func (ks *Keystore) initializeDB() error {
 	ks.userDB = prefixdb.New(usersPrefix, ks.dbManager.Current())
 	ks.bcDB = prefixdb.New(bcsPrefix, ks.dbManager.Current())
-	return ks.Migrate()
+	return ks.migrate()
 }
 
 func (ks *Keystore) migrateUserBCDB(previousUserBCDB database.Database, bcsBatch database.Batch, userBatch database.Batch) error {
