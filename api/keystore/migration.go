@@ -38,8 +38,8 @@ func (ks *Keystore) migrate110(prevDB, currentDB *manager.VersionedDatabase) err
 	}
 	ks.log.Info("migrating keystore from database version %s to %s", prevDB.Version, currentDB.Version)
 
-	previousUserDB := prefixdb.New(usersPrefix, prevDB)
-	previousBCDB := prefixdb.New(bcsPrefix, prevDB)
+	previousUserDB := prefixdb.New(usersPrefix, prevDB.Database)
+	previousBCDB := prefixdb.New(bcsPrefix, prevDB.Database)
 	userIterator := previousUserDB.NewIterator()
 	defer userIterator.Release()
 	for userIterator.Next() {

@@ -95,8 +95,8 @@ func (ks *Keystore) Initialize(log logging.Logger, dbManager manager.Manager) er
 	ks.log = log
 	ks.codec = manager
 	ks.users = make(map[string]*password.Hash)
-	ks.userDB = prefixdb.New(usersPrefix, dbManager.Current())
-	ks.bcDB = prefixdb.New(bcsPrefix, dbManager.Current())
+	ks.userDB = prefixdb.New(usersPrefix, dbManager.Current().Database)
+	ks.bcDB = prefixdb.New(bcsPrefix, dbManager.Current().Database)
 	return ks.migrate(dbManager)
 }
 

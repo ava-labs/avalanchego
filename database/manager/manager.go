@@ -212,7 +212,6 @@ func New(
 					Version:  version,
 				})
 			}
-
 			return filepath.SkipDir
 		})
 	}
