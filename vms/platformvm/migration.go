@@ -74,8 +74,8 @@ func (vm *VM) migrate110(prevDB, currentDB *manager.VersionedDatabase) error {
 		}
 
 		lastUpdated := time.Unix(int64(uptime.LastUpdated), 0)
-		// todo review this
 		if !vm.bootstrappedTime.After(lastUpdated) {
+			vm.Ctx.Log.Warn("bootstrapped time (%s) at or before lastUpdated (%s)", vm.bootstrappedTime, lastUpdated)
 			continue
 		}
 		durationOffline := vm.bootstrappedTime.Sub(lastUpdated)
