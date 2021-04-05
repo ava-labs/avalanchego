@@ -95,7 +95,7 @@ func (b *EthAPIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumb
 	// identically.
 	acceptedBlock := b.eth.AcceptedBlock()
 	if number.IsAccepted() {
-		return b.eth.AcceptedBlock().Header(), nil
+		return acceptedBlock.Header(), nil
 	}
 
 	if !b.GetVMConfig().AllowUnfinalizedQueries && acceptedBlock != nil {
