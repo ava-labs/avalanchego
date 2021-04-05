@@ -46,13 +46,13 @@ type Manager interface {
 	MarkBootstrapped(version.Version) error
 	Bootstrapped(version.Version) (bool, error)
 
-	// NewPrefixDBManager returns a new database manager with each of its databases
+	// AddPrefix returns a new database manager with each of its databases
 	// prefixed with [prefix]
-	NewPrefixDBManager(prefix []byte) Manager
+	AddPrefix(prefix []byte) Manager
 
-	// NewMeterDBManager returns a new database manager with each of its databases
+	// AddMeter returns a new database manager with each of its databases
 	// wrapped with a meterdb instance to support metrics on database performance.
-	NewMeterDBManager(namespace string, registerer prometheus.Registerer) (Manager, error)
+	AddMeter(namespace string, registerer prometheus.Registerer) (Manager, error)
 }
 
 type manager struct {
@@ -227,9 +227,9 @@ func New(
 	return manager, nil
 }
 
-// NewPrefixDBManager creates a new manager with each database instance prefixed
+// AddPrefix creates a new manager with each database instance prefixed
 // by [prefix]
-func (m *manager) NewPrefixDBManager(prefix []byte) Manager {
+func (m *manager) AddPrefix(prefix []byte) Manager {
 	m, _ = m.wrapManager(func(vdb *VersionedDatabase) (*VersionedDatabase, error) {
 		return &VersionedDatabase{
 			rawDB:    vdb.rawDB,
@@ -240,9 +240,9 @@ func (m *manager) NewPrefixDBManager(prefix []byte) Manager {
 	return m
 }
 
-// NewMeterDBManager wraps the current database instance with a meterdb instance.
+// AddMeter wraps the current database instance with a meterdb instance.
 // Note: calling this more than once with the same [namespace] will cause a conflict error for the [registerer]
-func (m *manager) NewMeterDBManager(namespace string, registerer prometheus.Registerer) (Manager, error) {
+func (m *manager) AddMeter(namespace string, registerer prometheus.Registerer) (Manager, error) {
 	currentDB := m.Current()
 	currentMeterDB, err := meterdb.New(namespace, registerer, currentDB.Database)
 	if err != nil {

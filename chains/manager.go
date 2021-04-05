@@ -449,12 +449,12 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	metricsManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+	metricsManager, err := m.DBManager.AddMeter(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	dbManager := metricsManager.NewPrefixDBManager(ctx.ChainID[:])
-	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
+	dbManager := metricsManager.AddPrefix(ctx.ChainID[:])
+	vmDBManager := dbManager.AddPrefix([]byte("vm"))
 
 	db := dbManager.Current()
 	vertexDB := prefixdb.New([]byte("vertex"), db)
@@ -580,12 +580,12 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	metricsManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+	metricsManager, err := m.DBManager.AddMeter(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	dbManager := metricsManager.NewPrefixDBManager(ctx.ChainID[:])
-	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
+	dbManager := metricsManager.AddPrefix(ctx.ChainID[:])
+	vmDBManager := dbManager.AddPrefix([]byte("vm"))
 
 	db := dbManager.Current()
 	bootstrappingDB := prefixdb.New([]byte("bs"), db)

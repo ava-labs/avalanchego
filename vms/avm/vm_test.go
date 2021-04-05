@@ -268,7 +268,7 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 	}
 	err = vm.Initialize(
 		ctx,
-		baseDBManager.NewPrefixDBManager([]byte{1}),
+		baseDBManager.AddPrefix([]byte{1}),
 		genesisBytes,
 		nil,
 		nil,

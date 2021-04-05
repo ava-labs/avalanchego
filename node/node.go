@@ -623,7 +623,7 @@ func (n *Node) initSharedMemory() error {
 // Assumes n.APIServer is already set
 func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
-	keystoreDB := n.DBManager.NewPrefixDBManager([]byte("keystore"))
+	keystoreDB := n.DBManager.AddPrefix([]byte("keystore"))
 	if err := n.keystoreServer.Initialize(n.Log, keystoreDB); err != nil {
 		return err
 	}
@@ -657,7 +657,7 @@ func (n *Node) initMetricsAPI() error {
 	n.Log.Info("initializing metrics API")
 
 	dbNamespace := fmt.Sprintf("%s_db", constants.PlatformName)
-	meterDBManager, err := n.DBManager.NewMeterDBManager(dbNamespace, registry)
+	meterDBManager, err := n.DBManager.AddMeter(dbNamespace, registry)
 	if err != nil {
 		return err
 	}

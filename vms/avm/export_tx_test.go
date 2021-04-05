@@ -1025,7 +1025,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	vm := &VM{}
 	err = vm.Initialize(
 		ctx,
-		baseDBManager.NewPrefixDBManager([]byte{1}),
+		baseDBManager.AddPrefix([]byte{1}),
 		genesisBytes,
 		nil,
 		nil,
@@ -1198,7 +1198,7 @@ func TestIssueExportTx(t *testing.T) {
 	vm := &VM{}
 	if err := vm.Initialize(
 		ctx,
-		baseDBManager.NewPrefixDBManager([]byte{1}),
+		baseDBManager.AddPrefix([]byte{1}),
 		genesisBytes,
 		nil,
 		nil,
@@ -1328,7 +1328,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	vm := &VM{}
 	err = vm.Initialize(
 		ctx,
-		baseDBManager.NewPrefixDBManager([]byte{1}),
+		baseDBManager.AddPrefix([]byte{1}),
 		genesisBytes,
 		nil,
 		nil,

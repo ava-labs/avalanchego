@@ -97,8 +97,8 @@ func (_m *Manager) MarkBootstrapped(_a0 version.Version) error {
 	return r0
 }
 
-// NewMeterDBManager provides a mock function with given fields: namespace, registerer
-func (_m *Manager) NewMeterDBManager(namespace string, registerer prometheus.Registerer) (manager.Manager, error) {
+// AddMeter provides a mock function with given fields: namespace, registerer
+func (_m *Manager) AddMeter(namespace string, registerer prometheus.Registerer) (manager.Manager, error) {
 	ret := _m.Called(namespace, registerer)
 
 	var r0 manager.Manager
@@ -120,8 +120,8 @@ func (_m *Manager) NewMeterDBManager(namespace string, registerer prometheus.Reg
 	return r0, r1
 }
 
-// NewPrefixDBManager provides a mock function with given fields: prefix
-func (_m *Manager) NewPrefixDBManager(prefix []byte) manager.Manager {
+// AddPrefix provides a mock function with given fields: prefix
+func (_m *Manager) AddPrefix(prefix []byte) manager.Manager {
 	ret := _m.Called(prefix)
 
 	var r0 manager.Manager

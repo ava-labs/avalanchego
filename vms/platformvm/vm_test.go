@@ -301,7 +301,7 @@ func defaultVM() (*VM, database.Database) {
 	}
 
 	baseDBManager := manager.NewDefaultMemDBManager()
-	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
+	chainDBManager := baseDBManager.AddPrefix([]byte{0})
 	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current())
 
 	vm.vdrMgr = validators.NewManager()
@@ -374,7 +374,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 	}
 
 	baseDBManager := manager.NewDefaultMemDBManager()
-	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
+	chainDBManager := baseDBManager.AddPrefix([]byte{0})
 	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current())
 
 	vm.vdrMgr = validators.NewManager()
@@ -1953,7 +1953,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	baseDBManager := manager.NewDefaultMemDBManager()
 
-	vmDBManager := baseDBManager.NewPrefixDBManager([]byte("vm"))
+	vmDBManager := baseDBManager.AddPrefix([]byte("vm"))
 	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), baseDBManager.Current())
 
 	blocked, err := queue.New(bootstrappingDB)
@@ -2431,7 +2431,7 @@ func TestUptimeReporting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
+	firstDBManager := baseDBManager.AddPrefix([]byte{0})
 
 	vm := &VM{
 		SnowmanVM:          &core.SnowmanVM{},
@@ -2503,7 +2503,7 @@ func TestUptimeReporting(t *testing.T) {
 
 	vm.clock.Set(endTime)
 	vm.vdrMgr = validators.NewManager()
-	restartDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
+	restartDBManager := baseDBManager.AddPrefix([]byte{0})
 
 	if err := vm.Initialize(ctx, restartDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
@@ -2543,7 +2543,7 @@ func TestUptimeReporting(t *testing.T) {
 	migrateTime := endTime.Add(5 * time.Second)
 	vm.clock.Set(migrateTime)
 	vm.vdrMgr = validators.NewManager()
-	migratedDBManager := newDBManager.NewPrefixDBManager([]byte{0})
+	migratedDBManager := newDBManager.AddPrefix([]byte{0})
 
 	// Replace the metrics registry to prevent conflicts
 	ctx.Metrics = prometheus.NewRegistry()

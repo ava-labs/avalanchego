@@ -197,8 +197,8 @@ func TestPrefixDBManager(t *testing.T) {
 		},
 	}}
 
-	m0 := m.NewPrefixDBManager(prefix0)
-	m1 := m0.NewPrefixDBManager(prefix1)
+	m0 := m.AddPrefix(prefix0)
+	m1 := m0.AddPrefix(prefix1)
 
 	val, err := m0.Current().Get(k0)
 	assert.NoError(t, err)
@@ -230,7 +230,7 @@ func TestMeterDBManager(t *testing.T) {
 	// Create meterdb manager with fresh registry and confirm
 	// that there are no errors registering metrics for multiple
 	// versioned databases.
-	manager, err := m.NewMeterDBManager("", registry)
+	manager, err := m.AddMeter("", registry)
 	assert.NoError(t, err)
 
 	dbs := manager.GetDatabases()
@@ -244,7 +244,7 @@ func TestMeterDBManager(t *testing.T) {
 	assert.False(t, ok)
 
 	// Confirm that the error from a name conflict is handled correctly
-	_, err = m.NewMeterDBManager("", registry)
+	_, err = m.AddMeter("", registry)
 	assert.Error(t, err)
 }
 
