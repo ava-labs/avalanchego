@@ -137,16 +137,16 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 	}
 
 	logs, err = api.GetLogs(ctx, fc2)
-	if err != nil {
-		t.Fatalf("GetLogs failed due to %s", err)
+	if err == nil || err.Error() != "begin block 1 is greater than end block 0" {
+		t.Fatalf("Expected GetLogs to error about invalid range, but found error %s", err)
 	}
 	if len(logs) != 0 {
 		t.Fatalf("Expected GetLogs to return 0 log, but found %d", len(logs))
 	}
 
 	logs, err = api.GetFilterLogs(ctx, fid2)
-	if err != nil {
-		t.Fatalf("GetFilter failed due to %s", err)
+	if err == nil || err.Error() != "begin block 1 is greater than end block 0" {
+		t.Fatalf("Expected GetLogs to error about invalid range, but found error %s", err)
 	}
 	if len(logs) != 0 {
 		t.Fatalf("Expected GetFilterLogs to return 0 log, but found %d", len(logs))

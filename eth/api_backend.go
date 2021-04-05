@@ -89,9 +89,6 @@ func (b *EthAPIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumb
 	}
 	// Treat requests for the pending, latest, or accepted block
 	// identically.
-	// TODO: need to use current block here instead of accepted
-	// What is the true meaning of "AllowUnfinalizedQueries"? It may not mean
-	// prefer unfinalized queries, just allow if you want.
 	acceptedBlock := b.eth.AcceptedBlock()
 	if number.IsAccepted() {
 		return acceptedBlock.Header(), nil
