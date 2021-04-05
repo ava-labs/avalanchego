@@ -41,7 +41,6 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/eth/gasprice"
-	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
@@ -393,10 +392,11 @@ func (b *EthAPIBackend) CurrentHeader() *types.Header {
 	return b.eth.blockchain.CurrentHeader()
 }
 
-func (b *EthAPIBackend) Miner() *miner.Miner {
-	return b.eth.Miner()
-}
-
-func (b *EthAPIBackend) StartMining(threads int) error {
-	return b.eth.StartMining(threads)
-}
+// Original code:
+// func (b *EthAPIBackend) Miner() *miner.Miner {
+// 	return b.eth.Miner()
+// }
+//
+// func (b *EthAPIBackend) StartMining(threads int) error {
+// 	return b.eth.StartMining(threads)
+// }

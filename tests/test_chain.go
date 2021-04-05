@@ -75,9 +75,6 @@ func NewDefaultChain(t *testing.T) (*coreth.ETHChain, chan *types.Block, chan co
 		Alloc:      core.GenesisAlloc{fundedKey.Address: {Balance: initialBalance}},
 	}
 
-	// grab the control of block generation
-	config.Miner.ManualMining = true
-
 	chain := coreth.NewETHChain(&config, nil, nil, nil, eth.DefaultSettings)
 
 	if err := chain.Accept(chain.GetGenesisBlock()); err != nil {
