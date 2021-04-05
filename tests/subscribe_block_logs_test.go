@@ -243,6 +243,32 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 		t.Fatalf("Expected GetFilterLogs to return 1 log with BlocKNumber 1, but found BlockNumber %d", logs[0].BlockNumber)
 	}
 
+	fc4 := filters.FilterCriteria{}
+	logs, err = api.GetLogs(ctx, fc4)
+	if err != nil {
+		t.Fatalf("Failed to GetLogs for FilterCriteria with empty from and to block due to %s", err)
+	}
+	if len(logs) != 1 {
+		t.Fatalf("Expected GetLogs to return 1 log, but found %d", len(logs))
+	}
+	if logs[0].BlockNumber != 1 {
+		t.Fatalf("Expected single log to have block number 1, but found %d", logs[0].BlockNumber)
+	}
+	fid4, err := api.NewFilter(fc4)
+	if err != nil {
+		t.Fatalf("NewFilter failed due to %s", err)
+	}
+	logs, err = api.GetFilterLogs(ctx, fid4)
+	if err != nil {
+		t.Fatalf("GetFilterLogs failed due to %s", err)
+	}
+	if len(logs) != 1 {
+		t.Fatalf("Expected GetFilterLogs to return 1 log, but found %d", len(logs))
+	}
+	if logs[0].BlockNumber != 1 {
+		t.Fatalf("Expected GetFilterLogs to return 1 log with BlockNumber 1, but found BlockNumber %d", logs[0].BlockNumber)
+	}
+
 	select {
 	case acceptedLogs := <-acceptedLogsCh:
 		if len(acceptedLogs) != 1 {
