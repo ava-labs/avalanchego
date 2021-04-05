@@ -38,6 +38,7 @@ func (vm *VM) migrate110(prevDB, currentDB *manager.VersionedDatabase) error {
 		return nil
 	}
 
+	vm.Ctx.Log.Info("migrating platformvm from database version %s to %s", prevDB.Version, currentDB.Version)
 	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, vm.DB)
 	defer stopDB.Close()
@@ -94,5 +95,10 @@ func (vm *VM) migrate110(prevDB, currentDB *manager.VersionedDatabase) error {
 		vm.DB.Commit(),
 		stopDB.Close(),
 	)
-	return err
+	if errs.Err != nil {
+		return err
+	}
+
+	vm.Ctx.Log.Info("finished migrating platformvm from database version %s to %s", prevDB.Version, currentDB.Version)
+	return nil
 }

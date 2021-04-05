@@ -35,9 +35,6 @@ func (ks *Keystore) migrate110(prevDB, currentDB *manager.VersionedDatabase) err
 		return nil
 	}
 	ks.log.Info("migrating keystore from database version %s to %s", prevDB.Version, currentDB.Version)
-	defer func() {
-		ks.log.Info("done migrating keystore")
-	}()
 
 	previousUserDB := prefixdb.New(usersPrefix, prevDB)
 	previousBCDB := prefixdb.New(bcsPrefix, prevDB)
@@ -70,5 +67,10 @@ func (ks *Keystore) migrate110(prevDB, currentDB *manager.VersionedDatabase) err
 		return err
 	}
 
-	return currentDB.Put(migratedKey, []byte(prevDB.Version.String()))
+	if err := currentDB.Put(migratedKey, []byte(prevDB.Version.String())); err != nil {
+		return err
+	}
+
+	ks.log.Info("finished migrating keystore from database version %s to %s", prevDB.Version, currentDB.Version)
+	return nil
 }
