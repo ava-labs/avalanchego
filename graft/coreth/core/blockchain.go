@@ -139,9 +139,9 @@ type CacheConfig struct {
 	TrieDirtyLimit      int           // Memory limit (MB) at which to start flushing dirty trie nodes to disk
 	TrieDirtyDisabled   bool          // Whether to disable trie write caching and GC altogether (archive node)
 	TrieTimeLimit       time.Duration // Time limit after which to flush the current in-memory trie to disk
-	SnapshotLimit       int           // Memory allowance (MB) to use for caching snapshot entries in memory
 
-	SnapshotWait bool // Wait for snapshot construction on startup. TODO(karalabe): This is a dirty hack for testing, nuke it
+	// SnapshotLimit       int           // Memory allowance (MB) to use for caching snapshot entries in memory
+	// SnapshotWait bool // Wait for snapshot construction on startup. TODO(karalabe): This is a dirty hack for testing, nuke it
 }
 
 // defaultCacheConfig are the default caching values if none are specified by the
@@ -150,8 +150,8 @@ var defaultCacheConfig = &CacheConfig{
 	TrieCleanLimit: 256,
 	TrieDirtyLimit: 256,
 	TrieTimeLimit:  5 * time.Minute,
-	SnapshotLimit:  256,
-	SnapshotWait:   true,
+	// SnapshotLimit:  256,
+	// SnapshotWait:   true,
 }
 
 // BlockChain represents the canonical chain given a database with a genesis
@@ -172,7 +172,8 @@ type BlockChain struct {
 	chainConfig *params.ChainConfig // Chain & network configuration
 	cacheConfig *CacheConfig        // Cache configuration for pruning
 
-	db     ethdb.Database // Low level persistent database to store final content in
+	db ethdb.Database // Low level persistent database to store final content in
+
 	snaps  *snapshot.Tree // Snapshot tree for fast trie leaf access
 	triegc *prque.Prque   // Priority queue mapping block numbers to tries to gc
 	gcproc time.Duration  // Accumulates canonical block processing for trie dumping
@@ -184,15 +185,17 @@ type BlockChain struct {
 	//  * nil: disable tx reindexer/deleter, but still index new blocks
 	txLookupLimit uint64
 
-	hc            *HeaderChain
-	rmLogsFeed    event.Feed
-	chainFeed     event.Feed
-	chainSideFeed event.Feed
-	chainHeadFeed event.Feed
-	logsFeed      event.Feed
-	blockProcFeed event.Feed
-	scope         event.SubscriptionScope
-	genesisBlock  *types.Block
+	hc                *HeaderChain
+	rmLogsFeed        event.Feed
+	chainFeed         event.Feed
+	chainSideFeed     event.Feed
+	chainHeadFeed     event.Feed
+	chainAcceptedFeed event.Feed
+	logsFeed          event.Feed
+	logsAcceptedFeed  event.Feed
+	blockProcFeed     event.Feed
+	scope             event.SubscriptionScope
+	genesisBlock      *types.Block
 
 	chainmu sync.RWMutex // blockchain insertion lock
 
@@ -360,10 +363,14 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		bc.indexLock.Wait()
 		log.Debug("indexing unlocked")
 
-		// Load any existing snapshot, regenerating it if loading failed
-		if bc.cacheConfig.SnapshotLimit > 0 {
-			bc.snaps = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, bc.CurrentBlock().Root(), !bc.cacheConfig.SnapshotWait)
-		}
+		// Always disable snapshots (experimental feature)
+		//
+		// Original code:
+		// // Load any existing snapshot, regenerating it if loading failed
+		// if bc.cacheConfig.SnapshotLimit > 0 {
+		// 	bc.snaps = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, bc.CurrentBlock().Root(), !bc.cacheConfig.SnapshotWait)
+		// }
+
 		// Take ownership of this particular state
 		// go bc.update()
 		if txLookupLimit != nil {
@@ -883,19 +890,7 @@ func (bc *BlockChain) GetBlockByHash(hash common.Hash) *types.Block {
 func (bc *BlockChain) GetBlockByNumber(number uint64) *types.Block {
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
-	if !bc.vmConfig.AllowUnfinalizedQueries &&
-		bc.lastAccepted != nil &&
-		number > bc.lastAccepted.NumberU64() {
-		return nil
-	}
-	return bc.getBlockByNumber(number)
-}
 
-// GetBlockByNumberUnfinalized retrieves a block from the canonical chain by number, caching it
-// (associated with its hash) if found. It may return an unfinalized block if it requests a block above the last accepted height.
-func (bc *BlockChain) GetBlockByNumberUnfinalized(number uint64) *types.Block {
-	bc.chainmu.Lock()
-	defer bc.chainmu.Unlock()
 	return bc.getBlockByNumber(number)
 }
 
@@ -1711,6 +1706,23 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 	}
 
 	bc.lastAccepted = block
+
+	// Fetch block logs
+	receipts := rawdb.ReadReceipts(bc.db, block.Hash(), block.NumberU64(), bc.chainConfig)
+	var logs []*types.Log
+	for _, receipt := range receipts {
+		for _, log := range receipt.Logs {
+			l := *log
+			logs = append(logs, &l)
+		}
+	}
+
+	// Update accepted feeds
+	bc.chainAcceptedFeed.Send(ChainEvent{Block: block, Hash: block.Hash(), Logs: logs})
+	if len(logs) > 0 {
+		bc.logsAcceptedFeed.Send(logs)
+	}
+
 	return nil
 }
 
@@ -2819,6 +2831,11 @@ func (bc *BlockChain) SubscribeChainEvent(ch chan<- ChainEvent) event.Subscripti
 	return bc.scope.Track(bc.chainFeed.Subscribe(ch))
 }
 
+// SubscribeChainAcceptedEvent registers a subscription of ChainEvent.
+func (bc *BlockChain) SubscribeChainAcceptedEvent(ch chan<- ChainEvent) event.Subscription {
+	return bc.scope.Track(bc.chainAcceptedFeed.Subscribe(ch))
+}
+
 // SubscribeChainHeadEvent registers a subscription of ChainHeadEvent.
 func (bc *BlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) event.Subscription {
 	return bc.scope.Track(bc.chainHeadFeed.Subscribe(ch))
@@ -2832,6 +2849,11 @@ func (bc *BlockChain) SubscribeChainSideEvent(ch chan<- ChainSideEvent) event.Su
 // SubscribeLogsEvent registers a subscription of []*types.Log.
 func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
 	return bc.scope.Track(bc.logsFeed.Subscribe(ch))
+}
+
+// SubscribeAcceptedLogsEvent registers a subscription of accepted []*types.Log.
+func (bc *BlockChain) SubscribeAcceptedLogsEvent(ch chan<- []*types.Log) event.Subscription {
+	return bc.scope.Track(bc.logsAcceptedFeed.Subscribe(ch))
 }
 
 // SubscribeBlockProcessingEvent registers a subscription of bool where true means

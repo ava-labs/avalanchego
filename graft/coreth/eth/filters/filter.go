@@ -29,7 +29,10 @@ package filters
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
+
+	"github.com/ava-labs/coreth/core/vm"
 
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/bloombits"
@@ -49,12 +52,18 @@ type Backend interface {
 
 	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
 	SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription
+	SubscribeChainAcceptedEvent(ch chan<- core.ChainEvent) event.Subscription
 	SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription
 	SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription
+	SubscribeAcceptedLogsEvent(ch chan<- []*types.Log) event.Subscription
+
 	SubscribePendingLogsEvent(ch chan<- []*types.Log) event.Subscription
 
 	BloomStatus() (uint64, uint64)
 	ServiceFilter(ctx context.Context, session *bloombits.MatcherSession)
+
+	GetVMConfig() *vm.Config
+	AcceptedBlock() *types.Block
 }
 
 // Filter can be used to retrieve and filter logs.
@@ -73,7 +82,10 @@ type Filter struct {
 
 // NewRangeFilter creates a new filter which uses a bloom filter on blocks to
 // figure out whether a particular block is interesting or not.
-func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Address, topics [][]common.Hash) *Filter {
+func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Address, topics [][]common.Hash) (*Filter, error) {
+	allowUnfinalizedQueries := backend.GetVMConfig().AllowUnfinalizedQueries
+	acceptedBlock := backend.AcceptedBlock()
+
 	// Flatten the address and topic filter clauses into a single bloombits filter
 	// system. Since the bloombits are not positional, nil topics are permitted,
 	// which get flattened into a nil byte slice.
@@ -94,14 +106,22 @@ func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Addres
 	}
 	size, _ := backend.BloomStatus()
 
+	if !allowUnfinalizedQueries && acceptedBlock != nil {
+		lastAccepted := acceptedBlock.Number().Int64()
+		if begin >= 0 && begin > lastAccepted {
+			return nil, fmt.Errorf("requested from block %d after last accepted block %d", begin, lastAccepted)
+		}
+		if end >= 0 && end > lastAccepted {
+			return nil, fmt.Errorf("requested to block %d after last accepted block %d", end, lastAccepted)
+		}
+	}
+
 	// Create a generic filter and convert it into a range filter
 	filter := newFilter(backend, addresses, topics)
-
 	filter.matcher = bloombits.NewMatcher(size, filters)
 	filter.begin = begin
 	filter.end = end
-
-	return filter
+	return filter, nil
 }
 
 // NewBlockFilter creates a new filter which directly inspects the contents of
@@ -139,9 +159,12 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 		return f.blockLogs(ctx, header)
 	}
 	// Figure out the limits of the filter range
-	// LatestBlockNumber is handled appropriately in HeaderByNumber
+	// LatestBlockNumber is transformed into the last accepted block in HeaderByNumber
 	// so it is left in place here.
-	header, _ := f.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	header, err := f.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	if err != nil {
+		return nil, err
+	}
 	if header == nil {
 		return nil, nil
 	}
@@ -154,11 +177,19 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 	if f.end == -1 {
 		end = head
 	}
+
+	// When querying unfinalized data without a populated end block, it is
+	// possible that the begin will be greater than the end.
+	//
+	// We error in this case to prevent a bad UX where the caller thinks there
+	// are no logs from the specified beginning to end (when in reality there may
+	// be some).
+	if end < uint64(f.begin) {
+		return nil, fmt.Errorf("begin block %d is greater than end block %d", f.begin, end)
+	}
+
 	// Gather all indexed logs, and finish with non indexed ones
-	var (
-		logs []*types.Log
-		err  error
-	)
+	var logs []*types.Log
 	size, sections := f.backend.BloomStatus()
 	if indexed := sections * size; indexed > uint64(f.begin) {
 		if indexed > end {
