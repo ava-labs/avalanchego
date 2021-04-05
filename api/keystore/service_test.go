@@ -26,7 +26,7 @@ var (
 )
 
 func TestServiceListNoUsers(t *testing.T) {
-	ks, err := CreateTestKeystore()
+	ks, _, err := CreateTestKeystore()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestServiceListNoUsers(t *testing.T) {
 }
 
 func TestServiceCreateUser(t *testing.T) {
-	ks, err := CreateTestKeystore()
+	ks, _, err := CreateTestKeystore()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func genStr(n int) string {
 // TestServiceCreateUserArgsCheck generates excessively long usernames or
 // passwords to assure the sanity checks on string length are not exceeded
 func TestServiceCreateUserArgsCheck(t *testing.T) {
-	ks, err := CreateTestKeystore()
+	ks, _, err := CreateTestKeystore()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ func TestServiceCreateUserArgsCheck(t *testing.T) {
 // TestServiceCreateUserWeakPassword tests creating a new user with a weak
 // password to ensure the password strength check is working
 func TestServiceCreateUserWeakPassword(t *testing.T) {
-	ks, err := CreateTestKeystore()
+	ks, _, err := CreateTestKeystore()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestServiceCreateUserWeakPassword(t *testing.T) {
 }
 
 func TestServiceCreateDuplicate(t *testing.T) {
-	ks, err := CreateTestKeystore()
+	ks, _, err := CreateTestKeystore()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +180,7 @@ func TestServiceCreateDuplicate(t *testing.T) {
 }
 
 func TestServiceCreateUserNoName(t *testing.T) {
-	ks, err := CreateTestKeystore()
+	ks, _, err := CreateTestKeystore()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func TestServiceCreateUserNoName(t *testing.T) {
 }
 
 func TestServiceUseBlockchainDB(t *testing.T) {
-	ks, err := CreateTestKeystore()
+	ks, _, err := CreateTestKeystore()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +238,7 @@ func TestServiceUseBlockchainDB(t *testing.T) {
 func TestServiceExportImport(t *testing.T) {
 	encodings := []formatting.Encoding{formatting.Hex, formatting.CB58}
 	for _, encoding := range encodings {
-		ks, err := CreateTestKeystore()
+		ks, _, err := CreateTestKeystore()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -278,7 +278,7 @@ func TestServiceExportImport(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		newKS, err := CreateTestKeystore()
+		newKS, _, err := CreateTestKeystore()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -394,7 +394,7 @@ func TestServiceDeleteUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			ks, err := CreateTestKeystore()
+			ks, _, err := CreateTestKeystore()
 			if err != nil {
 				t.Fatal(err)
 			}

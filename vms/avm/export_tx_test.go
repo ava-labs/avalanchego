@@ -1008,7 +1008,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 
 	ctx.Lock.Lock()
 
-	userKeystore, err := keystore.CreateTestKeystore()
+	userKeystore, _, err := keystore.CreateTestKeystore()
 	if err != nil {
 		t.Fatal(err)
 	}

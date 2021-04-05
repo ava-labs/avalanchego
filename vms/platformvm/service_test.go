@@ -49,7 +49,7 @@ func defaultService(t *testing.T) *Service {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer vm.Ctx.Lock.Unlock()
-	ks, err := keystore.CreateTestKeystore()
+	ks, _, err := keystore.CreateTestKeystore()
 	if err != nil {
 		t.Fatal(err)
 	}

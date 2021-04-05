@@ -19,12 +19,15 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/encdb"
 	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/manager/mocks"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
+	"github.com/ava-labs/avalanchego/version"
 
 	jsoncodec "github.com/ava-labs/avalanchego/utils/json"
 )
@@ -73,7 +76,6 @@ type Keystore struct {
 	// Used to persist users and their data
 	userDB database.Database
 	bcDB   database.Database
-
 	//           BaseDB
 	//          /      \
 	//    UserDB        BlockchainDB
@@ -376,8 +378,7 @@ func (ks *Keystore) GetDatabase(bID ids.ID, username, password string) (database
 	return encdb.New([]byte(password), bcDB)
 }
 
-// AddUser attempts to register this username and password as a new user of the
-// keystore.
+// AddUser attempts to register this username and password as a new user of the keystore.
 func (ks *Keystore) AddUser(username, pword string) error {
 	if username == "" {
 		return errEmptyUsername
@@ -413,7 +414,15 @@ func (ks *Keystore) AddUser(username, pword string) error {
 }
 
 // CreateTestKeystore returns a new keystore that can be utilized for testing
-func CreateTestKeystore() (*Keystore, error) {
+func CreateTestKeystore() (*Keystore, *mocks.Manager, error) {
 	ks := &Keystore{}
-	return ks, ks.Initialize(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	mockDBManager := &mocks.Manager{}
+	mockDBManager.On("Current").Return(
+		&manager.VersionedDatabase{
+			Database: memdb.New(),
+			Version:  version.NewDefaultVersion(1, 1, 0),
+		},
+	)
+	mockDBManager.On("Previous").Return(nil, false)
+	return ks, mockDBManager, ks.Initialize(logging.NoLog{}, mockDBManager)
 }
