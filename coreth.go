@@ -4,7 +4,6 @@
 package coreth
 
 import (
-	"crypto/ecdsa"
 	"io"
 	"math/big"
 	"os"
@@ -19,7 +18,6 @@ import (
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -73,12 +71,12 @@ func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Add
 }
 
 func (self *ETHChain) Start() {
-	self.backend.StartMining(0)
+	self.backend.StartMining()
 	self.backend.Start()
 }
 
 func (self *ETHChain) Stop() {
-	self.backend.StopPart()
+	self.backend.Stop()
 }
 
 func (self *ETHChain) GenBlock() {
@@ -91,6 +89,10 @@ func (self *ETHChain) SubscribeNewMinedBlockEvent() *event.TypeMuxSubscription {
 
 func (self *ETHChain) BlockChain() *core.BlockChain {
 	return self.backend.BlockChain()
+}
+
+func (self *ETHChain) APIBackend() *eth.EthAPIBackend {
+	return self.backend.APIBackend
 }
 
 func (self *ETHChain) UnlockIndexing() {
@@ -170,11 +172,6 @@ func (self *ETHChain) GetBlockByNumber(num uint64) *types.Block {
 	return self.backend.BlockChain().GetBlockByNumber(num)
 }
 
-// Retrives a block from the database by number.
-func (self *ETHChain) GetBlockByNumberUnfinalized(num uint64) *types.Block {
-	return self.backend.BlockChain().GetBlockByNumberUnfinalized(num)
-}
-
 // Validate the canonical chain from current block to the genesis.
 // This should only be called as a convenience method in tests, not
 // in production as it traverses the entire chain.
@@ -229,9 +226,10 @@ func (self *ETHChain) AttachEthService(handler *rpc.Server, namespaces []string)
 	}
 }
 
-// TODO: use SubscribeNewTxsEvent()
-func (self *ETHChain) GetTxSubmitCh() <-chan struct{} {
-	return self.backend.GetTxSubmitCh()
+func (self *ETHChain) GetTxSubmitCh() <-chan core.NewTxsEvent {
+	newTxsChan := make(chan core.NewTxsEvent)
+	self.backend.TxPool().SubscribeNewTxsEvent(newTxsChan)
+	return newTxsChan
 }
 
 func (self *ETHChain) GetTxPool() *core.TxPool {
@@ -241,27 +239,6 @@ func (self *ETHChain) GetTxPool() *core.TxPool {
 // SetGasPrice sets the gas price on the backend
 func (self *ETHChain) SetGasPrice(newGasPrice *big.Int) {
 	self.backend.SetGasPrice(newGasPrice)
-}
-
-type Key struct {
-	Address    common.Address
-	PrivateKey *ecdsa.PrivateKey
-}
-
-func NewKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *Key {
-	key := &Key{
-		Address:    crypto.PubkeyToAddress(privateKeyECDSA.PublicKey),
-		PrivateKey: privateKeyECDSA,
-	}
-	return key
-}
-
-func NewKey(rand io.Reader) (*Key, error) {
-	privateKeyECDSA, err := ecdsa.GenerateKey(crypto.S256(), rand)
-	if err != nil {
-		return nil, err
-	}
-	return NewKeyFromECDSA(privateKeyECDSA), nil
 }
 
 func init() {

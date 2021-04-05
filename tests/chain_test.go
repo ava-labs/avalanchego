@@ -1,16 +1,18 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package main
+package tests
 
 import (
 	"crypto/rand"
-	"fmt"
 	"math/big"
 	"sync"
+	"testing"
 
 	"github.com/ava-labs/coreth"
+	"github.com/ava-labs/coreth/accounts/keystore"
 	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/params"
@@ -20,13 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-func checkError(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
-type TestChain struct {
+type testChain struct {
 	hasBlock    map[common.Hash]struct{}
 	blocks      []common.Hash
 	blkCount    uint32
@@ -36,17 +32,18 @@ type TestChain struct {
 	blockWait   sync.WaitGroup
 }
 
-func (tc *TestChain) insertBlock(block *types.Block) {
+func (tc *testChain) insertBlock(block *types.Block) {
 	if _, ok := tc.hasBlock[block.Hash()]; !ok {
 		tc.hasBlock[block.Hash()] = struct{}{}
 		tc.blocks = append(tc.blocks, block.Hash())
 	}
 }
 
-func NewTestChain(name string, config *eth.Config,
+func newTestChain(name string, config *eth.Config,
 	inBlockCh <-chan []byte, outBlockCh chan<- []byte,
-	inAckCh <-chan struct{}, outAckCh chan<- struct{}) *TestChain {
-	tc := &TestChain{
+	inAckCh <-chan struct{}, outAckCh chan<- struct{},
+	t *testing.T) *testChain {
+	tc := &testChain{
 		hasBlock:   make(map[common.Hash]struct{}),
 		blocks:     make([]common.Hash, 0),
 		blkCount:   0,
@@ -54,69 +51,72 @@ func NewTestChain(name string, config *eth.Config,
 		outBlockCh: outBlockCh,
 	}
 	tc.insertBlock(tc.chain.GetGenesisBlock())
+	tc.chain.SetOnFinalizeAndAssemble(func(_ *state.StateDB, _ []*types.Transaction) ([]byte, error) {
+		// NOTE: introduce random data as the extra data in the block so all
+		// blocks have distinct hashes in this unit test. Do NOT use this trick
+		// in production!
+		randData := make([]byte, 32)
+		_, err := rand.Read(randData)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return randData, nil
+	})
 	tc.chain.SetOnSealFinish(func(block *types.Block) error {
-		blkID := tc.blkCount
 		tc.blkCount++
 		if len(block.Uncles()) != 0 {
-			panic("#uncles should be zero")
+			t.Fatal("#uncles should be zero")
 		}
-		if tc.parentBlock != block.ParentHash() {
-			panic("mismatching parent hash")
-		}
-		log.Info(fmt.Sprintf("%s: create %s <= (%d = %s)",
-			name, tc.parentBlock.Hex(), blkID, block.Hash().Hex()))
 		tc.insertBlock(block)
 		if tc.outBlockCh != nil {
 			serialized, err := rlp.EncodeToBytes(block)
 			if err != nil {
-				panic(err)
+				t.Fatal(err)
 			}
 			tc.outBlockCh <- serialized
 			<-inAckCh
-			log.Info(fmt.Sprintf("%s: got ack", name))
 		}
 		tc.blockWait.Done()
 		return nil
 	})
 	go func() {
-		for {
-			select {
-			case serialized := <-inBlockCh:
-				block := new(types.Block)
-				err := rlp.DecodeBytes(serialized, block)
-				if err != nil {
+		for serialized := range inBlockCh {
+			block := new(types.Block)
+			err := rlp.DecodeBytes(serialized, block)
+			if err != nil {
+				panic(err)
+			}
+			if block.Hash() != tc.chain.GetGenesisBlock().Hash() {
+				if _, err = tc.chain.InsertChain([]*types.Block{block}); err != nil {
 					panic(err)
 				}
-				// TODO: verify block is well formed
-				tc.chain.InsertChain([]*types.Block{block})
-				tc.insertBlock(block)
-				log.Info(fmt.Sprintf("%s: got block %s, sending ack", name, block.Hash().Hex()))
-				outAckCh <- struct{}{}
 			}
+			tc.insertBlock(block)
+			outAckCh <- struct{}{}
 		}
 	}()
 	return tc
 }
 
-func (tc *TestChain) Start() {
+func (tc *testChain) start() {
 	tc.chain.Start()
 	tc.chain.BlockChain().UnlockIndexing()
 }
 
-func (tc *TestChain) Stop() {
+func (tc *testChain) stop() {
 	tc.chain.Stop()
 }
 
-func (tc *TestChain) GenRandomTree(n int, max int) {
+func (tc *testChain) GenRandomTree(n int, max int) {
 	for i := 0; i < n; i++ {
-		nblocks := len(tc.blocks)
+		numBlocks := len(tc.blocks)
 		m := max
-		if m < 0 || nblocks < m {
-			m = nblocks
+		if m < 0 || numBlocks < m {
+			m = numBlocks
 		}
 		pb, _ := rand.Int(rand.Reader, big.NewInt((int64)(m)))
 		pn := pb.Int64()
-		tc.parentBlock = tc.blocks[nblocks-1-(int)(pn)]
+		tc.parentBlock = tc.blocks[numBlocks-1-(int)(pn)]
 		tc.chain.SetPreference(tc.chain.GetBlockByHash(tc.parentBlock))
 		tc.blockWait.Add(1)
 		tc.chain.GenBlock()
@@ -124,41 +124,35 @@ func (tc *TestChain) GenRandomTree(n int, max int) {
 	}
 }
 
-func run(config *eth.Config, a1, a2, b1, b2 int) {
+func run(config *eth.Config, a1, a2, b1, b2 int, t *testing.T) {
 	aliceBlk := make(chan []byte)
 	bobBlk := make(chan []byte)
 	aliceAck := make(chan struct{})
 	bobAck := make(chan struct{})
-	alice := NewTestChain("alice", config, bobBlk, aliceBlk, bobAck, aliceAck)
-	bob := NewTestChain("bob", config, aliceBlk, bobBlk, aliceAck, bobAck)
-	alice.Start()
-	bob.Start()
+	alice := newTestChain("alice", config, bobBlk, aliceBlk, bobAck, aliceAck, t)
+	bob := newTestChain("bob", config, aliceBlk, bobBlk, aliceAck, bobAck, t)
+	alice.start()
+	bob.start()
 	log.Info("alice genesis", "block", alice.chain.GetGenesisBlock().Hash().Hex())
 	log.Info("bob genesis", "block", bob.chain.GetGenesisBlock().Hash().Hex())
 	alice.GenRandomTree(a1, a2)
 	log.Info("alice finished generating the tree")
-	//time.Sleep(1 * time.Second)
+
 	bob.outBlockCh = nil
 	bob.GenRandomTree(b1, b2)
-	//mrand.Shuffle(len(bob.blocks),
-	//	func(i, j int) { bob.blocks[i], bob.blocks[j] = bob.blocks[j], bob.blocks[i] })
-	log.Info("bob finished generating the tree")
-	//time.Sleep(1 * time.Second)
-	log.Info("bob sends out all its blocks")
 	for i := range bob.blocks {
 		serialized, err := rlp.EncodeToBytes(bob.chain.GetBlockByHash(bob.blocks[i]))
 		if err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
 		bobBlk <- serialized
 		<-aliceAck
-		log.Info(fmt.Sprintf("bob: got ack"))
 	}
 	log.Info("bob finished generating the tree")
-	//time.Sleep(1 * time.Second)
+
 	log.Info("comparing two trees")
 	if len(alice.blocks) != len(bob.blocks) {
-		panic(fmt.Sprintf("mismatching tree size %d != %d", len(alice.blocks), len(bob.blocks)))
+		t.Fatalf("mismatching tree size %d != %d", len(alice.blocks), len(bob.blocks))
 	}
 	gn := big.NewInt(0)
 	for i := range alice.blocks {
@@ -166,27 +160,21 @@ func run(config *eth.Config, a1, a2, b1, b2 int) {
 		bblk := bob.chain.GetBlockByHash(alice.blocks[i])
 		for ablk.Number().Cmp(gn) > 0 && bblk.Number().Cmp(gn) > 0 {
 			result := ablk.Hash() == bblk.Hash()
-			opsign := "=="
 			if !result {
-				opsign = "!="
-			}
-			log.Info(fmt.Sprintf("alice(%d = %s) %s bob (%d = %s)",
-				ablk.Number(), ablk.Hash().Hex(),
-				opsign,
-				bblk.Number(), bblk.Hash().Hex()))
-			if !result {
-				panic("mismatching path")
+				t.Fatal("mismatching path")
 			}
 			ablk = alice.chain.GetBlockByHash(ablk.ParentHash())
 			bblk = bob.chain.GetBlockByHash(bblk.ParentHash())
 		}
-		log.Info(fmt.Sprintf("%s ok", alice.blocks[i].Hex()))
 	}
-	alice.Stop()
-	bob.Stop()
+	alice.stop()
+	bob.stop()
 }
 
-func main() {
+// TestChain randomly generates a chain (tree of blocks) on each of two
+// entities ("Alice" and "Bob") and lets them exchange each other's blocks via
+// a go channel and finally checks if they have the identical chain structure.
+func TestChain(t *testing.T) {
 	// configure the chain
 	config := eth.DefaultConfig
 	chainConfig := &params.ChainConfig{
@@ -207,7 +195,7 @@ func main() {
 
 	// configure the genesis block
 	genBalance := big.NewInt(100000000000000000)
-	genKey, _ := coreth.NewKey(rand.Reader)
+	genKey, _ := keystore.NewKey(rand.Reader)
 
 	config.Genesis = &core.Genesis{
 		Config:     chainConfig,
@@ -219,9 +207,5 @@ func main() {
 		Alloc:      core.GenesisAlloc{genKey.Address: {Balance: genBalance}},
 	}
 
-	// grab the control of block generation
-	config.Miner.ManualMining = true
-
-	run(&config, 60, 1, 60, 1)
-	run(&config, 500, 10, 500, 5)
+	run(&config, 20, 10, 20, 10, t)
 }

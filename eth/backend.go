@@ -140,12 +140,14 @@ func New(stack *node.Node, config *Config,
 		config.Miner.GasPrice = new(big.Int).Set(DefaultConfig.Miner.GasPrice)
 	}
 	if config.NoPruning && config.TrieDirtyCache > 0 {
-		if config.SnapshotCache > 0 {
-			config.TrieCleanCache += config.TrieDirtyCache * 3 / 5
-			config.SnapshotCache += config.TrieDirtyCache * 2 / 5
-		} else {
-			config.TrieCleanCache += config.TrieDirtyCache
-		}
+		// Original code:
+		// if config.SnapshotCache > 0 {
+		// 	config.TrieCleanCache += config.TrieDirtyCache * 3 / 5
+		// 	config.SnapshotCache += config.TrieDirtyCache * 2 / 5
+		// } else {
+		// 	config.TrieCleanCache += config.TrieDirtyCache
+		// }
+		config.TrieCleanCache += config.TrieDirtyCache
 		config.TrieDirtyCache = 0
 	}
 	log.Info("Allocated trie memory caches", "clean", common.StorageSize(config.TrieCleanCache)*1024*1024, "dirty", common.StorageSize(config.TrieDirtyCache)*1024*1024)
@@ -212,7 +214,7 @@ func New(stack *node.Node, config *Config,
 			TrieDirtyLimit:      config.TrieDirtyCache,
 			TrieDirtyDisabled:   config.NoPruning,
 			TrieTimeLimit:       config.TrieTimeout,
-			SnapshotLimit:       config.SnapshotCache,
+			// SnapshotLimit:       config.SnapshotCache,
 		}
 	)
 	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, chainConfig, eth.engine, vmConfig, eth.shouldPreserve, &config.TxLookupLimit)
@@ -304,21 +306,21 @@ func (s *Ethereum) APIs() []rpc.API {
 			Version:   "1.0",
 			Service:   NewPublicEthereumAPI(s),
 			Public:    true,
-		}, {
-			Namespace: "eth",
-			Version:   "1.0",
-			Service:   NewPublicMinerAPI(s),
-			Public:    true,
+			// }, {
+			// 	Namespace: "eth",
+			// 	Version:   "1.0",
+			// 	Service:   NewPublicMinerAPI(s),
+			// 	Public:    true,
 			//}, {
 			//	Namespace: "eth",
 			//	Version:   "1.0",
 			//	Service:   downloader.NewPublicDownloaderAPI(s.protocolManager.downloader, s.eventMux),
 			//	Public:    true,
-		}, {
-			Namespace: "miner",
-			Version:   "1.0",
-			Service:   NewPrivateMinerAPI(s),
-			Public:    false,
+			// }, {
+			// 	Namespace: "miner",
+			// 	Version:   "1.0",
+			// 	Service:   NewPrivateMinerAPI(s),
+			// 	Public:    false,
 		}, {
 			Namespace: "eth",
 			Version:   "1.0",
@@ -440,18 +442,19 @@ func (s *Ethereum) SetEtherbase(etherbase common.Address) {
 // StartMining starts the miner with the given number of CPU threads. If mining
 // is already running, this method adjust the number of threads allowed to use
 // and updates the minimum price required by the transaction pool.
-func (s *Ethereum) StartMining(threads int) error {
-	// Update the thread count within the consensus engine
-	type threaded interface {
-		SetThreads(threads int)
-	}
-	if th, ok := s.engine.(threaded); ok {
-		log.Info("Updated mining threads", "threads", threads)
-		if threads == 0 {
-			threads = -1 // Disable the miner from within
-		}
-		th.SetThreads(threads)
-	}
+func (s *Ethereum) StartMining() error {
+	// Original code:
+	// // Update the thread count within the consensus engine
+	// type threaded interface {
+	// 	SetThreads(threads int)
+	// }
+	// if th, ok := s.engine.(threaded); ok {
+	// 	log.Info("Updated mining threads", "threads", threads)
+	// 	if threads == 0 {
+	// 		threads = -1 // Disable the miner from within
+	// 	}
+	// 	th.SetThreads(threads)
+	// }
 	// If the miner was not running, initialize it
 	if !s.IsMining() {
 		// Propagate the initial price point to the transaction pool
@@ -479,13 +482,14 @@ func (s *Ethereum) StartMining(threads int) error {
 // StopMining terminates the miner, both at the consensus engine level as well as
 // at the block creation level.
 func (s *Ethereum) StopMining() {
-	// Update the thread count within the consensus engine
-	type threaded interface {
-		SetThreads(threads int)
-	}
-	if th, ok := s.engine.(threaded); ok {
-		th.SetThreads(-1)
-	}
+	// Original code:
+	// // Update the thread count within the consensus engine
+	// type threaded interface {
+	// 	SetThreads(threads int)
+	// }
+	// if th, ok := s.engine.(threaded); ok {
+	// 	th.SetThreads(-1)
+	// }
 	// Stop the block creating itself
 	s.miner.Stop()
 }
@@ -547,18 +551,6 @@ func (s *Ethereum) Stop() error {
 	//s.protocolManager.Stop()
 
 	// Then stop everything else.
-	s.bloomIndexer.Close()
-	close(s.closeBloomHandler)
-	s.txPool.Stop()
-	s.miner.Stop()
-	s.blockchain.Stop()
-	s.engine.Close()
-	s.chainDb.Close()
-	s.eventMux.Stop()
-	return nil
-}
-
-func (s *Ethereum) StopPart() error {
 	s.bloomIndexer.Close()
 	close(s.closeBloomHandler)
 	s.txPool.Stop()

@@ -224,7 +224,6 @@ type VM struct {
 	awaitingBuildBlock bool
 
 	genlock            sync.Mutex
-	txSubmitChan       <-chan struct{}
 	atomicTxSubmitChan chan struct{}
 	baseCodec          codec.Registry
 	codec              codec.Manager
@@ -314,11 +313,6 @@ func (vm *VM) Initialize(
 
 	config := eth.NewDefaultConfig()
 	config.Genesis = g
-	// disable the experimental snapshot feature from geth
-	config.TrieCleanCache += config.SnapshotCache
-	config.SnapshotCache = 0
-
-	config.Miner.ManualMining = true
 
 	// Set minimum gas price and launch goroutine to sleep until
 	// network upgrade when the gas price must be changed
@@ -976,10 +970,10 @@ func (vm *VM) awaitTxPoolStabilized() {
 
 func (vm *VM) awaitSubmittedTxs() {
 	defer vm.shutdownWg.Done()
-	vm.txSubmitChan = vm.chain.GetTxSubmitCh()
+	txSubmitChan := vm.chain.GetTxSubmitCh()
 	for {
 		select {
-		case <-vm.txSubmitChan:
+		case <-txSubmitChan:
 			log.Trace("New tx detected, trying to generate a block")
 			vm.tryBlockGen()
 		case <-vm.atomicTxSubmitChan:

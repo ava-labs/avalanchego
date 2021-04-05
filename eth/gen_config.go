@@ -42,7 +42,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		TrieCleanCacheRejournal time.Duration `toml:",omitempty"`
 		TrieDirtyCache          int
 		TrieTimeout             time.Duration
-		SnapshotCache           int
+		// SnapshotCache           int
 		Miner                   miner.Config
 		Ethash                  ethash.Config
 		TxPool                  core.TxPoolConfig
@@ -82,7 +82,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.TrieCleanCacheRejournal = c.TrieCleanCacheRejournal
 	enc.TrieDirtyCache = c.TrieDirtyCache
 	enc.TrieTimeout = c.TrieTimeout
-	enc.SnapshotCache = c.SnapshotCache
+	// enc.SnapshotCache = c.SnapshotCache
 	enc.Miner = c.Miner
 	enc.Ethash = c.Ethash
 	enc.TxPool = c.TxPool
@@ -219,9 +219,9 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	if dec.TrieTimeout != nil {
 		c.TrieTimeout = *dec.TrieTimeout
 	}
-	if dec.SnapshotCache != nil {
-		c.SnapshotCache = *dec.SnapshotCache
-	}
+	// if dec.SnapshotCache != nil {
+	// 	c.SnapshotCache = *dec.SnapshotCache
+	// }
 	if dec.Miner != nil {
 		c.Miner = *dec.Miner
 	}
