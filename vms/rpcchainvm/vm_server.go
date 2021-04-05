@@ -210,11 +210,11 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	}
 	parentID := blk.Parent().ID()
 	return &vmproto.InitializeResponse{
-		Id:       lastAccepted[:],
-		ParentID: parentID[:],
-		Status:   uint32(choices.Accepted),
-		Height:   blk.Height(),
-		Bytes:    blk.Bytes(),
+		LastAcceptedID:       lastAccepted[:],
+		LastAcceptedParentID: parentID[:],
+		Status:               uint32(choices.Accepted),
+		Height:               blk.Height(),
+		Bytes:                blk.Bytes(),
 	}, err
 }
 

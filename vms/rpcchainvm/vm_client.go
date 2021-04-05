@@ -173,11 +173,11 @@ func (vm *VMClient) Initialize(
 		return err
 	}
 
-	id, err := ids.ToID(resp.Id)
+	id, err := ids.ToID(resp.LastAcceptedID)
 	if err != nil {
 		return err
 	}
-	parentID, err := ids.ToID(resp.ParentID)
+	parentID, err := ids.ToID(resp.LastAcceptedParentID)
 	if err != nil {
 		return err
 	}
