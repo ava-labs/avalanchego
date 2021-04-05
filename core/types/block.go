@@ -185,8 +185,9 @@ type Block struct {
 	header       *Header
 	uncles       []*Header
 	transactions Transactions
-	version      uint32
 
+	// Coreth specific data structures to support atomic transactions
+	version uint32
 	extdata *[]byte
 
 	// caches
