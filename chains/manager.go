@@ -514,7 +514,7 @@ func (m *manager) createAvalancheChain(
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
-	handler.Initialize(
+	err = handler.Initialize(
 		engine,
 		validators,
 		msgChan,
@@ -533,7 +533,7 @@ func (m *manager) createAvalancheChain(
 		Handler: handler,
 		VM:      vm,
 		Ctx:     ctx,
-	}, nil
+	}, err
 }
 
 // Create a linear chain using the Snowman consensus engine
@@ -623,7 +623,7 @@ func (m *manager) createSnowmanChain(
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
-	handler.Initialize(
+	err = handler.Initialize(
 		engine,
 		validators,
 		msgChan,
@@ -635,6 +635,9 @@ func (m *manager) createSnowmanChain(
 		consensusParams.Metrics,
 		delay,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize message handler: %s", err)
+	}
 
 	// Register health checks
 	chainAlias, err := m.PrimaryAlias(ctx.ChainID)

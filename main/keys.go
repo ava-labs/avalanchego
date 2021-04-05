@@ -58,7 +58,7 @@ const (
 	networkHealthMaxTimeSinceMsgSentKey     = "network-health-max-time-since-msg-sent"
 	networkHealthMaxPortionSendQueueFillKey = "network-health-max-portion-send-queue-full"
 	networkHealthMaxSendFailRateKey         = "network-health-max-send-fail-rate"
-	networkHealthMaxTimeSinceNoReqsKey      = "network-health-max-time-since-no-requests"
+	networkHealthMaxOutstandingDurationKey  = "network-health-max-outstanding-request-duration"
 	sendQueueSizeKey                        = "send-queue-size"
 	benchlistFailThresholdKey               = "benchlist-fail-threshold"
 	benchlistPeerSummaryEnabledKey          = "benchlist-peer-summary-enabled"
