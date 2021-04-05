@@ -20,11 +20,15 @@ func TestAcceptedHeadSubscriptions(t *testing.T) {
 		newBlockChan <- block
 		return nil
 	})
+	acceptedBlock := chain.GetGenesisBlock()
+	chain.SetOnQueryAcceptedBlock(func() *types.Block {
+		return acceptedBlock
+	})
 
 	chain.Start()
 	defer chain.Stop()
 
-	ethBackend := chain.Backend().APIBackend
+	ethBackend := chain.APIBackend()
 
 	acceptedChainCh := make(chan core.ChainEvent, 1000)
 	chainCh := make(chan core.ChainEvent, 1000)
@@ -99,6 +103,7 @@ func TestAcceptedHeadSubscriptions(t *testing.T) {
 	if err := chain.Accept(block); err != nil {
 		t.Fatal(err)
 	}
+	acceptedBlock = block
 
 	select {
 	case fb := <-acceptedChainCh:
