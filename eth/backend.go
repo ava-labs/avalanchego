@@ -147,8 +147,14 @@ func New(stack *node.Node, config *Config,
 
 	var err error
 	if chainDb == nil {
-		// Assemble the Ethereum object
-		chainDb, err = stack.OpenDatabaseWithFreezer("chaindata", config.DatabaseCache, config.DatabaseHandles, config.DatabaseFreezer, "eth/db/chaindata/")
+		// Original code:
+		// // Assemble the Ethereum object
+		// chainDb, err = stack.OpenDatabaseWithFreezer("chaindata", config.DatabaseCache, config.DatabaseHandles, config.DatabaseFreezer, "eth/db/chaindata/")
+		// if err != nil {
+		// 	return nil, err
+		// }
+
+		chainDb, err = stack.OpenDatabase("chaindata", config.DatabaseCache, config.DatabaseHandles, "eth/db/chaindata/")
 		if err != nil {
 			return nil, err
 		}
