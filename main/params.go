@@ -743,7 +743,8 @@ func setNodeConfig(v *viper.Viper) error {
 }
 
 // Initialize Config.BootstrapPeers.
-// If in fetch only mode,
+// If in fetch only mode and defaults given, bootstrap from node with ID [fetchOnlyFrom]
+// on localhost:9651
 func initBootstrapPeers(v *viper.Viper, fetchOnlyFrom ids.ShortID) error {
 	bootstrapIPs := v.GetString(bootstrapIPsKey)
 	bootstrapIDs := v.GetString(bootstrapIDsKey)

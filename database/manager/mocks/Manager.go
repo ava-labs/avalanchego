@@ -16,6 +16,45 @@ type Manager struct {
 	mock.Mock
 }
 
+// AddMeter provides a mock function with given fields: namespace, registerer
+func (_m *Manager) AddMeter(namespace string, registerer prometheus.Registerer) (manager.Manager, error) {
+	ret := _m.Called(namespace, registerer)
+
+	var r0 manager.Manager
+	if rf, ok := ret.Get(0).(func(string, prometheus.Registerer) manager.Manager); ok {
+		r0 = rf(namespace, registerer)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(manager.Manager)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, prometheus.Registerer) error); ok {
+		r1 = rf(namespace, registerer)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// AddPrefix provides a mock function with given fields: prefix
+func (_m *Manager) AddPrefix(prefix []byte) manager.Manager {
+	ret := _m.Called(prefix)
+
+	var r0 manager.Manager
+	if rf, ok := ret.Get(0).(func([]byte) manager.Manager); ok {
+		r0 = rf(prefix)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(manager.Manager)
+		}
+	}
+
+	return r0
+}
+
 // Bootstrapped provides a mock function with given fields: _a0
 func (_m *Manager) Bootstrapped(_a0 version.Version) (bool, error) {
 	ret := _m.Called(_a0)
@@ -83,54 +122,15 @@ func (_m *Manager) GetDatabases() []*manager.VersionedDatabase {
 	return r0
 }
 
-// MarkBootstrapped provides a mock function with given fields: _a0
-func (_m *Manager) MarkBootstrapped(_a0 version.Version) error {
-	ret := _m.Called(_a0)
+// MarkBootstrapped provides a mock function with given fields:
+func (_m *Manager) MarkBootstrapped() error {
+	ret := _m.Called()
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(version.Version) error); ok {
-		r0 = rf(_a0)
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
 	} else {
 		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// AddMeter provides a mock function with given fields: namespace, registerer
-func (_m *Manager) AddMeter(namespace string, registerer prometheus.Registerer) (manager.Manager, error) {
-	ret := _m.Called(namespace, registerer)
-
-	var r0 manager.Manager
-	if rf, ok := ret.Get(0).(func(string, prometheus.Registerer) manager.Manager); ok {
-		r0 = rf(namespace, registerer)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(manager.Manager)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(string, prometheus.Registerer) error); ok {
-		r1 = rf(namespace, registerer)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// AddPrefix provides a mock function with given fields: prefix
-func (_m *Manager) AddPrefix(prefix []byte) manager.Manager {
-	ret := _m.Called(prefix)
-
-	var r0 manager.Manager
-	if rf, ok := ret.Get(0).(func([]byte) manager.Manager); ok {
-		r0 = rf(prefix)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(manager.Manager)
-		}
 	}
 
 	return r0
