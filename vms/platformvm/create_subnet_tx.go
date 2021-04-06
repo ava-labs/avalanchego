@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -57,7 +56,7 @@ func (tx *UnsignedCreateSubnetTx) Verify(
 // SemanticVerify returns nil if [tx] is valid given the state in [db]
 func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 	vm *VM,
-	db database.Database,
+	vs versionedState,
 	stx *Tx,
 ) (
 	func() error,
@@ -68,31 +67,19 @@ func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 		return nil, permError{err}
 	}
 
-	// Add new subnet to list of subnets
-	subnets, err := vm.getSubnets(db)
-	if err != nil {
-		return nil, tempError{err}
-	}
-	subnets = append(subnets, stx) // add new subnet
-	if err := vm.putSubnets(db, subnets); err != nil {
-		return nil, tempError{err}
-	}
-
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, stx.Creds, vm.creationTxFee, vm.Ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, tx.Outs, stx.Creds, vm.creationTxFee, vm.Ctx.AVAXAssetID); err != nil {
 		return nil, err
 	}
 
-	txID := tx.ID()
-
 	// Consume the UTXOS
-	if err := vm.consumeInputs(db, tx.Ins); err != nil {
-		return nil, tempError{err}
-	}
+	vm.consumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
-	if err := vm.produceOutputs(db, txID, tx.Outs); err != nil {
-		return nil, tempError{err}
-	}
+	txID := tx.ID()
+	vm.produceOutputs(vs, txID, tx.Outs)
+	// Attempt to the new chain to the database
+	vs.AddSubnet(stx)
+
 	// Register new subnet in validator manager
 	onAccept := func() error {
 		return vm.vdrMgr.Set(tx.ID(), validators.NewSet())

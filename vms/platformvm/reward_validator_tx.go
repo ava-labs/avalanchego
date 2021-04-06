@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -53,11 +52,11 @@ type UnsignedRewardValidatorTx struct {
 //   chain timestamp.
 func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 	vm *VM,
-	db database.Database,
+	parentState versionedState,
 	stx *Tx,
 ) (
-	*versiondb.Database,
-	*versiondb.Database,
+	versionedState,
+	versionedState,
 	func() error,
 	func() error,
 	TxError,
@@ -78,27 +77,29 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		}
 	}
 	if stakerID := stakerTx.Tx.ID(); stakerID != tx.TxID {
-		return nil, nil, nil, nil, permError{fmt.Errorf("attempting to remove TxID: %s. Should be removing %s",
-			tx.TxID,
-			stakerID)}
-	}
-
-	// Verify that the chain's timestamp is the validator's end time
-	currentTime, err := vm.getTimestamp(db)
-	if err != nil {
-		return nil, nil, nil, nil, tempError{
-			fmt.Errorf("failed to get timestamp: %w", err),
+		return nil, nil, nil, nil, permError{
+			fmt.Errorf(
+				"attempting to remove TxID: %s. Should be removing %s",
+				tx.TxID,
+				stakerID,
+			),
 		}
 	}
 
+	// Verify that the chain's timestamp is the validator's end time
+	currentTime := parentState.GetTimestamp()
 	staker, ok := stakerTx.Tx.UnsignedTx.(TimedTx)
 	if !ok {
 		return nil, nil, nil, nil, permError{errWrongTxType}
 	}
 	if endTime := staker.EndTime(); !endTime.Equal(currentTime) {
-		return nil, nil, nil, nil, permError{fmt.Errorf("attempting to remove TxID: %s before their end time %s",
-			tx.TxID,
-			endTime)}
+		return nil, nil, nil, nil, permError{
+			fmt.Errorf(
+				"attempting to remove TxID: %s before their end time %s",
+				tx.TxID,
+				endTime,
+			),
+		}
 	}
 
 	// If this tx's proposal is committed, remove the validator from the validator set

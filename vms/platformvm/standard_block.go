@@ -77,13 +77,7 @@ func (sb *StandardBlock) Verify() error {
 			}
 			return err
 		}
-		if txBytes, err := sb.vm.codec.Marshal(codecVersion, tx); err != nil {
-			return fmt.Errorf("failed to marshal tx %s: %w", txID, err)
-		} else if err := sb.vm.putTx(sb.onAcceptDB, txID, txBytes); err != nil {
-			return fmt.Errorf("failed to put tx %s: %w", txID, err)
-		} else if err := sb.vm.putStatus(sb.onAcceptDB, txID, Committed); err != nil {
-			return fmt.Errorf("failed to put tx %s status: %w", txID, err)
-		} else if onAccept != nil {
+		if onAccept != nil {
 			funcs = append(funcs, onAccept)
 		}
 	}

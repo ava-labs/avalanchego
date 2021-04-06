@@ -9,6 +9,7 @@ import (
 	"unicode"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -118,41 +119,35 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 		return nil, err
 	}
 
-	txID := tx.ID()
-
-	// Consume the UTXOS
-	if err := vm.consumeInputs(db, tx.Ins); err != nil {
+	subnetIntf, _, err := vs.GetTx(tx.SubnetID)
+	if err == database.ErrNotFound {
+		return nil, permError{
+			fmt.Errorf("%s isn't a known subnet", tx.SubnetID),
+		}
+	}
+	if err != nil {
 		return nil, tempError{err}
 	}
-	// Produce the UTXOS
-	if err := vm.produceOutputs(db, txID, tx.Outs); err != nil {
-		return nil, tempError{err}
+
+	subnet, ok := subnetIntf.UnsignedTx.(*UnsignedCreateSubnetTx)
+	if !ok {
+		return nil, permError{
+			fmt.Errorf("%s isn't a subnet", tx.SubnetID),
+		}
 	}
 
 	// Verify that this chain is authorized by the subnet
-	subnet, err := vm.getSubnet(db, tx.SubnetID)
-	if err != nil {
-		return nil, err
-	}
-	unsignedSubnet := subnet.UnsignedTx.(*UnsignedCreateSubnetTx)
-	if err := vm.fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, unsignedSubnet.Owner); err != nil {
+	if err := vm.fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
 		return nil, permError{err}
 	}
 
-	// Attempt to add the new chain to the database
-	currentChains, sErr := vm.getChains(db) // chains that currently exist
-	if sErr != nil {
-		return nil, tempError{fmt.Errorf("couldn't get list of blockchains: %w", sErr)}
-	}
-	for _, chain := range currentChains {
-		if chain.ID() == tx.ID() {
-			return nil, permError{fmt.Errorf("chain %s already exists", chain.ID())}
-		}
-	}
-	currentChains = append(currentChains, stx) // add this new chain
-	if err := vm.putChains(db, currentChains); err != nil {
-		return nil, tempError{err}
-	}
+	// Consume the UTXOS
+	vm.consumeInputs(vs, tx.Ins)
+	// Produce the UTXOS
+	txID := tx.ID()
+	vm.produceOutputs(vs, txID, tx.Outs)
+	// Attempt to the new chain to the database
+	vs.AddChain(stx)
 
 	// If this proposal is committed and this node is a member of the
 	// subnet that validates the blockchain, create the blockchain
