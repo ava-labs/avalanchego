@@ -105,7 +105,7 @@ type Ethereum struct {
 	networkID     uint64
 	netRPCService *ethapi.PublicNetAPI
 
-	p2pServer *p2p.Server
+	// p2pServer *p2p.Server
 
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
 
@@ -119,7 +119,17 @@ func New(stack *node.Node, config *Config,
 	mcb *miner.MinerCallbacks,
 	chainDb ethdb.Database,
 	settings Settings,
+	initGenesis bool,
 ) (*Ethereum, error) {
+	if chainDb == nil {
+		// Original code:
+		// // Assemble the Ethereum object
+		// chainDb, err = stack.OpenDatabaseWithFreezer("chaindata", config.DatabaseCache, config.DatabaseHandles, config.DatabaseFreezer, "eth/db/chaindata/")
+		// if err != nil {
+		// 	return nil, err
+		// }
+		return nil, errors.New("chainDb cannot be nil")
+	}
 	// Ensure configuration values are compatible and sane
 	if config.SyncMode == downloader.LightSync {
 		return nil, errors.New("can't run eth.Ethereum in light sync mode, use les.LightEthereum")
@@ -144,15 +154,7 @@ func New(stack *node.Node, config *Config,
 	}
 	log.Info("Allocated trie memory caches", "clean", common.StorageSize(config.TrieCleanCache)*1024*1024, "dirty", common.StorageSize(config.TrieDirtyCache)*1024*1024)
 
-	var err error
-	if chainDb == nil {
-		// Assemble the Ethereum object
-		chainDb, err = stack.OpenDatabaseWithFreezer("chaindata", config.DatabaseCache, config.DatabaseHandles, config.DatabaseFreezer, "eth/db/chaindata/")
-		if err != nil {
-			return nil, err
-		}
-	}
-	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis)
+	chainConfig, _, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis)
 	if genesisErr != nil {
 		return nil, genesisErr
 	}
@@ -170,8 +172,8 @@ func New(stack *node.Node, config *Config,
 		etherbase:         config.Miner.Etherbase,
 		bloomRequests:     make(chan chan *bloombits.Retrieval),
 		bloomIndexer:      NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
-		p2pServer:         stack.Server(),
-		settings:          settings,
+		// p2pServer:         stack.Server(),
+		settings: settings,
 	}
 
 	bcVersion := rawdb.ReadDatabaseVersion(chainDb)
@@ -207,16 +209,18 @@ func New(stack *node.Node, config *Config,
 			// SnapshotLimit:       config.SnapshotCache,
 		}
 	)
-	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, chainConfig, eth.engine, vmConfig, eth.shouldPreserve, &config.TxLookupLimit)
+	var err error
+	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, chainConfig, eth.engine, vmConfig, eth.shouldPreserve, &config.TxLookupLimit, initGenesis)
 	if err != nil {
 		return nil, err
 	}
-	// Rewind the chain in case of an incompatible config upgrade.
-	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
-		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
-		eth.blockchain.SetHead(compat.RewindTo)
-		rawdb.WriteChainConfig(chainDb, genesisHash, chainConfig)
-	}
+	// Original code:
+	// // Rewind the chain in case of an incompatible config upgrade.
+	// if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
+	// 	log.Warn("Rewinding chain to upgrade configuration", "err", compat)
+	// 	eth.blockchain.SetHead(compat.RewindTo)
+	// 	rawdb.WriteChainConfig(chainDb, genesisHash, chainConfig)
+	// }
 	eth.bloomIndexer.Start(eth.blockchain)
 
 	if config.TxPool.Journal != "" {
@@ -249,7 +253,7 @@ func New(stack *node.Node, config *Config,
 	}
 
 	// Start the RPC service
-	eth.netRPCService = ethapi.NewPublicNetAPI(eth.p2pServer, eth.NetVersion())
+	eth.netRPCService = ethapi.NewPublicNetAPI(eth.NetVersion())
 
 	// Register the backend on the node
 	stack.RegisterAPIs(eth.APIs())
@@ -338,9 +342,10 @@ func (s *Ethereum) APIs() []rpc.API {
 	}...)
 }
 
-func (s *Ethereum) ResetWithGenesisBlock(gb *types.Block) {
-	s.blockchain.ResetWithGenesisBlock(gb, false)
-}
+// Original code:
+// func (s *Ethereum) ResetWithGenesisBlock(gb *types.Block) {
+// 	s.blockchain.ResetWithGenesisBlock(gb, false)
+// }
 
 func (s *Ethereum) Etherbase() (eb common.Address, err error) {
 	s.lock.RLock()
