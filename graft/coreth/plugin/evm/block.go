@@ -119,7 +119,7 @@ func (b *Block) Accept() error {
 		return err
 	}
 	if tx == nil {
-		return nil
+		return vm.db.Commit()
 	}
 
 	// Remove the accepted transaction from the mempool
@@ -135,7 +135,12 @@ func (b *Block) Accept() error {
 		return nil
 	}
 
-	return tx.UnsignedAtomicTx.Accept(vm.ctx, nil)
+	batch, err := vm.db.CommitBatch()
+	if err != nil {
+		return fmt.Errorf("failed to create commit batch due to: %w", err)
+	}
+
+	return tx.UnsignedAtomicTx.Accept(vm.ctx, batch)
 }
 
 // Reject implements the snowman.Block interface
@@ -148,7 +153,7 @@ func (b *Block) Reject() error {
 		b.vm.mempool.RejectTx(tx.ID())
 	}
 
-	return nil
+	return b.vm.db.Commit()
 }
 
 // SetStatus implements the InternalBlock interface allowing ChainState
@@ -287,8 +292,10 @@ func (b *Block) Verify() error {
 		}
 	}
 
-	_, err = vm.chain.InsertChain([]*types.Block{b.ethBlock})
-	return err
+	if _, err = vm.chain.InsertChain([]*types.Block{b.ethBlock}); err != nil {
+		return fmt.Errorf("failed to insert block %s into chain due to %w", b.ethBlock.Hash(), err)
+	}
+	return vm.db.Commit()
 }
 
 // Bytes implements the snowman.Block interface

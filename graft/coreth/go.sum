@@ -50,6 +50,8 @@ github.com/ava-labs/avalanchego v1.3.0 h1:D1yNjEON5l+/VoLqb5RBU32yuqhZR5oSOwxj4E
 github.com/ava-labs/avalanchego v1.3.0/go.mod h1:lcxr8j/scJnveC819OOBLHtWkraYg2U1auwMb6+h4dk=
 github.com/ava-labs/avalanchego v1.3.1-0.20210405025504-dcb5b8b4fc12 h1:vZF5/qS56qbwSV9ATMdzegye0gpay6pWDkkaZAc2F+U=
 github.com/ava-labs/avalanchego v1.3.1-0.20210405025504-dcb5b8b4fc12/go.mod h1:lcxr8j/scJnveC819OOBLHtWkraYg2U1auwMb6+h4dk=
+github.com/ava-labs/avalanchego v1.3.1-0.20210406150628-aefcf15463ff h1:kBlbzWGMahZSOakl1kfPhip5LZo1grJK3qWiYaiFHsE=
+github.com/ava-labs/avalanchego v1.3.1-0.20210406150628-aefcf15463ff/go.mod h1:lcxr8j/scJnveC819OOBLHtWkraYg2U1auwMb6+h4dk=
 github.com/aws/aws-sdk-go v1.25.48/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=

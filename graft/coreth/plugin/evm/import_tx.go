@@ -159,14 +159,14 @@ func (tx *UnsignedImportTx) SemanticVerify(
 // we don't want to remove an imported UTXO in semanticVerify
 // only to have the transaction not be Accepted. This would be inconsistent.
 // Recall that imported UTXOs are not kept in a versionDB.
-func (tx *UnsignedImportTx) Accept(ctx *snow.Context, _ database.Batch) error {
+func (tx *UnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) error {
 	// TODO: Is any batch passed in here?
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))
 	for i, in := range tx.ImportedInputs {
 		inputID := in.InputID()
 		utxoIDs[i] = inputID[:]
 	}
-	return ctx.SharedMemory.Remove(tx.SourceChain, utxoIDs)
+	return ctx.SharedMemory.Remove(tx.SourceChain, utxoIDs, batch)
 }
 
 // newImportTx returns a new ImportTx

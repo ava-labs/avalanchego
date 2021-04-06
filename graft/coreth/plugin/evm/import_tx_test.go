@@ -277,7 +277,11 @@ func TestImportTxSemanticVerify(t *testing.T) {
 		t.Fatalf("Semantic verification should have passed after bootstrapping with the UTXO present")
 	}
 
-	if err := unsignedImportTx.Accept(vm.ctx, nil); err != nil {
+	commitBatch, err := vm.db.CommitBatch()
+	if err != nil {
+		t.Fatalf("Failed to create commit batch for VM due to %s", err)
+	}
+	if err := unsignedImportTx.Accept(vm.ctx, commitBatch); err != nil {
 		t.Fatalf("Accept failed due to: %s", err)
 	}
 
@@ -359,7 +363,11 @@ func TestNewImportTx(t *testing.T) {
 		t.Fatalf("newImportTx created an invalid transaction")
 	}
 
-	if err := importTx.Accept(vm.ctx, nil); err != nil {
+	commitBatch, err := vm.db.CommitBatch()
+	if err != nil {
+		t.Fatalf("Failed to create commit batch for VM due to %s", err)
+	}
+	if err := importTx.Accept(vm.ctx, commitBatch); err != nil {
 		t.Fatalf("Failed to accept import transaction due to: %s", err)
 	}
 }
