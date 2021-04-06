@@ -327,7 +327,20 @@ func (vm *VM) Initialize(
 		panic(err)
 	}
 	nodecfg := node.Config{NoUSB: true}
-	chain := coreth.NewETHChain(&config, &nodecfg, vm.chaindb, vm.CLIConfig.EthBackendSettings())
+
+	// Attempt to load last accepted block to determine if it is necessary to
+	// initialize state with the genesis block.
+	var initGenesis bool
+	lastAcceptedBlkID, lastAcceptedErr := vm.acceptedBlockDB.Get(lastAcceptedKey)
+	switch {
+	case lastAcceptedErr == nil:
+	case lastAcceptedErr == database.ErrNotFound:
+		initGenesis = true
+	default:
+		return fmt.Errorf("failed to get last accepted block due to %w", lastAcceptedErr)
+	}
+
+	chain := coreth.NewETHChain(&config, &nodecfg, vm.chaindb, vm.CLIConfig.EthBackendSettings(), initGenesis)
 	vm.chain = chain
 	vm.networkID = config.NetworkId
 
@@ -422,10 +435,9 @@ func (vm *VM) Initialize(
 	var lastAcceptedBlk *Block
 	ethGenesisBlock := chain.GetGenesisBlock()
 	vm.genesisHash = chain.GetGenesisBlock().Hash()
-	blkIDBytes, err := vm.acceptedBlockDB.Get(lastAcceptedKey)
 	switch {
-	case err == nil:
-		blkHash := common.BytesToHash(blkIDBytes)
+	case lastAcceptedErr == nil:
+		blkHash := common.BytesToHash(lastAcceptedBlkID)
 		ethLastAcceptedBlock := vm.chain.GetBlockByHash(blkHash)
 		if ethLastAcceptedBlock == nil {
 			return fmt.Errorf("failed to get block by hash of last accepted blk %s", blkHash)
@@ -435,7 +447,7 @@ func (vm *VM) Initialize(
 			id:       ids.ID(ethLastAcceptedBlock.Hash()),
 			vm:       vm,
 		}
-	case err == database.ErrNotFound:
+	case lastAcceptedErr == database.ErrNotFound:
 		// The VM is being initialized for the first time. Create the genesis block and mark it as accepted.
 		lastAcceptedBlk = &Block{
 			ethBlock: ethGenesisBlock,
@@ -443,7 +455,9 @@ func (vm *VM) Initialize(
 			vm:       vm,
 		}
 	default:
-		return fmt.Errorf("failed to get last accepted block due to %w", err)
+		// This should never occur because we error in this case earlier in the
+		// function but keeping it here for defensiveness.
+		return fmt.Errorf("failed to get last accepted block due to %w", lastAcceptedErr)
 	}
 
 	vm.State.Initialize(&chainState.Config{
