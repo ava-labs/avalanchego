@@ -42,8 +42,8 @@ type Manager interface {
 	GetDatabases() []*VersionedDatabase
 	// Close all of the databases controlled by the manager
 	Close() error
-	MarkBootstrapped() error
-	Bootstrapped(version.Version) (bool, error)
+	MarkCurrentDBBootstrapped() error
+	CurrentDBBootstrapped() (bool, error)
 
 	// AddPrefix returns a new database manager with each of its databases
 	// prefixed with [prefix]
@@ -81,17 +81,12 @@ func (m *manager) Close() error {
 	return errs.Err
 }
 
-func (m *manager) MarkBootstrapped() error {
+func (m *manager) MarkCurrentDBBootstrapped() error {
 	return m.databases[0].MarkBootstrapped()
 }
 
-func (m *manager) Bootstrapped(v version.Version) (bool, error) {
-	for i := 0; i < len(m.databases); i++ {
-		if m.databases[i].Version.Compare(v) == 0 {
-			return m.databases[i].Bootstrapped()
-		}
-	}
-	return false, nil
+func (m *manager) CurrentDBBootstrapped() (bool, error) {
+	return m.databases[0].Bootstrapped()
 }
 
 // wrapManager returns a new database manager with each managed database wrapped by

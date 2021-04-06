@@ -52,7 +52,7 @@ var (
 		"Note that populating the new database version will approximately double the amount of disk space required by AvalancheGo.\n" +
 		"Ensure that this computer has at least enough disk space available.\n" +
 		"You should not delete the old database version unless advised to by the Avalanche team.\n"
-	alreadyUpgradedMsg = "fetch only mode done. Restart this node without --fetch-only to run normally"
+	alreadyUpgradedMsg = "fetch only mode done. Restart this node without --fetch-only to run normally\n"
 )
 
 // main is the primary entry point to Avalanche.
@@ -100,7 +100,7 @@ func main() {
 	}
 
 	// Fetch only
-	currentDBBootstrapped, err := dbManager.Bootstrapped(dbVersion)
+	currentDBBootstrapped, err := dbManager.CurrentDBBootstrapped()
 	if err != nil {
 		log.Error("couldn't get whether database version %s ever bootstrapped: %s", dbVersion)
 		return

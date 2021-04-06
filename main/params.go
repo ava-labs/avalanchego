@@ -92,7 +92,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(fetchOnlyKey, false, "If true, bootstrap the current database version then stop")
 	fs.Uint(fetchOnlyHTTPPortPKey, 9652, fmt.Sprintf("Port used for HTTP API calls during node executions where --%s=true.", fetchOnlyKey))
 	fs.Uint(fetchOnlyStakingPortKey, 9653, fmt.Sprintf("Port used for P2P communication during node executions where --%s=true.", fetchOnlyKey))
-	fs.String(fetchOnlyLogDirKey, logging.DefaultLogDirectory+"/db-fetch-only", fmt.Sprintf("Path logs are sent to during node executions where --%s=true.", fetchOnlyKey))
+	fs.String(fetchOnlyLogDirKey, "/db-fetch-only", fmt.Sprintf("Path logs are sent to during node executions where --%s=true.", fetchOnlyKey))
 
 	// System
 	fs.Uint64(fdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
@@ -297,15 +297,20 @@ func setNodeConfig(v *viper.Viper) error {
 	if err != nil {
 		return err
 	}
-	logsDir := ""
-	if Config.FetchOnly {
-		logsDir = v.GetString(fetchOnlyLogDirKey)
-	} else {
-		logsDir = v.GetString(logsDirKey)
-	}
+	logsDir := v.GetString(logsDirKey)
 	if logsDir != "" {
 		loggingConfig.Directory = logsDir
 	}
+
+	if Config.FetchOnly {
+		logsDir = v.GetString(fetchOnlyLogDirKey)
+		if logsDir == "/db-fetch-only" {
+			loggingConfig.Directory += logsDir
+		} else {
+			loggingConfig.Directory = logsDir
+		}
+	}
+
 	loggingConfig.LogLevel, err = logging.ToLevel(v.GetString(logLevelKey))
 	if err != nil {
 		return err
