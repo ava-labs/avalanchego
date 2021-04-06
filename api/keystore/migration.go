@@ -59,7 +59,7 @@ func (ks *Keystore) migrate110(prevDB, currentDB *manager.VersionedDatabase) err
 		currentUserBCDB := prefixdb.New(username, ks.bcDB)
 		previousUserBCDB := prefixdb.New(username, previousBCDB)
 		bcsBatch := currentUserBCDB.NewBatch()
-		if err := ks.migrateUserBCDB(previousUserBCDB, bcsBatch, userBatch); err != nil {
+		if err := migrateUserBCDB(previousUserBCDB, bcsBatch, userBatch); err != nil {
 			return err
 		}
 	}
@@ -74,7 +74,7 @@ func (ks *Keystore) migrate110(prevDB, currentDB *manager.VersionedDatabase) err
 	return nil
 }
 
-func (ks *Keystore) migrateUserBCDB(previousUserBCDB database.Database, bcsBatch database.Batch, userBatch database.Batch) error {
+func migrateUserBCDB(previousUserBCDB database.Database, bcsBatch database.Batch, userBatch database.Batch) error {
 	iterator := previousUserBCDB.NewIterator()
 	defer iterator.Release()
 
