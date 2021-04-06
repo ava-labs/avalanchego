@@ -1343,6 +1343,10 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 			toRemove := toRemoveHeap[0]
 			toRemoveHeap = toRemoveHeap[1:]
 
+			if currentWeight > maxWeight && !startTime.After(toRemove.EndTime()) {
+				maxWeight = currentWeight
+			}
+
 			newWeight, err := safemath.Sub64(currentWeight, toRemove.Wght)
 			if err != nil {
 				return 0, err
