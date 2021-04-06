@@ -46,7 +46,8 @@ type State struct {
 	// State keeps these function types to request operations
 	// from the VM implementation.
 	getBlockIDAtHeight func(uint64) (ids.ID, error)
-	// getBlock retrieves a block from the VM's storage. If getBlock retunrs
+	// getBlock retrieves a block from the VM's storage. If getBlock returns
+	// a nil error, then the returned block must not have the status Unknown
 	getBlock       func(ids.ID) (Block, error)
 	unmarshalBlock func([]byte) (Block, error)
 	buildBlock     func() (Block, error)
