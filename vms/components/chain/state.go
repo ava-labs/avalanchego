@@ -9,8 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -18,7 +16,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// Add GetBlockIDAtHeight to support
+// VM defines an updated VM interface to include GetBlockIDAtHeight. Any VM
+// that implements this interface can be easily wrapped with the caching layer
+// defined by State.
 type VM interface {
 	block.ChainVM
 
@@ -33,27 +33,24 @@ var (
 	ErrBlockNotFound = errors.New("block not found")
 )
 
-// State defines the canonical state of the chain
-// it tracks the accepted blocks and wraps a VM's implementation
-// of snowman.Block in order to take care of writing blocks to
-// the database and adding a caching layer for both the blocks
-// and their statuses.
+// State implements an efficient caching layer used to wrap a VM
+// implementation.
 type State struct {
-	// baseDB is the base level database used to make
-	// atomic commits on block acceptance.
-	baseDB *versiondb.Database
-
-	// State keeps these function types to request operations
-	// from the VM implementation.
+	// getBlockIDAtHeight returns the blkID
 	getBlockIDAtHeight func(uint64) (ids.ID, error)
 	// getBlock retrieves a block from the VM's storage. If getBlock returns
 	// a nil error, then the returned block must not have the status Unknown
-	getBlock       func(ids.ID) (Block, error)
+	getBlock func(ids.ID) (Block, error)
+	// unmarshals [b] into a block
 	unmarshalBlock func([]byte) (Block, error)
-	buildBlock     func() (Block, error)
+	// buildBlock attempts to build a block on top of the currently preferred block
+	// buildBlock should always return a block with status Processing since it should never
+	// create an unknonw block, and building on top of the preferred block should be built on
+	// top of at
+	buildBlock func() (Block, error)
 
-	// verifiedBlocks are the verified blocks that have entered
-	// consensus
+	// verifiedBlocks is a map of blocks that have been verified and are
+	// therefore currently in consensus.
 	verifiedBlocks map[ids.ID]*BlockWrapper
 	// decidedBlocks is an LRU cache of decided blocks.
 	decidedBlocks cache.Cacher
@@ -75,9 +72,8 @@ type Config struct {
 }
 
 // NewState returns a new uninitialized State
-func NewState(db database.Database, decidedCacheSize, missingCacheSize, unverifiedCacheSize int) *State {
+func NewState(decidedCacheSize, missingCacheSize, unverifiedCacheSize int) *State {
 	return &State{
-		baseDB:           versiondb.New(db),
 		verifiedBlocks:   make(map[ids.ID]*BlockWrapper),
 		decidedBlocks:    &cache.LRU{Size: decidedCacheSize},
 		missingBlocks:    &cache.LRU{Size: missingCacheSize},
@@ -86,7 +82,6 @@ func NewState(db database.Database, decidedCacheSize, missingCacheSize, unverifi
 }
 
 func NewMeteredState(
-	db database.Database,
 	registerer prometheus.Registerer,
 	namespace string,
 	decidedCacheSize,
@@ -119,7 +114,6 @@ func NewMeteredState(
 	}
 
 	return &State{
-		baseDB:           versiondb.New(db),
 		verifiedBlocks:   make(map[ids.ID]*BlockWrapper),
 		decidedBlocks:    decidedCache,
 		missingBlocks:    missingCache,
@@ -150,11 +144,6 @@ func (c *State) FlushCaches() {
 	c.missingBlocks.Flush()
 	c.unverifiedBlocks.Flush()
 }
-
-// ExternalDB returns a database to be used external to State
-// Any operations that occur on the returned database during Accept/Reject
-// of blocks will be automatically batched by State.
-func (c *State) ExternalDB() database.Database { return c.baseDB }
 
 // GetBlock returns the BlockWrapper as snowman.Block corresponding to [blkID]
 func (c *State) GetBlock(blkID ids.ID) (snowman.Block, error) {
@@ -239,18 +228,24 @@ func (c *State) BuildBlock() (snowman.Block, error) {
 	}
 
 	blkID := blk.ID()
-	// Evict the produced block from missing blocks.
+	// Defensive: buildBlock should not return a block that has already been verfied.
+	// If it does, make sure to return the existing reference to the block.
+	if existingBlk, ok := c.verifiedBlocks[blkID]; ok {
+		return existingBlk, nil
+	}
+	// Evict the produced block from missing blocks in case it was previously
+	// marked as missing.
 	c.missingBlocks.Evict(blkID)
 
 	// Blocks built by BuildBlock are built on top of the
-	// preferred block, so it is guaranteed to be in Processing.
+	// preferred block, so it is guaranteed to have status Processing.
 	blk.SetStatus(choices.Processing)
 	wrappedBlk := &BlockWrapper{
 		Block: blk,
 		state: c,
 	}
 	// Since the consensus engine has not called Verify on this
-	// block yet, we can add it directly as a non-processing block.
+	// block yet, we can add it directly as an unverified block.
 	c.unverifiedBlocks.Put(blkID, wrappedBlk)
 	return wrappedBlk, nil
 }

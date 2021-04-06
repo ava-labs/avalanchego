@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -161,8 +159,6 @@ func checkRejectedBlock(t *testing.T, c *State, blk snowman.Block, cached bool) 
 }
 
 func TestState(t *testing.T) {
-	db := memdb.New()
-
 	testBlks := snowman.NewTestBlocks(3, nil)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Processing)
@@ -183,7 +179,7 @@ func TestState(t *testing.T) {
 	}
 	testBlks = append(testBlks, blk3)
 
-	chainState := NewState(prefixdb.New([]byte{1}, db), 2, 2, 2)
+	chainState := NewState(2, 2, 2)
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 	chainState.Initialize(&Config{
@@ -296,8 +292,6 @@ func TestState(t *testing.T) {
 }
 
 func TestBuildBlock(t *testing.T) {
-	db := memdb.New()
-
 	testBlks := snowman.NewTestBlocks(2, nil)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Processing)
@@ -307,7 +301,7 @@ func TestBuildBlock(t *testing.T) {
 	blk1 := testBlks[1]
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
-	chainState := NewState(prefixdb.New([]byte{1}, db), 2, 2, 2)
+	chainState := NewState(2, 2, 2)
 	buildBlock := func() (Block, error) {
 		// Once the block is built, mark it as processing
 		blk1.SetStatus(choices.Processing)
@@ -343,8 +337,6 @@ func TestBuildBlock(t *testing.T) {
 }
 
 func TestStateDecideBlock(t *testing.T) {
-	db := memdb.New()
-
 	testBlks := snowman.NewTestBlocks(4, nil)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Processing)
@@ -358,7 +350,7 @@ func TestStateDecideBlock(t *testing.T) {
 	badRejectBlk := testBlks[3]
 	badRejectBlk.RejectV = errors.New("this block should fail on reject")
 
-	chainState := NewState(prefixdb.New([]byte{1}, db), 2, 2, 2)
+	chainState := NewState(2, 2, 2)
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 
 	chainState.Initialize(&Config{
@@ -415,8 +407,6 @@ func TestStateDecideBlock(t *testing.T) {
 }
 
 func TestStateParent(t *testing.T) {
-	db := memdb.New()
-
 	testBlks := snowman.NewTestBlocks(3, nil)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Processing)
@@ -426,7 +416,7 @@ func TestStateParent(t *testing.T) {
 	blk1 := testBlks[1]
 	blk2 := testBlks[2]
 
-	chainState := NewState(prefixdb.New([]byte{1}, db), 2, 2, 2)
+	chainState := NewState(2, 2, 2)
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 
 	chainState.Initialize(&Config{
@@ -459,8 +449,6 @@ func TestStateParent(t *testing.T) {
 }
 
 func TestGetBlockInternal(t *testing.T) {
-	db := memdb.New()
-
 	testBlks := snowman.NewTestBlocks(1, nil)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Processing)
@@ -468,7 +456,7 @@ func TestGetBlockInternal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chainState := NewState(prefixdb.New([]byte{1}, db), 2, 2, 2)
+	chainState := NewState(2, 2, 2)
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 
 	chainState.Initialize(&Config{
@@ -501,8 +489,6 @@ func TestGetBlockInternal(t *testing.T) {
 }
 
 func TestGetBlockError(t *testing.T) {
-	db := memdb.New()
-
 	testBlks := snowman.NewTestBlocks(2, nil)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Processing)
@@ -511,7 +497,7 @@ func TestGetBlockError(t *testing.T) {
 	}
 	blk1 := testBlks[1]
 
-	chainState := NewState(prefixdb.New([]byte{1}, db), 2, 2, 2)
+	chainState := NewState(2, 2, 2)
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 	wrappedGetBlock := func(id ids.ID) (Block, error) {
 		blk, err := getBlock(id)
@@ -548,8 +534,6 @@ func TestGetBlockError(t *testing.T) {
 }
 
 func TestParseBlockError(t *testing.T) {
-	db := memdb.New()
-
 	testBlks := snowman.NewTestBlocks(1, nil)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Processing)
@@ -557,7 +541,7 @@ func TestParseBlockError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chainState := NewState(prefixdb.New([]byte{1}, db), 2, 2, 2)
+	chainState := NewState(2, 2, 2)
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 
 	chainState.Initialize(&Config{
@@ -575,8 +559,6 @@ func TestParseBlockError(t *testing.T) {
 }
 
 func TestBuildBlockError(t *testing.T) {
-	db := memdb.New()
-
 	testBlks := snowman.NewTestBlocks(1, nil)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Processing)
@@ -584,7 +566,7 @@ func TestBuildBlockError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chainState := NewState(prefixdb.New([]byte{1}, db), 2, 2, 2)
+	chainState := NewState(2, 2, 2)
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 
 	chainState.Initialize(&Config{

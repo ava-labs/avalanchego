@@ -47,7 +47,7 @@ var (
 )
 
 const (
-	decidedCacheSize    = 100
+	decidedCacheSize    = 200
 	missingCacheSize    = 100
 	unverifiedCacheSize = 100
 )
@@ -195,7 +195,6 @@ func (vm *VMClient) Initialize(
 	}
 
 	chainState, err := chain.NewMeteredState(
-		dbManager.Current(),
 		ctx.Metrics,
 		fmt.Sprintf("%s_rpcchainvm", ctx.Namespace),
 		decidedCacheSize,
