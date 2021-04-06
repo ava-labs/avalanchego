@@ -462,10 +462,10 @@ func (vm *VM) Initialize(
 
 	vm.State.Initialize(&chainState.Config{
 		LastAcceptedBlock:  lastAcceptedBlk,
-		GetBlockIDAtHeight: vm.internalGetBlockIDAtHeight,
-		GetBlock:           vm.internalGetBlock,
-		UnmarshalBlock:     vm.internalParseBlock,
-		BuildBlock:         vm.internalBuildBlock,
+		GetBlockIDAtHeight: vm.getBlockIDAtHeight,
+		GetBlock:           vm.getBlock,
+		UnmarshalBlock:     vm.parseBlock,
+		BuildBlock:         vm.buildBlock,
 	})
 	if err := vm.chain.Accept(lastAcceptedBlk.ethBlock); err != nil {
 		return fmt.Errorf("could not initialize VM with last accepted blkID %s: %w", lastAcceptedBlk.ethBlock.Hash().Hex(), err)
@@ -509,8 +509,8 @@ func (vm *VM) Shutdown() error {
 	return nil
 }
 
-// internalBuildBlock builds a block to be wrapped by ChainState
-func (vm *VM) internalBuildBlock() (chainState.Block, error) {
+// buildBlock builds a block to be wrapped by ChainState
+func (vm *VM) buildBlock() (chainState.Block, error) {
 	vm.chain.GenBlock()
 	block := <-vm.newBlockChan
 
@@ -544,8 +544,8 @@ func (vm *VM) internalBuildBlock() (chainState.Block, error) {
 	return block, nil
 }
 
-// internalParseBlock parses [b] into a block to be wrapped by ChainState.
-func (vm *VM) internalParseBlock(b []byte) (chainState.Block, error) {
+// parseBlock parses [b] into a block to be wrapped by ChainState.
+func (vm *VM) parseBlock(b []byte) (chainState.Block, error) {
 	ethBlock := new(types.Block)
 	if err := rlp.DecodeBytes(b, ethBlock); err != nil {
 		return nil, err
@@ -564,9 +564,9 @@ func (vm *VM) internalParseBlock(b []byte) (chainState.Block, error) {
 	return block, nil
 }
 
-// internalGetBlock attempts to retrieve block [id] from the VM to be wrapped
+// getBlock attempts to retrieve block [id] from the VM to be wrapped
 // by ChainState.
-func (vm *VM) internalGetBlock(id ids.ID) (chainState.Block, error) {
+func (vm *VM) getBlock(id ids.ID) (chainState.Block, error) {
 	ethBlock := vm.chain.GetBlockByHash(common.Hash(id))
 	// If [ethBlock] is nil, return [chainState.ErrBlockNotFound] here
 	// so that the miss is considered cacheable.
@@ -584,17 +584,21 @@ func (vm *VM) internalGetBlock(id ids.ID) (chainState.Block, error) {
 
 // SetPreference sets what the current tail of the chain is
 func (vm *VM) SetPreference(blkID ids.ID) error {
+	// Since each internal handler used by [vm.State] always returns a block
+	// with non-nil ethBlock value, GetBlockInternal should never return a
+	// (*Block) with a nil ethBlock value.
 	block, err := vm.GetBlockInternal(blkID)
 	if err != nil {
 		return fmt.Errorf("failed to set preference to %s: %w", blkID, err)
 	}
+
 	return vm.chain.SetPreference(block.(*Block).ethBlock)
 }
 
-// internalGetBlockIDAtHeight retrieves the blkID of the canonical block at [blkHeight]
+// getBlockIDAtHeight retrieves the blkID of the canonical block at [blkHeight]
 // if [blkHeight] is less than the height of the last accepted block, this will return
 // a canonical block. Otherwise, it may return a blkID that has not yet been accepted.
-func (vm *VM) internalGetBlockIDAtHeight(blkHeight uint64) (ids.ID, error) {
+func (vm *VM) getBlockIDAtHeight(blkHeight uint64) (ids.ID, error) {
 	ethBlock := vm.chain.GetBlockByNumber(blkHeight)
 	if ethBlock == nil {
 		return ids.ID{}, fmt.Errorf("could not find block at height: %d", blkHeight)
