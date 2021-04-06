@@ -26,7 +26,7 @@ type BlockWrapper struct {
 }
 
 // Verify verifies the underlying block, evicts from the unverified block cache
-// and if the block passes verification, adds it to [state] verifiedBlocks.
+// and if the block passes verification, adds it to [state.verifiedBlocks].
 // Note: it is guaranteed that if a block passes verification it will be added to
 // consensus and eventually be decided ie. either Accept/Reject will be called
 // on [bw] removing it from [verifiedBlocks].

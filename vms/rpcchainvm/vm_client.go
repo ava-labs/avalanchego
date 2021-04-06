@@ -432,11 +432,7 @@ func (b *BlockClient) Accept() error {
 	_, err := b.vm.client.BlockAccept(context.Background(), &vmproto.BlockAcceptRequest{
 		Id: b.id[:],
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (b *BlockClient) Reject() error {
@@ -444,7 +440,6 @@ func (b *BlockClient) Reject() error {
 	_, err := b.vm.client.BlockReject(context.Background(), &vmproto.BlockRejectRequest{
 		Id: b.id[:],
 	})
-
 	return err
 }
 
