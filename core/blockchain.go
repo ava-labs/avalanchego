@@ -378,7 +378,7 @@ func NewBlockChain(
 	// Take ownership of this particular state
 	if txLookupLimit != nil {
 		bc.txLookupLimit = *txLookupLimit
-		go bc.maintainTxIndex(0)
+		go bc.maintainTxIndex()
 	}
 	// If periodic cache journal is required, spin it up.
 	if bc.cacheConfig.TrieCleanRejournal > 0 {
@@ -440,7 +440,7 @@ func (bc *BlockChain) loadLastState(initGenesis bool) error {
 		// // Corrupt or empty database, init from scratch
 		// log.Warn("Head block missing, resetting chain", "hash", head)
 		// return bc.Reset()
-		return fmt.Errorf("could not load block %s", head.Hex())
+		return fmt.Errorf("could not load head block %s", head.Hex())
 	}
 	// Everything seems to be fine, set as the head block
 	bc.currentBlock.Store(currentBlock)
@@ -2640,18 +2640,19 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 // The user can adjust the txlookuplimit value for each launch after fast
 // sync, Geth will automatically construct the missing indices and delete
 // the extra indices.
-func (bc *BlockChain) maintainTxIndex(ancients uint64) {
-	// Before starting the actual maintenance, we need to handle a special case,
-	// where user might init Geth with an external ancient database. If so, we
-	// need to reindex all necessary transactions before starting to process any
-	// pruning requests.
-	if ancients > 0 {
-		var from = uint64(0)
-		if bc.txLookupLimit != 0 && ancients > bc.txLookupLimit {
-			from = ancients - bc.txLookupLimit
-		}
-		rawdb.IndexTransactions(bc.db, from, ancients)
-	}
+func (bc *BlockChain) maintainTxIndex() {
+	// Original code:
+	// // Before starting the actual maintenance, we need to handle a special case,
+	// // where user might init Geth with an external ancient database. If so, we
+	// // need to reindex all necessary transactions before starting to process any
+	// // pruning requests.
+	// if ancients > 0 {
+	// 	var from = uint64(0)
+	// 	if bc.txLookupLimit != 0 && ancients > bc.txLookupLimit {
+	// 		from = ancients - bc.txLookupLimit
+	// 	}
+	// 	rawdb.IndexTransactions(bc.db, from, ancients)
+	// }
 	// indexBlocks reindexes or unindexes transactions depending on user configuration
 	indexBlocks := func(tail *uint64, head uint64, done chan struct{}) {
 		defer func() { done <- struct{}{} }()
