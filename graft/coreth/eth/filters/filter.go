@@ -62,8 +62,10 @@ type Backend interface {
 	BloomStatus() (uint64, uint64)
 	ServiceFilter(ctx context.Context, session *bloombits.MatcherSession)
 
+	// Added to the backend interface to support limiting of logs requests
 	GetVMConfig() *vm.Config
 	AcceptedBlock() *types.Block
+	GetMaxBlocksPerRequest() int64
 }
 
 // Filter can be used to retrieve and filter logs.
@@ -170,11 +172,11 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 	}
 	head := header.Number.Uint64()
 
-	if f.begin == -1 {
+	if f.begin < 0 {
 		f.begin = int64(head)
 	}
 	end := uint64(f.end)
-	if f.end == -1 {
+	if f.end < 0 {
 		end = head
 	}
 
@@ -188,6 +190,11 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 		return nil, fmt.Errorf("begin block %d is greater than end block %d", f.begin, end)
 	}
 
+	// If the requested range of blocks exceeds the maximum number of blocks allowed by the backend
+	// return an error instead of searching for the logs.
+	if maxBlocks := f.backend.GetMaxBlocksPerRequest(); int64(end)-f.begin > maxBlocks && maxBlocks > 0 {
+		return nil, fmt.Errorf("requested too many blocks from %d to %d, maximum is set to %d", f.begin, int64(end), maxBlocks)
+	}
 	// Gather all indexed logs, and finish with non indexed ones
 	var logs []*types.Log
 	size, sections := f.backend.BloomStatus()
