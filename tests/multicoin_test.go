@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/accounts/keystore"
 	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/eth"
@@ -85,7 +86,7 @@ func TestMulticoin(t *testing.T) {
 	}
 	code := common.Hex2Bytes(contract)
 
-	chain := coreth.NewETHChain(&config, nil, nil, eth.DefaultSettings, true)
+	chain := coreth.NewETHChain(&config, nil, rawdb.NewMemoryDatabase(), eth.DefaultSettings, true)
 
 	if err := chain.Accept(chain.GetGenesisBlock()); err != nil {
 		t.Fatal(err)
