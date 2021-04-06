@@ -325,7 +325,7 @@ func (vm *VM) authorize(
 // [creds] are the credentials of [tx], which allow [ins] to be spent.
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpend(
-	db database.Database,
+	utxoDB utxoGetter,
 	tx UnsignedTx,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
@@ -335,10 +335,15 @@ func (vm *VM) semanticVerifySpend(
 ) TxError {
 	utxos := make([]*avax.UTXO, len(ins))
 	for index, input := range ins {
-		utxoID := input.UTXOID.InputID()
-		utxo, err := vm.getUTXO(db, utxoID)
+		utxo, err := utxoDB.GetUTXO(input.UTXOID)
 		if err != nil {
-			return tempError{fmt.Errorf("failed to read consumed UTXO %s due to: %w", utxoID, err)}
+			return tempError{
+				fmt.Errorf(
+					"failed to read consumed UTXO %s due to: %w",
+					&input.UTXOID,
+					err,
+				),
+			}
 		}
 		utxos[index] = utxo
 	}
@@ -553,38 +558,29 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 // Removes the UTXOs consumed by [ins] from the UTXO set
 func (vm *VM) consumeInputs(
-	db database.Database,
+	utxoDB utxoDeleter,
 	ins []*avax.TransferableInput,
-) error {
+) {
 	for _, input := range ins {
-		utxoID := input.UTXOID.InputID()
-		if err := vm.removeUTXO(db, utxoID); err != nil {
-			return tempError{
-				fmt.Errorf("failed to remove UTXO %s: %w", utxoID, err),
-			}
-		}
+		utxoDB.DeleteUTXO(input.UTXOID)
 	}
-	return nil
 }
 
 // Adds the UTXOs created by [outs] to the UTXO set.
 // [txID] is the ID of the tx that created [outs].
 func (vm *VM) produceOutputs(
-	db database.Database,
+	utxoDB utxoAdder,
 	txID ids.ID,
 	outs []*avax.TransferableOutput,
-) error {
+) {
 	for index, out := range outs {
-		if err := vm.putUTXO(db, &avax.UTXO{
+		utxoDB.AddUTXO(&avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        txID,
 				OutputIndex: uint32(index),
 			},
 			Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 			Out:   out.Output(),
-		}); err != nil {
-			return fmt.Errorf("failed to put UTXO %w", err)
-		}
+		})
 	}
-	return nil
 }

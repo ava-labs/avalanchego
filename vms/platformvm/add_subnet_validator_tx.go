@@ -10,10 +10,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -90,19 +88,15 @@ func (tx *UnsignedAddSubnetValidatorTx) Verify(
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 	vm *VM,
-	db database.Database,
+	parentState versionedState,
 	stx *Tx,
 ) (
-	*versiondb.Database,
-	*versiondb.Database,
+	versionedState,
+	versionedState,
 	func() error,
 	func() error,
 	TxError,
 ) {
-	// Verify the tx is well-formed
-	if len(stx.Creds) == 0 {
-		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
-	}
 	if err := tx.Verify(
 		vm.Ctx,
 		vm.codec,
@@ -114,106 +108,152 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, permError{err}
 	}
 
+	// Verify the tx is well-formed
+	if len(stx.Creds) == 0 {
+		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
+	}
+
+	currentStakers := parentState.CurrentStakerChainState()
+	pendingStakers := parentState.PendingStakerChainState()
+
 	if vm.bootstrapped {
+		currentTimestamp := parentState.GetTimestamp()
 		// Ensure the proposed validator starts after the current timestamp
-		if currentTimestamp, err := vm.getTimestamp(db); err != nil {
-			return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't get current timestamp: %v", err)}
-		} else if validatorStartTime := tx.StartTime(); !currentTimestamp.Before(validatorStartTime) {
-			return nil, nil, nil, nil, permError{fmt.Errorf("validator's start time (%s) is at or after current chain timestamp (%s)",
-				currentTimestamp,
-				validatorStartTime)}
+		if validatorStartTime := tx.StartTime(); !currentTimestamp.Before(validatorStartTime) {
+			return nil, nil, nil, nil, permError{
+				fmt.Errorf(
+					"validator's start time (%s) is at or after current chain timestamp (%s)",
+					currentTimestamp,
+					validatorStartTime,
+				),
+			}
 		} else if validatorStartTime.After(currentTimestamp.Add(maxFutureStartTime)) {
-			return nil, nil, nil, nil, permError{fmt.Errorf("validator start time (%s) more than two weeks after current chain timestamp (%s)", validatorStartTime, currentTimestamp)}
+			return nil, nil, nil, nil, permError{
+				fmt.Errorf(
+					"validator start time (%s) more than two weeks after current chain timestamp (%s)",
+					validatorStartTime,
+					currentTimestamp,
+				),
+			}
 		}
 
-		// Ensure that the period this validator validates the specified subnet is a
-		// subnet of the time they validate the primary network.
-		vdr, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
-		if err != nil {
-			return nil, nil, nil, nil, tempError{err}
-		}
-		if isValidator && !tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
-			return nil, nil, nil, nil, permError{errDSValidatorSubset}
-		}
-		if !isValidator {
-			// Ensure that the period this validator validates the specified subnet
-			// is a subnet of the time they will validate the primary network.
-			vdr, willBeValidator, err := vm.willBeValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
-			if err != nil {
-				return nil, nil, nil, nil, tempError{err}
+		currentValidator, err := currentStakers.GetValidator(tx.Validator.NodeID)
+		if err != nil && err != database.ErrNotFound {
+			return nil, nil, nil, nil, tempError{
+				fmt.Errorf(
+					"failed to find whether %s is a validator: %w",
+					tx.Validator.NodeID,
+					err,
+				),
 			}
-			if !willBeValidator || !tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
+		}
+
+		// Ensure that the period this validator validates the specified subnet
+		// is a subnet of the time they validate the primary network.
+		if err == nil {
+			vdrTx := currentValidator.AddValidatorTx()
+			if !tx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
+				return nil, nil, nil, nil, permError{errDSValidatorSubset}
+			}
+
+			// Ensure that this transaction isn't a duplicate add validator tx.
+			subnets := currentValidator.SubnetValidators()
+			if _, validates := subnets[tx.Validator.Subnet]; validates {
+				return nil, nil, nil, nil, permError{
+					fmt.Errorf(
+						"already validating subnet %s",
+						tx.Validator.Subnet,
+					),
+				}
+			}
+		} else {
+			vdrTx, err := pendingStakers.GetStakerByNodeID(tx.Validator.NodeID)
+			if err != nil {
+				if err == database.ErrNotFound {
+					return nil, nil, nil, nil, permError{errDSValidatorSubset}
+				}
+				return nil, nil, nil, nil, tempError{
+					fmt.Errorf(
+						"failed to find whether %s is a validator: %w",
+						tx.Validator.NodeID,
+						err,
+					),
+				}
+			}
+
+			if !vdrTx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
 				return nil, nil, nil, nil, permError{errDSValidatorSubset}
 			}
 		}
 
-		// Ensure that the period this validator validates the specified subnet is a
-		// subnet of the time they validate the primary network.
-		_, isValidator, err = vm.isValidator(db, tx.Validator.Subnet, tx.Validator.NodeID)
-		if err != nil {
-			return nil, nil, nil, nil, tempError{err}
-		}
-		if isValidator {
-			return nil, nil, nil, nil, permError{fmt.Errorf("already validating subnet between")}
-		}
-
-		// Ensure that the period this validator validates the specified subnet
-		// is a subnet of the time they will validate the primary network.
-		_, willBeValidator, err := vm.willBeValidator(db, tx.Validator.Subnet, tx.Validator.NodeID)
-		if err != nil {
-			return nil, nil, nil, nil, tempError{err}
-		}
-		if willBeValidator {
-			return nil, nil, nil, nil, permError{fmt.Errorf("already validating subnet between")}
+		// Ensure that this transaction isn't a duplicate add validator tx.
+		pendingValidator := pendingStakers.GetValidator(tx.Validator.NodeID)
+		subnets := pendingValidator.SubnetValidators()
+		if _, validates := subnets[tx.Validator.Subnet]; validates {
+			return nil, nil, nil, nil, permError{
+				fmt.Errorf(
+					"already validating subnet %s",
+					tx.Validator.Subnet,
+				),
+			}
 		}
 
 		baseTxCredsLen := len(stx.Creds) - 1
 		baseTxCreds := stx.Creds[:baseTxCredsLen]
 		subnetCred := stx.Creds[baseTxCredsLen]
 
-		subnet, timedErr := vm.getSubnet(db, tx.Validator.Subnet)
-		if timedErr != nil {
-			return nil, nil, nil, nil, timedErr
+		subnetIntf, _, err := parentState.GetTx(tx.Validator.Subnet)
+		if err != nil {
+			if err == database.ErrNotFound {
+				return nil, nil, nil, nil, permError{errDSValidatorSubset}
+			}
+			return nil, nil, nil, nil, tempError{
+				fmt.Errorf(
+					"couldn't find subnet %s with %w",
+					tx.Validator.Subnet,
+					err,
+				),
+			}
 		}
-		unsignedSubnet := subnet.UnsignedTx.(*UnsignedCreateSubnetTx)
-		if err := vm.fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, unsignedSubnet.Owner); err != nil {
+
+		subnet, ok := subnetIntf.UnsignedTx.(*UnsignedCreateSubnetTx)
+		if !ok {
+			return nil, nil, nil, nil, tempError{
+				fmt.Errorf(
+					"%s is not a subnet",
+					tx.Validator.Subnet,
+				),
+			}
+		}
+
+		if err := vm.fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
 			return nil, nil, nil, nil, permError{err}
 		}
 
 		// Verify the flowcheck
-		if err := vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, baseTxCreds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
+		if err := vm.semanticVerifySpend(parentState, tx, tx.Ins, tx.Outs, baseTxCreds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
 			return nil, nil, nil, nil, err
 		}
 	}
 
+	// Set up the state if this tx is committed
+	newlyPendingStakers := pendingStakers.AddStaker(stx)
+	onCommitState := NewVersionedState(parentState, currentStakers, newlyPendingStakers)
+
+	// Consume the UTXOS
+	vm.consumeInputs(onCommitState, tx.Ins)
+	// Produce the UTXOS
 	txID := tx.ID()
+	vm.produceOutputs(onCommitState, txID, tx.Outs)
 
-	// Set up the DB if this tx is committed
-	onCommitDB := versiondb.New(db)
+	// Set up the state if this tx is aborted
+	onAbortState := NewVersionedState(parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
-	if err := vm.consumeInputs(onCommitDB, tx.Ins); err != nil {
-		return nil, nil, nil, nil, tempError{err}
-	}
+	vm.consumeInputs(onAbortState, tx.Ins)
 	// Produce the UTXOS
-	if err := vm.produceOutputs(onCommitDB, txID, tx.Outs); err != nil {
-		return nil, nil, nil, nil, tempError{err}
-	}
-	// Add the validator to the set of pending validators
-	if err := vm.enqueueStaker(onCommitDB, tx.Validator.Subnet, stx); err != nil {
-		return nil, nil, nil, nil, tempError{err}
-	}
+	vm.produceOutputs(onAbortState, txID, tx.Outs)
 
-	onAbortDB := versiondb.New(db)
-	// Consume the UTXOS
-	if err := vm.consumeInputs(onAbortDB, tx.Ins); err != nil {
-		return nil, nil, nil, nil, tempError{err}
-	}
-	// Produce the UTXOS
-	if err := vm.produceOutputs(onAbortDB, txID, tx.Outs); err != nil {
-		return nil, nil, nil, nil, tempError{err}
-	}
-
-	return onCommitDB, onAbortDB, nil, nil, nil
+	return onCommitState, onAbortState, nil, nil, nil
 }
 
 // InitiallyPrefersCommit returns true if the proposed validators start time is

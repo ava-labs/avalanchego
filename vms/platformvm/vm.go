@@ -99,6 +99,9 @@ type VM struct {
 	metrics
 	*core.SnowmanVM
 
+	// TODO: need to populate
+	internalState allState
+
 	dbManager manager.Manager
 
 	// Node's validator manager
@@ -734,7 +737,7 @@ func (vm *VM) Disconnected(vdrID ids.ShortID) {
 
 // Returns the time when the next staker of any subnet starts/stops staking
 // after the current timestamp
-func (vm *VM) nextStakerChangeTime(db database.Database) (time.Time, error) {
+func (vm *VM) nextStakerChangeTime(vs versionedState) (time.Time, error) {
 	subnets, err := vm.getSubnets(db)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("couldn't get subnets: %w", err)
@@ -776,39 +779,33 @@ func (vm *VM) nextStakerChangeTime(db database.Database) (time.Time, error) {
 }
 
 // update validator set of [subnetID] based on the current chain timestamp
-func (vm *VM) updateValidators(db database.Database) error {
-	timestamp, err := vm.getTimestamp(db)
-	if err != nil {
-		return fmt.Errorf("can't get timestamp: %w", err)
-	}
-
-	subnets, err := vm.getSubnets(db)
+func (vm *VM) updateValidators(vs versionedState) error {
+	timestamp := vs.GetTimestamp()
+	subnets, err := vs.GetSubnets()
 	if err != nil {
 		return err
 	}
 
-	if err := vm.updateSubnetValidators(db, constants.PrimaryNetworkID, timestamp); err != nil {
+	if err := vm.updateSubnetValidators(vs, constants.PrimaryNetworkID, timestamp); err != nil {
 		return err
 	}
 	for _, subnet := range subnets {
-		if err := vm.updateSubnetValidators(db, subnet.ID(), timestamp); err != nil {
+		if err := vm.updateSubnetValidators(vs, subnet.ID(), timestamp); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (vm *VM) calculateReward(db database.Database, duration time.Duration, stakeAmount uint64) (uint64, error) {
-	currentSupply, err := vm.getCurrentSupply(db)
-	if err != nil {
-		return 0, err
-	}
+func (vm *VM) calculateReward(vs versionedState, duration time.Duration, stakeAmount uint64) (uint64, error) {
+	currentSupply := vs.GetCurrentSupply()
 	reward := Reward(duration, stakeAmount, currentSupply, vm.stakeMintingPeriod)
 	newSupply, err := safemath.Add64(currentSupply, reward)
 	if err != nil {
 		return 0, err
 	}
-	return reward, vm.putCurrentSupply(db, newSupply)
+	vs.SetCurrentSupply(newSupply)
+	return reward, nil
 }
 
 func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, timestamp time.Time) error {

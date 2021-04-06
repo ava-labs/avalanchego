@@ -10,11 +10,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -119,11 +118,11 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	vm *VM,
-	db database.Database,
+	parentState versionedState,
 	stx *Tx,
 ) (
-	*versiondb.Database,
-	*versiondb.Database,
+	versionedState,
+	versionedState,
 	func() error,
 	func() error,
 	TxError,
@@ -143,71 +142,103 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.Stake)
 
+	currentStakers := parentState.CurrentStakerChainState()
+	pendingStakers := parentState.PendingStakerChainState()
+
 	if vm.bootstrapped {
+		currentTimestamp := parentState.GetTimestamp()
 		// Ensure the proposed validator starts after the current timestamp
-		if currentTimestamp, err := vm.getTimestamp(db); err != nil {
-			return nil, nil, nil, nil, tempError{
-				fmt.Errorf("failed to get timestamp: %w", err),
+		if validatorStartTime := tx.StartTime(); !currentTimestamp.Before(validatorStartTime) {
+			return nil, nil, nil, nil, permError{
+				fmt.Errorf(
+					"chain timestamp (%s) not before validator's start time (%s)",
+					currentTimestamp,
+					validatorStartTime,
+				),
 			}
-		} else if validatorStartTime := tx.StartTime(); !currentTimestamp.Before(validatorStartTime) {
-			return nil, nil, nil, nil, permError{fmt.Errorf("chain timestamp (%s) not before validator's start time (%s)",
-				currentTimestamp,
-				validatorStartTime)}
 		} else if validatorStartTime.After(currentTimestamp.Add(maxFutureStartTime)) {
-			return nil, nil, nil, nil, permError{fmt.Errorf("validator start time (%s) more than two weeks after current chain timestamp (%s)", validatorStartTime, currentTimestamp)}
+			return nil, nil, nil, nil, permError{
+				fmt.Errorf(
+					"validator start time (%s) more than two weeks after current chain timestamp (%s)",
+					validatorStartTime,
+					currentTimestamp,
+				),
+			}
 		}
 
-		// Ensure that the period this delegator delegates is a subset of the time
-		// the validator validates.
-		vdr, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
-		vdrWeight := uint64(0)
-		if err != nil {
+		currentValidator, err := currentStakers.GetValidator(tx.Validator.NodeID)
+		if err != nil && err != database.ErrNotFound {
 			return nil, nil, nil, nil, tempError{
-				fmt.Errorf("failed to find whether %s is a validator: %w", tx.Validator.NodeID, err),
+				fmt.Errorf(
+					"failed to find whether %s is a validator: %w",
+					tx.Validator.NodeID,
+					err,
+				),
 			}
 		}
-		if isValidator && !tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
-			return nil, nil, nil, nil, permError{errDelegatorSubset}
-		}
-		if !isValidator {
-			// Ensure that the period this delegator delegates is a subset of the
-			// time the validator will validates.
-			vdr, willBeValidator, err := vm.willBeValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
-			if err != nil {
-				return nil, nil, nil, nil, tempError{
-					fmt.Errorf("failed to find whether %s will be a validator: %w", tx.Validator.NodeID, err),
-				}
-			}
-			if !willBeValidator || !tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
+
+		pendingValidator := pendingStakers.GetValidator(tx.Validator.NodeID)
+		pendingDelegators := pendingValidator.Delegators()
+
+		// Ensure that the period this delegator delegates is a subset of the
+		// time the validator validates.
+		if err == nil {
+			vdrTx := currentValidator.AddValidatorTx()
+			if !vdrTx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
 				return nil, nil, nil, nil, permError{errDelegatorSubset}
 			}
-			vdrWeight = vdr.Weight()
+			vdrWeight := vdrTx.Weight()
+			delegatorWeight := currentValidator.DelegatorWeight()
+			currentWeight, err := math.Add64(vdrWeight, delegatorWeight)
+			if err != nil {
+				return nil, nil, nil, nil, permError{err}
+			}
+			maximumWeight, err := safemath.Mul64(5, vdrWeight)
+			if err != nil {
+				return nil, nil, nil, nil, permError{errStakeOverflow}
+			}
+			currentDelegators := currentValidator.Delegators()
+			canDelegate, err := CanDelegate(currentDelegators, pendingDelegators, tx, currentWeight, maximumWeight)
+			if err != nil {
+				return nil, nil, nil, nil, permError{err}
+			}
+			if !canDelegate {
+				return nil, nil, nil, nil, permError{errOverDelegated}
+			}
 		} else {
-			vdrWeight = vdr.Weight()
-		}
+			vdrTx, err := pendingStakers.GetStakerByNodeID(tx.Validator.NodeID)
+			if err != nil {
+				if err == database.ErrNotFound {
+					return nil, nil, nil, nil, permError{errDelegatorSubset}
+				}
+				return nil, nil, nil, nil, tempError{
+					fmt.Errorf(
+						"failed to find whether %s is a validator: %w",
+						tx.Validator.NodeID,
+						err,
+					),
+				}
+			}
 
-		maxWeight, err := vm.maxStakeAmount(db, constants.PrimaryNetworkID, tx.Validator.NodeID, tx.StartTime(), tx.EndTime())
-		if err != nil {
-			return nil, nil, nil, nil, tempError{err}
-		}
-		newWeight, err := safemath.Add64(maxWeight, tx.Validator.Wght)
-		if err != nil {
-			return nil, nil, nil, nil, permError{errStakeOverflow}
-		}
-		if newWeight > vm.maxValidatorStake {
-			return nil, nil, nil, nil, permError{errCapWeightBroken}
-		}
-
-		delegationRestrict, err := safemath.Mul64(5, vdrWeight)
-		if err != nil {
-			return nil, nil, nil, nil, permError{errStakeOverflow}
-		}
-		if newWeight > delegationRestrict {
-			return nil, nil, nil, nil, permError{errOverDelegated}
+			if !vdrTx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
+				return nil, nil, nil, nil, permError{errDelegatorSubset}
+			}
+			vdrWeight := vdrTx.Weight()
+			maximumWeight, err := safemath.Mul64(5, vdrWeight)
+			if err != nil {
+				return nil, nil, nil, nil, permError{errStakeOverflow}
+			}
+			canDelegate, err := CanDelegate(nil, pendingDelegators, tx, vdrWeight, maximumWeight)
+			if err != nil {
+				return nil, nil, nil, nil, permError{err}
+			}
+			if !canDelegate {
+				return nil, nil, nil, nil, permError{errOverDelegated}
+			}
 		}
 
 		// Verify the flowcheck
-		if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, 0, vm.Ctx.AVAXAssetID); err != nil {
+		if err := vm.semanticVerifySpend(parentState, tx, tx.Ins, outs, stx.Creds, 0, vm.Ctx.AVAXAssetID); err != nil {
 			switch err.(type) {
 			case permError:
 				return nil, nil, nil, nil, permError{
@@ -221,46 +252,24 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 		}
 	}
 
+	// Set up the state if this tx is committed
+	newlyPendingStakers := pendingStakers.AddStaker(stx)
+	onCommitState := NewVersionedState(parentState, currentStakers, newlyPendingStakers)
+
+	// Consume the UTXOS
+	vm.consumeInputs(onCommitState, tx.Ins)
+	// Produce the UTXOS
 	txID := tx.ID()
+	vm.produceOutputs(onCommitState, txID, tx.Outs)
 
-	// Set up the DB if this tx is committed
-	onCommitDB := versiondb.New(db)
+	// Set up the state if this tx is aborted
+	onAbortState := NewVersionedState(parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
-	if err := vm.consumeInputs(onCommitDB, tx.Ins); err != nil {
-		return nil, nil, nil, nil, tempError{
-			fmt.Errorf("failed to consume inputs: %w", err),
-		}
-	}
+	vm.consumeInputs(onAbortState, tx.Ins)
 	// Produce the UTXOS
-	if err := vm.produceOutputs(onCommitDB, txID, tx.Outs); err != nil {
-		return nil, nil, nil, nil, tempError{
-			fmt.Errorf("failed to produce outputs: %w", err),
-		}
-	}
+	vm.produceOutputs(onAbortState, txID, outs)
 
-	// If this proposal is committed, update the pending validator set to include the delegator
-	if err := vm.enqueueStaker(onCommitDB, constants.PrimaryNetworkID, stx); err != nil {
-		return nil, nil, nil, nil, tempError{
-			fmt.Errorf("failed to enqueue staker: %w", err),
-		}
-	}
-
-	// Set up the DB if this tx is aborted
-	onAbortDB := versiondb.New(db)
-	// Consume the UTXOS
-	if err := vm.consumeInputs(onAbortDB, tx.Ins); err != nil {
-		return nil, nil, nil, nil, tempError{
-			fmt.Errorf("failed to consume inputs: %w", err),
-		}
-	}
-	// Produce the UTXOS
-	if err := vm.produceOutputs(onAbortDB, txID, outs); err != nil {
-		return nil, nil, nil, nil, tempError{
-			fmt.Errorf("failed to produce outputs: %w", err),
-		}
-	}
-
-	return onCommitDB, onAbortDB, nil, nil, nil
+	return onCommitState, onAbortState, nil, nil, nil
 }
 
 // InitiallyPrefersCommit returns true if the proposed validators start time is
@@ -315,4 +324,117 @@ func (vm *VM) newAddDelegatorTx(
 		vm.minStakeDuration,
 		vm.maxStakeDuration,
 	)
+}
+
+func CanDelegate(
+	current, // sorted by next end time first
+	pending []*UnsignedAddDelegatorTx, // sorted by next start time first
+	new *UnsignedAddDelegatorTx,
+	currentStake,
+	maximumStake uint64,
+) (bool, error) {
+	// For completeness
+	if currentStake > maximumStake {
+		return false, nil
+	}
+
+	toRemoveHeap := validatorHeap{}
+	for _, currentDelegator := range current {
+		toRemoveHeap.Add(&currentDelegator.Validator)
+	}
+
+	var err error
+
+	i := 0
+	for ; i < len(pending); i++ { // Iterates in order of increasing start time
+		nextPending := pending[i]
+
+		// If the new delegator is starting before or at the same time as this
+		// delegator, then we should add the new delegators stake now.
+		if !new.StartTime().After(nextPending.StartTime()) {
+			break
+		}
+
+		for len(toRemoveHeap) > 0 && !toRemoveHeap.Peek().EndTime().After(nextPending.StartTime()) {
+			// TODO: in a future network upgrade, this should be changed to:
+			// toRemove := toRemoveHeap.Remove()
+			// So that we don't mangle the underlying heap.
+			toRemove := toRemoveHeap[0]
+			toRemoveHeap = toRemoveHeap[1:]
+
+			currentStake, err = safemath.Sub64(currentStake, toRemove.Wght)
+			if err != nil {
+				return false, err
+			}
+		}
+
+		// The new delegator hasn't started yet, so we should add the pending
+		// delegator to the current set.
+		currentStake, err = math.Add64(currentStake, nextPending.Validator.Wght)
+		if err != nil {
+			return false, err
+		}
+
+		toRemoveHeap.Add(&nextPending.Validator)
+	}
+
+	for len(toRemoveHeap) > 0 && !toRemoveHeap.Peek().EndTime().After(new.StartTime()) {
+		// TODO: in a future network upgrade, this should be changed to:
+		// toRemove := toRemoveHeap.Remove()
+		// So that we don't mangle the underlying heap.
+		toRemove := toRemoveHeap[0]
+		toRemoveHeap = toRemoveHeap[1:]
+
+		currentStake, err = safemath.Sub64(currentStake, toRemove.Wght)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	currentStake, err = math.Add64(currentStake, new.Validator.Wght)
+	if err != nil {
+		return false, err
+	}
+
+	if currentStake > maximumStake {
+		return false, nil
+	}
+
+	for ; i < len(pending); i++ { // Iterates in order of increasing start time
+		nextPending := pending[i]
+
+		// If the new delegator is starting after this delegator, then we don't
+		// need to check that the maximum is honored past this point.
+		if nextPending.StartTime().After(new.Validator.EndTime()) {
+			break
+		}
+
+		for len(toRemoveHeap) > 0 && !toRemoveHeap.Peek().EndTime().After(nextPending.StartTime()) {
+			// TODO: in a future network upgrade, this should be changed to:
+			// toRemove := toRemoveHeap.Remove()
+			// So that we don't mangle the underlying heap.
+			toRemove := toRemoveHeap[0]
+			toRemoveHeap = toRemoveHeap[1:]
+
+			currentStake, err = safemath.Sub64(currentStake, toRemove.Wght)
+			if err != nil {
+				return false, err
+			}
+		}
+
+		// The new delegator hasn't stopped yet, so we should add the pending
+		// delegator to the current set.
+		currentStake, err = math.Add64(currentStake, nextPending.Validator.Wght)
+		if err != nil {
+			return false, err
+		}
+
+		if currentStake > maximumStake {
+			return false, nil
+		}
+
+		toRemoveHeap.Add(&nextPending.Validator)
+	}
+
+	return true, nil
 }

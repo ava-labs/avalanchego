@@ -37,7 +37,7 @@ func (a *Abort) Verify() error {
 		return errInvalidBlockType
 	}
 
-	a.onAcceptDB, a.onAcceptFunc = parent.onAbort()
+	a.onAcceptState, a.onAcceptFunc = parent.onAbort()
 
 	a.vm.currentBlocks[a.ID()] = a
 	a.parentBlock().addChild(a)

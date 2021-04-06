@@ -9,7 +9,6 @@ import (
 	"unicode"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -95,7 +94,7 @@ func (tx *UnsignedCreateChainTx) Verify(
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedCreateChainTx) SemanticVerify(
 	vm *VM,
-	db database.Database,
+	vs versionedState,
 	stx *Tx,
 ) (
 	func() error,
@@ -115,7 +114,7 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	subnetCred := stx.Creds[baseTxCredsLen]
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, baseTxCreds, vm.creationTxFee, vm.Ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, tx.Outs, baseTxCreds, vm.creationTxFee, vm.Ctx.AVAXAssetID); err != nil {
 		return nil, err
 	}
 

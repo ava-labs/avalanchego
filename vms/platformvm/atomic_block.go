@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/components/core"
@@ -86,20 +85,14 @@ func (ab *AtomicBlock) Verify() error {
 		return errInvalidBlockType
 	}
 
-	pdb := parent.onAccept()
-
-	ab.onAcceptDB = versiondb.New(pdb)
-	if err := tx.SemanticVerify(ab.vm, ab.onAcceptDB, &ab.Tx); err != nil {
+	parentState := parent.onAccept()
+	onAccept, err := tx.SemanticVerify(ab.vm, parentState, &ab.Tx)
+	if err != nil {
 		ab.vm.droppedTxCache.Put(ab.Tx.ID(), err.Error()) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", tx.ID(), err)
 	}
-	txBytes := ab.Tx.Bytes()
-	if err := ab.vm.putTx(ab.onAcceptDB, ab.Tx.ID(), txBytes); err != nil {
-		return fmt.Errorf("failed to put tx %s: %w", tx.ID(), err)
-	} else if err := ab.vm.putStatus(ab.onAcceptDB, ab.Tx.ID(), Committed); err != nil {
-		return fmt.Errorf("failed to put status of tx %s: %w", tx.ID(), err)
-	}
 
+	ab.onAcceptState = onAccept
 	ab.vm.currentBlocks[ab.ID()] = ab
 	ab.parentBlock().addChild(ab)
 	return nil
@@ -107,20 +100,29 @@ func (ab *AtomicBlock) Verify() error {
 
 // Accept implements the snowman.Block interface
 func (ab *AtomicBlock) Accept() error {
-	ab.vm.Ctx.Log.Verbo("Accepting Atomic Block %s at height %d with parent %s", ab.ID(), ab.Height(), ab.ParentID())
+	blkID := ab.ID()
+	ab.vm.Ctx.Log.Verbo(
+		"Accepting Atomic Block %s at height %d with parent %s",
+		blkID,
+		ab.Height(),
+		ab.ParentID(),
+	)
+
+	if err := ab.CommonBlock.Accept(); err != nil {
+		return fmt.Errorf("failed to accept CommonBlock of %s: %w", blkID, err)
+	}
 
 	tx, ok := ab.Tx.UnsignedTx.(UnsignedAtomicTx)
 	if !ok {
 		return errWrongTxType
 	}
 
-	if err := ab.CommonBlock.Accept(); err != nil {
-		return fmt.Errorf("failed to accept CommonBlock of %s: %w", ab.ID(), err)
-	}
-
 	// Update the state of the chain in the database
-	if err := ab.onAcceptDB.Commit(); err != nil {
-		return fmt.Errorf("failed to commit onAcceptDB for block %s: %w", ab.ID(), err)
+	if err := ab.onAcceptState.Apply(ab.vm.internalState); err != nil {
+		return fmt.Errorf("failed to commit onAcceptState: %w", err)
+	}
+	if err := ab.vm.internalState.Commit(); err != nil {
+		return fmt.Errorf("failed to commit vm's DB: %w", err)
 	}
 
 	batch, err := ab.vm.DB.CommitBatch()
@@ -134,11 +136,11 @@ func (ab *AtomicBlock) Accept() error {
 	}
 
 	for _, child := range ab.children {
-		child.setBaseDatabase(ab.vm.DB)
+		child.setBaseState()
 	}
 	if ab.onAcceptFunc != nil {
 		if err := ab.onAcceptFunc(); err != nil {
-			return fmt.Errorf("failed to execute onAcceptFunc of %s: %w", ab.ID(), err)
+			return fmt.Errorf("failed to execute onAcceptFunc of %s: %w", blkID, err)
 		}
 	}
 

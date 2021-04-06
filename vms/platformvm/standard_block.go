@@ -6,7 +6,6 @@ package platformvm
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/core"
 )
@@ -56,9 +55,13 @@ func (sb *StandardBlock) Verify() error {
 		return errInvalidBlockType
 	}
 
-	pdb := parent.onAccept()
+	parentState := parent.onAccept()
+	sb.onAcceptState = NewVersionedState(
+		parentState,
+		parentState.CurrentStakerChainState(),
+		parentState.PendingStakerChainState(),
+	)
 
-	sb.onAcceptDB = versiondb.New(pdb)
 	funcs := make([]func() error, 0, len(sb.Txs))
 	for _, tx := range sb.Txs {
 		utx, ok := tx.UnsignedTx.(UnsignedDecisionTx)
@@ -66,7 +69,7 @@ func (sb *StandardBlock) Verify() error {
 			return errWrongTxType
 		}
 		txID := tx.ID()
-		onAccept, err := utx.SemanticVerify(sb.vm, sb.onAcceptDB, tx)
+		onAccept, err := utx.SemanticVerify(sb.vm, sb.onAcceptState, tx)
 		if err != nil {
 			sb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
 			if err := sb.Reject(); err != nil {

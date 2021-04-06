@@ -85,11 +85,11 @@ func (tx *UnsignedExportTx) Verify(
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedExportTx) SemanticVerify(
 	vm *VM,
-	db database.Database,
+	parentState versionedState,
 	stx *Tx,
-) TxError {
+) (versionedState, TxError) {
 	if err := tx.Verify(vm.Ctx.XChainID, vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
-		return permError{err}
+		return nil, permError{err}
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
@@ -97,34 +97,31 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(parentState, tx, tx.Ins, outs, stx.Creds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
 		switch err.(type) {
 		case permError:
-			return permError{
+			return nil, permError{
 				fmt.Errorf("failed semanticVerifySpend: %w", err),
 			}
 		default:
-			return tempError{
+			return nil, tempError{
 				fmt.Errorf("failed semanticVerifySpend: %w", err),
 			}
 		}
 	}
 
-	txID := tx.ID()
-
+	// Set up the state if this tx is committed
+	newState := NewVersionedState(
+		parentState,
+		parentState.CurrentStakerChainState(),
+		parentState.PendingStakerChainState(),
+	)
 	// Consume the UTXOS
-	if err := vm.consumeInputs(db, tx.Ins); err != nil {
-		return tempError{
-			fmt.Errorf("failed to consume inputs: %w", err),
-		}
-	}
+	vm.consumeInputs(newState, tx.Ins)
 	// Produce the UTXOS
-	if err := vm.produceOutputs(db, txID, tx.Outs); err != nil {
-		return tempError{
-			fmt.Errorf("failed to produce outputs: %w", err),
-		}
-	}
-	return nil
+	txID := tx.ID()
+	vm.produceOutputs(newState, txID, tx.Outs)
+	return newState, nil
 }
 
 // Accept this transaction.

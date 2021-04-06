@@ -11,10 +11,25 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
-type versionedState interface {
-	CurrentStakerChainState() immutableCurrentStakerChainState
-	PendingStakerChainState() immutablePendingStakerChainState
+type utxoGetter interface {
+	GetUTXO(utxoID avax.UTXOID) (*avax.UTXO, error)
+}
 
+type utxoAdder interface {
+	AddUTXO(utxo *avax.UTXO)
+}
+
+type utxoDeleter interface {
+	DeleteUTXO(utxoID avax.UTXOID)
+}
+
+type utxoState interface {
+	utxoGetter
+	utxoAdder
+	utxoDeleter
+}
+
+type mutableState interface {
 	GetTimestamp() time.Time
 	SetTimestamp(time.Time)
 
@@ -30,16 +45,23 @@ type versionedState interface {
 	GetTx(txID ids.ID) (*Tx, Status, error)
 	AddTx(tx *Tx, status Status)
 
-	GetUTXO(utxoID avax.UTXOID) (*avax.UTXO, error)
-	AddUTXO(utxo *avax.UTXO)
-	DeleteUTXO(utxoID avax.UTXOID)
+	utxoState
+}
+
+type versionedState interface {
+	mutableState
+
+	CurrentStakerChainState() currentStakerChainState
+	PendingStakerChainState() pendingStakerChainState
+
+	SetBase(versionedState)
+	Apply(internalState) error
 }
 
 type internalState interface {
-	versionedState
+	mutableState
 
 	CurrentStakers() currentStakerState
-	PendingStakers() pendingStakerChainState
 
 	GetLastAccepted() ids.ID
 	SetLastAccepted(ids.ID)
@@ -49,6 +71,19 @@ type internalState interface {
 
 	Commit() error
 	Close() error
+}
+
+type allState interface {
+	versionedState
+	internalState
+}
+
+func NewVersionedState(
+	vs versionedState,
+	current currentStakerChainState,
+	pending pendingStakerChainState,
+) versionedState {
+	return nil
 }
 
 // var (

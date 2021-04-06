@@ -6,8 +6,6 @@ package platformvm
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -26,10 +24,10 @@ type ProposalBlock struct {
 
 	Tx Tx `serialize:"true" json:"tx"`
 
-	// The database that the chain will have if this block's proposal is committed
-	onCommitDB *versiondb.Database
-	// The database that the chain will have if this block's proposal is aborted
-	onAbortDB *versiondb.Database
+	// The state that the chain will have if this block's proposal is committed
+	onCommitState versionedState
+	// The state that the chain will have if this block's proposal is aborted
+	onAbortState versionedState
 	// The function to execute if this block's proposal is committed
 	onCommitFunc func() error
 	// The function to execute if this block's proposal is aborted
@@ -74,33 +72,30 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte) error {
 	return nil
 }
 
-// setBaseDatabase sets this block's base database to [db]
-func (pb *ProposalBlock) setBaseDatabase(db database.Database) {
-	if err := pb.onCommitDB.SetDatabase(db); err != nil {
-		pb.vm.Ctx.Log.Error("problem while setting base database: %s", err)
-	}
-	if err := pb.onAbortDB.SetDatabase(db); err != nil {
-		pb.vm.Ctx.Log.Error("problem while setting base database: %s", err)
-	}
+// setBaseDatabase sets this block's base state
+func (pb *ProposalBlock) setBaseState() {
+	pb.onCommitState.SetBase(pb.vm.internalState)
+	pb.onAbortState.SetBase(pb.vm.internalState)
 }
 
 // onCommit should only be called after Verify is called.
 // onCommit returns:
-//   1. A database that contains the state of the chain assuming this proposal
-//      is enacted. (That is, if this block is accepted and followed by an
-//      accepted Commit block.)
-//   2. A function be be executed when this block's proposal is committed.
-//      This function should not write to state.
-func (pb *ProposalBlock) onCommit() (*versiondb.Database, func() error) {
-	return pb.onCommitDB, pb.onCommitFunc
+//   1. The state of the chain assuming this proposal is enacted. (That is, if
+//      this block is accepted and followed by an accepted Commit block.)
+//   2. A function be be executed when this block's proposal is committed. This
+//      function should not write to state.
+func (pb *ProposalBlock) onCommit() (versionedState, func() error) {
+	return pb.onCommitState, pb.onCommitFunc
 }
 
 // onAbort should only be called after Verify is called.
-// onAbort returns a database that contains the state of the chain assuming this
-// block's proposal is rejected. (That is, if this block is accepted and
-// followed by an accepted Abort block.)
-func (pb *ProposalBlock) onAbort() (*versiondb.Database, func() error) {
-	return pb.onAbortDB, pb.onAbortFunc
+// onAbort returns:
+//   1. The state of the chain assuming this proposal is not enacted. (That is,
+//      if this block is accepted and followed by an accepted Abort block.)
+//   2. A function be be executed when this block's proposal is aborted. This
+//      function should not write to state.
+func (pb *ProposalBlock) onAbort() (versionedState, func() error) {
+	return pb.onAbortState, pb.onAbortFunc
 }
 
 // Verify this block is valid.
@@ -132,14 +127,13 @@ func (pb *ProposalBlock) Verify() error {
 		return errInvalidBlockType
 	}
 
-	// pdb is the database if this block's parent is accepted
-	pdb := parent.onAccept()
-
-	txID := tx.ID()
+	// parentState is the state if this block's parent is accepted
+	parentState := parent.onAccept()
 
 	var err TxError
-	pb.onCommitDB, pb.onAbortDB, pb.onCommitFunc, pb.onAbortFunc, err = tx.SemanticVerify(pb.vm, pdb, &pb.Tx)
+	pb.onCommitState, pb.onAbortState, pb.onCommitFunc, pb.onAbortFunc, err = tx.SemanticVerify(pb.vm, parentState, &pb.Tx)
 	if err != nil {
+		txID := tx.ID()
 		pb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
 		// If this block's transaction proposes to advance the timestamp, the transaction may fail
 		// verification now but be valid in the future, so don't (permanently) mark the block as rejected.
@@ -149,21 +143,6 @@ func (pb *ProposalBlock) Verify() error {
 			}
 		}
 		return err
-	}
-
-	txBytes := tx.Bytes()
-	if err := pb.vm.putTx(pb.onCommitDB, txID, txBytes); err != nil {
-		return fmt.Errorf("failed to put tx %s in database: %w", txID, err)
-	}
-	if err := pb.vm.putStatus(pb.onCommitDB, txID, Committed); err != nil {
-		return fmt.Errorf("failed to put status of tx %s: %w", txID, err)
-	}
-
-	if err := pb.vm.putTx(pb.onAbortDB, txID, txBytes); err != nil {
-		return fmt.Errorf("failed to put tx %s in database: %w", txID, err)
-	}
-	if err := pb.vm.putStatus(pb.onAbortDB, txID, Aborted); err != nil {
-		return fmt.Errorf("failed to put status of tx %s: %w", txID, err)
 	}
 
 	pb.vm.currentBlocks[pb.ID()] = pb

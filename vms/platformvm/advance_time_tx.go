@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
@@ -37,11 +35,11 @@ func (tx *UnsignedAdvanceTimeTx) Timestamp() time.Time {
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	vm *VM,
-	db database.Database,
+	parentState versionedState,
 	stx *Tx,
 ) (
-	*versiondb.Database,
-	*versiondb.Database,
+	versionedState,
+	versionedState,
 	func() error,
 	func() error,
 	TxError,
@@ -50,34 +48,52 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	case tx == nil:
 		return nil, nil, nil, nil, tempError{errNilTx}
 	case vm.clock.Time().Add(syncBound).Before(tx.Timestamp()):
-		return nil, nil, nil, nil, tempError{fmt.Errorf("proposed time, %s, is too far in the future relative to local time (%s)",
-			tx.Timestamp(), vm.clock.Time())}
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf(
+				"proposed time, %s, is too far in the future relative to local time (%s)",
+				tx.Timestamp(),
+				vm.clock.Time(),
+			),
+		}
 	case len(stx.Creds) != 0:
 		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
 	}
 
-	if currentTimestamp, err := vm.getTimestamp(db); err != nil {
-		return nil, nil, nil, nil, tempError{err}
-	} else if tx.Time <= uint64(currentTimestamp.Unix()) {
-		return nil, nil, nil, nil, permError{fmt.Errorf("proposed timestamp (%s), not after current timestamp (%s)",
-			tx.Timestamp(), currentTimestamp)}
+	currentTimestamp := parentState.GetTimestamp()
+	if tx.Time <= uint64(currentTimestamp.Unix()) {
+		return nil, nil, nil, nil, permError{
+			fmt.Errorf(
+				"proposed timestamp (%s), not after current timestamp (%s)",
+				tx.Timestamp(),
+				currentTimestamp,
+			),
+		}
 	}
 
 	// Only allow timestamp to move forward as far as the time of next staker set change time
-	nextStakerChangeTime, err := vm.nextStakerChangeTime(db)
+	nextStakerChangeTime, err := vm.nextStakerChangeTime(parentState)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
-	} else if tx.Time > uint64(nextStakerChangeTime.Unix()) {
-		return nil, nil, nil, nil, permError{fmt.Errorf("proposed timestamp (%s) later than next staker change time (%s)",
-			tx.Timestamp(), nextStakerChangeTime)}
+	}
+
+	newTimestamp := tx.Timestamp()
+	if newTimestamp.After(nextStakerChangeTime) {
+		return nil, nil, nil, nil, permError{
+			fmt.Errorf(
+				"proposed timestamp (%s) later than next staker change time (%s)",
+				newTimestamp,
+				nextStakerChangeTime,
+			),
+		}
 	}
 
 	// Specify what the state of the chain will be if this proposal is committed
-	onCommitDB := versiondb.New(db)
-	if err := vm.putTimestamp(onCommitDB, tx.Timestamp()); err != nil {
-		return nil, nil, nil, nil, tempError{err}
-	}
-	if err := vm.updateValidators(onCommitDB); err != nil {
+	currentStakers := parentState.CurrentStakerChainState()
+	pendingStakers := parentState.PendingStakerChainState()
+	onCommitState := NewVersionedState(parentState, currentStakers, pendingStakers)
+	onCommitState.SetTimestamp(newTimestamp)
+
+	if err := vm.updateValidators(onCommitState); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 
@@ -90,8 +106,7 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	}
 
 	// State doesn't change if this proposal is aborted
-	onAbortDB := versiondb.New(db)
-	return onCommitDB, onAbortDB, onCommitFunc, nil, nil
+	return onCommitState, parentState, onCommitFunc, nil, nil
 }
 
 // InitiallyPrefersCommit returns true if the proposed time is at

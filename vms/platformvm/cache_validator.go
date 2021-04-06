@@ -9,7 +9,20 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-type immutableCurrentStakerChainState interface {
+type validator interface {
+	Delegators() []*UnsignedAddDelegatorTx
+	SubnetValidators() map[ids.ID]*UnsignedAddSubnetValidatorTx
+}
+
+type currentValidator interface {
+	validator
+
+	AddValidatorTx() *UnsignedAddValidatorTx
+	DelegatorWeight() uint64
+	PotentialReward() uint64
+}
+
+type currentStakerChainState interface {
 	// MutableCurrentStakerChainState returns a current staker chain state
 	// object that can be modifed. The current object will not be modified by
 	// updates made by the returned state.
@@ -18,15 +31,12 @@ type immutableCurrentStakerChainState interface {
 	GetNextStaker() (addStakerTx *Tx, potentialReward uint64, err error)
 	GetStaker(txID ids.ID) (addStakerTx *Tx, potentialReward uint64, err error)
 
-	GetValidatorByNodeID(nodeID ids.ShortID) (addValidatorTx *Tx, potentialReward uint64, err error)
-	GetDelegatorsByNodeID(nodeID ids.ShortID) ([]*Tx, error)
-}
+	GetValidator(nodeID ids.ShortID) (currentValidator, error)
 
-type currentStakerChainState interface {
-	immutableCurrentStakerChainState
-
-	AddStaker(addStakerTx *Tx, potentialReward uint64) error
-	DeleteStaker(txID ids.ID) error
+	// AddStaker is a convenience method to avoid using an `[]*validatorReward`.
+	AddStaker(addStakerTx *Tx, potentialReward uint64) (currentStakerChainState, error)
+	AddStakers(addStakerTxsWithRewards []*validatorReward) (currentStakerChainState, error)
+	DeleteStaker(txID ids.ID) (currentStakerChainState, error)
 }
 
 type currentStakerState interface {
@@ -36,24 +46,20 @@ type currentStakerState interface {
 	SetUptime(nodeID ids.ShortID, upDuration time.Duration, lastUpdated time.Time) error
 }
 
-type immutablePendingStakerChainState interface {
-	// MutablePendingStakerChainState returns a pending staker chain state
-	// object that can be modifed. The current object will not be modified by
-	// updates made by the returned state.
-	MutablePendingStakerChainState() pendingStakerChainState
-
+type pendingStakerChainState interface {
 	GetNextStaker() (addStakerTx *Tx, err error)
 	GetStaker(txID ids.ID) (addStakerTx *Tx, err error)
+	GetStakerByNodeID(nodeID ids.ShortID) (addStakerTx *UnsignedAddValidatorTx, err error)
 
-	GetValidatorByNodeID(nodeID ids.ShortID) (addValidatorTx *Tx, err error)
-	GetDelegatorsByNodeID(nodeID ids.ShortID) ([]*Tx, error)
+	GetValidator(nodeID ids.ShortID) validator
+
+	AddStaker(addStakerTx *Tx) pendingStakerChainState
+	DeleteStaker(txID ids.ID) pendingStakerChainState
 }
 
-type pendingStakerChainState interface {
-	immutablePendingStakerChainState
-
-	AddStaker(addStakerTx *Tx) error
-	DeleteStaker(txID ids.ID) error
+type validatorReward struct {
+	addStakerTx     *Tx
+	potentialReward uint64
 }
 
 // type currentStakerStateImpl struct {

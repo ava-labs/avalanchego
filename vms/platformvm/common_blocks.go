@@ -7,8 +7,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -88,23 +86,25 @@ type Block interface {
 	// [bytes] is the byte representation of this block
 	initialize(vm *VM, bytes []byte) error
 
+	// returns true if this block or any processing ancestors consume any of the
+	// named atomic imports.
 	conflicts(ids.Set) bool
 
 	// parentBlock returns the parent block, similarly to Parent. However, it
-	// provides the more specific staking.Block interface.
+	// provides the more specific Block interface.
 	parentBlock() Block
 
-	// addChild notifies this block that it has a child block building on
-	// its database. When this block commits its database, it should set the
-	// child's database to the former's underlying database instance. This ensures that
-	// the database versions do not recurse the length of the chain.
+	// addChild notifies this block that it has a child block building on it.
+	// When this block commits its changes, it should set the child's base state
+	// to the internal state. This ensures that the state versions do not
+	// recurse the length of the chain.
 	addChild(Block)
 
 	// free all the references of this block from the vm's memory
 	free()
 
-	// Set the database underlying the block's versiondb's to [db]
-	setBaseDatabase(db database.Database)
+	// Set the block's underlying state to the chain's internal state
+	setBaseState()
 }
 
 // A decision block (either Commit, Abort, or DecisionBlock.) represents a
@@ -113,9 +113,12 @@ type Block interface {
 // immediately.
 type decision interface {
 	// This function should only be called after Verify is called.
-	// returns a database that contains the state of the chain if this block is
-	// accepted.
-	onAccept() database.Database
+	// onAccept returns:
+	// 1) The current state of the chain, if this block is decided or hasn't
+	//    been verified.
+	// 2) The state of the chain after this block is accepted, if this block was
+	//    verified successfully.
+	onAccept() versionedState
 }
 
 // CommonBlock contains the fields common to all blocks of the Platform Chain
@@ -127,7 +130,6 @@ type CommonBlock struct {
 	children []Block
 }
 
-// Verify implements the snowman.Block interface
 func (cb *CommonBlock) Verify() error {
 	if expectedHeight := cb.Parent().Height() + 1; expectedHeight != cb.Height() {
 		return fmt.Errorf("expected block to have height %d, but found %d", expectedHeight, cb.Height())
@@ -135,7 +137,6 @@ func (cb *CommonBlock) Verify() error {
 	return nil
 }
 
-// Reject implements the snowman.Block interface
 func (cb *CommonBlock) Reject() error {
 	defer cb.free() // remove this block from memory
 
@@ -146,13 +147,11 @@ func (cb *CommonBlock) Reject() error {
 	return cb.vm.DB.Commit()
 }
 
-// free removes this block from memory
 func (cb *CommonBlock) free() {
 	delete(cb.vm.currentBlocks, cb.ID())
 	cb.children = nil
 }
 
-// Reject implements the snowman.Block interface
 func (cb *CommonBlock) conflicts(s ids.Set) bool {
 	if cb.Status() == choices.Accepted {
 		return false
@@ -160,7 +159,6 @@ func (cb *CommonBlock) conflicts(s ids.Set) bool {
 	return cb.parentBlock().conflicts(s)
 }
 
-// Parent returns this block's parent
 func (cb *CommonBlock) Parent() snowman.Block {
 	parent := cb.parentBlock()
 	if parent != nil {
@@ -169,7 +167,6 @@ func (cb *CommonBlock) Parent() snowman.Block {
 	return &missing.Block{BlkID: cb.ParentID()}
 }
 
-// parentBlock returns this block's parent
 func (cb *CommonBlock) parentBlock() Block {
 	// Get the parent from database
 	parentID := cb.ParentID()
@@ -180,7 +177,6 @@ func (cb *CommonBlock) parentBlock() Block {
 	return parent.(Block)
 }
 
-// addChild adds [child] as a child of this block
 func (cb *CommonBlock) addChild(child Block) { cb.children = append(cb.children, child) }
 
 // CommonDecisionBlock contains the fields and methods common to all decision blocks
@@ -188,38 +184,27 @@ type CommonDecisionBlock struct {
 	CommonBlock `serialize:"true"`
 
 	// state of the chain if this block is accepted
-	onAcceptDB *versiondb.Database
+	onAcceptState versionedState
 
 	// to be executed if this block is accepted
 	onAcceptFunc func() error
 }
 
-// initialize this block
 func (cdb *CommonDecisionBlock) initialize(vm *VM, bytes []byte) error {
 	cdb.vm = vm
 	cdb.Block.Initialize(bytes, vm.SnowmanVM)
 	return nil
 }
 
-// setBaseDatabase sets this block's base database to [db]
-func (cdb *CommonDecisionBlock) setBaseDatabase(db database.Database) {
-	if err := cdb.onAcceptDB.SetDatabase(db); err != nil {
-		cdb.vm.Ctx.Log.Error("problem while setting base database: %s", err)
-	}
+func (cdb *CommonDecisionBlock) setBaseState() {
+	cdb.onAcceptState.SetBase(cdb.vm.internalState)
 }
 
-// onAccept returns:
-// 1) The current state of the chain, if this block is decided or hasn't been
-//    verified.
-// 2) The state of the chain after this block is accepted, if this block was
-//    verified successfully.
-func (cdb *CommonDecisionBlock) onAccept() database.Database {
-	// While this function should never be called if the block isn't accepted or
-	// verified, we handle the case as a matter of precaution.
-	if cdb.Status().Decided() || cdb.onAcceptDB == nil {
-		return cdb.vm.DB
+func (cdb *CommonDecisionBlock) onAccept() versionedState {
+	if cdb.Status().Decided() || cdb.onAcceptState == nil {
+		return cdb.vm.internalState
 	}
-	return cdb.onAcceptDB
+	return cdb.onAcceptState
 }
 
 // SingleDecisionBlock contains the accept for standalone decision blocks
@@ -236,15 +221,18 @@ func (sdb *SingleDecisionBlock) Accept() error {
 	}
 
 	// Update the state of the chain in the database
-	if err := sdb.onAcceptDB.Commit(); err != nil {
-		return fmt.Errorf("failed to commit onAcceptDB: %w", err)
+	if err := sdb.onAcceptState.Apply(sdb.vm.internalState); err != nil {
+		return fmt.Errorf("failed to commit onAcceptState: %w", err)
+	}
+	if err := sdb.vm.internalState.Commit(); err != nil {
+		return fmt.Errorf("failed to commit vm's state: %w", err)
 	}
 	if err := sdb.vm.DB.Commit(); err != nil {
 		return fmt.Errorf("failed to commit vm's DB: %w", err)
 	}
 
 	for _, child := range sdb.children {
-		child.setBaseDatabase(sdb.vm.DB)
+		child.setBaseState()
 	}
 	if sdb.onAcceptFunc != nil {
 		if err := sdb.onAcceptFunc(); err != nil {
@@ -280,15 +268,18 @@ func (ddb *DoubleDecisionBlock) Accept() error {
 	}
 
 	// Update the state of the chain in the database
-	if err := ddb.onAcceptDB.Commit(); err != nil {
+	if err := ddb.onAcceptState.Apply(ddb.vm.internalState); err != nil {
 		return fmt.Errorf("failed to commit onAcceptDB: %w", err)
+	}
+	if err := ddb.vm.internalState.Commit(); err != nil {
+		return fmt.Errorf("failed to commit vm's state: %w", err)
 	}
 	if err := ddb.vm.DB.Commit(); err != nil {
 		return fmt.Errorf("failed to commit vm's DB: %w", err)
 	}
 
 	for _, child := range ddb.children {
-		child.setBaseDatabase(ddb.vm.DB)
+		child.setBaseState()
 	}
 	if ddb.onAcceptFunc != nil {
 		if err := ddb.onAcceptFunc(); err != nil {

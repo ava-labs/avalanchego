@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -177,20 +176,17 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 	preferred, err := m.vm.getBlock(preferredID)
 	m.vm.Ctx.Log.AssertNoError(err)
 
-	// The database if the preferred block were to be accepted
-	var db database.Database
-	// The preferred block should always be a decision block
-	if preferred, ok := preferred.(decision); ok {
-		db = preferred.onAccept()
-	} else {
+	preferredDecision, ok := preferred.(decision)
+	if !ok {
+		// The preferred block should always be a decision block
 		return nil, errInvalidBlockType
 	}
 
+	// The state if the preferred block were to be accepted
+	preferredState := preferredDecision.onAccept()
+
 	// The chain time if the preferred block were to be committed
-	currentChainTimestamp, err := m.vm.getTimestamp(db)
-	if err != nil {
-		return nil, err
-	}
+	currentChainTimestamp := preferredState.GetTimestamp()
 	if !currentChainTimestamp.Before(timer.MaxTime) {
 		return nil, errEndOfTime
 	}
@@ -320,29 +316,28 @@ func (m *Mempool) ResetTimer() {
 		return
 	}
 
+	preferredID := m.vm.Preferred()
+
 	// Get the preferred block
-	preferredIntf, err := m.vm.getBlock(m.vm.Preferred())
+	preferredIntf, err := m.vm.getBlock(preferredID)
 	if err != nil {
-		m.vm.Ctx.Log.Error("Error fetching the preferred block (%s), %s", m.vm.Preferred(), err)
+		m.vm.Ctx.Log.Error("Error fetching the preferred block (%s), %s", preferredID, err)
 		return
 	}
 
-	// The database if the preferred block were to be committed
-	var db database.Database
-	// The preferred block should always be a decision block
-	if preferred, ok := preferredIntf.(decision); ok {
-		db = preferred.onAccept()
-	} else {
-		m.vm.Ctx.Log.Error("The preferred block, %s, should always be a decision block", m.vm.Preferred())
+	preferredDecision, ok := preferredIntf.(decision)
+	if !ok {
+		// The preferred block should always be a decision block
+		m.vm.Ctx.Log.Error("The preferred block, %s, should always be a decision block", preferredID)
 		return
 	}
 
-	// The chain time if the preferred block were to be committed
-	timestamp, err := m.vm.getTimestamp(db)
-	if err != nil {
-		m.vm.Ctx.Log.Error("could not retrieve timestamp from database")
-		return
-	}
+	// The state if the preferred block were to be accepted
+	preferredState := preferredDecision.onAccept()
+
+	// The chain time if the preferred block were to be accepted
+	timestamp := preferredState.GetTimestamp()
+
 	if timestamp.Equal(timer.MaxTime) {
 		m.vm.Ctx.Log.Error("Program time is suspiciously far in the future. Either this codebase was way more successful than expected, or a critical error has occurred.")
 		return

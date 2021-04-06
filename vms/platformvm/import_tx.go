@@ -86,71 +86,68 @@ func (tx *UnsignedImportTx) Verify(
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedImportTx) SemanticVerify(
 	vm *VM,
-	db database.Database,
+	parentState versionedState,
 	stx *Tx,
-) TxError {
+) (versionedState, TxError) {
 	if err := tx.Verify(vm.Ctx.XChainID, vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
-		return permError{err}
+		return nil, permError{err}
 	}
 
 	utxos := make([]*avax.UTXO, len(tx.Ins)+len(tx.ImportedInputs))
 	for index, input := range tx.Ins {
-		utxoID := input.UTXOID.InputID()
-		utxo, err := vm.getUTXO(db, utxoID)
+		utxo, err := parentState.GetUTXO(input.UTXOID)
 		if err != nil {
-			return tempError{
-				fmt.Errorf("failed to get UTXO %s: %w", utxoID, err),
+			return nil, tempError{
+				fmt.Errorf("failed to get UTXO %s: %w", &input.UTXOID, err),
 			}
 		}
 		utxos[index] = utxo
 	}
 
-	txID := tx.ID()
-
-	// Consume the UTXOS
-	if err := vm.consumeInputs(db, tx.Ins); err != nil {
-		return tempError{
-			fmt.Errorf("failed to consume inputs: %w", err),
+	if vm.bootstrapped {
+		utxoIDs := make([][]byte, len(tx.ImportedInputs))
+		for i, in := range tx.ImportedInputs {
+			utxoID := in.UTXOID.InputID()
+			utxoIDs[i] = utxoID[:]
 		}
-	}
-	// Produce the UTXOS
-	if err := vm.produceOutputs(db, txID, tx.Outs); err != nil {
-		return tempError{
-			fmt.Errorf("failed to produce outputs: %w", err),
-		}
-	}
-
-	if !vm.bootstrapped {
-		return nil
-	}
-
-	utxoIDs := make([][]byte, len(tx.ImportedInputs))
-	for i, in := range tx.ImportedInputs {
-		utxoID := in.UTXOID.InputID()
-		utxoIDs[i] = utxoID[:]
-	}
-	allUTXOBytes, err := vm.Ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
-	if err != nil {
-		return tempError{
-			fmt.Errorf("failed to get shared memory: %w", err),
-		}
-	}
-
-	for i, utxoBytes := range allUTXOBytes {
-		utxo := &avax.UTXO{}
-		if _, err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
-			return tempError{
-				fmt.Errorf("failed to get unmarshal UTXO: %w", err),
+		allUTXOBytes, err := vm.Ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
+		if err != nil {
+			return nil, tempError{
+				fmt.Errorf("failed to get shared memory: %w", err),
 			}
 		}
-		utxos[i+len(tx.Ins)] = utxo
+
+		for i, utxoBytes := range allUTXOBytes {
+			utxo := &avax.UTXO{}
+			if _, err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
+				return nil, tempError{
+					fmt.Errorf("failed to get unmarshal UTXO: %w", err),
+				}
+			}
+			utxos[i+len(tx.Ins)] = utxo
+		}
+
+		ins := make([]*avax.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
+		copy(ins, tx.Ins)
+		copy(ins[len(tx.Ins):], tx.ImportedInputs)
+
+		if err := vm.semanticVerifySpendUTXOs(tx, utxos, ins, tx.Outs, stx.Creds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
+			return nil, err
+		}
 	}
 
-	ins := make([]*avax.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
-	copy(ins, tx.Ins)
-	copy(ins[len(tx.Ins):], tx.ImportedInputs)
-
-	return vm.semanticVerifySpendUTXOs(tx, utxos, ins, tx.Outs, stx.Creds, vm.txFee, vm.Ctx.AVAXAssetID)
+	// Set up the state if this tx is committed
+	newState := NewVersionedState(
+		parentState,
+		parentState.CurrentStakerChainState(),
+		parentState.PendingStakerChainState(),
+	)
+	// Consume the UTXOS
+	vm.consumeInputs(newState, tx.Ins)
+	// Produce the UTXOS
+	txID := tx.ID()
+	vm.produceOutputs(newState, txID, tx.Outs)
+	return newState, nil
 }
 
 // Accept this transaction and spend imported inputs
