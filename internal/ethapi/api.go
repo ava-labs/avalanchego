@@ -1909,11 +1909,12 @@ func (s *PublicNetAPI) Listening() bool {
 	return true // always listening
 }
 
-// Original code:
-// // PeerCount returns the number of connected peers
-// func (s *PublicNetAPI) PeerCount() hexutil.Uint {
-// 	return hexutil.Uint(s.net.PeerCount())
-// }
+// PeerCount returns the number of connected peers
+func (s *PublicNetAPI) PeerCount() hexutil.Uint {
+	// Original code:
+	// return hexutil.Uint(s.net.PeerCount())
+	return hexutil.Uint(0)
+}
 
 // Version returns the current ethereum protocol version.
 func (s *PublicNetAPI) Version() string {
