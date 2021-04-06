@@ -110,7 +110,7 @@ func (i *issuer) Update() {
 	}
 
 	// Issue a repoll
-	i.t.errs.Add(i.t.repoll())
+	i.t.repoll()
 }
 
 type vtxIssuer struct{ i *issuer }
