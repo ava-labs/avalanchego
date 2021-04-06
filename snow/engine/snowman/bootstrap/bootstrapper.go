@@ -18,12 +18,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
 	// Parameters for delaying bootstrapping to avoid potential CPU burns
-	initialBootstrappingDelay = 2 * time.Second
+	initialBootstrappingDelay = 500 * time.Millisecond
 	maxBootstrappingDelay     = time.Minute
 )
 
@@ -249,9 +248,9 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 			b.NumFetched++                                      // Progress tracker
 			if b.NumFetched%common.StatusUpdateFrequency == 0 { // Periodically print progress
 				if !b.Restarted {
-					b.Ctx.Log.Info("fetched %d of %d blocks", b.NumFetched, safemath.Max64(0, b.tipHeight-b.startingHeight))
+					b.Ctx.Log.Info("fetched %d of %d blocks", b.NumFetched, b.tipHeight-b.startingHeight)
 				} else {
-					b.Ctx.Log.Debug("fetched %d of %d blocks", b.NumFetched, safemath.Max64(0, b.tipHeight-b.startingHeight))
+					b.Ctx.Log.Debug("fetched %d of %d blocks", b.NumFetched, b.tipHeight-b.startingHeight)
 				}
 			}
 		}
@@ -367,9 +366,9 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs) (int, error) {
 		numExecuted++
 		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
 			if !b.Restarted {
-				b.Ctx.Log.Info("executed %d of %d blocks", numExecuted, safemath.Max64(0, b.tipHeight-b.startingHeight))
+				b.Ctx.Log.Info("executed %d of %d blocks", numExecuted, b.tipHeight-b.startingHeight)
 			} else {
-				b.Ctx.Log.Debug("executed %d of %d blocks", numExecuted, safemath.Max64(0, b.tipHeight-b.startingHeight))
+				b.Ctx.Log.Debug("executed %d of %d blocks", numExecuted, b.tipHeight-b.startingHeight)
 			}
 		}
 
