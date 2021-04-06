@@ -52,7 +52,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/tyler-smith/go-bip39"
 )
@@ -1888,20 +1887,21 @@ func (api *PrivateDebugAPI) ChaindbCompact() error {
 	return nil
 }
 
-// SetHead rewinds the head of the blockchain to a previous block.
-func (api *PrivateDebugAPI) SetHead(number hexutil.Uint64) {
-	api.b.SetHead(uint64(number))
-}
+// Original code:
+// // SetHead rewinds the head of the blockchain to a previous block.
+// func (api *PrivateDebugAPI) SetHead(number hexutil.Uint64) {
+// 	api.b.SetHead(uint64(number))
+// }
 
 // PublicNetAPI offers network related RPC methods
 type PublicNetAPI struct {
-	net            *p2p.Server
+	// net            *p2p.Server
 	networkVersion uint64
 }
 
 // NewPublicNetAPI creates a new net API instance.
-func NewPublicNetAPI(net *p2p.Server, networkVersion uint64) *PublicNetAPI {
-	return &PublicNetAPI{net, networkVersion}
+func NewPublicNetAPI(networkVersion uint64) *PublicNetAPI {
+	return &PublicNetAPI{networkVersion}
 }
 
 // Listening returns an indication if the node is listening for network connections.
@@ -1909,10 +1909,11 @@ func (s *PublicNetAPI) Listening() bool {
 	return true // always listening
 }
 
-// PeerCount returns the number of connected peers
-func (s *PublicNetAPI) PeerCount() hexutil.Uint {
-	return hexutil.Uint(s.net.PeerCount())
-}
+// Original code:
+// // PeerCount returns the number of connected peers
+// func (s *PublicNetAPI) PeerCount() hexutil.Uint {
+// 	return hexutil.Uint(s.net.PeerCount())
+// }
 
 // Version returns the current ethereum protocol version.
 func (s *PublicNetAPI) Version() string {

@@ -47,7 +47,7 @@ func newTestChain(name string, config *eth.Config,
 		hasBlock:   make(map[common.Hash]struct{}),
 		blocks:     make([]common.Hash, 0),
 		blkCount:   0,
-		chain:      coreth.NewETHChain(config, nil, nil, eth.DefaultSettings),
+		chain:      coreth.NewETHChain(config, nil, nil, eth.DefaultSettings, true),
 		outBlockCh: outBlockCh,
 	}
 	tc.insertBlock(tc.chain.GetGenesisBlock())

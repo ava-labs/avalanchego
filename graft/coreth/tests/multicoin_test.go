@@ -85,7 +85,7 @@ func TestMulticoin(t *testing.T) {
 	}
 	code := common.Hex2Bytes(contract)
 
-	chain := coreth.NewETHChain(&config, nil, nil, eth.DefaultSettings)
+	chain := coreth.NewETHChain(&config, nil, nil, eth.DefaultSettings, true)
 
 	if err := chain.Accept(chain.GetGenesisBlock()); err != nil {
 		t.Fatal(err)
