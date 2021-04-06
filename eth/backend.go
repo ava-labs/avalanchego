@@ -119,8 +119,17 @@ func New(stack *node.Node, config *Config,
 	mcb *miner.MinerCallbacks,
 	chainDb ethdb.Database,
 	settings Settings,
-	allowGenesis bool,
+	initGenesis bool,
 ) (*Ethereum, error) {
+	if chainDb == nil {
+		// Original code:
+		// // Assemble the Ethereum object
+		// chainDb, err = stack.OpenDatabaseWithFreezer("chaindata", config.DatabaseCache, config.DatabaseHandles, config.DatabaseFreezer, "eth/db/chaindata/")
+		// if err != nil {
+		// 	return nil, err
+		// }
+		return nil, errors.New("chainDb cannot be nil")
+	}
 	// Ensure configuration values are compatible and sane
 	if config.SyncMode == downloader.LightSync {
 		return nil, errors.New("can't run eth.Ethereum in light sync mode, use les.LightEthereum")
@@ -145,20 +154,6 @@ func New(stack *node.Node, config *Config,
 	}
 	log.Info("Allocated trie memory caches", "clean", common.StorageSize(config.TrieCleanCache)*1024*1024, "dirty", common.StorageSize(config.TrieDirtyCache)*1024*1024)
 
-	var err error
-	if chainDb == nil {
-		// Original code:
-		// // Assemble the Ethereum object
-		// chainDb, err = stack.OpenDatabaseWithFreezer("chaindata", config.DatabaseCache, config.DatabaseHandles, config.DatabaseFreezer, "eth/db/chaindata/")
-		// if err != nil {
-		// 	return nil, err
-		// }
-
-		chainDb, err = stack.OpenDatabase("chaindata", config.DatabaseCache, config.DatabaseHandles, "eth/db/chaindata/")
-		if err != nil {
-			return nil, err
-		}
-	}
 	chainConfig, _, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis)
 	if genesisErr != nil {
 		return nil, genesisErr
@@ -214,7 +209,8 @@ func New(stack *node.Node, config *Config,
 			// SnapshotLimit:       config.SnapshotCache,
 		}
 	)
-	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, chainConfig, eth.engine, vmConfig, eth.shouldPreserve, &config.TxLookupLimit, allowGenesis)
+	var err error
+	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, chainConfig, eth.engine, vmConfig, eth.shouldPreserve, &config.TxLookupLimit, initGenesis)
 	if err != nil {
 		return nil, err
 	}
