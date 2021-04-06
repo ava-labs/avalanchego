@@ -327,7 +327,18 @@ func (vm *VM) Initialize(
 		panic(err)
 	}
 	nodecfg := node.Config{NoUSB: true}
-	chain := coreth.NewETHChain(&config, &nodecfg, vm.chaindb, vm.CLIConfig.EthBackendSettings())
+
+	var allowGenesis bool
+	_, err := vm.acceptedBlockDB.Get(lastAcceptedKey)
+	switch {
+	case err == nil:
+	case err == database.ErrNotFound:
+		allowGenesis = true
+	default:
+		return fmt.Errorf("failed to get last accepted block due to %w", err)
+	}
+
+	chain := coreth.NewETHChain(&config, &nodecfg, vm.chaindb, vm.CLIConfig.EthBackendSettings(), allowGenesis)
 	vm.chain = chain
 	vm.networkID = config.NetworkId
 

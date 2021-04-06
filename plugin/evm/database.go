@@ -19,6 +19,7 @@ var (
 type Database struct{ database.Database }
 
 // HasAncient returns an error as we don't have a backing chain freezer.
+// TODO: remove ancients
 func (db Database) HasAncient(kind string, number uint64) (bool, error) {
 	return false, errOpNotSupported
 }
