@@ -235,7 +235,7 @@ type BlockChain struct {
 // Processor.
 func NewBlockChain(
 	db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine,
-	vmConfig vm.Config, shouldPreserve func(block *types.Block) bool, txLookupLimit *uint64, allowGenesis bool,
+	vmConfig vm.Config, shouldPreserve func(block *types.Block) bool, txLookupLimit *uint64, initGenesis bool,
 ) (*BlockChain, error) {
 	if cacheConfig == nil {
 		cacheConfig = defaultCacheConfig
@@ -297,7 +297,7 @@ func NewBlockChain(
 	// 		txIndexBlock = frozen
 	// 	}
 	// }
-	if err := bc.loadLastState(allowGenesis); err != nil {
+	if err := bc.loadLastState(initGenesis); err != nil {
 		return nil, err
 	}
 	// Make sure the state associated with the block is available
@@ -419,6 +419,11 @@ func (bc *BlockChain) empty() bool {
 // loadLastState loads the last known chain state from the database. This method
 // assumes that the chain manager mutex is held.
 func (bc *BlockChain) loadLastState(initGenesis bool) error {
+	// Initialize genesis state
+	if initGenesis {
+		return bc.loadGenesisState()
+	}
+
 	// Restore the last known head block
 	head := rawdb.ReadHeadBlockHash(bc.db)
 	if head == (common.Hash{}) {
@@ -426,9 +431,6 @@ func (bc *BlockChain) loadLastState(initGenesis bool) error {
 		// // Corrupt or empty database, init from scratch
 		// log.Warn("Empty database, resetting chain")
 		// return bc.Reset()
-		if initGenesis {
-			return bc.GenesisInit()
-		}
 		return errors.New("could not read head block hash")
 	}
 	// Make sure the entire head block is available
@@ -721,7 +723,7 @@ func (bc *BlockChain) StateCache() state.Database {
 // 	return nil
 // }
 
-func (bc *BlockChain) GenesisInit() error {
+func (bc *BlockChain) loadGenesisState() error {
 	// Prepare the genesis block and reinitialise the chain
 	genesis := bc.genesisBlock
 	batch := bc.db.NewBatch()
