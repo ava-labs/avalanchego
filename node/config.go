@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -28,13 +27,14 @@ type Config struct {
 
 	NodeID ids.ShortID
 
-	// Will bootstrap using the current database version and then end the node.
-	FetchOnly            bool
+	// If true, bootstrap the current database version and then end the node.
+	FetchOnly bool
+	// P2P port of node running in fetch only mode
 	FetchOnlyStakingPort uint16
-	FetchOnlyHTTPPort    uint16
-	FetchOnlyDBDir       string
-	FetchOnlyLogDir      string
-	FetchOnlyFrom        validators.Set
+	// HTTP port of node running in fetch only mode
+	FetchOnlyHTTPPort uint16
+	// Log directory of node running in fetch only mode
+	FetchOnlyLogDir string
 
 	// Genesis information
 	GenesisBytes []byte
