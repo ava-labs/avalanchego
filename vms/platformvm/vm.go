@@ -325,8 +325,8 @@ func (vm *VM) Initialize(
 
 	vm.currentBlocks = make(map[ids.ID]Block)
 
-	if err := vm.initSubnets(); err != nil {
-		ctx.Log.Error("failed to initialize Subnets: %s", err)
+	if err := vm.updateVdrMgr(true); err != nil {
+		ctx.Log.Error("failed to initialize validator sets: %s", err)
 		return err
 	}
 
@@ -363,8 +363,8 @@ func (vm *VM) Initialize(
 	return nil
 }
 
-// Create all chains that exist that this node validates
-// Can only be called after initSubnets()
+// Create all chains that exist that this node validates. Should only be called
+// after the validator sets are initialized.
 func (vm *VM) initBlockchains() error {
 	blockchains, err := vm.getChains(vm.DB) // get blockchains that exist
 	if err != nil {
@@ -375,14 +375,6 @@ func (vm *VM) initBlockchains() error {
 		vm.createChain(chain)
 	}
 	return nil
-}
-
-// Set the node's validator manager to be up to date
-func (vm *VM) initSubnets() error {
-	if err := vm.updateValidators(vm.DB); err != nil {
-		return err
-	}
-	return vm.updateVdrMgr(true)
 }
 
 // Create the blockchain described in [tx], but only if this node is a member of
