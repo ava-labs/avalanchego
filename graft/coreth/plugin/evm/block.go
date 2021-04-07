@@ -104,6 +104,8 @@ func (b *Block) ID() ids.ID { return b.id }
 // Accept implements the snowman.Block interface
 func (b *Block) Accept() error {
 	vm := b.vm
+	vm.db.StartCommit()
+	defer vm.db.AbortCommit()
 
 	b.status = choices.Accepted
 	log.Trace(fmt.Sprintf("Accepting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
@@ -135,7 +137,13 @@ func (b *Block) Accept() error {
 		return nil
 	}
 
+	// Note: since CommitBatch holds the database lock, this precludes any other
+	// database operations until EndCommit is called. Therefore, calling Accept
+	// on the unsigned atomic tx cannot interact with the vm's database or it will
+	// deadlock. This is ok because it only needs to interact with the shared memory
+	// database.
 	batch, err := vm.db.CommitBatch()
+	defer vm.db.EndCommit()
 	if err != nil {
 		return fmt.Errorf("failed to create commit batch due to: %w", err)
 	}
@@ -153,7 +161,7 @@ func (b *Block) Reject() error {
 		b.vm.mempool.RejectTx(tx.ID())
 	}
 
-	return b.vm.db.Commit()
+	return nil
 }
 
 // SetStatus implements the InternalBlock interface allowing ChainState
@@ -295,7 +303,7 @@ func (b *Block) Verify() error {
 	if _, err = vm.chain.InsertChain([]*types.Block{b.ethBlock}); err != nil {
 		return fmt.Errorf("failed to insert block %s into chain due to %w", b.ethBlock.Hash(), err)
 	}
-	return vm.db.Commit()
+	return nil
 }
 
 // Bytes implements the snowman.Block interface

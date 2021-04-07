@@ -36,7 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/database/versionabledb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -180,7 +180,7 @@ type VM struct {
 	chain       *coreth.ETHChain
 	chainConfig *params.ChainConfig
 	// [db] is the VM's current database managed by ChainState
-	db *versiondb.Database
+	db *versionabledb.Database
 	// [chaindb] is the database supplied to the Ethereum backend
 	chaindb Database
 	// [acceptedBlockDB] is the database to store the last accepted
@@ -265,7 +265,7 @@ func (vm *VM) Initialize(
 	vm.State = chainState.NewState(decidedCacheSize, missingCacheSize, unverifiedCacheSize)
 	vm.shutdownChan = make(chan struct{}, 1)
 	vm.ctx = ctx
-	vm.db = versiondb.New(dbManager.Current().Database)
+	vm.db = versionabledb.New(dbManager.Current().Database)
 	vm.chaindb = Database{prefixdb.New(ethDBPrefix, vm.db)}
 	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
 	vm.acceptedAtomicTxDB = prefixdb.New(atomicTxPrefix, vm.db)

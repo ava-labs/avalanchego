@@ -284,6 +284,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 	if err := unsignedImportTx.Accept(vm.ctx, commitBatch); err != nil {
 		t.Fatalf("Accept failed due to: %s", err)
 	}
+	vm.db.EndCommit()
 
 	if err := unsignedImportTx.EVMStateTransfer(vm, state); err != nil {
 		t.Fatalf("EVM State Transfer failed due to: %s", err)
@@ -370,4 +371,5 @@ func TestNewImportTx(t *testing.T) {
 	if err := importTx.Accept(vm.ctx, commitBatch); err != nil {
 		t.Fatalf("Failed to accept import transaction due to: %s", err)
 	}
+	vm.db.EndCommit()
 }
