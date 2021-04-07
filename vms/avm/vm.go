@@ -299,18 +299,21 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	}, err
 }
 
-// CreateStaticHandlers implements the avalanche.DAGVM interface
-func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
+// CreateStaticHandlers implements the common.StaticVM interface
+func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	// name this service "avm"
 	staticService := CreateStaticService()
-	_ = newServer.RegisterService(staticService, "avm")
+	err := newServer.RegisterService(staticService, "avm")
+	if err != nil {
+		return nil, err
+	}
 	return map[string]*common.HTTPHandler{
 		"": {LockOptions: common.WriteLock, Handler: newServer},
-	}
+	}, nil
 }
 
 // Pending implements the avalanche.DAGVM interface
