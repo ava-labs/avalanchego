@@ -364,16 +364,6 @@ func (vm *VMClient) internalParseBlock(bytes []byte) (snowman.Block, error) {
 	return blk, nil
 }
 
-func (vm *VMClient) internalGetBlockIDAtHeight(height uint64) (ids.ID, error) {
-	resp, err := vm.client.GetBlockIDAtHeight(context.Background(), &vmproto.GetBlockIDAtHeightRequest{
-		Height: height,
-	})
-	if err != nil {
-		return ids.ID{}, err
-	}
-	return ids.ToID(resp.BlockID)
-}
-
 func (vm *VMClient) internalGetBlock(id ids.ID) (snowman.Block, error) {
 	resp, err := vm.client.GetBlock(context.Background(), &vmproto.GetBlockRequest{
 		Id: id[:],
