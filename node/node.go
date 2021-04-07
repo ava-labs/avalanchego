@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/api/admin"
+	"github.com/ava-labs/avalanchego/api/auth"
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/api/keystore"
@@ -499,15 +500,42 @@ func (n *Node) initChains(genesisBytes []byte) {
 func (n *Node) initAPIServer() error {
 	n.Log.Info("initializing API server")
 
-	return n.APIServer.Initialize(
+	if !n.Config.APIRequireAuthToken {
+		n.APIServer.Initialize(
+			n.Log,
+			n.LogFactory,
+			n.Config.HTTPHost,
+			n.Config.HTTPPort,
+			n.Config.APIAllowedOrigins,
+		)
+		return nil
+	}
+
+	a, err := auth.New(n.Log, "auth", n.Config.APIAuthPassword)
+	if err != nil {
+		return err
+	}
+
+	n.APIServer.Initialize(
 		n.Log,
 		n.LogFactory,
 		n.Config.HTTPHost,
 		n.Config.HTTPPort,
-		n.Config.APIRequireAuthToken,
-		n.Config.APIAuthPassword,
 		n.Config.APIAllowedOrigins,
+		a,
 	)
+
+	// only create auth service if token authorization is required
+	n.Log.Info("API authorization is enabled. Auth tokens must be passed in the header of API requests, except requests to the auth service.")
+	authService, err := a.CreateHandler()
+	if err != nil {
+		return err
+	}
+	handler := &common.HTTPHandler{
+		LockOptions: common.NoLock,
+		Handler:     authService,
+	}
+	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "auth", "", n.Log)
 }
 
 // Create the vmManager, chainManager and register the following VMs:
