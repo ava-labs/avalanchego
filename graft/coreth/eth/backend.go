@@ -205,8 +205,9 @@ func New(stack *node.Node, config *Config,
 			AllowUnfinalizedQueries: config.AllowUnfinalizedQueries,
 		}
 		cacheConfig = &core.CacheConfig{
-			TrieCleanLimit:      config.TrieCleanCache,
-			TrieCleanJournal:    stack.ResolvePath(config.TrieCleanCacheJournal),
+			TrieCleanLimit: config.TrieCleanCache,
+			// Original code (requires disk):
+			// TrieCleanJournal:    stack.ResolvePath(config.TrieCleanCacheJournal),
 			TrieCleanRejournal:  config.TrieCleanCacheRejournal,
 			TrieCleanNoPrefetch: config.NoPrefetch,
 			TrieDirtyLimit:      config.TrieDirtyCache,
@@ -229,9 +230,11 @@ func New(stack *node.Node, config *Config,
 	// }
 	eth.bloomIndexer.Start(eth.blockchain)
 
-	if config.TxPool.Journal != "" {
-		config.TxPool.Journal = stack.ResolvePath(config.TxPool.Journal)
-	}
+	// Original code (requires disk):
+	// if config.TxPool.Journal != "" {
+	// 	config.TxPool.Journal = stack.ResolvePath(config.TxPool.Journal)
+	// }
+	config.TxPool.Journal = ""
 	eth.txPool = core.NewTxPool(config.TxPool, chainConfig, eth.blockchain)
 
 	//// Permit the downloader to use the trie cache allowance during fast sync
