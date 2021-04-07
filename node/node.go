@@ -504,6 +504,7 @@ func (n *Node) initAPIServer() error {
 			n.Config.HTTPPort,
 			n.Config.APIAllowedOrigins,
 		)
+		return nil
 	}
 
 	a, err := auth.New(n.Log, "auth", n.Config.APIAuthPassword)
