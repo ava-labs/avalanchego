@@ -20,6 +20,10 @@ PLUGIN_DIR="$BUILD_DIR/plugins" # Where plugin binaries (namely coreth) go
 
 "$AVALANCHE_PATH/scripts/build_coreth.sh"
 
+"$AVALANCHE_PATH/scripts/build_prev_avalanche.sh"
+
+"$AVALANCHE_PATH/scripts/build_prev_coreth.sh"
+
 if [[ -f "$BUILD_DIR/avalanchego" && -f "$PLUGIN_DIR/evm" ]]; then
         echo "Build Successful"
         exit 0
