@@ -28,14 +28,18 @@ package node
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/ava-labs/coreth/internal/debug"
+	"github.com/ava-labs/coreth/plugin"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/enode"
+)
+
+var (
+	errNotSupported = errors.New("not supported")
 )
 
 // apis returns the collection of built-in RPC APIs.
@@ -44,11 +48,11 @@ func (n *Node) apis() []rpc.API {
 		{
 			Namespace: "admin",
 			Version:   "1.0",
-			Service:   &privateAdminAPI{n},
+			Service:   &privateAdminAPI{},
 		}, {
 			Namespace: "admin",
 			Version:   "1.0",
-			Service:   &publicAdminAPI{n},
+			Service:   &publicAdminAPI{},
 			Public:    true,
 		}, {
 			Namespace: "debug",
@@ -57,7 +61,7 @@ func (n *Node) apis() []rpc.API {
 		}, {
 			Namespace: "web3",
 			Version:   "1.0",
-			Service:   &publicWeb3API{n},
+			Service:   &publicWeb3API{},
 			Public:    true,
 		},
 	}
@@ -66,150 +70,167 @@ func (n *Node) apis() []rpc.API {
 // privateAdminAPI is the collection of administrative API methods exposed only
 // over a secure RPC channel.
 type privateAdminAPI struct {
-	node *Node // Node interfaced by this API
+	// node *Node // Node interfaced by this API
 }
 
 // AddPeer requests connecting to a remote node, and also maintaining the new
 // connection at all times, even reconnecting if it is lost.
 func (api *privateAdminAPI) AddPeer(url string) (bool, error) {
-	// Make sure the server is running, fail otherwise
-	server := api.node.Server()
-	if server == nil {
-		return false, ErrNodeStopped
-	}
-	// Try to add the url as a static peer and return
-	node, err := enode.Parse(enode.ValidSchemes, url)
-	if err != nil {
-		return false, fmt.Errorf("invalid enode: %v", err)
-	}
-	server.AddPeer(node)
-	return true, nil
+	// Original code:
+	// // Make sure the server is running, fail otherwise
+	// server := api.node.Server()
+	// if server == nil {
+	// 	return false, ErrNodeStopped
+	// }
+	// // Try to add the url as a static peer and return
+	// node, err := enode.Parse(enode.ValidSchemes, url)
+	// if err != nil {
+	// 	return false, fmt.Errorf("invalid enode: %v", err)
+	// }
+	// server.AddPeer(node)
+	// return true, nil
+	return false, errNotSupported
 }
 
 // RemovePeer disconnects from a remote node if the connection exists
 func (api *privateAdminAPI) RemovePeer(url string) (bool, error) {
-	// Make sure the server is running, fail otherwise
-	server := api.node.Server()
-	if server == nil {
-		return false, ErrNodeStopped
-	}
-	// Try to remove the url as a static peer and return
-	node, err := enode.Parse(enode.ValidSchemes, url)
-	if err != nil {
-		return false, fmt.Errorf("invalid enode: %v", err)
-	}
-	server.RemovePeer(node)
-	return true, nil
+	// Original code:
+	// // Make sure the server is running, fail otherwise
+	// server := api.node.Server()
+	// if server == nil {
+	// 	return false, ErrNodeStopped
+	// }
+	// // Try to remove the url as a static peer and return
+	// node, err := enode.Parse(enode.ValidSchemes, url)
+	// if err != nil {
+	// 	return false, fmt.Errorf("invalid enode: %v", err)
+	// }
+	// server.RemovePeer(node)
+	// return true, nil
+	return false, errNotSupported
 }
 
 // AddTrustedPeer allows a remote node to always connect, even if slots are full
 func (api *privateAdminAPI) AddTrustedPeer(url string) (bool, error) {
-	// Make sure the server is running, fail otherwise
-	server := api.node.Server()
-	if server == nil {
-		return false, ErrNodeStopped
-	}
-	node, err := enode.Parse(enode.ValidSchemes, url)
-	if err != nil {
-		return false, fmt.Errorf("invalid enode: %v", err)
-	}
-	server.AddTrustedPeer(node)
-	return true, nil
+	// Original code:
+	// // Make sure the server is running, fail otherwise
+	// server := api.node.Server()
+	// if server == nil {
+	// 	return false, ErrNodeStopped
+	// }
+	// node, err := enode.Parse(enode.ValidSchemes, url)
+	// if err != nil {
+	// 	return false, fmt.Errorf("invalid enode: %v", err)
+	// }
+	// server.AddTrustedPeer(node)
+	// return true, nil
+	return false, errNotSupported
 }
 
 // RemoveTrustedPeer removes a remote node from the trusted peer set, but it
 // does not disconnect it automatically.
 func (api *privateAdminAPI) RemoveTrustedPeer(url string) (bool, error) {
-	// Make sure the server is running, fail otherwise
-	server := api.node.Server()
-	if server == nil {
-		return false, ErrNodeStopped
-	}
-	node, err := enode.Parse(enode.ValidSchemes, url)
-	if err != nil {
-		return false, fmt.Errorf("invalid enode: %v", err)
-	}
-	server.RemoveTrustedPeer(node)
-	return true, nil
+	// Original code:
+	// // Make sure the server is running, fail otherwise
+	// server := api.node.Server()
+	// if server == nil {
+	// 	return false, ErrNodeStopped
+	// }
+	// node, err := enode.Parse(enode.ValidSchemes, url)
+	// if err != nil {
+	// 	return false, fmt.Errorf("invalid enode: %v", err)
+	// }
+	// server.RemoveTrustedPeer(node)
+	// return true, nil
+	return false, errNotSupported
 }
 
 // PeerEvents creates an RPC subscription which receives peer events from the
 // node's p2p.Server
 func (api *privateAdminAPI) PeerEvents(ctx context.Context) (*rpc.Subscription, error) {
-	// Make sure the server is running, fail otherwise
-	server := api.node.Server()
-	if server == nil {
-		return nil, ErrNodeStopped
-	}
+	// Original code:
+	// // Make sure the server is running, fail otherwise
+	// server := api.node.Server()
+	// if server == nil {
+	// 	return nil, ErrNodeStopped
+	// }
 
-	// Create the subscription
-	notifier, supported := rpc.NotifierFromContext(ctx)
-	if !supported {
-		return nil, rpc.ErrNotificationsUnsupported
-	}
-	rpcSub := notifier.CreateSubscription()
+	// // Create the subscription
+	// notifier, supported := rpc.NotifierFromContext(ctx)
+	// if !supported {
+	// 	return nil, rpc.ErrNotificationsUnsupported
+	// }
+	// rpcSub := notifier.CreateSubscription()
 
-	go func() {
-		events := make(chan *p2p.PeerEvent)
-		sub := server.SubscribeEvents(events)
-		defer sub.Unsubscribe()
+	// go func() {
+	// 	events := make(chan *p2p.PeerEvent)
+	// 	sub := server.SubscribeEvents(events)
+	// 	defer sub.Unsubscribe()
 
-		for {
-			select {
-			case event := <-events:
-				notifier.Notify(rpcSub.ID, event)
-			case <-sub.Err():
-				return
-			case <-rpcSub.Err():
-				return
-			case <-notifier.Closed():
-				return
-			}
-		}
-	}()
-
-	return rpcSub, nil
+	// 	for {
+	// 		select {
+	// 		case event := <-events:
+	// 			notifier.Notify(rpcSub.ID, event)
+	// 		case <-sub.Err():
+	// 			return
+	// 		case <-rpcSub.Err():
+	// 			return
+	// 		case <-notifier.Closed():
+	// 			return
+	// 		}
+	// 	}
+	// }()
+	// return rpcSub, nil
+	return nil, errNotSupported
 }
 
 // publicAdminAPI is the collection of administrative API methods exposed over
 // both secure and unsecure RPC channels.
 type publicAdminAPI struct {
-	node *Node // Node interfaced by this API
+	// node *Node // Node interfaced by this API
 }
 
 // Peers retrieves all the information we know about each individual peer at the
 // protocol granularity.
 func (api *publicAdminAPI) Peers() ([]*p2p.PeerInfo, error) {
-	server := api.node.Server()
-	if server == nil {
-		return nil, ErrNodeStopped
-	}
-	return server.PeersInfo(), nil
+	// Original code:
+	// server := api.node.Server()
+	// if server == nil {
+	// 	return nil, ErrNodeStopped
+	// }
+	// return server.PeersInfo(), nil
+	return nil, errNotSupported
 }
 
 // NodeInfo retrieves all the information we know about the host node at the
 // protocol granularity.
 func (api *publicAdminAPI) NodeInfo() (*p2p.NodeInfo, error) {
-	server := api.node.Server()
-	if server == nil {
-		return nil, ErrNodeStopped
-	}
-	return server.NodeInfo(), nil
+	// Original code:
+	// server := api.node.Server()
+	// if server == nil {
+	// 	return nil, ErrNodeStopped
+	// }
+	// return server.NodeInfo(), nil
+	return nil, errNotSupported
 }
 
 // Datadir retrieves the current data directory the node is using.
 func (api *publicAdminAPI) Datadir() string {
-	return api.node.DataDir()
+	// Original code:
+	// return api.node.DataDir()
+	return ""
 }
 
 // publicWeb3API offers helper utils
 type publicWeb3API struct {
-	stack *Node
+	// stack *Node
 }
 
 // ClientVersion returns the node name
 func (s *publicWeb3API) ClientVersion() string {
-	return s.stack.Server().Name
+	// Original code:
+	// return s.stack.Server().Name
+	return plugin.Version
 }
 
 // Sha3 applies the ethereum sha3 implementation on the input.

@@ -31,18 +31,16 @@ import (
 
 	"github.com/ava-labs/coreth/accounts"
 	"github.com/ava-labs/coreth/rpc"
-	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 )
 
 // Node is a container on which services can be registered.
 type Node struct {
-	eventmux      *event.TypeMux
-	config        *Config
-	accman        *accounts.Manager
-	log           log.Logger
-	ephemKeystore string // if non-empty, the key directory that will be removed by Stop
+	// eventmux *event.TypeMux
+	config *Config
+	accman *accounts.Manager
+	// log      log.Logger
+	// ephemKeystore string // if non-empty, the key directory that will be removed by Stop
 	// dirLock       fileutil.Releaser // prevents concurrent use of instance directory
 	// stop          chan struct{}     // Channel to wait for termination notifications
 	// server        *p2p.Server // Currently running P2P networking layer
@@ -114,7 +112,7 @@ func New(conf *Config) (*Node, error) {
 	node := &Node{
 		config:        conf,
 		inprocHandler: rpc.NewServer(0),
-		eventmux:      new(event.TypeMux),
+		// eventmux:      new(event.TypeMux),
 		// log:           conf.Logger,
 		// stop: make(chan struct{}),
 		// server:        &p2p.Server{Config: conf.P2P},
@@ -132,12 +130,12 @@ func New(conf *Config) (*Node, error) {
 
 	// Ensure that the AccountManager method works before the node has started. We rely on
 	// this in cmd/geth.
-	am, ephemeralKeystore, err := makeAccountManager(conf)
+	am, _, err := makeAccountManager(conf)
 	if err != nil {
 		return nil, err
 	}
 	node.accman = am
-	node.ephemKeystore = ephemeralKeystore
+	// node.ephemKeystore = ephemeralKeystore
 
 	// // Initialize the p2p server. This creates the node key and discovery databases.
 	// node.server.Config.PrivateKey = node.config.NodeKey()
@@ -163,43 +161,45 @@ func (n *Node) Config() *Config {
 	return n.config
 }
 
-// Server retrieves the currently running P2P network layer. This method is meant
-// only to inspect fields of the currently running server. Callers should not
-// start or stop the returned server.
-func (n *Node) Server() *p2p.Server {
-	// n.lock.Lock()
-	// defer n.lock.Unlock()
-
-	// return n.server
-	return nil
-}
-
-// DataDir retrieves the current datadir used by the protocol stack.
-// Deprecated: No files should be stored in this directory, use InstanceDir instead.
-func (n *Node) DataDir() string {
-	// Original code:
-	// return n.config.DataDir
-	return ""
-}
-
-// InstanceDir retrieves the instance directory used by the protocol stack.
-func (n *Node) InstanceDir() string {
-	// TODO: remove?
-	// Original code:
-	// return n.config.instanceDir()
-	return ""
-}
+// Original code:
+// // Server retrieves the currently running P2P network layer. This method is meant
+// // only to inspect fields of the currently running server. Callers should not
+// // start or stop the returned server.
+// func (n *Node) Server() *p2p.Server {
+// 	// n.lock.Lock()
+// 	// defer n.lock.Unlock()
+//
+// 	// return n.server
+// 	return nil
+// }
+//
+// // DataDir retrieves the current datadir used by the protocol stack.
+// // Deprecated: No files should be stored in this directory, use InstanceDir instead.
+// func (n *Node) DataDir() string {
+// 	// Original code:
+// 	// return n.config.DataDir
+// 	return ""
+// }
+//
+// // InstanceDir retrieves the instance directory used by the protocol stack.
+// func (n *Node) InstanceDir() string {
+// 	// TODO: remove?
+// 	// Original code:
+// 	// return n.config.instanceDir()
+// 	return ""
+// }
 
 // AccountManager retrieves the account manager used by the protocol stack.
 func (n *Node) AccountManager() *accounts.Manager {
 	return n.accman
 }
 
-// EventMux retrieves the event multiplexer used by all the network services in
-// the current protocol stack.
-func (n *Node) EventMux() *event.TypeMux {
-	return n.eventmux
-}
+// Original code:
+// // EventMux retrieves the event multiplexer used by all the network services in
+// // the current protocol stack.
+// func (n *Node) EventMux() *event.TypeMux {
+// 	return n.eventmux
+// }
 
 // Original code:
 // // OpenDatabase opens an existing database with the given name (or creates one if no
