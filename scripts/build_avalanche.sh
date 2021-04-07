@@ -13,8 +13,8 @@ BUILD_DIR=$AVALANCHE_PATH/build # Where binaries go
 GIT_COMMIT=$( git rev-list -1 HEAD )
 
 # Build AVALANCHE
-echo "Building Avalanche..."
+echo "Building AvalancheGo..."
 go build -ldflags "-X main.GitCommit=$GIT_COMMIT" -o "$BUILD_DIR/avalanchego-latest" "$AVALANCHE_PATH/app/"*.go
 
-echo "Building Avalanche BinaryManager..."
+echo "Building AvalancheGo binary manager..."
 go build -ldflags "-X main.GitCommit=$GIT_COMMIT" -o "$BUILD_DIR/avalanchego" "$AVALANCHE_PATH/main/"*.go

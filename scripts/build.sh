@@ -14,15 +14,16 @@ GOPATH="$(go env GOPATH)"
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory above this script
 BUILD_DIR=$AVALANCHE_PATH/build # Where binaries go
 PLUGIN_DIR="$BUILD_DIR/plugins" # Where plugin binaries (namely coreth) go
-
+PREV_AVALANCHEGO_VER="v1.3.1"
 
 "$AVALANCHE_PATH/scripts/build_avalanche.sh"
-
 "$AVALANCHE_PATH/scripts/build_coreth.sh"
 
-"$AVALANCHE_PATH/scripts/build_prev_avalanche.sh"
+if [[ ! -d "$BUILD_DIR/avalanchego-$PREV_AVALANCHEGO_VER" ]]; then
+        "$AVALANCHE_PATH/scripts/build_prev_avalanche.sh"
+        "$AVALANCHE_PATH/scripts/build_prev_coreth.sh"
+fi
 
-"$AVALANCHE_PATH/scripts/build_prev_coreth.sh"
 
 if [[ -f "$BUILD_DIR/avalanchego" && -f "$PLUGIN_DIR/evm" ]]; then
         echo "Build Successful"

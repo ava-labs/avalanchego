@@ -30,7 +30,7 @@ else
 fi
 
 # Build Coreth, which is run as a subprocess
-echo "Building Coreth..."
+echo "building pre-db upgrade Coreth..."
 cd "$CORETH_PATH"
 go build -o "$BINARY_PATH" "plugin/"*.go
 cd "$CURRENT_DIR"
