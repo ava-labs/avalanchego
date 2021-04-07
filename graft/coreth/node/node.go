@@ -47,7 +47,7 @@ type Node struct {
 	// stop          chan struct{}     // Channel to wait for termination notifications
 	// server        *p2p.Server // Currently running P2P networking layer
 	// startStopLock sync.Mutex // Start/Stop are protected by an additional lock
-	state int // Tracks state of node lifecycle
+	// state int // Tracks state of node lifecycle
 
 	lock          sync.Mutex
 	rpcAPIs       []rpc.API   // List of APIs currently provided by the node
@@ -56,10 +56,10 @@ type Node struct {
 	// databases map[*closeTrackingDB]struct{} // All open databases
 }
 
-const (
-	initializingState = iota
-	closedState
-)
+// const (
+// 	initializingState = iota
+// 	closedState
+// )
 
 // func (n *Node) openDataDir() error {
 // 	if n.config.DataDir == "" {
@@ -302,8 +302,9 @@ func (n *Node) RegisterAPIs(apis []rpc.API) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	if n.state != initializingState {
-		panic("can't register APIs on running/stopped node")
-	}
+	// Original code:
+	// if n.state != initializingState {
+	// 	panic("can't register APIs on running/stopped node")
+	// }
 	n.rpcAPIs = append(n.rpcAPIs, apis...)
 }
