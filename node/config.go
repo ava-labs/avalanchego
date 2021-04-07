@@ -184,6 +184,8 @@ type Config struct {
 	// staticNodesWarning     bool
 	// trustedNodesWarning    bool
 	//  oldGethResourceWarning bool
+
+	CorethVersion string
 }
 
 // Original code:

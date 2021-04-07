@@ -31,7 +31,6 @@ import (
 	"errors"
 
 	"github.com/ava-labs/coreth/internal/debug"
-	"github.com/ava-labs/coreth/plugin"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -61,7 +60,7 @@ func (n *Node) apis() []rpc.API {
 		}, {
 			Namespace: "web3",
 			Version:   "1.0",
-			Service:   &publicWeb3API{},
+			Service:   &publicWeb3API{n},
 			Public:    true,
 		},
 	}
@@ -223,14 +222,14 @@ func (api *publicAdminAPI) Datadir() string {
 
 // publicWeb3API offers helper utils
 type publicWeb3API struct {
-	// stack *Node
+	stack *Node
 }
 
 // ClientVersion returns the node name
 func (s *publicWeb3API) ClientVersion() string {
 	// Original code:
 	// return s.stack.Server().Name
-	return plugin.Version
+	return s.stack.config.CorethVersion
 }
 
 // Sha3 applies the ethereum sha3 implementation on the input.
