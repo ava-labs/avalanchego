@@ -354,6 +354,7 @@ func (vm *VM) Initialize(
 		panic(err)
 	}
 	nodecfg := node.Config{
+		CorethVersion:         Version,
 		KeyStoreDir:           vm.CLIConfig.KeystoreDirectory,
 		ExternalSigner:        vm.CLIConfig.KeystoreExternalSigner,
 		InsecureUnlockAllowed: vm.CLIConfig.KeystoreInsecureUnlockAllowed,

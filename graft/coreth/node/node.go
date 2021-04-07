@@ -29,16 +29,17 @@ package node
 import (
 	"sync"
 
+	"github.com/ethereum/go-ethereum/event"
+
 	"github.com/ava-labs/coreth/accounts"
 	"github.com/ava-labs/coreth/rpc"
-	"github.com/ethereum/go-ethereum/p2p"
 )
 
 // Node is a container on which services can be registered.
 type Node struct {
-	// eventmux *event.TypeMux
-	config *Config
-	accman *accounts.Manager
+	eventmux *event.TypeMux
+	config   *Config
+	accman   *accounts.Manager
 	// log      log.Logger
 	// ephemKeystore string // if non-empty, the key directory that will be removed by Stop
 	// dirLock       fileutil.Releaser // prevents concurrent use of instance directory
@@ -52,6 +53,8 @@ type Node struct {
 	inprocHandler *rpc.Server // In-process RPC request handler to process the API requests
 
 	// databases map[*closeTrackingDB]struct{} // All open databases
+
+	corethVersion string
 }
 
 // const (
@@ -112,7 +115,7 @@ func New(conf *Config) (*Node, error) {
 	node := &Node{
 		config:        conf,
 		inprocHandler: rpc.NewServer(0),
-		// eventmux:      new(event.TypeMux),
+		eventmux:      new(event.TypeMux),
 		// log:           conf.Logger,
 		// stop: make(chan struct{}),
 		// server:        &p2p.Server{Config: conf.P2P},
@@ -194,12 +197,11 @@ func (n *Node) AccountManager() *accounts.Manager {
 	return n.accman
 }
 
-// Original code:
-// // EventMux retrieves the event multiplexer used by all the network services in
-// // the current protocol stack.
-// func (n *Node) EventMux() *event.TypeMux {
-// 	return n.eventmux
-// }
+// EventMux retrieves the event multiplexer used by all the network services in
+// the current protocol stack.
+func (n *Node) EventMux() *event.TypeMux {
+	return n.eventmux
+}
 
 // Original code:
 // // OpenDatabase opens an existing database with the given name (or creates one if no
