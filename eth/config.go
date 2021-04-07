@@ -157,7 +157,7 @@ type Config struct {
 	SkipBcVersionCheck bool `toml:"-"`
 	DatabaseHandles    int  `toml:"-"`
 	DatabaseCache      int
-	DatabaseFreezer    string
+	// DatabaseFreezer    string
 
 	TrieCleanCache          int
 	TrieCleanCacheJournal   string        `toml:",omitempty"` // Disk journal directory for trie cache to survive node restarts

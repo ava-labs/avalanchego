@@ -78,10 +78,11 @@ func (b *EthAPIBackend) AcceptedBlock() *types.Block {
 	return b.eth.AcceptedBlock()
 }
 
-func (b *EthAPIBackend) SetHead(number uint64) {
-	//b.eth.protocolManager.downloader.Cancel()
-	b.eth.blockchain.SetHead(number)
-}
+// Original code:
+// func (b *EthAPIBackend) SetHead(number uint64) {
+// 	//b.eth.protocolManager.downloader.Cancel()
+// 	b.eth.blockchain.SetHead(number)
+// }
 
 func (b *EthAPIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error) {
 	if deadline, exists := ctx.Deadline(); exists && time.Until(deadline) < 0 {
