@@ -54,7 +54,7 @@ const (
 
 // VMClient is an implementation of VM that talks over RPC.
 type VMClient struct {
-	*chain.State
+	*chain.ChainCache
 	client vmproto.VMClient
 	broker *plugin.GRPCBroker
 	proc   *plugin.Client
@@ -194,25 +194,24 @@ func (vm *VMClient) Initialize(
 		height:   resp.Height,
 	}
 
-	chainState, err := chain.NewMeteredState(
+	chainCache, err := chain.NewMeteredChainCache(
 		ctx.Metrics,
 		fmt.Sprintf("%s_rpcchainvm", ctx.Namespace),
-		decidedCacheSize,
-		missingCacheSize,
-		unverifiedCacheSize,
+		&chain.Config{
+			DecidedCacheSize:    decidedCacheSize,
+			MissingCacheSize:    missingCacheSize,
+			UnverifiedCacheSize: unverifiedCacheSize,
+			LastAcceptedBlock:   lastAcceptedBlk,
+			GetBlock:            vm.internalGetBlock,
+			UnmarshalBlock:      vm.internalParseBlock,
+			BuildBlock:          vm.internalBuildBlock,
+		},
 	)
 	if err != nil {
 		return err
 	}
 
-	chainState.Initialize(&chain.Config{
-		LastAcceptedBlock:  lastAcceptedBlk,
-		GetBlockIDAtHeight: vm.internalGetBlockIDAtHeight,
-		GetBlock:           vm.internalGetBlock,
-		UnmarshalBlock:     vm.internalParseBlock,
-		BuildBlock:         vm.internalBuildBlock,
-	})
-	vm.State = chainState
+	vm.ChainCache = chainCache
 
 	return nil
 }
@@ -314,7 +313,7 @@ func (vm *VMClient) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	return handlers, nil
 }
 
-func (vm *VMClient) internalBuildBlock() (chain.Block, error) {
+func (vm *VMClient) internalBuildBlock() (snowman.Block, error) {
 	resp, err := vm.client.BuildBlock(context.Background(), &vmproto.BuildBlockRequest{})
 	if err != nil {
 		return nil, err
@@ -336,7 +335,7 @@ func (vm *VMClient) internalBuildBlock() (chain.Block, error) {
 	}, nil
 }
 
-func (vm *VMClient) internalParseBlock(bytes []byte) (chain.Block, error) {
+func (vm *VMClient) internalParseBlock(bytes []byte) (snowman.Block, error) {
 	resp, err := vm.client.ParseBlock(context.Background(), &vmproto.ParseBlockRequest{
 		Bytes: bytes,
 	})
@@ -375,7 +374,7 @@ func (vm *VMClient) internalGetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	return ids.ToID(resp.BlockID)
 }
 
-func (vm *VMClient) internalGetBlock(id ids.ID) (chain.Block, error) {
+func (vm *VMClient) internalGetBlock(id ids.ID) (snowman.Block, error) {
 	resp, err := vm.client.GetBlock(context.Background(), &vmproto.GetBlockRequest{
 		Id: id[:],
 	})
@@ -442,8 +441,6 @@ func (b *BlockClient) Reject() error {
 	})
 	return err
 }
-
-func (b *BlockClient) SetStatus(status choices.Status) { b.status = status }
 
 func (b *BlockClient) Status() choices.Status { return b.status }
 

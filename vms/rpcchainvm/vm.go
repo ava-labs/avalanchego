@@ -10,7 +10,7 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
-	"github.com/ava-labs/avalanchego/vms/components/chain"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/vmproto"
 )
 
@@ -32,11 +32,11 @@ type Plugin struct {
 	plugin.NetRPCUnsupportedPlugin
 	// Concrete implementation, written in Go. This is only used for plugins
 	// that are written in Go.
-	vm chain.VM
+	vm block.ChainVM
 }
 
 // New creates a new plugin from the provided VM
-func New(vm chain.VM) *Plugin { return &Plugin{vm: vm} }
+func New(vm block.ChainVM) *Plugin { return &Plugin{vm: vm} }
 
 // GRPCServer registers a new GRPC server.
 func (p *Plugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server) error {

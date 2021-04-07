@@ -94,14 +94,6 @@ message GetBlockResponse {
     uint64 height = 4;
 }
 
-message GetBlockIDAtHeightRequest {
-    uint64 height = 1;
-}
-
-message GetBlockIDAtHeightResponse {
-    bytes blockID = 1;
-}
-
 message SetPreferenceRequest {
     bytes id = 1;
 }

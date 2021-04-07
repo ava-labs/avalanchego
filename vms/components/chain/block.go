@@ -4,25 +4,24 @@
 package chain
 
 import (
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/components/missing"
 )
 
-// Block is the internal representation of a Block to be wrapped by BlockWrapper
-type Block interface {
-	snowman.Block
-	// SetStatus sets the internal status of an existing block. This is used by State
-	// to allow internal blocks to keep their status up to date.
-	SetStatus(choices.Status)
-}
+// // Block is the internal representation of a Block to be wrapped by BlockWrapper
+// type Block interface {
+// 	snowman.Block
+// 	// SetStatus sets the internal status of an existing block. This is used by State
+// 	// to allow internal blocks to keep their status up to date.
+// 	SetStatus(choices.Status)
+// }
 
 // BlockWrapper wraps a snowman Block while adding a smart caching layer to improve
 // VM performance.
 type BlockWrapper struct {
-	Block
+	snowman.Block
 
-	state *State
+	state *ChainCache
 }
 
 // Verify verifies the underlying block, evicts from the unverified block cache

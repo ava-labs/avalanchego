@@ -19,10 +19,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup/galiaslookupproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
@@ -45,7 +45,7 @@ var (
 
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {
-	vm     chain.VM
+	vm     block.ChainVM
 	broker *plugin.GRPCBroker
 
 	serverCloser grpcutils.ServerCloser
@@ -56,7 +56,7 @@ type VMServer struct {
 }
 
 // NewServer returns a vm instance connected to a remote vm instance
-func NewServer(vm chain.VM, broker *plugin.GRPCBroker) *VMServer {
+func NewServer(vm block.ChainVM, broker *plugin.GRPCBroker) *VMServer {
 	return &VMServer{
 		vm:     vm,
 		broker: broker,
@@ -314,16 +314,6 @@ func (vm *VMServer) GetBlock(_ context.Context, req *vmproto.GetBlockRequest) (*
 		Bytes:    blk.Bytes(),
 		Status:   uint32(blk.Status()),
 		Height:   blk.Height(),
-	}, nil
-}
-
-func (vm *VMServer) GetBlockIDAtHeight(_ context.Context, req *vmproto.GetBlockIDAtHeightRequest) (*vmproto.GetBlockIDAtHeightResponse, error) {
-	blkID, err := vm.vm.GetBlockIDAtHeight(req.Height)
-	if err != nil {
-		return nil, err
-	}
-	return &vmproto.GetBlockIDAtHeightResponse{
-		BlockID: blkID[:],
 	}, nil
 }
 
