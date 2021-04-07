@@ -55,7 +55,7 @@ func main() {
 
 	if !needDBUpgrade {
 		viper.Set("fetch-only", "false")
-		cmd := exec.Command("/home/danlaine/go/src/github.com/ava-labs/avalanchego/build/avalanchego-v1.3.2") // TODO replace with dynamic binary path
+		cmd := exec.Command("/home/danlaine/go/src/github.com/ava-labs/avalanchego/build/avalanchego-v1.3.2/avalanchego-inner") // TODO replace with dynamic binary path
 		for k, v := range viper.AllSettings() {
 			cmd.Args = append(cmd.Args, fmt.Sprintf("--%s=%v", k, v))
 		}
@@ -66,7 +66,7 @@ func main() {
 		}
 		return
 	}
-	oldNodeCmd := exec.Command("/home/danlaine/go/src/github.com/ava-labs/avalanchego/build/avalanchego-1.3.1/avalanchego") // TODO replace with dynamic binary path
+	oldNodeCmd := exec.Command("/home/danlaine/go/src/github.com/ava-labs/avalanchego/build/avalanchego-v1.3.1/avalanchego") // TODO replace with dynamic binary path
 	fmt.Println(oldNodeCmd.Dir)
 	for k, v := range viper.AllSettings() {
 		if k == "fetch-only" {
@@ -81,7 +81,7 @@ func main() {
 		fmt.Println(err)
 	}
 
-	newNode := exec.Command("/home/danlaine/go/src/github.com/ava-labs/avalanchego/build/avalanchego-v1.3.2") // TODO replace with dynamic binary path
+	newNode := exec.Command("/home/danlaine/go/src/github.com/ava-labs/avalanchego/build/avalanchego-v1.3.2/avalanchego-inner") // TODO replace with dynamic binary path
 	viper.Set("fetch-only", "true")
 	viper.Set("bootstrap-ips", fmt.Sprintf("127.0.0.1:%d", config.StakingIP.Port)) // Bootstrap from local node when in fetch only mode
 	viper.Set("bootstrap-ids", fmt.Sprintf("%s%s", constants.NodeIDPrefix, config.NodeID))

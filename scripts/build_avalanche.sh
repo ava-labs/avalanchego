@@ -8,13 +8,14 @@ set -o pipefail
 GOPATH="$(go env GOPATH)"
 
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory above this script
-BUILD_DIR=$AVALANCHE_PATH/build # Where binaries go
+source $AVALANCHE_PATH/scripts/constants.sh
+
 
 GIT_COMMIT=$( git rev-list -1 HEAD )
 
 # Build AVALANCHE
 echo "Building AvalancheGo..."
-go build -ldflags "-X main.GitCommit=$GIT_COMMIT" -o "$BUILD_DIR/avalanchego-latest" "$AVALANCHE_PATH/app/"*.go
+go build -ldflags "-X main.GitCommit=$GIT_COMMIT" -o "$AVALANCHEGO_INNER_PATH" "$AVALANCHE_PATH/app/"*.go
 
 echo "Building AvalancheGo binary manager..."
-go build -ldflags "-X main.GitCommit=$GIT_COMMIT" -o "$BUILD_DIR/avalanchego" "$AVALANCHE_PATH/main/"*.go
+go build -ldflags "-X main.GitCommit=$GIT_COMMIT" -o "$BINARY_MANAGER_PATH" "$AVALANCHE_PATH/main/"*.go

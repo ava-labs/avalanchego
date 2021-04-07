@@ -8,24 +8,18 @@ set -o pipefail
 echo "Downloading dependencies..."
 go mod download
 
-# Set GOPATH
-GOPATH="$(go env GOPATH)"
-
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory above this script
-BUILD_DIR=$AVALANCHE_PATH/build # Where binaries go
-PLUGIN_DIR="$BUILD_DIR/plugins" # Where plugin binaries (namely coreth) go
-PREV_AVALANCHEGO_VER="v1.3.1"
+source $AVALANCHE_PATH/scripts/constants.sh
 
 "$AVALANCHE_PATH/scripts/build_avalanche.sh"
 "$AVALANCHE_PATH/scripts/build_coreth.sh"
 
 if [[ ! -d "$BUILD_DIR/avalanchego-$PREV_AVALANCHEGO_VER" ]]; then
-        "$AVALANCHE_PATH/scripts/build_prev_avalanche.sh"
-        "$AVALANCHE_PATH/scripts/build_prev_coreth.sh"
+        "$AVALANCHE_PATH/scripts/build_prev.sh"
 fi
 
 
-if [[ -f "$BUILD_DIR/avalanchego" && -f "$PLUGIN_DIR/evm" ]]; then
+if [[ -f "$AVALANCHEGO_INNER_PATH" && -f "$EVM_PATH" ]]; then
         echo "Build Successful"
         exit 0
 else
