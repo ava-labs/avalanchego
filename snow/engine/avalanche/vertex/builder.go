@@ -47,7 +47,7 @@ func Build(
 		return nil, err
 	}
 
-	vtxBytes, err := Codec.Marshal(innerVtx.Version, innerVtx)
+	vtxBytes, err := c.Marshal(innerVtx.Version, innerVtx)
 	vtx := statelessVertex{
 		innerStatelessVertex: innerVtx,
 		id:                   hashing.ComputeHash256Array(vtxBytes),
