@@ -188,6 +188,7 @@ func (i *index) GetContainerByIndex(index uint64) (Container, error) {
 	return i.getContainerByIndex(index)
 }
 
+// Assumes [i.lock] is held
 func (i *index) getContainerByIndex(index uint64) (Container, error) {
 	lastAcceptedIndex, ok := i.lastAcceptedIndex()
 	if !ok || index > lastAcceptedIndex {
@@ -225,6 +226,7 @@ func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, e
 	} else if numToFetch > MaxFetchedByRange {
 		return nil, fmt.Errorf("requested %d but maximum page size is %d", numToFetch, MaxFetchedByRange)
 	}
+
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
@@ -313,21 +315,22 @@ func (i *index) GetContainerByID(containerID ids.ID) (Container, error) {
 // GetLastAccepted returns the last accepted container
 // Returns an error if no containers have been accepted
 func (i *index) GetLastAccepted() (Container, error) {
+	i.lock.RLock()
+	defer i.lock.RUnlock()
+
 	lastAcceptedIndex, exists := i.lastAcceptedIndex()
 	if !exists {
 		return Container{}, errNoneAccepted
 	}
-	return i.GetContainerByIndex(lastAcceptedIndex)
+	return i.getContainerByIndex(lastAcceptedIndex)
 }
 
+// Assumes i.lock is held
 // Returns:
 // 1) The index of the most recently accepted transaction,
 //    or 0 if no transactions have been accepted
 // 2) Whether at least 1 transaction has been accepted
 func (i *index) lastAcceptedIndex() (uint64, bool) {
-	i.lock.RLock()
-	defer i.lock.RUnlock()
-
 	return i.nextAcceptedIndex - 1, i.nextAcceptedIndex != 0
 }
 
