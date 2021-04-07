@@ -133,11 +133,12 @@ func New(conf *Config) (*Node, error) {
 
 	// Ensure that the AccountManager method works before the node has started. We rely on
 	// this in cmd/geth.
-	am, _, err := makeAccountManager(conf)
+	am, err := makeAccountManager(conf)
 	if err != nil {
 		return nil, err
 	}
 	node.accman = am
+	// Original code (never remove a keystore):
 	// node.ephemKeystore = ephemeralKeystore
 
 	// // Initialize the p2p server. This creates the node key and discovery databases.
