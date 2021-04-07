@@ -111,9 +111,6 @@ type Ethereum struct {
 
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
 
-	txSubmitChan chan struct{}
-	bcb          *BackendCallbacks
-
 	settings Settings // Settings for Ethereum API
 }
 
@@ -122,7 +119,6 @@ type Ethereum struct {
 func New(stack *node.Node, config *Config,
 	cb *dummy.ConsensusCallbacks,
 	mcb *miner.MinerCallbacks,
-	bcb *BackendCallbacks,
 	chainDb ethdb.Database,
 	settings Settings,
 	initGenesis bool,
@@ -180,9 +176,7 @@ func New(stack *node.Node, config *Config,
 		bloomRequests:     make(chan chan *bloombits.Retrieval),
 		bloomIndexer:      NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
 		// p2pServer:         stack.Server(),
-		txSubmitChan: make(chan struct{}, 1),
-		bcb:          bcb,
-		settings:     settings,
+		settings: settings,
 	}
 
 	bcVersion := rawdb.ReadDatabaseVersion(chainDb)
@@ -566,16 +560,8 @@ func (s *Ethereum) Stop() error {
 	return nil
 }
 
-func (s *Ethereum) GetTxSubmitCh() <-chan struct{} {
-	return s.txSubmitChan
-}
-
-func (s *Ethereum) AcceptedBlock() *types.Block {
-	cb := s.bcb.OnQueryAcceptedBlock
-	if cb != nil {
-		return cb()
-	}
-	return s.blockchain.CurrentBlock()
+func (s *Ethereum) LastAcceptedBlock() *types.Block {
+	return s.blockchain.LastAcceptedBlock()
 }
 
 // SetGasPrice sets the minimum gas price to [newGasPrice]
