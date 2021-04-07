@@ -1721,6 +1721,14 @@ func (bc *BlockChain) setPreference(block *types.Block) error {
 	return nil
 }
 
+// LastAcceptedBlock returns the last block to be marked as accepted.
+func (bc *BlockChain) LastAcceptedBlock() *types.Block {
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
+
+	return bc.lastAccepted
+}
+
 // Accept sets a minimum height at which no reorg can pass. Additionally,
 // this function may trigger a reorg if the block being accepted is not in the
 // canonical chain.
