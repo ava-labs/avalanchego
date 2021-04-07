@@ -4,7 +4,6 @@
 package chain
 
 import (
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/components/missing"
 )
@@ -15,14 +14,6 @@ type BlockWrapper struct {
 	snowman.Block
 
 	cache *Cache
-}
-
-// Block is an interface wrapping the normal snowman.Block interface to be used in
-// association with passing in a non-nil function to GetBlockIDAtHeight
-type Block interface {
-	snowman.Block
-
-	SetStatus(choices.Status)
 }
 
 // Verify verifies the underlying block, evicts from the unverified block cache

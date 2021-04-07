@@ -25,9 +25,6 @@ var (
 // State implements an efficient caching layer used to wrap a VM
 // implementation.
 type Cache struct {
-	// getBlockIDAtHeight returns the blkID at the given height. If this height is less than or
-	// equal to the last accepted block, then the returned blkID should be guaranteed to be accepted.
-	getBlockIDAtHeight func(uint64) (ids.ID, error)
 	// getBlock retrieves a block from the VM's storage. If getBlock returns
 	// a nil error, then the returned block must not have the status Unknown
 	getBlock func(ids.ID) (snowman.Block, error)
@@ -38,6 +35,9 @@ type Cache struct {
 	// create an unknown block, and building on top of the preferred block should never yield
 	// a block that has already been decided.
 	buildBlock func() (snowman.Block, error)
+
+	// getStatus returns the status of the block
+	getStatus func(snowman.Block) (choices.Status, error)
 
 	// verifiedBlocks is a map of blocks that have been verified and are
 	// therefore currently in consensus.
@@ -60,23 +60,22 @@ type Config struct {
 	// Cache configuration:
 	DecidedCacheSize, MissingCacheSize, UnverifiedCacheSize int
 
-	LastAcceptedBlock  snowman.Block
-	GetBlockIDAtHeight func(uint64) (ids.ID, error)
-	GetBlock           func(ids.ID) (snowman.Block, error)
-	UnmarshalBlock     func([]byte) (snowman.Block, error)
-	BuildBlock         func() (snowman.Block, error)
+	LastAcceptedBlock snowman.Block
+	GetBlock          func(ids.ID) (snowman.Block, error)
+	UnmarshalBlock    func([]byte) (snowman.Block, error)
+	BuildBlock        func() (snowman.Block, error)
 }
 
 func NewCache(config *Config) *Cache {
 	c := &Cache{
-		verifiedBlocks:     make(map[ids.ID]*BlockWrapper),
-		decidedBlocks:      &cache.LRU{Size: config.DecidedCacheSize},
-		missingBlocks:      &cache.LRU{Size: config.MissingCacheSize},
-		unverifiedBlocks:   &cache.LRU{Size: config.UnverifiedCacheSize},
-		getBlock:           config.GetBlock,
-		getBlockIDAtHeight: config.GetBlockIDAtHeight,
-		unmarshalBlock:     config.UnmarshalBlock,
-		buildBlock:         config.BuildBlock,
+		verifiedBlocks:   make(map[ids.ID]*BlockWrapper),
+		decidedBlocks:    &cache.LRU{Size: config.DecidedCacheSize},
+		missingBlocks:    &cache.LRU{Size: config.MissingCacheSize},
+		unverifiedBlocks: &cache.LRU{Size: config.UnverifiedCacheSize},
+		getBlock:         config.GetBlock,
+		unmarshalBlock:   config.UnmarshalBlock,
+		buildBlock:       config.BuildBlock,
+		getStatus:        func(blk snowman.Block) (choices.Status, error) { return blk.Status(), nil },
 	}
 	c.lastAcceptedBlock = &BlockWrapper{
 		Block: config.LastAcceptedBlock,
@@ -261,37 +260,6 @@ func (c *Cache) addBlockOutsideConsensus(blk snowman.Block) (snowman.Block, erro
 	}
 
 	return wrappedBlk, nil
-}
-
-func (c *Cache) getStatus(blk snowman.Block) (choices.Status, error) {
-	internalBlk, ok := blk.(Block)
-	if !ok || c.getBlockIDAtHeight == nil {
-		return blk.Status(), nil
-	}
-
-	lastAcceptedHeight := c.lastAcceptedBlock.Height()
-	blkHeight := internalBlk.Height()
-
-	// If [internalBlk] has a height larger than the last accepted height
-	// then we consider it processing
-	if lastAcceptedHeight < blkHeight {
-		internalBlk.SetStatus(choices.Processing)
-		return choices.Processing, nil
-	}
-
-	// Otherwise, this block can be considered decided, so we lookup the accepted
-	// blockID at this height
-	acceptedID, err := c.getBlockIDAtHeight(blkHeight)
-	if err != nil {
-		return choices.Unknown, fmt.Errorf("could not find block ID at height %d due to %w", blkHeight, err)
-	}
-	if acceptedID == blk.ID() {
-		internalBlk.SetStatus(choices.Accepted)
-		return choices.Accepted, nil
-	}
-
-	internalBlk.SetStatus(choices.Rejected)
-	return choices.Rejected, nil
 }
 
 // LastAccepted ...

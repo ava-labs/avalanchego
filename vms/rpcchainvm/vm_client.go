@@ -210,7 +210,6 @@ func (vm *VMClient) Initialize(
 	if err != nil {
 		return err
 	}
-
 	vm.Cache = chainCache
 
 	return nil
