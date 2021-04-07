@@ -14,6 +14,7 @@ import (
 
 	"github.com/gorilla/rpc/v2"
 
+	"github.com/ava-labs/avalanchego/api/pubsub"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -80,7 +81,7 @@ type VM struct {
 	codec         codec.Manager
 	codecRegistry codec.Registry
 
-	pubsub *cjson.PubSubServer
+	pubsub *pubsub.Server
 
 	// State management
 	state *prefixedState
@@ -133,7 +134,7 @@ func (vm *VM) Initialize(
 	vm.Aliaser.Initialize()
 	vm.assetToFxCache = &cache.LRU{Size: assetToFxCacheSize}
 
-	vm.pubsub = cjson.NewPubSubServer(ctx)
+	vm.pubsub = pubsub.NewServer(ctx)
 
 	genesisCodec := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
 	c := linearcodec.NewDefault()

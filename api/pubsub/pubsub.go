@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package json
+package pubsub
 
 import (
 	"errors"
@@ -47,8 +47,8 @@ var (
 	errDuplicateChannel = errors.New("duplicate channel")
 )
 
-// PubSubServer maintains the set of active clients and sends messages to the clients.
-type PubSubServer struct {
+// Server maintains the set of active clients and sends messages to the clients.
+type Server struct {
 	ctx *snow.Context
 
 	lock     sync.Mutex
@@ -56,16 +56,16 @@ type PubSubServer struct {
 	channels map[string]map[*Connection]struct{}
 }
 
-// NewPubSubServer ...
-func NewPubSubServer(ctx *snow.Context) *PubSubServer {
-	return &PubSubServer{
+// NewServer ...
+func NewServer(ctx *snow.Context) *Server {
+	return &Server{
 		ctx:      ctx,
 		conns:    make(map[*Connection]map[string]struct{}),
 		channels: make(map[string]map[*Connection]struct{}),
 	}
 }
 
-func (s *PubSubServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	wsConn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		s.ctx.Log.Debug("Failed to upgrade %s", err)
@@ -76,7 +76,7 @@ func (s *PubSubServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // Publish ...
-func (s *PubSubServer) Publish(channel string, msg interface{}) {
+func (s *Server) Publish(channel string, msg interface{}) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -101,7 +101,7 @@ func (s *PubSubServer) Publish(channel string, msg interface{}) {
 }
 
 // Register ...
-func (s *PubSubServer) Register(channel string) error {
+func (s *Server) Register(channel string) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -113,7 +113,7 @@ func (s *PubSubServer) Register(channel string) error {
 	return nil
 }
 
-func (s *PubSubServer) addConnection(conn *Connection) {
+func (s *Server) addConnection(conn *Connection) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.conns[conn] = make(map[string]struct{})
@@ -122,7 +122,7 @@ func (s *PubSubServer) addConnection(conn *Connection) {
 	go conn.readPump()
 }
 
-func (s *PubSubServer) removeConnection(conn *Connection) {
+func (s *Server) removeConnection(conn *Connection) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -137,7 +137,7 @@ func (s *PubSubServer) removeConnection(conn *Connection) {
 	}
 }
 
-func (s *PubSubServer) addChannel(conn *Connection, channel string) {
+func (s *Server) addChannel(conn *Connection, channel string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -155,7 +155,7 @@ func (s *PubSubServer) addChannel(conn *Connection, channel string) {
 	conns[conn] = struct{}{}
 }
 
-func (s *PubSubServer) removeChannel(conn *Connection, channel string) {
+func (s *Server) removeChannel(conn *Connection, channel string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -185,7 +185,7 @@ type subscribe struct {
 
 // Connection is a representation of the websocket connection.
 type Connection struct {
-	s *PubSubServer
+	s *Server
 
 	// The websocket connection.
 	conn *websocket.Conn

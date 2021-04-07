@@ -10,11 +10,11 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
+	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/api/keystore/gkeystore/gkeystoreproto"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gkeystore/gkeystoreproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
 
@@ -24,12 +24,12 @@ var (
 
 // Server is a snow.Keystore that is managed over RPC.
 type Server struct {
-	ks     snow.Keystore
+	ks     keystore.BlockchainKeystore
 	broker *plugin.GRPCBroker
 }
 
 // NewServer returns a keystore connected to a remote keystore
-func NewServer(ks snow.Keystore, broker *plugin.GRPCBroker) *Server {
+func NewServer(ks keystore.BlockchainKeystore, broker *plugin.GRPCBroker) *Server {
 	return &Server{
 		ks:     ks,
 		broker: broker,
@@ -40,7 +40,7 @@ func (s *Server) GetDatabase(
 	_ context.Context,
 	req *gkeystoreproto.GetDatabaseRequest,
 ) (*gkeystoreproto.GetDatabaseResponse, error) {
-	db, err := s.ks.GetDatabase(req.Username, req.Password)
+	db, err := s.ks.GetRawDatabase(req.Username, req.Password)
 	if err != nil {
 		return nil, err
 	}
