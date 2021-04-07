@@ -77,7 +77,6 @@ func (m *manager) Close() error {
 	for _, db := range m.databases {
 		errs.Add(db.Close())
 	}
-
 	return errs.Err
 }
 
@@ -266,6 +265,15 @@ type VersionedDatabase struct {
 	rawDB database.Database
 	database.Database
 	version.Version
+}
+
+func (db *VersionedDatabase) Close() error {
+	errs := wrappers.Errs{}
+	errs.Add(db.Database.Close())
+	if db.rawDB != nil {
+		errs.Add(db.rawDB.Close())
+	}
+	return errs.Err
 }
 
 func (db *VersionedDatabase) Bootstrapped() (bool, error) {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/nat"
@@ -58,26 +59,33 @@ var (
 
 // main is the primary entry point to Avalanche.
 func main() {
-
 	// todo review this logic, exitCode, maybe a func ? also the restart functionality
 	exitCode := 0
 	defer func() {
 		os.Exit(exitCode)
 	}()
 
-	// parse config using viper
-	if err := parseViper(); err != nil {
-		fmt.Printf("parsing parameters returned with error %s\n", err)
+	config, err := config.GetConfig()
+	if err != nil {
+		exitCode = 1
+		fmt.Printf("couldn't get node config: %s", err)
 		return
 	}
+
+	// TODO remove
+	// fmt.Printf("%+v\n", config)
 
 	// Set the data directory permissions to be read write.
-	if err := perms.ChmodR(defaultDataDir, true, perms.ReadWriteExecute); err != nil {
-		fmt.Printf("failed to restrict the permissions of the data directory with error %s\n", err)
+	if err := perms.ChmodR(config.DBPath, true, perms.ReadWriteExecute); err != nil {
+		fmt.Printf("failed to restrict the permissions of the database directory with error %s\n", err)
+		return
+	}
+	if err := perms.ChmodR(config.LoggingConfig.Directory, true, perms.ReadWriteExecute); err != nil {
+		fmt.Printf("failed to restrict the permissions of the log directory with error %s\n", err)
 		return
 	}
 
-	logFactory := logging.NewFactory(Config.LoggingConfig)
+	logFactory := logging.NewFactory(config.LoggingConfig)
 	defer logFactory.Close()
 
 	log, err := logFactory.Make()
@@ -88,10 +96,10 @@ func main() {
 	fmt.Println(header)
 
 	var dbManager manager.Manager
-	if Config.DBEnabled {
-		dbManager, err = manager.New(Config.DBPath, log, dbVersion, !Config.FetchOnly)
+	if config.DBEnabled {
+		dbManager, err = manager.New(config.DBPath, log, dbVersion, !config.FetchOnly)
 		if err != nil {
-			log.Error("couldn't create db manager at %s: %s", Config.DBPath, err)
+			log.Error("couldn't create db manager at %s: %s", config.DBPath, err)
 			exitCode = 1
 			return
 		}
@@ -116,7 +124,7 @@ func main() {
 	}
 	log.Info("bootstrapped with current database version: %v", currentDBBootstrapped)
 
-	if Config.FetchOnly {
+	if config.FetchOnly {
 		// Flag says to run in fetch only mode
 		// Check if we have already have the current database
 		if currentDBBootstrapped {
@@ -152,78 +160,78 @@ func main() {
 	}()
 
 	// Track if sybil control is enforced
-	if !Config.EnableStaking && Config.EnableP2PTLS {
+	if !config.EnableStaking && config.EnableP2PTLS {
 		log.Warn("Staking is disabled. Sybil control is not enforced.")
 	}
-	if !Config.EnableStaking && !Config.EnableP2PTLS {
+	if !config.EnableStaking && !config.EnableP2PTLS {
 		log.Warn("Staking and p2p encryption are disabled. Packet spoofing is possible.")
 	}
 
 	// Check if transaction signatures should be checked
-	if !Config.EnableCrypto {
+	if !config.EnableCrypto {
 		log.Warn("transaction signatures are not being checked")
 	}
-	crypto.EnableCrypto = Config.EnableCrypto
+	crypto.EnableCrypto = config.EnableCrypto
 
-	if err := Config.ConsensusParams.Valid(); err != nil {
+	if err := config.ConsensusParams.Valid(); err != nil {
 		log.Error("consensus parameters are invalid: %s", err)
 		return
 	}
 
 	// Track if assertions should be executed
-	if Config.LoggingConfig.Assertions {
+	if config.LoggingConfig.Assertions {
 		log.Debug("assertions are enabled. This may slow down execution")
 	}
 
 	// SupportsNAT() for NoRouter is false.
 	// Which means we tried to perform a NAT activity but we were not successful.
-	if Config.AttemptedNATTraversal && !Config.Nat.SupportsNAT() {
+	if config.AttemptedNATTraversal && !config.Nat.SupportsNAT() {
 		log.Error("UPnP or NAT-PMP router attach failed, you may not be listening publicly," +
 			" please confirm the settings in your router")
 	}
 
-	mapper := nat.NewPortMapper(log, Config.Nat)
+	mapper := nat.NewPortMapper(log, config.Nat)
 	defer mapper.UnmapAllPorts()
 
 	// Open staking port we want for NAT Traversal to have the external port
-	// (Config.StakingIP.Port) to connect to our internal listening port
-	// (Config.InternalStakingPort) which should be the same in most cases.
+	// (config.StakingIP.Port) to connect to our internal listening port
+	// (config.InternalStakingPort) which should be the same in most cases.
 	mapper.Map(
 		"TCP",
-		Config.StakingIP.IP().Port,
-		Config.StakingIP.IP().Port,
+		config.StakingIP.IP().Port,
+		config.StakingIP.IP().Port,
 		stakingPortName,
-		&Config.StakingIP,
-		Config.DynamicUpdateDuration,
+		&config.StakingIP,
+		config.DynamicUpdateDuration,
 	)
 
 	// Open the HTTP port iff the HTTP server is not listening on localhost
-	if Config.HTTPHost != "127.0.0.1" && Config.HTTPHost != "localhost" {
+	if config.HTTPHost != "127.0.0.1" && config.HTTPHost != "localhost" {
 		// For NAT Traversal we want to route from the external port
-		// (Config.ExternalHTTPPort) to our internal port (Config.HTTPPort)
+		// (config.ExternalHTTPPort) to our internal port (config.HTTPPort)
 		mapper.Map(
 			"TCP",
-			Config.HTTPPort,
-			Config.HTTPPort,
+			config.HTTPPort,
+			config.HTTPPort,
 			httpPortName,
 			nil,
-			Config.DynamicUpdateDuration,
+			config.DynamicUpdateDuration,
 		)
 	}
 
 	// Regularly updates our public IP (or does nothing, if configured that way)
 	externalIPUpdater := dynamicip.NewDynamicIPManager(
-		Config.DynamicPublicIPResolver,
-		Config.DynamicUpdateDuration,
+		config.DynamicPublicIPResolver,
+		config.DynamicUpdateDuration,
 		log,
-		&Config.StakingIP,
+		&config.StakingIP,
 	)
 	defer externalIPUpdater.Stop()
 
-	log.Info("this node's IP is set to: %s", Config.StakingIP.IP())
+	log.Info("this node's IP is set to: %s", config.StakingIP.IP())
 
 	for {
-		shouldRestart, err := run(dbManager, log, logFactory)
+		shouldRestart, err := run(config, dbManager, log, logFactory)
 		if err != nil {
 			break
 		}
@@ -237,14 +245,19 @@ func main() {
 
 // Initialize and run the node.
 // Returns true if the node should restart after this function returns.
-func run(dbManager manager.Manager, log logging.Logger, logFactory logging.Factory) (bool, error) {
+func run(
+	config node.Config,
+	dbManager manager.Manager,
+	log logging.Logger,
+	logFactory logging.Factory,
+) (bool, error) {
 	log.Info("initializing node")
 	node := node.Node{}
 	restarter := &restarter{
 		node:          &node,
 		shouldRestart: &utils.AtomicBool{},
 	}
-	if err := node.Initialize(&Config, dbManager, log, logFactory, restarter); err != nil {
+	if err := node.Initialize(&config, dbManager, log, logFactory, restarter); err != nil {
 		log.Error("error initializing node: %s", err)
 		return restarter.shouldRestart.GetValue(), err
 	}
