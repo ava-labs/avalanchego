@@ -7,4 +7,5 @@
   roles:
     - name: avalanche_stop
     - name: avalanche_build
+    - name: coreth_build
     - name: avalanche_start
