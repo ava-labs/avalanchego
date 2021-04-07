@@ -20,10 +20,6 @@ func TestAcceptedHeadSubscriptions(t *testing.T) {
 		newBlockChan <- block
 		return nil
 	})
-	acceptedBlock := chain.GetGenesisBlock()
-	chain.SetOnQueryAcceptedBlock(func() *types.Block {
-		return acceptedBlock
-	})
 
 	chain.Start()
 	defer chain.Stop()
@@ -103,7 +99,6 @@ func TestAcceptedHeadSubscriptions(t *testing.T) {
 	if err := chain.Accept(block); err != nil {
 		t.Fatal(err)
 	}
-	acceptedBlock = block
 
 	select {
 	case fb := <-acceptedChainCh:
