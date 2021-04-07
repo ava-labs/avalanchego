@@ -5,27 +5,41 @@ package main
 
 import (
 	"fmt"
-	"time"
+	"os"
 )
 
 // main is the primary entry point to Avalanche.
 func main() {
-
-	// run both versions
-	// exit if any of the versions are exiting
+	exitCode := 0
 	binaryManager := NewBinaryManager()
-	go binaryManager.StartOldNode()
-	time.Sleep(10 * time.Second)
-	go binaryManager.StartNewNode()
 
+	defer func() {
+		binaryManager.KillAll()
+		os.Exit(exitCode)
+	}()
+
+	migrationManager := NewMigrationManager()
+
+	if migrationManager.ShouldMigrate() {
+		migrationManager.Migrate(binaryManager)
+	}
+
+	prevVersionChan, newVersionChan := binaryManager.Start()
 	for {
 		select {
-		case <-binaryManager.oldNodeErrChan:
-			fmt.Println("old node errored")
+		case err := <-prevVersionChan:
+			if err != nil {
+				fmt.Println("previous version node errored")
+				exitCode = 1
+			}
 			break
-		case <-binaryManager.newNodeErrChan:
-			fmt.Println("new node errored")
+		case err := <-newVersionChan:
+			if err != nil {
+				fmt.Println("previous version node errored")
+				exitCode = 1
+			}
 			break
 		}
+		return
 	}
 }

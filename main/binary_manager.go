@@ -4,46 +4,79 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"time"
 )
 
+type application struct {
+	path    string
+	errChan chan error
+	cmd     *exec.Cmd
+	setup   bool
+}
+
+func newApplication() *application {
+	return &application{
+		path:    "",
+		errChan: make(chan error),
+		cmd:     nil,
+		setup:   false,
+	}
+}
+
 type BinaryManager struct {
-	oldNodeErrChan chan error
-	newNodeErrChan chan error
+	prevVsApp *application
+	currVsApp *application
 }
 
 func NewBinaryManager() *BinaryManager {
 	return &BinaryManager{
-		oldNodeErrChan: make(chan error),
-		newNodeErrChan: make(chan error),
+		prevVsApp: newApplication(),
+		currVsApp: newApplication(),
 	}
 }
 
-func (b *BinaryManager) StartOldNode() {
-	cmd := exec.Command("/Users/pedro/go/src/github.com/ava-labs/avalanchego/build/avalanchego")
+func (b *BinaryManager) Start() (chan error, chan error) {
+
+	if b.prevVsApp.setup {
+		go b.StartApp(b.prevVsApp)
+	}
+
+	// give it a few seconds to avoid any unexpected lock-grabbing
+	time.Sleep(10 * time.Second)
+
+	if b.currVsApp.setup {
+		go b.StartApp(b.currVsApp)
+	}
+	return b.prevVsApp.errChan, b.currVsApp.errChan
+}
+
+func (b *BinaryManager) StartApp(app *application) {
+	fmt.Printf("Starting %s\n", app.path)
+	cmd := exec.Command(app.path)
+	app.cmd = cmd
 
 	cmd.Stdout = os.Stdout
 
 	// start the command after having set up the pipe
 	if err := cmd.Start(); err != nil {
-		fmt.Println(err)
+		app.errChan <- err
 	}
 
 	if err := cmd.Wait(); err != nil {
-		b.oldNodeErrChan <- err
+		app.errChan <- err
 	}
 }
 
-func (b *BinaryManager) StartNewNode() {
-	cmd := exec.Command("/Users/pedro/go/src/github.com/ava-labs/avalanchego-internal/build/avalanchego-1.3.2")
-
-	cmd.Stdout = os.Stdout
-
-	// start the command after having set up the pipe
-	if err := cmd.Start(); err != nil {
-		fmt.Println(err)
+func (b *BinaryManager) KillAll() {
+	if b.prevVsApp.cmd.Process != nil {
+		if err := b.prevVsApp.cmd.Process.Kill(); err != nil {
+			fmt.Printf("failed to kill process: %v\n", err)
+		}
 	}
 
-	if err := cmd.Wait(); err != nil {
-		b.newNodeErrChan <- err
+	if b.currVsApp.cmd.Process != nil {
+		if err := b.currVsApp.cmd.Process.Kill(); err != nil {
+			fmt.Printf("failed to kill process: %v\n", err)
+		}
 	}
 }
