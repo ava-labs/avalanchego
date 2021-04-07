@@ -454,20 +454,22 @@ func (c *Config) AccountConfig() (int, int, string, error) {
 	return scryptN, scryptP, keydir, err
 }
 
-func makeAccountManager(conf *Config) (*accounts.Manager, string, error) {
+func makeAccountManager(conf *Config) (*accounts.Manager, error) {
 	scryptN, scryptP, keydir, err := conf.AccountConfig()
-	var ephemeral string
+	// var ephemeral string
 	if keydir == "" {
 		// There is no datadir.
-		keydir, err = ioutil.TempDir("", "go-ethereum-keystore")
-		ephemeral = keydir
+		keydir, err = ioutil.TempDir("", "coreth-keystore")
+
+		// Original code (never delete keystore):
+		// ephemeral = keydir
 	}
 
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	if err := os.MkdirAll(keydir, 0700); err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	// Assemble the account manager and supported backends
 	var backends []accounts.Backend
@@ -476,7 +478,7 @@ func makeAccountManager(conf *Config) (*accounts.Manager, string, error) {
 		if extapi, err := external.NewExternalBackend(conf.ExternalSigner); err == nil {
 			backends = append(backends, extapi)
 		} else {
-			return nil, "", fmt.Errorf("error connecting to external signer: %v", err)
+			return nil, fmt.Errorf("error connecting to external signer: %v", err)
 		}
 	}
 	if len(backends) == 0 {
@@ -515,7 +517,7 @@ func makeAccountManager(conf *Config) (*accounts.Manager, string, error) {
 		// }
 	}
 
-	return accounts.NewManager(&accounts.Config{InsecureUnlockAllowed: conf.InsecureUnlockAllowed}, backends...), ephemeral, nil
+	return accounts.NewManager(&accounts.Config{InsecureUnlockAllowed: conf.InsecureUnlockAllowed}, backends...), nil
 }
 
 // Original code:
