@@ -387,7 +387,7 @@ func NewBlockChain(
 		// go bc.update()
 		if txLookupLimit != nil {
 			bc.txLookupLimit = *txLookupLimit
-			go bc.maintainTxIndex(0)
+			go bc.maintainTxIndex()
 		}
 		// If periodic cache journal is required, spin it up.
 		if bc.cacheConfig.TrieCleanRejournal > 0 {

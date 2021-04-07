@@ -44,7 +44,7 @@ type ETHChain struct {
 }
 
 // NewETHChain creates an Ethereum blockchain with the given configs.
-func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Address, chainDB ethdb.Database, settings eth.Settings, initGenesis bool) *ETHChain {
+func NewETHChain(config *eth.Config, nodecfg *node.Config, chainDB ethdb.Database, settings eth.Settings, initGenesis bool) *ETHChain {
 	if config == nil {
 		config = &eth.DefaultConfig
 	}
@@ -61,16 +61,12 @@ func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Add
 	//}
 	cb := new(dummy.ConsensusCallbacks)
 	mcb := new(miner.MinerCallbacks)
-	bcb := new(eth.BackendCallbacks)
-	backend, err := eth.New(node, config, cb, mcb, bcb, chainDB, settings, initGenesis)
+	backend, err := eth.New(node, config, cb, mcb, chainDB, settings, initGenesis)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create new eth backend due to %s", err))
 	}
-	chain := &ETHChain{backend: backend, cb: cb, mcb: mcb, bcb: bcb}
-	if etherBase == nil {
-		etherBase = &BlackholeAddr
-	}
-	backend.SetEtherbase(*etherBase)
+	chain := &ETHChain{backend: backend, cb: cb, mcb: mcb}
+	backend.SetEtherbase(BlackholeAddr)
 	return chain
 }
 
@@ -152,10 +148,6 @@ func (self *ETHChain) SetOnExtraStateChange(cb dummy.OnExtraStateChangeType) {
 	self.cb.OnExtraStateChange = cb
 }
 
-func (self *ETHChain) SetOnQueryAcceptedBlock(cb func() *types.Block) {
-	self.bcb.OnQueryAcceptedBlock = cb
-}
-
 // Returns a new mutable state based on the current HEAD block.
 func (self *ETHChain) CurrentState() (*state.StateDB, error) {
 	return self.backend.BlockChain().State()
@@ -200,6 +192,11 @@ func (self *ETHChain) SetPreference(block *types.Block) error {
 // canonical chain.
 func (self *ETHChain) Accept(block *types.Block) error {
 	return self.BlockChain().Accept(block)
+}
+
+// LastAcceptedBlock returns the last block to be marked as accepted.
+func (self *ETHChain) LastAcceptedBlock() *types.Block {
+	return self.BlockChain().LastAcceptedBlock()
 }
 
 func (self *ETHChain) GetReceiptsByHash(hash common.Hash) types.Receipts {

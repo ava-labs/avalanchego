@@ -64,7 +64,7 @@ type Backend interface {
 
 	// Added to the backend interface to support limiting of logs requests
 	GetVMConfig() *vm.Config
-	AcceptedBlock() *types.Block
+	LastAcceptedBlock() *types.Block
 	GetMaxBlocksPerRequest() int64
 }
 
@@ -86,7 +86,7 @@ type Filter struct {
 // figure out whether a particular block is interesting or not.
 func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Address, topics [][]common.Hash) (*Filter, error) {
 	allowUnfinalizedQueries := backend.GetVMConfig().AllowUnfinalizedQueries
-	acceptedBlock := backend.AcceptedBlock()
+	acceptedBlock := backend.LastAcceptedBlock()
 
 	// Flatten the address and topic filter clauses into a single bloombits filter
 	// system. Since the bloombits are not positional, nil topics are permitted,

@@ -74,8 +74,8 @@ func (b *EthAPIBackend) CurrentBlock() *types.Block {
 	return b.eth.blockchain.CurrentBlock()
 }
 
-func (b *EthAPIBackend) AcceptedBlock() *types.Block {
-	return b.eth.AcceptedBlock()
+func (b *EthAPIBackend) LastAcceptedBlock() *types.Block {
+	return b.eth.LastAcceptedBlock()
 }
 
 // Original code:
@@ -90,7 +90,7 @@ func (b *EthAPIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumb
 	}
 	// Treat requests for the pending, latest, or accepted block
 	// identically.
-	acceptedBlock := b.eth.AcceptedBlock()
+	acceptedBlock := b.eth.LastAcceptedBlock()
 	if number.IsAccepted() {
 		return acceptedBlock.Header(), nil
 	}
@@ -134,9 +134,9 @@ func (b *EthAPIBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumbe
 	}
 	// Treat requests for the pending, latest, or accepted block
 	// identically.
-	acceptedBlock := b.eth.AcceptedBlock()
+	acceptedBlock := b.eth.LastAcceptedBlock()
 	if number.IsAccepted() {
-		return b.eth.AcceptedBlock(), nil
+		return b.eth.LastAcceptedBlock(), nil
 	}
 
 	if !b.GetVMConfig().AllowUnfinalizedQueries && acceptedBlock != nil {
