@@ -65,7 +65,8 @@ func (s *Server) Initialize(
 
 	s.log.Info("API created with allowed origins: %v", allowedOrigins)
 	corsWrapper := cors.New(cors.Options{
-		AllowedOrigins: allowedOrigins,
+		AllowedOrigins:   allowedOrigins,
+		AllowCredentials: true,
 	})
 	s.handler = corsWrapper.Handler(s.router)
 
