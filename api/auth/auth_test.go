@@ -22,7 +22,7 @@ import (
 var (
 	testPassword              = "password!@#$%$#@!"
 	hashedPassword            = password.Hash{}
-	unAuthorizedResponseRegex = "^{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"(.*)\"},\"id\":1}$"
+	unAuthorizedResponseRegex = "^{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"(.*)\"},\"id\":1}"
 )
 
 func init() {
@@ -39,10 +39,10 @@ var (
 func TestNewTokenWrongPassword(t *testing.T) {
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword)
 
-	_, err := auth.NewToken("", time.Hour, []string{"endpoint1, endpoint2"})
+	_, err := auth.NewToken("", defaultTokenLifespan, []string{"endpoint1, endpoint2"})
 	assert.Error(t, err, "should have failed because password is wrong")
 
-	_, err = auth.NewToken("notThePassword", time.Hour, []string{"endpoint1, endpoint2"})
+	_, err = auth.NewToken("notThePassword", defaultTokenLifespan, []string{"endpoint1, endpoint2"})
 	assert.Error(t, err, "should have failed because password is wrong")
 }
 
@@ -54,7 +54,7 @@ func TestNewTokenHappyPath(t *testing.T) {
 
 	// Make a token
 	endpoints := []string{"endpoint1", "endpoint2", "endpoint3"}
-	tokenStr, err := auth.NewToken(testPassword, time.Hour, endpoints)
+	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
 	assert.NoError(t, err)
 
 	// Parse the token
@@ -78,7 +78,7 @@ func TestTokenHasWrongSig(t *testing.T) {
 
 	// Make a token
 	endpoints := []string{"endpoint1", "endpoint2", "endpoint3"}
-	tokenStr, err := auth.NewToken(testPassword, time.Hour, endpoints)
+	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
 	assert.NoError(t, err)
 
 	// Try to parse the token using the wrong password
@@ -131,7 +131,7 @@ func TestRevokeToken(t *testing.T) {
 
 	// Make a token
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
-	tokenStr, err := auth.NewToken(testPassword, time.Hour, endpoints)
+	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
 	assert.NoError(t, err)
 
 	err = auth.RevokeToken(tokenStr, testPassword)
@@ -144,7 +144,7 @@ func TestWrapHandlerHappyPath(t *testing.T) {
 
 	// Make a token
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
-	tokenStr, err := auth.NewToken(testPassword, time.Hour, endpoints)
+	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
 	assert.NoError(t, err)
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
@@ -163,7 +163,7 @@ func TestWrapHandlerRevokedToken(t *testing.T) {
 
 	// Make a token
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
-	tokenStr, err := auth.NewToken(testPassword, time.Hour, endpoints)
+	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
 	assert.NoError(t, err)
 
 	err = auth.RevokeToken(tokenStr, testPassword)
@@ -189,7 +189,7 @@ func TestWrapHandlerExpiredToken(t *testing.T) {
 
 	// Make a token that expired well in the past
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
-	tokenStr, err := auth.NewToken(testPassword, time.Hour, endpoints)
+	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
 	assert.NoError(t, err)
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
@@ -225,7 +225,7 @@ func TestWrapHandlerUnauthorizedEndpoint(t *testing.T) {
 
 	// Make a token
 	endpoints := []string{"/ext/info"}
-	tokenStr, err := auth.NewToken(testPassword, time.Hour, endpoints)
+	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
 	assert.NoError(t, err)
 
 	unauthorizedEndpoints := []string{"/ext/bc/X", "/ext/metrics", "", "/foo", "/ext/info/foo"}
@@ -247,7 +247,7 @@ func TestWrapHandlerAuthEndpoint(t *testing.T) {
 
 	// Make a token
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics", "", "/foo", "/ext/info/foo"}
-	tokenStr, err := auth.NewToken(testPassword, time.Hour, endpoints)
+	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
 	assert.NoError(t, err)
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
@@ -263,7 +263,7 @@ func TestWrapHandlerAccessAll(t *testing.T) {
 
 	// Make a token that allows access to all endpoints
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics", "", "/foo", "/ext/foo/info"}
-	tokenStr, err := auth.NewToken(testPassword, time.Hour, []string{"*"})
+	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, []string{"*"})
 	assert.NoError(t, err)
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
@@ -280,7 +280,7 @@ func TestWriteUnauthorizedResponse(t *testing.T) {
 	rr := httptest.NewRecorder()
 	writeUnauthorizedResponse(rr, errors.New("example err"))
 	assert.Equal(t, http.StatusUnauthorized, rr.Code)
-	assert.Equal(t, "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"example err\"},\"id\":1}", rr.Body.String())
+	assert.Equal(t, "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"example err\"},\"id\":1}\n", rr.Body.String())
 }
 
 func TestWrapHandlerMutatedRevokedToken(t *testing.T) {
@@ -288,7 +288,7 @@ func TestWrapHandlerMutatedRevokedToken(t *testing.T) {
 
 	// Make a token
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
-	tokenStr, err := auth.NewToken(testPassword, time.Hour, endpoints)
+	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
 	assert.NoError(t, err)
 
 	err = auth.RevokeToken(tokenStr, testPassword)
