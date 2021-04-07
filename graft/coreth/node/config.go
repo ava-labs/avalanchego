@@ -432,25 +432,23 @@ func (c *Config) AccountConfig() (int, int, string, error) {
 		scryptP = keystore.LightScryptP
 	}
 
+	var (
+		keydir string
+		err    error
+	)
+	switch {
+	case filepath.IsAbs(c.KeyStoreDir):
+		keydir = c.KeyStoreDir
 	// Original code:
-	// var (
-	// 	keydir string
-	// 	err    error
-	// )
-	// switch {
-	// case filepath.IsAbs(c.KeyStoreDir):
-	// 	keydir = c.KeyStoreDir
 	// case c.DataDir != "":
 	// 	if c.KeyStoreDir == "" {
 	// 		keydir = filepath.Join(c.DataDir, datadirDefaultKeyStore)
 	// 	} else {
 	// 		keydir, err = filepath.Abs(c.KeyStoreDir)
 	// 	}
-	// case c.KeyStoreDir != "":
-	// 	keydir, err = filepath.Abs(c.KeyStoreDir)
-	// }
-
-	keydir, err := filepath.Abs(c.KeyStoreDir)
+	case c.KeyStoreDir != "":
+		keydir, err = filepath.Abs(c.KeyStoreDir)
+	}
 	return scryptN, scryptP, keydir, err
 }
 
