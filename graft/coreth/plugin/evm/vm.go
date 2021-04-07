@@ -353,7 +353,11 @@ func (vm *VM) Initialize(
 	if err := config.SetGCMode("archive"); err != nil {
 		panic(err)
 	}
-	nodecfg := node.Config{NoUSB: true, KeyStoreDir: vm.CLIConfig.KeystoreDirectory}
+	nodecfg := node.Config{
+		KeyStoreDir:           vm.CLIConfig.KeystoreDirectory,
+		ExternalSigner:        vm.CLIConfig.KeystoreExternalSigner,
+		InsecureUnlockAllowed: vm.CLIConfig.KeystoreInsecureUnlockAllowed,
+	}
 
 	// Attempt to load last accepted block to determine if it is necessary to
 	// initialize state with the genesis block.
