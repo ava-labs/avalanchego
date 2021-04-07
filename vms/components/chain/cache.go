@@ -15,16 +15,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// // VM defines an updated VM interface to include GetBlockIDAtHeight. Any VM
-// // that implements this interface can be easily wrapped with the caching layer
-// // defined by State.
-// type VM interface {
-// 	block.ChainVM
-
-// 	// Add GetBlockIDAtHeight to support ChainState block status lookups.
-// 	GetBlockIDAtHeight(height uint64) (ids.ID, error)
-// }
-
 var (
 	// ErrBlockNotFound indicates that the VM was not able to retrieve a block. If this error is returned
 	// from getBlock then the miss will be considered cacheable. Any other error will not be considered a
@@ -34,10 +24,10 @@ var (
 
 // State implements an efficient caching layer used to wrap a VM
 // implementation.
-type ChainCache struct {
-	// // getBlockIDAtHeight returns the blkID at the given height. If this height is less than or
-	// // equal to the last accepted block, then the returned blkID should be guaranteed to be accepted.
-	// getBlockIDAtHeight func(uint64) (ids.ID, error)
+type Cache struct {
+	// getBlockIDAtHeight returns the blkID at the given height. If this height is less than or
+	// equal to the last accepted block, then the returned blkID should be guaranteed to be accepted.
+	getBlockIDAtHeight func(uint64) (ids.ID, error)
 	// getBlock retrieves a block from the VM's storage. If getBlock returns
 	// a nil error, then the returned block must not have the status Unknown
 	getBlock func(ids.ID) (snowman.Block, error)
@@ -70,36 +60,37 @@ type Config struct {
 	// Cache configuration:
 	DecidedCacheSize, MissingCacheSize, UnverifiedCacheSize int
 
-	LastAcceptedBlock snowman.Block
-	// GetBlockIDAtHeight func(uint64) (ids.ID, error)
-	GetBlock       func(ids.ID) (snowman.Block, error)
-	UnmarshalBlock func([]byte) (snowman.Block, error)
-	BuildBlock     func() (snowman.Block, error)
+	LastAcceptedBlock  snowman.Block
+	GetBlockIDAtHeight func(uint64) (ids.ID, error)
+	GetBlock           func(ids.ID) (snowman.Block, error)
+	UnmarshalBlock     func([]byte) (snowman.Block, error)
+	BuildBlock         func() (snowman.Block, error)
 }
 
-func NewChainCache(config *Config) *ChainCache {
-	c := &ChainCache{
-		verifiedBlocks:   make(map[ids.ID]*BlockWrapper),
-		decidedBlocks:    &cache.LRU{Size: config.DecidedCacheSize},
-		missingBlocks:    &cache.LRU{Size: config.MissingCacheSize},
-		unverifiedBlocks: &cache.LRU{Size: config.UnverifiedCacheSize},
-		getBlock:         config.GetBlock,
-		unmarshalBlock:   config.UnmarshalBlock,
-		buildBlock:       config.BuildBlock,
+func NewCache(config *Config) *Cache {
+	c := &Cache{
+		verifiedBlocks:     make(map[ids.ID]*BlockWrapper),
+		decidedBlocks:      &cache.LRU{Size: config.DecidedCacheSize},
+		missingBlocks:      &cache.LRU{Size: config.MissingCacheSize},
+		unverifiedBlocks:   &cache.LRU{Size: config.UnverifiedCacheSize},
+		getBlock:           config.GetBlock,
+		getBlockIDAtHeight: config.GetBlockIDAtHeight,
+		unmarshalBlock:     config.UnmarshalBlock,
+		buildBlock:         config.BuildBlock,
 	}
 	c.lastAcceptedBlock = &BlockWrapper{
 		Block: config.LastAcceptedBlock,
-		state: c,
+		cache: c,
 	}
 	c.decidedBlocks.Put(config.LastAcceptedBlock.ID(), c.lastAcceptedBlock)
 	return c
 }
 
-func NewMeteredChainCache(
+func NewMeteredCache(
 	registerer prometheus.Registerer,
 	namespace string,
 	config *Config,
-) (*ChainCache, error) {
+) (*Cache, error) {
 	decidedCache, err := metercacher.New(
 		fmt.Sprintf("%s_decided_cache", namespace),
 		registerer,
@@ -124,7 +115,7 @@ func NewMeteredChainCache(
 	if err != nil {
 		return nil, err
 	}
-	c := &ChainCache{
+	c := &Cache{
 		verifiedBlocks:   make(map[ids.ID]*BlockWrapper),
 		decidedBlocks:    decidedCache,
 		missingBlocks:    missingCache,
@@ -135,38 +126,21 @@ func NewMeteredChainCache(
 	}
 	c.lastAcceptedBlock = &BlockWrapper{
 		Block: config.LastAcceptedBlock,
-		state: c,
+		cache: c,
 	}
 	c.decidedBlocks.Put(config.LastAcceptedBlock.ID(), c.lastAcceptedBlock)
 	return c, nil
 }
 
-// // Initialize sets the last accepted block, and the internal functions for retrieving/parsing/building
-// // blocks from the VM layer.
-// func (c *ChainCache) Initialize(config *Config) {
-// 	// Set the functions for retrieving blocks from the VM
-// 	s.getBlockIDAtHeight = config.GetBlockIDAtHeight
-// 	s.getBlock = config.GetBlock
-// 	c.unmarshalBlock = config.UnmarshalBlock
-// 	s.buildBlock = config.BuildBlock
-
-// 	config.LastAcceptedBlock.SetStatus(choices.Accepted)
-// 	c.lastAcceptedBlock = &BlockWrapper{
-// 		Block: config.LastAcceptedBlock,
-// 		state: s,
-// 	}
-// 	c.decidedBlocks.Put(config.LastAcceptedBlock.ID(), c.lastAcceptedBlock)
-// }
-
 // FlushCaches flushes each block cache completely.
-func (c *ChainCache) FlushCaches() {
+func (c *Cache) FlushCaches() {
 	c.decidedBlocks.Flush()
 	c.missingBlocks.Flush()
 	c.unverifiedBlocks.Flush()
 }
 
 // GetBlock returns the BlockWrapper as snowman.Block corresponding to [blkID]
-func (c *ChainCache) GetBlock(blkID ids.ID) (snowman.Block, error) {
+func (c *Cache) GetBlock(blkID ids.ID) (snowman.Block, error) {
 	if blk, ok := c.getCachedBlock(blkID); ok {
 		return blk, nil
 	}
@@ -190,7 +164,7 @@ func (c *ChainCache) GetBlock(blkID ids.ID) (snowman.Block, error) {
 
 // getCachedBlock checks the caches for [blkID] by priority. Returning
 // true if [blkID] is found in one of the caches.
-func (c *ChainCache) getCachedBlock(blkID ids.ID) (snowman.Block, bool) {
+func (c *Cache) getCachedBlock(blkID ids.ID) (snowman.Block, bool) {
 	if blk, ok := c.verifiedBlocks[blkID]; ok {
 		return blk, true
 	}
@@ -207,7 +181,7 @@ func (c *ChainCache) getCachedBlock(blkID ids.ID) (snowman.Block, bool) {
 }
 
 // GetBlockInternal returns the internal representation of [blkID]
-func (c *ChainCache) GetBlockInternal(blkID ids.ID) (snowman.Block, error) {
+func (c *Cache) GetBlockInternal(blkID ids.ID) (snowman.Block, error) {
 	wrappedBlk, err := c.GetBlock(blkID)
 	if err != nil {
 		return nil, err
@@ -218,7 +192,7 @@ func (c *ChainCache) GetBlockInternal(blkID ids.ID) (snowman.Block, error) {
 
 // ParseBlock attempts to parse [b] into an internal Block and adds it to the appropriate
 // caching layer if successful.
-func (c *ChainCache) ParseBlock(b []byte) (snowman.Block, error) {
+func (c *Cache) ParseBlock(b []byte) (snowman.Block, error) {
 	blk, err := c.unmarshalBlock(b)
 	if err != nil {
 		return nil, err
@@ -241,16 +215,16 @@ func (c *ChainCache) ParseBlock(b []byte) (snowman.Block, error) {
 
 // BuildBlock attempts to build a new internal Block, wraps it, and adds it
 // to the appropriate caching layer if successful.
-func (c *ChainCache) BuildBlock() (snowman.Block, error) {
+func (c *Cache) BuildBlock() (snowman.Block, error) {
 	blk, err := c.buildBlock()
 	if err != nil {
 		return nil, err
 	}
 
 	blkID := blk.ID()
-	// Defensive: buildBlock should not return a block that has already been verfied.
+	// Defensive: buildBlock should not return a block that has already been verified.
 	// If it does, make sure to return the existing reference to the block.
-	if existingBlk, ok := c.verifiedBlocks[blkID]; ok {
+	if existingBlk, ok := c.getCachedBlock(blkID); ok {
 		return existingBlk, nil
 	}
 	// Evict the produced block from missing blocks in case it was previously
@@ -266,14 +240,17 @@ func (c *ChainCache) BuildBlock() (snowman.Block, error) {
 // assumes [blk] is a known, non-wrapped block that is not currently
 // in consensus. [blk] could be either decided or a block that has not yet
 // been verified and added to consensus.
-func (c *ChainCache) addBlockOutsideConsensus(blk snowman.Block) (snowman.Block, error) {
+func (c *Cache) addBlockOutsideConsensus(blk snowman.Block) (snowman.Block, error) {
 	wrappedBlk := &BlockWrapper{
 		Block: blk,
-		state: c,
+		cache: c,
 	}
 
 	blkID := blk.ID()
-	status := blk.Status()
+	status, err := c.getStatus(blk)
+	if err != nil {
+		return nil, fmt.Errorf("could not get block status for %s due to %w", blkID, err)
+	}
 	switch status {
 	case choices.Accepted, choices.Rejected:
 		c.decidedBlocks.Put(blkID, wrappedBlk)
@@ -286,44 +263,48 @@ func (c *ChainCache) addBlockOutsideConsensus(blk snowman.Block) (snowman.Block,
 	return wrappedBlk, nil
 }
 
+func (c *Cache) getStatus(blk snowman.Block) (choices.Status, error) {
+	internalBlk, ok := blk.(Block)
+	if !ok || c.getBlockIDAtHeight == nil {
+		return blk.Status(), nil
+	}
+
+	lastAcceptedHeight := c.lastAcceptedBlock.Height()
+	blkHeight := internalBlk.Height()
+
+	// If [internalBlk] has a height larger than the last accepted height
+	// then we consider it processing
+	if lastAcceptedHeight < blkHeight {
+		internalBlk.SetStatus(choices.Processing)
+		return choices.Processing, nil
+	}
+
+	// Otherwise, this block can be considered decided, so we lookup the accepted
+	// blockID at this height
+	acceptedID, err := c.getBlockIDAtHeight(blkHeight)
+	if err != nil {
+		return choices.Unknown, fmt.Errorf("could not find block ID at height %d due to %w", blkHeight, err)
+	}
+	if acceptedID == blk.ID() {
+		internalBlk.SetStatus(choices.Accepted)
+		return choices.Accepted, nil
+	}
+
+	internalBlk.SetStatus(choices.Rejected)
+	return choices.Rejected, nil
+}
+
 // LastAccepted ...
-func (c *ChainCache) LastAccepted() (ids.ID, error) {
+func (c *Cache) LastAccepted() (ids.ID, error) {
 	return c.lastAcceptedBlock.ID(), nil
 }
 
 // LastAcceptedBlock returns the last accepted wrapped block
-func (c *ChainCache) LastAcceptedBlock() *BlockWrapper {
+func (c *Cache) LastAcceptedBlock() *BlockWrapper {
 	return c.lastAcceptedBlock
 }
 
 // LastAcceptedBlockInternal returns the internal snowman.Block that was last last accepted
-func (c *ChainCache) LastAcceptedBlockInternal() snowman.Block {
+func (c *Cache) LastAcceptedBlockInternal() snowman.Block {
 	return c.LastAcceptedBlock().Block
 }
-
-// // GetBlockIDAtHeight returns the blockID at the given height by passing through to the internal
-// // function.
-// func (c *ChainCache) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
-// 	return s.getBlockIDAtHeight(height)
-// }
-
-// // getStatus returns the status of [blk]. Assumes that [blk] is a known block.
-// func (c *ChainCache) getStatus(blk snowman.Block) (choices.Status, error) {
-// 	blkHeight := blk.Height()
-// 	lastAcceptedHeight := c.lastAcceptedBlock.Height()
-// 	if blkHeight > lastAcceptedHeight {
-// 		return choices.Processing, nil
-// 	}
-
-// 	// Get the blockID at [blkHeight] so it can be compared to [blk]
-// 	acceptedBlkID, err := s.getBlockIDAtHeight(blk.Height())
-// 	if err != nil {
-// 		return choices.Unknown, fmt.Errorf("failed to get acceptedID at height %d, below last accepted height: %w", blk.Height(), err)
-// 	}
-
-// 	if acceptedBlkID == blk.ID() {
-// 		return choices.Accepted, nil
-// 	}
-
-// 	return choices.Rejected, nil
-// }
