@@ -359,7 +359,7 @@ func (vm *VM) Initialize(
 	// initialize state with the genesis block.
 	lastAcceptedBytes, lastAcceptedErr := vm.chaindb.Get(lastAcceptedKey)
 	initGenesis := lastAcceptedErr == database.ErrNotFound
-	chain := coreth.NewETHChain(&config, &nodecfg, nil, vm.chaindb, vm.CLIConfig.EthBackendSettings(), initGenesis)
+	chain := coreth.NewETHChain(&config, &nodecfg, vm.chaindb, vm.CLIConfig.EthBackendSettings(), initGenesis)
 	vm.chain = chain
 	vm.networkID = config.NetworkId
 
@@ -411,9 +411,6 @@ func (vm *VM) Initialize(
 		vm.txPoolStabilizedHead = block.Hash()
 		vm.txPoolStabilizedLock.Unlock()
 		return nil
-	})
-	chain.SetOnQueryAcceptedBlock(func() *types.Block {
-		return vm.getLastAccepted().ethBlock
 	})
 	chain.SetOnExtraStateChange(func(block *types.Block, state *state.StateDB) error {
 		tx, err := vm.getAtomicTx(block)
@@ -477,9 +474,9 @@ func (vm *VM) Initialize(
 	// Determine if db corruption has occurred.
 	switch {
 	case lastAccepted != nil && initGenesis:
-		return fmt.Errorf("should be initializing genesis")
+		return errors.New("database corruption detected, should be initializing genesis")
 	case lastAccepted == nil && !initGenesis:
-		return fmt.Errorf("should not be initializing genesis")
+		return errors.New("database corruption detected, should not be initializing genesis")
 	case lastAccepted == nil && initGenesis:
 		log.Debug("lastAccepted is unavailable, setting to the genesis block")
 		lastAccepted = chain.GetGenesisBlock()

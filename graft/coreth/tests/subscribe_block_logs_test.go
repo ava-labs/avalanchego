@@ -23,10 +23,6 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 		newBlockChan <- block
 		return nil
 	})
-	acceptedBlock := chain.GetGenesisBlock()
-	chain.SetOnQueryAcceptedBlock(func() *types.Block {
-		return acceptedBlock
-	})
 
 	chain.Start()
 	defer chain.Stop()
@@ -240,7 +236,6 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 	if err := chain.Accept(block); err != nil {
 		t.Fatal(err)
 	}
-	acceptedBlock = block
 
 	chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = false
 	logs, err = api.GetLogs(ctx, fc)
