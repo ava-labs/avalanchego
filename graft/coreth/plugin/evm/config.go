@@ -24,10 +24,11 @@ type CommandLineConfig struct {
 	Web3APIEnabled     bool `json:"web3-api-enabled"`
 
 	// Eth Settings
-	LocalTxsEnabled         bool  `json:"local-txs-enabled"`
-	APIMaxDuration          int64 `json:"api-max-duration"`
-	MaxBlocksPerRequest     int64 `json:"api-max-blocks-per-request"`
-	AllowUnfinalizedQueries bool  `json:"allow-unfinalized-queries"`
+	LocalTxsEnabled         bool   `json:"local-txs-enabled"`
+	APIMaxDuration          int64  `json:"api-max-duration"`
+	MaxBlocksPerRequest     int64  `json:"api-max-blocks-per-request"`
+	AllowUnfinalizedQueries bool   `json:"allow-unfinalized-queries"`
+	KeystoreDirectory       string `json:"keystore-directory"`
 
 	ParsingError error
 }
