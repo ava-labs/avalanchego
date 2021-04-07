@@ -14,6 +14,7 @@ import (
 
 	"github.com/gorilla/rpc/v2"
 
+	"github.com/ava-labs/avalanchego/api/pubsub"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -61,7 +62,8 @@ var (
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
 
-	_ vertex.DAGVM = &VM{}
+	_ vertex.DAGVM    = &VM{}
+	_ common.StaticVM = &VM{}
 )
 
 // VM implements the avalanche.DAGVM interface
@@ -79,7 +81,7 @@ type VM struct {
 	codec         codec.Manager
 	codecRegistry codec.Registry
 
-	pubsub *cjson.PubSubServer
+	pubsub *pubsub.Server
 
 	// State management
 	state *prefixedState
@@ -132,7 +134,7 @@ func (vm *VM) Initialize(
 	vm.Aliaser.Initialize()
 	vm.assetToFxCache = &cache.LRU{Size: assetToFxCacheSize}
 
-	vm.pubsub = cjson.NewPubSubServer(ctx)
+	vm.pubsub = pubsub.NewServer(ctx)
 
 	genesisCodec := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
 	c := linearcodec.NewDefault()
@@ -299,18 +301,17 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	}, err
 }
 
-// CreateStaticHandlers implements the avalanche.DAGVM interface
-func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
+// CreateStaticHandlers implements the common.StaticVM interface
+func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	// name this service "avm"
 	staticService := CreateStaticService()
-	_ = newServer.RegisterService(staticService, "avm")
 	return map[string]*common.HTTPHandler{
 		"": {LockOptions: common.WriteLock, Handler: newServer},
-	}
+	}, newServer.RegisterService(staticService, "avm")
 }
 
 // Pending implements the avalanche.DAGVM interface

@@ -252,11 +252,8 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
 
-	userKeystore, err := keystore.CreateTestKeystore()
-	if err != nil {
-		tb.Fatal(err)
-	}
-	if err := userKeystore.AddUser(username, password); err != nil {
+	userKeystore := keystore.New(logging.NoLog{}, memdb.New())
+	if err := userKeystore.CreateUser(username, password); err != nil {
 		tb.Fatal(err)
 	}
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)

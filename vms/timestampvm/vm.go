@@ -28,7 +28,8 @@ var (
 	errNoPendingBlocks = errors.New("there is no block to propose")
 	errBadGenesisBytes = errors.New("genesis data should be bytes (max length 32)")
 
-	_ block.ChainVM = &VM{}
+	_ block.ChainVM   = &VM{}
+	_ common.StaticVM = &VM{}
 )
 
 // VM implements the snowman.VM interface

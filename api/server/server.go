@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package api
+package server
 
 import (
 	"context"
@@ -76,7 +76,8 @@ func (s *Server) Initialize(
 
 	s.log.Info("API created with allowed origins: %v", allowedOrigins)
 	corsWrapper := cors.New(cors.Options{
-		AllowedOrigins: allowedOrigins,
+		AllowedOrigins:   allowedOrigins,
+		AllowCredentials: true,
 	})
 	corsHandler := corsWrapper.Handler(s.router)
 	s.handler = s.auth.WrapHandler(corsHandler)

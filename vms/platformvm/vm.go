@@ -90,6 +90,7 @@ var (
 
 	_ block.ChainVM        = &VM{}
 	_ validators.Connector = &VM{}
+	_ common.StaticVM      = &VM{}
 )
 
 // VM implements the snowman.ChainVM interface
