@@ -1109,7 +1109,8 @@ func TestEngineIssueRepoll(t *testing.T) {
 		}
 	}
 
-	if err := te.repoll(); err != nil {
+	te.repoll()
+	if err := te.errs.Err; err != nil {
 		t.Fatal(err)
 	}
 }

@@ -32,11 +32,11 @@ func initHistogram(namespace, name string, registerer prometheus.Registerer, err
 	return histogram
 }
 
-type metrics struct {
-	namespace                   string
-	registerer                  prometheus.Registerer
-	pending                     prometheus.Gauge
-	dropped, expired, throttled prometheus.Counter
+type handlerMetrics struct {
+	namespace        string
+	registerer       prometheus.Registerer
+	pending          prometheus.Gauge
+	dropped, expired prometheus.Counter
 	getAcceptedFrontier, acceptedFrontier, getAcceptedFrontierFailed,
 	getAccepted, accepted, getAcceptedFailed,
 	getAncestors, multiPut, getAncestorsFailed,
@@ -50,7 +50,7 @@ type metrics struct {
 }
 
 // Initialize implements the Engine interface
-func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer) error {
+func (m *handlerMetrics) Initialize(namespace string, registerer prometheus.Registerer) error {
 	m.namespace = namespace
 	m.registerer = registerer
 	errs := wrappers.Errs{}
@@ -81,15 +81,6 @@ func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer)
 	})
 	if err := registerer.Register(m.expired); err != nil {
 		errs.Add(fmt.Errorf("failed to register expired statistics due to %w", err))
-	}
-
-	m.throttled = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "throttled",
-		Help:      "Number of throttled events",
-	})
-	if err := registerer.Register(m.throttled); err != nil {
-		errs.Add(fmt.Errorf("failed to register throttled statistics due to %w", err))
 	}
 
 	m.getAcceptedFrontier = initHistogram(namespace, "get_accepted_frontier", registerer, &errs)
@@ -135,7 +126,7 @@ func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer)
 	return errs.Err
 }
 
-func (m *metrics) registerTierStatistics(tier int) (prometheus.Gauge, prometheus.Histogram, error) {
+func (m *handlerMetrics) registerTierStatistics(tier int) (prometheus.Gauge, prometheus.Histogram, error) {
 	errs := wrappers.Errs{}
 
 	gauge := prometheus.NewGauge(prometheus.GaugeOpts{
@@ -159,7 +150,7 @@ func (m *metrics) registerTierStatistics(tier int) (prometheus.Gauge, prometheus
 	return gauge, histogram, errs.Err
 }
 
-func (m *metrics) getMSGHistogram(msg constants.MsgType) prometheus.Histogram {
+func (m *handlerMetrics) getMSGHistogram(msg constants.MsgType) prometheus.Histogram {
 	switch msg {
 	case constants.GetAcceptedFrontierMsg:
 		return m.getAcceptedFrontier
