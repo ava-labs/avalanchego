@@ -202,9 +202,9 @@ func (vm *VMClient) Initialize(
 			MissingCacheSize:    missingCacheSize,
 			UnverifiedCacheSize: unverifiedCacheSize,
 			LastAcceptedBlock:   lastAcceptedBlk,
-			GetBlock:            vm.internalGetBlock,
-			UnmarshalBlock:      vm.internalParseBlock,
-			BuildBlock:          vm.internalBuildBlock,
+			GetBlock:            vm.getBlock,
+			UnmarshalBlock:      vm.parseBlock,
+			BuildBlock:          vm.buildBlock,
 		},
 	)
 	if err != nil {
@@ -313,7 +313,7 @@ func (vm *VMClient) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	return handlers, nil
 }
 
-func (vm *VMClient) internalBuildBlock() (snowman.Block, error) {
+func (vm *VMClient) buildBlock() (snowman.Block, error) {
 	resp, err := vm.client.BuildBlock(context.Background(), &vmproto.BuildBlockRequest{})
 	if err != nil {
 		return nil, err
@@ -335,7 +335,7 @@ func (vm *VMClient) internalBuildBlock() (snowman.Block, error) {
 	}, nil
 }
 
-func (vm *VMClient) internalParseBlock(bytes []byte) (snowman.Block, error) {
+func (vm *VMClient) parseBlock(bytes []byte) (snowman.Block, error) {
 	resp, err := vm.client.ParseBlock(context.Background(), &vmproto.ParseBlockRequest{
 		Bytes: bytes,
 	})
@@ -364,7 +364,7 @@ func (vm *VMClient) internalParseBlock(bytes []byte) (snowman.Block, error) {
 	return blk, nil
 }
 
-func (vm *VMClient) internalGetBlock(id ids.ID) (snowman.Block, error) {
+func (vm *VMClient) getBlock(id ids.ID) (snowman.Block, error) {
 	resp, err := vm.client.GetBlock(context.Background(), &vmproto.GetBlockRequest{
 		Id: id[:],
 	})
