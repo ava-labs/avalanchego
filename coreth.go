@@ -40,7 +40,6 @@ type ETHChain struct {
 	backend *eth.Ethereum
 	cb      *dummy.ConsensusCallbacks
 	mcb     *miner.MinerCallbacks
-	bcb     *eth.BackendCallbacks
 }
 
 // NewETHChain creates an Ethereum blockchain with the given configs.
