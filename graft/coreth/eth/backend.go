@@ -204,6 +204,9 @@ func New(stack *node.Node, config *Config,
 			EVMInterpreter:          config.EVMInterpreter,
 			AllowUnfinalizedQueries: config.AllowUnfinalizedQueries,
 		}
+		// TODO: need to fix journal
+		// TODO: need to get changes merged from other branch (cleaning up default
+		// db)
 		cacheConfig = &core.CacheConfig{
 			TrieCleanLimit:      config.TrieCleanCache,
 			TrieCleanJournal:    stack.ResolvePath(config.TrieCleanCacheJournal),
