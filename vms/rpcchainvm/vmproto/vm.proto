@@ -133,7 +133,6 @@ service VM {
     rpc BuildBlock(BuildBlockRequest) returns (BuildBlockResponse);
     rpc ParseBlock(ParseBlockRequest) returns (ParseBlockResponse);
     rpc GetBlock(GetBlockRequest) returns (GetBlockResponse);
-    rpc GetBlockIDAtHeight(GetBlockIDAtHeightRequest) returns (GetBlockIDAtHeightResponse);
     rpc SetPreference(SetPreferenceRequest) returns (SetPreferenceResponse);
     rpc Health(HealthRequest) returns (HealthResponse);
 
