@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -57,6 +58,13 @@ var (
 
 // main is the primary entry point to Avalanche.
 func main() {
+
+	// todo review this logic, exitCode, maybe a func ? also the restart functionality
+	exitCode := 0
+	defer func() {
+		os.Exit(exitCode)
+	}()
+
 	// parse config using viper
 	if err := parseViper(); err != nil {
 		fmt.Printf("parsing parameters returned with error %s\n", err)
@@ -84,6 +92,7 @@ func main() {
 		dbManager, err = manager.New(Config.DBPath, log, dbVersion, !Config.FetchOnly)
 		if err != nil {
 			log.Error("couldn't create db manager at %s: %s", Config.DBPath, err)
+			exitCode = 1
 			return
 		}
 	} else {

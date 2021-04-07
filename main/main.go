@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 )
 
 // main is the primary entry point to Avalanche.
@@ -12,13 +13,10 @@ func main() {
 
 	// run both versions
 	// exit if any of the versions are exiting
-
-	// apply any logic
-	// if migrationManager.ShouldMigrate() {  }
-
 	binaryManager := NewBinaryManager()
 	go binaryManager.StartOldNode()
-	//binaryManager.StartNewNode()
+	time.Sleep(10 * time.Second)
+	go binaryManager.StartNewNode()
 
 	for {
 		select {
@@ -28,8 +26,6 @@ func main() {
 		case <-binaryManager.newNodeErrChan:
 			fmt.Println("new node errored")
 			break
-
 		}
 	}
-	fmt.Println("derp")
 }

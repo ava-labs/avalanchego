@@ -44,6 +44,6 @@ func (b *BinaryManager) StartNewNode() {
 	}
 
 	if err := cmd.Wait(); err != nil {
-		b.oldNodeErrChan <- err
+		b.newNodeErrChan <- err
 	}
 }
