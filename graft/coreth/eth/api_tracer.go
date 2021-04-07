@@ -116,13 +116,13 @@ func (api *PrivateDebugAPI) TraceChain(ctx context.Context, start, end rpc.Block
 	var from, to *types.Block
 
 	if start.IsAccepted() {
-		from = api.eth.AcceptedBlock()
+		from = api.eth.LastAcceptedBlock()
 	} else {
 		from = api.eth.blockchain.GetBlockByNumber(uint64(start))
 	}
 
 	if end.IsAccepted() {
-		to = api.eth.AcceptedBlock()
+		to = api.eth.LastAcceptedBlock()
 	} else {
 		to = api.eth.blockchain.GetBlockByNumber(uint64(end))
 	}
@@ -363,7 +363,7 @@ func (api *PrivateDebugAPI) TraceBlockByNumber(ctx context.Context, number rpc.B
 	var block *types.Block
 
 	if number.IsAccepted() {
-		block = api.eth.AcceptedBlock()
+		block = api.eth.LastAcceptedBlock()
 	} else {
 		block = api.eth.blockchain.GetBlockByNumber(uint64(number))
 	}

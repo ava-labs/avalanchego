@@ -111,6 +111,8 @@ type Ethereum struct {
 
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
 
+	txSubmitChan chan struct{}
+
 	settings Settings // Settings for Ethereum API
 }
 
@@ -176,7 +178,8 @@ func New(stack *node.Node, config *Config,
 		bloomRequests:     make(chan chan *bloombits.Retrieval),
 		bloomIndexer:      NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
 		// p2pServer:         stack.Server(),
-		settings: settings,
+		txSubmitChan: make(chan struct{}, 1),
+		settings:     settings,
 	}
 
 	bcVersion := rawdb.ReadDatabaseVersion(chainDb)
@@ -558,6 +561,10 @@ func (s *Ethereum) Stop() error {
 	s.chainDb.Close()
 	s.eventMux.Stop()
 	return nil
+}
+
+func (s *Ethereum) GetTxSubmitCh() <-chan struct{} {
+	return s.txSubmitChan
 }
 
 func (s *Ethereum) LastAcceptedBlock() *types.Block {

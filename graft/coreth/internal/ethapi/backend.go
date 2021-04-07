@@ -99,7 +99,7 @@ type Backend interface {
 
 	ChainConfig() *params.ChainConfig
 	Engine() consensus.Engine
-	AcceptedBlock() *types.Block
+	LastAcceptedBlock() *types.Block
 }
 
 func GetAPIs(apiBackend Backend) []rpc.API {
