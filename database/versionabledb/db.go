@@ -135,6 +135,17 @@ func (db *Database) StartCommit() {
 	db.versionEnabled = true
 }
 
+// Commit writes all the operations in the versiondb to the
+// underlying database and sets the [versionEnabled] flag to false.
+// If StartCommit() was never called, then Commit() will be a no-op.
+func (db *Database) Commit() error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	db.versionEnabled = false
+	return db.vdb.Commit()
+}
+
 // EndCommit sets the [versionEnabled] flag back to false and calls
 // Abort() on the versiondb.
 func (db *Database) AbortCommit() {
