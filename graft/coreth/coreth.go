@@ -4,6 +4,7 @@
 package coreth
 
 import (
+	"fmt"
 	"io"
 	"math/big"
 	"os"
@@ -43,7 +44,7 @@ type ETHChain struct {
 }
 
 // NewETHChain creates an Ethereum blockchain with the given configs.
-func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Address, chainDB ethdb.Database, settings eth.Settings) *ETHChain {
+func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Address, chainDB ethdb.Database, settings eth.Settings, initGenesis bool) *ETHChain {
 	if config == nil {
 		config = &eth.DefaultConfig
 	}
@@ -61,7 +62,10 @@ func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Add
 	cb := new(dummy.ConsensusCallbacks)
 	mcb := new(miner.MinerCallbacks)
 	bcb := new(eth.BackendCallbacks)
-	backend, _ := eth.New(node, config, cb, mcb, bcb, chainDB, settings)
+	backend, err := eth.New(node, config, cb, mcb, bcb, chainDB, settings, initGenesis)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create new eth backend due to %s", err))
+	}
 	chain := &ETHChain{backend: backend, cb: cb, mcb: mcb, bcb: bcb}
 	if etherBase == nil {
 		etherBase = &BlackholeAddr
