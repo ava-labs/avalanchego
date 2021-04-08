@@ -286,7 +286,7 @@ func TestState(t *testing.T) {
 	}
 
 	// Flush the caches to ensure decided blocks are handled correctly on cache misses.
-	chainState.FlushCaches()
+	chainState.Flush()
 	checkAcceptedBlock(t, chainState, wrappedGenesisBlk, false)
 	checkAcceptedBlock(t, chainState, parsedBlk1, false)
 	checkAcceptedBlock(t, chainState, parsedBlk2, false)
@@ -571,7 +571,7 @@ func TestBuildBlockError(t *testing.T) {
 	}
 }
 
-func TestMeteredState(t *testing.T) {
+func TestMeteredCache(t *testing.T) {
 	registry := prometheus.NewRegistry()
 	namespace1 := "Joe"
 	namespace2 := "Namath"

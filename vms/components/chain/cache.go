@@ -106,17 +106,12 @@ func produceGetStatus(c *Cache, getBlockIDAtHeight func(uint64) (ids.ID, error))
 	}
 }
 
-func NewCache(config *Config) *Cache {
-	c := &Cache{
-		verifiedBlocks:   make(map[ids.ID]*BlockWrapper),
-		decidedBlocks:    &cache.LRU{Size: config.DecidedCacheSize},
-		missingBlocks:    &cache.LRU{Size: config.MissingCacheSize},
-		unverifiedBlocks: &cache.LRU{Size: config.UnverifiedCacheSize},
-		getBlock:         config.GetBlock,
-		unmarshalBlock:   config.UnmarshalBlock,
-		buildBlock:       config.BuildBlock,
-		getStatus:        func(blk snowman.Block) (choices.Status, error) { return blk.Status(), nil },
-	}
+func (c *Cache) initialize(config *Config) {
+	c.verifiedBlocks = make(map[ids.ID]*BlockWrapper)
+	c.getBlock = config.GetBlock
+	c.buildBlock = config.BuildBlock
+	c.unmarshalBlock = config.UnmarshalBlock
+	c.getStatus = func(blk snowman.Block) (choices.Status, error) { return blk.Status(), nil }
 	if config.GetBlockIDAtHeight != nil {
 		c.getStatus = produceGetStatus(c, config.GetBlockIDAtHeight)
 	}
@@ -125,6 +120,16 @@ func NewCache(config *Config) *Cache {
 		cache: c,
 	}
 	c.decidedBlocks.Put(config.LastAcceptedBlock.ID(), c.lastAcceptedBlock)
+}
+
+func NewCache(config *Config) *Cache {
+	c := &Cache{
+		verifiedBlocks:   make(map[ids.ID]*BlockWrapper),
+		decidedBlocks:    &cache.LRU{Size: config.DecidedCacheSize},
+		missingBlocks:    &cache.LRU{Size: config.MissingCacheSize},
+		unverifiedBlocks: &cache.LRU{Size: config.UnverifiedCacheSize},
+	}
+	c.initialize(config)
 	return c
 }
 
@@ -162,23 +167,13 @@ func NewMeteredCache(
 		decidedBlocks:    decidedCache,
 		missingBlocks:    missingCache,
 		unverifiedBlocks: unverifiedCache,
-		getBlock:         config.GetBlock,
-		unmarshalBlock:   config.UnmarshalBlock,
-		buildBlock:       config.BuildBlock,
 	}
-	if config.GetBlockIDAtHeight != nil {
-		c.getStatus = produceGetStatus(c, config.GetBlockIDAtHeight)
-	}
-	c.lastAcceptedBlock = &BlockWrapper{
-		Block: config.LastAcceptedBlock,
-		cache: c,
-	}
-	c.decidedBlocks.Put(config.LastAcceptedBlock.ID(), c.lastAcceptedBlock)
+	c.initialize(config)
 	return c, nil
 }
 
-// FlushCaches flushes each block cache completely.
-func (c *Cache) FlushCaches() {
+// Flush each block cache
+func (c *Cache) Flush() {
 	c.decidedBlocks.Flush()
 	c.missingBlocks.Flush()
 	c.unverifiedBlocks.Flush()
