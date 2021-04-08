@@ -37,6 +37,8 @@ var (
 // Index indexes container (a blob of bytes with an ID) in their order of acceptance
 // Index implements triggers.Acceptor
 // Index is thread-safe.
+// Index assumes that Accept is called before the container is committed to the
+// database of the VM that the container exists in.
 type Index interface {
 	Accept(ctx *snow.Context, containerID ids.ID, container []byte) error
 	GetContainerByIndex(index uint64) (Container, error)
