@@ -34,7 +34,7 @@ var (
 	_ Index = &index{}
 )
 
-// Index indexes container (a blob of bytes with an ID) in their order of acceptance
+// Index indexes containers in their order of acceptance
 // Index implements triggers.Acceptor
 // Index is thread-safe.
 // Index assumes that Accept is called before the container is committed to the
@@ -47,6 +47,24 @@ type Index interface {
 	GetIndex(containerID ids.ID) (uint64, error)
 	GetContainerByID(containerID ids.ID) (Container, error)
 	Close() error
+}
+
+// indexer indexes all accepted transactions by the order in which they were accepted
+type index struct {
+	codec codec.Manager
+	clock timer.Clock
+	lock  sync.RWMutex
+	// The index of the next accepted transaction
+	nextAcceptedIndex uint64
+	// When [baseDB] is committed, writes to [baseDB]
+	vDB    *versiondb.Database
+	baseDB database.Database
+	// Both [indexToContainer] and [containerToIndex] have [vDB] underneath
+	// Index --> Container
+	indexToContainer database.Database
+	// Container ID --> Index
+	containerToIndex database.Database
+	log              logging.Logger
 }
 
 // Returns a new, thread-safe Index.
@@ -70,7 +88,6 @@ func newIndex(
 		indexToContainer: indexToContainer,
 		containerToIndex: containerToIndex,
 		log:              log,
-		isAcceptedFunc:   isAcceptedFunc,
 	}
 
 	// Get next accepted index from db
@@ -98,6 +115,7 @@ func newIndex(
 			return nil, fmt.Errorf("couldn't get container at index %d: %s", j-1, err)
 		}
 		if isAcceptedFunc(lastAccepted.ID) {
+			// The last accepted container is marked as accepted by the VM. Stop.
 			break
 		}
 		if err := i.removeLastAccepted(lastAccepted.ID); err != nil {
@@ -105,25 +123,6 @@ func newIndex(
 		}
 	}
 	return i, nil
-}
-
-// indexer indexes all accepted transactions by the order in which they were accepted
-type index struct {
-	codec          codec.Manager
-	isAcceptedFunc func(containerID ids.ID) bool
-	clock          timer.Clock
-	lock           sync.RWMutex
-	// The index of the next accepted transaction
-	nextAcceptedIndex uint64
-	// When [baseDB] is committed, actual write to disk happens
-	vDB    *versiondb.Database
-	baseDB database.Database
-	// Both [indexToContainer] and [containerToIndex] have [baseDB] underneath
-	// Index --> Container
-	indexToContainer database.Database
-	// Container ID --> Index
-	containerToIndex database.Database
-	log              logging.Logger
 }
 
 // Close this index
@@ -137,7 +136,8 @@ func (i *index) Close() error {
 }
 
 // Index that the given transaction is accepted
-// Returned error should be treated as fatal
+// Returned error should be treated as fatal; the VM should not commit [containerID]
+// or any new containers as accepted.
 func (i *index) Accept(ctx *snow.Context, containerID ids.ID, containerBytes []byte) error {
 	i.lock.Lock()
 	defer i.lock.Unlock()
@@ -150,8 +150,8 @@ func (i *index) Accept(ctx *snow.Context, containerID ids.ID, containerBytes []b
 		return fmt.Errorf("couldn't convert next accepted index to bytes: %w", p.Err)
 	}
 	bytes, err := i.codec.Marshal(codecVersion, Container{
-		Bytes:     containerBytes,
 		ID:        containerID,
+		Bytes:     containerBytes,
 		Timestamp: i.clock.Time().UnixNano(),
 	})
 	if err != nil {
@@ -177,12 +177,14 @@ func (i *index) Accept(ctx *snow.Context, containerID ids.ID, containerBytes []b
 		return fmt.Errorf("couldn't put accepted container %s into index: %w", containerID, err)
 	}
 
+	// Atomically commit [i.vDB], [i.indexToContainer], [i.containerToIndex] to [i.baseDB]
 	return i.vDB.Commit()
 }
 
 // Returns the ID of the [index]th accepted container and the container itself.
 // For example, if [index] == 0, returns the first accepted container.
 // If [index] == 1, returns the second accepted container, etc.
+// Returns an error if there is no container at the given index.
 func (i *index) GetContainerByIndex(index uint64) (Container, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
@@ -219,8 +221,10 @@ func (i *index) getContainerByIndex(index uint64) (Container, error) {
 	return container, nil
 }
 
-// GetContainerRange returns the IDs of containers at index
-// [startIndex], [startIndex+1], ..., [startIndex+numToFetch-1]
+// GetContainerRange returns the IDs of containers at indices
+// [startIndex], [startIndex+1], ..., [startIndex+numToFetch-1].
+// [startIndex] should be <= i.lastAcceptedIndex().
+// [numToFetch] should be in [0, MaxFetchedByRange]
 func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, error) {
 	// Check arguments for validity
 	if numToFetch == 0 {
@@ -242,7 +246,7 @@ func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, e
 	// Calculate the last index we will fetch
 	lastIndex := math.Min64(startIndex+numToFetch-1, lastAcceptedIndex)
 	// [lastIndex] is always >= [startIndex] so this is safe.
-	// [n] is limited to [MaxFetchedByRange] so [containerIDs] can't be crazy big.
+	// [numToFetch] is limited to [MaxFetchedByRange] so [containers] is bounded in size.
 	containers := make([]Container, int(lastIndex)-int(startIndex)+1)
 
 	n := 0
@@ -314,8 +318,8 @@ func (i *index) GetContainerByID(containerID ids.ID) (Container, error) {
 	return container, nil
 }
 
-// GetLastAccepted returns the last accepted container
-// Returns an error if no containers have been accepted
+// GetLastAccepted returns the last accepted container.
+// Returns an error if no containers have been accepted.
 func (i *index) GetLastAccepted() (Container, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
@@ -336,9 +340,9 @@ func (i *index) lastAcceptedIndex() (uint64, bool) {
 	return i.nextAcceptedIndex - 1, i.nextAcceptedIndex != 0
 }
 
-// Remove the last accepted container, whose ID is given, from the databases
-// Assumes [p.nextAcceptedIndex] >= 1
-// Assumes [containerID] is actually the ID of the last accepted container
+// Remove the last accepted container, [containerID], from the databases.
+// Assumes [p.nextAcceptedIndex] >= 1.
+// Assumes [containerID] is actually the ID of the last accepted container.
 func (i *index) removeLastAccepted(containerID ids.ID) error {
 	i.lock.Lock()
 	defer i.lock.Unlock()

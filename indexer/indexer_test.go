@@ -197,7 +197,7 @@ func TestIndexer(t *testing.T) {
 		}, nil,
 	).Twice()
 
-	cd.Accept(chain1Ctx, blkID, blkBytes)
+	assert.NoError(cd.Accept(chain1Ctx, blkID, blkBytes))
 
 	blkIdx := idxr.blockIndices[chain1Ctx.ChainID]
 	assert.NotNil(blkIdx)
@@ -307,7 +307,7 @@ func TestIndexer(t *testing.T) {
 		}, nil,
 	).Once()
 
-	cd.Accept(chain2Ctx, vtxID, blkBytes)
+	assert.NoError(cd.Accept(chain2Ctx, vtxID, blkBytes))
 
 	vtxIdx := idxr.vtxIndices[chain2Ctx.ChainID]
 	assert.NotNil(vtxIdx)
@@ -356,7 +356,7 @@ func TestIndexer(t *testing.T) {
 		}, nil,
 	).Once()
 
-	dd.Accept(chain2Ctx, txID, blkBytes)
+	assert.NoError(dd.Accept(chain2Ctx, txID, blkBytes))
 
 	txIdx := idxr.txIndices[chain2Ctx.ChainID]
 	assert.NotNil(txIdx)

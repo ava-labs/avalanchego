@@ -1,16 +1,14 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package api
+package server
 
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/gorilla/mux"
 )
 
@@ -18,10 +16,6 @@ var (
 	errUnknownBaseURL  = errors.New("unknown base url")
 	errUnknownEndpoint = errors.New("unknown endpoint")
 )
-
-type RouteAdder interface {
-	AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string, loggingWriter io.Writer) error
-}
 
 type router struct {
 	lock   sync.RWMutex

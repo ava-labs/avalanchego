@@ -8,15 +8,16 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
+	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/api/keystore/gkeystore/gkeystoreproto"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/encdb"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gkeystore/gkeystoreproto"
 )
 
 var (
-	_ snow.Keystore = &Client{}
+	_ keystore.BlockchainKeystore = &Client{}
 )
 
 // Client is a snow.Keystore that talks over RPC.
@@ -33,7 +34,15 @@ func NewClient(client gkeystoreproto.KeystoreClient, broker *plugin.GRPCBroker) 
 	}
 }
 
-func (c *Client) GetDatabase(username, password string) (database.Database, error) {
+func (c *Client) GetDatabase(username, password string) (*encdb.Database, error) {
+	bcDB, err := c.GetRawDatabase(username, password)
+	if err != nil {
+		return nil, err
+	}
+	return encdb.New([]byte(password), bcDB)
+}
+
+func (c *Client) GetRawDatabase(username, password string) (database.Database, error) {
 	resp, err := c.client.GetDatabase(context.Background(), &gkeystoreproto.GetDatabaseRequest{
 		Username: username,
 		Password: password,

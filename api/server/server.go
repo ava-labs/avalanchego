@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package api
+package server
 
 import (
 	"context"
@@ -18,7 +18,6 @@ import (
 
 	"github.com/rs/cors"
 
-	"github.com/ava-labs/avalanchego/api/auth"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -35,6 +34,10 @@ var (
 	errUnknownLockOption = errors.New("invalid lock options")
 )
 
+type RouteAdder interface {
+	AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string, loggingWriter io.Writer) error
+}
+
 // Server maintains the HTTP router
 type Server struct {
 	// log this server writes to
@@ -47,9 +50,6 @@ type Server struct {
 	handler http.Handler
 	// Listens for HTTP traffic on this address
 	listenAddress string
-	// Handles authorization. Must be non-nil after initialization, even if
-	// token authorization is off.
-	auth *auth.Auth
 
 	// http server
 	srv *http.Server
@@ -61,37 +61,24 @@ func (s *Server) Initialize(
 	factory logging.Factory,
 	host string,
 	port uint16,
-	authEnabled bool,
-	authPassword string,
 	allowedOrigins []string,
-) error {
+	wrappers ...Wrapper,
+) {
 	s.log = log
 	s.factory = factory
 	s.listenAddress = fmt.Sprintf("%s:%d", host, port)
 	s.router = newRouter()
 
-	a, err := auth.New(authEnabled, authPassword)
-	if err != nil {
-		return err
-	}
-	s.auth = a
-
 	s.log.Info("API created with allowed origins: %v", allowedOrigins)
 	corsWrapper := cors.New(cors.Options{
-		AllowedOrigins: allowedOrigins,
+		AllowedOrigins:   allowedOrigins,
+		AllowCredentials: true,
 	})
-	corsHandler := corsWrapper.Handler(s.router)
-	s.handler = s.auth.WrapHandler(corsHandler)
+	s.handler = corsWrapper.Handler(s.router)
 
-	if !authEnabled {
-		return nil
+	for _, wrapper := range wrappers {
+		s.handler = wrapper.WrapHandler(s.handler)
 	}
-
-	// only create auth service if token authorization is required
-	s.log.Info("API authorization is enabled. Auth tokens must be passed in the header of API requests, except requests to the auth service.")
-	authService := auth.NewService(s.log, s.auth)
-	return s.AddRoute(authService, &sync.RWMutex{}, auth.Endpoint, "", s.log)
-
 }
 
 // Dispatch starts the API server

@@ -5,7 +5,7 @@ import (
 	"math"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -61,7 +61,7 @@ type Config struct {
 	AllowIncompleteIndex                    bool
 	Name                                    string
 	DecisionDispatcher, ConsensusDispatcher *triggers.EventDispatcher
-	APIServer                               api.RouteAdder
+	APIServer                               server.RouteAdder
 	ShutdownF                               func()
 }
 
@@ -70,7 +70,7 @@ type Config struct {
 // they were accepted by this node.
 // Indexer is threadsafe.
 type Indexer interface {
-	RegisterChain(name string, ctx *snow.Context, vm interface{})
+	RegisterChain(name string, ctx *snow.Context, engine interface{})
 	// Close will do nothing and return nil after the first call
 	Close() error
 }
@@ -124,7 +124,7 @@ type indexer struct {
 	hasRunBefore bool
 
 	// Used to add API endpoint for new indices
-	routeAdder api.RouteAdder
+	routeAdder server.RouteAdder
 
 	// If true, allow running in such a way that could allow the creation
 	// of an index which could be missing accepted containers.

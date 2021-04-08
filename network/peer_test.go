@@ -67,13 +67,23 @@ func TestPeer_Close(t *testing.T) {
 	vdrs := validators.NewSet()
 	handler := &testHandler{}
 
+	versionManager := version.NewCompatibility(
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+	)
+
 	netwrk := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id,
 		ip,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener,
 		caller,
@@ -88,7 +98,6 @@ func TestPeer_Close(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
