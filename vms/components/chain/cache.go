@@ -318,7 +318,7 @@ func (c *Cache) LastAcceptedBlock() *BlockWrapper {
 	return c.lastAcceptedBlock
 }
 
-// LastAcceptedBlockInternal returns the internal snowman.Block that was last last accepted
+// LastAcceptedBlockInternal returns the internal snowman.Block that was last accepted
 func (c *Cache) LastAcceptedBlockInternal() snowman.Block {
 	return c.LastAcceptedBlock().Block
 }

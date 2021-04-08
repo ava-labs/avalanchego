@@ -46,7 +46,7 @@ func TestInterfaceCommitBatch(t *testing.T) {
 		if err := batch.Write(); err != nil {
 			t.Fatalf("Unexpected error on batch.Write: %s", err)
 		}
-		db.EndCommit()
+		db.EndBatch()
 	}
 }
 

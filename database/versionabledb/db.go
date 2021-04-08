@@ -137,7 +137,7 @@ func (db *Database) StartCommit() {
 
 // Commit writes all the operations in the versiondb to the
 // underlying database and sets the [versionEnabled] flag to false.
-// If StartCommit() was never called, then Commit() will be a no-op.
+// If StartCommit() was never called, then Commit() is a no-op.
 func (db *Database) Commit() error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -146,8 +146,8 @@ func (db *Database) Commit() error {
 	return db.vdb.Commit()
 }
 
-// EndCommit sets the [versionEnabled] flag back to false and calls
-// Abort() on the versiondb.
+// AbortCommit aborts any operations on the versiondb and sets the
+// [versionEnabled] flag to false.
 func (db *Database) AbortCommit() {
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -156,22 +156,25 @@ func (db *Database) AbortCommit() {
 	db.vdb.Abort()
 }
 
-// EndCommit sets the [versionEnabled] flag back to false and calls
-// Abort() on the versiondb.
-func (db *Database) EndCommit() {
-	db.versionEnabled = false
-	db.vdb.Abort()
-	db.lock.Unlock()
-}
-
 // CommitBatch returns a batch that contains all uncommitted puts/deletes.
 // Calling Write() on the returned batch causes the puts/deletes to be
 // written to the underlying database. CommitBatch holds onto the lock,
-// blocking all other database operations until EndCommit() is called.
+// blocking all other database operations until EndBatch() is called.
 func (db *Database) CommitBatch() (database.Batch, error) {
 	db.lock.Lock()
 
 	return db.vdb.CommitBatch()
+}
+
+// EndBatch sets the [versionEnabled] flag back to false and calls
+// Abort() on the versiondb.
+// EndBatch should be called exactly once following a call to
+// CommitBatch.
+// Assumes [db.lock] is still held by the initial call to CommitBatch
+func (db *Database) EndBatch() {
+	db.versionEnabled = false
+	db.vdb.Abort()
+	db.lock.Unlock()
 }
 
 // Close implements the database.Database interface

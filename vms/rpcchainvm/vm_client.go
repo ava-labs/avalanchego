@@ -47,9 +47,9 @@ var (
 )
 
 const (
-	decidedCacheSize    = 200
-	missingCacheSize    = 100
-	unverifiedCacheSize = 100
+	decidedCacheSize    = 500
+	missingCacheSize    = 200
+	unverifiedCacheSize = 200
 )
 
 // VMClient is an implementation of VM that talks over RPC.
