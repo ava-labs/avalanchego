@@ -109,7 +109,10 @@ func main() {
 	}
 	newNode.Stdout = os.Stdout
 	if err = newNode.Run(); err != nil {
-		fmt.Println(err)
+		exitCode = 1
+		if err := oldNodeCmd.Process.Signal(os.Interrupt); err != nil {
+			exitCode = 1
+		}
 	}
 
 	/*
