@@ -1825,7 +1825,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	assert.Len(t, net3.Peers([]ids.ShortID{}), 0)
 
 	// Disconnect original peer
-	caller0.clients[ip1.String()].Close()
+	_ = caller0.clients[ip1.String()].Close()
 
 	// Track ip2 on net3
 	wg2.Wait()

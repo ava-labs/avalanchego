@@ -43,7 +43,7 @@ func (b *BinaryManager) Start() (chan error, chan error) {
 
 func (b *BinaryManager) StartApp(app *application) {
 	fmt.Printf("Starting %s %s \n", app.path, app.args)
-	cmd := exec.Command(app.path, app.args...)
+	cmd := exec.Command(app.path, app.args...) // #nosec G204
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
