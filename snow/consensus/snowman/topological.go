@@ -513,6 +513,12 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 	child := n.children[pref]
 	// Notify anyone listening that this block was accepted.
 	bytes := child.Bytes()
+	// Because this is the newest accepted block, this is the new head.
+	ts.head = pref
+	ts.height = child.Height()
+	// Remove the decided block from the set of processing IDs, as its status
+	// now implies its preferredness.
+	ts.preferredIDs.Remove(pref)
 	ts.Metrics.Accepted(pref)
 	// Note that DecisionDispatcher.Accept / DecisionDispatcher.Accept must be called before
 	// child.Accept to honor EventDispatcher.Accept's invariant.
@@ -522,12 +528,6 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 	if err := ts.ctx.ConsensusDispatcher.Accept(ts.ctx, pref, bytes); err != nil {
 		return err
 	}
-	// Because this is the newest accepted block, this is the new head.
-	ts.head = pref
-	ts.height = child.Height()
-	// Remove the decided block from the set of processing IDs, as its status
-	// now implies its preferredness.
-	ts.preferredIDs.Remove(pref)
 	if err := child.Accept(); err != nil {
 		return err
 	}
