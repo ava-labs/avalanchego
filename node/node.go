@@ -67,14 +67,9 @@ const (
 
 var (
 	errPrimarySubnetNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
-)
 
-var (
 	genesisHashKey = []byte("genesisID")
 
-	// Version is the version of this code
-	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 3, 1)
-	versionParser           = version.NewDefaultParser()
 	beaconConnectionTimeout = 1 * time.Minute
 )
 
@@ -236,14 +231,24 @@ func (n *Node) initNetworking() error {
 		}
 	}
 
+	versionManager := version.NewCompatibility(
+		Version,
+		MinimumCompatibleVersion,
+		GetApricotPhase1Time(n.Config.NetworkID),
+		PrevMinimumCompatibleVersion,
+		MinimumUnmaskedVersion,
+		GetApricotPhase0Time(n.Config.NetworkID),
+		PrevMinimumUnmaskedVersion,
+	)
+
 	n.Net = network.NewDefaultNetwork(
 		n.Config.ConsensusParams.Metrics,
 		n.Log,
 		n.ID,
 		n.Config.StakingIP,
 		n.Config.NetworkID,
-		Version,
-		versionParser,
+		versionManager,
+		VersionParser,
 		listener,
 		dialer,
 		serverUpgrader,
@@ -257,7 +262,6 @@ func (n *Node) initNetworking() error {
 		n.Config.RestartOnDisconnected,
 		n.Config.DisconnectedCheckFreq,
 		n.Config.DisconnectedRestartTimeout,
-		n.Config.ApricotPhase0Time,
 		n.Config.SendQueueSize,
 		n.Config.NetworkHealthConfig,
 		n.benchlistManager,
@@ -643,7 +647,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			MinStakeDuration:   n.Config.MinStakeDuration,
 			MaxStakeDuration:   n.Config.MaxStakeDuration,
 			StakeMintingPeriod: n.Config.StakeMintingPeriod,
-			ApricotPhase0Time:  n.Config.ApricotPhase0Time,
+			ApricotPhase0Time:  GetApricotPhase0Time(n.Config.NetworkID),
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
 			CreationFee: n.Config.CreationTxFee,
