@@ -14,6 +14,7 @@ source $AVALANCHE_PATH/scripts/constants.sh
 "$AVALANCHE_PATH/scripts/build_avalanche.sh"
 "$AVALANCHE_PATH/scripts/build_coreth.sh"
 
+# build the previous version just one time
 if [[ ! -d "$PREV_BUILD_DIR" ]]; then
         "$AVALANCHE_PATH/scripts/build_prev.sh"
 fi

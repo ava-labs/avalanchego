@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -138,6 +138,7 @@ func main() {
 			// fetch only mode is to bootstrap from a node on the same machine (127.0.0.1) whose
 			// staking port is 9650. Tell the user to run in fetch only mode.
 			log.Error(mustUpgradeMsg)
+			exitCode = 1
 			return
 		}
 	}
