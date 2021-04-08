@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package api
+package server
 
 import (
 	"bytes"
@@ -30,18 +30,13 @@ func (s *Service) Call(_ *http.Request, args *Args, reply *Reply) error {
 
 func TestCall(t *testing.T) {
 	s := Server{}
-	err := s.Initialize(
+	s.Initialize(
 		logging.NoLog{},
 		logging.NoFactory{},
 		"localhost",
 		8080,
-		false,
-		"",
 		[]string{"*"},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	serv := &Service{}
 	newServer := rpc.NewServer()
@@ -51,7 +46,7 @@ func TestCall(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = s.AddRoute(
+	err := s.AddRoute(
 		&common.HTTPHandler{Handler: newServer},
 		new(sync.RWMutex),
 		"vm/lol",

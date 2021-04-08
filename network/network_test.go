@@ -254,13 +254,23 @@ func TestNewDefaultNetwork(t *testing.T) {
 	vdrs := validators.NewSet()
 	handler := &testHandler{}
 
+	versionManager := version.NewCompatibility(
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+	)
+
 	net := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id,
 		ip,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener,
 		caller,
@@ -275,7 +285,6 @@ func TestNewDefaultNetwork(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
@@ -371,13 +380,23 @@ func TestEstablishConnection(t *testing.T) {
 		},
 	}
 
+	versionManager := version.NewCompatibility(
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+	)
+
 	net0 := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id0,
 		ip0,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener0,
 		caller0,
@@ -392,7 +411,6 @@ func TestEstablishConnection(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
@@ -406,7 +424,7 @@ func TestEstablishConnection(t *testing.T) {
 		id1,
 		ip1,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener1,
 		caller1,
@@ -421,7 +439,6 @@ func TestEstablishConnection(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
@@ -529,13 +546,23 @@ func TestDoubleTrack(t *testing.T) {
 		},
 	}
 
+	versionManager := version.NewCompatibility(
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+	)
+
 	net0 := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id0,
 		ip0,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener0,
 		caller0,
@@ -550,7 +577,6 @@ func TestDoubleTrack(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
@@ -564,7 +590,7 @@ func TestDoubleTrack(t *testing.T) {
 		id1,
 		ip1,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener1,
 		caller1,
@@ -579,7 +605,6 @@ func TestDoubleTrack(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
@@ -688,13 +713,23 @@ func TestDoubleClose(t *testing.T) {
 		},
 	}
 
+	versionManager := version.NewCompatibility(
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+	)
+
 	net0 := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id0,
 		ip0,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener0,
 		caller0,
@@ -709,7 +744,6 @@ func TestDoubleClose(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
@@ -723,7 +757,7 @@ func TestDoubleClose(t *testing.T) {
 		id1,
 		ip1,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener1,
 		caller1,
@@ -738,7 +772,6 @@ func TestDoubleClose(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
@@ -852,13 +885,23 @@ func TestTrackConnected(t *testing.T) {
 		},
 	}
 
+	versionManager := version.NewCompatibility(
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+	)
+
 	net0 := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id0,
 		ip0,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener0,
 		caller0,
@@ -873,7 +916,6 @@ func TestTrackConnected(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
@@ -887,7 +929,7 @@ func TestTrackConnected(t *testing.T) {
 		id1,
 		ip1,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener1,
 		caller1,
@@ -902,7 +944,6 @@ func TestTrackConnected(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
@@ -990,13 +1031,23 @@ func TestTrackConnectedRace(t *testing.T) {
 	vdrs := validators.NewSet()
 	handler := &testHandler{}
 
+	versionManager := version.NewCompatibility(
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+	)
+
 	net0 := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id0,
 		ip0,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener0,
 		caller0,
@@ -1011,7 +1062,6 @@ func TestTrackConnectedRace(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
@@ -1025,7 +1075,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		id1,
 		ip1,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener1,
 		caller1,
@@ -1040,7 +1090,6 @@ func TestTrackConnectedRace(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
@@ -1256,13 +1305,23 @@ func TestPeerAliasesTicker(t *testing.T) {
 		assert.Fail(t, "caller 0 unauthorized close", local.String(), remote.String())
 	}
 
+	versionManager := version.NewCompatibility(
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+	)
+
 	net0 := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id0,
 		ip0,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener0,
 		caller0,
@@ -1277,7 +1336,6 @@ func TestPeerAliasesTicker(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
@@ -1291,7 +1349,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		id1,
 		ip1,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener1,
 		caller1,
@@ -1306,7 +1364,6 @@ func TestPeerAliasesTicker(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
@@ -1320,7 +1377,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		id1,
 		ip2,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener2,
 		caller2,
@@ -1335,7 +1392,6 @@ func TestPeerAliasesTicker(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
@@ -1349,7 +1405,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		id2,
 		ip2,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener3,
 		caller3,
@@ -1364,7 +1420,6 @@ func TestPeerAliasesTicker(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
@@ -1662,13 +1717,23 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		assert.Fail(t, "caller 0 unauthorized close", local.String(), remote.String())
 	}
 
+	versionManager := version.NewCompatibility(
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+	)
+
 	net0 := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id0,
 		ip0,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener0,
 		caller0,
@@ -1683,7 +1748,6 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
@@ -1697,7 +1761,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		id1,
 		ip1,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener1,
 		caller1,
@@ -1712,7 +1776,6 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
@@ -1726,7 +1789,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		id1,
 		ip2,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener2,
 		caller2,
@@ -1741,7 +1804,6 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
@@ -1755,7 +1817,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		id2,
 		ip2,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener3,
 		caller3,
@@ -1770,7 +1832,6 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),

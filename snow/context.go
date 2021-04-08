@@ -11,8 +11,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -23,11 +23,6 @@ type EventDispatcher interface {
 	Issue(ctx *Context, containerID ids.ID, container []byte)
 	Accept(ctx *Context, containerID ids.ID, container []byte)
 	Reject(ctx *Context, containerID ids.ID, container []byte)
-}
-
-// Keystore ...
-type Keystore interface {
-	GetDatabase(username, password string) (database.Database, error)
 }
 
 // AliasLookup ...
@@ -58,7 +53,7 @@ type Context struct {
 	DecisionDispatcher  EventDispatcher
 	ConsensusDispatcher EventDispatcher
 	Lock                sync.RWMutex
-	Keystore            Keystore
+	Keystore            keystore.BlockchainKeystore
 	SharedMemory        atomic.SharedMemory
 	BCLookup            AliasLookup
 	SNLookup            SubnetLookup

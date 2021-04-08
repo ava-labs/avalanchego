@@ -17,12 +17,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/admin"
+	"github.com/ava-labs/avalanchego/api/auth"
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
+	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
@@ -32,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
@@ -65,14 +67,9 @@ const (
 
 var (
 	errPrimarySubnetNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
-)
 
-var (
 	genesisHashKey = []byte("genesisID")
 
-	// Version is the version of this code
-	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 3, 1)
-	versionParser           = version.NewDefaultParser()
 	beaconConnectionTimeout = 1 * time.Minute
 )
 
@@ -90,7 +87,7 @@ type Node struct {
 	DB database.Database
 
 	// Handles calls to Keystore API
-	keystoreServer keystore.Keystore
+	keystore keystore.Keystore
 
 	// Manages shared memory
 	sharedMemory atomic.Memory
@@ -123,7 +120,7 @@ type Node struct {
 	vdrs validators.Manager
 
 	// Handles HTTP API calls
-	APIServer api.Server
+	APIServer server.Server
 
 	// This node's configuration
 	Config *Config
@@ -234,14 +231,24 @@ func (n *Node) initNetworking() error {
 		}
 	}
 
+	versionManager := version.NewCompatibility(
+		Version,
+		MinimumCompatibleVersion,
+		GetApricotPhase1Time(n.Config.NetworkID),
+		PrevMinimumCompatibleVersion,
+		MinimumUnmaskedVersion,
+		GetApricotPhase0Time(n.Config.NetworkID),
+		PrevMinimumUnmaskedVersion,
+	)
+
 	n.Net = network.NewDefaultNetwork(
 		n.Config.ConsensusParams.Metrics,
 		n.Log,
 		n.ID,
 		n.Config.StakingIP,
 		n.Config.NetworkID,
-		Version,
-		versionParser,
+		versionManager,
+		VersionParser,
 		listener,
 		dialer,
 		serverUpgrader,
@@ -255,7 +262,6 @@ func (n *Node) initNetworking() error {
 		n.Config.RestartOnDisconnected,
 		n.Config.DisconnectedCheckFreq,
 		n.Config.DisconnectedRestartTimeout,
-		n.Config.ApricotPhase0Time,
 		n.Config.SendQueueSize,
 		n.Config.NetworkHealthConfig,
 		n.benchlistManager,
@@ -494,15 +500,42 @@ func (n *Node) initChains(genesisBytes []byte) {
 func (n *Node) initAPIServer() error {
 	n.Log.Info("initializing API server")
 
-	return n.APIServer.Initialize(
+	if !n.Config.APIRequireAuthToken {
+		n.APIServer.Initialize(
+			n.Log,
+			n.LogFactory,
+			n.Config.HTTPHost,
+			n.Config.HTTPPort,
+			n.Config.APIAllowedOrigins,
+		)
+		return nil
+	}
+
+	a, err := auth.New(n.Log, "auth", n.Config.APIAuthPassword)
+	if err != nil {
+		return err
+	}
+
+	n.APIServer.Initialize(
 		n.Log,
 		n.LogFactory,
 		n.Config.HTTPHost,
 		n.Config.HTTPPort,
-		n.Config.APIRequireAuthToken,
-		n.Config.APIAuthPassword,
 		n.Config.APIAllowedOrigins,
+		a,
 	)
+
+	// only create auth service if token authorization is required
+	n.Log.Info("API authorization is enabled. Auth tokens must be passed in the header of API requests, except requests to the auth service.")
+	authService, err := a.CreateHandler()
+	if err != nil {
+		return err
+	}
+	handler := &common.HTTPHandler{
+		LockOptions: common.NoLock,
+		Handler:     authService,
+	}
+	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "auth", "", n.Log)
 }
 
 // Create the vmManager, chainManager and register the following VMs:
@@ -576,7 +609,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		NodeID:                    n.ID,
 		NetworkID:                 n.Config.NetworkID,
 		Server:                    &n.APIServer,
-		Keystore:                  &n.keystoreServer,
+		Keystore:                  n.keystore,
 		AtomicMemory:              &n.sharedMemory,
 		AVAXAssetID:               avaxAssetID,
 		XChainID:                  xChainID,
@@ -614,7 +647,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			MinStakeDuration:   n.Config.MinStakeDuration,
 			MaxStakeDuration:   n.Config.MaxStakeDuration,
 			StakeMintingPeriod: n.Config.StakeMintingPeriod,
-			ApricotPhase0Time:  n.Config.ApricotPhase0Time,
+			ApricotPhase0Time:  GetApricotPhase0Time(n.Config.NetworkID),
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
 			CreationFee: n.Config.CreationTxFee,
@@ -650,10 +683,8 @@ func (n *Node) initSharedMemory() error {
 func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
 	keystoreDB := prefixdb.New([]byte("keystore"), n.DB)
-	if err := n.keystoreServer.Initialize(n.Log, keystoreDB); err != nil {
-		return err
-	}
-	keystoreHandler, err := n.keystoreServer.CreateHandler()
+	n.keystore = keystore.New(n.Log, keystoreDB)
+	keystoreHandler, err := n.keystore.CreateHandler()
 	if err != nil {
 		return err
 	}
@@ -662,7 +693,11 @@ func (n *Node) initKeystoreAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing keystore API")
-	return n.APIServer.AddRoute(keystoreHandler, &sync.RWMutex{}, "keystore", "", n.HTTPLog)
+	handler := &common.HTTPHandler{
+		LockOptions: common.NoLock,
+		Handler:     keystoreHandler,
+	}
+	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "keystore", "", n.HTTPLog)
 }
 
 // initMetricsAPI initializes the Metrics API
