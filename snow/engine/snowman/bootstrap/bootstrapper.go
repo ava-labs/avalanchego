@@ -327,8 +327,14 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs) (int, error) {
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		jobID := job.ID()
 		jobBytes := job.Bytes()
-		b.Ctx.ConsensusDispatcher.Accept(b.Ctx, jobID, jobBytes)
-		b.Ctx.DecisionDispatcher.Accept(b.Ctx, jobID, jobBytes)
+		// Note that ConsensusDispatcher.Accept / ConsensusDispatcher.Accept must be
+		// called before job.Execute to honor EventDispatcher.Accept's invariant.
+		if err := b.Ctx.ConsensusDispatcher.Accept(b.Ctx, jobID, jobBytes); err != nil {
+			return numExecuted, err
+		}
+		if err := b.Ctx.DecisionDispatcher.Accept(b.Ctx, jobID, jobBytes); err != nil {
+			return numExecuted, err
+		}
 
 		if err := jobs.Execute(job); err != nil {
 			return numExecuted, err

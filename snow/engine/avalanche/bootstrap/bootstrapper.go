@@ -442,7 +442,11 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher)
 
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		b.Ctx.Log.Debug("Executing: %s", job.ID())
-		events.Accept(b.Ctx, job.ID(), job.Bytes())
+		// Note that events.Accept must be called before
+		// job.Execute to honor EventDispatcher.Accept's invariant.
+		if err := events.Accept(b.Ctx, job.ID(), job.Bytes()); err != nil {
+			return numExecuted, err
+		}
 		if err := jobs.Execute(job); err != nil {
 			b.Ctx.Log.Error("Error executing: %s", err)
 			return numExecuted, err

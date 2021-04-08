@@ -513,8 +513,14 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 	child := n.children[pref]
 	// Notify anyone listening that this block was accepted.
 	bytes := child.Bytes()
-	ts.ctx.DecisionDispatcher.Accept(ts.ctx, pref, bytes)
-	ts.ctx.ConsensusDispatcher.Accept(ts.ctx, pref, bytes)
+	// Note that DecisionDispatcher.Accept / ConsensusDispatcher.Accept must be called before
+	// child.Accept to honor EventDispatcher.Accept's invariant.
+	if err := ts.ctx.DecisionDispatcher.Accept(ts.ctx, pref, bytes); err != nil {
+		return err
+	}
+	if err := ts.ctx.ConsensusDispatcher.Accept(ts.ctx, pref, bytes); err != nil {
+		return err
+	}
 	if err := child.Accept(); err != nil {
 		return err
 	}

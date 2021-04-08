@@ -307,7 +307,7 @@ func (i *indexer) registerChainHelper(
 	}
 
 	// Register index to learn about new accepted vertices
-	if err := dispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID), index); err != nil {
+	if err := dispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID), index, true); err != nil {
 		_ = index.Close()
 		return nil, err
 	}

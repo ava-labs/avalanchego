@@ -508,7 +508,11 @@ func (ta *Topological) update(vtx Vertex) error {
 	switch {
 	case acceptable:
 		// I'm acceptable, why not accept?
-		ta.ctx.ConsensusDispatcher.Accept(ta.ctx, vtxID, vtx.Bytes())
+		// Note that ConsensusDispatcher.Accept must be called before vtx.Accept to honor
+		// EventDispatcher.Accept's invariant.
+		if err := ta.ctx.ConsensusDispatcher.Accept(ta.ctx, vtxID, vtx.Bytes()); err != nil {
+			return err
+		}
 		if err := vtx.Accept(); err != nil {
 			return err
 		}

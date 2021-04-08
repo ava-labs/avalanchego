@@ -21,7 +21,10 @@ import (
 // EventDispatcher ...
 type EventDispatcher interface {
 	Issue(ctx *Context, containerID ids.ID, container []byte)
-	Accept(ctx *Context, containerID ids.ID, container []byte)
+	// If the returned error is non-nil, the chain associated with [ctx] should shut
+	// down and not commit [container] or any other container to its database as accepted.
+	// Accept must be called before [containerID] is commited to the VM as accepted.
+	Accept(ctx *Context, containerID ids.ID, container []byte) error
 	Reject(ctx *Context, containerID ids.ID, container []byte)
 }
 
@@ -116,6 +119,6 @@ func DefaultContextTest() *Context {
 
 type emptyEventDispatcher struct{}
 
-func (emptyEventDispatcher) Issue(*Context, ids.ID, []byte)  {}
-func (emptyEventDispatcher) Accept(*Context, ids.ID, []byte) {}
-func (emptyEventDispatcher) Reject(*Context, ids.ID, []byte) {}
+func (emptyEventDispatcher) Issue(*Context, ids.ID, []byte)        {}
+func (emptyEventDispatcher) Accept(*Context, ids.ID, []byte) error { return nil }
+func (emptyEventDispatcher) Reject(*Context, ids.ID, []byte)       {}

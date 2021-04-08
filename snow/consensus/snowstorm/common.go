@@ -138,7 +138,11 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 	// vacuously accepted and doesn't need to be voted on.
 
 	// Notify those listening for accepted txs
-	c.ctx.DecisionDispatcher.Accept(c.ctx, txID, bytes)
+	// Note that DecisionDispatcher.Accept must be called before
+	// tx.Accept to honor EventDispatcher.Accept's invariant.
+	if err := c.ctx.DecisionDispatcher.Accept(c.ctx, txID, bytes); err != nil {
+		return false, err
+	}
 
 	if err := tx.Accept(); err != nil {
 		return false, err
@@ -154,7 +158,11 @@ func (c *common) acceptTx(tx Tx) error {
 	txID := tx.ID()
 
 	// Notify those listening that this tx has been accepted.
-	c.ctx.DecisionDispatcher.Accept(c.ctx, txID, tx.Bytes())
+	// Note that DecisionDispatcher.Accept must be called before
+	// tx.Accept to honor EventDispatcher.Accept's invariant.
+	if err := c.ctx.DecisionDispatcher.Accept(c.ctx, txID, tx.Bytes()); err != nil {
+		return err
+	}
 
 	// Accept is called before notifying the IPC so that acceptances that cause
 	// fatal errors aren't sent to an IPC peer.
