@@ -485,7 +485,7 @@ func (n *Node) initIPCs() error {
 	return err
 }
 
-// Initialize [n.txIndexer] and [n.vtxIndexer]
+// Initialize [n.indexer].
 // Should only be called after [n.DB], [n.DecisionDispatcher], [n.ConsensusDispatcher],
 // [n.Log], [n.APIServer], [n.chainManager] are initialized
 func (n *Node) initIndexer() error {
@@ -681,9 +681,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			ApricotPhase0Time:  GetApricotPhase0Time(n.Config.NetworkID),
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
-			IndexEnabled: n.Config.IndexAPIEnabled,
-			CreationFee:  n.Config.CreationTxFee,
-			Fee:          n.Config.TxFee,
+			CreationFee: n.Config.CreationTxFee,
+			Fee:         n.Config.TxFee,
 		}),
 		n.vmManager.RegisterVMFactory(evm.ID, &rpcchainvm.Factory{
 			Path:   filepath.Join(n.Config.PluginDir, "evm"),

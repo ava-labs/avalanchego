@@ -15,9 +15,8 @@ var (
 
 // Factory ...
 type Factory struct {
-	CreationFee  uint64
-	Fee          uint64
-	IndexEnabled bool
+	CreationFee uint64
+	Fee         uint64
 }
 
 // New ...
