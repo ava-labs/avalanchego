@@ -58,12 +58,25 @@ func (m *MigrationManager) ResolveMigration() error {
 	return m.setupApp(needDBUpgrade)
 }
 
+// todo this is wonky, clean it up
 func (m *MigrationManager) setupApp(upgrade bool) error {
 	var cmdArgs []string
 
 	// setting up the current version
 	for k, v := range m.viper.AllSettings() { // Pass args
+		if upgrade {
+			// use the next available port
+			if k == "http-port" || k == "staking-port" {
+				v = "0"
+			}
+		}
+
 		cmdArgs = append(cmdArgs, fmt.Sprintf("--%s=%v", k, v))
+	}
+
+	if upgrade {
+		// and ensure it's in fetch mode
+		cmdArgs = append(cmdArgs, "--fetch-only=true")
 	}
 
 	// todo hook versions dynamically

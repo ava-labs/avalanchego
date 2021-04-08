@@ -23,7 +23,9 @@ type BinaryManager struct {
 
 func NewBinaryManager(path string) *BinaryManager {
 	return &BinaryManager{
-		rootPath: path,
+		rootPath:  path,
+		prevVsApp: &application{errChan: make(chan error)},
+		currVsApp: &application{errChan: make(chan error)},
 	}
 }
 
