@@ -11,7 +11,7 @@ BUILD_DIR=$AVALANCHE_PATH/build/avalanchego-$AVALANCHEGO_VER # Where AvalancheGo
 PLUGIN_DIR="$BUILD_DIR/plugins" # Where plugin binaries (namely coreth) go
 EVM_PATH="$PLUGIN_DIR/evm"
 AVALANCHEGO_INNER_PATH="$BUILD_DIR/avalanchego-inner"
-BINARY_MANAGER_PATH="$BUILD_DIR/avalanchego"
+BINARY_MANAGER_PATH="$AVALANCHE_PATH/build/avalanchego"
 
 PREV_BUILD_DIR="$AVALANCHE_PATH/build/avalanchego-$PREV_AVALANCHEGO_VER" # Where AvalancheGo binary goes
 PREV_PLUGIN_DIR="$PREV_BUILD_DIR/plugins"

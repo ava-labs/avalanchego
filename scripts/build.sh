@@ -14,7 +14,7 @@ source $AVALANCHE_PATH/scripts/constants.sh
 "$AVALANCHE_PATH/scripts/build_avalanche.sh"
 "$AVALANCHE_PATH/scripts/build_coreth.sh"
 
-if [[ ! -d "$BUILD_DIR/avalanchego-$PREV_AVALANCHEGO_VER" ]]; then
+if [[ ! -d "$PREV_BUILD_DIR" ]]; then
         "$AVALANCHE_PATH/scripts/build_prev.sh"
 fi
 

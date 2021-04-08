@@ -72,9 +72,6 @@ func main() {
 		return
 	}
 
-	// TODO remove
-	// fmt.Printf("%+v\n", config)
-
 	// Set the data directory permissions to be read write.
 	if err := perms.ChmodR(config.DBPath, true, perms.ReadWriteExecute); err != nil {
 		fmt.Printf("failed to restrict the permissions of the database directory with error %s\n", err)
