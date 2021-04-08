@@ -143,7 +143,7 @@ func (b *Block) Accept() error {
 	// deadlock. This is ok because it only needs to interact with the shared memory
 	// database.
 	batch, err := vm.db.CommitBatch()
-	defer vm.db.EndCommit()
+	defer vm.db.EndBatch()
 	if err != nil {
 		return fmt.Errorf("failed to create commit batch due to: %w", err)
 	}
