@@ -47,7 +47,6 @@ func TestNewIndexer(t *testing.T) {
 		IndexingEnabled:      true,
 		AllowIncompleteIndex: true,
 		Log:                  logging.NoLog{},
-		Name:                 "test",
 		DB:                   memdb.New(),
 		ConsensusDispatcher:  ed,
 		DecisionDispatcher:   ed,
@@ -59,7 +58,6 @@ func TestNewIndexer(t *testing.T) {
 	assert.NoError(err)
 	idxr, ok := idxrIntf.(*indexer)
 	assert.True(ok)
-	assert.Equal("test", idxr.name)
 	assert.NotNil(idxr.codec)
 	assert.NotNil(idxr.log)
 	assert.NotNil(idxr.db)
@@ -93,7 +91,6 @@ func TestMarkHasRunAndShutdown(t *testing.T) {
 	config := Config{
 		IndexingEnabled:     true,
 		Log:                 logging.NoLog{},
-		Name:                "test",
 		DB:                  db,
 		ConsensusDispatcher: cd,
 		DecisionDispatcher:  dd,
@@ -133,7 +130,6 @@ func TestIndexer(t *testing.T) {
 		IndexingEnabled:      true,
 		AllowIncompleteIndex: false,
 		Log:                  logging.NoLog{},
-		Name:                 "test",
 		DB:                   db,
 		ConsensusDispatcher:  cd,
 		DecisionDispatcher:   dd,
@@ -437,7 +433,6 @@ func TestIncompleteIndex(t *testing.T) {
 		IndexingEnabled:      false,
 		AllowIncompleteIndex: false,
 		Log:                  logging.NoLog{},
-		Name:                 "test",
 		DB:                   versiondb.New(baseDB),
 		ConsensusDispatcher:  cd,
 		DecisionDispatcher:   dd,
@@ -526,7 +521,6 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 		IndexingEnabled:      true,
 		AllowIncompleteIndex: false,
 		Log:                  logging.NoLog{},
-		Name:                 "test",
 		DB:                   db,
 		ConsensusDispatcher:  cd,
 		DecisionDispatcher:   dd,

@@ -494,7 +494,6 @@ func (n *Node) initIndexer() error {
 	n.indexer, err = indexer.NewIndexer(indexer.Config{
 		IndexingEnabled:      n.Config.IndexAPIEnabled,
 		AllowIncompleteIndex: n.Config.IndexAllowIncomplete,
-		Name:                 "tx",
 		DB:                   txIndexerDB,
 		Log:                  n.Log,
 		DecisionDispatcher:   n.DecisionDispatcher,

@@ -59,7 +59,6 @@ type Config struct {
 	Log                                     logging.Logger
 	IndexingEnabled                         bool
 	AllowIncompleteIndex                    bool
-	Name                                    string
 	DecisionDispatcher, ConsensusDispatcher *triggers.EventDispatcher
 	APIServer                               server.RouteAdder
 	ShutdownF                               func()
@@ -78,7 +77,6 @@ type Indexer interface {
 // NewIndexer returns a new Indexer and registers a new endpoint on the given API server.
 func NewIndexer(config Config) (Indexer, error) {
 	indexer := &indexer{
-		name:                 config.Name,
 		codec:                codec.NewManager(codecMaxSize),
 		log:                  config.Log,
 		db:                   config.DB,
@@ -109,7 +107,6 @@ func NewIndexer(config Config) (Indexer, error) {
 // indexer implements Indexer
 type indexer struct {
 	// Name of endpoint
-	name   string
 	codec  codec.Manager
 	clock  timer.Clock
 	lock   sync.RWMutex
