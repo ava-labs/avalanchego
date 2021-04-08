@@ -647,7 +647,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			MinStakeDuration:   n.Config.MinStakeDuration,
 			MaxStakeDuration:   n.Config.MaxStakeDuration,
 			StakeMintingPeriod: n.Config.StakeMintingPeriod,
-			ApricotPhase0Time:  GetApricotPhase1Time(n.Config.NetworkID),
+			ApricotPhase0Time:  GetApricotPhase0Time(n.Config.NetworkID),
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
 			CreationFee: n.Config.CreationTxFee,
