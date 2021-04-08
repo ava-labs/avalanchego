@@ -442,6 +442,7 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher)
 
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		b.Ctx.Log.Debug("Executing: %s", job.ID())
+		events.Accept(b.Ctx, job.ID(), job.Bytes())
 		if err := jobs.Execute(job); err != nil {
 			b.Ctx.Log.Error("Error executing: %s", err)
 			return numExecuted, err
@@ -454,7 +455,6 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher)
 			b.Ctx.Log.Info("executed %d operations", numExecuted)
 		}
 
-		events.Accept(b.Ctx, job.ID(), job.Bytes())
 	}
 	b.Ctx.Log.Info("executed %d operations", numExecuted)
 	return numExecuted, nil
