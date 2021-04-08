@@ -5,9 +5,7 @@ package coreth
 
 import (
 	"fmt"
-	"io"
 	"math/big"
-	"os"
 	"time"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
@@ -21,8 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/mattn/go-isatty"
 )
 
 var (
@@ -239,10 +235,4 @@ func (self *ETHChain) GetTxPool() *core.TxPool {
 // SetGasPrice sets the gas price on the backend
 func (self *ETHChain) SetGasPrice(newGasPrice *big.Int) {
 	self.backend.SetGasPrice(newGasPrice)
-}
-
-func init() {
-	usecolor := (isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd())) && os.Getenv("TERM") != "dumb"
-	glogger := log.StreamHandler(io.Writer(os.Stderr), log.TerminalFormat(usecolor))
-	log.Root().SetHandler(glogger)
 }
