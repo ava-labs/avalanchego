@@ -144,6 +144,8 @@ func (pb *ProposalBlock) Verify() error {
 		}
 		return err
 	}
+	pb.onCommitState.AddTx(&pb.Tx, Committed)
+	pb.onAbortState.AddTx(&pb.Tx, Aborted)
 
 	pb.vm.currentBlocks[pb.ID()] = pb
 	parentIntf.addChild(pb)

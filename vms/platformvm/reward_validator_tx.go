@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -70,13 +71,19 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
 	}
 
-	stakerTx, err := vm.nextStakerStop(db, constants.PrimaryNetworkID)
-	if err != nil {
+	currentStakers := parentState.CurrentStakerChainState()
+	stakerTx, _, err := currentStakers.GetNextStaker()
+	if err == database.ErrNotFound {
 		return nil, nil, nil, nil, permError{
 			fmt.Errorf("failed to get next staker stop time: %w", err),
 		}
 	}
-	if stakerID := stakerTx.Tx.ID(); stakerID != tx.TxID {
+	if err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
+
+	stakerID := stakerTx.ID()
+	if stakerID != tx.TxID {
 		return nil, nil, nil, nil, permError{
 			fmt.Errorf(
 				"attempting to remove TxID: %s. Should be removing %s",
@@ -88,7 +95,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 
 	// Verify that the chain's timestamp is the validator's end time
 	currentTime := parentState.GetTimestamp()
-	staker, ok := stakerTx.Tx.UnsignedTx.(TimedTx)
+	staker, ok := stakerTx.UnsignedTx.(TimedTx)
 	if !ok {
 		return nil, nil, nil, nil, permError{errWrongTxType}
 	}
@@ -101,6 +108,14 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 			),
 		}
 	}
+
+	newlyCurrentStakers, err := currentStakers.DeleteStaker(stakerID)
+	if err != nil {
+		return nil, nil, nil, nil, permError{err}
+	}
+
+	pendingStakers := parentState.PendingStakerChainState()
+	onCommitState := NewVersionedState(parentState, newlyCurrentStakers, pendingStakers)
 
 	// If this tx's proposal is committed, remove the validator from the validator set
 	onCommitDB := versiondb.New(db)

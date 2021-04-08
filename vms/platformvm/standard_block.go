@@ -77,6 +77,7 @@ func (sb *StandardBlock) Verify() error {
 			}
 			return err
 		}
+		sb.onAcceptState.AddTx(tx, Committed)
 		if onAccept != nil {
 			funcs = append(funcs, onAccept)
 		}

@@ -61,23 +61,6 @@ func (vm *VM) getTx(db database.Database, txID ids.ID) ([]byte, error) {
 	return nil, fmt.Errorf("expected tx to be []byte but is type %T", txIntf)
 }
 
-// Persist a status
-func (vm *VM) putStatus(db database.Database, id ids.ID, status Status) error {
-	return vm.State.Put(db, statusTypeID, id, status)
-}
-
-// Retrieve a status
-func (vm *VM) getStatus(db database.Database, id ids.ID) (Status, error) {
-	statusIntf, err := vm.State.Get(db, statusTypeID, id)
-	if err != nil {
-		return Unknown, err
-	}
-	if status, ok := statusIntf.(Status); ok {
-		return status, nil
-	}
-	return Unknown, fmt.Errorf("expected status to be type Status but is type %T", statusIntf)
-}
-
 // Add a staker to subnet [subnetID]'s pending validator queue. A staker may be
 // a validator or a delegator
 func (vm *VM) enqueueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) error {

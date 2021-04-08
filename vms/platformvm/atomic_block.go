@@ -91,6 +91,7 @@ func (ab *AtomicBlock) Verify() error {
 		ab.vm.droppedTxCache.Put(ab.Tx.ID(), err.Error()) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", tx.ID(), err)
 	}
+	onAccept.AddTx(&ab.Tx, Committed)
 
 	ab.onAcceptState = onAccept
 	ab.vm.currentBlocks[ab.ID()] = ab

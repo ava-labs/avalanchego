@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -44,6 +45,7 @@ var (
 	errNoAddresses           = errors.New("no addresses provided")
 	errNoKeys                = errors.New("user has no keys or funds")
 	errNoPrimaryValidators   = errors.New("no default subnet validators")
+	errCorruptedReason       = errors.New("tx validity corrupted")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -1784,19 +1786,17 @@ func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error
 			return false, errMissingDecisionBlock
 		}
 	}
-	db := block.onAccept()
+	state := block.onAccept()
 
-	chains, err := service.vm.getChains(db)
+	tx, _, err := state.GetTx(chainID)
+	if err == database.ErrNotFound {
+		return false, nil
+	}
 	if err != nil {
 		return false, err
 	}
-
-	for _, chain := range chains {
-		if chain.ID() == chainID {
-			return true, nil
-		}
-	}
-	return false, nil
+	_, ok = tx.UnsignedTx.(*UnsignedCreateChainTx)
+	return ok, nil
 }
 
 // ValidatedByArgs is the arguments for calling ValidatedBy
@@ -1965,40 +1965,61 @@ type GetTxStatusResponse struct {
 // GetTxStatus gets a tx's status
 func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *GetTxStatusResponse) error {
 	service.vm.Ctx.Log.Info("Platform: GetTxStatus called")
-	status, err := service.vm.getStatus(service.vm.DB, args.TxID)
+
+	_, status, err := service.vm.internalState.GetTx(args.TxID)
 	if err == nil { // Found the status. Report it.
 		response.Status = status
 		return nil
 	}
-	// The status of this transaction is not in the database.
-	// Check if the tx is in the preferred block's db. If so, return that it's processing.
+	if err != database.ErrNotFound {
+		return err
+	}
+
+	// The status of this transaction is not in the database - check if the tx
+	// is in the preferred block's db. If so, return that it's processing.
 	preferred, err := service.vm.getBlock(service.vm.Preferred())
 	if err != nil {
 		service.vm.Ctx.Log.Error("couldn't get preferred block: %s", err)
+		return err
+	}
+
+	block, ok := preferred.(decision)
+	if !ok {
+		service.vm.Ctx.Log.Error("preferred block should always be a decision block")
+		return errInvalidBlockType
+	}
+
+	onAccept := block.onAccept()
+	_, status, err = onAccept.GetTx(args.TxID)
+	if err == nil {
+		// Found the status in the preferred block's db. Report tx is processing.
+		response.Status = status
+		return nil
+	}
+	if err != database.ErrNotFound {
+		return err
+	}
+
+	reason, ok := service.vm.droppedTxCache.Get(args.TxID)
+	if !ok {
+		// The tx isn't being tracked by the node.
 		response.Status = Unknown
 		return nil
 	}
-	if block, ok := preferred.(decision); ok {
-		if _, err := service.vm.getStatus(block.onAccept(), args.TxID); err == nil {
-			// Found the status in the preferred block's db. Report tx is processing.
-			status := Processing
-			response.Status = status
-			return nil
-		}
+
+	// The tx was recently dropped because it was invalid.
+	response.Status = Dropped
+	if !args.IncludeReason {
+		return nil
 	}
-	if reason, ok := service.vm.droppedTxCache.Get(args.TxID); ok {
-		response.Status = Dropped
-		if args.IncludeReason {
-			reasonStr, ok := reason.(string)
-			if !ok {
-				service.vm.Ctx.Log.Error("reason should be a string")
-				return nil
-			}
-			response.Reason = reasonStr
-		}
-	} else {
-		response.Status = Unknown
+
+	reasonStr, ok := reason.(string)
+	if !ok {
+		service.vm.Ctx.Log.Error("reason should be a string")
+		return errCorruptedReason
 	}
+
+	response.Reason = reasonStr
 	return nil
 }
 
