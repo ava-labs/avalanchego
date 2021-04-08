@@ -181,17 +181,15 @@ func TestState(t *testing.T) {
 	testBlks = append(testBlks, blk3)
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
-	chainState := NewState(&StateConfig{
-		Config: Config{
-			DecidedCacheSize:    2,
-			MissingCacheSize:    2,
-			UnverifiedCacheSize: 2,
-			LastAcceptedBlock:   genesisBlock,
-			GetBlock:            getBlock,
-			UnmarshalBlock:      parseBlock,
-			BuildBlock:          cantBuildBlock,
-		},
-		GetBlockIDAtHeight: getCanonicalBlockID,
+	chainState := NewCache(&Config{
+		DecidedCacheSize:    2,
+		MissingCacheSize:    2,
+		UnverifiedCacheSize: 2,
+		LastAcceptedBlock:   genesisBlock,
+		GetBlock:            getBlock,
+		UnmarshalBlock:      parseBlock,
+		BuildBlock:          cantBuildBlock,
+		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
 	lastAccepted, err := chainState.LastAccepted()
@@ -308,17 +306,15 @@ func TestBuildBlock(t *testing.T) {
 		return blk1, nil
 	}
 
-	chainState := NewState(&StateConfig{
-		Config: Config{
-			DecidedCacheSize:    2,
-			MissingCacheSize:    2,
-			UnverifiedCacheSize: 2,
-			LastAcceptedBlock:   genesisBlock,
-			GetBlock:            getBlock,
-			UnmarshalBlock:      parseBlock,
-			BuildBlock:          buildBlock,
-		},
-		GetBlockIDAtHeight: getCanonicalBlockID,
+	chainState := NewCache(&Config{
+		DecidedCacheSize:    2,
+		MissingCacheSize:    2,
+		UnverifiedCacheSize: 2,
+		LastAcceptedBlock:   genesisBlock,
+		GetBlock:            getBlock,
+		UnmarshalBlock:      parseBlock,
+		BuildBlock:          buildBlock,
+		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
 	builtBlk, err := chainState.BuildBlock()
@@ -352,17 +348,15 @@ func TestStateDecideBlock(t *testing.T) {
 	badRejectBlk := testBlks[3]
 	badRejectBlk.RejectV = errors.New("this block should fail on reject")
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
-	chainState := NewState(&StateConfig{
-		Config: Config{
-			DecidedCacheSize:    2,
-			MissingCacheSize:    2,
-			UnverifiedCacheSize: 2,
-			LastAcceptedBlock:   genesisBlock,
-			GetBlock:            getBlock,
-			UnmarshalBlock:      parseBlock,
-			BuildBlock:          cantBuildBlock,
-		},
-		GetBlockIDAtHeight: getCanonicalBlockID,
+	chainState := NewCache(&Config{
+		DecidedCacheSize:    2,
+		MissingCacheSize:    2,
+		UnverifiedCacheSize: 2,
+		LastAcceptedBlock:   genesisBlock,
+		GetBlock:            getBlock,
+		UnmarshalBlock:      parseBlock,
+		BuildBlock:          cantBuildBlock,
+		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
 	// Parse badVerifyBlk (which should fail verification)
@@ -418,17 +412,15 @@ func TestStateParent(t *testing.T) {
 	blk2 := testBlks[2]
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
-	chainState := NewState(&StateConfig{
-		Config: Config{
-			DecidedCacheSize:    2,
-			MissingCacheSize:    2,
-			UnverifiedCacheSize: 2,
-			LastAcceptedBlock:   genesisBlock,
-			GetBlock:            getBlock,
-			UnmarshalBlock:      parseBlock,
-			BuildBlock:          cantBuildBlock,
-		},
-		GetBlockIDAtHeight: getCanonicalBlockID,
+	chainState := NewCache(&Config{
+		DecidedCacheSize:    2,
+		MissingCacheSize:    2,
+		UnverifiedCacheSize: 2,
+		LastAcceptedBlock:   genesisBlock,
+		GetBlock:            getBlock,
+		UnmarshalBlock:      parseBlock,
+		BuildBlock:          cantBuildBlock,
+		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
 	parsedBlk2, err := chainState.ParseBlock(blk2.Bytes())
@@ -458,17 +450,15 @@ func TestGetBlockInternal(t *testing.T) {
 	genesisBlock.SetStatus(choices.Accepted)
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
-	chainState := NewState(&StateConfig{
-		Config: Config{
-			DecidedCacheSize:    2,
-			MissingCacheSize:    2,
-			UnverifiedCacheSize: 2,
-			LastAcceptedBlock:   genesisBlock,
-			GetBlock:            getBlock,
-			UnmarshalBlock:      parseBlock,
-			BuildBlock:          cantBuildBlock,
-		},
-		GetBlockIDAtHeight: getCanonicalBlockID,
+	chainState := NewCache(&Config{
+		DecidedCacheSize:    2,
+		MissingCacheSize:    2,
+		UnverifiedCacheSize: 2,
+		LastAcceptedBlock:   genesisBlock,
+		GetBlock:            getBlock,
+		UnmarshalBlock:      parseBlock,
+		BuildBlock:          cantBuildBlock,
+		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
 	genesisBlockInternal := chainState.LastAcceptedBlockInternal()
@@ -506,17 +496,15 @@ func TestGetBlockError(t *testing.T) {
 		}
 		return blk, nil
 	}
-	chainState := NewState(&StateConfig{
-		Config: Config{
-			DecidedCacheSize:    2,
-			MissingCacheSize:    2,
-			UnverifiedCacheSize: 2,
-			LastAcceptedBlock:   genesisBlock,
-			GetBlock:            wrappedGetBlock,
-			UnmarshalBlock:      parseBlock,
-			BuildBlock:          cantBuildBlock,
-		},
-		GetBlockIDAtHeight: getCanonicalBlockID,
+	chainState := NewCache(&Config{
+		DecidedCacheSize:    2,
+		MissingCacheSize:    2,
+		UnverifiedCacheSize: 2,
+		LastAcceptedBlock:   genesisBlock,
+		GetBlock:            wrappedGetBlock,
+		UnmarshalBlock:      parseBlock,
+		BuildBlock:          cantBuildBlock,
+		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
 	_, err := chainState.GetBlock(blk1.ID())
@@ -543,17 +531,15 @@ func TestParseBlockError(t *testing.T) {
 	genesisBlock.SetStatus(choices.Accepted)
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
-	chainState := NewState(&StateConfig{
-		Config: Config{
-			DecidedCacheSize:    2,
-			MissingCacheSize:    2,
-			UnverifiedCacheSize: 2,
-			LastAcceptedBlock:   genesisBlock,
-			GetBlock:            getBlock,
-			UnmarshalBlock:      parseBlock,
-			BuildBlock:          cantBuildBlock,
-		},
-		GetBlockIDAtHeight: getCanonicalBlockID,
+	chainState := NewCache(&Config{
+		DecidedCacheSize:    2,
+		MissingCacheSize:    2,
+		UnverifiedCacheSize: 2,
+		LastAcceptedBlock:   genesisBlock,
+		GetBlock:            getBlock,
+		UnmarshalBlock:      parseBlock,
+		BuildBlock:          cantBuildBlock,
+		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
 	blk, err := chainState.ParseBlock([]byte{255})
@@ -568,17 +554,15 @@ func TestBuildBlockError(t *testing.T) {
 	genesisBlock.SetStatus(choices.Accepted)
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
-	chainState := NewState(&StateConfig{
-		Config: Config{
-			DecidedCacheSize:    2,
-			MissingCacheSize:    2,
-			UnverifiedCacheSize: 2,
-			LastAcceptedBlock:   genesisBlock,
-			GetBlock:            getBlock,
-			UnmarshalBlock:      parseBlock,
-			BuildBlock:          cantBuildBlock,
-		},
-		GetBlockIDAtHeight: getCanonicalBlockID,
+	chainState := NewCache(&Config{
+		DecidedCacheSize:    2,
+		MissingCacheSize:    2,
+		UnverifiedCacheSize: 2,
+		LastAcceptedBlock:   genesisBlock,
+		GetBlock:            getBlock,
+		UnmarshalBlock:      parseBlock,
+		BuildBlock:          cantBuildBlock,
+		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
 	blk, err := chainState.BuildBlock()
@@ -597,27 +581,25 @@ func TestMeteredState(t *testing.T) {
 	genesisBlock.SetStatus(choices.Accepted)
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
-	config := &StateConfig{
-		Config: Config{
-			DecidedCacheSize:    2,
-			MissingCacheSize:    2,
-			UnverifiedCacheSize: 2,
-			LastAcceptedBlock:   genesisBlock,
-			GetBlock:            getBlock,
-			UnmarshalBlock:      parseBlock,
-			BuildBlock:          cantBuildBlock,
-		},
-		GetBlockIDAtHeight: getCanonicalBlockID,
+	config := &Config{
+		DecidedCacheSize:    2,
+		MissingCacheSize:    2,
+		UnverifiedCacheSize: 2,
+		LastAcceptedBlock:   genesisBlock,
+		GetBlock:            getBlock,
+		UnmarshalBlock:      parseBlock,
+		BuildBlock:          cantBuildBlock,
+		GetBlockIDAtHeight:  getCanonicalBlockID,
 	}
-	_, err := NewMeteredState(registry, namespace1, config)
+	_, err := NewMeteredCache(registry, namespace1, config)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = NewMeteredState(registry, namespace1, config)
+	_, err = NewMeteredCache(registry, namespace1, config)
 	if err == nil {
-		t.Fatal("Expected creating a second NewMeteredState with the same namespace to error due to a registry conflict")
+		t.Fatal("Expected creating a second NewMeteredCache with the same namespace to error due to a registry conflict")
 	}
-	_, err = NewMeteredState(registry, namespace2, config)
+	_, err = NewMeteredCache(registry, namespace2, config)
 	if err != nil {
 		t.Fatal(err)
 	}

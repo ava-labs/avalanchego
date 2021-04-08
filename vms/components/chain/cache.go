@@ -60,10 +60,50 @@ type Config struct {
 	// Cache configuration:
 	DecidedCacheSize, MissingCacheSize, UnverifiedCacheSize int
 
-	LastAcceptedBlock snowman.Block
-	GetBlock          func(ids.ID) (snowman.Block, error)
-	UnmarshalBlock    func([]byte) (snowman.Block, error)
-	BuildBlock        func() (snowman.Block, error)
+	LastAcceptedBlock  snowman.Block
+	GetBlock           func(ids.ID) (snowman.Block, error)
+	UnmarshalBlock     func([]byte) (snowman.Block, error)
+	BuildBlock         func() (snowman.Block, error)
+	GetBlockIDAtHeight func(uint64) (ids.ID, error)
+}
+
+// Block is an interface wrapping the normal snowman.Block interface to be used in
+// association with passing in a non-nil function to GetBlockIDAtHeight
+type Block interface {
+	snowman.Block
+
+	SetStatus(choices.Status)
+}
+
+// produceGetStatus creates a getStatus function that infers the status of a block by using a function
+// passed in from the VM that gets the block ID at a specific height. It is assumed that for any height
+// less than or equal to the last accepted block, getBlockIDAtHeight returns the accepted blockID at
+// the requested height.
+func produceGetStatus(c *Cache, getBlockIDAtHeight func(uint64) (ids.ID, error)) func(snowman.Block) (choices.Status, error) {
+	return func(blk snowman.Block) (choices.Status, error) {
+		internalBlk, ok := blk.(Block)
+		if !ok {
+			return choices.Unknown, fmt.Errorf("expected block to match chain Block interface but found block of type %T", blk)
+		}
+		lastAcceptedHeight := c.lastAcceptedBlock.Height()
+		blkHeight := internalBlk.Height()
+		if blkHeight > lastAcceptedHeight {
+			internalBlk.SetStatus(choices.Processing)
+			return choices.Processing, nil
+		}
+
+		acceptedID, err := getBlockIDAtHeight(blkHeight)
+		if err != nil {
+			return choices.Unknown, fmt.Errorf("failed to get accepted blkID at height %d", blkHeight)
+		}
+		if acceptedID == blk.ID() {
+			internalBlk.SetStatus(choices.Accepted)
+			return choices.Accepted, nil
+		}
+
+		internalBlk.SetStatus(choices.Rejected)
+		return choices.Rejected, nil
+	}
 }
 
 func NewCache(config *Config) *Cache {
@@ -76,6 +116,9 @@ func NewCache(config *Config) *Cache {
 		unmarshalBlock:   config.UnmarshalBlock,
 		buildBlock:       config.BuildBlock,
 		getStatus:        func(blk snowman.Block) (choices.Status, error) { return blk.Status(), nil },
+	}
+	if config.GetBlockIDAtHeight != nil {
+		c.getStatus = produceGetStatus(c, config.GetBlockIDAtHeight)
 	}
 	c.lastAcceptedBlock = &BlockWrapper{
 		Block: config.LastAcceptedBlock,
@@ -122,6 +165,9 @@ func NewMeteredCache(
 		getBlock:         config.GetBlock,
 		unmarshalBlock:   config.UnmarshalBlock,
 		buildBlock:       config.BuildBlock,
+	}
+	if config.GetBlockIDAtHeight != nil {
+		c.getStatus = produceGetStatus(c, config.GetBlockIDAtHeight)
 	}
 	c.lastAcceptedBlock = &BlockWrapper{
 		Block: config.LastAcceptedBlock,
