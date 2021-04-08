@@ -100,9 +100,8 @@ func newIndex(
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get next accepted index from database: %w", err)
 	}
-	p := wrappers.Packer{Bytes: nextAcceptedIndexBytes}
-	i.nextAcceptedIndex = p.UnpackLong()
-	if p.Err != nil {
+	i.nextAcceptedIndex, err = wrappers.UnpackLong(nextAcceptedIndexBytes)
+	if err != nil {
 		return nil, fmt.Errorf("couldn't parse next accepted index from bytes: %w", err)
 	}
 	i.log.Info("next accepted index %d", i.nextAcceptedIndex)
@@ -144,11 +143,7 @@ func (i *index) Accept(ctx *snow.Context, containerID ids.ID, containerBytes []b
 
 	ctx.Log.Debug("indexing %d --> container %s", i.nextAcceptedIndex, containerID)
 	// Persist index --> Container
-	p := wrappers.Packer{MaxSize: wrappers.LongLen}
-	p.PackLong(i.nextAcceptedIndex)
-	if p.Err != nil {
-		return fmt.Errorf("couldn't convert next accepted index to bytes: %w", p.Err)
-	}
+	nextAcceptedIndexBytes := wrappers.PackLong(i.nextAcceptedIndex)
 	bytes, err := i.codec.Marshal(codecVersion, Container{
 		ID:        containerID,
 		Bytes:     containerBytes,
@@ -157,23 +152,19 @@ func (i *index) Accept(ctx *snow.Context, containerID ids.ID, containerBytes []b
 	if err != nil {
 		return fmt.Errorf("couldn't serialize container %s: %w", containerID, err)
 	}
-	if err := i.indexToContainer.Put(p.Bytes, bytes); err != nil {
+	if err := i.indexToContainer.Put(nextAcceptedIndexBytes, bytes); err != nil {
 		return fmt.Errorf("couldn't put accepted container %s into index: %w", containerID, err)
 	}
 
 	// Persist container ID --> index
-	if err := i.containerToIndex.Put(containerID[:], p.Bytes); err != nil {
+	if err := i.containerToIndex.Put(containerID[:], nextAcceptedIndexBytes); err != nil {
 		return fmt.Errorf("couldn't map container %s to index: %w", containerID, err)
 	}
 
 	// Persist next accepted index
 	i.nextAcceptedIndex++
-	p = wrappers.Packer{MaxSize: wrappers.LongLen}
-	p.PackLong(i.nextAcceptedIndex)
-	if p.Err != nil {
-		return fmt.Errorf("couldn't convert next accepted index to bytes: %w", p.Err)
-	}
-	if err := i.vDB.Put(nextAcceptedIndexKey, p.Bytes); err != nil {
+	nextAcceptedIndexBytes = wrappers.PackLong(i.nextAcceptedIndex)
+	if err := i.vDB.Put(nextAcceptedIndexKey, nextAcceptedIndexBytes); err != nil {
 		return fmt.Errorf("couldn't put accepted container %s into index: %w", containerID, err)
 	}
 
@@ -199,13 +190,8 @@ func (i *index) getContainerByIndex(index uint64) (Container, error) {
 		return Container{}, fmt.Errorf("no container at index %d", index)
 	}
 
-	p := wrappers.Packer{MaxSize: wrappers.LongLen}
-	p.PackLong(index)
-	if p.Err != nil {
-		return Container{}, fmt.Errorf("couldn't convert index to bytes: %w", p.Err)
-	}
-
-	containerBytes, err := i.indexToContainer.Get(p.Bytes)
+	indexBytes := wrappers.PackLong(index)
+	containerBytes, err := i.indexToContainer.Get(indexBytes)
 	switch {
 	case err == database.ErrNotFound:
 		return Container{}, fmt.Errorf("no container at index %d", index)
@@ -252,14 +238,10 @@ func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, e
 	n := 0
 	for j := startIndex; j <= lastIndex; j++ {
 		// Convert index to bytes
-		p := wrappers.Packer{MaxSize: wrappers.LongLen}
-		p.PackLong(j)
-		if p.Err != nil {
-			return nil, fmt.Errorf("couldn't convert index %d to bytes: %w", j, p.Err)
-		}
+		indexBytes := wrappers.PackLong(j)
 
 		// Get container from database and deserialize
-		containerBytes, err := i.indexToContainer.Get(p.Bytes)
+		containerBytes, err := i.indexToContainer.Get(indexBytes)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't get container from database: %w", err)
 		}
@@ -281,13 +263,11 @@ func (i *index) GetIndex(containerID ids.ID) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-
-	p := wrappers.Packer{Bytes: indexBytes}
-	index := p.UnpackLong()
-	if p.Err != nil {
+	index, err := wrappers.UnpackLong(indexBytes)
+	if err != nil {
 		// Should never happen
 		i.log.Error("couldn't unpack index: %w", err)
-		return 0, p.Err
+		return 0, err
 	}
 	return index, nil
 }
@@ -350,25 +330,13 @@ func (i *index) removeLastAccepted(containerID ids.ID) error {
 	if err := i.containerToIndex.Delete(containerID[:]); err != nil {
 		return err
 	}
-
-	p := wrappers.Packer{MaxSize: wrappers.LongLen}
-	p.PackLong(i.nextAcceptedIndex - 1)
-	if p.Err != nil {
-		return fmt.Errorf("couldn't convert last accepted index to bytes: %w", p.Err)
-	}
-
-	if err := i.indexToContainer.Delete(p.Bytes); err != nil {
+	indexBytes := wrappers.PackLong(i.nextAcceptedIndex - 1)
+	if err := i.indexToContainer.Delete(indexBytes); err != nil {
 		return fmt.Errorf("couldn't remove last accepted: %w", err)
 	}
-
 	i.nextAcceptedIndex--
-
-	p = wrappers.Packer{MaxSize: wrappers.LongLen}
-	p.PackLong(i.nextAcceptedIndex)
-	if p.Err != nil {
-		return fmt.Errorf("couldn't convert next accepted index to bytes: %w", p.Err)
-	}
-	if err := i.vDB.Put(nextAcceptedIndexKey, p.Bytes); err != nil {
+	indexBytes = wrappers.PackLong(i.nextAcceptedIndex)
+	if err := i.vDB.Put(nextAcceptedIndexKey, indexBytes); err != nil {
 		return fmt.Errorf("couldn't put next accepted key: %s", err)
 	}
 	return i.vDB.Commit()
