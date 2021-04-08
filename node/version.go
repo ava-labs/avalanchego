@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	Version                      = version.NewDefaultVersion(constants.PlatformName, 1, 3, 1)
+	Version                      = version.NewDefaultVersion(constants.PlatformName, 1, 3, 2)
 	MinimumCompatibleVersion     = version.NewDefaultVersion(constants.PlatformName, 1, 3, 0)
 	PrevMinimumCompatibleVersion = version.NewDefaultVersion(constants.PlatformName, 1, 2, 0)
 	MinimumUnmaskedVersion       = version.NewDefaultVersion(constants.PlatformName, 1, 1, 0)
