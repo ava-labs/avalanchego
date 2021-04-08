@@ -106,7 +106,6 @@ func NewIndexer(config Config) (Indexer, error) {
 
 // indexer implements Indexer
 type indexer struct {
-	// Name of endpoint
 	codec  codec.Manager
 	clock  timer.Clock
 	lock   sync.RWMutex
