@@ -144,12 +144,12 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 		return false, err
 	}
 
+	// Notify the metrics that this transaction was accepted.
+	c.Metrics.Accepted(txID)
+
 	if err := tx.Accept(); err != nil {
 		return false, err
 	}
-
-	// Notify the metrics that this transaction was just accepted.
-	c.Metrics.Accepted(txID)
 	return false, nil
 }
 
@@ -164,12 +164,6 @@ func (c *common) acceptTx(tx Tx) error {
 		return err
 	}
 
-	// Accept is called before notifying the IPC so that acceptances that cause
-	// fatal errors aren't sent to an IPC peer.
-	if err := tx.Accept(); err != nil {
-		return err
-	}
-
 	// Update the metrics to account for this transaction's acceptance
 	c.Metrics.Accepted(txID)
 
@@ -179,7 +173,8 @@ func (c *common) acceptTx(tx Tx) error {
 	// If there is a tx that was issued pending on this tx, the ancestor tx
 	// doesn't need to be rejected because of this tx.
 	c.pendingReject.Abandon(txID)
-	return nil
+
+	return tx.Accept()
 }
 
 // reject the provided tx.

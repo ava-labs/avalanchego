@@ -513,19 +513,19 @@ func (ta *Topological) update(vtx Vertex) error {
 		if err := ta.ctx.ConsensusDispatcher.Accept(ta.ctx, vtxID, vtx.Bytes()); err != nil {
 			return err
 		}
+		delete(ta.nodes, vtxID)
+		ta.Metrics.Accepted(vtxID)
 		if err := vtx.Accept(); err != nil {
 			return err
 		}
-		delete(ta.nodes, vtxID)
-		ta.Metrics.Accepted(vtxID)
 	case rejectable:
 		// I'm rejectable, why not reject?
 		ta.ctx.ConsensusDispatcher.Reject(ta.ctx, vtxID, vtx.Bytes())
+		delete(ta.nodes, vtxID)
+		ta.Metrics.Rejected(vtxID)
 		if err := vtx.Reject(); err != nil {
 			return err
 		}
-		delete(ta.nodes, vtxID)
-		ta.Metrics.Rejected(vtxID)
 	}
 	return nil
 }
