@@ -304,9 +304,16 @@ func (vm *VM) Initialize(
 	switch {
 	case g.Config.ChainID.Cmp(params.AvalancheMainnetChainID) == 0:
 		g.Config.ApricotPhase1BlockTimestamp = params.AvalancheApricotMainnetChainConfig.ApricotPhase1BlockTimestamp
+		phase0BlockValidator.extDataHashes = mainnetExtDataHashes
 	case g.Config.ChainID.Cmp(params.AvalancheFujiChainID) == 0:
 		g.Config.ApricotPhase1BlockTimestamp = params.AvalancheApricotFujiChainConfig.ApricotPhase1BlockTimestamp
+		phase0BlockValidator.extDataHashes = fujiExtDataHashes
 	}
+
+	// Allow ExtDataHashes to be garbage collected as soon as freed from block
+	// validator
+	fujiExtDataHashes = nil
+	mainnetExtDataHashes = nil
 
 	vm.chainID = g.Config.ChainID
 	vm.txFee = txFee
@@ -778,11 +785,19 @@ func (vm *VM) updateStatus(blkID ids.ID, status choices.Status) error {
 		if blk == nil {
 			return errUnknownBlock
 		}
-		if err := vm.chain.Accept(blk.ethBlock); err != nil {
+		ethBlock := blk.ethBlock
+		if err := vm.chain.Accept(ethBlock); err != nil {
 			return fmt.Errorf("could not accept %s: %w", blkID, err)
 		}
 		if err := vm.setLastAccepted(blk); err != nil {
 			return fmt.Errorf("could not set %s as last accepted: %w", blkID, err)
+		}
+
+		// Free ExtDataHashes from memory when they are no longer needed (when the
+		// first block is accepted after the AP1 transition).
+		if phase0BlockValidator.extDataHashes != nil && vm.IsApricotPhase1(ethBlock.Time()) {
+			phase0BlockValidator.extDataHashes = nil
+			log.Debug("removed ExtDataHashes from memory")
 		}
 	}
 
@@ -1101,8 +1116,8 @@ func (vm *VM) GetAtomicUTXOs(
 // TODO switch to returning a list of private keys
 // since there are no multisig inputs in Ethereum
 func (vm *VM) GetSpendableFunds(keys []*crypto.PrivateKeySECP256K1R, assetID ids.ID, amount uint64) ([]EVMInput, [][]*crypto.PrivateKeySECP256K1R, error) {
-	// NOTE: should we use HEAD block or lastAccepted?
-	state, err := vm.chain.BlockState(vm.lastAccepted.ethBlock)
+	// Note: current state uses the state of the preferred block.
+	state, err := vm.chain.CurrentState()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1127,7 +1142,7 @@ func (vm *VM) GetSpendableFunds(keys []*crypto.PrivateKeySECP256K1R, assetID ids
 		if amount < balance {
 			balance = amount
 		}
-		nonce, err := vm.GetAcceptedNonce(addr)
+		nonce, err := vm.GetCurrentNonce(addr)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1148,9 +1163,11 @@ func (vm *VM) GetSpendableFunds(keys []*crypto.PrivateKeySECP256K1R, assetID ids
 	return inputs, signers, nil
 }
 
-// GetAcceptedNonce returns the nonce associated with the address at the last accepted block
-func (vm *VM) GetAcceptedNonce(address common.Address) (uint64, error) {
-	state, err := vm.chain.BlockState(vm.lastAccepted.ethBlock)
+// GetCurrentNonce returns the nonce associated with the address at the
+// preferred block
+func (vm *VM) GetCurrentNonce(address common.Address) (uint64, error) {
+	// Note: current state uses the state of the preferred block.
+	state, err := vm.chain.CurrentState()
 	if err != nil {
 		return 0, err
 	}
