@@ -156,7 +156,7 @@ type ManagerConfig struct {
 	// [FetchOnlyFrom] ignored unless [FetchOnly] is true
 	FetchOnlyFrom validators.Set
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
-	ShutdownNodeFunc func()
+	ShutdownNodeFunc func(exitCode int)
 }
 
 type manager struct {
@@ -239,7 +239,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 				m.Log.AssertNoError(m.DBManager.MarkCurrentDBBootstrapped())
 				if m.ManagerConfig.FetchOnly {
 					m.Log.Info("\n\ndone with fetch only mode. Restart without flag --fetch-only to run normally. Starting node shutdown.\n")
-					go m.ShutdownNodeFunc()
+					go m.ShutdownNodeFunc(10)
 				}
 			},
 		}

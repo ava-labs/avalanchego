@@ -135,6 +135,9 @@ type Node struct {
 	// True if node is shutting down or is done shutting down
 	shuttingDown utils.AtomicBool
 
+	// Sets the exit code
+	shuttingDownExitCode utils.AtomicInterface
+
 	// Incremented only once on initialization.
 	// Decremented when node is done shutting down.
 	doneShuttingDown sync.WaitGroup
@@ -212,7 +215,7 @@ func (n *Node) initNetworking() error {
 			// If the timeout fires and we're already shutting down, nothing to do.
 			if !n.shuttingDown.GetValue() {
 				n.Log.Warn("Failed to connect to bootstrap nodes. Node shutting down...")
-				go n.Shutdown()
+				go n.Shutdown(1)
 			}
 		})
 
@@ -257,7 +260,7 @@ func (n *Node) initNetworking() error {
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
 		// errors are already logged internally if they are meaningful
-		n.Shutdown()
+		n.Shutdown(1)
 	}, syscall.SIGINT, syscall.SIGTERM)
 
 	return nil
@@ -342,7 +345,7 @@ func (n *Node) Dispatch() error {
 		}
 		// If the API server isn't running, shut down the node.
 		// If node is already shutting down, this does nothing.
-		n.Shutdown()
+		n.Shutdown(1)
 	})
 
 	// Add bootstrap nodes to the peer network
@@ -359,7 +362,7 @@ func (n *Node) Dispatch() error {
 
 	// If the P2P server isn't running, shut down the node.
 	// If node is already shutting down, this does nothing.
-	n.Shutdown()
+	n.Shutdown(1)
 
 	// Wait until the node is done shutting down before returning
 	n.doneShuttingDown.Wait()
@@ -887,13 +890,14 @@ func (n *Node) Initialize(
 
 // Shutdown this node
 // May be called multiple times
-func (n *Node) Shutdown() {
+func (n *Node) Shutdown(exitCode int) {
 	n.shuttingDown.SetValue(true)
+	n.shuttingDownExitCode.SetValue(exitCode)
 	n.shutdownOnce.Do(n.shutdown)
 }
 
 func (n *Node) shutdown() {
-	n.Log.Info("shutting down node")
+	n.Log.Info("shutting down node with exit code %d", n.ExitCode())
 	if n.IPCs != nil {
 		if err := n.IPCs.Shutdown(); err != nil {
 			n.Log.Debug("error during IPC shutdown: %s", err)
@@ -912,4 +916,11 @@ func (n *Node) shutdown() {
 	utils.ClearSignals(n.nodeCloser)
 	n.doneShuttingDown.Done()
 	n.Log.Info("finished node shutdown")
+}
+
+func (n *Node) ExitCode() int {
+	if exitCode, ok := n.shuttingDownExitCode.GetValue().(int); ok {
+		return exitCode
+	}
+	return 0
 }

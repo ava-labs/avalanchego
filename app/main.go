@@ -31,6 +31,7 @@ const (
 )
 
 var (
+	exitCode        = 0
 	stakingPortName = fmt.Sprintf("%s-staking", constants.AppName)
 	httpPortName    = fmt.Sprintf("%s-http", constants.AppName)
 	mustUpgradeMsg  = "\nThis version of AvalancheGo requires a database upgrade before running.\n" +
@@ -59,8 +60,6 @@ var (
 
 // main is the primary entry point to Avalanche.
 func main() {
-	// todo review this logic, exitCode, maybe a func ? also the restart functionality
-	exitCode := 0
 	defer func() {
 		os.Exit(exitCode)
 	}()
@@ -127,6 +126,7 @@ func main() {
 		if currentDBBootstrapped {
 			// We already have the current database
 			log.Info(alreadyUpgradedMsg)
+			exitCode = 10
 			return
 		}
 		log.Info(upgradingMsg)
@@ -228,8 +228,9 @@ func main() {
 
 	log.Info("this node's IP is set to: %s", config.StakingIP.IP())
 
+	var shouldRestart bool
 	for {
-		shouldRestart, err := run(config, dbManager, log, logFactory)
+		shouldRestart, exitCode, err = run(config, dbManager, log, logFactory)
 		if err != nil {
 			break
 		}
@@ -248,7 +249,7 @@ func run(
 	dbManager manager.Manager,
 	log logging.Logger,
 	logFactory logging.Factory,
-) (bool, error) {
+) (bool, int, error) {
 	log.Info("initializing node")
 	node := node.Node{}
 	restarter := &restarter{
@@ -257,7 +258,7 @@ func run(
 	}
 	if err := node.Initialize(&config, dbManager, log, logFactory, restarter); err != nil {
 		log.Error("error initializing node: %s", err)
-		return restarter.shouldRestart.GetValue(), err
+		return restarter.shouldRestart.GetValue(), node.ExitCode(), err
 	}
 
 	log.Debug("dispatching node handlers")
@@ -265,7 +266,7 @@ func run(
 	if err != nil {
 		log.Debug("node dispatch returned: %s", err)
 	}
-	return restarter.shouldRestart.GetValue(), nil
+	return restarter.shouldRestart.GetValue(), node.ExitCode(), nil
 }
 
 // restarter implements utils.Restarter
@@ -280,5 +281,5 @@ type restarter struct {
 func (r *restarter) Restart() {
 	r.shouldRestart.SetValue(true)
 	// Shutdown is safe to call multiple times because it uses sync.Once
-	r.node.Shutdown()
+	r.node.Shutdown(0)
 }

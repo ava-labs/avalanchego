@@ -80,7 +80,7 @@ func (m *MigrationManager) setupApp(upgrade bool) error {
 	}
 
 	// todo hook versions dynamically
-	m.binaryManager.currVsApp = &application{
+	m.binaryManager.CurrentApp = &application{
 		path:    m.binaryManager.rootPath + "/build/avalanchego-" + "v1.3.2" + "/avalanchego-inner",
 		errChan: make(chan error),
 		setup:   true,
@@ -98,7 +98,7 @@ func (m *MigrationManager) setupApp(upgrade bool) error {
 		}
 
 		// todo hook versions dynamically
-		m.binaryManager.prevVsApp = &application{
+		m.binaryManager.PreviousApp = &application{
 			path:    m.binaryManager.rootPath + "/build/avalanchego-" + "v1.3.1" + "/avalanchego-inner",
 			errChan: make(chan error),
 			setup:   true,
@@ -107,4 +107,32 @@ func (m *MigrationManager) setupApp(upgrade bool) error {
 	}
 
 	return nil
+}
+
+func (m *MigrationManager) HandleErr(version string, handlingErr error) bool {
+	switch version {
+	case "current":
+		if handlingErr.Error() == "exit status 10" {
+			// current version is bootstrapped - kill the previous version and restart current one
+			err := m.binaryManager.PreviousApp.Kill()
+			if err != nil {
+				fmt.Printf("unable to kill PreviousApp %v\n", err)
+				return false
+			}
+
+			// overriding previous args
+			var cmdArgs []string
+			for k, v := range m.viper.AllSettings() { // Pass args
+				cmdArgs = append(cmdArgs, fmt.Sprintf("--%s=%v", k, v))
+			}
+
+			m.binaryManager.CurrentApp.args = cmdArgs
+			m.binaryManager.CurrentApp.Start()
+			return true
+		}
+	case "previous":
+		return false
+	}
+
+	return false
 }

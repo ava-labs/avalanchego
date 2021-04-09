@@ -5,14 +5,16 @@ package main
 
 import (
 	"fmt"
-	"os"
-
 	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"os"
 )
+
+var exitCode = 0
 
 // main is the primary entry point to Avalanche.
 func main() {
-	exitCode := 0
+	//todo handle the path retrieval
 	folderPath, err := os.Getwd()
 	if err != nil {
 		panic(err)
@@ -28,6 +30,7 @@ func main() {
 	viper, err := config.GetViper()
 	if err != nil {
 		fmt.Printf("couldn't get viper: %s", err)
+		exitCode = 1
 		return
 	}
 	dbVersion := config.DBVersion
@@ -35,6 +38,16 @@ func main() {
 	nodeConfig, err := config.GetConfig()
 	if err != nil {
 		fmt.Printf("couldn't get config: %s", err)
+		exitCode = 1
+		return
+	}
+
+	logFactory := logging.NewFactory(nodeConfig.LoggingConfig)
+	defer logFactory.Close()
+
+	log, err := logFactory.Make()
+	if err != nil {
+		fmt.Printf("starting logger failed with: %s\n", err)
 		return
 	}
 
@@ -48,20 +61,26 @@ func main() {
 
 	// start apps and waits for errors
 	prevVersionChan, newVersionChan := binaryManager.Start()
+
 	for {
 		select {
-		case err := <-prevVersionChan:
-			if err != nil {
-				fmt.Println("previous version node errored")
-				exitCode = 1
+		case err = <-prevVersionChan:
+			if migrationManager.HandleErr("previous", err) {
+				continue
 			}
+			log.Error("previous version node errored - %v\n", err)
+			exitCode = 1
 			break
-		case err := <-newVersionChan:
-			if err != nil {
-				fmt.Println("current version node errored")
-				exitCode = 1
+
+		case err = <-newVersionChan:
+			if migrationManager.HandleErr("current", err) {
+				continue
 			}
+
+			log.Error("current version node errored - %v\n", err)
+			exitCode = 1
 			break
 		}
+		break
 	}
 }

@@ -15,32 +15,61 @@ type application struct {
 	args    []string
 }
 
+func (a *application) Start() {
+	if !a.setup {
+		fmt.Printf("Skipping %s \n", a.path)
+		return
+	}
+	fmt.Printf("Starting %s \n %s \n", a.path, a.args)
+	cmd := exec.Command(a.path, a.args...) // #nosec G204
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	a.cmd = cmd
+	// start the command after having set up the pipe
+	if err := cmd.Start(); err != nil {
+		a.errChan <- err
+	}
+
+	if err := cmd.Wait(); err != nil {
+		a.errChan <- err
+	}
+}
+
+func (a *application) Kill() error {
+	if a.setup && a.cmd.Process != nil {
+		//todo change this to interrupt
+		err := a.cmd.Process.Kill()
+		if err != nil && err != os.ErrProcessDone {
+			fmt.Printf("failed to kill process: %v\n", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
 type BinaryManager struct {
-	prevVsApp *application
-	currVsApp *application
-	rootPath  string
+	PreviousApp *application
+	CurrentApp  *application
+	rootPath    string
 }
 
 func NewBinaryManager(path string) *BinaryManager {
 	return &BinaryManager{
-		rootPath:  path,
-		prevVsApp: &application{errChan: make(chan error)},
-		currVsApp: &application{errChan: make(chan error)},
+		rootPath:    path,
+		PreviousApp: &application{errChan: make(chan error)},
+		CurrentApp:  &application{errChan: make(chan error)},
 	}
 }
 
 func (b *BinaryManager) Start() (chan error, chan error) {
-	if b.prevVsApp.setup {
-		go b.StartApp(b.prevVsApp)
-	}
-
+	go b.PreviousApp.Start()
 	// give it a few seconds to avoid any unexpected lock-grabbing
 	time.Sleep(10 * time.Second)
 
-	if b.currVsApp.setup {
-		go b.StartApp(b.currVsApp)
-	}
-	return b.prevVsApp.errChan, b.currVsApp.errChan
+	go b.CurrentApp.Start()
+	return b.PreviousApp.errChan, b.CurrentApp.errChan
 }
 
 func (b *BinaryManager) StartApp(app *application) {
@@ -61,17 +90,12 @@ func (b *BinaryManager) StartApp(app *application) {
 }
 
 func (b *BinaryManager) KillAll() {
-	if b.prevVsApp.setup && b.prevVsApp.cmd.Process != nil {
-		err := b.prevVsApp.cmd.Process.Kill()
-		if err != nil && err != os.ErrProcessDone {
-			fmt.Printf("failed to kill process: %v\n", err)
-		}
+	err := b.PreviousApp.Kill()
+	if err != nil {
+		fmt.Printf("error killing the previous app %v\n", err)
 	}
-
-	if b.currVsApp.cmd.Process != nil {
-		err := b.currVsApp.cmd.Process.Kill()
-		if err != nil && err != os.ErrProcessDone {
-			fmt.Printf("failed to kill process: %v\n", err)
-		}
+	err = b.CurrentApp.Kill()
+	if err != nil {
+		fmt.Printf("error killing the current app %v\n", err)
 	}
 }
