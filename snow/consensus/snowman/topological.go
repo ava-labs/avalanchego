@@ -106,8 +106,12 @@ func (ts *Topological) Add(blk Block) error {
 	blkBytes := blk.Bytes()
 
 	// Notify anyone listening that this block was issued.
-	ts.ctx.DecisionDispatcher.Issue(ts.ctx, blkID, blkBytes)
-	ts.ctx.ConsensusDispatcher.Issue(ts.ctx, blkID, blkBytes)
+	if err := ts.ctx.DecisionDispatcher.Issue(ts.ctx, blkID, blkBytes); err != nil {
+		return err
+	}
+	if err := ts.ctx.ConsensusDispatcher.Issue(ts.ctx, blkID, blkBytes); err != nil {
+		return err
+	}
 	ts.Metrics.Issued(blkID)
 
 	parentNode, ok := ts.blocks[parentID]
@@ -120,8 +124,12 @@ func (ts *Topological) Add(blk Block) error {
 		}
 
 		// Notify anyone listening that this block was rejected.
-		ts.ctx.DecisionDispatcher.Reject(ts.ctx, blkID, blkBytes)
-		ts.ctx.ConsensusDispatcher.Reject(ts.ctx, blkID, blkBytes)
+		if err := ts.ctx.DecisionDispatcher.Reject(ts.ctx, blkID, blkBytes); err != nil {
+			return err
+		}
+		if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, blkID, blkBytes); err != nil {
+			return err
+		}
 		ts.Metrics.Rejected(blkID)
 		return nil
 	}
@@ -550,8 +558,12 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 
 		// Notify anyone listening that this block was rejected.
 		bytes := child.Bytes()
-		ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes)
-		ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes)
+		if err := ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
+			return err
+		}
+		if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
+			return err
+		}
 		ts.Metrics.Rejected(childID)
 
 		// Track which blocks have been directly rejected
@@ -583,8 +595,12 @@ func (ts *Topological) rejectTransitively(rejected []ids.ID) error {
 
 			// Notify anyone listening that this block was rejected.
 			bytes := child.Bytes()
-			ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes)
-			ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes)
+			if err := ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
+				return err
+			}
+			if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
+				return err
+			}
 			ts.Metrics.Rejected(childID)
 
 			// add the newly rejected block to the end of the queue

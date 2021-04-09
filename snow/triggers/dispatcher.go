@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+var _ snow.EventDispatcher = &EventDispatcher{}
+
 type handler struct {
 	// Must implement at least one of Acceptor, Rejector, Issuer
 	handlerFunc interface{}
@@ -75,7 +77,7 @@ func (ed *EventDispatcher) Accept(ctx *snow.Context, containerID ids.ID, contain
 }
 
 // Reject is called when a transaction or block is rejected
-func (ed *EventDispatcher) Reject(ctx *snow.Context, containerID ids.ID, container []byte) {
+func (ed *EventDispatcher) Reject(ctx *snow.Context, containerID ids.ID, container []byte) error {
 	ed.lock.Lock()
 	defer ed.lock.Unlock()
 
@@ -92,7 +94,7 @@ func (ed *EventDispatcher) Reject(ctx *snow.Context, containerID ids.ID, contain
 
 	events, exist := ed.chainHandlers[ctx.ChainID]
 	if !exist {
-		return
+		return nil
 	}
 	for id, handler := range events {
 		handler, ok := handler.handlerFunc.(Rejector)
@@ -104,10 +106,11 @@ func (ed *EventDispatcher) Reject(ctx *snow.Context, containerID ids.ID, contain
 			ed.log.Error("unable to Reject on %s for chainID %s: %s", id, ctx.ChainID, err)
 		}
 	}
+	return nil
 }
 
 // Issue is called when a transaction or block is issued
-func (ed *EventDispatcher) Issue(ctx *snow.Context, containerID ids.ID, container []byte) {
+func (ed *EventDispatcher) Issue(ctx *snow.Context, containerID ids.ID, container []byte) error {
 	ed.lock.Lock()
 	defer ed.lock.Unlock()
 
@@ -124,7 +127,7 @@ func (ed *EventDispatcher) Issue(ctx *snow.Context, containerID ids.ID, containe
 
 	events, exist := ed.chainHandlers[ctx.ChainID]
 	if !exist {
-		return
+		return nil
 	}
 	for id, handler := range events {
 		handler, ok := handler.handlerFunc.(Issuer)
@@ -136,6 +139,7 @@ func (ed *EventDispatcher) Issue(ctx *snow.Context, containerID ids.ID, containe
 			ed.log.Error("unable to Issue on %s for chainID %s: %s", id, ctx.ChainID, err)
 		}
 	}
+	return nil
 }
 
 // RegisterChain causes [handlerFunc] to be invoked every time a container is issued, accepted or rejected on chain [chainID].

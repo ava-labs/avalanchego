@@ -123,7 +123,9 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 	bytes := tx.Bytes()
 
 	// Notify the IPC socket that this tx has been issued.
-	c.ctx.DecisionDispatcher.Issue(c.ctx, txID, bytes)
+	if err := c.ctx.DecisionDispatcher.Issue(c.ctx, txID, bytes); err != nil {
+		return false, err
+	}
 
 	// Notify the metrics that this transaction is being issued.
 	c.Metrics.Issued(txID)
@@ -189,7 +191,9 @@ func (c *common) rejectTx(tx Tx) error {
 	txID := tx.ID()
 
 	// Notify the IPC that the tx was rejected
-	c.ctx.DecisionDispatcher.Reject(c.ctx, txID, tx.Bytes())
+	if err := c.ctx.DecisionDispatcher.Reject(c.ctx, txID, tx.Bytes()); err != nil {
+		return err
+	}
 
 	// Update the metrics to account for this transaction's rejection
 	c.Metrics.Rejected(txID)

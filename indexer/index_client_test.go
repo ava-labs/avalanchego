@@ -48,7 +48,7 @@ func TestIndexClient(t *testing.T) {
 	id = ids.GenerateTestID()
 	client.EndpointRequester = &mockClient{
 		f: func(reply interface{}) error {
-			*(reply.(*[]FormattedContainer)) = []FormattedContainer{{ID: id}}
+			*(reply.(**GetContainerRangeResponse)) = &GetContainerRangeResponse{Containers: []FormattedContainer{{ID: id}}}
 			return nil
 		},
 	}
