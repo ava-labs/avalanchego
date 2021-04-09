@@ -139,10 +139,17 @@ func TestExportTxVerify(t *testing.T) {
 			Nonce:   0,
 		},
 	}
+	// Test ExportTx with invalid EVM Input amount 0 fails verification
 	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err == nil {
 		t.Fatal("ExportTx should have failed verification due to 0 value amount")
 	}
 	exportTx.Ins = []EVMInput{evmInputs[0], evmInputs[0]}
+	// Test non-unique EVM Inputs passes verification before AP1
+	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, false); err != nil {
+		t.Fatalf("ExportTx with non-unique EVM Inputs should have passed verification prior to AP1, but failed due to %s", err)
+	}
+	exportTx.Ins = []EVMInput{evmInputs[0], evmInputs[0]}
+	// Test non-unique EVM Inputs fails verification after AP1
 	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err == nil {
 		t.Fatal("ExportTx should have failed verification due to non-unique inputs")
 	}

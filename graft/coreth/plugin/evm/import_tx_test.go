@@ -122,11 +122,12 @@ func TestImportTxVerify(t *testing.T) {
 	}
 
 	importTx.ImportedInputs = []*avax.TransferableInput{importedIns[0], importedIns[1]}
-	// Test unsorted EVM Outputs
 	importTx.Outs = []EVMOutput{evmOutputs[1], evmOutputs[0]}
+	// Test unsorted EVM Outputs pass verification prior to AP1
 	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, false); err != nil {
-		t.Fatalf("ImportTx should have passed verification in AP1, but failed due to %s", err)
+		t.Fatalf("ImportTx should have passed verification prior to AP1, but failed due to %s", err)
 	}
+	// Test unsorted EVM Outputs fails verification after AP1
 	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err == nil {
 		t.Fatal("ImportTx should have failed verification due to unsorted EVM Outputs in AP1")
 	}
@@ -137,10 +138,16 @@ func TestImportTxVerify(t *testing.T) {
 			AssetID: testAvaxAssetID,
 		},
 	}
+	// Test ImportTx with invalid EVM Output Amount 0 fails verification
 	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err == nil {
 		t.Fatal("ImportTx should have failed verification due to 0 value amount")
 	}
 	importTx.Outs = []EVMOutput{evmOutputs[0], evmOutputs[0]}
+	// Test non-unique EVM Outputs passes verification before AP1
+	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, false); err != nil {
+		t.Fatal("ImportTx with non-unique EVM Outputs should have passed verification prior to AP1")
+	}
+	// Test non-unique EVM Outputs fails verification after AP1
 	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err == nil {
 		t.Fatal("ImportTx should have failed verification due to non-unique outputs")
 	}
