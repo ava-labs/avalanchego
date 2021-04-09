@@ -188,22 +188,24 @@ func (i *index) getContainerByIndex(index uint64) (Container, error) {
 	if !ok || index > lastAcceptedIndex {
 		return Container{}, fmt.Errorf("no container at index %d", index)
 	}
-
 	indexBytes := wrappers.PackLong(index)
+	return i.getContainerByIndexBytes(indexBytes)
+}
+
+// [indexBytes] is the byte representation of the index to fetch.
+// Assumes [i.lock] is held
+func (i *index) getContainerByIndexBytes(indexBytes []byte) (Container, error) {
 	containerBytes, err := i.indexToContainer.Get(indexBytes)
-	switch {
-	case err == database.ErrNotFound:
-		return Container{}, fmt.Errorf("no container at index %d", index)
-	case err != nil:
+	if err != nil {
 		i.log.Error("couldn't read container from database: %w", err)
 		return Container{}, fmt.Errorf("couldn't read from database: %w", err)
 	}
-
 	var container Container
 	if _, err = i.codec.Unmarshal(containerBytes, &container); err != nil {
 		return Container{}, fmt.Errorf("couldn't unmarshal container: %w", err)
 	}
 	return container, nil
+
 }
 
 // GetContainerRange returns the IDs of containers at indices
@@ -272,21 +274,7 @@ func (i *index) GetContainerByID(containerID ids.ID) (Container, error) {
 	if err != nil {
 		return Container{}, err
 	}
-
-	// Read container from database
-	containerBytes, err := i.indexToContainer.Get(indexBytes)
-	if err != nil {
-		err = fmt.Errorf("couldn't read container from database: %w", err)
-		i.log.Error("%s", err)
-		return Container{}, err
-	}
-
-	// Parse container
-	var container Container
-	if _, err = i.codec.Unmarshal(containerBytes, &container); err != nil {
-		return Container{}, fmt.Errorf("couldn't unmarshal container: %w", err)
-	}
-	return container, nil
+	return i.getContainerByIndexBytes(indexBytes)
 }
 
 // GetLastAccepted returns the last accepted container.
