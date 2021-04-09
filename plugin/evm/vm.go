@@ -55,6 +55,10 @@ import (
 )
 
 var (
+	// x2cRate is the conversion rate between the smallest denomination on the X-Chain
+	// 1 nAVAX and the smallest denomination on the C-Chain 1 wei. Where 1 nAVAX = 1 gWei.
+	// This is only required for AVAX because the denomination of 1 AVAX is 9 decimal
+	// places on the X and P chains, but is 18 decimal places within the EVM.
 	x2cRate = big.NewInt(1000000000)
 	// GitCommit is set by the build script
 	GitCommit string
@@ -1140,6 +1144,8 @@ func (vm *VM) GetSpendableFunds(keys []*crypto.PrivateKeySECP256K1R, assetID ids
 		addr := GetEthAddress(key)
 		var balance uint64
 		if assetID == vm.ctx.AVAXAssetID {
+			// If the asset is AVAX, we divide by the x2cRate to convert back to the correct
+			// denomination of AVAX that can be exported.
 			balance = new(big.Int).Div(state.GetBalance(addr), x2cRate).Uint64()
 		} else {
 			balance = state.GetBalanceMultiCoin(addr, common.Hash(assetID)).Uint64()
