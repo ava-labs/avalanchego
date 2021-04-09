@@ -74,12 +74,12 @@ func cantBuildBlock() (snowman.Block, error) {
 
 // checkProcessingBlock checks that [blk] is of the correct type and is
 // correctly uniquified when calling GetBlock and ParseBlock.
-func checkProcessingBlock(t *testing.T, c *Cache, blk snowman.Block) {
+func checkProcessingBlock(t *testing.T, s *State, blk snowman.Block) {
 	if _, ok := blk.(*BlockWrapper); !ok {
 		t.Fatalf("Expected block to be of type (*BlockWrapper)")
 	}
 
-	parsedBlk, err := c.ParseBlock(blk.Bytes())
+	parsedBlk, err := s.ParseBlock(blk.Bytes())
 	if err != nil {
 		t.Fatalf("Failed to parse verified block due to %s", err)
 	}
@@ -96,7 +96,7 @@ func checkProcessingBlock(t *testing.T, c *Cache, blk snowman.Block) {
 		t.Fatalf("Expected parsed block to return a uniquified block")
 	}
 
-	getBlk, err := c.GetBlock(blk.ID())
+	getBlk, err := s.GetBlock(blk.ID())
 	if err != nil {
 		t.Fatalf("Unexpected error during GetBlock for processing block %s", err)
 	}
@@ -107,12 +107,12 @@ func checkProcessingBlock(t *testing.T, c *Cache, blk snowman.Block) {
 
 // checkDecidedBlock asserts that [blk] is returned with the correct status by ParseBlock
 // and GetBlock.
-func checkDecidedBlock(t *testing.T, c *Cache, blk snowman.Block, expectedStatus choices.Status, cached bool) {
+func checkDecidedBlock(t *testing.T, s *State, blk snowman.Block, expectedStatus choices.Status, cached bool) {
 	if _, ok := blk.(*BlockWrapper); !ok {
 		t.Fatalf("Expected block to be of type (*BlockWrapper)")
 	}
 
-	parsedBlk, err := c.ParseBlock(blk.Bytes())
+	parsedBlk, err := s.ParseBlock(blk.Bytes())
 	if err != nil {
 		t.Fatalf("Unexpected error parsing decided block %s", err)
 	}
@@ -130,7 +130,7 @@ func checkDecidedBlock(t *testing.T, c *Cache, blk snowman.Block, expectedStatus
 		t.Fatalf("Expected parsed block to have been cached, but retrieved non-unique decided block")
 	}
 
-	getBlk, err := c.GetBlock(blk.ID())
+	getBlk, err := s.GetBlock(blk.ID())
 	if err != nil {
 		t.Fatalf("Unexpected error during GetBlock for decided block %s", err)
 	}
@@ -151,12 +151,12 @@ func checkDecidedBlock(t *testing.T, c *Cache, blk snowman.Block, expectedStatus
 	}
 }
 
-func checkAcceptedBlock(t *testing.T, c *Cache, blk snowman.Block, cached bool) {
-	checkDecidedBlock(t, c, blk, choices.Accepted, cached)
+func checkAcceptedBlock(t *testing.T, s *State, blk snowman.Block, cached bool) {
+	checkDecidedBlock(t, s, blk, choices.Accepted, cached)
 }
 
-func checkRejectedBlock(t *testing.T, c *Cache, blk snowman.Block, cached bool) {
-	checkDecidedBlock(t, c, blk, choices.Rejected, cached)
+func checkRejectedBlock(t *testing.T, s *State, blk snowman.Block, cached bool) {
+	checkDecidedBlock(t, s, blk, choices.Rejected, cached)
 }
 
 func TestState(t *testing.T) {
@@ -181,7 +181,7 @@ func TestState(t *testing.T) {
 	testBlks = append(testBlks, blk3)
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
-	chainState := NewCache(&Config{
+	chainState := NewState(&Config{
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
 		UnverifiedCacheSize: 2,
@@ -306,7 +306,7 @@ func TestBuildBlock(t *testing.T) {
 		return blk1, nil
 	}
 
-	chainState := NewCache(&Config{
+	chainState := NewState(&Config{
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
 		UnverifiedCacheSize: 2,
@@ -348,7 +348,7 @@ func TestStateDecideBlock(t *testing.T) {
 	badRejectBlk := testBlks[3]
 	badRejectBlk.RejectV = errors.New("this block should fail on reject")
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
-	chainState := NewCache(&Config{
+	chainState := NewState(&Config{
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
 		UnverifiedCacheSize: 2,
@@ -412,7 +412,7 @@ func TestStateParent(t *testing.T) {
 	blk2 := testBlks[2]
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
-	chainState := NewCache(&Config{
+	chainState := NewState(&Config{
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
 		UnverifiedCacheSize: 2,
@@ -450,7 +450,7 @@ func TestGetBlockInternal(t *testing.T) {
 	genesisBlock.SetStatus(choices.Accepted)
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
-	chainState := NewCache(&Config{
+	chainState := NewState(&Config{
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
 		UnverifiedCacheSize: 2,
@@ -496,7 +496,7 @@ func TestGetBlockError(t *testing.T) {
 		}
 		return blk, nil
 	}
-	chainState := NewCache(&Config{
+	chainState := NewState(&Config{
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
 		UnverifiedCacheSize: 2,
@@ -531,7 +531,7 @@ func TestParseBlockError(t *testing.T) {
 	genesisBlock.SetStatus(choices.Accepted)
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
-	chainState := NewCache(&Config{
+	chainState := NewState(&Config{
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
 		UnverifiedCacheSize: 2,
@@ -554,7 +554,7 @@ func TestBuildBlockError(t *testing.T) {
 	genesisBlock.SetStatus(choices.Accepted)
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
-	chainState := NewCache(&Config{
+	chainState := NewState(&Config{
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
 		UnverifiedCacheSize: 2,
@@ -591,15 +591,15 @@ func TestMeteredCache(t *testing.T) {
 		BuildBlock:          cantBuildBlock,
 		GetBlockIDAtHeight:  getCanonicalBlockID,
 	}
-	_, err := NewMeteredCache(registry, namespace1, config)
+	_, err := NewMeteredState(registry, namespace1, config)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = NewMeteredCache(registry, namespace1, config)
+	_, err = NewMeteredState(registry, namespace1, config)
 	if err == nil {
-		t.Fatal("Expected creating a second NewMeteredCache with the same namespace to error due to a registry conflict")
+		t.Fatal("Expected creating a second NewMeteredState with the same namespace to error due to a registry conflict")
 	}
-	_, err = NewMeteredCache(registry, namespace2, config)
+	_, err = NewMeteredState(registry, namespace2, config)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -54,7 +54,7 @@ const (
 
 // VMClient is an implementation of VM that talks over RPC.
 type VMClient struct {
-	*chain.Cache
+	*chain.State
 	client vmproto.VMClient
 	broker *plugin.GRPCBroker
 	proc   *plugin.Client
@@ -194,7 +194,7 @@ func (vm *VMClient) Initialize(
 		height:   resp.Height,
 	}
 
-	chainCache, err := chain.NewMeteredCache(
+	chainState, err := chain.NewMeteredState(
 		ctx.Metrics,
 		fmt.Sprintf("%s_rpcchainvm", ctx.Namespace),
 		&chain.Config{
@@ -210,7 +210,7 @@ func (vm *VMClient) Initialize(
 	if err != nil {
 		return err
 	}
-	vm.Cache = chainCache
+	vm.State = chainState
 
 	return nil
 }

@@ -13,7 +13,7 @@ import (
 type BlockWrapper struct {
 	snowman.Block
 
-	cache *Cache
+	state *State
 }
 
 // Verify verifies the underlying block, evicts from the unverified block cache
@@ -23,7 +23,7 @@ type BlockWrapper struct {
 // on [bw] removing it from [verifiedBlocks].
 func (bw *BlockWrapper) Verify() error {
 	blkID := bw.ID()
-	bw.cache.unverifiedBlocks.Evict(blkID)
+	bw.state.unverifiedBlocks.Evict(blkID)
 
 	err := bw.Block.Verify()
 	if err != nil {
@@ -32,7 +32,7 @@ func (bw *BlockWrapper) Verify() error {
 		// the future.
 		return err
 	}
-	bw.cache.verifiedBlocks[blkID] = bw
+	bw.state.verifiedBlocks[blkID] = bw
 	return nil
 }
 
@@ -40,9 +40,9 @@ func (bw *BlockWrapper) Verify() error {
 // block, and updates the last acceptd block.
 func (bw *BlockWrapper) Accept() error {
 	blkID := bw.ID()
-	delete(bw.cache.verifiedBlocks, blkID)
-	bw.cache.decidedBlocks.Put(blkID, bw)
-	bw.cache.lastAcceptedBlock = bw
+	delete(bw.state.verifiedBlocks, blkID)
+	bw.state.decidedBlocks.Put(blkID, bw)
+	bw.state.lastAcceptedBlock = bw
 
 	return bw.Block.Accept()
 }
@@ -51,8 +51,8 @@ func (bw *BlockWrapper) Accept() error {
 // decided block.
 func (bw *BlockWrapper) Reject() error {
 	blkID := bw.ID()
-	delete(bw.cache.verifiedBlocks, blkID)
-	bw.cache.decidedBlocks.Put(blkID, bw)
+	delete(bw.state.verifiedBlocks, blkID)
+	bw.state.decidedBlocks.Put(blkID, bw)
 	return bw.Block.Reject()
 }
 
@@ -61,7 +61,7 @@ func (bw *BlockWrapper) Reject() error {
 // block type by using cache to retrieve the parent block by ID.
 func (bw *BlockWrapper) Parent() snowman.Block {
 	parentID := bw.Block.Parent().ID()
-	blk, err := bw.cache.GetBlock(parentID)
+	blk, err := bw.state.GetBlock(parentID)
 	if err == nil {
 		return blk
 	}
