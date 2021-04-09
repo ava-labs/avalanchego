@@ -1,81 +1,22 @@
 package indexer
 
 import (
-	"errors"
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-var (
-	errInvalidIndexType = errors.New("invalid index type given")
-	errInvalidChain     = errors.New("invalid chain given")
-	errOnlyHaveBlocks   = errors.New("P-Chain and C-Chain only have blocks")
-	errNoBlocks         = errors.New("X-Chain doesn't have blocks")
-)
-
-type IndexType byte
-
-const (
-	IndexTypeTransactions IndexType = iota
-	IndexTypeVertices
-	IndexTypeBlocks
-)
-
-func (t IndexType) String() string {
-	switch t {
-	case IndexTypeTransactions:
-		return "tx"
-	case IndexTypeVertices:
-		return "vtx"
-	case IndexTypeBlocks:
-		return "block"
-	}
-	return "unknown"
-}
-
-type IndexedChain byte
-
-const (
-	XChain IndexedChain = iota
-	PChain
-	CChain
-)
-
-func (t IndexedChain) String() string {
-	switch t {
-	case XChain:
-		return "X"
-	case PChain:
-		return "P"
-	case CChain:
-		return "C"
-	}
-	// Should never happen
-	return "unknown"
-}
-
 type Client struct {
 	rpc.EndpointRequester
 }
 
-// NewClient creates a client.
-func NewClient(uri string, chain IndexedChain, indexType IndexType, requestTimeout time.Duration) (*Client, error) {
-	switch {
-	case chain == XChain && indexType == IndexTypeBlocks:
-		return nil, errNoBlocks
-	case (chain == PChain || chain == CChain) && indexType != IndexTypeBlocks:
-		return nil, errOnlyHaveBlocks
-	case chain != XChain && chain != PChain && chain != CChain:
-		return nil, errInvalidChain
-	case indexType != IndexTypeTransactions && indexType != IndexTypeVertices && indexType != IndexTypeBlocks:
-		return nil, errInvalidIndexType
-	}
-
+// NewClient creates a client that can interact with an index via HTTP API calls.
+// [host] is the host to make API calls to (e.g. http://1.2.3.4:9650).
+// [endpoint] is the path to the index endpoint (e.g. /ext/index/C/block or /ext/index/X/tx).
+func NewClient(host, endpoint string, requestTimeout time.Duration) *Client {
 	return &Client{
-		EndpointRequester: rpc.NewEndpointRequester(uri, fmt.Sprintf("ext/index/%s/%s", chain, indexType), "index", requestTimeout),
-	}, nil
+		EndpointRequester: rpc.NewEndpointRequester(host, endpoint, "index", requestTimeout),
+	}
 }
 
 func (c *Client) GetContainerRange(args *GetContainerRange) ([]FormattedContainer, error) {
