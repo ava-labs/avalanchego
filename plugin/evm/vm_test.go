@@ -482,7 +482,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 	}
 
 	// Clear the cache and ensure that GetBlock returns internal blocks with the correct status
-	vm.Cache.Flush()
+	vm.State.Flush()
 	blk2Refreshed, err := vm.GetBlockInternal(blk2.ID())
 	if err != nil {
 		t.Fatal(err)

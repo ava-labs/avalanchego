@@ -174,9 +174,9 @@ type blockErrorTuple struct {
 // VM implements the snowman.ChainVM interface
 type VM struct {
 	ctx *snow.Context
-	// ChainState helps to implement the VM interface by wrapping blocks
+	// *chain.State helps to implement the VM interface by wrapping blocks
 	// with an efficient caching layer.
-	*chain.Cache
+	*chain.State
 
 	CLIConfig CommandLineConfig
 
@@ -466,7 +466,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to get last accepted block due to %w", lastAcceptedErr)
 	}
 
-	vm.Cache = chain.NewCache(&chain.Config{
+	vm.State = chain.NewState(&chain.Config{
 		DecidedCacheSize:    decidedCacheSize,
 		MissingCacheSize:    missingCacheSize,
 		UnverifiedCacheSize: unverifiedCacheSize,
