@@ -131,4 +131,19 @@ func TestExportTxVerify(t *testing.T) {
 	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err == nil {
 		t.Fatal("ExportTx should have failed verification due to unsorted EVM Inputs")
 	}
+	exportTx.Ins = []EVMInput{
+		{
+			Address: testEthAddrs[0],
+			Amount:  0,
+			AssetID: testAvaxAssetID,
+			Nonce:   0,
+		},
+	}
+	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err == nil {
+		t.Fatal("ExportTx should have failed verification due to 0 value amount")
+	}
+	exportTx.Ins = []EVMInput{evmInputs[0], evmInputs[0]}
+	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err == nil {
+		t.Fatal("ExportTx should have failed verification due to non-unique inputs")
+	}
 }
