@@ -79,8 +79,8 @@ func (tx *UnsignedImportTx) Verify(
 	if !avax.IsSortedAndUniqueTransferableInputs(tx.ImportedInputs) {
 		return errInputsNotSortedUnique
 	}
-	if ap1 && !IsSortedEVMOutputs(tx.Outs) {
-		return errOutputsNotSorted
+	if ap1 && !IsSortedAndUniqueEVMOutputs(tx.Outs) {
+		return errOutputsNotSortedUnique
 	}
 
 	return nil

@@ -192,8 +192,8 @@ func SortEVMOutputs(outputs []EVMOutput) {
 	sort.Sort(&innerSortEVMOutputs{outputs: outputs})
 }
 
-// IsSortedEVMOutputs returns true if the EVMOutputs are sorted
-// based on the account addresses and assetIDs
-func IsSortedEVMOutputs(outputs []EVMOutput) bool {
-	return sort.IsSorted(&innerSortEVMOutputs{outputs: outputs})
+// IsSortedAndUniqueEVMOutputs returns true if the EVMOutputs are sorted
+// and unique based on the account addresses and assetIDs
+func IsSortedAndUniqueEVMOutputs(outputs []EVMOutput) bool {
+	return utils.IsSortedAndUnique(&innerSortEVMOutputs{outputs: outputs})
 }
