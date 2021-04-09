@@ -1120,8 +1120,9 @@ func (vm *VM) GetAtomicUTXOs(
 
 // GetSpendableFunds returns a list of EVMInputs and keys (in corresponding order)
 // to total [amount] of [assetID] owned by [keys]
-// TODO switch to returning a list of private keys
-// since there are no multisig inputs in Ethereum
+// Note: we return [][]*crypto.PrivateKeySECP256K1R even though each input corresponds
+// to a single key, so that the signers can be passed in to [tx.Sign] which supports
+// multiple keys on a single input.
 func (vm *VM) GetSpendableFunds(keys []*crypto.PrivateKeySECP256K1R, assetID ids.ID, amount uint64) ([]EVMInput, [][]*crypto.PrivateKeySECP256K1R, error) {
 	// Note: current state uses the state of the preferred block.
 	state, err := vm.chain.CurrentState()
@@ -1130,8 +1131,8 @@ func (vm *VM) GetSpendableFunds(keys []*crypto.PrivateKeySECP256K1R, assetID ids
 	}
 	inputs := []EVMInput{}
 	signers := [][]*crypto.PrivateKeySECP256K1R{}
-	// NOTE: we assume all keys correspond to distinct accounts here (so the
-	// nonce handling in export_tx.go is correct)
+	// Note: we assume that each key in [keys] is unique, so that iterating over
+	// the keys will not produce duplicated nonces in the returned EVMInput slice.
 	for _, key := range keys {
 		if amount == 0 {
 			break
