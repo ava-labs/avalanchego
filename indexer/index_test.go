@@ -15,8 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func testIsAccepted(_ ids.ID) bool { return true }
-
 func TestIndex(t *testing.T) {
 	// Setup
 	pageSize := uint64(64)
@@ -28,7 +26,7 @@ func TestIndex(t *testing.T) {
 	db := versiondb.New(baseDB)
 	ctx := snow.DefaultContextTest()
 
-	indexIntf, err := newIndex(db, logging.NoLog{}, codec, timer.Clock{}, testIsAccepted)
+	indexIntf, err := newIndex(db, logging.NoLog{}, codec, timer.Clock{})
 	assert.NoError(err)
 	idx := indexIntf.(*index)
 
@@ -82,7 +80,7 @@ func TestIndex(t *testing.T) {
 	assert.NoError(db.Commit())
 	assert.NoError(idx.Close())
 	db = versiondb.New(baseDB)
-	indexIntf, err = newIndex(db, logging.NoLog{}, codec, timer.Clock{}, testIsAccepted)
+	indexIntf, err = newIndex(db, logging.NoLog{}, codec, timer.Clock{})
 	assert.NoError(err)
 	idx = indexIntf.(*index)
 
@@ -117,7 +115,7 @@ func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	assert.NoError(err)
 	db := memdb.New()
 	ctx := snow.DefaultContextTest()
-	indexIntf, err := newIndex(db, logging.NoLog{}, codec, timer.Clock{}, testIsAccepted)
+	indexIntf, err := newIndex(db, logging.NoLog{}, codec, timer.Clock{})
 	assert.NoError(err)
 	idx := indexIntf.(*index)
 
@@ -151,55 +149,25 @@ func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	assert.EqualValues(containers[0], containers2[MaxFetchedByRange-2])
 }
 
-func TestIndexRollBackAccepted(t *testing.T) {
+func TestDontIndexSameContainerTwice(t *testing.T) {
 	// Setup
 	assert := assert.New(t)
 	codec := codec.NewDefaultManager()
 	err := codec.RegisterCodec(codecVersion, linearcodec.NewDefault())
 	assert.NoError(err)
-	baseDB := memdb.New()
-	db := versiondb.New(baseDB)
+	db := memdb.New()
 	ctx := snow.DefaultContextTest()
-	indexIntf, err := newIndex(db, logging.NoLog{}, codec, timer.Clock{}, testIsAccepted)
+	idx, err := newIndex(db, logging.NoLog{}, codec, timer.Clock{})
 	assert.NoError(err)
-	idx := indexIntf.(*index)
 
-	// Accept 3 containers
-	containers := []ids.ID{}
-	for i := uint64(0); i < 3; i++ {
-		id := ids.GenerateTestID()
-		containers = append(containers, id)
-		assert.NoError(idx.Accept(ctx, id, utils.RandomBytes(32)))
-	}
-
-	// Close the index
-	assert.NoError(db.Commit())
-	assert.NoError(idx.Close())
-
-	// Re-open but with a function that says that only the first container is accepted
-	db = versiondb.New(baseDB)
-	isAccepted := func(containerID ids.ID) bool {
-		assert.Contains(containers, containerID)
-		return containerID == containers[0]
-	}
-	indexIntf, err = newIndex(db, logging.NoLog{}, codec, timer.Clock{}, isAccepted)
-	assert.NoError(err)
-	idx = indexIntf.(*index)
-
-	// Should say that the only accepted container is containers[0]
-	index, ok := idx.lastAcceptedIndex()
-	assert.True(ok)
-	assert.EqualValues(0, index)
-	container, err := idx.GetLastAccepted()
-	assert.NoError(err)
-	assert.Equal(containers[0], container.ID)
-	assert.EqualValues(1, idx.nextAcceptedIndex)
+	// Accept the same container twice
+	containerID := ids.GenerateTestID()
+	assert.NoError(idx.Accept(ctx, containerID, []byte{1, 2, 3}))
+	assert.NoError(idx.Accept(ctx, containerID, []byte{4, 5, 6}))
 	_, err = idx.GetContainerByIndex(1)
-	assert.Error(err)
-	_, err = idx.GetContainerByIndex(2)
-	assert.Error(err)
-	_, err = idx.GetContainerByID(containers[1])
-	assert.Error(err)
-	_, err = idx.GetContainerByID(containers[2])
-	assert.Error(err)
+	assert.Error(err, "should not have accepted same container twice")
+	gotContainer, err := idx.GetContainerByID(containerID)
+	assert.NoError(err)
+	assert.EqualValues(gotContainer.Bytes, []byte{1, 2, 3}, "should not have accepted same container twice")
+
 }

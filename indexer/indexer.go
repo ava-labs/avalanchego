@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman"
@@ -222,17 +221,9 @@ func (i *indexer) RegisterChain(name string, ctx *snow.Context, engineIntf inter
 		return
 	}
 
-	switch engine := engineIntf.(type) {
+	switch engineIntf.(type) {
 	case snowman.Engine:
-		isAcceptedFunc := func(blkID ids.ID) bool {
-			ctx.Lock.Lock()
-			defer ctx.Lock.Unlock()
-
-			blk, err := engine.GetVM().GetBlock(blkID)
-			return err == nil && blk.Status() == choices.Accepted
-		}
-
-		index, err := i.registerChainHelper(chainID, blockPrefix, name, "block", i.consensusDispatcher, isAcceptedFunc)
+		index, err := i.registerChainHelper(chainID, blockPrefix, name, "block", i.consensusDispatcher)
 		if err != nil {
 			i.log.Fatal("couldn't create block index for %s: %s", name, err)
 			if err := i.close(); err != nil {
@@ -242,15 +233,7 @@ func (i *indexer) RegisterChain(name string, ctx *snow.Context, engineIntf inter
 		}
 		i.blockIndices[chainID] = index
 	case avalanche.Engine:
-		isVtxAcceptedFunc := func(vtxID ids.ID) bool {
-			ctx.Lock.Lock()
-			defer ctx.Lock.Unlock()
-
-			vtx, err := engine.GetVtx(vtxID)
-			return err == nil && vtx.Status() == choices.Accepted
-		}
-
-		vtxIndex, err := i.registerChainHelper(chainID, vtxPrefix, name, "vtx", i.consensusDispatcher, isVtxAcceptedFunc)
+		vtxIndex, err := i.registerChainHelper(chainID, vtxPrefix, name, "vtx", i.consensusDispatcher)
 		if err != nil {
 			i.log.Fatal("couldn't create vertex index for %s: %s", name, err)
 			if err := i.close(); err != nil {
@@ -260,14 +243,7 @@ func (i *indexer) RegisterChain(name string, ctx *snow.Context, engineIntf inter
 		}
 		i.vtxIndices[chainID] = vtxIndex
 
-		isTxAcceptedFunc := func(txID ids.ID) bool {
-			ctx.Lock.Lock()
-			defer ctx.Lock.Unlock()
-
-			tx, err := engine.GetVM().GetTx(txID)
-			return err == nil && tx.Status() == choices.Accepted
-		}
-		txIndex, err := i.registerChainHelper(chainID, txPrefix, name, "tx", i.decisionDispatcher, isTxAcceptedFunc)
+		txIndex, err := i.registerChainHelper(chainID, txPrefix, name, "tx", i.decisionDispatcher)
 		if err != nil {
 			i.log.Fatal("couldn't create tx index for %s: %s", name, err)
 			if err := i.close(); err != nil {
@@ -291,13 +267,12 @@ func (i *indexer) registerChainHelper(
 	prefixEnd byte,
 	name, endpoint string,
 	dispatcher *triggers.EventDispatcher,
-	isAcceptedF func(containerID ids.ID) bool,
 ) (Index, error) {
 	prefix := make([]byte, hashing.HashLen+wrappers.ByteLen)
 	copy(prefix, chainID[:])
 	prefix[hashing.HashLen] = prefixEnd
 	indexDB := prefixdb.New(prefix, i.db)
-	index, err := newIndex(indexDB, i.log, i.codec, i.clock, isAcceptedF)
+	index, err := newIndex(indexDB, i.log, i.codec, i.clock)
 	if err != nil {
 		_ = indexDB.Close()
 		return nil, err

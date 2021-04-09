@@ -74,7 +74,6 @@ func newIndex(
 	log logging.Logger,
 	codec codec.Manager,
 	clock timer.Clock,
-	isAcceptedFunc func(containerID ids.ID) bool,
 ) (Index, error) {
 	vDB := versiondb.New(baseDB)
 	indexToContainer := prefixdb.New(indexToContainerPrefix, vDB)
@@ -105,22 +104,6 @@ func newIndex(
 		return nil, fmt.Errorf("couldn't parse next accepted index from bytes: %w", err)
 	}
 	i.log.Info("next accepted index %d", i.nextAcceptedIndex)
-
-	// We may have committed some containers in the index's DB that were not committed at
-	// the VM's DB. Go back through recently accepted things and make sure they're accepted.
-	for j := i.nextAcceptedIndex; j >= 1; j-- {
-		lastAccepted, err := i.getContainerByIndex(j - 1)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't get container at index %d: %s", j-1, err)
-		}
-		if isAcceptedFunc(lastAccepted.ID) {
-			// The last accepted container is marked as accepted by the VM. Stop.
-			break
-		}
-		if err := i.removeLastAccepted(lastAccepted.ID); err != nil {
-			return nil, fmt.Errorf("couldn't remove container: %s", err)
-		}
-	}
 	return i, nil
 }
 
@@ -140,6 +123,19 @@ func (i *index) Close() error {
 func (i *index) Accept(ctx *snow.Context, containerID ids.ID, containerBytes []byte) error {
 	i.lock.Lock()
 	defer i.lock.Unlock()
+
+	// It may be the case that in a previous run of this node, this index committed [containerID]
+	// as accepted and then the node shut down before the VM committed [containerID] as accepted.
+	// In that case, when the node restarts Accept will be called with the same container.
+	// Make sure we don't index the same container twice in that event.
+	_, err := i.containerToIndex.Get(containerID[:])
+	if err == nil {
+		ctx.Log.Debug("not indexing already accepted container %s", containerID)
+		return nil
+	}
+	if err != database.ErrNotFound {
+		return fmt.Errorf("couldn't get whether %s is accepted: %w", containerID, err)
+	}
 
 	ctx.Log.Debug("indexing %d --> container %s", i.nextAcceptedIndex, containerID)
 	// Persist index --> Container
@@ -318,26 +314,4 @@ func (i *index) GetLastAccepted() (Container, error) {
 // 2) Whether at least 1 transaction has been accepted
 func (i *index) lastAcceptedIndex() (uint64, bool) {
 	return i.nextAcceptedIndex - 1, i.nextAcceptedIndex != 0
-}
-
-// Remove the last accepted container, [containerID], from the databases.
-// Assumes [p.nextAcceptedIndex] >= 1.
-// Assumes [containerID] is actually the ID of the last accepted container.
-func (i *index) removeLastAccepted(containerID ids.ID) error {
-	i.lock.Lock()
-	defer i.lock.Unlock()
-
-	if err := i.containerToIndex.Delete(containerID[:]); err != nil {
-		return err
-	}
-	indexBytes := wrappers.PackLong(i.nextAcceptedIndex - 1)
-	if err := i.indexToContainer.Delete(indexBytes); err != nil {
-		return fmt.Errorf("couldn't remove last accepted: %w", err)
-	}
-	i.nextAcceptedIndex--
-	indexBytes = wrappers.PackLong(i.nextAcceptedIndex)
-	if err := i.vDB.Put(nextAcceptedIndexKey, indexBytes); err != nil {
-		return fmt.Errorf("couldn't put next accepted key: %s", err)
-	}
-	return i.vDB.Commit()
 }
