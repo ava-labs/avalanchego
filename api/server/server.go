@@ -19,9 +19,7 @@ import (
 	"github.com/rs/cors"
 
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -109,29 +107,19 @@ func (s *Server) DispatchTLS(certFile, keyFile string) error {
 // creating a new chain and holds the P-Chain's lock when this function is held,
 // and at the same time the server's lock is held due to an API call and is trying
 // to grab the P-Chain's lock.
-func (s *Server) RegisterChain(chainName string, ctx *snow.Context, engineIntf interface{}) {
-	go s.registerChain(chainName, ctx, engineIntf)
+func (s *Server) RegisterChain(chainName string, ctx *snow.Context, engine common.Engine) {
+	go s.registerChain(chainName, ctx, engine)
 }
 
-func (s *Server) registerChain(chainName string, ctx *snow.Context, engineIntf interface{}) {
+func (s *Server) registerChain(chainName string, ctx *snow.Context, engine common.Engine) {
 	var (
 		handlers map[string]*common.HTTPHandler
 		err      error
 	)
 
-	switch engine := engineIntf.(type) {
-	case snowman.Engine:
-		ctx.Lock.Lock()
-		handlers, err = engine.GetVM().CreateHandlers()
-		ctx.Lock.Unlock()
-	case avalanche.Engine:
-		ctx.Lock.Lock()
-		handlers, err = engine.GetVM().CreateHandlers()
-		ctx.Lock.Unlock()
-	default:
-		s.log.Error("engine has unexpected type %T", engineIntf)
-		return
-	}
+	ctx.Lock.Lock()
+	handlers, err = engine.GetVM().CreateHandlers()
+	ctx.Lock.Unlock()
 	if err != nil {
 		s.log.Error("failed to create %s handlers: %s", chainName, err)
 		return

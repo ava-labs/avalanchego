@@ -157,7 +157,7 @@ func TestIndexer(t *testing.T) {
 
 	// Register this chain, creating a new index
 	chainVM := &smblockmocks.ChainVM{}
-	chainEngine := &smengmocks.SnowmanEngine{}
+	chainEngine := &smengmocks.Engine{}
 	chainEngine.On("GetVM").Return(chainVM)
 
 	idxr.RegisterChain("chain1", chain1Ctx, chainEngine)
@@ -454,7 +454,7 @@ func TestIncompleteIndex(t *testing.T) {
 	previouslyIndexed, err := idxr.previouslyIndexed(chain1Ctx.ChainID)
 	assert.NoError(err)
 	assert.False(previouslyIndexed)
-	chainEngine := &smengmocks.SnowmanEngine{}
+	chainEngine := &smengmocks.Engine{}
 	idxr.RegisterChain("chain1", chain1Ctx, chainEngine)
 	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
 	assert.NoError(err)
@@ -541,7 +541,7 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 
 	// RegisterChain should return without adding an index for this chain
 	chainVM := &smblockmocks.ChainVM{}
-	chainEngine := &smengmocks.SnowmanEngine{}
+	chainEngine := &smengmocks.Engine{}
 	chainEngine.On("GetVM").Return(chainVM)
 	idxr.RegisterChain("chain1", chain1Ctx, chainEngine)
 	assert.Len(idxr.blockIndices, 0)

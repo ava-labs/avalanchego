@@ -69,7 +69,7 @@ type Config struct {
 // they were accepted by this node.
 // Indexer is threadsafe.
 type Indexer interface {
-	RegisterChain(name string, ctx *snow.Context, engine interface{})
+	RegisterChain(name string, ctx *snow.Context, engine common.Engine)
 	// Close will do nothing and return nil after the first call
 	Close() error
 }
@@ -142,8 +142,8 @@ type indexer struct {
 	decisionDispatcher *triggers.EventDispatcher
 }
 
-// Assumes [engineIntf]'s context lock is not held
-func (i *indexer) RegisterChain(name string, ctx *snow.Context, engineIntf interface{}) {
+// Assumes [engine]'s context lock is not held
+func (i *indexer) RegisterChain(name string, ctx *snow.Context, engine common.Engine) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
@@ -221,7 +221,7 @@ func (i *indexer) RegisterChain(name string, ctx *snow.Context, engineIntf inter
 		return
 	}
 
-	switch engineIntf.(type) {
+	switch engine.(type) {
 	case snowman.Engine:
 		index, err := i.registerChainHelper(chainID, blockPrefix, name, "block", i.consensusDispatcher)
 		if err != nil {
@@ -253,7 +253,7 @@ func (i *indexer) RegisterChain(name string, ctx *snow.Context, engineIntf inter
 		}
 		i.txIndices[chainID] = txIndex
 	default:
-		i.log.Error("got unexpected engine type %T", engineIntf)
+		i.log.Error("got unexpected engine type %T", engine)
 		if err := i.close(); err != nil {
 			i.log.Error("error while closing indexer: %s", err)
 		}

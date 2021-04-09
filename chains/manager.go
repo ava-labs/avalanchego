@@ -699,7 +699,7 @@ func (m *manager) LookupVM(alias string) (ids.ID, error) { return m.VMManager.Lo
 
 // Notify registrants [those who want to know about the creation of chains]
 // that the specified chain has been created
-func (m *manager) notifyRegistrants(name string, ctx *snow.Context, engine interface{}) {
+func (m *manager) notifyRegistrants(name string, ctx *snow.Context, engine common.Engine) {
 	for _, registrant := range m.registrants {
 		registrant.RegisterChain(name, ctx, engine)
 	}
