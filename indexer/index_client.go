@@ -8,6 +8,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
+var (
+	errInvalidIndexType = errors.New("invalid index type given")
+	errInvalidChain     = errors.New("invalid chain given")
+	errOnlyHaveBlocks   = errors.New("P-Chain and C-Chain only have blocks")
+	errNoBlocks         = errors.New("X-Chain doesn't have blocks")
+)
+
 type IndexType byte
 
 const (
@@ -57,13 +64,13 @@ type Client struct {
 func NewClient(uri string, chain IndexedChain, indexType IndexType, requestTimeout time.Duration) (*Client, error) {
 	switch {
 	case chain == XChain && indexType == IndexTypeBlocks:
-		return nil, errors.New("X-Chain doesn't have blocks")
+		return nil, errNoBlocks
 	case (chain == PChain || chain == CChain) && indexType != IndexTypeBlocks:
-		return nil, errors.New("P-Chain and C-Chain only have blocks")
+		return nil, errOnlyHaveBlocks
 	case chain != XChain && chain != PChain && chain != CChain:
-		return nil, errors.New("invalid chain given")
+		return nil, errInvalidChain
 	case indexType != IndexTypeTransactions && indexType != IndexTypeVertices && indexType != IndexTypeBlocks:
-		return nil, errors.New("invalid index type given")
+		return nil, errInvalidIndexType
 	}
 
 	return &Client{

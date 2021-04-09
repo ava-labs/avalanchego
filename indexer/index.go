@@ -3,6 +3,7 @@ package indexer
 import (
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -46,7 +47,7 @@ type Index interface {
 	GetLastAccepted() (Container, error)
 	GetIndex(containerID ids.ID) (uint64, error)
 	GetContainerByID(containerID ids.ID) (Container, error)
-	Close() error
+	io.Closer
 }
 
 // indexer indexes all accepted transactions by the order in which they were accepted
@@ -110,10 +111,12 @@ func newIndex(
 // Close this index
 func (i *index) Close() error {
 	errs := wrappers.Errs{}
-	errs.Add(i.indexToContainer.Close())
-	errs.Add(i.containerToIndex.Close())
-	errs.Add(i.vDB.Close())
-	errs.Add(i.baseDB.Close())
+	errs.Add(
+		i.indexToContainer.Close(),
+		i.containerToIndex.Close(),
+		i.vDB.Close(),
+		i.baseDB.Close(),
+	)
 	return errs.Err
 }
 
@@ -232,20 +235,12 @@ func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, e
 	containers := make([]Container, int(lastIndex)-int(startIndex)+1)
 
 	n := 0
+	var err error
 	for j := startIndex; j <= lastIndex; j++ {
-		// Convert index to bytes
-		indexBytes := wrappers.PackLong(j)
-
-		// Get container from database and deserialize
-		containerBytes, err := i.indexToContainer.Get(indexBytes)
+		containers[n], err = i.getContainerByIndex(j)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't get container from database: %w", err)
+			return nil, fmt.Errorf("couldn't get container at index %d: %w", j, err)
 		}
-		var container Container
-		if _, err := i.codec.Unmarshal(containerBytes, &container); err != nil {
-			return nil, fmt.Errorf("couldn't unmarshal container: %w", err)
-		}
-		containers[n] = container
 		n++
 	}
 	return containers, nil

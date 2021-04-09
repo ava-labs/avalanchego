@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"sync"
 
@@ -71,7 +72,7 @@ type Config struct {
 type Indexer interface {
 	RegisterChain(name string, ctx *snow.Context, engine common.Engine)
 	// Close will do nothing and return nil after the first call
-	Close() error
+	io.Closer
 }
 
 // NewIndexer returns a new Indexer and registers a new endpoint on the given API server.
