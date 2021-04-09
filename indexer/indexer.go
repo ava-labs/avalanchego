@@ -321,16 +321,22 @@ func (i *indexer) close() error {
 
 	errs := &wrappers.Errs{}
 	for chainID, txIndex := range i.txIndices {
-		errs.Add(txIndex.Close())
-		errs.Add(i.decisionDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)))
+		errs.Add(
+			txIndex.Close(),
+			i.decisionDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
+		)
 	}
 	for chainID, vtxIndex := range i.vtxIndices {
-		errs.Add(vtxIndex.Close())
-		errs.Add(i.consensusDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)))
+		errs.Add(
+			vtxIndex.Close(),
+			i.consensusDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
+		)
 	}
 	for chainID, blockIndex := range i.blockIndices {
-		errs.Add(blockIndex.Close())
-		errs.Add(i.consensusDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)))
+		errs.Add(
+			blockIndex.Close(),
+			i.consensusDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
+		)
 	}
 	errs.Add(i.db.Close())
 

@@ -128,6 +128,7 @@ func (s *Server) registerChain(chainName string, ctx *snow.Context, engine commo
 	httpLogger, err := s.factory.MakeChain(chainName, "http")
 	if err != nil {
 		s.log.Error("failed to create new http logger: %s", err)
+		return
 	}
 
 	s.log.Verbo("About to add API endpoints for chain with ID %s", ctx.ChainID)
