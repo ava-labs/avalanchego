@@ -704,17 +704,19 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 //   * The LockOption is the first element of [lockOption]
 //     By default the LockOption is WriteLock
 //     [lockOption] should have either 0 or 1 elements. Elements beside the first are ignored.
-func newHandler(name string, service interface{}, lockOption ...commonEng.LockOption) *commonEng.HTTPHandler {
+func newHandler(name string, service interface{}, lockOption ...commonEng.LockOption) (*commonEng.HTTPHandler, error) {
 	server := avalancheRPC.NewServer()
 	server.RegisterCodec(avalancheJSON.NewCodec(), "application/json")
 	server.RegisterCodec(avalancheJSON.NewCodec(), "application/json;charset=UTF-8")
-	server.RegisterService(service, name)
+	if err := server.RegisterService(service, name); err != nil {
+		return nil, err
+	}
 
 	var lock commonEng.LockOption = commonEng.WriteLock
 	if len(lockOption) != 0 {
 		lock = lockOption[0]
 	}
-	return &commonEng.HTTPHandler{LockOptions: lock, Handler: server}
+	return &commonEng.HTTPHandler{LockOptions: lock, Handler: server}, nil
 }
 
 // CreateHandlers makes new http handlers that can handle API calls
@@ -748,11 +750,16 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 		return nil, errs.Err
 	}
 
+	avaxAPI, err := newHandler("avax", &AvaxAPI{vm})
+	if err != nil {
+		return nil, fmt.Errorf("failed to register service for AVAX API due to %w", err)
+	}
+
 	log.Info(fmt.Sprintf("Enabled APIs: %s", strings.Join(enabledAPIs, ", ")))
 
 	return map[string]*commonEng.HTTPHandler{
 		"/rpc":  {LockOptions: commonEng.NoLock, Handler: handler},
-		"/avax": newHandler("avax", &AvaxAPI{vm}),
+		"/avax": avaxAPI,
 		"/ws":   {LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandler([]string{"*"})},
 	}, nil
 }
