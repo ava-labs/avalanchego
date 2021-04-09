@@ -160,7 +160,6 @@ func (tx *UnsignedImportTx) SemanticVerify(
 // only to have the transaction not be Accepted. This would be inconsistent.
 // Recall that imported UTXOs are not kept in a versionDB.
 func (tx *UnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) error {
-	// TODO: Is any batch passed in here?
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))
 	for i, in := range tx.ImportedInputs {
 		inputID := in.InputID()
