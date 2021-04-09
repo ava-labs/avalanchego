@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/poll"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 	"github.com/ava-labs/avalanchego/snow/events"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -755,6 +754,6 @@ func (t *Transitive) GetBlock(blkID ids.ID) (snowman.Block, error) {
 }
 
 // GetVM implements the snowman.Engine interface
-func (t *Transitive) GetVM() block.ChainVM {
+func (t *Transitive) GetVM() common.VM {
 	return t.VM
 }
