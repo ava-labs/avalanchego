@@ -130,6 +130,20 @@ func TestImportTxVerify(t *testing.T) {
 	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err == nil {
 		t.Fatal("ImportTx should have failed verification due to unsorted EVM Outputs in AP1")
 	}
+	importTx.Outs = []EVMOutput{
+		{
+			Address: testEthAddrs[0],
+			Amount:  0,
+			AssetID: testAvaxAssetID,
+		},
+	}
+	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err == nil {
+		t.Fatal("ImportTx should have failed verification due to 0 value amount")
+	}
+	importTx.Outs = []EVMOutput{evmOutputs[0], evmOutputs[0]}
+	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err == nil {
+		t.Fatal("ImportTx should have failed verification due to non-unique outputs")
+	}
 }
 
 func TestImportTxSemanticVerify(t *testing.T) {
