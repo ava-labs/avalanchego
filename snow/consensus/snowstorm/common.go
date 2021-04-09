@@ -155,21 +155,19 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 
 // accept the provided tx.
 func (c *common) acceptTx(tx Tx) error {
-	if err := tx.Accept(); err != nil {
-		return err
-	}
 	txID := tx.ID()
-
 	// Notify those listening that this tx has been accepted.
 	// Note that DecisionDispatcher.Accept must be called before
 	// tx.Accept to honor EventDispatcher.Accept's invariant.
 	if err := c.ctx.DecisionDispatcher.Accept(c.ctx, txID, tx.Bytes()); err != nil {
 		return err
 	}
+	if err := tx.Accept(); err != nil {
+		return err
+	}
 
 	// Update the metrics to account for this transaction's acceptance
 	c.Metrics.Accepted(txID)
-
 	// If there is a tx that was accepted pending on this tx, the ancestor
 	// should be notified that it doesn't need to block on this tx anymore.
 	c.pendingAccept.Fulfill(txID)
