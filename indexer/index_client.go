@@ -19,10 +19,10 @@ func NewClient(host, endpoint string, requestTimeout time.Duration) *Client {
 	}
 }
 
-func (c *Client) GetContainerRange(args *GetContainerRange) ([]FormattedContainer, error) {
-	var response []FormattedContainer
+func (c *Client) GetContainerRange(args *GetContainerRangeArgs) ([]FormattedContainer, error) {
+	var response *GetContainerRangeResponse
 	err := c.SendRequest("getContainerRange", args, &response)
-	return response, err
+	return response.Containers, err
 }
 
 func (c *Client) GetContainerByIndex(args *GetContainer) (FormattedContainer, error) {

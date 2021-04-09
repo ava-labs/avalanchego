@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -72,10 +73,14 @@ func (s *service) GetContainerByIndex(_ *http.Request, args *GetContainer, reply
 	return err
 }
 
-type GetContainerRange struct {
+type GetContainerRangeArgs struct {
 	StartIndex json.Uint64         `json:"startIndex"`
 	NumToFetch json.Uint64         `json:"numToFetch"`
 	Encoding   formatting.Encoding `json:"encoding"`
+}
+
+type GetContainerRangeResponse struct {
+	Containers []FormattedContainer `json:"containers"`
 }
 
 // GetContainerRange returns the transactions at index [startIndex], [startIndex+1], ... , [startIndex+n-1]
@@ -83,25 +88,23 @@ type GetContainerRange struct {
 // If [startIndex] > the last accepted index, returns an error (unless the above apply.)
 // If [n] > [MaxFetchedByRange], returns an error.
 // If we run out of transactions, returns the ones fetched before running out.
-func (s *service) GetContainerRange(r *http.Request, args *GetContainerRange, reply *[]FormattedContainer) error {
+func (s *service) GetContainerRange(r *http.Request, args *GetContainerRangeArgs, reply *GetContainerRangeResponse) error {
 	containers, err := s.Index.GetContainerRange(uint64(args.StartIndex), uint64(args.NumToFetch))
 	if err != nil {
 		return err
 	}
 
-	formattedContainers := make([]FormattedContainer, len(containers))
+	reply.Containers = make([]FormattedContainer, len(containers))
 	for i, container := range containers {
 		index, err := s.Index.GetIndex(container.ID)
 		if err != nil {
 			return fmt.Errorf("couldn't get index: %s", err)
 		}
-		formattedContainers[i], err = newFormattedContainer(container, index, args.Encoding)
+		reply.Containers[i], err = newFormattedContainer(container, index, args.Encoding)
 		if err != nil {
 			return err
 		}
 	}
-
-	*reply = formattedContainers
 	return nil
 }
 
@@ -120,10 +123,21 @@ func (s *service) GetIndex(r *http.Request, args *GetIndexArgs, reply *GetIndexR
 	return err
 }
 
-func (s *service) IsAccepted(r *http.Request, args *GetIndexArgs, reply *bool) error {
+type IsAcceptedResponse struct {
+	IsAccepted bool `json:"isAccepted"`
+}
+
+func (s *service) IsAccepted(r *http.Request, args *GetIndexArgs, reply *IsAcceptedResponse) error {
 	_, err := s.Index.GetIndex(args.ContainerID)
-	*reply = err == nil
-	return nil
+	if err == nil {
+		reply.IsAccepted = true
+		return nil
+	}
+	if err == database.ErrNotFound {
+		reply.IsAccepted = false
+		return nil
+	}
+	return err
 }
 
 func (s *service) GetContainerByID(r *http.Request, args *GetIndexArgs, reply *FormattedContainer) error {

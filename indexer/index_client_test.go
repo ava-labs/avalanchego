@@ -52,7 +52,7 @@ func TestIndexClient(t *testing.T) {
 			return nil
 		},
 	}
-	containers, err := client.GetContainerRange(&GetContainerRange{StartIndex: 1, NumToFetch: 10, Encoding: formatting.Hex})
+	containers, err := client.GetContainerRange(&GetContainerRangeArgs{StartIndex: 1, NumToFetch: 10, Encoding: formatting.Hex})
 	assert.NoError(err)
 	assert.Len(containers, 1)
 	assert.EqualValues(id, containers[0].ID)

@@ -248,6 +248,7 @@ func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, e
 	return containers, nil
 }
 
+// Returns database.ErrNotFound if the container is not indexed as accepted
 func (i *index) GetIndex(containerID ids.ID) (uint64, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
