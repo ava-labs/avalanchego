@@ -417,8 +417,8 @@ func (s *stateObject) SetBalance(amount *big.Int) {
 	s.setBalance(amount)
 }
 
-// AddBalance removes amount from c's balance.
-// It is used to add funds to the destination account of a transfer.
+// AddBalanceMultiCoin adds amount of coinID to s's balance.
+// It is used to add multicoin funds to the destination account of a transfer.
 func (s *stateObject) AddBalanceMultiCoin(coinID common.Hash, amount *big.Int, db Database) {
 	if amount.Sign() == 0 {
 		if s.empty() {
@@ -430,8 +430,8 @@ func (s *stateObject) AddBalanceMultiCoin(coinID common.Hash, amount *big.Int, d
 	s.SetBalanceMultiCoin(coinID, new(big.Int).Add(s.BalanceMultiCoin(coinID, db), amount), db)
 }
 
-// SubBalance removes amount from c's balance.
-// It is used to remove funds from the origin account of a transfer.
+// SubBalanceMultiCoin removes amount of coinID from s's balance.
+// It is used to remove multicoin funds from the origin account of a transfer.
 func (s *stateObject) SubBalanceMultiCoin(coinID common.Hash, amount *big.Int, db Database) {
 	if amount.Sign() == 0 {
 		return
