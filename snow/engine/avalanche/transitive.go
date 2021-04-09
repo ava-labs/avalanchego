@@ -658,6 +658,6 @@ func (t *Transitive) GetVtx(vtxID ids.ID) (avalanche.Vertex, error) {
 	return t.Manager.Get(vtxID)
 }
 
-func (t *Transitive) GetVM() vertex.DAGVM {
+func (t *Transitive) GetVM() common.VM {
 	return t.VM
 }

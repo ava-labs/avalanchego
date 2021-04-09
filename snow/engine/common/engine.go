@@ -22,6 +22,9 @@ type Engine interface {
 	// Returns nil if the engine is healthy.
 	// Periodically called and reported through the health API
 	health.Checkable
+
+	// GetVM returns this engine's VM
+	GetVM() VM
 }
 
 // Handler defines the functions that are acted on the node

@@ -7,7 +7,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 // Engine describes the events that can occur to a Snowman instance.
@@ -27,7 +26,4 @@ type Engine interface {
 	// GetBlock returns a block by its ID.
 	// Returns an error if unknown.
 	GetBlock(blkID ids.ID) (snowman.Block, error)
-
-	// GetVM returns this engine's VM
-	GetVM() block.ChainVM
 }

@@ -110,53 +110,55 @@ func (s *Server) DispatchTLS(certFile, keyFile string) error {
 // and at the same time the server's lock is held due to an API call and is trying
 // to grab the P-Chain's lock.
 func (s *Server) RegisterChain(chainName string, ctx *snow.Context, engineIntf interface{}) {
-	go func() {
-		var (
-			handlers map[string]*common.HTTPHandler
-			err      error
-		)
+	go s.registerChain(chainName, ctx, engineIntf)
+}
 
-		switch engine := engineIntf.(type) {
-		case snowman.Engine:
-			ctx.Lock.Lock()
-			handlers, err = engine.GetVM().CreateHandlers()
-			ctx.Lock.Unlock()
-		case avalanche.Engine:
-			ctx.Lock.Lock()
-			handlers, err = engine.GetVM().CreateHandlers()
-			ctx.Lock.Unlock()
-		default:
-			s.log.Error("engine has unexpected type %T", engineIntf)
-			return
-		}
-		if err != nil {
-			s.log.Error("failed to create %s handlers: %s", chainName, err)
-			return
-		}
+func (s *Server) registerChain(chainName string, ctx *snow.Context, engineIntf interface{}) {
+	var (
+		handlers map[string]*common.HTTPHandler
+		err      error
+	)
 
-		httpLogger, err := s.factory.MakeChain(chainName, "http")
-		if err != nil {
-			s.log.Error("failed to create new http logger: %s", err)
-		}
+	switch engine := engineIntf.(type) {
+	case snowman.Engine:
+		ctx.Lock.Lock()
+		handlers, err = engine.GetVM().CreateHandlers()
+		ctx.Lock.Unlock()
+	case avalanche.Engine:
+		ctx.Lock.Lock()
+		handlers, err = engine.GetVM().CreateHandlers()
+		ctx.Lock.Unlock()
+	default:
+		s.log.Error("engine has unexpected type %T", engineIntf)
+		return
+	}
+	if err != nil {
+		s.log.Error("failed to create %s handlers: %s", chainName, err)
+		return
+	}
 
-		s.log.Verbo("About to add API endpoints for chain with ID %s", ctx.ChainID)
-		// all subroutes to a chain begin with "bc/<the chain's ID>"
-		defaultEndpoint := "bc/" + ctx.ChainID.String()
+	httpLogger, err := s.factory.MakeChain(chainName, "http")
+	if err != nil {
+		s.log.Error("failed to create new http logger: %s", err)
+	}
 
-		// Register each endpoint
-		for extension, handler := range handlers {
-			// Validate that the route being added is valid
-			// e.g. "/foo" and "" are ok but "\n" is not
-			_, err := url.ParseRequestURI(extension)
-			if extension != "" && err != nil {
-				s.log.Error("could not add route to chain's API handler because route is malformed: %s", err)
-				continue
-			}
-			if err := s.AddChainRoute(handler, ctx, defaultEndpoint, extension, httpLogger); err != nil {
-				s.log.Error("error adding route: %s", err)
-			}
+	s.log.Verbo("About to add API endpoints for chain with ID %s", ctx.ChainID)
+	// all subroutes to a chain begin with "bc/<the chain's ID>"
+	defaultEndpoint := "bc/" + ctx.ChainID.String()
+
+	// Register each endpoint
+	for extension, handler := range handlers {
+		// Validate that the route being added is valid
+		// e.g. "/foo" and "" are ok but "\n" is not
+		_, err := url.ParseRequestURI(extension)
+		if extension != "" && err != nil {
+			s.log.Error("could not add route to chain's API handler because route is malformed: %s", err)
+			continue
 		}
-	}()
+		if err := s.AddChainRoute(handler, ctx, defaultEndpoint, extension, httpLogger); err != nil {
+			s.log.Error("error adding route: %s", err)
+		}
+	}
 }
 
 // AddChainRoute registers a route to a chain's handler

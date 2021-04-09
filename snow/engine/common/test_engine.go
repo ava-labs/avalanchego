@@ -50,7 +50,7 @@ type EngineTest struct {
 
 	CantHealth,
 
-	CantGetVtx bool
+	CantGetVtx, CantGetVM bool
 
 	IsBootstrappedF                                    func() bool
 	ContextF                                           func() *snow.Context
@@ -65,6 +65,7 @@ type EngineTest struct {
 	ConnectedF, DisconnectedF func(validatorID ids.ShortID) error
 	HealthF                   func() (interface{}, error)
 	GetVtxF                   func() (avalanche.Vertex, error)
+	GetVMF                    func() VM
 }
 
 var _ Engine = &EngineTest{}
@@ -107,6 +108,7 @@ func (e *EngineTest) Default(cant bool) {
 	e.CantHealth = cant
 
 	e.CantGetVtx = cant
+	e.CantGetVM = cant
 }
 
 func (e *EngineTest) Context() *snow.Context {
@@ -434,4 +436,14 @@ func (e *EngineTest) GetVtx() (avalanche.Vertex, error) {
 		e.T.Fatalf("Unexpectedly called GetVtx")
 	}
 	return nil, errors.New("unexpectedly called GetVtx")
+}
+
+func (e *EngineTest) GetVM() VM {
+	if e.GetVMF != nil {
+		return e.GetVMF()
+	}
+	if e.CantGetVM && e.T != nil {
+		e.T.Fatalf("Unexpectedly called GetVM")
+	}
+	return nil
 }

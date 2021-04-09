@@ -6,7 +6,6 @@ package avalanche
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
-	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
@@ -20,7 +19,4 @@ type Engine interface {
 	// GetVtx returns a vertex by its ID.
 	// Returns an error if unknown.
 	GetVtx(vtxID ids.ID) (avalanche.Vertex, error)
-
-	// GetVM returns this engine's VM
-	GetVM() vertex.DAGVM
 }
