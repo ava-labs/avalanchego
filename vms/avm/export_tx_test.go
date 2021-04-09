@@ -1266,7 +1266,7 @@ func TestIssueExportTx(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	txs := vm.Pending()
+	txs := vm.PendingTxs()
 	if len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}
@@ -1397,7 +1397,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	txs := vm.Pending()
+	txs := vm.PendingTxs()
 	if len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}

@@ -15,7 +15,7 @@ type DAGVM interface {
 	common.VM
 
 	// Return any transactions that have not been sent to consensus yet
-	Pending() []snowstorm.Tx
+	PendingTxs() []snowstorm.Tx
 
 	// Convert a stream of bytes to a transaction or return an error
 	ParseTx(tx []byte) (snowstorm.Tx, error)

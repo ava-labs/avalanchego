@@ -20,26 +20,26 @@ var (
 type TestVM struct {
 	common.TestVM
 
-	CantPending, CantParse, CantGet bool
+	CantPendingTxs, CantParse, CantGet bool
 
-	PendingF func() []snowstorm.Tx
-	ParseTxF func([]byte) (snowstorm.Tx, error)
-	GetTxF   func(ids.ID) (snowstorm.Tx, error)
+	PendingTxsF func() []snowstorm.Tx
+	ParseTxF    func([]byte) (snowstorm.Tx, error)
+	GetTxF      func(ids.ID) (snowstorm.Tx, error)
 }
 
 func (vm *TestVM) Default(cant bool) {
 	vm.TestVM.Default(cant)
 
-	vm.CantPending = cant
+	vm.CantPendingTxs = cant
 	vm.CantParse = cant
 	vm.CantGet = cant
 }
 
-func (vm *TestVM) Pending() []snowstorm.Tx {
-	if vm.PendingF != nil {
-		return vm.PendingF()
+func (vm *TestVM) PendingTxs() []snowstorm.Tx {
+	if vm.PendingTxsF != nil {
+		return vm.PendingTxsF()
 	}
-	if vm.CantPending && vm.T != nil {
+	if vm.CantPendingTxs && vm.T != nil {
 		vm.T.Fatal(errPending)
 	}
 	return nil

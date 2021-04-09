@@ -11,7 +11,7 @@ import (
 // Parser parses bytes into a vertex.
 type Parser interface {
 	// Parse a vertex from a slice of bytes
-	Parse(vertex []byte) (avalanche.Vertex, error)
+	ParseVtx(vertex []byte) (avalanche.Vertex, error)
 }
 
 // Parse the provided vertex bytes into a stateless vertex

@@ -156,8 +156,8 @@ func (_m *DAGVM) ParseTx(tx []byte) (snowstorm.Tx, error) {
 	return r0, r1
 }
 
-// Pending provides a mock function with given fields:
-func (_m *DAGVM) Pending() []snowstorm.Tx {
+// PendingTxs provides a mock function with given fields:
+func (_m *DAGVM) PendingTxs() []snowstorm.Tx {
 	ret := _m.Called()
 
 	var r0 []snowstorm.Tx

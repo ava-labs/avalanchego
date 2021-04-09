@@ -315,7 +315,7 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 }
 
 // Pending implements the avalanche.DAGVM interface
-func (vm *VM) Pending() []snowstorm.Tx {
+func (vm *VM) PendingTxs() []snowstorm.Tx {
 	vm.metrics.numPendingCalls.Inc()
 
 	vm.timer.Cancel()
