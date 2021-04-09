@@ -511,15 +511,11 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 
 	// Get the child and accept it
 	child := n.children[pref]
+	if err := child.Accept(); err != nil {
+		return err
+	}
 	// Notify anyone listening that this block was accepted.
 	bytes := child.Bytes()
-	// Because this is the newest accepted block, this is the new head.
-	ts.head = pref
-	ts.height = child.Height()
-	// Remove the decided block from the set of processing IDs, as its status
-	// now implies its preferredness.
-	ts.preferredIDs.Remove(pref)
-	ts.Metrics.Accepted(pref)
 	// Note that DecisionDispatcher.Accept / DecisionDispatcher.Accept must be called before
 	// child.Accept to honor EventDispatcher.Accept's invariant.
 	if err := ts.ctx.DecisionDispatcher.Accept(ts.ctx, pref, bytes); err != nil {
@@ -528,9 +524,14 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 	if err := ts.ctx.ConsensusDispatcher.Accept(ts.ctx, pref, bytes); err != nil {
 		return err
 	}
-	if err := child.Accept(); err != nil {
-		return err
-	}
+	ts.Metrics.Accepted(pref)
+
+	// Because this is the newest accepted block, this is the new head.
+	ts.head = pref
+	ts.height = child.Height()
+	// Remove the decided block from the set of processing IDs, as its status
+	// now implies its preferredness.
+	ts.preferredIDs.Remove(pref)
 
 	// Because ts.blocks contains the last accepted block, we don't delete the
 	// block from the blocks map here.
@@ -542,6 +543,10 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 			continue
 		}
 
+		if err := child.Reject(); err != nil {
+			return err
+		}
+
 		// Notify anyone listening that this block was rejected.
 		bytes := child.Bytes()
 		ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes)
@@ -550,10 +555,6 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 
 		// Track which blocks have been directly rejected
 		rejects = append(rejects, childID)
-
-		if err := child.Reject(); err != nil {
-			return err
-		}
 	}
 
 	// reject all the descendants of the blocks we just rejected
@@ -575,6 +576,10 @@ func (ts *Topological) rejectTransitively(rejected []ids.ID) error {
 		delete(ts.blocks, rejectedID)
 
 		for childID, child := range rejectedNode.children {
+			if err := child.Reject(); err != nil {
+				return err
+			}
+
 			// Notify anyone listening that this block was rejected.
 			bytes := child.Bytes()
 			ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes)
@@ -583,10 +588,6 @@ func (ts *Topological) rejectTransitively(rejected []ids.ID) error {
 
 			// add the newly rejected block to the end of the queue
 			rejected = append(rejected, childID)
-
-			if err := child.Reject(); err != nil {
-				return err
-			}
 		}
 	}
 	return nil

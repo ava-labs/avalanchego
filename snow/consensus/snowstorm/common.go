@@ -144,17 +144,20 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 		return false, err
 	}
 
-	// Notify the metrics that this transaction was accepted.
-	c.Metrics.Accepted(txID)
-
 	if err := tx.Accept(); err != nil {
 		return false, err
 	}
+
+	// Notify the metrics that this transaction was accepted.
+	c.Metrics.Accepted(txID)
 	return false, nil
 }
 
 // accept the provided tx.
 func (c *common) acceptTx(tx Tx) error {
+	if err := tx.Accept(); err != nil {
+		return err
+	}
 	txID := tx.ID()
 
 	// Notify those listening that this tx has been accepted.
@@ -174,7 +177,7 @@ func (c *common) acceptTx(tx Tx) error {
 	// doesn't need to be rejected because of this tx.
 	c.pendingReject.Abandon(txID)
 
-	return tx.Accept()
+	return nil
 }
 
 // reject the provided tx.
