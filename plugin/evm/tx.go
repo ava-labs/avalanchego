@@ -27,6 +27,10 @@ var (
 	errWrongBlockchainID = errors.New("wrong blockchain ID provided")
 	errWrongNetworkID    = errors.New("tx was issued with a different network ID")
 	errNilTx             = errors.New("tx is nil")
+	errNoValueOutput     = errors.New("output has no value")
+	errNoValueInput      = errors.New("input has no value")
+	errNilOutput         = errors.New("nil output")
+	errNilInput          = errors.New("nil input")
 )
 
 // EVMOutput defines an output from EVM State created from export transactions
@@ -46,11 +50,23 @@ type EVMInput struct {
 
 // Verify ...
 func (out *EVMOutput) Verify() error {
+	switch {
+	case out == nil:
+		return errNilOutput
+	case out.Amount == 0:
+		return errNoValueOutput
+	}
 	return nil
 }
 
 // Verify ...
 func (in *EVMInput) Verify() error {
+	switch {
+	case in == nil:
+		return errNilInput
+	case in.Amount == 0:
+		return errNoValueInput
+	}
 	return nil
 }
 
