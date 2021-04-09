@@ -39,6 +39,9 @@ func TestExportTxVerify(t *testing.T) {
 				Nonce:   0,
 			},
 		},
+		// [exportAmount] is used for both inputs and both outputs, so we subtract
+		// [testTxFee] from the amount of the first output so that the total burned
+		// amount by this exportTx is equal to [testTxFee].
 		ExportedOutputs: []*avax.TransferableOutput{
 			{
 				Asset: avax.Asset{ID: testAvaxAssetID},
@@ -54,7 +57,7 @@ func TestExportTxVerify(t *testing.T) {
 			{
 				Asset: avax.Asset{ID: testAvaxAssetID},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: exportAmount, // only subtract fee from one output
+					Amt: exportAmount,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Locktime:  0,
 						Threshold: 1,
