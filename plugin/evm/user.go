@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/encdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ethereum/go-ethereum/common"
@@ -25,7 +25,7 @@ var (
 type user struct {
 	secpFactory *crypto.FactorySECP256K1R
 	// This user's database, acquired from the keystore
-	db database.Database
+	db *encdb.Database
 }
 
 // Get the addresses controlled by this user
