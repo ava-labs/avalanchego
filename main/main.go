@@ -5,36 +5,25 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"os"
+	"github.com/ava-labs/avalanchego/version"
 )
 
-var exitCode = 0
+var (
+	previousVersion = version.NewDefaultVersion(1, 3, 1)
+	currentVersion  = version.NewDefaultVersion(1, 3, 2) // TODO only have 1 copy of this
+)
 
 // main is the primary entry point to Avalanche.
 func main() {
-	//todo handle the path retrieval
-	folderPath, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-	binaryManager := NewBinaryManager(folderPath)
-
+	exitCode := 0
 	defer func() {
-		binaryManager.KillAll()
 		os.Exit(exitCode)
 	}()
 
-	// Get the config
-	viper, err := config.GetViper()
-	if err != nil {
-		fmt.Printf("couldn't get viper: %s", err)
-		exitCode = 1
-		return
-	}
-	dbVersion := config.DBVersion
-	prevDBVersion := config.PrevDBVersion
 	nodeConfig, err := config.GetConfig()
 	if err != nil {
 		fmt.Printf("couldn't get config: %s", err)
@@ -42,6 +31,7 @@ func main() {
 		return
 	}
 
+	nodeConfig.LoggingConfig.Directory += "/daemon"
 	logFactory := logging.NewFactory(nodeConfig.LoggingConfig)
 	defer logFactory.Close()
 
@@ -51,36 +41,38 @@ func main() {
 		return
 	}
 
-	// decide the run logic
-	migrationManager := NewMigrationManager(binaryManager, &nodeConfig, viper, dbVersion, prevDBVersion)
-	err = migrationManager.ResolveMigration()
+	//TODO handle the path retrieval
+	folderPath, err := os.Getwd()
 	if err != nil {
+		panic(err)
+	}
+	binaryManager := newBinaryManager(folderPath, log)
+	log.Info("folder path: %s", folderPath) // todo remove this
+
+	// Get the config
+	v, err := config.GetViper()
+	if err != nil {
+		log.Fatal("couldn't get viper: %s", err)
 		exitCode = 1
 		return
 	}
 
-	// start apps and waits for errors
-	prevVersionChan, newVersionChan := binaryManager.Start()
-
-	for {
-		select {
-		case err = <-prevVersionChan:
-			if migrationManager.HandleErr("previous", err) {
-				continue
-			}
-			log.Error("previous version node errored - %v\n", err)
-			exitCode = 1
-			break
-
-		case err = <-newVersionChan:
-			if migrationManager.HandleErr("current", err) {
-				continue
-			}
-
-			log.Error("current version node errored - %v\n", err)
-			exitCode = 1
-			break
-		}
-		break
+	shouldMigrate, err := shouldMigrate(nodeConfig, log)
+	if err != nil {
+		log.Fatal("error while deciding whether to migrate database: %s", err)
 	}
+
+	if shouldMigrate {
+		if err := binaryManager.runMigration(v); err != nil {
+			log.Error("error while running migration: %s", err)
+			exitCode = 1
+			return
+		}
+	}
+	if err := binaryManager.runNormal(v); err != nil {
+		log.Error("error starting node: %s", err)
+		exitCode = 1
+		return
+	}
+
 }

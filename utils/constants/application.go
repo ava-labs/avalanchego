@@ -10,4 +10,6 @@ const (
 
 	// Name of the avalanche application
 	AppName = "avalanchego"
+
+	ExitCodeDoneMigrating = 1337
 )

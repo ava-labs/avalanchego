@@ -4,98 +4,158 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"time"
+
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
+	"github.com/spf13/viper"
 )
 
-type application struct {
-	path    string
-	errChan chan error
-	cmd     *exec.Cmd
-	setup   bool
-	args    []string
+type nodeProcess struct {
+	path     string
+	errChan  chan error
+	exitCode int
+	cmd      *exec.Cmd
 }
 
-func (a *application) Start() {
-	if !a.setup {
-		fmt.Printf("Skipping %s \n", a.path)
-		return
+// Returns a new nodeProcess running the binary at [path].
+// Returns an error if the command fails to start.
+// When the nodeProcess terminates, the returned error (which may be nil)
+// is sent on [a.errChan]
+func startNode(path string, args []string) (*nodeProcess, error) {
+	fmt.Printf("Starting binary at %s with args %s", path, args)
+	a := &nodeProcess{
+		path: path,
 	}
-	fmt.Printf("Starting %s \n %s \n", a.path, a.args)
-	cmd := exec.Command(a.path, a.args...) // #nosec G204
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	a.cmd = exec.Command(path, args...) // #nosec G204
+	a.cmd.Stdout = os.Stdout            // TODO where to put stdout and stderr?
+	a.cmd.Stderr = os.Stderr
 
-	a.cmd = cmd
-	// start the command after having set up the pipe
-	if err := cmd.Start(); err != nil {
-		a.errChan <- err
+	// Start the nodeProcess
+	if err := a.cmd.Start(); err != nil {
+		return nil, err
 	}
-
-	if err := cmd.Wait(); err != nil {
-		a.errChan <- err
-	}
-}
-
-func (a *application) Kill() error {
-	if a.setup && a.cmd.Process != nil {
-		//todo change this to interrupt
-		err := a.cmd.Process.Kill()
-		if err != nil && err != os.ErrProcessDone {
-			fmt.Printf("failed to kill process: %v\n", err)
-			return err
+	go func() {
+		// Wait for the nodeProcess to stop.
+		// When it does, set the exit code and send the returned error
+		// (which may be nil) to [a.errChain]
+		if err := a.cmd.Wait(); err != nil {
+			if exitError, ok := err.(*exec.ExitError); ok {
+				// This code only executes if the exit code is non-zero
+				a.exitCode = exitError.ExitCode()
+			}
+			a.errChan <- err
 		}
-	}
+	}()
+	return a, nil
+}
 
+func (a *nodeProcess) kill() error {
+	if a.cmd.Process == nil {
+		return nil
+	}
+	//todo change this to interrupt?
+	err := a.cmd.Process.Kill() // todo kill subprocesses
+	if err != nil && err != os.ErrProcessDone {
+		return fmt.Errorf("failed to kill process: %w", err)
+	}
 	return nil
 }
 
-type BinaryManager struct {
-	PreviousApp *application
-	CurrentApp  *application
-	rootPath    string
+type binaryManager struct {
+	rootPath string
+	log      logging.Logger
 }
 
-func NewBinaryManager(path string) *BinaryManager {
-	return &BinaryManager{
-		rootPath:    path,
-		PreviousApp: &application{errChan: make(chan error)},
-		CurrentApp:  &application{errChan: make(chan error)},
+func newBinaryManager(path string, log logging.Logger) *binaryManager {
+	return &binaryManager{
+		rootPath: path,
+		log:      log,
 	}
 }
 
-func (b *BinaryManager) Start() (chan error, chan error) {
-	go b.PreviousApp.Start()
-	// give it a few seconds to avoid any unexpected lock-grabbing
-	time.Sleep(10 * time.Second)
-
-	go b.CurrentApp.Start()
-	return b.PreviousApp.errChan, b.CurrentApp.errChan
-}
-
-func (b *BinaryManager) StartApp(app *application) {
-	fmt.Printf("Starting %s %s \n", app.path, app.args)
-	cmd := exec.Command(app.path, app.args...) // #nosec G204
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	app.cmd = cmd
-	// start the command after having set up the pipe
-	if err := cmd.Start(); err != nil {
-		app.errChan <- err
-	}
-
-	if err := cmd.Wait(); err != nil {
-		app.errChan <- err
-	}
-}
-
-func (b *BinaryManager) KillAll() {
-	err := b.PreviousApp.Kill()
+func (b *binaryManager) runMigration(v *viper.Viper) error {
+	prevVersionNode, err := b.runPreviousVersion(previousVersion, v)
 	if err != nil {
-		fmt.Printf("error killing the previous app %v\n", err)
+		return fmt.Errorf("couldn't start old version during migration: %w", err)
 	}
-	err = b.CurrentApp.Kill()
+
+	currentVersionNode, err := b.runCurrentVersion(v, true)
 	if err != nil {
-		fmt.Printf("error killing the current app %v\n", err)
+		return fmt.Errorf("couldn't start current version during migration: %w", err)
 	}
+
+	defer func() {
+		if err := prevVersionNode.kill(); err != nil {
+			b.log.Error("error while killing previous version: %w", err)
+		}
+		if err := currentVersionNode.kill(); err != nil {
+			b.log.Error("error while killing current version: %w", err)
+		}
+	}()
+
+	for {
+		select {
+		case err := <-prevVersionNode.errChan:
+			if err != nil {
+				return fmt.Errorf("previous version died with exit code %d", prevVersionNode.exitCode)
+			}
+			if prevVersionNode.exitCode == constants.ExitCodeDoneMigrating {
+				return nil
+			}
+			// TODO restart here
+		case err := <-currentVersionNode.errChan:
+			if err != nil {
+				return fmt.Errorf("current version died with exit code %d", currentVersionNode.exitCode)
+			}
+		}
+	}
+}
+
+func (b *binaryManager) runNormal(v *viper.Viper) error {
+	node, err := b.runCurrentVersion(v, false)
+	if err != nil {
+		return fmt.Errorf("couldn't start old version during migration: %w", err)
+	}
+	return <-node.errChan
+}
+
+func (b *binaryManager) runPreviousVersion(prevVersion version.Version, v *viper.Viper) (*nodeProcess, error) {
+	binaryPath := getBinaryPath(b.rootPath, prevVersion)
+	args := []string{}
+	for k, v := range v.AllSettings() {
+		args = append(args, fmt.Sprintf("--%s=%v", k, v))
+	}
+	return startNode(binaryPath, args)
+}
+
+func (b *binaryManager) runCurrentVersion(
+	v *viper.Viper,
+	fetchOnly bool,
+) (*nodeProcess, error) {
+	binaryPath := getBinaryPath(b.rootPath, currentVersion)
+	args := []string{}
+	for k, v := range v.AllSettings() {
+		switch {
+		case fetchOnly && k == "http-port":
+			args = append(args, fmt.Sprintf("--http-port=%d", v.(int)+2)) // TODO assign HTTP port better than this
+		case fetchOnly && k == "staking-port":
+			args = append(args, fmt.Sprintf("--staking-port=%d", v.(int)+2)) // TODO assign HTTP port better than this
+		default:
+			args = append(args, fmt.Sprintf("--%s=%v", k, v))
+		}
+		// TODO handle other command line flags
+	}
+	if fetchOnly {
+		args = append(args, "--fetch-only=true")
+	}
+	return startNode(binaryPath, args)
+}
+
+func getBinaryPath(rootPath string, nodeVersion version.Version) string {
+	return fmt.Sprintf(
+		"%s/build/avalanchego-%s/avalanchego-inner",
+		rootPath,
+		nodeVersion,
+	)
 }
