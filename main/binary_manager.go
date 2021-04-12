@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/node"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
@@ -18,6 +19,7 @@ import (
 type nodeProcess struct {
 	path     string
 	errChan  chan error
+	done     *utils.AtomicBool
 	exitCode int
 	cmd      *exec.Cmd
 }
@@ -32,6 +34,7 @@ func startNode(path string, args []string, printToStdOut bool) (*nodeProcess, er
 		path:    path,
 		cmd:     exec.Command(path, args...), // #nosec G204
 		errChan: make(chan error, 1),
+		done:    &utils.AtomicBool{},
 	}
 	if printToStdOut {
 		n.cmd.Stdout = os.Stdout
@@ -51,6 +54,7 @@ func startNode(path string, args []string, printToStdOut bool) (*nodeProcess, er
 				// This code only executes if the exit code is non-zero
 				n.exitCode = exitError.ExitCode()
 			}
+			n.done.SetValue(true)
 			n.errChan <- err
 		}
 	}()
@@ -64,7 +68,6 @@ func (a *nodeProcess) kill() error {
 	// Stop printing output from node
 	a.cmd.Stdout = ioutil.Discard
 	a.cmd.Stderr = ioutil.Discard
-	//todo change this to interrupt?
 	err := a.cmd.Process.Kill() // todo kill subprocesses
 	if err != nil && err != os.ErrProcessDone {
 		return fmt.Errorf("failed to kill process: %w", err)
@@ -113,14 +116,20 @@ func (b *binaryManager) runMigration(v *viper.Viper, nodeConfig node.Config) err
 	for {
 		select {
 		case err := <-prevVersionNode.errChan:
+			b.log.Info("previous version node returned")
+			if currentVersionNode.done.GetValue() {
+				return nil
+			}
 			if err != nil {
 				return fmt.Errorf("previous version died with exit code %d", prevVersionNode.exitCode)
-			} else if prevVersionNode.exitCode != constants.ExitCodeDoneMigrating {
-				return fmt.Errorf("expected error code %d (done with migration) but got %d", constants.ExitCodeDoneMigrating, prevVersionNode.exitCode)
 			}
 			return nil
-		case err := <-currentVersionNode.errChan:
-			return fmt.Errorf("current version died with exit code %d and error: %w", currentVersionNode.exitCode, err)
+		case <-currentVersionNode.errChan:
+			b.log.Info("current version node returned")
+			if currentVersionNode.exitCode != constants.ExitCodeDoneMigrating {
+				return fmt.Errorf("current version died with exit code %d", currentVersionNode.exitCode)
+			}
+			return nil
 		}
 	}
 }

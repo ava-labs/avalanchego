@@ -271,7 +271,9 @@ func (db *VersionedDatabase) Close() error {
 	errs := wrappers.Errs{}
 	errs.Add(db.Database.Close())
 	if db.rawDB != nil {
-		errs.Add(db.rawDB.Close())
+		if err := db.rawDB.Close(); err != nil && err != database.ErrClosed {
+			errs.Add(err)
+		}
 	}
 	return errs.Err
 }
