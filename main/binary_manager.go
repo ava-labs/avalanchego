@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"syscall"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/node"
@@ -40,6 +41,7 @@ func startNode(path string, args []string, printToStdOut bool) (*nodeProcess, er
 		n.cmd.Stdout = os.Stdout
 		n.cmd.Stderr = os.Stderr
 	}
+	n.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	// Start the nodeProcess
 	if err := n.cmd.Start(); err != nil {
@@ -48,7 +50,7 @@ func startNode(path string, args []string, printToStdOut bool) (*nodeProcess, er
 	go func() {
 		// Wait for the nodeProcess to stop.
 		// When it does, set the exit code and send the returned error
-		// (which may be nil) to [a.errChain]
+		// (which may be nil) to [a.errChan]
 		if err := n.cmd.Wait(); err != nil {
 			if exitError, ok := err.(*exec.ExitError); ok {
 				// This code only executes if the exit code is non-zero
@@ -62,13 +64,13 @@ func startNode(path string, args []string, printToStdOut bool) (*nodeProcess, er
 }
 
 func (a *nodeProcess) kill() error {
-	if a.cmd.Process == nil {
+	if a.cmd.Process == nil || a.done.GetValue() {
 		return nil
 	}
 	// Stop printing output from node
 	a.cmd.Stdout = ioutil.Discard
 	a.cmd.Stderr = ioutil.Discard
-	err := a.cmd.Process.Kill() // todo kill subprocesses
+	err := syscall.Kill(-a.cmd.Process.Pid, syscall.SIGKILL)
 	if err != nil && err != os.ErrProcessDone {
 		return fmt.Errorf("failed to kill process: %w", err)
 	}
@@ -99,7 +101,7 @@ func (b *binaryManager) runMigration(v *viper.Viper, nodeConfig node.Config) err
 	}
 	defer func() {
 		if err := prevVersionNode.kill(); err != nil {
-			b.log.Error("error while killing previous version: %w", err)
+			b.log.Error("error while killing previous version: %s", err)
 		}
 	}()
 
@@ -109,7 +111,7 @@ func (b *binaryManager) runMigration(v *viper.Viper, nodeConfig node.Config) err
 	}
 	defer func() {
 		if err := currentVersionNode.kill(); err != nil {
-			b.log.Error("error while killing current version: %w", err)
+			b.log.Error("error while killing current version: %s", err)
 		}
 	}()
 
