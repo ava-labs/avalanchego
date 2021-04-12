@@ -206,7 +206,6 @@ func (i *indexer) RegisterChain(name string, ctx *snow.Context, engine common.En
 	}
 
 	if !i.allowIncompleteIndex && isIncomplete && (previouslyIndexed || i.hasRunBefore) {
-		i.log.Fatal("previously indexed: %v. has run before: %v", previouslyIndexed, i.hasRunBefore)
 		i.log.Fatal("index %s is incomplete but incomplete indices are disabled. Shutting down", name)
 		if err := i.close(); err != nil {
 			i.log.Error("error while closing indexer: %s", err)

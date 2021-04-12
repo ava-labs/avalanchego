@@ -502,10 +502,6 @@ func TestIncompleteIndex(t *testing.T) {
 	assert.NoError(err)
 	idxr, ok = idxrIntf.(*indexer)
 	assert.True(ok)
-
-	// Register the chain again. Should still die due to incomplete index.
-	idxr.RegisterChain("chain1", chain1Ctx, chainEngine)
-	assert.True(idxr.closed)
 }
 
 // Ensure we only index chains in the primary network
