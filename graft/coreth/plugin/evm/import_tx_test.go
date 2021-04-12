@@ -211,7 +211,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 
 	// Check that SemanticVerify passes without the UTXO being present during bootstrapping
 	if err := unsignedImportTx.SemanticVerify(vm, tx, true); err != nil {
-		t.Fatal("Should have failed to import non-existent UTXO")
+		t.Fatal(err)
 	}
 	inputID := utxo.InputID()
 	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
@@ -226,7 +226,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 
 	// Check that SemanticVerify passes when the UTXO is present during bootstrapping
 	if err := unsignedImportTx.SemanticVerify(vm, tx, true); err != nil {
-		t.Fatalf("Semantic verification should have passed during bootstrapping when the UTXO was present")
+		t.Fatal(err)
 	}
 
 	// Check that SemanticVerify does not pass if an additional output is added in
@@ -255,7 +255,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 	// Remove the signature
 	tx.Creds = nil
 	if err := unsignedImportTx.SemanticVerify(vm, tx, true); err == nil {
-		t.Fatalf("SemanticVerify should have failed due to no signatures")
+		t.Fatal("SemanticVerify should have failed due to no signatures")
 	}
 
 	// Sign with the incorrect key
@@ -263,7 +263,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := unsignedImportTx.SemanticVerify(vm, tx, true); err == nil {
-		t.Fatalf("SemanticVerify should have failed due to an invalid signature")
+		t.Fatal("SemanticVerify should have failed due to an invalid signature")
 	}
 
 	// Re-sign with the correct key
@@ -274,7 +274,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 
 	// Check that SemanticVerify passes when the UTXO is present after bootstrapping
 	if err := unsignedImportTx.SemanticVerify(vm, tx, true); err != nil {
-		t.Fatalf("Semantic verification should have passed after bootstrapping with the UTXO present")
+		t.Fatal(err)
 	}
 
 	if err := unsignedImportTx.Accept(vm.ctx, nil); err != nil {
@@ -294,7 +294,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 
 	// Check that SemanticVerify fails when the UTXO is not present after bootstrapping
 	if err := unsignedImportTx.SemanticVerify(vm, tx, true); err == nil {
-		t.Fatalf("Semantic verification should have failed after the UTXO removed from shared memory")
+		t.Fatal("Semantic verification should have failed after the UTXO removed from shared memory")
 	}
 }
 
@@ -353,7 +353,7 @@ func TestNewImportTx(t *testing.T) {
 	importTx := tx.UnsignedAtomicTx
 
 	if err := importTx.SemanticVerify(vm, tx, true); err != nil {
-		t.Fatalf("newImportTx created an invalid transaction")
+		t.Fatal("newImportTx created an invalid transaction")
 	}
 
 	if err := importTx.Accept(vm.ctx, nil); err != nil {
