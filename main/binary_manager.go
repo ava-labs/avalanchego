@@ -21,33 +21,34 @@ type nodeProcess struct {
 // Returns a new nodeProcess running the binary at [path].
 // Returns an error if the command fails to start.
 // When the nodeProcess terminates, the returned error (which may be nil)
-// is sent on [a.errChan]
+// is sent on [n.errChan]
 func startNode(path string, args []string) (*nodeProcess, error) {
 	fmt.Printf("Starting binary at %s with args %s", path, args)
-	a := &nodeProcess{
-		path: path,
+	n := &nodeProcess{
+		path:    path,
+		cmd:     exec.Command(path, args...), // #nosec G204
+		errChan: make(chan error, 1),
 	}
-	a.cmd = exec.Command(path, args...) // #nosec G204
-	a.cmd.Stdout = os.Stdout            // TODO where to put stdout and stderr?
-	a.cmd.Stderr = os.Stderr
+	n.cmd.Stdout = os.Stdout // TODO where to put stdout and stderr?
+	n.cmd.Stderr = os.Stderr
 
 	// Start the nodeProcess
-	if err := a.cmd.Start(); err != nil {
+	if err := n.cmd.Start(); err != nil {
 		return nil, err
 	}
 	go func() {
 		// Wait for the nodeProcess to stop.
 		// When it does, set the exit code and send the returned error
 		// (which may be nil) to [a.errChain]
-		if err := a.cmd.Wait(); err != nil {
+		if err := n.cmd.Wait(); err != nil {
 			if exitError, ok := err.(*exec.ExitError); ok {
 				// This code only executes if the exit code is non-zero
-				a.exitCode = exitError.ExitCode()
+				n.exitCode = exitError.ExitCode()
 			}
-			a.errChan <- err
+			n.errChan <- err
 		}
 	}()
-	return a, nil
+	return n, nil
 }
 
 func (a *nodeProcess) kill() error {
