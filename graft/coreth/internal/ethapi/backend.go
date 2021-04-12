@@ -60,7 +60,7 @@ type Backend interface {
 	RPCTxFeeCap() float64 // global tx fee cap for all transaction related APIs
 
 	// Blockchain API
-	SetHead(number uint64)
+	// SetHead(number uint64)
 	HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error)
 	HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error)
 	HeaderByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*types.Header, error)
@@ -93,12 +93,13 @@ type Backend interface {
 	GetLogs(ctx context.Context, blockHash common.Hash) ([][]*types.Log, error)
 	ServiceFilter(ctx context.Context, session *bloombits.MatcherSession)
 	SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription
+	SubscribeAcceptedLogsEvent(ch chan<- []*types.Log) event.Subscription
 	SubscribePendingLogsEvent(ch chan<- []*types.Log) event.Subscription
 	SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription
 
 	ChainConfig() *params.ChainConfig
 	Engine() consensus.Engine
-	AcceptedBlock() *types.Block
+	LastAcceptedBlock() *types.Block
 }
 
 func GetAPIs(apiBackend Backend) []rpc.API {

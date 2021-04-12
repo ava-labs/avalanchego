@@ -4,10 +4,8 @@
 package coreth
 
 import (
-	"crypto/ecdsa"
-	"io"
+	"fmt"
 	"math/big"
-	"os"
 	"time"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
@@ -19,11 +17,8 @@ import (
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/mattn/go-isatty"
 )
 
 var (
@@ -41,11 +36,10 @@ type ETHChain struct {
 	backend *eth.Ethereum
 	cb      *dummy.ConsensusCallbacks
 	mcb     *miner.MinerCallbacks
-	bcb     *eth.BackendCallbacks
 }
 
 // NewETHChain creates an Ethereum blockchain with the given configs.
-func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Address, chainDB ethdb.Database, settings eth.Settings) *ETHChain {
+func NewETHChain(config *eth.Config, nodecfg *node.Config, chainDB ethdb.Database, settings eth.Settings, initGenesis bool) *ETHChain {
 	if config == nil {
 		config = &eth.DefaultConfig
 	}
@@ -62,23 +56,22 @@ func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Add
 	//}
 	cb := new(dummy.ConsensusCallbacks)
 	mcb := new(miner.MinerCallbacks)
-	bcb := new(eth.BackendCallbacks)
-	backend, _ := eth.New(node, config, cb, mcb, bcb, chainDB, settings)
-	chain := &ETHChain{backend: backend, cb: cb, mcb: mcb, bcb: bcb}
-	if etherBase == nil {
-		etherBase = &BlackholeAddr
+	backend, err := eth.New(node, config, cb, mcb, chainDB, settings, initGenesis)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create new eth backend due to %s", err))
 	}
-	backend.SetEtherbase(*etherBase)
+	chain := &ETHChain{backend: backend, cb: cb, mcb: mcb}
+	backend.SetEtherbase(BlackholeAddr)
 	return chain
 }
 
 func (self *ETHChain) Start() {
-	self.backend.StartMining(0)
+	self.backend.StartMining()
 	self.backend.Start()
 }
 
 func (self *ETHChain) Stop() {
-	self.backend.StopPart()
+	self.backend.Stop()
 }
 
 func (self *ETHChain) GenBlock() {
@@ -91,6 +84,10 @@ func (self *ETHChain) SubscribeNewMinedBlockEvent() *event.TypeMuxSubscription {
 
 func (self *ETHChain) BlockChain() *core.BlockChain {
 	return self.backend.BlockChain()
+}
+
+func (self *ETHChain) APIBackend() *eth.EthAPIBackend {
+	return self.backend.APIBackend
 }
 
 func (self *ETHChain) UnlockIndexing() {
@@ -146,10 +143,6 @@ func (self *ETHChain) SetOnExtraStateChange(cb dummy.OnExtraStateChangeType) {
 	self.cb.OnExtraStateChange = cb
 }
 
-func (self *ETHChain) SetOnQueryAcceptedBlock(cb func() *types.Block) {
-	self.bcb.OnQueryAcceptedBlock = cb
-}
-
 // Returns a new mutable state based on the current HEAD block.
 func (self *ETHChain) CurrentState() (*state.StateDB, error) {
 	return self.backend.BlockChain().State()
@@ -168,11 +161,6 @@ func (self *ETHChain) GetBlockByHash(hash common.Hash) *types.Block {
 // Retrives a block from the database by number.
 func (self *ETHChain) GetBlockByNumber(num uint64) *types.Block {
 	return self.backend.BlockChain().GetBlockByNumber(num)
-}
-
-// Retrives a block from the database by number.
-func (self *ETHChain) GetBlockByNumberUnfinalized(num uint64) *types.Block {
-	return self.backend.BlockChain().GetBlockByNumberUnfinalized(num)
 }
 
 // Validate the canonical chain from current block to the genesis.
@@ -199,6 +187,11 @@ func (self *ETHChain) SetPreference(block *types.Block) error {
 // canonical chain.
 func (self *ETHChain) Accept(block *types.Block) error {
 	return self.BlockChain().Accept(block)
+}
+
+// LastAcceptedBlock returns the last block to be marked as accepted.
+func (self *ETHChain) LastAcceptedBlock() *types.Block {
+	return self.BlockChain().LastAcceptedBlock()
 }
 
 func (self *ETHChain) GetReceiptsByHash(hash common.Hash) types.Receipts {
@@ -229,9 +222,10 @@ func (self *ETHChain) AttachEthService(handler *rpc.Server, namespaces []string)
 	}
 }
 
-// TODO: use SubscribeNewTxsEvent()
-func (self *ETHChain) GetTxSubmitCh() <-chan struct{} {
-	return self.backend.GetTxSubmitCh()
+func (self *ETHChain) GetTxSubmitCh() <-chan core.NewTxsEvent {
+	newTxsChan := make(chan core.NewTxsEvent)
+	self.backend.TxPool().SubscribeNewTxsEvent(newTxsChan)
+	return newTxsChan
 }
 
 func (self *ETHChain) GetTxPool() *core.TxPool {
@@ -241,31 +235,4 @@ func (self *ETHChain) GetTxPool() *core.TxPool {
 // SetGasPrice sets the gas price on the backend
 func (self *ETHChain) SetGasPrice(newGasPrice *big.Int) {
 	self.backend.SetGasPrice(newGasPrice)
-}
-
-type Key struct {
-	Address    common.Address
-	PrivateKey *ecdsa.PrivateKey
-}
-
-func NewKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *Key {
-	key := &Key{
-		Address:    crypto.PubkeyToAddress(privateKeyECDSA.PublicKey),
-		PrivateKey: privateKeyECDSA,
-	}
-	return key
-}
-
-func NewKey(rand io.Reader) (*Key, error) {
-	privateKeyECDSA, err := ecdsa.GenerateKey(crypto.S256(), rand)
-	if err != nil {
-		return nil, err
-	}
-	return NewKeyFromECDSA(privateKeyECDSA), nil
-}
-
-func init() {
-	usecolor := (isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd())) && os.Getenv("TERM") != "dumb"
-	glogger := log.StreamHandler(io.Writer(os.Stderr), log.TerminalFormat(usecolor))
-	log.Root().SetHandler(glogger)
 }

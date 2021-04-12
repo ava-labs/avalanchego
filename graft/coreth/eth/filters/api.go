@@ -62,24 +62,22 @@ type filter struct {
 // PublicFilterAPI offers support to create and manage filters. This will allow external clients to retrieve various
 // information related to the Ethereum protocol such als blocks, transactions and logs.
 type PublicFilterAPI struct {
-	backend             Backend
-	mux                 *event.TypeMux
-	quit                chan struct{}
-	chainDb             ethdb.Database
-	events              *EventSystem
-	filtersMu           sync.Mutex
-	filters             map[rpc.ID]*filter
-	maxBlocksPerRequest int64
+	backend   Backend
+	mux       *event.TypeMux
+	quit      chan struct{}
+	chainDb   ethdb.Database
+	events    *EventSystem
+	filtersMu sync.Mutex
+	filters   map[rpc.ID]*filter
 }
 
 // NewPublicFilterAPI returns a new PublicFilterAPI instance.
-func NewPublicFilterAPI(backend Backend, lightMode bool, maxBlocksPerRequest int64) *PublicFilterAPI {
+func NewPublicFilterAPI(backend Backend, lightMode bool) *PublicFilterAPI {
 	api := &PublicFilterAPI{
-		backend:             backend,
-		chainDb:             backend.ChainDb(),
-		events:              NewEventSystem(backend, lightMode),
-		filters:             make(map[rpc.ID]*filter),
-		maxBlocksPerRequest: maxBlocksPerRequest,
+		backend: backend,
+		chainDb: backend.ChainDb(),
+		events:  NewEventSystem(backend, lightMode),
+		filters: make(map[rpc.ID]*filter),
 	}
 	go api.timeoutLoop()
 
@@ -187,8 +185,14 @@ func (api *PublicFilterAPI) NewPendingTransactions(ctx context.Context) (*rpc.Su
 func (api *PublicFilterAPI) NewBlockFilter() rpc.ID {
 	var (
 		headers   = make(chan *types.Header)
-		headerSub = api.events.SubscribeNewHeads(headers)
+		headerSub *Subscription
 	)
+
+	if api.backend.GetVMConfig().AllowUnfinalizedQueries {
+		headerSub = api.events.SubscribeNewHeads(headers)
+	} else {
+		headerSub = api.events.SubscribeAcceptedHeads(headers)
+	}
 
 	api.filtersMu.Lock()
 	api.filters[headerSub.ID] = &filter{typ: BlocksSubscription, deadline: time.NewTimer(deadline), hashes: make([]common.Hash, 0), s: headerSub}
@@ -215,7 +219,7 @@ func (api *PublicFilterAPI) NewBlockFilter() rpc.ID {
 	return headerSub.ID
 }
 
-// NewHeads send a notification each time a new (header) block is appended to the chain.
+// NewHeads send a notification each time a new accepted (header) block is appended to the chain.
 func (api *PublicFilterAPI) NewHeads(ctx context.Context) (*rpc.Subscription, error) {
 	notifier, supported := rpc.NotifierFromContext(ctx)
 	if !supported {
@@ -225,8 +229,16 @@ func (api *PublicFilterAPI) NewHeads(ctx context.Context) (*rpc.Subscription, er
 	rpcSub := notifier.CreateSubscription()
 
 	go func() {
-		headers := make(chan *types.Header)
-		headersSub := api.events.SubscribeNewHeads(headers)
+		var (
+			headers    = make(chan *types.Header)
+			headersSub event.Subscription
+		)
+
+		if api.backend.GetVMConfig().AllowUnfinalizedQueries {
+			headersSub = api.events.SubscribeNewHeads(headers)
+		} else {
+			headersSub = api.events.SubscribeAcceptedHeads(headers)
+		}
 
 		for {
 			select {
@@ -255,15 +267,23 @@ func (api *PublicFilterAPI) Logs(ctx context.Context, crit FilterCriteria) (*rpc
 	var (
 		rpcSub      = notifier.CreateSubscription()
 		matchedLogs = make(chan []*types.Log)
+		logsSub     event.Subscription
+		err         error
 	)
 
-	logsSub, err := api.events.SubscribeLogs(ethereum.FilterQuery(crit), matchedLogs)
-	if err != nil {
-		return nil, err
+	if api.backend.GetVMConfig().AllowUnfinalizedQueries {
+		logsSub, err = api.events.SubscribeLogs(ethereum.FilterQuery(crit), matchedLogs)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		logsSub, err = api.events.SubscribeAcceptedLogs(ethereum.FilterQuery(crit), matchedLogs)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	go func() {
-
 		for {
 			select {
 			case logs := <-matchedLogs:
@@ -301,10 +321,22 @@ type FilterCriteria ethereum.FilterQuery
 //
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_newfilter
 func (api *PublicFilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
-	logs := make(chan []*types.Log)
-	logsSub, err := api.events.SubscribeLogs(ethereum.FilterQuery(crit), logs)
-	if err != nil {
-		return rpc.ID(""), err
+	var (
+		matchedLogs = make(chan []*types.Log)
+		logsSub     *Subscription
+		err         error
+	)
+
+	if api.backend.GetVMConfig().AllowUnfinalizedQueries {
+		logsSub, err = api.events.SubscribeLogs(ethereum.FilterQuery(crit), matchedLogs)
+		if err != nil {
+			return rpc.ID(""), err
+		}
+	} else {
+		logsSub, err = api.events.SubscribeAcceptedLogs(ethereum.FilterQuery(crit), matchedLogs)
+		if err != nil {
+			return rpc.ID(""), err
+		}
 	}
 
 	api.filtersMu.Lock()
@@ -314,7 +346,7 @@ func (api *PublicFilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
 	go func() {
 		for {
 			select {
-			case l := <-logs:
+			case l := <-matchedLogs:
 				api.filtersMu.Lock()
 				if f, found := api.filters[logsSub.ID]; found {
 					f.logs = append(f.logs, l...)
@@ -353,10 +385,11 @@ func (api *PublicFilterAPI) GetLogs(ctx context.Context, crit FilterCriteria) ([
 			end = crit.ToBlock.Int64()
 		}
 		// Construct the range filter
-		if end-begin > api.maxBlocksPerRequest && api.maxBlocksPerRequest > 0 {
-			return nil, fmt.Errorf("requested too many blocks from %d to %d, maximum is set to %d", begin, end, api.maxBlocksPerRequest)
+		var err error
+		filter, err = NewRangeFilter(api.backend, begin, end, crit.Addresses, crit.Topics)
+		if err != nil {
+			return nil, err
 		}
-		filter = NewRangeFilter(api.backend, begin, end, crit.Addresses, crit.Topics)
 	}
 	// Run the filter and return all the logs
 	logs, err := filter.Logs(ctx)
@@ -414,10 +447,11 @@ func (api *PublicFilterAPI) GetFilterLogs(ctx context.Context, id rpc.ID) ([]*ty
 			end = f.crit.ToBlock.Int64()
 		}
 		// Construct the range filter
-		if end-begin > api.maxBlocksPerRequest && api.maxBlocksPerRequest > 0 {
-			return nil, fmt.Errorf("requested too many blocks from %d to %d, maximum is set to %d", begin, end, api.maxBlocksPerRequest)
+		var err error
+		filter, err = NewRangeFilter(api.backend, begin, end, f.crit.Addresses, f.crit.Topics)
+		if err != nil {
+			return nil, err
 		}
-		filter = NewRangeFilter(api.backend, begin, end, f.crit.Addresses, f.crit.Topics)
 	}
 	// Run the filter and return all the logs
 	logs, err := filter.Logs(ctx)
@@ -447,11 +481,11 @@ func (api *PublicFilterAPI) GetFilterChanges(id rpc.ID) (interface{}, error) {
 		f.deadline.Reset(deadline)
 
 		switch f.typ {
-		case PendingTransactionsSubscription, BlocksSubscription:
+		case PendingTransactionsSubscription, BlocksSubscription, AcceptedBlocksSubscription:
 			hashes := f.hashes
 			f.hashes = nil
 			return returnHashes(hashes), nil
-		case LogsSubscription, MinedAndPendingLogsSubscription:
+		case LogsSubscription, AcceptedLogsSubscription, MinedAndPendingLogsSubscription:
 			logs := f.logs
 			f.logs = nil
 			return returnLogs(logs), nil

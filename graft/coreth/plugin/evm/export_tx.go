@@ -95,7 +95,6 @@ func (tx *UnsignedExportTx) SemanticVerify(
 		return permError{errSignatureInputsMismatch}
 	}
 
-	f := crypto.FactorySECP256K1R{}
 	for i, input := range tx.Ins {
 		cred, ok := stx.Creds[i].(*secp256k1fx.Credential)
 		if !ok {
@@ -108,7 +107,7 @@ func (tx *UnsignedExportTx) SemanticVerify(
 		if len(cred.Sigs) != 1 {
 			return permError{fmt.Errorf("expected one signature for EVM Input Credential, but found: %d", len(cred.Sigs))}
 		}
-		pubKeyIntf, err := f.RecoverPublicKey(tx.UnsignedBytes(), cred.Sigs[0][:])
+		pubKeyIntf, err := vm.secpFactory.RecoverPublicKey(tx.UnsignedBytes(), cred.Sigs[0][:])
 		if err != nil {
 			return permError{err}
 		}
@@ -248,6 +247,8 @@ func (tx *UnsignedExportTx) EVMStateTransfer(vm *VM, state *state.StateDB) error
 	for _, from := range tx.Ins {
 		log.Info("crosschain C->X", "addr", from.Address, "amount", from.Amount)
 		if from.AssetID == vm.ctx.AVAXAssetID {
+			// We multiply the input amount by x2cRate to convert AVAX back to the appropriate
+			// denomination before export.
 			amount := new(big.Int).Mul(
 				new(big.Int).SetUint64(from.Amount), x2cRate)
 			if state.GetBalance(from.Address).Cmp(amount) < 0 {
