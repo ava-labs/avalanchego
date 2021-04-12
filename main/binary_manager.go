@@ -115,15 +115,12 @@ func (b *binaryManager) runMigration(v *viper.Viper, nodeConfig node.Config) err
 		case err := <-prevVersionNode.errChan:
 			if err != nil {
 				return fmt.Errorf("previous version died with exit code %d", prevVersionNode.exitCode)
+			} else if prevVersionNode.exitCode != constants.ExitCodeDoneMigrating {
+				return fmt.Errorf("expected error code %d (done with migration) but got %d", constants.ExitCodeDoneMigrating, prevVersionNode.exitCode)
 			}
-			if prevVersionNode.exitCode == constants.ExitCodeDoneMigrating {
-				return nil
-			}
-			// TODO restart here
+			return nil
 		case err := <-currentVersionNode.errChan:
-			if err != nil {
-				return fmt.Errorf("current version died with exit code %d", currentVersionNode.exitCode)
-			}
+			return fmt.Errorf("current version died with exit code %d and error: %w", currentVersionNode.exitCode, err)
 		}
 	}
 }
