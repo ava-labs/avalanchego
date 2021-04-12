@@ -357,6 +357,17 @@ func (b *Bootstrapper) finish() error {
 func (b *Bootstrapper) executeAll(jobs *queue.Jobs) (int, error) {
 	numExecuted := 0
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
+		jobID := job.ID()
+		jobBytes := job.Bytes()
+		// Note that ConsensusDispatcher.Accept / DecisionDispatcher.Accept must be
+		// called before job.Execute to honor EventDispatcher.Accept's invariant.
+		if err := b.Ctx.ConsensusDispatcher.Accept(b.Ctx, jobID, jobBytes); err != nil {
+			return numExecuted, err
+		}
+		if err := b.Ctx.DecisionDispatcher.Accept(b.Ctx, jobID, jobBytes); err != nil {
+			return numExecuted, err
+		}
+
 		if err := jobs.Execute(job); err != nil {
 			return numExecuted, err
 		}
@@ -372,8 +383,6 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs) (int, error) {
 			}
 		}
 
-		b.Ctx.ConsensusDispatcher.Accept(b.Ctx, job.ID(), job.Bytes())
-		b.Ctx.DecisionDispatcher.Accept(b.Ctx, job.ID(), job.Bytes())
 	}
 	if !b.Restarted {
 		b.Ctx.Log.Info("executed %d blocks", numExecuted)

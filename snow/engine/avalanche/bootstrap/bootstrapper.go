@@ -120,7 +120,7 @@ func (b *Bootstrapper) CurrentAcceptedFrontier() ([]ids.ID, error) {
 func (b *Bootstrapper) FilterAccepted(containerIDs []ids.ID) []ids.ID {
 	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, vtxID := range containerIDs {
-		if vtx, err := b.Manager.Get(vtxID); err == nil && vtx.Status() == choices.Accepted {
+		if vtx, err := b.Manager.GetVtx(vtxID); err == nil && vtx.Status() == choices.Accepted {
 			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
 		}
 	}
@@ -142,7 +142,7 @@ func (b *Bootstrapper) fetch(vtxIDs ...ids.ID) error {
 		}
 
 		// Make sure we don't already have this vertex
-		if _, err := b.Manager.Get(vtxID); err == nil {
+		if _, err := b.Manager.GetVtx(vtxID); err == nil {
 			continue
 		}
 
@@ -272,7 +272,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 	}
 
 	requestedVtxID, requested := b.OutstandingRequests.Remove(vdr, requestID)
-	vtx, err := b.Manager.Parse(vtxs[0]) // first vertex should be the one we requested in GetAncestors request
+	vtx, err := b.Manager.ParseVtx(vtxs[0]) // first vertex should be the one we requested in GetAncestors request
 	if err != nil {
 		if !requested {
 			b.Ctx.Log.Debug("failed to parse unrequested vertex from %s with requestID %d: %s", vdr, requestID, err)
@@ -313,7 +313,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 	}
 
 	for _, vtxBytes := range vtxs[1:] { // Parse/persist all the vertices
-		vtx, err := b.Manager.Parse(vtxBytes) // Persists the vtx
+		vtx, err := b.Manager.ParseVtx(vtxBytes) // Persists the vtx
 		if err != nil {
 			b.Ctx.Log.Debug("failed to parse vertex: %s", err)
 			b.Ctx.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxBytes})
@@ -360,7 +360,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	b.NumFetched = 0
 	toProcess := make([]avalanche.Vertex, 0, len(acceptedContainerIDs))
 	for _, vtxID := range acceptedContainerIDs {
-		if vtx, err := b.Manager.Get(vtxID); err == nil {
+		if vtx, err := b.Manager.GetVtx(vtxID); err == nil {
 			toProcess = append(toProcess, vtx) // Process this vertex.
 		} else {
 			b.needToFetch.Add(vtxID) // We don't have this vertex. Mark that we have to fetch it.
@@ -455,6 +455,11 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher)
 
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		b.Ctx.Log.Debug("Executing: %s", job.ID())
+		// Note that events.Accept must be called before
+		// job.Execute to honor EventDispatcher.Accept's invariant.
+		if err := events.Accept(b.Ctx, job.ID(), job.Bytes()); err != nil {
+			return numExecuted, err
+		}
 		if err := jobs.Execute(job); err != nil {
 			b.Ctx.Log.Error("Error executing: %s", err)
 			return numExecuted, err
@@ -471,7 +476,6 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher)
 			}
 		}
 
-		events.Accept(b.Ctx, job.ID(), job.Bytes())
 	}
 	if !b.Restarted {
 		b.Ctx.Log.Info("executed %d operations", numExecuted)

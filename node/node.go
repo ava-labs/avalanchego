@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/indexer"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -66,9 +67,9 @@ const (
 )
 
 var (
+	genesisHashKey                  = []byte("genesisID")
+	indexerDBPrefix                 = []byte{0x00}
 	errPrimarySubnetNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
-
-	genesisHashKey = []byte("genesisID")
 
 	beaconConnectionTimeout = 1 * time.Minute
 )
@@ -85,6 +86,9 @@ type Node struct {
 
 	// Storage for this node
 	DB database.Database
+
+	// Indexes blocks, transactions and blocks
+	indexer indexer.Indexer
 
 	// Handles calls to Keystore API
 	keystore keystore.Keystore
@@ -479,6 +483,32 @@ func (n *Node) initIPCs() error {
 	var err error
 	n.IPCs, err = ipcs.NewChainIPCs(n.Log, n.Config.IPCPath, n.Config.NetworkID, n.ConsensusDispatcher, n.DecisionDispatcher, chainIDs)
 	return err
+}
+
+// Initialize [n.indexer].
+// Should only be called after [n.DB], [n.DecisionDispatcher], [n.ConsensusDispatcher],
+// [n.Log], [n.APIServer], [n.chainManager] are initialized
+func (n *Node) initIndexer() error {
+	txIndexerDB := prefixdb.New(indexerDBPrefix, n.DB)
+	var err error
+	n.indexer, err = indexer.NewIndexer(indexer.Config{
+		IndexingEnabled:      n.Config.IndexAPIEnabled,
+		AllowIncompleteIndex: n.Config.IndexAllowIncomplete,
+		DB:                   txIndexerDB,
+		Log:                  n.Log,
+		DecisionDispatcher:   n.DecisionDispatcher,
+		ConsensusDispatcher:  n.ConsensusDispatcher,
+		APIServer:            &n.APIServer,
+		ShutdownF:            n.Shutdown,
+	})
+	if err != nil {
+		return fmt.Errorf("couldn't create index for txs: %w", err)
+	}
+
+	// Chain manager will notify indexer when a chain is created
+	n.chainManager.AddRegistrant(n.indexer)
+
+	return nil
 }
 
 // Initializes the Platform chain.
@@ -940,6 +970,9 @@ func (n *Node) Initialize(
 	if err := n.initAliases(n.Config.GenesisBytes); err != nil { // Set up aliases
 		return fmt.Errorf("couldn't initialize aliases: %w", err)
 	}
+	if err := n.initIndexer(); err != nil {
+		return fmt.Errorf("couldn't initialize indexer: %w", err)
+	}
 	// Start the Platform chain
 	n.initChains(n.Config.GenesisBytes)
 	return nil
@@ -968,6 +1001,9 @@ func (n *Node) shutdown() {
 	}
 	if err := n.APIServer.Shutdown(); err != nil {
 		n.Log.Debug("error during API shutdown: %s", err)
+	}
+	if err := n.indexer.Close(); err != nil {
+		n.Log.Debug("error closing tx indexer: %w", err)
 	}
 	utils.ClearSignals(n.nodeCloser)
 	n.doneShuttingDown.Done()
