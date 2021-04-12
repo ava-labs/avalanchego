@@ -38,13 +38,16 @@ func main() {
 	log, err := logFactory.Make()
 	if err != nil {
 		fmt.Printf("starting logger failed with: %s\n", err)
+		exitCode = 1
 		return
 	}
 
 	//TODO handle the path retrieval
 	folderPath, err := os.Getwd()
 	if err != nil {
-		panic(err)
+		log.Fatal("couldn't get working directory: %s", err)
+		exitCode = 1
+		return
 	}
 	binaryManager := newBinaryManager(folderPath, log)
 	log.Info("folder path: %s", folderPath) // todo remove this
@@ -60,6 +63,8 @@ func main() {
 	shouldMigrate, err := shouldMigrate(nodeConfig, log)
 	if err != nil {
 		log.Fatal("error while deciding whether to migrate database: %s", err)
+		exitCode = 1
+		return
 	}
 
 	if shouldMigrate {
@@ -74,5 +79,4 @@ func main() {
 		exitCode = 1
 		return
 	}
-
 }

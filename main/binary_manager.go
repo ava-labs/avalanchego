@@ -75,6 +75,11 @@ func newBinaryManager(path string, log logging.Logger) *binaryManager {
 	}
 }
 
+// Run two nodes at once: one is a version before the database upgrade and the other after.
+// The latter will bootstrap from the former. Its staking port and HTTP port are 2
+// greater than the staking/HTTP ports in [v].
+// When the new node version is done bootstrapping, both nodes are stopped.
+// Returns nil if the new node version successfully bootstrapped.
 func (b *binaryManager) runMigration(v *viper.Viper) error {
 	prevVersionNode, err := b.runPreviousVersion(previousVersion, v)
 	if err != nil {
