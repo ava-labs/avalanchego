@@ -205,7 +205,6 @@ func (i *index) getContainerByIndexBytes(indexBytes []byte) (Container, error) {
 		return Container{}, fmt.Errorf("couldn't unmarshal container: %w", err)
 	}
 	return container, nil
-
 }
 
 // GetContainerRange returns the IDs of containers at indices
