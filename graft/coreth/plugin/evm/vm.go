@@ -803,13 +803,6 @@ func (vm *VM) updateStatus(blkID ids.ID, status choices.Status) error {
 		if err := vm.setLastAccepted(blk); err != nil {
 			return fmt.Errorf("could not set %s as last accepted: %w", blkID, err)
 		}
-
-		// Free ExtDataHashes from memory when they are no longer needed (when the
-		// first block is accepted after the AP1 transition).
-		if phase0BlockValidator.extDataHashes != nil && vm.IsApricotPhase1(ethBlock.Time()) {
-			phase0BlockValidator.extDataHashes = nil
-			log.Debug("removed ExtDataHashes from memory")
-		}
 	}
 
 	vm.blockStatusCache.Put(blkID, status)
