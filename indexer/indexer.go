@@ -47,7 +47,7 @@ var (
 	blockPrefix             = byte(0x03)
 	isIncompletePrefix      = byte(0x04)
 	previouslyIndexedPrefix = byte(0x05)
-	hasRunKey               = []byte{0x06}
+	hasRunKey               = []byte{0x07}
 )
 
 var (
@@ -182,14 +182,6 @@ func (i *indexer) RegisterChain(name string, ctx *snow.Context, engine common.En
 		return
 	}
 
-	if !i.allowIncompleteIndex && isIncomplete && (previouslyIndexed || i.hasRunBefore) {
-		i.log.Fatal("index %s is incomplete but incomplete indices are disabled. Shutting down", name)
-		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
-		}
-		return
-	}
-
 	if !i.indexingEnabled { // Indexing is disabled
 		if previouslyIndexed && !i.allowIncompleteIndex {
 			// We indexed this chain in a previous run but not in this run.
@@ -207,6 +199,15 @@ func (i *indexer) RegisterChain(name string, ctx *snow.Context, engine common.En
 			return
 		}
 		i.log.Fatal("couldn't mark chain %s as incomplete: %s", name, err)
+		if err := i.close(); err != nil {
+			i.log.Error("error while closing indexer: %s", err)
+		}
+		return
+	}
+
+	if !i.allowIncompleteIndex && isIncomplete && (previouslyIndexed || i.hasRunBefore) {
+		i.log.Fatal("previously indexed: %v. has run before: %v", previouslyIndexed, i.hasRunBefore)
+		i.log.Fatal("index %s is incomplete but incomplete indices are disabled. Shutting down", name)
 		if err := i.close(); err != nil {
 			i.log.Error("error while closing indexer: %s", err)
 		}
