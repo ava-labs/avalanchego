@@ -204,7 +204,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 	}
 	nextValidatorEndtime := staker.EndTime()
 	if currentChainTimestamp.Equal(nextValidatorEndtime) {
-		rewardValidatorTx, err := m.vm.newRewardValidatorTx(tx.Tx.ID())
+		rewardValidatorTx, err := m.vm.newRewardValidatorTx(tx.ID())
 		if err != nil {
 			return nil, err
 		}
