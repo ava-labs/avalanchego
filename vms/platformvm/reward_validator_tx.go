@@ -262,7 +262,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, permError{errShouldBeDSValidator}
 	}
 
-	uptime, err := vm.calculateUptime(vm.DB, nodeID, startTime)
+	uptime, err := vm.calculateUptime(nodeID, startTime)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{
 			fmt.Errorf("failed to calculate uptime: %w", err),

@@ -1193,8 +1193,10 @@ func (vm *VM) calculateUptime(nodeID ids.ShortID, startTime time.Time) (float64,
 			upDuration += durationConnected
 		}
 	}
-	bestPossibleUpDuration := uint64(currentLocalTime.Sub(startTime) / time.Second)
-	return float64(upDuration) / float64(bestPossibleUpDuration), nil
+
+	bestPossibleUpDuration := currentLocalTime.Sub(startTime)
+	uptime := float64(upDuration) / float64(bestPossibleUpDuration)
+	return uptime, nil
 }
 
 // Returns the current staker set of the Primary Network.
