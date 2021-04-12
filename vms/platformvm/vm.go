@@ -1164,32 +1164,33 @@ func (vm *VM) FormatAddress(chainID ids.ID, addr ids.ShortID) (string, error) {
 	return formatting.FormatAddress(chainIDAlias, hrp, addr.Bytes())
 }
 
-func (vm *VM) calculateUptime(db database.Database, nodeID ids.ShortID, startTime time.Time) (float64, error) {
-	uptime, err := vm.uptime(db, nodeID)
+func (vm *VM) calculateUptime(nodeID ids.ShortID, startTime time.Time) (float64, error) {
+	currentStakers := vm.internalState.CurrentStakers()
+	upDuration, lastUpdated, err := currentStakers.GetUptime(nodeID)
 	switch {
 	case err == database.ErrNotFound:
-		uptime = &validatorUptime{
-			LastUpdated: uint64(startTime.Unix()),
-		}
+		upDuration = 0
+		lastUpdated = startTime
 	case err != nil:
 		return 0, err
 	}
 
-	upDuration := uptime.UpDuration
 	currentLocalTime := vm.clock.Time()
+
 	if timeConnected, isConnected := vm.connections[nodeID]; isConnected {
+		// The time the peer connected should be set to:
+		// max(realTimeConnected, bootstrappedTime, lastUpdated)
 		if timeConnected.Before(vm.bootstrappedTime) {
 			timeConnected = vm.bootstrappedTime
 		}
-
-		lastUpdated := time.Unix(int64(uptime.LastUpdated), 0)
 		if timeConnected.Before(lastUpdated) {
 			timeConnected = lastUpdated
 		}
 
-		durationConnected := currentLocalTime.Sub(timeConnected)
-		if durationConnected > 0 {
-			upDuration += uint64(durationConnected / time.Second)
+		// Increase the uptimes by the amount of time this node has been running
+		// since the last time it's uptime was written to disk.
+		if durationConnected := currentLocalTime.Sub(timeConnected); durationConnected > 0 {
+			upDuration += durationConnected
 		}
 	}
 	bestPossibleUpDuration := uint64(currentLocalTime.Sub(startTime) / time.Second)
