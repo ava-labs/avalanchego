@@ -438,12 +438,6 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, fmt.Errorf("problem deriving node ID from certificate: %w", err)
 	}
 	switch {
-	case !config.EnableP2PTLS:
-		// If TLS is disabled, my node ID is the hash of my IP
-		config.NodeID = ids.ShortID(hashing.ComputeHash160Array([]byte(config.StakingIP.IP().String())))
-	case !config.FetchOnly:
-		// If TLS is enabled and I'm not in fetch only mode, my node ID is derived from my staking key/cert
-		config.NodeID = nodeIDFromFile
 	case config.FetchOnly:
 		// If TLS is enabled and I'm in fetch only mode, my node ID is derived from a new, ephemeral staking key/cert
 		keyBytes, certBytes, err := staking.GenerateStakingCert()
@@ -463,6 +457,12 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 		if err != nil {
 			return node.Config{}, fmt.Errorf("problem deriving node ID from certificate: %w", err)
 		}
+	case !config.EnableP2PTLS:
+		// If TLS is disabled, my node ID is the hash of my IP
+		config.NodeID = ids.ShortID(hashing.ComputeHash160Array([]byte(config.StakingIP.IP().String())))
+	case !config.FetchOnly:
+		// If TLS is enabled and I'm not in fetch only mode, my node ID is derived from my staking key/cert
+		config.NodeID = nodeIDFromFile
 	}
 
 	if err := initBootstrapPeers(v, &config); err != nil {

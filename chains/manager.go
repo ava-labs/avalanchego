@@ -239,7 +239,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 				m.Log.AssertNoError(m.DBManager.MarkCurrentDBBootstrapped())
 				if m.ManagerConfig.FetchOnly {
 					m.Log.Info("\n\ndone with fetch only mode. Restart without flag --fetch-only to run normally. Starting node shutdown.\n")
-					go m.ShutdownNodeFunc(10)
+					go m.ShutdownNodeFunc(constants.ExitCodeDoneMigrating)
 				}
 			},
 		}
@@ -247,7 +247,6 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	sb.addChain(chainParams.ID)
 
 	// In fetch-only mode, use custom bootstrap beacons
-	// (by default, a local node with staking port 9651)
 	if m.FetchOnly {
 		chainParams.CustomBeacons = m.FetchOnlyFrom
 	}

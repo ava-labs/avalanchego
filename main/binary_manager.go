@@ -2,9 +2,13 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
+	"strconv"
 
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
@@ -22,15 +26,17 @@ type nodeProcess struct {
 // Returns an error if the command fails to start.
 // When the nodeProcess terminates, the returned error (which may be nil)
 // is sent on [n.errChan]
-func startNode(path string, args []string) (*nodeProcess, error) {
-	fmt.Printf("Starting binary at %s with args %s", path, args)
+func startNode(path string, args []string, printToStdOut bool) (*nodeProcess, error) {
+	fmt.Printf("Starting binary at %s with args %s\n", path, args) // TODO remove
 	n := &nodeProcess{
 		path:    path,
 		cmd:     exec.Command(path, args...), // #nosec G204
 		errChan: make(chan error, 1),
 	}
-	n.cmd.Stdout = os.Stdout // TODO where to put stdout and stderr?
-	n.cmd.Stderr = os.Stderr
+	if printToStdOut {
+		n.cmd.Stdout = os.Stdout
+		n.cmd.Stderr = os.Stderr
+	}
 
 	// Start the nodeProcess
 	if err := n.cmd.Start(); err != nil {
@@ -55,6 +61,9 @@ func (a *nodeProcess) kill() error {
 	if a.cmd.Process == nil {
 		return nil
 	}
+	// Stop printing output from node
+	a.cmd.Stdout = ioutil.Discard
+	a.cmd.Stderr = ioutil.Discard
 	//todo change this to interrupt?
 	err := a.cmd.Process.Kill() // todo kill subprocesses
 	if err != nil && err != os.ErrProcessDone {
@@ -80,21 +89,22 @@ func newBinaryManager(path string, log logging.Logger) *binaryManager {
 // greater than the staking/HTTP ports in [v].
 // When the new node version is done bootstrapping, both nodes are stopped.
 // Returns nil if the new node version successfully bootstrapped.
-func (b *binaryManager) runMigration(v *viper.Viper) error {
+func (b *binaryManager) runMigration(v *viper.Viper, nodeConfig node.Config) error {
 	prevVersionNode, err := b.runPreviousVersion(previousVersion, v)
 	if err != nil {
 		return fmt.Errorf("couldn't start old version during migration: %w", err)
 	}
-
-	currentVersionNode, err := b.runCurrentVersion(v, true)
-	if err != nil {
-		return fmt.Errorf("couldn't start current version during migration: %w", err)
-	}
-
 	defer func() {
 		if err := prevVersionNode.kill(); err != nil {
 			b.log.Error("error while killing previous version: %w", err)
 		}
+	}()
+
+	currentVersionNode, err := b.runCurrentVersion(v, true, nodeConfig.NodeID)
+	if err != nil {
+		return fmt.Errorf("couldn't start current version during migration: %w", err)
+	}
+	defer func() {
 		if err := currentVersionNode.kill(); err != nil {
 			b.log.Error("error while killing current version: %w", err)
 		}
@@ -119,7 +129,7 @@ func (b *binaryManager) runMigration(v *viper.Viper) error {
 }
 
 func (b *binaryManager) runNormal(v *viper.Viper) error {
-	node, err := b.runCurrentVersion(v, false)
+	node, err := b.runCurrentVersion(v, false, ids.ShortID{})
 	if err != nil {
 		return fmt.Errorf("couldn't start old version during migration: %w", err)
 	}
@@ -130,32 +140,43 @@ func (b *binaryManager) runPreviousVersion(prevVersion version.Version, v *viper
 	binaryPath := getBinaryPath(b.rootPath, prevVersion)
 	args := []string{}
 	for k, v := range v.AllSettings() {
+		if k == "fetch-only" { // TODO replace with const
+			continue
+		}
 		args = append(args, fmt.Sprintf("--%s=%v", k, v))
 	}
-	return startNode(binaryPath, args)
+	return startNode(binaryPath, args, false)
 }
 
 func (b *binaryManager) runCurrentVersion(
 	v *viper.Viper,
 	fetchOnly bool,
+	fetchFrom ids.ShortID,
 ) (*nodeProcess, error) {
-	binaryPath := getBinaryPath(b.rootPath, currentVersion)
-	args := []string{}
-	for k, v := range v.AllSettings() {
-		switch {
-		case fetchOnly && k == "http-port":
-			args = append(args, fmt.Sprintf("--http-port=%d", v.(int)+2)) // TODO assign HTTP port better than this
-		case fetchOnly && k == "staking-port":
-			args = append(args, fmt.Sprintf("--staking-port=%d", v.(int)+2)) // TODO assign HTTP port better than this
-		default:
-			args = append(args, fmt.Sprintf("--%s=%v", k, v))
-		}
-		// TODO handle other command line flags
-	}
+	argsMap := v.AllSettings()
 	if fetchOnly {
-		args = append(args, "--fetch-only=true")
+		// TODO use constants for arg names here
+		stakingPort, err := strconv.Atoi(argsMap["staking-port"].(string))
+		if err != nil {
+			return nil, fmt.Errorf("couldn't parse staking port as int: %w", err)
+		}
+		argsMap["bootstrap-ips"] = fmt.Sprintf("127.0.0.1:%d", stakingPort)
+		argsMap["bootstrap-ids"] = fmt.Sprintf("%s%s", constants.NodeIDPrefix, fetchFrom)
+		argsMap["staking-port"] = stakingPort + 2
+
+		httpPort, err := strconv.Atoi(argsMap["http-port"].(string))
+		if err != nil {
+			return nil, fmt.Errorf("couldn't parse staking port as int: %w", err)
+		}
+		argsMap["http-port"] = httpPort + 2
+		argsMap["fetch-only"] = true
 	}
-	return startNode(binaryPath, args)
+	args := []string{}
+	for k, v := range argsMap {
+		args = append(args, fmt.Sprintf("--%s=%v", k, v))
+	}
+	binaryPath := getBinaryPath(b.rootPath, currentVersion)
+	return startNode(binaryPath, args, true)
 }
 
 func getBinaryPath(rootPath string, nodeVersion version.Version) string {

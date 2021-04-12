@@ -68,7 +68,7 @@ func main() {
 	}
 
 	if shouldMigrate {
-		if err := binaryManager.runMigration(v); err != nil {
+		if err := binaryManager.runMigration(v, nodeConfig); err != nil {
 			log.Error("error while running migration: %s", err)
 			exitCode = 1
 			return

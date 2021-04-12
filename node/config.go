@@ -29,12 +29,6 @@ type Config struct {
 
 	// If true, bootstrap the current database version and then end the node.
 	FetchOnly bool
-	// P2P port of node running in fetch only mode
-	FetchOnlyStakingPort uint16
-	// HTTP port of node running in fetch only mode
-	FetchOnlyHTTPPort uint16
-	// Log directory of node running in fetch only mode
-	FetchOnlyLogDir string
 
 	// Genesis information
 	GenesisBytes []byte
