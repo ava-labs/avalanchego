@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/encdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ethereum/go-ethereum/common"
@@ -23,8 +23,9 @@ var (
 )
 
 type user struct {
+	secpFactory *crypto.FactorySECP256K1R
 	// This user's database, acquired from the keystore
-	db database.Database
+	db *encdb.Database
 }
 
 // Get the addresses controlled by this user
@@ -112,12 +113,11 @@ func (u *user) getKey(address common.Address) (*crypto.PrivateKeySECP256K1R, err
 		//	return nil, errEmptyAddress
 	}
 
-	factory := crypto.FactorySECP256K1R{}
 	bytes, err := u.db.Get(address.Bytes())
 	if err != nil {
 		return nil, err
 	}
-	sk, err := factory.ToPrivateKey(bytes)
+	sk, err := u.secpFactory.ToPrivateKey(bytes)
 	if err != nil {
 		return nil, err
 	}

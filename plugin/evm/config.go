@@ -29,6 +29,11 @@ type CommandLineConfig struct {
 	MaxBlocksPerRequest     int64 `json:"api-max-blocks-per-request"`
 	AllowUnfinalizedQueries bool  `json:"allow-unfinalized-queries"`
 
+	// Keystore Settings
+	KeystoreDirectory             string `json:"keystore-directory"` // both absolute and relative supported
+	KeystoreExternalSigner        string `json:"keystore-external-signer"`
+	KeystoreInsecureUnlockAllowed bool   `json:"keystore-insecure-unlock-allowed"`
+
 	ParsingError error
 }
 

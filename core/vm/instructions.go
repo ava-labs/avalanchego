@@ -539,10 +539,7 @@ func opSload(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) ([]b
 func opSstore(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) ([]byte, error) {
 	loc := callContext.stack.pop()
 	val := callContext.stack.pop()
-	if err := interpreter.evm.StateDB.SetState(callContext.contract.Address(),
-		common.Hash(loc.Bytes32()), common.Hash(val.Bytes32())); err != nil {
-		return nil, err
-	}
+	interpreter.evm.StateDB.SetState(callContext.contract.Address(), common.Hash(loc.Bytes32()), common.Hash(val.Bytes32()))
 	return nil, nil
 }
 
