@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
@@ -118,7 +117,7 @@ func (m *Mempool) IssueTx(tx *Tx) error {
 // BuildBlock builds a block to be added to consensus
 func (m *Mempool) BuildBlock() (snowman.Block, error) {
 	m.vm.Ctx.Log.Debug("in BuildBlock")
-	// TODO: Add PreferredHeight() to core.snowmanVM
+
 	preferredHeight, err := m.vm.preferredHeight()
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get preferred block's height: %w", err)
@@ -191,13 +190,15 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		return nil, errEndOfTime
 	}
 
+	currentStakers := m.vm.internalState.CurrentStakers()
+
 	// If the chain time would be the time for the next primary network staker to leave,
 	// then we create a block that removes the staker and proposes they receive a staker reward
-	tx, err := m.vm.nextStakerStop(db, constants.PrimaryNetworkID)
+	tx, _, err := currentStakers.GetNextStaker()
 	if err != nil {
 		return nil, err
 	}
-	staker, ok := tx.Tx.UnsignedTx.(TimedTx)
+	staker, ok := tx.UnsignedTx.(TimedTx)
 	if !ok {
 		return nil, fmt.Errorf("expected staker tx to be TimedTx but got %T", tx)
 	}
