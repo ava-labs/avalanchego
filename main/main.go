@@ -69,20 +69,13 @@ func main() {
 		return
 	}
 
-	shouldMigrate, err := shouldMigrate(nodeConfig, log)
-	if err != nil {
-		log.Fatal("error while deciding whether to migrate database: %s", err)
+	migrationManager := newMigrationManager(binaryManager, v, nodeConfig, log)
+	if err := migrationManager.migrate(); err != nil {
+		log.Error("error while running migration: %s", err)
 		exitCode = 1
 		return
 	}
 
-	if shouldMigrate {
-		if err := binaryManager.runMigration(v, nodeConfig); err != nil {
-			log.Error("error while running migration: %s", err)
-			exitCode = 1
-			return
-		}
-	}
 	if err := binaryManager.runNormal(v); err != nil {
 		exitCode = 1
 		return

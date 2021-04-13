@@ -2,14 +2,12 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strconv"
 	"syscall"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -17,33 +15,33 @@ import (
 	"github.com/spf13/viper"
 )
 
-type nodeProcess struct {
-	path       string
-	errChan    chan error
-	done       *utils.AtomicBool
-	exitCode   int
-	cmd        *exec.Cmd
-	nodeNumber int
+type process struct {
+	path     string
+	errChan  chan error
+	done     *utils.AtomicBool
+	exitCode int
+	cmd      *exec.Cmd
+	nodeID   int
 }
 
 type binaryManager struct {
 	rootPath       string
 	log            logging.Logger
 	nextNodeNumber int
-	runningNodes   map[int]*nodeProcess
+	runningNodes   map[int]*process
 }
 
 func newBinaryManager(path string, log logging.Logger) *binaryManager {
 	return &binaryManager{
 		rootPath:     path,
 		log:          log,
-		runningNodes: map[int]*nodeProcess{},
+		runningNodes: map[int]*process{},
 	}
 }
 
 func (b *binaryManager) killAll() {
 	for _, nodeProcess := range b.runningNodes {
-		if err := b.kill(nodeProcess.nodeNumber); err != nil {
+		if err := b.kill(nodeProcess.nodeID); err != nil {
 			b.log.Error("error killing node running binary at %s: %s", nodeProcess.path, err)
 		}
 	}
@@ -58,9 +56,7 @@ func (b *binaryManager) kill(nodeNumber int) error {
 	if nodeProcess.cmd.Process == nil || nodeProcess.done.GetValue() {
 		return nil
 	}
-	// Stop printing output from node
-	nodeProcess.cmd.Stdout = ioutil.Discard
-	nodeProcess.cmd.Stderr = ioutil.Discard
+
 	err := syscall.Kill(-nodeProcess.cmd.Process.Pid, syscall.SIGKILL)
 	if err != nil && err != os.ErrProcessDone {
 		return fmt.Errorf("failed to kill process: %w", err)
@@ -72,14 +68,14 @@ func (b *binaryManager) kill(nodeNumber int) error {
 // Returns an error if the command fails to start.
 // When the nodeProcess terminates, the returned error (which may be nil)
 // is sent on [n.errChan]
-func (b *binaryManager) startNode(path string, args []string, printToStdOut bool) (*nodeProcess, error) {
+func (b *binaryManager) startNode(path string, args []string, printToStdOut bool) (*process, error) {
 	b.log.Info("Starting binary at %s with args %s\n", path, args) // TODO remove
-	n := &nodeProcess{
-		path:       path,
-		cmd:        exec.Command(path, args...), // #nosec G204
-		errChan:    make(chan error, 1),
-		done:       &utils.AtomicBool{},
-		nodeNumber: b.nextNodeNumber,
+	n := &process{
+		path:    path,
+		cmd:     exec.Command(path, args...), // #nosec G204
+		errChan: make(chan error, 1),
+		done:    &utils.AtomicBool{},
+		nodeID:  b.nextNodeNumber,
 	}
 	b.nextNodeNumber++
 	if printToStdOut {
@@ -91,7 +87,7 @@ func (b *binaryManager) startNode(path string, args []string, printToStdOut bool
 	if err := n.cmd.Start(); err != nil {
 		return nil, err
 	}
-	b.runningNodes[n.nodeNumber] = n
+	b.runningNodes[n.nodeID] = n
 	go func() {
 		// Wait for the nodeProcess to stop.
 		// When it does, set the exit code and send the returned error
@@ -108,59 +104,20 @@ func (b *binaryManager) startNode(path string, args []string, printToStdOut bool
 	return n, nil
 }
 
-// Run two nodes at once: one is a version before the database upgrade and the other after.
-// The latter will bootstrap from the former. Its staking port and HTTP port are 2
-// greater than the staking/HTTP ports in [v].
-// When the new node version is done bootstrapping, both nodes are stopped.
-// Returns nil if the new node version successfully bootstrapped.
-func (b *binaryManager) runMigration(v *viper.Viper, nodeConfig node.Config) error {
-	prevVersionNode, err := b.runPreviousVersion(previousVersion, v)
-	if err != nil {
-		return fmt.Errorf("couldn't start old version during migration: %w", err)
-	}
-	defer func() {
-		if err := b.kill(prevVersionNode.nodeNumber); err != nil {
-			b.log.Error("error while killing previous version: %s", err)
-		}
-	}()
-
-	currentVersionNode, err := b.runCurrentVersion(v, true, nodeConfig.NodeID)
-	if err != nil {
-		return fmt.Errorf("couldn't start current version during migration: %w", err)
-	}
-	defer func() {
-		if err := b.kill(currentVersionNode.nodeNumber); err != nil {
-			b.log.Error("error while killing current version: %s", err)
-		}
-	}()
-
-	for {
-		select {
-		case err := <-prevVersionNode.errChan:
-			return fmt.Errorf("previous version stopped with: %s", err)
-		case <-currentVersionNode.errChan:
-			if currentVersionNode.exitCode != constants.ExitCodeDoneMigrating {
-				return fmt.Errorf("current version died with exit code %d", currentVersionNode.exitCode)
-			}
-			return nil
-		}
-	}
-}
-
 func (b *binaryManager) runNormal(v *viper.Viper) error {
 	node, err := b.runCurrentVersion(v, false, ids.ShortID{})
 	if err != nil {
 		return fmt.Errorf("couldn't start old version during migration: %w", err)
 	}
 	defer func() {
-		if err := b.kill(node.nodeNumber); err != nil {
+		if err := b.kill(node.nodeID); err != nil {
 			b.log.Error("error stopping node: %s", err)
 		}
 	}()
 	return <-node.errChan
 }
 
-func (b *binaryManager) runPreviousVersion(prevVersion version.Version, v *viper.Viper) (*nodeProcess, error) {
+func (b *binaryManager) runPreviousVersion(prevVersion version.Version, v *viper.Viper) (*process, error) {
 	binaryPath := getBinaryPath(b.rootPath, prevVersion)
 	args := []string{}
 	for k, v := range v.AllSettings() {
@@ -176,7 +133,7 @@ func (b *binaryManager) runCurrentVersion(
 	v *viper.Viper,
 	fetchOnly bool,
 	fetchFrom ids.ShortID,
-) (*nodeProcess, error) {
+) (*process, error) {
 	argsMap := v.AllSettings()
 	if fetchOnly {
 		// TODO use constants for arg names here

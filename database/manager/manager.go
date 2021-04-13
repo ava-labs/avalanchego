@@ -42,6 +42,7 @@ type Manager interface {
 	GetDatabases() []*VersionedDatabase
 	// Close all of the databases controlled by the manager
 	Close() error
+	Shutdown() error
 	MarkCurrentDBBootstrapped() error
 	CurrentDBBootstrapped() (bool, error)
 
@@ -59,6 +60,14 @@ type manager struct {
 	// descending order
 	// invariant: len(databases) > 0
 	databases []*VersionedDatabase
+}
+
+func (m *manager) Shutdown() error {
+	errs := wrappers.Errs{}
+	for _, db := range m.databases {
+		errs.Add(db.Shutdown())
+	}
+	return errs.Err
 }
 
 func (m *manager) Current() *VersionedDatabase { return m.databases[0] }
@@ -269,7 +278,17 @@ type VersionedDatabase struct {
 
 func (db *VersionedDatabase) Close() error {
 	errs := wrappers.Errs{}
-	errs.Add(db.Database.Close())
+	if err := db.Database.Close(); err != nil && err != database.ErrClosed {
+		errs.Add(err)
+		fmt.Println("VersionedDatabase.Database.Close: Trying to close a closed DB")
+	}
+	errs.Add()
+	return errs.Err
+}
+
+func (db *VersionedDatabase) Shutdown() error {
+	errs := wrappers.Errs{}
+	errs.Add(db.Close())
 	if db.rawDB != nil {
 		if err := db.rawDB.Close(); err != nil && err != database.ErrClosed {
 			errs.Add(err)
