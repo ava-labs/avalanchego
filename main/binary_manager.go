@@ -27,7 +27,7 @@ type nodeProcess struct {
 }
 
 type binaryManager struct {
-	rootPath       string
+	buildDirPath   string
 	log            logging.Logger
 	nextNodeNumber int
 	runningNodes   map[int]*nodeProcess
@@ -35,7 +35,7 @@ type binaryManager struct {
 
 func newBinaryManager(path string, log logging.Logger) *binaryManager {
 	return &binaryManager{
-		rootPath:     path,
+		buildDirPath: path,
 		log:          log,
 		runningNodes: map[int]*nodeProcess{},
 	}
@@ -114,7 +114,7 @@ func (b *binaryManager) startNode(path string, args []string, printToStdOut bool
 // When the new node version is done bootstrapping, both nodes are stopped.
 // Returns nil if the new node version successfully bootstrapped.
 func (b *binaryManager) runMigration(v *viper.Viper, nodeConfig node.Config) error {
-	prevVersionNode, err := b.runPreviousVersion(previousVersion, v)
+	prevVersionNode, err := b.runPreviousVersion(node.PreviousVersion.AsVersion(), v)
 	if err != nil {
 		return fmt.Errorf("couldn't start old version during migration: %w", err)
 	}
@@ -161,7 +161,7 @@ func (b *binaryManager) runNormal(v *viper.Viper) error {
 }
 
 func (b *binaryManager) runPreviousVersion(prevVersion version.Version, v *viper.Viper) (*nodeProcess, error) {
-	binaryPath := getBinaryPath(b.rootPath, prevVersion)
+	binaryPath := getBinaryPath(b.buildDirPath, prevVersion)
 	args := []string{}
 	for k, v := range v.AllSettings() {
 		if k == "fetch-only" { // TODO replace with const
@@ -199,14 +199,14 @@ func (b *binaryManager) runCurrentVersion(
 	for k, v := range argsMap {
 		args = append(args, fmt.Sprintf("--%s=%v", k, v))
 	}
-	binaryPath := getBinaryPath(b.rootPath, currentVersion)
+	binaryPath := getBinaryPath(b.buildDirPath, node.Version.AsVersion())
 	return b.startNode(binaryPath, args, true)
 }
 
-func getBinaryPath(rootPath string, nodeVersion version.Version) string {
+func getBinaryPath(buildDirPath string, nodeVersion version.Version) string {
 	return fmt.Sprintf(
-		"%s/build/avalanchego-%s/avalanchego-inner",
-		rootPath,
+		"%s/avalanchego-%s/avalanchego-inner",
+		buildDirPath,
 		nodeVersion,
 	)
 }

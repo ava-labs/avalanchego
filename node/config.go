@@ -108,6 +108,9 @@ type Config struct {
 	// Plugin directory
 	PluginDir string
 
+	// Path to build directory
+	BuildDir string
+
 	// Consensus configuration
 	ConsensusParams avalanche.Parameters
 

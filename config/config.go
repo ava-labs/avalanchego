@@ -55,11 +55,10 @@ var (
 	defaultDbDir           = filepath.Join(defaultDataDir, "db")
 	defaultStakingKeyPath  = filepath.Join(defaultDataDir, "staking", "staker.key")
 	defaultStakingCertPath = filepath.Join(defaultDataDir, "staking", "staker.crt")
-	defaultPluginDirs      = []string{
-		filepath.Join(".", "build", "plugins"),
-		filepath.Join(".", "plugins"),
-		filepath.Join("/", "usr", "local", "lib", constants.AppName),
-		filepath.Join(defaultDataDir, "plugins"),
+	defaultBuildDirs       = []string{
+		filepath.Join(".", "build"),
+		filepath.Join("/", "usr", "local", "lib", constants.AppName, "build"),
+		filepath.Join(defaultDataDir, "build"),
 	}
 	// GitCommit should be optionally set at compile time.
 	GitCommit string
@@ -68,7 +67,7 @@ var (
 func init() {
 	folderPath, err := osext.ExecutableFolder()
 	if err == nil {
-		defaultPluginDirs = append(defaultPluginDirs, filepath.Join(folderPath, "plugins"))
+		defaultBuildDirs = append(defaultBuildDirs, filepath.Join(folderPath, "build"))
 	}
 }
 
@@ -480,20 +479,53 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 		}
 	}
 
-	// Plugins
-	pluginDir := v.GetString(pluginDirKey)
-	if pluginDir == defaultString {
-		config.PluginDir = defaultPluginDirs[0]
+	// Build directory
+	// The directory should have this structure:
+	// build
+	// |_avalanchego-[currentVersion]
+	//   |_avalanchego-inner
+	//   |_plugins
+	//     |_evm
+	// |_avalanchego-[previousVersion]
+	//   |_avalanchego-inner
+	//   |_plugins
+	//     |_evm
+	// where [currentVersion] and [previousVersion] are, for example, v1.3.2 and v.1.3.1, resepectively
+	buildDir := v.GetString(buildDirKey)
+	if buildDir == defaultString {
+		config.BuildDir = defaultBuildDirs[0]
 	} else {
-		config.PluginDir = pluginDir
+		config.BuildDir = buildDir
 	}
-	if _, err := os.Stat(config.PluginDir); os.IsNotExist(err) {
-		for _, dir := range defaultPluginDirs {
-			if _, err := os.Stat(dir); !os.IsNotExist(err) {
-				config.PluginDir = dir
+	validBuildDir := func(dir string) bool {
+		info, err := os.Stat(dir)
+		if err != nil || !info.IsDir() {
+			return false
+		}
+		// make sure both expected subdirectories exist
+		if _, err := os.Stat(filepath.Join(dir, fmt.Sprintf("%s%s%s", constants.AppName, "-", node.Version.AsVersion()))); err != nil {
+			return false
+		}
+		if _, err := os.Stat(filepath.Join(dir, fmt.Sprintf("%s%s%s", constants.AppName, "-", node.PreviousVersion.AsVersion()))); err != nil {
+			return false
+		}
+		return true
+	}
+	if !validBuildDir(config.BuildDir) {
+		for _, dir := range defaultBuildDirs {
+			if validBuildDir(dir) {
+				config.BuildDir = dir
 				break
 			}
 		}
+	}
+
+	// Plugin directory
+	pluginDir := v.GetString(pluginDirKey)
+	if pluginDir == defaultString {
+		config.PluginDir = filepath.Join(config.BuildDir, fmt.Sprintf("%s%s%s", constants.AppName, "-", node.PreviousVersion.AsVersion()), "plugins")
+	} else {
+		config.PluginDir = pluginDir
 	}
 
 	// HTTP:

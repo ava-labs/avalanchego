@@ -11,15 +11,9 @@ import (
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/version"
 )
 
-var (
-	previousVersion = version.NewDefaultVersion(1, 3, 1)
-	currentVersion  = version.NewDefaultVersion(1, 3, 2) // TODO only have 1 copy of this
-)
-
-// main is the primary entry point to Avalanche.
+// main is the entry point to AvalancheGo.
 func main() {
 	exitCode := 0
 	defer func() {
@@ -44,15 +38,7 @@ func main() {
 		return
 	}
 
-	//TODO handle the path retrieval
-	folderPath, err := os.Getwd()
-	if err != nil {
-		log.Fatal("couldn't get working directory: %s", err)
-		exitCode = 1
-		return
-	}
-	binaryManager := newBinaryManager(folderPath, log)
-	log.Info("folder path: %s", folderPath) // todo remove this
+	binaryManager := newBinaryManager(nodeConfig.BuildDir, log)
 
 	_ = utils.HandleSignals(
 		func(os.Signal) {

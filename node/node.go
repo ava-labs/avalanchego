@@ -68,7 +68,8 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version                 = version.NewDefaultApplication(constants.PlatformName, 1, 3, 2)
+	Version                 = version.NewDefaultApplication(constants.PlatformName, 1, 3, 2) // TODO can we put this config or somewhere better than here?
+	PreviousVersion         = version.NewDefaultApplication(constants.PlatformName, 1, 3, 1) // TODO can we put this config or somewhere better than here?
 	versionParser           = version.NewDefaultApplicationParser()
 	beaconConnectionTimeout = 1 * time.Minute
 )
