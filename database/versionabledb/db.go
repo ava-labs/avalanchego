@@ -158,19 +158,30 @@ func (db *Database) AbortCommit() {
 
 // CommitBatch returns a batch that contains all uncommitted puts/deletes.
 // Calling Write() on the returned batch causes the puts/deletes to be
-// written to the underlying database. CommitBatch holds onto the lock,
-// blocking all other database operations until EndBatch() is called.
+// written to the underlying database.
+// If CommitBatch returns a nil error, then it holds onto the lock until
+// EndBatch is called.
+// If a non-nil error is returned, CommitBatch releases the lock, so that
+// EndBatch should not be called. Note: if CommitBatch returns an error,
+// such that it releases the lock, then calling EndBatch immediately will
+// cause a panic.
 func (db *Database) CommitBatch() (database.Batch, error) {
 	db.lock.Lock()
 
-	return db.vdb.CommitBatch()
+	batch, err := db.vdb.CommitBatch()
+	if err != nil {
+		db.lock.Unlock()
+		return nil, err
+	}
+	return batch, nil
 }
 
 // EndBatch sets the [versionEnabled] flag back to false and calls
 // Abort() on the versiondb.
-// EndBatch should be called exactly once following a call to
-// CommitBatch.
+// EndBatch should be called exactly once following a successful call
+// to CommitBatch.
 // Assumes [db.lock] is still held by the initial call to CommitBatch
+// Note: if CommitBatch returns an error, EndBatch should not be called.
 func (db *Database) EndBatch() {
 	db.versionEnabled = false
 	db.vdb.Abort()
@@ -207,5 +218,6 @@ func (b *batch) Write() error {
 	return b.Batch.Write()
 }
 
-// Inner returns itself
+// Inner returns the batch writing to the underlying database
+// [b.db.db]
 func (b *batch) Inner() database.Batch { return b.Batch }
