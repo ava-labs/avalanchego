@@ -37,7 +37,6 @@ func main() {
 		exitCode = 1
 		return
 	}
-
 	binaryManager := newBinaryManager(nodeConfig.BuildDir, log)
 
 	_ = utils.HandleSignals(

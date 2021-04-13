@@ -167,7 +167,7 @@ func (b *binaryManager) runCurrentVersion(
 
 func getBinaryPath(buildDirPath string, nodeVersion version.Version) string {
 	return fmt.Sprintf(
-		"%s/avalanchego-%s/avalanchego-inner",
+		"%s/avalanchego-v%s/avalanchego-inner",
 		buildDirPath,
 		nodeVersion,
 	)
