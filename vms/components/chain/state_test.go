@@ -15,9 +15,50 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func createInternalBlockFuncs(t *testing.T, blks []*snowman.TestBlock) (func(id ids.ID) (snowman.Block, error), func(b []byte) (snowman.Block, error), func(height uint64) (ids.ID, error)) {
-	blkMap := make(map[ids.ID]*snowman.TestBlock)
-	blkByteMap := make(map[byte]*snowman.TestBlock)
+type TestBlock struct {
+	*snowman.TestBlock
+}
+
+// SetStatus sets the status of the Block. Implements the BlockWrapper interface.
+func (b *TestBlock) SetStatus(status choices.Status) { b.TestBlock.TestDecidable.StatusV = status }
+
+// NewTestBlock returns a new test block with height, bytes, and ID derived from [i]
+// and using [parent] as the parent block
+func NewTestBlock(i uint64, parent *TestBlock) *TestBlock {
+	b := []byte{byte(i)}
+	id := hashing.ComputeHash256Array(b)
+	return &TestBlock{
+		TestBlock: &snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     id,
+				StatusV: choices.Unknown,
+			},
+			HeightV: i,
+			ParentV: parent,
+			BytesV:  b,
+		},
+	}
+}
+
+// NewTestBlocks generates [numBlocks] consecutive blocks starting
+// at height [parent.Height() + 1].
+func NewTestBlocks(numBlocks uint64, parent *TestBlock) []*TestBlock {
+	blks := make([]*TestBlock, 0, numBlocks)
+	var startHeight uint64
+	if parent != nil {
+		startHeight = parent.HeightV + 1
+	}
+	for i := startHeight; i < numBlocks; i++ {
+		blks = append(blks, NewTestBlock(i, parent))
+		parent = blks[len(blks)-1]
+	}
+
+	return blks
+}
+
+func createInternalBlockFuncs(t *testing.T, blks []*TestBlock) (func(id ids.ID) (snowman.Block, error), func(b []byte) (snowman.Block, error), func(height uint64) (ids.ID, error)) {
+	blkMap := make(map[ids.ID]*TestBlock)
+	blkByteMap := make(map[byte]*TestBlock)
 	for _, blk := range blks {
 		blkMap[blk.ID()] = blk
 		blkBytes := blk.Bytes()
@@ -161,7 +202,7 @@ func checkRejectedBlock(t *testing.T, s *State, blk snowman.Block, cached bool) 
 }
 
 func TestState(t *testing.T) {
-	testBlks := snowman.NewTestBlocks(3, nil)
+	testBlks := NewTestBlocks(3, nil)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 	blk1 := testBlks[1]
@@ -170,14 +211,16 @@ func TestState(t *testing.T) {
 	// to generate a conflict with blk2
 	blk3Bytes := []byte{byte(3)}
 	blk3ID := hashing.ComputeHash256Array(blk3Bytes)
-	blk3 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blk3ID,
-			StatusV: choices.Processing,
+	blk3 := &TestBlock{
+		TestBlock: &snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     blk3ID,
+				StatusV: choices.Processing,
+			},
+			HeightV: uint64(2),
+			BytesV:  blk3Bytes,
+			ParentV: blk1,
 		},
-		HeightV: uint64(2),
-		BytesV:  blk3Bytes,
-		ParentV: blk1,
 	}
 	testBlks = append(testBlks, blk3)
 
@@ -295,7 +338,7 @@ func TestState(t *testing.T) {
 }
 
 func TestBuildBlock(t *testing.T) {
-	testBlks := snowman.NewTestBlocks(2, nil)
+	testBlks := NewTestBlocks(2, nil)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 	blk1 := testBlks[1]
@@ -339,7 +382,7 @@ func TestBuildBlock(t *testing.T) {
 }
 
 func TestStateDecideBlock(t *testing.T) {
-	testBlks := snowman.NewTestBlocks(4, nil)
+	testBlks := NewTestBlocks(4, nil)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 	badAcceptBlk := testBlks[1]
@@ -406,7 +449,7 @@ func TestStateDecideBlock(t *testing.T) {
 }
 
 func TestStateParent(t *testing.T) {
-	testBlks := snowman.NewTestBlocks(3, nil)
+	testBlks := NewTestBlocks(3, nil)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 	blk1 := testBlks[1]
@@ -446,7 +489,7 @@ func TestStateParent(t *testing.T) {
 }
 
 func TestGetBlockInternal(t *testing.T) {
-	testBlks := snowman.NewTestBlocks(1, nil)
+	testBlks := NewTestBlocks(1, nil)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 
@@ -463,7 +506,7 @@ func TestGetBlockInternal(t *testing.T) {
 	})
 
 	genesisBlockInternal := chainState.LastAcceptedBlockInternal()
-	if _, ok := genesisBlockInternal.(*snowman.TestBlock); !ok {
+	if _, ok := genesisBlockInternal.(*TestBlock); !ok {
 		t.Fatalf("Expected LastAcceptedBlockInternal to return a block of type *snowman.TestBlock, but found %T", genesisBlockInternal)
 	}
 	if genesisBlockInternal.ID() != genesisBlock.ID() {
@@ -475,7 +518,7 @@ func TestGetBlockInternal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, ok := blk.(*snowman.TestBlock); !ok {
+	if _, ok := blk.(*TestBlock); !ok {
 		t.Fatalf("Expected retrieved block to return a block of type *snowman.TestBlock, but found %T", blk)
 	}
 	if blk.ID() != genesisBlock.ID() {
@@ -484,7 +527,7 @@ func TestGetBlockInternal(t *testing.T) {
 }
 
 func TestGetBlockError(t *testing.T) {
-	testBlks := snowman.NewTestBlocks(2, nil)
+	testBlks := NewTestBlocks(2, nil)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 	blk1 := testBlks[1]
@@ -527,7 +570,7 @@ func TestGetBlockError(t *testing.T) {
 }
 
 func TestParseBlockError(t *testing.T) {
-	testBlks := snowman.NewTestBlocks(1, nil)
+	testBlks := NewTestBlocks(1, nil)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 
@@ -550,7 +593,7 @@ func TestParseBlockError(t *testing.T) {
 }
 
 func TestBuildBlockError(t *testing.T) {
-	testBlks := snowman.NewTestBlocks(1, nil)
+	testBlks := NewTestBlocks(1, nil)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 
@@ -577,7 +620,7 @@ func TestMeteredCache(t *testing.T) {
 	namespace1 := "Joe"
 	namespace2 := "Namath"
 
-	testBlks := snowman.NewTestBlocks(1, nil)
+	testBlks := NewTestBlocks(1, nil)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 
