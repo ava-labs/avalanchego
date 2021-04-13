@@ -6,8 +6,10 @@ package main
 import (
 	"fmt"
 	"os"
+	"syscall"
 
 	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -52,6 +54,13 @@ func main() {
 	binaryManager := newBinaryManager(folderPath, log)
 	log.Info("folder path: %s", folderPath) // todo remove this
 
+	_ = utils.HandleSignals(
+		func(os.Signal) {
+			binaryManager.killAll()
+		},
+		syscall.SIGINT, syscall.SIGTERM,
+	)
+
 	// Get the config
 	v, err := config.GetViper()
 	if err != nil {
@@ -75,7 +84,6 @@ func main() {
 		}
 	}
 	if err := binaryManager.runNormal(v); err != nil {
-		log.Error("error starting node: %s", err)
 		exitCode = 1
 		return
 	}

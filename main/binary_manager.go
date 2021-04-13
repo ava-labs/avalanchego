@@ -18,35 +18,80 @@ import (
 )
 
 type nodeProcess struct {
-	path     string
-	errChan  chan error
-	done     *utils.AtomicBool
-	exitCode int
-	cmd      *exec.Cmd
+	path       string
+	errChan    chan error
+	done       *utils.AtomicBool
+	exitCode   int
+	cmd        *exec.Cmd
+	nodeNumber int
+}
+
+type binaryManager struct {
+	rootPath       string
+	log            logging.Logger
+	nextNodeNumber int
+	runningNodes   map[int]*nodeProcess
+}
+
+func newBinaryManager(path string, log logging.Logger) *binaryManager {
+	return &binaryManager{
+		rootPath:     path,
+		log:          log,
+		runningNodes: map[int]*nodeProcess{},
+	}
+}
+
+func (b *binaryManager) killAll() {
+	for _, nodeProcess := range b.runningNodes {
+		if err := b.kill(nodeProcess.nodeNumber); err != nil {
+			b.log.Error("error killing node running binary at %s: %s", nodeProcess.path, err)
+		}
+	}
+}
+
+func (b *binaryManager) kill(nodeNumber int) error {
+	nodeProcess, ok := b.runningNodes[nodeNumber]
+	if !ok {
+		return nil
+	}
+	delete(b.runningNodes, nodeNumber)
+	if nodeProcess.cmd.Process == nil || nodeProcess.done.GetValue() {
+		return nil
+	}
+	// Stop printing output from node
+	nodeProcess.cmd.Stdout = ioutil.Discard
+	nodeProcess.cmd.Stderr = ioutil.Discard
+	err := syscall.Kill(-nodeProcess.cmd.Process.Pid, syscall.SIGKILL)
+	if err != nil && err != os.ErrProcessDone {
+		return fmt.Errorf("failed to kill process: %w", err)
+	}
+	return nil
 }
 
 // Returns a new nodeProcess running the binary at [path].
 // Returns an error if the command fails to start.
 // When the nodeProcess terminates, the returned error (which may be nil)
 // is sent on [n.errChan]
-func startNode(path string, args []string, printToStdOut bool) (*nodeProcess, error) {
-	fmt.Printf("Starting binary at %s with args %s\n", path, args) // TODO remove
+func (b *binaryManager) startNode(path string, args []string, printToStdOut bool) (*nodeProcess, error) {
+	b.log.Info("Starting binary at %s with args %s\n", path, args) // TODO remove
 	n := &nodeProcess{
-		path:    path,
-		cmd:     exec.Command(path, args...), // #nosec G204
-		errChan: make(chan error, 1),
-		done:    &utils.AtomicBool{},
+		path:       path,
+		cmd:        exec.Command(path, args...), // #nosec G204
+		errChan:    make(chan error, 1),
+		done:       &utils.AtomicBool{},
+		nodeNumber: b.nextNodeNumber,
 	}
+	b.nextNodeNumber++
 	if printToStdOut {
 		n.cmd.Stdout = os.Stdout
 		n.cmd.Stderr = os.Stderr
 	}
 	n.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-
 	// Start the nodeProcess
 	if err := n.cmd.Start(); err != nil {
 		return nil, err
 	}
+	b.runningNodes[n.nodeNumber] = n
 	go func() {
 		// Wait for the nodeProcess to stop.
 		// When it does, set the exit code and send the returned error
@@ -63,32 +108,6 @@ func startNode(path string, args []string, printToStdOut bool) (*nodeProcess, er
 	return n, nil
 }
 
-func (a *nodeProcess) kill() error {
-	if a.cmd.Process == nil || a.done.GetValue() {
-		return nil
-	}
-	// Stop printing output from node
-	a.cmd.Stdout = ioutil.Discard
-	a.cmd.Stderr = ioutil.Discard
-	err := syscall.Kill(-a.cmd.Process.Pid, syscall.SIGKILL)
-	if err != nil && err != os.ErrProcessDone {
-		return fmt.Errorf("failed to kill process: %w", err)
-	}
-	return nil
-}
-
-type binaryManager struct {
-	rootPath string
-	log      logging.Logger
-}
-
-func newBinaryManager(path string, log logging.Logger) *binaryManager {
-	return &binaryManager{
-		rootPath: path,
-		log:      log,
-	}
-}
-
 // Run two nodes at once: one is a version before the database upgrade and the other after.
 // The latter will bootstrap from the former. Its staking port and HTTP port are 2
 // greater than the staking/HTTP ports in [v].
@@ -100,7 +119,7 @@ func (b *binaryManager) runMigration(v *viper.Viper, nodeConfig node.Config) err
 		return fmt.Errorf("couldn't start old version during migration: %w", err)
 	}
 	defer func() {
-		if err := prevVersionNode.kill(); err != nil {
+		if err := b.kill(prevVersionNode.nodeNumber); err != nil {
 			b.log.Error("error while killing previous version: %s", err)
 		}
 	}()
@@ -110,7 +129,7 @@ func (b *binaryManager) runMigration(v *viper.Viper, nodeConfig node.Config) err
 		return fmt.Errorf("couldn't start current version during migration: %w", err)
 	}
 	defer func() {
-		if err := currentVersionNode.kill(); err != nil {
+		if err := b.kill(currentVersionNode.nodeNumber); err != nil {
 			b.log.Error("error while killing current version: %s", err)
 		}
 	}()
@@ -118,16 +137,8 @@ func (b *binaryManager) runMigration(v *viper.Viper, nodeConfig node.Config) err
 	for {
 		select {
 		case err := <-prevVersionNode.errChan:
-			b.log.Info("previous version node returned")
-			if currentVersionNode.done.GetValue() {
-				return nil
-			}
-			if err != nil {
-				return fmt.Errorf("previous version died with exit code %d", prevVersionNode.exitCode)
-			}
-			return nil
+			return fmt.Errorf("previous version stopped with: %s", err)
 		case <-currentVersionNode.errChan:
-			b.log.Info("current version node returned")
 			if currentVersionNode.exitCode != constants.ExitCodeDoneMigrating {
 				return fmt.Errorf("current version died with exit code %d", currentVersionNode.exitCode)
 			}
@@ -141,6 +152,11 @@ func (b *binaryManager) runNormal(v *viper.Viper) error {
 	if err != nil {
 		return fmt.Errorf("couldn't start old version during migration: %w", err)
 	}
+	defer func() {
+		if err := b.kill(node.nodeNumber); err != nil {
+			b.log.Error("error stopping node: %s", err)
+		}
+	}()
 	return <-node.errChan
 }
 
@@ -153,7 +169,7 @@ func (b *binaryManager) runPreviousVersion(prevVersion version.Version, v *viper
 		}
 		args = append(args, fmt.Sprintf("--%s=%v", k, v))
 	}
-	return startNode(binaryPath, args, false)
+	return b.startNode(binaryPath, args, false)
 }
 
 func (b *binaryManager) runCurrentVersion(
@@ -184,7 +200,7 @@ func (b *binaryManager) runCurrentVersion(
 		args = append(args, fmt.Sprintf("--%s=%v", k, v))
 	}
 	binaryPath := getBinaryPath(b.rootPath, currentVersion)
-	return startNode(binaryPath, args, true)
+	return b.startNode(binaryPath, args, true)
 }
 
 func getBinaryPath(rootPath string, nodeVersion version.Version) string {

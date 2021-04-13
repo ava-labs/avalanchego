@@ -260,7 +260,7 @@ func (n *Node) initNetworking() error {
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
 		// errors are already logged internally if they are meaningful
-		n.Shutdown(1)
+		n.Shutdown(0)
 	}, syscall.SIGINT, syscall.SIGTERM)
 
 	return nil
