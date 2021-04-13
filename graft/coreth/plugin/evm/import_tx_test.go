@@ -350,10 +350,7 @@ func TestNewImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	importTx, ok := tx.UnsignedAtomicTx.(UnsignedAtomicTx)
-	if !ok {
-		t.Fatal("newImportTx did not return an atomic transaction")
-	}
+	importTx := tx.UnsignedAtomicTx
 
 	if err := importTx.SemanticVerify(vm, tx, true); err != nil {
 		t.Fatalf("newImportTx created an invalid transaction")
