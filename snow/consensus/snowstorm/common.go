@@ -123,7 +123,9 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 	bytes := tx.Bytes()
 
 	// Notify the IPC socket that this tx has been issued.
-	c.ctx.DecisionDispatcher.Issue(c.ctx, txID, bytes)
+	if err := c.ctx.DecisionDispatcher.Issue(c.ctx, txID, bytes); err != nil {
+		return false, err
+	}
 
 	// Notify the metrics that this transaction is being issued.
 	c.Metrics.Issued(txID)
@@ -137,42 +139,44 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 	// any conflicting transactions. Therefore, this transaction is treated as
 	// vacuously accepted and doesn't need to be voted on.
 
-	// Accept is called before notifying the IPC so that acceptances that
-	// cause fatal errors aren't sent to an IPC peer.
+	// Notify those listening for accepted txs
+	// Note that DecisionDispatcher.Accept must be called before
+	// tx.Accept to honor EventDispatcher.Accept's invariant.
+	if err := c.ctx.DecisionDispatcher.Accept(c.ctx, txID, bytes); err != nil {
+		return false, err
+	}
+
 	if err := tx.Accept(); err != nil {
 		return false, err
 	}
 
-	// Notify the IPC socket that this tx has been accepted.
-	c.ctx.DecisionDispatcher.Accept(c.ctx, txID, bytes)
-
-	// Notify the metrics that this transaction was just accepted.
+	// Notify the metrics that this transaction was accepted.
 	c.Metrics.Accepted(txID)
 	return false, nil
 }
 
 // accept the provided tx.
 func (c *common) acceptTx(tx Tx) error {
-	// Accept is called before notifying the IPC so that acceptances that cause
-	// fatal errors aren't sent to an IPC peer.
+	txID := tx.ID()
+	// Notify those listening that this tx has been accepted.
+	// Note that DecisionDispatcher.Accept must be called before
+	// tx.Accept to honor EventDispatcher.Accept's invariant.
+	if err := c.ctx.DecisionDispatcher.Accept(c.ctx, txID, tx.Bytes()); err != nil {
+		return err
+	}
 	if err := tx.Accept(); err != nil {
 		return err
 	}
 
-	txID := tx.ID()
-
-	// Notify the IPC socket that this tx has been accepted.
-	c.ctx.DecisionDispatcher.Accept(c.ctx, txID, tx.Bytes())
-
 	// Update the metrics to account for this transaction's acceptance
 	c.Metrics.Accepted(txID)
-
 	// If there is a tx that was accepted pending on this tx, the ancestor
 	// should be notified that it doesn't need to block on this tx anymore.
 	c.pendingAccept.Fulfill(txID)
 	// If there is a tx that was issued pending on this tx, the ancestor tx
 	// doesn't need to be rejected because of this tx.
 	c.pendingReject.Abandon(txID)
+
 	return nil
 }
 
@@ -187,7 +191,9 @@ func (c *common) rejectTx(tx Tx) error {
 	txID := tx.ID()
 
 	// Notify the IPC that the tx was rejected
-	c.ctx.DecisionDispatcher.Reject(c.ctx, txID, tx.Bytes())
+	if err := c.ctx.DecisionDispatcher.Reject(c.ctx, txID, tx.Bytes()); err != nil {
+		return err
+	}
 
 	// Update the metrics to account for this transaction's rejection
 	c.Metrics.Rejected(txID)

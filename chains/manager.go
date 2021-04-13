@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/meterdb"
@@ -65,7 +65,7 @@ type Manager interface {
 	ForceCreateChain(ChainParameters)
 
 	// Add a registrant [r]. Every time a chain is
-	// created, [r].RegisterChain([new chain]) is called
+	// created, [r].RegisterChain([new chain]) is called.
 	AddRegistrant(Registrant)
 
 	// Given an alias, return the ID of the chain associated with that alias
@@ -130,8 +130,8 @@ type ManagerConfig struct {
 	Validators                validators.Manager // Validators validating on this chain
 	NodeID                    ids.ShortID        // The ID of this node
 	NetworkID                 uint32             // ID of the network this node is connected to
-	Server                    *api.Server        // Handles HTTP API calls
-	Keystore                  *keystore.Keystore
+	Server                    *server.Server     // Handles HTTP API calls
+	Keystore                  keystore.Keystore
 	AtomicMemory              *atomic.Memory
 	AVAXAssetID               ids.ID
 	XChainID                  ids.ID
@@ -149,7 +149,8 @@ type manager struct {
 	ids.Aliaser
 	ManagerConfig
 
-	registrants []Registrant // Those notified when a chain is created
+	// Those notified when a chain is created
+	registrants []Registrant
 
 	unblocked     bool
 	blockedChains []ChainParameters
@@ -240,7 +241,20 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	m.Log.AssertNoError(m.Alias(chainParams.ID, chainParams.ID.String()))
 
 	// Notify those that registered to be notified when a new chain is created
-	m.notifyRegistrants(chain.Name, chain.Ctx, chain.VM)
+	m.notifyRegistrants(chain.Name, chain.Ctx, chain.Engine)
+
+	// Tell the chain to start processing messages.
+	// If the X or P Chain panics, do not attempt to recover
+	if m.CriticalChains.Contains(chainParams.ID) {
+		go chain.Ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
+	} else {
+		go chain.Ctx.Log.RecoverAndExit(chain.Handler.Dispatch, func() {
+			chain.Ctx.Log.Error("Chain with ID: %s was shutdown due to a panic", chainParams.ID)
+		})
+	}
+
+	// Allows messages to be routed to the new chain
+	m.ManagerConfig.Router.AddChain(chain.Handler)
 }
 
 // Create a chain
@@ -382,17 +396,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		return nil, err
 	}
 
-	// Allows messages to be routed to the new chain
-	m.ManagerConfig.Router.AddChain(chain.Handler)
-
-	// If the X or P Chain panics, do not attempt to recover
-	if m.CriticalChains.Contains(chainParams.ID) {
-		go ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
-	} else {
-		go ctx.Log.RecoverAndExit(chain.Handler.Dispatch, func() {
-			ctx.Log.Error("Chain with ID: %s was shutdown due to a panic", chainParams.ID)
-		})
-	}
 	return chain, nil
 }
 
@@ -696,9 +699,9 @@ func (m *manager) LookupVM(alias string) (ids.ID, error) { return m.VMManager.Lo
 
 // Notify registrants [those who want to know about the creation of chains]
 // that the specified chain has been created
-func (m *manager) notifyRegistrants(name string, ctx *snow.Context, vm interface{}) {
+func (m *manager) notifyRegistrants(name string, ctx *snow.Context, engine common.Engine) {
 	for _, registrant := range m.registrants {
-		go registrant.RegisterChain(name, ctx, vm)
+		registrant.RegisterChain(name, ctx, engine)
 	}
 }
 

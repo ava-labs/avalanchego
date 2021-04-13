@@ -106,8 +106,12 @@ func (ts *Topological) Add(blk Block) error {
 	blkBytes := blk.Bytes()
 
 	// Notify anyone listening that this block was issued.
-	ts.ctx.DecisionDispatcher.Issue(ts.ctx, blkID, blkBytes)
-	ts.ctx.ConsensusDispatcher.Issue(ts.ctx, blkID, blkBytes)
+	if err := ts.ctx.DecisionDispatcher.Issue(ts.ctx, blkID, blkBytes); err != nil {
+		return err
+	}
+	if err := ts.ctx.ConsensusDispatcher.Issue(ts.ctx, blkID, blkBytes); err != nil {
+		return err
+	}
 	ts.Metrics.Issued(blkID)
 
 	parentNode, ok := ts.blocks[parentID]
@@ -120,8 +124,12 @@ func (ts *Topological) Add(blk Block) error {
 		}
 
 		// Notify anyone listening that this block was rejected.
-		ts.ctx.DecisionDispatcher.Reject(ts.ctx, blkID, blkBytes)
-		ts.ctx.ConsensusDispatcher.Reject(ts.ctx, blkID, blkBytes)
+		if err := ts.ctx.DecisionDispatcher.Reject(ts.ctx, blkID, blkBytes); err != nil {
+			return err
+		}
+		if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, blkID, blkBytes); err != nil {
+			return err
+		}
 		ts.Metrics.Rejected(blkID)
 		return nil
 	}
@@ -511,20 +519,25 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 
 	// Get the child and accept it
 	child := n.children[pref]
+	// Notify anyone listening that this block was accepted.
+	bytes := child.Bytes()
+	// Note that DecisionDispatcher.Accept / DecisionDispatcher.Accept must be called before
+	// child.Accept to honor EventDispatcher.Accept's invariant.
+	if err := ts.ctx.DecisionDispatcher.Accept(ts.ctx, pref, bytes); err != nil {
+		return err
+	}
+	if err := ts.ctx.ConsensusDispatcher.Accept(ts.ctx, pref, bytes); err != nil {
+		return err
+	}
 	if err := child.Accept(); err != nil {
 		return err
 	}
 
-	// Notify anyone listening that this block was accepted.
-	bytes := child.Bytes()
-	ts.ctx.DecisionDispatcher.Accept(ts.ctx, pref, bytes)
-	ts.ctx.ConsensusDispatcher.Accept(ts.ctx, pref, bytes)
 	ts.Metrics.Accepted(pref)
 
 	// Because this is the newest accepted block, this is the new head.
 	ts.head = pref
 	ts.height = child.Height()
-
 	// Remove the decided block from the set of processing IDs, as its status
 	// now implies its preferredness.
 	ts.preferredIDs.Remove(pref)
@@ -545,8 +558,12 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 
 		// Notify anyone listening that this block was rejected.
 		bytes := child.Bytes()
-		ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes)
-		ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes)
+		if err := ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
+			return err
+		}
+		if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
+			return err
+		}
 		ts.Metrics.Rejected(childID)
 
 		// Track which blocks have been directly rejected
@@ -578,8 +595,12 @@ func (ts *Topological) rejectTransitively(rejected []ids.ID) error {
 
 			// Notify anyone listening that this block was rejected.
 			bytes := child.Bytes()
-			ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes)
-			ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes)
+			if err := ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
+				return err
+			}
+			if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
+				return err
+			}
 			ts.Metrics.Rejected(childID)
 
 			// add the newly rejected block to the end of the queue

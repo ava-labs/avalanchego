@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-// PrivateKey-vmRQiZeXEXYMyJhEiqdC2z5JhuDbxL8ix9UVvjgMu2Er1NepE => X-local1g65uqn6t77p656w64023nh8nd9updzmxyymev2
+// PrivateKey-vmRQiZeXEXYMyJhEiqdC2z5JhuDbxL8ix9UVvjgMu2Er1NepE => P-local1g65uqn6t77p656w64023nh8nd9updzmxyymev2
 // PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN => X-local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u
 
 var (
@@ -104,6 +104,5 @@ var (
 		StakeMintingPeriod:   365 * 24 * time.Hour,
 		EpochFirstTransition: time.Unix(1607626800, 0),
 		EpochDuration:        5 * time.Minute,
-		ApricotPhase0Time:    time.Date(2020, 12, 5, 5, 00, 0, 0, time.UTC),
 	}
 )
