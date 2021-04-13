@@ -23,11 +23,6 @@ type currentValidator interface {
 }
 
 type currentStakerChainState interface {
-	// MutableCurrentStakerChainState returns a current staker chain state
-	// object that can be modifed. The current object will not be modified by
-	// updates made by the returned state.
-	MutableCurrentStakerChainState() currentStakerChainState
-
 	GetNextStaker() (addStakerTx *Tx, potentialReward uint64, err error)
 	GetStaker(txID ids.ID) (addStakerTx *Tx, potentialReward uint64, err error)
 
@@ -37,6 +32,8 @@ type currentStakerChainState interface {
 	AddStaker(addStakerTx *Tx, potentialReward uint64) (currentStakerChainState, error)
 	AddStakers(addStakerTxsWithRewards []*validatorReward) (currentStakerChainState, error)
 	DeleteStaker(txID ids.ID) (currentStakerChainState, error)
+
+	Stakers() []*Tx // Sorted in removal order
 }
 
 type currentStakerState interface {
@@ -47,14 +44,15 @@ type currentStakerState interface {
 }
 
 type pendingStakerChainState interface {
-	GetNextStaker() (addStakerTx *Tx, err error)
 	GetStaker(txID ids.ID) (addStakerTx *Tx, err error)
 	GetStakerByNodeID(nodeID ids.ShortID) (addStakerTx *UnsignedAddValidatorTx, err error)
 
 	GetValidator(nodeID ids.ShortID) validator
 
 	AddStaker(addStakerTx *Tx) pendingStakerChainState
-	DeleteStaker(txID ids.ID) pendingStakerChainState
+	DeleteStaker(txID ...ids.ID) pendingStakerChainState
+
+	Stakers() []*Tx // Sorted in removal order
 }
 
 type validatorReward struct {
