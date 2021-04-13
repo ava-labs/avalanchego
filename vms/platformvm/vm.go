@@ -730,41 +730,30 @@ func (vm *VM) Disconnected(vdrID ids.ShortID) {
 // Returns the time when the next staker of any subnet starts/stops staking
 // after the current timestamp
 func (vm *VM) nextStakerChangeTime(vs versionedState) (time.Time, error) {
-	subnets, err := vm.getSubnets(db)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("couldn't get subnets: %w", err)
-	}
-	earliest := timer.MaxTime
+	currentStakers := vs.CurrentStakerChainState()
+	pendingStakers := vs.PendingStakerChainState()
 
-	for _, subnet := range subnets {
-		subnetID := subnet.ID()
-		if tx, err := vm.nextStakerStart(db, subnetID); err == nil {
-			if staker, ok := tx.UnsignedTx.(TimedTx); ok {
-				if startTime := staker.StartTime(); startTime.Before(earliest) {
-					earliest = startTime
-				}
-			}
+	earliest := timer.MaxTime
+	if currentStakers := currentStakers.Stakers(); len(currentStakers) > 0 {
+		nextStakerToRemove := currentStakers[0]
+		staker, ok := nextStakerToRemove.UnsignedTx.(TimedTx)
+		if !ok {
+			return time.Time{}, errWrongTxType
 		}
-		if tx, err := vm.nextStakerStop(db, subnetID); err == nil {
-			if staker, ok := tx.Tx.UnsignedTx.(TimedTx); ok {
-				if endTime := staker.EndTime(); endTime.Before(earliest) {
-					earliest = endTime
-				}
-			}
+		endTime := staker.EndTime()
+		if endTime.Before(earliest) {
+			earliest = endTime
 		}
 	}
-	if tx, err := vm.nextStakerStart(db, constants.PrimaryNetworkID); err == nil {
-		if staker, ok := tx.UnsignedTx.(TimedTx); ok {
-			if startTime := staker.StartTime(); startTime.Before(earliest) {
-				earliest = startTime
-			}
+	if pendingStakers := pendingStakers.Stakers(); len(pendingStakers) > 0 {
+		nextStakerToAdd := pendingStakers[0]
+		staker, ok := nextStakerToAdd.UnsignedTx.(TimedTx)
+		if !ok {
+			return time.Time{}, errWrongTxType
 		}
-	}
-	if tx, err := vm.nextStakerStop(db, constants.PrimaryNetworkID); err == nil {
-		if staker, ok := tx.Tx.UnsignedTx.(TimedTx); ok {
-			if endTime := staker.EndTime(); endTime.Before(earliest) {
-				earliest = endTime
-			}
+		startTime := staker.StartTime()
+		if startTime.Before(earliest) {
+			earliest = startTime
 		}
 	}
 	return earliest, nil

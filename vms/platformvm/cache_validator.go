@@ -30,7 +30,10 @@ type currentStakerChainState interface {
 
 	// AddStaker is a convenience method to avoid using an `[]*validatorReward`.
 	AddStaker(addStakerTx *Tx, potentialReward uint64) (currentStakerChainState, error)
-	AddStakers(addStakerTxsWithRewards []*validatorReward) (currentStakerChainState, error)
+	AddStakers(
+		addStakerTxsWithRewards []*validatorReward,
+		addStakerTxsWithoutRewards []*Tx,
+	) (currentStakerChainState, error)
 	DeleteStaker(txID ids.ID) (currentStakerChainState, error)
 
 	Stakers() []*Tx // Sorted in removal order

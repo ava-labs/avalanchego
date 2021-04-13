@@ -190,10 +190,11 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		return nil, errEndOfTime
 	}
 
-	currentStakers := m.vm.internalState.CurrentStakers()
+	currentStakers := preferredState.CurrentStakerChainState()
 
-	// If the chain time would be the time for the next primary network staker to leave,
-	// then we create a block that removes the staker and proposes they receive a staker reward
+	// If the chain time would be the time for the next primary network staker
+	// to leave, then we create a block that removes the staker and proposes
+	// they receive a staker reward
 	tx, _, err := currentStakers.GetNextStaker()
 	if err != nil {
 		return nil, err
@@ -220,13 +221,14 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 
 	// If local time is >= time of the next staker set change,
 	// propose moving the chain time forward
-	nextStakerChangeTime, err := m.vm.nextStakerChangeTime(db)
+	nextStakerChangeTime, err := m.vm.nextStakerChangeTime(preferredState)
 	if err != nil {
 		return nil, err
 	}
 
 	localTime := m.vm.clock.Time()
-	if !localTime.Before(nextStakerChangeTime) { // local time is at or after the time for the next staker to start/stop
+	if !localTime.Before(nextStakerChangeTime) {
+		// local time is at or after the time for the next staker to start/stop
 		advanceTimeTx, err := m.vm.newAdvanceTimeTx(nextStakerChangeTime)
 		if err != nil {
 			return nil, err
@@ -262,10 +264,6 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 			continue
 		}
 
-		// If the chain timestamp is too far in the past to issue this transaction
-		// but according to local time, it's ready to be issued, then attempt to
-		// advance the timestamp, so it can be issued.
-		maxChainStartTime := currentChainTimestamp.Add(maxFutureStartTime)
 		maxLocalStartTime := localTime.Add(maxFutureStartTime)
 		// If the start time is too far in the future relative to local time
 		// drop the transaction and continue
@@ -275,6 +273,10 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 			continue
 		}
 
+		// If the chain timestamp is too far in the past to issue this
+		// transaction but according to local time, it's ready to be issued,
+		// then attempt to advance the timestamp, so it can be issued.
+		maxChainStartTime := currentChainTimestamp.Add(maxFutureStartTime)
 		if startTime.After(maxChainStartTime) {
 			advanceTimeTx, err := m.vm.newAdvanceTimeTx(localTime)
 			if err != nil {
@@ -346,7 +348,7 @@ func (m *Mempool) ResetTimer() {
 
 	// If local time is >= time of the next change in the validator set,
 	// propose moving forward the chain timestamp
-	nextStakerChangeTime, err := m.vm.nextStakerChangeTime(db)
+	nextStakerChangeTime, err := m.vm.nextStakerChangeTime(preferredState)
 	if err != nil {
 		m.vm.Ctx.Log.Error("couldn't get next staker change time: %s", err)
 		return
