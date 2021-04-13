@@ -4,22 +4,15 @@
 package chain
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/prometheus/client_golang/prometheus"
-)
-
-var (
-	// ErrBlockNotFound indicates that the VM was not able to retrieve a block. If this error is returned
-	// from getBlock then the miss will be considered cacheable. Any other error will not be considered a
-	// cacheable miss.
-	ErrBlockNotFound = errors.New("block not found")
 )
 
 // State implements an efficient caching layer used to wrap a VM
@@ -186,11 +179,13 @@ func (s *State) GetBlock(blkID ids.ID) (snowman.Block, error) {
 	}
 
 	if _, ok := s.missingBlocks.Get(blkID); ok {
-		return nil, ErrBlockNotFound
+		return nil, database.ErrNotFound
 	}
 
 	blk, err := s.getBlock(blkID)
-	if err == ErrBlockNotFound {
+	// If getBlock returns [database.ErrNotFound], State considers
+	// this a cacheable miss.
+	if err == database.ErrNotFound {
 		s.missingBlocks.Put(blkID, struct{}{})
 		return nil, err
 	} else if err != nil {

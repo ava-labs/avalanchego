@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -29,7 +30,7 @@ func createInternalBlockFuncs(t *testing.T, blks []*snowman.TestBlock) (func(id 
 	getBlock := func(id ids.ID) (snowman.Block, error) {
 		blk, ok := blkMap[id]
 		if !ok || !blk.Status().Fetched() {
-			return nil, ErrBlockNotFound
+			return nil, database.ErrNotFound
 		}
 
 		return blk, nil
