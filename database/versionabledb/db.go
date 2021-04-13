@@ -217,7 +217,3 @@ func (b *batch) Write() error {
 
 	return b.Batch.Write()
 }
-
-// Inner returns the batch writing to the underlying database
-// [b.db.db]
-func (b *batch) Inner() database.Batch { return b.Batch }
