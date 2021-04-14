@@ -70,10 +70,12 @@ func main() {
 
 	// Set the data directory permissions to be read write.
 	if err := perms.ChmodR(config.DBPath, true, perms.ReadWriteExecute); err != nil {
+		exitCode = 1
 		fmt.Printf("failed to restrict the permissions of the database directory with error %s\n", err)
 		return
 	}
 	if err := perms.ChmodR(config.LoggingConfig.Directory, true, perms.ReadWriteExecute); err != nil {
+		exitCode = 1
 		fmt.Printf("failed to restrict the permissions of the log directory with error %s\n", err)
 		return
 	}
@@ -93,5 +95,6 @@ func main() {
 		})
 		return
 	}
-	app.Start()
+	exitCode, err = app.Start()
+	fmt.Printf("node process return exit code %d and error: %s\n", exitCode, err)
 }
