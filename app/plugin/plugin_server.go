@@ -26,7 +26,8 @@ func NewServer(app *process.App, broker *plugin.GRPCBroker) *Server {
 }
 
 func (ns *Server) Start(_ context.Context, req *appproto.StartRequest) (*appproto.StartResponse, error) {
-	return &appproto.StartResponse{}, ns.app.Start()
+	exitCode, err := ns.app.Start()
+	return &appproto.StartResponse{ExitCode: int32(exitCode)}, err
 }
 
 func (ns *Server) Stop(_ context.Context, req *appproto.StopRequest) (*appproto.StopResponse, error) {

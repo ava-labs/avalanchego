@@ -1,5 +1,4 @@
 syntax = "proto3";
-option go_package = "./";
 package appproto;
 
 // To compile: protoc --go_out=plugins=grpc:. app.proto
@@ -9,7 +8,7 @@ message StartRequest {
 }
 
 message StartResponse {
-// TODO
+    int32 exitCode = 1;
 }
 
 message StopRequest {
@@ -17,7 +16,7 @@ message StopRequest {
 }
 
 message StopResponse {
-int32 exitCode = 1;
+    int32 exitCode = 1;
 }
 
 service Node {
