@@ -25,6 +25,7 @@ func main() {
 		os.Exit(exitCode)
 	}()
 
+	// Get the config
 	nodeConfig, err := config.GetConfig()
 	if err != nil {
 		fmt.Printf("couldn't get config: %s", err)
@@ -51,14 +52,6 @@ func main() {
 		syscall.SIGINT, syscall.SIGTERM,
 	)
 
-	// Get the config
-	_, err = config.GetViper()
-	if err != nil {
-		log.Fatal("couldn't get viper: %s", err)
-		exitCode = 1
-		return
-	}
-
 	//migrationManager := newMigrationManager(binaryManager, v, nodeConfig, log)
 	//if err := migrationManager.migrate(); err != nil {
 	//	log.Error("error while running migration: %s", err)
@@ -73,11 +66,22 @@ func main() {
 
 	// Ignore warning from launching an executable with a variable command
 	// because the command is a controlled and required input
+
+	v, err := config.GetViper()
+	if err != nil {
+		fmt.Printf("couldn't get viper: %s\n", err)
+		exitCode = 1
+		return
+	}
+	args := []string{}
+	for k, v := range v.AllSettings() {
+		args = append(args, fmt.Sprintf("--%s=%v", k, v))
+	}
 	// #nosec G204
 	config := &plugin.ClientConfig{
 		HandshakeConfig: appplugin.Handshake,
 		Plugins:         appplugin.PluginMap,
-		Cmd:             exec.Command("/home/danlaine/go/src/github.com/ava-labs/avalanchego/build/avalanchego-v1.3.2/avalanchego-inner"),
+		Cmd:             exec.Command("/home/danlaine/go/src/github.com/ava-labs/avalanchego/build/avalanchego-v1.3.2/avalanchego-inner", args...),
 		AllowedProtocols: []plugin.Protocol{
 			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,
