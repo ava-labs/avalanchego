@@ -124,11 +124,11 @@ func GenesisVM(t *testing.T, finishBootstrapping bool, genesisJSON string) (chan
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
 
-	userKeystore, err := keystore.CreateTestKeystore()
+	userKeystore, err := keystore.New(logging.NoLog{}, manager.NewDefaultMemDBManager())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := userKeystore.AddUser(username, password); err != nil {
+	if err := userKeystore.CreateUser(username, password); err != nil {
 		t.Fatal(err)
 	}
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
