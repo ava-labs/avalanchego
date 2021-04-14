@@ -48,6 +48,7 @@ var (
 
 type App struct {
 	config node.Config
+	node   *node.Node // set in Start()
 }
 
 func NewApp(config node.Config) *App {
@@ -194,25 +195,21 @@ func (a *App) Start() (int, error) {
 	defer externalIPUpdater.Stop()
 
 	log.Info("this node's IP is set to: %s", config.StakingIP.IP())
-
-	var (
-		shouldRestart bool
-		exitCode      int
-	)
-	for {
-		shouldRestart, exitCode, err = run(config, dbManager, log, logFactory)
-		if err != nil {
-			break
-		}
-		// If the node says it should restart, do that. Otherwise, end the program.
-		if !shouldRestart {
-			break
-		}
-		log.Info("restarting node")
+	node := node.Node{}
+	if err := node.Initialize(&config, dbManager, log, logFactory); err != nil {
+		log.Error("error initializing node: %s", err)
+		return node.ExitCode(), err
 	}
-	return exitCode, nil
+
+	err = node.Dispatch()
+	log.Debug("node dispatch returned: %s", err)
+	return node.ExitCode(), nil
 }
 
-func (a *App) Stop() int {
+func (a *App) Stop() int { // TODO remove return value?
+	if a.node == nil {
+		return 0
+	}
+	a.node.Shutdown(0)
 	return 0
 }

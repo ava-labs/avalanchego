@@ -22,15 +22,18 @@ func NewClient(node appproto.NodeClient, broker *plugin.GRPCBroker) *Client {
 	}
 }
 
-func (c *Client) Start() error {
-	_, err := c.client.Start(context.Background(), &appproto.StartRequest{})
-	return err
+func (c *Client) Start() (int, error) {
+	resp, err := c.client.Start(context.Background(), &appproto.StartRequest{})
+	if err != nil {
+		return 1, err
+	}
+	return int(resp.ExitCode), err
 }
 
-func (c *Client) Stop() int {
+func (c *Client) Stop() (int, error) {
 	resp, err := c.client.Stop(context.Background(), &appproto.StopRequest{})
 	if err != nil {
-		return 1
+		return 1, err
 	}
-	return int(resp.ExitCode)
+	return int(resp.ExitCode), nil
 }

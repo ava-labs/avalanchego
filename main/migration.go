@@ -12,13 +12,13 @@ import (
 )
 
 type migrationManager struct {
-	binaryManager *binaryManager
+	binaryManager *nodeProcessManager
 	nodeConfig    node.Config
 	log           logging.Logger
 	viperConfig   *viper.Viper
 }
 
-func newMigrationManager(binaryManager *binaryManager, v *viper.Viper, nConfig node.Config, log logging.Logger) *migrationManager {
+func newMigrationManager(binaryManager *nodeProcessManager, v *viper.Viper, nConfig node.Config, log logging.Logger) *migrationManager {
 	return &migrationManager{
 		binaryManager: binaryManager,
 		nodeConfig:    nConfig,

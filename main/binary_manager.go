@@ -26,22 +26,22 @@ type process struct {
 	processID int
 }
 
-type binaryManager struct {
+type nodeProcessManager struct {
 	buildDirPath  string
 	log           logging.Logger
 	nextProcessID int
 	runningNodes  map[int]*process
 }
 
-func newBinaryManager(path string, log logging.Logger) *binaryManager {
-	return &binaryManager{
+func newNodeProcessManager(path string, log logging.Logger) *nodeProcessManager {
+	return &nodeProcessManager{
 		buildDirPath: path,
 		log:          log,
 		runningNodes: map[int]*process{},
 	}
 }
 
-func (b *binaryManager) killAll() {
+func (b *nodeProcessManager) killAll() {
 	for _, nodeProcess := range b.runningNodes {
 		if err := b.kill(nodeProcess.processID); err != nil {
 			b.log.Error("error killing node running binary at %s: %s", nodeProcess.path, err)
@@ -49,7 +49,7 @@ func (b *binaryManager) killAll() {
 	}
 }
 
-func (b *binaryManager) kill(nodeNumber int) error {
+func (b *nodeProcessManager) kill(nodeNumber int) error {
 	nodeProcess, ok := b.runningNodes[nodeNumber]
 	if !ok {
 		return nil
@@ -73,7 +73,7 @@ func (b *binaryManager) kill(nodeNumber int) error {
 // Returns an error if the command fails to start.
 // When the nodeProcess terminates, the returned error (which may be nil)
 // is sent on [n.errChan]
-func (b *binaryManager) startNode(path string, args []string, printToStdOut bool) (*process, error) {
+func (b *nodeProcessManager) startNode(path string, args []string, printToStdOut bool) (*process, error) {
 	b.log.Info("Starting binary at %s with args %s\n", path, args) // TODO remove
 	n := &process{
 		path:      path,
@@ -109,7 +109,7 @@ func (b *binaryManager) startNode(path string, args []string, printToStdOut bool
 	return n, nil
 }
 
-func (b *binaryManager) runNormal(v *viper.Viper) error {
+func (b *nodeProcessManager) runNormal(v *viper.Viper) error {
 	node, err := b.runCurrentVersion(v, false, ids.ShortID{})
 	if err != nil {
 		return fmt.Errorf("couldn't start old version during migration: %w", err)
@@ -122,7 +122,7 @@ func (b *binaryManager) runNormal(v *viper.Viper) error {
 	return <-node.errChan
 }
 
-func (b *binaryManager) runPreviousVersion(prevVersion version.Version, v *viper.Viper) (*process, error) {
+func (b *nodeProcessManager) runPreviousVersion(prevVersion version.Version, v *viper.Viper) (*process, error) {
 	binaryPath := getBinaryPath(b.buildDirPath, prevVersion)
 	args := []string{}
 	for k, v := range v.AllSettings() {
@@ -134,7 +134,7 @@ func (b *binaryManager) runPreviousVersion(prevVersion version.Version, v *viper
 	return b.startNode(binaryPath, args, false)
 }
 
-func (b *binaryManager) runCurrentVersion(
+func (b *nodeProcessManager) runCurrentVersion(
 	v *viper.Viper,
 	fetchOnly bool,
 	fetchFrom ids.ShortID,

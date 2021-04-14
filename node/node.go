@@ -142,9 +142,6 @@ type Node struct {
 	// Incremented only once on initialization.
 	// Decremented when node is done shutting down.
 	doneShuttingDown sync.WaitGroup
-
-	// Restarter can shutdown and restart the node
-	restarter utils.Restarter
 }
 
 /*
@@ -248,10 +245,6 @@ func (n *Node) initNetworking() error {
 		consensusRouter,
 		n.Config.ConnMeterResetDuration,
 		n.Config.ConnMeterMaxConns,
-		n.restarter,
-		n.Config.RestartOnDisconnected,
-		n.Config.DisconnectedCheckFreq,
-		n.Config.DisconnectedRestartTimeout,
 		n.Config.ApricotPhase0Time,
 		n.Config.SendQueueSize,
 		n.Config.NetworkHealthConfig,
@@ -814,13 +807,11 @@ func (n *Node) Initialize(
 	dbManager manager.Manager,
 	logger logging.Logger,
 	logFactory logging.Factory,
-	restarter utils.Restarter,
 ) error {
 	n.Log = logger
 	n.ID = config.NodeID
 	n.LogFactory = logFactory
 	n.Config = config
-	n.restarter = restarter
 	n.doneShuttingDown.Add(1)
 	n.Log.Info("Node version is: %s", Version)
 	n.Log.Info("Node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))
