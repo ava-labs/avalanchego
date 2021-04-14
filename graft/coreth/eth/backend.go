@@ -105,8 +105,6 @@ type Ethereum struct {
 	networkID     uint64
 	netRPCService *ethapi.PublicNetAPI
 
-	// p2pServer *p2p.Server
-
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
 
 	settings Settings // Settings for Ethereum API
