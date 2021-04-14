@@ -138,15 +138,15 @@ func (b *Block) Accept() error {
 	}
 
 	// Note: since CommitBatch holds the database lock, this precludes any other
-	// database operations until EndCommit is called. Therefore, calling Accept
+	// database operations until EndBatch is called. Therefore, calling Accept
 	// on the unsigned atomic tx cannot interact with the vm's database or it will
 	// deadlock. This is ok because it only needs to interact with the shared memory
 	// database.
 	batch, err := vm.db.CommitBatch()
-	defer vm.db.EndBatch()
 	if err != nil {
 		return fmt.Errorf("failed to create commit batch due to: %w", err)
 	}
+	defer vm.db.EndBatch()
 
 	return tx.UnsignedAtomicTx.Accept(vm.ctx, batch)
 }
