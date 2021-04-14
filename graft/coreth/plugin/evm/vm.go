@@ -579,10 +579,10 @@ func (vm *VM) parseBlock(b []byte) (snowman.Block, error) {
 // by ChainState.
 func (vm *VM) getBlock(id ids.ID) (snowman.Block, error) {
 	ethBlock := vm.chain.GetBlockByHash(common.Hash(id))
-	// If [ethBlock] is nil, return [chain.ErrBlockNotFound] here
+	// If [ethBlock] is nil, return [database.ErrNotFound] here
 	// so that the miss is considered cacheable.
 	if ethBlock == nil {
-		return nil, chain.ErrBlockNotFound
+		return nil, database.ErrNotFound
 	}
 	// Note: the status of block is set by ChainState
 	blk := &Block{
