@@ -108,7 +108,7 @@ func (b *Block) Accept() error {
 	defer vm.db.AbortCommit()
 
 	b.status = choices.Accepted
-	log.Trace(fmt.Sprintf("Accepting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
+	log.Debug(fmt.Sprintf("Accepting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
 	if err := vm.chain.Accept(b.ethBlock); err != nil {
 		return fmt.Errorf("chain could not accept %s: %w", b.ID(), err)
 	}
@@ -155,7 +155,7 @@ func (b *Block) Accept() error {
 // If [b] contains an atomic transaction, attempt to re-issue it
 func (b *Block) Reject() error {
 	b.status = choices.Rejected
-	log.Trace(fmt.Sprintf("Rejecting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
+	log.Debug(fmt.Sprintf("Rejecting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
 	tx, _ := b.vm.extractAtomicTx(b.ethBlock)
 	if tx != nil {
 		b.vm.mempool.RejectTx(tx.ID())

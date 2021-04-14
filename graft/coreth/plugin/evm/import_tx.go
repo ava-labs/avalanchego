@@ -271,6 +271,8 @@ func (tx *UnsignedImportTx) EVMStateTransfer(vm *VM, state *state.StateDB) error
 	for _, to := range tx.Outs {
 		log.Info("crosschain X->C", "addr", to.Address, "amount", to.Amount)
 		if to.AssetID == vm.ctx.AVAXAssetID {
+			// If the asset is AVAX, convert the input amount in nAVAX to gWei by
+			// multiplying by the x2c rate.
 			amount := new(big.Int).Mul(
 				new(big.Int).SetUint64(to.Amount), x2cRate)
 			state.AddBalance(to.Address, amount)

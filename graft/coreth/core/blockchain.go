@@ -287,7 +287,6 @@ func NewBlockChain(
 	// Original code:
 	// // Initialize the chain with ancient data if it isn't empty.
 	// var txIndexBlock uint64
-	//
 	// if bc.empty() {
 	// 	rawdb.InitDatabaseFromFreezer(bc.db)
 	// 	// If ancient database is not empty, reconstruct all missing
@@ -376,6 +375,7 @@ func NewBlockChain(
 	// }
 
 	// Take ownership of this particular state
+	// go bc.update()
 	if txLookupLimit != nil {
 		bc.txLookupLimit = *txLookupLimit
 		go bc.maintainTxIndex()
@@ -387,7 +387,6 @@ func NewBlockChain(
 			bc.cacheConfig.TrieCleanRejournal = time.Minute
 		}
 		triedb := bc.stateCache.TrieDB()
-		bc.wg.Add(1)
 		go func() {
 			defer bc.wg.Done()
 			triedb.SaveCachePeriodically(bc.cacheConfig.TrieCleanJournal, bc.cacheConfig.TrieCleanRejournal, bc.quit)
