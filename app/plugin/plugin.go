@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+
 	appproto "github.com/ava-labs/avalanchego/app/plugin/proto"
 	"github.com/ava-labs/avalanchego/app/process"
 	"google.golang.org/grpc"
@@ -11,13 +12,13 @@ import (
 
 var Handshake = plugin.HandshakeConfig{
 	ProtocolVersion:  1,
-	MagicCookieKey:   "NODE_PLUGIN",
+	MagicCookieKey:   "NODE_PROCESS_PLUGIN",
 	MagicCookieValue: "dynamic",
 }
 
 // PluginMap is the map of plugins we can dispense.
 var PluginMap = map[string]plugin.Plugin{
-	"process": &AppPlugin{},
+	"nodeProcess": &AppPlugin{},
 }
 
 type AppPlugin struct {
@@ -26,7 +27,6 @@ type AppPlugin struct {
 }
 
 func New(app *process.App) *AppPlugin {
-
 	return &AppPlugin{
 		app: app,
 	}

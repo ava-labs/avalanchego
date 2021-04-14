@@ -5,10 +5,11 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/ava-labs/avalanchego/app/process"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
-	"os"
 
 	appPlugin "github.com/ava-labs/avalanchego/app/plugin"
 	"github.com/ava-labs/avalanchego/config"
@@ -78,22 +79,19 @@ func main() {
 	}
 
 	app := process.NewApp(config)
-	//fmt.Println("running plugin")
 	if true { // run as plugin flag otherwise run as a normal node
 		plugin.Serve(&plugin.ServeConfig{
 			HandshakeConfig: appPlugin.Handshake,
 			Plugins: map[string]plugin.Plugin{
-				"process": appPlugin.New(app), // TODO pass in args
+				"nodeProcess": appPlugin.New(app),
 			},
 			// A non-nil value here enables gRPC serving for this plugin
 			GRPCServer: plugin.DefaultGRPCServer,
 			Logger: hclog.New(&hclog.LoggerOptions{
-				Output: os.Stdout,
+				Level: hclog.Error,
 			}),
 		})
 		return
 	}
-
 	app.Start()
-
 }

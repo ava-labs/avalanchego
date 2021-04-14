@@ -5,6 +5,7 @@ package plugin
 
 import (
 	"context"
+
 	appproto "github.com/ava-labs/avalanchego/app/plugin/proto"
 
 	"github.com/hashicorp/go-plugin"

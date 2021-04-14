@@ -2,6 +2,7 @@ package process
 
 import (
 	"fmt"
+
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/nat"
@@ -67,7 +68,6 @@ func (a *App) Start() error {
 		return err
 	}
 	//fmt.Println(header)
-
 	var dbManager manager.Manager
 	if config.DBEnabled {
 		dbManager, err = manager.New(config.DBPath, log, dbVersion, !config.FetchOnly)

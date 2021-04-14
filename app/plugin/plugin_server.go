@@ -5,6 +5,7 @@ package plugin
 
 import (
 	"context"
+
 	appproto "github.com/ava-labs/avalanchego/app/plugin/proto"
 	"github.com/ava-labs/avalanchego/app/process"
 
@@ -25,7 +26,7 @@ func NewServer(app *process.App, broker *plugin.GRPCBroker) *Server {
 }
 
 func (ns *Server) Start(_ context.Context, req *appproto.StartRequest) (*appproto.StartResponse, error) {
-	return nil, ns.app.Start()
+	return &appproto.StartResponse{}, ns.app.Start()
 }
 
 func (ns *Server) Stop(_ context.Context, req *appproto.StopRequest) (*appproto.StopResponse, error) {

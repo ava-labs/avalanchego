@@ -5,10 +5,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/hashicorp/go-plugin"
 	"os"
 	"os/exec"
 	"syscall"
+
+	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-plugin"
 
 	appplugin "github.com/ava-labs/avalanchego/app/plugin"
 	"github.com/ava-labs/avalanchego/config"
@@ -75,18 +77,16 @@ func main() {
 	config := &plugin.ClientConfig{
 		HandshakeConfig: appplugin.Handshake,
 		Plugins:         appplugin.PluginMap,
-		Cmd:             exec.Command("/Users/pedro/go/src/github.com/ava-labs/avalanchego-internal/build/avalanchego-v1.3.2/avalanchego-inner", "--log-level=info"),
+		Cmd:             exec.Command("/home/danlaine/go/src/github.com/ava-labs/avalanchego/build/avalanchego-v1.3.2/avalanchego-inner"),
 		AllowedProtocols: []plugin.Protocol{
 			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,
 		},
+		SyncStdout: os.Stdout,
+		SyncStderr: os.Stderr,
+		Logger:     hclog.New(&hclog.LoggerOptions{Level: hclog.Error}),
 	}
-	// TODO figure out how to pipe the log output from avalanchego to std out
-	////log.SetOutput(logger)
-	//config.Stderr = os.Stderr
-	//config.Logger = hclog.New(&hclog.LoggerOptions{
-	//	Output: logger,
-	//})
+
 	client := plugin.NewClient(config)
 	defer client.Kill()
 	rpcClient, err := client.Client()
@@ -94,7 +94,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	raw, err := rpcClient.Dispense("node")
+	raw, err := rpcClient.Dispense("nodeProcess")
 	if err != nil {
 		fmt.Println(err)
 		return
