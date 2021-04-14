@@ -8,7 +8,7 @@ require (
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0-20200627015759-01fd2de07837
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
-	github.com/golang/protobuf v1.4.2
+	github.com/golang/protobuf v1.5.2
 	github.com/golang/snappy v0.0.3 // indirect
 	github.com/gorilla/handlers v1.4.2
 	github.com/gorilla/mux v1.7.4
@@ -38,6 +38,6 @@ require (
 	golang.org/x/sys v0.0.0-20200824131525-c12d262b63d8 // indirect
 	google.golang.org/genproto v0.0.0-20200218151345-dad8c97a84f5 // indirect
 	google.golang.org/grpc v1.29.1
-	google.golang.org/protobuf v1.23.0
+	google.golang.org/protobuf v1.26.0
 	gotest.tools v2.2.0+incompatible
 )
