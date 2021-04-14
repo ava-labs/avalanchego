@@ -141,7 +141,7 @@ type Node struct {
 
 	// Incremented only once on initialization.
 	// Decremented when node is done shutting down.
-	doneShuttingDown sync.WaitGroup
+	DoneShuttingDown sync.WaitGroup
 }
 
 /*
@@ -359,7 +359,7 @@ func (n *Node) Dispatch() error {
 	n.Shutdown(1)
 
 	// Wait until the node is done shutting down before returning
-	n.doneShuttingDown.Wait()
+	n.DoneShuttingDown.Wait()
 	return err
 }
 
@@ -812,7 +812,7 @@ func (n *Node) Initialize(
 	n.ID = config.NodeID
 	n.LogFactory = logFactory
 	n.Config = config
-	n.doneShuttingDown.Add(1)
+	n.DoneShuttingDown.Add(1)
 	n.Log.Info("Node version is: %s", Version)
 	n.Log.Info("Node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))
 
@@ -908,7 +908,7 @@ func (n *Node) shutdown() {
 		n.Log.Debug("error during API shutdown: %s", err)
 	}
 	utils.ClearSignals(n.nodeCloser)
-	n.doneShuttingDown.Done()
+	n.DoneShuttingDown.Done()
 	n.Log.Info("finished node shutdown")
 }
 

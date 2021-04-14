@@ -68,33 +68,35 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 // When the new node version is done bootstrapping, both nodes are stopped.
 // Returns nil if the new node version successfully bootstrapped.
 func (m *migrationManager) runMigration() error {
-	prevVersionNode, err := m.binaryManager.runPreviousVersion(node.PreviousVersion.AsVersion(), m.viperConfig)
+	prevVersionNode, err := m.binaryManager.previousVersionNode(node.PreviousVersion.AsVersion(), m.viperConfig)
 	if err != nil {
-		return fmt.Errorf("couldn't start old version during migration: %w", err)
+		return fmt.Errorf("couldn't create previous version node during migration: %w", err)
 	}
+	prevVersionNodeExitCodeChan := prevVersionNode.start()
 	defer func() {
-		if err := m.binaryManager.kill(prevVersionNode.processID); err != nil {
-			m.log.Error("error while killing previous version: %s", err)
+		if err := m.binaryManager.stop(prevVersionNode.processID); err != nil {
+			m.log.Error(err.Error())
 		}
 	}()
 
-	currentVersionNode, err := m.binaryManager.runCurrentVersion(m.viperConfig, true, m.nodeConfig.NodeID)
+	currentVersionNode, err := m.binaryManager.currentVersionNode(m.viperConfig, true, m.nodeConfig.NodeID)
 	if err != nil {
-		return fmt.Errorf("couldn't start current version during migration: %w", err)
+		return fmt.Errorf("couldn't create current version during migration: %w", err)
 	}
+	currentVersionNodeExitCodeChan := currentVersionNode.start()
 	defer func() {
-		if err := m.binaryManager.kill(currentVersionNode.processID); err != nil {
-			m.log.Error("error while killing current version: %s", err)
+		if err := currentVersionNode.stop(); err != nil {
+			m.log.Error("error while stopping current version node: %s", err)
 		}
 	}()
 
 	for {
 		select {
-		case err := <-prevVersionNode.errChan:
-			return fmt.Errorf("previous version stopped with: %s", err)
-		case <-currentVersionNode.errChan:
-			if currentVersionNode.exitCode != constants.ExitCodeDoneMigrating {
-				return fmt.Errorf("current version died with exit code %d", currentVersionNode.exitCode)
+		case exitCode := <-prevVersionNodeExitCodeChan:
+			return fmt.Errorf("previous version node stopped with exit code %d", exitCode)
+		case exitCode := <-currentVersionNodeExitCodeChan:
+			if exitCode != constants.ExitCodeDoneMigrating {
+				return fmt.Errorf("current version died with exit code %d", exitCode)
 			}
 			return nil
 		}

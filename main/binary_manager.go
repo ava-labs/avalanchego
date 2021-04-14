@@ -2,127 +2,137 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strconv"
-	"syscall"
 
+	appplugin "github.com/ava-labs/avalanchego/app/plugin"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/node"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-plugin"
 	"github.com/spf13/viper"
 )
 
-type process struct {
-	path      string
-	errChan   chan error
-	done      *utils.AtomicBool
-	exitCode  int
-	cmd       *exec.Cmd
+type nodeProcess struct {
 	processID int
+	rawClient *plugin.Client
+	node      *appplugin.Client
+}
+
+func (np *nodeProcess) start() chan int {
+	exitCodeChan := make(chan int, 1)
+	go func() {
+		exitCode, err := np.node.Start()
+		if err != nil {
+			// Couldn't start the node
+			exitCodeChan <- 1
+			return
+		}
+		exitCodeChan <- exitCode
+	}()
+	return exitCodeChan
+}
+
+// Stop should be called on each nodeProcess when we are done with it
+func (np *nodeProcess) stop() error {
+	_, err := np.node.Stop()
+	np.rawClient.Kill()
+	return err
 }
 
 type nodeProcessManager struct {
 	buildDirPath  string
 	log           logging.Logger
+	nodes         map[int]*nodeProcess
 	nextProcessID int
-	runningNodes  map[int]*process
+}
+
+func (b *nodeProcessManager) stopAll() {
+	for _, node := range b.nodes {
+		if err := b.stop(node.processID); err != nil {
+			b.log.Error("error stopping node: %s", err)
+		}
+	}
+}
+
+func (b *nodeProcessManager) stop(processID int) error {
+	nodeProcess, exists := b.nodes[processID]
+	if !exists {
+		return nil
+	}
+	delete(b.nodes, processID)
+	if err := nodeProcess.stop(); err != nil {
+		return fmt.Errorf("error stopping node: %s", err)
+	}
+	return nil
 }
 
 func newNodeProcessManager(path string, log logging.Logger) *nodeProcessManager {
 	return &nodeProcessManager{
 		buildDirPath: path,
 		log:          log,
-		runningNodes: map[int]*process{},
+		nodes:        map[int]*nodeProcess{},
 	}
 }
 
-func (b *nodeProcessManager) killAll() {
-	for _, nodeProcess := range b.runningNodes {
-		if err := b.kill(nodeProcess.processID); err != nil {
-			b.log.Error("error killing node running binary at %s: %s", nodeProcess.path, err)
-		}
+func (b *nodeProcessManager) newNode(path string, args []string, printToStdOut bool) (*nodeProcess, error) {
+	config := &plugin.ClientConfig{
+		HandshakeConfig: appplugin.Handshake,
+		Plugins:         appplugin.PluginMap,
+		Cmd:             exec.Command(path, args...),
+		AllowedProtocols: []plugin.Protocol{
+			plugin.ProtocolNetRPC,
+			plugin.ProtocolGRPC,
+		},
+		Logger: hclog.New(&hclog.LoggerOptions{Level: hclog.Error}),
 	}
-}
-
-func (b *nodeProcessManager) kill(nodeNumber int) error {
-	nodeProcess, ok := b.runningNodes[nodeNumber]
-	if !ok {
-		return nil
-	}
-	// Stop printing output from node
-	nodeProcess.cmd.Stdout = ioutil.Discard
-	nodeProcess.cmd.Stderr = ioutil.Discard
-	delete(b.runningNodes, nodeNumber)
-	if nodeProcess.cmd.Process == nil || nodeProcess.done.GetValue() {
-		return nil
-	}
-
-	err := syscall.Kill(-nodeProcess.cmd.Process.Pid, syscall.SIGKILL)
-	if err != nil && err != os.ErrProcessDone {
-		return fmt.Errorf("failed to kill process: %w", err)
-	}
-	return nil
-}
-
-// Returns a new nodeProcess running the binary at [path].
-// Returns an error if the command fails to start.
-// When the nodeProcess terminates, the returned error (which may be nil)
-// is sent on [n.errChan]
-func (b *nodeProcessManager) startNode(path string, args []string, printToStdOut bool) (*process, error) {
-	b.log.Info("Starting binary at %s with args %s\n", path, args) // TODO remove
-	n := &process{
-		path:      path,
-		cmd:       exec.Command(path, args...), // #nosec G204
-		errChan:   make(chan error, 1),
-		done:      &utils.AtomicBool{},
-		processID: b.nextProcessID,
-	}
-	b.nextProcessID++
 	if printToStdOut {
-		n.cmd.Stdout = os.Stdout
-		n.cmd.Stderr = os.Stderr
+		config.SyncStdout = os.Stdout
+		config.SyncStderr = os.Stderr
 	}
-	n.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	// Start the nodeProcess
-	if err := n.cmd.Start(); err != nil {
+	client := plugin.NewClient(config)
+	rpcClient, err := client.Client()
+	if err != nil {
+		client.Kill()
 		return nil, err
 	}
-	b.runningNodes[n.processID] = n
-	go func() {
-		// Wait for the nodeProcess to stop.
-		// When it does, set the exit code and send the returned error
-		// (which may be nil) to [a.errChan]
-		if err := n.cmd.Wait(); err != nil {
-			if exitError, ok := err.(*exec.ExitError); ok {
-				// This code only executes if the exit code is non-zero
-				n.exitCode = exitError.ExitCode()
-			}
-			n.done.SetValue(true)
-			n.errChan <- err
-		}
-	}()
-	return n, nil
-}
-
-func (b *nodeProcessManager) runNormal(v *viper.Viper) error {
-	node, err := b.runCurrentVersion(v, false, ids.ShortID{})
+	raw, err := rpcClient.Dispense("nodeProcess")
 	if err != nil {
-		return fmt.Errorf("couldn't start old version during migration: %w", err)
+		client.Kill()
+		return nil, err
 	}
-	defer func() {
-		if err := b.kill(node.processID); err != nil {
-			b.log.Error("error stopping node: %s", err)
-		}
-	}()
-	return <-node.errChan
+	node, ok := raw.(*appplugin.Client)
+	if !ok {
+		client.Kill()
+		return nil, fmt.Errorf("expected *node.NodeClient but got %T", raw)
+	}
+	b.nextProcessID++
+	np := &nodeProcess{
+		node:      node,
+		rawClient: client,
+		processID: b.nextProcessID,
+	}
+	b.nodes[np.processID] = np
+	return np, nil
 }
 
-func (b *nodeProcessManager) runPreviousVersion(prevVersion version.Version, v *viper.Viper) (*process, error) {
+func (b *nodeProcessManager) runNormal(v *viper.Viper) (int, error) {
+	node, err := b.currentVersionNode(v, false, ids.ShortID{})
+	if err != nil {
+		return 1, fmt.Errorf("couldn't create current version node: %s", err)
+	}
+	exitCode := <-node.start()
+	return exitCode, nil
+}
+
+func (b *nodeProcessManager) previousVersionNode(
+	prevVersion version.Version,
+	v *viper.Viper,
+) (*nodeProcess, error) {
 	binaryPath := getBinaryPath(b.buildDirPath, prevVersion)
 	args := []string{}
 	for k, v := range v.AllSettings() {
@@ -131,14 +141,14 @@ func (b *nodeProcessManager) runPreviousVersion(prevVersion version.Version, v *
 		}
 		args = append(args, fmt.Sprintf("--%s=%v", k, v))
 	}
-	return b.startNode(binaryPath, args, false)
+	return b.newNode(binaryPath, args, false)
 }
 
-func (b *nodeProcessManager) runCurrentVersion(
+func (b *nodeProcessManager) currentVersionNode(
 	v *viper.Viper,
 	fetchOnly bool,
 	fetchFrom ids.ShortID,
-) (*process, error) {
+) (*nodeProcess, error) {
 	argsMap := v.AllSettings()
 	if fetchOnly {
 		// TODO use constants for arg names here
@@ -162,7 +172,7 @@ func (b *nodeProcessManager) runCurrentVersion(
 		args = append(args, fmt.Sprintf("--%s=%v", k, v))
 	}
 	binaryPath := getBinaryPath(b.buildDirPath, node.Version.AsVersion())
-	return b.startNode(binaryPath, args, true)
+	return b.newNode(binaryPath, args, true)
 }
 
 func getBinaryPath(buildDirPath string, nodeVersion version.Version) string {

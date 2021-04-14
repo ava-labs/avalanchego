@@ -13,7 +13,6 @@ import (
 
 	appPlugin "github.com/ava-labs/avalanchego/app/plugin"
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
@@ -28,35 +27,13 @@ const (
 )
 
 var (
-	exitCode        = 0
-	stakingPortName = fmt.Sprintf("%s-staking", constants.AppName)
-	httpPortName    = fmt.Sprintf("%s-http", constants.AppName)
-	mustUpgradeMsg  = "\nThis version of AvalancheGo requires a database upgrade before running.\n" +
-		"To do the database upgrade, restart this node with argument --fetch-only.\n" +
-		"This will start the node in fetch only mode. It will bootstrap a new database version and then stop.\n" +
-		"By default, this node will attempt to bootstrap from a node running on the same machine (localhost) with staking port 9651.\n" +
-		"If no such node exists, fetch only mode will be unable to complete.\n" +
-		"The node in fetch only mode will by default not interfere with the node already running.\n" +
-		"When the node in fetch only mode finishes, stop the other node running on this computer and run without --fetch-only flag to run node normally.\n" +
-		"Fetch only mode will not change this node's staking key/certificate.\n" +
-		"Note that populating the new database version will approximately double the amount of disk space required by AvalancheGo.\n" +
-		"Ensure that this computer has at least enough disk space available.\n" +
-		"You should not delete the old database version unless advised to by the Avalanche team."
-	upgradingMsg = "\nNode running in fetch only mode.\n" +
-		"It will bootstrap a new database version and then stop.\n" +
-		"By default, this node will attempt to bootstrap from a node running on the same machine (localhost) with staking port 9651.\n" +
-		"If no such node exists, fetch only mode will be unable to complete.\n" +
-		"The node in fetch only mode will not by default interfere with the node already running on this machine.\n" +
-		"When the node in fetch only mode finishes, stop the other node running on this computer and run without --fetch-only flag to run node normally.\n" +
-		"Fetch only mode will not change this node's staking key/certificate.\n" +
-		"Note that populating the new database version will approximately double the amount of disk space required by AvalancheGo.\n" +
-		"Ensure that this computer has at least enough disk space available.\n" +
-		"You should not delete the old database version unless advised to by the Avalanche team.\n"
-	alreadyUpgradedMsg = "fetch only mode done. Restart this node without --fetch-only to run normally\n"
+	exitCode = 0
 )
 
 // main is the primary entry point to Avalanche.
 func main() {
+	fmt.Println(header)
+
 	defer func() {
 		os.Exit(exitCode)
 	}()
@@ -81,7 +58,7 @@ func main() {
 	}
 
 	app := process.NewApp(config)
-	if true { // run as plugin flag otherwise run as a normal node
+	if true { // run as plugin flag otherwise run as a normal node // TODO parse flag for whether to run as plugin
 		plugin.Serve(&plugin.ServeConfig{
 			HandshakeConfig: appPlugin.Handshake,
 			Plugins: map[string]plugin.Plugin{
@@ -95,6 +72,5 @@ func main() {
 		})
 		return
 	}
-	exitCode, err = app.Start()
-	fmt.Printf("node process return exit code %d and error: %s\n", exitCode, err)
+	exitCode = app.Start()
 }

@@ -22,17 +22,17 @@ var (
 var (
 	stakingPortName = fmt.Sprintf("%s-staking", constants.AppName)
 	httpPortName    = fmt.Sprintf("%s-http", constants.AppName)
-	errMustUpgrade  = fmt.Errorf("%s", "\nThis version of AvalancheGo requires a database upgrade before running.\n"+
-		"To do the database upgrade, restart this node with argument --fetch-only.\n"+
-		"This will start the node in fetch only mode. It will bootstrap a new database version and then stop.\n"+
-		"By default, this node will attempt to bootstrap from a node running on the same machine (localhost) with staking port 9651.\n"+
-		"If no such node exists, fetch only mode will be unable to complete.\n"+
-		"The node in fetch only mode will by default not interfere with the node already running.\n"+
-		"When the node in fetch only mode finishes, stop the other node running on this computer and run without --fetch-only flag to run node normally.\n"+
-		"Fetch only mode will not change this node's staking key/certificate.\n"+
-		"Note that populating the new database version will approximately double the amount of disk space required by AvalancheGo.\n"+
-		"Ensure that this computer has at least enough disk space available.\n"+
-		"You should not delete the old database version unless advised to by the Avalanche team.")
+	mustUpgradeMsg  = "\nThis version of AvalancheGo requires a database upgrade before running.\n" +
+		"To do the database upgrade, restart this node with argument --fetch-only.\n" +
+		"This will start the node in fetch only mode. It will bootstrap a new database version and then stop.\n" +
+		"By default, this node will attempt to bootstrap from a node running on the same machine (localhost) with staking port 9651.\n" +
+		"If no such node exists, fetch only mode will be unable to complete.\n" +
+		"The node in fetch only mode will by default not interfere with the node already running.\n" +
+		"When the node in fetch only mode finishes, stop the other node running on this computer and run without --fetch-only flag to run node normally.\n" +
+		"Fetch only mode will not change this node's staking key/certificate.\n" +
+		"Note that populating the new database version will approximately double the amount of disk space required by AvalancheGo.\n" +
+		"Ensure that this computer has at least enough disk space available.\n" +
+		"You should not delete the old database version unless advised to by the Avalanche team."
 	upgradingMsg = "\nNode running in fetch only mode.\n" +
 		"It will bootstrap a new database version and then stop.\n" +
 		"By default, this node will attempt to bootstrap from a node running on the same machine (localhost) with staking port 9651.\n" +
@@ -57,7 +57,7 @@ func NewApp(config node.Config) *App {
 	}
 }
 
-func (a *App) Start() (int, error) {
+func (a *App) Start() int {
 	config := a.config
 	logFactory := logging.NewFactory(config.LoggingConfig)
 	defer logFactory.Close()
@@ -65,14 +65,14 @@ func (a *App) Start() (int, error) {
 	log, err := logFactory.Make()
 	if err != nil {
 		fmt.Printf("starting logger failed with: %s\n", err)
-		return 1, err
+		return 1
 	}
-	//fmt.Println(header)
 	var dbManager manager.Manager
 	if config.DBEnabled {
 		dbManager, err = manager.New(config.DBPath, log, dbVersion, !config.FetchOnly)
 		if err != nil {
-			return 1, fmt.Errorf("couldn't create db manager at %s: %s", config.DBPath, err)
+			log.Fatal("couldn't create db manager at %s: %s", config.DBPath, err)
+			return 1
 		}
 	} else {
 		dbManager, err = manager.NewManagerFromDBs([]*manager.VersionedDatabase{
@@ -82,14 +82,16 @@ func (a *App) Start() (int, error) {
 			},
 		})
 		if err != nil {
-			return 1, fmt.Errorf("couldn't create db manager from memory db: %s", err)
+			log.Fatal("couldn't create db manager from memory db: %s", err)
+			return 1
 		}
 	}
 
 	// Fetch only
 	currentDBBootstrapped, err := dbManager.CurrentDBBootstrapped()
 	if err != nil {
-		return 1, fmt.Errorf("couldn't get whether database version %s ever bootstrapped: %s", dbVersion, err)
+		log.Error("couldn't get whether database version %s ever bootstrapped: %s", dbVersion, err)
+		return 1
 	}
 	log.Info("bootstrapped with current database version: %v", currentDBBootstrapped)
 
@@ -98,7 +100,7 @@ func (a *App) Start() (int, error) {
 		if currentDBBootstrapped {
 			// We have already bootstrapped the current database
 			log.Info(alreadyUpgradedMsg)
-			return constants.ExitCodeDoneMigrating, nil
+			return constants.ExitCodeDoneMigrating
 		}
 		log.Info(upgradingMsg)
 	} else {
@@ -108,7 +110,8 @@ func (a *App) Start() (int, error) {
 			// must run in fetch only mode (--fetch-only). The default behavior for a node in
 			// fetch only mode is to bootstrap from a node on the same machine (127.0.0.1)
 			// Tell the user to run in fetch only mode.
-			return 1, errMustUpgrade
+			log.Fatal(mustUpgradeMsg)
+			return 1
 		}
 	}
 
@@ -141,7 +144,8 @@ func (a *App) Start() (int, error) {
 	crypto.EnableCrypto = config.EnableCrypto
 
 	if err := config.ConsensusParams.Valid(); err != nil {
-		return 1, fmt.Errorf("consensus parameters are invalid: %s", err)
+		log.Fatal("consensus parameters are invalid: %s", err)
+		return 1
 	}
 
 	// Track if assertions should be executed
@@ -195,21 +199,20 @@ func (a *App) Start() (int, error) {
 	defer externalIPUpdater.Stop()
 
 	log.Info("this node's IP is set to: %s", config.StakingIP.IP())
-	node := node.Node{}
-	if err := node.Initialize(&config, dbManager, log, logFactory); err != nil {
+	a.node = &node.Node{}
+	if err := a.node.Initialize(&config, dbManager, log, logFactory); err != nil {
 		log.Error("error initializing node: %s", err)
-		return node.ExitCode(), err
+		return 1
 	}
 
-	err = node.Dispatch()
+	err = a.node.Dispatch()
 	log.Debug("node dispatch returned: %s", err)
-	return node.ExitCode(), nil
+	return a.node.ExitCode()
 }
 
+// Assumes [a.node] is not nil
 func (a *App) Stop() int { // TODO remove return value?
-	if a.node == nil {
-		return 0
-	}
 	a.node.Shutdown(0)
+	a.node.DoneShuttingDown.Wait()
 	return 0
 }

@@ -6,13 +6,8 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"syscall"
 
-	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/go-plugin"
-
-	appplugin "github.com/ava-labs/avalanchego/app/plugin"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -43,14 +38,6 @@ func main() {
 		exitCode = 1
 		return
 	}
-	binaryManager := newNodeProcessManager(nodeConfig.BuildDir, log)
-
-	_ = utils.HandleSignals(
-		func(os.Signal) {
-			binaryManager.killAll()
-		},
-		syscall.SIGINT, syscall.SIGTERM,
-	)
 
 	//migrationManager := newMigrationManager(binaryManager, v, nodeConfig, log)
 	//if err := migrationManager.migrate(); err != nil {
@@ -73,40 +60,14 @@ func main() {
 		exitCode = 1
 		return
 	}
-	args := []string{}
-	for k, v := range v.AllSettings() {
-		args = append(args, fmt.Sprintf("--%s=%v", k, v))
-	}
-	// #nosec G204
-	config := &plugin.ClientConfig{
-		HandshakeConfig: appplugin.Handshake,
-		Plugins:         appplugin.PluginMap,
-		Cmd:             exec.Command("/home/danlaine/go/src/github.com/ava-labs/avalanchego/build/avalanchego-v1.3.2/avalanchego-inner", args...),
-		AllowedProtocols: []plugin.Protocol{
-			plugin.ProtocolNetRPC,
-			plugin.ProtocolGRPC,
+	binaryManager := newNodeProcessManager(nodeConfig.BuildDir, log)
+	_ = utils.HandleSignals(
+		func(os.Signal) {
+			binaryManager.stopAll()
 		},
-		SyncStdout: os.Stdout,
-		SyncStderr: os.Stderr,
-		Logger:     hclog.New(&hclog.LoggerOptions{Level: hclog.Error}),
-	}
-
-	client := plugin.NewClient(config)
-	defer client.Kill()
-	rpcClient, err := client.Client()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	raw, err := rpcClient.Dispense("nodeProcess")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	node, ok := raw.(*appplugin.Client)
-	if !ok {
-		fmt.Printf("expected *node.NodeClient but got %T", raw)
-		return
-	}
-	fmt.Println(node.Start()) // TODO remove this is just here for testing
+		syscall.SIGINT, syscall.SIGTERM,
+	)
+	exitCode, err = binaryManager.runNormal(v)
+	fmt.Printf("exit code: %d\n", exitCode)
+	fmt.Printf("err: %v\n", err)
 }
