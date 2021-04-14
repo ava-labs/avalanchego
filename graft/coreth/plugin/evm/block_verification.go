@@ -14,24 +14,46 @@ import (
 )
 
 var (
-	phase0BlockValidator BlockValidator = blockValidatorPhase0{}
-	phase1BlockValidator BlockValidator = blockValidatorPhase1{}
+	phase0BlockValidator = blockValidatorPhase0{}
+	phase1BlockValidator = blockValidatorPhase1{}
 )
 
 type BlockValidator interface {
 	SyntacticVerify(b *Block) error
 }
 
-type blockValidatorPhase0 struct{}
+type blockValidatorPhase0 struct {
+	extDataHashes map[common.Hash]common.Hash
+}
 
-func (blockValidatorPhase0) SyntacticVerify(b *Block) error {
+func (v blockValidatorPhase0) SyntacticVerify(b *Block) error {
 	if b == nil || b.ethBlock == nil {
 		return errInvalidBlock
 	}
 
+	blockHash := b.ethBlock.Hash()
+	if v.extDataHashes != nil {
+		extData := b.ethBlock.ExtData()
+		extDataHash := types.CalcExtDataHash(extData)
+		// If there is no extra data, check that there is no extra data in the hash map either to ensure we do not
+		// have a block that is unexpectedly missing extra data.
+		expectedExtDataHash, ok := v.extDataHashes[blockHash]
+		if len(extData) == 0 {
+			if ok {
+				return fmt.Errorf("found block with unexpected missing extra data (%s, %d), expected extra data hash: %s", blockHash, b.Height(), expectedExtDataHash)
+			}
+		} else {
+			// If there is extra data, check to make sure that the extra data hash matches the expected extra data hash for this
+			// block
+			if extDataHash != expectedExtDataHash {
+				return fmt.Errorf("extra data hash in block (%s, %d): %s, did not match the expected extra data hash: %s", blockHash, b.Height(), extDataHash, expectedExtDataHash)
+			}
+		}
+	}
+
 	// Skip verification of the genesis block since it
 	// should already be marked as accepted
-	if b.ethBlock.Hash() == b.vm.genesisHash {
+	if blockHash == b.vm.genesisHash {
 		return nil
 	}
 

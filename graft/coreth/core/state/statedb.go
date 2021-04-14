@@ -457,14 +457,12 @@ func (s *StateDB) SetCode(addr common.Address, code []byte) {
 	}
 }
 
-func (s *StateDB) SetState(addr common.Address, key, value common.Hash) (res error) {
-	res = nil
+func (s *StateDB) SetState(addr common.Address, key, value common.Hash) {
 	stateObject := s.GetOrNewStateObject(addr)
 	if stateObject != nil {
 		NormalizeStateKey(&key)
 		stateObject.SetState(s.db, key, value)
 	}
-	return
 }
 
 // SetStorage replaces the entire storage for the specified account with given

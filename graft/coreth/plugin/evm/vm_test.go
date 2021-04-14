@@ -124,11 +124,11 @@ func GenesisVM(t *testing.T, finishBootstrapping bool, genesisJSON string) (chan
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
 
-	userKeystore, err := keystore.CreateTestKeystore()
+	userKeystore, err := keystore.New(logging.NoLog{}, manager.NewDefaultMemDBManager())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := userKeystore.AddUser(username, password); err != nil {
+	if err := userKeystore.CreateUser(username, password); err != nil {
 		t.Fatal(err)
 	}
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
@@ -137,7 +137,7 @@ func GenesisVM(t *testing.T, finishBootstrapping bool, genesisJSON string) (chan
 	vm := &VM{
 		txFee: testTxFee,
 	}
-	err = vm.Initialize(
+	if err := vm.Initialize(
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
@@ -145,8 +145,7 @@ func GenesisVM(t *testing.T, finishBootstrapping bool, genesisJSON string) (chan
 		nil,
 		issuer,
 		[]*engCommon.Fx{},
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -299,7 +298,7 @@ func TestIssueAtomicTxs(t *testing.T) {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk.ID(), lastAcceptedID)
 	}
 
-	exportTx, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-vm.txFee-1, vm.ctx.XChainID, testShortIDAddrs[0], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	exportTx, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-vm.txFee, vm.ctx.XChainID, testShortIDAddrs[0], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}

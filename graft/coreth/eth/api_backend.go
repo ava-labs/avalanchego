@@ -393,3 +393,7 @@ func (b *EthAPIBackend) CurrentHeader() *types.Header {
 // func (b *EthAPIBackend) StartMining(threads int) error {
 // 	return b.eth.StartMining(threads)
 // }
+
+func (b *EthAPIBackend) GetMaxBlocksPerRequest() int64 {
+	return b.eth.settings.MaxBlocksPerRequest
+}
