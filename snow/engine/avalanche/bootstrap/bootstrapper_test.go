@@ -1195,7 +1195,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	parsedVtx3 := false
 	parsedVtx4 := false
 	parsedVtx5 := false
-	manager.GetF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID0:
 			if parsedVtx0 {
@@ -1229,7 +1229,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		}
 		return nil, errUnknownVertex
 	}
-	manager.ParseF = func(vtxBytes []byte) (avalanche.Vertex, error) {
+	manager.ParseVtxF = func(vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes0):
 			vtx0.StatusV = choices.Processing

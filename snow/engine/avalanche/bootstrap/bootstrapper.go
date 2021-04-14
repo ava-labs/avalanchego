@@ -12,7 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
@@ -416,7 +415,7 @@ func (b *Bootstrapper) checkFinish() error {
 		b.Ctx.Log.Debug("bootstrapping fetched %d vertices. Executing transaction state transitions...", b.NumFetched)
 	}
 
-	_, err := b.TxBlocked.ExecuteAll(b.Ctx, b.Ctx.DecisionDispatcher)
+	_, err := b.TxBlocked.ExecuteAll(b.Ctx, b.Restarted, b.Ctx.DecisionDispatcher)
 	if err != nil {
 		return err
 	}
@@ -426,7 +425,7 @@ func (b *Bootstrapper) checkFinish() error {
 	} else {
 		b.Ctx.Log.Debug("executing vertex state transitions...")
 	}
-	executedVts, err := b.executeAll(b.VtxBlocked, b.Ctx.ConsensusDispatcher)
+	executedVts, err := b.VtxBlocked.ExecuteAll(b.Ctx, b.Restarted, b.Ctx.ConsensusDispatcher)
 	if err != nil {
 		return err
 	}
@@ -481,41 +480,6 @@ func (b *Bootstrapper) finish() error {
 	b.Ctx.Bootstrapped()
 
 	return nil
-}
-
-func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher) (int, error) {
-	numExecuted := 0
-
-	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
-		b.Ctx.Log.Debug("Executing: %s", job.ID())
-		// Note that events.Accept must be called before
-		// job.Execute to honor EventDispatcher.Accept's invariant.
-		if err := events.Accept(b.Ctx, job.ID(), job.Bytes()); err != nil {
-			return numExecuted, err
-		}
-		if err := jobs.Execute(job); err != nil {
-			b.Ctx.Log.Error("Error executing: %s", err)
-			return numExecuted, err
-		}
-		if err := jobs.Commit(); err != nil {
-			return numExecuted, err
-		}
-		numExecuted++
-		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
-			if !b.Restarted {
-				b.Ctx.Log.Info("executed %d operations", numExecuted)
-			} else {
-				b.Ctx.Log.Debug("executed %d operations", numExecuted)
-			}
-		}
-
-	}
-	if !b.Restarted {
-		b.Ctx.Log.Info("executed %d operations", numExecuted)
-	} else {
-		b.Ctx.Log.Debug("executed %d operations", numExecuted)
-	}
-	return numExecuted, nil
 }
 
 // Connected implements the Engine interface.

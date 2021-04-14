@@ -313,7 +313,7 @@ func (b *Bootstrapper) checkFinish() error {
 		b.Ctx.Log.Debug("bootstrapping fetched %d blocks. Executing state transitions...", b.NumFetched)
 	}
 
-	executedBlocks, err := b.Blocked.ExecuteAll(b.Ctx, b.Ctx.ConsensusDispatcher, b.Ctx.DecisionDispatcher)
+	executedBlocks, err := b.Blocked.ExecuteAll(b.Ctx, b.Restarted, b.Ctx.ConsensusDispatcher, b.Ctx.DecisionDispatcher)
 	if err != nil {
 		return err
 	}
@@ -370,44 +370,6 @@ func (b *Bootstrapper) finish() error {
 	}
 	b.Ctx.Bootstrapped()
 	return nil
-}
-
-func (b *Bootstrapper) executeAll(jobs *queue.Jobs) (int, error) {
-	numExecuted := 0
-	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
-		jobID := job.ID()
-		jobBytes := job.Bytes()
-		// Note that ConsensusDispatcher.Accept / DecisionDispatcher.Accept must be
-		// called before job.Execute to honor EventDispatcher.Accept's invariant.
-		if err := b.Ctx.ConsensusDispatcher.Accept(b.Ctx, jobID, jobBytes); err != nil {
-			return numExecuted, err
-		}
-		if err := b.Ctx.DecisionDispatcher.Accept(b.Ctx, jobID, jobBytes); err != nil {
-			return numExecuted, err
-		}
-
-		if err := jobs.Execute(job); err != nil {
-			return numExecuted, err
-		}
-		if err := jobs.Commit(); err != nil {
-			return numExecuted, err
-		}
-		numExecuted++
-		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
-			if !b.Restarted {
-				b.Ctx.Log.Info("executed %d of %d blocks", numExecuted, b.tipHeight-b.startingHeight)
-			} else {
-				b.Ctx.Log.Debug("executed %d of %d blocks", numExecuted, b.tipHeight-b.startingHeight)
-			}
-		}
-
-	}
-	if !b.Restarted {
-		b.Ctx.Log.Info("executed %d blocks", numExecuted)
-	} else {
-		b.Ctx.Log.Debug("executed %d blocks", numExecuted)
-	}
-	return numExecuted, nil
 }
 
 // Connected implements the Engine interface.

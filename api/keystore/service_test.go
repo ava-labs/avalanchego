@@ -26,8 +26,11 @@ var (
 )
 
 func TestServiceListNoUsers(t *testing.T) {
-	ks := New(logging.NoLog{}, memdb.New()).(*keystore)
-	s := service{ks: ks}
+	ks, err := New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := service{ks: ks.(*keystore)}
 
 	reply := ListUsersReply{}
 	if err := s.ListUsers(nil, nil, &reply); err != nil {
@@ -39,8 +42,11 @@ func TestServiceListNoUsers(t *testing.T) {
 }
 
 func TestServiceCreateUser(t *testing.T) {
-	ks := New(logging.NoLog{}, memdb.New()).(*keystore)
-	s := service{ks: ks}
+	ks, err := New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := service{ks: ks.(*keystore)}
 
 	{
 		reply := api.SuccessResponse{}
@@ -79,8 +85,11 @@ func genStr(n int) string {
 // TestServiceCreateUserArgsCheck generates excessively long usernames or
 // passwords to assure the sanity checks on string length are not exceeded
 func TestServiceCreateUserArgsCheck(t *testing.T) {
-	ks := New(logging.NoLog{}, memdb.New()).(*keystore)
-	s := service{ks: ks}
+	ks, err := New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := service{ks: ks.(*keystore)}
 
 	{
 		reply := api.SuccessResponse{}
@@ -121,8 +130,11 @@ func TestServiceCreateUserArgsCheck(t *testing.T) {
 // TestServiceCreateUserWeakPassword tests creating a new user with a weak
 // password to ensure the password strength check is working
 func TestServiceCreateUserWeakPassword(t *testing.T) {
-	ks := New(logging.NoLog{}, memdb.New()).(*keystore)
-	s := service{ks: ks}
+	ks, err := New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := service{ks: ks.(*keystore)}
 
 	{
 		reply := api.SuccessResponse{}
@@ -138,8 +150,11 @@ func TestServiceCreateUserWeakPassword(t *testing.T) {
 }
 
 func TestServiceCreateDuplicate(t *testing.T) {
-	ks := New(logging.NoLog{}, memdb.New()).(*keystore)
-	s := service{ks: ks}
+	ks, err := New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := service{ks: ks.(*keystore)}
 
 	{
 		reply := api.SuccessResponse{}
@@ -166,8 +181,11 @@ func TestServiceCreateDuplicate(t *testing.T) {
 }
 
 func TestServiceCreateUserNoName(t *testing.T) {
-	ks := New(logging.NoLog{}, memdb.New()).(*keystore)
-	s := service{ks: ks}
+	ks, err := New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := service{ks: ks.(*keystore)}
 
 	reply := api.SuccessResponse{}
 	if err := s.CreateUser(nil, &api.UserPass{
@@ -178,8 +196,11 @@ func TestServiceCreateUserNoName(t *testing.T) {
 }
 
 func TestServiceUseBlockchainDB(t *testing.T) {
-	ks := New(logging.NoLog{}, memdb.New()).(*keystore)
-	s := service{ks: ks}
+	ks, err := New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := service{ks: ks.(*keystore)}
 
 	{
 		reply := api.SuccessResponse{}
@@ -220,8 +241,11 @@ func TestServiceUseBlockchainDB(t *testing.T) {
 func TestServiceExportImport(t *testing.T) {
 	encodings := []formatting.Encoding{formatting.Hex, formatting.CB58}
 	for _, encoding := range encodings {
-		ks := New(logging.NoLog{}, memdb.New()).(*keystore)
-		s := service{ks: ks}
+		ks, err := New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := service{ks: ks.(*keystore)}
 
 		{
 			reply := api.SuccessResponse{}
@@ -258,8 +282,11 @@ func TestServiceExportImport(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		newKS := New(logging.NoLog{}, memdb.New()).(*keystore)
-		newS := service{ks: newKS}
+		newKS, err := New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+		if err != nil {
+			t.Fatal(err)
+		}
+		newS := service{ks: newKS.(*keystore)}
 
 		{
 			reply := api.SuccessResponse{}
@@ -374,7 +401,11 @@ func TestServiceDeleteUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			ks := New(logging.NoLog{}, memdb.New()).(*keystore)
+			ksIntf, err := New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+			if err != nil {
+				t.Fatal(err)
+			}
+			ks := ksIntf.(*keystore)
 			s := service{ks: ks}
 
 			if tt.setup != nil {
@@ -383,7 +414,7 @@ func TestServiceDeleteUser(t *testing.T) {
 				}
 			}
 			got := &api.SuccessResponse{}
-			err := s.DeleteUser(nil, tt.request, got)
+			err = s.DeleteUser(nil, tt.request, got)
 			if (err != nil) != tt.wantError {
 				t.Fatalf("DeleteUser() failed: error %v, wantError %v", err, tt.wantError)
 			}
@@ -410,10 +441,9 @@ func TestMigrateKeystoreUser(t *testing.T) {
 	testUser := "testUser"
 	password := "passwTest@fake01ord"
 	bID := ids.Empty
-	currentDB := memdb.New()
 	versionedDBs := []*manager.VersionedDatabase{
 		{
-			Database: currentDB,
+			Database: memdb.New(),
 			Version:  version.DefaultVersion1,
 		},
 	}
@@ -422,12 +452,12 @@ func TestMigrateKeystoreUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ks := &Keystore{}
-	if err := ks.Initialize(logging.NoLog{}, dbManager); err != nil {
+	ks, err := New(logging.NoLog{}, dbManager)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := ks.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.SuccessResponse{}); err != nil {
+	if err := ks.CreateUser(testUser, password); err != nil {
 		t.Fatalf("Failed to create user: %s", err)
 	}
 
@@ -455,22 +485,22 @@ func TestMigrateKeystoreUser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ksUpgraded := &Keystore{}
-	if err := ksUpgraded.Initialize(logging.NoLog{}, upgradedDBManager); err != nil {
+	ksUpgraded, err := New(logging.NoLog{}, upgradedDBManager)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	reply := &ListUsersReply{}
-	if err := ksUpgraded.ListUsers(nil, nil, reply); err != nil {
+	users, err := ksUpgraded.ListUsers()
+	if err != nil {
 		t.Fatalf("Failed to list users: %s", err)
 	}
 
-	if len(reply.Users) != 1 {
-		t.Fatalf("Exepcted 1 user, but found: %d", len(reply.Users))
+	if len(users) != 1 {
+		t.Fatalf("Exepcted 1 user, but found: %d", len(users))
 	}
 
-	if reply.Users[0] != testUser {
-		t.Fatalf("Expected first user to be %s, but found %s", testUser, reply.Users[0])
+	if users[0] != testUser {
+		t.Fatalf("Expected first user to be %s, but found %s", testUser, users[0])
 	}
 
 	userDB, err = ksUpgraded.GetDatabase(bID, testUser, password)
@@ -503,22 +533,22 @@ func TestMigrateKeystoreUser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ksSecondUpgrade := &Keystore{}
-	if err := ksSecondUpgrade.Initialize(logging.NoLog{}, secondUpgradedDBManager); err != nil {
+	ksSecondUpgrade, err := New(logging.NoLog{}, secondUpgradedDBManager)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	reply = &ListUsersReply{}
-	if err := ksSecondUpgrade.ListUsers(nil, nil, reply); err != nil {
+	users, err = ksSecondUpgrade.ListUsers()
+	if err != nil {
 		t.Fatalf("Failed to list users: %s", err)
 	}
 
-	if len(reply.Users) != 1 {
-		t.Fatalf("Exepcted 1 user, but found: %d", len(reply.Users))
+	if len(users) != 1 {
+		t.Fatalf("Exepcted 1 user, but found: %d", len(users))
 	}
 
-	if reply.Users[0] != testUser {
-		t.Fatalf("Expected first user to be %s, but found %s", testUser, reply.Users[0])
+	if users[0] != testUser {
+		t.Fatalf("Expected first user to be %s, but found %s", testUser, users[0])
 	}
 
 	userDB, err = ksSecondUpgrade.GetDatabase(bID, testUser, password)

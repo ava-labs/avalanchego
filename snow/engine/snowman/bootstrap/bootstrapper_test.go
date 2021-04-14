@@ -922,18 +922,8 @@ func TestRestartBootstrapping(t *testing.T) {
 		BytesV:  blkBytes4,
 	}
 
-	finished := new(bool)
-	bs := Bootstrapper{}
-	err := bs.Initialize(
-		config,
-		func() error { *finished = true; return nil },
-		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
-		prometheus.NewRegistry(),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	vm.CantLastAccepted = false
+	vm.LastAcceptedF = func() (ids.ID, error) { return blk0.ID(), nil }
 	parsedBlk1 := false
 	parsedBlk2 := false
 	parsedBlk3 := false
@@ -990,6 +980,18 @@ func TestRestartBootstrapping(t *testing.T) {
 		}
 		t.Fatal(errUnknownBlock)
 		return nil, errUnknownBlock
+	}
+
+	finished := new(bool)
+	bs := Bootstrapper{}
+	err := bs.Initialize(
+		config,
+		func() error { *finished = true; return nil },
+		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
+		prometheus.NewRegistry(),
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	requestIDs := map[ids.ID]uint32{}

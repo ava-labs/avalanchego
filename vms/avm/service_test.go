@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -39,7 +39,10 @@ var (
 // 4) atomic memory to use in tests
 func setup(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
 	genesisBytes, _, vm, m := GenesisVM(t)
-	keystore := keystore.New(logging.NoLog{}, memdb.New())
+	keystore, err := keystore.New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := keystore.CreateUser(username, password); err != nil {
 		t.Fatalf("couldn't add user: %s", err)
 	}
