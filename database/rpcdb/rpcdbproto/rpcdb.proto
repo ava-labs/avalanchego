@@ -102,7 +102,9 @@ message IteratorReleaseRequest {
     uint64 id = 1;
 }
 
-message IteratorReleaseResponse {}
+message IteratorReleaseResponse {
+    uint32 err = 1;
+}
 
 service Database {
     rpc Has(HasRequest) returns (HasResponse);

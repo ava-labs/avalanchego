@@ -53,7 +53,7 @@ func (v *voter) Update() {
 	orphans := v.t.Consensus.Orphans()
 	txs := make([]snowstorm.Tx, 0, orphans.Len())
 	for orphanID := range orphans {
-		if tx, err := v.t.VM.Get(orphanID); err == nil {
+		if tx, err := v.t.VM.GetTx(orphanID); err == nil {
 			txs = append(txs, tx)
 		} else {
 			v.t.Ctx.Log.Warn("Failed to fetch %s during attempted re-issuance", orphanID)
@@ -79,7 +79,7 @@ func (v *voter) Update() {
 func (v *voter) bubbleVotes(votes ids.UniqueBag) (ids.UniqueBag, error) {
 	vertexHeap := vertex.NewHeap()
 	for vote := range votes {
-		vtx, err := v.t.Manager.Get(vote)
+		vtx, err := v.t.Manager.GetVtx(vote)
 		if err != nil {
 			continue
 		}

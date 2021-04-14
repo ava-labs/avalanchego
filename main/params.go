@@ -238,6 +238,11 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(ipcsChainIDsKey, "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
 	fs.String(ipcsPathKey, defaultString, "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
 
+	// Indexer
+	// TODO handle the below line better
+	fs.Bool(indexEnabledKey, false, "If true, index all accepted containers and transactions and expose them via an API")
+	fs.Bool(indexAllowIncompleteKey, false, "If true, allow running the node in such a way that could cause an index to miss transactions. Ignored if index is disabled.")
+
 	return fs
 }
 
@@ -527,6 +532,7 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.MetricsAPIEnabled = v.GetBool(metricsAPIEnabledKey)
 	Config.HealthAPIEnabled = v.GetBool(healthAPIEnabledKey)
 	Config.IPCAPIEnabled = v.GetBool(ipcAPIEnabledKey)
+	Config.IndexAPIEnabled = v.GetBool(indexEnabledKey)
 
 	// Throughput:
 	Config.ThroughputServerEnabled = v.GetBool(xputServerEnabledKey)
@@ -714,6 +720,9 @@ func setNodeConfig(v *viper.Viper) error {
 		}
 	}
 	Config.CorethConfig = corethConfigString
+
+	// Indexer
+	Config.IndexAllowIncomplete = v.GetBool(indexAllowIncompleteKey)
 
 	// Bootstrap Configs
 	Config.RetryBootstrap = v.GetBool(retryBootstrap)

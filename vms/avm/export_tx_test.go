@@ -774,7 +774,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.Parse(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -834,7 +834,7 @@ func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.Parse(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -894,7 +894,7 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.Parse(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -978,7 +978,7 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.Parse(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1008,11 +1008,8 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 
 	ctx.Lock.Lock()
 
-	userKeystore, err := keystore.CreateTestKeystore()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := userKeystore.AddUser(username, password); err != nil {
+	userKeystore := keystore.New(logging.NoLog{}, memdb.New())
+	if err := userKeystore.CreateUser(username, password); err != nil {
 		t.Fatal(err)
 	}
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
@@ -1099,7 +1096,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.Parse(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1159,7 +1156,7 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.Parse(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1273,7 +1270,7 @@ func TestIssueExportTx(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	txs := vm.Pending()
+	txs := vm.PendingTxs()
 	if len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}
@@ -1406,7 +1403,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	txs := vm.Pending()
+	txs := vm.PendingTxs()
 	if len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}

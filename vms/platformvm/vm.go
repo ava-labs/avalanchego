@@ -92,6 +92,7 @@ var (
 
 	_ block.ChainVM        = &VM{}
 	_ validators.Connector = &VM{}
+	_ common.StaticVM      = &VM{}
 )
 
 // VM implements the snowman.ChainVM interface
@@ -1371,6 +1372,10 @@ func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.S
 		for len(toRemoveHeap) > 0 && !toRemoveHeap[0].EndTime().After(validator.StartTime()) {
 			toRemove := toRemoveHeap[0]
 			toRemoveHeap = toRemoveHeap[1:]
+
+			if currentWeight > maxWeight && !startTime.After(toRemove.EndTime()) {
+				maxWeight = currentWeight
+			}
 
 			newWeight, err := safemath.Sub64(currentWeight, toRemove.Wght)
 			if err != nil {
