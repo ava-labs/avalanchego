@@ -27,16 +27,21 @@ var (
 	errWrongBlockchainID = errors.New("wrong blockchain ID provided")
 	errWrongNetworkID    = errors.New("tx was issued with a different network ID")
 	errNilTx             = errors.New("tx is nil")
+	errNoValueOutput     = errors.New("output has no value")
+	errNoValueInput      = errors.New("input has no value")
+	errNilOutput         = errors.New("nil output")
+	errNilInput          = errors.New("nil input")
+	errEmptyAssetID      = errors.New("empty asset ID is not valid")
 )
 
-// EVMOutput defines an output from EVM State created from export transactions
+// EVMOutput defines an output that is added to the EVM state created by import transactions
 type EVMOutput struct {
 	Address common.Address `serialize:"true" json:"address"`
 	Amount  uint64         `serialize:"true" json:"amount"`
 	AssetID ids.ID         `serialize:"true" json:"assetID"`
 }
 
-// EVMInput defines an input for the EVM State to be used in import transactions
+// EVMInput defines an input created from the EVM state to fund export transactions
 type EVMInput struct {
 	Address common.Address `serialize:"true" json:"address"`
 	Amount  uint64         `serialize:"true" json:"amount"`
@@ -46,11 +51,27 @@ type EVMInput struct {
 
 // Verify ...
 func (out *EVMOutput) Verify() error {
+	switch {
+	case out == nil:
+		return errNilOutput
+	case out.Amount == 0:
+		return errNoValueOutput
+	case out.AssetID == ids.Empty:
+		return errEmptyAssetID
+	}
 	return nil
 }
 
 // Verify ...
 func (in *EVMInput) Verify() error {
+	switch {
+	case in == nil:
+		return errNilInput
+	case in.Amount == 0:
+		return errNoValueInput
+	case in.AssetID == ids.Empty:
+		return errEmptyAssetID
+	}
 	return nil
 }
 
