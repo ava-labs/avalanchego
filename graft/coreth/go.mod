@@ -4,7 +4,7 @@ go 1.15
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.5.7
-	github.com/ava-labs/avalanchego v1.3.1-0.20210413232250-061f6ef88860
+	github.com/ava-labs/avalanchego v1.3.3-0.20210414180501-d3c6d3d61797
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
 	github.com/edsrzf/mmap-go v1.0.0
