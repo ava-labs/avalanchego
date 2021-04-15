@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/config/versionconfig"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -68,8 +69,6 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version                 = version.NewDefaultApplication(constants.PlatformName, 1, 3, 2) // TODO can we put this config or somewhere better than here?
-	PreviousVersion         = version.NewDefaultApplication(constants.PlatformName, 1, 3, 1) // TODO can we put this config or somewhere better than here?
 	versionParser           = version.NewDefaultApplicationParser()
 	beaconConnectionTimeout = 1 * time.Minute
 )
@@ -234,7 +233,7 @@ func (n *Node) initNetworking() error {
 		n.ID,
 		n.Config.StakingIP,
 		n.Config.NetworkID,
-		Version,
+		versionconfig.NodeVersion,
 		versionParser,
 		listener,
 		dialer,
@@ -687,7 +686,7 @@ func (n *Node) initInfoAPI() error {
 	n.Log.Info("initializing info API")
 	service, err := info.NewService(
 		n.Log,
-		Version,
+		versionconfig.NodeVersion,
 		n.ID,
 		n.Config.NetworkID,
 		n.chainManager,
@@ -813,7 +812,7 @@ func (n *Node) Initialize(
 	n.LogFactory = logFactory
 	n.Config = config
 	n.DoneShuttingDown.Add(1)
-	n.Log.Info("Node version is: %s", Version)
+	n.Log.Info("Node version is: %s", versionconfig.NodeVersion)
 	n.Log.Info("Node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))
 
 	httpLog, err := logFactory.MakeSubdir("http")

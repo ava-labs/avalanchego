@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ava-labs/avalanchego/config/versionconfig"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
@@ -500,10 +501,10 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 			return false
 		}
 		// make sure both expected subdirectories exist
-		if _, err := os.Stat(filepath.Join(dir, fmt.Sprintf("%s%s%s", constants.AppName, "-v", node.Version.AsVersion()))); err != nil {
+		if _, err := os.Stat(filepath.Join(dir, fmt.Sprintf("%s%s%s", constants.AppName, "-v", versionconfig.NodeVersion.AsVersion()))); err != nil {
 			return false
 		}
-		if _, err := os.Stat(filepath.Join(dir, fmt.Sprintf("%s%s%s", constants.AppName, "-v", node.PreviousVersion.AsVersion()))); err != nil {
+		if _, err := os.Stat(filepath.Join(dir, fmt.Sprintf("%s%s%s", constants.AppName, "-v", versionconfig.PreDBUpgradeNodeVersion.AsVersion()))); err != nil {
 			return false
 		}
 		return true
@@ -520,7 +521,7 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 	// Plugin directory
 	pluginDir := v.GetString(pluginDirKey)
 	if pluginDir == defaultString {
-		config.PluginDir = filepath.Join(config.BuildDir, fmt.Sprintf("%s%s%s", constants.AppName, "-v", node.Version.AsVersion()), "plugins") // TODO fix this. It always uses the current node version right now.
+		config.PluginDir = filepath.Join(config.BuildDir, fmt.Sprintf("%s%s%s", constants.AppName, "-v", versionconfig.NodeVersion.AsVersion()), "plugins") // TODO fix this. It always uses the current node version right now.
 	} else {
 		config.PluginDir = pluginDir
 	}
@@ -814,7 +815,7 @@ func GetConfig() (node.Config, error) {
 	if v.GetBool(versionKey) {
 		format := "%s ["
 		args := []interface{}{
-			node.Version,
+			versionconfig.NodeVersion,
 		}
 
 		networkID, err := constants.NetworkID(v.GetString(networkNameKey))

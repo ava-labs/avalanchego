@@ -39,10 +39,13 @@ var (
 	httpPortName    = fmt.Sprintf("%s-http", constants.AppName)
 )
 
+// App is a wrapper around a node
 type App struct {
 	config node.Config
-	node   *node.Node // set in Start()
-	log    logging.Logger
+	// node is set in Start()
+	node *node.Node
+	// log is set in Start()
+	log logging.Logger
 }
 
 func NewApp(config node.Config) *App {
@@ -51,6 +54,9 @@ func NewApp(config node.Config) *App {
 	}
 }
 
+// Start creates and runs an AvalancheGo nodes
+// Returns the node's exit code. If [a.Stop()] is called,
+// returns 0. This method blocks until the node is done.
 func (a *App) Start() int {
 	// we want to create the logger after the plugin as started the app
 	logFactory := logging.NewFactory(a.config.LoggingConfig)
@@ -63,7 +69,7 @@ func (a *App) Start() int {
 		return 1
 	}
 
-	// startup the dbManager
+	// start the db manager
 	var dbManager manager.Manager
 	if a.config.DBEnabled {
 		dbManager, err = manager.New(a.config.DBPath, a.log, config.DBVersion, !a.config.FetchOnly)
@@ -91,7 +97,6 @@ func (a *App) Start() int {
 		return 1
 	}
 	a.log.Info("bootstrapped with current database version: %v", currentDBBootstrapped)
-
 	if a.config.FetchOnly {
 		// Flag says to run in fetch only mode
 		if currentDBBootstrapped {

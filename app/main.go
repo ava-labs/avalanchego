@@ -20,7 +20,9 @@ var (
 	exitCode = 0
 )
 
-// main is the primary entry point to Avalanche.
+// main runs an AvalancheGo node.
+// If specified in the config, serves a hashicorp plugin that can be consumed by the daemon
+// (see avalanchego/main).
 func main() {
 	defer func() {
 		os.Exit(exitCode)
@@ -45,20 +47,19 @@ func main() {
 		return
 	}
 
-	app := process.NewApp(c)
-	if c.PluginMode { // defaults to run as plugin
+	app := process.NewApp(c) // Create node wrapper
+	if c.PluginMode {        // Serve as a plugin
 		plugin.Serve(&plugin.ServeConfig{
 			HandshakeConfig: appPlugin.Handshake,
 			Plugins: map[string]plugin.Plugin{
 				"nodeProcess": appPlugin.New(app),
 			},
-			// A non-nil value here enables gRPC serving for this plugin
-			GRPCServer: plugin.DefaultGRPCServer,
+			GRPCServer: plugin.DefaultGRPCServer, // A non-nil value here enables gRPC serving for this plugin
 			Logger: hclog.New(&hclog.LoggerOptions{
 				Level: hclog.Error,
 			}),
 		})
 		return
 	}
-	exitCode = app.Start()
+	exitCode = app.Start() // Start the node
 }

@@ -51,10 +51,10 @@ func main() {
 		return
 	}
 
-	binaryManager := newNodeProcessManager(nodeConfig.BuildDir, log)
+	nodeManager := newNodeManager(nodeConfig.BuildDir, log)
 	_ = utils.HandleSignals(
 		func(os.Signal) {
-			binaryManager.shutdown()
+			nodeManager.shutdown()
 			os.Exit(exitCode)
 		},
 		syscall.SIGINT, syscall.SIGTERM,
@@ -67,7 +67,7 @@ func main() {
 		return
 	}
 
-	migrationManager := newMigrationManager(binaryManager, v, nodeConfig, log)
+	migrationManager := newMigrationManager(nodeManager, v, nodeConfig, log)
 	if err := migrationManager.migrate(); err != nil {
 		log.Error("error while running migration: %s", err)
 		exitCode = 1
@@ -75,8 +75,7 @@ func main() {
 	}
 
 	log.Info("starting to run node in normal execution mode")
-	exitCode, err = binaryManager.runNormal(v)
-	fmt.Printf("exit code: %d\n", exitCode)
-	fmt.Printf("err: %v\n", err)
-	binaryManager.shutdown() // make sure all the nodes are stopped
+	exitCode, err = nodeManager.runNormal(v)
+	log.Debug("node manager returned exit code %s, error %v", exitCode, err)
+	nodeManager.shutdown() // make sure all the nodes are stopped
 }

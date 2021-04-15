@@ -4,21 +4,32 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/config/versionconfig"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/spf13/viper"
 )
 
+var (
+	preDBUpgradeNodeVersion = version.NewDefaultVersion(1, 3, 2)
+)
+
 type migrationManager struct {
-	binaryManager *nodeProcessManager
+	binaryManager *nodeManager
 	nodeConfig    node.Config
 	log           logging.Logger
 	v             *viper.Viper
 }
 
-func newMigrationManager(binaryManager *nodeProcessManager, v *viper.Viper, nConfig node.Config, log logging.Logger) *migrationManager {
+func newMigrationManager(
+	binaryManager *nodeManager,
+	v *viper.Viper,
+	nConfig node.Config,
+	log logging.Logger,
+) *migrationManager {
 	return &migrationManager{
 		binaryManager: binaryManager,
 		nodeConfig:    nConfig,
@@ -68,20 +79,20 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 // When the new node version is done bootstrapping, both nodes are stopped.
 // Returns nil if the new node version successfully bootstrapped.
 func (m *migrationManager) runMigration() error {
-	m.log.Info("starting database migration mode")
-	prevVersionNode, err := m.binaryManager.previousVersionNode(node.PreviousVersion.AsVersion(), m.v)
+	m.log.Info("starting database migration")
+	preDBUpgradeNode, err := m.binaryManager.preDBUpgradeNode(versionconfig.PreDBUpgradeNodeVersion.AsVersion(), m.v)
 	if err != nil {
 		return fmt.Errorf("couldn't create previous version node during migration: %w", err)
 	}
-	m.log.Info("starting node version %s", node.PreviousVersion.AsVersion())
-	prevVersionNodeExitCodeChan := prevVersionNode.start()
+	m.log.Info("starting node version %s", versionconfig.PreDBUpgradeNodeVersion.AsVersion())
+	preDBUpgradeNodeExitCodeChan := preDBUpgradeNode.start()
 	defer func() {
-		if err := m.binaryManager.stop(prevVersionNode.processID); err != nil {
+		if err := m.binaryManager.stop(preDBUpgradeNode.processID); err != nil {
 			m.log.Error(err.Error())
 		}
 	}()
 
-	m.log.Info("starting node version %s", node.Version.AsVersion())
+	m.log.Info("starting node version %s", versionconfig.NodeVersion.AsVersion())
 	currentVersionNode, err := m.binaryManager.currentVersionNode(m.v, true, m.nodeConfig.NodeID)
 	if err != nil {
 		return fmt.Errorf("couldn't create current version during migration: %w", err)
@@ -95,7 +106,7 @@ func (m *migrationManager) runMigration() error {
 
 	for {
 		select {
-		case exitCode := <-prevVersionNodeExitCodeChan:
+		case exitCode := <-preDBUpgradeNodeExitCodeChan:
 			return fmt.Errorf("previous version node stopped with exit code %d", exitCode)
 		case exitCode := <-currentVersionNodeExitCodeChan:
 			if exitCode != constants.ExitCodeDoneMigrating {

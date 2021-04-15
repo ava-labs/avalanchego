@@ -8,8 +8,8 @@ import (
 
 	appplugin "github.com/ava-labs/avalanchego/app/plugin"
 	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/config/versionconfig"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
@@ -45,42 +45,42 @@ func (np *nodeProcess) stop() error {
 	return err
 }
 
-type nodeProcessManager struct {
+type nodeManager struct {
 	buildDirPath  string
 	log           logging.Logger
 	nodes         map[int]*nodeProcess
 	nextProcessID int
 }
 
-func (b *nodeProcessManager) shutdown() {
-	for _, node := range b.nodes {
-		if err := b.stop(node.processID); err != nil {
-			b.log.Error("error stopping node: %s", err)
+func (nm *nodeManager) shutdown() {
+	for _, node := range nm.nodes {
+		if err := nm.stop(node.processID); err != nil {
+			nm.log.Error("error stopping node: %s", err)
 		}
 	}
 }
 
-func (b *nodeProcessManager) stop(processID int) error {
-	nodeProcess, exists := b.nodes[processID]
+func (nm *nodeManager) stop(processID int) error {
+	nodeProcess, exists := nm.nodes[processID]
 	if !exists {
 		return nil
 	}
-	delete(b.nodes, processID)
+	delete(nm.nodes, processID)
 	if err := nodeProcess.stop(); err != nil {
 		return err
 	}
 	return nil
 }
 
-func newNodeProcessManager(path string, log logging.Logger) *nodeProcessManager {
-	return &nodeProcessManager{
+func newNodeManager(path string, log logging.Logger) *nodeManager {
+	return &nodeManager{
 		buildDirPath: path,
 		log:          log,
 		nodes:        map[int]*nodeProcess{},
 	}
 }
 
-func (b *nodeProcessManager) newNode(path string, args []string, printToStdOut bool) (*nodeProcess, error) {
+func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (*nodeProcess, error) {
 	config := &plugin.ClientConfig{
 		HandshakeConfig: appplugin.Handshake,
 		Plugins:         appplugin.PluginMap,
@@ -111,20 +111,20 @@ func (b *nodeProcessManager) newNode(path string, args []string, printToStdOut b
 		client.Kill()
 		return nil, fmt.Errorf("expected *node.NodeClient but got %T", raw)
 	}
-	b.nextProcessID++
+	nm.nextProcessID++
 	np := &nodeProcess{
-		log:       b.log,
+		log:       nm.log,
 		node:      node,
 		rawClient: client,
-		processID: b.nextProcessID,
+		processID: nm.nextProcessID,
 	}
-	b.nodes[np.processID] = np
+	nm.nodes[np.processID] = np
 	return np, nil
 }
 
-func (b *nodeProcessManager) runNormal(v *viper.Viper) (int, error) {
-	b.log.Info("starting node version %s", node.Version.AsVersion())
-	node, err := b.currentVersionNode(v, false, ids.ShortID{})
+func (nm *nodeManager) runNormal(v *viper.Viper) (int, error) {
+	nm.log.Info("starting node version %s", versionconfig.NodeVersion.AsVersion())
+	node, err := nm.currentVersionNode(v, false, ids.ShortID{})
 	if err != nil {
 		return 1, fmt.Errorf("couldn't create current version node: %s", err)
 	}
@@ -132,11 +132,11 @@ func (b *nodeProcessManager) runNormal(v *viper.Viper) (int, error) {
 	return exitCode, nil
 }
 
-func (b *nodeProcessManager) previousVersionNode(
+func (nm *nodeManager) preDBUpgradeNode(
 	prevVersion version.Version,
 	v *viper.Viper,
 ) (*nodeProcess, error) {
-	binaryPath := getBinaryPath(b.buildDirPath, prevVersion)
+	binaryPath := getBinaryPath(nm.buildDirPath, prevVersion)
 	args := []string{}
 	ignorableArgs := map[string]bool{config.FetchOnlyKey: true, config.PluginModeKey: true}
 	for k, v := range v.AllSettings() {
@@ -146,10 +146,10 @@ func (b *nodeProcessManager) previousVersionNode(
 		args = append(args, fmt.Sprintf("--%s=%v", k, v))
 	}
 	args = append(args, "--plugin-mode-enabled=true") // run as a plugin
-	return b.newNode(binaryPath, args, false)
+	return nm.newNode(binaryPath, args, false)
 }
 
-func (b *nodeProcessManager) currentVersionNode(
+func (nm *nodeManager) currentVersionNode(
 	v *viper.Viper,
 	fetchOnly bool,
 	fetchFrom ids.ShortID,
@@ -174,9 +174,9 @@ func (b *nodeProcessManager) currentVersionNode(
 	for k, v := range argsMap {
 		args = append(args, fmt.Sprintf("--%s=%v", k, v))
 	}
-	binaryPath := getBinaryPath(b.buildDirPath, node.Version.AsVersion())
+	binaryPath := getBinaryPath(nm.buildDirPath, versionconfig.NodeVersion.AsVersion())
 	args = append(args, "--plugin-mode-enabled=true") // run as a plugin
-	return b.newNode(binaryPath, args, true)
+	return nm.newNode(binaryPath, args, true)
 }
 
 func getBinaryPath(buildDirPath string, nodeVersion version.Version) string {
