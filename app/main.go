@@ -16,24 +16,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
-const (
-	header = "" +
-		`     _____               .__                       .__` + "\n" +
-		`    /  _  \___  _______  |  | _____    ____   ____ |  |__   ____    ,_ o` + "\n" +
-		`   /  /_\  \  \/ /\__  \ |  | \__  \  /    \_/ ___\|  |  \_/ __ \   / //\,` + "\n" +
-		`  /    |    \   /  / __ \|  |__/ __ \|   |  \  \___|   Y  \  ___/    \>> |` + "\n" +
-		`  \____|__  /\_/  (____  /____(____  /___|  /\___  >___|  /\___  >    \\` + "\n" +
-		`          \/           \/          \/     \/     \/     \/     \/`
-)
-
 var (
 	exitCode = 0
 )
 
 // main is the primary entry point to Avalanche.
 func main() {
-	fmt.Println(header)
-
 	defer func() {
 		os.Exit(exitCode)
 	}()

@@ -13,14 +13,27 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+const (
+	header = "" +
+		`     _____               .__                       .__` + "\n" +
+		`    /  _  \___  _______  |  | _____    ____   ____ |  |__   ____    ,_ o` + "\n" +
+		`   /  /_\  \  \/ /\__  \ |  | \__  \  /    \_/ ___\|  |  \_/ __ \   / //\,` + "\n" +
+		`  /    |    \   /  / __ \|  |__/ __ \|   |  \  \___|   Y  \  ___/    \>> |` + "\n" +
+		`  \____|__  /\_/  (____  /____(____  /___|  /\___  >___|  /\___  >    \\` + "\n" +
+		`          \/           \/          \/     \/     \/     \/     \/`
+)
+
 // main is the entry point to AvalancheGo.
 func main() {
+	fmt.Println(header)
+
 	exitCode := 0
 	defer func() {
 		os.Exit(exitCode)
 	}()
 
 	// Get the config
+	fmt.Println("getting node config")
 	nodeConfig, err := config.GetConfig()
 	if err != nil {
 		fmt.Printf("couldn't get config: %s", err)
@@ -60,14 +73,18 @@ func main() {
 		exitCode = 1
 		return
 	}
+
+	log.Info("starting node manager")
 	binaryManager := newNodeProcessManager(nodeConfig.BuildDir, log)
 	_ = utils.HandleSignals(
 		func(os.Signal) {
-			binaryManager.stopAll()
+			binaryManager.shutdown()
+			os.Exit(exitCode)
 		},
 		syscall.SIGINT, syscall.SIGTERM,
 	)
 	exitCode, err = binaryManager.runNormal(v)
 	fmt.Printf("exit code: %d\n", exitCode)
 	fmt.Printf("err: %v\n", err)
+	binaryManager.shutdown() // make sure all the nodes are stopped
 }

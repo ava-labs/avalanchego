@@ -18,6 +18,7 @@ import (
 )
 
 type nodeProcess struct {
+	log       logging.Logger
 	processID int
 	rawClient *plugin.Client
 	node      *appplugin.Client
@@ -29,6 +30,7 @@ func (np *nodeProcess) start() chan int {
 		exitCode, err := np.node.Start()
 		if err != nil {
 			// Couldn't start the node
+			np.log.Error("couldn't start node: %w", err)
 			exitCodeChan <- 1
 			return
 		}
@@ -51,7 +53,7 @@ type nodeProcessManager struct {
 	nextProcessID int
 }
 
-func (b *nodeProcessManager) stopAll() {
+func (b *nodeProcessManager) shutdown() {
 	for _, node := range b.nodes {
 		if err := b.stop(node.processID); err != nil {
 			b.log.Error("error stopping node: %s", err)
@@ -66,7 +68,7 @@ func (b *nodeProcessManager) stop(processID int) error {
 	}
 	delete(b.nodes, processID)
 	if err := nodeProcess.stop(); err != nil {
-		return fmt.Errorf("error stopping node: %s", err)
+		return err
 	}
 	return nil
 }
@@ -98,12 +100,12 @@ func (b *nodeProcessManager) newNode(path string, args []string, printToStdOut b
 	rpcClient, err := client.Client()
 	if err != nil {
 		client.Kill()
-		return nil, err
+		return nil, fmt.Errorf("couldn't get Client: %w", err)
 	}
 	raw, err := rpcClient.Dispense("nodeProcess")
 	if err != nil {
 		client.Kill()
-		return nil, err
+		return nil, fmt.Errorf("couldn't dispense plugin '%s': %w", "nodeProcess", err)
 	}
 	node, ok := raw.(*appplugin.Client)
 	if !ok {
@@ -112,6 +114,7 @@ func (b *nodeProcessManager) newNode(path string, args []string, printToStdOut b
 	}
 	b.nextProcessID++
 	np := &nodeProcess{
+		log:       b.log,
 		node:      node,
 		rawClient: client,
 		processID: b.nextProcessID,
@@ -121,6 +124,7 @@ func (b *nodeProcessManager) newNode(path string, args []string, printToStdOut b
 }
 
 func (b *nodeProcessManager) runNormal(v *viper.Viper) (int, error) {
+	b.log.Info("starting node version %s", node.Version.AsVersion())
 	node, err := b.currentVersionNode(v, false, ids.ShortID{})
 	if err != nil {
 		return 1, fmt.Errorf("couldn't create current version node: %s", err)
