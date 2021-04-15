@@ -235,6 +235,9 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(ipcsChainIDsKey, "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
 	fs.String(ipcsPathKey, defaultString, "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
 
+	// Plugin
+	fs.Bool(pluginRun, true, "Whether the app should run as a plugin. Defaults to true")
+
 	return fs
 }
 
@@ -738,6 +741,9 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 
 	// Peer alias
 	config.PeerAliasTimeout = v.GetDuration(peerAliasTimeoutKey)
+
+	// Plugin config
+	config.PluginRun = v.GetBool(pluginRun)
 
 	return config, nil
 }

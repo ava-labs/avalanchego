@@ -154,4 +154,6 @@ type Config struct {
 	PeerAliasTimeout time.Duration
 	// ChainConfigs
 	ChainConfigs map[ids.ID]chains.ChainConfig
+	// PluginRun decides whether to run the app as a plugin
+	PluginRun bool
 }

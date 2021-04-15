@@ -105,4 +105,5 @@ const (
 	retryBootstrap                          = "bootstrap-retry-enabled"
 	retryBootstrapMaxAttempts               = "bootstrap-retry-max-attempts"
 	peerAliasTimeoutKey                     = "peer-alias-timeout"
+	pluginRun                               = "plugin-run-enabled"
 )

@@ -46,7 +46,7 @@ func main() {
 	}
 
 	app := process.NewApp(config)
-	if true { // run as plugin flag otherwise run as a normal node // TODO parse flag for whether to run as plugin
+	if config.PluginRun { // defaults to run as plugin
 		plugin.Serve(&plugin.ServeConfig{
 			HandshakeConfig: appPlugin.Handshake,
 			Plugins: map[string]plugin.Plugin{
