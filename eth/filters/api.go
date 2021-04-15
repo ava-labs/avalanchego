@@ -178,6 +178,38 @@ func (api *PublicFilterAPI) NewPendingTransactions(ctx context.Context) (*rpc.Su
 	return rpcSub, nil
 }
 
+// NewAcceptedTransactions creates a subscription that is triggered each time a transaction is accepted.
+func (api *PublicFilterAPI) NewAcceptedTransactions(ctx context.Context) (*rpc.Subscription, error) {
+	notifier, supported := rpc.NotifierFromContext(ctx)
+	if !supported {
+		return &rpc.Subscription{}, rpc.ErrNotificationsUnsupported
+	}
+
+	rpcSub := notifier.CreateSubscription()
+
+	go func() {
+		txHashes := make(chan []common.Hash, 128)
+		acceptedTxSub := api.events.SubscribeAcceptedTxs(txHashes)
+
+		for {
+			select {
+			case hashes := <-txHashes:
+				for _, h := range hashes {
+					notifier.Notify(rpcSub.ID, h)
+				}
+			case <-rpcSub.Err():
+				acceptedTxSub.Unsubscribe()
+				return
+			case <-notifier.Closed():
+				acceptedTxSub.Unsubscribe()
+				return
+			}
+		}
+	}()
+
+	return rpcSub, nil
+}
+
 // NewBlockFilter creates a filter that fetches blocks that are imported into the chain.
 // It is part of the filter package since polling goes with eth_getFilterChanges.
 //
@@ -481,7 +513,7 @@ func (api *PublicFilterAPI) GetFilterChanges(id rpc.ID) (interface{}, error) {
 		f.deadline.Reset(deadline)
 
 		switch f.typ {
-		case PendingTransactionsSubscription, BlocksSubscription, AcceptedBlocksSubscription:
+		case PendingTransactionsSubscription, BlocksSubscription, AcceptedBlocksSubscription, AcceptedTransactionsSubscription:
 			hashes := f.hashes
 			f.hashes = nil
 			return returnHashes(hashes), nil

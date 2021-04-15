@@ -281,6 +281,10 @@ func (b *EthAPIBackend) SubscribeAcceptedLogsEvent(ch chan<- []*types.Log) event
 	return b.eth.BlockChain().SubscribeAcceptedLogsEvent(ch)
 }
 
+func (b *EthAPIBackend) SubscribeAcceptedTransactionEvent(ch chan<- core.NewTxsEvent) event.Subscription {
+	return b.eth.BlockChain().SubscribeAcceptedTransactionEvent(ch)
+}
+
 func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
 	if deadline, exists := ctx.Deadline(); exists && time.Until(deadline) < 0 {
 		return errExpired
