@@ -85,7 +85,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(versionKey, false, "If true, print version and quit")
 
 	// Fetch only mode
-	fs.Bool(fetchOnlyKey, false, "If true, bootstrap the current database version then stop")
+	fs.Bool(FetchOnlyKey, false, "If true, bootstrap the current database version then stop")
 
 	// System
 	fs.Uint64(fdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
@@ -156,7 +156,7 @@ func avalancheFlagSet() *flag.FlagSet {
 
 	// HTTP API
 	fs.String(httpHostKey, "127.0.0.1", "Address of the HTTP server")
-	fs.Uint(httpPortKey, 9650, "Port of the HTTP server")
+	fs.Uint(HTTPPortKey, 9650, "Port of the HTTP server")
 	fs.Bool(httpsEnabledKey, false, "Upgrade the HTTP server to HTTPs")
 	fs.String(httpsKeyFileKey, "", "TLS private key file for the HTTPs server")
 	fs.String(httpsCertFileKey, "", "TLS certificate file for the HTTPs server")
@@ -188,7 +188,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Duration(networkHealthMaxOutstandingDurationKey, 5*time.Minute, "Node reports unhealthy if there has been a request outstanding for this duration")
 
 	// Staking
-	fs.Uint(stakingPortKey, 9651, "Port of the consensus server")
+	fs.Uint(StakingPortKey, 9651, "Port of the consensus server")
 	fs.Bool(stakingEnabledKey, true, "Enable staking. If enabled, Network TLS is required.")
 	fs.Bool(p2pTLSEnabledKey, true, "Require TLS to authenticate network communication")
 	fs.String(stakingKeyPathKey, defaultString, "Path to the TLS private key for staking")
@@ -212,8 +212,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Subnets
 	fs.String(whitelistedSubnetsKey, "", "Whitelist of subnets to validate.")
 	// Bootstrapping
-	fs.String(bootstrapIPsKey, defaultString, "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
-	fs.String(bootstrapIDsKey, defaultString, "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	fs.String(BootstrapIPsKey, defaultString, "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
+	fs.String(BootstrapIDsKey, defaultString, "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 	fs.Bool(retryBootstrap, true, "Specifies whether bootstrap should be retried")
 	fs.Int(retryBootstrapMaxAttempts, 50, "Specifies how many times bootstrap should be retried")
 
@@ -236,7 +236,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(ipcsPathKey, defaultString, "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
 
 	// Plugin
-	fs.Bool(pluginRun, true, "Whether the app should run as a plugin. Defaults to true")
+	fs.Bool(PluginModeKey, true, "Whether the app should run as a plugin. Defaults to true")
 
 	return fs
 }
@@ -268,7 +268,7 @@ func GetViper() (*viper.Viper, error) {
 func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 	config := node.Config{}
 
-	config.FetchOnly = v.GetBool(fetchOnlyKey)
+	config.FetchOnly = v.GetBool(FetchOnlyKey)
 
 	// Consensus Parameters
 	config.ConsensusParams.K = v.GetInt(snowSampleSizeKey)
@@ -362,7 +362,7 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, fmt.Errorf("invalid IP Address %s", publicIP)
 	}
 
-	config.StakingIP = utils.NewDynamicIPDesc(ip, uint16(v.GetUint(stakingPortKey)))
+	config.StakingIP = utils.NewDynamicIPDesc(ip, uint16(v.GetUint(StakingPortKey)))
 
 	config.DynamicUpdateDuration = v.GetDuration(dynamicUpdateDurationKey)
 	config.ConnMeterResetDuration = v.GetDuration(connMeterResetDurationKey)
@@ -527,7 +527,7 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 
 	// HTTP:
 	config.HTTPHost = v.GetString(httpHostKey)
-	config.HTTPPort = uint16(v.GetUint(httpPortKey))
+	config.HTTPPort = uint16(v.GetUint(HTTPPortKey))
 
 	config.HTTPSEnabled = v.GetBool(httpsEnabledKey)
 	config.HTTPSKeyFile = v.GetString(httpsKeyFileKey)
@@ -743,15 +743,15 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 	config.PeerAliasTimeout = v.GetDuration(peerAliasTimeoutKey)
 
 	// Plugin config
-	config.PluginRun = v.GetBool(pluginRun)
+	config.PluginMode = v.GetBool(PluginModeKey)
 
 	return config, nil
 }
 
 // Initialize config.BootstrapPeers.
 func initBootstrapPeers(v *viper.Viper, config *node.Config) error {
-	bootstrapIPs := v.GetString(bootstrapIPsKey)
-	bootstrapIDs := v.GetString(bootstrapIDsKey)
+	bootstrapIPs := v.GetString(BootstrapIPsKey)
+	bootstrapIDs := v.GetString(BootstrapIDsKey)
 
 	defaultBootstrapIPs, defaultBootstrapIDs := genesis.SampleBeacons(config.NetworkID, 5)
 	if bootstrapIPs == defaultString { // If no IPs specified, use default bootstrap node IPs

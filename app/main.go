@@ -46,7 +46,7 @@ func main() {
 	}
 
 	app := process.NewApp(c)
-	if c.PluginRun { // defaults to run as plugin
+	if c.PluginMode { // defaults to run as plugin
 		plugin.Serve(&plugin.ServeConfig{
 			HandshakeConfig: appPlugin.Handshake,
 			Plugins: map[string]plugin.Plugin{

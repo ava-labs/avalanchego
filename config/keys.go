@@ -5,7 +5,7 @@ package config
 
 const (
 	defaultString                           = "default"
-	fetchOnlyKey                            = "fetch-only"
+	FetchOnlyKey                            = "fetch-only"
 	configFileKey                           = "config-file"
 	versionKey                              = "version"
 	genesisConfigFileKey                    = "genesis"
@@ -30,16 +30,16 @@ const (
 	connMeterResetDurationKey               = "conn-meter-reset-duration"
 	connMeterMaxConnsKey                    = "conn-meter-max-conns"
 	httpHostKey                             = "http-host"
-	httpPortKey                             = "http-port"
+	HTTPPortKey                             = "http-port"
 	httpsEnabledKey                         = "http-tls-enabled"
 	httpsKeyFileKey                         = "http-tls-key-file"
 	httpsCertFileKey                        = "http-tls-cert-file"
 	httpAllowedOrigins                      = "http-allowed-origins"
 	apiAuthRequiredKey                      = "api-auth-required"
 	apiAuthPasswordFileKey                  = "api-auth-password-file" // #nosec G101
-	bootstrapIPsKey                         = "bootstrap-ips"
-	bootstrapIDsKey                         = "bootstrap-ids"
-	stakingPortKey                          = "staking-port"
+	BootstrapIPsKey                         = "bootstrap-ips"
+	BootstrapIDsKey                         = "bootstrap-ids"
+	StakingPortKey                          = "staking-port"
 	stakingEnabledKey                       = "staking-enabled"
 	p2pTLSEnabledKey                        = "p2p-tls-enabled"
 	stakingKeyPathKey                       = "staking-tls-key-file"
@@ -105,5 +105,5 @@ const (
 	retryBootstrap                          = "bootstrap-retry-enabled"
 	retryBootstrapMaxAttempts               = "bootstrap-retry-max-attempts"
 	peerAliasTimeoutKey                     = "peer-alias-timeout"
-	pluginRun                               = "plugin-run-enabled"
+	PluginModeKey                           = "plugin-mode-enabled"
 )

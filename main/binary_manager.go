@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	appplugin "github.com/ava-labs/avalanchego/app/plugin"
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -139,12 +140,14 @@ func (b *nodeProcessManager) previousVersionNode(
 ) (*nodeProcess, error) {
 	binaryPath := getBinaryPath(b.buildDirPath, prevVersion)
 	args := []string{}
+	ignorableArgs := map[string]bool{config.FetchOnlyKey: true, config.PluginModeKey: true}
 	for k, v := range v.AllSettings() {
-		if k == "fetch-only" { // TODO replace with const
+		if ignorableArgs[k] {
 			continue
 		}
 		args = append(args, fmt.Sprintf("--%s=%v", k, v))
 	}
+	args = append(args, "--plugin-mode-enabled=true") //ensure it's running as a plugin
 	return b.newNode(binaryPath, args, false)
 }
 
@@ -155,21 +158,15 @@ func (b *nodeProcessManager) currentVersionNode(
 ) (*nodeProcess, error) {
 	argsMap := v.AllSettings()
 	if fetchOnly {
-		// TODO use constants for arg names here
 		stakingPort, err := strconv.Atoi(argsMap["staking-port"].(string))
 		if err != nil {
 			return nil, fmt.Errorf("couldn't parse staking port as int: %w", err)
 		}
-		argsMap["bootstrap-ips"] = fmt.Sprintf("127.0.0.1:%d", stakingPort)
-		argsMap["bootstrap-ids"] = fmt.Sprintf("%s%s", constants.NodeIDPrefix, fetchFrom)
-		argsMap["staking-port"] = stakingPort + 2
-
-		httpPort, err := strconv.Atoi(argsMap["http-port"].(string))
-		if err != nil {
-			return nil, fmt.Errorf("couldn't parse staking port as int: %w", err)
-		}
-		argsMap["http-port"] = httpPort + 2
-		argsMap["fetch-only"] = true
+		argsMap[config.BootstrapIPsKey] = fmt.Sprintf("127.0.0.1:%d", stakingPort)
+		argsMap[config.BootstrapIDsKey] = fmt.Sprintf("%s%s", constants.NodeIDPrefix, fetchFrom)
+		argsMap[config.StakingPortKey] = 0
+		argsMap[config.HTTPPortKey] = 0
+		argsMap[config.FetchOnlyKey] = true
 	}
 	args := []string{}
 	for k, v := range argsMap {

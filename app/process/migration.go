@@ -2,6 +2,7 @@ package process
 
 import (
 	"fmt"
+
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/utils/constants"
 )

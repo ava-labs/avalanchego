@@ -12,7 +12,7 @@ source $AVALANCHE_PATH/scripts/constants.sh
 rm -rf tmp
 mkdir tmp
 echo "Fetching AvalancheGo ${PREV_AVALANCHEGO_VER}..."
-git clone --quiet https://github.com/ava-labs/avalanchego tmp
+git clone --quiet https://github.com/ava-labs/avalanchego-internal tmp
 cd tmp
 git checkout --quiet $PREV_AVALANCHEGO_VER
 
