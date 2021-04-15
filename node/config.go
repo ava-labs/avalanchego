@@ -149,4 +149,5 @@ type Config struct {
 
 	// Peer alias configuration
 	PeerAliasTimeout time.Duration
+	PluginRun        bool
 }

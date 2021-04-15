@@ -242,6 +242,9 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(indexEnabledKey, false, "If true, index all accepted containers and transactions and expose them via an API")
 	fs.Bool(indexAllowIncompleteKey, false, "If true, allow running the node in such a way that could cause an index to miss transactions. Ignored if index is disabled.")
 
+	// Plugin
+	fs.Bool(pluginRun, false, "Whether the app should run as a plugin. Defaults to false")
+
 	return fs
 }
 
@@ -729,6 +732,9 @@ func setNodeConfig(v *viper.Viper) error {
 
 	// Peer alias
 	Config.PeerAliasTimeout = v.GetDuration(peerAliasTimeoutKey)
+
+	// Plugin config
+	Config.PluginRun = v.GetBool(pluginRun)
 
 	return nil
 }
