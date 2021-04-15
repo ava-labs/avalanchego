@@ -26,7 +26,7 @@ func main() {
 		os.Exit(exitCode)
 	}()
 
-	config, err := config.GetConfig()
+	c, err := config.GetConfig()
 	if err != nil {
 		exitCode = 1
 		fmt.Printf("couldn't get node config: %s", err)
@@ -34,19 +34,19 @@ func main() {
 	}
 
 	// Set the data directory permissions to be read write.
-	if err := perms.ChmodR(config.DBPath, true, perms.ReadWriteExecute); err != nil {
+	if err := perms.ChmodR(c.DBPath, true, perms.ReadWriteExecute); err != nil {
 		exitCode = 1
 		fmt.Printf("failed to restrict the permissions of the database directory with error %s\n", err)
 		return
 	}
-	if err := perms.ChmodR(config.LoggingConfig.Directory, true, perms.ReadWriteExecute); err != nil {
+	if err := perms.ChmodR(c.LoggingConfig.Directory, true, perms.ReadWriteExecute); err != nil {
 		exitCode = 1
 		fmt.Printf("failed to restrict the permissions of the log directory with error %s\n", err)
 		return
 	}
 
-	app := process.NewApp(config)
-	if config.PluginRun { // defaults to run as plugin
+	app := process.NewApp(c)
+	if c.PluginRun { // defaults to run as plugin
 		plugin.Serve(&plugin.ServeConfig{
 			HandshakeConfig: appPlugin.Handshake,
 			Plugins: map[string]plugin.Plugin{
