@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
@@ -76,26 +77,118 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 		return nil, nil, nil, nil, tempError{err}
 	}
 
-	newTimestamp := tx.Timestamp()
-	if newTimestamp.After(nextStakerChangeTime) {
+	timestamp := tx.Timestamp()
+	if timestamp.After(nextStakerChangeTime) {
 		return nil, nil, nil, nil, permError{
 			fmt.Errorf(
 				"proposed timestamp (%s) later than next staker change time (%s)",
-				newTimestamp,
+				timestamp,
 				nextStakerChangeTime,
 			),
 		}
 	}
 
-	// Specify what the state of the chain will be if this proposal is committed
-	currentStakers := parentState.CurrentStakerChainState()
-	pendingStakers := parentState.PendingStakerChainState()
-	onCommitState := NewVersionedState(parentState, currentStakers, pendingStakers)
-	onCommitState.SetTimestamp(newTimestamp)
+	currentSupply := parentState.GetCurrentSupply()
 
-	if err := vm.updateValidators(onCommitState); err != nil {
+	pendingStakers := parentState.PendingStakerChainState()
+	toAddWithRewardToCurrent := []*validatorReward(nil)
+	toAddWithoutRewardToCurrent := []*Tx(nil)
+	numToRemoveFromPending := 0
+
+pendingStakerLoop:
+	for _, tx := range pendingStakers.Stakers() {
+		switch staker := tx.UnsignedTx.(type) {
+		case *UnsignedAddDelegatorTx:
+			if staker.StartTime().After(timestamp) {
+				break pendingStakerLoop
+			}
+
+			reward := Reward(
+				staker.Validator.Duration(),
+				staker.Validator.Wght,
+				currentSupply,
+				vm.stakeMintingPeriod,
+			)
+			currentSupply, err = safemath.Add64(currentSupply, reward)
+			if err != nil {
+				return nil, nil, nil, nil, permError{err}
+			}
+
+			toAddWithRewardToCurrent = append(toAddWithRewardToCurrent, &validatorReward{
+				addStakerTx:     tx,
+				potentialReward: reward,
+			})
+			numToRemoveFromPending++
+		case *UnsignedAddValidatorTx:
+			if staker.StartTime().After(timestamp) {
+				break pendingStakerLoop
+			}
+
+			reward := Reward(
+				staker.Validator.Duration(),
+				staker.Validator.Wght,
+				currentSupply,
+				vm.stakeMintingPeriod,
+			)
+			currentSupply, err = safemath.Add64(currentSupply, reward)
+			if err != nil {
+				return nil, nil, nil, nil, permError{err}
+			}
+
+			toAddWithRewardToCurrent = append(toAddWithRewardToCurrent, &validatorReward{
+				addStakerTx:     tx,
+				potentialReward: reward,
+			})
+			numToRemoveFromPending++
+		case *UnsignedAddSubnetValidatorTx:
+			if staker.StartTime().After(timestamp) {
+				break pendingStakerLoop
+			}
+
+			// If this staker should already be removed, then we should just
+			// never add them.
+			if staker.EndTime().After(timestamp) {
+				toAddWithoutRewardToCurrent = append(toAddWithoutRewardToCurrent, tx)
+			}
+			numToRemoveFromPending++
+		default:
+			return nil, nil, nil, nil, permError{
+				fmt.Errorf("expected validator but got %T", tx.UnsignedTx),
+			}
+		}
+	}
+	newlyPendingStakers := pendingStakers.DeleteStaker(numToRemoveFromPending)
+
+	currentStakers := parentState.CurrentStakerChainState()
+	numToRemoveFromCurrent := 0
+
+currentStakerLoop:
+	for _, tx := range currentStakers.Stakers() {
+		switch staker := tx.UnsignedTx.(type) {
+		case *UnsignedAddSubnetValidatorTx:
+			if staker.EndTime().After(timestamp) {
+				break currentStakerLoop
+			}
+
+			numToRemoveFromCurrent++
+		default:
+			return nil, nil, nil, nil, permError{
+				fmt.Errorf("expected subnet validator but got %T", tx.UnsignedTx),
+			}
+		}
+	}
+	newlyCurrentStakers, err := currentStakers.UpdateStakers(
+		toAddWithRewardToCurrent,
+		toAddWithoutRewardToCurrent,
+		numToRemoveFromCurrent,
+	)
+	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
+
+	onCommitState := NewVersionedState(parentState, newlyCurrentStakers, newlyPendingStakers)
+	onCommitState.SetTimestamp(timestamp)
+	onCommitState.SetCurrentSupply(currentSupply)
 
 	// If this block is committed, update the validator sets.
 	// onCommitDB will be committed to vm.DB before this is called.

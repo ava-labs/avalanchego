@@ -107,7 +107,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		}
 	}
 
-	newlyCurrentStakers, err := currentStakers.DeleteStaker(stakerID)
+	newlyCurrentStakers, err := currentStakers.DeleteNextStaker()
 	if err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
