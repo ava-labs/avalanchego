@@ -228,6 +228,12 @@ func (self *ETHChain) GetTxSubmitCh() <-chan core.NewTxsEvent {
 	return newTxsChan
 }
 
+func (self *ETHChain) GetTxAcceptedSubmitCh() <-chan core.NewTxsEvent {
+	newTxsChan := make(chan core.NewTxsEvent)
+	self.backend.BlockChain().SubscribeAcceptedTransactionEvent(newTxsChan)
+	return newTxsChan
+}
+
 func (self *ETHChain) GetTxPool() *core.TxPool {
 	return self.backend.TxPool()
 }
