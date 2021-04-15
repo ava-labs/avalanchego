@@ -4,59 +4,9 @@
 package platformvm
 
 import (
-	"time"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
-
-type utxoGetter interface {
-	GetUTXO(utxoID avax.UTXOID) (*avax.UTXO, error)
-}
-
-type utxoAdder interface {
-	AddUTXO(utxo *avax.UTXO)
-}
-
-type utxoDeleter interface {
-	DeleteUTXO(utxoID avax.UTXOID)
-}
-
-type utxoState interface {
-	utxoGetter
-	utxoAdder
-	utxoDeleter
-}
-
-type mutableState interface {
-	GetTimestamp() time.Time
-	SetTimestamp(time.Time)
-
-	GetCurrentSupply() uint64
-	SetCurrentSupply(uint64)
-
-	GetSubnets() ([]*Tx, error)
-	AddSubnet(createSubnetTx *Tx)
-
-	GetChains(subnetID ids.ID) ([]*Tx, error)
-	AddChain(createChainTx *Tx)
-
-	GetTx(txID ids.ID) (*Tx, Status, error)
-	AddTx(tx *Tx, status Status)
-
-	utxoState
-}
-
-type versionedState interface {
-	mutableState
-
-	CurrentStakerChainState() currentStakerChainState
-	PendingStakerChainState() pendingStakerChainState
-
-	SetBase(versionedState)
-	Apply(internalState) error
-}
 
 type internalState interface {
 	mutableState
@@ -76,14 +26,6 @@ type internalState interface {
 type allState interface {
 	versionedState
 	internalState
-}
-
-func NewVersionedState(
-	vs versionedState,
-	current currentStakerChainState,
-	pending pendingStakerChainState,
-) versionedState {
-	return nil
 }
 
 // var (

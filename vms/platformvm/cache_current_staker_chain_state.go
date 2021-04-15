@@ -28,6 +28,8 @@ type currentStakerChainState interface {
 	DeleteNextStaker() (currentStakerChainState, error)
 
 	Stakers() []*Tx // Sorted in removal order
+
+	Apply(internalState) error
 }
 
 type currentStakerChainStateImpl struct {
@@ -223,6 +225,10 @@ func (cs *currentStakerChainStateImpl) DeleteNextStaker() (currentStakerChainSta
 }
 
 func (cs *currentStakerChainStateImpl) Stakers() []*Tx {
+	return cs.validators
+}
+
+func (cs *currentStakerChainStateImpl) Apply(is internalState) error {
 	return cs.validators
 }
 

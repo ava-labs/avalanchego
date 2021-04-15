@@ -25,6 +25,8 @@ type pendingStakerChainState interface {
 	DeleteStaker(numToRemove int) pendingStakerChainState
 
 	Stakers() []*Tx // Sorted in removal order
+
+	Apply(internalState) error
 }
 
 type pendingStakerChainStateImpl struct {
