@@ -33,7 +33,6 @@ func main() {
 	}()
 
 	// Get the config
-	fmt.Println("getting node config")
 	nodeConfig, err := config.GetConfig()
 	if err != nil {
 		fmt.Printf("couldn't get config: %s", err)
@@ -52,29 +51,6 @@ func main() {
 		return
 	}
 
-	//migrationManager := newMigrationManager(binaryManager, v, nodeConfig, log)
-	//if err := migrationManager.migrate(); err != nil {
-	//	log.Error("error while running migration: %s", err)
-	//	exitCode = 1
-	//	return
-	//}
-	//
-	//if err := binaryManager.runNormal(v); err != nil {
-	//	exitCode = 1
-	//	return
-	//}
-
-	// Ignore warning from launching an executable with a variable command
-	// because the command is a controlled and required input
-
-	v, err := config.GetViper()
-	if err != nil {
-		fmt.Printf("couldn't get viper: %s\n", err)
-		exitCode = 1
-		return
-	}
-
-	log.Info("starting node manager")
 	binaryManager := newNodeProcessManager(nodeConfig.BuildDir, log)
 	_ = utils.HandleSignals(
 		func(os.Signal) {
@@ -83,6 +59,22 @@ func main() {
 		},
 		syscall.SIGINT, syscall.SIGTERM,
 	)
+
+	v, err := config.GetViper()
+	if err != nil {
+		fmt.Printf("couldn't get viper: %s\n", err)
+		exitCode = 1
+		return
+	}
+
+	migrationManager := newMigrationManager(binaryManager, v, nodeConfig, log)
+	if err := migrationManager.migrate(); err != nil {
+		log.Error("error while running migration: %s", err)
+		exitCode = 1
+		return
+	}
+
+	log.Info("starting to run node in normal execution mode")
 	exitCode, err = binaryManager.runNormal(v)
 	fmt.Printf("exit code: %d\n", exitCode)
 	fmt.Printf("err: %v\n", err)

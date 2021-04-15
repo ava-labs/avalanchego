@@ -15,7 +15,7 @@ type migrationManager struct {
 	binaryManager *nodeProcessManager
 	nodeConfig    node.Config
 	log           logging.Logger
-	viperConfig   *viper.Viper
+	v             *viper.Viper
 }
 
 func newMigrationManager(binaryManager *nodeProcessManager, v *viper.Viper, nConfig node.Config, log logging.Logger) *migrationManager {
@@ -23,7 +23,7 @@ func newMigrationManager(binaryManager *nodeProcessManager, v *viper.Viper, nCon
 		binaryManager: binaryManager,
 		nodeConfig:    nConfig,
 		log:           log,
-		viperConfig:   v,
+		v:             v,
 	}
 }
 
@@ -68,10 +68,12 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 // When the new node version is done bootstrapping, both nodes are stopped.
 // Returns nil if the new node version successfully bootstrapped.
 func (m *migrationManager) runMigration() error {
-	prevVersionNode, err := m.binaryManager.previousVersionNode(node.PreviousVersion.AsVersion(), m.viperConfig)
+	m.log.Info("starting database migration mode")
+	prevVersionNode, err := m.binaryManager.previousVersionNode(node.PreviousVersion.AsVersion(), m.v)
 	if err != nil {
 		return fmt.Errorf("couldn't create previous version node during migration: %w", err)
 	}
+	m.log.Info("starting node version %s", node.PreviousVersion.AsVersion())
 	prevVersionNodeExitCodeChan := prevVersionNode.start()
 	defer func() {
 		if err := m.binaryManager.stop(prevVersionNode.processID); err != nil {
@@ -79,7 +81,8 @@ func (m *migrationManager) runMigration() error {
 		}
 	}()
 
-	currentVersionNode, err := m.binaryManager.currentVersionNode(m.viperConfig, true, m.nodeConfig.NodeID)
+	m.log.Info("starting node version %s", node.Version.AsVersion())
+	currentVersionNode, err := m.binaryManager.currentVersionNode(m.v, true, m.nodeConfig.NodeID)
 	if err != nil {
 		return fmt.Errorf("couldn't create current version during migration: %w", err)
 	}

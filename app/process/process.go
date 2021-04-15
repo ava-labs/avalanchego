@@ -211,7 +211,7 @@ func (a *App) Start() int {
 }
 
 // Assumes [a.node] is not nil
-func (a *App) Stop() int { // TODO remove return value?
+func (a *App) Stop() int { // TODO remove return value
 	a.node.Shutdown(0)
 	a.node.DoneShuttingDown.Wait()
 	return 0
