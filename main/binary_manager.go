@@ -30,10 +30,8 @@ func (np *nodeProcess) start() chan int {
 	go func() {
 		exitCode, err := np.node.Start()
 		if err != nil {
-			// Couldn't start the node
-			np.log.Error("couldn't start node: %w", err)
-			exitCodeChan <- 1
-			return
+			// This error could be from the subprocess shutting down
+			np.log.Debug("node returned: %s", err)
 		}
 		exitCodeChan <- exitCode
 	}()
@@ -147,7 +145,7 @@ func (b *nodeProcessManager) previousVersionNode(
 		}
 		args = append(args, fmt.Sprintf("--%s=%v", k, v))
 	}
-	args = append(args, "--plugin-mode-enabled=true") //ensure it's running as a plugin
+	args = append(args, "--plugin-mode-enabled=true") // run as a plugin
 	return b.newNode(binaryPath, args, false)
 }
 
@@ -158,7 +156,11 @@ func (b *nodeProcessManager) currentVersionNode(
 ) (*nodeProcess, error) {
 	argsMap := v.AllSettings()
 	if fetchOnly {
-		stakingPort, err := strconv.Atoi(argsMap["staking-port"].(string))
+		stakingPortStr, ok := argsMap[config.StakingPortKey].(string)
+		if !ok {
+			return nil, fmt.Errorf("expected value for %s to be string but is %T", config.StakingPortKey, argsMap[config.StakingPortKey])
+		}
+		stakingPort, err := strconv.Atoi(stakingPortStr)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't parse staking port as int: %w", err)
 		}
@@ -173,6 +175,7 @@ func (b *nodeProcessManager) currentVersionNode(
 		args = append(args, fmt.Sprintf("--%s=%v", k, v))
 	}
 	binaryPath := getBinaryPath(b.buildDirPath, node.Version.AsVersion())
+	args = append(args, "--plugin-mode-enabled=true") // run as a plugin
 	return b.newNode(binaryPath, args, true)
 }
 

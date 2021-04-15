@@ -238,7 +238,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 				// If running in fetch only mode, shut down node since fetching is complete.
 				m.Log.AssertNoError(m.DBManager.MarkCurrentDBBootstrapped())
 				if m.ManagerConfig.FetchOnly {
-					m.Log.Info("\n\ndone with fetch only mode. Restart without flag --fetch-only to run normally. Starting node shutdown.\n")
+					m.Log.Info("done with fetch only mode. Starting node shutdown")
 					go m.ShutdownNodeFunc(constants.ExitCodeDoneMigrating)
 				}
 			},
