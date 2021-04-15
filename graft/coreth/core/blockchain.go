@@ -194,6 +194,7 @@ type BlockChain struct {
 	logsFeed          event.Feed
 	logsAcceptedFeed  event.Feed
 	blockProcFeed     event.Feed
+	txAcceptedFeed    event.Feed
 	scope             event.SubscriptionScope
 	genesisBlock      *types.Block
 
@@ -1765,6 +1766,9 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 	if len(logs) > 0 {
 		bc.logsAcceptedFeed.Send(logs)
 	}
+	if len(block.Transactions()) != 0 {
+		bc.txAcceptedFeed.Send(NewTxsEvent{block.Transactions()})
+	}
 
 	return nil
 }
@@ -2904,4 +2908,9 @@ func (bc *BlockChain) SubscribeAcceptedLogsEvent(ch chan<- []*types.Log) event.S
 // block processing has started while false means it has stopped.
 func (bc *BlockChain) SubscribeBlockProcessingEvent(ch chan<- bool) event.Subscription {
 	return bc.scope.Track(bc.blockProcFeed.Subscribe(ch))
+}
+
+// SubscribeAcceptedTransactionEvent registers a subscription of accepted transactions
+func (bc *BlockChain) SubscribeAcceptedTransactionEvent(ch chan<- NewTxsEvent) event.Subscription {
+	return bc.scope.Track(bc.txAcceptedFeed.Subscribe(ch))
 }

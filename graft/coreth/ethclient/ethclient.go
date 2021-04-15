@@ -359,6 +359,16 @@ func toBlockNumArg(number *big.Int) string {
 // 	}, nil
 // }
 
+// SubscribeNewAcceptedTransactions subscribes to notifications about the accepted transaction hashes on the given channel.
+func (ec *Client) SubscribeNewAcceptedTransactions(ctx context.Context, ch chan<- *common.Hash) (coreth.Subscription, error) {
+	return ec.c.EthSubscribe(ctx, ch, "newAcceptedTransactions")
+}
+
+// SubscribeNewAcceptedTransactions subscribes to notifications about the accepted transaction hashes on the given channel.
+func (ec *Client) SubscribeNewPendingTransactions(ctx context.Context, ch chan<- *common.Hash) (coreth.Subscription, error) {
+	return ec.c.EthSubscribe(ctx, ch, "newPendingTransactions")
+}
+
 // SubscribeNewHead subscribes to notifications about the current blockchain head
 // on the given channel.
 func (ec *Client) SubscribeNewHead(ctx context.Context, ch chan<- *types.Header) (coreth.Subscription, error) {
