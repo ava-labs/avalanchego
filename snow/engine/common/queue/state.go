@@ -17,7 +17,7 @@ import (
 
 const (
 	dependentsCacheSize = 1024
-	jobsCacheSize       = 4096
+	jobsCacheSize       = 2048
 )
 
 var (
@@ -128,7 +128,11 @@ func (ps *state) GetJob(id ids.ID) (Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ps.parser.Parse(jobBytes)
+	job, err := ps.parser.Parse(jobBytes)
+	if err == nil {
+		ps.jobsCache.Put(id, job)
+	}
+	return job, err
 }
 
 // AddBlocking adds [dependent] as blocking on [dependency] being completed

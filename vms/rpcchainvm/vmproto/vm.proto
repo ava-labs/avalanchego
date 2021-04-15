@@ -91,10 +91,6 @@ message BlockVerifyRequest {
     bytes id = 1;
 }
 
-message BlockVerifyWithBytesRequest {
-    bytes blockBytes = 1;
-}
-
 message BlockVerifyResponse {}
 
 message BlockAcceptRequest {
@@ -128,7 +124,6 @@ service VM {
     rpc Health(HealthRequest) returns (HealthResponse);
 
     rpc BlockVerify(BlockVerifyRequest) returns (BlockVerifyResponse);
-    rpc BlockVerifyWithBytes(BlockVerifyWithBytesRequest) returns (BlockVerifyResponse);
     rpc BlockAccept(BlockAcceptRequest) returns (BlockAcceptResponse);
     rpc BlockReject(BlockRejectRequest) returns (BlockRejectResponse);
 }
