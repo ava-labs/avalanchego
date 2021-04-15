@@ -3,7 +3,7 @@ package process
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/config/versionconfig"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/nat"
@@ -72,7 +72,7 @@ func (a *App) Start() int {
 	// start the db manager
 	var dbManager manager.Manager
 	if a.config.DBEnabled {
-		dbManager, err = manager.New(a.config.DBPath, a.log, config.DBVersion, !a.config.FetchOnly)
+		dbManager, err = manager.New(a.config.DBPath, a.log, versionconfig.CurrentDBVersion, !a.config.FetchOnly)
 		if err != nil {
 			a.log.Error("couldn't create db manager at %s: %s", a.config.DBPath, err)
 			return 1
@@ -81,7 +81,7 @@ func (a *App) Start() int {
 		dbManager, err = manager.NewManagerFromDBs([]*manager.VersionedDatabase{
 			{
 				Database: memdb.New(),
-				Version:  config.DBVersion,
+				Version:  versionconfig.CurrentDBVersion,
 			},
 		})
 		if err != nil {
@@ -93,7 +93,7 @@ func (a *App) Start() int {
 	// ensure migrations are done
 	currentDBBootstrapped, err := dbManager.CurrentDBBootstrapped()
 	if err != nil {
-		a.log.Error("couldn't get whether database version %s ever bootstrapped: %s", config.DBVersion, err)
+		a.log.Error("couldn't get whether database version %s ever bootstrapped: %s", versionconfig.CurrentDBVersion, err)
 		return 1
 	}
 	a.log.Info("bootstrapped with current database version: %v", currentDBBootstrapped)
@@ -107,7 +107,7 @@ func (a *App) Start() int {
 		a.log.Info(upgradingMsg)
 	} else {
 		prevDB, exists := dbManager.Previous()
-		if !currentDBBootstrapped && exists && prevDB.Version.Compare(config.PrevDBVersion) == 0 {
+		if !currentDBBootstrapped && exists && prevDB.Version.Compare(versionconfig.PrevDBVersion) == 0 {
 			// If we have the previous database version but not the current one then node
 			// must run in fetch only mode (--fetch-only). The default behavior for a node in
 			// fetch only mode is to bootstrap from a node on the same machine (127.0.0.1)

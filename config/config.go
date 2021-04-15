@@ -35,15 +35,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/password"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/kardianos/osext"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-)
-
-var (
-	PrevDBVersion = version.NewDefaultVersion(1, 0, 0)
-	DBVersion     = version.NewDefaultVersion(1, 1, 0)
 )
 
 // Results of parsing the CLI
@@ -831,7 +825,7 @@ func GetConfig() (node.Config, error) {
 		args = append(args, networkGeneration)
 
 		format += ", database=%s"
-		args = append(args, DBVersion)
+		args = append(args, versionconfig.CurrentDBVersion)
 
 		if GitCommit != "" {
 			format += ", commit=%s"

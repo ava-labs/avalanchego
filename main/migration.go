@@ -3,18 +3,12 @@ package main
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/config/versionconfig"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/spf13/viper"
-)
-
-var (
-	preDBUpgradeNodeVersion = version.NewDefaultVersion(1, 3, 2)
 )
 
 type migrationManager struct {
@@ -53,7 +47,7 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 	if !m.nodeConfig.DBEnabled {
 		return false, nil
 	}
-	dbManager, err := manager.New(m.nodeConfig.DBPath, logging.NoLog{}, config.DBVersion, true)
+	dbManager, err := manager.New(m.nodeConfig.DBPath, logging.NoLog{}, versionconfig.CurrentDBVersion, true)
 	if err != nil {
 		return false, fmt.Errorf("couldn't create db manager at %s: %w", m.nodeConfig.DBPath, err)
 	}
@@ -64,7 +58,7 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 	}()
 	currentDBBootstrapped, err := dbManager.CurrentDBBootstrapped()
 	if err != nil {
-		return false, fmt.Errorf("couldn't get if database version %s is bootstrapped: %w", config.DBVersion, err)
+		return false, fmt.Errorf("couldn't get if database version %s is bootstrapped: %w", versionconfig.CurrentDBVersion, err)
 	}
 	if currentDBBootstrapped {
 		return false, nil
