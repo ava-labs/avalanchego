@@ -23,7 +23,6 @@ type Application interface {
 	App() string
 	Compatible(Application) error
 	Before(Application) bool
-	AsVersion() Version
 }
 
 type application struct {
@@ -70,9 +69,8 @@ func NewApplication(
 	}
 }
 
-func (v *application) App() string        { return v.app }
-func (v *application) String() string     { return v.str }
-func (v *application) AsVersion() Version { return v.Version }
+func (v *application) App() string    { return v.app }
+func (v *application) String() string { return v.str }
 
 func (v *application) Compatible(o Application) error {
 	switch {

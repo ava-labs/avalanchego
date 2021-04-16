@@ -97,6 +97,8 @@ func newNodeManager(path string, log logging.Logger) *nodeManager {
 	}
 }
 
+// Return a wrapper around a node wunning the binary at [path] with args [args].
+// The returned nodeProcess must eventually have [nodeProcess.rawClient.Kill] called on it.
 func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (*nodeProcess, error) {
 	clientConfig := &plugin.ClientConfig{
 		HandshakeConfig: appplugin.Handshake,
@@ -139,6 +141,8 @@ func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (
 	return np, nil
 }
 
+// Run the latest node version with the config given by [v].
+// Returns the node's exit code.
 func (nm *nodeManager) runNormal(v *viper.Viper, nodeConfig node.Config) (int, error) {
 	nm.log.Info("starting latest node version")
 	node, err := nm.latestVersionNode(v, false, ids.ShortID{}, 0)

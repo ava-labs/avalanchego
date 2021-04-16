@@ -43,6 +43,9 @@ func (m *migrationManager) migrate() error {
 	return m.runMigration()
 }
 
+// Return true if the database should be migrated from the previous database version
+// to the current one. We should migrate if we have not finished bootstrapping with the
+// current database version and the previous database version exists.
 func (m *migrationManager) shouldMigrate() (bool, error) {
 	if !m.nodeConfig.DBEnabled {
 		return false, nil
@@ -69,7 +72,7 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 
 // Run two nodes at once: one is a version before the database upgrade and the other after.
 // The latter will bootstrap from the former. The pre-upgrade node will have staking port and
-// http port 2 greater than the values given by the user.
+// HTTP port 2 greater than the values given by the user.
 // When the new node version is done bootstrapping, both nodes are stopped.
 // Returns nil if the new node version successfully bootstrapped.
 func (m *migrationManager) runMigration() error {
@@ -107,15 +110,15 @@ func (m *migrationManager) runMigration() error {
 		}
 	}()
 
-	for {
-		select {
-		case exitCode := <-preDBUpgradeNodeExitCodeChan:
-			return fmt.Errorf("previous version node stopped with exit code %d", exitCode)
-		case exitCode := <-latestVersionExitCodeChan:
-			if exitCode != constants.ExitCodeDoneMigrating {
-				return fmt.Errorf("latest version died with exit code %d", exitCode)
-			}
-			return nil
+	// Wait until one of the nodes finishes. If the bootstrapping node finishes with
+	// an exit code other than the one indicating it is done bootstrapping, error.
+	select {
+	case exitCode := <-preDBUpgradeNodeExitCodeChan:
+		return fmt.Errorf("previous version node stopped with exit code %d", exitCode)
+	case exitCode := <-latestVersionExitCodeChan:
+		if exitCode != constants.ExitCodeDoneMigrating {
+			return fmt.Errorf("latest version died with exit code %d", exitCode)
 		}
+		return nil
 	}
 }
