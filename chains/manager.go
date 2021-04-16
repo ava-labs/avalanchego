@@ -433,11 +433,14 @@ func (m *manager) createAvalancheChain(
 	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db)
 	txBootstrappingDB := prefixdb.New([]byte("tx_bs"), db)
 
-	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB)
+	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, consensusParams.Namespace+"_vtx", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	txBlocker := queue.New(txBootstrappingDB)
+	txBlocker, err := queue.New(txBootstrappingDB, consensusParams.Namespace+"_tx", ctx.Metrics)
+	if err != nil {
+		return nil, err
+	}
 
 	// The channel through which a VM may send messages to the consensus engine
 	// VM uses this channel to notify engine that a block is ready to be made
@@ -556,7 +559,7 @@ func (m *manager) createSnowmanChain(
 	vmDB := prefixdb.New([]byte("vm"), db)
 	bootstrappingDB := prefixdb.New([]byte("bs"), db)
 
-	blocked, err := queue.NewWithMissing(bootstrappingDB)
+	blocked, err := queue.NewWithMissing(bootstrappingDB, consensusParams.Namespace+"_block", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}

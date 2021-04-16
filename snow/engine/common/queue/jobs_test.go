@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,7 +22,10 @@ func TestNew(t *testing.T) {
 	parser := &TestParser{T: t}
 	db := memdb.New()
 
-	jobs := New(db)
+	jobs, err := New(db, "", prometheus.NewRegistry())
+	if err != nil {
+		t.Fatal(err)
+	}
 	jobs.SetParser(parser)
 
 	dbSize, err := database.Size(db)
@@ -37,7 +41,10 @@ func TestPushAndExecute(t *testing.T) {
 	parser := &TestParser{T: t}
 	db := memdb.New()
 
-	jobs := New(db)
+	jobs, err := New(db, "", prometheus.NewRegistry())
+	if err != nil {
+		t.Fatal(err)
+	}
 	jobs.SetParser(parser)
 
 	jobID := ids.GenerateTestID()
@@ -65,7 +72,8 @@ func TestPushAndExecute(t *testing.T) {
 	err = jobs.Commit()
 	assert.NoError(err)
 
-	jobs = New(db)
+	jobs, err = New(db, "", prometheus.NewRegistry())
+	assert.NoError(err)
 	jobs.SetParser(parser)
 
 	has, err = jobs.Has(jobID)
@@ -106,7 +114,10 @@ func TestRemoveDependency(t *testing.T) {
 	parser := &TestParser{T: t}
 	db := memdb.New()
 
-	jobs := New(db)
+	jobs, err := New(db, "", prometheus.NewRegistry())
+	if err != nil {
+		t.Fatal(err)
+	}
 	jobs.SetParser(parser)
 
 	job0ID := ids.GenerateTestID()
@@ -186,7 +197,10 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 
 	db := memdb.New()
 
-	jobs := New(db)
+	jobs, err := New(db, "", prometheus.NewRegistry())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	jobID := ids.GenerateTestID()
 	job := &TestJob{
@@ -209,7 +223,8 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 	err = jobs.Commit()
 	assert.NoError(err)
 
-	jobs = New(db)
+	jobs, err = New(db, "", prometheus.NewRegistry())
+	assert.NoError(err)
 
 	pushed, err = jobs.Push(job)
 	assert.False(pushed)
@@ -222,7 +237,10 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 
 	db := memdb.New()
 
-	jobs := New(db)
+	jobs, err := New(db, "", prometheus.NewRegistry())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	job0ID := ids.GenerateTestID()
 	job1ID := ids.GenerateTestID()
@@ -246,7 +264,8 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 	err = jobs.Commit()
 	assert.NoError(err)
 
-	jobs = New(db)
+	jobs, err = New(db, "", prometheus.NewRegistry())
+	assert.NoError(err)
 
 	pushed, err = jobs.Push(job1)
 	assert.False(pushed)
@@ -259,7 +278,7 @@ func TestMissingJobs(t *testing.T) {
 	parser := &TestParser{T: t}
 	db := memdb.New()
 
-	jobs, err := NewWithMissing(db)
+	jobs, err := NewWithMissing(db, "", prometheus.NewRegistry())
 	assert.NoError(err)
 	jobs.SetParser(parser)
 
@@ -289,7 +308,7 @@ func TestMissingJobs(t *testing.T) {
 	err = jobs.Commit()
 	assert.NoError(err)
 
-	jobs, err = NewWithMissing(db)
+	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())
 	assert.NoError(err)
 	jobs.SetParser(parser)
 

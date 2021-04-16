@@ -55,6 +55,8 @@ type Bootstrapper struct {
 	executedStateTransitions int
 
 	delayAmount time.Duration
+
+	parser *parser
 }
 
 // Initialize this engine.
@@ -75,12 +77,13 @@ func (b *Bootstrapper) Initialize(
 		return err
 	}
 
-	b.Blocked.SetParser(&parser{
+	b.parser = &parser{
 		log:         config.Ctx.Log,
 		numAccepted: b.numAccepted,
 		numDropped:  b.numDropped,
 		vm:          b.VM,
-	})
+	}
+	b.Blocked.SetParser(b.parser)
 
 	config.Bootstrapable = b
 	return b.Bootstrapper.Initialize(config.Config)
@@ -236,6 +239,7 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 		b.Blocked.RemoveMissingID(blkID)
 
 		pushed, err := b.Blocked.Push(&blockJob{
+			parser:      b.parser,
 			numAccepted: b.numAccepted,
 			numDropped:  b.numDropped,
 			blk:         blk,

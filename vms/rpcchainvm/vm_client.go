@@ -445,7 +445,6 @@ func (b *BlockClient) Verify() error {
 	if err != nil {
 		return err
 	}
-
 	b.vm.blks[b.id] = b
 	return nil
 }
