@@ -23,4 +23,5 @@ echo "Building AvalancheGo ${PREUPGRADE_AVALANCHEGO_VER}..."
 mkdir -p $PREV_PLUGIN_DIR
 mv $CURRENT_DIR/tmp/build/avalanchego "$PREV_AVALANCHEGO_INNER_PATH"
 mv  $CURRENT_DIR/tmp/build/plugins/* "$PREV_PLUGIN_DIR"
+cd -
 rm -rf tmp
