@@ -68,17 +68,8 @@ func (b *blockJob) Execute() error {
 		return fmt.Errorf("attempting to execute block with status %s", status)
 	case choices.Processing:
 		if err := b.blk.Verify(); err != nil {
-			// Might have failed verification because VM forgot about this block.
-			// Re-parse this block to put it back in the VM.
-			_, err := b.parser.Parse(b.blk.Bytes())
-			if err != nil {
-				return fmt.Errorf("failed to re-parse block %s", b.blk.ID())
-			}
-			// Try verifying again now that we re-parsed
-			if err := b.blk.Verify(); err != nil {
-				b.log.Error("block %s failed verification during bootstrapping due to %s", b.blk.ID(), err)
-				return fmt.Errorf("failed to verify block in bootstrapping: %w", err)
-			}
+			b.log.Error("block %s failed verification during bootstrapping due to %s", b.blk.ID(), err)
+			return fmt.Errorf("failed to verify block in bootstrapping: %w", err)
 		}
 
 		b.numAccepted.Inc()

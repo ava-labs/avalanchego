@@ -88,6 +88,9 @@ func (j *Jobs) Push(job Job) (bool, error) {
 
 func (j *Jobs) ExecuteAll(ctx *snow.Context, events ...snow.EventDispatcher) (int, error) {
 	numExecuted := 0
+
+	// Disable and clear state caches since the hit rate will be near 0 during execution.
+	j.state.DisableCaching()
 	for {
 		job, err := j.state.RemoveRunnableJob()
 		if err == database.ErrNotFound {
@@ -137,9 +140,6 @@ func (j *Jobs) ExecuteAll(ctx *snow.Context, events ...snow.EventDispatcher) (in
 			event.Accept(ctx, job.ID(), job.Bytes())
 		}
 	}
-	// Clear caches
-	j.state.jobsCache.Flush()
-	j.state.dependentsCache.Flush()
 
 	ctx.Log.Info("executed %d operations", numExecuted)
 	return numExecuted, nil
