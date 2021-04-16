@@ -62,6 +62,7 @@ const (
 
 type internalState interface {
 	mutableState
+	UptimeState
 
 	AddCurrentStaker(tx *Tx, potentialReward uint64)
 	DeleteCurrentStaker(tx *Tx)
@@ -71,9 +72,6 @@ type internalState interface {
 
 	SetCurrentStakerChainState(currentStakerChainState)
 	SetPendingStakerChainState(pendingStakerChainState)
-
-	GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time, err error)
-	SetUptime(nodeID ids.ShortID, upDuration time.Duration, lastUpdated time.Time) error
 
 	GetLastAccepted() ids.ID
 	SetLastAccepted(ids.ID)
