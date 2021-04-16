@@ -68,35 +68,6 @@ func TestCommandMessage_Load(t *testing.T) {
 	}
 }
 
-func TestCompare(t *testing.T) {
-	idsid1, _ := hex2Short("0000000000000000000000000000000000000001")
-	idsid2, _ := hex2Short("0000000000000000000000000000000000000001")
-
-	if !compare(idsid1, idsid2[:]) {
-		t.Fatalf("filter failed")
-	}
-
-	idsid3, _ := hex2Short("0000000000000000000000000000000000000010")
-
-	if compare(idsid1, idsid3[:]) {
-		t.Fatalf("filter failed")
-	}
-
-	idsid1, _ = hex2Short("0000000000000000000000000000000000000011")
-	idsid4, _ := hex2Short("0000000000000000000000000000000000000001")
-
-	if !compare(idsid1, idsid4[:]) {
-		t.Fatalf("filter failed")
-	}
-
-	idsid1, _ = hex2Short("0000000000000000000000000000000000000011")
-	idsid4, _ = hex2Short("0000000000000000000000000000000000000010")
-
-	if !compare(idsid1, idsid4[:]) {
-		t.Fatalf("filter failed")
-	}
-}
-
 func TestFilterParamUpdateMulti(t *testing.T) {
 	fp := NewFilterParam()
 	bl := make([][]byte, 0, 10)

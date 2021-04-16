@@ -32,24 +32,9 @@ func (f *FilterParam) CheckAddress(addr2check []byte) bool {
 	if f.filter != nil && f.filter.Check(addr2check) {
 		return true
 	}
-	for addr := range f.address {
-		if compare(addr, addr2check) {
-			return true
-		}
-	}
-	return false
-}
-
-func compare(a ids.ShortID, b []byte) bool {
-	if len(b) != len(a) {
-		return false
-	}
-	for i := 0; i < len(a); i++ {
-		if (a[i] & b[i]) != b[i] {
-			return false
-		}
-	}
-	return true
+	addr2checkID := ByteToID(addr2check)
+	_, ok := f.address[addr2checkID]
+	return ok
 }
 
 func (f *FilterParam) HasFilter() bool {
