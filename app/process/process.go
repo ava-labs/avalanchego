@@ -42,8 +42,7 @@ var (
 // App is a wrapper around a node
 type App struct {
 	config node.Config
-	// node is set in Start()
-	node *node.Node
+	node   *node.Node
 	// log is set in Start()
 	log logging.Logger
 }
@@ -51,6 +50,7 @@ type App struct {
 func NewApp(config node.Config) *App {
 	return &App{
 		config: config,
+		node:   &node.Node{},
 	}
 }
 
@@ -158,8 +158,8 @@ func (a *App) Start() int {
 	// SupportsNAT() for NoRouter is false.
 	// Which means we tried to perform a NAT activity but we were not successful.
 	if a.config.AttemptedNATTraversal && !a.config.Nat.SupportsNAT() {
-		a.log.Error("UPnP or NAT-PMP router attach failed, you may not be listening publicly," +
-			" please confirm the settings in your router")
+		a.log.Warn("UPnP or NAT-PMP router attach failed, you may not be listening publicly. " +
+			"Please confirm the settings in your router")
 	}
 
 	mapper := nat.NewPortMapper(a.log, a.config.Nat)
@@ -201,7 +201,6 @@ func (a *App) Start() int {
 	defer externalIPUpdater.Stop()
 
 	a.log.Info("this node's IP is set to: %s", a.config.StakingIP.IP())
-	a.node = &node.Node{}
 	if err := a.node.Initialize(&a.config, dbManager, a.log, logFactory); err != nil {
 		a.log.Error("error initializing node: %s", err)
 		return 1
@@ -213,8 +212,7 @@ func (a *App) Start() int {
 }
 
 // Assumes [a.node] is not nil
-func (a *App) Stop() int {
+func (a *App) Stop() {
 	a.node.Shutdown(0)
 	a.node.DoneShuttingDown.Wait()
-	return 0
 }

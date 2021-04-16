@@ -28,5 +28,6 @@ func (ns *Server) Start(_ context.Context, req *appproto.StartRequest) (*appprot
 }
 
 func (ns *Server) Stop(_ context.Context, req *appproto.StopRequest) (*appproto.StopResponse, error) {
+	ns.app.Stop()
 	return &appproto.StopResponse{}, nil
 }
