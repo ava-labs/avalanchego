@@ -20,7 +20,7 @@ if [[ ! -d "$PREV_BUILD_DIR" ]]; then
 fi
 
 
-if [[ -f "$AVALANCHEGO_INNER_PATH" && -f "$EVM_PATH" ]]; then
+if [[ -f "$AVALANCHEGO_PROCESS_PATH" && -f "$EVM_PATH" ]]; then
         echo "Build Successful"
         exit 0
 else

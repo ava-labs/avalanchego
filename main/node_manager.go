@@ -54,11 +54,11 @@ type nodeManager struct {
 	// Path to the build directory, which should have this structure:
 	// build
 	// |_avalanchego-latest
-	//   |_avalanchego-inner (the binary from compiling the app directory)
+	//   |_avalanchego-process (the binary from compiling the app directory)
 	//   |_plugins
 	//     |_evm
 	// |_avalanchego-preupgrade
-	//   |_avalanchego-inner (the binary from compiling the app directory)
+	//   |_avalanchego-process (the binary from compiling the app directory)
 	//   |_plugins
 	//     |_evm
 	buildDirPath string
@@ -155,7 +155,7 @@ func (nm *nodeManager) runNormal(v *viper.Viper, nodeConfig node.Config) (int, e
 
 // Start a node compatible with the previous database version
 // Override the staking port, HTTP port and plugin directory of the node.
-// Assumes the node binary path is [buildDir]/avalanchego-preupgrade/avalanchego-inner
+// Assumes the node binary path is [buildDir]/avalanchego-preupgrade/avalanchego-process
 // Assumes the node's plugin path is [buildDir]/avalanchego-preupgrade/plugins
 // Assumes the binary can be served as a plugin
 func (nm *nodeManager) preDBUpgradeNode(
@@ -181,8 +181,8 @@ func (nm *nodeManager) preDBUpgradeNode(
 	args = append(args, fmt.Sprintf("--%s=%s/avalanchego-preupgrade/plugins", config.PluginDirKey, nm.buildDirPath))
 	args = append(args, fmt.Sprintf("--%s=%d", config.HTTPPortKey, httpPort))
 	args = append(args, fmt.Sprintf("--%s=%d", config.StakingPortKey, stakingPort))
-	binaryPath := fmt.Sprintf("%s/avalanchego-preupgrade/avalanchego-inner", nm.buildDirPath)
-	return nm.newNode(binaryPath, args, false)
+	binaryPath := fmt.Sprintf("%s/avalanchego-preupgrade/avalanchego-process", nm.buildDirPath)
+	return nm.newNode(binaryPath, args, true)
 }
 
 // Run a
@@ -203,6 +203,6 @@ func (nm *nodeManager) latestVersionNode(
 		args = append(args, fmt.Sprintf("--%s=%v", k, v))
 	}
 	args = append(args, fmt.Sprintf("--%s=true", config.PluginModeKey)) // run as a plugin
-	binaryPath := fmt.Sprintf("%s/avalanchego-latest/avalanchego-inner", nm.buildDirPath)
-	return nm.newNode(binaryPath, args, true)
+	binaryPath := fmt.Sprintf("%s/avalanchego-latest/avalanchego-process", nm.buildDirPath)
+	return nm.newNode(binaryPath, args, !fetchOnly)
 }

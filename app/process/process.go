@@ -24,13 +24,11 @@ const (
 		"When the node in fetch only mode finishes, stop the other node running on this computer and run without --fetch-only flag to run node normally.\n" +
 		"Fetch only mode will not change this node's staking key/certificate.\n" +
 		"Note that populating the new database version will approximately double the amount of disk space required by AvalancheGo.\n" +
-		"Ensure that this computer has at least enough disk space available.\n" +
-		"You should not delete the old database version unless advised to by the Avalanche team."
+		"Ensure that this computer has at least enough disk space available."
 	upgradingMsg = "\nNode running in fetch only mode.\n" +
 		"Fetch only mode will not change this node's staking key/certificate.\n" +
 		"Note that populating the new database version will approximately double the amount of disk space required by AvalancheGo.\n" +
-		"Ensure that this computer has at least enough disk space available.\n" +
-		"You should not delete the old database version unless advised to by the Avalanche team."
+		"Ensure that this computer has at least enough disk space available."
 	alreadyUpgradedMsg = "fetch only mode done. Restart this node without --fetch-only to run normally"
 )
 
@@ -58,7 +56,7 @@ func NewApp(config node.Config) *App {
 // Returns the node's exit code. If [a.Stop()] is called, Start()
 // returns 0. This method blocks until the node is done.
 func (a *App) Start() int {
-	// we want to create the logger after the plugin as started the app
+	// we want to create the logger after the plugin has started the app
 	logFactory := logging.NewFactory(a.config.LoggingConfig)
 	defer logFactory.Close()
 

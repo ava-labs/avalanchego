@@ -15,7 +15,7 @@ GIT_COMMIT=${AVALANCHEGO_COMMIT:-$( git rev-list -1 HEAD )}
 
 # Build AVALANCHE
 echo "Building AvalancheGo..."
-go build -ldflags "-X main.GitCommit=$GIT_COMMIT" -o "$AVALANCHEGO_INNER_PATH" "$AVALANCHE_PATH/app/"*.go
+go build -ldflags "-X main.GitCommit=$GIT_COMMIT" -o "$AVALANCHEGO_PROCESS_PATH" "$AVALANCHE_PATH/app/"*.go
 
 echo "Building AvalancheGo binary manager..."
 go build -ldflags "-X main.GitCommit=$GIT_COMMIT" -o "$BINARY_MANAGER_PATH" "$AVALANCHE_PATH/main/"*.go

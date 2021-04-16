@@ -480,11 +480,11 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 	// The directory should have this structure:
 	// build
 	// |_avalanchego-latest
-	//   |_avalanchego-inner (the binary from compiling the app directory)
+	//   |_avalanchego-process (the binary from compiling the app directory)
 	//   |_plugins
 	//     |_evm
 	// |_avalanchego-preupgrade
-	//   |_avalanchego-inner (the binary from compiling the app directory)
+	//   |_avalanchego-process (the binary from compiling the app directory)
 	//   |_plugins
 	//     |_evm
 	buildDir := v.GetString(buildDirKey)
