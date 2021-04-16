@@ -33,7 +33,7 @@ func main() {
 	}()
 
 	// Get the config
-	nodeConfig, err := config.GetConfig()
+	nodeConfig, v, err := config.GetConfig()
 	if err != nil {
 		fmt.Printf("couldn't get config: %s", err)
 		exitCode = 1
@@ -59,13 +59,6 @@ func main() {
 		},
 		syscall.SIGINT, syscall.SIGTERM,
 	)
-
-	v, err := config.GetViper()
-	if err != nil {
-		fmt.Printf("couldn't get viper: %s\n", err)
-		exitCode = 1
-		return
-	}
 
 	migrationManager := newMigrationManager(nodeManager, v, nodeConfig, log)
 	if err := migrationManager.migrate(); err != nil {

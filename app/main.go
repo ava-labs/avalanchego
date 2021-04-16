@@ -28,7 +28,7 @@ func main() {
 		os.Exit(exitCode)
 	}()
 
-	c, err := config.GetConfig()
+	c, _, err := config.GetConfig()
 	if err != nil {
 		exitCode = 1
 		fmt.Printf("couldn't get node config: %s", err)

@@ -236,7 +236,6 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(ipcsPathKey, defaultString, "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
 
 	// Indexer
-	// TODO handle the below line better
 	fs.Bool(indexEnabledKey, false, "If true, index all accepted containers and transactions and expose them via an API")
 	fs.Bool(indexAllowIncompleteKey, false, "If true, allow running the node in such a way that could cause an index to miss transactions. Ignored if index is disabled.")
 	// Plugin
@@ -247,23 +246,20 @@ func avalancheFlagSet() *flag.FlagSet {
 
 // getViper returns the viper environment from parsing config file from default search paths
 // and any parsed command line flags
-func GetViper() (*viper.Viper, error) {
+func getViper() (*viper.Viper, error) {
 	v := viper.New()
-
 	fs := avalancheFlagSet()
 	pflag.CommandLine.AddGoFlagSet(fs)
 	pflag.Parse()
 	if err := v.BindPFlags(pflag.CommandLine); err != nil {
 		return nil, err
 	}
-
 	if configFile := v.GetString(configFileKey); configFile != defaultString {
 		v.SetConfigFile(configFile)
 		if err := v.ReadInConfig(); err != nil {
 			return nil, err
 		}
 	}
-
 	return v, nil
 }
 
@@ -816,10 +812,10 @@ func initBootstrapPeers(v *viper.Viper, config *node.Config) error {
 	return nil
 }
 
-func GetConfig() (node.Config, error) {
-	v, err := GetViper()
+func GetConfig() (node.Config, *viper.Viper, error) {
+	v, err := getViper()
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, err
 	}
 
 	if v.GetBool(versionKey) {
@@ -830,7 +826,7 @@ func GetConfig() (node.Config, error) {
 
 		networkID, err := constants.NetworkID(v.GetString(networkNameKey))
 		if err != nil {
-			return node.Config{}, err
+			return node.Config{}, nil, err
 		}
 		networkGeneration := constants.NetworkName(networkID)
 		if networkID == constants.MainnetID {
@@ -853,6 +849,6 @@ func GetConfig() (node.Config, error) {
 		fmt.Printf(format, args...)
 		os.Exit(0)
 	}
-
-	return getConfigFromViper(v)
+	config, err := getConfigFromViper(v)
+	return config, v, err
 }

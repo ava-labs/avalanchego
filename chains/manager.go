@@ -47,7 +47,7 @@ const (
 	defaultChannelSize = 1024
 )
 
-// Manager manages the chains running on this
+// Manager manages the chains running on this node.
 // It can:
 //   * Create a chain
 //   * Add a registrant. When a chain is created, each registrant calls
@@ -457,11 +457,11 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	metricsManager, err := m.DBManager.AddMeter(consensusParams.Namespace+"_db", ctx.Metrics)
+	meteredManager, err := m.DBManager.AddMeter(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	dbManager := metricsManager.AddPrefix(ctx.ChainID[:])
+	dbManager := meteredManager.AddPrefix(ctx.ChainID[:])
 	vmDBManager := dbManager.AddPrefix([]byte("vm"))
 
 	db := dbManager.Current()
@@ -588,11 +588,11 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	metricsManager, err := m.DBManager.AddMeter(consensusParams.Namespace+"_db", ctx.Metrics)
+	meteredManager, err := m.DBManager.AddMeter(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	dbManager := metricsManager.AddPrefix(ctx.ChainID[:])
+	dbManager := meteredManager.AddPrefix(ctx.ChainID[:])
 	vmDBManager := dbManager.AddPrefix([]byte("vm"))
 
 	db := dbManager.Current()
