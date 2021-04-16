@@ -252,7 +252,7 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
 
-	userKeystore, err := keystore.New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	userKeystore, _, err := keystore.CreateTestKeystore()
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -268,7 +268,7 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 	}
 	err = vm.Initialize(
 		ctx,
-		baseDBManager.NewPrefixDBManager([]byte{1}),
+		baseDBManager.AddPrefix([]byte{1}),
 		genesisBytes,
 		nil,
 		nil,
@@ -507,13 +507,13 @@ func TestInvalidGenesis(t *testing.T) {
 	}()
 
 	err := vm.Initialize(
-		/*context=*/ ctx,
-		/*dbManager=*/ manager.NewDefaultMemDBManager(),
-		/*genesisState=*/ nil,
-		/*upgradeBytes=*/ nil,
-		/*configBytes=*/ nil,
-		/*engineMessenger=*/ make(chan common.Message, 1),
-		/*fxs=*/ nil,
+		ctx,                              // context
+		manager.NewDefaultMemDBManager(), // dbManager
+		nil,                              // genesisState
+		nil,                              // upgradeBytes
+		nil,                              // configBytes
+		make(chan common.Message, 1),     // engineMessenger
+		nil,                              // fxs
 	)
 	if err == nil {
 		t.Fatalf("Should have errored due to an invalid genesis")
@@ -533,13 +533,13 @@ func TestInvalidFx(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	err := vm.Initialize(
-		/*context=*/ ctx,
-		/*dbManager=*/ manager.NewDefaultMemDBManager(),
-		/*genesisState=*/ genesisBytes,
-		/*upgradeBytes=*/ nil,
-		/*configBytes=*/ nil,
-		/*engineMessenger=*/ make(chan common.Message, 1),
-		/*fxs=*/ []*common.Fx{
+		ctx,                              // context
+		manager.NewDefaultMemDBManager(), // dbManager
+		genesisBytes,                     // genesisState
+		nil,                              // upgradeBytes
+		nil,                              // configBytes
+		make(chan common.Message, 1),     // engineMessenger
+		[]*common.Fx{ // fxs
 			nil,
 		},
 	)
@@ -561,13 +561,13 @@ func TestFxInitializationFailure(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	err := vm.Initialize(
-		/*context=*/ ctx,
-		/*dbManager=*/ manager.NewDefaultMemDBManager(),
-		/*genesisState=*/ genesisBytes,
-		/*upgradeBytes=*/ nil,
-		/*configBytes=*/ nil,
-		/*engineMessenger=*/ make(chan common.Message, 1),
-		/*fxs=*/ []*common.Fx{{
+		ctx,                              // context
+		manager.NewDefaultMemDBManager(), // dbManager
+		genesisBytes,                     // genesisState
+		nil,                              // upgradeBytes
+		nil,                              // configBytes
+		make(chan common.Message, 1),     // engineMessenger
+		[]*common.Fx{{ // fxs
 			ID: ids.Empty,
 			Fx: &FxTest{
 				InitializeF: func(interface{}) error {

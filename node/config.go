@@ -4,6 +4,7 @@
 package node
 
 import (
+	"crypto/tls"
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -23,6 +24,11 @@ import (
 // Config contains all of the configurations of an Avalanche node.
 type Config struct {
 	genesis.Params
+
+	NodeID ids.ShortID
+
+	// If true, bootstrap the current database version and then end the node.
+	FetchOnly bool
 
 	// Genesis information
 	GenesisBytes []byte
@@ -53,8 +59,9 @@ type Config struct {
 	StakingIP             utils.DynamicIPDesc
 	EnableP2PTLS          bool
 	EnableStaking         bool
-	StakingKeyFile        string
 	StakingCertFile       string
+	StakingKeyFile        string
+	StakingTLSCert        tls.Certificate
 	DisabledStakingWeight uint64
 
 	// Throttling
@@ -102,6 +109,9 @@ type Config struct {
 	// Plugin directory
 	PluginDir string
 
+	// Path to build directory
+	BuildDir string
+
 	// Consensus configuration
 	ConsensusParams avalanche.Parameters
 
@@ -132,11 +142,6 @@ type Config struct {
 	// Subnet Whitelist
 	WhitelistedSubnets ids.Set
 
-	// Restart on disconnect settings
-	RestartOnDisconnected      bool
-	DisconnectedCheckFreq      time.Duration
-	DisconnectedRestartTimeout time.Duration
-
 	// Coreth
 	CorethConfig string
 
@@ -152,4 +157,6 @@ type Config struct {
 	PeerAliasTimeout time.Duration
 	// ChainConfigs
 	ChainConfigs map[ids.ID]chains.ChainConfig
+	// PluginMode decides whether to run the app as a plugin
+	PluginMode bool
 }

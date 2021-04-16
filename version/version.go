@@ -16,6 +16,7 @@ const (
 var (
 	errDifferentMajor = errors.New("different major version")
 	DefaultVersion1   = NewDefaultVersion(1, 0, 0)
+	DefaultVersion2   = NewDefaultVersion(1, 1, 0)
 )
 
 type Version interface {
@@ -24,7 +25,8 @@ type Version interface {
 	Major() int
 	Minor() int
 	Patch() int
-	Compare(v Version) int
+	// Compare returns a positive number if v > o, 0 if v == o, or a negative number if v < 0.
+	Compare(o Version) int
 }
 
 type version struct {

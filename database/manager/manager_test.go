@@ -23,7 +23,7 @@ import (
 func TestNewSingleDB(t *testing.T) {
 	dir := t.TempDir()
 
-	v1 := version.DefaultVersion1
+	v1 := version.DefaultVersion2
 
 	dbPath := path.Join(dir, v1.String())
 	db, err := leveldb.New(dbPath, logging.NoLog{}, 0, 0, 0)
@@ -36,7 +36,7 @@ func TestNewSingleDB(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager, err := New(dir, logging.NoLog{}, v1)
+	manager, err := New(dir, logging.NoLog{}, v1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,9 +58,9 @@ func TestNewSingleDB(t *testing.T) {
 func TestNewCreatesSingleDB(t *testing.T) {
 	dir := t.TempDir()
 
-	v1 := version.DefaultVersion1
+	v1 := version.DefaultVersion2
 
-	manager, err := New(dir, logging.NoLog{}, v1)
+	manager, err := New(dir, logging.NoLog{}, v1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,20 +102,16 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = New(dir, logging.NoLog{}, v2)
+	_, err = New(dir, logging.NoLog{}, v2, true)
 	assert.Error(t, err, "expected to error creating the manager due to an open db")
 
 	err = db1.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	_, err = os.Create(path.Join(dir, "dummy"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
-	_, err = New(dir, logging.NoLog{}, v1)
+	_, err = New(dir, logging.NoLog{}, v1, true)
 	assert.Error(t, err, "expected to error due to non-directory file being present")
 }
 
@@ -143,7 +139,7 @@ func TestNewSortsDatabases(t *testing.T) {
 		}
 	}
 
-	manager, err := New(dir, logging.NoLog{}, vers[0])
+	manager, err := New(dir, logging.NoLog{}, vers[0], true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,50 +193,12 @@ func TestPrefixDBManager(t *testing.T) {
 	m := &manager{databases: []*VersionedDatabase{
 		{
 			Database: db,
-			Version:  version.DefaultVersion1,
+			Version:  version.DefaultVersion2,
 		},
 	}}
 
-	m0 := m.NewPrefixDBManager(prefix0)
-	m1 := m0.NewPrefixDBManager(prefix1)
-
-	val, err := m0.Current().Get(k0)
-	assert.NoError(t, err)
-	assert.Equal(t, v0, val)
-
-	val, err = m1.Current().Get(k1)
-	assert.NoError(t, err)
-	assert.Equal(t, v1, val)
-}
-
-func TestNestedPrefixDBManager(t *testing.T) {
-	db := memdb.New()
-
-	prefix0 := []byte{0}
-	db0 := prefixdb.NewNested(prefix0, db)
-
-	prefix1 := []byte{1}
-	db1 := prefixdb.NewNested(prefix1, db0)
-
-	k0 := []byte{'s', 'c', 'h', 'n', 'i'}
-	v0 := []byte{'t', 'z', 'e', 'l'}
-	k1 := []byte{'c', 'u', 'r', 'r', 'y'}
-	v1 := []byte{'w', 'u', 'r', 's', 't'}
-
-	assert.NoError(t, db0.Put(k0, v0))
-	assert.NoError(t, db1.Put(k1, v1))
-	assert.NoError(t, db0.Close())
-	assert.NoError(t, db1.Close())
-
-	m := &manager{databases: []*VersionedDatabase{
-		{
-			Database: db,
-			Version:  version.DefaultVersion1,
-		},
-	}}
-
-	m0 := m.NewNestedPrefixDBManager(prefix0)
-	m1 := m0.NewNestedPrefixDBManager(prefix1)
+	m0 := m.AddPrefix(prefix0)
+	m1 := m0.AddPrefix(prefix1)
 
 	val, err := m0.Current().Get(k0)
 	assert.NoError(t, err)
@@ -265,14 +223,14 @@ func TestMeterDBManager(t *testing.T) {
 		},
 		{
 			Database: memdb.New(),
-			Version:  version.DefaultVersion1,
+			Version:  version.DefaultVersion2,
 		},
 	}}
 
 	// Create meterdb manager with fresh registry and confirm
 	// that there are no errors registering metrics for multiple
 	// versioned databases.
-	manager, err := m.NewMeterDBManager("", registry)
+	manager, err := m.AddMeter("", registry)
 	assert.NoError(t, err)
 
 	dbs := manager.GetDatabases()
@@ -286,46 +244,7 @@ func TestMeterDBManager(t *testing.T) {
 	assert.False(t, ok)
 
 	// Confirm that the error from a name conflict is handled correctly
-	_, err = m.NewMeterDBManager("", registry)
-	assert.Error(t, err)
-}
-
-func TestCompleteMeterDBManager(t *testing.T) {
-	registry := prometheus.NewRegistry()
-
-	m := &manager{databases: []*VersionedDatabase{
-		{
-			Database: memdb.New(),
-			Version:  version.NewDefaultVersion(2, 0, 0),
-		},
-		{
-			Database: memdb.New(),
-			Version:  version.NewDefaultVersion(1, 5, 0),
-		},
-		{
-			Database: memdb.New(),
-			Version:  version.DefaultVersion1,
-		},
-	}}
-
-	// Create complete meterdb manager with fresh registry and confirm
-	// that there are no errors registering metrics for multiple
-	// versioned databases.
-	manager, err := m.NewCompleteMeterDBManager("", registry)
-	assert.NoError(t, err)
-
-	dbs := manager.GetDatabases()
-	assert.Len(t, dbs, 3)
-
-	_, ok := dbs[0].Database.(*meterdb.Database)
-	assert.True(t, ok)
-	_, ok = dbs[1].Database.(*meterdb.Database)
-	assert.True(t, ok)
-	_, ok = dbs[2].Database.(*meterdb.Database)
-	assert.True(t, ok)
-
-	// Confirm that the error from a name conflict is handled correctly
-	_, err = m.NewCompleteMeterDBManager("", registry)
+	_, err = m.AddMeter("", registry)
 	assert.Error(t, err)
 }
 
@@ -375,4 +294,22 @@ func TestNewManagerFromNonUniqueDBs(t *testing.T) {
 		},
 	})
 	assert.Error(t, err)
+}
+
+func TestDontIncludePreviousVersions(t *testing.T) {
+	dir := t.TempDir()
+	v1 := version.NewDefaultVersion(1, 1, 0)
+	v2 := version.NewDefaultVersion(1, 2, 0)
+	db1Path := path.Join(dir, v1.String())
+	_, err := leveldb.New(db1Path, logging.NoLog{}, 0, 0, 0)
+	assert.NoError(t, err)
+	db2Path := path.Join(dir, v2.String())
+	db2, err := leveldb.New(db2Path, logging.NoLog{}, 0, 0, 0)
+	assert.NoError(t, err)
+
+	err = db2.Close()
+	assert.NoError(t, err)
+
+	_, err = New(dir, logging.NoLog{}, v2, false)
+	assert.NoError(t, err, "shouldn't error because shouldn't try to open previous database version")
 }

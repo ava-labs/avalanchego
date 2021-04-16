@@ -10,9 +10,6 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
-	"strings"
-
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
@@ -23,10 +20,17 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
 	errNonSortedAndUniqueDBs = errors.New("managed databases were not sorted and unique")
+	bootstrappedKey          = []byte{0x00}
+	dbPrefix                 = []byte{0x01}
+
+	// First database version where we put [bootstrappedKey] in the top level db
+	// to mark that the database has been bootstrapped at least once
+	firstVersionWithBootstrappedFlag = version.NewDefaultVersion(1, 1, 0)
 )
 
 type Manager interface {
@@ -38,16 +42,17 @@ type Manager interface {
 	GetDatabases() []*VersionedDatabase
 	// Close all of the databases controlled by the manager
 	Close() error
+	Shutdown() error
+	MarkCurrentDBBootstrapped() error
+	CurrentDBBootstrapped() (bool, error)
 
-	// NewPrefixDBManager returns a new database manager with each of its databases
+	// AddPrefix returns a new database manager with each of its databases
 	// prefixed with [prefix]
-	NewPrefixDBManager(prefix []byte) Manager
-	// NewNestedPrefixDBManager returns a new database manager where each of its databases
-	// has the nested prefix [prefix] applied to it.
-	NewNestedPrefixDBManager(prefix []byte) Manager
-	// NewMeterDBManager returns a new database manager with each of its databases
+	AddPrefix(prefix []byte) Manager
+
+	// AddMeter returns a new database manager with each of its databases
 	// wrapped with a meterdb instance to support metrics on database performance.
-	NewMeterDBManager(namespace string, registerer prometheus.Registerer) (Manager, error)
+	AddMeter(namespace string, registerer prometheus.Registerer) (Manager, error)
 }
 
 type manager struct {
@@ -55,6 +60,14 @@ type manager struct {
 	// descending order
 	// invariant: len(databases) > 0
 	databases []*VersionedDatabase
+}
+
+func (m *manager) Shutdown() error {
+	errs := wrappers.Errs{}
+	for _, db := range m.databases {
+		errs.Add(db.Shutdown())
+	}
+	return errs.Err
 }
 
 func (m *manager) Current() *VersionedDatabase { return m.databases[0] }
@@ -73,8 +86,15 @@ func (m *manager) Close() error {
 	for _, db := range m.databases {
 		errs.Add(db.Close())
 	}
-
 	return errs.Err
+}
+
+func (m *manager) MarkCurrentDBBootstrapped() error {
+	return m.databases[0].MarkBootstrapped()
+}
+
+func (m *manager) CurrentDBBootstrapped() (bool, error) {
+	return m.databases[0].Bootstrapped()
 }
 
 // wrapManager returns a new database manager with each managed database wrapped by
@@ -106,8 +126,9 @@ func NewDefaultMemDBManager() Manager {
 	return &manager{
 		databases: []*VersionedDatabase{
 			{
+				rawDB:    memdb.New(),
 				Database: memdb.New(),
-				Version:  version.DefaultVersion1,
+				Version:  version.DefaultVersion2,
 			},
 		},
 	}
@@ -115,65 +136,82 @@ func NewDefaultMemDBManager() Manager {
 
 // New creates a database manager at [filePath] by creating a database instance from each directory
 // with a version <= [currentVersion]
-func New(dbDirPath string, log logging.Logger, currentVersion version.Version) (Manager, error) {
+func New(
+	dbDirPath string,
+	log logging.Logger,
+	currentVersion version.Version,
+	includePreviousVersions bool,
+) (Manager, error) {
 	parser := version.NewDefaultParser()
-
 	currentDBPath := path.Join(dbDirPath, currentVersion.String())
-	currentDB, err := leveldb.New(currentDBPath, log, 0, 0, 0)
+	rawCurrentDB, err := leveldb.New(currentDBPath, log, 0, 0, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create db at %s: %w", currentDBPath, err)
 	}
+	currentDB := prefixdb.New(dbPrefix, rawCurrentDB)
 
 	manager := &manager{
 		databases: []*VersionedDatabase{
 			{
+				rawDB:    rawCurrentDB,
 				Database: currentDB,
 				Version:  currentVersion,
 			},
 		},
 	}
-	err = filepath.Walk(dbDirPath, func(path string, info os.FileInfo, err error) error {
-		// the walkFn is called with a non-nil error argument if an os.Lstat
-		// or Readdirnames call returns an error. Both cases are considered
-		// fatal in the traversal.
-		// Reference: https://golang.org/pkg/path/filepath/#WalkFunc
-		if err != nil {
-			return err
-		}
-		// Skip the root directory
-		if path == dbDirPath {
-			return nil
-		}
 
-		// The database directory should only contain database directories, no files.
-		if !info.IsDir() {
-			return fmt.Errorf("unexpectedly found non-directory at %s", path)
-		}
-		_, dbName := filepath.Split(path)
-		version, err := parser.Parse(dbName)
-		if err != nil {
-			return err
-		}
+	// Conditionally ignore old databases
+	if includePreviousVersions {
+		err = filepath.Walk(dbDirPath, func(path string, info os.FileInfo, err error) error {
+			// the walkFn is called with a non-nil error argument if an os.Lstat
+			// or Readdirnames call returns an error. Both cases are considered
+			// fatal in the traversal.
+			// Reference: https://golang.org/pkg/path/filepath/#WalkFunc
+			if err != nil {
+				return err
+			}
+			// Skip the root directory
+			if path == dbDirPath {
+				return nil
+			}
 
-		// If [version] is greater than or equal to the specified version
-		// skip over creating the new database to avoid creating the same db
-		// twice or creating a database with a version ahead of the desired one.
-		if cmp := version.Compare(currentVersion); cmp >= 0 {
+			// The database directory should only contain database directories, no files.
+			if !info.IsDir() {
+				return fmt.Errorf("unexpectedly found non-directory at %s", path)
+			}
+			_, dbName := filepath.Split(path)
+			version, err := parser.Parse(dbName)
+			if err != nil {
+				return err
+			}
+
+			// If [version] is greater than or equal to the specified version
+			// skip over creating the new database to avoid creating the same db
+			// twice or creating a database with a version ahead of the desired one.
+			if cmp := version.Compare(currentVersion); cmp >= 0 {
+				return filepath.SkipDir
+			}
+
+			db, err := leveldb.New(path, log, 0, 0, 0)
+			if err != nil {
+				return fmt.Errorf("couldn't create db at %s: %w", path, err)
+			}
+
+			if version.Compare(firstVersionWithBootstrappedFlag) >= 0 {
+				manager.databases = append(manager.databases, &VersionedDatabase{
+					rawDB:    db,
+					Database: prefixdb.New(dbPrefix, db),
+					Version:  version,
+				})
+			} else {
+				manager.databases = append(manager.databases, &VersionedDatabase{
+					Database: db,
+					Version:  version,
+				})
+			}
 			return filepath.SkipDir
-		}
-
-		db, err := leveldb.New(path, log, 0, 0, 0)
-		if err != nil {
-			return fmt.Errorf("couldn't create db at %s: %w", path, err)
-		}
-
-		manager.databases = append(manager.databases, &VersionedDatabase{
-			Database: db,
-			Version:  version,
 		})
-
-		return filepath.SkipDir
-	})
+	}
 	SortDescending(manager.databases)
 
 	// If an error occurred walking [dbDirPath] close the
@@ -186,11 +224,12 @@ func New(dbDirPath string, log logging.Logger, currentVersion version.Version) (
 	return manager, nil
 }
 
-// NewPrefixDBManager creates a new manager with each database instance prefixed
+// AddPrefix creates a new manager with each database instance prefixed
 // by [prefix]
-func (m *manager) NewPrefixDBManager(prefix []byte) Manager {
+func (m *manager) AddPrefix(prefix []byte) Manager {
 	m, _ = m.wrapManager(func(vdb *VersionedDatabase) (*VersionedDatabase, error) {
 		return &VersionedDatabase{
+			rawDB:    vdb.rawDB,
 			Database: prefixdb.New(prefix, vdb.Database),
 			Version:  vdb.Version,
 		}, nil
@@ -198,21 +237,9 @@ func (m *manager) NewPrefixDBManager(prefix []byte) Manager {
 	return m
 }
 
-// NewNestedPrefixDBManager creates a new manager with each database instance
-// wrapped with a nested prfix of [prefix]
-func (m *manager) NewNestedPrefixDBManager(prefix []byte) Manager {
-	m, _ = m.wrapManager(func(vdb *VersionedDatabase) (*VersionedDatabase, error) {
-		return &VersionedDatabase{
-			Database: prefixdb.NewNested(prefix, vdb.Database),
-			Version:  vdb.Version,
-		}, nil
-	})
-	return m
-}
-
-// NewMeterDBManager wraps the current database instance with a meterdb instance.
+// AddMeter wraps the current database instance with a meterdb instance.
 // Note: calling this more than once with the same [namespace] will cause a conflict error for the [registerer]
-func (m *manager) NewMeterDBManager(namespace string, registerer prometheus.Registerer) (Manager, error) {
+func (m *manager) AddMeter(namespace string, registerer prometheus.Registerer) (Manager, error) {
 	currentDB := m.Current()
 	currentMeterDB, err := meterdb.New(namespace, registerer, currentDB.Database)
 	if err != nil {
@@ -224,26 +251,11 @@ func (m *manager) NewMeterDBManager(namespace string, registerer prometheus.Regi
 	copy(newManager.databases[1:], m.databases[1:])
 	// Overwrite the current database with the meter DB
 	newManager.databases[0] = &VersionedDatabase{
+		rawDB:    currentDB.rawDB,
 		Database: currentMeterDB,
 		Version:  currentDB.Version,
 	}
 	return newManager, nil
-}
-
-// NewCompleteMeterDBManager wraps each database instance with a meterdb instance. The namespace
-// is concatenated with the version of the database. Note: calling this more than once
-// with the same [namespace] will cause a conflict error for the [registerer]
-func (m *manager) NewCompleteMeterDBManager(namespace string, registerer prometheus.Registerer) (Manager, error) {
-	return m.wrapManager(func(vdb *VersionedDatabase) (*VersionedDatabase, error) {
-		mdb, err := meterdb.New(fmt.Sprintf("%s_%s", namespace, strings.ReplaceAll(vdb.Version.String(), ".", "_")), registerer, vdb.Database)
-		if err != nil {
-			return nil, err
-		}
-		return &VersionedDatabase{
-			Database: mdb,
-			Version:  vdb.Version,
-		}, nil
-	})
 }
 
 // NewManagerFromDBs
@@ -259,8 +271,41 @@ func NewManagerFromDBs(dbs []*VersionedDatabase) (Manager, error) {
 }
 
 type VersionedDatabase struct {
+	rawDB database.Database
 	database.Database
 	version.Version
+}
+
+func (db *VersionedDatabase) Close() error {
+	if err := db.Database.Close(); err != nil && err != database.ErrClosed {
+		return err
+	}
+	return nil
+}
+
+func (db *VersionedDatabase) Shutdown() error {
+	errs := wrappers.Errs{}
+	errs.Add(db.Close())
+	if db.rawDB != nil {
+		if err := db.rawDB.Close(); err != nil && err != database.ErrClosed {
+			errs.Add(err)
+		}
+	}
+	return errs.Err
+}
+
+func (db *VersionedDatabase) Bootstrapped() (bool, error) {
+	if db.rawDB == nil {
+		return false, nil
+	}
+	return db.rawDB.Has(bootstrappedKey)
+}
+
+func (db *VersionedDatabase) MarkBootstrapped() error {
+	if db.rawDB == nil {
+		return nil
+	}
+	return db.rawDB.Put(bootstrappedKey, nil)
 }
 
 type innerSortDescendingVersionedDBs []*VersionedDatabase

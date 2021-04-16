@@ -47,7 +47,7 @@ const (
 	defaultChannelSize = 1024
 )
 
-// Manager manages the chains running on this node.
+// Manager manages the chains running on this
 // It can:
 //   * Create a chain
 //   * Add a registrant. When a chain is created, each registrant calls
@@ -150,6 +150,13 @@ type ManagerConfig struct {
 	RetryBootstrap            bool // Should Bootstrap be retried
 	RetryBootstrapMaxAttempts int  // Max number of times to retry bootstrap
 	ChainConfigs              map[ids.ID]ChainConfig
+	// If true, shut down the node after the Primary Network has bootstrapped
+	// and use [FetchOnlyFrom] as beacons
+	FetchOnly bool
+	// [FetchOnlyFrom] ignored unless [FetchOnly] is true
+	FetchOnlyFrom validators.Set
+	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
+	ShutdownNodeFunc func(exitCode int)
 }
 
 type manager struct {
@@ -226,9 +233,24 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 
 	sb, exists := m.subnets[chainParams.SubnetID]
 	if !exists {
-		sb = &subnet{}
+		sb = &subnet{
+			onFinish: func() {
+				// When this subnet is done bootstrapping, mark that we have bootstrapped this database version.
+				// If running in fetch only mode, shut down node since fetching is complete.
+				m.Log.AssertNoError(m.DBManager.MarkCurrentDBBootstrapped())
+				if m.ManagerConfig.FetchOnly {
+					m.Log.Info("done with fetch only mode. Starting node shutdown")
+					go m.ShutdownNodeFunc(constants.ExitCodeDoneMigrating)
+				}
+			},
+		}
 	}
 	sb.addChain(chainParams.ID)
+
+	// In fetch-only mode, use custom bootstrap beacons
+	if m.FetchOnly {
+		chainParams.CustomBeacons = m.FetchOnlyFrom
+	}
 
 	chain, err := m.buildChain(chainParams, sb)
 	if err != nil {
@@ -435,12 +457,12 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	metricsManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+	metricsManager, err := m.DBManager.AddMeter(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	dbManager := metricsManager.NewPrefixDBManager(ctx.ChainID[:])
-	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
+	dbManager := metricsManager.AddPrefix(ctx.ChainID[:])
+	vmDBManager := dbManager.AddPrefix([]byte("vm"))
 
 	db := dbManager.Current()
 	vertexDB := prefixdb.New([]byte("vertex"), db)
@@ -566,12 +588,12 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	metricsManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+	metricsManager, err := m.DBManager.AddMeter(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	dbManager := metricsManager.NewPrefixDBManager(ctx.ChainID[:])
-	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
+	dbManager := metricsManager.AddPrefix(ctx.ChainID[:])
+	vmDBManager := dbManager.AddPrefix([]byte("vm"))
 
 	db := dbManager.Current()
 	bootstrappingDB := prefixdb.New([]byte("bs"), db)

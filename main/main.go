@@ -1,21 +1,16 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
 
 import (
 	"fmt"
+	"os"
+	"syscall"
 
-	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/nat"
-	"github.com/ava-labs/avalanchego/node"
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
 const (
@@ -28,186 +23,59 @@ const (
 		`          \/           \/          \/     \/     \/     \/     \/`
 )
 
-var (
-	stakingPortName = fmt.Sprintf("%s-staking", constants.AppName)
-	httpPortName    = fmt.Sprintf("%s-http", constants.AppName)
-)
-
-// main is the primary entry point to Avalanche.
+// main is the entry point to AvalancheGo.
 func main() {
-	// parse config using viper
-	if err := parseViper(); err != nil {
-		fmt.Printf("parsing parameters returned with error %s\n", err)
+	fmt.Println(header)
+
+	exitCode := 0
+	defer func() {
+		os.Exit(exitCode)
+	}()
+
+	// Get the config
+	nodeConfig, err := config.GetConfig()
+	if err != nil {
+		fmt.Printf("couldn't get config: %s", err)
+		exitCode = 1
 		return
 	}
 
-	// Set the data directory permissions to be read write.
-	if err := perms.ChmodR(defaultDataDir, true, perms.ReadWriteExecute); err != nil {
-		fmt.Printf("failed to restrict the permissions of the data directory with error %s\n", err)
-		return
-	}
-
-	logFactory := logging.NewFactory(Config.LoggingConfig)
+	nodeConfig.LoggingConfig.Directory += "/daemon"
+	logFactory := logging.NewFactory(nodeConfig.LoggingConfig)
 	defer logFactory.Close()
 
 	log, err := logFactory.Make()
 	if err != nil {
 		fmt.Printf("starting logger failed with: %s\n", err)
-		return
-	}
-	fmt.Println(header)
-
-	var dbManager manager.Manager
-	if Config.DBEnabled {
-		dbManager, err = manager.New(Config.DBPath, log, dbVersion)
-		if err != nil {
-			log.Error("couldn't create db manager at %s: %s", Config.DBPath, err)
-			return
-		}
-	} else {
-		dbManager, err = manager.NewManagerFromDBs([]*manager.VersionedDatabase{
-			{
-				Database: memdb.New(),
-				Version:  dbVersion,
-			},
-		})
-		if err != nil {
-			log.Error("couldn't create db manager from memory db: %s", err)
-			return
-		}
-	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println("Recovered panic from", r)
-		}
-	}()
-
-	defer func() {
-		if err := dbManager.Close(); err != nil {
-			log.Warn("failed to close the node's DB: %s", err)
-		}
-		log.StopOnPanic()
-		log.Stop()
-	}()
-
-	// Track if sybil control is enforced
-	if !Config.EnableStaking && Config.EnableP2PTLS {
-		log.Warn("Staking is disabled. Sybil control is not enforced.")
-	}
-	if !Config.EnableStaking && !Config.EnableP2PTLS {
-		log.Warn("Staking and p2p encryption are disabled. Packet spoofing is possible.")
-	}
-
-	// Check if transaction signatures should be checked
-	if !Config.EnableCrypto {
-		log.Warn("transaction signatures are not being checked")
-	}
-	crypto.EnableCrypto = Config.EnableCrypto
-
-	if err := Config.ConsensusParams.Valid(); err != nil {
-		log.Error("consensus parameters are invalid: %s", err)
+		exitCode = 1
 		return
 	}
 
-	// Track if assertions should be executed
-	if Config.LoggingConfig.Assertions {
-		log.Debug("assertions are enabled. This may slow down execution")
-	}
-
-	// SupportsNAT() for NoRouter is false.
-	// Which means we tried to perform a NAT activity but we were not successful.
-	if Config.AttemptedNATTraversal && !Config.Nat.SupportsNAT() {
-		log.Error("UPnP or NAT-PMP router attach failed, you may not be listening publicly," +
-			" please confirm the settings in your router")
-	}
-
-	mapper := nat.NewPortMapper(log, Config.Nat)
-	defer mapper.UnmapAllPorts()
-
-	// Open staking port we want for NAT Traversal to have the external port
-	// (Config.StakingIP.Port) to connect to our internal listening port
-	// (Config.InternalStakingPort) which should be the same in most cases.
-	mapper.Map(
-		"TCP",
-		Config.StakingIP.IP().Port,
-		Config.StakingIP.IP().Port,
-		stakingPortName,
-		&Config.StakingIP,
-		Config.DynamicUpdateDuration,
+	nodeManager := newNodeManager(nodeConfig.BuildDir, log)
+	_ = utils.HandleSignals(
+		func(os.Signal) {
+			nodeManager.shutdown()
+			os.Exit(exitCode)
+		},
+		syscall.SIGINT, syscall.SIGTERM,
 	)
 
-	// Open the HTTP port iff the HTTP server is not listening on localhost
-	if Config.HTTPHost != "127.0.0.1" && Config.HTTPHost != "localhost" {
-		// For NAT Traversal we want to route from the external port
-		// (Config.ExternalHTTPPort) to our internal port (Config.HTTPPort)
-		mapper.Map(
-			"TCP",
-			Config.HTTPPort,
-			Config.HTTPPort,
-			httpPortName,
-			nil,
-			Config.DynamicUpdateDuration,
-		)
-	}
-
-	// Regularly updates our public IP (or does nothing, if configured that way)
-	externalIPUpdater := dynamicip.NewDynamicIPManager(
-		Config.DynamicPublicIPResolver,
-		Config.DynamicUpdateDuration,
-		log,
-		&Config.StakingIP,
-	)
-	defer externalIPUpdater.Stop()
-
-	log.Info("this node's IP is set to: %s", Config.StakingIP.IP())
-
-	for {
-		shouldRestart, err := run(dbManager, log, logFactory)
-		if err != nil {
-			break
-		}
-		// If the node says it should restart, do that. Otherwise, end the program.
-		if !shouldRestart {
-			break
-		}
-		log.Info("restarting node")
-	}
-}
-
-// Initialize and run the node.
-// Returns true if the node should restart after this function returns.
-func run(dbManager manager.Manager, log logging.Logger, logFactory logging.Factory) (bool, error) {
-	log.Info("initializing node")
-	node := node.Node{}
-	restarter := &restarter{
-		node:          &node,
-		shouldRestart: &utils.AtomicBool{},
-	}
-	if err := node.Initialize(&Config, dbManager, log, logFactory, restarter); err != nil {
-		log.Error("error initializing node: %s", err)
-		return restarter.shouldRestart.GetValue(), err
-	}
-
-	log.Debug("dispatching node handlers")
-	err := node.Dispatch()
+	v, err := config.GetViper()
 	if err != nil {
-		log.Debug("node dispatch returned: %s", err)
+		fmt.Printf("couldn't get viper: %s\n", err)
+		exitCode = 1
+		return
 	}
-	return restarter.shouldRestart.GetValue(), nil
-}
 
-// restarter implements utils.Restarter
-type restarter struct {
-	node *node.Node
-	// If true, node should restart after shutting down
-	shouldRestart *utils.AtomicBool
-}
+	migrationManager := newMigrationManager(nodeManager, v, nodeConfig, log)
+	if err := migrationManager.migrate(); err != nil {
+		log.Error("error while running migration: %s", err)
+		exitCode = 1
+		return
+	}
 
-// Restarter shuts down the node and marks that it should restart
-// It is safe to call Restart multiple times
-func (r *restarter) Restart() {
-	r.shouldRestart.SetValue(true)
-	// Shutdown is safe to call multiple times because it uses sync.Once
-	r.node.Shutdown()
+	log.Info("starting to run node in normal execution mode")
+	exitCode, err = nodeManager.runNormal(v, nodeConfig)
+	log.Debug("node manager returned exit code %s, error %v", exitCode, err)
+	nodeManager.shutdown() // make sure all the nodes are stopped
 }

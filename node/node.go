@@ -5,11 +5,8 @@ package node
 
 import (
 	"crypto/tls"
-	"crypto/x509"
-	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -26,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/config/versionconfig"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -71,6 +69,8 @@ var (
 	indexerDBPrefix                 = []byte{0x00}
 	errPrimarySubnetNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
 
+	// Version is the version of this code
+	versionParser           = version.NewDefaultApplicationParser() // todo do we need this?
 	beaconConnectionTimeout = 1 * time.Minute
 )
 
@@ -139,12 +139,12 @@ type Node struct {
 	// True if node is shutting down or is done shutting down
 	shuttingDown utils.AtomicBool
 
+	// Sets the exit code
+	shuttingDownExitCode utils.AtomicInterface
+
 	// Incremented only once on initialization.
 	// Decremented when node is done shutting down.
-	doneShuttingDown sync.WaitGroup
-
-	// Restarter can shutdown and restart the node
-	restarter utils.Restarter
+	DoneShuttingDown sync.WaitGroup
 }
 
 /*
@@ -162,14 +162,9 @@ func (n *Node) initNetworking() error {
 
 	var serverUpgrader, clientUpgrader network.Upgrader
 	if n.Config.EnableP2PTLS {
-		cert, err := tls.LoadX509KeyPair(n.Config.StakingCertFile, n.Config.StakingKeyFile)
-		if err != nil {
-			return err
-		}
-
 		// #nosec G402
 		tlsConfig := &tls.Config{
-			Certificates: []tls.Certificate{cert},
+			Certificates: []tls.Certificate{n.Config.StakingTLSCert},
 			ClientAuth:   tls.RequireAnyClientCert,
 			// We do not use the TLS CA functionality to authenticate a
 			// hostname. We only require an authenticated channel based on the
@@ -221,7 +216,7 @@ func (n *Node) initNetworking() error {
 			// If the timeout fires and we're already shutting down, nothing to do.
 			if !n.shuttingDown.GetValue() {
 				n.Log.Warn("Failed to connect to bootstrap nodes. Node shutting down...")
-				go n.Shutdown()
+				go n.Shutdown(1)
 			}
 		})
 
@@ -263,10 +258,6 @@ func (n *Node) initNetworking() error {
 		consensusRouter,
 		n.Config.ConnMeterResetDuration,
 		n.Config.ConnMeterMaxConns,
-		n.restarter,
-		n.Config.RestartOnDisconnected,
-		n.Config.DisconnectedCheckFreq,
-		n.Config.DisconnectedRestartTimeout,
 		n.Config.SendQueueSize,
 		n.Config.NetworkHealthConfig,
 		n.benchlistManager,
@@ -275,7 +266,7 @@ func (n *Node) initNetworking() error {
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
 		// errors are already logged internally if they are meaningful
-		n.Shutdown()
+		n.Shutdown(0)
 	}, syscall.SIGINT, syscall.SIGTERM)
 
 	return nil
@@ -360,7 +351,7 @@ func (n *Node) Dispatch() error {
 		}
 		// If the API server isn't running, shut down the node.
 		// If node is already shutting down, this does nothing.
-		n.Shutdown()
+		n.Shutdown(1)
 	})
 
 	// Add bootstrap nodes to the peer network
@@ -377,10 +368,10 @@ func (n *Node) Dispatch() error {
 
 	// If the P2P server isn't running, shut down the node.
 	// If node is already shutting down, this does nothing.
-	n.Shutdown()
+	n.Shutdown(1)
 
 	// Wait until the node is done shutting down before returning
-	n.doneShuttingDown.Wait()
+	n.DoneShuttingDown.Wait()
 	return err
 }
 
@@ -417,35 +408,6 @@ func (n *Node) initDatabase(dbManager manager.Manager) error {
 	if genesisHash != expectedGenesisHash {
 		return fmt.Errorf("db contains invalid genesis hash. DB Genesis: %s Generated Genesis: %s", genesisHash, expectedGenesisHash)
 	}
-	return nil
-}
-
-// Initialize this node's ID
-// If staking is disabled, a node's ID is a hash of its IP
-// Otherwise, it is a hash of the TLS certificate that this node
-// uses for P2P communication
-func (n *Node) initNodeID() error {
-	if !n.Config.EnableP2PTLS {
-		n.ID = ids.ShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.IP().String())))
-		n.Log.Info("Set the node's ID to %s", n.ID.PrefixedString(constants.NodeIDPrefix))
-		return nil
-	}
-
-	stakeCert, err := ioutil.ReadFile(n.Config.StakingCertFile)
-	if err != nil {
-		return fmt.Errorf("problem reading staking certificate: %w", err)
-	}
-
-	block, _ := pem.Decode(stakeCert)
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return fmt.Errorf("problem parsing staking certificate: %w", err)
-	}
-	n.ID, err = ids.ToShortID(hashing.PubkeyBytesToAddress(cert.Raw))
-	if err != nil {
-		return fmt.Errorf("problem deriving staker ID from certificate: %w", err)
-	}
-	n.Log.Info("Set node's ID to %s", n.ID.PrefixedString(constants.NodeIDPrefix))
 	return nil
 }
 
@@ -501,7 +463,7 @@ func (n *Node) initIndexer() error {
 		DecisionDispatcher:   n.DecisionDispatcher,
 		ConsensusDispatcher:  n.ConsensusDispatcher,
 		APIServer:            &n.APIServer,
-		ShutdownF:            n.Shutdown,
+		ShutdownF:            func() { n.Shutdown(0) }, // TODO put exit code here
 	})
 	if err != nil {
 		return fmt.Errorf("couldn't create index for txs: %w", err)
@@ -620,7 +582,16 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		return fmt.Errorf("couldn't initialize chain router: %w", err)
 	}
 
+	fetchOnlyFrom := validators.NewSet()
+	for _, peer := range n.Config.BootstrapPeers {
+		if err := fetchOnlyFrom.AddWeight(peer.ID, 1); err != nil {
+			return fmt.Errorf("couldn't initialize fetch from set: %w", err)
+		}
+	}
+
 	n.chainManager = chains.New(&chains.ManagerConfig{
+		FetchOnly:                 n.Config.FetchOnly,
+		FetchOnlyFrom:             fetchOnlyFrom,
 		StakingEnabled:            n.Config.EnableStaking,
 		MaxPendingMsgs:            n.Config.MaxPendingMsgs,
 		MaxNonStakerPendingMsgs:   n.Config.MaxNonStakerPendingMsgs,
@@ -651,6 +622,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		WhitelistedSubnets:        n.Config.WhitelistedSubnets,
 		RetryBootstrap:            n.Config.RetryBootstrap,
 		RetryBootstrapMaxAttempts: n.Config.RetryBootstrapMaxAttempts,
+		ShutdownNodeFunc:          n.Shutdown,
 	})
 
 	vdrs := n.vdrs
@@ -714,7 +686,7 @@ func (n *Node) initSharedMemory() error {
 // Assumes n.APIServer is already set
 func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
-	keystoreDB := n.DBManager.NewPrefixDBManager([]byte("keystore"))
+	keystoreDB := n.DBManager.AddPrefix([]byte("keystore"))
 	ks, err := keystore.New(n.Log, keystoreDB)
 	if err != nil {
 		return err
@@ -754,7 +726,7 @@ func (n *Node) initMetricsAPI() error {
 	n.Log.Info("initializing metrics API")
 
 	dbNamespace := fmt.Sprintf("%s_db", constants.PlatformName)
-	meterDBManager, err := n.DBManager.NewMeterDBManager(dbNamespace, registry)
+	meterDBManager, err := n.DBManager.AddMeter(dbNamespace, registry)
 	if err != nil {
 		return err
 	}
@@ -786,7 +758,7 @@ func (n *Node) initInfoAPI() error {
 	n.Log.Info("initializing info API")
 	service, err := info.NewService(
 		n.Log,
-		Version,
+		versionconfig.NodeVersion,
 		n.ID,
 		n.Config.NetworkID,
 		n.chainManager,
@@ -906,14 +878,14 @@ func (n *Node) Initialize(
 	dbManager manager.Manager,
 	logger logging.Logger,
 	logFactory logging.Factory,
-	restarter utils.Restarter,
 ) error {
 	n.Log = logger
+	n.ID = config.NodeID
 	n.LogFactory = logFactory
 	n.Config = config
-	n.restarter = restarter
-	n.doneShuttingDown.Add(1)
-	n.Log.Info("Node version is: %s", Version)
+	n.DoneShuttingDown.Add(1)
+	n.Log.Info("Node version is: %s", versionconfig.NodeVersion)
+	n.Log.Info("Node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))
 
 	httpLog, err := logFactory.MakeSubdir("http")
 	if err != nil {
@@ -924,9 +896,7 @@ func (n *Node) Initialize(
 	if err := n.initDatabase(dbManager); err != nil { // Set up the node's database
 		return fmt.Errorf("problem initializing database: %w", err)
 	}
-	if err = n.initNodeID(); err != nil { // Derive this node's ID
-		return fmt.Errorf("problem initializing staker ID: %w", err)
-	}
+
 	if err = n.initBeacons(); err != nil { // Configure the beacons
 		return fmt.Errorf("problem initializing node beacons: %w", err)
 	}
@@ -986,13 +956,16 @@ func (n *Node) Initialize(
 
 // Shutdown this node
 // May be called multiple times
-func (n *Node) Shutdown() {
+func (n *Node) Shutdown(exitCode int) {
+	if !n.shuttingDown.GetValue() {
+		n.shuttingDownExitCode.SetValue(exitCode)
+	}
 	n.shuttingDown.SetValue(true)
 	n.shutdownOnce.Do(n.shutdown)
 }
 
 func (n *Node) shutdown() {
-	n.Log.Info("shutting down node")
+	n.Log.Info("shutting down node with exit code %d", n.ExitCode())
 	if n.IPCs != nil {
 		if err := n.IPCs.Shutdown(); err != nil {
 			n.Log.Debug("error during IPC shutdown: %s", err)
@@ -1012,6 +985,13 @@ func (n *Node) shutdown() {
 		n.Log.Debug("error closing tx indexer: %w", err)
 	}
 	utils.ClearSignals(n.nodeCloser)
-	n.doneShuttingDown.Done()
+	n.DoneShuttingDown.Done()
 	n.Log.Info("finished node shutdown")
+}
+
+func (n *Node) ExitCode() int {
+	if exitCode, ok := n.shuttingDownExitCode.GetValue().(int); ok {
+		return exitCode
+	}
+	return 0
 }

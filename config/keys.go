@@ -1,10 +1,11 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package main
+package config
 
 const (
 	defaultString                           = "default"
+	FetchOnlyKey                            = "fetch-only"
 	configFileKey                           = "config-file"
 	versionKey                              = "version"
 	genesisConfigFileKey                    = "genesis"
@@ -29,16 +30,16 @@ const (
 	connMeterResetDurationKey               = "conn-meter-reset-duration"
 	connMeterMaxConnsKey                    = "conn-meter-max-conns"
 	httpHostKey                             = "http-host"
-	httpPortKey                             = "http-port"
+	HTTPPortKey                             = "http-port"
 	httpsEnabledKey                         = "http-tls-enabled"
 	httpsKeyFileKey                         = "http-tls-key-file"
 	httpsCertFileKey                        = "http-tls-cert-file"
 	httpAllowedOrigins                      = "http-allowed-origins"
 	apiAuthRequiredKey                      = "api-auth-required"
 	apiAuthPasswordFileKey                  = "api-auth-password-file" // #nosec G101
-	bootstrapIPsKey                         = "bootstrap-ips"
-	bootstrapIDsKey                         = "bootstrap-ids"
-	stakingPortKey                          = "staking-port"
+	BootstrapIPsKey                         = "bootstrap-ips"
+	BootstrapIDsKey                         = "bootstrap-ids"
+	StakingPortKey                          = "staking-port"
 	stakingEnabledKey                       = "staking-enabled"
 	p2pTLSEnabledKey                        = "p2p-tls-enabled"
 	stakingKeyPathKey                       = "staking-tls-key-file"
@@ -64,7 +65,8 @@ const (
 	benchlistPeerSummaryEnabledKey          = "benchlist-peer-summary-enabled"
 	benchlistDurationKey                    = "benchlist-duration"
 	benchlistMinFailingDurationKey          = "benchlist-min-failing-duration"
-	pluginDirKey                            = "plugin-dir"
+	PluginDirKey                            = "plugin-dir"
+	buildDirKey                             = "build-dir"
 	logsDirKey                              = "log-dir"
 	logLevelKey                             = "log-level"
 	logDisplayLevelKey                      = "log-display-level"
@@ -96,9 +98,6 @@ const (
 	consensusShutdownTimeoutKey             = "consensus-shutdown-timeout"
 	fdLimitKey                              = "fd-limit"
 	corethConfigKey                         = "coreth-config"
-	disconnectedCheckFreqKey                = "disconnected-check-frequency"
-	disconnectedRestartTimeoutKey           = "disconnected-restart-timeout"
-	restartOnDisconnectedKey                = "restart-on-disconnected"
 	indexEnabledKey                         = "index-enabled"
 	indexAllowIncompleteKey                 = "index-allow-incomplete"
 	routerHealthMaxDropRateKey              = "router-health-max-drop-rate"
@@ -108,4 +107,5 @@ const (
 	retryBootstrap                          = "bootstrap-retry-enabled"
 	retryBootstrapMaxAttempts               = "bootstrap-retry-max-attempts"
 	peerAliasTimeoutKey                     = "peer-alias-timeout"
+	PluginModeKey                           = "plugin-mode-enabled"
 )

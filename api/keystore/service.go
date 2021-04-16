@@ -8,7 +8,13 @@ import (
 	"net/http"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/manager/mocks"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/password"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 type service struct {
@@ -92,4 +98,21 @@ func (s *service) ExportUser(_ *http.Request, args *ExportUserArgs, reply *Expor
 	}
 	reply.Encoding = args.Encoding
 	return nil
+}
+
+// CreateTestKeystore returns a new keystore that can be utilized for testing
+func CreateTestKeystore() (Keystore, *mocks.Manager, error) {
+	ks := &keystore{
+		log:                logging.NoLog{},
+		usernameToPassword: map[string]*password.Hash{},
+	}
+	mockDBManager := &mocks.Manager{}
+	mockDBManager.On("Current").Return(
+		&manager.VersionedDatabase{
+			Database: memdb.New(),
+			Version:  version.NewDefaultVersion(1, 1, 0),
+		},
+	)
+	mockDBManager.On("Previous").Return(nil, false)
+	return ks, mockDBManager, ks.initializeDB(mockDBManager)
 }

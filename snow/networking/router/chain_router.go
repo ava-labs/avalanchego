@@ -54,7 +54,7 @@ type ChainRouter struct {
 	closeTimeout     time.Duration
 	peers            ids.ShortSet
 	criticalChains   ids.Set
-	onFatal          func()
+	onFatal          func(exitCode int)
 	metrics          *routerMetrics
 	// Parameters for doing health checks
 	healthConfig HealthConfig
@@ -81,7 +81,7 @@ func (cr *ChainRouter) Initialize(
 	gossipFrequency time.Duration,
 	closeTimeout time.Duration,
 	criticalChains ids.Set,
-	onFatal func(),
+	onFatal func(exitCode int),
 	healthConfig HealthConfig,
 	metricsNamespace string,
 	metricsRegisterer prometheus.Registerer,
@@ -234,7 +234,7 @@ func (cr *ChainRouter) RemoveChain(chainID ids.ID) {
 	ticker.Stop()
 
 	if cr.onFatal != nil && cr.criticalChains.Contains(chainID) {
-		go cr.onFatal()
+		go cr.onFatal(1)
 	}
 }
 
