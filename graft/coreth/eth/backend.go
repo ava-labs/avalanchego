@@ -529,7 +529,7 @@ func (s *Ethereum) Protocols() []p2p.Protocol {
 
 // Start implements node.Lifecycle, starting all internal goroutines needed by the
 // Ethereum protocol implementation.
-func (s *Ethereum) Start() error {
+func (s *Ethereum) Start() {
 	//s.startEthEntryUpdate(s.p2pServer.LocalNode())
 
 	// Start the bloom bits servicing goroutines
@@ -545,7 +545,7 @@ func (s *Ethereum) Start() error {
 	// }
 	// Start the networking layer and the light server if requested
 	//s.protocolManager.Start(maxPeers)
-	return nil
+	// return nil
 }
 
 // Stop implements node.Lifecycle, terminating all internal goroutines used by the
