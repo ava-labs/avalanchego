@@ -28,9 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -70,6 +68,8 @@ var (
 // VM implements the avalanche.DAGVM interface
 type VM struct {
 	metrics
+	avax.AddressManager
+	avax.AtomicUTXOManager
 	ids.Aliaser
 
 	// Contains information of where this VM is executing
@@ -129,13 +129,18 @@ func (vm *VM) Initialize(
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 ) error {
+	if err := vm.metrics.Initialize(ctx.Namespace, ctx.Metrics); err != nil {
+		return err
+	}
+	vm.AddressManager = avax.NewAddressManager(ctx)
+	vm.Aliaser.Initialize()
+
 	db := dbManager.Current()
 	vm.ctx = ctx
 	vm.toEngine = toEngine
 	vm.baseDB = db
 	vm.db = versiondb.New(db)
 	vm.typeToFxIndex = map[reflect.Type]int{}
-	vm.Aliaser.Initialize()
 	vm.assetToFxCache = &cache.LRU{Size: assetToFxCacheSize}
 
 	vm.pubsub = cjson.NewPubSubServer(ctx)
@@ -145,11 +150,10 @@ func (vm *VM) Initialize(
 
 	vm.genesisCodec = codec.NewManager(math.MaxInt32)
 	vm.codec = codec.NewDefaultManager()
+	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx, vm.codec)
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		vm.metrics.Initialize(ctx.Namespace, ctx.Metrics),
-
 		vm.pubsub.Register("accepted"),
 		vm.pubsub.Register("rejected"),
 		vm.pubsub.Register("verified"),
@@ -374,64 +378,6 @@ func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 	}
 	vm.issueTx(tx)
 	return tx.ID(), nil
-}
-
-// GetAtomicUTXOs returns imported/exports UTXOs such that at least one of the addresses in [addrs] is referenced.
-// Returns at most [limit] UTXOs.
-// If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
-// Returns:
-// * The fetched UTXOs
-// * true if all there are no more UTXOs in this range to fetch
-// * The address associated with the last UTXO fetched
-// * The ID of the last UTXO fetched
-func (vm *VM) GetAtomicUTXOs(
-	chainID ids.ID,
-	addrs ids.ShortSet,
-	startAddr ids.ShortID,
-	startUTXOID ids.ID,
-	limit int,
-) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
-	if limit <= 0 || limit > maxUTXOsToFetch {
-		limit = maxUTXOsToFetch
-	}
-
-	addrsList := make([][]byte, addrs.Len())
-	i := 0
-	for addr := range addrs {
-		copied := addr
-		addrsList[i] = copied[:]
-		i++
-	}
-
-	allUTXOBytes, lastAddr, lastUTXO, err := vm.ctx.SharedMemory.Indexed(
-		chainID,
-		addrsList,
-		startAddr.Bytes(),
-		startUTXOID[:],
-		limit,
-	)
-	if err != nil {
-		return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error fetching atomic UTXOs: %w", err)
-	}
-
-	lastAddrID, err := ids.ToShortID(lastAddr)
-	if err != nil {
-		lastAddrID = ids.ShortEmpty
-	}
-	lastUTXOID, err := ids.ToID(lastUTXO)
-	if err != nil {
-		lastUTXOID = ids.Empty
-	}
-
-	utxos := make([]*avax.UTXO, len(allUTXOBytes))
-	for i, utxoBytes := range allUTXOBytes {
-		utxo := &avax.UTXO{}
-		if _, err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
-			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error parsing UTXO: %w", err)
-		}
-		utxos[i] = utxo
-	}
-	return utxos, lastAddrID, lastUTXOID, nil
 }
 
 // GetUTXOs returns UTXOs such that at least one of the addresses in [addrs] is referenced.
@@ -1227,61 +1173,6 @@ func (vm *VM) MintNFT(
 
 	sortOperationsWithSigners(ops, keys, vm.codec)
 	return ops, keys, nil
-}
-
-// ParseLocalAddress takes in an address for this chain and produces the ID
-func (vm *VM) ParseLocalAddress(addrStr string) (ids.ShortID, error) {
-	chainID, addr, err := vm.ParseAddress(addrStr)
-	if err != nil {
-		return ids.ShortID{}, err
-	}
-	if chainID != vm.ctx.ChainID {
-		return ids.ShortID{}, fmt.Errorf("expected chainID to be %q but was %q",
-			vm.ctx.ChainID, chainID)
-	}
-	return addr, nil
-}
-
-// ParseAddress takes in an address and produces the ID of the chain it's for
-// the ID of the address
-func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
-	chainIDAlias, hrp, addrBytes, err := formatting.ParseAddress(addrStr)
-	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
-	}
-
-	chainID, err := vm.ctx.BCLookup.Lookup(chainIDAlias)
-	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
-	}
-
-	expectedHRP := constants.GetHRP(vm.ctx.NetworkID)
-	if hrp != expectedHRP {
-		return ids.ID{}, ids.ShortID{}, fmt.Errorf("expected hrp %q but got %q",
-			expectedHRP, hrp)
-	}
-
-	addr, err := ids.ToShortID(addrBytes)
-	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
-	}
-	return chainID, addr, nil
-}
-
-// FormatLocalAddress takes in a raw address and produces the formatted address
-func (vm *VM) FormatLocalAddress(addr ids.ShortID) (string, error) {
-	return vm.FormatAddress(vm.ctx.ChainID, addr)
-}
-
-// FormatAddress takes in a chainID and a raw address and produces the formatted
-// address
-func (vm *VM) FormatAddress(chainID ids.ID, addr ids.ShortID) (string, error) {
-	chainIDAlias, err := vm.ctx.BCLookup.PrimaryAlias(chainID)
-	if err != nil {
-		return "", err
-	}
-	hrp := constants.GetHRP(vm.ctx.NetworkID)
-	return formatting.FormatAddress(chainIDAlias, hrp, addr.Bytes())
 }
 
 // selectChangeAddr returns the change address to be used for [kc] when [changeAddr] is given

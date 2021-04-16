@@ -119,9 +119,7 @@ func (ab *AtomicBlock) Accept() error {
 	}
 
 	// Update the state of the chain in the database
-	if err := ab.onAcceptState.Apply(ab.vm.internalState); err != nil {
-		return fmt.Errorf("failed to commit onAcceptState: %w", err)
-	}
+	ab.onAcceptState.Apply(ab.vm.internalState)
 	if err := ab.vm.internalState.Commit(); err != nil {
 		return fmt.Errorf("failed to commit vm's DB: %w", err)
 	}

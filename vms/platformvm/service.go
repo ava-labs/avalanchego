@@ -708,7 +708,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			weight := json.Uint64(staker.Validator.Weight())
 			potentialReward := json.Uint64(tx.Reward)
 			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(PercentDenominator))
-			rawUptime, err := service.vm.calculateUptime(nodeID, startTime)
+			rawUptime, err := service.vm.calculateUptimePercent(nodeID, startTime)
 			if err != nil {
 				return err
 			}

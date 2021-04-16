@@ -4,7 +4,6 @@
 package platformvm
 
 import (
-	"container/heap"
 	"errors"
 	"fmt"
 	"time"
@@ -25,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -97,38 +95,24 @@ var (
 // VM implements the snowman.ChainVM interface
 type VM struct {
 	metrics
-	*core.SnowmanVM
+	avax.AddressManager
+	avax.AtomicUTXOManager
 
-	// TODO: need to populate
-	internalState allState
+	// Used to get time. Useful for faking time during tests.
+	clock timer.Clock
 
-	dbManager manager.Manager
+	// Used to create and use keys.
+	factory crypto.FactorySECP256K1R
+
+	// true if the node is being run with staking enabled
+	stakingEnabled bool
 
 	// Node's validator manager
 	// Maps Subnets --> validators of the Subnet
 	vdrMgr validators.Manager
 
-	// true if the node is being run with staking enabled
-	stakingEnabled bool
-
 	// The node's chain manager
 	chainManager chains.Manager
-
-	fx            Fx
-	codec         codec.Manager
-	codecRegistry codec.Registry
-
-	mempool Mempool
-
-	// Used to create and use keys.
-	factory crypto.FactorySECP256K1R
-
-	// Used to get time. Useful for faking time during tests.
-	clock timer.Clock
-
-	// Key: block ID
-	// Value: the block
-	currentBlocks map[ids.ID]Block
 
 	// fee that must be burned by every state creating transaction
 	creationTxFee uint64
@@ -162,6 +146,38 @@ type VM struct {
 	// Time of the apricot phase 0 rule change
 	apricotPhase0Time time.Time
 
+	dbManager manager.Manager
+	// TODO: need to populate
+	internalState internalState
+
+	// VersionDB on top of underlying database
+	// Important note: In order for writes to [DB] to be persisted,
+	// DB.Commit() must be called
+	// We use a versionDB here so user can do atomic commits as they see fit
+	db database.Database
+
+	// The context of this vm
+	ctx *snow.Context
+
+	// ID of the preferred block
+	preferred ids.ID
+
+	// ID of the last accepted block
+	lastAcceptedID ids.ID
+
+	// channel to send messages to the consensus engine
+	toEngine chan<- common.Message
+
+	fx            Fx
+	codec         codec.Manager
+	codecRegistry codec.Registry
+
+	mempool Mempool
+
+	// Key: block ID
+	// Value: the block
+	currentBlocks map[ids.ID]Block
+
 	// Contains the IDs of transactions recently dropped because they failed verification.
 	// These txs may be re-issued and put into accepted blocks, so check the database
 	// to see if it was later committed/aborted before reporting that it's dropped.
@@ -194,6 +210,12 @@ func (vm *VM) Initialize(
 	if err := vm.metrics.Initialize(ctx.Namespace, ctx.Metrics); err != nil {
 		return err
 	}
+
+	// Initialize the utility to parse addresses
+	vm.AddressManager = avax.NewAddressManager(ctx)
+
+	// Initialize the utility to fetch atomic UTXOs
+	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx, Codec)
 
 	// Initialize the inner VM, which has a lot of boiler-plate logic
 	vm.SnowmanVM = &core.SnowmanVM{}
@@ -727,38 +749,6 @@ func (vm *VM) Disconnected(vdrID ids.ShortID) {
 	}
 }
 
-// Returns the time when the next staker of any subnet starts/stops staking
-// after the current timestamp
-func (vm *VM) nextStakerChangeTime(vs versionedState) (time.Time, error) {
-	currentStakers := vs.CurrentStakerChainState()
-	pendingStakers := vs.PendingStakerChainState()
-
-	earliest := timer.MaxTime
-	if currentStakers := currentStakers.Stakers(); len(currentStakers) > 0 {
-		nextStakerToRemove := currentStakers[0]
-		staker, ok := nextStakerToRemove.UnsignedTx.(TimedTx)
-		if !ok {
-			return time.Time{}, errWrongTxType
-		}
-		endTime := staker.EndTime()
-		if endTime.Before(earliest) {
-			earliest = endTime
-		}
-	}
-	if pendingStakers := pendingStakers.Stakers(); len(pendingStakers) > 0 {
-		nextStakerToAdd := pendingStakers[0]
-		staker, ok := nextStakerToAdd.UnsignedTx.(TimedTx)
-		if !ok {
-			return time.Time{}, errWrongTxType
-		}
-		startTime := staker.StartTime()
-		if startTime.Before(earliest) {
-			earliest = startTime
-		}
-	}
-	return earliest, nil
-}
-
 func (vm *VM) updateVdrMgr(force bool) error {
 	if !force && !vm.bootstrapped {
 		return nil
@@ -829,166 +819,6 @@ func (vm *VM) updateVdrSet(subnetID ids.ID) error {
 	return errs.Err
 }
 
-// Codec ...
-func (vm *VM) Codec() codec.Manager { return vm.codec }
-
-// CodecRegistry ...
-func (vm *VM) CodecRegistry() codec.Registry { return vm.codecRegistry }
-
-// Clock ...
-func (vm *VM) Clock() *timer.Clock { return &vm.clock }
-
-// Logger ...
-func (vm *VM) Logger() logging.Logger { return vm.Ctx.Log }
-
-// GetAtomicUTXOs returns imported/exports UTXOs such that at least one of the addresses in [addrs] is referenced.
-// Returns at most [limit] UTXOs.
-// If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
-// Returns:
-// * The fetched UTXOs
-// * true if all there are no more UTXOs in this range to fetch
-// * The address associated with the last UTXO fetched
-// * The ID of the last UTXO fetched
-func (vm *VM) GetAtomicUTXOs(
-	chainID ids.ID,
-	addrs ids.ShortSet,
-	startAddr ids.ShortID,
-	startUTXOID ids.ID,
-	limit int,
-) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
-	if limit <= 0 || limit > maxUTXOsToFetch {
-		limit = maxUTXOsToFetch
-	}
-
-	addrsList := make([][]byte, addrs.Len())
-	i := 0
-	for addr := range addrs {
-		copied := addr
-		addrsList[i] = copied[:]
-		i++
-	}
-
-	allUTXOBytes, lastAddr, lastUTXO, err := vm.Ctx.SharedMemory.Indexed(
-		chainID,
-		addrsList,
-		startAddr.Bytes(),
-		startUTXOID[:],
-		limit,
-	)
-	if err != nil {
-		return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error fetching atomic UTXOs: %w", err)
-	}
-
-	lastAddrID, err := ids.ToShortID(lastAddr)
-	if err != nil {
-		lastAddrID = ids.ShortEmpty
-	}
-	lastUTXOID, err := ids.ToID(lastUTXO)
-	if err != nil {
-		lastUTXOID = ids.Empty
-	}
-
-	utxos := make([]*avax.UTXO, len(allUTXOBytes))
-	for i, utxoBytes := range allUTXOBytes {
-		utxo := &avax.UTXO{}
-		if _, err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
-			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error parsing UTXO: %w", err)
-		}
-		utxos[i] = utxo
-	}
-	return utxos, lastAddrID, lastUTXOID, nil
-}
-
-// ParseLocalAddress takes in an address for this chain and produces the ID
-func (vm *VM) ParseLocalAddress(addrStr string) (ids.ShortID, error) {
-	chainID, addr, err := vm.ParseAddress(addrStr)
-	if err != nil {
-		return ids.ShortID{}, err
-	}
-	if chainID != vm.Ctx.ChainID {
-		return ids.ShortID{}, fmt.Errorf("expected chainID to be %q but was %q",
-			vm.Ctx.ChainID, chainID)
-	}
-	return addr, nil
-}
-
-// ParseAddress takes in an address and produces the ID of the chain it's for
-// the ID of the address
-func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
-	chainIDAlias, hrp, addrBytes, err := formatting.ParseAddress(addrStr)
-	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
-	}
-
-	chainID, err := vm.Ctx.BCLookup.Lookup(chainIDAlias)
-	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
-	}
-
-	expectedHRP := constants.GetHRP(vm.Ctx.NetworkID)
-	if hrp != expectedHRP {
-		return ids.ID{}, ids.ShortID{}, fmt.Errorf("expected hrp %q but got %q",
-			expectedHRP, hrp)
-	}
-
-	addr, err := ids.ToShortID(addrBytes)
-	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
-	}
-	return chainID, addr, nil
-}
-
-// FormatLocalAddress takes in a raw address and produces the formatted address
-func (vm *VM) FormatLocalAddress(addr ids.ShortID) (string, error) {
-	return vm.FormatAddress(vm.Ctx.ChainID, addr)
-}
-
-// FormatAddress takes in a chainID and a raw address and produces the formatted
-// address
-func (vm *VM) FormatAddress(chainID ids.ID, addr ids.ShortID) (string, error) {
-	chainIDAlias, err := vm.Ctx.BCLookup.PrimaryAlias(chainID)
-	if err != nil {
-		return "", err
-	}
-	hrp := constants.GetHRP(vm.Ctx.NetworkID)
-	return formatting.FormatAddress(chainIDAlias, hrp, addr.Bytes())
-}
-
-func (vm *VM) calculateUptime(nodeID ids.ShortID, startTime time.Time) (float64, error) {
-	currentStakers := vm.internalState.CurrentStakers()
-	upDuration, lastUpdated, err := currentStakers.GetUptime(nodeID)
-	switch {
-	case err == database.ErrNotFound:
-		upDuration = 0
-		lastUpdated = startTime
-	case err != nil:
-		return 0, err
-	}
-
-	currentLocalTime := vm.clock.Time()
-
-	if timeConnected, isConnected := vm.connections[nodeID]; isConnected {
-		// The time the peer connected should be set to:
-		// max(realTimeConnected, bootstrappedTime, lastUpdated)
-		if timeConnected.Before(vm.bootstrappedTime) {
-			timeConnected = vm.bootstrappedTime
-		}
-		if timeConnected.Before(lastUpdated) {
-			timeConnected = lastUpdated
-		}
-
-		// Increase the uptimes by the amount of time this node has been running
-		// since the last time it's uptime was written to disk.
-		if durationConnected := currentLocalTime.Sub(timeConnected); durationConnected > 0 {
-			upDuration += durationConnected
-		}
-	}
-
-	bestPossibleUpDuration := currentLocalTime.Sub(startTime)
-	uptime := float64(upDuration) / float64(bestPossibleUpDuration)
-	return uptime, nil
-}
-
 // Returns the current staker set of the Primary Network.
 // Each element corresponds to a staking transaction.
 // There may be multiple elements with the same node ID.
@@ -1026,6 +856,50 @@ func (vm *VM) getStakers() ([]validators.Validator, error) {
 	return stakers, errs.Err
 }
 
+// Returns the time when the next staker of any subnet starts/stops staking
+// after the current timestamp
+func (vm *VM) nextStakerChangeTime(vs versionedState) (time.Time, error) {
+	currentStakers := vs.CurrentStakerChainState()
+	pendingStakers := vs.PendingStakerChainState()
+
+	earliest := timer.MaxTime
+	if currentStakers := currentStakers.Stakers(); len(currentStakers) > 0 {
+		nextStakerToRemove := currentStakers[0]
+		staker, ok := nextStakerToRemove.UnsignedTx.(TimedTx)
+		if !ok {
+			return time.Time{}, errWrongTxType
+		}
+		endTime := staker.EndTime()
+		if endTime.Before(earliest) {
+			earliest = endTime
+		}
+	}
+	if pendingStakers := pendingStakers.Stakers(); len(pendingStakers) > 0 {
+		nextStakerToAdd := pendingStakers[0]
+		staker, ok := nextStakerToAdd.UnsignedTx.(TimedTx)
+		if !ok {
+			return time.Time{}, errWrongTxType
+		}
+		startTime := staker.StartTime()
+		if startTime.Before(earliest) {
+			earliest = startTime
+		}
+	}
+	return earliest, nil
+}
+
+// Codec ...
+func (vm *VM) Codec() codec.Manager { return vm.codec }
+
+// CodecRegistry ...
+func (vm *VM) CodecRegistry() codec.Registry { return vm.codecRegistry }
+
+// Clock ...
+func (vm *VM) Clock() *timer.Clock { return &vm.clock }
+
+// Logger ...
+func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
+
 // Returns the percentage of the total stake on the Primary Network
 // of nodes connected to this node.
 func (vm *VM) getPercentConnected() (float64, error) {
@@ -1042,7 +916,7 @@ func (vm *VM) getPercentConnected() (float64, error) {
 			return 0, err
 		}
 		if _, connected := vm.connections[staker.ID()]; !connected {
-			continue // not connected to use --> don't include
+			continue // not connected to us --> don't include
 		}
 		connectedStake, err = safemath.Add64(connectedStake, staker.Weight())
 		if err != nil {
@@ -1053,163 +927,38 @@ func (vm *VM) getPercentConnected() (float64, error) {
 	return float64(connectedStake) / float64(totalStake), nil
 }
 
-func (vm *VM) maxStakeAmount(db database.Database, subnetID ids.ID, nodeID ids.ShortID, startTime time.Time, endTime time.Time) (uint64, error) {
-	currentTime, err := vm.getTimestamp(db)
+func (vm *VM) calculateUptimePercent(nodeID ids.ShortID, startTime time.Time) (float64, error) {
+	upDuration, currentLocalTime, err := vm.calculateUptime(nodeID)
 	if err != nil {
 		return 0, err
 	}
-	if currentTime.After(startTime) {
-		return 0, errStartTimeTooEarly
-	}
-	if startTime.After(endTime) {
-		return 0, errStartAfterEndTime
-	}
-
-	stopPrefix := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
-	stopDB := prefixdb.NewNested(stopPrefix, db)
-	defer stopDB.Close()
-
-	stopIter := stopDB.NewIterator()
-	defer stopIter.Release()
-
-	currentWeight := uint64(0)
-	toRemoveHeap := validatorHeap{}
-	for stopIter.Next() { // Iterates in order of increasing stop time
-		txBytes := stopIter.Value()
-
-		tx := rewardTx{}
-		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
-			return 0, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
-		}
-
-		validator := (*Validator)(nil)
-		switch staker := tx.Tx.UnsignedTx.(type) {
-		case *UnsignedAddDelegatorTx:
-			validator = &staker.Validator
-		case *UnsignedAddValidatorTx:
-			validator = &staker.Validator
-		case *UnsignedAddSubnetValidatorTx:
-			validator = &staker.Validator.Validator
-		default:
-			return 0, fmt.Errorf("expected validator but got %T", tx.Tx.UnsignedTx)
-		}
-
-		if validator.NodeID != nodeID {
-			continue
-		}
-
-		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
-			return 0, err
-		}
-
-		newWeight, err := safemath.Add64(currentWeight, validator.Wght)
-		if err != nil {
-			return 0, err
-		}
-		currentWeight = newWeight
-		toRemoveHeap.Add(validator)
-	}
-
-	startPrefix := []byte(fmt.Sprintf("%s%s", subnetID, startDBPrefix))
-	startDB := prefixdb.NewNested(startPrefix, db)
-	defer startDB.Close()
-
-	startIter := startDB.NewIterator()
-	defer startIter.Release()
-
-	maxWeight := uint64(0)
-	for startIter.Next() { // Iterates in order of increasing start time
-		txBytes := startIter.Value()
-
-		tx := Tx{}
-		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
-			return 0, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
-		}
-
-		validator := (*Validator)(nil)
-		switch staker := tx.UnsignedTx.(type) {
-		case *UnsignedAddDelegatorTx:
-			validator = &staker.Validator
-		case *UnsignedAddValidatorTx:
-			validator = &staker.Validator
-		case *UnsignedAddSubnetValidatorTx:
-			validator = &staker.Validator.Validator
-		default:
-			return 0, fmt.Errorf("expected validator but got %T", tx.UnsignedTx)
-		}
-
-		if validator.StartTime().After(endTime) {
-			break
-		}
-
-		if validator.NodeID != nodeID {
-			continue
-		}
-
-		if err := tx.Sign(vm.codec, nil); err != nil {
-			return 0, err
-		}
-
-		for len(toRemoveHeap) > 0 && !toRemoveHeap[0].EndTime().After(validator.StartTime()) {
-			toRemove := toRemoveHeap[0]
-			toRemoveHeap = toRemoveHeap[1:]
-
-			newWeight, err := safemath.Sub64(currentWeight, toRemove.Wght)
-			if err != nil {
-				return 0, err
-			}
-			currentWeight = newWeight
-		}
-
-		newWeight, err := safemath.Add64(currentWeight, validator.Wght)
-		if err != nil {
-			return 0, err
-		}
-		currentWeight = newWeight
-		if currentWeight > maxWeight && !startTime.After(validator.StartTime()) {
-			maxWeight = currentWeight
-		}
-
-		toRemoveHeap.Add(validator)
-	}
-
-	for len(toRemoveHeap) > 0 && toRemoveHeap[0].EndTime().Before(startTime) {
-		toRemove := toRemoveHeap[0]
-		toRemoveHeap = toRemoveHeap[1:]
-
-		newWeight, err := safemath.Sub64(currentWeight, toRemove.Wght)
-		if err != nil {
-			return 0, err
-		}
-		currentWeight = newWeight
-	}
-
-	if currentWeight > maxWeight {
-		maxWeight = currentWeight
-	}
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		stopIter.Error(),
-		stopDB.Close(),
-		startIter.Error(),
-		startDB.Close(),
-	)
-	return maxWeight, errs.Err
+	bestPossibleUpDuration := currentLocalTime.Sub(startTime)
+	uptime := float64(upDuration) / float64(bestPossibleUpDuration)
+	return uptime, nil
 }
 
-type validatorHeap []*Validator
+func (vm *VM) calculateUptime(nodeID ids.ShortID) (time.Duration, time.Time, error) {
+	upDuration, lastUpdated, err := vm.internalState.GetUptime(nodeID)
+	if err != nil {
+		return 0, time.Time{}, err
+	}
 
-func (h *validatorHeap) Len() int                 { return len(*h) }
-func (h *validatorHeap) Less(i, j int) bool       { return (*h)[i].EndTime().Before((*h)[j].EndTime()) }
-func (h *validatorHeap) Swap(i, j int)            { (*h)[i], (*h)[j] = (*h)[j], (*h)[i] }
-func (h *validatorHeap) Add(validator *Validator) { heap.Push(h, validator) }
-func (h *validatorHeap) Peek() *Validator         { return (*h)[0] }
-func (h *validatorHeap) Remove() *Validator       { return heap.Pop(h).(*Validator) }
-func (h *validatorHeap) Push(x interface{})       { *h = append(*h, x.(*Validator)) }
-func (h *validatorHeap) Pop() interface{} {
-	newLen := len(*h) - 1
-	val := (*h)[newLen]
-	*h = (*h)[:newLen]
-	return val
+	currentLocalTime := vm.clock.Time()
+	if timeConnected, isConnected := vm.connections[nodeID]; isConnected {
+		// The time the peer connected should be set to:
+		// max(realTimeConnected, bootstrappedTime, lastUpdated)
+		if timeConnected.Before(vm.bootstrappedTime) {
+			timeConnected = vm.bootstrappedTime
+		}
+		if timeConnected.Before(lastUpdated) {
+			timeConnected = lastUpdated
+		}
+
+		// Increase the uptimes by the amount of time this node has been running
+		// since the last time it's uptime was written to disk.
+		if durationConnected := currentLocalTime.Sub(timeConnected); durationConnected > 0 {
+			upDuration += durationConnected
+		}
+	}
+	return upDuration, currentLocalTime, nil
 }

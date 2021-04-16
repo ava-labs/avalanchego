@@ -105,6 +105,8 @@ type Block interface {
 
 	// Set the block's underlying state to the chain's internal state
 	setBaseState()
+
+	SetStatus(status choices.Status)
 }
 
 // A decision block (either Commit, Abort, or DecisionBlock.) represents a
@@ -200,7 +202,7 @@ func (cdb *CommonDecisionBlock) setBaseState() {
 	cdb.onAcceptState.SetBase(cdb.vm.internalState)
 }
 
-func (cdb *CommonDecisionBlock) onAccept() versionedState {
+func (cdb *CommonDecisionBlock) onAccept() mutableState {
 	if cdb.Status().Decided() || cdb.onAcceptState == nil {
 		return cdb.vm.internalState
 	}
@@ -221,9 +223,7 @@ func (sdb *SingleDecisionBlock) Accept() error {
 	}
 
 	// Update the state of the chain in the database
-	if err := sdb.onAcceptState.Apply(sdb.vm.internalState); err != nil {
-		return fmt.Errorf("failed to commit onAcceptState: %w", err)
-	}
+	sdb.onAcceptState.Apply(sdb.vm.internalState)
 	if err := sdb.vm.internalState.Commit(); err != nil {
 		return fmt.Errorf("failed to commit vm's state: %w", err)
 	}
@@ -268,9 +268,7 @@ func (ddb *DoubleDecisionBlock) Accept() error {
 	}
 
 	// Update the state of the chain in the database
-	if err := ddb.onAcceptState.Apply(ddb.vm.internalState); err != nil {
-		return fmt.Errorf("failed to commit onAcceptDB: %w", err)
-	}
+	ddb.onAcceptState.Apply(ddb.vm.internalState)
 	if err := ddb.vm.internalState.Commit(); err != nil {
 		return fmt.Errorf("failed to commit vm's state: %w", err)
 	}

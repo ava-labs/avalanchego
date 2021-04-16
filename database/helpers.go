@@ -24,11 +24,14 @@ func PutID(db KeyValueWriter, key []byte, val ids.ID) error {
 	return db.Put(key, val[:])
 }
 func GetID(db KeyValueReader, key []byte) (ids.ID, error) {
-	bytes, err := db.Get(key)
+	b, err := db.Get(key)
 	if err != nil {
 		return ids.ID{}, err
 	}
-	return ids.ToID(bytes)
+	return ParseID(b)
+}
+func ParseID(b []byte) (ids.ID, error) {
+	return ids.ToID(b)
 }
 
 func PutUInt64(db KeyValueWriter, key []byte, val uint64) error {
@@ -37,14 +40,17 @@ func PutUInt64(db KeyValueWriter, key []byte, val uint64) error {
 	return db.Put(key, p.Bytes)
 }
 func GetUInt64(db KeyValueReader, key []byte) (uint64, error) {
-	bytes, err := db.Get(key)
+	b, err := db.Get(key)
 	if err != nil {
 		return 0, err
 	}
-	if len(bytes) != wrappers.LongLen {
+	return ParseUInt64(b)
+}
+func ParseUInt64(b []byte) (uint64, error) {
+	if len(b) != wrappers.LongLen {
 		return 0, errWrongSize
 	}
-	p := wrappers.Packer{Bytes: bytes}
+	p := wrappers.Packer{Bytes: b}
 	return p.UnpackLong(), nil
 }
 
@@ -54,14 +60,17 @@ func PutUInt32(db KeyValueWriter, key []byte, val uint32) error {
 	return db.Put(key, p.Bytes)
 }
 func GetUInt32(db KeyValueReader, key []byte) (uint32, error) {
-	bytes, err := db.Get(key)
+	b, err := db.Get(key)
 	if err != nil {
 		return 0, err
 	}
-	if len(bytes) != wrappers.IntLen {
+	return ParseUInt32(b)
+}
+func ParseUInt32(b []byte) (uint32, error) {
+	if len(b) != wrappers.IntLen {
 		return 0, errWrongSize
 	}
-	p := wrappers.Packer{Bytes: bytes}
+	p := wrappers.Packer{Bytes: b}
 	return p.UnpackInt(), nil
 }
 
@@ -73,12 +82,15 @@ func PutTimestamp(db KeyValueWriter, key []byte, val time.Time) error {
 	return db.Put(key, valBytes)
 }
 func GetTimestamp(db KeyValueReader, key []byte) (time.Time, error) {
-	valBytes, err := db.Get(key)
+	b, err := db.Get(key)
 	if err != nil {
 		return time.Time{}, err
 	}
+	return ParseTimestamp(b)
+}
+func ParseTimestamp(b []byte) (time.Time, error) {
 	val := time.Time{}
-	if err := val.UnmarshalBinary(valBytes); err != nil {
+	if err := val.UnmarshalBinary(b); err != nil {
 		return time.Time{}, err
 	}
 	return val, nil

@@ -29,7 +29,7 @@ type currentStakerChainState interface {
 
 	Stakers() []*Tx // Sorted in removal order
 
-	Apply(internalState) error
+	Apply(internalState)
 }
 
 type currentStakerChainStateImpl struct {
@@ -43,6 +43,9 @@ type currentStakerChainStateImpl struct {
 
 	// list of current validators in order of their removal
 	validators []*Tx
+
+	addedStakers   []*validatorReward
+	deletedStakers []*Tx
 }
 
 type validatorReward struct {
@@ -74,6 +77,9 @@ func (cs *currentStakerChainStateImpl) UpdateStakers(
 		validatorsByNodeID: make(map[ids.ShortID]*currentValidatorImpl, len(cs.validatorsByNodeID)),
 		validatorsByTxID:   make(map[ids.ID]*validatorReward, len(cs.validatorsByTxID)+len(addStakerTxsWithRewards)+len(addStakerTxsWithRewards)),
 		validators:         cs.validators[numTxsToRemove:], // sorted in order of removal
+
+		addedStakers:   addStakerTxsWithRewards,
+		deletedStakers: cs.validators[:numTxsToRemove],
 	}
 
 	for nodeID, vdr := range cs.validatorsByNodeID {
@@ -112,6 +118,7 @@ func (cs *currentStakerChainStateImpl) UpdateStakers(
 				copy(newVdr.delegators, oldVdr.delegators)
 				newVdr.delegators[len(oldVdr.delegators)] = tx
 				sortDelegatorsByRemoval(newVdr.delegators)
+				newVdr.delegatorWeight += tx.Validator.Wght
 				newCS.validatorsByNodeID[tx.Validator.NodeID] = &newVdr
 			default:
 				return nil, errWrongTxType
@@ -131,9 +138,11 @@ func (cs *currentStakerChainStateImpl) UpdateStakers(
 			default:
 				return nil, errWrongTxType
 			}
-			newCS.validatorsByTxID[vdr.ID()] = &validatorReward{
+			wrappedTx := &validatorReward{
 				addStakerTx: vdr,
 			}
+			newCS.validatorsByTxID[vdr.ID()] = wrappedTx
+			newCS.addedStakers = append(newCS.addedStakers, wrappedTx)
 		}
 	}
 
@@ -158,13 +167,7 @@ func (cs *currentStakerChainStateImpl) UpdateStakers(
 		}
 	}
 
-	for _, tx := range newCS.validators {
-		switch tx.UnsignedTx.(type) {
-		case *UnsignedAddValidatorTx, *UnsignedAddDelegatorTx:
-			newCS.nextStaker = newCS.validatorsByTxID[tx.ID()]
-			return newCS, nil
-		}
-	}
+	newCS.setNextStaker()
 	return newCS, nil
 }
 
@@ -179,6 +182,8 @@ func (cs *currentStakerChainStateImpl) DeleteNextStaker() (currentStakerChainSta
 		validatorsByNodeID: make(map[ids.ShortID]*currentValidatorImpl, len(cs.validatorsByNodeID)),
 		validatorsByTxID:   make(map[ids.ID]*validatorReward, len(cs.validatorsByTxID)-1),
 		validators:         cs.validators[1:], // sorted in order of removal
+
+		deletedStakers: []*Tx{removedTx},
 	}
 
 	switch tx := removedTx.UnsignedTx.(type) {
@@ -214,13 +219,7 @@ func (cs *currentStakerChainStateImpl) DeleteNextStaker() (currentStakerChainSta
 		}
 	}
 
-	for _, tx := range newCS.validators {
-		switch tx.UnsignedTx.(type) {
-		case *UnsignedAddValidatorTx, *UnsignedAddDelegatorTx:
-			newCS.nextStaker = newCS.validatorsByTxID[tx.ID()]
-			return newCS, nil
-		}
-	}
+	newCS.setNextStaker()
 	return newCS, nil
 }
 
@@ -228,8 +227,28 @@ func (cs *currentStakerChainStateImpl) Stakers() []*Tx {
 	return cs.validators
 }
 
-func (cs *currentStakerChainStateImpl) Apply(is internalState) error {
-	return cs.validators
+func (cs *currentStakerChainStateImpl) Apply(is internalState) {
+	for _, added := range cs.addedStakers {
+		is.AddCurrentStaker(added.addStakerTx, added.potentialReward)
+	}
+	for _, deleted := range cs.deletedStakers {
+		is.DeleteCurrentStaker(deleted)
+	}
+	is.SetCurrentStakerChainState(cs)
+
+	// Validator changes should only be applied once.
+	cs.addedStakers = nil
+	cs.deletedStakers = nil
+}
+
+func (cs *currentStakerChainStateImpl) setNextStaker() {
+	for _, tx := range cs.validators {
+		switch tx.UnsignedTx.(type) {
+		case *UnsignedAddValidatorTx, *UnsignedAddDelegatorTx:
+			cs.nextStaker = cs.validatorsByTxID[tx.ID()]
+			return
+		}
+	}
 }
 
 type innerSortValidatorsByRemoval []*Tx

@@ -49,21 +49,21 @@ type mutableState interface {
 	GetTx(txID ids.ID) (*Tx, Status, error)
 	AddTx(tx *Tx, status Status)
 
+	CurrentStakerChainState() currentStakerChainState
+	PendingStakerChainState() pendingStakerChainState
+
 	utxoState
 }
 
 type versionedState interface {
 	mutableState
 
-	CurrentStakerChainState() currentStakerChainState
-	PendingStakerChainState() pendingStakerChainState
-
-	SetBase(versionedState)
-	Apply(internalState) error
+	SetBase(mutableState)
+	Apply(internalState)
 }
 
 type versionedStateImpl struct {
-	parentState versionedState
+	parentState mutableState
 
 	currentStakerChainState currentStakerChainState
 	pendingStakerChainState pendingStakerChainState
@@ -96,11 +96,17 @@ type utxoImpl struct {
 }
 
 func NewVersionedState(
-	vs versionedState,
+	ps mutableState,
 	current currentStakerChainState,
 	pending pendingStakerChainState,
 ) versionedState {
-	return nil
+	return &versionedStateImpl{
+		parentState:             ps,
+		currentStakerChainState: current,
+		pendingStakerChainState: pending,
+		timestamp:               ps.GetTimestamp(),
+		currentSupply:           ps.GetCurrentSupply(),
+	}
 }
 
 func (vs *versionedStateImpl) GetTimestamp() time.Time {
@@ -270,11 +276,11 @@ func (vs *versionedStateImpl) PendingStakerChainState() pendingStakerChainState 
 	return vs.pendingStakerChainState
 }
 
-func (vs *versionedStateImpl) SetBase(parentState versionedState) {
+func (vs *versionedStateImpl) SetBase(parentState mutableState) {
 	vs.parentState = parentState
 }
 
-func (vs *versionedStateImpl) Apply(is internalState) error {
+func (vs *versionedStateImpl) Apply(is internalState) {
 	is.SetTimestamp(vs.timestamp)
 	is.SetCurrentSupply(vs.currentSupply)
 	for _, subnet := range vs.addedSubnets {
@@ -295,4 +301,6 @@ func (vs *versionedStateImpl) Apply(is internalState) error {
 			is.DeleteUTXO(*utxo.utxoID)
 		}
 	}
+	vs.currentStakerChainState.Apply(is)
+	vs.pendingStakerChainState.Apply(is)
 }

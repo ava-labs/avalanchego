@@ -24,7 +24,7 @@ type Abort struct {
 func (a *Abort) Verify() error {
 	if err := a.DoubleDecisionBlock.Verify(); err != nil {
 		if err := a.Reject(); err != nil {
-			a.vm.Ctx.Log.Error("failed to reject abort block %s due to %s", a.ID(), err)
+			a.vm.ctx.Log.Error("failed to reject abort block %s due to %s", a.ID(), err)
 		}
 		return err
 	}
@@ -32,7 +32,7 @@ func (a *Abort) Verify() error {
 	// Abort is a decision, so its parent must be a proposal
 	if !ok {
 		if err := a.Reject(); err != nil {
-			a.vm.Ctx.Log.Error("failed to reject abort block %s due to %s", a.ID(), err)
+			a.vm.ctx.Log.Error("failed to reject abort block %s due to %s", a.ID(), err)
 		}
 		return errInvalidBlockType
 	}

@@ -26,7 +26,7 @@ type pendingStakerChainState interface {
 
 	Stakers() []*Tx // Sorted in removal order
 
-	Apply(internalState) error
+	Apply(internalState)
 }
 
 type pendingStakerChainStateImpl struct {
@@ -36,6 +36,9 @@ type pendingStakerChainStateImpl struct {
 
 	// list of pending validators in order of their removal
 	validators []*Tx
+
+	addedStakers   []*Tx
+	deletedStakers []*Tx
 }
 
 func (ps *pendingStakerChainStateImpl) GetStakerByNodeID(nodeID ids.ShortID) (addStakerTx *UnsignedAddValidatorTx, err error) {
@@ -55,7 +58,8 @@ func (ps *pendingStakerChainStateImpl) GetValidator(nodeID ids.ShortID) validato
 
 func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *Tx) pendingStakerChainState {
 	newPS := &pendingStakerChainStateImpl{
-		validators: make([]*Tx, len(ps.validators)+1),
+		validators:   make([]*Tx, len(ps.validators)+1),
+		addedStakers: []*Tx{addStakerTx},
 	}
 	copy(newPS.validators, ps.validators)
 	newPS.validators[len(ps.validators)] = addStakerTx
@@ -135,6 +139,8 @@ func (ps *pendingStakerChainStateImpl) DeleteStaker(numToRemove int) pendingStak
 		validatorsByNodeID:      make(map[ids.ShortID]*UnsignedAddValidatorTx, len(ps.validatorsByNodeID)),
 		validatorExtrasByNodeID: make(map[ids.ShortID]*validatorImpl, len(ps.validatorExtrasByNodeID)),
 		validators:              ps.validators[numToRemove:],
+
+		deletedStakers: ps.validators[:numToRemove],
 	}
 
 	for nodeID, vdr := range ps.validatorsByNodeID {
@@ -184,6 +190,20 @@ func (ps *pendingStakerChainStateImpl) DeleteStaker(numToRemove int) pendingStak
 
 func (ps *pendingStakerChainStateImpl) Stakers() []*Tx {
 	return ps.validators
+}
+
+func (ps *pendingStakerChainStateImpl) Apply(is internalState) {
+	for _, added := range ps.addedStakers {
+		is.AddPendingStaker(added)
+	}
+	for _, deleted := range ps.deletedStakers {
+		is.DeletePendingStaker(deleted)
+	}
+	is.SetPendingStakerChainState(ps)
+
+	// Validator changes should only be applied once.
+	ps.addedStakers = nil
+	ps.deletedStakers = nil
 }
 
 type innerSortValidatorsByAddition []*Tx
