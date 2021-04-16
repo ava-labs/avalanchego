@@ -473,7 +473,9 @@ func (vm *VM) Initialize(
 	vm.newMinedBlockSub = vm.chain.SubscribeNewMinedBlockEvent()
 	vm.shutdownWg.Add(1)
 	go ctx.Log.RecoverAndPanic(vm.awaitTxPoolStabilized)
-	chain.Start()
+	if err := chain.Start(); err != nil {
+		return fmt.Errorf("failed to start ETH Chain due to %w", err)
+	}
 
 	var lastAccepted *types.Block
 	if lastAcceptedErr == nil {
