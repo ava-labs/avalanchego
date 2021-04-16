@@ -1,7 +1,6 @@
 ./consensus/dummy/consensus.go
-./consensus/clique/clique.go
 ./consensus/consensus.go
-./consensus/ethash/consensus.go
+./consensus/ethash/ethash.go (consolidated unused files to just use the config and SeedHash function)
 ./core/blockchain.go
 ./core/events.go
 ./core/evm.go
