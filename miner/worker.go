@@ -30,6 +30,7 @@
 package miner
 
 import (
+	"fmt"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -673,7 +674,9 @@ func (w *worker) resultLoop() {
 			log.Info("Successfully sealed new block", "number", block.Number(), "sealhash", sealhash, "hash", hash,
 				"elapsed", common.PrettyDuration(time.Since(task.createdAt)))
 			if w.minerCallbacks.OnSealFinish != nil {
-				w.minerCallbacks.OnSealFinish(block)
+				if err := w.minerCallbacks.OnSealFinish(block); err != nil {
+					log.Error(fmt.Sprintf("Miner callback OnSealFinish returned error: %s", err))
+				}
 			}
 
 			// Broadcast the block and announce chain insertion event
