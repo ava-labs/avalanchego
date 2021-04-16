@@ -33,8 +33,9 @@ const (
 	httpsEnabledKey                         = "http-tls-enabled"
 	httpsKeyFileKey                         = "http-tls-key-file"
 	httpsCertFileKey                        = "http-tls-cert-file"
+	httpAllowedOrigins                      = "http-allowed-origins"
 	apiAuthRequiredKey                      = "api-auth-required"
-	apiAuthPasswordKey                      = "api-auth-password" // #nosec G101
+	apiAuthPasswordFileKey                  = "api-auth-password-file" // #nosec G101
 	bootstrapIPsKey                         = "bootstrap-ips"
 	bootstrapIDsKey                         = "bootstrap-ids"
 	stakingPortKey                          = "staking-port"
@@ -57,7 +58,7 @@ const (
 	networkHealthMaxTimeSinceMsgSentKey     = "network-health-max-time-since-msg-sent"
 	networkHealthMaxPortionSendQueueFillKey = "network-health-max-portion-send-queue-full"
 	networkHealthMaxSendFailRateKey         = "network-health-max-send-fail-rate"
-	networkHealthMaxTimeSinceNoReqsKey      = "network-health-max-time-since-no-requests"
+	networkHealthMaxOutstandingDurationKey  = "network-health-max-outstanding-request-duration"
 	sendQueueSizeKey                        = "send-queue-size"
 	benchlistFailThresholdKey               = "benchlist-fail-threshold"
 	benchlistPeerSummaryEnabledKey          = "benchlist-peer-summary-enabled"
@@ -98,6 +99,8 @@ const (
 	disconnectedCheckFreqKey                = "disconnected-check-frequency"
 	disconnectedRestartTimeoutKey           = "disconnected-restart-timeout"
 	restartOnDisconnectedKey                = "restart-on-disconnected"
+	indexEnabledKey                         = "index-enabled"
+	indexAllowIncompleteKey                 = "index-allow-incomplete"
 	routerHealthMaxDropRateKey              = "router-health-max-drop-rate"
 	routerHealthMaxOutstandingRequestsKey   = "router-health-max-outstanding-requests"
 	healthCheckFreqKey                      = "health-check-frequency"

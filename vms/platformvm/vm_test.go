@@ -350,10 +350,6 @@ func defaultVM() (*VM, database.Database) {
 	return vm, baseDB
 }
 
-func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) {
-	return GenesisVMWithArgs(t, nil)
-}
-
 func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
 	var genesisBytes []byte
 
@@ -2061,8 +2057,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 				Ctx:        ctx,
 				Validators: vdrs,
 				Beacons:    beacons,
-				SampleK:    int(beacons.Weight()),
-				Alpha:      uint64(beacons.Len()/2 + 1),
+				SampleK:    beacons.Len(),
+				Alpha:      beacons.Weight()/2 + 1,
 				Sender:     &sender,
 				Subnet:     subnet,
 			},
@@ -2088,7 +2084,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
-	handler.Initialize(
+	err = handler.Initialize(
 		&engine,
 		vdrs,
 		msgChan,
@@ -2100,6 +2096,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		prometheus.NewRegistry(),
 		&router.Delay{},
 	)
+	assert.NoError(t, err)
 
 	// Allow incoming messages to be routed to the new chain
 	chainRouter.AddChain(handler)

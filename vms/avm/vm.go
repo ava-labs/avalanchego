@@ -12,8 +12,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/ava-labs/avalanchego/pubsub"
-
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -23,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/pubsub"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
@@ -63,7 +62,8 @@ var (
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
 
-	_ vertex.DAGVM = &VM{}
+	_ vertex.DAGVM    = &VM{}
+	_ common.StaticVM = &VM{}
 )
 
 // VM implements the avalanche.DAGVM interface
@@ -301,22 +301,21 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	}, err
 }
 
-// CreateStaticHandlers implements the avalanche.DAGVM interface
-func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
+// CreateStaticHandlers implements the common.StaticVM interface
+func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	// name this service "avm"
 	staticService := CreateStaticService()
-	_ = newServer.RegisterService(staticService, "avm")
 	return map[string]*common.HTTPHandler{
 		"": {LockOptions: common.WriteLock, Handler: newServer},
-	}
+	}, newServer.RegisterService(staticService, "avm")
 }
 
 // Pending implements the avalanche.DAGVM interface
-func (vm *VM) Pending() []snowstorm.Tx {
+func (vm *VM) PendingTxs() []snowstorm.Tx {
 	vm.metrics.numPendingCalls.Inc()
 
 	vm.timer.Cancel()
@@ -327,14 +326,14 @@ func (vm *VM) Pending() []snowstorm.Tx {
 }
 
 // Parse implements the avalanche.DAGVM interface
-func (vm *VM) Parse(b []byte) (snowstorm.Tx, error) {
+func (vm *VM) ParseTx(b []byte) (snowstorm.Tx, error) {
 	vm.metrics.numParseCalls.Inc()
 
 	return vm.parseTx(b)
 }
 
 // Get implements the avalanche.DAGVM interface
-func (vm *VM) Get(txID ids.ID) (snowstorm.Tx, error) {
+func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
 	vm.metrics.numGetCalls.Inc()
 
 	tx := &UniqueTx{
