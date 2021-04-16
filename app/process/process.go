@@ -30,7 +30,7 @@ const (
 		"Fetch only mode will not change this node's staking key/certificate.\n" +
 		"Note that populating the new database version will approximately double the amount of disk space required by AvalancheGo.\n" +
 		"Ensure that this computer has at least enough disk space available.\n" +
-		"You should not delete the old database version unless advised to by the Avalanche team.\n"
+		"You should not delete the old database version unless advised to by the Avalanche team."
 	alreadyUpgradedMsg = "fetch only mode done. Restart this node without --fetch-only to run normally"
 )
 

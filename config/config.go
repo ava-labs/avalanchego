@@ -40,6 +40,11 @@ import (
 	"github.com/spf13/viper"
 )
 
+const (
+	avalanchegoLatest     = "avalanchego-latest"
+	avalanchegoPreupgrade = "avalanchego-preupgrade"
+)
+
 // Results of parsing the CLI
 var (
 	defaultNetworkName = constants.MainnetName
@@ -90,7 +95,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Genesis config File
 	fs.String(genesisConfigFileKey, "", "Specifies a genesis config file (ignored when running standard networks)")
 	// Plugins
-	fs.String(pluginDirKey, defaultString, "Plugin directory for Avalanche VMs")
+	fs.String(PluginDirKey, defaultString, "Plugin directory for Avalanche VMs")
 	// Network ID
 	fs.String(networkNameKey, defaultNetworkName, "Network ID this node will connect to")
 	// AVAX fees
@@ -474,15 +479,14 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 	// Build directory
 	// The directory should have this structure:
 	// build
-	// |_avalanchego-[currentVersion]
+	// |_avalanchego-latest
 	//   |_avalanchego-inner
 	//   |_plugins
 	//     |_evm
-	// |_avalanchego-[previousVersion]
+	// |_avalanchego-preupgrade
 	//   |_avalanchego-inner
 	//   |_plugins
 	//     |_evm
-	// where [currentVersion] and [previousVersion] are, for example, v1.3.2 and v.1.3.1, resepectively
 	buildDir := v.GetString(buildDirKey)
 	if buildDir == defaultString {
 		config.BuildDir = defaultBuildDirs[0]
@@ -495,27 +499,32 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 			return false
 		}
 		// make sure both expected subdirectories exist
-		if _, err := os.Stat(filepath.Join(dir, fmt.Sprintf("%s%s%s", constants.AppName, "-v", versionconfig.NodeVersion.AsVersion()))); err != nil {
+		if _, err := os.Stat(filepath.Join(dir, avalanchegoLatest)); err != nil {
 			return false
 		}
-		if _, err := os.Stat(filepath.Join(dir, fmt.Sprintf("%s%s%s", constants.AppName, "-v", versionconfig.PreDBUpgradeNodeVersion.AsVersion()))); err != nil {
+		if _, err := os.Stat(filepath.Join(dir, avalanchegoPreupgrade)); err != nil {
 			return false
 		}
 		return true
 	}
 	if !validBuildDir(config.BuildDir) {
+		foundBuildDir := false
 		for _, dir := range defaultBuildDirs {
 			if validBuildDir(dir) {
 				config.BuildDir = dir
+				foundBuildDir = true
 				break
 			}
 		}
+		if !foundBuildDir {
+			return node.Config{}, fmt.Errorf("couldn't find valid build directory in any of the default locations: %s", defaultBuildDirs)
+		}
 	}
 
-	// Plugin directory
-	pluginDir := v.GetString(pluginDirKey)
+	// Plugin directory. Defaults to [buildDirectory]/plugins
+	pluginDir := v.GetString(PluginDirKey)
 	if pluginDir == defaultString {
-		config.PluginDir = filepath.Join(config.BuildDir, fmt.Sprintf("%s%s%s", constants.AppName, "-v", versionconfig.NodeVersion.AsVersion()), "plugins") // TODO fix this. It always uses the current node version right now.
+		config.PluginDir = filepath.Join(config.BuildDir, avalanchegoLatest, "plugins")
 	} else {
 		config.PluginDir = pluginDir
 	}
@@ -523,7 +532,6 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 	// HTTP:
 	config.HTTPHost = v.GetString(httpHostKey)
 	config.HTTPPort = uint16(v.GetUint(HTTPPortKey))
-
 	config.HTTPSEnabled = v.GetBool(httpsEnabledKey)
 	config.HTTPSKeyFile = v.GetString(httpsKeyFileKey)
 	config.HTTPSCertFile = v.GetString(httpsCertFileKey)
