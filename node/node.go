@@ -957,7 +957,7 @@ func (n *Node) Initialize(
 // Shutdown this node
 // May be called multiple times
 func (n *Node) Shutdown(exitCode int) {
-	if !n.shuttingDown.GetValue() {
+	if !n.shuttingDown.GetValue() { // only set the exit code once
 		n.shuttingDownExitCode.SetValue(exitCode)
 	}
 	n.shuttingDown.SetValue(true)

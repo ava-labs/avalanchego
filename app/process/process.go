@@ -211,7 +211,8 @@ func (a *App) Start() int {
 	return a.node.ExitCode()
 }
 
-// Assumes [a.node] is not nil
+// Assumes [a.node] is not nil.
+// Blocks until [a.node] is done shutting down.
 func (a *App) Stop() {
 	a.node.Shutdown(0)
 	a.node.DoneShuttingDown.Wait()

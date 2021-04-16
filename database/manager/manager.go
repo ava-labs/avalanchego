@@ -282,6 +282,8 @@ type VersionedDatabase struct {
 	version.Version
 }
 
+// Returns nil if the [db.Database] is already closed.
+// Doesn't close [db.rawDB] (if it exists)
 func (db *VersionedDatabase) Close() error {
 	if err := db.Database.Close(); err != nil && err != database.ErrClosed {
 		return err
@@ -300,6 +302,8 @@ func (db *VersionedDatabase) Shutdown() error {
 	return errs.Err
 }
 
+// Returns true if the node has ever finished bootstrapping the Primary Network
+// using this database version
 func (db *VersionedDatabase) Bootstrapped() (bool, error) {
 	if db.rawDB == nil {
 		return false, nil
@@ -307,6 +311,8 @@ func (db *VersionedDatabase) Bootstrapped() (bool, error) {
 	return db.rawDB.Has(bootstrappedKey)
 }
 
+// Mark that the node has finished bootstrapping the Primary Network
+// using this database version
 func (db *VersionedDatabase) MarkBootstrapped() error {
 	if db.rawDB == nil {
 		return nil

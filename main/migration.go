@@ -68,8 +68,8 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 }
 
 // Run two nodes at once: one is a version before the database upgrade and the other after.
-// The latter will bootstrap from the former. Its staking port and HTTP port are 2
-// greater than the staking/HTTP ports in [v].
+// The latter will bootstrap from the former. The pre-upgrade node will have staking port and
+// http port 2 greater than the values given by the user.
 // When the new node version is done bootstrapping, both nodes are stopped.
 // Returns nil if the new node version successfully bootstrapped.
 func (m *migrationManager) runMigration() error {
@@ -91,19 +91,19 @@ func (m *migrationManager) runMigration() error {
 	}()
 
 	m.log.Info("starting latest node version")
-	currentVersionNode, err := m.binaryManager.currentVersionNode(
+	latestVersion, err := m.binaryManager.latestVersionNode(
 		m.v,
 		true,
 		m.nodeConfig.NodeID,
 		int(m.nodeConfig.StakingIP.Port)+2,
 	)
 	if err != nil {
-		return fmt.Errorf("couldn't create current version during migration: %w", err)
+		return fmt.Errorf("couldn't create latest version during migration: %w", err)
 	}
-	currentVersionNodeExitCodeChan := currentVersionNode.start()
+	latestVersionExitCodeChan := latestVersion.start()
 	defer func() {
-		if err := currentVersionNode.stop(); err != nil {
-			m.log.Error("error while stopping current version node: %s", err)
+		if err := latestVersion.stop(); err != nil {
+			m.log.Error("error while stopping latest version node: %s", err)
 		}
 	}()
 
@@ -111,9 +111,9 @@ func (m *migrationManager) runMigration() error {
 		select {
 		case exitCode := <-preDBUpgradeNodeExitCodeChan:
 			return fmt.Errorf("previous version node stopped with exit code %d", exitCode)
-		case exitCode := <-currentVersionNodeExitCodeChan:
+		case exitCode := <-latestVersionExitCodeChan:
 			if exitCode != constants.ExitCodeDoneMigrating {
-				return fmt.Errorf("current version died with exit code %d", exitCode)
+				return fmt.Errorf("latest version died with exit code %d", exitCode)
 			}
 			return nil
 		}

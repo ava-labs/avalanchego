@@ -6,8 +6,10 @@ package main
 import (
 	"fmt"
 	"os"
+	"syscall"
 
 	"github.com/ava-labs/avalanchego/app/process"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 
@@ -48,7 +50,15 @@ func main() {
 	}
 
 	app := process.NewApp(c) // Create node wrapper
-	if c.PluginMode {        // Serve as a plugin
+	_ = utils.HandleSignals(
+		func(os.Signal) {
+			app.Stop()
+			os.Exit(exitCode)
+		},
+		syscall.SIGINT, syscall.SIGTERM,
+	)
+
+	if c.PluginMode { // Serve as a plugin
 		plugin.Serve(&plugin.ServeConfig{
 			HandshakeConfig: appPlugin.Handshake,
 			Plugins: map[string]plugin.Plugin{

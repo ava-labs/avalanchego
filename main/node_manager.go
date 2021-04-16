@@ -16,13 +16,19 @@ import (
 	"github.com/spf13/viper"
 )
 
+// nodeProcess wraps a node client
 type nodeProcess struct {
-	log       logging.Logger
+	log logging.Logger
+	// Every nodeProcess has a unique ID
 	processID int
+	// [rawClient].Kill() should eventually be called be called
+	// on each nodeProcess
 	rawClient *plugin.Client
 	node      *appplugin.Client
 }
 
+// Returns a channel that the node's exit code is sent on when the node is done
+// This method does not block.
 func (np *nodeProcess) start() chan int {
 	exitCodeChan := make(chan int, 1)
 	go func() {
@@ -36,7 +42,8 @@ func (np *nodeProcess) start() chan int {
 	return exitCodeChan
 }
 
-// Stop should be called on each nodeProcess when we are done with it
+// Stop should be called on each nodeProcess when we are done with it.
+// Calls [Kill()] on the underlying client.
 func (np *nodeProcess) stop() error {
 	err := np.node.Stop()
 	np.rawClient.Kill()
@@ -44,8 +51,19 @@ func (np *nodeProcess) stop() error {
 }
 
 type nodeManager struct {
-	buildDirPath  string
-	log           logging.Logger
+	// Path to the build directory, which should have this structure:
+	// build
+	// |_avalanchego-latest
+	//   |_avalanchego-inner (the binary from compiling the app directory)
+	//   |_plugins
+	//     |_evm
+	// |_avalanchego-preupgrade
+	//   |_avalanchego-inner (the binary from compiling the app directory)
+	//   |_plugins
+	//     |_evm
+	buildDirPath string
+	log          logging.Logger
+	// nodeProcess ID --> nodeProcess
 	nodes         map[int]*nodeProcess
 	nextProcessID int
 }
@@ -58,15 +76,16 @@ func (nm *nodeManager) shutdown() {
 	}
 }
 
+// stop a node. Blocks until the node is done shutting down.
 func (nm *nodeManager) stop(processID int) error {
 	nodeProcess, exists := nm.nodes[processID]
 	if !exists {
 		return nil
 	}
-	delete(nm.nodes, processID)
 	if err := nodeProcess.stop(); err != nil {
 		return err
 	}
+	delete(nm.nodes, processID)
 	return nil
 }
 
@@ -79,7 +98,7 @@ func newNodeManager(path string, log logging.Logger) *nodeManager {
 }
 
 func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (*nodeProcess, error) {
-	config := &plugin.ClientConfig{
+	clientConfig := &plugin.ClientConfig{
 		HandshakeConfig: appplugin.Handshake,
 		Plugins:         appplugin.PluginMap,
 		Cmd:             exec.Command(path, args...),
@@ -90,10 +109,10 @@ func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (
 		Logger: hclog.New(&hclog.LoggerOptions{Level: hclog.Error}),
 	}
 	if printToStdOut {
-		config.SyncStdout = os.Stdout
-		config.SyncStderr = os.Stderr
+		clientConfig.SyncStdout = os.Stdout
+		clientConfig.SyncStderr = os.Stderr
 	}
-	client := plugin.NewClient(config)
+	client := plugin.NewClient(clientConfig)
 	rpcClient, err := client.Client()
 	if err != nil {
 		client.Kill()
@@ -122,7 +141,7 @@ func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (
 
 func (nm *nodeManager) runNormal(v *viper.Viper, nodeConfig node.Config) (int, error) {
 	nm.log.Info("starting latest node version")
-	node, err := nm.currentVersionNode(v, false, ids.ShortID{}, 0)
+	node, err := nm.latestVersionNode(v, false, ids.ShortID{}, 0)
 	if err != nil {
 		return 1, fmt.Errorf("couldn't create current version node: %s", err)
 	}
@@ -140,7 +159,7 @@ func (nm *nodeManager) preDBUpgradeNode(
 	stakingPort int,
 	httpPort int,
 ) (*nodeProcess, error) {
-	ignorableArgs := map[string]bool{
+	ignorableArgs := map[string]bool{ // Ignore these viper args. They're manually set below.
 		config.FetchOnlyKey:   true,
 		config.PluginModeKey:  true,
 		config.HTTPPortKey:    true,
@@ -154,22 +173,23 @@ func (nm *nodeManager) preDBUpgradeNode(
 		}
 		args = append(args, fmt.Sprintf("--%s=%v", k, v))
 	}
-	args = append(args, "--plugin-mode-enabled=true") // run as a plugin
-	args = append(args, fmt.Sprintf("--plugin-dir=%s/avalanchego-preupgrade/plugins", nm.buildDirPath))
+	args = append(args, fmt.Sprintf("--%s=true", config.PluginModeKey)) // run as a plugin
+	args = append(args, fmt.Sprintf("--%s=%s/avalanchego-preupgrade/plugins", config.PluginDirKey, nm.buildDirPath))
 	args = append(args, fmt.Sprintf("--%s=%d", config.HTTPPortKey, httpPort))
 	args = append(args, fmt.Sprintf("--%s=%d", config.StakingPortKey, stakingPort))
 	binaryPath := fmt.Sprintf("%s/avalanchego-preupgrade/avalanchego-inner", nm.buildDirPath)
 	return nm.newNode(binaryPath, args, false)
 }
 
-func (nm *nodeManager) currentVersionNode(
+// Run a
+func (nm *nodeManager) latestVersionNode(
 	v *viper.Viper,
 	fetchOnly bool,
 	fetchFromNodeID ids.ShortID,
 	fetchFromStakingPort int,
 ) (*nodeProcess, error) {
 	argsMap := v.AllSettings()
-	if fetchOnly {
+	if fetchOnly { // in fetch only mode, bootstrap from local node on the given port with the given node ID
 		argsMap[config.BootstrapIPsKey] = fmt.Sprintf("127.0.0.1:%d", fetchFromStakingPort)
 		argsMap[config.BootstrapIDsKey] = fmt.Sprintf("%s%s", constants.NodeIDPrefix, fetchFromNodeID)
 		argsMap[config.FetchOnlyKey] = true
@@ -178,7 +198,7 @@ func (nm *nodeManager) currentVersionNode(
 	for k, v := range argsMap {
 		args = append(args, fmt.Sprintf("--%s=%v", k, v))
 	}
+	args = append(args, fmt.Sprintf("--%s=true", config.PluginModeKey)) // run as a plugin
 	binaryPath := fmt.Sprintf("%s/avalanchego-latest/avalanchego-inner", nm.buildDirPath)
-	args = append(args, "--plugin-mode-enabled=true") // run as a plugin
 	return nm.newNode(binaryPath, args, true)
 }

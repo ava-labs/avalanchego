@@ -20,6 +20,8 @@ func NewClient(node appproto.NodeClient) *Client {
 	}
 }
 
+// Blocks until the node is done shutting down.
+// Returns the node's exit code.
 func (c *Client) Start() (int, error) {
 	resp, err := c.client.Start(context.Background(), &appproto.StartRequest{})
 	if err != nil {
@@ -28,6 +30,7 @@ func (c *Client) Start() (int, error) {
 	return int(resp.ExitCode), err
 }
 
+// Blocks until the node is done shutting down.
 func (c *Client) Stop() error {
 	_, err := c.client.Stop(context.Background(), &appproto.StopRequest{})
 	return err

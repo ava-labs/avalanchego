@@ -15,18 +15,19 @@ type Server struct {
 	app *process.App
 }
 
-// NewServer returns a vm instance connected to a remote vm instance
 func NewServer(app *process.App) *Server {
 	return &Server{
 		app: app,
 	}
 }
 
+// Blocks until the node returns
 func (ns *Server) Start(_ context.Context, req *appproto.StartRequest) (*appproto.StartResponse, error) {
 	exitCode := ns.app.Start()
 	return &appproto.StartResponse{ExitCode: int32(exitCode)}, nil
 }
 
+// Blocks until the node is done shutting down
 func (ns *Server) Stop(_ context.Context, req *appproto.StopRequest) (*appproto.StopResponse, error) {
 	ns.app.Stop()
 	return &appproto.StopResponse{}, nil
