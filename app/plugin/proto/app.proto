@@ -3,23 +3,17 @@ package appproto;
 
 // To compile: protoc --go_out=plugins=grpc:. app.proto
 
-message StartRequest {
-// TODO
-}
+message StartRequest {}
 
 message StartResponse {
     int32 exitCode = 1;
 }
 
-message StopRequest {
-// TODO
-}
+message StopRequest {}
 
-message StopResponse {
-    int32 exitCode = 1;
-}
+message StopResponse {}
 
 service Node {
-rpc Start(StartRequest) returns (StartResponse);
-rpc Stop(StopRequest) returns (StopResponse);
+    rpc Start(StartRequest) returns (StartResponse);
+    rpc Stop(StopRequest) returns (StopResponse);
 }

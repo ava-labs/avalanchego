@@ -8,20 +8,17 @@ import (
 
 	appproto "github.com/ava-labs/avalanchego/app/plugin/proto"
 	"github.com/ava-labs/avalanchego/app/process"
-
-	"github.com/hashicorp/go-plugin"
 )
 
+// Server wraps a node so it can be served with the hashicorp plugin harness
 type Server struct {
-	app    *process.App
-	broker *plugin.GRPCBroker
+	app *process.App
 }
 
 // NewServer returns a vm instance connected to a remote vm instance
-func NewServer(app *process.App, broker *plugin.GRPCBroker) *Server {
+func NewServer(app *process.App) *Server {
 	return &Server{
-		app:    app,
-		broker: broker,
+		app: app,
 	}
 }
 
@@ -31,5 +28,5 @@ func (ns *Server) Start(_ context.Context, req *appproto.StartRequest) (*appprot
 }
 
 func (ns *Server) Stop(_ context.Context, req *appproto.StopRequest) (*appproto.StopResponse, error) {
-	return &appproto.StopResponse{ExitCode: int32(ns.app.Stop())}, nil
+	return &appproto.StopResponse{}, nil
 }

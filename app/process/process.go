@@ -54,8 +54,8 @@ func NewApp(config node.Config) *App {
 	}
 }
 
-// Start creates and runs an AvalancheGo nodes
-// Returns the node's exit code. If [a.Stop()] is called,
+// Start creates and runs an AvalancheGo node.
+// Returns the node's exit code. If [a.Stop()] is called, Start()
 // returns 0. This method blocks until the node is done.
 func (a *App) Start() int {
 	// we want to create the logger after the plugin as started the app

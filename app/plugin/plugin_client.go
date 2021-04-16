@@ -7,8 +7,6 @@ import (
 	"context"
 
 	appproto "github.com/ava-labs/avalanchego/app/plugin/proto"
-
-	"github.com/hashicorp/go-plugin"
 )
 
 type Client struct {
@@ -16,7 +14,7 @@ type Client struct {
 }
 
 // NewServer returns a vm instance connected to a remote vm instance
-func NewClient(node appproto.NodeClient, broker *plugin.GRPCBroker) *Client {
+func NewClient(node appproto.NodeClient) *Client {
 	return &Client{
 		client: node,
 	}
@@ -30,10 +28,7 @@ func (c *Client) Start() (int, error) {
 	return int(resp.ExitCode), err
 }
 
-func (c *Client) Stop() (int, error) {
-	resp, err := c.client.Stop(context.Background(), &appproto.StopRequest{})
-	if err != nil {
-		return 1, err
-	}
-	return int(resp.ExitCode), nil
+func (c *Client) Stop() error {
+	_, err := c.client.Stop(context.Background(), &appproto.StopRequest{})
+	return err
 }

@@ -135,7 +135,8 @@ func NewDefaultMemDBManager() Manager {
 }
 
 // New creates a database manager at [filePath] by creating a database instance from each directory
-// with a version <= [currentVersion]
+// with a version <= [currentVersion]. If [includePreviousVersions], opens previous database
+// versions and includes them in the returned Manager.
 func New(
 	dbDirPath string,
 	log logging.Logger,
@@ -271,6 +272,8 @@ func NewManagerFromDBs(dbs []*VersionedDatabase) (Manager, error) {
 }
 
 type VersionedDatabase struct {
+	// Has flag the specifies whether this database version has been bootstrapped.
+	// nil if Version < [firstVersionWithBootstrappedFlag]
 	rawDB database.Database
 	database.Database
 	version.Version

@@ -38,7 +38,7 @@ func (np *nodeProcess) start() chan int {
 
 // Stop should be called on each nodeProcess when we are done with it
 func (np *nodeProcess) stop() error {
-	_, err := np.node.Stop()
+	err := np.node.Stop()
 	np.rawClient.Kill()
 	return err
 }
