@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gorilla/rpc/v2"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/codec"
@@ -25,12 +27,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/core"
+	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -97,6 +101,7 @@ type VM struct {
 	metrics
 	avax.AddressManager
 	avax.AtomicUTXOManager
+	uptime.Manager
 
 	// Used to get time. Useful for faking time during tests.
 	clock timer.Clock
@@ -216,6 +221,9 @@ func (vm *VM) Initialize(
 
 	// Initialize the utility to fetch atomic UTXOs
 	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx, Codec)
+
+	// Initialize the utility to track validator uptimes
+	vm.Manager = uptime.NewManager(vm.internalState)
 
 	// Initialize the inner VM, which has a lot of boiler-plate logic
 	vm.SnowmanVM = &core.SnowmanVM{}
@@ -433,12 +441,14 @@ func (vm *VM) createChain(tx *Tx) {
 }
 
 // Bootstrapping marks this VM as bootstrapping
-func (vm *VM) Bootstrapping() error { vm.bootstrapped = false; return vm.fx.Bootstrapping() }
+func (vm *VM) Bootstrapping() error {
+	vm.bootstrapped = false
+	return vm.fx.Bootstrapping()
+}
 
 // Bootstrapped marks this VM as bootstrapped
 func (vm *VM) Bootstrapped() error {
 	vm.bootstrapped = true
-	vm.bootstrappedTime = time.Unix(vm.clock.Time().Unix(), 0)
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -449,167 +459,31 @@ func (vm *VM) Bootstrapped() error {
 		return errs.Err
 	}
 
-	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
-	stopDB := prefixdb.NewNested(stopPrefix, vm.DB)
-	defer stopDB.Close()
-
-	stopIter := stopDB.NewIterator()
-	defer stopIter.Release()
-
-	previousDB, previousDBExists := vm.dbManager.Previous()
-	completedMigration, err := vm.DB.Has(migratedKey)
-	if err != nil {
+	// TODO: get validator list
+	if err := vm.StartTracking(nil); err != nil {
 		return err
 	}
-
-	for stopIter.Next() { // Iterates in order of increasing stop time
-		txBytes := stopIter.Value()
-
-		tx := rewardTx{}
-		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
-			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
-		}
-		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
-			return err
-		}
-
-		unsignedTx, ok := tx.Tx.UnsignedTx.(*UnsignedAddValidatorTx)
-		if !ok {
-			continue
-		}
-
-		nodeID := unsignedTx.Validator.ID()
-
-		uptime, err := vm.uptime(vm.DB, nodeID)
-		switch {
-		case err == database.ErrNotFound:
-			if previousDBExists && !completedMigration {
-				priorUptime, err := vm.uptime(previousDB, nodeID)
-				if err == nil {
-					uptime = priorUptime
-					break
-				}
-				if err != database.ErrNotFound {
-					vm.Ctx.Log.Debug("Couldn't find uptime in prior database for %s: %s", nodeID, err)
-				}
-			}
-			uptime = &validatorUptime{
-				LastUpdated: uint64(unsignedTx.StartTime().Unix()),
-			}
-		case err != nil:
-			return err
-		}
-
-		lastUpdated := time.Unix(int64(uptime.LastUpdated), 0)
-		if !vm.bootstrappedTime.After(lastUpdated) {
-			continue
-		}
-
-		durationOffline := vm.bootstrappedTime.Sub(lastUpdated)
-
-		uptime.UpDuration += uint64(durationOffline / time.Second)
-		uptime.LastUpdated = uint64(vm.bootstrappedTime.Unix())
-
-		if err := vm.setUptime(vm.DB, nodeID, uptime); err != nil {
-			return err
-		}
-	}
-	if err := stopIter.Error(); err != nil {
-		return err
-	}
-
-	if previousDBExists && !completedMigration {
-		errs.Add(vm.DB.Put(migratedKey, []byte(previousDB.Version.String())))
-	} else if !completedMigration {
-		errs.Add(vm.DB.Put(migratedKey, noMigration))
-	}
-
-	errs.Add(
-		vm.DB.Commit(),
-		stopDB.Close(),
-	)
-	return errs.Err
+	return vm.internalState.Commit()
 }
 
 // Shutdown this blockchain
 func (vm *VM) Shutdown() error {
-	if vm.DB == nil {
+	if vm.db == nil {
 		return nil
 	}
 
 	vm.mempool.Shutdown()
 
-	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
-	stopDB := prefixdb.NewNested(stopPrefix, vm.DB)
-	defer stopDB.Close()
-
-	stopIter := stopDB.NewIterator()
-	defer stopIter.Release()
-
-	for stopIter.Next() { // Iterates in order of increasing stop time
-		txBytes := stopIter.Value()
-
-		tx := rewardTx{}
-		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
-			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
-		}
-		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
-			return err
-		}
-
-		staker, ok := tx.Tx.UnsignedTx.(*UnsignedAddValidatorTx)
-		if !ok {
-			continue
-		}
-		nodeID := staker.Validator.ID()
-		startTime := staker.StartTime()
-
-		uptime, err := vm.uptime(vm.DB, nodeID)
-		switch {
-		case err == database.ErrNotFound:
-			uptime = &validatorUptime{
-				LastUpdated: uint64(startTime.Unix()),
-			}
-		case err != nil:
-			return err
-		}
-
-		currentLocalTime := vm.clock.Time()
-		timeConnected := currentLocalTime
-		if realTimeConnected, isConnected := vm.connections[nodeID]; isConnected {
-			timeConnected = realTimeConnected
-		}
-		if timeConnected.Before(vm.bootstrappedTime) {
-			timeConnected = vm.bootstrappedTime
-		}
-
-		lastUpdated := time.Unix(int64(uptime.LastUpdated), 0)
-		if timeConnected.Before(lastUpdated) {
-			timeConnected = lastUpdated
-		}
-
-		// If the current local time is before the time this peer
-		// was marked as connected skip updating its uptime.
-		if currentLocalTime.Before(timeConnected) {
-			continue
-		}
-
-		uptime.UpDuration += uint64(currentLocalTime.Sub(timeConnected) / time.Second)
-		uptime.LastUpdated = uint64(currentLocalTime.Unix())
-
-		if err := vm.setUptime(vm.DB, nodeID, uptime); err != nil {
-			vm.Ctx.Log.Error("failed to write back uptime data")
-		}
-	}
-	if err := stopIter.Error(); err != nil {
+	// TODO: get validator list
+	if err := vm.Manager.Shutdown(nil); err != nil {
 		return err
 	}
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		vm.DB.Commit(),
-		stopDB.Close(),
-		vm.DB.Close(),
+		vm.internalState.Commit(),
+		vm.internalState.Close(),
+		vm.dbManager.Close(),
 	)
 	return errs.Err
 }
@@ -646,25 +520,19 @@ func (vm *VM) getBlock(blkID ids.ID) (Block, error) {
 	if blk, exists := vm.currentBlocks[blkID]; exists {
 		return blk, nil
 	}
-	// Block isn't in memory. If block is in database, return it.
-	blkInterface, err := vm.State.GetBlock(vm.DB, blkID)
-	if err != nil {
-		return nil, err
-	}
-	if block, ok := blkInterface.(Block); ok {
-		return block, nil
-	}
-	return nil, errors.New("block not found")
+	return vm.internalState.GetBlock(blkID)
 }
 
 // SetPreference sets the preferred block to be the one with ID [blkID]
 func (vm *VM) SetPreference(blkID ids.ID) error {
-	if blkID != vm.Preferred() {
-		if err := vm.SnowmanVM.SetPreference(blkID); err != nil {
-			return err
-		}
-		vm.mempool.ResetTimer()
+	if blkID == vm.preferred {
+		return nil
 	}
+
+	if err := vm.SnowmanVM.SetPreference(blkID); err != nil {
+		return err
+	}
+	vm.mempool.ResetTimer()
 	return nil
 }
 
@@ -673,80 +541,48 @@ func (vm *VM) SetPreference(blkID ids.ID) error {
 // * values are API handlers
 // See API documentation for more information
 func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
-	// Create a service with name "platform"
-	handler, err := vm.SnowmanVM.NewHandler("platform", &Service{vm: vm})
-	return map[string]*common.HTTPHandler{"": handler}, err
+	server := rpc.NewServer()
+	server.RegisterCodec(json.NewCodec(), "application/json")
+	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
+	if err := server.RegisterService(&Service{vm: vm}, "platform"); err != nil {
+		return nil, err
+	}
+
+	return map[string]*common.HTTPHandler{
+		"": &common.HTTPHandler{
+			Handler: server,
+		},
+	}, nil
 }
 
 // CreateStaticHandlers implements the snowman.ChainVM interface
 func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
-	// Static service's name is platform
-	staticService := CreateStaticService()
-	handler, err := vm.SnowmanVM.NewHandler("platform", staticService)
+	server := rpc.NewServer()
+	server.RegisterCodec(json.NewCodec(), "application/json")
+	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
+	if err := server.RegisterService(&StaticService{}, "platform"); err != nil {
+		return nil, err
+	}
+
 	return map[string]*common.HTTPHandler{
-		"": handler,
-	}, err
+		"": &common.HTTPHandler{
+			LockOptions: common.NoLock,
+			Handler:     server,
+		},
+	}, nil
 }
 
 // Connected implements validators.Connector
-func (vm *VM) Connected(vdrID ids.ShortID) {
-	vm.connections[vdrID] = time.Unix(vm.clock.Time().Unix(), 0)
+func (vm *VM) Connected(vdrID ids.ShortID) error {
+	return vm.Connect(vdrID)
 }
 
 // Disconnected implements validators.Connector
-func (vm *VM) Disconnected(vdrID ids.ShortID) {
-	timeConnected, ok := vm.connections[vdrID]
-	if !ok {
-		return
+func (vm *VM) Disconnected(vdrID ids.ShortID) error {
+	if err := vm.Disconnect(vdrID); err != nil {
+		return err
 	}
-	delete(vm.connections, vdrID)
-
-	if !vm.bootstrapped {
-		return
-	}
-
-	txIntf, isValidator, err := vm.isValidator(vm.DB, constants.PrimaryNetworkID, vdrID)
-	if err != nil || !isValidator {
-		return
-	}
-	tx, ok := txIntf.(*UnsignedAddValidatorTx)
-	if !ok {
-		return
-	}
-
-	uptime, err := vm.uptime(vm.DB, vdrID)
-	switch {
-	case err == database.ErrNotFound:
-		uptime = &validatorUptime{
-			LastUpdated: uint64(tx.StartTime().Unix()),
-		}
-	case err != nil:
-		return
-	}
-
-	if timeConnected.Before(vm.bootstrappedTime) {
-		timeConnected = vm.bootstrappedTime
-	}
-
-	lastUpdated := time.Unix(int64(uptime.LastUpdated), 0)
-	if timeConnected.Before(lastUpdated) {
-		timeConnected = lastUpdated
-	}
-
-	currentLocalTime := vm.clock.Time()
-	if !currentLocalTime.After(lastUpdated) {
-		return
-	}
-
-	uptime.UpDuration += uint64(currentLocalTime.Sub(timeConnected) / time.Second)
-	uptime.LastUpdated = uint64(currentLocalTime.Unix())
-
-	if err := vm.setUptime(vm.DB, vdrID, uptime); err != nil {
-		vm.Ctx.Log.Error("failed to write back uptime data")
-	}
-	if err := vm.DB.Commit(); err != nil {
-		vm.Ctx.Log.Error("failed to commit database changes")
-	}
+	return vm.internalState.Commit()
 }
 
 func (vm *VM) updateVdrMgr(force bool) error {
@@ -819,43 +655,6 @@ func (vm *VM) updateVdrSet(subnetID ids.ID) error {
 	return errs.Err
 }
 
-// Returns the current staker set of the Primary Network.
-// Each element corresponds to a staking transaction.
-// There may be multiple elements with the same node ID.
-// TODO implement this more efficiently
-func (vm *VM) getStakers() ([]validators.Validator, error) {
-	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
-	stopDB := prefixdb.NewNested(stopPrefix, vm.DB)
-	defer stopDB.Close()
-	stopIter := stopDB.NewIterator()
-	defer stopIter.Release()
-
-	stakers := []validators.Validator{}
-	for stopIter.Next() { // Iterates in order of increasing stop time
-		txBytes := stopIter.Value()
-		tx := rewardTx{}
-		if _, err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
-			return nil, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
-		} else if err := tx.Tx.Sign(vm.codec, nil); err != nil {
-			return nil, err
-		}
-
-		switch staker := tx.Tx.UnsignedTx.(type) {
-		case *UnsignedAddDelegatorTx:
-			stakers = append(stakers, &staker.Validator)
-		case *UnsignedAddValidatorTx:
-			stakers = append(stakers, &staker.Validator)
-		}
-	}
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		stopIter.Error(),
-		stopDB.Close(),
-	)
-	return stakers, errs.Err
-}
-
 // Returns the time when the next staker of any subnet starts/stops staking
 // after the current timestamp
 func (vm *VM) nextStakerChangeTime(vs versionedState) (time.Time, error) {
@@ -900,65 +699,28 @@ func (vm *VM) Clock() *timer.Clock { return &vm.clock }
 // Logger ...
 func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
 
-// Returns the percentage of the total stake on the Primary Network
-// of nodes connected to this node.
+// Returns the percentage of the total stake on the Primary Network of nodes
+// connected to this node.
 func (vm *VM) getPercentConnected() (float64, error) {
-	stakers, err := vm.getStakers()
-	if err != nil {
-		return 0, fmt.Errorf("couldn't get stakers: %w", err)
+	vdrSet, exists := vm.vdrMgr.GetValidators(constants.PrimaryNetworkID)
+	if !exists {
+		return 0, errNoPrimaryValidators
 	}
 
-	connectedStake := uint64(0)
-	totalStake := uint64(0)
-	for _, staker := range stakers {
-		totalStake, err = safemath.Add64(totalStake, staker.Weight())
-		if err != nil {
-			return 0, err
-		}
-		if _, connected := vm.connections[staker.ID()]; !connected {
+	vdrs := vdrSet.List()
+
+	var (
+		connectedStake uint64
+		err            error
+	)
+	for _, vdr := range vdrs {
+		if _, connected := vm.connections[vdr.ID()]; !connected {
 			continue // not connected to us --> don't include
 		}
-		connectedStake, err = safemath.Add64(connectedStake, staker.Weight())
+		connectedStake, err = safemath.Add64(connectedStake, vdr.Weight())
 		if err != nil {
 			return 0, err
 		}
 	}
-
-	return float64(connectedStake) / float64(totalStake), nil
-}
-
-func (vm *VM) calculateUptimePercent(nodeID ids.ShortID, startTime time.Time) (float64, error) {
-	upDuration, currentLocalTime, err := vm.calculateUptime(nodeID)
-	if err != nil {
-		return 0, err
-	}
-	bestPossibleUpDuration := currentLocalTime.Sub(startTime)
-	uptime := float64(upDuration) / float64(bestPossibleUpDuration)
-	return uptime, nil
-}
-
-func (vm *VM) calculateUptime(nodeID ids.ShortID) (time.Duration, time.Time, error) {
-	upDuration, lastUpdated, err := vm.internalState.GetUptime(nodeID)
-	if err != nil {
-		return 0, time.Time{}, err
-	}
-
-	currentLocalTime := vm.clock.Time()
-	if timeConnected, isConnected := vm.connections[nodeID]; isConnected {
-		// The time the peer connected should be set to:
-		// max(realTimeConnected, bootstrappedTime, lastUpdated)
-		if timeConnected.Before(vm.bootstrappedTime) {
-			timeConnected = vm.bootstrappedTime
-		}
-		if timeConnected.Before(lastUpdated) {
-			timeConnected = lastUpdated
-		}
-
-		// Increase the uptimes by the amount of time this node has been running
-		// since the last time it's uptime was written to disk.
-		if durationConnected := currentLocalTime.Sub(timeConnected); durationConnected > 0 {
-			upDuration += durationConnected
-		}
-	}
-	return upDuration, currentLocalTime, nil
+	return float64(connectedStake) / float64(vdrSet.Weight()), nil
 }
