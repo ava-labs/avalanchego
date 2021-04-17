@@ -69,8 +69,6 @@ var (
 	indexerDBPrefix                 = []byte{0x00}
 	errPrimarySubnetNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
 
-	// Version is the version of this code
-	versionParser           = version.NewDefaultApplicationParser() // todo do we need this?
 	beaconConnectionTimeout = 1 * time.Minute
 )
 
