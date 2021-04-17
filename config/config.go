@@ -362,7 +362,16 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, fmt.Errorf("invalid IP Address %s", publicIP)
 	}
 
-	config.StakingIP = utils.NewDynamicIPDesc(ip, uint16(v.GetUint(StakingPortKey)))
+	pf := portFinder{}
+	stakingPort := uint16(v.GetUint(StakingPortKey))
+	if stakingPort == 0 {
+		stakingPort, err = pf.getNewPort()
+		if err != nil {
+			return node.Config{}, fmt.Errorf("unable to fetch a random staking port %v", err)
+		}
+	}
+
+	config.StakingIP = utils.NewDynamicIPDesc(ip, stakingPort)
 
 	config.DynamicUpdateDuration = v.GetDuration(dynamicUpdateDurationKey)
 	config.ConnMeterResetDuration = v.GetDuration(connMeterResetDurationKey)
@@ -531,7 +540,15 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 
 	// HTTP:
 	config.HTTPHost = v.GetString(httpHostKey)
-	config.HTTPPort = uint16(v.GetUint(HTTPPortKey))
+	httpPort := uint16(v.GetUint(HTTPPortKey))
+	if httpPort == 0 {
+		httpPort, err = pf.getNewPort()
+		if err != nil {
+			return node.Config{}, fmt.Errorf("unable to fetch a random http port %v", err)
+		}
+	}
+
+	config.HTTPPort = httpPort
 	config.HTTPSEnabled = v.GetBool(httpsEnabledKey)
 	config.HTTPSKeyFile = v.GetString(httpsKeyFileKey)
 	config.HTTPSCertFile = v.GetString(httpsCertFileKey)
@@ -851,4 +868,27 @@ func GetConfig() (node.Config, *viper.Viper, error) {
 	}
 	config, err := getConfigFromViper(v)
 	return config, v, err
+}
+
+// portFinder ensures the same port is not given twice
+type portFinder struct {
+	usedPort uint16
+}
+
+// getNewPort returns a new unused port to be bounded to that interface
+func (p *portFinder) getNewPort() (uint16, error) {
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		return 0, fmt.Errorf("unable to open a new port %v", err)
+	}
+	port := uint16(listener.Addr().(*net.TCPAddr).Port)
+	if port == p.usedPort {
+		return p.getNewPort()
+	}
+	err = listener.Close()
+	if err != nil {
+		return 0, fmt.Errorf("unable to use the new port %v", err)
+	}
+	p.usedPort = port
+	return port, nil
 }
