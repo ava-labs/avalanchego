@@ -79,7 +79,7 @@ func (m *migrationManager) runMigration() error {
 	m.log.Info("starting database migration")
 	preDBUpgradeNode, err := m.binaryManager.preDBUpgradeNode(m.v)
 	if err != nil {
-		return fmt.Errorf("couldn't create previous version node during migration: %w", err)
+		return fmt.Errorf("couldn't create pre-upgrade node during migration: %w", err)
 	}
 	m.log.Info("starting pre-database upgrade node")
 	preDBUpgradeNodeExitCodeChan := preDBUpgradeNode.start()
@@ -94,7 +94,7 @@ func (m *migrationManager) runMigration() error {
 		m.v,
 		m.nodeConfig.NodeID,
 		int(m.nodeConfig.StakingIP.Port),
-		int(m.nodeConfig.HTTPPort),
+		int(m.nodeConfig.HTTPPort)+2,
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create latest version during migration: %w", err)

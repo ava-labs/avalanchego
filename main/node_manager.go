@@ -155,11 +155,11 @@ func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (
 // Assumes the binary can be served as a plugin
 func (nm *nodeManager) preDBUpgradeNode(v *viper.Viper) (*nodeProcess, error) {
 	argsMap := v.AllSettings()
-	argsMap[config.FetchOnlyKey] = false
+	delete(argsMap, config.FetchOnlyKey)
 	argsMap[config.PluginModeKey] = true
 	argsMap[config.PluginDirKey] = fmt.Sprintf("%s/avalanchego-preupgrade/plugins", nm.buildDirPath)
 	args := []string{}
-	for k, v := range v.AllSettings() { // Pass args to subprocess
+	for k, v := range argsMap { // Pass args to subprocess
 		args = append(args, fmt.Sprintf("--%s=%v", k, v))
 	}
 	binaryPath := nm.preupgradeNodeVersionPath()
