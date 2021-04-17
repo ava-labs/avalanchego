@@ -163,16 +163,16 @@ func (nm *nodeManager) preDBUpgradeNode(
 	stakingPort int,
 	httpPort int,
 ) (*nodeProcess, error) {
-	ignorableArgs := map[string]bool{ // Ignore these viper args. They're manually set below.
-		config.FetchOnlyKey:   true,
-		config.PluginModeKey:  true,
-		config.HTTPPortKey:    true,
-		config.StakingPortKey: true,
-		config.PluginDirKey:   true,
+	ignorableArgs := map[string]struct{}{ // Ignore these viper args. They're manually set below.
+		config.FetchOnlyKey:   {},
+		config.PluginModeKey:  {},
+		config.HTTPPortKey:    {},
+		config.StakingPortKey: {},
+		config.PluginDirKey:   {},
 	}
 	args := []string{}
 	for k, v := range v.AllSettings() { // Pass args to subprocess
-		if ignorableArgs[k] {
+		if _, exists := ignorableArgs[k]; exists {
 			continue
 		}
 		args = append(args, fmt.Sprintf("--%s=%v", k, v))
@@ -185,7 +185,7 @@ func (nm *nodeManager) preDBUpgradeNode(
 	return nm.newNode(binaryPath, args, true)
 }
 
-// Run a
+// Run the latest node version
 func (nm *nodeManager) latestVersionNode(
 	v *viper.Viper,
 	fetchOnly bool,
