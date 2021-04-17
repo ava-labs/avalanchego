@@ -77,11 +77,7 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 // Returns nil if the new node version successfully bootstrapped.
 func (m *migrationManager) runMigration() error {
 	m.log.Info("starting database migration")
-	preDBUpgradeNode, err := m.binaryManager.preDBUpgradeNode(
-		m.v,
-		int(m.nodeConfig.StakingIP.Port)+2,
-		int(m.nodeConfig.HTTPPort)+2,
-	)
+	preDBUpgradeNode, err := m.binaryManager.preDBUpgradeNode(m.v)
 	if err != nil {
 		return fmt.Errorf("couldn't create previous version node during migration: %w", err)
 	}
@@ -94,11 +90,11 @@ func (m *migrationManager) runMigration() error {
 	}()
 
 	m.log.Info("starting latest node version")
-	latestVersion, err := m.binaryManager.latestVersionNode(
+	latestVersion, err := m.binaryManager.latestVersionNodeFetchOnly(
 		m.v,
-		true,
 		m.nodeConfig.NodeID,
-		int(m.nodeConfig.StakingIP.Port)+2,
+		int(m.nodeConfig.StakingIP.Port),
+		int(m.nodeConfig.HTTPPort),
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create latest version during migration: %w", err)

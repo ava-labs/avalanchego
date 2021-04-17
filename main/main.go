@@ -68,7 +68,7 @@ func main() {
 	}
 
 	log.Info("starting to run node in normal execution mode")
-	exitCode, err = nodeManager.runNormal(v, nodeConfig)
+	exitCode, err = nodeManager.runNormal(v)
 	log.Debug("node manager returned exit code %s, error %v", exitCode, err)
 	nodeManager.shutdown() // make sure all the nodes are stopped
 }
