@@ -67,6 +67,14 @@ type nodeManager struct {
 	nextProcessID int
 }
 
+func (nm *nodeManager) latestNodeVersionPath() string {
+	return fmt.Sprintf("%s/avalanchego-latest/avalanchego-process", nm.buildDirPath)
+}
+
+func (nm *nodeManager) preupgradeNodeVersionPath() string {
+	return fmt.Sprintf("%s/avalanchego-preupgrade/avalanchego-process", nm.buildDirPath)
+}
+
 func (nm *nodeManager) shutdown() {
 	for _, node := range nm.nodes {
 		if err := nm.stop(node.processID); err != nil {
@@ -146,46 +154,16 @@ func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (
 // Assumes the node's plugin path is [buildDir]/avalanchego-preupgrade/plugins
 // Assumes the binary can be served as a plugin
 func (nm *nodeManager) preDBUpgradeNode(v *viper.Viper) (*nodeProcess, error) {
-	ignorableArgs := map[string]struct{}{ // Ignore these viper args. They're manually set below.
-		config.FetchOnlyKey:  {},
-		config.PluginModeKey: {},
-		config.PluginDirKey:  {},
-	}
+	argsMap := v.AllSettings()
+	argsMap[config.FetchOnlyKey] = false
+	argsMap[config.PluginModeKey] = true
+	argsMap[config.PluginDirKey] = fmt.Sprintf("%s/avalanchego-preupgrade/plugins", nm.buildDirPath)
 	args := []string{}
 	for k, v := range v.AllSettings() { // Pass args to subprocess
-		if _, exists := ignorableArgs[k]; exists {
-			continue
-		}
 		args = append(args, fmt.Sprintf("--%s=%v", k, v))
 	}
-	args = append(args, fmt.Sprintf("--%s=true", config.PluginModeKey)) // run as a plugin
-	args = append(args, fmt.Sprintf("--%s=%s/avalanchego-preupgrade/plugins", config.PluginDirKey, nm.buildDirPath))
-	binaryPath := fmt.Sprintf("%s/avalanchego-preupgrade/avalanchego-process", nm.buildDirPath)
+	binaryPath := nm.preupgradeNodeVersionPath()
 	return nm.newNode(binaryPath, args, true)
-}
-
-// Run the latest node version
-func (nm *nodeManager) latestVersionNode(
-	v *viper.Viper,
-	fetchOnly bool,
-	fetchFromNodeID ids.ShortID,
-	fetchFromStakingPort int,
-	httpPort int,
-) (*nodeProcess, error) {
-	argsMap := v.AllSettings()
-	if fetchOnly { // in fetch only mode, bootstrap from local node on the given port with the given node ID
-		argsMap[config.BootstrapIPsKey] = fmt.Sprintf("127.0.0.1:%d", fetchFromStakingPort)
-		argsMap[config.BootstrapIDsKey] = fmt.Sprintf("%s%s", constants.NodeIDPrefix, fetchFromNodeID)
-		argsMap[config.FetchOnlyKey] = true
-		argsMap[config.StakingPortKey] = fetchFromStakingPort + 2
-	}
-	args := []string{}
-	for k, v := range argsMap {
-		args = append(args, fmt.Sprintf("--%s=%v", k, v))
-	}
-	args = append(args, fmt.Sprintf("--%s=true", config.PluginModeKey)) // run as a plugin
-	binaryPath := fmt.Sprintf("%s/avalanchego-latest/avalanchego-process", nm.buildDirPath)
-	return nm.newNode(binaryPath, args, !fetchOnly)
 }
 
 // Run the latest node version
@@ -206,7 +184,7 @@ func (nm *nodeManager) latestVersionNodeFetchOnly(
 	for k, v := range argsMap {
 		args = append(args, fmt.Sprintf("--%s=%v", k, v))
 	}
-	binaryPath := fmt.Sprintf("%s/avalanchego-latest/avalanchego-process", nm.buildDirPath)
+	binaryPath := nm.latestNodeVersionPath()
 	return nm.newNode(binaryPath, args, false)
 }
 
@@ -221,7 +199,7 @@ func (nm *nodeManager) runNormal(v *viper.Viper) (int, error) {
 	for k, v := range argsMap {
 		args = append(args, fmt.Sprintf("--%s=%v", k, v))
 	}
-	binaryPath := fmt.Sprintf("%s/avalanchego-latest/avalanchego-process", nm.buildDirPath)
+	binaryPath := nm.latestNodeVersionPath()
 	node, err := nm.newNode(binaryPath, args, true)
 	if err != nil {
 		return 1, fmt.Errorf("couldn't create node: %w", err)
