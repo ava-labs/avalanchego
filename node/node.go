@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api/admin"
@@ -261,11 +260,6 @@ func (n *Node) initNetworking() error {
 		n.benchlistManager,
 		n.Config.PeerAliasTimeout,
 	)
-
-	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
-		// errors are already logged internally if they are meaningful
-		n.Shutdown(0)
-	}, syscall.SIGINT, syscall.SIGTERM)
 
 	return nil
 }

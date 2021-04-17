@@ -8,14 +8,13 @@ import (
 	"os"
 	"syscall"
 
+	appPlugin "github.com/ava-labs/avalanchego/app/plugin"
 	"github.com/ava-labs/avalanchego/app/process"
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
-
-	appPlugin "github.com/ava-labs/avalanchego/app/plugin"
-	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
 var (
@@ -50,15 +49,16 @@ func main() {
 	}
 
 	app := process.NewApp(c) // Create node wrapper
-	_ = utils.HandleSignals(
-		func(os.Signal) {
-			app.Stop()
-			os.Exit(exitCode)
-		},
-		syscall.SIGINT, syscall.SIGTERM,
-	)
 
 	if c.PluginMode { // Serve as a plugin
+
+		// ignore interrupt signals in plugin mode
+		_ = utils.HandleSignals(
+			func(os.Signal) {
+			},
+			syscall.SIGINT, syscall.SIGTERM,
+		)
+
 		plugin.Serve(&plugin.ServeConfig{
 			HandshakeConfig: appPlugin.Handshake,
 			Plugins: map[string]plugin.Plugin{
@@ -71,5 +71,13 @@ func main() {
 		})
 		return
 	}
+
+	_ = utils.HandleSignals(
+		func(os.Signal) {
+			app.Stop()
+			os.Exit(exitCode)
+		},
+		syscall.SIGINT, syscall.SIGTERM,
+	)
 	exitCode = app.Start() // Start the node
 }

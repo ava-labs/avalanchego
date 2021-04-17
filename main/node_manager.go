@@ -118,10 +118,16 @@ func newNodeManager(path string, log logging.Logger) *nodeManager {
 // Return a wrapper around a node wunning the binary at [path] with args [args].
 // The returned nodeProcess must eventually have [nodeProcess.rawClient.Kill] called on it.
 func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (*nodeProcess, error) {
+	cmd := exec.Command(path, args...)
+	// ensures children run with a different process group and that they won't capture interrupt signals
+	//cmd.SysProcAttr = &syscall.SysProcAttr{
+	//	Setpgid: true,
+	//	Pgid:    0,
+	//}
 	clientConfig := &plugin.ClientConfig{
 		HandshakeConfig: appplugin.Handshake,
 		Plugins:         appplugin.PluginMap,
-		Cmd:             exec.Command(path, args...),
+		Cmd:             cmd,
 		AllowedProtocols: []plugin.Protocol{
 			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,
