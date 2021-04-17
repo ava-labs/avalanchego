@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sync"
 
 	appplugin "github.com/ava-labs/avalanchego/app/plugin"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/hashicorp/go-hclog"
@@ -65,6 +67,8 @@ type nodeManager struct {
 	// nodeProcess ID --> nodeProcess
 	nodes         map[int]*nodeProcess
 	nextProcessID int
+	processLock   sync.Mutex
+	shuttingDown  utils.AtomicBool
 }
 
 func (nm *nodeManager) latestNodeVersionPath() string {
@@ -76,7 +80,9 @@ func (nm *nodeManager) preupgradeNodeVersionPath() string {
 }
 
 func (nm *nodeManager) shutdown() {
+	nm.shuttingDown.SetValue(true)
 	for _, node := range nm.nodes {
+		nm.log.Info("Shutting down %v", node)
 		if err := nm.stop(node.processID); err != nil {
 			nm.log.Error("error stopping node: %s", err)
 		}
@@ -85,6 +91,9 @@ func (nm *nodeManager) shutdown() {
 
 // stop a node. Blocks until the node is done shutting down.
 func (nm *nodeManager) stop(processID int) error {
+	nm.processLock.Lock()
+	defer nm.processLock.Unlock()
+
 	nodeProcess, exists := nm.nodes[processID]
 	if !exists {
 		return nil
@@ -93,6 +102,7 @@ func (nm *nodeManager) stop(processID int) error {
 		return err
 	}
 	delete(nm.nodes, processID)
+	nm.log.Info("Stopping process %v", processID)
 	return nil
 }
 
@@ -101,6 +111,7 @@ func newNodeManager(path string, log logging.Logger) *nodeManager {
 		buildDirPath: path,
 		log:          log,
 		nodes:        map[int]*nodeProcess{},
+		processLock:  sync.Mutex{},
 	}
 }
 
@@ -171,14 +182,13 @@ func (nm *nodeManager) latestVersionNodeFetchOnly(
 	v *viper.Viper,
 	fetchFromNodeID ids.ShortID,
 	fetchFromStakingPort int,
-	httpPort int,
 ) (*nodeProcess, error) {
 	argsMap := v.AllSettings()
 	argsMap[config.BootstrapIPsKey] = fmt.Sprintf("127.0.0.1:%d", fetchFromStakingPort)
 	argsMap[config.BootstrapIDsKey] = fmt.Sprintf("%s%s", constants.NodeIDPrefix, fetchFromNodeID)
 	argsMap[config.FetchOnlyKey] = true
-	argsMap[config.StakingPortKey] = fetchFromStakingPort + 2
-	argsMap[config.HTTPPortKey] = httpPort
+	argsMap[config.StakingPortKey] = 0
+	argsMap[config.HTTPPortKey] = 0
 	argsMap[config.PluginModeKey] = true
 	args := []string{}
 	for k, v := range argsMap {

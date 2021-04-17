@@ -94,14 +94,16 @@ func (m *migrationManager) runMigration() error {
 		m.v,
 		m.nodeConfig.NodeID,
 		int(m.nodeConfig.StakingIP.Port),
-		int(m.nodeConfig.HTTPPort)+2,
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create latest version during migration: %w", err)
 	}
 	latestVersionExitCodeChan := latestVersion.start()
 	defer func() {
-		if err := latestVersion.stop(); err != nil {
+		if m.binaryManager.shuttingDown.GetValue() {
+			return
+		}
+		if err := m.binaryManager.stop(latestVersion.processID); err != nil {
 			m.log.Error("error while stopping latest version node: %s", err)
 		}
 	}()
@@ -110,8 +112,14 @@ func (m *migrationManager) runMigration() error {
 	// an exit code other than the one indicating it is done bootstrapping, error.
 	select {
 	case exitCode := <-preDBUpgradeNodeExitCodeChan:
+		if m.binaryManager.shuttingDown.GetValue() {
+			return fmt.Errorf("node shutting down")
+		}
 		return fmt.Errorf("previous version node stopped with exit code %d", exitCode)
 	case exitCode := <-latestVersionExitCodeChan:
+		if m.binaryManager.shuttingDown.GetValue() {
+			return fmt.Errorf("node shutting down")
+		}
 		if exitCode != constants.ExitCodeDoneMigrating {
 			return fmt.Errorf("latest version died with exit code %d", exitCode)
 		}

@@ -877,7 +877,7 @@ type portFinder struct {
 
 // getNewPort returns a new unused port to be bounded to that interface
 func (p *portFinder) getNewPort() (uint16, error) {
-	listener, err := net.Listen("tcp", ":0")
+	listener, err := net.Listen("tcp", ":0") // #nosec G102
 	if err != nil {
 		return 0, fmt.Errorf("unable to open a new port %v", err)
 	}
