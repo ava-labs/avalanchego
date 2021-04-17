@@ -472,7 +472,9 @@ func (b *Bootstrapper) finish() error {
 // Connected implements the Engine interface.
 func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
 	if connector, ok := b.VM.(validators.Connector); ok {
-		connector.Connected(validatorID)
+		if err := connector.Connected(validatorID); err != nil {
+			return err
+		}
 	}
 	return b.Bootstrapper.Connected(validatorID)
 }
@@ -480,7 +482,9 @@ func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
 // Disconnected implements the Engine interface.
 func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
 	if connector, ok := b.VM.(validators.Connector); ok {
-		connector.Disconnected(validatorID)
+		if err := connector.Disconnected(validatorID); err != nil {
+			return err
+		}
 	}
 	return b.Bootstrapper.Disconnected(validatorID)
 }

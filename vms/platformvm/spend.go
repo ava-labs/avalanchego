@@ -433,31 +433,14 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 		amount := in.Amount()
 
-		// Rule change for Apricot phase 0 hardfork
-		chainTime, err := vm.getTimestamp(vm.DB)
-		if err != nil {
-			return tempError{fmt.Errorf("couldn't get chain timestamp: %w", err)}
-		}
-		if chainTime.Before(vm.apricotPhase0Time) {
-			// Old rule
-			if locktime == 0 {
-				newUnlockedConsumed, err := safemath.Add64(unlockedConsumed, amount)
-				if err != nil {
-					return permError{err}
-				}
-				unlockedConsumed = newUnlockedConsumed
-				continue
+		// New rule
+		if now >= locktime {
+			newUnlockedConsumed, err := safemath.Add64(unlockedConsumed, amount)
+			if err != nil {
+				return permError{err}
 			}
-		} else {
-			// New rule
-			if now >= locktime {
-				newUnlockedConsumed, err := safemath.Add64(unlockedConsumed, amount)
-				if err != nil {
-					return permError{err}
-				}
-				unlockedConsumed = newUnlockedConsumed
-				continue
-			}
+			unlockedConsumed = newUnlockedConsumed
+			continue
 		}
 
 		owned, ok := out.(Owned)

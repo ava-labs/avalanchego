@@ -10,6 +10,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -30,6 +33,8 @@ type currentStakerChainState interface {
 	Stakers() []*Tx // Sorted in removal order
 
 	Apply(internalState)
+
+	ValidatorSet(subnetID ids.ID) (validators.Set, error)
 }
 
 type currentStakerChainStateImpl struct {
@@ -239,6 +244,47 @@ func (cs *currentStakerChainStateImpl) Apply(is internalState) {
 	// Validator changes should only be applied once.
 	cs.addedStakers = nil
 	cs.deletedStakers = nil
+}
+
+func (cs *currentStakerChainStateImpl) ValidatorSet(subnetID ids.ID) (validators.Set, error) {
+	if subnetID == constants.PrimaryNetworkID {
+		return cs.primaryValidatorSet()
+	}
+	return cs.subnetValidatorSet(subnetID)
+}
+
+func (cs *currentStakerChainStateImpl) primaryValidatorSet() (validators.Set, error) {
+	vdrs := validators.NewSet()
+
+	var err error
+	for nodeID, vdr := range cs.validatorsByNodeID {
+		vdrWeight := vdr.addValidatorTx.Validator.Wght
+		vdrWeight, err = safemath.Add64(vdrWeight, vdr.delegatorWeight)
+		if err != nil {
+			return nil, err
+		}
+		if err := vdrs.AddWeight(nodeID, vdrWeight); err != nil {
+			return nil, err
+		}
+	}
+
+	return vdrs, nil
+}
+
+func (cs *currentStakerChainStateImpl) subnetValidatorSet(subnetID ids.ID) (validators.Set, error) {
+	vdrs := validators.NewSet()
+
+	for nodeID, vdr := range cs.validatorsByNodeID {
+		subnetVDR, exists := vdr.subnets[subnetID]
+		if !exists {
+			continue
+		}
+		if err := vdrs.AddWeight(nodeID, subnetVDR.Validator.Wght); err != nil {
+			return nil, err
+		}
+	}
+
+	return vdrs, nil
 }
 
 func (cs *currentStakerChainStateImpl) setNextStaker() {

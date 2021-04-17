@@ -24,6 +24,7 @@ type Manager interface {
 	Shutdown(nodeIDs []ids.ShortID) error
 
 	Connect(nodeID ids.ShortID) error
+	IsConnected(nodeID ids.ShortID) bool
 	Disconnect(nodeID ids.ShortID) error
 
 	CalculateUptime(nodeID ids.ShortID) (time.Duration, time.Time, error)
@@ -101,6 +102,11 @@ func (m *manager) Shutdown(nodeIDs []ids.ShortID) error {
 func (m *manager) Connect(nodeID ids.ShortID) error {
 	m.connections[nodeID] = m.clock.Time()
 	return nil
+}
+
+func (m *manager) IsConnected(nodeID ids.ShortID) bool {
+	_, connected := m.connections[nodeID]
+	return connected
 }
 
 func (m *manager) Disconnect(nodeID ids.ShortID) error {

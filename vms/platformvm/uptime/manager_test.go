@@ -304,8 +304,14 @@ func TestConnectAndDisconnect(t *testing.T) {
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
 
+	connected := up.IsConnected(nodeID0)
+	assert.False(connected)
+
 	err := up.StartTracking([]ids.ShortID{nodeID0})
 	assert.NoError(err)
+
+	connected = up.IsConnected(nodeID0)
+	assert.False(connected)
 
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0)
 	assert.NoError(err)
@@ -314,6 +320,9 @@ func TestConnectAndDisconnect(t *testing.T) {
 
 	err = up.Connect(nodeID0)
 	assert.NoError(err)
+
+	connected = up.IsConnected(nodeID0)
+	assert.True(connected)
 
 	currentTime = currentTime.Add(time.Second)
 	up.clock.Set(currentTime)
@@ -325,6 +334,9 @@ func TestConnectAndDisconnect(t *testing.T) {
 
 	err = up.Disconnect(nodeID0)
 	assert.NoError(err)
+
+	connected = up.IsConnected(nodeID0)
+	assert.False(connected)
 
 	currentTime = currentTime.Add(time.Second)
 	up.clock.Set(currentTime)

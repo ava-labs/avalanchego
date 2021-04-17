@@ -705,27 +705,3 @@ func (vm *VM) getSubnets(db database.Database) ([]*Tx, error) {
 	}
 	return subnets, nil
 }
-
-// get the subnet with the specified ID
-func (vm *VM) getSubnet(db database.Database, id ids.ID) (*Tx, TxError) {
-	subnets, err := vm.getSubnets(db)
-	if err != nil {
-		return nil, tempError{err}
-	}
-
-	for _, subnet := range subnets {
-		if subnet.ID() == id {
-			return subnet, nil
-		}
-	}
-	return nil, permError{fmt.Errorf("couldn't find subnet with ID %s", id)}
-}
-
-// Returns the height of the preferred block
-func (vm *VM) preferredHeight() (uint64, error) {
-	preferred, err := vm.getBlock(vm.Preferred())
-	if err != nil {
-		return 0, err
-	}
-	return preferred.Height(), nil
-}

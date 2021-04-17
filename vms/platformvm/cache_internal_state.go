@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -42,6 +43,8 @@ var (
 	initializedKey    = []byte("initialized")
 
 	errWrongNetworkID = errors.New("tx has wrong network ID")
+
+	_ internalState = &internalStateImpl{}
 )
 
 const (
@@ -81,10 +84,6 @@ type internalState interface {
 
 	Commit() error
 	Close() error
-
-	shouldInit() (bool, error)
-	init() error
-	load() error
 }
 
 /*
@@ -205,7 +204,7 @@ type stateBlk struct {
 	Status choices.Status `serialize:"true"`
 }
 
-func newInternalState(vm *VM, db database.Database) *internalStateImpl {
+func newInternalState(vm *VM, db database.Database, genesis []byte) (internalState, error) {
 	baseDB := versiondb.New(db)
 
 	validatorsDB := prefixdb.New(validatorsPrefix, baseDB)
@@ -221,7 +220,7 @@ func newInternalState(vm *VM, db database.Database) *internalStateImpl {
 	pendingSubnetValidatorBaseDB := prefixdb.New(subnetValidatorPrefix, pendingValidatorsDB)
 
 	subnetBaseDB := prefixdb.New(subnetPrefix, baseDB)
-	return &internalStateImpl{
+	is := &internalStateImpl{
 		vm: vm,
 
 		baseDB: baseDB,
@@ -270,6 +269,42 @@ func newInternalState(vm *VM, db database.Database) *internalStateImpl {
 
 		singletonDB: prefixdb.New(singletonPrefix, baseDB),
 	}
+
+	shouldInit, err := is.shouldInit()
+	if err != nil {
+		// Drop any errors on close to return the first error
+		_ = is.Close()
+
+		return nil, fmt.Errorf(
+			"failed to check if the database is initialized: %w",
+			err,
+		)
+	}
+
+	// If the database is empty, create the platform chain anew using the
+	// provided genesis state
+	if shouldInit {
+		if err := is.init(genesis); err != nil {
+			// Drop any errors on close to return the first error
+			_ = is.Close()
+
+			return nil, fmt.Errorf(
+				"failed to initialize the database: %w",
+				err,
+			)
+		}
+	}
+
+	if err := is.load(); err != nil {
+		// Drop any errors on close to return the first error
+		_ = is.Close()
+
+		return nil, fmt.Errorf(
+			"failed to load the database state: %w",
+			err,
+		)
+	}
+	return is, nil
 }
 
 func (st *internalStateImpl) GetTimestamp() time.Time          { return st.timestamp }
@@ -1179,7 +1214,7 @@ func (st *internalStateImpl) init(genesisBytes []byte) error {
 			stakeDuration,
 			stakeAmount,
 			currentSupply,
-			st.vm.stakeMintingPeriod,
+			st.vm.StakeMintingPeriod,
 		)
 		newCurrentSupply, err := safemath.Add64(currentSupply, reward)
 		if err != nil {

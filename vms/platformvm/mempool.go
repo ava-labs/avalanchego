@@ -74,19 +74,19 @@ type Mempool struct {
 func (m *Mempool) Initialize(vm *VM) {
 	m.vm = vm
 
-	m.vm.Ctx.Log.Verbo("initializing platformVM mempool")
+	m.vm.ctx.Log.Verbo("initializing platformVM mempool")
 
 	// Transactions from clients that have not yet been put into blocks and
 	// added to consensus
 	m.unissuedProposalTxs = &EventHeap{SortByStartTime: true}
 
 	m.timer = timer.NewTimer(func() {
-		m.vm.Ctx.Lock.Lock()
-		defer m.vm.Ctx.Lock.Unlock()
+		m.vm.ctx.Lock.Lock()
+		defer m.vm.ctx.Lock.Unlock()
 
 		m.ResetTimer()
 	})
-	go m.vm.Ctx.Log.RecoverAndPanic(m.timer.Dispatch)
+	go m.vm.ctx.Log.RecoverAndPanic(m.timer.Dispatch)
 }
 
 // IssueTx enqueues the [tx] to be put into a block
