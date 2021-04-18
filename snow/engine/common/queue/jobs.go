@@ -171,7 +171,6 @@ func (j *Jobs) ExecuteAll(ctx *snow.Context, restarted bool, events ...snow.Even
 		}
 	}
 
-	ctx.Log.Info("executed %d operations", numExecuted)
 	return numExecuted, nil
 }
 

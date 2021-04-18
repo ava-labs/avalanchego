@@ -149,7 +149,7 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 
 	// If this proposal is committed and this node is a member of the
 	// subnet that validates the blockchain, create the blockchain
-	onAccept := func() error { vm.createChain(stx); return nil }
+	onAccept := func() error { return vm.createChain(stx) }
 	return onAccept, nil
 }
 

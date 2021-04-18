@@ -1005,7 +1005,7 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 	delegatorIt := st.currentDelegatorDB.NewIterator()
 	defer delegatorIt.Release()
 	for delegatorIt.Next() {
-		txIDBytes := validatorIt.Key()
+		txIDBytes := delegatorIt.Key()
 		txID, err := ids.ToID(txIDBytes)
 		if err != nil {
 			return err
@@ -1015,7 +1015,7 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 			return err
 		}
 
-		potentialRewardBytes := validatorIt.Value()
+		potentialRewardBytes := delegatorIt.Value()
 		potentialReward, err := database.ParseUInt64(potentialRewardBytes)
 		if err != nil {
 			return err
@@ -1038,14 +1038,14 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 			potentialReward: potentialReward,
 		}
 	}
-	if err := validatorIt.Error(); err != nil {
+	if err := delegatorIt.Error(); err != nil {
 		return err
 	}
 
 	subnetValidatorIt := st.currentSubnetValidatorDB.NewIterator()
 	defer subnetValidatorIt.Release()
 	for subnetValidatorIt.Next() {
-		txIDBytes := validatorIt.Key()
+		txIDBytes := subnetValidatorIt.Key()
 		txID, err := ids.ToID(txIDBytes)
 		if err != nil {
 			return err
@@ -1070,7 +1070,7 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 			addStakerTx: tx,
 		}
 	}
-	if err := validatorIt.Error(); err != nil {
+	if err := subnetValidatorIt.Error(); err != nil {
 		return err
 	}
 
@@ -1118,7 +1118,7 @@ func (st *internalStateImpl) loadPendingValidators() error {
 	delegatorIt := st.pendingDelegatorDB.NewIterator()
 	defer delegatorIt.Release()
 	for delegatorIt.Next() {
-		txIDBytes := validatorIt.Key()
+		txIDBytes := delegatorIt.Key()
 		txID, err := ids.ToID(txIDBytes)
 		if err != nil {
 			return err
@@ -1143,14 +1143,14 @@ func (st *internalStateImpl) loadPendingValidators() error {
 			}
 		}
 	}
-	if err := validatorIt.Error(); err != nil {
+	if err := delegatorIt.Error(); err != nil {
 		return err
 	}
 
 	subnetValidatorIt := st.pendingSubnetValidatorDB.NewIterator()
 	defer subnetValidatorIt.Release()
 	for subnetValidatorIt.Next() {
-		txIDBytes := validatorIt.Key()
+		txIDBytes := subnetValidatorIt.Key()
 		txID, err := ids.ToID(txIDBytes)
 		if err != nil {
 			return err
@@ -1176,7 +1176,7 @@ func (st *internalStateImpl) loadPendingValidators() error {
 			}
 		}
 	}
-	if err := validatorIt.Error(); err != nil {
+	if err := subnetValidatorIt.Error(); err != nil {
 		return err
 	}
 

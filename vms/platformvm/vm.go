@@ -218,6 +218,16 @@ func (vm *VM) Initialize(
 
 // Create all chains that exist that this node validates.
 func (vm *VM) initBlockchains() error {
+	chains, err := vm.internalState.GetChains(constants.PrimaryNetworkID)
+	if err != nil {
+		return err
+	}
+	for _, chain := range chains {
+		if err := vm.createChain(chain); err != nil {
+			return err
+		}
+	}
+
 	for subnetID := range vm.WhitelistedSubnets {
 		chains, err := vm.internalState.GetChains(subnetID)
 		if err != nil {
