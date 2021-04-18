@@ -164,6 +164,13 @@ func (j *Jobs) ExecuteAll(ctx *snow.Context, restarted bool, events ...snow.Even
 			}
 		}
 
+		// TODO putting this after commit could cause dropped events
+		// Ex. if a job is executed and accepted, committed to the database, and then
+		// the node dies, then since the event has been committed we will not execute
+		// it again and therefore the event will never be sent.
+		// We should be able to fix this at the risk of emitting duplicate events by
+		// sending Accept events before the job has been committed. Not sure which is
+		// better here.
 		for _, event := range events {
 			if err := event.Accept(ctx, job.ID(), job.Bytes()); err != nil {
 				return numExecuted, err
