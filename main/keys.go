@@ -99,6 +99,8 @@ const (
 	disconnectedCheckFreqKey                = "disconnected-check-frequency"
 	disconnectedRestartTimeoutKey           = "disconnected-restart-timeout"
 	restartOnDisconnectedKey                = "restart-on-disconnected"
+	indexEnabledKey                         = "index-enabled"
+	indexAllowIncompleteKey                 = "index-allow-incomplete"
 	routerHealthMaxDropRateKey              = "router-health-max-drop-rate"
 	routerHealthMaxOutstandingRequestsKey   = "router-health-max-outstanding-requests"
 	healthCheckFreqKey                      = "health-check-frequency"

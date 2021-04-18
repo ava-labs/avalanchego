@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -59,13 +59,13 @@ type manager struct {
 
 	// The node's API server.
 	// [manager] adds routes to this server to expose new API endpoints/services
-	apiServer *api.Server
+	apiServer *server.Server
 
 	log logging.Logger
 }
 
 // NewManager returns an instance of a VM manager
-func NewManager(apiServer *api.Server, log logging.Logger) Manager {
+func NewManager(apiServer *server.Server, log logging.Logger) Manager {
 	m := &manager{
 		vmFactories: make(map[ids.ID]VMFactory),
 		apiServer:   apiServer,

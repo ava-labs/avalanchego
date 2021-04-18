@@ -162,9 +162,12 @@ func (db *DatabaseServer) IteratorRelease(_ context.Context, req *rpcdbproto.Ite
 	defer db.lock.Unlock()
 
 	it, exists := db.iterators[req.Id]
-	if exists {
-		delete(db.iterators, req.Id)
-		it.Release()
+	if !exists {
+		return &rpcdbproto.IteratorReleaseResponse{Err: 0}, nil
 	}
-	return &rpcdbproto.IteratorReleaseResponse{}, nil
+
+	delete(db.iterators, req.Id)
+	err := it.Error()
+	it.Release()
+	return &rpcdbproto.IteratorReleaseResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
 }

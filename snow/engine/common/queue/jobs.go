@@ -113,7 +113,7 @@ func (j *Jobs) MissingIDs() []ids.ID { return j.missingIDs.List() }
 
 func (j *Jobs) NumMissingIDs() int { return j.missingIDs.Len() }
 
-func (j *Jobs) ExecuteAll(ctx *snow.Context, events ...snow.EventDispatcher) (int, error) {
+func (j *Jobs) ExecuteAll(ctx *snow.Context, restarted bool, events ...snow.EventDispatcher) (int, error) {
 	numExecuted := 0
 	for {
 		job, err := j.state.RemoveRunnableJob()
@@ -157,11 +157,17 @@ func (j *Jobs) ExecuteAll(ctx *snow.Context, events ...snow.EventDispatcher) (in
 
 		numExecuted++
 		if numExecuted%StatusUpdateFrequency == 0 { // Periodically print progress
-			ctx.Log.Info("executed %d operations", numExecuted)
+			if !restarted {
+				ctx.Log.Info("executed %d operations", numExecuted)
+			} else {
+				ctx.Log.Debug("executed %d operations", numExecuted)
+			}
 		}
 
 		for _, event := range events {
-			event.Accept(ctx, job.ID(), job.Bytes())
+			if err := event.Accept(ctx, job.ID(), job.Bytes()); err != nil {
+				return numExecuted, err
+			}
 		}
 	}
 

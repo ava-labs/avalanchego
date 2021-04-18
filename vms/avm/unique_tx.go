@@ -145,6 +145,7 @@ func (tx *UniqueTx) Accept() error {
 	}
 
 	txID := tx.ID()
+
 	commitBatch, err := tx.vm.db.CommitBatch()
 	if err != nil {
 		tx.vm.ctx.Log.Error("Failed to calculate CommitBatch for %s due to %s", txID, err)
@@ -159,6 +160,7 @@ func (tx *UniqueTx) Accept() error {
 	tx.vm.ctx.Log.Verbo("Accepted Tx: %s", txID)
 
 	tx.vm.pubsub.Publish("accepted", txID)
+
 	tx.vm.walletService.decided(txID)
 
 	tx.deps = nil // Needed to prevent a memory leak
