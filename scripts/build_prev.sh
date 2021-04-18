@@ -12,9 +12,8 @@ source $AVALANCHE_PATH/scripts/constants.sh
 rm -rf tmp
 mkdir tmp
 echo "Fetching AvalancheGo ${PREUPGRADE_AVALANCHEGO_VER}..."
-git clone --quiet https://github.com/ava-labs/avalanchego-internal tmp
+git clone -b $PREUPGRADE_AVALANCHEGO_VER --single-branch --quiet https://github.com/ava-labs/avalanchego-internal tmp
 cd tmp
-git checkout --quiet $PREUPGRADE_AVALANCHEGO_VER
 
 # Run the pre-db upgrade version's build script
 echo "Building AvalancheGo ${PREUPGRADE_AVALANCHEGO_VER}..."
