@@ -338,6 +338,7 @@ func (vm *VM) Initialize(
 	config.TxPool.NoLocals = !vm.CLIConfig.LocalTxsEnabled
 	config.AllowUnfinalizedQueries = vm.CLIConfig.AllowUnfinalizedQueries
 	vm.chainConfig = g.Config
+	vm.networkID = config.NetworkId
 	vm.secpFactory = crypto.FactorySECP256K1R{Cache: cache.LRU{Size: secpFactoryCacheSize}}
 
 	if err := config.SetGCMode("archive"); err != nil {
@@ -352,10 +353,40 @@ func (vm *VM) Initialize(
 
 	// Attempt to load last accepted block to determine if it is necessary to
 	// initialize state with the genesis block.
-	lastAcceptedBytes, lastAcceptedErr := vm.chaindb.Get(lastAcceptedKey)
+	lastAcceptedBytes, lastAcceptedErr := vm.acceptedBlockDB.Get(lastAcceptedKey)
+	if lastAcceptedErr != nil && lastAcceptedErr != database.ErrNotFound {
+		return fmt.Errorf("failed to get last accepted block ID due to: %w", lastAcceptedErr)
+	}
 	initGenesis := lastAcceptedErr == database.ErrNotFound
 	vm.chain = coreth.NewETHChain(&config, &nodecfg, vm.chaindb, vm.CLIConfig.EthBackendSettings(), initGenesis)
-	vm.networkID = config.NetworkId
+
+	var lastAccepted *types.Block
+	if lastAcceptedErr == nil {
+		if len(lastAcceptedBytes) != common.HashLength {
+			return fmt.Errorf("last accepted bytes should have been length %d, but found %d", common.HashLength, len(lastAcceptedBytes))
+		}
+		hash := common.BytesToHash(lastAcceptedBytes)
+		if block := vm.chain.GetBlockByHash(hash); block == nil {
+			return fmt.Errorf("last accepted block not found in chaindb")
+		} else {
+			lastAccepted = block
+		}
+	}
+
+	// Determine if db corruption has occurred.
+	switch {
+	case lastAccepted != nil && initGenesis:
+		return errors.New("database corruption detected, should be initializing genesis")
+	case lastAccepted == nil && !initGenesis:
+		return errors.New("database corruption detected, should not be initializing genesis")
+	case lastAccepted == nil && initGenesis:
+		log.Debug("lastAccepted is unavailable, setting to the genesis block")
+		lastAccepted = vm.chain.GetGenesisBlock()
+	}
+
+	if err := vm.chain.Accept(lastAccepted); err != nil {
+		return fmt.Errorf("could not initialize VM with last accepted blkID %s: %w", lastAccepted.Hash().Hex(), err)
+	}
 
 	// Kickoff gasPriceUpdate goroutine once the backend is initialized, if it
 	// exists
@@ -443,32 +474,6 @@ func (vm *VM) Initialize(
 	go ctx.Log.RecoverAndPanic(vm.awaitTxPoolStabilized)
 	vm.chain.Start()
 
-	var lastAccepted *types.Block
-	if lastAcceptedErr == nil {
-		var hash common.Hash
-		if err := rlp.DecodeBytes(lastAcceptedBytes, &hash); err == nil {
-			if block := vm.chain.GetBlockByHash(hash); block == nil {
-				log.Debug("lastAccepted block not found in chaindb")
-			} else {
-				lastAccepted = block
-			}
-		}
-	}
-
-	// Determine if db corruption has occurred.
-	switch {
-	case lastAccepted != nil && initGenesis:
-		return errors.New("database corruption detected, should be initializing genesis")
-	case lastAccepted == nil && !initGenesis:
-		return errors.New("database corruption detected, should not be initializing genesis")
-	case lastAccepted == nil && initGenesis:
-		log.Debug("lastAccepted is unavailable, setting to the genesis block")
-		lastAccepted = vm.chain.GetGenesisBlock()
-	}
-
-	if err := vm.chain.Accept(lastAccepted); err != nil {
-		return fmt.Errorf("could not initialize VM with last accepted blkID %s: %w", lastAccepted.Hash().Hex(), err)
-	}
 	vm.genesisHash = vm.chain.GetGenesisBlock().Hash()
 	log.Info(fmt.Sprintf("lastAccepted = %s", lastAccepted.Hash().Hex()))
 
