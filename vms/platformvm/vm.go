@@ -338,12 +338,12 @@ func (vm *VM) Shutdown() error {
 func (vm *VM) BuildBlock() (snowman.Block, error) { return vm.mempool.BuildBlock() }
 
 // ParseBlock implements the snowman.ChainVM interface
-func (vm *VM) ParseBlock(bytes []byte) (snowman.Block, error) {
+func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	var blk Block
-	if _, err := GenesisCodec.Unmarshal(bytes, &blk); err != nil {
+	if _, err := GenesisCodec.Unmarshal(b, &blk); err != nil {
 		return nil, err
 	}
-	if err := blk.initialize(vm, bytes, choices.Processing, blk); err != nil {
+	if err := blk.initialize(vm, b, choices.Processing, blk); err != nil {
 		return nil, err
 	}
 

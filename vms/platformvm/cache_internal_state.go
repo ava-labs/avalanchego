@@ -523,7 +523,7 @@ func (st *internalStateImpl) GetBlock(blockID ids.ID) (Block, error) {
 	if _, err := GenesisCodec.Unmarshal(blkStatus.Blk, &blk); err != nil {
 		return nil, err
 	}
-	if err := blk.initialize(st.vm, blkBytes, blkStatus.Status, blk); err != nil {
+	if err := blk.initialize(st.vm, blkStatus.Blk, blkStatus.Status, blk); err != nil {
 		return nil, err
 	}
 
