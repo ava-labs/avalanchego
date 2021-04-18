@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
@@ -116,14 +117,22 @@ func (m *Mempool) IssueTx(tx *Tx) error {
 
 // BuildBlock builds a block to be added to consensus
 func (m *Mempool) BuildBlock() (snowman.Block, error) {
-	m.vm.Ctx.Log.Debug("in BuildBlock")
+	m.vm.ctx.Log.Debug("in BuildBlock")
 
-	preferredHeight, err := m.vm.preferredHeight()
+	// Get the preferred block (which we want to build off)
+	preferred, err := m.vm.Preferred()
 	if err != nil {
-		return nil, fmt.Errorf("couldn't get preferred block's height: %w", err)
+		return nil, fmt.Errorf("couldn't get preferred block: %w", err)
 	}
 
-	preferredID := m.vm.Preferred()
+	preferredDecision, ok := preferred.(decision)
+	if !ok {
+		// The preferred block should always be a decision block
+		return nil, errInvalidBlockType
+	}
+
+	preferredID := preferred.ID()
+	nextHeight := preferred.Height() + 1
 
 	// If there are pending decision txs, build a block with a batch of them
 	if len(m.unissuedDecisionTxs) > 0 {
@@ -136,20 +145,20 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		for _, tx := range txs {
 			m.unissuedTxIDs.Remove(tx.ID())
 		}
-		blk, err := m.vm.newStandardBlock(preferredID, preferredHeight+1, txs)
+		blk, err := m.vm.newStandardBlock(preferredID, nextHeight, txs)
 		if err != nil {
 			m.ResetTimer()
 			return nil, err
 		}
+		blk.SetStatus(choices.Processing)
+
 		if err := blk.Verify(); err != nil {
 			m.ResetTimer()
 			return nil, err
 		}
-		if err := m.vm.State.PutBlock(m.vm.DB, blk); err != nil {
-			m.ResetTimer()
-			return nil, err
-		}
-		return blk, m.vm.DB.Commit()
+
+		m.vm.internalState.AddBlock(blk)
+		return blk, m.vm.internalState.Commit()
 	}
 
 	// If there is a pending atomic tx, build a block with it
@@ -157,28 +166,19 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		tx := m.unissuedAtomicTxs[0]
 		m.unissuedAtomicTxs = m.unissuedAtomicTxs[1:]
 		m.unissuedTxIDs.Remove(tx.ID())
-		blk, err := m.vm.newAtomicBlock(preferredID, preferredHeight+1, *tx)
+		blk, err := m.vm.newAtomicBlock(preferredID, nextHeight, *tx)
 		if err != nil {
 			return nil, err
 		}
+		blk.SetStatus(choices.Processing)
+
 		if err := blk.Verify(); err != nil {
 			m.ResetTimer()
 			return nil, err
 		}
-		if err := m.vm.State.PutBlock(m.vm.DB, blk); err != nil {
-			return nil, err
-		}
-		return blk, m.vm.DB.Commit()
-	}
 
-	// Get the preferred block (which we want to build off)
-	preferred, err := m.vm.getBlock(preferredID)
-	m.vm.Ctx.Log.AssertNoError(err)
-
-	preferredDecision, ok := preferred.(decision)
-	if !ok {
-		// The preferred block should always be a decision block
-		return nil, errInvalidBlockType
+		m.vm.internalState.AddBlock(blk)
+		return blk, m.vm.internalState.Commit()
 	}
 
 	// The state if the preferred block were to be accepted
@@ -209,14 +209,19 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		blk, err := m.vm.newProposalBlock(preferredID, preferredHeight+1, *rewardValidatorTx)
+		blk, err := m.vm.newProposalBlock(preferredID, nextHeight, *rewardValidatorTx)
 		if err != nil {
 			return nil, err
 		}
-		if err := m.vm.State.PutBlock(m.vm.DB, blk); err != nil {
+		blk.SetStatus(choices.Processing)
+
+		if err := blk.Verify(); err != nil {
+			m.ResetTimer()
 			return nil, err
 		}
-		return blk, m.vm.DB.Commit()
+
+		m.vm.internalState.AddBlock(blk)
+		return blk, m.vm.internalState.Commit()
 	}
 
 	// If local time is >= time of the next staker set change,
@@ -233,14 +238,19 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		blk, err := m.vm.newProposalBlock(preferredID, preferredHeight+1, *advanceTimeTx)
+		blk, err := m.vm.newProposalBlock(preferredID, nextHeight, *advanceTimeTx)
 		if err != nil {
 			return nil, err
 		}
-		if err := m.vm.State.PutBlock(m.vm.DB, blk); err != nil {
+		blk.SetStatus(choices.Processing)
+
+		if err := blk.Verify(); err != nil {
+			m.ResetTimer()
 			return nil, err
 		}
-		return blk, m.vm.DB.Commit()
+
+		m.vm.internalState.AddBlock(blk)
+		return blk, m.vm.internalState.Commit()
 	}
 
 	// Propose adding a new validator but only if their start time is in the
@@ -260,7 +270,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 				startTime,
 			)
 			m.vm.droppedTxCache.Put(txID, errMsg) // cache tx as dropped
-			m.vm.Ctx.Log.Debug("dropping tx %s: %s", txID, errMsg)
+			m.vm.ctx.Log.Debug("dropping tx %s: %s", txID, errMsg)
 			continue
 		}
 
@@ -282,30 +292,40 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 			if err != nil {
 				return nil, err
 			}
-			blk, err := m.vm.newProposalBlock(preferredID, preferredHeight+1, *advanceTimeTx)
+			blk, err := m.vm.newProposalBlock(preferredID, nextHeight, *advanceTimeTx)
 			if err != nil {
 				return nil, err
 			}
-			if err := m.vm.State.PutBlock(m.vm.DB, blk); err != nil {
+			blk.SetStatus(choices.Processing)
+
+			if err := blk.Verify(); err != nil {
+				m.ResetTimer()
 				return nil, err
 			}
-			return blk, m.vm.DB.Commit()
+
+			m.vm.internalState.AddBlock(blk)
+			return blk, m.vm.internalState.Commit()
 		}
 
 		// Attempt to issue the transaction
 		m.unissuedProposalTxs.Remove()
 		m.unissuedTxIDs.Remove(txID)
-		blk, err := m.vm.newProposalBlock(preferredID, preferredHeight+1, *tx)
+		blk, err := m.vm.newProposalBlock(preferredID, nextHeight, *tx)
 		if err != nil {
 			return nil, err
 		}
-		if err := m.vm.State.PutBlock(m.vm.DB, blk); err != nil {
+		blk.SetStatus(choices.Processing)
+
+		if err := blk.Verify(); err != nil {
+			m.ResetTimer()
 			return nil, err
 		}
-		return blk, m.vm.DB.Commit()
+
+		m.vm.internalState.AddBlock(blk)
+		return blk, m.vm.internalState.Commit()
 	}
 
-	m.vm.Ctx.Log.Debug("BuildBlock returning error (no blocks)")
+	m.vm.ctx.Log.Debug("BuildBlock returning error (no blocks)")
 	return nil, errNoPendingBlocks
 }
 
@@ -315,23 +335,20 @@ func (m *Mempool) ResetTimer() {
 	// If there is a pending transaction, trigger building of a block with that
 	// transaction
 	if len(m.unissuedDecisionTxs) > 0 || len(m.unissuedAtomicTxs) > 0 {
-		m.vm.SnowmanVM.NotifyBlockReady()
+		m.vm.NotifyBlockReady()
 		return
 	}
 
-	preferredID := m.vm.Preferred()
-
-	// Get the preferred block
-	preferredIntf, err := m.vm.getBlock(preferredID)
+	// Get the preferred block (which we want to build off)
+	preferred, err := m.vm.Preferred()
 	if err != nil {
-		m.vm.Ctx.Log.Error("Error fetching the preferred block (%s), %s", preferredID, err)
+		m.vm.ctx.Log.Error("error fetching the preferred block: %s", err)
 		return
 	}
 
-	preferredDecision, ok := preferredIntf.(decision)
+	preferredDecision, ok := preferred.(decision)
 	if !ok {
-		// The preferred block should always be a decision block
-		m.vm.Ctx.Log.Error("The preferred block, %s, should always be a decision block", preferredID)
+		m.vm.ctx.Log.Error("the preferred block %q should be a decision block", preferred.ID())
 		return
 	}
 
@@ -340,9 +357,8 @@ func (m *Mempool) ResetTimer() {
 
 	// The chain time if the preferred block were to be accepted
 	timestamp := preferredState.GetTimestamp()
-
 	if timestamp.Equal(timer.MaxTime) {
-		m.vm.Ctx.Log.Error("Program time is suspiciously far in the future. Either this codebase was way more successful than expected, or a critical error has occurred.")
+		m.vm.ctx.Log.Error("program time is suspiciously far in the future. Either this codebase was way more successful than expected, or a critical error has occurred")
 		return
 	}
 
@@ -350,17 +366,17 @@ func (m *Mempool) ResetTimer() {
 	// propose moving forward the chain timestamp
 	nextStakerChangeTime, err := m.vm.nextStakerChangeTime(preferredState)
 	if err != nil {
-		m.vm.Ctx.Log.Error("couldn't get next staker change time: %s", err)
+		m.vm.ctx.Log.Error("couldn't get next staker change time: %s", err)
 		return
 	}
 	if timestamp.Equal(nextStakerChangeTime) {
-		m.vm.SnowmanVM.NotifyBlockReady() // Should issue a proposal to reward validator
+		m.vm.NotifyBlockReady() // Should issue a proposal to reward a validator
 		return
 	}
 
 	localTime := m.vm.clock.Time()
 	if !localTime.Before(nextStakerChangeTime) { // time is at or after the time for the next validator to join/leave
-		m.vm.SnowmanVM.NotifyBlockReady() // Should issue a proposal to advance timestamp
+		m.vm.NotifyBlockReady() // Should issue a proposal to advance timestamp
 		return
 	}
 
@@ -368,7 +384,7 @@ func (m *Mempool) ResetTimer() {
 	for m.unissuedProposalTxs.Len() > 0 {
 		startTime := m.unissuedProposalTxs.Peek().UnsignedTx.(TimedTx).StartTime()
 		if !syncTime.After(startTime) {
-			m.vm.SnowmanVM.NotifyBlockReady() // Should issue a ProposeAddValidator
+			m.vm.NotifyBlockReady() // Should issue a ProposeAddValidator
 			return
 		}
 		// If the tx doesn't meet the synchrony bound, drop it
@@ -383,11 +399,11 @@ func (m *Mempool) ResetTimer() {
 			txID,
 			errMsg,
 		)
-		m.vm.Ctx.Log.Debug("dropping tx %s: %s", txID, errMsg)
+		m.vm.ctx.Log.Debug("dropping tx %s: %s", txID, errMsg)
 	}
 
 	waitTime := nextStakerChangeTime.Sub(localTime)
-	m.vm.Ctx.Log.Debug("next scheduled event is at %s (%s in the future)", nextStakerChangeTime, waitTime)
+	m.vm.ctx.Log.Debug("next scheduled event is at %s (%s in the future)", nextStakerChangeTime, waitTime)
 
 	// Wake up when it's time to add/remove the next validator
 	m.timer.SetTimeoutIn(waitTime)
@@ -401,7 +417,7 @@ func (m *Mempool) Shutdown() {
 
 	// There is a potential deadlock if the timer is about to execute a timeout.
 	// So, the lock must be released before stopping the timer.
-	m.vm.Ctx.Lock.Unlock()
+	m.vm.ctx.Lock.Unlock()
 	m.timer.Stop()
-	m.vm.Ctx.Lock.Lock()
+	m.vm.ctx.Lock.Lock()
 }

@@ -137,7 +137,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + i),
 				},
-				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 				Out:   out.Output(),
 			}
 			onCommitState.AddUTXO(utxo)
@@ -161,7 +161,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake)),
 				},
-				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 				Out:   out,
 			})
 		}
@@ -177,7 +177,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + i),
 				},
-				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 				Out:   out.Output(),
 			}
 			onCommitState.AddUTXO(utxo)
@@ -227,7 +227,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake)),
 				},
-				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 				Out:   out,
 			})
 
@@ -251,7 +251,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake) + offset),
 				},
-				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 				Out:   out,
 			})
 		}
@@ -262,18 +262,18 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, permError{errShouldBeDSValidator}
 	}
 
-	uptime, err := vm.calculateUptimePercent(nodeID, startTime)
+	uptime, err := vm.CalculateUptimePercent(nodeID, startTime)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{
 			fmt.Errorf("failed to calculate uptime: %w", err),
 		}
 	}
-	tx.shouldPreferCommit = uptime >= vm.uptimePercentage
+	tx.shouldPreferCommit = uptime >= vm.UptimePercentage
 
 	// Regardless of whether this tx is committed or aborted, update the
 	// validator set to remove the staker. onAbortDB or onCommitDB should commit
 	// (flush to vm.DB) before this is called
-	updateValidators := func() error { return vm.updateVdrMgr(false) }
+	updateValidators := func() error { return vm.updateValidators(false) }
 	return onCommitState, onAbortState, updateValidators, updateValidators, nil
 }
 

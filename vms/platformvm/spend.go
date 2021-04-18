@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -22,6 +21,7 @@ var (
 	errCantSign                     = errors.New("can't sign")
 )
 
+/*
 // stake the provided amount while deducting the provided fee.
 // Arguments:
 // - [db] is the database that is used to attempt to fetch the funds from.
@@ -82,7 +82,7 @@ func (vm *VM) stake(
 			break
 		}
 
-		if assetID := utxo.AssetID(); assetID != vm.Ctx.AVAXAssetID {
+		if assetID := utxo.AssetID(); assetID != vm.ctx.AVAXAssetID {
 			continue // We only care about staking AVAX, so ignore other assets
 		}
 
@@ -111,7 +111,7 @@ func (vm *VM) stake(
 		}
 		in, ok := inIntf.(avax.TransferableIn)
 		if !ok { // should never happen
-			vm.Ctx.Log.Warn("expected input to be avax.TransferableIn but is %T", inIntf)
+			vm.ctx.Log.Warn("expected input to be avax.TransferableIn but is %T", inIntf)
 			continue
 		}
 
@@ -129,7 +129,7 @@ func (vm *VM) stake(
 		// Add the input to the consumed inputs
 		ins = append(ins, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
-			Asset:  avax.Asset{ID: vm.Ctx.AVAXAssetID},
+			Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
 			In: &StakeableLockIn{
 				Locktime:       out.Locktime,
 				TransferableIn: in,
@@ -138,7 +138,7 @@ func (vm *VM) stake(
 
 		// Add the output to the staked outputs
 		stakedOuts = append(stakedOuts, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 			Out: &StakeableLockOut{
 				Locktime: out.Locktime,
 				TransferableOut: &secp256k1fx.TransferOutput{
@@ -152,7 +152,7 @@ func (vm *VM) stake(
 			// This input provided more value than was needed to be locked.
 			// Some of it must be returned
 			returnedOuts = append(returnedOuts, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 				Out: &StakeableLockOut{
 					Locktime: out.Locktime,
 					TransferableOut: &secp256k1fx.TransferOutput{
@@ -178,7 +178,7 @@ func (vm *VM) stake(
 			break
 		}
 
-		if assetID := utxo.AssetID(); assetID != vm.Ctx.AVAXAssetID {
+		if assetID := utxo.AssetID(); assetID != vm.ctx.AVAXAssetID {
 			continue // We only care about burning AVAX, so ignore other assets
 		}
 
@@ -228,14 +228,14 @@ func (vm *VM) stake(
 		// Add the input to the consumed inputs
 		ins = append(ins, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
-			Asset:  avax.Asset{ID: vm.Ctx.AVAXAssetID},
+			Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
 			In:     in,
 		})
 
 		if amountToStake > 0 {
 			// Some of this input was put for staking
 			stakedOuts = append(stakedOuts, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: amountToStake,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -250,7 +250,7 @@ func (vm *VM) stake(
 		if remainingValue > 0 {
 			// This input had extra value, so some of it must be returned
 			returnedOuts = append(returnedOuts, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: remainingValue,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -278,10 +278,11 @@ func (vm *VM) stake(
 
 	return ins, returnedOuts, stakedOuts, signers, nil
 }
+*/
 
 // authorize an operation on behalf of the named subnet with the provided keys.
 func (vm *VM) authorize(
-	db database.Database,
+	vs mutableState,
 	subnetID ids.ID,
 	keys []*crypto.PrivateKeySECP256K1R,
 ) (
@@ -289,14 +290,21 @@ func (vm *VM) authorize(
 	[]*crypto.PrivateKeySECP256K1R, // Keys that prove ownership
 	error,
 ) {
-	// Get information about the subnet we're authorizing the operation for
-	subnet, err := vm.getSubnet(db, subnetID)
+	subnetTx, _, err := vs.GetTx(subnetID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("subnet %s doesn't exist", subnetID)
+		return nil, nil, fmt.Errorf(
+			"failed to fetch subnet %s: %w",
+			subnetID,
+			err,
+		)
+	}
+	subnet, ok := subnetTx.UnsignedTx.(*UnsignedCreateSubnetTx)
+	if !ok {
+		return nil, nil, errWrongTxType
 	}
 
 	// Make sure the owners of the subnet match the provided keys
-	owner, ok := subnet.UnsignedTx.(*UnsignedCreateSubnetTx).Owner.(*secp256k1fx.OutputOwners)
+	owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
 	if !ok {
 		return nil, nil, errUnknownOwners
 	}
@@ -562,7 +570,7 @@ func (vm *VM) produceOutputs(
 				TxID:        txID,
 				OutputIndex: uint32(index),
 			},
-			Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 			Out:   out.Output(),
 		})
 	}

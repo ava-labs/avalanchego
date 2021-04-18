@@ -89,7 +89,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	parentState versionedState,
 	stx *Tx,
 ) (versionedState, TxError) {
-	if err := tx.Verify(vm.Ctx.XChainID, vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
+	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
 		return nil, permError{err}
 	}
 
@@ -110,7 +110,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 			utxoID := in.UTXOID.InputID()
 			utxoIDs[i] = utxoID[:]
 		}
-		allUTXOBytes, err := vm.Ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
+		allUTXOBytes, err := vm.ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
 		if err != nil {
 			return nil, tempError{
 				fmt.Errorf("failed to get shared memory: %w", err),
@@ -131,7 +131,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 		copy(ins, tx.Ins)
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
-		if err := vm.semanticVerifySpendUTXOs(tx, utxos, ins, tx.Outs, stx.Creds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
+		if err := vm.semanticVerifySpendUTXOs(tx, utxos, ins, tx.Outs, stx.Creds, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
 			return nil, err
 		}
 	}
@@ -171,7 +171,7 @@ func (vm *VM) newImportTx(
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	if vm.Ctx.XChainID != chainID {
+	if vm.ctx.XChainID != chainID {
 		return nil, errWrongChainID
 	}
 
@@ -191,7 +191,7 @@ func (vm *VM) newImportTx(
 	importedAmount := uint64(0)
 	now := vm.clock.Unix()
 	for _, utxo := range atomicUTXOs {
-		if utxo.AssetID() != vm.Ctx.AVAXAssetID {
+		if utxo.AssetID() != vm.ctx.AVAXAssetID {
 			continue
 		}
 		inputIntf, utxoSigners, err := kc.Spend(utxo.Out, now)
@@ -221,18 +221,18 @@ func (vm *VM) newImportTx(
 
 	ins := []*avax.TransferableInput{}
 	outs := []*avax.TransferableOutput{}
-	if importedAmount < vm.txFee { // imported amount goes toward paying tx fee
+	if importedAmount < vm.TxFee { // imported amount goes toward paying tx fee
 		var baseSigners [][]*crypto.PrivateKeySECP256K1R
-		ins, outs, _, baseSigners, err = vm.stake(vm.DB, keys, 0, vm.txFee-importedAmount, changeAddr)
+		ins, outs, _, baseSigners, err = vm.stake(vm.DB, keys, 0, vm.TxFee-importedAmount, changeAddr)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 		}
 		signers = append(baseSigners, signers...)
-	} else if importedAmount > vm.txFee {
+	} else if importedAmount > vm.TxFee {
 		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: importedAmount - vm.txFee,
+				Amt: importedAmount - vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -245,8 +245,8 @@ func (vm *VM) newImportTx(
 	// Create the transaction
 	utx := &UnsignedImportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.Ctx.NetworkID,
-			BlockchainID: vm.Ctx.ChainID,
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
 			Outs:         outs,
 			Ins:          ins,
 		}},
@@ -257,5 +257,5 @@ func (vm *VM) newImportTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.Ctx.XChainID, vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID)
+	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID)
 }

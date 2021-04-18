@@ -36,7 +36,7 @@ type ProposalBlock struct {
 
 // Accept implements the snowman.Block interface
 func (pb *ProposalBlock) Accept() error {
-	pb.vm.Ctx.Log.Verbo("Accepting Proposal Block %s at height %d with parent %s", pb.ID(), pb.Height(), pb.ParentID())
+	pb.vm.ctx.Log.Verbo("Accepting Proposal Block %s at height %d with parent %s", pb.ID(), pb.Height(), pb.ParentID())
 
 	pb.SetStatus(choices.Accepted)
 	pb.VM.LastAcceptedID = pb.ID()
@@ -45,10 +45,10 @@ func (pb *ProposalBlock) Accept() error {
 
 // Reject implements the snowman.Block interface
 func (pb *ProposalBlock) Reject() error {
-	pb.vm.Ctx.Log.Verbo("Rejecting Proposal Block %s at height %d with parent %s", pb.ID(), pb.Height(), pb.ParentID())
+	pb.vm.ctx.Log.Verbo("Rejecting Proposal Block %s at height %d with parent %s", pb.ID(), pb.Height(), pb.ParentID())
 
 	if err := pb.vm.mempool.IssueTx(&pb.Tx); err != nil {
-		pb.vm.Ctx.Log.Verbo("failed to reissue tx %q due to: %s", pb.Tx.ID(), err)
+		pb.vm.ctx.Log.Verbo("failed to reissue tx %q due to: %s", pb.Tx.ID(), err)
 	}
 	return pb.CommonBlock.Reject()
 }
@@ -106,7 +106,7 @@ func (pb *ProposalBlock) onAbort() (versionedState, func() error) {
 func (pb *ProposalBlock) Verify() error {
 	if err := pb.CommonBlock.Verify(); err != nil {
 		if err := pb.Reject(); err != nil {
-			pb.vm.Ctx.Log.Error("failed to reject proposal block %s due to %s", pb.ID(), err)
+			pb.vm.ctx.Log.Error("failed to reject proposal block %s due to %s", pb.ID(), err)
 		}
 		return err
 	}
@@ -122,7 +122,7 @@ func (pb *ProposalBlock) Verify() error {
 	parent, ok := parentIntf.(decision)
 	if !ok {
 		if err := pb.Reject(); err != nil {
-			pb.vm.Ctx.Log.Error("failed to reject proposal block %s due to %s", pb.ID(), err)
+			pb.vm.ctx.Log.Error("failed to reject proposal block %s due to %s", pb.ID(), err)
 		}
 		return errInvalidBlockType
 	}
@@ -139,7 +139,7 @@ func (pb *ProposalBlock) Verify() error {
 		// verification now but be valid in the future, so don't (permanently) mark the block as rejected.
 		if !err.Temporary() {
 			if err := pb.Reject(); err != nil {
-				pb.vm.Ctx.Log.Error("failed to reject proposal block %s due to %s", pb.ID(), err)
+				pb.vm.ctx.Log.Error("failed to reject proposal block %s due to %s", pb.ID(), err)
 			}
 		}
 		return err
@@ -154,25 +154,51 @@ func (pb *ProposalBlock) Verify() error {
 
 // Options returns the possible children of this block in preferential order.
 func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
-	blockID := pb.ID()
+	var (
+		blockID    = pb.ID()
+		nextHeight = pb.Height() + 1
+		commit     Block
+		abort      Block
+	)
 
-	commit, err := pb.vm.newCommitBlock(blockID, pb.Height()+1)
+	commit, err := pb.vm.newCommitBlock(blockID, nextHeight)
 	if err != nil {
-		return [2]snowman.Block{}, fmt.Errorf("failed to create commit block: %w", err)
+		return [2]snowman.Block{}, fmt.Errorf(
+			"failed to create commit block: %w",
+			err,
+		)
 	}
-	abort, err := pb.vm.newAbortBlock(blockID, pb.Height()+1)
+	abort, err = pb.vm.newAbortBlock(blockID, nextHeight)
 	if err != nil {
-		return [2]snowman.Block{}, fmt.Errorf("failed to create abort block: %w", err)
+		return [2]snowman.Block{}, fmt.Errorf(
+			"failed to create abort block: %w",
+			err,
+		)
 	}
 
-	if err := pb.vm.State.PutBlock(pb.vm.DB, commit); err != nil {
-		return [2]snowman.Block{}, fmt.Errorf("failed to put commit block: %w", err)
+	fetchedCommit, getCommitErr := pb.vm.getBlock(commit.ID())
+	if getCommitErr == nil {
+		commit = fetchedCommit
+	} else {
+		commit.SetStatus(choices.Processing)
+		pb.vm.internalState.AddBlock(commit)
 	}
-	if err := pb.vm.State.PutBlock(pb.vm.DB, abort); err != nil {
-		return [2]snowman.Block{}, fmt.Errorf("failed to put abort block: %w", err)
+
+	fetchedAbort, getAbortErr := pb.vm.getBlock(abort.ID())
+	if getAbortErr == nil {
+		abort = fetchedAbort
+	} else {
+		abort.SetStatus(choices.Processing)
+		pb.vm.internalState.AddBlock(abort)
 	}
-	if err := pb.vm.DB.Commit(); err != nil {
-		return [2]snowman.Block{}, fmt.Errorf("failed to commit VM's database: %w", err)
+
+	if getCommitErr != nil || getAbortErr != nil {
+		if err := pb.vm.internalState.Commit(); err != nil {
+			return [2]snowman.Block{}, fmt.Errorf(
+				"failed to commit VM's database: %w",
+				err,
+			)
+		}
 	}
 
 	tx, ok := pb.Tx.UnsignedTx.(UnsignedProposalTx)

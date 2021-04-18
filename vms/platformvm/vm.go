@@ -380,6 +380,7 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 // SetPreference sets the preferred block to be the one with ID [blkID]
 func (vm *VM) SetPreference(blkID ids.ID) error {
 	if blkID == vm.preferred {
+		// If the preference didn't change, then this is a noop
 		return nil
 	}
 	vm.preferred = blkID
@@ -397,6 +398,16 @@ func (vm *VM) PreferredHeight() (uint64, error) {
 		return 0, err
 	}
 	return blk.Height(), nil
+}
+
+// NotifyBlockReady tells the consensus engine that a new block is ready to be
+// created
+func (vm *VM) NotifyBlockReady() {
+	select {
+	case vm.toEngine <- common.PendingTxs:
+	default:
+		vm.ctx.Log.Debug("dropping message to consensus engine")
+	}
 }
 
 // CreateHandlers returns a map where:

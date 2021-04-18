@@ -98,12 +98,12 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 	TxError,
 ) {
 	if err := tx.Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
-		vm.minStakeDuration,
-		vm.maxStakeDuration,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
+		vm.MinStakeDuration,
+		vm.MaxStakeDuration,
 	); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
@@ -231,7 +231,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 		}
 
 		// Verify the flowcheck
-		if err := vm.semanticVerifySpend(parentState, tx, tx.Ins, tx.Outs, baseTxCreds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
+		if err := vm.semanticVerifySpend(parentState, tx, tx.Ins, tx.Outs, baseTxCreds, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
 			return nil, nil, nil, nil, err
 		}
 	}
@@ -272,12 +272,12 @@ func (vm *VM) newAddSubnetValidatorTx(
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to use for adding the validator
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, vm.txFee, changeAddr)
+	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, vm.TxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 
-	subnetAuth, subnetSigners, err := vm.authorize(vm.DB, subnetID, keys)
+	subnetAuth, subnetSigners, err := vm.authorize(vm.internalState, subnetID, keys)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
 	}
@@ -286,8 +286,8 @@ func (vm *VM) newAddSubnetValidatorTx(
 	// Create the tx
 	utx := &UnsignedAddSubnetValidatorTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.Ctx.NetworkID,
-			BlockchainID: vm.Ctx.ChainID,
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
 			Ins:          ins,
 			Outs:         outs,
 		}},
@@ -307,11 +307,11 @@ func (vm *VM) newAddSubnetValidatorTx(
 		return nil, err
 	}
 	return tx, utx.Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
-		vm.minStakeDuration,
-		vm.maxStakeDuration,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
+		vm.MinStakeDuration,
+		vm.MaxStakeDuration,
 	)
 }

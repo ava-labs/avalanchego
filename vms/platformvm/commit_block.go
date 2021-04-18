@@ -22,9 +22,11 @@ type Commit struct {
 //
 // This function also sets the onCommit databases if the verification passes.
 func (c *Commit) Verify() error {
+	blkID := c.ID()
+
 	if err := c.DoubleDecisionBlock.Verify(); err != nil {
 		if err := c.Reject(); err != nil {
-			c.vm.Ctx.Log.Error("failed to reject commit block %s due to %s", c.ID(), err)
+			c.vm.ctx.Log.Error("failed to reject commit block %s due to %s", blkID, err)
 		}
 		return err
 	}
@@ -33,14 +35,14 @@ func (c *Commit) Verify() error {
 	parent, ok := c.parentBlock().(*ProposalBlock)
 	if !ok {
 		if err := c.Reject(); err != nil {
-			c.vm.Ctx.Log.Error("failed to reject commit block %s due to %s", c.ID(), err)
+			c.vm.ctx.Log.Error("failed to reject commit block %s due to %s", blkID, err)
 		}
 		return errInvalidBlockType
 	}
 
 	c.onAcceptState, c.onAcceptFunc = parent.onCommit()
 
-	c.vm.currentBlocks[c.ID()] = c
+	c.vm.currentBlocks[blkID] = c
 	c.parentBlock().addChild(c)
 	return nil
 }

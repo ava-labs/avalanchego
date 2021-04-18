@@ -82,7 +82,9 @@ type internalState interface {
 	GetBlock(blockID ids.ID) (Block, error)
 	AddBlock(block Block)
 
+	Abort()
 	Commit() error
+	CommitBatch() (database.Batch, error)
 	Close() error
 }
 
@@ -589,35 +591,48 @@ func (st *internalStateImpl) DeletePendingStaker(tx *Tx) {
 	st.deletedPendingStakers = append(st.deletedPendingStakers, tx)
 }
 
+func (st *internalStateImpl) Abort() {
+	st.baseDB.Abort()
+}
+
 func (st *internalStateImpl) Commit() error {
-	if err := st.writeCurrentStakers(); err != nil {
+	defer st.Abort()
+	batch, err := st.CommitBatch()
+	if err != nil {
 		return err
+	}
+	return batch.Write()
+}
+
+func (st *internalStateImpl) CommitBatch() (database.Batch, error) {
+	if err := st.writeCurrentStakers(); err != nil {
+		return nil, err
 	}
 	if err := st.writePendingStakers(); err != nil {
-		return err
+		return nil, err
 	}
 	if err := st.writeUptimes(); err != nil {
-		return err
+		return nil, err
 	}
 	if err := st.writeBlocks(); err != nil {
-		return err
+		return nil, err
 	}
 	if err := st.writeTXs(); err != nil {
-		return err
+		return nil, err
 	}
 	if err := st.writeUTXOs(); err != nil {
-		return err
+		return nil, err
 	}
 	if err := st.writeSubnets(); err != nil {
-		return err
+		return nil, err
 	}
 	if err := st.writeChains(); err != nil {
-		return err
+		return nil, err
 	}
 	if err := st.writeSingletons(); err != nil {
-		return err
+		return nil, err
 	}
-	return st.baseDB.Commit()
+	return st.baseDB.CommitBatch()
 }
 
 func (st *internalStateImpl) Close() error {

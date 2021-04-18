@@ -107,7 +107,7 @@ pendingStakerLoop:
 				staker.Validator.Duration(),
 				staker.Validator.Wght,
 				currentSupply,
-				vm.stakeMintingPeriod,
+				vm.StakeMintingPeriod,
 			)
 			currentSupply, err = safemath.Add64(currentSupply, reward)
 			if err != nil {
@@ -128,7 +128,7 @@ pendingStakerLoop:
 				staker.Validator.Duration(),
 				staker.Validator.Wght,
 				currentSupply,
-				vm.stakeMintingPeriod,
+				vm.StakeMintingPeriod,
 			)
 			currentSupply, err = safemath.Add64(currentSupply, reward)
 			if err != nil {
@@ -195,7 +195,7 @@ currentStakerLoop:
 	onCommitFunc := func() error {
 		// For each Subnet, update the node's validator manager to reflect
 		// current Subnet membership
-		return vm.updateVdrMgr(false)
+		return vm.updateValidators(false)
 	}
 
 	// State doesn't change if this proposal is aborted

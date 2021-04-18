@@ -145,8 +145,7 @@ func (cb *CommonBlock) Reject() error {
 	if err := cb.Block.Reject(); err != nil {
 		return err
 	}
-
-	return cb.vm.DB.Commit()
+	return cb.vm.internalState.Commit()
 }
 
 func (cb *CommonBlock) free() {
@@ -227,9 +226,6 @@ func (sdb *SingleDecisionBlock) Accept() error {
 	if err := sdb.vm.internalState.Commit(); err != nil {
 		return fmt.Errorf("failed to commit vm's state: %w", err)
 	}
-	if err := sdb.vm.DB.Commit(); err != nil {
-		return fmt.Errorf("failed to commit vm's DB: %w", err)
-	}
 
 	for _, child := range sdb.children {
 		child.setBaseState()
@@ -255,7 +251,7 @@ func (ddb *DoubleDecisionBlock) Accept() error {
 
 	parent, ok := ddb.parentBlock().(*ProposalBlock)
 	if !ok {
-		ddb.vm.Ctx.Log.Error("double decision block should only follow a proposal block")
+		ddb.vm.ctx.Log.Error("double decision block should only follow a proposal block")
 		return errInvalidBlockType
 	}
 
@@ -271,9 +267,6 @@ func (ddb *DoubleDecisionBlock) Accept() error {
 	ddb.onAcceptState.Apply(ddb.vm.internalState)
 	if err := ddb.vm.internalState.Commit(); err != nil {
 		return fmt.Errorf("failed to commit vm's state: %w", err)
-	}
-	if err := ddb.vm.DB.Commit(); err != nil {
-		return fmt.Errorf("failed to commit vm's DB: %w", err)
 	}
 
 	for _, child := range ddb.children {

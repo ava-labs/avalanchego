@@ -62,7 +62,7 @@ func (ab *AtomicBlock) conflicts(s ids.Set) bool {
 func (ab *AtomicBlock) Verify() error {
 	if err := ab.CommonDecisionBlock.Verify(); err != nil {
 		if err := ab.Reject(); err != nil {
-			ab.vm.Ctx.Log.Error("failed to reject atomic block %s due to %s", ab.ID(), err)
+			ab.vm.ctx.Log.Error("failed to reject atomic block %s due to %s", ab.ID(), err)
 		}
 		return err
 	}
@@ -102,7 +102,7 @@ func (ab *AtomicBlock) Verify() error {
 // Accept implements the snowman.Block interface
 func (ab *AtomicBlock) Accept() error {
 	blkID := ab.ID()
-	ab.vm.Ctx.Log.Verbo(
+	ab.vm.ctx.Log.Verbo(
 		"Accepting Atomic Block %s at height %d with parent %s",
 		blkID,
 		ab.Height(),
@@ -120,17 +120,13 @@ func (ab *AtomicBlock) Accept() error {
 
 	// Update the state of the chain in the database
 	ab.onAcceptState.Apply(ab.vm.internalState)
-	if err := ab.vm.internalState.Commit(); err != nil {
-		return fmt.Errorf("failed to commit vm's DB: %w", err)
-	}
 
-	batch, err := ab.vm.DB.CommitBatch()
+	defer ab.vm.internalState.Abort()
+	batch, err := ab.vm.internalState.CommitBatch()
 	if err != nil {
 		return fmt.Errorf("failed to commit VM's database for block %s: %w", ab.ID(), err)
 	}
-	defer ab.vm.DB.Abort()
-
-	if err := tx.Accept(ab.vm.Ctx, batch); err != nil {
+	if err := tx.Accept(ab.vm.ctx, batch); err != nil {
 		return fmt.Errorf("failed to atomically accept tx %s in block %s: %w", tx.ID(), ab.ID(), err)
 	}
 
@@ -149,10 +145,10 @@ func (ab *AtomicBlock) Accept() error {
 
 // Reject implements the snowman.Block interface
 func (ab *AtomicBlock) Reject() error {
-	ab.vm.Ctx.Log.Verbo("Rejecting Atomic Block %s at height %d with parent %s", ab.ID(), ab.Height(), ab.ParentID())
+	ab.vm.ctx.Log.Verbo("Rejecting Atomic Block %s at height %d with parent %s", ab.ID(), ab.Height(), ab.ParentID())
 
 	if err := ab.vm.mempool.IssueTx(&ab.Tx); err != nil {
-		ab.vm.Ctx.Log.Debug("failed to reissue tx %q due to: %s", ab.Tx.ID(), err)
+		ab.vm.ctx.Log.Debug("failed to reissue tx %q due to: %s", ab.Tx.ID(), err)
 	}
 	return ab.CommonDecisionBlock.Reject()
 }

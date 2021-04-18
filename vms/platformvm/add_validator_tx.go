@@ -141,13 +141,13 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 ) {
 	// Verify the tx is well-formed
 	if err := tx.Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.minValidatorStake,
-		vm.maxValidatorStake,
-		vm.minStakeDuration,
-		vm.maxStakeDuration,
-		vm.minDelegationFee,
+		vm.MinValidatorStake,
+		vm.MaxValidatorStake,
+		vm.MinStakeDuration,
+		vm.MaxStakeDuration,
+		vm.MinDelegationFee,
 	); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
@@ -221,7 +221,7 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 		}
 
 		// Verify the flowcheck
-		if err := vm.semanticVerifySpend(parentState, tx, tx.Ins, outs, stx.Creds, 0, vm.Ctx.AVAXAssetID); err != nil {
+		if err := vm.semanticVerifySpend(parentState, tx, tx.Ins, outs, stx.Creds, 0, vm.ctx.AVAXAssetID); err != nil {
 			switch err.(type) {
 			case permError:
 				return nil, nil, nil, nil, permError{
@@ -279,8 +279,8 @@ func (vm *VM) newAddValidatorTx(
 	// Create the tx
 	utx := &UnsignedAddValidatorTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.Ctx.NetworkID,
-			BlockchainID: vm.Ctx.ChainID,
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
 			Ins:          ins,
 			Outs:         unlockedOuts,
 		}},
@@ -303,12 +303,12 @@ func (vm *VM) newAddValidatorTx(
 		return nil, err
 	}
 	return tx, utx.Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.minValidatorStake,
-		vm.maxValidatorStake,
-		vm.minStakeDuration,
-		vm.maxStakeDuration,
-		vm.minDelegationFee,
+		vm.MinValidatorStake,
+		vm.MaxValidatorStake,
+		vm.MinStakeDuration,
+		vm.MaxStakeDuration,
+		vm.MinDelegationFee,
 	)
 }
