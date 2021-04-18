@@ -301,7 +301,7 @@ func (b *Block) Verify() error {
 	}
 
 	if _, err = vm.chain.InsertChain([]*types.Block{b.ethBlock}); err != nil {
-		return fmt.Errorf("failed to insert block %s into chain due to %w", b.ethBlock.Hash(), err)
+		return fmt.Errorf("failed to insert block %s into chain due to %w", b.ethBlock.Hash().String(), err)
 	}
 	return nil
 }
