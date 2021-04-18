@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (

@@ -89,12 +89,12 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *Tx) pendingStakerC
 			newDelegators[len(vdr.delegators)] = tx
 			sortDelegatorsByAddition(newDelegators)
 
-			ps.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
+			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
 				delegators: newDelegators,
 				subnets:    vdr.subnets,
 			}
 		} else {
-			ps.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
+			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
 				delegators: []*UnsignedAddDelegatorTx{
 					tx,
 				},
@@ -116,12 +116,12 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *Tx) pendingStakerC
 			}
 			newSubnets[tx.Validator.Subnet] = tx
 
-			ps.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
+			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
 				delegators: vdr.delegators,
 				subnets:    newSubnets,
 			}
 		} else {
-			ps.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
+			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
 				subnets: map[ids.ID]*UnsignedAddSubnetValidatorTx{
 					tx.Validator.Subnet: tx,
 				},

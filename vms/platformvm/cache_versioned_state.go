@@ -295,7 +295,7 @@ func (vs *versionedStateImpl) Apply(is internalState) {
 		is.AddTx(tx.tx, tx.status)
 	}
 	for _, utxo := range vs.modifiedUTXOs {
-		if utxo.utxo == nil {
+		if utxo.utxo != nil {
 			is.AddUTXO(utxo.utxo)
 		} else {
 			is.DeleteUTXO(*utxo.utxoID)

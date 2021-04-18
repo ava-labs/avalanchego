@@ -25,7 +25,7 @@ import (
 var (
 	validatorsPrefix      = []byte("validators")
 	currentPrefix         = []byte("current")
-	pendingPrefix         = []byte("current")
+	pendingPrefix         = []byte("pending")
 	validatorPrefix       = []byte("validator")
 	delegatorPrefix       = []byte("delegator")
 	subnetValidatorPrefix = []byte("subnetValidator")
@@ -1147,7 +1147,7 @@ func (st *internalStateImpl) loadPendingValidators() error {
 		return err
 	}
 
-	subnetValidatorIt := st.currentSubnetValidatorDB.NewIterator()
+	subnetValidatorIt := st.pendingSubnetValidatorDB.NewIterator()
 	defer subnetValidatorIt.Release()
 	for subnetValidatorIt.Next() {
 		txIDBytes := validatorIt.Key()

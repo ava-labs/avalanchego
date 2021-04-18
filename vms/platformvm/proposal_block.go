@@ -35,12 +35,16 @@ type ProposalBlock struct {
 
 // Accept implements the snowman.Block interface
 func (pb *ProposalBlock) Accept() error {
+	blkID := pb.ID()
 	pb.vm.ctx.Log.Verbo(
 		"Accepting Proposal Block %s at height %d with parent %s",
-		pb.ID(),
+		blkID,
 		pb.Height(),
 		pb.ParentID(),
 	)
+
+	pb.status = choices.Accepted
+	pb.vm.lastAcceptedID = blkID
 	return nil
 }
 

@@ -173,7 +173,9 @@ func (b *CommonBlock) Height() uint64 { return b.Hght }
 func (b *CommonBlock) Parent() snowman.Block {
 	parent, err := b.parent()
 	if err != nil {
-		return &missing.Block{BlkID: b.ParentID()}
+		return &missing.Block{
+			BlkID: b.ParentID(),
+		}
 	}
 	return parent
 }
@@ -223,15 +225,20 @@ func (b *CommonBlock) Verify() error {
 }
 
 func (b *CommonBlock) Reject() error {
+	defer b.free()
+
 	b.status = choices.Rejected
 	b.vm.internalState.AddBlock(b.self)
-	return nil
+	return b.vm.internalState.Commit()
 }
 
 func (b *CommonBlock) Accept() error {
+	blkID := b.ID()
+
 	b.status = choices.Accepted
 	b.vm.internalState.AddBlock(b.self)
-	b.vm.internalState.SetLastAccepted(b.ID())
+	b.vm.internalState.SetLastAccepted(blkID)
+	b.vm.lastAcceptedID = blkID
 	return nil
 }
 

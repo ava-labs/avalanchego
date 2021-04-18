@@ -208,15 +208,12 @@ func (vm *VM) Initialize(
 		)
 	}
 
-	lastAcceptedID, err := vm.LastAccepted()
-	if err != nil {
-		return err
-	}
+	vm.lastAcceptedID = is.GetLastAccepted()
 
-	ctx.Log.Info("initializing last accepted block as %s", lastAcceptedID)
+	ctx.Log.Info("initializing last accepted block as %s", vm.lastAcceptedID)
 
 	// Build off the most recently accepted block
-	return vm.SetPreference(lastAcceptedID)
+	return vm.SetPreference(vm.lastAcceptedID)
 }
 
 // Create all chains that exist that this node validates.
@@ -373,7 +370,7 @@ func (vm *VM) getBlock(blkID ids.ID) (Block, error) {
 
 // LastAccepted returns the block most recently accepted
 func (vm *VM) LastAccepted() (ids.ID, error) {
-	return vm.internalState.GetLastAccepted(), nil
+	return vm.lastAcceptedID, nil
 }
 
 // SetPreference sets the preferred block to be the one with ID [blkID]
