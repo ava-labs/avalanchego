@@ -511,6 +511,52 @@ func (vm *VM) nextStakerChangeTime(vs mutableState) (time.Time, error) {
 	return earliest, nil
 }
 
+// Returns the time when the next staker of the primary subnet will be removed
+func (vm *VM) nextStakerRemovalTime(vs mutableState) (time.Time, error) {
+	currentStakers := vs.CurrentStakerChainState()
+	pendingStakers := vs.PendingStakerChainState()
+
+	earliest := timer.MaxTime
+
+currentStakerLoop:
+	for _, staker := range currentStakers.Stakers() {
+		switch tx := staker.UnsignedTx.(type) {
+		case *UnsignedAddValidatorTx:
+			earliest = tx.EndTime()
+			break currentStakerLoop
+		case *UnsignedAddDelegatorTx:
+			earliest = tx.EndTime()
+			break currentStakerLoop
+		}
+	}
+	for _, staker := range pendingStakers.Stakers() {
+		var (
+			startTime time.Time
+		)
+		switch tx := staker.UnsignedTx.(type) {
+		case *UnsignedAddValidatorTx:
+			startTime = tx.StartTime()
+			if endTime := tx.EndTime(); endTime.Before(earliest) {
+				earliest = endTime
+			}
+		case *UnsignedAddDelegatorTx:
+			startTime = tx.StartTime()
+			if endTime := tx.EndTime(); endTime.Before(earliest) {
+				earliest = endTime
+			}
+		case *UnsignedAddSubnetValidatorTx:
+			startTime = tx.StartTime()
+		default:
+			return time.Time{}, errWrongTxType
+		}
+
+		if startTime.After(earliest) {
+			break
+		}
+	}
+	return earliest, nil
+}
+
 // Codec ...
 func (vm *VM) Codec() codec.Manager { return vm.codec }
 

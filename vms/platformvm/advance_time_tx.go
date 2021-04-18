@@ -72,18 +72,18 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	}
 
 	// Only allow timestamp to move forward as far as the time of next staker set change time
-	nextStakerChangeTime, err := vm.nextStakerChangeTime(parentState)
+	nextStakerRemovalTime, err := vm.nextStakerRemovalTime(parentState)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 
 	timestamp := tx.Timestamp()
-	if timestamp.After(nextStakerChangeTime) {
+	if timestamp.After(nextStakerRemovalTime) {
 		return nil, nil, nil, nil, permError{
 			fmt.Errorf(
-				"proposed timestamp (%s) later than next staker change time (%s)",
+				"proposed timestamp (%s) later than next staker removal time (%s)",
 				timestamp,
-				nextStakerChangeTime,
+				nextStakerRemovalTime,
 			),
 		}
 	}
@@ -172,9 +172,8 @@ currentStakerLoop:
 
 			numToRemoveFromCurrent++
 		default:
-			return nil, nil, nil, nil, permError{
-				fmt.Errorf("expected subnet validator but got %T", tx.UnsignedTx),
-			}
+			// We shouldn't be removing any primary network validators here
+			break currentStakerLoop
 		}
 	}
 	newlyCurrentStakers, err := currentStakers.UpdateStakers(
