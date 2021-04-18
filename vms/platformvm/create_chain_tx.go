@@ -13,8 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -155,6 +153,7 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	return onAccept, nil
 }
 
+/*
 // Create a new transaction
 func (vm *VM) newCreateChainTx(
 	subnetID ids.ID, // ID of the subnet that validates the new chain
@@ -200,3 +199,4 @@ func (vm *VM) newCreateChainTx(
 	}
 	return tx, utx.Verify(vm.ctx, vm.codec, vm.CreationTxFee, vm.ctx.AVAXAssetID)
 }
+*/

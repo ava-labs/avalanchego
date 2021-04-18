@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
@@ -150,7 +149,6 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 			m.ResetTimer()
 			return nil, err
 		}
-		blk.SetStatus(choices.Processing)
 
 		if err := blk.Verify(); err != nil {
 			m.ResetTimer()
@@ -170,7 +168,6 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		blk.SetStatus(choices.Processing)
 
 		if err := blk.Verify(); err != nil {
 			m.ResetTimer()
@@ -213,7 +210,6 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		blk.SetStatus(choices.Processing)
 
 		if err := blk.Verify(); err != nil {
 			m.ResetTimer()
@@ -242,7 +238,6 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		blk.SetStatus(choices.Processing)
 
 		if err := blk.Verify(); err != nil {
 			m.ResetTimer()
@@ -296,7 +291,6 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 			if err != nil {
 				return nil, err
 			}
-			blk.SetStatus(choices.Processing)
 
 			if err := blk.Verify(); err != nil {
 				m.ResetTimer()
@@ -314,7 +308,6 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		blk.SetStatus(choices.Processing)
 
 		if err := blk.Verify(); err != nil {
 			m.ResetTimer()

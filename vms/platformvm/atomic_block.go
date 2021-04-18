@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/vms/components/core"
 )
 
 var (
@@ -27,8 +26,8 @@ type AtomicBlock struct {
 }
 
 // initialize this block
-func (ab *AtomicBlock) initialize(vm *VM, bytes []byte) error {
-	if err := ab.CommonDecisionBlock.initialize(vm, bytes); err != nil {
+func (ab *AtomicBlock) initialize(vm *VM, bytes []byte, status choices.Status, self Block) error {
+	if err := ab.CommonDecisionBlock.initialize(vm, bytes, status, self); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	unsignedBytes, err := vm.codec.Marshal(codecVersion, &ab.Tx.UnsignedTx)
@@ -44,14 +43,18 @@ func (ab *AtomicBlock) initialize(vm *VM, bytes []byte) error {
 }
 
 // Reject implements the snowman.Block interface
-func (ab *AtomicBlock) conflicts(s ids.Set) bool {
+func (ab *AtomicBlock) conflicts(s ids.Set) (bool, error) {
 	if ab.Status() == choices.Accepted {
-		return false
+		return false, nil
 	}
 	if ab.inputs.Overlaps(s) {
-		return true
+		return true, nil
 	}
-	return ab.parentBlock().conflicts(s)
+	parent, err := ab.parent()
+	if err != nil {
+		return false, err
+	}
+	return parent.conflicts(s)
 }
 
 // Verify this block performs a valid state transition.
@@ -73,14 +76,22 @@ func (ab *AtomicBlock) Verify() error {
 	}
 	ab.inputs = tx.InputUTXOs()
 
-	parentBlock := ab.parentBlock()
-	if parentBlock.conflicts(ab.inputs) {
+	parentIntf, err := ab.parent()
+	if err != nil {
+		return err
+	}
+
+	conflicts, err := parentIntf.conflicts(ab.inputs)
+	if err != nil {
+		return err
+	}
+	if conflicts {
 		return errConflictingParentTxs
 	}
 
 	// AtomicBlock is not a modifier on a proposal block, so its parent must be
 	// a decision.
-	parent, ok := parentBlock.(decision)
+	parent, ok := parentIntf.(decision)
 	if !ok {
 		return errInvalidBlockType
 	}
@@ -95,7 +106,7 @@ func (ab *AtomicBlock) Verify() error {
 
 	ab.onAcceptState = onAccept
 	ab.vm.currentBlocks[ab.ID()] = ab
-	ab.parentBlock().addChild(ab)
+	parentIntf.addChild(ab)
 	return nil
 }
 
@@ -159,8 +170,8 @@ func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx Tx) (*AtomicBloc
 	ab := &AtomicBlock{
 		CommonDecisionBlock: CommonDecisionBlock{
 			CommonBlock: CommonBlock{
-				Block: core.NewBlock(parentID, height),
-				vm:    vm,
+				PrntID: parentID,
+				Hght:   height,
 			},
 		},
 		Tx: tx,
@@ -173,6 +184,5 @@ func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx Tx) (*AtomicBloc
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}
-	ab.Block.Initialize(bytes, vm.SnowmanVM)
-	return ab, nil
+	return ab, ab.CommonDecisionBlock.initialize(vm, bytes, choices.Processing, ab)
 }

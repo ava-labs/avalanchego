@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/components/core"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/missing"
 )
 
@@ -84,15 +84,15 @@ type Block interface {
 	// This method should be called when a block is unmarshaled from bytes.
 	// [vm] is the vm the block exists in
 	// [bytes] is the byte representation of this block
-	initialize(vm *VM, bytes []byte) error
+	initialize(vm *VM, bytes []byte, status choices.Status, self Block) error
 
 	// returns true if this block or any processing ancestors consume any of the
 	// named atomic imports.
-	conflicts(ids.Set) bool
+	conflicts(ids.Set) (bool, error)
 
-	// parentBlock returns the parent block, similarly to Parent. However, it
+	// parent returns the parent block, similarly to Parent. However, it
 	// provides the more specific Block interface.
-	parentBlock() Block
+	parent() (Block, error)
 
 	// addChild notifies this block that it has a child block building on it.
 	// When this block commits its changes, it should set the child's base state
@@ -105,8 +105,6 @@ type Block interface {
 
 	// Set the block's underlying state to the chain's internal state
 	setBaseState()
-
-	SetStatus(status choices.Status)
 }
 
 // A decision block (either Commit, Abort, or DecisionBlock.) represents a
@@ -120,65 +118,122 @@ type decision interface {
 	//    been verified.
 	// 2) The state of the chain after this block is accepted, if this block was
 	//    verified successfully.
-	onAccept() versionedState
+	onAccept() mutableState
 }
 
-// CommonBlock contains the fields common to all blocks of the Platform Chain
+var (
+	errBlockNil = errors.New("block is nil")
+	errRejected = errors.New("block is rejected")
+)
+
+// Block contains fields and methods common to block's in a Snowman blockchain.
+// Block is meant to be a building-block (pun intended).
+// When you write a VM, your blocks can (and should) embed a core.Block
+// to take care of some bioler-plate code.
+// Block's methods can be over-written by structs that embed this struct.
 type CommonBlock struct {
-	*core.Block `serialize:"true"`
-	vm          *VM
+	PrntID ids.ID `serialize:"true" json:"parentID"` // parent's ID
+	Hght   uint64 `serialize:"true" json:"height"`   // This block's height. The genesis block is at height 0.
+
+	self   Block // self is a reference to this block's implementing struct
+	id     ids.ID
+	bytes  []byte
+	status choices.Status
+	vm     *VM
 
 	// This block's children
 	children []Block
 }
 
-func (cb *CommonBlock) Verify() error {
-	if expectedHeight := cb.Parent().Height() + 1; expectedHeight != cb.Height() {
-		return fmt.Errorf("expected block to have height %d, but found %d", expectedHeight, cb.Height())
+func (b *CommonBlock) initialize(vm *VM, bytes []byte, status choices.Status, self Block) error {
+	b.self = self
+	b.id = hashing.ComputeHash256Array(bytes)
+	b.bytes = bytes
+	b.status = status
+	b.vm = vm
+	return nil
+}
+
+// ID returns the ID of this block
+func (b *CommonBlock) ID() ids.ID { return b.id }
+
+// Status returns the status of this block
+func (b *CommonBlock) Bytes() []byte { return b.bytes }
+
+// Status returns the status of this block
+func (b *CommonBlock) Status() choices.Status { return b.status }
+
+// ParentID returns [b]'s parent's ID
+func (b *CommonBlock) ParentID() ids.ID { return b.PrntID }
+
+// Height returns this block's height. The genesis block has height 0.
+func (b *CommonBlock) Height() uint64 { return b.Hght }
+
+// Parent returns [b]'s parent
+func (b *CommonBlock) Parent() snowman.Block {
+	parent, err := b.parent()
+	if err != nil {
+		return &missing.Block{BlkID: b.ParentID()}
+	}
+	return parent
+}
+
+// Parent returns [b]'s parent
+func (b *CommonBlock) parent() (Block, error) {
+	return b.vm.getBlock(b.ParentID())
+}
+
+func (b *CommonBlock) addChild(child Block) {
+	b.children = append(b.children, child)
+}
+
+func (b *CommonBlock) free() {
+	delete(b.vm.currentBlocks, b.ID())
+	b.children = nil
+}
+
+func (b *CommonBlock) conflicts(s ids.Set) (bool, error) {
+	if b.Status() == choices.Accepted {
+		return false, nil
+	}
+	parent, err := b.parent()
+	if err != nil {
+		return false, err
+	}
+	return parent.conflicts(s)
+}
+
+func (b *CommonBlock) Verify() error {
+	if b == nil {
+		return errBlockNil
+	}
+
+	parent, err := b.parent()
+	if err != nil {
+		return err
+	}
+	if expectedHeight := parent.Height() + 1; expectedHeight != b.Hght {
+		return fmt.Errorf(
+			"expected block to have height %d, but found %d",
+			expectedHeight,
+			b.Hght,
+		)
 	}
 	return nil
 }
 
-func (cb *CommonBlock) Reject() error {
-	defer cb.free() // remove this block from memory
-
-	if err := cb.Block.Reject(); err != nil {
-		return err
-	}
-	return cb.vm.internalState.Commit()
+func (b *CommonBlock) Reject() error {
+	b.status = choices.Rejected
+	b.vm.internalState.AddBlock(b.self)
+	return nil
 }
 
-func (cb *CommonBlock) free() {
-	delete(cb.vm.currentBlocks, cb.ID())
-	cb.children = nil
+func (b *CommonBlock) Accept() error {
+	b.status = choices.Accepted
+	b.vm.internalState.AddBlock(b.self)
+	b.vm.internalState.SetLastAccepted(b.ID())
+	return nil
 }
-
-func (cb *CommonBlock) conflicts(s ids.Set) bool {
-	if cb.Status() == choices.Accepted {
-		return false
-	}
-	return cb.parentBlock().conflicts(s)
-}
-
-func (cb *CommonBlock) Parent() snowman.Block {
-	parent := cb.parentBlock()
-	if parent != nil {
-		return parent
-	}
-	return &missing.Block{BlkID: cb.ParentID()}
-}
-
-func (cb *CommonBlock) parentBlock() Block {
-	// Get the parent from database
-	parentID := cb.ParentID()
-	parent, err := cb.vm.getBlock(parentID)
-	if err != nil {
-		return nil
-	}
-	return parent.(Block)
-}
-
-func (cb *CommonBlock) addChild(child Block) { cb.children = append(cb.children, child) }
 
 // CommonDecisionBlock contains the fields and methods common to all decision blocks
 type CommonDecisionBlock struct {
@@ -189,12 +244,6 @@ type CommonDecisionBlock struct {
 
 	// to be executed if this block is accepted
 	onAcceptFunc func() error
-}
-
-func (cdb *CommonDecisionBlock) initialize(vm *VM, bytes []byte) error {
-	cdb.vm = vm
-	cdb.Block.Initialize(bytes, vm.SnowmanVM)
-	return nil
 }
 
 func (cdb *CommonDecisionBlock) setBaseState() {
@@ -215,9 +264,9 @@ type SingleDecisionBlock struct {
 
 // Accept implements the snowman.Block interface
 func (sdb *SingleDecisionBlock) Accept() error {
-	sdb.VM.Ctx.Log.Verbo("accepting block with ID %s", sdb.ID())
+	sdb.vm.ctx.Log.Verbo("accepting block with ID %s", sdb.ID())
 
-	if err := sdb.CommonBlock.Accept(); err != nil {
+	if err := sdb.CommonDecisionBlock.Accept(); err != nil {
 		return fmt.Errorf("failed to accept CommonBlock: %w", err)
 	}
 
@@ -247,9 +296,14 @@ type DoubleDecisionBlock struct {
 
 // Accept implements the snowman.Block interface
 func (ddb *DoubleDecisionBlock) Accept() error {
-	ddb.VM.Ctx.Log.Verbo("Accepting block with ID %s", ddb.ID())
+	ddb.vm.ctx.Log.Verbo("Accepting block with ID %s", ddb.ID())
 
-	parent, ok := ddb.parentBlock().(*ProposalBlock)
+	parentIntf, err := ddb.parent()
+	if err != nil {
+		return err
+	}
+
+	parent, ok := parentIntf.(*ProposalBlock)
 	if !ok {
 		ddb.vm.ctx.Log.Error("double decision block should only follow a proposal block")
 		return errInvalidBlockType

@@ -10,12 +10,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -130,7 +127,7 @@ func (tx *UnsignedAddValidatorTx) Verify(
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	vm *VM,
-	parentState versionedState,
+	parentState mutableState,
 	stx *Tx,
 ) (
 	versionedState,
@@ -261,6 +258,7 @@ func (tx *UnsignedAddValidatorTx) InitiallyPrefersCommit(vm *VM) bool {
 	return tx.StartTime().After(vm.clock.Time())
 }
 
+/*
 // NewAddValidatorTx returns a new NewAddValidatorTx
 func (vm *VM) newAddValidatorTx(
 	stakeAmt, // Amount the delegator stakes
@@ -312,3 +310,4 @@ func (vm *VM) newAddValidatorTx(
 		vm.MinDelegationFee,
 	)
 }
+*/

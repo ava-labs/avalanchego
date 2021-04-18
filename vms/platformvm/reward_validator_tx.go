@@ -51,7 +51,7 @@ type UnsignedRewardValidatorTx struct {
 //   chain timestamp.
 func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 	vm *VM,
-	parentState versionedState,
+	parentState mutableState,
 	stx *Tx,
 ) (
 	versionedState,

@@ -11,10 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
@@ -86,7 +83,7 @@ func (tx *UnsignedImportTx) Verify(
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedImportTx) SemanticVerify(
 	vm *VM,
-	parentState versionedState,
+	parentState mutableState,
 	stx *Tx,
 ) (versionedState, TxError) {
 	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
@@ -164,6 +161,7 @@ func (tx *UnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 	return ctx.SharedMemory.Remove(tx.SourceChain, utxoIDs, batch)
 }
 
+/*
 // Create a new transaction
 func (vm *VM) newImportTx(
 	chainID ids.ID, // chain to import from
@@ -259,3 +257,4 @@ func (vm *VM) newImportTx(
 	}
 	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID)
 }
+*/

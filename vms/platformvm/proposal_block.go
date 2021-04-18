@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/components/core"
 )
 
 // ProposalBlock is a proposal to change the chain's state.
@@ -36,16 +35,23 @@ type ProposalBlock struct {
 
 // Accept implements the snowman.Block interface
 func (pb *ProposalBlock) Accept() error {
-	pb.vm.ctx.Log.Verbo("Accepting Proposal Block %s at height %d with parent %s", pb.ID(), pb.Height(), pb.ParentID())
-
-	pb.SetStatus(choices.Accepted)
-	pb.VM.LastAcceptedID = pb.ID()
+	pb.vm.ctx.Log.Verbo(
+		"Accepting Proposal Block %s at height %d with parent %s",
+		pb.ID(),
+		pb.Height(),
+		pb.ParentID(),
+	)
 	return nil
 }
 
 // Reject implements the snowman.Block interface
 func (pb *ProposalBlock) Reject() error {
-	pb.vm.ctx.Log.Verbo("Rejecting Proposal Block %s at height %d with parent %s", pb.ID(), pb.Height(), pb.ParentID())
+	pb.vm.ctx.Log.Verbo(
+		"Rejecting Proposal Block %s at height %d with parent %s",
+		pb.ID(),
+		pb.Height(),
+		pb.ParentID(),
+	)
 
 	if err := pb.vm.mempool.IssueTx(&pb.Tx); err != nil {
 		pb.vm.ctx.Log.Verbo("failed to reissue tx %q due to: %s", pb.Tx.ID(), err)
@@ -56,9 +62,10 @@ func (pb *ProposalBlock) Reject() error {
 // Initialize this block.
 // Sets [pb.vm] to [vm] and populates non-serialized fields
 // This method should be called when a block is unmarshaled from bytes
-func (pb *ProposalBlock) initialize(vm *VM, bytes []byte) error {
-	pb.vm = vm
-	pb.Block.Initialize(bytes, vm.SnowmanVM)
+func (pb *ProposalBlock) initialize(vm *VM, bytes []byte, status choices.Status, self Block) error {
+	if err := pb.CommonBlock.initialize(vm, bytes, status, self); err != nil {
+		return err
+	}
 
 	unsignedBytes, err := pb.vm.codec.Marshal(codecVersion, &pb.Tx.UnsignedTx)
 	if err != nil {
@@ -116,7 +123,10 @@ func (pb *ProposalBlock) Verify() error {
 		return errWrongTxType
 	}
 
-	parentIntf := pb.parentBlock()
+	parentIntf, parentErr := pb.parent()
+	if parentErr != nil {
+		return parentErr
+	}
 
 	// The parent of a proposal block (ie this block) must be a decision block
 	parent, ok := parentIntf.(decision)
@@ -176,29 +186,14 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 		)
 	}
 
-	fetchedCommit, getCommitErr := pb.vm.getBlock(commit.ID())
-	if getCommitErr == nil {
-		commit = fetchedCommit
-	} else {
-		commit.SetStatus(choices.Processing)
-		pb.vm.internalState.AddBlock(commit)
-	}
+	pb.vm.internalState.AddBlock(commit)
+	pb.vm.internalState.AddBlock(abort)
 
-	fetchedAbort, getAbortErr := pb.vm.getBlock(abort.ID())
-	if getAbortErr == nil {
-		abort = fetchedAbort
-	} else {
-		abort.SetStatus(choices.Processing)
-		pb.vm.internalState.AddBlock(abort)
-	}
-
-	if getCommitErr != nil || getAbortErr != nil {
-		if err := pb.vm.internalState.Commit(); err != nil {
-			return [2]snowman.Block{}, fmt.Errorf(
-				"failed to commit VM's database: %w",
-				err,
-			)
-		}
+	if err := pb.vm.internalState.Commit(); err != nil {
+		return [2]snowman.Block{}, fmt.Errorf(
+			"failed to commit VM's database: %w",
+			err,
+		)
 	}
 
 	tx, ok := pb.Tx.UnsignedTx.(UnsignedProposalTx)
@@ -218,8 +213,8 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx Tx) (*ProposalBlock, error) {
 	pb := &ProposalBlock{
 		CommonBlock: CommonBlock{
-			Block: core.NewBlock(parentID, height),
-			vm:    vm,
+			PrntID: parentID,
+			Hght:   height,
 		},
 		Tx: tx,
 	}
@@ -231,6 +226,5 @@ func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx Tx) (*Proposal
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}
-	pb.Initialize(bytes, vm.SnowmanVM)
-	return pb, nil
+	return pb, pb.initialize(vm, bytes, choices.Processing, pb)
 }

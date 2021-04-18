@@ -40,7 +40,7 @@ type UnsignedProposalTx interface {
 	UnsignedTx
 
 	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(vm *VM, state versionedState, stx *Tx) (
+	SemanticVerify(vm *VM, state mutableState, stx *Tx) (
 		onCommitState versionedState,
 		onAbortState versionedState,
 		onCommitFunc func() error,
@@ -57,7 +57,7 @@ type UnsignedAtomicTx interface {
 	// UTXOs this tx consumes
 	InputUTXOs() ids.Set
 	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(vm *VM, parentState versionedState, stx *Tx) (versionedState, TxError)
+	SemanticVerify(vm *VM, parentState mutableState, stx *Tx) (versionedState, TxError)
 
 	// Accept this transaction with the additionally provided state transitions.
 	Accept(ctx *snow.Context, batch database.Batch) error

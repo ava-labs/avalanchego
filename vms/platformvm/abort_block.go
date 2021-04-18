@@ -7,7 +7,11 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/components/core"
+	"github.com/ava-labs/avalanchego/snow/choices"
+)
+
+var (
+	_ Block = &Abort{}
 )
 
 // Abort being accepted results in the proposal of its parent (which must be a proposal block)
@@ -28,7 +32,13 @@ func (a *Abort) Verify() error {
 		}
 		return err
 	}
-	parent, ok := a.parentBlock().(*ProposalBlock)
+
+	parentIntf, err := a.parent()
+	if err != nil {
+		return err
+	}
+
+	parent, ok := parentIntf.(*ProposalBlock)
 	// Abort is a decision, so its parent must be a proposal
 	if !ok {
 		if err := a.Reject(); err != nil {
@@ -40,7 +50,7 @@ func (a *Abort) Verify() error {
 	a.onAcceptState, a.onAcceptFunc = parent.onAbort()
 
 	a.vm.currentBlocks[a.ID()] = a
-	a.parentBlock().addChild(a)
+	parentIntf.addChild(a)
 	return nil
 }
 
@@ -51,8 +61,8 @@ func (vm *VM) newAbortBlock(parentID ids.ID, height uint64) (*Abort, error) {
 		DoubleDecisionBlock: DoubleDecisionBlock{
 			CommonDecisionBlock: CommonDecisionBlock{
 				CommonBlock: CommonBlock{
-					Block: core.NewBlock(parentID, height),
-					vm:    vm,
+					PrntID: parentID,
+					Hght:   height,
 				},
 			},
 		},
@@ -65,7 +75,5 @@ func (vm *VM) newAbortBlock(parentID ids.ID, height uint64) (*Abort, error) {
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
-
-	abort.Block.Initialize(bytes, vm.SnowmanVM)
-	return abort, nil
+	return abort, abort.DoubleDecisionBlock.initialize(vm, bytes, choices.Processing, abort)
 }

@@ -4,19 +4,17 @@
 package platformvm
 
 import (
+	"container/heap"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -118,7 +116,7 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	vm *VM,
-	parentState versionedState,
+	parentState mutableState,
 	stx *Tx,
 ) (
 	versionedState,
@@ -278,6 +276,7 @@ func (tx *UnsignedAddDelegatorTx) InitiallyPrefersCommit(vm *VM) bool {
 	return tx.StartTime().After(vm.clock.Time())
 }
 
+/*
 // Creates a new transaction
 func (vm *VM) newAddDelegatorTx(
 	stakeAmt, // Amount the delegator stakes
@@ -325,6 +324,7 @@ func (vm *VM) newAddDelegatorTx(
 		vm.MaxStakeDuration,
 	)
 }
+*/
 
 func CanDelegate(
 	current, // sorted by next end time first
@@ -437,4 +437,20 @@ func CanDelegate(
 	}
 
 	return true, nil
+}
+
+type validatorHeap []*Validator
+
+func (h *validatorHeap) Len() int                 { return len(*h) }
+func (h *validatorHeap) Less(i, j int) bool       { return (*h)[i].EndTime().Before((*h)[j].EndTime()) }
+func (h *validatorHeap) Swap(i, j int)            { (*h)[i], (*h)[j] = (*h)[j], (*h)[i] }
+func (h *validatorHeap) Add(validator *Validator) { heap.Push(h, validator) }
+func (h *validatorHeap) Peek() *Validator         { return (*h)[0] }
+func (h *validatorHeap) Remove() *Validator       { return heap.Pop(h).(*Validator) }
+func (h *validatorHeap) Push(x interface{})       { *h = append(*h, x.(*Validator)) }
+func (h *validatorHeap) Pop() interface{} {
+	newLen := len(*h) - 1
+	val := (*h)[newLen]
+	*h = (*h)[:newLen]
+	return val
 }

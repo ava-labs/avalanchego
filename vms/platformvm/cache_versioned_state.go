@@ -194,7 +194,7 @@ func (vs *versionedStateImpl) AddChain(createChainTx *Tx) {
 	tx := createChainTx.UnsignedTx.(*UnsignedCreateChainTx)
 	if vs.addedChains == nil {
 		vs.addedChains = map[ids.ID][]*Tx{
-			tx.SubnetID: []*Tx{createChainTx},
+			tx.SubnetID: {createChainTx},
 		}
 	} else {
 		vs.addedChains[tx.SubnetID] = append(vs.addedChains[tx.SubnetID], createChainTx)

@@ -500,16 +500,15 @@ func (st *internalStateImpl) GetBlock(blockID ids.ID) (Block, error) {
 		return blk, nil
 	}
 	if blkIntf, cached := st.blockCache.Get(blockID); cached {
-		blk := blkIntf.(Block)
-		if blk == nil {
+		if blkIntf == nil {
 			return nil, database.ErrNotFound
 		}
-		return blk, nil
+		return blkIntf.(Block), nil
 	}
 
 	blkBytes, err := st.blockDB.Get(blockID[:])
 	if err == database.ErrNotFound {
-		st.blockCache.Put(blockID, (Block)(nil))
+		st.blockCache.Put(blockID, nil)
 		return nil, database.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -524,10 +523,9 @@ func (st *internalStateImpl) GetBlock(blockID ids.ID) (Block, error) {
 	if _, err := GenesisCodec.Unmarshal(blkStatus.Blk, &blk); err != nil {
 		return nil, err
 	}
-	if err := blk.initialize(st.vm, blkBytes); err != nil {
+	if err := blk.initialize(st.vm, blkBytes, blkStatus.Status, blk); err != nil {
 		return nil, err
 	}
-	blk.SetStatus(blkStatus.Status)
 
 	st.blockCache.Put(blockID, blk)
 	return blk, nil
@@ -831,7 +829,7 @@ func (st *internalStateImpl) writeTXs() error {
 
 		delete(st.addedTxs, txID)
 		st.txCache.Put(txID, txStatus)
-		if err := st.blockDB.Put(txID[:], txBytes); err != nil {
+		if err := st.txDB.Put(txID[:], txBytes); err != nil {
 			return err
 		}
 	}
@@ -999,6 +997,7 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 
 		st.uptimes[addValidatorTx.Validator.NodeID] = uptime
 	}
+
 	if err := validatorIt.Error(); err != nil {
 		return err
 	}
@@ -1265,7 +1264,7 @@ func (st *internalStateImpl) init(genesisBytes []byte) error {
 	if err != nil {
 		return err
 	}
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.status = choices.Accepted
 	st.AddBlock(genesisBlock)
 	st.SetLastAccepted(genesisBlock.ID())
 

@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/components/core"
+	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
 // StandardBlock being accepted results in the transactions contained in the
@@ -19,8 +19,8 @@ type StandardBlock struct {
 }
 
 // initialize this block
-func (sb *StandardBlock) initialize(vm *VM, bytes []byte) error {
-	if err := sb.SingleDecisionBlock.initialize(vm, bytes); err != nil {
+func (sb *StandardBlock) initialize(vm *VM, bytes []byte, status choices.Status, blk Block) error {
+	if err := sb.SingleDecisionBlock.initialize(vm, bytes, status, blk); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	for _, tx := range sb.Txs {
@@ -44,10 +44,13 @@ func (sb *StandardBlock) Verify() error {
 		return err
 	}
 
-	parentBlock := sb.parentBlock()
+	parentIntf, err := sb.parent()
+	if err != nil {
+		return err
+	}
 	// StandardBlock is not a modifier on a proposal block, so its parent must
 	// be a decision.
-	parent, ok := parentBlock.(decision)
+	parent, ok := parentIntf.(decision)
 	if !ok {
 		if err := sb.Reject(); err != nil {
 			sb.vm.ctx.Log.Error("failed to reject standard block %s due to %s", sb.ID(), err)
@@ -97,7 +100,7 @@ func (sb *StandardBlock) Verify() error {
 	}
 
 	sb.vm.currentBlocks[sb.ID()] = sb
-	sb.parentBlock().addChild(sb)
+	parentIntf.addChild(sb)
 	return nil
 }
 
@@ -120,8 +123,8 @@ func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*Tx) (*Stan
 		SingleDecisionBlock: SingleDecisionBlock{
 			CommonDecisionBlock: CommonDecisionBlock{
 				CommonBlock: CommonBlock{
-					Block: core.NewBlock(parentID, height),
-					vm:    vm,
+					PrntID: parentID,
+					Hght:   height,
 				},
 			},
 		},
@@ -135,6 +138,5 @@ func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*Tx) (*Stan
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}
-	sb.Block.Initialize(bytes, vm.SnowmanVM)
-	return sb, nil
+	return sb, sb.SingleDecisionBlock.initialize(vm, bytes, choices.Processing, sb)
 }

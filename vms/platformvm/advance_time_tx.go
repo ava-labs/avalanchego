@@ -36,7 +36,7 @@ func (tx *UnsignedAdvanceTimeTx) Timestamp() time.Time {
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	vm *VM,
-	parentState versionedState,
+	parentState mutableState,
 	stx *Tx,
 ) (
 	versionedState,
@@ -190,6 +190,8 @@ currentStakerLoop:
 	onCommitState.SetTimestamp(timestamp)
 	onCommitState.SetCurrentSupply(currentSupply)
 
+	onAbortState := NewVersionedState(parentState, currentStakers, pendingStakers)
+
 	// If this block is committed, update the validator sets.
 	// onCommitDB will be committed to vm.DB before this is called.
 	onCommitFunc := func() error {
@@ -199,7 +201,7 @@ currentStakerLoop:
 	}
 
 	// State doesn't change if this proposal is aborted
-	return onCommitState, parentState, onCommitFunc, nil, nil
+	return onCommitState, onAbortState, onCommitFunc, nil, nil
 }
 
 // InitiallyPrefersCommit returns true if the proposed time is at

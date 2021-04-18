@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -110,10 +109,8 @@ type VM struct {
 	mempool Mempool
 
 	// The context of this vm
-	ctx *snow.Context
-
+	ctx       *snow.Context
 	dbManager manager.Manager
-	db        database.Database
 
 	// channel to send messages to the consensus engine
 	toEngine chan<- common.Message
@@ -171,10 +168,12 @@ func (vm *VM) Initialize(
 
 	vm.fx = &secp256k1fx.Fx{}
 
+	vm.ctx = ctx
 	vm.dbManager = dbManager
 
 	vm.codec = Codec
 	vm.codecRegistry = linearcodec.NewDefault()
+
 	if err := vm.fx.Initialize(vm); err != nil {
 		return err
 	}
@@ -303,7 +302,7 @@ func (vm *VM) Bootstrapped() error {
 
 // Shutdown this blockchain
 func (vm *VM) Shutdown() error {
-	if vm.db == nil {
+	if vm.dbManager == nil {
 		return nil
 	}
 
@@ -346,7 +345,7 @@ func (vm *VM) ParseBlock(bytes []byte) (snowman.Block, error) {
 	if _, err := GenesisCodec.Unmarshal(bytes, &blk); err != nil {
 		return nil, err
 	}
-	if err := blk.initialize(vm, bytes); err != nil {
+	if err := blk.initialize(vm, bytes, choices.Processing, blk); err != nil {
 		return nil, err
 	}
 
@@ -356,7 +355,6 @@ func (vm *VM) ParseBlock(bytes []byte) (snowman.Block, error) {
 		return block, nil
 	}
 
-	blk.SetStatus(choices.Processing)
 	vm.internalState.AddBlock(blk)
 	return blk, vm.internalState.Commit()
 }
@@ -423,7 +421,7 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	}
 
 	return map[string]*common.HTTPHandler{
-		"": &common.HTTPHandler{
+		"": {
 			Handler: server,
 		},
 	}, nil
@@ -439,7 +437,7 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	}
 
 	return map[string]*common.HTTPHandler{
-		"": &common.HTTPHandler{
+		"": {
 			LockOptions: common.NoLock,
 			Handler:     server,
 		},
@@ -483,7 +481,7 @@ func (vm *VM) updateValidators(force bool) error {
 
 // Returns the time when the next staker of any subnet starts/stops staking
 // after the current timestamp
-func (vm *VM) nextStakerChangeTime(vs versionedState) (time.Time, error) {
+func (vm *VM) nextStakerChangeTime(vs mutableState) (time.Time, error) {
 	currentStakers := vs.CurrentStakerChainState()
 	pendingStakers := vs.PendingStakerChainState()
 

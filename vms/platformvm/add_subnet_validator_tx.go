@@ -12,8 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -88,7 +86,7 @@ func (tx *UnsignedAddSubnetValidatorTx) Verify(
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 	vm *VM,
-	parentState versionedState,
+	parentState mutableState,
 	stx *Tx,
 ) (
 	versionedState,
@@ -262,6 +260,7 @@ func (tx *UnsignedAddSubnetValidatorTx) InitiallyPrefersCommit(vm *VM) bool {
 	return tx.StartTime().After(vm.clock.Time())
 }
 
+/*
 // Create a new transaction
 func (vm *VM) newAddSubnetValidatorTx(
 	weight, // Sampling weight of the new validator
@@ -315,3 +314,4 @@ func (vm *VM) newAddSubnetValidatorTx(
 		vm.MaxStakeDuration,
 	)
 }
+*/
