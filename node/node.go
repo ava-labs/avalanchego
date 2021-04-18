@@ -11,10 +11,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"os"
 	"path/filepath"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api/admin"
@@ -128,9 +126,6 @@ type Node struct {
 
 	// This node's configuration
 	Config *Config
-
-	// channel for closing the node
-	nodeCloser chan<- os.Signal
 
 	// ensures that we only close the node once.
 	shutdownOnce sync.Once
@@ -271,11 +266,6 @@ func (n *Node) initNetworking() error {
 		n.benchlistManager,
 		n.Config.PeerAliasTimeout,
 	)
-
-	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
-		// errors are already logged internally if they are meaningful
-		n.Shutdown()
-	}, syscall.SIGINT, syscall.SIGTERM)
 
 	return nil
 }
@@ -1005,7 +995,6 @@ func (n *Node) shutdown() {
 	if err := n.indexer.Close(); err != nil {
 		n.Log.Debug("error closing tx indexer: %w", err)
 	}
-	utils.ClearSignals(n.nodeCloser)
 	n.doneShuttingDown.Done()
 	n.Log.Info("finished node shutdown")
 }

@@ -5,6 +5,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/ava-labs/avalanchego/utils"
+	"syscall"
 
 	"os"
 
@@ -42,6 +44,13 @@ func main() {
 
 	app := process.NewApp(c)
 	if c.PluginMode { // Defaults to run as an standalone
+
+		_ = utils.HandleSignals(
+			func(os.Signal) {
+			},
+			syscall.SIGINT, syscall.SIGTERM,
+		)
+
 		plugin.Serve(&plugin.ServeConfig{
 			HandshakeConfig: appPlugin.Handshake,
 			Plugins: map[string]plugin.Plugin{
@@ -55,5 +64,13 @@ func main() {
 		})
 		return
 	}
+
+	_ = utils.HandleSignals(
+		func(os.Signal) {
+			app.Stop()
+			os.Exit(exitCode)
+		},
+		syscall.SIGINT, syscall.SIGTERM,
+	)
 	exitCode = app.Start()
 }
