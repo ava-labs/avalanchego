@@ -10,7 +10,6 @@ AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Direct
 source $AVALANCHE_PATH/scripts/constants.sh
 
 rm -rf tmp
-mkdir tmp
 echo "Fetching AvalancheGo ${PREUPGRADE_AVALANCHEGO_VER}..."
 git clone -b $PREUPGRADE_AVALANCHEGO_VER --single-branch --quiet https://github.com/ava-labs/avalanchego-internal tmp
 cd tmp
