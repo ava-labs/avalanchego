@@ -9,7 +9,6 @@ import (
 	appplugin "github.com/ava-labs/avalanchego/app/plugin"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/hashicorp/go-hclog"
@@ -68,7 +67,6 @@ type nodeManager struct {
 	nodes         map[int]*nodeProcess
 	nextProcessID int
 	processLock   sync.Mutex
-	shuttingDown  utils.AtomicBool
 }
 
 func (nm *nodeManager) latestNodeVersionPath() string {
@@ -80,20 +78,29 @@ func (nm *nodeManager) preupgradeNodeVersionPath() string {
 }
 
 func (nm *nodeManager) shutdown() {
-	nm.shuttingDown.SetValue(true)
+	nm.processLock.Lock()
+	defer nm.processLock.Unlock()
+
 	for _, node := range nm.nodes {
-		nm.log.Info("Shutting down %v", node)
+		nm.log.Info("stopping process %v", node.processID)
 		if err := nm.stop(node.processID); err != nil {
 			nm.log.Error("error stopping node: %s", err)
 		}
+		nm.log.Info("done stopping process %v", node.processID)
 	}
 }
 
 // stop a node. Blocks until the node is done shutting down.
-func (nm *nodeManager) stop(processID int) error {
+// Assumes [nm.processLock] is not held
+func (nm *nodeManager) Stop(processID int) error {
 	nm.processLock.Lock()
 	defer nm.processLock.Unlock()
+	return nm.stop(processID)
+}
 
+// stop a node. Blocks until the node is done shutting down.
+// Assumes [nm.processLock] is held
+func (nm *nodeManager) stop(processID int) error {
 	nodeProcess, exists := nm.nodes[processID]
 	if !exists {
 		return nil
@@ -102,7 +109,6 @@ func (nm *nodeManager) stop(processID int) error {
 		return err
 	}
 	delete(nm.nodes, processID)
-	nm.log.Info("Stopping process %v", processID)
 	return nil
 }
 
@@ -118,21 +124,15 @@ func newNodeManager(path string, log logging.Logger) *nodeManager {
 // Return a wrapper around a node wunning the binary at [path] with args [args].
 // The returned nodeProcess must eventually have [nodeProcess.rawClient.Kill] called on it.
 func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (*nodeProcess, error) {
-	cmd := exec.Command(path, args...)
-	// ensures children run with a different process group and that they won't capture interrupt signals
-	//cmd.SysProcAttr = &syscall.SysProcAttr{
-	//	Setpgid: true,
-	//	Pgid:    0,
-	//}
 	clientConfig := &plugin.ClientConfig{
 		HandshakeConfig: appplugin.Handshake,
 		Plugins:         appplugin.PluginMap,
-		Cmd:             cmd,
+		Cmd:             exec.Command(path, args...),
 		AllowedProtocols: []plugin.Protocol{
 			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,
 		},
-		Logger: hclog.New(&hclog.LoggerOptions{Level: hclog.Error}),
+		Logger: hclog.New(&hclog.LoggerOptions{Level: hclog.Warn}),
 	}
 	if printToStdOut {
 		clientConfig.SyncStdout = os.Stdout

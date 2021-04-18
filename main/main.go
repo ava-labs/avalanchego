@@ -63,6 +63,7 @@ func main() {
 	migrationManager := newMigrationManager(nodeManager, v, nodeConfig, log)
 	if err := migrationManager.migrate(); err != nil {
 		log.Error("error while running migration: %s", err)
+		nodeManager.shutdown()
 		exitCode = 1
 		return
 	}

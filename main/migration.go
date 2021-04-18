@@ -84,7 +84,7 @@ func (m *migrationManager) runMigration() error {
 	m.log.Info("starting pre-database upgrade node")
 	preDBUpgradeNodeExitCodeChan := preDBUpgradeNode.start()
 	defer func() {
-		if err := m.binaryManager.stop(preDBUpgradeNode.processID); err != nil {
+		if err := m.binaryManager.Stop(preDBUpgradeNode.processID); err != nil {
 			m.log.Error(err.Error())
 		}
 	}()
@@ -100,10 +100,7 @@ func (m *migrationManager) runMigration() error {
 	}
 	latestVersionExitCodeChan := latestVersion.start()
 	defer func() {
-		if m.binaryManager.shuttingDown.GetValue() {
-			return
-		}
-		if err := m.binaryManager.stop(latestVersion.processID); err != nil {
+		if err := m.binaryManager.Stop(latestVersion.processID); err != nil {
 			m.log.Error("error while stopping latest version node: %s", err)
 		}
 	}()
@@ -112,14 +109,8 @@ func (m *migrationManager) runMigration() error {
 	// an exit code other than the one indicating it is done bootstrapping, error.
 	select {
 	case exitCode := <-preDBUpgradeNodeExitCodeChan:
-		if m.binaryManager.shuttingDown.GetValue() {
-			return fmt.Errorf("node shutting down")
-		}
 		return fmt.Errorf("previous version node stopped with exit code %d", exitCode)
 	case exitCode := <-latestVersionExitCodeChan:
-		if m.binaryManager.shuttingDown.GetValue() {
-			return fmt.Errorf("node shutting down")
-		}
 		if exitCode != constants.ExitCodeDoneMigrating {
 			return fmt.Errorf("latest version died with exit code %d", exitCode)
 		}
