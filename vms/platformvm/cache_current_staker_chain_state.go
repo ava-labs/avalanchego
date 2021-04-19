@@ -24,8 +24,9 @@ type currentStakerChainState interface {
 	GetValidator(nodeID ids.ShortID) (currentValidator, error)
 
 	UpdateStakers(
-		addStakerTxsWithRewards []*validatorReward,
-		addStakerTxsWithoutRewards []*Tx,
+		addValidators []*validatorReward,
+		addDelegators []*validatorReward,
+		addSubnetValidators []*Tx,
 		numTxsToRemove int,
 	) (currentStakerChainState, error)
 	DeleteNextStaker() (currentStakerChainState, error)
@@ -74,16 +75,17 @@ func (cs *currentStakerChainStateImpl) GetValidator(nodeID ids.ShortID) (current
 }
 
 func (cs *currentStakerChainStateImpl) UpdateStakers(
-	addStakerTxsWithRewards []*validatorReward,
-	addStakerTxsWithoutRewards []*Tx,
+	addValidatorTxs []*validatorReward,
+	addDelegatorTxs []*validatorReward,
+	addSubnetValidatorTxs []*Tx,
 	numTxsToRemove int,
 ) (currentStakerChainState, error) {
 	newCS := &currentStakerChainStateImpl{
-		validatorsByNodeID: make(map[ids.ShortID]*currentValidatorImpl, len(cs.validatorsByNodeID)),
-		validatorsByTxID:   make(map[ids.ID]*validatorReward, len(cs.validatorsByTxID)+len(addStakerTxsWithRewards)+len(addStakerTxsWithRewards)),
+		validatorsByNodeID: make(map[ids.ShortID]*currentValidatorImpl, len(cs.validatorsByNodeID)+len(addValidatorTxs)),
+		validatorsByTxID:   make(map[ids.ID]*validatorReward, len(cs.validatorsByTxID)+len(addValidatorTxs)+len(addDelegatorTxs)+len(addSubnetValidatorTxs)),
 		validators:         cs.validators[numTxsToRemove:], // sorted in order of removal
 
-		addedStakers:   addStakerTxsWithRewards,
+		addedStakers:   append(addValidatorTxs, addDelegatorTxs...),
 		deletedStakers: cs.validators[:numTxsToRemove],
 	}
 
@@ -95,27 +97,41 @@ func (cs *currentStakerChainStateImpl) UpdateStakers(
 		newCS.validatorsByTxID[txID] = vdr
 	}
 
-	if numAdded := len(addStakerTxsWithRewards) + len(addStakerTxsWithoutRewards); numAdded != 0 {
+	if numAdded := len(addValidatorTxs) + len(addDelegatorTxs) + len(addSubnetValidatorTxs); numAdded != 0 {
 		numCurrent := len(newCS.validators)
 		newSize := numCurrent + numAdded
 		newValidators := make([]*Tx, newSize)
 		copy(newValidators, newCS.validators)
-		copy(newValidators[numCurrent:], addStakerTxsWithoutRewards)
+		copy(newValidators[numCurrent:], addSubnetValidatorTxs)
 
-		numStart := numCurrent + len(addStakerTxsWithoutRewards)
-		for i := 0; i < len(addStakerTxsWithRewards); i++ {
-			newValidators[numStart+i] = addStakerTxsWithRewards[i].addStakerTx
+		numStart := numCurrent + len(addSubnetValidatorTxs)
+		for i, tx := range addValidatorTxs {
+			newValidators[numStart+i] = tx.addStakerTx
 		}
+
+		numStart = numCurrent + len(addSubnetValidatorTxs) + len(addValidatorTxs)
+		for i, tx := range addDelegatorTxs {
+			newValidators[numStart+i] = tx.addStakerTx
+		}
+
 		sortValidatorsByRemoval(newValidators)
 		newCS.validators = newValidators
 
-		for _, vdr := range addStakerTxsWithRewards {
+		for _, vdr := range addValidatorTxs {
 			switch tx := vdr.addStakerTx.UnsignedTx.(type) {
 			case *UnsignedAddValidatorTx:
 				newCS.validatorsByNodeID[tx.Validator.NodeID] = &currentValidatorImpl{
 					addValidatorTx:  tx,
 					potentialReward: vdr.potentialReward,
 				}
+				newCS.validatorsByTxID[vdr.addStakerTx.ID()] = vdr
+			default:
+				return nil, errWrongTxType
+			}
+		}
+
+		for _, vdr := range addDelegatorTxs {
+			switch tx := vdr.addStakerTx.UnsignedTx.(type) {
 			case *UnsignedAddDelegatorTx:
 				oldVdr := newCS.validatorsByNodeID[tx.Validator.NodeID]
 				newVdr := *oldVdr
@@ -125,12 +141,13 @@ func (cs *currentStakerChainStateImpl) UpdateStakers(
 				sortDelegatorsByRemoval(newVdr.delegators)
 				newVdr.delegatorWeight += tx.Validator.Wght
 				newCS.validatorsByNodeID[tx.Validator.NodeID] = &newVdr
+				newCS.validatorsByTxID[vdr.addStakerTx.ID()] = vdr
 			default:
 				return nil, errWrongTxType
 			}
-			newCS.validatorsByTxID[vdr.addStakerTx.ID()] = vdr
 		}
-		for _, vdr := range addStakerTxsWithoutRewards {
+
+		for _, vdr := range addSubnetValidatorTxs {
 			switch tx := vdr.UnsignedTx.(type) {
 			case *UnsignedAddSubnetValidatorTx:
 				oldVdr := newCS.validatorsByNodeID[tx.Validator.NodeID]
@@ -143,6 +160,7 @@ func (cs *currentStakerChainStateImpl) UpdateStakers(
 			default:
 				return nil, errWrongTxType
 			}
+
 			wrappedTx := &validatorReward{
 				addStakerTx: vdr,
 			}

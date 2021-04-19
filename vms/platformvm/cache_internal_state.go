@@ -48,19 +48,19 @@ var (
 )
 
 const (
-	blockCacheSize   = 2048
-	txCacheSize      = 2048
-	utxoCacheSize    = 2048
-	addressCacheSize = 2048
-	chainCacheSize   = 2048
-	chainDBCacheSize = 2048
-
 	// priority values are used as part of the keys in the pending/current
 	// validator state to ensure they are sorted in the order that they should
 	// be added/removed.
 	lowPriority byte = iota
 	mediumPriority
 	topPriority
+
+	blockCacheSize   = 2048
+	txCacheSize      = 2048
+	utxoCacheSize    = 2048
+	addressCacheSize = 2048
+	chainCacheSize   = 2048
+	chainDBCacheSize = 2048
 )
 
 type internalState interface {

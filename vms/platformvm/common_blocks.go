@@ -253,6 +253,11 @@ type CommonDecisionBlock struct {
 	onAcceptFunc func() error
 }
 
+func (cdb *CommonDecisionBlock) free() {
+	cdb.CommonBlock.free()
+	cdb.onAcceptState = nil
+}
+
 func (cdb *CommonDecisionBlock) setBaseState() {
 	cdb.onAcceptState.SetBase(cdb.vm.internalState)
 }
@@ -262,6 +267,14 @@ func (cdb *CommonDecisionBlock) onAccept() mutableState {
 		return cdb.vm.internalState
 	}
 	return cdb.onAcceptState
+}
+
+func (cdb *CommonDecisionBlock) Reject() error {
+	defer cdb.free()
+
+	cdb.status = choices.Rejected
+	cdb.vm.internalState.AddBlock(cdb.self)
+	return cdb.vm.internalState.Commit()
 }
 
 // SingleDecisionBlock contains the accept for standalone decision blocks

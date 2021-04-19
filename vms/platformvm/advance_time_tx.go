@@ -92,7 +92,8 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	currentSupply := parentState.GetCurrentSupply()
 
 	pendingStakers := parentState.PendingStakerChainState()
-	toAddWithRewardToCurrent := []*validatorReward(nil)
+	toAddValidatorsWithRewardToCurrent := []*validatorReward(nil)
+	toAddDelegatorsWithRewardToCurrent := []*validatorReward(nil)
 	toAddWithoutRewardToCurrent := []*Tx(nil)
 	numToRemoveFromPending := 0
 
@@ -115,7 +116,7 @@ pendingStakerLoop:
 				return nil, nil, nil, nil, permError{err}
 			}
 
-			toAddWithRewardToCurrent = append(toAddWithRewardToCurrent, &validatorReward{
+			toAddDelegatorsWithRewardToCurrent = append(toAddDelegatorsWithRewardToCurrent, &validatorReward{
 				addStakerTx:     tx,
 				potentialReward: reward,
 			})
@@ -136,7 +137,7 @@ pendingStakerLoop:
 				return nil, nil, nil, nil, permError{err}
 			}
 
-			toAddWithRewardToCurrent = append(toAddWithRewardToCurrent, &validatorReward{
+			toAddValidatorsWithRewardToCurrent = append(toAddValidatorsWithRewardToCurrent, &validatorReward{
 				addStakerTx:     tx,
 				potentialReward: reward,
 			})
@@ -178,7 +179,8 @@ currentStakerLoop:
 		}
 	}
 	newlyCurrentStakers, err := currentStakers.UpdateStakers(
-		toAddWithRewardToCurrent,
+		toAddValidatorsWithRewardToCurrent,
+		toAddDelegatorsWithRewardToCurrent,
 		toAddWithoutRewardToCurrent,
 		numToRemoveFromCurrent,
 	)

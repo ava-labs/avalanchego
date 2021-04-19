@@ -33,6 +33,12 @@ type ProposalBlock struct {
 	onAbortFunc func() error
 }
 
+func (pb *ProposalBlock) free() {
+	pb.CommonBlock.free()
+	pb.onCommitState = nil
+	pb.onAbortState = nil
+}
+
 // Accept implements the snowman.Block interface
 func (pb *ProposalBlock) Accept() error {
 	blkID := pb.ID()
@@ -56,6 +62,9 @@ func (pb *ProposalBlock) Reject() error {
 		pb.Height(),
 		pb.ParentID(),
 	)
+
+	pb.onCommitState = nil
+	pb.onAbortState = nil
 
 	if err := pb.vm.mempool.IssueTx(&pb.Tx); err != nil {
 		pb.vm.ctx.Log.Verbo("failed to reissue tx %q due to: %s", pb.Tx.ID(), err)

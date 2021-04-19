@@ -219,10 +219,10 @@ func (s innerSortValidatorsByAddition) Less(i, j int) bool {
 	switch tx := iDel.UnsignedTx.(type) {
 	case *UnsignedAddValidatorTx:
 		iStartTime = tx.StartTime()
-		iPriority = topPriority
+		iPriority = mediumPriority
 	case *UnsignedAddDelegatorTx:
 		iStartTime = tx.StartTime()
-		iPriority = mediumPriority
+		iPriority = topPriority
 	case *UnsignedAddSubnetValidatorTx:
 		iStartTime = tx.StartTime()
 		iPriority = lowPriority
@@ -237,10 +237,10 @@ func (s innerSortValidatorsByAddition) Less(i, j int) bool {
 	switch tx := jDel.UnsignedTx.(type) {
 	case *UnsignedAddValidatorTx:
 		jStartTime = tx.StartTime()
-		jPriority = topPriority
+		jPriority = mediumPriority
 	case *UnsignedAddDelegatorTx:
 		jStartTime = tx.StartTime()
-		jPriority = mediumPriority
+		jPriority = topPriority
 	case *UnsignedAddSubnetValidatorTx:
 		jStartTime = tx.StartTime()
 		jPriority = lowPriority
