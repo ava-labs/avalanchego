@@ -13,10 +13,19 @@ import (
 )
 
 type AddressManager interface {
+	// ParseLocalAddress takes in an address for this chain and produces the ID
 	ParseLocalAddress(addrStr string) (ids.ShortID, error)
+
+	// ParseAddress takes in an address and produces the ID of the chain it's
+	// for and the ID of the address
 	ParseAddress(addrStr string) (ids.ID, ids.ShortID, error)
 
+	// FormatLocalAddress takes in a raw address and produces the formatted
+	// address for this chain
 	FormatLocalAddress(addr ids.ShortID) (string, error)
+
+	// FormatAddress takes in a chainID and a raw address and produces the
+	// formatted address for that chain
 	FormatAddress(chainID ids.ID, addr ids.ShortID) (string, error)
 }
 
@@ -30,7 +39,6 @@ func NewAddressManager(ctx *snow.Context) AddressManager {
 	}
 }
 
-// ParseLocalAddress takes in an address for this chain and produces the ID
 func (a *addressManager) ParseLocalAddress(addrStr string) (ids.ShortID, error) {
 	chainID, addr, err := a.ParseAddress(addrStr)
 	if err != nil {
@@ -46,8 +54,6 @@ func (a *addressManager) ParseLocalAddress(addrStr string) (ids.ShortID, error) 
 	return addr, nil
 }
 
-// ParseAddress takes in an address and produces the ID of the chain it's for
-// the ID of the address
 func (a *addressManager) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
 	chainIDAlias, hrp, addrBytes, err := formatting.ParseAddress(addrStr)
 	if err != nil {
@@ -75,13 +81,10 @@ func (a *addressManager) ParseAddress(addrStr string) (ids.ID, ids.ShortID, erro
 	return chainID, addr, nil
 }
 
-// FormatLocalAddress takes in a raw address and produces the formatted address
 func (a *addressManager) FormatLocalAddress(addr ids.ShortID) (string, error) {
 	return a.FormatAddress(a.ctx.ChainID, addr)
 }
 
-// FormatAddress takes in a chainID and a raw address and produces the formatted
-// address
 func (a *addressManager) FormatAddress(chainID ids.ID, addr ids.ShortID) (string, error) {
 	chainIDAlias, err := a.ctx.BCLookup.PrimaryAlias(chainID)
 	if err != nil {
