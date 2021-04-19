@@ -89,7 +89,7 @@ func TestPushAndExecute(t *testing.T) {
 		return job, nil
 	}
 
-	count, err := jobs.ExecuteAll(snow.DefaultContextTest())
+	count, err := jobs.ExecuteAll(snow.DefaultContextTest(), false)
 	assert.NoError(err)
 	assert.Equal(1, count)
 
@@ -176,7 +176,7 @@ func TestRemoveDependency(t *testing.T) {
 		}
 	}
 
-	count, err := jobs.ExecuteAll(snow.DefaultContextTest())
+	count, err := jobs.ExecuteAll(snow.DefaultContextTest(), false)
 	assert.NoError(err)
 	assert.Equal(2, count)
 	assert.True(executed0)

@@ -86,7 +86,33 @@ func (j *Jobs) Push(job Job) (bool, error) {
 	return true, nil
 }
 
-func (j *Jobs) ExecuteAll(ctx *snow.Context, events ...snow.EventDispatcher) (int, error) {
+// AddMissingID adds [jobID] to missingIDs
+func (j *Jobs) AddMissingID(jobIDs ...ids.ID) {
+	for _, jobID := range jobIDs {
+		if !j.missingIDs.Contains(jobID) {
+			j.missingIDs.Add(jobID)
+			j.addToMissingIDs.Add(jobID)
+			j.removeFromMissingIDs.Remove(jobID)
+		}
+	}
+}
+
+// RemoveMissingID removes [jobID] from missingIDs
+func (j *Jobs) RemoveMissingID(jobIDs ...ids.ID) {
+	for _, jobID := range jobIDs {
+		if j.missingIDs.Contains(jobID) {
+			j.missingIDs.Remove(jobID)
+			j.addToMissingIDs.Remove(jobID)
+			j.removeFromMissingIDs.Add(jobID)
+		}
+	}
+}
+
+func (j *Jobs) MissingIDs() []ids.ID { return j.missingIDs.List() }
+
+func (j *Jobs) NumMissingIDs() int { return j.missingIDs.Len() }
+
+func (j *Jobs) ExecuteAll(ctx *snow.Context, restarted bool, events ...snow.EventDispatcher) (int, error) {
 	numExecuted := 0
 
 	// Disable and clear state caches since the hit rate will be near 0 during execution.
@@ -133,15 +159,32 @@ func (j *Jobs) ExecuteAll(ctx *snow.Context, events ...snow.EventDispatcher) (in
 
 		numExecuted++
 		if numExecuted%StatusUpdateFrequency == 0 { // Periodically print progress
-			ctx.Log.Info("executed %d operations", numExecuted)
+			if !restarted {
+				ctx.Log.Info("executed %d operations", numExecuted)
+			} else {
+				ctx.Log.Debug("executed %d operations", numExecuted)
+			}
 		}
 
+		// TODO putting this after commit could cause dropped events
+		// Ex. if a job is executed and accepted, committed to the database, and then
+		// the node dies, then since the event has been committed we will not execute
+		// it again and therefore the event will never be sent.
+		// We should be able to fix this at the risk of emitting duplicate events by
+		// sending Accept events before the job has been committed. Not sure which is
+		// better here.
 		for _, event := range events {
-			event.Accept(ctx, job.ID(), job.Bytes())
+			if err := event.Accept(ctx, job.ID(), job.Bytes()); err != nil {
+				return numExecuted, err
+			}
 		}
 	}
 
-	ctx.Log.Info("executed %d operations", numExecuted)
+	if !restarted {
+		ctx.Log.Info("executed %d operations", numExecuted)
+	} else {
+		ctx.Log.Debug("executed %d operations", numExecuted)
+	}
 	return numExecuted, nil
 }
 

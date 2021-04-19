@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -239,7 +239,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 
 func TestOptimisticUptime(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	db := memdb.New()
+	db := manager.NewDefaultMemDBManager()
 
 	firstVM := &VM{
 		SnowmanVM:          &core.SnowmanVM{},
@@ -254,7 +254,7 @@ func TestOptimisticUptime(t *testing.T) {
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
-	if err := firstVM.Initialize(firstCtx, db, genesisBytes, firstMsgChan, nil); err != nil {
+	if err := firstVM.Initialize(firstCtx, db, genesisBytes, nil, nil, firstMsgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -293,7 +293,7 @@ func TestOptimisticUptime(t *testing.T) {
 	}()
 
 	secondMsgChan := make(chan common.Message, 1)
-	if err := secondVM.Initialize(secondCtx, db, genesisBytes, secondMsgChan, nil); err != nil {
+	if err := secondVM.Initialize(secondCtx, db, genesisBytes, nil, nil, secondMsgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -382,7 +382,7 @@ func TestOptimisticUptime(t *testing.T) {
 
 func TestObservedUptime(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	db := memdb.New()
+	db := manager.NewDefaultMemDBManager()
 
 	firstVM := &VM{
 		SnowmanVM:          &core.SnowmanVM{},
@@ -397,7 +397,7 @@ func TestObservedUptime(t *testing.T) {
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
-	if err := firstVM.Initialize(firstCtx, db, genesisBytes, firstMsgChan, nil); err != nil {
+	if err := firstVM.Initialize(firstCtx, db, genesisBytes, nil, nil, firstMsgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -440,7 +440,7 @@ func TestObservedUptime(t *testing.T) {
 	}()
 
 	secondMsgChan := make(chan common.Message, 1)
-	if err := secondVM.Initialize(secondCtx, db, genesisBytes, secondMsgChan, nil); err != nil {
+	if err := secondVM.Initialize(secondCtx, db, genesisBytes, nil, nil, secondMsgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -529,7 +529,7 @@ func TestObservedUptime(t *testing.T) {
 
 func TestUptimeDisallowed(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	db := memdb.New()
+	db := manager.NewDefaultMemDBManager()
 
 	firstVM := &VM{
 		SnowmanVM:          &core.SnowmanVM{},
@@ -544,7 +544,7 @@ func TestUptimeDisallowed(t *testing.T) {
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
-	if err := firstVM.Initialize(firstCtx, db, genesisBytes, firstMsgChan, nil); err != nil {
+	if err := firstVM.Initialize(firstCtx, db, genesisBytes, nil, nil, firstMsgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -583,7 +583,7 @@ func TestUptimeDisallowed(t *testing.T) {
 	}()
 
 	secondMsgChan := make(chan common.Message, 1)
-	if err := secondVM.Initialize(secondCtx, db, genesisBytes, secondMsgChan, nil); err != nil {
+	if err := secondVM.Initialize(secondCtx, db, genesisBytes, nil, nil, secondMsgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 

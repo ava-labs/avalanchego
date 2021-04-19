@@ -44,6 +44,13 @@ type Bootstrapper struct {
 	common.Fetcher
 	metrics
 
+	// Greatest height of the blocks passed in ForceAccepted
+	tipHeight uint64
+	// Height of the last accepted block when bootstrapping starts
+	startingHeight uint64
+	// Blocks passed into ForceAccepted
+	startingAcceptedFrontier ids.Set
+
 	// Blocked tracks operations that are blocked on blocks
 	Blocked *queue.JobsWithMissing
 
@@ -72,6 +79,16 @@ func (b *Bootstrapper) Initialize(
 	b.OnFinished = onFinished
 	b.executedStateTransitions = math.MaxInt32
 	b.delayAmount = initialBootstrappingDelay
+	b.startingAcceptedFrontier = ids.Set{}
+	lastAcceptedID, err := b.VM.LastAccepted()
+	if err != nil {
+		return fmt.Errorf("couldn't get last accepted ID: %s", err)
+	}
+	lastAccepted, err := b.VM.GetBlock(lastAcceptedID)
+	if err != nil {
+		return fmt.Errorf("couldn't get last accepted block: %s", err)
+	}
+	b.startingHeight = lastAccepted.Height()
 
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return err
@@ -125,7 +142,11 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 
 	b.Ctx.Log.Debug("Starting bootstrapping with %d pending blocks and %d from accepted frontier", len(pendingContainerIDs), len(acceptedContainerIDs))
 	for _, blkID := range checkIDs {
+		b.startingAcceptedFrontier.Add(blkID)
 		if blk, err := b.VM.GetBlock(blkID); err == nil {
+			if height := blk.Height(); height > b.tipHeight {
+				b.tipHeight = height
+			}
 			if blk.Status() == choices.Accepted {
 				b.Blocked.RemoveMissingID(blkID)
 			} else {
@@ -235,6 +256,10 @@ func (b *Bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) err
 func (b *Bootstrapper) process(blk snowman.Block) error {
 	status := blk.Status()
 	blkID := blk.ID()
+	blkHeight := blk.Height()
+	if blkHeight > b.tipHeight && b.startingAcceptedFrontier.Contains(blkID) {
+		b.tipHeight = blkHeight
+	}
 	for status == choices.Processing {
 		b.Blocked.RemoveMissingID(blkID)
 
@@ -260,9 +285,13 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 		}
 
 		b.numFetched.Inc()
-		b.NumFetched++                                     // Progress tracker
-		if b.NumFetched%queue.StatusUpdateFrequency == 0 { // Periodically print progress
-			b.Ctx.Log.Info("fetched %d blocks", b.NumFetched)
+		b.NumFetched++                                      // Progress tracker
+		if b.NumFetched%common.StatusUpdateFrequency == 0 { // Periodically print progress
+			if !b.Restarted {
+				b.Ctx.Log.Info("fetched %d of %d blocks", b.NumFetched, b.tipHeight-b.startingHeight)
+			} else {
+				b.Ctx.Log.Debug("fetched %d of %d blocks", b.NumFetched, b.tipHeight-b.startingHeight)
+			}
 		}
 	}
 
@@ -292,10 +321,14 @@ func (b *Bootstrapper) checkFinish() error {
 	if b.IsBootstrapped() {
 		return nil
 	}
-	b.Ctx.Log.Info("bootstrapping fetched %d blocks. executing state transitions...",
-		b.NumFetched)
 
-	executedBlocks, err := b.Blocked.ExecuteAll(b.Ctx, b.Ctx.ConsensusDispatcher, b.Ctx.DecisionDispatcher)
+	if !b.Restarted {
+		b.Ctx.Log.Info("bootstrapping fetched %d blocks. Executing state transitions...", b.NumFetched)
+	} else {
+		b.Ctx.Log.Debug("bootstrapping fetched %d blocks. Executing state transitions...", b.NumFetched)
+	}
+
+	executedBlocks, err := b.Blocked.ExecuteAll(b.Ctx, b.Restarted, b.Ctx.ConsensusDispatcher, b.Ctx.DecisionDispatcher)
 	if err != nil {
 		return err
 	}
@@ -306,12 +339,8 @@ func (b *Bootstrapper) checkFinish() error {
 	// Note that executedVts < c*previouslyExecuted is enforced so that the
 	// bootstrapping process will terminate even as new blocks are being issued.
 	if executedBlocks > 0 && executedBlocks < previouslyExecuted/2 && b.RetryBootstrap {
-		b.Ctx.Log.Info("bootstrapping is checking for more blocks before finishing the bootstrap process...")
-
 		return b.RestartBootstrap(true)
 	}
-
-	b.Ctx.Log.Info("bootstrapping fetched enough blocks to finish the bootstrap process...")
 
 	// Notify the subnet that this chain is synced
 	b.Subnet.Bootstrapped(b.Ctx.ChainID)
@@ -325,7 +354,11 @@ func (b *Bootstrapper) checkFinish() error {
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
 	if !b.Subnet.IsBootstrapped() {
-		b.Ctx.Log.Info("bootstrapping is waiting for the remaining chains in this subnet to finish syncing...")
+		if !b.Restarted {
+			b.Ctx.Log.Info("waiting for the remaining chains in this subnet to finish syncing")
+		} else {
+			b.Ctx.Log.Debug("waiting for the remaining chains in this subnet to finish syncing")
+		}
 		// Delay new incoming messages to avoid consuming unnecessary resources
 		// while keeping up to date on the latest tip.
 		b.Config.Delay.Delay(b.delayAmount)

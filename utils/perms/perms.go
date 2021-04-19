@@ -5,6 +5,6 @@ package perms
 
 const (
 	ReadOnly         = 0400
-	ReadWrite        = 0600
-	ReadWriteExecute = 0700
+	ReadWrite        = 0640
+	ReadWriteExecute = 0750
 )
