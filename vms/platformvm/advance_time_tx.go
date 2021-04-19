@@ -54,12 +54,13 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	}
 
 	timestamp := tx.Timestamp()
-	if vm.clock.Time().Add(syncBound).Before(tx.Timestamp()) {
+	localTimestamp := vm.clock.Time()
+	if localTimestamp.Add(syncBound).Before(timestamp) {
 		return nil, nil, nil, nil, tempError{
 			fmt.Errorf(
 				"proposed time (%s) is too far in the future relative to local time (%s)",
-				tx.Timestamp(),
-				vm.clock.Time(),
+				timestamp,
+				localTimestamp,
 			),
 		}
 	}

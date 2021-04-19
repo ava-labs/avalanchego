@@ -406,9 +406,6 @@ func (st *internalStateImpl) getChainDB(subnetID ids.ID) linkeddb.LinkedDB {
 
 func (st *internalStateImpl) GetTx(txID ids.ID) (*Tx, Status, error) {
 	if tx, exists := st.addedTxs[txID]; exists {
-		if tx == nil {
-			return nil, Unknown, database.ErrNotFound
-		}
 		return tx.tx, tx.status, nil
 	}
 	if txIntf, cached := st.txCache.Get(txID); cached {
