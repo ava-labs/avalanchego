@@ -23,7 +23,6 @@ type StandardBlock struct {
 	Txs []*Tx `serialize:"true" json:"txs"`
 }
 
-// initialize this block
 func (sb *StandardBlock) initialize(vm *VM, bytes []byte, status choices.Status, blk Block) error {
 	if err := sb.SingleDecisionBlock.initialize(vm, bytes, status, blk); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
@@ -42,9 +41,15 @@ func (sb *StandardBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 //
 // This function also sets onAcceptDB database if the verification passes.
 func (sb *StandardBlock) Verify() error {
+	blkID := sb.ID()
+
 	if err := sb.SingleDecisionBlock.Verify(); err != nil {
 		if err := sb.Reject(); err != nil {
-			sb.vm.ctx.Log.Error("failed to reject standard block %s due to %s", sb.ID(), err)
+			sb.vm.ctx.Log.Error(
+				"failed to reject standard block %s due to %s",
+				blkID,
+				err,
+			)
 		}
 		return err
 	}
@@ -53,12 +58,17 @@ func (sb *StandardBlock) Verify() error {
 	if err != nil {
 		return err
 	}
+
 	// StandardBlock is not a modifier on a proposal block, so its parent must
 	// be a decision.
 	parent, ok := parentIntf.(decision)
 	if !ok {
 		if err := sb.Reject(); err != nil {
-			sb.vm.ctx.Log.Error("failed to reject standard block %s due to %s", sb.ID(), err)
+			sb.vm.ctx.Log.Error(
+				"failed to reject standard block %s due to %s",
+				blkID,
+				err,
+			)
 		}
 		return errInvalidBlockType
 	}
@@ -81,7 +91,11 @@ func (sb *StandardBlock) Verify() error {
 		if err != nil {
 			sb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
 			if err := sb.Reject(); err != nil {
-				sb.vm.ctx.Log.Error("failed to reject standard block %s due to %s", sb.ID(), err)
+				sb.vm.ctx.Log.Error(
+					"failed to reject standard block %s due to %s",
+					blkID,
+					err,
+				)
 			}
 			return err
 		}
@@ -104,18 +118,26 @@ func (sb *StandardBlock) Verify() error {
 		}
 	}
 
-	sb.vm.currentBlocks[sb.ID()] = sb
+	sb.vm.currentBlocks[blkID] = sb
 	parentIntf.addChild(sb)
 	return nil
 }
 
-// Reject implements the snowman.Block interface
 func (sb *StandardBlock) Reject() error {
-	sb.vm.ctx.Log.Verbo("Rejecting Standard Block %s at height %d with parent %s", sb.ID(), sb.Height(), sb.ParentID())
+	sb.vm.ctx.Log.Verbo(
+		"Rejecting Standard Block %s at height %d with parent %s",
+		sb.ID(),
+		sb.Height(),
+		sb.ParentID(),
+	)
 
 	for _, tx := range sb.Txs {
 		if err := sb.vm.mempool.IssueTx(tx); err != nil {
-			sb.vm.ctx.Log.Debug("failed to reissue tx %q due to: %s", tx.ID(), err)
+			sb.vm.ctx.Log.Debug(
+				"failed to reissue tx %q due to: %s",
+				tx.ID(),
+				err,
+			)
 		}
 	}
 	return sb.SingleDecisionBlock.Reject()
