@@ -16,10 +16,13 @@ var (
 )
 
 // ProposalBlock is a proposal to change the chain's state.
+//
 // A proposal may be to:
 // 	1. Advance the chain's timestamp (*AdvanceTimeTx)
 //  2. Remove a staker from the staker set (*RewardStakerTx)
-//  3. Add a new staker to the set of pending (future) stakers (*AddStakerTx)
+//  3. Add a new staker to the set of pending (future) stakers
+//     (*AddValidatorTx, *AddDelegatorTx, *AddSubnetValidatorTx)
+//
 // The proposal will be enacted (change the chain's state) if the proposal block
 // is accepted and followed by an accepted Commit block
 type ProposalBlock struct {
@@ -43,7 +46,6 @@ func (pb *ProposalBlock) free() {
 	pb.onAbortState = nil
 }
 
-// Accept implements the snowman.Block interface
 func (pb *ProposalBlock) Accept() error {
 	blkID := pb.ID()
 	pb.vm.ctx.Log.Verbo(
@@ -71,14 +73,15 @@ func (pb *ProposalBlock) Reject() error {
 	pb.onAbortState = nil
 
 	if err := pb.vm.mempool.IssueTx(&pb.Tx); err != nil {
-		pb.vm.ctx.Log.Verbo("failed to reissue tx %q due to: %s", pb.Tx.ID(), err)
+		pb.vm.ctx.Log.Verbo(
+			"failed to reissue tx %q due to: %s",
+			pb.Tx.ID(),
+			err,
+		)
 	}
 	return pb.CommonBlock.Reject()
 }
 
-// Initialize this block.
-// Sets [pb.vm] to [vm] and populates non-serialized fields
-// This method should be called when a block is unmarshaled from bytes
 func (pb *ProposalBlock) initialize(vm *VM, bytes []byte, status choices.Status, self Block) error {
 	if err := pb.CommonBlock.initialize(vm, bytes, status, self); err != nil {
 		return err
@@ -96,28 +99,31 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 	return nil
 }
 
-// setBaseDatabase sets this block's base state
 func (pb *ProposalBlock) setBaseState() {
 	pb.onCommitState.SetBase(pb.vm.internalState)
 	pb.onAbortState.SetBase(pb.vm.internalState)
 }
 
 // onCommit should only be called after Verify is called.
-// onCommit returns:
+//
+// returns:
 //   1. The state of the chain assuming this proposal is enacted. (That is, if
 //      this block is accepted and followed by an accepted Commit block.)
-//   2. A function be be executed when this block's proposal is committed. This
-//      function should not write to state.
+//   2. A function to be executed when this block's proposal is committed. This
+//      function should not write to state. This function should only be called
+//      after the state has been updated.
 func (pb *ProposalBlock) onCommit() (versionedState, func() error) {
 	return pb.onCommitState, pb.onCommitFunc
 }
 
 // onAbort should only be called after Verify is called.
-// onAbort returns:
+//
+// returns:
 //   1. The state of the chain assuming this proposal is not enacted. (That is,
 //      if this block is accepted and followed by an accepted Abort block.)
-//   2. A function be be executed when this block's proposal is aborted. This
-//      function should not write to state.
+//   2. A function to be executed when this block's proposal is aborted. This
+//      function should not write to state. This function should only be called
+//      after the state has been updated.
 func (pb *ProposalBlock) onAbort() (versionedState, func() error) {
 	return pb.onAbortState, pb.onAbortFunc
 }
@@ -128,9 +134,15 @@ func (pb *ProposalBlock) onAbort() (versionedState, func() error) {
 //
 // If this block is valid, this function also sets pas.onCommit and pas.onAbort.
 func (pb *ProposalBlock) Verify() error {
+	blkID := pb.ID()
+
 	if err := pb.CommonBlock.Verify(); err != nil {
 		if err := pb.Reject(); err != nil {
-			pb.vm.ctx.Log.Error("failed to reject proposal block %s due to %s", pb.ID(), err)
+			pb.vm.ctx.Log.Error(
+				"failed to reject proposal block %s due to %s",
+				blkID,
+				err,
+			)
 		}
 		return err
 	}
@@ -149,7 +161,11 @@ func (pb *ProposalBlock) Verify() error {
 	parent, ok := parentIntf.(decision)
 	if !ok {
 		if err := pb.Reject(); err != nil {
-			pb.vm.ctx.Log.Error("failed to reject proposal block %s due to %s", pb.ID(), err)
+			pb.vm.ctx.Log.Error(
+				"failed to reject proposal block %s due to %s",
+				blkID,
+				err,
+			)
 		}
 		return errInvalidBlockType
 	}
@@ -162,11 +178,16 @@ func (pb *ProposalBlock) Verify() error {
 	if err != nil {
 		txID := tx.ID()
 		pb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
-		// If this block's transaction proposes to advance the timestamp, the transaction may fail
-		// verification now but be valid in the future, so don't (permanently) mark the block as rejected.
+		// If this block's transaction proposes to advance the timestamp, the
+		// transaction may fail verification now but be valid in the future, so
+		// don't (permanently) mark the block as rejected.
 		if !err.Temporary() {
 			if err := pb.Reject(); err != nil {
-				pb.vm.ctx.Log.Error("failed to reject proposal block %s due to %s", pb.ID(), err)
+				pb.vm.ctx.Log.Error(
+					"failed to reject proposal block %s due to %s",
+					blkID,
+					err,
+				)
 			}
 		}
 		return err
@@ -174,7 +195,7 @@ func (pb *ProposalBlock) Verify() error {
 	pb.onCommitState.AddTx(&pb.Tx, Committed)
 	pb.onAbortState.AddTx(&pb.Tx, Aborted)
 
-	pb.vm.currentBlocks[pb.ID()] = pb
+	pb.vm.currentBlocks[blkID] = pb
 	parentIntf.addChild(pb)
 	return nil
 }
@@ -182,20 +203,20 @@ func (pb *ProposalBlock) Verify() error {
 // Options returns the possible children of this block in preferential order.
 func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	var (
-		blockID    = pb.ID()
+		blkID      = pb.ID()
 		nextHeight = pb.Height() + 1
 		commit     Block
 		abort      Block
 	)
 
-	commit, err := pb.vm.newCommitBlock(blockID, nextHeight)
+	commit, err := pb.vm.newCommitBlock(blkID, nextHeight)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create commit block: %w",
 			err,
 		)
 	}
-	abort, err = pb.vm.newAbortBlock(blockID, nextHeight)
+	abort, err = pb.vm.newAbortBlock(blkID, nextHeight)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create abort block: %w",
@@ -225,8 +246,10 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 }
 
 // newProposalBlock creates a new block that proposes to issue a transaction.
-// The parent of this block has ID [parentID]. The parent must be a decision block.
-// Returns nil if there's an error while creating this block
+//
+// The parent of this block has ID [parentID].
+//
+// The parent must be a decision block.
 func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx Tx) (*ProposalBlock, error) {
 	pb := &ProposalBlock{
 		CommonBlock: CommonBlock{

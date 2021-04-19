@@ -84,6 +84,8 @@ type Block interface {
 	// This method should be called when a block is unmarshaled from bytes.
 	// [vm] is the vm the block exists in
 	// [bytes] is the byte representation of this block
+	// [status] is the current status of this block
+	// [self] is the lowest implementing struct of this block
 	initialize(vm *VM, bytes []byte, status choices.Status, self Block) error
 
 	// returns true if this block or any processing ancestors consume any of the
