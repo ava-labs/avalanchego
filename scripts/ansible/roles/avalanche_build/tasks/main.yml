@@ -4,6 +4,7 @@
     dest: "{{ repo_folder }}"
     version: "{{ repo_branch }}"
     update: yes
+    force: yes
 
 - name: Build project
   # noqa 301
