@@ -29,13 +29,8 @@ package eth
 import (
 	"errors"
 	"math/big"
-	"os"
-	"os/user"
-	"path/filepath"
-	"runtime"
 	"time"
 
-	"github.com/ava-labs/coreth/consensus/ethash"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/eth/gasprice"
 	"github.com/ava-labs/coreth/miner"
@@ -63,16 +58,7 @@ var DefaultConfig = NewDefaultConfig()
 
 func NewDefaultConfig() Config {
 	return Config{
-		SyncMode: downloader.FastSync,
-		Ethash: ethash.Config{
-			CacheDir:         "ethash",
-			CachesInMem:      2,
-			CachesOnDisk:     3,
-			CachesLockMmap:   false,
-			DatasetsInMem:    1,
-			DatasetsOnDisk:   2,
-			DatasetsLockMmap: false,
-		},
+		SyncMode:                downloader.FastSync,
 		NetworkId:               1,
 		LightPeers:              100,
 		UltraLightFraction:      75,
@@ -97,26 +83,27 @@ func NewDefaultConfig() Config {
 	}
 }
 
-func init() {
-	home := os.Getenv("HOME")
-	if home == "" {
-		if user, err := user.Current(); err == nil {
-			home = user.HomeDir
-		}
-	}
-	if runtime.GOOS == "darwin" {
-		DefaultConfig.Ethash.DatasetDir = filepath.Join(home, "Library", "Ethash")
-	} else if runtime.GOOS == "windows" {
-		localappdata := os.Getenv("LOCALAPPDATA")
-		if localappdata != "" {
-			DefaultConfig.Ethash.DatasetDir = filepath.Join(localappdata, "Ethash")
-		} else {
-			DefaultConfig.Ethash.DatasetDir = filepath.Join(home, "AppData", "Local", "Ethash")
-		}
-	} else {
-		DefaultConfig.Ethash.DatasetDir = filepath.Join(home, ".ethash")
-	}
-}
+// Original Code:
+// func init() {
+// 	home := os.Getenv("HOME")
+// 	if home == "" {
+// 		if user, err := user.Current(); err == nil {
+// 			home = user.HomeDir
+// 		}
+// 	}
+// 	if runtime.GOOS == "darwin" {
+// 		DefaultConfig.Ethash.DatasetDir = filepath.Join(home, "Library", "Ethash")
+// 	} else if runtime.GOOS == "windows" {
+// 		localappdata := os.Getenv("LOCALAPPDATA")
+// 		if localappdata != "" {
+// 			DefaultConfig.Ethash.DatasetDir = filepath.Join(localappdata, "Ethash")
+// 		} else {
+// 			DefaultConfig.Ethash.DatasetDir = filepath.Join(home, "AppData", "Local", "Ethash")
+// 		}
+// 	} else {
+// 		DefaultConfig.Ethash.DatasetDir = filepath.Join(home, ".ethash")
+// 	}
+// }
 
 //go:generate gencodec -type Config -formats toml -out gen_config.go
 
@@ -169,8 +156,9 @@ type Config struct {
 	// Mining options
 	Miner miner.Config
 
-	// Ethash options
-	Ethash ethash.Config
+	// Original Code:
+	// // Ethash options
+	// Ethash ethash.Config
 
 	// Transaction pool options
 	TxPool core.TxPoolConfig
@@ -197,11 +185,12 @@ type Config struct {
 	// send-transction variants. The unit is ether.
 	RPCTxFeeCap float64 `toml:",omitempty"`
 
-	// Checkpoint is a hardcoded checkpoint which can be nil.
-	Checkpoint *params.TrustedCheckpoint `toml:",omitempty"`
+	// Original Code:
+	// // Checkpoint is a hardcoded checkpoint which can be nil.
+	// Checkpoint *params.TrustedCheckpoint `toml:",omitempty"`
 
-	// CheckpointOracle is the configuration for checkpoint oracle.
-	CheckpointOracle *params.CheckpointOracleConfig `toml:",omitempty"`
+	// // CheckpointOracle is the configuration for checkpoint oracle.
+	// CheckpointOracle *params.CheckpointOracleConfig `toml:",omitempty"`
 
 	// AllowUnfinalizedQueries allow unfinalized queries
 	AllowUnfinalizedQueries bool

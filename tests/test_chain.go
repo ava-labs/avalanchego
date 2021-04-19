@@ -63,7 +63,6 @@ func NewDefaultChain(t *testing.T) (*coreth.ETHChain, chan *types.Block, chan co
 		ConstantinopleBlock: big.NewInt(0),
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
-		Ethash:              nil,
 	}
 
 	config.Genesis = &core.Genesis{

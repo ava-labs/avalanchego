@@ -191,7 +191,6 @@ func TestChain(t *testing.T) {
 		ConstantinopleBlock: big.NewInt(0),
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
-		Ethash:              nil,
 	}
 
 	// configure the genesis block

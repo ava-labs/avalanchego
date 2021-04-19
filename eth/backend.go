@@ -159,7 +159,7 @@ func New(stack *node.Node, config *Config,
 	}
 	log.Info("Allocated trie memory caches", "clean", common.StorageSize(config.TrieCleanCache)*1024*1024, "dirty", common.StorageSize(config.TrieDirtyCache)*1024*1024)
 
-	chainConfig, _, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis)
+	chainConfig, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis)
 	if genesisErr != nil {
 		return nil, genesisErr
 	}
