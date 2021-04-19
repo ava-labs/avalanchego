@@ -424,7 +424,6 @@ func (vm *VM) NotifyBlockReady() {
 // CreateHandlers returns a map where:
 // * keys are API endpoint extensions
 // * values are API handlers
-// See API documentation for more information
 func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
@@ -440,7 +439,9 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	}, nil
 }
 
-// CreateStaticHandlers implements the snowman.ChainVM interface
+// CreateStaticHandlers returns a map where:
+// * keys are API endpoint extensions
+// * values are API handlers
 func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")

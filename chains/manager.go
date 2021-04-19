@@ -200,7 +200,7 @@ func (m *manager) CreateChain(chain ChainParameters) {
 // Create a chain, this is only called from the P-chain thread, except for
 // creating the P-chain.
 func (m *manager) ForceCreateChain(chainParams ChainParameters) {
-	if !m.WhitelistedSubnets.Contains(chainParams.SubnetID) {
+	if chainParams.SubnetID != constants.PrimaryNetworkID && !m.WhitelistedSubnets.Contains(chainParams.SubnetID) {
 		m.Log.Debug("Skipped creating non-whitelisted chain:\n"+
 			"    ID: %s\n"+
 			"    VMID:%s",

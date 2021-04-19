@@ -669,6 +669,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Chains:             n.chainManager,
 			Validators:         vdrs,
 			StakingEnabled:     n.Config.EnableStaking,
+			WhitelistedSubnets: n.Config.WhitelistedSubnets,
 			CreationTxFee:      n.Config.CreationTxFee,
 			TxFee:              n.Config.TxFee,
 			UptimePercentage:   n.Config.UptimeRequirement,
