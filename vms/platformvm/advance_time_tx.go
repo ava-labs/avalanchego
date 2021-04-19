@@ -49,7 +49,12 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	switch {
 	case tx == nil:
 		return nil, nil, nil, nil, tempError{errNilTx}
-	case vm.clock.Time().Add(syncBound).Before(tx.Timestamp()):
+	case len(stx.Creds) != 0:
+		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
+	}
+
+	timestamp := tx.Timestamp()
+	if vm.clock.Time().Add(syncBound).Before(tx.Timestamp()) {
 		return nil, nil, nil, nil, tempError{
 			fmt.Errorf(
 				"proposed time (%s) is too far in the future relative to local time (%s)",
@@ -57,16 +62,13 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 				vm.clock.Time(),
 			),
 		}
-	case len(stx.Creds) != 0:
-		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
 	}
 
-	currentTimestamp := parentState.GetTimestamp()
-	if tx.Time <= uint64(currentTimestamp.Unix()) {
+	if currentTimestamp := parentState.GetTimestamp(); !timestamp.After(currentTimestamp) {
 		return nil, nil, nil, nil, permError{
 			fmt.Errorf(
 				"proposed timestamp (%s), not after current timestamp (%s)",
-				tx.Timestamp(),
+				timestamp,
 				currentTimestamp,
 			),
 		}
@@ -78,7 +80,6 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 		return nil, nil, nil, nil, tempError{err}
 	}
 
-	timestamp := tx.Timestamp()
 	if timestamp.After(nextStakerRemovalTime) {
 		return nil, nil, nil, nil, permError{
 			fmt.Errorf(
