@@ -211,11 +211,6 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 
-		if err := blk.Verify(); err != nil {
-			m.ResetTimer()
-			return nil, err
-		}
-
 		m.vm.internalState.AddBlock(blk)
 		return blk, m.vm.internalState.Commit()
 	}
@@ -236,11 +231,6 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		}
 		blk, err := m.vm.newProposalBlock(preferredID, nextHeight, *advanceTimeTx)
 		if err != nil {
-			return nil, err
-		}
-
-		if err := blk.Verify(); err != nil {
-			m.ResetTimer()
 			return nil, err
 		}
 
@@ -289,11 +279,6 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 			}
 			blk, err := m.vm.newProposalBlock(preferredID, nextHeight, *advanceTimeTx)
 			if err != nil {
-				return nil, err
-			}
-
-			if err := blk.Verify(); err != nil {
-				m.ResetTimer()
 				return nil, err
 			}
 

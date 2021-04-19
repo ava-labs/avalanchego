@@ -64,7 +64,7 @@ func (ab *AtomicBlock) conflicts(s ids.Set) (bool, error) {
 
 // Verify this block performs a valid state transition.
 //
-// The parent block must be a proposal
+// The parent block must be a decision block
 //
 // This function also sets onAcceptDB database if the verification passes.
 func (ab *AtomicBlock) Verify() error {

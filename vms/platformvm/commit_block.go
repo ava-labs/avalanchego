@@ -23,9 +23,9 @@ type Commit struct {
 
 // Verify this block performs a valid state transition.
 //
-// The parent block must either be a proposal
+// The parent block must be a proposal
 //
-// This function also sets the onCommit databases if the verification passes.
+// This function also sets onAcceptState if the verification passes.
 func (c *Commit) Verify() error {
 	blkID := c.ID()
 

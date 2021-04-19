@@ -25,7 +25,7 @@ type Abort struct {
 //
 // The parent block must be a proposal
 //
-// This function also sets onAcceptDB database if the verification passes.
+// This function also sets onAcceptState if the verification passes.
 func (a *Abort) Verify() error {
 	blkID := a.ID()
 

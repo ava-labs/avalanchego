@@ -168,13 +168,11 @@ func (b *CommonBlock) Height() uint64 { return b.Hght }
 
 // Parent returns [b]'s parent
 func (b *CommonBlock) Parent() snowman.Block {
-	parent, err := b.parent()
-	if err != nil {
-		return &missing.Block{
-			BlkID: b.ParentID(),
-		}
+	// TODO: This should properly propegate the error.
+	if parent, err := b.parent(); err == nil {
+		return parent
 	}
-	return parent
+	return &missing.Block{BlkID: b.ParentID()}
 }
 
 // Parent returns [b]'s parent
