@@ -327,36 +327,44 @@ func (vm *VM) newAddDelegatorTx(
 }
 */
 
+// CanDelegate returns if the [new] delegator can be added to a validator who
+// has [current] and [pending] delegators. [currentStake] is the current amount
+// of stake on the validator, include the [current] delegators. [maximumStake]
+// is the maximum amount of stake that can be on the validator at any given
+// time. It is assumed that the validator without adding [new] does not violate
+// [maximumStake]. It is assumed that [pending]
 func CanDelegate(
-	current, // sorted by next end time first
+	current,
 	pending []*UnsignedAddDelegatorTx, // sorted by next start time first
 	new *UnsignedAddDelegatorTx,
 	currentStake,
 	maximumStake uint64,
 ) (bool, error) {
-	// For completeness
-	if currentStake > maximumStake {
-		return false, nil
-	}
-
+	// Keep track of which delegators should be removed next so that we can
+	// efficiently remove delegators and keep the current stake updated.
 	toRemoveHeap := validatorHeap{}
 	for _, currentDelegator := range current {
 		toRemoveHeap.Add(&currentDelegator.Validator)
 	}
 
-	var err error
+	var (
+		err       error
+		i         = 0 // last processed pending delegator
+		startTime = new.StartTime()
+	)
 
-	i := 0
-	for ; i < len(pending); i++ { // Iterates in order of increasing start time
+	// Iterate through time until the new delegator should be added.
+	for ; i < len(pending); i++ {
 		nextPending := pending[i]
+		nextPendingStartTime := nextPending.StartTime()
 
 		// If the new delegator is starting before or at the same time as this
 		// delegator, then we should add the new delegators stake now.
-		if !new.StartTime().After(nextPending.StartTime()) {
+		if !startTime.After(nextPendingStartTime) {
 			break
 		}
 
-		for len(toRemoveHeap) > 0 && !toRemoveHeap.Peek().EndTime().After(nextPending.StartTime()) {
+		for len(toRemoveHeap) > 0 && !toRemoveHeap.Peek().EndTime().After(nextPendingStartTime) {
 			// TODO: in a future network upgrade, this should be changed to:
 			// toRemove := toRemoveHeap.Remove()
 			// So that we don't mangle the underlying heap.
@@ -379,7 +387,7 @@ func CanDelegate(
 		toRemoveHeap.Add(&nextPending.Validator)
 	}
 
-	for len(toRemoveHeap) > 0 && !toRemoveHeap.Peek().EndTime().After(new.StartTime()) {
+	for len(toRemoveHeap) > 0 && !toRemoveHeap.Peek().EndTime().After(startTime) {
 		// TODO: in a future network upgrade, this should be changed to:
 		// toRemove := toRemoveHeap.Remove()
 		// So that we don't mangle the underlying heap.
@@ -401,16 +409,20 @@ func CanDelegate(
 		return false, nil
 	}
 
+	endTime := new.EndTime()
+
+	// Iterate through time until the new delegator should be removed.
 	for ; i < len(pending); i++ { // Iterates in order of increasing start time
 		nextPending := pending[i]
+		nextPendingStartTime := nextPending.StartTime()
 
 		// If the new delegator is starting after this delegator, then we don't
 		// need to check that the maximum is honored past this point.
-		if nextPending.StartTime().After(new.Validator.EndTime()) {
+		if nextPendingStartTime.After(endTime) {
 			break
 		}
 
-		for len(toRemoveHeap) > 0 && !toRemoveHeap.Peek().EndTime().After(nextPending.StartTime()) {
+		for len(toRemoveHeap) > 0 && !toRemoveHeap.Peek().EndTime().After(nextPendingStartTime) {
 			// TODO: in a future network upgrade, this should be changed to:
 			// toRemove := toRemoveHeap.Remove()
 			// So that we don't mangle the underlying heap.
