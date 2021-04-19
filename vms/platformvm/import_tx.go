@@ -118,7 +118,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 			utxo := &avax.UTXO{}
 			if _, err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
 				return nil, tempError{
-					fmt.Errorf("failed to get unmarshal UTXO: %w", err),
+					fmt.Errorf("failed to unmarshal UTXO: %w", err),
 				}
 			}
 			utxos[i+len(tx.Ins)] = utxo

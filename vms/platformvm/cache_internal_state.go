@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -65,7 +66,7 @@ const (
 
 type internalState interface {
 	mutableState
-	UptimeState
+	uptime.State
 
 	AddCurrentStaker(tx *Tx, potentialReward uint64)
 	DeleteCurrentStaker(tx *Tx)

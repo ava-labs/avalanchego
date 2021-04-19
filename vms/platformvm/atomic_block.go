@@ -122,7 +122,6 @@ func (ab *AtomicBlock) Verify() error {
 	return nil
 }
 
-// Accept implements the snowman.Block interface
 func (ab *AtomicBlock) Accept() error {
 	blkID := ab.ID()
 	ab.vm.ctx.Log.Verbo(
@@ -179,7 +178,6 @@ func (ab *AtomicBlock) Accept() error {
 	return nil
 }
 
-// Reject implements the snowman.Block interface
 func (ab *AtomicBlock) Reject() error {
 	ab.vm.ctx.Log.Verbo(
 		"Rejecting Atomic Block %s at height %d with parent %s",

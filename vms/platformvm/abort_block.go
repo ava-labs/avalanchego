@@ -15,8 +15,8 @@ var (
 	_ decision = &Abort{}
 )
 
-// Abort being accepted results in the proposal of its parent (which must be a proposal block)
-// being rejected.
+// Abort being accepted results in the proposal of its parent (which must be a
+// proposal block) being rejected.
 type Abort struct {
 	DoubleDecisionBlock `serialize:"true"`
 }
