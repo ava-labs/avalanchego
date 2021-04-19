@@ -5,17 +5,15 @@ package main
 
 import (
 	"fmt"
-	"github.com/ava-labs/avalanchego/utils"
+	"os"
 	"syscall"
 
-	"os"
-
+	appPlugin "github.com/ava-labs/avalanchego/main/plugin"
 	"github.com/ava-labs/avalanchego/main/process"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
-
-	appPlugin "github.com/ava-labs/avalanchego/main/plugin"
-	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
 var (
