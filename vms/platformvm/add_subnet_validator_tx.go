@@ -148,7 +148,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 		}
 
 		// Ensure that the period this validator validates the specified subnet
-		// is a subnet of the time they validate the primary network.
+		// is a subset of the time they validate the primary network.
 		if err == nil {
 			vdrTx := currentValidator.AddValidatorTx()
 			if !tx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
