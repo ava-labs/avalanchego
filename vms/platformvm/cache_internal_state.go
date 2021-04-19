@@ -412,15 +412,15 @@ func (st *internalStateImpl) GetTx(txID ids.ID) (*Tx, Status, error) {
 		return tx.tx, tx.status, nil
 	}
 	if txIntf, cached := st.txCache.Get(txID); cached {
-		tx := txIntf.(*txStatusImpl)
-		if tx == nil {
+		if txIntf == nil {
 			return nil, Unknown, database.ErrNotFound
 		}
+		tx := txIntf.(*txStatusImpl)
 		return tx.tx, tx.status, nil
 	}
 	txBytes, err := st.txDB.Get(txID[:])
 	if err == database.ErrNotFound {
-		st.txCache.Put(txID, (*txStatusImpl)(nil))
+		st.txCache.Put(txID, nil)
 		return nil, Unknown, database.ErrNotFound
 	} else if err != nil {
 		return nil, Unknown, err
@@ -467,15 +467,14 @@ func (st *internalStateImpl) getUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 		return utxo, nil
 	}
 	if utxoIntf, cached := st.utxoCache.Get(utxoID); cached {
-		utxo := utxoIntf.(*avax.UTXO)
-		if utxo == nil {
+		if utxoIntf == nil {
 			return nil, database.ErrNotFound
 		}
-		return utxo, nil
+		return utxoIntf.(*avax.UTXO), nil
 	}
 	utxoBytes, err := st.utxoDB.Get(utxoID[:])
 	if err == database.ErrNotFound {
-		st.utxoCache.Put(utxoID, (*avax.UTXO)(nil))
+		st.utxoCache.Put(utxoID, nil)
 		return nil, database.ErrNotFound
 	} else if err != nil {
 		return nil, err
