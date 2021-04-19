@@ -4,7 +4,7 @@
 package config
 
 const (
-	defaultString                           = "default"
+	DefaultString                           = "default"
 	FetchOnlyKey                            = "fetch-only"
 	configFileKey                           = "config-file"
 	versionKey                              = "version"

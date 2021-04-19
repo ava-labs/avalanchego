@@ -227,8 +227,10 @@ func (nm *nodeManager) runNormal(v *viper.Viper) (int, error) {
 
 func formatArgs(k string, v interface{}) string {
 	if k == config.CorethConfigKey {
-		s, _ := json.MarshalIndent(v, "", "\t")
-		v = string(s)
+		if val, ok := v.(string); ok && val != config.DefaultString {
+			s, _ := json.Marshal(v)
+			v = string(s)
+		}
 	}
 	return fmt.Sprintf("--%s=%v", k, v)
 }

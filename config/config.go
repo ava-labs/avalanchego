@@ -91,11 +91,11 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Uint64(fdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
 
 	// config
-	fs.String(configFileKey, defaultString, "Specifies a config file")
+	fs.String(configFileKey, DefaultString, "Specifies a config file")
 	// Genesis config File
 	fs.String(genesisConfigFileKey, "", "Specifies a genesis config file (ignored when running standard networks)")
 	// Plugins
-	fs.String(PluginDirKey, defaultString, "Plugin directory for Avalanche VMs")
+	fs.String(PluginDirKey, DefaultString, "Plugin directory for Avalanche VMs")
 	// Network ID
 	fs.String(networkNameKey, defaultNetworkName, "Network ID this node will connect to")
 	// AVAX fees
@@ -105,7 +105,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(dbEnabledKey, true, "Turn on persistent storage")
 	fs.String(dbPathKey, defaultDbDir, "Path to database directory")
 	// Coreth config
-	fs.String(CorethConfigKey, defaultString, "Specifies config to pass into coreth")
+	fs.String(CorethConfigKey, DefaultString, "Specifies config to pass into coreth")
 	// Logging
 	fs.String(logsDirKey, "", "Logging directory for Avalanche")
 	fs.String(logLevelKey, "info", "The log level. Should be one of {verbo, debug, info, warn, error, fatal, off}")
@@ -191,8 +191,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Uint(StakingPortKey, 9651, "Port of the consensus server")
 	fs.Bool(stakingEnabledKey, true, "Enable staking. If enabled, Network TLS is required.")
 	fs.Bool(p2pTLSEnabledKey, true, "Require TLS to authenticate network communication")
-	fs.String(stakingKeyPathKey, defaultString, "Path to the TLS private key for staking")
-	fs.String(stakingCertPathKey, defaultString, "Path to the TLS certificate for staking")
+	fs.String(stakingKeyPathKey, DefaultString, "Path to the TLS private key for staking")
+	fs.String(stakingCertPathKey, DefaultString, "Path to the TLS certificate for staking")
 	fs.Uint64(stakingDisabledWeightKey, 1, "Weight to provide to each peer when staking is disabled")
 	// Uptime Requirement
 	fs.Float64(uptimeRequirementKey, .6, "Fraction of time a validator must be online to receive rewards")
@@ -212,8 +212,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Subnets
 	fs.String(whitelistedSubnetsKey, "", "Whitelist of subnets to validate.")
 	// Bootstrapping
-	fs.String(BootstrapIPsKey, defaultString, "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
-	fs.String(BootstrapIDsKey, defaultString, "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	fs.String(BootstrapIPsKey, DefaultString, "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
+	fs.String(BootstrapIDsKey, DefaultString, "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 	fs.Bool(retryBootstrap, true, "Specifies whether bootstrap should be retried")
 	fs.Int(retryBootstrapMaxAttempts, 50, "Specifies how many times bootstrap should be retried")
 
@@ -233,7 +233,7 @@ func avalancheFlagSet() *flag.FlagSet {
 
 	// IPC
 	fs.String(ipcsChainIDsKey, "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
-	fs.String(ipcsPathKey, defaultString, "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
+	fs.String(ipcsPathKey, DefaultString, "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
 
 	// Indexer
 	fs.Bool(indexEnabledKey, false, "If true, index all accepted containers and transactions and expose them via an API")
@@ -254,7 +254,7 @@ func getViper() (*viper.Viper, error) {
 	if err := v.BindPFlags(pflag.CommandLine); err != nil {
 		return nil, err
 	}
-	if configFile := v.GetString(configFileKey); configFile != defaultString {
+	if configFile := v.GetString(configFileKey); configFile != DefaultString {
 		v.SetConfigFile(configFile)
 		if err := v.ReadInConfig(); err != nil {
 			return nil, err
@@ -324,7 +324,7 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 	// DB:
 	config.DBEnabled = v.GetBool(dbEnabledKey)
 	config.DBPath = os.ExpandEnv(v.GetString(dbPathKey))
-	if config.DBPath == defaultString {
+	if config.DBPath == DefaultString {
 		config.DBPath = defaultDbDir
 	}
 	config.DBPath = path.Join(config.DBPath, constants.NetworkName(config.NetworkID))
@@ -394,13 +394,13 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 	}
 
 	stakingKeyPath := v.GetString(stakingKeyPathKey)
-	if stakingKeyPath == defaultString {
+	if stakingKeyPath == DefaultString {
 		config.StakingKeyFile = defaultStakingKeyPath
 	} else {
 		config.StakingKeyFile = stakingKeyPath
 	}
 	stakingCertPath := v.GetString(stakingCertPathKey)
-	if stakingCertPath == defaultString {
+	if stakingCertPath == DefaultString {
 		config.StakingCertFile = defaultStakingCertPath
 	} else {
 		config.StakingCertFile = stakingCertPath
@@ -497,7 +497,7 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 	//   |_plugins
 	//     |_evm
 	buildDir := v.GetString(buildDirKey)
-	if buildDir == defaultString {
+	if buildDir == DefaultString {
 		config.BuildDir = defaultBuildDirs[0]
 	} else {
 		config.BuildDir = buildDir
@@ -532,7 +532,7 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 
 	// Plugin directory. Defaults to [buildDirectory]/plugins
 	pluginDir := v.GetString(PluginDirKey)
-	if pluginDir == defaultString {
+	if pluginDir == DefaultString {
 		config.PluginDir = filepath.Join(config.BuildDir, avalanchegoLatest, "plugins")
 	} else {
 		config.PluginDir = pluginDir
@@ -608,7 +608,7 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 	}
 
 	ipcsPath := v.GetString(ipcsPathKey)
-	if ipcsPath == defaultString {
+	if ipcsPath == DefaultString {
 		config.IPCPath = ipcs.DefaultBaseURL
 	} else {
 		config.IPCPath = ipcsPath
@@ -741,7 +741,7 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 
 	// Coreth Plugin
 	corethConfigString := v.GetString(CorethConfigKey)
-	if corethConfigString != defaultString {
+	if corethConfigString != DefaultString {
 		corethConfigValue := v.Get(CorethConfigKey)
 		switch value := corethConfigValue.(type) {
 		case string:
@@ -778,10 +778,10 @@ func initBootstrapPeers(v *viper.Viper, config *node.Config) error {
 	bootstrapIDs := v.GetString(BootstrapIDsKey)
 
 	defaultBootstrapIPs, defaultBootstrapIDs := genesis.SampleBeacons(config.NetworkID, 5)
-	if bootstrapIPs == defaultString { // If no IPs specified, use default bootstrap node IPs
+	if bootstrapIPs == DefaultString { // If no IPs specified, use default bootstrap node IPs
 		bootstrapIPs = strings.Join(defaultBootstrapIPs, ",")
 	}
-	if bootstrapIDs == defaultString { // If no node IDs given, use node IDs of nodes in [bootstrapIPs]
+	if bootstrapIDs == DefaultString { // If no node IDs given, use node IDs of nodes in [bootstrapIPs]
 		if bootstrapIPs == "" { // If user specified no bootstrap IPs, default to no bootstrap IDs either
 			bootstrapIDs = ""
 		} else {
