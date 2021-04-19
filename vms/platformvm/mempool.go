@@ -166,6 +166,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		m.unissuedTxIDs.Remove(tx.ID())
 		blk, err := m.vm.newAtomicBlock(preferredID, nextHeight, *tx)
 		if err != nil {
+			m.ResetTimer()
 			return nil, err
 		}
 
@@ -291,6 +292,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		m.unissuedTxIDs.Remove(txID)
 		blk, err := m.vm.newProposalBlock(preferredID, nextHeight, *tx)
 		if err != nil {
+			m.ResetTimer()
 			return nil, err
 		}
 
