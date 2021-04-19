@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -177,7 +178,7 @@ func (nm *nodeManager) preDBUpgradeNode(v *viper.Viper) (*nodeProcess, error) {
 	argsMap[config.PluginDirKey] = fmt.Sprintf("%s/avalanchego-preupgrade/plugins", nm.buildDirPath)
 	args := []string{}
 	for k, v := range argsMap { // Pass args to subprocess
-		args = append(args, fmt.Sprintf("--%s=%v", k, v))
+		args = append(args, formatArgs(k, v))
 	}
 	binaryPath := nm.preupgradeNodeVersionPath()
 	return nm.newNode(binaryPath, args, true)
@@ -198,7 +199,7 @@ func (nm *nodeManager) latestVersionNodeFetchOnly(
 	argsMap[config.PluginModeKey] = true
 	args := []string{}
 	for k, v := range argsMap {
-		args = append(args, fmt.Sprintf("--%s=%v", k, v))
+		args = append(args, formatArgs(k, v))
 	}
 	binaryPath := nm.latestNodeVersionPath()
 	return nm.newNode(binaryPath, args, false)
@@ -213,7 +214,7 @@ func (nm *nodeManager) runNormal(v *viper.Viper) (int, error) {
 	argsMap[config.PluginModeKey] = true // run as plugin
 	args := []string{}
 	for k, v := range argsMap {
-		args = append(args, fmt.Sprintf("--%s=%v", k, v))
+		args = append(args, formatArgs(k, v))
 	}
 	binaryPath := nm.latestNodeVersionPath()
 	node, err := nm.newNode(binaryPath, args, true)
@@ -222,4 +223,12 @@ func (nm *nodeManager) runNormal(v *viper.Viper) (int, error) {
 	}
 	exitCode := <-node.start()
 	return exitCode, nil
+}
+
+func formatArgs(k string, v interface{}) string {
+	if k == config.CorethConfigKey {
+		s, _ := json.MarshalIndent(v, "", "\t")
+		v = string(s)
+	}
+	return fmt.Sprintf("--%s=%v", k, v)
 }
