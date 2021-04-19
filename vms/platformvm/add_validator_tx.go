@@ -183,8 +183,8 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 		if err == nil {
 			return nil, nil, nil, nil, permError{
 				fmt.Errorf(
-					"validator %s is already a primary network validator",
-					tx.Validator.NodeID,
+					"%s is already a primary network validator",
+					tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
 				),
 			}
 		}
@@ -203,8 +203,8 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 		if err == nil {
 			return nil, nil, nil, nil, permError{
 				fmt.Errorf(
-					"validator %s is about to become a primary network validator",
-					tx.Validator.NodeID,
+					"%s is about to become a primary network validator",
+					tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
 				),
 			}
 		}
@@ -212,7 +212,7 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 			return nil, nil, nil, nil, tempError{
 				fmt.Errorf(
 					"failed to find whether %s is about to become a validator: %w",
-					tx.Validator.NodeID,
+					tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
 					err,
 				),
 			}
