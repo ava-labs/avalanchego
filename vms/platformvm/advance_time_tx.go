@@ -174,9 +174,11 @@ currentStakerLoop:
 			}
 
 			numToRemoveFromCurrent++
-		default:
+		case *UnsignedAddValidatorTx, *UnsignedAddDelegatorTx:
 			// We shouldn't be removing any primary network validators here
 			break currentStakerLoop
+		default:
+			return nil, nil, nil, nil, permError{errWrongTxType}
 		}
 	}
 	newlyCurrentStakers, err := currentStakers.UpdateStakers(
