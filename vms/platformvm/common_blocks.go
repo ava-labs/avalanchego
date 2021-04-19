@@ -73,6 +73,8 @@ import (
 //	  proposal is being rejected
 
 var (
+	errBlockNil         = errors.New("block is nil")
+	errRejected         = errors.New("block is rejected")
 	errInvalidBlockType = errors.New("invalid block type")
 )
 
@@ -81,7 +83,9 @@ type Block interface {
 	snowman.Block
 
 	// initialize this block's non-serialized fields.
+	//
 	// This method should be called when a block is unmarshaled from bytes.
+	//
 	// [vm] is the vm the block exists in
 	// [bytes] is the byte representation of this block
 	// [status] is the current status of this block
@@ -123,16 +127,7 @@ type decision interface {
 	onAccept() mutableState
 }
 
-var (
-	errBlockNil = errors.New("block is nil")
-	errRejected = errors.New("block is rejected")
-)
-
-// Block contains fields and methods common to block's in a Snowman blockchain.
-// Block is meant to be a building-block (pun intended).
-// When you write a VM, your blocks can (and should) embed a core.Block
-// to take care of some bioler-plate code.
-// Block's methods can be over-written by structs that embed this struct.
+// CommonBlock contains fields and methods common to all blocks in this VM.
 type CommonBlock struct {
 	PrntID ids.ID `serialize:"true" json:"parentID"` // parent's ID
 	Hght   uint64 `serialize:"true" json:"height"`   // This block's height. The genesis block is at height 0.
