@@ -180,7 +180,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 				}
 			}
 
-			if !vdrTx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
+			if !tx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
 				return nil, nil, nil, nil, permError{errDSValidatorSubset}
 			}
 		}

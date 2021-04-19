@@ -183,7 +183,7 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 		// time the validator validates.
 		if err == nil {
 			vdrTx := currentValidator.AddValidatorTx()
-			if !vdrTx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
+			if !tx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
 				return nil, nil, nil, nil, permError{errDelegatorSubset}
 			}
 			vdrWeight := vdrTx.Weight()
@@ -219,7 +219,7 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 				}
 			}
 
-			if !vdrTx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
+			if !tx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
 				return nil, nil, nil, nil, permError{errDelegatorSubset}
 			}
 			vdrWeight := vdrTx.Weight()
