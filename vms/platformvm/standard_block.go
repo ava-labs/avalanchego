@@ -10,6 +10,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
+var (
+	_ Block    = &StandardBlock{}
+	_ decision = &StandardBlock{}
+)
+
 // StandardBlock being accepted results in the transactions contained in the
 // block to be accepted and committed to the chain.
 type StandardBlock struct {

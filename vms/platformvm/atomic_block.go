@@ -13,6 +13,9 @@ import (
 
 var (
 	errConflictingParentTxs = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
+
+	_ Block    = &AtomicBlock{}
+	_ decision = &AtomicBlock{}
 )
 
 // AtomicBlock being accepted results in the transaction contained in the

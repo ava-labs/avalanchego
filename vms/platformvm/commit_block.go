@@ -10,6 +10,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
+var (
+	_ Block    = &Commit{}
+	_ decision = &Commit{}
+)
+
 // Commit being accepted results in the proposal of its parent (which must be a proposal block)
 // being enacted.
 type Commit struct {
@@ -36,7 +41,7 @@ func (c *Commit) Verify() error {
 		return err
 	}
 
-	// the parent of an Commit block should always be a proposal
+	// The parent of a Commit block should always be a proposal
 	parent, ok := parentIntf.(*ProposalBlock)
 	if !ok {
 		if err := c.Reject(); err != nil {

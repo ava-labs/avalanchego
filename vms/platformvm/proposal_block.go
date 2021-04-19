@@ -11,6 +11,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
+var (
+	_ Block = &ProposalBlock{}
+)
+
 // ProposalBlock is a proposal to change the chain's state.
 // A proposal may be to:
 // 	1. Advance the chain's timestamp (*AdvanceTimeTx)

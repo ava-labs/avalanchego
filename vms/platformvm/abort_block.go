@@ -11,7 +11,8 @@ import (
 )
 
 var (
-	_ Block = &Abort{}
+	_ Block    = &Abort{}
+	_ decision = &Abort{}
 )
 
 // Abort being accepted results in the proposal of its parent (which must be a proposal block)
@@ -26,9 +27,11 @@ type Abort struct {
 //
 // This function also sets onAcceptDB database if the verification passes.
 func (a *Abort) Verify() error {
+	blkID := a.ID()
+
 	if err := a.DoubleDecisionBlock.Verify(); err != nil {
 		if err := a.Reject(); err != nil {
-			a.vm.ctx.Log.Error("failed to reject abort block %s due to %s", a.ID(), err)
+			a.vm.ctx.Log.Error("failed to reject abort block %s due to %s", blkID, err)
 		}
 		return err
 	}
@@ -38,18 +41,18 @@ func (a *Abort) Verify() error {
 		return err
 	}
 
+	// The parent of an Abort block should always be a proposal
 	parent, ok := parentIntf.(*ProposalBlock)
-	// Abort is a decision, so its parent must be a proposal
 	if !ok {
 		if err := a.Reject(); err != nil {
-			a.vm.ctx.Log.Error("failed to reject abort block %s due to %s", a.ID(), err)
+			a.vm.ctx.Log.Error("failed to reject abort block %s due to %s", blkID, err)
 		}
 		return errInvalidBlockType
 	}
 
 	a.onAcceptState, a.onAcceptFunc = parent.onAbort()
 
-	a.vm.currentBlocks[a.ID()] = a
+	a.vm.currentBlocks[blkID] = a
 	parentIntf.addChild(a)
 	return nil
 }
