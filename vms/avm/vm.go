@@ -152,7 +152,7 @@ func (vm *VM) Initialize(
 
 	vm.genesisCodec = codec.NewManager(math.MaxInt32)
 	vm.codec = codec.NewDefaultManager()
-	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx, vm.codec)
+	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, vm.codec)
 
 	errs := wrappers.Errs{}
 	errs.Add(

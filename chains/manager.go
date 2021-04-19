@@ -272,6 +272,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	if err != nil {
 		return nil, fmt.Errorf("error while looking up VM: %w", err)
 	}
+
 	primaryAlias, err := m.PrimaryAlias(chainParams.ID)
 	if err != nil {
 		primaryAlias = chainParams.ID.String()
@@ -302,6 +303,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		EpochFirstTransition: m.EpochFirstTransition,
 		EpochDuration:        m.EpochDuration,
 	}
+
 	// Get a factory for the vm we want to use on our chain
 	vmFactory, err := m.VMManager.GetVMFactory(vmID)
 	if err != nil {

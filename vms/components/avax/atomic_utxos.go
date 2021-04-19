@@ -6,9 +6,9 @@ package avax
 import (
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 )
 
 const (
@@ -16,6 +16,17 @@ const (
 )
 
 type AtomicUTXOManager interface {
+	// GetAtomicUTXOs returns exported UTXOs such that at least one of the
+	// addresses in [addrs] is referenced.
+	//
+	// Returns at most [limit] UTXOs. If [limit] <= 0 or
+	// [limit] > [maxUTXOsToFetch], [limit] is set to [maxUTXOsToFetch].
+	//
+	// Returns:
+	// * The fetched UTXOs
+	// * The address associated with the last UTXO fetched
+	// * The ID of the last UTXO fetched
+	// * Any error that may have occurred upstream.
 	GetAtomicUTXOs(
 		chainID ids.ID,
 		addrs ids.ShortSet,
@@ -26,26 +37,17 @@ type AtomicUTXOManager interface {
 }
 
 type atomicUTXOManager struct {
-	ctx   *snow.Context
+	sm    atomic.SharedMemory
 	codec codec.Manager
 }
 
-func NewAtomicUTXOManager(ctx *snow.Context, codec codec.Manager) AtomicUTXOManager {
+func NewAtomicUTXOManager(sm atomic.SharedMemory, codec codec.Manager) AtomicUTXOManager {
 	return &atomicUTXOManager{
-		ctx:   ctx,
+		sm:    sm,
 		codec: codec,
 	}
 }
 
-// GetAtomicUTXOs returns imported/exports UTXOs such that at least one of the
-// addresses in [addrs] is referenced.
-// Returns at most [limit] UTXOs.
-// If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
-// Returns:
-// * The fetched UTXOs
-// * true if all there are no more UTXOs in this range to fetch
-// * The address associated with the last UTXO fetched
-// * The ID of the last UTXO fetched
 func (a *atomicUTXOManager) GetAtomicUTXOs(
 	chainID ids.ID,
 	addrs ids.ShortSet,
@@ -65,7 +67,7 @@ func (a *atomicUTXOManager) GetAtomicUTXOs(
 		i++
 	}
 
-	allUTXOBytes, lastAddr, lastUTXO, err := a.ctx.SharedMemory.Indexed(
+	allUTXOBytes, lastAddr, lastUTXO, err := a.sm.Indexed(
 		chainID,
 		addrsList,
 		startAddr.Bytes(),

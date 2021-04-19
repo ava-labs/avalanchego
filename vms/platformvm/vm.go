@@ -165,7 +165,7 @@ func (vm *VM) Initialize(
 	vm.AddressManager = avax.NewAddressManager(ctx)
 
 	// Initialize the utility to fetch atomic UTXOs
-	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx, Codec)
+	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, Codec)
 
 	vm.fx = &secp256k1fx.Fx{}
 

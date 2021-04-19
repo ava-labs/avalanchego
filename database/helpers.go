@@ -23,13 +23,15 @@ const (
 func PutID(db KeyValueWriter, key []byte, val ids.ID) error {
 	return db.Put(key, val[:])
 }
+
 func GetID(db KeyValueReader, key []byte) (ids.ID, error) {
 	b, err := db.Get(key)
 	if err != nil {
 		return ids.ID{}, err
 	}
-	return ParseID(b)
+	return ids.ToID(b)
 }
+
 func ParseID(b []byte) (ids.ID, error) {
 	return ids.ToID(b)
 }
@@ -39,6 +41,7 @@ func PutUInt64(db KeyValueWriter, key []byte, val uint64) error {
 	p.PackLong(val)
 	return db.Put(key, p.Bytes)
 }
+
 func GetUInt64(db KeyValueReader, key []byte) (uint64, error) {
 	b, err := db.Get(key)
 	if err != nil {
@@ -46,6 +49,7 @@ func GetUInt64(db KeyValueReader, key []byte) (uint64, error) {
 	}
 	return ParseUInt64(b)
 }
+
 func ParseUInt64(b []byte) (uint64, error) {
 	if len(b) != wrappers.LongLen {
 		return 0, errWrongSize
@@ -59,6 +63,7 @@ func PutUInt32(db KeyValueWriter, key []byte, val uint32) error {
 	p.PackInt(val)
 	return db.Put(key, p.Bytes)
 }
+
 func GetUInt32(db KeyValueReader, key []byte) (uint32, error) {
 	b, err := db.Get(key)
 	if err != nil {
@@ -66,6 +71,7 @@ func GetUInt32(db KeyValueReader, key []byte) (uint32, error) {
 	}
 	return ParseUInt32(b)
 }
+
 func ParseUInt32(b []byte) (uint32, error) {
 	if len(b) != wrappers.IntLen {
 		return 0, errWrongSize
@@ -81,6 +87,7 @@ func PutTimestamp(db KeyValueWriter, key []byte, val time.Time) error {
 	}
 	return db.Put(key, valBytes)
 }
+
 func GetTimestamp(db KeyValueReader, key []byte) (time.Time, error) {
 	b, err := db.Get(key)
 	if err != nil {
@@ -88,6 +95,7 @@ func GetTimestamp(db KeyValueReader, key []byte) (time.Time, error) {
 	}
 	return ParseTimestamp(b)
 }
+
 func ParseTimestamp(b []byte) (time.Time, error) {
 	val := time.Time{}
 	if err := val.UnmarshalBinary(b); err != nil {
