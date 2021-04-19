@@ -18,17 +18,18 @@ var (
 	_ decision = &AtomicBlock{}
 )
 
-// AtomicBlock being accepted results in the transaction contained in the
+// AtomicBlock being accepted results in the atomic transaction contained in the
 // block to be accepted and committed to the chain.
 type AtomicBlock struct {
 	CommonDecisionBlock `serialize:"true"`
 
 	Tx Tx `serialize:"true" json:"tx"`
 
+	// inputs are the atomic inputs that are consumed by this block's atomic
+	// transaction
 	inputs ids.Set
 }
 
-// initialize this block
 func (ab *AtomicBlock) initialize(vm *VM, bytes []byte, status choices.Status, self Block) error {
 	if err := ab.CommonDecisionBlock.initialize(vm, bytes, status, self); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
@@ -45,7 +46,8 @@ func (ab *AtomicBlock) initialize(vm *VM, bytes []byte, status choices.Status, s
 	return nil
 }
 
-// Reject implements the snowman.Block interface
+// conflicts checks to see if the provided input set contains any conflicts with
+// any of this block's non-accepted ancestors or itself.
 func (ab *AtomicBlock) conflicts(s ids.Set) (bool, error) {
 	if ab.Status() == choices.Accepted {
 		return false, nil
@@ -66,9 +68,15 @@ func (ab *AtomicBlock) conflicts(s ids.Set) (bool, error) {
 //
 // This function also sets onAcceptDB database if the verification passes.
 func (ab *AtomicBlock) Verify() error {
+	blkID := ab.ID()
+
 	if err := ab.CommonDecisionBlock.Verify(); err != nil {
 		if err := ab.Reject(); err != nil {
-			ab.vm.ctx.Log.Error("failed to reject atomic block %s due to %s", ab.ID(), err)
+			ab.vm.ctx.Log.Error(
+				"failed to reject atomic block %s due to %s",
+				blkID,
+				err,
+			)
 		}
 		return err
 	}
@@ -102,13 +110,14 @@ func (ab *AtomicBlock) Verify() error {
 	parentState := parent.onAccept()
 	onAccept, err := tx.SemanticVerify(ab.vm, parentState, &ab.Tx)
 	if err != nil {
-		ab.vm.droppedTxCache.Put(ab.Tx.ID(), err.Error()) // cache tx as dropped
-		return fmt.Errorf("tx %s failed semantic verification: %w", tx.ID(), err)
+		txID := tx.ID()
+		ab.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
+		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
 	}
 	onAccept.AddTx(&ab.Tx, Committed)
 
 	ab.onAcceptState = onAccept
-	ab.vm.currentBlocks[ab.ID()] = ab
+	ab.vm.currentBlocks[blkID] = ab
 	parentIntf.addChild(ab)
 	return nil
 }
@@ -138,10 +147,19 @@ func (ab *AtomicBlock) Accept() error {
 	defer ab.vm.internalState.Abort()
 	batch, err := ab.vm.internalState.CommitBatch()
 	if err != nil {
-		return fmt.Errorf("failed to commit VM's database for block %s: %w", ab.ID(), err)
+		return fmt.Errorf(
+			"failed to commit VM's database for block %s: %w",
+			blkID,
+			err,
+		)
 	}
 	if err := tx.Accept(ab.vm.ctx, batch); err != nil {
-		return fmt.Errorf("failed to atomically accept tx %s in block %s: %w", tx.ID(), ab.ID(), err)
+		return fmt.Errorf(
+			"failed to atomically accept tx %s in block %s: %w",
+			tx.ID(),
+			blkID,
+			err,
+		)
 	}
 
 	for _, child := range ab.children {
@@ -149,7 +167,11 @@ func (ab *AtomicBlock) Accept() error {
 	}
 	if ab.onAcceptFunc != nil {
 		if err := ab.onAcceptFunc(); err != nil {
-			return fmt.Errorf("failed to execute onAcceptFunc of %s: %w", blkID, err)
+			return fmt.Errorf(
+				"failed to execute onAcceptFunc of %s: %w",
+				blkID,
+				err,
+			)
 		}
 	}
 
@@ -159,10 +181,19 @@ func (ab *AtomicBlock) Accept() error {
 
 // Reject implements the snowman.Block interface
 func (ab *AtomicBlock) Reject() error {
-	ab.vm.ctx.Log.Verbo("Rejecting Atomic Block %s at height %d with parent %s", ab.ID(), ab.Height(), ab.ParentID())
+	ab.vm.ctx.Log.Verbo(
+		"Rejecting Atomic Block %s at height %d with parent %s",
+		ab.ID(),
+		ab.Height(),
+		ab.ParentID(),
+	)
 
 	if err := ab.vm.mempool.IssueTx(&ab.Tx); err != nil {
-		ab.vm.ctx.Log.Debug("failed to reissue tx %q due to: %s", ab.Tx.ID(), err)
+		ab.vm.ctx.Log.Debug(
+			"failed to reissue tx %q due to: %s",
+			ab.Tx.ID(),
+			err,
+		)
 	}
 	return ab.CommonDecisionBlock.Reject()
 }
