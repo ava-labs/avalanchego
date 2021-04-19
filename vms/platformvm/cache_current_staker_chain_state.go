@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"bytes"
+	"errors"
 	"sort"
 	"time"
 
@@ -17,6 +18,8 @@ import (
 )
 
 var (
+	errNotEnoughValidators = errors.New("not enough validators")
+
 	_ currentStakerChainState = &currentStakerChainStateImpl{}
 )
 
@@ -81,6 +84,9 @@ func (cs *currentStakerChainStateImpl) UpdateStakers(
 	addSubnetValidatorTxs []*Tx,
 	numTxsToRemove int,
 ) (currentStakerChainState, error) {
+	if numTxsToRemove > len(cs.validators) {
+		return nil, errNotEnoughValidators
+	}
 	newCS := &currentStakerChainStateImpl{
 		validatorsByNodeID: make(map[ids.ShortID]*currentValidatorImpl, len(cs.validatorsByNodeID)+len(addValidatorTxs)),
 		validatorsByTxID:   make(map[ids.ID]*validatorReward, len(cs.validatorsByTxID)+len(addValidatorTxs)+len(addDelegatorTxs)+len(addSubnetValidatorTxs)),
