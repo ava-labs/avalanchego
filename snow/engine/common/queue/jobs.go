@@ -86,32 +86,6 @@ func (j *Jobs) Push(job Job) (bool, error) {
 	return true, nil
 }
 
-// AddMissingID adds [jobID] to missingIDs
-func (j *Jobs) AddMissingID(jobIDs ...ids.ID) {
-	for _, jobID := range jobIDs {
-		if !j.missingIDs.Contains(jobID) {
-			j.missingIDs.Add(jobID)
-			j.addToMissingIDs.Add(jobID)
-			j.removeFromMissingIDs.Remove(jobID)
-		}
-	}
-}
-
-// RemoveMissingID removes [jobID] from missingIDs
-func (j *Jobs) RemoveMissingID(jobIDs ...ids.ID) {
-	for _, jobID := range jobIDs {
-		if j.missingIDs.Contains(jobID) {
-			j.missingIDs.Remove(jobID)
-			j.addToMissingIDs.Remove(jobID)
-			j.removeFromMissingIDs.Add(jobID)
-		}
-	}
-}
-
-func (j *Jobs) MissingIDs() []ids.ID { return j.missingIDs.List() }
-
-func (j *Jobs) NumMissingIDs() int { return j.missingIDs.Len() }
-
 func (j *Jobs) ExecuteAll(ctx *snow.Context, restarted bool, events ...snow.EventDispatcher) (int, error) {
 	numExecuted := 0
 
