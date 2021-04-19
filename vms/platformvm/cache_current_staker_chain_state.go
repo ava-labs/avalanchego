@@ -42,6 +42,9 @@ type currentStakerChainState interface {
 	ValidatorSet(subnetID ids.ID) (validators.Set, error)
 }
 
+// currentStakerChainStateImpl is a copy on write implementation for versioning
+// the validator set. None of the slices, maps, or pointers should be modified
+// after initialization.
 type currentStakerChainStateImpl struct {
 	nextStaker *validatorReward
 

@@ -29,6 +29,9 @@ type pendingStakerChainState interface {
 	Apply(internalState)
 }
 
+// pendingStakerChainStateImpl is a copy on write implementation for versioning
+// the validator set. None of the slices, maps, or pointers should be modified
+// after initialization.
 type pendingStakerChainStateImpl struct {
 	// nodeID -> validator
 	validatorsByNodeID      map[ids.ShortID]*UnsignedAddValidatorTx
