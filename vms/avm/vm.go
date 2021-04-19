@@ -65,6 +65,7 @@ var (
 
 	_ vertex.DAGVM    = &VM{}
 	_ common.StaticVM = &VM{}
+	_ secp256k1fx.VM  = &VM{}
 )
 
 // VM implements the avalanche.DAGVM interface

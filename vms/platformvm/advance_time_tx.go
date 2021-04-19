@@ -75,18 +75,19 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 		}
 	}
 
-	// Only allow timestamp to move forward as far as the time of next staker set change time
-	nextStakerRemovalTime, err := vm.nextStakerRemovalTime(parentState)
+	// Only allow timestamp to move forward as far as the time of next staker
+	// set change time
+	nextStakerChangeTime, err := vm.nextStakerChangeTime(parentState)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 
-	if timestamp.After(nextStakerRemovalTime) {
+	if timestamp.After(nextStakerChangeTime) {
 		return nil, nil, nil, nil, permError{
 			fmt.Errorf(
-				"proposed timestamp (%s) later than next staker removal time (%s)",
+				"proposed timestamp (%s) later than next staker change time (%s)",
 				timestamp,
-				nextStakerRemovalTime,
+				nextStakerChangeTime,
 			),
 		}
 	}

@@ -95,6 +95,7 @@ var (
 	_ block.ChainVM        = &VM{}
 	_ validators.Connector = &VM{}
 	_ common.StaticVM      = &VM{}
+	_ secp256k1fx.VM       = &VM{}
 )
 
 // VM implements the snowman.ChainVM interface
@@ -523,62 +524,12 @@ func (vm *VM) nextStakerChangeTime(vs mutableState) (time.Time, error) {
 	return earliest, nil
 }
 
-// Returns the time when the next staker of the primary subnet will be removed
-func (vm *VM) nextStakerRemovalTime(vs mutableState) (time.Time, error) {
-	currentStakers := vs.CurrentStakerChainState()
-	pendingStakers := vs.PendingStakerChainState()
-
-	earliest := timer.MaxTime
-
-currentStakerLoop:
-	for _, staker := range currentStakers.Stakers() {
-		switch tx := staker.UnsignedTx.(type) {
-		case *UnsignedAddValidatorTx:
-			earliest = tx.EndTime()
-			break currentStakerLoop
-		case *UnsignedAddDelegatorTx:
-			earliest = tx.EndTime()
-			break currentStakerLoop
-		}
-	}
-	for _, staker := range pendingStakers.Stakers() {
-		var (
-			startTime time.Time
-		)
-		switch tx := staker.UnsignedTx.(type) {
-		case *UnsignedAddValidatorTx:
-			startTime = tx.StartTime()
-			if endTime := tx.EndTime(); endTime.Before(earliest) {
-				earliest = endTime
-			}
-		case *UnsignedAddDelegatorTx:
-			startTime = tx.StartTime()
-			if endTime := tx.EndTime(); endTime.Before(earliest) {
-				earliest = endTime
-			}
-		case *UnsignedAddSubnetValidatorTx:
-			startTime = tx.StartTime()
-		default:
-			return time.Time{}, errWrongTxType
-		}
-
-		if startTime.After(earliest) {
-			break
-		}
-	}
-	return earliest, nil
-}
-
-// Codec ...
 func (vm *VM) Codec() codec.Manager { return vm.codec }
 
-// CodecRegistry ...
 func (vm *VM) CodecRegistry() codec.Registry { return vm.codecRegistry }
 
-// Clock ...
 func (vm *VM) Clock() *timer.Clock { return &vm.clock }
 
-// Logger ...
 func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
 
 // Returns the percentage of the total stake on the Primary Network of nodes
