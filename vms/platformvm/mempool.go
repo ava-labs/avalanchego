@@ -198,7 +198,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 	}
 	staker, ok := tx.UnsignedTx.(TimedTx)
 	if !ok {
-		return nil, fmt.Errorf("expected staker tx to be TimedTx but got %T", tx)
+		return nil, fmt.Errorf("expected staker tx to be TimedTx but got %T", tx.UnsignedTx)
 	}
 	nextValidatorEndtime := staker.EndTime()
 	if currentChainTimestamp.Equal(nextValidatorEndtime) {
