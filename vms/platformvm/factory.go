@@ -34,6 +34,9 @@ type Factory struct {
 	// Fee that must be burned by every state creating transaction
 	CreationTxFee uint64
 
+	// Fee that must be burned by every create staker transaction
+	AddStakerTxFee uint64
+
 	// Fee that is burned by every non-state creating transaction
 	TxFee uint64
 
