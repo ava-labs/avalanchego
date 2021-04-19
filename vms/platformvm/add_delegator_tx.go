@@ -192,7 +192,7 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 			if err != nil {
 				return nil, nil, nil, nil, permError{err}
 			}
-			maximumWeight, err := safemath.Mul64(5, vdrWeight)
+			maximumWeight, err := safemath.Mul64(MaxValidatorWeightFactor, vdrWeight)
 			if err != nil {
 				return nil, nil, nil, nil, permError{errStakeOverflow}
 			}
@@ -223,7 +223,7 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 				return nil, nil, nil, nil, permError{errDelegatorSubset}
 			}
 			vdrWeight := vdrTx.Weight()
-			maximumWeight, err := safemath.Mul64(5, vdrWeight)
+			maximumWeight, err := safemath.Mul64(MaxValidatorWeightFactor, vdrWeight)
 			if err != nil {
 				return nil, nil, nil, nil, permError{errStakeOverflow}
 			}

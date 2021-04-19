@@ -65,6 +65,10 @@ const (
 	// to be minted
 	MinConsumptionRate = 100000 // 10%
 
+	// The maximum amount of weight on a validator is required to be no more
+	// than [MaxValidatorWeightFactor] * the validator's stake amount.
+	MaxValidatorWeightFactor uint64 = 5
+
 	// SupplyCap is the maximum amount of AVAX that should ever exist
 	SupplyCap = 720 * units.MegaAvax
 
