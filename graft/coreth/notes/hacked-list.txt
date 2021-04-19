@@ -1,6 +1,5 @@
 ./consensus/dummy/consensus.go
 ./consensus/consensus.go
-./consensus/ethash/ethash.go (consolidated unused files to just use the config and SeedHash function)
 ./core/blockchain.go
 ./core/events.go
 ./core/evm.go
@@ -28,7 +27,6 @@
 ./eth/backend.go
 ./eth/config.go
 ./eth/gasprice/gasprice.go
-./eth/gen_config.go
 ./eth/tracers/internal/tracers/assets.go
 ./ethclient/ethclient.go
 ./ethclient/signer.go
@@ -40,6 +38,7 @@
 ./node/config.go
 ./node/node.go
 ./node/service.go
+./params/config.go
 ./params/protocol_params.go
 ./rpc/client.go
 ./rpc/types.go

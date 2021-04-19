@@ -11,7 +11,6 @@
 ./core/chain_indexer.go
 ./core/error.go
 ./core/gaspool.go
-./core/genesis_alloc.go
 ./core/headerchain.go
 ./core/mkalloc.go
 ./core/rawdb/accessors_indexes.go
@@ -78,7 +77,6 @@
 ./miner/unconfirmed.go
 ./node/defaults.go
 ./node/errors.go
-./params/config.go
 ./params/dao.go
 ./params/denomination.go
 ./params/network_params.go
