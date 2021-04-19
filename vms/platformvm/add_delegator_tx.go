@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -169,7 +170,7 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 			return nil, nil, nil, nil, tempError{
 				fmt.Errorf(
 					"failed to find whether %s is a validator: %w",
-					tx.Validator.NodeID,
+					tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
 					err,
 				),
 			}
@@ -212,7 +213,7 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 				return nil, nil, nil, nil, tempError{
 					fmt.Errorf(
 						"failed to find whether %s is a validator: %w",
-						tx.Validator.NodeID,
+						tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
 						err,
 					),
 				}
