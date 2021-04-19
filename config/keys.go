@@ -97,7 +97,7 @@ const (
 	consensusGossipFrequencyKey             = "consensus-gossip-frequency"
 	consensusShutdownTimeoutKey             = "consensus-shutdown-timeout"
 	fdLimitKey                              = "fd-limit"
-	corethConfigKey                         = "coreth-config"
+	CorethConfigKey                         = "coreth-config"
 	indexEnabledKey                         = "index-enabled"
 	indexAllowIncompleteKey                 = "index-allow-incomplete"
 	routerHealthMaxDropRateKey              = "router-health-max-drop-rate"

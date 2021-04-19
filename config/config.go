@@ -105,7 +105,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(dbEnabledKey, true, "Turn on persistent storage")
 	fs.String(dbPathKey, defaultDbDir, "Path to database directory")
 	// Coreth config
-	fs.String(corethConfigKey, defaultString, "Specifies config to pass into coreth")
+	fs.String(CorethConfigKey, defaultString, "Specifies config to pass into coreth")
 	// Logging
 	fs.String(logsDirKey, "", "Logging directory for Avalanche")
 	fs.String(logLevelKey, "info", "The log level. Should be one of {verbo, debug, info, warn, error, fatal, off}")
@@ -740,9 +740,9 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 	config.EnableCrypto = v.GetBool(signatureVerificationEnabledKey)
 
 	// Coreth Plugin
-	corethConfigString := v.GetString(corethConfigKey)
+	corethConfigString := v.GetString(CorethConfigKey)
 	if corethConfigString != defaultString {
-		corethConfigValue := v.Get(corethConfigKey)
+		corethConfigValue := v.Get(CorethConfigKey)
 		switch value := corethConfigValue.(type) {
 		case string:
 			corethConfigString = value
