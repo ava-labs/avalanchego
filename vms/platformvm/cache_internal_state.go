@@ -153,18 +153,18 @@ type internalStateImpl struct {
 	validatorsDB                 database.Database
 	currentValidatorsDB          database.Database
 	currentValidatorBaseDB       database.Database
-	currentValidatorDB           linkeddb.LinkedDB
+	currentValidatorList         linkeddb.LinkedDB
 	currentDelegatorBaseDB       database.Database
-	currentDelegatorDB           linkeddb.LinkedDB
+	currentDelegatorList         linkeddb.LinkedDB
 	currentSubnetValidatorBaseDB database.Database
-	currentSubnetValidatorDB     linkeddb.LinkedDB
+	currentSubnetValidatorList   linkeddb.LinkedDB
 	pendingValidatorsDB          database.Database
 	pendingValidatorBaseDB       database.Database
-	pendingValidatorDB           linkeddb.LinkedDB
+	pendingValidatorList         linkeddb.LinkedDB
 	pendingDelegatorBaseDB       database.Database
-	pendingDelegatorDB           linkeddb.LinkedDB
+	pendingDelegatorList         linkeddb.LinkedDB
 	pendingSubnetValidatorBaseDB database.Database
-	pendingSubnetValidatorDB     linkeddb.LinkedDB
+	pendingSubnetValidatorList   linkeddb.LinkedDB
 
 	addedBlocks map[ids.ID]Block // map of blockID -> Block
 	blockCache  cache.Cacher     // cache of blockID -> Block, if the entry is nil, it is not in the database
@@ -234,18 +234,18 @@ func newInternalState(vm *VM, db database.Database, genesis []byte) (internalSta
 		validatorsDB:                 validatorsDB,
 		currentValidatorsDB:          currentValidatorsDB,
 		currentValidatorBaseDB:       currentValidatorBaseDB,
-		currentValidatorDB:           linkeddb.NewDefault(currentValidatorBaseDB),
+		currentValidatorList:         linkeddb.NewDefault(currentValidatorBaseDB),
 		currentDelegatorBaseDB:       currentDelegatorBaseDB,
-		currentDelegatorDB:           linkeddb.NewDefault(currentDelegatorBaseDB),
+		currentDelegatorList:         linkeddb.NewDefault(currentDelegatorBaseDB),
 		currentSubnetValidatorBaseDB: currentSubnetValidatorBaseDB,
-		currentSubnetValidatorDB:     linkeddb.NewDefault(currentSubnetValidatorBaseDB),
+		currentSubnetValidatorList:   linkeddb.NewDefault(currentSubnetValidatorBaseDB),
 		pendingValidatorsDB:          pendingValidatorsDB,
 		pendingValidatorBaseDB:       pendingValidatorBaseDB,
-		pendingValidatorDB:           linkeddb.NewDefault(pendingValidatorBaseDB),
+		pendingValidatorList:         linkeddb.NewDefault(pendingValidatorBaseDB),
 		pendingDelegatorBaseDB:       pendingDelegatorBaseDB,
-		pendingDelegatorDB:           linkeddb.NewDefault(pendingDelegatorBaseDB),
+		pendingDelegatorList:         linkeddb.NewDefault(pendingDelegatorBaseDB),
 		pendingSubnetValidatorBaseDB: pendingSubnetValidatorBaseDB,
-		pendingSubnetValidatorDB:     linkeddb.NewDefault(pendingSubnetValidatorBaseDB),
+		pendingSubnetValidatorList:   linkeddb.NewDefault(pendingSubnetValidatorBaseDB),
 
 		addedBlocks: make(map[ids.ID]Block),
 		blockCache:  &cache.LRU{Size: blockCacheSize},
@@ -685,16 +685,16 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 				return err
 			}
 
-			if err := st.currentValidatorDB.Put(txID[:], vdrBytes); err != nil {
+			if err := st.currentValidatorList.Put(txID[:], vdrBytes); err != nil {
 				return err
 			}
 			st.uptimes[tx.Validator.NodeID] = vdr
 		case *UnsignedAddDelegatorTx:
-			if err := database.PutUInt64(st.currentDelegatorDB, txID[:], potentialReward); err != nil {
+			if err := database.PutUInt64(st.currentDelegatorList, txID[:], potentialReward); err != nil {
 				return err
 			}
 		case *UnsignedAddSubnetValidatorTx:
-			if err := st.currentSubnetValidatorDB.Put(txID[:], nil); err != nil {
+			if err := st.currentSubnetValidatorList.Put(txID[:], nil); err != nil {
 				return err
 			}
 		default:
@@ -707,13 +707,13 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 		var db database.KeyValueWriter
 		switch tx := tx.UnsignedTx.(type) {
 		case *UnsignedAddValidatorTx:
-			db = st.currentValidatorDB
+			db = st.currentValidatorList
 			delete(st.uptimes, tx.Validator.NodeID)
 			delete(st.updatedUptimes, tx.Validator.NodeID)
 		case *UnsignedAddDelegatorTx:
-			db = st.currentDelegatorDB
+			db = st.currentDelegatorList
 		case *UnsignedAddSubnetValidatorTx:
-			db = st.currentSubnetValidatorDB
+			db = st.currentSubnetValidatorList
 		default:
 			return errWrongTxType
 		}
@@ -732,11 +732,11 @@ func (st *internalStateImpl) writePendingStakers() error {
 		var db database.KeyValueWriter
 		switch tx.UnsignedTx.(type) {
 		case *UnsignedAddValidatorTx:
-			db = st.pendingValidatorDB
+			db = st.pendingValidatorList
 		case *UnsignedAddDelegatorTx:
-			db = st.pendingDelegatorDB
+			db = st.pendingDelegatorList
 		case *UnsignedAddSubnetValidatorTx:
-			db = st.pendingSubnetValidatorDB
+			db = st.pendingSubnetValidatorList
 		default:
 			return errWrongTxType
 		}
@@ -752,11 +752,11 @@ func (st *internalStateImpl) writePendingStakers() error {
 		var db database.KeyValueWriter
 		switch tx.UnsignedTx.(type) {
 		case *UnsignedAddValidatorTx:
-			db = st.pendingValidatorDB
+			db = st.pendingValidatorList
 		case *UnsignedAddDelegatorTx:
-			db = st.pendingDelegatorDB
+			db = st.pendingDelegatorList
 		case *UnsignedAddSubnetValidatorTx:
-			db = st.pendingSubnetValidatorDB
+			db = st.pendingSubnetValidatorList
 		default:
 			return errWrongTxType
 		}
@@ -782,7 +782,7 @@ func (st *internalStateImpl) writeUptimes() error {
 			return err
 		}
 
-		if err := st.currentValidatorDB.Put(uptime.txID[:], uptimeBytes); err != nil {
+		if err := st.currentValidatorList.Put(uptime.txID[:], uptimeBytes); err != nil {
 			return err
 		}
 	}
@@ -952,7 +952,7 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 		validatorsByTxID:   make(map[ids.ID]*validatorReward),
 	}
 
-	validatorIt := st.currentValidatorDB.NewIterator()
+	validatorIt := st.currentValidatorList.NewIterator()
 	defer validatorIt.Release()
 	for validatorIt.Next() {
 		txIDBytes := validatorIt.Key()
@@ -999,7 +999,7 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 		return err
 	}
 
-	delegatorIt := st.currentDelegatorDB.NewIterator()
+	delegatorIt := st.currentDelegatorList.NewIterator()
 	defer delegatorIt.Release()
 	for delegatorIt.Next() {
 		txIDBytes := delegatorIt.Key()
@@ -1039,7 +1039,7 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 		return err
 	}
 
-	subnetValidatorIt := st.currentSubnetValidatorDB.NewIterator()
+	subnetValidatorIt := st.currentSubnetValidatorList.NewIterator()
 	defer subnetValidatorIt.Release()
 	for subnetValidatorIt.Next() {
 		txIDBytes := subnetValidatorIt.Key()
@@ -1087,7 +1087,7 @@ func (st *internalStateImpl) loadPendingValidators() error {
 		validatorExtrasByNodeID: make(map[ids.ShortID]*validatorImpl),
 	}
 
-	validatorIt := st.pendingValidatorDB.NewIterator()
+	validatorIt := st.pendingValidatorList.NewIterator()
 	defer validatorIt.Release()
 	for validatorIt.Next() {
 		txIDBytes := validatorIt.Key()
@@ -1112,7 +1112,7 @@ func (st *internalStateImpl) loadPendingValidators() error {
 		return err
 	}
 
-	delegatorIt := st.pendingDelegatorDB.NewIterator()
+	delegatorIt := st.pendingDelegatorList.NewIterator()
 	defer delegatorIt.Release()
 	for delegatorIt.Next() {
 		txIDBytes := delegatorIt.Key()
@@ -1144,7 +1144,7 @@ func (st *internalStateImpl) loadPendingValidators() error {
 		return err
 	}
 
-	subnetValidatorIt := st.pendingSubnetValidatorDB.NewIterator()
+	subnetValidatorIt := st.pendingSubnetValidatorList.NewIterator()
 	defer subnetValidatorIt.Release()
 	for subnetValidatorIt.Next() {
 		txIDBytes := subnetValidatorIt.Key()
