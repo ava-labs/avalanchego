@@ -103,6 +103,13 @@ func (j *Jobs) ExecuteAll(ctx *snow.Context, restarted bool, events ...snow.Even
 
 		jobID := job.ID()
 		ctx.Log.Debug("Executing: %s", jobID)
+		// Note that event.Accept must be called before executing [job]
+		// to honor EventDispatcher.Accept's invariant.
+		for _, event := range events {
+			if err := event.Accept(ctx, job.ID(), job.Bytes()); err != nil {
+				return numExecuted, err
+			}
+		}
 		if err := job.Execute(); err != nil {
 			return 0, fmt.Errorf("failed to execute job %s due to %w", jobID, err)
 		}
@@ -138,19 +145,6 @@ func (j *Jobs) ExecuteAll(ctx *snow.Context, restarted bool, events ...snow.Even
 				ctx.Log.Info("executed %d operations", numExecuted)
 			} else {
 				ctx.Log.Debug("executed %d operations", numExecuted)
-			}
-		}
-
-		// TODO putting this after commit could cause dropped events
-		// Ex. if a job is executed and accepted, committed to the database, and then
-		// the node dies, then since the event has been committed we will not execute
-		// it again and therefore the event will never be sent.
-		// We should be able to fix this at the risk of emitting duplicate events by
-		// sending Accept events before the job has been committed. Not sure which is
-		// better here.
-		for _, event := range events {
-			if err := event.Accept(ctx, job.ID(), job.Bytes()); err != nil {
-				return numExecuted, err
 			}
 		}
 	}
