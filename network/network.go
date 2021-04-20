@@ -59,9 +59,6 @@ var (
 	errNetworkLayerUnhealthy = errors.New("network layer is unhealthy")
 )
 
-// Network Upgrade
-var minimumUnmaskedVersion = version.NewDefaultApplication(constants.PlatformName, 1, 1, 0)
-
 func init() { rand.Seed(time.Now().UnixNano()) }
 
 // Network defines the functionality of the networking library.
@@ -118,7 +115,7 @@ type network struct {
 	id                                 ids.ShortID
 	ip                                 utils.DynamicIPDesc
 	networkID                          uint32
-	msgVersion                         version.Application
+	versionCompatibility               version.Compatibility
 	parser                             version.ApplicationParser
 	listener                           net.Listener
 	dialer                             Dialer
@@ -149,7 +146,6 @@ type network struct {
 	connMeterMaxConns                  int
 	connMeter                          ConnMeter
 	b                                  Builder
-	apricotPhase0Time                  time.Time
 
 	// stateLock should never be held when grabbing a peer senderLock
 	stateLock    sync.RWMutex
@@ -215,7 +211,7 @@ func NewDefaultNetwork(
 	id ids.ShortID,
 	ip utils.DynamicIPDesc,
 	networkID uint32,
-	version version.Application,
+	versionCompatibility version.Compatibility,
 	parser version.ApplicationParser,
 	listener net.Listener,
 	dialer Dialer,
@@ -230,7 +226,6 @@ func NewDefaultNetwork(
 	restartOnDisconnected bool,
 	disconnectedCheckFreq time.Duration,
 	disconnectedRestartTimeout time.Duration,
-	apricotPhase0Time time.Time,
 	sendQueueSize uint32,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
@@ -242,7 +237,7 @@ func NewDefaultNetwork(
 		id,
 		ip,
 		networkID,
-		version,
+		versionCompatibility,
 		parser,
 		listener,
 		dialer,
@@ -275,7 +270,6 @@ func NewDefaultNetwork(
 		restartOnDisconnected,
 		disconnectedCheckFreq,
 		disconnectedRestartTimeout,
-		apricotPhase0Time,
 		healthConfig,
 		benchlistManager,
 		peerAliasTimeout,
@@ -289,7 +283,7 @@ func NewNetwork(
 	id ids.ShortID,
 	ip utils.DynamicIPDesc,
 	networkID uint32,
-	version version.Application,
+	versionCompatibility version.Compatibility,
 	parser version.ApplicationParser,
 	listener net.Listener,
 	dialer Dialer,
@@ -322,26 +316,25 @@ func NewNetwork(
 	restartOnDisconnected bool,
 	disconnectedCheckFreq time.Duration,
 	disconnectedRestartTimeout time.Duration,
-	apricotPhase0Time time.Time,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
 ) Network {
 	// #nosec G404
 	netw := &network{
-		log:            log,
-		id:             id,
-		ip:             ip,
-		networkID:      networkID,
-		msgVersion:     version,
-		parser:         parser,
-		listener:       listener,
-		dialer:         dialer,
-		serverUpgrader: serverUpgrader,
-		clientUpgrader: clientUpgrader,
-		vdrs:           vdrs,
-		beacons:        beacons,
-		router:         router,
+		log:                  log,
+		id:                   id,
+		ip:                   ip,
+		networkID:            networkID,
+		versionCompatibility: versionCompatibility,
+		parser:               parser,
+		listener:             listener,
+		dialer:               dialer,
+		serverUpgrader:       serverUpgrader,
+		clientUpgrader:       clientUpgrader,
+		vdrs:                 vdrs,
+		beacons:              beacons,
+		router:               router,
 		// This field just makes sure we don't connect to ourselves when TLS is
 		// disabled. So, cryptographically secure random number generation isn't
 		// used here.
@@ -377,7 +370,6 @@ func NewNetwork(
 		disconnectedCheckFreq:              disconnectedCheckFreq,
 		connectedMeter:                     timer.TimedMeter{Duration: disconnectedRestartTimeout},
 		restarter:                          restarter,
-		apricotPhase0Time:                  apricotPhase0Time,
 		healthConfig:                       healthConfig,
 		benchlistManager:                   benchlistManager,
 	}
@@ -406,7 +398,7 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 			n.log.Debug("failed to send GetAcceptedFrontier(%s, %s, %d)",
 				vID,
 				chainID,
@@ -440,7 +432,7 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 		n.log.Debug("failed to send AcceptedFrontier(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -475,7 +467,7 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 			n.log.Debug("failed to send GetAccepted(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -510,7 +502,7 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 		n.log.Debug("failed to send Accepted(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -538,7 +530,7 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 		n.log.Debug("failed to send GetAncestors(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -567,7 +559,7 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 		n.log.Debug("failed to send MultiPut(%s, %s, %d, %d)",
 			validatorID,
 			chainID,
@@ -591,7 +583,7 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	n.log.AssertNoError(err)
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 		n.log.Debug("failed to send Get(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -625,7 +617,7 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 		n.log.Debug("failed to send Put(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -663,7 +655,7 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -694,7 +686,7 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 			n.log.Debug("failed to send PullQuery(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -729,7 +721,7 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
 		n.log.Debug("failed to send Chits(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -799,7 +791,7 @@ func (n *network) upgradeIncoming(remoteAddr string) (bool, error) {
 func (n *network) Dispatch() error {
 	go n.gossip() // Periodically gossip peers
 	go func() {
-		duration := time.Until(n.apricotPhase0Time)
+		duration := time.Until(n.versionCompatibility.MaskTime())
 		time.Sleep(duration)
 
 		n.stateLock.Lock()
@@ -894,6 +886,7 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 					PublicIP:     peer.getIP().String(),
 					ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
 					Version:      peer.versionStr.GetValue().(string),
+					Up:           peer.compatible.GetValue(),
 					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
 					Benched:      n.benchlistManager.GetBenched(peer.id),
@@ -910,6 +903,7 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 					PublicIP:     peer.getIP().String(),
 					ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
 					Version:      peer.versionStr.GetValue().(string),
+					Up:           peer.compatible.GetValue(),
 					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
 					Benched:      n.benchlistManager.GetBenched(peer.id),
@@ -1057,7 +1051,7 @@ func (n *network) gossip() {
 				!ip.IsZero() &&
 				n.vdrs.Contains(peer.id) {
 				peerVersion := peer.versionStruct.GetValue().(version.Application)
-				if !peerVersion.Before(minimumUnmaskedVersion) || time.Since(n.apricotPhase0Time) < 0 {
+				if n.versionCompatibility.Unmaskable(peerVersion) == nil {
 					ips = append(ips, ip)
 				}
 			}
@@ -1300,7 +1294,7 @@ func (n *network) validatorIPs() []utils.IPDesc {
 		ip := peer.getIP()
 		if peer.connected.GetValue() && !ip.IsZero() && n.vdrs.Contains(peer.id) {
 			peerVersion := peer.versionStruct.GetValue().(version.Application)
-			if !peerVersion.Before(minimumUnmaskedVersion) || time.Since(n.apricotPhase0Time) < 0 {
+			if n.versionCompatibility.Unmaskable(peerVersion) == nil {
 				ips = append(ips, ip)
 			}
 		}
@@ -1320,7 +1314,7 @@ func (n *network) connected(p *peer) {
 	peerVersion := p.versionStruct.GetValue().(version.Application)
 
 	if n.hasMasked {
-		if peerVersion.Before(minimumUnmaskedVersion) {
+		if n.versionCompatibility.Unmaskable(peerVersion) != nil {
 			if err := n.vdrs.MaskValidator(p.id); err != nil {
 				n.log.Error("failed to mask validator %s due to %s", p.id, err)
 			}
@@ -1331,7 +1325,7 @@ func (n *network) connected(p *peer) {
 		}
 		n.log.Verbo("The new staking set is:\n%s", n.vdrs)
 	} else {
-		if peerVersion.Before(minimumUnmaskedVersion) {
+		if n.versionCompatibility.WontMask(peerVersion) != nil {
 			n.maskedValidators.Add(p.id)
 		} else {
 			n.maskedValidators.Remove(p.id)
@@ -1349,7 +1343,12 @@ func (n *network) connected(p *peer) {
 		n.connectedIPs[str] = struct{}{}
 	}
 
-	n.router.Connected(p.id)
+	compatible := n.versionCompatibility.Compatible(peerVersion) == nil
+	p.compatible.SetValue(compatible)
+
+	if compatible {
+		n.router.Connected(p.id)
+	}
 }
 
 // should only be called after the peer is marked as connected.
@@ -1376,7 +1375,8 @@ func (n *network) disconnected(p *peer) {
 		n.track(ip)
 	}
 
-	if p.connected.GetValue() {
+	if p.compatible.GetValue() {
+		p.compatible.SetValue(false)
 		n.router.Disconnected(p.id)
 	}
 }

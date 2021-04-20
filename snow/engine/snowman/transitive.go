@@ -27,6 +27,8 @@ const (
 	maxContainersLen = int(4 * network.DefaultMaxMessageSize / 5)
 )
 
+var _ Engine = &Transitive{}
+
 // Transitive implements the Engine interface by attempting to fetch all
 // transitive dependencies.
 type Transitive struct {
@@ -744,4 +746,14 @@ func (t *Transitive) HealthCheck() (interface{}, error) {
 		return intf, consensusErr
 	}
 	return intf, fmt.Errorf("vm: %s ; consensus: %s", vmErr, consensusErr)
+}
+
+// GetBlock implements the snowman.Engine interface
+func (t *Transitive) GetBlock(blkID ids.ID) (snowman.Block, error) {
+	return t.VM.GetBlock(blkID)
+}
+
+// GetVM implements the snowman.Engine interface
+func (t *Transitive) GetVM() common.VM {
+	return t.VM
 }

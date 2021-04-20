@@ -165,7 +165,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(httpsCertFileKey, "", "TLS certificate file for the HTTPs server")
 	fs.String(httpAllowedOrigins, "*", "Origins to allow on the HTTP port. Defaults to * which allows all origins. Example: https://*.avax.network https://*.avax-test.network")
 	fs.Bool(apiAuthRequiredKey, false, "Require authorization token to call HTTP APIs")
-	fs.String(apiAuthPasswordFileKey, "", "Password file used to initially create/validate API authorization tokens. Can be changed via API call.")
+	fs.String(apiAuthPasswordFileKey, "", "Password file used to initially create/validate API authorization tokens. Leading and trailing whitespace is removed from the password. Can be changed via API call.")
 	// Enable/Disable APIs
 	fs.Bool(adminAPIEnabledKey, false, "If true, this node exposes the Admin API")
 	fs.Bool(infoAPIEnabledKey, true, "If true, this node exposes the Info API")
@@ -188,7 +188,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Router Health
 	fs.Float64(routerHealthMaxDropRateKey, 1, "Node reports unhealthy if the router drops more than this portion of messages.")
 	fs.Uint(routerHealthMaxOutstandingRequestsKey, 1024, "Node reports unhealthy if there are more than this many outstanding consensus requests (Get, PullQuery, etc.) over all chains")
-	fs.Duration(networkHealthMaxTimeSinceNoReqsKey, 5*time.Minute, "Node reports unhealthy if there is at least 1 outstanding request continuously for this duration")
+	fs.Duration(networkHealthMaxOutstandingDurationKey, 5*time.Minute, "Node reports unhealthy if there has been a request outstanding for this duration")
 
 	// Staking
 	fs.Uint(stakingPortKey, 9651, "Port of the consensus server")
@@ -237,6 +237,11 @@ func avalancheFlagSet() *flag.FlagSet {
 	// IPC
 	fs.String(ipcsChainIDsKey, "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
 	fs.String(ipcsPathKey, defaultString, "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
+
+	// Indexer
+	// TODO handle the below line better
+	fs.Bool(indexEnabledKey, false, "If true, index all accepted containers and transactions and expose them via an API")
+	fs.Bool(indexAllowIncompleteKey, false, "If true, allow running the node in such a way that could cause an index to miss transactions. Ignored if index is disabled.")
 
 	return fs
 }
@@ -514,7 +519,7 @@ func setNodeConfig(v *viper.Viper) error {
 		if err != nil {
 			return fmt.Errorf("api-auth-password-file %q failed to be read with: %w", passwordFile, err)
 		}
-		Config.APIAuthPassword = string(pwBytes)
+		Config.APIAuthPassword = strings.TrimSpace(string(pwBytes))
 		if !password.SufficientlyStrong(Config.APIAuthPassword, password.OK) {
 			return errors.New("api-auth-password is not strong enough")
 		}
@@ -527,6 +532,7 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.MetricsAPIEnabled = v.GetBool(metricsAPIEnabledKey)
 	Config.HealthAPIEnabled = v.GetBool(healthAPIEnabledKey)
 	Config.IPCAPIEnabled = v.GetBool(ipcAPIEnabledKey)
+	Config.IndexAPIEnabled = v.GetBool(indexEnabledKey)
 
 	// Throughput:
 	Config.ThroughputServerEnabled = v.GetBool(xputServerEnabledKey)
@@ -542,14 +548,14 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.ConsensusRouter = &router.ChainRouter{}
 	Config.RouterHealthConfig.MaxDropRate = v.GetFloat64(routerHealthMaxDropRateKey)
 	Config.RouterHealthConfig.MaxOutstandingRequests = int(v.GetUint(routerHealthMaxOutstandingRequestsKey))
-	Config.RouterHealthConfig.MaxTimeSinceNoOutstandingRequests = v.GetDuration(networkHealthMaxTimeSinceNoReqsKey)
+	Config.RouterHealthConfig.MaxOutstandingDuration = v.GetDuration(networkHealthMaxOutstandingDurationKey)
 	Config.RouterHealthConfig.MaxRunTimeRequests = v.GetDuration(networkMaximumTimeoutKey)
 	Config.RouterHealthConfig.MaxDropRateHalflife = healthCheckAveragerHalflife
 	switch {
 	case Config.RouterHealthConfig.MaxDropRate < 0 || Config.RouterHealthConfig.MaxDropRate > 1:
 		return fmt.Errorf("%s must be in [0,1]", routerHealthMaxDropRateKey)
-	case Config.RouterHealthConfig.MaxTimeSinceNoOutstandingRequests <= 0:
-		return fmt.Errorf("%s must be positive", networkHealthMaxTimeSinceNoReqsKey)
+	case Config.RouterHealthConfig.MaxOutstandingDuration <= 0:
+		return fmt.Errorf("%s must be positive", networkHealthMaxOutstandingDurationKey)
 	}
 
 	// IPCs
@@ -714,6 +720,9 @@ func setNodeConfig(v *viper.Viper) error {
 		}
 	}
 	Config.CorethConfig = corethConfigString
+
+	// Indexer
+	Config.IndexAllowIncomplete = v.GetBool(indexAllowIncompleteKey)
 
 	// Bootstrap Configs
 	Config.RetryBootstrap = v.GetBool(retryBootstrap)

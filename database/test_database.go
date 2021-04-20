@@ -26,6 +26,8 @@ var (
 		TestIteratorStartPrefix,
 		TestIteratorMemorySafety,
 		TestIteratorClosed,
+		TestIteratorError,
+		TestIteratorErrorAfterRelease,
 		TestStatNoPanic,
 		TestCompactNoPanic,
 		TestMemorySafetyDatabase,
@@ -801,6 +803,75 @@ func TestIteratorClosed(t *testing.T, db Database) {
 	} else if value := iterator.Value(); value != nil {
 		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
 	} else if err := iterator.Error(); err != ErrClosed {
+		t.Fatalf("Expected %s on iterator.Error", ErrClosed)
+	}
+}
+
+// TestIteratorError tests to make sure that an iterator still works after the
+// database is closed.
+func TestIteratorError(t *testing.T, db Database) {
+	key := []byte("hello1")
+	value := []byte("world1")
+
+	if err := db.Put(key, value); err != nil {
+		t.Fatalf("Unexpected error on batch.Put: %s", err)
+	}
+
+	iterator := db.NewIterator()
+	if iterator == nil {
+		t.Fatalf("db.NewIterator returned nil")
+	}
+	defer iterator.Release()
+
+	if err := db.Close(); err != nil {
+		t.Fatalf("Unexpected error on db.Close: %s", err)
+	}
+
+	if !iterator.Next() {
+		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", false, true)
+	}
+	if itKey := iterator.Key(); !bytes.Equal(itKey, key) {
+		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: 0x%x", itKey, key)
+	}
+	if itValue := iterator.Value(); !bytes.Equal(itValue, value) {
+		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: 0x%x", itValue, value)
+	}
+	if err := iterator.Error(); err != nil {
+		t.Fatalf("Expected no error on iterator.Error but got %s", err)
+	}
+}
+
+// TestIteratorErrorAfterRelease tests to make sure that an iterator that was
+// released still reports the error correctly.
+func TestIteratorErrorAfterRelease(t *testing.T, db Database) {
+	key := []byte("hello1")
+	value := []byte("world1")
+
+	if err := db.Put(key, value); err != nil {
+		t.Fatalf("Unexpected error on batch.Put: %s", err)
+	}
+
+	if err := db.Close(); err != nil {
+		t.Fatalf("Unexpected error on db.Close: %s", err)
+	}
+
+	iterator := db.NewIterator()
+	if iterator == nil {
+		t.Fatalf("db.NewIterator returned nil")
+	}
+
+	iterator.Release()
+
+	if iterator.Next() {
+		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", false, true)
+	}
+	if key := iterator.Key(); key != nil {
+		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: nil", key)
+	}
+	if value := iterator.Value(); value != nil {
+		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
+	}
+	if err := iterator.Error(); err != ErrClosed {
 		t.Fatalf("Expected %s on iterator.Error", ErrClosed)
 	}
 }

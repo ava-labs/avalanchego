@@ -12,11 +12,14 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
+	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
+	"github.com/ava-labs/avalanchego/api/keystore/gkeystore/gkeystoreproto"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -26,8 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup/galiaslookupproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/ghttpproto"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gkeystore"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gkeystore/gkeystoreproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsharedmemory"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsharedmemory/gsharedmemoryproto"
@@ -200,8 +201,20 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 
 	vm.toEngine = toEngine
 	lastAccepted, err := vm.vm.LastAccepted()
+	if err != nil {
+		return nil, err
+	}
+	blk, err := vm.vm.GetBlock(lastAccepted)
+	if err != nil {
+		return nil, err
+	}
+	parentID := blk.Parent().ID()
 	return &vmproto.InitializeResponse{
-		LastAcceptedID: lastAccepted[:],
+		LastAcceptedID:       lastAccepted[:],
+		LastAcceptedParentID: parentID[:],
+		Status:               uint32(choices.Accepted),
+		Height:               blk.Height(),
+		Bytes:                blk.Bytes(),
 	}, err
 }
 
