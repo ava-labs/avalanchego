@@ -49,7 +49,6 @@ const (
 	batchSize          = 30
 	statusCacheSize    = 10000
 	idCacheSize        = 10000
-	txCacheSize        = 10000
 	utxoCacheSize      = 10000
 	assetToFxCacheSize = 1024
 	maxUTXOsToFetch    = 1024
