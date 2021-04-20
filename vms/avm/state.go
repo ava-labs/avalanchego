@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
@@ -33,7 +34,25 @@ type state struct {
 }
 
 func NewState(db database.Database, genesisCodec, codec codec.Manager) State {
+	return &state{
+		UTXOState: avax.NewUTXOState(),
+	}
 
+	vm.state = &prefixedState{
+		state: &state{
+			txCache: &cache.LRU{Size: txCacheSize},
+			txDB:    prefixdb.NewNested([]byte("tx"), vm.db),
+			State: avax.NewState(
+				vm.db,
+				vm.genesisCodec,
+				vm.codec,
+				utxoCacheSize,
+				statusCacheSize,
+				idCacheSize,
+			),
+		},
+		uniqueTx: &cache.EvictableLRU{Size: txCacheSize},
+	}
 }
 
 // UniqueTx de-duplicates the transaction.
