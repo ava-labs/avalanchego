@@ -229,10 +229,13 @@ func (nm *nodeManager) runNormal(v *viper.Viper) (int, error) {
 
 func formatArgs(k string, v interface{}) string {
 	if k == config.CorethConfigKey {
-		if val, ok := v.(string); ok && val != config.DefaultString {
-			s, _ := json.Marshal(v)
-			v = string(s)
+		// it either is a string, "default" or a json
+		if val, ok := v.(string); ok {
+			return fmt.Sprintf("--%s=%s", k, val)
 		}
+		// or it's a loaded config from either the defaults or a config file
+		s, _ := json.Marshal(v)
+		v = string(s)
 	}
 	return fmt.Sprintf("--%s=%v", k, v)
 }
