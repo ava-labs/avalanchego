@@ -93,19 +93,23 @@ func (b *Bootstrapper) Initialize(
 		return err
 	}
 
-	b.VtxBlocked.SetParser(&vtxParser{
+	if err := b.VtxBlocked.SetParser(&vtxParser{
 		log:         config.Ctx.Log,
 		numAccepted: b.numAcceptedVts,
 		numDropped:  b.numDroppedVts,
 		manager:     b.Manager,
-	})
+	}); err != nil {
+		return err
+	}
 
-	b.TxBlocked.SetParser(&txParser{
+	if err := b.TxBlocked.SetParser(&txParser{
 		log:         config.Ctx.Log,
 		numAccepted: b.numAcceptedTxs,
 		numDropped:  b.numDroppedTxs,
 		vm:          b.VM,
-	})
+	}); err != nil {
+		return err
+	}
 
 	config.Bootstrapable = b
 	return b.Bootstrapper.Initialize(config.Config)

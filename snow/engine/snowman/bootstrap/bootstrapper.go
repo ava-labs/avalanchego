@@ -100,7 +100,9 @@ func (b *Bootstrapper) Initialize(
 		numDropped:  b.numDropped,
 		vm:          b.VM,
 	}
-	b.Blocked.SetParser(b.parser)
+	if err := b.Blocked.SetParser(b.parser); err != nil {
+		return err
+	}
 
 	config.Bootstrapable = b
 	return b.Bootstrapper.Initialize(config.Config)

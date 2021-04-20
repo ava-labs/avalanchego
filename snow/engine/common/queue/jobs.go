@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -46,7 +47,7 @@ func New(
 }
 
 // SetParser tells this job queue how to parse jobs from the database.
-func (j *Jobs) SetParser(parser Parser) { j.state.parser = parser }
+func (j *Jobs) SetParser(parser Parser) error { j.state.parser = parser; return nil }
 
 func (j *Jobs) Has(jobID ids.ID) (bool, error) { return j.state.HasJob(jobID) }
 
@@ -195,6 +196,12 @@ func NewWithMissing(
 	return jobs, err
 }
 
+// SetParser tells this job queue how to parse jobs from the database.
+func (jm *JobsWithMissing) SetParser(parser Parser) error {
+	jm.state.parser = parser
+	return jm.cleanRunnableStack()
+}
+
 func (jm *JobsWithMissing) Has(jobID ids.ID) (bool, error) {
 	if jm.missingIDs.Contains(jobID) {
 		return false, nil
@@ -280,4 +287,59 @@ func (jm *JobsWithMissing) Commit() error {
 		jm.removeFromMissingIDs.Clear()
 	}
 	return jm.Jobs.Commit()
+}
+
+// cleanRunnableStack iterates over the jobs on the runnable stack and resets any job
+// that has missing dependencies to block on those dependencies.
+// Note: the jobs queue ensures that no job with missing dependencies will be placed
+// on the runnable stack in the first place.
+// However, for specific VM implementations blocks may be committed via a two stage commit
+// (ex. platformvm Proposal and Commit/Abort blocks). This can cause an issue where if the first stage
+// is executed immediately before the node dies, it will be removed from the runnable stack
+// without writing the state transition to the VM's database. When the node restarts, the
+// VM will not have marked the first block (the proposal block as accepted), but it could
+// have already been removed from the jobs queue. cleanRunnableStack handles this case.
+func (jm *JobsWithMissing) cleanRunnableStack() error {
+	runnableJobsIter := jm.state.runnableJobIDs.NewIterator()
+	defer runnableJobsIter.Release()
+
+	for runnableJobsIter.Next() {
+		jobIDBytes := runnableJobsIter.Key()
+		jobID, err := ids.ToID(jobIDBytes)
+		if err != nil {
+			return fmt.Errorf("failed to convert jobID bytes into ID due to: %w", err)
+		}
+
+		job, err := jm.state.GetJob(jobID)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve job on runnnable stack due to: %w", err)
+		}
+		deps, err := job.MissingDependencies()
+		if err != nil {
+			return fmt.Errorf("failed to retrieve missing dependencies of job on runnable stack due to: %w", err)
+		}
+		if deps.Len() == 0 {
+			continue
+		}
+
+		// If the job has missing dependencies, remove it from the runnable stack
+		if err := jm.state.runnableJobIDs.Delete(jobIDBytes); err != nil {
+			return fmt.Errorf("failed to delete jobID from runnable stack due to: %w", err)
+		}
+
+		// Add the missing dependencies to the set that needs to be fetched.
+		jm.AddMissingID(deps.List()...)
+		for depID := range deps {
+			if err := jm.state.AddDependency(depID, jobID); err != nil {
+				return fmt.Errorf("failed to add blocking for depID %s, jobID %s while cleaning the runnable stack", depID, jobID)
+			}
+		}
+	}
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		runnableJobsIter.Error(),
+		jm.Commit(),
+	)
+	return errs.Err
 }
