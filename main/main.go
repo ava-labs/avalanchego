@@ -28,35 +28,32 @@ const (
 func main() {
 	fmt.Println(header)
 
-	exitCode := 0
-	defer func() {
-		os.Exit(exitCode)
-	}()
-
 	// Get the config
 	nodeConfig, v, err := config.GetConfig()
 	if err != nil {
 		fmt.Printf("couldn't get config: %s", err)
-		exitCode = 1
-		return
+		os.Exit(1)
 	}
 
-	nodeConfig.LoggingConfig.Directory = filepath.Join(nodeConfig.LoggingConfig.Directory, "daemon")
-	logFactory := logging.NewFactory(nodeConfig.LoggingConfig)
+	logConfigCopy := nodeConfig.LoggingConfig
+	logConfigCopy.Directory = filepath.Join(logConfigCopy.Directory, "daemon")
+	logFactory := logging.NewFactory(logConfigCopy)
 	defer logFactory.Close()
 
 	log, err := logFactory.Make()
 	if err != nil {
 		fmt.Printf("starting logger failed with: %s\n", err)
-		exitCode = 1
-		return
+		os.Exit(1)
 	}
 
 	nodeManager := newNodeManager(nodeConfig.BuildDir, log)
 	_ = utils.HandleSignals(
 		func(os.Signal) {
+			// SIGINT and SIGTERM cause all running nodes
+			// to be ended and this program to exit with
+			// exit code 0
 			nodeManager.shutdown()
-			os.Exit(exitCode)
+			os.Exit(0)
 		},
 		syscall.SIGINT, syscall.SIGTERM,
 	)
@@ -65,12 +62,12 @@ func main() {
 	if err := migrationManager.migrate(); err != nil {
 		log.Error("error while running migration: %s", err)
 		nodeManager.shutdown()
-		exitCode = 1
-		return
+		os.Exit(1)
 	}
 
 	log.Info("starting to run node in normal execution mode")
-	exitCode, err = nodeManager.runNormal(v)
+	exitCode, err := nodeManager.runNormal(v)
 	log.Debug("node manager returned exit code %s, error %v", exitCode, err)
 	nodeManager.shutdown() // make sure all the nodes are stopped
+	os.Exit(exitCode)
 }

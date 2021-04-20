@@ -79,7 +79,7 @@ func (m *migrationManager) runMigration() error {
 	m.log.Info("starting pre-database upgrade node")
 	preDBUpgradeNodeExitCodeChan := preDBUpgradeNode.start()
 	defer func() {
-		if err := m.binaryManager.Stop(preDBUpgradeNode.processID); err != nil {
+		if err := m.binaryManager.Stop(preDBUpgradeNode.path); err != nil {
 			m.log.Error(err.Error())
 		}
 	}()
@@ -91,7 +91,7 @@ func (m *migrationManager) runMigration() error {
 	}
 	latestVersionExitCodeChan := latestVersion.start()
 	defer func() {
-		if err := m.binaryManager.Stop(latestVersion.processID); err != nil {
+		if err := m.binaryManager.Stop(latestVersion.path); err != nil {
 			m.log.Error("error while stopping latest version node: %s", err)
 		}
 	}()

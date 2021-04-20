@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
+	"path/filepath"
 	"sync"
 
 	appplugin "github.com/ava-labs/avalanchego/app/plugin"
@@ -21,8 +21,9 @@ import (
 // nodeProcess wraps a node client
 type nodeProcess struct {
 	log logging.Logger
-	// Every nodeProcess has a unique ID
-	processID int
+	// Path to the binary being executed
+	// must be unique among all nodeProcess
+	path string
 	// [rawClient].Kill() should eventually be called be called
 	// on each nodeProcess
 	rawClient *plugin.Client
@@ -37,7 +38,7 @@ func (np *nodeProcess) start() chan int {
 		exitCode, err := np.node.Start()
 		if err != nil {
 			// This error could be from the subprocess shutting down
-			np.log.Debug("node returned: %s", err)
+			np.log.Debug("node at path %s returned: %s", np.path, err)
 		}
 		exitCodeChan <- exitCode
 	}()
@@ -65,10 +66,10 @@ type nodeManager struct {
 	//     |_evm
 	buildDirPath string
 	log          logging.Logger
-	// nodeProcess ID --> nodeProcess
-	nodes         map[int]*nodeProcess
-	nextProcessID int
-	processLock   sync.Mutex
+	// nodeProcess binary path --> nodeProcess
+	// Must hold [lock] while touching this
+	nodes map[string]*nodeProcess
+	lock  sync.Mutex
 }
 
 func (nm *nodeManager) latestNodeVersionPath() string {
@@ -80,37 +81,37 @@ func (nm *nodeManager) preupgradeNodeVersionPath() string {
 }
 
 func (nm *nodeManager) shutdown() {
-	nm.processLock.Lock()
-	defer nm.processLock.Unlock()
+	nm.lock.Lock()
+	defer nm.lock.Unlock()
 
 	for _, node := range nm.nodes {
-		nm.log.Info("stopping process %v", node.processID)
-		if err := nm.stop(node.processID); err != nil {
+		nm.log.Info("stopping node at path %s", node.path)
+		if err := nm.stop(node.path); err != nil {
 			nm.log.Error("error stopping node: %s", err)
 		}
-		nm.log.Info("done stopping process %v", node.processID)
+		nm.log.Info("done stopping process %v", node.path)
 	}
 }
 
 // stop a node. Blocks until the node is done shutting down.
-// Assumes [nm.processLock] is not held
-func (nm *nodeManager) Stop(processID int) error {
-	nm.processLock.Lock()
-	defer nm.processLock.Unlock()
-	return nm.stop(processID)
+// Assumes [nm.lock] is not held
+func (nm *nodeManager) Stop(path string) error {
+	nm.lock.Lock()
+	defer nm.lock.Unlock()
+	return nm.stop(path)
 }
 
 // stop a node. Blocks until the node is done shutting down.
-// Assumes [nm.processLock] is held
-func (nm *nodeManager) stop(processID int) error {
-	nodeProcess, exists := nm.nodes[processID]
+// Assumes [nm.lock] is held
+func (nm *nodeManager) stop(path string) error {
+	nodeProcess, exists := nm.nodes[path]
 	if !exists {
 		return nil
 	}
 	if err := nodeProcess.stop(); err != nil {
 		return err
 	}
-	delete(nm.nodes, processID)
+	delete(nm.nodes, nodeProcess.path)
 	return nil
 }
 
@@ -118,8 +119,8 @@ func newNodeManager(path string, log logging.Logger) *nodeManager {
 	return &nodeManager{
 		buildDirPath: path,
 		log:          log,
-		nodes:        map[int]*nodeProcess{},
-		processLock:  sync.Mutex{},
+		nodes:        map[string]*nodeProcess{},
+		lock:         sync.Mutex{},
 	}
 }
 
@@ -144,26 +145,25 @@ func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (
 	rpcClient, err := client.Client()
 	if err != nil {
 		client.Kill()
-		return nil, fmt.Errorf("couldn't get Client: %w", err)
+		return nil, fmt.Errorf("couldn't get client at path %s: %w", path, err)
 	}
 	raw, err := rpcClient.Dispense("nodeProcess")
 	if err != nil {
 		client.Kill()
-		return nil, fmt.Errorf("couldn't dispense plugin '%s': %w", "nodeProcess", err)
+		return nil, fmt.Errorf("couldn't dispense plugin at path %s': %w", path, err)
 	}
 	node, ok := raw.(*appplugin.Client)
 	if !ok {
 		client.Kill()
 		return nil, fmt.Errorf("expected *node.NodeClient but got %T", raw)
 	}
-	nm.nextProcessID++
 	np := &nodeProcess{
 		log:       nm.log,
 		node:      node,
 		rawClient: client,
-		processID: nm.nextProcessID,
+		path:      path,
 	}
-	nm.nodes[np.processID] = np
+	nm.nodes[np.path] = np
 	return np, nil
 }
 
@@ -194,10 +194,7 @@ func (nm *nodeManager) latestVersionNodeFetchOnly(v *viper.Viper, nodeConfig nod
 	argsMap[config.StakingPortKey] = 0
 	argsMap[config.HTTPPortKey] = 0
 	argsMap[config.PluginModeKey] = true
-	// replace the last folder named daemon in path with fetch-only
-	daemonLogDir := nodeConfig.LoggingConfig.Directory
-	i := strings.LastIndex(daemonLogDir, "daemon")
-	argsMap[config.LogsDirKey] = daemonLogDir[:i] + strings.Replace(daemonLogDir[i:], "daemon", "fetch-only", 1)
+	argsMap[config.LogsDirKey] = filepath.Join(nodeConfig.LoggingConfig.Directory, "fetch-only")
 
 	var args []string
 	for k, v := range argsMap {
