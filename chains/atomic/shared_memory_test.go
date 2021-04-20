@@ -46,6 +46,22 @@ func TestSharedMemory(t *testing.T) {
 	}})
 	assert.NoError(err)
 
+	err = sm0.Put(chainID1, []*Element{{
+		Key:   []byte{6},
+		Value: []byte{7},
+		Traits: [][]byte{
+			{8},
+		},
+	}})
+	assert.NoError(err)
+
+	err = sm0.Put(chainID1, []*Element{{
+		Key:    []byte{9},
+		Value:  []byte{10},
+		Traits: nil,
+	}})
+	assert.NoError(err)
+
 	values, _, _, err := sm0.Indexed(chainID1, [][]byte{{2}}, nil, nil, 1)
 	assert.NoError(err)
 	assert.Empty(values, "wrong indexed values returned")
@@ -56,23 +72,34 @@ func TestSharedMemory(t *testing.T) {
 
 	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{2}}, nil, nil, 1)
 	assert.NoError(err)
-	assert.Equal([][]byte{{1}}, values, "wrong indexed values returned")
+	assert.Len(values, 1)
+	assert.Contains([][]byte{{1}, {5}}, values[0], "wrong indexed values returned")
 
 	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{2}}, nil, nil, 2)
 	assert.NoError(err)
-	assert.Equal([][]byte{{1}, {5}}, values, "wrong indexed values returned")
+	assert.ElementsMatch([][]byte{{1}, {5}}, values, "wrong indexed values returned")
 
 	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{2}}, nil, nil, 3)
 	assert.NoError(err)
-	assert.Equal([][]byte{{1}, {5}}, values, "wrong indexed values returned")
+	assert.ElementsMatch([][]byte{{1}, {5}}, values, "wrong indexed values returned")
 
 	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{3}}, nil, nil, 3)
 	assert.NoError(err)
-	assert.Equal([][]byte{{1}, {5}}, values, "wrong indexed values returned")
+	assert.ElementsMatch([][]byte{{1}, {5}}, values, "wrong indexed values returned")
 
+	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{2}, {3}, {8}}, nil, nil, 3)
+	assert.NoError(err)
+	assert.ElementsMatch([][]byte{{1}, {5}, {7}}, values, "wrong indexed values returned")
+
+	// Delete 2 entries
+	err = sm1.Remove(chainID0, [][]byte{{4}, {6}})
+	assert.NoError(err)
 	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{2}, {3}}, nil, nil, 3)
 	assert.NoError(err)
-	assert.Equal([][]byte{{1}, {5}}, values, "wrong indexed values returned")
+	assert.ElementsMatch([][]byte{{1}}, values, "wrong indexed values returned")
+	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{2}, {3}, {8}}, nil, nil, 3)
+	assert.NoError(err)
+	assert.ElementsMatch([][]byte{{1}}, values, "wrong indexed values returned")
 }
 
 func TestSharedMemoryCantDuplicatePut(t *testing.T) {
