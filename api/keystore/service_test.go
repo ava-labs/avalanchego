@@ -438,23 +438,20 @@ func TestServiceDeleteUser(t *testing.T) {
 }
 
 // 1st part -> insert data into 1.0.0
-// 2nd part -> migrate data from 1.0.0 to 1.1.0
-// 3rd part -> check if data from 1.0.0 exists in 1.1.0
+// 2nd part -> migrate data from 1.0.0 to 1.3.3
+// 3rd part -> check if data from 1.0.0 exists in 1.3.3
 
 // second test ? - in the future ?
 // 1st part -> insert data into 1.2.0
-// 2nd part -> migrate data from 1.1.0 to 1.2.0
-// 3rd part -> check if data from 1.1.0 exists in 1.2.0
-// we have not defined yet a 1.1.0 -> 1.2.0 migration
+// 2nd part -> migrate data from 1.3.3 to 1.?.?
+// 3rd part -> check if data from 1.3.3 exists in 1.?.?
+// we have not defined yet a 1.3.3 -> 1.?.? migration
 func TestMigrateKeystoreUser(t *testing.T) {
 	testUser := "testUser"
 	password := "passwTest@fake01ord"
 	bID := ids.Empty
 	versionedDBs := []*manager.VersionedDatabase{
-		{
-			Database: memdb.New(),
-			Version:  version.DefaultVersion2,
-		},
+		manager.NewVersionedDatabase(memdb.New(), version.NewDefaultVersion(1, 0, 0)),
 	}
 
 	dbManager, err := manager.NewManagerFromDBs(memdb.New(), versionedDBs)
@@ -485,10 +482,7 @@ func TestMigrateKeystoreUser(t *testing.T) {
 		t.Fatalf("Failed to put value in userDB: %s", err)
 	}
 
-	versionedDBs = append(versionedDBs, &manager.VersionedDatabase{
-		Database: memdb.New(),
-		Version:  version.NewDefaultVersion(1, 0, 0),
-	})
+	versionedDBs = append(versionedDBs, manager.NewVersionedDatabase(memdb.New(), version.NewDefaultVersion(1, 3, 3)))
 	upgradedDBManager, err := manager.NewManagerFromDBs(memdb.New(), versionedDBs)
 	if err != nil {
 		t.Fatal(err)

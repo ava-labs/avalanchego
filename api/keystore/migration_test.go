@@ -23,8 +23,8 @@ func TestMigrationNoPrevDB(t *testing.T) {
 	assert.NoError(ks.(*keystore).migrate(dbManager))
 }
 
-// Test migration from database version 1.0.0 to 1.1.0
-// Recall that the structure of the 1.0.0 and 1.1.0 keystore databases is:
+// Test migration from database version 1.0.0 to 1.3.3
+// Recall that the structure of the 1.0.0 and 1.3.3 keystore databases is:
 //           BaseDB
 //          /      \
 //    UserDB        BlockchainDB
@@ -32,7 +32,7 @@ func TestMigrationNoPrevDB(t *testing.T) {
 //               Usr     Usr    Usr
 //             /  |  \
 //          BID  BID  BID
-func TestMigration100_to_110(t *testing.T) {
+func TestMigration100_to_133(t *testing.T) {
 	assert := assert.New(t)
 	ks := &keystore{log: logging.NoLog{}}
 	dbManager := &mocks.Manager{}
@@ -49,16 +49,13 @@ func TestMigration100_to_110(t *testing.T) {
 	assert.NoError(userPrevBCDB.Put(userDataKey, userDataValue))
 
 	dbManager.On("Previous").Return(
-		&manager.VersionedDatabase{
-			Database: prevDB,
-			Version:  version.NewDefaultVersion(1, 0, 0),
-		},
+		manager.NewVersionedDatabase(prevDB, version.NewDefaultVersion(1, 0, 0)),
 		true,
 	)
 
 	currentDB := &manager.VersionedDatabase{
 		Database: memdb.New(),
-		Version:  version.NewDefaultVersion(1, 1, 0),
+		Version:  version.NewDefaultVersion(1, 3, 3),
 	}
 	dbManager.On("Current").Return(currentDB)
 
