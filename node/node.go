@@ -17,21 +17,24 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/admin"
+	"github.com/ava-labs/avalanchego/api/auth"
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
+	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/meterdb"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/indexer"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
@@ -64,15 +67,10 @@ const (
 )
 
 var (
+	genesisHashKey                  = []byte("genesisID")
+	indexerDBPrefix                 = []byte{0x00}
 	errPrimarySubnetNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
-)
 
-var (
-	genesisHashKey = []byte("genesisID")
-
-	// Version is the version of this code
-	Version                 = version.NewDefaultVersion(constants.PlatformName, 1, 2, 4)
-	versionParser           = version.NewDefaultParser()
 	beaconConnectionTimeout = 1 * time.Minute
 )
 
@@ -87,10 +85,14 @@ type Node struct {
 	ID ids.ShortID
 
 	// Storage for this node
-	DB database.Database
+	DBManager manager.Manager
+	DB        database.Database
+
+	// Indexes blocks, transactions and blocks
+	indexer indexer.Indexer
 
 	// Handles calls to Keystore API
-	keystoreServer keystore.Keystore
+	keystore keystore.Keystore
 
 	// Manages shared memory
 	sharedMemory atomic.Memory
@@ -123,7 +125,7 @@ type Node struct {
 	vdrs validators.Manager
 
 	// Handles HTTP API calls
-	APIServer api.Server
+	APIServer server.Server
 
 	// This node's configuration
 	Config *Config
@@ -234,14 +236,24 @@ func (n *Node) initNetworking() error {
 		}
 	}
 
+	versionManager := version.NewCompatibility(
+		Version,
+		MinimumCompatibleVersion,
+		GetApricotPhase1Time(n.Config.NetworkID),
+		PrevMinimumCompatibleVersion,
+		MinimumUnmaskedVersion,
+		GetApricotPhase0Time(n.Config.NetworkID),
+		PrevMinimumUnmaskedVersion,
+	)
+
 	n.Net = network.NewDefaultNetwork(
 		n.Config.ConsensusParams.Metrics,
 		n.Log,
 		n.ID,
 		n.Config.StakingIP,
 		n.Config.NetworkID,
-		Version,
-		versionParser,
+		versionManager,
+		VersionParser,
 		listener,
 		dialer,
 		serverUpgrader,
@@ -255,7 +267,6 @@ func (n *Node) initNetworking() error {
 		n.Config.RestartOnDisconnected,
 		n.Config.DisconnectedCheckFreq,
 		n.Config.DisconnectedRestartTimeout,
-		n.Config.ApricotPhase0Time,
 		n.Config.SendQueueSize,
 		n.Config.NetworkHealthConfig,
 		n.benchlistManager,
@@ -333,22 +344,20 @@ func (b *beaconManager) Disconnected(vdrID ids.ShortID) {
 func (n *Node) Dispatch() error {
 	// Start the HTTP API server
 	go n.Log.RecoverAndPanic(func() {
+		var err error
 		if n.Config.HTTPSEnabled {
 			n.Log.Debug("initializing API server with TLS")
-			err := n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
-			n.Log.Warn("TLS enabled API server dispatch failed with %s. Attempting to create insecure API server", err)
+			err = n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
+		} else {
+			n.Log.Debug("initializing API server without TLS")
+			err = n.APIServer.Dispatch()
 		}
-
-		n.Log.Debug("initializing API server without TLS")
-		err := n.APIServer.Dispatch()
-
 		// When [n].Shutdown() is called, [n.APIServer].Close() is called.
 		// This causes [n.APIServer].Dispatch() to return an error.
 		// If that happened, don't log/return an error here.
 		if !n.shuttingDown.GetValue() {
 			n.Log.Fatal("API server dispatch failed with %s", err)
 		}
-
 		// If the API server isn't running, shut down the node.
 		// If node is already shutting down, this does nothing.
 		n.Shutdown()
@@ -381,8 +390,9 @@ func (n *Node) Dispatch() error {
  ******************************************************************************
  */
 
-func (n *Node) initDatabase(db database.Database) error {
-	n.DB = db
+func (n *Node) initDatabase(dbManager manager.Manager) error {
+	n.DBManager = dbManager
+	n.DB = dbManager.Current()
 
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
 
@@ -477,10 +487,35 @@ func (n *Node) initIPCs() error {
 	return err
 }
 
+// Initialize [n.indexer].
+// Should only be called after [n.DB], [n.DecisionDispatcher], [n.ConsensusDispatcher],
+// [n.Log], [n.APIServer], [n.chainManager] are initialized
+func (n *Node) initIndexer() error {
+	txIndexerDB := prefixdb.New(indexerDBPrefix, n.DB)
+	var err error
+	n.indexer, err = indexer.NewIndexer(indexer.Config{
+		IndexingEnabled:      n.Config.IndexAPIEnabled,
+		AllowIncompleteIndex: n.Config.IndexAllowIncomplete,
+		DB:                   txIndexerDB,
+		Log:                  n.Log,
+		DecisionDispatcher:   n.DecisionDispatcher,
+		ConsensusDispatcher:  n.ConsensusDispatcher,
+		APIServer:            &n.APIServer,
+		ShutdownF:            n.Shutdown,
+	})
+	if err != nil {
+		return fmt.Errorf("couldn't create index for txs: %w", err)
+	}
+
+	// Chain manager will notify indexer when a chain is created
+	n.chainManager.AddRegistrant(n.indexer)
+
+	return nil
+}
+
 // Initializes the Platform chain.
-// Its genesis data specifies the other chains that should
-// be created.
-func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
+// Its genesis data specifies the other chains that should be created.
+func (n *Node) initChains(genesisBytes []byte) {
 	n.Log.Info("initializing chains")
 
 	// Create the Platform Chain
@@ -491,27 +526,53 @@ func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 		VMAlias:       platformvm.ID.String(),
 		CustomBeacons: n.beacons,
 	})
-
-	return nil
 }
 
 // initAPIServer initializes the server that handles HTTP calls
 func (n *Node) initAPIServer() error {
 	n.Log.Info("initializing API server")
 
-	return n.APIServer.Initialize(
+	if !n.Config.APIRequireAuthToken {
+		n.APIServer.Initialize(
+			n.Log,
+			n.LogFactory,
+			n.Config.HTTPHost,
+			n.Config.HTTPPort,
+			n.Config.APIAllowedOrigins,
+		)
+		return nil
+	}
+
+	a, err := auth.New(n.Log, "auth", n.Config.APIAuthPassword)
+	if err != nil {
+		return err
+	}
+
+	n.APIServer.Initialize(
 		n.Log,
 		n.LogFactory,
 		n.Config.HTTPHost,
 		n.Config.HTTPPort,
-		n.Config.APIRequireAuthToken,
-		n.Config.APIAuthPassword,
+		n.Config.APIAllowedOrigins,
+		a,
 	)
+
+	// only create auth service if token authorization is required
+	n.Log.Info("API authorization is enabled. Auth tokens must be passed in the header of API requests, except requests to the auth service.")
+	authService, err := a.CreateHandler()
+	if err != nil {
+		return err
+	}
+	handler := &common.HTTPHandler{
+		LockOptions: common.NoLock,
+		Handler:     authService,
+	}
+	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "auth", "", n.Log)
 }
 
 // Create the vmManager, chainManager and register the following VMs:
 // AVM, Simple Payments DAG, Simple Payments Chain, and Platform VM
-// Assumes n.DB, n.vdrs all initialized (non-nil)
+// Assumes n.DBManager, n.vdrs all initialized (non-nil)
 func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	n.vmManager = vms.NewManager(&n.APIServer, n.HTTPLog)
 
@@ -570,7 +631,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		VMManager:                 n.vmManager,
 		DecisionEvents:            n.DecisionDispatcher,
 		ConsensusEvents:           n.ConsensusDispatcher,
-		DB:                        n.DB,
+		DBManager:                 n.DBManager,
 		Router:                    n.Config.ConsensusRouter,
 		Net:                       n.Net,
 		ConsensusParams:           n.Config.ConsensusParams,
@@ -580,7 +641,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		NodeID:                    n.ID,
 		NetworkID:                 n.Config.NetworkID,
 		Server:                    &n.APIServer,
-		Keystore:                  &n.keystoreServer,
+		Keystore:                  n.keystore,
 		AtomicMemory:              &n.sharedMemory,
 		AVAXAssetID:               avaxAssetID,
 		XChainID:                  xChainID,
@@ -618,7 +679,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			MinStakeDuration:   n.Config.MinStakeDuration,
 			MaxStakeDuration:   n.Config.MaxStakeDuration,
 			StakeMintingPeriod: n.Config.StakeMintingPeriod,
-			ApricotPhase0Time:  n.Config.ApricotPhase0Time,
+			ApricotPhase0Time:  GetApricotPhase0Time(n.Config.NetworkID),
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
 			CreationFee: n.Config.CreationTxFee,
@@ -653,11 +714,13 @@ func (n *Node) initSharedMemory() error {
 // Assumes n.APIServer is already set
 func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
-	keystoreDB := prefixdb.New([]byte("keystore"), n.DB)
-	if err := n.keystoreServer.Initialize(n.Log, keystoreDB); err != nil {
+	keystoreDB := n.DBManager.NewPrefixDBManager([]byte("keystore"))
+	ks, err := keystore.New(n.Log, keystoreDB)
+	if err != nil {
 		return err
 	}
-	keystoreHandler, err := n.keystoreServer.CreateHandler()
+	n.keystore = ks
+	keystoreHandler, err := n.keystore.CreateHandler()
 	if err != nil {
 		return err
 	}
@@ -666,7 +729,11 @@ func (n *Node) initKeystoreAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing keystore API")
-	return n.APIServer.AddRoute(keystoreHandler, &sync.RWMutex{}, "keystore", "", n.HTTPLog)
+	handler := &common.HTTPHandler{
+		LockOptions: common.NoLock,
+		Handler:     keystoreHandler,
+	}
+	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "keystore", "", n.HTTPLog)
 }
 
 // initMetricsAPI initializes the Metrics API
@@ -687,11 +754,11 @@ func (n *Node) initMetricsAPI() error {
 	n.Log.Info("initializing metrics API")
 
 	dbNamespace := fmt.Sprintf("%s_db", constants.PlatformName)
-	db, err := meterdb.New(dbNamespace, registry, n.DB)
+	meterDBManager, err := n.DBManager.NewMeterDBManager(dbNamespace, registry)
 	if err != nil {
 		return err
 	}
-	n.DB = db
+	n.DBManager = meterDBManager
 
 	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "metrics", "", n.HTTPLog)
 }
@@ -836,7 +903,7 @@ func (n *Node) initAliases(genesisBytes []byte) error {
 // Initialize this node
 func (n *Node) Initialize(
 	config *Config,
-	db database.Database,
+	dbManager manager.Manager,
 	logger logging.Logger,
 	logFactory logging.Factory,
 	restarter utils.Restarter,
@@ -854,7 +921,7 @@ func (n *Node) Initialize(
 	}
 	n.HTTPLog = httpLog
 
-	if err := n.initDatabase(db); err != nil { // Set up the node's database
+	if err := n.initDatabase(dbManager); err != nil { // Set up the node's database
 		return fmt.Errorf("problem initializing database: %w", err)
 	}
 	if err = n.initNodeID(); err != nil { // Derive this node's ID
@@ -867,11 +934,11 @@ func (n *Node) Initialize(
 	if err := n.initAPIServer(); err != nil { // Start the API Server
 		return fmt.Errorf("couldn't initialize API server: %w", err)
 	}
-	if err := n.initKeystoreAPI(); err != nil { // Start the Keystore API
-		return fmt.Errorf("couldn't initialize keystore API: %w", err)
-	}
 	if err := n.initMetricsAPI(); err != nil { // Start the Metrics API
 		return fmt.Errorf("couldn't initialize metrics API: %w", err)
+	}
+	if err := n.initKeystoreAPI(); err != nil { // Start the Keystore API
+		return fmt.Errorf("couldn't initialize keystore API: %w", err)
 	}
 
 	if err := n.initSharedMemory(); err != nil { // Initialize shared memory
@@ -909,9 +976,11 @@ func (n *Node) Initialize(
 	if err := n.initAliases(n.Config.GenesisBytes); err != nil { // Set up aliases
 		return fmt.Errorf("couldn't initialize aliases: %w", err)
 	}
-	if err := n.initChains(n.Config.GenesisBytes, n.Config.AvaxAssetID); err != nil { // Start the Platform chain
-		return fmt.Errorf("couldn't initialize chains: %w", err)
+	if err := n.initIndexer(); err != nil {
+		return fmt.Errorf("couldn't initialize indexer: %w", err)
 	}
+	// Start the Platform chain
+	n.initChains(n.Config.GenesisBytes)
 	return nil
 }
 
@@ -938,6 +1007,9 @@ func (n *Node) shutdown() {
 	}
 	if err := n.APIServer.Shutdown(); err != nil {
 		n.Log.Debug("error during API shutdown: %s", err)
+	}
+	if err := n.indexer.Close(); err != nil {
+		n.Log.Debug("error closing tx indexer: %w", err)
 	}
 	utils.ClearSignals(n.nodeCloser)
 	n.doneShuttingDown.Done()

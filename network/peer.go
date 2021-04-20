@@ -44,6 +44,10 @@ type peer struct {
 	// has been returned. is only modified on the connection's reader routine.
 	connected utils.AtomicBool
 
+	// if the peer is connected and the peer is able to follow the protocol. is
+	// only modified on the connection's reader routine.
+	compatible utils.AtomicBool
+
 	// only close the peer once
 	once sync.Once
 
@@ -249,7 +253,7 @@ func (p *peer) ReadMessages() {
 				p.id,
 				formatting.DumpBytes{Bytes: msgBytes},
 				err)
-			return
+			continue
 		}
 
 		p.handle(msg)
@@ -388,9 +392,19 @@ func (p *peer) handle(msg Msg) {
 		return
 	}
 
-	peerVersion := p.versionStruct.GetValue().(version.Version)
-	if peerVersion.Before(minimumUnmaskedVersion) && time.Until(p.net.apricotPhase0Time) < 0 {
+	peerVersion := p.versionStruct.GetValue().(version.Application)
+	if p.net.versionCompatibility.Compatible(peerVersion) != nil {
 		p.net.log.Verbo("dropping message from un-upgraded validator %s", p.id)
+
+		if p.compatible.GetValue() {
+			p.net.stateLock.Lock()
+			defer p.net.stateLock.Unlock()
+
+			if p.compatible.GetValue() {
+				p.net.router.Disconnected(p.id)
+				p.compatible.SetValue(false)
+			}
+		}
 		return
 	}
 
@@ -482,16 +496,16 @@ func (p *peer) Version() {
 		p.net.nodeID,
 		p.net.clock.Unix(),
 		p.net.ip.IP(),
-		p.net.msgVersion.String(),
+		p.net.versionCompatibility.Version().String(),
 	)
 	p.net.stateLock.RUnlock()
 	p.net.log.AssertNoError(err)
 	if p.Send(msg) {
-		p.net.version.numSent.Inc()
-		p.net.version.sentBytes.Add(float64(len(msg.Bytes())))
+		p.net.metrics.version.numSent.Inc()
+		p.net.metrics.version.sentBytes.Add(float64(len(msg.Bytes())))
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
 	} else {
-		p.net.version.numFailed.Inc()
+		p.net.metrics.version.numFailed.Inc()
 		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
 	}
 }
@@ -616,7 +630,7 @@ func (p *peer) version(msg Msg) {
 		return
 	}
 
-	if p.net.msgVersion.Before(peerVersion) {
+	if p.net.versionCompatibility.Version().Before(peerVersion) {
 		if p.net.beacons.Contains(p.id) {
 			p.net.log.Info("beacon %s attempting to connect with newer version %s. You may want to update your client",
 				p.id,
@@ -628,7 +642,7 @@ func (p *peer) version(msg Msg) {
 		}
 	}
 
-	if err := p.net.msgVersion.Compatible(peerVersion); err != nil {
+	if err := p.net.versionCompatibility.Connectable(peerVersion); err != nil {
 		p.net.log.Debug("peer version not compatible due to %s", err)
 
 		if !p.net.beacons.Contains(p.id) {

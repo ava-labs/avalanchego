@@ -23,7 +23,6 @@ func TestTimer(t *testing.T) {
 func TestTimerCancel(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	defer wg.Wait()
 
 	failTimer := NewTimer(func() {
 		wg.Done()
@@ -37,6 +36,11 @@ func TestTimerCancel(t *testing.T) {
 	go failTimer.Dispatch()
 	go cancelTimer.Dispatch()
 
-	failTimer.SetTimeoutIn(time.Second)
+	failTimer.SetTimeoutIn(10 * time.Millisecond)
 	cancelTimer.SetTimeoutIn(time.Millisecond)
+
+	wg.Wait()
+	// Sleep for 10ms, so that if cancellation does not work the timer will
+	// go off and cause the test to fail.
+	time.Sleep(10 * time.Millisecond)
 }

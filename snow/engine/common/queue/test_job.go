@@ -25,7 +25,6 @@ type TestJob struct {
 	BytesF               func() []byte
 }
 
-// Default ...
 func (j *TestJob) Default(cant bool) {
 	j.CantID = cant
 	j.CantMissingDependencies = cant
@@ -33,7 +32,6 @@ func (j *TestJob) Default(cant bool) {
 	j.CantBytes = cant
 }
 
-// ID ...
 func (j *TestJob) ID() ids.ID {
 	if j.IDF != nil {
 		return j.IDF()
@@ -44,7 +42,6 @@ func (j *TestJob) ID() ids.ID {
 	return ids.ID{}
 }
 
-// MissingDependencies ...
 func (j *TestJob) MissingDependencies() (ids.Set, error) {
 	if j.MissingDependenciesF != nil {
 		return j.MissingDependenciesF()
@@ -55,17 +52,16 @@ func (j *TestJob) MissingDependencies() (ids.Set, error) {
 	return ids.Set{}, nil
 }
 
-// Execute ...
 func (j *TestJob) Execute() error {
 	if j.ExecuteF != nil {
 		return j.ExecuteF()
-	} else if j.CantExecute && j.T != nil {
+	}
+	if j.CantExecute && j.T != nil {
 		j.T.Fatalf("Unexpectedly called Execute")
 	}
 	return errors.New("unexpectedly called Execute")
 }
 
-// Bytes ...
 func (j *TestJob) Bytes() []byte {
 	if j.BytesF != nil {
 		return j.BytesF()

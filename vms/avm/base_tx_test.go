@@ -8,7 +8,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -863,8 +863,10 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		memdb.New(),
+		manager.NewDefaultMemDBManager(),
 		genesisBytes,
+		nil,
+		nil,
 		issuer,
 		[]*common.Fx{
 			{
@@ -1133,7 +1135,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	vm.Pending()
+	vm.PendingTxs()
 
 	tx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
@@ -1228,7 +1230,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	vm.Pending()
+	vm.PendingTxs()
 
 	tx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
@@ -1284,8 +1286,10 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 
 	err := vm.Initialize(
 		ctx,
-		memdb.New(),
+		manager.NewDefaultMemDBManager(),
 		genesisBytes,
+		nil,
+		nil,
 		issuer,
 		[]*common.Fx{
 			{
@@ -1366,7 +1370,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	vm.Pending()
+	vm.PendingTxs()
 
 	tx := &Tx{
 		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
@@ -1426,8 +1430,10 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 
 	err := vm.Initialize(
 		ctx,
-		memdb.New(),
+		manager.NewDefaultMemDBManager(),
 		genesisBytes,
+		nil,
+		nil,
 		issuer,
 		[]*common.Fx{
 			{
@@ -1508,7 +1514,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	vm.Pending()
+	vm.PendingTxs()
 
 	tx := &Tx{
 		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{

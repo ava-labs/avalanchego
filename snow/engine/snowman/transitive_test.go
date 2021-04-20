@@ -1057,6 +1057,8 @@ func TestEngineAbandonQuery(t *testing.T) {
 		t.Fatalf("Should have blocked on request")
 	}
 
+	sender.CantChits = false
+
 	if err := te.GetFailed(vdr, *reqID); err != nil {
 		t.Fatal(err)
 	}
@@ -1306,6 +1308,7 @@ func TestEngineRetryFetch(t *testing.T) {
 
 	vm.CantGetBlock = true
 	sender.GetF = nil
+	sender.CantChits = false
 
 	if err := te.GetFailed(vdr, *reqID); err != nil {
 		t.Fatal(err)

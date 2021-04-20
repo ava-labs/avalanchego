@@ -24,7 +24,7 @@ type txParser struct {
 }
 
 func (p *txParser) Parse(txBytes []byte) (queue.Job, error) {
-	tx, err := p.vm.Parse(txBytes)
+	tx, err := p.vm.ParseTx(txBytes)
 	if err != nil {
 		return nil, err
 	}

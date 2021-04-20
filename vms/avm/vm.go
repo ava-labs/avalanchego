@@ -14,11 +14,13 @@ import (
 
 	"github.com/gorilla/rpc/v2"
 
+	"github.com/ava-labs/avalanchego/api/pubsub"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -63,7 +65,8 @@ var (
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
 
-	_ vertex.DAGVM = &VM{}
+	_ vertex.DAGVM    = &VM{}
+	_ common.StaticVM = &VM{}
 )
 
 // VM implements the avalanche.DAGVM interface
@@ -81,7 +84,7 @@ type VM struct {
 	codec         codec.Manager
 	codecRegistry codec.Registry
 
-	pubsub *cjson.PubSubServer
+	pubsub *pubsub.Server
 
 	// State management
 	state *prefixedState
@@ -121,11 +124,14 @@ type VM struct {
 // Initialize implements the avalanche.DAGVM interface
 func (vm *VM) Initialize(
 	ctx *snow.Context,
-	db database.Database,
+	dbManager manager.Manager,
 	genesisBytes []byte,
+	upgradeBytes []byte,
+	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 ) error {
+	db := dbManager.Current()
 	vm.ctx = ctx
 	vm.toEngine = toEngine
 	vm.baseDB = db
@@ -134,7 +140,7 @@ func (vm *VM) Initialize(
 	vm.Aliaser.Initialize()
 	vm.assetToFxCache = &cache.LRU{Size: assetToFxCacheSize}
 
-	vm.pubsub = cjson.NewPubSubServer(ctx)
+	vm.pubsub = pubsub.NewServer(ctx)
 
 	genesisCodec := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
 	c := linearcodec.NewDefault()
@@ -302,22 +308,21 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	}, err
 }
 
-// CreateStaticHandlers implements the avalanche.DAGVM interface
-func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
+// CreateStaticHandlers implements the common.StaticVM interface
+func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	// name this service "avm"
 	staticService := CreateStaticService()
-	_ = newServer.RegisterService(staticService, "avm")
 	return map[string]*common.HTTPHandler{
 		"": {LockOptions: common.WriteLock, Handler: newServer},
-	}
+	}, newServer.RegisterService(staticService, "avm")
 }
 
 // Pending implements the avalanche.DAGVM interface
-func (vm *VM) Pending() []snowstorm.Tx {
+func (vm *VM) PendingTxs() []snowstorm.Tx {
 	vm.metrics.numPendingCalls.Inc()
 
 	vm.timer.Cancel()
@@ -328,14 +333,14 @@ func (vm *VM) Pending() []snowstorm.Tx {
 }
 
 // Parse implements the avalanche.DAGVM interface
-func (vm *VM) Parse(b []byte) (snowstorm.Tx, error) {
+func (vm *VM) ParseTx(b []byte) (snowstorm.Tx, error) {
 	vm.metrics.numParseCalls.Inc()
 
 	return vm.parseTx(b)
 }
 
 // Get implements the avalanche.DAGVM interface
-func (vm *VM) Get(txID ids.ID) (snowstorm.Tx, error) {
+func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
 	vm.metrics.numGetCalls.Inc()
 
 	tx := &UniqueTx{

@@ -6,6 +6,7 @@ package node
 import (
 	"time"
 
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/nat"
@@ -85,6 +86,7 @@ type Config struct {
 	HTTPSCertFile       string
 	APIRequireAuthToken bool
 	APIAuthPassword     string
+	APIAllowedOrigins   []string
 
 	// Enable/Disable APIs
 	AdminAPIEnabled    bool
@@ -92,6 +94,7 @@ type Config struct {
 	KeystoreAPIEnabled bool
 	MetricsAPIEnabled  bool
 	HealthAPIEnabled   bool
+	IndexAPIEnabled    bool
 
 	// Logging configuration
 	LoggingConfig logging.Config
@@ -137,6 +140,8 @@ type Config struct {
 	// Coreth
 	CorethConfig string
 
+	IndexAllowIncomplete bool
+
 	// Should Bootstrap be retried
 	RetryBootstrap bool
 
@@ -145,4 +150,6 @@ type Config struct {
 
 	// Peer alias configuration
 	PeerAliasTimeout time.Duration
+	// ChainConfigs
+	ChainConfigs map[ids.ID]chains.ChainConfig
 }

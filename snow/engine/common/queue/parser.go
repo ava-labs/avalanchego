@@ -3,7 +3,7 @@
 
 package queue
 
-// Parser ...
+// Parser allows parsing a job from bytes.
 type Parser interface {
 	Parse([]byte) (Job, error)
 }

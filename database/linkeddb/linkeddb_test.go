@@ -398,3 +398,106 @@ func TestEmptyLinkedDBIteratorStart(t *testing.T) {
 
 	iter.Release()
 }
+
+func TestLinkedDBIsEmpty(t *testing.T) {
+	assert := assert.New(t)
+
+	db := memdb.New()
+	ldb := NewDefault(db)
+
+	isEmpty, err := ldb.IsEmpty()
+	assert.NoError(err)
+	assert.True(isEmpty)
+
+	key := []byte("hello")
+	value := []byte("world")
+
+	err = ldb.Put(key, value)
+	assert.NoError(err)
+
+	isEmpty, err = ldb.IsEmpty()
+	assert.NoError(err)
+	assert.False(isEmpty)
+
+	err = ldb.Delete(key)
+	assert.NoError(err)
+
+	isEmpty, err = ldb.IsEmpty()
+	assert.NoError(err)
+	assert.True(isEmpty)
+}
+
+func TestLinkedDBHeadKey(t *testing.T) {
+	assert := assert.New(t)
+
+	db := memdb.New()
+	ldb := NewDefault(db)
+
+	_, err := ldb.HeadKey()
+	assert.Equal(database.ErrNotFound, err)
+
+	key0 := []byte("hello0")
+	value0 := []byte("world0")
+	key1 := []byte("hello1")
+	value1 := []byte("world1")
+
+	err = ldb.Put(key0, value0)
+	assert.NoError(err)
+
+	headKey, err := ldb.HeadKey()
+	assert.NoError(err)
+	assert.Equal(key0, headKey)
+
+	err = ldb.Put(key1, value1)
+	assert.NoError(err)
+
+	headKey, err = ldb.HeadKey()
+	assert.NoError(err)
+	assert.Equal(key1, headKey)
+
+	err = ldb.Delete(key1)
+	assert.NoError(err)
+
+	headKey, err = ldb.HeadKey()
+	assert.NoError(err)
+	assert.Equal(key0, headKey)
+}
+
+func TestLinkedDBHead(t *testing.T) {
+	assert := assert.New(t)
+
+	db := memdb.New()
+	ldb := NewDefault(db)
+
+	_, _, err := ldb.Head()
+	assert.Equal(database.ErrNotFound, err)
+
+	key0 := []byte("hello0")
+	value0 := []byte("world0")
+	key1 := []byte("hello1")
+	value1 := []byte("world1")
+
+	err = ldb.Put(key0, value0)
+	assert.NoError(err)
+
+	headKey, headVal, err := ldb.Head()
+	assert.NoError(err)
+	assert.Equal(key0, headKey)
+	assert.Equal(value0, headVal)
+
+	err = ldb.Put(key1, value1)
+	assert.NoError(err)
+
+	headKey, headVal, err = ldb.Head()
+	assert.NoError(err)
+	assert.Equal(key1, headKey)
+	assert.Equal(value1, headVal)
+
+	err = ldb.Delete(key1)
+	assert.NoError(err)
+
+	headKey, headVal, err = ldb.Head()
+	assert.NoError(err)
+	assert.Equal(key0, headKey)
+	assert.Equal(value0, headVal)
+}
