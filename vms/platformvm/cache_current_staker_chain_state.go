@@ -24,6 +24,10 @@ var (
 )
 
 type currentStakerChainState interface {
+	// The NextStaker value returns the next staker that is going to be removed
+	// using a RewardValidatorTx. Therefore, only AddValidatorTxs and
+	// AddDelegatorTxs will be returned. AddSubnetValidatorTxs are removing
+	// using AdvanceTimestampTxs.
 	GetNextStaker() (addStakerTx *Tx, potentialReward uint64, err error)
 	GetValidator(nodeID ids.ShortID) (currentValidator, error)
 
@@ -315,6 +319,8 @@ func (cs *currentStakerChainStateImpl) subnetValidatorSet(subnetID ids.ID) (vali
 	return vdrs, nil
 }
 
+// setNextStaker to the next staker that will be removed using a
+// RewardValidatorTx.
 func (cs *currentStakerChainStateImpl) setNextStaker() {
 	for _, tx := range cs.validators {
 		switch tx.UnsignedTx.(type) {
