@@ -6,6 +6,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"syscall"
 
 	"github.com/ava-labs/avalanchego/config"
@@ -40,7 +41,7 @@ func main() {
 		return
 	}
 
-	nodeConfig.LoggingConfig.Directory += "/daemon"
+	nodeConfig.LoggingConfig.Directory = filepath.Join(nodeConfig.LoggingConfig.Directory, "daemon")
 	logFactory := logging.NewFactory(nodeConfig.LoggingConfig)
 	defer logFactory.Close()
 

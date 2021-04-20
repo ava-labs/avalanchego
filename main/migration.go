@@ -18,12 +18,7 @@ type migrationManager struct {
 	v             *viper.Viper
 }
 
-func newMigrationManager(
-	binaryManager *nodeManager,
-	v *viper.Viper,
-	nConfig node.Config,
-	log logging.Logger,
-) *migrationManager {
+func newMigrationManager(binaryManager *nodeManager, v *viper.Viper, nConfig node.Config, log logging.Logger) *migrationManager {
 	return &migrationManager{
 		binaryManager: binaryManager,
 		nodeConfig:    nConfig,
@@ -90,11 +85,7 @@ func (m *migrationManager) runMigration() error {
 	}()
 
 	m.log.Info("starting latest node version")
-	latestVersion, err := m.binaryManager.latestVersionNodeFetchOnly(
-		m.v,
-		m.nodeConfig.NodeID,
-		int(m.nodeConfig.StakingIP.Port),
-	)
+	latestVersion, err := m.binaryManager.latestVersionNodeFetchOnly(m.v, m.nodeConfig)
 	if err != nil {
 		return fmt.Errorf("couldn't create latest version during migration: %w", err)
 	}

@@ -67,7 +67,7 @@ const (
 	benchlistMinFailingDurationKey          = "benchlist-min-failing-duration"
 	PluginDirKey                            = "plugin-dir"
 	buildDirKey                             = "build-dir"
-	logsDirKey                              = "log-dir"
+	LogsDirKey                              = "log-dir"
 	logLevelKey                             = "log-level"
 	logDisplayLevelKey                      = "log-display-level"
 	logDisplayHighlightKey                  = "log-display-highlight"

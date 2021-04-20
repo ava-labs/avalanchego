@@ -107,7 +107,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Coreth config
 	fs.String(CorethConfigKey, DefaultString, "Specifies config to pass into coreth")
 	// Logging
-	fs.String(logsDirKey, "", "Logging directory for Avalanche")
+	fs.String(LogsDirKey, "", "Logging directory for Avalanche")
 	fs.String(logLevelKey, "info", "The log level. Should be one of {verbo, debug, info, warn, error, fatal, off}")
 	fs.String(logDisplayLevelKey, "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, info, warn, error, fatal, off}")
 	fs.String(logDisplayHighlightKey, "auto", "Whether to color/highlight display logs. Default highlights when the output is a terminal. Otherwise, should be one of {auto, plain, colors}")
@@ -289,7 +289,7 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 	if err != nil {
 		return node.Config{}, err
 	}
-	logsDir := v.GetString(logsDirKey)
+	logsDir := v.GetString(LogsDirKey)
 	if logsDir != "" {
 		loggingconfig.Directory = logsDir
 	}

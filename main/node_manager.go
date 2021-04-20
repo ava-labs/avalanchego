@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 
 	appplugin "github.com/ava-labs/avalanchego/app/plugin"
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/hashicorp/go-hclog"
@@ -185,19 +186,20 @@ func (nm *nodeManager) preDBUpgradeNode(v *viper.Viper) (*nodeProcess, error) {
 }
 
 // Run the latest node version
-func (nm *nodeManager) latestVersionNodeFetchOnly(
-	v *viper.Viper,
-	fetchFromNodeID ids.ShortID,
-	fetchFromStakingPort int,
-) (*nodeProcess, error) {
+func (nm *nodeManager) latestVersionNodeFetchOnly(v *viper.Viper, nodeConfig node.Config) (*nodeProcess, error) {
 	argsMap := v.AllSettings()
-	argsMap[config.BootstrapIPsKey] = fmt.Sprintf("127.0.0.1:%d", fetchFromStakingPort)
-	argsMap[config.BootstrapIDsKey] = fmt.Sprintf("%s%s", constants.NodeIDPrefix, fetchFromNodeID)
+	argsMap[config.BootstrapIPsKey] = fmt.Sprintf("127.0.0.1:%d", int(nodeConfig.StakingIP.Port))
+	argsMap[config.BootstrapIDsKey] = fmt.Sprintf("%s%s", constants.NodeIDPrefix, nodeConfig.NodeID)
 	argsMap[config.FetchOnlyKey] = true
 	argsMap[config.StakingPortKey] = 0
 	argsMap[config.HTTPPortKey] = 0
 	argsMap[config.PluginModeKey] = true
-	args := []string{}
+	// replace the last folder named daemon in path with fetch-only
+	daemonLogDir := nodeConfig.LoggingConfig.Directory
+	i := strings.LastIndex(daemonLogDir, "daemon")
+	argsMap[config.LogsDirKey] = daemonLogDir[:i] + strings.Replace(daemonLogDir[i:], "daemon", "fetch-only", 1)
+
+	var args []string
 	for k, v := range argsMap {
 		args = append(args, formatArgs(k, v))
 	}
