@@ -254,20 +254,22 @@ func TestNewManagerFromDBs(t *testing.T) {
 		version.NewDefaultVersion(1, 2, 0),
 		version.NewDefaultVersion(1, 1, 1),
 	}
-	m, err := NewManagerFromDBs([]*VersionedDatabase{
-		{
-			Database: memdb.New(),
-			Version:  versions[2],
-		},
-		{
-			Database: memdb.New(),
-			Version:  versions[1],
-		},
-		{
-			Database: memdb.New(),
-			Version:  versions[0],
-		},
-	})
+	m, err := NewManagerFromDBs(
+		memdb.New(),
+		[]*VersionedDatabase{
+			{
+				Database: memdb.New(),
+				Version:  versions[2],
+			},
+			{
+				Database: memdb.New(),
+				Version:  versions[1],
+			},
+			{
+				Database: memdb.New(),
+				Version:  versions[0],
+			},
+		})
 	assert.NoError(t, err)
 
 	dbs := m.GetDatabases()
@@ -279,20 +281,22 @@ func TestNewManagerFromDBs(t *testing.T) {
 }
 
 func TestNewManagerFromNonUniqueDBs(t *testing.T) {
-	_, err := NewManagerFromDBs([]*VersionedDatabase{
-		{
-			Database: memdb.New(),
-			Version:  version.NewDefaultVersion(1, 1, 0),
-		},
-		{
-			Database: memdb.New(),
-			Version:  version.NewDefaultVersion(1, 1, 0),
-		},
-		{
-			Database: memdb.New(),
-			Version:  version.NewDefaultVersion(1, 2, 0),
-		},
-	})
+	_, err := NewManagerFromDBs(
+		memdb.New(),
+		[]*VersionedDatabase{
+			{
+				Database: memdb.New(),
+				Version:  version.NewDefaultVersion(1, 1, 0),
+			},
+			{
+				Database: memdb.New(),
+				Version:  version.NewDefaultVersion(1, 1, 0),
+			},
+			{
+				Database: memdb.New(),
+				Version:  version.NewDefaultVersion(1, 2, 0),
+			},
+		})
 	assert.Error(t, err)
 }
 

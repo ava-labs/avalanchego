@@ -50,7 +50,7 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 		return false, fmt.Errorf("couldn't create db manager at %s: %w", m.nodeConfig.DBPath, err)
 	}
 	defer func() {
-		if err := dbManager.Shutdown(); err != nil {
+		if err := dbManager.Close(); err != nil {
 			m.log.Error("error shutting down db manager: %s", err)
 		}
 	}()

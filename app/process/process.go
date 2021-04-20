@@ -76,12 +76,14 @@ func (a *App) Start() int {
 			return 1
 		}
 	} else {
-		dbManager, err = manager.NewManagerFromDBs([]*manager.VersionedDatabase{
-			{
-				Database: memdb.New(),
-				Version:  versionconfig.CurrentDBVersion,
-			},
-		})
+		dbManager, err = manager.NewManagerFromDBs(
+			memdb.New(),
+			[]*manager.VersionedDatabase{
+				{
+					Database: memdb.New(),
+					Version:  versionconfig.CurrentDBVersion,
+				},
+			})
 		if err != nil {
 			a.log.Error("couldn't create db manager from memory db: %s", err)
 			return 1
@@ -122,7 +124,7 @@ func (a *App) Start() int {
 	}()
 
 	defer func() {
-		if err := dbManager.Shutdown(); err != nil {
+		if err := dbManager.Close(); err != nil {
 			a.log.Warn("failed to close the node's DB: %s", err)
 		}
 		a.log.StopOnPanic()

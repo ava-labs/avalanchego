@@ -457,7 +457,7 @@ func TestMigrateKeystoreUser(t *testing.T) {
 		},
 	}
 
-	dbManager, err := manager.NewManagerFromDBs(versionedDBs)
+	dbManager, err := manager.NewManagerFromDBs(memdb.New(), versionedDBs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -489,7 +489,7 @@ func TestMigrateKeystoreUser(t *testing.T) {
 		Database: memdb.New(),
 		Version:  version.NewDefaultVersion(1, 0, 0),
 	})
-	upgradedDBManager, err := manager.NewManagerFromDBs(versionedDBs)
+	upgradedDBManager, err := manager.NewManagerFromDBs(memdb.New(), versionedDBs)
 	if err != nil {
 		t.Fatal(err)
 	}

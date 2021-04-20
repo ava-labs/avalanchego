@@ -27,6 +27,7 @@ var (
 	errNonSortedAndUniqueDBs = errors.New("managed databases were not sorted and unique")
 	bootstrappedKey          = []byte{0x00}
 	dbPrefix                 = []byte{0x01}
+	errNoDBs                 = errors.New("no dbs given")
 
 	// First database version where we put [bootstrappedKey] in the top level db
 	// to mark that the database has been bootstrapped at least once
@@ -42,14 +43,11 @@ type Manager interface {
 	GetDatabases() []*VersionedDatabase
 	// Close all of the databases controlled by the manager
 	Close() error
-	Shutdown() error
 	MarkCurrentDBBootstrapped() error
 	CurrentDBBootstrapped() (bool, error)
-
 	// AddPrefix returns a new database manager with each of its databases
 	// prefixed with [prefix]
 	AddPrefix(prefix []byte) Manager
-
 	// AddMeter returns a new database manager with each of its databases
 	// wrapped with a meterdb instance to support metrics on database performance.
 	AddMeter(namespace string, registerer prometheus.Registerer) (Manager, error)
@@ -60,14 +58,8 @@ type manager struct {
 	// descending order
 	// invariant: len(databases) > 0
 	databases []*VersionedDatabase
-}
-
-func (m *manager) Shutdown() error {
-	errs := wrappers.Errs{}
-	for _, db := range m.databases {
-		errs.Add(db.Shutdown())
-	}
-	return errs.Err
+	// [rawCurrentDB] has a flag that specifies whether this database version has been bootstrapped
+	rawCurrentDB database.Database
 }
 
 func (m *manager) Current() *VersionedDatabase { return m.databases[0] }
@@ -86,15 +78,16 @@ func (m *manager) Close() error {
 	for _, db := range m.databases {
 		errs.Add(db.Close())
 	}
+	errs.Add(m.rawCurrentDB.Close())
 	return errs.Err
 }
 
 func (m *manager) MarkCurrentDBBootstrapped() error {
-	return m.databases[0].MarkBootstrapped()
+	return m.rawCurrentDB.Put(bootstrappedKey, nil)
 }
 
 func (m *manager) CurrentDBBootstrapped() (bool, error) {
-	return m.databases[0].Bootstrapped()
+	return m.rawCurrentDB.Has(bootstrappedKey)
 }
 
 // wrapManager returns a new database manager with each managed database wrapped by
@@ -105,7 +98,8 @@ func (m *manager) CurrentDBBootstrapped() (bool, error) {
 // underlying database.
 func (m *manager) wrapManager(wrap func(db *VersionedDatabase) (*VersionedDatabase, error)) (*manager, error) {
 	newManager := &manager{
-		databases: make([]*VersionedDatabase, 0, len(m.databases)),
+		databases:    make([]*VersionedDatabase, 0, len(m.databases)),
+		rawCurrentDB: m.rawCurrentDB,
 	}
 
 	for _, db := range m.databases {
@@ -126,11 +120,11 @@ func NewDefaultMemDBManager() Manager {
 	return &manager{
 		databases: []*VersionedDatabase{
 			{
-				rawDB:    memdb.New(),
 				Database: memdb.New(),
 				Version:  version.DefaultVersion2,
 			},
 		},
+		rawCurrentDB: memdb.New(),
 	}
 }
 
@@ -154,11 +148,11 @@ func New(
 	manager := &manager{
 		databases: []*VersionedDatabase{
 			{
-				rawDB:    rawCurrentDB,
 				Database: currentDB,
 				Version:  currentVersion,
 			},
 		},
+		rawCurrentDB: rawCurrentDB,
 	}
 
 	// Conditionally ignore old databases
@@ -204,7 +198,6 @@ func New(
 
 		if version.Compare(firstVersionWithBootstrappedFlag) >= 0 {
 			manager.databases = append(manager.databases, &VersionedDatabase{
-				rawDB:    db,
 				Database: prefixdb.New(dbPrefix, db),
 				Version:  version,
 			})
@@ -233,7 +226,6 @@ func New(
 func (m *manager) AddPrefix(prefix []byte) Manager {
 	m, _ = m.wrapManager(func(vdb *VersionedDatabase) (*VersionedDatabase, error) {
 		return &VersionedDatabase{
-			rawDB:    vdb.rawDB,
 			Database: prefixdb.New(prefix, vdb.Database),
 			Version:  vdb.Version,
 		}, nil
@@ -250,12 +242,12 @@ func (m *manager) AddMeter(namespace string, registerer prometheus.Registerer) (
 		return nil, err
 	}
 	newManager := &manager{
-		databases: make([]*VersionedDatabase, len(m.databases)),
+		databases:    make([]*VersionedDatabase, len(m.databases)),
+		rawCurrentDB: m.rawCurrentDB,
 	}
 	copy(newManager.databases[1:], m.databases[1:])
 	// Overwrite the current database with the meter DB
 	newManager.databases[0] = &VersionedDatabase{
-		rawDB:    currentDB.rawDB,
 		Database: currentMeterDB,
 		Version:  currentDB.Version,
 	}
@@ -263,61 +255,29 @@ func (m *manager) AddMeter(namespace string, registerer prometheus.Registerer) (
 }
 
 // NewManagerFromDBs
-func NewManagerFromDBs(dbs []*VersionedDatabase) (Manager, error) {
+func NewManagerFromDBs(rawCurrentDB database.Database, dbs []*VersionedDatabase) (Manager, error) {
+	if len(dbs) == 0 {
+		return nil, errNoDBs
+	}
 	SortDescending(dbs)
 	sortedAndUnique := utils.IsSortedAndUnique(innerSortDescendingVersionedDBs(dbs))
 	if !sortedAndUnique {
 		return nil, errNonSortedAndUniqueDBs
 	}
 	return &manager{
-		databases: dbs,
+		databases:    dbs,
+		rawCurrentDB: rawCurrentDB,
 	}, nil
 }
 
 type VersionedDatabase struct {
-	// [rawDB] has flag that specifies whether this database version has been bootstrapped.
-	// nil if Version < [firstVersionWithBootstrappedFlag]
-	rawDB database.Database
 	database.Database
 	version.Version
 }
 
-// Returns nil if the [db.Database] is already closed.
-// Doesn't close [db.rawDB] (if it exists)
+// Close the underlying database
 func (db *VersionedDatabase) Close() error {
-	if err := db.Database.Close(); err != nil && err != database.ErrClosed {
-		return err
-	}
-	return nil
-}
-
-func (db *VersionedDatabase) Shutdown() error {
-	errs := wrappers.Errs{}
-	errs.Add(db.Close())
-	if db.rawDB != nil {
-		if err := db.rawDB.Close(); err != nil && err != database.ErrClosed {
-			errs.Add(err)
-		}
-	}
-	return errs.Err
-}
-
-// Returns true if the node has ever finished bootstrapping the Primary Network
-// using this database version
-func (db *VersionedDatabase) Bootstrapped() (bool, error) {
-	if db.rawDB == nil {
-		return false, nil
-	}
-	return db.rawDB.Has(bootstrappedKey)
-}
-
-// Mark that the node has finished bootstrapping the Primary Network
-// using this database version
-func (db *VersionedDatabase) MarkBootstrapped() error {
-	if db.rawDB == nil {
-		return nil
-	}
-	return db.rawDB.Put(bootstrappedKey, nil)
+	return db.Database.Close()
 }
 
 type innerSortDescendingVersionedDBs []*VersionedDatabase
