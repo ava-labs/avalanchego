@@ -13,7 +13,7 @@ import (
 
 type migrationManager struct {
 	binaryManager *nodeManager
-	nodeConfig    node.Config
+	rootConfig    node.Config
 	log           logging.Logger
 	v             *viper.Viper
 }
@@ -21,7 +21,7 @@ type migrationManager struct {
 func newMigrationManager(binaryManager *nodeManager, v *viper.Viper, nConfig node.Config, log logging.Logger) *migrationManager {
 	return &migrationManager{
 		binaryManager: binaryManager,
-		nodeConfig:    nConfig,
+		rootConfig:    nConfig,
 		log:           log,
 		v:             v,
 	}
@@ -42,16 +42,16 @@ func (m *migrationManager) migrate() error {
 // to the current one. We should migrate if we have not finished bootstrapping with the
 // current database version and the previous database version exists.
 func (m *migrationManager) shouldMigrate() (bool, error) {
-	if !m.nodeConfig.DBEnabled {
+	if !m.rootConfig.DBEnabled {
 		return false, nil
 	}
-	dbManager, err := manager.New(m.nodeConfig.DBPath, logging.NoLog{}, versionconfig.CurrentDBVersion, true)
+	dbManager, err := manager.New(m.rootConfig.DBPath, logging.NoLog{}, versionconfig.CurrentDBVersion, true)
 	if err != nil {
-		return false, fmt.Errorf("couldn't create db manager at %s: %w", m.nodeConfig.DBPath, err)
+		return false, fmt.Errorf("couldn't create db manager at %s: %w", m.rootConfig.DBPath, err)
 	}
 	defer func() {
 		if err := dbManager.Close(); err != nil {
-			m.log.Error("error shutting down db manager: %s", err)
+			m.log.Error("error closing db manager: %s", err)
 		}
 	}()
 	currentDBBootstrapped, err := dbManager.CurrentDBBootstrapped()
@@ -85,7 +85,7 @@ func (m *migrationManager) runMigration() error {
 	}()
 
 	m.log.Info("starting latest node version")
-	latestVersion, err := m.binaryManager.latestVersionNodeFetchOnly(m.v, m.nodeConfig)
+	latestVersion, err := m.binaryManager.latestVersionNodeFetchOnly(m.v, m.rootConfig)
 	if err != nil {
 		return fmt.Errorf("couldn't create latest version during migration: %w", err)
 	}

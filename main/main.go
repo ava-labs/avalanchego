@@ -29,13 +29,13 @@ func main() {
 	fmt.Println(header)
 
 	// Get the config
-	nodeConfig, v, err := config.GetConfig()
+	rootConfig, v, err := config.GetConfig()
 	if err != nil {
 		fmt.Printf("couldn't get config: %s", err)
 		os.Exit(1)
 	}
 
-	logConfigCopy := nodeConfig.LoggingConfig
+	logConfigCopy := rootConfig.LoggingConfig
 	logConfigCopy.Directory = filepath.Join(logConfigCopy.Directory, "daemon")
 	logFactory := logging.NewFactory(logConfigCopy)
 	defer logFactory.Close()
@@ -46,7 +46,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	nodeManager := newNodeManager(nodeConfig.BuildDir, log)
+	nodeManager := newNodeManager(rootConfig.BuildDir, log)
 	_ = utils.HandleSignals(
 		func(os.Signal) {
 			// SIGINT and SIGTERM cause all running nodes
@@ -58,7 +58,7 @@ func main() {
 		syscall.SIGINT, syscall.SIGTERM,
 	)
 
-	migrationManager := newMigrationManager(nodeManager, v, nodeConfig, log)
+	migrationManager := newMigrationManager(nodeManager, v, rootConfig, log)
 	if err := migrationManager.migrate(); err != nil {
 		log.Error("error while running migration: %s", err)
 		nodeManager.shutdown()
