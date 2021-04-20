@@ -54,6 +54,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/timestampvm"
+	"github.com/hashicorp/go-plugin"
 
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
 )
@@ -977,6 +978,9 @@ func (n *Node) shutdown() {
 		n.Log.Debug("error closing tx indexer: %w", err)
 	}
 	utils.ClearSignals(n.nodeCloser)
+	// Make sure all plugin subprocesses are killed
+	n.Log.Info("cleaning up plugin subprocesses")
+	plugin.CleanupClients()
 	n.DoneShuttingDown.Done()
 	n.Log.Info("finished node shutdown")
 }
