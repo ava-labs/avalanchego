@@ -38,6 +38,7 @@ func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,
 		},
+		Managed: true,
 	}
 	if ctx != nil {
 		log.SetOutput(ctx.Log)
