@@ -4,7 +4,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"os"
 	"syscall"
 
@@ -28,27 +28,19 @@ func main() {
 
 	// parse config using viper
 	if err := parseViper(); err != nil {
-		fmt.Printf("parsing parameters returned with error %s\n", err)
-		return
+		// Returns error code 1
+		log.Fatalf("parsing parameters returned with error %s", err)
 	}
 
 	// Set the data directory permissions to be read write.
 	if err := perms.ChmodR(defaultDataDir, true, perms.ReadWriteExecute); err != nil {
-		fmt.Printf("failed to restrict the permissions of the data directory with error %s\n", err)
-		return
+		log.Fatalf("failed to restrict the permissions of the data directory with error %s", err)
 	}
 
 	c := Config
 
 	app := process.NewApp(c)
 	if c.PluginMode { // Defaults to run as an standalone
-
-		_ = utils.HandleSignals(
-			func(os.Signal) {
-			},
-			syscall.SIGINT, syscall.SIGTERM,
-		)
-
 		plugin.Serve(&plugin.ServeConfig{
 			HandshakeConfig: appPlugin.Handshake,
 			Plugins: map[string]plugin.Plugin{
@@ -70,5 +62,6 @@ func main() {
 		},
 		syscall.SIGINT, syscall.SIGTERM,
 	)
+	// Start the node
 	exitCode = app.Start()
 }

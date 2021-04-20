@@ -1,3 +1,6 @@
+// (c) 2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package process
 
 import (
@@ -20,20 +23,23 @@ var (
 	httpPortName    = fmt.Sprintf("%s-http", constants.AppName)
 )
 
+// App is a wrapper around a node
 type App struct {
 	config node.Config
-	node   *node.Node // set in Start()
-	log    logging.Logger
+	node   *node.Node
+	// log is set in Start()
+	log logging.Logger
 }
 
 func NewApp(config node.Config) *App {
 	return &App{
 		config: config,
+		node:   &node.Node{},
 	}
 }
 
 func (a *App) Start() int {
-	// we want to create the logger after the plugin as started the app
+	// Create the logger
 	logFactory := logging.NewFactory(a.config.LoggingConfig)
 	defer logFactory.Close()
 
@@ -152,7 +158,7 @@ func (a *App) Start() int {
 
 	err = a.node.Dispatch()
 	a.log.Debug("node dispatch returned: %s", err)
-	return 1
+	return 0
 }
 
 // Assumes [a.node] is not nil

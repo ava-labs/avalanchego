@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package plugin
@@ -8,28 +8,27 @@ import (
 
 	appproto "github.com/ava-labs/avalanchego/main/plugin/proto"
 	"github.com/ava-labs/avalanchego/main/process"
-
-	"github.com/hashicorp/go-plugin"
 )
 
+// Server wraps a node so it can be served with the hashicorp plugin harness
 type Server struct {
-	app    *process.App
-	broker *plugin.GRPCBroker
+	app *process.App
 }
 
-// NewServer returns a vm instance connected to a remote vm instance
-func NewServer(app *process.App, broker *plugin.GRPCBroker) *Server {
+func NewServer(app *process.App) *Server {
 	return &Server{
-		app:    app,
-		broker: broker,
+		app: app,
 	}
 }
 
-func (ns *Server) Start(_ context.Context, req *appproto.StartRequest) (*appproto.StartResponse, error) {
-	exitCode := ns.app.Start()
+// Blocks until the node returns
+func (s *Server) Start(_ context.Context, req *appproto.StartRequest) (*appproto.StartResponse, error) {
+	exitCode := s.app.Start()
 	return &appproto.StartResponse{ExitCode: int32(exitCode)}, nil
 }
 
-func (ns *Server) Stop(_ context.Context, req *appproto.StopRequest) (*appproto.StopResponse, error) {
-	return &appproto.StopResponse{ExitCode: int32(ns.app.Stop())}, nil
+// Blocks until the node is done shutting down
+func (s *Server) Stop(_ context.Context, req *appproto.StopRequest) (*appproto.StopResponse, error) {
+	s.app.Stop()
+	return &appproto.StopResponse{}, nil
 }
