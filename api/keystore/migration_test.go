@@ -49,7 +49,10 @@ func TestMigration100_to_133(t *testing.T) {
 	assert.NoError(userPrevBCDB.Put(userDataKey, userDataValue))
 
 	dbManager.On("Previous").Return(
-		manager.NewVersionedDatabase(prevDB, version.NewDefaultVersion(1, 0, 0)),
+		&manager.VersionedDatabase{
+			Database: prevDB,
+			Version:  version.NewDefaultVersion(1, 0, 0),
+		},
 		true,
 	)
 

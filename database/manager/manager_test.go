@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/ava-labs/avalanchego/config/versionconfig"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/meterdb"
@@ -255,7 +256,6 @@ func TestNewManagerFromDBs(t *testing.T) {
 		version.NewDefaultVersion(1, 1, 1),
 	}
 	m, err := NewManagerFromDBs(
-		memdb.New(),
 		[]*VersionedDatabase{
 			{
 				Database: memdb.New(),
@@ -282,7 +282,6 @@ func TestNewManagerFromDBs(t *testing.T) {
 
 func TestNewManagerFromNonUniqueDBs(t *testing.T) {
 	_, err := NewManagerFromDBs(
-		memdb.New(),
 		[]*VersionedDatabase{
 			{
 				Database: memdb.New(),
@@ -316,4 +315,57 @@ func TestDontIncludePreviousVersions(t *testing.T) {
 
 	_, err = New(dir, logging.NoLog{}, v2, false)
 	assert.NoError(t, err, "shouldn't error because shouldn't try to open previous database version")
+}
+
+func TestMarkBootstrapped(t *testing.T) {
+	dir := t.TempDir()
+
+	{
+		manager, err := New(dir, logging.NoLog{}, versionconfig.CurrentDBVersion, true)
+		assert.NoError(t, err)
+		bootstrapped, err := manager.CurrentDBBootstrapped()
+		assert.NoError(t, err)
+		assert.False(t, bootstrapped)
+		assert.NoError(t, manager.MarkCurrentDBBootstrapped())
+		bootstrapped, err = manager.CurrentDBBootstrapped()
+		assert.NoError(t, err)
+		assert.True(t, bootstrapped)
+		err = manager.Close()
+		assert.NoError(t, err)
+	}
+	{
+		manager, err := New(dir, logging.NoLog{}, versionconfig.CurrentDBVersion, true)
+		assert.NoError(t, err)
+		bootstrapped, err := manager.CurrentDBBootstrapped()
+		assert.NoError(t, err)
+		assert.True(t, bootstrapped)
+		err = manager.Close()
+		assert.NoError(t, err)
+	}
+
+	// Make sure other database versions aren't marked as bootstrapped
+	v := version.NewDefaultVersion(1, 5, 0) // some other version
+	{
+		manager, err := New(dir, logging.NoLog{}, v, true)
+		assert.NoError(t, err)
+		bootstrapped, err := manager.CurrentDBBootstrapped()
+		assert.NoError(t, err)
+		assert.False(t, bootstrapped)
+		assert.NoError(t, manager.MarkCurrentDBBootstrapped())
+		bootstrapped, err = manager.CurrentDBBootstrapped()
+		assert.NoError(t, err)
+		assert.True(t, bootstrapped)
+		err = manager.Close()
+		assert.NoError(t, err)
+	}
+	{
+		manager, err := New(dir, logging.NoLog{}, v, true)
+		assert.NoError(t, err)
+		bootstrapped, err := manager.CurrentDBBootstrapped()
+		assert.NoError(t, err)
+		assert.True(t, bootstrapped)
+		err = manager.Close()
+		assert.NoError(t, err)
+	}
+
 }

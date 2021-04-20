@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore/gkeystoreproto"
 	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto"
 	"github.com/ava-labs/avalanchego/ids"
@@ -115,7 +114,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 			Version:  version,
 		}
 	}
-	dbManager, err := manager.NewManagerFromDBs(memdb.New(), versionedDBs)
+	dbManager, err := manager.NewManagerFromDBs(versionedDBs)
 	if err != nil {
 		// Ignore closing errors to return the original error
 		_ = vm.connCloser.Close()

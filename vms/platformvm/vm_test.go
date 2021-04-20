@@ -2427,7 +2427,7 @@ func TestUptimeReporting(t *testing.T) {
 			Version:  version.DefaultVersion1,
 		},
 	}
-	baseDBManager, err := manager.NewManagerFromDBs(memdb.New(), versionedDBs)
+	baseDBManager, err := manager.NewManagerFromDBs(versionedDBs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2537,7 +2537,7 @@ func TestUptimeReporting(t *testing.T) {
 	copy(newVersionedDBs[1:], versionedDBs)
 	versionedDBs = newVersionedDBs
 
-	newDBManager, err := manager.NewManagerFromDBs(memdb.New(), versionedDBs)
+	newDBManager, err := manager.NewManagerFromDBs(versionedDBs)
 	if err != nil {
 		t.Fatal(err)
 	}

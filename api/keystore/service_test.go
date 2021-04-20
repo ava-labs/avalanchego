@@ -451,10 +451,13 @@ func TestMigrateKeystoreUser(t *testing.T) {
 	password := "passwTest@fake01ord"
 	bID := ids.Empty
 	versionedDBs := []*manager.VersionedDatabase{
-		manager.NewVersionedDatabase(memdb.New(), version.NewDefaultVersion(1, 0, 0)),
+		{
+			Database: memdb.New(),
+			Version:  version.NewDefaultVersion(1, 0, 0),
+		},
 	}
 
-	dbManager, err := manager.NewManagerFromDBs(memdb.New(), versionedDBs)
+	dbManager, err := manager.NewManagerFromDBs(versionedDBs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -482,8 +485,11 @@ func TestMigrateKeystoreUser(t *testing.T) {
 		t.Fatalf("Failed to put value in userDB: %s", err)
 	}
 
-	versionedDBs = append(versionedDBs, manager.NewVersionedDatabase(memdb.New(), version.NewDefaultVersion(1, 3, 3)))
-	upgradedDBManager, err := manager.NewManagerFromDBs(memdb.New(), versionedDBs)
+	versionedDBs = append(versionedDBs, &manager.VersionedDatabase{
+		Database: memdb.New(),
+		Version:  version.NewDefaultVersion(1, 3, 3),
+	})
+	upgradedDBManager, err := manager.NewManagerFromDBs(versionedDBs)
 	if err != nil {
 		t.Fatal(err)
 	}

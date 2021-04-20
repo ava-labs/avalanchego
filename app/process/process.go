@@ -77,7 +77,6 @@ func (a *App) Start() int {
 		}
 	} else {
 		dbManager, err = manager.NewManagerFromDBs(
-			memdb.New(),
 			[]*manager.VersionedDatabase{
 				{
 					Database: memdb.New(),

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/ava-labs/avalanchego/config/versionconfig"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -28,10 +29,6 @@ var (
 	bootstrappedKey          = []byte{0x00}
 	dbPrefix                 = []byte{0x01}
 	errNoDBs                 = errors.New("no dbs given")
-
-	// First database version where we put [bootstrappedKey] in the top level db
-	// to mark that the database has been bootstrapped at least once
-	firstVersionWithBootstrappedFlag = version.NewDefaultVersion(1, 1, 0)
 )
 
 type Manager interface {
@@ -78,16 +75,15 @@ func (m *manager) Close() error {
 	for _, db := range m.databases {
 		errs.Add(db.Close())
 	}
-	errs.Add(m.rawCurrentDB.Close())
 	return errs.Err
 }
 
 func (m *manager) MarkCurrentDBBootstrapped() error {
-	return m.rawCurrentDB.Put(bootstrappedKey, nil)
+	return prefixdb.New(dbPrefix, m.rawCurrentDB).Put(bootstrappedKey, nil)
 }
 
 func (m *manager) CurrentDBBootstrapped() (bool, error) {
-	return m.rawCurrentDB.Has(bootstrappedKey)
+	return prefixdb.New(dbPrefix, m.rawCurrentDB).Has(bootstrappedKey)
 }
 
 // wrapManager returns a new database manager with each managed database wrapped by
@@ -115,13 +111,13 @@ func (m *manager) wrapManager(wrap func(db *VersionedDatabase) (*VersionedDataba
 }
 
 // NewDefaultMemDBManager returns a database manager with a single memdb instance
-// with version v1.1.0
+// with the current database version
 func NewDefaultMemDBManager() Manager {
 	return &manager{
 		databases: []*VersionedDatabase{
 			{
 				Database: memdb.New(),
-				Version:  version.DefaultVersion2,
+				Version:  versionconfig.CurrentDBVersion,
 			},
 		},
 		rawCurrentDB: memdb.New(),
@@ -139,11 +135,10 @@ func New(
 ) (Manager, error) {
 	parser := version.NewDefaultParser()
 	currentDBPath := path.Join(dbDirPath, currentVersion.String())
-	rawCurrentDB, err := leveldb.New(currentDBPath, log, 0, 0, 0)
+	currentDB, err := leveldb.New(currentDBPath, log, 0, 0, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create db at %s: %w", currentDBPath, err)
 	}
-	currentDB := prefixdb.New(dbPrefix, rawCurrentDB)
 
 	manager := &manager{
 		databases: []*VersionedDatabase{
@@ -152,7 +147,7 @@ func New(
 				Version:  currentVersion,
 			},
 		},
-		rawCurrentDB: rawCurrentDB,
+		rawCurrentDB: currentDB,
 	}
 
 	// Conditionally ignore old databases
@@ -196,17 +191,11 @@ func New(
 			return fmt.Errorf("couldn't create db at %s: %w", path, err)
 		}
 
-		if version.Compare(firstVersionWithBootstrappedFlag) >= 0 {
-			manager.databases = append(manager.databases, &VersionedDatabase{
-				Database: prefixdb.New(dbPrefix, db),
-				Version:  version,
-			})
-		} else {
-			manager.databases = append(manager.databases, &VersionedDatabase{
-				Database: db,
-				Version:  version,
-			})
-		}
+		manager.databases = append(manager.databases, &VersionedDatabase{
+			Database: db,
+			Version:  version,
+		})
+
 		return filepath.SkipDir
 	})
 	SortDescending(manager.databases)
@@ -255,7 +244,7 @@ func (m *manager) AddMeter(namespace string, registerer prometheus.Registerer) (
 }
 
 // NewManagerFromDBs
-func NewManagerFromDBs(rawCurrentDB database.Database, dbs []*VersionedDatabase) (Manager, error) {
+func NewManagerFromDBs(dbs []*VersionedDatabase) (Manager, error) {
 	if len(dbs) == 0 {
 		return nil, errNoDBs
 	}
@@ -266,7 +255,7 @@ func NewManagerFromDBs(rawCurrentDB database.Database, dbs []*VersionedDatabase)
 	}
 	return &manager{
 		databases:    dbs,
-		rawCurrentDB: rawCurrentDB,
+		rawCurrentDB: dbs[0].Database,
 	}, nil
 }
 
