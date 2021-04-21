@@ -21,8 +21,8 @@ import (
 )
 
 // Test that validator uptimes are correctly migrated from
-// database version 1.0.0 to database version 1.1.0
-func TestMigrateUptime110(t *testing.T) {
+// database version 1.0.0 to database version 1.3.3
+func TestMigrateUptime_100_133(t *testing.T) {
 	now := time.Now()
 
 	// A validator whose uptime we migrate from an old database version
@@ -77,14 +77,14 @@ func TestMigrateUptime110(t *testing.T) {
 	chainDBManager.On("Previous").Return(
 		&manager.VersionedDatabase{
 			Database: previousDB,
-			Version:  version.DefaultVersion1,
+			Version:  version.NewDefaultVersion(1, 0, 0),
 		},
 		true,
 	)
 	chainDBManager.On("Current").Return(
 		&manager.VersionedDatabase{
 			Database: currentDB,
-			Version:  version.DefaultVersion2,
+			Version:  version.NewDefaultVersion(1, 3, 3),
 		},
 	)
 	vm := &VM{
@@ -122,7 +122,7 @@ func TestMigrateUptime110(t *testing.T) {
 	assert.NoError(t, vm.addStaker(vm.DB, constants.PrimaryNetworkID, validator2Tx))
 
 	assert.NoError(t, vm.Bootstrapping())
-	assert.NoError(t, vm.Bootstrapped()) // Calling bootstrapped triggers off the migration
+	assert.NoError(t, vm.Bootstrapped()) // Calling bootstrapped triggers the migration
 
 	// Check that uptimes were migrated correctly
 	{

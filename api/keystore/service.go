@@ -8,13 +8,13 @@ import (
 	"net/http"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/config/versionconfig"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/manager/mocks"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
-	"github.com/ava-labs/avalanchego/version"
 )
 
 type service struct {
@@ -110,7 +110,7 @@ func CreateTestKeystore() (Keystore, *mocks.Manager, error) {
 	mockDBManager.On("Current").Return(
 		&manager.VersionedDatabase{
 			Database: memdb.New(),
-			Version:  version.NewDefaultVersion(1, 1, 0),
+			Version:  versionconfig.CurrentDBVersion,
 		},
 	)
 	mockDBManager.On("Previous").Return(nil, false)

@@ -2424,7 +2424,7 @@ func TestUptimeReporting(t *testing.T) {
 	versionedDBs := []*manager.VersionedDatabase{
 		{
 			Database: memdb.New(),
-			Version:  version.DefaultVersion1,
+			Version:  version.NewDefaultVersion(1, 0, 0),
 		},
 	}
 	baseDBManager, err := manager.NewManagerFromDBs(versionedDBs)
@@ -2532,7 +2532,7 @@ func TestUptimeReporting(t *testing.T) {
 	newVersionedDBs := make([]*manager.VersionedDatabase, len(versionedDBs)+1)
 	newVersionedDBs[0] = &manager.VersionedDatabase{
 		Database: memdb.New(),
-		Version:  version.DefaultVersion2,
+		Version:  version.NewDefaultVersion(1, 3, 3),
 	}
 	copy(newVersionedDBs[1:], versionedDBs)
 	versionedDBs = newVersionedDBs

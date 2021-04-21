@@ -22,9 +22,9 @@ func (vm *VM) migrate() error {
 	prevDBVersion := prevDB.Version
 	currentDB := vm.dbManager.Current()
 	currentDBVersion := currentDB.Version
-	// Only valid migration is from database version 1.0.0 to 1.1.0
+	// Only valid migration is from database version 1.0.0 to 1.3.3
 	if prevDBVersion.Compare(version.NewDefaultVersion(1, 0, 0)) == 0 &&
-		currentDBVersion.Compare(version.NewDefaultVersion(1, 1, 0)) == 0 {
+		currentDBVersion.Compare(version.NewDefaultVersion(1, 3, 3)) == 0 {
 		return vm.migrate110(prevDB, currentDB)
 	}
 	return nil
