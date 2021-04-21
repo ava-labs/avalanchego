@@ -89,23 +89,11 @@ func (s *state) RemoveRunnableJob() (Job, error) {
 	if err != nil {
 		return nil, fmt.Errorf("couldn't convert job ID bytes to job ID: %s", err)
 	}
-	if s.cachingEnabled {
-		jobIntf, exists := s.jobsCache.Get(jobID)
-		if exists {
-			s.jobsCache.Evict(jobID)
-			return jobIntf.(Job), s.jobs.Delete(jobIDBytes)
-		}
-	}
-
-	jobBytes, err := s.jobs.Get(jobIDBytes)
+	job, err := s.GetJob(jobID)
 	if err != nil {
 		return nil, err
 	}
-	job, err := s.parser.Parse(jobBytes)
-	if err != nil {
-		return nil, err
-	}
-	return job, s.jobs.Delete(jobIDBytes)
+	return job, s.jobs.Delete((jobIDBytes))
 }
 
 // PutJob adds the job to the queue
