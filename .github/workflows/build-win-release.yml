@@ -53,7 +53,7 @@ jobs:
       run: |
         Install-Module -Name AWS.Tools.Installer -Force
         Install-AWSToolsModule AWS.Tools.EC2,AWS.Tools.S3 -CleanUp -Force
-        Write-S3Object -BucketName s3://${BUCKET} -File .\build\avalanchego-win-${VERSION}-experimental.zip -Key windows/avalanchego-win-${VERSION}-experimental.zip
+        Write-S3Object -BucketName ${BUCKET} -File .\build\avalanchego-win-${VERSION}-experimental.zip -Key windows/avalanchego-win-${VERSION}-experimental.zip
       env:
         BUCKET: ${{ secrets.BUCKET }}
         VERSION: ${{ steps.get_version.outputs.VERSION }}
