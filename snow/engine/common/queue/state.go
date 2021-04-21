@@ -93,7 +93,7 @@ func (s *state) RemoveRunnableJob() (Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	return job, s.jobs.Delete((jobIDBytes))
+	return job, s.jobs.Delete(jobIDBytes)
 }
 
 // PutJob adds the job to the queue
