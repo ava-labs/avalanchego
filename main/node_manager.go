@@ -137,7 +137,7 @@ func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (
 			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,
 		},
-		Logger: hclog.New(&hclog.LoggerOptions{Level: hclog.Warn}),
+		Logger: hclog.New(&hclog.LoggerOptions{Level: hclog.Error}),
 	}
 	if printToStdOut {
 		clientConfig.SyncStdout = os.Stdout
