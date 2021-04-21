@@ -723,7 +723,7 @@ func TestBaseTxSemanticVerify(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -779,7 +779,7 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -831,7 +831,7 @@ func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -914,7 +914,7 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -969,7 +969,7 @@ func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -1017,7 +1017,7 @@ func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -1066,7 +1066,7 @@ func TestBaseTxSemanticVerifyInvalidUTXO(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -1161,7 +1161,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -1257,7 +1257,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -1401,7 +1401,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -1547,7 +1547,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -1656,7 +1656,7 @@ func TestBaseTxSemanticVerifyInvalidFxOutput(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,

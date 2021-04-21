@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	statusCacheSize = 1024
+	statusCacheSize = 8192
 )
 
 // StatusState is a thin wrapper around a database to provide, caching,

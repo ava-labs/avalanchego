@@ -18,7 +18,7 @@ var (
 )
 
 const (
-	utxoCacheSize  = 1024
+	utxoCacheSize  = 8192
 	indexCacheSize = 64
 )
 

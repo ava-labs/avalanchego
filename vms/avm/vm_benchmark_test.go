@@ -110,7 +110,7 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 			},
 		}
 
-		if err := vm.state.FundUTXO(utxo); err != nil {
+		if err := vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
 			b.Fatal(err)
 		}
 	}

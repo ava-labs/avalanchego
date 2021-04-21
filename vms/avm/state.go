@@ -15,6 +15,13 @@ const (
 	txDeduplicatorSize = 8192
 )
 
+var (
+	utxoStatePrefix      = []byte("utxo")
+	statusStatePrefix    = []byte("status")
+	singletonStatePrefix = []byte("singleton")
+	txStatePrefix        = []byte("tx")
+)
+
 type State interface {
 	avax.UTXOState
 	avax.StatusState
@@ -34,24 +41,20 @@ type state struct {
 }
 
 func NewState(db database.Database, genesisCodec, codec codec.Manager) State {
-	return &state{
-		UTXOState: avax.NewUTXOState(),
-	}
+	utxoDB := prefixdb.New(utxoStatePrefix, db)
+	statusDB := prefixdb.New(statusStatePrefix, db)
+	singletonDB := prefixdb.New(singletonStatePrefix, db)
+	txDB := prefixdb.New(txStatePrefix, db)
 
-	vm.state = &prefixedState{
-		state: &state{
-			txCache: &cache.LRU{Size: txCacheSize},
-			txDB:    prefixdb.NewNested([]byte("tx"), vm.db),
-			State: avax.NewState(
-				vm.db,
-				vm.genesisCodec,
-				vm.codec,
-				utxoCacheSize,
-				statusCacheSize,
-				idCacheSize,
-			),
+	return &state{
+		UTXOState:      avax.NewUTXOState(utxoDB, codec),
+		StatusState:    avax.NewStatusState(statusDB),
+		SingletonState: avax.NewSingletonState(singletonDB),
+		TxState:        NewTxState(txDB, genesisCodec),
+
+		uniqueTxs: &cache.EvictableLRU{
+			Size: txDeduplicatorSize,
 		},
-		uniqueTx: &cache.EvictableLRU{Size: txCacheSize},
 	}
 }
 

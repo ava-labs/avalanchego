@@ -177,7 +177,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 			addrSet,
 			startAddr,
 			startUTXO,
-			uint(args.Limit),
+			int(args.Limit),
 		)
 	} else {
 		utxos, endAddr, endUTXOID, err = service.vm.GetAtomicUTXOs(

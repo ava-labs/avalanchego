@@ -1191,8 +1191,8 @@ func TestTxCached(t *testing.T) {
 		*called = true
 		return nil, errors.New("")
 	}
-	vm.state.state.txDB = prefixdb.New([]byte("tx"), db)
-	vm.state.state.txCache.Flush()
+
+	vm.state.(*state).TxState = NewTxState(prefixdb.New([]byte("tx"), db), vm.genesisCodec)
 
 	_, err = vm.ParseTx(txBytes)
 	assert.NoError(t, err)
@@ -1222,10 +1222,11 @@ func TestTxNotCached(t *testing.T) {
 		return nil, errors.New("")
 	}
 	db.OnPut = func([]byte, []byte) error { return nil }
-	vm.state.state.txDB = prefixdb.New([]byte("tx"), db)
-	vm.state.state.StatusDB = prefixdb.New([]byte("status"), db)
-	vm.state.uniqueTx.Flush()
-	vm.state.StatusCache.Flush()
+
+	s := vm.state.(*state)
+	s.TxState = NewTxState(prefixdb.New(txStatePrefix, db), vm.genesisCodec)
+	s.StatusState = avax.NewStatusState(prefixdb.New(statusStatePrefix, db))
+	s.uniqueTxs.Flush()
 
 	_, err = vm.ParseTx(txBytes)
 	assert.NoError(t, err)
