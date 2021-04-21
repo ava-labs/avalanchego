@@ -33,6 +33,7 @@ type nodeProcess struct {
 // Returns a channel that the node's exit code is sent on when the node is done
 // This method does not block.
 func (np *nodeProcess) start() chan int {
+	np.log.Info("starting node at %s", np.path)
 	exitCodeChan := make(chan int, 1)
 	go func() {
 		exitCode, err := np.node.Start()
@@ -73,11 +74,11 @@ type nodeManager struct {
 }
 
 func (nm *nodeManager) latestNodeVersionPath() string {
-	return fmt.Sprintf("%s/avalanchego-latest/avalanchego-process", nm.buildDirPath)
+	return filepath.Join(nm.buildDirPath, "avalanchego-latest", "avalanchego-process")
 }
 
 func (nm *nodeManager) preupgradeNodeVersionPath() string {
-	return fmt.Sprintf("%s/avalanchego-preupgrade/avalanchego-process", nm.buildDirPath)
+	return filepath.Join(nm.buildDirPath, "avalanchego-preupgrade", "avalanchego-process")
 }
 
 func (nm *nodeManager) shutdown() {
@@ -176,7 +177,7 @@ func (nm *nodeManager) preDBUpgradeNode(v *viper.Viper) (*nodeProcess, error) {
 	argsMap := v.AllSettings()
 	delete(argsMap, config.FetchOnlyKey)
 	argsMap[config.PluginModeKey] = true
-	argsMap[config.PluginDirKey] = fmt.Sprintf("%s/avalanchego-preupgrade/plugins", nm.buildDirPath)
+	argsMap[config.PluginDirKey] = filepath.Join(nm.buildDirPath, "avalanchego-preupgrade", "plugins")
 	args := []string{}
 	for k, v := range argsMap { // Pass args to subprocess
 		args = append(args, formatArgs(k, v))
@@ -195,6 +196,9 @@ func (nm *nodeManager) latestVersionNodeFetchOnly(v *viper.Viper, nodeConfig nod
 	argsMap[config.HTTPPortKey] = 0
 	argsMap[config.PluginModeKey] = true
 	argsMap[config.LogsDirKey] = filepath.Join(nodeConfig.LoggingConfig.Directory, "fetch-only")
+	// Make sure the node doesn't exit if the local node it's bootsrapping from doesn't respond to some messages
+	argsMap[config.RetryBootstrapKey] = true
+	argsMap[config.RetryBootstrapMaxAttemptsKey] = 1000
 
 	var args []string
 	for k, v := range argsMap {

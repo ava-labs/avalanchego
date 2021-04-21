@@ -214,8 +214,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Bootstrapping
 	fs.String(BootstrapIPsKey, DefaultString, "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
 	fs.String(BootstrapIDsKey, DefaultString, "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
-	fs.Bool(retryBootstrap, true, "Specifies whether bootstrap should be retried")
-	fs.Int(retryBootstrapMaxAttempts, 50, "Specifies how many times bootstrap should be retried")
+	fs.Bool(RetryBootstrapKey, true, "Specifies whether bootstrap should be retried")
+	fs.Int(RetryBootstrapMaxAttemptsKey, 50, "Specifies how many times bootstrap should be retried")
 
 	// Consensus
 	fs.Int(snowSampleSizeKey, 20, "Number of nodes to query for each network poll")
@@ -760,8 +760,8 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 	config.IndexAllowIncomplete = v.GetBool(indexAllowIncompleteKey)
 
 	// Bootstrap Configs
-	config.RetryBootstrap = v.GetBool(retryBootstrap)
-	config.RetryBootstrapMaxAttempts = v.GetInt(retryBootstrapMaxAttempts)
+	config.RetryBootstrap = v.GetBool(RetryBootstrapKey)
+	config.RetryBootstrapMaxAttempts = v.GetInt(RetryBootstrapMaxAttemptsKey)
 
 	// Peer alias
 	config.PeerAliasTimeout = v.GetDuration(peerAliasTimeoutKey)
