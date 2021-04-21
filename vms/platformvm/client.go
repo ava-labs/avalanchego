@@ -128,7 +128,6 @@ func (c *Client) GetStakingAssetID(subnetID ids.ID) (ids.ID, error) {
 	return res.AssetID, err
 }
 
-/*
 // GetCurrentValidators returns the list of current validators for subnet with ID [subnetID]
 func (c *Client) GetCurrentValidators(subnetID ids.ID) ([]interface{}, error) {
 	res := &GetCurrentValidatorsReply{}
@@ -146,7 +145,6 @@ func (c *Client) GetPendingValidators(subnetID ids.ID) ([]interface{}, []interfa
 	}, res)
 	return res.Validators, res.Delegators, err
 }
-*/
 
 // GetCurrentSupply returns an upper bound on the supply of AVAX in the system
 func (c *Client) GetCurrentSupply() (uint64, error) {

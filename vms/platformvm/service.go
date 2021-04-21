@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/database"
@@ -621,7 +622,6 @@ func (service *Service) GetStakingAssetID(_ *http.Request, args *GetStakingAsset
  ******************************************************
  */
 
-/*
 // GetCurrentValidatorsArgs are the arguments for calling GetCurrentValidators
 type GetCurrentValidatorsArgs struct {
 	// Subnet we're listing the validators of
@@ -660,26 +660,18 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	}
 	includeAllNodes := nodeIDs.Len() == 0
 
-	stopPrefix := []byte(fmt.Sprintf("%s%s", args.SubnetID, stopDBPrefix))
-	stopDB := prefixdb.NewNested(stopPrefix, service.vm.DB)
-	defer stopDB.Close()
+	currentValidators := service.vm.internalState.CurrentStakerChainState()
 
-	stopIter := stopDB.NewIterator()
-	defer stopIter.Release()
-
-	for stopIter.Next() { // Iterates in order of increasing stop time
-		txBytes := stopIter.Value()
-
-		tx := rewardTx{}
-		if _, err := service.vm.codec.Unmarshal(txBytes, &tx); err != nil {
-			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
-		}
-		if err := tx.Tx.Sign(service.vm.codec, nil); err != nil {
+	for _, tx := range currentValidators.Stakers() { // Iterates in order of increasing stop time
+		_, reward, err := currentValidators.GetStaker(tx.ID())
+		if err != nil {
 			return err
 		}
-
-		switch staker := tx.Tx.UnsignedTx.(type) {
+		switch staker := tx.UnsignedTx.(type) {
 		case *UnsignedAddDelegatorTx:
+			if args.SubnetID != constants.PrimaryNetworkID {
+				continue
+			}
 			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
 				continue
 			}
@@ -702,10 +694,10 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				}
 			}
 
-			potentialReward := json.Uint64(tx.Reward)
+			potentialReward := json.Uint64(reward)
 			delegator := APIPrimaryDelegator{
 				APIStaker: APIStaker{
-					TxID:        tx.Tx.ID(),
+					TxID:        tx.ID(),
 					StartTime:   json.Uint64(staker.StartTime().Unix()),
 					EndTime:     json.Uint64(staker.EndTime().Unix()),
 					StakeAmount: &weight,
@@ -716,6 +708,9 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			}
 			vdrToDelegators[delegator.NodeID] = append(vdrToDelegators[delegator.NodeID], delegator)
 		case *UnsignedAddValidatorTx:
+			if args.SubnetID != constants.PrimaryNetworkID {
+				continue
+			}
 			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
 				continue
 			}
@@ -723,15 +718,15 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			nodeID := staker.Validator.ID()
 			startTime := staker.StartTime()
 			weight := json.Uint64(staker.Validator.Weight())
-			potentialReward := json.Uint64(tx.Reward)
+			potentialReward := json.Uint64(reward)
 			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(PercentDenominator))
-			rawUptime, err := service.vm.calculateUptimePercent(nodeID, startTime)
+			rawUptime, err := service.vm.CalculateUptimePercent(nodeID, startTime)
 			if err != nil {
 				return err
 			}
 			uptime := json.Float32(rawUptime)
 
-			_, connected := service.vm.connections[nodeID]
+			connected := service.vm.IsConnected(nodeID)
 
 			var rewardOwner *APIOwner
 			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
@@ -751,7 +746,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 
 			reply.Validators = append(reply.Validators, APIPrimaryValidator{
 				APIStaker: APIStaker{
-					TxID:        tx.Tx.ID(),
+					TxID:        tx.ID(),
 					NodeID:      nodeID.PrefixedString(constants.NodeIDPrefix),
 					StartTime:   json.Uint64(startTime.Unix()),
 					EndTime:     json.Uint64(staker.EndTime().Unix()),
@@ -764,24 +759,24 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				DelegationFee:   delegationFee,
 			})
 		case *UnsignedAddSubnetValidatorTx:
+			if args.SubnetID != staker.Validator.Subnet {
+				continue
+			}
 			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
 				continue
 			}
 
 			weight := json.Uint64(staker.Validator.Weight())
 			reply.Validators = append(reply.Validators, APIStaker{
-				TxID:      tx.Tx.ID(),
+				TxID:      tx.ID(),
 				NodeID:    staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
 				StartTime: json.Uint64(staker.StartTime().Unix()),
 				EndTime:   json.Uint64(staker.EndTime().Unix()),
 				Weight:    &weight,
 			})
 		default:
-			return fmt.Errorf("expected validator but got %T", tx.Tx.UnsignedTx)
+			return fmt.Errorf("expected validator but got %T", tx.UnsignedTx)
 		}
-	}
-	if err := stopIter.Error(); err != nil {
-		return fmt.Errorf("iterator error: %w", err)
 	}
 
 	for i, vdrIntf := range reply.Validators {
@@ -795,7 +790,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 		reply.Validators[i] = vdr
 	}
 
-	return stopDB.Close()
+	return nil
 }
 
 // GetPendingValidatorsArgs are the arguments for calling GetPendingValidators
@@ -819,7 +814,7 @@ type GetPendingValidatorsReply struct {
 
 // GetPendingValidators returns the list of pending validators
 func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidatorsArgs, reply *GetPendingValidatorsReply) error {
-	service.vm.Ctx.Log.Info("Platform: GetPendingValidators called")
+	service.vm.ctx.Log.Info("Platform: GetPendingValidators called")
 
 	reply.Validators = []interface{}{}
 	reply.Delegators = []interface{}{}
@@ -835,26 +830,14 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 	}
 	includeAllNodes := nodeIDs.Len() == 0
 
-	startPrefix := []byte(fmt.Sprintf("%s%s", args.SubnetID, startDBPrefix))
-	startDB := prefixdb.NewNested(startPrefix, service.vm.DB)
-	defer startDB.Close()
+	pendingValidators := service.vm.internalState.PendingStakerChainState()
 
-	startIter := startDB.NewIterator()
-	defer startIter.Release()
-
-	for startIter.Next() { // Iterates in order of increasing start time
-		txBytes := startIter.Value()
-
-		tx := Tx{}
-		if _, err := service.vm.codec.Unmarshal(txBytes, &tx); err != nil {
-			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
-		}
-		if err := tx.Sign(service.vm.codec, nil); err != nil {
-			return err
-		}
-
+	for _, tx := range pendingValidators.Stakers() { // Iterates in order of increasing start time
 		switch staker := tx.UnsignedTx.(type) {
 		case *UnsignedAddDelegatorTx:
+			if args.SubnetID != constants.PrimaryNetworkID {
+				continue
+			}
 			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
 				continue
 			}
@@ -868,6 +851,9 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 				StakeAmount: &weight,
 			})
 		case *UnsignedAddValidatorTx:
+			if args.SubnetID != constants.PrimaryNetworkID {
+				continue
+			}
 			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
 				continue
 			}
@@ -876,7 +862,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			weight := json.Uint64(staker.Validator.Weight())
 			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(PercentDenominator))
 
-			_, connected := service.vm.connections[nodeID]
+			connected := service.vm.IsConnected(nodeID)
 			reply.Validators = append(reply.Validators, APIPrimaryValidator{
 				APIStaker: APIStaker{
 					TxID:        tx.ID(),
@@ -889,6 +875,9 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 				Connected:     &connected,
 			})
 		case *UnsignedAddSubnetValidatorTx:
+			if args.SubnetID != staker.Validator.Subnet {
+				continue
+			}
 			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
 				continue
 			}
@@ -905,14 +894,8 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			return fmt.Errorf("expected validator but got %T", tx.UnsignedTx)
 		}
 	}
-	errs := wrappers.Errs{}
-	errs.Add(
-		startIter.Error(),
-		startDB.Close(),
-	)
-	return errs.Err
+	return nil
 }
-*/
 
 // GetCurrentSupplyReply are the results from calling GetCurrentSupply
 type GetCurrentSupplyReply struct {
@@ -2099,7 +2082,6 @@ type GetStakeReply struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-/*
 // Takes in a staker and a set of addresses
 // Returns:
 // 1) The total amount staked by addresses in [addrs]
@@ -2188,24 +2170,9 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		stakedOuts []avax.TransferableOutput
 	)
 
-	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
-	stopDB := prefixdb.NewNested(stopPrefix, service.vm.DB)
-	defer stopDB.Close()
-	stopIter := stopDB.NewIterator()
-	defer stopIter.Release()
-
-	for stopIter.Next() { // Iterates over current stakers
-		stakerBytes := stopIter.Value()
-
-		tx := rewardTx{}
-		if _, err := service.vm.codec.Unmarshal(stakerBytes, &tx); err != nil {
-			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
-		}
-		if err := tx.Tx.Sign(service.vm.codec, nil); err != nil {
-			return err
-		}
-
-		stakedAmt, outs, err := service.getStakeHelper(&tx.Tx, addrs)
+	currentStakers := service.vm.internalState.CurrentStakerChainState()
+	for _, tx := range currentStakers.Stakers() { // Iterates over current stakers
+		stakedAmt, outs, err := service.getStakeHelper(tx, addrs)
 		if err != nil {
 			return err
 		}
@@ -2215,29 +2182,10 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		}
 		stakedOuts = append(stakedOuts, outs...)
 	}
-	if err := stopIter.Error(); err != nil {
-		return fmt.Errorf("iterator errored: %w", err)
-	}
 
-	// Iterate over pending validators
-	startPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, startDBPrefix))
-	startDB := prefixdb.NewNested(startPrefix, service.vm.DB)
-	defer startDB.Close()
-	startIter := startDB.NewIterator()
-	defer startIter.Release()
-
-	for startIter.Next() { // Iterates over pending stakers
-		stakerBytes := startIter.Value()
-
-		tx := Tx{}
-		if _, err := service.vm.codec.Unmarshal(stakerBytes, &tx); err != nil {
-			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
-		}
-		if err := tx.Sign(service.vm.codec, nil); err != nil {
-			return err
-		}
-
-		stakedAmt, outs, err := service.getStakeHelper(&tx, addrs)
+	pendingStakers := service.vm.internalState.PendingStakerChainState()
+	for _, tx := range pendingStakers.Stakers() { // Iterates over pending stakers
+		stakedAmt, outs, err := service.getStakeHelper(tx, addrs)
 		if err != nil {
 			return err
 		}
@@ -2247,15 +2195,6 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		}
 		stakedOuts = append(stakedOuts, outs...)
 	}
-	if err := startIter.Error(); err != nil {
-		return fmt.Errorf("iterator errored: %w", err)
-	}
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		stopDB.Close(),
-		startDB.Close(),
-	)
 
 	response.Staked = json.Uint64(totalStake)
 	response.Outputs = make([]string, len(stakedOuts))
@@ -2271,9 +2210,8 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 	}
 	response.Encoding = args.Encoding
 
-	return errs.Err
+	return nil
 }
-*/
 
 // GetMinStakeReply is the response from calling GetMinStake.
 type GetMinStakeReply struct {
@@ -2318,7 +2256,6 @@ type GetMaxStakeAmountReply struct {
 	Amount json.Uint64 `json:"amount"`
 }
 
-/*
 // GetMaxStakeAmount returns the maximum amount of nAVAX staking to the named
 // node during the time period.
 func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmountArgs, reply *GetMaxStakeAmountReply) error {
@@ -2329,8 +2266,13 @@ func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmou
 	startTime := time.Unix(int64(args.StartTime), 0)
 	endTime := time.Unix(int64(args.EndTime), 0)
 
-	amount, err := service.vm.maxStakeAmount(service.vm.DB, args.SubnetID, nodeID, startTime, endTime)
-	reply.Amount = json.Uint64(amount)
+	maxStakeAmount, err := service.vm.maxStakeAmount(
+		args.SubnetID,
+		nodeID,
+		startTime,
+		endTime,
+	)
+
+	reply.Amount = json.Uint64(maxStakeAmount)
 	return err
 }
-*/

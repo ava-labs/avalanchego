@@ -119,11 +119,7 @@ type internalState interface {
  * |-. txs
  * | '-- txID -> tx bytes + tx status
  * |- utxos
- * | '-- utxoID -> utxo bytes
- * |-. addresses
- * | '-. address
- * |   '-. list
- * |     '-- utxoID -> nil
+ * | '-- utxoDB
  * |-. subnets
  * | '-. list
  * |   '-- txID -> nil

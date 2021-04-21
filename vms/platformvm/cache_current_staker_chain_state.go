@@ -29,6 +29,7 @@ type currentStakerChainState interface {
 	// AddDelegatorTxs will be returned. AddSubnetValidatorTxs are removing
 	// using AdvanceTimestampTxs.
 	GetNextStaker() (addStakerTx *Tx, potentialReward uint64, err error)
+	GetStaker(txID ids.ID) (tx *Tx, potentialReward uint64, err error)
 	GetValidator(nodeID ids.ShortID) (currentValidator, error)
 
 	UpdateStakers(
@@ -317,6 +318,14 @@ func (cs *currentStakerChainStateImpl) subnetValidatorSet(subnetID ids.ID) (vali
 	}
 
 	return vdrs, nil
+}
+
+func (cs *currentStakerChainStateImpl) GetStaker(txID ids.ID) (tx *Tx, reward uint64, err error) {
+	staker, exists := cs.validatorsByTxID[txID]
+	if !exists {
+		return nil, 0, database.ErrNotFound
+	}
+	return staker.addStakerTx, staker.potentialReward, nil
 }
 
 // setNextStaker to the next staker that will be removed using a

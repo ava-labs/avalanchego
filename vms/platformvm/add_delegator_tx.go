@@ -341,6 +341,24 @@ func CanDelegate(
 	currentStake,
 	maximumStake uint64,
 ) (bool, error) {
+	maxStake, err := MaxStakeAmount(current, pending, new.StartTime(), new.EndTime(), currentStake)
+	if err != nil {
+		return false, err
+	}
+	newMaxStake, err := safemath.Add64(maxStake, new.Validator.Wght)
+	if err != nil {
+		return false, err
+	}
+	return newMaxStake <= maximumStake, nil
+}
+
+func MaxStakeAmount(
+	current,
+	pending []*UnsignedAddDelegatorTx, // sorted by next start time first
+	startTime time.Time,
+	endTime time.Time,
+	currentStake uint64,
+) (uint64, error) {
 	// Keep track of which delegators should be removed next so that we can
 	// efficiently remove delegators and keep the current stake updated.
 	toRemoveHeap := validatorHeap{}
@@ -349,23 +367,30 @@ func CanDelegate(
 	}
 
 	var (
-		err       error
-		i         = 0 // last processed pending delegator
-		startTime = new.StartTime()
+		err      error
+		maxStake uint64 = 0
 	)
 
-	// Iterate through time until the new delegator should be added.
-	for ; i < len(pending); i++ {
-		nextPending := pending[i]
+	// Iterate through time until [endTime].
+	for _, nextPending := range pending { // Iterates in order of increasing start time
 		nextPendingStartTime := nextPending.StartTime()
 
-		// If the new delegator is starting before or at the same time as this
-		// delegator, then we should add the new delegators stake now.
-		if !startTime.After(nextPendingStartTime) {
+		// If the new delegator is starting after [endTime], then we don't need
+		// to check the maximum after this point.
+		if nextPendingStartTime.After(endTime) {
 			break
 		}
 
-		for len(toRemoveHeap) > 0 && !toRemoveHeap.Peek().EndTime().After(nextPendingStartTime) {
+		for len(toRemoveHeap) > 0 {
+			toRemoveEndTime := toRemoveHeap.Peek().EndTime()
+			if toRemoveEndTime.After(nextPendingStartTime) {
+				break
+			}
+
+			if !toRemoveEndTime.After(startTime) && currentStake > maxStake {
+				maxStake = currentStake
+			}
+
 			// TODO: in a future network upgrade, this should be changed to:
 			// toRemove := toRemoveHeap.Remove()
 			// So that we don't mangle the underlying heap.
@@ -374,21 +399,30 @@ func CanDelegate(
 
 			currentStake, err = safemath.Sub64(currentStake, toRemove.Wght)
 			if err != nil {
-				return false, err
+				return 0, err
 			}
 		}
 
-		// The new delegator hasn't started yet, so we should add the pending
+		// The new delegator hasn't stopped yet, so we should add the pending
 		// delegator to the current set.
 		currentStake, err = math.Add64(currentStake, nextPending.Validator.Wght)
 		if err != nil {
-			return false, err
+			return 0, err
+		}
+
+		if currentStake > maxStake {
+			maxStake = currentStake
 		}
 
 		toRemoveHeap.Add(&nextPending.Validator)
 	}
 
-	for len(toRemoveHeap) > 0 && !toRemoveHeap.Peek().EndTime().After(startTime) {
+	for len(toRemoveHeap) > 0 {
+		toRemoveEndTime := toRemoveHeap.Peek().EndTime()
+		if !toRemoveEndTime.Before(startTime) {
+			break
+		}
+
 		// TODO: in a future network upgrade, this should be changed to:
 		// toRemove := toRemoveHeap.Remove()
 		// So that we don't mangle the underlying heap.
@@ -397,60 +431,125 @@ func CanDelegate(
 
 		currentStake, err = safemath.Sub64(currentStake, toRemove.Wght)
 		if err != nil {
-			return false, err
+			return 0, err
 		}
 	}
 
-	currentStake, err = math.Add64(currentStake, new.Validator.Wght)
-	if err != nil {
-		return false, err
+	if currentStake > maxStake {
+		maxStake = currentStake
 	}
 
-	if currentStake > maximumStake {
-		return false, nil
+	return maxStake, nil
+}
+
+func (vm *VM) maxStakeAmount(
+	subnetID ids.ID,
+	nodeID ids.ShortID,
+	startTime time.Time,
+	endTime time.Time,
+) (uint64, error) {
+	if startTime.After(endTime) {
+		return 0, errStartAfterEndTime
+	}
+	if timestamp := vm.internalState.GetTimestamp(); startTime.Before(timestamp) {
+		return 0, errStartTimeTooEarly
+	}
+	if subnetID == constants.PrimaryNetworkID {
+		return vm.maxPrimarySubnetStakeAmount(nodeID, startTime, endTime)
+	}
+	return vm.maxSubnetStakeAmount(subnetID, nodeID, startTime, endTime)
+}
+
+func (vm *VM) maxSubnetStakeAmount(
+	subnetID ids.ID,
+	nodeID ids.ShortID,
+	startTime time.Time,
+	endTime time.Time,
+) (uint64, error) {
+	var (
+		vdrTx  *UnsignedAddSubnetValidatorTx
+		exists bool
+	)
+
+	pendingStakers := vm.internalState.PendingStakerChainState()
+	pendingValidator := pendingStakers.GetValidator(nodeID)
+
+	currentStakers := vm.internalState.CurrentStakerChainState()
+	currentValidator, err := currentStakers.GetValidator(nodeID)
+	switch err {
+	case nil:
+		vdrTx, exists = currentValidator.SubnetValidators()[subnetID]
+		if !exists {
+			vdrTx = pendingValidator.SubnetValidators()[subnetID]
+		}
+	case database.ErrNotFound:
+		vdrTx = pendingValidator.SubnetValidators()[subnetID]
+	default:
+		return 0, err
 	}
 
-	endTime := new.EndTime()
+	if vdrTx == nil {
+		return 0, nil
+	}
+	if vdrTx.StartTime().After(endTime) {
+		return 0, nil
+	}
+	if vdrTx.EndTime().Before(startTime) {
+		return 0, nil
+	}
+	return vdrTx.Weight(), nil
+}
 
-	// Iterate through time until the new delegator should be removed.
-	for ; i < len(pending); i++ { // Iterates in order of increasing start time
-		nextPending := pending[i]
-		nextPendingStartTime := nextPending.StartTime()
+func (vm *VM) maxPrimarySubnetStakeAmount(
+	nodeID ids.ShortID,
+	startTime time.Time,
+	endTime time.Time,
+) (uint64, error) {
+	currentStakers := vm.internalState.CurrentStakerChainState()
+	pendingStakers := vm.internalState.PendingStakerChainState()
 
-		// If the new delegator is starting after this delegator, then we don't
-		// need to check that the maximum is honored past this point.
-		if nextPendingStartTime.After(endTime) {
-			break
-		}
+	pendingValidator := pendingStakers.GetValidator(nodeID)
+	currentValidator, err := currentStakers.GetValidator(nodeID)
 
-		for len(toRemoveHeap) > 0 && !toRemoveHeap.Peek().EndTime().After(nextPendingStartTime) {
-			// TODO: in a future network upgrade, this should be changed to:
-			// toRemove := toRemoveHeap.Remove()
-			// So that we don't mangle the underlying heap.
-			toRemove := toRemoveHeap[0]
-			toRemoveHeap = toRemoveHeap[1:]
-
-			currentStake, err = safemath.Sub64(currentStake, toRemove.Wght)
-			if err != nil {
-				return false, err
-			}
-		}
-
-		// The new delegator hasn't stopped yet, so we should add the pending
-		// delegator to the current set.
-		currentStake, err = math.Add64(currentStake, nextPending.Validator.Wght)
+	switch err {
+	case nil:
+		currentWeight := currentValidator.AddValidatorTx().Weight()
+		currentWeight, err = safemath.Add64(currentWeight, currentValidator.DelegatorWeight())
 		if err != nil {
-			return false, err
+			return 0, err
+		}
+		return MaxStakeAmount(
+			currentValidator.Delegators(),
+			pendingValidator.Delegators(),
+			startTime,
+			endTime,
+			currentWeight,
+		)
+	case database.ErrNotFound:
+		futureValidator, err := pendingStakers.GetStakerByNodeID(nodeID)
+		if err == database.ErrNotFound {
+			return 0, nil
+		}
+		if err != nil {
+			return 0, err
+		}
+		if futureValidator.StartTime().After(endTime) {
+			return 0, nil
+		}
+		if futureValidator.EndTime().Before(startTime) {
+			return 0, nil
 		}
 
-		if currentStake > maximumStake {
-			return false, nil
-		}
-
-		toRemoveHeap.Add(&nextPending.Validator)
+		return MaxStakeAmount(
+			nil,
+			pendingValidator.Delegators(),
+			startTime,
+			endTime,
+			futureValidator.Weight(),
+		)
+	default:
+		return 0, err
 	}
-
-	return true, nil
 }
 
 type validatorHeap []*Validator
