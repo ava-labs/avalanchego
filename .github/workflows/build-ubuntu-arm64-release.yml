@@ -2,8 +2,8 @@ name: build-arm64-debian-packages
 
 on:
   push:
-    branch:
-      - auto-build
+    tags:
+      - '*'
 
 jobs:
   build-bionic-arm64-package:

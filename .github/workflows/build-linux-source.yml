@@ -42,6 +42,7 @@ jobs:
         TAG: ${{ steps.get_version.outputs.VERSION }}
         BUCKET: ${{ secrets.BUCKET }}
         ARCH: "amd64"
+        RELEASE: "focal"
 
   build-arm64-source-tarball:
     runs-on: [self-hosted, linux, ARM64, bionic]
@@ -79,4 +80,4 @@ jobs:
         TAG: ${{ steps.get_version.outputs.VERSION }}
         BUCKET: ${{ secrets.BUCKET }}
         ARCH: "arm64"
-
+        RELEASE: "focal"
