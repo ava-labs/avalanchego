@@ -6,7 +6,7 @@ on:
       - '*'
 
 jobs:
-  build-x86_64-source-tarball:
+  build-x86_64-binaries-tarball:
     runs-on: ubuntu-18.04 
 
     steps:
@@ -44,7 +44,7 @@ jobs:
         ARCH: "amd64"
         RELEASE: "focal"
 
-  build-arm64-source-tarball:
+  build-arm64-binaries-tarball:
     runs-on: [self-hosted, linux, ARM64, bionic]
 
     steps:
