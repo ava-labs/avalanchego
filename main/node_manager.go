@@ -128,6 +128,7 @@ func newNodeManager(path string, log logging.Logger) *nodeManager {
 // Return a wrapper around a node wunning the binary at [path] with args [args].
 // The returned nodeProcess must eventually have [nodeProcess.rawClient.Kill] called on it.
 func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (*nodeProcess, error) {
+	nm.log.Debug("creating new node at '%s'", path)
 	clientConfig := &plugin.ClientConfig{
 		HandshakeConfig: appplugin.Handshake,
 		Plugins:         appplugin.PluginMap,
@@ -142,22 +143,26 @@ func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (
 		clientConfig.SyncStdout = os.Stdout
 		clientConfig.SyncStderr = os.Stderr
 	}
+
 	client := plugin.NewClient(clientConfig)
 	rpcClient, err := client.Client()
 	if err != nil {
 		client.Kill()
 		return nil, fmt.Errorf("couldn't get client at path %s: %w", path, err)
 	}
+
 	raw, err := rpcClient.Dispense("nodeProcess")
 	if err != nil {
 		client.Kill()
 		return nil, fmt.Errorf("couldn't dispense plugin at path %s': %w", path, err)
 	}
+
 	node, ok := raw.(*appplugin.Client)
 	if !ok {
 		client.Kill()
 		return nil, fmt.Errorf("expected *node.NodeClient but got %T", raw)
 	}
+
 	np := &nodeProcess{
 		log:       nm.log,
 		node:      node,

@@ -45,6 +45,7 @@ func main() {
 		fmt.Printf("starting logger failed with: %s\n", err)
 		os.Exit(1)
 	}
+	log.Info("using build directory at path '%s'", rootConfig.BuildDir)
 
 	nodeManager := newNodeManager(rootConfig.BuildDir, log)
 	_ = utils.HandleSignals(

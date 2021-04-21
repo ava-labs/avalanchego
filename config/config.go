@@ -55,11 +55,8 @@ var (
 	defaultDbDir           = filepath.Join(defaultDataDir, "db")
 	defaultStakingKeyPath  = filepath.Join(defaultDataDir, "staking", "staker.key")
 	defaultStakingCertPath = filepath.Join(defaultDataDir, "staking", "staker.crt")
-	defaultBuildDirs       = []string{
-		filepath.Join(".", "build"),
-		filepath.Join("/", "usr", "local", "lib", constants.AppName, "build"),
-		filepath.Join(defaultDataDir, "build"),
-	}
+	// Places to look for the build directory
+	defaultBuildDirs = []string{}
 	// GitCommit should be optionally set at compile time.
 	GitCommit string
 )
@@ -67,8 +64,15 @@ var (
 func init() {
 	folderPath, err := osext.ExecutableFolder()
 	if err == nil {
-		defaultBuildDirs = append(defaultBuildDirs, filepath.Join(folderPath, "build"))
+		defaultBuildDirs = append(defaultBuildDirs, folderPath)
+		defaultBuildDirs = append(defaultBuildDirs, filepath.Dir(folderPath))
 	}
+	defaultBuildDirs = append(defaultBuildDirs,
+		filepath.Join(".", "build"),
+		filepath.Join("/", "usr", "local", "lib", constants.AppName, "build"),
+		filepath.Join(defaultDataDir, "build"),
+	)
+
 }
 
 var (
