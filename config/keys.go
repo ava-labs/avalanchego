@@ -64,7 +64,7 @@ const (
 	benchlistFailThresholdKey               = "benchlist-fail-threshold"
 	benchlistPeerSummaryEnabledKey          = "benchlist-peer-summary-enabled"
 	benchlistDurationKey                    = "benchlist-duration"
-	benchlistMinFailingDurationKey          = "benchlist-min-failing-duration"
+	BenchlistMinFailingDurationKey          = "benchlist-min-failing-duration"
 	PluginDirKey                            = "plugin-dir"
 	buildDirKey                             = "build-dir"
 	LogsDirKey                              = "log-dir"

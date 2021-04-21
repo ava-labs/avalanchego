@@ -149,7 +149,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Int(benchlistFailThresholdKey, 10, "Number of consecutive failed queries before benchlisting a node.")
 	fs.Bool(benchlistPeerSummaryEnabledKey, false, "Enables peer specific query latency metrics.")
 	fs.Duration(benchlistDurationKey, 30*time.Minute, "Max amount of time a peer is benchlisted after surpassing the threshold.")
-	fs.Duration(benchlistMinFailingDurationKey, 5*time.Minute, "Minimum amount of time messages to a peer must be failing before the peer is benched.")
+	fs.Duration(BenchlistMinFailingDurationKey, 5*time.Minute, "Minimum amount of time messages to a peer must be failing before the peer is benched.")
 	// Router
 	fs.Uint(maxNonStakerPendingMsgsKey, uint(router.DefaultMaxNonStakerPendingMsgs), "Maximum number of messages a non-staker is allowed to have pending.")
 	fs.Float64(stakerMsgReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain message queue's space for stakers.")
@@ -673,7 +673,7 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 	config.BenchlistConfig.Threshold = v.GetInt(benchlistFailThresholdKey)
 	config.BenchlistConfig.PeerSummaryEnabled = v.GetBool(benchlistPeerSummaryEnabledKey)
 	config.BenchlistConfig.Duration = v.GetDuration(benchlistDurationKey)
-	config.BenchlistConfig.MinimumFailingDuration = v.GetDuration(benchlistMinFailingDurationKey)
+	config.BenchlistConfig.MinimumFailingDuration = v.GetDuration(BenchlistMinFailingDurationKey)
 	config.BenchlistConfig.MaxPortion = (1.0 - (float64(config.ConsensusParams.Alpha) / float64(config.ConsensusParams.K))) / 3.0
 
 	if config.ConsensusGossipFrequency < 0 {

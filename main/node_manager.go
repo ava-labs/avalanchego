@@ -112,10 +112,10 @@ func (nm *nodeManager) stop(path string) error {
 	if !exists {
 		return nil
 	}
+	delete(nm.nodes, nodeProcess.path)
 	if err := nodeProcess.stop(); err != nil {
 		return err
 	}
-	delete(nm.nodes, nodeProcess.path)
 	return nil
 }
 
@@ -207,6 +207,9 @@ func (nm *nodeManager) latestVersionNodeFetchOnly(v *viper.Viper, rootConfig nod
 	// Make sure the node doesn't exit if the local node it's bootsrapping from doesn't respond to some messages
 	argsMap[config.RetryBootstrapKey] = true
 	argsMap[config.RetryBootstrapMaxAttemptsKey] = 1000
+	// It's not expected that this node would bench the other node on this
+	// machine, which it is bootstrapping from, but set this to be sure
+	argsMap[config.BenchlistMinFailingDurationKey] = "1000h"
 
 	var args []string
 	for k, v := range argsMap {

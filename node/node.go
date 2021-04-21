@@ -877,8 +877,9 @@ func (n *Node) Initialize(
 	n.LogFactory = logFactory
 	n.Config = config
 	n.DoneShuttingDown.Add(1)
-	n.Log.Info("Node version is: %s", versionconfig.NodeVersion)
-	n.Log.Info("Node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))
+	n.Log.Info("node version is: %s", versionconfig.NodeVersion)
+	n.Log.Info("node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))
+	n.Log.Info("current database version: %s", dbManager.Current().Version)
 
 	httpLog, err := logFactory.MakeSubdir("http")
 	if err != nil {
