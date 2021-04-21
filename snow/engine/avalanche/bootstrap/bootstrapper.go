@@ -378,15 +378,12 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	b.NumFetched = 0
 
 	pendingContainerIDs := b.VtxBlocked.MissingIDs()
-	// Copy all of the missingIDs and the newly received [acceptedContainerIDs] into the same list
-	// to kick off bootstrapping.
-	checkIDs := make([]ids.ID, len(pendingContainerIDs)+len(acceptedContainerIDs))
-	copy(checkIDs, pendingContainerIDs)
-	copy(checkIDs[len(pendingContainerIDs):], acceptedContainerIDs)
-	b.Ctx.Log.Debug("Starting bootstrapping with %d pending vertices and %d from accepted frontier", len(pendingContainerIDs), len(acceptedContainerIDs))
-
-	toProcess := make([]avalanche.Vertex, 0, len(checkIDs))
-	for _, vtxID := range checkIDs {
+	// Append the list of accepted container IDs to pendingContainerIDs to ensure
+	// we iterate over every container that must be traversed.
+	pendingContainerIDs = append(pendingContainerIDs, acceptedContainerIDs...)
+	b.Ctx.Log.Debug("Starting bootstrapping with %d missing vertices and %d from the accepted frontier", len(pendingContainerIDs), len(acceptedContainerIDs))
+	toProcess := make([]avalanche.Vertex, 0, len(pendingContainerIDs))
+	for _, vtxID := range pendingContainerIDs {
 		if vtx, err := b.Manager.GetVtx(vtxID); err == nil {
 			if vtx.Status() == choices.Accepted {
 				b.VtxBlocked.RemoveMissingID(vtxID)

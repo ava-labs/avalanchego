@@ -135,15 +135,13 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	b.NumFetched = 0
 
 	pendingContainerIDs := b.Blocked.MissingIDs()
-	// Copy all of the missingIDs and the newly received [acceptedContainerIDs] into the same list
-	// to kick off bootstrapping.
-	checkIDs := make([]ids.ID, len(pendingContainerIDs)+len(acceptedContainerIDs))
-	copy(checkIDs, pendingContainerIDs)
-	copy(checkIDs[len(pendingContainerIDs):], acceptedContainerIDs)
-	toProcess := make([]snowman.Block, 0, len(acceptedContainerIDs))
 
-	b.Ctx.Log.Debug("Starting bootstrapping with %d pending blocks and %d from accepted frontier", len(pendingContainerIDs), len(acceptedContainerIDs))
-	for _, blkID := range checkIDs {
+	// Append the list of accepted container IDs to pendingContainerIDs to ensure
+	// we iterate over every container that must be traversed.
+	pendingContainerIDs = append(pendingContainerIDs, acceptedContainerIDs...)
+	toProcess := make([]snowman.Block, 0, len(acceptedContainerIDs))
+	b.Ctx.Log.Debug("Starting bootstrapping with %d pending blocks and %d from the accepted frontier", len(pendingContainerIDs), len(acceptedContainerIDs))
+	for _, blkID := range pendingContainerIDs {
 		b.startingAcceptedFrontier.Add(blkID)
 		if blk, err := b.VM.GetBlock(blkID); err == nil {
 			if height := blk.Height(); height > b.tipHeight {
