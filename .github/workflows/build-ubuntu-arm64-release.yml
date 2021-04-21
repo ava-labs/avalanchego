@@ -22,7 +22,7 @@ jobs:
     - name: Install aws cli
       run: |
         sudo apt update
-        sudo apt-get install awscli
+        sudo apt-get -y install awscli
 
     - name: Get the version
       id: get_version
@@ -60,7 +60,7 @@ jobs:
     - name: Install aws cli
       run: |
         sudo apt update
-        sudo apt-get install awscli
+        sudo apt-get -y install awscli
 
     - name: Install rpmbuild
       run: sudo apt-get install rpm
