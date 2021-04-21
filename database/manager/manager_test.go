@@ -250,6 +250,10 @@ func TestMeterDBManager(t *testing.T) {
 }
 
 func TestNewManagerFromDBs(t *testing.T) {
+	// Should error if no dbs are given
+	_, err := NewManagerFromDBs(nil)
+	assert.Error(t, err)
+
 	versions := []version.Version{
 		version.NewDefaultVersion(3, 2, 0),
 		version.NewDefaultVersion(1, 2, 0),
@@ -289,7 +293,7 @@ func TestNewManagerFromNonUniqueDBs(t *testing.T) {
 			},
 			{
 				Database: memdb.New(),
-				Version:  version.NewDefaultVersion(1, 1, 0),
+				Version:  version.NewDefaultVersion(1, 1, 0), // Duplicate
 			},
 			{
 				Database: memdb.New(),
@@ -314,8 +318,12 @@ func TestDontIncludePreviousVersions(t *testing.T) {
 	err = db2.Close()
 	assert.NoError(t, err)
 
-	_, err = New(dir, logging.NoLog{}, v2, false)
+	manager, err := New(dir, logging.NoLog{}, v2, false)
 	assert.NoError(t, err, "shouldn't error because shouldn't try to open previous database version")
+	assert.NoError(t, manager.Close())
+
+	_, err = New(dir, logging.NoLog{}, v2, true)
+	assert.Error(t, err, "should error because trying to open open database (1.1.0)")
 }
 
 func TestMarkBootstrapped(t *testing.T) {

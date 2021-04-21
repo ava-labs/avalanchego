@@ -35,6 +35,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Set the log directory for this process by adding a subdirectory
+	// "daemon" to the log directory given in the config
 	logConfigCopy := rootConfig.LoggingConfig
 	logConfigCopy.Directory = filepath.Join(logConfigCopy.Directory, "daemon")
 	logFactory := logging.NewFactory(logConfigCopy)
@@ -59,6 +61,7 @@ func main() {
 		syscall.SIGINT, syscall.SIGTERM,
 	)
 
+	// Migrate the database if necessary
 	migrationManager := newMigrationManager(nodeManager, v, rootConfig, log)
 	if err := migrationManager.migrate(); err != nil {
 		log.Error("error while running migration: %s", err)
@@ -66,6 +69,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Run normally
 	log.Info("starting to run node in normal execution mode")
 	exitCode, err := nodeManager.runNormal(v)
 	log.Debug("node manager returned exit code %s, error %v", exitCode, err)

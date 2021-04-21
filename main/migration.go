@@ -27,6 +27,8 @@ func newMigrationManager(binaryManager *nodeManager, v *viper.Viper, nConfig nod
 	}
 }
 
+// Migrate determines whether to do a database migration, and if so,
+// does it. See runMigration().
 func (m *migrationManager) migrate() error {
 	shouldMigrate, err := m.shouldMigrate()
 	if err != nil {
@@ -66,10 +68,10 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 }
 
 // Run two nodes at once: one is a version before the database upgrade and the other after.
-// The latter will bootstrap from the former. The pre-upgrade node will have staking port and
-// HTTP port 2 greater than the values given by the user.
+// The latter will bootstrap from the former.
 // When the new node version is done bootstrapping, both nodes are stopped.
 // Returns nil if the new node version successfully bootstrapped.
+// Some configuration flags are modified before being passed into the 2 nodes.
 func (m *migrationManager) runMigration() error {
 	m.log.Info("starting database migration")
 	preDBUpgradeNode, err := m.binaryManager.preDBUpgradeNode(m.v)
