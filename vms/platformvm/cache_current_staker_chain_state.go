@@ -172,6 +172,7 @@ func (cs *currentStakerChainStateImpl) UpdateStakers(
 					newVdr.subnets[subnetID] = addTx
 				}
 				newVdr.subnets[tx.Validator.Subnet] = tx
+				newCS.validatorsByNodeID[tx.Validator.NodeID] = &newVdr
 			default:
 				return nil, errWrongTxType
 			}
