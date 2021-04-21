@@ -270,7 +270,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(twoOfTwoUTXO)
+	err = vm.state.PutUTXO(twoOfTwoUTXO.InputID(), twoOfTwoUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -315,7 +315,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(oneOfTwoUTXO)
+	err = vm.state.PutUTXO(oneOfTwoUTXO.InputID(), oneOfTwoUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -362,7 +362,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(futureUTXO)
+	err = vm.state.PutUTXO(futureUTXO.InputID(), futureUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -423,7 +423,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(twoOfTwoUTXO)
+	err = vm.state.PutUTXO(twoOfTwoUTXO.InputID(), twoOfTwoUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -465,7 +465,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(oneOfTwoUTXO)
+	err = vm.state.PutUTXO(oneOfTwoUTXO.InputID(), oneOfTwoUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -510,7 +510,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(futureUTXO)
+	err = vm.state.PutUTXO(futureUTXO.InputID(), futureUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -553,7 +553,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(otherAssetUTXO)
+	err = vm.state.PutUTXO(otherAssetUTXO.InputID(), otherAssetUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -654,7 +654,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 	numUTXOs := 10
 	// Put a bunch of UTXOs
 	for i := 0; i < numUTXOs; i++ {
-		if err := vm.state.FundUTXO(&avax.UTXO{
+		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID: ids.GenerateTestID(),
 			},
@@ -666,7 +666,8 @@ func TestServiceGetUTXOs(t *testing.T) {
 					Addrs:     []ids.ShortID{rawAddr},
 				},
 			},
-		}); err != nil {
+		}
+		if err := vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
 			t.Fatal(err)
 		}
 	}

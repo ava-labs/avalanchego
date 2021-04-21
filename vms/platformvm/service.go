@@ -16,6 +16,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -173,7 +176,6 @@ type GetBalanceResponse struct {
 	UTXOIDs            []*avax.UTXOID `json:"utxoIDs"`
 }
 
-/*
 // GetBalance gets the balance of an address
 func (service *Service) GetBalance(_ *http.Request, args *api.JSONAddress, response *GetBalanceResponse) error {
 	service.vm.ctx.Log.Info("Platform: GetBalance called for address %s", args.Address)
@@ -186,7 +188,7 @@ func (service *Service) GetBalance(_ *http.Request, args *api.JSONAddress, respo
 
 	addrs := ids.ShortSet{}
 	addrs.Add(addr)
-	utxos, _, _, err := service.vm.GetUTXOs(service.vm.DB, addrs, ids.ShortEmpty, ids.Empty, -1, false)
+	utxos, _, _, err := service.vm.getAllUTXOs(addrs)
 	if err != nil {
 		addr, err2 := service.vm.FormatLocalAddress(addr)
 		if err2 != nil {
@@ -222,7 +224,7 @@ utxoFor:
 			innerOut, ok := out.TransferableOut.(*secp256k1fx.TransferOutput)
 			switch {
 			case !ok:
-				service.vm.SnowmanVM.Ctx.Log.Warn("Unexpected Output type in UTXO: %T",
+				service.vm.ctx.Log.Warn("Unexpected Output type in UTXO: %T",
 					out.TransferableOut)
 				continue utxoFor
 			case innerOut.Locktime > currentTime:
@@ -266,7 +268,6 @@ utxoFor:
 	response.LockedNotStakeable = json.Uint64(lockedNotStakeable)
 	return nil
 }
-*/
 
 // CreateAddress creates an address controlled by [args.Username]
 // Returns the newly created address
@@ -369,7 +370,6 @@ type GetUTXOsResponse struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-/*
 // GetUTXOs returns the UTXOs controlled by the given addresses
 func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *GetUTXOsResponse) error {
 	service.vm.ctx.Log.Info("Platform: ListAddresses called")
@@ -422,13 +422,11 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		err       error
 	)
 	if sourceChain == service.vm.ctx.ChainID {
-		utxos, endAddr, endUTXOID, err = service.vm.GetUTXOs(
-			service.vm.DB,
+		utxos, endAddr, endUTXOID, err = service.vm.getPaginatedUTXOs(
 			addrSet,
 			startAddr,
 			startUTXO,
 			int(args.Limit),
-			true,
 		)
 	} else {
 		utxos, endAddr, endUTXOID, err = service.vm.GetAtomicUTXOs(
@@ -466,7 +464,6 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 	response.Encoding = args.Encoding
 	return nil
 }
-*/
 
 /*
  ******************************************************
@@ -991,7 +988,6 @@ type AddValidatorArgs struct {
 	DelegationFeeRate json.Float32 `json:"delegationFeeRate"`
 }
 
-/*
 // AddValidator creates and signs and issues a transaction to add a
 // validator to the primary network
 func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *api.JSONTxIDChangeAddr) error {
@@ -1100,7 +1096,6 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	)
 	return errs.Err
 }
-*/
 
 // AddDelegatorArgs are the arguments to AddDelegator
 type AddDelegatorArgs struct {
@@ -1110,7 +1105,6 @@ type AddDelegatorArgs struct {
 	RewardAddress string `json:"rewardAddress"`
 }
 
-/*
 // AddDelegator creates and signs and issues a transaction to add a
 // delegator to the primary network
 func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *api.JSONTxIDChangeAddr) error {
@@ -1215,7 +1209,6 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	)
 	return errs.Err
 }
-*/
 
 // AddSubnetValidatorArgs are the arguments to AddSubnetValidator
 type AddSubnetValidatorArgs struct {
@@ -1226,7 +1219,6 @@ type AddSubnetValidatorArgs struct {
 	SubnetID string `json:"subnetID"`
 }
 
-/*
 // AddSubnetValidator creates and signs and issues a transaction to
 // add a validator to a subnet other than the primary network
 func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorArgs, response *api.JSONTxIDChangeAddr) error {
@@ -1328,7 +1320,6 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	)
 	return errs.Err
 }
-*/
 
 // CreateSubnetArgs are the arguments to CreateSubnet
 type CreateSubnetArgs struct {
@@ -1338,7 +1329,6 @@ type CreateSubnetArgs struct {
 	APISubnet
 }
 
-/*
 // CreateSubnet creates and signs and issues a transaction to create a new
 // subnet
 func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response *api.JSONTxIDChangeAddr) error {
@@ -1424,7 +1414,6 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	)
 	return errs.Err
 }
-*/
 
 // ExportAVAXArgs are the arguments to ExportAVAX
 type ExportAVAXArgs struct {
@@ -1439,7 +1428,6 @@ type ExportAVAXArgs struct {
 	To string `json:"to"`
 }
 
-/*
 // ExportAVAX exports AVAX from the P-Chain to the X-Chain
 // It must be imported on the X-Chain to complete the transfer
 func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JSONTxIDChangeAddr) error {
@@ -1526,7 +1514,6 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 	)
 	return errs.Err
 }
-*/
 
 // ImportAVAXArgs are the arguments to ImportAVAX
 type ImportAVAXArgs struct {
@@ -1540,7 +1527,6 @@ type ImportAVAXArgs struct {
 	To string `json:"to"`
 }
 
-/*
 // ImportAVAX issues a transaction to import AVAX from the X-chain. The AVAX
 // must have already been exported from the X-Chain.
 func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *api.JSONTxIDChangeAddr) error {
@@ -1622,7 +1608,6 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 	)
 	return errs.Err
 }
-*/
 
 /*
  ******************************************************
@@ -1648,7 +1633,6 @@ type CreateBlockchainArgs struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-/*
 // CreateBlockchain issues a transaction to create a new blockchain
 func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, response *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Info("Platform: CreateBlockchain called")
@@ -1763,7 +1747,6 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	)
 	return errs.Err
 }
-*/
 
 // GetBlockchainStatusArgs is the arguments for calling GetBlockchainStatus
 // [BlockchainID] is the ID of or an alias of the blockchain to get the status of.

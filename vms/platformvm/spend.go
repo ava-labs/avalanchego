@@ -21,10 +21,8 @@ var (
 	errCantSign                     = errors.New("can't sign")
 )
 
-/*
 // stake the provided amount while deducting the provided fee.
 // Arguments:
-// - [db] is the database that is used to attempt to fetch the funds from.
 // - [keys] are the owners of the funds
 // - [amount] is the amount of funds that are trying to be staked
 // - [fee] is the amount of AVAX that should be burned
@@ -37,7 +35,6 @@ var (
 //                   staking period
 // - [signers] the proof of ownership of the funds being moved
 func (vm *VM) stake(
-	db database.Database,
 	keys []*crypto.PrivateKeySECP256K1R,
 	amount uint64,
 	fee uint64,
@@ -53,7 +50,7 @@ func (vm *VM) stake(
 	for _, key := range keys {
 		addrs.Add(key.PublicKey().Address())
 	}
-	utxos, _, _, err := vm.GetUTXOs(db, addrs, ids.ShortEmpty, ids.Empty, -1, false) // The UTXOs controlled by [keys]
+	utxos, _, _, err := vm.getAllUTXOs(addrs) // The UTXOs controlled by [keys]
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}
@@ -278,7 +275,6 @@ func (vm *VM) stake(
 
 	return ins, returnedOuts, stakedOuts, signers, nil
 }
-*/
 
 // authorize an operation on behalf of the named subnet with the provided keys.
 func (vm *VM) authorize(
@@ -343,7 +339,7 @@ func (vm *VM) semanticVerifySpend(
 ) TxError {
 	utxos := make([]*avax.UTXO, len(ins))
 	for index, input := range ins {
-		utxo, err := utxoDB.GetUTXO(input.UTXOID)
+		utxo, err := utxoDB.GetUTXO(input.InputID())
 		if err != nil {
 			return tempError{
 				fmt.Errorf(
@@ -553,7 +549,7 @@ func (vm *VM) consumeInputs(
 	ins []*avax.TransferableInput,
 ) {
 	for _, input := range ins {
-		utxoDB.DeleteUTXO(input.UTXOID)
+		utxoDB.DeleteUTXO(input.InputID())
 	}
 }
 

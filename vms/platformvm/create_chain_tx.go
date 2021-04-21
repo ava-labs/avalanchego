@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -153,7 +155,6 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	return onAccept, nil
 }
 
-/*
 // Create a new transaction
 func (vm *VM) newCreateChainTx(
 	subnetID ids.ID, // ID of the subnet that validates the new chain
@@ -164,7 +165,7 @@ func (vm *VM) newCreateChainTx(
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to sign the tx
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, vm.CreationTxFee, changeAddr)
+	ins, outs, _, signers, err := vm.stake(keys, 0, vm.CreationTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -199,4 +200,3 @@ func (vm *VM) newCreateChainTx(
 	}
 	return tx, utx.Verify(vm.ctx, vm.codec, vm.CreationTxFee, vm.ctx.AVAXAssetID)
 }
-*/

@@ -11,7 +11,10 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
@@ -92,7 +95,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 
 	utxos := make([]*avax.UTXO, len(tx.Ins)+len(tx.ImportedInputs))
 	for index, input := range tx.Ins {
-		utxo, err := parentState.GetUTXO(input.UTXOID)
+		utxo, err := parentState.GetUTXO(input.InputID())
 		if err != nil {
 			return nil, tempError{
 				fmt.Errorf("failed to get UTXO %s: %w", &input.UTXOID, err),
@@ -161,7 +164,6 @@ func (tx *UnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 	return ctx.SharedMemory.Remove(tx.SourceChain, utxoIDs, batch)
 }
 
-/*
 // Create a new transaction
 func (vm *VM) newImportTx(
 	chainID ids.ID, // chain to import from
@@ -221,7 +223,7 @@ func (vm *VM) newImportTx(
 	outs := []*avax.TransferableOutput{}
 	if importedAmount < vm.TxFee { // imported amount goes toward paying tx fee
 		var baseSigners [][]*crypto.PrivateKeySECP256K1R
-		ins, outs, _, baseSigners, err = vm.stake(vm.DB, keys, 0, vm.TxFee-importedAmount, changeAddr)
+		ins, outs, _, baseSigners, err = vm.stake(keys, 0, vm.TxFee-importedAmount, changeAddr)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 		}
@@ -257,4 +259,3 @@ func (vm *VM) newImportTx(
 	}
 	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID)
 }
-*/

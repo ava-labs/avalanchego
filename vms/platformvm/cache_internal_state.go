@@ -83,6 +83,8 @@ type internalState interface {
 	GetBlock(blockID ids.ID) (Block, error)
 	AddBlock(block Block)
 
+	UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error)
+
 	Abort()
 	Commit() error
 	CommitBatch() (database.Batch, error)
@@ -175,11 +177,8 @@ type internalStateImpl struct {
 	txDB     database.Database
 
 	modifiedUTXOs map[ids.ID]*avax.UTXO // map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
-	utxoCache     cache.Cacher          // cache of UTXOID -> *UTXO if the UTXO is nil then it does not exist in the database
 	utxoDB        database.Database
-
-	// addressCache cache.Cacher // cache of address -> linkedDB
-	// addressDB    database.Database
+	utxoState     avax.UTXOState
 
 	cachedSubnets []*Tx // nil if the subnets haven't been loaded
 	addedSubnets  []*Tx
@@ -222,6 +221,7 @@ func newInternalState(vm *VM, db database.Database, genesis []byte) (internalSta
 	pendingDelegatorBaseDB := prefixdb.New(delegatorPrefix, pendingValidatorsDB)
 	pendingSubnetValidatorBaseDB := prefixdb.New(subnetValidatorPrefix, pendingValidatorsDB)
 
+	utxoDB := prefixdb.New(utxoPrefix, baseDB)
 	subnetBaseDB := prefixdb.New(subnetPrefix, baseDB)
 	is := &internalStateImpl{
 		vm: vm,
@@ -256,11 +256,8 @@ func newInternalState(vm *VM, db database.Database, genesis []byte) (internalSta
 		txDB:     prefixdb.New(txPrefix, baseDB),
 
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
-		utxoCache:     &cache.LRU{Size: utxoCacheSize},
-		utxoDB:        prefixdb.New(utxoPrefix, baseDB),
-
-		// addressCache: &cache.LRU{Size: addressCacheSize},
-		// addressDB:    prefixdb.New(addressPrefix, baseDB),
+		utxoDB:        utxoDB,
+		utxoState:     avax.NewUTXOState(utxoDB, GenesisCodec),
 
 		subnetBaseDB: subnetBaseDB,
 		subnetDB:     linkeddb.NewDefault(subnetBaseDB),
@@ -452,44 +449,22 @@ func (st *internalStateImpl) AddTx(tx *Tx, status Status) {
 	}
 }
 
-func (st *internalStateImpl) GetUTXO(utxoID avax.UTXOID) (*avax.UTXO, error) {
-	return st.getUTXO(utxoID.InputID())
-}
-
-func (st *internalStateImpl) getUTXO(utxoID ids.ID) (*avax.UTXO, error) {
+func (st *internalStateImpl) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 	if utxo, exists := st.modifiedUTXOs[utxoID]; exists {
 		if utxo == nil {
 			return nil, database.ErrNotFound
 		}
 		return utxo, nil
 	}
-	if utxoIntf, cached := st.utxoCache.Get(utxoID); cached {
-		if utxoIntf == nil {
-			return nil, database.ErrNotFound
-		}
-		return utxoIntf.(*avax.UTXO), nil
-	}
-	utxoBytes, err := st.utxoDB.Get(utxoID[:])
-	if err == database.ErrNotFound {
-		st.utxoCache.Put(utxoID, nil)
-		return nil, database.ErrNotFound
-	} else if err != nil {
-		return nil, err
-	}
-	utxo := &avax.UTXO{}
-	if _, err := GenesisCodec.Unmarshal(utxoBytes, utxo); err != nil {
-		return nil, err
-	}
-	st.utxoCache.Put(utxoID, utxo)
-	return utxo, nil
+	return st.utxoState.GetUTXO(utxoID)
 }
 
 func (st *internalStateImpl) AddUTXO(utxo *avax.UTXO) {
 	st.modifiedUTXOs[utxo.InputID()] = utxo
 }
 
-func (st *internalStateImpl) DeleteUTXO(utxoID avax.UTXOID) {
-	st.modifiedUTXOs[utxoID.InputID()] = nil
+func (st *internalStateImpl) DeleteUTXO(utxoID ids.ID) {
+	st.modifiedUTXOs[utxoID] = nil
 }
 
 func (st *internalStateImpl) GetBlock(blockID ids.ID) (Block, error) {
@@ -530,6 +505,10 @@ func (st *internalStateImpl) GetBlock(blockID ids.ID) (Block, error) {
 
 func (st *internalStateImpl) AddBlock(block Block) {
 	st.addedBlocks[block.ID()] = block
+}
+
+func (st *internalStateImpl) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
+	return st.utxoState.UTXOIDs(addr, start, limit)
 }
 
 func (st *internalStateImpl) CurrentStakerChainState() currentStakerChainState {
@@ -835,24 +814,15 @@ func (st *internalStateImpl) writeTXs() error {
 
 func (st *internalStateImpl) writeUTXOs() error {
 	for utxoID, utxo := range st.modifiedUTXOs {
-		utxoID := utxoID
-
 		delete(st.modifiedUTXOs, utxoID)
-		st.utxoCache.Put(utxoID, utxo)
 
 		if utxo == nil {
-			if err := st.utxoDB.Delete(utxoID[:]); err != nil {
+			if err := st.utxoState.DeleteUTXO(utxoID); err != nil {
 				return err
 			}
 			continue
 		}
-
-		utxoBytes, err := GenesisCodec.Marshal(codecVersion, utxo)
-		if err != nil {
-			return err
-		}
-
-		if err := st.utxoDB.Put(utxoID[:], utxoBytes); err != nil {
+		if err := st.utxoState.PutUTXO(utxoID, utxo); err != nil {
 			return err
 		}
 	}

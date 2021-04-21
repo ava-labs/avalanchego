@@ -11,11 +11,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -277,7 +280,6 @@ func (tx *UnsignedAddDelegatorTx) InitiallyPrefersCommit(vm *VM) bool {
 	return tx.StartTime().After(vm.clock.Time())
 }
 
-/*
 // Creates a new transaction
 func (vm *VM) newAddDelegatorTx(
 	stakeAmt, // Amount the delegator stakes
@@ -288,7 +290,7 @@ func (vm *VM) newAddDelegatorTx(
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, vm.AddStakerTxFee, changeAddr)
+	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(keys, stakeAmt, vm.AddStakerTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -325,7 +327,6 @@ func (vm *VM) newAddDelegatorTx(
 		vm.MaxStakeDuration,
 	)
 }
-*/
 
 // CanDelegate returns if the [new] delegator can be added to a validator who
 // has [current] and [pending] delegators. [currentStake] is the current amount

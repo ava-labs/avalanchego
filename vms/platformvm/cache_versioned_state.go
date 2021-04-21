@@ -16,7 +16,7 @@ var (
 )
 
 type utxoGetter interface {
-	GetUTXO(utxoID avax.UTXOID) (*avax.UTXO, error)
+	GetUTXO(utxoID ids.ID) (*avax.UTXO, error)
 }
 
 type utxoAdder interface {
@@ -24,7 +24,7 @@ type utxoAdder interface {
 }
 
 type utxoDeleter interface {
-	DeleteUTXO(utxoID avax.UTXOID)
+	DeleteUTXO(utxoID ids.ID)
 }
 
 type utxoState interface {
@@ -91,7 +91,7 @@ type txStatusImpl struct {
 }
 
 type utxoImpl struct {
-	utxoID *avax.UTXOID
+	utxoID ids.ID
 	utxo   *avax.UTXO
 }
 
@@ -230,8 +230,8 @@ func (vs *versionedStateImpl) AddTx(tx *Tx, status Status) {
 	}
 }
 
-func (vs *versionedStateImpl) GetUTXO(utxoID avax.UTXOID) (*avax.UTXO, error) {
-	utxo, modified := vs.modifiedUTXOs[utxoID.InputID()]
+func (vs *versionedStateImpl) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
+	utxo, modified := vs.modifiedUTXOs[utxoID]
 	if !modified {
 		return vs.parentState.GetUTXO(utxoID)
 	}
@@ -243,7 +243,7 @@ func (vs *versionedStateImpl) GetUTXO(utxoID avax.UTXOID) (*avax.UTXO, error) {
 
 func (vs *versionedStateImpl) AddUTXO(utxo *avax.UTXO) {
 	newUTXO := &utxoImpl{
-		utxoID: &utxo.UTXOID,
+		utxoID: utxo.InputID(),
 		utxo:   utxo,
 	}
 	if vs.modifiedUTXOs == nil {
@@ -255,16 +255,16 @@ func (vs *versionedStateImpl) AddUTXO(utxo *avax.UTXO) {
 	}
 }
 
-func (vs *versionedStateImpl) DeleteUTXO(utxoID avax.UTXOID) {
+func (vs *versionedStateImpl) DeleteUTXO(utxoID ids.ID) {
 	newUTXO := &utxoImpl{
-		utxoID: &utxoID,
+		utxoID: utxoID,
 	}
 	if vs.modifiedUTXOs == nil {
 		vs.modifiedUTXOs = map[ids.ID]*utxoImpl{
-			utxoID.InputID(): newUTXO,
+			utxoID: newUTXO,
 		}
 	} else {
-		vs.modifiedUTXOs[utxoID.InputID()] = newUTXO
+		vs.modifiedUTXOs[utxoID] = newUTXO
 	}
 }
 
@@ -298,7 +298,7 @@ func (vs *versionedStateImpl) Apply(is internalState) {
 		if utxo.utxo != nil {
 			is.AddUTXO(utxo.utxo)
 		} else {
-			is.DeleteUTXO(*utxo.utxoID)
+			is.DeleteUTXO(utxo.utxoID)
 		}
 	}
 	vs.currentStakerChainState.Apply(is)

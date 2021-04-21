@@ -12,7 +12,10 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
@@ -154,7 +157,6 @@ func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 	return ctx.SharedMemory.Put(tx.DestinationChain, elems, batch)
 }
 
-/*
 // Create a new transaction
 func (vm *VM) newExportTx(
 	amount uint64, // Amount of tokens to export
@@ -171,7 +173,7 @@ func (vm *VM) newExportTx(
 	if err != nil {
 		return nil, errOverflowExport
 	}
-	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, toBurn, changeAddr)
+	ins, outs, _, signers, err := vm.stake(keys, 0, toBurn, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -203,4 +205,3 @@ func (vm *VM) newExportTx(
 	}
 	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID)
 }
-*/

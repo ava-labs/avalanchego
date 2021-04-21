@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -261,7 +263,6 @@ func (tx *UnsignedAddSubnetValidatorTx) InitiallyPrefersCommit(vm *VM) bool {
 	return tx.StartTime().After(vm.clock.Time())
 }
 
-/*
 // Create a new transaction
 func (vm *VM) newAddSubnetValidatorTx(
 	weight, // Sampling weight of the new validator
@@ -272,7 +273,7 @@ func (vm *VM) newAddSubnetValidatorTx(
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to use for adding the validator
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, vm.TxFee, changeAddr)
+	ins, outs, _, signers, err := vm.stake(keys, 0, vm.TxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -315,4 +316,3 @@ func (vm *VM) newAddSubnetValidatorTx(
 		vm.MaxStakeDuration,
 	)
 }
-*/

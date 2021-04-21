@@ -4,10 +4,15 @@
 package platformvm
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
@@ -77,7 +82,6 @@ func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 	return nil, nil
 }
 
-/*
 // [controlKeys] must be unique. They will be sorted by this method.
 // If [controlKeys] is nil, [tx.Controlkeys] will be an empty list.
 func (vm *VM) newCreateSubnetTx(
@@ -86,7 +90,7 @@ func (vm *VM) newCreateSubnetTx(
 	keys []*crypto.PrivateKeySECP256K1R, // pay the fee
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, vm.CreationTxFee, changeAddr)
+	ins, outs, _, signers, err := vm.stake(keys, 0, vm.CreationTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -113,4 +117,3 @@ func (vm *VM) newCreateSubnetTx(
 	}
 	return tx, utx.Verify(vm.ctx, vm.codec, vm.CreationTxFee, vm.ctx.AVAXAssetID)
 }
-*/

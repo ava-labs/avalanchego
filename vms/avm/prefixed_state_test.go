@@ -62,25 +62,25 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := state.SetUTXO(ids.Empty, utxo); err != nil {
+	if err := state.PutUTXO(ids.Empty, utxo); err != nil {
 		t.Fatal(err)
 	}
-	if err := state.SetTx(ids.Empty, tx); err != nil {
+	if err := state.PutTx(ids.Empty, tx); err != nil {
 		t.Fatal(err)
 	}
-	if err := state.SetStatus(ids.Empty, choices.Accepted); err != nil {
+	if err := state.PutStatus(ids.Empty, choices.Accepted); err != nil {
 		t.Fatal(err)
 	}
 
-	resultUTXO, err := state.UTXO(ids.Empty)
+	resultUTXO, err := state.GetUTXO(ids.Empty)
 	if err != nil {
 		t.Fatal(err)
 	}
-	resultTx, err := state.Tx(ids.Empty)
+	resultTx, err := state.GetTx(ids.Empty)
 	if err != nil {
 		t.Fatal(err)
 	}
-	resultStatus, err := state.Status(ids.Empty)
+	resultStatus, err := state.GetStatus(ids.Empty)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,10 +120,10 @@ func TestPrefixedFundingNoAddresses(t *testing.T) {
 		Out:   &avax.TestVerifiable{},
 	}
 
-	if err := state.FundUTXO(utxo); err != nil {
+	if err := state.PutUTXO(utxo.InputID(), utxo); err != nil {
 		t.Fatal(err)
 	}
-	if err := state.SpendUTXO(utxo.InputID()); err != nil {
+	if err := state.DeleteUTXO(utxo.InputID()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -154,27 +154,27 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 		},
 	}
 
-	if err := state.FundUTXO(utxo); err != nil {
+	if err := state.PutUTXO(utxo.InputID(), utxo); err != nil {
 		t.Fatal(err)
 	}
-	funds, err := state.Funds([]byte{0}, ids.Empty, math.MaxInt32)
+	utxos, err := state.UTXOIDs([]byte{0}, ids.Empty, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(funds) != 1 {
+	if len(utxos) != 1 {
 		t.Fatalf("Should have returned 1 utxoIDs")
 	}
-	if utxoID := funds[0]; utxoID != utxo.InputID() {
+	if utxoID := utxos[0]; utxoID != utxo.InputID() {
 		t.Fatalf("Returned wrong utxoID")
 	}
-	if err := state.SpendUTXO(utxo.InputID()); err != nil {
+	if err := state.DeleteUTXO(utxo.InputID()); err != nil {
 		t.Fatal(err)
 	}
-	funds, err = state.Funds([]byte{0}, ids.Empty, math.MaxInt32)
+	utxos, err = state.UTXOIDs([]byte{0}, ids.Empty, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(funds) != 0 {
+	if len(utxos) != 0 {
 		t.Fatalf("Should have returned 0 utxoIDs")
 	}
 }
