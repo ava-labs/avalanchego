@@ -41,7 +41,7 @@ jobs:
     - name: Create zip file
       run: 7z a avalanchego-macos-${VERSION}.zip build/avalanchego build/plugins
       env:
-        VERSION: ${{ steps.get_version.outputs.VERSION }
+        VERSION: ${{ steps.get_version.outputs.VERSION }}
 
     - name: Upload file to S3 
       run: aws s3 cp avalanchego-macos-${VERSION}.zip s3://${BUCKET}/macos/ 
