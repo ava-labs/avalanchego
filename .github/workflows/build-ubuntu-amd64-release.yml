@@ -2,8 +2,8 @@ name: build-amd64-debian-packages
 
 on:
   push:
-    tags:
-      - '*'
+    branch:
+      - auto-build
 
 jobs:
   build-bionic-amd64-package:
