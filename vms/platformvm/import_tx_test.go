@@ -16,12 +16,12 @@ import (
 
 func TestNewImportTx(t *testing.T) {
 	vm, baseDB := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	type test struct {
@@ -50,7 +50,7 @@ func TestNewImportTx(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		sm := m.NewSharedMemory(vm.Ctx.ChainID)
+		sm := m.NewSharedMemory(vm.ctx.ChainID)
 		peerSharedMemory := m.NewSharedMemory(avmID)
 
 		// #nosec G404
@@ -74,7 +74,7 @@ func TestNewImportTx(t *testing.T) {
 			panic(err)
 		}
 		inputID := utxo.InputID()
-		if err := peerSharedMemory.Put(vm.Ctx.ChainID, []*atomic.Element{{
+		if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
 			Key:   inputID[:],
 			Value: utxoBytes,
 			Traits: [][]byte{
@@ -90,14 +90,14 @@ func TestNewImportTx(t *testing.T) {
 	tests := []test{
 		{
 			description:   "recipient key can't pay fee;",
-			sharedMemory:  fundedSharedMemory(vm.txFee - 1),
+			sharedMemory:  fundedSharedMemory(vm.TxFee - 1),
 			recipientKeys: []*crypto.PrivateKeySECP256K1R{recipientKey},
 			shouldErr:     true,
 		},
 		{
 
 			description:   "recipient key pays fee",
-			sharedMemory:  fundedSharedMemory(vm.txFee),
+			sharedMemory:  fundedSharedMemory(vm.TxFee),
 			recipientKeys: []*crypto.PrivateKeySECP256K1R{recipientKey},
 			shouldErr:     false,
 		},
@@ -106,7 +106,7 @@ func TestNewImportTx(t *testing.T) {
 	vdb := versiondb.New(vm.DB)
 	to := ids.GenerateTestShortID()
 	for _, tt := range tests {
-		vm.Ctx.SharedMemory = tt.sharedMemory
+		vm.ctx.SharedMemory = tt.sharedMemory
 		tx, err := vm.newImportTx(avmID, to, tt.recipientKeys, ids.ShortEmpty)
 		if err != nil {
 			if !tt.shouldErr {
@@ -133,8 +133,8 @@ func TestNewImportTx(t *testing.T) {
 		for _, out := range unsignedTx.Outs {
 			totalOut += out.Out.Amount()
 		}
-		if totalIn-totalOut != vm.txFee {
-			t.Fatalf("in test '%s'. inputs (%d) != outputs (%d) + txFee (%d)", tt.description, totalIn, totalOut, vm.txFee)
+		if totalIn-totalOut != vm.TxFee {
+			t.Fatalf("in test '%s'. inputs (%d) != outputs (%d) + txFee (%d)", tt.description, totalIn, totalOut, vm.TxFee)
 		}
 		vdb.Abort()
 	}

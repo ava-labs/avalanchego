@@ -15,12 +15,12 @@ import (
 // Ensure semantic verification fails when proposed timestamp is at or before current timestamp
 func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	if tx, err := vm.newAdvanceTimeTx(defaultGenesisTime); err != nil {
@@ -33,7 +33,7 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 // Ensure semantic verification fails when proposed timestamp is after next validator set change time
 func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -42,7 +42,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	nodeIDKey, _ := vm.factory.NewPrivateKey()
 	nodeID := nodeIDKey.PublicKey().Address()
 	addPendingValidatorTx, err := vm.newAddValidatorTx(
-		vm.minValidatorStake,
+		vm.MinValidatorStake,
 		uint64(pendingValidatorStartTime.Unix()),
 		uint64(pendingValidatorEndTime.Unix()),
 		nodeID,
@@ -68,16 +68,16 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	if err := vm.Shutdown(); err != nil {
 		t.Fatal(err)
 	}
-	vm.Ctx.Lock.Unlock()
+	vm.ctx.Lock.Unlock()
 
 	// Case: Timestamp is after next validator end time
 	vm, _ = defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	// fast forward clock to 10 seconds before genesis validators stop validating
@@ -95,12 +95,12 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 // for the primary network
 func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	// Case: Timestamp is after next validator start time
@@ -110,7 +110,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	nodeIDKey, _ := vm.factory.NewPrivateKey()
 	nodeID := nodeIDKey.PublicKey().Address()
 	addPendingValidatorTx, err := vm.newAddValidatorTx(
-		vm.minValidatorStake,
+		vm.MinValidatorStake,
 		uint64(pendingValidatorStartTime.Unix()),
 		uint64(pendingValidatorEndTime.Unix()),
 		nodeID,
@@ -281,17 +281,17 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers2(t *testing.T) {
 
 	for _, tt := range tests {
 		vm, _ := defaultVM()
-		vm.Ctx.Lock.Lock()
+		vm.ctx.Lock.Lock()
 		defer func() {
 			if err := vm.Shutdown(); err != nil {
 				t.Fatal(err)
 			}
-			vm.Ctx.Lock.Unlock()
+			vm.ctx.Lock.Unlock()
 		}()
 
 		for _, staker := range tt.stakers {
 			tx, err := vm.newAddValidatorTx(
-				vm.minValidatorStake,
+				vm.MinValidatorStake,
 				uint64(staker.startTime.Unix()),
 				uint64(staker.endTime.Unix()),
 				staker.nodeID,  // validator ID
@@ -349,12 +349,12 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers2(t *testing.T) {
 // is after the new timestamp
 func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	// Add a subnet validator to the staker set
@@ -423,12 +423,12 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 // Test method InitiallyPrefersCommit
 func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	vm.clock.Set(defaultGenesisTime) // VM's clock reads the genesis time
@@ -453,12 +453,12 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 // Ensure marshaling/unmarshaling works
 func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	tx, err := vm.newAdvanceTimeTx(defaultGenesisTime)

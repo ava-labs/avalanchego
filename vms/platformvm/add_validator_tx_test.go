@@ -18,12 +18,12 @@ import (
 
 func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	key, err := vm.factory.NewPrivateKey()
@@ -35,10 +35,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	// Case: tx is nil
 	var unsignedTx *UnsignedAddValidatorTx
 	if err := unsignedTx.Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.minValidatorStake,
-		vm.maxValidatorStake,
+		vm.MinValidatorStake,
+		vm.MaxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -48,7 +48,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case 3: Wrong Network ID
 	tx, err := vm.newAddValidatorTx(
-		vm.minValidatorStake,
+		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -65,10 +65,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.minValidatorStake,
-		vm.maxValidatorStake,
+		vm.MinValidatorStake,
+		vm.MaxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -78,7 +78,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: Stake owner has no addresses
 	tx, err = vm.newAddValidatorTx(
-		vm.minValidatorStake,
+		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -94,7 +94,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).Stake = []*avax.TransferableOutput{{
 		Asset: avax.Asset{ID: avaxAssetID},
 		Out: &secp256k1fx.TransferOutput{
-			Amt: vm.minValidatorStake,
+			Amt: vm.MinValidatorStake,
 			OutputOwners: secp256k1fx.OutputOwners{
 				Locktime:  0,
 				Threshold: 1,
@@ -105,10 +105,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.minValidatorStake,
-		vm.maxValidatorStake,
+		vm.MinValidatorStake,
+		vm.MaxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -118,7 +118,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: Rewards owner has no addresses
 	tx, err = vm.newAddValidatorTx(
-		vm.minValidatorStake,
+		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -139,10 +139,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.minValidatorStake,
-		vm.maxValidatorStake,
+		vm.MinValidatorStake,
+		vm.MaxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -152,7 +152,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: Stake amount too small
 	tx, err = vm.newAddValidatorTx(
-		vm.minValidatorStake,
+		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -169,10 +169,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.minValidatorStake,
-		vm.maxValidatorStake,
+		vm.MinValidatorStake,
+		vm.MaxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -182,7 +182,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: Too many shares
 	tx, err = vm.newAddValidatorTx(
-		vm.minValidatorStake,
+		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -199,10 +199,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.minValidatorStake,
-		vm.maxValidatorStake,
+		vm.MinValidatorStake,
+		vm.MaxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -212,7 +212,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: Validation length is too short
 	tx, err = vm.newAddValidatorTx(
-		vm.minValidatorStake,
+		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix()),
 		nodeID,
@@ -229,10 +229,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.minValidatorStake,
-		vm.maxValidatorStake,
+		vm.MinValidatorStake,
+		vm.MaxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -242,7 +242,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: Validation length is negative
 	tx, err = vm.newAddValidatorTx(
-		vm.minValidatorStake,
+		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix()),
 		nodeID,
@@ -259,10 +259,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.minValidatorStake,
-		vm.maxValidatorStake,
+		vm.MinValidatorStake,
+		vm.MaxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -272,7 +272,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: Validation length is too long
 	tx, err = vm.newAddValidatorTx(
-		vm.minValidatorStake,
+		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Add(defaultMaxStakingDuration).Unix()),
 		nodeID,
@@ -289,10 +289,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.minValidatorStake,
-		vm.maxValidatorStake,
+		vm.MinValidatorStake,
+		vm.MaxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -302,7 +302,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: Valid
 	if tx, err := vm.newAddValidatorTx(
-		vm.minValidatorStake,
+		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -314,10 +314,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	} else if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.minValidatorStake,
-		vm.maxValidatorStake,
+		vm.MinValidatorStake,
+		vm.MaxValidatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 		defaultMinDelegationFee,
@@ -329,12 +329,12 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 // Test AddValidatorTx.SemanticVerify
 func TestAddValidatorTxSemanticVerify(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 	vDB := versiondb.New(vm.DB)
 
@@ -346,7 +346,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 
 	// Case: Validator's start time too early
 	if tx, err := vm.newAddValidatorTx(
-		vm.minValidatorStake,
+		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix())-1,
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -363,7 +363,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 
 	// Case: Validator's start time too far in the future
 	if tx, err := vm.newAddValidatorTx(
-		vm.minValidatorStake,
+		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Add(maxFutureStartTime).Unix()+1),
 		uint64(defaultValidateStartTime.Add(maxFutureStartTime).Add(defaultMinStakingDuration).Unix()+1),
 		nodeID,
@@ -380,7 +380,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 
 	// Case: Validator already validating primary network
 	if tx, err := vm.newAddValidatorTx(
-		vm.minValidatorStake,
+		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID, // node ID
@@ -402,7 +402,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 	}
 	startTime := defaultGenesisTime.Add(1 * time.Second)
 	tx, err := vm.newAddValidatorTx(
-		vm.minValidatorStake,     // stake amount
+		vm.MinValidatorStake,     // stake amount
 		uint64(startTime.Unix()), // start time
 		uint64(startTime.Add(defaultMinStakingDuration).Unix()), // end time
 		nodeID,                     // node ID
@@ -425,7 +425,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 
 	// Case: Validator doesn't have enough tokens to cover stake amount
 	if _, err := vm.newAddValidatorTx( // create the tx
-		vm.minValidatorStake,
+		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,

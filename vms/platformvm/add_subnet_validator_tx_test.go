@@ -17,12 +17,12 @@ import (
 
 func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	nodeID := keys[0].PublicKey().Address()
@@ -30,10 +30,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	// Case: tx is nil
 	var unsignedTx *UnsignedAddSubnetValidatorTx
 	if err := unsignedTx.Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err == nil {
@@ -57,10 +57,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err == nil {
@@ -84,10 +84,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err == nil {
@@ -111,10 +111,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err == nil {
@@ -139,10 +139,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
 	if err = tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err == nil {
@@ -166,10 +166,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err == nil {
@@ -193,10 +193,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err == nil {
@@ -215,10 +215,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	} else if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err != nil {
@@ -228,12 +228,12 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	nodeID := keys[0].PublicKey().Address()
@@ -285,7 +285,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 	DSEndTime := DSStartTime.Add(5 * defaultMinStakingDuration)
 
 	addDSTx, err := vm.newAddValidatorTx(
-		vm.minValidatorStake,                    // stake amount
+		vm.MinValidatorStake,                    // stake amount
 		uint64(DSStartTime.Unix()),              // start time
 		uint64(DSEndTime.Unix()),                // end time
 		pendingDSValidatorID,                    // node ID
@@ -522,12 +522,12 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 // Test that marshalling/unmarshalling works
 func TestAddSubnetValidatorMarshal(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	var unmarshaledTx Tx
@@ -551,10 +551,10 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 	} else if err := unmarshaledTx.Sign(vm.codec, nil); err != nil {
 		t.Fatal(err)
 	} else if err := unmarshaledTx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err != nil {

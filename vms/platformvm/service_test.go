@@ -49,8 +49,8 @@ var (
 
 func defaultService(t *testing.T) *Service {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
-	defer vm.Ctx.Lock.Unlock()
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
 	ks, err := keystore.New(logging.NoLog{}, manager.NewDefaultMemDBManager())
 	if err != nil {
 		t.Fatal(err)
@@ -58,15 +58,15 @@ func defaultService(t *testing.T) *Service {
 	if err := ks.CreateUser(testUsername, testPassword); err != nil {
 		t.Fatal(err)
 	}
-	vm.SnowmanVM.Ctx.Keystore = ks.NewBlockchainKeyStore(vm.SnowmanVM.Ctx.ChainID)
+	vm.ctx.Keystore = ks.NewBlockchainKeyStore(vm.ctx.ChainID)
 	return &Service{vm: vm}
 }
 
 // Give user [testUsername] control of [testPrivateKey] and keys[0] (which is funded)
 func defaultAddress(t *testing.T, service *Service) {
-	service.vm.Ctx.Lock.Lock()
-	defer service.vm.Ctx.Lock.Unlock()
-	userDB, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(testUsername, testPassword)
+	service.vm.ctx.Lock.Lock()
+	defer service.vm.ctx.Lock.Unlock()
+	userDB, err := service.vm.ctx.Keystore.GetDatabase(testUsername, testPassword)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,12 +118,12 @@ func TestExportKey(t *testing.T) {
 
 	service := defaultService(t)
 	defaultAddress(t, service)
-	service.vm.Ctx.Lock.Lock()
+	service.vm.ctx.Lock.Lock()
 	defer func() {
 		if err := service.vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		service.vm.Ctx.Lock.Unlock()
+		service.vm.ctx.Lock.Unlock()
 	}()
 
 	reply := ExportKeyReply{}
@@ -153,12 +153,12 @@ func TestImportKey(t *testing.T) {
 	}
 
 	service := defaultService(t)
-	service.vm.Ctx.Lock.Lock()
+	service.vm.ctx.Lock.Lock()
 	defer func() {
 		if err := service.vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		service.vm.Ctx.Lock.Unlock()
+		service.vm.ctx.Lock.Unlock()
 	}()
 
 	reply := api.JSONAddress{}
@@ -174,12 +174,12 @@ func TestImportKey(t *testing.T) {
 func TestGetTxStatus(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
-	service.vm.Ctx.Lock.Lock()
+	service.vm.ctx.Lock.Lock()
 	defer func() {
 		if err := service.vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		service.vm.Ctx.Lock.Unlock()
+		service.vm.ctx.Lock.Unlock()
 	}()
 
 	// create a tx
@@ -284,12 +284,12 @@ func TestGetTxStatus(t *testing.T) {
 func TestGetTx(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
-	service.vm.Ctx.Lock.Lock()
+	service.vm.ctx.Lock.Lock()
 	defer func() {
 		if err := service.vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		service.vm.Ctx.Lock.Unlock()
+		service.vm.ctx.Lock.Unlock()
 	}()
 
 	type test struct {
@@ -316,7 +316,7 @@ func TestGetTx(t *testing.T) {
 			"proposal block",
 			func() (*Tx, error) {
 				return service.vm.newAddValidatorTx( // Test GetTx works for proposal blocks
-					service.vm.minValidatorStake,
+					service.vm.MinValidatorStake,
 					uint64(service.vm.clock.Time().Add(syncBound).Unix()),
 					uint64(service.vm.clock.Time().Add(syncBound).Add(defaultMinStakingDuration).Unix()),
 					ids.GenerateTestShortID(),
@@ -332,7 +332,7 @@ func TestGetTx(t *testing.T) {
 			func() (*Tx, error) {
 				return service.vm.newExportTx( // Test GetTx works for proposal blocks
 					100,
-					service.vm.Ctx.XChainID,
+					service.vm.ctx.XChainID,
 					ids.GenerateTestShortID(),
 					[]*crypto.PrivateKeySECP256K1R{keys[0]},
 					keys[0].PublicKey().Address(), // change addr
@@ -389,12 +389,12 @@ func TestGetTx(t *testing.T) {
 func TestGetBalance(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
-	service.vm.Ctx.Lock.Lock()
+	service.vm.ctx.Lock.Lock()
 	defer func() {
 		if err := service.vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		service.vm.Ctx.Lock.Unlock()
+		service.vm.ctx.Lock.Unlock()
 	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
@@ -427,11 +427,11 @@ func TestGetStake(t *testing.T) {
 	assert := assert.New(t)
 	service := defaultService(t)
 	defaultAddress(t, service)
-	service.vm.Ctx.Lock.Lock()
+	service.vm.ctx.Lock.Lock()
 	defer func() {
 		err := service.vm.Shutdown()
 		assert.NoError(err)
-		service.vm.Ctx.Lock.Unlock()
+		service.vm.ctx.Lock.Unlock()
 	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
@@ -495,7 +495,7 @@ func TestGetStake(t *testing.T) {
 	oldStake := uint64(defaultWeight)
 
 	// Add a delegator
-	stakeAmt := service.vm.minDelegatorStake + 12345
+	stakeAmt := service.vm.MinDelegatorStake + 12345
 	delegatorNodeID := ids.GenerateTestShortID()
 	delegatorEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
 	tx, err := service.vm.newAddDelegatorTx(
@@ -536,7 +536,7 @@ func TestGetStake(t *testing.T) {
 
 	// Make sure this works for pending stakers
 	// Add a pending staker
-	stakeAmt = service.vm.minValidatorStake + 54321
+	stakeAmt = service.vm.MinValidatorStake + 54321
 	pendingStakerNodeID := ids.GenerateTestShortID()
 	pendingStakerEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
 	tx, err = service.vm.newAddValidatorTx(
@@ -573,12 +573,12 @@ func TestGetStake(t *testing.T) {
 func TestGetCurrentValidators(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
-	service.vm.Ctx.Lock.Lock()
+	service.vm.ctx.Lock.Lock()
 	defer func() {
 		if err := service.vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		service.vm.Ctx.Lock.Unlock()
+		service.vm.ctx.Lock.Unlock()
 	}()
 
 	genesis, _ := defaultGenesis()
@@ -631,7 +631,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	}
 
 	// Add a delegator
-	stakeAmt := service.vm.minDelegatorStake + 12345
+	stakeAmt := service.vm.MinDelegatorStake + 12345
 	validatorNodeID := keys[1].PublicKey().Address()
 	delegatorStartTime := uint64(defaultValidateStartTime.Unix())
 	delegatorEndTime := uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())

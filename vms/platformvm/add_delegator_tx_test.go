@@ -18,12 +18,12 @@ import (
 
 func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	nodeID := keys[0].PublicKey().Address()
@@ -32,9 +32,9 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	// Case : tx is nil
 	var unsignedTx *UnsignedAddDelegatorTx
 	if err := unsignedTx.Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.minDelegatorStake,
+		vm.MinDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err == nil {
@@ -43,7 +43,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: Wrong network ID
 	tx, err := vm.newAddDelegatorTx(
-		vm.minDelegatorStake,
+		vm.MinDelegatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -58,9 +58,9 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.minDelegatorStake,
+		vm.MinDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err == nil {
@@ -69,7 +69,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: Not enough weight
 	tx, err = vm.newAddDelegatorTx(
-		vm.minDelegatorStake,
+		vm.MinDelegatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -80,13 +80,13 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddDelegatorTx).Validator.Wght = vm.minDelegatorStake - 1
+	tx.UnsignedTx.(*UnsignedAddDelegatorTx).Validator.Wght = vm.MinDelegatorStake - 1
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.minDelegatorStake,
+		vm.MinDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err == nil {
@@ -95,7 +95,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: Validation length is too short
 	tx, err = vm.newAddDelegatorTx(
-		vm.minDelegatorStake,
+		vm.MinDelegatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix()),
 		nodeID,
@@ -110,9 +110,9 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
 	if err = tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.minDelegatorStake,
+		vm.MinDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err == nil {
@@ -121,7 +121,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: Validation length is too long
 	if tx, err = vm.newAddDelegatorTx(
-		vm.minDelegatorStake,
+		vm.MinDelegatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Add(defaultMaxStakingDuration).Unix()),
 		nodeID,
@@ -135,9 +135,9 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.minDelegatorStake,
+		vm.MinDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err == nil {
@@ -146,7 +146,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: Valid
 	if tx, err = vm.newAddDelegatorTx(
-		vm.minDelegatorStake,
+		vm.MinDelegatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -156,9 +156,9 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	} else if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.minDelegatorStake,
+		vm.MinDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err != nil {
@@ -168,12 +168,12 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 
 func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 	nodeID := keys[0].PublicKey().Address()
 	rewardAddress := nodeID
@@ -194,7 +194,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 	// [addValidator] adds a new validator to the primary network's pending validator set
 	addValidator := func(db database.Database) {
 		if tx, err := vm.newAddValidatorTx(
-			vm.minValidatorStake,                    // stake amount
+			vm.MinValidatorStake,                    // stake amount
 			newValidatorStartTime,                   // start time
 			newValidatorEndTime,                     // end time
 			newValidatorID,                          // node ID
@@ -226,7 +226,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 
 	tests := []test{
 		{
-			vm.minDelegatorStake,
+			vm.MinDelegatorStake,
 			uint64(defaultValidateStartTime.Unix()),
 			uint64(defaultValidateEndTime.Unix()) + 1,
 			nodeID,
@@ -237,7 +237,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"validator stops validating primary network earlier than subnet",
 		},
 		{
-			vm.minDelegatorStake,
+			vm.MinDelegatorStake,
 			uint64(currentTimestamp.Add(maxFutureStartTime + time.Second).Unix()),
 			uint64(currentTimestamp.Add(maxFutureStartTime * 2).Unix()),
 			nodeID,
@@ -248,7 +248,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			fmt.Sprintf("validator should not be added more than (%s) in the future", maxFutureStartTime),
 		},
 		{
-			vm.minDelegatorStake,
+			vm.MinDelegatorStake,
 			uint64(defaultValidateStartTime.Unix()),
 			uint64(defaultValidateEndTime.Unix()) + 1,
 			nodeID,
@@ -259,7 +259,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"end time is after the primary network end time",
 		},
 		{
-			vm.minDelegatorStake,
+			vm.MinDelegatorStake,
 			uint64(defaultValidateStartTime.Add(5 * time.Second).Unix()),
 			uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix()),
 			newValidatorID,
@@ -270,7 +270,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"validator not in the current or pending validator sets of the subnet",
 		},
 		{
-			vm.minDelegatorStake,
+			vm.MinDelegatorStake,
 			newValidatorStartTime - 1, // start validating subnet before primary network
 			newValidatorEndTime,
 			newValidatorID,
@@ -281,7 +281,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"validator starts validating subnet before primary network",
 		},
 		{
-			vm.minDelegatorStake,
+			vm.MinDelegatorStake,
 			newValidatorStartTime,
 			newValidatorEndTime + 1, // stop validating subnet after stopping validating primary network
 			newValidatorID,
@@ -292,7 +292,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"validator stops validating primary network before subnet",
 		},
 		{
-			vm.minDelegatorStake,
+			vm.MinDelegatorStake,
 			newValidatorStartTime, // same start time as for primary network
 			newValidatorEndTime,   // same end time as for primary network
 			newValidatorID,
@@ -303,7 +303,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"valid",
 		},
 		{
-			vm.minDelegatorStake, // weight
+			vm.MinDelegatorStake, // weight
 			uint64(currentTimestamp.Unix()),
 			uint64(defaultValidateEndTime.Unix()),
 			nodeID,                                  // node ID
@@ -314,7 +314,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"starts validating at current timestamp",
 		},
 		{
-			vm.minDelegatorStake,                    // weight
+			vm.MinDelegatorStake,                    // weight
 			uint64(defaultValidateStartTime.Unix()), // start time
 			uint64(defaultValidateEndTime.Unix()),   // end time
 			nodeID,                                  // node ID
@@ -365,12 +365,12 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	validatorStartTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
@@ -383,7 +383,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	// create valid tx
 	addValidatorTx, err := vm.newAddValidatorTx(
-		vm.minValidatorStake,
+		vm.MinValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		id,
@@ -465,11 +465,11 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	}
 
 	firstDelegatorStartTime := validatorStartTime.Add(syncBound).Add(1 * time.Second)
-	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.minStakeDuration)
+	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.MinStakeDuration)
 
 	// create valid tx
 	addFirstDelegatorTx, err := vm.newAddDelegatorTx(
-		4*vm.minValidatorStake, // maximum amount of stake this delegator can provide
+		4*vm.MinValidatorStake, // maximum amount of stake this delegator can provide
 		uint64(firstDelegatorStartTime.Unix()),
 		uint64(firstDelegatorEndTime.Unix()),
 		id,
@@ -550,13 +550,13 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	}
 
 	secondDelegatorStartTime := firstDelegatorEndTime.Add(2 * time.Second)
-	secondDelegatorEndTime := secondDelegatorStartTime.Add(vm.minStakeDuration)
+	secondDelegatorEndTime := secondDelegatorStartTime.Add(vm.MinStakeDuration)
 
 	vm.clock.Set(secondDelegatorStartTime.Add(-10 * syncBound))
 
 	// create valid tx
 	addSecondDelegatorTx, err := vm.newAddDelegatorTx(
-		vm.minDelegatorStake,
+		vm.MinDelegatorStake,
 		uint64(secondDelegatorStartTime.Unix()),
 		uint64(secondDelegatorEndTime.Unix()),
 		id,
@@ -604,11 +604,11 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	}
 
 	thirdDelegatorStartTime := firstDelegatorEndTime.Add(-time.Second)
-	thirdDelegatorEndTime := thirdDelegatorStartTime.Add(vm.minStakeDuration)
+	thirdDelegatorEndTime := thirdDelegatorStartTime.Add(vm.MinStakeDuration)
 
 	// create valid tx
 	addThirdDelegatorTx, err := vm.newAddDelegatorTx(
-		vm.minDelegatorStake,
+		vm.MinDelegatorStake,
 		uint64(thirdDelegatorStartTime.Unix()),
 		uint64(thirdDelegatorEndTime.Unix()),
 		id,
