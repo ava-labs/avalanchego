@@ -90,7 +90,13 @@ func (j *Jobs) Push(job Job) (bool, error) {
 func (j *Jobs) ExecuteAll(ctx *snow.Context, restarted bool, events ...snow.EventDispatcher) (int, error) {
 	numExecuted := 0
 
-	// Disable and clear state caches since the hit rate will be near 0 during execution.
+	// Disable and clear state caches to prevent us from attempting to execute
+	// a vertex that was previously parsed, but not saved to the VM. Some VMs
+	// may only persist containers when they are accepted. This is a stop-gap
+	// measure to ensure the job will be re-parsed before executing until the VM
+	// provides a more explicit interface for freeing parsed blocks.
+	// TODO remove DisableCaching when VM provides better interface for freeing
+	// blocks.
 	j.state.DisableCaching()
 	for {
 		job, err := j.state.RemoveRunnableJob()
