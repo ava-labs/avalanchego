@@ -40,14 +40,19 @@ jobs:
         mv .\build\plugins\evm .\build\plugins\evm.exe
         Compress-Archive -Path .\build\avalanchego.exe,.\build\plugins -DestinationPath .\build\avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
 
-    - name: Install aws cli
-      env:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: us-east-1
-        BUCKET: ${{ secrets.BUCKET }}
+
+    - name: Move to S3
       run: |
         Install-Module -Name AWS.Tools.Installer -Force
         Install-AWSToolsModule AWS.Tools.EC2,AWS.Tools.S3 -CleanUp -Force
-        Write-S3Object -BucketName ${{ secrets.BUCKET }} -File .\build\avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip -Key windows/avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
+        Write-S3Object -BucketName ${BUCKET} -File .\build\avalanchego-win-${VERSION}-experimental.zip -Key windows/avalanchego-win-${VERSION}-experimental.zip
+      env:
+        BUCKET: ${{ secrets.BUCKET }}
+        VERSION: ${{ steps.get_version.outputs.VERSION }}
 
