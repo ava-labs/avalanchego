@@ -100,6 +100,9 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	toAddWithoutRewardToCurrent := []*Tx(nil)
 	numToRemoveFromPending := 0
 
+	// Add to the staker set any pending stakers whose start time is at or
+	// before the new timestamp. [pendingStakers.Stakers()] is sorted in order
+	// of increasing startTime
 pendingStakerLoop:
 	for _, tx := range pendingStakers.Stakers() {
 		switch staker := tx.UnsignedTx.(type) {
@@ -108,20 +111,20 @@ pendingStakerLoop:
 				break pendingStakerLoop
 			}
 
-			reward := Reward(
+			r := reward(
 				staker.Validator.Duration(),
 				staker.Validator.Wght,
 				currentSupply,
 				vm.StakeMintingPeriod,
 			)
-			currentSupply, err = safemath.Add64(currentSupply, reward)
+			currentSupply, err = safemath.Add64(currentSupply, r)
 			if err != nil {
 				return nil, nil, nil, nil, permError{err}
 			}
 
 			toAddDelegatorsWithRewardToCurrent = append(toAddDelegatorsWithRewardToCurrent, &validatorReward{
 				addStakerTx:     tx,
-				potentialReward: reward,
+				potentialReward: r,
 			})
 			numToRemoveFromPending++
 		case *UnsignedAddValidatorTx:
@@ -129,20 +132,20 @@ pendingStakerLoop:
 				break pendingStakerLoop
 			}
 
-			reward := Reward(
+			r := reward(
 				staker.Validator.Duration(),
 				staker.Validator.Wght,
 				currentSupply,
 				vm.StakeMintingPeriod,
 			)
-			currentSupply, err = safemath.Add64(currentSupply, reward)
+			currentSupply, err = safemath.Add64(currentSupply, r)
 			if err != nil {
 				return nil, nil, nil, nil, permError{err}
 			}
 
 			toAddValidatorsWithRewardToCurrent = append(toAddValidatorsWithRewardToCurrent, &validatorReward{
 				addStakerTx:     tx,
-				potentialReward: reward,
+				potentialReward: r,
 			})
 			numToRemoveFromPending++
 		case *UnsignedAddSubnetValidatorTx:
@@ -162,11 +165,13 @@ pendingStakerLoop:
 			}
 		}
 	}
-	newlyPendingStakers := pendingStakers.DeleteStaker(numToRemoveFromPending)
+	newlyPendingStakers := pendingStakers.DeleteStakers(numToRemoveFromPending)
 
 	currentStakers := parentState.CurrentStakerChainState()
 	numToRemoveFromCurrent := 0
 
+	// Remove from the staker set any subnet validators whose endTime is at or
+	// before the new timestamp
 currentStakerLoop:
 	for _, tx := range currentStakers.Stakers() {
 		switch staker := tx.UnsignedTx.(type) {
@@ -197,6 +202,7 @@ currentStakerLoop:
 	onCommitState.SetTimestamp(timestamp)
 	onCommitState.SetCurrentSupply(currentSupply)
 
+	// State doesn't change if this proposal is aborted
 	onAbortState := newVersionedState(parentState, currentStakers, pendingStakers)
 
 	// If this block is committed, update the validator sets.
@@ -207,7 +213,6 @@ currentStakerLoop:
 		return vm.updateValidators(false)
 	}
 
-	// State doesn't change if this proposal is aborted
 	return onCommitState, onAbortState, onCommitFunc, nil, nil
 }
 

@@ -28,6 +28,8 @@ type StatusState interface {
 }
 
 type statusState struct {
+	// ID -> Status of thing with that ID, or nil if StatusState doesn't have
+	// that status.
 	statusCache cache.Cacher
 	statusDB    database.Database
 }
@@ -57,6 +59,10 @@ func (s *statusState) GetStatus(id ids.ID) (choices.Status, error) {
 	}
 
 	status := choices.Status(val)
+	if err := status.Valid(); err != nil {
+		return choices.Unknown, err
+	}
+
 	s.statusCache.Put(id, status)
 	return status, nil
 }

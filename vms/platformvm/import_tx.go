@@ -143,10 +143,10 @@ func (tx *UnsignedImportTx) SemanticVerify(
 		parentState.PendingStakerChainState(),
 	)
 	// Consume the UTXOS
-	vm.consumeInputs(newState, tx.Ins)
+	consumeInputs(newState, tx.Ins)
 	// Produce the UTXOS
 	txID := tx.ID()
-	vm.produceOutputs(newState, txID, tx.Outs)
+	produceOutputs(newState, txID, vm.ctx.AVAXAssetID, tx.Outs)
 	return newState, nil
 }
 

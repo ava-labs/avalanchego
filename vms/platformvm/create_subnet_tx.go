@@ -72,10 +72,10 @@ func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 	}
 
 	// Consume the UTXOS
-	vm.consumeInputs(vs, tx.Ins)
+	consumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
 	txID := tx.ID()
-	vm.produceOutputs(vs, txID, tx.Outs)
+	produceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
 	// Attempt to the new chain to the database
 	vs.AddSubnet(stx)
 

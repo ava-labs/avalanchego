@@ -6,6 +6,7 @@ package platformvm
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"sort"
 	"time"
 
@@ -362,7 +363,7 @@ func (s innerSortValidatorsByRemoval) Less(i, j int) bool {
 		iEndTime = tx.EndTime()
 		iPriority = topPriority
 	default:
-		panic(errWrongTxType)
+		panic(fmt.Errorf("expected staker tx type but got %T", iDel.UnsignedTx))
 	}
 
 	var (
@@ -380,7 +381,7 @@ func (s innerSortValidatorsByRemoval) Less(i, j int) bool {
 		jEndTime = tx.EndTime()
 		jPriority = topPriority
 	default:
-		panic(errWrongTxType)
+		panic(fmt.Errorf("expected staker tx type but got %T", jDel.UnsignedTx))
 	}
 
 	if iEndTime.Before(jEndTime) {

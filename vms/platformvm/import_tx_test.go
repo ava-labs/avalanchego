@@ -73,7 +73,7 @@ func TestNewImportTx(t *testing.T) {
 		}
 		utxoBytes, err := Codec.Marshal(codecVersion, utxo)
 		if err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
 		inputID := utxo.InputID()
 		if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
@@ -83,7 +83,7 @@ func TestNewImportTx(t *testing.T) {
 				recipientKey.PublicKey().Address().Bytes(),
 			},
 		}}); err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
 
 		return sm

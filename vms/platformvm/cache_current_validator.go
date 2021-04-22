@@ -11,7 +11,11 @@ type currentValidator interface {
 	validator
 
 	AddValidatorTx() *UnsignedAddValidatorTx
+
+	// Weight of delegations to this validator. Doesn't include the stake
+	// provided by this validator.
 	DelegatorWeight() uint64
+
 	PotentialReward() uint64
 }
 

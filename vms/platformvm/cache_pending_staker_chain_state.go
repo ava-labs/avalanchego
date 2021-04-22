@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"bytes"
+	"fmt"
 	"sort"
 	"time"
 
@@ -16,13 +17,14 @@ var (
 	_ pendingStakerChainState = &pendingStakerChainStateImpl{}
 )
 
+// pendingStakerChainState manages the set of stakers (both validators and
+// delegators) that are slated to start staking in the future.
 type pendingStakerChainState interface {
-	GetStakerByNodeID(nodeID ids.ShortID) (addStakerTx *UnsignedAddValidatorTx, err error)
-
+	GetValidatorTx(nodeID ids.ShortID) (addStakerTx *UnsignedAddValidatorTx, err error)
 	GetValidator(nodeID ids.ShortID) validator
 
 	AddStaker(addStakerTx *Tx) pendingStakerChainState
-	DeleteStaker(numToRemove int) pendingStakerChainState
+	DeleteStakers(numToRemove int) pendingStakerChainState
 
 	Stakers() []*Tx // Sorted in removal order
 
@@ -37,14 +39,15 @@ type pendingStakerChainStateImpl struct {
 	validatorsByNodeID      map[ids.ShortID]*UnsignedAddValidatorTx
 	validatorExtrasByNodeID map[ids.ShortID]*validatorImpl
 
-	// list of pending validators in order of their removal
+	// list of pending validators in order of their removal from the pending
+	// staker set
 	validators []*Tx
 
 	addedStakers   []*Tx
 	deletedStakers []*Tx
 }
 
-func (ps *pendingStakerChainStateImpl) GetStakerByNodeID(nodeID ids.ShortID) (addStakerTx *UnsignedAddValidatorTx, err error) {
+func (ps *pendingStakerChainStateImpl) GetValidatorTx(nodeID ids.ShortID) (addStakerTx *UnsignedAddValidatorTx, err error) {
 	vdr, exists := ps.validatorsByNodeID[nodeID]
 	if !exists {
 		return nil, database.ErrNotFound
@@ -131,13 +134,13 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *Tx) pendingStakerC
 			}
 		}
 	default:
-		panic(errWrongTxType)
+		panic(fmt.Errorf("expected staker tx type but got %T", addStakerTx.UnsignedTx))
 	}
 
 	return newPS
 }
 
-func (ps *pendingStakerChainStateImpl) DeleteStaker(numToRemove int) pendingStakerChainState {
+func (ps *pendingStakerChainStateImpl) DeleteStakers(numToRemove int) pendingStakerChainState {
 	newPS := &pendingStakerChainStateImpl{
 		validatorsByNodeID:      make(map[ids.ShortID]*UnsignedAddValidatorTx, len(ps.validatorsByNodeID)),
 		validatorExtrasByNodeID: make(map[ids.ShortID]*validatorImpl, len(ps.validatorExtrasByNodeID)),
@@ -184,7 +187,7 @@ func (ps *pendingStakerChainStateImpl) DeleteStaker(numToRemove int) pendingStak
 				subnets:    newSubnets,
 			}
 		default:
-			panic(errWrongTxType)
+			panic(fmt.Errorf("expected staker tx type but got %T", removedTx.UnsignedTx))
 		}
 	}
 
@@ -230,7 +233,7 @@ func (s innerSortValidatorsByAddition) Less(i, j int) bool {
 		iStartTime = tx.StartTime()
 		iPriority = lowPriority
 	default:
-		panic(errWrongTxType)
+		panic(fmt.Errorf("expected staker tx type but got %T", iDel.UnsignedTx))
 	}
 
 	var (
@@ -248,7 +251,7 @@ func (s innerSortValidatorsByAddition) Less(i, j int) bool {
 		jStartTime = tx.StartTime()
 		jPriority = lowPriority
 	default:
-		panic(errWrongTxType)
+		panic(fmt.Errorf("expected staker tx type but got %T", jDel.UnsignedTx))
 	}
 
 	if iStartTime.Before(jStartTime) {

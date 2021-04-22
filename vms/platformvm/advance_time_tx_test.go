@@ -155,7 +155,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	}
 
 	onCommitPendingStakers := onCommit.PendingStakerChainState()
-	if _, err := onCommitPendingStakers.GetStakerByNodeID(nodeID); err == nil {
+	if _, err := onCommitPendingStakers.GetValidatorTx(nodeID); err == nil {
 		t.Fatalf("Should have removed the validator from the pending validator set")
 	}
 
@@ -173,7 +173,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	}
 
 	onAbortPendingStakers := onAbort.PendingStakerChainState()
-	vdr, err := onAbortPendingStakers.GetStakerByNodeID(nodeID)
+	vdr, err := onAbortPendingStakers.GetValidatorTx(nodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -353,7 +353,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers2(t *testing.T) {
 		// Check that the validators we expect to be in the pending staker set are there
 		pendingStakers := vm.internalState.PendingStakerChainState()
 		for _, stakerNodeID := range tt.expectedPending {
-			_, err := pendingStakers.GetStakerByNodeID(stakerNodeID)
+			_, err := pendingStakers.GetValidatorTx(stakerNodeID)
 			if err != nil {
 				t.Fatalf("failed test '%s': expected validator to be in pending validator set but it isn't", tt.description)
 			}

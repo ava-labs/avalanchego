@@ -34,9 +34,9 @@ type UTXOState interface {
 	// DeleteUTXO deletes the provided utxo from storage.
 	DeleteUTXO(utxoID ids.ID) error
 
-	// IDs returns the slice of IDs associated with [key], starting after
+	// UTXOIDs returns the slice of IDs associated with [addr], starting after
 	// [previous].
-	// If start is not in the list, starts at beginning.
+	// If [previous] is not in the list, starts at beginning.
 	// Returns at most [limit] IDs.
 	UTXOIDs(addr []byte, previous ids.ID, limit int) ([]ids.ID, error)
 }
@@ -44,6 +44,7 @@ type UTXOState interface {
 type utxoState struct {
 	codec codec.Manager
 
+	// UTXO ID -> *UTXO. If the *UTXO is nil the UTXO doesn't exist
 	utxoCache cache.Cacher
 	utxoDB    database.Database
 

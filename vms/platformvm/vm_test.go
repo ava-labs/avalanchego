@@ -659,7 +659,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	pendingStakers := vm.internalState.PendingStakerChainState()
 
 	// Verify that new validator now in pending validator set
-	if _, err := pendingStakers.GetStakerByNodeID(nodeID); err != nil {
+	if _, err := pendingStakers.GetValidatorTx(nodeID); err != nil {
 		t.Fatalf("Should have added validator to the pending queue")
 	}
 }
@@ -804,7 +804,7 @@ func TestAddValidatorReject(t *testing.T) {
 	pendingStakers := vm.internalState.PendingStakerChainState()
 
 	// Verify that new validator NOT in pending validator set
-	if _, err := pendingStakers.GetStakerByNodeID(nodeID); err == nil {
+	if _, err := pendingStakers.GetValidatorTx(nodeID); err == nil {
 		t.Fatalf("Shouldn't have added validator to the pending queue")
 	}
 }

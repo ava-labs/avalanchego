@@ -544,7 +544,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 }
 
 // Removes the UTXOs consumed by [ins] from the UTXO set
-func (vm *VM) consumeInputs(
+func consumeInputs(
 	utxoDB UTXODeleter,
 	ins []*avax.TransferableInput,
 ) {
@@ -555,9 +555,10 @@ func (vm *VM) consumeInputs(
 
 // Adds the UTXOs created by [outs] to the UTXO set.
 // [txID] is the ID of the tx that created [outs].
-func (vm *VM) produceOutputs(
+func produceOutputs(
 	utxoDB UTXOAdder,
 	txID ids.ID,
+	assetID ids.ID,
 	outs []*avax.TransferableOutput,
 ) {
 	for index, out := range outs {
@@ -566,7 +567,7 @@ func (vm *VM) produceOutputs(
 				TxID:        txID,
 				OutputIndex: uint32(index),
 			},
-			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+			Asset: avax.Asset{ID: assetID},
 			Out:   out.Output(),
 		})
 	}

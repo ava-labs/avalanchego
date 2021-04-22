@@ -168,7 +168,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 				}
 			}
 		} else {
-			vdrTx, err := pendingStakers.GetStakerByNodeID(tx.Validator.NodeID)
+			vdrTx, err := pendingStakers.GetValidatorTx(tx.Validator.NodeID)
 			if err != nil {
 				if err == database.ErrNotFound {
 					return nil, nil, nil, nil, permError{errDSValidatorSubset}
@@ -242,17 +242,17 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 	onCommitState := newVersionedState(parentState, currentStakers, newlyPendingStakers)
 
 	// Consume the UTXOS
-	vm.consumeInputs(onCommitState, tx.Ins)
+	consumeInputs(onCommitState, tx.Ins)
 	// Produce the UTXOS
 	txID := tx.ID()
-	vm.produceOutputs(onCommitState, txID, tx.Outs)
+	produceOutputs(onCommitState, txID, vm.ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
 	onAbortState := newVersionedState(parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
-	vm.consumeInputs(onAbortState, tx.Ins)
+	consumeInputs(onAbortState, tx.Ins)
 	// Produce the UTXOS
-	vm.produceOutputs(onAbortState, txID, tx.Outs)
+	produceOutputs(onAbortState, txID, vm.ctx.AVAXAssetID, tx.Outs)
 
 	return onCommitState, onAbortState, nil, nil, nil
 }
