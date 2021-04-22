@@ -278,7 +278,7 @@ func (vm *VM) stake(
 
 // authorize an operation on behalf of the named subnet with the provided keys.
 func (vm *VM) authorize(
-	vs mutableState,
+	vs MutableState,
 	subnetID ids.ID,
 	keys []*crypto.PrivateKeySECP256K1R,
 ) (
@@ -329,7 +329,7 @@ func (vm *VM) authorize(
 // [creds] are the credentials of [tx], which allow [ins] to be spent.
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpend(
-	utxoDB utxoGetter,
+	utxoDB UTXOGetter,
 	tx UnsignedTx,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
@@ -545,7 +545,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 // Removes the UTXOs consumed by [ins] from the UTXO set
 func (vm *VM) consumeInputs(
-	utxoDB utxoDeleter,
+	utxoDB UTXODeleter,
 	ins []*avax.TransferableInput,
 ) {
 	for _, input := range ins {
@@ -556,7 +556,7 @@ func (vm *VM) consumeInputs(
 // Adds the UTXOs created by [outs] to the UTXO set.
 // [txID] is the ID of the tx that created [outs].
 func (vm *VM) produceOutputs(
-	utxoDB utxoAdder,
+	utxoDB UTXOAdder,
 	txID ids.ID,
 	outs []*avax.TransferableOutput,
 ) {

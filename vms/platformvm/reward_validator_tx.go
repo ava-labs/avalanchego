@@ -51,11 +51,11 @@ type UnsignedRewardValidatorTx struct {
 //   chain timestamp.
 func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 	vm *VM,
-	parentState mutableState,
+	parentState MutableState,
 	stx *Tx,
 ) (
-	versionedState,
-	versionedState,
+	VersionedState,
+	VersionedState,
 	func() error,
 	func() error,
 	TxError,
@@ -113,8 +113,8 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 	}
 
 	pendingStakers := parentState.PendingStakerChainState()
-	onCommitState := NewVersionedState(parentState, newlyCurrentStakers, pendingStakers)
-	onAbortState := NewVersionedState(parentState, newlyCurrentStakers, pendingStakers)
+	onCommitState := newVersionedState(parentState, newlyCurrentStakers, pendingStakers)
+	onAbortState := newVersionedState(parentState, newlyCurrentStakers, pendingStakers)
 
 	// If the reward is aborted, then the current supply should be decreased.
 	currentSupply := onAbortState.GetCurrentSupply()

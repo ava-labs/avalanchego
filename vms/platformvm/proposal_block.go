@@ -31,9 +31,9 @@ type ProposalBlock struct {
 	Tx Tx `serialize:"true" json:"tx"`
 
 	// The state that the chain will have if this block's proposal is committed
-	onCommitState versionedState
+	onCommitState VersionedState
 	// The state that the chain will have if this block's proposal is aborted
-	onAbortState versionedState
+	onAbortState VersionedState
 	// The function to execute if this block's proposal is committed
 	onCommitFunc func() error
 	// The function to execute if this block's proposal is aborted
@@ -112,7 +112,7 @@ func (pb *ProposalBlock) setBaseState() {
 //   2. A function to be executed when this block's proposal is committed. This
 //      function should not write to state. This function should only be called
 //      after the state has been updated.
-func (pb *ProposalBlock) onCommit() (versionedState, func() error) {
+func (pb *ProposalBlock) onCommit() (VersionedState, func() error) {
 	return pb.onCommitState, pb.onCommitFunc
 }
 
@@ -124,7 +124,7 @@ func (pb *ProposalBlock) onCommit() (versionedState, func() error) {
 //   2. A function to be executed when this block's proposal is aborted. This
 //      function should not write to state. This function should only be called
 //      after the state has been updated.
-func (pb *ProposalBlock) onAbort() (versionedState, func() error) {
+func (pb *ProposalBlock) onAbort() (VersionedState, func() error) {
 	return pb.onAbortState, pb.onAbortFunc
 }
 

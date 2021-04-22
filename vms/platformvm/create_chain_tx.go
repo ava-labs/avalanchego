@@ -95,7 +95,7 @@ func (tx *UnsignedCreateChainTx) Verify(
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedCreateChainTx) SemanticVerify(
 	vm *VM,
-	vs versionedState,
+	vs VersionedState,
 	stx *Tx,
 ) (
 	func() error,

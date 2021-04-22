@@ -74,7 +74,7 @@ func (sb *StandardBlock) Verify() error {
 	}
 
 	parentState := parent.onAccept()
-	sb.onAcceptState = NewVersionedState(
+	sb.onAcceptState = newVersionedState(
 		parentState,
 		parentState.CurrentStakerChainState(),
 		parentState.PendingStakerChainState(),

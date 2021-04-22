@@ -9,10 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 )
 
@@ -167,23 +164,11 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 }
 
 func TestAddDelegatorTxSemanticVerify(t *testing.T) {
-	vm, _ := defaultVM()
-	vm.ctx.Lock.Lock()
-	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-		vm.ctx.Lock.Unlock()
-	}()
 	nodeID := keys[0].PublicKey().Address()
 	rewardAddress := nodeID
-	vdb := versiondb.New(vm.DB) // so tests don't interfere with one another
-	currentTimestamp, err := vm.getTimestamp(vm.DB)
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	keyIntf, err := vm.factory.NewPrivateKey()
+	factory := crypto.FactorySECP256K1R{}
+	keyIntf, err := factory.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,9 +176,10 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 	newValidatorID := newValidatorKey.PublicKey().Address()
 	newValidatorStartTime := uint64(defaultValidateStartTime.Add(5 * time.Second).Unix())
 	newValidatorEndTime := uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix())
+
 	// [addValidator] adds a new validator to the primary network's pending validator set
-	addValidator := func(db database.Database) {
-		if tx, err := vm.newAddValidatorTx(
+	addValidator := func(vm *VM) {
+		tx, err := vm.newAddValidatorTx(
 			vm.MinValidatorStake,                    // stake amount
 			newValidatorStartTime,                   // start time
 			newValidatorEndTime,                     // end time
@@ -202,15 +188,23 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			PercentDenominator,                      // subnet
 			[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 			ids.ShortEmpty,                          // change addr
-		); err != nil {
+		)
+		if err != nil {
 			t.Fatal(err)
-		} else if err := vm.addStaker(db, constants.PrimaryNetworkID, &rewardTx{
-			Reward: 0,
-			Tx:     *tx,
-		}); err != nil {
+		}
+
+		vm.internalState.AddCurrentStaker(tx, 0)
+		vm.internalState.AddTx(tx, Committed)
+		if err := vm.internalState.Commit(); err != nil {
+			t.Fatal(err)
+		}
+		if err := vm.internalState.(*internalStateImpl).loadCurrentValidators(); err != nil {
 			t.Fatal(err)
 		}
 	}
+
+	freshVM, _ := defaultVM()
+	currentTimestamp := freshVM.internalState.GetTimestamp()
 
 	type test struct {
 		stakeAmount   uint64
@@ -219,14 +213,14 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 		nodeID        ids.ShortID
 		rewardAddress ids.ShortID
 		feeKeys       []*crypto.PrivateKeySECP256K1R
-		setup         func(db database.Database)
+		setup         func(vm *VM)
 		shouldErr     bool
 		description   string
 	}
 
 	tests := []test{
 		{
-			vm.MinDelegatorStake,
+			freshVM.MinDelegatorStake,
 			uint64(defaultValidateStartTime.Unix()),
 			uint64(defaultValidateEndTime.Unix()) + 1,
 			nodeID,
@@ -237,7 +231,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"validator stops validating primary network earlier than subnet",
 		},
 		{
-			vm.MinDelegatorStake,
+			freshVM.MinDelegatorStake,
 			uint64(currentTimestamp.Add(maxFutureStartTime + time.Second).Unix()),
 			uint64(currentTimestamp.Add(maxFutureStartTime * 2).Unix()),
 			nodeID,
@@ -248,7 +242,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			fmt.Sprintf("validator should not be added more than (%s) in the future", maxFutureStartTime),
 		},
 		{
-			vm.MinDelegatorStake,
+			freshVM.MinDelegatorStake,
 			uint64(defaultValidateStartTime.Unix()),
 			uint64(defaultValidateEndTime.Unix()) + 1,
 			nodeID,
@@ -259,7 +253,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"end time is after the primary network end time",
 		},
 		{
-			vm.MinDelegatorStake,
+			freshVM.MinDelegatorStake,
 			uint64(defaultValidateStartTime.Add(5 * time.Second).Unix()),
 			uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix()),
 			newValidatorID,
@@ -270,7 +264,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"validator not in the current or pending validator sets of the subnet",
 		},
 		{
-			vm.MinDelegatorStake,
+			freshVM.MinDelegatorStake,
 			newValidatorStartTime - 1, // start validating subnet before primary network
 			newValidatorEndTime,
 			newValidatorID,
@@ -281,7 +275,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"validator starts validating subnet before primary network",
 		},
 		{
-			vm.MinDelegatorStake,
+			freshVM.MinDelegatorStake,
 			newValidatorStartTime,
 			newValidatorEndTime + 1, // stop validating subnet after stopping validating primary network
 			newValidatorID,
@@ -292,7 +286,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"validator stops validating primary network before subnet",
 		},
 		{
-			vm.MinDelegatorStake,
+			freshVM.MinDelegatorStake,
 			newValidatorStartTime, // same start time as for primary network
 			newValidatorEndTime,   // same end time as for primary network
 			newValidatorID,
@@ -303,7 +297,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"valid",
 		},
 		{
-			vm.MinDelegatorStake, // weight
+			freshVM.MinDelegatorStake, // weight
 			uint64(currentTimestamp.Unix()),
 			uint64(defaultValidateEndTime.Unix()),
 			nodeID,                                  // node ID
@@ -314,21 +308,22 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"starts validating at current timestamp",
 		},
 		{
-			vm.MinDelegatorStake,                    // weight
+			freshVM.MinDelegatorStake,               // weight
 			uint64(defaultValidateStartTime.Unix()), // start time
 			uint64(defaultValidateEndTime.Unix()),   // end time
 			nodeID,                                  // node ID
 			rewardAddress,                           // Reward Address
 			[]*crypto.PrivateKeySECP256K1R{keys[1]}, // tx fee payer
-			func(db database.Database) { // Remove all UTXOs owned by keys[1]
-				utxoIDs, err := vm.getReferencingUTXOs(db, keys[1].PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
+			func(vm *VM) { // Remove all UTXOs owned by keys[1]
+				utxoIDs, err := vm.internalState.UTXOIDs(keys[1].PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
 				if err != nil {
 					t.Fatal(err)
 				}
 				for _, utxoID := range utxoIDs {
-					if err := vm.removeUTXO(db, utxoID); err != nil {
-						t.Fatal(err)
-					}
+					vm.internalState.DeleteUTXO(utxoID)
+				}
+				if err := vm.internalState.Commit(); err != nil {
+					t.Fatal(err)
 				}
 			},
 			true,
@@ -338,7 +333,15 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			vdb.Abort()
+			vm, _ := defaultVM()
+			vm.ctx.Lock.Lock()
+			defer func() {
+				if err := vm.Shutdown(); err != nil {
+					t.Fatal(err)
+				}
+				vm.ctx.Lock.Unlock()
+			}()
+
 			tx, err := vm.newAddDelegatorTx(
 				tt.stakeAmount,
 				tt.startTime,
@@ -352,9 +355,9 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 				t.Fatalf("couldn't build tx: %s", err)
 			}
 			if tt.setup != nil {
-				tt.setup(vdb)
+				tt.setup(vm)
 			}
-			if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vdb, tx); err != nil && !tt.shouldErr {
+			if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err != nil && !tt.shouldErr {
 				t.Fatalf("shouldn't have errored but got %s", err)
 			} else if err == nil && tt.shouldErr {
 				t.Fatalf("expected test to error but got none")
@@ -625,13 +628,8 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	addThirdDelegatorBlockIntf, err := vm.BuildBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Verify the proposed block is invalid
-	if err := addThirdDelegatorBlockIntf.Verify(); err == nil {
+	// Verify the proposed tx is invalid
+	if _, err := vm.BuildBlock(); err == nil {
 		t.Fatalf("should have marked the delegator as being over delegated")
 	}
 }

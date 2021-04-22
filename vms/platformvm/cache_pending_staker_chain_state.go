@@ -26,7 +26,7 @@ type pendingStakerChainState interface {
 
 	Stakers() []*Tx // Sorted in removal order
 
-	Apply(internalState)
+	Apply(InternalState)
 }
 
 // pendingStakerChainStateImpl is a copy on write implementation for versioning
@@ -76,7 +76,7 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *Tx) pendingStakerC
 		for nodeID, vdr := range ps.validatorsByNodeID {
 			newPS.validatorsByNodeID[nodeID] = vdr
 		}
-		ps.validatorsByNodeID[tx.Validator.NodeID] = tx
+		newPS.validatorsByNodeID[tx.Validator.NodeID] = tx
 	case *UnsignedAddDelegatorTx:
 		newPS.validatorsByNodeID = ps.validatorsByNodeID
 
@@ -195,7 +195,7 @@ func (ps *pendingStakerChainStateImpl) Stakers() []*Tx {
 	return ps.validators
 }
 
-func (ps *pendingStakerChainStateImpl) Apply(is internalState) {
+func (ps *pendingStakerChainStateImpl) Apply(is InternalState) {
 	for _, added := range ps.addedStakers {
 		is.AddPendingStaker(added)
 	}

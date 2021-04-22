@@ -26,7 +26,6 @@ import (
 var (
 	errDelegatorSubset = errors.New("delegator's time range must be a subset of the validator's time range")
 	errInvalidState    = errors.New("generated output isn't valid state")
-	errCapWeightBroken = errors.New("validator would surpass maximum weight")
 	errOverDelegated   = errors.New("validator would be over delegated")
 
 	_ UnsignedProposalTx = &UnsignedAddDelegatorTx{}
@@ -120,11 +119,11 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	vm *VM,
-	parentState mutableState,
+	parentState MutableState,
 	stx *Tx,
 ) (
-	versionedState,
-	versionedState,
+	VersionedState,
+	VersionedState,
 	func() error,
 	func() error,
 	TxError,
@@ -256,7 +255,7 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 
 	// Set up the state if this tx is committed
 	newlyPendingStakers := pendingStakers.AddStaker(stx)
-	onCommitState := NewVersionedState(parentState, currentStakers, newlyPendingStakers)
+	onCommitState := newVersionedState(parentState, currentStakers, newlyPendingStakers)
 
 	// Consume the UTXOS
 	vm.consumeInputs(onCommitState, tx.Ins)
@@ -265,7 +264,7 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	vm.produceOutputs(onCommitState, txID, tx.Outs)
 
 	// Set up the state if this tx is aborted
-	onAbortState := NewVersionedState(parentState, currentStakers, pendingStakers)
+	onAbortState := newVersionedState(parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
 	vm.consumeInputs(onAbortState, tx.Ins)
 	// Produce the UTXOS
@@ -387,7 +386,7 @@ func MaxStakeAmount(
 				break
 			}
 
-			if !toRemoveEndTime.After(startTime) && currentStake > maxStake {
+			if !toRemoveEndTime.Before(startTime) && currentStake > maxStake {
 				maxStake = currentStake
 			}
 
@@ -513,7 +512,15 @@ func (vm *VM) maxPrimarySubnetStakeAmount(
 
 	switch err {
 	case nil:
-		currentWeight := currentValidator.AddValidatorTx().Weight()
+		vdrTx := currentValidator.AddValidatorTx()
+		if vdrTx.StartTime().After(endTime) {
+			return 0, nil
+		}
+		if vdrTx.EndTime().Before(startTime) {
+			return 0, nil
+		}
+
+		currentWeight := vdrTx.Weight()
 		currentWeight, err = safemath.Add64(currentWeight, currentValidator.DelegatorWeight())
 		if err != nil {
 			return 0, err

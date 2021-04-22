@@ -22,6 +22,8 @@ var (
 	txStatePrefix        = []byte("tx")
 )
 
+// State persistently maintains a set of UTXOs, transaction, statuses, and
+// singletons.
 type State interface {
 	avax.UTXOState
 	avax.StatusState

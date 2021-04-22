@@ -42,7 +42,7 @@ type currentStakerChainState interface {
 
 	Stakers() []*Tx // Sorted in removal order
 
-	Apply(internalState)
+	Apply(InternalState)
 
 	ValidatorSet(subnetID ids.ID) (validators.Set, error)
 }
@@ -266,7 +266,7 @@ func (cs *currentStakerChainStateImpl) Stakers() []*Tx {
 	return cs.validators
 }
 
-func (cs *currentStakerChainStateImpl) Apply(is internalState) {
+func (cs *currentStakerChainStateImpl) Apply(is InternalState) {
 	for _, added := range cs.addedStakers {
 		is.AddCurrentStaker(added.addStakerTx, added.potentialReward)
 	}

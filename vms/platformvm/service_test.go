@@ -7,24 +7,25 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	cjson "github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	cjson "github.com/ava-labs/avalanchego/utils/json"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -182,19 +183,62 @@ func TestGetTxStatus(t *testing.T) {
 		service.vm.ctx.Lock.Unlock()
 	}()
 
-	// create a tx
-	tx, err := service.vm.newCreateChainTx(
-		testSubnet1.ID(),
-		nil,
-		avm.ID,
-		nil,
-		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
-	)
+	factory := crypto.FactorySECP256K1R{}
+	recipientKeyIntf, err := factory.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
+	recipientKey := recipientKeyIntf.(*crypto.PrivateKeySECP256K1R)
+
+	m := &atomic.Memory{}
+	err = m.Initialize(logging.NoLog{}, prefixdb.New([]byte{}, service.vm.dbManager.Current()))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sm := m.NewSharedMemory(service.vm.ctx.ChainID)
+	peerSharedMemory := m.NewSharedMemory(avmID)
+
+	// #nosec G404
+	utxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        ids.GenerateTestID(),
+			OutputIndex: rand.Uint32(),
+		},
+		Asset: avax.Asset{ID: avaxAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 1234567,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  0,
+				Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+				Threshold: 1,
+			},
+		},
+	}
+	utxoBytes, err := Codec.Marshal(codecVersion, utxo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inputID := utxo.InputID()
+	if err := peerSharedMemory.Put(service.vm.ctx.ChainID, []*atomic.Element{{
+		Key:   inputID[:],
+		Value: utxoBytes,
+		Traits: [][]byte{
+			recipientKey.PublicKey().Address().Bytes(),
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	oldAtomicUTXOManager := service.vm.AtomicUTXOManager
+	newAtomicUTXOManager := avax.NewAtomicUTXOManager(sm, Codec)
+
+	service.vm.AtomicUTXOManager = newAtomicUTXOManager
+	tx, err := service.vm.newImportTx(avmID, ids.ShortEmpty, []*crypto.PrivateKeySECP256K1R{recipientKey}, ids.ShortEmpty)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.vm.AtomicUTXOManager = oldAtomicUTXOManager
 
 	arg := &GetTxStatusArgs{TxID: tx.ID()}
 	argIncludeReason := &GetTxStatusArgs{TxID: tx.ID(), IncludeReason: true}
@@ -225,10 +269,8 @@ func TestGetTxStatus(t *testing.T) {
 	// put the chain in existing chain list
 	if err := service.vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
-	} else if err := service.vm.putChains(service.vm.DB, []*Tx{tx}); err != nil {
-		t.Fatal(err)
 	} else if _, err := service.vm.BuildBlock(); err == nil {
-		t.Fatal("should have errored because chain already exists")
+		t.Fatal("should have errored because of missing funds")
 	}
 
 	resp = GetTxStatusResponse{} // reset
@@ -253,15 +295,15 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatalf("reason shouldn't be empty")
 	}
 
-	// remove the chain from existing chain list
-	if err := service.vm.putChains(service.vm.DB, []*Tx{}); err != nil {
-		t.Fatal(err)
-	} else if err := service.vm.mempool.IssueTx(tx); err != nil {
+	service.vm.AtomicUTXOManager = newAtomicUTXOManager
+	service.vm.ctx.SharedMemory = sm
+
+	if err := service.vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
 	} else if block, err := service.vm.BuildBlock(); err != nil {
 		t.Fatal(err)
-	} else if blk, ok := block.(*StandardBlock); !ok {
-		t.Fatalf("should be *StandardBlock but is %T", blk)
+	} else if blk, ok := block.(*AtomicBlock); !ok {
+		t.Fatalf("should be *AtomicBlock but is %T", block)
 	} else if err := blk.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {
@@ -496,7 +538,7 @@ func TestGetStake(t *testing.T) {
 
 	// Add a delegator
 	stakeAmt := service.vm.MinDelegatorStake + 12345
-	delegatorNodeID := ids.GenerateTestShortID()
+	delegatorNodeID := keys[0].PublicKey().Address()
 	delegatorEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
 	tx, err := service.vm.newAddDelegatorTx(
 		stakeAmt,
@@ -508,10 +550,12 @@ func TestGetStake(t *testing.T) {
 		keys[0].PublicKey().Address(), // change addr
 	)
 	assert.NoError(err)
-	err = service.vm.addStaker(service.vm.DB, constants.PrimaryNetworkID, &rewardTx{
-		Reward: 0,
-		Tx:     *tx,
-	})
+
+	service.vm.internalState.AddCurrentStaker(tx, 0)
+	service.vm.internalState.AddTx(tx, Committed)
+	err = service.vm.internalState.Commit()
+	assert.NoError(err)
+	err = service.vm.internalState.(*internalStateImpl).loadCurrentValidators()
 	assert.NoError(err)
 
 	// Make sure the delegator addr has the right stake (old stake + stakeAmt)
@@ -550,8 +594,14 @@ func TestGetStake(t *testing.T) {
 		keys[0].PublicKey().Address(), // change addr
 	)
 	assert.NoError(err)
-	err = service.vm.enqueueStaker(service.vm.DB, constants.PrimaryNetworkID, tx)
+
+	service.vm.internalState.AddPendingStaker(tx)
+	service.vm.internalState.AddTx(tx, Committed)
+	err = service.vm.internalState.Commit()
 	assert.NoError(err)
+	err = service.vm.internalState.(*internalStateImpl).loadPendingValidators()
+	assert.NoError(err)
+
 	// Make sure the delegator has the right stake (old stake + stakeAmt)
 	err = service.GetStake(nil, &args, &response)
 	assert.NoError(err)
@@ -648,10 +698,15 @@ func TestGetCurrentValidators(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := service.vm.addStaker(service.vm.DB, constants.PrimaryNetworkID, &rewardTx{
-		Reward: 0,
-		Tx:     *tx,
-	}); err != nil {
+
+	service.vm.internalState.AddCurrentStaker(tx, 0)
+	service.vm.internalState.AddTx(tx, Committed)
+	err = service.vm.internalState.Commit()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = service.vm.internalState.(*internalStateImpl).loadCurrentValidators()
+	if err != nil {
 		t.Fatal(err)
 	}
 

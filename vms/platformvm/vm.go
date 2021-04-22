@@ -37,18 +37,6 @@ import (
 )
 
 const (
-	// TODO: remove skipped values on the next DB migration
-	// For putting/getting values from state
-	validatorsTypeID uint64 = iota
-	chainsTypeID
-	_
-	subnetsTypeID
-	utxoTypeID
-	_
-	txTypeID
-	statusTypeID
-	currentSupplyTypeID
-
 	// PercentDenominator is the denominator used to calculate percentages
 	PercentDenominator = 1000000
 
@@ -77,20 +65,11 @@ const (
 )
 
 var (
-	timestampKey     = ids.ID{'t', 'i', 'm', 'e'}
-	chainsKey        = ids.ID{'c', 'h', 'a', 'i', 'n', 's'}
-	subnetsKey       = ids.ID{'s', 'u', 'b', 'n', 'e', 't', 's'}
-	currentSupplyKey = ids.ID{'c', 'u', 'r', 'r', 'e', 't', ' ', 's', 'u', 'p', 'p', 'l', 'y'}
-	migratedKey      = []byte("migrated")
-	noMigration      = []byte("no migration")
-
-	errRegisteringType          = errors.New("error registering type with database")
-	errInvalidLastAcceptedBlock = errors.New("last accepted block must be a decision block")
-	errInvalidID                = errors.New("invalid ID")
-	errDSCantValidate           = errors.New("new blockchain can't be validated by primary network")
-	errStartTimeTooLate         = errors.New("start time is too far in the future")
-	errStartTimeTooEarly        = errors.New("start time is before the current chain time")
-	errStartAfterEndTime        = errors.New("start time is after the end time")
+	errInvalidID         = errors.New("invalid ID")
+	errDSCantValidate    = errors.New("new blockchain can't be validated by primary network")
+	errStartTimeTooLate  = errors.New("start time is too far in the future")
+	errStartTimeTooEarly = errors.New("start time is before the current chain time")
+	errStartAfterEndTime = errors.New("start time is after the end time")
 
 	_ block.ChainVM        = &VM{}
 	_ validators.Connector = &VM{}
@@ -121,7 +100,7 @@ type VM struct {
 	// channel to send messages to the consensus engine
 	toEngine chan<- common.Message
 
-	internalState internalState
+	internalState InternalState
 
 	// ID of the preferred block
 	preferred ids.ID
@@ -481,21 +460,25 @@ func (vm *VM) updateValidators(force bool) error {
 	if err != nil {
 		return err
 	}
-	vm.Validators.Set(constants.PrimaryNetworkID, primaryValidators)
+	if err := vm.Validators.Set(constants.PrimaryNetworkID, primaryValidators); err != nil {
+		return err
+	}
 
 	for subnetID := range vm.WhitelistedSubnets {
 		subnetValidators, err := currentValidators.ValidatorSet(subnetID)
 		if err != nil {
 			return err
 		}
-		vm.Validators.Set(subnetID, subnetValidators)
+		if err := vm.Validators.Set(subnetID, subnetValidators); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 // Returns the time when the next staker of any subnet starts/stops staking
 // after the current timestamp
-func (vm *VM) nextStakerChangeTime(vs mutableState) (time.Time, error) {
+func (vm *VM) nextStakerChangeTime(vs MutableState) (time.Time, error) {
 	currentStakers := vs.CurrentStakerChainState()
 	pendingStakers := vs.PendingStakerChainState()
 

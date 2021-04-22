@@ -33,7 +33,6 @@ var (
 	blockPrefix           = []byte("block")
 	txPrefix              = []byte("tx")
 	utxoPrefix            = []byte("utxo")
-	addressPrefix         = []byte("address")
 	subnetPrefix          = []byte("subnet")
 	chainPrefix           = []byte("chain")
 	singletonPrefix       = []byte("singleton")
@@ -45,7 +44,7 @@ var (
 
 	errWrongNetworkID = errors.New("tx has wrong network ID")
 
-	_ internalState = &internalStateImpl{}
+	_ InternalState = &internalStateImpl{}
 )
 
 const (
@@ -58,14 +57,12 @@ const (
 
 	blockCacheSize   = 2048
 	txCacheSize      = 2048
-	utxoCacheSize    = 2048
-	addressCacheSize = 2048
 	chainCacheSize   = 2048
 	chainDBCacheSize = 2048
 )
 
-type internalState interface {
-	mutableState
+type InternalState interface {
+	MutableState
 	uptime.State
 
 	AddCurrentStaker(tx *Tx, potentialReward uint64)
@@ -202,7 +199,7 @@ type stateBlk struct {
 	Status choices.Status `serialize:"true"`
 }
 
-func newInternalState(vm *VM, db database.Database, genesis []byte) (internalState, error) {
+func newInternalState(vm *VM, db database.Database, genesis []byte) (InternalState, error) {
 	baseDB := versiondb.New(db)
 
 	validatorsDB := prefixdb.New(validatorsPrefix, baseDB)

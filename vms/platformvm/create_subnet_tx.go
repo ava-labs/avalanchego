@@ -55,7 +55,7 @@ func (tx *UnsignedCreateSubnetTx) Verify(
 // SemanticVerify returns nil if [tx] is valid given the state in [db]
 func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 	vm *VM,
-	vs versionedState,
+	vs VersionedState,
 	stx *Tx,
 ) (
 	func() error,

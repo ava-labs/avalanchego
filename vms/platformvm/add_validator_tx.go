@@ -131,11 +131,11 @@ func (tx *UnsignedAddValidatorTx) Verify(
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	vm *VM,
-	parentState mutableState,
+	parentState MutableState,
 	stx *Tx,
 ) (
-	versionedState,
-	versionedState,
+	VersionedState,
+	VersionedState,
 	func() error,
 	func() error,
 	TxError,
@@ -238,7 +238,7 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 
 	// Set up the state if this tx is committed
 	newlyPendingStakers := pendingStakers.AddStaker(stx)
-	onCommitState := NewVersionedState(parentState, currentStakers, newlyPendingStakers)
+	onCommitState := newVersionedState(parentState, currentStakers, newlyPendingStakers)
 
 	// Consume the UTXOS
 	vm.consumeInputs(onCommitState, tx.Ins)
@@ -247,7 +247,7 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	vm.produceOutputs(onCommitState, txID, tx.Outs)
 
 	// Set up the state if this tx is aborted
-	onAbortState := NewVersionedState(parentState, currentStakers, pendingStakers)
+	onAbortState := newVersionedState(parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
 	vm.consumeInputs(onAbortState, tx.Ins)
 	// Produce the UTXOS

@@ -34,10 +34,11 @@ type UTXOState interface {
 	// DeleteUTXO deletes the provided utxo from storage.
 	DeleteUTXO(utxoID ids.ID) error
 
-	// IDs returns the slice of IDs associated with [key], starting at [start].
+	// IDs returns the slice of IDs associated with [key], starting after
+	// [previous].
 	// If start is not in the list, starts at beginning.
 	// Returns at most [limit] IDs.
-	UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error)
+	UTXOIDs(addr []byte, previous ids.ID, limit int) ([]ids.ID, error)
 }
 
 type utxoState struct {
@@ -152,6 +153,11 @@ func (s *utxoState) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, err
 		if err != nil {
 			return nil, err
 		}
+		if utxoID == start {
+			continue
+		}
+
+		start = ids.Empty
 		utxoIDs = append(utxoIDs, utxoID)
 	}
 	return utxoIDs, iter.Error()

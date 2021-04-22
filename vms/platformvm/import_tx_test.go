@@ -1,3 +1,6 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package platformvm
 
 import (
@@ -6,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -103,10 +105,9 @@ func TestNewImportTx(t *testing.T) {
 		},
 	}
 
-	vdb := versiondb.New(vm.DB)
 	to := ids.GenerateTestShortID()
 	for _, tt := range tests {
-		vm.ctx.SharedMemory = tt.sharedMemory
+		vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(tt.sharedMemory, Codec)
 		tx, err := vm.newImportTx(avmID, to, tt.recipientKeys, ids.ShortEmpty)
 		if err != nil {
 			if !tt.shouldErr {
@@ -136,6 +137,5 @@ func TestNewImportTx(t *testing.T) {
 		if totalIn-totalOut != vm.TxFee {
 			t.Fatalf("in test '%s'. inputs (%d) != outputs (%d) + txFee (%d)", tt.description, totalIn, totalOut, vm.TxFee)
 		}
-		vdb.Abort()
 	}
 }

@@ -30,6 +30,8 @@ type TxState interface {
 type txState struct {
 	codec codec.Manager
 
+	// Caches TxID -> *Tx. If the *Tx is nil, that means the tx is not in
+	// storage.
 	txCache cache.Cacher
 	txDB    database.Database
 }

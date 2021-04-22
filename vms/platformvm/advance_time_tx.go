@@ -37,11 +37,11 @@ func (tx *UnsignedAdvanceTimeTx) Timestamp() time.Time {
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	vm *VM,
-	parentState mutableState,
+	parentState MutableState,
 	stx *Tx,
 ) (
-	versionedState,
-	versionedState,
+	VersionedState,
+	VersionedState,
 	func() error,
 	func() error,
 	TxError,
@@ -193,11 +193,11 @@ currentStakerLoop:
 		return nil, nil, nil, nil, tempError{err}
 	}
 
-	onCommitState := NewVersionedState(parentState, newlyCurrentStakers, newlyPendingStakers)
+	onCommitState := newVersionedState(parentState, newlyCurrentStakers, newlyPendingStakers)
 	onCommitState.SetTimestamp(timestamp)
 	onCommitState.SetCurrentSupply(currentSupply)
 
-	onAbortState := NewVersionedState(parentState, currentStakers, pendingStakers)
+	onAbortState := newVersionedState(parentState, currentStakers, pendingStakers)
 
 	// If this block is committed, update the validator sets.
 	// onCommitDB will be committed to vm.DB before this is called.

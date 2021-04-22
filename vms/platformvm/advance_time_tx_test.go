@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 )
 
@@ -25,7 +24,7 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 
 	if tx, err := vm.newAdvanceTimeTx(defaultGenesisTime); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
+	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've failed verification because proposed timestamp same as current timestamp")
 	}
 }
@@ -55,14 +54,19 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.enqueueStaker(vm.DB, constants.PrimaryNetworkID, addPendingValidatorTx); err != nil {
+	vm.internalState.AddPendingStaker(addPendingValidatorTx)
+	vm.internalState.AddTx(addPendingValidatorTx, Committed)
+	if err := vm.internalState.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := vm.internalState.(*internalStateImpl).loadPendingValidators(); err != nil {
 		t.Fatal(err)
 	}
 
 	tx, err := vm.newAdvanceTimeTx(pendingValidatorStartTime.Add(1 * time.Second))
 	if err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
+	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've failed verification because proposed timestamp is after pending validator start time")
 	}
 	if err := vm.Shutdown(); err != nil {
@@ -86,7 +90,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	// Proposes advancing timestamp to 1 second after genesis validators stop validating
 	if tx, err := vm.newAdvanceTimeTx(defaultValidateEndTime.Add(1 * time.Second)); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
+	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've failed verification because proposed timestamp is after pending validator start time")
 	}
 }
@@ -123,7 +127,12 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.enqueueStaker(vm.DB, constants.PrimaryNetworkID, addPendingValidatorTx); err != nil {
+	vm.internalState.AddPendingStaker(addPendingValidatorTx)
+	vm.internalState.AddTx(addPendingValidatorTx, Committed)
+	if err := vm.internalState.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := vm.internalState.(*internalStateImpl).loadPendingValidators(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -131,40 +140,44 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	onCommit, onAbort, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx)
+	onCommit, onAbort, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if validatorTx, isValidator, err := vm.isValidator(onCommit, constants.PrimaryNetworkID, nodeID); err != nil {
+	onCommitCurrentStakers := onCommit.CurrentStakerChainState()
+	validator, err := onCommitCurrentStakers.GetValidator(nodeID)
+	if err != nil {
 		t.Fatal(err)
-	} else if !isValidator {
-		t.Fatalf("Should have added the validator to the validator set")
-	} else if validatorTx.ID() != addPendingValidatorTx.ID() {
+	}
+	if validator.AddValidatorTx().ID() != addPendingValidatorTx.ID() {
 		t.Fatalf("Added the wrong tx to the validator set")
-	} else if _, willBeValidator, err := vm.willBeValidator(onCommit, constants.PrimaryNetworkID, nodeID); err != nil {
-		t.Fatal(err)
-	} else if willBeValidator {
-		t.Fatalf("Should have removed the validator from the pending validator set")
-	} else if tx, err := vm.nextStakerStop(onCommit, constants.PrimaryNetworkID); err != nil {
-		t.Fatal(err)
-	} else if tx.Reward != 1370 { // See rewards tests
-		t.Fatalf("Expected reward of %d but was %d", 1370, tx.Reward)
 	}
 
-	if _, isValidator, err := vm.isValidator(onAbort, constants.PrimaryNetworkID, nodeID); err != nil {
+	onCommitPendingStakers := onCommit.PendingStakerChainState()
+	if _, err := onCommitPendingStakers.GetStakerByNodeID(nodeID); err == nil {
+		t.Fatalf("Should have removed the validator from the pending validator set")
+	}
+
+	_, reward, err := onCommitCurrentStakers.GetNextStaker()
+	if err != nil {
 		t.Fatal(err)
-	} else if isValidator {
+	}
+	if reward != 1370 { // See rewards tests
+		t.Fatalf("Expected reward of %d but was %d", 1370, reward)
+	}
+
+	onAbortCurrentStakers := onAbort.CurrentStakerChainState()
+	if _, err := onAbortCurrentStakers.GetValidator(nodeID); err == nil {
 		t.Fatalf("Shouldn't have added the validator to the validator set")
 	}
 
-	validatorTx, willBeValidator, err := vm.willBeValidator(onAbort, constants.PrimaryNetworkID, nodeID)
-	switch {
-	case err != nil:
+	onAbortPendingStakers := onAbort.PendingStakerChainState()
+	vdr, err := onAbortPendingStakers.GetStakerByNodeID(nodeID)
+	if err != nil {
 		t.Fatal(err)
-	case !willBeValidator:
-		t.Fatalf("Shouldn't have removed the validator from the pending validator set")
-	case validatorTx.ID() != addPendingValidatorTx.ID():
+	}
+	if vdr.ID() != addPendingValidatorTx.ID() {
 		t.Fatalf("Added the wrong tx to the pending validator set")
 	}
 }
@@ -303,12 +316,17 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers2(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := vm.enqueueStaker(vm.DB, constants.PrimaryNetworkID, tx); err != nil {
+
+			vm.internalState.AddPendingStaker(tx)
+			vm.internalState.AddTx(tx, Committed)
+			if err := vm.internalState.Commit(); err != nil {
+				t.Fatal(err)
+			}
+			if err := vm.internalState.(*internalStateImpl).loadPendingValidators(); err != nil {
 				t.Fatal(err)
 			}
 		}
 
-		db := vm.DB
 		for _, newTime := range tt.advanceTimeTo {
 			vm.clock.Set(newTime)
 			tx, err := vm.newAdvanceTimeTx(newTime)
@@ -316,27 +334,27 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers2(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			db, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, db, tx)
+			onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
 			if err != nil {
 				t.Fatalf("failed test '%s': %s", tt.description, err)
 			}
+			onCommitState.Apply(vm.internalState)
 		}
 
 		// Check that the validators we expect to be in the current staker set are there
+		currentStakers := vm.internalState.CurrentStakerChainState()
 		for _, stakerNodeID := range tt.expectedCurrent {
-			_, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, stakerNodeID)
+			_, err := currentStakers.GetValidator(stakerNodeID)
 			if err != nil {
-				t.Fatal(err)
-			} else if !isValidator {
 				t.Fatalf("failed test '%s': expected validator to be in current validator set but it isn't", tt.description)
 			}
 		}
+
 		// Check that the validators we expect to be in the pending staker set are there
+		pendingStakers := vm.internalState.PendingStakerChainState()
 		for _, stakerNodeID := range tt.expectedPending {
-			_, willBeValidator, err := vm.willBeValidator(db, constants.PrimaryNetworkID, stakerNodeID)
+			_, err := pendingStakers.GetStakerByNodeID(stakerNodeID)
 			if err != nil {
-				t.Fatal(err)
-			} else if !willBeValidator {
 				t.Fatalf("failed test '%s': expected validator to be in pending validator set but it isn't", tt.description)
 			}
 		}
@@ -374,13 +392,16 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rewardTx := &rewardTx{
-		Reward: 0,
-		Tx:     *tx,
-	}
-	if err := vm.addStaker(vm.DB, testSubnet1.ID(), rewardTx); err != nil {
+
+	vm.internalState.AddCurrentStaker(tx, 0)
+	vm.internalState.AddTx(tx, Committed)
+	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
 	}
+	if err := vm.internalState.(*internalStateImpl).loadCurrentValidators(); err != nil {
+		t.Fatal(err)
+	}
+
 	// The above validator is now part of the staking set
 
 	// Queue a staker that joins the staker set after the above validator leaves
@@ -395,9 +416,17 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatal(err)
-	} else if err := vm.enqueueStaker(vm.DB, testSubnet1.ID(), tx); err != nil {
+	}
+
+	vm.internalState.AddPendingStaker(tx)
+	vm.internalState.AddTx(tx, Committed)
+	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
 	}
+	if err := vm.internalState.(*internalStateImpl).loadPendingValidators(); err != nil {
+		t.Fatal(err)
+	}
+
 	// The above validator is now in the pending staker set
 
 	// Advance time to the first staker's end time.
@@ -406,16 +435,20 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	onCommitDB, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx)
+	onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// The first staker should now be removed. Verify that is the case.
-	_, isValidator, err := vm.isValidator(onCommitDB, testSubnet1.ID(), subnetValidatorNodeID)
+	currentStakers := onCommitState.CurrentStakerChainState()
+	vdr, err := currentStakers.GetValidator(subnetValidatorNodeID)
 	if err != nil {
 		t.Fatal(err)
-	} else if isValidator {
+	}
+	_, exists := vdr.SubnetValidators()[testSubnet1.ID()]
+
+	// The first staker should now be removed. Verify that is the case.
+	if exists {
 		t.Fatal("should have been removed from validator set")
 	}
 }

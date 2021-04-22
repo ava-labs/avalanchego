@@ -8,9 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -336,7 +334,6 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		}
 		vm.ctx.Lock.Unlock()
 	}()
-	vDB := versiondb.New(vm.DB)
 
 	key, err := vm.factory.NewPrivateKey()
 	if err != nil {
@@ -356,10 +353,9 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vDB, tx); err == nil {
+	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've errored because start time too early")
 	}
-	vDB.Abort()
 
 	// Case: Validator's start time too far in the future
 	if tx, err := vm.newAddValidatorTx(
@@ -373,10 +369,9 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vDB, tx); err == nil {
+	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've errored because start time too far in the future")
 	}
-	vDB.Abort()
 
 	// Case: Validator already validating primary network
 	if tx, err := vm.newAddValidatorTx(
@@ -390,10 +385,9 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vDB, tx); err == nil {
+	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've errored because validator already validating")
 	}
-	vDB.Abort()
 
 	// Case: Validator in pending validator set of primary network
 	key2, err := vm.factory.NewPrivateKey()
@@ -413,15 +407,20 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatal(err)
-	} else if err := vm.addStaker(vDB, constants.PrimaryNetworkID, &rewardTx{
-		Reward: 0,
-		Tx:     *tx,
-	}); err != nil {
+	}
+
+	vm.internalState.AddCurrentStaker(tx, 0)
+	vm.internalState.AddTx(tx, Committed)
+	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vDB, tx); err == nil {
+	}
+	if err := vm.internalState.(*internalStateImpl).loadCurrentValidators(); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because validator in pending validator set")
 	}
-	vDB.Abort()
 
 	// Case: Validator doesn't have enough tokens to cover stake amount
 	if _, err := vm.newAddValidatorTx( // create the tx
@@ -437,18 +436,15 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Remove all UTXOs owned by keys[0]
-	utxoIDs, err := vm.getReferencingUTXOs(vDB, keys[0].PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
+	utxoIDs, err := vm.internalState.UTXOIDs(keys[0].PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, utxoID := range utxoIDs {
-		if err := vm.removeUTXO(vDB, utxoID); err != nil {
-			t.Fatal(err)
-		}
+		vm.internalState.DeleteUTXO(utxoID)
 	}
 	// Now keys[0] has no funds
-	if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vDB, tx); err == nil {
+	if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because tx fee paying key has no funds")
 	}
-	vDB.Abort()
 }

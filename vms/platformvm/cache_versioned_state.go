@@ -12,28 +12,28 @@ import (
 )
 
 var (
-	_ versionedState = &versionedStateImpl{}
+	_ VersionedState = &versionedStateImpl{}
 )
 
-type utxoGetter interface {
+type UTXOGetter interface {
 	GetUTXO(utxoID ids.ID) (*avax.UTXO, error)
 }
 
-type utxoAdder interface {
+type UTXOAdder interface {
 	AddUTXO(utxo *avax.UTXO)
 }
 
-type utxoDeleter interface {
+type UTXODeleter interface {
 	DeleteUTXO(utxoID ids.ID)
 }
 
-type utxoState interface {
-	utxoGetter
-	utxoAdder
-	utxoDeleter
+type UTXOState interface {
+	UTXOGetter
+	UTXOAdder
+	UTXODeleter
 }
 
-type mutableState interface {
+type MutableState interface {
 	GetTimestamp() time.Time
 	SetTimestamp(time.Time)
 
@@ -52,18 +52,18 @@ type mutableState interface {
 	CurrentStakerChainState() currentStakerChainState
 	PendingStakerChainState() pendingStakerChainState
 
-	utxoState
+	UTXOState
 }
 
-type versionedState interface {
-	mutableState
+type VersionedState interface {
+	MutableState
 
-	SetBase(mutableState)
-	Apply(internalState)
+	SetBase(MutableState)
+	Apply(InternalState)
 }
 
 type versionedStateImpl struct {
-	parentState mutableState
+	parentState MutableState
 
 	currentStakerChainState currentStakerChainState
 	pendingStakerChainState pendingStakerChainState
@@ -95,11 +95,11 @@ type utxoImpl struct {
 	utxo   *avax.UTXO
 }
 
-func NewVersionedState(
-	ps mutableState,
+func newVersionedState(
+	ps MutableState,
 	current currentStakerChainState,
 	pending pendingStakerChainState,
-) versionedState {
+) VersionedState {
 	return &versionedStateImpl{
 		parentState:             ps,
 		currentStakerChainState: current,
@@ -276,11 +276,11 @@ func (vs *versionedStateImpl) PendingStakerChainState() pendingStakerChainState 
 	return vs.pendingStakerChainState
 }
 
-func (vs *versionedStateImpl) SetBase(parentState mutableState) {
+func (vs *versionedStateImpl) SetBase(parentState MutableState) {
 	vs.parentState = parentState
 }
 
-func (vs *versionedStateImpl) Apply(is internalState) {
+func (vs *versionedStateImpl) Apply(is InternalState) {
 	is.SetTimestamp(vs.timestamp)
 	is.SetCurrentSupply(vs.currentSupply)
 	for _, subnet := range vs.addedSubnets {

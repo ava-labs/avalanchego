@@ -86,9 +86,9 @@ func (tx *UnsignedImportTx) Verify(
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedImportTx) SemanticVerify(
 	vm *VM,
-	parentState mutableState,
+	parentState MutableState,
 	stx *Tx,
-) (versionedState, TxError) {
+) (VersionedState, TxError) {
 	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
 		return nil, permError{err}
 	}
@@ -137,7 +137,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	}
 
 	// Set up the state if this tx is committed
-	newState := NewVersionedState(
+	newState := newVersionedState(
 		parentState,
 		parentState.CurrentStakerChainState(),
 		parentState.PendingStakerChainState(),

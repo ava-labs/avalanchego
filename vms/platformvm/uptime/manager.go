@@ -11,6 +11,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
+var (
+	_ TestManager = &manager{}
+)
+
 type State interface {
 	GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time, err error)
 	SetUptime(nodeID ids.ShortID, upDuration time.Duration, lastUpdated time.Time) error
@@ -29,6 +33,11 @@ type Manager interface {
 
 	CalculateUptime(nodeID ids.ShortID) (time.Duration, time.Time, error)
 	CalculateUptimePercent(nodeID ids.ShortID, startTime time.Time) (float64, error)
+}
+
+type TestManager interface {
+	Manager
+	SetTime(time.Time)
 }
 
 type manager struct {
@@ -175,4 +184,8 @@ func (m *manager) CalculateUptimePercent(nodeID ids.ShortID, startTime time.Time
 	}
 	uptime := float64(upDuration) / float64(bestPossibleUpDuration)
 	return uptime, nil
+}
+
+func (m *manager) SetTime(newTime time.Time) {
+	m.clock.Set(newTime)
 }
