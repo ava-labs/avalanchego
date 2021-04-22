@@ -223,7 +223,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 
 		subnet, ok := subnetIntf.UnsignedTx.(*UnsignedCreateSubnetTx)
 		if !ok {
-			return nil, nil, nil, nil, tempError{
+			return nil, nil, nil, nil, permError{
 				fmt.Errorf(
 					"%s is not a subnet",
 					tx.Validator.Subnet,
