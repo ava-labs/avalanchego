@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func TestPrefixedSetsAndGets(t *testing.T) {
+func TestSetsAndGets(t *testing.T) {
 	_, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
@@ -96,7 +96,7 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 	}
 }
 
-func TestPrefixedFundingNoAddresses(t *testing.T) {
+func TestFundingNoAddresses(t *testing.T) {
 	_, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
@@ -128,7 +128,7 @@ func TestPrefixedFundingNoAddresses(t *testing.T) {
 	}
 }
 
-func TestPrefixedFundingAddresses(t *testing.T) {
+func TestFundingAddresses(t *testing.T) {
 	_, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
