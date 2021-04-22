@@ -149,13 +149,13 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 			}
 		}
 
-		// Ensure that the period this validator validates the specified subnet
-		// is a subset of the time they validate the primary network.
+		var (
+			vdrTx *UnsignedAddValidatorTx
+		)
 		if err == nil {
-			vdrTx := currentValidator.AddValidatorTx()
-			if !tx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
-				return nil, nil, nil, nil, permError{errDSValidatorSubset}
-			}
+			// This validator is attempting to validate with a currently
+			// validing node.
+			vdrTx = currentValidator.AddValidatorTx()
 
 			// Ensure that this transaction isn't a duplicate add validator tx.
 			subnets := currentValidator.SubnetValidators()
@@ -168,7 +168,9 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 				}
 			}
 		} else {
-			vdrTx, err := pendingStakers.GetValidatorTx(tx.Validator.NodeID)
+			// This validator is attempting to validate with a node that hasn't
+			// started validating yet.
+			vdrTx, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
 			if err != nil {
 				if err == database.ErrNotFound {
 					return nil, nil, nil, nil, permError{errDSValidatorSubset}
@@ -181,10 +183,12 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 					),
 				}
 			}
+		}
 
-			if !tx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
-				return nil, nil, nil, nil, permError{errDSValidatorSubset}
-			}
+		// Ensure that the period this validator validates the specified subnet
+		// is a subset of the time they validate the primary network.
+		if !tx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
+			return nil, nil, nil, nil, permError{errDSValidatorSubset}
 		}
 
 		// Ensure that this transaction isn't a duplicate add validator tx.
