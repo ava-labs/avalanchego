@@ -155,6 +155,7 @@ func (vm *VM) Initialize(
 
 	vm.ctx = ctx
 	vm.dbManager = dbManager
+	vm.toEngine = msgs
 
 	vm.codec = Codec
 	vm.codecRegistry = linearcodec.NewDefault()
