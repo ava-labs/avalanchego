@@ -181,33 +181,21 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 		pendingValidator := pendingStakers.GetValidator(tx.Validator.NodeID)
 		pendingDelegators := pendingValidator.Delegators()
 
-		// Ensure that the period this delegator delegates is a subset of the
-		// time the validator validates.
+		var (
+			vdrTx                  *UnsignedAddValidatorTx
+			currentDelegatorWeight uint64
+			currentDelegators      []*UnsignedAddDelegatorTx
+		)
 		if err == nil {
-			vdrTx := currentValidator.AddValidatorTx()
-			if !tx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
-				return nil, nil, nil, nil, permError{errDelegatorSubset}
-			}
-			vdrWeight := vdrTx.Weight()
-			delegatorWeight := currentValidator.DelegatorWeight()
-			currentWeight, err := math.Add64(vdrWeight, delegatorWeight)
-			if err != nil {
-				return nil, nil, nil, nil, permError{err}
-			}
-			maximumWeight, err := safemath.Mul64(MaxValidatorWeightFactor, vdrWeight)
-			if err != nil {
-				return nil, nil, nil, nil, permError{errStakeOverflow}
-			}
-			currentDelegators := currentValidator.Delegators()
-			canDelegate, err := CanDelegate(currentDelegators, pendingDelegators, tx, currentWeight, maximumWeight)
-			if err != nil {
-				return nil, nil, nil, nil, permError{err}
-			}
-			if !canDelegate {
-				return nil, nil, nil, nil, permError{errOverDelegated}
-			}
+			// This delegator is attempting to delegate to a currently validing
+			// node.
+			vdrTx = currentValidator.AddValidatorTx()
+			currentDelegatorWeight = currentValidator.DelegatorWeight()
+			currentDelegators = currentValidator.Delegators()
 		} else {
-			vdrTx, err := pendingStakers.GetValidatorTx(tx.Validator.NodeID)
+			// This delegator is attempting to delegate to a node that hasn't
+			// started validating yet.
+			vdrTx, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
 			if err != nil {
 				if err == database.ErrNotFound {
 					return nil, nil, nil, nil, permError{errDelegatorSubset}
@@ -220,22 +208,32 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 					),
 				}
 			}
+		}
 
-			if !tx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
-				return nil, nil, nil, nil, permError{errDelegatorSubset}
-			}
-			vdrWeight := vdrTx.Weight()
-			maximumWeight, err := safemath.Mul64(MaxValidatorWeightFactor, vdrWeight)
-			if err != nil {
-				return nil, nil, nil, nil, permError{errStakeOverflow}
-			}
-			canDelegate, err := CanDelegate(nil, pendingDelegators, tx, vdrWeight, maximumWeight)
-			if err != nil {
-				return nil, nil, nil, nil, permError{err}
-			}
-			if !canDelegate {
-				return nil, nil, nil, nil, permError{errOverDelegated}
-			}
+		// Ensure that the period this delegator delegates is a subset of the
+		// time the validator validates.
+		if !tx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
+			return nil, nil, nil, nil, permError{errDelegatorSubset}
+		}
+
+		// Ensure that the period this delegator delegates wouldn't become over
+		// delegated.
+		vdrWeight := vdrTx.Weight()
+		currentWeight, err := math.Add64(vdrWeight, currentDelegatorWeight)
+		if err != nil {
+			return nil, nil, nil, nil, permError{err}
+		}
+
+		maximumWeight, err := safemath.Mul64(MaxValidatorWeightFactor, vdrWeight)
+		if err != nil {
+			return nil, nil, nil, nil, permError{errStakeOverflow}
+		}
+		canDelegate, err := CanDelegate(currentDelegators, pendingDelegators, tx, currentWeight, maximumWeight)
+		if err != nil {
+			return nil, nil, nil, nil, permError{err}
+		}
+		if !canDelegate {
+			return nil, nil, nil, nil, permError{errOverDelegated}
 		}
 
 		// Verify the flowcheck
