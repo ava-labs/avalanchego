@@ -369,7 +369,7 @@ func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 
 // getPaginatedUTXOs returns UTXOs such that at least one of the addresses in [addrs] is referenced.
 // Returns at most [limit] UTXOs.
-// If [limit] == 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
+// If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
 // Only returns UTXOs associated with addresses >= [startAddr].
 // For address [startAddr], only returns UTXOs whose IDs are greater than [startUTXOID].
 // Returns:
@@ -387,6 +387,7 @@ func (vm *VM) getPaginatedUTXOs(
 	}
 	lastAddr := ids.ShortEmpty
 	lastIndex := ids.Empty
+	searchSize := limit // maximum number of utxos that can be returned
 
 	utxos := make([]*avax.UTXO, 0, limit)
 	seen := make(ids.Set, limit) // IDs of UTXOs already in the list
@@ -403,9 +404,9 @@ func (vm *VM) getPaginatedUTXOs(
 			start = startUTXOID
 		}
 
-		// Get UTXOs associated with [addr]. [limit] is used here to ensure
+		// Get UTXOs associated with [addr]. [searchSize] is used here to ensure
 		// that no UTXOs are dropped due to duplicated fetching.
-		utxoIDs, err := vm.state.UTXOIDs(addr.Bytes(), start, limit)
+		utxoIDs, err := vm.state.UTXOIDs(addr.Bytes(), start, searchSize)
 		if err != nil {
 			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 		}
@@ -430,7 +431,7 @@ func (vm *VM) getPaginatedUTXOs(
 			}
 		}
 	}
-	return utxos, lastAddr, lastIndex, nil // Didnt reach the [limit] utxos; no more were found
+	return utxos, lastAddr, lastIndex, nil // Didn't reach the [limit] utxos; no more were found
 }
 
 func (vm *VM) getAllUTXOs(addrs ids.ShortSet) ([]*avax.UTXO, error) {
