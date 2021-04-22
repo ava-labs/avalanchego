@@ -1956,7 +1956,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	vmDBManager := baseDBManager.NewPrefixDBManager([]byte("vm"))
 	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), baseDBManager.Current())
 
-	blocked, err := queue.New(bootstrappingDB)
+	blocked, err := queue.NewWithMissing(bootstrappingDB, "", prometheus.NewRegistry())
 	if err != nil {
 		t.Fatal(err)
 	}
