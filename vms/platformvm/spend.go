@@ -437,7 +437,6 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 		amount := in.Amount()
 
-		// New rule
 		if now >= locktime {
 			newUnlockedConsumed, err := safemath.Add64(unlockedConsumed, amount)
 			if err != nil {
