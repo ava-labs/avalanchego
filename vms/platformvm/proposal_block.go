@@ -202,12 +202,8 @@ func (pb *ProposalBlock) Verify() error {
 
 // Options returns the possible children of this block in preferential order.
 func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
-	var (
-		blkID      = pb.ID()
-		nextHeight = pb.Height() + 1
-		commit     Block
-		abort      Block
-	)
+	blkID := pb.ID()
+	nextHeight := pb.Height() + 1
 
 	commit, err := pb.vm.newCommitBlock(blkID, nextHeight)
 	if err != nil {
@@ -216,7 +212,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 			err,
 		)
 	}
-	abort, err = pb.vm.newAbortBlock(blkID, nextHeight)
+	abort, err := pb.vm.newAbortBlock(blkID, nextHeight)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create abort block: %w",

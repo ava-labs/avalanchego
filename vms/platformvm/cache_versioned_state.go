@@ -34,6 +34,8 @@ type UTXOState interface {
 }
 
 type MutableState interface {
+	UTXOState
+
 	GetTimestamp() time.Time
 	SetTimestamp(time.Time)
 
@@ -51,8 +53,6 @@ type MutableState interface {
 
 	CurrentStakerChainState() currentStakerChainState
 	PendingStakerChainState() pendingStakerChainState
-
-	UTXOState
 }
 
 type VersionedState interface {

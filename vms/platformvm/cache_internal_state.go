@@ -37,10 +37,10 @@ var (
 	chainPrefix           = []byte("chain")
 	singletonPrefix       = []byte("singleton")
 
-	timestampKey2     = []byte("timestamp")
-	currentSupplyKey2 = []byte("current supply")
-	lastAcceptedKey   = []byte("last accepted")
-	initializedKey    = []byte("initialized")
+	timestampKey     = []byte("timestamp")
+	currentSupplyKey = []byte("current supply")
+	lastAcceptedKey  = []byte("last accepted")
+	initializedKey   = []byte("initialized")
 
 	errWrongNetworkID = errors.New("tx has wrong network ID")
 
@@ -851,13 +851,13 @@ func (st *internalStateImpl) writeChains() error {
 
 func (st *internalStateImpl) writeSingletons() error {
 	if !st.originalTimestamp.Equal(st.timestamp) {
-		if err := database.PutTimestamp(st.singletonDB, timestampKey2, st.timestamp); err != nil {
+		if err := database.PutTimestamp(st.singletonDB, timestampKey, st.timestamp); err != nil {
 			return err
 		}
 		st.originalTimestamp = st.timestamp
 	}
 	if st.originalCurrentSupply != st.currentSupply {
-		if err := database.PutUInt64(st.singletonDB, currentSupplyKey2, st.currentSupply); err != nil {
+		if err := database.PutUInt64(st.singletonDB, currentSupplyKey, st.currentSupply); err != nil {
 			return err
 		}
 		st.originalCurrentSupply = st.currentSupply
@@ -885,14 +885,14 @@ func (st *internalStateImpl) load() error {
 }
 
 func (st *internalStateImpl) loadSingletons() error {
-	timestamp, err := database.GetTimestamp(st.singletonDB, timestampKey2)
+	timestamp, err := database.GetTimestamp(st.singletonDB, timestampKey)
 	if err != nil {
 		return err
 	}
 	st.originalTimestamp = timestamp
 	st.timestamp = timestamp
 
-	currentSupply, err := database.GetUInt64(st.singletonDB, currentSupplyKey2)
+	currentSupply, err := database.GetUInt64(st.singletonDB, currentSupplyKey)
 	if err != nil {
 		return err
 	}

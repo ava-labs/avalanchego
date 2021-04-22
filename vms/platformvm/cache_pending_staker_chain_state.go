@@ -26,7 +26,9 @@ type pendingStakerChainState interface {
 	AddStaker(addStakerTx *Tx) pendingStakerChainState
 	DeleteStakers(numToRemove int) pendingStakerChainState
 
-	Stakers() []*Tx // Sorted in removal order
+	// Stakers returns the list of pending validators in order of their removal
+	// from the pending staker set
+	Stakers() []*Tx
 
 	Apply(InternalState)
 }

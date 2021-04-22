@@ -27,8 +27,8 @@ var (
 type currentStakerChainState interface {
 	// The NextStaker value returns the next staker that is going to be removed
 	// using a RewardValidatorTx. Therefore, only AddValidatorTxs and
-	// AddDelegatorTxs will be returned. AddSubnetValidatorTxs are removing
-	// using AdvanceTimestampTxs.
+	// AddDelegatorTxs will be returned. AddSubnetValidatorTxs are removed using
+	// AdvanceTimestampTxs.
 	GetNextStaker() (addStakerTx *Tx, potentialReward uint64, err error)
 	GetStaker(txID ids.ID) (tx *Tx, potentialReward uint64, err error)
 	GetValidator(nodeID ids.ShortID) (currentValidator, error)
@@ -41,7 +41,9 @@ type currentStakerChainState interface {
 	) (currentStakerChainState, error)
 	DeleteNextStaker() (currentStakerChainState, error)
 
-	Stakers() []*Tx // Sorted in removal order
+	// Stakers returns the current stakers on the network sorted in order of the
+	// order of their future removal from the validator set.
+	Stakers() []*Tx
 
 	Apply(InternalState)
 
@@ -60,7 +62,8 @@ type currentStakerChainStateImpl struct {
 	// txID -> tx
 	validatorsByTxID map[ids.ID]*validatorReward
 
-	// list of current validators in order of their removal
+	// list of current validators in order of their removal from the validator
+	// set
 	validators []*Tx
 
 	addedStakers   []*validatorReward
