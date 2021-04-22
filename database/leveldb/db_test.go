@@ -4,8 +4,6 @@
 package leveldb
 
 import (
-	"fmt"
-	"path"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -13,10 +11,8 @@ import (
 )
 
 func TestInterface(t *testing.T) {
-	for i, test := range database.Tests {
-		tempDir := t.TempDir()
-		folder := path.Join(tempDir, fmt.Sprintf("db%d", i))
-
+	for _, test := range database.Tests {
+		folder := t.TempDir()
 		db, err := New(folder, logging.NoLog{}, 0, 0, 0)
 		if err != nil {
 			t.Fatalf("leveldb.New(%q, logging.NoLog{}, 0, 0, 0) errored with %s", folder, err)

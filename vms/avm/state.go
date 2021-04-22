@@ -4,62 +4,63 @@
 package avm
 
 import (
-	"errors"
-
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
-var (
-	errCacheTypeMismatch = errors.New("type returned from cache doesn't match the expected type")
+const (
+	txDeduplicatorSize = 8192
 )
 
-// state is a thin wrapper around a database to provide, caching, serialization,
-// and de-serialization.
+var (
+	utxoStatePrefix      = []byte("utxo")
+	statusStatePrefix    = []byte("status")
+	singletonStatePrefix = []byte("singleton")
+	txStatePrefix        = []byte("tx")
+)
+
+// State persistently maintains a set of UTXOs, transaction, statuses, and
+// singletons.
+type State interface {
+	avax.UTXOState
+	avax.StatusState
+	avax.SingletonState
+	TxState
+
+	DeduplicateTx(tx *UniqueTx) *UniqueTx
+}
+
 type state struct {
-	txCache cache.Cacher
-	txDB    database.Database
-	*avax.State
+	avax.UTXOState
+	avax.StatusState
+	avax.SingletonState
+	TxState
+
+	uniqueTxs cache.Deduplicator
 }
 
-// Tx attempts to load a transaction from storage.
-func (s *state) Tx(id ids.ID) (*Tx, error) {
-	if txIntf, found := s.txCache.Get(id); found {
-		if tx, ok := txIntf.(*Tx); ok {
-			return tx, nil
-		}
-		return nil, errCacheTypeMismatch
-	}
+func NewState(db database.Database, genesisCodec, codec codec.Manager) State {
+	utxoDB := prefixdb.New(utxoStatePrefix, db)
+	statusDB := prefixdb.New(statusStatePrefix, db)
+	singletonDB := prefixdb.New(singletonStatePrefix, db)
+	txDB := prefixdb.New(txStatePrefix, db)
 
-	bytes, err := s.txDB.Get(id[:])
-	if err != nil {
-		return nil, err
-	}
+	return &state{
+		UTXOState:      avax.NewUTXOState(utxoDB, codec),
+		StatusState:    avax.NewStatusState(statusDB),
+		SingletonState: avax.NewSingletonState(singletonDB),
+		TxState:        NewTxState(txDB, genesisCodec),
 
-	// The key was in the database
-	tx := &Tx{}
-	if _, err := s.GenesisCodec.Unmarshal(bytes, tx); err != nil {
-		return nil, err
+		uniqueTxs: &cache.EvictableLRU{
+			Size: txDeduplicatorSize,
+		},
 	}
-	unsignedBytes, err := s.GenesisCodec.Marshal(codecVersion, &tx.UnsignedTx)
-	if err != nil {
-		return nil, err
-	}
-	tx.Initialize(unsignedBytes, bytes)
-
-	s.txCache.Put(id, tx)
-	return tx, nil
 }
 
-// SetTx saves the provided transaction to storage.
-func (s *state) SetTx(id ids.ID, tx *Tx) error {
-	if tx == nil {
-		s.txCache.Evict(id)
-		return s.txDB.Delete(id[:])
-	}
-
-	s.txCache.Put(id, tx)
-	return s.txDB.Put(id[:], tx.Bytes())
+// UniqueTx de-duplicates the transaction.
+func (s *state) DeduplicateTx(tx *UniqueTx) *UniqueTx {
+	return s.uniqueTxs.Deduplicate(tx).(*UniqueTx)
 }

@@ -666,11 +666,12 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		n.vmManager.RegisterVMFactory(platformvm.ID, &platformvm.Factory{
-			ChainManager:       n.chainManager,
+			Chains:             n.chainManager,
 			Validators:         vdrs,
 			StakingEnabled:     n.Config.EnableStaking,
-			CreationFee:        n.Config.CreationTxFee,
-			Fee:                n.Config.TxFee,
+			WhitelistedSubnets: n.Config.WhitelistedSubnets,
+			CreationTxFee:      n.Config.CreationTxFee,
+			TxFee:              n.Config.TxFee,
 			UptimePercentage:   n.Config.UptimeRequirement,
 			MinValidatorStake:  n.Config.MinValidatorStake,
 			MaxValidatorStake:  n.Config.MaxValidatorStake,
@@ -679,7 +680,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			MinStakeDuration:   n.Config.MinStakeDuration,
 			MaxStakeDuration:   n.Config.MaxStakeDuration,
 			StakeMintingPeriod: n.Config.StakeMintingPeriod,
-			ApricotPhase0Time:  GetApricotPhase0Time(n.Config.NetworkID),
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
 			CreationFee: n.Config.CreationTxFee,

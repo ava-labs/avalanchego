@@ -7,7 +7,12 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/components/core"
+	"github.com/ava-labs/avalanchego/snow/choices"
+)
+
+var (
+	_ Block    = &Commit{}
+	_ decision = &Commit{}
 )
 
 // Commit being accepted results in the proposal of its parent (which must be a proposal block)
@@ -18,30 +23,37 @@ type Commit struct {
 
 // Verify this block performs a valid state transition.
 //
-// The parent block must either be a proposal
+// The parent block must be a proposal
 //
-// This function also sets the onCommit databases if the verification passes.
+// This function also sets onAcceptState if the verification passes.
 func (c *Commit) Verify() error {
+	blkID := c.ID()
+
 	if err := c.DoubleDecisionBlock.Verify(); err != nil {
 		if err := c.Reject(); err != nil {
-			c.vm.Ctx.Log.Error("failed to reject commit block %s due to %s", c.ID(), err)
+			c.vm.ctx.Log.Error("failed to reject commit block %s due to %s", blkID, err)
 		}
 		return err
 	}
 
-	// the parent of an Commit block should always be a proposal
-	parent, ok := c.parentBlock().(*ProposalBlock)
+	parentIntf, err := c.parent()
+	if err != nil {
+		return err
+	}
+
+	// The parent of a Commit block should always be a proposal
+	parent, ok := parentIntf.(*ProposalBlock)
 	if !ok {
 		if err := c.Reject(); err != nil {
-			c.vm.Ctx.Log.Error("failed to reject commit block %s due to %s", c.ID(), err)
+			c.vm.ctx.Log.Error("failed to reject commit block %s due to %s", blkID, err)
 		}
 		return errInvalidBlockType
 	}
 
-	c.onAcceptDB, c.onAcceptFunc = parent.onCommit()
+	c.onAcceptState, c.onAcceptFunc = parent.onCommit()
 
-	c.vm.currentBlocks[c.ID()] = c
-	c.parentBlock().addChild(c)
+	c.vm.currentBlocks[blkID] = c
+	parent.addChild(c)
 	return nil
 }
 
@@ -52,8 +64,8 @@ func (vm *VM) newCommitBlock(parentID ids.ID, height uint64) (*Commit, error) {
 		DoubleDecisionBlock: DoubleDecisionBlock{
 			CommonDecisionBlock: CommonDecisionBlock{
 				CommonBlock: CommonBlock{
-					Block: core.NewBlock(parentID, height),
-					vm:    vm,
+					PrntID: parentID,
+					Hght:   height,
 				},
 			},
 		},
@@ -66,6 +78,5 @@ func (vm *VM) newCommitBlock(parentID ids.ID, height uint64) (*Commit, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal commit block: %w", err)
 	}
-	commit.Block.Initialize(bytes, vm.SnowmanVM)
-	return commit, nil
+	return commit, commit.DoubleDecisionBlock.initialize(vm, bytes, choices.Processing, commit)
 }

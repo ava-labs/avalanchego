@@ -475,7 +475,6 @@ func setNodeConfig(v *viper.Viper) error {
 		}
 	}
 
-	Config.WhitelistedSubnets.Add(constants.PrimaryNetworkID)
 	for _, subnet := range strings.Split(v.GetString(whitelistedSubnetsKey), ",") {
 		if subnet != "" {
 			subnetID, err := ids.FromString(subnet)

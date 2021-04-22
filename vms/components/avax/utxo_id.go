@@ -6,6 +6,7 @@ package avax
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"sort"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -42,6 +43,10 @@ func (utxo *UTXOID) InputID() ids.ID {
 // Symbolic returns if this is the ID of a UTXO in the DB, or if it is a
 // symbolic input
 func (utxo *UTXOID) Symbolic() bool { return utxo.Symbol }
+
+func (utxo *UTXOID) String() string {
+	return fmt.Sprintf("%s:%d", utxo.TxID, utxo.OutputIndex)
+}
 
 // Verify implements the verify.Verifiable interface
 func (utxo *UTXOID) Verify() error {

@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -29,9 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -47,10 +44,6 @@ import (
 const (
 	batchTimeout       = time.Second
 	batchSize          = 30
-	statusCacheSize    = 10000
-	idCacheSize        = 10000
-	txCacheSize        = 10000
-	utxoCacheSize      = 10000
 	assetToFxCacheSize = 1024
 	maxUTXOsToFetch    = 1024
 
@@ -67,11 +60,14 @@ var (
 
 	_ vertex.DAGVM    = &VM{}
 	_ common.StaticVM = &VM{}
+	_ secp256k1fx.VM  = &VM{}
 )
 
 // VM implements the avalanche.DAGVM interface
 type VM struct {
 	metrics
+	avax.AddressManager
+	avax.AtomicUTXOManager
 	ids.Aliaser
 
 	// Contains information of where this VM is executing
@@ -87,7 +83,7 @@ type VM struct {
 	pubsub *pubsub.Server
 
 	// State management
-	state *prefixedState
+	state State
 
 	// Set to true once this VM is marked as `Bootstrapped` by the engine
 	bootstrapped bool
@@ -131,13 +127,18 @@ func (vm *VM) Initialize(
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 ) error {
+	if err := vm.metrics.Initialize(ctx.Namespace, ctx.Metrics); err != nil {
+		return err
+	}
+	vm.AddressManager = avax.NewAddressManager(ctx)
+	vm.Aliaser.Initialize()
+
 	db := dbManager.Current()
 	vm.ctx = ctx
 	vm.toEngine = toEngine
 	vm.baseDB = db
 	vm.db = versiondb.New(db)
 	vm.typeToFxIndex = map[reflect.Type]int{}
-	vm.Aliaser.Initialize()
 	vm.assetToFxCache = &cache.LRU{Size: assetToFxCacheSize}
 
 	vm.pubsub = pubsub.NewServer(ctx)
@@ -147,11 +148,10 @@ func (vm *VM) Initialize(
 
 	vm.genesisCodec = codec.NewManager(math.MaxInt32)
 	vm.codec = codec.NewDefaultManager()
+	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, vm.codec)
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		vm.metrics.Initialize(ctx.Namespace, ctx.Metrics),
-
 		vm.pubsub.Register("accepted"),
 		vm.pubsub.Register("rejected"),
 		vm.pubsub.Register("verified"),
@@ -197,27 +197,17 @@ func (vm *VM) Initialize(
 		}
 	}
 
-	vm.state = &prefixedState{
-		state: &state{
-			txCache: &cache.LRU{Size: txCacheSize},
-			txDB:    prefixdb.NewNested([]byte("tx"), vm.db),
-			State: avax.NewState(
-				vm.db,
-				vm.genesisCodec,
-				vm.codec,
-				utxoCacheSize,
-				statusCacheSize,
-				idCacheSize,
-			),
-		},
-		uniqueTx: &cache.EvictableLRU{Size: txCacheSize},
-	}
+	vm.state = NewState(vm.db, vm.genesisCodec, vm.codec)
 
 	if err := vm.initAliases(genesisBytes); err != nil {
 		return err
 	}
 
-	if dbStatus, err := vm.state.DBInitialized(); err != nil || dbStatus == choices.Unknown {
+	initialized, err := vm.state.IsInitialized()
+	if err != nil {
+		return err
+	}
+	if !initialized {
 		if err := vm.initState(genesisBytes); err != nil {
 			return err
 		}
@@ -377,102 +367,30 @@ func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 	return tx.ID(), nil
 }
 
-// GetAtomicUTXOs returns imported/exports UTXOs such that at least one of the addresses in [addrs] is referenced.
-// Returns at most [limit] UTXOs.
-// If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
-// Returns:
-// * The fetched UTXOs
-// * true if all there are no more UTXOs in this range to fetch
-// * The address associated with the last UTXO fetched
-// * The ID of the last UTXO fetched
-func (vm *VM) GetAtomicUTXOs(
-	chainID ids.ID,
-	addrs ids.ShortSet,
-	startAddr ids.ShortID,
-	startUTXOID ids.ID,
-	limit int,
-) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
-	if limit <= 0 || limit > maxUTXOsToFetch {
-		limit = maxUTXOsToFetch
-	}
-
-	addrsList := make([][]byte, addrs.Len())
-	i := 0
-	for addr := range addrs {
-		copied := addr
-		addrsList[i] = copied[:]
-		i++
-	}
-
-	allUTXOBytes, lastAddr, lastUTXO, err := vm.ctx.SharedMemory.Indexed(
-		chainID,
-		addrsList,
-		startAddr.Bytes(),
-		startUTXOID[:],
-		limit,
-	)
-	if err != nil {
-		return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error fetching atomic UTXOs: %w", err)
-	}
-
-	lastAddrID, err := ids.ToShortID(lastAddr)
-	if err != nil {
-		lastAddrID = ids.ShortEmpty
-	}
-	lastUTXOID, err := ids.ToID(lastUTXO)
-	if err != nil {
-		lastUTXOID = ids.Empty
-	}
-
-	utxos := make([]*avax.UTXO, len(allUTXOBytes))
-	for i, utxoBytes := range allUTXOBytes {
-		utxo := &avax.UTXO{}
-		if _, err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
-			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error parsing UTXO: %w", err)
-		}
-		utxos[i] = utxo
-	}
-	return utxos, lastAddrID, lastUTXOID, nil
-}
-
-// GetUTXOs returns UTXOs such that at least one of the addresses in [addrs] is referenced.
+// getPaginatedUTXOs returns UTXOs such that at least one of the addresses in [addrs] is referenced.
 // Returns at most [limit] UTXOs.
 // If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
 // Only returns UTXOs associated with addresses >= [startAddr].
 // For address [startAddr], only returns UTXOs whose IDs are greater than [startUTXOID].
-// Given a ![paginate] input all utxos will be fetched
 // Returns:
 // * The fetched UTXOs
 // * The address associated with the last UTXO fetched
 // * The ID of the last UTXO fetched
-func (vm *VM) GetUTXOs(
+func (vm *VM) getPaginatedUTXOs(
 	addrs ids.ShortSet,
 	startAddr ids.ShortID,
 	startUTXOID ids.ID,
 	limit int,
-	paginate bool,
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
 	if limit <= 0 || limit > maxUTXOsToFetch {
 		limit = maxUTXOsToFetch
 	}
-
-	if paginate {
-		return vm.getPaginatedUTXOs(addrs, startAddr, startUTXOID, limit)
-	}
-	return vm.getAllUTXOs(addrs)
-}
-
-func (vm *VM) getPaginatedUTXOs(addrs ids.ShortSet,
-	startAddr ids.ShortID,
-	startUTXOID ids.ID,
-	limit int,
-) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
 	lastAddr := ids.ShortEmpty
 	lastIndex := ids.Empty
+	searchSize := limit // maximum number of utxos that can be returned
 
 	utxos := make([]*avax.UTXO, 0, limit)
 	seen := make(ids.Set, limit) // IDs of UTXOs already in the list
-	searchSize := limit          // the limit diminishes which can impact the expected return
 
 	// enforces the same ordering for pagination
 	addrsList := addrs.List()
@@ -488,7 +406,7 @@ func (vm *VM) getPaginatedUTXOs(addrs ids.ShortSet,
 
 		// Get UTXOs associated with [addr]. [searchSize] is used here to ensure
 		// that no UTXOs are dropped due to duplicated fetching.
-		utxoIDs, err := vm.state.Funds(addr.Bytes(), start, searchSize)
+		utxoIDs, err := vm.state.UTXOIDs(addr.Bytes(), start, searchSize)
 		if err != nil {
 			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 		}
@@ -500,7 +418,7 @@ func (vm *VM) getPaginatedUTXOs(addrs ids.ShortSet,
 				continue
 			}
 
-			utxo, err := vm.state.UTXO(utxoID)
+			utxo, err := vm.state.GetUTXO(utxoID)
 			if err != nil {
 				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
 			}
@@ -513,13 +431,10 @@ func (vm *VM) getPaginatedUTXOs(addrs ids.ShortSet,
 			}
 		}
 	}
-	return utxos, lastAddr, lastIndex, nil // Didnt reach the [limit] utxos; no more were found
+	return utxos, lastAddr, lastIndex, nil // Didn't reach the [limit] utxos; no more were found
 }
 
-func (vm *VM) getAllUTXOs(addrs ids.ShortSet) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
-	var err error
-	lastAddr := ids.ShortEmpty
-	lastIndex := ids.Empty
+func (vm *VM) getAllUTXOs(addrs ids.ShortSet) ([]*avax.UTXO, error) {
 	seen := make(ids.Set, maxUTXOsToFetch) // IDs of UTXOs already in the list
 	utxos := make([]*avax.UTXO, 0, maxUTXOsToFetch)
 
@@ -529,41 +444,38 @@ func (vm *VM) getAllUTXOs(addrs ids.ShortSet) ([]*avax.UTXO, ids.ShortID, ids.ID
 
 	// iterate over the addresses and get all the utxos
 	for _, addr := range addrsList {
-		lastIndex, err = vm.getAllUniqueAddressUTXOs(addr, &seen, &utxos)
-		if err != nil {
-			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
-		}
-
-		if lastIndex != ids.Empty {
-			lastAddr = addr // The last address searched that has UTXOs (even duplicated) - not the last found
+		if err := vm.getAllUniqueAddressUTXOs(addr, &seen, &utxos); err != nil {
+			return nil, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 		}
 	}
-	return utxos, lastAddr, lastIndex, nil
+	return utxos, nil
 }
 
-func (vm *VM) getAllUniqueAddressUTXOs(addr ids.ShortID, seen *ids.Set, utxos *[]*avax.UTXO) (ids.ID, error) {
+func (vm *VM) getAllUniqueAddressUTXOs(addr ids.ShortID, seen *ids.Set, utxos *[]*avax.UTXO) error {
 	lastIndex := ids.Empty
+	addrBytes := addr.Bytes()
 
 	for {
-		utxoIDs, err := vm.state.Funds(addr.Bytes(), lastIndex, maxUTXOsToFetch) // Get UTXOs associated with [addr]
+		utxoIDs, err := vm.state.UTXOIDs(addrBytes, lastIndex, maxUTXOsToFetch) // Get UTXOs associated with [addr]
 		if err != nil {
-			return ids.ID{}, err
+			return err
 		}
 
-		if len(utxoIDs) == 0 {
-			return lastIndex, nil
+		// There are no more UTXO IDs to fetch
+		if len(utxoIDs) == 0 || utxoIDs[len(utxoIDs)-1] == lastIndex {
+			return nil
 		}
+
+		lastIndex = utxoIDs[len(utxoIDs)-1]
 
 		for _, utxoID := range utxoIDs {
-			lastIndex = utxoID // The last searched UTXO - not the last found
-
 			if seen.Contains(utxoID) { // Already have this UTXO in the list
 				continue
 			}
 
-			utxo, err := vm.state.UTXO(utxoID)
+			utxo, err := vm.state.GetUTXO(utxoID)
 			if err != nil {
-				return ids.ID{}, err
+				return err
 			}
 			*utxos = append(*utxos, utxo)
 			seen.Add(utxoID)
@@ -661,20 +573,20 @@ func (vm *VM) initState(genesisBytes []byte) error {
 
 		txID := tx.ID()
 		vm.ctx.Log.Info("initializing with AssetID %s", txID)
-		if err := vm.state.SetTx(txID, &tx); err != nil {
+		if err := vm.state.PutTx(txID, &tx); err != nil {
 			return err
 		}
-		if err := vm.state.SetStatus(txID, choices.Accepted); err != nil {
+		if err := vm.state.PutStatus(txID, choices.Accepted); err != nil {
 			return err
 		}
 		for _, utxo := range tx.UTXOs() {
-			if err := vm.state.FundUTXO(utxo); err != nil {
+			if err := vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
 				return err
 			}
 		}
 	}
 
-	return vm.state.SetDBInitialized(choices.Processing)
+	return vm.state.SetInitialized()
 }
 
 func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
@@ -684,7 +596,7 @@ func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
 	}
 
 	tx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: rawTx,
 		},
 		vm:   vm,
@@ -695,7 +607,7 @@ func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
 	}
 
 	if tx.Status() == choices.Unknown {
-		if err := vm.state.SetTx(tx.ID(), tx.Tx); err != nil {
+		if err := vm.state.PutTx(tx.ID(), tx.Tx); err != nil {
 			return nil, err
 		}
 		if err := tx.setStatus(choices.Processing); err != nil {
@@ -733,7 +645,7 @@ func (vm *VM) issueTx(tx snowstorm.Tx) {
 
 func (vm *VM) getUTXO(utxoID *avax.UTXOID) (*avax.UTXO, error) {
 	inputID := utxoID.InputID()
-	utxo, err := vm.state.UTXO(inputID)
+	utxo, err := vm.state.GetUTXO(inputID)
 	if err == nil {
 		return utxo, nil
 	}
@@ -884,7 +796,7 @@ func (vm *VM) LoadUser(
 		return nil, nil, err
 	}
 
-	utxos, _, _, err := vm.GetUTXOs(kc.Addresses(), ids.ShortEmpty, ids.Empty, -1, false)
+	utxos, err := vm.getAllUTXOs(kc.Addresses())
 	if err != nil {
 		return nil, nil, fmt.Errorf("problem retrieving user's UTXOs: %w", err)
 	}
@@ -1228,61 +1140,6 @@ func (vm *VM) MintNFT(
 
 	sortOperationsWithSigners(ops, keys, vm.codec)
 	return ops, keys, nil
-}
-
-// ParseLocalAddress takes in an address for this chain and produces the ID
-func (vm *VM) ParseLocalAddress(addrStr string) (ids.ShortID, error) {
-	chainID, addr, err := vm.ParseAddress(addrStr)
-	if err != nil {
-		return ids.ShortID{}, err
-	}
-	if chainID != vm.ctx.ChainID {
-		return ids.ShortID{}, fmt.Errorf("expected chainID to be %q but was %q",
-			vm.ctx.ChainID, chainID)
-	}
-	return addr, nil
-}
-
-// ParseAddress takes in an address and produces the ID of the chain it's for
-// the ID of the address
-func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
-	chainIDAlias, hrp, addrBytes, err := formatting.ParseAddress(addrStr)
-	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
-	}
-
-	chainID, err := vm.ctx.BCLookup.Lookup(chainIDAlias)
-	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
-	}
-
-	expectedHRP := constants.GetHRP(vm.ctx.NetworkID)
-	if hrp != expectedHRP {
-		return ids.ID{}, ids.ShortID{}, fmt.Errorf("expected hrp %q but got %q",
-			expectedHRP, hrp)
-	}
-
-	addr, err := ids.ToShortID(addrBytes)
-	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
-	}
-	return chainID, addr, nil
-}
-
-// FormatLocalAddress takes in a raw address and produces the formatted address
-func (vm *VM) FormatLocalAddress(addr ids.ShortID) (string, error) {
-	return vm.FormatAddress(vm.ctx.ChainID, addr)
-}
-
-// FormatAddress takes in a chainID and a raw address and produces the formatted
-// address
-func (vm *VM) FormatAddress(chainID ids.ID, addr ids.ShortID) (string, error) {
-	chainIDAlias, err := vm.ctx.BCLookup.PrimaryAlias(chainID)
-	if err != nil {
-		return "", err
-	}
-	hrp := constants.GetHRP(vm.ctx.NetworkID)
-	return formatting.FormatAddress(chainIDAlias, hrp, addr.Bytes())
 }
 
 // selectChangeAddr returns the change address to be used for [kc] when [changeAddr] is given
