@@ -1,10 +1,4 @@
-./consensus/clique/api.go
-./consensus/clique/snapshot.go
 ./consensus/errors.go
-./consensus/ethash/algorithm.go
-./consensus/ethash/api.go
-./consensus/ethash/ethash.go
-./consensus/ethash/sealer.go
 ./consensus/misc/dao.go
 ./consensus/misc/forks.go
 ./core/blockchain_insert.go
@@ -17,7 +11,6 @@
 ./core/chain_indexer.go
 ./core/error.go
 ./core/gaspool.go
-./core/genesis_alloc.go
 ./core/headerchain.go
 ./core/mkalloc.go
 ./core/rawdb/accessors_indexes.go
@@ -84,7 +77,6 @@
 ./miner/unconfirmed.go
 ./node/defaults.go
 ./node/errors.go
-./params/config.go
 ./params/dao.go
 ./params/denomination.go
 ./params/network_params.go

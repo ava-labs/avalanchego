@@ -74,8 +74,8 @@ var (
 const (
 	minBlockTime = 2 * time.Second
 	maxBlockTime = 3 * time.Second
-	// maxFutureBlockTime should be smaller than the max allowed future time (15s) used
-	// in dummy consensus engine's verifyHeader
+	// Max time from current time allowed for blocks, before they're considered future blocks
+	// and fail verification
 	maxFutureBlockTime   = 10 * time.Second
 	batchSize            = 250
 	maxUTXOsToFetch      = 1024
