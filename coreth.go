@@ -61,9 +61,9 @@ func NewETHChain(config *eth.Config, nodecfg *node.Config, chainDB ethdb.Databas
 	return chain
 }
 
-func (self *ETHChain) Start() {
-	self.backend.StartMining()
+func (self *ETHChain) Start() error {
 	self.backend.Start()
+	return self.backend.StartMining()
 }
 
 func (self *ETHChain) Stop() {
