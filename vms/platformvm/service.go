@@ -2035,10 +2035,10 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 	}
 
 	onAccept := block.onAccept()
-	_, status, err = onAccept.GetTx(args.TxID)
+	_, _, err = onAccept.GetTx(args.TxID)
 	if err == nil {
 		// Found the status in the preferred block's db. Report tx is processing.
-		response.Status = status
+		response.Status = Processing
 		return nil
 	}
 	if err != database.ErrNotFound {

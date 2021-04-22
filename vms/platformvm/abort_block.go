@@ -53,7 +53,7 @@ func (a *Abort) Verify() error {
 	a.onAcceptState, a.onAcceptFunc = parent.onAbort()
 
 	a.vm.currentBlocks[blkID] = a
-	parentIntf.addChild(a)
+	parent.addChild(a)
 	return nil
 }
 
