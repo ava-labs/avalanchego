@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,9 +22,13 @@ func TestNew(t *testing.T) {
 	parser := &TestParser{T: t}
 	db := memdb.New()
 
-	jobs, err := New(db)
-	assert.NoError(err)
-	jobs.SetParser(parser)
+	jobs, err := New(db, "", prometheus.NewRegistry())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := jobs.SetParser(parser); err != nil {
+		t.Fatal(err)
+	}
 
 	dbSize, err := database.Size(db)
 	assert.NoError(err)
@@ -38,9 +43,13 @@ func TestPushAndExecute(t *testing.T) {
 	parser := &TestParser{T: t}
 	db := memdb.New()
 
-	jobs, err := New(db)
-	assert.NoError(err)
-	jobs.SetParser(parser)
+	jobs, err := New(db, "", prometheus.NewRegistry())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := jobs.SetParser(parser); err != nil {
+		t.Fatal(err)
+	}
 
 	jobID := ids.GenerateTestID()
 	job := &TestJob{
@@ -56,7 +65,8 @@ func TestPushAndExecute(t *testing.T) {
 	assert.NoError(err)
 	assert.False(has)
 
-	err = jobs.Push(job)
+	pushed, err := jobs.Push(job)
+	assert.True(pushed)
 	assert.NoError(err)
 
 	has, err = jobs.Has(jobID)
@@ -66,9 +76,11 @@ func TestPushAndExecute(t *testing.T) {
 	err = jobs.Commit()
 	assert.NoError(err)
 
-	jobs, err = New(db)
+	jobs, err = New(db, "", prometheus.NewRegistry())
 	assert.NoError(err)
-	jobs.SetParser(parser)
+	if err := jobs.SetParser(parser); err != nil {
+		t.Fatal(err)
+	}
 
 	has, err = jobs.Has(jobID)
 	assert.NoError(err)
@@ -108,9 +120,13 @@ func TestRemoveDependency(t *testing.T) {
 	parser := &TestParser{T: t}
 	db := memdb.New()
 
-	jobs, err := New(db)
-	assert.NoError(err)
-	jobs.SetParser(parser)
+	jobs, err := New(db, "", prometheus.NewRegistry())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := jobs.SetParser(parser); err != nil {
+		t.Fatal(err)
+	}
 
 	job0ID := ids.GenerateTestID()
 	executed0 := false
@@ -140,14 +156,16 @@ func TestRemoveDependency(t *testing.T) {
 		BytesF: func() []byte { return []byte{0} },
 	}
 
-	err = jobs.Push(job1)
+	pushed, err := jobs.Push(job1)
+	assert.True(pushed)
 	assert.NoError(err)
 
 	hasNext, err := jobs.state.HasRunnableJob()
 	assert.NoError(err)
 	assert.False(hasNext)
 
-	err = jobs.Push(job0)
+	pushed, err = jobs.Push(job0)
+	assert.True(pushed)
 	assert.NoError(err)
 
 	hasNext, err = jobs.state.HasRunnableJob()
@@ -187,8 +205,10 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 
 	db := memdb.New()
 
-	jobs, err := New(db)
-	assert.NoError(err)
+	jobs, err := New(db, "", prometheus.NewRegistry())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	jobID := ids.GenerateTestID()
 	job := &TestJob{
@@ -200,20 +220,23 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 		BytesF:               func() []byte { return []byte{0} },
 	}
 
-	err = jobs.Push(job)
+	pushed, err := jobs.Push(job)
+	assert.True(pushed)
 	assert.NoError(err)
 
-	err = jobs.Push(job)
-	assert.Error(err)
+	pushed, err = jobs.Push(job)
+	assert.False(pushed)
+	assert.NoError(err)
 
 	err = jobs.Commit()
 	assert.NoError(err)
 
-	jobs, err = New(db)
+	jobs, err = New(db, "", prometheus.NewRegistry())
 	assert.NoError(err)
 
-	err = jobs.Push(job)
-	assert.Error(err)
+	pushed, err = jobs.Push(job)
+	assert.False(pushed)
+	assert.NoError(err)
 }
 
 // Test that a job that isn't ready to be executed can only be added once
@@ -222,8 +245,10 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 
 	db := memdb.New()
 
-	jobs, err := New(db)
-	assert.NoError(err)
+	jobs, err := New(db, "", prometheus.NewRegistry())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	job0ID := ids.GenerateTestID()
 	job1ID := ids.GenerateTestID()
@@ -236,31 +261,36 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 		BytesF:               func() []byte { return []byte{1} },
 	}
 
-	err = jobs.Push(job1)
+	pushed, err := jobs.Push(job1)
+	assert.True(pushed)
 	assert.NoError(err)
 
-	err = jobs.Push(job1)
-	assert.Error(err)
+	pushed, err = jobs.Push(job1)
+	assert.False(pushed)
+	assert.NoError(err)
 
 	err = jobs.Commit()
 	assert.NoError(err)
 
-	jobs, err = New(db)
+	jobs, err = New(db, "", prometheus.NewRegistry())
 	assert.NoError(err)
 
-	err = jobs.Push(job1)
-	assert.Error(err)
+	pushed, err = jobs.Push(job1)
+	assert.False(pushed)
+	assert.NoError(err)
 }
 
-func TestPendingJobs(t *testing.T) {
+func TestMissingJobs(t *testing.T) {
 	assert := assert.New(t)
 
 	parser := &TestParser{T: t}
 	db := memdb.New()
 
-	jobs, err := New(db)
+	jobs, err := NewWithMissing(db, "", prometheus.NewRegistry())
 	assert.NoError(err)
-	jobs.SetParser(parser)
+	if err := jobs.SetParser(parser); err != nil {
+		t.Fatal(err)
+	}
 
 	job0ID := ids.GenerateTestID()
 	job1ID := ids.GenerateTestID()
@@ -288,9 +318,11 @@ func TestPendingJobs(t *testing.T) {
 	err = jobs.Commit()
 	assert.NoError(err)
 
-	jobs, err = New(db)
+	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())
 	assert.NoError(err)
-	jobs.SetParser(parser)
+	if err := jobs.SetParser(parser); err != nil {
+		t.Fatal(err)
+	}
 
 	missingIDSet = ids.Set{}
 	missingIDSet.Add(jobs.MissingIDs()...)
@@ -300,4 +332,113 @@ func TestPendingJobs(t *testing.T) {
 
 	containsJob1ID = missingIDSet.Contains(job1ID)
 	assert.False(containsJob1ID)
+}
+
+func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
+	assert := assert.New(t)
+
+	parser := &TestParser{T: t}
+	db := memdb.New()
+
+	jobs, err := NewWithMissing(db, "", prometheus.NewRegistry())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := jobs.SetParser(parser); err != nil {
+		t.Fatal(err)
+	}
+
+	job0ID := ids.GenerateTestID()
+	executed0 := false
+	job1ID := ids.GenerateTestID()
+	executed1 := false
+
+	job1 := &TestJob{
+		T: t,
+
+		IDF:                  func() ids.ID { return job1ID },
+		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{job0ID: true}, nil },
+		ExecuteF:             func() error { return database.ErrClosed }, // job1 fails to execute the first time due to a closed database
+		BytesF:               func() []byte { return []byte{1} },
+	}
+	job0 := &TestJob{
+		T: t,
+
+		IDF:                  func() ids.ID { return job0ID },
+		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{}, nil },
+		ExecuteF: func() error {
+			executed0 = true
+			job1.MissingDependenciesF = func() (ids.Set, error) {
+				return ids.Set{}, nil
+			}
+			return nil
+		},
+		BytesF: func() []byte { return []byte{0} },
+	}
+
+	pushed, err := jobs.Push(job1)
+	assert.True(pushed)
+	assert.NoError(err)
+
+	hasNext, err := jobs.state.HasRunnableJob()
+	assert.NoError(err)
+	assert.False(hasNext)
+
+	pushed, err = jobs.Push(job0)
+	assert.True(pushed)
+	assert.NoError(err)
+
+	hasNext, err = jobs.state.HasRunnableJob()
+	assert.NoError(err)
+	assert.True(hasNext)
+
+	parser.ParseF = func(b []byte) (Job, error) {
+		switch {
+		case bytes.Equal(b, []byte{0}):
+			return job0, nil
+		case bytes.Equal(b, []byte{1}):
+			return job1, nil
+		default:
+			assert.FailNow("Unknown job")
+			return nil, nil
+		}
+	}
+
+	_, err = jobs.ExecuteAll(snow.DefaultContextTest(), false)
+	// Assert that the database closed error on job1 causes ExecuteAll
+	// to fail in the middle of execution.
+	assert.Error(err)
+	assert.True(executed0)
+	assert.False(executed1)
+
+	job1.MissingDependenciesF = func() (ids.Set, error) { return ids.Set{job0ID: true}, nil }
+	job1.ExecuteF = func() error { executed1 = true; return nil }
+
+	// Create jobs queue from the same database and ensure that the jobs queue
+	// recovers correctly.
+	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := jobs.SetParser(parser); err != nil {
+		t.Fatal(err)
+	}
+
+	missingIDs := jobs.MissingIDs()
+	assert.Equal(1, len(missingIDs))
+
+	assert.Equal(missingIDs[0], job0.ID())
+
+	pushed, err = jobs.Push(job0)
+	assert.NoError(err)
+	assert.True(pushed)
+
+	hasNext, err = jobs.state.HasRunnableJob()
+	assert.NoError(err)
+	assert.True(hasNext)
+
+	count, err := jobs.ExecuteAll(snow.DefaultContextTest(), false)
+	assert.NoError(err)
+	assert.Equal(2, count)
+	assert.True(executed1)
 }

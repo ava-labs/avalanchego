@@ -31,7 +31,7 @@ type Config struct {
 	common.Config
 
 	// Blocked tracks operations that are blocked on blocks
-	Blocked *queue.Jobs
+	Blocked *queue.JobsWithMissing
 
 	VM block.ChainVM
 
@@ -52,7 +52,7 @@ type Bootstrapper struct {
 	startingAcceptedFrontier ids.Set
 
 	// Blocked tracks operations that are blocked on blocks
-	Blocked *queue.Jobs
+	Blocked *queue.JobsWithMissing
 
 	VM block.ChainVM
 
@@ -62,6 +62,8 @@ type Bootstrapper struct {
 	executedStateTransitions int
 
 	delayAmount time.Duration
+
+	parser *parser
 }
 
 // Initialize this engine.
@@ -92,12 +94,15 @@ func (b *Bootstrapper) Initialize(
 		return err
 	}
 
-	b.Blocked.SetParser(&parser{
+	b.parser = &parser{
 		log:         config.Ctx.Log,
 		numAccepted: b.numAccepted,
 		numDropped:  b.numDropped,
 		vm:          b.VM,
-	})
+	}
+	if err := b.Blocked.SetParser(b.parser); err != nil {
+		return err
+	}
 
 	config.Bootstrapable = b
 	return b.Bootstrapper.Initialize(config.Config)
@@ -128,9 +133,14 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	}
 
 	b.NumFetched = 0
-	b.Blocked.AddMissingID(acceptedContainerIDs...)
+
 	pendingContainerIDs := b.Blocked.MissingIDs()
-	b.Ctx.Log.Debug("Starting bootstrapping with %d pending blocks and %d from accepted frontier", len(pendingContainerIDs), len(acceptedContainerIDs))
+
+	// Append the list of accepted container IDs to pendingContainerIDs to ensure
+	// we iterate over every container that must be traversed.
+	pendingContainerIDs = append(pendingContainerIDs, acceptedContainerIDs...)
+	toProcess := make([]snowman.Block, 0, len(acceptedContainerIDs))
+	b.Ctx.Log.Debug("Starting bootstrapping with %d pending blocks and %d from the accepted frontier", len(pendingContainerIDs), len(acceptedContainerIDs))
 	for _, blkID := range pendingContainerIDs {
 		b.startingAcceptedFrontier.Add(blkID)
 		if blk, err := b.VM.GetBlock(blkID); err == nil {
@@ -139,10 +149,20 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 			}
 			if blk.Status() == choices.Accepted {
 				b.Blocked.RemoveMissingID(blkID)
-			} else if err := b.process(blk); err != nil {
+			} else {
+				toProcess = append(toProcess, blk)
+			}
+		} else {
+			b.Blocked.AddMissingID(blkID)
+			if err := b.fetch(blkID); err != nil {
 				return err
 			}
-		} else if err := b.fetch(blkID); err != nil {
+		}
+	}
+
+	// Process received blocks
+	for _, blk := range toProcess {
+		if err := b.process(blk); err != nil {
 			return err
 		}
 	}
@@ -243,15 +263,14 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 	for status == choices.Processing {
 		b.Blocked.RemoveMissingID(blkID)
 
-		has, err := b.Blocked.Has(blkID)
-		if err != nil {
-			return err
-		}
-
-		job := &blockJob{
+		pushed, err := b.Blocked.Push(&blockJob{
+			parser:      b.parser,
 			numAccepted: b.numAccepted,
 			numDropped:  b.numDropped,
 			blk:         blk,
+		})
+		if err != nil {
+			return err
 		}
 
 		// Traverse to the next block regardless of if the block is pushed
@@ -259,14 +278,10 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 		status = blk.Status()
 		blkID = blk.ID()
 
-		if has {
+		if !pushed {
 			// If this block is already on the queue, then we can stop
 			// traversing here.
 			break
-		}
-
-		if err := b.Blocked.Push(job); err != nil {
-			return err
 		}
 
 		b.numFetched.Inc()
@@ -375,7 +390,9 @@ func (b *Bootstrapper) finish() error {
 // Connected implements the Engine interface.
 func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
 	if connector, ok := b.VM.(validators.Connector); ok {
-		connector.Connected(validatorID)
+		if err := connector.Connected(validatorID); err != nil {
+			return err
+		}
 	}
 	return b.Bootstrapper.Connected(validatorID)
 }
@@ -383,7 +400,9 @@ func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
 // Disconnected implements the Engine interface.
 func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
 	if connector, ok := b.VM.(validators.Connector); ok {
-		connector.Disconnected(validatorID)
+		if err := connector.Disconnected(validatorID); err != nil {
+			return err
+		}
 	}
 	return b.Bootstrapper.Disconnected(validatorID)
 }

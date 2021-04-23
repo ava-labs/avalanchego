@@ -13,10 +13,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -85,11 +84,11 @@ func (tx *UnsignedExportTx) Verify(
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedExportTx) SemanticVerify(
 	vm *VM,
-	db database.Database,
+	parentState MutableState,
 	stx *Tx,
-) TxError {
-	if err := tx.Verify(vm.Ctx.XChainID, vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
-		return permError{err}
+) (VersionedState, TxError) {
+	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
+		return nil, permError{err}
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
@@ -97,34 +96,31 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(parentState, tx, tx.Ins, outs, stx.Creds, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
 		switch err.(type) {
 		case permError:
-			return permError{
+			return nil, permError{
 				fmt.Errorf("failed semanticVerifySpend: %w", err),
 			}
 		default:
-			return tempError{
+			return nil, tempError{
 				fmt.Errorf("failed semanticVerifySpend: %w", err),
 			}
 		}
 	}
 
-	txID := tx.ID()
-
+	// Set up the state if this tx is committed
+	newState := newVersionedState(
+		parentState,
+		parentState.CurrentStakerChainState(),
+		parentState.PendingStakerChainState(),
+	)
 	// Consume the UTXOS
-	if err := vm.consumeInputs(db, tx.Ins); err != nil {
-		return tempError{
-			fmt.Errorf("failed to consume inputs: %w", err),
-		}
-	}
+	consumeInputs(newState, tx.Ins)
 	// Produce the UTXOS
-	if err := vm.produceOutputs(db, txID, tx.Outs); err != nil {
-		return tempError{
-			fmt.Errorf("failed to produce outputs: %w", err),
-		}
-	}
-	return nil
+	txID := tx.ID()
+	produceOutputs(newState, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	return newState, nil
 }
 
 // Accept this transaction.
@@ -169,15 +165,15 @@ func (vm *VM) newExportTx(
 	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee and provide the tokens
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	if vm.Ctx.XChainID != chainID {
+	if vm.ctx.XChainID != chainID {
 		return nil, errWrongChainID
 	}
 
-	toBurn, err := safemath.Add64(amount, vm.txFee)
+	toBurn, err := safemath.Add64(amount, vm.TxFee)
 	if err != nil {
 		return nil, errOverflowExport
 	}
-	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, toBurn, changeAddr)
+	ins, outs, _, signers, err := vm.stake(keys, 0, toBurn, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -185,14 +181,14 @@ func (vm *VM) newExportTx(
 	// Create the transaction
 	utx := &UnsignedExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.Ctx.NetworkID,
-			BlockchainID: vm.Ctx.ChainID,
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
 			Ins:          ins,
 			Outs:         outs, // Non-exported outputs
 		}},
 		DestinationChain: chainID,
 		ExportedOutputs: []*avax.TransferableOutput{{ // Exported to X-Chain
-			Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: amount,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -207,5 +203,5 @@ func (vm *VM) newExportTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.Ctx.XChainID, vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID)
+	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID)
 }

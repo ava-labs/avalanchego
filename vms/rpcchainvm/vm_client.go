@@ -444,11 +444,7 @@ func (b *BlockClient) Verify() error {
 	_, err := b.vm.client.BlockVerify(context.Background(), &vmproto.BlockVerifyRequest{
 		Id: b.id[:],
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (b *BlockClient) Bytes() []byte  { return b.bytes }

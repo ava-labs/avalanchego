@@ -625,11 +625,27 @@ func TestGenesisGetUTXOs(t *testing.T) {
 
 	addrsSet := ids.ShortSet{}
 	addrsSet.Add(addrs[0])
-	utxos, _, _, err := vm.GetUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, -1, true)
+
+	utxos, _, _, err := vm.getPaginatedUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(utxos) != 4 {
+		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 4, len(utxos))
+	}
 
+	utxos, err = vm.getAllUTXOs(addrsSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(utxos) != 4 {
+		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 4, len(utxos))
+	}
+
+	utxos, _, _, err = vm.getPaginatedUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(utxos) != 4 {
 		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 4, len(utxos))
 	}
@@ -694,7 +710,7 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 
 	var totalUTXOs []*avax.UTXO
 	for i := 0; i <= 3; i++ {
-		fetchedUTXOs, lastAddr, lastIdx, err = vm.GetUTXOs(addrsSet, lastAddr, lastIdx, -1, true)
+		fetchedUTXOs, lastAddr, lastIdx, err = vm.getPaginatedUTXOs(addrsSet, lastAddr, lastIdx, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -710,7 +726,7 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 	}
 
 	// Fetch all UTXOs
-	notPaginatedUTXOs, _, _, err := vm.GetUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, -1, false)
+	notPaginatedUTXOs, err := vm.getAllUTXOs(addrsSet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1175,8 +1191,8 @@ func TestTxCached(t *testing.T) {
 		*called = true
 		return nil, errors.New("")
 	}
-	vm.state.state.txDB = prefixdb.New([]byte("tx"), db)
-	vm.state.state.txCache.Flush()
+
+	vm.state.(*state).TxState = NewTxState(prefixdb.New([]byte("tx"), db), vm.genesisCodec)
 
 	_, err = vm.ParseTx(txBytes)
 	assert.NoError(t, err)
@@ -1206,10 +1222,11 @@ func TestTxNotCached(t *testing.T) {
 		return nil, errors.New("")
 	}
 	db.OnPut = func([]byte, []byte) error { return nil }
-	vm.state.state.txDB = prefixdb.New([]byte("tx"), db)
-	vm.state.state.StatusDB = prefixdb.New([]byte("status"), db)
-	vm.state.uniqueTx.Flush()
-	vm.state.StatusCache.Flush()
+
+	s := vm.state.(*state)
+	s.TxState = NewTxState(prefixdb.New(txStatePrefix, db), vm.genesisCodec)
+	s.StatusState = avax.NewStatusState(prefixdb.New(statusStatePrefix, db))
+	s.uniqueTxs.Flush()
 
 	_, err = vm.ParseTx(txBytes)
 	assert.NoError(t, err)

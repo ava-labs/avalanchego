@@ -15,12 +15,12 @@ import (
 
 func TestUnsignedCreateChainTxVerify(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	type test struct {
@@ -78,7 +78,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			setup:       func(tx *UnsignedCreateChainTx) *UnsignedCreateChainTx { tx.SubnetID = vm.Ctx.ChainID; return tx },
+			setup:       func(tx *UnsignedCreateChainTx) *UnsignedCreateChainTx { tx.SubnetID = vm.ctx.ChainID; return tx },
 		},
 		{
 			description: "chain name is too long",
@@ -139,7 +139,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 		}
 		tx.UnsignedTx.(*UnsignedCreateChainTx).syntacticallyVerified = false
 		tx.UnsignedTx = test.setup(tx.UnsignedTx.(*UnsignedCreateChainTx))
-		if err := tx.UnsignedTx.(*UnsignedCreateChainTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err != nil && !test.shouldErr {
+		if err := tx.UnsignedTx.(*UnsignedCreateChainTx).Verify(vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID); err != nil && !test.shouldErr {
 			t.Fatalf("test '%s' shouldn't have errored but got: %s", test.description, err)
 		} else if err == nil && test.shouldErr {
 			t.Fatalf("test '%s' didn't error but should have", test.description)
@@ -150,12 +150,12 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 // Ensure SemanticVerify fails when there are not enough control sigs
 func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	tx, err := vm.newCreateChainTx(
@@ -171,9 +171,15 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	vs := newVersionedState(
+		vm.internalState,
+		vm.internalState.CurrentStakerChainState(),
+		vm.internalState.PendingStakerChainState(),
+	)
+
 	// Remove a signature
 	tx.Creds[0].(*secp256k1fx.Credential).Sigs = tx.Creds[0].(*secp256k1fx.Credential).Sigs[1:]
-	if _, err := tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vm.DB, tx); err == nil {
+	if _, err := tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vs, tx); err == nil {
 		t.Fatal("should have errored because a sig is missing")
 	}
 }
@@ -181,12 +187,12 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 // Ensure SemanticVerify fails when an incorrect control signature is given
 func TestCreateChainTxWrongControlSig(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	tx, err := vm.newCreateChainTx( // create a tx
@@ -209,13 +215,19 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	vs := newVersionedState(
+		vm.internalState,
+		vm.internalState.CurrentStakerChainState(),
+		vm.internalState.PendingStakerChainState(),
+	)
+
 	// Replace a valid signature with one from another key
 	sig, err := key.SignHash(hashing.ComputeHash256(tx.UnsignedBytes()))
 	if err != nil {
 		t.Fatal(err)
 	}
 	copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
-	if _, err = tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vm.DB, tx); err == nil {
+	if _, err = tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vs, tx); err == nil {
 		t.Fatal("should have failed verification because a sig is invalid")
 	}
 }
@@ -224,12 +236,12 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 // its validator set doesn't exist
 func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	tx, err := vm.newCreateChainTx(
@@ -244,56 +256,28 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	vs := newVersionedState(
+		vm.internalState,
+		vm.internalState.CurrentStakerChainState(),
+		vm.internalState.PendingStakerChainState(),
+	)
+
 	tx.UnsignedTx.(*UnsignedCreateChainTx).SubnetID = ids.GenerateTestID()
-	if _, err := tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vm.DB, tx); err == nil {
+	if _, err := tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vs, tx); err == nil {
 		t.Fatal("should have failed because subent doesn't exist")
-	}
-}
-
-func TestCreateChainTxAlreadyExists(t *testing.T) {
-	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
-	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-		vm.Ctx.Lock.Unlock()
-	}()
-
-	// create a tx
-	tx, err := vm.newCreateChainTx(
-		testSubnet1.ID(),
-		nil,
-		avm.ID,
-		nil,
-		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// put the chain in existing chain list
-	if err := vm.putChains(vm.DB, []*Tx{tx}); err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vm.DB, tx)
-	if err == nil {
-		t.Fatalf("should have failed because the chain already exists")
 	}
 }
 
 // Ensure valid tx passes semanticVerify
 func TestCreateChainTxValid(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	// create a valid tx
@@ -310,7 +294,13 @@ func TestCreateChainTxValid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vm.DB, tx)
+	vs := newVersionedState(
+		vm.internalState,
+		vm.internalState.CurrentStakerChainState(),
+		vm.internalState.PendingStakerChainState(),
+	)
+
+	_, err = tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vs, tx)
 	if err != nil {
 		t.Fatalf("expected tx to pass verification but got error: %v", err)
 	}

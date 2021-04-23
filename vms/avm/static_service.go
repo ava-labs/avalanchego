@@ -59,25 +59,9 @@ type BuildGenesisReply struct {
 // BuildGenesis returns the UTXOs such that at least one address in [args.Addresses] is
 // referenced in the UTXO.
 func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
-	errs := wrappers.Errs{}
-
-	c := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
-	manager := codec.NewManager(math.MaxUint32)
-	errs.Add(
-		c.RegisterType(&BaseTx{}),
-		c.RegisterType(&CreateAssetTx{}),
-		c.RegisterType(&OperationTx{}),
-		c.RegisterType(&ImportTx{}),
-		c.RegisterType(&ExportTx{}),
-		c.RegisterType(&secp256k1fx.TransferInput{}),
-		c.RegisterType(&secp256k1fx.MintOutput{}),
-		c.RegisterType(&secp256k1fx.TransferOutput{}),
-		c.RegisterType(&secp256k1fx.MintOperation{}),
-		c.RegisterType(&secp256k1fx.Credential{}),
-		manager.RegisterCodec(codecVersion, c),
-	)
-	if errs.Errored() {
-		return errs.Err
+	manager, err := staticCodec()
+	if err != nil {
+		return err
 	}
 
 	g := Genesis{}
@@ -186,4 +170,25 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 	reply.Encoding = args.Encoding
 	return nil
+}
+
+func staticCodec() (codec.Manager, error) {
+	c := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
+	manager := codec.NewManager(math.MaxUint32)
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		c.RegisterType(&BaseTx{}),
+		c.RegisterType(&CreateAssetTx{}),
+		c.RegisterType(&OperationTx{}),
+		c.RegisterType(&ImportTx{}),
+		c.RegisterType(&ExportTx{}),
+		c.RegisterType(&secp256k1fx.TransferInput{}),
+		c.RegisterType(&secp256k1fx.MintOutput{}),
+		c.RegisterType(&secp256k1fx.TransferOutput{}),
+		c.RegisterType(&secp256k1fx.MintOperation{}),
+		c.RegisterType(&secp256k1fx.Credential{}),
+		manager.RegisterCodec(codecVersion, c),
+	)
+	return manager, errs.Err
 }

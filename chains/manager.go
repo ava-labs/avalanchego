@@ -207,7 +207,7 @@ func (m *manager) CreateChain(chain ChainParameters) {
 // Create a chain, this is only called from the P-chain thread, except for
 // creating the P-chain.
 func (m *manager) ForceCreateChain(chainParams ChainParameters) {
-	if !m.WhitelistedSubnets.Contains(chainParams.SubnetID) {
+	if chainParams.SubnetID != constants.PrimaryNetworkID && !m.WhitelistedSubnets.Contains(chainParams.SubnetID) {
 		m.Log.Debug("Skipped creating non-whitelisted chain:\n"+
 			"    ID: %s\n"+
 			"    VMID:%s",
@@ -469,11 +469,11 @@ func (m *manager) createAvalancheChain(
 	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db)
 	txBootstrappingDB := prefixdb.New([]byte("tx_bs"), db)
 
-	vtxBlocker, err := queue.New(vertexBootstrappingDB)
+	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, consensusParams.Namespace+"_vtx", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	txBlocker, err := queue.New(txBootstrappingDB)
+	txBlocker, err := queue.New(txBootstrappingDB, consensusParams.Namespace+"_tx", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
@@ -598,7 +598,7 @@ func (m *manager) createSnowmanChain(
 	db := dbManager.Current()
 	bootstrappingDB := prefixdb.New([]byte("bs"), db)
 
-	blocked, err := queue.New(bootstrappingDB)
+	blocked, err := queue.NewWithMissing(bootstrappingDB, consensusParams.Namespace+"_block", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
