@@ -4,76 +4,33 @@
 package platformvm
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/database/manager/mocks"
+	managermocks "github.com/ava-labs/avalanchego/database/manager/mocks"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/components/core"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
-// Test that validator uptimes are correctly migrated from
-// database version 1.0.0 to database version 1.3.3
-func TestMigrateUptime_100_133(t *testing.T) {
-	now := time.Now()
-
-	// A validator whose uptime we migrate from an old database version
-	validator1NodeID := ids.GenerateTestShortID()
-	validator1Tx := &rewardTx{
-		Reward: 1,
-		Tx: Tx{
-			UnsignedTx: &UnsignedAddValidatorTx{
-				Validator: Validator{
-					NodeID: validator1NodeID,
-					Start:  uint64(now.Add(-1 * time.Minute).Unix()),
-					End:    uint64(now.Add(3 * defaultMinStakingDuration).Unix()),
-				},
-				RewardsOwner: &secp256k1fx.OutputOwners{},
-			},
-		},
-	}
-	validator1TxBytes, err := Codec.Marshal(codecVersion, validator1Tx)
-	assert.NoError(t, err)
-	assert.NotNil(t, validator1TxBytes)
-	validator1Uptime := validatorUptime{
-		UpDuration:  12345,
-		LastUpdated: uint64(now.Add(-1 * time.Minute).Unix()),
-	}
-
-	// A validator whose uptime we migrate from an old database version
-	validator2NodeID := ids.GenerateTestShortID()
-	validator2Tx := &rewardTx{
-		Reward: 2,
-		Tx: Tx{
-			UnsignedTx: &UnsignedAddValidatorTx{
-				Validator: Validator{
-					NodeID: validator2NodeID,
-					Start:  uint64(now.Add(-5 * time.Minute).Unix()),
-					End:    uint64(now.Add(2 * defaultMinStakingDuration).Unix()),
-				},
-				RewardsOwner: &secp256k1fx.OutputOwners{},
-			},
-		},
-	}
-	validator2TxBytes, err := Codec.Marshal(codecVersion, validator2Tx)
-	assert.NoError(t, err)
-	assert.NotNil(t, validator2TxBytes)
-	validator2Uptime := validatorUptime{
-		UpDuration:  54321,
-		LastUpdated: uint64(now.Add(-2 * time.Minute).Unix()),
-	}
-
+// // Test that the migrater migrates a validator's uptime
+func TestMigrateUptime(t *testing.T) {
 	previousDB := memdb.New()
+	defer previousDB.Close()
 	currentDB := memdb.New()
-	chainDBManager := &mocks.Manager{}
+	defer previousDB.Close()
+	chainDBManager := &managermocks.Manager{}
 	chainDBManager.On("Previous").Return(
 		&manager.VersionedDatabase{
 			Database: previousDB,
@@ -87,17 +44,13 @@ func TestMigrateUptime_100_133(t *testing.T) {
 			Version:  version.NewDefaultVersion(1, 3, 3),
 		},
 	)
-	vm := &VM{
-		SnowmanVM:          &core.SnowmanVM{},
-		minValidatorStake:  defaultMinValidatorStake,
-		maxValidatorStake:  defaultMaxValidatorStake,
-		minDelegatorStake:  defaultMinDelegatorStake,
-		minStakeDuration:   defaultMinStakingDuration,
-		maxStakeDuration:   defaultMaxStakingDuration,
-		stakeMintingPeriod: defaultMaxStakingDuration,
-	}
+	chainDBManager.On("Close").Return(nil)
+
+	// Setup the VM
+	vm := &VM{}
+	now := time.Now()
 	vm.clock.Set(now)
-	vm.vdrMgr = validators.NewManager()
+	vm.Validators = validators.NewManager()
 	ctx := defaultContext()
 	ctx.Lock.Lock()
 	defer func() {
@@ -108,41 +61,107 @@ func TestMigrateUptime_100_133(t *testing.T) {
 	}()
 	msgChan := make(chan common.Message, 1)
 	_, genesisBytes := defaultGenesis()
+	vm.StakeMintingPeriod = 365 * 24 * time.Hour
 	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
-	// Mark that in an old database version, validator 1 and validator 2 have uptimes
-	// associated with them
-	assert.NoError(t, vm.setUptime(previousDB, validator1NodeID, &validator1Uptime))
-	assert.NoError(t, vm.setUptime(previousDB, validator2NodeID, &validator2Uptime))
-
-	// Mark these validators as current validators
-	assert.NoError(t, vm.addStaker(vm.DB, constants.PrimaryNetworkID, validator1Tx))
-	assert.NoError(t, vm.addStaker(vm.DB, constants.PrimaryNetworkID, validator2Tx))
-
-	assert.NoError(t, vm.Bootstrapping())
-	assert.NoError(t, vm.Bootstrapped()) // Calling bootstrapped triggers the migration
-
-	// Check that uptimes were migrated correctly
-	{
-		uptime, err := vm.uptime(vm.DB, validator1NodeID)
-		assert.NoError(t, err)
-		// expected up duration is old up duration plus the amount of time we were "offline" (the VM's bootstrap time
-		// minus the old "last updated" time
-		durationOffline := vm.bootstrappedTime.Sub(time.Unix(int64(validator1Uptime.LastUpdated), 0))
-		expectedUpDuration := validator1Uptime.UpDuration + uint64(durationOffline.Seconds())
-		assert.EqualValues(t, uptime.UpDuration, expectedUpDuration)
-		assert.EqualValues(t, uptime.LastUpdated, uint64(now.Unix()))
+	// Insert the pre-upgrade validators into the pre-upgrade database
+	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
+	stopDB := prefixdb.NewNested(stopPrefix, previousDB)
+	defer stopDB.Close()
+	uptimeDB := prefixdb.NewNested([]byte(uptimeDBPrefix), previousDB)
+	defer uptimeDB.Close()
+	nodeID := ids.GenerateTestShortID()
+	tx := Tx{
+		&UnsignedAddValidatorTx{
+			BaseTx: BaseTx{},
+			Validator: Validator{
+				NodeID: nodeID,
+			},
+			Stake:        nil,
+			RewardsOwner: &secp256k1fx.OutputOwners{},
+		},
+		nil, // credentials
 	}
-	{
-		uptime, err := vm.uptime(vm.DB, validator2NodeID)
-		assert.NoError(t, err)
-		// expected up duration is old up duration plus the amount of time we were "offline" (the VM's bootstrap time
-		// minus the old "last updated" time
-		expectedUpDuration := validator2Uptime.UpDuration + uint64(vm.bootstrappedTime.Sub(time.Unix(int64(validator2Uptime.LastUpdated), 0)).Seconds())
-		assert.EqualValues(t, uptime.UpDuration, expectedUpDuration)
-		assert.EqualValues(t, uptime.LastUpdated, uint64(now.Unix()))
+	err := tx.Sign(vm.codec, nil)
+	assert.NoError(t, err)
+	rewardTx := rewardTxV100{
+		Reward: 1337,
+		Tx:     tx,
 	}
+	txBytes, err := vm.codec.Marshal(codecVersion, rewardTx)
+	assert.NoError(t, err)
+	err = stopDB.Put(utils.RandomBytes(32), txBytes)
+	assert.NoError(t, err)
 
+	oldUptime := &uptimeV100{
+		UpDuration:  1337,
+		LastUpdated: uint64(now.Add(-1 * time.Minute).Unix()),
+	}
+	uptimeBytes, err := vm.codec.Marshal(codecVersion, oldUptime)
+	assert.NoError(t, err)
+	err = uptimeDB.Put(nodeID.Bytes(), uptimeBytes)
+	assert.NoError(t, err)
+
+	// Case 1: Validator is in database v1.0.0 but not v1.3.3
+	// Set up mocked VM state
+	mockCurrentStakerChainState := &mockCurrentStakerChainState{}
+	mockCurrentStakerChainState.Test(t)
+	mockCurrentStakerChainState.On("GetStaker", mock.Anything).Return(nil, uint64(0), database.ErrNotFound).Once()
+	mockInternalState := &MockInternalState{}
+	mockInternalState.Test(t)
+	mockInternalState.On("IsMigrated").Return(false, nil)
+	mockInternalState.On("SetMigrated").Return(nil)
+	mockInternalState.On("CurrentStakerChainState").Return(mockCurrentStakerChainState)
+	mockInternalState.On("Commit").Return(nil)
+	mockInternalState.On("Close").Return(nil)
+	vm.internalState = mockInternalState
+
+	// Do the migration
+	assert.NoError(t, vm.migrateUptimes())
+	// Uptime shouldn't have migrated because validator is not in current validator set
+	mockInternalState.AssertNumberOfCalls(t, "IsMigrated", 1)
+	mockInternalState.AssertNumberOfCalls(t, "SetMigrated", 1)
+	mockInternalState.AssertNotCalled(t, "SetUptime")
+	mockCurrentStakerChainState.AssertNumberOfCalls(t, "GetStaker", 1)
+
+	// Case 2: Validator is in database v1.0.0 and v1.3.3,
+	// and the lastUpdated value in the database v1.0.0 <= now
+	// Should update lastUpdated and upDuration
+	// Add the node to the current validator set
+	mockCurrentStakerChainState.On("GetStaker", tx.ID()).Return(nil, uint64(0), nil)
+	mockInternalState.On("CurrentStakerChainState").Return(mockCurrentStakerChainState)
+
+	expectedDurationOffline := now.Sub(time.Unix(int64(oldUptime.LastUpdated), 0))
+	expectedUpDuration := oldUptime.UpDuration*uint64(time.Second) + uint64(expectedDurationOffline.Nanoseconds())
+	mockInternalState.On("SetUptime", nodeID, mock.AnythingOfType("time.Duration"), mock.AnythingOfType("time.Time")).Run(
+		func(args mock.Arguments) {
+			// Make sure the expected args are being passed in
+			assert.EqualValues(t, expectedUpDuration, args[1])
+			assert.EqualValues(t, now, args[2])
+		},
+	).Return(nil).Once()
+
+	// Do the migration
+	assert.NoError(t, vm.migrateUptimes())
+	mockInternalState.AssertNumberOfCalls(t, "IsMigrated", 2)
+	mockInternalState.AssertNumberOfCalls(t, "SetMigrated", 2)
+	mockCurrentStakerChainState.AssertNumberOfCalls(t, "GetStaker", 2)
+	mockInternalState.AssertNumberOfCalls(t, "SetUptime", 1)
+
+	// Case 3: Validator is in database v1.0.0 and v1.3.3,
+	// and the lastUpdated value in the database v1.0.0 > now
+	vm.clock.Set(time.Unix(int64(oldUptime.LastUpdated-1), 0)) // Set VM's clock to before lastUpdated in old database
+	mockInternalState.On("SetUptime", nodeID, mock.AnythingOfType("time.Duration"), mock.AnythingOfType("time.Time")).Run(
+		func(args mock.Arguments) {
+			// Make sure the expected args are being passed in
+			// Should be migrating the old uptime from seconds to nanoseconds but otherwise unchanged
+			// Should keep lastUpdated the same as in database v1.0.0
+			assert.EqualValues(t, oldUptime.UpDuration*uint64(time.Second), args[1])
+			assert.EqualValues(t, time.Unix(int64(oldUptime.LastUpdated), 0), args[2])
+		},
+	).Return(nil).Once()
+	// Do the migration
+	assert.NoError(t, vm.migrateUptimes())
 }
