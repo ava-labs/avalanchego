@@ -93,6 +93,7 @@ type Config struct {
 	KeystoreAPIEnabled bool
 	MetricsAPIEnabled  bool
 	HealthAPIEnabled   bool
+	IndexAPIEnabled    bool
 
 	// Logging configuration
 	LoggingConfig logging.Config
@@ -137,6 +138,8 @@ type Config struct {
 
 	// Coreth
 	CorethConfig string
+
+	IndexAllowIncomplete bool
 
 	// Should Bootstrap be retried
 	RetryBootstrap bool

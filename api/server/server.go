@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package api
+package server
 
 import (
 	"context"
@@ -18,7 +18,6 @@ import (
 
 	"github.com/rs/cors"
 
-	"github.com/ava-labs/avalanchego/api/auth"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -33,6 +32,10 @@ var (
 	errUnknownLockOption = errors.New("invalid lock options")
 )
 
+type RouteAdder interface {
+	AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string, loggingWriter io.Writer) error
+}
+
 // Server maintains the HTTP router
 type Server struct {
 	// log this server writes to
@@ -45,9 +48,6 @@ type Server struct {
 	handler http.Handler
 	// Listens for HTTP traffic on this address
 	listenAddress string
-	// Handles authorization. Must be non-nil after initialization, even if
-	// token authorization is off.
-	auth *auth.Auth
 
 	// http server
 	srv *http.Server
@@ -59,37 +59,24 @@ func (s *Server) Initialize(
 	factory logging.Factory,
 	host string,
 	port uint16,
-	authEnabled bool,
-	authPassword string,
 	allowedOrigins []string,
-) error {
+	wrappers ...Wrapper,
+) {
 	s.log = log
 	s.factory = factory
 	s.listenAddress = fmt.Sprintf("%s:%d", host, port)
 	s.router = newRouter()
 
-	a, err := auth.New(authEnabled, authPassword)
-	if err != nil {
-		return err
-	}
-	s.auth = a
-
 	s.log.Info("API created with allowed origins: %v", allowedOrigins)
 	corsWrapper := cors.New(cors.Options{
-		AllowedOrigins: allowedOrigins,
+		AllowedOrigins:   allowedOrigins,
+		AllowCredentials: true,
 	})
-	corsHandler := corsWrapper.Handler(s.router)
-	s.handler = s.auth.WrapHandler(corsHandler)
+	s.handler = corsWrapper.Handler(s.router)
 
-	if !authEnabled {
-		return nil
+	for _, wrapper := range wrappers {
+		s.handler = wrapper.WrapHandler(s.handler)
 	}
-
-	// only create auth service if token authorization is required
-	s.log.Info("API authorization is enabled. Auth tokens must be passed in the header of API requests, except requests to the auth service.")
-	authService := auth.NewService(s.log, s.auth)
-	return s.AddRoute(authService, &sync.RWMutex{}, auth.Endpoint, "", s.log)
-
 }
 
 // Dispatch starts the API server
@@ -113,25 +100,34 @@ func (s *Server) DispatchTLS(certFile, keyFile string) error {
 	return http.ServeTLS(listener, s.handler, certFile, keyFile)
 }
 
-// RegisterChain registers the API endpoints associated with this chain That is,
-// add <route, handler> pairs to server so that http calls can be made to the vm
-func (s *Server) RegisterChain(chainName string, ctx *snow.Context, vmIntf interface{}) {
-	vm, ok := vmIntf.(common.VM)
-	if !ok {
-		return
-	}
+// RegisterChain registers the API endpoints associated with this chain. That is,
+// add <route, handler> pairs to server so that API calls can be made to the VM.
+// This method runs in a goroutine to avoid a deadlock in the event that the caller
+// holds the engine's context lock. Namely, this could happen when the P-Chain is
+// creating a new chain and holds the P-Chain's lock when this function is held,
+// and at the same time the server's lock is held due to an API call and is trying
+// to grab the P-Chain's lock.
+func (s *Server) RegisterChain(chainName string, ctx *snow.Context, engine common.Engine) {
+	go s.registerChain(chainName, ctx, engine)
+}
+
+func (s *Server) registerChain(chainName string, ctx *snow.Context, engine common.Engine) {
+	var (
+		handlers map[string]*common.HTTPHandler
+		err      error
+	)
 
 	ctx.Lock.Lock()
-	handlers, err := vm.CreateHandlers()
+	handlers, err = engine.GetVM().CreateHandlers()
 	ctx.Lock.Unlock()
 	if err != nil {
-		s.log.Error("Failed to create %s handlers: %s", chainName, err)
+		s.log.Error("failed to create %s handlers: %s", chainName, err)
 		return
 	}
 
 	httpLogger, err := s.factory.MakeChain(chainName, "http")
 	if err != nil {
-		s.log.Error("Failed to create new http logger: %s", err)
+		s.log.Error("failed to create new http logger: %s", err)
 		return
 	}
 
@@ -140,7 +136,7 @@ func (s *Server) RegisterChain(chainName string, ctx *snow.Context, vmIntf inter
 	defaultEndpoint := "bc/" + ctx.ChainID.String()
 
 	// Register each endpoint
-	for extension, service := range handlers {
+	for extension, handler := range handlers {
 		// Validate that the route being added is valid
 		// e.g. "/foo" and "" are ok but "\n" is not
 		_, err := url.ParseRequestURI(extension)
@@ -148,7 +144,7 @@ func (s *Server) RegisterChain(chainName string, ctx *snow.Context, vmIntf inter
 			s.log.Error("could not add route to chain's API handler because route is malformed: %s", err)
 			continue
 		}
-		if err := s.AddChainRoute(service, ctx, defaultEndpoint, extension, httpLogger); err != nil {
+		if err := s.AddChainRoute(handler, ctx, defaultEndpoint, extension, httpLogger); err != nil {
 			s.log.Error("error adding route: %s", err)
 		}
 	}

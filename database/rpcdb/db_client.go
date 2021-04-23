@@ -261,8 +261,12 @@ func (it *iterator) Value() []byte { return it.value }
 
 // Release frees any resources held by the iterator
 func (it *iterator) Release() {
-	_, err := it.db.client.IteratorRelease(context.Background(), &rpcdbproto.IteratorReleaseRequest{
+	resp, err := it.db.client.IteratorRelease(context.Background(), &rpcdbproto.IteratorReleaseRequest{
 		Id: it.id,
 	})
-	it.errs.Add(err)
+	if err != nil {
+		it.errs.Add(err)
+	} else {
+		it.errs.Add(errCodeToError[resp.Err])
+	}
 }
