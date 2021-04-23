@@ -181,40 +181,37 @@ func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (
 // Assumes the node's plugin path is [buildDir]/avalanchego-preupgrade/plugins
 // Assumes the binary can be served as a plugin
 func (nm *nodeManager) preDBUpgradeNode(v *viper.Viper) (*nodeProcess, error) {
-	argsMap := v.AllSettings()
-	delete(argsMap, config.FetchOnlyKey)
-	argsMap[config.PluginModeKey] = true
-	argsMap[config.PluginDirKey] = filepath.Join(nm.buildDirPath, "avalanchego-preupgrade", "plugins")
-	args := []string{}
-	for k, v := range argsMap { // Pass args to subprocess
-		args = append(args, formatArgs(k, v))
-	}
+	args := make([]string, len(os.Args)-1)
+	copy(args, os.Args[1:])
+	args = append(
+		args,
+		fmt.Sprintf("--%s=%s", config.PluginModeKey, "true"),
+		fmt.Sprintf("--%s=%s", config.PluginDirKey, filepath.Join(nm.buildDirPath, "avalanchego-preupgrade", "plugins")),
+	)
+
 	binaryPath := nm.preupgradeNodeVersionPath()
 	return nm.newNode(binaryPath, args, true)
 }
 
 // Run the latest node version
 func (nm *nodeManager) latestVersionNodeFetchOnly(v *viper.Viper, rootConfig node.Config) (*nodeProcess, error) {
-	argsMap := v.AllSettings()
-	// Tell this node to run in fetch only mode and to bootstrap only from the local node
-	argsMap[config.BootstrapIPsKey] = fmt.Sprintf("127.0.0.1:%d", int(rootConfig.StakingIP.Port))
-	argsMap[config.BootstrapIDsKey] = fmt.Sprintf("%s%s", constants.NodeIDPrefix, rootConfig.NodeID)
-	argsMap[config.FetchOnlyKey] = true
-	argsMap[config.StakingPortKey] = 0   // Tell node to use any free staking port
-	argsMap[config.HTTPPortKey] = 0      // Tell node to use any free HTTP port
-	argsMap[config.PluginModeKey] = true // Run the node as a plugin
-	argsMap[config.LogsDirKey] = filepath.Join(rootConfig.LoggingConfig.Directory, "fetch-only")
-	// Make sure the node doesn't exit if the local node it's bootsrapping from doesn't respond to some messages
-	argsMap[config.RetryBootstrapKey] = true
-	argsMap[config.RetryBootstrapMaxAttemptsKey] = 1000
-	// It's not expected that this node would bench the other node on this
-	// machine, which it is bootstrapping from, but set this to be sure
-	argsMap[config.BenchlistMinFailingDurationKey] = "1000h"
+	args := make([]string, len(os.Args)-1)
+	copy(args, os.Args[1:])
+	args = append(
+		args,
+		// Tell this node to run in fetch only mode and to bootstrap only from the local node
+		fmt.Sprintf("--%s=127.0.0.1:%d", config.BootstrapIPsKey, int(rootConfig.StakingIP.Port)),
+		fmt.Sprintf("--%s=%s%s", config.BootstrapIDsKey, constants.NodeIDPrefix, rootConfig.NodeID),
+		fmt.Sprintf("--%s=%s", config.FetchOnlyKey, "true"),
+		fmt.Sprintf("--%s=%d", config.StakingPortKey, 0),
+		fmt.Sprintf("--%s=%d", config.HTTPPortKey, 0),
+		fmt.Sprintf("--%s=%s", config.PluginModeKey, "true"),
+		fmt.Sprintf("--%s=%s", config.LogsDirKey, filepath.Join(rootConfig.LoggingConfig.Directory, "fetch-only")),
+		fmt.Sprintf("--%s=%s", config.RetryBootstrapKey, "true"),
+		fmt.Sprintf("--%s=%d", config.RetryBootstrapMaxAttemptsKey, 1000),
+		fmt.Sprintf("--%s=%s", config.BenchlistMinFailingDurationKey, "1000h"),
+	)
 
-	var args []string
-	for k, v := range argsMap {
-		args = append(args, formatArgs(k, v))
-	}
 	binaryPath := nm.latestNodeVersionPath()
 	return nm.newNode(binaryPath, args, false)
 }
@@ -224,13 +221,15 @@ func (nm *nodeManager) latestVersionNodeFetchOnly(v *viper.Viper, rootConfig nod
 // Returns the node's exit code.
 func (nm *nodeManager) runNormal(v *viper.Viper) (int, error) {
 	nm.log.Info("starting latest node version")
-	argsMap := v.AllSettings()
-	argsMap[config.FetchOnlyKey] = false // don't run in fetch only mode
-	argsMap[config.PluginModeKey] = true // run as plugin
-	args := []string{}
-	for k, v := range argsMap {
-		args = append(args, formatArgs(k, v))
-	}
+
+	args := make([]string, len(os.Args)-1)
+	copy(args, os.Args[1:])
+	args = append(
+		args,
+		fmt.Sprintf("--%s=false", config.FetchOnlyKey), // don't run in fetch only mode
+		fmt.Sprintf("--%s=true", config.PluginModeKey), // run as plugin
+	)
+
 	binaryPath := nm.latestNodeVersionPath()
 	node, err := nm.newNode(binaryPath, args, true)
 	if err != nil {
