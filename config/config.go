@@ -57,8 +57,6 @@ var (
 	defaultStakingCertPath = filepath.Join(defaultDataDir, "staking", "staker.crt")
 	// Places to look for the build directory
 	defaultBuildDirs = []string{}
-	// GitCommit should be optionally set at compile time.
-	GitCommit string
 )
 
 func init() {
@@ -833,10 +831,10 @@ func initBootstrapPeers(v *viper.Viper, config *node.Config) error {
 	return nil
 }
 
-func GetConfig() (node.Config, *viper.Viper, error) {
+func GetConfig(commit string) (node.Config, *viper.Viper, string, bool, error) {
 	v, err := getViper()
 	if err != nil {
-		return node.Config{}, nil, err
+		return node.Config{}, nil, "", false, err
 	}
 
 	if v.GetBool(versionKey) {
@@ -847,7 +845,7 @@ func GetConfig() (node.Config, *viper.Viper, error) {
 
 		networkID, err := constants.NetworkID(v.GetString(networkNameKey))
 		if err != nil {
-			return node.Config{}, nil, err
+			return node.Config{}, nil, "", false, err
 		}
 		networkGeneration := constants.NetworkName(networkID)
 		if networkID == constants.MainnetID {
@@ -860,18 +858,17 @@ func GetConfig() (node.Config, *viper.Viper, error) {
 		format += ", database=%s"
 		args = append(args, versionconfig.CurrentDBVersion)
 
-		if GitCommit != "" {
+		if commit != "" {
 			format += ", commit=%s"
-			args = append(args, GitCommit)
+			args = append(args, commit)
 		}
 
 		format += "]\n"
 
-		fmt.Printf(format, args...)
-		os.Exit(0)
+		return node.Config{}, v, fmt.Sprintf(format, args...), true, nil
 	}
 	config, err := getConfigFromViper(v)
-	return config, v, err
+	return config, v, "", false, err
 }
 
 // portFinder ensures the same port is not given twice

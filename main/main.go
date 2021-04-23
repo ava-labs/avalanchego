@@ -24,15 +24,25 @@ const (
 		`          \/           \/          \/     \/     \/     \/     \/`
 )
 
+var (
+	// GitCommit should be optionally set at compile time.
+	GitCommit string
+)
+
 // main is the entry point to AvalancheGo.
 func main() {
 	fmt.Println(header)
 
 	// Get the config
-	rootConfig, v, err := config.GetConfig()
+	rootConfig, v, version, displayVersion, err := config.GetConfig(GitCommit)
 	if err != nil {
 		fmt.Printf("couldn't get config: %s", err)
 		os.Exit(1)
+	}
+
+	if displayVersion {
+		fmt.Print(version)
+		os.Exit(0)
 	}
 
 	// Set the log directory for this process by adding a subdirectory

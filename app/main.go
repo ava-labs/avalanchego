@@ -19,6 +19,9 @@ import (
 
 var (
 	exitCode = 0
+
+	// GitCommit should be optionally set at compile time.
+	GitCommit string
 )
 
 // main runs an AvalancheGo node.
@@ -29,10 +32,16 @@ func main() {
 		os.Exit(exitCode)
 	}()
 
-	c, _, err := config.GetConfig()
+	c, _, version, displayVersion, err := config.GetConfig(GitCommit)
 	if err != nil {
 		exitCode = 1
 		fmt.Printf("couldn't get node config: %s", err)
+		return
+	}
+
+	if displayVersion {
+		fmt.Print(version)
+		exitCode = 0
 		return
 	}
 
