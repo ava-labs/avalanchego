@@ -66,11 +66,10 @@ func init() {
 		defaultBuildDirs = append(defaultBuildDirs, filepath.Dir(folderPath))
 	}
 	defaultBuildDirs = append(defaultBuildDirs,
-		filepath.Join(".", "build"),
-		filepath.Join("/", "usr", "local", "lib", constants.AppName, "build"),
-		filepath.Join(defaultDataDir, "build"),
+		".",
+		filepath.Join("/", "usr", "local", "lib", constants.AppName),
+		defaultDataDir,
 	)
-
 }
 
 var (
