@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -127,9 +126,6 @@ type Node struct {
 
 	// This node's configuration
 	Config *Config
-
-	// channel for closing the node
-	nodeCloser chan<- os.Signal
 
 	// ensures that we only close the node once.
 	shutdownOnce sync.Once
@@ -978,7 +974,7 @@ func (n *Node) shutdown() {
 	if err := n.indexer.Close(); err != nil {
 		n.Log.Debug("error closing tx indexer: %w", err)
 	}
-	utils.ClearSignals(n.nodeCloser)
+
 	// Make sure all plugin subprocesses are killed
 	n.Log.Info("cleaning up plugin subprocesses")
 	plugin.CleanupClients()

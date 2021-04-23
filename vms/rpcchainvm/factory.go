@@ -38,15 +38,16 @@ func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,
 		},
-		// We kill this client by calling kill() when the chain running this VM shuts down.
-		// However, there are some cases where the VM's Shutdown method is not called.
-		// Namely, if:
+		// We kill this client by calling kill() when the chain running this VM
+		// shuts down. However, there are some cases where the VM's Shutdown
+		// method is not called. Namely, if:
 		// 1) The node shuts down after the client is created but before the
 		//    chain is registered with the message router.
-		// 2) The chain doesn't handle a shutdown message before the node times out on the
-		//    chain's shutdown and dies, leaving the shutdown message unhandled.
-		// We set managed to true so that we can call plugin.CleanupClients on node shutdown
-		// to ensure every plugin subprocess is killed.
+		// 2) The chain doesn't handle a shutdown message before the node times
+		//    out on the chain's shutdown and dies, leaving the shutdown message
+		//    unhandled.
+		// We set managed to true so that we can call plugin.CleanupClients on
+		// node shutdown to ensure every plugin subprocess is killed.
 		Managed: true,
 	}
 	if ctx != nil {
