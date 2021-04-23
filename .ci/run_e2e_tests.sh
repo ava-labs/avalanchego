@@ -4,7 +4,7 @@ SRC_PATH=$(dirname "${SCRIPTS_PATH}")
 # Early auth to avoid limit rating
 if [[ -z ${DOCKER_USERNAME} ]]; then
     echo "Skipping E2E Tests for untrusted build"
-    #exit 0
+    exit 0
 else
     echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
 fi
