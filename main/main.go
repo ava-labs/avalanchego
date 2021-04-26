@@ -34,7 +34,7 @@ func main() {
 	fmt.Println(header)
 
 	// Get the config
-	rootConfig, v, version, displayVersion, err := config.GetConfig(GitCommit)
+	rootConfig, version, displayVersion, err := config.GetConfig(GitCommit)
 	if err != nil {
 		fmt.Printf("couldn't get config: %s", err)
 		os.Exit(1)
@@ -72,7 +72,7 @@ func main() {
 	)
 
 	// Migrate the database if necessary
-	migrationManager := newMigrationManager(nodeManager, v, rootConfig, log)
+	migrationManager := newMigrationManager(nodeManager, rootConfig, log)
 	if err := migrationManager.migrate(); err != nil {
 		log.Error("error while running migration: %s", err)
 		nodeManager.shutdown()
@@ -81,7 +81,7 @@ func main() {
 
 	// Run normally
 	log.Info("starting to run node in normal execution mode")
-	exitCode, err := nodeManager.runNormal(v)
+	exitCode, err := nodeManager.runNormal()
 	log.Debug("node manager returned exit code %s, error %v", exitCode, err)
 	nodeManager.shutdown() // make sure all the nodes are stopped
 	os.Exit(exitCode)

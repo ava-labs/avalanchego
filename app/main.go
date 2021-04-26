@@ -18,8 +18,6 @@ import (
 )
 
 var (
-	exitCode = 0
-
 	// GitCommit should be optionally set at compile time.
 	GitCommit string
 )
@@ -28,46 +26,30 @@ var (
 // If specified in the config, serves a hashicorp plugin that can be consumed by the daemon
 // (see avalanchego/main).
 func main() {
-	defer func() {
-		os.Exit(exitCode)
-	}()
-
-	c, _, version, displayVersion, err := config.GetConfig(GitCommit)
+	c, version, displayVersion, err := config.GetConfig(GitCommit)
 	if err != nil {
-		exitCode = 1
-		fmt.Printf("couldn't get node config: %s", err)
-		return
+		fmt.Printf("couldn't get node config: %s\n", err)
+		os.Exit(1)
 	}
 
 	if displayVersion {
 		fmt.Print(version)
-		exitCode = 0
-		return
+		os.Exit(0)
 	}
 
 	// Set the data directory permissions to be read write.
 	if err := perms.ChmodR(c.DBPath, true, perms.ReadWriteExecute); err != nil {
-		exitCode = 1
 		fmt.Printf("failed to restrict the permissions of the database directory with error %s\n", err)
-		return
+		os.Exit(1)
 	}
 	if err := perms.ChmodR(c.LoggingConfig.Directory, true, perms.ReadWriteExecute); err != nil {
-		exitCode = 1
 		fmt.Printf("failed to restrict the permissions of the log directory with error %s\n", err)
-		return
+		os.Exit(1)
 	}
 
 	app := process.NewApp(c) // Create node wrapper
 
 	if c.PluginMode { // Serve as a plugin
-
-		// ignore interrupt signals in plugin mode
-		_ = utils.HandleSignals(
-			func(os.Signal) {
-			},
-			syscall.SIGINT, syscall.SIGTERM,
-		)
-
 		plugin.Serve(&plugin.ServeConfig{
 			HandshakeConfig: appPlugin.Handshake,
 			Plugins: map[string]plugin.Plugin{
@@ -78,15 +60,16 @@ func main() {
 				Level: hclog.Error,
 			}),
 		})
-		return
+		return // TODO what should get returned here?
 	}
 
 	_ = utils.HandleSignals(
 		func(os.Signal) {
 			app.Stop()
-			os.Exit(exitCode)
+			os.Exit(0) // TODO what should get returned here?
 		},
 		syscall.SIGINT, syscall.SIGTERM,
 	)
-	exitCode = app.Start() // Start the node
+	exitCode := app.Start() // Start the node
+	os.Exit(exitCode)
 }

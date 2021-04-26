@@ -8,22 +8,19 @@ import (
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/spf13/viper"
 )
 
 type migrationManager struct {
 	binaryManager *nodeManager
 	rootConfig    node.Config
 	log           logging.Logger
-	v             *viper.Viper
 }
 
-func newMigrationManager(binaryManager *nodeManager, v *viper.Viper, nConfig node.Config, log logging.Logger) *migrationManager {
+func newMigrationManager(binaryManager *nodeManager, rootConfig node.Config, log logging.Logger) *migrationManager {
 	return &migrationManager{
 		binaryManager: binaryManager,
-		rootConfig:    nConfig,
+		rootConfig:    rootConfig,
 		log:           log,
-		v:             v,
 	}
 }
 
@@ -74,7 +71,7 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 // Some configuration flags are modified before being passed into the 2 nodes.
 func (m *migrationManager) runMigration() error {
 	m.log.Info("starting database migration")
-	preDBUpgradeNode, err := m.binaryManager.preDBUpgradeNode(m.v)
+	preDBUpgradeNode, err := m.binaryManager.preDBUpgradeNode()
 	if err != nil {
 		return fmt.Errorf("couldn't create pre-upgrade node during migration: %w", err)
 	}
@@ -87,7 +84,7 @@ func (m *migrationManager) runMigration() error {
 	}()
 
 	m.log.Info("starting latest node version")
-	latestVersion, err := m.binaryManager.latestVersionNodeFetchOnly(m.v, m.rootConfig)
+	latestVersion, err := m.binaryManager.latestVersionNodeFetchOnly(m.rootConfig)
 	if err != nil {
 		return fmt.Errorf("couldn't create latest version during migration: %w", err)
 	}

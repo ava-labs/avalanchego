@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
-	"github.com/spf13/viper"
 )
 
 // nodeProcess wraps a node client
@@ -180,7 +178,7 @@ func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (
 // Assumes the node binary path is [buildDir]/avalanchego-preupgrade/avalanchego-process
 // Assumes the node's plugin path is [buildDir]/avalanchego-preupgrade/plugins
 // Assumes the binary can be served as a plugin
-func (nm *nodeManager) preDBUpgradeNode(v *viper.Viper) (*nodeProcess, error) {
+func (nm *nodeManager) preDBUpgradeNode() (*nodeProcess, error) {
 	args := make([]string, len(os.Args)-1)
 	copy(args, os.Args[1:])
 	args = append(
@@ -194,7 +192,7 @@ func (nm *nodeManager) preDBUpgradeNode(v *viper.Viper) (*nodeProcess, error) {
 }
 
 // Run the latest node version
-func (nm *nodeManager) latestVersionNodeFetchOnly(v *viper.Viper, rootConfig node.Config) (*nodeProcess, error) {
+func (nm *nodeManager) latestVersionNodeFetchOnly(rootConfig node.Config) (*nodeProcess, error) {
 	args := make([]string, len(os.Args)-1)
 	copy(args, os.Args[1:])
 	args = append(
@@ -219,7 +217,7 @@ func (nm *nodeManager) latestVersionNodeFetchOnly(v *viper.Viper, rootConfig nod
 // Run the latest node version with the config given by [v].
 // Runs until the node exits.
 // Returns the node's exit code.
-func (nm *nodeManager) runNormal(v *viper.Viper) (int, error) {
+func (nm *nodeManager) runNormal() (int, error) {
 	nm.log.Info("starting latest node version")
 
 	args := make([]string, len(os.Args)-1)
@@ -237,17 +235,4 @@ func (nm *nodeManager) runNormal(v *viper.Viper) (int, error) {
 	}
 	exitCode := <-node.start()
 	return exitCode, nil
-}
-
-func formatArgs(k string, v interface{}) string {
-	if k == config.CorethConfigKey {
-		// it either is a string, "default" or a json
-		if val, ok := v.(string); ok {
-			return fmt.Sprintf("--%s=%s", k, val)
-		}
-		// or it's a loaded config from either the defaults or a config file
-		s, _ := json.Marshal(v)
-		v = string(s)
-	}
-	return fmt.Sprintf("--%s=%v", k, v)
 }

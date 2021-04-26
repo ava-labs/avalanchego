@@ -830,10 +830,10 @@ func initBootstrapPeers(v *viper.Viper, config *node.Config) error {
 	return nil
 }
 
-func GetConfig(commit string) (node.Config, *viper.Viper, string, bool, error) {
+func GetConfig(commit string) (node.Config, string, bool, error) {
 	v, err := getViper()
 	if err != nil {
-		return node.Config{}, nil, "", false, err
+		return node.Config{}, "", false, err
 	}
 
 	if v.GetBool(versionKey) {
@@ -844,7 +844,7 @@ func GetConfig(commit string) (node.Config, *viper.Viper, string, bool, error) {
 
 		networkID, err := constants.NetworkID(v.GetString(networkNameKey))
 		if err != nil {
-			return node.Config{}, nil, "", false, err
+			return node.Config{}, "", false, err
 		}
 		networkGeneration := constants.NetworkName(networkID)
 		if networkID == constants.MainnetID {
@@ -864,10 +864,10 @@ func GetConfig(commit string) (node.Config, *viper.Viper, string, bool, error) {
 
 		format += "]\n"
 
-		return node.Config{}, v, fmt.Sprintf(format, args...), true, nil
+		return node.Config{}, fmt.Sprintf(format, args...), true, nil
 	}
 	config, err := getConfigFromViper(v)
-	return config, v, "", false, err
+	return config, "", false, err
 }
 
 // portFinder ensures the same port is not given twice
