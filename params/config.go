@@ -501,7 +501,7 @@ func (c *ChainConfig) IsEWASM(num *big.Int) bool {
 
 // Avalanche Upgrades:
 
-// IsApricotPhase returns whether [blockTimestamp] represents a block
+// IsApricotPhase1 returns whether [blockTimestamp] represents a block
 // with a timestamp after the Apricot Phase 1 upgrade time.
 func (c *ChainConfig) IsApricotPhase1(blockTimestamp *big.Int) bool {
 	return isForked(c.ApricotPhase1BlockTimestamp, blockTimestamp)
