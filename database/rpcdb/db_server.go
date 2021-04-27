@@ -102,12 +102,18 @@ func (db *DatabaseServer) WriteBatch(_ context.Context, req *rpcdbproto.WriteBat
 
 	for _, put := range req.Puts {
 		if err := batch.Put(put.Key, put.Value); err != nil {
+			// Because we are reporting an error, we free the allocated batch.
+			delete(db.batches, req.Id)
+
 			return &rpcdbproto.WriteBatchResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
 		}
 	}
 
 	for _, del := range req.Deletes {
 		if err := batch.Delete(del.Key); err != nil {
+			// Because we are reporting an error, we free the allocated batch.
+			delete(db.batches, req.Id)
+
 			return &rpcdbproto.WriteBatchResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
 		}
 	}
