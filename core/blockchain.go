@@ -194,6 +194,7 @@ type BlockChain struct {
 	logsFeed          event.Feed
 	logsAcceptedFeed  event.Feed
 	blockProcFeed     event.Feed
+	txAcceptedFeed    event.Feed
 	scope             event.SubscriptionScope
 	genesisBlock      *types.Block
 
@@ -1775,6 +1776,9 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 	if len(logs) > 0 {
 		bc.logsAcceptedFeed.Send(logs)
 	}
+	if len(block.Transactions()) != 0 {
+		bc.txAcceptedFeed.Send(NewTxsEvent{block.Transactions()})
+	}
 
 	return nil
 }
@@ -2153,11 +2157,15 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, er
 		// just skip the block (we already validated it once fully (and crashed), since
 		// its header and body was already in the database).
 		if err == ErrKnownBlock {
-			logger := log.Debug
-			if bc.chainConfig.Clique == nil {
-				logger = log.Warn
-			}
-			logger("Inserted known block", "number", block.Number(), "hash", block.Hash(),
+			// Original Code:
+			// logger := log.Debug
+			// if bc.chainConfig.Clique == nil {
+			// 	logger = log.Warn
+			// }
+			// logger("Inserted known block", "number", block.Number(), "hash", block.Hash(),
+			// 	"uncles", len(block.Uncles()), "txs", len(block.Transactions()), "gas", block.GasUsed(),
+			// 	"root", block.Root())
+			log.Warn("Inserted known block", "number", block.Number(), "hash", block.Hash(),
 				"uncles", len(block.Uncles()), "txs", len(block.Transactions()), "gas", block.GasUsed(),
 				"root", block.Root())
 
@@ -2914,6 +2922,11 @@ func (bc *BlockChain) SubscribeAcceptedLogsEvent(ch chan<- []*types.Log) event.S
 // block processing has started while false means it has stopped.
 func (bc *BlockChain) SubscribeBlockProcessingEvent(ch chan<- bool) event.Subscription {
 	return bc.scope.Track(bc.blockProcFeed.Subscribe(ch))
+}
+
+// SubscribeAcceptedTransactionEvent registers a subscription of accepted transactions
+func (bc *BlockChain) SubscribeAcceptedTransactionEvent(ch chan<- NewTxsEvent) event.Subscription {
+	return bc.scope.Track(bc.txAcceptedFeed.Subscribe(ch))
 }
 
 func (bc *BlockChain) UnlockIndexing() {

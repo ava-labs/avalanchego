@@ -104,7 +104,7 @@ func (b *Block) ID() ids.ID { return b.id }
 func (b *Block) Accept() error {
 	vm := b.vm
 
-	log.Trace(fmt.Sprintf("Accepting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
+	log.Debug(fmt.Sprintf("Accepting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
 	if err := vm.updateStatus(b.id, choices.Accepted); err != nil {
 		return err
 	}
@@ -130,7 +130,7 @@ func (b *Block) Accept() error {
 
 // Reject implements the snowman.Block interface
 func (b *Block) Reject() error {
-	log.Trace(fmt.Sprintf("Rejecting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
+	log.Debug(fmt.Sprintf("Rejecting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
 	return b.vm.updateStatus(b.ID(), choices.Rejected)
 }
 

@@ -65,9 +65,9 @@ func NewETHChain(config *eth.Config, nodecfg *node.Config, chainDB ethdb.Databas
 	return chain
 }
 
-func (self *ETHChain) Start() {
-	self.backend.StartMining()
+func (self *ETHChain) Start() error {
 	self.backend.Start()
+	return self.backend.StartMining()
 }
 
 func (self *ETHChain) Stop() {
@@ -225,6 +225,12 @@ func (self *ETHChain) AttachEthService(handler *rpc.Server, namespaces []string)
 func (self *ETHChain) GetTxSubmitCh() <-chan core.NewTxsEvent {
 	newTxsChan := make(chan core.NewTxsEvent)
 	self.backend.TxPool().SubscribeNewTxsEvent(newTxsChan)
+	return newTxsChan
+}
+
+func (self *ETHChain) GetTxAcceptedSubmitCh() <-chan core.NewTxsEvent {
+	newTxsChan := make(chan core.NewTxsEvent)
+	self.backend.BlockChain().SubscribeAcceptedTransactionEvent(newTxsChan)
 	return newTxsChan
 }
 
