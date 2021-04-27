@@ -97,13 +97,6 @@ func (c *Client) GetAtomicUTXOs(addrs []string, sourceChain string, limit uint32
 	return utxos, res.EndIndex, nil
 }
 
-// CreateAddress creates a new address controlled by [user]
-func (c *Client) CreateAddress(user api.UserPass) (string, error) {
-	res := &api.JSONAddress{}
-	err := c.requester.SendRequest("createAddress", &user, res)
-	return res.Address, err
-}
-
 // ListAddresses returns all addresses on this chain controlled by [user]
 func (c *Client) ListAddresses(user api.UserPass) ([]string, error) {
 	res := &api.JSONAddresses{}
