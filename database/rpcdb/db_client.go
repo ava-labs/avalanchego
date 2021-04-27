@@ -4,6 +4,8 @@
 package rpcdb
 
 import (
+	"sync/atomic"
+
 	"golang.org/x/net/context"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -13,8 +15,17 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
+const (
+	maxBatchSize    = 64 * 1024 // 64 KiB
+	baseElementSize = 8         // bytes
+)
+
 // DatabaseClient is an implementation of database that talks over RPC.
-type DatabaseClient struct{ client rpcdbproto.DatabaseClient }
+type DatabaseClient struct {
+	client rpcdbproto.DatabaseClient
+
+	batchIndex int64
+}
 
 // NewClient returns a database instance connected to a remote database instance
 func NewClient(client rpcdbproto.DatabaseClient) *DatabaseClient {
@@ -158,8 +169,13 @@ func (b *batch) Delete(key []byte) error {
 func (b *batch) Size() int { return b.size }
 
 func (b *batch) Write() error {
-	request := &rpcdbproto.WriteBatchRequest{}
+	id := atomic.AddInt64(&b.db.batchIndex, 1)
 
+	request := &rpcdbproto.WriteBatchRequest{
+		Id:        id,
+		Continues: true,
+	}
+	currentSize := 0
 	keySet := make(map[string]struct{}, len(b.writes))
 	for i := len(b.writes) - 1; i >= 0; i-- {
 		kv := b.writes[i]
@@ -169,11 +185,27 @@ func (b *batch) Write() error {
 		}
 		keySet[key] = struct{}{}
 
+		sizeChange := baseElementSize + len(kv.key) + len(kv.value)
+		if newSize := currentSize + sizeChange; newSize > maxBatchSize {
+			resp, err := b.db.client.WriteBatch(context.Background(), request)
+			if err != nil {
+				return err
+			}
+			if err := errCodeToError[resp.Err]; err != nil {
+				return err
+			}
+			currentSize = 0
+			request.Deletes = request.Deletes[len(request.Deletes):]
+			request.Puts = request.Puts[len(request.Puts):]
+		}
+		currentSize += sizeChange
+
 		if kv.delete {
 			request.Deletes = append(request.Deletes, &rpcdbproto.DeleteRequest{
 				Key: kv.key,
 			})
 		} else {
+			currentSize += len(kv.value)
 			request.Puts = append(request.Puts, &rpcdbproto.PutRequest{
 				Key:   kv.key,
 				Value: kv.value,
@@ -181,6 +213,7 @@ func (b *batch) Write() error {
 		}
 	}
 
+	request.Continues = false
 	resp, err := b.db.client.WriteBatch(context.Background(), request)
 	if err != nil {
 		return err

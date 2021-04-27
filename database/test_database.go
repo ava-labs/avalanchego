@@ -5,6 +5,7 @@ package database
 
 import (
 	"bytes"
+	"crypto/rand"
 	"testing"
 )
 
@@ -20,6 +21,7 @@ var (
 		TestBatchRewrite,
 		TestBatchReplay,
 		TestBatchInner,
+		TestBatchLargeSize,
 		TestIterator,
 		TestIteratorStart,
 		TestIteratorPrefix,
@@ -546,6 +548,42 @@ func TestBatchInner(t *testing.T, db Database) {
 		t.Fatalf("Unexpected error on db.Get: %s", err)
 	} else if !bytes.Equal(value2, v) {
 		t.Fatalf("db.Get: Returned: 0x%x ; Expected: 0x%x", v, value2)
+	}
+}
+
+// TestBatchLargeSize tests to make sure that the batch can support a large
+// amount of entries.
+//nolint:interfacer // This function must match the test function definition
+func TestBatchLargeSize(t *testing.T, db Database) {
+	totalSize := 8 * 1024 * 1024 // 8 MiB
+	elementSize := 4 * 1024      // 4 KiB
+	pairSize := 2 * elementSize  // 8 KiB
+
+	bytes := make([]byte, totalSize)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	batch := db.NewBatch()
+	if batch == nil {
+		t.Fatalf("db.NewBatch returned nil")
+	}
+
+	for len(bytes) > pairSize {
+		key := bytes[:elementSize]
+		bytes = bytes[elementSize:]
+
+		value := bytes[:elementSize]
+		bytes = bytes[elementSize:]
+
+		if err := batch.Put(key, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := batch.Write(); err != nil {
+		t.Fatalf("Unexpected error on batch.Write: %s", err)
 	}
 }
 
