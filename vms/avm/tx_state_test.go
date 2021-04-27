@@ -6,6 +6,8 @@ package avm
 import (
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -74,4 +76,15 @@ func TestTxState(t *testing.T) {
 
 	_, err = s.GetTx(ids.Empty)
 	assert.Equal(database.ErrNotFound, err)
+}
+
+func TestMeteredTxState(t *testing.T) {
+	assert := assert.New(t)
+
+	db := memdb.New()
+	codec, err := staticCodec()
+	assert.NoError(err)
+
+	_, err = NewMeteredTxState(db, codec, "", prometheus.NewRegistry())
+	assert.NoError(err)
 }

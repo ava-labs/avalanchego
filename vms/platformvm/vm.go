@@ -169,7 +169,7 @@ func (vm *VM) Initialize(
 
 	vm.mempool.Initialize(vm)
 
-	is, err := newInternalState(vm, vm.dbManager.Current().Database, genesisBytes)
+	is, err := NewMeteredInternalState(vm, vm.dbManager.Current().Database, genesisBytes, ctx.Namespace, ctx.Metrics)
 	if err != nil {
 		return err
 	}

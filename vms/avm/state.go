@@ -4,6 +4,8 @@
 package avm
 
 import (
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
@@ -58,6 +60,35 @@ func NewState(db database.Database, genesisCodec, codec codec.Manager) State {
 			Size: txDeduplicatorSize,
 		},
 	}
+}
+
+func NewMeteredState(db database.Database, genesisCodec, codec codec.Manager, namespace string, metrics prometheus.Registerer) (State, error) {
+	utxoDB := prefixdb.New(utxoStatePrefix, db)
+	statusDB := prefixdb.New(statusStatePrefix, db)
+	singletonDB := prefixdb.New(singletonStatePrefix, db)
+	txDB := prefixdb.New(txStatePrefix, db)
+
+	utxoState, err := avax.NewMeteredUTXOState(utxoDB, codec, namespace, metrics)
+	if err != nil {
+		return nil, err
+	}
+
+	statusState, err := avax.NewMeteredStatusState(statusDB, namespace, metrics)
+	if err != nil {
+		return nil, err
+	}
+
+	txState, err := NewMeteredTxState(txDB, genesisCodec, namespace, metrics)
+	return &state{
+		UTXOState:      utxoState,
+		StatusState:    statusState,
+		SingletonState: avax.NewSingletonState(singletonDB),
+		TxState:        txState,
+
+		uniqueTxs: &cache.EvictableLRU{
+			Size: txDeduplicatorSize,
+		},
+	}, err
 }
 
 // UniqueTx de-duplicates the transaction.

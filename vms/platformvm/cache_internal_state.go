@@ -8,7 +8,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -199,7 +202,7 @@ type stateBlk struct {
 	Status choices.Status `serialize:"true"`
 }
 
-func newInternalState(vm *VM, db database.Database, genesis []byte) (InternalState, error) {
+func newInternalStateDatabases(vm *VM, db database.Database) *internalStateImpl {
 	baseDB := versiondb.New(db)
 
 	validatorsDB := prefixdb.New(validatorsPrefix, baseDB)
@@ -216,7 +219,7 @@ func newInternalState(vm *VM, db database.Database, genesis []byte) (InternalSta
 
 	utxoDB := prefixdb.New(utxoPrefix, baseDB)
 	subnetBaseDB := prefixdb.New(subnetPrefix, baseDB)
-	is := &internalStateImpl{
+	return &internalStateImpl{
 		vm: vm,
 
 		baseDB: baseDB,
@@ -241,34 +244,82 @@ func newInternalState(vm *VM, db database.Database, genesis []byte) (InternalSta
 		pendingSubnetValidatorList:   linkeddb.NewDefault(pendingSubnetValidatorBaseDB),
 
 		addedBlocks: make(map[ids.ID]Block),
-		blockCache:  &cache.LRU{Size: blockCacheSize},
 		blockDB:     prefixdb.New(blockPrefix, baseDB),
 
 		addedTxs: make(map[ids.ID]*txStatusImpl),
-		txCache:  &cache.LRU{Size: txCacheSize},
 		txDB:     prefixdb.New(txPrefix, baseDB),
 
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
 		utxoDB:        utxoDB,
-		utxoState:     avax.NewUTXOState(utxoDB, GenesisCodec),
 
 		subnetBaseDB: subnetBaseDB,
 		subnetDB:     linkeddb.NewDefault(subnetBaseDB),
 
-		addedChains:  make(map[ids.ID][]*Tx),
-		chainCache:   &cache.LRU{Size: chainCacheSize},
-		chainDBCache: &cache.LRU{Size: chainDBCacheSize},
-		chainDB:      prefixdb.New(chainPrefix, baseDB),
+		addedChains: make(map[ids.ID][]*Tx),
+		chainDB:     prefixdb.New(chainPrefix, baseDB),
 
 		singletonDB: prefixdb.New(singletonPrefix, baseDB),
 	}
+}
 
-	shouldInit, err := is.shouldInit()
+func (st *internalStateImpl) initCaches() {
+	st.blockCache = &cache.LRU{Size: blockCacheSize}
+	st.txCache = &cache.LRU{Size: txCacheSize}
+	st.utxoState = avax.NewUTXOState(st.utxoDB, GenesisCodec)
+	st.chainCache = &cache.LRU{Size: chainCacheSize}
+	st.chainDBCache = &cache.LRU{Size: chainDBCacheSize}
+}
+
+func (st *internalStateImpl) initMeteredCaches(namespace string, metrics prometheus.Registerer) error {
+	blockCache, err := metercacher.New(
+		fmt.Sprintf("%s_block_cache", namespace),
+		metrics,
+		&cache.LRU{Size: blockCacheSize},
+	)
 	if err != nil {
-		// Drop any errors on close to return the first error
-		_ = is.Close()
+		return err
+	}
 
-		return nil, fmt.Errorf(
+	txCache, err := metercacher.New(
+		fmt.Sprintf("%s_tx_cache", namespace),
+		metrics,
+		&cache.LRU{Size: txCacheSize},
+	)
+	if err != nil {
+		return err
+	}
+
+	utxoState, err := avax.NewMeteredUTXOState(st.utxoDB, GenesisCodec, namespace, metrics)
+	if err != nil {
+		return err
+	}
+
+	chainCache, err := metercacher.New(
+		fmt.Sprintf("%s_chain_cache", namespace),
+		metrics,
+		&cache.LRU{Size: chainCacheSize},
+	)
+	if err != nil {
+		return err
+	}
+
+	chainDBCache, err := metercacher.New(
+		fmt.Sprintf("%s_chaindb_cache", namespace),
+		metrics,
+		&cache.LRU{Size: chainDBCacheSize},
+	)
+	st.blockCache = blockCache
+	st.txCache = txCache
+	st.utxoState = utxoState
+	st.chainCache = chainCache
+	st.chainDBCache = chainDBCache
+	return err
+}
+
+func (st *internalStateImpl) sync(genesis []byte) error {
+	shouldInit, err := st.shouldInit()
+	if err != nil {
+		return fmt.Errorf(
 			"failed to check if the database is initialized: %w",
 			err,
 		)
@@ -277,25 +328,50 @@ func newInternalState(vm *VM, db database.Database, genesis []byte) (InternalSta
 	// If the database is empty, create the platform chain anew using the
 	// provided genesis state
 	if shouldInit {
-		if err := is.init(genesis); err != nil {
-			// Drop any errors on close to return the first error
-			_ = is.Close()
-
-			return nil, fmt.Errorf(
+		if err := st.init(genesis); err != nil {
+			return fmt.Errorf(
 				"failed to initialize the database: %w",
 				err,
 			)
 		}
 	}
 
-	if err := is.load(); err != nil {
-		// Drop any errors on close to return the first error
-		_ = is.Close()
-
-		return nil, fmt.Errorf(
+	if err := st.load(); err != nil {
+		return fmt.Errorf(
 			"failed to load the database state: %w",
 			err,
 		)
+	}
+	return nil
+}
+
+func NewInternalState(vm *VM, db database.Database, genesis []byte) (InternalState, error) {
+	is := newInternalStateDatabases(vm, db)
+	is.initCaches()
+
+	if err := is.sync(genesis); err != nil {
+		// Drop any errors on close to return the first error
+		_ = is.Close()
+
+		return nil, err
+	}
+	return is, nil
+}
+
+func NewMeteredInternalState(vm *VM, db database.Database, genesis []byte, namespace string, metrics prometheus.Registerer) (InternalState, error) {
+	is := newInternalStateDatabases(vm, db)
+	if err := is.initMeteredCaches(namespace, metrics); err != nil {
+		// Drop any errors on close to return the first error
+		_ = is.Close()
+
+		return nil, err
+	}
+
+	if err := is.sync(genesis); err != nil {
+		// Drop any errors on close to return the first error
+		_ = is.Close()
+
+		return nil, err
 	}
 	return is, nil
 }

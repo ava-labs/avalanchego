@@ -197,7 +197,11 @@ func (vm *VM) Initialize(
 		}
 	}
 
-	vm.state = NewState(vm.db, vm.genesisCodec, vm.codec)
+	state, err := NewMeteredState(vm.db, vm.genesisCodec, vm.codec, ctx.Namespace, ctx.Metrics)
+	if err != nil {
+		return err
+	}
+	vm.state = state
 
 	if err := vm.initAliases(genesisBytes); err != nil {
 		return err
