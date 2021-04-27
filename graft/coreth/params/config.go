@@ -85,6 +85,7 @@ var (
 		IstanbulBlock:               big.NewInt(0),
 		MuirGlacierBlock:            big.NewInt(0),
 		ApricotPhase1BlockTimestamp: big.NewInt(1617199200), // 10am EST 3/31/2021
+		ApricotPhase2BlockTimestamp: big.NewInt(1620223200), // 10am EST 5/5/2021
 	}
 
 	// AvalancheApricotFujiChainConfig is the configuration for the Fuji Test Network
@@ -102,6 +103,7 @@ var (
 		IstanbulBlock:               big.NewInt(0),
 		MuirGlacierBlock:            big.NewInt(0),
 		ApricotPhase1BlockTimestamp: big.NewInt(1616767200), // 10am EST 3/26/2021
+		ApricotPhase2BlockTimestamp: big.NewInt(1620223200), // 10am EST 5/5/2021
 	}
 
 	// Original Code:
@@ -302,7 +304,7 @@ var (
 	// adding flags to the config to also have to set these fields.
 	// AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, &CliqueConfig{Period: 0, Epoch: 30000}}
 
-	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil}
+	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil}
 	TestRules       = TestChainConfig.Rules(new(big.Int))
 )
 
@@ -380,6 +382,7 @@ type ChainConfig struct {
 
 	// Avalanche Network Upgrades
 	ApricotPhase1BlockTimestamp *big.Int `json:"apricotPhase1BlockTimestamp,omitempty"` // Apricot Phase 1 Block Timestamp (nil = no fork, 0 = already activated)
+	ApricotPhase2BlockTimestamp *big.Int `json:"apricotPhase2BlockTimestamp,omitempty"` // Apricot Phase 2 Block Timestamp (nil = no fork, 0 = already activated)
 
 	// Original Code:
 	// // Various consensus engines
@@ -419,7 +422,7 @@ func (c *ChainConfig) String() string {
 	// default:
 	// 	engine = "unknown"
 	// }
-	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, YOLO v1: %v, Apricot Phase 1: %v, Engine: Dummy Consensus Engine}",
+	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, YOLO v1: %v, Apricot Phase 1: %v, Apricot Phase 2: %v, Engine: Dummy Consensus Engine}",
 		c.ChainID,
 		c.HomesteadBlock,
 		c.DAOForkBlock,
@@ -434,6 +437,7 @@ func (c *ChainConfig) String() string {
 		c.MuirGlacierBlock,
 		c.YoloV1Block,
 		c.ApricotPhase1BlockTimestamp,
+		c.ApricotPhase2BlockTimestamp,
 	)
 }
 
@@ -501,10 +505,16 @@ func (c *ChainConfig) IsEWASM(num *big.Int) bool {
 
 // Avalanche Upgrades:
 
-// IsApricotPhase returns whether [blockTimestamp] represents a block
+// IsApricotPhase1 returns whether [blockTimestamp] represents a block
 // with a timestamp after the Apricot Phase 1 upgrade time.
 func (c *ChainConfig) IsApricotPhase1(blockTimestamp *big.Int) bool {
 	return isForked(c.ApricotPhase1BlockTimestamp, blockTimestamp)
+}
+
+// IsApricotPhase2 returns whether [blockTimestamp] represents a block
+// with a timestamp after the Apricot Phase 2 upgrade time.
+func (c *ChainConfig) IsApricotPhase2(blockTimestamp *big.Int) bool {
+	return isForked(c.ApricotPhase2BlockTimestamp, blockTimestamp)
 }
 
 // CheckCompatible checks whether scheduled fork transitions have been imported
@@ -687,6 +697,7 @@ type Rules struct {
 
 	// Rules for Avalanche releases
 	IsApricotPhase1 bool
+	IsApricotPhase2 bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -715,5 +726,6 @@ func (c *ChainConfig) AvalancheRules(blockNum, blockTimestamp *big.Int) Rules {
 	rules := c.Rules(blockNum)
 
 	rules.IsApricotPhase1 = c.IsApricotPhase1(blockTimestamp)
+	rules.IsApricotPhase2 = c.IsApricotPhase2(blockTimestamp)
 	return rules
 }
