@@ -205,7 +205,6 @@ func (b *batch) Write() error {
 				Key: kv.key,
 			})
 		} else {
-			currentSize += len(kv.value)
 			request.Puts = append(request.Puts, &rpcdbproto.PutRequest{
 				Key:   kv.key,
 				Value: kv.value,
