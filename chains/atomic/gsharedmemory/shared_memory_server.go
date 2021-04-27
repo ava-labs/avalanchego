@@ -7,9 +7,9 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory/gsharedmemoryproto"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsharedmemory/gsharedmemoryproto"
 )
 
 var (
@@ -48,21 +48,9 @@ func (s *Server) Put(
 		}
 	}
 
-	batches := make([]database.Batch, len(req.Batches))
-	for i, reqBatch := range req.Batches {
-		batch := s.db.NewBatch()
-		for _, putReq := range reqBatch.Puts {
-			if err := batch.Put(putReq.Key, putReq.Value); err != nil {
-				return nil, err
-			}
-		}
-
-		for _, deleteReq := range reqBatch.Deletes {
-			if err := batch.Delete(deleteReq.Key); err != nil {
-				return nil, err
-			}
-		}
-		batches[i] = batch
+	batches, err := s.parseBatches(req.Batches)
+	if err != nil {
+		return nil, err
 	}
 
 	return &gsharedmemoryproto.PutResponse{}, s.sm.Put(peerChainID, elems, batches...)
@@ -115,8 +103,19 @@ func (s *Server) Remove(
 		return nil, err
 	}
 
-	batches := make([]database.Batch, len(req.Batches))
-	for i, reqBatch := range req.Batches {
+	batches, err := s.parseBatches(req.Batches)
+	if err != nil {
+		return nil, err
+	}
+
+	return &gsharedmemoryproto.RemoveResponse{}, s.sm.Remove(peerChainID, req.Keys, batches...)
+}
+
+func (s *Server) parseBatches(
+	rawBatches []*gsharedmemoryproto.Batch,
+) ([]database.Batch, error) {
+	batches := make([]database.Batch, len(rawBatches))
+	for i, reqBatch := range rawBatches {
 		batch := s.db.NewBatch()
 		for _, putReq := range reqBatch.Puts {
 			if err := batch.Put(putReq.Key, putReq.Value); err != nil {
@@ -131,6 +130,5 @@ func (s *Server) Remove(
 		}
 		batches[i] = batch
 	}
-
-	return &gsharedmemoryproto.RemoveResponse{}, s.sm.Remove(peerChainID, req.Keys, batches...)
+	return batches, nil
 }
