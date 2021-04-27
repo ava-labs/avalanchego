@@ -228,7 +228,7 @@ func TestVMGenesis(t *testing.T) {
 }
 
 func TestIssueAtomicTxs(t *testing.T) {
-	issuer, vm, _, sharedMemory := GenesisVM(t, true, genesisJSONApricotPhase0)
+	issuer, vm, _, sharedMemory := GenesisVM(t, true, genesisJSONApricotPhase2)
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -236,7 +236,7 @@ func TestIssueAtomicTxs(t *testing.T) {
 		}
 	}()
 
-	importAmount := uint64(10000000)
+	importAmount := uint64(50000000)
 	utxoID := avax.UTXOID{
 		TxID: ids.ID{
 			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
@@ -318,7 +318,7 @@ func TestIssueAtomicTxs(t *testing.T) {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk.ID(), lastAcceptedID)
 	}
 
-	exportTx, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-vm.txFee, vm.ctx.XChainID, testShortIDAddrs[0], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	exportTx, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-(2*vm.txFee), vm.ctx.XChainID, testShortIDAddrs[0], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,7 +360,7 @@ func TestIssueAtomicTxs(t *testing.T) {
 }
 
 func TestBuildEthTxBlock(t *testing.T) {
-	issuer, vm, _, sharedMemory := GenesisVM(t, true, genesisJSONApricotPhase0)
+	issuer, vm, _, sharedMemory := GenesisVM(t, true, genesisJSONApricotPhase2)
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -373,7 +373,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	importAmount := uint64(10000000)
+	importAmount := uint64(20000000)
 	utxoID := avax.UTXOID{
 		TxID: ids.ID{
 			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,

@@ -124,6 +124,8 @@ var (
 	errInvalidMixDigest           = errors.New("invalid mix digest")
 	errInvalidExtDataHash         = errors.New("invalid extra data hash")
 	errHeaderExtraDataTooBig      = errors.New("header extra data too big")
+	errInsufficientFundsForFee    = errors.New("insufficient AVAX funds to pay transaction fee")
+	errNoEVMOutputs               = errors.New("tx has no EVM outputs")
 )
 
 // mayBuildBlockStatus denotes whether the engine should be notified
