@@ -81,8 +81,7 @@ func (tx *UnsignedImportTx) Verify(
 		return errInputsNotSortedUnique
 	}
 
-	// TODO replace with rules.IsApricotPhase2
-	if false {
+	if rules.IsApricotPhase2 {
 		if !IsSortedAndUniqueEVMOutputs(tx.Outs) {
 			return errOutputsNotSortedUnique
 		}
