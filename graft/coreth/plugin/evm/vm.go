@@ -109,7 +109,7 @@ var (
 	errWrongChainID               = errors.New("tx has wrong chain ID")
 	errInsufficientFunds          = errors.New("insufficient funds")
 	errNoExportOutputs            = errors.New("tx has no export outputs")
-	errOutputsNotSorted           = errors.New("outputs not sorted")
+	errOutputsNotSorted           = errors.New("tx outputs not sorted")
 	errOutputsNotSortedUnique     = errors.New("outputs not sorted and unique")
 	errOverflowExport             = errors.New("overflow when computing export amount + txFee")
 	errInvalidNonce               = errors.New("invalid nonce")
