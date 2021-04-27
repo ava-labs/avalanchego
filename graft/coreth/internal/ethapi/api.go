@@ -39,7 +39,6 @@ import (
 	"github.com/ava-labs/coreth/accounts"
 	"github.com/ava-labs/coreth/accounts/keystore"
 	"github.com/ava-labs/coreth/accounts/scwallet"
-	"github.com/ava-labs/coreth/consensus/ethash"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
@@ -1846,14 +1845,15 @@ func (api *PublicDebugAPI) PrintBlock(ctx context.Context, number uint64) (strin
 	return spew.Sdump(block), nil
 }
 
+// Original Code:
 // SeedHash retrieves the seed hash of a block.
-func (api *PublicDebugAPI) SeedHash(ctx context.Context, number uint64) (string, error) {
-	block, _ := api.b.BlockByNumber(ctx, rpc.BlockNumber(number))
-	if block == nil {
-		return "", fmt.Errorf("block #%d not found", number)
-	}
-	return fmt.Sprintf("0x%x", ethash.SeedHash(number)), nil
-}
+// func (api *PublicDebugAPI) SeedHash(ctx context.Context, number uint64) (string, error) {
+// 	block, _ := api.b.BlockByNumber(ctx, rpc.BlockNumber(number))
+// 	if block == nil {
+// 		return "", fmt.Errorf("block #%d not found", number)
+// 	}
+// 	return fmt.Sprintf("0x%x", ethash.SeedHash(number)), nil
+// }
 
 // PrivateDebugAPI is the collection of Ethereum APIs exposed over the private
 // debugging endpoint.
