@@ -10,11 +10,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/coreth/params"
 )
 
 func TestExportTxVerifyNil(t *testing.T) {
 	var exportTx *UnsignedExportTx
-	if err := exportTx.Verify(testXChainID, NewContext(), testTxFee, testAvaxAssetID, true); err == nil {
+	if err := exportTx.Verify(testXChainID, NewContext(), testTxFee, testAvaxAssetID, params.Rules{}); err == nil {
 		t.Fatal("Verify should have failed due to nil transaction")
 	}
 }
@@ -78,28 +79,28 @@ func TestExportTxVerify(t *testing.T) {
 	ctx := NewContext()
 
 	// Test Valid Export Tx
-	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err != nil {
+	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, params.Rules{IsApricotPhase1: true}); err != nil {
 		t.Fatalf("Failed to verify valid ExportTx: %s", err)
 	}
 
 	exportTx.NetworkID = testNetworkID + 1
 
 	// Test Incorrect Network ID Errors
-	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err == nil {
+	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, params.Rules{IsApricotPhase1: true}); err == nil {
 		t.Fatal("ExportTx should have failed verification due to incorrect network ID")
 	}
 
 	exportTx.NetworkID = testNetworkID
 	exportTx.BlockchainID = nonExistentID
 	// Test Incorrect Blockchain ID Errors
-	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err == nil {
+	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, params.Rules{IsApricotPhase1: true}); err == nil {
 		t.Fatal("ExportTx should have failed verification due to incorrect blockchain ID")
 	}
 
 	exportTx.BlockchainID = testCChainID
 	exportTx.DestinationChain = nonExistentID
 	// Test Incorrect Destination Chain ID Errors
-	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err == nil {
+	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, params.Rules{IsApricotPhase1: true}); err == nil {
 		t.Fatal("ExportTx should have failed verification due to incorrect destination chain")
 	}
 
@@ -108,30 +109,30 @@ func TestExportTxVerify(t *testing.T) {
 	exportTx.ExportedOutputs = nil
 	evmInputs := exportTx.Ins
 	// Test No Exported Outputs Errors
-	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err == nil {
+	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, params.Rules{IsApricotPhase1: true}); err == nil {
 		t.Fatal("ExportTx should have failed verification due to no exported outputs")
 	}
 
 	exportTx.ExportedOutputs = []*avax.TransferableOutput{exportedOuts[1], exportedOuts[0]}
 	// Test Unsorted outputs Errors
-	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err == nil {
+	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, params.Rules{IsApricotPhase1: true}); err == nil {
 		t.Fatal("ExportTx should have failed verification due to no unsorted exported outputs")
 	}
 
 	exportTx.ExportedOutputs = []*avax.TransferableOutput{exportedOuts[0], nil}
 	// Test invalid exported output
-	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err == nil {
+	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, params.Rules{IsApricotPhase1: true}); err == nil {
 		t.Fatal("ExportTx should have failed verification due to invalid output")
 	}
 
 	exportTx.ExportedOutputs = []*avax.TransferableOutput{exportedOuts[0], exportedOuts[1]}
 	exportTx.Ins = []EVMInput{evmInputs[1], evmInputs[0]}
 	// Test unsorted EVM Inputs passes before AP1
-	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, false); err != nil {
+	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, params.Rules{}); err != nil {
 		t.Fatalf("ExportTx should have passed verification before AP1, but failed due to %s", err)
 	}
 	// Test unsorted EVM Inputs fails after AP1
-	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err == nil {
+	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, params.Rules{IsApricotPhase1: true}); err == nil {
 		t.Fatal("ExportTx should have failed verification due to unsorted EVM Inputs")
 	}
 	exportTx.Ins = []EVMInput{
@@ -143,17 +144,17 @@ func TestExportTxVerify(t *testing.T) {
 		},
 	}
 	// Test ExportTx with invalid EVM Input amount 0 fails verification
-	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err == nil {
+	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, params.Rules{IsApricotPhase1: true}); err == nil {
 		t.Fatal("ExportTx should have failed verification due to 0 value amount")
 	}
 	exportTx.Ins = []EVMInput{evmInputs[0], evmInputs[0]}
 	// Test non-unique EVM Inputs passes verification before AP1
-	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, false); err != nil {
+	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, params.Rules{}); err != nil {
 		t.Fatalf("ExportTx with non-unique EVM Inputs should have passed verification prior to AP1, but failed due to %s", err)
 	}
 	exportTx.Ins = []EVMInput{evmInputs[0], evmInputs[0]}
 	// Test non-unique EVM Inputs fails verification after AP1
-	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, true); err == nil {
+	if err := exportTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, params.Rules{IsApricotPhase1: true}); err == nil {
 		t.Fatal("ExportTx should have failed verification due to non-unique inputs")
 	}
 }

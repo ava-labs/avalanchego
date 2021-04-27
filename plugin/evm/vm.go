@@ -668,7 +668,7 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	}
 	// Performing syntactic verification in ParseBlock allows for
 	// short-circuiting bad blocks before they are processed by the VM.
-	if err := block.syntacticVerify(); err != nil {
+	if _, err := block.syntacticVerify(); err != nil {
 		return nil, fmt.Errorf("syntactic block verification failed: %w", err)
 	}
 	vm.blockCache.Put(block.ID(), block)
@@ -1184,18 +1184,19 @@ func (vm *VM) GetCurrentNonce(address common.Address) (uint64, error) {
 	return state.GetNonce(address), nil
 }
 
-func (vm *VM) IsApricotPhase1(timestamp uint64) bool {
-	return vm.chainConfig.IsApricotPhase1(new(big.Int).SetUint64(timestamp))
+// currentRules returns the chain rules for the current block.
+func (vm *VM) currentRules() params.Rules {
+	header := vm.chain.APIBackend().CurrentHeader()
+	return vm.chainConfig.AvalancheRules(header.Number, big.NewInt(int64(header.Time)))
 }
 
-func (vm *VM) useApricotPhase1() bool {
-	return vm.IsApricotPhase1(vm.chain.BlockChain().CurrentHeader().Time)
-}
-
-func (vm *VM) getBlockValidator(timestamp uint64) BlockValidator {
-	if vm.IsApricotPhase1(timestamp) {
+// getBlockValidator returns the block validator that should be used for a block that
+// follows the ruleset defined by [rules]
+func (vm *VM) getBlockValidator(rules params.Rules) BlockValidator {
+	switch {
+	case rules.IsApricotPhase1:
 		return phase1BlockValidator
-	} else {
+	default:
 		return phase0BlockValidator
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/core/state"
+	"github.com/ava-labs/coreth/params"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -50,7 +51,7 @@ func (tx *UnsignedImportTx) Verify(
 	ctx *snow.Context,
 	feeAmount uint64,
 	feeAssetID ids.ID,
-	ap1 bool,
+	rules params.Rules,
 ) error {
 	switch {
 	case tx == nil:
@@ -79,12 +80,16 @@ func (tx *UnsignedImportTx) Verify(
 	if !avax.IsSortedAndUniqueTransferableInputs(tx.ImportedInputs) {
 		return errInputsNotSortedUnique
 	}
-	if ap1 && !IsSortedEVMOutputs(tx.Outs) {
-		return errOutputsNotSorted
-	}
-	// TODO change to isAP2
+
+	// TODO replace with rules.IsApricotPhase2
 	if false {
-		return errOutputsNotSortedUnique
+		if !IsSortedAndUniqueEVMOutputs(tx.Outs) {
+			return errOutputsNotSortedUnique
+		}
+	} else if rules.IsApricotPhase1 {
+		if !IsSortedEVMOutputs(tx.Outs) {
+			return errOutputsNotSorted
+		}
 	}
 
 	return nil
@@ -94,9 +99,9 @@ func (tx *UnsignedImportTx) Verify(
 func (tx *UnsignedImportTx) SemanticVerify(
 	vm *VM,
 	stx *Tx,
-	ap1 bool,
+	rules params.Rules,
 ) TxError {
-	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, ap1); err != nil {
+	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, rules); err != nil {
 		return tempError{err}
 	}
 
@@ -267,7 +272,7 @@ func (vm *VM) newImportTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, vm.useApricotPhase1())
+	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, vm.currentRules())
 }
 
 // EVMStateTransfer performs the state transfer to increase the balances of
