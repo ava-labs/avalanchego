@@ -16,8 +16,11 @@ import (
 )
 
 const (
-	maxBatchSize    = 64 * 1024 // 64 KiB
-	baseElementSize = 8         // bytes
+	maxBatchSize = 64 * 1024 // 64 KiB
+
+	// baseElementSize is an approximation of the protobuf encoding overhead per
+	// element
+	baseElementSize = 8 // bytes
 )
 
 // DatabaseClient is an implementation of database that talks over RPC.
@@ -195,8 +198,8 @@ func (b *batch) Write() error {
 				return err
 			}
 			currentSize = 0
-			request.Deletes = request.Deletes[len(request.Deletes):]
-			request.Puts = request.Puts[len(request.Puts):]
+			request.Deletes = request.Deletes[:0]
+			request.Puts = request.Puts[:0]
 		}
 		currentSize += sizeChange
 
