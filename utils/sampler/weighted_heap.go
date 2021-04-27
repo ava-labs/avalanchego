@@ -29,10 +29,11 @@ type weightedHeap struct {
 }
 
 func (s *weightedHeap) Initialize(weights []uint64) error {
-	if len(weights) > len(s.heap) {
-		s.heap = make([]weightedHeapElement, len(weights))
+	numWeights := len(weights)
+	if numWeights <= cap(s.heap) {
+		s.heap = s.heap[:numWeights]
 	} else {
-		s.heap = s.heap[:len(weights)]
+		s.heap = make([]weightedHeapElement, numWeights)
 	}
 	for i, weight := range weights {
 		s.heap[i] = weightedHeapElement{
