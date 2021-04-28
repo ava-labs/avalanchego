@@ -15,3 +15,5 @@ evm_path="$plugin_dir/evm"
 dockerhub_repo="avaplatform/avalanchego"
 avalanche_image_name="avalanchego"
 
+# Current branch
+current_branch=$(git branch --show-current)

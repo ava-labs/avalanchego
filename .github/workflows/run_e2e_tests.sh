@@ -2,11 +2,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-root_dirpath="$(cd "$(dirname "${0}")" && cd ../../ && pwd)"
-kurtosis_core_dirpath="${root_dirpath}/.kurtosis"
-
-echo "root_dirpath: ${root_dirpath}"
-echo "kurtosis_core_dirpath: ${kurtosis_core_dirpath}"
+# Testing specific variables
+avalanche_testing_repo="avaplatform/avalanche-testing"
 
 # Define avalanche byzantine version to use
 avalanche_byzantine_image="avaplatform/avalanche-byzantine:v0.2.0-rc.1"
@@ -18,29 +15,50 @@ avalanche_testing_image="avaplatform/avalanche-testing:kurtosis_upgrade"
 if [[ -z ${DOCKER_USERNAME} ]]; then
     echo "Skipping Byzantine Tests because Docker Credentials were not present."
     exit 1
-else
-    echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
-    docker pull ${avalanche_testing_image}
-    docker pull ${avalanche_byzantine_image}
 fi
 
+# Directory above this script
+AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )
+
+# Load the versions
+source "$AVALANCHE_PATH"/scripts/versions.sh
+
+# Load the constants
+source "$AVALANCHE_PATH"/scripts/constants.sh
+
+# Checks available docker tags exist
+function docker_tag_exists() {
+    TOKEN=$(curl -s -H "Content-Type: application/json" -X POST -d '{"username": "'${DOCKER_USERNAME}'", "password": "'${DOCKER_PASS}'"}' https://hub.docker.com/v2/users/login/ | jq -r .token)
+    curl --silent -H "Authorization: JWT ${TOKEN}" -f --head -lL https://hub.docker.com/v2/repositories/$1/tags/$2/ > /dev/null
+}
+
+# Defines the avalanche-testing tag to use
+# Either uses the same tag as the current branch or uses the default
+if docker_tag_exists $avalanche_testing_repo $current_branch; then
+    echo "$avalanche_testing_repo:$current_branch exists; using this image to run e2e tests"
+    avalanche_testing_image="$avalanche_testing_repo:$current_branch"
+else
+    echo "$avalanche_testing_repo $current_branch does NOT exist; using the default image to run e2e tests"
+fi
+
+echo "Using $avalanche_testing_image for e2e tests"
+
+kurtosis_core_dirpath="$AVALANCHE_PATH/.kurtosis"
+
 # Setting the build ID
-GIT_COMMIT_ID=$( git rev-list -1 HEAD )
+git_commit_id=$( git rev-list -1 HEAD )
 
 # Build current avalanchego
-"${root_dirpath}"/scripts/build_image.sh
+"$AVALANCHE_PATH"/scripts/build_image.sh
 
 # Target built version to use in avalanche-testing
-# Todo hook this with the e2e matchup
-#avalanche_image_tag=$(docker image ls --format="{{.Tag}}" | head -n 1)
-avalanche_image_tag="dev"
-avalanche_image="avaplatform/avalanchego:${avalanche_image_tag}"
+avalanche_image="avaplatform/avalanchego:$current_branch"
 
 echo "Running Avalanche Image: ${avalanche_image}"
-echo "Running Avalanche Image Tag: ${avalanche_image_tag}"
+echo "Running Avalanche Image Tag: $current_branch"
 echo "Running Avalanche Testing Image: ${avalanche_testing_image}"
 echo "Running Avalanche Byzantine Image: ${avalanche_byzantine_image}"
-echo "Git Commit ID : ${GIT_COMMIT_ID}"
+echo "Git Commit ID : ${git_commit_id}"
 
 
 # >>>>>>>> avalanche-testing custom parameters <<<<<<<<<<<<<

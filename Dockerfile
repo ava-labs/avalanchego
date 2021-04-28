@@ -3,7 +3,7 @@ FROM golang:1.15.5-alpine AS builder
 RUN apk add --no-cache bash git make gcc musl-dev linux-headers git ca-certificates
 
 WORKDIR /build
-# Copy and download dependencies using go mod
+# Copy and download avalanche dependencies using go mod
 COPY go.mod .
 COPY go.sum .
 RUN go mod download
@@ -17,7 +17,13 @@ RUN ./scripts/build.sh
 # ============= Cleanup Stage ================
 FROM alpine:3.13 AS execution
 
-WORKDIR /run
+# Maintain compatibility with previous images
+RUN mkdir -p /avalanchego/build
+WORKDIR /avalanchego/build
 
 # Copy the executables into the container
 COPY --from=builder /build/build/ .
+
+
+
+
