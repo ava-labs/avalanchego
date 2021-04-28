@@ -151,11 +151,11 @@ func TestSharedMemoryCommitOnPut(t *testing.T, _, chainID1 ids.ID, sm0, _ Shared
 	)
 	assert.NoError(err)
 
-	has, err := db.Has([]byte{0})
+	val, err := db.Get([]byte{0})
 	assert.NoError(err)
-	assert.True(has)
+	assert.Equal([]byte{1}, val)
 
-	has, err = db.Has([]byte{1})
+	has, err := db.Has([]byte{1})
 	assert.NoError(err)
 	assert.False(has)
 }
@@ -181,11 +181,11 @@ func TestSharedMemoryCommitOnRemove(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 	)
 	assert.NoError(err)
 
-	has, err := db.Has([]byte{0})
+	val, err := db.Get([]byte{0})
 	assert.NoError(err)
-	assert.True(has)
+	assert.Equal([]byte{1}, val)
 
-	has, err = db.Has([]byte{1})
+	has, err := db.Has([]byte{1})
 	assert.NoError(err)
 	assert.False(has)
 }
@@ -235,11 +235,11 @@ func TestSharedMemoryLargeSize(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMe
 	)
 	assert.NoError(err)
 
-	has, err := db.Has([]byte{0})
+	val, err := db.Get([]byte{0})
 	assert.NoError(err)
-	assert.True(has)
+	assert.Equal([]byte{1}, val)
 
-	has, err = db.Has([]byte{1})
+	has, err := db.Has([]byte{1})
 	assert.NoError(err)
 	assert.False(has)
 }
