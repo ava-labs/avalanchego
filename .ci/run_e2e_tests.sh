@@ -31,7 +31,7 @@ SUITE_EXECUTION_VOLUME="avalanche-test-suite_${AVALANCHE_IMAGE_TAG}_$(date +%s)"
 docker volume create "${SUITE_EXECUTION_VOLUME}"
 
 # Docker only allows you to have spaces in the variable if you escape them or use a Docker env file
-CUSTOM_ENV_VARS_JSON="CUSTOM_ENV_VARS_JSON={\"AVALANCHE_IMAGE\":\"${AVALANCHE_IMAGE}\"}"
+CUSTOM_ENV_VARS_JSON="CUSTOM_ENV_VARS_JSON={\"AVALANCHE_IMAGE\":\"${AVALANCHE_IMAGE}\",\"BYZANTINE_IMAGE\":\"\"}"
 
 echo "${CUSTOM_ENV_VARS_JSON}"
 echo "${KURTOSIS_API_IMAGE}"
