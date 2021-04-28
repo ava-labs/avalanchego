@@ -11,15 +11,15 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Run Kurtosis Tests
-        env: # Secret as an environment variable
+        env:
           KURTOSIS_CLIENT_ID: ${{ secrets.kurtosis_client_id }}
           KURTOSIS_CLIENT_SECRET: ${{ secrets.kurtosis_client_secret }}
           DOCKER_USERNAME: ${{ secrets.docker_username }}
           DOCKER_PASS: ${{ secrets.docker_pass }}
-        run: ./run_e2e_tests.sh
+        run: .github/workflows/run_e2e_tests.sh
 
       - name: Publish image to DockerHub
-        env: # Secret as an environment variable
+        env:
           DOCKER_USERNAME: ${{ secrets.docker_username }}
           DOCKER_PASS: ${{ secrets.docker_pass }}
         run: .github/workflows/publish_image.sh
