@@ -19,14 +19,6 @@ jobs:
     - ".ci/lint.sh"
 
   - stage: build
-    os: linux
-    dist: bionic
-    script:
-    - ".ci/build_and_test.sh"
-    - ".ci/run_e2e_tests.sh"
-    - ".ci/after_success.sh"
-
-  - stage: build
     os: osx
     osx_image: xcode11.4
     script:

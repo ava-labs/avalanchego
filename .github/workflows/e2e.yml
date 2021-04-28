@@ -1,0 +1,25 @@
+name: Test + build Image
+
+on:
+  push:
+    branches:
+      - kurtosis_upgrade
+
+jobs:
+  e2e_plus_publish:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run Kurtosis Tests
+        env: # Secret as an environment variable
+          KURTOSIS_CLIENT_ID: ${{ secrets.kurtosis_client_id }}
+          KURTOSIS_CLIENT_SECRET: ${{ secrets.kurtosis_client_secret }}
+          DOCKER_USERNAME: ${{ secrets.docker_username }}
+          DOCKER_PASS: ${{ secrets.docker_pass }}
+        run: ./run_e2e_tests.sh
+
+      - name: Publish image to DockerHub
+        env: # Secret as an environment variable
+          DOCKER_USERNAME: ${{ secrets.docker_username }}
+          DOCKER_PASS: ${{ secrets.docker_pass }}
+        run: .github/workflows/publish_image.sh

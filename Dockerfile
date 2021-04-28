@@ -1,17 +1,23 @@
-# syntax=docker/dockerfile:experimental
+# ============= Compilation Stage ================
+FROM golang:1.15.5-alpine AS builder
+RUN apk add --no-cache bash git make gcc musl-dev linux-headers git ca-certificates
 
-ARG AVALANCHEGO_COMMIT
-FROM golang:1.15.5-buster
+WORKDIR /build
+# Copy and download dependencies using go mod
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
 
-ARG AVALANCHEGO_COMMIT
+# Copy the code into the container
+COPY . .
 
-RUN mkdir -p /go/src/github.com/ava-labs
-
-WORKDIR $GOPATH/src/github.com/ava-labs/
-COPY . avalanchego
-
-WORKDIR $GOPATH/src/github.com/ava-labs/avalanchego
-RUN export AVALANCHEGO_COMMIT=$AVALANCHEGO_COMMIT
+# Build avalanchego and plugins
 RUN ./scripts/build.sh
 
-RUN ln -sv $GOPATH/src/github.com/ava-labs/avalanchego/ /avalanchego
+# ============= Cleanup Stage ================
+FROM alpine:3.13 AS execution
+
+WORKDIR /run
+
+# Copy the executables into the container
+COPY --from=builder /build/build/ .

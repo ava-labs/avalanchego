@@ -4,14 +4,17 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Set GOPATH
-GOPATH="$(go env GOPATH)"
+# Directory above this script
+AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 
-AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory above this script
-BUILD_DIR=$AVALANCHE_PATH/build # Where binaries go
+# Load the versions
+source "$AVALANCHE_PATH"/scripts/versions.sh
 
-GIT_COMMIT=${AVALANCHEGO_COMMIT:-$( git rev-list -1 HEAD )}
+# Load the constants
+source "$AVALANCHE_PATH"/scripts/constants.sh
 
-# Build aVALANCHE
-echo "Building Avalanche..."
-go build -ldflags "-X main.GitCommit=$GIT_COMMIT" -o "$BUILD_DIR/avalanchego" "$AVALANCHE_PATH/main/"*.go
+git_commit=${AVALANCHEGO_COMMIT:-$( git rev-list -1 HEAD )}
+
+# Build AVALANCHE
+echo "Building Avalanche @ ${git_commit} ..."
+go build -ldflags "-X main.GitCommit=$git_commit" -o "$build_dir/avalanchego" "$AVALANCHE_PATH/main/"*.go
