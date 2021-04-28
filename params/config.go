@@ -717,6 +717,7 @@ func (c *ChainConfig) Rules(num *big.Int) Rules {
 		IsPetersburg:     c.IsPetersburg(num),
 		IsIstanbul:       c.IsIstanbul(num),
 		IsYoloV1:         c.IsYoloV1(num),
+		IsApricotPhase2:  c.IsApricotPhase2(num),
 	}
 }
 

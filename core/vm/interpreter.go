@@ -82,6 +82,14 @@ type Interpreter interface {
 	CanRun([]byte) bool
 }
 
+// ScopeContext contains the things that are per-call, such as stack and memory,
+// but not transients like pc and gas
+type ScopeContext struct {
+	Memory   *Memory
+	Stack    *Stack
+	Contract *Contract
+}
+
 // callCtx contains the things that are per-call, such as stack and memory,
 // but not transients like pc and gas
 type callCtx struct {
@@ -119,6 +127,8 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 	if cfg.JumpTable[STOP] == nil {
 		var jt JumpTable
 		switch {
+		case evm.chainRules.IsApricotPhase2:
+			jt = apricotPhase2InstructionSet
 		case evm.chainRules.IsApricotPhase1:
 			jt = apricotPhase1InstructionSet
 		case evm.chainRules.IsYoloV1:
