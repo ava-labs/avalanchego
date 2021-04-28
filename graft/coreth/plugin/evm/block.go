@@ -166,7 +166,7 @@ func (b *Block) syntacticVerify() (params.Rules, error) {
 	}
 
 	header := b.ethBlock.Header()
-	rules := b.vm.chainConfig.AvalancheRules(header.Number, big.NewInt(int64(header.Time)))
+	rules := b.vm.chainConfig.AvalancheRules(header.Number, new(big.Int).SetUint64(header.Time))
 	return rules, b.vm.getBlockValidator(rules).SyntacticVerify(b)
 }
 
