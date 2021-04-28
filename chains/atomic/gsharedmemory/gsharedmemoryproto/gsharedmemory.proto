@@ -13,6 +13,7 @@ message BatchDelete {
 message Batch {
     repeated BatchPut puts = 1;
     repeated BatchDelete deletes = 2;
+    int64 id = 3;
 }
 
 message Element {
@@ -25,6 +26,8 @@ message PutRequest {
     bytes peerChainID = 1;
     repeated Element elems = 2;
     repeated Batch batches = 3;
+    int64 id = 4;
+    bool continues = 5;
 }
 
 message PutResponse {}
@@ -56,6 +59,8 @@ message RemoveRequest {
     bytes peerChainID = 1;
     repeated bytes keys = 2;
     repeated Batch batches = 3;
+    int64 id = 4;
+    bool continues = 5;
 }
 
 message RemoveResponse {}
