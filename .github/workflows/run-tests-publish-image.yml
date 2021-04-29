@@ -42,7 +42,7 @@ jobs:
           KURTOSIS_CLIENT_SECRET: ${{ secrets.kurtosis_client_secret }}
           DOCKER_USERNAME: ${{ secrets.docker_username }}
           DOCKER_PASS: ${{ secrets.docker_pass }}
-        run: .github/workflows/run_e2e_tests.sh --parallelism=7 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
+        run: .github/workflows/run_e2e_tests.sh --parallelism 7 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
 
       - name: Publish image to DockerHub
         env:
