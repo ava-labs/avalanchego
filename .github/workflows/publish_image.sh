@@ -35,8 +35,8 @@ if [[ $current_branch == "dev" ]]; then
 fi
 
 if [[ $current_branch != "" ]]; then
-  echo "Tagging current avalanchego image as $dockerhub_repo:current_branch"
-  docker_image=$dockerhub_repo:current_branch
+  echo "Tagging current avalanchego image as $dockerhub_repo:$current_branch"
+  docker_image=$dockerhub_repo:$current_branch
 fi
 
 echo "Pushing: $docker_image"
