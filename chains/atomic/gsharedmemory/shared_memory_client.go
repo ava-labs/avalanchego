@@ -41,23 +41,33 @@ func NewClient(client gsharedmemoryproto.SharedMemoryClient) *Client {
 func (c *Client) Put(peerChainID ids.ID, elems []*atomic.Element, rawBatches ...database.Batch) error {
 	req := gsharedmemoryproto.PutRequest{
 		PeerChainID: peerChainID[:],
-		Elems:       make([]*gsharedmemoryproto.Element, len(elems)),
+		Elems:       make([]*gsharedmemoryproto.Element, 0, len(elems)),
 		Id:          stdatomic.AddInt64(&c.uniqueID, 1),
 		Continues:   true,
 	}
 
 	currentSize := 0
-	for i, elem := range elems {
-		currentSize += baseElementSize + len(elem.Key) + len(elem.Value)
+	for _, elem := range elems {
+		sizeChange := baseElementSize + len(elem.Key) + len(elem.Value)
 		for _, trait := range elem.Traits {
-			currentSize += len(trait)
+			sizeChange += len(trait)
 		}
 
-		req.Elems[i] = &gsharedmemoryproto.Element{
+		if newSize := currentSize + sizeChange; newSize > maxBatchSize {
+			if _, err := c.client.Put(context.Background(), &req); err != nil {
+				return err
+			}
+			currentSize = 0
+			req.PeerChainID = nil
+			req.Elems = req.Elems[:0]
+		}
+		currentSize += sizeChange
+
+		req.Elems = append(req.Elems, &gsharedmemoryproto.Element{
 			Key:    elem.Key,
 			Value:  elem.Value,
 			Traits: elem.Traits,
-		}
+		})
 	}
 
 	batchGroups, err := c.makeBatches(rawBatches, currentSize)
@@ -83,15 +93,50 @@ func (c *Client) Put(peerChainID ids.ID, elems []*atomic.Element, rawBatches ...
 	return nil
 }
 
-func (c *Client) Get(peerChainID ids.ID, keys [][]byte) (values [][]byte, err error) {
-	resp, err := c.client.Get(context.Background(), &gsharedmemoryproto.GetRequest{
+func (c *Client) Get(peerChainID ids.ID, keys [][]byte) ([][]byte, error) {
+	req := &gsharedmemoryproto.GetRequest{
 		PeerChainID: peerChainID[:],
-		Keys:        keys,
-	})
+		Id:          stdatomic.AddInt64(&c.uniqueID, 1),
+		Continues:   true,
+	}
+
+	currentSize := 0
+	prevIndex := 0
+	for i, key := range keys {
+		sizeChange := baseElementSize + len(key)
+		if newSize := currentSize + sizeChange; newSize > maxBatchSize {
+			_, err := c.client.Get(context.Background(), req)
+			if err != nil {
+				return nil, err
+			}
+
+			currentSize = 0
+			prevIndex = i
+			req.PeerChainID = nil
+		}
+		currentSize += sizeChange
+
+		req.Keys = keys[prevIndex : i+1]
+	}
+
+	req.Continues = false
+	resp, err := c.client.Get(context.Background(), req)
 	if err != nil {
 		return nil, err
 	}
-	return resp.Values, nil
+
+	values := resp.Values
+
+	req.PeerChainID = nil
+	req.Keys = nil
+	for resp.Continues {
+		resp, err = c.client.Get(context.Background(), req)
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, resp.Values...)
+	}
+	return values, nil
 }
 
 func (c *Client) Indexed(
@@ -101,35 +146,89 @@ func (c *Client) Indexed(
 	startKey []byte,
 	limit int,
 ) (
-	values [][]byte,
-	lastTrait,
-	lastKey []byte,
-	err error,
+	[][]byte,
+	[]byte,
+	[]byte,
+	error,
 ) {
-	resp, err := c.client.Indexed(context.Background(), &gsharedmemoryproto.IndexedRequest{
+	req := &gsharedmemoryproto.IndexedRequest{
 		PeerChainID: peerChainID[:],
-		Traits:      traits,
 		StartTrait:  startTrait,
 		StartKey:    startKey,
 		Limit:       int32(limit),
-	})
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	return resp.Values, resp.LastTrait, resp.LastKey, nil
-}
-
-func (c *Client) Remove(peerChainID ids.ID, keys [][]byte, rawBatches ...database.Batch) error {
-	req := gsharedmemoryproto.RemoveRequest{
-		PeerChainID: peerChainID[:],
-		Keys:        keys,
 		Id:          stdatomic.AddInt64(&c.uniqueID, 1),
 		Continues:   true,
 	}
 
 	currentSize := 0
-	for _, key := range keys {
-		currentSize += baseElementSize + len(key)
+	prevIndex := 0
+	for i, trait := range traits {
+		sizeChange := baseElementSize + len(trait)
+		if newSize := currentSize + sizeChange; newSize > maxBatchSize {
+			_, err := c.client.Indexed(context.Background(), req)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+
+			currentSize = 0
+			prevIndex = i
+			req.PeerChainID = nil
+			req.StartTrait = nil
+			req.StartKey = nil
+			req.Limit = 0
+		}
+		currentSize += sizeChange
+
+		req.Traits = traits[prevIndex : i+1]
+	}
+
+	req.Continues = false
+	resp, err := c.client.Indexed(context.Background(), req)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	lastTrait := resp.LastTrait
+	lastKey := resp.LastKey
+	values := resp.Values
+
+	req.PeerChainID = nil
+	req.Traits = nil
+	req.StartTrait = nil
+	req.StartKey = nil
+	req.Limit = 0
+	for resp.Continues {
+		resp, err = c.client.Indexed(context.Background(), req)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		values = append(values, resp.Values...)
+	}
+	return values, lastTrait, lastKey, nil
+}
+
+func (c *Client) Remove(peerChainID ids.ID, keys [][]byte, rawBatches ...database.Batch) error {
+	req := gsharedmemoryproto.RemoveRequest{
+		PeerChainID: peerChainID[:],
+		Id:          stdatomic.AddInt64(&c.uniqueID, 1),
+		Continues:   true,
+	}
+
+	currentSize := 0
+	prevIndex := 0
+	for i, key := range keys {
+		sizeChange := baseElementSize + len(key)
+		if newSize := currentSize + sizeChange; newSize > maxBatchSize {
+			if _, err := c.client.Remove(context.Background(), &req); err != nil {
+				return err
+			}
+
+			currentSize = 0
+			prevIndex = i
+			req.PeerChainID = nil
+		}
+		currentSize += sizeChange
+
+		req.Keys = keys[prevIndex : i+1]
 	}
 
 	batchGroups, err := c.makeBatches(rawBatches, currentSize)
@@ -220,51 +319,8 @@ func (c *Client) makeBatches(rawBatches []database.Batch, currentSize int) ([][]
 			Id: stdatomic.AddInt64(&c.uniqueID, 1),
 		}
 	}
-	if len(currentBatch.Deletes)+len(currentBatch.Puts) > 0 {
-		currentBatchGroup = append(currentBatchGroup, currentBatch)
-	}
 	if len(currentBatchGroup) > 0 {
 		batchGroups = append(batchGroups, currentBatchGroup)
 	}
 	return batchGroups, nil
-}
-
-type filteredBatch struct {
-	writes  map[string][]byte
-	deletes map[string]struct{}
-}
-
-func (b *filteredBatch) Put(key []byte, value []byte) error {
-	keyStr := string(key)
-	delete(b.deletes, keyStr)
-	b.writes[keyStr] = value
-	return nil
-}
-
-func (b *filteredBatch) Delete(key []byte) error {
-	keyStr := string(key)
-	delete(b.writes, keyStr)
-	b.deletes[keyStr] = struct{}{}
-	return nil
-}
-
-func (b *filteredBatch) PutRequests() []*gsharedmemoryproto.BatchPut {
-	reqs := make([]*gsharedmemoryproto.BatchPut, 0, len(b.writes))
-	for keyStr, value := range b.writes {
-		reqs = append(reqs, &gsharedmemoryproto.BatchPut{
-			Key:   []byte(keyStr),
-			Value: value,
-		})
-	}
-	return reqs
-}
-
-func (b *filteredBatch) DeleteRequests() []*gsharedmemoryproto.BatchDelete {
-	reqs := make([]*gsharedmemoryproto.BatchDelete, 0, len(b.deletes))
-	for keyStr := range b.deletes {
-		reqs = append(reqs, &gsharedmemoryproto.BatchDelete{
-			Key: []byte(keyStr),
-		})
-	}
-	return reqs
 }

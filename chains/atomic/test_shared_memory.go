@@ -4,7 +4,7 @@
 package atomic
 
 import (
-	"crypto/rand"
+	"math/rand"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -15,12 +15,14 @@ import (
 // SharedMemoryTests is a list of all shared memory tests
 var SharedMemoryTests = []func(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, db database.Database){
 	TestSharedMemoryPutAndGet,
+	TestSharedMemoryLargePutGetAndRemove,
 	TestSharedMemoryIndexed,
+	TestSharedMemoryLargeIndexed,
 	TestSharedMemoryCantDuplicatePut,
 	TestSharedMemoryCantDuplicateRemove,
 	TestSharedMemoryCommitOnPut,
 	TestSharedMemoryCommitOnRemove,
-	TestSharedMemoryLargeSize,
+	TestSharedMemoryLargeBatchSize,
 }
 
 func TestSharedMemoryPutAndGet(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database) {
@@ -35,6 +37,58 @@ func TestSharedMemoryPutAndGet(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1
 	values, err := sm1.Get(chainID0, [][]byte{{0}})
 	assert.NoError(err)
 	assert.Equal([][]byte{{1}}, values, "wrong values returned")
+}
+
+// TestSharedMemoryLargePutGetAndRemove tests to make sure that the interface
+// can support large values.
+func TestSharedMemoryLargePutGetAndRemove(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database) {
+	assert := assert.New(t)
+	rand.Seed(0)
+
+	totalSize := 16 * 1024 * 1024 // 16 MiB
+	elementSize := 4 * 1024       // 4 KiB
+	pairSize := 2 * elementSize   // 8 KiB
+
+	b := make([]byte, totalSize)
+	_, err := rand.Read(b) // #nosec G404
+	assert.NoError(err)
+
+	elems := []*Element{}
+	keys := [][]byte{}
+	for len(b) > pairSize {
+		key := b[:elementSize]
+		b = b[elementSize:]
+
+		value := b[:elementSize]
+		b = b[elementSize:]
+
+		elems = append(elems, &Element{
+			Key:   key,
+			Value: value,
+		})
+		keys = append(keys, key)
+	}
+
+	err = sm0.Put(
+		chainID1,
+		elems,
+	)
+	assert.NoError(err)
+
+	values, err := sm1.Get(
+		chainID0,
+		keys,
+	)
+	assert.NoError(err)
+	for i, value := range values {
+		assert.Equal(elems[i].Value, value)
+	}
+
+	err = sm1.Remove(
+		chainID0,
+		keys,
+	)
+	assert.NoError(err)
 }
 
 func TestSharedMemoryIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database) {
@@ -87,6 +141,47 @@ func TestSharedMemoryIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 S
 	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{2}, {3}}, nil, nil, 3)
 	assert.NoError(err)
 	assert.Equal([][]byte{{1}, {5}}, values, "wrong indexed values returned")
+}
+
+func TestSharedMemoryLargeIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database) {
+	assert := assert.New(t)
+
+	totalSize := 8 * 1024 * 1024 // 8 MiB
+	elementSize := 1024          // 1 KiB
+	pairSize := 3 * elementSize  // 3 KiB
+
+	b := make([]byte, totalSize)
+	_, err := rand.Read(b) // #nosec G404
+	assert.NoError(err)
+
+	elems := []*Element{}
+	allTraits := [][]byte{}
+	for len(b) > pairSize {
+		key := b[:elementSize]
+		b = b[elementSize:]
+
+		value := b[:elementSize]
+		b = b[elementSize:]
+
+		traits := [][]byte{
+			b[:elementSize],
+		}
+		allTraits = append(allTraits, traits...)
+		b = b[elementSize:]
+
+		elems = append(elems, &Element{
+			Key:    key,
+			Value:  value,
+			Traits: traits,
+		})
+	}
+
+	err = sm0.Put(chainID1, elems)
+	assert.NoError(err)
+
+	values, _, _, err := sm1.Indexed(chainID0, allTraits, nil, nil, len(elems)+1)
+	assert.NoError(err)
+	assert.Len(values, len(elems), "wrong number of values returned")
 }
 
 func TestSharedMemoryCantDuplicatePut(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, _ database.Database) {
@@ -190,24 +285,24 @@ func TestSharedMemoryCommitOnRemove(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 	assert.False(has)
 }
 
-// TestSharedMemoryLargeSize tests to make sure that the interface can support
-// large batches.
-func TestSharedMemoryLargeSize(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, db database.Database) {
+// TestSharedMemoryLargeBatchSize tests to make sure that the interface can
+// support large batches.
+func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, db database.Database) {
 	assert := assert.New(t)
+	rand.Seed(0)
 
 	totalSize := 8 * 1024 * 1024 // 8 MiB
 	elementSize := 4 * 1024      // 4 KiB
 	pairSize := 2 * elementSize  // 8 KiB
 
 	bytes := make([]byte, totalSize)
-	_, err := rand.Read(bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	_, err := rand.Read(bytes) // #nosec G404
+	assert.NoError(err)
 
 	batch := db.NewBatch()
 	assert.NotNil(batch)
 
+	initialBytes := bytes
 	for len(bytes) > pairSize {
 		key := bytes[:elementSize]
 		bytes = bytes[elementSize:]
@@ -242,4 +337,22 @@ func TestSharedMemoryLargeSize(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMe
 	has, err := db.Has([]byte{1})
 	assert.NoError(err)
 	assert.False(has)
+
+	batch.Reset()
+
+	bytes = initialBytes
+	for len(bytes) > pairSize {
+		key := bytes[:elementSize]
+		bytes = bytes[pairSize:]
+
+		err := batch.Delete(key)
+		assert.NoError(err)
+	}
+
+	err = sm0.Remove(
+		chainID1,
+		[][]byte{{1}},
+		batch,
+	)
+	assert.NoError(err)
 }

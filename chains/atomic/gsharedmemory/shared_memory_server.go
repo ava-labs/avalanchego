@@ -25,6 +25,12 @@ type Server struct {
 	putsLock sync.Mutex
 	puts     map[int64]*putRequest
 
+	getsLock sync.Mutex
+	gets     map[int64]*getRequest
+
+	indexedLock sync.Mutex
+	indexed     map[int64]*indexedRequest
+
 	removesLock sync.Mutex
 	removes     map[int64]*removeRequest
 }
@@ -35,6 +41,8 @@ func NewServer(sm atomic.SharedMemory, db database.Database) *Server {
 		sm:      sm,
 		db:      db,
 		puts:    make(map[int64]*putRequest),
+		gets:    make(map[int64]*getRequest),
+		indexed: make(map[int64]*indexedRequest),
 		removes: make(map[int64]*removeRequest),
 	}
 }
@@ -61,19 +69,21 @@ func (s *Server) Put(
 
 		put = &putRequest{
 			peerChainID: peerChainID,
-			elems:       make([]*atomic.Element, len(req.Elems)),
+			elems:       make([]*atomic.Element, 0, len(req.Elems)),
 			batches:     make(map[int64]database.Batch),
-		}
-		for i, elem := range req.Elems {
-			put.elems[i] = &atomic.Element{
-				Key:    elem.Key,
-				Value:  elem.Value,
-				Traits: elem.Traits,
-			}
 		}
 	}
 
+	for _, elem := range req.Elems {
+		put.elems = append(put.elems, &atomic.Element{
+			Key:    elem.Key,
+			Value:  elem.Value,
+			Traits: elem.Traits,
+		})
+	}
+
 	if err := s.parseBatches(put.batches, req.Batches); err != nil {
+		delete(s.puts, req.Id)
 		return nil, err
 	}
 
@@ -93,42 +103,166 @@ func (s *Server) Put(
 	return &gsharedmemoryproto.PutResponse{}, s.sm.Put(put.peerChainID, put.elems, batches...)
 }
 
+type getRequest struct {
+	peerChainID ids.ID
+	keys        [][]byte
+
+	executed        bool
+	remainingValues [][]byte
+}
+
 func (s *Server) Get(
 	_ context.Context,
 	req *gsharedmemoryproto.GetRequest,
 ) (*gsharedmemoryproto.GetResponse, error) {
-	peerChainID, err := ids.ToID(req.PeerChainID)
-	if err != nil {
-		return nil, err
+	s.getsLock.Lock()
+	defer s.getsLock.Unlock()
+
+	get, exists := s.gets[req.Id]
+	if !exists {
+		peerChainID, err := ids.ToID(req.PeerChainID)
+		if err != nil {
+			return nil, err
+		}
+
+		get = &getRequest{
+			peerChainID: peerChainID,
+			keys:        make([][]byte, 0, len(req.Keys)),
+		}
 	}
 
-	values, err := s.sm.Get(peerChainID, req.Keys)
-	return &gsharedmemoryproto.GetResponse{
-		Values: values,
-	}, err
+	get.keys = append(get.keys, req.Keys...)
+
+	if req.Continues {
+		s.gets[req.Id] = get
+		return &gsharedmemoryproto.GetResponse{}, nil
+	}
+
+	if !get.executed {
+		values, err := s.sm.Get(get.peerChainID, get.keys)
+		if err != nil {
+			delete(s.gets, req.Id)
+			return nil, err
+		}
+
+		get.executed = true
+		get.remainingValues = values
+	}
+
+	currentSize := 0
+	resp := &gsharedmemoryproto.GetResponse{
+		Values: make([][]byte, 0, len(get.remainingValues)),
+	}
+	for i, value := range get.remainingValues {
+		sizeChange := baseElementSize + len(value)
+		if newSize := currentSize + sizeChange; newSize > maxBatchSize && i > 0 {
+			break
+		}
+		currentSize += sizeChange
+
+		resp.Values = append(resp.Values, value)
+	}
+
+	get.remainingValues = get.remainingValues[len(resp.Values):]
+	resp.Continues = len(get.remainingValues) > 0
+
+	if resp.Continues {
+		s.gets[req.Id] = get
+	} else {
+		delete(s.gets, req.Id)
+	}
+	return resp, nil
+}
+
+type indexedRequest struct {
+	peerChainID ids.ID
+	traits      [][]byte
+	startTrait  []byte
+	startKey    []byte
+	limit       int
+
+	executed        bool
+	remainingValues [][]byte
+	lastTrait       []byte
+	lastKey         []byte
 }
 
 func (s *Server) Indexed(
 	_ context.Context,
 	req *gsharedmemoryproto.IndexedRequest,
 ) (*gsharedmemoryproto.IndexedResponse, error) {
-	peerChainID, err := ids.ToID(req.PeerChainID)
-	if err != nil {
-		return nil, err
+	s.indexedLock.Lock()
+	defer s.indexedLock.Unlock()
+
+	indexed, exists := s.indexed[req.Id]
+	if !exists {
+		peerChainID, err := ids.ToID(req.PeerChainID)
+		if err != nil {
+			return nil, err
+		}
+
+		indexed = &indexedRequest{
+			peerChainID: peerChainID,
+			traits:      make([][]byte, 0, len(req.Traits)),
+			startTrait:  req.StartTrait,
+			startKey:    req.StartKey,
+			limit:       int(req.Limit),
+		}
 	}
 
-	values, lastTrait, lastKey, err := s.sm.Indexed(
-		peerChainID,
-		req.Traits,
-		req.StartTrait,
-		req.StartKey,
-		int(req.Limit),
-	)
-	return &gsharedmemoryproto.IndexedResponse{
-		Values:    values,
-		LastTrait: lastTrait,
-		LastKey:   lastKey,
-	}, err
+	indexed.traits = append(indexed.traits, req.Traits...)
+
+	if req.Continues {
+		s.indexed[req.Id] = indexed
+		return &gsharedmemoryproto.IndexedResponse{}, nil
+	}
+
+	if !indexed.executed {
+		values, lastTrait, lastKey, err := s.sm.Indexed(
+			indexed.peerChainID,
+			indexed.traits,
+			indexed.startTrait,
+			indexed.startKey,
+			indexed.limit,
+		)
+		if err != nil {
+			delete(s.indexed, req.Id)
+			return nil, err
+		}
+
+		indexed.executed = true
+		indexed.remainingValues = values
+		indexed.lastTrait = lastTrait
+		indexed.lastKey = lastKey
+	}
+
+	currentSize := 0
+	resp := &gsharedmemoryproto.IndexedResponse{
+		Values:    make([][]byte, 0, len(indexed.remainingValues)),
+		LastTrait: indexed.lastTrait,
+		LastKey:   indexed.lastKey,
+	}
+	for i, value := range indexed.remainingValues {
+		sizeChange := baseElementSize + len(value)
+		if newSize := currentSize + sizeChange; newSize > maxBatchSize && i > 0 {
+			break
+		}
+		currentSize += sizeChange
+
+		resp.Values = append(resp.Values, value)
+	}
+
+	indexed.remainingValues = indexed.remainingValues[len(resp.Values):]
+	resp.Continues = len(indexed.remainingValues) > 0
+
+	if resp.Continues {
+		indexed.lastTrait = nil
+		indexed.lastKey = nil
+		s.indexed[req.Id] = indexed
+	} else {
+		delete(s.indexed, req.Id)
+	}
+	return resp, nil
 }
 
 type removeRequest struct {
@@ -153,12 +287,13 @@ func (s *Server) Remove(
 
 		remove = &removeRequest{
 			peerChainID: peerChainID,
-			keys:        req.Keys,
 			batches:     make(map[int64]database.Batch),
 		}
 	}
 
+	remove.keys = append(remove.keys, req.Keys...)
 	if err := s.parseBatches(remove.batches, req.Batches); err != nil {
+		delete(s.removes, req.Id)
 		return nil, err
 	}
 

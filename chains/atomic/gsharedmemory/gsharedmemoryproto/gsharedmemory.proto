@@ -35,10 +35,13 @@ message PutResponse {}
 message GetRequest {
     bytes peerChainID = 1;
     repeated bytes keys = 2;
+    int64 id = 3;
+    bool continues = 4;
 }
 
 message GetResponse {
     repeated bytes values = 1;
+    bool continues = 2;
 }
 
 message IndexedRequest {
@@ -47,12 +50,15 @@ message IndexedRequest {
     bytes startTrait = 3;
     bytes startKey = 4;
     int32 limit = 5;
+    int64 id = 6;
+    bool continues = 7;
 }
 
 message IndexedResponse {
     repeated bytes values = 1;
     bytes lastTrait = 2;
     bytes lastKey = 3;
+    bool continues = 4;
 }
 
 message RemoveRequest {
