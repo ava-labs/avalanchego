@@ -23,6 +23,10 @@ const (
 	baseElementSize = 8 // bytes
 )
 
+var (
+	_ database.Database = &DatabaseClient{}
+)
+
 // DatabaseClient is an implementation of database that talks over RPC.
 type DatabaseClient struct {
 	client rpcdbproto.DatabaseClient
@@ -172,10 +176,8 @@ func (b *batch) Delete(key []byte) error {
 func (b *batch) Size() int { return b.size }
 
 func (b *batch) Write() error {
-	id := atomic.AddInt64(&b.db.batchIndex, 1)
-
 	request := &rpcdbproto.WriteBatchRequest{
-		Id:        id,
+		Id:        atomic.AddInt64(&b.db.batchIndex, 1),
 		Continues: true,
 	}
 	currentSize := 0
