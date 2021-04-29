@@ -114,7 +114,7 @@ type Trie interface {
 
 // NewDatabase creates a backing store for state. The returned database is safe for
 // concurrent use, but does not retain any recent trie nodes in memory. To keep some
-// historical state in memory, use the NewDatabaseWithCache constructor.
+// historical state in memory, use the NewDatabaseWithConfig constructor.
 func NewDatabase(db ethdb.Database) Database {
 	return NewDatabaseWithConfig(db, nil)
 }
