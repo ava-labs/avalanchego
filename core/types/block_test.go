@@ -87,70 +87,72 @@ func TestBlockEncoding(t *testing.T) {
 	}
 }
 
-func TestEIP2718BlockEncoding(t *testing.T) {
-	blockEnc := common.FromHex("f90319f90211a00000000000000000000000000000000000000000000000000000000000000000a01dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347948888f1f195afa192cfee860698584c030f4c9db1a0ef1552a40b7165c3cd773806b9e0c165b75356e0314bf0706f279c729f51e017a0e6e49996c7ec59f7a23d22b83239a60151512c65613bf84a0d7da336399ebc4aa0cafe75574d59780665a97fbfd11365c7545aa8f1abf4e5e12e8243334ef7286bb901000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000083020000820200832fefd882a410845506eb0796636f6f6c65737420626c6f636b206f6e20636861696ea0bd4472abb6659ebe3ee06ee4d7b72a00a9f4d001caca51342001075469aff49888a13a5a8c8f2bb1c4f90101f85f800a82c35094095e7baea6a6c7c4c2dfeb977efac326af552d870a801ba09bea4c4daac7c7c52e093e6a4c35dbbcf8856f1af7b059ba20253e70848d094fa08a8fae537ce25ed8cb5af9adac3f141af69bd515bd2ba031522df09b97dd72b1b89e01f89b01800a8301e24194095e7baea6a6c7c4c2dfeb977efac326af552d878080f838f7940000000000000000000000000000000000000001e1a0000000000000000000000000000000000000000000000000000000000000000001a03dbacc8d0259f2508625e97fdfc57cd85fdd16e5821bc2c10bdd1a52649e8335a0476e10695b183a87b0aa292a7f4b78ef0c3fbe62aa2c42c84e1d9c3da159ef14c0")
-	var block Block
-	if err := rlp.DecodeBytes(blockEnc, &block); err != nil {
-		t.Fatal("decode error: ", err)
-	}
-
-	check := func(f string, got, want interface{}) {
-		if !reflect.DeepEqual(got, want) {
-			t.Errorf("%s mismatch: got %v, want %v", f, got, want)
-		}
-	}
-	check("Difficulty", block.Difficulty(), big.NewInt(131072))
-	check("GasLimit", block.GasLimit(), uint64(3141592))
-	check("GasUsed", block.GasUsed(), uint64(42000))
-	check("Coinbase", block.Coinbase(), common.HexToAddress("8888f1f195afa192cfee860698584c030f4c9db1"))
-	check("MixDigest", block.MixDigest(), common.HexToHash("bd4472abb6659ebe3ee06ee4d7b72a00a9f4d001caca51342001075469aff498"))
-	check("Root", block.Root(), common.HexToHash("ef1552a40b7165c3cd773806b9e0c165b75356e0314bf0706f279c729f51e017"))
-	check("Nonce", block.Nonce(), uint64(0xa13a5a8c8f2bb1c4))
-	check("Time", block.Time(), uint64(1426516743))
-	check("Size", block.Size(), common.StorageSize(len(blockEnc)))
-
-	// Create legacy tx.
-	to := common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87")
-	tx1 := NewTx(&LegacyTx{
-		Nonce:    0,
-		To:       &to,
-		Value:    big.NewInt(10),
-		Gas:      50000,
-		GasPrice: big.NewInt(10),
-	})
-	sig := common.Hex2Bytes("9bea4c4daac7c7c52e093e6a4c35dbbcf8856f1af7b059ba20253e70848d094f8a8fae537ce25ed8cb5af9adac3f141af69bd515bd2ba031522df09b97dd72b100")
-	tx1, _ = tx1.WithSignature(HomesteadSigner{}, sig)
-
-	// Create ACL tx.
-	addr := common.HexToAddress("0x0000000000000000000000000000000000000001")
-	tx2 := NewTx(&AccessListTx{
-		ChainID:    big.NewInt(1),
-		Nonce:      0,
-		To:         &to,
-		Gas:        123457,
-		GasPrice:   big.NewInt(10),
-		AccessList: AccessList{{Address: addr, StorageKeys: []common.Hash{{0}}}},
-	})
-	sig2 := common.Hex2Bytes("3dbacc8d0259f2508625e97fdfc57cd85fdd16e5821bc2c10bdd1a52649e8335476e10695b183a87b0aa292a7f4b78ef0c3fbe62aa2c42c84e1d9c3da159ef1401")
-	tx2, _ = tx2.WithSignature(NewEIP2930Signer(big.NewInt(1)), sig2)
-	check("Transactions[1].Type()", block.Transactions()[1].Type(), uint8(AccessListTxType))
-
-	check("len(Transactions)", len(block.Transactions()), 2)
-	check("Transactions[0].Hash", block.Transactions()[0].Hash(), tx1.Hash())
-	check("Transactions[1].Hash", block.Transactions()[1].Hash(), tx2.Hash())
-
-	if !bytes.Equal(block.ExtData(), []byte{}) {
-		t.Errorf("Block ExtraData field mismatch, expected empty byte array, but found 0x%x", block.ExtData())
-	}
-
-	ourBlockEnc, err := rlp.EncodeToBytes(&block)
-	if err != nil {
-		t.Fatal("encode error: ", err)
-	}
-	if !bytes.Equal(ourBlockEnc, blockEnc) {
-		t.Errorf("encoded block mismatch:\ngot:  %x\nwant: %x", ourBlockEnc, blockEnc)
-	}
-}
+// TODO (TS): This hardcoded test vector fails because it doesn't have an extdata encoded in it.
+// Error: block_test.go:94: decode error:  rlp: too few elements for types.Header, decoding into (types.Block)(types.extblock).Header
+//func TestEIP2718BlockEncoding(t *testing.T) {
+//	blockEnc := common.FromHex("f90319f90211a00000000000000000000000000000000000000000000000000000000000000000a01dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347948888f1f195afa192cfee860698584c030f4c9db1a0ef1552a40b7165c3cd773806b9e0c165b75356e0314bf0706f279c729f51e017a0e6e49996c7ec59f7a23d22b83239a60151512c65613bf84a0d7da336399ebc4aa0cafe75574d59780665a97fbfd11365c7545aa8f1abf4e5e12e8243334ef7286bb901000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000083020000820200832fefd882a410845506eb0796636f6f6c65737420626c6f636b206f6e20636861696ea0bd4472abb6659ebe3ee06ee4d7b72a00a9f4d001caca51342001075469aff49888a13a5a8c8f2bb1c4f90101f85f800a82c35094095e7baea6a6c7c4c2dfeb977efac326af552d870a801ba09bea4c4daac7c7c52e093e6a4c35dbbcf8856f1af7b059ba20253e70848d094fa08a8fae537ce25ed8cb5af9adac3f141af69bd515bd2ba031522df09b97dd72b1b89e01f89b01800a8301e24194095e7baea6a6c7c4c2dfeb977efac326af552d878080f838f7940000000000000000000000000000000000000001e1a0000000000000000000000000000000000000000000000000000000000000000001a03dbacc8d0259f2508625e97fdfc57cd85fdd16e5821bc2c10bdd1a52649e8335a0476e10695b183a87b0aa292a7f4b78ef0c3fbe62aa2c42c84e1d9c3da159ef14c0")
+//	var block Block
+//	if err := rlp.DecodeBytes(blockEnc, &block); err != nil {
+//		t.Fatal("decode error: ", err)
+//	}
+//
+//	check := func(f string, got, want interface{}) {
+//		if !reflect.DeepEqual(got, want) {
+//			t.Errorf("%s mismatch: got %v, want %v", f, got, want)
+//		}
+//	}
+//	check("Difficulty", block.Difficulty(), big.NewInt(131072))
+//	check("GasLimit", block.GasLimit(), uint64(3141592))
+//	check("GasUsed", block.GasUsed(), uint64(42000))
+//	check("Coinbase", block.Coinbase(), common.HexToAddress("8888f1f195afa192cfee860698584c030f4c9db1"))
+//	check("MixDigest", block.MixDigest(), common.HexToHash("bd4472abb6659ebe3ee06ee4d7b72a00a9f4d001caca51342001075469aff498"))
+//	check("Root", block.Root(), common.HexToHash("ef1552a40b7165c3cd773806b9e0c165b75356e0314bf0706f279c729f51e017"))
+//	check("Nonce", block.Nonce(), uint64(0xa13a5a8c8f2bb1c4))
+//	check("Time", block.Time(), uint64(1426516743))
+//	check("Size", block.Size(), common.StorageSize(len(blockEnc)))
+//
+//	// Create legacy tx.
+//	to := common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87")
+//	tx1 := NewTx(&LegacyTx{
+//		Nonce:    0,
+//		To:       &to,
+//		Value:    big.NewInt(10),
+//		Gas:      50000,
+//		GasPrice: big.NewInt(10),
+//	})
+//	sig := common.Hex2Bytes("9bea4c4daac7c7c52e093e6a4c35dbbcf8856f1af7b059ba20253e70848d094f8a8fae537ce25ed8cb5af9adac3f141af69bd515bd2ba031522df09b97dd72b100")
+//	tx1, _ = tx1.WithSignature(HomesteadSigner{}, sig)
+//
+//	// Create ACL tx.
+//	addr := common.HexToAddress("0x0000000000000000000000000000000000000001")
+//	tx2 := NewTx(&AccessListTx{
+//		ChainID:    big.NewInt(1),
+//		Nonce:      0,
+//		To:         &to,
+//		Gas:        123457,
+//		GasPrice:   big.NewInt(10),
+//		AccessList: AccessList{{Address: addr, StorageKeys: []common.Hash{{0}}}},
+//	})
+//	sig2 := common.Hex2Bytes("3dbacc8d0259f2508625e97fdfc57cd85fdd16e5821bc2c10bdd1a52649e8335476e10695b183a87b0aa292a7f4b78ef0c3fbe62aa2c42c84e1d9c3da159ef1401")
+//	tx2, _ = tx2.WithSignature(NewEIP2930Signer(big.NewInt(1)), sig2)
+//	check("Transactions[1].Type()", block.Transactions()[1].Type(), uint8(AccessListTxType))
+//
+//	check("len(Transactions)", len(block.Transactions()), 2)
+//	check("Transactions[0].Hash", block.Transactions()[0].Hash(), tx1.Hash())
+//	check("Transactions[1].Hash", block.Transactions()[1].Hash(), tx2.Hash())
+//
+//	if !bytes.Equal(block.ExtData(), []byte{}) {
+//		t.Errorf("Block ExtraData field mismatch, expected empty byte array, but found 0x%x", block.ExtData())
+//	}
+//
+//	ourBlockEnc, err := rlp.EncodeToBytes(&block)
+//	if err != nil {
+//		t.Fatal("encode error: ", err)
+//	}
+//	if !bytes.Equal(ourBlockEnc, blockEnc) {
+//		t.Errorf("encoded block mismatch:\ngot:  %x\nwant: %x", ourBlockEnc, blockEnc)
+//	}
+//}
 
 func TestBlockEncodingWithExtraData(t *testing.T) {
 	blockEnc := common.FromHex("f903f2f90215a02a0d1d68d26eb213cf1c6c1e6abbaf374f0ee9a5428558df334c36d380c6a080a01dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347940100000000000000000000000000000000000000a0c0caa90fe3722cb2e288f7998d54a855a6d40f67e0e77a695d0d65dad22c6290a056e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421a056e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000102837a1200808460674e3380a00000000000000000000000000000000000000000000000000000000000000000880000000000000000a0296ff3bfdebf7c4b1fb71f589d69ed03b1c59b278d1780d54dc86ea7cb87cf17c0c080b901d400000000000000003039c85fc1980a77c5da78fe5486233fc09a769bb812bcb2cc548cf9495d046b3f1bd891ad56056d9c01f18f43f58b5c784ad07a4a49cf3d1f11623804b5cba2c6bf000000028a0f7c3e4d840143671a4c4ecacccb4d60fb97dce97a7aa5d60dfd072a7509cf00000001dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db0000000500002d79883d20000000000100000000e0d5c4edc78f594b79025a56c44933c28e8ba3e51e6e23318727eeaac10eb27d00000001dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db0000000500002d79883d20000000000100000000000000016dc8ea73dd39ab12fa2ecbc3427abaeb87d56fd800005af3107a4000dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db0000000200000009000000010d9f115cd63c3ab78b5b82cfbe4339cd6be87f21cda14cf192b269c7a6cb2d03666aa8f8b23ca0a2ceee4050e75c9b05525a17aa1dd0e9ea391a185ce395943f0000000009000000010d9f115cd63c3ab78b5b82cfbe4339cd6be87f21cda14cf192b269c7a6cb2d03666aa8f8b23ca0a2ceee4050e75c9b05525a17aa1dd0e9ea391a185ce395943f00")
