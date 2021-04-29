@@ -66,7 +66,7 @@ type AccessListTx struct {
 }
 
 // copy creates a deep copy of the transaction data and initializes all fields.
-func (tx *AccessListTx) copy() *AccessListTx {
+func (tx *AccessListTx) copy() TxData {
 	cpy := &AccessListTx{
 		Nonce: tx.Nonce,
 		To:    tx.To, // TODO: copy pointed-to address
