@@ -2,8 +2,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-echo "derp -> $@"
-
 # Testing specific variables
 avalanche_testing_repo="avaplatform/avalanche-testing"
 
@@ -15,7 +13,7 @@ avalanche_testing_image="avaplatform/avalanche-testing:kurtosis_upgrade"
 # Fetch the images
 # If Docker Credentials are not available fail
 if [[ -z ${DOCKER_USERNAME} ]]; then
-    echo "Skipping Byzantine Tests because Docker Credentials were not present."
+    echo "Skipping Tests because Docker Credentials were not present."
     exit 1
 fi
 
@@ -27,6 +25,9 @@ source "$AVALANCHE_PATH"/scripts/versions.sh
 
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
+
+# Login to docker
+echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
 
 # Checks available docker tags exist
 function docker_tag_exists() {
