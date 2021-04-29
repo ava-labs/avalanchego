@@ -7,6 +7,7 @@ avalanche_testing_repo="avaplatform/avalanche-testing"
 
 # Define avalanche byzantine version to use
 avalanchego_byzantine_version=${AVALANCHEGO_BYZANTINE_VERSION:-'v0.2.1'}
+avalanchego_byzantine_image="avaplatform/avalanche-byzantine:$avalanche_avalanchego_byzantine_version"
 
 # Define avalanche testing version to use
 avalanche_testing_image="avaplatform/avalanche-testing:master"
@@ -49,7 +50,7 @@ echo "Using $avalanche_testing_image for e2e tests"
 
 # pulling the avalanche-testing image
 docker pull $avalanche_testing_image
-docker pull $avalanchego_byzantine_version
+docker pull $avalanchego_byzantine_image
 
 # Setting the build ID
 git_commit_id=$( git rev-list -1 HEAD )
@@ -63,7 +64,7 @@ avalanche_image="avaplatform/avalanchego:$current_branch"
 echo "Running Avalanche Image: ${avalanche_image}"
 echo "Running Avalanche Image Tag: $current_branch"
 echo "Running Avalanche Testing Image: ${avalanche_testing_image}"
-echo "Running Avalanche Byzantine Image: ${avalanchego_byzantine_version}"
+echo "Running Avalanche Byzantine Image: ${avalanchego_byzantine_image}"
 echo "Git Commit ID : ${git_commit_id}"
 
 
@@ -71,7 +72,7 @@ echo "Git Commit ID : ${git_commit_id}"
 custom_params_json="{
     \"isKurtosisCoreDevMode\": false,
     \"avalanchegoImage\":\"${avalanche_image}\",
-    \"avalanchegoByzantineImage\":\"${avalanchego_byzantine_version}\"
+    \"avalanchegoByzantineImage\":\"${avalanchego_byzantine_image}\"
 }"
 # >>>>>>>> avalanche-testing custom parameters <<<<<<<<<<<<<
 
